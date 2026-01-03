@@ -239,10 +239,12 @@ This document tracks all systems to build and open assumptions requiring resolut
 
 | Decision | Options | Recommendation | Status |
 |----------|---------|----------------|--------|
-| CRDT library | loro-crdt + @loro-extended vs Yjs + y-webrtc | **loro-extended** (spike confirmed it works) | DECIDED |
-| MCP server in mesh? | Yes (needs WebRTC polyfills) vs No (browser-only sync) | **WebSocket for MCP↔browser** (no polyfills, spike confirmed) | DECIDED |
+| CRDT library | loro-crdt + @loro-extended vs Yjs + BlockNote | **Yjs + BlockNote** (ADR-0001) | DECIDED |
+| Block editor | Custom vs BlockNote vs BlockSuite | **BlockNote** (built-in comments, Yjs-native) | DECIDED |
+| MCP server sync | WebRTC vs WebSocket | **y-websocket** (no polyfills needed) | DECIDED |
 | Private repo support | Require PAT auth vs Public repos only | Start with public, add PAT later | OPEN |
-| UI framework | React vs Svelte vs vanilla | React (loro-extended has `@loro-extended/react` hooks) | DECIDED |
+| UI framework | React | BlockNote is React-native | DECIDED |
+| Logging | pino vs winston vs consola | **pino** (stderr-safe, aligns with standards) | DECIDED |
 
 ---
 

@@ -55,8 +55,8 @@
           "options": {
             "patterns": [
               {
-                "group": ["../**"],
-                "message": "Cross-package imports must use workspace protocol (@peer-plan/...). Relative imports within the same package are fine."
+                "group": ["../../**"],
+                "message": "Cross-package imports must use workspace protocol (@peer-plan/...). Use import from '@peer-plan/package-name' instead."
               }
             ]
           }

@@ -4,10 +4,22 @@
   "type": "module",
   "description": "Shared types and schemas for peer-plan",
   "exports": {
-    ".": "./dist/index.js",
-    "./plan": "./dist/plan.js",
-    "./url": "./dist/url-encoding.js",
-    "./yjs": "./dist/yjs-helpers.js"
+    ".": {
+      "import": "./dist/index.mjs",
+      "types": "./dist/index.d.mts"
+    },
+    "./plan": {
+      "import": "./dist/plan.mjs",
+      "types": "./dist/plan.d.mts"
+    },
+    "./url": {
+      "import": "./dist/url-encoding.mjs",
+      "types": "./dist/url-encoding.d.mts"
+    },
+    "./yjs": {
+      "import": "./dist/yjs-helpers.mjs",
+      "types": "./dist/yjs-helpers.d.mts"
+    }
   },
   "scripts": {
     "build": "tsdown",

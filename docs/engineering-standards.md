@@ -288,6 +288,7 @@ This project uses a specialized stack for P2P collaborative editing. It follows 
 | Comments | BlockNote native | Built-in | YjsThreadStore for annotations |
 | URL Encoding | lz-string | 1.5.0 | URL-safe compression (40-60% reduction) |
 | MCP Server | @modelcontextprotocol/sdk | Latest | Agent integration |
+| Logging | pino + pino-pretty | 10.1.0 | Structured logs, stderr-safe for MCP |
 
 ## UI Stack
 
@@ -298,6 +299,42 @@ This project uses a specialized stack for P2P collaborative editing. It follows 
 | Build Tool | Vite | 6.0.0 | Fast dev server, static build for GitHub Pages |
 
 See [decisions/0001-use-yjs-not-loro.md](./decisions/0001-use-yjs-not-loro.md) for why we chose Yjs + BlockNote.
+
+## Logging Strategy
+
+### MCP Server Logging (pino)
+
+Use **pino** for all server-side logging:
+
+```typescript
+import pino from 'pino';
+
+// Environment-aware configuration
+const transport = process.env.NODE_ENV === 'development'
+  ? {
+      target: 'pino-pretty',
+      options: {
+        colorize: true,
+        translateTime: 'SYS:standard',
+        ignore: 'pid,hostname'
+      }
+    }
+  : undefined;
+
+export const logger = pino(
+  {
+    level: process.env.LOG_LEVEL || 'debug',
+    timestamp: pino.stdTimeFunctions.isoTime,
+  },
+  transport ? pino.transport(transport) : undefined
+);
+```
+
+**Critical for MCP:** Pino logs to **stderr by default**. This is essential because MCP uses stdout for JSON-RPC protocol communication. Any stdout logs will corrupt the protocol.
+
+**Levels:** debug, info, warn, error
+**Development:** Use pino-pretty for readable logs
+**Production:** Raw JSON to stderr for log aggregators
 
 # AI-Assisted Development
 
