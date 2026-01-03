@@ -1,6 +1,8 @@
 # Peer-Plan: Agent Briefing
 
 > Quick context for agents working on this project. Read this first, then dive into the relevant milestone.
+>
+> **Engineering Standards**: See [engineering-standards.md](./engineering-standards.md) for code quality, testing, and development practices.
 
 ---
 
@@ -49,13 +51,17 @@ Agent creates plan → URL generated → Browser opens
 
 | Component | Choice | Package |
 |-----------|--------|---------|
-| CRDT sync | loro-extended | `@loro-extended/repo`, `loro-crdt` |
-| MCP ↔ Browser | WebSocket | `@loro-extended/adapter-websocket` |
-| Browser ↔ Browser | WebRTC | `@loro-extended/adapter-webrtc` |
-| Browser storage | IndexedDB | `@loro-extended/adapter-indexeddb` |
+| CRDT sync | Yjs | `yjs` |
+| Block editor | BlockNote | `@blocknote/react` |
+| MCP ↔ Browser | y-websocket | `y-websocket` |
+| Browser ↔ Browser | y-webrtc | `y-webrtc` |
+| Browser storage | IndexedDB | `y-indexeddb` |
+| Comments | BlockNote native | `YjsThreadStore` |
 | URL encoding | lz-string | `lz-string` |
 | MCP server | Official SDK | `@modelcontextprotocol/sdk` |
-| UI | React | `@loro-extended/react` |
+| UI | React | `@blocknote/react`, `@blocknote/mantine` |
+
+See [decisions/0001-use-yjs-not-loro.md](./decisions/0001-use-yjs-not-loro.md) for why we chose Yjs over Loro.
 
 ---
 

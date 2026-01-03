@@ -1,6 +1,10 @@
 # Peer-Plan Architecture
 
-This document captures the refined architecture based on research and spikes conducted on 2026-01-02.
+This document captures the current architecture based on research and spikes conducted on 2026-01-02.
+
+**Key Technology Decisions:** See [decisions/](./decisions/) for the evolution of architectural choices.
+
+**Current stack:** Yjs + BlockNote ([ADR-0001](./decisions/0001-use-yjs-not-loro.md))
 
 ---
 
@@ -140,25 +144,23 @@ The distributed nature of P2P means data naturally replicates across peers.
 
 ## Technology Choices
 
-### Validated (via spike)
+| Component | Choice | Package | Rationale |
+|-----------|--------|---------|-----------|
+| CRDT | Yjs | `yjs@13.6.0` | Mature, BlockNote-native |
+| Block editor | BlockNote | `@blocknote/react@0.18.0` | Notion-like UI, built-in comments |
+| MCP ↔ Browser | y-websocket | `y-websocket@2.0.4` | WebSocket provider for Yjs |
+| Browser ↔ Browser | y-webrtc | `y-webrtc@10.3.0` | P2P sync for remote reviewers |
+| Browser storage | IndexedDB | `y-indexeddb@9.0.12` | Persistence across sessions |
+| Comments | BlockNote native | `YjsThreadStore` | Threaded comments, reactions |
+| URL compression | lz-string | `lz-string@1.5.0` | Purpose-built for URL encoding, small, fast |
+| MCP SDK | Official SDK | `@modelcontextprotocol/sdk` | Agent integration |
+| UI framework | React | `react@18.3.0` | BlockNote is React-native |
+| Artifact storage | GitHub orphan branch | GitHub API | Same repo, same permissions |
+| Build tool | tsdown | `tsdown@0.3.1` | 49% faster than tsup |
+| Linting | Biome | `biome@1.9.4` | 20-50x faster than ESLint |
+| Testing | Vitest | `vitest@2.1.0` | Fast, parallel execution |
 
-| Component | Choice | Package |
-|-----------|--------|---------|
-| CRDT | loro-crdt | `loro-crdt@1.10.3` |
-| Sync framework | loro-extended | `@loro-extended/repo@4.0.0` |
-| MCP ↔ Browser | WebSocket | `@loro-extended/adapter-websocket` |
-| Browser ↔ Browser | WebRTC | `@loro-extended/adapter-webrtc` |
-| Browser storage | IndexedDB | `@loro-extended/adapter-indexeddb` |
-| React hooks | loro-extended | `@loro-extended/react` |
-
-### Planned
-
-| Component | Choice | Rationale |
-|-----------|--------|-----------|
-| URL compression | lz-string | Purpose-built for URL encoding, small, fast |
-| MCP SDK | @modelcontextprotocol/sdk | Official SDK |
-| UI framework | React | loro-extended has React hooks |
-| Artifact storage | GitHub orphan branch | Same repo, same permissions |
+See [engineering-standards.md](./engineering-standards.md#peer-plan-tech-stack) for full stack details and [decisions/0001-use-yjs-not-loro.md](./decisions/0001-use-yjs-not-loro.md) for decision rationale.
 
 ---
 
