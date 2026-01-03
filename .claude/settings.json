@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "echo '📋 IMPORTANT: Before starting any work on peer-plan, you MUST read CLAUDE.md. This includes required context from docs/BRIEF.md and docs/engineering-standards.md. Not optional.'"
+            "command": "echo '📋 CRITICAL: Before starting any work on peer-plan, you MUST read CLAUDE.md. This includes required context from docs/BRIEF.md and docs/engineering-standards.md. Not optional.'"
           }
         ]
       }

@@ -28,8 +28,9 @@ No GitHub, no sync, no persistence yet. Just plan creation → browser launch.
 ### 1b: `create_plan` Tool
 
 - [ ] Define tool schema with Zod
-- [ ] Accept: title, steps[], prNumber, repo
+- [ ] Accept: title, content (BlockNote blocks), prNumber, repo
 - [ ] Generate plan ID (hash or UUID)
+- [ ] Create Y.Doc with plan data
 - [ ] Encode plan to URL using `@peer-plan/schema`
 - [ ] Return plan URL
 
@@ -39,17 +40,34 @@ server.tool(
   "create_plan",
   {
     title: z.string().describe("Plan title"),
-    repo: z.string().describe("GitHub repo (org/repo)"),
-    prNumber: z.number().describe("PR number"),
-    steps: z.array(z.object({
-      title: z.string(),
-      description: z.string(),
-    })).describe("Implementation steps"),
+    repo: z.string().optional().describe("GitHub repo (org/repo)"),
+    prNumber: z.number().optional().describe("PR number"),
+    content: z.string().describe("Plan content (markdown or BlockNote JSON)"),
   },
   async (args) => {
-    const plan = createPlan(args);
-    const url = encodePlanToUrl(plan);
-    return { planId: plan.id, url };
+    // Create Y.Doc with plan
+    const ydoc = new Y.Doc();
+    const planId = generatePlanId();
+
+    // Set metadata
+    initPlanMetadata(ydoc, {
+      id: planId,
+      title: args.title,
+      status: 'draft',
+      repo: args.repo,
+      pr: args.prNumber,
+    });
+
+    // Encode to URL
+    const url = createPlanUrl(baseUrl, {
+      v: 1,
+      id: planId,
+      title: args.title,
+      status: 'draft',
+      content: parseContentToBlocks(args.content),
+    });
+
+    return { planId, url };
   }
 );
 ```

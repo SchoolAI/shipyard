@@ -7,29 +7,32 @@
 
 ## Overview
 
-Add the core review functionality:
-1. Reviewers can add annotations to steps
-2. Reviewers can approve or request changes
+Add the core review functionality using BlockNote's native comments:
+1. Reviewers can add comments/annotations to blocks
+2. Reviewers can approve or request changes (via plan status)
 3. Agent can see feedback via MCP tool
 4. Complete review cycle works
+
+**Key change:** Using BlockNote's built-in `YjsThreadStore` for comments instead of custom annotation system.
 
 ---
 
 ## Deliverables
 
-### 4a: Annotation UI
+### 4a: BlockNote Comments Integration
 
-- [ ] Add annotation button on each step
-- [ ] Annotation form (type, content)
-- [ ] Display existing annotations
-- [ ] Reply to annotations
-- [ ] Mark annotations as resolved
+- [ ] Enable BlockNote `CommentsExtension`
+- [ ] Configure `YjsThreadStore` for comment sync
+- [ ] Add comment UI (BlockNote provides this)
+- [ ] Display existing comments
+- [ ] Reply to comments (threaded)
+- [ ] Mark comments as resolved
 
-**Annotation types:**
-- Question
-- Concern
-- Suggestion
-- Approval
+**Comment features (built-in to BlockNote):**
+- Threaded replies
+- Emoji reactions
+- User mentions
+- Resolution status
 
 ### 4b: Review Status UI
 
@@ -40,8 +43,8 @@ Add the core review functionality:
 
 ### 4c: MCP `get_feedback` Tool
 
-- [ ] Returns new annotations since last check
-- [ ] Returns current review status
+- [ ] Returns comments from Y.Doc threads map
+- [ ] Returns current review status from metadata
 - [ ] Agent can poll for updates
 
 ```typescript
@@ -49,21 +52,24 @@ server.tool(
   "get_feedback",
   { planId: z.string() },
   async ({ planId }) => {
-    const handle = repo.get(planId, LiveStateSchema);
-    const state = handle.doc.toJSON();
+    const ydoc = getYDoc(planId);
+    const metadata = getPlanMetadata(ydoc);
+    const threads = ydoc.getMap('threads').toJSON();
+
     return {
-      status: state.reviewStatus,
-      annotations: state.annotations,
+      status: metadata?.status,
+      comments: threads,
+      commentCount: Object.keys(threads).length,
     };
   }
 );
 ```
 
-### 4d: Annotation Notifications
+### 4d: Y.Doc Change Observation
 
-- [ ] MCP server observes annotation changes
-- [ ] Could log to console for now
-- [ ] Future: actual notification system
+- [ ] MCP server subscribes to Y.Doc updates
+- [ ] Logs when comments are added
+- [ ] Could trigger notifications in future
 
 ---
 
@@ -94,47 +100,49 @@ server.tool(
 
 ## Technical Notes
 
-### Annotation Schema (already defined)
+### BlockNote Comments Setup
 
 ```typescript
-annotations: Shape.list(
-  Shape.plain.struct({
-    id: Shape.plain.string(),
-    stepId: Shape.plain.string().nullable(),
-    author: Shape.plain.string(),
-    type: Shape.plain.string(),  // 'question' | 'concern' | 'suggestion' | 'approval'
-    content: Shape.plain.string(),
-    createdAt: Shape.plain.number(),
-    resolved: Shape.plain.boolean(),
-  })
-),
+import { BlockNoteEditor } from '@blocknote/core';
+import { YjsThreadStore } from '@blocknote/core';
+import * as Y from 'yjs';
+
+// Create editor with comments extension
+const editor = useCreateBlockNote({
+  collaboration: {
+    provider: wsProvider,
+    fragment: ydoc.getXmlFragment('blocknote'),
+  },
+  _tiptapOptions: {
+    extensions: [
+      CommentsExtension.configure({
+        threadStore: new YjsThreadStore(
+          userId,
+          ydoc.getMap('threads'),
+          new DefaultThreadStoreAuth(userId, 'editor')
+        ),
+      }),
+    ],
+  },
+});
 ```
 
-### Adding Annotation
+### Reading Comments from MCP Server
 
 ```typescript
-function addAnnotation(handle, stepId: string, type: string, content: string) {
-  handle.change(draft => {
-    draft.annotations.push({
-      id: crypto.randomUUID(),
-      stepId,
-      author: getAuthorId(), // From browser, could be anonymous or authenticated
-      type,
-      content,
-      createdAt: Date.now(),
-      resolved: false,
-    });
-  });
+function getComments(ydoc: Y.Doc) {
+  const threads = ydoc.getMap('threads');
+  return threads.toJSON(); // Returns all comments
 }
 ```
 
 ### Review Status
 
 ```typescript
-function setReviewStatus(handle, status: 'approved' | 'changes_requested') {
-  handle.change(draft => {
-    draft.reviewStatus = status;
-  });
+function setReviewStatus(ydoc: Y.Doc, status: 'approved' | 'changes_requested') {
+  const metadata = ydoc.getMap('metadata');
+  metadata.set('status', status);
+  metadata.set('updatedAt', Date.now());
 }
 ```
 

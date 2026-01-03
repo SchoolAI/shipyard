@@ -1,0 +1,32 @@
+{
+  "name": "peer-plan-monorepo",
+  "version": "0.1.0",
+  "private": true,
+  "description": "P2P collaborative review for AI-generated implementation plans",
+  "scripts": {
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "typecheck": "turbo run typecheck",
+    "lint": "turbo run lint:fix",
+    "lint:fix": "turbo run lint:fix",
+    "check": "turbo run test typecheck lint:fix",
+    "dev": "turbo run dev",
+    "dev:server": "turbo run dev --filter=@peer-plan/server",
+    "dev:web": "turbo run dev --filter=@peer-plan/web",
+    "prepare": "simple-git-hooks"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.3.10",
+    "simple-git-hooks": "^2.13.1",
+    "turbo": "^2.7.2",
+    "typescript": "^5.9.3"
+  },
+  "engines": {
+    "node": ">=22.14.0",
+    "pnpm": ">=10.9.0"
+  },
+  "packageManager": "pnpm@10.9.0",
+  "simple-git-hooks": {
+    "pre-commit": "pnpm check"
+  }
+}

@@ -7,10 +7,10 @@
 
 ## Overview
 
-Add loro-extended sync so that:
-1. MCP server and browser share CRDT state
-2. Changes propagate in real-time
-3. Browser persists state in IndexedDB
+Add Yjs sync so that:
+1. MCP server and browser share CRDT state (Y.Doc)
+2. Changes propagate in real-time via y-websocket
+3. Browser persists state in IndexedDB via y-indexeddb
 
 This is where the app becomes truly collaborative.
 
@@ -20,17 +20,17 @@ This is where the app becomes truly collaborative.
 
 ### 3a: MCP Server WebSocket
 
-- [ ] Add `@loro-extended/adapter-websocket` (server)
-- [ ] Create `Repo` with WebSocket adapter
+- [ ] Add `y-websocket` server
+- [ ] Manage Y.Doc instances for each plan
 - [ ] Handle connections from browser clients
-- [ ] Hydrate CRDT from URL-encoded plan on creation
+- [ ] Sync Y.Doc updates between server and browsers
 
 ### 3b: Browser WebSocket Client
 
-- [ ] Add `@loro-extended/adapter-websocket` (client)
-- [ ] Add `@loro-extended/adapter-indexeddb` for persistence
+- [ ] Add `y-websocket` provider
+- [ ] Add `y-indexeddb` for persistence
 - [ ] Connect to MCP server on localhost
-- [ ] Hydrate from URL, then sync live state
+- [ ] Hydrate from URL, then sync live state via Yjs
 
 ### 3c: State Hydration Flow
 
@@ -79,62 +79,85 @@ This is where the app becomes truly collaborative.
 
 ## Technical Notes
 
-### MCP Server with loro-extended
+### MCP Server with y-websocket
 
 ```typescript
-import { Repo } from "@loro-extended/repo";
-import { WsServerNetworkAdapter, wrapWsSocket } from "@loro-extended/adapter-websocket/server";
-import { WebSocketServer } from "ws";
-
-const wsAdapter = new WsServerNetworkAdapter();
-const repo = new Repo({ adapters: [wsAdapter] });
+import * as Y from 'yjs';
+import { WebSocketServer } from 'ws';
+import { setupWSConnection } from 'y-websocket/bin/utils';
 
 const wss = new WebSocketServer({ port: WS_PORT });
-wss.on("connection", (ws) => {
-  const { start } = wsAdapter.handleConnection({
-    socket: wrapWsSocket(ws),
+
+// Store Y.Docs for each plan
+const docs = new Map<string, Y.Doc>();
+
+wss.on('connection', (ws, req) => {
+  // y-websocket handles sync automatically
+  setupWSConnection(ws, req, {
+    docName: req.url?.slice(1) || 'default', // Plan ID from URL
+    gc: true
   });
-  start();
 });
 ```
 
-### Browser with Multiple Adapters
+### Browser with y-websocket + y-indexeddb
 
 ```typescript
-import { RepoProvider } from "@loro-extended/react";
-import { WsClientNetworkAdapter } from "@loro-extended/adapter-websocket/client";
-import { IndexedDBStorageAdapter } from "@loro-extended/adapter-indexeddb";
+import * as Y from 'yjs';
+import { WebsocketProvider } from 'y-websocket';
+import { IndexeddbPersistence } from 'y-indexeddb';
 
-const wsAdapter = new WsClientNetworkAdapter({
-  url: `ws://localhost:${WS_PORT}`,
-});
-const storageAdapter = new IndexedDBStorageAdapter();
+function usePlan(planId: string) {
+  const [ydoc] = useState(() => new Y.Doc());
 
-<RepoProvider config={{ adapters: [wsAdapter, storageAdapter] }}>
-  <App />
-</RepoProvider>
+  useEffect(() => {
+    // WebSocket sync with MCP server
+    const wsProvider = new WebsocketProvider(
+      `ws://localhost:${WS_PORT}`,
+      planId,
+      ydoc
+    );
+
+    // IndexedDB persistence
+    const indexeddbProvider = new IndexeddbPersistence(planId, ydoc);
+
+    return () => {
+      wsProvider.destroy();
+      indexeddbProvider.destroy();
+    };
+  }, [planId, ydoc]);
+
+  return ydoc;
+}
 ```
 
 ### Hydration Pattern
 
 ```typescript
-function usePlan(urlPlan: UrlEncodedPlan) {
-  const handle = useHandle(urlPlan.id, LiveStateSchema);
+function usePlanWithHydration(urlPlan: UrlEncodedPlan) {
+  const ydoc = usePlan(urlPlan.id);
 
-  // On first load, hydrate from URL if CRDT is empty
   useEffect(() => {
-    if (handle.doc.toJSON().planId === '') {
-      handle.change(draft => {
-        draft.planId = urlPlan.id;
-        // Initialize step status from URL
-        urlPlan.steps.forEach(step => {
-          draft.stepStatus.set(step.id, false);
-        });
-      });
-    }
-  }, []);
+    // On first load, hydrate from URL if Y.Doc is empty
+    const metadata = ydoc.getMap('metadata');
 
-  return handle;
+    if (metadata.size === 0) {
+      // Initialize from URL snapshot
+      initPlanMetadata(ydoc, {
+        id: urlPlan.id,
+        title: urlPlan.title,
+        status: urlPlan.status as any,
+        repo: urlPlan.repo,
+        pr: urlPlan.pr,
+      });
+
+      // Initialize BlockNote content from URL
+      const blocknoteDoc = ydoc.get('blocknote', Y.XmlFragment);
+      // BlockNote will handle this via its editor
+    }
+  }, [ydoc, urlPlan]);
+
+  return ydoc;
 }
 ```
 

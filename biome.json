@@ -1,0 +1,97 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.3.10/schema.json",
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true
+  },
+  "files": {
+    "ignoreUnknown": false
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 100
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "recommended": true,
+      "complexity": {
+        "noBannedTypes": "error",
+        "noUselessRename": "error",
+        "noUselessTernary": "error"
+      },
+      "correctness": {
+        "noUnusedImports": "error",
+        "noInvalidConstructorSuper": "error",
+        "noConstantCondition": "error",
+        "noSwitchDeclarations": "error",
+        "noInvalidUseBeforeDeclaration": "error"
+      },
+      "performance": {
+        "noAccumulatingSpread": "error"
+      },
+      "security": {
+        "noDangerouslySetInnerHtml": "error"
+      },
+      "style": {
+        "noNonNullAssertion": "error",
+        "useImportType": "error",
+        "useNodejsImportProtocol": "error",
+        "useTemplate": "error",
+        "useExponentiationOperator": "error",
+        "noRestrictedImports": {
+          "level": "error",
+          "options": {
+            "patterns": [
+              {
+                "group": ["../**"],
+                "message": "Cross-package imports must use workspace protocol (@peer-plan/...). Relative imports within the same package are fine."
+              }
+            ]
+          }
+        }
+      },
+      "suspicious": {
+        "noExplicitAny": "error",
+        "noImplicitAnyLet": "error",
+        "noDoubleEquals": "error",
+        "noAssignInExpressions": "error",
+        "noConsole": "error",
+        "noDebugger": "error",
+        "noVar": "error"
+      }
+    }
+  },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "single",
+      "trailingCommas": "es5",
+      "semicolons": "always"
+    }
+  },
+  "overrides": [
+    {
+      "includes": ["**/*.test.ts", "**/*.spec.ts"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noExplicitAny": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["**/scripts/*.ts", "**/scripts/*.js"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noConsole": "off"
+          }
+        }
+      }
+    }
+  ]
+}

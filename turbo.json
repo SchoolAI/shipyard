@@ -1,0 +1,44 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "ui": "tui",
+  "globalEnv": ["NODE_ENV", "CI"],
+  "globalPassThroughEnv": ["GITHUB_ACTIONS", "GITHUB_SHA", "GITHUB_REF", "TURBO_REMOTE_ONLY"],
+  "globalDependencies": [
+    "package.json",
+    "pnpm-lock.yaml",
+    "pnpm-workspace.yaml",
+    "turbo.json",
+    "tsconfig.json"
+  ],
+  "tasks": {
+    "build": {
+      "cache": true,
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**", "build/**", ".next/**", "!.next/cache/**"]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    },
+    "test": {
+      "cache": true,
+      "dependsOn": ["build"],
+      "outputs": ["coverage/**"]
+    },
+    "test:watch": {
+      "cache": false,
+      "persistent": true
+    },
+    "typecheck": {
+      "cache": true,
+      "outputs": ["tsconfig.tsbuildinfo", ".tsbuildinfo"]
+    },
+    "lint": {
+      "cache": true,
+      "outputs": [".eslintcache"]
+    },
+    "lint:fix": {
+      "cache": false
+    }
+  }
+}
