@@ -1,0 +1,115 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+importers:
+
+  .:
+    dependencies:
+      '@loro-extended/adapter-webrtc':
+        specifier: ^4.0.0
+        version: 4.0.0(loro-crdt@1.10.3)
+      '@loro-extended/adapter-websocket':
+        specifier: ^4.0.0
+        version: 4.0.0
+      '@loro-extended/repo':
+        specifier: ^4.0.0
+        version: 4.0.0(loro-crdt@1.10.3)
+      loro-crdt:
+        specifier: ^1.10.3
+        version: 1.10.3
+      ws:
+        specifier: ^8.18.0
+        version: 8.18.3
+
+packages:
+
+  '@levischuck/tiny-cbor@0.3.2':
+    resolution: {integrity: sha512-v15eUU94R54eghlKZJtO/hwJmYC7w4ZIj/ybAJT2tMKdcrJNlXm7axCHS8xrQiC1wPlAQNemiwEpuBUaFGwJlQ==}
+
+  '@logtape/logtape@1.3.5':
+    resolution: {integrity: sha512-G+MxWB7Tbv/2764519+Cp6rKXUdRbe/GiRwTvlm/Wv/sNsiquRnx9Hzr9eXaIpAYLT4PrBlkthjJ4gmqdSPrFg==}
+
+  '@loro-extended/adapter-webrtc@4.0.0':
+    resolution: {integrity: sha512-QlNnHhBaEdPoHipHay+xBmIAa2kcuXAfBhhsNZVlQchRB9zeWpp1i+sVl+9H4VVA93x/zgZg0h6srnvtUqOMNg==}
+
+  '@loro-extended/adapter-websocket@4.0.0':
+    resolution: {integrity: sha512-CqDBc6LopAN0ojWsAkARqH6tHGpSQMkuzzSd8A78d1GuKGnHKmVTqXldpwP7WabrS3rEHNtEUsg74rTt158F7w==}
+
+  '@loro-extended/change@4.0.0':
+    resolution: {integrity: sha512-WOVBNhwNVkBNiF4kAY1agEYLxno4geFYgpqTKAdTouiPWyg7RGr5ho/auyfRVyTKwKWbrrwAdU7gsswMXwOUxA==}
+
+  '@loro-extended/repo@4.0.0':
+    resolution: {integrity: sha512-FMVzQw+uUnmBOKqUCk+eW+SHqPqI3LivGHshDuTujZ+9XqXBa6L3aH1QYEuAFZtUHZg5aNekjbc7fbmynPCmUA==}
+    peerDependencies:
+      loro-crdt: ^1.10.3
+
+  emittery@1.2.0:
+    resolution: {integrity: sha512-KxdRyyFcS85pH3dnU8Y5yFUm2YJdaHwcBZWrfG8o89ZY9a13/f9itbN+YG3ELbBo9Pg5zvIozstmuV8bX13q6g==}
+    engines: {node: '>=14.16'}
+
+  loro-crdt@1.10.3:
+    resolution: {integrity: sha512-vzWkVw7mWrKTilPjrgAhhzjAyOn3/DaUPJxdK9lunpEI1Y+uQMDBt/pEtRiovKFtGXo4tUVfULnFc7H/ufGwkQ==}
+
+  mutative@1.3.0:
+    resolution: {integrity: sha512-8MJj6URmOZAV70dpFe1YnSppRTKC4DsMkXQiBDFayLcDI4ljGokHxmpqaBQuDWa4iAxWaJJ1PS8vAmbntjjKmQ==}
+    engines: {node: '>=14.0'}
+
+  uuid@9.0.1:
+    resolution: {integrity: sha512-b+1eJOlsR9K8HJpow9Ok3fiWOWSIcIzXodvv0rQjVoOVNpWMpxf1wZNpt4y9h10odCNrqnYp1OBzRktckBe3sA==}
+    hasBin: true
+
+  ws@8.18.3:
+    resolution: {integrity: sha512-PEIGCY5tSlUt50cqyMXfCzX+oOPqN0vuGqWzbcJ2xvnkzkq46oOpz7dQaTDBdfICb4N14+GARUDw2XV2N4tvzg==}
+    engines: {node: '>=10.0.0'}
+    peerDependencies:
+      bufferutil: ^4.0.1
+      utf-8-validate: '>=5.0.2'
+    peerDependenciesMeta:
+      bufferutil:
+        optional: true
+      utf-8-validate:
+        optional: true
+
+snapshots:
+
+  '@levischuck/tiny-cbor@0.3.2': {}
+
+  '@logtape/logtape@1.3.5': {}
+
+  '@loro-extended/adapter-webrtc@4.0.0(loro-crdt@1.10.3)':
+    dependencies:
+      '@loro-extended/repo': 4.0.0(loro-crdt@1.10.3)
+    transitivePeerDependencies:
+      - loro-crdt
+
+  '@loro-extended/adapter-websocket@4.0.0':
+    dependencies:
+      '@levischuck/tiny-cbor': 0.3.2
+      '@loro-extended/repo': 4.0.0(loro-crdt@1.10.3)
+      loro-crdt: 1.10.3
+
+  '@loro-extended/change@4.0.0':
+    dependencies:
+      loro-crdt: 1.10.3
+
+  '@loro-extended/repo@4.0.0(loro-crdt@1.10.3)':
+    dependencies:
+      '@logtape/logtape': 1.3.5
+      '@loro-extended/change': 4.0.0
+      emittery: 1.2.0
+      loro-crdt: 1.10.3
+      mutative: 1.3.0
+      uuid: 9.0.1
+
+  emittery@1.2.0: {}
+
+  loro-crdt@1.10.3: {}
+
+  mutative@1.3.0: {}
+
+  uuid@9.0.1: {}
+
+  ws@8.18.3: {}

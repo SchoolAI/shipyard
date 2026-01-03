@@ -1,0 +1,157 @@
+# Peer-Plan: Agent Briefing
+
+> Quick context for agents working on this project. Read this first, then dive into the relevant milestone.
+
+---
+
+## The Problem
+
+When AI agents generate implementation plans, there's no good way to:
+1. **Verify** the agent actually did what it claimed (screenshots, test results, etc.)
+2. **Review** the plan collaboratively with humans in real-time
+3. **Provide feedback** that the agent can act on
+
+We're building a P2P collaborative review system that solves this.
+
+---
+
+## How It Works (30-second version)
+
+```
+Agent creates plan → URL generated → Browser opens
+                                          ↓
+                            Reviewer sees plan + artifacts
+                                          ↓
+                            Reviewer adds annotations
+                                          ↓
+                        Agent sees feedback via MCP tool
+                                          ↓
+                            Review approved/iterate
+```
+
+---
+
+## Data Model
+
+**Three places data lives:**
+
+| Location | What | Persistence |
+|----------|------|-------------|
+| **URL** | Plan snapshot (title, steps, artifacts refs, annotations) | Shareable, regenerable anytime |
+| **CRDT** | Live state (annotations, status, step completion) | Browser IndexedDB + peer sync |
+| **GitHub** | Binary blobs only (screenshots, videos) | Orphan branch in same repo |
+
+**Key insight:** URLs are snapshots, not source of truth. The CRDT state (distributed across browsers) is the source of truth. URLs can always be regenerated from current state.
+
+---
+
+## Tech Stack
+
+| Component | Choice | Package |
+|-----------|--------|---------|
+| CRDT sync | loro-extended | `@loro-extended/repo`, `loro-crdt` |
+| MCP ↔ Browser | WebSocket | `@loro-extended/adapter-websocket` |
+| Browser ↔ Browser | WebRTC | `@loro-extended/adapter-webrtc` |
+| Browser storage | IndexedDB | `@loro-extended/adapter-indexeddb` |
+| URL encoding | lz-string | `lz-string` |
+| MCP server | Official SDK | `@modelcontextprotocol/sdk` |
+| UI | React | `@loro-extended/react` |
+
+---
+
+## Network Topology
+
+```
+┌─────────────────────────────┐
+│ MCP Server (Node.js)        │
+│ └─ WebSocket server         │
+└──────────┬──────────────────┘
+           │ WebSocket (localhost)
+           ▼
+┌─────────────────────────────┐     WebRTC P2P     ┌──────────────────┐
+│ Author's Browser            │◄──────────────────►│ Remote Reviewer  │
+│ ├─ WebSocket → MCP          │                    │ Browser          │
+│ ├─ WebRTC → peers           │                    └──────────────────┘
+│ └─ IndexedDB (persistence)  │
+└─────────────────────────────┘
+```
+
+---
+
+## Project Structure
+
+```
+peer-plan/
+├── packages/
+│   ├── schema/     # Shared types, URL encoding, loro schemas
+│   ├── server/     # MCP server
+│   └── web/        # React app
+├── docs/
+│   ├── BRIEF.md        # This file
+│   ├── architecture.md # Detailed architecture
+│   ├── systems-inventory.md
+│   ├── milestones/     # Implementation phases
+│   └── original-vision/ # Original design docs (historical)
+└── spikes/         # Proof of concept code
+```
+
+---
+
+## Milestones (Current State)
+
+| # | Milestone | Status | What It Delivers |
+|---|-----------|--------|------------------|
+| 0 | Foundation | **Not Started** | Scaffold, schemas, URL encoding |
+| 1 | Agent Creates Plans | Not Started | MCP tools, browser launch |
+| 2 | View Plans | Not Started | Static React UI |
+| 3 | Live Sync | Not Started | WebSocket CRDT sync |
+| 4 | Review Flow | Not Started | Annotations, approval |
+| 5 | Artifacts | Not Started | GitHub blob storage |
+| 6 | P2P | Not Started | WebRTC remote collab |
+
+**Start here:** [Milestone 0: Foundation](./milestones/00-foundation.md)
+
+---
+
+## Key Files to Know
+
+| File | Purpose |
+|------|---------|
+| `docs/architecture.md` | Data model, resilience, decisions |
+| `docs/systems-inventory.md` | Components, risks, assumptions |
+| `docs/milestones/*.md` | Implementation details per phase |
+| `spikes/loro-websocket/` | Validated WebSocket sync (reference code) |
+
+---
+
+## Validated via Spikes
+
+These things are **confirmed working** (see `spikes/loro-websocket/`):
+
+- ✅ loro-extended WebSocket sync in Node.js (no polyfills needed)
+- ✅ Bidirectional CRDT sync between server and client
+- ✅ Schema-driven documents with `Shape.doc()`
+- ✅ `@loro-extended/*` packages all published to npm (v4.0.0)
+
+---
+
+## Important Constraints
+
+1. **No paid infrastructure** — Everything runs on GitHub Pages + local MCP
+2. **URL is recovery mechanism** — If all else fails, URL has the plan
+3. **GitHub only for blobs** — Don't store plan data in GitHub, only artifacts
+4. **Two-way doors** — Most schema/structure decisions are reversible
+
+---
+
+## When Starting a Task
+
+1. Read this brief (you just did)
+2. Read the relevant milestone doc
+3. Check `spikes/` for reference implementations
+4. Check `docs/architecture.md` for decisions
+5. Ask if anything is unclear
+
+---
+
+*Last updated: 2026-01-02*

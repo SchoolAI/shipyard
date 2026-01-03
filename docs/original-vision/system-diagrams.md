@@ -1,3 +1,9 @@
+> **ORIGINAL VISION DOCUMENT**
+> These diagrams reflect the initial design. Some details have been refined.
+> For current architecture, see [../architecture.md](../architecture.md).
+
+---
+
 # Peer-Plan Diagrams (Mermaid)
 
 Render these at [mermaid.live](https://mermaid.live) or any Mermaid-compatible tool.

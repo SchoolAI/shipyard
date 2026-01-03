@@ -1,6 +1,13 @@
+> **ORIGINAL VISION DOCUMENT**
+> This is the initial design spec. Some details have been refined through research and spikes.
+> For current implementation architecture, see [../architecture.md](../architecture.md).
+> For quick project context, see [../BRIEF.md](../BRIEF.md).
+
+---
+
 # Peer-Plan: P2P Collaborative Plan Review
 
-**Technical Architecture Brief**  
+**Technical Architecture Brief**
 *Draft v0.2 — January 2026*
 
 ---
@@ -423,7 +430,7 @@ jobs:
 
 ## loro-extended
 
-Using [loro-extended](https://github.com/anthropics/loro-extended) instead of Yjs + y-webrtc:
+Using [loro-extended](https://github.com/SchoolAI/loro-extended) instead of Yjs + y-webrtc:
 
 - Built-in adapters: SSE, WebSocket, WebRTC data channels
 - No Node.js polyfill hacks needed (unlike y-webrtc which requires `@roamhq/wrtc` and global WebSocket polyfills)

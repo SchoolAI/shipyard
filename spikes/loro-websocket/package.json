@@ -1,0 +1,17 @@
+{
+  "name": "loro-websocket-spike",
+  "version": "0.0.1",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "server": "node server.js",
+    "client": "node client.js"
+  },
+  "dependencies": {
+    "loro-crdt": "^1.10.3",
+    "@loro-extended/repo": "^4.0.0",
+    "@loro-extended/adapter-websocket": "^4.0.0",
+    "@loro-extended/adapter-webrtc": "^4.0.0",
+    "ws": "^8.18.0"
+  }
+}
