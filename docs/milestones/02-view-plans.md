@@ -1,30 +1,30 @@
 # Milestone 2: View Plans
 
-**Status**: Not Started
-**Goal**: Web UI that renders plans from URLs
+**Status**: In Progress
+**Goal**: Upgrade web UI to use BlockNote editor and shadcn/ui components
 
 ---
 
 ## Overview
 
-Build a React app that:
-1. Decodes plan from URL
-2. Renders plan structure nicely
-3. Shows steps, status, artifact placeholders
-4. Deployable to GitHub Pages
+Upgrade the basic React app to:
+1. Render BlockNote blocks with the actual BlockNote editor (read-only mode)
+2. Use shadcn/ui for clean, accessible components
+3. Add proper styling and layout
+4. Deploy to GitHub Pages
 
-No live sync yet. Pure static rendering from URL data.
+No live sync yet. Pure static rendering from URL data with professional UI.
 
 ---
 
 ## Deliverables
 
-### 2a: React App Setup
+### 2a: shadcn/ui Setup
 
-- [ ] Vite + React + TypeScript
-- [ ] Install `@peer-plan/schema` from workspace
-- [ ] Configure for GitHub Pages deployment
-- [ ] Set up routing (single page, query param based)
+- [ ] Initialize shadcn/ui in web package
+- [ ] Install Tailwind CSS
+- [ ] Add shadcn/ui components: Card, Badge, Button, Separator
+- [ ] Set up theme (light/dark mode support for future)
 
 ### 2b: URL Decoding
 
@@ -33,12 +33,13 @@ No live sync yet. Pure static rendering from URL data.
 - [ ] Handle invalid/missing data gracefully
 - [ ] Show error state for corrupt URLs
 
-### 2c: Plan Renderer
+### 2c: Plan Renderer with BlockNote
 
-- [ ] Plan header (title, status badge, PR link)
-- [ ] Steps list with checkboxes (read-only for now)
-- [ ] Artifact references (placeholders, no actual images yet)
-- [ ] Clean, minimal styling (Tailwind or CSS modules)
+- [ ] Replace JSON rendering with BlockNote editor (read-only mode)
+- [ ] Plan header using shadcn Card (title, status Badge, PR link)
+- [ ] BlockNote editor for content display
+- [ ] Artifact references using shadcn components
+- [ ] Professional layout and spacing
 
 ### 2d: GitHub Pages Deployment
 

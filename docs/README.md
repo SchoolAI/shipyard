@@ -27,9 +27,9 @@ See [original-vision/](./original-vision/) for the initial design docs (historic
 
 | Phase | Milestone | Description | Status |
 |-------|-----------|-------------|--------|
-| 0 | [Foundation](./milestones/00-foundation.md) | Scaffold, schemas, URL encoding | Not Started |
-| 1 | [Agent Creates Plans](./milestones/01-agent-creates-plans.md) | MCP server, browser launch | Not Started |
-| 2 | [View Plans](./milestones/02-view-plans.md) | Static UI, GitHub Pages | Not Started |
+| 0 | [Foundation](./milestones/00-foundation.md) | Scaffold, schemas, URL encoding | ✅ Complete |
+| 1 | [Agent Creates Plans](./milestones/01-agent-creates-plans.md) | MCP server, browser launch | ✅ Complete |
+| 2 | [View Plans](./milestones/02-view-plans.md) | BlockNote UI, shadcn/ui | 🚧 In Progress |
 | 3 | [Live Sync](./milestones/03-live-sync.md) | WebSocket sync, IndexedDB | Not Started |
 | 4 | [Review Flow](./milestones/04-review-flow.md) | Annotations, approval | Not Started |
 | 5 | [Artifacts](./milestones/05-artifacts.md) | GitHub blob storage | Not Started |
