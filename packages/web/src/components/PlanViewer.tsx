@@ -1,14 +1,22 @@
+import type { Block } from '@blocknote/core';
 import { BlockNoteView } from '@blocknote/mantine';
 import { useCreateBlockNote } from '@blocknote/react';
-import type { UrlEncodedPlan } from '@peer-plan/schema';
+import type * as Y from 'yjs';
 
-interface PlanViewerProps {
-  plan: UrlEncodedPlan;
+interface PlanViewerFallback {
+  content: Block[];
 }
 
-export function PlanViewer({ plan }: PlanViewerProps) {
+interface PlanViewerProps {
+  ydoc: Y.Doc;
+  fallback: PlanViewerFallback;
+}
+
+export function PlanViewer({ ydoc: _ydoc, fallback }: PlanViewerProps) {
+  // For M3, we still use the fallback content from URL
+  // Full BlockNote Yjs collaboration will be added in M4
   const editor = useCreateBlockNote({
-    initialContent: plan.content,
+    initialContent: fallback.content,
   });
 
   return (

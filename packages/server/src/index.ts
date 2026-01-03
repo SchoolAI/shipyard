@@ -9,6 +9,10 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import { logger } from './logger.js';
 import { createPlanTool } from './tools/create-plan.js';
+import { startWebSocketServer } from './ws-server.js';
+
+// Start WebSocket server for Yjs sync (runs alongside MCP)
+startWebSocketServer();
 
 const server = new Server(
   {

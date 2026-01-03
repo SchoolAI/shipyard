@@ -66,3 +66,38 @@ export function initPlanMetadata(
   if (init.repo) map.set('repo', init.repo);
   if (init.pr) map.set('pr', init.pr);
 }
+
+/**
+ * Gets the completion status of all steps in a plan.
+ *
+ * @param ydoc - Yjs document
+ * @returns Map of stepId → completed boolean
+ */
+export function getStepCompletions(ydoc: Y.Doc): Map<string, boolean> {
+  const steps = ydoc.getMap<boolean>('stepCompletions');
+  return new Map(steps.entries());
+}
+
+/**
+ * Toggles the completion status of a step.
+ *
+ * @param ydoc - Yjs document
+ * @param stepId - ID of the step to toggle
+ */
+export function toggleStepCompletion(ydoc: Y.Doc, stepId: string): void {
+  const steps = ydoc.getMap<boolean>('stepCompletions');
+  const current = steps.get(stepId) || false;
+  steps.set(stepId, !current);
+}
+
+/**
+ * Gets the completion status of a single step.
+ *
+ * @param ydoc - Yjs document
+ * @param stepId - ID of the step
+ * @returns true if completed, false otherwise
+ */
+export function isStepCompleted(ydoc: Y.Doc, stepId: string): boolean {
+  const steps = ydoc.getMap<boolean>('stepCompletions');
+  return steps.get(stepId) || false;
+}

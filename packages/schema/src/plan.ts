@@ -39,3 +39,11 @@ export const ArtifactSchema = z.object({
 export function getArtifactUrl(repo: string, pr: number, planId: string, filename: string): string {
   return `https://raw.githubusercontent.com/${repo}/plan-artifacts/pr-${pr}/${planId}/${filename}`;
 }
+
+// Step completion tracking for interactive checkboxes
+export interface StepCompletion {
+  stepId: string;
+  completed: boolean;
+  completedAt?: number;
+  completedBy?: string;
+}
