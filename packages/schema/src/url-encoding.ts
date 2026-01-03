@@ -71,7 +71,6 @@ export function createPlanUrl(baseUrl: string, plan: UrlEncodedPlan): string {
  * @returns Decoded plan or null if not found/invalid
  */
 export function getPlanFromUrl(): UrlEncodedPlan | null {
-  
   if (typeof globalThis !== 'undefined' && 'location' in globalThis) {
     const location = (globalThis as typeof globalThis & { location: { search: string } }).location;
     const params = new URLSearchParams(location.search);

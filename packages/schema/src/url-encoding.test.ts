@@ -154,7 +154,6 @@ describe('URL Encoding', () => {
       const json = JSON.stringify(largePlan);
       const encoded = encodePlan(largePlan);
 
-      
       expect(encoded.length).toBeLessThan(json.length);
 
       expect(encoded.length).toBeLessThan(2000);
@@ -167,7 +166,6 @@ describe('URL Encoding', () => {
       const encoded = encodePlan(futureVersionPlan);
       const decoded = decodePlan(encoded);
 
-      
       expect(decoded).toBeTruthy();
       expect(decoded?.id).toBe(samplePlan.id);
     });
