@@ -1,50 +1,29 @@
-import type { Artifact } from '@peer-plan/schema';
 import { getPlanFromUrl } from '@peer-plan/schema';
+import { PlanHeader } from './components/PlanHeader';
+import { PlanViewer } from './components/PlanViewer';
 
 export function App() {
   const plan = getPlanFromUrl();
 
   if (!plan) {
     return (
-      <div style={{ padding: '2rem', fontFamily: 'system-ui' }}>
-        <h1>Peer Plan</h1>
-        <p>No plan found in URL. Add ?d= parameter with encoded plan data.</p>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold mb-2">No Plan Found</h1>
+          <p className="text-gray-600">
+            The URL doesn't contain valid plan data. Add ?d= parameter.
+          </p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div style={{ padding: '2rem', fontFamily: 'system-ui', maxWidth: '800px', margin: '0 auto' }}>
-      <h1>{plan.title}</h1>
-      <p>
-        <strong>Status:</strong> <code>{plan.status}</code>
-      </p>
-      {plan.repo && (
-        <p>
-          <strong>Repo:</strong> {plan.repo}
-          {plan.pr && ` (PR #${plan.pr})`}
-        </p>
-      )}
-
-      <h2>Content ({plan.content.length} blocks)</h2>
-      <div
-        style={{ background: '#f5f5f5', padding: '1rem', borderRadius: '4px', overflow: 'auto' }}
-      >
-        <pre style={{ margin: 0 }}>{JSON.stringify(plan.content, null, 2)}</pre>
+    <div className="min-h-screen bg-gray-50 py-8">
+      <div className="max-w-4xl mx-auto px-4 space-y-6">
+        <PlanHeader plan={plan} />
+        <PlanViewer plan={plan} />
       </div>
-
-      {plan.artifacts && plan.artifacts.length > 0 && (
-        <>
-          <h2>Artifacts ({plan.artifacts.length})</h2>
-          <ul>
-            {plan.artifacts.map((artifact: Artifact) => (
-              <li key={artifact.id}>
-                {artifact.type}: {artifact.filename}
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
     </div>
   );
 }

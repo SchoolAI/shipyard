@@ -12,14 +12,27 @@
     "lint:fix": "biome check src --write"
   },
   "dependencies": {
+    "@blocknote/core": "^0.45.0",
+    "@blocknote/mantine": "^0.45.0",
+    "@blocknote/react": "^0.45.0",
+    "@mantine/core": "^8.3.10",
+    "@mantine/hooks": "^8.3.10",
     "@peer-plan/schema": "workspace:*",
+    "@radix-ui/react-separator": "^1.1.8",
+    "@radix-ui/react-slot": "^1.2.4",
+    "@tiptap/extensions": "^3.14.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "tailwind-merge": "^3.4.0"
   },
   "devDependencies": {
+    "@tailwindcss/vite": "^4.1.18",
     "@types/react": "^19.0.6",
     "@types/react-dom": "^19.0.2",
     "@vitejs/plugin-react": "^4.3.4",
+    "tailwindcss": "^4.1.18",
     "typescript": "^5.9.3",
     "vite": "^6.0.7"
   }
