@@ -1,4 +1,7 @@
-@import "@blocknote/core/fonts/inter.css";
-@import "@mantine/core/styles.layer.css";
-@import "@blocknote/mantine/style.css";
+/*
+ * Tailwind CSS v4
+ *
+ * Third-party CSS (Mantine, BlockNote) is imported in main.tsx
+ * to avoid @import ordering issues with Tailwind's vite plugin.
+ */
 @import "tailwindcss";

@@ -16,11 +16,13 @@
     "@blocknote/core": "^0.45.0",
     "@modelcontextprotocol/sdk": "^1.22.0",
     "@peer-plan/schema": "workspace:*",
+    "lib0": "^0.2.117",
     "nanoid": "^5.0.9",
     "open": "^10.1.0",
     "pino": "^10.1.0",
     "ws": "^8.18.3",
     "y-leveldb": "^0.2.0",
+    "y-protocols": "^1.0.7",
     "y-websocket": "^3.0.0",
     "yjs": "^13.6.28",
     "zod": "^4.3.4"

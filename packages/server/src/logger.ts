@@ -8,6 +8,7 @@ const transport =
           colorize: true,
           translateTime: 'SYS:standard',
           ignore: 'pid,hostname',
+          destination: 2, // stderr - CRITICAL: MCP uses stdout for protocol
         },
       }
     : undefined;
@@ -17,5 +18,5 @@ export const logger = pino(
     level: process.env.LOG_LEVEL || 'info',
     timestamp: pino.stdTimeFunctions.isoTime,
   },
-  transport ? pino.transport(transport) : undefined
+  transport ? pino.transport(transport) : pino.destination(2) // stderr for production too
 );
