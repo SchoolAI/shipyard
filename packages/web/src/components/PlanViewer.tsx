@@ -188,49 +188,36 @@ export function PlanViewer({
                 },
           }
         : undefined,
-      // Create extension inline to ensure it's created with the editor
-      extensions: hasComments
-        ? [
-            CommentsExtension({
-              threadStore: new YjsThreadStore(
-                identity.id,
-                ydoc.getMap('threads'),
-                new DefaultThreadStoreAuth(identity.id, 'editor')
-              ),
-              resolveUsers: createResolveUsers(ydoc, identity),
-            }),
-          ]
-        : [],
-      // Keep editor editable for FormattingToolbar to work, but block content changes
-      _tiptapOptions: {
-        editorProps: {
-          // Prevent typing, pasting, and other input but allow selection
-          handleKeyDown: (_view, event) => {
-            const selectionKeys = [
-              'ArrowLeft',
-              'ArrowRight',
-              'ArrowUp',
-              'ArrowDown',
-              'Home',
-              'End',
-            ];
-            if (selectionKeys.includes(event.key) || event.shiftKey) {
-              return false; // Let event through
-            }
-            return true;
-          },
-          handlePaste: () => true, // Block paste
-          handleDrop: () => true, // Block drag and drop
-        },
-      },
+      // ALWAYS load CommentsExtension to properly render comment marks in the document.
+      // Without this, documents with comment marks will render incorrectly when
+      // identity is null (e.g., after clearing browser data).
+      // When identity is null, we use 'anonymous' as userId with 'comment' role (read-only).
+      extensions: [
+        CommentsExtension({
+          threadStore: new YjsThreadStore(
+            identity?.id ?? 'anonymous-viewer',
+            ydoc.getMap('threads'),
+            new DefaultThreadStoreAuth(
+              identity?.id ?? 'anonymous-viewer',
+              identity ? 'editor' : 'comment'
+            )
+          ),
+          resolveUsers: createResolveUsers(ydoc, identity),
+        }),
+      ],
+      // Note: We use editable={false} on BlockNoteView instead of _tiptapOptions
+      // to make the editor read-only. BlockNote officially supports commenting
+      // even when editable={false}. Using _tiptapOptions.handleKeyDown to block
+      // input was causing comment mark position bugs by interfering with
+      // ProseMirror's internal state management.
     },
     // Dependencies: recreate editor when ydoc OR identity changes.
     // This ensures the extension is properly registered when identity becomes available.
     [ydoc, identity?.id]
   );
 
-  // Note: We don't set editor.isEditable = false because that would prevent
-  // the FormattingToolbar from appearing. Instead, we block input via editorProps handlers above.
+  // Note: We set editable={false} on BlockNoteView to make it read-only.
+  // BlockNote officially supports commenting even when editable={false}.
 
   // Force BlockNoteView remount when switching plans. Identity changes are handled
   // by the parent's key prop on PlanViewer, which remounts this entire component.
@@ -276,16 +263,101 @@ export function PlanViewer({
     return () => observer.disconnect();
   }, [identity]);
 
-  // Handle Ctrl+Enter to submit comments
+  // Auto-focus comment input when FloatingComposer appears
+  useEffect(() => {
+    if (!hasComments || !containerRef.current) return;
+
+    const focusCommentInput = () => {
+      // BlockNote's FloatingComposer uses a mini BlockNote editor (CommentEditor)
+      // which renders as a ProseMirror contenteditable div
+      const selectors = [
+        // ProseMirror editor inside floating composer
+        '.bn-thread .ProseMirror[contenteditable="true"]',
+        // Fallback: any contenteditable in the thread
+        '.bn-thread [contenteditable="true"]',
+        // Generic BlockNote editor in thread
+        '.bn-thread .bn-editor',
+      ];
+
+      for (const selector of selectors) {
+        const input = containerRef.current?.querySelector(selector);
+        if (input instanceof HTMLElement) {
+          // Small delay to ensure the composer is fully rendered and ready
+          setTimeout(() => {
+            input.focus();
+            // For ProseMirror, we may need to trigger a selection
+            const selection = window.getSelection();
+            if (selection && input.firstChild) {
+              selection.selectAllChildren(input);
+              selection.collapseToEnd();
+            }
+          }, 50);
+          return;
+        }
+      }
+    };
+
+    // Observe for the floating composer appearing
+    // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: MutationObserver callback is inherently nested
+    const observer = new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        for (const node of mutation.addedNodes) {
+          if (node instanceof HTMLElement) {
+            // Check if this is or contains the thread/composer
+            if (node.classList.contains('bn-thread') || node.querySelector('.bn-thread')) {
+              focusCommentInput();
+            }
+          }
+        }
+      }
+    });
+
+    observer.observe(containerRef.current, {
+      childList: true,
+      subtree: true,
+    });
+
+    return () => observer.disconnect();
+  }, [hasComments]);
+
+  // Handle Enter to submit comments (Shift+Enter or Ctrl+Enter for newline)
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Keyboard handling requires multiple condition checks
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-      // Find and click the submit button in the floating composer
-      const submitButton = containerRef.current?.querySelector(
-        '[data-floating-composer] button[type="submit"], .bn-comment-input-submit-btn, .bn-floating-composer button'
-      );
-      if (submitButton instanceof HTMLButtonElement) {
-        e.preventDefault();
-        submitButton.click();
+    // Check if we're in a comment input (BlockNote thread component)
+    const target = e.target as HTMLElement;
+    const isInThread =
+      target.closest('.bn-thread') ||
+      target.closest('.bn-floating-composer') ||
+      target.closest('[data-floating-composer]');
+
+    if (!isInThread) return;
+
+    if (e.key === 'Enter') {
+      // Shift+Enter or Ctrl+Enter: Insert newline
+      if (e.shiftKey || e.ctrlKey || e.metaKey) {
+        // For contenteditable (ProseMirror), let the default behavior handle it
+        // ProseMirror already handles Shift+Enter as soft break
+        return;
+      }
+
+      // Enter without modifier: Submit the comment
+      e.preventDefault();
+      e.stopPropagation();
+
+      // BlockNote uses .bn-button inside .bn-action-toolbar for the save button
+      const buttonSelectors = [
+        '.bn-thread .bn-action-toolbar .bn-button',
+        '.bn-thread button[type="submit"]',
+        '.bn-thread .bn-button',
+        '.bn-floating-composer .bn-button',
+      ];
+
+      for (const selector of buttonSelectors) {
+        const submitButton = containerRef.current?.querySelector(selector);
+        if (submitButton instanceof HTMLButtonElement) {
+          submitButton.click();
+          return;
+        }
       }
     }
   };
@@ -302,7 +374,7 @@ export function PlanViewer({
       <BlockNoteView
         key={editorKey}
         editor={editor}
-        editable={true} // Keep UI interactive for toolbar and selection
+        editable={false} // Read-only, but comments still work per BlockNote docs
         theme="light"
         // Hide editing controls - this is a read-only view (except for comments)
         sideMenu={false}
