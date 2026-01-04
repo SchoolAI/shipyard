@@ -2,7 +2,7 @@
   "mcpServers": {
     "peer-plan": {
       "command": "node",
-      "args": ["packages/server/dist/index.mjs"],
+      "args": ["apps/server/dist/index.mjs"],
       "env": {
         "NODE_ENV": "development"
       }

@@ -3,10 +3,11 @@ import { Link, useParams } from 'react-router-dom';
 import { CollapsiblePanel, CollapsiblePanelHeader } from '@/components/ui/collapsible-panel';
 import { usePlanIndex } from '@/hooks/usePlanIndex';
 import { cn } from '@/lib/utils';
+import { formatConnectionInfo, hasAnyConnection } from '@/utils/connectionStatus';
 import { getSidebarCollapsed, setSidebarCollapsed } from '@/utils/uiPreferences';
 
 export function Sidebar() {
-  const { plans, connected, synced, serverCount, activeCount } = usePlanIndex();
+  const { plans, synced, serverCount, activeCount, peerCount } = usePlanIndex();
   const { id: currentPlanId } = useParams<{ id: string }>();
   const [collapsed, setCollapsed] = useState(getSidebarCollapsed);
 
@@ -17,17 +18,9 @@ export function Sidebar() {
   };
 
   const getStatusText = () => {
-    if (!connected) return 'Offline';
+    if (!hasAnyConnection(activeCount, peerCount)) return 'Offline';
     if (!synced) return 'Syncing...';
     return 'Synced';
-  };
-
-  const getPeerInfo = () => {
-    if (serverCount === 0) return null;
-    if (activeCount === serverCount) {
-      return `(${activeCount} peer${activeCount !== 1 ? 's' : ''})`;
-    }
-    return `(${activeCount}/${serverCount} peers)`;
   };
 
   return (
@@ -35,10 +28,15 @@ export function Sidebar() {
       <CollapsiblePanelHeader side="left" onToggle={handleToggle} title="Plans">
         <div className="flex items-center gap-2 text-xs text-gray-500 mt-1">
           <span
-            className={cn('w-2 h-2 rounded-full', connected ? 'bg-green-500' : 'bg-gray-300')}
+            className={cn(
+              'w-2 h-2 rounded-full',
+              hasAnyConnection(activeCount, peerCount) ? 'bg-green-500' : 'bg-gray-300'
+            )}
           />
           {getStatusText()}
-          {getPeerInfo() && <span>{getPeerInfo()}</span>}
+          {formatConnectionInfo(activeCount, serverCount, peerCount) && (
+            <span>{formatConnectionInfo(activeCount, serverCount, peerCount)}</span>
+          )}
         </div>
       </CollapsiblePanelHeader>
 

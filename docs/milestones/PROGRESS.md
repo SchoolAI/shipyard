@@ -113,17 +113,37 @@ Browser discovers all → Multi-provider Yjs merge
 - ✅ FormattingToolbar with AddCommentButton
 
 **Key files:**
-- `packages/web/src/components/CommentsPanel.tsx` - Thread list sidebar
-- `packages/web/src/components/ReviewActions.tsx` - Approve/Request Changes
-- `packages/web/src/utils/identity.ts` - User identity helpers
-- `packages/server/src/tools/get-feedback.ts` - MCP feedback tool
+- `apps/web/src/components/CommentsPanel.tsx` - Thread list sidebar
+- `apps/web/src/components/ReviewActions.tsx` - Approve/Request Changes
+- `apps/web/src/utils/identity.ts` - User identity helpers
+- `apps/server/src/tools/get-feedback.ts` - MCP feedback tool
 - `packages/schema/src/thread.ts` - Thread parsing utilities
+
+---
+
+## Milestone 6: P2P ✅ COMPLETE
+
+**Goal:** WebRTC remote collaboration - multiple reviewers sync without central server
+
+**Completed:**
+- ✅ y-webrtc provider added to browser
+- ✅ Signaling server configurable via `VITE_WEBRTC_SIGNALING` env var
+- ✅ Peer count shown in sidebar ("X P2P" indicator)
+- ✅ Share button to copy URL for P2P collaboration
+- ✅ Full offline P2P - works even without MCP server
+
+**Key files:**
+- `apps/web/src/hooks/useMultiProviderSync.ts` - WebRTC provider integration
+- `apps/web/src/components/ShareButton.tsx` - Copy URL to clipboard
+- `apps/web/src/components/Sidebar.tsx` - P2P peer count display
+
+**Future enhancement:** [Token-based room auth](https://github.com/SchoolAI/peer-plan/issues/12)
 
 ---
 
 ## Next Up
 
-**Milestone 6 (P2P):** WebRTC remote collaboration - multiple reviewers sync without central server
+**Milestone 7 (Artifacts):** GitHub blob storage for screenshots, videos, test results
 
 ---
 

@@ -1,0 +1,15 @@
+{
+  "name": "@peer-plan/signaling",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "description": "WebRTC signaling server for P2P peer discovery",
+  "scripts": {
+    "dev": "node src/server.js",
+    "start": "node src/server.js"
+  },
+  "dependencies": {
+    "lib0": "^0.2.98",
+    "ws": "^8.18.0"
+  }
+}

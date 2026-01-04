@@ -2,6 +2,7 @@ import type { PlanMetadata, PlanStatusType } from '@peer-plan/schema';
 import { MessageSquare } from 'lucide-react';
 import type * as Y from 'yjs';
 import { ReviewActions } from '@/components/ReviewActions';
+import { ShareButton } from '@/components/ShareButton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader } from '@/components/ui/card';
@@ -62,6 +63,7 @@ export function PlanHeader({
         <div className="flex items-start justify-between gap-4">
           <h1 className="text-3xl font-bold">{display.title}</h1>
           <div className="flex items-center gap-2 shrink-0">
+            <ShareButton />
             {onToggleComments && (
               <Button
                 variant={commentsPanelOpen ? 'secondary' : 'ghost'}

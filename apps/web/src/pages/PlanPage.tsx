@@ -15,19 +15,27 @@ import { SyncStatus } from '@/components/SyncStatus';
 import { useIdentity } from '@/hooks/useIdentity';
 import { useMultiProviderSync } from '@/hooks/useMultiProviderSync';
 
+// Long enough to read, short enough not to linger
+const HINT_AUTO_DISMISS_MS = 8000;
+
 export function PlanPage() {
   const { id } = useParams<{ id: string }>();
   // The route /plan/:id guarantees id is defined
   const planId = id ?? '';
-  const { ydoc, syncState, providers } = useMultiProviderSync(planId);
+  const { ydoc, syncState, providers, rtcProvider } = useMultiProviderSync(planId);
   const { identity } = useIdentity();
   const [metadata, setMetadata] = useState<PlanMetadata | null>(null);
   const [showProfileSetup, setShowProfileSetup] = useState(false);
+  const [pendingCommentHint, setPendingCommentHint] = useState(false);
   const [commentsPanelOpen, setCommentsPanelOpen] = useState(true);
   const commentCount = useThreadCount(ydoc);
 
   const { ydoc: indexDoc } = useMultiProviderSync(PLAN_INDEX_DOC_NAME);
-  const activeProvider = providers.find((p) => p.wsconnected) ?? providers[0] ?? null;
+  // Prefer WebSocket provider when connected, fall back to WebRTC for P2P-only mode.
+  // This ensures BlockNote binds to the Y.Doc fragment even without a WebSocket server,
+  // so comment highlights sync properly via WebRTC.
+  const activeWsProvider = providers.find((p) => p.wsconnected) ?? providers[0] ?? null;
+  const activeProvider = activeWsProvider ?? rtcProvider;
 
   useEffect(() => {
     const metaMap = ydoc.getMap('metadata');
@@ -40,9 +48,11 @@ export function PlanPage() {
     return () => metaMap.unobserve(update);
   }, [ydoc]);
 
-  // Memoize to prevent recreation on every render
+  // When user tries to comment without identity, we show profile setup
+  // and track that they were trying to comment
   const handleRequestIdentity = useCallback(() => {
     setShowProfileSetup(true);
+    setPendingCommentHint(true);
   }, []);
 
   const handleStatusChange = useCallback(
@@ -64,6 +74,12 @@ export function PlanPage() {
   const handleToggleComments = useCallback(() => {
     setCommentsPanelOpen((prev) => !prev);
   }, []);
+
+  useEffect(() => {
+    if (!pendingCommentHint || !identity) return;
+    const timer = setTimeout(() => setPendingCommentHint(false), HINT_AUTO_DISMISS_MS);
+    return () => clearTimeout(timer);
+  }, [pendingCommentHint, identity]);
 
   // MUST be before early returns (Rules of Hooks)
   const fallback = useMemo(() => {
@@ -91,7 +107,11 @@ export function PlanPage() {
   if (!metadata && !syncState.synced) {
     return (
       <div className="p-8">
-        <SyncStatus {...syncState} />
+        <SyncStatus
+          synced={syncState.synced}
+          serverCount={syncState.activeCount}
+          peerCount={syncState.peerCount}
+        />
         <p className="text-gray-600 mt-4">Loading plan...</p>
       </div>
     );
@@ -111,7 +131,11 @@ export function PlanPage() {
       {/* Main content area */}
       <div className="flex-1 p-8 overflow-y-auto">
         <div className="max-w-4xl mx-auto space-y-6">
-          <SyncStatus {...syncState} />
+          <SyncStatus
+            synced={syncState.synced}
+            serverCount={syncState.activeCount}
+            peerCount={syncState.peerCount}
+          />
           <PlanHeader
             ydoc={ydoc}
             metadata={metadata}
@@ -122,6 +146,34 @@ export function PlanPage() {
             commentsPanelOpen={commentsPanelOpen}
             onToggleComments={handleToggleComments}
           />
+          {/* Hint shown after profile setup when user was trying to comment */}
+          {pendingCommentHint && identity && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-center justify-between">
+              <p className="text-blue-800 text-sm">
+                <span className="font-medium">Ready to comment!</span> Select text in the document
+                below, then click the Comment button.
+              </p>
+              <button
+                type="button"
+                onClick={() => setPendingCommentHint(false)}
+                className="text-blue-600 hover:text-blue-800 ml-4"
+                aria-label="Dismiss hint"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  aria-hidden="true"
+                >
+                  <path d="M18 6L6 18M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          )}
           {/* Key forces full remount when identity changes, ensuring
               useCreateBlockNote creates a fresh editor with correct extensions.
               Without this, changing from anonymous to identified user would crash

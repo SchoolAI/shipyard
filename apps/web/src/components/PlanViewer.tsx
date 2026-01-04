@@ -13,9 +13,13 @@ import {
   useCreateBlockNote,
 } from '@blocknote/react';
 import { useEffect, useRef } from 'react';
+import type { WebrtcProvider } from 'y-webrtc';
 import type { WebsocketProvider } from 'y-websocket';
 import type * as Y from 'yjs';
 import type { UserIdentity } from '@/utils/identity';
+
+/** Provider type that BlockNote can use for collaboration (WebSocket or WebRTC) */
+type CollaborationProvider = WebsocketProvider | WebrtcProvider;
 
 interface PlanViewerFallback {
   content: Block[];
@@ -26,8 +30,8 @@ interface PlanViewerProps {
   fallback: PlanViewerFallback;
   /** User identity for comments */
   identity: UserIdentity | null;
-  /** WebSocket provider for collaboration */
-  provider?: WebsocketProvider | null;
+  /** Provider for collaboration (WebSocket or WebRTC) */
+  provider?: CollaborationProvider | null;
   /** Called when user needs to set up identity for commenting */
   onRequestIdentity?: () => void;
 }

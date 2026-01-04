@@ -113,10 +113,10 @@ peer-plan/
 | 3 | Live Sync | ✅ Complete | WebSocket CRDT sync |
 | 4 | Plan Discovery | ✅ Complete | Multi-peer architecture, sidebar |
 | 5 | Review Flow | ✅ Complete | Comments, approval, get_feedback tool |
-| 6 | P2P | **Next** | WebRTC remote collab |
-| 7 | Artifacts | Not Started | GitHub blob storage |
+| 6 | P2P | ✅ Complete | WebRTC remote collab |
+| 7 | Artifacts | **Next** | GitHub blob storage |
 
-**Current:** [Milestone 6: P2P](./milestones/06-p2p.md)
+**Current:** [Milestone 7: Artifacts](./milestones/05-artifacts.md)
 
 ---
 

@@ -10,7 +10,8 @@
     "lint": "turbo run lint",
     "lint:fix": "turbo run lint:fix",
     "check": "turbo run test typecheck lint",
-    "dev": "pnpm dev:web",
+    "dev": "concurrently --names \"signal,web\" --prefix-colors \"cyan,magenta\" \"pnpm dev:signaling\" \"pnpm dev:web\"",
+    "dev:signaling": "turbo run dev --filter=@peer-plan/signaling",
     "dev:web": "turbo run dev --filter=@peer-plan/web",
     "prepare": "simple-git-hooks"
   },

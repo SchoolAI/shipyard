@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { IndexeddbPersistence } from 'y-indexeddb';
+import { WebrtcProvider } from 'y-webrtc';
 import { WebsocketProvider } from 'y-websocket';
 import * as Y from 'yjs';
+
+const DEFAULT_SIGNALING_SERVER = 'wss://signaling.yjs.dev';
 
 const DEFAULT_REGISTRY_PORTS = [32191, 32192];
 
@@ -27,6 +30,8 @@ interface SyncState {
   synced: boolean;
   serverCount: number;
   activeCount: number;
+  /** Number of peers connected via WebRTC P2P */
+  peerCount: number;
 }
 
 interface ProviderState {
@@ -64,12 +69,23 @@ async function discoverServers(): Promise<ServerEntry[]> {
  * Hook for connecting to multiple Yjs providers discovered via registry.
  * Handles disconnection gracefully by removing dead providers after max retries.
  * Uses y-websocket's built-in exponential backoff.
+ *
+ * @param docName - Document name (plan ID or 'plan-index')
+ * @param options - Optional configuration
+ * @param options.enableWebRTC - Enable P2P WebRTC sync (default: true for plan docs, false for plan-index)
  */
-export function useMultiProviderSync(docName: string): {
+export function useMultiProviderSync(
+  docName: string,
+  options: { enableWebRTC?: boolean } = {}
+): {
   ydoc: Y.Doc;
   syncState: SyncState;
   providers: WebsocketProvider[];
+  /** WebRTC provider for P2P sync (null if not connected) */
+  rtcProvider: WebrtcProvider | null;
 } {
+  // Don't enable WebRTC for plan-index (only for individual plans)
+  const enableWebRTC = options.enableWebRTC ?? docName !== 'plan-index';
   // biome-ignore lint/correctness/useExhaustiveDependencies: docName triggers Y.Doc recreation intentionally
   const ydoc = useMemo(() => new Y.Doc(), [docName]);
   const [syncState, setSyncState] = useState<SyncState>({
@@ -77,12 +93,16 @@ export function useMultiProviderSync(docName: string): {
     synced: false,
     serverCount: 0,
     activeCount: 0,
+    peerCount: 0,
   });
+  const [rtcProvider, setRtcProvider] = useState<WebrtcProvider | null>(null);
 
   const [providersList, setProvidersList] = useState<WebsocketProvider[]>([]);
 
   // Use ref to track providers so we can modify without re-running effect
   const providersRef = useRef<Map<string, ProviderState>>(new Map());
+
+  const peerCountRef = useRef<number>(0);
 
   // Use sessionStorage to persist across page refreshes
   const removedServersRef = useRef<Map<string, number> | null>(null);
@@ -114,17 +134,44 @@ export function useMultiProviderSync(docName: string): {
 
     const idbProvider = new IndexeddbPersistence(docName, ydoc);
 
+    let rtc: WebrtcProvider | null = null;
+    if (enableWebRTC) {
+      const signalingServer =
+        (import.meta.env.VITE_WEBRTC_SIGNALING as string) || DEFAULT_SIGNALING_SERVER;
+      rtc = new WebrtcProvider(`peer-plan-${docName}`, ydoc, {
+        signaling: [signalingServer],
+      });
+      setRtcProvider(rtc);
+
+      rtc.on('peers', ({ webrtcPeers }: { webrtcPeers: string[] }) => {
+        peerCountRef.current = webrtcPeers.length;
+        if (mounted) {
+          updateSyncState();
+        }
+      });
+
+      // Track sync state
+      rtc.on('synced', () => {
+        if (mounted) {
+          updateSyncState();
+        }
+      });
+    }
+
     function updateSyncState() {
       const providers = Array.from(providersRef.current.values());
       const connectedProviders = providers.filter((p) => p.provider.wsconnected);
-      const anyConnected = connectedProviders.length > 0;
-      const anySynced = providers.some((p) => p.provider.synced);
+      const anyConnected = connectedProviders.length > 0 || (rtc?.connected ?? false);
+      // Consider synced if ANY provider has synced
+      // For WebRTC: consider synced if we have connected peers (P2P doesn't have central sync point)
+      const anySynced = providers.some((p) => p.provider.synced) || peerCountRef.current > 0; // WebRTC with peers = synced
 
       setSyncState({
         connected: anyConnected,
         synced: anySynced,
         serverCount: providers.length,
         activeCount: connectedProviders.length,
+        peerCount: peerCountRef.current,
       });
 
       setProvidersList(providers.map((p) => p.provider));
@@ -258,8 +305,13 @@ export function useMultiProviderSync(docName: string): {
       }
       providersRef.current.clear();
       idbProvider.destroy();
+      if (rtc) {
+        rtc.disconnect();
+        rtc.destroy();
+        setRtcProvider(null);
+      }
     };
-  }, [docName, ydoc]);
+  }, [docName, ydoc, enableWebRTC]);
 
-  return { ydoc, syncState, providers: providersList };
+  return { ydoc, syncState, providers: providersList, rtcProvider };
 }

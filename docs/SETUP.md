@@ -36,7 +36,7 @@ Opens on `http://localhost:5173`
 
 ```bash
 claude mcp add --transport stdio peer-plan \
-  -- node "/Users/jacobpetterle/Working Directory/peer-plan/packages/server/dist/index.mjs"
+  -- node "/Users/jacobpetterle/Working Directory/peer-plan/apps/server/dist/index.mjs"
 ```
 
 Verify it was added:
@@ -74,7 +74,7 @@ pnpm dev:server   # Start server in watch mode
 
 Test the server directly:
 ```bash
-node packages/server/dist/index.mjs
+node apps/server/dist/index.mjs
 ```
 
 Should see: "MCP server started" in logs (stderr)

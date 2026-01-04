@@ -12,7 +12,7 @@ Visual diagrams showing how Y.Doc keys are used across the system.
                        │
                        ▼
 ┌─────────────────────────────────────────────────────────────┐
-│              SERVER: packages/server/src/tools/             │
+│              SERVER: apps/server/src/tools/             │
 │                    create-plan.ts                           │
 │                                                             │
 │  1. Parse markdown → Block[]                                │
@@ -45,7 +45,7 @@ Visual diagrams showing how Y.Doc keys are used across the system.
                        │
                        ▼
 ┌─────────────────────────────────────────────────────────────┐
-│              BROWSER: packages/web/src/                     │
+│              BROWSER: apps/web/src/                     │
 │                                                             │
 │  1. URL contains snapshot (fallback)                        │
 │                                                             │
@@ -98,7 +98,7 @@ Visual diagrams showing how Y.Doc keys are used across the system.
                        │
                        ▼
 ┌─────────────────────────────────────────────────────────────┐
-│              BROWSER: packages/web/src/                     │
+│              BROWSER: apps/web/src/                     │
 │                                                             │
 │  1. Parse URL snapshot                                      │
 │     ┌────────────────────────────────────┐                 │
@@ -162,7 +162,7 @@ Visual diagrams showing how Y.Doc keys are used across the system.
                        │
                        ▼
 ┌─────────────────────────────────────────────────────────────┐
-│       BROWSER: packages/web/src/components/                 │
+│       BROWSER: apps/web/src/components/                 │
 │                 PlanViewer.tsx                              │
 │                                                             │
 │  1. Initialize YjsThreadStore                               │
@@ -204,7 +204,7 @@ Visual diagrams showing how Y.Doc keys are used across the system.
                        │
                        ▼
 ┌─────────────────────────────────────────────────────────────┐
-│       SERVER: packages/server/src/tools/                    │
+│       SERVER: apps/server/src/tools/                    │
 │                 get-feedback.ts                             │
 │                                                             │
 │  const threadsMap = ydoc.getMap(YDOC_KEYS.THREADS)          │
@@ -230,7 +230,7 @@ Visual diagrams showing how Y.Doc keys are used across the system.
                        │
                        ▼
 ┌─────────────────────────────────────────────────────────────┐
-│       BROWSER: packages/web/src/components/                 │
+│       BROWSER: apps/web/src/components/                 │
 │                 ReviewActions.tsx                           │
 │                                                             │
 │  ydoc.transact(() => {                                      │

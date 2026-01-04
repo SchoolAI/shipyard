@@ -8,6 +8,8 @@ export interface PlanIndexState {
   synced: boolean;
   serverCount: number;
   activeCount: number;
+  /** Number of peers connected via WebRTC P2P */
+  peerCount: number;
 }
 
 /**
@@ -39,5 +41,6 @@ export function usePlanIndex(): PlanIndexState {
     synced: syncState.synced,
     serverCount: syncState.serverCount,
     activeCount: syncState.activeCount,
+    peerCount: syncState.peerCount,
   };
 }

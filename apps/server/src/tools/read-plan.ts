@@ -14,7 +14,8 @@ const ReadPlanInput = z.object({
 export const readPlanTool = {
   definition: {
     name: 'read_plan',
-    description: 'Read a specific plan by ID, returning its metadata and content in markdown format',
+    description:
+      'Read a specific plan by ID, returning its metadata and content in markdown format',
     inputSchema: {
       type: 'object',
       properties: {

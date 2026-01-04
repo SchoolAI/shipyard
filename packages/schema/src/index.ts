@@ -23,8 +23,6 @@ export {
   ThreadCommentSchema,
   ThreadSchema,
 } from './thread.js';
-export type { UserProfile } from './user-helpers.js';
-export { createUserResolver } from './user-helpers.js';
 export type { UrlEncodedPlan } from './url-encoding.js';
 export {
   createPlanUrl,
@@ -32,6 +30,8 @@ export {
   encodePlan,
   getPlanFromUrl,
 } from './url-encoding.js';
+export type { UserProfile } from './user-helpers.js';
+export { createUserResolver } from './user-helpers.js';
 export {
   getPlanMetadata,
   getStepCompletions,

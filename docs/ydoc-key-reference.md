@@ -173,25 +173,25 @@ if (isValidYDocKey(key)) {
 ## Where Keys Are Used
 
 ### Server Side
-- `/packages/server/src/tools/create-plan.ts`
+- `/apps/server/src/tools/create-plan.ts`
   - Writes: METADATA, CONTENT, DOCUMENT_FRAGMENT
-- `/packages/server/src/tools/read-plan.ts`
+- `/apps/server/src/tools/read-plan.ts`
   - Reads: METADATA, CONTENT
-- `/packages/server/src/tools/get-feedback.ts`
+- `/apps/server/src/tools/get-feedback.ts`
   - Reads: METADATA, THREADS
 
 ### Browser Side
-- `/packages/web/src/components/PlanViewer.tsx`
+- `/apps/web/src/components/PlanViewer.tsx`
   - Reads: DOCUMENT_FRAGMENT (BlockNote), THREADS
-- `/packages/web/src/components/CommentsPanel.tsx`
+- `/apps/web/src/components/CommentsPanel.tsx`
   - Reads: THREADS
-- `/packages/web/src/components/ReviewActions.tsx`
+- `/apps/web/src/components/ReviewActions.tsx`
   - Writes: METADATA (status, reviewedAt, reviewedBy)
-- `/packages/web/src/pages/PlanPage.tsx`
+- `/apps/web/src/pages/PlanPage.tsx`
   - Reads: METADATA, CONTENT (fallback)
-- `/packages/web/src/hooks/useHydration.ts`
+- `/apps/web/src/hooks/useHydration.ts`
   - Writes: METADATA, CONTENT
-- `/packages/web/src/hooks/usePlanIndex.ts`
+- `/apps/web/src/hooks/usePlanIndex.ts`
   - Reads: PLANS
 
 ### Schema Helpers
