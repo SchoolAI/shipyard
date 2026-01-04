@@ -125,11 +125,6 @@ export class SignalingRoom extends DurableObject<Env> {
     // Also keep in memory for fast access
     (server as any).__state = state;
 
-    // Note: Auto-response for ping/pong could be added here, but we handle it in webSocketMessage
-    // this.ctx.setWebSocketAutoResponse(
-    //   new WebSocketRequestResponsePair('{"type":"ping"}', '{"type":"pong"}')
-    // );
-
     // Return the client side of the WebSocket
     return new Response(null, {
       status: 101,
