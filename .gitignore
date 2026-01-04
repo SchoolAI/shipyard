@@ -140,3 +140,11 @@ dist
 # Vite logs files
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# External repos cloned for analysis
+spikes/plannotator/
+spikes/plan-notator-analysis.md
+spikes/loro-extended-repo/
+
+# Playwright MCP
+.playwright-mcp/

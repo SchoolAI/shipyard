@@ -1,3 +1,4 @@
+import { ServerBlockNoteEditor } from '@blocknote/server-util';
 import { initPlanMetadata, type UrlEncodedPlan } from '@peer-plan/schema';
 import { useEffect, useRef } from 'react';
 import type * as Y from 'yjs';
@@ -17,8 +18,9 @@ export function useHydration(ydoc: Y.Doc, urlPlan: UrlEncodedPlan): void {
 
     // Only hydrate if Y.Doc is empty (no prior state from IndexedDB or server)
     if (metadata.size === 0) {
+      const editor = ServerBlockNoteEditor.create();
+
       ydoc.transact(() => {
-        // Initialize metadata from URL snapshot
         initPlanMetadata(ydoc, {
           id: urlPlan.id,
           title: urlPlan.title,
@@ -27,11 +29,16 @@ export function useHydration(ydoc: Y.Doc, urlPlan: UrlEncodedPlan): void {
           pr: urlPlan.pr,
         });
 
-        // Initialize BlockNote content array
+        // Initialize BlockNote content in both places:
+        // 1. 'content' Y.Array for JSON serialization
         const content = ydoc.getArray('content');
         for (const block of urlPlan.content) {
           content.push([block]);
         }
+
+        // 2. 'document' Y.XmlFragment for BlockNote collaboration
+        const fragment = ydoc.getXmlFragment('document');
+        editor.blocksToYXmlFragment(urlPlan.content, fragment);
       });
 
       hydrated.current = true;

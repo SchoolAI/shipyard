@@ -1,4 +1,4 @@
-import { getPlanFromUrl } from '@peer-plan/schema';
+import { getPlanFromUrl, type PlanMetadata } from '@peer-plan/schema';
 import { useMemo } from 'react';
 import * as Y from 'yjs';
 import { PlanHeader } from '@/components/PlanHeader';
@@ -17,6 +17,20 @@ export function SnapshotPage() {
     );
   }
 
+  // Snapshot view is read-only, no identity needed
+  const noOp = () => {};
+
+  // Snapshots are static - no timestamps needed
+  const snapshotMetadata: PlanMetadata = {
+    id: urlPlan.id,
+    title: urlPlan.title,
+    status: urlPlan.status,
+    repo: urlPlan.repo,
+    pr: urlPlan.pr,
+    createdAt: 0,
+    updatedAt: 0,
+  };
+
   return (
     <div className="p-8 max-w-4xl mx-auto space-y-6">
       {/* Snapshot banner */}
@@ -25,8 +39,13 @@ export function SnapshotPage() {
         in time.
       </div>
 
-      <PlanHeader ydoc={ydoc} fallback={urlPlan} />
-      <PlanViewer ydoc={ydoc} fallback={urlPlan} />
+      <PlanHeader
+        ydoc={ydoc}
+        metadata={snapshotMetadata}
+        identity={null}
+        onRequestIdentity={noOp}
+      />
+      <PlanViewer ydoc={ydoc} fallback={urlPlan} identity={null} />
     </div>
   );
 }

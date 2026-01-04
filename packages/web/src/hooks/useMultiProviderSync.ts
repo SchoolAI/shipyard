@@ -3,17 +3,13 @@ import { IndexeddbPersistence } from 'y-indexeddb';
 import { WebsocketProvider } from 'y-websocket';
 import * as Y from 'yjs';
 
-// Registry server ports to try
 const DEFAULT_REGISTRY_PORTS = [32191, 32192];
 
 // After this many failed reconnects (using y-websocket's internal counter), destroy the provider
 // At 5 fails with 2500ms max backoff, this is roughly 5-7 seconds of trying
 const MAX_FAILED_RECONNECTS = 5;
 
-// How often to refresh from registry (ms)
 const REGISTRY_REFRESH_INTERVAL = 10000;
-
-// How often to check for dead providers (ms)
 const DEAD_PROVIDER_CHECK_INTERVAL = 2000;
 
 // How long to remember removed servers (prevent re-adding from stale registry)
@@ -57,11 +53,10 @@ async function discoverServers(): Promise<ServerEntry[]> {
         return data.servers;
       }
     } catch {
-      // Try next port
+      // continue to next port
     }
   }
 
-  // No registry found
   return [];
 }
 
@@ -73,8 +68,8 @@ async function discoverServers(): Promise<ServerEntry[]> {
 export function useMultiProviderSync(docName: string): {
   ydoc: Y.Doc;
   syncState: SyncState;
+  providers: WebsocketProvider[];
 } {
-  // Create new Y.Doc when docName changes
   // biome-ignore lint/correctness/useExhaustiveDependencies: docName triggers Y.Doc recreation intentionally
   const ydoc = useMemo(() => new Y.Doc(), [docName]);
   const [syncState, setSyncState] = useState<SyncState>({
@@ -84,27 +79,32 @@ export function useMultiProviderSync(docName: string): {
     activeCount: 0,
   });
 
+  const [providersList, setProvidersList] = useState<WebsocketProvider[]>([]);
+
   // Use ref to track providers so we can modify without re-running effect
   const providersRef = useRef<Map<string, ProviderState>>(new Map());
 
-  // Track recently removed servers to prevent re-adding from stale registry
   // Use sessionStorage to persist across page refreshes
-  const removedServersRef = useRef<Map<string, number>>(null as unknown as Map<string, number>);
+  const removedServersRef = useRef<Map<string, number> | null>(null);
+
+  // Lazy initialization - runs once per hook instance
   if (removedServersRef.current === null) {
+    removedServersRef.current = loadRemovedServersFromSession();
+  }
+
+  function loadRemovedServersFromSession(): Map<string, number> {
     try {
       const stored = sessionStorage.getItem('peer-plan-removed-servers');
       if (stored) {
         const entries = JSON.parse(stored) as [string, number][];
-        // Filter out expired entries
         const now = Date.now();
         const valid = entries.filter(([, time]) => now - time < REMOVED_SERVER_TTL);
-        removedServersRef.current = new Map(valid);
-      } else {
-        removedServersRef.current = new Map();
+        return new Map(valid);
       }
     } catch {
-      removedServersRef.current = new Map();
+      // Ignore parse errors
     }
+    return new Map();
   }
 
   useEffect(() => {
@@ -112,7 +112,6 @@ export function useMultiProviderSync(docName: string): {
     let refreshInterval: ReturnType<typeof setInterval> | null = null;
     let deadCheckInterval: ReturnType<typeof setInterval> | null = null;
 
-    // IndexedDB for local persistence
     const idbProvider = new IndexeddbPersistence(docName, ydoc);
 
     function updateSyncState() {
@@ -127,6 +126,8 @@ export function useMultiProviderSync(docName: string): {
         serverCount: providers.length,
         activeCount: connectedProviders.length,
       });
+
+      setProvidersList(providers.map((p) => p.provider));
     }
 
     /**
@@ -150,23 +151,30 @@ export function useMultiProviderSync(docName: string): {
       state.provider.disconnect();
       state.provider.destroy();
       providersRef.current.delete(url);
+
       // Remember this server was removed to prevent re-adding from stale registry
-      removedServersRef.current.set(url, Date.now());
-      // Persist to sessionStorage so it survives page refresh
-      try {
-        const entries = Array.from(removedServersRef.current.entries());
-        sessionStorage.setItem('peer-plan-removed-servers', JSON.stringify(entries));
-      } catch {
-        // Ignore storage errors
+      const removedServers = removedServersRef.current;
+      if (removedServers) {
+        removedServers.set(url, Date.now());
+        // Persist to sessionStorage so it survives page refresh
+        try {
+          const entries = Array.from(removedServers.entries());
+          sessionStorage.setItem('peer-plan-removed-servers', JSON.stringify(entries));
+        } catch {
+          // Ignore storage errors
+        }
       }
     }
 
     function isRecentlyRemoved(url: string): boolean {
-      const removedAt = removedServersRef.current.get(url);
+      const removedServers = removedServersRef.current;
+      if (!removedServers) return false;
+
+      const removedAt = removedServers.get(url);
       if (!removedAt) return false;
+
       if (Date.now() - removedAt > REMOVED_SERVER_TTL) {
-        // Expired, clean up
-        removedServersRef.current.delete(url);
+        removedServers.delete(url);
         return false;
       }
       return true;
@@ -183,7 +191,6 @@ export function useMultiProviderSync(docName: string): {
         url: server.url,
       };
 
-      // Track connection status changes
       provider.on('status', () => {
         updateSyncState();
       });
@@ -233,13 +240,8 @@ export function useMultiProviderSync(docName: string): {
       }
     }
 
-    // Initial server discovery
     refreshServers();
-
-    // Periodic refresh to detect new servers
     refreshInterval = setInterval(refreshServers, REGISTRY_REFRESH_INTERVAL);
-
-    // Periodic check for dead providers (uses y-websocket's internal backoff counter)
     deadCheckInterval = setInterval(checkDeadProviders, DEAD_PROVIDER_CHECK_INTERVAL);
 
     return () => {
@@ -259,5 +261,5 @@ export function useMultiProviderSync(docName: string): {
     };
   }, [docName, ydoc]);
 
-  return { ydoc, syncState };
+  return { ydoc, syncState, providers: providersList };
 }

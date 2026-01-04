@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { type PlanStatusType, PlanStatusValues } from './plan.js';
 
 /**
  * The document name for the plan index Y.Doc.
@@ -8,6 +9,7 @@ export const PLAN_INDEX_DOC_NAME = 'plan-index';
 
 /**
  * Status values for a plan.
+ * @deprecated Use PlanStatusValues from plan.ts instead
  */
 export const PlanStatus = {
   DRAFT: 'draft',
@@ -16,7 +18,7 @@ export const PlanStatus = {
   CHANGES_REQUESTED: 'changes_requested',
 } as const;
 
-export type PlanStatusType = (typeof PlanStatus)[keyof typeof PlanStatus];
+export type { PlanStatusType };
 
 /**
  * Plan summary for the index (minimal data for sidebar display).
@@ -35,7 +37,7 @@ export interface PlanIndexEntry {
 export const PlanIndexEntrySchema = z.object({
   id: z.string(),
   title: z.string(),
-  status: z.enum(['draft', 'pending_review', 'approved', 'changes_requested']),
+  status: z.enum(PlanStatusValues),
   createdAt: z.number(),
   updatedAt: z.number(),
 });

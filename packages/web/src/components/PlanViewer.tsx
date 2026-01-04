@@ -1,7 +1,21 @@
 import type { Block } from '@blocknote/core';
+import {
+  CommentsExtension,
+  DefaultThreadStoreAuth,
+  YjsThreadStore,
+} from '@blocknote/core/comments';
 import { BlockNoteView } from '@blocknote/mantine';
-import { useCreateBlockNote } from '@blocknote/react';
+import {
+  AddCommentButton,
+  FloatingComposerController,
+  FormattingToolbar,
+  FormattingToolbarController,
+  useCreateBlockNote,
+} from '@blocknote/react';
+import { useEffect, useRef } from 'react';
+import type { WebsocketProvider } from 'y-websocket';
 import type * as Y from 'yjs';
+import type { UserIdentity } from '@/utils/identity';
 
 interface PlanViewerFallback {
   content: Block[];
@@ -10,18 +24,333 @@ interface PlanViewerFallback {
 interface PlanViewerProps {
   ydoc: Y.Doc;
   fallback: PlanViewerFallback;
+  /** User identity for comments */
+  identity: UserIdentity | null;
+  /** WebSocket provider for collaboration */
+  provider?: WebsocketProvider | null;
+  /** Called when user needs to set up identity for commenting */
+  onRequestIdentity?: () => void;
 }
 
-export function PlanViewer({ ydoc: _ydoc, fallback }: PlanViewerProps) {
-  // For M3, we still use the fallback content from URL
-  // Full BlockNote Yjs collaboration will be added in M4
-  const editor = useCreateBlockNote({
-    initialContent: fallback.content,
-  });
+/**
+ * Convert HSL color values to RGB.
+ * h: 0-360, s: 0-100, l: 0-100
+ */
+function hslToRgb(h: number, s: number, l: number): [number, number, number] {
+  const sNorm = s / 100;
+  const lNorm = l / 100;
+
+  const c = (1 - Math.abs(2 * lNorm - 1)) * sNorm;
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+  const m = lNorm - c / 2;
+
+  let r = 0;
+  let g = 0;
+  let b = 0;
+
+  if (h < 60) {
+    [r, g, b] = [c, x, 0];
+  } else if (h < 120) {
+    [r, g, b] = [x, c, 0];
+  } else if (h < 180) {
+    [r, g, b] = [0, c, x];
+  } else if (h < 240) {
+    [r, g, b] = [0, x, c];
+  } else if (h < 300) {
+    [r, g, b] = [x, 0, c];
+  } else {
+    [r, g, b] = [c, 0, x];
+  }
+
+  return [Math.round((r + m) * 255), Math.round((g + m) * 255), Math.round((b + m) * 255)];
+}
+
+/**
+ * Convert any color format to normalized hex for comparison.
+ * Handles: #hex, rgb(r,g,b), rgba(r,g,b,a), hsl(h, s%, l%)
+ */
+function normalizeColor(color: string): string {
+  if (!color) return '';
+
+  // Already hex
+  if (color.startsWith('#')) {
+    return color.toLowerCase();
+  }
+
+  // HSL/HSLA format: hsl(180, 70%, 50%) or hsla(180, 70%, 50%, 1)
+  const hslMatch = color.match(/hsla?\s*\(\s*(\d+)\s*,\s*(\d+)%?\s*,\s*(\d+)%?/i);
+  if (hslMatch?.[1] && hslMatch[2] && hslMatch[3]) {
+    const h = Number.parseInt(hslMatch[1], 10);
+    const s = Number.parseInt(hslMatch[2], 10);
+    const l = Number.parseInt(hslMatch[3], 10);
+    const [r, g, b] = hslToRgb(h, s, l);
+    return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+  }
+
+  // RGB/RGBA format
+  const rgbMatch = color.match(/rgba?\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
+  if (rgbMatch?.[1] && rgbMatch[2] && rgbMatch[3]) {
+    const r = Number.parseInt(rgbMatch[1], 10).toString(16).padStart(2, '0');
+    const g = Number.parseInt(rgbMatch[2], 10).toString(16).padStart(2, '0');
+    const b = Number.parseInt(rgbMatch[3], 10).toString(16).padStart(2, '0');
+    return `#${r}${g}${b}`;
+  }
+
+  return color.toLowerCase();
+}
+
+/**
+ * Create a resolveUsers function that looks up user info from the ydoc.
+ * Users are stored in a 'users' map when they set up their profile.
+ */
+function createResolveUsers(ydoc: Y.Doc, currentIdentity: UserIdentity | null) {
+  return async (
+    userIds: string[]
+  ): Promise<Array<{ id: string; username: string; avatarUrl: string }>> => {
+    const usersMap = ydoc.getMap<{ displayName: string; color: string }>('users');
+
+    return userIds.map((id) => {
+      // Check if this is the current user
+      if (currentIdentity && id === currentIdentity.id) {
+        return {
+          id,
+          username: currentIdentity.displayName,
+          avatarUrl: '',
+        };
+      }
+
+      // Look up from ydoc users map
+      const userData = usersMap.get(id);
+      if (userData) {
+        return {
+          id,
+          username: userData.displayName,
+          avatarUrl: '',
+        };
+      }
+
+      // Fallback to ID slice
+      return {
+        id,
+        username: id.slice(0, 8),
+        avatarUrl: '',
+      };
+    });
+  };
+}
+
+export function PlanViewer({
+  ydoc,
+  fallback,
+  identity,
+  provider,
+  onRequestIdentity,
+}: PlanViewerProps) {
+  // Comments are fully enabled only when identity is set
+  const hasComments = identity !== null;
+
+  // Store current user info in ydoc so other peers can resolve their name
+  useEffect(() => {
+    if (!identity) return;
+    const usersMap = ydoc.getMap<{ displayName: string; color: string }>('users');
+    usersMap.set(identity.id, {
+      displayName: identity.displayName,
+      color: identity.color,
+    });
+  }, [ydoc, identity]);
+
+  // Create editor with all configuration in one place to avoid timing issues.
+  // When identity is null, we don't enable comments at all.
+  // When identity is set, we create the threadStore and extension inline.
+  const editor = useCreateBlockNote(
+    {
+      // Only use initialContent when NOT in collaboration mode.
+      // When collaboration is enabled, content comes from the Yjs fragment.
+      // Mixing both causes conflicts and can clear block content!
+      initialContent: provider
+        ? undefined
+        : fallback.content.length > 0
+          ? fallback.content
+          : undefined,
+      collaboration: provider
+        ? {
+            provider,
+            // Use 'document' key to avoid conflict with 'content' Y.Array used for JSON block storage
+            fragment: ydoc.getXmlFragment('document'),
+            user: identity
+              ? {
+                  name: identity.displayName,
+                  color: identity.color,
+                }
+              : {
+                  name: 'Anonymous',
+                  color: '#808080',
+                },
+          }
+        : undefined,
+      // Create extension inline to ensure it's created with the editor
+      extensions: hasComments
+        ? [
+            CommentsExtension({
+              threadStore: new YjsThreadStore(
+                identity.id,
+                ydoc.getMap('threads'),
+                new DefaultThreadStoreAuth(identity.id, 'editor')
+              ),
+              resolveUsers: createResolveUsers(ydoc, identity),
+            }),
+          ]
+        : [],
+      // Keep editor editable for FormattingToolbar to work, but block content changes
+      _tiptapOptions: {
+        editorProps: {
+          // Prevent typing, pasting, and other input but allow selection
+          handleKeyDown: (_view, event) => {
+            const selectionKeys = [
+              'ArrowLeft',
+              'ArrowRight',
+              'ArrowUp',
+              'ArrowDown',
+              'Home',
+              'End',
+            ];
+            if (selectionKeys.includes(event.key) || event.shiftKey) {
+              return false; // Let event through
+            }
+            return true;
+          },
+          handlePaste: () => true, // Block paste
+          handleDrop: () => true, // Block drag and drop
+        },
+      },
+    },
+    // Dependencies: recreate editor when ydoc OR identity changes.
+    // This ensures the extension is properly registered when identity becomes available.
+    [ydoc, identity?.id]
+  );
+
+  // Note: We don't set editor.isEditable = false because that would prevent
+  // the FormattingToolbar from appearing. Instead, we block input via editorProps handlers above.
+
+  // Force BlockNoteView remount when switching plans. Identity changes are handled
+  // by the parent's key prop on PlanViewer, which remounts this entire component.
+  const editorKey = ydoc.guid;
+
+  // Ref for the container to observe cursor elements
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Mark own collaboration cursors so CSS can hide them
+  // This uses MutationObserver to detect cursor elements and marks ones matching our color
+  useEffect(() => {
+    if (!identity || !containerRef.current) return;
+
+    // Normalize our color to hex for consistent comparison
+    const ownColorNormalized = normalizeColor(identity.color);
+
+    const markOwnCursors = () => {
+      const cursors = containerRef.current?.querySelectorAll('.bn-collaboration-cursor__caret');
+      cursors?.forEach((cursor) => {
+        const cursorColor = (cursor as HTMLElement).style.backgroundColor;
+        const cursorColorNormalized = normalizeColor(cursorColor);
+        const parent = cursor.closest('.bn-collaboration-cursor__base');
+        if (parent) {
+          // Check if this cursor's color matches our color (both normalized to hex)
+          const isOwn = cursorColorNormalized === ownColorNormalized;
+          (parent as HTMLElement).setAttribute('data-is-own-cursor', isOwn ? 'true' : 'false');
+        }
+      });
+    };
+
+    // Initial mark
+    markOwnCursors();
+
+    // Observe for new cursor elements
+    const observer = new MutationObserver(markOwnCursors);
+    observer.observe(containerRef.current, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['style'],
+    });
+
+    return () => observer.disconnect();
+  }, [identity]);
+
+  // Handle Ctrl+Enter to submit comments
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      // Find and click the submit button in the floating composer
+      const submitButton = containerRef.current?.querySelector(
+        '[data-floating-composer] button[type="submit"], .bn-comment-input-submit-btn, .bn-floating-composer button'
+      );
+      if (submitButton instanceof HTMLButtonElement) {
+        e.preventDefault();
+        submitButton.click();
+      }
+    }
+  };
 
   return (
-    <div className="mt-6 bg-white rounded-lg shadow-sm p-6">
-      <BlockNoteView editor={editor} editable={false} theme="light" />
+    // biome-ignore lint/a11y/noNoninteractiveElementInteractions: Container needs keyboard handler for Ctrl+Enter comment submission
+    <div
+      ref={containerRef}
+      className="mt-6 bg-white rounded-lg shadow-sm p-6"
+      onKeyDown={handleKeyDown}
+      role="application"
+      aria-label="Plan viewer with comments"
+    >
+      <BlockNoteView
+        key={editorKey}
+        editor={editor}
+        editable={true} // Keep UI interactive for toolbar and selection
+        theme="light"
+        // Hide editing controls - this is a read-only view (except for comments)
+        sideMenu={false}
+        slashMenu={false}
+        formattingToolbar={false}
+        // Disable default comments UI - we add our own components below
+        // This prevents conflicts with FloatingComposerController
+        comments={false}
+      >
+        {/* Custom formatting toolbar - appears when text is selected */}
+        <FormattingToolbarController
+          formattingToolbar={() => (
+            <FormattingToolbar>
+              {hasComments ? (
+                // User has identity - show real comment button
+                <AddCommentButton />
+              ) : (
+                // No identity - show button that prompts for profile setup
+                <button
+                  type="button"
+                  onClick={onRequestIdentity}
+                  className="flex items-center gap-1.5 px-2 py-1 text-sm rounded hover:bg-gray-100"
+                  title="Set up your profile to leave comments"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                  </svg>
+                  Comment
+                </button>
+              )}
+            </FormattingToolbar>
+          )}
+        />
+        {/* Floating composer for creating new comments - only when identity is set */}
+        {hasComments && <FloatingComposerController />}
+        {/* Note: We use CommentsPanel sidebar for viewing threads, not FloatingThreadController */}
+      </BlockNoteView>
     </div>
   );
 }

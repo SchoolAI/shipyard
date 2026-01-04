@@ -1,6 +1,6 @@
 import type { Block } from '@blocknote/core';
 import lzstring from 'lz-string';
-import type { Artifact } from './plan.js';
+import type { Artifact, PlanMetadata } from './plan.js';
 
 /**
  * URL-encoded plan structure.
@@ -10,7 +10,8 @@ export interface UrlEncodedPlan {
   v: 1;
   id: string;
   title: string;
-  status: string;
+  /** Status uses the same union type as PlanMetadata for type safety */
+  status: PlanMetadata['status'];
   repo?: string;
   pr?: number;
   content: Block[];

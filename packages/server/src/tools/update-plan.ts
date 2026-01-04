@@ -54,17 +54,14 @@ export const updatePlanTool = {
       };
     }
 
-    // Build updates
     const updates: { title?: string; status?: PlanStatusType; updatedAt: number } = {
       updatedAt: Date.now(),
     };
     if (input.title) updates.title = input.title;
     if (input.status) updates.status = input.status;
 
-    // Update plan metadata
     setPlanMetadata(doc, updates);
 
-    // Update the plan index
     const indexDoc = await getOrCreateDoc(PLAN_INDEX_DOC_NAME);
     setPlanIndexEntry(indexDoc, {
       id: existingMetadata.id,

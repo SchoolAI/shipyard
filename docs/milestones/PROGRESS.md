@@ -99,9 +99,31 @@ Browser discovers all → Multi-provider Yjs merge
 
 ---
 
+## Milestone 5: Review Flow ✅ COMPLETE
+
+**Goal:** Full annotation and review workflow
+
+**Completed:**
+- ✅ BlockNote comments integration (YjsThreadStore, CommentsExtension)
+- ✅ CommentsPanel sidebar with real-time thread sync
+- ✅ User identity system (ProfileSetup modal, localStorage)
+- ✅ Review status UI (Approve/Request Changes with confirmation)
+- ✅ `get_feedback` MCP tool for agent feedback loop
+- ✅ Thread parsing and export to structured markdown
+- ✅ FormattingToolbar with AddCommentButton
+
+**Key files:**
+- `packages/web/src/components/CommentsPanel.tsx` - Thread list sidebar
+- `packages/web/src/components/ReviewActions.tsx` - Approve/Request Changes
+- `packages/web/src/utils/identity.ts` - User identity helpers
+- `packages/server/src/tools/get-feedback.ts` - MCP feedback tool
+- `packages/schema/src/thread.ts` - Thread parsing utilities
+
+---
+
 ## Next Up
 
-**Milestone 5 (Review Flow):** BlockNote comments, approval workflow, `get_feedback` tool
+**Milestone 6 (P2P):** WebRTC remote collaboration - multiple reviewers sync without central server
 
 ---
 

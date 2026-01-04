@@ -152,8 +152,8 @@ function usePlanWithHydration(urlPlan: UrlEncodedPlan) {
       });
 
       // Initialize BlockNote content from URL
-      const blocknoteDoc = ydoc.get('blocknote', Y.XmlFragment);
-      // BlockNote will handle this via its editor
+      const documentFragment = ydoc.getXmlFragment('document');
+      // BlockNote will handle this via its editor (using initialContent)
     }
   }, [ydoc, urlPlan]);
 

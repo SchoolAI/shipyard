@@ -53,8 +53,11 @@ Every plan is represented by a single `Y.Doc` with three main compartments:
 ├─────────────────────────────────────────────────────────────┤
 │                                                             │
 │  1. BlockNote Content                                       │
-│     ├── ydoc.getXmlFragment('blocknote')                    │
-│     └── Managed by: BlockNote automatically                 │
+│     ├── ydoc.getXmlFragment('document')                     │
+│     │   (for BlockNote collaboration)                       │
+│     ├── ydoc.getArray('content')                            │
+│     │   (for JSON serialization/URLs)                       │
+│     └── Managed by: BlockNote + our helpers                 │
 │                                                             │
 │  2. Plan Metadata                                           │
 │     ├── ydoc.getMap('metadata')                             │
@@ -66,6 +69,10 @@ Every plan is represented by a single `Y.Doc` with three main compartments:
 │                                                             │
 └─────────────────────────────────────────────────────────────┘
 ```
+
+**Note**: Content is stored in TWO places:
+- `'document'` Y.XmlFragment: For BlockNote real-time collaboration
+- `'content'` Y.Array: For JSON export (URL snapshots, read_plan tool)
 
 ### Visual Diagram
 
@@ -112,8 +119,10 @@ BlockNote content is the rich text document containing all blocks (paragraphs, h
 ### Storage Location
 
 ```typescript
-const blocknoteFragment = ydoc.getXmlFragment('blocknote');
+const documentFragment = ydoc.getXmlFragment('document');
 ```
+
+**IMPORTANT**: We use `'document'` as the fragment key, not `'blocknote'`. This is because BlockNote's collaboration requires a consistent key across all peers.
 
 ### Who Manages It?
 
@@ -139,7 +148,7 @@ function MyEditor() {
     // Pass the Y.Doc to BlockNote
     collaboration: {
       provider: ydoc,
-      fragment: ydoc.getXmlFragment('blocknote'),
+      fragment: ydoc.getXmlFragment('document'),
       user: {
         name: 'Alice',
         color: '#ff0000',
@@ -290,7 +299,7 @@ function MyEditor() {
   const editor = useCreateBlockNote({
     collaboration: {
       provider: ydoc,
-      fragment: ydoc.getXmlFragment('blocknote'),
+      fragment: ydoc.getXmlFragment('document'),
       user: { name: 'Alice', color: '#ff0000' },
     },
   });
@@ -713,7 +722,7 @@ function PlanEditor() {
   const editor = useCreateBlockNote({
     collaboration: {
       provider: ydoc,
-      fragment: ydoc.getXmlFragment('blocknote'),
+      fragment: ydoc.getXmlFragment('document'),
       user: {
         name: 'Alice',
         color: '#3b82f6',
@@ -998,7 +1007,7 @@ When changing the schema:
 
 1. **Use type-safe helpers**: Always use `getPlanMetadata()`, `setPlanMetadata()`, etc.
 2. **Validate on read**: Use Zod schemas to validate Y.Map data
-3. **Let BlockNote manage content**: Don't manipulate `ydoc.getXmlFragment('blocknote')` directly
+3. **Let BlockNote manage content**: Don't manipulate `ydoc.getXmlFragment('document')` directly
 4. **Clean up providers**: Always call `.destroy()` on unmount
 5. **Handle offline gracefully**: Show UI indicators when sync is unavailable
 6. **Version your schemas**: Include version fields for future compatibility

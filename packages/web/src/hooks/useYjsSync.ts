@@ -22,10 +22,7 @@ export function useYjsSync(planId: string): {
   });
 
   useEffect(() => {
-    // WebSocket provider for server sync
     const wsProvider = new WebsocketProvider(WS_URL, planId, ydoc);
-
-    // IndexedDB for local persistence
     const idbProvider = new IndexeddbPersistence(planId, ydoc);
 
     wsProvider.on('status', ({ status }: { status: string }) => {

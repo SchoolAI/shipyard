@@ -20,16 +20,12 @@ export function usePlanIndex(): PlanIndexState {
   const [plans, setPlans] = useState<PlanIndexEntry[]>([]);
 
   useEffect(() => {
-    // Listen for index changes
     const plansMap = ydoc.getMap('plans');
     const updatePlans = () => {
       setPlans(getPlanIndex(ydoc));
     };
 
-    // Initial load
     updatePlans();
-
-    // Observe changes
     plansMap.observeDeep(updatePlans);
 
     return () => {

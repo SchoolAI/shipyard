@@ -1,32 +1,38 @@
+import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { CollapsiblePanel, CollapsiblePanelHeader } from '@/components/ui/collapsible-panel';
 import { usePlanIndex } from '@/hooks/usePlanIndex';
 import { cn } from '@/lib/utils';
+import { getSidebarCollapsed, setSidebarCollapsed } from '@/utils/uiPreferences';
 
 export function Sidebar() {
   const { plans, connected, synced, serverCount, activeCount } = usePlanIndex();
   const { id: currentPlanId } = useParams<{ id: string }>();
+  const [collapsed, setCollapsed] = useState(getSidebarCollapsed);
 
-  // Determine status text
+  const handleToggle = () => {
+    const newState = !collapsed;
+    setCollapsed(newState);
+    setSidebarCollapsed(newState);
+  };
+
   const getStatusText = () => {
     if (!connected) return 'Offline';
     if (!synced) return 'Syncing...';
     return 'Synced';
   };
 
-  // Show peer count info
   const getPeerInfo = () => {
     if (serverCount === 0) return null;
     if (activeCount === serverCount) {
       return `(${activeCount} peer${activeCount !== 1 ? 's' : ''})`;
     }
-    // Show both counts when some are disconnected
     return `(${activeCount}/${serverCount} peers)`;
   };
 
   return (
-    <aside className="w-64 border-r border-gray-200 bg-white h-screen flex flex-col">
-      <div className="p-4 border-b border-gray-200">
-        <h2 className="font-semibold text-lg">Plans</h2>
+    <CollapsiblePanel side="left" isOpen={!collapsed} onToggle={handleToggle} className="bg-white">
+      <CollapsiblePanelHeader side="left" onToggle={handleToggle} title="Plans">
         <div className="flex items-center gap-2 text-xs text-gray-500 mt-1">
           <span
             className={cn('w-2 h-2 rounded-full', connected ? 'bg-green-500' : 'bg-gray-300')}
@@ -34,7 +40,7 @@ export function Sidebar() {
           {getStatusText()}
           {getPeerInfo() && <span>{getPeerInfo()}</span>}
         </div>
-      </div>
+      </CollapsiblePanelHeader>
 
       <nav className="flex-1 overflow-y-auto p-2">
         {plans.length === 0 ? (
@@ -60,6 +66,6 @@ export function Sidebar() {
           </ul>
         )}
       </nav>
-    </aside>
+    </CollapsiblePanel>
   );
 }

@@ -1,6 +1,5 @@
 import { logger } from './logger.js';
 
-// Default registry ports to try
 const DEFAULT_REGISTRY_PORTS = [32191, 32192];
 
 /**
@@ -28,7 +27,7 @@ async function findRegistryPort(): Promise<number | null> {
         return port;
       }
     } catch {
-      // Not running on this port
+      // continue to next port
     }
   }
 

@@ -2,13 +2,10 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import { WebSocket } from 'ws';
 import { logger } from './logger.js';
 
-// Default registry ports (high ephemeral range, unlikely to collide)
+// High ephemeral range ports, unlikely to collide with other services
 const DEFAULT_REGISTRY_PORTS = [32191, 32192];
 
-// How often to check if registered servers are still alive (ms)
 const HEALTH_CHECK_INTERVAL = 10000;
-
-// Timeout for health check connection attempts (ms)
 const HEALTH_CHECK_TIMEOUT = 2000;
 
 interface ServerEntry {
@@ -153,7 +150,6 @@ async function handleUnregister(req: IncomingMessage, res: ServerResponse): Prom
  * Handle incoming HTTP requests
  */
 async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
-  // CORS preflight
   if (req.method === 'OPTIONS') {
     res.writeHead(204, {
       'Access-Control-Allow-Origin': '*',
@@ -164,7 +160,6 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
     return;
   }
 
-  // Route to specific handlers
   if (req.method === 'GET' && req.url === '/registry') {
     await handleGetRegistry(res);
     return;
@@ -180,7 +175,6 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
     return;
   }
 
-  // 404 for everything else
   sendJson(res, 404, { error: 'Not found' });
 }
 
@@ -207,17 +201,14 @@ export async function startRegistryServer(): Promise<number | null> {
 
         server.listen(port, () => {
           logger.info({ port }, 'Registry server started');
-
-          // Start periodic health checks to remove dead servers
           setInterval(healthCheck, HEALTH_CHECK_INTERVAL);
-
           resolve();
         });
       });
 
       return port;
     } catch {
-      // Port in use, try next
+      // continue to next port
     }
   }
 
@@ -242,7 +233,7 @@ export async function isRegistryRunning(): Promise<number | null> {
         return port;
       }
     } catch {
-      // Not running on this port
+      // continue to next port
     }
   }
 

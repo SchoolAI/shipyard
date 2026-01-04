@@ -19,12 +19,10 @@ const PERSISTENCE_DIR = join(homedir(), '.peer-plan', 'plans', `session-${proces
 const messageSync = 0;
 const messageAwareness = 1;
 
-// Store Y.Docs and awareness per document
 const docs = new Map<string, Y.Doc>();
 const awarenessMap = new Map<string, awarenessProtocol.Awareness>();
 const conns = new Map<string, Set<WsWebSocket>>();
 
-// LevelDB persistence instance
 let ldb: LeveldbPersistence | null = null;
 
 /**
@@ -39,10 +37,7 @@ export function initPersistence(): void {
 }
 
 async function getDoc(docName: string): Promise<Y.Doc> {
-  // Ensure persistence is initialized
   initPersistence();
-
-  // After initPersistence, ldb is guaranteed to be set
   const persistence = ldb;
   if (!persistence) {
     throw new Error('LevelDB persistence failed to initialize');
@@ -52,19 +47,16 @@ async function getDoc(docName: string): Promise<Y.Doc> {
   if (!doc) {
     doc = new Y.Doc();
 
-    // Load persisted state
     const persistedDoc = await persistence.getYDoc(docName);
     const state = Y.encodeStateAsUpdate(persistedDoc);
     Y.applyUpdate(doc, state);
 
-    // Persist updates
     doc.on('update', (update: Uint8Array) => {
       persistence.storeUpdate(docName, update);
     });
 
     docs.set(docName, doc);
 
-    // Create awareness for this doc
     const awareness = new awarenessProtocol.Awareness(doc);
     awarenessMap.set(docName, awareness);
   }
@@ -103,20 +95,17 @@ function broadcastUpdate(docName: string, update: Uint8Array, origin: unknown) {
 
 export function startWebSocketServer(): WebSocketServer | null {
   try {
-    // Initialize persistence (shared with MCP tools)
     initPersistence();
 
     // Use port 0 for dynamic allocation (OS assigns available port)
     const wss = new WebSocketServer({ port: 0 });
 
-    // Register with registry server after port is allocated
     wss.on('listening', async () => {
       const addr = wss.address() as { port: number };
       logger.info({ port: addr.port, persistence: PERSISTENCE_DIR }, 'WebSocket server started');
       await registerWithRegistry(addr.port);
     });
 
-    // Handle server-level errors gracefully
     wss.on('error', (err: Error & { code?: string }) => {
       logger.error({ err }, 'WebSocket server error');
     });
@@ -133,20 +122,17 @@ export function startWebSocketServer(): WebSocketServer | null {
         }
         logger.debug({ planId }, 'Got doc and awareness');
 
-        // Track connections per document
         if (!conns.has(planId)) {
           conns.set(planId, new Set());
         }
         const planConns = conns.get(planId);
         planConns?.add(ws);
 
-        // Listen for document updates and broadcast
         const updateHandler = (update: Uint8Array, origin: unknown) => {
           broadcastUpdate(planId, update, origin);
         };
         doc.on('update', updateHandler);
 
-        // Listen for awareness updates
         const awarenessHandler = (
           { added, updated, removed }: { added: number[]; updated: number[]; removed: number[] },
           _origin: unknown
@@ -165,13 +151,11 @@ export function startWebSocketServer(): WebSocketServer | null {
         };
         awareness.on('update', awarenessHandler);
 
-        // Send initial sync step 1
         const encoder = encoding.createEncoder();
         encoding.writeVarUint(encoder, messageSync);
         syncProtocol.writeSyncStep1(encoder, doc);
         send(ws, encoding.toUint8Array(encoder));
 
-        // Send current awareness state
         const awarenessStates = awareness.getStates();
         if (awarenessStates.size > 0) {
           const awarenessEncoder = encoding.createEncoder();
@@ -183,7 +167,6 @@ export function startWebSocketServer(): WebSocketServer | null {
           send(ws, encoding.toUint8Array(awarenessEncoder));
         }
 
-        // Handle incoming messages
         ws.on('message', (message: Buffer) => {
           try {
             const decoder = decoding.createDecoder(new Uint8Array(message));
@@ -194,7 +177,6 @@ export function startWebSocketServer(): WebSocketServer | null {
                 const encoder = encoding.createEncoder();
                 encoding.writeVarUint(encoder, messageSync);
                 syncProtocol.readSyncMessage(decoder, encoder, doc, ws);
-                // Send response if encoder has content (sync step 2 or update)
                 if (encoding.length(encoder) > 1) {
                   send(ws, encoding.toUint8Array(encoder));
                 }

@@ -5,3 +5,65 @@
  * to avoid @import ordering issues with Tailwind's vite plugin.
  */
 @import "tailwindcss";
+
+/* Global: Pointer cursor for all interactive elements */
+button,
+[role="button"],
+[type="button"],
+[type="submit"],
+[type="reset"],
+a[href],
+select,
+summary,
+input[type="checkbox"],
+input[type="radio"],
+label[for] {
+  cursor: pointer;
+}
+
+/* Disabled states should show not-allowed cursor */
+button:disabled,
+[role="button"]:disabled,
+[disabled] {
+  cursor: not-allowed;
+}
+
+/*
+ * Hide own collaboration cursor
+ * When only one user is present, we hide the collaboration cursor
+ * since it's just showing your own position which is redundant.
+ * The cursor uses inline styles for color, so we hide based on the
+ * data attribute added by our useEffect.
+ */
+.bn-collaboration-cursor__base[data-is-own-cursor="true"] {
+  /* biome-ignore lint/complexity/noImportantStyles: Required to override BlockNote's inline cursor styles */
+  display: none !important;
+}
+
+/*
+ * Scrollbar styling - thin but visible for accessibility
+ * Users should be able to see scrollable areas
+ */
+* {
+  scrollbar-width: thin; /* Firefox - thin but visible */
+  scrollbar-color: #cbd5e1 transparent; /* thumb track */
+}
+
+/* Webkit browsers (Chrome, Safari) - thin but visible */
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}

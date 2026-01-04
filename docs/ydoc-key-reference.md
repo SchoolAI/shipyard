@@ -1,0 +1,252 @@
+# Y.Doc Key Reference
+
+Quick reference for all Y.Doc keys used in peer-plan.
+
+## Import
+
+```typescript
+import { YDOC_KEYS } from '@peer-plan/schema';
+```
+
+## Keys Overview
+
+| Constant | String Value | Type | Purpose |
+|----------|--------------|------|---------|
+| `YDOC_KEYS.METADATA` | `'metadata'` | Y.Map | Plan metadata (id, title, status, etc.) |
+| `YDOC_KEYS.CONTENT` | `'content'` | Y.Array | BlockNote blocks as JSON (for snapshots) |
+| `YDOC_KEYS.DOCUMENT_FRAGMENT` | `'document'` | Y.XmlFragment | BlockNote editor structure (for collaboration) |
+| `YDOC_KEYS.THREADS` | `'threads'` | Y.Map | Comment threads (managed by BlockNote) |
+| `YDOC_KEYS.STEP_COMPLETIONS` | `'stepCompletions'` | Y.Map | Checklist completion status |
+| `YDOC_KEYS.PLANS` | `'plans'` | Y.Map | Plan index (only in index doc) |
+
+## Usage Examples
+
+### Reading Metadata
+```typescript
+import { YDOC_KEYS, getPlanMetadata } from '@peer-plan/schema';
+
+// Option 1: Use helper function (recommended)
+const metadata = getPlanMetadata(ydoc);
+
+// Option 2: Direct access
+const metaMap = ydoc.getMap(YDOC_KEYS.METADATA);
+const status = metaMap.get('status');
+```
+
+### Updating Metadata
+```typescript
+import { YDOC_KEYS } from '@peer-plan/schema';
+
+ydoc.transact(() => {
+  const metadata = ydoc.getMap(YDOC_KEYS.METADATA);
+  metadata.set('status', 'approved');
+  metadata.set('reviewedAt', Date.now());
+  metadata.set('updatedAt', Date.now());
+});
+```
+
+### Reading Content Array
+```typescript
+import { YDOC_KEYS } from '@peer-plan/schema';
+
+const contentArray = ydoc.getArray(YDOC_KEYS.CONTENT);
+const blocks = contentArray.toJSON();
+```
+
+### BlockNote Collaboration
+```typescript
+import { YDOC_KEYS } from '@peer-plan/schema';
+import { useCreateBlockNote } from '@blocknote/react';
+
+const editor = useCreateBlockNote({
+  collaboration: {
+    provider: wsProvider,
+    // CRITICAL: Must use DOCUMENT_FRAGMENT, not CONTENT!
+    fragment: ydoc.getXmlFragment(YDOC_KEYS.DOCUMENT_FRAGMENT),
+    user: { name: 'Alice', color: '#ff0000' },
+  },
+});
+```
+
+### Comment Threads
+```typescript
+import { YDOC_KEYS } from '@peer-plan/schema';
+import { YjsThreadStore } from '@blocknote/core/comments';
+
+// Initialize thread store
+const threadsMap = ydoc.getMap(YDOC_KEYS.THREADS);
+const threadStore = new YjsThreadStore(userId, threadsMap, auth);
+
+// Read threads
+const threadsData = threadsMap.toJSON();
+const threads = parseThreads(threadsData);
+```
+
+### Step Completions
+```typescript
+import { YDOC_KEYS, toggleStepCompletion } from '@peer-plan/schema';
+
+// Toggle a step
+toggleStepCompletion(ydoc, 'step-123');
+
+// Check if completed
+const steps = ydoc.getMap(YDOC_KEYS.STEP_COMPLETIONS);
+const isCompleted = steps.get('step-123') || false;
+```
+
+### Plan Index
+```typescript
+import { YDOC_KEYS, getPlanIndex } from '@peer-plan/schema';
+
+// Get all plans (only in index doc!)
+const plans = getPlanIndex(indexDoc);
+
+// Direct access
+const plansMap = indexDoc.getMap(YDOC_KEYS.PLANS);
+const planEntry = plansMap.get(planId);
+```
+
+## Critical: Content vs Document Fragment
+
+**Problem:** Why do we have both `CONTENT` and `DOCUMENT_FRAGMENT`?
+
+**Answer:** They serve different purposes:
+
+### CONTENT (`'content'`)
+- **Type:** Y.Array<Block>
+- **Format:** JSON array of BlockNote blocks
+- **Purpose:**
+  - Serialization for URL snapshots
+  - MCP tool access (read_plan)
+  - Easy to convert to/from JSON
+- **Not used for:** Real-time editing
+
+### DOCUMENT_FRAGMENT (`'document'`)
+- **Type:** Y.XmlFragment
+- **Format:** ProseMirror document structure
+- **Purpose:**
+  - Real-time collaborative editing
+  - BlockNote's native format
+  - Required for collaboration
+- **Not used for:** Serialization
+
+### Sync Strategy
+
+```typescript
+// SERVER: Create both on plan creation
+ydoc.transact(() => {
+  // 1. JSON array for snapshots
+  const contentArray = ydoc.getArray(YDOC_KEYS.CONTENT);
+  contentArray.push(blocks);
+
+  // 2. XmlFragment for editing
+  const fragment = ydoc.getXmlFragment(YDOC_KEYS.DOCUMENT_FRAGMENT);
+  editor.blocksToYXmlFragment(blocks, fragment);
+});
+
+// BROWSER: BlockNote reads from DOCUMENT_FRAGMENT
+const editor = useCreateBlockNote({
+  collaboration: {
+    fragment: ydoc.getXmlFragment(YDOC_KEYS.DOCUMENT_FRAGMENT), // ✅
+    // NOT: ydoc.getArray(YDOC_KEYS.CONTENT) // ❌
+  },
+});
+```
+
+**Rule:**
+- Server writes to BOTH
+- Browser reads DOCUMENT_FRAGMENT for editing
+- Browser reads CONTENT for snapshots/fallback
+
+## Validation
+
+```typescript
+import { isValidYDocKey } from '@peer-plan/schema';
+
+const key = 'metadata';
+if (isValidYDocKey(key)) {
+  // TypeScript knows key is YDocKey here
+  const map = ydoc.getMap(key);
+}
+```
+
+## Where Keys Are Used
+
+### Server Side
+- `/packages/server/src/tools/create-plan.ts`
+  - Writes: METADATA, CONTENT, DOCUMENT_FRAGMENT
+- `/packages/server/src/tools/read-plan.ts`
+  - Reads: METADATA, CONTENT
+- `/packages/server/src/tools/get-feedback.ts`
+  - Reads: METADATA, THREADS
+
+### Browser Side
+- `/packages/web/src/components/PlanViewer.tsx`
+  - Reads: DOCUMENT_FRAGMENT (BlockNote), THREADS
+- `/packages/web/src/components/CommentsPanel.tsx`
+  - Reads: THREADS
+- `/packages/web/src/components/ReviewActions.tsx`
+  - Writes: METADATA (status, reviewedAt, reviewedBy)
+- `/packages/web/src/pages/PlanPage.tsx`
+  - Reads: METADATA, CONTENT (fallback)
+- `/packages/web/src/hooks/useHydration.ts`
+  - Writes: METADATA, CONTENT
+- `/packages/web/src/hooks/usePlanIndex.ts`
+  - Reads: PLANS
+
+### Schema Helpers
+- `/packages/schema/src/yjs-helpers.ts`
+  - All keys via helper functions
+- `/packages/schema/src/plan-index-helpers.ts`
+  - PLANS key
+
+## Best Practices
+
+### ✅ DO
+```typescript
+// Use constants
+import { YDOC_KEYS } from '@peer-plan/schema';
+const metadata = ydoc.getMap(YDOC_KEYS.METADATA);
+
+// Use helper functions
+import { getPlanMetadata } from '@peer-plan/schema';
+const metadata = getPlanMetadata(ydoc);
+
+// Use transactions for multiple updates
+ydoc.transact(() => {
+  metadata.set('status', 'approved');
+  metadata.set('updatedAt', Date.now());
+});
+```
+
+### ❌ DON'T
+```typescript
+// Hard-code strings (typo-prone)
+const metadata = ydoc.getMap('metadata');
+
+// Wrong key for BlockNote
+const fragment = ydoc.getArray('content'); // ❌ Should be getXmlFragment('document')
+
+// Multiple transactions
+metadata.set('status', 'approved'); // Transaction 1
+metadata.set('updatedAt', Date.now()); // Transaction 2 (triggers observers twice!)
+```
+
+## Migration Checklist
+
+If you're refactoring old code:
+
+- [ ] Replace `'metadata'` with `YDOC_KEYS.METADATA`
+- [ ] Replace `'content'` with `YDOC_KEYS.CONTENT`
+- [ ] Replace `'document'` with `YDOC_KEYS.DOCUMENT_FRAGMENT`
+- [ ] Replace `'threads'` with `YDOC_KEYS.THREADS`
+- [ ] Replace `'stepCompletions'` with `YDOC_KEYS.STEP_COMPLETIONS`
+- [ ] Replace `'plans'` with `YDOC_KEYS.PLANS`
+- [ ] Verify BlockNote uses DOCUMENT_FRAGMENT, not CONTENT
+- [ ] Add import: `import { YDOC_KEYS } from '@peer-plan/schema';`
+
+## See Also
+
+- [Y.Doc Data Model](./yjs-data-model.md) - Detailed explanation
+- [Y.Doc Key Audit](../YDOC_KEY_AUDIT.md) - Full audit report
+- Source: [packages/schema/src/yjs-keys.ts](../packages/schema/src/yjs-keys.ts)

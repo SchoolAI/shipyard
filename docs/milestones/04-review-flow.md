@@ -1,6 +1,6 @@
 # Milestone 4: Review Flow
 
-**Status**: Not Started
+**Status**: ✅ Complete
 **Goal**: Full annotation and review workflow
 
 ---
@@ -21,12 +21,12 @@ Add the core review functionality using BlockNote's native comments:
 
 ### 4a: BlockNote Comments Integration
 
-- [ ] Enable BlockNote `CommentsExtension`
-- [ ] Configure `YjsThreadStore` for comment sync
-- [ ] Add comment UI (BlockNote provides this)
-- [ ] Display existing comments
-- [ ] Reply to comments (threaded)
-- [ ] Mark comments as resolved
+- [x] Enable BlockNote `CommentsExtension`
+- [x] Configure `YjsThreadStore` for comment sync
+- [x] Add comment UI (BlockNote provides this)
+- [x] Display existing comments
+- [x] Reply to comments (threaded)
+- [x] Mark comments as resolved
 
 **Comment features (built-in to BlockNote):**
 - Threaded replies
@@ -36,16 +36,16 @@ Add the core review functionality using BlockNote's native comments:
 
 ### 4b: Review Status UI
 
-- [ ] Status badge (pending, approved, changes_requested)
-- [ ] "Approve" button
-- [ ] "Request Changes" button
-- [ ] Confirmation before changing status
+- [x] Status badge (pending, approved, changes_requested)
+- [x] "Approve" button
+- [x] "Request Changes" button
+- [x] Confirmation before changing status
 
 ### 4c: MCP `get_feedback` Tool
 
-- [ ] Returns comments from Y.Doc threads map
-- [ ] Returns current review status from metadata
-- [ ] Agent can poll for updates
+- [x] Returns comments from Y.Doc threads map
+- [x] Returns current review status from metadata
+- [x] Agent can poll for updates
 
 ```typescript
 server.tool(
@@ -67,9 +67,9 @@ server.tool(
 
 ### 4d: Y.Doc Change Observation
 
-- [ ] MCP server subscribes to Y.Doc updates
-- [ ] Logs when comments are added
-- [ ] Could trigger notifications in future
+- [x] MCP server subscribes to Y.Doc updates
+- [x] Logs when comments are added
+- [ ] Could trigger notifications in future (M7+)
 
 ---
 
@@ -111,7 +111,7 @@ import * as Y from 'yjs';
 const editor = useCreateBlockNote({
   collaboration: {
     provider: wsProvider,
-    fragment: ydoc.getXmlFragment('blocknote'),
+    fragment: ydoc.getXmlFragment('document'),
   },
   _tiptapOptions: {
     extensions: [

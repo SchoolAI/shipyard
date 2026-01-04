@@ -1,6 +1,12 @@
-export type { Artifact, ArtifactType, PlanMetadata, StepCompletion } from './plan.js';
-export { ArtifactSchema, getArtifactUrl, PlanMetadataSchema } from './plan.js';
-export type { PlanIndexEntry, PlanStatusType } from './plan-index.js';
+export type {
+  Artifact,
+  ArtifactType,
+  PlanMetadata,
+  PlanStatusType,
+  StepCompletion,
+} from './plan.js';
+export { ArtifactSchema, getArtifactUrl, PlanMetadataSchema, PlanStatusValues } from './plan.js';
+export type { PlanIndexEntry } from './plan-index.js';
 export { PLAN_INDEX_DOC_NAME, PlanIndexEntrySchema, PlanStatus } from './plan-index.js';
 export {
   getPlanIndex,
@@ -9,6 +15,14 @@ export {
   setPlanIndexEntry,
   touchPlanIndexEntry,
 } from './plan-index-helpers.js';
+export type { CommentBody, Thread, ThreadComment } from './thread.js';
+export {
+  extractTextFromCommentBody,
+  isThread,
+  parseThreads,
+  ThreadCommentSchema,
+  ThreadSchema,
+} from './thread.js';
 export type { UrlEncodedPlan } from './url-encoding.js';
 export {
   createPlanUrl,
@@ -24,3 +38,5 @@ export {
   setPlanMetadata,
   toggleStepCompletion,
 } from './yjs-helpers.js';
+export type { YDocKey } from './yjs-keys.js';
+export { isValidYDocKey, YDOC_KEYS } from './yjs-keys.js';

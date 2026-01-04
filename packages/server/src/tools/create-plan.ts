@@ -1,4 +1,5 @@
 import type { Block } from '@blocknote/core';
+import { ServerBlockNoteEditor } from '@blocknote/server-util';
 import {
   createPlanUrl,
   initPlanMetadata,
@@ -12,12 +13,16 @@ import { z } from 'zod';
 import { logger } from '../logger.js';
 import { getOrCreateDoc } from '../ws-server.js';
 
+// --- Input Schema ---
+
 const CreatePlanInput = z.object({
   title: z.string().describe('Plan title'),
   content: z.string().describe('Plan content (markdown)'),
   repo: z.string().optional().describe('GitHub repo (org/repo)'),
   prNumber: z.number().optional().describe('PR number'),
 });
+
+// --- Public Export ---
 
 export const createPlanTool = {
   definition: {
@@ -42,7 +47,6 @@ export const createPlanTool = {
 
     logger.info({ planId, title: input.title }, 'Creating plan');
 
-    // Get or create the plan Y.Doc (persisted to LevelDB)
     const ydoc = await getOrCreateDoc(planId);
     initPlanMetadata(ydoc, {
       id: planId,
@@ -52,13 +56,26 @@ export const createPlanTool = {
       pr: input.prNumber,
     });
 
-    // Store content in the Y.Doc
-    const blocks = parseMarkdownToBlocks(input.content);
-    const contentArray = ydoc.getArray('content');
-    contentArray.delete(0, contentArray.length); // Clear existing
-    contentArray.push(blocks);
+    // NOTE: We store blocks in both places:
+    // 1. 'content' Y.Array for JSON serialization (URL snapshots, read_plan tool)
+    // 2. 'document' Y.XmlFragment for BlockNote collaboration
+    logger.info({ contentLength: input.content.length }, 'About to parse markdown');
+    const blocks = await parseMarkdownToBlocks(input.content);
+    logger.info({ blockCount: blocks.length }, 'Parsed blocks, storing in Y.Doc');
 
-    // Update the plan index (syncs to connected browsers)
+    const editor = ServerBlockNoteEditor.create();
+
+    ydoc.transact(() => {
+      const contentArray = ydoc.getArray('content');
+      contentArray.delete(0, contentArray.length);
+      contentArray.push(blocks);
+
+      const fragment = ydoc.getXmlFragment('document');
+      editor.blocksToYXmlFragment(blocks, fragment);
+    });
+
+    logger.info('Content stored in Y.Doc (both content array and document fragment)');
+
     const indexDoc = await getOrCreateDoc(PLAN_INDEX_DOC_NAME);
     setPlanIndexEntry(indexDoc, {
       id: planId,
@@ -70,7 +87,6 @@ export const createPlanTool = {
 
     logger.info({ planId }, 'Plan index updated');
 
-    // Create URL for sharing/opening
     const baseUrl = 'http://localhost:5173/plan';
     const urlPlan: UrlEncodedPlan = {
       v: 1,
@@ -98,13 +114,25 @@ export const createPlanTool = {
   },
 };
 
-function parseMarkdownToBlocks(markdown: string): Block[] {
-  const lines = markdown.split('\n').filter(Boolean);
-  return lines.map((line, i) => ({
-    id: `block-${i}`,
-    type: 'paragraph',
-    props: { textColor: 'default', backgroundColor: 'default', textAlignment: 'left' },
-    content: [{ type: 'text', text: line, styles: {} }],
-    children: [],
-  })) as Block[];
+// --- Private Helpers ---
+
+async function parseMarkdownToBlocks(markdown: string): Promise<Block[]> {
+  logger.info({ markdown: markdown.substring(0, 100) }, 'Parsing markdown to blocks');
+
+  try {
+    const editor = ServerBlockNoteEditor.create();
+    const blocks = await editor.tryParseMarkdownToBlocks(markdown);
+    logger.info(
+      { blockCount: blocks.length, firstBlockType: blocks[0]?.type },
+      'Markdown parsed to blocks'
+    );
+
+    return blocks;
+  } catch (error) {
+    logger.error(
+      { error, markdown: markdown.substring(0, 100) },
+      'Error parsing markdown to blocks'
+    );
+    throw error;
+  }
 }

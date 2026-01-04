@@ -96,10 +96,7 @@ describe('Plan Index Helpers', () => {
       const ydoc = new Y.Doc();
       const plansMap = ydoc.getMap<Record<string, unknown>>('plans');
 
-      // Add valid entry
       setPlanIndexEntry(ydoc, createEntry({ id: 'valid' }));
-
-      // Add invalid entry directly to map
       plansMap.set('invalid', { foo: 'bar' });
 
       const plans = getPlanIndex(ydoc);
@@ -120,7 +117,6 @@ describe('Plan Index Helpers', () => {
 
     it('does nothing for non-existent entry', () => {
       const ydoc = new Y.Doc();
-      // Should not throw
       removePlanIndexEntry(ydoc, 'non-existent');
       expect(getPlanIndex(ydoc)).toHaveLength(0);
     });
@@ -149,8 +145,6 @@ describe('Plan Index Helpers', () => {
       });
 
       setPlanIndexEntry(ydoc, entry);
-
-      // Touch the entry
       touchPlanIndexEntry(ydoc, 'plan-1');
 
       const retrieved = getPlanIndexEntry(ydoc, 'plan-1');
@@ -161,7 +155,6 @@ describe('Plan Index Helpers', () => {
 
     it('does nothing for non-existent entry', () => {
       const ydoc = new Y.Doc();
-      // Should not throw
       touchPlanIndexEntry(ydoc, 'non-existent');
       expect(getPlanIndex(ydoc)).toHaveLength(0);
     });
@@ -172,14 +165,11 @@ describe('Plan Index Helpers', () => {
       const doc1 = new Y.Doc();
       const doc2 = new Y.Doc();
 
-      // Add entry to doc1
       setPlanIndexEntry(doc1, createEntry({ id: 'plan-1', title: 'From Doc1' }));
 
-      // Sync doc1 -> doc2
       const update = Y.encodeStateAsUpdate(doc1);
       Y.applyUpdate(doc2, update);
 
-      // doc2 should have the entry
       const retrieved = getPlanIndexEntry(doc2, 'plan-1');
       expect(retrieved?.title).toBe('From Doc1');
     });
@@ -188,15 +178,12 @@ describe('Plan Index Helpers', () => {
       const doc1 = new Y.Doc();
       const doc2 = new Y.Doc();
 
-      // Both docs add different plans concurrently
       setPlanIndexEntry(doc1, createEntry({ id: 'plan-a', title: 'Plan A' }));
       setPlanIndexEntry(doc2, createEntry({ id: 'plan-b', title: 'Plan B' }));
 
-      // Sync both ways
       Y.applyUpdate(doc2, Y.encodeStateAsUpdate(doc1));
       Y.applyUpdate(doc1, Y.encodeStateAsUpdate(doc2));
 
-      // Both docs should have both plans
       expect(getPlanIndex(doc1)).toHaveLength(2);
       expect(getPlanIndex(doc2)).toHaveLength(2);
     });
