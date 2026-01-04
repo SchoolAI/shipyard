@@ -23,9 +23,12 @@ function AppRoutes() {
   );
 }
 
+// Base path from Vite config for GitHub Pages deployment
+const basename = import.meta.env.BASE_URL;
+
 export function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename={basename}>
       <ActivePlanSyncProvider>
         <Layout>
           <AppRoutes />
