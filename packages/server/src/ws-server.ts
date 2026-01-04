@@ -1,18 +1,19 @@
 import { mkdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import * as decoding from 'lib0/decoding';
+import * as encoding from 'lib0/encoding';
 import type { WebSocket as WsWebSocket } from 'ws';
 import { WebSocketServer } from 'ws';
 import { LeveldbPersistence } from 'y-leveldb';
 import * as awarenessProtocol from 'y-protocols/awareness';
 import * as syncProtocol from 'y-protocols/sync';
 import * as Y from 'yjs';
-import * as encoding from 'lib0/encoding';
-import * as decoding from 'lib0/decoding';
 import { logger } from './logger';
+import { registerWithRegistry, unregisterFromRegistry } from './registry-client.js';
 
-const WS_PORT = Number.parseInt(process.env.WS_PORT || '1234', 10);
-const PERSISTENCE_DIR = join(homedir(), '.peer-plan', 'plans');
+// Per-instance LevelDB to avoid locking conflicts
+const PERSISTENCE_DIR = join(homedir(), '.peer-plan', 'plans', `session-${process.pid}`);
 
 // Message types matching y-websocket protocol
 const messageSync = 0;
@@ -24,21 +25,41 @@ const awarenessMap = new Map<string, awarenessProtocol.Awareness>();
 const conns = new Map<string, Set<WsWebSocket>>();
 
 // LevelDB persistence instance
-let ldb: LeveldbPersistence;
+let ldb: LeveldbPersistence | null = null;
+
+/**
+ * Ensures LevelDB persistence is initialized.
+ * Called automatically by startWebSocketServer, but can be called independently.
+ */
+export function initPersistence(): void {
+  if (!ldb) {
+    mkdirSync(PERSISTENCE_DIR, { recursive: true });
+    ldb = new LeveldbPersistence(PERSISTENCE_DIR);
+  }
+}
 
 async function getDoc(docName: string): Promise<Y.Doc> {
+  // Ensure persistence is initialized
+  initPersistence();
+
+  // After initPersistence, ldb is guaranteed to be set
+  const persistence = ldb;
+  if (!persistence) {
+    throw new Error('LevelDB persistence failed to initialize');
+  }
+
   let doc = docs.get(docName);
   if (!doc) {
     doc = new Y.Doc();
 
     // Load persisted state
-    const persistedDoc = await ldb.getYDoc(docName);
+    const persistedDoc = await persistence.getYDoc(docName);
     const state = Y.encodeStateAsUpdate(persistedDoc);
     Y.applyUpdate(doc, state);
 
     // Persist updates
     doc.on('update', (update: Uint8Array) => {
-      ldb.storeUpdate(docName, update);
+      persistence.storeUpdate(docName, update);
     });
 
     docs.set(docName, doc);
@@ -48,6 +69,14 @@ async function getDoc(docName: string): Promise<Y.Doc> {
     awarenessMap.set(docName, awareness);
   }
   return doc;
+}
+
+/**
+ * Gets or creates a Y.Doc by name. Exported for use by MCP tools.
+ * This function ensures persistence is initialized before accessing docs.
+ */
+export async function getOrCreateDoc(docName: string): Promise<Y.Doc> {
+  return getDoc(docName);
 }
 
 function send(ws: WsWebSocket, message: Uint8Array) {
@@ -74,130 +103,151 @@ function broadcastUpdate(docName: string, update: Uint8Array, origin: unknown) {
 
 export function startWebSocketServer(): WebSocketServer | null {
   try {
-    // Ensure persistence directory exists
-    mkdirSync(PERSISTENCE_DIR, { recursive: true });
+    // Initialize persistence (shared with MCP tools)
+    initPersistence();
 
-    // Initialize LevelDB persistence
-    ldb = new LeveldbPersistence(PERSISTENCE_DIR);
+    // Use port 0 for dynamic allocation (OS assigns available port)
+    const wss = new WebSocketServer({ port: 0 });
 
-    const wss = new WebSocketServer({ port: WS_PORT });
+    // Register with registry server after port is allocated
+    wss.on('listening', async () => {
+      const addr = wss.address() as { port: number };
+      logger.info({ port: addr.port, persistence: PERSISTENCE_DIR }, 'WebSocket server started');
+      await registerWithRegistry(addr.port);
+    });
 
-    // Handle server-level errors (like EADDRINUSE) gracefully
+    // Handle server-level errors gracefully
     wss.on('error', (err: Error & { code?: string }) => {
-      if (err.code === 'EADDRINUSE') {
-        logger.warn({ port: WS_PORT }, 'WebSocket port in use, sync disabled');
-      } else {
-        logger.error({ err }, 'WebSocket server error');
-      }
+      logger.error({ err }, 'WebSocket server error');
     });
 
-  wss.on('connection', async (ws, req) => {
-    const planId = req.url?.slice(1) || 'default';
-    logger.info({ planId }, 'WebSocket client connected');
+    wss.on('connection', async (ws, req) => {
+      const planId = req.url?.slice(1) || 'default';
+      logger.info({ planId }, 'WebSocket client connected');
 
-    try {
-      const doc = await getDoc(planId);
-      const awareness = awarenessMap.get(planId)!;
-      logger.debug({ planId }, 'Got doc and awareness');
-
-    // Track connections per document
-    if (!conns.has(planId)) {
-      conns.set(planId, new Set());
-    }
-    conns.get(planId)!.add(ws);
-
-    // Listen for document updates and broadcast
-    const updateHandler = (update: Uint8Array, origin: unknown) => {
-      broadcastUpdate(planId, update, origin);
-    };
-    doc.on('update', updateHandler);
-
-    // Listen for awareness updates
-    const awarenessHandler = (
-      { added, updated, removed }: { added: number[]; updated: number[]; removed: number[] },
-      _origin: unknown
-    ) => {
-      const changedClients = added.concat(updated, removed);
-      const encoder = encoding.createEncoder();
-      encoding.writeVarUint(encoder, messageAwareness);
-      encoding.writeVarUint8Array(
-        encoder,
-        awarenessProtocol.encodeAwarenessUpdate(awareness, changedClients)
-      );
-      const message = encoding.toUint8Array(encoder);
-      for (const conn of conns.get(planId) || []) {
-        send(conn, message);
-      }
-    };
-    awareness.on('update', awarenessHandler);
-
-    // Send initial sync step 1
-    const encoder = encoding.createEncoder();
-    encoding.writeVarUint(encoder, messageSync);
-    syncProtocol.writeSyncStep1(encoder, doc);
-    send(ws, encoding.toUint8Array(encoder));
-
-    // Send current awareness state
-    const awarenessStates = awareness.getStates();
-    if (awarenessStates.size > 0) {
-      const awarenessEncoder = encoding.createEncoder();
-      encoding.writeVarUint(awarenessEncoder, messageAwareness);
-      encoding.writeVarUint8Array(
-        awarenessEncoder,
-        awarenessProtocol.encodeAwarenessUpdate(awareness, Array.from(awarenessStates.keys()))
-      );
-      send(ws, encoding.toUint8Array(awarenessEncoder));
-    }
-
-    // Handle incoming messages
-    ws.on('message', (message: Buffer) => {
       try {
-        const decoder = decoding.createDecoder(new Uint8Array(message));
-        const messageType = decoding.readVarUint(decoder);
-
-        switch (messageType) {
-          case messageSync: {
-            const encoder = encoding.createEncoder();
-            encoding.writeVarUint(encoder, messageSync);
-            syncProtocol.readSyncMessage(decoder, encoder, doc, ws);
-            // Send response if encoder has content (sync step 2 or update)
-            if (encoding.length(encoder) > 1) {
-              send(ws, encoding.toUint8Array(encoder));
-            }
-            break;
-          }
-          case messageAwareness: {
-            awarenessProtocol.applyAwarenessUpdate(
-              awareness,
-              decoding.readVarUint8Array(decoder),
-              ws
-            );
-            break;
-          }
+        const doc = await getDoc(planId);
+        const awareness = awarenessMap.get(planId);
+        if (!awareness) {
+          throw new Error(`Awareness not found for planId: ${planId}`);
         }
+        logger.debug({ planId }, 'Got doc and awareness');
+
+        // Track connections per document
+        if (!conns.has(planId)) {
+          conns.set(planId, new Set());
+        }
+        const planConns = conns.get(planId);
+        planConns?.add(ws);
+
+        // Listen for document updates and broadcast
+        const updateHandler = (update: Uint8Array, origin: unknown) => {
+          broadcastUpdate(planId, update, origin);
+        };
+        doc.on('update', updateHandler);
+
+        // Listen for awareness updates
+        const awarenessHandler = (
+          { added, updated, removed }: { added: number[]; updated: number[]; removed: number[] },
+          _origin: unknown
+        ) => {
+          const changedClients = added.concat(updated, removed);
+          const encoder = encoding.createEncoder();
+          encoding.writeVarUint(encoder, messageAwareness);
+          encoding.writeVarUint8Array(
+            encoder,
+            awarenessProtocol.encodeAwarenessUpdate(awareness, changedClients)
+          );
+          const message = encoding.toUint8Array(encoder);
+          for (const conn of conns.get(planId) || []) {
+            send(conn, message);
+          }
+        };
+        awareness.on('update', awarenessHandler);
+
+        // Send initial sync step 1
+        const encoder = encoding.createEncoder();
+        encoding.writeVarUint(encoder, messageSync);
+        syncProtocol.writeSyncStep1(encoder, doc);
+        send(ws, encoding.toUint8Array(encoder));
+
+        // Send current awareness state
+        const awarenessStates = awareness.getStates();
+        if (awarenessStates.size > 0) {
+          const awarenessEncoder = encoding.createEncoder();
+          encoding.writeVarUint(awarenessEncoder, messageAwareness);
+          encoding.writeVarUint8Array(
+            awarenessEncoder,
+            awarenessProtocol.encodeAwarenessUpdate(awareness, Array.from(awarenessStates.keys()))
+          );
+          send(ws, encoding.toUint8Array(awarenessEncoder));
+        }
+
+        // Handle incoming messages
+        ws.on('message', (message: Buffer) => {
+          try {
+            const decoder = decoding.createDecoder(new Uint8Array(message));
+            const messageType = decoding.readVarUint(decoder);
+
+            switch (messageType) {
+              case messageSync: {
+                const encoder = encoding.createEncoder();
+                encoding.writeVarUint(encoder, messageSync);
+                syncProtocol.readSyncMessage(decoder, encoder, doc, ws);
+                // Send response if encoder has content (sync step 2 or update)
+                if (encoding.length(encoder) > 1) {
+                  send(ws, encoding.toUint8Array(encoder));
+                }
+                break;
+              }
+              case messageAwareness: {
+                awarenessProtocol.applyAwarenessUpdate(
+                  awareness,
+                  decoding.readVarUint8Array(decoder),
+                  ws
+                );
+                break;
+              }
+            }
+          } catch (err) {
+            logger.error({ err, planId }, 'Failed to process message');
+          }
+        });
+
+        ws.on('close', () => {
+          logger.info({ planId }, 'WebSocket client disconnected');
+          doc.off('update', updateHandler);
+          awareness.off('update', awarenessHandler);
+          conns.get(planId)?.delete(ws);
+          awarenessProtocol.removeAwarenessStates(awareness, [doc.clientID], null);
+        });
+
+        ws.on('error', (err: Error) => {
+          logger.error({ err, planId }, 'WebSocket error');
+        });
       } catch (err) {
-        logger.error({ err, planId }, 'Failed to process message');
+        logger.error({ err, planId }, 'Error handling WebSocket connection');
+        ws.close();
       }
     });
 
-    ws.on('close', () => {
-      logger.info({ planId }, 'WebSocket client disconnected');
-      doc.off('update', updateHandler);
-      awareness.off('update', awarenessHandler);
-      conns.get(planId)?.delete(ws);
-      awarenessProtocol.removeAwarenessStates(awareness, [doc.clientID], null);
+    // Cleanup on shutdown
+    const cleanup = async () => {
+      logger.info('Shutting down WebSocket server');
+      await unregisterFromRegistry();
+      wss.close();
+    };
+
+    process.on('SIGINT', async () => {
+      await cleanup();
+      process.exit(0);
     });
 
-    ws.on('error', (err: Error) => {
-      logger.error({ err, planId }, 'WebSocket error');
+    process.on('SIGTERM', async () => {
+      await cleanup();
+      process.exit(0);
     });
-    } catch (err) {
-      logger.error({ err, planId }, 'Error handling WebSocket connection');
-      ws.close();
-    }
-  });
 
-    logger.info({ port: WS_PORT, persistence: PERSISTENCE_DIR }, 'WebSocket server started');
     return wss;
   } catch (err) {
     logger.error({ err }, 'Failed to start WebSocket server, sync disabled');

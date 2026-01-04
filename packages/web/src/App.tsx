@@ -1,46 +1,33 @@
-import { getPlanFromUrl, type UrlEncodedPlan } from '@peer-plan/schema';
-import { PlanHeader } from './components/PlanHeader';
-import { PlanViewer } from './components/PlanViewer';
-import { SyncStatus } from './components/SyncStatus';
-import { useHydration } from './hooks/useHydration';
-import { useYjsSync } from './hooks/useYjsSync';
+import { BrowserRouter, Navigate, Route, Routes, useSearchParams } from 'react-router-dom';
+import { Layout } from './components/Layout';
+import { HomePage } from './pages/HomePage';
+import { PlanPage } from './pages/PlanPage';
+import { SnapshotPage } from './pages/SnapshotPage';
 
-function NoPlanError() {
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="text-center">
-        <h1 className="text-2xl font-bold mb-2">No Plan Found</h1>
-        <p className="text-gray-600">The URL doesn't contain valid plan data. Add ?d= parameter.</p>
-      </div>
-    </div>
-  );
-}
+function AppRoutes() {
+  const [searchParams] = useSearchParams();
+  const hasSnapshot = searchParams.has('d');
 
-interface PlanAppProps {
-  urlPlan: UrlEncodedPlan;
-}
-
-function PlanApp({ urlPlan }: PlanAppProps) {
-  const { ydoc, syncState } = useYjsSync(urlPlan.id);
-  useHydration(ydoc, urlPlan);
+  // If we have ?d= param, show snapshot regardless of path
+  if (hasSnapshot) {
+    return <SnapshotPage />;
+  }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-4xl mx-auto px-4 space-y-6">
-        <SyncStatus {...syncState} />
-        <PlanHeader ydoc={ydoc} fallback={urlPlan} />
-        <PlanViewer ydoc={ydoc} fallback={urlPlan} />
-      </div>
-    </div>
+    <Routes>
+      <Route path="/" element={<HomePage />} />
+      <Route path="/plan/:id" element={<PlanPage />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   );
 }
 
 export function App() {
-  const urlPlan = getPlanFromUrl();
-
-  if (!urlPlan) {
-    return <NoPlanError />;
-  }
-
-  return <PlanApp urlPlan={urlPlan} />;
+  return (
+    <BrowserRouter>
+      <Layout>
+        <AppRoutes />
+      </Layout>
+    </BrowserRouter>
+  );
 }

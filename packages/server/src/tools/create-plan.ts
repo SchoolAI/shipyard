@@ -1,10 +1,16 @@
 import type { Block } from '@blocknote/core';
-import { createPlanUrl, initPlanMetadata, type UrlEncodedPlan } from '@peer-plan/schema';
+import {
+  createPlanUrl,
+  initPlanMetadata,
+  PLAN_INDEX_DOC_NAME,
+  setPlanIndexEntry,
+  type UrlEncodedPlan,
+} from '@peer-plan/schema';
 import { nanoid } from 'nanoid';
 import open from 'open';
-import * as Y from 'yjs';
 import { z } from 'zod';
 import { logger } from '../logger.js';
+import { getOrCreateDoc } from '../ws-server.js';
 
 const CreatePlanInput = z.object({
   title: z.string().describe('Plan title'),
@@ -32,10 +38,12 @@ export const createPlanTool = {
   handler: async (args: unknown) => {
     const input = CreatePlanInput.parse(args);
     const planId = nanoid();
+    const now = Date.now();
 
     logger.info({ planId, title: input.title }, 'Creating plan');
 
-    const ydoc = new Y.Doc();
+    // Get or create the plan Y.Doc (persisted to LevelDB)
+    const ydoc = await getOrCreateDoc(planId);
     initPlanMetadata(ydoc, {
       id: planId,
       title: input.title,
@@ -44,8 +52,25 @@ export const createPlanTool = {
       pr: input.prNumber,
     });
 
+    // Store content in the Y.Doc
     const blocks = parseMarkdownToBlocks(input.content);
+    const contentArray = ydoc.getArray('content');
+    contentArray.delete(0, contentArray.length); // Clear existing
+    contentArray.push(blocks);
 
+    // Update the plan index (syncs to connected browsers)
+    const indexDoc = await getOrCreateDoc(PLAN_INDEX_DOC_NAME);
+    setPlanIndexEntry(indexDoc, {
+      id: planId,
+      title: input.title,
+      status: 'draft',
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    logger.info({ planId }, 'Plan index updated');
+
+    // Create URL for sharing/opening
     const baseUrl = 'http://localhost:5173/plan';
     const urlPlan: UrlEncodedPlan = {
       v: 1,
