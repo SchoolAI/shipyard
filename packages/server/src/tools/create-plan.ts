@@ -70,7 +70,12 @@ export const createPlanTool = {
       contentArray.delete(0, contentArray.length);
       contentArray.push(blocks);
 
+      // Clear and populate the document fragment for BlockNote collaboration
       const fragment = ydoc.getXmlFragment('document');
+      // Clear existing content first to avoid duplicates or conflicts
+      while (fragment.length > 0) {
+        fragment.delete(0, 1);
+      }
       editor.blocksToYXmlFragment(blocks, fragment);
     });
 

@@ -1,5 +1,10 @@
 import { ServerBlockNoteEditor } from '@blocknote/server-util';
-import { extractTextFromCommentBody, parseThreads, type Thread } from '@peer-plan/schema';
+import {
+  createUserResolver,
+  extractTextFromCommentBody,
+  parseThreads,
+  type Thread,
+} from '@peer-plan/schema';
 import type * as Y from 'yjs';
 
 // --- Public API ---
@@ -9,6 +14,13 @@ export interface ExportOptions {
   includeResolved?: boolean;
   /** Max length for selected text preview (default: 100) */
   selectedTextMaxLength?: number;
+}
+
+/**
+ * Thread with selected text extracted from the document.
+ */
+interface ThreadWithText extends Thread {
+  selectedText?: string;
 }
 
 /**
@@ -29,16 +41,27 @@ export async function exportPlanToMarkdown(
   const blocks = editor.yXmlFragmentToBlocks(fragment);
   const contentMarkdown = await editor.blocksToMarkdownLossy(blocks);
 
-  // Get threads
+  // Get threads and extract selected text from document marks
   const threadsMap = ydoc.getMap('threads');
   const threadsData = threadsMap.toJSON() as Record<string, unknown>;
   const allThreads = parseThreads(threadsData);
 
+  // Extract selected text for each thread from document marks
+  const threadTextMap = extractThreadTextFromFragment(fragment);
+  const threadsWithText: ThreadWithText[] = allThreads.map((thread) => ({
+    ...thread,
+    selectedText: thread.selectedText || threadTextMap.get(thread.id),
+  }));
+
+  // Create user resolver for author names
+  const resolveUser = createUserResolver(ydoc);
+
   // Format feedback section
-  const feedbackMarkdown = formatFeedbackSection(allThreads, {
-    includeResolved,
-    selectedTextMaxLength,
-  });
+  const feedbackMarkdown = formatFeedbackSection(
+    threadsWithText,
+    { includeResolved, selectedTextMaxLength },
+    resolveUser
+  );
 
   // Combine
   if (!feedbackMarkdown) {
@@ -49,10 +72,63 @@ export async function exportPlanToMarkdown(
 }
 
 /**
+ * Extract text content for each thread by finding marks in the XmlFragment.
+ * BlockNote stores thread references as spans with data-bn-thread-id attribute.
+ */
+function extractThreadTextFromFragment(fragment: Y.XmlFragment): Map<string, string> {
+  const threadTextMap = new Map<string, string>();
+
+  // Walk through all XML elements looking for thread marks
+  for (const node of fragment.createTreeWalker(() => true)) {
+    // Check if this is an XmlElement with thread mark attributes
+    if ('getAttribute' in node && typeof node.getAttribute === 'function') {
+      const threadId = node.getAttribute('data-bn-thread-id');
+      if (threadId) {
+        // Extract text content from this marked span
+        const text = extractTextFromXmlNode(node);
+        if (text) {
+          // Accumulate text for this thread (marks may span multiple nodes)
+          const existing = threadTextMap.get(threadId) || '';
+          threadTextMap.set(threadId, existing + text);
+        }
+      }
+    }
+  }
+
+  return threadTextMap;
+}
+
+/**
+ * Extract plain text from an XML node and its children.
+ */
+function extractTextFromXmlNode(node: Y.XmlElement | Y.XmlText): string {
+  // If it's a text node, return its string content
+  if ('toString' in node && node.constructor.name === 'YXmlText') {
+    return node.toString();
+  }
+
+  // For element nodes, recursively extract text from children
+  if ('toArray' in node && typeof node.toArray === 'function') {
+    const children = node.toArray() as Array<Y.XmlElement | Y.XmlText>;
+    return children.map((child) => extractTextFromXmlNode(child)).join('');
+  }
+
+  return '';
+}
+
+/**
  * Format just the feedback section (without document content).
  * Useful if you already have the markdown or want feedback standalone.
+ *
+ * @param threads - Threads to format
+ * @param options - Export options
+ * @param resolveUser - Optional function to resolve user IDs to display names
  */
-export function formatFeedbackSection(threads: Thread[], options: ExportOptions = {}): string {
+export function formatFeedbackSection(
+  threads: Thread[],
+  options: ExportOptions = {},
+  resolveUser?: (userId: string) => string
+): string {
   const { includeResolved = false, selectedTextMaxLength = 100 } = options;
 
   const unresolvedThreads = threads.filter((t) => !t.resolved);
@@ -70,7 +146,7 @@ export function formatFeedbackSection(threads: Thread[], options: ExportOptions 
   let output = '## Reviewer Feedback\n\n';
 
   threadsToShow.forEach((thread, index) => {
-    output += formatThread(thread, index + 1, selectedTextMaxLength);
+    output += formatThread(thread, index + 1, selectedTextMaxLength, resolveUser);
     output += '\n';
   });
 
@@ -84,7 +160,12 @@ export function formatFeedbackSection(threads: Thread[], options: ExportOptions 
 
 // --- Private Helpers ---
 
-function formatThread(thread: Thread, number: number, selectedTextMaxLength: number): string {
+function formatThread(
+  thread: Thread,
+  number: number,
+  selectedTextMaxLength: number,
+  resolveUser?: (userId: string) => string
+): string {
   let output = `### ${number}. `;
 
   // Header with selected text or "General"
@@ -103,13 +184,14 @@ function formatThread(thread: Thread, number: number, selectedTextMaxLength: num
   // Comments
   thread.comments.forEach((comment, idx) => {
     const bodyText = extractTextFromCommentBody(comment.body);
+    const authorName = resolveUser ? resolveUser(comment.userId) : comment.userId.slice(0, 8);
 
     if (idx === 0) {
       // First comment is the main feedback
-      output += `> ${bodyText}\n`;
+      output += `> **${authorName}:** ${bodyText}\n`;
     } else {
       // Subsequent comments are replies
-      output += `>\n> **Reply:** ${bodyText}\n`;
+      output += `>\n> **${authorName} (Reply):** ${bodyText}\n`;
     }
   });
 

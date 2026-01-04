@@ -1,29 +1,37 @@
 import { getPlanMetadata } from '@peer-plan/schema';
 import { z } from 'zod';
+import { exportPlanToMarkdown } from '../export-markdown.js';
 import { getOrCreateDoc } from '../ws-server.js';
 
 const ReadPlanInput = z.object({
   planId: z.string().describe('The plan ID to read'),
+  includeAnnotations: z
+    .boolean()
+    .optional()
+    .describe('Include comment threads/annotations in the response (default: false)'),
 });
 
 export const readPlanTool = {
   definition: {
     name: 'read_plan',
-    description: 'Read a specific plan by ID, returning its metadata and content',
+    description: 'Read a specific plan by ID, returning its metadata and content in markdown format',
     inputSchema: {
       type: 'object',
       properties: {
         planId: { type: 'string', description: 'The plan ID to read' },
+        includeAnnotations: {
+          type: 'boolean',
+          description: 'Include comment threads/annotations in the response (default: false)',
+        },
       },
       required: ['planId'],
     },
   },
 
   handler: async (args: unknown) => {
-    const { planId } = ReadPlanInput.parse(args);
+    const { planId, includeAnnotations = false } = ReadPlanInput.parse(args);
     const doc = await getOrCreateDoc(planId);
     const metadata = getPlanMetadata(doc);
-    const content = doc.getArray('content').toJSON();
 
     if (!metadata) {
       return {
@@ -37,24 +45,32 @@ export const readPlanTool = {
       };
     }
 
+    // Export plan to markdown (with annotations if requested)
+    const markdown = await exportPlanToMarkdown(doc, {
+      includeResolved: includeAnnotations, // Include resolved comments if showing annotations
+    });
+
+    // Build metadata header
+    let output = `# ${metadata.title}\n\n`;
+    output += `**Status:** ${metadata.status.replace('_', ' ')}\n`;
+    if (metadata.repo) {
+      output += `**Repo:** ${metadata.repo}\n`;
+    }
+    if (metadata.pr) {
+      output += `**PR:** #${metadata.pr}\n`;
+    }
+    output += `**Created:** ${new Date(metadata.createdAt).toISOString()}\n`;
+    output += `**Updated:** ${new Date(metadata.updatedAt).toISOString()}\n`;
+    output += '\n---\n\n';
+
+    // Append markdown content
+    output += markdown;
+
     return {
       content: [
         {
           type: 'text',
-          text: JSON.stringify(
-            {
-              id: metadata.id,
-              title: metadata.title,
-              status: metadata.status,
-              repo: metadata.repo,
-              pr: metadata.pr,
-              createdAt: metadata.createdAt,
-              updatedAt: metadata.updatedAt,
-              content,
-            },
-            null,
-            2
-          ),
+          text: output,
         },
       ],
     };

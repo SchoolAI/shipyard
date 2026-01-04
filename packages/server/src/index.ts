@@ -10,7 +10,6 @@ import {
 import { logger } from './logger.js';
 import { isRegistryRunning, startRegistryServer } from './registry-server.js';
 import { createPlanTool } from './tools/create-plan.js';
-import { getFeedbackTool } from './tools/get-feedback.js';
 import { listPlansTool } from './tools/list-plans.js';
 import { readPlanTool } from './tools/read-plan.js';
 import { updatePlanTool } from './tools/update-plan.js';
@@ -43,7 +42,6 @@ const server = new Server(
 server.setRequestHandler(ListToolsRequestSchema, async () => ({
   tools: [
     createPlanTool.definition,
-    getFeedbackTool.definition,
     listPlansTool.definition,
     readPlanTool.definition,
     updatePlanTool.definition,
@@ -56,8 +54,6 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   switch (name) {
     case 'create_plan':
       return await createPlanTool.handler(args ?? {});
-    case 'get_feedback':
-      return await getFeedbackTool.handler(args ?? {});
     case 'list_plans':
       return await listPlansTool.handler(args ?? {});
     case 'read_plan':
