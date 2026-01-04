@@ -35,8 +35,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build web app
-        run: pnpm --filter @peer-plan/web build
+      - name: Build web app (with dependencies)
+        run: pnpm turbo run build --filter=@peer-plan/web
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
