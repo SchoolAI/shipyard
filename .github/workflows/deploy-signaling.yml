@@ -1,0 +1,44 @@
+name: Deploy Signaling Server
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/signaling/cloudflare/**'
+      - '.github/workflows/deploy-signaling.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    name: Deploy to Cloudflare Workers
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.9.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.14.0'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        working-directory: apps/signaling/cloudflare
+        run: pnpm install --frozen-lockfile
+
+      - name: Deploy to Cloudflare Workers
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          workingDirectory: apps/signaling/cloudflare
+          command: deploy
+
+      - name: Summary
+        run: |
+          echo "✅ Signaling server deployed"
+          echo "URL: wss://peer-plan-signaling.jacob-191.workers.dev"
