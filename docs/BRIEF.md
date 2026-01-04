@@ -107,15 +107,16 @@ peer-plan/
 
 | # | Milestone | Status | What It Delivers |
 |---|-----------|--------|------------------|
-| 0 | Foundation | **Not Started** | Scaffold, schemas, URL encoding |
-| 1 | Agent Creates Plans | Not Started | MCP tools, browser launch |
-| 2 | View Plans | Not Started | Static React UI |
-| 3 | Live Sync | Not Started | WebSocket CRDT sync |
-| 4 | Review Flow | Not Started | Annotations, approval |
-| 5 | Artifacts | Not Started | GitHub blob storage |
-| 6 | P2P | Not Started | WebRTC remote collab |
+| 0 | Foundation | ✅ Complete | Scaffold, schemas, URL encoding |
+| 1 | Agent Creates Plans | ✅ Complete | MCP tools, browser launch |
+| 2 | View Plans | ✅ Complete | Static React UI with BlockNote |
+| 3 | Live Sync | ✅ Complete | WebSocket CRDT sync |
+| 4 | Plan Discovery | ✅ Complete | Multi-peer architecture, sidebar |
+| 5 | Review Flow | **Next** | Annotations, approval |
+| 6 | Artifacts | Not Started | GitHub blob storage |
+| 7 | P2P | Not Started | WebRTC remote collab |
 
-**Start here:** [Milestone 0: Foundation](./milestones/00-foundation.md)
+**Current:** [Milestone 5: Review Flow](./milestones/04-review-flow.md)
 
 ---
 
