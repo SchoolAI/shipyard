@@ -10,21 +10,35 @@ import type { Plugin } from 'vite';
  * GitHub Pages serves 404.html for unknown paths, allowing client-side routing.
  */
 function githubPagesSpa(): Plugin {
+  let outDir: string;
+
   return {
     name: 'github-pages-spa',
-    closeBundle() {
-      const distDir = path.resolve(__dirname, 'dist');
-      const indexPath = path.join(distDir, 'index.html');
-      const notFoundPath = path.join(distDir, '404.html');
-      const nojekyllPath = path.join(distDir, '.nojekyll');
+    configResolved(config) {
+      outDir = config.build.outDir;
+    },
+    closeBundle: {
+      order: 'post',
+      sequential: true,
+      async handler() {
+        const distDir = path.resolve(__dirname, outDir);
+        const indexPath = path.join(distDir, 'index.html');
+        const notFoundPath = path.join(distDir, '404.html');
+        const nojekyllPath = path.join(distDir, '.nojekyll');
 
-      // Copy index.html to 404.html for SPA routing
-      if (fs.existsSync(indexPath)) {
-        fs.copyFileSync(indexPath, notFoundPath);
-      }
+        // Ensure dist directory exists
+        if (!fs.existsSync(distDir)) {
+          fs.mkdirSync(distDir, { recursive: true });
+        }
 
-      // Create .nojekyll to prevent GitHub Pages from ignoring _-prefixed files
-      fs.writeFileSync(nojekyllPath, '');
+        // Copy index.html to 404.html for SPA routing
+        if (fs.existsSync(indexPath)) {
+          fs.copyFileSync(indexPath, notFoundPath);
+        }
+
+        // Create .nojekyll to prevent GitHub Pages from ignoring _-prefixed files
+        fs.writeFileSync(nojekyllPath, '');
+      },
     },
   };
 }
