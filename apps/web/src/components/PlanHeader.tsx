@@ -3,9 +3,11 @@ import { MessageSquare } from 'lucide-react';
 import type * as Y from 'yjs';
 import { ReviewActions } from '@/components/ReviewActions';
 import { ShareButton } from '@/components/ShareButton';
+import { SyncStatus } from '@/components/SyncStatus';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader } from '@/components/ui/card';
+import { useActivePlanSync } from '@/contexts/ActivePlanSyncContext';
 import type { UserIdentity } from '@/utils/identity';
 
 interface PlanHeaderProps {
@@ -38,6 +40,7 @@ export function PlanHeader({
 }: PlanHeaderProps) {
   // No local state or observer - metadata comes from parent to avoid duplicate observers
   const display = metadata;
+  const { syncState } = useActivePlanSync();
 
   const getStatusVariant = (status: PlanStatusType) => {
     switch (status) {
@@ -83,6 +86,15 @@ export function PlanHeader({
             </Badge>
           </div>
         </div>
+        {syncState && (
+          <div className="mt-2">
+            <SyncStatus
+              synced={syncState.synced}
+              serverCount={syncState.activeCount}
+              peerCount={syncState.peerCount}
+            />
+          </div>
+        )}
         {(display.repo || display.pr) && (
           <p className="text-sm text-muted-foreground mt-2">
             {display.repo && <span>{display.repo}</span>}

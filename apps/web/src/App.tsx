@@ -1,5 +1,6 @@
 import { BrowserRouter, Navigate, Route, Routes, useSearchParams } from 'react-router-dom';
 import { Layout } from './components/Layout';
+import { ActivePlanSyncProvider } from './contexts/ActivePlanSyncContext';
 import { HomePage } from './pages/HomePage';
 import { PlanPage } from './pages/PlanPage';
 import { SnapshotPage } from './pages/SnapshotPage';
@@ -25,9 +26,11 @@ function AppRoutes() {
 export function App() {
   return (
     <BrowserRouter>
-      <Layout>
-        <AppRoutes />
-      </Layout>
+      <ActivePlanSyncProvider>
+        <Layout>
+          <AppRoutes />
+        </Layout>
+      </ActivePlanSyncProvider>
     </BrowserRouter>
   );
 }

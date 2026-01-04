@@ -25,7 +25,7 @@ interface ServerEntry {
   registeredAt: number;
 }
 
-interface SyncState {
+export interface SyncState {
   connected: boolean;
   synced: boolean;
   serverCount: number;

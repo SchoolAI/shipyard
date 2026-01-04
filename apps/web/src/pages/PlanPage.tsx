@@ -11,7 +11,7 @@ import { CommentsPanel, useThreadCount } from '@/components/CommentsPanel';
 import { PlanHeader } from '@/components/PlanHeader';
 import { PlanViewer } from '@/components/PlanViewer';
 import { ProfileSetup } from '@/components/ProfileSetup';
-import { SyncStatus } from '@/components/SyncStatus';
+import { useActivePlanSync } from '@/contexts/ActivePlanSyncContext';
 import { useIdentity } from '@/hooks/useIdentity';
 import { useMultiProviderSync } from '@/hooks/useMultiProviderSync';
 
@@ -24,6 +24,7 @@ export function PlanPage() {
   const planId = id ?? '';
   const { ydoc, syncState, providers, rtcProvider } = useMultiProviderSync(planId);
   const { identity } = useIdentity();
+  const { setActivePlanSync, clearActivePlanSync } = useActivePlanSync();
   const [metadata, setMetadata] = useState<PlanMetadata | null>(null);
   const [showProfileSetup, setShowProfileSetup] = useState(false);
   const [pendingCommentHint, setPendingCommentHint] = useState(false);
@@ -47,6 +48,12 @@ export function PlanPage() {
     metaMap.observe(update);
     return () => metaMap.unobserve(update);
   }, [ydoc]);
+
+  // Update context with active plan sync state
+  useEffect(() => {
+    setActivePlanSync(planId, syncState);
+    return () => clearActivePlanSync();
+  }, [planId, syncState, setActivePlanSync, clearActivePlanSync]);
 
   // When user tries to comment without identity, we show profile setup
   // and track that they were trying to comment
@@ -107,12 +114,7 @@ export function PlanPage() {
   if (!metadata && !syncState.synced) {
     return (
       <div className="p-8">
-        <SyncStatus
-          synced={syncState.synced}
-          serverCount={syncState.activeCount}
-          peerCount={syncState.peerCount}
-        />
-        <p className="text-gray-600 mt-4">Loading plan...</p>
+        <p className="text-gray-600">Loading plan...</p>
       </div>
     );
   }
@@ -131,11 +133,6 @@ export function PlanPage() {
       {/* Main content area */}
       <div className="flex-1 p-8 overflow-y-auto">
         <div className="max-w-4xl mx-auto space-y-6">
-          <SyncStatus
-            synced={syncState.synced}
-            serverCount={syncState.activeCount}
-            peerCount={syncState.peerCount}
-          />
           <PlanHeader
             ydoc={ydoc}
             metadata={metadata}
