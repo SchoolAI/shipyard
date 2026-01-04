@@ -3,8 +3,25 @@ import { usePlanIndex } from '@/hooks/usePlanIndex';
 import { cn } from '@/lib/utils';
 
 export function Sidebar() {
-  const { plans, connected, synced, serverCount } = usePlanIndex();
+  const { plans, connected, synced, serverCount, activeCount } = usePlanIndex();
   const { id: currentPlanId } = useParams<{ id: string }>();
+
+  // Determine status text
+  const getStatusText = () => {
+    if (!connected) return 'Offline';
+    if (!synced) return 'Syncing...';
+    return 'Synced';
+  };
+
+  // Show peer count info
+  const getPeerInfo = () => {
+    if (serverCount === 0) return null;
+    if (activeCount === serverCount) {
+      return `(${activeCount} peer${activeCount !== 1 ? 's' : ''})`;
+    }
+    // Show both counts when some are disconnected
+    return `(${activeCount}/${serverCount} peers)`;
+  };
 
   return (
     <aside className="w-64 border-r border-gray-200 bg-white h-screen flex flex-col">
@@ -14,12 +31,8 @@ export function Sidebar() {
           <span
             className={cn('w-2 h-2 rounded-full', connected ? 'bg-green-500' : 'bg-gray-300')}
           />
-          {!connected ? 'Offline' : synced ? 'Synced' : 'Syncing...'}
-          {serverCount > 0 && (
-            <span>
-              ({serverCount} peer{serverCount > 1 ? 's' : ''})
-            </span>
-          )}
+          {getStatusText()}
+          {getPeerInfo() && <span>{getPeerInfo()}</span>}
         </div>
       </div>
 

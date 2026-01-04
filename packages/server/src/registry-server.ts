@@ -1,8 +1,15 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
+import { WebSocket } from 'ws';
 import { logger } from './logger.js';
 
 // Default registry ports (high ephemeral range, unlikely to collide)
 const DEFAULT_REGISTRY_PORTS = [32191, 32192];
+
+// How often to check if registered servers are still alive (ms)
+const HEALTH_CHECK_INTERVAL = 10000;
+
+// Timeout for health check connection attempts (ms)
+const HEALTH_CHECK_TIMEOUT = 2000;
 
 interface ServerEntry {
   port: number;
@@ -13,6 +20,45 @@ interface ServerEntry {
 
 // In-memory registry (ephemeral, no persistence)
 const servers = new Map<number, ServerEntry>();
+
+/**
+ * Check if a WebSocket server is still alive by attempting to connect
+ */
+async function isServerAlive(entry: ServerEntry): Promise<boolean> {
+  return new Promise((resolve) => {
+    const ws = new WebSocket(entry.url);
+    const timeout = setTimeout(() => {
+      ws.close();
+      resolve(false);
+    }, HEALTH_CHECK_TIMEOUT);
+
+    ws.on('open', () => {
+      clearTimeout(timeout);
+      ws.close();
+      resolve(true);
+    });
+
+    ws.on('error', () => {
+      clearTimeout(timeout);
+      resolve(false);
+    });
+  });
+}
+
+/**
+ * Periodic health check to remove dead servers from registry
+ */
+async function healthCheck(): Promise<void> {
+  const entries = Array.from(servers.entries());
+
+  for (const [pid, entry] of entries) {
+    const alive = await isServerAlive(entry);
+    if (!alive) {
+      servers.delete(pid);
+      logger.info({ pid, port: entry.port }, 'Removed dead server from registry');
+    }
+  }
+}
 
 /**
  * Parse JSON body from request
@@ -161,6 +207,10 @@ export async function startRegistryServer(): Promise<number | null> {
 
         server.listen(port, () => {
           logger.info({ port }, 'Registry server started');
+
+          // Start periodic health checks to remove dead servers
+          setInterval(healthCheck, HEALTH_CHECK_INTERVAL);
+
           resolve();
         });
       });

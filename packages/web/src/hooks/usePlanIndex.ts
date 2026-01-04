@@ -7,6 +7,7 @@ export interface PlanIndexState {
   connected: boolean;
   synced: boolean;
   serverCount: number;
+  activeCount: number;
 }
 
 /**
@@ -41,5 +42,6 @@ export function usePlanIndex(): PlanIndexState {
     connected: syncState.connected,
     synced: syncState.synced,
     serverCount: syncState.serverCount,
+    activeCount: syncState.activeCount,
   };
 }

@@ -231,8 +231,12 @@ export function startWebSocketServer(): WebSocketServer | null {
       }
     });
 
-    // Cleanup on shutdown
+    // Cleanup on shutdown (ensure we only run once)
+    let isShuttingDown = false;
     const cleanup = async () => {
+      if (isShuttingDown) return;
+      isShuttingDown = true;
+
       logger.info('Shutting down WebSocket server');
       await unregisterFromRegistry();
       wss.close();

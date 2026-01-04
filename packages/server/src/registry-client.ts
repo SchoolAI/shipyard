@@ -68,28 +68,30 @@ export async function registerWithRegistry(wsPort: number): Promise<boolean> {
 }
 
 /**
- * Unregister this server from the registry
+ * Unregister this server from the registry.
+ * Uses a short timeout since this is called during shutdown.
  */
 export async function unregisterFromRegistry(): Promise<void> {
-  const registryPort = await findRegistryPort();
+  // Use cached registry port if available, with very short timeout for shutdown
+  const ports = getRegistryPorts();
 
-  if (!registryPort) {
-    logger.debug('Registry server not found, skipping unregister');
-    return;
-  }
+  for (const port of ports) {
+    try {
+      const res = await fetch(`http://localhost:${port}/unregister`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pid: process.pid }),
+        signal: AbortSignal.timeout(500), // Short timeout for shutdown
+      });
 
-  try {
-    const res = await fetch(`http://localhost:${registryPort}/unregister`, {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pid: process.pid }),
-      signal: AbortSignal.timeout(2000),
-    });
-
-    if (res.ok) {
-      logger.info('Unregistered from registry server');
+      if (res.ok) {
+        logger.info({ port }, 'Unregistered from registry server');
+        return;
+      }
+    } catch {
+      // Try next port or silently fail - registry may already be down
     }
-  } catch (err) {
-    logger.debug({ err }, 'Error unregistering from registry (may already be down)');
   }
+
+  logger.debug('Registry server not reachable during unregister (may already be down)');
 }
