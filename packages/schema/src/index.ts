@@ -7,7 +7,12 @@ export type {
 } from './plan.js';
 export { ArtifactSchema, getArtifactUrl, PlanMetadataSchema, PlanStatusValues } from './plan.js';
 export type { PlanIndexEntry } from './plan-index.js';
-export { PLAN_INDEX_DOC_NAME, PlanIndexEntrySchema, PlanStatus } from './plan-index.js';
+export {
+  NON_PLAN_DB_NAMES,
+  PLAN_INDEX_DOC_NAME,
+  PlanIndexEntrySchema,
+  PlanStatus,
+} from './plan-index.js';
 export {
   getPlanIndex,
   getPlanIndexEntry,
@@ -33,10 +38,13 @@ export {
 export type { UserProfile } from './user-helpers.js';
 export { createUserResolver } from './user-helpers.js';
 export {
+  addArtifact,
+  getArtifacts,
   getPlanMetadata,
   getStepCompletions,
   initPlanMetadata,
   isStepCompleted,
+  removeArtifact,
   setPlanMetadata,
   toggleStepCompletion,
 } from './yjs-helpers.js';

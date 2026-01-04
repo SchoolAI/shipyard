@@ -135,6 +135,8 @@ export function useMultiProviderSync(
     const idbProvider = new IndexeddbPersistence(docName, ydoc);
 
     let rtc: WebrtcProvider | null = null;
+    let handleBeforeUnload: (() => void) | null = null;
+
     if (enableWebRTC) {
       const signalingServer =
         (import.meta.env.VITE_WEBRTC_SIGNALING as string) || DEFAULT_SIGNALING_SERVER;
@@ -143,12 +145,28 @@ export function useMultiProviderSync(
       });
       setRtcProvider(rtc);
 
-      rtc.on('peers', ({ webrtcPeers }: { webrtcPeers: string[] }) => {
-        peerCountRef.current = webrtcPeers.length;
+      // Use awareness protocol for peer counting instead of raw WebRTC connections.
+      // The awareness protocol has a heartbeat/timeout mechanism that properly detects
+      // disconnected peers, unlike raw WebRTC connections which can stay "open" after
+      // a page refresh until ICE connectivity checks fail (15-30+ seconds).
+      const awareness = rtc.awareness;
+
+      // Count peers from awareness states (excluding self)
+      const updatePeerCountFromAwareness = () => {
+        const states = awareness.getStates();
+        // Count peers excluding ourselves
+        const peerCount = states.size - 1;
+        peerCountRef.current = Math.max(0, peerCount);
         if (mounted) {
           updateSyncState();
         }
-      });
+      };
+
+      // Listen for awareness changes (peers joining/leaving)
+      awareness.on('change', updatePeerCountFromAwareness);
+
+      // Initial count
+      updatePeerCountFromAwareness();
 
       // Track sync state
       rtc.on('synced', () => {
@@ -156,6 +174,13 @@ export function useMultiProviderSync(
           updateSyncState();
         }
       });
+
+      // Clear awareness on page unload so other peers see us leave immediately
+      // instead of waiting for the 30-second awareness timeout
+      handleBeforeUnload = () => {
+        awareness.setLocalState(null);
+      };
+      window.addEventListener('beforeunload', handleBeforeUnload);
     }
 
     function updateSyncState() {
@@ -306,9 +331,14 @@ export function useMultiProviderSync(
       providersRef.current.clear();
       idbProvider.destroy();
       if (rtc) {
+        // Clear awareness before destroying so other peers see us leave
+        rtc.awareness.setLocalState(null);
         rtc.disconnect();
         rtc.destroy();
         setRtcProvider(null);
+      }
+      if (handleBeforeUnload) {
+        window.removeEventListener('beforeunload', handleBeforeUnload);
       }
     };
   }, [docName, ydoc, enableWebRTC]);

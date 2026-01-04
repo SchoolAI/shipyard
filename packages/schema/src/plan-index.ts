@@ -8,6 +8,15 @@ import { type PlanStatusType, PlanStatusValues } from './plan.js';
 export const PLAN_INDEX_DOC_NAME = 'plan-index';
 
 /**
+ * Known IndexedDB database names that are NOT plan documents.
+ * Used to filter when querying for shared plans.
+ */
+export const NON_PLAN_DB_NAMES = [
+  'plan-index', // Our plan index doc
+  'idb-keyval', // External library (dependency of UI components)
+] as const;
+
+/**
  * Status values for a plan.
  * @deprecated Use PlanStatusValues from plan.ts instead
  */
