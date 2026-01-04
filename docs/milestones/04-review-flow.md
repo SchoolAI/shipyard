@@ -41,28 +41,21 @@ Add the core review functionality using BlockNote's native comments:
 - [x] "Request Changes" button
 - [x] Confirmation before changing status
 
-### 4c: MCP `get_feedback` Tool
+### 4c: Agent Feedback via `read_plan` Tool
 
-- [x] Returns comments from Y.Doc threads map
+- [x] Returns comments from Y.Doc threads via `includeAnnotations` parameter
 - [x] Returns current review status from metadata
-- [x] Agent can poll for updates
+- [x] Agent can read annotations and respond
+
+**Implementation**: The `read_plan` tool with `includeAnnotations: true` exports the plan with all comment threads included in markdown format. See `apps/server/src/tools/read-plan.ts` and `apps/server/src/export-markdown.ts` for implementation.
 
 ```typescript
-server.tool(
-  "get_feedback",
-  { planId: z.string() },
-  async ({ planId }) => {
-    const ydoc = getYDoc(planId);
-    const metadata = getPlanMetadata(ydoc);
-    const threads = ydoc.getMap('threads').toJSON();
-
-    return {
-      status: metadata?.status,
-      comments: threads,
-      commentCount: Object.keys(threads).length,
-    };
-  }
-);
+// Agent calls this to get feedback:
+read_plan({
+  planId: "abc123",
+  includeAnnotations: true
+})
+// Returns markdown with inline comment threads
 ```
 
 ### 4d: Y.Doc Change Observation
@@ -159,3 +152,4 @@ function setReviewStatus(ydoc: Y.Doc, status: 'approved' | 'changes_requested') 
 ---
 
 *Created: 2026-01-02*
+*Updated: 2026-01-04*

@@ -88,10 +88,12 @@ See [decisions/0001-use-yjs-not-loro.md](./decisions/0001-use-yjs-not-loro.md) f
 
 ```
 peer-plan/
-├── packages/
-│   ├── schema/     # Shared types, URL encoding, loro schemas
-│   ├── server/     # MCP server
-│   └── web/        # React app
+├── apps/               # Deployable applications
+│   ├── server/         # MCP server (WebSocket + tools)
+│   ├── web/            # React app (BlockNote UI)
+│   └── signaling/      # WebRTC signaling server
+├── packages/           # Shared libraries
+│   └── schema/         # Shared types, URL encoding, Yjs helpers
 ├── docs/
 │   ├── BRIEF.md        # This file
 │   ├── architecture.md # Detailed architecture
@@ -112,11 +114,11 @@ peer-plan/
 | 2 | View Plans | ✅ Complete | Static React UI with BlockNote |
 | 3 | Live Sync | ✅ Complete | WebSocket CRDT sync |
 | 4 | Plan Discovery | ✅ Complete | Multi-peer architecture, sidebar |
-| 5 | Review Flow | ✅ Complete | Comments, approval, get_feedback tool |
+| 5 | Review Flow | ✅ Complete | Comments, approval, feedback via read_plan |
 | 6 | P2P | ✅ Complete | WebRTC remote collab |
-| 7 | Artifacts | **Next** | GitHub blob storage |
+| 7 | Artifacts | ✅ Complete | GitHub blob storage |
 
-**Current:** [Milestone 7: Artifacts](./milestones/05-artifacts.md)
+**All milestones complete!** See [PROGRESS.md](./milestones/PROGRESS.md) for detailed implementation notes.
 
 ---
 
@@ -127,18 +129,7 @@ peer-plan/
 | `docs/architecture.md` | Data model, resilience, decisions |
 | `docs/systems-inventory.md` | Components, risks, assumptions |
 | `docs/milestones/*.md` | Implementation details per phase |
-| `spikes/loro-websocket/` | Validated WebSocket sync (reference code) |
-
----
-
-## Validated via Spikes
-
-These things are **confirmed working** (see `spikes/loro-websocket/`):
-
-- ✅ loro-extended WebSocket sync in Node.js (no polyfills needed)
-- ✅ Bidirectional CRDT sync between server and client
-- ✅ Schema-driven documents with `Shape.doc()`
-- ✅ `@loro-extended/*` packages all published to npm (v4.0.0)
+| `docs/yjs-data-model.md` | Yjs CRDT structure reference |
 
 ---
 
@@ -161,4 +152,4 @@ These things are **confirmed working** (see `spikes/loro-websocket/`):
 
 ---
 
-*Last updated: 2026-01-02*
+*Last updated: 2026-01-04*

@@ -13,10 +13,10 @@
 
 ## Current Status
 
-**Milestone:** 0 (Foundation)
-**Phase:** Setting up schemas, monorepo, URL encoding
+**Milestone:** All 7 core milestones complete! 🎉
+**Phase:** Active enhancements and bug fixes
 
-See [docs/milestones/00-foundation.md](./docs/milestones/00-foundation.md) for current work.
+See [docs/milestones/PROGRESS.md](./docs/milestones/PROGRESS.md) for full implementation details.
 
 ## Tech Stack (Quick Reference)
 
@@ -37,10 +37,12 @@ peer-plan/
 │   ├── decisions/              # ADRs (decision log)
 │   ├── milestones/             # Implementation phases
 │   └── original-vision/        # Historical (don't use for impl)
-├── packages/
-│   ├── schema/     # Shared types, URL encoding
-│   ├── server/     # MCP server
-│   └── web/        # React app
+├── apps/               # Deployable applications
+│   ├── server/         # MCP server (WebSocket + tools)
+│   ├── web/            # React app (BlockNote UI)
+│   └── signaling/      # WebRTC signaling server
+├── packages/           # Shared libraries
+│   └── schema/         # Shared types, URL encoding, Yjs helpers
 └── spikes/         # Proof of concept code
 ```
 
@@ -90,4 +92,4 @@ Follow the **3+ Rule** from engineering-standards.md:
 
 ---
 
-*Last updated: 2026-01-02*
+*Last updated: 2026-01-04*

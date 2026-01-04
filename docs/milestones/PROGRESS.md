@@ -108,7 +108,7 @@ Browser discovers all → Multi-provider Yjs merge
 - ✅ CommentsPanel sidebar with real-time thread sync
 - ✅ User identity system (ProfileSetup modal, localStorage)
 - ✅ Review status UI (Approve/Request Changes with confirmation)
-- ✅ `get_feedback` MCP tool for agent feedback loop
+- ✅ Agent feedback via `read_plan` tool with `includeAnnotations: true`
 - ✅ Thread parsing and export to structured markdown
 - ✅ FormattingToolbar with AddCommentButton
 
@@ -116,7 +116,7 @@ Browser discovers all → Multi-provider Yjs merge
 - `apps/web/src/components/CommentsPanel.tsx` - Thread list sidebar
 - `apps/web/src/components/ReviewActions.tsx` - Approve/Request Changes
 - `apps/web/src/utils/identity.ts` - User identity helpers
-- `apps/server/src/tools/get-feedback.ts` - MCP feedback tool
+- `apps/server/src/tools/read-plan.ts` - MCP tool includes annotations
 - `packages/schema/src/thread.ts` - Thread parsing utilities
 
 ---
@@ -141,10 +141,39 @@ Browser discovers all → Multi-provider Yjs merge
 
 ---
 
-## Next Up
+## Milestone 7: Artifacts ✅ COMPLETE
 
-**Milestone 7 (Artifacts):** GitHub blob storage for screenshots, videos, test results
+**Goal:** GitHub blob storage for screenshots, videos, test results
+
+**Completed:**
+- ✅ GitHub storage functions (orphan branch creation, artifact upload)
+- ✅ `add_artifact` MCP tool with base64 content support
+- ✅ Artifact type detection and rendering (images, videos, JSON, diffs)
+- ✅ Attachments section in UI with real-time CRDT sync
+- ✅ Schema validation with Zod (`ArtifactSchema`)
+- ✅ YDOC_KEYS.ARTIFACTS added to schema package
+
+**Key files:**
+- `apps/server/src/github-artifacts.ts` - GitHub API integration
+- `apps/server/src/tools/add-artifact.ts` - MCP tool
+- `apps/web/src/components/ArtifactRenderer.tsx` - Type-specific rendering
+- `apps/web/src/components/Attachments.tsx` - Artifacts display section
+- `packages/schema/src/yjs-helpers.ts` - CRDT artifact helpers
+- `packages/schema/src/yjs-keys.ts` - ARTIFACTS key definition
+
+**Tech stack:**
+- @octokit/rest for GitHub API
+- Orphan branch: `plan-artifacts`
+- Authentication: GitHub PAT via `GITHUB_TOKEN` env var
+
+**Future enhancement:** [OAuth for private repos](https://github.com/SchoolAI/peer-plan/issues/13)
 
 ---
 
-*Last updated: 2026-01-03*
+## All Milestones Complete! 🎉
+
+**Next steps:** Enhancements, bug fixes, and polish based on usage feedback.
+
+---
+
+*Last updated: 2026-01-04*

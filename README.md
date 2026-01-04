@@ -16,11 +16,11 @@ When an AI agent generates an implementation plan, peer-plan enables:
 
 ## Status
 
-**In Development** — See [milestones](./docs/README.md#milestones) for progress.
+**All core milestones complete!** 🎉 See [PROGRESS.md](./docs/milestones/PROGRESS.md) for implementation details.
 
 ## Quick Start
 
-Coming soon. See [Milestone 0](./docs/milestones/00-foundation.md) for first steps.
+See [SETUP.md](./docs/SETUP.md) for installation and development instructions.
 
 ## License
 

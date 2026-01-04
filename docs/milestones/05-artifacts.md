@@ -1,7 +1,9 @@
-# Milestone 5: Artifacts
+# Milestone 7: Artifacts
 
-**Status**: Not Started
+**Status**: ✅ Complete
 **Goal**: GitHub blob storage for screenshots, videos, test results
+
+**Note**: This was originally numbered as Milestone 5 but implemented as Milestone 7 after P2P (M6) was prioritized.
 
 ---
 
@@ -18,20 +20,24 @@ Note: This comes AFTER the core flow works. Artifacts are additive proof, not cr
 
 ## Deliverables
 
-### 5a: GitHub Storage Functions
+### 7a: GitHub Storage Functions
 
-- [ ] `ensureOrphanBranch(repo, pat)` - create if not exists
-- [ ] `uploadArtifact(repo, pat, planId, filename, content)` - push file
-- [ ] `getArtifactUrl(repo, planId, filename)` - construct raw URL
+- [x] `ensureOrphanBranch(repo, pat)` - create if not exists
+- [x] `uploadArtifact(repo, pat, planId, filename, content)` - push file
+- [x] `getArtifactUrl(repo, planId, filename)` - construct raw URL
 
 **Storage path:** `plan-artifacts/pr-{pr}/{plan-id}/{filename}`
 
-### 5b: MCP `add_artifact` Tool
+**Implementation**: See `apps/server/src/github-artifacts.ts`
 
-- [ ] Accept: planId, type, filename, base64Content
-- [ ] Upload to GitHub
-- [ ] Update plan's artifact list in CRDT
-- [ ] Return artifact URL
+### 7b: MCP `add_artifact` Tool
+
+- [x] Accept: planId, type, filename, base64Content
+- [x] Upload to GitHub
+- [x] Update plan's artifact list in CRDT
+- [x] Return artifact URL
+
+**Implementation**: See `apps/server/src/tools/add-artifact.ts`
 
 ```typescript
 server.tool(
@@ -51,20 +57,24 @@ server.tool(
 );
 ```
 
-### 5c: Artifact Renderer in UI
+### 7c: Artifact Renderer in UI
 
-- [ ] Detect artifact type from extension/metadata
-- [ ] Render images inline
-- [ ] Render videos with player
-- [ ] Render JSON as formatted code block
-- [ ] Render diffs with syntax highlighting
-- [ ] Handle missing artifacts gracefully
+- [x] Detect artifact type from extension/metadata
+- [x] Render images inline
+- [x] Render videos with player
+- [x] Render JSON as formatted code block
+- [x] Render diffs with syntax highlighting
+- [x] Handle missing artifacts gracefully
 
-### 5d: Artifact in URL Snapshots
+**Implementation**: See `apps/web/src/components/ArtifactRenderer.tsx` and `Attachments.tsx`
 
-- [ ] Include artifact references in URL encoding
-- [ ] Only filename, not content (content is in GitHub)
-- [ ] URL can reconstruct what artifacts should exist
+### 7d: Artifact in URL Snapshots
+
+- [x] Include artifact references in URL encoding
+- [x] Only filename, not content (content is in GitHub)
+- [x] URL can reconstruct what artifacts should exist
+
+**Implementation**: Artifacts stored in Y.Doc `artifacts` Y.Array, synced via CRDT
 
 ---
 
@@ -164,4 +174,21 @@ function getArtifactRenderer(artifact: Artifact) {
 
 ---
 
+## Implementation Notes
+
+**Completed**: 2026-01-04 (commit 419d0db)
+
+**Key Technologies**:
+- `@octokit/rest` for GitHub API
+- Orphan branch: `plan-artifacts`
+- CRDT key: `YDOC_KEYS.ARTIFACTS`
+- Schema validation with Zod
+
+**Configuration**:
+- Requires `GITHUB_TOKEN` in `.mcp.json` for PAT authentication
+- Currently supports public repos only (OAuth for private repos tracked in issue #13)
+
+---
+
 *Created: 2026-01-02*
+*Completed: 2026-01-04*
