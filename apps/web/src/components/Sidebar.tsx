@@ -29,7 +29,7 @@ function PlanLink({ plan, badge, activeBadge, peerCount }: PlanLinkProps) {
       {/* biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Badge display logic is straightforward */}
       {({ isActive }) => {
         const displayBadge = isActive && activeBadge ? activeBadge : badge;
-        const showPeerCount = isActive && peerCount !== undefined && peerCount > 0;
+        const showPeerCount = peerCount !== undefined && peerCount > 0;
 
         // Build badge text
         let badgeText = '';
@@ -95,16 +95,14 @@ export function Sidebar() {
               )}
             </div>
             <ul className="space-y-1">
-              {localPlans.map((plan) => {
-                const isActive = activePlanId === plan.id;
-                const peerCount = isActive ? syncState?.peerCount : undefined;
-
-                return (
-                  <li key={plan.id}>
-                    <PlanLink plan={plan} peerCount={peerCount} />
-                  </li>
-                );
-              })}
+              {localPlans.map((plan) => (
+                <li key={plan.id}>
+                  <PlanLink
+                    plan={plan}
+                    peerCount={plan.id === activePlanId ? syncState?.peerCount : undefined}
+                  />
+                </li>
+              ))}
             </ul>
           </div>
         )}
@@ -116,21 +114,16 @@ export function Sidebar() {
               Shared with me ({sharedPlans.length})
             </h3>
             <ul className="space-y-1">
-              {sharedPlans.map((plan) => {
-                const isActive = activePlanId === plan.id;
-                const peerCount = isActive ? syncState?.peerCount : undefined;
-
-                return (
-                  <li key={plan.id}>
-                    <PlanLink
-                      plan={plan}
-                      badge="Shared"
-                      activeBadge="Active"
-                      peerCount={peerCount}
-                    />
-                  </li>
-                );
-              })}
+              {sharedPlans.map((plan) => (
+                <li key={plan.id}>
+                  <PlanLink
+                    plan={plan}
+                    badge="Shared"
+                    activeBadge="Active"
+                    peerCount={plan.id === activePlanId ? syncState?.peerCount : undefined}
+                  />
+                </li>
+              ))}
             </ul>
           </div>
         )}
