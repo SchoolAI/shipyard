@@ -41,31 +41,56 @@ Uses the Node.js implementation (`src/server.js`).
 - Global edge distribution (300+ locations)
 - No container management
 
-### Deploy to Production
+### One-Time Setup
+
+**1. Create Cloudflare API Token** (for GitHub Actions auto-deploy):
+
+1. Go to [Cloudflare API Tokens](https://dash.cloudflare.com/profile/api-tokens)
+2. Create token with template: **Edit Cloudflare Workers**
+3. Permissions: Workers Scripts Edit, Durable Objects Write
+4. Add to [GitHub Secrets](https://github.com/SchoolAI/peer-plan/settings/secrets/actions):
+   - Name: `CLOUDFLARE_API_TOKEN`
+   - Value: [paste token]
+
+**2. Manual Deploy** (first time or when testing):
 
 ```bash
 cd cloudflare
 
-# First time: login to Cloudflare
+# Login to Cloudflare
 npx wrangler login
 
 # Deploy
 npx wrangler deploy
+```
 
-# View logs
+**3. Auto-Deploy:** On push to `main`, GitHub Actions deploys automatically (see `.github/workflows/deploy-signaling.yml`)
+
+### Monitoring
+
+```bash
+# View live logs
+cd cloudflare
 npx wrangler tail
+
+# Check deployment status
+npx wrangler deployments list
 ```
 
-Auto-deploys via GitHub Actions on push to `main`.
+Dashboard: [Cloudflare Workers](https://dash.cloudflare.com) → peer-plan-signaling → Metrics
 
-### Update Web App
+### Moving to SchoolAI Account (Optional)
 
-After deployment, update the web app:
+Currently on jacob@schoolai.com personal account. To move to organization:
 
-```env
-# apps/web/.env.production
-VITE_WEBRTC_SIGNALING=wss://peer-plan-signaling.jacob-191.workers.dev
-```
+1. Update `cloudflare/wrangler.toml`:
+   ```toml
+   account_id = "c0919df946085842429c15f17dfc46ee"  # SchoolAI
+   ```
+2. Set up workers.dev subdomain at SchoolAI account
+3. Create new API token for SchoolAI account
+4. Deploy: `npx wrangler deploy`
+5. Update web app URL in `apps/web/src/hooks/useMultiProviderSync.ts`
 
 ## Configuration
 
@@ -113,6 +138,24 @@ All public y-webrtc signaling servers are down (tested January 2026):
 - `wss://y-webrtc-signaling-*.herokuapp.com` - 404 (Heroku free tier discontinued)
 
 See `../../spikes/public-signaling-test/` for test results.
+
+## Troubleshooting
+
+### WebSocket Connection Fails
+
+1. Check URL protocol: Must be `wss://` not `https://`
+2. Test connection:
+   ```bash
+   cd ../../spikes/public-signaling-test
+   node test-connection.js wss://peer-plan-signaling.jacob-191.workers.dev
+   ```
+3. Check [Cloudflare Dashboard](https://dash.cloudflare.com) for errors
+
+### GitHub Actions Deployment Fails
+
+1. Verify secret exists: Settings → Secrets → `CLOUDFLARE_API_TOKEN`
+2. Check token permissions: Workers Scripts Edit, Durable Objects Write
+3. Review workflow logs in Actions tab
 
 ## References
 
