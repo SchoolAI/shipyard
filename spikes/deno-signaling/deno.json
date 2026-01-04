@@ -1,0 +1,19 @@
+{
+  "name": "@peer-plan/deno-signaling",
+  "version": "0.1.0",
+  "exports": "./main.ts",
+  "tasks": {
+    "dev": "deno run --watch --allow-net main.ts",
+    "start": "deno run --allow-net main.ts",
+    "check": "deno check main.ts",
+    "fmt": "deno fmt",
+    "lint": "deno lint"
+  },
+  "compilerOptions": {
+    "strict": true
+  },
+  "deploy": {
+    "project": "peer-plan-signaling",
+    "exclude": ["README.md"]
+  }
+}

@@ -4,7 +4,7 @@ import { WebrtcProvider } from 'y-webrtc';
 import { WebsocketProvider } from 'y-websocket';
 import * as Y from 'yjs';
 
-const DEFAULT_SIGNALING_SERVER = 'wss://signaling.yjs.dev';
+const DEFAULT_SIGNALING_SERVER = 'wss://peer-plan-signaling.jacob-191.workers.dev';
 
 const DEFAULT_REGISTRY_PORTS = [32191, 32192];
 
