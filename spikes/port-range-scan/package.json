@@ -1,0 +1,12 @@
+{
+  "name": "port-range-scan-spike",
+  "version": "1.0.0",
+  "description": "Test browser discovery via port range scanning",
+  "type": "module",
+  "scripts": {
+    "server": "node ws-server.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.3"
+  }
+}

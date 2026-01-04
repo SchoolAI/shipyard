@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WebSocket Registry Discovery Spike</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 800px;
+      margin: 40px auto;
+      padding: 0 20px;
+      line-height: 1.6;
+    }
+
+    h1 {
+      border-bottom: 2px solid #333;
+      padding-bottom: 10px;
+    }
+
+    .registry-status {
+      background: #f5f5f5;
+      border-radius: 8px;
+      padding: 20px;
+      margin: 20px 0;
+    }
+
+    .server-list {
+      margin-top: 20px;
+    }
+
+    .server-card {
+      background: white;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      padding: 15px;
+      margin: 10px 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .server-info {
+      flex: 1;
+    }
+
+    .server-id {
+      font-weight: bold;
+      color: #333;
+    }
+
+    .server-port {
+      color: #666;
+      font-size: 0.9em;
+    }
+
+    .status-badge {
+      padding: 4px 12px;
+      border-radius: 12px;
+      font-size: 0.85em;
+      font-weight: 500;
+    }
+
+    .status-connected {
+      background: #d4edda;
+      color: #155724;
+    }
+
+    .status-disconnected {
+      background: #f8d7da;
+      color: #721c24;
+    }
+
+    .status-connecting {
+      background: #fff3cd;
+      color: #856404;
+    }
+
+    .messages {
+      margin-top: 20px;
+      max-height: 300px;
+      overflow-y: auto;
+      background: #f9f9f9;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      padding: 15px;
+      font-family: 'Courier New', monospace;
+      font-size: 0.9em;
+    }
+
+    .message {
+      margin: 5px 0;
+      padding: 5px;
+    }
+
+    .message.sent {
+      color: #0066cc;
+    }
+
+    .message.received {
+      color: #28a745;
+    }
+
+    .message.system {
+      color: #666;
+      font-style: italic;
+    }
+
+    .controls {
+      margin: 20px 0;
+      display: flex;
+      gap: 10px;
+    }
+
+    button {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 6px;
+      background: #007bff;
+      color: white;
+      cursor: pointer;
+      font-size: 1em;
+    }
+
+    button:hover {
+      background: #0056b3;
+    }
+
+    button:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+
+    input {
+      flex: 1;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 1em;
+    }
+
+    .error {
+      background: #f8d7da;
+      border: 1px solid #f5c6cb;
+      color: #721c24;
+      padding: 12px;
+      border-radius: 6px;
+      margin: 10px 0;
+    }
+  </style>
+</head>
+<body>
+  <h1>WebSocket Registry Discovery Spike</h1>
+
+  <p>
+    This page fetches the registry from <code>/api/registry</code> and connects to all
+    discovered WebSocket servers.
+  </p>
+
+  <div class="controls">
+    <button id="refresh-btn">Refresh Registry</button>
+    <button id="send-btn">Send Test Message</button>
+    <input type="text" id="message-input" placeholder="Enter message to send to all servers" value="Hello from browser!" />
+  </div>
+
+  <div class="registry-status">
+    <h2>Registry Status</h2>
+    <div id="registry-info">Loading...</div>
+    <div class="server-list" id="server-list"></div>
+  </div>
+
+  <div>
+    <h2>Messages</h2>
+    <div class="messages" id="messages"></div>
+  </div>
+
+  <script type="module">
+    // State management
+    const connections = new Map(); // serverId -> WebSocket
+    let registryData = null;
+
+    // DOM elements
+    const registryInfo = document.getElementById('registry-info');
+    const serverList = document.getElementById('server-list');
+    const messages = document.getElementById('messages');
+    const refreshBtn = document.getElementById('refresh-btn');
+    const sendBtn = document.getElementById('send-btn');
+    const messageInput = document.getElementById('message-input');
+
+    /**
+     * Add a message to the log
+     */
+    function addMessage(text, type = 'system') {
+      const div = document.createElement('div');
+      div.className = `message ${type}`;
+      div.textContent = `[${new Date().toLocaleTimeString()}] ${text}`;
+      messages.appendChild(div);
+      messages.scrollTop = messages.scrollHeight;
+    }
+
+    /**
+     * Update the status badge for a server
+     */
+    function updateServerStatus(serverId, status) {
+      const badge = document.querySelector(`[data-server-id="${serverId}"] .status-badge`);
+      if (badge) {
+        badge.className = 'status-badge';
+        badge.classList.add(`status-${status}`);
+        badge.textContent = status.charAt(0).toUpperCase() + status.slice(1);
+      }
+    }
+
+    /**
+     * Connect to a WebSocket server
+     */
+    function connectToServer(server) {
+      const { id, port } = server;
+      const url = `ws://localhost:${port}`;
+
+      // Skip if already connected
+      if (connections.has(id)) {
+        addMessage(`Already connected to ${id}`, 'system');
+        return;
+      }
+
+      addMessage(`Connecting to ${id} on port ${port}...`, 'system');
+      updateServerStatus(id, 'connecting');
+
+      const ws = new WebSocket(url);
+
+      ws.addEventListener('open', () => {
+        addMessage(`Connected to ${id}`, 'system');
+        updateServerStatus(id, 'connected');
+        connections.set(id, ws);
+      });
+
+      ws.addEventListener('message', (event) => {
+        addMessage(`[${id}] ${event.data}`, 'received');
+      });
+
+      ws.addEventListener('close', () => {
+        addMessage(`Disconnected from ${id}`, 'system');
+        updateServerStatus(id, 'disconnected');
+        connections.delete(id);
+      });
+
+      ws.addEventListener('error', (err) => {
+        addMessage(`Error connecting to ${id}: ${err.message || 'Unknown error'}`, 'system');
+        updateServerStatus(id, 'disconnected');
+      });
+    }
+
+    /**
+     * Fetch the registry and connect to all servers
+     */
+    async function fetchRegistry() {
+      try {
+        addMessage('Fetching registry...', 'system');
+        const response = await fetch('/api/registry');
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        registryData = await response.json();
+        const { servers = [] } = registryData;
+
+        registryInfo.textContent = `Found ${servers.length} server${servers.length !== 1 ? 's' : ''}`;
+
+        // Render server list
+        serverList.innerHTML = '';
+        if (servers.length === 0) {
+          serverList.innerHTML = '<p style="color: #666; font-style: italic;">No servers registered. Start a server with <code>npm run server</code></p>';
+        } else {
+          servers.forEach(server => {
+            const card = document.createElement('div');
+            card.className = 'server-card';
+            card.dataset.serverId = server.id;
+
+            card.innerHTML = `
+              <div class="server-info">
+                <div class="server-id">${server.id}</div>
+                <div class="server-port">Port: ${server.port} | PID: ${server.pid} | Started: ${new Date(server.startedAt).toLocaleTimeString()}</div>
+              </div>
+              <span class="status-badge status-disconnected">Disconnected</span>
+            `;
+
+            serverList.appendChild(card);
+
+            // Connect to this server
+            connectToServer(server);
+          });
+        }
+
+        addMessage(`Registry fetched: ${servers.length} server(s)`, 'system');
+      } catch (err) {
+        registryInfo.innerHTML = `<div class="error">Failed to fetch registry: ${err.message}</div>`;
+        addMessage(`Registry fetch failed: ${err.message}`, 'system');
+      }
+    }
+
+    /**
+     * Send a message to all connected servers
+     */
+    function sendMessageToAll() {
+      const message = messageInput.value.trim();
+      if (!message) {
+        addMessage('No message to send', 'system');
+        return;
+      }
+
+      if (connections.size === 0) {
+        addMessage('No servers connected', 'system');
+        return;
+      }
+
+      connections.forEach((ws, serverId) => {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(message);
+          addMessage(`[${serverId}] Sent: ${message}`, 'sent');
+        }
+      });
+    }
+
+    // Event listeners
+    refreshBtn.addEventListener('click', fetchRegistry);
+    sendBtn.addEventListener('click', sendMessageToAll);
+    messageInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        sendMessageToAll();
+      }
+    });
+
+    // Initial fetch
+    fetchRegistry();
+
+    // Auto-refresh every 5 seconds
+    setInterval(fetchRegistry, 5000);
+  </script>
+</body>
+</html>

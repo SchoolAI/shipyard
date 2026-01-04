@@ -1,0 +1,13 @@
+{
+  "name": "registry-server-spike",
+  "version": "1.0.0",
+  "description": "Spike to test browser discovery via dedicated registry server",
+  "type": "module",
+  "scripts": {
+    "registry": "node registry-server.js",
+    "ws": "node ws-server.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.3"
+  }
+}

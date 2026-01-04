@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Port Range Scanner</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      padding: 20px;
+      background: #f5f5f5;
+      line-height: 1.6;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      background: white;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    h1 {
+      color: #333;
+      margin-bottom: 10px;
+    }
+
+    .subtitle {
+      color: #666;
+      margin-bottom: 30px;
+      font-size: 14px;
+    }
+
+    .controls {
+      margin-bottom: 30px;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    button {
+      padding: 10px 20px;
+      font-size: 14px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      background: #007bff;
+      color: white;
+      transition: background 0.2s;
+    }
+
+    button:hover:not(:disabled) {
+      background: #0056b3;
+    }
+
+    button:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+
+    .status {
+      padding: 10px;
+      background: #e7f3ff;
+      border-left: 4px solid #007bff;
+      border-radius: 4px;
+      margin-bottom: 20px;
+      font-size: 14px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+      gap: 15px;
+      margin-bottom: 30px;
+    }
+
+    .port-card {
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      padding: 15px;
+      background: #fafafa;
+      transition: all 0.2s;
+    }
+
+    .port-card.scanning {
+      border-color: #ffc107;
+      background: #fff8e1;
+    }
+
+    .port-card.active {
+      border-color: #28a745;
+      background: #d4edda;
+    }
+
+    .port-card.inactive {
+      border-color: #dc3545;
+      background: #f8d7da;
+    }
+
+    .port-card.connected {
+      border-color: #17a2b8;
+      background: #d1ecf1;
+      box-shadow: 0 2px 8px rgba(23,162,184,0.2);
+    }
+
+    .port-number {
+      font-weight: bold;
+      font-size: 16px;
+      margin-bottom: 8px;
+      color: #333;
+    }
+
+    .port-status {
+      font-size: 12px;
+      color: #666;
+      margin-bottom: 5px;
+    }
+
+    .port-info {
+      font-size: 11px;
+      color: #888;
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px solid #ddd;
+    }
+
+    .messages {
+      margin-top: 30px;
+    }
+
+    .messages h2 {
+      margin-bottom: 15px;
+      color: #333;
+      font-size: 18px;
+    }
+
+    .message-list {
+      max-height: 300px;
+      overflow-y: auto;
+      background: #f8f9fa;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      padding: 15px;
+    }
+
+    .message {
+      padding: 8px;
+      margin-bottom: 8px;
+      background: white;
+      border-radius: 3px;
+      font-size: 13px;
+      font-family: 'Monaco', 'Courier New', monospace;
+    }
+
+    .message .timestamp {
+      color: #666;
+      font-size: 11px;
+    }
+
+    .message.welcome {
+      border-left: 3px solid #28a745;
+    }
+
+    .message.echo {
+      border-left: 3px solid #007bff;
+    }
+
+    .stats {
+      display: flex;
+      gap: 20px;
+      margin-top: 20px;
+      padding: 15px;
+      background: #f8f9fa;
+      border-radius: 4px;
+    }
+
+    .stat {
+      flex: 1;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 24px;
+      font-weight: bold;
+      color: #007bff;
+    }
+
+    .stat-label {
+      font-size: 12px;
+      color: #666;
+      margin-top: 5px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>WebSocket Port Range Scanner</h1>
+    <div class="subtitle">Testing browser discovery via port scanning (1234-1244)</div>
+
+    <div class="controls">
+      <button id="scanBtn" onclick="startScan()">Scan Ports</button>
+      <button id="connectBtn" onclick="connectToAll()" disabled>Connect to All</button>
+      <button id="testBtn" onclick="testConnections()" disabled>Send Test Message</button>
+      <button onclick="clearMessages()">Clear Messages</button>
+    </div>
+
+    <div id="statusBar" class="status" style="display: none;"></div>
+
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-value" id="totalPorts">0</div>
+        <div class="stat-label">Total Ports</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value" id="activePorts">0</div>
+        <div class="stat-label">Active Ports</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value" id="connectedPorts">0</div>
+        <div class="stat-label">Connected</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value" id="scanTime">0ms</div>
+        <div class="stat-label">Scan Time</div>
+      </div>
+    </div>
+
+    <div class="grid" id="portsGrid"></div>
+
+    <div class="messages">
+      <h2>Messages</h2>
+      <div class="message-list" id="messageList"></div>
+    </div>
+  </div>
+
+  <script>
+    const MIN_PORT = 1234;
+    const MAX_PORT = 1244;
+    const PROBE_TIMEOUT = 500; // ms
+    const HOST = 'localhost';
+
+    const ports = [];
+    const connections = new Map();
+    let scanStartTime = 0;
+
+    // Initialize port grid
+    function initializeGrid() {
+      const grid = document.getElementById('portsGrid');
+      grid.innerHTML = '';
+
+      for (let port = MIN_PORT; port <= MAX_PORT; port++) {
+        const card = document.createElement('div');
+        card.className = 'port-card';
+        card.id = `port-${port}`;
+        card.innerHTML = `
+          <div class="port-number">Port ${port}</div>
+          <div class="port-status">Not scanned</div>
+          <div class="port-info" style="display: none;"></div>
+        `;
+        grid.appendChild(card);
+
+        ports.push({
+          port,
+          active: false,
+          connected: false,
+          serverId: null,
+          element: card
+        });
+      }
+
+      document.getElementById('totalPorts').textContent = ports.length;
+    }
+
+    // Update port card UI
+    function updatePortCard(port, status, info = '') {
+      const portData = ports.find(p => p.port === port);
+      if (!portData) return;
+
+      const card = portData.element;
+      const statusEl = card.querySelector('.port-status');
+      const infoEl = card.querySelector('.port-info');
+
+      statusEl.textContent = status;
+
+      if (info) {
+        infoEl.textContent = info;
+        infoEl.style.display = 'block';
+      } else {
+        infoEl.style.display = 'none';
+      }
+
+      // Update card class based on state
+      card.className = 'port-card';
+      if (portData.connected) {
+        card.classList.add('connected');
+      } else if (portData.active) {
+        card.classList.add('active');
+      } else if (status === 'Scanning...') {
+        card.classList.add('scanning');
+      } else if (status === 'Inactive') {
+        card.classList.add('inactive');
+      }
+    }
+
+    // Probe a single port
+    async function probePort(port) {
+      return new Promise((resolve) => {
+        updatePortCard(port, 'Scanning...', '');
+
+        const ws = new WebSocket(`ws://${HOST}:${port}`);
+        const timeout = setTimeout(() => {
+          ws.close();
+          resolve(false);
+        }, PROBE_TIMEOUT);
+
+        ws.onopen = () => {
+          clearTimeout(timeout);
+          ws.close();
+          resolve(true);
+        };
+
+        ws.onerror = () => {
+          clearTimeout(timeout);
+          resolve(false);
+        };
+      });
+    }
+
+    // Scan all ports in range
+    async function startScan() {
+      const scanBtn = document.getElementById('scanBtn');
+      const connectBtn = document.getElementById('connectBtn');
+      const statusBar = document.getElementById('statusBar');
+
+      scanBtn.disabled = true;
+      connectBtn.disabled = true;
+      statusBar.style.display = 'block';
+      statusBar.textContent = 'Scanning ports...';
+
+      // Reset all ports
+      ports.forEach(p => {
+        p.active = false;
+        p.connected = false;
+        p.serverId = null;
+      });
+
+      scanStartTime = Date.now();
+
+      // Scan all ports in parallel
+      const results = await Promise.all(
+        ports.map(p => probePort(p.port))
+      );
+
+      const scanTime = Date.now() - scanStartTime;
+      document.getElementById('scanTime').textContent = `${scanTime}ms`;
+
+      // Update results
+      let activeCount = 0;
+      results.forEach((isActive, index) => {
+        const portData = ports[index];
+        portData.active = isActive;
+
+        if (isActive) {
+          activeCount++;
+          updatePortCard(portData.port, 'Active', 'Server detected');
+        } else {
+          updatePortCard(portData.port, 'Inactive', 'No server');
+        }
+      });
+
+      document.getElementById('activePorts').textContent = activeCount;
+
+      statusBar.textContent = `Scan complete: ${activeCount} active port(s) found in ${scanTime}ms`;
+      scanBtn.disabled = false;
+      connectBtn.disabled = activeCount === 0;
+    }
+
+    // Connect to all active ports
+    function connectToAll() {
+      const activePorts = ports.filter(p => p.active && !p.connected);
+
+      if (activePorts.length === 0) {
+        addMessage('No active ports to connect to', 'info');
+        return;
+      }
+
+      addMessage(`Connecting to ${activePorts.length} active port(s)...`, 'info');
+
+      activePorts.forEach(portData => {
+        connectToPort(portData.port);
+      });
+    }
+
+    // Connect to a specific port
+    function connectToPort(port) {
+      if (connections.has(port)) {
+        addMessage(`Already connected to port ${port}`, 'info');
+        return;
+      }
+
+      updatePortCard(port, 'Connecting...', '');
+
+      const ws = new WebSocket(`ws://${HOST}:${port}`);
+
+      ws.onopen = () => {
+        const portData = ports.find(p => p.port === port);
+        if (portData) {
+          portData.connected = true;
+          updatePortCard(port, 'Connected', 'Ready to send/receive');
+          updateConnectedCount();
+        }
+        addMessage(`Connected to port ${port}`, 'info');
+        document.getElementById('testBtn').disabled = false;
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          handleMessage(port, data);
+        } catch (e) {
+          addMessage(`Port ${port}: ${event.data}`, 'error');
+        }
+      };
+
+      ws.onerror = (error) => {
+        addMessage(`Port ${port}: Connection error`, 'error');
+        updatePortCard(port, 'Error', 'Connection failed');
+      };
+
+      ws.onclose = () => {
+        connections.delete(port);
+        const portData = ports.find(p => p.port === port);
+        if (portData) {
+          portData.connected = false;
+          updatePortCard(port, 'Disconnected', 'Connection closed');
+          updateConnectedCount();
+        }
+        addMessage(`Disconnected from port ${port}`, 'info');
+
+        if (connections.size === 0) {
+          document.getElementById('testBtn').disabled = true;
+        }
+      };
+
+      connections.set(port, ws);
+    }
+
+    // Handle incoming messages
+    function handleMessage(port, data) {
+      const portData = ports.find(p => p.port === port);
+
+      if (data.type === 'welcome') {
+        if (portData) {
+          portData.serverId = data.serverId;
+          updatePortCard(port, 'Connected', `Server: ${data.serverId}`);
+        }
+        addMessage(`Port ${port} welcome: ${data.serverId}`, 'welcome', data);
+      } else if (data.type === 'echo') {
+        addMessage(`Port ${port} echo from ${data.serverId}`, 'echo', data);
+      }
+    }
+
+    // Send test message to all connected servers
+    function testConnections() {
+      if (connections.size === 0) {
+        addMessage('No active connections', 'info');
+        return;
+      }
+
+      const testMessage = {
+        type: 'test',
+        message: 'Hello from browser!',
+        timestamp: Date.now()
+      };
+
+      connections.forEach((ws, port) => {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify(testMessage));
+          addMessage(`Sent test message to port ${port}`, 'info');
+        }
+      });
+    }
+
+    // Add message to list
+    function addMessage(text, type = 'info', data = null) {
+      const messageList = document.getElementById('messageList');
+      const message = document.createElement('div');
+      message.className = `message ${type}`;
+
+      const now = new Date();
+      const timestamp = now.toLocaleTimeString() + '.' + now.getMilliseconds();
+
+      let content = `<div class="timestamp">[${timestamp}]</div>${text}`;
+
+      if (data) {
+        content += `<pre style="margin-top: 5px; font-size: 11px;">${JSON.stringify(data, null, 2)}</pre>`;
+      }
+
+      message.innerHTML = content;
+      messageList.appendChild(message);
+      messageList.scrollTop = messageList.scrollHeight;
+    }
+
+    // Clear messages
+    function clearMessages() {
+      document.getElementById('messageList').innerHTML = '';
+    }
+
+    // Update connected count
+    function updateConnectedCount() {
+      const count = ports.filter(p => p.connected).length;
+      document.getElementById('connectedPorts').textContent = count;
+    }
+
+    // Initialize on load
+    initializeGrid();
+    addMessage('Ready to scan. Click "Scan Ports" to discover WebSocket servers.', 'info');
+  </script>
+</body>
+</html>

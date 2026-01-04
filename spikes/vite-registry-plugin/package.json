@@ -1,0 +1,19 @@
+{
+  "name": "vite-registry-plugin-spike",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "description": "Spike to test browser discovery via Vite plugin serving a registry file",
+  "scripts": {
+    "dev": "vite",
+    "server": "node ws-server.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.0.3",
+    "@types/ws": "^8.18.1",
+    "vite": "^6.0.0"
+  }
+}

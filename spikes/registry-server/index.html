@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Registry Server Discovery Spike</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: #f5f5f5;
+      padding: 20px;
+      line-height: 1.6;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      background: white;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    h1 {
+      color: #333;
+      margin-bottom: 10px;
+    }
+
+    .subtitle {
+      color: #666;
+      margin-bottom: 30px;
+      font-size: 14px;
+    }
+
+    .section {
+      margin-bottom: 30px;
+    }
+
+    .section-title {
+      font-size: 18px;
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 15px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .status-badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .status-badge.success {
+      background: #d4edda;
+      color: #155724;
+    }
+
+    .status-badge.error {
+      background: #f8d7da;
+      color: #721c24;
+    }
+
+    .status-badge.pending {
+      background: #fff3cd;
+      color: #856404;
+    }
+
+    button {
+      background: #007bff;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      transition: background 0.2s;
+    }
+
+    button:hover {
+      background: #0056b3;
+    }
+
+    button:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+
+    .server-list {
+      display: grid;
+      gap: 15px;
+    }
+
+    .server-card {
+      border: 2px solid #e0e0e0;
+      border-radius: 6px;
+      padding: 15px;
+      background: #fafafa;
+      transition: all 0.2s;
+    }
+
+    .server-card.connected {
+      border-color: #28a745;
+      background: #f0f9f4;
+    }
+
+    .server-card.disconnected {
+      border-color: #dc3545;
+      background: #fef5f5;
+    }
+
+    .server-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .server-url {
+      font-weight: 600;
+      color: #333;
+      font-size: 16px;
+    }
+
+    .server-info {
+      font-size: 13px;
+      color: #666;
+      margin-bottom: 8px;
+    }
+
+    .server-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .server-actions button {
+      padding: 6px 14px;
+      font-size: 13px;
+    }
+
+    .message-log {
+      background: #f8f9fa;
+      border: 1px solid #dee2e6;
+      border-radius: 4px;
+      padding: 15px;
+      max-height: 300px;
+      overflow-y: auto;
+      font-family: 'Monaco', 'Courier New', monospace;
+      font-size: 12px;
+      line-height: 1.8;
+    }
+
+    .message-log div {
+      margin-bottom: 8px;
+      padding: 4px;
+      border-radius: 2px;
+    }
+
+    .message-log .sent {
+      background: #e3f2fd;
+      color: #1565c0;
+    }
+
+    .message-log .received {
+      background: #f1f8e9;
+      color: #558b2f;
+    }
+
+    .message-log .error {
+      background: #ffebee;
+      color: #c62828;
+    }
+
+    .message-log .system {
+      background: #fff3e0;
+      color: #e65100;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 40px;
+      color: #999;
+    }
+
+    .timestamp {
+      color: #999;
+      font-size: 11px;
+      margin-right: 8px;
+    }
+
+    .controls {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Registry Server Discovery Spike</h1>
+    <p class="subtitle">Testing browser discovery of WebSocket servers via HTTP registry</p>
+
+    <div class="section">
+      <div class="section-title">
+        Registry Status
+        <span id="registryStatus" class="status-badge pending">Not checked</span>
+      </div>
+      <div class="controls">
+        <button id="discoverBtn" onclick="discoverServers()">Discover Servers</button>
+        <button onclick="connectAll()">Connect All</button>
+        <button onclick="disconnectAll()">Disconnect All</button>
+        <button onclick="sendTestMessage()">Send Test Message</button>
+        <button onclick="clearLog()">Clear Log</button>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Discovered Servers (<span id="serverCount">0</span>)</div>
+      <div id="serverList" class="server-list">
+        <div class="empty-state">No servers discovered yet. Click "Discover Servers" to fetch from registry.</div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Message Log</div>
+      <div id="messageLog" class="message-log">
+        <div class="system"><span class="timestamp">[Ready]</span>Waiting for server discovery...</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const REGISTRY_URL = 'http://localhost:3001/registry';
+    const connections = new Map(); // port -> WebSocket
+    let discoveredServers = [];
+
+    function log(message, type = 'system') {
+      const messageLog = document.getElementById('messageLog');
+      const timestamp = new Date().toLocaleTimeString();
+      const div = document.createElement('div');
+      div.className = type;
+      div.innerHTML = `<span class="timestamp">[${timestamp}]</span>${message}`;
+      messageLog.appendChild(div);
+      messageLog.scrollTop = messageLog.scrollHeight;
+    }
+
+    function updateRegistryStatus(status, text) {
+      const badge = document.getElementById('registryStatus');
+      badge.className = `status-badge ${status}`;
+      badge.textContent = text;
+    }
+
+    function updateServerCount() {
+      document.getElementById('serverCount').textContent = discoveredServers.length;
+    }
+
+    async function discoverServers() {
+      log('Fetching registry from ' + REGISTRY_URL + '...', 'system');
+      updateRegistryStatus('pending', 'Fetching...');
+
+      try {
+        const response = await fetch(REGISTRY_URL);
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        const registry = await response.json();
+        discoveredServers = registry.servers || [];
+
+        log(`Discovered ${discoveredServers.length} servers`, 'system');
+        updateRegistryStatus('success', `Found ${discoveredServers.length} servers`);
+        updateServerCount();
+
+        renderServerList();
+      } catch (err) {
+        log(`Error fetching registry: ${err.message}`, 'error');
+        updateRegistryStatus('error', 'Failed to fetch');
+        console.error('Discovery error:', err);
+      }
+    }
+
+    function renderServerList() {
+      const listEl = document.getElementById('serverList');
+
+      if (discoveredServers.length === 0) {
+        listEl.innerHTML = '<div class="empty-state">No servers in registry</div>';
+        return;
+      }
+
+      listEl.innerHTML = discoveredServers.map(server => {
+        const isConnected = connections.has(server.port) && connections.get(server.port).readyState === WebSocket.OPEN;
+        const statusClass = isConnected ? 'connected' : 'disconnected';
+        const statusText = isConnected ? 'Connected' : 'Disconnected';
+
+        return `
+          <div class="server-card ${statusClass}" id="server-${server.port}">
+            <div class="server-header">
+              <div class="server-url">${server.url}</div>
+              <span class="status-badge ${isConnected ? 'success' : 'error'}">${statusText}</span>
+            </div>
+            <div class="server-info">Port: ${server.port} | PID: ${server.pid}</div>
+            <div class="server-info">Started: ${new Date(server.startedAt).toLocaleString()}</div>
+            <div class="server-actions">
+              <button onclick="connectToServer(${server.port})" ${isConnected ? 'disabled' : ''}>Connect</button>
+              <button onclick="disconnectFromServer(${server.port})" ${!isConnected ? 'disabled' : ''}>Disconnect</button>
+              <button onclick="sendMessage(${server.port}, 'Hello from browser!')" ${!isConnected ? 'disabled' : ''}>Send Test</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function connectToServer(port) {
+      const server = discoveredServers.find(s => s.port === port);
+      if (!server) {
+        log(`Server on port ${port} not found in registry`, 'error');
+        return;
+      }
+
+      if (connections.has(port)) {
+        log(`Already connected to ${server.url}`, 'system');
+        return;
+      }
+
+      log(`Connecting to ${server.url}...`, 'system');
+
+      try {
+        const ws = new WebSocket(server.url);
+
+        ws.onopen = () => {
+          log(`Connected to ${server.url}`, 'system');
+          connections.set(port, ws);
+          renderServerList();
+        };
+
+        ws.onmessage = (event) => {
+          log(`Received from port ${port}: ${event.data}`, 'received');
+        };
+
+        ws.onerror = (event) => {
+          log(`WebSocket error on port ${port}`, 'error');
+          console.error('WebSocket error:', event);
+        };
+
+        ws.onclose = () => {
+          log(`Disconnected from port ${port}`, 'system');
+          connections.delete(port);
+          renderServerList();
+        };
+
+      } catch (err) {
+        log(`Error connecting to port ${port}: ${err.message}`, 'error');
+        console.error('Connection error:', err);
+      }
+    }
+
+    function disconnectFromServer(port) {
+      const ws = connections.get(port);
+      if (ws) {
+        ws.close();
+        connections.delete(port);
+        log(`Disconnecting from port ${port}...`, 'system');
+        renderServerList();
+      }
+    }
+
+    function sendMessage(port, message) {
+      const ws = connections.get(port);
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(message);
+        log(`Sent to port ${port}: ${message}`, 'sent');
+      } else {
+        log(`Cannot send to port ${port}: not connected`, 'error');
+      }
+    }
+
+    function connectAll() {
+      discoveredServers.forEach(server => {
+        if (!connections.has(server.port)) {
+          connectToServer(server.port);
+        }
+      });
+    }
+
+    function disconnectAll() {
+      connections.forEach((ws, port) => {
+        disconnectFromServer(port);
+      });
+    }
+
+    function sendTestMessage() {
+      const message = `Test message at ${new Date().toISOString()}`;
+      connections.forEach((ws, port) => {
+        sendMessage(port, message);
+      });
+    }
+
+    function clearLog() {
+      document.getElementById('messageLog').innerHTML = '<div class="system"><span class="timestamp">[Cleared]</span>Log cleared</div>';
+    }
+
+    // Auto-discover on page load
+    window.addEventListener('load', () => {
+      log('Page loaded. Click "Discover Servers" to begin.', 'system');
+      setTimeout(() => {
+        document.getElementById('discoverBtn').click();
+      }, 500);
+    });
+  </script>
+</body>
+</html>
