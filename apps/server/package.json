@@ -16,6 +16,7 @@
     "@blocknote/core": "^0.45.0",
     "@blocknote/server-util": "^0.45.0",
     "@modelcontextprotocol/sdk": "^1.22.0",
+    "@octokit/rest": "^21.0.0",
     "@peer-plan/schema": "workspace:*",
     "lib0": "^0.2.117",
     "nanoid": "^5.0.9",

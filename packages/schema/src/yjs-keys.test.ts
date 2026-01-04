@@ -10,6 +10,7 @@ describe('YDOC_KEYS', () => {
       THREADS: 'threads',
       STEP_COMPLETIONS: 'stepCompletions',
       PLANS: 'plans',
+      ARTIFACTS: 'artifacts',
     });
   });
 
@@ -34,6 +35,7 @@ describe('isValidYDocKey', () => {
     expect(isValidYDocKey('threads')).toBe(true);
     expect(isValidYDocKey('stepCompletions')).toBe(true);
     expect(isValidYDocKey('plans')).toBe(true);
+    expect(isValidYDocKey('artifacts')).toBe(true);
   });
 
   it('should return false for unknown keys', () => {

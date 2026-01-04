@@ -1,5 +1,6 @@
 import type * as Y from 'yjs';
-import { type PlanMetadata, PlanMetadataSchema } from './plan.js';
+import { type Artifact, ArtifactSchema, type PlanMetadata, PlanMetadataSchema } from './plan.js';
+import { YDOC_KEYS } from './yjs-keys.js';
 
 /**
  * Type-safe helpers for working with Yjs Y.Map for plan metadata.
@@ -100,4 +101,49 @@ export function toggleStepCompletion(ydoc: Y.Doc, stepId: string): void {
 export function isStepCompleted(ydoc: Y.Doc, stepId: string): boolean {
   const steps = ydoc.getMap<boolean>('stepCompletions');
   return steps.get(stepId) || false;
+}
+
+/**
+ * Gets all artifacts from Y.Doc with validation.
+ *
+ * @param ydoc - Yjs document
+ * @returns Array of validated artifacts (invalid entries filtered out)
+ */
+export function getArtifacts(ydoc: Y.Doc): Artifact[] {
+  const array = ydoc.getArray(YDOC_KEYS.ARTIFACTS);
+  const data = array.toJSON() as unknown[];
+
+  return data
+    .map((item) => ArtifactSchema.safeParse(item))
+    .filter((result) => result.success)
+    .map((result) => result.data);
+}
+
+/**
+ * Adds an artifact to the Y.Doc.
+ *
+ * @param ydoc - Yjs document
+ * @param artifact - Artifact to add
+ */
+export function addArtifact(ydoc: Y.Doc, artifact: Artifact): void {
+  const array = ydoc.getArray(YDOC_KEYS.ARTIFACTS);
+  array.push([artifact]);
+}
+
+/**
+ * Removes an artifact from Y.Doc by ID.
+ *
+ * @param ydoc - Yjs document
+ * @param artifactId - ID of artifact to remove
+ * @returns true if removed, false if not found
+ */
+export function removeArtifact(ydoc: Y.Doc, artifactId: string): boolean {
+  const array = ydoc.getArray(YDOC_KEYS.ARTIFACTS);
+  const artifacts = array.toJSON() as Artifact[];
+  const index = artifacts.findIndex((a) => a.id === artifactId);
+
+  if (index === -1) return false;
+
+  array.delete(index, 1);
+  return true;
 }

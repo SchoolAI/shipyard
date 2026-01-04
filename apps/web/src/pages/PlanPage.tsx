@@ -7,6 +7,7 @@ import {
 } from '@peer-plan/schema';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
+import { Attachments } from '@/components/Attachments';
 import { CommentsPanel, useThreadCount } from '@/components/CommentsPanel';
 import { PlanHeader } from '@/components/PlanHeader';
 import { PlanViewer } from '@/components/PlanViewer';
@@ -183,6 +184,7 @@ export function PlanPage() {
             provider={activeProvider}
             onRequestIdentity={handleRequestIdentity}
           />
+          <Attachments ydoc={ydoc} />
         </div>
       </div>
 

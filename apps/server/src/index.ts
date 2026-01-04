@@ -9,6 +9,7 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import { logger } from './logger.js';
 import { isRegistryRunning, startRegistryServer } from './registry-server.js';
+import { addArtifactTool } from './tools/add-artifact.js';
 import { createPlanTool } from './tools/create-plan.js';
 import { listPlansTool } from './tools/list-plans.js';
 import { readPlanTool } from './tools/read-plan.js';
@@ -41,6 +42,7 @@ const server = new Server(
 
 server.setRequestHandler(ListToolsRequestSchema, async () => ({
   tools: [
+    addArtifactTool.definition,
     createPlanTool.definition,
     listPlansTool.definition,
     readPlanTool.definition,
@@ -52,6 +54,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
 
   switch (name) {
+    case 'add_artifact':
+      return await addArtifactTool.handler(args ?? {});
     case 'create_plan':
       return await createPlanTool.handler(args ?? {});
     case 'list_plans':

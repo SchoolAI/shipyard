@@ -86,6 +86,18 @@ export const YDOC_KEYS = {
    * - Helpers: packages/schema/src/plan-index-helpers.ts (read/write)
    */
   PLANS: 'plans' as const,
+
+  /**
+   * Artifact references (Y.Array<Artifact>)
+   * Contains: id, type, filename, url
+   * Binary content lives in GitHub orphan branch, not in CRDT
+   *
+   * Used by:
+   * - Server: apps/server/src/tools/add-artifact.ts (write)
+   * - Web: apps/web/src/components/Attachments.tsx (read)
+   * - Helpers: packages/schema/src/yjs-helpers.ts (read/write)
+   */
+  ARTIFACTS: 'artifacts' as const,
 } as const;
 
 /**
