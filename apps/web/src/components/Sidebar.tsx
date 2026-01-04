@@ -26,9 +26,20 @@ function PlanLink({ plan, badge, activeBadge, peerCount }: PlanLinkProps) {
         )
       }
     >
+      {/* biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Badge display logic is straightforward */}
       {({ isActive }) => {
         const displayBadge = isActive && activeBadge ? activeBadge : badge;
         const showPeerCount = isActive && peerCount !== undefined && peerCount > 0;
+
+        // Build badge text
+        let badgeText = '';
+        if (showPeerCount && displayBadge) {
+          badgeText = `${displayBadge} • ${peerCount} ${peerCount === 1 ? 'peer' : 'peers'}`;
+        } else if (showPeerCount) {
+          badgeText = `${peerCount} ${peerCount === 1 ? 'peer' : 'peers'}`;
+        } else if (displayBadge) {
+          badgeText = displayBadge;
+        }
 
         return (
           <div className="flex items-center justify-between gap-2">
@@ -36,11 +47,9 @@ function PlanLink({ plan, badge, activeBadge, peerCount }: PlanLinkProps) {
               <div className="font-medium truncate">{plan.title}</div>
               <div className="text-xs text-gray-500">{plan.status.replace('_', ' ')}</div>
             </div>
-            {(displayBadge || showPeerCount) && (
+            {badgeText && (
               <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded shrink-0">
-                {showPeerCount
-                  ? `${displayBadge} • ${peerCount} ${peerCount === 1 ? 'peer' : 'peers'}`
-                  : displayBadge}
+                {badgeText}
               </span>
             )}
           </div>
@@ -86,11 +95,16 @@ export function Sidebar() {
               )}
             </div>
             <ul className="space-y-1">
-              {localPlans.map((plan) => (
-                <li key={plan.id}>
-                  <PlanLink plan={plan} />
-                </li>
-              ))}
+              {localPlans.map((plan) => {
+                const isActive = activePlanId === plan.id;
+                const peerCount = isActive ? syncState?.peerCount : undefined;
+
+                return (
+                  <li key={plan.id}>
+                    <PlanLink plan={plan} peerCount={peerCount} />
+                  </li>
+                );
+              })}
             </ul>
           </div>
         )}
