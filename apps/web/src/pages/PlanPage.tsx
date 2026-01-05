@@ -6,8 +6,9 @@ import {
   setPlanIndexEntry,
 } from '@peer-plan/schema';
 import { FileText, Package } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
+import { toast } from 'sonner';
 import { Attachments } from '@/components/Attachments';
 import { DeliverablesView } from '@/components/DeliverablesView';
 import { PlanHeader } from '@/components/PlanHeader';
@@ -19,9 +20,6 @@ import { useMultiProviderSync } from '@/hooks/useMultiProviderSync';
 
 type ViewType = 'plan' | 'deliverables';
 
-// Long enough to read, short enough not to linger
-const HINT_AUTO_DISMISS_MS = 8000;
-
 export function PlanPage() {
   const { id } = useParams<{ id: string }>();
   // The route /plan/:id guarantees id is defined
@@ -31,8 +29,9 @@ export function PlanPage() {
   const { setActivePlanSync, clearActivePlanSync } = useActivePlanSync();
   const [metadata, setMetadata] = useState<PlanMetadata | null>(null);
   const [showProfileSetup, setShowProfileSetup] = useState(false);
-  const [pendingCommentHint, setPendingCommentHint] = useState(false);
   const [activeView, setActiveView] = useState<ViewType>('plan');
+  // Track if user was trying to comment when they opened profile setup
+  const wasRequestingCommentRef = useRef(false);
 
   const { ydoc: indexDoc } = useMultiProviderSync(PLAN_INDEX_DOC_NAME);
   // Prefer WebSocket provider when connected, fall back to WebRTC for P2P-only mode.
@@ -59,10 +58,9 @@ export function PlanPage() {
   }, [planId, syncState, setActivePlanSync, clearActivePlanSync]);
 
   // When user tries to comment without identity, we show profile setup
-  // and track that they were trying to comment
   const handleRequestIdentity = useCallback(() => {
+    wasRequestingCommentRef.current = true;
     setShowProfileSetup(true);
-    setPendingCommentHint(true);
   }, []);
 
   const handleStatusChange = useCallback(
@@ -80,12 +78,6 @@ export function PlanPage() {
     },
     [indexDoc, planId, metadata]
   );
-
-  useEffect(() => {
-    if (!pendingCommentHint || !identity) return;
-    const timer = setTimeout(() => setPendingCommentHint(false), HINT_AUTO_DISMISS_MS);
-    return () => clearTimeout(timer);
-  }, [pendingCommentHint, identity]);
 
   // Mark plan as deleted in index if metadata is missing after sync
   useEffect(() => {
@@ -168,34 +160,6 @@ export function PlanPage() {
         {activeView === 'plan' && (
           <div className="flex-1 overflow-y-auto bg-background">
             <div className="max-w-4xl mx-auto p-6 space-y-6">
-              {/* Hint shown after profile setup when user was trying to comment */}
-              {pendingCommentHint && identity && (
-                <div className="bg-primary/10 border border-primary/20 rounded-lg p-3 flex items-center justify-between">
-                  <p className="text-primary text-sm">
-                    <span className="font-medium">Ready to comment!</span> Select text in the
-                    document below, then click the Comment button.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => setPendingCommentHint(false)}
-                    className="text-primary hover:text-primary/90 ml-4"
-                    aria-label="Dismiss hint"
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      aria-hidden="true"
-                    >
-                      <path d="M18 6L6 18M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-              )}
               {/* Key forces full remount when identity changes, ensuring
                     useCreateBlockNote creates a fresh editor with correct extensions.
                     Without this, changing from anonymous to identified user would crash
@@ -222,8 +186,19 @@ export function PlanPage() {
       {/* Profile setup modal */}
       {showProfileSetup && (
         <ProfileSetup
-          onComplete={() => setShowProfileSetup(false)}
-          onCancel={() => setShowProfileSetup(false)}
+          onComplete={() => {
+            setShowProfileSetup(false);
+            if (wasRequestingCommentRef.current) {
+              wasRequestingCommentRef.current = false;
+              toast.success('Ready to comment!', {
+                description: 'Select text in the document, then click Comment.',
+              });
+            }
+          }}
+          onCancel={() => {
+            setShowProfileSetup(false);
+            wasRequestingCommentRef.current = false;
+          }}
         />
       )}
     </div>

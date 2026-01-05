@@ -20,6 +20,7 @@ import './index.css';
 import { MantineProvider } from '@mantine/core';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import { Toaster } from 'sonner';
 import { App } from './App';
 
 const root = document.getElementById('root');
@@ -29,6 +30,7 @@ ReactDOM.createRoot(root).render(
   <React.StrictMode>
     <MantineProvider>
       <App />
+      <Toaster position="bottom-right" richColors closeButton />
     </MantineProvider>
   </React.StrictMode>
 );

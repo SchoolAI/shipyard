@@ -1,13 +1,4 @@
-import {
-  Button,
-  Description,
-  FieldError,
-  Form,
-  Input,
-  Label,
-  Modal,
-  TextField,
-} from '@heroui/react';
+import { Button, FieldError, Form, Input, Label, Modal, TextField } from '@heroui/react';
 import { useState } from 'react';
 import { useIdentity } from '@/hooks/useIdentity';
 
@@ -99,11 +90,11 @@ export function ProfileSetup({ onComplete, onCancel, isEditing = false }: Profil
               {identity && (
                 <div className="mt-4 flex items-center gap-2">
                   <div
-                    className="w-4 h-4 rounded-full"
+                    className="w-4 h-4 rounded-full ring-1 ring-border ring-offset-1 ring-offset-surface"
                     style={{ backgroundColor: identity.color }}
                     title="Your color"
                   />
-                  <Description>Your color for comments</Description>
+                  <span className="text-sm text-muted-foreground">Your color for comments</span>
                 </div>
               )}
             </Modal.Body>

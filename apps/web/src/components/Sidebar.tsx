@@ -3,6 +3,7 @@ import type { PlanIndexEntry } from '@peer-plan/schema';
 import { User, Users } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 import { ProfileSetup } from '@/components/ProfileSetup';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { CollapsiblePanel } from '@/components/ui/collapsible-panel';
@@ -35,7 +36,14 @@ function PlanItem({ plan, isShared, peerCount }: PlanItemProps) {
   );
 }
 
-export function Sidebar() {
+interface SidebarProps {
+  /** Called after navigation (used to close mobile drawer) */
+  onNavigate?: () => void;
+  /** When true, skip CollapsiblePanel wrapper (used in mobile drawer) */
+  inDrawer?: boolean;
+}
+
+export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
   const { plans: localPlans, activeCount } = usePlanIndex();
   const { activePlanId, syncState } = useActivePlanSync();
   const [collapsed, setCollapsed] = useState(getSidebarCollapsed);
@@ -52,14 +60,9 @@ export function Sidebar() {
     setSidebarCollapsed(newState);
   };
 
-  return (
-    <CollapsiblePanel
-      side="left"
-      isOpen={!collapsed}
-      onToggle={handleToggle}
-      className="bg-surface"
-    >
-      <nav className="flex-1 flex flex-col overflow-y-auto p-2">
+  const content = (
+    <>
+      <nav className="flex-1 flex flex-col overflow-y-auto p-2 pb-safe">
         <DisclosureGroup>
           {/* My Plans section */}
           {localPlans.length > 0 && (
@@ -88,7 +91,11 @@ export function Sidebar() {
                     selectedKeys={activePlanId ? [activePlanId] : []}
                     onSelectionChange={(keys) => {
                       const key = Array.from(keys)[0];
-                      if (key) navigate(`/plan/${key}`);
+                      if (key) {
+                        // Close drawer first, then navigate
+                        onNavigate?.();
+                        navigate(`/plan/${key}`);
+                      }
                     }}
                   >
                     {localPlans.map((plan) => (
@@ -129,7 +136,11 @@ export function Sidebar() {
                     selectedKeys={activePlanId ? [activePlanId] : []}
                     onSelectionChange={(keys) => {
                       const key = Array.from(keys)[0];
-                      if (key) navigate(`/plan/${key}`);
+                      if (key) {
+                        // Close drawer first, then navigate
+                        onNavigate?.();
+                        navigate(`/plan/${key}`);
+                      }
                     }}
                   >
                     {sharedPlans.map((plan) => (
@@ -162,6 +173,7 @@ export function Sidebar() {
           size="sm"
           aria-label="Profile"
           onPress={() => setShowProfile(true)}
+          className="touch-target"
         >
           <User className="w-4 h-4 text-foreground" />
         </Button>
@@ -172,10 +184,30 @@ export function Sidebar() {
       {showProfile && (
         <ProfileSetup
           isEditing
-          onComplete={() => setShowProfile(false)}
+          onComplete={() => {
+            setShowProfile(false);
+            toast.success('Profile updated');
+          }}
           onCancel={() => setShowProfile(false)}
         />
       )}
+    </>
+  );
+
+  // In drawer mode, render content directly (drawer provides wrapper)
+  if (inDrawer) {
+    return <div className="flex flex-col h-full bg-surface">{content}</div>;
+  }
+
+  // Desktop mode: wrap in CollapsiblePanel
+  return (
+    <CollapsiblePanel
+      side="left"
+      isOpen={!collapsed}
+      onToggle={handleToggle}
+      className="bg-surface"
+    >
+      {content}
     </CollapsiblePanel>
   );
 }
