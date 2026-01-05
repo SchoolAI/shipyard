@@ -168,7 +168,7 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
       </nav>
 
       {/* Footer with profile and theme toggle */}
-      <div className="px-3 py-3 pb-safe border-t border-separator flex items-center gap-0 shrink-0 mt-auto">
+      <div className="px-3 py-2 border-t border-separator flex items-center gap-0 shrink-0 mt-auto">
         <Button
           isIconOnly
           variant="ghost"

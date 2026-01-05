@@ -1,12 +1,19 @@
+import { Chip, useOverlayState } from '@heroui/react';
 import { getPlanFromUrl, type PlanMetadata } from '@peer-plan/schema';
 import { useMemo } from 'react';
 import * as Y from 'yjs';
+import { MobileHeader } from '@/components/MobileHeader';
 import { PlanHeader } from '@/components/PlanHeader';
 import { PlanViewer } from '@/components/PlanViewer';
+import { Sidebar } from '@/components/Sidebar';
+import { Drawer } from '@/components/ui/drawer';
+import { useIsMobile } from '@/hooks/useIsMobile';
 
 export function SnapshotPage() {
   const urlPlan = getPlanFromUrl();
   const ydoc = useMemo(() => new Y.Doc(), []); // Empty doc, not synced
+  const isMobile = useIsMobile();
+  const drawerState = useOverlayState();
 
   if (!urlPlan) {
     return (
@@ -33,21 +40,45 @@ export function SnapshotPage() {
     updatedAt: 0,
   };
 
-  return (
+  const pageContent = (
     <div className="p-4 md:p-8 max-w-4xl mx-auto space-y-4 md:space-y-6">
-      {/* Snapshot banner - using semantic warning tokens for theme consistency */}
-      <div className="bg-warning/10 border border-warning/30 rounded-lg p-3 text-warning text-xs md:text-sm">
-        <strong>Viewing snapshot</strong> - This is a read-only view of a plan at a specific point
-        in time.
-      </div>
-
-      <PlanHeader
-        ydoc={ydoc}
-        metadata={snapshotMetadata}
-        identity={null}
-        onRequestIdentity={noOp}
-      />
+      {/* Desktop: show PlanHeader with snapshot indicator */}
+      {!isMobile && (
+        <PlanHeader
+          ydoc={ydoc}
+          metadata={snapshotMetadata}
+          identity={null}
+          onRequestIdentity={noOp}
+          isSnapshot
+        />
+      )}
       <PlanViewer ydoc={ydoc} identity={null} />
     </div>
   );
+
+  // Mobile: Custom header with snapshot indicator
+  if (isMobile) {
+    return (
+      <>
+        <div className="fixed top-0 left-0 right-0 z-50">
+          <MobileHeader
+            onMenuOpen={drawerState.open}
+            title={urlPlan.title}
+            status={urlPlan.status}
+            rightContent={
+              <Chip color="warning" variant="soft" className="text-[11px] h-5 px-2">
+                snapshot
+              </Chip>
+            }
+          />
+        </div>
+        <Drawer isOpen={drawerState.isOpen} onOpenChange={drawerState.setOpen} side="left">
+          <Sidebar inDrawer onNavigate={drawerState.close} />
+        </Drawer>
+        {pageContent}
+      </>
+    );
+  }
+
+  return pageContent;
 }

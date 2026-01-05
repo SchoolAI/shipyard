@@ -17,6 +17,8 @@ interface PlanHeaderProps {
   onRequestIdentity: () => void;
   /** Called after status is successfully updated in the plan doc */
   onStatusChange?: (newStatus: 'approved' | 'changes_requested') => void;
+  /** When true, shows snapshot indicator and hides interactive elements */
+  isSnapshot?: boolean;
 }
 
 export function PlanHeader({
@@ -25,6 +27,7 @@ export function PlanHeader({
   identity,
   onRequestIdentity,
   onStatusChange,
+  isSnapshot = false,
 }: PlanHeaderProps) {
   // No local state or observer - metadata comes from parent to avoid duplicate observers
   const display = metadata;
@@ -58,6 +61,11 @@ export function PlanHeader({
       <Chip {...getStatusChipProps(display.status)} className="shrink-0">
         {display.status.replace('_', ' ')}
       </Chip>
+      {isSnapshot && (
+        <Chip color="warning" variant="soft" className="shrink-0">
+          snapshot
+        </Chip>
+      )}
       {(display.repo || display.pr) && (
         <span className="text-xs md:text-sm text-muted-foreground shrink-0">
           {display.repo}
@@ -65,35 +73,37 @@ export function PlanHeader({
         </span>
       )}
 
-      {/* Right side: agents/peers, review actions, share */}
-      <div className="flex items-center gap-2 ml-auto shrink-0">
-        {/* Presence indicators */}
-        {syncState && syncState.activeCount > 0 && (
-          <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <span className="w-1.5 h-1.5 rounded-full bg-success" />
-            {syncState.activeCount} {syncState.activeCount === 1 ? 'agent' : 'agents'}
-          </span>
-        )}
-        {syncState && syncState.peerCount > 0 && (
-          <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <span className="w-1.5 h-1.5 rounded-full bg-info" />
-            {syncState.peerCount} {syncState.peerCount === 1 ? 'peer' : 'peers'}
-          </span>
-        )}
+      {/* Right side: agents/peers, review actions, share - hidden for snapshots */}
+      {!isSnapshot && (
+        <div className="flex items-center gap-2 ml-auto shrink-0">
+          {/* Presence indicators */}
+          {syncState && syncState.activeCount > 0 && (
+            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <span className="w-1.5 h-1.5 rounded-full bg-success" />
+              {syncState.activeCount} {syncState.activeCount === 1 ? 'agent' : 'agents'}
+            </span>
+          )}
+          {syncState && syncState.peerCount > 0 && (
+            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <span className="w-1.5 h-1.5 rounded-full bg-info" />
+              {syncState.peerCount} {syncState.peerCount === 1 ? 'peer' : 'peers'}
+            </span>
+          )}
 
-        {/* Review actions - inline on desktop, floating on mobile */}
-        {!isMobile && (
-          <ReviewActions
-            ydoc={ydoc}
-            currentStatus={display.status}
-            identity={identity}
-            onRequestIdentity={onRequestIdentity}
-            onStatusChange={onStatusChange}
-          />
-        )}
+          {/* Review actions - inline on desktop, floating on mobile */}
+          {!isMobile && (
+            <ReviewActions
+              ydoc={ydoc}
+              currentStatus={display.status}
+              identity={identity}
+              onRequestIdentity={onRequestIdentity}
+              onStatusChange={onStatusChange}
+            />
+          )}
 
-        <ShareButton />
-      </div>
+          <ShareButton />
+        </div>
+      )}
     </div>
   );
 }

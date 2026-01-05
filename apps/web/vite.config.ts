@@ -43,9 +43,10 @@ function githubPagesSpa(): Plugin {
   };
 }
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   // Base path for GitHub Pages: https://schoolai.github.io/peer-plan/
-  base: '/peer-plan/',
+  // Use '/' for development, '/peer-plan/' for production
+  base: mode === 'production' ? '/peer-plan/' : '/',
   plugins: [tailwindcss(), react(), githubPagesSpa()],
   server: {
     port: 5173,
@@ -56,4 +57,4 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
-});
+}));
