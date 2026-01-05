@@ -84,11 +84,13 @@
   --snow: oklch(0.9911 0 0);
   --eclipse: oklch(0.2103 0.0059 285.89);
 
-  /* Light mode */
-  --background: oklch(0.9702 0 0);
-  --foreground: var(--eclipse);
-  --surface: oklch(100% 0 0);
-  --muted: oklch(0.5517 0.0138 285.94);
+  /* Light mode - subtle gray background with proper contrast */
+  --background: oklch(0.98 0 0);
+  --background-subtle: oklch(0.95 0 0);
+  --foreground: oklch(0.18 0 0);
+  --surface: oklch(0.9911 0 0);
+  --muted: oklch(0.88 0 0);
+  --muted-foreground: oklch(0.48 0 0);
 
   --accent: oklch(0.5729 0.1385 180.72);
   --accent-foreground: var(--snow);
@@ -102,37 +104,46 @@
   --ring: var(--accent);
 
   /* Map Tailwind utilities to HeroUI variables */
-  --color-muted-foreground: oklch(0.5517 0.0138 285.94);
+  --color-muted-foreground: oklch(0.48 0 0);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-muted: var(--muted);
 }
 
 [data-theme="dark"],
 .dark {
-  --background: oklch(12% 0.005 285.823);
-  --foreground: var(--snow);
-  --surface: oklch(0.2103 0.0059 285.89);
-  --overlay: oklch(0.22 0.0059 285.89);
-  --muted: oklch(0.5517 0.0138 285.94);
-
-  /* Override Tailwind semantic colors for dark mode */
-  --color-background: oklch(12% 0.005 285.823);
-  --color-foreground: oklch(0.9911 0 0);
-  --color-surface: oklch(0.2103 0.0059 285.89);
-  --color-muted: oklch(27.4% 0.006 286.033);
-  --color-muted-foreground: oklch(70.5% 0.015 286.067);
-  --color-border: oklch(22% 0.006 286.033);
-  --color-input: oklch(22% 0.006 286.033);
+  --background: oklch(0.15 0.005 285.823);
+  --background-subtle: oklch(0.18 0.005 285.823);
+  --foreground: oklch(0.95 0 0);
+  --surface: oklch(0.22 0.0059 285.89);
+  --overlay: oklch(0.24 0.0059 285.89);
+  --muted: oklch(0.35 0.006 286.033);
+  --muted-foreground: oklch(0.7 0.015 286.067);
 
   /* Scrollbar for dark mode */
-  scrollbar-color: oklch(70.5% 0.015 286.067) transparent;
+  scrollbar-color: var(--muted-foreground) transparent;
 }
 
 /* Dark mode scrollbar (webkit) */
 .dark *::-webkit-scrollbar-thumb {
-  background: oklch(70.5% 0.015 286.067);
+  background: var(--muted-foreground);
 }
 
 .dark *::-webkit-scrollbar-thumb:hover {
-  background: oklch(60% 0.015 286.067);
+  background: oklch(0.65 0.015 286.067);
+}
+
+/* Base styling - ensure proper background colors */
+html,
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+}
+
+#root {
+  background-color: var(--background);
+  color: var(--foreground);
 }
 
 /* Global: Pointer cursor for all interactive elements */
@@ -207,4 +218,88 @@ button:disabled,
 
 .dark *::-webkit-scrollbar-thumb:hover {
   background: var(--color-slate-500);
+}
+
+/*
+ * Mobile Responsive Utilities
+ * Safe areas for notched devices, dynamic viewport, and touch targets
+ */
+
+/* Safe area padding for notched devices (iPhone X+, etc.) */
+.pt-safe {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.pl-safe {
+  padding-left: env(safe-area-inset-left, 0px);
+}
+.pr-safe {
+  padding-right: env(safe-area-inset-right, 0px);
+}
+
+/* Dynamic viewport height - handles mobile browser address bar */
+.h-screen-safe {
+  height: 100dvh;
+}
+
+/* Minimum tap target size for accessibility (44x44px per Apple/Google guidelines) */
+/* Only enforce on mobile - desktop can use smaller buttons */
+@media (max-width: 767px) {
+  .touch-target {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
+/* Mobile BlockNote toolbar - larger touch targets */
+@media (max-width: 767px) {
+  .bn-toolbar button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .bn-thread {
+    max-width: calc(100vw - 32px);
+  }
+
+  /* Ensure floating comment UI doesn't overflow */
+  .bn-floating-composer,
+  .bn-floating-thread {
+    max-width: calc(100vw - 24px);
+  }
+
+  /* Reduce BlockNote editor padding on mobile for more content space */
+  .bn-container {
+    padding-left: 8px !important;
+    padding-right: 8px !important;
+  }
+}
+
+/* Drawer slide-in animation classes */
+.drawer-enter-left {
+  animation: slideInFromLeft 300ms cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.drawer-exit-left {
+  animation: slideOutToLeft 200ms cubic-bezier(0.5, 0, 0.75, 0);
+}
+
+@keyframes slideInFromLeft {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideOutToLeft {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-100%);
+  }
 }

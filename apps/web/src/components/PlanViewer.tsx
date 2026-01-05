@@ -184,7 +184,7 @@ export function PlanViewer({ ydoc, identity, provider, onRequestIdentity }: Plan
                 }
               : {
                   name: 'Anonymous',
-                  color: '#808080',
+                  color: 'hsl(0, 0%, 55%)', // Neutral gray works in light and dark modes
                 },
           }
         : undefined,

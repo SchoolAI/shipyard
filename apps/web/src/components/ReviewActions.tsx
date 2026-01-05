@@ -71,7 +71,6 @@ export function ReviewActions({
       {!showConfirm && (
         <>
           <Button
-            variant="primary"
             size="sm"
             className="bg-success hover:bg-success-dark text-white touch-target text-[11px] h-6 px-2 py-0.5 min-h-0"
             onPress={() => handleAction('approve')}
@@ -98,7 +97,7 @@ export function ReviewActions({
             {showConfirm === 'approve' ? 'Approve this plan?' : 'Request changes?'}
           </span>
           <Button
-            variant={showConfirm === 'approve' ? 'primary' : 'danger'}
+            variant={showConfirm === 'approve' ? 'secondary' : 'danger'}
             className={`touch-target ${
               showConfirm === 'approve' ? 'bg-success hover:bg-success-dark text-white' : ''
             }`}

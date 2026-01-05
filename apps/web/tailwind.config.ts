@@ -72,28 +72,28 @@ const config: Config = {
 					dark: '#2563eb',
 				},
 
-				// shadcn/ui semantic tokens
-				background: 'hsl(0 0% 100%)',
-				foreground: 'hsl(215 25% 10%)',
+				// Semantic tokens using CSS variables (theme-aware)
+				background: 'var(--background)',
+				foreground: 'var(--foreground)',
 				card: {
-					DEFAULT: 'hsl(0 0% 100%)',
-					foreground: 'hsl(215 25% 10%)',
+					DEFAULT: 'var(--surface)',
+					foreground: 'var(--foreground)',
 				},
 				popover: {
-					DEFAULT: 'hsl(0 0% 100%)',
-					foreground: 'hsl(215 25% 10%)',
+					DEFAULT: 'var(--surface)',
+					foreground: 'var(--foreground)',
 				},
 				muted: {
-					DEFAULT: 'hsl(214 32% 96%)', // slate-100
-					foreground: 'hsl(215 16% 47%)', // slate-600
+					DEFAULT: 'var(--muted)',
+					foreground: 'var(--muted-foreground)',
 				},
 				destructive: {
 					DEFAULT: '#f97316', // orange-500 (changes requested)
-					foreground: 'hsl(0 0% 100%)',
+					foreground: 'var(--snow)',
 				},
-				border: 'hsl(214 32% 91%)', // slate-200
-				input: 'hsl(214 32% 91%)', // slate-200
-				ring: '#0D9488', // primary
+				border: 'var(--muted)',
+				input: 'var(--muted)',
+				ring: 'var(--accent)'
 			},
 		},
 	},

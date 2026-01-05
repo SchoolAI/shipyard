@@ -35,8 +35,8 @@ export function SnapshotPage() {
 
   return (
     <div className="p-4 md:p-8 max-w-4xl mx-auto space-y-4 md:space-y-6">
-      {/* Snapshot banner */}
-      <div className="bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700 rounded-lg p-3 text-amber-800 dark:text-amber-200 text-xs md:text-sm">
+      {/* Snapshot banner - using semantic warning tokens for theme consistency */}
+      <div className="bg-warning/10 border border-warning/30 rounded-lg p-3 text-warning text-xs md:text-sm">
         <strong>Viewing snapshot</strong> - This is a read-only view of a plan at a specific point
         in time.
       </div>
