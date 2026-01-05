@@ -5,12 +5,12 @@ describe('YDOC_KEYS', () => {
   it('should export all expected keys', () => {
     expect(YDOC_KEYS).toEqual({
       METADATA: 'metadata',
-      CONTENT: 'content',
       DOCUMENT_FRAGMENT: 'document',
       THREADS: 'threads',
       STEP_COMPLETIONS: 'stepCompletions',
       PLANS: 'plans',
       ARTIFACTS: 'artifacts',
+      PRESENCE: 'presence',
     });
   });
 
@@ -30,12 +30,12 @@ describe('YDOC_KEYS', () => {
 describe('isValidYDocKey', () => {
   it('should return true for all YDOC_KEYS values', () => {
     expect(isValidYDocKey('metadata')).toBe(true);
-    expect(isValidYDocKey('content')).toBe(true);
     expect(isValidYDocKey('document')).toBe(true);
     expect(isValidYDocKey('threads')).toBe(true);
     expect(isValidYDocKey('stepCompletions')).toBe(true);
     expect(isValidYDocKey('plans')).toBe(true);
     expect(isValidYDocKey('artifacts')).toBe(true);
+    expect(isValidYDocKey('presence')).toBe(true);
   });
 
   it('should return false for unknown keys', () => {

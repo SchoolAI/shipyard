@@ -10,9 +10,11 @@
     "lint": "turbo run lint",
     "lint:fix": "turbo run lint:fix",
     "check": "turbo run test typecheck lint",
-    "dev": "concurrently --names \"signal,web\" --prefix-colors \"cyan,magenta\" \"pnpm dev:signaling\" \"pnpm dev:web\"",
+    "dev": "concurrently --names \"server,signal,web,hook\" --prefix-colors \"green,cyan,magenta,yellow\" \"pnpm dev:server\" \"pnpm dev:signaling\" \"pnpm dev:web\" \"pnpm dev:hook\"",
+    "dev:server": "turbo run dev --filter=@peer-plan/server",
     "dev:signaling": "turbo run dev --filter=@peer-plan/signaling",
     "dev:web": "turbo run dev --filter=@peer-plan/web",
+    "dev:hook": "turbo run dev --filter=@peer-plan/hook",
     "prepare": "simple-git-hooks"
   },
   "devDependencies": {

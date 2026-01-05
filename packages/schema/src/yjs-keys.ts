@@ -85,6 +85,18 @@ export const YDOC_KEYS = {
    * - Helpers: packages/schema/src/yjs-helpers.ts (read/write)
    */
   ARTIFACTS: 'artifacts' as const,
+
+  /**
+   * Agent presence (Y.Map<string, AgentPresence>)
+   * Maps session ID → presence info (agentType, connectedAt, lastSeenAt)
+   * Used for real-time "Claude is here" indicator
+   *
+   * Used by:
+   * - Server: apps/server/src/registry-server.ts (write via hook API)
+   * - Web: apps/web/src/components/PresenceIndicator.tsx (read)
+   * - Helpers: packages/schema/src/yjs-helpers.ts (read/write)
+   */
+  PRESENCE: 'presence' as const,
 } as const;
 
 /**

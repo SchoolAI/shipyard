@@ -1,12 +1,6 @@
 import type { Block } from '@blocknote/core';
 import { ServerBlockNoteEditor } from '@blocknote/server-util';
-import {
-  createPlanUrl,
-  initPlanMetadata,
-  PLAN_INDEX_DOC_NAME,
-  setPlanIndexEntry,
-  type UrlEncodedPlan,
-} from '@peer-plan/schema';
+import { initPlanMetadata, PLAN_INDEX_DOC_NAME, setPlanIndexEntry } from '@peer-plan/schema';
 import { nanoid } from 'nanoid';
 import open from 'open';
 import { z } from 'zod';
@@ -87,18 +81,8 @@ export const createPlanTool = {
 
     logger.info({ planId }, 'Plan index updated');
 
-    const baseUrl = 'http://localhost:5173/plan';
-    const urlPlan: UrlEncodedPlan = {
-      v: 1,
-      id: planId,
-      title: input.title,
-      status: 'draft',
-      repo: input.repo,
-      pr: input.prNumber,
-      content: blocks,
-    };
-
-    const url = createPlanUrl(baseUrl, urlPlan);
+    // Open the live plan page (not a snapshot URL) so the browser connects via WebSocket
+    const url = `http://localhost:5173/plan/${planId}`;
 
     await open(url);
     logger.info({ url }, 'Browser launched');

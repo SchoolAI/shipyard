@@ -1,4 +1,5 @@
 import type * as Y from 'yjs';
+import { type AgentPresence, AgentPresenceSchema } from './hook-api.js';
 import { type Artifact, ArtifactSchema, type PlanMetadata, PlanMetadataSchema } from './plan.js';
 import { YDOC_KEYS } from './yjs-keys.js';
 
@@ -146,4 +147,67 @@ export function removeArtifact(ydoc: Y.Doc, artifactId: string): boolean {
 
   array.delete(index, 1);
   return true;
+}
+
+// --- Agent Presence Helpers ---
+
+/**
+ * Gets all agent presences from Y.Doc with validation.
+ *
+ * @param ydoc - Yjs document
+ * @returns Map of sessionId → AgentPresence
+ */
+export function getAgentPresences(ydoc: Y.Doc): Map<string, AgentPresence> {
+  const map = ydoc.getMap(YDOC_KEYS.PRESENCE);
+  const result = new Map<string, AgentPresence>();
+
+  for (const [sessionId, value] of map.entries()) {
+    const parsed = AgentPresenceSchema.safeParse(value);
+    if (parsed.success) {
+      result.set(sessionId, parsed.data);
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Sets agent presence in Y.Doc.
+ *
+ * @param ydoc - Yjs document
+ * @param presence - Agent presence to set
+ */
+export function setAgentPresence(ydoc: Y.Doc, presence: AgentPresence): void {
+  const map = ydoc.getMap(YDOC_KEYS.PRESENCE);
+  map.set(presence.sessionId, presence);
+}
+
+/**
+ * Clears agent presence from Y.Doc.
+ *
+ * @param ydoc - Yjs document
+ * @param sessionId - Session ID to clear
+ * @returns true if cleared, false if not found
+ */
+export function clearAgentPresence(ydoc: Y.Doc, sessionId: string): boolean {
+  const map = ydoc.getMap(YDOC_KEYS.PRESENCE);
+  if (!map.has(sessionId)) return false;
+  map.delete(sessionId);
+  return true;
+}
+
+/**
+ * Gets a single agent presence by session ID.
+ *
+ * @param ydoc - Yjs document
+ * @param sessionId - Session ID to get
+ * @returns AgentPresence or null if not found
+ */
+export function getAgentPresence(ydoc: Y.Doc, sessionId: string): AgentPresence | null {
+  const map = ydoc.getMap(YDOC_KEYS.PRESENCE);
+  const value = map.get(sessionId);
+  if (!value) return null;
+
+  const parsed = AgentPresenceSchema.safeParse(value);
+  return parsed.success ? parsed.data : null;
 }
