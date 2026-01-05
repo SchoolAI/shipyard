@@ -120,18 +120,6 @@
   --overlay: oklch(0.24 0.0059 285.89);
   --muted: oklch(0.35 0.006 286.033);
   --muted-foreground: oklch(0.7 0.015 286.067);
-
-  /* Scrollbar for dark mode */
-  scrollbar-color: var(--muted-foreground) transparent;
-}
-
-/* Dark mode scrollbar (webkit) */
-.dark *::-webkit-scrollbar-thumb {
-  background: var(--muted-foreground);
-}
-
-.dark *::-webkit-scrollbar-thumb:hover {
-  background: oklch(0.65 0.015 286.067);
 }
 
 /* Base styling - ensure proper background colors */
@@ -181,43 +169,15 @@ button:disabled,
 }
 
 /*
- * Scrollbar styling - thin but visible for accessibility
- * Users should be able to see scrollable areas
+ * Hide scrollbars globally while maintaining scroll functionality
+ * Uses cross-browser approach for Firefox, Chrome, Safari, Edge
  */
 * {
-  scrollbar-width: thin; /* Firefox - thin but visible */
-  scrollbar-color: var(--color-slate-300) transparent; /* thumb track */
+  scrollbar-width: none; /* Firefox */
 }
 
-.dark * {
-  scrollbar-color: var(--color-slate-600) transparent; /* darker thumb for dark mode */
-}
-
-/* Webkit browsers (Chrome, Safari) - thin but visible */
 *::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-
-*::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-*::-webkit-scrollbar-thumb {
-  background: var(--color-slate-300);
-  border-radius: 3px;
-}
-
-*::-webkit-scrollbar-thumb:hover {
-  background: var(--color-slate-400);
-}
-
-.dark *::-webkit-scrollbar-thumb {
-  background: var(--color-slate-600);
-}
-
-.dark *::-webkit-scrollbar-thumb:hover {
-  background: var(--color-slate-500);
+  display: none; /* Chrome, Safari, Edge */
 }
 
 /*
@@ -271,9 +231,34 @@ button:disabled,
   }
 
   /* Reduce BlockNote editor padding on mobile for more content space */
+  /* Multi-level approach - padding comes from multiple sources */
   .bn-container {
-    padding-left: 8px !important;
-    padding-right: 8px !important;
+    /* biome-ignore lint/complexity/noImportantStyles: Required to override BlockNote's inline styles */
+    padding-left: 0 !important;
+    /* biome-ignore lint/complexity/noImportantStyles: Required to override BlockNote's inline styles */
+    padding-right: 0 !important;
+  }
+
+  .bn-editor {
+    /* biome-ignore lint/complexity/noImportantStyles: Required to override BlockNote's inline styles */
+    padding-left: 0 !important;
+    /* biome-ignore lint/complexity/noImportantStyles: Required to override BlockNote's inline styles */
+    padding-right: 0 !important;
+  }
+
+  .bn-block {
+    /* biome-ignore lint/complexity/noImportantStyles: Required to override BlockNote's inline styles */
+    padding-left: 0 !important;
+    /* biome-ignore lint/complexity/noImportantStyles: Required to override BlockNote's inline styles */
+    padding-right: 0 !important;
+  }
+
+  /* Final content padding - balanced for mobile */
+  .bn-editor .ProseMirror {
+    /* biome-ignore lint/complexity/noImportantStyles: Required to override BlockNote's inline styles */
+    padding-left: 20px !important;
+    /* biome-ignore lint/complexity/noImportantStyles: Required to override BlockNote's inline styles */
+    padding-right: 20px !important;
   }
 }
 
@@ -301,5 +286,30 @@ button:disabled,
   }
   to {
     transform: translateX(-100%);
+  }
+}
+
+/* Mobile-specific BlockNote padding override */
+@media (max-width: 767px) {
+  .mobile-blocknote .bn-container,
+  .mobile-blocknote .bn-editor,
+  .mobile-blocknote .bn-block-outer,
+  .mobile-blocknote .bn-block-content,
+  .mobile-blocknote [data-node-type] {
+    /* biome-ignore lint/complexity/noImportantStyles: Required to override BlockNote's inline styles */
+    padding-left: 0 !important;
+    /* biome-ignore lint/complexity/noImportantStyles: Required to override BlockNote's inline styles */
+    padding-right: 0 !important;
+    /* biome-ignore lint/complexity/noImportantStyles: Required to override BlockNote's inline styles */
+    margin-left: 0 !important;
+    /* biome-ignore lint/complexity/noImportantStyles: Required to override BlockNote's inline styles */
+    margin-right: 0 !important;
+  }
+
+  .mobile-blocknote .ProseMirror {
+    /* biome-ignore lint/complexity/noImportantStyles: Required to override BlockNote's inline styles */
+    padding-left: 16px !important;
+    /* biome-ignore lint/complexity/noImportantStyles: Required to override BlockNote's inline styles */
+    padding-right: 16px !important;
   }
 }

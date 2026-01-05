@@ -1,3 +1,4 @@
+import { useOverlayState } from '@heroui/react';
 import {
   getPlanIndexEntry,
   getPlanMetadata,
@@ -11,21 +12,30 @@ import { useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Attachments } from '@/components/Attachments';
 import { DeliverablesView } from '@/components/DeliverablesView';
+import { MobileHeader } from '@/components/MobileHeader';
 import { PlanHeader } from '@/components/PlanHeader';
 import { PlanViewer } from '@/components/PlanViewer';
 import { ProfileSetup } from '@/components/ProfileSetup';
+import { ReviewActions } from '@/components/ReviewActions';
+import { ShareButton } from '@/components/ShareButton';
+import { Sidebar } from '@/components/Sidebar';
+import { Drawer } from '@/components/ui/drawer';
 import { useActivePlanSync } from '@/contexts/ActivePlanSyncContext';
 import { useIdentity } from '@/hooks/useIdentity';
+import { useIsMobile } from '@/hooks/useIsMobile';
 import { useMultiProviderSync } from '@/hooks/useMultiProviderSync';
 
 type ViewType = 'plan' | 'deliverables';
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Component has necessary conditional logic for sync state handling
 export function PlanPage() {
   const { id } = useParams<{ id: string }>();
   // The route /plan/:id guarantees id is defined
   const planId = id ?? '';
   const { ydoc, syncState, providers, rtcProvider } = useMultiProviderSync(planId);
   const { identity } = useIdentity();
+  const isMobile = useIsMobile();
+  const drawerState = useOverlayState();
   const { setActivePlanSync, clearActivePlanSync } = useActivePlanSync();
   const [metadata, setMetadata] = useState<PlanMetadata | null>(null);
   const [showProfileSetup, setShowProfileSetup] = useState(false);
@@ -112,27 +122,29 @@ export function PlanPage() {
     );
   }
 
-  return (
+  const pageContent = (
     <div className="flex flex-col h-full overflow-hidden">
-      {/* Header bar with plan metadata */}
-      <div className="border-b border-separator bg-surface px-6 py-3 shrink-0">
-        <PlanHeader
-          ydoc={ydoc}
-          metadata={metadata}
-          identity={identity}
-          onRequestIdentity={handleRequestIdentity}
-          onStatusChange={handleStatusChange}
-        />
-      </div>
+      {/* Header bar with plan metadata - hidden on mobile (shown in MobileHeader instead) */}
+      {!isMobile && (
+        <div className="border-b border-separator bg-surface px-2 md:px-6 py-1 md:py-3 shrink-0">
+          <PlanHeader
+            ydoc={ydoc}
+            metadata={metadata}
+            identity={identity}
+            onRequestIdentity={handleRequestIdentity}
+            onStatusChange={handleStatusChange}
+          />
+        </div>
+      )}
 
       <div className="flex flex-col flex-1 overflow-hidden">
         {/* Tab navigation */}
-        <div className="border-b border-separator bg-surface px-6 py-2 shrink-0">
-          <div className="flex gap-4">
+        <div className="border-b border-separator bg-surface px-2 md:px-6 py-1 md:py-2 shrink-0">
+          <div className="flex gap-0 md:gap-4">
             <button
               type="button"
               onClick={() => setActiveView('plan')}
-              className={`flex items-center gap-2 pb-2 px-2 font-medium text-sm transition-colors ${
+              className={`flex items-center justify-center gap-2 pb-2 px-2 font-medium text-sm transition-colors flex-1 md:flex-initial ${
                 activeView === 'plan'
                   ? 'text-primary border-b-2 border-primary'
                   : 'text-muted-foreground hover:text-foreground border-b-2 border-transparent'
@@ -144,7 +156,7 @@ export function PlanPage() {
             <button
               type="button"
               onClick={() => setActiveView('deliverables')}
-              className={`flex items-center gap-2 pb-2 px-2 font-medium text-sm transition-colors ${
+              className={`flex items-center justify-center gap-2 pb-2 px-2 font-medium text-sm transition-colors flex-1 md:flex-initial ${
                 activeView === 'deliverables'
                   ? 'text-primary border-b-2 border-primary'
                   : 'text-muted-foreground hover:text-foreground border-b-2 border-transparent'
@@ -159,7 +171,7 @@ export function PlanPage() {
         {/* Tab content */}
         {activeView === 'plan' && (
           <div className="flex-1 overflow-y-auto bg-background">
-            <div className="max-w-4xl mx-auto p-6 space-y-6">
+            <div className="max-w-4xl mx-auto px-1 py-2 md:p-6 space-y-3 md:space-y-6">
               {/* Key forces full remount when identity changes, ensuring
                     useCreateBlockNote creates a fresh editor with correct extensions.
                     Without this, changing from anonymous to identified user would crash
@@ -183,6 +195,21 @@ export function PlanPage() {
         )}
       </div>
 
+      {/* Floating review actions on mobile */}
+      {isMobile && metadata && (
+        <div className="fixed bottom-3 right-3 z-30 pb-safe">
+          <div className="bg-surface rounded-lg shadow-lg border border-separator p-1.5">
+            <ReviewActions
+              ydoc={ydoc}
+              currentStatus={metadata.status}
+              identity={identity}
+              onRequestIdentity={handleRequestIdentity}
+              onStatusChange={handleStatusChange}
+            />
+          </div>
+        </div>
+      )}
+
       {/* Profile setup modal */}
       {showProfileSetup && (
         <ProfileSetup
@@ -203,4 +230,30 @@ export function PlanPage() {
       )}
     </div>
   );
+
+  // Mobile: Custom header overlays Layout's default header
+  if (isMobile && metadata) {
+    return (
+      <>
+        {/* Fixed header overlays Layout's default "Peer Plan" header */}
+        <div className="fixed top-0 left-0 right-0 z-50">
+          <MobileHeader
+            onMenuOpen={drawerState.open}
+            title={metadata.title}
+            status={metadata.status}
+            agentCount={syncState?.activeCount}
+            peerCount={syncState?.peerCount}
+            rightContent={<ShareButton />}
+          />
+        </div>
+        <Drawer isOpen={drawerState.isOpen} onOpenChange={drawerState.setOpen} side="left">
+          <Sidebar inDrawer onNavigate={drawerState.close} />
+        </Drawer>
+        {pageContent}
+      </>
+    );
+  }
+
+  // Desktop: Standard layout
+  return pageContent;
 }
