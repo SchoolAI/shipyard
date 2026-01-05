@@ -115,9 +115,7 @@ export function ReviewActions({
 
       {/* Review info */}
       {isReviewed && !showConfirm && (
-        <span className="text-xs text-muted-foreground ml-2">
-          Click to change status
-        </span>
+        <span className="text-xs text-muted-foreground ml-2">Click to change status</span>
       )}
     </div>
   );

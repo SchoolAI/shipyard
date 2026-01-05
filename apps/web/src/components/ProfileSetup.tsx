@@ -79,7 +79,7 @@ export function ProfileSetup({ onComplete, onCancel, isEditing = false }: Profil
             </p>
           </Modal.Header>
           <Form onSubmit={handleSubmit}>
-            <Modal.Body>
+            <Modal.Body className="overflow-visible">
               <TextField
                 name="displayName"
                 isRequired
@@ -89,6 +89,7 @@ export function ProfileSetup({ onComplete, onCancel, isEditing = false }: Profil
                   setDisplayName(value);
                   setError(null);
                 }}
+                className="overflow-visible"
               >
                 <Label>Display Name</Label>
                 <Input placeholder="Enter your name..." maxLength={50} />

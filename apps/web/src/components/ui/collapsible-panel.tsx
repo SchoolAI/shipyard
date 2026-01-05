@@ -55,9 +55,7 @@ export function CollapsiblePanel({
       className={cn(
         'h-full flex flex-col overflow-hidden shrink-0',
         'transition-all duration-200 ease-in-out',
-        side === 'left'
-          ? 'border-r border-separator'
-          : 'border-l border-separator',
+        side === 'left' ? 'border-r border-separator' : 'border-l border-separator',
         width,
         className
       )}
@@ -93,12 +91,7 @@ export function CollapsiblePanelHeader({
   const ChevronIcon = side === 'left' ? ChevronLeft : ChevronRight;
 
   return (
-    <div
-      className={cn(
-        'p-4 border-b border-separator bg-surface min-w-64',
-        className
-      )}
-    >
+    <div className={cn('p-4 border-b border-separator bg-surface min-w-64', className)}>
       <div className="flex items-center justify-between">
         {side === 'left' ? (
           <>

@@ -12,9 +12,7 @@ export function SnapshotPage() {
     return (
       <div className="p-8 text-center">
         <h1 className="text-xl font-bold text-foreground">Invalid Snapshot</h1>
-        <p className="text-muted-foreground">
-          The URL does not contain valid plan data.
-        </p>
+        <p className="text-muted-foreground">The URL does not contain valid plan data.</p>
       </div>
     );
   }

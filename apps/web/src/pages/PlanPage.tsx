@@ -114,9 +114,7 @@ export function PlanPage() {
     return (
       <div className="p-8 text-center">
         <h1 className="text-xl font-bold text-foreground">Plan Not Found</h1>
-        <p className="text-muted-foreground">
-          The plan &quot;{id}&quot; does not exist.
-        </p>
+        <p className="text-muted-foreground">The plan &quot;{id}&quot; does not exist.</p>
         <p className="text-sm text-muted-foreground mt-2">It has been removed from your sidebar.</p>
       </div>
     );

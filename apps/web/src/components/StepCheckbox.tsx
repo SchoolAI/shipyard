@@ -32,9 +32,7 @@ export function StepCheckbox({ ydoc, stepId, label }: StepCheckboxProps) {
         <Checkbox.Indicator />
       </Checkbox.Control>
       <Checkbox.Content>
-        <Label className={checked ? 'line-through text-muted-foreground' : ''}>
-          {label}
-        </Label>
+        <Label className={checked ? 'line-through text-muted-foreground' : ''}>{label}</Label>
       </Checkbox.Content>
     </Checkbox>
   );

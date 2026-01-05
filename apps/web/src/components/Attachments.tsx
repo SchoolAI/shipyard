@@ -37,15 +37,10 @@ export function Attachments({ ydoc }: AttachmentsProps) {
       </h2>
       <div className="grid gap-4">
         {artifacts.map((artifact) => (
-          <div
-            key={artifact.id}
-            className="bg-surface rounded-lg border border-separator p-4"
-          >
+          <div key={artifact.id} className="bg-surface rounded-lg border border-separator p-4">
             <div className="flex items-center gap-2 mb-3">
               <ArtifactTypeIcon type={artifact.type} />
-              <span className="text-sm font-medium text-foreground">
-                {artifact.filename}
-              </span>
+              <span className="text-sm font-medium text-foreground">{artifact.filename}</span>
               <span className="text-xs text-muted-foreground capitalize">
                 {artifact.type.replace('_', ' ')}
               </span>
