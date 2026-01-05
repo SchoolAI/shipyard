@@ -27,30 +27,17 @@ export const YDOC_KEYS = {
   METADATA: 'metadata' as const,
 
   /**
-   * BlockNote content as JSON blocks (Y.Array<Block>)
-   * Used for: JSON serialization, URL snapshots, read_plan tool
-   *
-   * NOTE: This is separate from DOCUMENT_FRAGMENT which BlockNote uses for editing.
-   * Both must be kept in sync!
-   *
-   * Used by:
-   * - Server: packages/server/src/tools/create-plan.ts (write)
-   * - Server: packages/server/src/tools/read-plan.ts (read)
-   * - Web: packages/web/src/hooks/useHydration.ts (write)
-   * - Web: packages/web/src/pages/PlanPage.tsx (read, for fallback)
-   */
-  CONTENT: 'content' as const,
-
-  /**
-   * BlockNote document (Y.XmlFragment)
-   * Used for: Real-time collaborative editing in BlockNote
+   * BlockNote document (Y.XmlFragment) - SOURCE OF TRUTH for plan content
+   * Used for: Real-time collaborative editing, read_plan tool, all content operations
    *
    * CRITICAL: BlockNote expects this to be an XmlFragment, NOT an Array!
-   * This is the authoritative source for the editor display.
+   * This is the authoritative source for all plan content.
    *
    * Used by:
-   * - Server: packages/server/src/tools/create-plan.ts (write via blocksToYXmlFragment)
-   * - Web: packages/web/src/components/PlanViewer.tsx (read, BlockNote collaboration)
+   * - Server: apps/server/src/tools/create-plan.ts (write via blocksToYXmlFragment)
+   * - Server: apps/server/src/export-markdown.ts (read via yXmlFragmentToBlocks)
+   * - Web: apps/web/src/components/PlanViewer.tsx (BlockNote collaboration)
+   * - Web: apps/web/src/hooks/useHydration.ts (write from URL snapshot)
    */
   DOCUMENT_FRAGMENT: 'document' as const,
 
@@ -113,23 +100,3 @@ export type YDocKey = (typeof YDOC_KEYS)[keyof typeof YDOC_KEYS];
 export function isValidYDocKey(key: string): key is YDocKey {
   return Object.values(YDOC_KEYS).includes(key as YDocKey);
 }
-
-/**
- * CRITICAL ISSUE FIXED:
- *
- * Previously, there was a mismatch between:
- * - Server: stored content in ydoc.getArray('content')
- * - Browser: read content from ydoc.getXmlFragment('document')
- *
- * These are DIFFERENT Y.Doc structures and never synced!
- *
- * FIX:
- * - CONTENT ('content'): Y.Array for JSON serialization
- * - DOCUMENT_FRAGMENT ('document'): Y.XmlFragment for BlockNote collaboration
- * - Server creates BOTH in create-plan.ts
- * - Browser hydration creates CONTENT, BlockNote manages DOCUMENT_FRAGMENT
- *
- * Both structures contain the same blocks but in different formats:
- * - content: Block[] (plain JSON)
- * - document: Y.XmlFragment (ProseMirror structure)
- */

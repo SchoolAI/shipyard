@@ -28,6 +28,9 @@ interface ThreadWithText extends Thread {
  *
  * Uses BlockNote's server-side converter for the document content,
  * then appends a structured feedback section from comment threads.
+ *
+ * Block IDs are included as HTML comments (e.g., <!-- block:abc123 -->)
+ * so the AI can reference specific blocks for editing via update_block_content.
  */
 export async function exportPlanToMarkdown(
   ydoc: Y.Doc,
@@ -35,11 +38,21 @@ export async function exportPlanToMarkdown(
 ): Promise<string> {
   const { includeResolved = false, selectedTextMaxLength = 100 } = options;
 
-  // Convert document content to markdown
+  // Convert document content to markdown with block IDs
   const editor = ServerBlockNoteEditor.create();
   const fragment = ydoc.getXmlFragment('document');
   const blocks = editor.yXmlFragmentToBlocks(fragment);
-  const contentMarkdown = await editor.blocksToMarkdownLossy(blocks);
+
+  // Build markdown with block ID comments for AI targeting
+  const markdownParts: string[] = [];
+  for (const block of blocks) {
+    // Add block ID as HTML comment (invisible to humans, parseable by AI)
+    markdownParts.push(`<!-- block:${block.id} -->`);
+    // Convert single block to markdown
+    const blockMarkdown = await editor.blocksToMarkdownLossy([block]);
+    markdownParts.push(blockMarkdown);
+  }
+  const contentMarkdown = markdownParts.join('\n');
 
   // Get threads and extract selected text from document marks
   const threadsMap = ydoc.getMap('threads');

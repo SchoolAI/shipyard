@@ -8,6 +8,7 @@ export const TOOL_NAMES = {
   LIST_PLANS: 'list_plans',
   READ_PLAN: 'read_plan',
   SETUP_REVIEW_NOTIFICATION: 'setup_review_notification',
+  UPDATE_BLOCK_CONTENT: 'update_block_content',
   UPDATE_PLAN: 'update_plan',
 } as const;
 

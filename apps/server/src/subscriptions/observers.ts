@@ -34,7 +34,7 @@ export function attachObservers(planId: string, doc: Y.Doc): void {
     status: metadata?.status,
     commentCount: threads.reduce((acc, t) => acc + t.comments.length, 0),
     resolvedCount: threads.filter((t) => t.resolved).length,
-    contentLength: doc.getArray('content').length,
+    contentLength: doc.getXmlFragment('document').length,
     artifactCount: doc.getArray('artifacts').length,
   });
 
@@ -95,7 +95,8 @@ export function attachObservers(planId: string, doc: Y.Doc): void {
     }
   });
 
-  doc.getArray('content').observe(() => {
+  // Watch the document fragment (source of truth) for content changes
+  doc.getXmlFragment('document').observeDeep(() => {
     notifyChange(planId, {
       type: 'content',
       timestamp: Date.now(),

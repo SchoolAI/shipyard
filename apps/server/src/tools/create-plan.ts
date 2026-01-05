@@ -57,9 +57,7 @@ export const createPlanTool = {
       pr: input.prNumber,
     });
 
-    // NOTE: We store blocks in both places:
-    // 1. 'content' Y.Array for JSON serialization (URL snapshots, read_plan tool)
-    // 2. 'document' Y.XmlFragment for BlockNote collaboration
+    // Parse markdown to blocks and store in Y.XmlFragment for BlockNote collaboration
     logger.info({ contentLength: input.content.length }, 'About to parse markdown');
     const blocks = await parseMarkdownToBlocks(input.content);
     logger.info({ blockCount: blocks.length }, 'Parsed blocks, storing in Y.Doc');
@@ -67,11 +65,7 @@ export const createPlanTool = {
     const editor = ServerBlockNoteEditor.create();
 
     ydoc.transact(() => {
-      const contentArray = ydoc.getArray('content');
-      contentArray.delete(0, contentArray.length);
-      contentArray.push(blocks);
-
-      // Clear and populate the document fragment for BlockNote collaboration
+      // Store in document fragment for BlockNote collaboration (source of truth)
       const fragment = ydoc.getXmlFragment('document');
       // Clear existing content first to avoid duplicates or conflicts
       while (fragment.length > 0) {
@@ -80,7 +74,7 @@ export const createPlanTool = {
       editor.blocksToYXmlFragment(blocks, fragment);
     });
 
-    logger.info('Content stored in Y.Doc (both content array and document fragment)');
+    logger.info('Content stored in Y.Doc document fragment');
 
     const indexDoc = await getOrCreateDoc(PLAN_INDEX_DOC_NAME);
     setPlanIndexEntry(indexDoc, {

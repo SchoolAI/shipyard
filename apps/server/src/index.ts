@@ -15,6 +15,7 @@ import { listPlansTool } from './tools/list-plans.js';
 import { readPlanTool } from './tools/read-plan.js';
 import { setupReviewNotificationTool } from './tools/setup-review-notification.js';
 import { TOOL_NAMES } from './tools/tool-names.js';
+import { updateBlockContentTool } from './tools/update-block-content.js';
 import { updatePlanTool } from './tools/update-plan.js';
 import { startWebSocketServer } from './ws-server.js';
 
@@ -49,6 +50,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     listPlansTool.definition,
     readPlanTool.definition,
     setupReviewNotificationTool.definition,
+    updateBlockContentTool.definition,
     updatePlanTool.definition,
   ],
 }));
@@ -67,6 +69,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       return await readPlanTool.handler(args ?? {});
     case TOOL_NAMES.SETUP_REVIEW_NOTIFICATION:
       return await setupReviewNotificationTool.handler(args ?? {});
+    case TOOL_NAMES.UPDATE_BLOCK_CONTENT:
+      return await updateBlockContentTool.handler(args ?? {});
     case TOOL_NAMES.UPDATE_PLAN:
       return await updatePlanTool.handler(args ?? {});
     default: {
