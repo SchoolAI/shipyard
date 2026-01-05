@@ -105,7 +105,7 @@ export function PlanPage() {
   if (!metadata && !syncState.synced) {
     return (
       <div className="p-8">
-        <p className="text-slate-600 dark:text-slate-400">Loading plan...</p>
+        <p className="text-muted-foreground">Loading plan...</p>
       </div>
     );
   }
@@ -113,8 +113,8 @@ export function PlanPage() {
   if (!metadata) {
     return (
       <div className="p-8 text-center">
-        <h1 className="text-xl font-bold text-slate-800 dark:text-slate-100">Plan Not Found</h1>
-        <p className="text-slate-600 dark:text-slate-400">
+        <h1 className="text-xl font-bold text-foreground">Plan Not Found</h1>
+        <p className="text-muted-foreground">
           The plan &quot;{id}&quot; does not exist.
         </p>
         <p className="text-sm text-muted-foreground mt-2">It has been removed from your sidebar.</p>
@@ -125,7 +125,7 @@ export function PlanPage() {
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Header bar with plan metadata */}
-      <div className="border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-surface px-6 py-3 shrink-0">
+      <div className="border-b border-separator bg-surface px-6 py-3 shrink-0">
         <PlanHeader
           ydoc={ydoc}
           metadata={metadata}
@@ -137,7 +137,7 @@ export function PlanPage() {
 
       <div className="flex flex-col flex-1 overflow-hidden">
         {/* Tab navigation */}
-        <div className="border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-surface px-6 py-2 shrink-0">
+        <div className="border-b border-separator bg-surface px-6 py-2 shrink-0">
           <div className="flex gap-4">
             <button
               type="button"
@@ -145,7 +145,7 @@ export function PlanPage() {
               className={`flex items-center gap-2 pb-2 px-2 font-medium text-sm transition-colors ${
                 activeView === 'plan'
                   ? 'text-primary border-b-2 border-primary'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 border-b-2 border-transparent'
+                  : 'text-muted-foreground hover:text-foreground border-b-2 border-transparent'
               }`}
             >
               <FileText className="w-4 h-4" />
@@ -157,7 +157,7 @@ export function PlanPage() {
               className={`flex items-center gap-2 pb-2 px-2 font-medium text-sm transition-colors ${
                 activeView === 'deliverables'
                   ? 'text-primary border-b-2 border-primary'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 border-b-2 border-transparent'
+                  : 'text-muted-foreground hover:text-foreground border-b-2 border-transparent'
               }`}
             >
               <Package className="w-4 h-4" />
@@ -168,7 +168,7 @@ export function PlanPage() {
 
         {/* Tab content */}
         {activeView === 'plan' && (
-          <div className="flex-1 overflow-y-auto bg-slate-50 dark:bg-background">
+          <div className="flex-1 overflow-y-auto bg-background">
             <div className="max-w-4xl mx-auto p-6 space-y-6">
               {/* Hint shown after profile setup when user was trying to comment */}
               {pendingCommentHint && identity && (
@@ -215,7 +215,7 @@ export function PlanPage() {
         )}
 
         {activeView === 'deliverables' && (
-          <div className="flex-1 overflow-y-auto bg-slate-50 dark:bg-background">
+          <div className="flex-1 overflow-y-auto bg-background">
             <DeliverablesView planId={planId} />
           </div>
         )}

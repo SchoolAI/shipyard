@@ -92,8 +92,8 @@ export function ReviewActions({
 
       {/* Confirmation dialog */}
       {showConfirm && (
-        <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 px-4 py-2 rounded-md">
-          <span className="text-sm text-slate-700 dark:text-slate-200">
+        <div className="flex items-center gap-2 bg-muted px-4 py-2 rounded-md">
+          <span className="text-sm text-foreground">
             {showConfirm === 'approve' ? 'Approve this plan?' : 'Request changes to this plan?'}
           </span>
           <Button
@@ -115,7 +115,7 @@ export function ReviewActions({
 
       {/* Review info */}
       {isReviewed && !showConfirm && (
-        <span className="text-xs text-slate-500 dark:text-slate-400 ml-2">
+        <span className="text-xs text-muted-foreground ml-2">
           Click to change status
         </span>
       )}

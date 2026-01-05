@@ -11,8 +11,8 @@ export function SnapshotPage() {
   if (!urlPlan) {
     return (
       <div className="p-8 text-center">
-        <h1 className="text-xl font-bold text-slate-800 dark:text-slate-100">Invalid Snapshot</h1>
-        <p className="text-slate-600 dark:text-slate-400">
+        <h1 className="text-xl font-bold text-foreground">Invalid Snapshot</h1>
+        <p className="text-muted-foreground">
           The URL does not contain valid plan data.
         </p>
       </div>

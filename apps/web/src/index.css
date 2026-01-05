@@ -100,6 +100,9 @@
   --danger-foreground: var(--snow);
   --focus: var(--accent);
   --ring: var(--accent);
+
+  /* Map Tailwind utilities to HeroUI variables */
+  --color-muted-foreground: oklch(0.5517 0.0138 285.94);
 }
 
 [data-theme="dark"],

@@ -1,47 +1,105 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useSyncExternalStore } from 'react';
 
 type Theme = 'light' | 'dark' | 'system';
 
+// Custom event for cross-component synchronization (storage events only fire across tabs)
+const THEME_CHANGE_EVENT = 'theme-change';
+
+// Shared state for theme across all hook instances
+let currentTheme: Theme = 'system';
+const listeners = new Set<() => void>();
+
+// Initialize from localStorage (only once)
+if (typeof window !== 'undefined') {
+  currentTheme = (localStorage.getItem('theme') as Theme) || 'system';
+}
+
+function subscribe(callback: () => void): () => void {
+  listeners.add(callback);
+  return () => listeners.delete(callback);
+}
+
+function getSnapshot(): Theme {
+  return currentTheme;
+}
+
+function getServerSnapshot(): Theme {
+  return 'system';
+}
+
+function setThemeValue(newTheme: Theme): void {
+  if (newTheme === currentTheme) return;
+  currentTheme = newTheme;
+  localStorage.setItem('theme', newTheme);
+
+  // Notify all listeners
+  for (const listener of listeners) {
+    listener();
+  }
+
+  // Dispatch custom event for any edge cases
+  window.dispatchEvent(new CustomEvent(THEME_CHANGE_EVENT, { detail: newTheme }));
+}
+
+function applyThemeToDOM(theme: Theme): void {
+  const root = document.documentElement;
+  const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+  if (theme === 'dark' || (theme === 'system' && systemDark)) {
+    root.setAttribute('data-theme', 'dark');
+    root.classList.add('dark');
+  } else {
+    root.removeAttribute('data-theme');
+    root.classList.remove('dark');
+  }
+}
+
 export function useTheme() {
-  const [theme, setTheme] = useState<Theme>(() => {
-    if (typeof window === 'undefined') return 'system';
-    return (localStorage.getItem('theme') as Theme) || 'system';
-  });
+  const theme = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
+  const setTheme = useCallback((newTheme: Theme) => {
+    setThemeValue(newTheme);
+  }, []);
+
+  // Apply theme to DOM when it changes
   useEffect(() => {
-    const root = document.documentElement;
-    const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-
-    if (theme === 'dark' || (theme === 'system' && systemDark)) {
-      root.setAttribute('data-theme', 'dark');
-      root.classList.add('dark');
-    } else {
-      root.removeAttribute('data-theme');
-      root.classList.remove('dark');
-    }
-
-    localStorage.setItem('theme', theme);
+    applyThemeToDOM(theme);
   }, [theme]);
 
-  // Listen for system preference changes
+  // Listen for system preference changes when theme is 'system'
   useEffect(() => {
     if (theme !== 'system') return;
 
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    const handler = (e: MediaQueryListEvent) => {
-      const root = document.documentElement;
-      if (e.matches) {
-        root.setAttribute('data-theme', 'dark');
-        root.classList.add('dark');
-      } else {
-        root.removeAttribute('data-theme');
-        root.classList.remove('dark');
+    const handler = () => {
+      applyThemeToDOM(theme);
+      // Force all listeners to re-render to pick up new effective theme
+      for (const listener of listeners) {
+        listener();
       }
     };
 
     mediaQuery.addEventListener('change', handler);
     return () => mediaQuery.removeEventListener('change', handler);
   }, [theme]);
+
+  // Listen for storage events (cross-tab sync)
+  useEffect(() => {
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === 'theme' && e.newValue) {
+        const newTheme = e.newValue as Theme;
+        if (newTheme !== currentTheme) {
+          currentTheme = newTheme;
+          for (const listener of listeners) {
+            listener();
+          }
+        }
+      }
+    };
+
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
+  }, []);
 
   return { theme, setTheme };
 }

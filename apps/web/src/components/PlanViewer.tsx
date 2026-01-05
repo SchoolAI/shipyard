@@ -220,9 +220,10 @@ export function PlanViewer({ ydoc, identity, provider, onRequestIdentity }: Plan
   // Note: We set editable={false} on BlockNoteView to make it read-only.
   // BlockNote officially supports commenting even when editable={false}.
 
-  // Force BlockNoteView remount when switching plans. Identity changes are handled
-  // by the parent's key prop on PlanViewer, which remounts this entire component.
-  const editorKey = ydoc.guid;
+  // Force BlockNoteView remount when switching plans or theme.
+  // Identity changes are handled by the parent's key prop on PlanViewer.
+  // Adding theme to key ensures BlockNote updates immediately without refresh.
+  const editorKey = `${ydoc.guid}-${effectiveTheme}`;
 
   // Ref for the container to observe cursor elements
   const containerRef = useRef<HTMLDivElement>(null);
@@ -385,7 +386,7 @@ export function PlanViewer({ ydoc, identity, provider, onRequestIdentity }: Plan
         comments={false}
       >
         {/* Main editor card */}
-        <div className="bg-white dark:bg-surface rounded-lg shadow-sm p-6">
+        <div className="bg-surface rounded-lg shadow-sm p-6">
           {/* Custom formatting toolbar - appears when text is selected */}
           <FormattingToolbarController
             formattingToolbar={() => (
@@ -398,7 +399,7 @@ export function PlanViewer({ ydoc, identity, provider, onRequestIdentity }: Plan
                   <button
                     type="button"
                     onClick={onRequestIdentity}
-                    className="flex items-center gap-1.5 px-2 py-1 text-sm rounded hover:bg-slate-100 dark:hover:bg-slate-700"
+                    className="flex items-center gap-1.5 px-2 py-1 text-sm rounded hover:bg-muted"
                     title="Set up your profile to leave comments"
                   >
                     <svg

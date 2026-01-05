@@ -72,7 +72,7 @@ export function ProfileSetup({ onComplete, onCancel, isEditing = false }: Profil
           {onCancel && <Modal.CloseTrigger />}
           <Modal.Header>
             <Modal.Heading>{isEditing ? 'Edit Profile' : 'Set Up Your Profile'}</Modal.Heading>
-            <p className="text-sm text-muted mt-1">
+            <p className="text-sm text-muted-foreground mt-1">
               {isEditing
                 ? 'Update your display name for comments'
                 : 'Enter a name to identify yourself in comments'}
@@ -89,7 +89,6 @@ export function ProfileSetup({ onComplete, onCancel, isEditing = false }: Profil
                   setDisplayName(value);
                   setError(null);
                 }}
-                className="w-full"
               >
                 <Label>Display Name</Label>
                 <Input placeholder="Enter your name..." maxLength={50} />

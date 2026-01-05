@@ -1,8 +1,9 @@
 import { Button, Disclosure, DisclosureGroup, ListBox, ListBoxItem } from '@heroui/react';
 import type { PlanIndexEntry } from '@peer-plan/schema';
-import { Settings, User, Users } from 'lucide-react';
+import { User, Users } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { ProfileSetup } from '@/components/ProfileSetup';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { CollapsiblePanel } from '@/components/ui/collapsible-panel';
 import { useActivePlanSync } from '@/contexts/ActivePlanSyncContext';
@@ -38,6 +39,7 @@ export function Sidebar() {
   const { plans: localPlans, activeCount } = usePlanIndex();
   const { activePlanId, syncState } = useActivePlanSync();
   const [collapsed, setCollapsed] = useState(getSidebarCollapsed);
+  const [showProfile, setShowProfile] = useState(false);
   const navigate = useNavigate();
 
   // Memoize plan IDs to prevent infinite re-renders in useSharedPlans
@@ -55,7 +57,7 @@ export function Sidebar() {
       side="left"
       isOpen={!collapsed}
       onToggle={handleToggle}
-      className="bg-white dark:bg-surface"
+      className="bg-surface"
     >
       <nav className="flex-1 flex flex-col overflow-y-auto p-2">
         <DisclosureGroup>
@@ -152,34 +154,28 @@ export function Sidebar() {
         )}
       </nav>
 
-      {/* Footer with settings, profile, and theme toggle */}
-      <div className="px-3 py-2 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-1">
-          <Button
-            isIconOnly
-            variant="ghost"
-            size="sm"
-            aria-label="Settings"
-            onPress={() => {
-              /* TODO: Open settings */
-            }}
-          >
-            <Settings className="w-4 h-4 text-foreground" />
-          </Button>
-          <Button
-            isIconOnly
-            variant="ghost"
-            size="sm"
-            aria-label="Profile"
-            onPress={() => {
-              /* TODO: Open profile */
-            }}
-          >
-            <User className="w-4 h-4 text-foreground" />
-          </Button>
-        </div>
+      {/* Footer with profile and theme toggle */}
+      <div className="px-3 py-2 border-t border-separator flex items-center justify-between gap-2">
+        <Button
+          isIconOnly
+          variant="ghost"
+          size="sm"
+          aria-label="Profile"
+          onPress={() => setShowProfile(true)}
+        >
+          <User className="w-4 h-4 text-foreground" />
+        </Button>
         <ThemeToggle />
       </div>
+
+      {/* Profile modal */}
+      {showProfile && (
+        <ProfileSetup
+          isEditing
+          onComplete={() => setShowProfile(false)}
+          onCancel={() => setShowProfile(false)}
+        />
+      )}
     </CollapsiblePanel>
   );
 }

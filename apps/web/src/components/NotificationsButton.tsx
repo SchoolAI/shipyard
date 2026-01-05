@@ -37,7 +37,7 @@ export function NotificationsButton() {
           </svg>
 
           {/* Badge (always 0 for now) */}
-          <span className="absolute -top-1 -right-1 w-4 h-4 bg-slate-300 dark:bg-slate-600 text-white text-xs rounded-full flex items-center justify-center">
+          <span className="absolute -top-1 -right-1 w-4 h-4 bg-muted text-foreground text-xs rounded-full flex items-center justify-center">
             0
           </span>
         </Button>

@@ -31,22 +31,22 @@ export function Attachments({ ydoc }: AttachmentsProps) {
   }
 
   return (
-    <div className="mt-8 pt-6 border-t border-slate-200 dark:border-slate-700">
-      <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4">
+    <div className="mt-8 pt-6 border-t border-separator">
+      <h2 className="text-lg font-semibold text-foreground mb-4">
         Attachments ({artifacts.length})
       </h2>
       <div className="grid gap-4">
         {artifacts.map((artifact) => (
           <div
             key={artifact.id}
-            className="bg-white dark:bg-surface rounded-lg border border-slate-200 dark:border-slate-700 p-4"
+            className="bg-surface rounded-lg border border-separator p-4"
           >
             <div className="flex items-center gap-2 mb-3">
               <ArtifactTypeIcon type={artifact.type} />
-              <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
+              <span className="text-sm font-medium text-foreground">
                 {artifact.filename}
               </span>
-              <span className="text-xs text-slate-400 dark:text-slate-500 capitalize">
+              <span className="text-xs text-muted-foreground capitalize">
                 {artifact.type.replace('_', ' ')}
               </span>
             </div>
@@ -59,7 +59,7 @@ export function Attachments({ ydoc }: AttachmentsProps) {
 }
 
 function ArtifactTypeIcon({ type }: { type: Artifact['type'] }) {
-  const iconClass = 'w-4 h-4 text-slate-500 dark:text-slate-400';
+  const iconClass = 'w-4 h-4 text-muted-foreground';
 
   switch (type) {
     case 'screenshot':

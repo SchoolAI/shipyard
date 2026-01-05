@@ -40,7 +40,7 @@ export function CollapsiblePanel({
         isIconOnly
         onPress={onToggle}
         className={cn(
-          'fixed top-4 z-50 shadow-md bg-white dark:bg-surface',
+          'fixed top-4 z-50 shadow-md bg-surface',
           side === 'left' ? 'left-4' : 'right-4'
         )}
         aria-label={`Expand ${side} panel`}
@@ -56,8 +56,8 @@ export function CollapsiblePanel({
         'h-full flex flex-col overflow-hidden shrink-0',
         'transition-all duration-200 ease-in-out',
         side === 'left'
-          ? 'border-r border-slate-200 dark:border-slate-700'
-          : 'border-l border-slate-200 dark:border-slate-700',
+          ? 'border-r border-separator'
+          : 'border-l border-separator',
         width,
         className
       )}
@@ -95,7 +95,7 @@ export function CollapsiblePanelHeader({
   return (
     <div
       className={cn(
-        'p-4 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-surface min-w-64',
+        'p-4 border-b border-separator bg-surface min-w-64',
         className
       )}
     >
