@@ -22,7 +22,7 @@ function PlanLink({ plan, badge, activeBadge, peerCount }: PlanLinkProps) {
       className={({ isActive }) =>
         cn(
           'block px-3 py-2 rounded-md text-sm transition-colors',
-          isActive ? 'bg-blue-100 text-blue-900' : 'text-gray-700 hover:bg-gray-100'
+          isActive ? 'bg-primary/10 text-primary-700' : 'text-slate-700 hover:bg-slate-100'
         )
       }
     >
@@ -45,10 +45,10 @@ function PlanLink({ plan, badge, activeBadge, peerCount }: PlanLinkProps) {
           <div className="flex items-center justify-between gap-2">
             <div className="flex-1 min-w-0">
               <div className="font-medium truncate">{plan.title}</div>
-              <div className="text-xs text-gray-500">{plan.status.replace('_', ' ')}</div>
+              <div className="text-xs text-slate-500">{plan.status.replace('_', ' ')}</div>
             </div>
             {badgeText && (
-              <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded shrink-0">
+              <span className="text-xs bg-accent/10 text-accent px-2 py-0.5 rounded shrink-0">
                 {badgeText}
               </span>
             )}
@@ -83,13 +83,13 @@ export function Sidebar() {
         {localPlans.length > 0 && (
           <div>
             <div className="flex items-center justify-between px-2 mb-2">
-              <h3 className="text-xs font-semibold text-gray-500">Local ({localPlans.length})</h3>
+              <h3 className="text-xs font-semibold text-slate-500">Local ({localPlans.length})</h3>
               {activeCount > 0 ? (
-                <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">
+                <span className="text-xs bg-success-light text-success-dark px-2 py-0.5 rounded">
                   Synced ({activeCount} MCP)
                 </span>
               ) : (
-                <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">
+                <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded">
                   Offline
                 </span>
               )}
@@ -110,7 +110,7 @@ export function Sidebar() {
         {/* Shared Plans - received via P2P */}
         {sharedPlans.length > 0 && (
           <div>
-            <h3 className="text-xs font-semibold text-gray-500 px-2 mb-2">
+            <h3 className="text-xs font-semibold text-slate-500 px-2 mb-2">
               Shared with me ({sharedPlans.length})
             </h3>
             <ul className="space-y-1">
@@ -130,7 +130,7 @@ export function Sidebar() {
 
         {/* Empty state */}
         {localPlans.length === 0 && sharedPlans.length === 0 && (
-          <p className="text-gray-500 text-sm p-2">No plans yet</p>
+          <p className="text-slate-500 text-sm p-2">No plans yet</p>
         )}
       </nav>
     </CollapsiblePanel>

@@ -15,7 +15,7 @@ export function NotificationsButton() {
         type="button"
         onMouseEnter={() => setShowTooltip(true)}
         onMouseLeave={() => setShowTooltip(false)}
-        className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 relative"
+        className="p-2 rounded-lg hover:bg-slate-100 text-slate-500 relative"
         title="Notifications"
       >
         {/* Bell icon */}
@@ -36,16 +36,16 @@ export function NotificationsButton() {
         </svg>
 
         {/* Badge (always 0 for now) */}
-        <span className="absolute -top-1 -right-1 w-4 h-4 bg-gray-300 text-white text-xs rounded-full flex items-center justify-center">
+        <span className="absolute -top-1 -right-1 w-4 h-4 bg-slate-300 text-white text-xs rounded-full flex items-center justify-center">
           0
         </span>
       </button>
 
       {/* Tooltip */}
       {showTooltip && (
-        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 px-3 py-2 bg-gray-800 text-white text-xs rounded-lg whitespace-nowrap z-50">
+        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 px-3 py-2 bg-slate-800 text-white text-xs rounded-lg whitespace-nowrap z-50">
           Coming soon
-          <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-gray-800 rotate-45" />
+          <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-slate-800 rotate-45" />
         </div>
       )}
     </div>

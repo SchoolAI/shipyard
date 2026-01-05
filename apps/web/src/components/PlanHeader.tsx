@@ -102,7 +102,7 @@ export function PlanHeader({
           </p>
         )}
         {/* Review actions */}
-        <div className="mt-4 pt-4 border-t border-gray-100">
+        <div className="mt-4 pt-4 border-t border-slate-100">
           <ReviewActions
             ydoc={ydoc}
             currentStatus={display.status}

@@ -400,7 +400,7 @@ export function PlanViewer({
                 <button
                   type="button"
                   onClick={onRequestIdentity}
-                  className="flex items-center gap-1.5 px-2 py-1 text-sm rounded hover:bg-gray-100"
+                  className="flex items-center gap-1.5 px-2 py-1 text-sm rounded hover:bg-slate-100"
                   title="Set up your profile to leave comments"
                 >
                   <svg

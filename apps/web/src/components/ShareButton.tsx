@@ -41,7 +41,7 @@ export function ShareButton({ className }: ShareButtonProps) {
     >
       {copied ? (
         <>
-          <Check className="w-4 h-4 mr-1.5 text-green-600" />
+          <Check className="w-4 h-4 mr-1.5 text-success" />
           Copied!
         </>
       ) : (

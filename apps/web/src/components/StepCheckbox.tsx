@@ -31,9 +31,9 @@ export function StepCheckbox({ ydoc, stepId, label }: StepCheckboxProps) {
         type="checkbox"
         checked={checked}
         onChange={handleToggle}
-        className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+        className="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary"
       />
-      <span className={checked ? 'line-through text-gray-400' : ''}>{label}</span>
+      <span className={checked ? 'line-through text-slate-400' : ''}>{label}</span>
     </label>
   );
 }

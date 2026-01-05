@@ -54,7 +54,7 @@ export function CollapsiblePanel({
       className={cn(
         'h-full flex flex-col overflow-hidden shrink-0',
         'transition-all duration-200 ease-in-out',
-        side === 'left' ? 'border-r border-gray-200' : 'border-l border-gray-200',
+        side === 'left' ? 'border-r border-slate-200' : 'border-l border-slate-200',
         width,
         className
       )}
@@ -90,7 +90,7 @@ export function CollapsiblePanelHeader({
   const ChevronIcon = side === 'left' ? ChevronLeft : ChevronRight;
 
   return (
-    <div className={cn('p-4 border-b border-gray-200 bg-white min-w-64', className)}>
+    <div className={cn('p-4 border-b border-slate-200 bg-white min-w-64', className)}>
       <div className="flex items-center justify-between">
         {side === 'left' ? (
           <>
@@ -101,7 +101,7 @@ export function CollapsiblePanelHeader({
           </>
         ) : (
           <>
-            <h3 className="font-semibold text-gray-900 whitespace-nowrap">{title}</h3>
+            <h3 className="font-semibold text-slate-900 whitespace-nowrap">{title}</h3>
             <Button variant="ghost" size="icon-sm" onClick={onToggle} aria-label="Collapse panel">
               <ChevronIcon className="h-4 w-4" />
             </Button>

@@ -8,6 +8,10 @@
         "NODE_ENV": "development",
         "GITHUB_TOKEN": "${GITHUB_TOKEN}"
       }
+    },
+    "heroui-react": {
+      "command": "npx",
+      "args": ["-y", "@heroui/react-mcp@latest"]
     }
   }
 }

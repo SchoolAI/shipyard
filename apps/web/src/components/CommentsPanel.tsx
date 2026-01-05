@@ -66,13 +66,13 @@ export function CommentsPanel({ ydoc, isOpen, onClose }: CommentsPanelProps) {
   const title = threads.length > 0 ? `Comments (${threads.length})` : 'Comments';
 
   return (
-    <CollapsiblePanel side="right" isOpen={isOpen} onToggle={onClose} className="bg-gray-50">
+    <CollapsiblePanel side="right" isOpen={isOpen} onToggle={onClose} className="bg-slate-50">
       <CollapsiblePanelHeader side="right" onToggle={onClose} title={title} />
 
       {/* Thread list */}
       <div className="flex-1 overflow-y-auto p-2 space-y-2 min-w-72">
         {threads.length === 0 ? (
-          <div className="p-4 text-sm text-gray-500 text-center">
+          <div className="p-4 text-sm text-slate-500 text-center">
             No comments yet.
             <br />
             <span className="text-xs">Select text in the editor to add a comment.</span>
@@ -82,27 +82,27 @@ export function CommentsPanel({ ydoc, isOpen, onClose }: CommentsPanelProps) {
             <div
               key={thread.id}
               className={`bg-white rounded-lg border p-3 ${
-                thread.resolved ? 'opacity-60 border-gray-200' : 'border-gray-300'
+                thread.resolved ? 'opacity-60 border-slate-200' : 'border-slate-300'
               }`}
             >
               {thread.comments.map((comment, idx) => (
                 <div
                   key={comment.id}
-                  className={idx > 0 ? 'mt-2 pt-2 border-t border-gray-100' : ''}
+                  className={idx > 0 ? 'mt-2 pt-2 border-t border-slate-100' : ''}
                 >
-                  <div className="flex items-center gap-2 text-xs text-gray-500">
-                    <span className="font-medium text-gray-700">
+                  <div className="flex items-center gap-2 text-xs text-slate-500">
+                    <span className="font-medium text-slate-700">
                       {getDisplayName(comment.userId)}
                     </span>
                     <span>{new Date(comment.createdAt).toLocaleDateString()}</span>
                   </div>
-                  <p className="text-sm text-gray-800 mt-1">
+                  <p className="text-sm text-slate-800 mt-1">
                     {extractTextFromCommentBody(comment.body)}
                   </p>
                 </div>
               ))}
               {thread.resolved && (
-                <div className="mt-2 text-xs text-green-600 font-medium">Resolved</div>
+                <div className="mt-2 text-xs text-success font-medium">Resolved</div>
               )}
             </div>
           ))
@@ -110,8 +110,8 @@ export function CommentsPanel({ ydoc, isOpen, onClose }: CommentsPanelProps) {
       </div>
 
       {/* Footer hint */}
-      <div className="p-4 border-t border-gray-200 bg-white min-w-72">
-        <p className="text-xs text-gray-500 whitespace-nowrap">
+      <div className="p-4 border-t border-slate-200 bg-white min-w-72">
+        <p className="text-xs text-slate-500 whitespace-nowrap">
           Comments sync in real-time across all peers
         </p>
       </div>

@@ -18,7 +18,7 @@ export function SyncStatus({ synced, serverCount = 0, peerCount = 0 }: SyncStatu
 
   if (!hasAnyConnection(serverCount, peerCount)) {
     return (
-      <div className="text-sm text-yellow-600 bg-yellow-50 px-3 py-1 rounded inline-block">
+      <div className="text-sm text-warning-dark bg-warning-light px-3 py-1 rounded inline-block">
         Offline - viewing snapshot
       </div>
     );
@@ -26,14 +26,14 @@ export function SyncStatus({ synced, serverCount = 0, peerCount = 0 }: SyncStatu
 
   if (!synced) {
     return (
-      <div className="text-sm text-blue-600 bg-blue-50 px-3 py-1 rounded inline-block">
+      <div className="text-sm text-info-dark bg-info-light px-3 py-1 rounded inline-block">
         Syncing...{getConnectionDetails()}
       </div>
     );
   }
 
   return (
-    <div className="text-sm text-green-600 bg-green-50 px-3 py-1 rounded inline-block">
+    <div className="text-sm text-success-dark bg-success-light px-3 py-1 rounded inline-block">
       Synced{getConnectionDetails()}
     </div>
   );

@@ -2,6 +2,8 @@
 
 P2P collaborative review for AI-generated implementation plans.
 
+The Penrose triangle logo represents the "impossible triangle" of AI development: quality, speed, and low effort. Traditionally you sacrifice one. Peer Plan enables all three through collaborative verification loops.
+
 ## What is this?
 
 When an AI agent generates an implementation plan, peer-plan enables:

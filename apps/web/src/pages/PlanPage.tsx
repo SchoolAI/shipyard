@@ -115,7 +115,7 @@ export function PlanPage() {
   if (!metadata && !syncState.synced) {
     return (
       <div className="p-8">
-        <p className="text-gray-600">Loading plan...</p>
+        <p className="text-slate-600">Loading plan...</p>
       </div>
     );
   }
@@ -123,8 +123,8 @@ export function PlanPage() {
   if (!metadata) {
     return (
       <div className="p-8 text-center">
-        <h1 className="text-xl font-bold text-gray-800">Plan Not Found</h1>
-        <p className="text-gray-600">The plan &quot;{id}&quot; does not exist.</p>
+        <h1 className="text-xl font-bold text-slate-800">Plan Not Found</h1>
+        <p className="text-slate-600">The plan &quot;{id}&quot; does not exist.</p>
       </div>
     );
   }
@@ -146,15 +146,15 @@ export function PlanPage() {
           />
           {/* Hint shown after profile setup when user was trying to comment */}
           {pendingCommentHint && identity && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-center justify-between">
-              <p className="text-blue-800 text-sm">
+            <div className="bg-primary/10 border border-primary/20 rounded-lg p-3 flex items-center justify-between">
+              <p className="text-primary text-sm">
                 <span className="font-medium">Ready to comment!</span> Select text in the document
                 below, then click the Comment button.
               </p>
               <button
                 type="button"
                 onClick={() => setPendingCommentHint(false)}
-                className="text-blue-600 hover:text-blue-800 ml-4"
+                className="text-primary hover:text-primary/90 ml-4"
                 aria-label="Dismiss hint"
               >
                 <svg

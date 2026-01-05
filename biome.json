@@ -81,6 +81,13 @@
       "semicolons": "always"
     }
   },
+  "css": {
+    "parser": {
+      "cssModules": false,
+      "allowWrongLineComments": true,
+      "tailwindDirectives": true
+    }
+  },
   "overrides": [
     {
       "includes": ["**/*.test.ts", "**/*.spec.ts"],

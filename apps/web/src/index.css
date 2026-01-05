@@ -6,6 +6,76 @@
  */
 @import "tailwindcss";
 
+/* Custom color palette - Tailwind v4 uses @theme for configuration */
+@theme {
+  /* Primary Brand (Teal) */
+  --color-primary-400: #2dd4bf;
+  --color-primary-500: #14b8a6;
+  --color-primary-600: #0d9488;
+  --color-primary-700: #0f766e;
+  --color-primary-800: #115e59;
+  --color-primary: #0d9488;
+
+  /* Neutrals (Slate) */
+  --color-slate-50: #f8fafc;
+  --color-slate-100: #f1f5f9;
+  --color-slate-200: #e2e8f0;
+  --color-slate-300: #cbd5e1;
+  --color-slate-400: #94a3b8;
+  --color-slate-500: #64748b;
+  --color-slate-600: #475569;
+  --color-slate-700: #334155;
+  --color-slate-800: #1e293b;
+  --color-slate-900: #0f172a;
+  --color-slate-950: #020617;
+
+  /* Accent (Violet - AI indicators) */
+  --color-accent: #8b5cf6;
+  --color-accent-light: #a78bfa;
+
+  /* Semantic Status Colors */
+  --color-success-100: #d1fae5;
+  --color-success-400: #34d399;
+  --color-success-500: #10b981;
+  --color-success-600: #059669;
+  --color-success: #10b981;
+  --color-success-light: #d1fae5;
+  --color-success-dark: #059669;
+
+  --color-warning-100: #fef3c7;
+  --color-warning-500: #f59e0b;
+  --color-warning-600: #d97706;
+  --color-warning: #f59e0b;
+  --color-warning-light: #fef3c7;
+  --color-warning-dark: #d97706;
+
+  --color-danger-100: #ffe4e6;
+  --color-danger-400: #fb7185;
+  --color-danger-500: #f43f5e;
+  --color-danger-600: #e11d48;
+  --color-danger: #f43f5e;
+  --color-danger-light: #ffe4e6;
+  --color-danger-dark: #e11d48;
+
+  --color-info-100: #dbeafe;
+  --color-info-500: #3b82f6;
+  --color-info-600: #2563eb;
+  --color-info: #3b82f6;
+  --color-info-light: #dbeafe;
+  --color-info-dark: #2563eb;
+
+  /* shadcn/ui semantic tokens */
+  --color-background: #ffffff;
+  --color-foreground: #18181b;
+  --color-muted: #f4f4f5;
+  --color-muted-foreground: #71717a;
+  --color-destructive: #f97316;
+  --color-destructive-foreground: #ffffff;
+  --color-border: #e4e4e7;
+  --color-input: #e4e4e7;
+  --color-ring: #0d9488;
+}
+
 /* Global: Pointer cursor for all interactive elements */
 button,
 [role="button"],
@@ -46,7 +116,7 @@ button:disabled,
  */
 * {
   scrollbar-width: thin; /* Firefox - thin but visible */
-  scrollbar-color: #cbd5e1 transparent; /* thumb track */
+  scrollbar-color: var(--color-slate-300) transparent; /* thumb track */
 }
 
 /* Webkit browsers (Chrome, Safari) - thin but visible */
@@ -60,10 +130,10 @@ button:disabled,
 }
 
 *::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: var(--color-slate-300);
   border-radius: 3px;
 }
 
 *::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: var(--color-slate-400);
 }
