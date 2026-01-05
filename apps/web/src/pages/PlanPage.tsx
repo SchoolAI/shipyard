@@ -6,18 +6,16 @@ import {
   setPlanIndexEntry,
 } from '@peer-plan/schema';
 import { FileText, Package } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Attachments } from '@/components/Attachments';
 import { DeliverablesView } from '@/components/DeliverablesView';
 import { PlanHeader } from '@/components/PlanHeader';
 import { PlanViewer } from '@/components/PlanViewer';
 import { ProfileSetup } from '@/components/ProfileSetup';
-import { ShareButton } from '@/components/ShareButton';
 import { useActivePlanSync } from '@/contexts/ActivePlanSyncContext';
 import { useIdentity } from '@/hooks/useIdentity';
 import { useMultiProviderSync } from '@/hooks/useMultiProviderSync';
-import { cn } from '@/lib/utils';
 
 type ViewType = 'plan' | 'deliverables';
 
@@ -89,33 +87,25 @@ export function PlanPage() {
     return () => clearTimeout(timer);
   }, [pendingCommentHint, identity]);
 
-  // MUST be before early returns (Rules of Hooks)
-  const fallback = useMemo(() => {
-    if (!metadata) {
-      return {
-        v: 1 as const,
-        id: '',
-        title: '',
-        status: 'draft' as const,
-        content: [],
-      };
+  // Mark plan as deleted in index if metadata is missing after sync
+  useEffect(() => {
+    if (syncState.synced && !metadata) {
+      const existingEntry = getPlanIndexEntry(indexDoc, planId);
+      if (existingEntry && !existingEntry.deleted) {
+        setPlanIndexEntry(indexDoc, {
+          ...existingEntry,
+          deleted: true,
+          deletedAt: Date.now(),
+        });
+      }
     }
-    return {
-      v: 1 as const,
-      id: metadata.id,
-      title: metadata.title,
-      status: metadata.status,
-      repo: metadata.repo,
-      pr: metadata.pr,
-      content: ydoc.getArray('content').toJSON(),
-    };
-  }, [metadata, ydoc]);
+  }, [syncState.synced, metadata, indexDoc, planId]);
 
   // Early returns AFTER all hooks
   if (!metadata && !syncState.synced) {
     return (
       <div className="p-8">
-        <p className="text-slate-600">Loading plan...</p>
+        <p className="text-slate-600 dark:text-slate-400">Loading plan...</p>
       </div>
     );
   }
@@ -123,55 +113,19 @@ export function PlanPage() {
   if (!metadata) {
     return (
       <div className="p-8 text-center">
-        <h1 className="text-xl font-bold text-slate-800">Plan Not Found</h1>
-        <p className="text-slate-600">The plan &quot;{id}&quot; does not exist.</p>
+        <h1 className="text-xl font-bold text-slate-800 dark:text-slate-100">Plan Not Found</h1>
+        <p className="text-slate-600 dark:text-slate-400">
+          The plan &quot;{id}&quot; does not exist.
+        </p>
+        <p className="text-sm text-muted-foreground mt-2">It has been removed from your sidebar.</p>
       </div>
     );
   }
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      {/* View tabs bar */}
-      <div className="border-b px-6 py-2 flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-1" role="tablist">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={activeView === 'plan'}
-            onClick={() => setActiveView('plan')}
-            className={cn(
-              'flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md transition-colors',
-              activeView === 'plan'
-                ? 'bg-primary/10 text-primary'
-                : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-            )}
-          >
-            <FileText className="w-4 h-4" />
-            Plan
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={activeView === 'deliverables'}
-            onClick={() => setActiveView('deliverables')}
-            className={cn(
-              'flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md transition-colors',
-              activeView === 'deliverables'
-                ? 'bg-primary/10 text-primary'
-                : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-            )}
-          >
-            <Package className="w-4 h-4" />
-            Deliverables
-          </button>
-        </div>
-        <div className="flex items-center gap-2">
-          <ShareButton />
-        </div>
-      </div>
-
       {/* Header bar with plan metadata */}
-      <div className="border-b px-6 py-3 shrink-0">
+      <div className="border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-surface px-6 py-3 shrink-0">
         <PlanHeader
           ydoc={ydoc}
           metadata={metadata}
@@ -181,54 +135,90 @@ export function PlanPage() {
         />
       </div>
 
-      {/* View content */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex flex-col flex-1 overflow-hidden">
+        {/* Tab navigation */}
+        <div className="border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-surface px-6 py-2 shrink-0">
+          <div className="flex gap-4">
+            <button
+              type="button"
+              onClick={() => setActiveView('plan')}
+              className={`flex items-center gap-2 pb-2 px-2 font-medium text-sm transition-colors ${
+                activeView === 'plan'
+                  ? 'text-primary border-b-2 border-primary'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 border-b-2 border-transparent'
+              }`}
+            >
+              <FileText className="w-4 h-4" />
+              Plan
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveView('deliverables')}
+              className={`flex items-center gap-2 pb-2 px-2 font-medium text-sm transition-colors ${
+                activeView === 'deliverables'
+                  ? 'text-primary border-b-2 border-primary'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 border-b-2 border-transparent'
+              }`}
+            >
+              <Package className="w-4 h-4" />
+              Deliverables
+            </button>
+          </div>
+        </div>
+
+        {/* Tab content */}
         {activeView === 'plan' && (
-          <div className="max-w-4xl mx-auto p-6 space-y-6">
-            {/* Hint shown after profile setup when user was trying to comment */}
-            {pendingCommentHint && identity && (
-              <div className="bg-primary/10 border border-primary/20 rounded-lg p-3 flex items-center justify-between">
-                <p className="text-primary text-sm">
-                  <span className="font-medium">Ready to comment!</span> Select text in the document
-                  below, then click the Comment button.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => setPendingCommentHint(false)}
-                  className="text-primary hover:text-primary/90 ml-4"
-                  aria-label="Dismiss hint"
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    aria-hidden="true"
+          <div className="flex-1 overflow-y-auto bg-slate-50 dark:bg-background">
+            <div className="max-w-4xl mx-auto p-6 space-y-6">
+              {/* Hint shown after profile setup when user was trying to comment */}
+              {pendingCommentHint && identity && (
+                <div className="bg-primary/10 border border-primary/20 rounded-lg p-3 flex items-center justify-between">
+                  <p className="text-primary text-sm">
+                    <span className="font-medium">Ready to comment!</span> Select text in the
+                    document below, then click the Comment button.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setPendingCommentHint(false)}
+                    className="text-primary hover:text-primary/90 ml-4"
+                    aria-label="Dismiss hint"
                   >
-                    <path d="M18 6L6 18M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-            )}
-            {/* Key forces full remount when identity changes, ensuring
-                useCreateBlockNote creates a fresh editor with correct extensions.
-                Without this, changing from anonymous to identified user would crash
-                because the editor was created without CommentsExtension. */}
-            <PlanViewer
-              key={identity?.id ?? 'anonymous'}
-              ydoc={ydoc}
-              fallback={fallback}
-              identity={identity}
-              provider={activeProvider}
-              onRequestIdentity={handleRequestIdentity}
-            />
-            <Attachments ydoc={ydoc} />
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      aria-hidden="true"
+                    >
+                      <path d="M18 6L6 18M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              )}
+              {/* Key forces full remount when identity changes, ensuring
+                    useCreateBlockNote creates a fresh editor with correct extensions.
+                    Without this, changing from anonymous to identified user would crash
+                    because the editor was created without CommentsExtension. */}
+              <PlanViewer
+                key={identity?.id ?? 'anonymous'}
+                ydoc={ydoc}
+                identity={identity}
+                provider={activeProvider}
+                onRequestIdentity={handleRequestIdentity}
+              />
+              <Attachments ydoc={ydoc} />
+            </div>
           </div>
         )}
-        {activeView === 'deliverables' && <DeliverablesView planId={planId} />}
+
+        {activeView === 'deliverables' && (
+          <div className="flex-1 overflow-y-auto bg-slate-50 dark:bg-background">
+            <DeliverablesView planId={planId} />
+          </div>
+        )}
       </div>
 
       {/* Profile setup modal */}

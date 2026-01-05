@@ -1,61 +1,36 @@
+import { Button, Disclosure, DisclosureGroup, ListBox, ListBoxItem } from '@heroui/react';
 import type { PlanIndexEntry } from '@peer-plan/schema';
+import { Settings, User, Users } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import { NavLink } from 'react-router-dom';
-import { CollapsiblePanel, CollapsiblePanelHeader } from '@/components/ui/collapsible-panel';
+import { useNavigate } from 'react-router-dom';
+import { ThemeToggle } from '@/components/ThemeToggle';
+import { CollapsiblePanel } from '@/components/ui/collapsible-panel';
 import { useActivePlanSync } from '@/contexts/ActivePlanSyncContext';
 import { usePlanIndex } from '@/hooks/usePlanIndex';
 import { useSharedPlans } from '@/hooks/useSharedPlans';
-import { cn } from '@/lib/utils';
 import { getSidebarCollapsed, setSidebarCollapsed } from '@/utils/uiPreferences';
 
-interface PlanLinkProps {
+interface PlanItemProps {
   plan: PlanIndexEntry;
-  badge?: string;
-  activeBadge?: string;
+  isShared?: boolean;
   peerCount?: number;
 }
 
-function PlanLink({ plan, badge, activeBadge, peerCount }: PlanLinkProps) {
+function PlanItem({ plan, isShared, peerCount }: PlanItemProps) {
   return (
-    <NavLink
-      to={`/plan/${plan.id}`}
-      className={({ isActive }) =>
-        cn(
-          'block px-3 py-2 rounded-md text-sm transition-colors',
-          isActive ? 'bg-primary/10 text-primary-700' : 'text-slate-700 hover:bg-slate-100'
-        )
-      }
-    >
-      {/* biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Badge display logic is straightforward */}
-      {({ isActive }) => {
-        const displayBadge = isActive && activeBadge ? activeBadge : badge;
-        const showPeerCount = peerCount !== undefined && peerCount > 0;
-
-        // Build badge text
-        let badgeText = '';
-        if (showPeerCount && displayBadge) {
-          badgeText = `${displayBadge} • ${peerCount} ${peerCount === 1 ? 'peer' : 'peers'}`;
-        } else if (showPeerCount) {
-          badgeText = `${peerCount} ${peerCount === 1 ? 'peer' : 'peers'}`;
-        } else if (displayBadge) {
-          badgeText = displayBadge;
-        }
-
-        return (
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex-1 min-w-0">
-              <div className="font-medium truncate">{plan.title}</div>
-              <div className="text-xs text-slate-500">{plan.status.replace('_', ' ')}</div>
-            </div>
-            {badgeText && (
-              <span className="text-xs bg-accent/10 text-accent px-2 py-0.5 rounded shrink-0">
-                {badgeText}
-              </span>
-            )}
-          </div>
-        );
-      }}
-    </NavLink>
+    <div className="flex items-center justify-between gap-2 w-full">
+      <span className="truncate flex-1 text-foreground">{plan.title}</span>
+      <div className="flex items-center gap-2 shrink-0 text-xs text-muted-foreground">
+        {peerCount !== undefined && peerCount > 0 && (
+          <span className="flex items-center gap-1">
+            <Users className="w-3 h-3" />
+            {peerCount}
+          </span>
+        )}
+        {isShared && !peerCount && <Users className="w-3 h-3" />}
+        <span className="capitalize">{plan.status.replace('_', ' ')}</span>
+      </div>
+    </div>
   );
 }
 
@@ -63,6 +38,7 @@ export function Sidebar() {
   const { plans: localPlans, activeCount } = usePlanIndex();
   const { activePlanId, syncState } = useActivePlanSync();
   const [collapsed, setCollapsed] = useState(getSidebarCollapsed);
+  const navigate = useNavigate();
 
   // Memoize plan IDs to prevent infinite re-renders in useSharedPlans
   const localPlanIds = useMemo(() => localPlans.map((p) => p.id), [localPlans]);
@@ -75,64 +51,135 @@ export function Sidebar() {
   };
 
   return (
-    <CollapsiblePanel side="left" isOpen={!collapsed} onToggle={handleToggle} className="bg-white">
-      <CollapsiblePanelHeader side="left" onToggle={handleToggle} title="Plans" />
+    <CollapsiblePanel
+      side="left"
+      isOpen={!collapsed}
+      onToggle={handleToggle}
+      className="bg-white dark:bg-surface"
+    >
+      <nav className="flex-1 flex flex-col overflow-y-auto p-2">
+        <DisclosureGroup>
+          {/* My Plans section */}
+          {localPlans.length > 0 && (
+            <Disclosure defaultExpanded>
+              <Disclosure.Heading>
+                <Disclosure.Trigger className="w-full">
+                  <div className="flex items-center justify-between w-full px-2 py-1.5">
+                    <div className="flex items-center gap-2">
+                      <Disclosure.Indicator className="text-foreground" />
+                      <span className="text-xs font-semibold text-muted-foreground">My Plans</span>
+                    </div>
+                    {activeCount > 0 && (
+                      <span className="text-xs text-muted-foreground flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-success" />
+                        {activeCount} {activeCount === 1 ? 'agent' : 'agents'}
+                      </span>
+                    )}
+                  </div>
+                </Disclosure.Trigger>
+              </Disclosure.Heading>
+              <Disclosure.Content>
+                <Disclosure.Body>
+                  <ListBox
+                    aria-label="My plans"
+                    selectionMode="single"
+                    selectedKeys={activePlanId ? [activePlanId] : []}
+                    onSelectionChange={(keys) => {
+                      const key = Array.from(keys)[0];
+                      if (key) navigate(`/plan/${key}`);
+                    }}
+                  >
+                    {localPlans.map((plan) => (
+                      <ListBoxItem id={plan.id} key={plan.id} textValue={plan.title}>
+                        <PlanItem
+                          plan={plan}
+                          peerCount={plan.id === activePlanId ? syncState?.peerCount : undefined}
+                        />
+                      </ListBoxItem>
+                    ))}
+                  </ListBox>
+                </Disclosure.Body>
+              </Disclosure.Content>
+            </Disclosure>
+          )}
 
-      <nav className="flex-1 overflow-y-auto p-2 space-y-4">
-        {/* Local Plans - created via MCP */}
-        {localPlans.length > 0 && (
-          <div>
-            <div className="flex items-center justify-between px-2 mb-2">
-              <h3 className="text-xs font-semibold text-slate-500">Local ({localPlans.length})</h3>
-              {activeCount > 0 ? (
-                <span className="text-xs bg-success-light text-success-dark px-2 py-0.5 rounded">
-                  Synced ({activeCount} MCP)
-                </span>
-              ) : (
-                <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded">
-                  Offline
-                </span>
-              )}
-            </div>
-            <ul className="space-y-1">
-              {localPlans.map((plan) => (
-                <li key={plan.id}>
-                  <PlanLink
-                    plan={plan}
-                    peerCount={plan.id === activePlanId ? syncState?.peerCount : undefined}
-                  />
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-
-        {/* Shared Plans - received via P2P */}
-        {sharedPlans.length > 0 && (
-          <div>
-            <h3 className="text-xs font-semibold text-slate-500 px-2 mb-2">
-              Shared with me ({sharedPlans.length})
-            </h3>
-            <ul className="space-y-1">
-              {sharedPlans.map((plan) => (
-                <li key={plan.id}>
-                  <PlanLink
-                    plan={plan}
-                    badge="Shared"
-                    activeBadge="Active"
-                    peerCount={plan.id === activePlanId ? syncState?.peerCount : undefined}
-                  />
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
+          {/* Shared Plans section */}
+          {sharedPlans.length > 0 && (
+            <Disclosure defaultExpanded>
+              <Disclosure.Heading>
+                <Disclosure.Trigger className="w-full">
+                  <div className="flex items-center justify-between w-full px-2 py-1.5">
+                    <div className="flex items-center gap-2">
+                      <Disclosure.Indicator className="text-foreground" />
+                      <span className="text-xs font-semibold text-muted-foreground">
+                        Shared with me
+                      </span>
+                    </div>
+                    <Users className="w-3.5 h-3.5 text-muted-foreground" />
+                  </div>
+                </Disclosure.Trigger>
+              </Disclosure.Heading>
+              <Disclosure.Content>
+                <Disclosure.Body>
+                  <ListBox
+                    aria-label="Shared plans"
+                    selectionMode="single"
+                    selectedKeys={activePlanId ? [activePlanId] : []}
+                    onSelectionChange={(keys) => {
+                      const key = Array.from(keys)[0];
+                      if (key) navigate(`/plan/${key}`);
+                    }}
+                  >
+                    {sharedPlans.map((plan) => (
+                      <ListBoxItem id={plan.id} key={plan.id} textValue={plan.title}>
+                        <PlanItem
+                          plan={plan}
+                          isShared
+                          peerCount={plan.id === activePlanId ? syncState?.peerCount : undefined}
+                        />
+                      </ListBoxItem>
+                    ))}
+                  </ListBox>
+                </Disclosure.Body>
+              </Disclosure.Content>
+            </Disclosure>
+          )}
+        </DisclosureGroup>
 
         {/* Empty state */}
         {localPlans.length === 0 && sharedPlans.length === 0 && (
-          <p className="text-slate-500 text-sm p-2">No plans yet</p>
+          <p className="text-muted-foreground text-sm p-2 text-center">No plans yet</p>
         )}
       </nav>
+
+      {/* Footer with settings, profile, and theme toggle */}
+      <div className="px-3 py-2 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1">
+          <Button
+            isIconOnly
+            variant="ghost"
+            size="sm"
+            aria-label="Settings"
+            onPress={() => {
+              /* TODO: Open settings */
+            }}
+          >
+            <Settings className="w-4 h-4 text-foreground" />
+          </Button>
+          <Button
+            isIconOnly
+            variant="ghost"
+            size="sm"
+            aria-label="Profile"
+            onPress={() => {
+              /* TODO: Open profile */
+            }}
+          >
+            <User className="w-4 h-4 text-foreground" />
+          </Button>
+        </div>
+        <ThemeToggle />
+      </div>
     </CollapsiblePanel>
   );
 }

@@ -38,6 +38,10 @@ export interface PlanIndexEntry {
   status: PlanStatusType;
   createdAt: number;
   updatedAt: number;
+  /** True if plan has been deleted (soft delete for trash/recovery) */
+  deleted?: boolean;
+  /** Timestamp when plan was deleted */
+  deletedAt?: number;
 }
 
 /**
@@ -49,4 +53,6 @@ export const PlanIndexEntrySchema = z.object({
   status: z.enum(PlanStatusValues),
   createdAt: z.number(),
   updatedAt: z.number(),
+  deleted: z.boolean().optional(),
+  deletedAt: z.number().optional(),
 });

@@ -1,8 +1,8 @@
+import { Chip } from '@heroui/react';
 import type { PlanMetadata, PlanStatusType } from '@peer-plan/schema';
 import type * as Y from 'yjs';
 import { ReviewActions } from '@/components/ReviewActions';
-import { SyncStatus } from '@/components/SyncStatus';
-import { Badge } from '@/components/ui/badge';
+import { ShareButton } from '@/components/ShareButton';
 import { useActivePlanSync } from '@/contexts/ActivePlanSyncContext';
 import type { UserIdentity } from '@/utils/identity';
 
@@ -29,33 +29,34 @@ export function PlanHeader({
   const display = metadata;
   const { syncState } = useActivePlanSync();
 
-  const getStatusVariant = (status: PlanStatusType) => {
+  const getStatusChipProps = (
+    status: PlanStatusType
+  ): { color: 'success' | 'warning' | 'danger' | 'default'; variant: 'soft' | 'tertiary' } => {
     switch (status) {
       case 'approved':
-        return 'default';
+        return { color: 'success', variant: 'soft' };
       case 'pending_review':
-        return 'secondary';
+        return { color: 'warning', variant: 'soft' };
       case 'changes_requested':
-        return 'destructive';
+        return { color: 'danger', variant: 'soft' };
       case 'draft':
-        return 'outline';
+        return { color: 'default', variant: 'tertiary' };
       default: {
         // Exhaustiveness check
         status satisfies never;
-        return 'outline';
+        return { color: 'default', variant: 'tertiary' };
       }
     }
   };
 
   return (
-    <div className="flex flex-col gap-3">
-      {/* Top row: Title, metadata, status */}
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-4 min-w-0">
-          <h1 className="text-xl font-semibold truncate">{display.title}</h1>
-          <Badge variant={getStatusVariant(display.status)}>
-            {display.status.replace('_', ' ')}
-          </Badge>
+    <div className="flex items-start justify-between gap-4 w-full">
+      {/* Left side: Title and metadata */}
+      <div className="flex flex-col gap-3 flex-1 min-w-0">
+        {/* Title row */}
+        <div className="flex items-center gap-3 min-w-0">
+          <h1 className="text-xl font-semibold truncate text-foreground">{display.title}</h1>
+          <Chip {...getStatusChipProps(display.status)}>{display.status.replace('_', ' ')}</Chip>
           {(display.repo || display.pr) && (
             <span className="text-sm text-muted-foreground shrink-0">
               {display.repo}
@@ -63,22 +64,34 @@ export function PlanHeader({
             </span>
           )}
         </div>
-        {syncState && (
-          <SyncStatus
-            synced={syncState.synced}
-            serverCount={syncState.activeCount}
-            peerCount={syncState.peerCount}
-          />
-        )}
+        {/* Review actions */}
+        <ReviewActions
+          ydoc={ydoc}
+          currentStatus={display.status}
+          identity={identity}
+          onRequestIdentity={onRequestIdentity}
+          onStatusChange={onStatusChange}
+        />
       </div>
-      {/* Bottom row: Review actions */}
-      <ReviewActions
-        ydoc={ydoc}
-        currentStatus={display.status}
-        identity={identity}
-        onRequestIdentity={onRequestIdentity}
-        onStatusChange={onStatusChange}
-      />
+
+      {/* Right side: Sync status and share button */}
+      <div className="flex items-center gap-3 shrink-0">
+        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+          {syncState && syncState.activeCount > 0 && (
+            <span className="flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-success" />
+              {syncState.activeCount} {syncState.activeCount === 1 ? 'agent' : 'agents'}
+            </span>
+          )}
+          {syncState && syncState.peerCount > 0 && (
+            <span className="flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-info" />
+              {syncState.peerCount} {syncState.peerCount === 1 ? 'peer' : 'peers'}
+            </span>
+          )}
+        </div>
+        <ShareButton />
+      </div>
     </div>
   );
 }
