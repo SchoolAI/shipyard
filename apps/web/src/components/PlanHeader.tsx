@@ -4,6 +4,7 @@ import type * as Y from 'yjs';
 import { ReviewActions } from '@/components/ReviewActions';
 import { ShareButton } from '@/components/ShareButton';
 import { useActivePlanSync } from '@/contexts/ActivePlanSyncContext';
+import { useIsMobile } from '@/hooks/useIsMobile';
 import type { UserIdentity } from '@/utils/identity';
 
 interface PlanHeaderProps {
@@ -28,6 +29,7 @@ export function PlanHeader({
   // No local state or observer - metadata comes from parent to avoid duplicate observers
   const display = metadata;
   const { syncState } = useActivePlanSync();
+  const isMobile = useIsMobile();
 
   const getStatusChipProps = (
     status: PlanStatusType
@@ -50,46 +52,46 @@ export function PlanHeader({
   };
 
   return (
-    <div className="flex items-start justify-between gap-4 w-full">
-      {/* Left side: Title and metadata */}
-      <div className="flex flex-col gap-3 flex-1 min-w-0">
-        {/* Title row */}
-        <div className="flex items-center gap-3 min-w-0">
-          <h1 className="text-xl font-semibold truncate text-foreground">{display.title}</h1>
-          <Chip {...getStatusChipProps(display.status)}>{display.status.replace('_', ' ')}</Chip>
-          {(display.repo || display.pr) && (
-            <span className="text-sm text-muted-foreground shrink-0">
-              {display.repo}
-              {display.pr && ` #${display.pr}`}
-            </span>
-          )}
-        </div>
-        {/* Review actions */}
-        <ReviewActions
-          ydoc={ydoc}
-          currentStatus={display.status}
-          identity={identity}
-          onRequestIdentity={onRequestIdentity}
-          onStatusChange={onStatusChange}
-        />
-      </div>
+    <div className="flex flex-wrap items-center gap-2 w-full">
+      {/* Title and status */}
+      <h1 className="text-lg md:text-xl font-semibold text-foreground truncate">{display.title}</h1>
+      <Chip {...getStatusChipProps(display.status)} className="shrink-0">
+        {display.status.replace('_', ' ')}
+      </Chip>
+      {(display.repo || display.pr) && (
+        <span className="text-xs md:text-sm text-muted-foreground shrink-0">
+          {display.repo}
+          {display.pr && ` #${display.pr}`}
+        </span>
+      )}
 
-      {/* Right side: Sync status and share button */}
-      <div className="flex items-center gap-3 shrink-0">
-        <div className="flex items-center gap-3 text-xs text-muted-foreground">
-          {syncState && syncState.activeCount > 0 && (
-            <span className="flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-success" />
-              {syncState.activeCount} {syncState.activeCount === 1 ? 'agent' : 'agents'}
-            </span>
-          )}
-          {syncState && syncState.peerCount > 0 && (
-            <span className="flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-info" />
-              {syncState.peerCount} {syncState.peerCount === 1 ? 'peer' : 'peers'}
-            </span>
-          )}
-        </div>
+      {/* Right side: agents/peers, review actions, share */}
+      <div className="flex items-center gap-2 ml-auto shrink-0">
+        {/* Presence indicators */}
+        {syncState && syncState.activeCount > 0 && (
+          <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <span className="w-1.5 h-1.5 rounded-full bg-success" />
+            {syncState.activeCount} {syncState.activeCount === 1 ? 'agent' : 'agents'}
+          </span>
+        )}
+        {syncState && syncState.peerCount > 0 && (
+          <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <span className="w-1.5 h-1.5 rounded-full bg-info" />
+            {syncState.peerCount} {syncState.peerCount === 1 ? 'peer' : 'peers'}
+          </span>
+        )}
+
+        {/* Review actions - inline on desktop, floating on mobile */}
+        {!isMobile && (
+          <ReviewActions
+            ydoc={ydoc}
+            currentStatus={display.status}
+            identity={identity}
+            onRequestIdentity={onRequestIdentity}
+            onStatusChange={onStatusChange}
+          />
+        )}
+
         <ShareButton />
       </div>
     </div>

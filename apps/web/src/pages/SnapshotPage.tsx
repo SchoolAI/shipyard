@@ -10,9 +10,11 @@ export function SnapshotPage() {
 
   if (!urlPlan) {
     return (
-      <div className="p-8 text-center">
-        <h1 className="text-xl font-bold text-foreground">Invalid Snapshot</h1>
-        <p className="text-muted-foreground">The URL does not contain valid plan data.</p>
+      <div className="p-4 md:p-8 text-center">
+        <h1 className="text-lg md:text-xl font-bold text-foreground">Invalid Snapshot</h1>
+        <p className="text-sm md:text-base text-muted-foreground">
+          The URL does not contain valid plan data.
+        </p>
       </div>
     );
   }
@@ -32,9 +34,9 @@ export function SnapshotPage() {
   };
 
   return (
-    <div className="p-8 max-w-4xl mx-auto space-y-6">
+    <div className="p-4 md:p-8 max-w-4xl mx-auto space-y-4 md:space-y-6">
       {/* Snapshot banner */}
-      <div className="bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700 rounded-lg p-3 text-amber-800 dark:text-amber-200 text-sm">
+      <div className="bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700 rounded-lg p-3 text-amber-800 dark:text-amber-200 text-xs md:text-sm">
         <strong>Viewing snapshot</strong> - This is a read-only view of a plan at a specific point
         in time.
       </div>

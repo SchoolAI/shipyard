@@ -65,16 +65,15 @@ export function ReviewActions({
     setShowConfirm(null);
   };
 
-  const isReviewed = currentStatus === 'approved' || currentStatus === 'changes_requested';
-
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex flex-wrap items-center gap-2">
       {/* Action buttons */}
       {!showConfirm && (
         <>
           <Button
             variant="primary"
-            className="bg-success hover:bg-success-dark text-white"
+            size="sm"
+            className="bg-success hover:bg-success-dark text-white touch-target text-[11px] h-6 px-2 py-0.5 min-h-0"
             onPress={() => handleAction('approve')}
             isDisabled={isSubmitting || currentStatus === 'approved'}
           >
@@ -82,40 +81,43 @@ export function ReviewActions({
           </Button>
           <Button
             variant="danger"
+            size="sm"
+            className="touch-target text-[11px] h-6 px-2 py-0.5 min-h-0"
             onPress={() => handleAction('request_changes')}
             isDisabled={isSubmitting || currentStatus === 'changes_requested'}
           >
-            {currentStatus === 'changes_requested' ? 'Changes Requested' : 'Request Changes'}
+            {currentStatus === 'changes_requested' ? 'Changes' : 'Request Changes'}
           </Button>
         </>
       )}
 
-      {/* Confirmation dialog */}
+      {/* Confirmation dialog - stack on mobile */}
       {showConfirm && (
-        <div className="flex items-center gap-2 bg-muted px-4 py-2 rounded-md">
-          <span className="text-sm text-foreground">
-            {showConfirm === 'approve' ? 'Approve this plan?' : 'Request changes to this plan?'}
+        <div className="flex flex-wrap items-center gap-2 bg-muted px-3 md:px-4 py-2 rounded-md">
+          <span className="text-sm text-foreground w-full sm:w-auto">
+            {showConfirm === 'approve' ? 'Approve this plan?' : 'Request changes?'}
           </span>
           <Button
             variant={showConfirm === 'approve' ? 'primary' : 'danger'}
-            className={
+            className={`touch-target ${
               showConfirm === 'approve' ? 'bg-success hover:bg-success-dark text-white' : ''
-            }
+            }`}
             size="sm"
             onPress={confirmAction}
             isDisabled={isSubmitting}
           >
             {isSubmitting ? 'Saving...' : 'Confirm'}
           </Button>
-          <Button variant="secondary" size="sm" onPress={cancelAction} isDisabled={isSubmitting}>
+          <Button
+            variant="secondary"
+            size="sm"
+            className="touch-target"
+            onPress={cancelAction}
+            isDisabled={isSubmitting}
+          >
             Cancel
           </Button>
         </div>
-      )}
-
-      {/* Review info */}
-      {isReviewed && !showConfirm && (
-        <span className="text-xs text-muted-foreground ml-2">Click to change status</span>
       )}
     </div>
   );

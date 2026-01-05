@@ -385,47 +385,43 @@ export function PlanViewer({ ydoc, identity, provider, onRequestIdentity }: Plan
         // Disable default comments UI - we use ThreadsSidebar instead
         comments={false}
       >
-        {/* Main editor card */}
-        <div className="bg-surface rounded-lg shadow-sm p-6">
-          {/* Custom formatting toolbar - appears when text is selected */}
-          <FormattingToolbarController
-            formattingToolbar={() => (
-              <FormattingToolbar>
-                {hasComments ? (
-                  // User has identity - show real comment button
-                  <AddCommentButton />
-                ) : (
-                  // No identity - show button that prompts for profile setup
-                  <button
-                    type="button"
-                    onClick={onRequestIdentity}
-                    className="flex items-center gap-1.5 px-2 py-1 text-sm rounded hover:bg-muted"
-                    title="Set up your profile to leave comments"
+        {/* Custom formatting toolbar - appears when text is selected */}
+        <FormattingToolbarController
+          formattingToolbar={() => (
+            <FormattingToolbar>
+              {hasComments ? (
+                // User has identity - show real comment button
+                <AddCommentButton />
+              ) : (
+                // No identity - show button that prompts for profile setup
+                <button
+                  type="button"
+                  onClick={onRequestIdentity}
+                  className="flex items-center gap-1.5 px-2 py-1 text-sm rounded hover:bg-muted"
+                  title="Set up your profile to leave comments"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
                   >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      aria-hidden="true"
-                    >
-                      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                    </svg>
-                    Comment
-                  </button>
-                )}
-              </FormattingToolbar>
-            )}
-          />
-          {/* Floating composer for creating new comments - only when identity is set */}
-          {hasComments && <FloatingComposerController />}
-        </div>
-
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                  </svg>
+                  Comment
+                </button>
+              )}
+            </FormattingToolbar>
+          )}
+        />
+        {/* Floating composer for creating new comments - only when identity is set */}
+        {hasComments && <FloatingComposerController />}
         {/* Floating thread controller - shows comments when clicking highlighted text */}
         <FloatingThreadController />
       </BlockNoteView>
