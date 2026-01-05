@@ -13,6 +13,8 @@ import { addArtifactTool } from './tools/add-artifact.js';
 import { createPlanTool } from './tools/create-plan.js';
 import { listPlansTool } from './tools/list-plans.js';
 import { readPlanTool } from './tools/read-plan.js';
+import { setupReviewNotificationTool } from './tools/setup-review-notification.js';
+import { TOOL_NAMES } from './tools/tool-names.js';
 import { updatePlanTool } from './tools/update-plan.js';
 import { startWebSocketServer } from './ws-server.js';
 
@@ -46,6 +48,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     createPlanTool.definition,
     listPlansTool.definition,
     readPlanTool.definition,
+    setupReviewNotificationTool.definition,
     updatePlanTool.definition,
   ],
 }));
@@ -54,15 +57,17 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
 
   switch (name) {
-    case 'add_artifact':
+    case TOOL_NAMES.ADD_ARTIFACT:
       return await addArtifactTool.handler(args ?? {});
-    case 'create_plan':
+    case TOOL_NAMES.CREATE_PLAN:
       return await createPlanTool.handler(args ?? {});
-    case 'list_plans':
+    case TOOL_NAMES.LIST_PLANS:
       return await listPlansTool.handler(args ?? {});
-    case 'read_plan':
+    case TOOL_NAMES.READ_PLAN:
       return await readPlanTool.handler(args ?? {});
-    case 'update_plan':
+    case TOOL_NAMES.SETUP_REVIEW_NOTIFICATION:
+      return await setupReviewNotificationTool.handler(args ?? {});
+    case TOOL_NAMES.UPDATE_PLAN:
       return await updatePlanTool.handler(args ?? {});
     default: {
       const _exhaustiveCheck: never = name as never;

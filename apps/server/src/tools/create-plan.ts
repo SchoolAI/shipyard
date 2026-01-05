@@ -12,6 +12,7 @@ import open from 'open';
 import { z } from 'zod';
 import { logger } from '../logger.js';
 import { getOrCreateDoc } from '../ws-server.js';
+import { TOOL_NAMES } from './tool-names.js';
 
 // --- Input Schema ---
 
@@ -26,7 +27,7 @@ const CreatePlanInput = z.object({
 
 export const createPlanTool = {
   definition: {
-    name: 'create_plan',
+    name: TOOL_NAMES.CREATE_PLAN,
     description: 'Create a new implementation plan and open it in browser',
     inputSchema: {
       type: 'object',
@@ -112,7 +113,11 @@ export const createPlanTool = {
       content: [
         {
           type: 'text',
-          text: `Plan created!\nID: ${planId}\nURL: ${url}`,
+          text: `Plan created!
+ID: ${planId}
+URL: ${url}
+
+Use \`${TOOL_NAMES.SETUP_REVIEW_NOTIFICATION}\` tool to be notified when review completes.`,
         },
       ],
     };

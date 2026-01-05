@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { isGitHubConfigured, uploadArtifact } from '../github-artifacts.js';
 import { logger } from '../logger.js';
 import { getOrCreateDoc } from '../ws-server.js';
+import { TOOL_NAMES } from './tool-names.js';
 
 // --- Input Schema ---
 
@@ -18,7 +19,7 @@ const AddArtifactInput = z.object({
 
 export const addArtifactTool = {
   definition: {
-    name: 'add_artifact',
+    name: TOOL_NAMES.ADD_ARTIFACT,
     description:
       'Upload an artifact (screenshot, video, test results, diff) to a plan. Requires GITHUB_TOKEN env var and plan must have repo/pr set.',
     inputSchema: {

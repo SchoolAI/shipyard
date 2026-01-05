@@ -1,6 +1,15 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
+import { getPlanMetadata } from '@peer-plan/schema';
 import { WebSocket } from 'ws';
 import { logger } from './logger.js';
+import {
+  type ChangeType,
+  createSubscription,
+  deleteSubscription,
+  getChanges,
+  startCleanupInterval,
+} from './subscriptions/index.js';
+import { getOrCreateDoc } from './ws-server.js';
 
 // High ephemeral range ports, unlikely to collide with other services
 const DEFAULT_REGISTRY_PORTS = [32191, 32192];
@@ -147,6 +156,121 @@ async function handleUnregister(req: IncomingMessage, res: ServerResponse): Prom
 }
 
 /**
+ * Handle GET /api/plan/:id/status - Return plan status for polling
+ */
+async function handlePlanStatus(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  const match = req.url?.match(/^\/api\/plan\/([^/]+)\/status$/);
+  if (!match?.[1]) {
+    sendJson(res, 400, { error: 'Invalid plan ID' });
+    return;
+  }
+
+  const planId = decodeURIComponent(match[1]);
+
+  try {
+    const doc = await getOrCreateDoc(planId);
+    const metadata = getPlanMetadata(doc);
+
+    if (!metadata) {
+      res.writeHead(404, {
+        'Content-Type': 'text/plain',
+        'Access-Control-Allow-Origin': '*',
+      });
+      res.end('not_found');
+      return;
+    }
+
+    // Return plain text status for simple curl parsing
+    res.writeHead(200, {
+      'Content-Type': 'text/plain',
+      'Access-Control-Allow-Origin': '*',
+    });
+    res.end(metadata.status);
+  } catch (err) {
+    logger.error({ err, planId }, 'Failed to get plan status');
+    res.writeHead(500, {
+      'Content-Type': 'text/plain',
+      'Access-Control-Allow-Origin': '*',
+    });
+    res.end('error');
+  }
+}
+
+/**
+ * Handle POST /api/plan/:id/subscribe - Create a subscription
+ */
+async function handleSubscribe(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  const match = req.url?.match(/^\/api\/plan\/([^/]+)\/subscribe$/);
+  if (!match?.[1]) {
+    sendJson(res, 400, { error: 'Invalid plan ID' });
+    return;
+  }
+
+  const planId = decodeURIComponent(match[1]);
+
+  try {
+    const body = (await parseBody(req)) as {
+      subscribe?: string[];
+      windowMs?: number;
+      maxWindowMs?: number;
+      threshold?: number;
+    };
+
+    const clientId = createSubscription({
+      planId,
+      subscribe: (body.subscribe || ['status']) as ChangeType[],
+      windowMs: body.windowMs ?? 5000,
+      maxWindowMs: body.maxWindowMs ?? 30000,
+      threshold: body.threshold ?? 1,
+    });
+
+    sendJson(res, 200, { clientId });
+  } catch (err) {
+    logger.error({ err, planId }, 'Failed to create subscription');
+    sendJson(res, 400, { error: 'Invalid request body' });
+  }
+}
+
+/**
+ * Handle GET /api/plan/:id/changes?clientId=X - Poll for changes
+ */
+async function handleGetChanges(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  const match = req.url?.match(/^\/api\/plan\/([^/]+)\/changes\?clientId=([^&]+)/);
+  if (!match?.[1] || !match?.[2]) {
+    sendJson(res, 400, { error: 'Invalid plan ID or clientId' });
+    return;
+  }
+
+  const planId = decodeURIComponent(match[1]);
+  const clientId = decodeURIComponent(match[2]);
+
+  const result = getChanges(planId, clientId);
+  if (!result) {
+    sendJson(res, 404, { error: 'Subscription not found' });
+    return;
+  }
+
+  sendJson(res, 200, result);
+}
+
+/**
+ * Handle DELETE /api/plan/:id/unsubscribe?clientId=X - Remove subscription
+ */
+async function handleUnsubscribe(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  const match = req.url?.match(/^\/api\/plan\/([^/]+)\/unsubscribe\?clientId=([^&]+)/);
+  if (!match?.[1] || !match?.[2]) {
+    sendJson(res, 400, { error: 'Invalid plan ID or clientId' });
+    return;
+  }
+
+  const planId = decodeURIComponent(match[1]);
+  const clientId = decodeURIComponent(match[2]);
+
+  const deleted = deleteSubscription(planId, clientId);
+  sendJson(res, 200, { success: deleted });
+}
+
+/**
  * Handle incoming HTTP requests
  */
 async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
@@ -162,6 +286,26 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
 
   if (req.method === 'GET' && req.url === '/registry') {
     await handleGetRegistry(res);
+    return;
+  }
+
+  if (req.method === 'GET' && req.url?.startsWith('/api/plan/') && req.url?.endsWith('/status')) {
+    await handlePlanStatus(req, res);
+    return;
+  }
+
+  if (req.method === 'POST' && req.url?.match(/^\/api\/plan\/[^/]+\/subscribe$/)) {
+    await handleSubscribe(req, res);
+    return;
+  }
+
+  if (req.method === 'GET' && req.url?.match(/^\/api\/plan\/[^/]+\/changes/)) {
+    await handleGetChanges(req, res);
+    return;
+  }
+
+  if (req.method === 'DELETE' && req.url?.match(/^\/api\/plan\/[^/]+\/unsubscribe/)) {
+    await handleUnsubscribe(req, res);
     return;
   }
 
@@ -202,6 +346,7 @@ export async function startRegistryServer(): Promise<number | null> {
         server.listen(port, () => {
           logger.info({ port }, 'Registry server started');
           setInterval(healthCheck, HEALTH_CHECK_INTERVAL);
+          startCleanupInterval();
           resolve();
         });
       });

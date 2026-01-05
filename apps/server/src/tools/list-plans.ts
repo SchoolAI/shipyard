@@ -1,9 +1,10 @@
 import { getPlanIndex, PLAN_INDEX_DOC_NAME } from '@peer-plan/schema';
 import { getOrCreateDoc } from '../ws-server.js';
+import { TOOL_NAMES } from './tool-names.js';
 
 export const listPlansTool = {
   definition: {
-    name: 'list_plans',
+    name: TOOL_NAMES.LIST_PLANS,
     description: 'List all plans with their current status',
     inputSchema: {
       type: 'object',

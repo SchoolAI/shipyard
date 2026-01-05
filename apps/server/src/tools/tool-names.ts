@@ -1,0 +1,14 @@
+/**
+ * Centralized tool name constants for type safety.
+ * Use these when referencing tool names in responses or other tools.
+ */
+export const TOOL_NAMES = {
+  ADD_ARTIFACT: 'add_artifact',
+  CREATE_PLAN: 'create_plan',
+  LIST_PLANS: 'list_plans',
+  READ_PLAN: 'read_plan',
+  SETUP_REVIEW_NOTIFICATION: 'setup_review_notification',
+  UPDATE_PLAN: 'update_plan',
+} as const;
+
+export type ToolName = (typeof TOOL_NAMES)[keyof typeof TOOL_NAMES];

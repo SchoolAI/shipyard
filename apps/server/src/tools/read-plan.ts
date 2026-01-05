@@ -2,6 +2,7 @@ import { getPlanMetadata } from '@peer-plan/schema';
 import { z } from 'zod';
 import { exportPlanToMarkdown } from '../export-markdown.js';
 import { getOrCreateDoc } from '../ws-server.js';
+import { TOOL_NAMES } from './tool-names.js';
 
 const ReadPlanInput = z.object({
   planId: z.string().describe('The plan ID to read'),
@@ -13,7 +14,7 @@ const ReadPlanInput = z.object({
 
 export const readPlanTool = {
   definition: {
-    name: 'read_plan',
+    name: TOOL_NAMES.READ_PLAN,
     description:
       'Read a specific plan by ID, returning its metadata and content in markdown format',
     inputSchema: {

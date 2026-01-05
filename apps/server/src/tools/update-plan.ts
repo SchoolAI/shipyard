@@ -8,6 +8,7 @@ import {
 import { z } from 'zod';
 import { logger } from '../logger.js';
 import { getOrCreateDoc } from '../ws-server.js';
+import { TOOL_NAMES } from './tool-names.js';
 
 const UpdatePlanInput = z.object({
   planId: z.string().describe('The plan ID to update'),
@@ -20,7 +21,7 @@ const UpdatePlanInput = z.object({
 
 export const updatePlanTool = {
   definition: {
-    name: 'update_plan',
+    name: TOOL_NAMES.UPDATE_PLAN,
     description: 'Update an existing plan metadata (title, status)',
     inputSchema: {
       type: 'object',

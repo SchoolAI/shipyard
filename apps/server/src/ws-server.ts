@@ -11,6 +11,7 @@ import * as syncProtocol from 'y-protocols/sync';
 import * as Y from 'yjs';
 import { logger } from './logger';
 import { registerWithRegistry, unregisterFromRegistry } from './registry-client.js';
+import { attachObservers } from './subscriptions/index.js';
 
 // Per-instance LevelDB to avoid locking conflicts
 const PERSISTENCE_DIR = join(homedir(), '.peer-plan', 'plans', `session-${process.pid}`);
@@ -59,6 +60,9 @@ async function getDoc(docName: string): Promise<Y.Doc> {
 
     const awareness = new awarenessProtocol.Awareness(doc);
     awarenessMap.set(docName, awareness);
+
+    // Attach observers for subscription notifications
+    attachObservers(docName, doc);
   }
   return doc;
 }
