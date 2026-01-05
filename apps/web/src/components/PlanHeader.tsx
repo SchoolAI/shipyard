@@ -1,12 +1,8 @@
 import type { PlanMetadata, PlanStatusType } from '@peer-plan/schema';
-import { MessageSquare } from 'lucide-react';
 import type * as Y from 'yjs';
 import { ReviewActions } from '@/components/ReviewActions';
-import { ShareButton } from '@/components/ShareButton';
 import { SyncStatus } from '@/components/SyncStatus';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardHeader } from '@/components/ui/card';
 import { useActivePlanSync } from '@/contexts/ActivePlanSyncContext';
 import type { UserIdentity } from '@/utils/identity';
 
@@ -20,12 +16,6 @@ interface PlanHeaderProps {
   onRequestIdentity: () => void;
   /** Called after status is successfully updated in the plan doc */
   onStatusChange?: (newStatus: 'approved' | 'changes_requested') => void;
-  /** Number of comment threads (optional - hides button if not provided) */
-  commentCount?: number;
-  /** Whether comments panel is open */
-  commentsPanelOpen?: boolean;
-  /** Toggle comments panel */
-  onToggleComments?: () => void;
 }
 
 export function PlanHeader({
@@ -34,9 +24,6 @@ export function PlanHeader({
   identity,
   onRequestIdentity,
   onStatusChange,
-  commentCount,
-  commentsPanelOpen,
-  onToggleComments,
 }: PlanHeaderProps) {
   // No local state or observer - metadata comes from parent to avoid duplicate observers
   const display = metadata;
@@ -61,57 +48,37 @@ export function PlanHeader({
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-start justify-between gap-4">
-          <h1 className="text-3xl font-bold">{display.title}</h1>
-          <div className="flex items-center gap-2 shrink-0">
-            <ShareButton />
-            {onToggleComments && (
-              <Button
-                variant={commentsPanelOpen ? 'secondary' : 'ghost'}
-                size="sm"
-                onClick={onToggleComments}
-                className="gap-1.5"
-                aria-label={commentsPanelOpen ? 'Hide comments' : 'Show comments'}
-              >
-                <MessageSquare className="h-4 w-4" />
-                <span>
-                  Comments{commentCount != null && commentCount > 0 && ` (${commentCount})`}
-                </span>
-              </Button>
-            )}
-            <Badge variant={getStatusVariant(display.status)}>
-              {display.status.replace('_', ' ')}
-            </Badge>
-          </div>
+    <div className="flex flex-col gap-3">
+      {/* Top row: Title, metadata, status */}
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-4 min-w-0">
+          <h1 className="text-xl font-semibold truncate">{display.title}</h1>
+          <Badge variant={getStatusVariant(display.status)}>
+            {display.status.replace('_', ' ')}
+          </Badge>
+          {(display.repo || display.pr) && (
+            <span className="text-sm text-muted-foreground shrink-0">
+              {display.repo}
+              {display.pr && ` #${display.pr}`}
+            </span>
+          )}
         </div>
         {syncState && (
-          <div className="mt-2">
-            <SyncStatus
-              synced={syncState.synced}
-              serverCount={syncState.activeCount}
-              peerCount={syncState.peerCount}
-            />
-          </div>
-        )}
-        {(display.repo || display.pr) && (
-          <p className="text-sm text-muted-foreground mt-2">
-            {display.repo && <span>{display.repo}</span>}
-            {display.pr && <span className="ml-2">PR #{display.pr}</span>}
-          </p>
-        )}
-        {/* Review actions */}
-        <div className="mt-4 pt-4 border-t border-slate-100">
-          <ReviewActions
-            ydoc={ydoc}
-            currentStatus={display.status}
-            identity={identity}
-            onRequestIdentity={onRequestIdentity}
-            onStatusChange={onStatusChange}
+          <SyncStatus
+            synced={syncState.synced}
+            serverCount={syncState.activeCount}
+            peerCount={syncState.peerCount}
           />
-        </div>
-      </CardHeader>
-    </Card>
+        )}
+      </div>
+      {/* Bottom row: Review actions */}
+      <ReviewActions
+        ydoc={ydoc}
+        currentStatus={display.status}
+        identity={identity}
+        onRequestIdentity={onRequestIdentity}
+        onStatusChange={onStatusChange}
+      />
+    </div>
   );
 }

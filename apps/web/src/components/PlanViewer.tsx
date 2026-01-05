@@ -8,6 +8,7 @@ import { BlockNoteView } from '@blocknote/mantine';
 import {
   AddCommentButton,
   FloatingComposerController,
+  FloatingThreadController,
   FormattingToolbar,
   FormattingToolbarController,
   useCreateBlockNote,
@@ -370,7 +371,7 @@ export function PlanViewer({
     // biome-ignore lint/a11y/noNoninteractiveElementInteractions: Container needs keyboard handler for Ctrl+Enter comment submission
     <div
       ref={containerRef}
-      className="mt-6 bg-white rounded-lg shadow-sm p-6"
+      className="relative"
       onKeyDown={handleKeyDown}
       role="application"
       aria-label="Plan viewer with comments"
@@ -384,48 +385,52 @@ export function PlanViewer({
         sideMenu={false}
         slashMenu={false}
         formattingToolbar={false}
-        // Disable default comments UI - we add our own components below
-        // This prevents conflicts with FloatingComposerController
+        // Disable default comments UI - we use ThreadsSidebar instead
         comments={false}
       >
-        {/* Custom formatting toolbar - appears when text is selected */}
-        <FormattingToolbarController
-          formattingToolbar={() => (
-            <FormattingToolbar>
-              {hasComments ? (
-                // User has identity - show real comment button
-                <AddCommentButton />
-              ) : (
-                // No identity - show button that prompts for profile setup
-                <button
-                  type="button"
-                  onClick={onRequestIdentity}
-                  className="flex items-center gap-1.5 px-2 py-1 text-sm rounded hover:bg-slate-100"
-                  title="Set up your profile to leave comments"
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden="true"
+        {/* Main editor card */}
+        <div className="bg-white rounded-lg shadow-sm p-6">
+          {/* Custom formatting toolbar - appears when text is selected */}
+          <FormattingToolbarController
+            formattingToolbar={() => (
+              <FormattingToolbar>
+                {hasComments ? (
+                  // User has identity - show real comment button
+                  <AddCommentButton />
+                ) : (
+                  // No identity - show button that prompts for profile setup
+                  <button
+                    type="button"
+                    onClick={onRequestIdentity}
+                    className="flex items-center gap-1.5 px-2 py-1 text-sm rounded hover:bg-slate-100"
+                    title="Set up your profile to leave comments"
                   >
-                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                  </svg>
-                  Comment
-                </button>
-              )}
-            </FormattingToolbar>
-          )}
-        />
-        {/* Floating composer for creating new comments - only when identity is set */}
-        {hasComments && <FloatingComposerController />}
-        {/* Note: We use CommentsPanel sidebar for viewing threads, not FloatingThreadController */}
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                    </svg>
+                    Comment
+                  </button>
+                )}
+              </FormattingToolbar>
+            )}
+          />
+          {/* Floating composer for creating new comments - only when identity is set */}
+          {hasComments && <FloatingComposerController />}
+        </div>
+
+        {/* Floating thread controller - shows comments when clicking highlighted text */}
+        <FloatingThreadController />
       </BlockNoteView>
     </div>
   );
