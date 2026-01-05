@@ -22,9 +22,41 @@ See [docs/milestones/PROGRESS.md](./docs/milestones/PROGRESS.md) for full implem
 
 - **CRDT:** Yjs (not Loro) — See [ADR-0001](./docs/decisions/0001-use-yjs-not-loro.md)
 - **Block Editor:** BlockNote (Notion-like)
+- **UI Components:** HeroUI v3 (React) — See [HeroUI v3 Guidelines](#heroui-v3-guidelines) below
 - **Sync:** y-websocket (MCP↔browser), y-webrtc (P2P)
 - **Build:** pnpm + tsdown + Biome
 - **Testing:** Vitest with fan-in based coverage
+
+## HeroUI v3 Guidelines
+
+**Version:** v3.0.0 (beta) — Requires **Tailwind CSS v4** (not v3)
+
+**Documentation:** https://v3.heroui.com/react/llms.txt
+
+### Key Principles
+
+- **Accessibility First** — Built on React Aria Components with full a11y support
+- **Composition Pattern** — Use compound components (e.g., `<Card><Card.Header>...</Card.Header></Card>`)
+- **React Server Components** — Supported since v3.0.0-alpha.35
+- **No Provider Required** — Unlike v2, HeroUI v3 works directly without a Provider wrapper
+
+### Critical Usage Notes
+
+1. **Use compound components** — v3 uses `<Card.Header>` pattern, NOT flat props like v2's `<Card title="...">`
+2. **Use `onPress` not `onClick`** — React Aria uses `onPress` for button interactions
+3. **Check component availability** — v3 is beta; some v2 components may not exist yet
+4. **Form components** — Use TextField, RadioGroup, Fieldset, etc. with built-in validation
+
+### Before Using a Component
+
+Always verify the component exists and check its v3 API:
+- **Use the HeroUI MCP server** (preferred) — Available tools for up-to-date docs:
+  - `mcp__heroui-react__list_components` — See all available v3 components
+  - `mcp__heroui-react__get_component_info` — Get component anatomy and props
+  - `mcp__heroui-react__get_component_examples` — Get working code examples
+  - `mcp__heroui-react__installation` — Get framework-specific setup instructions
+- Reference https://v3.heroui.com for web docs
+- Don't assume v2 patterns work in v3
 
 ## Project Structure
 
