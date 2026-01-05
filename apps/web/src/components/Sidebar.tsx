@@ -62,7 +62,7 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
 
   const content = (
     <>
-      <nav className="flex-1 flex flex-col overflow-y-auto p-2 pb-safe">
+      <nav className="flex-1 flex flex-col overflow-y-auto px-3 pt-3 pb-0">
         <DisclosureGroup>
           {/* My Plans section */}
           {localPlans.length > 0 && (
@@ -84,8 +84,9 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
                 </Disclosure.Trigger>
               </Disclosure.Heading>
               <Disclosure.Content>
-                <Disclosure.Body>
+                <Disclosure.Body className="p-0">
                   <ListBox
+                    className="p-0"
                     aria-label="My plans"
                     selectionMode="single"
                     selectedKeys={activePlanId ? [activePlanId] : []}
@@ -129,8 +130,9 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
                 </Disclosure.Trigger>
               </Disclosure.Heading>
               <Disclosure.Content>
-                <Disclosure.Body>
+                <Disclosure.Body className="p-0">
                   <ListBox
+                    className="p-0"
                     aria-label="Shared plans"
                     selectionMode="single"
                     selectedKeys={activePlanId ? [activePlanId] : []}
@@ -166,18 +168,20 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
       </nav>
 
       {/* Footer with profile and theme toggle */}
-      <div className="px-3 py-2 border-t border-separator flex items-center justify-between gap-2">
+      <div className="px-3 py-3 pb-safe border-t border-separator flex items-center gap-0 shrink-0 mt-auto">
         <Button
           isIconOnly
           variant="ghost"
           size="sm"
           aria-label="Profile"
           onPress={() => setShowProfile(true)}
-          className="touch-target"
+          className="touch-target flex-1"
         >
           <User className="w-4 h-4 text-foreground" />
         </Button>
-        <ThemeToggle />
+        <div className="flex-1 flex justify-center">
+          <ThemeToggle />
+        </div>
       </div>
 
       {/* Profile modal */}

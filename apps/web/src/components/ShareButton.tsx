@@ -1,6 +1,7 @@
 import { Button } from '@heroui/react';
 import { Check, Share2 } from 'lucide-react';
 import { useState } from 'react';
+import { useIsMobile } from '@/hooks/useIsMobile';
 
 interface ShareButtonProps {
   className?: string;
@@ -11,6 +12,7 @@ interface ShareButtonProps {
  * The URL includes the plan ID which serves as the WebRTC room identifier.
  */
 export function ShareButton({ className }: ShareButtonProps) {
+  const isMobile = useIsMobile();
   const [copied, setCopied] = useState(false);
 
   const handleShare = async () => {
@@ -31,22 +33,42 @@ export function ShareButton({ className }: ShareButtonProps) {
     }
   };
 
+  // Mobile: icon-only, Desktop: icon + text
+  if (isMobile) {
+    return (
+      <Button
+        isIconOnly
+        variant="ghost"
+        size="sm"
+        onPress={handleShare}
+        className={`${className} w-6 h-6 min-w-0 min-h-0 p-0 shrink-0`}
+        aria-label="Copy link to share with reviewers"
+      >
+        {copied ? (
+          <Check className="w-3.5 h-3.5 text-success" />
+        ) : (
+          <Share2 className="w-3.5 h-3.5 text-foreground" />
+        )}
+      </Button>
+    );
+  }
+
   return (
     <Button
       variant="tertiary"
       size="sm"
       onPress={handleShare}
-      className={className}
+      className={`${className} text-xs !h-7 px-3 !min-h-0 rounded-lg`}
       aria-label="Copy link to share with reviewers"
     >
       {copied ? (
         <>
-          <Check className="w-4 h-4 mr-1.5 text-success" />
+          <Check className="w-3 h-3 mr-0.5 text-success" />
           <span className="text-foreground">Copied!</span>
         </>
       ) : (
         <>
-          <Share2 className="w-4 h-4 mr-1.5 text-foreground" />
+          <Share2 className="w-3 h-3 mr-0.5 text-foreground" />
           <span className="text-foreground">Share</span>
         </>
       )}

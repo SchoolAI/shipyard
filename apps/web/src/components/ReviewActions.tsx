@@ -72,7 +72,7 @@ export function ReviewActions({
         <>
           <Button
             size="sm"
-            className="bg-success hover:bg-success-dark text-white touch-target text-[11px] h-6 px-2 py-0.5 min-h-0"
+            className="bg-success hover:bg-success-dark text-white touch-target text-xs !h-7 px-3 !min-h-0 rounded-lg"
             onPress={() => handleAction('approve')}
             isDisabled={isSubmitting || currentStatus === 'approved'}
           >
@@ -81,7 +81,7 @@ export function ReviewActions({
           <Button
             variant="danger"
             size="sm"
-            className="touch-target text-[11px] h-6 px-2 py-0.5 min-h-0"
+            className="touch-target text-xs !h-7 px-3 !min-h-0 rounded-lg"
             onPress={() => handleAction('request_changes')}
             isDisabled={isSubmitting || currentStatus === 'changes_requested'}
           >

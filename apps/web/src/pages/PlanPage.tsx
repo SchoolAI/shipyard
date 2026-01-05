@@ -198,7 +198,7 @@ export function PlanPage() {
       {/* Floating review actions on mobile */}
       {isMobile && metadata && (
         <div className="fixed bottom-3 right-3 z-30 pb-safe">
-          <div className="bg-surface rounded-lg shadow-lg border border-separator p-1.5">
+          <div className="bg-surface rounded-lg shadow-lg border border-separator p-2">
             <ReviewActions
               ydoc={ydoc}
               currentStatus={metadata.status}

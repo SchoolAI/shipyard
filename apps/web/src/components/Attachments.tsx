@@ -31,13 +31,16 @@ export function Attachments({ ydoc }: AttachmentsProps) {
   }
 
   return (
-    <div className="mt-8 pt-6 border-t border-separator">
-      <h2 className="text-lg font-semibold text-foreground mb-4">
+    <div className="mt-6 md:mt-8 pt-4 md:pt-6 border-t border-separator px-3 md:px-0">
+      <h2 className="text-base md:text-lg font-semibold text-foreground mb-3 md:mb-4">
         Attachments ({artifacts.length})
       </h2>
-      <div className="grid gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
         {artifacts.map((artifact) => (
-          <div key={artifact.id} className="bg-surface rounded-lg border border-separator p-4">
+          <div
+            key={artifact.id}
+            className="bg-surface rounded-lg border border-separator p-3 md:p-4"
+          >
             <div className="flex items-center gap-2 mb-3">
               <ArtifactTypeIcon type={artifact.type} />
               <span className="text-sm font-medium text-foreground">{artifact.filename}</span>
