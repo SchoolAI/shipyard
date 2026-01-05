@@ -37,7 +37,7 @@ export function ArtifactRenderer({ artifact }: ArtifactRendererProps) {
           <img
             src={artifact.url}
             alt={artifact.filename}
-            className="max-w-full rounded-lg border border-slate-200"
+            className="max-w-full rounded-lg border border-slate-200 dark:border-slate-700"
             onLoad={() => setLoading(false)}
             onError={() => {
               setLoading(false);
@@ -52,7 +52,7 @@ export function ArtifactRenderer({ artifact }: ArtifactRendererProps) {
         <video
           src={artifact.url}
           controls
-          className="max-w-full rounded-lg border border-slate-200"
+          className="max-w-full rounded-lg border border-slate-200 dark:border-slate-700"
           onError={() => setError(true)}
         >
           <track kind="captions" />
@@ -92,16 +92,16 @@ export function ArtifactRenderer({ artifact }: ArtifactRendererProps) {
 
 function ArtifactPlaceholder({ filename, message }: { filename: string; message: string }) {
   return (
-    <div className="p-4 bg-slate-100 rounded-lg border border-slate-200 text-center">
-      <div className="text-slate-500 text-sm">{filename}</div>
-      <div className="text-slate-400 text-xs mt-1">{message}</div>
+    <div className="p-4 bg-slate-100 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 text-center">
+      <div className="text-slate-500 dark:text-slate-400 text-sm">{filename}</div>
+      <div className="text-slate-400 dark:text-slate-500 text-xs mt-1">{message}</div>
     </div>
   );
 }
 
 function LoadingSpinner() {
   return (
-    <div className="absolute inset-0 flex items-center justify-center bg-slate-50 rounded-lg">
+    <div className="absolute inset-0 flex items-center justify-center bg-slate-50 dark:bg-slate-800 rounded-lg">
       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
     </div>
   );

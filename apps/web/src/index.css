@@ -5,6 +5,7 @@
  * to avoid @import ordering issues with Tailwind's vite plugin.
  */
 @import "tailwindcss";
+@import "@heroui/styles";
 
 /* Custom color palette - Tailwind v4 uses @theme for configuration */
 @theme {
@@ -74,6 +75,61 @@
   --color-border: #e4e4e7;
   --color-input: #e4e4e7;
   --color-ring: #0d9488;
+  --color-surface: #ffffff;
+}
+
+/* HeroUI Theme Overrides */
+:root {
+  /* Base primitives (shared) */
+  --snow: oklch(0.9911 0 0);
+  --eclipse: oklch(0.2103 0.0059 285.89);
+
+  /* Light mode */
+  --background: oklch(0.9702 0 0);
+  --foreground: var(--eclipse);
+  --surface: oklch(100% 0 0);
+  --muted: oklch(0.5517 0.0138 285.94);
+
+  --accent: oklch(0.5729 0.1385 180.72);
+  --accent-foreground: var(--snow);
+  --success: oklch(0.7329 0.1935 150.81);
+  --success-foreground: var(--eclipse);
+  --warning: oklch(0.7819 0.1585 72.33);
+  --warning-foreground: var(--eclipse);
+  --danger: oklch(0.6532 0.2328 25.74);
+  --danger-foreground: var(--snow);
+  --focus: var(--accent);
+  --ring: var(--accent);
+}
+
+[data-theme="dark"],
+.dark {
+  --background: oklch(12% 0.005 285.823);
+  --foreground: var(--snow);
+  --surface: oklch(0.2103 0.0059 285.89);
+  --overlay: oklch(0.22 0.0059 285.89);
+  --muted: oklch(0.5517 0.0138 285.94);
+
+  /* Override Tailwind semantic colors for dark mode */
+  --color-background: oklch(12% 0.005 285.823);
+  --color-foreground: oklch(0.9911 0 0);
+  --color-surface: oklch(0.2103 0.0059 285.89);
+  --color-muted: oklch(27.4% 0.006 286.033);
+  --color-muted-foreground: oklch(70.5% 0.015 286.067);
+  --color-border: oklch(22% 0.006 286.033);
+  --color-input: oklch(22% 0.006 286.033);
+
+  /* Scrollbar for dark mode */
+  scrollbar-color: oklch(70.5% 0.015 286.067) transparent;
+}
+
+/* Dark mode scrollbar (webkit) */
+.dark *::-webkit-scrollbar-thumb {
+  background: oklch(70.5% 0.015 286.067);
+}
+
+.dark *::-webkit-scrollbar-thumb:hover {
+  background: oklch(60% 0.015 286.067);
 }
 
 /* Global: Pointer cursor for all interactive elements */
@@ -119,6 +175,10 @@ button:disabled,
   scrollbar-color: var(--color-slate-300) transparent; /* thumb track */
 }
 
+.dark * {
+  scrollbar-color: var(--color-slate-600) transparent; /* darker thumb for dark mode */
+}
+
 /* Webkit browsers (Chrome, Safari) - thin but visible */
 *::-webkit-scrollbar {
   width: 6px;
@@ -136,4 +196,12 @@ button:disabled,
 
 *::-webkit-scrollbar-thumb:hover {
   background: var(--color-slate-400);
+}
+
+.dark *::-webkit-scrollbar-thumb {
+  background: var(--color-slate-600);
+}
+
+.dark *::-webkit-scrollbar-thumb:hover {
+  background: var(--color-slate-500);
 }

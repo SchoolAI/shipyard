@@ -29,14 +29,7 @@ export function useHydration(ydoc: Y.Doc, urlPlan: UrlEncodedPlan): void {
           pr: urlPlan.pr,
         });
 
-        // Initialize BlockNote content in both places:
-        // 1. 'content' Y.Array for JSON serialization
-        const content = ydoc.getArray('content');
-        for (const block of urlPlan.content) {
-          content.push([block]);
-        }
-
-        // 2. 'document' Y.XmlFragment for BlockNote collaboration
+        // Initialize BlockNote content in document fragment (source of truth)
         const fragment = ydoc.getXmlFragment('document');
         editor.blocksToYXmlFragment(urlPlan.content, fragment);
       });

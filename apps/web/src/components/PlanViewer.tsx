@@ -1,4 +1,3 @@
-import type { Block } from '@blocknote/core';
 import {
   CommentsExtension,
   DefaultThreadStoreAuth,
@@ -17,18 +16,14 @@ import { useEffect, useRef } from 'react';
 import type { WebrtcProvider } from 'y-webrtc';
 import type { WebsocketProvider } from 'y-websocket';
 import type * as Y from 'yjs';
+import { useTheme } from '@/hooks/useTheme';
 import type { UserIdentity } from '@/utils/identity';
 
 /** Provider type that BlockNote can use for collaboration (WebSocket or WebRTC) */
 type CollaborationProvider = WebsocketProvider | WebrtcProvider;
 
-interface PlanViewerFallback {
-  content: Block[];
-}
-
 interface PlanViewerProps {
   ydoc: Y.Doc;
-  fallback: PlanViewerFallback;
   /** User identity for comments */
   identity: UserIdentity | null;
   /** Provider for collaboration (WebSocket or WebRTC) */
@@ -144,15 +139,21 @@ function createResolveUsers(ydoc: Y.Doc, currentIdentity: UserIdentity | null) {
   };
 }
 
-export function PlanViewer({
-  ydoc,
-  fallback,
-  identity,
-  provider,
-  onRequestIdentity,
-}: PlanViewerProps) {
+export function PlanViewer({ ydoc, identity, provider, onRequestIdentity }: PlanViewerProps) {
   // Comments are fully enabled only when identity is set
   const hasComments = identity !== null;
+  const { theme } = useTheme();
+
+  // Determine effective theme for BlockNote
+  const effectiveTheme: 'light' | 'dark' = (() => {
+    if (theme === 'system') {
+      return typeof window !== 'undefined' &&
+        window.matchMedia('(prefers-color-scheme: dark)').matches
+        ? 'dark'
+        : 'light';
+    }
+    return theme;
+  })();
 
   // Store current user info in ydoc so other peers can resolve their name
   useEffect(() => {
@@ -169,18 +170,12 @@ export function PlanViewer({
   // When identity is set, we create the threadStore and extension inline.
   const editor = useCreateBlockNote(
     {
-      // Only use initialContent when NOT in collaboration mode.
       // When collaboration is enabled, content comes from the Yjs fragment.
-      // Mixing both causes conflicts and can clear block content!
-      initialContent: provider
-        ? undefined
-        : fallback.content.length > 0
-          ? fallback.content
-          : undefined,
+      // No initialContent needed - the editor syncs from DOCUMENT_FRAGMENT.
       collaboration: provider
         ? {
             provider,
-            // Use 'document' key to avoid conflict with 'content' Y.Array used for JSON block storage
+            // Use 'document' key - this is the DOCUMENT_FRAGMENT (source of truth)
             fragment: ydoc.getXmlFragment('document'),
             user: identity
               ? {
@@ -216,9 +211,10 @@ export function PlanViewer({
       // input was causing comment mark position bugs by interfering with
       // ProseMirror's internal state management.
     },
-    // Dependencies: recreate editor when ydoc OR identity changes.
-    // This ensures the extension is properly registered when identity becomes available.
-    [ydoc, identity?.id]
+    // Dependencies: recreate editor when ydoc, identity, or theme changes.
+    // This ensures the extension is properly registered when identity becomes available,
+    // and the editor re-renders with the correct theme when toggling dark mode.
+    [ydoc, identity?.id, effectiveTheme]
   );
 
   // Note: We set editable={false} on BlockNoteView to make it read-only.
@@ -380,7 +376,7 @@ export function PlanViewer({
         key={editorKey}
         editor={editor}
         editable={false} // Read-only, but comments still work per BlockNote docs
-        theme="light"
+        theme={effectiveTheme}
         // Hide editing controls - this is a read-only view (except for comments)
         sideMenu={false}
         slashMenu={false}
@@ -389,7 +385,7 @@ export function PlanViewer({
         comments={false}
       >
         {/* Main editor card */}
-        <div className="bg-white rounded-lg shadow-sm p-6">
+        <div className="bg-white dark:bg-surface rounded-lg shadow-sm p-6">
           {/* Custom formatting toolbar - appears when text is selected */}
           <FormattingToolbarController
             formattingToolbar={() => (
@@ -402,7 +398,7 @@ export function PlanViewer({
                   <button
                     type="button"
                     onClick={onRequestIdentity}
-                    className="flex items-center gap-1.5 px-2 py-1 text-sm rounded hover:bg-slate-100"
+                    className="flex items-center gap-1.5 px-2 py-1 text-sm rounded hover:bg-slate-100 dark:hover:bg-slate-700"
                     title="Set up your profile to leave comments"
                   >
                     <svg

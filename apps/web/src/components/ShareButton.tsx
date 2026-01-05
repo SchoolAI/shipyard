@@ -1,6 +1,6 @@
+import { Button } from '@heroui/react';
 import { Check, Share2 } from 'lucide-react';
 import { useState } from 'react';
-import { Button } from '@/components/ui/button';
 
 interface ShareButtonProps {
   className?: string;
@@ -33,21 +33,21 @@ export function ShareButton({ className }: ShareButtonProps) {
 
   return (
     <Button
-      variant="outline"
+      variant="tertiary"
       size="sm"
-      onClick={handleShare}
+      onPress={handleShare}
       className={className}
-      title="Copy link to share with reviewers"
+      aria-label="Copy link to share with reviewers"
     >
       {copied ? (
         <>
           <Check className="w-4 h-4 mr-1.5 text-success" />
-          Copied!
+          <span className="text-foreground">Copied!</span>
         </>
       ) : (
         <>
-          <Share2 className="w-4 h-4 mr-1.5" />
-          Share
+          <Share2 className="w-4 h-4 mr-1.5 text-foreground" />
+          <span className="text-foreground">Share</span>
         </>
       )}
     </Button>

@@ -12,7 +12,9 @@ import '@blocknote/core/fonts/inter.css';
 import '@mantine/core/styles.layer.css';
 // 3. BlockNote Mantine theme styles
 import '@blocknote/mantine/style.css';
-// 4. Tailwind + app styles (must be last for proper cascade)
+// 4. HeroUI styles
+import '@heroui/styles';
+// 5. Tailwind + app styles (must be last for proper cascade)
 import './index.css';
 
 import { MantineProvider } from '@mantine/core';

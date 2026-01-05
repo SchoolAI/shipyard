@@ -1,26 +1,16 @@
-import * as SeparatorPrimitive from '@radix-ui/react-separator';
-import type * as React from 'react';
-
-import { cn } from '@/lib/utils';
-
-function Separator({
-  className,
-  orientation = 'horizontal',
-  decorative = true,
-  ...props
-}: React.ComponentProps<typeof SeparatorPrimitive.Root>) {
-  return (
-    <SeparatorPrimitive.Root
-      data-slot="separator"
-      decorative={decorative}
-      orientation={orientation}
-      className={cn(
-        'bg-border shrink-0 data-[orientation=horizontal]:h-px data-[orientation=horizontal]:w-full data-[orientation=vertical]:h-full data-[orientation=vertical]:w-px',
-        className
-      )}
-      {...props}
-    />
-  );
-}
-
-export { Separator };
+/**
+ * Separator component from HeroUI v3.
+ *
+ * Props:
+ * - orientation: 'horizontal' | 'vertical' (default: 'horizontal')
+ * - isOnSurface: boolean | undefined - Whether the separator is on a surface background
+ * - className: string - Additional CSS classes
+ *
+ * @example
+ * // Horizontal separator
+ * <Separator className="my-4" />
+ *
+ * // Vertical separator
+ * <Separator orientation="vertical" />
+ */
+export { Separator } from '@heroui/react';

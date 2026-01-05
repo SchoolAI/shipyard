@@ -1,3 +1,4 @@
+import { Chip } from '@heroui/react';
 import { hasAnyConnection } from '@/utils/connectionStatus';
 
 interface SyncStatusProps {
@@ -18,23 +19,23 @@ export function SyncStatus({ synced, serverCount = 0, peerCount = 0 }: SyncStatu
 
   if (!hasAnyConnection(serverCount, peerCount)) {
     return (
-      <div className="text-sm text-warning-dark bg-warning-light px-3 py-1 rounded inline-block">
+      <Chip color="warning" variant="soft">
         Offline - viewing snapshot
-      </div>
+      </Chip>
     );
   }
 
   if (!synced) {
     return (
-      <div className="text-sm text-info-dark bg-info-light px-3 py-1 rounded inline-block">
+      <Chip color="accent" variant="soft">
         Syncing...{getConnectionDetails()}
-      </div>
+      </Chip>
     );
   }
 
   return (
-    <div className="text-sm text-success-dark bg-success-light px-3 py-1 rounded inline-block">
+    <Chip color="success" variant="soft">
       Synced{getConnectionDetails()}
-    </div>
+    </Chip>
   );
 }

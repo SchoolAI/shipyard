@@ -1,3 +1,13 @@
+import {
+  Button,
+  Description,
+  FieldError,
+  Form,
+  Input,
+  Label,
+  Modal,
+  TextField,
+} from '@heroui/react';
 import { useState } from 'react';
 import { useIdentity } from '@/hooks/useIdentity';
 
@@ -49,73 +59,65 @@ export function ProfileSetup({ onComplete, onCancel, isEditing = false }: Profil
     onComplete();
   };
 
+  const handleOpenChange = (isOpen: boolean) => {
+    if (!isOpen && onCancel) {
+      onCancel();
+    }
+  };
+
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4 overflow-hidden">
-        {/* Header */}
-        <div className="px-6 py-4 border-b border-slate-200">
-          <h2 className="text-lg font-semibold text-slate-900">
-            {isEditing ? 'Edit Profile' : 'Set Up Your Profile'}
-          </h2>
-          <p className="text-sm text-slate-500 mt-1">
-            {isEditing
-              ? 'Update your display name for comments'
-              : 'Enter a name to identify yourself in comments'}
-          </p>
-        </div>
-
-        {/* Form */}
-        <form onSubmit={handleSubmit}>
-          <div className="px-6 py-4">
-            <label htmlFor="displayName" className="block text-sm font-medium text-slate-700 mb-2">
-              Display Name
-            </label>
-            <input
-              id="displayName"
-              type="text"
-              value={displayName}
-              onChange={(e) => {
-                setDisplayName(e.target.value);
-                setError(null);
-              }}
-              placeholder="Enter your name..."
-              className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-              maxLength={50}
-            />
-            {error && <p className="mt-2 text-sm text-danger">{error}</p>}
-
-            {identity && (
-              <div className="mt-4 flex items-center gap-2">
-                <div
-                  className="w-4 h-4 rounded-full"
-                  style={{ backgroundColor: identity.color }}
-                  title="Your color"
-                />
-                <span className="text-sm text-slate-500">Your color for comments</span>
-              </div>
-            )}
-          </div>
-
-          {/* Actions */}
-          <div className="px-6 py-4 bg-slate-50 flex justify-end gap-3">
-            {onCancel && (
-              <button
-                type="button"
-                onClick={onCancel}
-                className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-md hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-primary"
+    <Modal.Backdrop isOpen onOpenChange={handleOpenChange} isDismissable={!!onCancel}>
+      <Modal.Container>
+        <Modal.Dialog className="sm:max-w-md">
+          {onCancel && <Modal.CloseTrigger />}
+          <Modal.Header>
+            <Modal.Heading>{isEditing ? 'Edit Profile' : 'Set Up Your Profile'}</Modal.Heading>
+            <p className="text-sm text-muted mt-1">
+              {isEditing
+                ? 'Update your display name for comments'
+                : 'Enter a name to identify yourself in comments'}
+            </p>
+          </Modal.Header>
+          <Form onSubmit={handleSubmit}>
+            <Modal.Body>
+              <TextField
+                name="displayName"
+                isRequired
+                isInvalid={!!error}
+                value={displayName}
+                onChange={(value) => {
+                  setDisplayName(value);
+                  setError(null);
+                }}
+                className="w-full"
               >
-                Cancel
-              </button>
-            )}
-            <button
-              type="submit"
-              className="px-4 py-2 text-sm font-medium text-white bg-primary rounded-md hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
-            >
-              {isEditing ? 'Save Changes' : 'Continue'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+                <Label>Display Name</Label>
+                <Input placeholder="Enter your name..." maxLength={50} />
+                {error && <FieldError>{error}</FieldError>}
+              </TextField>
+
+              {identity && (
+                <div className="mt-4 flex items-center gap-2">
+                  <div
+                    className="w-4 h-4 rounded-full"
+                    style={{ backgroundColor: identity.color }}
+                    title="Your color"
+                  />
+                  <Description>Your color for comments</Description>
+                </div>
+              )}
+            </Modal.Body>
+            <Modal.Footer>
+              {onCancel && (
+                <Button variant="secondary" slot="close">
+                  Cancel
+                </Button>
+              )}
+              <Button type="submit">{isEditing ? 'Save Changes' : 'Continue'}</Button>
+            </Modal.Footer>
+          </Form>
+        </Modal.Dialog>
+      </Modal.Container>
+    </Modal.Backdrop>
   );
 }

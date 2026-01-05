@@ -1,3 +1,4 @@
+import { Checkbox, Label } from '@heroui/react';
 import { toggleStepCompletion } from '@peer-plan/schema';
 import { useEffect, useState } from 'react';
 import type * as Y from 'yjs';
@@ -26,14 +27,15 @@ export function StepCheckbox({ ydoc, stepId, label }: StepCheckboxProps) {
   };
 
   return (
-    <label className="flex items-center gap-2 cursor-pointer py-1">
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={handleToggle}
-        className="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary"
-      />
-      <span className={checked ? 'line-through text-slate-400' : ''}>{label}</span>
-    </label>
+    <Checkbox isSelected={checked} onChange={handleToggle} className="py-1">
+      <Checkbox.Control>
+        <Checkbox.Indicator />
+      </Checkbox.Control>
+      <Checkbox.Content>
+        <Label className={checked ? 'line-through text-slate-400 dark:text-slate-500' : ''}>
+          {label}
+        </Label>
+      </Checkbox.Content>
+    </Checkbox>
   );
 }

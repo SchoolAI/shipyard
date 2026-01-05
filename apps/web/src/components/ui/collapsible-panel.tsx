@@ -1,6 +1,6 @@
+import { Button } from '@heroui/react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
 interface CollapsiblePanelProps {
@@ -35,16 +35,17 @@ export function CollapsiblePanel({
   if (!isOpen) {
     return (
       <Button
-        variant="outline"
-        size="icon"
-        onClick={onToggle}
+        variant="tertiary"
+        size="sm"
+        isIconOnly
+        onPress={onToggle}
         className={cn(
-          'fixed top-4 z-50 shadow-md bg-white',
+          'fixed top-4 z-50 shadow-md bg-white dark:bg-surface',
           side === 'left' ? 'left-4' : 'right-4'
         )}
         aria-label={`Expand ${side} panel`}
       >
-        <ChevronClosed className="h-4 w-4" />
+        <ChevronClosed className="h-4 w-4 text-foreground" />
       </Button>
     );
   }
@@ -54,7 +55,9 @@ export function CollapsiblePanel({
       className={cn(
         'h-full flex flex-col overflow-hidden shrink-0',
         'transition-all duration-200 ease-in-out',
-        side === 'left' ? 'border-r border-slate-200' : 'border-l border-slate-200',
+        side === 'left'
+          ? 'border-r border-slate-200 dark:border-slate-700'
+          : 'border-l border-slate-200 dark:border-slate-700',
         width,
         className
       )}
@@ -90,20 +93,37 @@ export function CollapsiblePanelHeader({
   const ChevronIcon = side === 'left' ? ChevronLeft : ChevronRight;
 
   return (
-    <div className={cn('p-4 border-b border-slate-200 bg-white min-w-64', className)}>
+    <div
+      className={cn(
+        'p-4 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-surface min-w-64',
+        className
+      )}
+    >
       <div className="flex items-center justify-between">
         {side === 'left' ? (
           <>
-            <h2 className="font-semibold text-lg whitespace-nowrap">{title}</h2>
-            <Button variant="ghost" size="icon-sm" onClick={onToggle} aria-label="Collapse panel">
-              <ChevronIcon className="h-4 w-4" />
+            <h2 className="font-semibold text-lg whitespace-nowrap text-foreground">{title}</h2>
+            <Button
+              variant="ghost"
+              size="sm"
+              isIconOnly
+              onPress={onToggle}
+              aria-label="Collapse panel"
+            >
+              <ChevronIcon className="h-4 w-4 text-foreground" />
             </Button>
           </>
         ) : (
           <>
-            <h3 className="font-semibold text-slate-900 whitespace-nowrap">{title}</h3>
-            <Button variant="ghost" size="icon-sm" onClick={onToggle} aria-label="Collapse panel">
-              <ChevronIcon className="h-4 w-4" />
+            <h3 className="font-semibold text-foreground whitespace-nowrap">{title}</h3>
+            <Button
+              variant="ghost"
+              size="sm"
+              isIconOnly
+              onPress={onToggle}
+              aria-label="Collapse panel"
+            >
+              <ChevronIcon className="h-4 w-4 text-foreground" />
             </Button>
           </>
         )}
