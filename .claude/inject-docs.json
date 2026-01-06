@@ -1,0 +1,16 @@
+{
+  "description": "Docs to inject into Claude Code context at session start",
+  "docs": [
+    "docs/BRIEF.md",
+    "docs/engineering-standards.md",
+    "docs/architecture.md",
+    "docs/systems-inventory.md",
+    "docs/ydoc-key-reference.md",
+    "docs/milestones/*.md"
+  ],
+  "exclude": [
+    "docs/original-vision/*",
+    "docs/image-generation-prompts.md"
+  ],
+  "maxLinesPerFile": 500
+}
