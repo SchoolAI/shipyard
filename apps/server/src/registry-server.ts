@@ -277,7 +277,8 @@ export async function startRegistryServer(): Promise<number | null> {
   for (const port of ports) {
     try {
       await new Promise<void>((resolve, reject) => {
-        const server = app.listen(port, () => {
+        // Bind to localhost only for security (prevents local network access)
+        const server = app.listen(port, '127.0.0.1', () => {
           logger.info({ port }, 'Registry server started');
           setInterval(healthCheck, HEALTH_CHECK_INTERVAL);
           startCleanupInterval();

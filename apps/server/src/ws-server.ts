@@ -111,7 +111,8 @@ export function startWebSocketServer(): WebSocketServer | null {
     initPersistence();
 
     // Use port 0 for dynamic allocation (OS assigns available port)
-    const wss = new WebSocketServer({ port: 0 });
+    // Bind to localhost only for security (prevents local network access)
+    const wss = new WebSocketServer({ port: 0, host: '127.0.0.1' });
 
     wss.on('listening', async () => {
       const addr = wss.address() as { port: number };

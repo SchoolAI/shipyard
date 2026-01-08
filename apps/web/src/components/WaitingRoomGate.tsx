@@ -31,6 +31,15 @@ export function WaitingRoomGate({
 }: WaitingRoomGateProps) {
   const { isPending, isRejected } = useApprovalStatus(syncState);
 
+  // If connected to local MCP server (WebSocket), skip auth entirely
+  // This allows local development without authentication
+  // Shared links (P2P only) will still require auth since activeCount === 0
+  const isLocalViewing = syncState.activeCount > 0;
+
+  if (isLocalViewing) {
+    return <>{children}</>;
+  }
+
   // Read ownerId directly from Y.Doc to determine if approval is required
   // This works even if approvalStatus hasn't been computed yet
   const ownerId = getPlanOwnerId(ydoc);
