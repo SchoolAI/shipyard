@@ -35,13 +35,9 @@ export interface PlanMetadata {
   completedBy?: string;
   /** Snapshot URL generated on completion */
   snapshotUrl?: string;
-
-  // --- Access Control (Milestone 8) ---
-  /** User ID of the plan creator/owner */
   ownerId?: string;
-  /** Whether new users need approval to access (default: true when ownerId is set) */
+  /** Defaults to true when ownerId is set */
   approvalRequired?: boolean;
-  /** User IDs who have been approved for access */
   approvedUsers?: string[];
 }
 
@@ -58,7 +54,6 @@ export const PlanMetadataSchema = z.object({
   completedAt: z.number().optional(),
   completedBy: z.string().optional(),
   snapshotUrl: z.string().optional(),
-  // Access Control (Milestone 8)
   ownerId: z.string().optional(),
   approvalRequired: z.boolean().optional(),
   approvedUsers: z.array(z.string()).optional(),

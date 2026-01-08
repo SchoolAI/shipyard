@@ -75,12 +75,9 @@ export function initPlanMetadata(
   if (init.repo) map.set('repo', init.repo);
   if (init.pr) map.set('pr', init.pr);
 
-  // Access control fields (Milestone 8)
   if (init.ownerId) {
     map.set('ownerId', init.ownerId);
-    // Owner is automatically approved
     map.set('approvedUsers', [init.ownerId]);
-    // Default to requiring approval when owner is set
     map.set('approvalRequired', init.approvalRequired ?? true);
   }
 }
@@ -292,118 +289,62 @@ export function linkArtifactToDeliverable(
   return true;
 }
 
-// --- Access Control Helpers (Milestone 8) ---
-
-/**
- * Gets the owner ID of a plan.
- *
- * @param ydoc - Yjs document
- * @returns Owner ID or null if not set
- */
 export function getPlanOwnerId(ydoc: Y.Doc): string | null {
   const map = ydoc.getMap('metadata');
   const ownerId = map.get('ownerId');
   return typeof ownerId === 'string' ? ownerId : null;
 }
 
-/**
- * Checks if approval is required to access this plan.
- * Returns true if approvalRequired is explicitly set, or if ownerId is set (default behavior).
- *
- * @param ydoc - Yjs document
- * @returns true if approval is required
- */
+/** Returns true if approvalRequired is set, or defaults to true when ownerId exists. */
 export function isApprovalRequired(ydoc: Y.Doc): boolean {
   const map = ydoc.getMap('metadata');
   const approvalRequired = map.get('approvalRequired');
-
-  // If explicitly set, use that value
   if (typeof approvalRequired === 'boolean') {
     return approvalRequired;
   }
-
-  // Default: require approval if there's an owner
   const ownerId = map.get('ownerId');
   return typeof ownerId === 'string' && ownerId.length > 0;
 }
 
-/**
- * Gets the list of approved user IDs.
- *
- * @param ydoc - Yjs document
- * @returns Array of approved user IDs
- */
 export function getApprovedUsers(ydoc: Y.Doc): string[] {
   const map = ydoc.getMap('metadata');
   const approvedUsers = map.get('approvedUsers');
-
   if (!Array.isArray(approvedUsers)) {
     return [];
   }
-
   return approvedUsers.filter((id): id is string => typeof id === 'string');
 }
 
-/**
- * Checks if a user is approved to access this plan.
- * Owner is always approved. Otherwise checks approvedUsers list.
- *
- * @param ydoc - Yjs document
- * @param userId - User ID to check
- * @returns true if user is approved
- */
+/** Owner is always approved. */
 export function isUserApproved(ydoc: Y.Doc, userId: string): boolean {
   const ownerId = getPlanOwnerId(ydoc);
-
-  // Owner is always approved
   if (ownerId === userId) {
     return true;
   }
-
-  // Check approved users list
-  const approvedUsers = getApprovedUsers(ydoc);
-  return approvedUsers.includes(userId);
+  return getApprovedUsers(ydoc).includes(userId);
 }
 
-/**
- * Approves a user to access this plan.
- * Adds them to the approvedUsers list if not already present.
- *
- * @param ydoc - Yjs document
- * @param userId - User ID to approve
- */
 export function approveUser(ydoc: Y.Doc, userId: string): void {
   const map = ydoc.getMap('metadata');
   const currentApproved = getApprovedUsers(ydoc);
-
-  // Don't add duplicates
   if (currentApproved.includes(userId)) {
     return;
   }
-
   map.set('approvedUsers', [...currentApproved, userId]);
   map.set('updatedAt', Date.now());
 }
 
-/**
- * Revokes a user's access to this plan.
- * Removes them from the approvedUsers list.
- *
- * @param ydoc - Yjs document
- * @param userId - User ID to revoke
- * @returns true if user was removed, false if they weren't in the list
- */
 export function revokeUser(ydoc: Y.Doc, userId: string): boolean {
   const map = ydoc.getMap('metadata');
   const currentApproved = getApprovedUsers(ydoc);
-
   const index = currentApproved.indexOf(userId);
   if (index === -1) {
     return false;
   }
-
-  const newApproved = currentApproved.filter((id) => id !== userId);
-  map.set('approvedUsers', newApproved);
+  map.set(
+    'approvedUsers',
+    currentApproved.filter((id) => id !== userId)
+  );
   map.set('updatedAt', Date.now());
   return true;
 }
