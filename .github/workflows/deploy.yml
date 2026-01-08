@@ -40,7 +40,6 @@ jobs:
         env:
           VITE_GITHUB_CLIENT_ID: ${{ vars.GH_OAUTH_CLIENT_ID }}
           VITE_GITHUB_OAUTH_WORKER: https://peer-plan-github-oauth.jacob-191.workers.dev
-          VITE_DISABLE_WAITING_ROOM: false
 
       - name: Setup Pages
         uses: actions/configure-pages@v5

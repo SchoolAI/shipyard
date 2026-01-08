@@ -31,10 +31,7 @@ export function WaitingRoomGate({
 }: WaitingRoomGateProps) {
   const { isPending, isRejected, requiresApproval } = useApprovalStatus(syncState);
 
-  // Temporary: disable waiting room for local testing
-  const isWaitingRoomDisabled = import.meta.env.VITE_DISABLE_WAITING_ROOM === 'true';
-
-  if (isWaitingRoomDisabled || !requiresApproval) {
+  if (!requiresApproval) {
     return <>{children}</>;
   }
 
