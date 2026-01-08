@@ -1,0 +1,21 @@
+name = "peer-plan-github-oauth"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+account_id = "191909c2c1a28f6cb73d12e3362b874c"  # Jacob@schoolai.com's Account
+
+# Development settings
+[dev]
+port = 4445
+local_protocol = "http"
+
+# Environment variables (non-secret)
+[vars]
+ENVIRONMENT = "development"
+
+# Production environment overrides
+[env.production.vars]
+ENVIRONMENT = "production"
+
+# Secrets (set via wrangler secret put):
+# - GITHUB_CLIENT_ID
+# - GITHUB_CLIENT_SECRET
