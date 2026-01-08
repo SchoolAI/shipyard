@@ -1,7 +1,8 @@
-import { Button, Chip } from '@heroui/react';
+import { Button } from '@heroui/react';
 import type { PlanStatusType } from '@peer-plan/schema';
 import { Menu } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { StatusChip } from '@/components/StatusChip';
 
 interface MobileHeaderProps {
   /** Called when the menu button is pressed */
@@ -32,24 +33,6 @@ export function MobileHeader({
   peerCount,
   rightContent,
 }: MobileHeaderProps) {
-  const getStatusColor = (s: PlanStatusType): 'success' | 'warning' | 'danger' | 'default' => {
-    switch (s) {
-      case 'approved':
-        return 'success';
-      case 'pending_review':
-        return 'warning';
-      case 'changes_requested':
-        return 'danger';
-      case 'draft':
-        return 'default';
-      default: {
-        // Exhaustive check - compile error if new status added
-        s satisfies never;
-        return 'default';
-      }
-    }
-  };
-
   return (
     <header className="fixed top-0 left-0 right-0 z-50 h-12 bg-surface border-b border-separator flex items-center gap-1.5 px-1.5 pt-safe">
       <Button
@@ -65,15 +48,7 @@ export function MobileHeader({
 
       <h1 className="text-xs font-semibold text-foreground truncate flex-1 min-w-0">{title}</h1>
 
-      {status && (
-        <Chip
-          color={getStatusColor(status)}
-          variant="soft"
-          className="text-[11px] h-5 px-2 shrink-0"
-        >
-          {status.replace('_', ' ')}
-        </Chip>
-      )}
+      {status && <StatusChip status={status} className="text-[11px] h-5 px-2 shrink-0" />}
 
       {agentCount !== undefined && agentCount > 0 && (
         <span className="flex items-center gap-1 text-[11px] text-muted-foreground shrink-0">

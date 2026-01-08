@@ -1,4 +1,4 @@
-import { getPlanMetadata } from '@peer-plan/schema';
+import { getDeliverables, getPlanMetadata } from '@peer-plan/schema';
 import { z } from 'zod';
 import { exportPlanToMarkdown } from '../export-markdown.js';
 import { getOrCreateDoc } from '../ws-server.js';
@@ -67,6 +67,21 @@ export const readPlanTool = {
 
     // Append markdown content
     output += markdown;
+
+    // Append deliverables section if any exist
+    const deliverables = getDeliverables(doc);
+    if (deliverables.length > 0) {
+      output += '\n\n---\n\n## Deliverables\n\n';
+      output += 'Available deliverable IDs for artifact linking:\n\n';
+
+      for (const deliverable of deliverables) {
+        const checkbox = deliverable.linkedArtifactId ? '[x]' : '[ ]';
+        const linkedInfo = deliverable.linkedArtifactId
+          ? ` (linked to artifact: ${deliverable.linkedArtifactId})`
+          : '';
+        output += `- ${checkbox} ${deliverable.text} {id="${deliverable.id}"}${linkedInfo}\n`;
+      }
+    }
 
     return {
       content: [

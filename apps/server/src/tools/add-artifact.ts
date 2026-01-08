@@ -1,4 +1,9 @@
-import { type ArtifactType, addArtifact, getPlanMetadata } from '@peer-plan/schema';
+import {
+  type ArtifactType,
+  addArtifact,
+  getPlanMetadata,
+  linkArtifactToDeliverable,
+} from '@peer-plan/schema';
 import { nanoid } from 'nanoid';
 import { z } from 'zod';
 import { isGitHubConfigured, uploadArtifact } from '../github-artifacts.js';
@@ -13,6 +18,8 @@ const AddArtifactInput = z.object({
   type: z.enum(['screenshot', 'video', 'test_results', 'diff']).describe('Artifact type'),
   filename: z.string().describe('Filename for the artifact'),
   content: z.string().describe('Base64 encoded file content'),
+  description: z.string().optional().describe('What this artifact proves (deliverable name)'),
+  deliverableId: z.string().optional().describe('ID of the deliverable this artifact fulfills'),
 });
 
 // --- Public Export ---
@@ -21,7 +28,7 @@ export const addArtifactTool = {
   definition: {
     name: TOOL_NAMES.ADD_ARTIFACT,
     description:
-      'Upload an artifact (screenshot, video, test results, diff) to a plan. Requires GITHUB_TOKEN env var and plan must have repo/pr set.',
+      'Upload an artifact (screenshot, video, test results, diff) to a plan. Requires GITHUB_TOKEN env var and plan must have repo/pr set.\n\nIf linking to a deliverable, call read_plan first to see deliverable IDs, then pass the deliverable ID to automatically mark it as completed.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -33,6 +40,14 @@ export const addArtifactTool = {
         },
         filename: { type: 'string', description: 'Filename for the artifact' },
         content: { type: 'string', description: 'Base64 encoded file content' },
+        description: {
+          type: 'string',
+          description: 'What this artifact proves (deliverable name)',
+        },
+        deliverableId: {
+          type: 'string',
+          description: 'ID of the deliverable this artifact fulfills',
+        },
       },
       required: ['planId', 'type', 'filename', 'content'],
     },
@@ -97,16 +112,38 @@ export const addArtifactTool = {
         type: type as ArtifactType,
         filename,
         url,
+        description: input.description,
+        uploadedAt: Date.now(),
       };
       addArtifact(doc, artifact);
 
+      // Link to deliverable if specified
+      if (input.deliverableId) {
+        const linked = linkArtifactToDeliverable(doc, input.deliverableId, artifact.id);
+        if (linked) {
+          logger.info(
+            { planId, artifactId: artifact.id, deliverableId: input.deliverableId },
+            'Artifact linked to deliverable'
+          );
+        } else {
+          logger.warn(
+            { planId, deliverableId: input.deliverableId },
+            'Failed to link artifact: deliverable not found'
+          );
+        }
+      }
+
       logger.info({ planId, artifactId: artifact.id, url }, 'Artifact added');
+
+      const linkedText = input.deliverableId
+        ? `\nLinked to deliverable: ${input.deliverableId}`
+        : '';
 
       return {
         content: [
           {
             type: 'text',
-            text: `Artifact uploaded!\nID: ${artifact.id}\nType: ${type}\nFilename: ${filename}\nURL: ${url}`,
+            text: `Artifact uploaded!\nID: ${artifact.id}\nType: ${type}\nFilename: ${filename}\nURL: ${url}${linkedText}`,
           },
         ],
       };

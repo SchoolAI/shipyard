@@ -10,6 +10,7 @@ describe('YDOC_KEYS', () => {
       STEP_COMPLETIONS: 'stepCompletions',
       PLANS: 'plans',
       ARTIFACTS: 'artifacts',
+      DELIVERABLES: 'deliverables',
       PRESENCE: 'presence',
     });
   });
@@ -35,6 +36,7 @@ describe('isValidYDocKey', () => {
     expect(isValidYDocKey('stepCompletions')).toBe(true);
     expect(isValidYDocKey('plans')).toBe(true);
     expect(isValidYDocKey('artifacts')).toBe(true);
+    expect(isValidYDocKey('deliverables')).toBe(true);
     expect(isValidYDocKey('presence')).toBe(true);
   });
 

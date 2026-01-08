@@ -1,3 +1,4 @@
+export { extractDeliverables } from './deliverable-parser.js';
 export type {
   AgentPresence,
   CreateHookSessionRequest,
@@ -39,11 +40,18 @@ export {
 export type {
   Artifact,
   ArtifactType,
+  Deliverable,
   PlanMetadata,
   PlanStatusType,
   StepCompletion,
 } from './plan.js';
-export { ArtifactSchema, getArtifactUrl, PlanMetadataSchema, PlanStatusValues } from './plan.js';
+export {
+  ArtifactSchema,
+  DeliverableSchema,
+  getArtifactUrl,
+  PlanMetadataSchema,
+  PlanStatusValues,
+} from './plan.js';
 export type { PlanIndexEntry } from './plan-index.js';
 export {
   NON_PLAN_DB_NAMES,
@@ -77,14 +85,17 @@ export type { UserProfile } from './user-helpers.js';
 export { createUserResolver } from './user-helpers.js';
 export {
   addArtifact,
+  addDeliverable,
   clearAgentPresence,
   getAgentPresence,
   getAgentPresences,
   getArtifacts,
+  getDeliverables,
   getPlanMetadata,
   getStepCompletions,
   initPlanMetadata,
   isStepCompleted,
+  linkArtifactToDeliverable,
   removeArtifact,
   setAgentPresence,
   setPlanMetadata,

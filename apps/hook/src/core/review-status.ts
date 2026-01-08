@@ -1,12 +1,152 @@
 /**
  * Review status checking and feedback formatting.
+ * Uses Y.Doc observer for distributed approval flow.
  */
 
-import type { GetReviewStatusResponse, ReviewFeedback } from '@peer-plan/schema';
+import { type GetReviewStatusResponse, parseThreads, type ReviewFeedback } from '@peer-plan/schema';
+import { WebsocketProvider } from 'y-websocket';
+import * as Y from 'yjs';
 import type { CoreResponse } from '../adapters/types.js';
-import { getReviewStatus } from '../http-client.js';
+import { DEFAULT_AGENT_TYPE, DEFAULT_WEB_URL } from '../constants.js';
+import { getReviewStatus, getWebSocketUrl, updatePlanContent } from '../http-client.js';
 import { logger } from '../logger.js';
-import { getSessionState } from '../state.js';
+import { deleteSessionState, getSessionState } from '../state.js';
+import { createPlan } from './plan-manager.js';
+
+// --- Review Decision Types ---
+
+interface ReviewDecision {
+  approved: boolean;
+  feedback?: string;
+}
+
+// --- Y.Doc Observer for Review Decision ---
+
+const REVIEW_TIMEOUT_MS = 25 * 60 * 1000; // 25 minutes
+
+/**
+ * Wait for review decision by observing Y.Doc metadata changes.
+ * Connects to MCP server's WebSocket and watches for status changes.
+ */
+async function waitForReviewDecision(planId: string, wsUrl: string): Promise<ReviewDecision> {
+  const ydoc = new Y.Doc();
+
+  logger.info({ planId, wsUrl }, 'Connecting to WebSocket for Y.Doc sync');
+
+  const provider = new WebsocketProvider(wsUrl, planId, ydoc, {
+    connect: true,
+  });
+
+  return new Promise((resolve) => {
+    const metadata = ydoc.getMap('metadata');
+    let resolved = false;
+
+    const cleanup = () => {
+      if (!resolved) {
+        resolved = true;
+        provider.destroy();
+      }
+    };
+
+    const checkStatus = () => {
+      if (resolved) return;
+
+      const status = metadata.get('status') as string | undefined;
+      logger.debug({ planId, status }, 'Checking Y.Doc status');
+
+      if (status === 'approved') {
+        logger.info({ planId }, 'Plan approved via Y.Doc');
+        cleanup();
+        resolve({ approved: true });
+      } else if (status === 'changes_requested') {
+        // Extract feedback from threads if available
+        const feedback = extractFeedbackFromYDoc(ydoc);
+        logger.info({ planId, feedback }, 'Changes requested via Y.Doc');
+        cleanup();
+        resolve({ approved: false, feedback });
+      }
+    };
+
+    // Wait for sync before resetting status for fresh review
+    provider.on('sync', (isSynced: boolean) => {
+      if (isSynced) {
+        logger.info({ planId }, 'Y.Doc synced, resetting status for fresh review');
+
+        // Reset status to pending_review to force new decision
+        // This prevents using stale approve/deny from previous review
+        ydoc.transact(() => {
+          metadata.set('status', 'pending_review');
+          metadata.set('updatedAt', Date.now());
+        });
+
+        logger.info({ planId }, 'Status reset to pending_review, waiting for decision');
+      }
+    });
+
+    // Observe changes to metadata
+    metadata.observe(() => {
+      checkStatus();
+    });
+
+    // Log when connection is established
+    provider.on('status', ({ status }: { status: string }) => {
+      logger.debug({ planId, status }, 'WebSocket status changed');
+    });
+
+    // Timeout after 25 minutes
+    setTimeout(() => {
+      if (!resolved) {
+        logger.warn({ planId }, 'Review timeout - no decision received');
+        cleanup();
+        resolve({
+          approved: false,
+          feedback: 'Review timeout - no decision received in 25 minutes',
+        });
+      }
+    }, REVIEW_TIMEOUT_MS);
+
+    // Handle connection errors
+    provider.on('connection-error', (event: Event) => {
+      logger.error({ planId, event }, 'WebSocket connection error');
+    });
+
+    provider.on('connection-close', (event: CloseEvent | null) => {
+      if (!resolved) {
+        logger.warn({ planId, code: event?.code }, 'WebSocket connection closed unexpectedly');
+      }
+    });
+  });
+}
+
+/**
+ * Extract feedback from Y.Doc threads.
+ */
+function extractFeedbackFromYDoc(ydoc: Y.Doc): string | undefined {
+  try {
+    const threadsMap = ydoc.getMap('threads');
+    const threadsData = threadsMap.toJSON() as Record<string, unknown>;
+    const threads = parseThreads(threadsData);
+
+    if (threads.length === 0) {
+      return 'Changes requested. Check the plan for reviewer comments.';
+    }
+
+    const feedbackLines = threads.map((thread) => {
+      const comments = thread.comments
+        .map(
+          (c) =>
+            `  - ${c.userId ?? 'Reviewer'}: ${typeof c.body === 'string' ? c.body : JSON.stringify(c.body)}`
+        )
+        .join('\n');
+      return `Thread:\n${comments}`;
+    });
+
+    return `Changes requested:\n\n${feedbackLines.join('\n\n')}`;
+  } catch (err) {
+    logger.warn({ err }, 'Failed to extract feedback from Y.Doc');
+    return 'Changes requested. Check the plan for reviewer comments.';
+  }
+}
 
 // --- Review Status Check ---
 
@@ -14,16 +154,84 @@ import { getSessionState } from '../state.js';
  * Check review status for a session's plan.
  * Called when agent tries to exit plan mode.
  */
-export async function checkReviewStatus(sessionId: string): Promise<CoreResponse> {
-  const state = getSessionState(sessionId);
+export async function checkReviewStatus(
+  sessionId: string,
+  planContent?: string
+): Promise<CoreResponse> {
+  let state = getSessionState(sessionId);
+  let planId: string;
+
+  // Blocking approach: Create plan from ExitPlanMode if we have content
+  if (!state && planContent) {
+    logger.info(
+      { sessionId, contentLength: planContent.length },
+      'Creating plan from ExitPlanMode (blocking mode)'
+    );
+
+    // Get WebSocket URL from registry
+    const wsUrl = await getWebSocketUrl();
+    if (!wsUrl) {
+      logger.error({ sessionId }, 'No WebSocket server available - MCP server not running?');
+      // Fail open if we can't connect
+      return {
+        allow: true,
+        message: 'Warning: Could not connect to peer-plan server. Plan review skipped.',
+      };
+    }
+
+    // Create plan (this opens browser)
+    const result = await createPlan({
+      sessionId,
+      agentType: DEFAULT_AGENT_TYPE,
+      metadata: { source: 'ExitPlanMode' },
+    });
+
+    planId = result.planId;
+
+    // Sync content immediately
+    logger.info({ planId }, 'Syncing plan content');
+    await updatePlanContent(planId, {
+      content: planContent,
+      filePath: '/.claude/plans/plan.md',
+    });
+
+    state = getSessionState(sessionId);
+    logger.info(
+      { planId, url: result.url },
+      'Plan created and synced, browser opened. Waiting for Y.Doc status change...'
+    );
+
+    // Block until user approves/denies via Y.Doc observer
+    const decision = await waitForReviewDecision(planId, wsUrl);
+    logger.info({ planId, approved: decision.approved }, 'Decision received via Y.Doc');
+
+    // Clear session state so next ExitPlanMode goes through Y.Doc observer again
+    // This prevents using stale status from HTTP polling path
+    deleteSessionState(sessionId);
+    logger.debug({ sessionId }, 'Cleared session state for fresh review cycle');
+
+    if (decision.approved) {
+      return {
+        allow: true,
+        message: 'Plan approved',
+        planId,
+      };
+    }
+
+    return {
+      allow: false,
+      message: decision.feedback || 'Changes requested',
+      planId,
+    };
+  }
 
   if (!state) {
-    // No tracked plan - allow exit
-    logger.info({ sessionId }, 'No session state, allowing exit');
+    // No state and no plan content - allow exit
+    logger.info({ sessionId }, 'No session state or plan content, allowing exit');
     return { allow: true };
   }
 
-  const { planId } = state;
+  planId = state.planId;
 
   logger.info({ sessionId, planId }, 'Checking review status');
 
@@ -38,7 +246,7 @@ export async function checkReviewStatus(sessionId: string): Promise<CoreResponse
 
   logger.info({ sessionId, planId, status: status.status }, 'Review status retrieved');
 
-  const baseUrl = process.env.PEER_PLAN_WEB_URL ?? 'http://localhost:5173';
+  const baseUrl = process.env.PEER_PLAN_WEB_URL ?? DEFAULT_WEB_URL;
 
   switch (status.status) {
     case 'approved':
@@ -67,6 +275,22 @@ export async function checkReviewStatus(sessionId: string): Promise<CoreResponse
       return {
         allow: false,
         message: `Plan is still in draft.\n\nSubmit for review at: ${baseUrl}/plan/${planId}`,
+        planId,
+      };
+
+    case 'in_progress':
+      // Plan is approved and work is in progress - allow exit to continue work
+      return {
+        allow: true,
+        message: 'Plan approved. Work is in progress.',
+        planId,
+      };
+
+    case 'completed':
+      // Task is completed - allow exit
+      return {
+        allow: true,
+        message: status.reviewedBy ? `Task completed by ${status.reviewedBy}` : 'Task completed',
         planId,
       };
 

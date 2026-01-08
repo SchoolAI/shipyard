@@ -5,6 +5,7 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { ProfileSetup } from '@/components/ProfileSetup';
+import { StatusChip } from '@/components/StatusChip';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { CollapsiblePanel } from '@/components/ui/collapsible-panel';
 import { useActivePlanSync } from '@/contexts/ActivePlanSyncContext';
@@ -22,15 +23,15 @@ function PlanItem({ plan, isShared, peerCount }: PlanItemProps) {
   return (
     <div className="flex items-center justify-between gap-2 w-full">
       <span className="truncate flex-1 text-foreground">{plan.title}</span>
-      <div className="flex items-center gap-2 shrink-0 text-xs text-muted-foreground">
+      <div className="flex items-center gap-2 shrink-0">
         {peerCount !== undefined && peerCount > 0 && (
-          <span className="flex items-center gap-1">
+          <span className="flex items-center gap-1 text-xs text-muted-foreground">
             <Users className="w-3 h-3" />
             {peerCount}
           </span>
         )}
-        {isShared && !peerCount && <Users className="w-3 h-3" />}
-        <span className="capitalize">{plan.status.replace('_', ' ')}</span>
+        {isShared && !peerCount && <Users className="w-3 h-3 text-muted-foreground" />}
+        <StatusChip status={plan.status} className="text-[10px] h-5 px-1.5" />
       </div>
     </div>
   );

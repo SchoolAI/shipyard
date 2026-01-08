@@ -1,6 +1,12 @@
 import type { Block } from '@blocknote/core';
 import { ServerBlockNoteEditor } from '@blocknote/server-util';
-import { initPlanMetadata, PLAN_INDEX_DOC_NAME, setPlanIndexEntry } from '@peer-plan/schema';
+import {
+  addDeliverable,
+  extractDeliverables,
+  initPlanMetadata,
+  PLAN_INDEX_DOC_NAME,
+  setPlanIndexEntry,
+} from '@peer-plan/schema';
 import { nanoid } from 'nanoid';
 import open from 'open';
 import { z } from 'zod';
@@ -66,6 +72,16 @@ export const createPlanTool = {
         fragment.delete(0, 1);
       }
       editor.blocksToYXmlFragment(blocks, fragment);
+
+      // Extract and store deliverables
+      const deliverables = extractDeliverables(blocks);
+      for (const deliverable of deliverables) {
+        addDeliverable(ydoc, deliverable);
+      }
+
+      if (deliverables.length > 0) {
+        logger.info({ count: deliverables.length }, 'Deliverables extracted and stored');
+      }
     });
 
     logger.info('Content stored in Y.Doc document fragment');

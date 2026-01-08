@@ -20,6 +20,18 @@ export function ArtifactRenderer({ artifact }: ArtifactRendererProps) {
     setLoading(true);
   }, [artifact.url]);
 
+  // Timeout fallback: clear loading spinner after 5 seconds to prevent infinite loading
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      if (loading) {
+        // biome-ignore lint/suspicious/noConsole: Debug logging for timeout troubleshooting
+        console.warn(`[ArtifactRenderer] Timeout loading ${artifact.filename}, clearing spinner`);
+        setLoading(false);
+      }
+    }, 5000);
+    return () => clearTimeout(timeout);
+  }, [artifact.filename, loading]);
+
   if (!artifact.url) {
     return <ArtifactPlaceholder filename={artifact.filename} message="URL not available" />;
   }
@@ -31,15 +43,21 @@ export function ArtifactRenderer({ artifact }: ArtifactRendererProps) {
   switch (artifact.type) {
     case 'screenshot':
       return (
-        <div className="relative">
+        <div className="relative min-h-[200px]">
           {loading && <LoadingSpinner />}
           {/* biome-ignore lint/a11y/noNoninteractiveElementInteractions: onLoad/onError are standard img events for loading states */}
           <img
             src={artifact.url}
             alt={artifact.filename}
-            className="max-w-full rounded-lg border border-separator"
-            onLoad={() => setLoading(false)}
-            onError={() => {
+            className={`max-w-full rounded-lg border border-separator transition-opacity duration-200 ${loading ? 'opacity-0' : 'opacity-100'}`}
+            onLoad={() => {
+              // biome-ignore lint/suspicious/noConsole: Debug logging for load events
+              console.log(`[ArtifactRenderer] Image loaded: ${artifact.filename}`);
+              setLoading(false);
+            }}
+            onError={(e) => {
+              // biome-ignore lint/suspicious/noConsole: Debug logging for load errors
+              console.error(`[ArtifactRenderer] Image error: ${artifact.filename}`, e);
               setLoading(false);
               setError(true);
             }}
@@ -101,7 +119,7 @@ function ArtifactPlaceholder({ filename, message }: { filename: string; message:
 
 function LoadingSpinner() {
   return (
-    <div className="absolute inset-0 flex items-center justify-center bg-muted rounded-lg">
+    <div className="absolute inset-0 flex items-center justify-center bg-muted/50 rounded-lg">
       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
     </div>
   );
@@ -128,7 +146,7 @@ function JsonViewer({ url, filename, onError }: TextViewerProps) {
 
   if (!data) {
     return (
-      <div className="bg-surface rounded-lg p-4 h-32 flex items-center justify-center">
+      <div className="relative bg-surface rounded-lg p-4 min-h-[200px]">
         <LoadingSpinner />
       </div>
     );
@@ -166,7 +184,7 @@ function DiffViewer({ url, filename, onError }: TextViewerProps) {
 
   if (!data) {
     return (
-      <div className="bg-surface rounded-lg p-4 h-32 flex items-center justify-center">
+      <div className="relative bg-surface rounded-lg p-4 min-h-[200px]">
         <LoadingSpinner />
       </div>
     );

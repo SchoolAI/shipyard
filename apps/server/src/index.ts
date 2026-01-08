@@ -10,6 +10,7 @@ import {
 import { logger } from './logger.js';
 import { isRegistryRunning, startRegistryServer } from './registry-server.js';
 import { addArtifactTool } from './tools/add-artifact.js';
+import { completeTaskTool } from './tools/complete-task.js';
 import { createPlanTool } from './tools/create-plan.js';
 import { listPlansTool } from './tools/list-plans.js';
 import { readPlanTool } from './tools/read-plan.js';
@@ -46,6 +47,7 @@ const server = new Server(
 server.setRequestHandler(ListToolsRequestSchema, async () => ({
   tools: [
     addArtifactTool.definition,
+    completeTaskTool.definition,
     createPlanTool.definition,
     listPlansTool.definition,
     readPlanTool.definition,
@@ -61,6 +63,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   switch (name) {
     case TOOL_NAMES.ADD_ARTIFACT:
       return await addArtifactTool.handler(args ?? {});
+    case TOOL_NAMES.COMPLETE_TASK:
+      return await completeTaskTool.handler(args ?? {});
     case TOOL_NAMES.CREATE_PLAN:
       return await createPlanTool.handler(args ?? {});
     case TOOL_NAMES.LIST_PLANS:

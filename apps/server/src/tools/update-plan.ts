@@ -14,7 +14,7 @@ const UpdatePlanInput = z.object({
   planId: z.string().describe('The plan ID to update'),
   title: z.string().optional().describe('New title'),
   status: z
-    .enum(['draft', 'pending_review', 'approved', 'changes_requested'])
+    .enum(['draft', 'pending_review', 'approved', 'changes_requested', 'in_progress'])
     .optional()
     .describe('New status'),
 });
@@ -30,7 +30,7 @@ export const updatePlanTool = {
         title: { type: 'string', description: 'New title (optional)' },
         status: {
           type: 'string',
-          enum: ['draft', 'pending_review', 'approved', 'changes_requested'],
+          enum: ['draft', 'pending_review', 'approved', 'changes_requested', 'in_progress'],
           description: 'New status (optional)',
         },
       },

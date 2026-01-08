@@ -1,5 +1,5 @@
 import { Modal } from '@heroui/react';
-import type { ReactNode } from 'react';
+import type { ComponentProps, ReactNode } from 'react';
 
 interface DrawerProps {
   /** Whether the drawer is open */
@@ -55,7 +55,7 @@ export function Drawer({
           aria-modal="true"
           aria-label="Navigation drawer"
         >
-          {children}
+          {children as ComponentProps<typeof Modal.Dialog>['children']}
         </Modal.Dialog>
       </Modal.Container>
     </Modal.Backdrop>

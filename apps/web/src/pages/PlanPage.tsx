@@ -1,10 +1,12 @@
 import { useOverlayState } from '@heroui/react';
 import {
+  getDeliverables,
   getPlanIndexEntry,
   getPlanMetadata,
   PLAN_INDEX_DOC_NAME,
   type PlanMetadata,
   setPlanIndexEntry,
+  YDOC_KEYS,
 } from '@peer-plan/schema';
 import { FileText, Package } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -40,6 +42,7 @@ export function PlanPage() {
   const [metadata, setMetadata] = useState<PlanMetadata | null>(null);
   const [showProfileSetup, setShowProfileSetup] = useState(false);
   const [activeView, setActiveView] = useState<ViewType>('plan');
+  const [deliverableCount, setDeliverableCount] = useState({ completed: 0, total: 0 });
   // Track if user was trying to comment when they opened profile setup
   const wasRequestingCommentRef = useRef(false);
 
@@ -59,6 +62,19 @@ export function PlanPage() {
     update();
     metaMap.observe(update);
     return () => metaMap.unobserve(update);
+  }, [ydoc]);
+
+  // Subscribe to deliverables for tab count
+  useEffect(() => {
+    const deliverablesArray = ydoc.getArray(YDOC_KEYS.DELIVERABLES);
+    const updateCount = () => {
+      const deliverables = getDeliverables(ydoc);
+      const completed = deliverables.filter((d) => d.linkedArtifactId).length;
+      setDeliverableCount({ completed, total: deliverables.length });
+    };
+    updateCount();
+    deliverablesArray.observe(updateCount);
+    return () => deliverablesArray.unobserve(updateCount);
   }, [ydoc]);
 
   // Update context with active plan sync state
@@ -164,6 +180,11 @@ export function PlanPage() {
             >
               <Package className="w-4 h-4" />
               Deliverables
+              {deliverableCount.total > 0 && (
+                <span className="text-xs opacity-70">
+                  ({deliverableCount.completed}/{deliverableCount.total})
+                </span>
+              )}
             </button>
           </div>
         </div>
@@ -190,7 +211,12 @@ export function PlanPage() {
 
         {activeView === 'deliverables' && (
           <div className="flex-1 overflow-y-auto bg-background">
-            <DeliverablesView planId={planId} />
+            <DeliverablesView
+              ydoc={ydoc}
+              metadata={metadata}
+              identity={identity}
+              onRequestIdentity={handleRequestIdentity}
+            />
           </div>
         )}
       </div>

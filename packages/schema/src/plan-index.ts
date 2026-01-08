@@ -25,6 +25,8 @@ export const PlanStatus = {
   PENDING_REVIEW: 'pending_review',
   APPROVED: 'approved',
   CHANGES_REQUESTED: 'changes_requested',
+  IN_PROGRESS: 'in_progress',
+  COMPLETED: 'completed',
 } as const;
 
 export type { PlanStatusType };

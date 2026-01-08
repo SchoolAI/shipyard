@@ -87,6 +87,19 @@ export const YDOC_KEYS = {
   ARTIFACTS: 'artifacts' as const,
 
   /**
+   * Deliverables extracted from plan (Y.Array<Deliverable>)
+   * Contains checkboxes marked with {#deliverable} tag
+   * Linked to artifacts when agent uploads proof
+   *
+   * Used by:
+   * - Server: apps/server/src/tools/create-plan.ts (write)
+   * - Server: apps/server/src/tools/add-artifact.ts (update on link)
+   * - Web: apps/web/src/components/DeliverablesView.tsx (read)
+   * - Helpers: packages/schema/src/yjs-helpers.ts (read/write)
+   */
+  DELIVERABLES: 'deliverables' as const,
+
+  /**
    * Agent presence (Y.Map<string, AgentPresence>)
    * Maps session ID → presence info (agentType, connectedAt, lastSeenAt)
    * Used for real-time "Claude is here" indicator

@@ -1,8 +1,9 @@
 import { Chip } from '@heroui/react';
-import type { PlanMetadata, PlanStatusType } from '@peer-plan/schema';
+import type { PlanMetadata } from '@peer-plan/schema';
 import type * as Y from 'yjs';
 import { ReviewActions } from '@/components/ReviewActions';
 import { ShareButton } from '@/components/ShareButton';
+import { StatusChip } from '@/components/StatusChip';
 import { useActivePlanSync } from '@/contexts/ActivePlanSyncContext';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import type { UserIdentity } from '@/utils/identity';
@@ -34,33 +35,11 @@ export function PlanHeader({
   const { syncState } = useActivePlanSync();
   const isMobile = useIsMobile();
 
-  const getStatusChipProps = (
-    status: PlanStatusType
-  ): { color: 'success' | 'warning' | 'danger' | 'default'; variant: 'soft' | 'tertiary' } => {
-    switch (status) {
-      case 'approved':
-        return { color: 'success', variant: 'soft' };
-      case 'pending_review':
-        return { color: 'warning', variant: 'soft' };
-      case 'changes_requested':
-        return { color: 'danger', variant: 'soft' };
-      case 'draft':
-        return { color: 'default', variant: 'tertiary' };
-      default: {
-        // Exhaustiveness check
-        status satisfies never;
-        return { color: 'default', variant: 'tertiary' };
-      }
-    }
-  };
-
   return (
     <div className="flex flex-wrap items-center gap-2 w-full">
       {/* Title and status */}
       <h1 className="text-lg md:text-xl font-semibold text-foreground truncate">{display.title}</h1>
-      <Chip {...getStatusChipProps(display.status)} className="shrink-0">
-        {display.status.replace('_', ' ')}
-      </Chip>
+      <StatusChip status={display.status} className="shrink-0" />
       {isSnapshot && (
         <Chip color="warning" variant="soft" className="shrink-0">
           snapshot

@@ -1,6 +1,13 @@
 import type * as Y from 'yjs';
 import { type AgentPresence, AgentPresenceSchema } from './hook-api.js';
-import { type Artifact, ArtifactSchema, type PlanMetadata, PlanMetadataSchema } from './plan.js';
+import {
+  type Artifact,
+  ArtifactSchema,
+  type Deliverable,
+  DeliverableSchema,
+  type PlanMetadata,
+  PlanMetadataSchema,
+} from './plan.js';
 import { YDOC_KEYS } from './yjs-keys.js';
 
 /**
@@ -210,4 +217,68 @@ export function getAgentPresence(ydoc: Y.Doc, sessionId: string): AgentPresence 
 
   const parsed = AgentPresenceSchema.safeParse(value);
   return parsed.success ? parsed.data : null;
+}
+
+// --- Deliverable Helpers ---
+
+/**
+ * Gets all deliverables from Y.Doc with validation.
+ *
+ * @param ydoc - Yjs document
+ * @returns Array of validated deliverables
+ */
+export function getDeliverables(ydoc: Y.Doc): Deliverable[] {
+  const array = ydoc.getArray(YDOC_KEYS.DELIVERABLES);
+  const data = array.toJSON() as unknown[];
+
+  return data
+    .map((item) => DeliverableSchema.safeParse(item))
+    .filter((result) => result.success)
+    .map((result) => result.data);
+}
+
+/**
+ * Adds a deliverable to Y.Doc.
+ *
+ * @param ydoc - Yjs document
+ * @param deliverable - Deliverable to add
+ */
+export function addDeliverable(ydoc: Y.Doc, deliverable: Deliverable): void {
+  const array = ydoc.getArray(YDOC_KEYS.DELIVERABLES);
+  array.push([deliverable]);
+}
+
+/**
+ * Links an artifact to a deliverable.
+ * Updates the deliverable with the artifact ID and timestamp.
+ *
+ * @param ydoc - Yjs document
+ * @param deliverableId - ID of the deliverable
+ * @param artifactId - ID of the artifact to link
+ * @returns true if updated, false if deliverable not found
+ */
+export function linkArtifactToDeliverable(
+  ydoc: Y.Doc,
+  deliverableId: string,
+  artifactId: string
+): boolean {
+  const array = ydoc.getArray(YDOC_KEYS.DELIVERABLES);
+  const deliverables = array.toJSON() as Deliverable[];
+  const index = deliverables.findIndex((d) => d.id === deliverableId);
+
+  if (index === -1) return false;
+
+  const existing = deliverables[index];
+  if (!existing) return false; // Should never happen, but TypeScript requires check
+
+  const updated: Deliverable = {
+    id: existing.id,
+    text: existing.text,
+    linkedArtifactId: artifactId,
+    linkedAt: Date.now(),
+  };
+
+  array.delete(index, 1);
+  array.insert(index, [updated]);
+  return true;
 }
