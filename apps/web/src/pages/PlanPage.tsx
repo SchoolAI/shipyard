@@ -229,18 +229,32 @@ export function PlanPage() {
     }
 
     if (!metadata) {
-      // If user is not authenticated, they might need to sign in to access a shared plan
+      // If user is not authenticated, they need to sign in first
+      // Don't show "Plan Not Found" - the plan might exist but we can't verify without auth
       if (!githubIdentity) {
         return (
-          <div className="p-8 text-center max-w-md mx-auto">
-            <h1 className="text-xl font-bold text-foreground mb-4">Plan Not Found</h1>
-            <p className="text-muted-foreground mb-4">
-              This plan might be private. Try signing in with GitHub to request access.
-            </p>
-            <Button onPress={() => startAuth()} variant="primary">
-              <LogIn className="w-4 h-4" />
-              Sign in with GitHub
-            </Button>
+          <div className="flex items-center justify-center min-h-[60vh] p-4">
+            <div className="bg-surface border border-separator rounded-lg p-8 max-w-md w-full text-center">
+              <div className="flex justify-center mb-6">
+                <LogIn className="w-12 h-12 text-primary" />
+              </div>
+
+              <h1 className="text-xl font-semibold text-foreground mb-2">
+                Authentication Required
+              </h1>
+
+              <p className="text-muted-foreground mb-4">Sign in with GitHub to access this plan.</p>
+
+              <p className="text-sm text-muted-foreground mb-6">
+                If you own this plan or have been granted access, you'll be able to view it after
+                signing in.
+              </p>
+
+              <Button onPress={() => startAuth()} variant="primary" className="w-full">
+                <LogIn className="w-4 h-4" />
+                Sign in with GitHub
+              </Button>
+            </div>
           </div>
         );
       }

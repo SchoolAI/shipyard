@@ -29,19 +29,26 @@ export function WaitingRoomGate({
   onStartAuth,
   children,
 }: WaitingRoomGateProps) {
-  const { isPending, isRejected, requiresApproval } = useApprovalStatus(syncState);
+  const { isPending, isRejected } = useApprovalStatus(syncState);
+
+  // Read ownerId directly from Y.Doc to determine if approval is required
+  // This works even if approvalStatus hasn't been computed yet
+  const ownerId = getPlanOwnerId(ydoc);
+  const requiresApproval = ownerId !== null;
 
   if (!requiresApproval) {
     return <>{children}</>;
   }
 
   // Show auth prompt if user needs to authenticate to access this plan
+  // This must come BEFORE checking pending/rejected since unauthenticated users
+  // don't have an approval status yet
   if (!githubIdentity) {
     return <AuthRequired title={metadata.title} onStartAuth={onStartAuth} />;
   }
 
   if (isPending) {
-    return <WaitingRoom title={metadata.title} ownerId={getPlanOwnerId(ydoc)} />;
+    return <WaitingRoom title={metadata.title} ownerId={ownerId} />;
   }
 
   if (isRejected) {
