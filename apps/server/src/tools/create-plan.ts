@@ -76,13 +76,16 @@ When read_plan is called, deliverables show with {id="block-id"} for artifact li
     logger.info({ planId, title: input.title, repo }, 'Creating plan');
 
     const ydoc = await getOrCreateDoc(planId);
+    const ownerId = getGitHubUsername();
+    logger.info({ ownerId }, 'GitHub username for plan ownership');
+
     initPlanMetadata(ydoc, {
       id: planId,
       title: input.title,
       status: 'draft',
       repo,
       pr: input.prNumber,
-      ownerId: getGitHubUsername(),
+      ownerId,
       sessionTokenHash,
     });
 

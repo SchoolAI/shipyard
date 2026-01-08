@@ -1,4 +1,4 @@
-import { useOverlayState } from '@heroui/react';
+import { Button, useOverlayState } from '@heroui/react';
 import {
   addArtifact,
   extractDeliverables,
@@ -11,7 +11,7 @@ import {
   setPlanIndexEntry,
   YDOC_KEYS,
 } from '@peer-plan/schema';
-import { FileText, Package } from 'lucide-react';
+import { FileText, LogIn, Package } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -28,6 +28,7 @@ import { Sidebar } from '@/components/Sidebar';
 import { Drawer } from '@/components/ui/drawer';
 import { WaitingRoomGate } from '@/components/WaitingRoomGate';
 import { useActivePlanSync } from '@/contexts/ActivePlanSyncContext';
+import { useGitHubAuth } from '@/hooks/useGitHubAuth';
 import { useIdentity } from '@/hooks/useIdentity';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { useMultiProviderSync } from '@/hooks/useMultiProviderSync';
@@ -68,6 +69,7 @@ export function PlanPage() {
   const ydoc = isSnapshot ? (snapshotYdoc ?? syncedYdoc) : syncedYdoc;
 
   const { identity } = useIdentity();
+  const { identity: githubIdentity, startAuth } = useGitHubAuth();
   const isMobile = useIsMobile();
   const drawerState = useOverlayState();
   const { setActivePlanSync, clearActivePlanSync } = useActivePlanSync();
@@ -227,6 +229,23 @@ export function PlanPage() {
     }
 
     if (!metadata) {
+      // If user is not authenticated, they might need to sign in to access a shared plan
+      if (!githubIdentity) {
+        return (
+          <div className="p-8 text-center max-w-md mx-auto">
+            <h1 className="text-xl font-bold text-foreground mb-4">Plan Not Found</h1>
+            <p className="text-muted-foreground mb-4">
+              This plan might be private. Try signing in with GitHub to request access.
+            </p>
+            <Button onPress={() => startAuth()} variant="primary">
+              <LogIn className="w-4 h-4" />
+              Sign in with GitHub
+            </Button>
+          </div>
+        );
+      }
+
+      // User is authenticated but plan still doesn't exist
       return (
         <div className="p-8 text-center">
           <h1 className="text-xl font-bold text-foreground">Plan Not Found</h1>
@@ -259,7 +278,13 @@ export function PlanPage() {
   }
 
   const pageContent = (
-    <WaitingRoomGate ydoc={ydoc} syncState={syncState} metadata={metadata}>
+    <WaitingRoomGate
+      ydoc={ydoc}
+      syncState={syncState}
+      metadata={metadata}
+      githubIdentity={githubIdentity}
+      onStartAuth={startAuth}
+    >
       <div className="flex flex-col h-full overflow-hidden">
         {/* Header bar with plan metadata - hidden on mobile (shown in MobileHeader instead) */}
         {!isMobile && (
