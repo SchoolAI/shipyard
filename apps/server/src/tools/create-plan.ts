@@ -11,7 +11,8 @@ import { nanoid } from 'nanoid';
 import open from 'open';
 import { z } from 'zod';
 import { logger } from '../logger.js';
-import { getOrCreateDoc } from '../ws-server.js';
+import { getServerId } from '../server-identity.js';
+import { getOrCreateDoc, hasActiveConnections } from '../ws-server.js';
 import { TOOL_NAMES } from './tool-names.js';
 
 // --- Input Schema ---
@@ -55,6 +56,7 @@ export const createPlanTool = {
       status: 'draft',
       repo: input.repo,
       pr: input.prNumber,
+      ownerId: getServerId(),
     });
 
     // Parse markdown to blocks and store in Y.XmlFragment for BlockNote collaboration
