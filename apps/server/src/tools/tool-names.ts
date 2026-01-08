@@ -6,7 +6,6 @@ export const TOOL_NAMES = {
   ADD_ARTIFACT: 'add_artifact',
   COMPLETE_TASK: 'complete_task',
   CREATE_PLAN: 'create_plan',
-  LIST_PLANS: 'list_plans',
   READ_PLAN: 'read_plan',
   SETUP_REVIEW_NOTIFICATION: 'setup_review_notification',
   UPDATE_BLOCK_CONTENT: 'update_block_content',

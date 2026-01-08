@@ -12,7 +12,6 @@ import { isRegistryRunning, startRegistryServer } from './registry-server.js';
 import { addArtifactTool } from './tools/add-artifact.js';
 import { completeTaskTool } from './tools/complete-task.js';
 import { createPlanTool } from './tools/create-plan.js';
-import { listPlansTool } from './tools/list-plans.js';
 import { readPlanTool } from './tools/read-plan.js';
 import { setupReviewNotificationTool } from './tools/setup-review-notification.js';
 import { TOOL_NAMES } from './tools/tool-names.js';
@@ -49,7 +48,6 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     addArtifactTool.definition,
     completeTaskTool.definition,
     createPlanTool.definition,
-    listPlansTool.definition,
     readPlanTool.definition,
     setupReviewNotificationTool.definition,
     updateBlockContentTool.definition,
@@ -67,8 +65,6 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       return await completeTaskTool.handler(args ?? {});
     case TOOL_NAMES.CREATE_PLAN:
       return await createPlanTool.handler(args ?? {});
-    case TOOL_NAMES.LIST_PLANS:
-      return await listPlansTool.handler(args ?? {});
     case TOOL_NAMES.READ_PLAN:
       return await readPlanTool.handler(args ?? {});
     case TOOL_NAMES.SETUP_REVIEW_NOTIFICATION:

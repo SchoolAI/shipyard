@@ -83,7 +83,7 @@ Claude: "Create a plan for adding dark mode"
 - ✅ Browser multi-provider sync (connects to all MCP instances)
 - ✅ Sidebar with plan list (Notion-like UI)
 - ✅ Routing: `/`, `/plan/:id`, `/?d=` for snapshots
-- ✅ New MCP tools: `list_plans`, `read_plan`, `update_plan`
+- ✅ New MCP tools: `read_plan`, `update_plan`
 - ✅ Plan index syncs via CRDT across all peers
 
 **Architecture:**

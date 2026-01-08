@@ -342,7 +342,7 @@ Result: Editor shows content! 🎉
 | `document` | Y.XmlFragment | ✅ create-plan | ❌ | ✅ BlockNote editor | ✅ PlanViewer (BlockNote) |
 | `threads` | Y.Map | ❌ | ✅ get-feedback | ✅ BlockNote (YjsThreadStore) | ✅ PlanViewer, CommentsPanel |
 | `stepCompletions` | Y.Map | ❌ | ❌ | ✅ toggleStepCompletion | ✅ StepCheckbox |
-| `plans` | Y.Map | ✅ create-plan, update-plan | ✅ list-plans | ✅ PlanPage (status update) | ✅ usePlanIndex |
+| `plans` | Y.Map | ✅ create-plan, update-plan | ❌ | ✅ PlanPage (status update) | ✅ usePlanIndex |
 
 ## Legend
 
