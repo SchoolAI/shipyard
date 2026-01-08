@@ -39,6 +39,8 @@ export interface PlanMetadata {
   /** Defaults to true when ownerId is set */
   approvalRequired?: boolean;
   approvedUsers?: string[];
+  /** SHA256 hash of session token for MCP API access */
+  sessionTokenHash?: string;
 }
 
 export const PlanMetadataSchema = z.object({
@@ -57,6 +59,7 @@ export const PlanMetadataSchema = z.object({
   ownerId: z.string().optional(),
   approvalRequired: z.boolean().optional(),
   approvedUsers: z.array(z.string()).optional(),
+  sessionTokenHash: z.string().optional(),
 });
 
 export type ArtifactType = 'screenshot' | 'video' | 'test_results' | 'diff';

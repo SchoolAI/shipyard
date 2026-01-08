@@ -1,8 +1,14 @@
 import type { Block } from '@blocknote/core';
 import { ServerBlockNoteEditor } from '@blocknote/server-util';
-import { PLAN_INDEX_DOC_NAME, setPlanMetadata, touchPlanIndexEntry } from '@peer-plan/schema';
+import {
+  getPlanMetadata,
+  PLAN_INDEX_DOC_NAME,
+  setPlanMetadata,
+  touchPlanIndexEntry,
+} from '@peer-plan/schema';
 import { z } from 'zod';
 import { logger } from '../logger.js';
+import { verifySessionToken } from '../session-token.js';
 import { getOrCreateDoc } from '../ws-server.js';
 import { TOOL_NAMES } from './tool-names.js';
 
@@ -34,6 +40,7 @@ const BlockOperationSchema = z.discriminatedUnion('type', [
 
 const UpdateBlockContentInput = z.object({
   planId: z.string().describe('The plan ID to modify'),
+  sessionToken: z.string().describe('Session token from create_plan'),
   operations: z
     .array(BlockOperationSchema)
     .min(1)
@@ -53,6 +60,7 @@ export const updateBlockContentTool = {
       type: 'object',
       properties: {
         planId: { type: 'string', description: 'The plan ID to modify' },
+        sessionToken: { type: 'string', description: 'Session token from create_plan' },
         operations: {
           type: 'array',
           description: 'Array of operations to perform',
@@ -82,17 +90,37 @@ export const updateBlockContentTool = {
           },
         },
       },
-      required: ['planId', 'operations'],
+      required: ['planId', 'sessionToken', 'operations'],
     },
   },
 
   handler: async (args: unknown) => {
     const input = UpdateBlockContentInput.parse(args);
-    const { planId, operations } = input;
+    const { planId, sessionToken, operations } = input;
 
     logger.info({ planId, operationCount: operations.length }, 'Updating block content');
 
     const ydoc = await getOrCreateDoc(planId);
+
+    // Verify session token first
+    const metadata = getPlanMetadata(ydoc);
+    if (!metadata) {
+      return {
+        content: [{ type: 'text', text: `Plan "${planId}" not found.` }],
+        isError: true,
+      };
+    }
+
+    if (
+      !metadata.sessionTokenHash ||
+      !verifySessionToken(sessionToken, metadata.sessionTokenHash)
+    ) {
+      return {
+        content: [{ type: 'text', text: `Invalid session token for plan "${planId}".` }],
+        isError: true,
+      };
+    }
+
     const editor = ServerBlockNoteEditor.create();
 
     // Get current blocks from document fragment

@@ -1,11 +1,13 @@
 import { formatDeliverablesForLLM, getDeliverables, getPlanMetadata } from '@peer-plan/schema';
 import { z } from 'zod';
 import { exportPlanToMarkdown } from '../export-markdown.js';
+import { verifySessionToken } from '../session-token.js';
 import { getOrCreateDoc } from '../ws-server.js';
 import { TOOL_NAMES } from './tool-names.js';
 
 const ReadPlanInput = z.object({
   planId: z.string().describe('The plan ID to read'),
+  sessionToken: z.string().describe('Session token from create_plan'),
   includeAnnotations: z
     .boolean()
     .optional()
@@ -21,17 +23,18 @@ export const readPlanTool = {
       type: 'object',
       properties: {
         planId: { type: 'string', description: 'The plan ID to read' },
+        sessionToken: { type: 'string', description: 'Session token from create_plan' },
         includeAnnotations: {
           type: 'boolean',
           description: 'Include comment threads/annotations in the response (default: false)',
         },
       },
-      required: ['planId'],
+      required: ['planId', 'sessionToken'],
     },
   },
 
   handler: async (args: unknown) => {
-    const { planId, includeAnnotations = false } = ReadPlanInput.parse(args);
+    const { planId, sessionToken, includeAnnotations = false } = ReadPlanInput.parse(args);
     const doc = await getOrCreateDoc(planId);
     const metadata = getPlanMetadata(doc);
 
@@ -41,6 +44,22 @@ export const readPlanTool = {
           {
             type: 'text',
             text: `Plan "${planId}" not found or has no metadata.`,
+          },
+        ],
+        isError: true,
+      };
+    }
+
+    // Verify session token
+    if (
+      !metadata.sessionTokenHash ||
+      !verifySessionToken(sessionToken, metadata.sessionTokenHash)
+    ) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Invalid session token for plan "${planId}".`,
           },
         ],
         isError: true,

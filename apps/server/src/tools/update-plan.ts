@@ -7,11 +7,13 @@ import {
 } from '@peer-plan/schema';
 import { z } from 'zod';
 import { logger } from '../logger.js';
+import { verifySessionToken } from '../session-token.js';
 import { getOrCreateDoc } from '../ws-server.js';
 import { TOOL_NAMES } from './tool-names.js';
 
 const UpdatePlanInput = z.object({
   planId: z.string().describe('The plan ID to update'),
+  sessionToken: z.string().describe('Session token from create_plan'),
   title: z.string().optional().describe('New title'),
   status: z
     .enum(['draft', 'pending_review', 'approved', 'changes_requested', 'in_progress'])
@@ -27,6 +29,7 @@ export const updatePlanTool = {
       type: 'object',
       properties: {
         planId: { type: 'string', description: 'The plan ID to update' },
+        sessionToken: { type: 'string', description: 'Session token from create_plan' },
         title: { type: 'string', description: 'New title (optional)' },
         status: {
           type: 'string',
@@ -34,7 +37,7 @@ export const updatePlanTool = {
           description: 'New status (optional)',
         },
       },
-      required: ['planId'],
+      required: ['planId', 'sessionToken'],
     },
   },
 
@@ -49,6 +52,22 @@ export const updatePlanTool = {
           {
             type: 'text',
             text: `Plan "${input.planId}" not found.`,
+          },
+        ],
+        isError: true,
+      };
+    }
+
+    // Verify session token
+    if (
+      !existingMetadata.sessionTokenHash ||
+      !verifySessionToken(input.sessionToken, existingMetadata.sessionTokenHash)
+    ) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Invalid session token for plan "${input.planId}".`,
           },
         ],
         isError: true,

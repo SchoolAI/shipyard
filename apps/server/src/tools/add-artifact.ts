@@ -8,6 +8,7 @@ import { nanoid } from 'nanoid';
 import { z } from 'zod';
 import { isArtifactsEnabled, isGitHubConfigured, uploadArtifact } from '../github-artifacts.js';
 import { logger } from '../logger.js';
+import { verifySessionToken } from '../session-token.js';
 import { getOrCreateDoc } from '../ws-server.js';
 import { TOOL_NAMES } from './tool-names.js';
 
@@ -15,6 +16,7 @@ import { TOOL_NAMES } from './tool-names.js';
 
 const AddArtifactInput = z.object({
   planId: z.string().describe('The plan ID to add artifact to'),
+  sessionToken: z.string().describe('Session token from create_plan'),
   type: z.enum(['screenshot', 'video', 'test_results', 'diff']).describe('Artifact type'),
   filename: z.string().describe('Filename for the artifact'),
   content: z.string().describe('Base64 encoded file content'),
@@ -33,6 +35,7 @@ export const addArtifactTool = {
       type: 'object',
       properties: {
         planId: { type: 'string', description: 'The plan ID to add artifact to' },
+        sessionToken: { type: 'string', description: 'Session token from create_plan' },
         type: {
           type: 'string',
           enum: ['screenshot', 'video', 'test_results', 'diff'],
@@ -49,13 +52,13 @@ export const addArtifactTool = {
           description: 'ID of the deliverable this artifact fulfills',
         },
       },
-      required: ['planId', 'type', 'filename', 'content'],
+      required: ['planId', 'sessionToken', 'type', 'filename', 'content'],
     },
   },
 
   handler: async (args: unknown) => {
     const input = AddArtifactInput.parse(args);
-    const { planId, type, filename, content } = input;
+    const { planId, sessionToken, type, filename, content } = input;
 
     logger.info({ planId, type, filename }, 'Adding artifact');
 
@@ -92,6 +95,17 @@ export const addArtifactTool = {
     if (!metadata) {
       return {
         content: [{ type: 'text', text: `Plan "${planId}" not found.` }],
+        isError: true,
+      };
+    }
+
+    // Verify session token
+    if (
+      !metadata.sessionTokenHash ||
+      !verifySessionToken(sessionToken, metadata.sessionTokenHash)
+    ) {
+      return {
+        content: [{ type: 'text', text: `Invalid session token for plan "${planId}".` }],
         isError: true,
       };
     }

@@ -80,6 +80,10 @@ export function initPlanMetadata(
     map.set('approvedUsers', [init.ownerId]);
     map.set('approvalRequired', init.approvalRequired ?? true);
   }
+
+  if (init.sessionTokenHash) {
+    map.set('sessionTokenHash', init.sessionTokenHash);
+  }
 }
 
 /**

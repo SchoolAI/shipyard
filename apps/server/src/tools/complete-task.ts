@@ -9,11 +9,13 @@ import {
 } from '@peer-plan/schema';
 import { z } from 'zod';
 import { logger } from '../logger.js';
+import { verifySessionToken } from '../session-token.js';
 import { getOrCreateDoc } from '../ws-server.js';
 import { TOOL_NAMES } from './tool-names.js';
 
 const CompleteTaskInput = z.object({
   planId: z.string().describe('ID of the plan to complete'),
+  sessionToken: z.string().describe('Session token from create_plan'),
   summary: z.string().optional().describe('Optional completion summary'),
 });
 
@@ -26,9 +28,10 @@ export const completeTaskTool = {
       type: 'object',
       properties: {
         planId: { type: 'string', description: 'ID of the plan to complete' },
+        sessionToken: { type: 'string', description: 'Session token from create_plan' },
         summary: { type: 'string', description: 'Optional completion summary' },
       },
-      required: ['planId'],
+      required: ['planId', 'sessionToken'],
     },
   },
 
@@ -40,6 +43,17 @@ export const completeTaskTool = {
     if (!metadata) {
       return {
         content: [{ type: 'text', text: 'Plan not found' }],
+        isError: true,
+      };
+    }
+
+    // Verify session token
+    if (
+      !metadata.sessionTokenHash ||
+      !verifySessionToken(input.sessionToken, metadata.sessionTokenHash)
+    ) {
+      return {
+        content: [{ type: 'text', text: `Invalid session token for plan "${input.planId}".` }],
         isError: true,
       };
     }

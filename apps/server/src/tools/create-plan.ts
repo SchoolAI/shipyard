@@ -12,6 +12,7 @@ import open from 'open';
 import { z } from 'zod';
 import { logger } from '../logger.js';
 import { getServerId } from '../server-identity.js';
+import { generateSessionToken, hashSessionToken } from '../session-token.js';
 import { getOrCreateDoc, hasActiveConnections } from '../ws-server.js';
 import { TOOL_NAMES } from './tool-names.js';
 
@@ -45,6 +46,8 @@ export const createPlanTool = {
   handler: async (args: unknown) => {
     const input = CreatePlanInput.parse(args);
     const planId = nanoid();
+    const sessionToken = generateSessionToken();
+    const sessionTokenHash = hashSessionToken(sessionToken);
     const now = Date.now();
 
     logger.info({ planId, title: input.title }, 'Creating plan');
@@ -57,6 +60,7 @@ export const createPlanTool = {
       repo: input.repo,
       pr: input.prNumber,
       ownerId: getServerId(),
+      sessionTokenHash,
     });
 
     // Parse markdown to blocks and store in Y.XmlFragment for BlockNote collaboration
@@ -115,7 +119,10 @@ export const createPlanTool = {
           type: 'text',
           text: `Plan created!
 ID: ${planId}
+Session Token: ${sessionToken}
 URL: ${url}
+
+IMPORTANT: Save the session token - it's required for read_plan, update_plan, and add_artifact calls.
 
 Use \`${TOOL_NAMES.SETUP_REVIEW_NOTIFICATION}\` tool to be notified when review completes.`,
         },
