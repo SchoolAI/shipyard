@@ -1,4 +1,4 @@
-import { AvatarFallback, AvatarImage, AvatarRoot, Spinner } from '@heroui/react';
+import { Avatar, Spinner } from '@heroui/react';
 import type { GitHubIdentity } from '@/hooks/useGitHubAuth';
 
 interface UserProfileButtonProps {
@@ -6,6 +6,16 @@ interface UserProfileButtonProps {
   isValidating: boolean;
   collapsed?: boolean;
 }
+
+// Note: Avatar compound components have type issues in HeroUI v3 beta
+// Using type assertions until types are fixed in stable release
+const AvatarRoot = Avatar as unknown as React.FC<{
+  children: React.ReactNode;
+  size?: 'sm' | 'md' | 'lg';
+  className?: string;
+}>;
+const AvatarImage = Avatar.Image as React.FC<{ src?: string; alt: string }>;
+const AvatarFallback = Avatar.Fallback as React.FC<{ children: React.ReactNode }>;
 
 export function UserProfileButton({ identity, isValidating, collapsed }: UserProfileButtonProps) {
   if (collapsed) {

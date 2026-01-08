@@ -1,4 +1,4 @@
-import { AvatarFallback, AvatarImage, AvatarRoot } from '@heroui/react';
+import { Avatar } from '@heroui/react';
 import type { GitHubIdentity } from '@/hooks/useGitHubAuth';
 
 interface UserInfoHeaderProps {
@@ -13,6 +13,16 @@ function getInitials(name: string): string {
     .toUpperCase()
     .slice(0, 2);
 }
+
+// Note: Avatar compound components have type issues in HeroUI v3 beta
+// Using type assertions until types are fixed in stable release
+const AvatarRoot = Avatar as unknown as React.FC<{
+  children: React.ReactNode;
+  size?: 'sm' | 'md' | 'lg';
+  className?: string;
+}>;
+const AvatarImage = Avatar.Image as React.FC<{ src?: string; alt: string }>;
+const AvatarFallback = Avatar.Fallback as React.FC<{ children: React.ReactNode }>;
 
 export function UserInfoHeader({ identity }: UserInfoHeaderProps) {
   return (
