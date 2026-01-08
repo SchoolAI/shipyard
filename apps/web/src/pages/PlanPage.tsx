@@ -93,12 +93,14 @@ export function PlanPage() {
     (newStatus: 'approved' | 'changes_requested') => {
       if (!metadata) return;
 
+      // Only update plan-index if the plan is already there (owned by this user's MCP server)
+      // Don't add shared plans to plan-index - they should stay in "Shared with me"
       const existingEntry = getPlanIndexEntry(indexDoc, planId);
+      if (!existingEntry) return;
+
       setPlanIndexEntry(indexDoc, {
-        id: planId,
-        title: metadata.title,
+        ...existingEntry,
         status: newStatus,
-        createdAt: existingEntry?.createdAt ?? Date.now(),
         updatedAt: Date.now(),
       });
     },
