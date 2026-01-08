@@ -22,6 +22,7 @@ import { ReviewActions } from '@/components/ReviewActions';
 import { ShareButton } from '@/components/ShareButton';
 import { Sidebar } from '@/components/Sidebar';
 import { Drawer } from '@/components/ui/drawer';
+import { WaitingRoomGate } from '@/components/WaitingRoomGate';
 import { useActivePlanSync } from '@/contexts/ActivePlanSyncContext';
 import { useIdentity } from '@/hooks/useIdentity';
 import { useIsMobile } from '@/hooks/useIsMobile';
@@ -149,122 +150,124 @@ export function PlanPage() {
   }
 
   const pageContent = (
-    <div className="flex flex-col h-full overflow-hidden">
-      {/* Header bar with plan metadata - hidden on mobile (shown in MobileHeader instead) */}
-      {!isMobile && (
-        <div className="border-b border-separator bg-surface px-2 md:px-6 py-1 md:py-3 shrink-0">
-          <PlanHeader
-            ydoc={ydoc}
-            metadata={metadata}
-            identity={identity}
-            onRequestIdentity={handleRequestIdentity}
-            onStatusChange={handleStatusChange}
-          />
-        </div>
-      )}
-
-      <div className="flex flex-col flex-1 overflow-hidden">
-        {/* Tab navigation */}
-        <div className="border-b border-separator bg-surface px-2 md:px-6 py-1 md:py-2 shrink-0">
-          <div className="flex gap-0 md:gap-4">
-            <button
-              type="button"
-              onClick={() => setActiveView('plan')}
-              className={`flex items-center justify-center gap-2 pb-2 px-2 font-medium text-sm transition-colors flex-1 md:flex-initial ${
-                activeView === 'plan'
-                  ? 'text-primary border-b-2 border-primary'
-                  : 'text-muted-foreground hover:text-foreground border-b-2 border-transparent'
-              }`}
-            >
-              <FileText className="w-4 h-4" />
-              Plan
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveView('deliverables')}
-              className={`flex items-center justify-center gap-2 pb-2 px-2 font-medium text-sm transition-colors flex-1 md:flex-initial ${
-                activeView === 'deliverables'
-                  ? 'text-primary border-b-2 border-primary'
-                  : 'text-muted-foreground hover:text-foreground border-b-2 border-transparent'
-              }`}
-            >
-              <Package className="w-4 h-4" />
-              Deliverables
-              {deliverableCount.total > 0 && (
-                <span className="text-xs opacity-70">
-                  ({deliverableCount.completed}/{deliverableCount.total})
-                </span>
-              )}
-            </button>
-          </div>
-        </div>
-
-        {/* Tab content */}
-        {activeView === 'plan' && (
-          <div className="flex-1 overflow-y-auto bg-background">
-            <div className="max-w-4xl mx-auto px-1 py-2 md:p-6 space-y-3 md:space-y-6">
-              {/* Key forces full remount when identity changes, ensuring
-                    useCreateBlockNote creates a fresh editor with correct extensions.
-                    Without this, changing from anonymous to identified user would crash
-                    because the editor was created without CommentsExtension. */}
-              <PlanViewer
-                key={identity?.id ?? 'anonymous'}
-                ydoc={ydoc}
-                identity={identity}
-                provider={activeProvider}
-                onRequestIdentity={handleRequestIdentity}
-              />
-              <Attachments ydoc={ydoc} />
-            </div>
-          </div>
-        )}
-
-        {activeView === 'deliverables' && (
-          <div className="flex-1 overflow-y-auto bg-background">
-            <DeliverablesView
+    <WaitingRoomGate ydoc={ydoc} syncState={syncState} metadata={metadata}>
+      <div className="flex flex-col h-full overflow-hidden">
+        {/* Header bar with plan metadata - hidden on mobile (shown in MobileHeader instead) */}
+        {!isMobile && (
+          <div className="border-b border-separator bg-surface px-2 md:px-6 py-1 md:py-3 shrink-0">
+            <PlanHeader
               ydoc={ydoc}
               metadata={metadata}
-              identity={identity}
-              onRequestIdentity={handleRequestIdentity}
-            />
-          </div>
-        )}
-      </div>
-
-      {/* Floating review actions on mobile */}
-      {isMobile && metadata && (
-        <div className="fixed bottom-3 right-3 z-30 pb-safe">
-          <div className="bg-surface rounded-lg shadow-lg border border-separator p-2">
-            <ReviewActions
-              ydoc={ydoc}
-              currentStatus={metadata.status}
               identity={identity}
               onRequestIdentity={handleRequestIdentity}
               onStatusChange={handleStatusChange}
             />
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Profile setup modal */}
-      {showProfileSetup && (
-        <ProfileSetup
-          onComplete={() => {
-            setShowProfileSetup(false);
-            if (wasRequestingCommentRef.current) {
+        <div className="flex flex-col flex-1 overflow-hidden">
+          {/* Tab navigation */}
+          <div className="border-b border-separator bg-surface px-2 md:px-6 py-1 md:py-2 shrink-0">
+            <div className="flex gap-0 md:gap-4">
+              <button
+                type="button"
+                onClick={() => setActiveView('plan')}
+                className={`flex items-center justify-center gap-2 pb-2 px-2 font-medium text-sm transition-colors flex-1 md:flex-initial ${
+                  activeView === 'plan'
+                    ? 'text-primary border-b-2 border-primary'
+                    : 'text-muted-foreground hover:text-foreground border-b-2 border-transparent'
+                }`}
+              >
+                <FileText className="w-4 h-4" />
+                Plan
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveView('deliverables')}
+                className={`flex items-center justify-center gap-2 pb-2 px-2 font-medium text-sm transition-colors flex-1 md:flex-initial ${
+                  activeView === 'deliverables'
+                    ? 'text-primary border-b-2 border-primary'
+                    : 'text-muted-foreground hover:text-foreground border-b-2 border-transparent'
+                }`}
+              >
+                <Package className="w-4 h-4" />
+                Deliverables
+                {deliverableCount.total > 0 && (
+                  <span className="text-xs opacity-70">
+                    ({deliverableCount.completed}/{deliverableCount.total})
+                  </span>
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* Tab content */}
+          {activeView === 'plan' && (
+            <div className="flex-1 overflow-y-auto bg-background">
+              <div className="max-w-4xl mx-auto px-1 py-2 md:p-6 space-y-3 md:space-y-6">
+                {/* Key forces full remount when identity changes, ensuring
+                    useCreateBlockNote creates a fresh editor with correct extensions.
+                    Without this, changing from anonymous to identified user would crash
+                    because the editor was created without CommentsExtension. */}
+                <PlanViewer
+                  key={identity?.id ?? 'anonymous'}
+                  ydoc={ydoc}
+                  identity={identity}
+                  provider={activeProvider}
+                  onRequestIdentity={handleRequestIdentity}
+                />
+                <Attachments ydoc={ydoc} />
+              </div>
+            </div>
+          )}
+
+          {activeView === 'deliverables' && (
+            <div className="flex-1 overflow-y-auto bg-background">
+              <DeliverablesView
+                ydoc={ydoc}
+                metadata={metadata}
+                identity={identity}
+                onRequestIdentity={handleRequestIdentity}
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Floating review actions on mobile */}
+        {isMobile && metadata && (
+          <div className="fixed bottom-3 right-3 z-30 pb-safe">
+            <div className="bg-surface rounded-lg shadow-lg border border-separator p-2">
+              <ReviewActions
+                ydoc={ydoc}
+                currentStatus={metadata.status}
+                identity={identity}
+                onRequestIdentity={handleRequestIdentity}
+                onStatusChange={handleStatusChange}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Profile setup modal */}
+        {showProfileSetup && (
+          <ProfileSetup
+            onComplete={() => {
+              setShowProfileSetup(false);
+              if (wasRequestingCommentRef.current) {
+                wasRequestingCommentRef.current = false;
+                toast.success('Ready to comment!', {
+                  description: 'Select text in the document, then click Comment.',
+                });
+              }
+            }}
+            onCancel={() => {
+              setShowProfileSetup(false);
               wasRequestingCommentRef.current = false;
-              toast.success('Ready to comment!', {
-                description: 'Select text in the document, then click Comment.',
-              });
-            }
-          }}
-          onCancel={() => {
-            setShowProfileSetup(false);
-            wasRequestingCommentRef.current = false;
-          }}
-        />
-      )}
-    </div>
+            }}
+          />
+        )}
+      </div>
+    </WaitingRoomGate>
   );
 
   // Mobile: Custom header overlays Layout's default header
