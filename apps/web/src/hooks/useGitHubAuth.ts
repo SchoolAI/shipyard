@@ -105,7 +105,7 @@ async function processOAuthCallback(
   setAuthState({ status: 'exchanging_token' });
 
   try {
-    const redirectUri = window.location.origin;
+    const redirectUri = window.location.origin + (import.meta.env.BASE_URL || '/');
     const { access_token } = await handleCallback(code, state, redirectUri);
 
     const user = await getGitHubUser(access_token);
@@ -210,7 +210,7 @@ export function useGitHubAuth(): UseGitHubAuthReturn {
   }, []);
 
   const startAuth = useCallback((forceAccountPicker = false) => {
-    const redirectUri = window.location.origin;
+    const redirectUri = window.location.origin + (import.meta.env.BASE_URL || '/');
     startWebFlow(redirectUri, forceAccountPicker);
   }, []);
 
