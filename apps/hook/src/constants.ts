@@ -48,6 +48,7 @@ export const DEFAULT_AGENT_TYPE = 'claude-code';
 
 /**
  * Default web UI base URL
+ * Override with PEER_PLAN_WEB_URL env var
  */
 export const DEFAULT_WEB_URL = 'http://localhost:5173';
 

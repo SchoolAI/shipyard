@@ -17,6 +17,7 @@ interface ReviewActionsProps {
  * Approve and Request Changes buttons for plan review.
  *
  * Updates the plan metadata status via Y.Doc.
+ * The hook observes the Y.Doc for status changes to unblock.
  */
 export function ReviewActions({
   ydoc,
@@ -44,7 +45,7 @@ export function ReviewActions({
     try {
       const newStatus = showConfirm === 'approve' ? 'approved' : 'changes_requested';
 
-      // Use transaction to batch updates and trigger observer only once
+      // Update Y.Doc - hook observes this for distributed approval
       ydoc.transact(() => {
         const metadata = ydoc.getMap('metadata');
         metadata.set('status', newStatus);
@@ -54,7 +55,6 @@ export function ReviewActions({
       });
 
       onStatusChange?.(newStatus);
-
       setShowConfirm(null);
     } finally {
       setIsSubmitting(false);

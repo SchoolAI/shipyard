@@ -94,7 +94,7 @@ async function handlePlanExit(
   event: Extract<AdapterEvent, { type: 'plan_exit' }>
 ): Promise<CoreResponse> {
   try {
-    return await checkReviewStatus(event.sessionId);
+    return await checkReviewStatus(event.sessionId, event.planContent);
   } catch (err) {
     logger.error({ err }, 'Failed to check review status');
     // Fail open - allow the operation to proceed
@@ -176,13 +176,25 @@ async function main(): Promise<void> {
 
     // Format and output response
     const output = adapter.formatOutput(response);
+    logger.debug({ output }, 'Sending hook response');
     // biome-ignore lint/suspicious/noConsole: Hook output MUST go to stdout
     console.log(output);
+    process.exit(0);
   } catch (err) {
-    // On any error, fail open
+    // On any error, fail open with allow
     logger.error({ err }, 'Hook error, failing open');
     // biome-ignore lint/suspicious/noConsole: Hook output MUST go to stdout
-    console.log(JSON.stringify({ continue: true }));
+    console.log(
+      JSON.stringify({
+        hookSpecificOutput: {
+          hookEventName: 'PermissionRequest',
+          decision: {
+            behavior: 'allow',
+          },
+        },
+      })
+    );
+    process.exit(0);
   }
 }
 

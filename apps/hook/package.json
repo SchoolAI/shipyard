@@ -22,6 +22,8 @@
     "nanoid": "^5.0.9",
     "open": "^11.0.0",
     "pino": "^10.1.0",
+    "y-websocket": "^2.0.4",
+    "yjs": "^13.6.0",
     "zod": "^4.3.4"
   },
   "devDependencies": {

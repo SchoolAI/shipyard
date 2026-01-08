@@ -1,3 +1,4 @@
+export { formatDeliverablesForLLM } from './deliverable-formatter.js';
 export { extractDeliverables } from './deliverable-parser.js';
 export type {
   AgentPresence,
@@ -74,6 +75,8 @@ export {
   ThreadCommentSchema,
   ThreadSchema,
 } from './thread.js';
+export type { FormatThreadsOptions } from './thread-formatter.js';
+export { formatThreadsForLLM } from './thread-formatter.js';
 export type { UrlEncodedPlan } from './url-encoding.js';
 export {
   createPlanUrl,

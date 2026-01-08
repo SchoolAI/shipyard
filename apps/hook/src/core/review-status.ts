@@ -4,6 +4,8 @@
  */
 
 import {
+  createUserResolver,
+  formatDeliverablesForLLM,
   formatThreadsForLLM,
   type GetReviewStatusResponse,
   getDeliverables,
@@ -153,10 +155,12 @@ function extractFeedbackFromYDoc(ydoc: Y.Doc): string | undefined {
       .filter(Boolean)
       .join('\n');
 
-    // Format threads using shared formatter
+    // Format threads using shared formatter with user name resolution
+    const resolveUser = createUserResolver(ydoc);
     const feedbackText = formatThreadsForLLM(threads, {
       includeResolved: false,
       selectedTextMaxLength: 100,
+      resolveUser,
     });
 
     // Combine: plan content + reviewer feedback
@@ -171,17 +175,12 @@ function extractFeedbackFromYDoc(ydoc: Y.Doc): string | undefined {
     output += '## Reviewer Feedback\n\n';
     output += feedbackText;
 
-    // Add deliverables section if any exist
+    // Add deliverables section if any exist (uses shared formatter)
     const deliverables = getDeliverables(ydoc);
-    if (deliverables.length > 0) {
-      output += '\n\n---\n\n## Deliverables\n\n';
-      for (const deliverable of deliverables) {
-        const status = deliverable.linkedArtifactId ? '✓' : '○';
-        const linkedInfo = deliverable.linkedArtifactId
-          ? ` (linked to artifact: ${deliverable.linkedArtifactId})`
-          : '';
-        output += `${status} ${deliverable.text}${linkedInfo}\n`;
-      }
+    const deliverablesText = formatDeliverablesForLLM(deliverables);
+    if (deliverablesText) {
+      output += '\n\n---\n\n';
+      output += deliverablesText;
     }
 
     return output;

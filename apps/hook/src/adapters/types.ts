@@ -59,6 +59,8 @@ export interface ContentUpdateEvent {
 export interface PlanExitEvent {
   type: 'plan_exit';
   sessionId: string;
+  /** Full plan content from ExitPlanMode (if available) */
+  planContent?: string;
 }
 
 /** Agent session is ending */

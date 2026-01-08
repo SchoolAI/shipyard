@@ -50,6 +50,40 @@ async function getRegistryUrl(): Promise<string | null> {
 // --- API Methods ---
 
 /**
+ * Get WebSocket URL from registry for Y.Doc sync.
+ * Returns the first available WebSocket server URL.
+ */
+export async function getWebSocketUrl(): Promise<string | null> {
+  const baseUrl = await getRegistryUrl();
+  if (!baseUrl) {
+    return null;
+  }
+
+  try {
+    const res = await fetch(`${baseUrl}/registry`, {
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
+
+    if (!res.ok) {
+      return null;
+    }
+
+    const data = (await res.json()) as { servers?: Array<{ url: string }> };
+
+    // Return first available WebSocket server
+    const firstServer = data.servers?.[0];
+    if (firstServer) {
+      return firstServer.url;
+    }
+
+    return null;
+  } catch (err) {
+    logger.warn({ err }, 'Failed to get WebSocket URL from registry');
+    return null;
+  }
+}
+
+/**
  * Create a new plan session.
  */
 export async function createSession(
