@@ -8,8 +8,9 @@ export interface PlanIndexState {
   synced: boolean;
   serverCount: number;
   activeCount: number;
-  /** Number of peers connected via WebRTC P2P */
   peerCount: number;
+  navigationTarget: string | null;
+  clearNavigation: () => void;
 }
 
 /**
@@ -20,6 +21,7 @@ export interface PlanIndexState {
 export function usePlanIndex(): PlanIndexState {
   const { ydoc, syncState } = useMultiProviderSync(PLAN_INDEX_DOC_NAME);
   const [plans, setPlans] = useState<PlanIndexEntry[]>([]);
+  const [navigationTarget, setNavigationTarget] = useState<string | null>(null);
 
   useEffect(() => {
     const plansMap = ydoc.getMap('plans');
@@ -35,6 +37,29 @@ export function usePlanIndex(): PlanIndexState {
     };
   }, [ydoc]);
 
+  useEffect(() => {
+    const navMap = ydoc.getMap<string>('navigation');
+    const updateNav = () => {
+      const target = navMap.get('target');
+      if (target) {
+        setNavigationTarget(target);
+      }
+    };
+
+    updateNav();
+    navMap.observe(updateNav);
+
+    return () => {
+      navMap.unobserve(updateNav);
+    };
+  }, [ydoc]);
+
+  const clearNavigation = () => {
+    const navMap = ydoc.getMap<string>('navigation');
+    navMap.delete('target');
+    setNavigationTarget(null);
+  };
+
   return {
     plans,
     connected: syncState.connected,
@@ -42,5 +67,7 @@ export function usePlanIndex(): PlanIndexState {
     serverCount: syncState.serverCount,
     activeCount: syncState.activeCount,
     peerCount: syncState.peerCount,
+    navigationTarget,
+    clearNavigation,
   };
 }

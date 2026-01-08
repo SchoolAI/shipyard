@@ -1,8 +1,8 @@
 import { Button, Disclosure, DisclosureGroup, ListBox, ListBoxItem } from '@heroui/react';
 import type { PlanIndexEntry } from '@peer-plan/schema';
 import { User, Users } from 'lucide-react';
-import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { ProfileSetup } from '@/components/ProfileSetup';
 import { StatusChip } from '@/components/StatusChip';
@@ -45,11 +45,21 @@ interface SidebarProps {
 }
 
 export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
-  const { plans: localPlans, activeCount } = usePlanIndex();
+  const { plans: localPlans, activeCount, navigationTarget, clearNavigation } = usePlanIndex();
   const { activePlanId, syncState } = useActivePlanSync();
   const [collapsed, setCollapsed] = useState(getSidebarCollapsed);
   const [showProfile, setShowProfile] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    if (!navigationTarget) return;
+    const targetPath = `/plan/${navigationTarget}`;
+    if (location.pathname !== targetPath) {
+      navigate(targetPath);
+    }
+    clearNavigation();
+  }, [navigationTarget, clearNavigation, navigate, location.pathname]);
 
   // Memoize plan IDs to prevent infinite re-renders in useSharedPlans
   const localPlanIds = useMemo(() => localPlans.map((p) => p.id), [localPlans]);

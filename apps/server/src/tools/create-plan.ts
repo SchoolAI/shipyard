@@ -99,12 +99,11 @@ export const createPlanTool = {
 
     logger.info({ planId }, 'Plan index updated');
 
-    // Open the live plan page (not a snapshot URL) so the browser connects via WebSocket
     const url = `http://localhost:5173/plan/${planId}`;
 
-    // Only open browser if no browser is already connected to peer-plan
     if (hasActiveConnections(PLAN_INDEX_DOC_NAME)) {
-      logger.info({ url, planId }, 'Browser already connected, skipping open');
+      indexDoc.getMap('navigation').set('target', planId);
+      logger.info({ url, planId }, 'Browser already connected, navigating via CRDT');
     } else {
       await open(url);
       logger.info({ url }, 'Browser launched');
