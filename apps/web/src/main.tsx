@@ -8,13 +8,15 @@
 
 // 1. BlockNote fonts
 import '@blocknote/core/fonts/inter.css';
-// 2. Mantine core styles (layer version for proper cascade)
+// 2. BlockNote core styles (includes thread mark highlighting for comments)
+import '@blocknote/core/style.css';
+// 3. Mantine core styles (layer version for proper cascade)
 import '@mantine/core/styles.layer.css';
-// 3. BlockNote Mantine theme styles
+// 4. BlockNote Mantine theme styles
 import '@blocknote/mantine/style.css';
-// 4. HeroUI styles
+// 5. HeroUI styles
 import '@heroui/styles';
-// 5. Tailwind + app styles (must be last for proper cascade)
+// 6. Tailwind + app styles (must be last for proper cascade)
 import './index.css';
 
 import { MantineProvider } from '@mantine/core';
