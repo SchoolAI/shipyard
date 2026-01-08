@@ -137,7 +137,7 @@ export interface UseGitHubAuthReturn {
   identity: GitHubIdentity | null;
   isValidating: boolean;
   authState: AuthState;
-  startAuth: () => void;
+  startAuth: (forceAccountPicker?: boolean) => void;
   clearAuth: () => void;
 }
 

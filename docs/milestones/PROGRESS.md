@@ -170,17 +170,19 @@ Browser discovers all → Multi-provider Yjs merge
 
 ---
 
-## Milestone 8: Waiting Room & Access Control (NOT STARTED)
+## Milestone 8: Waiting Room & Access Control (IN PROGRESS)
 
 **Goal:** Zoom-like approval flow for shared plans
 
-**Planned:**
-- [ ] Schema updates: `ownerId`, `approvalRequired`, `approvedUsers` in PlanMetadata
-- [ ] Awareness protocol extension for pending/approved status
-- [ ] Waiting Room UI component (blocks content until approved)
-- [ ] Owner Approval Panel (approve/deny pending users)
-- [ ] Signaling server enforcement (gate CRDT sync server-side)
-- [ ] MCP integration (`approve_user`, `list_pending` tools)
+**Completed:**
+- ✅ Schema updates: `ownerId`, `approvalRequired`, `approvedUsers` in PlanMetadata
+- ✅ Awareness protocol extension for pending/approved status
+- ✅ Waiting Room UI component (blocks content until approved)
+- ⏳ Owner Approval Panel (approve/deny pending users) - Blocked on M9
+- ⏳ Signaling server enforcement - Deferred
+- ✅ MCP integration: `create_plan` sets `ownerId`
+
+**Blocked by:** Milestone 9 (GitHub Identity) - needed for verified ownership
 
 **Key architecture:**
 - Signaling server is the gatekeeper (server-side enforcement)
@@ -188,6 +190,28 @@ Browser discovers all → Multi-provider Yjs merge
 - CRDT metadata stores persistent approval list
 
 See [08-waiting-room.md](./08-waiting-room.md) for full details.
+
+---
+
+## Milestone 9: GitHub Identity ✅ COMPLETE
+
+**Goal:** Replace random IDs with verified GitHub usernames for ownership
+
+**Completed:**
+- ✅ Server uses `gh api user` for GitHub username as `ownerId`
+- ✅ Browser GitHub OAuth Web Flow authentication
+- ✅ Cloudflare Worker for token exchange (no backend needed)
+- ✅ Account UI in sidebar (avatar, dropdown, sign in/out)
+- ✅ Account picker prompt for switching accounts
+- ✅ Approval logic uses GitHub username
+
+**Key files:**
+- `apps/server/src/server-identity.ts` - GitHub username from gh CLI
+- `apps/web/src/hooks/useGitHubAuth.ts` - OAuth Web Flow hook
+- `apps/web/src/components/account/` - Account UI components
+- `apps/github-oauth-worker/` - Cloudflare Worker for token exchange
+
+**OAuth App:** `Ov23liNnbDyIs6wu4Btd`
 
 ---
 
@@ -203,8 +227,9 @@ See [08-waiting-room.md](./08-waiting-room.md) for full details.
 | 5 | Review Flow | ✅ Complete |
 | 6 | P2P | ✅ Complete |
 | 7 | Artifacts | ✅ Complete |
-| 8 | Waiting Room | 🔲 Not Started |
+| 8 | Waiting Room | 🔄 In Progress |
+| 9 | GitHub Identity | ✅ Complete |
 
 ---
 
-*Last updated: 2026-01-07*
+*Last updated: 2026-01-08*
