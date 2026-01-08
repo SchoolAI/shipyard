@@ -10,10 +10,11 @@
     "lint": "turbo run lint",
     "lint:fix": "turbo run lint:fix",
     "check": "turbo run test typecheck lint",
-    "dev:all": "concurrently --names \"server,signal,web,hook\" --prefix-colors \"green,cyan,magenta,yellow\" \"pnpm dev:server\" \"pnpm dev:signaling\" \"pnpm dev:web\" \"pnpm dev:hook\"",
+    "dev:all": "concurrently --names \"server,signal,oauth,web,hook\" --prefix-colors \"green,cyan,blue,magenta,yellow\" \"pnpm dev:server\" \"pnpm dev:signaling\" \"pnpm dev:github-oauth\" \"pnpm dev:web\" \"pnpm dev:hook\"",
     "dev:local": "bash scripts/dev-local.sh",
     "dev:server": "turbo run dev --filter=@peer-plan/server",
     "dev:signaling": "turbo run dev --filter=@peer-plan/signaling",
+    "dev:github-oauth": "pnpm --filter=github-oauth-worker dev",
     "dev:web": "turbo run dev --filter=@peer-plan/web",
     "dev:hook": "turbo run dev --filter=@peer-plan/hook",
     "prepare": "simple-git-hooks"
