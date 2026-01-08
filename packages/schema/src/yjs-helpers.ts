@@ -352,3 +352,56 @@ export function revokeUser(ydoc: Y.Doc, userId: string): boolean {
   map.set('updatedAt', Date.now());
   return true;
 }
+
+/** Gets the list of rejected users from metadata. */
+export function getRejectedUsers(ydoc: Y.Doc): string[] {
+  const map = ydoc.getMap('metadata');
+  const rejectedUsers = map.get('rejectedUsers');
+  if (!Array.isArray(rejectedUsers)) {
+    return [];
+  }
+  return rejectedUsers.filter((id): id is string => typeof id === 'string');
+}
+
+/** Checks if a user has been rejected. */
+export function isUserRejected(ydoc: Y.Doc, userId: string): boolean {
+  return getRejectedUsers(ydoc).includes(userId);
+}
+
+/** Rejects a user, adding them to the rejected list and removing from approved list if present. */
+export function rejectUser(ydoc: Y.Doc, userId: string): void {
+  const map = ydoc.getMap('metadata');
+  const currentRejected = getRejectedUsers(ydoc);
+  const currentApproved = getApprovedUsers(ydoc);
+
+  // Add to rejected list if not already there
+  if (!currentRejected.includes(userId)) {
+    map.set('rejectedUsers', [...currentRejected, userId]);
+  }
+
+  // Remove from approved list if present
+  if (currentApproved.includes(userId)) {
+    map.set(
+      'approvedUsers',
+      currentApproved.filter((id) => id !== userId)
+    );
+  }
+
+  map.set('updatedAt', Date.now());
+}
+
+/** Removes a user from the rejected list (to allow them to re-request access). */
+export function unrejectUser(ydoc: Y.Doc, userId: string): boolean {
+  const map = ydoc.getMap('metadata');
+  const currentRejected = getRejectedUsers(ydoc);
+  const index = currentRejected.indexOf(userId);
+  if (index === -1) {
+    return false;
+  }
+  map.set(
+    'rejectedUsers',
+    currentRejected.filter((id) => id !== userId)
+  );
+  map.set('updatedAt', Date.now());
+  return true;
+}

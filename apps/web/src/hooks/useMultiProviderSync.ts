@@ -1,4 +1,4 @@
-import { getPlanOwnerId, isUserApproved } from '@peer-plan/schema';
+import { getPlanOwnerId, isUserApproved, isUserRejected } from '@peer-plan/schema';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { IndexeddbPersistence } from 'y-indexeddb';
 import { WebrtcProvider } from 'y-webrtc';
@@ -243,6 +243,9 @@ export function useMultiProviderSync(
 
       // User not authenticated yet - they need to auth to view this plan
       if (!userId) return 'pending';
+
+      // Check rejection first (rejected takes precedence)
+      if (isUserRejected(ydoc, userId)) return 'rejected';
 
       return isUserApproved(ydoc, userId) ? 'approved' : 'pending';
     }

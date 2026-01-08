@@ -39,6 +39,8 @@ export interface PlanMetadata {
   /** Defaults to true when ownerId is set */
   approvalRequired?: boolean;
   approvedUsers?: string[];
+  /** Users who have been denied access to this plan */
+  rejectedUsers?: string[];
   /** SHA256 hash of session token for MCP API access */
   sessionTokenHash?: string;
   /** When the plan was archived (hidden from sidebar by default) */
@@ -63,6 +65,7 @@ export const PlanMetadataSchema = z.object({
   ownerId: z.string().optional(),
   approvalRequired: z.boolean().optional(),
   approvedUsers: z.array(z.string()).optional(),
+  rejectedUsers: z.array(z.string()).optional(),
   sessionTokenHash: z.string().optional(),
   archivedAt: z.number().optional(),
   archivedBy: z.string().optional(),

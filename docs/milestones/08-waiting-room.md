@@ -122,7 +122,7 @@ The signaling server controls who can sync CRDT data. By checking approval statu
 
 ### Phase 3: Waiting Room UI
 
-- [ ] Create `WaitingRoomGate.tsx` component:
+- [x] Create `WaitingRoomGate.tsx` component:
   ```typescript
   // Wraps plan content, shows waiting room if not approved
   <WaitingRoomGate planId={planId} syncState={syncState}>
@@ -130,28 +130,35 @@ The signaling server controls who can sync CRDT data. By checking approval statu
   </WaitingRoomGate>
   ```
 
-- [ ] Waiting room shows:
+- [x] Waiting room shows:
   - Plan title
   - Owner name
   - "Waiting for approval..." with spinner
   - Option to cancel/leave
 
-- [ ] "Access Denied" state for rejected users
+- [x] "Access Denied" state for rejected users
+  - Added `rejectedUsers` array to PlanMetadata
+  - `rejectUser()` helper to add users to rejected list
+  - `isUserRejected()` helper to check rejection status
+  - `computeApprovalStatus()` checks rejected list first
 
 ### Phase 4: Owner Approval Panel
 
-- [ ] Create `ApprovalPanel.tsx` component:
-  - Lists pending users (from awareness)
+- [x] Create `ApprovalPanel.tsx` component:
+  - Lists pending users (from awareness via `usePendingUsers` hook)
   - [Approve] / [Deny] buttons for each
-  - Shows in sidebar or header for owner
+  - Shows as popover in header for owner only
+  - Uses HeroUI Avatar, Button, Popover components
 
-- [ ] Approval actions:
-  - Add user to `approvedUsers` in metadata (persistent)
-  - Broadcast approval via awareness (instant)
+- [x] Approval actions:
+  - `approveUser()` adds user to `approvedUsers` in metadata (persistent)
+  - `rejectUser()` adds user to `rejectedUsers` in metadata (persistent)
+  - Changes sync via CRDT and user status updates immediately
 
-- [ ] Notification when new user requests access:
-  - Toast notification
-  - Badge/indicator in header
+- [x] Notification when new user requests access:
+  - Toast notification via `usePendingUserNotifications` hook
+  - Badge/indicator shows pending count in header
+  - 10-second toast with "View" action to open panel
 
 ### Phase 5: Signaling Server Enforcement
 

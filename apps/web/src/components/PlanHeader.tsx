@@ -1,13 +1,21 @@
 import { Button, Chip, Separator } from '@heroui/react';
 import type { PlanMetadata } from '@peer-plan/schema';
-import { getPlanIndexEntry, PLAN_INDEX_DOC_NAME, setPlanIndexEntry } from '@peer-plan/schema';
+import {
+  getPlanIndexEntry,
+  getPlanOwnerId,
+  PLAN_INDEX_DOC_NAME,
+  setPlanIndexEntry,
+} from '@peer-plan/schema';
 import { Archive, ArchiveRestore } from 'lucide-react';
 import { toast } from 'sonner';
+import type { WebrtcProvider } from 'y-webrtc';
 import type * as Y from 'yjs';
+import { ApprovalPanel } from '@/components/ApprovalPanel';
 import { ReviewActions } from '@/components/ReviewActions';
 import { ShareButton } from '@/components/ShareButton';
 import { StatusChip } from '@/components/StatusChip';
 import { useActivePlanSync } from '@/contexts/ActivePlanSyncContext';
+import { useGitHubAuth } from '@/hooks/useGitHubAuth';
 import { useIdentity } from '@/hooks/useIdentity';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { useMultiProviderSync } from '@/hooks/useMultiProviderSync';
@@ -27,6 +35,8 @@ interface PlanHeaderProps {
   onStatusChange?: (newStatus: 'approved' | 'changes_requested') => void;
   /** When true, shows snapshot indicator and hides interactive elements */
   isSnapshot?: boolean;
+  /** WebRTC provider for P2P sync and awareness (needed for approval panel) */
+  rtcProvider?: WebrtcProvider | null;
 }
 
 export function PlanHeader({
@@ -37,6 +47,7 @@ export function PlanHeader({
   onRequestIdentity,
   onStatusChange,
   isSnapshot = false,
+  rtcProvider = null,
 }: PlanHeaderProps) {
   // No local state or observer - metadata comes from parent to avoid duplicate observers
   const display = metadata;
@@ -44,7 +55,9 @@ export function PlanHeader({
   const isMobile = useIsMobile();
   const isArchived = !!display.archivedAt;
   const { identity: currentIdentity } = useIdentity();
+  const { identity: githubIdentity } = useGitHubAuth();
   const { ydoc: indexDoc } = useMultiProviderSync(PLAN_INDEX_DOC_NAME);
+  const ownerId = getPlanOwnerId(ydoc);
 
   const handleArchiveToggle = () => {
     if (!currentIdentity) {
@@ -126,6 +139,14 @@ export function PlanHeader({
               {syncState.peerCount} {syncState.peerCount === 1 ? 'peer' : 'peers'}
             </span>
           )}
+
+          {/* Approval panel for plan owners - shows pending access requests */}
+          <ApprovalPanel
+            ydoc={ydoc}
+            rtcProvider={rtcProvider}
+            currentUsername={githubIdentity?.username ?? null}
+            ownerId={ownerId}
+          />
 
           {/* Review actions - inline on desktop, floating on mobile */}
           {!isMobile && (

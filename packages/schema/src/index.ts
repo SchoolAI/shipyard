@@ -98,17 +98,21 @@ export {
   getDeliverables,
   getPlanMetadata,
   getPlanOwnerId,
+  getRejectedUsers,
   getStepCompletions,
   initPlanMetadata,
   isApprovalRequired,
   isStepCompleted,
   isUserApproved,
+  isUserRejected,
   linkArtifactToDeliverable,
+  rejectUser,
   removeArtifact,
   revokeUser,
   setAgentPresence,
   setPlanMetadata,
   toggleStepCompletion,
+  unrejectUser,
 } from './yjs-helpers.js';
 export type { YDocKey } from './yjs-keys.js';
 export { isValidYDocKey, YDOC_KEYS } from './yjs-keys.js';

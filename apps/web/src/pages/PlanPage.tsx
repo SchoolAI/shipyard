@@ -6,6 +6,7 @@ import {
   getPlanFromUrl,
   getPlanIndexEntry,
   getPlanMetadata,
+  getPlanOwnerId,
   PLAN_INDEX_DOC_NAME,
   type PlanMetadata,
   setPlanIndexEntry,
@@ -32,6 +33,7 @@ import { useGitHubAuth } from '@/hooks/useGitHubAuth';
 import { useIdentity } from '@/hooks/useIdentity';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { useMultiProviderSync } from '@/hooks/useMultiProviderSync';
+import { usePendingUserNotifications } from '@/hooks/usePendingUserNotifications';
 
 type ViewType = 'plan' | 'deliverables';
 
@@ -90,6 +92,13 @@ export function PlanPage() {
   // P2P grace period: when opening a shared URL, IndexedDB syncs immediately (empty)
   // but we need to wait for WebRTC to deliver the plan data before showing "Not Found"
   const [p2pGracePeriodExpired, setP2pGracePeriodExpired] = useState(false);
+
+  // Check if current user is the plan owner (for notifications)
+  const ownerId = getPlanOwnerId(ydoc);
+  const isOwner = !!(githubIdentity && ownerId && githubIdentity.username === ownerId);
+
+  // Show toast notifications when new users request access (only for owners)
+  usePendingUserNotifications(rtcProvider, isOwner);
 
   // Start timeout when in P2P-only mode without metadata
   useEffect(() => {
@@ -311,6 +320,7 @@ export function PlanPage() {
               onRequestIdentity={handleRequestIdentity}
               onStatusChange={handleStatusChange}
               isSnapshot={isSnapshot}
+              rtcProvider={rtcProvider}
             />
           </div>
         )}
