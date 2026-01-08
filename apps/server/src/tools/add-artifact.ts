@@ -4,6 +4,7 @@ import {
   addArtifact,
   getPlanMetadata,
   linkArtifactToDeliverable,
+  setPlanMetadata,
 } from '@peer-plan/schema';
 import { nanoid } from 'nanoid';
 import { z } from 'zod';
@@ -54,6 +55,7 @@ DELIVERABLE LINKING:
 - Pass deliverableId to automatically mark that deliverable as completed (checkmark)
 - Multiple artifacts can link to the same deliverable
 - Artifacts without deliverableId are stored but not linked
+- When a deliverable is linked and plan is in 'draft' status, it auto-changes to 'in_progress'
 
 ARTIFACT TYPES:
 - screenshot: PNG, JPG images of UI, terminal output, etc.
@@ -236,6 +238,7 @@ ARTIFACT TYPES:
       addArtifact(doc, artifact);
 
       // Link to deliverable if specified
+      let statusChanged = false;
       if (input.deliverableId) {
         const linked = linkArtifactToDeliverable(doc, input.deliverableId, artifact.id);
         if (linked) {
@@ -243,6 +246,13 @@ ARTIFACT TYPES:
             { planId, artifactId: artifact.id, deliverableId: input.deliverableId },
             'Artifact linked to deliverable'
           );
+
+          // Auto-progress status to in_progress when a deliverable is fulfilled
+          if (metadata.status === 'draft') {
+            setPlanMetadata(doc, { status: 'in_progress' });
+            statusChanged = true;
+            logger.info({ planId }, 'Plan status auto-changed to in_progress');
+          }
         } else {
           logger.warn(
             { planId, deliverableId: input.deliverableId },
@@ -256,12 +266,13 @@ ARTIFACT TYPES:
       const linkedText = input.deliverableId
         ? `\nLinked to deliverable: ${input.deliverableId}`
         : '';
+      const statusText = statusChanged ? '\nStatus: draft → in_progress (auto-updated)' : '';
 
       return {
         content: [
           {
             type: 'text',
-            text: `Artifact uploaded!\nID: ${artifact.id}\nType: ${type}\nFilename: ${filename}\nURL: ${url}${linkedText}`,
+            text: `Artifact uploaded!\nID: ${artifact.id}\nType: ${type}\nFilename: ${filename}\nURL: ${url}${linkedText}${statusText}`,
           },
         ],
       };

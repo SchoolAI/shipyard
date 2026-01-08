@@ -9,11 +9,11 @@ import {
 } from '@heroui/react';
 import type { PlanIndexEntry } from '@peer-plan/schema';
 import { getPlanIndexEntry, PLAN_INDEX_DOC_NAME, setPlanIndexEntry } from '@peer-plan/schema';
-import { Archive, ArchiveRestore, ChevronRight, FileText, Inbox, User, Users } from 'lucide-react';
+import { Archive, ArchiveRestore, ChevronRight, FileText, Inbox, Users } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { ProfileSetup } from '@/components/ProfileSetup';
+import { AccountSection } from '@/components/account';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { CollapsiblePanel } from '@/components/ui/collapsible-panel';
 import { useActivePlanSync } from '@/contexts/ActivePlanSyncContext';
@@ -95,10 +95,8 @@ interface CollapsedSidebarProps {
   localPlansCount: number;
   sharedPlansCount: number;
   showArchived: boolean;
-  showProfile: boolean;
   onToggle: () => void;
   onToggleArchived: () => void;
-  onShowProfile: (show: boolean) => void;
 }
 
 function CollapsedSidebar({
@@ -106,10 +104,8 @@ function CollapsedSidebar({
   localPlansCount,
   sharedPlansCount,
   showArchived,
-  showProfile,
   onToggle,
   onToggleArchived,
-  onShowProfile,
 }: CollapsedSidebarProps) {
   return (
     <div className="flex flex-col h-full bg-surface">
@@ -196,21 +192,7 @@ function CollapsedSidebar({
 
       {/* Footer icons */}
       <div className="px-3 py-2 border-t border-separator flex flex-col items-center gap-2 shrink-0">
-        <Tooltip>
-          <Tooltip.Trigger>
-            <Button
-              isIconOnly
-              variant="ghost"
-              size="sm"
-              aria-label="Profile"
-              onPress={() => onShowProfile(true)}
-              className="w-10 h-10"
-            >
-              <User className="w-4 h-4 text-foreground" />
-            </Button>
-          </Tooltip.Trigger>
-          <Tooltip.Content>Profile</Tooltip.Content>
-        </Tooltip>
+        <AccountSection collapsed />
         <Tooltip>
           <Tooltip.Trigger>
             <Button
@@ -230,18 +212,6 @@ function CollapsedSidebar({
           <ThemeToggle />
         </div>
       </div>
-
-      {/* Profile modal */}
-      {showProfile && (
-        <ProfileSetup
-          isEditing
-          onComplete={() => {
-            onShowProfile(false);
-            toast.success('Profile updated');
-          }}
-          onCancel={() => onShowProfile(false)}
-        />
-      )}
     </div>
   );
 }
@@ -257,7 +227,6 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
   } = usePlanIndex();
   const { activePlanId, syncState } = useActivePlanSync();
   const [collapsed, setCollapsed] = useState(getSidebarCollapsed);
-  const [showProfile, setShowProfile] = useState(false);
   const [showArchived, setShowArchivedState] = useState(getShowArchived);
   const [optimisticallyHiddenIds, setOptimisticallyHiddenIds] = useState<Set<string>>(new Set());
   const navigate = useNavigate();
@@ -405,10 +374,8 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
       localPlansCount={localPlans.length}
       sharedPlansCount={sharedPlans.length}
       showArchived={showArchived}
-      showProfile={showProfile}
       onToggle={handleToggle}
       onToggleArchived={handleToggleArchived}
-      onShowProfile={setShowProfile}
     />
   );
 
@@ -653,44 +620,28 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
         )}
       </nav>
 
-      {/* Footer with profile, archive toggle, and theme toggle */}
-      <div className="px-3 py-2 border-t border-separator flex items-center gap-0 shrink-0 mt-auto">
-        <Button
-          isIconOnly
-          variant="ghost"
-          size="sm"
-          aria-label="Profile"
-          onPress={() => setShowProfile(true)}
-          className="touch-target flex-1"
-        >
-          <User className="w-4 h-4 text-foreground" />
-        </Button>
-        <Button
-          isIconOnly
-          variant="ghost"
-          size="sm"
-          aria-label={showArchived ? 'Hide archived plans' : 'Show archived plans'}
-          onPress={handleToggleArchived}
-          className={`touch-target flex-1 ${showArchived ? 'text-primary' : ''}`}
-        >
-          <Archive className="w-4 h-4" />
-        </Button>
-        <div className="flex-1 flex justify-center">
-          <ThemeToggle />
+      {/* Footer with GitHub account, archive toggle, and theme toggle */}
+      <div className="px-3 py-2 border-t border-separator flex flex-col gap-2 shrink-0 mt-auto">
+        {/* Account section - takes full width */}
+        <AccountSection />
+
+        {/* Utility buttons row */}
+        <div className="flex items-center gap-0">
+          <Button
+            isIconOnly
+            variant="ghost"
+            size="sm"
+            aria-label={showArchived ? 'Hide archived plans' : 'Show archived plans'}
+            onPress={handleToggleArchived}
+            className={`touch-target flex-1 ${showArchived ? 'text-primary' : ''}`}
+          >
+            <Archive className="w-4 h-4" />
+          </Button>
+          <div className="flex-1 flex justify-center">
+            <ThemeToggle />
+          </div>
         </div>
       </div>
-
-      {/* Profile modal */}
-      {showProfile && (
-        <ProfileSetup
-          isEditing
-          onComplete={() => {
-            setShowProfile(false);
-            toast.success('Profile updated');
-          }}
-          onCancel={() => setShowProfile(false)}
-        />
-      )}
     </>
   );
 
