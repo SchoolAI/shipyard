@@ -1,6 +1,6 @@
 # Milestone 8: Waiting Room & Access Control
 
-**Status**: Not Started
+**Status**: In Progress
 **Goal**: Zoom-like approval flow for shared plans
 
 ---
@@ -80,14 +80,14 @@ The signaling server controls who can sync CRDT data. By checking approval statu
 
 ### Phase 1: Schema & Metadata
 
-- [ ] Add to `PlanMetadata` in `packages/schema/src/plan.ts`:
+- [x] Add to `PlanMetadata` in `packages/schema/src/plan.ts`:
   ```typescript
   ownerId: string;           // User ID of plan creator
   approvalRequired: boolean; // Default: true
   approvedUsers: string[];   // User IDs who have been approved
   ```
 
-- [ ] Add helper functions in `packages/schema/src/yjs-helpers.ts`:
+- [x] Add helper functions in `packages/schema/src/yjs-helpers.ts`:
   ```typescript
   approveUser(ydoc, userId): void
   revokeUser(ydoc, userId): void
@@ -95,11 +95,11 @@ The signaling server controls who can sync CRDT data. By checking approval statu
   getApprovedUsers(ydoc): string[]
   ```
 
-- [ ] Update `initPlanMetadata` to set `ownerId` from current user
+- [x] Update `initPlanMetadata` to set `ownerId` from current user
 
 ### Phase 2: Awareness Protocol Extension
 
-- [ ] Define awareness state shape:
+- [x] Define awareness state shape:
   ```typescript
   interface PlanAwarenessState {
     user: {
@@ -113,12 +113,12 @@ The signaling server controls who can sync CRDT data. By checking approval statu
   }
   ```
 
-- [ ] Update `useMultiProviderSync` to:
+- [x] Update `useMultiProviderSync` to:
   - Set local awareness state on connect
   - Listen for approval broadcasts from owner
   - Track `approvalStatus` in `SyncState`
 
-- [ ] Add `useApprovalStatus` hook for easy access
+- [x] Add `useApprovalStatus` hook for easy access
 
 ### Phase 3: Waiting Room UI
 
@@ -179,7 +179,7 @@ The signaling server controls who can sync CRDT data. By checking approval statu
 
 ### Phase 6: MCP Server Integration
 
-- [ ] `create_plan` tool sets `ownerId` automatically
+- [x] `create_plan` tool sets `ownerId` automatically
 - [ ] New `approve_user` tool for CLI approval
 - [ ] New `list_pending` tool to see pending users
 
