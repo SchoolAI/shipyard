@@ -19,7 +19,10 @@ interface WaitingRoomGateProps {
 export function WaitingRoomGate({ ydoc, syncState, metadata, children }: WaitingRoomGateProps) {
   const { isPending, isRejected, requiresApproval } = useApprovalStatus(syncState);
 
-  if (!requiresApproval) {
+  // Temporary: disable waiting room for local testing
+  const isWaitingRoomDisabled = import.meta.env.VITE_DISABLE_WAITING_ROOM === 'true';
+
+  if (isWaitingRoomDisabled || !requiresApproval) {
     return <>{children}</>;
   }
 
