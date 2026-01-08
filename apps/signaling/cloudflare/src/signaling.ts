@@ -6,9 +6,15 @@
  * - unsubscribe: Client leaves room topics
  * - publish: Broadcast message to all subscribers of a topic
  * - ping/pong: Keepalive (handled automatically via hibernation API)
+ * - approval_state: Owner pushes approval state for access control
  *
  * WebSocket Hibernation allows the DO to sleep while connections remain open,
  * dramatically reducing costs for idle connections.
+ *
+ * Access Control:
+ * The signaling server enforces approval at the peer discovery layer.
+ * When a user is not approved, they cannot discover or connect to other peers.
+ * This prevents unapproved users from receiving CRDT data.
  */
 
 import { DurableObject } from 'cloudflare:workers';
@@ -21,6 +27,7 @@ interface Env {
 interface SubscribeMessage {
   type: 'subscribe';
   topics: string[];
+  userId?: string; // GitHub username for approval checking
 }
 
 interface UnsubscribeMessage {
@@ -31,35 +38,61 @@ interface UnsubscribeMessage {
 interface PublishMessage {
   type: 'publish';
   topic: string;
+  from?: string; // y-webrtc client ID (not user ID)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  [key: string]: any; // y-webrtc adds various fields (from, to, signal, etc.)
+  [key: string]: any; // y-webrtc adds various fields (to, signal, etc.)
 }
 
 interface PingMessage {
   type: 'ping';
 }
 
+// Approval state message from plan owner
+interface ApprovalStateMessage {
+  type: 'approval_state';
+  planId: string;
+  ownerId: string;
+  approvedUsers: string[];
+  rejectedUsers: string[];
+}
+
 type SignalingMessage =
   | SubscribeMessage
   | UnsubscribeMessage
   | PublishMessage
-  | PingMessage;
+  | PingMessage
+  | ApprovalStateMessage;
 
 // Per-connection state stored as WebSocket attachment
 interface ConnectionState {
   id: string;
   topics: Set<string>;
+  userId?: string; // GitHub username for this connection
 }
 
 // Serialized form for WebSocket attachment (Sets can't be serialized)
 interface SerializedConnectionState {
   id: string;
   topics: string[];
+  userId?: string;
+}
+
+// Plan approval state (stored per plan)
+interface PlanApprovalState {
+  planId: string;
+  ownerId: string;
+  approvedUsers: string[];
+  rejectedUsers: string[];
+  lastUpdated: number;
 }
 
 export class SignalingRoom extends DurableObject<Env> {
   // In-memory topic -> WebSocket mapping (rebuilt on wake from hibernation)
   private topics: Map<string, Set<WebSocket>> = new Map();
+
+  // Plan approval state: planId -> approval state
+  // Not persisted across hibernation - owner will re-push on reconnect
+  private planApprovals: Map<string, PlanApprovalState> = new Map();
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -82,6 +115,7 @@ export class SignalingRoom extends DurableObject<Env> {
         const state: ConnectionState = {
           id: attachment.id,
           topics: new Set(attachment.topics),
+          userId: attachment.userId,
         };
 
         // Rebuild topic -> WebSocket mapping
@@ -156,6 +190,9 @@ export class SignalingRoom extends DurableObject<Env> {
           // Handled by setWebSocketAutoResponse, but just in case
           ws.send(JSON.stringify({ type: 'pong' }));
           break;
+        case 'approval_state':
+          this.handleApprovalState(ws, data);
+          break;
       }
     } catch (error) {
       console.error('Error handling message:', error);
@@ -168,6 +205,11 @@ export class SignalingRoom extends DurableObject<Env> {
   private handleSubscribe(ws: WebSocket, message: SubscribeMessage): void {
     const state = this.getState(ws);
     if (!state) return;
+
+    // Store userId if provided (for approval checking)
+    if (message.userId) {
+      state.userId = message.userId;
+    }
 
     for (const topic of message.topics || []) {
       if (typeof topic !== 'string') continue;
@@ -209,8 +251,61 @@ export class SignalingRoom extends DurableObject<Env> {
   }
 
   /**
+   * Extract plan ID from topic.
+   * Topics follow the format: "peer-plan-{planId}" for plan documents.
+   */
+  private extractPlanId(topic: string): string | null {
+    const prefix = 'peer-plan-';
+    if (topic.startsWith(prefix)) {
+      return topic.slice(prefix.length);
+    }
+    return null;
+  }
+
+  /**
+   * Check if a user is approved for a plan.
+   * Returns true if:
+   * - No approval state exists (legacy plan or not pushed yet)
+   * - User is the owner
+   * - User is in the approved list
+   * Returns false if user is in rejected list or not approved.
+   */
+  private isUserApproved(planId: string, userId: string | undefined): boolean {
+    const approval = this.planApprovals.get(planId);
+
+    // No approval state - allow (legacy plan or owner hasn't pushed yet)
+    if (!approval) return true;
+
+    // No user ID - can't verify, allow for backwards compatibility
+    if (!userId) return true;
+
+    // Owner is always approved
+    if (userId === approval.ownerId) return true;
+
+    // Check if rejected first (takes precedence)
+    if (approval.rejectedUsers.includes(userId)) return false;
+
+    // Check if approved
+    return approval.approvedUsers.includes(userId);
+  }
+
+  /**
+   * Check if a user is rejected for a plan.
+   */
+  private isUserRejected(planId: string, userId: string | undefined): boolean {
+    const approval = this.planApprovals.get(planId);
+    if (!approval || !userId) return false;
+    return approval.rejectedUsers.includes(userId);
+  }
+
+  /**
    * Handle publish (broadcast to topic subscribers)
    * This is the main signaling message for WebRTC offer/answer/ICE
+   *
+   * Access control is enforced here:
+   * - Rejected users cannot send or receive messages
+   * - Pending users can only communicate with other pending users (for awareness)
+   * - Approved users can communicate with all approved users and the owner
    */
   private handlePublish(ws: WebSocket, message: PublishMessage): void {
     if (!message.topic) return;
@@ -218,20 +313,102 @@ export class SignalingRoom extends DurableObject<Env> {
     const subscribers = this.topics.get(message.topic);
     if (!subscribers) return;
 
-    // Add client count to message (y-webrtc uses this)
-    const outMessage = JSON.stringify({
-      ...message,
-      clients: subscribers.size,
-    });
+    const senderState = this.getState(ws);
+    const senderUserId = senderState?.userId;
+    const planId = this.extractPlanId(message.topic);
 
-    // Broadcast to all subscribers in the topic
-    for (const subscriber of subscribers) {
-      try {
-        subscriber.send(outMessage);
-      } catch {
-        // Connection may be dead, will be cleaned up on close
+    // If this is a plan document topic, enforce approval
+    if (planId) {
+      // Block rejected senders completely
+      if (this.isUserRejected(planId, senderUserId)) {
+        return;
+      }
+
+      const senderApproved = this.isUserApproved(planId, senderUserId);
+
+      // Add client count to message (y-webrtc uses this)
+      const outMessage = JSON.stringify({
+        ...message,
+        clients: subscribers.size,
+      });
+
+      // Broadcast to filtered subscribers based on approval
+      for (const subscriber of subscribers) {
+        if (subscriber === ws) continue; // Don't send back to sender
+
+        const subscriberState = this.getState(subscriber);
+        const subscriberUserId = subscriberState?.userId;
+
+        // Block rejected recipients
+        if (this.isUserRejected(planId, subscriberUserId)) {
+          continue;
+        }
+
+        const subscriberApproved = this.isUserApproved(planId, subscriberUserId);
+
+        // Relay logic:
+        // - If sender is approved, only send to other approved users
+        // - If sender is pending, only send to other pending users (awareness sync)
+        // This prevents approved content from leaking to pending users
+        if (senderApproved === subscriberApproved) {
+          try {
+            subscriber.send(outMessage);
+          } catch {
+            // Connection may be dead, will be cleaned up on close
+          }
+        }
+      }
+    } else {
+      // Non-plan topics (e.g., plan-index) - broadcast to all
+      const outMessage = JSON.stringify({
+        ...message,
+        clients: subscribers.size,
+      });
+
+      for (const subscriber of subscribers) {
+        try {
+          subscriber.send(outMessage);
+        } catch {
+          // Connection may be dead, will be cleaned up on close
+        }
       }
     }
+  }
+
+  /**
+   * Handle approval state update from plan owner.
+   * Validates that the sender is the owner before accepting.
+   */
+  private handleApprovalState(ws: WebSocket, message: ApprovalStateMessage): void {
+    const state = this.getState(ws);
+    if (!state?.userId) {
+      console.warn('Received approval_state from unauthenticated connection');
+      return;
+    }
+
+    // Verify sender is the owner
+    const existingApproval = this.planApprovals.get(message.planId);
+    if (existingApproval && existingApproval.ownerId !== state.userId) {
+      console.warn(`Rejected approval_state: sender ${state.userId} is not owner ${existingApproval.ownerId}`);
+      return;
+    }
+
+    // For new plans, trust the ownerId in the message (first setter wins)
+    if (!existingApproval && message.ownerId !== state.userId) {
+      console.warn(`Rejected approval_state: sender ${state.userId} claims to be owner ${message.ownerId}`);
+      return;
+    }
+
+    // Store the approval state
+    this.planApprovals.set(message.planId, {
+      planId: message.planId,
+      ownerId: message.ownerId,
+      approvedUsers: message.approvedUsers,
+      rejectedUsers: message.rejectedUsers,
+      lastUpdated: Date.now(),
+    });
+
+    console.log(`Updated approval state for plan ${message.planId}: ${message.approvedUsers.length} approved, ${message.rejectedUsers.length} rejected`);
   }
 
   /**
@@ -287,6 +464,7 @@ export class SignalingRoom extends DurableObject<Env> {
       const state: ConnectionState = {
         id: attachment.id,
         topics: new Set(attachment.topics),
+        userId: attachment.userId,
       };
       (ws as any).__state = state;
       return state;
@@ -302,6 +480,7 @@ export class SignalingRoom extends DurableObject<Env> {
     ws.serializeAttachment({
       id: state.id,
       topics: Array.from(state.topics),
+      userId: state.userId,
     } satisfies SerializedConnectionState);
   }
 }

@@ -10,8 +10,14 @@ import {
 import { Package } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type * as Y from 'yjs';
-import type { UserIdentity } from '@/utils/identity';
 import { DeliverableCard } from './DeliverableCard';
+
+/** Simple identity type for display purposes */
+interface UserIdentity {
+  id: string;
+  name: string;
+  color: string;
+}
 
 interface DeliverablesViewProps {
   ydoc: Y.Doc;
@@ -175,7 +181,7 @@ export function DeliverablesView({
       const metadataMap = ydoc.getMap('metadata');
       metadataMap.set('status', 'completed');
       metadataMap.set('completedAt', Date.now());
-      metadataMap.set('completedBy', identity.displayName);
+      metadataMap.set('completedBy', identity.name);
       metadataMap.set('updatedAt', Date.now());
     });
   };

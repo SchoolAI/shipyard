@@ -1,4 +1,10 @@
-import { getPlanOwnerId, isUserApproved, isUserRejected } from '@peer-plan/schema';
+import {
+  getApprovedUsers,
+  getPlanOwnerId,
+  getRejectedUsers,
+  isUserApproved,
+  isUserRejected,
+} from '@peer-plan/schema';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { IndexeddbPersistence } from 'y-indexeddb';
 import { WebrtcProvider } from 'y-webrtc';
@@ -282,13 +288,88 @@ export function useMultiProviderSync(
       }
     }
 
+    /**
+     * Send user identity to signaling server for access control.
+     * This allows the server to track which user is on which connection.
+     */
+    // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Simple iteration over connections
+    function sendUserIdentityToSignaling() {
+      if (!rtc || !githubIdentity) return;
+
+      const identifyMessage = JSON.stringify({
+        type: 'subscribe',
+        topics: [], // Empty topics - just updating userId
+        userId: githubIdentity.username,
+      });
+
+      // Send to all connected signaling connections
+      const signalingConns = (rtc as unknown as { signalingConns: Array<{ ws: WebSocket }> })
+        .signalingConns;
+
+      if (signalingConns) {
+        for (const conn of signalingConns) {
+          if (conn.ws && conn.ws.readyState === WebSocket.OPEN) {
+            conn.ws.send(identifyMessage);
+          }
+        }
+      }
+    }
+
+    /**
+     * Push approval state to signaling server (owner only).
+     * This allows the signaling server to gate peer discovery for unapproved users.
+     */
+    // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Simple iteration over connections
+    function pushApprovalStateToSignaling() {
+      if (!rtc || !githubIdentity) return;
+
+      const ownerId = getPlanOwnerId(ydoc);
+      // Only owner pushes approval state
+      if (!ownerId || ownerId !== githubIdentity.username) return;
+
+      const approvedUsers = getApprovedUsers(ydoc);
+      const rejectedUsers = getRejectedUsers(ydoc);
+
+      const approvalStateMessage = JSON.stringify({
+        type: 'approval_state',
+        planId: docName,
+        ownerId,
+        approvedUsers,
+        rejectedUsers,
+      });
+
+      // Send to all connected signaling connections
+      // y-webrtc's signalingConns is an array of SignalingConn objects
+      const signalingConns = (rtc as unknown as { signalingConns: Array<{ ws: WebSocket }> })
+        .signalingConns;
+
+      if (signalingConns) {
+        for (const conn of signalingConns) {
+          if (conn.ws && conn.ws.readyState === WebSocket.OPEN) {
+            conn.ws.send(approvalStateMessage);
+          }
+        }
+      }
+    }
+
     // Watch for metadata changes (e.g., when owner approves user)
     const metadataMap = ydoc.getMap('metadata');
-    metadataMap.observe(updateApprovalStatus);
+
+    function handleMetadataChange() {
+      updateApprovalStatus();
+      pushApprovalStateToSignaling();
+    }
+
+    metadataMap.observe(handleMetadataChange);
 
     // Set initial awareness state when GitHub identity is available
     if (githubIdentity && rtc) {
       updateApprovalStatus();
+      // Send user identity and approval state after connection is established
+      setTimeout(() => {
+        sendUserIdentityToSignaling();
+        pushApprovalStateToSignaling();
+      }, 1000);
     }
 
     function updateSyncState() {
@@ -443,7 +524,7 @@ export function useMultiProviderSync(
         state.provider.destroy();
       }
       providersRef.current.clear();
-      metadataMap.unobserve(updateApprovalStatus);
+      metadataMap.unobserve(handleMetadataChange);
       idbProvider.destroy();
       if (rtc) {
         // Clear awareness before destroying so other peers see us leave

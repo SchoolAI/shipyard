@@ -13,16 +13,14 @@ import {
   YDOC_KEYS,
 } from '@peer-plan/schema';
 import { FileText, LogIn, Package } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
-import { toast } from 'sonner';
 import * as Y from 'yjs';
 import { Attachments } from '@/components/Attachments';
 import { DeliverablesView } from '@/components/DeliverablesView';
 import { MobileHeader } from '@/components/MobileHeader';
 import { PlanHeader } from '@/components/PlanHeader';
 import { PlanViewer } from '@/components/PlanViewer';
-import { ProfileSetup } from '@/components/ProfileSetup';
 import { ReviewActions } from '@/components/ReviewActions';
 import { ShareButton } from '@/components/ShareButton';
 import { Sidebar } from '@/components/Sidebar';
@@ -30,10 +28,10 @@ import { Drawer } from '@/components/ui/drawer';
 import { WaitingRoomGate } from '@/components/WaitingRoomGate';
 import { useActivePlanSync } from '@/contexts/ActivePlanSyncContext';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
-import { useIdentity } from '@/hooks/useIdentity';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { useMultiProviderSync } from '@/hooks/useMultiProviderSync';
 import { usePendingUserNotifications } from '@/hooks/usePendingUserNotifications';
+import { colorFromString } from '@/utils/color';
 
 type ViewType = 'plan' | 'deliverables';
 
@@ -70,17 +68,22 @@ export function PlanPage() {
 
   const ydoc = isSnapshot ? (snapshotYdoc ?? syncedYdoc) : syncedYdoc;
 
-  const { identity } = useIdentity();
   const { identity: githubIdentity, startAuth } = useGitHubAuth();
   const isMobile = useIsMobile();
   const drawerState = useOverlayState();
   const { setActivePlanSync, clearActivePlanSync } = useActivePlanSync();
   const [metadata, setMetadata] = useState<PlanMetadata | null>(null);
-  const [showProfileSetup, setShowProfileSetup] = useState(false);
   const [activeView, setActiveView] = useState<ViewType>('plan');
   const [deliverableCount, setDeliverableCount] = useState({ completed: 0, total: 0 });
-  // Track if user was trying to comment when they opened profile setup
-  const wasRequestingCommentRef = useRef(false);
+
+  // Convert GitHub identity to BlockNote-compatible format
+  const identity = githubIdentity
+    ? {
+        id: githubIdentity.username,
+        name: githubIdentity.displayName,
+        color: colorFromString(githubIdentity.username),
+      }
+    : null;
 
   const { ydoc: indexDoc } = useMultiProviderSync(PLAN_INDEX_DOC_NAME);
   // Prefer WebSocket provider when connected, fall back to WebRTC for P2P-only mode.
@@ -91,6 +94,8 @@ export function PlanPage() {
 
   // P2P grace period: when opening a shared URL, IndexedDB syncs immediately (empty)
   // but we need to wait for WebRTC to deliver the plan data before showing "Not Found"
+  // We use a longer grace period (15s) because WebRTC peer discovery and STUN/TURN
+  // negotiation can take 4-12 seconds depending on network conditions
   const [p2pGracePeriodExpired, setP2pGracePeriodExpired] = useState(false);
 
   // Check if current user is the plan owner (for notifications)
@@ -101,12 +106,16 @@ export function PlanPage() {
   usePendingUserNotifications(rtcProvider, isOwner);
 
   // Start timeout when in P2P-only mode without metadata
+  // Use longer timeout when peers are connected (they're actively trying to sync)
   useEffect(() => {
     const inP2POnlyMode = syncState.idbSynced && !syncState.synced && syncState.activeCount === 0;
     const needsP2PData = !metadata && inP2POnlyMode;
 
     if (needsP2PData) {
-      const timeout = setTimeout(() => setP2pGracePeriodExpired(true), 5000);
+      // If peers are connected, wait longer (30s) - they might be syncing large data
+      // If no peers yet, use standard timeout (15s) for initial peer discovery
+      const gracePeriod = syncState.peerCount > 0 ? 30000 : 15000;
+      const timeout = setTimeout(() => setP2pGracePeriodExpired(true), gracePeriod);
       return () => clearTimeout(timeout);
     }
     // Reset if metadata arrives (plan found via P2P)
@@ -114,7 +123,7 @@ export function PlanPage() {
       setP2pGracePeriodExpired(false);
     }
     return undefined;
-  }, [metadata, syncState.idbSynced, syncState.synced, syncState.activeCount]);
+  }, [metadata, syncState.idbSynced, syncState.synced, syncState.activeCount, syncState.peerCount]);
 
   // Set metadata from URL for snapshots, or from Y.Doc for normal plans
   useEffect(() => {
@@ -176,11 +185,10 @@ export function PlanPage() {
     return () => clearActivePlanSync();
   }, [planId, syncState, setActivePlanSync, clearActivePlanSync]);
 
-  // When user tries to comment without identity, we show profile setup
+  // When user tries to comment without identity, open GitHub auth
   const handleRequestIdentity = useCallback(() => {
-    wasRequestingCommentRef.current = true;
-    setShowProfileSetup(true);
-  }, []);
+    startAuth();
+  }, [startAuth]);
 
   const handleStatusChange = useCallback(
     (newStatus: 'approved' | 'changes_requested') => {
@@ -227,11 +235,18 @@ export function PlanPage() {
     const waitingForP2P = inP2POnlyMode && !metadata && !p2pGracePeriodExpired;
     const isStillLoading = (!syncState.synced && !syncState.idbSynced) || waitingForP2P;
 
-    if (!metadata && isStillLoading) {
+    // Also keep waiting if we have active peers - they might still be syncing
+    const hasPeersButNoData = syncState.peerCount > 0 && !metadata;
+
+    if (!metadata && (isStillLoading || hasPeersButNoData)) {
       return (
         <div className="p-8">
           <p className="text-muted-foreground">
-            {waitingForP2P ? 'Syncing from peers...' : 'Loading plan...'}
+            {syncState.peerCount > 0
+              ? `Syncing from ${syncState.peerCount} peer(s)...`
+              : waitingForP2P
+                ? 'Waiting for peers...'
+                : 'Loading plan...'}
           </p>
         </div>
       );
@@ -268,13 +283,14 @@ export function PlanPage() {
         );
       }
 
-      // User is authenticated but plan still doesn't exist
+      // User is authenticated but plan still doesn't exist after grace period
+      // and no peers are connected to sync from
       return (
         <div className="p-8 text-center">
           <h1 className="text-xl font-bold text-foreground">Plan Not Found</h1>
           <p className="text-muted-foreground">The plan &quot;{id}&quot; does not exist.</p>
           <p className="text-sm text-muted-foreground mt-2">
-            It has been removed from your sidebar.
+            The plan owner may be offline, or this link may be invalid.
           </p>
         </div>
       );
@@ -407,25 +423,6 @@ export function PlanPage() {
               />
             </div>
           </div>
-        )}
-
-        {/* Profile setup modal */}
-        {showProfileSetup && (
-          <ProfileSetup
-            onComplete={() => {
-              setShowProfileSetup(false);
-              if (wasRequestingCommentRef.current) {
-                wasRequestingCommentRef.current = false;
-                toast.success('Ready to comment!', {
-                  description: 'Select text in the document, then click Comment.',
-                });
-              }
-            }}
-            onCancel={() => {
-              setShowProfileSetup(false);
-              wasRequestingCommentRef.current = false;
-            }}
-          />
         )}
       </div>
     </WaitingRoomGate>

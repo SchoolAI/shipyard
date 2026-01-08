@@ -18,7 +18,6 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 import { CollapsiblePanel } from '@/components/ui/collapsible-panel';
 import { useActivePlanSync } from '@/contexts/ActivePlanSyncContext';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
-import { useIdentity } from '@/hooks/useIdentity';
 import { useMultiProviderSync } from '@/hooks/useMultiProviderSync';
 import { usePlanIndex } from '@/hooks/usePlanIndex';
 import { useSharedPlans } from '@/hooks/useSharedPlans';
@@ -232,7 +231,6 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
   const [optimisticallyHiddenIds, setOptimisticallyHiddenIds] = useState<Set<string>>(new Set());
   const navigate = useNavigate();
   const location = useLocation();
-  const { identity } = useIdentity();
   const { identity: githubIdentity } = useGitHubAuth();
   const { ydoc: indexDoc } = useMultiProviderSync(PLAN_INDEX_DOC_NAME);
 
@@ -253,8 +251,8 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
   };
 
   const handleArchive = async (planId: string) => {
-    if (!identity) {
-      toast.error('Please set up your profile first');
+    if (!githubIdentity) {
+      toast.error('Please sign in with GitHub first');
       return;
     }
 
@@ -272,7 +270,7 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
       planDoc.transact(() => {
         const metadata = planDoc.getMap('metadata');
         metadata.set('archivedAt', now);
-        metadata.set('archivedBy', identity.displayName);
+        metadata.set('archivedBy', githubIdentity.displayName);
         metadata.set('updatedAt', now);
       });
 
@@ -287,7 +285,7 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
       setPlanIndexEntry(indexDoc, {
         ...entry,
         deletedAt: now,
-        deletedBy: identity.displayName,
+        deletedBy: githubIdentity.displayName,
         updatedAt: now,
       });
     } else {
@@ -299,7 +297,7 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
         setPlanIndexEntry(indexDoc, {
           ...sharedPlan,
           deletedAt: now,
-          deletedBy: identity.displayName,
+          deletedBy: githubIdentity.displayName,
           updatedAt: now,
         });
       }
@@ -309,8 +307,8 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
   };
 
   const handleUnarchive = async (planId: string) => {
-    if (!identity) {
-      toast.error('Please set up your profile first');
+    if (!githubIdentity) {
+      toast.error('Please sign in with GitHub first');
       return;
     }
 

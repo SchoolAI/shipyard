@@ -16,10 +16,15 @@ import { ShareButton } from '@/components/ShareButton';
 import { StatusChip } from '@/components/StatusChip';
 import { useActivePlanSync } from '@/contexts/ActivePlanSyncContext';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
-import { useIdentity } from '@/hooks/useIdentity';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { useMultiProviderSync } from '@/hooks/useMultiProviderSync';
-import type { UserIdentity } from '@/utils/identity';
+
+/** Simple identity type for display purposes */
+interface UserIdentity {
+  id: string;
+  name: string;
+  color: string;
+}
 
 interface PlanHeaderProps {
   ydoc: Y.Doc;
@@ -54,14 +59,13 @@ export function PlanHeader({
   const { syncState } = useActivePlanSync();
   const isMobile = useIsMobile();
   const isArchived = !!display.archivedAt;
-  const { identity: currentIdentity } = useIdentity();
   const { identity: githubIdentity } = useGitHubAuth();
   const { ydoc: indexDoc } = useMultiProviderSync(PLAN_INDEX_DOC_NAME);
   const ownerId = getPlanOwnerId(ydoc);
 
   const handleArchiveToggle = () => {
-    if (!currentIdentity) {
-      toast.error('Please set up your profile first');
+    if (!githubIdentity) {
+      toast.error('Please sign in with GitHub first');
       return;
     }
 
@@ -75,7 +79,7 @@ export function PlanHeader({
         metadataMap.delete('archivedBy');
       } else {
         metadataMap.set('archivedAt', now);
-        metadataMap.set('archivedBy', currentIdentity.displayName);
+        metadataMap.set('archivedBy', githubIdentity.displayName);
       }
       metadataMap.set('updatedAt', now);
     });
@@ -91,7 +95,7 @@ export function PlanHeader({
         setPlanIndexEntry(indexDoc, {
           ...entry,
           deletedAt: now,
-          deletedBy: currentIdentity.displayName,
+          deletedBy: githubIdentity.displayName,
           updatedAt: now,
         });
         toast.success('Plan archived');

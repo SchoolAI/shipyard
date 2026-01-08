@@ -17,7 +17,13 @@ import type { WebrtcProvider } from 'y-webrtc';
 import type { WebsocketProvider } from 'y-websocket';
 import type * as Y from 'yjs';
 import { useTheme } from '@/hooks/useTheme';
-import type { UserIdentity } from '@/utils/identity';
+
+/** Simple identity type for display purposes */
+interface UserIdentity {
+  id: string;
+  name: string;
+  color: string;
+}
 
 /** Provider type that BlockNote can use for collaboration (WebSocket or WebRTC) */
 type CollaborationProvider = WebsocketProvider | WebrtcProvider;
@@ -116,7 +122,7 @@ function createResolveUsers(ydoc: Y.Doc, currentIdentity: UserIdentity | null) {
       if (currentIdentity && id === currentIdentity.id) {
         return {
           id,
-          username: currentIdentity.displayName,
+          username: currentIdentity.name,
           avatarUrl: '',
         };
       }
@@ -168,7 +174,7 @@ export function PlanViewer({
     if (!identity) return;
     const usersMap = ydoc.getMap<{ displayName: string; color: string }>('users');
     usersMap.set(identity.id, {
-      displayName: identity.displayName,
+      displayName: identity.name,
       color: identity.color,
     });
   }, [ydoc, identity]);
@@ -188,7 +194,7 @@ export function PlanViewer({
             fragment: ydoc.getXmlFragment('document'),
             user: identity
               ? {
-                  name: identity.displayName,
+                  name: identity.name,
                   color: identity.color,
                 }
               : {

@@ -8,7 +8,12 @@ import {
 } from '@peer-plan/schema';
 import { nanoid } from 'nanoid';
 import { z } from 'zod';
-import { isArtifactsEnabled, isGitHubConfigured, uploadArtifact } from '../github-artifacts.js';
+import {
+  GitHubAuthError,
+  isArtifactsEnabled,
+  isGitHubConfigured,
+  uploadArtifact,
+} from '../github-artifacts.js';
 import { logger } from '../logger.js';
 import { verifySessionToken } from '../session-token.js';
 import { getOrCreateDoc } from '../ws-server.js';
@@ -278,6 +283,20 @@ ARTIFACT TYPES:
       };
     } catch (error) {
       logger.error({ error, planId, filename }, 'Failed to upload artifact');
+
+      // Provide clear, actionable error message for auth failures
+      if (error instanceof GitHubAuthError) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `GitHub Authentication Error\n\n${error.message}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+
       const message = error instanceof Error ? error.message : 'Unknown error';
       return {
         content: [

@@ -2,7 +2,13 @@ import { Button } from '@heroui/react';
 import type { PlanStatusType } from '@peer-plan/schema';
 import { useState } from 'react';
 import type * as Y from 'yjs';
-import type { UserIdentity } from '@/utils/identity';
+
+/** Simple identity type for display purposes */
+interface UserIdentity {
+  id: string;
+  name: string;
+  color: string;
+}
 
 interface ReviewActionsProps {
   ydoc: Y.Doc;
@@ -50,7 +56,7 @@ export function ReviewActions({
         const metadata = ydoc.getMap('metadata');
         metadata.set('status', newStatus);
         metadata.set('reviewedAt', Date.now());
-        metadata.set('reviewedBy', identity.displayName);
+        metadata.set('reviewedBy', identity.name);
         metadata.set('updatedAt', Date.now());
       });
 
