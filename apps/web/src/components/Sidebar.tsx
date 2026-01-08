@@ -17,6 +17,7 @@ import { AccountSection } from '@/components/account';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { CollapsiblePanel } from '@/components/ui/collapsible-panel';
 import { useActivePlanSync } from '@/contexts/ActivePlanSyncContext';
+import { useGitHubAuth } from '@/hooks/useGitHubAuth';
 import { useIdentity } from '@/hooks/useIdentity';
 import { useMultiProviderSync } from '@/hooks/useMultiProviderSync';
 import { usePlanIndex } from '@/hooks/usePlanIndex';
@@ -232,11 +233,12 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const { identity } = useIdentity();
+  const { identity: githubIdentity } = useGitHubAuth();
   const { ydoc: indexDoc } = useMultiProviderSync(PLAN_INDEX_DOC_NAME);
 
   // Memoize plan IDs to prevent infinite re-renders in useSharedPlans
   const localPlanIds = useMemo(() => localPlans.map((p) => p.id), [localPlans]);
-  const rawSharedPlans = useSharedPlans(localPlanIds);
+  const rawSharedPlans = useSharedPlans(localPlanIds, githubIdentity?.username);
 
   // Filter out optimistically hidden plans
   const sharedPlans = useMemo(

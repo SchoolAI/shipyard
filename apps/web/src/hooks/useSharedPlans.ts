@@ -1,4 +1,9 @@
-import { getPlanMetadata, NON_PLAN_DB_NAMES, type PlanIndexEntry } from '@peer-plan/schema';
+import {
+  getPlanMetadata,
+  getPlanOwnerId,
+  NON_PLAN_DB_NAMES,
+  type PlanIndexEntry,
+} from '@peer-plan/schema';
 import { useEffect, useState } from 'react';
 import { IndexeddbPersistence } from 'y-indexeddb';
 import * as Y from 'yjs';
@@ -9,14 +14,20 @@ import * as Y from 'yjs';
  *
  * Plans migrate automatically: when they appear in plan-index, they stop
  * being returned by this hook (filter based on planIndexPlanIds).
+ *
+ * Plans owned by the current user (matching GitHub username) are excluded
+ * so they appear in "My Plans" instead of "Shared with me".
  */
-export function useSharedPlans(planIndexPlanIds: string[]): PlanIndexEntry[] {
+export function useSharedPlans(
+  planIndexPlanIds: string[],
+  currentGitHubUsername?: string
+): PlanIndexEntry[] {
   const [sharedPlans, setSharedPlans] = useState<PlanIndexEntry[]>([]);
 
   // Stable reference for planIndexPlanIds to avoid infinite re-runs
   const planIndexIdsKey = planIndexPlanIds.sort().join(',');
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: Using planIndexIdsKey string to prevent infinite re-renders from array reference changes
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Using planIndexIdsKey string and currentGitHubUsername to prevent infinite re-renders from array reference changes
   useEffect(() => {
     async function discoverSharedPlans() {
       try {
@@ -35,6 +46,7 @@ export function useSharedPlans(planIndexPlanIds: string[]): PlanIndexEntry[] {
 
         // Load metadata from each plan doc
         const plans = await Promise.all(
+          // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Async map with filtering logic for plan discovery
           planDocIds.map(async (id) => {
             try {
               const ydoc = new Y.Doc();
@@ -42,6 +54,7 @@ export function useSharedPlans(planIndexPlanIds: string[]): PlanIndexEntry[] {
               await idb.whenSynced;
 
               const metadata = getPlanMetadata(ydoc);
+              const ownerId = getPlanOwnerId(ydoc);
               idb.destroy();
 
               if (!metadata) {
@@ -50,6 +63,11 @@ export function useSharedPlans(planIndexPlanIds: string[]): PlanIndexEntry[] {
 
               // Skip archived plans
               if (metadata.archivedAt) {
+                return null;
+              }
+
+              // Skip plans owned by current user (they belong in "My Plans")
+              if (currentGitHubUsername && ownerId === currentGitHubUsername) {
                 return null;
               }
 
@@ -86,7 +104,7 @@ export function useSharedPlans(planIndexPlanIds: string[]): PlanIndexEntry[] {
     return () => {
       window.removeEventListener('indexeddb-plan-synced', handlePlanSynced);
     };
-  }, [planIndexIdsKey]);
+  }, [planIndexIdsKey, currentGitHubUsername]);
 
   return sharedPlans;
 }
