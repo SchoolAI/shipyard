@@ -132,17 +132,18 @@ export function PlanPage() {
 
   // Subscribe to deliverables for tab count
   useEffect(() => {
-    // For snapshots, extract and populate deliverables into Y.Doc
+    // For snapshots, use deliverables from URL (with linkage info) or extract from content
     if (isSnapshot && urlPlan) {
-      const deliverables = extractDeliverables(urlPlan.content);
+      // Prefer deliverables from URL (includes linkage info), fall back to extracting from content
+      const deliverables = urlPlan.deliverables ?? extractDeliverables(urlPlan.content);
       // Populate deliverables array in Y.Doc so components can access them
       const deliverablesArray = ydoc.getArray(YDOC_KEYS.DELIVERABLES);
       deliverablesArray.delete(0, deliverablesArray.length); // Clear existing
       deliverablesArray.push(deliverables);
 
-      // For snapshots, deliverables are shown as uncompleted
-      // (URL encoding doesn't include linkage info yet)
-      setDeliverableCount({ completed: 0, total: deliverables.length });
+      // Count completed deliverables (those with linkedArtifactId)
+      const completed = deliverables.filter((d) => d.linkedArtifactId).length;
+      setDeliverableCount({ completed, total: deliverables.length });
       return;
     }
 

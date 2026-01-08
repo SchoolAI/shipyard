@@ -21,6 +21,7 @@
     "@mantine/core": "^8.3.10",
     "@mantine/hooks": "^8.3.10",
     "@peer-plan/schema": "workspace:*",
+    "@radix-ui/react-avatar": "^1.1.11",
     "@radix-ui/react-separator": "^1.1.8",
     "@radix-ui/react-slot": "^1.2.4",
     "@tiptap/extensions": "^3.14.0",

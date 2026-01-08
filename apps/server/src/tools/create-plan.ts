@@ -11,7 +11,7 @@ import { nanoid } from 'nanoid';
 import open from 'open';
 import { z } from 'zod';
 import { logger } from '../logger.js';
-import { getGitHubUsername } from '../server-identity.js';
+import { getGitHubUsername, getRepositoryFullName } from '../server-identity.js';
 import { generateSessionToken, hashSessionToken } from '../session-token.js';
 import { getOrCreateDoc, hasActiveConnections } from '../ws-server.js';
 import { TOOL_NAMES } from './tool-names.js';
@@ -51,7 +51,8 @@ When read_plan is called, deliverables show with {id="block-id"} for artifact li
         },
         repo: {
           type: 'string',
-          description: 'GitHub repo (org/repo). Required for artifact uploads.',
+          description:
+            'GitHub repo (org/repo). Auto-detected from current directory if not provided. Required for artifact uploads.',
         },
         prNumber: { type: 'number', description: 'PR number. Required for artifact uploads.' },
       },
@@ -66,14 +67,20 @@ When read_plan is called, deliverables show with {id="block-id"} for artifact li
     const sessionTokenHash = hashSessionToken(sessionToken);
     const now = Date.now();
 
-    logger.info({ planId, title: input.title }, 'Creating plan');
+    // Auto-detect repo from current directory if not provided
+    const repo = input.repo || getRepositoryFullName() || undefined;
+    if (repo && !input.repo) {
+      logger.info({ repo }, 'Auto-detected repository from current directory');
+    }
+
+    logger.info({ planId, title: input.title, repo }, 'Creating plan');
 
     const ydoc = await getOrCreateDoc(planId);
     initPlanMetadata(ydoc, {
       id: planId,
       title: input.title,
       status: 'draft',
-      repo: input.repo,
+      repo,
       pr: input.prNumber,
       ownerId: getGitHubUsername(),
       sessionTokenHash,
@@ -129,6 +136,10 @@ When read_plan is called, deliverables show with {id="block-id"} for artifact li
       logger.info({ url }, 'Browser launched');
     }
 
+    const repoInfo = repo
+      ? `Repo: ${repo}${!input.repo ? ' (auto-detected)' : ''}`
+      : 'Repo: Not set (provide repo and prNumber for artifact uploads)';
+
     return {
       content: [
         {
@@ -136,6 +147,7 @@ When read_plan is called, deliverables show with {id="block-id"} for artifact li
           text: `Plan created!
 ID: ${planId}
 Session Token: ${sessionToken}
+${repoInfo}
 URL: ${url}
 
 IMPORTANT: Save the session token - it's required for read_plan, update_plan, and add_artifact calls.

@@ -1,6 +1,6 @@
 import type { Block } from '@blocknote/core';
 import lzstring from 'lz-string';
-import type { Artifact, PlanMetadata } from './plan.js';
+import type { Artifact, Deliverable, PlanMetadata } from './plan.js';
 
 /**
  * URL-encoded plan structure.
@@ -16,6 +16,8 @@ export interface UrlEncodedPlan {
   pr?: number;
   content: Block[];
   artifacts?: Artifact[];
+  /** Deliverables with linkage info (which artifact fulfills each deliverable) */
+  deliverables?: Deliverable[];
 
   comments?: unknown[];
 }

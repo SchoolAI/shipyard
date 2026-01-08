@@ -2,6 +2,7 @@ import { ServerBlockNoteEditor } from '@blocknote/server-util';
 import {
   createPlanUrl,
   getArtifacts,
+  getDeliverables,
   getPlanMetadata,
   PLAN_INDEX_DOC_NAME,
   setPlanIndexEntry,
@@ -99,6 +100,9 @@ WORKFLOW:
       };
     }
 
+    // Get deliverables with linkage info
+    const deliverables = getDeliverables(ydoc);
+
     // Get content blocks from Y.Doc
     const editor = ServerBlockNoteEditor.create();
     const fragment = ydoc.getXmlFragment('document');
@@ -115,6 +119,7 @@ WORKFLOW:
       pr: metadata.pr,
       content: blocks,
       artifacts,
+      deliverables,
     });
 
     // Update metadata
