@@ -30,6 +30,8 @@ interface PlanViewerProps {
   provider?: CollaborationProvider | null;
   /** Called when user needs to set up identity for commenting */
   onRequestIdentity?: () => void;
+  /** Initial content for snapshots (when no provider) */
+  initialContent?: unknown[];
 }
 
 /**
@@ -139,7 +141,13 @@ function createResolveUsers(ydoc: Y.Doc, currentIdentity: UserIdentity | null) {
   };
 }
 
-export function PlanViewer({ ydoc, identity, provider, onRequestIdentity }: PlanViewerProps) {
+export function PlanViewer({
+  ydoc,
+  identity,
+  provider,
+  onRequestIdentity,
+  initialContent: _initialContent,
+}: PlanViewerProps) {
   // Comments are fully enabled only when identity is set
   const hasComments = identity !== null;
   const { theme } = useTheme();
@@ -171,7 +179,8 @@ export function PlanViewer({ ydoc, identity, provider, onRequestIdentity }: Plan
   const editor = useCreateBlockNote(
     {
       // When collaboration is enabled, content comes from the Yjs fragment.
-      // No initialContent needed - the editor syncs from DOCUMENT_FRAGMENT.
+      // For snapshots (no provider), use initialContent from URL.
+      initialContent: !provider && _initialContent ? (_initialContent as never) : undefined,
       collaboration: provider
         ? {
             provider,

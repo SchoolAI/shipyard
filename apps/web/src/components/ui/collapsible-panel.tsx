@@ -16,6 +16,10 @@ interface CollapsiblePanelProps {
   children: ReactNode;
   /** Optional className for the panel */
   className?: string;
+  /** Optional content to show when collapsed (for sidebar icon mode) */
+  collapsedContent?: ReactNode;
+  /** Width when collapsed (default: 'w-16' for icon mode) */
+  collapsedWidth?: string;
 }
 
 /**
@@ -29,10 +33,13 @@ export function CollapsiblePanel({
   width = side === 'left' ? 'w-64' : 'w-72',
   children,
   className,
+  collapsedContent,
+  collapsedWidth = 'w-16',
 }: CollapsiblePanelProps) {
   const ChevronClosed = side === 'left' ? ChevronRight : ChevronLeft;
 
-  if (!isOpen) {
+  // If no collapsedContent provided, show floating button (right panel behavior)
+  if (!isOpen && !collapsedContent) {
     return (
       <Button
         variant="tertiary"
@@ -56,11 +63,11 @@ export function CollapsiblePanel({
         'h-full flex flex-col overflow-hidden shrink-0',
         'transition-all duration-200 ease-in-out',
         side === 'left' ? 'border-r border-separator' : 'border-l border-separator',
-        width,
+        isOpen ? width : collapsedWidth,
         className
       )}
     >
-      {children}
+      {isOpen ? children : collapsedContent}
     </aside>
   );
 }
