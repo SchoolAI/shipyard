@@ -5,8 +5,7 @@
       "command": "node",
       "args": ["apps/server/dist/index.mjs"],
       "env": {
-        "NODE_ENV": "development",
-        "GITHUB_TOKEN": "${GITHUB_TOKEN}"
+        "NODE_ENV": "development"
       }
     },
     "heroui-react": {

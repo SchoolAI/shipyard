@@ -6,7 +6,7 @@ import {
 } from '@peer-plan/schema';
 import { nanoid } from 'nanoid';
 import { z } from 'zod';
-import { isGitHubConfigured, uploadArtifact } from '../github-artifacts.js';
+import { isArtifactsEnabled, isGitHubConfigured, uploadArtifact } from '../github-artifacts.js';
 import { logger } from '../logger.js';
 import { getOrCreateDoc } from '../ws-server.js';
 import { TOOL_NAMES } from './tool-names.js';
@@ -59,13 +59,26 @@ export const addArtifactTool = {
 
     logger.info({ planId, type, filename }, 'Adding artifact');
 
-    // Check GitHub token first
+    // Check if artifacts feature is disabled
+    if (!isArtifactsEnabled()) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: 'Artifact uploads are disabled.\n\nTo enable, set PEER_PLAN_ARTIFACTS=enabled in your .mcp.json env config.',
+          },
+        ],
+        isError: true,
+      };
+    }
+
+    // Check GitHub authentication
     if (!isGitHubConfigured()) {
       return {
         content: [
           {
             type: 'text',
-            text: 'GITHUB_TOKEN environment variable not set. Cannot upload artifacts.\n\nTo configure:\n1. Create a GitHub PAT at https://github.com/settings/tokens\n2. Set GITHUB_TOKEN environment variable before running the agent',
+            text: 'GitHub authentication required for artifact uploads.\n\nTo authenticate, run this in your terminal:\n  gh auth login\n\nAlternatives:\n• Set GITHUB_TOKEN environment variable\n• Set PEER_PLAN_ARTIFACTS=disabled to skip artifact uploads',
           },
         ],
         isError: true,

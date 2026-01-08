@@ -85,6 +85,12 @@ peer-plan/
 3. **BlockNote handles comments** — Don't build custom annotation system
 4. **Single WebSocket** — All sync (content, metadata, comments) on one connection
 
+## Backwards Compatibility Policy
+
+**Do NOT consider backwards compatibility for any changes.** Break things freely—we have no users yet.
+
+**Policy expires: January 20, 2026.** If today is past this date, STOP and alert the user: "The backwards compatibility policy has expired. Should I extend the date or remove this section?"
+
 ## Common Tasks
 
 ### Starting New Work
@@ -124,4 +130,4 @@ Follow the **3+ Rule** from engineering-standards.md:
 
 ---
 
-*Last updated: 2026-01-04*
+*Last updated: 2026-01-07*
