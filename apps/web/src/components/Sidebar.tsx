@@ -274,17 +274,38 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
     setShowArchived(newState);
   };
 
-  const handleArchive = (planId: string) => {
+  const handleArchive = async (planId: string) => {
     if (!identity) {
       toast.error('Please set up your profile first');
       return;
     }
 
     const now = Date.now();
-    const entry = getPlanIndexEntry(indexDoc, planId);
 
+    // Update the plan's own metadata (for shared plans to be filtered)
+    try {
+      const planDoc = new (await import('yjs')).Doc();
+      const idb = new (await import('y-indexeddb')).IndexeddbPersistence(planId, planDoc);
+      await idb.whenSynced;
+
+      planDoc.transact(() => {
+        const metadata = planDoc.getMap('metadata');
+        metadata.set('archivedAt', now);
+        metadata.set('archivedBy', identity.displayName);
+        metadata.set('updatedAt', now);
+      });
+
+      idb.destroy();
+
+      // Trigger re-scan of shared plans
+      window.dispatchEvent(new CustomEvent('indexeddb-plan-synced', { detail: { planId } }));
+    } catch {
+      // If plan doc doesn't exist, that's fine
+    }
+
+    // Also update plan-index
+    const entry = getPlanIndexEntry(indexDoc, planId);
     if (entry) {
-      // Update existing entry
       setPlanIndexEntry(indexDoc, {
         ...entry,
         deletedAt: now,
@@ -309,21 +330,46 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
     toast.success('Plan archived');
   };
 
-  const handleUnarchive = (planId: string) => {
+  const handleUnarchive = async (planId: string) => {
     if (!identity) {
       toast.error('Please set up your profile first');
       return;
     }
 
+    const now = Date.now();
+
+    // Update the plan's own metadata
+    try {
+      const planDoc = new (await import('yjs')).Doc();
+      const idb = new (await import('y-indexeddb')).IndexeddbPersistence(planId, planDoc);
+      await idb.whenSynced;
+
+      planDoc.transact(() => {
+        const metadata = planDoc.getMap('metadata');
+        metadata.delete('archivedAt');
+        metadata.delete('archivedBy');
+        metadata.set('updatedAt', now);
+      });
+
+      idb.destroy();
+
+      // Trigger re-scan of shared plans
+      window.dispatchEvent(new CustomEvent('indexeddb-plan-synced', { detail: { planId } }));
+    } catch {
+      // If plan doc doesn't exist, that's fine
+    }
+
+    // Update plan-index
     const entry = getPlanIndexEntry(indexDoc, planId);
     if (entry) {
       const { deletedAt: _removed1, deletedBy: _removed2, ...rest } = entry;
       setPlanIndexEntry(indexDoc, {
         ...rest,
-        updatedAt: Date.now(),
+        updatedAt: now,
       });
-      toast.success('Plan unarchived');
     }
+
+    toast.success('Plan unarchived');
   };
 
   useEffect(() => {

@@ -48,6 +48,11 @@ export function useSharedPlans(planIndexPlanIds: string[]): PlanIndexEntry[] {
                 return null;
               }
 
+              // Skip archived plans
+              if (metadata.archivedAt) {
+                return null;
+              }
+
               return {
                 id: metadata.id,
                 title: metadata.title,

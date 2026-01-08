@@ -4,6 +4,7 @@ import { useMultiProviderSync } from './useMultiProviderSync';
 
 export interface PlanIndexState {
   plans: PlanIndexEntry[];
+  inboxPlans: PlanIndexEntry[];
   archivedPlans: PlanIndexEntry[];
   connected: boolean;
   synced: boolean;
@@ -22,6 +23,7 @@ export interface PlanIndexState {
 export function usePlanIndex(): PlanIndexState {
   const { ydoc, syncState } = useMultiProviderSync(PLAN_INDEX_DOC_NAME);
   const [plans, setPlans] = useState<PlanIndexEntry[]>([]);
+  const [inboxPlans, setInboxPlans] = useState<PlanIndexEntry[]>([]);
   const [archivedPlans, setArchivedPlans] = useState<PlanIndexEntry[]>([]);
   const [navigationTarget, setNavigationTarget] = useState<string | null>(null);
 
@@ -29,7 +31,20 @@ export function usePlanIndex(): PlanIndexState {
     const plansMap = ydoc.getMap('plans');
     const updatePlans = () => {
       // Get active plans (default excludes archived)
-      setPlans(getPlanIndex(ydoc, false));
+      const activePlans = getPlanIndex(ydoc, false);
+
+      // Inbox: plans needing attention (changes_requested or pending_review)
+      const inbox = activePlans.filter(
+        (p) => p.status === 'changes_requested' || p.status === 'pending_review'
+      );
+      setInboxPlans(inbox);
+
+      // Regular plans: everything else that's active
+      const regular = activePlans.filter(
+        (p) => p.status !== 'changes_requested' && p.status !== 'pending_review'
+      );
+      setPlans(regular);
+
       // Get archived plans separately
       const allPlans = getPlanIndex(ydoc, true);
       setArchivedPlans(allPlans.filter((p) => p.deletedAt));
@@ -68,6 +83,7 @@ export function usePlanIndex(): PlanIndexState {
 
   return {
     plans,
+    inboxPlans,
     archivedPlans,
     connected: syncState.connected,
     synced: syncState.synced,

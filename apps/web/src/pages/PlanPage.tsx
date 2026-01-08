@@ -15,6 +15,7 @@ import { FileText, Package } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
+import * as Y from 'yjs';
 import { Attachments } from '@/components/Attachments';
 import { DeliverablesView } from '@/components/DeliverablesView';
 import { MobileHeader } from '@/components/MobileHeader';
@@ -131,13 +132,17 @@ export function PlanPage() {
 
   // Subscribe to deliverables for tab count
   useEffect(() => {
-    // For snapshots, calculate from URL data
+    // For snapshots, extract and populate deliverables into Y.Doc
     if (isSnapshot && urlPlan) {
       const deliverables = extractDeliverables(urlPlan.content);
-      const completed = deliverables.filter((d) =>
-        urlPlan.artifacts?.some((a) => a.linkedDeliverableId === d.id)
-      ).length;
-      setDeliverableCount({ completed, total: deliverables.length });
+      // Populate deliverables array in Y.Doc so components can access them
+      const deliverablesArray = ydoc.getArray(YDOC_KEYS.DELIVERABLES);
+      deliverablesArray.delete(0, deliverablesArray.length); // Clear existing
+      deliverablesArray.push(deliverables);
+
+      // For snapshots, deliverables are shown as uncompleted
+      // (URL encoding doesn't include linkage info yet)
+      setDeliverableCount({ completed: 0, total: deliverables.length });
       return;
     }
 
@@ -239,6 +244,15 @@ export function PlanPage() {
       <div className="p-8 text-center">
         <h1 className="text-xl font-bold text-foreground">Invalid Snapshot</h1>
         <p className="text-muted-foreground">The URL does not contain valid plan data.</p>
+      </div>
+    );
+  }
+
+  // Metadata should be set at this point (either from URL or Y.Doc)
+  if (!metadata) {
+    return (
+      <div className="p-8">
+        <p className="text-muted-foreground">Loading...</p>
       </div>
     );
   }

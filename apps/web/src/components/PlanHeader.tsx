@@ -1,12 +1,16 @@
-import { Chip } from '@heroui/react';
+import { Button, Chip, Separator } from '@heroui/react';
 import type { PlanMetadata } from '@peer-plan/schema';
+import { getPlanIndexEntry, PLAN_INDEX_DOC_NAME, setPlanIndexEntry } from '@peer-plan/schema';
+import { Archive, ArchiveRestore } from 'lucide-react';
+import { toast } from 'sonner';
 import type * as Y from 'yjs';
-import { ArchiveActions } from '@/components/ArchiveActions';
 import { ReviewActions } from '@/components/ReviewActions';
 import { ShareButton } from '@/components/ShareButton';
 import { StatusChip } from '@/components/StatusChip';
 import { useActivePlanSync } from '@/contexts/ActivePlanSyncContext';
+import { useIdentity } from '@/hooks/useIdentity';
 import { useIsMobile } from '@/hooks/useIsMobile';
+import { useMultiProviderSync } from '@/hooks/useMultiProviderSync';
 import type { UserIdentity } from '@/utils/identity';
 
 interface PlanHeaderProps {
@@ -39,6 +43,48 @@ export function PlanHeader({
   const { syncState } = useActivePlanSync();
   const isMobile = useIsMobile();
   const isArchived = !!display.archivedAt;
+  const { identity: currentIdentity } = useIdentity();
+  const { ydoc: indexDoc } = useMultiProviderSync(PLAN_INDEX_DOC_NAME);
+
+  const handleArchiveToggle = () => {
+    if (!currentIdentity) {
+      toast.error('Please set up your profile first');
+      return;
+    }
+
+    const now = Date.now();
+
+    // Update plan metadata
+    ydoc.transact(() => {
+      const metadataMap = ydoc.getMap('metadata');
+      if (isArchived) {
+        metadataMap.delete('archivedAt');
+        metadataMap.delete('archivedBy');
+      } else {
+        metadataMap.set('archivedAt', now);
+        metadataMap.set('archivedBy', currentIdentity.displayName);
+      }
+      metadataMap.set('updatedAt', now);
+    });
+
+    // Update plan index
+    const entry = getPlanIndexEntry(indexDoc, planId);
+    if (entry) {
+      if (isArchived) {
+        const { deletedAt: _removed1, deletedBy: _removed2, ...rest } = entry;
+        setPlanIndexEntry(indexDoc, { ...rest, updatedAt: now });
+        toast.success('Plan unarchived');
+      } else {
+        setPlanIndexEntry(indexDoc, {
+          ...entry,
+          deletedAt: now,
+          deletedBy: currentIdentity.displayName,
+          updatedAt: now,
+        });
+        toast.success('Plan archived');
+      }
+    }
+  };
 
   return (
     <div className="flex flex-wrap items-center gap-2 w-full">
@@ -83,25 +129,33 @@ export function PlanHeader({
 
           {/* Review actions - inline on desktop, floating on mobile */}
           {!isMobile && (
-            <ReviewActions
-              ydoc={ydoc}
-              currentStatus={display.status}
-              identity={identity}
-              onRequestIdentity={onRequestIdentity}
-              onStatusChange={onStatusChange}
-            />
+            <>
+              <ReviewActions
+                ydoc={ydoc}
+                currentStatus={display.status}
+                identity={identity}
+                onRequestIdentity={onRequestIdentity}
+                onStatusChange={onStatusChange}
+              />
+
+              {/* Divider between review actions and utility icons */}
+              <Separator orientation="vertical" className="h-6" />
+            </>
           )}
 
           <ShareButton />
 
-          {/* Archive menu */}
-          <ArchiveActions
-            ydoc={ydoc}
-            planId={planId}
-            isArchived={isArchived}
-            identity={identity}
-            onRequestIdentity={onRequestIdentity}
-          />
+          {/* Archive icon button */}
+          <Button
+            isIconOnly
+            variant="ghost"
+            size="sm"
+            aria-label={isArchived ? 'Unarchive plan' : 'Archive plan'}
+            onPress={handleArchiveToggle}
+            className="touch-target"
+          >
+            {isArchived ? <ArchiveRestore className="w-4 h-4" /> : <Archive className="w-4 h-4" />}
+          </Button>
         </div>
       )}
     </div>

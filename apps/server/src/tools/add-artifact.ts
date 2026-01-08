@@ -100,6 +100,7 @@ ARTIFACT TYPES:
     },
   },
 
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Handler has necessary validation and error handling for artifact uploads
   handler: async (args: unknown) => {
     const input = AddArtifactInput.parse(args);
     const { planId, sessionToken, type, filename } = input;
