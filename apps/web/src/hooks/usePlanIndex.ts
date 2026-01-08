@@ -4,6 +4,7 @@ import { useMultiProviderSync } from './useMultiProviderSync';
 
 export interface PlanIndexState {
   plans: PlanIndexEntry[];
+  archivedPlans: PlanIndexEntry[];
   connected: boolean;
   synced: boolean;
   serverCount: number;
@@ -21,12 +22,17 @@ export interface PlanIndexState {
 export function usePlanIndex(): PlanIndexState {
   const { ydoc, syncState } = useMultiProviderSync(PLAN_INDEX_DOC_NAME);
   const [plans, setPlans] = useState<PlanIndexEntry[]>([]);
+  const [archivedPlans, setArchivedPlans] = useState<PlanIndexEntry[]>([]);
   const [navigationTarget, setNavigationTarget] = useState<string | null>(null);
 
   useEffect(() => {
     const plansMap = ydoc.getMap('plans');
     const updatePlans = () => {
-      setPlans(getPlanIndex(ydoc));
+      // Get active plans (default excludes archived)
+      setPlans(getPlanIndex(ydoc, false));
+      // Get archived plans separately
+      const allPlans = getPlanIndex(ydoc, true);
+      setArchivedPlans(allPlans.filter((p) => p.deletedAt));
     };
 
     updatePlans();
@@ -62,6 +68,7 @@ export function usePlanIndex(): PlanIndexState {
 
   return {
     plans,
+    archivedPlans,
     connected: syncState.connected,
     synced: syncState.synced,
     serverCount: syncState.serverCount,

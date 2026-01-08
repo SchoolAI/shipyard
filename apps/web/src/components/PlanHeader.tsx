@@ -1,6 +1,7 @@
 import { Chip } from '@heroui/react';
 import type { PlanMetadata } from '@peer-plan/schema';
 import type * as Y from 'yjs';
+import { ArchiveActions } from '@/components/ArchiveActions';
 import { ReviewActions } from '@/components/ReviewActions';
 import { ShareButton } from '@/components/ShareButton';
 import { StatusChip } from '@/components/StatusChip';
@@ -10,6 +11,8 @@ import type { UserIdentity } from '@/utils/identity';
 
 interface PlanHeaderProps {
   ydoc: Y.Doc;
+  /** Plan ID for archive actions */
+  planId: string;
   /** Current metadata from parent component */
   metadata: PlanMetadata;
   /** User identity for review actions */
@@ -24,6 +27,7 @@ interface PlanHeaderProps {
 
 export function PlanHeader({
   ydoc,
+  planId,
   metadata,
   identity,
   onRequestIdentity,
@@ -34,6 +38,7 @@ export function PlanHeader({
   const display = metadata;
   const { syncState } = useActivePlanSync();
   const isMobile = useIsMobile();
+  const isArchived = !!display.archivedAt;
 
   return (
     <div className="flex flex-wrap items-center gap-2 w-full">
@@ -50,6 +55,13 @@ export function PlanHeader({
           {display.repo}
           {display.pr && ` #${display.pr}`}
         </span>
+      )}
+
+      {/* Archived badge */}
+      {isArchived && (
+        <Chip color="default" variant="soft" className="shrink-0">
+          archived
+        </Chip>
       )}
 
       {/* Right side: agents/peers, review actions, share - hidden for snapshots */}
@@ -81,6 +93,15 @@ export function PlanHeader({
           )}
 
           <ShareButton />
+
+          {/* Archive menu */}
+          <ArchiveActions
+            ydoc={ydoc}
+            planId={planId}
+            isArchived={isArchived}
+            identity={identity}
+            onRequestIdentity={onRequestIdentity}
+          />
         </div>
       )}
     </div>

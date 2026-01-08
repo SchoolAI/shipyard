@@ -46,6 +46,7 @@ export function SnapshotPage() {
       {!isMobile && (
         <PlanHeader
           ydoc={ydoc}
+          planId={urlPlan.id}
           metadata={snapshotMetadata}
           identity={null}
           onRequestIdentity={noOp}

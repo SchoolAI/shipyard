@@ -40,10 +40,10 @@ export interface PlanIndexEntry {
   status: PlanStatusType;
   createdAt: number;
   updatedAt: number;
-  /** True if plan has been deleted (soft delete for trash/recovery) */
-  deleted?: boolean;
-  /** Timestamp when plan was deleted */
+  /** Timestamp when plan was archived/deleted (hidden from sidebar by default) */
   deletedAt?: number;
+  /** Display name of who archived/deleted the plan */
+  deletedBy?: string;
 }
 
 /**
@@ -55,6 +55,6 @@ export const PlanIndexEntrySchema = z.object({
   status: z.enum(PlanStatusValues),
   createdAt: z.number(),
   updatedAt: z.number(),
-  deleted: z.boolean().optional(),
   deletedAt: z.number().optional(),
+  deletedBy: z.string().optional(),
 });

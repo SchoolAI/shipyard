@@ -41,6 +41,10 @@ export interface PlanMetadata {
   approvedUsers?: string[];
   /** SHA256 hash of session token for MCP API access */
   sessionTokenHash?: string;
+  /** When the plan was archived (hidden from sidebar by default) */
+  archivedAt?: number;
+  /** Display name of who archived the plan */
+  archivedBy?: string;
 }
 
 export const PlanMetadataSchema = z.object({
@@ -60,6 +64,8 @@ export const PlanMetadataSchema = z.object({
   approvalRequired: z.boolean().optional(),
   approvedUsers: z.array(z.string()).optional(),
   sessionTokenHash: z.string().optional(),
+  archivedAt: z.number().optional(),
+  archivedBy: z.string().optional(),
 });
 
 export type ArtifactType = 'screenshot' | 'video' | 'test_results' | 'diff';

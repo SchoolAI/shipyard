@@ -136,10 +136,9 @@ export function PlanPage() {
   useEffect(() => {
     if (syncState.synced && syncState.activeCount > 0 && !metadata) {
       const existingEntry = getPlanIndexEntry(indexDoc, planId);
-      if (existingEntry && !existingEntry.deleted) {
+      if (existingEntry && !existingEntry.deletedAt) {
         setPlanIndexEntry(indexDoc, {
           ...existingEntry,
-          deleted: true,
           deletedAt: Date.now(),
         });
       }
@@ -182,6 +181,7 @@ export function PlanPage() {
           <div className="border-b border-separator bg-surface px-2 md:px-6 py-1 md:py-3 shrink-0">
             <PlanHeader
               ydoc={ydoc}
+              planId={planId}
               metadata={metadata}
               identity={identity}
               onRequestIdentity={handleRequestIdentity}

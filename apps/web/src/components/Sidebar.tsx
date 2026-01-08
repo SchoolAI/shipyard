@@ -1,6 +1,6 @@
-import { Button, Disclosure, DisclosureGroup, ListBox, ListBoxItem } from '@heroui/react';
+import { Button, Chip, Disclosure, DisclosureGroup, ListBox, ListBoxItem } from '@heroui/react';
 import type { PlanIndexEntry } from '@peer-plan/schema';
-import { User, Users } from 'lucide-react';
+import { Archive, User, Users } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -11,7 +11,12 @@ import { CollapsiblePanel } from '@/components/ui/collapsible-panel';
 import { useActivePlanSync } from '@/contexts/ActivePlanSyncContext';
 import { usePlanIndex } from '@/hooks/usePlanIndex';
 import { useSharedPlans } from '@/hooks/useSharedPlans';
-import { getSidebarCollapsed, setSidebarCollapsed } from '@/utils/uiPreferences';
+import {
+  getShowArchived,
+  getSidebarCollapsed,
+  setShowArchived,
+  setSidebarCollapsed,
+} from '@/utils/uiPreferences';
 
 interface PlanItemProps {
   plan: PlanIndexEntry;
@@ -45,12 +50,25 @@ interface SidebarProps {
 }
 
 export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
-  const { plans: localPlans, activeCount, navigationTarget, clearNavigation } = usePlanIndex();
+  const {
+    plans: localPlans,
+    archivedPlans,
+    activeCount,
+    navigationTarget,
+    clearNavigation,
+  } = usePlanIndex();
   const { activePlanId, syncState } = useActivePlanSync();
   const [collapsed, setCollapsed] = useState(getSidebarCollapsed);
   const [showProfile, setShowProfile] = useState(false);
+  const [showArchived, setShowArchivedState] = useState(getShowArchived);
   const navigate = useNavigate();
   const location = useLocation();
+
+  const handleToggleArchived = () => {
+    const newState = !showArchived;
+    setShowArchivedState(newState);
+    setShowArchived(newState);
+  };
 
   useEffect(() => {
     if (!navigationTarget) return;
@@ -170,6 +188,53 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
               </Disclosure.Content>
             </Disclosure>
           )}
+
+          {/* Archived Plans section - shown when toggle is on */}
+          {showArchived && archivedPlans.length > 0 && (
+            <Disclosure defaultExpanded>
+              <Disclosure.Heading>
+                <Disclosure.Trigger className="w-full">
+                  <div className="flex items-center justify-between w-full px-2 py-1.5">
+                    <div className="flex items-center gap-2">
+                      <Disclosure.Indicator className="text-foreground" />
+                      <span className="text-xs font-semibold text-muted-foreground">Archived</span>
+                    </div>
+                    <Chip size="sm" variant="soft" className="text-[10px] h-5 px-1.5">
+                      {archivedPlans.length}
+                    </Chip>
+                  </div>
+                </Disclosure.Trigger>
+              </Disclosure.Heading>
+              <Disclosure.Content>
+                <Disclosure.Body className="p-0">
+                  <ListBox
+                    className="p-0"
+                    aria-label="Archived plans"
+                    selectionMode="single"
+                    selectedKeys={activePlanId ? [activePlanId] : []}
+                    onSelectionChange={(keys) => {
+                      const key = Array.from(keys)[0];
+                      if (key) {
+                        onNavigate?.();
+                        navigate(`/plan/${key}`);
+                      }
+                    }}
+                  >
+                    {archivedPlans.map((plan) => (
+                      <ListBoxItem
+                        id={plan.id}
+                        key={plan.id}
+                        textValue={plan.title}
+                        className="opacity-60"
+                      >
+                        <PlanItem plan={plan} />
+                      </ListBoxItem>
+                    ))}
+                  </ListBox>
+                </Disclosure.Body>
+              </Disclosure.Content>
+            </Disclosure>
+          )}
         </DisclosureGroup>
 
         {/* Empty state */}
@@ -178,7 +243,7 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
         )}
       </nav>
 
-      {/* Footer with profile and theme toggle */}
+      {/* Footer with profile, archive toggle, and theme toggle */}
       <div className="px-3 py-2 border-t border-separator flex items-center gap-0 shrink-0 mt-auto">
         <Button
           isIconOnly
@@ -189,6 +254,16 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
           className="touch-target flex-1"
         >
           <User className="w-4 h-4 text-foreground" />
+        </Button>
+        <Button
+          isIconOnly
+          variant="ghost"
+          size="sm"
+          aria-label={showArchived ? 'Hide archived plans' : 'Show archived plans'}
+          onPress={handleToggleArchived}
+          className={`touch-target flex-1 ${showArchived ? 'text-primary' : ''}`}
+        >
+          <Archive className="w-4 h-4" />
         </Button>
         <div className="flex-1 flex justify-center">
           <ThemeToggle />

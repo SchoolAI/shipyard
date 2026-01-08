@@ -3,17 +3,17 @@ import { type PlanIndexEntry, PlanIndexEntrySchema } from './plan-index.js';
 
 /**
  * Gets all plans from the index Y.Doc, sorted by updatedAt (most recent first).
- * By default, filters out deleted plans. Pass includeDeleted=true to get all plans.
+ * By default, filters out archived plans. Pass includeArchived=true to get all plans.
  */
-export function getPlanIndex(ydoc: Y.Doc, includeDeleted = false): PlanIndexEntry[] {
+export function getPlanIndex(ydoc: Y.Doc, includeArchived = false): PlanIndexEntry[] {
   const plansMap = ydoc.getMap<Record<string, unknown>>('plans');
   const entries: PlanIndexEntry[] = [];
 
   for (const [_id, data] of plansMap.entries()) {
     const result = PlanIndexEntrySchema.safeParse(data);
     if (result.success) {
-      // Filter deleted plans unless explicitly requested
-      if (!includeDeleted && result.data.deleted) {
+      // Filter archived plans unless explicitly requested
+      if (!includeArchived && result.data.deletedAt) {
         continue;
       }
       entries.push(result.data);
@@ -48,12 +48,12 @@ export function setPlanIndexEntry(ydoc: Y.Doc, entry: PlanIndexEntry): void {
     createdAt: entry.createdAt,
     updatedAt: entry.updatedAt,
   };
-  // Include deleted fields if present
-  if (entry.deleted !== undefined) {
-    data.deleted = entry.deleted;
-  }
+  // Include archive fields if present
   if (entry.deletedAt !== undefined) {
     data.deletedAt = entry.deletedAt;
+  }
+  if (entry.deletedBy !== undefined) {
+    data.deletedBy = entry.deletedBy;
   }
   plansMap.set(entry.id, data);
 }
