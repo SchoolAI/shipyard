@@ -22,14 +22,28 @@ const CompleteTaskInput = z.object({
 export const completeTaskTool = {
   definition: {
     name: TOOL_NAMES.COMPLETE_TASK,
-    description:
-      'Mark a task as complete after all deliverables are attached. Returns a snapshot URL for embedding in a PR.',
+    description: `Mark a task as complete after all deliverables are attached. Returns a snapshot URL for embedding in a PR.
+
+REQUIREMENTS:
+- Plan status must be 'in_progress'
+- At least one artifact must be uploaded (deliverables with proof)
+- Use add_artifact tool to upload screenshots, videos, test results, or diffs
+- Deliverables are checkbox items marked with {#deliverable} in create_plan or update_block_content
+
+WORKFLOW:
+1. Create plan with deliverables: create_plan (use {#deliverable} markers)
+2. Upload artifacts: add_artifact (link to deliverable IDs from read_plan)
+3. Complete task: complete_task (generates snapshot URL)
+4. Embed snapshot URL in PR description`,
     inputSchema: {
       type: 'object',
       properties: {
         planId: { type: 'string', description: 'ID of the plan to complete' },
         sessionToken: { type: 'string', description: 'Session token from create_plan' },
-        summary: { type: 'string', description: 'Optional completion summary' },
+        summary: {
+          type: 'string',
+          description: 'Optional completion summary for PR description',
+        },
       },
       required: ['planId', 'sessionToken'],
     },

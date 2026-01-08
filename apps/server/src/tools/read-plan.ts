@@ -17,8 +17,19 @@ const ReadPlanInput = z.object({
 export const readPlanTool = {
   definition: {
     name: TOOL_NAMES.READ_PLAN,
-    description:
-      'Read a specific plan by ID, returning its metadata and content in markdown format',
+    description: `Read a specific plan by ID, returning its metadata and content in markdown format.
+
+OUTPUT INCLUDES:
+- Metadata: title, status, repo, PR, timestamps
+- Content: Full markdown with block IDs (<!-- block:id --> comments)
+- Deliverables section: Shows deliverable IDs {id="block-id"} and completion status [x]/[ ]
+- Annotations: Comment threads if includeAnnotations=true
+
+USE CASES:
+- Get deliverable IDs for artifact linking (set includeAnnotations=false)
+- Get block IDs for update_block_content operations
+- Review feedback from human reviewers (set includeAnnotations=true)
+- Check plan status and completion state`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -26,7 +37,8 @@ export const readPlanTool = {
         sessionToken: { type: 'string', description: 'Session token from create_plan' },
         includeAnnotations: {
           type: 'boolean',
-          description: 'Include comment threads/annotations in the response (default: false)',
+          description:
+            'Include comment threads/annotations in the response (default: false). Set true to see human feedback.',
         },
       },
       required: ['planId', 'sessionToken'],

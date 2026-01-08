@@ -13,8 +13,21 @@ const SetupReviewNotificationInput = z.object({
 export const setupReviewNotificationTool = {
   definition: {
     name: TOOL_NAMES.SETUP_REVIEW_NOTIFICATION,
-    description:
-      'Returns a script to monitor plan review status. Run in background to be notified when review completes.',
+    description: `Returns a bash script to monitor plan review status. Run in background to be notified when review completes.
+
+USAGE:
+1. Call this tool to get monitoring script
+2. Run script in background: bash <script> &
+3. Script polls registry server for status/comment changes
+4. Exits when status becomes 'approved' or 'changes_requested'
+5. Server-side batching reduces poll frequency (5s window or 1 change threshold)
+
+TYPICAL WORKFLOW:
+1. create_plan + update_plan(status=pending_review)
+2. setup_review_notification (get monitoring script)
+3. Run script in background
+4. Continue working on other tasks
+5. Get notified when human review completes`,
     inputSchema: {
       type: 'object',
       properties: {

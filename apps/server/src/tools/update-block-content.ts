@@ -54,8 +54,18 @@ type BlockOperation = z.infer<typeof BlockOperationSchema>;
 export const updateBlockContentTool = {
   definition: {
     name: TOOL_NAMES.UPDATE_BLOCK_CONTENT,
-    description:
-      'Modify plan content by updating, inserting, or deleting specific blocks. Use read_plan first to get block IDs.',
+    description: `Modify plan content by updating, inserting, or deleting specific blocks. Use read_plan first to get block IDs.
+
+DELIVERABLES: When inserting/updating content, you can mark checkbox items as deliverables using {#deliverable} marker. These can later be linked to artifacts via add_artifact tool.
+
+Operations:
+- update: Replace an existing block with new markdown content
+- insert: Add new blocks after a specific block (or at beginning if afterBlockId is null)
+- delete: Remove a specific block
+- replace_all: Replace entire plan content with new markdown
+
+Example with deliverables:
+{ "type": "insert", "afterBlockId": "block-123", "content": "- [ ] Screenshot of feature {#deliverable}" }`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -63,7 +73,7 @@ export const updateBlockContentTool = {
         sessionToken: { type: 'string', description: 'Session token from create_plan' },
         operations: {
           type: 'array',
-          description: 'Array of operations to perform',
+          description: 'Array of operations to perform atomically',
           items: {
             type: 'object',
             properties: {
@@ -74,16 +84,17 @@ export const updateBlockContentTool = {
               },
               blockId: {
                 type: 'string',
-                description: 'Block ID for update/delete operations',
+                description: 'Block ID for update/delete operations (from read_plan output)',
               },
               afterBlockId: {
                 type: 'string',
                 nullable: true,
-                description: 'Insert after this block (null = beginning)',
+                description: 'Insert after this block ID (null = beginning)',
               },
               content: {
                 type: 'string',
-                description: 'Markdown content for update/insert/replace_all',
+                description:
+                  'Markdown content for update/insert/replace_all. Can include {#deliverable} markers on checkbox items.',
               },
             },
             required: ['type'],

@@ -24,7 +24,23 @@ const UpdatePlanInput = z.object({
 export const updatePlanTool = {
   definition: {
     name: TOOL_NAMES.UPDATE_PLAN,
-    description: 'Update an existing plan metadata (title, status)',
+    description: `Update an existing plan's metadata (title, status). Does not modify content—use update_block_content for that.
+
+STATUS WORKFLOW:
+- draft: Initial state, not ready for review
+- pending_review: Ready for human feedback, triggers review notifications
+- in_progress: Work has started, artifacts being attached
+- approved: Human reviewer accepted the plan
+- changes_requested: Human reviewer requested modifications
+- completed: All deliverables attached, task finished (set by complete_task)
+
+TYPICAL FLOW:
+1. create_plan (status=draft)
+2. update_plan (status=pending_review) - signals ready for review
+3. [Human reviews, adds comments, approves/requests changes]
+4. update_plan (status=in_progress) - start work
+5. add_artifact (upload deliverables)
+6. complete_task (status=completed)`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -34,7 +50,8 @@ export const updatePlanTool = {
         status: {
           type: 'string',
           enum: ['draft', 'pending_review', 'approved', 'changes_requested', 'in_progress'],
-          description: 'New status (optional)',
+          description:
+            "New status (optional). Use 'pending_review' to signal ready for human feedback.",
         },
       },
       required: ['planId', 'sessionToken'],

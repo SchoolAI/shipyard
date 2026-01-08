@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import {
   type ArtifactType,
   addArtifact,
@@ -14,23 +15,51 @@ import { TOOL_NAMES } from './tool-names.js';
 
 // --- Input Schema ---
 
-const AddArtifactInput = z.object({
-  planId: z.string().describe('The plan ID to add artifact to'),
-  sessionToken: z.string().describe('Session token from create_plan'),
-  type: z.enum(['screenshot', 'video', 'test_results', 'diff']).describe('Artifact type'),
-  filename: z.string().describe('Filename for the artifact'),
-  content: z.string().describe('Base64 encoded file content'),
-  description: z.string().optional().describe('What this artifact proves (deliverable name)'),
-  deliverableId: z.string().optional().describe('ID of the deliverable this artifact fulfills'),
-});
+const AddArtifactInput = z
+  .object({
+    planId: z.string().describe('The plan ID to add artifact to'),
+    sessionToken: z.string().describe('Session token from create_plan'),
+    type: z.enum(['screenshot', 'video', 'test_results', 'diff']).describe('Artifact type'),
+    filename: z.string().describe('Filename for the artifact'),
+    content: z.string().optional().describe('Base64 encoded file content'),
+    filePath: z.string().optional().describe('Local file path to upload'),
+    contentUrl: z.string().optional().describe('URL to fetch content from'),
+    description: z.string().optional().describe('What this artifact proves (deliverable name)'),
+    deliverableId: z.string().optional().describe('ID of the deliverable this artifact fulfills'),
+  })
+  .refine((data) => {
+    const provided = [data.content, data.filePath, data.contentUrl].filter(Boolean).length;
+    return provided === 1;
+  }, 'Exactly one of content, filePath, or contentUrl must be provided');
 
 // --- Public Export ---
 
 export const addArtifactTool = {
   definition: {
     name: TOOL_NAMES.ADD_ARTIFACT,
-    description:
-      'Upload an artifact (screenshot, video, test results, diff) to a plan. Requires GITHUB_TOKEN env var and plan must have repo/pr set.\n\nIf linking to a deliverable, call read_plan first to see deliverable IDs, then pass the deliverable ID to automatically mark it as completed.',
+    description: `Upload an artifact (screenshot, video, test results, diff) to a plan. Provides proof that deliverables were completed.
+
+REQUIREMENTS:
+- Plan must have repo and prNumber set (from create_plan)
+- GitHub authentication required: run 'gh auth login' or set GITHUB_TOKEN env var
+- Artifacts stored in GitHub orphan branch 'plan-artifacts'
+
+CONTENT OPTIONS (provide exactly one):
+- content: Base64 encoded file content (legacy, still supported)
+- filePath: Local file path to read and upload (e.g., "/path/to/screenshot.png")
+- contentUrl: URL to fetch content from (e.g., "https://example.com/image.png")
+
+DELIVERABLE LINKING:
+- Call read_plan with includeAnnotations=false to see deliverable IDs: {id="block-id"}
+- Pass deliverableId to automatically mark that deliverable as completed (checkmark)
+- Multiple artifacts can link to the same deliverable
+- Artifacts without deliverableId are stored but not linked
+
+ARTIFACT TYPES:
+- screenshot: PNG, JPG images of UI, terminal output, etc.
+- video: MP4 recordings of feature demos, walkthroughs
+- test_results: JSON test output, coverage reports
+- diff: Code changes, git diffs`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -39,28 +68,89 @@ export const addArtifactTool = {
         type: {
           type: 'string',
           enum: ['screenshot', 'video', 'test_results', 'diff'],
-          description: 'Artifact type',
+          description: 'Artifact type for rendering',
         },
-        filename: { type: 'string', description: 'Filename for the artifact' },
-        content: { type: 'string', description: 'Base64 encoded file content' },
+        filename: {
+          type: 'string',
+          description: 'Filename with extension (e.g., screenshot.png, demo.mp4)',
+        },
+        content: {
+          type: 'string',
+          description: 'Base64 encoded file content (legacy, prefer filePath or contentUrl)',
+        },
+        filePath: {
+          type: 'string',
+          description: 'Local file path to upload (e.g., "/path/to/screenshot.png")',
+        },
+        contentUrl: {
+          type: 'string',
+          description: 'URL to fetch content from (e.g., "https://example.com/image.png")',
+        },
         description: {
           type: 'string',
-          description: 'What this artifact proves (deliverable name)',
+          description: 'Human-readable description of what this artifact proves',
         },
         deliverableId: {
           type: 'string',
-          description: 'ID of the deliverable this artifact fulfills',
+          description:
+            'ID of the deliverable this fulfills (from read_plan output). Automatically marks deliverable as completed.',
         },
       },
-      required: ['planId', 'sessionToken', 'type', 'filename', 'content'],
+      required: ['planId', 'sessionToken', 'type', 'filename'],
     },
   },
 
   handler: async (args: unknown) => {
     const input = AddArtifactInput.parse(args);
-    const { planId, sessionToken, type, filename, content } = input;
+    const { planId, sessionToken, type, filename } = input;
 
     logger.info({ planId, type, filename }, 'Adding artifact');
+
+    // Resolve content from filePath, contentUrl, or direct content
+    let content: string;
+    if (input.filePath) {
+      logger.info({ filePath: input.filePath }, 'Reading file from path');
+      try {
+        const fileBuffer = await readFile(input.filePath);
+        content = fileBuffer.toString('base64');
+      } catch (error) {
+        logger.error({ error, filePath: input.filePath }, 'Failed to read file');
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        return {
+          content: [{ type: 'text', text: `Failed to read file: ${message}` }],
+          isError: true,
+        };
+      }
+    } else if (input.contentUrl) {
+      logger.info({ contentUrl: input.contentUrl }, 'Fetching content from URL');
+      try {
+        const response = await fetch(input.contentUrl);
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        const arrayBuffer = await response.arrayBuffer();
+        content = Buffer.from(arrayBuffer).toString('base64');
+      } catch (error) {
+        logger.error({ error, contentUrl: input.contentUrl }, 'Failed to fetch URL');
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        return {
+          content: [{ type: 'text', text: `Failed to fetch URL: ${message}` }],
+          isError: true,
+        };
+      }
+    } else if (input.content) {
+      content = input.content;
+    } else {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: 'Must provide exactly one of: content, filePath, or contentUrl',
+          },
+        ],
+        isError: true,
+      };
+    }
 
     // Check if artifacts feature is disabled
     if (!isArtifactsEnabled()) {
