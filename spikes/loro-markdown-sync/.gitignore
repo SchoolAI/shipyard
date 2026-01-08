@@ -1,0 +1,6 @@
+node_modules/
+dist/
+plan-a.md
+plan-b.md
+commands.txt
+*.md.bak
