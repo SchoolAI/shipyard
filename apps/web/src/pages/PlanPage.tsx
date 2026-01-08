@@ -54,6 +54,26 @@ export function PlanPage() {
   const activeWsProvider = providers.find((p) => p.wsconnected) ?? providers[0] ?? null;
   const activeProvider = activeWsProvider ?? rtcProvider;
 
+  // P2P grace period: when opening a shared URL, IndexedDB syncs immediately (empty)
+  // but we need to wait for WebRTC to deliver the plan data before showing "Not Found"
+  const [p2pGracePeriodExpired, setP2pGracePeriodExpired] = useState(false);
+
+  // Start timeout when in P2P-only mode without metadata
+  useEffect(() => {
+    const inP2POnlyMode = syncState.idbSynced && !syncState.synced && syncState.activeCount === 0;
+    const needsP2PData = !metadata && inP2POnlyMode;
+
+    if (needsP2PData) {
+      const timeout = setTimeout(() => setP2pGracePeriodExpired(true), 5000);
+      return () => clearTimeout(timeout);
+    }
+    // Reset if metadata arrives (plan found via P2P)
+    if (metadata) {
+      setP2pGracePeriodExpired(false);
+    }
+    return undefined;
+  }, [metadata, syncState.idbSynced, syncState.synced, syncState.activeCount]);
+
   useEffect(() => {
     const metaMap = ydoc.getMap('metadata');
     const update = () => {
@@ -128,13 +148,18 @@ export function PlanPage() {
 
   // Early returns AFTER all hooks
   // Show loading while:
-  // 1. Neither WebSocket has synced NOR IndexedDB has synced
-  // This handles both server-connected and P2P-only modes
-  const isStillLoading = !syncState.synced && !syncState.idbSynced;
+  // 1. Neither WebSocket has synced NOR IndexedDB has synced, OR
+  // 2. In P2P-only mode (no servers) and still waiting for peers to sync data
+  const inP2POnlyMode = syncState.idbSynced && !syncState.synced && syncState.activeCount === 0;
+  const waitingForP2P = inP2POnlyMode && !metadata && !p2pGracePeriodExpired;
+  const isStillLoading = (!syncState.synced && !syncState.idbSynced) || waitingForP2P;
+
   if (!metadata && isStillLoading) {
     return (
       <div className="p-8">
-        <p className="text-muted-foreground">Loading plan...</p>
+        <p className="text-muted-foreground">
+          {waitingForP2P ? 'Syncing from peers...' : 'Loading plan...'}
+        </p>
       </div>
     );
   }
