@@ -1,6 +1,9 @@
 import { useOverlayState } from '@heroui/react';
 import {
+  addArtifact,
+  extractDeliverables,
   getDeliverables,
+  getPlanFromUrl,
   getPlanIndexEntry,
   getPlanMetadata,
   PLAN_INDEX_DOC_NAME,
@@ -9,8 +12,8 @@ import {
   YDOC_KEYS,
 } from '@peer-plan/schema';
 import { FileText, Package } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Attachments } from '@/components/Attachments';
 import { DeliverablesView } from '@/components/DeliverablesView';
@@ -33,9 +36,33 @@ type ViewType = 'plan' | 'deliverables';
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Component has necessary conditional logic for sync state handling
 export function PlanPage() {
   const { id } = useParams<{ id: string }>();
-  // The route /plan/:id guarantees id is defined
-  const planId = id ?? '';
-  const { ydoc, syncState, providers, rtcProvider } = useMultiProviderSync(planId);
+  const [searchParams] = useSearchParams();
+  const urlPlan = searchParams.has('d') ? getPlanFromUrl() : null;
+  const isSnapshot = urlPlan !== null;
+
+  // For snapshots, use planId from URL; for normal plans, use route param
+  const planId = isSnapshot ? (urlPlan?.id ?? '') : (id ?? '');
+
+  const { ydoc: syncedYdoc, syncState, providers, rtcProvider } = useMultiProviderSync(
+    isSnapshot ? '' : planId
+  ); // Don't sync snapshots
+
+  // For snapshots, create local Y.Doc hydrated with URL data
+  const snapshotYdoc = useMemo(() => {
+    if (!isSnapshot || !urlPlan) return null;
+
+    const doc = new Y.Doc();
+    // Add artifacts if present
+    if (urlPlan.artifacts) {
+      for (const artifact of urlPlan.artifacts) {
+        addArtifact(doc, artifact);
+      }
+    }
+    return doc;
+  }, [isSnapshot, urlPlan]);
+
+  const ydoc = isSnapshot ? (snapshotYdoc ?? syncedYdoc) : syncedYdoc;
+
   const { identity } = useIdentity();
   const isMobile = useIsMobile();
   const drawerState = useOverlayState();
@@ -52,7 +79,7 @@ export function PlanPage() {
   // This ensures BlockNote binds to the Y.Doc fragment even without a WebSocket server,
   // so comment highlights sync properly via WebRTC.
   const activeWsProvider = providers.find((p) => p.wsconnected) ?? providers[0] ?? null;
-  const activeProvider = activeWsProvider ?? rtcProvider;
+  const activeProvider = isSnapshot ? null : (activeWsProvider ?? rtcProvider);
 
   // P2P grace period: when opening a shared URL, IndexedDB syncs immediately (empty)
   // but we need to wait for WebRTC to deliver the plan data before showing "Not Found"
@@ -74,7 +101,21 @@ export function PlanPage() {
     return undefined;
   }, [metadata, syncState.idbSynced, syncState.synced, syncState.activeCount]);
 
+  // Set metadata from URL for snapshots, or from Y.Doc for normal plans
   useEffect(() => {
+    if (isSnapshot && urlPlan) {
+      setMetadata({
+        id: urlPlan.id,
+        title: urlPlan.title,
+        status: urlPlan.status,
+        repo: urlPlan.repo,
+        pr: urlPlan.pr,
+        createdAt: 0,
+        updatedAt: 0,
+      });
+      return;
+    }
+
     const metaMap = ydoc.getMap('metadata');
     const update = () => {
       const newMetadata = getPlanMetadata(ydoc);
@@ -83,10 +124,21 @@ export function PlanPage() {
     update();
     metaMap.observe(update);
     return () => metaMap.unobserve(update);
-  }, [ydoc]);
+  }, [ydoc, isSnapshot, urlPlan]);
 
   // Subscribe to deliverables for tab count
   useEffect(() => {
+    // For snapshots, calculate from URL data
+    if (isSnapshot && urlPlan) {
+      const deliverables = extractDeliverables(urlPlan.content);
+      const completed = deliverables.filter((d) =>
+        urlPlan.artifacts?.some((a) => a.linkedDeliverableId === d.id)
+      ).length;
+      setDeliverableCount({ completed, total: deliverables.length });
+      return;
+    }
+
+    // For normal plans, observe Y.Doc changes
     const deliverablesArray = ydoc.getArray(YDOC_KEYS.DELIVERABLES);
     const updateCount = () => {
       const deliverables = getDeliverables(ydoc);
@@ -96,7 +148,7 @@ export function PlanPage() {
     updateCount();
     deliverablesArray.observe(updateCount);
     return () => deliverablesArray.unobserve(updateCount);
-  }, [ydoc]);
+  }, [ydoc, isSnapshot, urlPlan]);
 
   // Update context with active plan sync state
   useEffect(() => {
@@ -146,29 +198,42 @@ export function PlanPage() {
   }, [syncState.synced, syncState.activeCount, metadata, indexDoc, planId]);
 
   // Early returns AFTER all hooks
-  // Show loading while:
-  // 1. Neither WebSocket has synced NOR IndexedDB has synced, OR
-  // 2. In P2P-only mode (no servers) and still waiting for peers to sync data
-  const inP2POnlyMode = syncState.idbSynced && !syncState.synced && syncState.activeCount === 0;
-  const waitingForP2P = inP2POnlyMode && !metadata && !p2pGracePeriodExpired;
-  const isStillLoading = (!syncState.synced && !syncState.idbSynced) || waitingForP2P;
+  // Skip loading/not-found checks for snapshots (they have URL data)
+  if (!isSnapshot) {
+    // Show loading while:
+    // 1. Neither WebSocket has synced NOR IndexedDB has synced, OR
+    // 2. In P2P-only mode (no servers) and still waiting for peers to sync data
+    const inP2POnlyMode = syncState.idbSynced && !syncState.synced && syncState.activeCount === 0;
+    const waitingForP2P = inP2POnlyMode && !metadata && !p2pGracePeriodExpired;
+    const isStillLoading = (!syncState.synced && !syncState.idbSynced) || waitingForP2P;
 
-  if (!metadata && isStillLoading) {
-    return (
-      <div className="p-8">
-        <p className="text-muted-foreground">
-          {waitingForP2P ? 'Syncing from peers...' : 'Loading plan...'}
-        </p>
-      </div>
-    );
+    if (!metadata && isStillLoading) {
+      return (
+        <div className="p-8">
+          <p className="text-muted-foreground">
+            {waitingForP2P ? 'Syncing from peers...' : 'Loading plan...'}
+          </p>
+        </div>
+      );
+    }
+
+    if (!metadata) {
+      return (
+        <div className="p-8 text-center">
+          <h1 className="text-xl font-bold text-foreground">Plan Not Found</h1>
+          <p className="text-muted-foreground">The plan &quot;{id}&quot; does not exist.</p>
+          <p className="text-sm text-muted-foreground mt-2">It has been removed from your sidebar.</p>
+        </div>
+      );
+    }
   }
 
-  if (!metadata) {
+  // For snapshots, handle invalid URL
+  if (isSnapshot && !urlPlan) {
     return (
       <div className="p-8 text-center">
-        <h1 className="text-xl font-bold text-foreground">Plan Not Found</h1>
-        <p className="text-muted-foreground">The plan &quot;{id}&quot; does not exist.</p>
-        <p className="text-sm text-muted-foreground mt-2">It has been removed from your sidebar.</p>
+        <h1 className="text-xl font-bold text-foreground">Invalid Snapshot</h1>
+        <p className="text-muted-foreground">The URL does not contain valid plan data.</p>
       </div>
     );
   }
@@ -186,6 +251,7 @@ export function PlanPage() {
               identity={identity}
               onRequestIdentity={handleRequestIdentity}
               onStatusChange={handleStatusChange}
+              isSnapshot={isSnapshot}
             />
           </div>
         )}
@@ -237,9 +303,10 @@ export function PlanPage() {
                 <PlanViewer
                   key={identity?.id ?? 'anonymous'}
                   ydoc={ydoc}
-                  identity={identity}
+                  identity={isSnapshot ? null : identity}
                   provider={activeProvider}
-                  onRequestIdentity={handleRequestIdentity}
+                  onRequestIdentity={isSnapshot ? undefined : handleRequestIdentity}
+                  initialContent={isSnapshot ? urlPlan?.content : undefined}
                 />
                 <Attachments ydoc={ydoc} />
               </div>
@@ -258,8 +325,8 @@ export function PlanPage() {
           )}
         </div>
 
-        {/* Floating review actions on mobile */}
-        {isMobile && metadata && (
+        {/* Floating review actions on mobile - hide for snapshots */}
+        {isMobile && metadata && !isSnapshot && (
           <div className="fixed bottom-3 right-3 z-30 pb-safe">
             <div className="bg-surface rounded-lg shadow-lg border border-separator p-2">
               <ReviewActions
