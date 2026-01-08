@@ -1,8 +1,10 @@
+import { getPlanOwnerId, isUserApproved } from '@peer-plan/schema';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { IndexeddbPersistence } from 'y-indexeddb';
 import { WebrtcProvider } from 'y-webrtc';
 import { WebsocketProvider } from 'y-websocket';
 import * as Y from 'yjs';
+import { useIdentity } from './useIdentity';
 
 const DEFAULT_SIGNALING_SERVER = 'wss://peer-plan-signaling.jacob-191.workers.dev';
 
@@ -17,6 +19,19 @@ const DEAD_PROVIDER_CHECK_INTERVAL = 2000;
 
 // How long to remember removed servers (prevent re-adding from stale registry)
 const REMOVED_SERVER_TTL = 60000; // 1 minute
+
+export type ApprovalStatus = 'pending' | 'approved' | 'rejected';
+
+export interface PlanAwarenessState {
+  user: {
+    id: string;
+    name: string;
+    color: string;
+  };
+  status: ApprovalStatus;
+  isOwner: boolean;
+  requestedAt?: number;
+}
 
 interface ServerEntry {
   port: number;
@@ -34,6 +49,8 @@ export interface SyncState {
   peerCount: number;
   /** Whether IndexedDB has synced (local data available) */
   idbSynced: boolean;
+  /** User's approval status for this plan (undefined if approval not required) */
+  approvalStatus?: ApprovalStatus;
 }
 
 interface ProviderState {
@@ -88,6 +105,7 @@ export function useMultiProviderSync(
 } {
   // Don't enable WebRTC for plan-index (only for individual plans)
   const enableWebRTC = options.enableWebRTC ?? docName !== 'plan-index';
+  const { identity } = useIdentity();
   // biome-ignore lint/correctness/useExhaustiveDependencies: docName triggers Y.Doc recreation intentionally
   const ydoc = useMemo(() => new Y.Doc(), [docName]);
   const [syncState, setSyncState] = useState<SyncState>({
@@ -99,6 +117,7 @@ export function useMultiProviderSync(
     idbSynced: false,
   });
   const idbSyncedRef = useRef(false);
+  const approvalStatusRef = useRef<ApprovalStatus | undefined>(undefined);
   const [rtcProvider, setRtcProvider] = useState<WebrtcProvider | null>(null);
 
   const [providersList, setProvidersList] = useState<WebsocketProvider[]>([]);
@@ -203,6 +222,58 @@ export function useMultiProviderSync(
       window.addEventListener('beforeunload', handleBeforeUnload);
     }
 
+    function computeApprovalStatus(userId: string | undefined): ApprovalStatus | undefined {
+      if (!userId) return undefined;
+
+      const ownerId = getPlanOwnerId(ydoc);
+
+      // No owner means approval not required (legacy plan or plan-index)
+      if (!ownerId) return undefined;
+
+      return isUserApproved(ydoc, userId) ? 'approved' : 'pending';
+    }
+
+    function setLocalAwarenessState() {
+      if (!rtc || !identity) return;
+
+      const ownerId = getPlanOwnerId(ydoc);
+      const status = computeApprovalStatus(identity.id);
+
+      // Only set awareness for plans with approval (not plan-index)
+      if (status === undefined) return;
+
+      const awarenessState: PlanAwarenessState = {
+        user: {
+          id: identity.id,
+          name: identity.displayName,
+          color: identity.color,
+        },
+        status,
+        isOwner: ownerId === identity.id,
+        requestedAt: status === 'pending' ? Date.now() : undefined,
+      };
+
+      rtc.awareness.setLocalStateField('planStatus', awarenessState);
+    }
+
+    function updateApprovalStatus() {
+      const newStatus = computeApprovalStatus(identity?.id);
+      if (newStatus !== approvalStatusRef.current) {
+        approvalStatusRef.current = newStatus;
+        setLocalAwarenessState();
+        updateSyncState();
+      }
+    }
+
+    // Watch for metadata changes (e.g., when owner approves user)
+    const metadataMap = ydoc.getMap('metadata');
+    metadataMap.observe(updateApprovalStatus);
+
+    // Set initial awareness state when identity is available
+    if (identity && rtc) {
+      updateApprovalStatus();
+    }
+
     function updateSyncState() {
       const providers = Array.from(providersRef.current.values());
       const connectedProviders = providers.filter((p) => p.provider.wsconnected);
@@ -222,6 +293,7 @@ export function useMultiProviderSync(
         activeCount: connectedProviders.length,
         peerCount: peerCountRef.current,
         idbSynced: idbSyncedRef.current,
+        approvalStatus: approvalStatusRef.current,
       });
 
       setProvidersList(providers.map((p) => p.provider));
@@ -354,6 +426,7 @@ export function useMultiProviderSync(
         state.provider.destroy();
       }
       providersRef.current.clear();
+      metadataMap.unobserve(updateApprovalStatus);
       idbProvider.destroy();
       if (rtc) {
         // Clear awareness before destroying so other peers see us leave
@@ -366,7 +439,7 @@ export function useMultiProviderSync(
         window.removeEventListener('beforeunload', handleBeforeUnload);
       }
     };
-  }, [docName, ydoc, enableWebRTC]);
+  }, [docName, ydoc, enableWebRTC, identity]);
 
   return { ydoc, syncState, providers: providersList, rtcProvider };
 }
