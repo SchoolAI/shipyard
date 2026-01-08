@@ -102,8 +102,13 @@ export const createPlanTool = {
     // Open the live plan page (not a snapshot URL) so the browser connects via WebSocket
     const url = `http://localhost:5173/plan/${planId}`;
 
-    await open(url);
-    logger.info({ url }, 'Browser launched');
+    // Only open browser if no browser is already connected to peer-plan
+    if (hasActiveConnections(PLAN_INDEX_DOC_NAME)) {
+      logger.info({ url, planId }, 'Browser already connected, skipping open');
+    } else {
+      await open(url);
+      logger.info({ url }, 'Browser launched');
+    }
 
     return {
       content: [

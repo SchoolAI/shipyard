@@ -75,6 +75,15 @@ export async function getOrCreateDoc(docName: string): Promise<Y.Doc> {
   return getDoc(docName);
 }
 
+/**
+ * Checks if there are any active WebSocket connections for a given plan.
+ * Used to avoid opening duplicate browser tabs.
+ */
+export function hasActiveConnections(planId: string): boolean {
+  const connections = conns.get(planId);
+  return connections !== undefined && connections.size > 0;
+}
+
 function send(ws: WsWebSocket, message: Uint8Array) {
   if (ws.readyState === ws.OPEN) {
     ws.send(message);
