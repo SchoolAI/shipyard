@@ -4,7 +4,7 @@ import { IndexeddbPersistence } from 'y-indexeddb';
 import { WebrtcProvider } from 'y-webrtc';
 import { WebsocketProvider } from 'y-websocket';
 import * as Y from 'yjs';
-import { useIdentity } from './useIdentity';
+import { useGitHubAuth } from './useGitHubAuth';
 
 const DEFAULT_SIGNALING_SERVER = 'wss://peer-plan-signaling.jacob-191.workers.dev';
 
@@ -19,6 +19,19 @@ const DEAD_PROVIDER_CHECK_INTERVAL = 2000;
 
 // How long to remember removed servers (prevent re-adding from stale registry)
 const REMOVED_SERVER_TTL = 60000; // 1 minute
+
+/**
+ * Generate a deterministic color from a string (e.g., username).
+ * Uses a simple hash to pick a hue for consistent colors per user.
+ */
+function colorFromString(str: string): string {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const hue = Math.abs(hash) % 360;
+  return `hsl(${hue}, 70%, 50%)`;
+}
 
 export type ApprovalStatus = 'pending' | 'approved' | 'rejected';
 
@@ -105,7 +118,7 @@ export function useMultiProviderSync(
 } {
   // Don't enable WebRTC for plan-index (only for individual plans)
   const enableWebRTC = options.enableWebRTC ?? docName !== 'plan-index';
-  const { identity } = useIdentity();
+  const { identity: githubIdentity } = useGitHubAuth();
   // biome-ignore lint/correctness/useExhaustiveDependencies: docName triggers Y.Doc recreation intentionally
   const ydoc = useMemo(() => new Y.Doc(), [docName]);
   const [syncState, setSyncState] = useState<SyncState>({
@@ -223,33 +236,34 @@ export function useMultiProviderSync(
     }
 
     function computeApprovalStatus(userId: string | undefined): ApprovalStatus | undefined {
-      if (!userId) return undefined;
-
       const ownerId = getPlanOwnerId(ydoc);
 
       // No owner means approval not required (legacy plan or plan-index)
       if (!ownerId) return undefined;
 
+      // User not authenticated yet - they need to auth to view this plan
+      if (!userId) return 'pending';
+
       return isUserApproved(ydoc, userId) ? 'approved' : 'pending';
     }
 
     function setLocalAwarenessState() {
-      if (!rtc || !identity) return;
+      if (!rtc || !githubIdentity) return;
 
       const ownerId = getPlanOwnerId(ydoc);
-      const status = computeApprovalStatus(identity.id);
+      const status = computeApprovalStatus(githubIdentity.username);
 
       // Only set awareness for plans with approval (not plan-index)
       if (status === undefined) return;
 
       const awarenessState: PlanAwarenessState = {
         user: {
-          id: identity.id,
-          name: identity.displayName,
-          color: identity.color,
+          id: githubIdentity.username,
+          name: githubIdentity.displayName,
+          color: colorFromString(githubIdentity.username),
         },
         status,
-        isOwner: ownerId === identity.id,
+        isOwner: ownerId === githubIdentity.username,
         requestedAt: status === 'pending' ? Date.now() : undefined,
       };
 
@@ -257,7 +271,7 @@ export function useMultiProviderSync(
     }
 
     function updateApprovalStatus() {
-      const newStatus = computeApprovalStatus(identity?.id);
+      const newStatus = computeApprovalStatus(githubIdentity?.username);
       if (newStatus !== approvalStatusRef.current) {
         approvalStatusRef.current = newStatus;
         setLocalAwarenessState();
@@ -269,8 +283,8 @@ export function useMultiProviderSync(
     const metadataMap = ydoc.getMap('metadata');
     metadataMap.observe(updateApprovalStatus);
 
-    // Set initial awareness state when identity is available
-    if (identity && rtc) {
+    // Set initial awareness state when GitHub identity is available
+    if (githubIdentity && rtc) {
       updateApprovalStatus();
     }
 
@@ -439,7 +453,7 @@ export function useMultiProviderSync(
         window.removeEventListener('beforeunload', handleBeforeUnload);
       }
     };
-  }, [docName, ydoc, enableWebRTC, identity]);
+  }, [docName, ydoc, enableWebRTC, githubIdentity]);
 
   return { ydoc, syncState, providers: providersList, rtcProvider };
 }

@@ -259,6 +259,7 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(getSidebarCollapsed);
   const [showProfile, setShowProfile] = useState(false);
   const [showArchived, setShowArchivedState] = useState(getShowArchived);
+  const [optimisticallyHiddenIds, setOptimisticallyHiddenIds] = useState<Set<string>>(new Set());
   const navigate = useNavigate();
   const location = useLocation();
   const { identity } = useIdentity();
@@ -266,7 +267,13 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
 
   // Memoize plan IDs to prevent infinite re-renders in useSharedPlans
   const localPlanIds = useMemo(() => localPlans.map((p) => p.id), [localPlans]);
-  const sharedPlans = useSharedPlans(localPlanIds);
+  const rawSharedPlans = useSharedPlans(localPlanIds);
+
+  // Filter out optimistically hidden plans
+  const sharedPlans = useMemo(
+    () => rawSharedPlans.filter((p) => !optimisticallyHiddenIds.has(p.id)),
+    [rawSharedPlans, optimisticallyHiddenIds]
+  );
 
   const handleToggleArchived = () => {
     const newState = !showArchived;
@@ -279,6 +286,9 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
       toast.error('Please set up your profile first');
       return;
     }
+
+    // Optimistic update - hide immediately
+    setOptimisticallyHiddenIds((prev) => new Set(prev).add(planId));
 
     const now = Date.now();
 
@@ -296,9 +306,6 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
       });
 
       idb.destroy();
-
-      // Trigger re-scan of shared plans
-      window.dispatchEvent(new CustomEvent('indexeddb-plan-synced', { detail: { planId } }));
     } catch {
       // If plan doc doesn't exist, that's fine
     }
@@ -314,7 +321,7 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
       });
     } else {
       // Shared plan - create new entry in plan-index
-      const sharedPlan = [...sharedPlans, ...inboxPlans, ...localPlans].find(
+      const sharedPlan = [...rawSharedPlans, ...inboxPlans, ...localPlans].find(
         (p) => p.id === planId
       );
       if (sharedPlan) {
@@ -336,6 +343,13 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
       return;
     }
 
+    // Optimistic update - show immediately
+    setOptimisticallyHiddenIds((prev) => {
+      const next = new Set(prev);
+      next.delete(planId);
+      return next;
+    });
+
     const now = Date.now();
 
     // Update the plan's own metadata
@@ -352,9 +366,6 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
       });
 
       idb.destroy();
-
-      // Trigger re-scan of shared plans
-      window.dispatchEvent(new CustomEvent('indexeddb-plan-synced', { detail: { planId } }));
     } catch {
       // If plan doc doesn't exist, that's fine
     }
