@@ -241,7 +241,6 @@ export async function ensureArtifactsBranch(repo: string): Promise<void> {
 
 export interface UploadArtifactParams {
   repo: string;
-  pr: number;
   planId: string;
   filename: string;
   content: string; // base64 encoded
@@ -259,9 +258,9 @@ export async function uploadArtifact(params: UploadArtifactParams): Promise<stri
       throw new Error('GITHUB_TOKEN not set');
     }
 
-    const { repo, pr, planId, filename, content } = params;
+    const { repo, planId, filename, content } = params;
     const { owner, repoName } = parseRepoString(repo);
-    const path = `pr-${pr}/${planId}/${filename}`;
+    const path = `plans/${planId}/${filename}`;
 
     // Ensure branch exists
     await ensureArtifactsBranch(repo);

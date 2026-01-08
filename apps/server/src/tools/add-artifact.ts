@@ -46,7 +46,7 @@ export const addArtifactTool = {
     description: `Upload an artifact (screenshot, video, test results, diff) to a plan. Provides proof that deliverables were completed.
 
 REQUIREMENTS:
-- Plan must have repo and prNumber set (from create_plan)
+- Plan must have repo set (from create_plan)
 - GitHub authentication required: run 'gh auth login' or set GITHUB_TOKEN env var
 - Artifacts stored in GitHub orphan branch 'plan-artifacts'
 
@@ -208,13 +208,13 @@ ARTIFACT TYPES:
       };
     }
 
-    // Check for repo/pr
-    if (!metadata.repo || !metadata.pr) {
+    // Check for repo
+    if (!metadata.repo) {
       return {
         content: [
           {
             type: 'text',
-            text: 'Plan must have repo and PR set to upload artifacts.\n\nUse create_plan with repo and prNumber parameters first.',
+            text: 'Plan must have repo set to upload artifacts.\n\nUse create_plan with repo parameter first.',
           },
         ],
         isError: true,
@@ -225,7 +225,6 @@ ARTIFACT TYPES:
       // Upload to GitHub
       const url = await uploadArtifact({
         repo: metadata.repo,
-        pr: metadata.pr,
         planId,
         filename,
         content,
