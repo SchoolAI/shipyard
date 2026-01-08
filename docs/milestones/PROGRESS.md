@@ -170,10 +170,41 @@ Browser discovers all → Multi-provider Yjs merge
 
 ---
 
-## All Milestones Complete! 🎉
+## Milestone 8: Waiting Room & Access Control (NOT STARTED)
 
-**Next steps:** Enhancements, bug fixes, and polish based on usage feedback.
+**Goal:** Zoom-like approval flow for shared plans
+
+**Planned:**
+- [ ] Schema updates: `ownerId`, `approvalRequired`, `approvedUsers` in PlanMetadata
+- [ ] Awareness protocol extension for pending/approved status
+- [ ] Waiting Room UI component (blocks content until approved)
+- [ ] Owner Approval Panel (approve/deny pending users)
+- [ ] Signaling server enforcement (gate CRDT sync server-side)
+- [ ] MCP integration (`approve_user`, `list_pending` tools)
+
+**Key architecture:**
+- Signaling server is the gatekeeper (server-side enforcement)
+- Yjs awareness for instant presence/status updates
+- CRDT metadata stores persistent approval list
+
+See [08-waiting-room.md](./08-waiting-room.md) for full details.
 
 ---
 
-*Last updated: 2026-01-04*
+## Summary
+
+| # | Milestone | Status |
+|---|-----------|--------|
+| 0 | Foundation | ✅ Complete |
+| 1 | Agent Creates Plans | ✅ Complete |
+| 2 | View Plans | ✅ Complete |
+| 3 | Live Sync | ✅ Complete |
+| 4 | Plan Discovery | ✅ Complete |
+| 5 | Review Flow | ✅ Complete |
+| 6 | P2P | ✅ Complete |
+| 7 | Artifacts | ✅ Complete |
+| 8 | Waiting Room | 🔲 Not Started |
+
+---
+
+*Last updated: 2026-01-07*
