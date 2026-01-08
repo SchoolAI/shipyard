@@ -41,13 +41,21 @@ export function getPlanIndexEntry(ydoc: Y.Doc, planId: string): PlanIndexEntry |
  */
 export function setPlanIndexEntry(ydoc: Y.Doc, entry: PlanIndexEntry): void {
   const plansMap = ydoc.getMap<Record<string, unknown>>('plans');
-  plansMap.set(entry.id, {
+  const data: Record<string, unknown> = {
     id: entry.id,
     title: entry.title,
     status: entry.status,
     createdAt: entry.createdAt,
     updatedAt: entry.updatedAt,
-  });
+  };
+  // Include deleted fields if present
+  if (entry.deleted !== undefined) {
+    data.deleted = entry.deleted;
+  }
+  if (entry.deletedAt !== undefined) {
+    data.deletedAt = entry.deletedAt;
+  }
+  plansMap.set(entry.id, data);
 }
 
 /**

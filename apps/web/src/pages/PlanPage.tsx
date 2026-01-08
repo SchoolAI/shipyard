@@ -105,9 +105,13 @@ export function PlanPage() {
     [indexDoc, planId, metadata]
   );
 
-  // Mark plan as deleted in index if metadata is missing after sync
+  // Mark plan as deleted in index if metadata is missing after sync.
+  // Only do this if we have at least one connected WebSocket server - this ensures
+  // we're not incorrectly marking plans as deleted in P2P-only mode or during
+  // initial connection setup. Without a connected server, we can't be sure the
+  // plan doesn't exist vs just being slow to sync.
   useEffect(() => {
-    if (syncState.synced && !metadata) {
+    if (syncState.synced && syncState.activeCount > 0 && !metadata) {
       const existingEntry = getPlanIndexEntry(indexDoc, planId);
       if (existingEntry && !existingEntry.deleted) {
         setPlanIndexEntry(indexDoc, {
@@ -117,10 +121,14 @@ export function PlanPage() {
         });
       }
     }
-  }, [syncState.synced, metadata, indexDoc, planId]);
+  }, [syncState.synced, syncState.activeCount, metadata, indexDoc, planId]);
 
   // Early returns AFTER all hooks
-  if (!metadata && !syncState.synced) {
+  // Show loading while:
+  // 1. Neither WebSocket has synced NOR IndexedDB has synced
+  // This handles both server-connected and P2P-only modes
+  const isStillLoading = !syncState.synced && !syncState.idbSynced;
+  if (!metadata && isStillLoading) {
     return (
       <div className="p-8">
         <p className="text-muted-foreground">Loading plan...</p>

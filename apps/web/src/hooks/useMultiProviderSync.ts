@@ -32,6 +32,8 @@ export interface SyncState {
   activeCount: number;
   /** Number of peers connected via WebRTC P2P */
   peerCount: number;
+  /** Whether IndexedDB has synced (local data available) */
+  idbSynced: boolean;
 }
 
 interface ProviderState {
@@ -94,7 +96,9 @@ export function useMultiProviderSync(
     serverCount: 0,
     activeCount: 0,
     peerCount: 0,
+    idbSynced: false,
   });
+  const idbSyncedRef = useRef(false);
   const [rtcProvider, setRtcProvider] = useState<WebrtcProvider | null>(null);
 
   const [providersList, setProvidersList] = useState<WebsocketProvider[]>([]);
@@ -133,6 +137,22 @@ export function useMultiProviderSync(
     let deadCheckInterval: ReturnType<typeof setInterval> | null = null;
 
     const idbProvider = new IndexeddbPersistence(docName, ydoc);
+
+    // Track when IndexedDB has synced - this means local data is available
+    idbProvider.whenSynced.then(() => {
+      if (mounted) {
+        idbSyncedRef.current = true;
+        updateSyncState();
+
+        // Fire event so useSharedPlans can discover newly synced plans
+        // Only fire for plan documents (not plan-index)
+        if (docName !== 'plan-index') {
+          window.dispatchEvent(
+            new CustomEvent('indexeddb-plan-synced', { detail: { planId: docName } })
+          );
+        }
+      }
+    });
 
     let rtc: WebrtcProvider | null = null;
     let handleBeforeUnload: (() => void) | null = null;
@@ -187,9 +207,13 @@ export function useMultiProviderSync(
       const providers = Array.from(providersRef.current.values());
       const connectedProviders = providers.filter((p) => p.provider.wsconnected);
       const anyConnected = connectedProviders.length > 0 || (rtc?.connected ?? false);
-      // Consider synced if ANY provider has synced
-      // For WebRTC: consider synced if we have connected peers (P2P doesn't have central sync point)
-      const anySynced = providers.some((p) => p.provider.synced) || peerCountRef.current > 0; // WebRTC with peers = synced
+      // Consider synced only if a WebSocket provider has explicitly synced.
+      // P2P peers do NOT count as "synced" because:
+      // 1. WebRTC doesn't have a sync flag - it's eventual consistency
+      // 2. Counting peers as synced causes race conditions where plans are marked
+      //    deleted before data actually arrives
+      // 3. IndexedDB persistence means local data is available even without peers
+      const anySynced = providers.some((p) => p.provider.synced);
 
       setSyncState({
         connected: anyConnected,
@@ -197,6 +221,7 @@ export function useMultiProviderSync(
         serverCount: providers.length,
         activeCount: connectedProviders.length,
         peerCount: peerCountRef.current,
+        idbSynced: idbSyncedRef.current,
       });
 
       setProvidersList(providers.map((p) => p.provider));

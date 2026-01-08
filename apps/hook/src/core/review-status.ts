@@ -3,7 +3,13 @@
  * Uses Y.Doc observer for distributed approval flow.
  */
 
-import { type GetReviewStatusResponse, parseThreads, type ReviewFeedback } from '@peer-plan/schema';
+import {
+  formatThreadsForLLM,
+  type GetReviewStatusResponse,
+  getDeliverables,
+  parseThreads,
+  type ReviewFeedback,
+} from '@peer-plan/schema';
 import { WebsocketProvider } from 'y-websocket';
 import * as Y from 'yjs';
 import type { CoreResponse } from '../adapters/types.js';
@@ -119,7 +125,8 @@ async function waitForReviewDecision(planId: string, wsUrl: string): Promise<Rev
 }
 
 /**
- * Extract feedback from Y.Doc threads.
+ * Extract feedback from Y.Doc with full plan context.
+ * Returns: plan content + comments + deliverables for LLM.
  */
 function extractFeedbackFromYDoc(ydoc: Y.Doc): string | undefined {
   try {
@@ -131,17 +138,53 @@ function extractFeedbackFromYDoc(ydoc: Y.Doc): string | undefined {
       return 'Changes requested. Check the plan for reviewer comments.';
     }
 
-    const feedbackLines = threads.map((thread) => {
-      const comments = thread.comments
-        .map(
-          (c) =>
-            `  - ${c.userId ?? 'Reviewer'}: ${typeof c.body === 'string' ? c.body : JSON.stringify(c.body)}`
-        )
-        .join('\n');
-      return `Thread:\n${comments}`;
+    // Get plan content from Y.Doc for context
+    const contentArray = ydoc.getArray('content');
+    const blocks = contentArray.toJSON() as Array<{ content?: Array<{ text?: string }> }>;
+
+    // Simple text extraction from BlockNote blocks
+    const planText = blocks
+      .map((block) => {
+        if (!block.content || !Array.isArray(block.content)) return '';
+        return block.content
+          .map((item) => (typeof item === 'object' && item && 'text' in item ? item.text : ''))
+          .join('');
+      })
+      .filter(Boolean)
+      .join('\n');
+
+    // Format threads using shared formatter
+    const feedbackText = formatThreadsForLLM(threads, {
+      includeResolved: false,
+      selectedTextMaxLength: 100,
     });
 
-    return `Changes requested:\n\n${feedbackLines.join('\n\n')}`;
+    // Combine: plan content + reviewer feedback
+    let output = 'Changes requested:\n\n';
+
+    if (planText) {
+      output += '## Current Plan\n\n';
+      output += planText;
+      output += '\n\n---\n\n';
+    }
+
+    output += '## Reviewer Feedback\n\n';
+    output += feedbackText;
+
+    // Add deliverables section if any exist
+    const deliverables = getDeliverables(ydoc);
+    if (deliverables.length > 0) {
+      output += '\n\n---\n\n## Deliverables\n\n';
+      for (const deliverable of deliverables) {
+        const status = deliverable.linkedArtifactId ? '✓' : '○';
+        const linkedInfo = deliverable.linkedArtifactId
+          ? ` (linked to artifact: ${deliverable.linkedArtifactId})`
+          : '';
+        output += `${status} ${deliverable.text}${linkedInfo}\n`;
+      }
+    }
+
+    return output;
   } catch (err) {
     logger.warn({ err }, 'Failed to extract feedback from Y.Doc');
     return 'Changes requested. Check the plan for reviewer comments.';
