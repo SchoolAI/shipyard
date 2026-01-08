@@ -102,11 +102,10 @@ export async function handleCreateSession(req: Request, res: Response): Promise<
     });
 
     // Generate URL - use simple plan ID (not snapshot) for live updates
-    // In dev mode, base is '/' so route is /plan/{id}
-    // In production, base is '/peer-plan/' so route is /peer-plan/plan/{id}
-    const webUrl = process.env.PEER_PLAN_WEB_URL ?? 'http://localhost:5173';
-    const isDev = !process.env.PEER_PLAN_WEB_URL; // If env var not set, assume dev
-    const url = isDev ? `${webUrl}/plan/${planId}` : `${webUrl}/peer-plan/plan/${planId}`;
+    // Production (default): https://schoolai.github.io/peer-plan/plan/{id}
+    // Dev (override via env): http://localhost:5173/plan/{id}
+    const webUrl = process.env.PEER_PLAN_WEB_URL ?? 'https://schoolai.github.io/peer-plan';
+    const url = `${webUrl}/plan/${planId}`;
 
     // Note: Browser opening is handled by the hook CLI, not the server
     logger.info({ url }, 'Plan URL generated');
