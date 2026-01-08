@@ -23,6 +23,14 @@ export type AuthState =
   | { status: 'success' }
   | { status: 'error'; message: string };
 
+export interface UseGitHubAuthReturn {
+  identity: GitHubIdentity | null;
+  isValidating: boolean;
+  authState: AuthState;
+  startAuth: (forceAccountPicker?: boolean) => void;
+  clearAuth: () => void;
+}
+
 let changeCounter = 0;
 const listeners = new Set<() => void>();
 
@@ -201,10 +209,9 @@ export function useGitHubAuth(): UseGitHubAuthReturn {
     }
   }, []);
 
-  const startAuth = useCallback(() => {
+  const startAuth = useCallback((forceAccountPicker = false) => {
     const redirectUri = window.location.origin;
-    startWebFlow(redirectUri);
-    // User is redirected away, page unloads
+    startWebFlow(redirectUri, forceAccountPicker);
   }, []);
 
   const clearAuth = useCallback(() => {

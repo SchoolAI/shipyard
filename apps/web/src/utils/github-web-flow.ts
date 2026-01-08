@@ -7,16 +7,20 @@ export interface GitHubUser {
   avatar_url: string;
 }
 
-export function startWebFlow(redirectUri: string): void {
+export function startWebFlow(redirectUri: string, forceAccountPicker = false): void {
   const state = generateRandomState();
   sessionStorage.setItem('github-oauth-state', state);
 
   const params = new URLSearchParams({
     client_id: CLIENT_ID,
     redirect_uri: redirectUri,
-    scope: '', // Empty scope - just need public profile
+    scope: '',
     state,
   });
+
+  if (forceAccountPicker) {
+    params.append('prompt', 'select_account');
+  }
 
   window.location.href = `https://github.com/login/oauth/authorize?${params}`;
 }

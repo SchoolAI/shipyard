@@ -12,7 +12,7 @@ export function AccountSection({ collapsed = false }: AccountSectionProps) {
 
   const handleSwitchAccount = () => {
     clearAuth();
-    startAuth();
+    startAuth(true);
   };
 
   if (!identity) {
