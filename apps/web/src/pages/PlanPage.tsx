@@ -43,9 +43,12 @@ export function PlanPage() {
   // For snapshots, use planId from URL; for normal plans, use route param
   const planId = isSnapshot ? (urlPlan?.id ?? '') : (id ?? '');
 
-  const { ydoc: syncedYdoc, syncState, providers, rtcProvider } = useMultiProviderSync(
-    isSnapshot ? '' : planId
-  ); // Don't sync snapshots
+  const {
+    ydoc: syncedYdoc,
+    syncState,
+    providers,
+    rtcProvider,
+  } = useMultiProviderSync(isSnapshot ? '' : planId); // Don't sync snapshots
 
   // For snapshots, create local Y.Doc hydrated with URL data
   const snapshotYdoc = useMemo(() => {
@@ -222,7 +225,9 @@ export function PlanPage() {
         <div className="p-8 text-center">
           <h1 className="text-xl font-bold text-foreground">Plan Not Found</h1>
           <p className="text-muted-foreground">The plan &quot;{id}&quot; does not exist.</p>
-          <p className="text-sm text-muted-foreground mt-2">It has been removed from your sidebar.</p>
+          <p className="text-sm text-muted-foreground mt-2">
+            It has been removed from your sidebar.
+          </p>
         </div>
       );
     }
