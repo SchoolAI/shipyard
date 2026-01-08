@@ -11,7 +11,7 @@ import { nanoid } from 'nanoid';
 import open from 'open';
 import { z } from 'zod';
 import { logger } from '../logger.js';
-import { getServerId } from '../server-identity.js';
+import { getGitHubUsername } from '../server-identity.js';
 import { generateSessionToken, hashSessionToken } from '../session-token.js';
 import { getOrCreateDoc, hasActiveConnections } from '../ws-server.js';
 import { TOOL_NAMES } from './tool-names.js';
@@ -30,14 +30,30 @@ const CreatePlanInput = z.object({
 export const createPlanTool = {
   definition: {
     name: TOOL_NAMES.CREATE_PLAN,
-    description: 'Create a new implementation plan and open it in browser',
+    description: `Create a new implementation plan and open it in browser
+
+DELIVERABLES: Mark checkbox items as deliverables by adding {#deliverable} marker. These can later be linked to artifacts (screenshots, videos, test results) via add_artifact tool.
+
+Example:
+- [ ] Setup Documentation {#deliverable}
+- [ ] Working implementation with tests {#deliverable}
+- [ ] Regular task without deliverable marker
+
+When read_plan is called, deliverables show with {id="block-id"} for artifact linking.`,
     inputSchema: {
       type: 'object',
       properties: {
         title: { type: 'string', description: 'Plan title' },
-        content: { type: 'string', description: 'Plan content (markdown)' },
-        repo: { type: 'string', description: 'GitHub repo (org/repo)' },
-        prNumber: { type: 'number', description: 'PR number' },
+        content: {
+          type: 'string',
+          description:
+            'Plan content in markdown. Use {#deliverable} marker on checkbox items to mark them as deliverables that can be linked to artifacts.',
+        },
+        repo: {
+          type: 'string',
+          description: 'GitHub repo (org/repo). Required for artifact uploads.',
+        },
+        prNumber: { type: 'number', description: 'PR number. Required for artifact uploads.' },
       },
       required: ['title', 'content'],
     },
@@ -59,7 +75,7 @@ export const createPlanTool = {
       status: 'draft',
       repo: input.repo,
       pr: input.prNumber,
-      ownerId: getServerId(),
+      ownerId: getGitHubUsername(),
       sessionTokenHash,
     });
 

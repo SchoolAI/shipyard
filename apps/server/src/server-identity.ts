@@ -1,26 +1,29 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { join } from 'node:path';
-import { nanoid } from 'nanoid';
+import { execSync } from 'node:child_process';
 
-const PEER_PLAN_DIR = join(homedir(), '.peer-plan');
-const SERVER_ID_FILE = join(PEER_PLAN_DIR, 'server-id');
+let cachedUsername: string | null = null;
 
-let cachedServerId: string | null = null;
-
-export function getServerId(): string {
-  if (cachedServerId) {
-    return cachedServerId;
+export function getGitHubUsername(): string {
+  if (cachedUsername) {
+    return cachedUsername;
   }
 
-  mkdirSync(PEER_PLAN_DIR, { recursive: true });
+  try {
+    const username = execSync('gh api user --jq .login', {
+      encoding: 'utf-8',
+      timeout: 5000,
+      stdio: ['pipe', 'pipe', 'pipe'],
+    }).trim();
 
-  if (existsSync(SERVER_ID_FILE)) {
-    cachedServerId = readFileSync(SERVER_ID_FILE, 'utf-8').trim();
-    return cachedServerId;
+    if (!username) {
+      throw new Error('No GitHub username returned');
+    }
+
+    cachedUsername = username;
+    return cachedUsername;
+  } catch {
+    throw new Error(
+      'GitHub authentication required. Please run: gh auth login\n\n' +
+        'This is needed to set plan ownership to your GitHub username.'
+    );
   }
-
-  cachedServerId = nanoid();
-  writeFileSync(SERVER_ID_FILE, cachedServerId, 'utf-8');
-  return cachedServerId;
 }
