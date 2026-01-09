@@ -33,7 +33,6 @@ export function ReviewActions({
   onStatusChange,
 }: ReviewActionsProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showConfirm, setShowConfirm] = useState<'approve' | 'request_changes' | null>(null);
 
   const handleAction = async (action: 'approve' | 'request_changes') => {
     if (!identity) {
@@ -41,15 +40,9 @@ export function ReviewActions({
       return;
     }
 
-    setShowConfirm(action);
-  };
-
-  const confirmAction = async () => {
-    if (!showConfirm || !identity) return;
-
     setIsSubmitting(true);
     try {
-      const newStatus = showConfirm === 'approve' ? 'approved' : 'changes_requested';
+      const newStatus = action === 'approve' ? 'approved' : 'changes_requested';
 
       // Update Y.Doc - hook observes this for distributed approval
       ydoc.transact(() => {
@@ -61,69 +54,30 @@ export function ReviewActions({
       });
 
       onStatusChange?.(newStatus);
-      setShowConfirm(null);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const cancelAction = () => {
-    setShowConfirm(null);
-  };
-
   return (
     <div className="flex flex-wrap items-center gap-2">
-      {/* Action buttons */}
-      {!showConfirm && (
-        <>
-          <Button
-            size="sm"
-            className="bg-success hover:bg-success-dark text-white touch-target text-xs !h-7 px-3 !min-h-0 rounded-lg"
-            onPress={() => handleAction('approve')}
-            isDisabled={isSubmitting || currentStatus === 'approved'}
-          >
-            {currentStatus === 'approved' ? 'Approved' : 'Approve'}
-          </Button>
-          <Button
-            variant="danger"
-            size="sm"
-            className="touch-target text-xs !h-7 px-3 !min-h-0 rounded-lg"
-            onPress={() => handleAction('request_changes')}
-            isDisabled={isSubmitting || currentStatus === 'changes_requested'}
-          >
-            {currentStatus === 'changes_requested' ? 'Changes' : 'Request Changes'}
-          </Button>
-        </>
-      )}
-
-      {/* Confirmation dialog - stack on mobile */}
-      {showConfirm && (
-        <div className="flex flex-wrap items-center gap-2 bg-muted px-3 md:px-4 py-2 rounded-md">
-          <span className="text-sm text-foreground w-full sm:w-auto">
-            {showConfirm === 'approve' ? 'Approve this plan?' : 'Request changes?'}
-          </span>
-          <Button
-            variant={showConfirm === 'approve' ? 'secondary' : 'danger'}
-            className={`touch-target ${
-              showConfirm === 'approve' ? 'bg-success hover:bg-success-dark text-white' : ''
-            }`}
-            size="sm"
-            onPress={confirmAction}
-            isDisabled={isSubmitting}
-          >
-            {isSubmitting ? 'Saving...' : 'Confirm'}
-          </Button>
-          <Button
-            variant="secondary"
-            size="sm"
-            className="touch-target"
-            onPress={cancelAction}
-            isDisabled={isSubmitting}
-          >
-            Cancel
-          </Button>
-        </div>
-      )}
+      <Button
+        size="sm"
+        className="bg-success hover:bg-success-dark text-white touch-target text-xs !h-7 px-3 !min-h-0 rounded-lg"
+        onPress={() => handleAction('approve')}
+        isDisabled={isSubmitting || currentStatus === 'approved'}
+      >
+        {currentStatus === 'approved' ? 'Approved' : 'Approve'}
+      </Button>
+      <Button
+        variant="danger"
+        size="sm"
+        className="touch-target text-xs !h-7 px-3 !min-h-0 rounded-lg"
+        onPress={() => handleAction('request_changes')}
+        isDisabled={isSubmitting || currentStatus === 'changes_requested'}
+      >
+        {currentStatus === 'changes_requested' ? 'Changes' : 'Request Changes'}
+      </Button>
     </div>
   );
 }
