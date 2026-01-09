@@ -6,10 +6,16 @@ import {
 import { BlockNoteView } from '@blocknote/mantine';
 import {
   AddCommentButton,
+  BasicTextStyleButton,
+  BlockTypeSelect,
+  CreateLinkButton,
   FloatingComposerController,
   FloatingThreadController,
   FormattingToolbar,
   FormattingToolbarController,
+  NestBlockButton,
+  TextAlignButton,
+  UnnestBlockButton,
   useCreateBlockNote,
 } from '@blocknote/react';
 import { useEffect, useRef } from 'react';
@@ -220,20 +226,12 @@ export function PlanViewer({
           resolveUsers: createResolveUsers(ydoc, identity),
         }),
       ],
-      // Note: We use editable={false} on BlockNoteView instead of _tiptapOptions
-      // to make the editor read-only. BlockNote officially supports commenting
-      // even when editable={false}. Using _tiptapOptions.handleKeyDown to block
-      // input was causing comment mark position bugs by interfering with
-      // ProseMirror's internal state management.
     },
     // Dependencies: recreate editor when ydoc, identity, or theme changes.
     // This ensures the extension is properly registered when identity becomes available,
     // and the editor re-renders with the correct theme when toggling dark mode.
     [ydoc, identity?.id, effectiveTheme]
   );
-
-  // Note: We set editable={false} on BlockNoteView to make it read-only.
-  // BlockNote officially supports commenting even when editable={false}.
 
   // Force BlockNoteView remount when switching plans or theme.
   // Identity changes are handled by the parent's key prop on PlanViewer.
@@ -391,11 +389,9 @@ export function PlanViewer({
       <BlockNoteView
         key={editorKey}
         editor={editor}
-        editable={false} // Read-only, but comments still work per BlockNote docs
+        editable={true}
         theme={effectiveTheme}
-        // Hide editing controls - this is a read-only view (except for comments)
-        sideMenu={false}
-        slashMenu={false}
+        // Use custom formatting toolbar with comments integration
         formattingToolbar={false}
         // Disable default comments UI - we use ThreadsSidebar instead
         comments={false}
@@ -404,6 +400,23 @@ export function PlanViewer({
         <FormattingToolbarController
           formattingToolbar={() => (
             <FormattingToolbar>
+              <BlockTypeSelect />
+
+              <BasicTextStyleButton basicTextStyle="bold" />
+              <BasicTextStyleButton basicTextStyle="italic" />
+              <BasicTextStyleButton basicTextStyle="underline" />
+              <BasicTextStyleButton basicTextStyle="strike" />
+              <BasicTextStyleButton basicTextStyle="code" />
+
+              <TextAlignButton textAlignment="left" />
+              <TextAlignButton textAlignment="center" />
+              <TextAlignButton textAlignment="right" />
+
+              <NestBlockButton />
+              <UnnestBlockButton />
+
+              <CreateLinkButton />
+
               {hasComments ? (
                 // User has identity - show real comment button
                 <AddCommentButton />
