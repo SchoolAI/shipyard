@@ -17,6 +17,7 @@
     "dev:github-oauth": "pnpm --filter=github-oauth-worker dev",
     "dev:web": "turbo run dev --filter=@peer-plan/web",
     "dev:hook": "turbo run dev --filter=@peer-plan/hook",
+    "setup:hook": "pnpm --filter @peer-plan/hook build && cd apps/hook && pnpm link --global && bash install.sh",
     "prepare": "simple-git-hooks"
   },
   "devDependencies": {
