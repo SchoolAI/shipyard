@@ -8,6 +8,7 @@ import {
 } from '@/utils/github-web-flow';
 
 const STORAGE_KEY = 'peer-plan-github-identity';
+const RETURN_URL_KEY = 'github-oauth-return-url';
 
 export interface GitHubIdentity {
   token: string;
@@ -121,24 +122,26 @@ async function processOAuthCallback(
     setStoredIdentity(newIdentity);
     setAuthState({ status: 'success' });
 
-    // Reset to idle after success
+    // Check for stored return URL and navigate there
+    const returnUrl = sessionStorage.getItem(RETURN_URL_KEY);
+    sessionStorage.removeItem(RETURN_URL_KEY);
+
+    // Reset to idle after success, then navigate if needed
     setTimeout(() => {
       setAuthState({ status: 'idle' });
+      // Navigate to return URL if it differs from current path
+      if (returnUrl && returnUrl !== window.location.pathname) {
+        window.location.href = returnUrl;
+      }
     }, 1500);
   } catch (err) {
+    // Clean up return URL on error too
+    sessionStorage.removeItem(RETURN_URL_KEY);
     setAuthState({
       status: 'error',
       message: err instanceof Error ? err.message : 'Authentication failed',
     });
   }
-}
-
-export interface UseGitHubAuthReturn {
-  identity: GitHubIdentity | null;
-  isValidating: boolean;
-  authState: AuthState;
-  startAuth: (forceAccountPicker?: boolean) => void;
-  clearAuth: () => void;
 }
 
 export function useGitHubAuth(): UseGitHubAuthReturn {
@@ -196,6 +199,7 @@ export function useGitHubAuth(): UseGitHubAuthReturn {
 
     // Handle error from GitHub (e.g., user denied access)
     if (error) {
+      sessionStorage.removeItem(RETURN_URL_KEY);
       setAuthState({
         status: 'error',
         message: errorDescription || 'Authentication was denied',
@@ -210,6 +214,10 @@ export function useGitHubAuth(): UseGitHubAuthReturn {
   }, []);
 
   const startAuth = useCallback((forceAccountPicker = false) => {
+    // Store current URL to return to after auth
+    const returnUrl = window.location.pathname + window.location.search + window.location.hash;
+    sessionStorage.setItem(RETURN_URL_KEY, returnUrl);
+
     const redirectUri = window.location.origin + (import.meta.env.BASE_URL || '/');
     startWebFlow(redirectUri, forceAccountPicker);
   }, []);
