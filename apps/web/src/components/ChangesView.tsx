@@ -643,7 +643,8 @@ interface SplitDiffRow {
 
 /**
  * Convert unified diff lines into paired rows for split view.
- * Pairs additions/removals that are adjacent, context lines appear on both sides.
+ * Shows removals on left, additions on right, without creating empty space.
+ * For balanced display when changes are asymmetric (e.g., 1 deletion + 10 additions).
  */
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Diff pairing logic inherently requires multiple conditions
 function pairDiffLinesForSplit(lines: DiffLine[]): SplitDiffRow[] {
@@ -687,23 +688,22 @@ function pairDiffLinesForSplit(lines: DiffLine[]): SplitDiffRow[] {
       i++;
     }
 
-    // Pair them up using the first diffIndex of each group
-    const maxLen = Math.max(removals.length, additions.length);
-    const baseOldIdx = removals[0]?.diffIndex ?? 0;
-    const baseNewIdx = additions[0]?.diffIndex ?? 0;
-    for (let j = 0; j < maxLen; j++) {
-      const oldLine = removals[j] ?? null;
-      const newLine = additions[j] ?? null;
-      // Create unique key from diff indices of both sides
-      const keyPart = oldLine
-        ? `o${oldLine.diffIndex}`
-        : newLine
-          ? `n${newLine.diffIndex}`
-          : `p${baseOldIdx}-${baseNewIdx}-${j}`;
+    // Show removals first (left column only)
+    for (const removal of removals) {
       result.push({
-        key: `pair-${keyPart}`,
-        oldLine,
-        newLine,
+        key: `rem-${removal.diffIndex}`,
+        oldLine: removal,
+        newLine: null,
+        spanBoth: null,
+      });
+    }
+
+    // Then show additions (right column only)
+    for (const addition of additions) {
+      result.push({
+        key: `add-${addition.diffIndex}`,
+        oldLine: null,
+        newLine: addition,
         spanBoth: null,
       });
     }
