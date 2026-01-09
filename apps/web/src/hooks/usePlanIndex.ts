@@ -1,5 +1,5 @@
 import { getPlanIndex, PLAN_INDEX_DOC_NAME, type PlanIndexEntry } from '@peer-plan/schema';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMultiProviderSync } from './useMultiProviderSync';
 
 export interface PlanIndexState {
@@ -22,41 +22,66 @@ export interface PlanIndexState {
  */
 export function usePlanIndex(): PlanIndexState {
   const { ydoc, syncState } = useMultiProviderSync(PLAN_INDEX_DOC_NAME);
-  const [plans, setPlans] = useState<PlanIndexEntry[]>([]);
-  const [inboxPlans, setInboxPlans] = useState<PlanIndexEntry[]>([]);
-  const [archivedPlans, setArchivedPlans] = useState<PlanIndexEntry[]>([]);
+  const [allPlansData, setAllPlansData] = useState<{
+    active: PlanIndexEntry[];
+    archived: PlanIndexEntry[];
+  }>({ active: [], archived: [] });
   const [navigationTarget, setNavigationTarget] = useState<string | null>(null);
 
   useEffect(() => {
     const plansMap = ydoc.getMap('plans');
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+
     const updatePlans = () => {
-      // Get active plans (default excludes archived)
+      // Get all plans in one call
       const activePlans = getPlanIndex(ydoc, false);
-
-      // Inbox: plans needing attention (changes_requested or pending_review)
-      const inbox = activePlans.filter(
-        (p) => p.status === 'changes_requested' || p.status === 'pending_review'
-      );
-      setInboxPlans(inbox);
-
-      // Regular plans: everything else that's active
-      const regular = activePlans.filter(
-        (p) => p.status !== 'changes_requested' && p.status !== 'pending_review'
-      );
-      setPlans(regular);
-
-      // Get archived plans separately
       const allPlans = getPlanIndex(ydoc, true);
-      setArchivedPlans(allPlans.filter((p) => p.deletedAt));
+      const archived = allPlans.filter((p) => p.deletedAt);
+
+      // Single state update instead of 3 separate ones
+      setAllPlansData({ active: activePlans, archived });
     };
 
+    const debouncedUpdatePlans = () => {
+      // Debounce to prevent excessive updates when multiple Y.Doc changes happen rapidly
+      if (debounceTimer) {
+        clearTimeout(debounceTimer);
+      }
+      debounceTimer = setTimeout(updatePlans, 100);
+    };
+
+    // Initial update without debounce
     updatePlans();
-    plansMap.observeDeep(updatePlans);
+
+    // Subsequent updates with debouncing
+    plansMap.observeDeep(debouncedUpdatePlans);
 
     return () => {
-      plansMap.unobserveDeep(updatePlans);
+      if (debounceTimer) {
+        clearTimeout(debounceTimer);
+      }
+      plansMap.unobserveDeep(debouncedUpdatePlans);
     };
   }, [ydoc]);
+
+  // Derive filtered lists with useMemo to avoid triggering dependent effects
+  const inboxPlans = useMemo(
+    () =>
+      allPlansData.active.filter(
+        (p) => p.status === 'changes_requested' || p.status === 'pending_review'
+      ),
+    [allPlansData.active]
+  );
+
+  const plans = useMemo(
+    () =>
+      allPlansData.active.filter(
+        (p) => p.status !== 'changes_requested' && p.status !== 'pending_review'
+      ),
+    [allPlansData.active]
+  );
+
+  const archivedPlans = useMemo(() => allPlansData.archived, [allPlansData.archived]);
 
   useEffect(() => {
     const navMap = ydoc.getMap<string>('navigation');
