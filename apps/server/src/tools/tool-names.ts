@@ -4,6 +4,7 @@
  */
 export const TOOL_NAMES = {
   ADD_ARTIFACT: 'add_artifact',
+  ADD_PR_REVIEW_COMMENT: 'add_pr_review_comment',
   COMPLETE_TASK: 'complete_task',
   CREATE_PLAN: 'create_plan',
   READ_PLAN: 'read_plan',
