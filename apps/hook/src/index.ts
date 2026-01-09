@@ -241,7 +241,7 @@ Behind the Scenes:
 - Snapshot URLs embed full state - shareable proof anyone can verify
 - P2P sync allows multiple reviewers without central server`;
 
-  // Output in Claude Code hook format
+  // Output in Claude Code hook JSON format
   const hookOutput = {
     hookSpecificOutput: {
       hookEventName: 'SessionStart',
@@ -261,7 +261,8 @@ async function main(): Promise<void> {
     // Handle --context flag for SessionStart hooks
     if (process.argv.includes('--context')) {
       outputSessionStartContext();
-      process.exit(0);
+      // Don't call process.exit - let process end naturally to avoid pino flush errors
+      return;
     }
 
     // Clean stale sessions periodically
