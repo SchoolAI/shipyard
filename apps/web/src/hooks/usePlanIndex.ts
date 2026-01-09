@@ -33,34 +33,54 @@ export function usePlanIndex(): PlanIndexState {
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
     const updatePlans = () => {
-      // Get all plans in one call
       const activePlans = getPlanIndex(ydoc, false);
       const allPlans = getPlanIndex(ydoc, true);
       const archived = allPlans.filter((p) => p.deletedAt);
 
-      // Single state update instead of 3 separate ones
-      setAllPlansData({ active: activePlans, archived });
+      // Only update if plan IDs actually changed to prevent infinite loops
+      setAllPlansData((prev) => {
+        const activeIds = activePlans
+          .map((p) => p.id)
+          .sort()
+          .join(',');
+        const archivedIds = archived
+          .map((p) => p.id)
+          .sort()
+          .join(',');
+        const prevActiveIds = prev.active
+          .map((p) => p.id)
+          .sort()
+          .join(',');
+        const prevArchivedIds = prev.archived
+          .map((p) => p.id)
+          .sort()
+          .join(',');
+
+        if (activeIds === prevActiveIds && archivedIds === prevArchivedIds) {
+          return prev;
+        }
+
+        return { active: activePlans, archived };
+      });
     };
 
     const debouncedUpdatePlans = () => {
-      // Debounce to prevent excessive updates when multiple Y.Doc changes happen rapidly
       if (debounceTimer) {
         clearTimeout(debounceTimer);
       }
       debounceTimer = setTimeout(updatePlans, 100);
     };
 
-    // Initial update without debounce
     updatePlans();
-
-    // Subsequent updates with debouncing
-    plansMap.observeDeep(debouncedUpdatePlans);
+    // Use shallow observe instead of observeDeep to avoid firing on nested field changes
+    // (e.g., updatedAt timestamp changes). We only care when plans are added/removed.
+    plansMap.observe(debouncedUpdatePlans);
 
     return () => {
       if (debounceTimer) {
         clearTimeout(debounceTimer);
       }
-      plansMap.unobserveDeep(debouncedUpdatePlans);
+      plansMap.unobserve(debouncedUpdatePlans);
     };
   }, [ydoc]);
 
