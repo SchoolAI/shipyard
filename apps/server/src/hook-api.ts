@@ -26,7 +26,7 @@ import {
 import type { Request, Response } from 'express';
 import { nanoid } from 'nanoid';
 import { logger } from './logger.js';
-import { getGitHubUsername } from './server-identity.js';
+import { getGitHubUsername, getRepositoryFullName } from './server-identity.js';
 import { getOrCreateDoc } from './ws-server.js';
 
 // --- Helper Functions ---
@@ -82,6 +82,12 @@ export async function handleCreateSession(req: Request, res: Response): Promise<
     const ownerId = getGitHubUsername();
     logger.info({ ownerId }, 'GitHub username for plan ownership');
 
+    // Auto-detect repo from current directory
+    const repo = getRepositoryFullName() || undefined;
+    if (repo) {
+      logger.info({ repo }, 'Auto-detected repository from current directory');
+    }
+
     // Create the Y.Doc for this plan
     const ydoc = await getOrCreateDoc(planId);
     initPlanMetadata(ydoc, {
@@ -89,6 +95,7 @@ export async function handleCreateSession(req: Request, res: Response): Promise<
       title: PLAN_IN_PROGRESS,
       status: 'draft',
       ownerId,
+      repo,
     });
 
     // Set initial presence
