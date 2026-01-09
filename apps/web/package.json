@@ -16,6 +16,8 @@
     "@blocknote/mantine": "^0.45.0",
     "@blocknote/react": "^0.45.0",
     "@blocknote/server-util": "^0.45.0",
+    "@git-diff-view/file": "^0.0.36",
+    "@git-diff-view/react": "^0.0.36",
     "@heroui/react": "3.0.0-beta.3",
     "@heroui/styles": "3.0.0-beta.3",
     "@mantine/core": "^8.3.10",
