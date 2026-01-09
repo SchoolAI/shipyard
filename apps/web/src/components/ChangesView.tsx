@@ -1167,9 +1167,16 @@ function SplitDiffRow({
   const oldTextClass = oldLine?.type === 'remove' ? 'text-danger' : 'text-foreground';
   const newTextClass = newLine?.type === 'add' ? 'text-success' : 'text-foreground';
 
-  // Strip the leading +/- from content for cleaner display
-  const oldContent = oldLine?.content.slice(1) ?? '';
-  const newContent = newLine?.content.slice(1) ?? '';
+  // Strip the leading +/- or space from content for cleaner display
+  // Note: context lines start with space, add/remove lines start with +/-
+  const oldContent =
+    oldLine?.content.startsWith('-') || oldLine?.content.startsWith(' ')
+      ? oldLine.content.slice(1)
+      : (oldLine?.content ?? '');
+  const newContent =
+    newLine?.content.startsWith('+') || newLine?.content.startsWith(' ')
+      ? newLine.content.slice(1)
+      : (newLine?.content ?? '');
 
   return (
     <>
