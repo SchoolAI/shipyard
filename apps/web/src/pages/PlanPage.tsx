@@ -12,11 +12,12 @@ import {
   setPlanIndexEntry,
   YDOC_KEYS,
 } from '@peer-plan/schema';
-import { FileText, LogIn, Package } from 'lucide-react';
+import { FileText, GitPullRequest, LogIn, Package } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import * as Y from 'yjs';
 import { Attachments } from '@/components/Attachments';
+import { ChangesView } from '@/components/ChangesView';
 import { DeliverablesView } from '@/components/DeliverablesView';
 import { MobileHeader } from '@/components/MobileHeader';
 import { PlanHeader } from '@/components/PlanHeader';
@@ -33,7 +34,7 @@ import { useMultiProviderSync } from '@/hooks/useMultiProviderSync';
 import { usePendingUserNotifications } from '@/hooks/usePendingUserNotifications';
 import { colorFromString } from '@/utils/color';
 
-type ViewType = 'plan' | 'deliverables';
+type ViewType = 'plan' | 'deliverables' | 'changes';
 
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Component has necessary conditional logic for sync state handling
 export function PlanPage() {
@@ -374,6 +375,18 @@ export function PlanPage() {
                   </span>
                 )}
               </button>
+              <button
+                type="button"
+                onClick={() => setActiveView('changes')}
+                className={`flex items-center justify-center gap-2 pb-2 px-2 font-medium text-sm transition-colors flex-1 md:flex-initial ${
+                  activeView === 'changes'
+                    ? 'text-primary border-b-2 border-primary'
+                    : 'text-muted-foreground hover:text-foreground border-b-2 border-transparent'
+                }`}
+              >
+                <GitPullRequest className="w-4 h-4" />
+                Changes
+              </button>
             </div>
           </div>
 
@@ -406,6 +419,12 @@ export function PlanPage() {
                 identity={identity}
                 onRequestIdentity={handleRequestIdentity}
               />
+            </div>
+          )}
+
+          {activeView === 'changes' && (
+            <div className="flex-1 overflow-y-auto bg-background">
+              <ChangesView ydoc={ydoc} metadata={metadata} />
             </div>
           )}
         </div>
