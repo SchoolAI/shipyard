@@ -202,6 +202,7 @@ function extractFeedbackFromYDoc(ydoc: Y.Doc): string | undefined {
  * Check review status for a session's plan.
  * Called when agent tries to exit plan mode.
  */
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Complex review flow requires conditional logic
 export async function checkReviewStatus(
   sessionId: string,
   planContent?: string

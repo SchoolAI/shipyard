@@ -42,16 +42,22 @@ export type {
   Artifact,
   ArtifactType,
   Deliverable,
+  LinkedPR,
+  LinkedPRStatus,
   PlanMetadata,
   PlanStatusType,
+  PRReviewComment,
   StepCompletion,
 } from './plan.js';
 export {
   ArtifactSchema,
   DeliverableSchema,
   getArtifactUrl,
+  LinkedPRSchema,
+  LinkedPRStatusValues,
   PlanMetadataSchema,
   PlanStatusValues,
+  PRReviewCommentSchema,
 } from './plan.js';
 export type { PlanIndexEntry } from './plan-index.js';
 export {
@@ -89,6 +95,7 @@ export { createUserResolver } from './user-helpers.js';
 export {
   addArtifact,
   addDeliverable,
+  addPRReviewComment,
   approveUser,
   clearAgentPresence,
   getAgentPresence,
@@ -96,8 +103,12 @@ export {
   getApprovedUsers,
   getArtifacts,
   getDeliverables,
+  getLinkedPR,
+  getLinkedPRs,
   getPlanMetadata,
   getPlanOwnerId,
+  getPRReviewComments,
+  getPRReviewCommentsForPR,
   getRejectedUsers,
   getStepCompletions,
   initPlanMetadata,
@@ -106,13 +117,18 @@ export {
   isUserApproved,
   isUserRejected,
   linkArtifactToDeliverable,
+  linkPR,
   rejectUser,
   removeArtifact,
+  removePRReviewComment,
+  resolvePRReviewComment,
   revokeUser,
   setAgentPresence,
   setPlanMetadata,
   toggleStepCompletion,
+  unlinkPR,
   unrejectUser,
+  updateLinkedPRStatus,
 } from './yjs-helpers.js';
 export type { YDocKey } from './yjs-keys.js';
 export { isValidYDocKey, YDOC_KEYS } from './yjs-keys.js';

@@ -110,6 +110,30 @@ export const YDOC_KEYS = {
    * - Helpers: packages/schema/src/yjs-helpers.ts (read/write)
    */
   PRESENCE: 'presence' as const,
+
+  /**
+   * Linked PRs (Y.Array<LinkedPR>)
+   * Contains GitHub PRs linked to this plan
+   * Auto-populated by complete_task when it detects a PR on the current branch
+   *
+   * Used by:
+   * - Server: apps/server/src/tools/complete-task.ts (write on auto-link)
+   * - Web: apps/web/src/components/ChangesView.tsx (read)
+   * - Helpers: packages/schema/src/yjs-helpers.ts (read/write)
+   */
+  LINKED_PRS: 'linkedPRs' as const,
+
+  /**
+   * PR Review Comments (Y.Array<PRReviewComment>)
+   * Contains review comments on PR diffs
+   * Can be added by AI (via MCP tool) or humans (via UI)
+   *
+   * Used by:
+   * - Server: apps/server/src/tools/add-pr-review-comment.ts (write)
+   * - Web: apps/web/src/components/MonacoDiffViewer.tsx (read/write)
+   * - Helpers: packages/schema/src/yjs-helpers.ts (read/write)
+   */
+  PR_REVIEW_COMMENTS: 'prReviewComments' as const,
 } as const;
 
 /**

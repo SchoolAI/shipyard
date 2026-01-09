@@ -12,7 +12,7 @@ let tokenResolutionAttempted = false;
  * Parse a "owner/repo" string into owner and repo components.
  * Throws if the format is invalid.
  */
-function parseRepoString(repo: string): { owner: string; repoName: string } {
+export function parseRepoString(repo: string): { owner: string; repoName: string } {
   const parts = repo.split('/');
   if (parts.length !== 2 || !parts[0] || !parts[1]) {
     throw new Error(`Invalid repo format: "${repo}". Expected "owner/repo".`);
@@ -157,7 +157,7 @@ async function withTokenRetry<T>(operation: () => Promise<T>): Promise<T> {
  * Get Octokit instance with token from resolution chain.
  * Returns null if no token is available (graceful degradation).
  */
-function getOctokit(): Octokit | null {
+export function getOctokit(): Octokit | null {
   const token = resolveGitHubToken();
   if (!token) {
     return null;

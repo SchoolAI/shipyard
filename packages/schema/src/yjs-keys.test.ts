@@ -12,6 +12,8 @@ describe('YDOC_KEYS', () => {
       ARTIFACTS: 'artifacts',
       DELIVERABLES: 'deliverables',
       PRESENCE: 'presence',
+      LINKED_PRS: 'linkedPRs',
+      PR_REVIEW_COMMENTS: 'prReviewComments',
     });
   });
 
@@ -38,6 +40,8 @@ describe('isValidYDocKey', () => {
     expect(isValidYDocKey('artifacts')).toBe(true);
     expect(isValidYDocKey('deliverables')).toBe(true);
     expect(isValidYDocKey('presence')).toBe(true);
+    expect(isValidYDocKey('linkedPRs')).toBe(true);
+    expect(isValidYDocKey('prReviewComments')).toBe(true);
   });
 
   it('should return false for unknown keys', () => {

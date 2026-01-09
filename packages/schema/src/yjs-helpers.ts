@@ -5,8 +5,12 @@ import {
   ArtifactSchema,
   type Deliverable,
   DeliverableSchema,
+  type LinkedPR,
+  LinkedPRSchema,
   type PlanMetadata,
   PlanMetadataSchema,
+  type PRReviewComment,
+  PRReviewCommentSchema,
 } from './plan.js';
 import { YDOC_KEYS } from './yjs-keys.js';
 
@@ -403,5 +407,184 @@ export function unrejectUser(ydoc: Y.Doc, userId: string): boolean {
     currentRejected.filter((id) => id !== userId)
   );
   map.set('updatedAt', Date.now());
+  return true;
+}
+
+// --- Linked PR Helpers ---
+
+/**
+ * Gets all linked PRs from Y.Doc with validation.
+ *
+ * @param ydoc - Yjs document
+ * @returns Array of validated linked PRs
+ */
+export function getLinkedPRs(ydoc: Y.Doc): LinkedPR[] {
+  const array = ydoc.getArray(YDOC_KEYS.LINKED_PRS);
+  const data = array.toJSON() as unknown[];
+
+  return data
+    .map((item) => LinkedPRSchema.safeParse(item))
+    .filter((result) => result.success)
+    .map((result) => result.data);
+}
+
+/**
+ * Links a PR to the plan.
+ * If a PR with the same number already exists, it will be replaced.
+ *
+ * @param ydoc - Yjs document
+ * @param pr - LinkedPR to add
+ */
+export function linkPR(ydoc: Y.Doc, pr: LinkedPR): void {
+  const array = ydoc.getArray(YDOC_KEYS.LINKED_PRS);
+  const existing = array.toJSON() as LinkedPR[];
+  const index = existing.findIndex((p) => p.prNumber === pr.prNumber);
+
+  // Remove existing PR with same number if present
+  if (index !== -1) {
+    array.delete(index, 1);
+  }
+
+  array.push([pr]);
+}
+
+/**
+ * Removes a linked PR by number.
+ *
+ * @param ydoc - Yjs document
+ * @param prNumber - PR number to unlink
+ * @returns true if removed, false if not found
+ */
+export function unlinkPR(ydoc: Y.Doc, prNumber: number): boolean {
+  const array = ydoc.getArray(YDOC_KEYS.LINKED_PRS);
+  const existing = array.toJSON() as LinkedPR[];
+  const index = existing.findIndex((p) => p.prNumber === prNumber);
+
+  if (index === -1) return false;
+
+  array.delete(index, 1);
+
+  return true;
+}
+
+/**
+ * Gets a linked PR by number.
+ *
+ * @param ydoc - Yjs document
+ * @param prNumber - PR number to get
+ * @returns LinkedPR or null if not found
+ */
+export function getLinkedPR(ydoc: Y.Doc, prNumber: number): LinkedPR | null {
+  const prs = getLinkedPRs(ydoc);
+  return prs.find((pr) => pr.prNumber === prNumber) ?? null;
+}
+
+/**
+ * Updates a linked PR's status.
+ *
+ * @param ydoc - Yjs document
+ * @param prNumber - PR number to update
+ * @param status - New status
+ * @returns true if updated, false if not found
+ */
+export function updateLinkedPRStatus(
+  ydoc: Y.Doc,
+  prNumber: number,
+  status: LinkedPR['status']
+): boolean {
+  const array = ydoc.getArray(YDOC_KEYS.LINKED_PRS);
+  const existing = array.toJSON() as LinkedPR[];
+  const index = existing.findIndex((p) => p.prNumber === prNumber);
+
+  if (index === -1) return false;
+
+  const pr = existing[index];
+  if (!pr) return false;
+
+  array.delete(index, 1);
+  array.insert(index, [{ ...pr, status }]);
+
+  return true;
+}
+
+// --- PR Review Comment Helpers ---
+
+/**
+ * Gets all PR review comments from Y.Doc with validation.
+ *
+ * @param ydoc - Yjs document
+ * @returns Array of validated PR review comments
+ */
+export function getPRReviewComments(ydoc: Y.Doc): PRReviewComment[] {
+  const array = ydoc.getArray(YDOC_KEYS.PR_REVIEW_COMMENTS);
+  const data = array.toJSON() as unknown[];
+
+  return data
+    .map((item) => PRReviewCommentSchema.safeParse(item))
+    .filter((result) => result.success)
+    .map((result) => result.data);
+}
+
+/**
+ * Gets PR review comments for a specific PR.
+ *
+ * @param ydoc - Yjs document
+ * @param prNumber - PR number to filter by
+ * @returns Array of comments for the specified PR
+ */
+export function getPRReviewCommentsForPR(ydoc: Y.Doc, prNumber: number): PRReviewComment[] {
+  return getPRReviewComments(ydoc).filter((c) => c.prNumber === prNumber);
+}
+
+/**
+ * Adds a PR review comment.
+ *
+ * @param ydoc - Yjs document
+ * @param comment - Comment to add
+ */
+export function addPRReviewComment(ydoc: Y.Doc, comment: PRReviewComment): void {
+  const array = ydoc.getArray(YDOC_KEYS.PR_REVIEW_COMMENTS);
+  array.push([comment]);
+}
+
+/**
+ * Resolves or unresolves a PR review comment.
+ *
+ * @param ydoc - Yjs document
+ * @param commentId - Comment ID to update
+ * @param resolved - Whether the comment is resolved
+ * @returns true if updated, false if not found
+ */
+export function resolvePRReviewComment(ydoc: Y.Doc, commentId: string, resolved: boolean): boolean {
+  const array = ydoc.getArray(YDOC_KEYS.PR_REVIEW_COMMENTS);
+  const existing = array.toJSON() as PRReviewComment[];
+  const index = existing.findIndex((c) => c.id === commentId);
+
+  if (index === -1) return false;
+
+  const comment = existing[index];
+  if (!comment) return false;
+
+  array.delete(index, 1);
+  array.insert(index, [{ ...comment, resolved }]);
+
+  return true;
+}
+
+/**
+ * Removes a PR review comment.
+ *
+ * @param ydoc - Yjs document
+ * @param commentId - Comment ID to remove
+ * @returns true if removed, false if not found
+ */
+export function removePRReviewComment(ydoc: Y.Doc, commentId: string): boolean {
+  const array = ydoc.getArray(YDOC_KEYS.PR_REVIEW_COMMENTS);
+  const existing = array.toJSON() as PRReviewComment[];
+  const index = existing.findIndex((c) => c.id === commentId);
+
+  if (index === -1) return false;
+
+  array.delete(index, 1);
   return true;
 }

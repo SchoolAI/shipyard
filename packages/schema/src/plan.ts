@@ -125,3 +125,75 @@ export const DeliverableSchema = z.object({
   linkedArtifactId: z.string().optional(),
   linkedAt: z.number().optional(),
 });
+
+// --- Linked PR Types ---
+
+/**
+ * Valid status values for a linked PR.
+ */
+export const LinkedPRStatusValues = ['draft', 'open', 'merged', 'closed'] as const;
+export type LinkedPRStatus = (typeof LinkedPRStatusValues)[number];
+
+/**
+ * A GitHub PR linked to a plan.
+ * Auto-detected from branch when complete_task runs.
+ */
+export interface LinkedPR {
+  /** GitHub PR number */
+  prNumber: number;
+  /** Full PR URL (e.g., https://github.com/org/repo/pull/123) */
+  url: string;
+  /** When the PR was linked to this plan */
+  linkedAt: number;
+  /** Current PR status */
+  status: LinkedPRStatus;
+  /** Branch name the PR is from */
+  branch?: string;
+  /** PR title for display */
+  title?: string;
+}
+
+export const LinkedPRSchema = z.object({
+  prNumber: z.number(),
+  url: z.string(),
+  linkedAt: z.number(),
+  status: z.enum(LinkedPRStatusValues),
+  branch: z.string().optional(),
+  title: z.string().optional(),
+});
+
+// --- PR Review Comment Types ---
+
+/**
+ * A review comment on a PR diff.
+ * Can be added by AI (via MCP tool) or human (via UI).
+ */
+export interface PRReviewComment {
+  /** Unique comment ID */
+  id: string;
+  /** PR number this comment belongs to */
+  prNumber: number;
+  /** File path in the diff */
+  path: string;
+  /** Line number in the diff (in modified file) */
+  line: number;
+  /** Comment content (markdown supported) */
+  body: string;
+  /** Author - GitHub username or "AI" */
+  author: string;
+  /** When the comment was created */
+  createdAt: number;
+  /** Whether the comment has been resolved */
+  resolved?: boolean;
+}
+
+export const PRReviewCommentSchema = z.object({
+  id: z.string(),
+  prNumber: z.number(),
+  path: z.string(),
+  line: z.number(),
+  body: z.string(),
+  author: z.string(),
+  createdAt: z.number(),
+  resolved: z.boolean().optional(),
+});
