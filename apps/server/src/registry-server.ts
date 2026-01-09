@@ -6,6 +6,7 @@ import {
 } from '@peer-plan/schema';
 import express, { type Request, type Response } from 'express';
 import { WebSocket } from 'ws';
+import { getOctokit, parseRepoString } from './github-artifacts.js';
 import {
   handleClearPresence,
   handleCreateSession,
@@ -230,6 +231,110 @@ async function handleUnsubscribe(req: Request, res: Response): Promise<void> {
 }
 
 /**
+ * Handle GET /api/plans/:id/pr-diff/:prNumber - Fetch PR diff via GitHub API
+ */
+async function handleGetPRDiff(req: Request, res: Response): Promise<void> {
+  const { id: planId, prNumber } = req.params;
+
+  if (!planId || !prNumber) {
+    res.status(400).json({ error: 'Missing plan ID or PR number' });
+    return;
+  }
+
+  try {
+    const doc = await getOrCreateDoc(planId);
+    const metadata = getPlanMetadata(doc);
+
+    if (!metadata || !metadata.repo) {
+      res.status(404).json({ error: 'Plan not found or repo not set' });
+      return;
+    }
+
+    const octokit = getOctokit();
+    if (!octokit) {
+      res.status(500).json({ error: 'GitHub authentication not configured' });
+      return;
+    }
+
+    const { owner, repoName } = parseRepoString(metadata.repo);
+    const prNum = Number.parseInt(prNumber, 10);
+
+    // Fetch diff from GitHub API
+    const response = await octokit.request('GET /repos/{owner}/{repo}/pulls/{pull_number}', {
+      owner,
+      repo: repoName,
+      pull_number: prNum,
+      headers: {
+        accept: 'application/vnd.github.diff',
+      },
+    });
+
+    // Return raw diff with proper content type
+    res.type('text/plain').send(response.data);
+    logger.debug({ planId, prNumber: prNum, repo: metadata.repo }, 'Served PR diff');
+  } catch (error) {
+    logger.error({ error, planId, prNumber }, 'Failed to fetch PR diff');
+    const status = (error as { status?: number }).status || 500;
+    res.status(status).json({ error: 'Failed to fetch PR diff' });
+  }
+}
+
+/**
+ * Handle GET /api/plans/:id/pr-files/:prNumber - Fetch list of changed files in PR
+ */
+async function handleGetPRFiles(req: Request, res: Response): Promise<void> {
+  const { id: planId, prNumber } = req.params;
+
+  if (!planId || !prNumber) {
+    res.status(400).json({ error: 'Missing plan ID or PR number' });
+    return;
+  }
+
+  try {
+    const doc = await getOrCreateDoc(planId);
+    const metadata = getPlanMetadata(doc);
+
+    if (!metadata || !metadata.repo) {
+      res.status(404).json({ error: 'Plan not found or repo not set' });
+      return;
+    }
+
+    const octokit = getOctokit();
+    if (!octokit) {
+      res.status(500).json({ error: 'GitHub authentication not configured' });
+      return;
+    }
+
+    const { owner, repoName } = parseRepoString(metadata.repo);
+    const prNum = Number.parseInt(prNumber, 10);
+
+    // Fetch files list from GitHub API
+    const { data: files } = await octokit.pulls.listFiles({
+      owner,
+      repo: repoName,
+      pull_number: prNum,
+    });
+
+    // Return simplified file list
+    const fileList = files.map((file) => ({
+      filename: file.filename,
+      status: file.status,
+      additions: file.additions,
+      deletions: file.deletions,
+      changes: file.changes,
+      patch: file.patch,
+    }));
+
+    res.json({ files: fileList });
+    logger.debug({ planId, prNumber: prNum, fileCount: fileList.length }, 'Served PR files');
+  } catch (error) {
+    logger.error({ error, planId, prNumber }, 'Failed to fetch PR files');
+    const status = (error as { status?: number }).status || 500;
+    res.status(status).json({ error: 'Failed to fetch PR files' });
+  }
+}
+
+/**
  * Create Express app with all routes
  */
 function createApp(): express.Express {
@@ -254,6 +359,10 @@ function createApp(): express.Express {
   app.post('/api/plan/:id/subscribe', handleSubscribe);
   app.get('/api/plan/:id/changes', handleGetChanges);
   app.delete('/api/plan/:id/unsubscribe', handleUnsubscribe);
+
+  // PR diff routes
+  app.get('/api/plans/:id/pr-diff/:prNumber', handleGetPRDiff);
+  app.get('/api/plans/:id/pr-files/:prNumber', handleGetPRFiles);
 
   // Hook API routes
   app.post('/api/hook/session', handleCreateSession);
