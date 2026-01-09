@@ -23,6 +23,8 @@ import type { WebrtcProvider } from 'y-webrtc';
 import type { WebsocketProvider } from 'y-websocket';
 import type * as Y from 'yjs';
 import { useTheme } from '@/hooks/useTheme';
+import { RedoButton } from './editor/RedoButton';
+import { UndoButton } from './editor/UndoButton';
 
 /** Simple identity type for display purposes */
 interface UserIdentity {
@@ -335,6 +337,63 @@ export function PlanViewer({
     return () => observer.disconnect();
   }, [hasComments]);
 
+  // Global keyboard shortcuts for undo/redo (works even when editor not focused)
+  useEffect(() => {
+    if (!editor) return;
+
+    // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Keyboard handler needs multiple condition checks for platform detection, focus state, and modifier keys
+    const handleUndoRedoKeyDown = (e: KeyboardEvent) => {
+      // Detect platform
+      const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+      const cmdOrCtrl = isMac ? e.metaKey : e.ctrlKey;
+
+      // Check if we're in an input/textarea (don't intercept their undo/redo)
+      const target = e.target as HTMLElement;
+      const isInInput =
+        target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
+
+      // Check if we're in BlockNote editor
+      const isInBlockNote = target.closest('.bn-editor') !== null;
+
+      if (cmdOrCtrl && e.key === 'z') {
+        // Allow BlockNote's built-in shortcuts to work when focused
+        if (isInBlockNote) return;
+
+        // For all other cases, handle globally
+        if (!isInInput) {
+          e.preventDefault();
+          editor.focus();
+
+          // Type for yUndo extension
+          interface YUndoExtension {
+            undoCommand?: (state: unknown, dispatch: unknown, view: unknown) => void;
+            redoCommand?: (state: unknown, dispatch: unknown, view: unknown) => void;
+          }
+
+          // Get the yUndo extension (used when collaboration is enabled)
+          const yUndo = editor.getExtension('yUndo') as YUndoExtension | undefined;
+          if (yUndo) {
+            const { state, view } = editor._tiptapEditor;
+            if (e.shiftKey) {
+              // Cmd+Shift+Z or Ctrl+Shift+Z: Redo
+              if (yUndo.redoCommand) {
+                yUndo.redoCommand(state, view.dispatch, view);
+              }
+            } else {
+              // Cmd+Z or Ctrl+Z: Undo
+              if (yUndo.undoCommand) {
+                yUndo.undoCommand(state, view.dispatch, view);
+              }
+            }
+          }
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleUndoRedoKeyDown);
+    return () => window.removeEventListener('keydown', handleUndoRedoKeyDown);
+  }, [editor]);
+
   // Handle Enter to submit comments (Shift+Enter or Ctrl+Enter for newline)
   // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Keyboard handling requires multiple condition checks
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -400,6 +459,10 @@ export function PlanViewer({
         <FormattingToolbarController
           formattingToolbar={() => (
             <FormattingToolbar>
+              {/* Undo/Redo - Global operations first */}
+              <UndoButton />
+              <RedoButton />
+
               <BlockTypeSelect />
 
               <BasicTextStyleButton basicTextStyle="bold" />

@@ -534,6 +534,16 @@ function FileDiffView({ filename, patch, viewMode }: FileDiffViewProps) {
     );
   }
 
+  // Detect file language from extension for syntax highlighting
+  const fileLang = filename.split('.').pop() || 'text';
+
+  // Construct a proper unified diff string from GitHub's patch
+  // GitHub API returns just the hunk content, but the library needs full diff format
+  const fullDiff = `diff --git a/${filename} b/${filename}
+--- a/${filename}
++++ b/${filename}
+${patch}`;
+
   return (
     <Card>
       <Card.Header>
@@ -541,7 +551,11 @@ function FileDiffView({ filename, patch, viewMode }: FileDiffViewProps) {
       </Card.Header>
       <Card.Content className="p-0">
         <DiffView
-          diffString={patch}
+          data={{
+            oldFile: { fileName: filename, fileLang },
+            newFile: { fileName: filename, fileLang },
+            hunks: [fullDiff],
+          }}
           diffViewMode={viewMode === 'split' ? DiffModeEnum.Split : DiffModeEnum.Unified}
           diffViewTheme={theme}
           diffViewHighlight={true}
