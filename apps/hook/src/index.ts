@@ -16,7 +16,7 @@ import { DEFAULT_AGENT_TYPE } from './constants.js';
 import { createPlan, updateContent } from './core/plan-manager.js';
 import { checkReviewStatus } from './core/review-status.js';
 import { logger } from './logger.js';
-import { cleanStaleSessions } from './state.js';
+import { cleanStaleSessions, deleteSessionState, getSessionState } from './state.js';
 
 // --- Adapter Selection ---
 
@@ -102,6 +102,55 @@ async function handlePlanExit(
   }
 }
 
+/**
+ * Handle post_exit event (after ExitPlanMode completes).
+ * Injects session context (sessionToken, planId, URL) for Claude to use.
+ */
+async function handlePostExit(
+  event: Extract<AdapterEvent, { type: 'post_exit' }>
+): Promise<CoreResponse> {
+  const state = getSessionState(event.sessionId);
+
+  if (!state?.sessionToken) {
+    logger.debug({ sessionId: event.sessionId }, 'No session token found for PostToolUse');
+    return {
+      allow: true,
+      hookType: 'post_tool_use',
+      additionalContext: '',
+    };
+  }
+
+  const { planId, sessionToken, url } = state;
+
+  logger.info({ planId }, 'Injecting session context via PostToolUse');
+
+  // Clear the session state now that we've delivered the token
+  deleteSessionState(event.sessionId);
+
+  const context = `[PEER-PLAN] Plan approved! You can now upload artifacts.
+
+Plan ID: ${planId}
+Session Token: ${sessionToken}
+URL: ${url}
+
+To attach proof to deliverables, use the MCP tools:
+- \`read_plan\` - Get deliverable IDs and current plan state
+- \`add_artifact\` - Upload screenshots, videos, test results as proof
+- \`complete_task\` - Generate shareable snapshot URL when done
+
+Example:
+add_artifact(planId="${planId}", sessionToken="${sessionToken}", type="screenshot", filePath="/path/to/screenshot.png", deliverableId="<from read_plan>")`;
+
+  return {
+    allow: true,
+    hookType: 'post_tool_use',
+    additionalContext: context,
+    planId,
+    sessionToken,
+    url,
+  };
+}
+
 // --- Main Entry Point ---
 
 /**
@@ -117,6 +166,9 @@ async function processEvent(_adapter: AgentAdapter, event: AdapterEvent): Promis
 
     case 'plan_exit':
       return handlePlanExit(event);
+
+    case 'post_exit':
+      return handlePostExit(event);
 
     case 'disconnect':
       // Could clear presence here if needed
@@ -148,10 +200,62 @@ async function readStdin(): Promise<string> {
 }
 
 /**
+ * Output SessionStart context for Claude to see.
+ */
+function outputSessionStartContext(): void {
+  const context = `[PEER-PLAN] Collaborative planning with human review & proof-of-work tracking.
+
+When creating implementation plans, use native plan mode (Shift+Tab) instead of create_plan tool:
+- Plans sync to browser in real-time
+- Use {#deliverable} markers for items needing proof
+- Exit is blocked until human approves
+
+Deliverables (Proof-of-Work):
+\`\`\`
+- [ ] Working login flow {#deliverable}
+- [ ] Tests passing {#deliverable}
+- [ ] Code cleanup (no proof needed)
+\`\`\`
+
+After approval, attach proof via \`add_artifact\` with the deliverable's block ID.
+
+Complete Workflow:
+1. Create plan → Browser opens, human sees plan live
+2. Human reviews → Comments on blocks, Approves or Requests Changes
+3. Check feedback → \`read_plan(includeAnnotations=true)\` to see comments
+4. Do work & attach proof → \`add_artifact(deliverableId, filePath/content)\`
+5. Complete → \`complete_task\` generates shareable snapshot URL for PR
+
+Status Flow: draft → pending_review → approved → in_progress → completed
+           (or changes_requested → iterate)
+
+Key Tools:
+- \`read_plan\` - Get plan content, deliverable IDs, human feedback
+- \`add_artifact\` - Upload screenshot/video/test_results/diff as proof
+- \`update_block_content\` - Modify plan based on feedback
+- \`complete_task\` - Generate snapshot URL for sharing
+
+Behind the Scenes:
+- Plans sync via CRDT (Yjs) - changes appear instantly in browser
+- Artifacts stored in GitHub orphan branch (same repo)
+- Snapshot URLs embed full state - shareable proof anyone can verify
+- P2P sync allows multiple reviewers without central server`;
+
+  // biome-ignore lint/suspicious/noConsole: Hook output MUST go to stdout
+  console.log(context);
+}
+
+/**
  * Main function - orchestrates the hook flow.
  */
 async function main(): Promise<void> {
   try {
+    // Handle --context flag for SessionStart hooks
+    if (process.argv.includes('--context')) {
+      outputSessionStartContext();
+      process.exit(0);
+    }
+
     // Clean stale sessions periodically
     cleanStaleSessions();
 

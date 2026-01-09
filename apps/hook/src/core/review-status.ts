@@ -16,9 +16,15 @@ import { WebsocketProvider } from 'y-websocket';
 import * as Y from 'yjs';
 import type { CoreResponse } from '../adapters/types.js';
 import { DEFAULT_AGENT_TYPE, DEFAULT_WEB_URL } from '../constants.js';
-import { getReviewStatus, getWebSocketUrl, updatePlanContent } from '../http-client.js';
+import {
+  getReviewStatus,
+  getWebSocketUrl,
+  setSessionToken,
+  updatePlanContent,
+} from '../http-client.js';
 import { logger } from '../logger.js';
-import { deleteSessionState, getSessionState } from '../state.js';
+import { generateSessionToken, hashSessionToken } from '../session-token.js';
+import { deleteSessionState, getSessionState, setSessionState } from '../state.js';
 import { createPlan } from './plan-manager.js';
 
 // --- Review Decision Types ---
@@ -247,18 +253,53 @@ export async function checkReviewStatus(
     const decision = await waitForReviewDecision(planId, wsUrl);
     logger.info({ planId, approved: decision.approved }, 'Decision received via Y.Doc');
 
-    // Clear session state so next ExitPlanMode goes through Y.Doc observer again
-    // This prevents using stale status from HTTP polling path
+    if (decision.approved) {
+      // Generate session token on approval so Claude can call add_artifact, etc.
+      const sessionToken = generateSessionToken();
+      const sessionTokenHash = hashSessionToken(sessionToken);
+
+      logger.info({ planId }, 'Generating session token for approved plan');
+
+      try {
+        // Set the token hash on the server
+        const tokenResult = await setSessionToken(planId, sessionTokenHash);
+        const url = tokenResult.url;
+
+        // Store in state for PostToolUse hook to read
+        const currentState = getSessionState(sessionId);
+        if (currentState) {
+          setSessionState(sessionId, {
+            ...currentState,
+            sessionToken,
+            url,
+            approvedAt: Date.now(),
+          });
+        }
+
+        logger.info({ planId, url }, 'Session token set and stored');
+
+        return {
+          allow: true,
+          message: 'Plan approved',
+          planId,
+          sessionToken,
+          url,
+        };
+      } catch (err) {
+        logger.error({ err, planId }, 'Failed to set session token, approving without it');
+        // Still approve, just without token - clear state
+        deleteSessionState(sessionId);
+        return {
+          allow: true,
+          message: 'Plan approved (session token unavailable)',
+          planId,
+        };
+      }
+    }
+
+    // Changes requested - clear state for fresh review cycle
     deleteSessionState(sessionId);
     logger.debug({ sessionId }, 'Cleared session state for fresh review cycle');
-
-    if (decision.approved) {
-      return {
-        allow: true,
-        message: 'Plan approved',
-        planId,
-      };
-    }
 
     return {
       allow: false,

@@ -6,7 +6,13 @@
 import { formatThreadsForLLM } from '@peer-plan/schema';
 import { z } from 'zod';
 import { CLAUDE_HOOK_EVENTS, CLAUDE_PERMISSION_MODES, CLAUDE_TOOL_NAMES } from '../constants.js';
-import type { AdapterEvent, AgentAdapter, CoreResponse, ReviewFeedback } from './types.js';
+import type {
+  AdapterEvent,
+  AgentAdapter,
+  CoreResponse,
+  PostExitEvent,
+  ReviewFeedback,
+} from './types.js';
 
 // --- Claude Code Hook Input Schemas ---
 
@@ -68,6 +74,22 @@ function handlePermissionRequest(input: ClaudeCodeHookInput): AdapterEvent {
   return { type: 'passthrough' };
 }
 
+function handlePostToolUse(input: ClaudeCodeHookInput): AdapterEvent {
+  const sessionId = input.session_id;
+  const toolName = input.tool_name;
+
+  // After ExitPlanMode completes, inject session context
+  if (toolName === CLAUDE_TOOL_NAMES.EXIT_PLAN_MODE) {
+    return {
+      type: 'post_exit',
+      sessionId,
+      toolName,
+    } as PostExitEvent;
+  }
+
+  return { type: 'passthrough' };
+}
+
 // --- Adapter Implementation ---
 
 export const claudeCodeAdapter: AgentAdapter = {
@@ -97,10 +119,25 @@ export const claudeCodeAdapter: AgentAdapter = {
       return handlePermissionRequest(input);
     }
 
+    if (input.hook_event_name === CLAUDE_HOOK_EVENTS.POST_TOOL_USE) {
+      return handlePostToolUse(input);
+    }
+
     return { type: 'passthrough' };
   },
 
   formatOutput(response: CoreResponse): string {
+    // Handle PostToolUse responses - inject additionalContext
+    if (response.hookType === 'post_tool_use') {
+      return JSON.stringify({
+        hookSpecificOutput: {
+          hookEventName: CLAUDE_HOOK_EVENTS.POST_TOOL_USE,
+          additionalContext: response.additionalContext || '',
+        },
+      });
+    }
+
+    // Handle PermissionRequest responses
     if (response.allow) {
       // Allow the operation
       return JSON.stringify({

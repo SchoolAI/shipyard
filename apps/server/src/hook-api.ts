@@ -6,9 +6,11 @@
 import type { Block } from '@blocknote/core';
 import { ServerBlockNoteEditor } from '@blocknote/server-util';
 import {
+  addDeliverable,
   CreateHookSessionRequestSchema,
   type CreateHookSessionResponse,
   clearAgentPresence,
+  extractDeliverables,
   type GetReviewStatusResponse,
   getPlanMetadata,
   initPlanMetadata,
@@ -24,6 +26,7 @@ import {
 import type { Request, Response } from 'express';
 import { nanoid } from 'nanoid';
 import { logger } from './logger.js';
+import { getGitHubUsername } from './server-identity.js';
 import { getOrCreateDoc } from './ws-server.js';
 
 // --- Helper Functions ---
@@ -75,12 +78,17 @@ export async function handleCreateSession(req: Request, res: Response): Promise<
 
     const PLAN_IN_PROGRESS = 'Plan in progress...';
 
+    // Get GitHub username for plan ownership
+    const ownerId = getGitHubUsername();
+    logger.info({ ownerId }, 'GitHub username for plan ownership');
+
     // Create the Y.Doc for this plan
     const ydoc = await getOrCreateDoc(planId);
     initPlanMetadata(ydoc, {
       id: planId,
       title: PLAN_IN_PROGRESS,
       status: 'draft',
+      ownerId,
     });
 
     // Set initial presence
@@ -148,7 +156,7 @@ export async function handleUpdateContent(req: Request, res: Response): Promise<
     const blocks = await parseMarkdownToBlocks(input.content);
     const title = extractTitleFromBlocks(blocks);
 
-    // Update Y.Doc content
+    // Update Y.Doc content and extract deliverables
     const editor = ServerBlockNoteEditor.create();
     ydoc.transact(() => {
       const fragment = ydoc.getXmlFragment('document');
@@ -157,6 +165,16 @@ export async function handleUpdateContent(req: Request, res: Response): Promise<
         fragment.delete(0, 1);
       }
       editor.blocksToYXmlFragment(blocks, fragment);
+
+      // Extract and store deliverables
+      const deliverables = extractDeliverables(blocks);
+      for (const deliverable of deliverables) {
+        addDeliverable(ydoc, deliverable);
+      }
+
+      if (deliverables.length > 0) {
+        logger.info({ count: deliverables.length }, 'Deliverables extracted from hook content');
+      }
     });
 
     // Update metadata
@@ -230,6 +248,51 @@ export async function handleGetReview(req: Request, res: Response): Promise<void
     res.json(response);
   } catch (err) {
     logger.error({ err }, 'Failed to get review status');
+    res.status(500).json({ error: 'Internal error' });
+  }
+}
+
+// --- POST /api/hook/plan/:id/session-token - Set session token (on approval) ---
+
+export async function handleSetSessionToken(req: Request, res: Response): Promise<void> {
+  try {
+    const planId = req.params.id;
+    if (!planId) {
+      res.status(400).json({ error: 'Missing plan ID' });
+      return;
+    }
+
+    const { sessionTokenHash } = req.body as { sessionTokenHash?: string };
+    if (!sessionTokenHash || typeof sessionTokenHash !== 'string') {
+      res.status(400).json({ error: 'Missing or invalid sessionTokenHash' });
+      return;
+    }
+
+    logger.info({ planId }, 'Setting session token from hook');
+
+    const ydoc = await getOrCreateDoc(planId);
+    const metadata = getPlanMetadata(ydoc);
+
+    if (!metadata) {
+      res.status(404).json({ error: 'Plan not found' });
+      return;
+    }
+
+    // Set the session token hash
+    setPlanMetadata(ydoc, {
+      sessionTokenHash,
+      updatedAt: Date.now(),
+    });
+
+    // Generate URL
+    const webUrl = process.env.PEER_PLAN_WEB_URL ?? 'https://schoolai.github.io/peer-plan';
+    const url = `${webUrl}/plan/${planId}`;
+
+    logger.info({ planId }, 'Session token set successfully');
+
+    res.json({ url });
+  } catch (err) {
+    logger.error({ err }, 'Failed to set session token');
     res.status(500).json({ error: 'Internal error' });
   }
 }

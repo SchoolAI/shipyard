@@ -10,6 +10,7 @@ import {
   handleClearPresence,
   handleCreateSession,
   handleGetReview,
+  handleSetSessionToken,
   handleUpdateContent,
   handleUpdatePresence,
 } from './hook-api.js';
@@ -258,6 +259,7 @@ function createApp(): express.Express {
   app.post('/api/hook/session', handleCreateSession);
   app.put('/api/hook/plan/:id/content', handleUpdateContent);
   app.get('/api/hook/plan/:id/review', handleGetReview);
+  app.post('/api/hook/plan/:id/session-token', handleSetSessionToken);
   app.post('/api/hook/plan/:id/presence', handleUpdatePresence);
   app.delete('/api/hook/plan/:id/presence', handleClearPresence);
 

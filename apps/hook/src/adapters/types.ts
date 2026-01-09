@@ -34,6 +34,7 @@ export type AdapterEvent =
   | PlanStartEvent
   | ContentUpdateEvent
   | PlanExitEvent
+  | PostExitEvent
   | DisconnectEvent
   | PassthroughEvent;
 
@@ -63,6 +64,14 @@ export interface PlanExitEvent {
   planContent?: string;
 }
 
+/** PostToolUse event after ExitPlanMode completes - used to inject session context */
+export interface PostExitEvent {
+  type: 'post_exit';
+  sessionId: string;
+  /** Tool name that just completed */
+  toolName: string;
+}
+
 /** Agent session is ending */
 export interface DisconnectEvent {
   type: 'disconnect';
@@ -87,10 +96,16 @@ export interface CoreResponse {
   message?: string;
   /** Review feedback if changes were requested */
   feedback?: ReviewFeedback[];
-  /** Plan ID (returned on plan creation) */
+  /** Plan ID (returned on plan creation/approval) */
   planId?: string;
-  /** URL to the plan (returned on plan creation) */
+  /** URL to the plan (returned on plan creation/approval) */
   url?: string;
+  /** Session token for MCP tool calls (returned on approval) */
+  sessionToken?: string;
+  /** Hook type to determine output format */
+  hookType?: 'permission_request' | 'post_tool_use';
+  /** Additional context to inject (for PostToolUse) */
+  additionalContext?: string;
 }
 
 // Note: AgentPresence is re-exported from @peer-plan/schema above

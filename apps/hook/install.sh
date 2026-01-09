@@ -81,6 +81,49 @@ if (!existingPermHook) {
   console.log('ℹ️  PermissionRequest hook already configured');
 }
 
+// Add PostToolUse hook for ExitPlanMode (injects session context)
+if (!settings.hooks.PostToolUse) {
+  settings.hooks.PostToolUse = [];
+}
+
+const existingPostHook = settings.hooks.PostToolUse.find(h =>
+  h.hooks?.some(hook => hook.command?.includes('peer-plan-hook'))
+);
+
+if (!existingPostHook) {
+  settings.hooks.PostToolUse.push({
+    matcher: "ExitPlanMode",
+    hooks: [{
+      type: "command",
+      command: "peer-plan-hook"
+    }]
+  });
+  console.log('✅ Added PostToolUse hook');
+} else {
+  console.log('ℹ️  PostToolUse hook already configured');
+}
+
+// Add SessionStart hook (injects peer-plan context)
+if (!settings.hooks.SessionStart) {
+  settings.hooks.SessionStart = [];
+}
+
+const existingSessionHook = settings.hooks.SessionStart.find(h =>
+  h.hooks?.some(hook => hook.command?.includes('peer-plan-hook --context'))
+);
+
+if (!existingSessionHook) {
+  settings.hooks.SessionStart.push({
+    hooks: [{
+      type: "command",
+      command: "peer-plan-hook --context"
+    }]
+  });
+  console.log('✅ Added SessionStart hook');
+} else {
+  console.log('ℹ️  SessionStart hook already configured');
+}
+
 fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2), 'utf-8');
 console.log('✅ Settings updated');
 EOF

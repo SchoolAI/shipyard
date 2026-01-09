@@ -199,6 +199,35 @@ export async function updatePresence(
 }
 
 /**
+ * Set session token hash on a plan (called on approval).
+ * Returns the URL for the plan.
+ */
+export async function setSessionToken(
+  planId: string,
+  sessionTokenHash: string
+): Promise<{ url: string }> {
+  const baseUrl = await getRegistryUrl();
+  if (!baseUrl) {
+    throw new Error('Registry server not available');
+  }
+
+  const res = await fetch(`${baseUrl}/api/hook/plan/${encodeURIComponent(planId)}/session-token`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sessionTokenHash }),
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+
+  if (!res.ok) {
+    const error = await res.text();
+    throw new Error(`Failed to set session token: ${res.status} ${error}`);
+  }
+
+  const data = (await res.json()) as { url: string };
+  return data;
+}
+
+/**
  * Clear agent presence.
  */
 export async function clearPresence(planId: string, sessionId: string): Promise<void> {

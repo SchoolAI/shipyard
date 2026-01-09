@@ -23,6 +23,10 @@ const SessionStateSchema = z.object({
   createdAt: z.number(),
   lastSyncedAt: z.number(),
   contentHash: z.string().optional(),
+  // Added on approval - allows Claude to call add_artifact, update_block_content, etc.
+  sessionToken: z.string().optional(),
+  url: z.string().optional(),
+  approvedAt: z.number().optional(),
 });
 
 export type SessionState = z.infer<typeof SessionStateSchema>;
