@@ -367,7 +367,7 @@ function FileListItem({ file, selected, onSelect, commentCount }: FileListItemPr
               {commentCount}
             </span>
           )}
-          <span className="text-success-400">+{file.additions}</span>
+          <span className="text-success">+{file.additions}</span>
           <span className="text-danger">-{file.deletions}</span>
         </div>
       </div>
@@ -574,7 +574,8 @@ function FileDiffView({ filename, patch, prNumber, ydoc, comments }: FileDiffVie
               {diffLines.map((line) => {
                 const lineComments =
                   line.newLineNumber !== null ? (commentsByLine.get(line.newLineNumber) ?? []) : [];
-                const isCommenting = commentingLine === line.newLineNumber;
+                const isCommenting =
+                  commentingLine !== null && commentingLine === line.newLineNumber;
                 const canComment = line.type === 'add' || line.type === 'context';
 
                 return (
@@ -635,16 +636,16 @@ function DiffLineRow({
     add: 'bg-success/10',
     remove: 'bg-danger/10',
     context: '',
-    hunk: 'bg-primary/5',
-    meta: 'bg-muted/50',
+    hunk: 'bg-accent/5',
+    meta: 'bg-muted/30',
   }[line.type];
 
   const textClass = {
-    add: 'text-success-400',
+    add: 'text-success',
     remove: 'text-danger',
     context: 'text-foreground',
-    hunk: 'text-primary font-semibold',
-    meta: 'text-muted-foreground',
+    hunk: 'text-accent font-semibold',
+    meta: 'text-muted',
   }[line.type];
 
   const hasComments = comments.length > 0;
