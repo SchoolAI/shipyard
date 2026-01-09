@@ -8,7 +8,7 @@
     "peer-plan-hook": "./dist/index.mjs"
   },
   "scripts": {
-    "dev": "tsdown --watch --on-success 'node dist/index.mjs'",
+    "dev": "pnpm link --global && tsdown --watch --on-success 'node dist/index.mjs'",
     "build": "tsdown",
     "typecheck": "tsc --noEmit",
     "lint": "biome check src",
