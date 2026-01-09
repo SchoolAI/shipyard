@@ -128,7 +128,7 @@ export function ChangesView({ ydoc, metadata }: ChangesViewProps) {
           <PRHeader pr={selected} repo={metadata.repo} planId={metadata.id} ydoc={ydoc} />
 
           {/* Diff Viewer with Comments */}
-          <DiffViewer pr={selected} planId={metadata.id} repo={metadata.repo || ''} ydoc={ydoc} />
+          <DiffViewer pr={selected} repo={metadata.repo || ''} ydoc={ydoc} />
         </div>
       )}
     </div>
@@ -293,17 +293,17 @@ function PRHeader({ pr, repo, planId, ydoc }: PRHeaderProps) {
 
 interface DiffViewerProps {
   pr: LinkedPR;
-  planId: string;
   repo: string;
   ydoc: Y.Doc;
 }
 
-function DiffViewer({ pr, planId, repo, ydoc }: DiffViewerProps) {
+function DiffViewer({ pr, repo, ydoc }: DiffViewerProps) {
   const [files, setFiles] = useState<PRFile[]>([]);
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<DiffViewMode>(getDiffViewModePreference);
+  const { identity } = useGitHubAuth();
 
   // Get all comments for this PR
   const comments = usePRReviewComments(ydoc, pr.prNumber);
@@ -324,35 +324,56 @@ function DiffViewer({ pr, planId, repo, ydoc }: DiffViewerProps) {
     return counts;
   }, [comments]);
 
-  // Fetch file list
+  // Fetch file list directly from GitHub API
   useEffect(() => {
     if (!repo) return;
 
     setLoading(true);
     setError(null);
 
-    // Find registry port (assuming localhost:32191 or 32192)
-    fetch(`http://localhost:32191/api/plan/${planId}/pr-files/${pr.prNumber}`)
+    // Build headers with optional auth for private repos
+    const headers: HeadersInit = {
+      Accept: 'application/vnd.github+json',
+    };
+    if (identity?.token) {
+      headers.Authorization = `Bearer ${identity.token}`;
+    }
+
+    // Fetch directly from GitHub API
+    fetch(`https://api.github.com/repos/${repo}/pulls/${pr.prNumber}/files`, { headers })
       .then((res) => {
-        if (!res.ok) {
-          // Try second port if first fails
-          return fetch(`http://localhost:32192/api/plan/${planId}/pr-files/${pr.prNumber}`);
-        }
-        return res;
-      })
-      .then((res) => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        if (!res.ok) throw new Error(`GitHub API returned ${res.status}`);
         return res.json();
       })
-      .then((data: { files: PRFile[] }) => {
-        setFiles(data.files);
-        setLoading(false);
-      })
+      .then(
+        (
+          data: Array<{
+            filename: string;
+            status: string;
+            additions: number;
+            deletions: number;
+            changes: number;
+            patch?: string;
+          }>
+        ) => {
+          setFiles(
+            data.map((file) => ({
+              filename: file.filename,
+              status: file.status,
+              additions: file.additions,
+              deletions: file.deletions,
+              changes: file.changes,
+              patch: file.patch,
+            }))
+          );
+          setLoading(false);
+        }
+      )
       .catch((err) => {
         setError(err.message);
         setLoading(false);
       });
-  }, [pr.prNumber, planId, repo]);
+  }, [pr.prNumber, repo, identity?.token]);
 
   // Auto-select first file when files load
   useEffect(() => {
