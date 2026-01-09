@@ -164,7 +164,7 @@ function JsonViewer({ url, filename, onError }: TextViewerProps) {
   return (
     <div className="bg-muted rounded-lg p-4 overflow-x-auto max-h-96">
       <div className="text-muted-foreground text-xs mb-2">{filename}</div>
-      <pre className="text-success-400 text-sm font-mono whitespace-pre-wrap">{displayContent}</pre>
+      <pre className="text-success text-sm font-mono whitespace-pre-wrap">{displayContent}</pre>
     </div>
   );
 }
@@ -198,11 +198,10 @@ function DiffViewer({ url, filename, onError }: TextViewerProps) {
       <pre className="text-sm font-mono">
         {lines.map((line, i) => {
           let className = 'text-foreground';
-          if (line.startsWith('+') && !line.startsWith('+++')) className = 'text-success-400';
+          if (line.startsWith('+') && !line.startsWith('+++')) className = 'text-success';
           else if (line.startsWith('-') && !line.startsWith('---')) className = 'text-danger';
-          else if (line.startsWith('@@')) className = 'text-primary';
-          else if (line.startsWith('diff') || line.startsWith('index'))
-            className = 'text-muted-foreground';
+          else if (line.startsWith('@@')) className = 'text-accent';
+          else if (line.startsWith('diff') || line.startsWith('index')) className = 'text-muted';
 
           return (
             <div key={`${i}-${line.slice(0, 20)}`} className={className}>

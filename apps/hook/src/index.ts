@@ -241,8 +241,16 @@ Behind the Scenes:
 - Snapshot URLs embed full state - shareable proof anyone can verify
 - P2P sync allows multiple reviewers without central server`;
 
+  // Output in Claude Code hook format
+  const hookOutput = {
+    hookSpecificOutput: {
+      hookEventName: 'SessionStart',
+      additionalContext: context,
+    },
+  };
+
   // biome-ignore lint/suspicious/noConsole: Hook output MUST go to stdout
-  console.log(context);
+  console.log(JSON.stringify(hookOutput));
 }
 
 /**

@@ -1,4 +1,13 @@
-import { Alert, Avatar, Button, Card, Chip, Link as HeroLink, TextArea } from '@heroui/react';
+import {
+  Alert,
+  Avatar,
+  Button,
+  ButtonGroup,
+  Card,
+  Chip,
+  Link as HeroLink,
+  TextArea,
+} from '@heroui/react';
 import {
   addPRReviewComment,
   type LinkedPR,
@@ -6,16 +15,20 @@ import {
   type PRReviewComment,
   removePRReviewComment,
   resolvePRReviewComment,
+  updateLinkedPRStatus,
 } from '@peer-plan/schema';
 import {
   Check,
   CheckCircle,
+  Columns2,
   ExternalLink,
   GitBranch,
   GitPullRequest,
   MessageSquare,
   Plus,
+  Rocket,
   RotateCcw,
+  Rows3,
   Trash2,
   X,
 } from 'lucide-react';
@@ -24,6 +37,31 @@ import type * as Y from 'yjs';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
 import { useLinkedPRs } from '@/hooks/useLinkedPRs';
 import { getCommentsForFile, usePRReviewComments } from '@/hooks/usePRReviewComments';
+
+// --- Types ---
+
+type DiffViewMode = 'unified' | 'split';
+
+// --- LocalStorage Helpers ---
+
+const DIFF_VIEW_MODE_KEY = 'peer-plan:diff-view-mode';
+
+function getDiffViewModePreference(): DiffViewMode {
+  try {
+    const stored = localStorage.getItem(DIFF_VIEW_MODE_KEY);
+    return stored === 'split' ? 'split' : 'unified';
+  } catch {
+    return 'unified';
+  }
+}
+
+function setDiffViewModePreference(mode: DiffViewMode): void {
+  try {
+    localStorage.setItem(DIFF_VIEW_MODE_KEY, mode);
+  } catch {
+    // Ignore localStorage errors
+  }
+}
 
 interface ChangesViewProps {
   ydoc: Y.Doc;
@@ -68,10 +106,10 @@ export function ChangesView({ ydoc, metadata }: ChangesViewProps) {
   const selected = linkedPRs.find((pr) => pr.prNumber === selectedPR) ?? linkedPRs[0] ?? null;
 
   return (
-    <div className="max-w-full mx-auto p-4 md:p-6 space-y-4">
+    <div className="max-w-full mx-auto p-2 md:p-4 space-y-2">
       {/* PR List (when multiple PRs) */}
       {linkedPRs.length > 1 && (
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           {linkedPRs.map((pr) => (
             <PRCard
               key={pr.prNumber}
@@ -85,9 +123,9 @@ export function ChangesView({ ydoc, metadata }: ChangesViewProps) {
 
       {/* Selected PR diff viewer */}
       {selected && (
-        <div className="space-y-4">
-          {/* PR Header */}
-          <PRHeader pr={selected} repo={metadata.repo} />
+        <div className="space-y-2">
+          {/* PR Header (compact) */}
+          <PRHeader pr={selected} repo={metadata.repo} planId={metadata.id} ydoc={ydoc} />
 
           {/* Diff Viewer with Comments */}
           <DiffViewer pr={selected} planId={metadata.id} repo={metadata.repo || ''} ydoc={ydoc} />
@@ -145,54 +183,111 @@ function PRCard({ pr, selected, onSelect }: PRCardProps) {
 interface PRHeaderProps {
   pr: LinkedPR;
   repo?: string;
+  planId: string;
+  ydoc: Y.Doc;
 }
 
-function PRHeader({ pr, repo }: PRHeaderProps) {
+function PRHeader({ pr, repo, planId, ydoc }: PRHeaderProps) {
+  const [isPublishing, setIsPublishing] = useState(false);
+  const [publishError, setPublishError] = useState<string | null>(null);
+
+  const handlePublish = useCallback(async () => {
+    if (!repo) return;
+
+    setIsPublishing(true);
+    setPublishError(null);
+
+    try {
+      // Call the registry server to publish the PR
+      const res = await fetch(
+        `http://localhost:32191/api/plan/${planId}/pr/${pr.prNumber}/publish`,
+        {
+          method: 'POST',
+        }
+      ).catch(() =>
+        // Try alternate port
+        fetch(`http://localhost:32192/api/plan/${planId}/pr/${pr.prNumber}/publish`, {
+          method: 'POST',
+        })
+      );
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+        throw new Error(errorData.error || `HTTP ${res.status}`);
+      }
+
+      // Update status in Y.Doc
+      updateLinkedPRStatus(ydoc, pr.prNumber, 'open');
+    } catch (err) {
+      setPublishError(err instanceof Error ? err.message : 'Failed to publish PR');
+    } finally {
+      setIsPublishing(false);
+    }
+  }, [repo, planId, pr.prNumber, ydoc]);
+
+  const isDraft = pr.status === 'draft';
+
   return (
-    <Card>
-      <Card.Content className="p-4">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex-1">
-            <div className="flex items-center gap-2 mb-1">
-              <GitPullRequest className="w-5 h-5 text-primary" />
-              <h3 className="text-lg font-semibold">PR #{pr.prNumber}</h3>
-              <Chip
-                size="sm"
-                color={
-                  pr.status === 'draft'
-                    ? 'default'
-                    : pr.status === 'merged'
-                      ? 'accent'
-                      : pr.status === 'open'
-                        ? 'success'
-                        : 'danger'
-                }
-              >
-                {pr.status}
-              </Chip>
-            </div>
-            {pr.title && <p className="text-foreground mb-2">{pr.title}</p>}
-            {pr.branch && (
-              <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                <GitBranch className="w-4 h-4" />
-                <code className="text-xs">{pr.branch}</code>
-              </div>
-            )}
-          </div>
-          {repo && (
-            <HeroLink
-              href={pr.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 text-sm text-primary hover:text-primary/80 transition-colors"
-            >
-              <ExternalLink className="w-4 h-4" />
-              View on GitHub
-            </HeroLink>
-          )}
-        </div>
-      </Card.Content>
-    </Card>
+    <div className="flex items-center justify-between gap-3 px-2 py-1.5 bg-surface rounded-lg border border-separator">
+      {/* Left: PR info (compact) */}
+      <div className="flex items-center gap-2 min-w-0 flex-1">
+        <GitPullRequest className="w-4 h-4 text-primary shrink-0" />
+        <span className="font-medium text-sm">#{pr.prNumber}</span>
+        <Chip
+          size="sm"
+          color={
+            pr.status === 'draft'
+              ? 'default'
+              : pr.status === 'merged'
+                ? 'accent'
+                : pr.status === 'open'
+                  ? 'success'
+                  : 'danger'
+          }
+        >
+          {pr.status}
+        </Chip>
+        {pr.title && (
+          <span className="text-sm text-foreground/80 truncate hidden sm:inline">{pr.title}</span>
+        )}
+        {pr.branch && (
+          <code className="text-xs text-muted-foreground hidden md:inline">
+            <GitBranch className="w-3 h-3 inline mr-0.5" />
+            {pr.branch}
+          </code>
+        )}
+      </div>
+
+      {/* Right: Actions */}
+      <div className="flex items-center gap-2 shrink-0">
+        {publishError && (
+          <span className="text-xs text-danger hidden sm:inline">{publishError}</span>
+        )}
+        {isDraft && repo && (
+          <Button
+            size="sm"
+            variant="primary"
+            onPress={handlePublish}
+            isDisabled={isPublishing}
+            isPending={isPublishing}
+          >
+            <Rocket className="w-3.5 h-3.5" />
+            Publish
+          </Button>
+        )}
+        {repo && (
+          <HeroLink
+            href={pr.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 text-sm text-primary hover:text-primary/80 transition-colors"
+          >
+            <ExternalLink className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">GitHub</span>
+          </HeroLink>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -208,9 +303,16 @@ function DiffViewer({ pr, planId, repo, ydoc }: DiffViewerProps) {
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<DiffViewMode>(getDiffViewModePreference);
 
   // Get all comments for this PR
   const comments = usePRReviewComments(ydoc, pr.prNumber);
+
+  // Handle view mode change with localStorage persistence
+  const handleViewModeChange = useCallback((mode: DiffViewMode) => {
+    setViewMode(mode);
+    setDiffViewModePreference(mode);
+  }, []);
 
   // Count comments per file
   const commentCountByFile = useMemo(() => {
@@ -296,26 +398,45 @@ function DiffViewer({ pr, planId, repo, ydoc }: DiffViewerProps) {
   }
 
   return (
-    <div className="space-y-4">
-      {/* File Tree */}
-      <Card>
-        <Card.Header>
-          <Card.Title>Files Changed ({files.length})</Card.Title>
-        </Card.Header>
-        <Card.Content className="p-0">
-          <div className="max-h-96 overflow-y-auto">
-            {files.map((file) => (
-              <FileListItem
-                key={file.filename}
-                file={file}
-                selected={file.filename === selectedFile}
-                onSelect={() => setSelectedFile(file.filename)}
-                commentCount={commentCountByFile.get(file.filename) ?? 0}
-              />
-            ))}
-          </div>
-        </Card.Content>
-      </Card>
+    <div className="space-y-2">
+      {/* Toolbar: File selector + View toggle */}
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        {/* File selector (compact horizontal scroll) */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 flex-1 min-w-0">
+          <span className="text-xs text-muted-foreground shrink-0">
+            {files.length} file{files.length !== 1 ? 's' : ''}:
+          </span>
+          {files.map((file) => (
+            <FileChip
+              key={file.filename}
+              file={file}
+              selected={file.filename === selectedFile}
+              onSelect={() => setSelectedFile(file.filename)}
+              commentCount={commentCountByFile.get(file.filename) ?? 0}
+            />
+          ))}
+        </div>
+
+        {/* View mode toggle */}
+        <ButtonGroup size="sm" variant="tertiary">
+          <Button
+            isIconOnly
+            aria-label="Unified view"
+            onPress={() => handleViewModeChange('unified')}
+            className={viewMode === 'unified' ? 'bg-primary/10 text-primary' : ''}
+          >
+            <Rows3 className="w-4 h-4" />
+          </Button>
+          <Button
+            isIconOnly
+            aria-label="Split view"
+            onPress={() => handleViewModeChange('split')}
+            className={viewMode === 'split' ? 'bg-primary/10 text-primary' : ''}
+          >
+            <Columns2 className="w-4 h-4" />
+          </Button>
+        </ButtonGroup>
+      </div>
 
       {/* Diff View for Selected File */}
       {selectedFile && (
@@ -325,6 +446,7 @@ function DiffViewer({ pr, planId, repo, ydoc }: DiffViewerProps) {
           prNumber={pr.prNumber}
           ydoc={ydoc}
           comments={getCommentsForFile(comments, selectedFile)}
+          viewMode={viewMode}
         />
       )}
     </div>
@@ -342,35 +464,40 @@ interface PRFile {
   patch?: string;
 }
 
-interface FileListItemProps {
+interface FileChipProps {
   file: PRFile;
   selected: boolean;
   onSelect: () => void;
   commentCount: number;
 }
 
-function FileListItem({ file, selected, onSelect, commentCount }: FileListItemProps) {
+/** Compact chip-style file selector for horizontal scrolling */
+function FileChip({ file, selected, onSelect, commentCount }: FileChipProps) {
+  // Extract just the filename from the path for display
+  const displayName = file.filename.split('/').pop() ?? file.filename;
+
   return (
     <button
       type="button"
       onClick={onSelect}
-      className={`w-full p-3 border-b border-separator text-left transition-colors hover:bg-muted/50 ${
-        selected ? 'bg-primary/5' : ''
+      className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-mono whitespace-nowrap transition-colors shrink-0 ${
+        selected
+          ? 'bg-primary text-white'
+          : 'bg-surface border border-separator hover:border-primary/50'
       }`}
+      title={file.filename}
     >
-      <div className="flex items-center justify-between gap-2">
-        <code className="text-sm font-mono truncate">{file.filename}</code>
-        <div className="flex items-center gap-2 text-xs shrink-0">
-          {commentCount > 0 && (
-            <span className="flex items-center gap-1 text-muted-foreground">
-              <MessageSquare className="w-3 h-3" />
-              {commentCount}
-            </span>
-          )}
-          <span className="text-success-400">+{file.additions}</span>
-          <span className="text-danger">-{file.deletions}</span>
-        </div>
-      </div>
+      <span className="truncate max-w-[150px]">{displayName}</span>
+      {commentCount > 0 && (
+        <span
+          className={`flex items-center gap-0.5 ${selected ? 'text-white/80' : 'text-primary'}`}
+        >
+          <MessageSquare className="w-3 h-3" />
+          {commentCount}
+        </span>
+      )}
+      <span className={selected ? 'text-white/80' : 'text-success'}>+{file.additions}</span>
+      <span className={selected ? 'text-white/80' : 'text-danger'}>-{file.deletions}</span>
     </button>
   );
 }
@@ -381,6 +508,7 @@ interface FileDiffViewProps {
   prNumber: number;
   ydoc: Y.Doc;
   comments: PRReviewComment[];
+  viewMode: DiffViewMode;
 }
 
 /** Parsed diff line with metadata for rendering comments */
@@ -482,7 +610,88 @@ function parseDiffPatch(patch: string): DiffLine[] {
   return result;
 }
 
-function FileDiffView({ filename, patch, prNumber, ydoc, comments }: FileDiffViewProps) {
+/** Represents a paired row for split view (old side | new side) */
+interface SplitDiffRow {
+  /** Unique key for React rendering */
+  key: string;
+  oldLine: DiffLine | null;
+  newLine: DiffLine | null;
+  /** For hunk/meta lines that span both sides */
+  spanBoth: DiffLine | null;
+}
+
+/**
+ * Convert unified diff lines into paired rows for split view.
+ * Pairs additions/removals that are adjacent, context lines appear on both sides.
+ */
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Diff pairing logic inherently requires multiple conditions
+function pairDiffLinesForSplit(lines: DiffLine[]): SplitDiffRow[] {
+  const result: SplitDiffRow[] = [];
+  let i = 0;
+
+  while (i < lines.length) {
+    const line = lines[i];
+    if (!line) {
+      i++;
+      continue;
+    }
+
+    // Hunk headers and meta lines span both sides
+    if (line.type === 'hunk' || line.type === 'meta') {
+      result.push({ key: `span-${line.diffIndex}`, oldLine: null, newLine: null, spanBoth: line });
+      i++;
+      continue;
+    }
+
+    // Context lines appear on both sides
+    if (line.type === 'context') {
+      result.push({ key: `ctx-${line.diffIndex}`, oldLine: line, newLine: line, spanBoth: null });
+      i++;
+      continue;
+    }
+
+    // Collect consecutive removals
+    const removals: DiffLine[] = [];
+    while (i < lines.length && lines[i]?.type === 'remove') {
+      const removal = lines[i];
+      if (removal) removals.push(removal);
+      i++;
+    }
+
+    // Collect consecutive additions
+    const additions: DiffLine[] = [];
+    while (i < lines.length && lines[i]?.type === 'add') {
+      const addition = lines[i];
+      if (addition) additions.push(addition);
+      i++;
+    }
+
+    // Pair them up using the first diffIndex of each group
+    const maxLen = Math.max(removals.length, additions.length);
+    const baseOldIdx = removals[0]?.diffIndex ?? 0;
+    const baseNewIdx = additions[0]?.diffIndex ?? 0;
+    for (let j = 0; j < maxLen; j++) {
+      const oldLine = removals[j] ?? null;
+      const newLine = additions[j] ?? null;
+      // Create unique key from diff indices of both sides
+      const keyPart = oldLine
+        ? `o${oldLine.diffIndex}`
+        : newLine
+          ? `n${newLine.diffIndex}`
+          : `p${baseOldIdx}-${baseNewIdx}-${j}`;
+      result.push({
+        key: `pair-${keyPart}`,
+        oldLine,
+        newLine,
+        spanBoth: null,
+      });
+    }
+  }
+
+  return result;
+}
+
+function FileDiffView({ filename, patch, prNumber, ydoc, comments, viewMode }: FileDiffViewProps) {
   const { identity } = useGitHubAuth();
   const [commentingLine, setCommentingLine] = useState<number | null>(null);
 
@@ -555,10 +764,11 @@ function FileDiffView({ filename, patch, prNumber, ydoc, comments }: FileDiffVie
   }
 
   const diffLines = parseDiffPatch(patch);
+  const splitRows = viewMode === 'split' ? pairDiffLinesForSplit(diffLines) : [];
 
   return (
     <Card>
-      <Card.Header className="flex flex-row items-center justify-between">
+      <Card.Header className="flex flex-row items-center justify-between py-2">
         <Card.Title className="font-mono text-sm">{filename}</Card.Title>
         {comments.length > 0 && (
           <Chip size="sm" color="default">
@@ -569,35 +779,77 @@ function FileDiffView({ filename, patch, prNumber, ydoc, comments }: FileDiffVie
       </Card.Header>
       <Card.Content className="p-0">
         <div className="bg-muted rounded-b-lg overflow-x-auto max-h-[600px] overflow-y-auto">
-          <table className="w-full text-sm font-mono border-collapse">
-            <tbody>
-              {diffLines.map((line) => {
-                const lineComments =
-                  line.newLineNumber !== null ? (commentsByLine.get(line.newLineNumber) ?? []) : [];
-                const isCommenting = commentingLine === line.newLineNumber;
-                const canComment = line.type === 'add' || line.type === 'context';
+          {viewMode === 'unified' ? (
+            <table className="w-full text-sm font-mono border-collapse">
+              <tbody>
+                {diffLines.map((line) => {
+                  const lineComments =
+                    line.newLineNumber !== null
+                      ? (commentsByLine.get(line.newLineNumber) ?? [])
+                      : [];
+                  const isCommenting =
+                    commentingLine !== null && commentingLine === line.newLineNumber;
+                  const canComment = line.type === 'add' || line.type === 'context';
 
-                return (
-                  <DiffLineRow
-                    key={line.diffIndex}
-                    line={line}
-                    comments={lineComments}
-                    isCommenting={isCommenting}
-                    canComment={canComment}
-                    hasIdentity={!!identity}
-                    onStartComment={() => setCommentingLine(line.newLineNumber)}
-                    onCancelComment={() => setCommentingLine(null)}
-                    onAddComment={(body) =>
-                      line.newLineNumber !== null && handleAddComment(line.newLineNumber, body)
-                    }
-                    onResolveComment={handleResolveComment}
-                    onDeleteComment={handleDeleteComment}
-                    currentUser={identity?.username}
-                  />
-                );
-              })}
-            </tbody>
-          </table>
+                  return (
+                    <DiffLineRow
+                      key={line.diffIndex}
+                      line={line}
+                      comments={lineComments}
+                      isCommenting={isCommenting}
+                      canComment={canComment}
+                      hasIdentity={!!identity}
+                      onStartComment={() => setCommentingLine(line.newLineNumber)}
+                      onCancelComment={() => setCommentingLine(null)}
+                      onAddComment={(body) =>
+                        line.newLineNumber !== null && handleAddComment(line.newLineNumber, body)
+                      }
+                      onResolveComment={handleResolveComment}
+                      onDeleteComment={handleDeleteComment}
+                      currentUser={identity?.username}
+                    />
+                  );
+                })}
+              </tbody>
+            </table>
+          ) : (
+            <table className="w-full text-sm font-mono border-collapse table-fixed">
+              <tbody>
+                {splitRows.map((row) => {
+                  // Spanning row (hunk header or meta)
+                  if (row.spanBoth) {
+                    return <SplitDiffSpanRow key={row.key} line={row.spanBoth} />;
+                  }
+
+                  const newLineNum = row.newLine?.newLineNumber ?? null;
+                  const lineComments =
+                    newLineNum !== null ? (commentsByLine.get(newLineNum) ?? []) : [];
+                  const isCommenting = commentingLine !== null && commentingLine === newLineNum;
+                  const canComment = row.newLine?.type === 'add' || row.newLine?.type === 'context';
+
+                  return (
+                    <SplitDiffRow
+                      key={row.key}
+                      oldLine={row.oldLine}
+                      newLine={row.newLine}
+                      comments={lineComments}
+                      isCommenting={isCommenting}
+                      canComment={canComment}
+                      hasIdentity={!!identity}
+                      onStartComment={() => setCommentingLine(newLineNum)}
+                      onCancelComment={() => setCommentingLine(null)}
+                      onAddComment={(body) =>
+                        newLineNum !== null && handleAddComment(newLineNum, body)
+                      }
+                      onResolveComment={handleResolveComment}
+                      onDeleteComment={handleDeleteComment}
+                      currentUser={identity?.username}
+                    />
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
         </div>
       </Card.Content>
     </Card>
@@ -635,16 +887,16 @@ function DiffLineRow({
     add: 'bg-success/10',
     remove: 'bg-danger/10',
     context: '',
-    hunk: 'bg-primary/5',
-    meta: 'bg-muted/50',
+    hunk: 'bg-accent/5',
+    meta: 'bg-muted/30',
   }[line.type];
 
   const textClass = {
-    add: 'text-success-400',
+    add: 'text-success',
     remove: 'text-danger',
     context: 'text-foreground',
-    hunk: 'text-primary font-semibold',
-    meta: 'text-muted-foreground',
+    hunk: 'text-accent font-semibold',
+    meta: 'text-muted',
   }[line.type];
 
   const hasComments = comments.length > 0;
@@ -850,6 +1102,156 @@ function CommentInput({ onSubmit, onCancel }: CommentInputProps) {
         </Button>
       </div>
     </div>
+  );
+}
+
+// --- Split View Components ---
+
+interface SplitDiffSpanRowProps {
+  line: DiffLine;
+}
+
+/** Row that spans both columns for hunk headers and meta lines */
+function SplitDiffSpanRow({ line }: SplitDiffSpanRowProps) {
+  const bgClass = line.type === 'hunk' ? 'bg-accent/5' : 'bg-muted/30';
+  const textClass = line.type === 'hunk' ? 'text-accent font-semibold' : 'text-muted';
+
+  return (
+    <tr className={bgClass}>
+      <td colSpan={4} className={`px-2 py-0.5 text-center whitespace-pre ${textClass}`}>
+        {line.content}
+      </td>
+    </tr>
+  );
+}
+
+interface SplitDiffRowComponentProps {
+  oldLine: DiffLine | null;
+  newLine: DiffLine | null;
+  comments: PRReviewComment[];
+  isCommenting: boolean;
+  canComment: boolean;
+  hasIdentity: boolean;
+  onStartComment: () => void;
+  onCancelComment: () => void;
+  onAddComment: (body: string) => void;
+  onResolveComment: (id: string, resolved: boolean) => void;
+  onDeleteComment: (id: string) => void;
+  currentUser?: string;
+}
+
+/** Side-by-side diff row: old content on left, new content on right */
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: UI component with conditional rendering for comments
+function SplitDiffRow({
+  oldLine,
+  newLine,
+  comments,
+  isCommenting,
+  canComment,
+  hasIdentity,
+  onStartComment,
+  onCancelComment,
+  onAddComment,
+  onResolveComment,
+  onDeleteComment,
+  currentUser,
+}: SplitDiffRowComponentProps) {
+  const hasComments = comments.length > 0;
+  const unresolvedCount = comments.filter((c) => !c.resolved).length;
+
+  // Background classes for each side
+  const oldBgClass = oldLine?.type === 'remove' ? 'bg-danger/10' : '';
+  const newBgClass = newLine?.type === 'add' ? 'bg-success/10' : '';
+
+  // Text classes
+  const oldTextClass = oldLine?.type === 'remove' ? 'text-danger' : 'text-foreground';
+  const newTextClass = newLine?.type === 'add' ? 'text-success' : 'text-foreground';
+
+  // Strip the leading +/- or space from content for cleaner display
+  // Note: context lines start with space, add/remove lines start with +/-
+  const oldContent =
+    oldLine?.content.startsWith('-') || oldLine?.content.startsWith(' ')
+      ? oldLine.content.slice(1)
+      : (oldLine?.content ?? '');
+  const newContent =
+    newLine?.content.startsWith('+') || newLine?.content.startsWith(' ')
+      ? newLine.content.slice(1)
+      : (newLine?.content ?? '');
+
+  return (
+    <>
+      <tr className="group hover:bg-muted/30">
+        {/* Old side: line number + content */}
+        <td
+          className={`w-12 text-right pr-2 text-muted-foreground/60 select-none border-r border-separator/30 ${oldBgClass}`}
+        >
+          {oldLine?.oldLineNumber ?? ''}
+        </td>
+        <td className={`w-1/2 pl-2 pr-4 whitespace-pre ${oldBgClass} ${oldTextClass}`}>
+          {oldContent}
+        </td>
+
+        {/* New side: line number + content + comment indicator */}
+        <td
+          className={`w-12 text-right pr-2 text-muted-foreground/60 select-none border-l border-r border-separator/30 ${newBgClass}`}
+        >
+          {newLine?.newLineNumber ?? ''}
+        </td>
+        <td className={`w-1/2 pl-2 pr-4 whitespace-pre relative ${newBgClass} ${newTextClass}`}>
+          {newContent}
+          {/* Comment indicator on the new side */}
+          <span className="absolute right-2 top-1/2 -translate-y-1/2">
+            {hasComments ? (
+              <span
+                className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-xs ${
+                  unresolvedCount > 0 ? 'bg-primary text-white' : 'bg-success/20 text-success'
+                }`}
+                title={`${comments.length} comment${comments.length !== 1 ? 's' : ''}`}
+              >
+                {unresolvedCount > 0 ? unresolvedCount : <Check className="w-3 h-3" />}
+              </span>
+            ) : canComment && hasIdentity ? (
+              <button
+                type="button"
+                onClick={onStartComment}
+                className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-primary/20"
+                title="Add comment"
+              >
+                <Plus className="w-3 h-3 text-primary" />
+              </button>
+            ) : null}
+          </span>
+        </td>
+      </tr>
+
+      {/* Existing comments (spans full width) */}
+      {hasComments && (
+        <tr>
+          <td colSpan={4} className="p-0">
+            <div className="border-l-4 border-primary ml-4 my-1">
+              {comments.map((comment) => (
+                <InlineComment
+                  key={comment.id}
+                  comment={comment}
+                  onResolve={(resolved) => onResolveComment(comment.id, resolved)}
+                  onDelete={() => onDeleteComment(comment.id)}
+                  canDelete={currentUser === comment.author}
+                />
+              ))}
+            </div>
+          </td>
+        </tr>
+      )}
+
+      {/* Comment input */}
+      {isCommenting && (
+        <tr>
+          <td colSpan={4} className="p-0">
+            <CommentInput onSubmit={onAddComment} onCancel={onCancelComment} />
+          </td>
+        </tr>
+      )}
+    </>
   );
 }
 

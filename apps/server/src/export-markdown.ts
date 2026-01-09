@@ -7,6 +7,18 @@ import {
 } from '@peer-plan/schema';
 import type * as Y from 'yjs';
 
+// --- Constants ---
+
+/**
+ * BlockNote's thread mark attribute names. Multiple formats checked
+ * because the internal format is undocumented and may change.
+ */
+const THREAD_MARK_ATTRS = {
+  COMMENT_THREAD_MARK: 'commentThreadMark',
+  THREAD_MARK: 'threadMark',
+  COMMENT_THREAD: 'commentThread',
+} as const;
+
 // --- Public API ---
 
 export interface ExportOptions {
@@ -85,22 +97,22 @@ export async function exportPlanToMarkdown(
 }
 
 /**
- * Extract text content for each thread by finding marks in the XmlFragment.
- * BlockNote stores thread references as spans with data-bn-thread-id attribute.
+ * Extract selected text for threads that don't have it in their metadata.
+ * BlockNote doesn't always populate selectedText in the thread object,
+ * so we reconstruct it from ProseMirror marks in the document.
  */
 function extractThreadTextFromFragment(fragment: Y.XmlFragment): Map<string, string> {
   const threadTextMap = new Map<string, string>();
 
-  // Walk through all XML elements looking for thread marks
   for (const node of fragment.createTreeWalker(() => true)) {
-    // Check if this is an XmlElement with thread mark attributes
-    if ('getAttribute' in node && typeof node.getAttribute === 'function') {
-      const threadId = node.getAttribute('data-bn-thread-id');
+    if (node.constructor.name === 'YXmlText') {
+      const textNode = node as Y.XmlText;
+      const attrs = textNode.getAttributes();
+      const threadId = extractThreadIdFromAttrs(attrs);
+
       if (threadId) {
-        // Extract text content from this marked span
-        const text = extractTextFromXmlNode(node);
+        const text = textNode.toString();
         if (text) {
-          // Accumulate text for this thread (marks may span multiple nodes)
           const existing = threadTextMap.get(threadId) || '';
           threadTextMap.set(threadId, existing + text);
         }
@@ -112,21 +124,32 @@ function extractThreadTextFromFragment(fragment: Y.XmlFragment): Map<string, str
 }
 
 /**
- * Extract plain text from an XML node and its children.
+ * BlockNote's internal attribute format is undocumented and may change between versions.
+ * We defensively check multiple possible formats to avoid breaking on BlockNote updates.
  */
-function extractTextFromXmlNode(node: Y.XmlElement | Y.XmlText): string {
-  // If it's a text node, return its string content
-  if ('toString' in node && node.constructor.name === 'YXmlText') {
-    return node.toString();
+function extractThreadIdFromAttrs(attrs: Record<string, unknown>): string | null {
+  const primaryAttr = attrs[THREAD_MARK_ATTRS.COMMENT_THREAD_MARK];
+  if (typeof primaryAttr === 'string') {
+    return primaryAttr;
+  }
+  if (typeof primaryAttr === 'object' && primaryAttr && 'id' in primaryAttr) {
+    const id = (primaryAttr as { id?: unknown }).id;
+    if (typeof id === 'string') {
+      return id;
+    }
   }
 
-  // For element nodes, recursively extract text from children
-  if ('toArray' in node && typeof node.toArray === 'function') {
-    const children = node.toArray() as Array<Y.XmlElement | Y.XmlText>;
-    return children.map((child) => extractTextFromXmlNode(child)).join('');
+  const altAttr1 = attrs[THREAD_MARK_ATTRS.THREAD_MARK];
+  if (typeof altAttr1 === 'string') {
+    return altAttr1;
   }
 
-  return '';
+  const altAttr2 = attrs[THREAD_MARK_ATTRS.COMMENT_THREAD];
+  if (typeof altAttr2 === 'string') {
+    return altAttr2;
+  }
+
+  return null;
 }
 
 /**
