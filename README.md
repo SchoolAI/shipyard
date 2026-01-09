@@ -20,6 +20,8 @@ When an AI agent generates an implementation plan, peer-plan enables:
 
 **All core milestones complete!** 🎉 See [PROGRESS.md](./docs/milestones/PROGRESS.md) for implementation details.
 
+> **Test:** Testing peer-plan end-to-end workflow with screenshot artifact and PR creation.
+
 ## Quick Start
 
 See [SETUP.md](./docs/SETUP.md) for installation and development instructions.
