@@ -365,11 +365,10 @@ export function useMultiProviderSync(
     // Set initial awareness state when GitHub identity is available
     if (githubIdentity && rtc) {
       updateApprovalStatus();
-      // Send user identity and approval state after connection is established
-      setTimeout(() => {
-        sendUserIdentityToSignaling();
-        pushApprovalStateToSignaling();
-      }, 1000);
+      // Send user identity and approval state immediately
+      // No delay - we need this before any WebRTC messages are relayed
+      sendUserIdentityToSignaling();
+      pushApprovalStateToSignaling();
     }
 
     function updateSyncState() {

@@ -33,3 +33,12 @@ ENVIRONMENT = "development"
 # Production environment overrides
 [env.production.vars]
 ENVIRONMENT = "production"
+
+# Durable Object binding for production (must be duplicated, not inherited)
+[[env.production.durable_objects.bindings]]
+name = "SIGNALING_ROOM"
+class_name = "SignalingRoom"
+
+[[env.production.migrations]]
+tag = "v1"
+new_sqlite_classes = ["SignalingRoom"]

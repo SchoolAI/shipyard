@@ -91,7 +91,7 @@ export class SignalingRoom extends DurableObject<Env> {
   private topics: Map<string, Set<WebSocket>> = new Map();
 
   // Plan approval state: planId -> approval state
-  // Not persisted across hibernation - owner will re-push on reconnect
+  // Cached in memory for fast access, persisted to storage for hibernation survival
   private planApprovals: Map<string, PlanApprovalState> = new Map();
 
   constructor(ctx: DurableObjectState, env: Env) {
@@ -100,6 +100,26 @@ export class SignalingRoom extends DurableObject<Env> {
     // Restore state from hibernated WebSockets
     // This runs both on first creation AND when waking from hibernation
     this.restoreFromHibernation();
+
+    // Restore approval state from storage (async, but fast)
+    this.restoreApprovalState();
+  }
+
+  /**
+   * Restore approval state from Durable Object storage.
+   * This ensures approval state survives hibernation.
+   */
+  private async restoreApprovalState(): Promise<void> {
+    try {
+      const stored = await this.ctx.storage.list<PlanApprovalState>({ prefix: 'approval:' });
+      for (const [key, value] of stored) {
+        const planId = key.replace('approval:', '');
+        this.planApprovals.set(planId, value);
+      }
+      console.log(`Restored ${stored.size} approval states from storage`);
+    } catch (error) {
+      console.error('Failed to restore approval state:', error);
+    }
   }
 
   /**
@@ -191,7 +211,7 @@ export class SignalingRoom extends DurableObject<Env> {
           ws.send(JSON.stringify({ type: 'pong' }));
           break;
         case 'approval_state':
-          this.handleApprovalState(ws, data);
+          await this.handleApprovalState(ws, data);
           break;
       }
     } catch (error) {
@@ -265,19 +285,30 @@ export class SignalingRoom extends DurableObject<Env> {
   /**
    * Check if a user is approved for a plan.
    * Returns true if:
-   * - No approval state exists (legacy plan or not pushed yet)
    * - User is the owner
    * - User is in the approved list
-   * Returns false if user is in rejected list or not approved.
+   * Returns false if:
+   * - User is in rejected list
+   * - No approval state exists (deny by default until owner pushes state)
+   * - No user ID provided (must authenticate first)
    */
   private isUserApproved(planId: string, userId: string | undefined): boolean {
     const approval = this.planApprovals.get(planId);
 
-    // No approval state - allow (legacy plan or owner hasn't pushed yet)
-    if (!approval) return true;
+    // No approval state - DENY by default
+    // This prevents race conditions where pending users connect before owner pushes state
+    // Once owner connects and pushes approval state, legitimate users will be approved
+    if (!approval) {
+      console.log(`[isUserApproved] No approval state for plan ${planId}, denying access`);
+      return false;
+    }
 
-    // No user ID - can't verify, allow for backwards compatibility
-    if (!userId) return true;
+    // No user ID - DENY (must authenticate to access plans)
+    // This prevents unauthenticated users from syncing plan data
+    if (!userId) {
+      console.log(`[isUserApproved] No userId provided for plan ${planId}, denying access`);
+      return false;
+    }
 
     // Owner is always approved
     if (userId === approval.ownerId) return true;
@@ -378,8 +409,9 @@ export class SignalingRoom extends DurableObject<Env> {
   /**
    * Handle approval state update from plan owner.
    * Validates that the sender is the owner before accepting.
+   * Persists to Durable Object storage for hibernation survival.
    */
-  private handleApprovalState(ws: WebSocket, message: ApprovalStateMessage): void {
+  private async handleApprovalState(ws: WebSocket, message: ApprovalStateMessage): Promise<void> {
     const state = this.getState(ws);
     if (!state?.userId) {
       console.warn('Received approval_state from unauthenticated connection');
@@ -389,26 +421,41 @@ export class SignalingRoom extends DurableObject<Env> {
     // Verify sender is the owner
     const existingApproval = this.planApprovals.get(message.planId);
     if (existingApproval && existingApproval.ownerId !== state.userId) {
-      console.warn(`Rejected approval_state: sender ${state.userId} is not owner ${existingApproval.ownerId}`);
+      console.warn(
+        `Rejected approval_state: sender ${state.userId} is not owner ${existingApproval.ownerId}`
+      );
       return;
     }
 
     // For new plans, trust the ownerId in the message (first setter wins)
     if (!existingApproval && message.ownerId !== state.userId) {
-      console.warn(`Rejected approval_state: sender ${state.userId} claims to be owner ${message.ownerId}`);
+      console.warn(
+        `Rejected approval_state: sender ${state.userId} claims to be owner ${message.ownerId}`
+      );
       return;
     }
 
-    // Store the approval state
-    this.planApprovals.set(message.planId, {
+    const approvalState: PlanApprovalState = {
       planId: message.planId,
       ownerId: message.ownerId,
       approvedUsers: message.approvedUsers,
       rejectedUsers: message.rejectedUsers,
       lastUpdated: Date.now(),
-    });
+    };
 
-    console.log(`Updated approval state for plan ${message.planId}: ${message.approvedUsers.length} approved, ${message.rejectedUsers.length} rejected`);
+    // Store in memory for fast access
+    this.planApprovals.set(message.planId, approvalState);
+
+    // Persist to Durable Object storage (survives hibernation)
+    try {
+      await this.ctx.storage.put(`approval:${message.planId}`, approvalState);
+      console.log(
+        `Persisted approval state for plan ${message.planId}: ${message.approvedUsers.length} approved, ${message.rejectedUsers.length} rejected`
+      );
+    } catch (error) {
+      console.error(`Failed to persist approval state for plan ${message.planId}:`, error);
+      // Still keep in memory even if storage fails
+    }
   }
 
   /**
