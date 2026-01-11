@@ -158,7 +158,3 @@ spikes/loro-extended-repo/
 
 # macOS system files
 .DS_Store
-
-# Test/experimental apps
-VT_APP_SNAPSHOT.md
-apps/vt-app/
