@@ -61,6 +61,7 @@ async function waitForReviewDecision(planId: string, wsUrl: string): Promise<Rev
   return new Promise((resolve) => {
     const metadata = ydoc.getMap('metadata');
     let resolved = false;
+    let statusResetComplete = false;
 
     const cleanup = () => {
       if (!resolved) {
@@ -72,8 +73,14 @@ async function waitForReviewDecision(planId: string, wsUrl: string): Promise<Rev
     const checkStatus = () => {
       if (resolved) return;
 
+      // Ignore status checks until we've reset to pending_review
+      if (!statusResetComplete) {
+        logger.debug({ planId }, 'Ignoring status check until reset complete');
+        return;
+      }
+
       const status = metadata.get('status') as string | undefined;
-      logger.debug({ planId, status }, 'Checking Y.Doc status');
+      logger.debug({ planId, status }, 'Checking Y.Doc status after reset');
 
       if (status === 'approved') {
         logger.info({ planId }, 'Plan approved via Y.Doc');
@@ -92,7 +99,7 @@ async function waitForReviewDecision(planId: string, wsUrl: string): Promise<Rev
 
     // Wait for sync before resetting status for fresh review
     provider.on('sync', (isSynced: boolean) => {
-      if (isSynced) {
+      if (isSynced && !statusResetComplete) {
         logger.info({ planId }, 'Y.Doc synced, resetting status for fresh review');
 
         // Reset status to pending_review to force new decision
@@ -102,7 +109,10 @@ async function waitForReviewDecision(planId: string, wsUrl: string): Promise<Rev
           metadata.set('updatedAt', Date.now());
         });
 
-        logger.info({ planId }, 'Status reset to pending_review, waiting for decision');
+        // Mark reset as complete so checkStatus can now process changes
+        statusResetComplete = true;
+
+        logger.info({ planId }, 'Status reset to pending_review, now watching for decision');
       }
     });
 

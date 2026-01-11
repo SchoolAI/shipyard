@@ -155,3 +155,10 @@ spikes/loro-extended-repo/
 
 # Playwright MCP
 .playwright-mcp/
+
+# macOS system files
+.DS_Store
+
+# Test/experimental apps
+VT_APP_SNAPSHOT.md
+apps/vt-app/

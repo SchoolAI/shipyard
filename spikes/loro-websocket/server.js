@@ -7,9 +7,9 @@
  * 3. Server receives changes from clients
  */
 
-import { Repo, Shape } from "@loro-extended/repo";
-import { WsServerNetworkAdapter, wrapWsSocket } from "@loro-extended/adapter-websocket/server";
-import { WebSocketServer } from "ws";
+import { WsServerNetworkAdapter, wrapWsSocket } from '@loro-extended/adapter-websocket/server';
+import { Repo, Shape } from '@loro-extended/repo';
+import { WebSocketServer } from 'ws';
 
 const PORT = 3456;
 
@@ -38,54 +38,54 @@ const PlanSchema = Shape.doc({
   ),
 });
 
-console.log("Starting loro-extended WebSocket server spike...\n");
+console.log('Starting loro-extended WebSocket server spike...\n');
 
 // 1. Create WebSocket adapter
 const wsAdapter = new WsServerNetworkAdapter();
 
 // 2. Create repo with adapter
 const repo = new Repo({ adapters: [wsAdapter] });
-console.log("Repo created");
+console.log('Repo created');
 
 // 3. Create a plan document (as MCP would)
-const DOC_ID = "plan-spike-001";
+const DOC_ID = 'plan-spike-001';
 const handle = repo.get(DOC_ID, PlanSchema);
 
 // 4. Initialize the plan
-handle.change(draft => {
+handle.change((draft) => {
   draft.meta.id = DOC_ID;
-  draft.meta.title = "Implementation Plan: Add User Auth";
-  draft.meta.status = "pending_review";
+  draft.meta.title = 'Implementation Plan: Add User Auth';
+  draft.meta.status = 'pending_review';
   draft.meta.createdAt = Date.now();
 
   draft.steps.push({
-    id: "step-1",
-    title: "Create auth middleware",
+    id: 'step-1',
+    title: 'Create auth middleware',
     done: false,
   });
   draft.steps.push({
-    id: "step-2",
-    title: "Add login endpoint",
+    id: 'step-2',
+    title: 'Add login endpoint',
     done: false,
   });
   draft.steps.push({
-    id: "step-3",
-    title: "Write tests",
+    id: 'step-3',
+    title: 'Write tests',
     done: false,
   });
 });
 
-console.log("Plan created:", handle.doc.toJSON().meta.title);
-console.log("Steps:", handle.doc.toJSON().steps.length);
+console.log('Plan created:', handle.doc.toJSON().meta.title);
+console.log('Steps:', handle.doc.toJSON().steps.length);
 
 // 5. Subscribe to changes (simulates MCP watching for feedback)
 handle.doc.$.loroDoc.subscribe((event) => {
-  console.log("\n=== Document changed ===");
+  console.log('\n=== Document changed ===');
   const data = handle.doc.toJSON();
-  console.log("Status:", data.meta.status);
-  console.log("Annotations:", data.annotations.length);
+  console.log('Status:', data.meta.status);
+  console.log('Annotations:', data.annotations.length);
   if (data.annotations.length > 0) {
-    console.log("Latest annotation:", data.annotations[data.annotations.length - 1]);
+    console.log('Latest annotation:', data.annotations[data.annotations.length - 1]);
   }
 });
 
@@ -95,16 +95,16 @@ console.log(`\nWebSocket server listening on ws://localhost:${PORT}`);
 console.log(`Document ID: ${DOC_ID}`);
 
 // 7. Handle connections
-wss.on("connection", (ws) => {
-  console.log("\n>>> Client connected");
+wss.on('connection', (ws) => {
+  console.log('\n>>> Client connected');
 
   const { start } = wsAdapter.handleConnection({
     socket: wrapWsSocket(ws),
   });
   start();
 
-  ws.on("close", () => console.log("<<< Client disconnected"));
+  ws.on('close', () => console.log('<<< Client disconnected'));
 });
 
 console.log("\nServer ready. Run 'node client.js' to test sync.");
-console.log("The client will add an annotation that should appear here.\n");
+console.log('The client will add an annotation that should appear here.\n');

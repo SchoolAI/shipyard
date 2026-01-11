@@ -48,10 +48,12 @@ async function testServer(url) {
         console.log(`  ✅ Connected (${results.latency}ms)`);
 
         // Test subscribe
-        ws.send(JSON.stringify({
-          type: 'subscribe',
-          topics: ['test-room-' + Date.now()]
-        }));
+        ws.send(
+          JSON.stringify({
+            type: 'subscribe',
+            topics: ['test-room-' + Date.now()],
+          })
+        );
         console.log('  ✅ Subscribe sent');
 
         // Test ping
@@ -83,7 +85,6 @@ async function testServer(url) {
         clearTimeout(timeout);
         resolve(results);
       });
-
     } catch (err) {
       results.error = err.message;
       clearTimeout(timeout);
@@ -111,7 +112,7 @@ async function main() {
     if (r.error) console.log(`   Error: ${r.error}`);
   }
 
-  const working = results.filter(r => r.connected && r.pingPong);
+  const working = results.filter((r) => r.connected && r.pingPong);
   if (working.length > 0) {
     console.log(`\nRECOMMENDATION: Use ${working[0].url}`);
   } else {

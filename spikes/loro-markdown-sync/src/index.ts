@@ -5,16 +5,16 @@
  * Testing if this feels smoother than event-based sync.
  */
 
-import { LoroDoc } from "loro-crdt";
-import { readFileSync, writeFileSync, existsSync } from "node:fs";
-import { resolve } from "node:path";
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { LoroDoc } from 'loro-crdt';
 
 // ============================================================================
 // Config
 // ============================================================================
 
-const FILE_A = resolve(process.argv[2] || "plan-a.md");
-const FILE_B = resolve(process.argv[3] || "plan-b.md");
+const FILE_A = resolve(process.argv[2] || 'plan-a.md');
+const FILE_B = resolve(process.argv[3] || 'plan-b.md');
 const POLL_INTERVAL = 20; // ms between file reads
 const WRITE_DELAY = 100; // ms to wait before writing back
 
@@ -23,15 +23,15 @@ const WRITE_DELAY = 100; // ms to wait before writing back
 // ============================================================================
 
 const doc = new LoroDoc();
-const text = doc.getText("content");
+const text = doc.getText('content');
 
 // Track last known content of each file
-let lastContentA = "";
-let lastContentB = "";
+let lastContentA = '';
+let lastContentB = '';
 
 // Track what we last wrote to avoid feedback
-let lastWrittenA = "";
-let lastWrittenB = "";
+let lastWrittenA = '';
+let lastWrittenB = '';
 
 // Write timers
 let writeTimerA: NodeJS.Timeout | null = null;
@@ -46,20 +46,20 @@ let syncCount = 0;
 // ============================================================================
 
 function log(msg: string, data?: object) {
-  const ts = new Date().toISOString().split("T")[1].slice(0, 12);
-  console.log(`[${ts}] ${msg}`, data ? JSON.stringify(data) : "");
+  const ts = new Date().toISOString().split('T')[1].slice(0, 12);
+  console.log(`[${ts}] ${msg}`, data ? JSON.stringify(data) : '');
 }
 
 function readFile(path: string): string {
   try {
-    return readFileSync(path, "utf-8");
+    return readFileSync(path, 'utf-8');
   } catch {
-    return "";
+    return '';
   }
 }
 
 function writeFile(path: string, content: string) {
-  writeFileSync(path, content, "utf-8");
+  writeFileSync(path, content, 'utf-8');
 }
 
 function getCrdtContent(): string {
@@ -76,13 +76,13 @@ function updateCrdt(newContent: string) {
 // ============================================================================
 
 function scheduleWrite(filePath: string, label: string) {
-  const timer = label === "A" ? writeTimerA : writeTimerB;
+  const timer = label === 'A' ? writeTimerA : writeTimerB;
   if (timer) clearTimeout(timer);
 
   const newTimer = setTimeout(() => {
     const content = getCrdtContent();
 
-    if (label === "A") {
+    if (label === 'A') {
       if (content !== lastWrittenA) {
         writeFile(filePath, content);
         lastWrittenA = content;
@@ -99,11 +99,16 @@ function scheduleWrite(filePath: string, label: string) {
     }
   }, WRITE_DELAY);
 
-  if (label === "A") writeTimerA = newTimer;
+  if (label === 'A') writeTimerA = newTimer;
   else writeTimerB = newTimer;
 }
 
-function pollFile(filePath: string, label: string, lastContent: string, lastWritten: string): string {
+function pollFile(
+  filePath: string,
+  label: string,
+  lastContent: string,
+  lastWritten: string
+): string {
   const currentContent = readFile(filePath);
 
   // No change from what we know
@@ -117,7 +122,7 @@ function pollFile(filePath: string, label: string, lastContent: string, lastWrit
   }
 
   // Skip empty content overwriting real content
-  if (currentContent.trim() === "" && getCrdtContent().trim() !== "") {
+  if (currentContent.trim() === '' && getCrdtContent().trim() !== '') {
     return lastContent;
   }
 
@@ -127,14 +132,14 @@ function pollFile(filePath: string, label: string, lastContent: string, lastWrit
     syncCount++;
     log(`Sync ${label} → CRDT (#${syncCount})`, {
       fileLen: currentContent.length,
-      crdtLen: crdtContent.length
+      crdtLen: crdtContent.length,
     });
 
     updateCrdt(currentContent);
 
     // Schedule writes to both files
-    scheduleWrite(FILE_A, "A");
-    scheduleWrite(FILE_B, "B");
+    scheduleWrite(FILE_A, 'A');
+    scheduleWrite(FILE_B, 'B');
 
     // Log state occasionally
     if (syncCount % 5 === 0) {
@@ -148,8 +153,8 @@ function pollFile(filePath: string, label: string, lastContent: string, lastWrit
 function pollLoop() {
   pollCount++;
 
-  lastContentA = pollFile(FILE_A, "A", lastContentA, lastWrittenA);
-  lastContentB = pollFile(FILE_B, "B", lastContentB, lastWrittenB);
+  lastContentA = pollFile(FILE_A, 'A', lastContentA, lastWrittenA);
+  lastContentB = pollFile(FILE_B, 'B', lastContentB, lastWrittenB);
 
   setTimeout(pollLoop, POLL_INTERVAL);
 }
@@ -160,11 +165,11 @@ function pollLoop() {
 
 function logState() {
   const content = getCrdtContent();
-  console.log("\n--- CRDT State ---");
+  console.log('\n--- CRDT State ---');
   console.log(`Characters: ${content.length} | Polls: ${pollCount} | Syncs: ${syncCount}`);
-  console.log("Content:");
-  console.log(content.slice(0, 300) + (content.length > 300 ? "..." : ""));
-  console.log("------------------\n");
+  console.log('Content:');
+  console.log(content.slice(0, 300) + (content.length > 300 ? '...' : ''));
+  console.log('------------------\n');
 }
 
 // ============================================================================
@@ -182,14 +187,14 @@ async function main() {
 `);
 
   // Initialize files
-  if (!existsSync(FILE_A)) writeFile(FILE_A, "");
-  if (!existsSync(FILE_B)) writeFile(FILE_B, "");
+  if (!existsSync(FILE_A)) writeFile(FILE_A, '');
+  if (!existsSync(FILE_B)) writeFile(FILE_B, '');
 
   const contentA = readFile(FILE_A);
   const contentB = readFile(FILE_B);
 
   if (contentA) {
-    log("Initializing from File A");
+    log('Initializing from File A');
     updateCrdt(contentA);
     lastContentA = contentA;
     lastWrittenA = contentA;
@@ -202,7 +207,7 @@ async function main() {
       lastWrittenB = contentB;
     }
   } else if (contentB) {
-    log("Initializing from File B");
+    log('Initializing from File B');
     updateCrdt(contentB);
     lastContentB = contentB;
     lastWrittenB = contentB;
@@ -222,7 +227,7 @@ async function main() {
 
 Edit either file and watch them sync!
 `;
-    log("Creating initial content");
+    log('Creating initial content');
     updateCrdt(initial);
     writeFile(FILE_A, initial);
     writeFile(FILE_B, initial);
@@ -237,8 +242,8 @@ Edit either file and watch them sync!
   log(`Starting poll loop (${POLL_INTERVAL}ms interval)...`);
   pollLoop();
 
-  process.on("SIGINT", () => {
-    console.log("\n\nFinal state:");
+  process.on('SIGINT', () => {
+    console.log('\n\nFinal state:');
     console.log(`Total polls: ${pollCount}, Total syncs: ${syncCount}`);
     logState();
     process.exit(0);

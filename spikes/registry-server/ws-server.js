@@ -13,10 +13,10 @@
  * Example: node ws-server.js 3100
  */
 
-import { WebSocketServer } from 'ws';
-import { writeFile, mkdir, readFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
+import { join } from 'node:path';
+import { WebSocketServer } from 'ws';
 
 const PORT = process.argv[2] ? Number.parseInt(process.argv[2], 10) : 3100;
 const REGISTRY_DIR = join(homedir(), '.peer-plan');
@@ -128,12 +128,14 @@ wss.on('connection', (ws, req) => {
   });
 
   // Send welcome message
-  ws.send(JSON.stringify({
-    type: 'welcome',
-    port: PORT,
-    message: `Connected to WebSocket server on port ${PORT}`,
-    timestamp: new Date().toISOString(),
-  }));
+  ws.send(
+    JSON.stringify({
+      type: 'welcome',
+      port: PORT,
+      message: `Connected to WebSocket server on port ${PORT}`,
+      timestamp: new Date().toISOString(),
+    })
+  );
 });
 
 wss.on('error', (err) => {

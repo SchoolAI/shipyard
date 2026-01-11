@@ -8,11 +8,11 @@
  * Includes CORS headers for browser access.
  */
 
-import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
+import { createServer } from 'node:http';
 import { homedir } from 'node:os';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const PORT = 3001;
 const REGISTRY_PATH = join(homedir(), '.peer-plan', 'servers.json');
@@ -68,7 +68,9 @@ const server = createServer(async (req, res) => {
       const registry = await readRegistry();
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify(registry, null, 2));
-      console.log(`[${new Date().toISOString()}] Served registry: ${registry.servers.length} servers`);
+      console.log(
+        `[${new Date().toISOString()}] Served registry: ${registry.servers.length} servers`
+      );
     } catch (err) {
       console.error('Error reading registry:', err);
       res.writeHead(500, { 'Content-Type': 'application/json' });

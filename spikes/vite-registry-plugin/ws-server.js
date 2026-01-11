@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 
-import { WebSocketServer } from 'ws';
-import { writeFileSync, readFileSync, mkdirSync, existsSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
+import { WebSocketServer } from 'ws';
 
 // Registry file path in ~/.peer-plan/servers.json
 const REGISTRY_DIR = join(homedir(), '.peer-plan');
@@ -48,7 +48,7 @@ function registerServer(port, serverId) {
     id: serverId,
     port,
     pid: process.pid,
-    startedAt: new Date().toISOString()
+    startedAt: new Date().toISOString(),
   });
 
   writeRegistry(registry);
@@ -62,7 +62,7 @@ function unregisterServer(serverId) {
   const registry = readRegistry();
 
   // Remove this server
-  registry.servers = registry.servers.filter(s => s.id !== serverId);
+  registry.servers = registry.servers.filter((s) => s.id !== serverId);
 
   writeRegistry(registry);
   console.log(`[Registry] Unregistered server ${serverId}`);

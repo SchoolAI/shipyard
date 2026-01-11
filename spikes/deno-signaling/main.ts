@@ -68,7 +68,7 @@ function handleMessage(conn: WebSocket, data: string): void {
     return; // Invalid JSON, ignore
   }
 
-  if (!message || typeof message.type !== "string") {
+  if (!message || typeof message.type !== 'string') {
     return;
   }
 
@@ -79,11 +79,11 @@ function handleMessage(conn: WebSocket, data: string): void {
   const subscribedTopics = connectionTopics.get(conn)!;
 
   switch (message.type) {
-    case "subscribe": {
+    case 'subscribe': {
       const messageTopics = message.topics;
       if (Array.isArray(messageTopics)) {
         for (const topicName of messageTopics) {
-          if (typeof topicName === "string") {
+          if (typeof topicName === 'string') {
             // Add conn to topic
             if (!topics.has(topicName)) {
               topics.set(topicName, new Set());
@@ -97,11 +97,11 @@ function handleMessage(conn: WebSocket, data: string): void {
       break;
     }
 
-    case "unsubscribe": {
+    case 'unsubscribe': {
       const messageTopics = message.topics;
       if (Array.isArray(messageTopics)) {
         for (const topicName of messageTopics) {
-          if (typeof topicName === "string") {
+          if (typeof topicName === 'string') {
             const subs = topics.get(topicName);
             if (subs) {
               subs.delete(conn);
@@ -116,9 +116,9 @@ function handleMessage(conn: WebSocket, data: string): void {
       break;
     }
 
-    case "publish": {
+    case 'publish': {
       const topic = message.topic;
-      if (typeof topic === "string") {
+      if (typeof topic === 'string') {
         const receivers = topics.get(topic);
         if (receivers) {
           // Add client count to message (y-webrtc uses this)
@@ -131,8 +131,8 @@ function handleMessage(conn: WebSocket, data: string): void {
       break;
     }
 
-    case "ping": {
-      send(conn, { type: "pong" });
+    case 'ping': {
+      send(conn, { type: 'pong' });
       break;
     }
   }
@@ -144,17 +144,17 @@ function handleMessage(conn: WebSocket, data: string): void {
 function setupConnection(socket: WebSocket): void {
   connectionTopics.set(socket, new Set());
 
-  socket.addEventListener("message", (event) => {
-    if (typeof event.data === "string") {
+  socket.addEventListener('message', (event) => {
+    if (typeof event.data === 'string') {
       handleMessage(socket, event.data);
     }
   });
 
-  socket.addEventListener("close", () => {
+  socket.addEventListener('close', () => {
     cleanupConnection(socket);
   });
 
-  socket.addEventListener("error", () => {
+  socket.addEventListener('error', () => {
     cleanupConnection(socket);
   });
 }
@@ -166,33 +166,30 @@ Deno.serve((req: Request): Response => {
   const url = new URL(req.url);
 
   // Health check endpoint
-  if (url.pathname === "/" || url.pathname === "/health") {
-    return new Response("okay", {
+  if (url.pathname === '/' || url.pathname === '/health') {
+    return new Response('okay', {
       status: 200,
-      headers: { "Content-Type": "text/plain" },
+      headers: { 'Content-Type': 'text/plain' },
     });
   }
 
   // Stats endpoint (useful for monitoring)
-  if (url.pathname === "/stats") {
+  if (url.pathname === '/stats') {
     const stats = {
       topics: topics.size,
-      connections: Array.from(topics.values()).reduce(
-        (sum, set) => sum + set.size,
-        0
-      ),
+      connections: Array.from(topics.values()).reduce((sum, set) => sum + set.size, 0),
       topicList: Array.from(topics.keys()),
     };
     return new Response(JSON.stringify(stats, null, 2), {
       status: 200,
-      headers: { "Content-Type": "application/json" },
+      headers: { 'Content-Type': 'application/json' },
     });
   }
 
   // WebSocket upgrade
-  const upgradeHeader = req.headers.get("upgrade");
-  if (upgradeHeader?.toLowerCase() !== "websocket") {
-    return new Response("Expected WebSocket upgrade", { status: 426 });
+  const upgradeHeader = req.headers.get('upgrade');
+  if (upgradeHeader?.toLowerCase() !== 'websocket') {
+    return new Response('Expected WebSocket upgrade', { status: 426 });
   }
 
   const { socket, response } = Deno.upgradeWebSocket(req);

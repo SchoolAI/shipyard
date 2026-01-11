@@ -1,7 +1,7 @@
-import { defineConfig, Plugin } from 'vite';
-import { readFileSync, existsSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
+import { defineConfig, type Plugin } from 'vite';
 
 /**
  * Vite plugin that serves the registry file at /api/registry
@@ -34,7 +34,7 @@ function registryPlugin(): Plugin {
           res.end(JSON.stringify({ error: 'Failed to read registry' }));
         }
       });
-    }
+    },
   };
 }
 
@@ -42,6 +42,6 @@ export default defineConfig({
   plugins: [registryPlugin()],
   server: {
     port: 5173,
-    strictPort: true
-  }
+    strictPort: true,
+  },
 });

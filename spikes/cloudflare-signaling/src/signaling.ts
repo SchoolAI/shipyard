@@ -39,11 +39,7 @@ interface PingMessage {
   type: 'ping';
 }
 
-type SignalingMessage =
-  | SubscribeMessage
-  | UnsubscribeMessage
-  | PublishMessage
-  | PingMessage;
+type SignalingMessage = SubscribeMessage | UnsubscribeMessage | PublishMessage | PingMessage;
 
 // Per-connection state stored as WebSocket attachment
 interface ConnectionState {

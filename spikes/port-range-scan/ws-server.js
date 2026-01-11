@@ -34,12 +34,14 @@ function startServer(preferredPort = null) {
     console.log(`[${port}] Client connected: ${clientId}`);
 
     // Send welcome message with server info
-    ws.send(JSON.stringify({
-      type: 'welcome',
-      serverId,
-      port,
-      timestamp: Date.now()
-    }));
+    ws.send(
+      JSON.stringify({
+        type: 'welcome',
+        serverId,
+        port,
+        timestamp: Date.now(),
+      })
+    );
 
     ws.on('message', (data) => {
       try {
@@ -47,13 +49,15 @@ function startServer(preferredPort = null) {
         console.log(`[${port}] Received:`, message);
 
         // Echo back with server info
-        ws.send(JSON.stringify({
-          type: 'echo',
-          serverId,
-          port,
-          original: message,
-          timestamp: Date.now()
-        }));
+        ws.send(
+          JSON.stringify({
+            type: 'echo',
+            serverId,
+            port,
+            original: message,
+            timestamp: Date.now(),
+          })
+        );
       } catch (e) {
         console.error(`[${port}] Failed to parse message:`, e);
       }
