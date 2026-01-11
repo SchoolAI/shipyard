@@ -8,9 +8,6 @@
     "docs/ydoc-key-reference.md",
     "docs/milestones/*.md"
   ],
-  "exclude": [
-    "docs/original-vision/*",
-    "docs/image-generation-prompts.md"
-  ],
+  "exclude": ["docs/original-vision/*", "docs/image-generation-prompts.md"],
   "maxLinesPerFile": 500
 }

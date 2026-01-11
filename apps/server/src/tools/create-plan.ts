@@ -30,16 +30,22 @@ const CreatePlanInput = z.object({
 export const createPlanTool = {
   definition: {
     name: TOOL_NAMES.CREATE_PLAN,
-    description: `Create a new implementation plan and open it in browser
+    description: `Create a new implementation plan and open it in browser.
 
-DELIVERABLES: Mark checkbox items as deliverables by adding {#deliverable} marker. These can later be linked to artifacts (screenshots, videos, test results) via add_artifact tool.
+NOTE FOR CLAUDE CODE USERS: If you have the peer-plan hook installed, use native plan mode (Shift+Tab) instead of this tool. The hook handles plan creation automatically and provides a better experience.
 
-Example:
-- [ ] Setup Documentation {#deliverable}
-- [ ] Working implementation with tests {#deliverable}
-- [ ] Regular task without deliverable marker
+This tool is for agents WITHOUT hook support (Cursor, Devin, etc).
 
-When read_plan is called, deliverables show with {id="block-id"} for artifact linking.`,
+DELIVERABLES: Mark checkbox items as deliverables using {#deliverable} marker. Deliverables are measurable outcomes you can prove with artifacts.
+
+Good deliverables (provable with artifacts):
+- [ ] Screenshot of working feature {#deliverable}
+- [ ] Video demo of user flow {#deliverable}
+- [ ] Test results showing all tests pass {#deliverable}
+
+Bad deliverables (not provable):
+- [ ] Implement the API  ← This is a task, not a deliverable
+- [ ] Add error handling ← Can't prove this with an artifact`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -153,9 +159,12 @@ Session Token: ${sessionToken}
 ${repoInfo}
 URL: ${url}
 
-IMPORTANT: Save the session token - it's required for read_plan, update_plan, and add_artifact calls.
+IMPORTANT: Save the session token - it's required for add_artifact calls.
 
-Use \`${TOOL_NAMES.SETUP_REVIEW_NOTIFICATION}\` tool to be notified when review completes.`,
+Next steps:
+1. Wait for human to review and approve the plan in the browser
+2. Once approved, use add_artifact to upload proof for each deliverable
+3. When all deliverables have artifacts, the task auto-completes with a snapshot URL`,
         },
       ],
     };

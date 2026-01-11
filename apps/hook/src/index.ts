@@ -104,7 +104,7 @@ async function handlePlanExit(
 
 /**
  * Handle post_exit event (after ExitPlanMode completes).
- * Injects session context (sessionToken, planId, URL) for Claude to use.
+ * Injects session context (sessionToken, planId, URL, deliverables) for Claude to use.
  */
 async function handlePostExit(
   event: Extract<AdapterEvent, { type: 'post_exit' }>
@@ -120,26 +120,49 @@ async function handlePostExit(
     };
   }
 
-  const { planId, sessionToken, url } = state;
+  const { planId, sessionToken, url, deliverables } = state;
 
-  logger.info({ planId }, 'Injecting session context via PostToolUse');
+  logger.info(
+    { planId, deliverableCount: deliverables?.length ?? 0 },
+    'Injecting session context via PostToolUse'
+  );
 
   // Clear the session state now that we've delivered the token
   deleteSessionState(event.sessionId);
 
-  const context = `[PEER-PLAN] Plan approved! You can now upload artifacts.
+  // Format deliverables for Claude
+  let deliverablesSection = '';
+  if (deliverables && deliverables.length > 0) {
+    deliverablesSection = `\n## Deliverables\n\nAttach proof to each deliverable using add_artifact:\n\n`;
+    for (const d of deliverables) {
+      deliverablesSection += `- ${d.text}\n  deliverableId="${d.id}"\n`;
+    }
+  } else {
+    deliverablesSection = `\n## Deliverables\n\nNo deliverables marked in this plan. You can still upload artifacts without linking them.`;
+  }
 
-Plan ID: ${planId}
-Session Token: ${sessionToken}
-URL: ${url}
+  const context = `[PEER-PLAN] Plan approved! 🎉
+${deliverablesSection}
+## Session Info
 
-To attach proof to deliverables, use the MCP tools:
-- \`read_plan\` - Get deliverable IDs and current plan state
-- \`add_artifact\` - Upload screenshots, videos, test results as proof
-- \`complete_task\` - Generate shareable snapshot URL when done
+planId="${planId}"
+sessionToken="${sessionToken}"
+url="${url}"
 
-Example:
-add_artifact(planId="${planId}", sessionToken="${sessionToken}", type="screenshot", filePath="/path/to/screenshot.png", deliverableId="<from read_plan>")`;
+## How to Attach Proof
+
+For each deliverable above, call:
+\`\`\`
+add_artifact(
+  planId="${planId}",
+  sessionToken="${sessionToken}",
+  type="screenshot",  // or "video", "test_results", "diff"
+  filePath="/path/to/file.png",
+  deliverableId="<id from above>"
+)
+\`\`\`
+
+When the LAST deliverable gets an artifact, the task auto-completes and returns a snapshot URL for your PR.`;
 
   return {
     allow: true,
@@ -205,41 +228,40 @@ async function readStdin(): Promise<string> {
 function outputSessionStartContext(): void {
   const context = `[PEER-PLAN] Collaborative planning with human review & proof-of-work tracking.
 
-When creating implementation plans, use native plan mode (Shift+Tab) instead of create_plan tool:
-- Plans sync to browser in real-time
-- Use {#deliverable} markers for items needing proof
-- Exit is blocked until human approves
+IMPORTANT: Use native plan mode (Shift+Tab) to create plans. The hook handles everything automatically.
 
-Deliverables (Proof-of-Work):
+## What are Deliverables?
+
+Deliverables are measurable outcomes you can prove with artifacts (screenshots, videos, test results).
+
+Good deliverables (provable):
 \`\`\`
-- [ ] Working login flow {#deliverable}
-- [ ] Tests passing {#deliverable}
-- [ ] Code cleanup (no proof needed)
+- [ ] Screenshot of working login page {#deliverable}
+- [ ] Video showing feature in action {#deliverable}
+- [ ] Test results showing all tests pass {#deliverable}
 \`\`\`
 
-After approval, attach proof via \`add_artifact\` with the deliverable's block ID.
+Bad deliverables (implementation details, not provable):
+\`\`\`
+- [ ] Implement getUserMedia API  ← This is a task, not a deliverable
+- [ ] Add error handling          ← Can't prove this with an artifact
+\`\`\`
 
-Complete Workflow:
-1. Create plan → Browser opens, human sees plan live
-2. Human reviews → Comments on blocks, Approves or Requests Changes
-3. Check feedback → \`read_plan(includeAnnotations=true)\` to see comments
-4. Do work & attach proof → \`add_artifact(deliverableId, filePath/content)\`
-5. Complete → \`complete_task\` generates shareable snapshot URL for PR
+## Workflow
 
-Status Flow: draft → pending_review → approved → in_progress → completed
-           (or changes_requested → iterate)
+1. Enter plan mode (Shift+Tab) → Browser opens with live plan
+2. Write plan with {#deliverable} markers for provable outcomes
+3. Exit plan mode → Hook BLOCKS until human approves
+4. On approval → You receive planId, sessionToken, and deliverable IDs
+5. Do work → Take screenshots/videos as you go
+6. \`add_artifact(filePath, deliverableId)\` for each deliverable
+7. When all deliverables fulfilled → Auto-completes with snapshot URL
 
-Key Tools:
-- \`read_plan\` - Get plan content, deliverable IDs, human feedback
-- \`add_artifact\` - Upload screenshot/video/test_results/diff as proof
-- \`update_block_content\` - Modify plan based on feedback
-- \`complete_task\` - Generate snapshot URL for sharing
+## After Approval
 
-Behind the Scenes:
-- Plans sync via CRDT (Yjs) - changes appear instantly in browser
-- Artifacts stored in GitHub orphan branch (same repo)
-- Snapshot URLs embed full state - shareable proof anyone can verify
-- P2P sync allows multiple reviewers without central server`;
+You only need ONE tool: \`add_artifact\`
+
+When the last deliverable gets an artifact, the task auto-completes and returns a snapshot URL for your PR.`;
 
   // Output in Claude Code hook JSON format
   const hookOutput = {

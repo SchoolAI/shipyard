@@ -70,25 +70,19 @@ export default {
     }
 
     if (request.method !== 'POST') {
-      return new Response(
-        JSON.stringify({ error: 'Method not allowed' }),
-        {
-          status: 405,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
+      return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+        status: 405,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     // Validate environment secrets are configured
     if (!env.GITHUB_CLIENT_ID || !env.GITHUB_CLIENT_SECRET) {
       console.error('Missing GITHUB_CLIENT_ID or GITHUB_CLIENT_SECRET');
-      return new Response(
-        JSON.stringify({ error: 'Server misconfigured' }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
+      return new Response(JSON.stringify({ error: 'Server misconfigured' }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     // Parse request body
@@ -96,25 +90,19 @@ export default {
     try {
       body = await request.json();
     } catch {
-      return new Response(
-        JSON.stringify({ error: 'Invalid JSON body' }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
+      return new Response(JSON.stringify({ error: 'Invalid JSON body' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     const { code, redirect_uri } = body;
 
     if (!code || !redirect_uri) {
-      return new Response(
-        JSON.stringify({ error: 'Missing code or redirect_uri' }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
+      return new Response(JSON.stringify({ error: 'Missing code or redirect_uri' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     // Exchange code for token with GitHub
@@ -165,13 +153,10 @@ export default {
       );
     } catch (error) {
       console.error('Token exchange failed:', error);
-      return new Response(
-        JSON.stringify({ error: 'Token exchange failed' }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
+      return new Response(JSON.stringify({ error: 'Token exchange failed' }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
   },
 };

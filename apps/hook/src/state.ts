@@ -17,6 +17,14 @@ const STATE_FILE = join(STATE_DIR, STATE_FILE_NAME);
 
 // --- State Schema ---
 
+// Simplified deliverable info for injection into Claude's context
+const DeliverableInfoSchema = z.object({
+  id: z.string(),
+  text: z.string(),
+});
+
+export type DeliverableInfo = z.infer<typeof DeliverableInfoSchema>;
+
 const SessionStateSchema = z.object({
   planId: z.string(),
   planFilePath: z.string().optional(),
@@ -27,6 +35,8 @@ const SessionStateSchema = z.object({
   sessionToken: z.string().optional(),
   url: z.string().optional(),
   approvedAt: z.number().optional(),
+  // Deliverables to inject into Claude's context after approval
+  deliverables: z.array(DeliverableInfoSchema).optional(),
 });
 
 export type SessionState = z.infer<typeof SessionStateSchema>;

@@ -29,19 +29,22 @@ const CompleteTaskInput = z.object({
 export const completeTaskTool = {
   definition: {
     name: TOOL_NAMES.COMPLETE_TASK,
-    description: `Mark a task as complete after all deliverables are attached. Returns a snapshot URL for embedding in a PR.
+    description: `Mark a task as complete and generate a snapshot URL for embedding in a PR.
+
+NOTE: You usually DON'T need this tool! When you use add_artifact to upload proof for ALL deliverables, the task auto-completes and returns the snapshot URL automatically.
+
+USE THIS TOOL ONLY IF:
+- You need to force completion without all deliverables fulfilled
+- The plan has no deliverables marked
+- Auto-complete didn't trigger for some reason
 
 REQUIREMENTS:
-- Plan status must be 'in_progress'
-- At least one artifact must be uploaded (deliverables with proof)
-- Use add_artifact tool to upload screenshots, videos, test results, or diffs
-- Deliverables are checkbox items marked with {#deliverable} in create_plan or update_block_content
+- Plan status must be 'approved' or 'in_progress'
+- At least one artifact should be uploaded
 
-WORKFLOW:
-1. Create plan with deliverables: create_plan (use {#deliverable} markers)
-2. Upload artifacts: add_artifact (link to deliverable IDs from read_plan)
-3. Complete task: complete_task (generates snapshot URL)
-4. Embed snapshot URL in PR description`,
+RETURNS:
+- Snapshot URL with complete plan state embedded
+- Auto-links PR from current git branch if available`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -80,13 +83,13 @@ WORKFLOW:
       };
     }
 
-    // Validate status (must be in_progress)
-    if (metadata.status !== 'in_progress') {
+    // Validate status (must be approved or in_progress)
+    if (metadata.status !== 'in_progress' && metadata.status !== 'approved') {
       return {
         content: [
           {
             type: 'text',
-            text: `Cannot complete: plan status is '${metadata.status}', must be 'in_progress'`,
+            text: `Cannot complete: plan status is '${metadata.status}', must be 'approved' or 'in_progress'`,
           },
         ],
         isError: true,

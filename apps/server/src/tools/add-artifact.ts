@@ -1,17 +1,30 @@
+import { execSync } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
+import { ServerBlockNoteEditor } from '@blocknote/server-util';
 import {
   type ArtifactType,
   addArtifact,
+  createPlanUrl,
+  getArtifacts,
+  getDeliverables,
+  getLinkedPRs,
   getPlanMetadata,
+  type LinkedPR,
   linkArtifactToDeliverable,
+  linkPR,
+  PLAN_INDEX_DOC_NAME,
+  setPlanIndexEntry,
   setPlanMetadata,
 } from '@peer-plan/schema';
 import { nanoid } from 'nanoid';
+import type * as Y from 'yjs';
 import { z } from 'zod';
 import {
   GitHubAuthError,
+  getOctokit,
   isArtifactsEnabled,
   isGitHubConfigured,
+  parseRepoString,
   uploadArtifact,
 } from '../github-artifacts.js';
 import { logger } from '../logger.js';
@@ -43,28 +56,32 @@ const AddArtifactInput = z
 export const addArtifactTool = {
   definition: {
     name: TOOL_NAMES.ADD_ARTIFACT,
-    description: `Upload an artifact (screenshot, video, test results, diff) to a plan. Provides proof that deliverables were completed.
+    description: `Upload an artifact (screenshot, video, test results, diff) to a plan as proof of work.
+
+AUTO-COMPLETE: When ALL deliverables have artifacts attached, the task automatically completes:
+- Status changes to 'completed'
+- PR auto-links from current git branch
+- Snapshot URL returned for embedding in PR
+
+This means you usually don't need to call complete_task - just upload artifacts for all deliverables.
 
 REQUIREMENTS:
-- Plan must have repo set (from create_plan)
-- GitHub authentication required: run 'gh auth login' or set GITHUB_TOKEN env var
-- Artifacts stored in GitHub orphan branch 'plan-artifacts'
+- Plan must have repo set (from create_plan or auto-detected)
+- GitHub authentication: run 'gh auth login' or set GITHUB_TOKEN env var
 
 CONTENT OPTIONS (provide exactly one):
-- content: Base64 encoded file content (legacy, still supported)
-- filePath: Local file path to read and upload (e.g., "/path/to/screenshot.png")
-- contentUrl: URL to fetch content from (e.g., "https://example.com/image.png")
+- filePath: Local file path (e.g., "/path/to/screenshot.png") - RECOMMENDED
+- contentUrl: URL to fetch content from
+- content: Base64 encoded (legacy)
 
 DELIVERABLE LINKING:
-- Call read_plan with includeAnnotations=false to see deliverable IDs: {id="block-id"}
-- Pass deliverableId to automatically mark that deliverable as completed (checkmark)
-- Multiple artifacts can link to the same deliverable
-- Artifacts without deliverableId are stored but not linked
-- When a deliverable is linked and plan is in 'draft' status, it auto-changes to 'in_progress'
+- Pass deliverableId to link artifact to a deliverable
+- If using Claude Code hooks, deliverable IDs are provided after plan approval
+- Otherwise, call read_plan to get deliverable IDs
 
 ARTIFACT TYPES:
-- screenshot: PNG, JPG images of UI, terminal output, etc.
-- video: MP4 recordings of feature demos, walkthroughs
+- screenshot: PNG, JPG images of UI, terminal output
+- video: MP4 recordings of feature demos
 - test_results: JSON test output, coverage reports
 - diff: Code changes, git diffs`,
     inputSchema: {
@@ -270,13 +287,101 @@ ARTIFACT TYPES:
       const linkedText = input.deliverableId
         ? `\nLinked to deliverable: ${input.deliverableId}`
         : '';
+
+      // Check if all deliverables are now fulfilled → auto-complete
+      const deliverables = getDeliverables(doc);
+      const allFulfilled = deliverables.length > 0 && deliverables.every((d) => d.linkedArtifactId);
+
+      if (allFulfilled) {
+        logger.info({ planId }, 'All deliverables fulfilled, auto-completing task');
+
+        // Auto-link PR from current branch
+        let linkedPR: LinkedPR | null = null;
+        const existingLinkedPRs = getLinkedPRs(doc);
+        if (metadata.repo && existingLinkedPRs.length === 0) {
+          linkedPR = await tryAutoLinkPR(doc, metadata.repo);
+          if (linkedPR) {
+            logger.info(
+              { planId, prNumber: linkedPR.prNumber, branch: linkedPR.branch },
+              'Auto-linked PR from current branch'
+            );
+          }
+        }
+
+        // Generate snapshot URL
+        const editor = ServerBlockNoteEditor.create();
+        const fragment = doc.getXmlFragment('document');
+        const blocks = editor.yXmlFragmentToBlocks(fragment);
+        const artifacts = getArtifacts(doc);
+
+        const baseUrl = process.env.PEER_PLAN_BASE_URL || 'http://localhost:5173';
+        const snapshotUrl = createPlanUrl(baseUrl, {
+          v: 1,
+          id: planId,
+          title: metadata.title,
+          status: 'completed',
+          repo: metadata.repo,
+          pr: metadata.pr,
+          content: blocks,
+          artifacts,
+          deliverables,
+        });
+
+        // Update metadata
+        setPlanMetadata(doc, {
+          status: 'completed',
+          completedAt: Date.now(),
+          completedBy: 'agent',
+          snapshotUrl,
+        });
+
+        // Update plan index
+        const indexDoc = await getOrCreateDoc(PLAN_INDEX_DOC_NAME);
+        setPlanIndexEntry(indexDoc, {
+          id: metadata.id,
+          title: metadata.title,
+          status: 'completed',
+          createdAt: metadata.createdAt ?? Date.now(),
+          updatedAt: Date.now(),
+        });
+
+        logger.info({ planId, snapshotUrl }, 'Task auto-completed');
+
+        // Build completion response
+        let prText = '';
+        if (linkedPR) {
+          prText = `\n\nPR linked: #${linkedPR.prNumber} (${linkedPR.status})\nBranch: ${linkedPR.branch}\nURL: ${linkedPR.url}`;
+        } else if (existingLinkedPRs.length > 0) {
+          prText = `\n\nExisting linked PR: #${existingLinkedPRs[0]?.prNumber}`;
+        }
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Artifact uploaded!\nID: ${artifact.id}\nType: ${type}\nFilename: ${filename}\nURL: ${url}${linkedText}
+
+🎉 ALL DELIVERABLES COMPLETE! Task auto-completed.
+
+Snapshot URL: ${snapshotUrl}${prText}
+
+Embed this snapshot URL in your PR description as proof of completed work.`,
+            },
+          ],
+        };
+      }
+
+      // Not all deliverables fulfilled yet
       const statusText = statusChanged ? '\nStatus: draft → in_progress (auto-updated)' : '';
+      const remainingCount = deliverables.filter((d) => !d.linkedArtifactId).length;
+      const remainingText =
+        remainingCount > 0 ? `\n\n${remainingCount} deliverable(s) remaining.` : '';
 
       return {
         content: [
           {
             type: 'text',
-            text: `Artifact uploaded!\nID: ${artifact.id}\nType: ${type}\nFilename: ${filename}\nURL: ${url}${linkedText}${statusText}`,
+            text: `Artifact uploaded!\nID: ${artifact.id}\nType: ${type}\nFilename: ${filename}\nURL: ${url}${linkedText}${statusText}${remainingText}`,
           },
         ],
       };
@@ -309,3 +414,75 @@ ARTIFACT TYPES:
     }
   },
 };
+
+// --- Helper Functions ---
+
+/**
+ * Tries to auto-link a PR from the current git branch.
+ * Returns the linked PR if found, null otherwise.
+ */
+async function tryAutoLinkPR(ydoc: Y.Doc, repo: string): Promise<LinkedPR | null> {
+  // Get current branch
+  let branch: string;
+  try {
+    branch = execSync('git branch --show-current', {
+      encoding: 'utf-8',
+      timeout: 5000,
+      stdio: ['pipe', 'pipe', 'pipe'],
+    }).trim();
+  } catch (error) {
+    logger.debug({ error }, 'Could not detect current git branch');
+    return null;
+  }
+
+  if (!branch) {
+    logger.debug('Not on a branch (possibly detached HEAD)');
+    return null;
+  }
+
+  // Get Octokit instance
+  const octokit = getOctokit();
+  if (!octokit) {
+    logger.debug('No GitHub token available for PR lookup');
+    return null;
+  }
+
+  // Parse repo
+  const { owner, repoName } = parseRepoString(repo);
+
+  try {
+    // Look for open PRs from this branch
+    const { data: prs } = await octokit.pulls.list({
+      owner,
+      repo: repoName,
+      head: `${owner}:${branch}`,
+      state: 'open',
+    });
+
+    if (prs.length === 0) {
+      logger.debug({ branch, repo }, 'No open PR found on branch');
+      return null;
+    }
+
+    // Use the first (most recent) PR
+    const pr = prs[0];
+    if (!pr) return null;
+
+    const linkedPR: LinkedPR = {
+      prNumber: pr.number,
+      url: pr.html_url,
+      linkedAt: Date.now(),
+      status: pr.draft ? 'draft' : 'open',
+      branch,
+      title: pr.title,
+    };
+
+    // Store in Y.Doc
+    linkPR(ydoc, linkedPR);
+
+    return linkedPR;
+  } catch (error) {
+    logger.warn({ error, repo, branch }, 'Failed to lookup PR from GitHub');
+    return null;
+  }
+}

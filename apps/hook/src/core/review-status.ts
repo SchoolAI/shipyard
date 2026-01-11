@@ -5,6 +5,7 @@
 
 import {
   createUserResolver,
+  type Deliverable,
   formatDeliverablesForLLM,
   formatThreadsForLLM,
   type GetReviewStatusResponse,
@@ -24,7 +25,12 @@ import {
 } from '../http-client.js';
 import { logger } from '../logger.js';
 import { generateSessionToken, hashSessionToken } from '../session-token.js';
-import { deleteSessionState, getSessionState, setSessionState } from '../state.js';
+import {
+  type DeliverableInfo,
+  deleteSessionState,
+  getSessionState,
+  setSessionState,
+} from '../state.js';
 import { createPlan } from './plan-manager.js';
 
 // --- Review Decision Types ---
@@ -32,6 +38,7 @@ import { createPlan } from './plan-manager.js';
 interface ReviewDecision {
   approved: boolean;
   feedback?: string;
+  deliverables?: Deliverable[];
 }
 
 // --- Y.Doc Observer for Review Decision ---
@@ -70,8 +77,10 @@ async function waitForReviewDecision(planId: string, wsUrl: string): Promise<Rev
 
       if (status === 'approved') {
         logger.info({ planId }, 'Plan approved via Y.Doc');
+        // Extract deliverables to include in approval response
+        const deliverables = getDeliverables(ydoc);
         cleanup();
-        resolve({ approved: true });
+        resolve({ approved: true, deliverables });
       } else if (status === 'changes_requested') {
         // Extract feedback from threads if available
         const feedback = extractFeedbackFromYDoc(ydoc);
@@ -266,6 +275,12 @@ export async function checkReviewStatus(
         const tokenResult = await setSessionToken(planId, sessionTokenHash);
         const url = tokenResult.url;
 
+        // Convert deliverables to simplified format for state storage
+        const deliverableInfos: DeliverableInfo[] = (decision.deliverables ?? []).map((d) => ({
+          id: d.id,
+          text: d.text,
+        }));
+
         // Store in state for PostToolUse hook to read
         const currentState = getSessionState(sessionId);
         if (currentState) {
@@ -274,10 +289,14 @@ export async function checkReviewStatus(
             sessionToken,
             url,
             approvedAt: Date.now(),
+            deliverables: deliverableInfos,
           });
         }
 
-        logger.info({ planId, url }, 'Session token set and stored');
+        logger.info(
+          { planId, url, deliverableCount: deliverableInfos.length },
+          'Session token set and stored with deliverables'
+        );
 
         return {
           allow: true,

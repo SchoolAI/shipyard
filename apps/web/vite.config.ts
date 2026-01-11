@@ -1,9 +1,9 @@
-import react from '@vitejs/plugin-react';
-import tailwindcss from '@tailwindcss/vite';
-import { defineConfig } from 'vite';
-import path from 'node:path';
 import fs from 'node:fs';
+import path from 'node:path';
+import tailwindcss from '@tailwindcss/vite';
+import react from '@vitejs/plugin-react';
 import type { Plugin } from 'vite';
+import { defineConfig } from 'vite';
 
 /**
  * Plugin to copy index.html to 404.html for GitHub Pages SPA support.

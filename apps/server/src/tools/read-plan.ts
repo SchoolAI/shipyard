@@ -19,17 +19,20 @@ export const readPlanTool = {
     name: TOOL_NAMES.READ_PLAN,
     description: `Read a specific plan by ID, returning its metadata and content in markdown format.
 
-OUTPUT INCLUDES:
-- Metadata: title, status, repo, PR, timestamps
-- Content: Full markdown with block IDs (<!-- block:id --> comments)
-- Deliverables section: Shows deliverable IDs {id="block-id"} and completion status [x]/[ ]
-- Annotations: Comment threads if includeAnnotations=true
+NOTE FOR CLAUDE CODE USERS: If you just received plan approval via the hook, deliverable IDs were already provided in the approval message. You only need this tool if:
+- You need to check human feedback (set includeAnnotations=true)
+- You need to refresh state after changes
 
 USE CASES:
-- Get deliverable IDs for artifact linking (set includeAnnotations=false)
-- Get block IDs for update_block_content operations
 - Review feedback from human reviewers (set includeAnnotations=true)
-- Check plan status and completion state`,
+- Check plan status and completion state
+- Get block IDs for update_block_content operations
+
+OUTPUT INCLUDES:
+- Metadata: title, status, repo, PR, timestamps
+- Content: Full markdown with block IDs
+- Deliverables section: Shows deliverable IDs and completion status
+- Annotations: Comment threads if includeAnnotations=true`,
     inputSchema: {
       type: 'object',
       properties: {

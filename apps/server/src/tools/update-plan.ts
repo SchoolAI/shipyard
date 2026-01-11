@@ -26,21 +26,24 @@ export const updatePlanTool = {
     name: TOOL_NAMES.UPDATE_PLAN,
     description: `Update an existing plan's metadata (title, status). Does not modify content—use update_block_content for that.
 
-STATUS WORKFLOW:
-- draft: Initial state, not ready for review
-- pending_review: Ready for human feedback, triggers review notifications
-- in_progress: Work has started, artifacts being attached
-- approved: Human reviewer accepted the plan
-- changes_requested: Human reviewer requested modifications
-- completed: All deliverables attached, task finished (set by complete_task)
+NOTE: Most status transitions are automatic. You rarely need to call this tool.
 
-TYPICAL FLOW:
-1. create_plan (status=draft)
-2. update_plan (status=pending_review) - signals ready for review
-3. [Human reviews, adds comments, approves/requests changes]
-4. update_plan (status=in_progress) - start work
-5. add_artifact (upload deliverables)
-6. complete_task (status=completed)`,
+AUTOMATIC TRANSITIONS:
+- draft → approved/changes_requested: Set by human in browser
+- approved → in_progress: Auto-set when first artifact is uploaded
+- in_progress → completed: Auto-set when all deliverables have artifacts
+
+MANUAL USE CASES (rare):
+- Resetting a plan to draft status
+- Changing title after creation
+- Edge cases where automatic transitions don't apply
+
+STATUSES:
+- draft: Initial state
+- approved: Human accepted the plan
+- changes_requested: Human requested modifications
+- in_progress: Work started (usually auto-set)
+- completed: All deliverables fulfilled (usually auto-set by add_artifact)`,
     inputSchema: {
       type: 'object',
       properties: {

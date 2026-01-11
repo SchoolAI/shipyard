@@ -13,21 +13,15 @@ const SetupReviewNotificationInput = z.object({
 export const setupReviewNotificationTool = {
   definition: {
     name: TOOL_NAMES.SETUP_REVIEW_NOTIFICATION,
-    description: `Returns a bash script to monitor plan review status. Run in background to be notified when review completes.
+    description: `Returns a bash script to monitor plan review status.
 
-USAGE:
+NOTE FOR CLAUDE CODE USERS: If you have the peer-plan hook installed, you DON'T need this tool. The hook automatically blocks until the human approves or requests changes. This tool is only for agents WITHOUT hook support.
+
+USAGE (for non-hook agents):
 1. Call this tool to get monitoring script
 2. Run script in background: bash <script> &
-3. Script polls registry server for status/comment changes
-4. Exits when status becomes 'approved' or 'changes_requested'
-5. Server-side batching reduces poll frequency (5s window or 1 change threshold)
-
-TYPICAL WORKFLOW:
-1. create_plan + update_plan(status=pending_review)
-2. setup_review_notification (get monitoring script)
-3. Run script in background
-4. Continue working on other tasks
-5. Get notified when human review completes`,
+3. Script polls registry server for status changes
+4. Exits when status becomes 'approved' or 'changes_requested'`,
     inputSchema: {
       type: 'object',
       properties: {
