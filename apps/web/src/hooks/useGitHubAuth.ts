@@ -178,18 +178,9 @@ export function useGitHubAuth(): UseGitHubAuthReturn {
   const hasRepoScope = identity?.scope?.includes('repo') ?? false;
 
   // Validate existing token on mount
-  // biome-ignore lint/correctness/useExhaustiveDependencies: Temporarily disabled for debugging
   useEffect(() => {
     if (!identity) return;
 
-    // TEMPORARY: Skip validation for debugging
-    // biome-ignore lint/suspicious/noConsole: Debug logging
-    console.log('[useGitHubAuth] SKIPPING token validation for debugging');
-    setIsValidating(false);
-    return;
-
-    // Original validation code (disabled)
-    /*
     let cancelled = false;
     const token = identity.token;
 
@@ -209,7 +200,6 @@ export function useGitHubAuth(): UseGitHubAuthReturn {
     return () => {
       cancelled = true;
     };
-    */
   }, [identity]);
 
   // Handle OAuth callback on mount
