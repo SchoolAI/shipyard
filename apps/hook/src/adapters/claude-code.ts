@@ -63,11 +63,16 @@ function handlePermissionRequest(input: ClaudeCodeHookInput): AdapterEvent {
       return { type: 'plan_exit', sessionId };
     }
 
-    // Return plan_exit with full plan content for review
+    // Return plan_exit with full plan content for review + origin metadata
     return {
       type: 'plan_exit',
       sessionId,
       planContent: parsed.data.plan,
+      metadata: {
+        originSessionId: input.session_id,
+        originTranscriptPath: input.transcript_path,
+        originCwd: input.cwd,
+      },
     };
   }
 

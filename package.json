@@ -10,13 +10,15 @@
     "lint": "turbo run lint",
     "lint:fix": "turbo run lint:fix",
     "check": "turbo run test typecheck lint",
-    "dev:all": "concurrently --names \"server,signal,oauth,web,hook\" --prefix-colors \"green,cyan,blue,magenta,yellow\" \"pnpm dev:server\" \"pnpm dev:signaling\" \"pnpm dev:github-oauth\" \"pnpm dev:web\" \"pnpm dev:hook\"",
+    "dev:all": "pnpm --filter=@peer-plan/schema build && concurrently --kill-others-on-fail --names \"schema,server,signal,oauth,web,hook\" --prefix-colors \"gray,green,cyan,blue,magenta,yellow\" \"pnpm dev:schema\" \"pnpm dev:server\" \"pnpm dev:signaling\" \"pnpm dev:github-oauth\" \"pnpm dev:web\" \"pnpm dev:hook\"",
     "dev:local": "bash scripts/dev-local.sh",
+    "dev:schema": "turbo run dev --filter=@peer-plan/schema",
     "dev:server": "turbo run dev --filter=@peer-plan/server",
     "dev:signaling": "turbo run dev --filter=@peer-plan/signaling",
-    "dev:github-oauth": "pnpm --filter=github-oauth-worker dev",
+    "dev:github-oauth": "turbo run dev --filter=@peer-plan/github-oauth-worker",
     "dev:web": "turbo run dev --filter=@peer-plan/web",
     "dev:hook": "turbo run dev --filter=@peer-plan/hook",
+    "cleanup": "pkill -f 'dist/index.mjs' || true && pkill -f 'vite' || true && rm -rf apps/*/dist packages/*/dist .turbo node_modules/.vite && echo 'Cleaned up processes and build artifacts'",
     "prepare": "simple-git-hooks"
   },
   "devDependencies": {
@@ -24,6 +26,7 @@
     "concurrently": "^9.2.1",
     "playwright": "^1.57.0",
     "simple-git-hooks": "^2.13.1",
+    "tsx": "^4.21.0",
     "turbo": "^2.7.2",
     "typescript": "^5.9.3"
   },

@@ -18,11 +18,27 @@ import { TOOL_NAMES } from './tool-names.js';
 
 // --- Input Schema ---
 
+/**
+ * Origin platforms for conversation export.
+ * Claude Code uses hook, so only other platforms are listed here.
+ */
+const OriginPlatformEnum = z.enum(['devin', 'cursor', 'windsurf', 'aider', 'unknown']);
+
 const CreatePlanInput = z.object({
   title: z.string().describe('Plan title'),
   content: z.string().describe('Plan content (markdown)'),
   repo: z.string().optional().describe('GitHub repo (org/repo)'),
   prNumber: z.number().optional().describe('PR number'),
+
+  // Origin tracking for conversation export (Issue #41)
+  originPlatform: OriginPlatformEnum.optional().describe(
+    'Platform where this plan originated (for conversation export)'
+  ),
+  originSessionId: z.string().optional().describe('Platform-specific session ID'),
+  originMetadata: z
+    .record(z.unknown())
+    .optional()
+    .describe('Platform-specific metadata for conversation export'),
 });
 
 // --- Public Export ---
@@ -61,6 +77,21 @@ Bad deliverables (not provable):
             'GitHub repo (org/repo). Auto-detected from current directory if not provided. Required for artifact uploads.',
         },
         prNumber: { type: 'number', description: 'PR number. Required for artifact uploads.' },
+        // Origin tracking for conversation export (Issue #41)
+        originPlatform: {
+          type: 'string',
+          enum: ['devin', 'cursor', 'windsurf', 'aider', 'unknown'],
+          description: 'Platform where this plan originated. Used for conversation export/import.',
+        },
+        originSessionId: {
+          type: 'string',
+          description:
+            'Platform-specific session ID. Include this so conversation history can be exported later.',
+        },
+        originMetadata: {
+          type: 'object',
+          description: 'Platform-specific metadata for conversation export.',
+        },
       },
       required: ['title', 'content'],
     },
@@ -93,6 +124,10 @@ Bad deliverables (not provable):
       pr: input.prNumber,
       ownerId,
       sessionTokenHash,
+      // Origin tracking for conversation export (Issue #41)
+      originPlatform: input.originPlatform,
+      originSessionId: input.originSessionId,
+      originMetadata: input.originMetadata,
     });
 
     // Parse markdown to blocks and store in Y.XmlFragment for BlockNote collaboration

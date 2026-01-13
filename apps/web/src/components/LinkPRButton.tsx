@@ -21,19 +21,33 @@ import { useGitHubAuth } from '@/hooks/useGitHubAuth';
 interface LinkPRButtonProps {
   ydoc: Y.Doc;
   className?: string;
+  /** Controlled open state (optional) */
+  isOpen?: boolean;
+  /** Controlled open state change handler (optional) */
+  onOpenChange?: (isOpen: boolean) => void;
 }
 
 /**
  * Button to manually link a GitHub PR to the current plan.
  * Opens a popover with PR number input and optional repo override.
+ * Can be controlled externally via isOpen/onOpenChange props.
  */
-export function LinkPRButton({ ydoc, className }: LinkPRButtonProps) {
-  const [isOpen, setIsOpen] = useState(false);
+export function LinkPRButton({
+  ydoc,
+  className,
+  isOpen: controlledIsOpen,
+  onOpenChange,
+}: LinkPRButtonProps) {
+  const [internalIsOpen, setInternalIsOpen] = useState(false);
   const [prNumber, setPrNumber] = useState<number | undefined>(undefined);
   const [repo, setRepo] = useState('');
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { identity } = useGitHubAuth();
+
+  // Use controlled state if provided, otherwise use internal state
+  const isOpen = controlledIsOpen ?? internalIsOpen;
+  const setIsOpen = onOpenChange ?? setInternalIsOpen;
 
   const metadata = getPlanMetadata(ydoc);
   const isInvalid = prNumber !== undefined && prNumber < 1;

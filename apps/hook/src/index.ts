@@ -94,7 +94,7 @@ async function handlePlanExit(
   event: Extract<AdapterEvent, { type: 'plan_exit' }>
 ): Promise<CoreResponse> {
   try {
-    return await checkReviewStatus(event.sessionId, event.planContent);
+    return await checkReviewStatus(event.sessionId, event.planContent, event.metadata);
   } catch (err) {
     logger.error({ err }, 'Failed to check review status');
     // Fail open - allow the operation to proceed

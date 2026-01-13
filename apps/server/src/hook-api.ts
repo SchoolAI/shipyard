@@ -3,6 +3,7 @@
  * These endpoints allow the peer-plan-hook CLI to communicate with the server.
  */
 
+import { readFile } from 'node:fs/promises';
 import type { Block } from '@blocknote/core';
 import { ServerBlockNoteEditor } from '@blocknote/server-util';
 import {
@@ -15,6 +16,7 @@ import {
   getPlanMetadata,
   initPlanMetadata,
   PLAN_INDEX_DOC_NAME,
+  parseClaudeCodeOrigin,
   parseThreads,
   type ReviewFeedback,
   setAgentPresence,
@@ -90,12 +92,40 @@ export async function handleCreateSession(req: Request, res: Response): Promise<
 
     // Create the Y.Doc for this plan
     const ydoc = await getOrCreateDoc(planId);
+
+    // Parse and validate origin metadata from hook request for conversation export (Issue #41)
+    const origin = parseClaudeCodeOrigin(input.metadata) || {
+      platform: 'claude-code' as const,
+      sessionId: input.sessionId,
+      transcriptPath: '',
+    };
+
+    // Read transcript file if available for handoff feature
+    let transcriptContent = '';
+    if (origin && origin.platform === 'claude-code' && origin.transcriptPath) {
+      try {
+        transcriptContent = await readFile(origin.transcriptPath, 'utf-8');
+        logger.info(
+          { transcriptPath: origin.transcriptPath, size: transcriptContent.length },
+          'Loaded transcript for handoff'
+        );
+      } catch (error) {
+        logger.warn(
+          { error, transcriptPath: origin.transcriptPath },
+          'Failed to read transcript file'
+        );
+        // Continue without transcript - handoff will show fallback message
+      }
+    }
+
     initPlanMetadata(ydoc, {
       id: planId,
       title: PLAN_IN_PROGRESS,
       status: 'draft',
       ownerId,
       repo,
+      // Origin tracking for conversation export (type-safe, validated)
+      origin,
     });
 
     // Set initial presence
@@ -105,6 +135,15 @@ export async function handleCreateSession(req: Request, res: Response): Promise<
       connectedAt: now,
       lastSeenAt: now,
     });
+
+    // Store transcript in Y.Doc if available (for handoff feature)
+    if (transcriptContent) {
+      ydoc.getText('transcript').insert(0, transcriptContent);
+      logger.info(
+        { planId, transcriptSize: transcriptContent.length },
+        'Transcript stored in Y.Doc'
+      );
+    }
 
     // Update plan index
     const indexDoc = await getOrCreateDoc(PLAN_INDEX_DOC_NAME);

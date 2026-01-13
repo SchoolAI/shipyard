@@ -13,6 +13,7 @@ import {
   parseThreads,
   type ReviewFeedback,
 } from '@peer-plan/schema';
+import { nanoid } from 'nanoid';
 import { WebsocketProvider } from 'y-websocket';
 import * as Y from 'yjs';
 import type { CoreResponse } from '../adapters/types.js';
@@ -48,11 +49,15 @@ const REVIEW_TIMEOUT_MS = 25 * 60 * 1000; // 25 minutes
 /**
  * Wait for review decision by observing Y.Doc metadata changes.
  * Connects to MCP server's WebSocket and watches for status changes.
+ * Uses a unique reviewRequestId to prevent stale decisions from previous cycles.
  */
 async function waitForReviewDecision(planId: string, wsUrl: string): Promise<ReviewDecision> {
   const ydoc = new Y.Doc();
 
-  logger.info({ planId, wsUrl }, 'Connecting to WebSocket for Y.Doc sync');
+  // Generate unique ID for this review request to prevent stale decisions
+  const reviewRequestId = nanoid();
+
+  logger.info({ planId, wsUrl, reviewRequestId }, 'Connecting to WebSocket for Y.Doc sync');
 
   const provider = new WebsocketProvider(wsUrl, planId, ydoc, {
     connect: true,
@@ -61,7 +66,7 @@ async function waitForReviewDecision(planId: string, wsUrl: string): Promise<Rev
   return new Promise((resolve) => {
     const metadata = ydoc.getMap('metadata');
     let resolved = false;
-    let statusResetComplete = false;
+    let syncComplete = false;
 
     const cleanup = () => {
       if (!resolved) {
@@ -73,17 +78,28 @@ async function waitForReviewDecision(planId: string, wsUrl: string): Promise<Rev
     const checkStatus = () => {
       if (resolved) return;
 
-      // Ignore status checks until we've reset to pending_review
-      if (!statusResetComplete) {
-        logger.debug({ planId }, 'Ignoring status check until reset complete');
+      // Don't check until sync complete and reviewRequestId is set
+      if (!syncComplete) {
+        logger.debug({ planId }, 'Ignoring status check until sync complete');
+        return;
+      }
+
+      const currentReviewId = metadata.get('reviewRequestId') as string | undefined;
+
+      // Only accept decisions that match OUR review request
+      if (currentReviewId !== reviewRequestId) {
+        logger.debug(
+          { planId, expected: reviewRequestId, actual: currentReviewId },
+          'Review ID mismatch, ignoring status change'
+        );
         return;
       }
 
       const status = metadata.get('status') as string | undefined;
-      logger.debug({ planId, status }, 'Checking Y.Doc status after reset');
+      logger.debug({ planId, status, reviewRequestId }, 'Checking Y.Doc status');
 
       if (status === 'approved') {
-        logger.info({ planId }, 'Plan approved via Y.Doc');
+        logger.info({ planId, reviewRequestId }, 'Plan approved via Y.Doc');
         // Extract deliverables to include in approval response
         const deliverables = getDeliverables(ydoc);
         cleanup();
@@ -91,28 +107,29 @@ async function waitForReviewDecision(planId: string, wsUrl: string): Promise<Rev
       } else if (status === 'changes_requested') {
         // Extract feedback from threads if available
         const feedback = extractFeedbackFromYDoc(ydoc);
-        logger.info({ planId, feedback }, 'Changes requested via Y.Doc');
+        logger.info({ planId, reviewRequestId, feedback }, 'Changes requested via Y.Doc');
         cleanup();
         resolve({ approved: false, feedback });
       }
     };
 
-    // Wait for sync before resetting status for fresh review
+    // Wait for sync before setting review request ID
     provider.on('sync', (isSynced: boolean) => {
-      if (isSynced && !statusResetComplete) {
-        logger.info({ planId }, 'Y.Doc synced, resetting status for fresh review');
+      if (isSynced && !syncComplete) {
+        logger.info({ planId, reviewRequestId }, 'Y.Doc synced, setting review request ID');
 
-        // Reset status to pending_review to force new decision
-        // This prevents using stale approve/deny from previous review
+        // Set unique review request ID and reset status
+        // This prevents using stale approve/deny from previous review cycle
         ydoc.transact(() => {
+          metadata.set('reviewRequestId', reviewRequestId);
           metadata.set('status', 'pending_review');
           metadata.set('updatedAt', Date.now());
         });
 
-        // Mark reset as complete so checkStatus can now process changes
-        statusResetComplete = true;
+        // Mark sync as complete so checkStatus can now process changes
+        syncComplete = true;
 
-        logger.info({ planId }, 'Status reset to pending_review, now watching for decision');
+        logger.info({ planId, reviewRequestId }, 'Review request ID set, waiting for decision');
       }
     });
 
@@ -240,7 +257,8 @@ function extractFeedbackFromYDoc(ydoc: Y.Doc): string | undefined {
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Complex review flow requires conditional logic
 export async function checkReviewStatus(
   sessionId: string,
-  planContent?: string
+  planContent?: string,
+  originMetadata?: Record<string, unknown>
 ): Promise<CoreResponse> {
   let state = getSessionState(sessionId);
   let planId: string;
@@ -267,7 +285,10 @@ export async function checkReviewStatus(
     const result = await createPlan({
       sessionId,
       agentType: DEFAULT_AGENT_TYPE,
-      metadata: { source: 'ExitPlanMode' },
+      metadata: {
+        source: 'ExitPlanMode',
+        ...originMetadata, // Spread origin fields (originSessionId, originTranscriptPath, originCwd)
+      },
     });
 
     planId = result.planId;

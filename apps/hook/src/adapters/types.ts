@@ -62,6 +62,8 @@ export interface PlanExitEvent {
   sessionId: string;
   /** Full plan content from ExitPlanMode (if available) */
   planContent?: string;
+  /** Origin metadata for conversation export (session ID, transcript path, etc.) */
+  metadata?: Record<string, unknown>;
 }
 
 /** PostToolUse event after ExitPlanMode completes - used to inject session context */

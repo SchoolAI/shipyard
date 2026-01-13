@@ -287,6 +287,7 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
     navigationTarget,
     clearNavigation,
     isLoading,
+    markPlanAsRead,
   } = usePlanIndex(githubIdentity?.username);
   const { activePlanId, syncState } = useActivePlanSync();
   const [collapsed, setCollapsed] = useState(getSidebarCollapsed);
@@ -630,6 +631,7 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
           onSelectionChange={(keys) => {
             const key = Array.from(keys)[0];
             if (key) {
+              markPlanAsRead(String(key));
               onNavigate?.();
               navigate(`/plan/${key}`);
             }

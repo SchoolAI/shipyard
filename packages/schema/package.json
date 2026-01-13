@@ -3,6 +3,8 @@
   "version": "0.1.0",
   "type": "module",
   "description": "Shared types and schemas for peer-plan",
+  "main": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
   "exports": {
     ".": {
       "import": "./dist/index.mjs",
@@ -23,6 +25,7 @@
   },
   "scripts": {
     "build": "tsdown",
+    "dev": "tsdown --watch",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",

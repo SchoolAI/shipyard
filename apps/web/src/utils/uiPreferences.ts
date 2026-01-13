@@ -14,6 +14,8 @@ export interface ViewPreferences {
   searchQuery: string;
   /** Current sort option */
   sortBy: SortOption;
+  /** Sort direction */
+  sortDirection: 'asc' | 'desc';
   /** Active status filters (empty = show all) */
   statusFilters: PlanStatusType[];
 }
@@ -65,6 +67,7 @@ export function setShowArchived(show: boolean): void {
 const DEFAULT_VIEW_PREFERENCES: ViewPreferences = {
   searchQuery: '',
   sortBy: 'updated',
+  sortDirection: 'desc',
   statusFilters: [],
 };
 
@@ -78,6 +81,7 @@ export function getViewPreferences(): ViewPreferences {
     return {
       searchQuery: parsed.searchQuery ?? DEFAULT_VIEW_PREFERENCES.searchQuery,
       sortBy: parsed.sortBy ?? DEFAULT_VIEW_PREFERENCES.sortBy,
+      sortDirection: parsed.sortDirection ?? DEFAULT_VIEW_PREFERENCES.sortDirection,
       statusFilters: parsed.statusFilters ?? DEFAULT_VIEW_PREFERENCES.statusFilters,
     };
   } catch {

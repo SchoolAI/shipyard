@@ -56,12 +56,49 @@ interface ApprovalStateMessage {
   rejectedUsers: string[];
 }
 
+// --- Invite Token Messages ---
+
+// Request to create a new invite token (owner only)
+interface CreateInviteMessage {
+  type: 'create_invite';
+  planId: string;
+  ttlMinutes?: number; // Default: 30
+  maxUses?: number | null; // Default: null (unlimited)
+  label?: string;
+}
+
+// Request to redeem an invite token (guest)
+interface RedeemInviteMessage {
+  type: 'redeem_invite';
+  planId: string;
+  tokenId: string;
+  tokenValue: string;
+  userId: string; // Guest's GitHub username
+}
+
+// Request to revoke an invite token (owner only)
+interface RevokeInviteMessage {
+  type: 'revoke_invite';
+  planId: string;
+  tokenId: string;
+}
+
+// Request to list active invites (owner only)
+interface ListInvitesMessage {
+  type: 'list_invites';
+  planId: string;
+}
+
 type SignalingMessage =
   | SubscribeMessage
   | UnsubscribeMessage
   | PublishMessage
   | PingMessage
-  | ApprovalStateMessage;
+  | ApprovalStateMessage
+  | CreateInviteMessage
+  | RedeemInviteMessage
+  | RevokeInviteMessage
+  | ListInvitesMessage;
 
 // Per-connection state stored as WebSocket attachment
 interface ConnectionState {
@@ -86,6 +123,27 @@ interface PlanApprovalState {
   lastUpdated: number;
 }
 
+// Invite token (server-side only, stored in Durable Object)
+interface InviteToken {
+  id: string; // tokenId for URL lookup
+  tokenHash: string; // SHA256(tokenValue) - never store raw token
+  planId: string;
+  createdBy: string; // Owner's GitHub username
+  createdAt: number;
+  expiresAt: number;
+  maxUses: number | null; // null = unlimited
+  useCount: number;
+  revoked: boolean;
+  label?: string;
+}
+
+// Record of who redeemed an invite
+interface InviteRedemption {
+  redeemedBy: string;
+  redeemedAt: number;
+  tokenId: string;
+}
+
 export class SignalingRoom extends DurableObject<Env> {
   // In-memory topic -> WebSocket mapping (rebuilt on wake from hibernation)
   private topics: Map<string, Set<WebSocket>> = new Map();
@@ -94,6 +152,10 @@ export class SignalingRoom extends DurableObject<Env> {
   // Cached in memory for fast access, persisted to storage for hibernation survival
   private planApprovals: Map<string, PlanApprovalState> = new Map();
 
+  // Invite tokens: "planId:tokenId" -> InviteToken
+  // Cached in memory, persisted to storage for hibernation survival
+  private inviteTokens: Map<string, InviteToken> = new Map();
+
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
 
@@ -101,8 +163,9 @@ export class SignalingRoom extends DurableObject<Env> {
     // This runs both on first creation AND when waking from hibernation
     this.restoreFromHibernation();
 
-    // Restore approval state from storage (async, but fast)
+    // Restore approval state and invite tokens from storage (async, but fast)
     this.restoreApprovalState();
+    this.restoreInviteTokens();
   }
 
   /**
@@ -119,6 +182,34 @@ export class SignalingRoom extends DurableObject<Env> {
       console.log(`Restored ${stored.size} approval states from storage`);
     } catch (error) {
       console.error('Failed to restore approval state:', error);
+    }
+  }
+
+  /**
+   * Restore invite tokens from Durable Object storage.
+   * Also cleans up expired tokens during restoration.
+   */
+  private async restoreInviteTokens(): Promise<void> {
+    try {
+      const stored = await this.ctx.storage.list<InviteToken>({ prefix: 'invite:' });
+      const now = Date.now();
+      let expiredCount = 0;
+
+      for (const [key, token] of stored) {
+        // Skip and delete expired tokens
+        if (token.expiresAt < now) {
+          await this.ctx.storage.delete(key);
+          expiredCount++;
+          continue;
+        }
+        this.inviteTokens.set(key.replace('invite:', ''), token);
+      }
+
+      console.log(
+        `Restored ${this.inviteTokens.size} invite tokens from storage (${expiredCount} expired tokens cleaned up)`
+      );
+    } catch (error) {
+      console.error('Failed to restore invite tokens:', error);
     }
   }
 
@@ -215,6 +306,19 @@ export class SignalingRoom extends DurableObject<Env> {
           break;
         case 'approval_state':
           await this.handleApprovalState(ws, data);
+          break;
+        // Invite token handlers
+        case 'create_invite':
+          await this.handleCreateInvite(ws, data);
+          break;
+        case 'redeem_invite':
+          await this.handleRedeemInvite(ws, data);
+          break;
+        case 'revoke_invite':
+          await this.handleRevokeInvite(ws, data);
+          break;
+        case 'list_invites':
+          await this.handleListInvites(ws, data);
           break;
       }
     } catch (error) {
@@ -416,6 +520,9 @@ export class SignalingRoom extends DurableObject<Env> {
    * Handle approval state update from plan owner.
    * Validates that the sender is the owner before accepting.
    * Persists to Durable Object storage for hibernation survival.
+   *
+   * IMPORTANT: Merges approved users from existing state (invite redemptions)
+   * to handle race condition where guest redeems before owner connects.
    */
   private async handleApprovalState(ws: WebSocket, message: ApprovalStateMessage): Promise<void> {
     const state = this.getState(ws);
@@ -441,10 +548,22 @@ export class SignalingRoom extends DurableObject<Env> {
       return;
     }
 
+    // MERGE approved users from existing state (preserves invite redemptions)
+    const mergedApprovedUsers = new Set([
+      ...message.approvedUsers,
+      ...(existingApproval?.approvedUsers ?? []),
+    ]);
+
+    // Don't include rejected users in approved list
+    const rejectedSet = new Set(message.rejectedUsers);
+    const finalApprovedUsers = Array.from(mergedApprovedUsers).filter(
+      (user) => !rejectedSet.has(user)
+    );
+
     const approvalState: PlanApprovalState = {
       planId: message.planId,
       ownerId: message.ownerId,
-      approvedUsers: message.approvedUsers,
+      approvedUsers: finalApprovedUsers,
       rejectedUsers: message.rejectedUsers,
       lastUpdated: Date.now(),
     };
@@ -456,12 +575,352 @@ export class SignalingRoom extends DurableObject<Env> {
     try {
       await this.ctx.storage.put(`approval:${message.planId}`, approvalState);
       console.log(
-        `Persisted approval state for plan ${message.planId}: ${message.approvedUsers.length} approved, ${message.rejectedUsers.length} rejected`
+        `Persisted approval state for plan ${message.planId}: ${finalApprovedUsers.length} approved, ${message.rejectedUsers.length} rejected`
       );
     } catch (error) {
       console.error(`Failed to persist approval state for plan ${message.planId}:`, error);
       // Still keep in memory even if storage fails
     }
+  }
+
+  // --- Invite Token Handlers ---
+
+  /**
+   * Generate a cryptographically secure invite token.
+   * Uses Web Crypto API available in Cloudflare Workers.
+   */
+  private async generateInviteToken(): Promise<{
+    tokenId: string;
+    tokenValue: string;
+    tokenHash: string;
+  }> {
+    // Short ID for URL (8 chars from UUID)
+    const tokenId = crypto.randomUUID().slice(0, 8);
+
+    // 32 bytes of random data for the secret
+    const bytes = new Uint8Array(32);
+    crypto.getRandomValues(bytes);
+
+    // Convert to base64url
+    const tokenValue = btoa(String.fromCharCode(...bytes))
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=/g, '');
+
+    // Hash for storage (never store raw token)
+    const encoder = new TextEncoder();
+    const hashBuffer = await crypto.subtle.digest('SHA-256', encoder.encode(tokenValue));
+    const tokenHash = Array.from(new Uint8Array(hashBuffer))
+      .map((b) => b.toString(16).padStart(2, '0'))
+      .join('');
+
+    return { tokenId, tokenValue, tokenHash };
+  }
+
+  /**
+   * Verify a token value against a stored hash.
+   */
+  private async verifyTokenHash(tokenValue: string, storedHash: string): Promise<boolean> {
+    const encoder = new TextEncoder();
+    const hashBuffer = await crypto.subtle.digest('SHA-256', encoder.encode(tokenValue));
+    const computedHash = Array.from(new Uint8Array(hashBuffer))
+      .map((b) => b.toString(16).padStart(2, '0'))
+      .join('');
+    return computedHash === storedHash;
+  }
+
+  /**
+   * Handle create_invite message from owner.
+   * Creates a new time-limited invite token.
+   */
+  private async handleCreateInvite(ws: WebSocket, message: CreateInviteMessage): Promise<void> {
+    const state = this.getState(ws);
+    if (!state?.userId) {
+      ws.send(JSON.stringify({ type: 'error', error: 'unauthenticated' }));
+      return;
+    }
+
+    // Verify sender is owner
+    const approval = this.planApprovals.get(message.planId);
+    if (!approval || approval.ownerId !== state.userId) {
+      ws.send(JSON.stringify({ type: 'error', error: 'not_owner' }));
+      return;
+    }
+
+    const { tokenId, tokenValue, tokenHash } = await this.generateInviteToken();
+    const now = Date.now();
+    const ttlMs = (message.ttlMinutes ?? 30) * 60 * 1000;
+
+    const token: InviteToken = {
+      id: tokenId,
+      tokenHash,
+      planId: message.planId,
+      createdBy: state.userId,
+      createdAt: now,
+      expiresAt: now + ttlMs,
+      maxUses: message.maxUses ?? null,
+      useCount: 0,
+      revoked: false,
+      label: message.label,
+    };
+
+    // Store in memory and persist
+    const storageKey = `${message.planId}:${tokenId}`;
+    this.inviteTokens.set(storageKey, token);
+    await this.ctx.storage.put(`invite:${storageKey}`, token);
+
+    console.log(
+      `Created invite token ${tokenId} for plan ${message.planId}, expires in ${message.ttlMinutes ?? 30}m`
+    );
+
+    // Send response with token value (only time it's sent!)
+    ws.send(
+      JSON.stringify({
+        type: 'invite_created',
+        tokenId,
+        tokenValue, // Only sent once!
+        expiresAt: token.expiresAt,
+        maxUses: token.maxUses,
+        label: token.label,
+      })
+    );
+  }
+
+  /**
+   * Handle redeem_invite message from guest.
+   * Validates token and auto-approves the user if valid.
+   */
+  private async handleRedeemInvite(ws: WebSocket, message: RedeemInviteMessage): Promise<void> {
+    const { planId, tokenId, tokenValue, userId } = message;
+    const storageKey = `${planId}:${tokenId}`;
+
+    // Get token from memory or storage
+    let token = this.inviteTokens.get(storageKey);
+    if (!token) {
+      // Try to load from storage
+      token = await this.ctx.storage.get<InviteToken>(`invite:${storageKey}`);
+      if (token) {
+        this.inviteTokens.set(storageKey, token);
+      }
+    }
+
+    // Validate token
+    const error = await this.validateInviteToken(token, tokenValue, userId);
+    if (error) {
+      ws.send(JSON.stringify({ type: 'invite_redemption_result', success: false, error }));
+      return;
+    }
+
+    // Check if already redeemed by this user
+    const redemptionKey = `redemption:${planId}:${tokenId}:${userId}`;
+    const existingRedemption = await this.ctx.storage.get<InviteRedemption>(redemptionKey);
+    if (existingRedemption) {
+      // Already redeemed - return success (idempotent)
+      ws.send(JSON.stringify({ type: 'invite_redemption_result', success: true, planId }));
+      return;
+    }
+
+    // Increment use count
+    token!.useCount++;
+    this.inviteTokens.set(storageKey, token!);
+    await this.ctx.storage.put(`invite:${storageKey}`, token);
+
+    // Record redemption
+    const redemption: InviteRedemption = {
+      redeemedBy: userId,
+      redeemedAt: Date.now(),
+      tokenId,
+    };
+    await this.ctx.storage.put(redemptionKey, redemption);
+
+    // Auto-approve user
+    await this.autoApproveUserFromInvite(planId, userId, token!);
+
+    console.log(`User ${userId} redeemed invite ${tokenId} for plan ${planId}`);
+
+    // Send success to guest
+    ws.send(JSON.stringify({ type: 'invite_redemption_result', success: true, planId }));
+
+    // Notify owner
+    this.notifyOwnerOfRedemption(planId, token!, userId);
+  }
+
+  /**
+   * Validate an invite token.
+   * Returns error code or null if valid.
+   */
+  private async validateInviteToken(
+    token: InviteToken | undefined,
+    tokenValue: string,
+    _userId: string
+  ): Promise<'invalid' | 'revoked' | 'expired' | 'exhausted' | null> {
+    if (!token) return 'invalid';
+    if (token.revoked) return 'revoked';
+    if (Date.now() > token.expiresAt) return 'expired';
+    if (token.maxUses !== null && token.useCount >= token.maxUses) return 'exhausted';
+
+    // Verify token hash
+    const isValid = await this.verifyTokenHash(tokenValue, token.tokenHash);
+    if (!isValid) return 'invalid';
+
+    return null; // Valid
+  }
+
+  /**
+   * Auto-approve a user after invite redemption.
+   * Creates approval state if it doesn't exist (handles race condition).
+   */
+  private async autoApproveUserFromInvite(
+    planId: string,
+    userId: string,
+    token: InviteToken
+  ): Promise<void> {
+    let approval = this.planApprovals.get(planId);
+
+    // If no approval state yet, create one from token metadata
+    // This handles the race condition where guest arrives before owner
+    if (!approval) {
+      approval = {
+        planId,
+        ownerId: token.createdBy,
+        approvedUsers: [token.createdBy], // Owner is always approved
+        rejectedUsers: [],
+        lastUpdated: Date.now(),
+      };
+    }
+
+    // Add user to approved list if not already present
+    if (!approval.approvedUsers.includes(userId)) {
+      approval.approvedUsers.push(userId);
+      approval.lastUpdated = Date.now();
+    }
+
+    // Remove from rejected list if present
+    const rejectedIndex = approval.rejectedUsers.indexOf(userId);
+    if (rejectedIndex !== -1) {
+      approval.rejectedUsers.splice(rejectedIndex, 1);
+    }
+
+    // Store in memory and persist
+    this.planApprovals.set(planId, approval);
+    await this.ctx.storage.put(`approval:${planId}`, approval);
+  }
+
+  /**
+   * Notify the owner that someone redeemed their invite.
+   * Sends notification to all owner's connected WebSockets.
+   */
+  private notifyOwnerOfRedemption(planId: string, token: InviteToken, redeemedBy: string): void {
+    const approval = this.planApprovals.get(planId);
+    if (!approval) return;
+
+    const notification = JSON.stringify({
+      type: 'invite_redeemed',
+      planId,
+      tokenId: token.id,
+      label: token.label,
+      redeemedBy,
+      useCount: token.useCount,
+      maxUses: token.maxUses,
+    });
+
+    // Find owner's connections and send notification
+    const topic = `peer-plan-${planId}`;
+    const subscribers = this.topics.get(topic);
+    if (!subscribers) return;
+
+    for (const ws of subscribers) {
+      const state = this.getState(ws);
+      if (state?.userId === approval.ownerId) {
+        try {
+          ws.send(notification);
+        } catch {
+          // Connection may be dead
+        }
+      }
+    }
+  }
+
+  /**
+   * Handle revoke_invite message from owner.
+   * Marks the invite as revoked (prevents future redemptions).
+   */
+  private async handleRevokeInvite(ws: WebSocket, message: RevokeInviteMessage): Promise<void> {
+    const state = this.getState(ws);
+    if (!state?.userId) {
+      ws.send(JSON.stringify({ type: 'invite_revoked', tokenId: message.tokenId, success: false }));
+      return;
+    }
+
+    // Verify sender is owner
+    const approval = this.planApprovals.get(message.planId);
+    if (!approval || approval.ownerId !== state.userId) {
+      ws.send(JSON.stringify({ type: 'invite_revoked', tokenId: message.tokenId, success: false }));
+      return;
+    }
+
+    const storageKey = `${message.planId}:${message.tokenId}`;
+    const token = this.inviteTokens.get(storageKey);
+    if (!token) {
+      ws.send(JSON.stringify({ type: 'invite_revoked', tokenId: message.tokenId, success: false }));
+      return;
+    }
+
+    // Mark as revoked
+    token.revoked = true;
+    this.inviteTokens.set(storageKey, token);
+    await this.ctx.storage.put(`invite:${storageKey}`, token);
+
+    console.log(`Revoked invite token ${message.tokenId} for plan ${message.planId}`);
+
+    ws.send(JSON.stringify({ type: 'invite_revoked', tokenId: message.tokenId, success: true }));
+  }
+
+  /**
+   * Handle list_invites message from owner.
+   * Returns list of active (non-expired, non-revoked) invites.
+   */
+  private async handleListInvites(ws: WebSocket, message: ListInvitesMessage): Promise<void> {
+    const state = this.getState(ws);
+    if (!state?.userId) {
+      ws.send(JSON.stringify({ type: 'invites_list', planId: message.planId, invites: [] }));
+      return;
+    }
+
+    // Verify sender is owner
+    const approval = this.planApprovals.get(message.planId);
+    if (!approval || approval.ownerId !== state.userId) {
+      ws.send(JSON.stringify({ type: 'invites_list', planId: message.planId, invites: [] }));
+      return;
+    }
+
+    const now = Date.now();
+    const invites: Array<{
+      tokenId: string;
+      label?: string;
+      expiresAt: number;
+      maxUses: number | null;
+      useCount: number;
+      createdAt: number;
+    }> = [];
+
+    // Collect active invites for this plan
+    for (const [key, token] of this.inviteTokens.entries()) {
+      if (!key.startsWith(`${message.planId}:`)) continue;
+      if (token.revoked || token.expiresAt < now) continue;
+      if (token.maxUses !== null && token.useCount >= token.maxUses) continue;
+
+      invites.push({
+        tokenId: token.id,
+        label: token.label,
+        expiresAt: token.expiresAt,
+        maxUses: token.maxUses,
+        useCount: token.useCount,
+        createdAt: token.createdAt,
+      });
+    }
+
+    ws.send(JSON.stringify({ type: 'invites_list', planId: message.planId, invites }));
   }
 
   /**

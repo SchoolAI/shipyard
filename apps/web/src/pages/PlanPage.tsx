@@ -19,6 +19,7 @@ import * as Y from 'yjs';
 import { Attachments } from '@/components/Attachments';
 import { ChangesView } from '@/components/ChangesView';
 import { DeliverablesView } from '@/components/DeliverablesView';
+import { ImportConversationHandler } from '@/components/ImportConversationHandler';
 import { MobileHeader } from '@/components/MobileHeader';
 import { PlanHeader } from '@/components/PlanHeader';
 import { PlanViewer } from '@/components/PlanViewer';
@@ -323,8 +324,14 @@ export function PlanPage() {
       syncState={syncState}
       metadata={metadata}
       githubIdentity={githubIdentity}
+      rtcProvider={rtcProvider}
       onStartAuth={startAuth}
     >
+      {/* P2P conversation receive handler - shows toast notifications and review modal */}
+      {!isSnapshot && (
+        <ImportConversationHandler planId={planId} ydoc={ydoc} rtcProvider={rtcProvider} />
+      )}
+
       <div className="flex flex-col h-full overflow-hidden">
         {/* Header bar with plan metadata - hidden on mobile (shown in MobileHeader instead) */}
         {!isMobile && (
@@ -459,7 +466,9 @@ export function PlanPage() {
             status={metadata.status}
             agentCount={syncState?.activeCount}
             peerCount={syncState?.peerCount}
-            rightContent={<ShareButton />}
+            rightContent={
+              <ShareButton planId={planId} rtcProvider={rtcProvider} isOwner={isOwner} />
+            }
           />
         </div>
         <Drawer isOpen={drawerState.isOpen} onOpenChange={drawerState.setOpen} side="left">

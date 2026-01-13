@@ -18,9 +18,11 @@ import {
 export interface ViewFiltersState {
   searchQuery: string;
   sortBy: SortOption;
+  sortDirection: 'asc' | 'desc';
   statusFilters: PlanStatusType[];
   setSearchQuery: (query: string) => void;
   setSortBy: (sort: SortOption) => void;
+  toggleSortDirection: () => void;
   toggleStatusFilter: (status: PlanStatusType) => void;
   clearFilters: () => void;
 }
@@ -66,6 +68,14 @@ export function useViewFilters(): ViewFiltersState {
     });
   }, []);
 
+  const toggleSortDirection = useCallback(() => {
+    setPreferencesState((prev) => {
+      const updated = { ...prev, sortDirection: prev.sortDirection === 'asc' ? 'desc' : 'asc' };
+      setViewPreferences(updated);
+      return updated;
+    });
+  }, []);
+
   const toggleStatusFilter = useCallback((status: PlanStatusType) => {
     setPreferencesState((prev) => {
       const newFilters = prev.statusFilters.includes(status)
@@ -81,6 +91,7 @@ export function useViewFilters(): ViewFiltersState {
     const cleared: ViewPreferences = {
       searchQuery: '',
       sortBy: 'updated',
+      sortDirection: 'desc',
       statusFilters: [],
     };
     setDebouncedSearchQuery('');
@@ -91,9 +102,11 @@ export function useViewFilters(): ViewFiltersState {
   return {
     searchQuery: debouncedSearchQuery,
     sortBy: preferences.sortBy,
+    sortDirection: preferences.sortDirection,
     statusFilters: preferences.statusFilters,
     setSearchQuery,
     setSortBy,
+    toggleSortDirection,
     toggleStatusFilter,
     clearFilters,
   };
@@ -107,7 +120,8 @@ export function filterAndSortPlans(
   plans: PlanIndexEntry[],
   searchQuery: string,
   sortBy: SortOption,
-  statusFilters: PlanStatusType[]
+  statusFilters: PlanStatusType[],
+  sortDirection: 'asc' | 'desc' = 'desc'
 ): FilteredPlansResult {
   let filtered = plans;
 
@@ -123,7 +137,7 @@ export function filterAndSortPlans(
   }
 
   // Sort plans
-  const sorted = sortPlans(filtered, sortBy);
+  const sorted = sortPlans(filtered, sortBy, sortDirection);
 
   return {
     filteredPlans: sorted,
@@ -139,8 +153,15 @@ export function useFilteredPlans(plans: PlanIndexEntry[]): FilteredPlansResult &
   const filters = useViewFilters();
 
   const result = useMemo(
-    () => filterAndSortPlans(plans, filters.searchQuery, filters.sortBy, filters.statusFilters),
-    [plans, filters.searchQuery, filters.sortBy, filters.statusFilters]
+    () =>
+      filterAndSortPlans(
+        plans,
+        filters.searchQuery,
+        filters.sortBy,
+        filters.statusFilters,
+        filters.sortDirection
+      ),
+    [plans, filters.searchQuery, filters.sortBy, filters.statusFilters, filters.sortDirection]
   );
 
   return { ...result, ...filters };
@@ -166,25 +187,30 @@ export const STATUS_FILTER_OPTIONS: { value: PlanStatusType; label: string; colo
 
 // --- Private Helpers ---
 
-function sortPlans(plans: PlanIndexEntry[], sortBy: SortOption): PlanIndexEntry[] {
+function sortPlans(
+  plans: PlanIndexEntry[],
+  sortBy: SortOption,
+  direction: 'asc' | 'desc' = 'desc'
+): PlanIndexEntry[] {
   const sorted = [...plans];
+  const multiplier = direction === 'asc' ? 1 : -1;
 
   switch (sortBy) {
     case 'name':
-      return sorted.sort((a, b) => a.title.localeCompare(b.title));
+      return sorted.sort((a, b) => multiplier * a.title.localeCompare(b.title));
 
     case 'newest':
-      return sorted.sort((a, b) => b.createdAt - a.createdAt);
+      return sorted.sort((a, b) => multiplier * (b.createdAt - a.createdAt));
 
     case 'updated':
-      return sorted.sort((a, b) => b.updatedAt - a.updatedAt);
+      return sorted.sort((a, b) => multiplier * (b.updatedAt - a.updatedAt));
 
     case 'status':
       // Sort by status workflow order
       return sorted.sort((a, b) => {
         const aIndex = PlanStatusValues.indexOf(a.status);
         const bIndex = PlanStatusValues.indexOf(b.status);
-        return aIndex - bIndex;
+        return multiplier * (aIndex - bIndex);
       });
 
     default: {

@@ -1,3 +1,27 @@
+// Conversation export (A2A protocol) - Issue #41
+export type {
+  A2ADataPart,
+  A2AFilePart,
+  A2AMessage,
+  A2APart,
+  A2ATextPart,
+  ClaudeCodeMessage,
+  ConversationExportMeta,
+  ParseTranscriptResult,
+} from './conversation-export.js';
+export {
+  A2ADataPartSchema,
+  A2AFilePartSchema,
+  A2AMessageSchema,
+  A2APartSchema,
+  A2ATextPartSchema,
+  ClaudeCodeMessageSchema,
+  ConversationExportMetaSchema,
+  claudeCodeToA2A,
+  parseClaudeCodeTranscriptString,
+  summarizeA2AConversation,
+  validateA2AMessages,
+} from './conversation-export.js';
 export { formatDeliverablesForLLM } from './deliverable-formatter.js';
 export { extractDeliverables } from './deliverable-parser.js';
 export type {
@@ -38,12 +62,66 @@ export {
   UpdatePresenceRequestSchema,
   UpdatePresenceResponseSchema,
 } from './hook-api.js';
+// Invite tokens for P2P room authentication - Issue #12
+export type {
+  CreateInviteRequest,
+  InviteCreatedResponse,
+  InviteRedeemedNotification,
+  InviteRedemption,
+  InviteRedemptionResult,
+  InviteRevokedResponse,
+  InviteSignalingMessage,
+  InviteSignalingResponse,
+  InvitesListResponse,
+  InviteToken,
+  ListInvitesRequest,
+  RedeemInviteRequest,
+  RevokeInviteRequest,
+} from './invite-token.js';
+export {
+  buildInviteUrl,
+  getTokenTimeRemaining,
+  InviteRedemptionSchema,
+  InviteTokenSchema,
+  parseInviteFromUrl,
+} from './invite-token.js';
+// P2P message protocol for conversation transfer - Issue #41
+export type {
+  ChunkMessage,
+  ConversationExportEnd,
+  ConversationExportStartMeta,
+  DecodedP2PMessage,
+  P2PMessageTypeValue,
+} from './p2p-messages.js';
+export {
+  assertNeverP2PMessage,
+  ChunkMessageSchema,
+  ConversationExportEndSchema,
+  ConversationExportStartMetaSchema,
+  decodeChunkMessage,
+  decodeExportEndMessage,
+  decodeExportStartMessage,
+  decodeP2PMessage,
+  encodeChunkMessage,
+  encodeExportEndMessage,
+  encodeExportStartMessage,
+  isConversationChunk,
+  isConversationExportEnd,
+  isConversationExportStart,
+  isP2PConversationMessage,
+  P2PMessageType,
+} from './p2p-messages.js';
 export type {
   Artifact,
   ArtifactType,
+  ClaudeCodeOriginMetadata,
+  CursorOriginMetadata,
   Deliverable,
+  DevinOriginMetadata,
   LinkedPR,
   LinkedPRStatus,
+  OriginMetadata,
+  OriginPlatform,
   PlanMetadata,
   PlanStatusType,
   PRReviewComment,
@@ -51,13 +129,19 @@ export type {
 } from './plan.js';
 export {
   ArtifactSchema,
+  ClaudeCodeOriginMetadataSchema,
+  CursorOriginMetadataSchema,
   DeliverableSchema,
+  DevinOriginMetadataSchema,
   getArtifactUrl,
   LinkedPRSchema,
   LinkedPRStatusValues,
+  OriginMetadataSchema,
+  OriginPlatformValues,
   PlanMetadataSchema,
   PlanStatusValues,
   PRReviewCommentSchema,
+  parseClaudeCodeOrigin,
 } from './plan.js';
 export type { PlanIndexEntry } from './plan-index.js';
 export {
@@ -111,13 +195,17 @@ export {
   getPRReviewCommentsForPR,
   getRejectedUsers,
   getStepCompletions,
+  getTranscriptContent,
+  getViewedBy,
   initPlanMetadata,
   isApprovalRequired,
+  isPlanUnread,
   isStepCompleted,
   isUserApproved,
   isUserRejected,
   linkArtifactToDeliverable,
   linkPR,
+  markPlanAsViewed,
   rejectUser,
   removeArtifact,
   removePRReviewComment,

@@ -51,10 +51,18 @@ export default defineConfig(({ mode }) => ({
   server: {
     port: 5173,
     open: true,
+    // Watch workspace packages for changes
+    watch: {
+      ignored: ['!**/node_modules/@peer-plan/**'],
+    },
   },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
     },
+  },
+  // Don't pre-bundle workspace packages - use them directly from dist
+  optimizeDeps: {
+    exclude: ['@peer-plan/schema'],
   },
 }));

@@ -1,4 +1,4 @@
-import type * as Y from 'yjs';
+import * as Y from 'yjs';
 import { type AgentPresence, AgentPresenceSchema } from './hook-api.js';
 import {
   type Artifact,
@@ -87,6 +87,11 @@ export function initPlanMetadata(
 
   if (init.sessionTokenHash) {
     map.set('sessionTokenHash', init.sessionTokenHash);
+  }
+
+  // Origin tracking for conversation export (Issue #41)
+  if (init.origin) {
+    map.set('origin', init.origin);
   }
 }
 
@@ -587,4 +592,111 @@ export function removePRReviewComment(ydoc: Y.Doc, commentId: string): boolean {
 
   array.delete(index, 1);
   return true;
+}
+
+// --- Per-User Read/Unread Tracking ---
+
+/**
+ * Marks a plan as viewed by a user.
+ * Records the current timestamp in the viewedBy map.
+ *
+ * @param ydoc - Yjs document
+ * @param username - GitHub username of the viewer
+ */
+export function markPlanAsViewed(ydoc: Y.Doc, username: string): void {
+  const map = ydoc.getMap(YDOC_KEYS.METADATA);
+
+  ydoc.transact(() => {
+    // Get existing viewedBy map - must handle Y.Map properly (can't spread it!)
+    const existingViewedBy = map.get('viewedBy');
+    let viewedBy: Record<string, number> = {};
+
+    if (existingViewedBy instanceof Y.Map) {
+      // Convert Y.Map to plain object using iteration (toJSON also works)
+      for (const [key, value] of existingViewedBy.entries()) {
+        if (typeof value === 'number') {
+          viewedBy[key] = value;
+        }
+      }
+    } else if (existingViewedBy && typeof existingViewedBy === 'object') {
+      // Handle plain object (shouldn't happen but be safe)
+      viewedBy = { ...(existingViewedBy as Record<string, number>) };
+    }
+
+    // Record when this user viewed the plan
+    viewedBy[username] = Date.now();
+
+    // Use Y.Map for the viewedBy to enable CRDT merging
+    const viewedByMap = new Y.Map<number>();
+    for (const [user, timestamp] of Object.entries(viewedBy)) {
+      viewedByMap.set(user, timestamp);
+    }
+    map.set('viewedBy', viewedByMap);
+  });
+}
+
+/**
+ * Gets the viewedBy map from plan metadata.
+ *
+ * @param ydoc - Yjs document
+ * @returns Map of username → timestamp, or empty object if not set
+ */
+export function getViewedBy(ydoc: Y.Doc): Record<string, number> {
+  const map = ydoc.getMap(YDOC_KEYS.METADATA);
+  const viewedBy = map.get('viewedBy');
+
+  if (!viewedBy) return {};
+
+  // Handle both Y.Map and plain object formats
+  if (viewedBy instanceof Y.Map) {
+    const result: Record<string, number> = {};
+    for (const [key, value] of viewedBy.entries()) {
+      if (typeof value === 'number') {
+        result[key] = value;
+      }
+    }
+    return result;
+  }
+
+  if (typeof viewedBy === 'object') {
+    return viewedBy as Record<string, number>;
+  }
+
+  return {};
+}
+
+/**
+ * Checks if a plan is unread for a specific user.
+ * A plan is unread if the user has never viewed it, or if the plan
+ * was updated after the user's last view.
+ *
+ * @param metadata - Plan metadata (can be from getPlanMetadata or plan index)
+ * @param username - GitHub username to check
+ * @param viewedBy - Optional viewedBy map (if not provided, uses metadata.viewedBy)
+ * @returns true if the plan is unread for this user
+ */
+export function isPlanUnread(
+  metadata: Pick<PlanMetadata, 'updatedAt'>,
+  username: string,
+  viewedBy?: Record<string, number>
+): boolean {
+  const viewed = viewedBy ?? {};
+  const lastViewed = viewed[username];
+
+  // Never viewed = unread
+  if (!lastViewed) return true;
+
+  // Viewed after last update = read
+  return lastViewed < metadata.updatedAt;
+}
+
+// --- Transcript Helpers ---
+
+/**
+ * Get conversation transcript content from Y.Doc.
+ * Returns empty string if transcript not available.
+ */
+export function getTranscriptContent(ydoc: Y.Doc): string {
+  const text = ydoc.getText(YDOC_KEYS.TRANSCRIPT);
+  return text.toString();
 }

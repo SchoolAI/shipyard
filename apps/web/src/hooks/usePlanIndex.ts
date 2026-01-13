@@ -2,22 +2,30 @@ import {
   getPlanIndex,
   getPlanMetadata,
   getPlanOwnerId,
+  getViewedBy,
+  isPlanUnread,
   NON_PLAN_DB_NAMES,
   PLAN_INDEX_DOC_NAME,
   type PlanIndexEntry,
 } from '@peer-plan/schema';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { IndexeddbPersistence } from 'y-indexeddb';
 import * as Y from 'yjs';
 import { useMultiProviderSync } from './useMultiProviderSync';
+
+/** Extended plan entry with unread status */
+export interface PlanIndexEntryWithReadState extends PlanIndexEntry {
+  /** True if the plan is unread by the current user */
+  isUnread?: boolean;
+}
 
 export interface PlanIndexState {
   /** Plans owned by the current user */
   myPlans: PlanIndexEntry[];
   /** Plans owned by others (shared with me) */
   sharedPlans: PlanIndexEntry[];
-  /** Plans needing attention (pending_review, changes_requested) */
-  inboxPlans: PlanIndexEntry[];
+  /** Plans needing attention (pending_review, changes_requested) AND unread */
+  inboxPlans: PlanIndexEntryWithReadState[];
   archivedPlans: PlanIndexEntry[];
   connected: boolean;
   synced: boolean;
@@ -26,6 +34,12 @@ export interface PlanIndexState {
   peerCount: number;
   navigationTarget: string | null;
   clearNavigation: () => void;
+  /** True while IndexedDB is loading local data */
+  isLoading: boolean;
+  /** Mark a plan as read by the current user (updates viewedBy in plan's Y.Doc) */
+  markPlanAsRead: (planId: string) => Promise<void>;
+  /** Force refresh of inbox unread states */
+  refreshInboxUnreadState: () => void;
 }
 
 /**
@@ -41,65 +55,81 @@ export function usePlanIndex(currentUsername: string | undefined): PlanIndexStat
     active: PlanIndexEntry[];
     archived: PlanIndexEntry[];
   }>({ active: [], archived: [] });
+
   const [discoveredPlans, setDiscoveredPlans] = useState<PlanIndexEntry[]>([]);
   const [navigationTarget, setNavigationTarget] = useState<string | null>(null);
   const lastDiscoveryKeyRef = useRef<string>('');
 
+  // Per-plan viewedBy data for inbox unread filtering
+  const [planViewedBy, setPlanViewedBy] = useState<Record<string, Record<string, number>>>({});
+  const [inboxRefreshTrigger, setInboxRefreshTrigger] = useState(0);
+
+  // Track last update to avoid redundant state changes
+  // Include updatedAt values so sorting works when timestamps change
+  const lastPlanKeysRef = useRef<{ active: string; archived: string }>({
+    active: '',
+    archived: '',
+  });
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: syncState.idbSynced is intentionally included to re-read plans when IndexedDB finishes loading
   useEffect(() => {
     const plansMap = ydoc.getMap('plans');
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    let isActive = true;
 
     const updatePlans = () => {
+      if (!isActive) return;
+
       const activePlans = getPlanIndex(ydoc, false);
       const allPlans = getPlanIndex(ydoc, true);
       const archived = allPlans.filter((p) => p.deletedAt);
 
-      // Only update if plan IDs actually changed to prevent infinite loops
-      setAllPlansData((prev) => {
-        const activeIds = activePlans
-          .map((p) => p.id)
-          .sort()
-          .join(',');
-        const archivedIds = archived
-          .map((p) => p.id)
-          .sort()
-          .join(',');
-        const prevActiveIds = prev.active
-          .map((p) => p.id)
-          .sort()
-          .join(',');
-        const prevArchivedIds = prev.archived
-          .map((p) => p.id)
-          .sort()
-          .join(',');
+      // Build key strings for comparison - include updatedAt so sorting triggers when timestamps change
+      const activeKeys = activePlans
+        .map((p) => `${p.id}:${p.updatedAt}:${p.status}`)
+        .sort()
+        .join(',');
+      const archivedKeys = archived
+        .map((p) => `${p.id}:${p.updatedAt}:${p.status}`)
+        .sort()
+        .join(',');
 
-        if (activeIds === prevActiveIds && archivedIds === prevArchivedIds) {
-          return prev;
-        }
+      // Skip update if nothing changed (using ref to avoid closure issues)
+      if (
+        activeKeys === lastPlanKeysRef.current.active &&
+        archivedKeys === lastPlanKeysRef.current.archived
+      ) {
+        return;
+      }
 
-        return { active: activePlans, archived };
-      });
+      // Update ref before state to prevent race conditions
+      lastPlanKeysRef.current = { active: activeKeys, archived: archivedKeys };
+      setAllPlansData({ active: activePlans, archived });
     };
 
     const debouncedUpdatePlans = () => {
       if (debounceTimer) {
         clearTimeout(debounceTimer);
       }
-      debounceTimer = setTimeout(updatePlans, 100);
+      // Reduced debounce from 100ms to 16ms (one frame) for snappier updates
+      debounceTimer = setTimeout(updatePlans, 16);
     };
 
+    // Initial update - run immediately without debounce
     updatePlans();
-    // Use shallow observe instead of observeDeep to avoid firing on nested field changes
-    // (e.g., updatedAt timestamp changes). We only care when plans are added/removed.
-    plansMap.observe(debouncedUpdatePlans);
+
+    // Use observeDeep to detect nested field changes (e.g., updatedAt timestamp changes)
+    // so that "Recently Updated" sorting works correctly when plans are modified.
+    plansMap.observeDeep(debouncedUpdatePlans);
 
     return () => {
+      isActive = false;
       if (debounceTimer) {
         clearTimeout(debounceTimer);
       }
-      plansMap.unobserve(debouncedUpdatePlans);
+      plansMap.unobserveDeep(debouncedUpdatePlans);
     };
-  }, [ydoc]);
+  }, [ydoc, syncState.idbSynced]);
 
   useEffect(() => {
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -181,9 +211,10 @@ export function usePlanIndex(currentUsername: string | undefined): PlanIndexStat
       if (debounceTimer) {
         clearTimeout(debounceTimer);
       }
+      // Reduced from 500ms to 100ms for faster discovery of new plans
       debounceTimer = setTimeout(() => {
         discoverIndexedDBPlans();
-      }, 500);
+      }, 100);
     };
 
     window.addEventListener('indexeddb-plan-synced', handlePlanSynced);
@@ -201,7 +232,8 @@ export function usePlanIndex(currentUsername: string | undefined): PlanIndexStat
     [allPlansData.active, discoveredPlans]
   );
 
-  const inboxPlans = useMemo(
+  // Get all plans that match inbox criteria (status-based)
+  const inboxCandidates = useMemo(
     () =>
       allActivePlans.filter(
         (p) =>
@@ -210,6 +242,85 @@ export function usePlanIndex(currentUsername: string | undefined): PlanIndexStat
       ),
     [allActivePlans, currentUsername]
   );
+
+  // Load viewedBy data for inbox candidates
+  // biome-ignore lint/correctness/useExhaustiveDependencies: inboxRefreshTrigger forces refresh when plans are marked as read
+  useEffect(() => {
+    let isActive = true;
+
+    async function loadViewedByForInbox() {
+      if (!currentUsername || inboxCandidates.length === 0) {
+        setPlanViewedBy({});
+        return;
+      }
+
+      const viewedByData: Record<string, Record<string, number>> = {};
+
+      await Promise.all(
+        inboxCandidates.map(async (plan) => {
+          try {
+            const planDoc = new Y.Doc();
+            const idb = new IndexeddbPersistence(plan.id, planDoc);
+            await idb.whenSynced;
+
+            if (!isActive) {
+              idb.destroy();
+              return;
+            }
+
+            viewedByData[plan.id] = getViewedBy(planDoc);
+            idb.destroy();
+          } catch {
+            // Plan doc doesn't exist yet, treat as unread
+            viewedByData[plan.id] = {};
+          }
+        })
+      );
+
+      if (isActive) {
+        // Merge with existing state to preserve optimistic updates from markPlanAsRead
+        setPlanViewedBy((prev) => {
+          const merged = { ...viewedByData };
+          // Preserve optimistic updates that have newer timestamps
+          for (const [planId, existingViewedBy] of Object.entries(prev)) {
+            if (!merged[planId]) {
+              merged[planId] = existingViewedBy;
+            } else {
+              // For each user, keep the newer timestamp
+              for (const [username, timestamp] of Object.entries(existingViewedBy)) {
+                if (!merged[planId][username] || timestamp > merged[planId][username]) {
+                  merged[planId] = { ...merged[planId], [username]: timestamp };
+                }
+              }
+            }
+          }
+          return merged;
+        });
+      }
+    }
+
+    loadViewedByForInbox();
+
+    return () => {
+      isActive = false;
+    };
+  }, [inboxCandidates, currentUsername, inboxRefreshTrigger]);
+
+  // Filter inbox to only unread plans
+  const inboxPlans: PlanIndexEntryWithReadState[] = useMemo(() => {
+    if (!currentUsername) {
+      return [];
+    }
+
+    const result = inboxCandidates
+      .map((plan) => {
+        const viewedBy = planViewedBy[plan.id] ?? {};
+        const isUnread = isPlanUnread(plan, currentUsername, viewedBy);
+        return { ...plan, isUnread };
+      })
+      .filter((plan) => plan.isUnread);
+    return result;
+  }, [inboxCandidates, currentUsername, planViewedBy]);
 
   const myPlans = useMemo(
     () =>
@@ -252,6 +363,59 @@ export function usePlanIndex(currentUsername: string | undefined): PlanIndexStat
     setNavigationTarget(null);
   };
 
+  // Loading until IndexedDB has synced - this is when local data becomes available
+  const isLoading = !syncState.idbSynced;
+
+  /**
+   * Mark a plan as read by the current user.
+   * Updates the viewedBy field in the plan's Y.Doc.
+   */
+  const markPlanAsRead = useCallback(
+    async (planId: string): Promise<void> => {
+      if (!currentUsername) {
+        return;
+      }
+
+      try {
+        // Import markPlanAsViewed dynamically to avoid circular deps
+        const { markPlanAsViewed } = await import('@peer-plan/schema');
+
+        const planDoc = new Y.Doc();
+        const idb = new IndexeddbPersistence(planId, planDoc);
+        await idb.whenSynced;
+
+        // Mark the plan as viewed in the Y.Doc
+        markPlanAsViewed(planDoc, currentUsername);
+
+        // Update local state immediately for instant UI feedback
+        const now = Date.now();
+        setPlanViewedBy((prev) => {
+          const next = {
+            ...prev,
+            [planId]: {
+              ...(prev[planId] ?? {}),
+              [currentUsername]: now,
+            },
+          };
+          return next;
+        });
+
+        // Keep the persistence alive briefly to ensure sync to IndexedDB
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        idb.destroy();
+      } catch (_error) {}
+    },
+    [currentUsername]
+  );
+
+  /**
+   * Force refresh of inbox unread states.
+   * Useful after external changes to viewedBy.
+   */
+  const refreshInboxUnreadState = useCallback(() => {
+    setInboxRefreshTrigger((prev) => prev + 1);
+  }, []);
+
   return {
     myPlans,
     sharedPlans,
@@ -264,5 +428,8 @@ export function usePlanIndex(currentUsername: string | undefined): PlanIndexStat
     peerCount: syncState.peerCount,
     navigationTarget,
     clearNavigation,
+    isLoading,
+    markPlanAsRead,
+    refreshInboxUnreadState,
   };
 }

@@ -17,6 +17,79 @@ export const PlanStatusValues = [
 ] as const;
 export type PlanStatusType = (typeof PlanStatusValues)[number];
 
+/**
+ * Supported origin platforms for conversation export.
+ * Used to identify where a plan/conversation originated.
+ */
+export const OriginPlatformValues = [
+  'claude-code',
+  'devin',
+  'cursor',
+  'windsurf',
+  'aider',
+  'unknown',
+] as const;
+export type OriginPlatform = (typeof OriginPlatformValues)[number];
+
+/**
+ * Origin metadata for conversation export - discriminated by platform.
+ * Each platform has different session tracking mechanisms.
+ */
+export const ClaudeCodeOriginMetadataSchema = z.object({
+  platform: z.literal('claude-code'),
+  sessionId: z.string(),
+  transcriptPath: z.string(),
+  cwd: z.string().optional(),
+});
+
+export const DevinOriginMetadataSchema = z.object({
+  platform: z.literal('devin'),
+  sessionId: z.string(),
+  // Add devin-specific fields when implemented
+});
+
+export const CursorOriginMetadataSchema = z.object({
+  platform: z.literal('cursor'),
+  conversationId: z.string(),
+  generationId: z.string().optional(),
+  // Add cursor-specific fields when implemented
+});
+
+export const UnknownOriginMetadataSchema = z.object({
+  platform: z.literal('unknown'),
+});
+
+export const OriginMetadataSchema = z.discriminatedUnion('platform', [
+  ClaudeCodeOriginMetadataSchema,
+  DevinOriginMetadataSchema,
+  CursorOriginMetadataSchema,
+  UnknownOriginMetadataSchema,
+]);
+
+export type OriginMetadata = z.infer<typeof OriginMetadataSchema>;
+export type ClaudeCodeOriginMetadata = z.infer<typeof ClaudeCodeOriginMetadataSchema>;
+export type DevinOriginMetadata = z.infer<typeof DevinOriginMetadataSchema>;
+export type CursorOriginMetadata = z.infer<typeof CursorOriginMetadataSchema>;
+
+/**
+ * Parse and validate Claude Code hook metadata.
+ * Safely extracts origin fields with runtime validation.
+ */
+export function parseClaudeCodeOrigin(
+  hookMetadata: Record<string, unknown> | undefined
+): ClaudeCodeOriginMetadata | null {
+  if (!hookMetadata) return null;
+
+  const result = ClaudeCodeOriginMetadataSchema.safeParse({
+    platform: 'claude-code',
+    sessionId: hookMetadata.originSessionId,
+    transcriptPath: hookMetadata.originTranscriptPath,
+    cwd: hookMetadata.originCwd,
+  });
+
+  return result.success ? result.data : null;
+}
+
 export interface PlanMetadata {
   id: string;
   title: string;
@@ -48,6 +121,25 @@ export interface PlanMetadata {
   archivedAt?: number;
   /** Display name of who archived the plan */
   archivedBy?: string;
+
+  // --- Origin tracking for conversation export (Issue #41) ---
+
+  /** Origin metadata for conversation export (platform-specific) */
+  origin?: OriginMetadata;
+
+  // --- Per-user read/unread tracking ---
+
+  /** Records when each user last viewed the plan (username → timestamp) */
+  viewedBy?: Record<string, number>;
+
+  // --- Review request tracking ---
+
+  /**
+   * Unique identifier for current review request.
+   * Set by hook when requesting review, checked before accepting approval/denial.
+   * Prevents stale review decisions from previous cycles.
+   */
+  reviewRequestId?: string;
 }
 
 export const PlanMetadataSchema = z.object({
@@ -71,6 +163,15 @@ export const PlanMetadataSchema = z.object({
   sessionTokenHash: z.string().optional(),
   archivedAt: z.number().optional(),
   archivedBy: z.string().optional(),
+
+  // Origin tracking for conversation export (Issue #41)
+  origin: OriginMetadataSchema.optional(),
+
+  // Per-user read/unread tracking
+  viewedBy: z.record(z.string(), z.number()).optional(),
+
+  // Review request tracking
+  reviewRequestId: z.string().optional(),
 });
 
 export type ArtifactType = 'screenshot' | 'video' | 'test_results' | 'diff';
