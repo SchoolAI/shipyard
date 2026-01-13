@@ -12,12 +12,13 @@ export interface GitHubUser {
  * @param redirectUri - Where GitHub should redirect after auth
  * @param options.forceAccountPicker - Force GitHub to show account picker
  * @param options.scope - OAuth scope to request (empty for basic identity, 'repo' for private repo access)
+ * @param options.forceConsent - Force GitHub to show consent screen (needed for scope upgrades)
  */
 export function startWebFlow(
   redirectUri: string,
-  options: { forceAccountPicker?: boolean; scope?: string } = {}
+  options: { forceAccountPicker?: boolean; scope?: string; forceConsent?: boolean } = {}
 ): void {
-  const { forceAccountPicker = false, scope = '' } = options;
+  const { forceAccountPicker = false, scope = '', forceConsent = false } = options;
 
   const state = generateRandomState();
   sessionStorage.setItem('github-oauth-state', state);
@@ -31,6 +32,11 @@ export function startWebFlow(
 
   if (forceAccountPicker) {
     params.append('prompt', 'select_account');
+  }
+
+  // Force consent screen when upgrading scopes (otherwise GitHub returns existing token)
+  if (forceConsent && scope) {
+    params.append('prompt', 'consent');
   }
 
   window.location.href = `https://github.com/login/oauth/authorize?${params}`;

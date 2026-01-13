@@ -71,11 +71,14 @@ export function parseArtifactUrl(url: string): ParsedArtifactUrl | null {
  * For text files (JSON/diff), returns the text content directly.
  *
  * Falls back to direct URL fetch for public repos when no token is provided.
+ *
+ * @param hasRepoScope - Whether the token has `repo` scope (affects 404 interpretation)
  */
 export async function fetchArtifact(
   url: string,
   token: string | null,
-  isBinary: boolean
+  isBinary: boolean,
+  hasRepoScope = false
 ): Promise<FetchArtifactResult> {
   const parsed = parseArtifactUrl(url);
 
@@ -96,7 +99,7 @@ export async function fetchArtifact(
   }
 
   // Fetch via GitHub API with auth
-  return fetchViaGitHubApi(parsed, token, isBinary);
+  return fetchViaGitHubApi(parsed, token, isBinary, hasRepoScope);
 }
 
 // ============================================================================
@@ -133,10 +136,12 @@ async function fetchDirect(url: string, isBinary: boolean): Promise<FetchArtifac
   }
 }
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: GitHub API error handling requires multiple branches
 async function fetchViaGitHubApi(
   parsed: ParsedArtifactUrl,
   token: string,
-  isBinary: boolean
+  isBinary: boolean,
+  hasRepoScope: boolean
 ): Promise<FetchArtifactResult> {
   const apiUrl = `https://api.github.com/repos/${parsed.owner}/${parsed.repo}/contents/${parsed.path}?ref=${parsed.ref}`;
 
@@ -153,6 +158,11 @@ async function fetchViaGitHubApi(
         return { status: 'needs_auth' };
       }
       if (response.status === 404) {
+        // 404 could mean "not found" OR "insufficient permissions"
+        // If user doesn't have repo scope, treat as needs_auth
+        if (!hasRepoScope) {
+          return { status: 'needs_auth' };
+        }
         return { status: 'not_found' };
       }
       return { status: 'error', error: `GitHub API: ${response.status}` };

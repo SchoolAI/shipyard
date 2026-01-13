@@ -145,13 +145,13 @@ function BinaryArtifactViewer({
       setBlobUrl(null);
     }
 
-    const result = await fetchArtifact(url, token, true);
+    const result = await fetchArtifact(url, token, true, hasRepoScope);
     setStatus(result.status);
 
     if (result.status === 'success' && result.blobUrl) {
       setBlobUrl(result.blobUrl);
     }
-  }, [url, token, blobUrl]);
+  }, [url, token, blobUrl, hasRepoScope]);
 
   // Load artifact on mount and when URL/token changes
   useEffect(() => {
@@ -224,13 +224,13 @@ function TextArtifactViewer({
   const loadArtifact = useCallback(async () => {
     setStatus('loading');
 
-    const result = await fetchArtifact(url, token, false);
+    const result = await fetchArtifact(url, token, false, hasRepoScope);
     setStatus(result.status);
 
     if (result.status === 'success' && result.textContent) {
       setContent(result.textContent);
     }
-  }, [url, token]);
+  }, [url, token, hasRepoScope]);
 
   useEffect(() => {
     loadArtifact();

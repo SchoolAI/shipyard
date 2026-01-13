@@ -47,7 +47,36 @@ interface SnapshotCache {
   value: GitHubIdentity | null;
 }
 
+// Initialize cache eagerly at module load to prevent race conditions.
+// This ensures the first call to getSnapshot() returns the stored value
+// without needing to wait for any async operations.
 let snapshotCache: SnapshotCache | null = null;
+
+// Eagerly initialize the snapshot cache at module load time.
+// This prevents race conditions where React might call getSnapshot()
+// before the cache is populated.
+function initializeSnapshotCache(): void {
+  if (typeof localStorage !== 'undefined' && snapshotCache === null) {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored) as GitHubIdentity;
+        // Ensure scope field exists (migration for old stored identities)
+        if (parsed.scope === undefined) {
+          parsed.scope = '';
+        }
+        snapshotCache = { counter: changeCounter, value: parsed };
+      } else {
+        snapshotCache = { counter: changeCounter, value: null };
+      }
+    } catch {
+      snapshotCache = { counter: changeCounter, value: null };
+    }
+  }
+}
+
+// Run initialization immediately when module is loaded
+initializeSnapshotCache();
 
 function notifyListeners() {
   changeCounter++;
@@ -77,10 +106,14 @@ function getStoredIdentity(): GitHubIdentity | null {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (!stored) return null;
     const parsed = JSON.parse(stored) as GitHubIdentity;
+
     // Ensure scope field exists (migration for old stored identities)
     if (parsed.scope === undefined) {
       parsed.scope = '';
+      // Persist the migration back to localStorage
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
     }
+
     return parsed;
   } catch (err) {
     // Log parse errors to help debug localStorage corruption
@@ -110,7 +143,15 @@ function getSnapshot(): GitHubIdentity | null {
 }
 
 function getServerSnapshot(): GitHubIdentity | null {
-  return null;
+  // In a pure client-side app, this shouldn't be called, but React's concurrent
+  // features and StrictMode can sometimes use this during initial render.
+  // To avoid race conditions where identity appears as null/undefined on first
+  // render, we also read from localStorage here.
+  // Note: This is safe because localStorage is synchronous and available in browsers.
+  if (typeof localStorage === 'undefined') {
+    return null;
+  }
+  return getStoredIdentity();
 }
 
 async function processOAuthCallback(
@@ -247,7 +288,9 @@ export function useGitHubAuth(): UseGitHubAuthReturn {
     sessionStorage.setItem(RETURN_URL_KEY, returnUrl);
 
     const redirectUri = window.location.origin + (import.meta.env.BASE_URL || '/');
-    startWebFlow(redirectUri, { scope: 'repo' });
+    // Request repo scope - this will replace the existing token
+    // Don't clear identity here - causes UI flicker. OAuth callback will replace it.
+    startWebFlow(redirectUri, { scope: 'repo', forceConsent: true });
   }, []);
 
   const clearAuth = useCallback(() => {
