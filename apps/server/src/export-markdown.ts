@@ -88,12 +88,27 @@ export async function exportPlanToMarkdown(
     resolveUser
   );
 
-  // Combine
-  if (!feedbackMarkdown) {
-    return contentMarkdown;
+  // Get reviewer comment from metadata
+  const metadataMap = ydoc.getMap('metadata');
+  const reviewComment = metadataMap.get('reviewComment') as string | undefined;
+  const reviewedBy = metadataMap.get('reviewedBy') as string | undefined;
+
+  // Build output with optional sections
+  const sections: string[] = [contentMarkdown];
+
+  // Add reviewer comment if present
+  if (reviewComment) {
+    let reviewerSection = '## Reviewer Comment\n\n';
+    reviewerSection += `> **${reviewedBy ?? 'Reviewer'}:** ${reviewComment}\n`;
+    sections.push(reviewerSection);
   }
 
-  return `${contentMarkdown}\n\n---\n\n${feedbackMarkdown}`;
+  // Add thread feedback if present
+  if (feedbackMarkdown) {
+    sections.push(feedbackMarkdown);
+  }
+
+  return sections.join('\n\n---\n\n');
 }
 
 /**

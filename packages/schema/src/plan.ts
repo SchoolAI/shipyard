@@ -29,6 +29,7 @@ export interface PlanMetadata {
   reviewedAt?: number;
   /** Display name of the reviewer */
   reviewedBy?: string;
+  reviewComment?: string;
   /** When the task was marked complete */
   completedAt?: number;
   /** Who marked the task complete (agent or reviewer name) */
@@ -59,6 +60,7 @@ export const PlanMetadataSchema = z.object({
   pr: z.number().optional(),
   reviewedAt: z.number().optional(),
   reviewedBy: z.string().optional(),
+  reviewComment: z.string().optional(),
   completedAt: z.number().optional(),
   completedBy: z.string().optional(),
   snapshotUrl: z.string().optional(),

@@ -215,6 +215,25 @@ See [08-waiting-room.md](./08-waiting-room.md) for full details.
 
 ---
 
+## Milestone 10: Organizational Views (NOT STARTED)
+
+**Goal:** Multi-view interface for managing AI agent work at scale
+
+**Planned:**
+- ⏳ Phase 1: Sidebar enhancements (search, sort, filter)
+- ⏳ Phase 2: View switcher & Kanban board
+- ⏳ Phase 3: Tags & filtering infrastructure
+- ⏳ Phase 4: Artifact gallery view
+- ⏳ Phase 5: Table view for power users
+
+**Strategic context:** The industry is converging on "artifacts as proof" (Google Antigravity, Nov 2025). This milestone surfaces artifact value through better organization and visualization.
+
+**Dependencies:** Milestone 7 (Artifacts), Milestone 9 (GitHub Identity)
+
+See [10-organizational-views.md](./10-organizational-views.md) for full implementation plan.
+
+---
+
 ## Summary
 
 | # | Milestone | Status |
@@ -229,7 +248,8 @@ See [08-waiting-room.md](./08-waiting-room.md) for full details.
 | 7 | Artifacts | ✅ Complete |
 | 8 | Waiting Room | 🔄 In Progress |
 | 9 | GitHub Identity | ✅ Complete |
+| 10 | Organizational Views | ⏳ Not Started |
 
 ---
 
-*Last updated: 2026-01-08*
+*Last updated: 2026-01-12*

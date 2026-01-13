@@ -99,6 +99,7 @@ export const GetReviewStatusResponseSchema = z.object({
   ]),
   reviewedAt: z.number().optional(),
   reviewedBy: z.string().optional(),
+  reviewComment: z.string().optional(),
   feedback: z.array(ReviewFeedbackSchema).optional(),
 });
 

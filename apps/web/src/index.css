@@ -92,6 +92,9 @@
   --muted: oklch(0.88 0 0);
   --muted-foreground: oklch(0.48 0 0);
 
+  /* Field placeholder - needs good contrast in light mode */
+  --field-placeholder: oklch(0.55 0 0);
+
   --accent: oklch(0.5729 0.1385 180.72);
   --accent-foreground: var(--snow);
   --success: oklch(0.7329 0.1935 150.81);
@@ -120,6 +123,7 @@
   --overlay: oklch(0.24 0.0059 285.89);
   --muted: oklch(0.35 0.006 286.033);
   --muted-foreground: oklch(0.7 0.015 286.067);
+  --field-placeholder: oklch(0.55 0.01 286);
 }
 
 /* Base styling - ensure proper background colors */

@@ -120,9 +120,6 @@
             "noConsole": "off",
             "noExplicitAny": "off"
           },
-          "style": {
-            "noNonNullAssertion": "off"
-          },
           "complexity": {
             "noExcessiveCognitiveComplexity": "off"
           },

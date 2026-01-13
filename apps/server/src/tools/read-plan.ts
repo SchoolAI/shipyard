@@ -97,6 +97,9 @@ OUTPUT INCLUDES:
     }
     output += `**Created:** ${new Date(metadata.createdAt).toISOString()}\n`;
     output += `**Updated:** ${new Date(metadata.updatedAt).toISOString()}\n`;
+    if (metadata.reviewComment) {
+      output += `\n**Reviewer Comment:** ${metadata.reviewComment}\n`;
+    }
     output += '\n---\n\n';
 
     // Append markdown content

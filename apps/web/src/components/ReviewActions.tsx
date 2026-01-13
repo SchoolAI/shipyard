@@ -1,6 +1,6 @@
-import { Button } from '@heroui/react';
+import { Button, Popover, TextArea } from '@heroui/react';
 import type { PlanStatusType } from '@peer-plan/schema';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type * as Y from 'yjs';
 
 /** Simple identity type for display purposes */
@@ -19,9 +19,12 @@ interface ReviewActionsProps {
   onStatusChange?: (newStatus: 'approved' | 'changes_requested') => void;
 }
 
+type PopoverType = 'approve' | 'changes' | null;
+
 /**
  * Approve and Request Changes buttons for plan review.
  *
+ * Opens a popover with optional comment field before confirming the action.
  * Updates the plan metadata status via Y.Doc.
  * The hook observes the Y.Doc for status changes to unblock.
  */
@@ -33,16 +36,38 @@ export function ReviewActions({
   onStatusChange,
 }: ReviewActionsProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [openPopover, setOpenPopover] = useState<PopoverType>(null);
+  const [comment, setComment] = useState('');
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const handleAction = async (action: 'approve' | 'request_changes') => {
+  // Auto-focus textarea when Request Changes popover opens
+  useEffect(() => {
+    if (openPopover === 'changes' && textareaRef.current) {
+      // Small delay to ensure popover is rendered
+      setTimeout(() => textareaRef.current?.focus(), 50);
+    }
+  }, [openPopover]);
+
+  const handleButtonPress = (type: 'approve' | 'changes') => {
     if (!identity) {
       onRequestIdentity();
       return;
     }
+    setOpenPopover(type);
+  };
+
+  const handleCancel = () => {
+    setOpenPopover(null);
+    setComment('');
+  };
+
+  const handleConfirm = async (action: 'approve' | 'request_changes') => {
+    if (!identity) return;
 
     setIsSubmitting(true);
     try {
       const newStatus = action === 'approve' ? 'approved' : 'changes_requested';
+      const trimmedComment = comment.trim();
 
       // Update Y.Doc - hook observes this for distributed approval
       ydoc.transact(() => {
@@ -51,8 +76,17 @@ export function ReviewActions({
         metadata.set('reviewedAt', Date.now());
         metadata.set('reviewedBy', identity.name);
         metadata.set('updatedAt', Date.now());
+
+        // Set or clear reviewComment
+        if (trimmedComment) {
+          metadata.set('reviewComment', trimmedComment);
+        } else {
+          metadata.delete('reviewComment');
+        }
       });
 
+      setOpenPopover(null);
+      setComment('');
       onStatusChange?.(newStatus);
     } finally {
       setIsSubmitting(false);
@@ -61,23 +95,109 @@ export function ReviewActions({
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <Button
-        size="sm"
-        className="bg-success hover:bg-success-dark text-white touch-target text-xs !h-7 px-3 !min-h-0 rounded-lg"
-        onPress={() => handleAction('approve')}
-        isDisabled={isSubmitting || currentStatus === 'approved'}
+      {/* Approve Button with Popover */}
+      <Popover
+        isOpen={openPopover === 'approve'}
+        onOpenChange={(open) => setOpenPopover(open ? 'approve' : null)}
       >
-        {currentStatus === 'approved' ? 'Approved' : 'Approve'}
-      </Button>
-      <Button
-        variant="danger"
-        size="sm"
-        className="touch-target text-xs !h-7 px-3 !min-h-0 rounded-lg"
-        onPress={() => handleAction('request_changes')}
-        isDisabled={isSubmitting || currentStatus === 'changes_requested'}
+        <Button
+          size="sm"
+          className="bg-success hover:bg-success-dark text-white text-xs px-4 rounded-lg min-h-[36px]"
+          onPress={() => handleButtonPress('approve')}
+          isDisabled={isSubmitting || currentStatus === 'approved'}
+        >
+          {currentStatus === 'approved' ? 'Approved' : 'Approve'}
+        </Button>
+
+        <Popover.Content placement="top" className="w-80">
+          <Popover.Dialog>
+            <Popover.Arrow />
+            <Popover.Heading>Approve Plan</Popover.Heading>
+
+            <div className="mt-3 space-y-3">
+              <label htmlFor="approve-comment" className="block text-xs text-muted-foreground">
+                Feedback for the agent (optional)
+              </label>
+              <TextArea
+                id="approve-comment"
+                placeholder="Great work! Consider also..."
+                value={comment}
+                onChange={(e) => setComment(e.target.value)}
+                rows={3}
+                className="w-full"
+              />
+
+              <div className="flex justify-end gap-2">
+                <Button size="sm" variant="ghost" onPress={handleCancel}>
+                  Cancel
+                </Button>
+                <Button
+                  size="sm"
+                  className="bg-success text-white"
+                  onPress={() => handleConfirm('approve')}
+                  isDisabled={isSubmitting}
+                  isPending={isSubmitting}
+                >
+                  Approve
+                </Button>
+              </div>
+            </div>
+          </Popover.Dialog>
+        </Popover.Content>
+      </Popover>
+
+      {/* Request Changes Button with Popover */}
+      <Popover
+        isOpen={openPopover === 'changes'}
+        onOpenChange={(open) => setOpenPopover(open ? 'changes' : null)}
       >
-        {currentStatus === 'changes_requested' ? 'Changes' : 'Request Changes'}
-      </Button>
+        <Button
+          variant="danger"
+          size="sm"
+          className="text-xs px-4 rounded-lg min-h-[36px]"
+          onPress={() => handleButtonPress('changes')}
+          isDisabled={isSubmitting || currentStatus === 'changes_requested'}
+        >
+          {currentStatus === 'changes_requested' ? 'Changes' : 'Request Changes'}
+        </Button>
+
+        <Popover.Content placement="top" className="w-80">
+          <Popover.Dialog>
+            <Popover.Arrow />
+            <Popover.Heading>Request Changes</Popover.Heading>
+
+            <div className="mt-3 space-y-3">
+              <label htmlFor="changes-comment" className="block text-xs text-muted-foreground">
+                What should the agent change?
+              </label>
+              <TextArea
+                id="changes-comment"
+                ref={textareaRef}
+                placeholder="Please update the error handling to..."
+                value={comment}
+                onChange={(e) => setComment(e.target.value)}
+                rows={3}
+                className="w-full"
+              />
+
+              <div className="flex justify-end gap-2">
+                <Button size="sm" variant="ghost" onPress={handleCancel}>
+                  Cancel
+                </Button>
+                <Button
+                  size="sm"
+                  variant="danger"
+                  onPress={() => handleConfirm('request_changes')}
+                  isDisabled={isSubmitting}
+                  isPending={isSubmitting}
+                >
+                  Submit
+                </Button>
+              </div>
+            </div>
+          </Popover.Dialog>
+        </Popover.Content>
+      </Popover>
     </div>
   );
 }

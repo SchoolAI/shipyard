@@ -5,12 +5,23 @@ import {
   DisclosureGroup,
   ListBox,
   ListBoxItem,
+  SearchField,
+  Select,
   Tooltip,
 } from '@heroui/react';
-import type { PlanIndexEntry } from '@peer-plan/schema';
+import type { PlanIndexEntry, PlanStatusType } from '@peer-plan/schema';
 import { getPlanIndexEntry, PLAN_INDEX_DOC_NAME, setPlanIndexEntry } from '@peer-plan/schema';
-import { Archive, ArchiveRestore, ChevronRight, FileText, Inbox, Users } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import {
+  Archive,
+  ArchiveRestore,
+  ArrowUpDown,
+  ChevronRight,
+  FileText,
+  Inbox,
+  Users,
+  X,
+} from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { AccountSection } from '@/components/account';
@@ -20,6 +31,12 @@ import { useActivePlanSync } from '@/contexts/ActivePlanSyncContext';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
 import { useMultiProviderSync } from '@/hooks/useMultiProviderSync';
 import { usePlanIndex } from '@/hooks/usePlanIndex';
+import {
+  filterAndSortPlans,
+  SORT_OPTIONS,
+  STATUS_FILTER_OPTIONS,
+  useViewFilters,
+} from '@/hooks/useViewFilters';
 import {
   getShowArchived,
   getSidebarCollapsed,
@@ -87,6 +104,112 @@ interface SidebarProps {
   onNavigate?: () => void;
   /** When true, skip CollapsiblePanel wrapper (used in mobile drawer) */
   inDrawer?: boolean;
+}
+
+interface FilterControlsProps {
+  searchQuery: string;
+  sortBy: string;
+  statusFilters: PlanStatusType[];
+  onSearchChange: (query: string) => void;
+  onSortChange: (sort: string) => void;
+  onStatusToggle: (status: PlanStatusType) => void;
+  onClearFilters: () => void;
+  hasActiveFilters: boolean;
+}
+
+function FilterControls({
+  searchQuery,
+  sortBy,
+  statusFilters,
+  onSearchChange,
+  onSortChange,
+  onStatusToggle,
+  onClearFilters,
+  hasActiveFilters,
+}: FilterControlsProps) {
+  return (
+    <div className="px-3 py-2 border-b border-separator space-y-2">
+      {/* Search input */}
+      <SearchField
+        aria-label="Search plans"
+        value={searchQuery}
+        onChange={onSearchChange}
+        className="w-full"
+      >
+        <SearchField.Group>
+          <SearchField.SearchIcon />
+          <SearchField.Input placeholder="Search plans..." />
+          <SearchField.ClearButton />
+        </SearchField.Group>
+      </SearchField>
+
+      {/* Sort dropdown and clear button */}
+      <div className="flex items-center gap-2">
+        <Select
+          aria-label="Sort plans"
+          selectedKey={sortBy}
+          onSelectionChange={(key) => onSortChange(key as string)}
+          className="flex-1"
+        >
+          <Select.Trigger>
+            <ArrowUpDown className="w-3.5 h-3.5 shrink-0" />
+            <Select.Value />
+          </Select.Trigger>
+          <Select.Popover>
+            <ListBox>
+              {SORT_OPTIONS.map((option) => (
+                <ListBoxItem key={option.value} id={option.value}>
+                  {option.label}
+                </ListBoxItem>
+              ))}
+            </ListBox>
+          </Select.Popover>
+        </Select>
+
+        {hasActiveFilters && (
+          <Tooltip>
+            <Tooltip.Trigger>
+              <Button
+                isIconOnly
+                variant="ghost"
+                size="sm"
+                aria-label="Clear all filters"
+                onPress={onClearFilters}
+                className="shrink-0"
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </Tooltip.Trigger>
+            <Tooltip.Content>Clear filters</Tooltip.Content>
+          </Tooltip>
+        )}
+      </div>
+
+      {/* Status filter chips */}
+      <div className="flex flex-wrap gap-1">
+        {STATUS_FILTER_OPTIONS.map((option) => {
+          const isActive = statusFilters.includes(option.value);
+          // Map color to HeroUI chip colors (primary -> accent for HeroUI v3)
+          const chipColor =
+            option.color === 'primary'
+              ? 'accent'
+              : (option.color as 'default' | 'warning' | 'success' | 'danger' | 'accent');
+          return (
+            <Chip
+              key={option.value}
+              size="sm"
+              variant={isActive ? 'soft' : 'soft'}
+              color={isActive ? chipColor : 'default'}
+              className={`cursor-pointer text-[10px] h-5 px-1.5 ${isActive ? 'ring-1 ring-current' : 'opacity-60'}`}
+              onClick={() => onStatusToggle(option.value)}
+            >
+              {option.label}
+            </Chip>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 interface CollapsedSidebarProps {
@@ -233,6 +356,40 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
   const location = useLocation();
   const { ydoc: indexDoc } = useMultiProviderSync(PLAN_INDEX_DOC_NAME);
 
+  // View filters
+  const {
+    searchQuery,
+    sortBy,
+    statusFilters,
+    setSearchQuery,
+    setSortBy,
+    toggleStatusFilter,
+    clearFilters,
+  } = useViewFilters();
+
+  // Apply filters to each plan category
+  const filteredInboxPlans = useMemo(() => {
+    const { filteredPlans } = filterAndSortPlans(inboxPlans, searchQuery, sortBy, statusFilters);
+    return filteredPlans;
+  }, [inboxPlans, searchQuery, sortBy, statusFilters]);
+
+  const filteredMyPlans = useMemo(() => {
+    const { filteredPlans } = filterAndSortPlans(myPlans, searchQuery, sortBy, statusFilters);
+    return filteredPlans;
+  }, [myPlans, searchQuery, sortBy, statusFilters]);
+
+  const filteredSharedPlans = useMemo(() => {
+    const { filteredPlans } = filterAndSortPlans(sharedPlans, searchQuery, sortBy, statusFilters);
+    return filteredPlans;
+  }, [sharedPlans, searchQuery, sortBy, statusFilters]);
+
+  const filteredArchivedPlans = useMemo(() => {
+    const { filteredPlans } = filterAndSortPlans(archivedPlans, searchQuery, sortBy, statusFilters);
+    return filteredPlans;
+  }, [archivedPlans, searchQuery, sortBy, statusFilters]);
+
+  const hasActiveFilters = searchQuery.trim() !== '' || statusFilters.length > 0;
+
   const handleToggleArchived = () => {
     const newState = !showArchived;
     setShowArchivedState(newState);
@@ -346,9 +503,9 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
   // Collapsed sidebar content (icon-only view)
   const collapsedContent = (
     <CollapsedSidebar
-      inboxCount={inboxPlans.length}
-      myPlansCount={myPlans.length}
-      sharedPlansCount={sharedPlans.length}
+      inboxCount={filteredInboxPlans.length}
+      myPlansCount={filteredMyPlans.length}
+      sharedPlansCount={filteredSharedPlans.length}
       showArchived={showArchived}
       onToggle={handleToggle}
       onToggleArchived={handleToggleArchived}
@@ -376,10 +533,22 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
         </Tooltip>
       </div>
 
+      {/* Filter controls */}
+      <FilterControls
+        searchQuery={searchQuery}
+        sortBy={sortBy}
+        statusFilters={statusFilters}
+        onSearchChange={setSearchQuery}
+        onSortChange={(sort) => setSortBy(sort as 'name' | 'newest' | 'updated' | 'status')}
+        onStatusToggle={toggleStatusFilter}
+        onClearFilters={clearFilters}
+        hasActiveFilters={hasActiveFilters}
+      />
+
       <nav className="flex-1 flex flex-col overflow-y-auto px-3 pt-3 pb-0">
         <DisclosureGroup>
           {/* Inbox section - plans needing attention */}
-          {inboxPlans.length > 0 && (
+          {filteredInboxPlans.length > 0 && (
             <Disclosure defaultExpanded>
               <Disclosure.Heading>
                 <Disclosure.Trigger className="w-full">
@@ -394,7 +563,7 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
                       color="warning"
                       className="text-[10px] h-5 px-1.5"
                     >
-                      {inboxPlans.length}
+                      {filteredInboxPlans.length}
                     </Chip>
                   </div>
                 </Disclosure.Trigger>
@@ -414,7 +583,7 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
                       }
                     }}
                   >
-                    {inboxPlans.map((plan) => (
+                    {filteredInboxPlans.map((plan) => (
                       <ListBoxItem
                         id={plan.id}
                         key={plan.id}
@@ -435,7 +604,7 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
           )}
 
           {/* My Plans section */}
-          {myPlans.length > 0 && (
+          {filteredMyPlans.length > 0 && (
             <Disclosure defaultExpanded>
               <Disclosure.Heading>
                 <Disclosure.Trigger className="w-full">
@@ -469,7 +638,7 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
                       }
                     }}
                   >
-                    {myPlans.map((plan) => (
+                    {filteredMyPlans.map((plan) => (
                       <ListBoxItem
                         id={plan.id}
                         key={plan.id}
@@ -490,7 +659,7 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
           )}
 
           {/* Shared Plans section */}
-          {sharedPlans.length > 0 && (
+          {filteredSharedPlans.length > 0 && (
             <Disclosure defaultExpanded>
               <Disclosure.Heading>
                 <Disclosure.Trigger className="w-full">
@@ -521,7 +690,7 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
                       }
                     }}
                   >
-                    {sharedPlans.map((plan) => (
+                    {filteredSharedPlans.map((plan) => (
                       <ListBoxItem
                         id={plan.id}
                         key={plan.id}
@@ -543,7 +712,7 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
           )}
 
           {/* Archived Plans section - shown when toggle is on */}
-          {showArchived && archivedPlans.length > 0 && (
+          {showArchived && filteredArchivedPlans.length > 0 && (
             <Disclosure defaultExpanded>
               <Disclosure.Heading>
                 <Disclosure.Trigger className="w-full">
@@ -553,7 +722,7 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
                       <span className="text-xs font-semibold text-muted-foreground">Archived</span>
                     </div>
                     <Chip size="sm" variant="soft" className="text-[10px] h-5 px-1.5">
-                      {archivedPlans.length}
+                      {filteredArchivedPlans.length}
                     </Chip>
                   </div>
                 </Disclosure.Trigger>
@@ -573,7 +742,7 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
                       }
                     }}
                   >
-                    {archivedPlans.map((plan) => (
+                    {filteredArchivedPlans.map((plan) => (
                       <ListBoxItem
                         id={plan.id}
                         key={plan.id}
@@ -591,9 +760,13 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
         </DisclosureGroup>
 
         {/* Empty state */}
-        {myPlans.length === 0 && sharedPlans.length === 0 && (
-          <p className="text-muted-foreground text-sm p-2 text-center">No plans yet</p>
-        )}
+        {filteredMyPlans.length === 0 &&
+          filteredSharedPlans.length === 0 &&
+          filteredInboxPlans.length === 0 && (
+            <p className="text-muted-foreground text-sm p-2 text-center">
+              {hasActiveFilters ? 'No matching plans' : 'No plans yet'}
+            </p>
+          )}
       </nav>
 
       {/* Footer with GitHub account, archive toggle, and theme toggle */}

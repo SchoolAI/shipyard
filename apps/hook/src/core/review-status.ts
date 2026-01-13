@@ -153,15 +153,21 @@ async function waitForReviewDecision(planId: string, wsUrl: string): Promise<Rev
 
 /**
  * Extract feedback from Y.Doc with full plan context.
- * Returns: plan content + comments + deliverables for LLM.
+ * Returns: plan content + reviewer comment + thread comments + deliverables for LLM.
  */
 function extractFeedbackFromYDoc(ydoc: Y.Doc): string | undefined {
   try {
+    // Get reviewer comment from metadata
+    const metadataMap = ydoc.getMap('metadata');
+    const reviewComment = metadataMap.get('reviewComment') as string | undefined;
+    const reviewedBy = metadataMap.get('reviewedBy') as string | undefined;
+
     const threadsMap = ydoc.getMap('threads');
     const threadsData = threadsMap.toJSON() as Record<string, unknown>;
     const threads = parseThreads(threadsData);
 
-    if (threads.length === 0) {
+    // If no reviewComment and no threads, return generic message
+    if (!reviewComment && threads.length === 0) {
       return 'Changes requested. Check the plan for reviewer comments.';
     }
 
@@ -188,7 +194,7 @@ function extractFeedbackFromYDoc(ydoc: Y.Doc): string | undefined {
       resolveUser,
     });
 
-    // Combine: plan content + reviewer feedback
+    // Combine: plan content + reviewer comment + thread feedback
     let output = 'Changes requested:\n\n';
 
     if (planText) {
@@ -197,8 +203,18 @@ function extractFeedbackFromYDoc(ydoc: Y.Doc): string | undefined {
       output += '\n\n---\n\n';
     }
 
-    output += '## Reviewer Feedback\n\n';
-    output += feedbackText;
+    // Add reviewer comment if present (this is the top-level feedback from approve/request changes)
+    if (reviewComment) {
+      output += '## Reviewer Comment\n\n';
+      output += `> **${reviewedBy ?? 'Reviewer'}:** ${reviewComment}\n`;
+      output += '\n---\n\n';
+    }
+
+    // Add inline thread feedback if any
+    if (feedbackText) {
+      output += '## Inline Feedback\n\n';
+      output += feedbackText;
+    }
 
     // Add deliverables section if any exist (uses shared formatter)
     const deliverables = getDeliverables(ydoc);

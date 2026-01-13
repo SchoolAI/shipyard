@@ -143,7 +143,10 @@ export class SignalingRoom extends DurableObject<Env> {
           if (!this.topics.has(topic)) {
             this.topics.set(topic, new Set());
           }
-          this.topics.get(topic)!.add(ws);
+          const topicSet = this.topics.get(topic);
+          if (topicSet) {
+            topicSet.add(ws);
+          }
         }
 
         // Update the in-memory state on the WebSocket
@@ -238,7 +241,10 @@ export class SignalingRoom extends DurableObject<Env> {
       if (!this.topics.has(topic)) {
         this.topics.set(topic, new Set());
       }
-      this.topics.get(topic)!.add(ws);
+      const topicSet = this.topics.get(topic);
+      if (topicSet) {
+        topicSet.add(ws);
+      }
 
       // Track on connection state
       state.topics.add(topic);
