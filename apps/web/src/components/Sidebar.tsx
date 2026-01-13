@@ -589,7 +589,17 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
           onSelectionChange={(keys) => {
             const key = Array.from(keys)[0];
             if (key) {
-              markPlanAsRead(String(key));
+              const planId = String(key);
+              // biome-ignore lint/suspicious/noConsole: Debug logging
+              console.log(
+                '[Sidebar] onSelectionChange - planId:',
+                planId,
+                'githubIdentity?.username:',
+                githubIdentity?.username,
+                'inboxPlans.length:',
+                inboxPlans.length
+              );
+              markPlanAsRead(planId);
               onNavigate?.();
               navigate(`/plan/${key}`);
             }

@@ -280,8 +280,16 @@ function assertNever(x: never): never {
  */
 function handleApprovalState(conn: WebSocket, message: ApprovalStateMessage): void {
   const userId = connectionUserIds.get(conn);
+  console.log('[handleApprovalState] Received approval_state:', {
+    planId: message.planId,
+    ownerId: message.ownerId,
+    userId,
+    approvedCount: message.approvedUsers.length,
+    rejectedCount: message.rejectedUsers.length,
+  });
+
   if (!userId) {
-    console.warn('Received approval_state from unauthenticated connection');
+    console.warn('[handleApprovalState] No userId - unauthenticated');
     return;
   }
 
@@ -430,13 +438,28 @@ function notifyOwnerOfRedemption(planId: string, token: InviteToken, redeemedBy:
  */
 function handleCreateInvite(conn: WebSocket, message: CreateInviteRequest): void {
   const userId = connectionUserIds.get(conn);
+  console.log('[handleCreateInvite] Request received:', {
+    planId: message.planId,
+    userId,
+    hasApproval: planApprovals.has(message.planId),
+  });
+
   if (!userId) {
+    console.warn('[handleCreateInvite] No userId - unauthenticated');
     send(conn, { type: 'error', error: 'unauthenticated' });
     return;
   }
 
   const approval = planApprovals.get(message.planId);
+  console.log('[handleCreateInvite] Approval state:', {
+    hasApproval: !!approval,
+    ownerId: approval?.ownerId,
+    userId,
+    matches: approval?.ownerId === userId,
+  });
+
   if (!approval || approval.ownerId !== userId) {
+    console.warn('[handleCreateInvite] Not owner or no approval state');
     send(conn, { type: 'error', error: 'not_owner' });
     return;
   }

@@ -205,17 +205,10 @@ export function useMultiProviderSync(
       const signalingServer =
         (import.meta.env.VITE_WEBRTC_SIGNALING as string) || DEFAULT_SIGNALING_SERVER;
 
-      console.log('[useMultiProviderSync] WebRTC signaling server:', signalingServer);
-
       rtc = new WebrtcProvider(`peer-plan-${docName}`, ydoc, {
         signaling: [signalingServer],
       });
       setRtcProvider(rtc);
-
-      // Log when WebSocket connects
-      rtc.on('status', (event: { status: string }) => {
-        console.log('[useMultiProviderSync] WebRTC status:', event.status);
-      });
 
       // Use awareness protocol for peer counting instead of raw WebRTC connections.
       // The awareness protocol has a heartbeat/timeout mechanism that properly detects
@@ -383,11 +376,20 @@ export function useMultiProviderSync(
 
     // Set initial awareness state when GitHub identity is available
     if (githubIdentity && rtc) {
+      console.log('[useMultiProviderSync] Sending initial identity and approval state', {
+        username: githubIdentity.username,
+        planId: docName,
+      });
       updateApprovalStatus();
       // Send user identity and approval state immediately
       // No delay - we need this before any WebRTC messages are relayed
       sendUserIdentityToSignaling();
       pushApprovalStateToSignaling();
+    } else {
+      console.warn('[useMultiProviderSync] NOT sending approval state:', {
+        hasGithubIdentity: !!githubIdentity,
+        hasRtc: !!rtc,
+      });
     }
 
     function updateSyncState() {

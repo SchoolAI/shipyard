@@ -95,6 +95,8 @@ export interface PlanIndexState {
  * @param currentUsername - GitHub username of the current user (for ownership filtering)
  */
 export function usePlanIndex(currentUsername: string | undefined): PlanIndexState {
+  // biome-ignore lint/suspicious/noConsole: Debug logging
+  console.log('[usePlanIndex] called with currentUsername=', currentUsername);
   const { ydoc, syncState } = useMultiProviderSync(PLAN_INDEX_DOC_NAME);
   const [allPlansData, setAllPlansData] = useState<{
     active: PlanIndexEntry[];
@@ -399,9 +401,25 @@ export function usePlanIndex(currentUsername: string | undefined): PlanIndexStat
    * Mark a plan as read by the current user.
    * Updates the viewedBy field in the plan's Y.Doc.
    */
+  // Log when the callback is recreated
+  // biome-ignore lint/suspicious/noConsole: Debug logging
+  console.log(
+    '[usePlanIndex] markPlanAsRead useCallback dependency changed, currentUsername=',
+    currentUsername
+  );
+
   const markPlanAsRead = useCallback(
     async (planId: string): Promise<void> => {
+      // biome-ignore lint/suspicious/noConsole: Debug logging
+      console.log(
+        '[markPlanAsRead] called with planId=',
+        planId,
+        'currentUsername=',
+        currentUsername
+      );
       if (!currentUsername) {
+        // biome-ignore lint/suspicious/noConsole: Debug logging
+        console.log('[markPlanAsRead] no currentUsername, returning early');
         return;
       }
 

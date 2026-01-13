@@ -15,7 +15,7 @@ import {
   Rows3,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { type NodeRendererProps, Tree, type TreeApi } from 'react-arborist';
+import { type NodeApi, type NodeRendererProps, Tree, type TreeApi } from 'react-arborist';
 import type * as Y from 'yjs';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
 import { useLinkedPRs } from '@/hooks/useLinkedPRs';
@@ -368,34 +368,17 @@ function DiffViewer({ pr, repo, ydoc }: DiffViewerProps) {
   const treeRef = useRef<TreeApi<FileTreeData>>(null);
 
   // Handle file selection from tree (MUST be before conditional returns!)
-  const handleFileSelect = useCallback(
-    (nodes: string[]) => {
-      // react-arborist passes selected node IDs, find the actual file
-      const nodeId = nodes[0];
-      if (!nodeId) return;
+  const handleFileSelect = useCallback((nodes: NodeApi<FileTreeData>[]) => {
+    // react-arborist passes NodeApi objects
+    const node = nodes[0];
+    if (!node) return;
 
-      // Find the file by traversing the tree
-      // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Recursive tree traversal requires nested loops
-      const findFile = (treeNodes: FileTreeData[]): PRFile | null => {
-        for (const node of treeNodes) {
-          if (node.id === nodeId) {
-            return node.file || null;
-          }
-          if (node.children) {
-            const found = findFile(node.children);
-            if (found) return found;
-          }
-        }
-        return null;
-      };
-
-      const file = findFile(fileTree);
-      if (file) {
-        setSelectedFile(file.filename);
-      }
-    },
-    [fileTree]
-  );
+    // Get the file from the node's data
+    const fileData = node.data;
+    if (fileData.file) {
+      setSelectedFile(fileData.file.filename);
+    }
+  }, []);
 
   // Create node renderer with comment counts (MUST be before conditional returns!)
   const NodeRenderer = useMemo(

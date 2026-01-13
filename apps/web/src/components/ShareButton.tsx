@@ -53,13 +53,6 @@ export function ShareButton({ planId, rtcProvider, isOwner = false, className }:
 
   // Create invite via signaling server (defaults: 30min TTL, unlimited uses)
   const createInvite = useCallback(() => {
-    // biome-ignore lint/suspicious/noConsole: Debug logging for signaling server diagnostics
-    console.log('[ShareButton] createInvite called', {
-      rtcProvider: !!rtcProvider,
-      planId,
-      isOwner,
-    });
-
     if (!rtcProvider || !planId) {
       handleSimpleShare();
       return;
@@ -89,32 +82,10 @@ export function ShareButton({ planId, rtcProvider, isOwner = false, className }:
     const signalingConns = (rtcProvider as unknown as { signalingConns: Array<{ ws: WebSocket }> })
       .signalingConns;
 
-    // biome-ignore lint/suspicious/noConsole: Debug logging for signaling server diagnostics
-    console.log('[ShareButton] Signaling connections:', {
-      hasSignalingConns: !!signalingConns,
-      connCount: signalingConns?.length ?? 0,
-      connections:
-        signalingConns?.map((c) => ({
-          hasWs: !!c.ws,
-          readyState: c.ws?.readyState,
-          readyStateName:
-            c.ws?.readyState === 0
-              ? 'CONNECTING'
-              : c.ws?.readyState === 1
-                ? 'OPEN'
-                : c.ws?.readyState === 2
-                  ? 'CLOSING'
-                  : 'CLOSED',
-          url: c.ws?.url,
-        })) ?? [],
-    });
-
     let sent = false;
     if (signalingConns) {
       for (const conn of signalingConns) {
         if (conn.ws && conn.ws.readyState === WebSocket.OPEN) {
-          // biome-ignore lint/suspicious/noConsole: Debug logging for signaling server diagnostics
-          console.log('[ShareButton] Sending create_invite to:', conn.ws.url, 'Message:', message);
           conn.ws.send(message);
           sent = true;
           break;
@@ -123,7 +94,6 @@ export function ShareButton({ planId, rtcProvider, isOwner = false, className }:
     }
 
     if (!sent) {
-      console.error('[ShareButton] Failed to send - no open WebSocket');
       clearTimeout(timeout);
       setIsCreating(false);
       // Fall back to copying current URL
