@@ -337,13 +337,18 @@ ARTIFACT TYPES:
 
         // Update plan index
         const indexDoc = await getOrCreateDoc(PLAN_INDEX_DOC_NAME);
-        setPlanIndexEntry(indexDoc, {
-          id: metadata.id,
-          title: metadata.title,
-          status: 'completed',
-          createdAt: metadata.createdAt ?? Date.now(),
-          updatedAt: Date.now(),
-        });
+        if (metadata.ownerId) {
+          setPlanIndexEntry(indexDoc, {
+            id: metadata.id,
+            title: metadata.title,
+            status: 'completed',
+            createdAt: metadata.createdAt ?? Date.now(),
+            updatedAt: Date.now(),
+            ownerId: metadata.ownerId,
+          });
+        } else {
+          logger.warn({ planId }, 'Cannot update plan index: missing ownerId');
+        }
 
         logger.info({ planId, snapshotUrl }, 'Task auto-completed');
 

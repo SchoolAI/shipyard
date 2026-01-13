@@ -131,6 +131,7 @@ Bad deliverables (not provable):
       status: 'draft',
       createdAt: now,
       updatedAt: now,
+      ownerId,
     });
 
     logger.info({ planId }, 'Plan index updated');

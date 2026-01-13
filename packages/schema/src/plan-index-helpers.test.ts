@@ -16,6 +16,7 @@ describe('Plan Index Helpers', () => {
     status: 'draft',
     createdAt: Date.now(),
     updatedAt: Date.now(),
+    ownerId: 'test-user',
     ...overrides,
   });
 

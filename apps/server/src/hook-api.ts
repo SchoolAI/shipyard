@@ -114,6 +114,7 @@ export async function handleCreateSession(req: Request, res: Response): Promise<
       status: 'draft',
       createdAt: now,
       updatedAt: now,
+      ownerId,
     });
 
     // Generate URL - use simple plan ID (not snapshot) for live updates
@@ -193,13 +194,18 @@ export async function handleUpdateContent(req: Request, res: Response): Promise<
 
     // Update plan index
     const indexDoc = await getOrCreateDoc(PLAN_INDEX_DOC_NAME);
-    setPlanIndexEntry(indexDoc, {
-      id: planId,
-      title,
-      status: metadata.status,
-      createdAt: metadata.createdAt ?? now,
-      updatedAt: now,
-    });
+    if (metadata.ownerId) {
+      setPlanIndexEntry(indexDoc, {
+        id: planId,
+        title,
+        status: metadata.status,
+        createdAt: metadata.createdAt ?? now,
+        updatedAt: now,
+        ownerId: metadata.ownerId,
+      });
+    } else {
+      logger.warn({ planId }, 'Cannot update plan index: missing ownerId');
+    }
 
     logger.info({ planId, title, blockCount: blocks.length }, 'Plan content updated');
 

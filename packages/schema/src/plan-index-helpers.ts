@@ -47,6 +47,7 @@ export function setPlanIndexEntry(ydoc: Y.Doc, entry: PlanIndexEntry): void {
     status: entry.status,
     createdAt: entry.createdAt,
     updatedAt: entry.updatedAt,
+    ownerId: entry.ownerId,
   };
   // Include archive fields if present
   if (entry.deletedAt !== undefined) {

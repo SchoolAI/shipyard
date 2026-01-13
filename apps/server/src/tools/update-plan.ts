@@ -103,13 +103,18 @@ STATUSES:
     setPlanMetadata(doc, updates);
 
     const indexDoc = await getOrCreateDoc(PLAN_INDEX_DOC_NAME);
-    setPlanIndexEntry(indexDoc, {
-      id: existingMetadata.id,
-      title: input.title ?? existingMetadata.title,
-      status: input.status ?? existingMetadata.status,
-      createdAt: existingMetadata.createdAt ?? Date.now(),
-      updatedAt: Date.now(),
-    });
+    if (existingMetadata.ownerId) {
+      setPlanIndexEntry(indexDoc, {
+        id: existingMetadata.id,
+        title: input.title ?? existingMetadata.title,
+        status: input.status ?? existingMetadata.status,
+        createdAt: existingMetadata.createdAt ?? Date.now(),
+        updatedAt: Date.now(),
+        ownerId: existingMetadata.ownerId,
+      });
+    } else {
+      logger.warn({ planId: input.planId }, 'Cannot update plan index: missing ownerId');
+    }
 
     logger.info({ planId: input.planId, updates }, 'Plan updated');
 

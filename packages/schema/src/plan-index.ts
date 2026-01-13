@@ -40,6 +40,8 @@ export interface PlanIndexEntry {
   status: PlanStatusType;
   createdAt: number;
   updatedAt: number;
+  /** GitHub username of the plan owner */
+  ownerId: string;
   /** Timestamp when plan was archived/deleted (hidden from sidebar by default) */
   deletedAt?: number;
   /** Display name of who archived/deleted the plan */
@@ -55,6 +57,7 @@ export const PlanIndexEntrySchema = z.object({
   status: z.enum(PlanStatusValues),
   createdAt: z.number(),
   updatedAt: z.number(),
+  ownerId: z.string(),
   deletedAt: z.number().optional(),
   deletedBy: z.string().optional(),
 });

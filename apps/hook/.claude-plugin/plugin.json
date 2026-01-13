@@ -1,0 +1,10 @@
+{
+  "name": "peer-plan",
+  "description": "P2P collaborative review for AI-generated implementation plans with proof-of-work tracking via artifacts",
+  "version": "0.1.0",
+  "author": {
+    "name": "SchoolAI"
+  },
+  "repository": "https://github.com/SchoolAI/peer-plan",
+  "keywords": ["planning", "review", "hooks", "ExitPlanMode", "collaboration", "artifacts", "p2p"]
+}

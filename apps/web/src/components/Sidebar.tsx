@@ -10,7 +10,7 @@ import {
 import type { PlanIndexEntry } from '@peer-plan/schema';
 import { getPlanIndexEntry, PLAN_INDEX_DOC_NAME, setPlanIndexEntry } from '@peer-plan/schema';
 import { Archive, ArchiveRestore, ChevronRight, FileText, Inbox, Users } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { AccountSection } from '@/components/account';
@@ -20,7 +20,6 @@ import { useActivePlanSync } from '@/contexts/ActivePlanSyncContext';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
 import { useMultiProviderSync } from '@/hooks/useMultiProviderSync';
 import { usePlanIndex } from '@/hooks/usePlanIndex';
-import { useSharedPlans } from '@/hooks/useSharedPlans';
 import {
   getShowArchived,
   getSidebarCollapsed,
@@ -92,7 +91,7 @@ interface SidebarProps {
 
 interface CollapsedSidebarProps {
   inboxCount: number;
-  localPlansCount: number;
+  myPlansCount: number;
   sharedPlansCount: number;
   showArchived: boolean;
   onToggle: () => void;
@@ -101,7 +100,7 @@ interface CollapsedSidebarProps {
 
 function CollapsedSidebar({
   inboxCount,
-  localPlansCount,
+  myPlansCount,
   sharedPlansCount,
   showArchived,
   onToggle,
@@ -154,7 +153,7 @@ function CollapsedSidebar({
         )}
 
         {/* My Plans indicator */}
-        {localPlansCount > 0 && (
+        {myPlansCount > 0 && (
           <Tooltip>
             <Tooltip.Trigger>
               <Button
@@ -167,7 +166,7 @@ function CollapsedSidebar({
                 <FileText className="w-5 h-5 text-foreground" />
               </Button>
             </Tooltip.Trigger>
-            <Tooltip.Content>My Plans ({localPlansCount})</Tooltip.Content>
+            <Tooltip.Content>My Plans ({myPlansCount})</Tooltip.Content>
           </Tooltip>
         )}
 
@@ -217,32 +216,22 @@ function CollapsedSidebar({
 }
 
 export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
+  const { identity: githubIdentity } = useGitHubAuth();
   const {
-    plans: localPlans,
+    myPlans,
+    sharedPlans,
     inboxPlans,
     archivedPlans,
     activeCount,
     navigationTarget,
     clearNavigation,
-  } = usePlanIndex();
+  } = usePlanIndex(githubIdentity?.username);
   const { activePlanId, syncState } = useActivePlanSync();
   const [collapsed, setCollapsed] = useState(getSidebarCollapsed);
   const [showArchived, setShowArchivedState] = useState(getShowArchived);
-  const [optimisticallyHiddenIds, setOptimisticallyHiddenIds] = useState<Set<string>>(new Set());
   const navigate = useNavigate();
   const location = useLocation();
-  const { identity: githubIdentity } = useGitHubAuth();
   const { ydoc: indexDoc } = useMultiProviderSync(PLAN_INDEX_DOC_NAME);
-
-  // Memoize plan IDs to prevent infinite re-renders in useSharedPlans
-  const localPlanIds = useMemo(() => localPlans.map((p) => p.id), [localPlans]);
-  const rawSharedPlans = useSharedPlans(localPlanIds, githubIdentity?.username);
-
-  // Filter out optimistically hidden plans
-  const sharedPlans = useMemo(
-    () => rawSharedPlans.filter((p) => !optimisticallyHiddenIds.has(p.id)),
-    [rawSharedPlans, optimisticallyHiddenIds]
-  );
 
   const handleToggleArchived = () => {
     const newState = !showArchived;
@@ -255,9 +244,6 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
       toast.error('Please sign in with GitHub first');
       return;
     }
-
-    // Optimistic update - hide immediately
-    setOptimisticallyHiddenIds((prev) => new Set(prev).add(planId));
 
     const now = Date.now();
 
@@ -289,13 +275,10 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
         updatedAt: now,
       });
     } else {
-      // Shared plan - create new entry in plan-index
-      const sharedPlan = [...rawSharedPlans, ...inboxPlans, ...localPlans].find(
-        (p) => p.id === planId
-      );
-      if (sharedPlan) {
+      const plan = [...sharedPlans, ...inboxPlans, ...myPlans].find((p) => p.id === planId);
+      if (plan) {
         setPlanIndexEntry(indexDoc, {
-          ...sharedPlan,
+          ...plan,
           deletedAt: now,
           deletedBy: githubIdentity.displayName,
           updatedAt: now,
@@ -311,13 +294,6 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
       toast.error('Please sign in with GitHub first');
       return;
     }
-
-    // Optimistic update - show immediately
-    setOptimisticallyHiddenIds((prev) => {
-      const next = new Set(prev);
-      next.delete(planId);
-      return next;
-    });
 
     const now = Date.now();
 
@@ -371,7 +347,7 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
   const collapsedContent = (
     <CollapsedSidebar
       inboxCount={inboxPlans.length}
-      localPlansCount={localPlans.length}
+      myPlansCount={myPlans.length}
       sharedPlansCount={sharedPlans.length}
       showArchived={showArchived}
       onToggle={handleToggle}
@@ -459,7 +435,7 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
           )}
 
           {/* My Plans section */}
-          {localPlans.length > 0 && (
+          {myPlans.length > 0 && (
             <Disclosure defaultExpanded>
               <Disclosure.Heading>
                 <Disclosure.Trigger className="w-full">
@@ -493,7 +469,7 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
                       }
                     }}
                   >
-                    {localPlans.map((plan) => (
+                    {myPlans.map((plan) => (
                       <ListBoxItem
                         id={plan.id}
                         key={plan.id}
@@ -615,7 +591,7 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
         </DisclosureGroup>
 
         {/* Empty state */}
-        {localPlans.length === 0 && sharedPlans.length === 0 && (
+        {myPlans.length === 0 && sharedPlans.length === 0 && (
           <p className="text-muted-foreground text-sm p-2 text-center">No plans yet</p>
         )}
       </nav>

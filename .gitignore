@@ -152,6 +152,7 @@ vite.config.ts.timestamp-*
 spikes/plannotator/
 spikes/plan-notator-analysis.md
 spikes/loro-extended-repo/
+plannotator/
 
 # Playwright MCP
 .playwright-mcp/

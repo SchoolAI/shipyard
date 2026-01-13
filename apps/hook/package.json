@@ -7,6 +7,11 @@
   "bin": {
     "peer-plan-hook": "./dist/index.mjs"
   },
+  "files": [
+    "dist",
+    ".claude-plugin",
+    "hooks"
+  ],
   "scripts": {
     "dev": "pnpm link --global && tsdown --watch --on-success 'node dist/index.mjs'",
     "build": "tsdown",
