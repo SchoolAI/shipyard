@@ -9,16 +9,8 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import { logger } from './logger.js';
 import { isRegistryRunning, startRegistryServer } from './registry-server.js';
-import { addArtifactTool } from './tools/add-artifact.js';
-import { addPRReviewCommentTool } from './tools/add-pr-review-comment.js';
-import { completeTaskTool } from './tools/complete-task.js';
-import { createPlanTool } from './tools/create-plan.js';
 import { executeCodeTool } from './tools/execute-code.js';
-import { readPlanTool } from './tools/read-plan.js';
-import { setupReviewNotificationTool } from './tools/setup-review-notification.js';
 import { TOOL_NAMES } from './tools/tool-names.js';
-import { updateBlockContentTool } from './tools/update-block-content.js';
-import { updatePlanTool } from './tools/update-plan.js';
 import { startWebSocketServer } from './ws-server.js';
 
 // Start registry server if not already running (singleton)
@@ -45,47 +37,19 @@ const server = new Server(
   }
 );
 
+// Only expose execute_code - all other APIs available through it
 server.setRequestHandler(ListToolsRequestSchema, async () => ({
-  tools: [
-    addArtifactTool.definition,
-    addPRReviewCommentTool.definition,
-    completeTaskTool.definition,
-    createPlanTool.definition,
-    executeCodeTool.definition,
-    readPlanTool.definition,
-    setupReviewNotificationTool.definition,
-    updateBlockContentTool.definition,
-    updatePlanTool.definition,
-  ],
+  tools: [executeCodeTool.definition],
 }));
 
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
 
-  switch (name) {
-    case TOOL_NAMES.ADD_ARTIFACT:
-      return await addArtifactTool.handler(args ?? {});
-    case TOOL_NAMES.ADD_PR_REVIEW_COMMENT:
-      return await addPRReviewCommentTool.handler(args ?? {});
-    case TOOL_NAMES.COMPLETE_TASK:
-      return await completeTaskTool.handler(args ?? {});
-    case TOOL_NAMES.CREATE_PLAN:
-      return await createPlanTool.handler(args ?? {});
-    case TOOL_NAMES.EXECUTE_CODE:
-      return await executeCodeTool.handler(args ?? {});
-    case TOOL_NAMES.READ_PLAN:
-      return await readPlanTool.handler(args ?? {});
-    case TOOL_NAMES.SETUP_REVIEW_NOTIFICATION:
-      return await setupReviewNotificationTool.handler(args ?? {});
-    case TOOL_NAMES.UPDATE_BLOCK_CONTENT:
-      return await updateBlockContentTool.handler(args ?? {});
-    case TOOL_NAMES.UPDATE_PLAN:
-      return await updatePlanTool.handler(args ?? {});
-    default: {
-      const _exhaustiveCheck: never = name as never;
-      throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${_exhaustiveCheck}`);
-    }
+  if (name === TOOL_NAMES.EXECUTE_CODE) {
+    return await executeCodeTool.handler(args ?? {});
   }
+
+  throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${name}`);
 });
 
 const transport = new StdioServerTransport();
