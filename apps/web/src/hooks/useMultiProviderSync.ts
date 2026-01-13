@@ -376,20 +376,12 @@ export function useMultiProviderSync(
 
     // Set initial awareness state when GitHub identity is available
     if (githubIdentity && rtc) {
-      console.log('[useMultiProviderSync] Sending initial identity and approval state', {
-        username: githubIdentity.username,
-        planId: docName,
-      });
       updateApprovalStatus();
       // Send user identity and approval state immediately
       // No delay - we need this before any WebRTC messages are relayed
       sendUserIdentityToSignaling();
       pushApprovalStateToSignaling();
     } else {
-      console.warn('[useMultiProviderSync] NOT sending approval state:', {
-        hasGithubIdentity: !!githubIdentity,
-        hasRtc: !!rtc,
-      });
     }
 
     function updateSyncState() {

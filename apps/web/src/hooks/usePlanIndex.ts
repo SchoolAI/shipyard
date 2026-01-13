@@ -95,8 +95,6 @@ export interface PlanIndexState {
  * @param currentUsername - GitHub username of the current user (for ownership filtering)
  */
 export function usePlanIndex(currentUsername: string | undefined): PlanIndexState {
-  // biome-ignore lint/suspicious/noConsole: Debug logging
-  console.log('[usePlanIndex] called with currentUsername=', currentUsername);
   const { ydoc, syncState } = useMultiProviderSync(PLAN_INDEX_DOC_NAME);
   const [allPlansData, setAllPlansData] = useState<{
     active: PlanIndexEntry[];
@@ -400,28 +398,20 @@ export function usePlanIndex(currentUsername: string | undefined): PlanIndexStat
   /**
    * Mark a plan as read by the current user.
    * Updates the viewedBy field in the plan's Y.Doc.
+   *
+   * Note: We use the currentUsername from the closure, which is kept up-to-date
+   * by the useCallback dependency array. If the user logs out while this is running,
+   * the operation will silently fail (which is the desired behavior).
    */
-  // Log when the callback is recreated
-  // biome-ignore lint/suspicious/noConsole: Debug logging
-  console.log(
-    '[usePlanIndex] markPlanAsRead useCallback dependency changed, currentUsername=',
-    currentUsername
-  );
-
   const markPlanAsRead = useCallback(
     async (planId: string): Promise<void> => {
-      // biome-ignore lint/suspicious/noConsole: Debug logging
-      console.log(
-        '[markPlanAsRead] called with planId=',
-        planId,
-        'currentUsername=',
-        currentUsername
-      );
+      // Early return if no user is logged in
       if (!currentUsername) {
-        // biome-ignore lint/suspicious/noConsole: Debug logging
-        console.log('[markPlanAsRead] no currentUsername, returning early');
         return;
       }
+
+      // Capture username at call time for use in async operations
+      const username = currentUsername;
 
       try {
         // Import markPlanAsViewed dynamically to avoid circular deps
@@ -430,26 +420,26 @@ export function usePlanIndex(currentUsername: string | undefined): PlanIndexStat
         const planDoc = new Y.Doc();
         const idb = new IndexeddbPersistence(planId, planDoc);
         await idb.whenSynced;
+
         // Mark the plan as viewed in the Y.Doc
-        markPlanAsViewed(planDoc, currentUsername);
+        markPlanAsViewed(planDoc, username);
 
         // Update local state immediately for instant UI feedback
         const now = Date.now();
-        setPlanViewedBy((prev) => {
-          const next = {
-            ...prev,
-            [planId]: {
-              ...(prev[planId] ?? {}),
-              [currentUsername]: now,
-            },
-          };
-          return next;
-        });
+        setPlanViewedBy((prev) => ({
+          ...prev,
+          [planId]: {
+            ...(prev[planId] ?? {}),
+            [username]: now,
+          },
+        }));
 
         // Keep the persistence alive briefly to ensure sync to IndexedDB
         await new Promise((resolve) => setTimeout(resolve, 100));
         idb.destroy();
-      } catch (_error) {}
+      } catch {
+        // Silently ignore errors - the plan will remain unread
+      }
     },
     [currentUsername]
   );

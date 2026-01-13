@@ -62,6 +62,22 @@ export {
   UpdatePresenceRequestSchema,
   UpdatePresenceResponseSchema,
 } from './hook-api.js';
+// Branded ID types - see docs/ID-SYSTEMS-INVENTORY.md
+export type {
+  AwarenessClientId,
+  ExportId,
+  GitHubUsername,
+  PlanId,
+  ReviewRequestId,
+  SessionToken,
+  WebRTCPeerId,
+} from './ids.js';
+export {
+  asAwarenessClientId,
+  asGitHubUsername,
+  asPlanId,
+  asWebRTCPeerId,
+} from './ids.js';
 // Invite tokens for P2P room authentication - Issue #12
 export type {
   CreateInviteRequest,

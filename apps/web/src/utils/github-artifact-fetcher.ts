@@ -87,8 +87,9 @@ export async function fetchArtifact(
   // If no token, try direct fetch first (works for public repos)
   if (!token) {
     const directResult = await fetchDirect(url, isBinary);
-    // Only return needs_auth if direct fetch failed with 403/404
-    if (directResult.status === 'error' && directResult.error?.includes('403')) {
+    // 404 on raw.githubusercontent.com could mean private repo (not truly missing)
+    // 403 definitely means needs auth
+    if (directResult.status === 'not_found' || directResult.status === 'needs_auth') {
       return { status: 'needs_auth' };
     }
     return directResult;

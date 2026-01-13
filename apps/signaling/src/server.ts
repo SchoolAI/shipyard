@@ -279,7 +279,16 @@ function assertNever(x: never): never {
  * @param message - The approval state message
  */
 function handleApprovalState(conn: WebSocket, message: ApprovalStateMessage): void {
-  const userId = connectionUserIds.get(conn);
+  // IMPORTANT: Store userId from this connection if not already set
+  // This handles the race condition where approval_state arrives before subscribe message
+  let userId = connectionUserIds.get(conn);
+  if (!userId && message.ownerId) {
+    // Infer userId from ownerId in the message (owner is sending this)
+    userId = message.ownerId;
+    connectionUserIds.set(conn, userId);
+    console.log('[handleApprovalState] Inferred userId from ownerId:', userId);
+  }
+
   console.log('[handleApprovalState] Received approval_state:', {
     planId: message.planId,
     ownerId: message.ownerId,
@@ -289,7 +298,7 @@ function handleApprovalState(conn: WebSocket, message: ApprovalStateMessage): vo
   });
 
   if (!userId) {
-    console.warn('[handleApprovalState] No userId - unauthenticated');
+    console.warn('[handleApprovalState] No userId even after inference - rejecting');
     return;
   }
 
