@@ -8,18 +8,16 @@ import {
   Select,
   Tooltip,
 } from '@heroui/react';
-import type { PlanIndexEntry, PlanStatusType } from '@peer-plan/schema';
+import type { PlanIndexEntry } from '@peer-plan/schema';
 import { getPlanIndexEntry, PLAN_INDEX_DOC_NAME, setPlanIndexEntry } from '@peer-plan/schema';
 import {
   Archive,
   ArchiveRestore,
   ArrowUpDown,
   ChevronRight,
-  FileText,
   Filter,
   Inbox,
   Users,
-  X,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -286,9 +284,9 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
     sharedPlans,
     inboxPlans,
     archivedPlans,
-    activeCount,
     navigationTarget,
     clearNavigation,
+    isLoading,
   } = usePlanIndex(githubIdentity?.username);
   const { activePlanId, syncState } = useActivePlanSync();
   const [collapsed, setCollapsed] = useState(getSidebarCollapsed);
@@ -296,35 +294,52 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
   const location = useLocation();
   const { ydoc: indexDoc } = useMultiProviderSync(PLAN_INDEX_DOC_NAME);
 
-  // Check if we're on inbox route
-  const isOnInbox = location.pathname === '/inbox';
-
   // View filters
   const {
     searchQuery,
     sortBy,
+    sortDirection,
     statusFilters,
     setSearchQuery,
     setSortBy,
+    toggleSortDirection,
     toggleStatusFilter,
     clearFilters,
   } = useViewFilters();
 
   // Apply filters to each plan category (always apply filtering)
   const filteredInboxPlans = useMemo(() => {
-    const { filteredPlans } = filterAndSortPlans(inboxPlans, searchQuery, sortBy, statusFilters);
+    const { filteredPlans } = filterAndSortPlans(
+      inboxPlans,
+      searchQuery,
+      sortBy,
+      statusFilters,
+      sortDirection
+    );
     return filteredPlans;
-  }, [inboxPlans, searchQuery, sortBy, statusFilters]);
+  }, [inboxPlans, searchQuery, sortBy, statusFilters, sortDirection]);
 
   const filteredMyPlans = useMemo(() => {
-    const { filteredPlans } = filterAndSortPlans(myPlans, searchQuery, sortBy, statusFilters);
+    const { filteredPlans } = filterAndSortPlans(
+      myPlans,
+      searchQuery,
+      sortBy,
+      statusFilters,
+      sortDirection
+    );
     return filteredPlans;
-  }, [myPlans, searchQuery, sortBy, statusFilters]);
+  }, [myPlans, searchQuery, sortBy, statusFilters, sortDirection]);
 
   const filteredSharedPlans = useMemo(() => {
-    const { filteredPlans } = filterAndSortPlans(sharedPlans, searchQuery, sortBy, statusFilters);
+    const { filteredPlans } = filterAndSortPlans(
+      sharedPlans,
+      searchQuery,
+      sortBy,
+      statusFilters,
+      sortDirection
+    );
     return filteredPlans;
-  }, [sharedPlans, searchQuery, sortBy, statusFilters]);
+  }, [sharedPlans, searchQuery, sortBy, statusFilters, sortDirection]);
 
   const hasActiveFilters = searchQuery.trim() !== '' || statusFilters.length > 0;
 
@@ -378,7 +393,8 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
     toast.success('Plan archived');
   };
 
-  const handleUnarchive = async (planId: string) => {
+  // TODO: Wire up to archived plans list when Archive section is implemented in sidebar
+  const _handleUnarchive = async (planId: string) => {
     if (!githubIdentity) {
       toast.error('Please sign in with GitHub first');
       return;
@@ -485,20 +501,17 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
 
       {/* Search and Filter controls inline */}
       <div className="px-3 py-2 border-b border-separator">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           {/* Search field */}
-          <SearchField
-            aria-label="Search plans"
-            value={searchQuery}
-            onChange={setSearchQuery}
-            className="flex-1"
-          >
-            <SearchField.Group>
-              <SearchField.SearchIcon />
-              <SearchField.Input placeholder="Search plans..." />
-              <SearchField.ClearButton />
-            </SearchField.Group>
-          </SearchField>
+          <div className="flex-1 min-w-0">
+            <SearchField aria-label="Search plans" value={searchQuery} onChange={setSearchQuery}>
+              <SearchField.Group>
+                <SearchField.SearchIcon />
+                <SearchField.Input placeholder="Search..." className="text-sm" />
+                {searchQuery.length > 0 && <SearchField.ClearButton />}
+              </SearchField.Group>
+            </SearchField>
+          </div>
 
           {/* Filter popover */}
           <Popover>
@@ -508,7 +521,7 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
                 variant="ghost"
                 size="sm"
                 aria-label="Filters"
-                className={`w-8 h-8 shrink-0 ${hasActiveFilters ? 'text-accent' : ''}`}
+                className={`w-9 h-9 shrink-0 relative ${hasActiveFilters ? 'text-accent' : ''}`}
               >
                 <Filter className="w-4 h-4" />
                 {hasActiveFilters && (
@@ -536,7 +549,19 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
 
                 {/* Sort dropdown */}
                 <div className="space-y-1.5">
-                  <label className="text-xs text-muted-foreground">Sort by</label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs text-muted-foreground">Sort by</label>
+                    <Button
+                      isIconOnly
+                      variant="ghost"
+                      size="sm"
+                      onPress={toggleSortDirection}
+                      className="w-6 h-6"
+                      title={`Sort direction: ${sortDirection}`}
+                    >
+                      <ArrowUpDown className="w-3 h-3" />
+                    </Button>
+                  </div>
                   <Select
                     aria-label="Sort plans"
                     selectedKey={sortBy}
@@ -546,10 +571,7 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
                     className="w-full"
                   >
                     <Select.Trigger className="h-8">
-                      <div className="flex items-center gap-2">
-                        <ArrowUpDown className="w-3.5 h-3.5 shrink-0" />
-                        <Select.Value />
-                      </div>
+                      <Select.Value />
                     </Select.Trigger>
                     <Select.Popover>
                       <ListBox>
@@ -650,12 +672,16 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
           {/* Note: Archived plans are NOT shown here - they only appear on /archive route */}
         </ListBox>
 
-        {/* Empty state - only for active plans */}
+        {/* Empty/Loading state - only for active plans */}
         {filteredMyPlans.length === 0 &&
           filteredSharedPlans.length === 0 &&
           filteredInboxPlans.length === 0 && (
             <p className="text-muted-foreground text-sm p-2 text-center">
-              {hasActiveFilters ? 'No matching plans' : 'No plans yet'}
+              {isLoading
+                ? 'Loading plans...'
+                : hasActiveFilters
+                  ? 'No matching plans'
+                  : 'No plans yet'}
             </p>
           )}
       </nav>
