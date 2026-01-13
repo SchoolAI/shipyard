@@ -4,6 +4,7 @@ import {
   addDeliverable,
   extractDeliverables,
   initPlanMetadata,
+  type OriginMetadata,
   PLAN_INDEX_DOC_NAME,
   setPlanIndexEntry,
 } from '@peer-plan/schema';
@@ -36,7 +37,7 @@ const CreatePlanInput = z.object({
   ),
   originSessionId: z.string().optional().describe('Platform-specific session ID'),
   originMetadata: z
-    .record(z.unknown())
+    .record(z.string(), z.unknown())
     .optional()
     .describe('Platform-specific metadata for conversation export'),
 });
@@ -116,6 +117,28 @@ Bad deliverables (not provable):
     const ownerId = getGitHubUsername();
     logger.info({ ownerId }, 'GitHub username for plan ownership');
 
+    // Construct origin metadata if platform is specified
+    let origin: OriginMetadata | undefined;
+    if (input.originPlatform && input.originSessionId) {
+      switch (input.originPlatform) {
+        case 'devin':
+          origin = {
+            platform: 'devin' as const,
+            sessionId: input.originSessionId,
+          };
+          break;
+        case 'cursor':
+          origin = {
+            platform: 'cursor' as const,
+            conversationId: input.originSessionId,
+            generationId: input.originMetadata?.generationId as string | undefined,
+          };
+          break;
+        default:
+          origin = { platform: 'unknown' as const };
+      }
+    }
+
     initPlanMetadata(ydoc, {
       id: planId,
       title: input.title,
@@ -124,10 +147,7 @@ Bad deliverables (not provable):
       pr: input.prNumber,
       ownerId,
       sessionTokenHash,
-      // Origin tracking for conversation export (Issue #41)
-      originPlatform: input.originPlatform,
-      originSessionId: input.originSessionId,
-      originMetadata: input.originMetadata,
+      origin,
     });
 
     // Parse markdown to blocks and store in Y.XmlFragment for BlockNote collaboration

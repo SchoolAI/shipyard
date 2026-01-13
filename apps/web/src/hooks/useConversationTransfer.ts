@@ -15,6 +15,7 @@
 import {
   type A2AMessage,
   type ConversationExportMeta,
+  type OriginMetadata,
   claudeCodeToA2A,
   parseClaudeCodeTranscriptString,
   summarizeA2AConversation,
@@ -207,7 +208,7 @@ export function useConversationTransfer(
    */
   const getPlanMetadata = useCallback(() => {
     const metadataMap = ydoc.getMap('metadata');
-    const origin = metadataMap.get('origin') as any;
+    const origin = metadataMap.get('origin') as OriginMetadata | undefined;
     return {
       origin,
     };

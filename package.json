@@ -18,7 +18,7 @@
     "dev:github-oauth": "turbo run dev --filter=@peer-plan/github-oauth-worker",
     "dev:web": "turbo run dev --filter=@peer-plan/web",
     "dev:hook": "turbo run dev --filter=@peer-plan/hook",
-    "cleanup": "pkill -f 'dist/index.mjs' || true && pkill -f 'vite' || true && rm -rf apps/*/dist packages/*/dist .turbo node_modules/.vite && echo 'Cleaned up processes and build artifacts'",
+    "cleanup": "bash scripts/cleanup.sh",
     "prepare": "simple-git-hooks"
   },
   "devDependencies": {

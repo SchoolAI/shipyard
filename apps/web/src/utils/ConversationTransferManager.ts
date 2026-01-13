@@ -129,7 +129,7 @@ function generateExportId(): string {
  * Computes SHA-256 hash of data and returns hex string.
  */
 async function computeChecksum(data: Uint8Array): Promise<string> {
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data as BufferSource);
   const hashArray = new Uint8Array(hashBuffer);
   return Array.from(hashArray)
     .map((b) => b.toString(16).padStart(2, '0'))
@@ -588,8 +588,8 @@ export class ConversationTransferManager {
     const listeners = this.peerListeners.get(peerId);
 
     if (peer && listeners) {
-      peer.removeListener('data', listeners.data);
-      peer.removeListener('close', listeners.close);
+      peer.removeListener('data', listeners.data as (...args: unknown[]) => void);
+      peer.removeListener('close', listeners.close as (...args: unknown[]) => void);
     }
 
     this.peers.delete(peerId);
@@ -617,8 +617,8 @@ export class ConversationTransferManager {
     for (const [peerId, peer] of this.peers) {
       const listeners = this.peerListeners.get(peerId);
       if (listeners) {
-        peer.removeListener('data', listeners.data);
-        peer.removeListener('close', listeners.close);
+        peer.removeListener('data', listeners.data as (...args: unknown[]) => void);
+        peer.removeListener('close', listeners.close as (...args: unknown[]) => void);
       }
     }
 

@@ -270,6 +270,9 @@ export function decodeP2PMessage(data: Uint8Array): DecodedP2PMessage {
   }
 
   const type = data[0];
+  if (type === undefined) {
+    throw new Error('Message type byte is missing');
+  }
 
   switch (type) {
     case P2PMessageType.CONVERSATION_EXPORT_START:

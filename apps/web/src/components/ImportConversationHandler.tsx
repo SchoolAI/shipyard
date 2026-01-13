@@ -416,16 +416,11 @@ export function ImportConversationHandler({
   const [isReviewOpen, setIsReviewOpen] = useState(false);
 
   // Hook into P2P receive notifications
-  const { receivedConversations, clearReceived } = useImportConversationToast(
-    planId,
-    ydoc,
-    rtcProvider,
-    (received) => {
-      // When user clicks "Review" on toast, open the modal
-      setSelectedReceived(received);
-      setIsReviewOpen(true);
-    }
-  );
+  useImportConversationToast(planId, ydoc, rtcProvider, (received) => {
+    // When user clicks "Review" on toast, open the modal
+    setSelectedReceived(received);
+    setIsReviewOpen(true);
+  });
 
   /**
    * Handle confirm/accept - notify parent and close modal.

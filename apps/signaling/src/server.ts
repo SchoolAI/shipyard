@@ -23,12 +23,8 @@
  */
 
 import { createHash, randomBytes } from 'node:crypto';
-import http from 'node:http';
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import * as map from 'lib0/map';
-import { nanoid } from 'nanoid';
-import { WebSocket, WebSocketServer } from 'ws';
-
+import http from 'node:http';
 import type {
   CreateInviteRequest,
   InviteCreatedResponse,
@@ -42,6 +38,9 @@ import type {
   RedeemInviteRequest,
   RevokeInviteRequest,
 } from '@peer-plan/schema';
+import * as map from 'lib0/map';
+import { nanoid } from 'nanoid';
+import { type WebSocket, WebSocketServer } from 'ws';
 
 // --- WebSocket Ready States ---
 const WS_READY_STATE_CONNECTING = 0;
@@ -295,9 +294,7 @@ function handleApprovalState(conn: WebSocket, message: ApprovalStateMessage): vo
   }
 
   if (!existingApproval && message.ownerId !== userId) {
-    console.warn(
-      `Rejected approval_state: sender ${userId} claims to be owner ${message.ownerId}`
-    );
+    console.warn(`Rejected approval_state: sender ${userId} claims to be owner ${message.ownerId}`);
     return;
   }
 

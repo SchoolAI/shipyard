@@ -128,23 +128,40 @@ export function useInviteToken(
     };
   }, [rtcProvider, clearInviteToken]);
 
+  // Helper to send message to signaling server
+  const sendToSignaling = useCallback(
+    (message: string): boolean => {
+      if (!rtcProvider) return false;
+
+      const signalingConns = (
+        rtcProvider as unknown as { signalingConns: Array<{ ws: WebSocket }> }
+      ).signalingConns;
+
+      if (!signalingConns) return false;
+
+      for (const conn of signalingConns) {
+        if (conn.ws && conn.ws.readyState === WebSocket.OPEN) {
+          conn.ws.send(message);
+          return true;
+        }
+      }
+      return false;
+    },
+    [rtcProvider]
+  );
+
   // Redeem invite token
   const redeemInvite = useCallback(() => {
     const invite = inviteRef.current;
 
-    // Validate state
-    if (!invite || !githubIdentity || !rtcProvider) {
-      return;
-    }
-
-    if (hasAttemptedRef.current) {
-      return;
-    }
+    // Early returns for validation
+    if (!invite || !githubIdentity) return;
+    if (hasAttemptedRef.current) return;
 
     setRedemptionState({ status: 'redeeming' });
     hasAttemptedRef.current = true;
 
-    // Build redeem message
+    // Build and send redeem message
     const redeemMessage = JSON.stringify({
       type: 'redeem_invite',
       planId,
@@ -153,25 +170,12 @@ export function useInviteToken(
       userId: githubIdentity.username,
     });
 
-    // Send to all signaling connections
-    const signalingConns = (rtcProvider as unknown as { signalingConns: Array<{ ws: WebSocket }> })
-      .signalingConns;
-
-    let sent = false;
-    if (signalingConns) {
-      for (const conn of signalingConns) {
-        if (conn.ws && conn.ws.readyState === WebSocket.OPEN) {
-          conn.ws.send(redeemMessage);
-          sent = true;
-        }
-      }
-    }
-
+    const sent = sendToSignaling(redeemMessage);
     if (!sent) {
       setRedemptionState({ status: 'error', error: 'invalid' });
       hasAttemptedRef.current = false;
     }
-  }, [planId, githubIdentity, rtcProvider]);
+  }, [planId, githubIdentity, sendToSignaling]);
 
   // Auto-redeem when conditions are met
   useEffect(() => {

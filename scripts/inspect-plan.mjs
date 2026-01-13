@@ -1,12 +1,13 @@
 #!/usr/bin/env node
+
 /**
  * Diagnostic script to inspect plan metadata and origin data.
  * Usage: node scripts/inspect-plan.mjs <planId>
  */
 
-import * as Y from 'yjs';
+import { getPlanMetadata, YDOC_KEYS } from '@peer-plan/schema';
 import { WebsocketProvider } from 'y-websocket';
-import { YDOC_KEYS, getPlanMetadata } from '@peer-plan/schema';
+import * as Y from 'yjs';
 
 const planId = process.argv[2];
 
@@ -73,8 +74,12 @@ function inspectMetadata() {
     console.log(`Owner ID: ${metadata.ownerId || 'N/A'}`);
     console.log(`Repo: ${metadata.repo || 'N/A'}`);
     console.log(`PR: ${metadata.pr || 'N/A'}`);
-    console.log(`Created: ${metadata.createdAt ? new Date(metadata.createdAt).toISOString() : 'N/A'}`);
-    console.log(`Updated: ${metadata.updatedAt ? new Date(metadata.updatedAt).toISOString() : 'N/A'}`);
+    console.log(
+      `Created: ${metadata.createdAt ? new Date(metadata.createdAt).toISOString() : 'N/A'}`
+    );
+    console.log(
+      `Updated: ${metadata.updatedAt ? new Date(metadata.updatedAt).toISOString() : 'N/A'}`
+    );
 
     console.log('\n🔗 Origin Metadata:');
     console.log('─'.repeat(50));
@@ -123,7 +128,6 @@ function inspectMetadata() {
     console.log(`content: ${ydoc.getArray('content').length > 0 ? '✅' : '❌'}`);
     console.log(`threads: ${ydoc.getMap('threads').size > 0 ? '✅' : '❌'}`);
     console.log(`artifacts: ${ydoc.getArray('artifacts').length > 0 ? '✅' : '❌'}`);
-
   } catch (error) {
     console.error('❌ Error inspecting metadata:', error);
   } finally {

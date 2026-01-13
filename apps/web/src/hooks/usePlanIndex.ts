@@ -383,7 +383,6 @@ export function usePlanIndex(currentUsername: string | undefined): PlanIndexStat
         const planDoc = new Y.Doc();
         const idb = new IndexeddbPersistence(planId, planDoc);
         await idb.whenSynced;
-
         // Mark the plan as viewed in the Y.Doc
         markPlanAsViewed(planDoc, currentUsername);
 

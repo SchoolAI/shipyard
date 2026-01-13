@@ -164,7 +164,8 @@ describe('ViewedBy helpers', () => {
     markPlanAsViewed(ydoc, 'user1');
     const secondTimestamp = getViewedBy(ydoc).user1;
 
-    expect(secondTimestamp).toBeGreaterThan(firstTimestamp);
+    expect(firstTimestamp).toBeDefined();
+    expect(secondTimestamp).toBeGreaterThan(firstTimestamp ?? 0);
   });
 
   it('isPlanUnread returns true when never viewed', () => {

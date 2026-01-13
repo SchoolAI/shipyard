@@ -14,6 +14,7 @@ describe('YDOC_KEYS', () => {
       PRESENCE: 'presence',
       LINKED_PRS: 'linkedPRs',
       PR_REVIEW_COMMENTS: 'prReviewComments',
+      TRANSCRIPT: 'transcript',
     });
   });
 
@@ -42,6 +43,7 @@ describe('isValidYDocKey', () => {
     expect(isValidYDocKey('presence')).toBe(true);
     expect(isValidYDocKey('linkedPRs')).toBe(true);
     expect(isValidYDocKey('prReviewComments')).toBe(true);
+    expect(isValidYDocKey('transcript')).toBe(true);
   });
 
   it('should return false for unknown keys', () => {

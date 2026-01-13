@@ -191,7 +191,7 @@ const ClaudeCodeToolUseBlockSchema = z.object({
   type: z.literal('tool_use'),
   id: z.string(),
   name: z.string(),
-  input: z.record(z.unknown()),
+  input: z.record(z.string(), z.unknown()),
 });
 type ClaudeCodeToolUseBlock = z.infer<typeof ClaudeCodeToolUseBlockSchema>;
 
@@ -423,7 +423,9 @@ function convertMessage(msg: ClaudeCodeMessage, contextId: string): A2AMessage {
   const role = msg.message.role === 'user' ? 'user' : 'agent';
 
   // Convert all content blocks to A2A parts
-  const parts: A2APart[] = msg.message.content.flatMap(convertContentBlock);
+  const parts: A2APart[] = msg.message.content.flatMap((block) =>
+    convertContentBlock(block as ClaudeCodeContentBlock)
+  );
 
   return {
     messageId: msg.uuid,

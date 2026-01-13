@@ -706,8 +706,14 @@ export class SignalingRoom extends DurableObject<Env> {
 
     // Validate token
     const error = await this.validateInviteToken(token, tokenValue, userId);
-    if (error) {
-      ws.send(JSON.stringify({ type: 'invite_redemption_result', success: false, error }));
+    if (error || !token) {
+      ws.send(
+        JSON.stringify({
+          type: 'invite_redemption_result',
+          success: false,
+          error: error || 'invalid',
+        })
+      );
       return;
     }
 
@@ -720,9 +726,9 @@ export class SignalingRoom extends DurableObject<Env> {
       return;
     }
 
-    // Increment use count
-    token!.useCount++;
-    this.inviteTokens.set(storageKey, token!);
+    // Increment use count (token is guaranteed non-null here)
+    token.useCount++;
+    this.inviteTokens.set(storageKey, token);
     await this.ctx.storage.put(`invite:${storageKey}`, token);
 
     // Record redemption
@@ -734,7 +740,7 @@ export class SignalingRoom extends DurableObject<Env> {
     await this.ctx.storage.put(redemptionKey, redemption);
 
     // Auto-approve user
-    await this.autoApproveUserFromInvite(planId, userId, token!);
+    await this.autoApproveUserFromInvite(planId, userId, token);
 
     console.log(`User ${userId} redeemed invite ${tokenId} for plan ${planId}`);
 
@@ -742,7 +748,7 @@ export class SignalingRoom extends DurableObject<Env> {
     ws.send(JSON.stringify({ type: 'invite_redemption_result', success: true, planId }));
 
     // Notify owner
-    this.notifyOwnerOfRedemption(planId, token!, userId);
+    this.notifyOwnerOfRedemption(planId, token, userId);
   }
 
   /**

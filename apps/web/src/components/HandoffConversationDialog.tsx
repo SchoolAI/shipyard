@@ -159,7 +159,7 @@ export function HandoffConversationDialog({
   transcriptContent,
 }: HandoffConversationDialogProps) {
   const { connectedPeers, peerCount } = useP2PPeers(rtcProvider);
-  const { exportToFile, progress, isProcessing } = useConversationTransfer(
+  const { exportToFile, sendToPeer, progress, isProcessing } = useConversationTransfer(
     planId,
     ydoc,
     rtcProvider
@@ -187,16 +187,49 @@ export function HandoffConversationDialog({
 
   /**
    * Handle P2P transfer to selected peer.
-   * NOTE: Currently falls back to file download as Phase 3 is not implemented.
    */
   async function handlePeerTransfer(peer: ConnectedPeer) {
+    if (!transcriptContent) {
+      toast.error('No transcript content available');
+      return;
+    }
+
     setSelectedPeer(peer);
 
-    // Phase 3 not implemented - show message and fall back to file download
-    toast.info('Direct P2P transfer coming soon! Downloading file instead...');
-    await handleDownloadHandoff();
+    try {
+      // Parse transcript to A2A messages
+      const { parseClaudeCodeTranscriptString, claudeCodeToA2A } = await import(
+        '@peer-plan/schema'
+      );
+      const parseResult = parseClaudeCodeTranscriptString(transcriptContent);
 
-    setSelectedPeer(null);
+      if (parseResult.messages.length === 0) {
+        toast.error('No messages found in transcript');
+        setSelectedPeer(null);
+        return;
+      }
+
+      const a2aMessages = claudeCodeToA2A(parseResult.messages, planId);
+
+      // Send via P2P
+      const success = await sendToPeer(peer.peerId, a2aMessages, {
+        onComplete: () => {
+          toast.success(`Handed off ${a2aMessages.length} messages to ${peer.name}`);
+          onClose();
+        },
+        onError: (error) => {
+          toast.error(`Transfer failed: ${error.message}`);
+        },
+      });
+
+      if (!success) {
+        toast.error('Failed to initiate P2P transfer');
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Transfer failed');
+    } finally {
+      setSelectedPeer(null);
+    }
   }
 
   // Calculate progress percentage
