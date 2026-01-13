@@ -368,12 +368,33 @@ function DiffViewer({ pr, repo, ydoc }: DiffViewerProps) {
   const treeRef = useRef<TreeApi<FileTreeData>>(null);
 
   // Handle file selection from tree (MUST be before conditional returns!)
-  const handleFileSelect = useCallback((nodes: FileTreeData[]) => {
-    const selected = nodes[0];
-    if (selected?.file) {
-      setSelectedFile(selected.file.filename);
-    }
-  }, []);
+  const handleFileSelect = useCallback(
+    (nodes: string[]) => {
+      // react-arborist passes selected node IDs, find the actual file
+      const nodeId = nodes[0];
+      if (!nodeId) return;
+
+      // Find the file by traversing the tree
+      const findFile = (treeNodes: FileTreeData[]): PRFile | null => {
+        for (const node of treeNodes) {
+          if (node.id === nodeId) {
+            return node.file || null;
+          }
+          if (node.children) {
+            const found = findFile(node.children);
+            if (found) return found;
+          }
+        }
+        return null;
+      };
+
+      const file = findFile(fileTree);
+      if (file) {
+        setSelectedFile(file.filename);
+      }
+    },
+    [fileTree]
+  );
 
   // Create node renderer with comment counts (MUST be before conditional returns!)
   const NodeRenderer = useMemo(() => createFileTreeNode(commentCountByFile), [commentCountByFile]);
