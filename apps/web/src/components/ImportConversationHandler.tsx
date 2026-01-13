@@ -12,6 +12,7 @@
 import { Avatar, Button, Card, Modal, Spinner } from '@heroui/react';
 import type { A2AMessage, ConversationExportMeta } from '@peer-plan/schema';
 import { Check, FileText, MessageSquare, Upload } from 'lucide-react';
+import type React from 'react';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import type { WebrtcProvider } from 'y-webrtc';
@@ -21,6 +22,14 @@ import {
   type ReceivedConversation,
   useConversationTransfer,
 } from '@/hooks/useConversationTransfer';
+
+// Avatar compound components have type issues in HeroUI v3 beta
+const AvatarRoot = Avatar as unknown as React.FC<{
+  children: React.ReactNode;
+  size?: 'sm' | 'md' | 'lg';
+  color?: 'default' | 'accent';
+}>;
+const AvatarFallback = Avatar.Fallback as React.FC<{ children: React.ReactNode }>;
 
 interface ImportConversationHandlerProps {
   /** Plan ID */
@@ -46,9 +55,9 @@ function MessagePreview({ message }: { message: A2AMessage }) {
 
   return (
     <div className={`flex gap-2 ${isUser ? '' : 'flex-row-reverse'}`}>
-      <Avatar size="sm" color={isUser ? 'default' : 'accent'}>
-        <Avatar.Fallback>{isUser ? 'U' : 'A'}</Avatar.Fallback>
-      </Avatar>
+      <AvatarRoot size="sm" color={isUser ? 'default' : 'accent'}>
+        <AvatarFallback>{isUser ? 'U' : 'A'}</AvatarFallback>
+      </AvatarRoot>
       <div
         className={`flex-1 p-2 rounded-lg text-sm ${
           isUser ? 'bg-surface-secondary' : 'bg-accent/10'

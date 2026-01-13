@@ -70,7 +70,8 @@ export function useViewFilters(): ViewFiltersState {
 
   const toggleSortDirection = useCallback(() => {
     setPreferencesState((prev) => {
-      const updated = { ...prev, sortDirection: prev.sortDirection === 'asc' ? 'desc' : 'asc' };
+      const newDirection: 'asc' | 'desc' = prev.sortDirection === 'asc' ? 'desc' : 'asc';
+      const updated = { ...prev, sortDirection: newDirection };
       setViewPreferences(updated);
       return updated;
     });

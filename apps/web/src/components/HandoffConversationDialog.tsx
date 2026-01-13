@@ -11,12 +11,24 @@
 
 import { Avatar, Button, Card, Modal, Spinner } from '@heroui/react';
 import { Download, Send, Users, X } from 'lucide-react';
+import type React from 'react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import type { WebrtcProvider } from 'y-webrtc';
 import type * as Y from 'yjs';
 import { useConversationTransfer } from '@/hooks/useConversationTransfer';
 import { type ConnectedPeer, useP2PPeers } from '@/hooks/useP2PPeers';
+
+// Avatar compound components have type issues in HeroUI v3 beta
+const AvatarRoot = Avatar as unknown as React.FC<{
+  children: React.ReactNode;
+  size?: 'sm' | 'md' | 'lg';
+  className?: string;
+}>;
+const AvatarFallback = Avatar.Fallback as React.FC<{
+  children: React.ReactNode;
+  style?: React.CSSProperties;
+}>;
 
 interface HandoffConversationDialogProps {
   /** Plan ID for handoff metadata */
@@ -76,11 +88,11 @@ function PeerCard({
         disabled={isDisabled}
         onClick={onSelect}
       >
-        <Avatar size="sm">
-          <Avatar.Fallback style={{ backgroundColor: peer.color }}>
+        <AvatarRoot size="sm">
+          <AvatarFallback style={{ backgroundColor: peer.color }}>
             {peer.name.slice(0, 2).toUpperCase()}
-          </Avatar.Fallback>
-        </Avatar>
+          </AvatarFallback>
+        </AvatarRoot>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium text-foreground truncate">{peer.name}</p>
           <p className="text-xs text-muted-foreground">{peer.platform}</p>
@@ -211,8 +223,14 @@ export function HandoffConversationDialog({
 
       const a2aMessages = claudeCodeToA2A(parseResult.messages, planId);
 
-      // Send via P2P
-      const success = await sendToPeer(peer.peerId, a2aMessages, {
+      // Send via P2P - use webrtcPeerId which is the key in room.webrtcConns
+      // Note: peerId (awareness clientID) is different from webrtcPeerId (UUID)
+      if (!peer.webrtcPeerId) {
+        toast.error('Peer connection not ready. Try again in a moment.');
+        setSelectedPeer(null);
+        return;
+      }
+      const success = await sendToPeer(peer.webrtcPeerId, a2aMessages, {
         onComplete: () => {
           toast.success(`Handed off ${a2aMessages.length} messages to ${peer.name}`);
           onClose();
@@ -270,10 +288,10 @@ export function HandoffConversationDialog({
                     <div className="space-y-2 max-h-[200px] overflow-y-auto">
                       {connectedPeers.map((peer) => (
                         <PeerCard
-                          key={peer.peerId}
+                          key={peer.webrtcPeerId ?? peer.peerId}
                           peer={peer}
                           onSelect={() => handlePeerTransfer(peer)}
-                          isDisabled={isProcessing}
+                          isDisabled={isProcessing || !peer.webrtcPeerId}
                         />
                       ))}
                     </div>

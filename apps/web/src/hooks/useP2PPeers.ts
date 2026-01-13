@@ -15,8 +15,18 @@ import type { WebrtcProvider } from 'y-webrtc';
  * Represents a connected P2P peer with identity information.
  */
 export interface ConnectedPeer {
-  /** Unique peer ID from awareness protocol */
+  /**
+   * Awareness client ID from Yjs (number).
+   * Used internally by Yjs for document sync.
+   * @deprecated Use webrtcPeerId for P2P transfers.
+   */
   peerId: number;
+  /**
+   * WebRTC peer ID (UUID string) for P2P transfers.
+   * This is the key used in room.webrtcConns Map.
+   * May be undefined if the peer hasn't broadcast their peerId yet.
+   */
+  webrtcPeerId: string | undefined;
   /** Platform type (e.g., 'browser', 'claude-code', 'devin') */
   platform: string;
   /** Display name for the peer */
@@ -39,6 +49,7 @@ function extractPeerInfo(peerId: number, state: Record<string, unknown>): Connec
     | {
         user?: { id: string; name: string; color: string };
         isOwner?: boolean;
+        webrtcPeerId?: string;
       }
     | undefined;
 
@@ -46,6 +57,7 @@ function extractPeerInfo(peerId: number, state: Record<string, unknown>): Connec
     // Unknown peer without identity - still track them
     return {
       peerId,
+      webrtcPeerId: planStatus?.webrtcPeerId,
       platform: 'browser',
       name: `Peer ${peerId}`,
       color: '#888888',
@@ -56,6 +68,7 @@ function extractPeerInfo(peerId: number, state: Record<string, unknown>): Connec
 
   return {
     peerId,
+    webrtcPeerId: planStatus.webrtcPeerId,
     platform: 'browser', // TODO: Could be enhanced to detect platform
     name: planStatus.user.name,
     color: planStatus.user.color,

@@ -40,7 +40,6 @@ function ArchiveItem({ plan, onUnarchive }: ArchiveItemProps) {
         isIconOnly
         variant="ghost"
         size="sm"
-        color="accent"
         aria-label="Unarchive plan"
         onPress={(e) => {
           e.continuePropagation?.();
@@ -73,6 +72,7 @@ function formatRelativeTime(timestamp: number): string {
 // --- Main Page Component ---
 
 export function ArchivePage() {
+  const navigate = useNavigate();
   const { identity: githubIdentity } = useGitHubAuth();
   const { archivedPlans } = usePlanIndex(githubIdentity?.username);
   const { ydoc: indexDoc } = useMultiProviderSync(PLAN_INDEX_DOC_NAME);

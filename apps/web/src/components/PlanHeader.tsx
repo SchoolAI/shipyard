@@ -56,6 +56,16 @@ function getMessageTextPreview(msg: A2AMessage, maxLength = 150): string {
   return text.length > maxLength ? `${text.slice(0, maxLength)}...` : text;
 }
 
+// Note: Avatar compound components have type issues in HeroUI v3 beta
+// Using type assertions until types are fixed in stable release
+const AvatarRoot = Avatar as unknown as React.FC<{
+  children: React.ReactNode;
+  size?: 'sm' | 'md' | 'lg';
+  color?: 'default' | 'accent';
+  className?: string;
+}>;
+const AvatarFallback = Avatar.Fallback as React.FC<{ children: React.ReactNode }>;
+
 /** Props for the message preview item */
 interface MessagePreviewItemProps {
   msg: A2AMessage;
@@ -69,9 +79,9 @@ function MessagePreviewItem({ msg, idx }: MessagePreviewItemProps) {
 
   return (
     <div key={msg.messageId || idx} className={`flex gap-2 ${isUser ? '' : 'flex-row-reverse'}`}>
-      <Avatar size="sm" color={isUser ? 'default' : 'accent'}>
-        <Avatar.Fallback>{isUser ? 'U' : 'A'}</Avatar.Fallback>
-      </Avatar>
+      <AvatarRoot size="sm" color={isUser ? 'default' : 'accent'}>
+        <AvatarFallback>{isUser ? 'U' : 'A'}</AvatarFallback>
+      </AvatarRoot>
       <div
         className={`flex-1 p-2 rounded-lg text-sm ${
           isUser ? 'bg-surface-secondary' : 'bg-accent/10'
@@ -91,7 +101,7 @@ interface PresenceIndicatorsProps {
 }
 
 /** Renders agent and peer presence indicators */
-function _PresenceIndicators({ activeCount, peerCount }: PresenceIndicatorsProps) {
+function PresenceIndicators({ activeCount, peerCount }: PresenceIndicatorsProps) {
   return (
     <>
       {activeCount > 0 && (
@@ -125,7 +135,7 @@ interface DesktopActionsProps {
 }
 
 /** Desktop action buttons (share, import, handoff, link PR, archive) */
-function _DesktopActions({
+function DesktopActions({
   planId,
   ydoc,
   rtcProvider,
@@ -190,7 +200,7 @@ interface MobileDropdownMenuProps {
 }
 
 /** Mobile dropdown menu with all actions */
-function _MobileDropdownMenu({
+function MobileDropdownMenu({
   hasOriginTranscript,
   isArchived,
   onAction,
@@ -266,7 +276,7 @@ interface ImportReviewModalProps {
 }
 
 /** Modal for reviewing imported conversation before confirming */
-function _ImportReviewModal({
+function ImportReviewModal({
   importData,
   isOpen,
   onOpenChange,
@@ -405,11 +415,7 @@ export function PlanHeader({
   const { importFromFile } = useConversationTransfer(planId, ydoc, rtcProvider);
 
   // State for mobile import review modal
-  const [mobileImportData, setMobileImportData] = useState<{
-    messages: import('@peer-plan/schema').A2AMessage[];
-    meta: import('@peer-plan/schema').ConversationExportMeta;
-    summary: { title: string; text: string };
-  } | null>(null);
+  const [mobileImportData, setMobileImportData] = useState<MobileImportData | null>(null);
   const [isMobileReviewOpen, setIsMobileReviewOpen] = useState(false);
 
   // Check if this plan has an origin transcript (can be handed off)
@@ -564,17 +570,11 @@ export function PlanHeader({
       {!isSnapshot && (
         <div className="flex items-center gap-2 ml-auto shrink-0">
           {/* Presence indicators */}
-          {syncState && syncState.activeCount > 0 && (
-            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <span className="w-1.5 h-1.5 rounded-full bg-success" />
-              {syncState.activeCount} {syncState.activeCount === 1 ? 'agent' : 'agents'}
-            </span>
-          )}
-          {syncState && syncState.peerCount > 0 && (
-            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <span className="w-1.5 h-1.5 rounded-full bg-info" />
-              {syncState.peerCount} {syncState.peerCount === 1 ? 'peer' : 'peers'}
-            </span>
+          {syncState && (
+            <PresenceIndicators
+              activeCount={syncState.activeCount}
+              peerCount={syncState.peerCount}
+            />
           )}
 
           {/* Approval panel for plan owners - shows pending access requests */}
@@ -602,107 +602,25 @@ export function PlanHeader({
           )}
 
           {/* Desktop: Show all buttons individually (hidden on mobile) */}
-          <div className="hidden md:flex items-center gap-2">
-            <ShareButton
-              planId={planId}
-              rtcProvider={rtcProvider}
-              isOwner={!!(githubIdentity && ownerId && githubIdentity.username === ownerId)}
-            />
-
-            {/* Import conversation button */}
-            <Tooltip delay={0}>
-              <ImportConversationButton planId={planId} ydoc={ydoc} rtcProvider={rtcProvider} />
-              <Tooltip.Content>Import conversation from file</Tooltip.Content>
-            </Tooltip>
-
-            {/* Handoff conversation button - only shown if plan has origin transcript */}
-            {hasOriginTranscript && (
-              <Tooltip delay={0}>
-                <Button
-                  isIconOnly
-                  variant="ghost"
-                  size="sm"
-                  aria-label="Handoff conversation to another agent"
-                  onPress={() => setIsHandoffDialogOpen(true)}
-                  className="touch-target"
-                >
-                  <MessageSquareShare className="w-4 h-4" />
-                </Button>
-                <Tooltip.Content>Handoff conversation to another agent</Tooltip.Content>
-              </Tooltip>
-            )}
-
-            {/* Link PR button */}
-            <LinkPRButton ydoc={ydoc} isOpen={isLinkPROpen} onOpenChange={setIsLinkPROpen} />
-
-            {/* Archive icon button */}
-            <Button
-              isIconOnly
-              variant="ghost"
-              size="sm"
-              aria-label={isArchived ? 'Unarchive plan' : 'Archive plan'}
-              onPress={handleArchiveToggle}
-              className="touch-target"
-            >
-              {isArchived ? (
-                <ArchiveRestore className="w-4 h-4" />
-              ) : (
-                <Archive className="w-4 h-4" />
-              )}
-            </Button>
-          </div>
+          <DesktopActions
+            planId={planId}
+            ydoc={ydoc}
+            rtcProvider={rtcProvider}
+            isOwner={!!(githubIdentity && ownerId && githubIdentity.username === ownerId)}
+            hasOriginTranscript={hasOriginTranscript}
+            isArchived={isArchived}
+            isLinkPROpen={isLinkPROpen}
+            onLinkPROpenChange={setIsLinkPROpen}
+            onHandoffDialogOpen={() => setIsHandoffDialogOpen(true)}
+            onArchiveToggle={handleArchiveToggle}
+          />
 
           {/* Mobile: Show dropdown menu with all actions */}
-          <div className="flex md:hidden">
-            <Dropdown>
-              <Button
-                isIconOnly
-                variant="ghost"
-                size="sm"
-                aria-label="More actions"
-                className="touch-target"
-              >
-                <MoreVertical className="w-4 h-4" />
-              </Button>
-              <Dropdown.Popover>
-                <Dropdown.Menu onAction={handleDropdownAction}>
-                  <Dropdown.Item id="share" textValue="Share">
-                    <Share2 className="w-4 h-4 shrink-0 text-muted" />
-                    <Label>Share</Label>
-                  </Dropdown.Item>
-
-                  <Dropdown.Item id="import" textValue="Import conversation">
-                    <Upload className="w-4 h-4 shrink-0 text-muted" />
-                    <Label>Import conversation</Label>
-                  </Dropdown.Item>
-
-                  {hasOriginTranscript && (
-                    <Dropdown.Item id="handoff" textValue="Handoff conversation">
-                      <MessageSquareShare className="w-4 h-4 shrink-0 text-muted" />
-                      <Label>Handoff conversation</Label>
-                    </Dropdown.Item>
-                  )}
-
-                  <Dropdown.Item id="link-pr" textValue="Link PR">
-                    <GitPullRequest className="w-4 h-4 shrink-0 text-muted" />
-                    <Label>Link PR</Label>
-                  </Dropdown.Item>
-
-                  <Dropdown.Item
-                    id={isArchived ? 'unarchive' : 'archive'}
-                    textValue={isArchived ? 'Unarchive' : 'Archive'}
-                  >
-                    {isArchived ? (
-                      <ArchiveRestore className="w-4 h-4 shrink-0 text-muted" />
-                    ) : (
-                      <Archive className="w-4 h-4 shrink-0 text-muted" />
-                    )}
-                    <Label>{isArchived ? 'Unarchive' : 'Archive'}</Label>
-                  </Dropdown.Item>
-                </Dropdown.Menu>
-              </Dropdown.Popover>
-            </Dropdown>
-          </div>
+          <MobileDropdownMenu
+            hasOriginTranscript={hasOriginTranscript}
+            isArchived={isArchived}
+            onAction={handleDropdownAction}
+          />
         </div>
       )}
 
@@ -728,115 +646,16 @@ export function PlanHeader({
 
       {/* Mobile import review modal */}
       {mobileImportData && (
-        <Modal.Backdrop
+        <ImportReviewModal
+          importData={mobileImportData}
           isOpen={isMobileReviewOpen}
           onOpenChange={(open) => !open && setIsMobileReviewOpen(false)}
-        >
-          <Modal.Container size="md">
-            <Modal.Dialog>
-              <Modal.CloseTrigger />
-              <Modal.Header>
-                <Modal.Icon className="bg-accent-soft text-accent-soft-foreground">
-                  <MessageSquare className="size-5" />
-                </Modal.Icon>
-                <Modal.Heading>Review Imported Conversation</Modal.Heading>
-                <p className="text-sm leading-5 text-muted-foreground">
-                  {mobileImportData.summary.title}
-                </p>
-              </Modal.Header>
-
-              <Modal.Body className="p-4">
-                {/* Metadata summary */}
-                <Card variant="secondary" className="mb-4">
-                  <Card.Content className="p-3">
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                      <div>
-                        <span className="text-muted-foreground">Source:</span>{' '}
-                        <span className="text-foreground">
-                          {mobileImportData.meta.sourcePlatform}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground">Messages:</span>{' '}
-                        <span className="text-foreground">
-                          {mobileImportData.meta.messageCount}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground">Exported:</span>{' '}
-                        <span className="text-foreground">
-                          {new Date(mobileImportData.meta.exportedAt).toLocaleString()}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground">Session:</span>{' '}
-                        <span className="text-foreground font-mono text-xs">
-                          {mobileImportData.meta.sourceSessionId.slice(0, 8)}...
-                        </span>
-                      </div>
-                    </div>
-                  </Card.Content>
-                </Card>
-
-                {/* Message preview */}
-                <p className="text-sm text-muted-foreground mb-3">Conversation preview:</p>
-                <div className="space-y-3 max-h-[300px] overflow-y-auto">
-                  {mobileImportData.messages.slice(0, 5).map((msg, idx) => {
-                    const isUser = msg.role === 'user';
-                    const firstTextPart = msg.parts.find((p) => p.type === 'text');
-                    const text =
-                      firstTextPart && 'text' in firstTextPart
-                        ? firstTextPart.text
-                        : '[Non-text content]';
-                    const preview = text.length > 150 ? `${text.slice(0, 150)}...` : text;
-
-                    return (
-                      <div
-                        key={msg.messageId || idx}
-                        className={`flex gap-2 ${isUser ? '' : 'flex-row-reverse'}`}
-                      >
-                        <Avatar size="sm" color={isUser ? 'default' : 'accent'}>
-                          <Avatar.Fallback>{isUser ? 'U' : 'A'}</Avatar.Fallback>
-                        </Avatar>
-                        <div
-                          className={`flex-1 p-2 rounded-lg text-sm ${
-                            isUser ? 'bg-surface-secondary' : 'bg-accent/10'
-                          }`}
-                        >
-                          <p className="text-muted-foreground text-xs mb-1">
-                            {isUser ? 'User' : 'Agent'}
-                          </p>
-                          <p className="text-foreground">{preview}</p>
-                        </div>
-                      </div>
-                    );
-                  })}
-                  {mobileImportData.messages.length > 5 && (
-                    <p className="text-sm text-muted-foreground text-center py-2">
-                      ... and {mobileImportData.messages.length - 5} more messages
-                    </p>
-                  )}
-                </div>
-              </Modal.Body>
-
-              <Modal.Footer>
-                <Button
-                  variant="secondary"
-                  onPress={() => {
-                    setIsMobileReviewOpen(false);
-                    setMobileImportData(null);
-                  }}
-                >
-                  Cancel
-                </Button>
-                <Button onPress={handleMobileImportConfirm}>
-                  <Check className="w-4 h-4" />
-                  Import Conversation
-                </Button>
-              </Modal.Footer>
-            </Modal.Dialog>
-          </Modal.Container>
-        </Modal.Backdrop>
+          onConfirm={handleMobileImportConfirm}
+          onCancel={() => {
+            setIsMobileReviewOpen(false);
+            setMobileImportData(null);
+          }}
+        />
       )}
     </div>
   );

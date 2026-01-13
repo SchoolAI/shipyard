@@ -50,6 +50,12 @@ export interface PlanAwarenessState {
   status: ApprovalStatus;
   isOwner: boolean;
   requestedAt?: number;
+  /**
+   * WebRTC peerId (UUID) for P2P transfers.
+   * This is different from the awareness clientID (number).
+   * The webrtcPeerId is used as the key in room.webrtcConns.
+   */
+  webrtcPeerId?: string;
 }
 
 interface ServerEntry {
@@ -198,10 +204,18 @@ export function useMultiProviderSync(
     if (enableWebRTC) {
       const signalingServer =
         (import.meta.env.VITE_WEBRTC_SIGNALING as string) || DEFAULT_SIGNALING_SERVER;
+
+      console.log('[useMultiProviderSync] WebRTC signaling server:', signalingServer);
+
       rtc = new WebrtcProvider(`peer-plan-${docName}`, ydoc, {
         signaling: [signalingServer],
       });
       setRtcProvider(rtc);
+
+      // Log when WebSocket connects
+      rtc.on('status', (event: { status: string }) => {
+        console.log('[useMultiProviderSync] WebRTC status:', event.status);
+      });
 
       // Use awareness protocol for peer counting instead of raw WebRTC connections.
       // The awareness protocol has a heartbeat/timeout mechanism that properly detects
@@ -265,6 +279,9 @@ export function useMultiProviderSync(
       // Only set awareness for plans with approval (not plan-index)
       if (status === undefined) return;
 
+      // Get WebRTC peerId from the room (may be undefined if room not initialized yet)
+      const webrtcPeerId = (rtc as unknown as { room?: { peerId?: string } }).room?.peerId;
+
       const awarenessState: PlanAwarenessState = {
         user: {
           id: githubIdentity.username,
@@ -274,6 +291,8 @@ export function useMultiProviderSync(
         status,
         isOwner: ownerId === githubIdentity.username,
         requestedAt: status === 'pending' ? Date.now() : undefined,
+        // Include WebRTC peerId for P2P transfers (used as key in room.webrtcConns)
+        webrtcPeerId,
       };
 
       rtc.awareness.setLocalStateField('planStatus', awarenessState);

@@ -193,8 +193,7 @@ function CollapsedSidebar({
           <Tooltip.Trigger>
             <Button
               isIconOnly
-              variant={location.pathname === '/inbox' ? 'soft' : 'ghost'}
-              color={location.pathname === '/inbox' ? 'accent' : 'default'}
+              variant={location.pathname === '/inbox' ? 'secondary' : 'ghost'}
               size="sm"
               aria-label="Inbox"
               onPress={() => {
@@ -219,8 +218,7 @@ function CollapsedSidebar({
           <Tooltip.Trigger>
             <Button
               isIconOnly
-              variant={location.pathname === '/archive' ? 'soft' : 'ghost'}
-              color={location.pathname === '/archive' ? 'accent' : 'default'}
+              variant={location.pathname === '/archive' ? 'secondary' : 'ghost'}
               size="sm"
               aria-label="Archive"
               onPress={() => {
@@ -394,46 +392,6 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
     toast.success('Plan archived');
   };
 
-  // TODO: Wire up to archived plans list when Archive section is implemented in sidebar
-  const _handleUnarchive = async (planId: string) => {
-    if (!githubIdentity) {
-      toast.error('Please sign in with GitHub first');
-      return;
-    }
-
-    const now = Date.now();
-
-    // Update the plan's own metadata
-    try {
-      const planDoc = new (await import('yjs')).Doc();
-      const idb = new (await import('y-indexeddb')).IndexeddbPersistence(planId, planDoc);
-      await idb.whenSynced;
-
-      planDoc.transact(() => {
-        const metadata = planDoc.getMap('metadata');
-        metadata.delete('archivedAt');
-        metadata.delete('archivedBy');
-        metadata.set('updatedAt', now);
-      });
-
-      idb.destroy();
-    } catch {
-      // If plan doc doesn't exist, that's fine
-    }
-
-    // Update plan-index
-    const entry = getPlanIndexEntry(indexDoc, planId);
-    if (entry) {
-      const { deletedAt: _removed1, deletedBy: _removed2, ...rest } = entry;
-      setPlanIndexEntry(indexDoc, {
-        ...rest,
-        updatedAt: now,
-      });
-    }
-
-    toast.success('Plan unarchived');
-  };
-
   useEffect(() => {
     if (!navigationTarget) return;
     const targetPath = `/plan/${navigationTarget}`;
@@ -551,14 +509,14 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
                 {/* Sort dropdown */}
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
-                    <label className="text-xs text-muted-foreground">Sort by</label>
+                    <span className="text-xs text-muted-foreground">Sort by</span>
                     <Button
                       isIconOnly
                       variant="ghost"
                       size="sm"
                       onPress={toggleSortDirection}
                       className="w-6 h-6"
-                      title={`Sort direction: ${sortDirection}`}
+                      aria-label={`Sort direction: ${sortDirection}`}
                     >
                       <ArrowUpDown className="w-3 h-3" />
                     </Button>
@@ -588,7 +546,7 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
 
                 {/* Status filters */}
                 <div className="space-y-1.5">
-                  <label className="text-xs text-muted-foreground">Status</label>
+                  <span className="text-xs text-muted-foreground">Status</span>
                   <div className="flex flex-wrap gap-1">
                     {STATUS_FILTER_OPTIONS.map((option) => {
                       const isActive = statusFilters.includes(option.value);

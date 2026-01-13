@@ -86,7 +86,6 @@ function InboxItem({ plan, onApprove, onRequestChanges }: InboxItemProps) {
               isIconOnly
               variant="ghost"
               size="sm"
-              color="success"
               aria-label="Approve plan"
               onPress={(e) => {
                 e.continuePropagation?.();
@@ -107,7 +106,6 @@ function InboxItem({ plan, onApprove, onRequestChanges }: InboxItemProps) {
               isIconOnly
               variant="ghost"
               size="sm"
-              color="warning"
               aria-label="Request changes"
               onPress={(e) => {
                 e.continuePropagation?.();

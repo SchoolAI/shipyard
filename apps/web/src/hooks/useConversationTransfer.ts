@@ -514,9 +514,11 @@ export function useConversationTransfer(
         );
 
         return true;
-      } catch (_err) {
+      } catch (err) {
+        const error = err instanceof Error ? err : new Error('Unknown error during P2P transfer');
         setProgress(null);
         setIsProcessing(false);
+        options.onError?.(error);
         return false;
       }
     },
