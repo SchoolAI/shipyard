@@ -1,6 +1,6 @@
 import { Button } from '@heroui/react';
 import { buildInviteUrl, type InviteCreatedResponse } from '@peer-plan/schema';
-import { AlertTriangle, Check, Loader2, Share2 } from 'lucide-react';
+import { Check, Loader2, Share2 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import type { WebrtcProvider } from 'y-webrtc';
@@ -55,7 +55,6 @@ export function ShareButton({ planId, rtcProvider, isOwner = false, className }:
 
     // Set timeout (5 seconds) - if no response, show error
     const timeout = setTimeout(() => {
-      console.error('[ShareButton] No invite_created response after 5s');
       setIsCreating(false);
       toast.error('Failed to create invite link', {
         description: 'Signaling server not responding. Try copying the plain URL instead.',

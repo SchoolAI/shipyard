@@ -60,4 +60,6 @@ class CloudflareLogger {
   }
 }
 
-export const logger = new CloudflareLogger((process.env.LOG_LEVEL as LogLevel) || 'info');
+// Default to 'info' level - Cloudflare Workers don't have process.env at module init
+// For now, we use a fixed log level. Could be made configurable via Env in the future.
+export const logger = new CloudflareLogger('info');
