@@ -7,6 +7,7 @@ import { addArtifactTool } from './add-artifact.js';
 import { addPRReviewCommentTool } from './add-pr-review-comment.js';
 import { completeTaskTool } from './complete-task.js';
 import { createPlanTool } from './create-plan.js';
+import { linkPRTool } from './link-pr.js';
 import { readPlanTool } from './read-plan.js';
 import { setupReviewNotificationTool } from './setup-review-notification.js';
 import { TOOL_NAMES } from './tool-names.js';
@@ -52,9 +53,10 @@ Parameters:
 - planId (string): The plan ID
 - sessionToken (string): Session token from createPlan
 - opts.includeAnnotations (boolean, optional): Include comment threads
+- opts.includeLinkedPRs (boolean, optional): Include linked PRs section
 
 Returns:
-- content: Full markdown (with block IDs and annotations if requested)
+- content: Full markdown (with block IDs, annotations, and linked PRs if requested)
 - status: Plan status (e.g., "draft", "pending_review", "approved", "changes_requested")
 - title: Plan title
 - repo: GitHub repo (if set)
@@ -64,7 +66,10 @@ Returns:
 
 Example:
 \`\`\`typescript
-const data = await readPlan(planId, token, { includeAnnotations: true });
+const data = await readPlan(planId, token, {
+  includeAnnotations: true,
+  includeLinkedPRs: true
+});
 if (data.status === "changes_requested") {
   // Respond to feedback
 }
@@ -131,6 +136,34 @@ Operations array items:
 - { type: 'insert', afterBlockId: string | null, content: string }
 - { type: 'delete', blockId: string }
 - { type: 'replace_all', content: string }
+
+---
+
+### linkPR(opts): Promise<{ prNumber, url, status, branch, title }>
+Link a GitHub PR to a plan.
+
+Parameters:
+- planId (string): The plan ID
+- sessionToken (string): Session token
+- prNumber (number): PR number to link
+- branch (string, optional): Branch name (will be fetched if omitted)
+- repo (string, optional): Repository override (org/repo). Uses plan repo if omitted.
+
+Returns:
+- prNumber: The PR number
+- url: PR URL
+- status: 'draft' | 'open' | 'merged' | 'closed'
+- branch: Branch name
+- title: PR title
+
+Example:
+\`\`\`typescript
+const pr = await linkPR({
+  planId, sessionToken,
+  prNumber: 42
+});
+console.log('Linked:', pr.title, pr.status);
+\`\`\`
 
 ---
 
@@ -232,12 +265,13 @@ async function createPlan(opts: {
 async function readPlan(
   planId: string,
   sessionToken: string,
-  opts?: { includeAnnotations?: boolean }
+  opts?: { includeAnnotations?: boolean; includeLinkedPRs?: boolean }
 ) {
   const result = await readPlanTool.handler({
     planId,
     sessionToken,
     includeAnnotations: opts?.includeAnnotations,
+    includeLinkedPRs: opts?.includeLinkedPRs,
   });
   const text = (result.content[0] as { text: string })?.text || '';
 
@@ -343,6 +377,36 @@ async function updateBlockContent(
   await updateBlockContentTool.handler({ planId, sessionToken, operations });
 }
 
+async function linkPR(opts: {
+  planId: string;
+  sessionToken: string;
+  prNumber: number;
+  branch?: string;
+  repo?: string;
+}) {
+  const result = await linkPRTool.handler(opts);
+  const text = (result.content[0] as { text: string })?.text || '';
+
+  if (result.isError) {
+    throw new Error(text);
+  }
+
+  // Parse PR details from response text
+  const prNumber = opts.prNumber;
+  const urlMatch = text.match(/URL: (https:\/\/[^\s]+)/);
+  const statusMatch = text.match(/Status: (\w+)/);
+  const branchMatch = text.match(/Branch: ([^\n]+)/);
+  const titleMatch = text.match(/PR: #\d+ - ([^\n]+)/);
+
+  return {
+    prNumber,
+    url: urlMatch?.[1] || '',
+    status: statusMatch?.[1] || '',
+    branch: branchMatch?.[1] || '',
+    title: titleMatch?.[1] || '',
+  };
+}
+
 async function addPRReviewComment(opts: {
   planId: string;
   sessionToken: string;
@@ -400,6 +464,7 @@ export const executeCodeTool = {
         addArtifact,
         completeTask,
         updateBlockContent,
+        linkPR,
         addPRReviewComment,
         setupReviewNotification,
         console: {

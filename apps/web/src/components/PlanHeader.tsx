@@ -1,4 +1,4 @@
-import { Button, Chip, Separator } from '@heroui/react';
+import { Button, Chip, Separator, Tooltip } from '@heroui/react';
 import type { PlanMetadata } from '@peer-plan/schema';
 import {
   getPlanIndexEntry,
@@ -6,11 +6,14 @@ import {
   PLAN_INDEX_DOC_NAME,
   setPlanIndexEntry,
 } from '@peer-plan/schema';
-import { Archive, ArchiveRestore } from 'lucide-react';
+import { Archive, ArchiveRestore, MessageSquareShare } from 'lucide-react';
+import { useState } from 'react';
 import { toast } from 'sonner';
 import type { WebrtcProvider } from 'y-webrtc';
 import type * as Y from 'yjs';
 import { ApprovalPanel } from '@/components/ApprovalPanel';
+import { ExportConversationDialog } from '@/components/ExportConversationDialog';
+import { LinkPRButton } from '@/components/LinkPRButton';
 import { ReviewActions } from '@/components/ReviewActions';
 import { ShareButton } from '@/components/ShareButton';
 import { StatusChip } from '@/components/StatusChip';
@@ -62,6 +65,12 @@ export function PlanHeader({
   const { identity: githubIdentity } = useGitHubAuth();
   const { ydoc: indexDoc } = useMultiProviderSync(PLAN_INDEX_DOC_NAME);
   const ownerId = getPlanOwnerId(ydoc);
+
+  // Export conversation dialog state
+  const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
+
+  // Check if this plan has an origin transcript (can be exported)
+  const hasOriginTranscript = Boolean(display.originTranscriptPath || display.originSessionId);
 
   const handleArchiveToggle = () => {
     if (!githubIdentity) {
@@ -170,6 +179,26 @@ export function PlanHeader({
 
           <ShareButton />
 
+          {/* Export conversation button - only shown if plan has origin transcript */}
+          {hasOriginTranscript && (
+            <Tooltip delay={0}>
+              <Button
+                isIconOnly
+                variant="ghost"
+                size="sm"
+                aria-label="Export conversation context"
+                onPress={() => setIsExportDialogOpen(true)}
+                className="touch-target"
+              >
+                <MessageSquareShare className="w-4 h-4" />
+              </Button>
+              <Tooltip.Content>Export conversation to another agent</Tooltip.Content>
+            </Tooltip>
+          )}
+
+          {/* Link PR button */}
+          <LinkPRButton ydoc={ydoc} />
+
           {/* Archive icon button */}
           <Button
             isIconOnly
@@ -183,6 +212,16 @@ export function PlanHeader({
           </Button>
         </div>
       )}
+
+      {/* Export conversation dialog */}
+      <ExportConversationDialog
+        planId={planId}
+        ydoc={ydoc}
+        rtcProvider={rtcProvider}
+        isOpen={isExportDialogOpen}
+        onClose={() => setIsExportDialogOpen(false)}
+        transcriptContent={null}
+      />
     </div>
   );
 }

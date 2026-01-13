@@ -8,6 +8,7 @@ export const TOOL_NAMES = {
   COMPLETE_TASK: 'complete_task',
   CREATE_PLAN: 'create_plan',
   EXECUTE_CODE: 'execute_code',
+  LINK_PR: 'link_pr',
   READ_PLAN: 'read_plan',
   SETUP_REVIEW_NOTIFICATION: 'setup_review_notification',
   UPDATE_BLOCK_CONTENT: 'update_block_content',

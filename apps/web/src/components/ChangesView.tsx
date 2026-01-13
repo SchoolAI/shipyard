@@ -3,15 +3,19 @@ import '@git-diff-view/react/styles/diff-view.css';
 import { Alert, Button, ButtonGroup, Card, Chip, Link as HeroLink } from '@heroui/react';
 import { type LinkedPR, type PlanMetadata, updateLinkedPRStatus } from '@peer-plan/schema';
 import {
+  ChevronRight,
   Columns2,
   ExternalLink,
+  FileText,
+  Folder,
   GitBranch,
   GitPullRequest,
   MessageSquare,
   Rocket,
   Rows3,
 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { type NodeRendererProps, Tree, type TreeApi } from 'react-arborist';
 import type * as Y from 'yjs';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
 import { useLinkedPRs } from '@/hooks/useLinkedPRs';
@@ -50,6 +54,7 @@ interface ChangesViewProps {
 export function ChangesView({ ydoc, metadata }: ChangesViewProps) {
   const linkedPRs = useLinkedPRs(ydoc);
   const [selectedPR, setSelectedPR] = useState<number | null>(null);
+  const { identity } = useGitHubAuth();
 
   // Auto-select first PR when available
   useEffect(() => {
@@ -60,6 +65,56 @@ export function ChangesView({ ydoc, metadata }: ChangesViewProps) {
       }
     }
   }, [linkedPRs, selectedPR]);
+
+  // PR status refresh - check GitHub for updated statuses
+  useEffect(() => {
+    if (linkedPRs.length === 0 || !metadata.repo || !identity?.token) {
+      return;
+    }
+
+    // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: GitHub API call with retry and error handling for multiple PRs
+    const refreshPRStatus = async () => {
+      for (const pr of linkedPRs) {
+        try {
+          const response = await fetch(
+            `https://api.github.com/repos/${metadata.repo}/pulls/${pr.prNumber}`,
+            {
+              headers: {
+                Authorization: `Bearer ${identity.token}`,
+                Accept: 'application/vnd.github.v3+json',
+              },
+            }
+          );
+
+          if (!response.ok) {
+            // 404 = PR deleted or moved, just skip
+            if (response.status === 404) {
+              continue;
+            }
+            throw new Error(`GitHub API error: ${response.statusText}`);
+          }
+
+          const data = await response.json();
+          const newStatus = data.merged
+            ? 'merged'
+            : data.state === 'closed'
+              ? 'closed'
+              : data.draft
+                ? 'draft'
+                : 'open';
+
+          // Only update if status changed
+          if (newStatus !== pr.status) {
+            updateLinkedPRStatus(ydoc, pr.prNumber, newStatus);
+          }
+        } catch (_error) {
+          // Continue with other PRs even if one fails
+        }
+      }
+    };
+
+    refreshPRStatus();
+  }, [linkedPRs, metadata.repo, identity?.token, ydoc]);
 
   // Empty state
   if (linkedPRs.length === 0) {
@@ -104,7 +159,7 @@ export function ChangesView({ ydoc, metadata }: ChangesViewProps) {
       {selected && (
         <div className="space-y-2">
           {/* PR Header (compact) */}
-          <PRHeader pr={selected} repo={metadata.repo} planId={metadata.id} ydoc={ydoc} />
+          <PRHeader pr={selected} repo={metadata.repo} ydoc={ydoc} />
 
           {/* Diff Viewer with Comments */}
           <DiffViewer pr={selected} repo={metadata.repo || ''} ydoc={ydoc} />
@@ -162,37 +217,42 @@ function PRCard({ pr, selected, onSelect }: PRCardProps) {
 interface PRHeaderProps {
   pr: LinkedPR;
   repo?: string;
-  planId: string;
   ydoc: Y.Doc;
 }
 
-function PRHeader({ pr, repo, planId, ydoc }: PRHeaderProps) {
+function PRHeader({ pr, repo, ydoc }: PRHeaderProps) {
   const [isPublishing, setIsPublishing] = useState(false);
   const [publishError, setPublishError] = useState<string | null>(null);
+  const { identity } = useGitHubAuth();
 
   const handlePublish = useCallback(async () => {
     if (!repo) return;
+
+    if (!identity?.token) {
+      setPublishError('GitHub authentication required');
+      return;
+    }
 
     setIsPublishing(true);
     setPublishError(null);
 
     try {
-      // Call the registry server to publish the PR
-      const res = await fetch(
-        `http://localhost:32191/api/plan/${planId}/pr/${pr.prNumber}/publish`,
-        {
-          method: 'POST',
-        }
-      ).catch(() =>
-        // Try alternate port
-        fetch(`http://localhost:32192/api/plan/${planId}/pr/${pr.prNumber}/publish`, {
-          method: 'POST',
-        })
-      );
+      // Call GitHub API directly to mark PR as ready for review
+      const response = await fetch(`https://api.github.com/repos/${repo}/pulls/${pr.prNumber}`, {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${identity.token}`,
+          Accept: 'application/vnd.github.v3+json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          draft: false,
+        }),
+      });
 
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
-        throw new Error(errorData.error || `HTTP ${res.status}`);
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: `HTTP ${response.status}` }));
+        throw new Error(errorData.message || errorData.error || `HTTP ${response.status}`);
       }
 
       // Update status in Y.Doc
@@ -202,7 +262,7 @@ function PRHeader({ pr, repo, planId, ydoc }: PRHeaderProps) {
     } finally {
       setIsPublishing(false);
     }
-  }, [repo, planId, pr.prNumber, ydoc]);
+  }, [repo, pr.prNumber, ydoc, identity?.token]);
 
   const isDraft = pr.status === 'draft';
 
@@ -303,6 +363,21 @@ function DiffViewer({ pr, repo, ydoc }: DiffViewerProps) {
     return counts;
   }, [comments]);
 
+  // Build file tree (must be before conditional returns!)
+  const fileTree = useMemo(() => buildFileTreeData(files), [files]);
+  const treeRef = useRef<TreeApi<FileTreeData>>(null);
+
+  // Handle file selection from tree (MUST be before conditional returns!)
+  const handleFileSelect = useCallback((nodes: FileTreeData[]) => {
+    const selected = nodes[0];
+    if (selected?.file) {
+      setSelectedFile(selected.file.filename);
+    }
+  }, []);
+
+  // Create node renderer with comment counts (MUST be before conditional returns!)
+  const NodeRenderer = useMemo(() => createFileTreeNode(commentCountByFile), [commentCountByFile]);
+
   // Fetch file list directly from GitHub API
   useEffect(() => {
     if (!repo) return;
@@ -398,54 +473,67 @@ function DiffViewer({ pr, repo, ydoc }: DiffViewerProps) {
   }
 
   return (
-    <div className="space-y-2">
-      {/* Toolbar: File selector + View toggle */}
-      <div className="flex items-center justify-between gap-2 flex-wrap">
-        {/* File selector (compact horizontal scroll) */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 flex-1 min-w-0">
-          <span className="text-xs text-muted-foreground shrink-0">
-            {files.length} file{files.length !== 1 ? 's' : ''}:
-          </span>
-          {files.map((file) => (
-            <FileChip
-              key={file.filename}
-              file={file}
-              selected={file.filename === selectedFile}
-              onSelect={() => setSelectedFile(file.filename)}
-              commentCount={commentCountByFile.get(file.filename) ?? 0}
-            />
-          ))}
-        </div>
-
-        {/* View mode toggle */}
-        <ButtonGroup size="sm" variant="tertiary">
-          <Button
-            isIconOnly
-            aria-label="Unified view"
-            onPress={() => handleViewModeChange('unified')}
-            className={viewMode === 'unified' ? 'bg-primary/10 text-primary' : ''}
+    <div className="grid grid-cols-1 md:grid-cols-[300px_1fr] gap-2">
+      {/* File tree sidebar */}
+      <Card className="h-fit max-h-[600px] overflow-hidden flex flex-col">
+        <Card.Header className="flex items-center justify-between">
+          <Card.Title className="text-sm">
+            {files.length} file{files.length !== 1 ? 's' : ''} changed
+          </Card.Title>
+          {/* View mode toggle */}
+          <ButtonGroup size="sm" variant="tertiary">
+            <Button
+              isIconOnly
+              aria-label="Unified view"
+              onPress={() => handleViewModeChange('unified')}
+              className={viewMode === 'unified' ? 'bg-primary/10 text-primary' : ''}
+            >
+              <Rows3 className="w-4 h-4" />
+            </Button>
+            <Button
+              isIconOnly
+              aria-label="Split view"
+              onPress={() => handleViewModeChange('split')}
+              className={viewMode === 'split' ? 'bg-primary/10 text-primary' : ''}
+            >
+              <Columns2 className="w-4 h-4" />
+            </Button>
+          </ButtonGroup>
+        </Card.Header>
+        <Card.Content className="p-0 overflow-hidden flex-1">
+          <Tree
+            ref={treeRef}
+            data={fileTree}
+            onSelect={handleFileSelect}
+            openByDefault={false}
+            disableDrag
+            disableDrop
+            width="100%"
+            height={600}
+            indent={16}
+            rowHeight={32}
           >
-            <Rows3 className="w-4 h-4" />
-          </Button>
-          <Button
-            isIconOnly
-            aria-label="Split view"
-            onPress={() => handleViewModeChange('split')}
-            className={viewMode === 'split' ? 'bg-primary/10 text-primary' : ''}
-          >
-            <Columns2 className="w-4 h-4" />
-          </Button>
-        </ButtonGroup>
-      </div>
+            {NodeRenderer}
+          </Tree>
+        </Card.Content>
+      </Card>
 
       {/* Diff View for Selected File */}
-      {selectedFile && (
-        <FileDiffView
-          filename={selectedFile}
-          patch={files.find((f) => f.filename === selectedFile)?.patch}
-          viewMode={viewMode}
-        />
-      )}
+      <div>
+        {selectedFile ? (
+          <FileDiffView
+            filename={selectedFile}
+            patch={files.find((f) => f.filename === selectedFile)?.patch}
+            viewMode={viewMode}
+          />
+        ) : (
+          <Card>
+            <Card.Content className="p-8 text-center">
+              <p className="text-muted-foreground">Select a file to view the diff</p>
+            </Card.Content>
+          </Card>
+        )}
+      </div>
     </div>
   );
 }
@@ -461,42 +549,147 @@ interface PRFile {
   patch?: string;
 }
 
-interface FileChipProps {
-  file: PRFile;
-  selected: boolean;
-  onSelect: () => void;
-  commentCount: number;
+// --- File Tree Types and Helpers (react-arborist) ---
+
+interface FileTreeData {
+  id: string;
+  name: string;
+  children?: FileTreeData[];
+  file?: PRFile; // Only for file nodes
 }
 
-/** Compact chip-style file selector for horizontal scrolling */
-function FileChip({ file, selected, onSelect, commentCount }: FileChipProps) {
-  // Extract just the filename from the path for display
-  const displayName = file.filename.split('/').pop() ?? file.filename;
+/**
+ * Build tree data structure for react-arborist from flat file list
+ */
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Tree building requires nested loops and recursive sorting
+function buildFileTreeData(files: PRFile[]): FileTreeData[] {
+  const root: FileTreeData = {
+    id: '__root__',
+    name: '',
+    children: [],
+  };
 
-  return (
-    <button
-      type="button"
-      onClick={onSelect}
-      className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-mono whitespace-nowrap transition-colors shrink-0 ${
-        selected
-          ? 'bg-primary text-white'
-          : 'bg-surface border border-separator hover:border-primary/50'
-      }`}
-      title={file.filename}
-    >
-      <span className="truncate max-w-[150px]">{displayName}</span>
-      {commentCount > 0 && (
-        <span
-          className={`flex items-center gap-0.5 ${selected ? 'text-white/80' : 'text-primary'}`}
+  for (const file of files) {
+    const parts = file.filename.split('/').filter(Boolean);
+    let currentNode = root;
+
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i];
+      if (!part) continue;
+
+      const isFile = i === parts.length - 1;
+      const path = parts.slice(0, i + 1).join('/');
+
+      // Find existing child or create new one
+      let childNode = currentNode.children?.find((c) => c.name === part);
+
+      if (!childNode) {
+        childNode = {
+          id: path,
+          name: part,
+          children: isFile ? undefined : [],
+          file: isFile ? file : undefined,
+        };
+        currentNode.children?.push(childNode);
+      }
+
+      // Move to next level if folder
+      if (!isFile) {
+        currentNode = childNode;
+      }
+    }
+  }
+
+  // Sort recursively
+  const sortNodes = (nodes: FileTreeData[]): FileTreeData[] => {
+    return nodes
+      .sort((a, b) => {
+        // Folders before files
+        const aIsFolder = a.children !== undefined;
+        const bIsFolder = b.children !== undefined;
+        if (aIsFolder !== bIsFolder) {
+          return aIsFolder ? -1 : 1;
+        }
+        // Alphabetical
+        return a.name.localeCompare(b.name);
+      })
+      .map((node) => ({
+        ...node,
+        children: node.children ? sortNodes(node.children) : undefined,
+      }));
+  };
+
+  return sortNodes(root.children || []);
+}
+
+/**
+ * Custom node renderer for react-arborist using HeroUI styling
+ */
+function createFileTreeNode(commentCountByFile: Map<string, number>) {
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Node renderer requires conditional rendering, stat display, comment badges
+  return function FileTreeNode({ node, style }: NodeRendererProps<FileTreeData>) {
+    const isFolder = node.data.children !== undefined;
+    const commentCount = node.data.file
+      ? (commentCountByFile.get(node.data.file.filename) ?? 0)
+      : 0;
+
+    if (isFolder) {
+      return (
+        <button
+          type="button"
+          style={style}
+          onClick={() => node.toggle()}
+          className="flex items-center gap-1.5 w-full px-2 py-1 text-left text-sm hover:bg-surface rounded transition-colors"
         >
-          <MessageSquare className="w-3 h-3" />
-          {commentCount}
-        </span>
-      )}
-      <span className={selected ? 'text-white/80' : 'text-success'}>+{file.additions}</span>
-      <span className={selected ? 'text-white/80' : 'text-danger'}>-{file.deletions}</span>
-    </button>
-  );
+          <ChevronRight
+            className={`w-3.5 h-3.5 text-muted-foreground transition-transform ${
+              node.isOpen ? 'rotate-90' : ''
+            }`}
+          />
+          <Folder className="w-4 h-4 text-muted-foreground" />
+          <span className="text-foreground font-medium">{node.data.name}</span>
+        </button>
+      );
+    }
+
+    // File node
+    return (
+      <button
+        type="button"
+        style={style}
+        onClick={() => node.select()}
+        className={`flex items-center gap-2 w-full px-2 py-1.5 text-left text-sm rounded transition-colors ${
+          node.isSelected ? 'bg-primary text-white' : 'hover:bg-surface'
+        }`}
+        title={node.data.file?.filename}
+      >
+        <FileText className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
+        <span className="font-mono text-xs truncate flex-1">{node.data.name}</span>
+        <div className="flex items-center gap-1.5 shrink-0">
+          {commentCount > 0 && (
+            <span
+              className={`flex items-center gap-0.5 text-xs ${
+                node.isSelected ? 'text-white/80' : 'text-primary'
+              }`}
+            >
+              <MessageSquare className="w-3 h-3" />
+              {commentCount}
+            </span>
+          )}
+          {node.data.file && (
+            <>
+              <span className={`text-xs ${node.isSelected ? 'text-white/80' : 'text-success'}`}>
+                +{node.data.file.additions}
+              </span>
+              <span className={`text-xs ${node.isSelected ? 'text-white/80' : 'text-danger'}`}>
+                -{node.data.file.deletions}
+              </span>
+            </>
+          )}
+        </div>
+      </button>
+    );
+  };
 }
 
 interface FileDiffViewProps {

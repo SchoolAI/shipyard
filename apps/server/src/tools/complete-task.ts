@@ -185,8 +185,9 @@ The PR is now visible in the "Changes" tab of your plan.`;
     } else if (existingLinkedPRs.length > 0) {
       responseText += `\n\nExisting linked PR: #${existingLinkedPRs[0]?.prNumber}`;
     } else {
-      responseText += `\n\nNo open PR found on current branch. Create one with:
+      responseText += `\n\nNo open PR found on current branch. You can:
 
+1. Create a new PR:
 \`\`\`
 gh pr create --title "${metadata.title}" --body "## Summary
 ${input.summary || 'Task completed.'}
@@ -196,6 +197,11 @@ ${input.summary || 'Task completed.'}
 
 ---
 Generated with [Peer-Plan](https://github.com/SchoolAI/peer-plan)"
+\`\`\`
+
+2. Or link an existing PR manually:
+\`\`\`
+linkPR({ planId, sessionToken, prNumber: 42 })
 \`\`\``;
     }
 
