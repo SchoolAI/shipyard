@@ -375,6 +375,7 @@ function DiffViewer({ pr, repo, ydoc }: DiffViewerProps) {
       if (!nodeId) return;
 
       // Find the file by traversing the tree
+      // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Recursive tree traversal requires nested loops
       const findFile = (treeNodes: FileTreeData[]): PRFile | null => {
         for (const node of treeNodes) {
           if (node.id === nodeId) {
@@ -397,7 +398,10 @@ function DiffViewer({ pr, repo, ydoc }: DiffViewerProps) {
   );
 
   // Create node renderer with comment counts (MUST be before conditional returns!)
-  const NodeRenderer = useMemo(() => createFileTreeNode(commentCountByFile), [commentCountByFile]);
+  const NodeRenderer = useMemo(
+    () => createFileTreeNode(commentCountByFile, setSelectedFile),
+    [commentCountByFile]
+  );
 
   // Fetch file list directly from GitHub API
   useEffect(() => {
@@ -651,7 +655,10 @@ function buildFileTreeData(files: PRFile[]): FileTreeData[] {
 /**
  * Custom node renderer for react-arborist using HeroUI styling
  */
-function createFileTreeNode(commentCountByFile: Map<string, number>) {
+function createFileTreeNode(
+  commentCountByFile: Map<string, number>,
+  onFileClick: (filename: string) => void
+) {
   // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Node renderer requires conditional rendering, stat display, comment badges
   return function FileTreeNode({ node, style }: NodeRendererProps<FileTreeData>) {
     const isFolder = node.data.children !== undefined;
@@ -683,7 +690,12 @@ function createFileTreeNode(commentCountByFile: Map<string, number>) {
       <button
         type="button"
         style={style}
-        onClick={() => node.select()}
+        onClick={() => {
+          node.select();
+          if (node.data.file) {
+            onFileClick(node.data.file.filename);
+          }
+        }}
         className={`flex items-center gap-2 w-full px-2 py-1.5 text-left text-sm rounded transition-colors ${
           node.isSelected ? 'bg-primary text-white' : 'hover:bg-surface'
         }`}
