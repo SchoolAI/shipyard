@@ -526,6 +526,17 @@ export class SignalingRoom extends DurableObject<Env> {
    */
   private async handleApprovalState(ws: WebSocket, message: ApprovalStateMessage): Promise<void> {
     const state = this.getState(ws);
+
+    // IMPORTANT: Infer userId from ownerId to handle race condition where
+    // approval_state arrives before subscribe message with userId
+    if (!state?.userId && message.ownerId) {
+      if (state) {
+        state.userId = message.ownerId;
+        this.persistState(ws, state);
+        console.log('[handleApprovalState] Inferred userId from ownerId:', message.ownerId);
+      }
+    }
+
     if (!state?.userId) {
       console.warn('Received approval_state from unauthenticated connection');
       return;
