@@ -21,12 +21,12 @@ import {
   Archive,
   ArchiveRestore,
   Check,
+  FileInput,
   GitPullRequest,
   MessageSquare,
   MessageSquareShare,
   MoreVertical,
   Share2,
-  Upload,
 } from 'lucide-react';
 import { useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -128,8 +128,6 @@ interface DesktopActionsProps {
   isOwner: boolean;
   hasOriginTranscript: boolean;
   isArchived: boolean;
-  isLinkPROpen: boolean;
-  onLinkPROpenChange: (open: boolean) => void;
   onHandoffDialogOpen: () => void;
   onArchiveToggle: () => void;
 }
@@ -142,13 +140,11 @@ function DesktopActions({
   isOwner,
   hasOriginTranscript,
   isArchived,
-  isLinkPROpen,
-  onLinkPROpenChange,
   onHandoffDialogOpen,
   onArchiveToggle,
 }: DesktopActionsProps) {
   return (
-    <div className="hidden md:flex items-center gap-2">
+    <>
       <ShareButton planId={planId} rtcProvider={rtcProvider} isOwner={isOwner} />
 
       {/* Import conversation button */}
@@ -174,9 +170,6 @@ function DesktopActions({
         </Tooltip>
       )}
 
-      {/* Link PR button */}
-      <LinkPRButton ydoc={ydoc} isOpen={isLinkPROpen} onOpenChange={onLinkPROpenChange} />
-
       {/* Archive icon button */}
       <Button
         isIconOnly
@@ -188,7 +181,7 @@ function DesktopActions({
       >
         {isArchived ? <ArchiveRestore className="w-4 h-4" /> : <Archive className="w-4 h-4" />}
       </Button>
-    </div>
+    </>
   );
 }
 
@@ -206,8 +199,7 @@ function MobileDropdownMenu({
   onAction,
 }: MobileDropdownMenuProps) {
   return (
-    <div className="flex md:hidden">
-      <Dropdown>
+    <Dropdown>
         <Button
           isIconOnly
           variant="ghost"
@@ -225,7 +217,7 @@ function MobileDropdownMenu({
             </Dropdown.Item>
 
             <Dropdown.Item id="import" textValue="Import conversation">
-              <Upload className="w-4 h-4 shrink-0 text-muted" />
+              <FileInput className="w-4 h-4 shrink-0 text-muted" />
               <Label>Import conversation</Label>
             </Dropdown.Item>
 
@@ -255,7 +247,6 @@ function MobileDropdownMenu({
           </Dropdown.Menu>
         </Dropdown.Popover>
       </Dropdown>
-    </div>
   );
 }
 
@@ -601,26 +592,29 @@ export function PlanHeader({
             </>
           )}
 
-          {/* Desktop: Show all buttons individually (hidden on mobile) */}
-          <DesktopActions
-            planId={planId}
-            ydoc={ydoc}
-            rtcProvider={rtcProvider}
-            isOwner={!!(githubIdentity && ownerId && githubIdentity.username === ownerId)}
-            hasOriginTranscript={hasOriginTranscript}
-            isArchived={isArchived}
-            isLinkPROpen={isLinkPROpen}
-            onLinkPROpenChange={setIsLinkPROpen}
-            onHandoffDialogOpen={() => setIsHandoffDialogOpen(true)}
-            onArchiveToggle={handleArchiveToggle}
-          />
+          {/* Desktop: Show all buttons individually */}
+          <div className="hidden md:flex items-center gap-2">
+            <DesktopActions
+              planId={planId}
+              ydoc={ydoc}
+              rtcProvider={rtcProvider}
+              isOwner={!!(githubIdentity && ownerId && githubIdentity.username === ownerId)}
+              hasOriginTranscript={hasOriginTranscript}
+              isArchived={isArchived}
+              onHandoffDialogOpen={() => setIsHandoffDialogOpen(true)}
+              onArchiveToggle={handleArchiveToggle}
+            />
+            <LinkPRButton ydoc={ydoc} isOpen={isLinkPROpen} onOpenChange={setIsLinkPROpen} />
+          </div>
 
           {/* Mobile: Show dropdown menu with all actions */}
-          <MobileDropdownMenu
-            hasOriginTranscript={hasOriginTranscript}
-            isArchived={isArchived}
-            onAction={handleDropdownAction}
-          />
+          <div className="flex md:hidden">
+            <MobileDropdownMenu
+              hasOriginTranscript={hasOriginTranscript}
+              isArchived={isArchived}
+              onAction={handleDropdownAction}
+            />
+          </div>
         </div>
       )}
 

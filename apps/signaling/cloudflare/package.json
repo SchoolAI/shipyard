@@ -9,6 +9,9 @@
     "deploy:production": "wrangler deploy --env production",
     "tail": "wrangler tail"
   },
+  "dependencies": {
+    "@peer-plan/schema": "workspace:*"
+  },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260103.0",
     "typescript": "^5.9.3",

@@ -60,13 +60,14 @@ export function ShareButton({ planId, rtcProvider, isOwner = false, className }:
 
     setIsCreating(true);
 
-    // Set timeout (5 seconds) - if no response, show error
+    // Set timeout (10 seconds) - if no response, show error
     const timeout = setTimeout(() => {
       setIsCreating(false);
       toast.error('Failed to create invite link', {
-        description: 'Signaling server not responding. Try copying the plain URL instead.',
+        description:
+          'Signaling server not responding after 10s. Try copying the plain URL instead.',
       });
-    }, 5000);
+    }, 10000);
 
     // Store timeout ID to clear it if we get a response
     window.__shareButtonTimeout = timeout;

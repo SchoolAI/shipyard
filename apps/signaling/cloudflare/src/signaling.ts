@@ -18,6 +18,7 @@
  */
 
 import { DurableObject } from 'cloudflare:workers';
+import type { InviteRedemption, InviteToken } from '@peer-plan/schema';
 
 interface Env {
   SIGNALING_ROOM: DurableObjectNamespace;
@@ -123,26 +124,7 @@ interface PlanApprovalState {
   lastUpdated: number;
 }
 
-// Invite token (server-side only, stored in Durable Object)
-interface InviteToken {
-  id: string; // tokenId for URL lookup
-  tokenHash: string; // SHA256(tokenValue) - never store raw token
-  planId: string;
-  createdBy: string; // Owner's GitHub username
-  createdAt: number;
-  expiresAt: number;
-  maxUses: number | null; // null = unlimited
-  useCount: number;
-  revoked: boolean;
-  label?: string;
-}
-
-// Record of who redeemed an invite
-interface InviteRedemption {
-  redeemedBy: string;
-  redeemedAt: number;
-  tokenId: string;
-}
+// InviteToken and InviteRedemption types imported from @peer-plan/schema
 
 export class SignalingRoom extends DurableObject<Env> {
   // In-memory topic -> WebSocket mapping (rebuilt on wake from hibernation)
@@ -320,6 +302,11 @@ export class SignalingRoom extends DurableObject<Env> {
         case 'list_invites':
           await this.handleListInvites(ws, data);
           break;
+        default: {
+          // Exhaustive check - TypeScript will error if we miss a case
+          const _exhaustive: never = data;
+          console.error('Unhandled message type:', _exhaustive);
+        }
       }
     } catch (error) {
       console.error('Error handling message:', error);

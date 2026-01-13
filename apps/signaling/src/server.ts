@@ -160,6 +160,13 @@ const redemptions = new Map<string, InviteRedemption>();
  */
 const connectionUserIds = new WeakMap<WebSocket, string>();
 
+/**
+ * Connection debug IDs for tracking.
+ * Helps identify if messages are coming from different WebSocket instances.
+ */
+const connectionDebugIds = new WeakMap<WebSocket, number>();
+let connectionIdCounter = 0;
+
 // --- WebSocket Server Setup ---
 const wss = new WebSocketServer({ noServer: true });
 
@@ -279,6 +286,8 @@ function assertNever(x: never): never {
  * @param message - The approval state message
  */
 function handleApprovalState(conn: WebSocket, message: ApprovalStateMessage): void {
+  const connId = connectionDebugIds.get(conn);
+
   // IMPORTANT: Store userId from this connection if not already set
   // This handles the race condition where approval_state arrives before subscribe message
   let userId = connectionUserIds.get(conn);
@@ -286,10 +295,10 @@ function handleApprovalState(conn: WebSocket, message: ApprovalStateMessage): vo
     // Infer userId from ownerId in the message (owner is sending this)
     userId = message.ownerId;
     connectionUserIds.set(conn, userId);
-    console.log('[handleApprovalState] Inferred userId from ownerId:', userId);
+    console.log(`[handleApprovalState] Conn #${connId}: Inferred userId from ownerId:`, userId);
   }
 
-  console.log('[handleApprovalState] Received approval_state:', {
+  console.log(`[handleApprovalState] Conn #${connId}:`, {
     planId: message.planId,
     ownerId: message.ownerId,
     userId,
@@ -446,21 +455,23 @@ function notifyOwnerOfRedemption(planId: string, token: InviteToken, redeemedBy:
  * @param message - The create invite request
  */
 function handleCreateInvite(conn: WebSocket, message: CreateInviteRequest): void {
+  const connId = connectionDebugIds.get(conn);
   const userId = connectionUserIds.get(conn);
-  console.log('[handleCreateInvite] Request received:', {
+
+  console.log(`[handleCreateInvite] Conn #${connId}:`, {
     planId: message.planId,
     userId,
     hasApproval: planApprovals.has(message.planId),
   });
 
   if (!userId) {
-    console.warn('[handleCreateInvite] No userId - unauthenticated');
+    console.warn(`[handleCreateInvite] Conn #${connId}: No userId - unauthenticated`);
     send(conn, { type: 'error', error: 'unauthenticated' });
     return;
   }
 
   const approval = planApprovals.get(message.planId);
-  console.log('[handleCreateInvite] Approval state:', {
+  console.log(`[handleCreateInvite] Conn #${connId}: Approval check:`, {
     hasApproval: !!approval,
     ownerId: approval?.ownerId,
     userId,
@@ -703,8 +714,11 @@ function handleSubscribe(
   message: SubscribeMessage,
   subscribedTopics: Set<string>
 ): void {
+  const connId = connectionDebugIds.get(conn);
+
   // Store userId if provided (for approval checking)
   if (message.userId) {
+    console.log(`[handleSubscribe] Conn #${connId}: Storing userId:`, message.userId);
     connectionUserIds.set(conn, message.userId);
   }
 
@@ -816,6 +830,11 @@ function handlePublish(conn: WebSocket, message: PublishMessage): void {
  * @param conn - The WebSocket connection
  */
 function onConnection(conn: WebSocket): void {
+  // Assign debug ID to track this connection
+  const connId = ++connectionIdCounter;
+  connectionDebugIds.set(conn, connId);
+  console.log(`[onConnection] New connection #${connId}`);
+
   const subscribedTopics = new Set<string>();
   let closed = false;
   let pongReceived = true;

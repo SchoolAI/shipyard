@@ -20,11 +20,11 @@ import { Attachments } from '@/components/Attachments';
 import { ChangesView } from '@/components/ChangesView';
 import { DeliverablesView } from '@/components/DeliverablesView';
 import { ImportConversationHandler } from '@/components/ImportConversationHandler';
+import { MobileActionsMenu } from '@/components/MobileActionsMenu';
 import { MobileHeader } from '@/components/MobileHeader';
 import { PlanHeader } from '@/components/PlanHeader';
 import { PlanViewer } from '@/components/PlanViewer';
 import { ReviewActions } from '@/components/ReviewActions';
-import { ShareButton } from '@/components/ShareButton';
 import { Sidebar } from '@/components/Sidebar';
 import { Drawer } from '@/components/ui/drawer';
 import { WaitingRoomGate } from '@/components/WaitingRoomGate';
@@ -467,7 +467,12 @@ export function PlanPage() {
             agentCount={syncState?.activeCount}
             peerCount={syncState?.peerCount}
             rightContent={
-              <ShareButton planId={planId} rtcProvider={rtcProvider} isOwner={isOwner} />
+              <MobileActionsMenu
+                planId={planId}
+                ydoc={ydoc}
+                rtcProvider={rtcProvider}
+                metadata={metadata}
+              />
             }
           />
         </div>
