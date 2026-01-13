@@ -475,32 +475,13 @@ function DiffViewer({ pr, repo, ydoc }: DiffViewerProps) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-[300px_1fr] gap-2">
       {/* File tree sidebar */}
-      <Card className="h-fit max-h-[600px] overflow-hidden flex flex-col">
-        <Card.Header className="flex items-center justify-between">
-          <Card.Title className="text-sm">
+      <div className="border border-separator rounded-lg overflow-hidden flex flex-col max-h-[600px]">
+        <div className="px-3 py-2 border-b border-separator bg-surface">
+          <span className="text-sm font-medium">
             {files.length} file{files.length !== 1 ? 's' : ''} changed
-          </Card.Title>
-          {/* View mode toggle */}
-          <ButtonGroup size="sm" variant="tertiary">
-            <Button
-              isIconOnly
-              aria-label="Unified view"
-              onPress={() => handleViewModeChange('unified')}
-              className={viewMode === 'unified' ? 'bg-primary/10 text-primary' : ''}
-            >
-              <Rows3 className="w-4 h-4" />
-            </Button>
-            <Button
-              isIconOnly
-              aria-label="Split view"
-              onPress={() => handleViewModeChange('split')}
-              className={viewMode === 'split' ? 'bg-primary/10 text-primary' : ''}
-            >
-              <Columns2 className="w-4 h-4" />
-            </Button>
-          </ButtonGroup>
-        </Card.Header>
-        <Card.Content className="p-0 overflow-hidden flex-1">
+          </span>
+        </div>
+        <div className="overflow-hidden flex-1">
           <Tree
             ref={treeRef}
             data={fileTree}
@@ -515,17 +496,41 @@ function DiffViewer({ pr, repo, ydoc }: DiffViewerProps) {
           >
             {NodeRenderer}
           </Tree>
-        </Card.Content>
-      </Card>
+        </div>
+      </div>
 
       {/* Diff View for Selected File */}
       <div>
         {selectedFile ? (
-          <FileDiffView
-            filename={selectedFile}
-            patch={files.find((f) => f.filename === selectedFile)?.patch}
-            viewMode={viewMode}
-          />
+          <div className="space-y-2">
+            {/* Diff controls */}
+            <div className="flex items-center justify-between px-2">
+              <span className="text-sm text-muted-foreground font-mono">{selectedFile}</span>
+              <ButtonGroup size="sm" variant="tertiary">
+                <Button
+                  isIconOnly
+                  aria-label="Unified view"
+                  onPress={() => handleViewModeChange('unified')}
+                  className={viewMode === 'unified' ? 'bg-primary/10 text-primary' : ''}
+                >
+                  <Rows3 className="w-4 h-4" />
+                </Button>
+                <Button
+                  isIconOnly
+                  aria-label="Split view"
+                  onPress={() => handleViewModeChange('split')}
+                  className={viewMode === 'split' ? 'bg-primary/10 text-primary' : ''}
+                >
+                  <Columns2 className="w-4 h-4" />
+                </Button>
+              </ButtonGroup>
+            </div>
+            <FileDiffView
+              filename={selectedFile}
+              patch={files.find((f) => f.filename === selectedFile)?.patch}
+              viewMode={viewMode}
+            />
+          </div>
         ) : (
           <Card>
             <Card.Content className="p-8 text-center">

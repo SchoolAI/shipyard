@@ -1,0 +1,313 @@
+/**
+ * Inbox Page - Shows plans needing review (pending_review or changes_requested).
+ * Includes search filtering for finding specific inbox items.
+ */
+
+import { Button, Chip, ListBox, ListBoxItem, SearchField, Tooltip } from '@heroui/react';
+import type { PlanIndexEntry, PlanStatusType } from '@peer-plan/schema';
+import { getPlanIndexEntry, PLAN_INDEX_DOC_NAME, setPlanIndexEntry } from '@peer-plan/schema';
+import { AlertTriangle, Check, Clock, ExternalLink, MessageSquare } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
+import { useGitHubAuth } from '@/hooks/useGitHubAuth';
+import { useMultiProviderSync } from '@/hooks/useMultiProviderSync';
+import { usePlanIndex } from '@/hooks/usePlanIndex';
+
+// --- Status Badge Component ---
+
+interface StatusBadgeProps {
+  status: PlanStatusType;
+}
+
+function StatusBadge({ status }: StatusBadgeProps) {
+  const config: Record<
+    PlanStatusType,
+    {
+      label: string;
+      color: 'warning' | 'danger' | 'success' | 'default' | 'accent';
+      icon: React.ReactNode;
+    }
+  > = {
+    pending_review: {
+      label: 'Pending Review',
+      color: 'warning',
+      icon: <Clock className="w-3 h-3" />,
+    },
+    changes_requested: {
+      label: 'Changes Requested',
+      color: 'danger',
+      icon: <AlertTriangle className="w-3 h-3" />,
+    },
+    draft: { label: 'Draft', color: 'default', icon: null },
+    approved: { label: 'Approved', color: 'success', icon: <Check className="w-3 h-3" /> },
+    in_progress: { label: 'In Progress', color: 'accent', icon: null },
+    completed: { label: 'Completed', color: 'success', icon: <Check className="w-3 h-3" /> },
+  };
+
+  const { label, color, icon } = config[status];
+
+  return (
+    <Chip size="sm" variant="soft" color={color} className="gap-1">
+      {icon}
+      {label}
+    </Chip>
+  );
+}
+
+// --- Inbox Item Component ---
+
+interface InboxItemProps {
+  plan: PlanIndexEntry;
+  onApprove: (planId: string) => void;
+  onRequestChanges: (planId: string) => void;
+}
+
+function InboxItem({ plan, onApprove, onRequestChanges }: InboxItemProps) {
+  const navigate = useNavigate();
+
+  return (
+    <div className="flex items-center justify-between gap-3 w-full py-2">
+      <div className="flex flex-col gap-1 flex-1 min-w-0">
+        <span className="font-medium text-foreground truncate">{plan.title}</span>
+        <div className="flex items-center gap-2">
+          <StatusBadge status={plan.status} />
+          <span className="text-xs text-muted-foreground">
+            {formatRelativeTime(plan.updatedAt)}
+          </span>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-1 shrink-0">
+        {/* Quick action: Approve */}
+        <Tooltip>
+          <Tooltip.Trigger>
+            <Button
+              isIconOnly
+              variant="ghost"
+              size="sm"
+              color="success"
+              aria-label="Approve plan"
+              onPress={(e) => {
+                e.continuePropagation?.();
+                onApprove(plan.id);
+              }}
+              className="w-8 h-8"
+            >
+              <Check className="w-4 h-4" />
+            </Button>
+          </Tooltip.Trigger>
+          <Tooltip.Content>Approve</Tooltip.Content>
+        </Tooltip>
+
+        {/* Quick action: Request Changes */}
+        <Tooltip>
+          <Tooltip.Trigger>
+            <Button
+              isIconOnly
+              variant="ghost"
+              size="sm"
+              color="warning"
+              aria-label="Request changes"
+              onPress={(e) => {
+                e.continuePropagation?.();
+                onRequestChanges(plan.id);
+              }}
+              className="w-8 h-8"
+            >
+              <MessageSquare className="w-4 h-4" />
+            </Button>
+          </Tooltip.Trigger>
+          <Tooltip.Content>Request Changes</Tooltip.Content>
+        </Tooltip>
+
+        {/* View plan */}
+        <Tooltip>
+          <Tooltip.Trigger>
+            <Button
+              isIconOnly
+              variant="ghost"
+              size="sm"
+              aria-label="View plan"
+              onPress={() => navigate(`/plan/${plan.id}`)}
+              className="w-8 h-8"
+            >
+              <ExternalLink className="w-4 h-4" />
+            </Button>
+          </Tooltip.Trigger>
+          <Tooltip.Content>View Plan</Tooltip.Content>
+        </Tooltip>
+      </div>
+    </div>
+  );
+}
+
+// --- Helper Functions ---
+
+function formatRelativeTime(timestamp: number): string {
+  const now = Date.now();
+  const diff = now - timestamp;
+  const minutes = Math.floor(diff / 60000);
+  const hours = Math.floor(diff / 3600000);
+  const days = Math.floor(diff / 86400000);
+
+  if (minutes < 1) return 'Just now';
+  if (minutes < 60) return `${minutes}m ago`;
+  if (hours < 24) return `${hours}h ago`;
+  if (days < 7) return `${days}d ago`;
+  return new Date(timestamp).toLocaleDateString();
+}
+
+// --- Main Page Component ---
+
+export function InboxPage() {
+  const { identity: githubIdentity } = useGitHubAuth();
+  const { inboxPlans } = usePlanIndex(githubIdentity?.username);
+  const { ydoc: indexDoc } = useMultiProviderSync(PLAN_INDEX_DOC_NAME);
+  const navigate = useNavigate();
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Sort by most recently updated first, then filter by search query
+  const sortedInboxPlans = useMemo(() => {
+    const sorted = [...inboxPlans].sort((a, b) => b.updatedAt - a.updatedAt);
+    if (!searchQuery.trim()) {
+      return sorted;
+    }
+    const query = searchQuery.toLowerCase();
+    return sorted.filter((plan) => plan.title.toLowerCase().includes(query));
+  }, [inboxPlans, searchQuery]);
+
+  const handleApprove = async (planId: string) => {
+    if (!githubIdentity) {
+      toast.error('Please sign in with GitHub first');
+      return;
+    }
+
+    const now = Date.now();
+
+    // Update plan-index
+    const entry = getPlanIndexEntry(indexDoc, planId);
+    if (entry) {
+      setPlanIndexEntry(indexDoc, {
+        ...entry,
+        status: 'approved',
+        updatedAt: now,
+      });
+    }
+
+    // Also update the plan's own metadata
+    try {
+      const planDoc = new (await import('yjs')).Doc();
+      const idb = new (await import('y-indexeddb')).IndexeddbPersistence(planId, planDoc);
+      await idb.whenSynced;
+
+      planDoc.transact(() => {
+        const metadata = planDoc.getMap('metadata');
+        metadata.set('status', 'approved');
+        metadata.set('updatedAt', now);
+      });
+
+      idb.destroy();
+    } catch {
+      // Plan doc may not exist locally
+    }
+
+    toast.success('Plan approved');
+  };
+
+  const handleRequestChanges = (planId: string) => {
+    // Navigate to the plan page where they can add comments
+    navigate(`/plan/${planId}`);
+    toast.info('Navigate to add comments and request changes');
+  };
+
+  // Empty state - true inbox zero (no plans at all)
+  if (inboxPlans.length === 0) {
+    return (
+      <div className="h-full flex items-center justify-center p-4">
+        <div className="text-center">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-success/10 flex items-center justify-center">
+            <Check className="w-8 h-8 text-success" />
+          </div>
+          <h1 className="text-xl font-bold text-foreground mb-2">Inbox Zero!</h1>
+          <p className="text-sm text-muted-foreground">No plans need your review right now.</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-full flex flex-col p-4 max-w-3xl mx-auto">
+      {/* Header */}
+      <div className="flex flex-col gap-3 mb-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-bold text-foreground">Inbox</h1>
+            <p className="text-sm text-muted-foreground">
+              {sortedInboxPlans.length}{' '}
+              {sortedInboxPlans.length === 1 ? 'plan needs' : 'plans need'} your review
+              {searchQuery && inboxPlans.length !== sortedInboxPlans.length && (
+                <span className="text-muted-foreground"> (filtered from {inboxPlans.length})</span>
+              )}
+            </p>
+          </div>
+        </div>
+
+        {/* Search Field */}
+        <SearchField
+          aria-label="Search inbox"
+          value={searchQuery}
+          onChange={setSearchQuery}
+          onClear={() => setSearchQuery('')}
+        >
+          <SearchField.Group>
+            <SearchField.SearchIcon />
+            <SearchField.Input placeholder="Search inbox..." className="w-full" />
+            <SearchField.ClearButton />
+          </SearchField.Group>
+        </SearchField>
+      </div>
+
+      {/* Plan list */}
+      <div className="flex-1 overflow-y-auto">
+        {sortedInboxPlans.length === 0 ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="text-center">
+              <p className="text-muted-foreground">No plans match "{searchQuery}"</p>
+              <Button variant="ghost" size="sm" onPress={() => setSearchQuery('')} className="mt-2">
+                Clear search
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <ListBox
+            aria-label="Inbox plans"
+            selectionMode="single"
+            onSelectionChange={(keys) => {
+              const key = Array.from(keys)[0];
+              if (key) {
+                navigate(`/plan/${key}`);
+              }
+            }}
+            className="divide-y divide-separator"
+          >
+            {sortedInboxPlans.map((plan) => (
+              <ListBoxItem
+                id={plan.id}
+                key={plan.id}
+                textValue={plan.title}
+                className="px-3 rounded-lg hover:bg-surface"
+              >
+                <InboxItem
+                  plan={plan}
+                  onApprove={handleApprove}
+                  onRequestChanges={handleRequestChanges}
+                />
+              </ListBoxItem>
+            ))}
+          </ListBox>
+        )}
+      </div>
+    </div>
+  );
+}

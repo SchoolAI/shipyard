@@ -1,10 +1,9 @@
 import {
   Button,
   Chip,
-  Disclosure,
-  DisclosureGroup,
   ListBox,
   ListBoxItem,
+  Popover,
   SearchField,
   Select,
   Tooltip,
@@ -17,6 +16,7 @@ import {
   ArrowUpDown,
   ChevronRight,
   FileText,
+  Filter,
   Inbox,
   Users,
   X,
@@ -37,12 +37,9 @@ import {
   STATUS_FILTER_OPTIONS,
   useViewFilters,
 } from '@/hooks/useViewFilters';
-import {
-  getShowArchived,
-  getSidebarCollapsed,
-  setShowArchived,
-  setSidebarCollapsed,
-} from '@/utils/uiPreferences';
+import { getSidebarCollapsed, setSidebarCollapsed } from '@/utils/uiPreferences';
+
+// --- Plan Item Component ---
 
 interface PlanItemProps {
   plan: PlanIndexEntry;
@@ -99,136 +96,77 @@ function PlanItem({
   );
 }
 
-interface SidebarProps {
-  /** Called after navigation (used to close mobile drawer) */
-  onNavigate?: () => void;
-  /** When true, skip CollapsiblePanel wrapper (used in mobile drawer) */
-  inDrawer?: boolean;
+// --- Navigation Item Component ---
+
+interface NavItemProps {
+  icon: React.ReactNode;
+  label: string;
+  href: string;
+  isActive: boolean;
+  badge?: number;
+  badgeColor?: 'warning' | 'default';
+  onClick?: () => void;
 }
 
-interface FilterControlsProps {
-  searchQuery: string;
-  sortBy: string;
-  statusFilters: PlanStatusType[];
-  onSearchChange: (query: string) => void;
-  onSortChange: (sort: string) => void;
-  onStatusToggle: (status: PlanStatusType) => void;
-  onClearFilters: () => void;
-  hasActiveFilters: boolean;
-}
+function NavItem({
+  icon,
+  label,
+  href,
+  isActive,
+  badge,
+  badgeColor = 'warning',
+  onClick,
+}: NavItemProps) {
+  const navigate = useNavigate();
 
-function FilterControls({
-  searchQuery,
-  sortBy,
-  statusFilters,
-  onSearchChange,
-  onSortChange,
-  onStatusToggle,
-  onClearFilters,
-  hasActiveFilters,
-}: FilterControlsProps) {
   return (
-    <div className="px-3 py-2 border-b border-separator space-y-2">
-      {/* Search input */}
-      <SearchField
-        aria-label="Search plans"
-        value={searchQuery}
-        onChange={onSearchChange}
-        className="w-full"
-      >
-        <SearchField.Group>
-          <SearchField.SearchIcon />
-          <SearchField.Input placeholder="Search plans..." />
-          <SearchField.ClearButton />
-        </SearchField.Group>
-      </SearchField>
-
-      {/* Sort dropdown and clear button */}
+    <button
+      type="button"
+      onClick={() => {
+        onClick?.();
+        navigate(href);
+      }}
+      className={`
+        w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-sm
+        transition-colors cursor-pointer
+        ${
+          isActive
+            ? 'bg-accent/10 text-accent font-medium'
+            : 'text-foreground hover:bg-surface-hover'
+        }
+      `}
+    >
       <div className="flex items-center gap-2">
-        <Select
-          aria-label="Sort plans"
-          selectedKey={sortBy}
-          onSelectionChange={(key) => onSortChange(key as string)}
-          className="flex-1"
-        >
-          <Select.Trigger>
-            <ArrowUpDown className="w-3.5 h-3.5 shrink-0" />
-            <Select.Value />
-          </Select.Trigger>
-          <Select.Popover>
-            <ListBox>
-              {SORT_OPTIONS.map((option) => (
-                <ListBoxItem key={option.value} id={option.value}>
-                  {option.label}
-                </ListBoxItem>
-              ))}
-            </ListBox>
-          </Select.Popover>
-        </Select>
-
-        {hasActiveFilters && (
-          <Tooltip>
-            <Tooltip.Trigger>
-              <Button
-                isIconOnly
-                variant="ghost"
-                size="sm"
-                aria-label="Clear all filters"
-                onPress={onClearFilters}
-                className="shrink-0"
-              >
-                <X className="w-4 h-4" />
-              </Button>
-            </Tooltip.Trigger>
-            <Tooltip.Content>Clear filters</Tooltip.Content>
-          </Tooltip>
-        )}
+        {icon}
+        <span>{label}</span>
       </div>
-
-      {/* Status filter chips */}
-      <div className="flex flex-wrap gap-1">
-        {STATUS_FILTER_OPTIONS.map((option) => {
-          const isActive = statusFilters.includes(option.value);
-          // Map color to HeroUI chip colors (primary -> accent for HeroUI v3)
-          const chipColor =
-            option.color === 'primary'
-              ? 'accent'
-              : (option.color as 'default' | 'warning' | 'success' | 'danger' | 'accent');
-          return (
-            <Chip
-              key={option.value}
-              size="sm"
-              variant={isActive ? 'soft' : 'soft'}
-              color={isActive ? chipColor : 'default'}
-              className={`cursor-pointer text-[10px] h-5 px-1.5 ${isActive ? 'ring-1 ring-current' : 'opacity-60'}`}
-              onClick={() => onStatusToggle(option.value)}
-            >
-              {option.label}
-            </Chip>
-          );
-        })}
-      </div>
-    </div>
+      {badge !== undefined && badge > 0 && (
+        <Chip size="sm" variant="soft" color={badgeColor} className="text-[10px] h-5 px-1.5">
+          {badge}
+        </Chip>
+      )}
+    </button>
   );
 }
 
+// --- Collapsed Sidebar ---
+
 interface CollapsedSidebarProps {
   inboxCount: number;
-  myPlansCount: number;
-  sharedPlansCount: number;
-  showArchived: boolean;
+  archivedCount: number;
   onToggle: () => void;
-  onToggleArchived: () => void;
+  onNavigate?: () => void;
 }
 
 function CollapsedSidebar({
   inboxCount,
-  myPlansCount,
-  sharedPlansCount,
-  showArchived,
+  archivedCount,
   onToggle,
-  onToggleArchived,
+  onNavigate,
 }: CollapsedSidebarProps) {
+  const navigate = useNavigate();
+  const location = useLocation();
+
   return (
     <div className="flex flex-col h-full bg-surface">
       {/* Expand button */}
@@ -251,85 +189,77 @@ function CollapsedSidebar({
       </div>
 
       {/* Navigation icons */}
-      <nav className="flex-1 flex flex-col items-center gap-2 px-3 pt-3 overflow-y-auto">
-        {/* Inbox indicator */}
-        {inboxCount > 0 && (
-          <Tooltip>
-            <Tooltip.Trigger>
-              <Button
-                isIconOnly
-                variant="ghost"
-                size="sm"
-                aria-label="Inbox"
-                className="w-10 h-10 relative"
-              >
-                <Inbox className="w-5 h-5 text-warning" />
-                {inboxCount > 0 && (
-                  <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-warning text-warning-foreground text-[10px] flex items-center justify-center font-semibold">
-                    {inboxCount}
-                  </span>
-                )}
-              </Button>
-            </Tooltip.Trigger>
-            <Tooltip.Content>Inbox ({inboxCount})</Tooltip.Content>
-          </Tooltip>
-        )}
+      <nav className="flex-1 flex flex-col items-center gap-2 px-3 pt-2 overflow-y-auto">
+        {/* Inbox */}
+        <Tooltip>
+          <Tooltip.Trigger>
+            <Button
+              isIconOnly
+              variant={location.pathname === '/inbox' ? 'soft' : 'ghost'}
+              color={location.pathname === '/inbox' ? 'accent' : 'default'}
+              size="sm"
+              aria-label="Inbox"
+              onPress={() => {
+                onNavigate?.();
+                navigate('/inbox');
+              }}
+              className="w-10 h-10 relative"
+            >
+              <Inbox className={`w-5 h-5 ${inboxCount > 0 ? 'text-warning' : ''}`} />
+              {inboxCount > 0 && (
+                <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-warning text-warning-foreground text-[10px] flex items-center justify-center font-semibold">
+                  {inboxCount}
+                </span>
+              )}
+            </Button>
+          </Tooltip.Trigger>
+          <Tooltip.Content>Inbox ({inboxCount})</Tooltip.Content>
+        </Tooltip>
 
-        {/* My Plans indicator */}
-        {myPlansCount > 0 && (
-          <Tooltip>
-            <Tooltip.Trigger>
-              <Button
-                isIconOnly
-                variant="ghost"
-                size="sm"
-                aria-label="My Plans"
-                className="w-10 h-10"
-              >
-                <FileText className="w-5 h-5 text-foreground" />
-              </Button>
-            </Tooltip.Trigger>
-            <Tooltip.Content>My Plans ({myPlansCount})</Tooltip.Content>
-          </Tooltip>
-        )}
+        {/* Archive */}
+        <Tooltip>
+          <Tooltip.Trigger>
+            <Button
+              isIconOnly
+              variant={location.pathname === '/archive' ? 'soft' : 'ghost'}
+              color={location.pathname === '/archive' ? 'accent' : 'default'}
+              size="sm"
+              aria-label="Archive"
+              onPress={() => {
+                onNavigate?.();
+                navigate('/archive');
+              }}
+              className="w-10 h-10"
+            >
+              <Archive className="w-5 h-5" />
+            </Button>
+          </Tooltip.Trigger>
+          <Tooltip.Content>Archive ({archivedCount})</Tooltip.Content>
+        </Tooltip>
 
-        {/* Shared Plans indicator */}
-        {sharedPlansCount > 0 && (
-          <Tooltip>
-            <Tooltip.Trigger>
-              <Button
-                isIconOnly
-                variant="ghost"
-                size="sm"
-                aria-label="Shared Plans"
-                className="w-10 h-10"
-              >
-                <Users className="w-5 h-5 text-foreground" />
-              </Button>
-            </Tooltip.Trigger>
-            <Tooltip.Content>Shared ({sharedPlansCount})</Tooltip.Content>
-          </Tooltip>
-        )}
-      </nav>
+        {/* Divider */}
+        <div className="w-8 h-px bg-separator my-1" />
 
-      {/* Footer icons */}
-      <div className="px-3 py-2 border-t border-separator flex flex-col items-center gap-2 shrink-0">
-        <AccountSection collapsed />
+        {/* Search icon - TODO: Add search functionality when clicked */}
         <Tooltip>
           <Tooltip.Trigger>
             <Button
               isIconOnly
               variant="ghost"
               size="sm"
-              aria-label={showArchived ? 'Hide archived plans' : 'Show archived plans'}
-              onPress={onToggleArchived}
-              className={`w-10 h-10 ${showArchived ? 'text-primary' : ''}`}
+              aria-label="Search plans"
+              className="w-10 h-10"
             >
-              <Archive className="w-4 h-4" />
+              <SearchField.SearchIcon />
             </Button>
           </Tooltip.Trigger>
-          <Tooltip.Content>{showArchived ? 'Hide archived' : 'Show archived'}</Tooltip.Content>
+          <Tooltip.Content>Search</Tooltip.Content>
         </Tooltip>
+      </nav>
+
+      {/* Footer icons */}
+      <div className="px-3 py-2 border-t border-separator flex flex-col items-center gap-2 shrink-0">
+        <AccountSection collapsed />
         <div className="w-10 h-10 flex items-center justify-center">
           <ThemeToggle />
         </div>
@@ -337,6 +267,17 @@ function CollapsedSidebar({
     </div>
   );
 }
+
+// --- Sidebar Props ---
+
+interface SidebarProps {
+  /** Called after navigation (used to close mobile drawer) */
+  onNavigate?: () => void;
+  /** When true, skip CollapsiblePanel wrapper (used in mobile drawer) */
+  inDrawer?: boolean;
+}
+
+// --- Main Sidebar Component ---
 
 export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
   const { identity: githubIdentity } = useGitHubAuth();
@@ -351,10 +292,12 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
   } = usePlanIndex(githubIdentity?.username);
   const { activePlanId, syncState } = useActivePlanSync();
   const [collapsed, setCollapsed] = useState(getSidebarCollapsed);
-  const [showArchived, setShowArchivedState] = useState(getShowArchived);
   const navigate = useNavigate();
   const location = useLocation();
   const { ydoc: indexDoc } = useMultiProviderSync(PLAN_INDEX_DOC_NAME);
+
+  // Check if we're on inbox route
+  const isOnInbox = location.pathname === '/inbox';
 
   // View filters
   const {
@@ -367,7 +310,7 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
     clearFilters,
   } = useViewFilters();
 
-  // Apply filters to each plan category
+  // Apply filters to each plan category (always apply filtering)
   const filteredInboxPlans = useMemo(() => {
     const { filteredPlans } = filterAndSortPlans(inboxPlans, searchQuery, sortBy, statusFilters);
     return filteredPlans;
@@ -383,18 +326,7 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
     return filteredPlans;
   }, [sharedPlans, searchQuery, sortBy, statusFilters]);
 
-  const filteredArchivedPlans = useMemo(() => {
-    const { filteredPlans } = filterAndSortPlans(archivedPlans, searchQuery, sortBy, statusFilters);
-    return filteredPlans;
-  }, [archivedPlans, searchQuery, sortBy, statusFilters]);
-
   const hasActiveFilters = searchQuery.trim() !== '' || statusFilters.length > 0;
-
-  const handleToggleArchived = () => {
-    const newState = !showArchived;
-    setShowArchivedState(newState);
-    setShowArchived(newState);
-  };
 
   const handleArchive = async (planId: string) => {
     if (!githubIdentity) {
@@ -503,12 +435,10 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
   // Collapsed sidebar content (icon-only view)
   const collapsedContent = (
     <CollapsedSidebar
-      inboxCount={filteredInboxPlans.length}
-      myPlansCount={filteredMyPlans.length}
-      sharedPlansCount={filteredSharedPlans.length}
-      showArchived={showArchived}
+      inboxCount={inboxPlans.length}
+      archivedCount={archivedPlans.length}
       onToggle={handleToggle}
-      onToggleArchived={handleToggleArchived}
+      onNavigate={onNavigate}
     />
   );
 
@@ -533,233 +463,194 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
         </Tooltip>
       </div>
 
-      {/* Filter controls */}
-      <FilterControls
-        searchQuery={searchQuery}
-        sortBy={sortBy}
-        statusFilters={statusFilters}
-        onSearchChange={setSearchQuery}
-        onSortChange={(sort) => setSortBy(sort as 'name' | 'newest' | 'updated' | 'status')}
-        onStatusToggle={toggleStatusFilter}
-        onClearFilters={clearFilters}
-        hasActiveFilters={hasActiveFilters}
-      />
+      {/* Navigation Items */}
+      <div className="px-3 py-2 border-b border-separator space-y-1">
+        <NavItem
+          icon={<Inbox className={`w-4 h-4 ${inboxPlans.length > 0 ? 'text-warning' : ''}`} />}
+          label="Inbox"
+          href="/inbox"
+          isActive={location.pathname === '/inbox'}
+          badge={inboxPlans.length}
+          badgeColor="warning"
+          onClick={onNavigate}
+        />
+        <NavItem
+          icon={<Archive className="w-4 h-4" />}
+          label="Archive"
+          href="/archive"
+          isActive={location.pathname === '/archive'}
+          onClick={onNavigate}
+        />
+      </div>
+
+      {/* Search and Filter controls inline */}
+      <div className="px-3 py-2 border-b border-separator">
+        <div className="flex items-center gap-2">
+          {/* Search field */}
+          <SearchField
+            aria-label="Search plans"
+            value={searchQuery}
+            onChange={setSearchQuery}
+            className="flex-1"
+          >
+            <SearchField.Group>
+              <SearchField.SearchIcon />
+              <SearchField.Input placeholder="Search plans..." />
+              <SearchField.ClearButton />
+            </SearchField.Group>
+          </SearchField>
+
+          {/* Filter popover */}
+          <Popover>
+            <Popover.Trigger>
+              <Button
+                isIconOnly
+                variant="ghost"
+                size="sm"
+                aria-label="Filters"
+                className={`w-8 h-8 shrink-0 ${hasActiveFilters ? 'text-accent' : ''}`}
+              >
+                <Filter className="w-4 h-4" />
+                {hasActiveFilters && (
+                  <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-accent text-accent-foreground text-[8px] flex items-center justify-center font-semibold">
+                    {(searchQuery.trim() ? 1 : 0) + statusFilters.length}
+                  </span>
+                )}
+              </Button>
+            </Popover.Trigger>
+            <Popover.Content className="w-64">
+              <div className="p-3 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-semibold">Filters</h3>
+                  {hasActiveFilters && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onPress={clearFilters}
+                      className="h-6 text-xs"
+                    >
+                      Clear all
+                    </Button>
+                  )}
+                </div>
+
+                {/* Sort dropdown */}
+                <div className="space-y-1.5">
+                  <label className="text-xs text-muted-foreground">Sort by</label>
+                  <Select
+                    aria-label="Sort plans"
+                    selectedKey={sortBy}
+                    onSelectionChange={(key) =>
+                      setSortBy(key as 'name' | 'newest' | 'updated' | 'status')
+                    }
+                    className="w-full"
+                  >
+                    <Select.Trigger className="h-8">
+                      <div className="flex items-center gap-2">
+                        <ArrowUpDown className="w-3.5 h-3.5 shrink-0" />
+                        <Select.Value />
+                      </div>
+                    </Select.Trigger>
+                    <Select.Popover>
+                      <ListBox>
+                        {SORT_OPTIONS.map((option) => (
+                          <ListBoxItem key={option.value} id={option.value}>
+                            {option.label}
+                          </ListBoxItem>
+                        ))}
+                      </ListBox>
+                    </Select.Popover>
+                  </Select>
+                </div>
+
+                {/* Status filters */}
+                <div className="space-y-1.5">
+                  <label className="text-xs text-muted-foreground">Status</label>
+                  <div className="flex flex-wrap gap-1">
+                    {STATUS_FILTER_OPTIONS.map((option) => {
+                      const isActive = statusFilters.includes(option.value);
+                      const chipColor =
+                        option.color === 'primary'
+                          ? 'accent'
+                          : (option.color as
+                              | 'default'
+                              | 'warning'
+                              | 'success'
+                              | 'danger'
+                              | 'accent');
+                      return (
+                        <Chip
+                          key={option.value}
+                          size="sm"
+                          variant={isActive ? 'soft' : 'soft'}
+                          color={isActive ? chipColor : 'default'}
+                          className={`cursor-pointer text-[10px] h-5 px-1.5 ${isActive ? 'ring-1 ring-current' : 'opacity-60'}`}
+                          onClick={() => toggleStatusFilter(option.value)}
+                        >
+                          {option.label}
+                        </Chip>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            </Popover.Content>
+          </Popover>
+        </div>
+      </div>
 
       <nav className="flex-1 flex flex-col overflow-y-auto px-3 pt-3 pb-0">
-        <DisclosureGroup>
-          {/* Inbox section - plans needing attention */}
-          {filteredInboxPlans.length > 0 && (
-            <Disclosure defaultExpanded>
-              <Disclosure.Heading>
-                <Disclosure.Trigger className="w-full">
-                  <div className="flex items-center justify-between w-full px-2 py-1.5">
-                    <div className="flex items-center gap-2">
-                      <Disclosure.Indicator className="text-foreground" />
-                      <span className="text-xs font-semibold text-muted-foreground">Inbox</span>
-                    </div>
-                    <Chip
-                      size="sm"
-                      variant="soft"
-                      color="warning"
-                      className="text-[10px] h-5 px-1.5"
-                    >
-                      {filteredInboxPlans.length}
-                    </Chip>
-                  </div>
-                </Disclosure.Trigger>
-              </Disclosure.Heading>
-              <Disclosure.Content>
-                <Disclosure.Body className="p-0">
-                  <ListBox
-                    className="p-0"
-                    aria-label="Inbox plans"
-                    selectionMode="single"
-                    selectedKeys={activePlanId ? [activePlanId] : []}
-                    onSelectionChange={(keys) => {
-                      const key = Array.from(keys)[0];
-                      if (key) {
-                        onNavigate?.();
-                        navigate(`/plan/${key}`);
-                      }
-                    }}
-                  >
-                    {filteredInboxPlans.map((plan) => (
-                      <ListBoxItem
-                        id={plan.id}
-                        key={plan.id}
-                        textValue={plan.title}
-                        className="group"
-                      >
-                        <PlanItem
-                          plan={plan}
-                          peerCount={plan.id === activePlanId ? syncState?.peerCount : undefined}
-                          onArchive={handleArchive}
-                        />
-                      </ListBoxItem>
-                    ))}
-                  </ListBox>
-                </Disclosure.Body>
-              </Disclosure.Content>
-            </Disclosure>
-          )}
+        <ListBox
+          className="p-0"
+          aria-label="All plans"
+          selectionMode="single"
+          selectedKeys={activePlanId ? [activePlanId] : []}
+          onSelectionChange={(keys) => {
+            const key = Array.from(keys)[0];
+            if (key) {
+              onNavigate?.();
+              navigate(`/plan/${key}`);
+            }
+          }}
+        >
+          {/* Inbox plans */}
+          {filteredInboxPlans.map((plan) => (
+            <ListBoxItem id={plan.id} key={plan.id} textValue={plan.title} className="group">
+              <PlanItem
+                plan={plan}
+                peerCount={plan.id === activePlanId ? syncState?.peerCount : undefined}
+                onArchive={handleArchive}
+              />
+            </ListBoxItem>
+          ))}
 
-          {/* My Plans section */}
-          {filteredMyPlans.length > 0 && (
-            <Disclosure defaultExpanded>
-              <Disclosure.Heading>
-                <Disclosure.Trigger className="w-full">
-                  <div className="flex items-center justify-between w-full px-2 py-1.5">
-                    <div className="flex items-center gap-2">
-                      <Disclosure.Indicator className="text-foreground" />
-                      <span className="text-xs font-semibold text-muted-foreground">My Plans</span>
-                    </div>
-                    {activeCount > 0 && (
-                      <span className="text-xs text-muted-foreground flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full bg-success" />
-                        {activeCount} {activeCount === 1 ? 'agent' : 'agents'}
-                      </span>
-                    )}
-                  </div>
-                </Disclosure.Trigger>
-              </Disclosure.Heading>
-              <Disclosure.Content>
-                <Disclosure.Body className="p-0">
-                  <ListBox
-                    className="p-0"
-                    aria-label="My plans"
-                    selectionMode="single"
-                    selectedKeys={activePlanId ? [activePlanId] : []}
-                    onSelectionChange={(keys) => {
-                      const key = Array.from(keys)[0];
-                      if (key) {
-                        // Close drawer first, then navigate
-                        onNavigate?.();
-                        navigate(`/plan/${key}`);
-                      }
-                    }}
-                  >
-                    {filteredMyPlans.map((plan) => (
-                      <ListBoxItem
-                        id={plan.id}
-                        key={plan.id}
-                        textValue={plan.title}
-                        className="group"
-                      >
-                        <PlanItem
-                          plan={plan}
-                          peerCount={plan.id === activePlanId ? syncState?.peerCount : undefined}
-                          onArchive={handleArchive}
-                        />
-                      </ListBoxItem>
-                    ))}
-                  </ListBox>
-                </Disclosure.Body>
-              </Disclosure.Content>
-            </Disclosure>
-          )}
+          {/* My Plans */}
+          {filteredMyPlans.map((plan) => (
+            <ListBoxItem id={plan.id} key={plan.id} textValue={plan.title} className="group">
+              <PlanItem
+                plan={plan}
+                peerCount={plan.id === activePlanId ? syncState?.peerCount : undefined}
+                onArchive={handleArchive}
+              />
+            </ListBoxItem>
+          ))}
 
-          {/* Shared Plans section */}
-          {filteredSharedPlans.length > 0 && (
-            <Disclosure defaultExpanded>
-              <Disclosure.Heading>
-                <Disclosure.Trigger className="w-full">
-                  <div className="flex items-center justify-between w-full px-2 py-1.5">
-                    <div className="flex items-center gap-2">
-                      <Disclosure.Indicator className="text-foreground" />
-                      <span className="text-xs font-semibold text-muted-foreground">
-                        Shared with me
-                      </span>
-                    </div>
-                    <Users className="w-3.5 h-3.5 text-muted-foreground" />
-                  </div>
-                </Disclosure.Trigger>
-              </Disclosure.Heading>
-              <Disclosure.Content>
-                <Disclosure.Body className="p-0">
-                  <ListBox
-                    className="p-0"
-                    aria-label="Shared plans"
-                    selectionMode="single"
-                    selectedKeys={activePlanId ? [activePlanId] : []}
-                    onSelectionChange={(keys) => {
-                      const key = Array.from(keys)[0];
-                      if (key) {
-                        // Close drawer first, then navigate
-                        onNavigate?.();
-                        navigate(`/plan/${key}`);
-                      }
-                    }}
-                  >
-                    {filteredSharedPlans.map((plan) => (
-                      <ListBoxItem
-                        id={plan.id}
-                        key={plan.id}
-                        textValue={plan.title}
-                        className="group"
-                      >
-                        <PlanItem
-                          plan={plan}
-                          isShared
-                          peerCount={plan.id === activePlanId ? syncState?.peerCount : undefined}
-                          onArchive={handleArchive}
-                        />
-                      </ListBoxItem>
-                    ))}
-                  </ListBox>
-                </Disclosure.Body>
-              </Disclosure.Content>
-            </Disclosure>
-          )}
+          {/* Shared Plans */}
+          {filteredSharedPlans.map((plan) => (
+            <ListBoxItem id={plan.id} key={plan.id} textValue={plan.title} className="group">
+              <PlanItem
+                plan={plan}
+                isShared
+                peerCount={plan.id === activePlanId ? syncState?.peerCount : undefined}
+                onArchive={handleArchive}
+              />
+            </ListBoxItem>
+          ))}
 
-          {/* Archived Plans section - shown when toggle is on */}
-          {showArchived && filteredArchivedPlans.length > 0 && (
-            <Disclosure defaultExpanded>
-              <Disclosure.Heading>
-                <Disclosure.Trigger className="w-full">
-                  <div className="flex items-center justify-between w-full px-2 py-1.5">
-                    <div className="flex items-center gap-2">
-                      <Disclosure.Indicator className="text-foreground" />
-                      <span className="text-xs font-semibold text-muted-foreground">Archived</span>
-                    </div>
-                    <Chip size="sm" variant="soft" className="text-[10px] h-5 px-1.5">
-                      {filteredArchivedPlans.length}
-                    </Chip>
-                  </div>
-                </Disclosure.Trigger>
-              </Disclosure.Heading>
-              <Disclosure.Content>
-                <Disclosure.Body className="p-0">
-                  <ListBox
-                    className="p-0"
-                    aria-label="Archived plans"
-                    selectionMode="single"
-                    selectedKeys={activePlanId ? [activePlanId] : []}
-                    onSelectionChange={(keys) => {
-                      const key = Array.from(keys)[0];
-                      if (key) {
-                        onNavigate?.();
-                        navigate(`/plan/${key}`);
-                      }
-                    }}
-                  >
-                    {filteredArchivedPlans.map((plan) => (
-                      <ListBoxItem
-                        id={plan.id}
-                        key={plan.id}
-                        textValue={plan.title}
-                        className="group opacity-60"
-                      >
-                        <PlanItem plan={plan} isArchived onUnarchive={handleUnarchive} />
-                      </ListBoxItem>
-                    ))}
-                  </ListBox>
-                </Disclosure.Body>
-              </Disclosure.Content>
-            </Disclosure>
-          )}
-        </DisclosureGroup>
+          {/* Note: Archived plans are NOT shown here - they only appear on /archive route */}
+        </ListBox>
 
-        {/* Empty state */}
+        {/* Empty state - only for active plans */}
         {filteredMyPlans.length === 0 &&
           filteredSharedPlans.length === 0 &&
           filteredInboxPlans.length === 0 && (
@@ -769,27 +660,10 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
           )}
       </nav>
 
-      {/* Footer with GitHub account, archive toggle, and theme toggle */}
-      <div className="px-3 py-2 border-t border-separator flex flex-col gap-2 shrink-0 mt-auto">
-        {/* Account section - takes full width */}
+      {/* Footer with GitHub account and theme toggle */}
+      <div className="px-3 py-2 border-t border-separator flex items-center justify-between gap-2 shrink-0 mt-auto">
         <AccountSection />
-
-        {/* Utility buttons row */}
-        <div className="flex items-center gap-0">
-          <Button
-            isIconOnly
-            variant="ghost"
-            size="sm"
-            aria-label={showArchived ? 'Hide archived plans' : 'Show archived plans'}
-            onPress={handleToggleArchived}
-            className={`touch-target flex-1 ${showArchived ? 'text-primary' : ''}`}
-          >
-            <Archive className="w-4 h-4" />
-          </Button>
-          <div className="flex-1 flex justify-center">
-            <ThemeToggle />
-          </div>
-        </div>
+        <ThemeToggle />
       </div>
     </>
   );

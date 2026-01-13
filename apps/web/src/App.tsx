@@ -1,7 +1,9 @@
 import { BrowserRouter, Navigate, Route, Routes, useSearchParams } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import { ActivePlanSyncProvider } from './contexts/ActivePlanSyncContext';
+import { ArchivePage } from './pages/ArchivePage';
 import { HomePage } from './pages/HomePage';
+import { InboxPage } from './pages/InboxPage';
 import { PlanPage } from './pages/PlanPage';
 
 function AppRoutes() {
@@ -16,6 +18,8 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/" element={<HomePage />} />
+      <Route path="/inbox" element={<InboxPage />} />
+      <Route path="/archive" element={<ArchivePage />} />
       {/* PlanPage handles both normal plans (/plan/:id) and snapshots (/?d=...) */}
       <Route path="/plan/:id" element={<PlanPage />} />
       <Route path="*" element={<Navigate to="/" replace />} />
