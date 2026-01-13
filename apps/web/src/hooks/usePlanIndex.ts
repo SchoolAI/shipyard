@@ -13,6 +13,51 @@ import { IndexeddbPersistence } from 'y-indexeddb';
 import * as Y from 'yjs';
 import { useMultiProviderSync } from './useMultiProviderSync';
 
+/** Type alias for viewedBy records: planId -> (username -> timestamp) */
+type ViewedByRecord = Record<string, Record<string, number>>;
+
+/**
+ * Merge existing viewedBy timestamps with new data, keeping newer timestamps.
+ * @param existingViewedBy - Existing viewedBy timestamps for a single plan
+ * @param newViewedBy - New viewedBy timestamps for a single plan
+ * @returns Merged viewedBy record with newer timestamps preserved
+ */
+function mergeViewedByTimestamps(
+  existingViewedBy: Record<string, number>,
+  newViewedBy: Record<string, number>
+): Record<string, number> {
+  const merged = { ...newViewedBy };
+  for (const [username, timestamp] of Object.entries(existingViewedBy)) {
+    if (!merged[username] || timestamp > merged[username]) {
+      merged[username] = timestamp;
+    }
+  }
+  return merged;
+}
+
+/**
+ * Merge new viewedBy data with existing state, preserving optimistic updates.
+ * For each plan, keeps the newer timestamp for each user.
+ * @param prevState - Previous viewedBy state
+ * @param newData - New viewedBy data from IndexedDB
+ * @returns Merged viewedBy record
+ */
+function mergeViewedByState(prevState: ViewedByRecord, newData: ViewedByRecord): ViewedByRecord {
+  const merged = { ...newData };
+
+  for (const [planId, existingViewedBy] of Object.entries(prevState)) {
+    if (!merged[planId]) {
+      // Plan not in new data, preserve existing
+      merged[planId] = existingViewedBy;
+    } else {
+      // Merge timestamps for this plan, keeping newer values
+      merged[planId] = mergeViewedByTimestamps(existingViewedBy, merged[planId]);
+    }
+  }
+
+  return merged;
+}
+
 /** Extended plan entry with unread status */
 export interface PlanIndexEntryWithReadState extends PlanIndexEntry {
   /** True if the plan is unread by the current user */
@@ -279,23 +324,7 @@ export function usePlanIndex(currentUsername: string | undefined): PlanIndexStat
 
       if (isActive) {
         // Merge with existing state to preserve optimistic updates from markPlanAsRead
-        setPlanViewedBy((prev) => {
-          const merged = { ...viewedByData };
-          // Preserve optimistic updates that have newer timestamps
-          for (const [planId, existingViewedBy] of Object.entries(prev)) {
-            if (!merged[planId]) {
-              merged[planId] = existingViewedBy;
-            } else {
-              // For each user, keep the newer timestamp
-              for (const [username, timestamp] of Object.entries(existingViewedBy)) {
-                if (!merged[planId][username] || timestamp > merged[planId][username]) {
-                  merged[planId] = { ...merged[planId], [username]: timestamp };
-                }
-              }
-            }
-          }
-          return merged;
-        });
+        setPlanViewedBy((prev) => mergeViewedByState(prev, viewedByData));
       }
     }
 

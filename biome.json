@@ -128,7 +128,7 @@
       }
     },
     {
-      "includes": ["apps/github-oauth-worker/**/*"],
+      "includes": ["apps/github-oauth-worker/src/logger.ts"],
       "linter": {
         "rules": {
           "suspicious": {

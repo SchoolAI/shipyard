@@ -1,7 +1,8 @@
 import { Button } from '@heroui/react';
 import { buildInviteUrl, type InviteCreatedResponse } from '@peer-plan/schema';
-import { Check, Loader2, Share2 } from 'lucide-react';
+import { AlertTriangle, Check, Loader2, Share2 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import type { WebrtcProvider } from 'y-webrtc';
 
 interface ShareButtonProps {
@@ -52,6 +53,18 @@ export function ShareButton({ planId, rtcProvider, isOwner = false, className }:
 
     setIsCreating(true);
 
+    // Set timeout (5 seconds) - if no response, show error
+    const timeout = setTimeout(() => {
+      console.error('[ShareButton] No invite_created response after 5s');
+      setIsCreating(false);
+      toast.error('Failed to create invite link', {
+        description: 'Signaling server not responding. Try copying the plain URL instead.',
+      });
+    }, 5000);
+
+    // Store timeout ID to clear it if we get a response
+    (window as any).__shareButtonTimeout = timeout;
+
     const message = JSON.stringify({
       type: 'create_invite',
       planId,
@@ -75,6 +88,7 @@ export function ShareButton({ planId, rtcProvider, isOwner = false, className }:
     }
 
     if (!sent) {
+      clearTimeout(timeout);
       setIsCreating(false);
       // Fall back to copying current URL
       handleSimpleShare();
@@ -89,6 +103,13 @@ export function ShareButton({ planId, rtcProvider, isOwner = false, className }:
       try {
         const data = JSON.parse(event.data) as InviteCreatedResponse;
         if (data.type === 'invite_created') {
+          // Clear the timeout fallback
+          const timeout = (window as any).__shareButtonTimeout;
+          if (timeout) {
+            clearTimeout(timeout);
+            delete (window as any).__shareButtonTimeout;
+          }
+
           // Build the invite URL
           const baseUrl = window.location.origin;
           const inviteUrl = buildInviteUrl(baseUrl, planId, data.tokenId, data.tokenValue);

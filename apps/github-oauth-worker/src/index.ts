@@ -13,6 +13,8 @@
  * 5. Worker returns token to browser
  */
 
+import { logger } from './logger.js';
+
 export interface Env {
   GITHUB_CLIENT_ID: string;
   GITHUB_CLIENT_SECRET: string;
@@ -78,7 +80,7 @@ export default {
 
     // Validate environment secrets are configured
     if (!env.GITHUB_CLIENT_ID || !env.GITHUB_CLIENT_SECRET) {
-      console.error('Missing GITHUB_CLIENT_ID or GITHUB_CLIENT_SECRET');
+      logger.error('Missing GITHUB_CLIENT_ID or GITHUB_CLIENT_SECRET');
       return new Response(JSON.stringify({ error: 'Server misconfigured' }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -126,7 +128,10 @@ export default {
 
       // GitHub returns 200 even on errors, check for error field
       if (data.error) {
-        console.error('GitHub OAuth error:', data.error, data.error_description);
+        logger.error(
+          { error: data.error, description: data.error_description },
+          'GitHub OAuth error'
+        );
         return new Response(
           JSON.stringify({
             error: data.error,
@@ -152,7 +157,7 @@ export default {
         }
       );
     } catch (error) {
-      console.error('Token exchange failed:', error);
+      logger.error({ error }, 'Token exchange failed');
       return new Response(JSON.stringify({ error: 'Token exchange failed' }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
