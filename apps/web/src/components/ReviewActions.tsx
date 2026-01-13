@@ -1,7 +1,8 @@
 import { Button, Popover, TextArea } from '@heroui/react';
 import type { PlanStatusType } from '@peer-plan/schema';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type * as Y from 'yjs';
+import { VoiceInputButton } from '@/components/voice-input';
 
 /** Simple identity type for display purposes */
 interface UserIdentity {
@@ -61,6 +62,10 @@ export function ReviewActions({
     setComment('');
   };
 
+  const handleTranscript = useCallback((text: string) => {
+    setComment((prev) => (prev ? `${prev} ${text}` : text));
+  }, []);
+
   const handleConfirm = async (action: 'approve' | 'request_changes') => {
     if (!identity) return;
 
@@ -118,14 +123,20 @@ export function ReviewActions({
               <label htmlFor="approve-comment" className="block text-xs text-muted-foreground">
                 Feedback for the agent (optional)
               </label>
-              <TextArea
-                id="approve-comment"
-                placeholder="Great work! Consider also..."
-                value={comment}
-                onChange={(e) => setComment(e.target.value)}
-                rows={3}
-                className="w-full"
-              />
+              <div className="relative">
+                <TextArea
+                  id="approve-comment"
+                  placeholder="Great work! Consider also..."
+                  value={comment}
+                  onChange={(e) => setComment(e.target.value)}
+                  rows={3}
+                  className="w-full pr-12"
+                />
+                <VoiceInputButton
+                  onTranscript={handleTranscript}
+                  className="absolute right-2 bottom-2"
+                />
+              </div>
 
               <div className="flex justify-end gap-2">
                 <Button size="sm" variant="ghost" onPress={handleCancel}>
@@ -170,15 +181,21 @@ export function ReviewActions({
               <label htmlFor="changes-comment" className="block text-xs text-muted-foreground">
                 What should the agent change?
               </label>
-              <TextArea
-                id="changes-comment"
-                ref={textareaRef}
-                placeholder="Please update the error handling to..."
-                value={comment}
-                onChange={(e) => setComment(e.target.value)}
-                rows={3}
-                className="w-full"
-              />
+              <div className="relative">
+                <TextArea
+                  id="changes-comment"
+                  ref={textareaRef}
+                  placeholder="Please update the error handling to..."
+                  value={comment}
+                  onChange={(e) => setComment(e.target.value)}
+                  rows={3}
+                  className="w-full pr-12"
+                />
+                <VoiceInputButton
+                  onTranscript={handleTranscript}
+                  className="absolute right-2 bottom-2"
+                />
+              </div>
 
               <div className="flex justify-end gap-2">
                 <Button size="sm" variant="ghost" onPress={handleCancel}>
