@@ -25,15 +25,16 @@ function ArchiveItem({ plan, onUnarchive }: ArchiveItemProps) {
 
   return (
     <div className="flex items-center justify-between gap-3 w-full py-2">
-      <div
-        className="flex flex-col gap-1 flex-1 min-w-0 cursor-pointer"
+      <button
+        type="button"
+        className="flex flex-col gap-1 flex-1 min-w-0 cursor-pointer text-left"
         onClick={() => navigate(`/plan/${plan.id}`)}
       >
         <span className="font-medium text-foreground truncate opacity-70">{plan.title}</span>
         <span className="text-xs text-muted-foreground">
           Archived {formatRelativeTime(plan.deletedAt || plan.updatedAt)}
         </span>
-      </div>
+      </button>
 
       <Button
         isIconOnly
