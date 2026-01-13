@@ -5,22 +5,26 @@
   "description": "Claude Code integration hook for peer-plan",
   "main": "./dist/index.mjs",
   "bin": {
-    "peer-plan-hook": "./dist/index.mjs"
+    "peer-plan-hook": "./dist/index.mjs",
+    "peer-plan-hook-install": "./scripts/postinstall.mjs"
   },
   "files": [
     "dist",
+    "scripts",
     ".claude-plugin",
     "hooks"
   ],
   "scripts": {
-    "dev": "pnpm link --global && tsdown --watch --on-success 'node dist/index.mjs'",
+    "dev": "pnpm link --global && tsdown --watch",
+    "dev:link": "pnpm link --global",
     "build": "tsdown",
     "typecheck": "tsc --noEmit",
     "lint": "biome check src",
     "lint:fix": "biome check src --write",
     "test": "vitest run",
     "test:watch": "vitest",
-    "postinstall": "bash install.sh || echo 'Run install.sh manually to configure Claude Code hooks'"
+    "prepublishOnly": "pnpm build",
+    "postinstall": "node ./scripts/postinstall.mjs"
   },
   "dependencies": {
     "@peer-plan/schema": "workspace:*",

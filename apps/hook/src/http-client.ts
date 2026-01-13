@@ -34,16 +34,20 @@ async function getRegistryUrl(): Promise<string | null> {
     try {
       const url = `http://localhost:${port}`;
       const res = await fetch(`${url}/registry`, {
-        signal: AbortSignal.timeout(1000),
+        signal: AbortSignal.timeout(3000), // Increased from 1000ms to handle slow responses
       });
       if (res.ok) {
+        logger.debug({ port }, 'Found registry server');
         return url;
       }
-    } catch {
+      logger.debug({ port, status: res.status }, 'Registry responded but not ok');
+    } catch (err) {
+      logger.debug({ port, error: (err as Error).message }, 'Failed to connect to registry port');
       // Try next port
     }
   }
 
+  logger.warn({ ports }, 'No registry server found on any port');
   return null;
 }
 
@@ -56,6 +60,7 @@ async function getRegistryUrl(): Promise<string | null> {
 export async function getWebSocketUrl(): Promise<string | null> {
   const baseUrl = await getRegistryUrl();
   if (!baseUrl) {
+    logger.warn('getWebSocketUrl: No registry URL available');
     return null;
   }
 
@@ -65,6 +70,7 @@ export async function getWebSocketUrl(): Promise<string | null> {
     });
 
     if (!res.ok) {
+      logger.warn({ status: res.status }, 'getWebSocketUrl: Registry returned non-ok status');
       return null;
     }
 
@@ -73,9 +79,17 @@ export async function getWebSocketUrl(): Promise<string | null> {
     // Return first available WebSocket server
     const firstServer = data.servers?.[0];
     if (firstServer) {
+      logger.debug(
+        { wsUrl: firstServer.url, serverCount: data.servers?.length },
+        'Found WebSocket server'
+      );
       return firstServer.url;
     }
 
+    logger.warn(
+      { serverCount: data.servers?.length ?? 0 },
+      'getWebSocketUrl: No WebSocket servers registered'
+    );
     return null;
   } catch (err) {
     logger.warn({ err }, 'Failed to get WebSocket URL from registry');

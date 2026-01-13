@@ -17,7 +17,7 @@ This hook intercepts Claude Code events and bridges them to the peer-plan system
 - Node.js 22+ (LTS)
 - peer-plan MCP server running (`@peer-plan/server`)
 
-### Global Install (Recommended)
+### Option 1: npm Global Install (Recommended for Users)
 
 ```bash
 npm install -g @peer-plan/hook
@@ -25,13 +25,67 @@ npm install -g @peer-plan/hook
 
 The postinstall script automatically configures Claude Code hooks in `~/.claude/settings.json`. Just restart Claude Code after installation.
 
-### Project-Local Install
+If the automatic setup didn't work, you can manually run:
+```bash
+peer-plan-hook-install
+```
+
+### Option 2: Plugin Directory (Testing/Development)
+
+```bash
+# Build the hook first
+cd /path/to/peer-plan
+pnpm build
+
+# Run Claude Code with explicit plugin directory
+claude --plugin-dir ./apps/hook
+```
+
+This loads the plugin without global installation - useful for testing.
+
+### Option 3: Local Development
+
+For active development on peer-plan itself:
 
 ```bash
 cd /path/to/peer-plan
-pnpm install
-pnpm build
-bash apps/hook/install.sh  # Manually configure hooks
+
+# One-time: Create global symlink
+pnpm --filter @peer-plan/hook dev:link
+
+# Run in watch mode (rebuilds on changes)
+pnpm --filter @peer-plan/hook dev
+
+# The hooks.json expects "peer-plan-hook" in PATH
+# pnpm link --global creates this symlink automatically
+```
+
+### Option 4: Manual Configuration
+
+If you prefer manual setup, add to `~/.claude/settings.json`:
+
+```json
+{
+  "hooks": {
+    "PermissionRequest": [
+      {
+        "matcher": "ExitPlanMode",
+        "hooks": [{ "type": "command", "command": "peer-plan-hook", "timeout": 1800 }]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "ExitPlanMode",
+        "hooks": [{ "type": "command", "command": "peer-plan-hook" }]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [{ "type": "command", "command": "peer-plan-hook --context" }]
+      }
+    ]
+  }
+}
 ```
 
 ## Configuration (Automatic)

@@ -1,0 +1,13 @@
+{
+  "name": "peer-plan",
+  "owner": {
+    "name": "SchoolAI"
+  },
+  "plugins": [
+    {
+      "name": "peer-plan",
+      "source": "./apps/hook",
+      "description": "P2P collaborative review for AI-generated plans with proof-of-work tracking via artifacts"
+    }
+  ]
+}
