@@ -7,14 +7,25 @@ export interface GitHubUser {
   avatar_url: string;
 }
 
-export function startWebFlow(redirectUri: string, forceAccountPicker = false): void {
+/**
+ * Start GitHub OAuth web flow.
+ * @param redirectUri - Where GitHub should redirect after auth
+ * @param options.forceAccountPicker - Force GitHub to show account picker
+ * @param options.scope - OAuth scope to request (empty for basic identity, 'repo' for private repo access)
+ */
+export function startWebFlow(
+  redirectUri: string,
+  options: { forceAccountPicker?: boolean; scope?: string } = {}
+): void {
+  const { forceAccountPicker = false, scope = '' } = options;
+
   const state = generateRandomState();
   sessionStorage.setItem('github-oauth-state', state);
 
   const params = new URLSearchParams({
     client_id: CLIENT_ID,
     redirect_uri: redirectUri,
-    scope: '',
+    scope,
     state,
   });
 
@@ -29,7 +40,7 @@ export async function handleCallback(
   code: string,
   state: string,
   redirectUri: string
-): Promise<{ access_token: string }> {
+): Promise<{ access_token: string; scope?: string }> {
   const storedState = sessionStorage.getItem('github-oauth-state');
   if (state !== storedState) {
     throw new Error('Invalid state parameter - possible CSRF attack');
@@ -43,11 +54,14 @@ export async function handleCallback(
   });
 
   if (!response.ok) {
-    const error = await response.json();
+    const error = (await response.json()) as {
+      error?: string;
+      error_description?: string;
+    };
     throw new Error(error.error_description || error.error || 'Token exchange failed');
   }
 
-  return response.json();
+  return response.json() as Promise<{ access_token: string; scope?: string }>;
 }
 
 export async function getGitHubUser(token: string): Promise<GitHubUser> {

@@ -16,6 +16,8 @@ export interface GitHubIdentity {
   displayName: string;
   avatarUrl?: string;
   createdAt: number;
+  /** OAuth scopes granted (space-separated). Empty string means basic identity only. */
+  scope: string;
 }
 
 export type AuthState =
@@ -28,7 +30,12 @@ export interface UseGitHubAuthReturn {
   identity: GitHubIdentity | null;
   isValidating: boolean;
   authState: AuthState;
+  /** Whether the current token has `repo` scope for private repo access */
+  hasRepoScope: boolean;
+  /** Start basic auth flow (identity only, no repo access) */
   startAuth: (forceAccountPicker?: boolean) => void;
+  /** Request upgrade to repo scope (for private repo artifacts) */
+  requestRepoAccess: () => void;
   clearAuth: () => void;
 }
 
@@ -69,8 +76,16 @@ function getStoredIdentity(): GitHubIdentity | null {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (!stored) return null;
-    return JSON.parse(stored) as GitHubIdentity;
-  } catch {
+    const parsed = JSON.parse(stored) as GitHubIdentity;
+    // Ensure scope field exists (migration for old stored identities)
+    if (parsed.scope === undefined) {
+      parsed.scope = '';
+    }
+    return parsed;
+  } catch (err) {
+    // Log parse errors to help debug localStorage corruption
+    // biome-ignore lint/suspicious/noConsole: Intentional debugging log for localStorage corruption
+    console.error('[useGitHubAuth] Failed to parse stored identity:', err);
     return null;
   }
 }
@@ -107,7 +122,7 @@ async function processOAuthCallback(
 
   try {
     const redirectUri = window.location.origin + (import.meta.env.BASE_URL || '/');
-    const { access_token } = await handleCallback(code, state, redirectUri);
+    const { access_token, scope } = await handleCallback(code, state, redirectUri);
 
     const user = await getGitHubUser(access_token);
 
@@ -117,6 +132,7 @@ async function processOAuthCallback(
       displayName: user.name || user.login,
       avatarUrl: user.avatar_url,
       createdAt: Date.now(),
+      scope: scope || '',
     };
 
     setStoredIdentity(newIdentity);
@@ -157,6 +173,9 @@ export function useGitHubAuth(): UseGitHubAuthReturn {
   const identity = useSyncExternalStore(subscribeAll, getSnapshot, getServerSnapshot);
   const [isValidating, setIsValidating] = useState(false);
   const [authState, setAuthState] = useState<AuthState>({ status: 'idle' });
+
+  // Check if current token has repo scope
+  const hasRepoScope = identity?.scope?.includes('repo') ?? false;
 
   // Validate existing token on mount
   useEffect(() => {
@@ -219,7 +238,16 @@ export function useGitHubAuth(): UseGitHubAuthReturn {
     sessionStorage.setItem(RETURN_URL_KEY, returnUrl);
 
     const redirectUri = window.location.origin + (import.meta.env.BASE_URL || '/');
-    startWebFlow(redirectUri, forceAccountPicker);
+    startWebFlow(redirectUri, { forceAccountPicker });
+  }, []);
+
+  const requestRepoAccess = useCallback(() => {
+    // Store current URL to return to after auth
+    const returnUrl = window.location.pathname + window.location.search + window.location.hash;
+    sessionStorage.setItem(RETURN_URL_KEY, returnUrl);
+
+    const redirectUri = window.location.origin + (import.meta.env.BASE_URL || '/');
+    startWebFlow(redirectUri, { scope: 'repo' });
   }, []);
 
   const clearAuth = useCallback(() => {
@@ -231,7 +259,9 @@ export function useGitHubAuth(): UseGitHubAuthReturn {
     identity,
     isValidating,
     authState,
+    hasRepoScope,
     startAuth,
+    requestRepoAccess,
     clearAuth,
   };
 }
