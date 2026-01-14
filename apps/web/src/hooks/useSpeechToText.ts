@@ -78,9 +78,14 @@ export function useSpeechToText(): UseSpeechToTextReturn {
 
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
   const isStoppingRef = useRef(false);
+  const stateRef = useRef(state);
 
   const SpeechRecognitionClass = getSpeechRecognition();
   const isSupported = SpeechRecognitionClass !== null;
+
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
 
   useEffect(() => {
     if (!isSupported) {
@@ -159,7 +164,7 @@ export function useSpeechToText(): UseSpeechToTextReturn {
     };
 
     recognition.onend = () => {
-      if (!isStoppingRef.current && state === 'recording') {
+      if (!isStoppingRef.current && stateRef.current === 'recording') {
         recognition.start();
       } else {
         setState('ready');
@@ -173,7 +178,7 @@ export function useSpeechToText(): UseSpeechToTextReturn {
       setError('Failed to start speech recognition');
       setState('error');
     }
-  }, [SpeechRecognitionClass, state]);
+  }, [SpeechRecognitionClass]);
 
   const stopRecording = useCallback(() => {
     isStoppingRef.current = true;

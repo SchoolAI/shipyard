@@ -42,7 +42,7 @@ import { KanbanSkeleton } from '@/components/ui/KanbanSkeleton';
 import { KanbanCard } from '@/components/views/KanbanCard';
 import { KanbanColumn } from '@/components/views/KanbanColumn';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
-import { columnIdToStatus, useKanbanColumns } from '@/hooks/useKanbanColumns';
+import { type ColumnId, columnIdToStatus, useKanbanColumns } from '@/hooks/useKanbanColumns';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useMultiProviderSync } from '@/hooks/useMultiProviderSync';
 import { usePlanIndex } from '@/hooks/usePlanIndex';
@@ -56,19 +56,44 @@ import {
 /**
  * Determine the target column ID from a drag-drop event.
  */
-function getTargetColumnId(event: DragEndEvent, allPlans: PlanIndexEntry[]): string | null {
+function getTargetColumnId(event: DragEndEvent, allPlans: PlanIndexEntry[]): ColumnId | null {
   const { over } = event;
   if (!over) return null;
 
   // Dropped directly on a column
   if (over.data.current?.type === 'column') {
-    return over.id as string;
+    const columnId = over.id as string;
+    // Validate that it's a valid ColumnId
+    if (columnId === 'draft' || columnId === 'in_review' || columnId === 'in_progress' || columnId === 'completed') {
+      return columnId;
+    }
+    return null;
   }
 
-  // Dropped on a card - get the card's current status
+  // Dropped on a card - get the card's current status and map to column ID
   if (over.data.current?.type === 'plan') {
     const targetPlan = allPlans.find((p) => p.id === over.id);
-    return targetPlan?.status ?? null;
+    if (!targetPlan) return null;
+
+    // Map status to column ID
+    const status = targetPlan.status;
+    switch (status) {
+      case 'draft':
+        return 'draft';
+      case 'pending_review':
+      case 'changes_requested':
+        return 'in_review';
+      case 'in_progress':
+        return 'in_progress';
+      case 'completed':
+        return 'completed';
+      default: {
+        // Exhaustive check - this should never happen
+        const _exhaustive: never = status;
+        console.error('Unexpected plan status:', _exhaustive);
+        return null;
+      }
+    }
   }
 
   return null;
@@ -450,7 +475,7 @@ export function KanbanPage() {
     if (!targetColumnId) return;
 
     const newStatus = columnIdToStatus(targetColumnId);
-    if (!newStatus || plan.status === newStatus) return;
+    if (plan.status === newStatus) return;
 
     await updatePlanStatus(indexDoc, planId, newStatus);
     toast.success(`Moved to ${newStatus.replace('_', ' ')}`);

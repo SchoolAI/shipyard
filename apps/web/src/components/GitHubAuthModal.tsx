@@ -36,6 +36,10 @@ function AuthContent({ authState }: { authState: AuthState }) {
       return <SuccessState />;
     case 'error':
       return <ErrorState message={authState.message} />;
+    default: {
+      const _exhaustive: never = authState;
+      throw new Error(`Unhandled auth state: ${JSON.stringify(_exhaustive)}`);
+    }
   }
 }
 

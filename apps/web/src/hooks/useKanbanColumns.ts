@@ -6,9 +6,12 @@
 import type { PlanIndexEntry, PlanStatusType } from '@peer-plan/schema';
 import { useMemo } from 'react';
 
+/** Column IDs - exhaustive list */
+export type ColumnId = 'draft' | 'in_review' | 'in_progress' | 'completed';
+
 /** Column definition - extensible for future tag-based columns */
 export interface ColumnDefinition {
-  id: string;
+  id: ColumnId;
   label: string;
   color: 'default' | 'warning' | 'success' | 'danger' | 'accent';
   filter: (plan: PlanIndexEntry) => boolean;
@@ -51,7 +54,7 @@ const STATUS_COLUMNS: ColumnDefinition[] = [
  * Map column ID to PlanStatusType for drag-drop updates.
  * The 'in_review' column maps to 'pending_review' as the default status.
  */
-export function columnIdToStatus(columnId: string): PlanStatusType | null {
+export function columnIdToStatus(columnId: ColumnId): PlanStatusType {
   switch (columnId) {
     case 'draft':
       return 'draft';
@@ -61,8 +64,10 @@ export function columnIdToStatus(columnId: string): PlanStatusType | null {
       return 'in_progress';
     case 'completed':
       return 'completed';
-    default:
-      return null;
+    default: {
+      const _exhaustive: never = columnId;
+      throw new Error(`Unhandled column ID: ${_exhaustive}`);
+    }
   }
 }
 
