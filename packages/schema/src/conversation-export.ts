@@ -574,3 +574,203 @@ export function summarizeA2AConversation(
     text: summaryLines.join('\n'),
   };
 }
+
+// =============================================================================
+// A2A → Claude Code Converter Functions
+// =============================================================================
+
+/**
+ * Type guard for checking if a data part contains tool use info.
+ */
+interface ToolUseData {
+  toolUse: {
+    name: string;
+    id: string;
+    input: Record<string, unknown>;
+  };
+}
+
+/**
+ * Type guard for checking if a data part contains tool result info.
+ */
+interface ToolResultData {
+  toolResult: {
+    toolUseId: string;
+    content: unknown;
+    isError?: boolean;
+  };
+}
+
+function isToolUseData(data: unknown): data is ToolUseData {
+  if (!data || typeof data !== 'object') return false;
+  const d = data as Record<string, unknown>;
+  if (!d.toolUse || typeof d.toolUse !== 'object') return false;
+  const toolUse = d.toolUse as Record<string, unknown>;
+  return (
+    typeof toolUse.name === 'string' &&
+    typeof toolUse.id === 'string' &&
+    typeof toolUse.input === 'object'
+  );
+}
+
+function isToolResultData(data: unknown): data is ToolResultData {
+  if (!data || typeof data !== 'object') return false;
+  const d = data as Record<string, unknown>;
+  if (!d.toolResult || typeof d.toolResult !== 'object') return false;
+  const toolResult = d.toolResult as Record<string, unknown>;
+  return typeof toolResult.toolUseId === 'string';
+}
+
+/**
+ * Converts a single A2A part to Claude Code content block(s).
+ *
+ * @param part - A2A part to convert
+ * @returns Array of Claude Code content blocks
+ */
+function convertA2APartToContentBlock(part: A2APart): ClaudeCodeContentBlock[] {
+  switch (part.type) {
+    case 'text':
+      return [
+        {
+          type: 'text',
+          text: part.text,
+        },
+      ];
+
+    case 'data': {
+      const data = part.data;
+
+      if (isToolUseData(data)) {
+        return [
+          {
+            type: 'tool_use',
+            id: data.toolUse.id,
+            name: data.toolUse.name,
+            input: data.toolUse.input as Record<string, unknown>,
+          },
+        ];
+      }
+
+      if (isToolResultData(data)) {
+        return [
+          {
+            type: 'tool_result',
+            tool_use_id: data.toolResult.toolUseId,
+            content: data.toolResult.content,
+            is_error: data.toolResult.isError,
+          },
+        ];
+      }
+
+      // Unknown data format - convert to text representation
+      return [
+        {
+          type: 'text',
+          text: `[Data: ${JSON.stringify(data)}]`,
+        },
+      ];
+    }
+
+    case 'file':
+      // Files are represented as text in Claude Code format
+      return [
+        {
+          type: 'text',
+          text: `[File: ${part.name ?? part.uri}${part.mediaType ? ` (${part.mediaType})` : ''}]`,
+        },
+      ];
+
+    default:
+      // Exhaustive check
+      return assertNever(part as never);
+  }
+}
+
+/**
+ * Converts an A2A message to Claude Code format.
+ *
+ * @param msg - A2A message to convert
+ * @param sessionId - Session ID to use for the Claude Code message
+ * @param parentUuid - Optional parent message UUID
+ * @returns Claude Code message
+ */
+function convertA2AToClaudeCodeMessage(
+  msg: A2AMessage,
+  sessionId: string,
+  parentUuid?: string
+): ClaudeCodeMessage {
+  const role = msg.role === 'user' ? 'user' : 'assistant';
+  const type = msg.role === 'user' ? 'user' : 'assistant';
+
+  // Convert all parts to content blocks
+  const content = msg.parts.flatMap(convertA2APartToContentBlock);
+
+  // Extract metadata if present
+  const metadata = msg.metadata || {};
+  const timestamp =
+    typeof metadata.timestamp === 'string' ? metadata.timestamp : new Date().toISOString();
+  const model = typeof metadata.model === 'string' ? metadata.model : undefined;
+  const usage = metadata.usage as
+    | {
+        input_tokens: number;
+        output_tokens: number;
+        cache_creation_input_tokens?: number;
+        cache_read_input_tokens?: number;
+      }
+    | undefined;
+  const costUSD = typeof metadata.costUSD === 'number' ? metadata.costUSD : undefined;
+  const durationMs = typeof metadata.durationMs === 'number' ? metadata.durationMs : undefined;
+
+  const claudeMsg: ClaudeCodeMessage = {
+    sessionId,
+    type,
+    message: {
+      role,
+      content,
+      ...(model && { model }),
+      ...(usage && { usage }),
+    },
+    uuid: msg.messageId,
+    timestamp,
+    ...(parentUuid && { parentUuid }),
+    ...(costUSD !== undefined && { costUSD }),
+    ...(durationMs !== undefined && { durationMs }),
+  };
+
+  return claudeMsg;
+}
+
+/**
+ * Converts an array of A2A messages to Claude Code format.
+ *
+ * This is the inverse of claudeCodeToA2A(). It converts A2A messages
+ * back to the Claude Code JSONL format for import into Claude Code sessions.
+ *
+ * @param messages - Array of A2A messages to convert
+ * @param sessionId - Optional session ID (generates new one if not provided)
+ * @returns Array of Claude Code messages
+ */
+export function a2aToClaudeCode(messages: A2AMessage[], sessionId?: string): ClaudeCodeMessage[] {
+  const resolvedSessionId = sessionId ?? crypto.randomUUID();
+
+  let parentUuid: string | undefined;
+
+  return messages.map((msg) => {
+    const claudeMsg = convertA2AToClaudeCodeMessage(msg, resolvedSessionId, parentUuid);
+    parentUuid = claudeMsg.uuid;
+    return claudeMsg;
+  });
+}
+
+/**
+ * Formats an array of Claude Code messages as JSONL string.
+ *
+ * Claude Code session files are JSONL (JSON Lines) format where each
+ * line is a complete JSON object representing one message.
+ *
+ * @param messages - Array of Claude Code messages
+ * @returns JSONL formatted string
+ */
+export function formatAsClaudeCodeJSONL(messages: ClaudeCodeMessage[]): string {
+  return messages.map((msg) => JSON.stringify(msg)).join('\n');
+}

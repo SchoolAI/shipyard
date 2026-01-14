@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
 import { useMultiProviderSync } from '@/hooks/useMultiProviderSync';
 import { usePlanIndex } from '@/hooks/usePlanIndex';
+import { formatRelativeTime } from '@/utils/formatters';
 
 // --- Archive Item Component ---
 
@@ -51,22 +52,6 @@ function ArchiveItem({ plan, onUnarchive }: ArchiveItemProps) {
       </Button>
     </div>
   );
-}
-
-// --- Helper Functions ---
-
-function formatRelativeTime(timestamp: number): string {
-  const now = Date.now();
-  const diff = now - timestamp;
-  const minutes = Math.floor(diff / 60000);
-  const hours = Math.floor(diff / 3600000);
-  const days = Math.floor(diff / 86400000);
-
-  if (minutes < 1) return 'just now';
-  if (minutes < 60) return `${minutes}m ago`;
-  if (hours < 24) return `${hours}h ago`;
-  if (days < 7) return `${days}d ago`;
-  return new Date(timestamp).toLocaleDateString();
 }
 
 // --- Main Page Component ---

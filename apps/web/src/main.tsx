@@ -24,6 +24,20 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { Toaster } from 'sonner';
 import { App } from './App';
+import { resetAllBrowserStorage } from './utils/resetStorage';
+
+// Expose reset function in development for console access
+// Usage: window.__resetPeerPlan() or just __resetPeerPlan()
+if (import.meta.env.DEV) {
+  (window as unknown as { __resetPeerPlan: typeof resetAllBrowserStorage }).__resetPeerPlan =
+    resetAllBrowserStorage;
+  // biome-ignore lint/suspicious/noConsole: Dev-only helpful message
+  console.log(
+    '%c[Peer-Plan Dev] %cReset available: window.__resetPeerPlan() or navigate to ?reset=all',
+    'color: #8b5cf6; font-weight: bold',
+    'color: #9ca3af'
+  );
+}
 
 const root = document.getElementById('root');
 if (!root) throw new Error('Root element not found');

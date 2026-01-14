@@ -21,9 +21,9 @@ import {
   Archive,
   ArchiveRestore,
   Check,
-  FileInput,
   GitPullRequest,
   MessageSquare,
+  MessageSquareReply,
   MessageSquareShare,
   MoreVertical,
   Share2,
@@ -147,10 +147,10 @@ function DesktopActions({
     <>
       <ShareButton planId={planId} rtcProvider={rtcProvider} isOwner={isOwner} />
 
-      {/* Import conversation button */}
+      {/* Resume conversation button */}
       <Tooltip delay={0}>
         <ImportConversationButton planId={planId} ydoc={ydoc} rtcProvider={rtcProvider} />
-        <Tooltip.Content>Import conversation from file</Tooltip.Content>
+        <Tooltip.Content>Resume a handed-off conversation</Tooltip.Content>
       </Tooltip>
 
       {/* Handoff conversation button - only shown if plan has origin transcript */}
@@ -200,53 +200,53 @@ function MobileDropdownMenu({
 }: MobileDropdownMenuProps) {
   return (
     <Dropdown>
-        <Button
-          isIconOnly
-          variant="ghost"
-          size="sm"
-          aria-label="More actions"
-          className="touch-target"
-        >
-          <MoreVertical className="w-4 h-4" />
-        </Button>
-        <Dropdown.Popover>
-          <Dropdown.Menu onAction={onAction}>
-            <Dropdown.Item id="share" textValue="Share">
-              <Share2 className="w-4 h-4 shrink-0 text-muted" />
-              <Label>Share</Label>
-            </Dropdown.Item>
+      <Button
+        isIconOnly
+        variant="ghost"
+        size="sm"
+        aria-label="More actions"
+        className="touch-target"
+      >
+        <MoreVertical className="w-4 h-4" />
+      </Button>
+      <Dropdown.Popover>
+        <Dropdown.Menu onAction={onAction}>
+          <Dropdown.Item id="share" textValue="Share">
+            <Share2 className="w-4 h-4 shrink-0 text-muted" />
+            <Label>Share</Label>
+          </Dropdown.Item>
 
-            <Dropdown.Item id="import" textValue="Import conversation">
-              <FileInput className="w-4 h-4 shrink-0 text-muted" />
-              <Label>Import conversation</Label>
-            </Dropdown.Item>
+          <Dropdown.Item id="import" textValue="Resume conversation">
+            <MessageSquareReply className="w-4 h-4 shrink-0 text-muted" />
+            <Label>Resume conversation</Label>
+          </Dropdown.Item>
 
-            {hasOriginTranscript && (
-              <Dropdown.Item id="handoff" textValue="Handoff conversation">
-                <MessageSquareShare className="w-4 h-4 shrink-0 text-muted" />
-                <Label>Handoff conversation</Label>
-              </Dropdown.Item>
+          {hasOriginTranscript && (
+            <Dropdown.Item id="handoff" textValue="Handoff conversation">
+              <MessageSquareShare className="w-4 h-4 shrink-0 text-muted" />
+              <Label>Handoff conversation</Label>
+            </Dropdown.Item>
+          )}
+
+          <Dropdown.Item id="link-pr" textValue="Link PR">
+            <GitPullRequest className="w-4 h-4 shrink-0 text-muted" />
+            <Label>Link PR</Label>
+          </Dropdown.Item>
+
+          <Dropdown.Item
+            id={isArchived ? 'unarchive' : 'archive'}
+            textValue={isArchived ? 'Unarchive' : 'Archive'}
+          >
+            {isArchived ? (
+              <ArchiveRestore className="w-4 h-4 shrink-0 text-muted" />
+            ) : (
+              <Archive className="w-4 h-4 shrink-0 text-muted" />
             )}
-
-            <Dropdown.Item id="link-pr" textValue="Link PR">
-              <GitPullRequest className="w-4 h-4 shrink-0 text-muted" />
-              <Label>Link PR</Label>
-            </Dropdown.Item>
-
-            <Dropdown.Item
-              id={isArchived ? 'unarchive' : 'archive'}
-              textValue={isArchived ? 'Unarchive' : 'Archive'}
-            >
-              {isArchived ? (
-                <ArchiveRestore className="w-4 h-4 shrink-0 text-muted" />
-              ) : (
-                <Archive className="w-4 h-4 shrink-0 text-muted" />
-              )}
-              <Label>{isArchived ? 'Unarchive' : 'Archive'}</Label>
-            </Dropdown.Item>
-          </Dropdown.Menu>
-        </Dropdown.Popover>
-      </Dropdown>
+            <Label>{isArchived ? 'Unarchive' : 'Archive'}</Label>
+          </Dropdown.Item>
+        </Dropdown.Menu>
+      </Dropdown.Popover>
+    </Dropdown>
   );
 }
 

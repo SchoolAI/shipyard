@@ -324,7 +324,10 @@ export function usePlanIndex(currentUsername: string | undefined): PlanIndexStat
 
       if (isActive) {
         // Merge with existing state to preserve optimistic updates from markPlanAsRead
-        setPlanViewedBy((prev) => mergeViewedByState(prev, viewedByData));
+        setPlanViewedBy((prev) => {
+          const merged = mergeViewedByState(prev, viewedByData);
+          return merged;
+        });
       }
     }
 
@@ -412,7 +415,6 @@ export function usePlanIndex(currentUsername: string | undefined): PlanIndexStat
 
       // Capture username at call time for use in async operations
       const username = currentUsername;
-
       try {
         // Import markPlanAsViewed dynamically to avoid circular deps
         const { markPlanAsViewed } = await import('@peer-plan/schema');
@@ -420,24 +422,25 @@ export function usePlanIndex(currentUsername: string | undefined): PlanIndexStat
         const planDoc = new Y.Doc();
         const idb = new IndexeddbPersistence(planId, planDoc);
         await idb.whenSynced;
-
         // Mark the plan as viewed in the Y.Doc
         markPlanAsViewed(planDoc, username);
 
         // Update local state immediately for instant UI feedback
         const now = Date.now();
-        setPlanViewedBy((prev) => ({
-          ...prev,
-          [planId]: {
-            ...(prev[planId] ?? {}),
-            [username]: now,
-          },
-        }));
-
+        setPlanViewedBy((prev) => {
+          const next = {
+            ...prev,
+            [planId]: {
+              ...(prev[planId] ?? {}),
+              [username]: now,
+            },
+          };
+          return next;
+        });
         // Keep the persistence alive briefly to ensure sync to IndexedDB
         await new Promise((resolve) => setTimeout(resolve, 100));
         idb.destroy();
-      } catch {
+      } catch (_error) {
         // Silently ignore errors - the plan will remain unread
       }
     },

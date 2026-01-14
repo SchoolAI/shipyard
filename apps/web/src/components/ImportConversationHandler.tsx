@@ -1,19 +1,20 @@
 /**
- * Handler component for importing conversation context.
+ * Handler component for resuming handed-off conversations.
  *
  * Features:
- * - File input for importing A2A conversation files
- * - Review modal to preview imported conversation
- * - Toast notifications for P2P received conversations (Phase 3)
+ * - File input for resuming conversations from .a2a.json files
+ * - Review modal to preview conversations before resuming
+ * - Toast notifications for P2P received conversations
+ * - Integration with registry server to create Claude Code sessions
  *
  * @see Issue #41 - Context Teleportation
  */
 
 import { Avatar, Button, Card, Modal, Spinner } from '@heroui/react';
 import type { A2AMessage, ConversationExportMeta } from '@peer-plan/schema';
-import { Check, FileText, MessageSquare, Upload } from 'lucide-react';
+import { Check, Download, MessageSquare, MessageSquareReply, Terminal } from 'lucide-react';
 import type React from 'react';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import type { WebrtcProvider } from 'y-webrtc';
 import type * as Y from 'yjs';
@@ -100,7 +101,7 @@ function ImportReviewModal({
             <Modal.Icon className="bg-accent-soft text-accent-soft-foreground">
               <MessageSquare className="size-5" />
             </Modal.Icon>
-            <Modal.Heading>Review Imported Conversation</Modal.Heading>
+            <Modal.Heading>Resume Conversation</Modal.Heading>
             <p className="text-sm leading-5 text-muted-foreground">{summary.title}</p>
           </Modal.Header>
 
@@ -217,7 +218,7 @@ export function ImportConversationButton({
         accept=".json,.a2a.json"
         onChange={handleFileSelect}
         className="hidden"
-        aria-label="Import conversation file"
+        aria-label="Resume conversation file"
       />
 
       <Button
@@ -226,10 +227,14 @@ export function ImportConversationButton({
         isIconOnly
         onPress={() => fileInputRef.current?.click()}
         isDisabled={isProcessing}
-        aria-label="Import conversation from file"
+        aria-label="Resume conversation from file"
         className="touch-target"
       >
-        {isProcessing ? <Spinner size="sm" color="current" /> : <Upload className="w-4 h-4" />}
+        {isProcessing ? (
+          <Spinner size="sm" color="current" />
+        ) : (
+          <MessageSquareReply className="w-4 h-4" />
+        )}
       </Button>
 
       {/* Review modal */}
@@ -306,6 +311,42 @@ export function useImportConversationToast(
  */
 export type { ReceivedConversation } from '@/hooks/useConversationTransfer';
 
+/** Registry server URL */
+const REGISTRY_URL = 'http://localhost:32191';
+
+/**
+ * Hook to check if registry server is available.
+ */
+function useRegistryAvailable(): boolean {
+  const [available, setAvailable] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function check() {
+      try {
+        const res = await fetch(`${REGISTRY_URL}/registry`, {
+          signal: AbortSignal.timeout(2000),
+        });
+        if (!cancelled && res.ok) {
+          setAvailable(true);
+        }
+      } catch {
+        if (!cancelled) {
+          setAvailable(false);
+        }
+      }
+    }
+
+    check();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return available;
+}
+
 /**
  * Modal for reviewing a P2P received conversation.
  */
@@ -315,12 +356,18 @@ function ReceivedReviewModal({
   received,
   onConfirm,
   onDownload,
+  onImportToClaudeCode,
+  isImporting,
+  registryAvailable,
 }: {
   isOpen: boolean;
   onClose: () => void;
   received: ReceivedConversation;
   onConfirm: () => void;
   onDownload: () => void;
+  onImportToClaudeCode: () => void;
+  isImporting: boolean;
+  registryAvailable: boolean;
 }) {
   const { messages, meta, summary } = received;
   const previewMessages = messages.slice(0, 5);
@@ -335,7 +382,7 @@ function ReceivedReviewModal({
             <Modal.Icon className="bg-success-soft text-success-soft-foreground">
               <MessageSquare className="size-5" />
             </Modal.Icon>
-            <Modal.Heading>Received Conversation</Modal.Heading>
+            <Modal.Heading>Resume Handed-Off Conversation</Modal.Heading>
             <p className="text-sm leading-5 text-muted-foreground">{summary.title}</p>
           </Modal.Header>
 
@@ -380,6 +427,13 @@ function ReceivedReviewModal({
                 </p>
               )}
             </div>
+
+            {/* Registry status info */}
+            {!registryAvailable && (
+              <p className="text-sm text-muted-foreground mt-3 italic">
+                Registry server not running. Download file to import manually.
+              </p>
+            )}
           </Modal.Body>
 
           <Modal.Footer>
@@ -387,9 +441,19 @@ function ReceivedReviewModal({
               Dismiss
             </Button>
             <Button variant="secondary" onPress={onDownload}>
-              <FileText className="w-4 h-4" />
+              <Download className="w-4 h-4" />
               Download
             </Button>
+            {registryAvailable && (
+              <Button variant="secondary" onPress={onImportToClaudeCode} isDisabled={isImporting}>
+                {isImporting ? (
+                  <Spinner size="sm" color="current" />
+                ) : (
+                  <Terminal className="w-4 h-4" />
+                )}
+                Import to Claude Code
+              </Button>
+            )}
             <Button onPress={onConfirm}>
               <Check className="w-4 h-4" />
               Accept
@@ -407,6 +471,7 @@ function ReceivedReviewModal({
  * This component:
  * - Shows toast notifications when conversations are received via P2P
  * - Provides a review modal to preview and accept/download conversations
+ * - Supports importing conversations directly to Claude Code sessions
  *
  * Render this component in PlanPage to enable P2P conversation receive notifications.
  */
@@ -423,6 +488,8 @@ export function ImportConversationHandler({
 }) {
   const [selectedReceived, setSelectedReceived] = useState<ReceivedConversation | null>(null);
   const [isReviewOpen, setIsReviewOpen] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const registryAvailable = useRegistryAvailable();
 
   // Hook into P2P receive notifications
   useImportConversationToast(planId, ydoc, rtcProvider, (received) => {
@@ -471,6 +538,47 @@ export function ImportConversationHandler({
   }
 
   /**
+   * Handle import to Claude Code - call registry API to create session file.
+   */
+  const handleImportToClaudeCode = useCallback(async () => {
+    if (!selectedReceived) return;
+
+    setIsImporting(true);
+
+    try {
+      const res = await fetch(`${REGISTRY_URL}/api/conversation/import`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          a2aMessages: selectedReceived.messages,
+          meta: selectedReceived.meta,
+        }),
+      });
+
+      const result = (await res.json()) as {
+        success: boolean;
+        sessionId?: string;
+        transcriptPath?: string;
+        messageCount?: number;
+        error?: string;
+      };
+
+      if (result.success) {
+        toast.success(
+          `Created Claude Code session: ${result.sessionId}\nPath: ${result.transcriptPath}`,
+          { duration: 8000 }
+        );
+      } else {
+        toast.error(result.error ?? 'Import failed');
+      }
+    } catch {
+      toast.error('Registry server not reachable. Download file instead.');
+    } finally {
+      setIsImporting(false);
+    }
+  }, [selectedReceived]);
+
+  /**
    * Handle close - just close the modal without action.
    */
   function handleClose() {
@@ -490,6 +598,9 @@ export function ImportConversationHandler({
       received={selectedReceived}
       onConfirm={handleConfirm}
       onDownload={handleDownload}
+      onImportToClaudeCode={handleImportToClaudeCode}
+      isImporting={isImporting}
+      registryAvailable={registryAvailable}
     />
   );
 }

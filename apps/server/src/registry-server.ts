@@ -1,10 +1,19 @@
+import { mkdir, writeFile } from 'node:fs/promises';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
+
 import {
+  type A2AMessage,
+  a2aToClaudeCode,
+  type ConversationExportMeta,
   CreateSubscriptionRequestSchema,
+  formatAsClaudeCodeJSONL,
   getPlanMetadata,
   RegisterServerRequestSchema,
   UnregisterServerRequestSchema,
 } from '@peer-plan/schema';
 import express, { type Request, type Response } from 'express';
+import { nanoid } from 'nanoid';
 import { WebSocket } from 'ws';
 import { getOctokit, parseRepoString } from './github-artifacts.js';
 import {
@@ -335,6 +344,83 @@ async function handleGetPRFiles(req: Request, res: Response): Promise<void> {
 }
 
 /**
+ * Handle POST /api/conversation/import - Import A2A conversation to Claude Code session
+ *
+ * Creates a new Claude Code session file from imported A2A messages.
+ * The session file is written to ~/.claude/projects/{project-name}/{session-id}.jsonl
+ */
+async function handleImportConversation(req: Request, res: Response): Promise<void> {
+  try {
+    const body = req.body as {
+      a2aMessages?: A2AMessage[];
+      meta?: ConversationExportMeta;
+    };
+
+    const { a2aMessages, meta } = body;
+
+    if (!a2aMessages || !Array.isArray(a2aMessages)) {
+      res.status(400).json({
+        success: false,
+        error: 'Missing or invalid a2aMessages',
+      });
+      return;
+    }
+
+    if (a2aMessages.length === 0) {
+      res.status(400).json({
+        success: false,
+        error: 'a2aMessages array is empty',
+      });
+      return;
+    }
+
+    // Convert A2A -> Claude Code format
+    const sessionId = nanoid();
+    const claudeMessages = a2aToClaudeCode(a2aMessages, sessionId);
+    const jsonl = formatAsClaudeCodeJSONL(claudeMessages);
+
+    // Determine project path
+    // Use cwd directory name or fallback to plan ID or 'peer-plan'
+    const projectName = meta?.planId
+      ? `peer-plan-${meta.planId.slice(0, 8)}`
+      : process.cwd().split('/').pop() || 'peer-plan';
+
+    const projectPath = join(homedir(), '.claude', 'projects', projectName);
+
+    // Ensure project directory exists
+    await mkdir(projectPath, { recursive: true });
+
+    // Create new session file
+    const transcriptPath = join(projectPath, `${sessionId}.jsonl`);
+
+    await writeFile(transcriptPath, jsonl, 'utf-8');
+
+    logger.info(
+      {
+        sessionId,
+        transcriptPath,
+        messageCount: claudeMessages.length,
+        sourcePlatform: meta?.sourcePlatform,
+      },
+      'Created Claude Code session from imported conversation'
+    );
+
+    res.json({
+      success: true,
+      sessionId,
+      transcriptPath,
+      messageCount: claudeMessages.length,
+    });
+  } catch (error) {
+    logger.error({ error }, 'Failed to import conversation');
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+}
+
+/**
  * Create Express app with all routes
  */
 function createApp(): express.Express {
@@ -371,6 +457,9 @@ function createApp(): express.Express {
   app.post('/api/hook/plan/:id/session-token', handleSetSessionToken);
   app.post('/api/hook/plan/:id/presence', handleUpdatePresence);
   app.delete('/api/hook/plan/:id/presence', handleClearPresence);
+
+  // Conversation import route
+  app.post('/api/conversation/import', handleImportConversation);
 
   return app;
 }
