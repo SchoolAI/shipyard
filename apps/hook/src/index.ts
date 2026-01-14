@@ -9,7 +9,6 @@
  *   echo '{"session_id": "...", ...}' | peer-plan-hook
  */
 
-import open from 'open';
 import { claudeCodeAdapter } from './adapters/claude-code.js';
 import type { AdapterEvent, AgentAdapter, CoreResponse } from './adapters/types.js';
 import { DEFAULT_AGENT_TYPE } from './constants.js';
@@ -43,14 +42,6 @@ async function handlePlanStart(
       agentType: DEFAULT_AGENT_TYPE,
       metadata: event.metadata,
     });
-
-    // Open browser with plan URL (cross-platform)
-    try {
-      await open(result.url);
-      logger.info({ url: result.url }, 'Browser opened');
-    } catch (err) {
-      logger.warn({ err, url: result.url }, 'Failed to open browser, continuing anyway');
-    }
 
     return {
       allow: true,
