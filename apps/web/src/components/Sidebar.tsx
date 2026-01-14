@@ -6,6 +6,7 @@ import {
   Popover,
   SearchField,
   Select,
+  Skeleton,
   Tooltip,
 } from '@heroui/react';
 import type { PlanIndexEntry } from '@peer-plan/schema';
@@ -38,8 +39,6 @@ import {
 } from '@/hooks/useViewFilters';
 import { getSidebarCollapsed, setSidebarCollapsed } from '@/utils/uiPreferences';
 
-// --- Plan Item Component ---
-
 interface PlanItemProps {
   plan: PlanIndexEntry;
   isShared?: boolean;
@@ -69,7 +68,6 @@ function PlanItem({
         )}
         {isShared && !peerCount && <Users className="w-3 h-3 text-muted-foreground" />}
 
-        {/* Archive button - visible on parent list item hover via CSS */}
         <Button
           isIconOnly
           variant="ghost"
@@ -94,8 +92,6 @@ function PlanItem({
     </div>
   );
 }
-
-// --- Navigation Item Component ---
 
 interface NavItemProps {
   icon: React.ReactNode;
@@ -148,11 +144,10 @@ function NavItem({
   );
 }
 
-// --- Collapsed Sidebar ---
-
 interface CollapsedSidebarProps {
   inboxCount: number;
   archivedCount: number;
+  isLoading: boolean;
   onToggle: () => void;
   onNavigate?: () => void;
 }
@@ -160,15 +155,18 @@ interface CollapsedSidebarProps {
 function CollapsedSidebar({
   inboxCount,
   archivedCount,
+  isLoading,
   onToggle,
   onNavigate,
 }: CollapsedSidebarProps) {
   const navigate = useNavigate();
   const location = useLocation();
 
+  // Hide counts during loading to prevent flash from 0→actual
+  const displayInboxCount = isLoading ? 0 : inboxCount;
+
   return (
     <div className="flex flex-col h-full bg-surface">
-      {/* Expand button */}
       <div className="px-3 py-3 border-b border-separator">
         <Tooltip>
           <Tooltip.Trigger>
@@ -187,9 +185,7 @@ function CollapsedSidebar({
         </Tooltip>
       </div>
 
-      {/* Navigation icons */}
       <nav className="flex-1 flex flex-col items-center gap-2 px-3 pt-2 overflow-y-auto">
-        {/* Inbox */}
         <Tooltip>
           <Tooltip.Trigger>
             <Button
@@ -203,18 +199,17 @@ function CollapsedSidebar({
               }}
               className="w-10 h-10 relative"
             >
-              <Inbox className={`w-5 h-5 ${inboxCount > 0 ? 'text-warning' : ''}`} />
-              {inboxCount > 0 && (
+              <Inbox className={`w-5 h-5 ${displayInboxCount > 0 ? 'text-warning' : ''}`} />
+              {!isLoading && displayInboxCount > 0 && (
                 <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-warning text-warning-foreground text-[10px] flex items-center justify-center font-semibold">
-                  {inboxCount}
+                  {displayInboxCount}
                 </span>
               )}
             </Button>
           </Tooltip.Trigger>
-          <Tooltip.Content>Inbox ({inboxCount})</Tooltip.Content>
+          <Tooltip.Content>Inbox {isLoading ? '' : `(${displayInboxCount})`}</Tooltip.Content>
         </Tooltip>
 
-        {/* Board */}
         <Tooltip>
           <Tooltip.Trigger>
             <Button
@@ -234,7 +229,6 @@ function CollapsedSidebar({
           <Tooltip.Content>Board</Tooltip.Content>
         </Tooltip>
 
-        {/* Archive */}
         <Tooltip>
           <Tooltip.Trigger>
             <Button
@@ -254,10 +248,9 @@ function CollapsedSidebar({
           <Tooltip.Content>Archive ({archivedCount})</Tooltip.Content>
         </Tooltip>
 
-        {/* Divider */}
         <div className="w-8 h-px bg-separator my-1" />
 
-        {/* Search icon - TODO: Add search functionality when clicked */}
+        {/* TODO: Add search functionality when clicked */}
         <Tooltip>
           <Tooltip.Trigger>
             <Button
@@ -274,7 +267,6 @@ function CollapsedSidebar({
         </Tooltip>
       </nav>
 
-      {/* Footer icons */}
       <div className="px-3 py-2 border-t border-separator flex flex-col items-center gap-2 shrink-0">
         <AccountSection collapsed />
         <div className="w-10 h-10 flex items-center justify-center">
@@ -285,16 +277,12 @@ function CollapsedSidebar({
   );
 }
 
-// --- Sidebar Props ---
-
 interface SidebarProps {
   /** Called after navigation (used to close mobile drawer) */
   onNavigate?: () => void;
   /** When true, skip CollapsiblePanel wrapper (used in mobile drawer) */
   inDrawer?: boolean;
 }
-
-// --- Main Sidebar Component ---
 
 export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
   const { identity: githubIdentity } = useGitHubAuth();
@@ -327,7 +315,6 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
     clearFilters,
   } = useViewFilters();
 
-  // Apply filters to each plan category (always apply filtering)
   const filteredInboxPlans = useMemo(() => {
     const { filteredPlans } = filterAndSortPlans(
       inboxPlans,
@@ -428,11 +415,11 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
     setSidebarCollapsed(newState);
   };
 
-  // Collapsed sidebar content (icon-only view)
   const collapsedContent = (
     <CollapsedSidebar
       inboxCount={inboxPlans.length}
       archivedCount={archivedPlans.length}
+      isLoading={isLoading}
       onToggle={handleToggle}
       onNavigate={onNavigate}
     />
@@ -440,7 +427,6 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
 
   const content = (
     <>
-      {/* Header with collapse button */}
       <div className="px-3 py-3 border-b border-separator flex items-center justify-between">
         <h2 className="font-semibold text-lg text-foreground">Plans</h2>
         <Tooltip>
@@ -459,14 +445,17 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
         </Tooltip>
       </div>
 
-      {/* Navigation Items */}
       <div className="px-3 py-2 border-b border-separator space-y-1">
         <NavItem
-          icon={<Inbox className={`w-4 h-4 ${inboxPlans.length > 0 ? 'text-warning' : ''}`} />}
+          icon={
+            <Inbox
+              className={`w-4 h-4 ${!isLoading && inboxPlans.length > 0 ? 'text-warning' : ''}`}
+            />
+          }
           label="Inbox"
           href="/inbox"
           isActive={location.pathname === '/inbox'}
-          badge={inboxPlans.length}
+          badge={isLoading ? undefined : inboxPlans.length}
           badgeColor="warning"
           onClick={onNavigate}
         />
@@ -486,10 +475,8 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
         />
       </div>
 
-      {/* Search and Filter controls inline */}
       <div className="px-3 py-2 border-b border-separator">
         <div className="flex items-center gap-1.5">
-          {/* Search field */}
           <div className="flex-1 min-w-0">
             <SearchField aria-label="Search plans" value={searchQuery} onChange={setSearchQuery}>
               <SearchField.Group>
@@ -500,7 +487,6 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
             </SearchField>
           </div>
 
-          {/* Filter popover */}
           <Popover>
             <Popover.Trigger>
               <Button
@@ -534,7 +520,6 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
                   )}
                 </div>
 
-                {/* Sort dropdown */}
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
                     <span className="text-xs text-muted-foreground">Sort by</span>
@@ -572,7 +557,6 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
                   </Select>
                 </div>
 
-                {/* Status filters */}
                 <div className="space-y-1.5">
                   <span className="text-xs text-muted-foreground">Status</span>
                   <div className="flex flex-wrap gap-1">
@@ -623,7 +607,6 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
             }
           }}
         >
-          {/* Inbox plans */}
           {filteredInboxPlans.map((plan) => (
             <ListBoxItem id={plan.id} key={plan.id} textValue={plan.title} className="group">
               <PlanItem
@@ -634,7 +617,6 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
             </ListBoxItem>
           ))}
 
-          {/* My Plans */}
           {filteredMyPlans.map((plan) => (
             <ListBoxItem id={plan.id} key={plan.id} textValue={plan.title} className="group">
               <PlanItem
@@ -645,7 +627,6 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
             </ListBoxItem>
           ))}
 
-          {/* Shared Plans */}
           {filteredSharedPlans.map((plan) => (
             <ListBoxItem id={plan.id} key={plan.id} textValue={plan.title} className="group">
               <PlanItem
@@ -660,16 +641,25 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
           {/* Note: Archived plans are NOT shown here - they only appear on /archive route */}
         </ListBox>
 
-        {/* Empty/Loading state - only for active plans */}
-        {filteredMyPlans.length === 0 &&
+        {/* Loading state with skeleton */}
+        {isLoading && (
+          <div className="space-y-1 p-2">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-3 px-3 py-2 rounded-lg">
+                <Skeleton className="h-4 flex-1 rounded" />
+                <Skeleton className="h-4 w-8 rounded" />
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Empty state - only show when not loading and no plans */}
+        {!isLoading &&
+          filteredMyPlans.length === 0 &&
           filteredSharedPlans.length === 0 &&
           filteredInboxPlans.length === 0 && (
             <p className="text-muted-foreground text-sm p-2 text-center">
-              {isLoading
-                ? 'Loading plans...'
-                : hasActiveFilters
-                  ? 'No matching plans'
-                  : 'No plans yet'}
+              {hasActiveFilters ? 'No matching plans' : 'No plans yet'}
             </p>
           )}
       </nav>

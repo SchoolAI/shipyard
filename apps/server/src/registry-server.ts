@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
@@ -34,7 +34,6 @@ import {
 } from './subscriptions/index.js';
 import { getOrCreateDoc } from './ws-server.js';
 
-// High ephemeral range ports, unlikely to collide with other services
 const DEFAULT_REGISTRY_PORTS = [32191, 32192];
 
 const HEALTH_CHECK_INTERVAL = 10000;
@@ -47,12 +46,8 @@ interface ServerEntry {
   registeredAt: number;
 }
 
-// In-memory registry (ephemeral, no persistence)
 const servers = new Map<number, ServerEntry>();
 
-/**
- * Check if a WebSocket server is still alive by attempting to connect
- */
 async function isServerAlive(entry: ServerEntry): Promise<boolean> {
   return new Promise((resolve) => {
     const ws = new WebSocket(entry.url);
@@ -74,9 +69,6 @@ async function isServerAlive(entry: ServerEntry): Promise<boolean> {
   });
 }
 
-/**
- * Periodic health check to remove dead servers from registry
- */
 async function healthCheck(): Promise<void> {
   const entries = Array.from(servers.entries());
 
@@ -89,18 +81,12 @@ async function healthCheck(): Promise<void> {
   }
 }
 
-/**
- * Handle GET /registry - Return list of active servers
- */
 async function handleGetRegistry(_req: Request, res: Response): Promise<void> {
   const serverList = Array.from(servers.values());
   logger.debug({ count: serverList.length }, 'Served registry');
   res.json({ servers: serverList });
 }
 
-/**
- * Handle POST /register - Register a WebSocket server
- */
 async function handleRegister(req: Request, res: Response): Promise<void> {
   try {
     const input = RegisterServerRequestSchema.parse(req.body);
@@ -121,9 +107,6 @@ async function handleRegister(req: Request, res: Response): Promise<void> {
   }
 }
 
-/**
- * Handle DELETE /unregister - Unregister a WebSocket server
- */
 async function handleUnregister(req: Request, res: Response): Promise<void> {
   try {
     const input = UnregisterServerRequestSchema.parse(req.body);
@@ -137,9 +120,6 @@ async function handleUnregister(req: Request, res: Response): Promise<void> {
   }
 }
 
-/**
- * Handle GET /api/plan/:id/status - Return plan status for polling
- */
 async function handlePlanStatus(req: Request, res: Response): Promise<void> {
   const planId = req.params.id;
   if (!planId) {
@@ -156,7 +136,6 @@ async function handlePlanStatus(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    // Return plain text status for simple curl parsing
     res.type('text/plain').send(metadata.status);
   } catch (err) {
     logger.error({ err, planId }, 'Failed to get plan status');
@@ -164,9 +143,6 @@ async function handlePlanStatus(req: Request, res: Response): Promise<void> {
   }
 }
 
-/**
- * Handle POST /api/plan/:id/subscribe - Create a subscription
- */
 async function handleSubscribe(req: Request, res: Response): Promise<void> {
   const planId = req.params.id;
   if (!planId) {
@@ -192,9 +168,6 @@ async function handleSubscribe(req: Request, res: Response): Promise<void> {
   }
 }
 
-/**
- * Handle GET /api/plan/:id/changes?clientId=X - Poll for changes
- */
 async function handleGetChanges(req: Request, res: Response): Promise<void> {
   const planId = req.params.id;
   if (!planId) {
@@ -218,9 +191,6 @@ async function handleGetChanges(req: Request, res: Response): Promise<void> {
   res.json(result);
 }
 
-/**
- * Handle DELETE /api/plan/:id/unsubscribe?clientId=X - Remove subscription
- */
 async function handleUnsubscribe(req: Request, res: Response): Promise<void> {
   const planId = req.params.id;
   if (!planId) {
@@ -239,9 +209,6 @@ async function handleUnsubscribe(req: Request, res: Response): Promise<void> {
   res.json({ success: deleted });
 }
 
-/**
- * Handle GET /api/plans/:id/pr-diff/:prNumber - Fetch PR diff via GitHub API
- */
 async function handleGetPRDiff(req: Request, res: Response): Promise<void> {
   const { id: planId, prNumber } = req.params;
 
@@ -268,7 +235,6 @@ async function handleGetPRDiff(req: Request, res: Response): Promise<void> {
     const { owner, repoName } = parseRepoString(metadata.repo);
     const prNum = Number.parseInt(prNumber, 10);
 
-    // Fetch diff from GitHub API
     const response = await octokit.request('GET /repos/{owner}/{repo}/pulls/{pull_number}', {
       owner,
       repo: repoName,
@@ -278,7 +244,6 @@ async function handleGetPRDiff(req: Request, res: Response): Promise<void> {
       },
     });
 
-    // Return raw diff with proper content type
     res.type('text/plain').send(response.data);
     logger.debug({ planId, prNumber: prNum, repo: metadata.repo }, 'Served PR diff');
   } catch (error) {
@@ -288,9 +253,6 @@ async function handleGetPRDiff(req: Request, res: Response): Promise<void> {
   }
 }
 
-/**
- * Handle GET /api/plans/:id/pr-files/:prNumber - Fetch list of changed files in PR
- */
 async function handleGetPRFiles(req: Request, res: Response): Promise<void> {
   const { id: planId, prNumber } = req.params;
 
@@ -317,14 +279,12 @@ async function handleGetPRFiles(req: Request, res: Response): Promise<void> {
     const { owner, repoName } = parseRepoString(metadata.repo);
     const prNum = Number.parseInt(prNumber, 10);
 
-    // Fetch files list from GitHub API
     const { data: files } = await octokit.pulls.listFiles({
       owner,
       repo: repoName,
       pull_number: prNum,
     });
 
-    // Return simplified file list
     const fileList = files.map((file) => ({
       filename: file.filename,
       status: file.status,
@@ -343,12 +303,6 @@ async function handleGetPRFiles(req: Request, res: Response): Promise<void> {
   }
 }
 
-/**
- * Handle POST /api/conversation/import - Import A2A conversation to Claude Code session
- *
- * Creates a new Claude Code session file from imported A2A messages.
- * The session file is written to ~/.claude/projects/{project-name}/{session-id}.jsonl
- */
 async function handleImportConversation(req: Request, res: Response): Promise<void> {
   try {
     const body = req.body as {
@@ -374,23 +328,16 @@ async function handleImportConversation(req: Request, res: Response): Promise<vo
       return;
     }
 
-    // Convert A2A -> Claude Code format
     const sessionId = nanoid();
     const claudeMessages = a2aToClaudeCode(a2aMessages, sessionId);
     const jsonl = formatAsClaudeCodeJSONL(claudeMessages);
 
-    // Determine project path
-    // Use cwd directory name or fallback to plan ID or 'peer-plan'
     const projectName = meta?.planId
       ? `peer-plan-${meta.planId.slice(0, 8)}`
       : process.cwd().split('/').pop() || 'peer-plan';
 
     const projectPath = join(homedir(), '.claude', 'projects', projectName);
-
-    // Ensure project directory exists
     await mkdir(projectPath, { recursive: true });
-
-    // Create new session file
     const transcriptPath = join(projectPath, `${sessionId}.jsonl`);
 
     await writeFile(transcriptPath, jsonl, 'utf-8');
@@ -420,13 +367,49 @@ async function handleImportConversation(req: Request, res: Response): Promise<vo
   }
 }
 
-/**
- * Create Express app with all routes
- */
+async function handleGetTranscript(req: Request, res: Response): Promise<void> {
+  const planId = req.params.id;
+  if (!planId) {
+    res.status(400).json({ error: 'Missing plan ID' });
+    return;
+  }
+
+  try {
+    const doc = await getOrCreateDoc(planId);
+    const metadata = getPlanMetadata(doc);
+
+    if (!metadata?.origin) {
+      res.status(404).json({ error: 'Plan has no origin metadata' });
+      return;
+    }
+
+    if (metadata.origin.platform !== 'claude-code') {
+      res.status(400).json({ error: 'Transcript only available for Claude Code plans' });
+      return;
+    }
+
+    const transcriptPath = (metadata.origin as { transcriptPath?: string }).transcriptPath;
+    if (!transcriptPath) {
+      res.status(404).json({ error: 'No transcript path in origin metadata' });
+      return;
+    }
+
+    const content = await readFile(transcriptPath, 'utf-8');
+    res.type('text/plain').send(content);
+    logger.debug({ planId, transcriptPath, size: content.length }, 'Served transcript for handoff');
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      res.status(404).json({ error: 'Transcript file not found' });
+    } else {
+      logger.error({ error, planId }, 'Failed to read transcript');
+      res.status(500).json({ error: 'Failed to read transcript' });
+    }
+  }
+}
+
 function createApp(): express.Express {
   const app = express();
 
-  // Middleware
   app.use(express.json());
   app.use((_req, res, next) => {
     res.header('Access-Control-Allow-Origin', '*');
@@ -435,22 +418,19 @@ function createApp(): express.Express {
     next();
   });
 
-  // Registry routes
   app.get('/registry', handleGetRegistry);
   app.post('/register', handleRegister);
   app.delete('/unregister', handleUnregister);
 
-  // Plan status routes
   app.get('/api/plan/:id/status', handlePlanStatus);
+  app.get('/api/plan/:id/transcript', handleGetTranscript);
   app.post('/api/plan/:id/subscribe', handleSubscribe);
   app.get('/api/plan/:id/changes', handleGetChanges);
   app.delete('/api/plan/:id/unsubscribe', handleUnsubscribe);
 
-  // PR diff routes
   app.get('/api/plans/:id/pr-diff/:prNumber', handleGetPRDiff);
   app.get('/api/plans/:id/pr-files/:prNumber', handleGetPRFiles);
 
-  // Hook API routes
   app.post('/api/hook/session', handleCreateSession);
   app.put('/api/hook/plan/:id/content', handleUpdateContent);
   app.get('/api/hook/plan/:id/review', handleGetReview);
@@ -458,15 +438,11 @@ function createApp(): express.Express {
   app.post('/api/hook/plan/:id/presence', handleUpdatePresence);
   app.delete('/api/hook/plan/:id/presence', handleClearPresence);
 
-  // Conversation import route
   app.post('/api/conversation/import', handleImportConversation);
 
   return app;
 }
 
-/**
- * Start registry server on available port from list
- */
 export async function startRegistryServer(): Promise<number | null> {
   const ports = process.env.REGISTRY_PORT
     ? [Number.parseInt(process.env.REGISTRY_PORT, 10)]
@@ -477,7 +453,6 @@ export async function startRegistryServer(): Promise<number | null> {
   for (const port of ports) {
     try {
       await new Promise<void>((resolve, reject) => {
-        // Bind to localhost only for security (prevents local network access)
         const server = app.listen(port, '127.0.0.1', () => {
           logger.info({ port }, 'Registry server started');
           setInterval(healthCheck, HEALTH_CHECK_INTERVAL);
@@ -495,18 +470,13 @@ export async function startRegistryServer(): Promise<number | null> {
       });
 
       return port;
-    } catch {
-      // continue to next port
-    }
+    } catch {}
   }
 
   logger.warn({ ports }, 'All registry ports in use');
   return null;
 }
 
-/**
- * Check if registry server is already running
- */
 export async function isRegistryRunning(): Promise<number | null> {
   const ports = process.env.REGISTRY_PORT
     ? [Number.parseInt(process.env.REGISTRY_PORT, 10)]
@@ -520,9 +490,7 @@ export async function isRegistryRunning(): Promise<number | null> {
       if (res.ok) {
         return port;
       }
-    } catch {
-      // continue to next port
-    }
+    } catch {}
   }
 
   return null;

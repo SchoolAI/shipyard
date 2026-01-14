@@ -16,12 +16,6 @@ import type { WebrtcProvider } from 'y-webrtc';
  */
 export interface ConnectedPeer {
   /**
-   * Awareness client ID from Yjs (number).
-   * Used internally by Yjs for document sync.
-   * @deprecated Use webrtcPeerId for P2P transfers.
-   */
-  peerId: number;
-  /**
    * WebRTC peer ID (UUID string) for P2P transfers.
    * This is the key used in room.webrtcConns Map.
    * May be undefined if the peer hasn't broadcast their peerId yet.
@@ -56,7 +50,6 @@ function extractPeerInfo(peerId: number, state: Record<string, unknown>): Connec
   if (!planStatus?.user) {
     // Unknown peer without identity - still track them
     return {
-      peerId,
       webrtcPeerId: planStatus?.webrtcPeerId,
       platform: 'browser',
       name: `Peer ${peerId}`,
@@ -67,7 +60,6 @@ function extractPeerInfo(peerId: number, state: Record<string, unknown>): Connec
   }
 
   return {
-    peerId,
     webrtcPeerId: planStatus.webrtcPeerId,
     platform: 'browser', // TODO: Could be enhanced to detect platform
     name: planStatus.user.name,

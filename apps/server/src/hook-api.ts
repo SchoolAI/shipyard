@@ -1,9 +1,3 @@
-/**
- * HTTP API handlers for hook integration.
- * These endpoints allow the peer-plan-hook CLI to communicate with the server.
- */
-
-import { readFile } from 'node:fs/promises';
 import type { Block } from '@blocknote/core';
 import { ServerBlockNoteEditor } from '@blocknote/server-util';
 import {
@@ -31,16 +25,11 @@ import { logger } from './logger.js';
 import { getGitHubUsername, getRepositoryFullName } from './server-identity.js';
 import { getOrCreateDoc } from './ws-server.js';
 
-// --- Helper Functions ---
-
 async function parseMarkdownToBlocks(markdown: string): Promise<Block[]> {
   const editor = ServerBlockNoteEditor.create();
   return await editor.tryParseMarkdownToBlocks(markdown);
 }
 
-/**
- * Extract title from first block of parsed content.
- */
 function extractTitleFromBlocks(blocks: Block[]): string {
   const UNTITLED = 'Untitled Plan';
   const firstBlock = blocks[0];
@@ -64,8 +53,6 @@ function extractTitleFromBlocks(blocks: Block[]): string {
   return text.slice(0, 50);
 }
 
-// --- POST /api/hook/session - Create a new plan session ---
-
 export async function handleCreateSession(req: Request, res: Response): Promise<void> {
   try {
     const input = CreateHookSessionRequestSchema.parse(req.body);
@@ -80,43 +67,21 @@ export async function handleCreateSession(req: Request, res: Response): Promise<
 
     const PLAN_IN_PROGRESS = 'Plan in progress...';
 
-    // Get GitHub username for plan ownership
     const ownerId = getGitHubUsername();
     logger.info({ ownerId }, 'GitHub username for plan ownership');
 
-    // Auto-detect repo from current directory
     const repo = getRepositoryFullName() || undefined;
     if (repo) {
       logger.info({ repo }, 'Auto-detected repository from current directory');
     }
 
-    // Create the Y.Doc for this plan
     const ydoc = await getOrCreateDoc(planId);
 
-    // Parse and validate origin metadata from hook request for conversation export (Issue #41)
     const origin = parseClaudeCodeOrigin(input.metadata) || {
       platform: 'claude-code' as const,
       sessionId: input.sessionId,
       transcriptPath: '',
     };
-
-    // Read transcript file if available for handoff feature
-    let transcriptContent = '';
-    if (origin && origin.platform === 'claude-code' && origin.transcriptPath) {
-      try {
-        transcriptContent = await readFile(origin.transcriptPath, 'utf-8');
-        logger.info(
-          { transcriptPath: origin.transcriptPath, size: transcriptContent.length },
-          'Loaded transcript for handoff'
-        );
-      } catch (error) {
-        logger.warn(
-          { error, transcriptPath: origin.transcriptPath },
-          'Failed to read transcript file'
-        );
-        // Continue without transcript - handoff will show fallback message
-      }
-    }
 
     initPlanMetadata(ydoc, {
       id: planId,
@@ -124,11 +89,9 @@ export async function handleCreateSession(req: Request, res: Response): Promise<
       status: 'draft',
       ownerId,
       repo,
-      // Origin tracking for conversation export (type-safe, validated)
       origin,
     });
 
-    // Set initial presence
     setAgentPresence(ydoc, {
       agentType: input.agentType ?? 'claude-code',
       sessionId: input.sessionId,
@@ -136,16 +99,23 @@ export async function handleCreateSession(req: Request, res: Response): Promise<
       lastSeenAt: now,
     });
 
-    // Store transcript in Y.Doc if available (for handoff feature)
-    if (transcriptContent) {
-      ydoc.getText('transcript').insert(0, transcriptContent);
+    if (origin && origin.platform === 'claude-code') {
+      const metadata = ydoc.getMap('metadata');
+      const initialVersion = {
+        versionId: nanoid(),
+        creator: input.metadata?.ownerId || 'unknown',
+        platform: origin.platform,
+        sessionId: origin.sessionId,
+        messageCount: 0, // Will be counted on first handoff
+        createdAt: now,
+      };
+      metadata.set('conversationVersions', [initialVersion]);
       logger.info(
-        { planId, transcriptSize: transcriptContent.length },
-        'Transcript stored in Y.Doc'
+        { planId, versionId: initialVersion.versionId },
+        'Added initial conversation version'
       );
     }
 
-    // Update plan index
     const indexDoc = await getOrCreateDoc(PLAN_INDEX_DOC_NAME);
     setPlanIndexEntry(indexDoc, {
       id: planId,
@@ -156,13 +126,9 @@ export async function handleCreateSession(req: Request, res: Response): Promise<
       ownerId,
     });
 
-    // Generate URL - use simple plan ID (not snapshot) for live updates
-    // Production (default): https://schoolai.github.io/peer-plan/plan/{id}
-    // Dev (override via env): http://localhost:5173/plan/{id}
     const webUrl = process.env.PEER_PLAN_WEB_URL ?? 'https://schoolai.github.io/peer-plan';
     const url = `${webUrl}/plan/${planId}`;
 
-    // Note: Browser opening is handled by the hook CLI, not the server
     logger.info({ url }, 'Plan URL generated');
 
     const response: CreateHookSessionResponse = {
@@ -176,8 +142,6 @@ export async function handleCreateSession(req: Request, res: Response): Promise<
     res.status(400).json({ error: 'Invalid request' });
   }
 }
-
-// --- PUT /api/hook/plan/:id/content - Update plan content ---
 
 export async function handleUpdateContent(req: Request, res: Response): Promise<void> {
   try {
@@ -199,21 +163,17 @@ export async function handleUpdateContent(req: Request, res: Response): Promise<
       return;
     }
 
-    // Parse markdown to blocks and extract title
     const blocks = await parseMarkdownToBlocks(input.content);
     const title = extractTitleFromBlocks(blocks);
 
-    // Update Y.Doc content and extract deliverables
     const editor = ServerBlockNoteEditor.create();
     ydoc.transact(() => {
       const fragment = ydoc.getXmlFragment('document');
-      // Clear existing content
       while (fragment.length > 0) {
         fragment.delete(0, 1);
       }
       editor.blocksToYXmlFragment(blocks, fragment);
 
-      // Extract and store deliverables
       const deliverables = extractDeliverables(blocks);
       for (const deliverable of deliverables) {
         addDeliverable(ydoc, deliverable);
@@ -224,14 +184,12 @@ export async function handleUpdateContent(req: Request, res: Response): Promise<
       }
     });
 
-    // Update metadata
     const now = Date.now();
     setPlanMetadata(ydoc, {
       title,
       updatedAt: now,
     });
 
-    // Update plan index
     const indexDoc = await getOrCreateDoc(PLAN_INDEX_DOC_NAME);
     if (metadata.ownerId) {
       setPlanIndexEntry(indexDoc, {
@@ -255,8 +213,6 @@ export async function handleUpdateContent(req: Request, res: Response): Promise<
   }
 }
 
-// --- GET /api/hook/plan/:id/review - Get review status ---
-
 export async function handleGetReview(req: Request, res: Response): Promise<void> {
   try {
     const planId = req.params.id;
@@ -273,7 +229,6 @@ export async function handleGetReview(req: Request, res: Response): Promise<void
       return;
     }
 
-    // Get feedback from threads if status is changes_requested
     let feedback: ReviewFeedback[] | undefined;
     if (metadata.status === 'changes_requested') {
       const threadsMap = ydoc.getMap('threads');
@@ -304,8 +259,6 @@ export async function handleGetReview(req: Request, res: Response): Promise<void
   }
 }
 
-// --- POST /api/hook/plan/:id/session-token - Set session token (on approval) ---
-
 export async function handleSetSessionToken(req: Request, res: Response): Promise<void> {
   try {
     const planId = req.params.id;
@@ -330,13 +283,11 @@ export async function handleSetSessionToken(req: Request, res: Response): Promis
       return;
     }
 
-    // Set the session token hash
     setPlanMetadata(ydoc, {
       sessionTokenHash,
       updatedAt: Date.now(),
     });
 
-    // Generate URL
     const webUrl = process.env.PEER_PLAN_WEB_URL ?? 'https://schoolai.github.io/peer-plan';
     const url = `${webUrl}/plan/${planId}`;
 
@@ -348,8 +299,6 @@ export async function handleSetSessionToken(req: Request, res: Response): Promis
     res.status(500).json({ error: 'Internal error' });
   }
 }
-
-// --- POST /api/hook/plan/:id/presence - Update presence ---
 
 export async function handleUpdatePresence(req: Request, res: Response): Promise<void> {
   try {
@@ -377,8 +326,6 @@ export async function handleUpdatePresence(req: Request, res: Response): Promise
     res.status(400).json({ error: 'Invalid request' });
   }
 }
-
-// --- DELETE /api/hook/plan/:id/presence - Clear presence ---
 
 export async function handleClearPresence(req: Request, res: Response): Promise<void> {
   try {

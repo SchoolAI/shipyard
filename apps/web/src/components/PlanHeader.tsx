@@ -13,7 +13,6 @@ import type { A2AMessage, ConversationExportMeta, PlanMetadata } from '@peer-pla
 import {
   getPlanIndexEntry,
   getPlanOwnerId,
-  getTranscriptContent,
   PLAN_INDEX_DOC_NAME,
   setPlanIndexEntry,
 } from '@peer-plan/schema';
@@ -28,7 +27,7 @@ import {
   MoreVertical,
   Share2,
 } from 'lucide-react';
-import { useMemo, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { toast } from 'sonner';
 import type { WebrtcProvider } from 'y-webrtc';
 import type * as Y from 'yjs';
@@ -415,12 +414,6 @@ export function PlanHeader({
     display.origin?.platform === 'claude-code' && display.origin.transcriptPath
   );
 
-  // Read transcript content for handoff
-  const transcriptContent = useMemo(() => {
-    const content = getTranscriptContent(ydoc);
-    return content || null;
-  }, [ydoc]);
-
   const handleArchiveToggle = () => {
     if (!githubIdentity) {
       toast.error('Please sign in with GitHub first');
@@ -429,7 +422,6 @@ export function PlanHeader({
 
     const now = Date.now();
 
-    // Update plan metadata
     ydoc.transact(() => {
       const metadataMap = ydoc.getMap('metadata');
       if (isArchived) {
@@ -442,7 +434,6 @@ export function PlanHeader({
       metadataMap.set('updatedAt', now);
     });
 
-    // Update plan index
     const entry = getPlanIndexEntry(indexDoc, planId);
     if (entry) {
       if (isArchived) {
@@ -625,7 +616,7 @@ export function PlanHeader({
         rtcProvider={rtcProvider}
         isOpen={isHandoffDialogOpen}
         onClose={() => setIsHandoffDialogOpen(false)}
-        transcriptContent={transcriptContent}
+        hasOriginTranscript={hasOriginTranscript}
       />
 
       {/* Hidden file input for mobile import */}

@@ -133,6 +133,7 @@ export type {
   Artifact,
   ArtifactType,
   ClaudeCodeOriginMetadata,
+  ConversationVersion,
   CursorOriginMetadata,
   Deliverable,
   DevinOriginMetadata,
@@ -148,6 +149,7 @@ export type {
 export {
   ArtifactSchema,
   ClaudeCodeOriginMetadataSchema,
+  ConversationVersionSchema,
   CursorOriginMetadataSchema,
   DeliverableSchema,
   DevinOriginMetadataSchema,
@@ -165,15 +167,20 @@ export type { PlanIndexEntry } from './plan-index.js';
 export {
   NON_PLAN_DB_NAMES,
   PLAN_INDEX_DOC_NAME,
+  PLAN_INDEX_VIEWED_BY_KEY,
   PlanIndexEntrySchema,
   PlanStatus,
 } from './plan-index.js';
 export {
+  getAllViewedByFromIndex,
   getPlanIndex,
   getPlanIndexEntry,
+  getViewedByFromIndex,
   removePlanIndexEntry,
+  removeViewedByFromIndex,
   setPlanIndexEntry,
   touchPlanIndexEntry,
+  updatePlanIndexViewedBy,
 } from './plan-index-helpers.js';
 export type { CommentBody, Thread, ThreadComment } from './thread.js';
 export {
@@ -196,6 +203,7 @@ export type { UserProfile } from './user-helpers.js';
 export { createUserResolver } from './user-helpers.js';
 export {
   addArtifact,
+  addConversationVersion,
   addDeliverable,
   addPRReviewComment,
   approveUser,
@@ -204,6 +212,7 @@ export {
   getAgentPresences,
   getApprovedUsers,
   getArtifacts,
+  getConversationVersions,
   getDeliverables,
   getLinkedPR,
   getLinkedPRs,
@@ -213,7 +222,6 @@ export {
   getPRReviewCommentsForPR,
   getRejectedUsers,
   getStepCompletions,
-  getTranscriptContent,
   getViewedBy,
   initPlanMetadata,
   isApprovalRequired,
@@ -224,6 +232,7 @@ export {
   linkArtifactToDeliverable,
   linkPR,
   markPlanAsViewed,
+  markVersionHandedOff,
   rejectUser,
   removeArtifact,
   removePRReviewComment,

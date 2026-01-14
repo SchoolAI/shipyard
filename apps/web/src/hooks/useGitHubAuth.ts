@@ -61,10 +61,6 @@ function initializeSnapshotCache(): void {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
         const parsed = JSON.parse(stored) as GitHubIdentity;
-        // Ensure scope field exists (migration for old stored identities)
-        if (parsed.scope === undefined) {
-          parsed.scope = '';
-        }
         snapshotCache = { counter: changeCounter, value: parsed };
       } else {
         snapshotCache = { counter: changeCounter, value: null };
@@ -106,13 +102,6 @@ function getStoredIdentity(): GitHubIdentity | null {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (!stored) return null;
     const parsed = JSON.parse(stored) as GitHubIdentity;
-
-    // Ensure scope field exists (migration for old stored identities)
-    if (parsed.scope === undefined) {
-      parsed.scope = '';
-      // Persist the migration back to localStorage
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
-    }
 
     return parsed;
   } catch (err) {

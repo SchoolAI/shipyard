@@ -14,8 +14,6 @@ import { useMultiProviderSync } from '@/hooks/useMultiProviderSync';
 import { usePlanIndex } from '@/hooks/usePlanIndex';
 import { formatRelativeTime } from '@/utils/formatters';
 
-// --- Archive Item Component ---
-
 interface ArchiveItemProps {
   plan: PlanIndexEntry;
   onUnarchive: (planId: string) => void;
@@ -54,8 +52,6 @@ function ArchiveItem({ plan, onUnarchive }: ArchiveItemProps) {
   );
 }
 
-// --- Main Page Component ---
-
 export function ArchivePage() {
   const navigate = useNavigate();
   const { identity: githubIdentity } = useGitHubAuth();
@@ -63,7 +59,6 @@ export function ArchivePage() {
   const { ydoc: indexDoc } = useMultiProviderSync(PLAN_INDEX_DOC_NAME);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Sort by most recently archived first, then filter by search
   const sortedArchivedPlans = useMemo(() => {
     const sorted = [...archivedPlans].sort(
       (a, b) => (b.deletedAt || b.updatedAt) - (a.deletedAt || a.updatedAt)
@@ -84,7 +79,6 @@ export function ArchivePage() {
           <Skeleton className="h-10 w-full rounded-lg" />
         </div>
         <div className="flex-1 space-y-2">
-          {/* biome-ignore lint/suspicious/noArrayIndexKey: Static skeleton items never reorder */}
           {Array.from({ length: 3 }).map((_, i) => (
             <div key={i} className="flex items-center justify-between gap-3 py-3 px-3 rounded-lg">
               <div className="flex flex-col gap-2 flex-1">
@@ -107,7 +101,6 @@ export function ArchivePage() {
 
     const now = Date.now();
 
-    // Update the plan's own metadata
     try {
       const planDoc = new (await import('yjs')).Doc();
       const idb = new (await import('y-indexeddb')).IndexeddbPersistence(planId, planDoc);
@@ -125,7 +118,6 @@ export function ArchivePage() {
       // Plan doc may not exist locally
     }
 
-    // Update plan-index
     const entry = getPlanIndexEntry(indexDoc, planId);
     if (entry) {
       const { deletedAt: _removed1, deletedBy: _removed2, ...rest } = entry;
@@ -138,7 +130,6 @@ export function ArchivePage() {
     toast.success('Plan unarchived');
   };
 
-  // Empty state
   if (archivedPlans.length === 0) {
     return (
       <div className="h-full flex items-center justify-center p-4">
@@ -155,7 +146,6 @@ export function ArchivePage() {
 
   return (
     <div className="h-full flex flex-col p-4 max-w-3xl mx-auto">
-      {/* Header */}
       <div className="flex flex-col gap-3 mb-4">
         <div className="flex items-center justify-between">
           <div>
@@ -173,7 +163,6 @@ export function ArchivePage() {
           </div>
         </div>
 
-        {/* Search Field */}
         <SearchField
           aria-label="Search archive"
           value={searchQuery}
@@ -188,7 +177,6 @@ export function ArchivePage() {
         </SearchField>
       </div>
 
-      {/* Plan list */}
       <div className="flex-1 overflow-y-auto">
         {sortedArchivedPlans.length === 0 ? (
           <div className="flex items-center justify-center py-12">

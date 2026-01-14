@@ -90,6 +90,34 @@ export function parseClaudeCodeOrigin(
   return result.success ? result.data : null;
 }
 
+/**
+ * A conversation version tracked on the plan.
+ * Content is NOT stored in CRDT - only metadata for provenance tracking.
+ * Actual content is transferred on-demand via P2P during handoff.
+ */
+export interface ConversationVersion {
+  versionId: string;
+  creator: string;
+  platform: OriginPlatform;
+  /** Foreign key to local file - content NOT stored in CRDT */
+  sessionId: string;
+  messageCount: number;
+  createdAt: number;
+  handedOffAt?: number;
+  handedOffTo?: string;
+}
+
+export const ConversationVersionSchema = z.object({
+  versionId: z.string(),
+  creator: z.string(),
+  platform: z.enum(OriginPlatformValues),
+  sessionId: z.string(),
+  messageCount: z.number(),
+  createdAt: z.number(),
+  handedOffAt: z.number().optional(),
+  handedOffTo: z.string().optional(),
+});
+
 export interface PlanMetadata {
   id: string;
   title: string;
@@ -122,17 +150,11 @@ export interface PlanMetadata {
   /** Display name of who archived the plan */
   archivedBy?: string;
 
-  // --- Origin tracking for conversation export (Issue #41) ---
-
   /** Origin metadata for conversation export (platform-specific) */
   origin?: OriginMetadata;
 
-  // --- Per-user read/unread tracking ---
-
   /** Records when each user last viewed the plan (username → timestamp) */
   viewedBy?: Record<string, number>;
-
-  // --- Review request tracking ---
 
   /**
    * Unique identifier for current review request.
@@ -140,6 +162,13 @@ export interface PlanMetadata {
    * Prevents stale review decisions from previous cycles.
    */
   reviewRequestId?: string;
+
+  /**
+   * Conversation versions tracked on this plan.
+   * Content is NOT stored - only metadata for provenance tracking.
+   * Actual content is transferred on-demand via P2P.
+   */
+  conversationVersions?: ConversationVersion[];
 }
 
 export const PlanMetadataSchema = z.object({
@@ -164,14 +193,10 @@ export const PlanMetadataSchema = z.object({
   archivedAt: z.number().optional(),
   archivedBy: z.string().optional(),
 
-  // Origin tracking for conversation export (Issue #41)
   origin: OriginMetadataSchema.optional(),
-
-  // Per-user read/unread tracking
   viewedBy: z.record(z.string(), z.number()).optional(),
-
-  // Review request tracking
   reviewRequestId: z.string().optional(),
+  conversationVersions: z.array(ConversationVersionSchema).optional(),
 });
 
 export type ArtifactType = 'screenshot' | 'video' | 'test_results' | 'diff';
@@ -229,11 +254,6 @@ export const DeliverableSchema = z.object({
   linkedAt: z.number().optional(),
 });
 
-// --- Linked PR Types ---
-
-/**
- * Valid status values for a linked PR.
- */
 export const LinkedPRStatusValues = ['draft', 'open', 'merged', 'closed'] as const;
 export type LinkedPRStatus = (typeof LinkedPRStatusValues)[number];
 
@@ -264,8 +284,6 @@ export const LinkedPRSchema = z.object({
   branch: z.string().optional(),
   title: z.string().optional(),
 });
-
-// --- PR Review Comment Types ---
 
 /**
  * A review comment on a PR diff.

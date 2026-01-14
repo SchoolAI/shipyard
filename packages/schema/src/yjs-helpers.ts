@@ -3,6 +3,7 @@ import { type AgentPresence, AgentPresenceSchema } from './hook-api.js';
 import {
   type Artifact,
   ArtifactSchema,
+  type ConversationVersion,
   type Deliverable,
   DeliverableSchema,
   type LinkedPR,
@@ -14,19 +15,6 @@ import {
 } from './plan.js';
 import { YDOC_KEYS } from './yjs-keys.js';
 
-/**
- * Type-safe helpers for working with Yjs Y.Map for plan metadata.
- *
- * These wrappers provide runtime validation via Zod and TypeScript types,
- * making up for Y.Map's lack of compile-time type safety.
- */
-
-/**
- * Reads plan metadata from Y.Doc with validation.
- *
- * @param ydoc - Yjs document
- * @returns Validated plan metadata or null if invalid/missing
- */
 export function getPlanMetadata(ydoc: Y.Doc): PlanMetadata | null {
   const map = ydoc.getMap('metadata');
   const data = map.toJSON();
@@ -39,12 +27,6 @@ export function getPlanMetadata(ydoc: Y.Doc): PlanMetadata | null {
   return result.data;
 }
 
-/**
- * Updates plan metadata in Y.Doc.
- *
- * @param ydoc - Yjs document
- * @param metadata - Partial metadata to update
- */
 export function setPlanMetadata(ydoc: Y.Doc, metadata: Partial<PlanMetadata>): void {
   const map = ydoc.getMap('metadata');
 
@@ -57,12 +39,6 @@ export function setPlanMetadata(ydoc: Y.Doc, metadata: Partial<PlanMetadata>): v
   map.set('updatedAt', Date.now());
 }
 
-/**
- * Initializes plan metadata in a new Y.Doc.
- *
- * @param ydoc - Yjs document
- * @param init - Initial metadata values
- */
 export function initPlanMetadata(
   ydoc: Y.Doc,
   init: Omit<PlanMetadata, 'createdAt' | 'updatedAt'>
@@ -95,47 +71,22 @@ export function initPlanMetadata(
   }
 }
 
-/**
- * Gets the completion status of all steps in a plan.
- *
- * @param ydoc - Yjs document
- * @returns Map of stepId → completed boolean
- */
 export function getStepCompletions(ydoc: Y.Doc): Map<string, boolean> {
   const steps = ydoc.getMap<boolean>('stepCompletions');
   return new Map(steps.entries());
 }
 
-/**
- * Toggles the completion status of a step.
- *
- * @param ydoc - Yjs document
- * @param stepId - ID of the step to toggle
- */
 export function toggleStepCompletion(ydoc: Y.Doc, stepId: string): void {
   const steps = ydoc.getMap<boolean>('stepCompletions');
   const current = steps.get(stepId) || false;
   steps.set(stepId, !current);
 }
 
-/**
- * Gets the completion status of a single step.
- *
- * @param ydoc - Yjs document
- * @param stepId - ID of the step
- * @returns true if completed, false otherwise
- */
 export function isStepCompleted(ydoc: Y.Doc, stepId: string): boolean {
   const steps = ydoc.getMap<boolean>('stepCompletions');
   return steps.get(stepId) || false;
 }
 
-/**
- * Gets all artifacts from Y.Doc with validation.
- *
- * @param ydoc - Yjs document
- * @returns Array of validated artifacts (invalid entries filtered out)
- */
 export function getArtifacts(ydoc: Y.Doc): Artifact[] {
   const array = ydoc.getArray(YDOC_KEYS.ARTIFACTS);
   const data = array.toJSON() as unknown[];
@@ -146,24 +97,11 @@ export function getArtifacts(ydoc: Y.Doc): Artifact[] {
     .map((result) => result.data);
 }
 
-/**
- * Adds an artifact to the Y.Doc.
- *
- * @param ydoc - Yjs document
- * @param artifact - Artifact to add
- */
 export function addArtifact(ydoc: Y.Doc, artifact: Artifact): void {
   const array = ydoc.getArray(YDOC_KEYS.ARTIFACTS);
   array.push([artifact]);
 }
 
-/**
- * Removes an artifact from Y.Doc by ID.
- *
- * @param ydoc - Yjs document
- * @param artifactId - ID of artifact to remove
- * @returns true if removed, false if not found
- */
 export function removeArtifact(ydoc: Y.Doc, artifactId: string): boolean {
   const array = ydoc.getArray(YDOC_KEYS.ARTIFACTS);
   const artifacts = array.toJSON() as Artifact[];
@@ -175,14 +113,6 @@ export function removeArtifact(ydoc: Y.Doc, artifactId: string): boolean {
   return true;
 }
 
-// --- Agent Presence Helpers ---
-
-/**
- * Gets all agent presences from Y.Doc with validation.
- *
- * @param ydoc - Yjs document
- * @returns Map of sessionId → AgentPresence
- */
 export function getAgentPresences(ydoc: Y.Doc): Map<string, AgentPresence> {
   const map = ydoc.getMap(YDOC_KEYS.PRESENCE);
   const result = new Map<string, AgentPresence>();
@@ -197,24 +127,11 @@ export function getAgentPresences(ydoc: Y.Doc): Map<string, AgentPresence> {
   return result;
 }
 
-/**
- * Sets agent presence in Y.Doc.
- *
- * @param ydoc - Yjs document
- * @param presence - Agent presence to set
- */
 export function setAgentPresence(ydoc: Y.Doc, presence: AgentPresence): void {
   const map = ydoc.getMap(YDOC_KEYS.PRESENCE);
   map.set(presence.sessionId, presence);
 }
 
-/**
- * Clears agent presence from Y.Doc.
- *
- * @param ydoc - Yjs document
- * @param sessionId - Session ID to clear
- * @returns true if cleared, false if not found
- */
 export function clearAgentPresence(ydoc: Y.Doc, sessionId: string): boolean {
   const map = ydoc.getMap(YDOC_KEYS.PRESENCE);
   if (!map.has(sessionId)) return false;
@@ -222,13 +139,6 @@ export function clearAgentPresence(ydoc: Y.Doc, sessionId: string): boolean {
   return true;
 }
 
-/**
- * Gets a single agent presence by session ID.
- *
- * @param ydoc - Yjs document
- * @param sessionId - Session ID to get
- * @returns AgentPresence or null if not found
- */
 export function getAgentPresence(ydoc: Y.Doc, sessionId: string): AgentPresence | null {
   const map = ydoc.getMap(YDOC_KEYS.PRESENCE);
   const value = map.get(sessionId);
@@ -238,14 +148,6 @@ export function getAgentPresence(ydoc: Y.Doc, sessionId: string): AgentPresence 
   return parsed.success ? parsed.data : null;
 }
 
-// --- Deliverable Helpers ---
-
-/**
- * Gets all deliverables from Y.Doc with validation.
- *
- * @param ydoc - Yjs document
- * @returns Array of validated deliverables
- */
 export function getDeliverables(ydoc: Y.Doc): Deliverable[] {
   const array = ydoc.getArray(YDOC_KEYS.DELIVERABLES);
   const data = array.toJSON() as unknown[];
@@ -256,26 +158,11 @@ export function getDeliverables(ydoc: Y.Doc): Deliverable[] {
     .map((result) => result.data);
 }
 
-/**
- * Adds a deliverable to Y.Doc.
- *
- * @param ydoc - Yjs document
- * @param deliverable - Deliverable to add
- */
 export function addDeliverable(ydoc: Y.Doc, deliverable: Deliverable): void {
   const array = ydoc.getArray(YDOC_KEYS.DELIVERABLES);
   array.push([deliverable]);
 }
 
-/**
- * Links an artifact to a deliverable.
- * Updates the deliverable with the artifact ID and timestamp.
- *
- * @param ydoc - Yjs document
- * @param deliverableId - ID of the deliverable
- * @param artifactId - ID of the artifact to link
- * @returns true if updated, false if deliverable not found
- */
 export function linkArtifactToDeliverable(
   ydoc: Y.Doc,
   deliverableId: string,
@@ -308,7 +195,6 @@ export function getPlanOwnerId(ydoc: Y.Doc): string | null {
   return typeof ownerId === 'string' ? ownerId : null;
 }
 
-/** Returns true if approvalRequired is set, or defaults to true when ownerId exists. */
 export function isApprovalRequired(ydoc: Y.Doc): boolean {
   const map = ydoc.getMap('metadata');
   const approvalRequired = map.get('approvalRequired');
@@ -328,7 +214,6 @@ export function getApprovedUsers(ydoc: Y.Doc): string[] {
   return approvedUsers.filter((id): id is string => typeof id === 'string');
 }
 
-/** Owner is always approved. */
 export function isUserApproved(ydoc: Y.Doc, userId: string): boolean {
   const ownerId = getPlanOwnerId(ydoc);
   if (ownerId === userId) {
@@ -362,7 +247,6 @@ export function revokeUser(ydoc: Y.Doc, userId: string): boolean {
   return true;
 }
 
-/** Gets the list of rejected users from metadata. */
 export function getRejectedUsers(ydoc: Y.Doc): string[] {
   const map = ydoc.getMap('metadata');
   const rejectedUsers = map.get('rejectedUsers');
@@ -372,12 +256,10 @@ export function getRejectedUsers(ydoc: Y.Doc): string[] {
   return rejectedUsers.filter((id): id is string => typeof id === 'string');
 }
 
-/** Checks if a user has been rejected. */
 export function isUserRejected(ydoc: Y.Doc, userId: string): boolean {
   return getRejectedUsers(ydoc).includes(userId);
 }
 
-/** Rejects a user, adding them to the rejected list and removing from approved list if present. */
 export function rejectUser(ydoc: Y.Doc, userId: string): void {
   const map = ydoc.getMap('metadata');
   const currentRejected = getRejectedUsers(ydoc);
@@ -399,7 +281,6 @@ export function rejectUser(ydoc: Y.Doc, userId: string): void {
   map.set('updatedAt', Date.now());
 }
 
-/** Removes a user from the rejected list (to allow them to re-request access). */
 export function unrejectUser(ydoc: Y.Doc, userId: string): boolean {
   const map = ydoc.getMap('metadata');
   const currentRejected = getRejectedUsers(ydoc);
@@ -415,14 +296,6 @@ export function unrejectUser(ydoc: Y.Doc, userId: string): boolean {
   return true;
 }
 
-// --- Linked PR Helpers ---
-
-/**
- * Gets all linked PRs from Y.Doc with validation.
- *
- * @param ydoc - Yjs document
- * @returns Array of validated linked PRs
- */
 export function getLinkedPRs(ydoc: Y.Doc): LinkedPR[] {
   const array = ydoc.getArray(YDOC_KEYS.LINKED_PRS);
   const data = array.toJSON() as unknown[];
@@ -433,13 +306,6 @@ export function getLinkedPRs(ydoc: Y.Doc): LinkedPR[] {
     .map((result) => result.data);
 }
 
-/**
- * Links a PR to the plan.
- * If a PR with the same number already exists, it will be replaced.
- *
- * @param ydoc - Yjs document
- * @param pr - LinkedPR to add
- */
 export function linkPR(ydoc: Y.Doc, pr: LinkedPR): void {
   const array = ydoc.getArray(YDOC_KEYS.LINKED_PRS);
   const existing = array.toJSON() as LinkedPR[];
@@ -453,13 +319,6 @@ export function linkPR(ydoc: Y.Doc, pr: LinkedPR): void {
   array.push([pr]);
 }
 
-/**
- * Removes a linked PR by number.
- *
- * @param ydoc - Yjs document
- * @param prNumber - PR number to unlink
- * @returns true if removed, false if not found
- */
 export function unlinkPR(ydoc: Y.Doc, prNumber: number): boolean {
   const array = ydoc.getArray(YDOC_KEYS.LINKED_PRS);
   const existing = array.toJSON() as LinkedPR[];
@@ -472,26 +331,11 @@ export function unlinkPR(ydoc: Y.Doc, prNumber: number): boolean {
   return true;
 }
 
-/**
- * Gets a linked PR by number.
- *
- * @param ydoc - Yjs document
- * @param prNumber - PR number to get
- * @returns LinkedPR or null if not found
- */
 export function getLinkedPR(ydoc: Y.Doc, prNumber: number): LinkedPR | null {
   const prs = getLinkedPRs(ydoc);
   return prs.find((pr) => pr.prNumber === prNumber) ?? null;
 }
 
-/**
- * Updates a linked PR's status.
- *
- * @param ydoc - Yjs document
- * @param prNumber - PR number to update
- * @param status - New status
- * @returns true if updated, false if not found
- */
 export function updateLinkedPRStatus(
   ydoc: Y.Doc,
   prNumber: number,
@@ -512,14 +356,6 @@ export function updateLinkedPRStatus(
   return true;
 }
 
-// --- PR Review Comment Helpers ---
-
-/**
- * Gets all PR review comments from Y.Doc with validation.
- *
- * @param ydoc - Yjs document
- * @returns Array of validated PR review comments
- */
 export function getPRReviewComments(ydoc: Y.Doc): PRReviewComment[] {
   const array = ydoc.getArray(YDOC_KEYS.PR_REVIEW_COMMENTS);
   const data = array.toJSON() as unknown[];
@@ -530,36 +366,15 @@ export function getPRReviewComments(ydoc: Y.Doc): PRReviewComment[] {
     .map((result) => result.data);
 }
 
-/**
- * Gets PR review comments for a specific PR.
- *
- * @param ydoc - Yjs document
- * @param prNumber - PR number to filter by
- * @returns Array of comments for the specified PR
- */
 export function getPRReviewCommentsForPR(ydoc: Y.Doc, prNumber: number): PRReviewComment[] {
   return getPRReviewComments(ydoc).filter((c) => c.prNumber === prNumber);
 }
 
-/**
- * Adds a PR review comment.
- *
- * @param ydoc - Yjs document
- * @param comment - Comment to add
- */
 export function addPRReviewComment(ydoc: Y.Doc, comment: PRReviewComment): void {
   const array = ydoc.getArray(YDOC_KEYS.PR_REVIEW_COMMENTS);
   array.push([comment]);
 }
 
-/**
- * Resolves or unresolves a PR review comment.
- *
- * @param ydoc - Yjs document
- * @param commentId - Comment ID to update
- * @param resolved - Whether the comment is resolved
- * @returns true if updated, false if not found
- */
 export function resolvePRReviewComment(ydoc: Y.Doc, commentId: string, resolved: boolean): boolean {
   const array = ydoc.getArray(YDOC_KEYS.PR_REVIEW_COMMENTS);
   const existing = array.toJSON() as PRReviewComment[];
@@ -576,13 +391,6 @@ export function resolvePRReviewComment(ydoc: Y.Doc, commentId: string, resolved:
   return true;
 }
 
-/**
- * Removes a PR review comment.
- *
- * @param ydoc - Yjs document
- * @param commentId - Comment ID to remove
- * @returns true if removed, false if not found
- */
 export function removePRReviewComment(ydoc: Y.Doc, commentId: string): boolean {
   const array = ydoc.getArray(YDOC_KEYS.PR_REVIEW_COMMENTS);
   const existing = array.toJSON() as PRReviewComment[];
@@ -594,15 +402,6 @@ export function removePRReviewComment(ydoc: Y.Doc, commentId: string): boolean {
   return true;
 }
 
-// --- Per-User Read/Unread Tracking ---
-
-/**
- * Marks a plan as viewed by a user.
- * Records the current timestamp in the viewedBy map.
- *
- * @param ydoc - Yjs document
- * @param username - GitHub username of the viewer
- */
 export function markPlanAsViewed(ydoc: Y.Doc, username: string): void {
   const map = ydoc.getMap(YDOC_KEYS.METADATA);
 
@@ -635,12 +434,6 @@ export function markPlanAsViewed(ydoc: Y.Doc, username: string): void {
   });
 }
 
-/**
- * Gets the viewedBy map from plan metadata.
- *
- * @param ydoc - Yjs document
- * @returns Map of username → timestamp, or empty object if not set
- */
 export function getViewedBy(ydoc: Y.Doc): Record<string, number> {
   const map = ydoc.getMap(YDOC_KEYS.METADATA);
   const viewedBy = map.get('viewedBy');
@@ -665,16 +458,6 @@ export function getViewedBy(ydoc: Y.Doc): Record<string, number> {
   return {};
 }
 
-/**
- * Checks if a plan is unread for a specific user.
- * A plan is unread if the user has never viewed it, or if the plan
- * was updated after the user's last view.
- *
- * @param metadata - Plan metadata (can be from getPlanMetadata or plan index)
- * @param username - GitHub username to check
- * @param viewedBy - Optional viewedBy map (if not provided, uses metadata.viewedBy)
- * @returns true if the plan is unread for this user
- */
 export function isPlanUnread(
   metadata: Pick<PlanMetadata, 'updatedAt'>,
   username: string,
@@ -690,13 +473,24 @@ export function isPlanUnread(
   return lastViewed < metadata.updatedAt;
 }
 
-// --- Transcript Helpers ---
+export function getConversationVersions(ydoc: Y.Doc): ConversationVersion[] {
+  const metadata = getPlanMetadata(ydoc);
+  return metadata?.conversationVersions || [];
+}
 
-/**
- * Get conversation transcript content from Y.Doc.
- * Returns empty string if transcript not available.
- */
-export function getTranscriptContent(ydoc: Y.Doc): string {
-  const text = ydoc.getText(YDOC_KEYS.TRANSCRIPT);
-  return text.toString();
+export function addConversationVersion(ydoc: Y.Doc, version: ConversationVersion): void {
+  const metadata = ydoc.getMap(YDOC_KEYS.METADATA);
+  const versions = (metadata.get('conversationVersions') as ConversationVersion[]) || [];
+  metadata.set('conversationVersions', [version, ...versions]);
+  metadata.set('updatedAt', Date.now());
+}
+
+export function markVersionHandedOff(ydoc: Y.Doc, versionId: string, handedOffTo: string): void {
+  const metadata = ydoc.getMap(YDOC_KEYS.METADATA);
+  const versions = (metadata.get('conversationVersions') as ConversationVersion[]) || [];
+  const updated = versions.map((v) =>
+    v.versionId === versionId ? { ...v, handedOffAt: Date.now(), handedOffTo } : v
+  );
+  metadata.set('conversationVersions', updated);
+  metadata.set('updatedAt', Date.now());
 }

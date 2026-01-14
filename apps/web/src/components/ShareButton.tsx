@@ -29,7 +29,6 @@ export function ShareButton({ planId, rtcProvider, isOwner = false, className }:
   const [copied, setCopied] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
 
-  // Helper to copy text to clipboard
   const copyToClipboard = useCallback(async (text: string) => {
     try {
       await navigator.clipboard.writeText(text);
@@ -44,7 +43,6 @@ export function ShareButton({ planId, rtcProvider, isOwner = false, className }:
     }
   }, []);
 
-  // Simple share - just copy current URL
   const handleSimpleShare = useCallback(async () => {
     await copyToClipboard(window.location.href);
     setCopied(true);
@@ -79,7 +77,6 @@ export function ShareButton({ planId, rtcProvider, isOwner = false, className }:
       maxUses: null, // Default: unlimited
     });
 
-    // Send to signaling server
     const signalingConns = (rtcProvider as unknown as { signalingConns: Array<{ ws: WebSocket }> })
       .signalingConns;
 

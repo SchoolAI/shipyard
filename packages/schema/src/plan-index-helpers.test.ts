@@ -2,11 +2,15 @@ import { describe, expect, it } from 'vitest';
 import * as Y from 'yjs';
 import type { PlanIndexEntry } from './plan-index.js';
 import {
+  getAllViewedByFromIndex,
   getPlanIndex,
   getPlanIndexEntry,
+  getViewedByFromIndex,
   removePlanIndexEntry,
+  removeViewedByFromIndex,
   setPlanIndexEntry,
   touchPlanIndexEntry,
+  updatePlanIndexViewedBy,
 } from './plan-index-helpers.js';
 
 describe('Plan Index Helpers', () => {
@@ -187,6 +191,152 @@ describe('Plan Index Helpers', () => {
 
       expect(getPlanIndex(doc1)).toHaveLength(2);
       expect(getPlanIndex(doc2)).toHaveLength(2);
+    });
+  });
+
+  describe('ViewedBy Helpers (Cross-Device Inbox Sync)', () => {
+    describe('getViewedByFromIndex', () => {
+      it('returns empty object for new doc', () => {
+        const ydoc = new Y.Doc();
+        expect(getViewedByFromIndex(ydoc, 'plan-1')).toEqual({});
+      });
+
+      it('returns empty object for non-existent plan', () => {
+        const ydoc = new Y.Doc();
+        updatePlanIndexViewedBy(ydoc, 'plan-1', 'user1');
+        expect(getViewedByFromIndex(ydoc, 'plan-2')).toEqual({});
+      });
+    });
+
+    describe('updatePlanIndexViewedBy', () => {
+      it('adds user with timestamp', () => {
+        const ydoc = new Y.Doc();
+        const before = Date.now();
+
+        updatePlanIndexViewedBy(ydoc, 'plan-1', 'user1');
+
+        const viewedBy = getViewedByFromIndex(ydoc, 'plan-1');
+        expect(viewedBy.user1).toBeGreaterThanOrEqual(before);
+        expect(viewedBy.user1).toBeLessThanOrEqual(Date.now());
+      });
+
+      it('preserves other users when adding new one', () => {
+        const ydoc = new Y.Doc();
+
+        updatePlanIndexViewedBy(ydoc, 'plan-1', 'user1');
+        const user1Time = getViewedByFromIndex(ydoc, 'plan-1').user1;
+
+        updatePlanIndexViewedBy(ydoc, 'plan-1', 'user2');
+
+        const viewedBy = getViewedByFromIndex(ydoc, 'plan-1');
+        expect(viewedBy.user1).toBe(user1Time);
+        expect(viewedBy.user2).toBeDefined();
+      });
+
+      it('updates timestamp on re-view', async () => {
+        const ydoc = new Y.Doc();
+
+        updatePlanIndexViewedBy(ydoc, 'plan-1', 'user1');
+        const firstTime = getViewedByFromIndex(ydoc, 'plan-1').user1;
+
+        // Wait a bit to ensure different timestamp
+        await new Promise((resolve) => setTimeout(resolve, 5));
+
+        updatePlanIndexViewedBy(ydoc, 'plan-1', 'user1');
+        const secondTime = getViewedByFromIndex(ydoc, 'plan-1').user1;
+
+        expect(secondTime).toBeGreaterThan(firstTime);
+      });
+
+      it('handles multiple plans independently', () => {
+        const ydoc = new Y.Doc();
+
+        updatePlanIndexViewedBy(ydoc, 'plan-1', 'user1');
+        updatePlanIndexViewedBy(ydoc, 'plan-2', 'user2');
+
+        expect(Object.keys(getViewedByFromIndex(ydoc, 'plan-1'))).toEqual(['user1']);
+        expect(Object.keys(getViewedByFromIndex(ydoc, 'plan-2'))).toEqual(['user2']);
+      });
+    });
+
+    describe('getAllViewedByFromIndex', () => {
+      it('returns batch results', () => {
+        const ydoc = new Y.Doc();
+
+        updatePlanIndexViewedBy(ydoc, 'plan-1', 'user1');
+        updatePlanIndexViewedBy(ydoc, 'plan-2', 'user2');
+
+        const result = getAllViewedByFromIndex(ydoc, ['plan-1', 'plan-2', 'plan-3']);
+
+        expect(result['plan-1'].user1).toBeDefined();
+        expect(result['plan-2'].user2).toBeDefined();
+        expect(result['plan-3']).toEqual({});
+      });
+
+      it('returns empty objects for empty planIds array', () => {
+        const ydoc = new Y.Doc();
+        updatePlanIndexViewedBy(ydoc, 'plan-1', 'user1');
+
+        const result = getAllViewedByFromIndex(ydoc, []);
+        expect(result).toEqual({});
+      });
+    });
+
+    describe('removeViewedByFromIndex', () => {
+      it('removes viewedBy data for a plan', () => {
+        const ydoc = new Y.Doc();
+
+        updatePlanIndexViewedBy(ydoc, 'plan-1', 'user1');
+        expect(getViewedByFromIndex(ydoc, 'plan-1').user1).toBeDefined();
+
+        removeViewedByFromIndex(ydoc, 'plan-1');
+        expect(getViewedByFromIndex(ydoc, 'plan-1')).toEqual({});
+      });
+
+      it('does not affect other plans', () => {
+        const ydoc = new Y.Doc();
+
+        updatePlanIndexViewedBy(ydoc, 'plan-1', 'user1');
+        updatePlanIndexViewedBy(ydoc, 'plan-2', 'user2');
+
+        removeViewedByFromIndex(ydoc, 'plan-1');
+
+        expect(getViewedByFromIndex(ydoc, 'plan-1')).toEqual({});
+        expect(getViewedByFromIndex(ydoc, 'plan-2').user2).toBeDefined();
+      });
+    });
+
+    describe('CRDT sync for viewedBy', () => {
+      it('syncs viewedBy between two docs', () => {
+        const doc1 = new Y.Doc();
+        const doc2 = new Y.Doc();
+
+        updatePlanIndexViewedBy(doc1, 'plan-1', 'user1');
+
+        Y.applyUpdate(doc2, Y.encodeStateAsUpdate(doc1));
+
+        expect(getViewedByFromIndex(doc2, 'plan-1').user1).toBeDefined();
+      });
+
+      it('merges concurrent viewedBy updates from different users', () => {
+        const doc1 = new Y.Doc();
+        const doc2 = new Y.Doc();
+
+        // Both docs update the same plan but different users
+        updatePlanIndexViewedBy(doc1, 'plan-1', 'user1');
+        updatePlanIndexViewedBy(doc2, 'plan-1', 'user2');
+
+        // Sync both ways
+        Y.applyUpdate(doc2, Y.encodeStateAsUpdate(doc1));
+        Y.applyUpdate(doc1, Y.encodeStateAsUpdate(doc2));
+
+        // Both users should be present in both docs
+        const viewedBy1 = getViewedByFromIndex(doc1, 'plan-1');
+        const viewedBy2 = getViewedByFromIndex(doc2, 'plan-1');
+
+        expect(Object.keys(viewedBy1).sort()).toEqual(['user1', 'user2']);
+        expect(Object.keys(viewedBy2).sort()).toEqual(['user1', 'user2']);
+      });
     });
   });
 });

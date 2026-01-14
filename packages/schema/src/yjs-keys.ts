@@ -134,17 +134,6 @@ export const YDOC_KEYS = {
    * - Helpers: packages/schema/src/yjs-helpers.ts (read/write)
    */
   PR_REVIEW_COMMENTS: 'prReviewComments' as const,
-
-  /**
-   * Conversation transcript (Y.Text)
-   * Stores Claude Code session transcript for handoff to other agents
-   * Format: Raw JSONL transcript content from ~/.claude/projects/.../session.jsonl
-   *
-   * Used by:
-   * - Server: apps/server/src/hook-api.ts (write on plan creation)
-   * - Web: apps/web/src/components/PlanHeader.tsx (read for handoff)
-   */
-  TRANSCRIPT: 'transcript' as const,
 } as const;
 
 /**

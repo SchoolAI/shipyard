@@ -1,12 +1,14 @@
 import {
+  getAllViewedByFromIndex,
   getPlanIndex,
   getPlanMetadata,
   getPlanOwnerId,
-  getViewedBy,
   isPlanUnread,
   NON_PLAN_DB_NAMES,
   PLAN_INDEX_DOC_NAME,
+  PLAN_INDEX_VIEWED_BY_KEY,
   type PlanIndexEntry,
+  updatePlanIndexViewedBy,
 } from '@peer-plan/schema';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { IndexeddbPersistence } from 'y-indexeddb';
@@ -288,55 +290,40 @@ export function usePlanIndex(currentUsername: string | undefined): PlanIndexStat
     [allActivePlans, currentUsername]
   );
 
-  // Load viewedBy data for inbox candidates
-  // biome-ignore lint/correctness/useExhaustiveDependencies: inboxRefreshTrigger forces refresh when plans are marked as read
+  // Load viewedBy from plan-index (syncs across devices via WebSocket + WebRTC)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: inboxRefreshTrigger forces refresh
   useEffect(() => {
     let isActive = true;
 
-    async function loadViewedByForInbox() {
+    function loadViewedByFromPlanIndex() {
       if (!currentUsername || inboxCandidates.length === 0) {
         setPlanViewedBy({});
         return;
       }
 
-      const viewedByData: Record<string, Record<string, number>> = {};
-
-      await Promise.all(
-        inboxCandidates.map(async (plan) => {
-          try {
-            const planDoc = new Y.Doc();
-            const idb = new IndexeddbPersistence(plan.id, planDoc);
-            await idb.whenSynced;
-
-            if (!isActive) {
-              idb.destroy();
-              return;
-            }
-
-            viewedByData[plan.id] = getViewedBy(planDoc);
-            idb.destroy();
-          } catch {
-            // Plan doc doesn't exist yet, treat as unread
-            viewedByData[plan.id] = {};
-          }
-        })
-      );
+      const planIds = inboxCandidates.map((p) => p.id);
+      const viewedByData = getAllViewedByFromIndex(ydoc, planIds);
 
       if (isActive) {
-        // Merge with existing state to preserve optimistic updates from markPlanAsRead
-        setPlanViewedBy((prev) => {
-          const merged = mergeViewedByState(prev, viewedByData);
-          return merged;
-        });
+        setPlanViewedBy((prev) => mergeViewedByState(prev, viewedByData));
       }
     }
 
-    loadViewedByForInbox();
+    loadViewedByFromPlanIndex();
+
+    const viewedByRoot = ydoc.getMap(PLAN_INDEX_VIEWED_BY_KEY);
+    const handleViewedByChange = () => {
+      if (isActive) {
+        loadViewedByFromPlanIndex();
+      }
+    };
+    viewedByRoot.observeDeep(handleViewedByChange);
 
     return () => {
       isActive = false;
+      viewedByRoot.unobserveDeep(handleViewedByChange);
     };
-  }, [inboxCandidates, currentUsername, inboxRefreshTrigger]);
+  }, [ydoc, inboxCandidates, currentUsername, inboxRefreshTrigger]);
 
   // Filter inbox to only unread plans
   const inboxPlans: PlanIndexEntryWithReadState[] = useMemo(() => {
@@ -398,53 +385,26 @@ export function usePlanIndex(currentUsername: string | undefined): PlanIndexStat
   // Loading until IndexedDB has synced - this is when local data becomes available
   const isLoading = !syncState.idbSynced;
 
-  /**
-   * Mark a plan as read by the current user.
-   * Updates the viewedBy field in the plan's Y.Doc.
-   *
-   * Note: We use the currentUsername from the closure, which is kept up-to-date
-   * by the useCallback dependency array. If the user logs out while this is running,
-   * the operation will silently fail (which is the desired behavior).
-   */
   const markPlanAsRead = useCallback(
-    async (planId: string): Promise<void> => {
-      // Early return if no user is logged in
+    (planId: string): Promise<void> => {
       if (!currentUsername) {
-        return;
+        return Promise.resolve();
       }
 
-      // Capture username at call time for use in async operations
-      const username = currentUsername;
-      try {
-        // Import markPlanAsViewed dynamically to avoid circular deps
-        const { markPlanAsViewed } = await import('@peer-plan/schema');
+      updatePlanIndexViewedBy(ydoc, planId, currentUsername);
 
-        const planDoc = new Y.Doc();
-        const idb = new IndexeddbPersistence(planId, planDoc);
-        await idb.whenSynced;
-        // Mark the plan as viewed in the Y.Doc
-        markPlanAsViewed(planDoc, username);
+      const now = Date.now();
+      setPlanViewedBy((prev) => ({
+        ...prev,
+        [planId]: {
+          ...(prev[planId] ?? {}),
+          [currentUsername]: now,
+        },
+      }));
 
-        // Update local state immediately for instant UI feedback
-        const now = Date.now();
-        setPlanViewedBy((prev) => {
-          const next = {
-            ...prev,
-            [planId]: {
-              ...(prev[planId] ?? {}),
-              [username]: now,
-            },
-          };
-          return next;
-        });
-        // Keep the persistence alive briefly to ensure sync to IndexedDB
-        await new Promise((resolve) => setTimeout(resolve, 100));
-        idb.destroy();
-      } catch (_error) {
-        // Silently ignore errors - the plan will remain unread
-      }
+      return Promise.resolve();
     },
-    [currentUsername]
+    [currentUsername, ydoc]
   );
 
   /**

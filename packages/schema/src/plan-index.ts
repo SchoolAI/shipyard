@@ -8,6 +8,13 @@ import { type PlanStatusType, PlanStatusValues } from './plan.js';
 export const PLAN_INDEX_DOC_NAME = 'plan-index';
 
 /**
+ * The key for the viewedBy map within the plan-index Y.Doc.
+ * Stores per-plan viewedBy data as nested Y.Maps for CRDT merging.
+ * Structure: Y.Map<planId, Y.Map<username, timestamp>>
+ */
+export const PLAN_INDEX_VIEWED_BY_KEY = 'viewedBy';
+
+/**
  * Known IndexedDB database names that are NOT plan documents.
  * Used to filter when querying for shared plans.
  */
@@ -15,19 +22,6 @@ export const NON_PLAN_DB_NAMES = [
   'plan-index', // Our plan index doc
   'idb-keyval', // External library (dependency of UI components)
 ] as const;
-
-/**
- * Status values for a plan.
- * @deprecated Use PlanStatusValues from plan.ts instead
- */
-export const PlanStatus = {
-  DRAFT: 'draft',
-  PENDING_REVIEW: 'pending_review',
-  APPROVED: 'approved',
-  CHANGES_REQUESTED: 'changes_requested',
-  IN_PROGRESS: 'in_progress',
-  COMPLETED: 'completed',
-} as const;
 
 export type { PlanStatusType };
 

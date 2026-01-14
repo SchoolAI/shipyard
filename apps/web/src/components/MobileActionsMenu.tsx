@@ -1,11 +1,6 @@
 import { Avatar, Button, Card, Dropdown, Label, Modal } from '@heroui/react';
 import type { A2AMessage, ConversationExportMeta, PlanMetadata } from '@peer-plan/schema';
-import {
-  getPlanIndexEntry,
-  getTranscriptContent,
-  PLAN_INDEX_DOC_NAME,
-  setPlanIndexEntry,
-} from '@peer-plan/schema';
+import { getPlanIndexEntry, PLAN_INDEX_DOC_NAME, setPlanIndexEntry } from '@peer-plan/schema';
 import {
   Archive,
   ArchiveRestore,
@@ -17,7 +12,7 @@ import {
   MoreVertical,
   Share2,
 } from 'lucide-react';
-import { useMemo, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { toast } from 'sonner';
 import type { WebrtcProvider } from 'y-webrtc';
 import type * as Y from 'yjs';
@@ -212,12 +207,6 @@ export function MobileActionsMenu({ planId, ydoc, rtcProvider, metadata }: Mobil
     metadata.origin?.platform === 'claude-code' && metadata.origin.transcriptPath
   );
 
-  // Read transcript content for handoff
-  const transcriptContent = useMemo(() => {
-    const content = getTranscriptContent(ydoc);
-    return content || null;
-  }, [ydoc]);
-
   const handleArchiveToggle = () => {
     if (!githubIdentity) {
       toast.error('Please sign in with GitHub first');
@@ -226,7 +215,6 @@ export function MobileActionsMenu({ planId, ydoc, rtcProvider, metadata }: Mobil
 
     const now = Date.now();
 
-    // Update plan metadata
     ydoc.transact(() => {
       const metadataMap = ydoc.getMap('metadata');
       if (isArchived) {
@@ -239,7 +227,6 @@ export function MobileActionsMenu({ planId, ydoc, rtcProvider, metadata }: Mobil
       metadataMap.set('updatedAt', now);
     });
 
-    // Update plan index
     const entry = getPlanIndexEntry(indexDoc, planId);
     if (entry) {
       if (isArchived) {
@@ -388,7 +375,7 @@ export function MobileActionsMenu({ planId, ydoc, rtcProvider, metadata }: Mobil
         rtcProvider={rtcProvider}
         isOpen={isHandoffDialogOpen}
         onClose={() => setIsHandoffDialogOpen(false)}
-        transcriptContent={transcriptContent}
+        hasOriginTranscript={hasOriginTranscript}
       />
 
       {/* Link PR popover - button hidden, but popover still works when triggered from dropdown */}

@@ -16,8 +16,6 @@ import { useMultiProviderSync } from '@/hooks/useMultiProviderSync';
 import { usePlanIndex } from '@/hooks/usePlanIndex';
 import { formatRelativeTime } from '@/utils/formatters';
 
-// --- Status Badge Component ---
-
 interface StatusBadgeProps {
   status: PlanStatusType;
 }
@@ -57,8 +55,6 @@ function StatusBadge({ status }: StatusBadgeProps) {
   );
 }
 
-// --- Inbox Item Component ---
-
 interface InboxItemProps {
   plan: PlanIndexEntry;
   onApprove: (planId: string) => void;
@@ -80,7 +76,6 @@ function InboxItem({ plan, onApprove, onRequestChanges, onViewPlan }: InboxItemP
       </div>
 
       <div className="flex items-center gap-1 shrink-0">
-        {/* Quick action: Approve */}
         <Tooltip>
           <Tooltip.Trigger>
             <Button
@@ -100,7 +95,6 @@ function InboxItem({ plan, onApprove, onRequestChanges, onViewPlan }: InboxItemP
           <Tooltip.Content>Approve</Tooltip.Content>
         </Tooltip>
 
-        {/* Quick action: Request Changes */}
         <Tooltip>
           <Tooltip.Trigger>
             <Button
@@ -120,7 +114,6 @@ function InboxItem({ plan, onApprove, onRequestChanges, onViewPlan }: InboxItemP
           <Tooltip.Content>Request Changes</Tooltip.Content>
         </Tooltip>
 
-        {/* View plan */}
         <Tooltip>
           <Tooltip.Trigger>
             <Button
@@ -141,8 +134,6 @@ function InboxItem({ plan, onApprove, onRequestChanges, onViewPlan }: InboxItemP
   );
 }
 
-// --- Main Page Component ---
-
 export function InboxPage() {
   const { identity: githubIdentity } = useGitHubAuth();
   const { inboxPlans, markPlanAsRead, isLoading } = usePlanIndex(githubIdentity?.username);
@@ -150,7 +141,6 @@ export function InboxPage() {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Sort by most recently updated first, then filter by search query
   const sortedInboxPlans = useMemo(() => {
     const sorted = [...inboxPlans].sort((a, b) => b.updatedAt - a.updatedAt);
     if (!searchQuery.trim()) {
@@ -172,7 +162,6 @@ export function InboxPage() {
 
     const now = Date.now();
 
-    // Update plan-index
     const entry = getPlanIndexEntry(indexDoc, planId);
     if (entry) {
       setPlanIndexEntry(indexDoc, {
@@ -182,7 +171,6 @@ export function InboxPage() {
       });
     }
 
-    // Also update the plan's own metadata
     try {
       const planDoc = new (await import('yjs')).Doc();
       const idb = new (await import('y-indexeddb')).IndexeddbPersistence(planId, planDoc);
@@ -203,19 +191,16 @@ export function InboxPage() {
   };
 
   const handleRequestChanges = (planId: string) => {
-    // Mark as read and navigate to the plan page where they can add comments
     markPlanAsRead(planId);
     navigate(`/plan/${planId}`);
     toast.info('Navigate to add comments and request changes');
   };
 
   const handleViewPlan = (planId: string) => {
-    // Mark as read when viewing
     markPlanAsRead(planId);
     navigate(`/plan/${planId}`);
   };
 
-  // Empty state - true inbox zero (no plans at all)
   if (inboxPlans.length === 0) {
     return (
       <div className="h-full flex items-center justify-center p-4">
@@ -232,7 +217,6 @@ export function InboxPage() {
 
   return (
     <div className="h-full flex flex-col p-4 max-w-3xl mx-auto">
-      {/* Header */}
       <div className="flex flex-col gap-3 mb-4">
         <div className="flex items-center justify-between">
           <div>
@@ -247,7 +231,6 @@ export function InboxPage() {
           </div>
         </div>
 
-        {/* Search Field */}
         <SearchField
           aria-label="Search inbox"
           value={searchQuery}
@@ -262,7 +245,6 @@ export function InboxPage() {
         </SearchField>
       </div>
 
-      {/* Plan list */}
       <div className="flex-1 overflow-y-auto">
         {sortedInboxPlans.length === 0 ? (
           <div className="flex items-center justify-center py-12">

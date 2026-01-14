@@ -1,17 +1,11 @@
-/**
- * Handler component for resuming handed-off conversations.
- *
- * Features:
- * - File input for resuming conversations from .a2a.json files
- * - Review modal to preview conversations before resuming
- * - Toast notifications for P2P received conversations
- * - Integration with registry server to create Claude Code sessions
- *
- * @see Issue #41 - Context Teleportation
- */
-
 import { Avatar, Button, Card, Modal, Spinner } from '@heroui/react';
-import type { A2AMessage, ConversationExportMeta } from '@peer-plan/schema';
+import {
+  type A2AMessage,
+  addConversationVersion,
+  type ConversationExportMeta,
+  type ConversationVersion,
+  type OriginPlatform,
+} from '@peer-plan/schema';
 import { Check, Download, MessageSquare, MessageSquareReply, Terminal } from 'lucide-react';
 import type React from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -23,6 +17,7 @@ import {
   type ReceivedConversation,
   useConversationTransfer,
 } from '@/hooks/useConversationTransfer';
+import { useGitHubAuth } from '@/hooks/useGitHubAuth';
 
 // Avatar compound components have type issues in HeroUI v3 beta
 const AvatarRoot = Avatar as unknown as React.FC<{
@@ -45,9 +40,6 @@ interface ImportConversationHandlerProps {
   children?: React.ReactNode;
 }
 
-/**
- * Message preview card for the review modal.
- */
 function MessagePreview({ message }: { message: A2AMessage }) {
   const isUser = message.role === 'user';
   const firstTextPart = message.parts.find((p) => p.type === 'text');
@@ -71,9 +63,6 @@ function MessagePreview({ message }: { message: A2AMessage }) {
   );
 }
 
-/**
- * Review modal for previewing imported conversation before confirming.
- */
 function ImportReviewModal({
   isOpen,
   onClose,
@@ -106,7 +95,6 @@ function ImportReviewModal({
           </Modal.Header>
 
           <Modal.Body className="p-4">
-            {/* Metadata summary */}
             <Card variant="secondary" className="mb-4">
               <Card.Content className="p-3">
                 <div className="grid grid-cols-2 gap-2 text-sm">
@@ -134,7 +122,6 @@ function ImportReviewModal({
               </Card.Content>
             </Card>
 
-            {/* Message preview */}
             <p className="text-sm text-muted-foreground mb-3">Conversation preview:</p>
             <div className="space-y-3 max-h-[300px] overflow-y-auto">
               {previewMessages.map((msg, idx) => (
@@ -163,9 +150,6 @@ function ImportReviewModal({
   );
 }
 
-/**
- * Import button with file input handling.
- */
 export function ImportConversationButton({
   planId,
   ydoc,
@@ -178,14 +162,10 @@ export function ImportConversationButton({
 
   const { importFromFile, isProcessing } = useConversationTransfer(planId, ydoc, rtcProvider);
 
-  /**
-   * Handle file selection.
-   */
   async function handleFileSelect(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    // Reset input so same file can be selected again
     event.target.value = '';
 
     const result = await importFromFile(file);
@@ -198,9 +178,6 @@ export function ImportConversationButton({
     }
   }
 
-  /**
-   * Confirm import and notify parent.
-   */
   function handleConfirmImport() {
     if (importedData?.messages && importedData?.meta) {
       onImportConfirmed?.(importedData.messages, importedData.meta);
@@ -218,7 +195,6 @@ export function ImportConversationButton({
         accept=".json,.a2a.json"
         onChange={handleFileSelect}
         className="hidden"
-        aria-label="Resume conversation file"
       />
 
       <Button
@@ -237,7 +213,6 @@ export function ImportConversationButton({
         )}
       </Button>
 
-      {/* Review modal */}
       {importedData?.messages && importedData?.meta && importedData?.summary && (
         <ImportReviewModal
           isOpen={isReviewOpen}
@@ -255,10 +230,6 @@ export function ImportConversationButton({
   );
 }
 
-/**
- * Hook to show toast notification when conversation is received via P2P.
- * Tracks shown conversations to avoid duplicate toasts.
- */
 export function useImportConversationToast(
   planId: string,
   ydoc: Y.Doc,
@@ -271,23 +242,18 @@ export function useImportConversationToast(
     rtcProvider
   );
 
-  // Track which conversations we've shown toasts for
   const shownToastsRef = useRef<Set<string>>(new Set());
 
-  // Show toast for each new received conversation
   useEffect(() => {
     for (const received of receivedConversations) {
       const toastKey = `${received.meta.exportId}-${received.receivedAt}`;
 
-      // Skip if we've already shown a toast for this conversation
       if (shownToastsRef.current.has(toastKey)) {
         continue;
       }
 
-      // Mark as shown
       shownToastsRef.current.add(toastKey);
 
-      // Show toast with action to review
       toast.info(
         `Received conversation from ${received.meta.sourcePlatform} (${received.meta.messageCount} messages)`,
         {
@@ -306,17 +272,10 @@ export function useImportConversationToast(
   return { receivedConversations, clearReceived };
 }
 
-/**
- * Received conversation type - re-exported for convenience.
- */
 export type { ReceivedConversation } from '@/hooks/useConversationTransfer';
 
-/** Registry server URL */
 const REGISTRY_URL = 'http://localhost:32191';
 
-/**
- * Hook to check if registry server is available.
- */
 function useRegistryAvailable(): boolean {
   const [available, setAvailable] = useState(false);
 
@@ -347,9 +306,6 @@ function useRegistryAvailable(): boolean {
   return available;
 }
 
-/**
- * Modal for reviewing a P2P received conversation.
- */
 function ReceivedReviewModal({
   isOpen,
   onClose,
@@ -387,7 +343,6 @@ function ReceivedReviewModal({
           </Modal.Header>
 
           <Modal.Body className="p-4">
-            {/* Metadata summary */}
             <Card variant="secondary" className="mb-4">
               <Card.Content className="p-3">
                 <div className="grid grid-cols-2 gap-2 text-sm">
@@ -415,7 +370,6 @@ function ReceivedReviewModal({
               </Card.Content>
             </Card>
 
-            {/* Message preview */}
             <p className="text-sm text-muted-foreground mb-3">Conversation preview:</p>
             <div className="space-y-3 max-h-[300px] overflow-y-auto">
               {previewMessages.map((msg, idx) => (
@@ -428,7 +382,6 @@ function ReceivedReviewModal({
               )}
             </div>
 
-            {/* Registry status info */}
             {!registryAvailable && (
               <p className="text-sm text-muted-foreground mt-3 italic">
                 Registry server not running. Download file to import manually.
@@ -465,16 +418,6 @@ function ReceivedReviewModal({
   );
 }
 
-/**
- * Full handler component for importing conversations.
- *
- * This component:
- * - Shows toast notifications when conversations are received via P2P
- * - Provides a review modal to preview and accept/download conversations
- * - Supports importing conversations directly to Claude Code sessions
- *
- * Render this component in PlanPage to enable P2P conversation receive notifications.
- */
 export function ImportConversationHandler({
   planId,
   ydoc,
@@ -490,19 +433,26 @@ export function ImportConversationHandler({
   const [isReviewOpen, setIsReviewOpen] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const registryAvailable = useRegistryAvailable();
+  const { identity } = useGitHubAuth();
 
-  // Hook into P2P receive notifications
   useImportConversationToast(planId, ydoc, rtcProvider, (received) => {
-    // When user clicks "Review" on toast, open the modal
     setSelectedReceived(received);
     setIsReviewOpen(true);
   });
 
-  /**
-   * Handle confirm/accept - notify parent and close modal.
-   */
   function handleConfirm() {
     if (selectedReceived) {
+      const newVersion: ConversationVersion = {
+        versionId: crypto.randomUUID(),
+        creator: identity?.username || 'anonymous',
+        platform: (selectedReceived.meta.sourcePlatform || 'unknown') as OriginPlatform,
+        sessionId: selectedReceived.meta.sourceSessionId,
+        messageCount: selectedReceived.meta.messageCount,
+        createdAt: Date.now(),
+      };
+
+      addConversationVersion(ydoc, newVersion);
+
       onImportConfirmed?.(selectedReceived.messages, selectedReceived.meta);
       toast.success(
         `Accepted ${selectedReceived.meta.messageCount} messages from ${selectedReceived.meta.sourcePlatform}`
@@ -512,9 +462,6 @@ export function ImportConversationHandler({
     setSelectedReceived(null);
   }
 
-  /**
-   * Handle download - save as .a2a.json file.
-   */
   function handleDownload() {
     if (!selectedReceived) return;
 
@@ -537,9 +484,6 @@ export function ImportConversationHandler({
     toast.success(`Downloaded conversation as ${filename}`);
   }
 
-  /**
-   * Handle import to Claude Code - call registry API to create session file.
-   */
   const handleImportToClaudeCode = useCallback(async () => {
     if (!selectedReceived) return;
 
@@ -578,15 +522,11 @@ export function ImportConversationHandler({
     }
   }, [selectedReceived]);
 
-  /**
-   * Handle close - just close the modal without action.
-   */
   function handleClose() {
     setIsReviewOpen(false);
     setSelectedReceived(null);
   }
 
-  // Render the review modal only when we have a selected conversation
   if (!selectedReceived) {
     return null;
   }

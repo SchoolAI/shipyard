@@ -1,18 +1,8 @@
-/**
- * Dialog for handing off conversation context to another agent platform.
- *
- * Features:
- * - Lists connected P2P peers for direct handoff transfer
- * - Fallback to file download when no peers connected
- * - Progress indicator during handoff
- *
- * @see Issue #41 - Context Teleportation
- */
-
 import { Avatar, Button, Card, Modal, Spinner } from '@heroui/react';
-import { Download, Send, Users, X } from 'lucide-react';
+import { getConversationVersions, markVersionHandedOff } from '@peer-plan/schema';
+import { Download, Send, Upload, Users, X } from 'lucide-react';
 import type React from 'react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import type { WebrtcProvider } from 'y-webrtc';
 import type * as Y from 'yjs';
@@ -41,13 +31,10 @@ interface HandoffConversationDialogProps {
   isOpen: boolean;
   /** Callback when dialog closes */
   onClose: () => void;
-  /** Raw transcript content to handoff (from origin metadata) */
-  transcriptContent: string | null;
+  /** If true, owner has local transcript - fetch from registry */
+  hasOriginTranscript: boolean;
 }
 
-/**
- * Progress bar component for handoff operations.
- */
 function ProgressBar({ progress, stage }: { progress: number; stage: string }) {
   return (
     <div className="w-full space-y-2">
@@ -65,9 +52,6 @@ function ProgressBar({ progress, stage }: { progress: number; stage: string }) {
   );
 }
 
-/**
- * Peer card component for selecting transfer target.
- */
 function PeerCard({
   peer,
   onSelect,
@@ -103,9 +87,6 @@ function PeerCard({
   );
 }
 
-/**
- * Empty state when no peers are connected.
- */
 function NoPeersState({
   onDownload,
   isHandingOff,
@@ -142,22 +123,42 @@ function NoPeersState({
   );
 }
 
-/**
- * No transcript available state.
- */
-function NoTranscriptState() {
+function FilePickerState({
+  onFileSelect,
+  isLoading,
+}: {
+  onFileSelect: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  isLoading: boolean;
+}) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   return (
     <div className="flex flex-col items-center gap-4 py-6">
-      <div className="w-16 h-16 rounded-full bg-warning/10 flex items-center justify-center">
-        <X className="w-8 h-8 text-warning" />
+      <div className="w-16 h-16 rounded-full bg-surface-secondary flex items-center justify-center">
+        <Upload className="w-8 h-8 text-muted-foreground" />
       </div>
       <div className="text-center">
-        <p className="text-sm font-medium text-foreground">No conversation to handoff</p>
+        <p className="text-sm font-medium text-foreground">Select your conversation file</p>
         <p className="text-xs text-muted-foreground mt-1">
-          This plan does not have an associated conversation transcript. Handoff is only available
-          for plans created from Claude Code sessions.
+          Choose your Claude Code session file (.jsonl) or a previously downloaded handoff file
+          (.a2a.json)
         </p>
       </div>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".jsonl,.json,.a2a.json"
+        onChange={onFileSelect}
+        className="hidden"
+      />
+      <Button
+        variant="secondary"
+        onPress={() => fileInputRef.current?.click()}
+        isDisabled={isLoading}
+      >
+        {isLoading ? <Spinner size="sm" /> : <Upload className="w-4 h-4" />}
+        Select File
+      </Button>
     </div>
   );
 }
@@ -168,7 +169,7 @@ export function HandoffConversationDialog({
   rtcProvider,
   isOpen,
   onClose,
-  transcriptContent,
+  hasOriginTranscript,
 }: HandoffConversationDialogProps) {
   const { connectedPeers, peerCount } = useP2PPeers(rtcProvider);
   const { exportToFile, sendToPeer, progress, isProcessing } = useConversationTransfer(
@@ -178,9 +179,74 @@ export function HandoffConversationDialog({
   );
   const [_selectedPeer, setSelectedPeer] = useState<ConnectedPeer | null>(null);
 
-  /**
-   * Handle handoff via file download.
-   */
+  const [transcriptContent, setTranscriptContent] = useState<string | null>(null);
+  const [isLoadingTranscript, setIsLoadingTranscript] = useState(false);
+  const [transcriptError, setTranscriptError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) {
+      // Reset state when dialog closes
+      setTranscriptContent(null);
+      setTranscriptError(null);
+      return;
+    }
+
+    if (hasOriginTranscript && !transcriptContent) {
+      setIsLoadingTranscript(true);
+      setTranscriptError(null);
+
+      fetch(`http://localhost:32191/api/plan/${planId}/transcript`)
+        .then((res) => {
+          if (res.ok) return res.text();
+          throw new Error('Failed to fetch transcript');
+        })
+        .then((content) => {
+          setTranscriptContent(content);
+        })
+        .catch((err) => {
+          setTranscriptError(err.message || 'Failed to load transcript');
+        })
+        .finally(() => {
+          setIsLoadingTranscript(false);
+        });
+    }
+  }, [isOpen, hasOriginTranscript, planId, transcriptContent]);
+
+  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setTranscriptContent(reader.result as string);
+      setTranscriptError(null);
+    };
+    reader.onerror = () => {
+      setTranscriptError('Failed to read file');
+    };
+    reader.readAsText(file);
+  }
+
+  function handleRetryFetch() {
+    setTranscriptError(null);
+    setIsLoadingTranscript(true);
+
+    fetch(`http://localhost:32191/api/plan/${planId}/transcript`)
+      .then((res) => {
+        if (res.ok) return res.text();
+        throw new Error('Failed to fetch transcript');
+      })
+      .then((content) => {
+        setTranscriptContent(content);
+      })
+      .catch((err) => {
+        setTranscriptError(err.message || 'Failed to load transcript');
+      })
+      .finally(() => {
+        setIsLoadingTranscript(false);
+      });
+  }
+
   async function handleDownloadHandoff() {
     if (!transcriptContent) {
       toast.error('No transcript content available');
@@ -197,9 +263,6 @@ export function HandoffConversationDialog({
     }
   }
 
-  /**
-   * Handle P2P transfer to selected peer.
-   */
   async function handlePeerTransfer(peer: ConnectedPeer) {
     if (!transcriptContent) {
       toast.error('No transcript content available');
@@ -209,7 +272,6 @@ export function HandoffConversationDialog({
     setSelectedPeer(peer);
 
     try {
-      // Parse transcript to A2A messages
       const { parseClaudeCodeTranscriptString, claudeCodeToA2A } = await import(
         '@peer-plan/schema'
       );
@@ -223,8 +285,6 @@ export function HandoffConversationDialog({
 
       const a2aMessages = claudeCodeToA2A(parseResult.messages, planId);
 
-      // Send via P2P - use webrtcPeerId which is the key in room.webrtcConns
-      // Note: peerId (awareness clientID) is different from webrtcPeerId (UUID)
       if (!peer.webrtcPeerId) {
         toast.error('Peer connection not ready. Try again in a moment.');
         setSelectedPeer(null);
@@ -232,6 +292,12 @@ export function HandoffConversationDialog({
       }
       const success = await sendToPeer(peer.webrtcPeerId, a2aMessages, {
         onComplete: () => {
+          const versions = getConversationVersions(ydoc);
+          const myVersion = versions.find((v) => !v.handedOffAt);
+          if (myVersion) {
+            markVersionHandedOff(ydoc, myVersion.versionId, peer.name);
+          }
+
           toast.success(`Handed off ${a2aMessages.length} messages to ${peer.name}`);
           onClose();
         },
@@ -250,7 +316,6 @@ export function HandoffConversationDialog({
     }
   }
 
-  // Calculate progress percentage
   const progressPercent = progress ? (progress.current / progress.total) * 100 : 0;
 
   return (
@@ -266,11 +331,36 @@ export function HandoffConversationDialog({
           </Modal.Header>
 
           <Modal.Body className="p-4">
-            {/* No transcript available */}
-            {!transcriptContent && <NoTranscriptState />}
+            {/* Loading state */}
+            {isLoadingTranscript && (
+              <div className="flex flex-col items-center gap-4 py-6">
+                <Spinner size="lg" />
+                <p className="text-sm text-muted-foreground">Loading transcript...</p>
+              </div>
+            )}
+
+            {/* Error state */}
+            {transcriptError && !isLoadingTranscript && (
+              <div className="flex flex-col items-center gap-4 py-6">
+                <div className="w-16 h-16 rounded-full bg-danger/10 flex items-center justify-center">
+                  <X className="w-8 h-8 text-danger" />
+                </div>
+                <p className="text-sm text-danger">{transcriptError}</p>
+                {hasOriginTranscript && (
+                  <Button variant="secondary" onPress={handleRetryFetch}>
+                    Retry
+                  </Button>
+                )}
+              </div>
+            )}
+
+            {/* File picker for non-owners (no origin transcript) */}
+            {!hasOriginTranscript && !transcriptContent && !isLoadingTranscript && (
+              <FilePickerState onFileSelect={handleFileSelect} isLoading={false} />
+            )}
 
             {/* Has transcript - show handoff options */}
-            {transcriptContent && (
+            {transcriptContent && !isLoadingTranscript && (
               <>
                 {/* Progress indicator */}
                 {isProcessing && progress && (
@@ -288,7 +378,7 @@ export function HandoffConversationDialog({
                     <div className="space-y-2 max-h-[200px] overflow-y-auto">
                       {connectedPeers.map((peer) => (
                         <PeerCard
-                          key={peer.webrtcPeerId ?? peer.peerId}
+                          key={peer.webrtcPeerId ?? `${peer.name}-${peer.connectedAt}`}
                           peer={peer}
                           onSelect={() => handlePeerTransfer(peer)}
                           isDisabled={isProcessing || !peer.webrtcPeerId}

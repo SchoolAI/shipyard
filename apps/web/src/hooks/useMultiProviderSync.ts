@@ -251,7 +251,6 @@ export function useMultiProviderSync(
     function computeApprovalStatus(userId: string | undefined): ApprovalStatus | undefined {
       const ownerId = getPlanOwnerId(ydoc);
 
-      // No owner means approval not required (legacy plan or plan-index)
       if (!ownerId) return undefined;
 
       // User not authenticated yet - they need to auth to view this plan

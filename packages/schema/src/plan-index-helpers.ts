@@ -1,5 +1,9 @@
-import type * as Y from 'yjs';
-import { type PlanIndexEntry, PlanIndexEntrySchema } from './plan-index.js';
+import * as Y from 'yjs';
+import {
+  PLAN_INDEX_VIEWED_BY_KEY,
+  type PlanIndexEntry,
+  PlanIndexEntrySchema,
+} from './plan-index.js';
 
 /**
  * Gets all plans from the index Y.Doc, sorted by updatedAt (most recent first).
@@ -76,4 +80,72 @@ export function touchPlanIndexEntry(ydoc: Y.Doc, planId: string): void {
   if (entry) {
     setPlanIndexEntry(ydoc, { ...entry, updatedAt: Date.now() });
   }
+}
+
+// --- ViewedBy Helpers for Cross-Device Inbox Sync ---
+
+/**
+ * Gets the viewedBy map for a plan from the plan-index.
+ * Returns empty object if no viewedBy data exists.
+ */
+export function getViewedByFromIndex(ydoc: Y.Doc, planId: string): Record<string, number> {
+  const viewedByRoot = ydoc.getMap<Y.Map<number>>(PLAN_INDEX_VIEWED_BY_KEY);
+  const planViewedBy = viewedByRoot.get(planId);
+
+  if (!planViewedBy || !(planViewedBy instanceof Y.Map)) {
+    return {};
+  }
+
+  const result: Record<string, number> = {};
+  for (const [username, timestamp] of planViewedBy.entries()) {
+    if (typeof timestamp === 'number') {
+      result[username] = timestamp;
+    }
+  }
+  return result;
+}
+
+/**
+ * Updates viewedBy for a plan in the plan-index.
+ * Uses nested Y.Map for proper CRDT merging of concurrent edits.
+ */
+export function updatePlanIndexViewedBy(ydoc: Y.Doc, planId: string, username: string): void {
+  ydoc.transact(() => {
+    const viewedByRoot = ydoc.getMap<Y.Map<number>>(PLAN_INDEX_VIEWED_BY_KEY);
+
+    // Get or create the Y.Map for this plan
+    let planViewedBy = viewedByRoot.get(planId);
+    if (!planViewedBy || !(planViewedBy instanceof Y.Map)) {
+      planViewedBy = new Y.Map<number>();
+      viewedByRoot.set(planId, planViewedBy);
+    }
+
+    // Update the timestamp for this user
+    planViewedBy.set(username, Date.now());
+  });
+}
+
+/**
+ * Gets all viewedBy data from the plan-index for multiple plans.
+ * Efficient batch read for inbox calculations.
+ */
+export function getAllViewedByFromIndex(
+  ydoc: Y.Doc,
+  planIds: string[]
+): Record<string, Record<string, number>> {
+  const result: Record<string, Record<string, number>> = {};
+
+  for (const planId of planIds) {
+    result[planId] = getViewedByFromIndex(ydoc, planId);
+  }
+
+  return result;
+}
+
+/**
+ * Removes viewedBy data for a plan (call when plan is deleted).
+ */
+export function removeViewedByFromIndex(ydoc: Y.Doc, planId: string): void {
+  const viewedByRoot = ydoc.getMap<Y.Map<number>>(PLAN_INDEX_VIEWED_BY_KEY);
+  viewedByRoot.delete(planId);
 }

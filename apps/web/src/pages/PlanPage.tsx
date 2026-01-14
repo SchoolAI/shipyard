@@ -1,4 +1,4 @@
-import { Button, useOverlayState } from '@heroui/react';
+import { Button, Spinner, useOverlayState } from '@heroui/react';
 import {
   addArtifact,
   extractDeliverables,
@@ -230,26 +230,39 @@ export function PlanPage() {
   // Early returns AFTER all hooks
   // Skip loading/not-found checks for snapshots (they have URL data)
   if (!isSnapshot) {
-    // Show loading while:
-    // 1. Neither WebSocket has synced NOR IndexedDB has synced, OR
-    // 2. In P2P-only mode (no servers) and still waiting for peers to sync data
+    // Phase 1: Initial loading (IndexedDB not synced yet)
+    if (!syncState.idbSynced) {
+      return (
+        <div className="flex items-center justify-center min-h-[50vh] p-4">
+          <div className="flex flex-col items-center gap-4">
+            <Spinner size="lg" />
+            <p className="text-muted-foreground">Loading plan...</p>
+          </div>
+        </div>
+      );
+    }
+
+    // Phase 2: P2P-only mode - waiting for peers to sync data
     const inP2POnlyMode = syncState.idbSynced && !syncState.synced && syncState.activeCount === 0;
     const waitingForP2P = inP2POnlyMode && !metadata && !p2pGracePeriodExpired;
-    const isStillLoading = (!syncState.synced && !syncState.idbSynced) || waitingForP2P;
-
-    // Also keep waiting if we have active peers - they might still be syncing
     const hasPeersButNoData = syncState.peerCount > 0 && !metadata;
 
-    if (!metadata && (isStillLoading || hasPeersButNoData)) {
+    if (!metadata && (waitingForP2P || hasPeersButNoData)) {
       return (
-        <div className="p-8">
-          <p className="text-muted-foreground">
-            {syncState.peerCount > 0
-              ? `Syncing from ${syncState.peerCount} peer(s)...`
-              : waitingForP2P
-                ? 'Waiting for peers...'
-                : 'Loading plan...'}
-          </p>
+        <div className="flex items-center justify-center min-h-[50vh] p-4">
+          <div className="flex flex-col items-center gap-4 text-center max-w-md">
+            <Spinner size="lg" />
+            <div>
+              <p className="text-foreground font-medium mb-2">
+                {syncState.peerCount > 0
+                  ? `Syncing from ${syncState.peerCount} peer${syncState.peerCount > 1 ? 's' : ''}...`
+                  : 'Waiting for peers...'}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                This plan is shared via P2P. It may take a moment to connect.
+              </p>
+            </div>
+          </div>
         </div>
       );
     }

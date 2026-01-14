@@ -70,7 +70,8 @@
         "noConsole": "error",
         "noDebugger": "error",
         "noVar": "error",
-        "noRedeclare": "error"
+        "noRedeclare": "error",
+        "noArrayIndexKey": "off"
       }
     }
   },
