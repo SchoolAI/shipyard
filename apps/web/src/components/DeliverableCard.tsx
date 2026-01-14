@@ -1,27 +1,11 @@
 import { Button, Checkbox, Chip, Disclosure } from '@heroui/react';
 import type { Artifact } from '@peer-plan/schema';
 import { useState } from 'react';
+import { formatRelativeTime } from '@/utils/formatters';
 import { ArtifactRenderer } from './ArtifactRenderer';
 
 interface DeliverableCardProps {
   artifact: Artifact;
-}
-
-/**
- * Format a timestamp as a relative time string.
- */
-function formatRelativeTime(timestamp: number): string {
-  const now = Date.now();
-  const diff = now - timestamp;
-  const seconds = Math.floor(diff / 1000);
-  const minutes = Math.floor(seconds / 60);
-  const hours = Math.floor(minutes / 60);
-  const days = Math.floor(hours / 24);
-
-  if (days > 0) return `${days}d ago`;
-  if (hours > 0) return `${hours}h ago`;
-  if (minutes > 0) return `${minutes}m ago`;
-  return 'just now';
 }
 
 /**

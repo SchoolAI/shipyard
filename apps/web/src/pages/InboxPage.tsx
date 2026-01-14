@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
 import { useMultiProviderSync } from '@/hooks/useMultiProviderSync';
 import { usePlanIndex } from '@/hooks/usePlanIndex';
+import { formatRelativeTime } from '@/utils/formatters';
 
 // --- Status Badge Component ---
 
@@ -61,11 +62,10 @@ interface InboxItemProps {
   plan: PlanIndexEntry;
   onApprove: (planId: string) => void;
   onRequestChanges: (planId: string) => void;
+  onViewPlan: (planId: string) => void;
 }
 
-function InboxItem({ plan, onApprove, onRequestChanges }: InboxItemProps) {
-  const navigate = useNavigate();
-
+function InboxItem({ plan, onApprove, onRequestChanges, onViewPlan }: InboxItemProps) {
   return (
     <div className="flex items-center justify-between gap-3 w-full py-2">
       <div className="flex flex-col gap-1 flex-1 min-w-0">
@@ -127,7 +127,7 @@ function InboxItem({ plan, onApprove, onRequestChanges }: InboxItemProps) {
               variant="ghost"
               size="sm"
               aria-label="View plan"
-              onPress={() => navigate(`/plan/${plan.id}`)}
+              onPress={() => onViewPlan(plan.id)}
               className="w-8 h-8"
             >
               <ExternalLink className="w-4 h-4" />
@@ -140,27 +140,11 @@ function InboxItem({ plan, onApprove, onRequestChanges }: InboxItemProps) {
   );
 }
 
-// --- Helper Functions ---
-
-function formatRelativeTime(timestamp: number): string {
-  const now = Date.now();
-  const diff = now - timestamp;
-  const minutes = Math.floor(diff / 60000);
-  const hours = Math.floor(diff / 3600000);
-  const days = Math.floor(diff / 86400000);
-
-  if (minutes < 1) return 'Just now';
-  if (minutes < 60) return `${minutes}m ago`;
-  if (hours < 24) return `${hours}h ago`;
-  if (days < 7) return `${days}d ago`;
-  return new Date(timestamp).toLocaleDateString();
-}
-
 // --- Main Page Component ---
 
 export function InboxPage() {
   const { identity: githubIdentity } = useGitHubAuth();
-  const { inboxPlans } = usePlanIndex(githubIdentity?.username);
+  const { inboxPlans, markPlanAsRead } = usePlanIndex(githubIdentity?.username);
   const { ydoc: indexDoc } = useMultiProviderSync(PLAN_INDEX_DOC_NAME);
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
@@ -214,9 +198,16 @@ export function InboxPage() {
   };
 
   const handleRequestChanges = (planId: string) => {
-    // Navigate to the plan page where they can add comments
+    // Mark as read and navigate to the plan page where they can add comments
+    markPlanAsRead(planId);
     navigate(`/plan/${planId}`);
     toast.info('Navigate to add comments and request changes');
+  };
+
+  const handleViewPlan = (planId: string) => {
+    // Mark as read when viewing
+    markPlanAsRead(planId);
+    navigate(`/plan/${planId}`);
   };
 
   // Empty state - true inbox zero (no plans at all)
@@ -284,6 +275,7 @@ export function InboxPage() {
             onSelectionChange={(keys) => {
               const key = Array.from(keys)[0];
               if (key) {
+                markPlanAsRead(String(key));
                 navigate(`/plan/${key}`);
               }
             }}
@@ -300,6 +292,7 @@ export function InboxPage() {
                   plan={plan}
                   onApprove={handleApprove}
                   onRequestChanges={handleRequestChanges}
+                  onViewPlan={handleViewPlan}
                 />
               </ListBoxItem>
             ))}

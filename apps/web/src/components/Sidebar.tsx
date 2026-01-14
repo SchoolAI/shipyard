@@ -17,6 +17,7 @@ import {
   ChevronRight,
   Filter,
   Inbox,
+  LayoutGrid,
   Users,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
@@ -211,6 +212,26 @@ function CollapsedSidebar({
             </Button>
           </Tooltip.Trigger>
           <Tooltip.Content>Inbox ({inboxCount})</Tooltip.Content>
+        </Tooltip>
+
+        {/* Board */}
+        <Tooltip>
+          <Tooltip.Trigger>
+            <Button
+              isIconOnly
+              variant={location.pathname === '/board' ? 'secondary' : 'ghost'}
+              size="sm"
+              aria-label="Board"
+              onPress={() => {
+                onNavigate?.();
+                navigate('/board');
+              }}
+              className="w-10 h-10"
+            >
+              <LayoutGrid className="w-5 h-5" />
+            </Button>
+          </Tooltip.Trigger>
+          <Tooltip.Content>Board</Tooltip.Content>
         </Tooltip>
 
         {/* Archive */}
@@ -447,6 +468,13 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
           isActive={location.pathname === '/inbox'}
           badge={inboxPlans.length}
           badgeColor="warning"
+          onClick={onNavigate}
+        />
+        <NavItem
+          icon={<LayoutGrid className="w-4 h-4" />}
+          label="Board"
+          href="/board"
+          isActive={location.pathname === '/board'}
           onClick={onNavigate}
         />
         <NavItem

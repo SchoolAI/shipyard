@@ -19,6 +19,7 @@
     "dev:web": "turbo run dev --filter=@peer-plan/web",
     "dev:hook": "turbo run dev --filter=@peer-plan/hook",
     "cleanup": "bash scripts/cleanup.sh",
+    "reset": "bash scripts/reset-all.sh",
     "prepare": "simple-git-hooks"
   },
   "devDependencies": {

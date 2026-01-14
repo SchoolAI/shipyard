@@ -219,30 +219,36 @@ See [08-waiting-room.md](./08-waiting-room.md) for full details.
 
 **Goal:** Multi-view interface for managing AI agent work at scale
 
-**Status:** Phase 1 design pivoted based on research (see milestone doc for rationale)
+**Status:** Phase 1 partially complete, Phase 2 ready to start
 
-**Planned:**
-- 🔄 Phase 1a: Sidebar navigation (Inbox, Active, All Plans routes)
-- ⏳ Phase 1b: Collapsible filter section on /plans view
-- ⏳ Phase 1c: Inbox page implementation
-- ⏳ Phase 2: View switcher & Kanban board
+### Completed:
+- ✅ **Phase 1a: Sidebar Navigation** - NavItem component with routes to `/inbox`, `/archive`
+- ✅ **Phase 1c: Inbox Page** - Dedicated `/inbox` route with quick actions (Approve, Request Changes)
+- ✅ **Filters in Sidebar** - Search, sort (with direction toggle), status filter chips
+- ✅ **Read/Unread Infrastructure** - `viewedBy` field, `markPlanAsRead()`, `isPlanUnread()` helpers
+- ✅ **Inbox Badge Count** - Shows unread plans needing attention
+
+### Diverged from Plan:
+- ⚠️ **Phase 1b: /plans route** - NOT DONE. Filters went into sidebar instead of dedicated route
+- ⚠️ **Inbox Groupings** - No "Needs Your Review" / "Needs Your Action" sections yet
+- ⚠️ **Active Route** - No `/plans?status=active` - have "My Plans" / "Shared With Me" sections instead
+
+### Known Issues:
+- 🐛 **GitHub identity race condition** - Fix applied (eager cache init in `useGitHubAuth.ts`), not fully verified
+- 🐛 **Read/unread reliability** - Depends on identity fix; may need verification
+
+### Pending:
+- ⏳ Phase 2: View switcher & Kanban board (drag-drop status changes)
 - ⏳ Phase 3: Tags & filtering infrastructure
 - ⏳ Phase 4: Artifact gallery view
 - ⏳ Phase 5: Table view for power users
-
-**Design pivot:** Original Phase 1 placed filters in sidebar header. Research from 9 tools (Notion, Linear, GitHub, etc.) showed:
-1. Inbox should be a separate route, not a filter
-2. Filters waste vertical space when always visible
-3. Global filters create scope confusion
-
-New design uses route-based navigation with collapsible filters on /plans only.
 
 **Research artifacts:**
 - [Executive Summary](../designs/organizational-views-EXECUTIVE-SUMMARY.md) - Main reference with full research
 - [Visual Mockups](../designs/ui-mockup-ascii.md) - ASCII mockups of all views
 - [Design Index](../designs/README.md) - Design docs overview
 
-**Dependencies:** Milestone 7 (Artifacts), Milestone 9 (GitHub Identity)
+**Dependencies:** Milestone 7 (Artifacts) ✅, Milestone 9 (GitHub Identity) ✅
 
 See [10-organizational-views.md](./10-organizational-views.md) for full implementation plan.
 
@@ -266,4 +272,4 @@ See [10-organizational-views.md](./10-organizational-views.md) for full implemen
 
 ---
 
-*Last updated: 2026-01-12*
+*Last updated: 2026-01-13*

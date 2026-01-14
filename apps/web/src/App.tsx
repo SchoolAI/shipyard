@@ -4,7 +4,10 @@ import { ActivePlanSyncProvider } from './contexts/ActivePlanSyncContext';
 import { ArchivePage } from './pages/ArchivePage';
 import { HomePage } from './pages/HomePage';
 import { InboxPage } from './pages/InboxPage';
+import { KanbanPage } from './pages/KanbanPage';
 import { PlanPage } from './pages/PlanPage';
+import { ResetPage } from './pages/ResetPage';
+import { hasResetParam } from './utils/resetStorage';
 
 function AppRoutes() {
   const [searchParams] = useSearchParams();
@@ -19,6 +22,7 @@ function AppRoutes() {
     <Routes>
       <Route path="/" element={<HomePage />} />
       <Route path="/inbox" element={<InboxPage />} />
+      <Route path="/board" element={<KanbanPage />} />
       <Route path="/archive" element={<ArchivePage />} />
       {/* PlanPage handles both normal plans (/plan/:id) and snapshots (/?d=...) */}
       <Route path="/plan/:id" element={<PlanPage />} />
@@ -30,14 +34,27 @@ function AppRoutes() {
 // Base path from Vite config for GitHub Pages deployment
 const basename = import.meta.env.BASE_URL;
 
+function AppWithLayout() {
+  // Check for reset param before any providers initialize
+  // This prevents sync attempts that would re-populate storage
+  // ONLY available in development mode for safety
+  if (import.meta.env.DEV && hasResetParam()) {
+    return <ResetPage />;
+  }
+
+  return (
+    <ActivePlanSyncProvider>
+      <Layout>
+        <AppRoutes />
+      </Layout>
+    </ActivePlanSyncProvider>
+  );
+}
+
 export function App() {
   return (
     <BrowserRouter basename={basename}>
-      <ActivePlanSyncProvider>
-        <Layout>
-          <AppRoutes />
-        </Layout>
-      </ActivePlanSyncProvider>
+      <AppWithLayout />
     </BrowserRouter>
   );
 }
