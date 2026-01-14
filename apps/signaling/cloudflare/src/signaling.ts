@@ -401,7 +401,7 @@ export class SignalingRoom extends DurableObject<Env> {
     // This prevents race conditions where pending users connect before owner pushes state
     // Once owner connects and pushes approval state, legitimate users will be approved
     if (!approval) {
-      logger.info(
+      logger.debug(
         { planId },
         '[isUserApproved] No approval state for plan, denying access'
       );
@@ -411,7 +411,7 @@ export class SignalingRoom extends DurableObject<Env> {
     // No user ID - DENY (must authenticate to access plans)
     // This prevents unauthenticated users from syncing plan data
     if (!userId) {
-      logger.info(
+      logger.debug(
         { planId },
         '[isUserApproved] No userId provided for plan, denying access'
       );
