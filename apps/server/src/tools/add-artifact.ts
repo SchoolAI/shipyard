@@ -12,6 +12,7 @@ import {
   type LinkedPR,
   linkArtifactToDeliverable,
   linkPR,
+  logPlanEvent,
   PLAN_INDEX_DOC_NAME,
   setPlanIndexEntry,
   setPlanMetadata,
@@ -19,6 +20,7 @@ import {
 import { nanoid } from 'nanoid';
 import type * as Y from 'yjs';
 import { z } from 'zod';
+import { webConfig } from '../config/env/web.js';
 import { getOrCreateDoc } from '../doc-store.js';
 import {
   GitHubAuthError,
@@ -257,6 +259,7 @@ ARTIFACT TYPES:
         uploadedAt: Date.now(),
       };
       addArtifact(doc, artifact);
+      logPlanEvent(doc, 'artifact_uploaded', 'agent', { artifactId: artifact.id });
 
       // Link to deliverable if specified
       let statusChanged = false;
@@ -314,7 +317,7 @@ ARTIFACT TYPES:
         const blocks = editor.yXmlFragmentToBlocks(fragment);
         const artifacts = getArtifacts(doc);
 
-        const baseUrl = process.env.PEER_PLAN_BASE_URL || 'http://localhost:5173';
+        const baseUrl = webConfig.PEER_PLAN_WEB_URL;
         const snapshotUrl = createPlanUrl(baseUrl, {
           v: 1,
           id: planId,

@@ -18,7 +18,8 @@ import {
   type UpdatePresenceResponse,
   UpdatePresenceResponseSchema,
 } from '@peer-plan/schema';
-import { DEFAULT_REGISTRY_PORTS, REQUEST_TIMEOUT_MS } from './constants.js';
+import { registryConfig } from './config/env/registry.js';
+import { REQUEST_TIMEOUT_MS } from './constants.js';
 import { logger } from './logger.js';
 
 /**
@@ -26,9 +27,7 @@ import { logger } from './logger.js';
  * Tries each port until one responds.
  */
 async function getRegistryUrl(): Promise<string | null> {
-  const ports = process.env.REGISTRY_PORT
-    ? [Number.parseInt(process.env.REGISTRY_PORT, 10)]
-    : DEFAULT_REGISTRY_PORTS;
+  const ports = registryConfig.REGISTRY_PORT;
 
   for (const port of ports) {
     try {

@@ -1,15 +1,11 @@
+import { registryConfig } from './config/env/registry.js';
 import { logger } from './logger.js';
 
-const DEFAULT_REGISTRY_PORTS = [32191, 32192];
-
 /**
- * Get registry port (try env var, then defaults)
+ * Get registry port from config
  */
 function getRegistryPorts(): number[] {
-  if (process.env.REGISTRY_PORT) {
-    return [Number.parseInt(process.env.REGISTRY_PORT, 10)];
-  }
-  return DEFAULT_REGISTRY_PORTS;
+  return registryConfig.REGISTRY_PORT;
 }
 
 /**

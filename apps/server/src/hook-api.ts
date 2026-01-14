@@ -21,6 +21,7 @@ import {
 } from '@peer-plan/schema';
 import type { Request, Response } from 'express';
 import { nanoid } from 'nanoid';
+import { webConfig } from './config/env/web.js';
 import { getOrCreateDoc } from './doc-store.js';
 import { logger } from './logger.js';
 import { getGitHubUsername, getRepositoryFullName } from './server-identity.js';
@@ -126,7 +127,7 @@ export async function handleCreateSession(req: Request, res: Response): Promise<
       ownerId,
     });
 
-    const webUrl = process.env.PEER_PLAN_WEB_URL ?? 'http://localhost:5173';
+    const webUrl = webConfig.PEER_PLAN_WEB_URL;
     const url = `${webUrl}/plan/${planId}`;
 
     logger.info({ url }, 'Plan URL generated');
@@ -288,7 +289,7 @@ export async function handleSetSessionToken(req: Request, res: Response): Promis
       updatedAt: Date.now(),
     });
 
-    const webUrl = process.env.PEER_PLAN_WEB_URL ?? 'http://localhost:5173';
+    const webUrl = webConfig.PEER_PLAN_WEB_URL;
     const url = `${webUrl}/plan/${planId}`;
 
     logger.info({ planId }, 'Session token set successfully');

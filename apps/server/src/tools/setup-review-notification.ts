@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { registryConfig } from '../config/env/registry.js';
 import { TOOL_NAMES } from './tool-names.js';
 
 const SetupReviewNotificationInput = z.object({
@@ -39,7 +40,7 @@ USAGE (for non-hook agents):
     const input = SetupReviewNotificationInput.parse(args);
     const { planId, pollIntervalSeconds = 30 } = input;
 
-    const registryPort = process.env.REGISTRY_PORT || '32191';
+    const registryPort = registryConfig.REGISTRY_PORT[0];
     const baseUrl = `http://localhost:${registryPort}/api/plan/${encodeURIComponent(planId)}`;
 
     const script = `# Subscribe to status and comment changes

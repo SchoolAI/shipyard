@@ -1,7 +1,8 @@
 import pino from 'pino';
+import { serverConfig } from './config/env/server.js';
 
 const transport =
-  process.env.NODE_ENV === 'development'
+  serverConfig.NODE_ENV === 'development'
     ? {
         target: 'pino-pretty',
         options: {
@@ -15,7 +16,7 @@ const transport =
 
 export const logger = pino(
   {
-    level: process.env.LOG_LEVEL || 'info',
+    level: serverConfig.LOG_LEVEL,
     timestamp: pino.stdTimeFunctions.isoTime,
   },
   transport ? pino.transport(transport) : pino.destination(2) // stderr for production too

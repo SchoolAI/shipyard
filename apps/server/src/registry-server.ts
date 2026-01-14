@@ -23,6 +23,7 @@ import { LeveldbPersistence } from 'y-leveldb';
 import * as awarenessProtocol from 'y-protocols/awareness';
 import * as syncProtocol from 'y-protocols/sync';
 import * as Y from 'yjs';
+import { registryConfig } from './config/env/registry.js';
 import { getOctokit, parseRepoString } from './github-artifacts.js';
 import {
   handleClearPresence,
@@ -32,7 +33,6 @@ import {
   handleUpdateContent,
   handleUpdatePresence,
 } from './hook-api.js';
-import { registryConfig } from './config/env/registry.js';
 import { logger } from './logger.js';
 import {
   attachObservers,

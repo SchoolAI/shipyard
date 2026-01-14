@@ -4,15 +4,15 @@
  */
 
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
-import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { z } from 'zod';
-import { STALE_SESSION_MAX_AGE_MS, STATE_DIR_NAME, STATE_FILE_NAME } from './constants.js';
+import { registryConfig } from './config/env/registry.js';
+import { STALE_SESSION_MAX_AGE_MS, STATE_FILE_NAME } from './constants.js';
 import { logger } from './logger.js';
 
 // --- State File Location ---
 
-const STATE_DIR = process.env.PEER_PLAN_STATE_DIR ?? join(homedir(), STATE_DIR_NAME);
+const STATE_DIR = registryConfig.PEER_PLAN_STATE_DIR;
 const STATE_FILE = join(STATE_DIR, STATE_FILE_NAME);
 
 // --- State Schema ---

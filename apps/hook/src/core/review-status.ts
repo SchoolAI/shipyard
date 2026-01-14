@@ -17,7 +17,8 @@ import { nanoid } from 'nanoid';
 import { WebsocketProvider } from 'y-websocket';
 import * as Y from 'yjs';
 import type { CoreResponse } from '../adapters/types.js';
-import { DEFAULT_AGENT_TYPE, DEFAULT_WEB_URL } from '../constants.js';
+import { webConfig } from '../config/env/web.js';
+import { DEFAULT_AGENT_TYPE } from '../constants.js';
 import {
   getReviewStatus,
   getWebSocketUrl,
@@ -396,7 +397,7 @@ export async function checkReviewStatus(
 
   logger.info({ sessionId, planId, status: status.status }, 'Review status retrieved');
 
-  const baseUrl = process.env.PEER_PLAN_WEB_URL ?? DEFAULT_WEB_URL;
+  const baseUrl = webConfig.PEER_PLAN_WEB_URL;
 
   switch (status.status) {
     case 'changes_requested':

@@ -1,12 +1,8 @@
-import { execSync } from 'node:child_process';
 import { Octokit } from '@octokit/rest';
+import { githubConfig } from './config/env/github.js';
 import { logger } from './logger.js';
 
 const ARTIFACTS_BRANCH = 'plan-artifacts';
-
-// Cache the resolved token for the session
-let cachedToken: string | null = null;
-let tokenResolutionAttempted = false;
 
 /**
  * Parse a "owner/repo" string into owner and repo components.
@@ -21,75 +17,22 @@ export function parseRepoString(repo: string): { owner: string; repoName: string
 }
 
 /**
- * Check if artifacts feature is enabled via environment variable.
- * Defaults to enabled.
+ * Check if artifacts feature is enabled.
+ * Configured via PEER_PLAN_ARTIFACTS environment variable (defaults to enabled).
  */
 export function isArtifactsEnabled(): boolean {
-  const setting = process.env.PEER_PLAN_ARTIFACTS?.toLowerCase();
-  return setting !== 'disabled' && setting !== 'false' && setting !== '0';
+  return githubConfig.PEER_PLAN_ARTIFACTS;
 }
 
 /**
- * Try to get GitHub token from gh CLI.
- * Returns null if gh is not installed or not authenticated.
- */
-function getTokenFromGhCli(): string | null {
-  try {
-    const token = execSync('gh auth token', {
-      encoding: 'utf-8',
-      timeout: 5000,
-      stdio: ['pipe', 'pipe', 'pipe'], // Suppress stderr
-    }).trim();
-    if (token) {
-      logger.debug('Got GitHub token from gh CLI');
-      return token;
-    }
-  } catch {
-    logger.debug('gh CLI not available or not authenticated');
-  }
-  return null;
-}
-
-/**
- * Resolve GitHub token using the following priority:
- * 1. GITHUB_TOKEN environment variable (explicit override)
- * 2. gh CLI token (if gh is installed and authenticated)
- * 3. null (graceful degradation)
+ * Resolve GitHub token from config.
+ * Priority: GITHUB_TOKEN env var > gh CLI token > null
+ *
+ * Token resolution happens once at config load time.
+ * To refresh token (e.g., after running `gh auth login`), restart the server.
  */
 export function resolveGitHubToken(): string | null {
-  // Return cached token if we've already resolved
-  if (tokenResolutionAttempted) {
-    return cachedToken;
-  }
-
-  tokenResolutionAttempted = true;
-
-  // 1. Check explicit env var first
-  if (process.env.GITHUB_TOKEN) {
-    logger.debug('Using GITHUB_TOKEN from environment');
-    cachedToken = process.env.GITHUB_TOKEN;
-    return cachedToken;
-  }
-
-  // 2. Try gh CLI
-  const ghToken = getTokenFromGhCli();
-  if (ghToken) {
-    cachedToken = ghToken;
-    return cachedToken;
-  }
-
-  // 3. No token available
-  logger.debug('No GitHub token available');
-  cachedToken = null;
-  return null;
-}
-
-/**
- * Reset token cache. Useful after user runs `gh auth login` externally.
- */
-export function resetTokenCache(): void {
-  cachedToken = null;
-  tokenResolutionAttempted = false;
+  return githubConfig.GITHUB_TOKEN;
 }
 
 /**

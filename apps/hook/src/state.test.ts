@@ -25,9 +25,9 @@ import {
   deleteSessionState,
   getSessionState,
   readState,
+  type SessionState,
   setSessionState,
   writeState,
-  type SessionState,
 } from './state.js';
 
 // Test directory for temporary state files
@@ -198,7 +198,9 @@ describe('State Management', () => {
 
       // After write, temp file should not exist
       const tempFiles = existsSync(TEST_STATE_DIR)
-        ? require('node:fs').readdirSync(TEST_STATE_DIR).filter((f: string) => f.includes('.tmp'))
+        ? require('node:fs')
+            .readdirSync(TEST_STATE_DIR)
+            .filter((f: string) => f.includes('.tmp'))
         : [];
       expect(tempFiles).toHaveLength(0);
     });

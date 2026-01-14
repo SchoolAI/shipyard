@@ -300,6 +300,33 @@ This project uses a specialized stack for P2P collaborative editing. It follows 
 
 See [decisions/0001-use-yjs-not-loro.md](./decisions/0001-use-yjs-not-loro.md) for why we chose Yjs + BlockNote.
 
+## Environment Variables
+
+All apps follow a modular environment variable pattern with Zod validation:
+
+```typescript
+// apps/*/src/config/env/*.ts
+import { z } from 'zod';
+import { loadEnv } from '../config.js';
+
+const schema = z.object({
+  MY_VAR: z.string().default('default-value'),
+  MY_PORT: z.coerce.number().default(3000),
+});
+
+export const myConfig = loadEnv(schema);
+export type MyConfig = z.infer<typeof schema>;
+```
+
+**Pattern requirements:**
+1. One file per domain (server, registry, github, web, etc.)
+2. All env vars validated with Zod schemas
+3. No direct `process.env` access outside config/ directory
+4. Clear default values in schemas
+5. Type inference via `z.infer`
+
+**Reference:** Power-up server `/apps/server/src/config/` for full example.
+
 ## Logging Strategy
 
 ### MCP Server Logging (pino)

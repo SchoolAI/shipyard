@@ -55,6 +55,38 @@ Claude will call the `create_plan` tool → browser opens with plan!
 
 ---
 
+## Environment Variables
+
+Each app has configurable environment variables. See the `.env.example` file in each app directory:
+
+- `apps/server/.env.example` - MCP server configuration
+- `apps/hook/.env.example` - Hook configuration
+- `apps/signaling/.env.example` - Signaling server configuration
+
+To customize:
+1. Copy `.env.example` to `.env` in the app directory
+2. Edit values as needed
+3. Restart the app
+
+### GitHub Authentication
+
+For artifact uploads, the server needs a GitHub token. Priority order:
+
+1. `GITHUB_TOKEN` environment variable (explicit override)
+2. `gh auth token` CLI command (if gh is installed and authenticated)
+3. null (feature gracefully disabled)
+
+To enable artifacts:
+```bash
+# Option 1: Use gh CLI (recommended)
+gh auth login
+
+# Option 2: Set explicit token
+export GITHUB_TOKEN=ghp_your_token_here
+```
+
+---
+
 ## Development Commands
 
 ```bash

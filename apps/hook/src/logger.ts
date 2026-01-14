@@ -7,13 +7,14 @@
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import pino from 'pino';
+import { serverConfig } from './config/env/server.js';
 
 const LOG_FILE = join(homedir(), '.peer-plan', 'hook-debug.log');
 
 // Create logger that writes to BOTH stderr and a file
 export const logger = pino(
   {
-    level: process.env.LOG_LEVEL ?? 'debug', // Set to debug for more verbose logging
+    level: serverConfig.LOG_LEVEL,
     timestamp: pino.stdTimeFunctions.isoTime,
   },
   pino.multistream([

@@ -50,6 +50,7 @@ import {
   WS_READY_STATE_CONNECTING,
   WS_READY_STATE_OPEN,
 } from './access-control.js';
+import { serverConfig } from './config/env/server.js';
 import { logger } from './logger.js';
 
 // --- Configuration ---
@@ -57,7 +58,7 @@ const PING_TIMEOUT_MS = 30000;
 const CLEANUP_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 const REDEMPTION_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
 const PLAN_APPROVAL_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours of inactivity
-const port = process.env.PORT || 4444;
+const port = serverConfig.PORT;
 
 // --- Message Types for y-webrtc signaling protocol ---
 

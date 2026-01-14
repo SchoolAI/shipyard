@@ -46,11 +46,7 @@ export const CLAUDE_HOOK_EVENTS = {
  */
 export const DEFAULT_AGENT_TYPE = 'claude-code';
 
-/**
- * Default web UI base URL
- * Override with PEER_PLAN_WEB_URL env var
- */
-export const DEFAULT_WEB_URL = 'http://localhost:5173';
+// Environment variables moved to config/env/
 
 /**
  * Default plan titles
@@ -61,21 +57,11 @@ export const DEFAULT_PLAN_TITLES = {
 } as const;
 
 /**
- * Default registry ports to try
- */
-export const DEFAULT_REGISTRY_PORTS = [32191, 32192];
-
-/**
  * HTTP request timeout in milliseconds
  */
 export const REQUEST_TIMEOUT_MS = 10000; // 10 seconds
 
 // --- State Management ---
-
-/**
- * State directory name
- */
-export const STATE_DIR_NAME = '.peer-plan';
 
 /**
  * State file name
