@@ -32,6 +32,7 @@ import {
   handleUpdateContent,
   handleUpdatePresence,
 } from './hook-api.js';
+import { registryConfig } from './config/env/registry.js';
 import { logger } from './logger.js';
 import {
   attachObservers,
@@ -41,8 +42,6 @@ import {
   getChanges,
   startCleanupInterval,
 } from './subscriptions/index.js';
-
-const DEFAULT_REGISTRY_PORTS = [32191, 32192];
 
 const HEALTH_CHECK_INTERVAL = 10000;
 const HEALTH_CHECK_TIMEOUT = 2000;
@@ -782,9 +781,7 @@ function createApp(): { app: express.Express; httpServer: http.Server } {
 }
 
 export async function startRegistryServer(): Promise<number | null> {
-  const ports = process.env.REGISTRY_PORT
-    ? [Number.parseInt(process.env.REGISTRY_PORT, 10)]
-    : DEFAULT_REGISTRY_PORTS;
+  const ports = registryConfig.REGISTRY_PORT;
 
   const { httpServer } = createApp();
 
@@ -843,9 +840,7 @@ export async function startRegistryServer(): Promise<number | null> {
 }
 
 export async function isRegistryRunning(): Promise<number | null> {
-  const ports = process.env.REGISTRY_PORT
-    ? [Number.parseInt(process.env.REGISTRY_PORT, 10)]
-    : DEFAULT_REGISTRY_PORTS;
+  const ports = registryConfig.REGISTRY_PORT;
 
   for (const port of ports) {
     try {
