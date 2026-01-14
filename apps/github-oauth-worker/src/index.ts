@@ -34,20 +34,52 @@ interface GitHubTokenResponse {
   error_description?: string;
 }
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
+// Allowed origins by environment - restrict CORS to prevent phishing attacks
+const ALLOWED_ORIGINS: Record<string, string[]> = {
+  development: [
+    'http://localhost:5173',
+    'http://localhost:5174',
+    'http://127.0.0.1:5173',
+    'http://127.0.0.1:5174',
+  ],
+  production: ['https://peer-plan.pages.dev', 'https://schoolai.github.io'],
 };
+
+function getCorsHeaders(origin: string | null, env: Env): Record<string, string> | null {
+  const allowedOrigins = ALLOWED_ORIGINS[env.ENVIRONMENT] || ALLOWED_ORIGINS.production;
+  const isAllowed = origin && allowedOrigins.includes(origin);
+
+  // Return null for unauthorized origins - caller should reject the request
+  if (!isAllowed) {
+    return null;
+  }
+
+  return {
+    'Access-Control-Allow-Origin': origin,
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+  };
+}
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
+    const origin = request.headers.get('Origin');
+    const corsHeaders = getCorsHeaders(origin, env);
 
-    // Health check endpoint
+    // Health check endpoint - includes environment for deployment verification
+    // No CORS required - this is for monitoring, not browser calls
     if (url.pathname === '/health') {
-      return new Response('OK', {
-        headers: { 'Content-Type': 'text/plain' },
+      return new Response(JSON.stringify({ status: 'OK', environment: env.ENVIRONMENT }), {
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Reject unauthorized origins before processing any request
+    if (!corsHeaders) {
+      return new Response(JSON.stringify({ error: 'Origin not allowed' }), {
+        status: 403,
+        headers: { 'Content-Type': 'application/json' },
       });
     }
 

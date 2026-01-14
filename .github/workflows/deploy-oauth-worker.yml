@@ -27,11 +27,12 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Deploy to Cloudflare Workers
+      - name: Deploy to Cloudflare Workers (production)
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           workingDirectory: apps/github-oauth-worker
+          command: deploy --env production
           secrets: |
             GITHUB_CLIENT_ID
             GITHUB_CLIENT_SECRET
