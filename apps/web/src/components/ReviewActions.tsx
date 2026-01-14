@@ -1,5 +1,5 @@
 import { Button, Popover, TextArea } from '@heroui/react';
-import type { PlanStatusType } from '@peer-plan/schema';
+import { logPlanEvent, type PlanStatusType } from '@peer-plan/schema';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type * as Y from 'yjs';
 import { VoiceInputButton } from '@/components/voice-input';
@@ -89,6 +89,9 @@ export function ReviewActions({
           metadata.delete('reviewComment');
         }
       });
+
+      const eventType = action === 'approve' ? 'approved' : 'changes_requested';
+      logPlanEvent(ydoc, eventType, identity.name);
 
       setOpenPopover(null);
       setComment('');

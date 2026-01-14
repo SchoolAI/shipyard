@@ -1,5 +1,6 @@
 import {
   getPlanMetadata,
+  logPlanEvent,
   PLAN_INDEX_DOC_NAME,
   type PlanStatusType,
   setPlanIndexEntry,
@@ -8,6 +9,7 @@ import {
 import { z } from 'zod';
 import { getOrCreateDoc } from '../doc-store.js';
 import { logger } from '../logger.js';
+import { getGitHubUsername } from '../server-identity.js';
 import { verifySessionToken } from '../session-token.js';
 import { TOOL_NAMES } from './tool-names.js';
 
@@ -65,6 +67,9 @@ STATUSES:
     const doc = await getOrCreateDoc(input.planId);
     const existingMetadata = getPlanMetadata(doc);
 
+    // Get actor name for event logging
+    const actorName = getGitHubUsername();
+
     if (!existingMetadata) {
       return {
         content: [
@@ -98,6 +103,13 @@ STATUSES:
     };
     if (input.title) updates.title = input.title;
     if (input.status) updates.status = input.status;
+
+    if (input.status && input.status !== existingMetadata.status) {
+      logPlanEvent(doc, 'status_changed', actorName, {
+        fromStatus: existingMetadata.status,
+        toStatus: input.status,
+      });
+    }
 
     setPlanMetadata(doc, updates);
 

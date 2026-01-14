@@ -1,3 +1,4 @@
+import { nanoid } from 'nanoid';
 import * as Y from 'yjs';
 import { type AgentPresence, AgentPresenceSchema } from './hook-api.js';
 import {
@@ -8,6 +9,9 @@ import {
   DeliverableSchema,
   type LinkedPR,
   LinkedPRSchema,
+  type PlanEvent,
+  PlanEventSchema,
+  type PlanEventType,
   type PlanMetadata,
   PlanMetadataSchema,
   type PRReviewComment,
@@ -420,7 +424,7 @@ export function markPlanAsViewed(ydoc: Y.Doc, username: string): void {
   const map = ydoc.getMap(YDOC_KEYS.METADATA);
 
   ydoc.transact(() => {
-    // Get existing viewedBy map - must handle Y.Map properly (can't spread it!)
+    // Must handle Y.Map properly (can't spread it!)
     const existingViewedBy = map.get('viewedBy');
     let viewedBy: Record<string, number> = {};
 
@@ -436,7 +440,6 @@ export function markPlanAsViewed(ydoc: Y.Doc, username: string): void {
       viewedBy = { ...(existingViewedBy as Record<string, number>) };
     }
 
-    // Record when this user viewed the plan
     viewedBy[username] = Date.now();
 
     // Use Y.Map for the viewedBy to enable CRDT merging
@@ -507,4 +510,31 @@ export function markVersionHandedOff(ydoc: Y.Doc, versionId: string, handedOffTo
   );
   metadata.set('conversationVersions', updated);
   metadata.set('updatedAt', Date.now());
+}
+
+export function logPlanEvent(
+  ydoc: Y.Doc,
+  type: PlanEventType,
+  actor: string,
+  data?: PlanEvent['data']
+): void {
+  const eventsArray = ydoc.getArray(YDOC_KEYS.EVENTS);
+  const event: PlanEvent = {
+    id: nanoid(),
+    type,
+    actor,
+    timestamp: Date.now(),
+    data,
+  };
+  eventsArray.push([event]);
+}
+
+export function getPlanEvents(ydoc: Y.Doc): PlanEvent[] {
+  const array = ydoc.getArray(YDOC_KEYS.EVENTS);
+  const data = array.toJSON() as unknown[];
+
+  return data
+    .map((item) => PlanEventSchema.safeParse(item))
+    .filter((result) => result.success)
+    .map((result) => result.data);
 }

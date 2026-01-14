@@ -4,6 +4,7 @@ import {
   addDeliverable,
   extractDeliverables,
   initPlanMetadata,
+  logPlanEvent,
   type OriginMetadata,
   PLAN_INDEX_DOC_NAME,
   setPlanIndexEntry,
@@ -134,8 +135,16 @@ Bad deliverables (not provable):
             generationId: input.originMetadata?.generationId as string | undefined,
           };
           break;
-        default:
+        case 'windsurf':
+        case 'aider':
+        case 'unknown':
           origin = { platform: 'unknown' as const };
+          break;
+        default: {
+          const _exhaustive: never = input.originPlatform;
+          void _exhaustive;
+          origin = { platform: 'unknown' as const };
+        }
       }
     }
 
@@ -175,6 +184,8 @@ Bad deliverables (not provable):
       if (deliverables.length > 0) {
         logger.info({ count: deliverables.length }, 'Deliverables extracted and stored');
       }
+
+      logPlanEvent(ydoc, 'plan_created', ownerId ?? 'unknown');
     });
 
     logger.info('Content stored in Y.Doc document fragment');

@@ -31,6 +31,7 @@ import {
   uploadArtifact,
 } from '../github-artifacts.js';
 import { logger } from '../logger.js';
+import { getGitHubUsername } from '../server-identity.js';
 import { verifySessionToken } from '../session-token.js';
 import { TOOL_NAMES } from './tool-names.js';
 
@@ -130,6 +131,9 @@ ARTIFACT TYPES:
   handler: async (args: unknown) => {
     const input = AddArtifactInput.parse(args);
     const { planId, sessionToken, type, filename } = input;
+
+    // Get actor name for event logging
+    const actorName = getGitHubUsername();
 
     logger.info({ planId, type, filename }, 'Adding artifact');
 
@@ -259,13 +263,18 @@ ARTIFACT TYPES:
         uploadedAt: Date.now(),
       };
       addArtifact(doc, artifact);
-      logPlanEvent(doc, 'artifact_uploaded', 'agent', { artifactId: artifact.id });
+      logPlanEvent(doc, 'artifact_uploaded', actorName, { artifactId: artifact.id });
 
       // Link to deliverable if specified
       let statusChanged = false;
       if (input.deliverableId) {
         const linked = linkArtifactToDeliverable(doc, input.deliverableId, artifact.id);
         if (linked) {
+          logPlanEvent(doc, 'deliverable_linked', actorName, {
+            deliverableId: input.deliverableId,
+            artifactId: artifact.id,
+          });
+
           logger.info(
             { planId, artifactId: artifact.id, deliverableId: input.deliverableId },
             'Artifact linked to deliverable'
@@ -274,6 +283,10 @@ ARTIFACT TYPES:
           // Auto-progress status to in_progress when a deliverable is fulfilled
           if (metadata.status === 'draft') {
             setPlanMetadata(doc, { status: 'in_progress' });
+            logPlanEvent(doc, 'status_changed', actorName, {
+              fromStatus: 'draft',
+              toStatus: 'in_progress',
+            });
             statusChanged = true;
             logger.info({ planId }, 'Plan status auto-changed to in_progress');
           }
@@ -334,9 +347,10 @@ ARTIFACT TYPES:
         setPlanMetadata(doc, {
           status: 'completed',
           completedAt: Date.now(),
-          completedBy: 'agent',
+          completedBy: actorName,
           snapshotUrl,
         });
+        logPlanEvent(doc, 'completed', actorName);
 
         // Update plan index
         const indexDoc = await getOrCreateDoc(PLAN_INDEX_DOC_NAME);
@@ -487,6 +501,10 @@ async function tryAutoLinkPR(ydoc: Y.Doc, repo: string): Promise<LinkedPR | null
 
     // Store in Y.Doc
     linkPR(ydoc, linkedPR);
+    const actorName = getGitHubUsername();
+    logPlanEvent(ydoc, 'pr_linked', actorName, {
+      prNumber: linkedPR.prNumber,
+    });
 
     return linkedPR;
   } catch (error) {

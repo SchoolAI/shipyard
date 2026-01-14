@@ -6,9 +6,17 @@
 
 import { Avatar, Button, Chip, Modal } from '@heroui/react';
 
-const AvatarRoot = Avatar as React.FC<{ children: React.ReactNode; size?: 'sm' | 'md' | 'lg'; className?: string }>;
+const AvatarRoot = Avatar as React.FC<{
+  children: React.ReactNode;
+  size?: 'sm' | 'md' | 'lg';
+  className?: string;
+}>;
 const AvatarImage = Avatar.Image as React.FC<{ src?: string; alt: string }>;
-const AvatarFallback = Avatar.Fallback as React.FC<{ children: React.ReactNode; className?: string }>;
+const AvatarFallback = Avatar.Fallback as React.FC<{
+  children: React.ReactNode;
+  className?: string;
+}>;
+
 import type { Deliverable, LinkedPR, PlanIndexEntry, PlanStatusType } from '@peer-plan/schema';
 import { getDeliverables, getLinkedPRs } from '@peer-plan/schema';
 import { CheckSquare, ExternalLink, GitPullRequest, Square, X } from 'lucide-react';

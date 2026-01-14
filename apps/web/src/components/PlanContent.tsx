@@ -6,18 +6,19 @@
 import type { Block } from '@blocknote/core';
 import type { PlanMetadata } from '@peer-plan/schema';
 import { extractDeliverables, getDeliverables, YDOC_KEYS } from '@peer-plan/schema';
-import { FileText, GitPullRequest, Package } from 'lucide-react';
+import { Clock, FileText, GitPullRequest, Package } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { WebrtcProvider } from 'y-webrtc';
 import type { WebsocketProvider } from 'y-websocket';
 import type * as Y from 'yjs';
+import { ActivityTimeline } from '@/components/ActivityTimeline';
 import { Attachments } from '@/components/Attachments';
 import { ChangesView } from '@/components/ChangesView';
 import { DeliverablesView } from '@/components/DeliverablesView';
 import { PlanViewer } from '@/components/PlanViewer';
 import type { SyncState } from '@/hooks/useMultiProviderSync';
 
-type ViewType = 'plan' | 'deliverables' | 'changes';
+type ViewType = 'plan' | 'activity' | 'deliverables' | 'changes';
 
 /** Simple identity type for display purposes */
 interface UserIdentity {
@@ -106,6 +107,18 @@ export function PlanContent({
           </button>
           <button
             type="button"
+            onClick={() => setActiveView('activity')}
+            className={`flex items-center justify-center gap-2 pb-2 px-2 font-medium text-sm transition-colors flex-1 md:flex-initial ${
+              activeView === 'activity'
+                ? 'text-primary border-b-2 border-primary'
+                : 'text-muted-foreground hover:text-foreground border-b-2 border-transparent'
+            }`}
+          >
+            <Clock className="w-4 h-4" />
+            Activity
+          </button>
+          <button
+            type="button"
             onClick={() => setActiveView('deliverables')}
             className={`flex items-center justify-center gap-2 pb-2 px-2 font-medium text-sm transition-colors flex-1 md:flex-initial ${
               activeView === 'deliverables'
@@ -149,6 +162,14 @@ export function PlanContent({
               initialContent={isSnapshot ? initialContent : undefined}
             />
             <Attachments ydoc={ydoc} />
+          </div>
+        </div>
+      )}
+
+      {activeView === 'activity' && (
+        <div className="flex-1 overflow-y-auto bg-background">
+          <div className="max-w-4xl mx-auto">
+            <ActivityTimeline ydoc={ydoc} />
           </div>
         </div>
       )}

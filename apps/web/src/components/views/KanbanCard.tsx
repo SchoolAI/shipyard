@@ -18,9 +18,16 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Avatar, Card, Chip } from '@heroui/react';
 
-const AvatarRoot = Avatar as React.FC<{ children: React.ReactNode; size?: 'sm' | 'md' | 'lg'; className?: string }>;
+const AvatarRoot = Avatar as React.FC<{
+  children: React.ReactNode;
+  size?: 'sm' | 'md' | 'lg';
+  className?: string;
+}>;
 const AvatarImage = Avatar.Image as React.FC<{ src?: string; alt: string }>;
-const AvatarFallback = Avatar.Fallback as React.FC<{ children: React.ReactNode; className?: string }>;
+const AvatarFallback = Avatar.Fallback as React.FC<{
+  children: React.ReactNode;
+  className?: string;
+}>;
 
 import type { PlanIndexEntry, PlanStatusType } from '@peer-plan/schema';
 import { CheckSquare, GitPullRequest } from 'lucide-react';
