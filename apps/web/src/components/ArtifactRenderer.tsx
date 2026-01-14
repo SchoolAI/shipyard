@@ -1,6 +1,6 @@
 import { Button, Card } from '@heroui/react';
 import type { Artifact, ArtifactType } from '@peer-plan/schema';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useGitHubAuth } from '../hooks/useGitHubAuth';
 import { type FetchArtifactStatus, fetchArtifact } from '../utils/github-artifact-fetcher';
 
@@ -136,22 +136,35 @@ function BinaryArtifactViewer({
   const [status, setStatus] = useState<FetchArtifactStatus | 'loading'>('loading');
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
 
-  const loadArtifact = useCallback(async () => {
-    setStatus('loading');
+  // Track blob URL in ref to avoid infinite loop in useCallback dependencies
+  const blobUrlRef = useRef<string | null>(null);
+  // Only show loading state on initial load, not re-fetches
+  const isInitialLoad = useRef(true);
 
-    // Revoke previous blob URL before creating new one to prevent memory leak
-    if (blobUrl) {
-      URL.revokeObjectURL(blobUrl);
-      setBlobUrl(null);
+  const loadArtifact = useCallback(async () => {
+    // Only show loading on initial load to prevent flash on re-fetch
+    if (isInitialLoad.current) {
+      setStatus('loading');
+    }
+
+    // Revoke previous blob URL to prevent memory leak
+    if (blobUrlRef.current) {
+      URL.revokeObjectURL(blobUrlRef.current);
+      blobUrlRef.current = null;
     }
 
     const result = await fetchArtifact(url, token, true, hasRepoScope);
     setStatus(result.status);
 
     if (result.status === 'success' && result.blobUrl) {
+      blobUrlRef.current = result.blobUrl;
       setBlobUrl(result.blobUrl);
+    } else {
+      setBlobUrl(null);
     }
-  }, [url, token, blobUrl, hasRepoScope]);
+
+    isInitialLoad.current = false;
+  }, [url, token, hasRepoScope]); // Remove blobUrl from dependencies
 
   // Load artifact on mount and when URL/token changes
   useEffect(() => {
@@ -161,11 +174,11 @@ function BinaryArtifactViewer({
   // Cleanup blob URL on unmount
   useEffect(() => {
     return () => {
-      if (blobUrl) {
-        URL.revokeObjectURL(blobUrl);
+      if (blobUrlRef.current) {
+        URL.revokeObjectURL(blobUrlRef.current);
       }
     };
-  }, [blobUrl]);
+  }, []);
 
   if (status === 'loading') {
     return (
@@ -221,8 +234,14 @@ function TextArtifactViewer({
   const [status, setStatus] = useState<FetchArtifactStatus | 'loading'>('loading');
   const [content, setContent] = useState<string | null>(null);
 
+  // Only show loading state on initial load, not re-fetches
+  const isInitialLoad = useRef(true);
+
   const loadArtifact = useCallback(async () => {
-    setStatus('loading');
+    // Only show loading on initial load to prevent flash on re-fetch
+    if (isInitialLoad.current) {
+      setStatus('loading');
+    }
 
     const result = await fetchArtifact(url, token, false, hasRepoScope);
     setStatus(result.status);
@@ -230,6 +249,8 @@ function TextArtifactViewer({
     if (result.status === 'success' && result.textContent) {
       setContent(result.textContent);
     }
+
+    isInitialLoad.current = false;
   }, [url, token, hasRepoScope]);
 
   useEffect(() => {
