@@ -9,25 +9,48 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import { initAsClient, initAsHub } from './doc-store.js';
 import { logger } from './logger.js';
-import { isRegistryRunning, startRegistryServer } from './registry-server.js';
+import {
+  isRegistryRunning,
+  releaseHubLock,
+  startRegistryServer,
+  tryAcquireHubLock,
+} from './registry-server.js';
 import { executeCodeTool } from './tools/execute-code.js';
 import { TOOL_NAMES } from './tools/tool-names.js';
 
 // Determine if we're the Registry Hub or a client
 const registryPort = await isRegistryRunning();
 if (!registryPort) {
-  // This instance becomes the Registry Hub
-  logger.info('Starting registry hub');
-  const hubPort = await startRegistryServer();
-  if (!hubPort) {
-    logger.error('Failed to start registry hub - all ports in use');
-    process.exit(1);
+  // No hub running - try to acquire lock and become hub
+  const acquired = await tryAcquireHubLock();
+  if (acquired) {
+    // We got the lock - become the hub
+    logger.info('Acquired hub lock, starting registry hub');
+    const hubPort = await startRegistryServer();
+    if (!hubPort) {
+      await releaseHubLock(); // Release on failure
+      logger.error('Failed to start registry hub - all ports in use');
+      process.exit(1);
+    }
+    // Hub mode: run our own WebSocket server for Y.Doc sync
+    initAsHub();
+    logger.info({ hubPort }, 'Registry hub started successfully');
+  } else {
+    // Another process holds the lock - wait and become client
+    logger.info('Hub lock held by another process, waiting to become client');
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+
+    const port = await isRegistryRunning();
+    if (port) {
+      logger.info({ registryPort: port }, 'Connecting to registry hub as client');
+      await initAsClient(port);
+    } else {
+      logger.error('Failed to find running hub after lock acquisition failed');
+      process.exit(1);
+    }
   }
-  // Hub mode: run our own WebSocket server for Y.Doc sync
-  initAsHub();
-  logger.info({ hubPort }, 'Registry hub started successfully');
 } else {
-  // Another instance is already the Registry Hub - connect as client
+  // Hub already running - connect as client
   logger.info({ registryPort }, 'Connecting to registry hub as client');
   await initAsClient(registryPort);
 }

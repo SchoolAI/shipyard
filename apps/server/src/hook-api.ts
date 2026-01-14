@@ -126,7 +126,7 @@ export async function handleCreateSession(req: Request, res: Response): Promise<
       ownerId,
     });
 
-    const webUrl = process.env.PEER_PLAN_WEB_URL ?? 'https://schoolai.github.io/peer-plan';
+    const webUrl = process.env.PEER_PLAN_WEB_URL ?? 'http://localhost:5173';
     const url = `${webUrl}/plan/${planId}`;
 
     logger.info({ url }, 'Plan URL generated');
@@ -288,7 +288,7 @@ export async function handleSetSessionToken(req: Request, res: Response): Promis
       updatedAt: Date.now(),
     });
 
-    const webUrl = process.env.PEER_PLAN_WEB_URL ?? 'https://schoolai.github.io/peer-plan';
+    const webUrl = process.env.PEER_PLAN_WEB_URL ?? 'http://localhost:5173';
     const url = `${webUrl}/plan/${planId}`;
 
     logger.info({ planId }, 'Session token set successfully');

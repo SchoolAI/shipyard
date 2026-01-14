@@ -12,9 +12,11 @@ interface KanbanColumnProps {
   column: ColumnWithPlans;
   /** Callback when a card is hovered (for Space bar peek preview) */
   onCardHover?: (planId: string | null) => void;
+  /** Callback when a card is clicked (for slide-out panel) */
+  onCardClick?: (planId: string) => void;
 }
 
-export function KanbanColumn({ column, onCardHover }: KanbanColumnProps) {
+export function KanbanColumn({ column, onCardHover, onCardClick }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({
     id: column.id,
     data: {
@@ -51,7 +53,12 @@ export function KanbanColumn({ column, onCardHover }: KanbanColumnProps) {
             </div>
           ) : (
             column.plans.map((plan) => (
-              <KanbanCard key={plan.id} plan={plan} onHover={onCardHover} />
+              <KanbanCard
+                key={plan.id}
+                plan={plan}
+                onHover={onCardHover}
+                onPanelOpen={onCardClick}
+              />
             ))
           )}
         </SortableContext>

@@ -1,5 +1,6 @@
 /**
  * Kanban Board Page - Visual workflow management with drag-drop status changes.
+ * Includes slide-out panel for viewing plans without losing board context.
  */
 
 import {
@@ -16,22 +17,37 @@ import {
   useSensors,
 } from '@dnd-kit/core';
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
-import { Button, Tooltip } from '@heroui/react';
-import type { PlanIndexEntry, PlanStatusType } from '@peer-plan/schema';
-import { getPlanIndexEntry, PLAN_INDEX_DOC_NAME, setPlanIndexEntry } from '@peer-plan/schema';
+import { Button, Spinner, Tooltip } from '@heroui/react';
+import {
+  getDeliverables,
+  getPlanIndexEntry,
+  getPlanMetadata,
+  PLAN_INDEX_DOC_NAME,
+  type PlanIndexEntry,
+  type PlanMetadata,
+  type PlanStatusType,
+  setPlanIndexEntry,
+} from '@peer-plan/schema';
 import { Eye, EyeOff } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { IndexeddbPersistence } from 'y-indexeddb';
 import * as Y from 'yjs';
+import { PlanContent } from '@/components/PlanContent';
+import { type PanelWidth, PlanPanel } from '@/components/PlanPanel';
+import { PlanPanelHeader } from '@/components/PlanPanelHeader';
 import { PlanPeekModal } from '@/components/PlanPeekModal';
 import { KanbanSkeleton } from '@/components/ui/KanbanSkeleton';
 import { KanbanCard } from '@/components/views/KanbanCard';
 import { KanbanColumn } from '@/components/views/KanbanColumn';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
 import { columnIdToStatus, useKanbanColumns } from '@/hooks/useKanbanColumns';
+import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useMultiProviderSync } from '@/hooks/useMultiProviderSync';
 import { usePlanIndex } from '@/hooks/usePlanIndex';
+import { colorFromString } from '@/utils/color';
+import { formatRelativeTime } from '@/utils/formatters';
 import {
   getHideEmptyColumns,
   setHideEmptyColumns as saveHideEmptyColumns,
@@ -90,21 +106,25 @@ async function updatePlanStatus(
       metadata.set('updatedAt', now);
     });
 
-    // Brief delay to ensure IndexedDB write
-    await new Promise((resolve) => setTimeout(resolve, 100));
     idb.destroy();
   } catch {
     // Plan doc may not exist locally - index update is sufficient
   }
 }
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: page component orchestrates multiple state machines
 export function KanbanPage() {
-  const { identity: githubIdentity } = useGitHubAuth();
+  const { identity: githubIdentity, startAuth } = useGitHubAuth();
   const { myPlans, sharedPlans, inboxPlans, isLoading } = usePlanIndex(githubIdentity?.username);
   const { ydoc: indexDoc } = useMultiProviderSync(PLAN_INDEX_DOC_NAME);
+  const navigate = useNavigate();
+  const location = useLocation();
 
-  // Combine all plans for the board
-  const allPlans = [...myPlans, ...sharedPlans, ...inboxPlans];
+  // Combine all plans for the board (memoized to stabilize identity for useCallback deps)
+  const allPlans = useMemo(
+    () => [...myPlans, ...sharedPlans, ...inboxPlans],
+    [myPlans, sharedPlans, inboxPlans]
+  );
   const columns = useKanbanColumns(allPlans);
 
   const [hideEmptyColumns, setHideEmptyColumns] = useState(getHideEmptyColumns);
@@ -124,12 +144,75 @@ export function KanbanPage() {
 
   const [activePlan, setActivePlan] = useState<PlanIndexEntry | null>(null);
 
+  // Space bar peek preview state
   const [hoveredCardId, setHoveredCardId] = useState<string | null>(null);
   const [isPeeking, setIsPeeking] = useState(false);
   const [peekPlanId, setPeekPlanId] = useState<string | null>(null);
 
+  // Slide-out panel state - read from URL on mount
+  const searchParams = new URLSearchParams(location.search);
+  const initialPanelId = searchParams.get('panel');
+  const rawWidth = searchParams.get('width');
+  const validWidths: PanelWidth[] = ['peek', 'expanded', 'full'];
+  const initialWidth: PanelWidth = validWidths.includes(rawWidth as PanelWidth)
+    ? (rawWidth as PanelWidth)
+    : 'peek';
+
+  const [selectedPlanId, setSelectedPlanId] = useState<string | null>(initialPanelId);
+  const [panelWidth, setPanelWidth] = useState<PanelWidth>(initialWidth);
+
+  // Plan data for panel
+  const [panelMetadata, setPanelMetadata] = useState<PlanMetadata | null>(null);
+  const [panelDeliverableStats, setPanelDeliverableStats] = useState({ completed: 0, total: 0 });
+  const [panelLastActivity, setPanelLastActivity] = useState('');
+
+  // Sync providers for selected plan
+  const {
+    ydoc: panelYdoc,
+    syncState: panelSyncState,
+    wsProvider: panelWsProvider,
+    rtcProvider: panelRtcProvider,
+  } = useMultiProviderSync(selectedPlanId || '');
+
+  // Update URL when panel state changes
+  useEffect(() => {
+    if (selectedPlanId) {
+      navigate(`?panel=${selectedPlanId}&width=${panelWidth}`, { replace: true });
+    } else {
+      navigate('', { replace: true });
+    }
+  }, [selectedPlanId, panelWidth, navigate]);
+
+  // Load panel metadata when plan is selected
+  useEffect(() => {
+    if (!selectedPlanId || !panelSyncState.idbSynced) {
+      setPanelMetadata(null);
+      return;
+    }
+
+    const metaMap = panelYdoc.getMap('metadata');
+    const update = () => {
+      const metadata = getPlanMetadata(panelYdoc);
+      setPanelMetadata(metadata);
+
+      // Update deliverable stats
+      const deliverables = getDeliverables(panelYdoc);
+      const completed = deliverables.filter((d) => d.linkedArtifactId).length;
+      setPanelDeliverableStats({ completed, total: deliverables.length });
+
+      // Format last activity
+      if (metadata?.updatedAt) {
+        setPanelLastActivity(`Updated ${formatRelativeTime(metadata.updatedAt)}`);
+      }
+    };
+    update();
+    metaMap.observe(update);
+    return () => metaMap.unobserve(update);
+  }, [selectedPlanId, panelYdoc, panelSyncState.idbSynced]);
+
   const peekPlan = peekPlanId ? allPlans.find((p) => p.id === peekPlanId) : null;
 
+  // Space bar peek handlers
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Only trigger if Space and hovering over a card, not during drag
@@ -175,6 +258,117 @@ export function KanbanPage() {
   const handleClosePeek = useCallback(() => {
     setIsPeeking(false);
   }, []);
+
+  // Panel handlers
+  const handleCardClick = useCallback((planId: string) => {
+    setSelectedPlanId(planId);
+    setPanelWidth('peek');
+  }, []);
+
+  const handleClosePanel = useCallback(() => {
+    setSelectedPlanId(null);
+  }, []);
+
+  const handleChangeWidth = useCallback((width: PanelWidth) => {
+    setPanelWidth(width);
+  }, []);
+
+  // Panel width cycling
+  const cycleWidth = useCallback(
+    (direction: 'expand' | 'collapse') => {
+      const widths: PanelWidth[] = ['peek', 'expanded', 'full'];
+      const currentIndex = widths.indexOf(panelWidth);
+      if (direction === 'expand' && currentIndex < widths.length - 1) {
+        setPanelWidth(widths[currentIndex + 1] as PanelWidth);
+      } else if (direction === 'collapse' && currentIndex > 0) {
+        setPanelWidth(widths[currentIndex - 1] as PanelWidth);
+      }
+    },
+    [panelWidth]
+  );
+
+  // Keyboard shortcuts for panel
+  useKeyboardShortcuts({
+    onTogglePanel: useCallback(() => {
+      if (selectedPlanId) {
+        cycleWidth('collapse');
+      }
+    }, [selectedPlanId, cycleWidth]),
+    onExpandPanel: useCallback(() => {
+      if (selectedPlanId) {
+        cycleWidth('expand');
+      }
+    }, [selectedPlanId, cycleWidth]),
+    onFullScreen: useCallback(() => {
+      if (selectedPlanId) {
+        setPanelWidth(panelWidth === 'full' ? 'peek' : 'full');
+      }
+    }, [selectedPlanId, panelWidth]),
+    onClose: handleClosePanel,
+    onNextItem: useCallback(() => {
+      if (!selectedPlanId) return;
+      const currentIndex = allPlans.findIndex((p) => p.id === selectedPlanId);
+      if (currentIndex < allPlans.length - 1) {
+        const nextPlan = allPlans[currentIndex + 1];
+        if (nextPlan) {
+          setSelectedPlanId(nextPlan.id);
+        }
+      }
+    }, [selectedPlanId, allPlans]),
+    onPrevItem: useCallback(() => {
+      if (!selectedPlanId) return;
+      const currentIndex = allPlans.findIndex((p) => p.id === selectedPlanId);
+      if (currentIndex > 0) {
+        const prevPlan = allPlans[currentIndex - 1];
+        if (prevPlan) {
+          setSelectedPlanId(prevPlan.id);
+        }
+      }
+    }, [selectedPlanId, allPlans]),
+  });
+
+  // Review action handlers
+  const handleApprove = useCallback(async () => {
+    if (!selectedPlanId || !panelMetadata) return;
+
+    panelYdoc.transact(() => {
+      const metadata = panelYdoc.getMap('metadata');
+      metadata.set('status', 'in_progress');
+      metadata.set('updatedAt', Date.now());
+    });
+
+    // Also update index
+    const entry = getPlanIndexEntry(indexDoc, selectedPlanId);
+    if (entry) {
+      setPlanIndexEntry(indexDoc, {
+        ...entry,
+        status: 'in_progress',
+        updatedAt: Date.now(),
+      });
+    }
+
+    toast.success('Plan approved');
+  }, [selectedPlanId, panelMetadata, panelYdoc, indexDoc]);
+
+  const handleRequestChanges = useCallback(() => {
+    if (!selectedPlanId) return;
+    // Navigate to full plan page for adding comments
+    navigate(`/plan/${selectedPlanId}`);
+    toast.info('Navigate to add comments and request changes');
+  }, [selectedPlanId, navigate]);
+
+  // Identity for comments
+  const identity = githubIdentity
+    ? {
+        id: githubIdentity.username,
+        name: githubIdentity.displayName,
+        color: colorFromString(githubIdentity.username),
+      }
+    : null;
+
+  const handleRequestIdentity = useCallback(() => {
+    startAuth();
+  }, [startAuth]);
 
   const sensors = useSensors(
     useSensor(MouseSensor, {
@@ -266,6 +460,9 @@ export function KanbanPage() {
     setActivePlan(null);
   };
 
+  // Prefer WebSocket when connected, fall back to WebRTC
+  const activeProvider = panelWsProvider ?? panelRtcProvider;
+
   return (
     <div className="h-full flex flex-col">
       <header className="flex items-center justify-between px-4 py-3 border-b border-separator shrink-0">
@@ -306,7 +503,12 @@ export function KanbanPage() {
         >
           <div className="flex gap-4 p-4 h-full min-w-min">
             {visibleColumns.map((column) => (
-              <KanbanColumn key={column.id} column={column} onCardHover={handleCardHover} />
+              <KanbanColumn
+                key={column.id}
+                column={column}
+                onCardHover={handleCardHover}
+                onCardClick={handleCardClick}
+              />
             ))}
           </div>
 
@@ -320,7 +522,47 @@ export function KanbanPage() {
         </DndContext>
       </div>
 
+      {/* Space bar peek modal */}
       {peekPlan && <PlanPeekModal plan={peekPlan} isOpen={isPeeking} onClose={handleClosePeek} />}
+
+      {/* Slide-out panel */}
+      <PlanPanel
+        planId={selectedPlanId}
+        width={panelWidth}
+        onClose={handleClosePanel}
+        onChangeWidth={handleChangeWidth}
+      >
+        {selectedPlanId && panelMetadata ? (
+          <>
+            <PlanPanelHeader
+              metadata={panelMetadata}
+              deliverableStats={panelDeliverableStats}
+              lastActivityText={panelLastActivity}
+              onApprove={handleApprove}
+              onRequestChanges={handleRequestChanges}
+              onClose={handleClosePanel}
+              onExpand={() => cycleWidth(panelWidth === 'peek' ? 'expand' : 'collapse')}
+              onFullScreen={() => setPanelWidth(panelWidth === 'full' ? 'peek' : 'full')}
+              width={panelWidth}
+            />
+            <PlanContent
+              ydoc={panelYdoc}
+              metadata={panelMetadata}
+              syncState={panelSyncState}
+              identity={identity}
+              onRequestIdentity={handleRequestIdentity}
+              provider={activeProvider}
+            />
+          </>
+        ) : selectedPlanId ? (
+          <div className="flex items-center justify-center h-full">
+            <div className="flex flex-col items-center gap-4">
+              <Spinner size="lg" />
+              <p className="text-muted-foreground">Loading plan...</p>
+            </div>
+          </div>
+        ) : null}
+      </PlanPanel>
     </div>
   );
 }

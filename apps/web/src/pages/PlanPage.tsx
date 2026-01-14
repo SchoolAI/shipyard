@@ -2,7 +2,6 @@ import { Button, Spinner, useOverlayState } from '@heroui/react';
 import {
   addArtifact,
   extractDeliverables,
-  getDeliverables,
   getPlanFromUrl,
   getPlanIndexEntry,
   getPlanMetadata,
@@ -12,18 +11,15 @@ import {
   setPlanIndexEntry,
   YDOC_KEYS,
 } from '@peer-plan/schema';
-import { FileText, GitPullRequest, LogIn, Package } from 'lucide-react';
+import { LogIn } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import * as Y from 'yjs';
-import { Attachments } from '@/components/Attachments';
-import { ChangesView } from '@/components/ChangesView';
-import { DeliverablesView } from '@/components/DeliverablesView';
 import { ImportConversationHandler } from '@/components/ImportConversationHandler';
 import { MobileActionsMenu } from '@/components/MobileActionsMenu';
 import { MobileHeader } from '@/components/MobileHeader';
+import { PlanContent } from '@/components/PlanContent';
 import { PlanHeader } from '@/components/PlanHeader';
-import { PlanViewer } from '@/components/PlanViewer';
 import { ReviewActions } from '@/components/ReviewActions';
 import { Sidebar } from '@/components/Sidebar';
 import { Drawer } from '@/components/ui/drawer';
@@ -35,9 +31,7 @@ import { useMultiProviderSync } from '@/hooks/useMultiProviderSync';
 import { usePendingUserNotifications } from '@/hooks/usePendingUserNotifications';
 import { colorFromString } from '@/utils/color';
 
-type ViewType = 'plan' | 'deliverables' | 'changes';
-
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Component has necessary conditional logic for sync state handling
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: page component handles complex sync state machine
 export function PlanPage() {
   const { id } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
@@ -65,6 +59,18 @@ export function PlanPage() {
         addArtifact(doc, artifact);
       }
     }
+
+    // Populate deliverables from URL if present
+    if (urlPlan.deliverables) {
+      const deliverablesArray = doc.getArray(YDOC_KEYS.DELIVERABLES);
+      deliverablesArray.push(urlPlan.deliverables);
+    } else if (urlPlan.content) {
+      // Extract from content as fallback
+      const deliverables = extractDeliverables(urlPlan.content);
+      const deliverablesArray = doc.getArray(YDOC_KEYS.DELIVERABLES);
+      deliverablesArray.push(deliverables);
+    }
+
     return doc;
   }, [isSnapshot, urlPlan]);
 
@@ -75,8 +81,6 @@ export function PlanPage() {
   const drawerState = useOverlayState();
   const { setActivePlanSync, clearActivePlanSync } = useActivePlanSync();
   const [metadata, setMetadata] = useState<PlanMetadata | null>(null);
-  const [activeView, setActiveView] = useState<ViewType>('plan');
-  const [deliverableCount, setDeliverableCount] = useState({ completed: 0, total: 0 });
 
   // Convert GitHub identity to BlockNote-compatible format
   const identity = githubIdentity
@@ -89,14 +93,10 @@ export function PlanPage() {
 
   const { ydoc: indexDoc } = useMultiProviderSync(PLAN_INDEX_DOC_NAME);
   // Prefer WebSocket provider when connected, fall back to WebRTC for P2P-only mode.
-  // This ensures BlockNote binds to the Y.Doc fragment even without a WebSocket server,
-  // so comment highlights sync properly via WebRTC.
   const activeProvider = isSnapshot ? null : (wsProvider ?? rtcProvider);
 
   // P2P grace period: when opening a shared URL, IndexedDB syncs immediately (empty)
   // but we need to wait for WebRTC to deliver the plan data before showing "Not Found"
-  // We use a longer grace period (15s) because WebRTC peer discovery and STUN/TURN
-  // negotiation can take 4-12 seconds depending on network conditions
   const [p2pGracePeriodExpired, setP2pGracePeriodExpired] = useState(false);
 
   // Check if current user is the plan owner (for notifications)
@@ -107,19 +107,15 @@ export function PlanPage() {
   usePendingUserNotifications(rtcProvider, isOwner);
 
   // Start timeout when in P2P-only mode without metadata
-  // Use longer timeout when peers are connected (they're actively trying to sync)
   useEffect(() => {
     const inP2POnlyMode = syncState.idbSynced && !syncState.synced && !syncState.connected;
     const needsP2PData = !metadata && inP2POnlyMode;
 
     if (needsP2PData) {
-      // If peers are connected, wait longer (30s) - they might be syncing large data
-      // If no peers yet, use standard timeout (15s) for initial peer discovery
       const gracePeriod = syncState.peerCount > 0 ? 30000 : 15000;
       const timeout = setTimeout(() => setP2pGracePeriodExpired(true), gracePeriod);
       return () => clearTimeout(timeout);
     }
-    // Reset if metadata arrives (plan found via P2P)
     if (metadata) {
       setP2pGracePeriodExpired(false);
     }
@@ -151,35 +147,6 @@ export function PlanPage() {
     return () => metaMap.unobserve(update);
   }, [ydoc, isSnapshot, urlPlan]);
 
-  // Subscribe to deliverables for tab count
-  useEffect(() => {
-    // For snapshots, use deliverables from URL (with linkage info) or extract from content
-    if (isSnapshot && urlPlan) {
-      // Prefer deliverables from URL (includes linkage info), fall back to extracting from content
-      const deliverables = urlPlan.deliverables ?? extractDeliverables(urlPlan.content);
-      // Populate deliverables array in Y.Doc so components can access them
-      const deliverablesArray = ydoc.getArray(YDOC_KEYS.DELIVERABLES);
-      deliverablesArray.delete(0, deliverablesArray.length); // Clear existing
-      deliverablesArray.push(deliverables);
-
-      // Count completed deliverables (those with linkedArtifactId)
-      const completed = deliverables.filter((d) => d.linkedArtifactId).length;
-      setDeliverableCount({ completed, total: deliverables.length });
-      return;
-    }
-
-    // For normal plans, observe Y.Doc changes
-    const deliverablesArray = ydoc.getArray(YDOC_KEYS.DELIVERABLES);
-    const updateCount = () => {
-      const deliverables = getDeliverables(ydoc);
-      const completed = deliverables.filter((d) => d.linkedArtifactId).length;
-      setDeliverableCount({ completed, total: deliverables.length });
-    };
-    updateCount();
-    deliverablesArray.observe(updateCount);
-    return () => deliverablesArray.unobserve(updateCount);
-  }, [ydoc, isSnapshot, urlPlan]);
-
   // Update context with active plan sync state
   useEffect(() => {
     setActivePlanSync(planId, syncState);
@@ -196,7 +163,6 @@ export function PlanPage() {
       if (!metadata) return;
 
       // Only update plan-index if the plan is already there (owned by this user's MCP server)
-      // Don't add shared plans to plan-index - they should stay in "Shared with me"
       const existingEntry = getPlanIndexEntry(indexDoc, planId);
       if (!existingEntry) return;
 
@@ -210,10 +176,6 @@ export function PlanPage() {
   );
 
   // Mark plan as deleted in index if metadata is missing after sync.
-  // Only do this if we're connected to the hub WebSocket - this ensures
-  // we're not incorrectly marking plans as deleted in P2P-only mode or during
-  // initial connection setup. Without a connected server, we can't be sure the
-  // plan doesn't exist vs just being slow to sync.
   useEffect(() => {
     if (syncState.synced && syncState.connected && !metadata) {
       const existingEntry = getPlanIndexEntry(indexDoc, planId);
@@ -227,9 +189,8 @@ export function PlanPage() {
   }, [syncState.synced, syncState.connected, metadata, indexDoc, planId]);
 
   // Early returns AFTER all hooks
-  // Skip loading/not-found checks for snapshots (they have URL data)
   if (!isSnapshot) {
-    // Phase 1: Initial loading (IndexedDB not synced yet)
+    // Phase 1: Initial loading
     if (!syncState.idbSynced) {
       return (
         <div className="flex items-center justify-center min-h-[50vh] p-4">
@@ -267,8 +228,6 @@ export function PlanPage() {
     }
 
     if (!metadata) {
-      // If user is not authenticated, they need to sign in first
-      // Don't show "Plan Not Found" - the plan might exist but we can't verify without auth
       if (!githubIdentity) {
         return (
           <div className="flex items-center justify-center min-h-[60vh] p-4">
@@ -297,8 +256,6 @@ export function PlanPage() {
         );
       }
 
-      // User is authenticated but plan still doesn't exist after grace period
-      // and no peers are connected to sync from
       return (
         <div className="p-8 text-center">
           <h1 className="text-xl font-bold text-foreground">Plan Not Found</h1>
@@ -321,7 +278,7 @@ export function PlanPage() {
     );
   }
 
-  // Metadata should be set at this point (either from URL or Y.Doc)
+  // Metadata should be set at this point
   if (!metadata) {
     return (
       <div className="p-8">
@@ -344,7 +301,7 @@ export function PlanPage() {
       )}
 
       <div className="flex flex-col h-full overflow-hidden">
-        {/* Header bar with plan metadata - hidden on mobile (shown in MobileHeader instead) */}
+        {/* Header bar with plan metadata - hidden on mobile */}
         {!isMobile && (
           <div className="border-b border-separator bg-surface px-2 md:px-6 py-1 md:py-3 shrink-0">
             <PlanHeader
@@ -360,91 +317,19 @@ export function PlanPage() {
           </div>
         )}
 
-        <div className="flex flex-col flex-1 overflow-hidden">
-          <div className="border-b border-separator bg-surface px-2 md:px-6 py-1 md:py-2 shrink-0">
-            <div className="flex gap-0 md:gap-4">
-              <button
-                type="button"
-                onClick={() => setActiveView('plan')}
-                className={`flex items-center justify-center gap-2 pb-2 px-2 font-medium text-sm transition-colors flex-1 md:flex-initial ${
-                  activeView === 'plan'
-                    ? 'text-primary border-b-2 border-primary'
-                    : 'text-muted-foreground hover:text-foreground border-b-2 border-transparent'
-                }`}
-              >
-                <FileText className="w-4 h-4" />
-                Plan
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveView('deliverables')}
-                className={`flex items-center justify-center gap-2 pb-2 px-2 font-medium text-sm transition-colors flex-1 md:flex-initial ${
-                  activeView === 'deliverables'
-                    ? 'text-primary border-b-2 border-primary'
-                    : 'text-muted-foreground hover:text-foreground border-b-2 border-transparent'
-                }`}
-              >
-                <Package className="w-4 h-4" />
-                Deliverables
-                {deliverableCount.total > 0 && (
-                  <span className="text-xs opacity-70">
-                    ({deliverableCount.completed}/{deliverableCount.total})
-                  </span>
-                )}
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveView('changes')}
-                className={`flex items-center justify-center gap-2 pb-2 px-2 font-medium text-sm transition-colors flex-1 md:flex-initial ${
-                  activeView === 'changes'
-                    ? 'text-primary border-b-2 border-primary'
-                    : 'text-muted-foreground hover:text-foreground border-b-2 border-transparent'
-                }`}
-              >
-                <GitPullRequest className="w-4 h-4" />
-                Changes
-              </button>
-            </div>
-          </div>
+        {/* Tabbed content using PlanContent component */}
+        <PlanContent
+          ydoc={ydoc}
+          metadata={metadata}
+          syncState={syncState}
+          identity={identity}
+          onRequestIdentity={handleRequestIdentity}
+          provider={activeProvider}
+          initialContent={isSnapshot ? urlPlan?.content : undefined}
+          isSnapshot={isSnapshot}
+        />
 
-          {activeView === 'plan' && (
-            <div className="flex-1 overflow-y-auto bg-background">
-              <div className="max-w-4xl mx-auto px-1 py-2 md:p-6 space-y-3 md:space-y-6">
-                {/* Key forces full remount when identity changes, ensuring
-                    useCreateBlockNote creates a fresh editor with correct extensions.
-                    Without this, changing from anonymous to identified user would crash
-                    because the editor was created without CommentsExtension. */}
-                <PlanViewer
-                  key={identity?.id ?? 'anonymous'}
-                  ydoc={ydoc}
-                  identity={isSnapshot ? null : identity}
-                  provider={activeProvider}
-                  onRequestIdentity={isSnapshot ? undefined : handleRequestIdentity}
-                  initialContent={isSnapshot ? urlPlan?.content : undefined}
-                />
-                <Attachments ydoc={ydoc} />
-              </div>
-            </div>
-          )}
-
-          {activeView === 'deliverables' && (
-            <div className="flex-1 overflow-y-auto bg-background">
-              <DeliverablesView
-                ydoc={ydoc}
-                metadata={metadata}
-                identity={identity}
-                onRequestIdentity={handleRequestIdentity}
-              />
-            </div>
-          )}
-
-          {activeView === 'changes' && (
-            <div className="flex-1 overflow-y-auto bg-background">
-              <ChangesView ydoc={ydoc} metadata={metadata} />
-            </div>
-          )}
-        </div>
-
+        {/* Mobile review actions */}
         {isMobile && metadata && !isSnapshot && (
           <div className="fixed bottom-3 right-3 z-30 pb-safe">
             <div className="bg-surface rounded-lg shadow-lg border border-separator p-2">

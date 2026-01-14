@@ -83,13 +83,16 @@ export async function getOrCreateDoc(docName: string): Promise<Y.Doc> {
 /**
  * Check if there are active connections for a plan.
  * Routes to the appropriate implementation based on initialization mode.
+ * In client mode, this makes an HTTP request to the hub.
  */
-export function hasActiveConnections(planId: string): boolean {
+export async function hasActiveConnections(planId: string): Promise<boolean> {
   switch (currentMode) {
     case 'hub':
+      // Sync function in hub mode
       return registryHasActiveConnections(planId);
     case 'client':
-      return hubHasActiveConnections(planId);
+      // Async function in client mode
+      return await hubHasActiveConnections(planId);
     case 'uninitialized':
       // In uninitialized state, assume no connections
       return false;

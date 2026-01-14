@@ -28,6 +28,8 @@ interface KanbanCardProps {
   plan: PlanIndexEntry;
   /** Callback when card is hovered (for Space bar peek preview) */
   onHover?: (planId: string | null) => void;
+  /** Callback when card is clicked to open slide-out panel (if provided, prevents navigation) */
+  onPanelOpen?: (planId: string) => void;
 }
 
 /**
@@ -53,7 +55,7 @@ function getStatusBorderColor(status: PlanStatusType): string {
   }
 }
 
-export function KanbanCard({ plan, onHover }: KanbanCardProps) {
+export function KanbanCard({ plan, onHover, onPanelOpen }: KanbanCardProps) {
   const navigate = useNavigate();
   const metadata = usePlanMetadata(plan.id);
 
@@ -72,8 +74,12 @@ export function KanbanCard({ plan, onHover }: KanbanCardProps) {
   };
 
   const handleClick = () => {
-    // Only navigate if not dragging (activation constraint handles this)
-    navigate(`/plan/${plan.id}`);
+    // If panel callback provided, open panel instead of navigating
+    if (onPanelOpen) {
+      onPanelOpen(plan.id);
+    } else {
+      navigate(`/plan/${plan.id}`);
+    }
   };
 
   const hasDeliverables = metadata.deliverableCount > 0;

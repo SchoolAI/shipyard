@@ -2,6 +2,18 @@
  * Hub client for MCP instances connecting to the Registry Hub.
  * When Registry Hub is already running, MCP instances become thin clients
  * that sync Y.Docs via WebSocket instead of running their own servers.
+ *
+ * ## Persistence Limitation
+ *
+ * Client MCPs do NOT have local persistence. All data is stored in the hub's
+ * LevelDB. This means:
+ *
+ * - Hub persists all acknowledged Y.Doc updates
+ * - Client MCP crash only loses in-flight operations (not yet confirmed by hub)
+ * - Browser IndexedDB provides additional resilience
+ *
+ * This trade-off was chosen for simplicity (KISS principle). The risk is low
+ * because y-websocket confirms sync before returning from operations.
  */
 
 import { WebsocketProvider } from 'y-websocket';
@@ -93,21 +105,25 @@ export async function getOrCreateDoc(docName: string): Promise<Y.Doc> {
 }
 
 /**
- * Check if there are active connections for a plan.
- *
- * LIMITATION: In client mode, we cannot know if the hub has active connections
- * without making an async HTTP call to the registry (but this function is sync).
- *
- * TRADE-OFF: We return false, which may open duplicate browser tabs if the hub
- * already has a browser connected. This is annoying UX but not a data integrity issue.
- *
- * FUTURE: Consider adding an HTTP endpoint like GET /api/plan/:id/connections
- * and making this function async, or accept the duplicate tab limitation.
+ * Check if there are active connections for a plan by querying the hub.
+ * Makes an HTTP request to the registry to check connection state.
  */
-export function hasActiveConnections(_planId: string): boolean {
-  // In client mode, return false (may open duplicate tabs)
-  // In practice, browser opening is fast and user can close duplicates
-  return false;
+export async function hasActiveConnections(planId: string): Promise<boolean> {
+  if (!hubPort) return false;
+
+  try {
+    const res = await fetch(`http://localhost:${hubPort}/api/plan/${planId}/has-connections`, {
+      signal: AbortSignal.timeout(500),
+    });
+
+    if (!res.ok) return false;
+
+    const data = (await res.json()) as { hasConnections: boolean };
+    return data.hasConnections;
+  } catch {
+    // Fail open - allow browser to open on error
+    return false;
+  }
 }
 
 /**

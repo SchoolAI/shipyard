@@ -14,8 +14,33 @@ import { useGitHubAuth } from './useGitHubAuth';
 
 const DEFAULT_SIGNALING_SERVER = 'wss://peer-plan-signaling.jacob-191.workers.dev';
 
-// Single hub URL - replaces multi-provider discovery
-const DEFAULT_HUB_URL = 'ws://localhost:32191';
+const DEFAULT_REGISTRY_PORTS = [32191, 32192];
+
+/**
+ * Discover the hub URL by checking registry endpoints.
+ * Tries ports 32191 and 32192 to handle hub restarts.
+ */
+async function discoverHubUrl(): Promise<string> {
+  const ports = import.meta.env.VITE_REGISTRY_PORT
+    ? [Number.parseInt(import.meta.env.VITE_REGISTRY_PORT as string, 10)]
+    : DEFAULT_REGISTRY_PORTS;
+
+  for (const port of ports) {
+    try {
+      const res = await fetch(`http://localhost:${port}/registry`, {
+        signal: AbortSignal.timeout(1000),
+      });
+      if (res.ok) {
+        return `ws://localhost:${port}`;
+      }
+    } catch {
+      // Continue to next port
+    }
+  }
+
+  // Fallback to default if discovery fails
+  return `ws://localhost:${DEFAULT_REGISTRY_PORTS[0]}`;
+}
 
 /**
  * Generate a deterministic color from a string (e.g., username).
@@ -102,6 +127,7 @@ export function useMultiProviderSync(
 
   useEffect(() => {
     let mounted = true;
+    let ws: WebsocketProvider | null = null;
 
     const idbProvider = new IndexeddbPersistence(docName, ydoc);
 
@@ -121,23 +147,30 @@ export function useMultiProviderSync(
       }
     });
 
-    // Connect to single Registry Hub
-    const hubUrl = (import.meta.env.VITE_HUB_URL as string) || DEFAULT_HUB_URL;
-    const ws = new WebsocketProvider(hubUrl, docName, ydoc, {
-      connect: true,
-      maxBackoffTime: 2500,
-    });
+    // Connect to single Registry Hub with port discovery
+    (async () => {
+      const hubUrl = import.meta.env.VITE_HUB_URL
+        ? (import.meta.env.VITE_HUB_URL as string)
+        : await discoverHubUrl();
 
-    wsProviderRef.current = ws;
-    setWsProvider(ws);
+      if (!mounted) return;
 
-    ws.on('status', () => {
-      if (mounted) updateSyncState();
-    });
+      ws = new WebsocketProvider(hubUrl, docName, ydoc, {
+        connect: true,
+        maxBackoffTime: 2500,
+      });
 
-    ws.on('sync', () => {
-      if (mounted) updateSyncState();
-    });
+      wsProviderRef.current = ws;
+      setWsProvider(ws);
+
+      ws.on('status', () => {
+        if (mounted) updateSyncState();
+      });
+
+      ws.on('sync', () => {
+        if (mounted) updateSyncState();
+      });
+    })();
 
     let rtc: WebrtcProvider | null = null;
     let handleBeforeUnload: (() => void) | null = null;
@@ -339,8 +372,10 @@ export function useMultiProviderSync(
 
     return () => {
       mounted = false;
-      ws.disconnect();
-      ws.destroy();
+      if (ws) {
+        ws.disconnect();
+        ws.destroy();
+      }
       wsProviderRef.current = null;
       setWsProvider(null);
       metadataMap.unobserve(handleMetadataChange);

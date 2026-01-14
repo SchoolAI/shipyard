@@ -41,11 +41,16 @@ import type {
 import * as map from 'lib0/map';
 import { nanoid } from 'nanoid';
 import { type WebSocket, WebSocketServer } from 'ws';
+import {
+  extractPlanId,
+  isUserApproved as isUserApprovedBase,
+  isUserRejected as isUserRejectedBase,
+  type PlanApprovalState,
+  send,
+  WS_READY_STATE_CONNECTING,
+  WS_READY_STATE_OPEN,
+} from './access-control.js';
 import { logger } from './logger.js';
-
-// --- WebSocket Ready States ---
-const WS_READY_STATE_CONNECTING = 0;
-const WS_READY_STATE_OPEN = 1;
 
 // --- Configuration ---
 const PING_TIMEOUT_MS = 30000;
@@ -124,14 +129,7 @@ type OutgoingMessage =
   | InviteRedeemedNotification;
 
 // --- Plan Approval State ---
-
-interface PlanApprovalState {
-  planId: string;
-  ownerId: string;
-  approvedUsers: string[];
-  rejectedUsers: string[];
-  lastUpdated: number;
-}
+// Type imported from access-control.ts
 
 // --- Token Validation Error Types ---
 type TokenValidationError = 'invalid' | 'revoked' | 'expired' | 'exhausted';
@@ -206,69 +204,25 @@ function verifyTokenHash(tokenValue: string, storedHash: string): boolean {
   return computedHash === storedHash;
 }
 
-/**
- * Extract plan ID from topic name.
- * Topics follow the format: "peer-plan-{planId}" for plan documents.
- *
- * @param topic - The topic name to extract from
- * @returns The plan ID or null if not a plan topic
- */
-function extractPlanId(topic: string): string | null {
-  const prefix = 'peer-plan-';
-  if (topic.startsWith(prefix)) {
-    return topic.slice(prefix.length);
-  }
-  return null;
-}
+// extractPlanId imported from access-control.ts
 
 /**
  * Check if a user is approved for a plan.
- * Returns true if user is owner or in approved list (and not rejected).
- *
- * @param planId - The plan ID to check approval for
- * @param userId - The user ID to check
- * @returns True if the user is approved
+ * Wrapper around the access-control module function.
  */
 function isUserApproved(planId: string, userId: string | undefined): boolean {
-  const approval = planApprovals.get(planId);
-  if (!approval) return false;
-  if (!userId) return false;
-  if (userId === approval.ownerId) return true;
-  if (approval.rejectedUsers.includes(userId)) return false;
-  return approval.approvedUsers.includes(userId);
+  return isUserApprovedBase(planApprovals, planId, userId);
 }
 
 /**
  * Check if a user is rejected for a plan.
- *
- * @param planId - The plan ID to check rejection for
- * @param userId - The user ID to check
- * @returns True if the user is rejected
+ * Wrapper around the access-control module function.
  */
 function isUserRejected(planId: string, userId: string | undefined): boolean {
-  const approval = planApprovals.get(planId);
-  if (!approval || !userId) return false;
-  return approval.rejectedUsers.includes(userId);
+  return isUserRejectedBase(planApprovals, planId, userId);
 }
 
-/**
- * Send a message to a WebSocket connection.
- * Handles connection state checking and error handling.
- *
- * @param conn - The WebSocket connection to send to
- * @param message - The message to send
- */
-function send(conn: WebSocket, message: OutgoingMessage): void {
-  if (conn.readyState !== WS_READY_STATE_CONNECTING && conn.readyState !== WS_READY_STATE_OPEN) {
-    conn.close();
-    return;
-  }
-  try {
-    conn.send(JSON.stringify(message));
-  } catch {
-    conn.close();
-  }
-}
+// send function imported from access-control.ts
 
 /**
  * Helper function for exhaustive switch statements.

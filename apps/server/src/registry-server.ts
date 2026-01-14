@@ -1,5 +1,5 @@
-import { mkdirSync } from 'node:fs';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdirSync, readFileSync, unlinkSync } from 'node:fs';
+import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
 import http from 'node:http';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
@@ -50,6 +50,9 @@ const HEALTH_CHECK_TIMEOUT = 2000;
 // Shared LevelDB for all plans (no session-pid isolation)
 const PERSISTENCE_DIR = join(homedir(), '.peer-plan', 'plans');
 
+// Lock file to prevent multiple processes from starting the hub simultaneously
+const HUB_LOCK_FILE = join(homedir(), '.peer-plan', 'hub.lock');
+
 // Message types matching y-websocket protocol
 const messageSync = 0;
 const messageAwareness = 1;
@@ -62,12 +65,125 @@ const conns = new Map<string, Set<WebSocket>>();
 let ldb: LeveldbPersistence | null = null;
 
 /**
+ * Attempts to acquire exclusive lock for hub startup.
+ * Uses atomic file creation (wx flag) to prevent race conditions.
+ * Returns true if lock acquired, false if another process holds the lock.
+ */
+export async function tryAcquireHubLock(): Promise<boolean> {
+  try {
+    // Ensure directory exists
+    mkdirSync(join(homedir(), '.peer-plan'), { recursive: true });
+
+    // Atomic create-only write (fails if exists)
+    await writeFile(HUB_LOCK_FILE, `${process.pid}\n${Date.now()}`, { flag: 'wx' });
+
+    // Clean up lock on process exit
+    process.once('exit', () => {
+      try {
+        unlinkSync(HUB_LOCK_FILE);
+      } catch {
+        // Lock may already be cleaned up
+      }
+    });
+
+    logger.info({ pid: process.pid }, 'Acquired hub lock');
+    return true;
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'EEXIST') {
+      // Lock exists - check if holder is still alive
+      try {
+        const content = await readFile(HUB_LOCK_FILE, 'utf-8');
+        const pidStr = content.split('\n')[0] ?? '';
+        const pid = Number.parseInt(pidStr, 10);
+
+        // Check if process is alive (signal 0 doesn't kill, just checks)
+        try {
+          process.kill(pid, 0);
+          logger.debug({ holderPid: pid }, 'Hub lock held by active process');
+          return false; // Process alive, lock valid
+        } catch {
+          // Process dead, remove stale lock and retry
+          logger.warn({ stalePid: pid }, 'Removing stale hub lock');
+          await unlink(HUB_LOCK_FILE);
+          return tryAcquireHubLock(); // Recursive retry
+        }
+      } catch (readErr) {
+        logger.error({ err: readErr }, 'Failed to read hub lock file');
+        return false;
+      }
+    }
+    logger.error({ err }, 'Failed to acquire hub lock');
+    return false;
+  }
+}
+
+/**
+ * Releases the hub lock file.
+ * Called on graceful shutdown.
+ */
+export async function releaseHubLock(): Promise<void> {
+  try {
+    await unlink(HUB_LOCK_FILE);
+    logger.info('Released hub lock');
+  } catch (err) {
+    // Lock file may already be cleaned up by exit handler
+    logger.debug({ err }, 'Hub lock already released');
+  }
+}
+
+/**
  * Ensures LevelDB persistence is initialized.
+ * Handles lock errors by checking if the lock holder process is still alive.
+ * If the lock is stale (process dead), removes it and retries initialization.
  */
 function initPersistence(): void {
   if (!ldb) {
     mkdirSync(PERSISTENCE_DIR, { recursive: true });
-    ldb = new LeveldbPersistence(PERSISTENCE_DIR);
+
+    try {
+      ldb = new LeveldbPersistence(PERSISTENCE_DIR);
+      logger.info({ dir: PERSISTENCE_DIR }, 'LevelDB persistence initialized');
+    } catch (err) {
+      const error = err as Error;
+
+      // Check if this is a lock error
+      if (error.message?.includes('LOCK') || error.message?.includes('lock')) {
+        logger.warn({ err: error }, 'LevelDB locked, checking for stale lock');
+
+        const lockFile = join(PERSISTENCE_DIR, 'LOCK');
+
+        // Try to read lock file to check if holder is alive
+        // LevelDB doesn't store PID, so we use hub.lock
+        try {
+          // If hub.lock exists and has live process, lock is valid
+          const hubLockContent = readFileSync(HUB_LOCK_FILE, 'utf-8');
+          const pidStr = hubLockContent.split('\n')[0] ?? '';
+          const pid = Number.parseInt(pidStr, 10);
+
+          try {
+            process.kill(pid, 0); // Check if process alive
+            logger.error({ holderPid: pid }, 'LevelDB locked by active process, cannot recover');
+            throw error; // Lock is valid, can't remove
+          } catch {
+            // Process dead, safe to remove lock
+            logger.warn('Hub process dead, removing stale LevelDB lock');
+            unlinkSync(lockFile);
+            ldb = new LeveldbPersistence(PERSISTENCE_DIR);
+            logger.info('Recovered from stale LevelDB lock');
+          }
+        } catch (_hubLockErr) {
+          // No hub.lock file - assume lock is stale (no process running)
+          logger.warn('No hub.lock found, assuming LevelDB lock is stale');
+          unlinkSync(lockFile);
+          ldb = new LeveldbPersistence(PERSISTENCE_DIR);
+          logger.info('Recovered from stale LevelDB lock');
+        }
+      } else {
+        // Not a lock error, re-throw
+        logger.error({ err: error }, 'Failed to initialize LevelDB persistence');
+        throw error;
+      }
+    }
   }
 }
 
@@ -352,6 +468,17 @@ async function handlePlanStatus(req: Request, res: Response): Promise<void> {
   }
 }
 
+async function handleHasConnections(req: Request, res: Response): Promise<void> {
+  const planId = req.params.id;
+  if (!planId) {
+    res.status(400).json({ error: 'Missing plan ID' });
+    return;
+  }
+
+  const has = hasActiveConnections(planId);
+  res.json({ hasConnections: has });
+}
+
 async function handleSubscribe(req: Request, res: Response): Promise<void> {
   const planId = req.params.id;
   if (!planId) {
@@ -633,6 +760,7 @@ function createApp(): { app: express.Express; httpServer: http.Server } {
   app.delete('/unregister', handleUnregister);
 
   app.get('/api/plan/:id/status', handlePlanStatus);
+  app.get('/api/plan/:id/has-connections', handleHasConnections);
   app.get('/api/plan/:id/transcript', handleGetTranscript);
   app.post('/api/plan/:id/subscribe', handleSubscribe);
   app.get('/api/plan/:id/changes', handleGetChanges);
@@ -672,6 +800,17 @@ export async function startRegistryServer(): Promise<number | null> {
 
   // Handle WebSocket connections
   wss.on('connection', handleWebSocketConnection);
+
+  // Register signal handlers for graceful shutdown with lock cleanup
+  process.once('SIGINT', async () => {
+    await releaseHubLock();
+    process.exit(0);
+  });
+
+  process.once('SIGTERM', async () => {
+    await releaseHubLock();
+    process.exit(0);
+  });
 
   for (const port of ports) {
     try {

@@ -193,7 +193,7 @@ Bad deliverables (not provable):
 
     const url = `http://localhost:5173/plan/${planId}`;
 
-    if (hasActiveConnections(PLAN_INDEX_DOC_NAME)) {
+    if (await hasActiveConnections(PLAN_INDEX_DOC_NAME)) {
       indexDoc.getMap('navigation').set('target', planId);
       logger.info({ url, planId }, 'Browser already connected, navigating via CRDT');
     } else {

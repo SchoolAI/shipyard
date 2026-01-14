@@ -1,21 +1,34 @@
 /**
  * Inbox Page - Shows plans needing review (pending_review or changes_requested).
- * Includes search filtering for finding specific inbox items.
+ * Includes search filtering and slide-out panel for viewing plans.
  */
 
-import { Button, Chip, ListBox, ListBoxItem, SearchField, Tooltip } from '@heroui/react';
-import type { PlanIndexEntry, PlanStatusType } from '@peer-plan/schema';
-import { getPlanIndexEntry, PLAN_INDEX_DOC_NAME, setPlanIndexEntry } from '@peer-plan/schema';
+import { Button, Chip, ListBox, ListBoxItem, SearchField, Spinner, Tooltip } from '@heroui/react';
+import {
+  getDeliverables,
+  getPlanIndexEntry,
+  getPlanMetadata,
+  PLAN_INDEX_DOC_NAME,
+  type PlanIndexEntry,
+  type PlanMetadata,
+  type PlanStatusType,
+  setPlanIndexEntry,
+} from '@peer-plan/schema';
 import { AlertTriangle, Check, Clock, ExternalLink, MessageSquare } from 'lucide-react';
-import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { IndexeddbPersistence } from 'y-indexeddb';
 import * as Y from 'yjs';
+import { PlanContent } from '@/components/PlanContent';
+import { type PanelWidth, PlanPanel } from '@/components/PlanPanel';
+import { PlanPanelHeader } from '@/components/PlanPanelHeader';
 import { InboxSkeleton } from '@/components/ui/InboxSkeleton';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
+import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useMultiProviderSync } from '@/hooks/useMultiProviderSync';
 import { usePlanIndex } from '@/hooks/usePlanIndex';
+import { colorFromString } from '@/utils/color';
 import { formatRelativeTime } from '@/utils/formatters';
 
 interface StatusBadgeProps {
@@ -134,11 +147,37 @@ function InboxItem({ plan, onApprove, onRequestChanges, onViewPlan }: InboxItemP
 }
 
 export function InboxPage() {
-  const { identity: githubIdentity } = useGitHubAuth();
+  const { identity: githubIdentity, startAuth } = useGitHubAuth();
   const { inboxPlans, markPlanAsRead, isLoading } = usePlanIndex(githubIdentity?.username);
   const { ydoc: indexDoc } = useMultiProviderSync(PLAN_INDEX_DOC_NAME);
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Slide-out panel state - read from URL on mount
+  const searchParams = new URLSearchParams(location.search);
+  const initialPanelId = searchParams.get('panel');
+  const rawWidth = searchParams.get('width');
+  const validWidths: PanelWidth[] = ['peek', 'expanded', 'full'];
+  const initialWidth: PanelWidth = validWidths.includes(rawWidth as PanelWidth)
+    ? (rawWidth as PanelWidth)
+    : 'peek';
+
+  const [selectedPlanId, setSelectedPlanId] = useState<string | null>(initialPanelId);
+  const [panelWidth, setPanelWidth] = useState<PanelWidth>(initialWidth);
+
+  // Plan data for panel
+  const [panelMetadata, setPanelMetadata] = useState<PlanMetadata | null>(null);
+  const [panelDeliverableStats, setPanelDeliverableStats] = useState({ completed: 0, total: 0 });
+  const [panelLastActivity, setPanelLastActivity] = useState('');
+
+  // Sync providers for selected plan
+  const {
+    ydoc: panelYdoc,
+    syncState: panelSyncState,
+    wsProvider: panelWsProvider,
+    rtcProvider: panelRtcProvider,
+  } = useMultiProviderSync(selectedPlanId || '');
 
   const sortedInboxPlans = useMemo(() => {
     const sorted = [...inboxPlans].sort((a, b) => b.updatedAt - a.updatedAt);
@@ -148,6 +187,120 @@ export function InboxPage() {
     const query = searchQuery.toLowerCase();
     return sorted.filter((plan) => plan.title.toLowerCase().includes(query));
   }, [inboxPlans, searchQuery]);
+
+  // Update URL when panel state changes
+  useEffect(() => {
+    if (selectedPlanId) {
+      navigate(`?panel=${selectedPlanId}&width=${panelWidth}`, { replace: true });
+    } else {
+      navigate('', { replace: true });
+    }
+  }, [selectedPlanId, panelWidth, navigate]);
+
+  // Load panel metadata when plan is selected
+  useEffect(() => {
+    if (!selectedPlanId || !panelSyncState.idbSynced) {
+      setPanelMetadata(null);
+      return;
+    }
+
+    const metaMap = panelYdoc.getMap('metadata');
+    const update = () => {
+      const metadata = getPlanMetadata(panelYdoc);
+      setPanelMetadata(metadata);
+
+      // Update deliverable stats
+      const deliverables = getDeliverables(panelYdoc);
+      const completed = deliverables.filter((d) => d.linkedArtifactId).length;
+      setPanelDeliverableStats({ completed, total: deliverables.length });
+
+      // Format last activity
+      if (metadata?.updatedAt) {
+        setPanelLastActivity(`Updated ${formatRelativeTime(metadata.updatedAt)}`);
+      }
+    };
+    update();
+    metaMap.observe(update);
+    return () => metaMap.unobserve(update);
+  }, [selectedPlanId, panelYdoc, panelSyncState.idbSynced]);
+
+  // Panel handlers
+  const handleClosePanel = useCallback(() => {
+    setSelectedPlanId(null);
+  }, []);
+
+  const handleChangeWidth = useCallback((width: PanelWidth) => {
+    setPanelWidth(width);
+  }, []);
+
+  // Panel width cycling
+  const cycleWidth = useCallback(
+    (direction: 'expand' | 'collapse') => {
+      const widths: PanelWidth[] = ['peek', 'expanded', 'full'];
+      const currentIndex = widths.indexOf(panelWidth);
+      if (direction === 'expand' && currentIndex < widths.length - 1) {
+        setPanelWidth(widths[currentIndex + 1] as PanelWidth);
+      } else if (direction === 'collapse' && currentIndex > 0) {
+        setPanelWidth(widths[currentIndex - 1] as PanelWidth);
+      }
+    },
+    [panelWidth]
+  );
+
+  // Keyboard shortcuts for panel
+  useKeyboardShortcuts({
+    onTogglePanel: useCallback(() => {
+      if (selectedPlanId) {
+        cycleWidth('collapse');
+      }
+    }, [selectedPlanId, cycleWidth]),
+    onExpandPanel: useCallback(() => {
+      if (selectedPlanId) {
+        cycleWidth('expand');
+      }
+    }, [selectedPlanId, cycleWidth]),
+    onFullScreen: useCallback(() => {
+      if (selectedPlanId) {
+        setPanelWidth(panelWidth === 'full' ? 'peek' : 'full');
+      }
+    }, [selectedPlanId, panelWidth]),
+    onClose: handleClosePanel,
+    onNextItem: useCallback(() => {
+      if (!selectedPlanId) return;
+      const currentIndex = sortedInboxPlans.findIndex((p) => p.id === selectedPlanId);
+      if (currentIndex < sortedInboxPlans.length - 1) {
+        const nextPlan = sortedInboxPlans[currentIndex + 1];
+        if (nextPlan) {
+          setSelectedPlanId(nextPlan.id);
+          markPlanAsRead(nextPlan.id);
+        }
+      }
+    }, [selectedPlanId, sortedInboxPlans, markPlanAsRead]),
+    onPrevItem: useCallback(() => {
+      if (!selectedPlanId) return;
+      const currentIndex = sortedInboxPlans.findIndex((p) => p.id === selectedPlanId);
+      if (currentIndex > 0) {
+        const prevPlan = sortedInboxPlans[currentIndex - 1];
+        if (prevPlan) {
+          setSelectedPlanId(prevPlan.id);
+          markPlanAsRead(prevPlan.id);
+        }
+      }
+    }, [selectedPlanId, sortedInboxPlans, markPlanAsRead]),
+  });
+
+  // Identity for comments
+  const identity = githubIdentity
+    ? {
+        id: githubIdentity.username,
+        name: githubIdentity.displayName,
+        color: colorFromString(githubIdentity.username),
+      }
+    : null;
+
+  const handleRequestIdentity = useCallback(() => {
+    startAuth();
+  }, [startAuth]);
 
   if (isLoading) {
     return <InboxSkeleton />;
@@ -191,14 +344,59 @@ export function InboxPage() {
 
   const handleRequestChanges = (planId: string) => {
     markPlanAsRead(planId);
-    navigate(`/plan/${planId}`);
-    toast.info('Navigate to add comments and request changes');
+    setSelectedPlanId(planId);
+    setPanelWidth('expanded');
+    toast.info('Open panel to add comments and request changes');
   };
 
   const handleViewPlan = (planId: string) => {
     markPlanAsRead(planId);
-    navigate(`/plan/${planId}`);
+    setSelectedPlanId(planId);
+    setPanelWidth('peek');
   };
+
+  const handleListSelection = (keys: Set<unknown> | 'all') => {
+    if (keys === 'all') return;
+    const key = Array.from(keys)[0];
+    if (key) {
+      markPlanAsRead(String(key));
+      setSelectedPlanId(String(key));
+      setPanelWidth('peek');
+    }
+  };
+
+  // Panel approve handler
+  const handlePanelApprove = async () => {
+    if (!selectedPlanId || !panelMetadata) return;
+
+    panelYdoc.transact(() => {
+      const metadata = panelYdoc.getMap('metadata');
+      metadata.set('status', 'in_progress');
+      metadata.set('updatedAt', Date.now());
+    });
+
+    // Also update index
+    const entry = getPlanIndexEntry(indexDoc, selectedPlanId);
+    if (entry) {
+      setPlanIndexEntry(indexDoc, {
+        ...entry,
+        status: 'in_progress',
+        updatedAt: Date.now(),
+      });
+    }
+
+    toast.success('Plan approved');
+  };
+
+  const handlePanelRequestChanges = () => {
+    if (!selectedPlanId) return;
+    // Navigate to full plan page for adding comments
+    navigate(`/plan/${selectedPlanId}`);
+    toast.info('Navigate to add comments and request changes');
+  };
+
+  // Prefer WebSocket when connected, fall back to WebRTC
+  const activeProvider = panelWsProvider ?? panelRtcProvider;
 
   if (inboxPlans.length === 0) {
     return (
@@ -258,13 +456,7 @@ export function InboxPage() {
           <ListBox
             aria-label="Inbox plans"
             selectionMode="single"
-            onSelectionChange={(keys) => {
-              const key = Array.from(keys)[0];
-              if (key) {
-                markPlanAsRead(String(key));
-                navigate(`/plan/${key}`);
-              }
-            }}
+            onSelectionChange={handleListSelection}
             className="divide-y divide-separator"
           >
             {sortedInboxPlans.map((plan) => (
@@ -285,6 +477,45 @@ export function InboxPage() {
           </ListBox>
         )}
       </div>
+
+      {/* Slide-out panel */}
+      <PlanPanel
+        planId={selectedPlanId}
+        width={panelWidth}
+        onClose={handleClosePanel}
+        onChangeWidth={handleChangeWidth}
+      >
+        {selectedPlanId && panelMetadata ? (
+          <>
+            <PlanPanelHeader
+              metadata={panelMetadata}
+              deliverableStats={panelDeliverableStats}
+              lastActivityText={panelLastActivity}
+              onApprove={handlePanelApprove}
+              onRequestChanges={handlePanelRequestChanges}
+              onClose={handleClosePanel}
+              onExpand={() => cycleWidth(panelWidth === 'peek' ? 'expand' : 'collapse')}
+              onFullScreen={() => setPanelWidth(panelWidth === 'full' ? 'peek' : 'full')}
+              width={panelWidth}
+            />
+            <PlanContent
+              ydoc={panelYdoc}
+              metadata={panelMetadata}
+              syncState={panelSyncState}
+              identity={identity}
+              onRequestIdentity={handleRequestIdentity}
+              provider={activeProvider}
+            />
+          </>
+        ) : selectedPlanId ? (
+          <div className="flex items-center justify-center h-full">
+            <div className="flex flex-col items-center gap-4">
+              <Spinner size="lg" />
+              <p className="text-muted-foreground">Loading plan...</p>
+            </div>
+          </div>
+        ) : null}
+      </PlanPanel>
     </div>
   );
 }
