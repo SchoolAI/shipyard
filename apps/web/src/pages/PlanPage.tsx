@@ -362,7 +362,6 @@ export function PlanPage() {
         )}
 
         <div className="flex flex-col flex-1 overflow-hidden">
-          {/* Tab navigation */}
           <div className="border-b border-separator bg-surface px-2 md:px-6 py-1 md:py-2 shrink-0">
             <div className="flex gap-0 md:gap-4">
               <button
@@ -409,7 +408,6 @@ export function PlanPage() {
             </div>
           </div>
 
-          {/* Tab content */}
           {activeView === 'plan' && (
             <div className="flex-1 overflow-y-auto bg-background">
               <div className="max-w-4xl mx-auto px-1 py-2 md:p-6 space-y-3 md:space-y-6">
@@ -448,7 +446,6 @@ export function PlanPage() {
           )}
         </div>
 
-        {/* Floating review actions on mobile - hide for snapshots */}
         {isMobile && metadata && !isSnapshot && (
           <div className="fixed bottom-3 right-3 z-30 pb-safe">
             <div className="bg-surface rounded-lg shadow-lg border border-separator p-2">
@@ -470,7 +467,6 @@ export function PlanPage() {
   if (isMobile && metadata) {
     return (
       <>
-        {/* Fixed header overlays Layout's default "Peer Plan" header */}
         <div className="fixed top-0 left-0 right-0 z-50">
           <MobileHeader
             onMenuOpen={drawerState.open}
@@ -496,6 +492,5 @@ export function PlanPage() {
     );
   }
 
-  // Desktop: Standard layout
   return pageContent;
 }

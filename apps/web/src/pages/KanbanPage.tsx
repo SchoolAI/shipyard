@@ -106,10 +106,8 @@ export function KanbanPage() {
   const allPlans = [...myPlans, ...sharedPlans, ...inboxPlans];
   const columns = useKanbanColumns(allPlans);
 
-  // Hide empty columns toggle state (persisted)
   const [hideEmptyColumns, setHideEmptyColumns] = useState(getHideEmptyColumns);
 
-  // Filter columns based on hide empty preference
   const visibleColumns = useMemo(() => {
     if (hideEmptyColumns) {
       return columns.filter((col) => col.plans.length > 0);
@@ -117,25 +115,20 @@ export function KanbanPage() {
     return columns;
   }, [columns, hideEmptyColumns]);
 
-  // Toggle handler
   const handleToggleEmptyColumns = useCallback(() => {
     const newValue = !hideEmptyColumns;
     setHideEmptyColumns(newValue);
     saveHideEmptyColumns(newValue);
   }, [hideEmptyColumns]);
 
-  // Track actively dragged plan for overlay
   const [activePlan, setActivePlan] = useState<PlanIndexEntry | null>(null);
 
-  // Space bar peek preview state
   const [hoveredCardId, setHoveredCardId] = useState<string | null>(null);
   const [isPeeking, setIsPeeking] = useState(false);
   const [peekPlanId, setPeekPlanId] = useState<string | null>(null);
 
-  // Get the plan for peek preview
   const peekPlan = peekPlanId ? allPlans.find((p) => p.id === peekPlanId) : null;
 
-  // Keyboard event handling for Space bar peek
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Only trigger if Space and hovering over a card, not during drag
@@ -167,7 +160,6 @@ export function KanbanPage() {
     };
   }, [hoveredCardId, isPeeking, activePlan]);
 
-  // Close peek when drag starts
   useEffect(() => {
     if (activePlan) {
       setIsPeeking(false);
@@ -175,17 +167,14 @@ export function KanbanPage() {
     }
   }, [activePlan]);
 
-  // Card hover handler (passed to columns)
   const handleCardHover = useCallback((planId: string | null) => {
     setHoveredCardId(planId);
   }, []);
 
-  // Close peek modal handler
   const handleClosePeek = useCallback(() => {
     setIsPeeking(false);
   }, []);
 
-  // Configure sensors for mouse, touch, and keyboard
   const sensors = useSensors(
     useSensor(MouseSensor, {
       activationConstraint: {
@@ -219,7 +208,6 @@ export function KanbanPage() {
     );
   }
 
-  // Screen reader announcements for drag operations
   const announcements: Announcements = {
     onDragStart({ active }) {
       const plan = active.data.current?.plan as PlanIndexEntry | undefined;
@@ -279,7 +267,6 @@ export function KanbanPage() {
 
   return (
     <div className="h-full flex flex-col">
-      {/* Header */}
       <header className="flex items-center justify-between px-4 py-3 border-b border-separator shrink-0">
         <div>
           <h1 className="text-xl font-bold text-foreground">Board</h1>
@@ -307,7 +294,6 @@ export function KanbanPage() {
         </div>
       </header>
 
-      {/* Kanban Board */}
       <div className="flex-1 overflow-x-auto overflow-y-hidden">
         <DndContext
           sensors={sensors}
@@ -323,7 +309,6 @@ export function KanbanPage() {
             ))}
           </div>
 
-          {/* Drag overlay - shows card being dragged */}
           <DragOverlay>
             {activePlan ? (
               <div className="opacity-90">
@@ -334,7 +319,6 @@ export function KanbanPage() {
         </DndContext>
       </div>
 
-      {/* Space bar peek preview modal */}
       {peekPlan && <PlanPeekModal plan={peekPlan} isOpen={isPeeking} onClose={handleClosePeek} />}
     </div>
   );

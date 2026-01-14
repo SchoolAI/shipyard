@@ -280,4 +280,4 @@ See [10-organizational-views.md](./10-organizational-views.md) for full implemen
 
 ---
 
-*Last updated: 2026-01-13*
+*Last updated: 2026-01-14*
