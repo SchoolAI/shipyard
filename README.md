@@ -26,6 +26,19 @@ When an AI agent generates an implementation plan, peer-plan enables:
 
 See [SETUP.md](./docs/SETUP.md) for installation and development instructions.
 
+## Claude Cowork Integration
+
+Use peer-plan with Claude Cowork via the included skill:
+
+```
+peer-plan-skill/
+├── SKILL.md      # Instructions for Claude
+├── README.md     # Setup guide
+└── examples/     # Usage examples
+```
+
+See [peer-plan-skill/README.md](./peer-plan-skill/README.md) for installation.
+
 ## License
 
 This project is licensed under the [FSL (Functional Source License)](./LICENSE.md).

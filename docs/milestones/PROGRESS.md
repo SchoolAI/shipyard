@@ -262,6 +262,28 @@ See [10-organizational-views.md](./10-organizational-views.md) for full implemen
 
 ---
 
+## Claude Cowork Integration (Issue #60 Phase 1) ✅ COMPLETE
+
+**Goal:** Enable Peer-Plan to work with Claude Cowork via a Skill
+
+**Completed:**
+- ✅ Created `peer-plan-skill/` directory with Skill structure
+- ✅ `SKILL.md` with execute_code pattern (not individual MCP tools)
+- ✅ `README.md` for human setup instructions
+- ✅ `examples/plan-example.md` showing agentic loop workflow
+- ✅ Updated project README with Cowork section
+
+**Key insight:** Cowork doesn't have plan mode hooks like Claude Code. Uses Skills to learn workflows. The skill teaches Cowork to use `execute_code` with TypeScript code blocks.
+
+**Key files:**
+- `peer-plan-skill/SKILL.md` - Main Cowork instructions
+- `peer-plan-skill/README.md` - Setup guide
+- `peer-plan-skill/examples/` - Usage examples
+
+**Phase 2 (Future):** Signaling server relay for remote sync without localhost browser - tracked in Issue #60.
+
+---
+
 ## Summary
 
 | # | Milestone | Status |
