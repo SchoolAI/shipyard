@@ -48,6 +48,9 @@ const WS_READY_STATE_OPEN = 1;
 
 // --- Configuration ---
 const PING_TIMEOUT_MS = 30000;
+const CLEANUP_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+const REDEMPTION_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
+const PLAN_APPROVAL_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours of inactivity
 const port = process.env.PORT || 4444;
 
 // --- Message Types for y-webrtc signaling protocol ---
@@ -274,6 +277,47 @@ function send(conn: WebSocket, message: OutgoingMessage): void {
  */
 function assertNever(x: never): never {
   throw new Error(`Unexpected message type: ${JSON.stringify(x)}`);
+}
+
+/**
+ * Clean up expired tokens, old redemptions, and stale plan approvals.
+ * Runs periodically to prevent unbounded memory growth.
+ */
+function cleanupExpiredData(): void {
+  const now = Date.now();
+  let tokensRemoved = 0;
+  let redemptionsRemoved = 0;
+  let approvalsRemoved = 0;
+
+  // Clean up expired invite tokens
+  for (const [key, token] of inviteTokens.entries()) {
+    if (now > token.expiresAt) {
+      inviteTokens.delete(key);
+      tokensRemoved++;
+    }
+  }
+
+  // Clean up old redemptions (24 hours old)
+  for (const [key, redemption] of redemptions.entries()) {
+    if (now - redemption.redeemedAt > REDEMPTION_MAX_AGE_MS) {
+      redemptions.delete(key);
+      redemptionsRemoved++;
+    }
+  }
+
+  // Clean up stale plan approvals (24 hours of inactivity)
+  for (const [planId, approval] of planApprovals.entries()) {
+    if (now - approval.lastUpdated > PLAN_APPROVAL_MAX_AGE_MS) {
+      planApprovals.delete(planId);
+      approvalsRemoved++;
+    }
+  }
+
+  if (tokensRemoved > 0 || redemptionsRemoved > 0 || approvalsRemoved > 0) {
+    console.log(
+      `[cleanup] Removed ${tokensRemoved} expired tokens, ${redemptionsRemoved} old redemptions, ${approvalsRemoved} stale approvals`
+    );
+  }
 }
 
 // --- Message Handlers ---
@@ -948,3 +992,20 @@ server.on('upgrade', (request: IncomingMessage, socket: import('stream').Duplex,
 server.listen(port);
 
 console.log(`Signaling server running on localhost:${port}`);
+
+// --- Periodic Cleanup ---
+
+// Start cleanup interval to prevent memory leaks
+const cleanupInterval = setInterval(cleanupExpiredData, CLEANUP_INTERVAL_MS);
+
+// Ensure cleanup interval is cleared on process termination
+process.on('SIGTERM', () => {
+  clearInterval(cleanupInterval);
+  server.close();
+});
+
+process.on('SIGINT', () => {
+  clearInterval(cleanupInterval);
+  server.close();
+  process.exit(0);
+});
