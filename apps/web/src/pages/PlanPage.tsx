@@ -50,7 +50,7 @@ export function PlanPage() {
   const {
     ydoc: syncedYdoc,
     syncState,
-    providers,
+    wsProvider,
     rtcProvider,
   } = useMultiProviderSync(isSnapshot ? '' : planId); // Don't sync snapshots
 
@@ -91,8 +91,7 @@ export function PlanPage() {
   // Prefer WebSocket provider when connected, fall back to WebRTC for P2P-only mode.
   // This ensures BlockNote binds to the Y.Doc fragment even without a WebSocket server,
   // so comment highlights sync properly via WebRTC.
-  const activeWsProvider = providers.find((p) => p.wsconnected) ?? providers[0] ?? null;
-  const activeProvider = isSnapshot ? null : (activeWsProvider ?? rtcProvider);
+  const activeProvider = isSnapshot ? null : (wsProvider ?? rtcProvider);
 
   // P2P grace period: when opening a shared URL, IndexedDB syncs immediately (empty)
   // but we need to wait for WebRTC to deliver the plan data before showing "Not Found"
@@ -110,7 +109,7 @@ export function PlanPage() {
   // Start timeout when in P2P-only mode without metadata
   // Use longer timeout when peers are connected (they're actively trying to sync)
   useEffect(() => {
-    const inP2POnlyMode = syncState.idbSynced && !syncState.synced && syncState.activeCount === 0;
+    const inP2POnlyMode = syncState.idbSynced && !syncState.synced && !syncState.connected;
     const needsP2PData = !metadata && inP2POnlyMode;
 
     if (needsP2PData) {
@@ -125,7 +124,7 @@ export function PlanPage() {
       setP2pGracePeriodExpired(false);
     }
     return undefined;
-  }, [metadata, syncState.idbSynced, syncState.synced, syncState.activeCount, syncState.peerCount]);
+  }, [metadata, syncState.idbSynced, syncState.synced, syncState.connected, syncState.peerCount]);
 
   // Set metadata from URL for snapshots, or from Y.Doc for normal plans
   useEffect(() => {
@@ -193,7 +192,7 @@ export function PlanPage() {
   }, [startAuth]);
 
   const handleStatusChange = useCallback(
-    (newStatus: 'approved' | 'changes_requested') => {
+    (newStatus: 'in_progress' | 'changes_requested') => {
       if (!metadata) return;
 
       // Only update plan-index if the plan is already there (owned by this user's MCP server)
@@ -211,12 +210,12 @@ export function PlanPage() {
   );
 
   // Mark plan as deleted in index if metadata is missing after sync.
-  // Only do this if we have at least one connected WebSocket server - this ensures
+  // Only do this if we're connected to the hub WebSocket - this ensures
   // we're not incorrectly marking plans as deleted in P2P-only mode or during
   // initial connection setup. Without a connected server, we can't be sure the
   // plan doesn't exist vs just being slow to sync.
   useEffect(() => {
-    if (syncState.synced && syncState.activeCount > 0 && !metadata) {
+    if (syncState.synced && syncState.connected && !metadata) {
       const existingEntry = getPlanIndexEntry(indexDoc, planId);
       if (existingEntry && !existingEntry.deletedAt) {
         setPlanIndexEntry(indexDoc, {
@@ -225,7 +224,7 @@ export function PlanPage() {
         });
       }
     }
-  }, [syncState.synced, syncState.activeCount, metadata, indexDoc, planId]);
+  }, [syncState.synced, syncState.connected, metadata, indexDoc, planId]);
 
   // Early returns AFTER all hooks
   // Skip loading/not-found checks for snapshots (they have URL data)
@@ -243,7 +242,7 @@ export function PlanPage() {
     }
 
     // Phase 2: P2P-only mode - waiting for peers to sync data
-    const inP2POnlyMode = syncState.idbSynced && !syncState.synced && syncState.activeCount === 0;
+    const inP2POnlyMode = syncState.idbSynced && !syncState.synced && !syncState.connected;
     const waitingForP2P = inP2POnlyMode && !metadata && !p2pGracePeriodExpired;
     const hasPeersButNoData = syncState.peerCount > 0 && !metadata;
 
@@ -472,7 +471,7 @@ export function PlanPage() {
             onMenuOpen={drawerState.open}
             title={metadata.title}
             status={metadata.status}
-            agentCount={syncState?.activeCount}
+            hubConnected={syncState?.connected}
             peerCount={syncState?.peerCount}
             rightContent={
               <MobileActionsMenu

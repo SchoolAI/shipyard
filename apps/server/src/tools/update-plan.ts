@@ -6,9 +6,9 @@ import {
   setPlanMetadata,
 } from '@peer-plan/schema';
 import { z } from 'zod';
+import { getOrCreateDoc } from '../doc-store.js';
 import { logger } from '../logger.js';
 import { verifySessionToken } from '../session-token.js';
-import { getOrCreateDoc } from '../ws-server.js';
 import { TOOL_NAMES } from './tool-names.js';
 
 const UpdatePlanInput = z.object({
@@ -16,7 +16,7 @@ const UpdatePlanInput = z.object({
   sessionToken: z.string().describe('Session token from create_plan'),
   title: z.string().optional().describe('New title'),
   status: z
-    .enum(['draft', 'pending_review', 'approved', 'changes_requested', 'in_progress'])
+    .enum(['draft', 'pending_review', 'changes_requested', 'in_progress', 'completed'])
     .optional()
     .describe('New status'),
 });
@@ -29,8 +29,7 @@ export const updatePlanTool = {
 NOTE: Most status transitions are automatic. You rarely need to call this tool.
 
 AUTOMATIC TRANSITIONS:
-- draft → approved/changes_requested: Set by human in browser
-- approved → in_progress: Auto-set when first artifact is uploaded
+- draft → in_progress/changes_requested: Set by human in browser
 - in_progress → completed: Auto-set when all deliverables have artifacts
 
 MANUAL USE CASES (rare):
@@ -40,7 +39,7 @@ MANUAL USE CASES (rare):
 
 STATUSES:
 - draft: Initial state
-- approved: Human accepted the plan
+- pending_review: Submitted for review
 - changes_requested: Human requested modifications
 - in_progress: Work started (usually auto-set)
 - completed: All deliverables fulfilled (usually auto-set by add_artifact)`,
@@ -52,7 +51,7 @@ STATUSES:
         title: { type: 'string', description: 'New title (optional)' },
         status: {
           type: 'string',
-          enum: ['draft', 'pending_review', 'approved', 'changes_requested', 'in_progress'],
+          enum: ['draft', 'pending_review', 'changes_requested', 'in_progress', 'completed'],
           description:
             "New status (optional). Use 'pending_review' to signal ready for human feedback.",
         },

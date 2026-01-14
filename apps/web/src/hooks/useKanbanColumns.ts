@@ -19,7 +19,7 @@ export interface ColumnWithPlans extends ColumnDefinition {
   plans: PlanIndexEntry[];
 }
 
-/** Status column configurations */
+/** Status column configurations - consolidated to 4 columns */
 const STATUS_COLUMNS: ColumnDefinition[] = [
   {
     id: 'draft',
@@ -28,32 +28,20 @@ const STATUS_COLUMNS: ColumnDefinition[] = [
     filter: (p) => p.status === 'draft',
   },
   {
+    id: 'in_review',
+    label: 'In Review',
+    color: 'warning',
+    filter: (p) => p.status === 'pending_review' || p.status === 'changes_requested',
+  },
+  {
     id: 'in_progress',
     label: 'In Progress',
     color: 'accent',
     filter: (p) => p.status === 'in_progress',
   },
   {
-    id: 'pending_review',
-    label: 'Pending Review',
-    color: 'warning',
-    filter: (p) => p.status === 'pending_review',
-  },
-  {
-    id: 'changes_requested',
-    label: 'Changes Requested',
-    color: 'danger',
-    filter: (p) => p.status === 'changes_requested',
-  },
-  {
-    id: 'approved',
-    label: 'Approved',
-    color: 'success',
-    filter: (p) => p.status === 'approved',
-  },
-  {
     id: 'completed',
-    label: 'Completed',
+    label: 'Done',
     color: 'success',
     filter: (p) => p.status === 'completed',
   },
@@ -61,17 +49,21 @@ const STATUS_COLUMNS: ColumnDefinition[] = [
 
 /**
  * Map column ID to PlanStatusType for drag-drop updates.
+ * The 'in_review' column maps to 'pending_review' as the default status.
  */
 export function columnIdToStatus(columnId: string): PlanStatusType | null {
-  const statusIds: PlanStatusType[] = [
-    'draft',
-    'in_progress',
-    'pending_review',
-    'changes_requested',
-    'approved',
-    'completed',
-  ];
-  return statusIds.includes(columnId as PlanStatusType) ? (columnId as PlanStatusType) : null;
+  switch (columnId) {
+    case 'draft':
+      return 'draft';
+    case 'in_review':
+      return 'pending_review';
+    case 'in_progress':
+      return 'in_progress';
+    case 'completed':
+      return 'completed';
+    default:
+      return null;
+  }
 }
 
 /**
@@ -91,20 +83,3 @@ export function useKanbanColumns(plans: PlanIndexEntry[]): ColumnWithPlans[] {
     }));
   }, [plans]);
 }
-
-/**
- * Future: Create columns from tags.
- * Uncomment and use when tag support is added.
- *
- * export function useTagColumns(plans: PlanIndexEntry[], tags: string[]): ColumnWithPlans[] {
- *   return useMemo(() => {
- *     return tags.map(tag => ({
- *       id: `tag-${tag}`,
- *       label: tag,
- *       color: 'default' as const,
- *       filter: (p: PlanIndexEntry) => p.tags?.includes(tag) ?? false,
- *       plans: plans.filter(p => p.tags?.includes(tag)).sort((a, b) => b.updatedAt - a.updatedAt),
- *     }));
- *   }, [plans, tags]);
- * }
- */

@@ -11,8 +11,8 @@ interface MobileHeaderProps {
   title?: string;
   /** Plan status badge (optional) */
   status?: PlanStatusType;
-  /** Agent count indicator */
-  agentCount?: number;
+  /** Hub WebSocket connected indicator */
+  hubConnected?: boolean;
   /** Peer count indicator */
   peerCount?: number;
   /** Share button action */
@@ -29,7 +29,7 @@ export function MobileHeader({
   onMenuOpen,
   title = 'Peer Plan',
   status,
-  agentCount,
+  hubConnected,
   peerCount,
   rightContent,
 }: MobileHeaderProps) {
@@ -50,10 +50,10 @@ export function MobileHeader({
 
       {status && <StatusChip status={status} className="text-[11px] h-5 px-2 shrink-0" />}
 
-      {agentCount !== undefined && agentCount > 0 && (
+      {hubConnected && (
         <span className="flex items-center gap-1 text-[11px] text-muted-foreground shrink-0">
           <span className="w-2 h-2 rounded-full bg-success" />
-          {agentCount}
+          hub
         </span>
       )}
 

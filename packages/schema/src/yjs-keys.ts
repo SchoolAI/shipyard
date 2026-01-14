@@ -134,6 +134,17 @@ export const YDOC_KEYS = {
    * - Helpers: packages/schema/src/yjs-helpers.ts (read/write)
    */
   PR_REVIEW_COMMENTS: 'prReviewComments' as const,
+
+  /**
+   * Plan events (Y.Array<PlanEvent>)
+   * Contains timeline events for audit trail and activity display
+   * Events include: plan_created, status_changed, approved, etc.
+   *
+   * Used by:
+   * - Server: apps/server/src/tools/*.ts (write on actions)
+   * - Web: apps/web/src/components/Timeline.tsx (read)
+   */
+  EVENTS: 'events' as const,
 } as const;
 
 /**

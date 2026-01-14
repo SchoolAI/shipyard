@@ -19,6 +19,7 @@
 
 import { DurableObject } from 'cloudflare:workers';
 import type { InviteRedemption, InviteToken } from '@peer-plan/schema';
+import { logger } from './logger.js';
 
 interface Env {
   SIGNALING_ROOM: DurableObjectNamespace;
@@ -161,9 +162,9 @@ export class SignalingRoom extends DurableObject<Env> {
         const planId = key.replace('approval:', '');
         this.planApprovals.set(planId, value);
       }
-      console.log(`Restored ${stored.size} approval states from storage`);
+      logger.info({ count: stored.size }, 'Restored approval states from storage');
     } catch (error) {
-      console.error('Failed to restore approval state:', error);
+      logger.error({ error }, 'Failed to restore approval state');
     }
   }
 
@@ -187,11 +188,15 @@ export class SignalingRoom extends DurableObject<Env> {
         this.inviteTokens.set(key.replace('invite:', ''), token);
       }
 
-      console.log(
-        `Restored ${this.inviteTokens.size} invite tokens from storage (${expiredCount} expired tokens cleaned up)`
+      logger.info(
+        {
+          restoredCount: this.inviteTokens.size,
+          expiredCount,
+        },
+        'Restored invite tokens from storage'
       );
     } catch (error) {
-      console.error('Failed to restore invite tokens:', error);
+      logger.error({ error }, 'Failed to restore invite tokens');
     }
   }
 
@@ -305,11 +310,11 @@ export class SignalingRoom extends DurableObject<Env> {
         default: {
           // Exhaustive check - TypeScript will error if we miss a case
           const _exhaustive: never = data;
-          console.error('Unhandled message type:', _exhaustive);
+          logger.error({ message: _exhaustive }, 'Unhandled message type');
         }
       }
     } catch (error) {
-      console.error('Error handling message:', error);
+      logger.error({ error }, 'Error handling message');
     }
   }
 
@@ -396,14 +401,20 @@ export class SignalingRoom extends DurableObject<Env> {
     // This prevents race conditions where pending users connect before owner pushes state
     // Once owner connects and pushes approval state, legitimate users will be approved
     if (!approval) {
-      console.log(`[isUserApproved] No approval state for plan ${planId}, denying access`);
+      logger.info(
+        { planId },
+        '[isUserApproved] No approval state for plan, denying access'
+      );
       return false;
     }
 
     // No user ID - DENY (must authenticate to access plans)
     // This prevents unauthenticated users from syncing plan data
     if (!userId) {
-      console.log(`[isUserApproved] No userId provided for plan ${planId}, denying access`);
+      logger.info(
+        { planId },
+        '[isUserApproved] No userId provided for plan, denying access'
+      );
       return false;
     }
 
@@ -520,28 +531,39 @@ export class SignalingRoom extends DurableObject<Env> {
       if (state) {
         state.userId = message.ownerId;
         this.persistState(ws, state);
-        console.log('[handleApprovalState] Inferred userId from ownerId:', message.ownerId);
+        logger.info(
+          { ownerId: message.ownerId },
+          '[handleApprovalState] Inferred userId from ownerId'
+        );
       }
     }
 
     if (!state?.userId) {
-      console.warn('Received approval_state from unauthenticated connection');
+      logger.warn('Received approval_state from unauthenticated connection');
       return;
     }
 
     // Verify sender is the owner
     const existingApproval = this.planApprovals.get(message.planId);
     if (existingApproval && existingApproval.ownerId !== state.userId) {
-      console.warn(
-        `Rejected approval_state: sender ${state.userId} is not owner ${existingApproval.ownerId}`
+      logger.warn(
+        {
+          userId: state.userId,
+          existingOwnerId: existingApproval.ownerId,
+        },
+        'Rejected approval_state: sender is not owner'
       );
       return;
     }
 
     // For new plans, trust the ownerId in the message (first setter wins)
     if (!existingApproval && message.ownerId !== state.userId) {
-      console.warn(
-        `Rejected approval_state: sender ${state.userId} claims to be owner ${message.ownerId}`
+      logger.warn(
+        {
+          userId: state.userId,
+          claimedOwnerId: message.ownerId,
+        },
+        'Rejected approval_state: sender claims to be different owner'
       );
       return;
     }
@@ -572,11 +594,19 @@ export class SignalingRoom extends DurableObject<Env> {
     // Persist to Durable Object storage (survives hibernation)
     try {
       await this.ctx.storage.put(`approval:${message.planId}`, approvalState);
-      console.log(
-        `Persisted approval state for plan ${message.planId}: ${finalApprovedUsers.length} approved, ${message.rejectedUsers.length} rejected`
+      logger.info(
+        {
+          planId: message.planId,
+          approvedCount: finalApprovedUsers.length,
+          rejectedCount: message.rejectedUsers.length,
+        },
+        'Persisted approval state for plan'
       );
     } catch (error) {
-      console.error(`Failed to persist approval state for plan ${message.planId}:`, error);
+      logger.error(
+        { planId: message.planId, error },
+        'Failed to persist approval state for plan'
+      );
       // Still keep in memory even if storage fails
     }
   }
@@ -667,8 +697,13 @@ export class SignalingRoom extends DurableObject<Env> {
     this.inviteTokens.set(storageKey, token);
     await this.ctx.storage.put(`invite:${storageKey}`, token);
 
-    console.log(
-      `Created invite token ${tokenId} for plan ${message.planId}, expires in ${message.ttlMinutes ?? 30}m`
+    logger.info(
+      {
+        tokenId,
+        planId: message.planId,
+        ttlMinutes: message.ttlMinutes ?? 30,
+      },
+      'Created invite token'
     );
 
     // Send response with token value (only time it's sent!)
@@ -740,7 +775,10 @@ export class SignalingRoom extends DurableObject<Env> {
     // Auto-approve user
     await this.autoApproveUserFromInvite(planId, userId, token);
 
-    console.log(`User ${userId} redeemed invite ${tokenId} for plan ${planId}`);
+    logger.info(
+      { userId, tokenId, planId },
+      'User redeemed invite token'
+    );
 
     // Send success to guest
     ws.send(JSON.stringify({ type: 'invite_redemption_result', success: true, planId }));
@@ -875,7 +913,10 @@ export class SignalingRoom extends DurableObject<Env> {
     this.inviteTokens.set(storageKey, token);
     await this.ctx.storage.put(`invite:${storageKey}`, token);
 
-    console.log(`Revoked invite token ${message.tokenId} for plan ${message.planId}`);
+    logger.info(
+      { tokenId: message.tokenId, planId: message.planId },
+      'Revoked invite token'
+    );
 
     ws.send(JSON.stringify({ type: 'invite_revoked', tokenId: message.tokenId, success: true }));
   }
@@ -943,7 +984,7 @@ export class SignalingRoom extends DurableObject<Env> {
    * Handle WebSocket error
    */
   async webSocketError(ws: WebSocket, error: unknown): Promise<void> {
-    console.error('WebSocket error:', error);
+    logger.error({ error }, 'WebSocket error');
     this.cleanupConnection(ws);
   }
 

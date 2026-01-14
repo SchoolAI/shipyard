@@ -1,4 +1,6 @@
+import { mkdirSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import http from 'node:http';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
@@ -13,8 +15,14 @@ import {
   UnregisterServerRequestSchema,
 } from '@peer-plan/schema';
 import express, { type Request, type Response } from 'express';
+import * as decoding from 'lib0/decoding';
+import * as encoding from 'lib0/encoding';
 import { nanoid } from 'nanoid';
-import { WebSocket } from 'ws';
+import { WebSocket, WebSocketServer } from 'ws';
+import { LeveldbPersistence } from 'y-leveldb';
+import * as awarenessProtocol from 'y-protocols/awareness';
+import * as syncProtocol from 'y-protocols/sync';
+import * as Y from 'yjs';
 import { getOctokit, parseRepoString } from './github-artifacts.js';
 import {
   handleClearPresence,
@@ -26,18 +34,219 @@ import {
 } from './hook-api.js';
 import { logger } from './logger.js';
 import {
+  attachObservers,
   type ChangeType,
   createSubscription,
   deleteSubscription,
   getChanges,
   startCleanupInterval,
 } from './subscriptions/index.js';
-import { getOrCreateDoc } from './ws-server.js';
 
 const DEFAULT_REGISTRY_PORTS = [32191, 32192];
 
 const HEALTH_CHECK_INTERVAL = 10000;
 const HEALTH_CHECK_TIMEOUT = 2000;
+
+// Shared LevelDB for all plans (no session-pid isolation)
+const PERSISTENCE_DIR = join(homedir(), '.peer-plan', 'plans');
+
+// Message types matching y-websocket protocol
+const messageSync = 0;
+const messageAwareness = 1;
+
+// Y.Doc management
+const docs = new Map<string, Y.Doc>();
+const awarenessMap = new Map<string, awarenessProtocol.Awareness>();
+const conns = new Map<string, Set<WebSocket>>();
+
+let ldb: LeveldbPersistence | null = null;
+
+/**
+ * Ensures LevelDB persistence is initialized.
+ */
+function initPersistence(): void {
+  if (!ldb) {
+    mkdirSync(PERSISTENCE_DIR, { recursive: true });
+    ldb = new LeveldbPersistence(PERSISTENCE_DIR);
+  }
+}
+
+async function getDoc(docName: string): Promise<Y.Doc> {
+  initPersistence();
+  const persistence = ldb;
+  if (!persistence) {
+    throw new Error('LevelDB persistence failed to initialize');
+  }
+
+  let doc = docs.get(docName);
+  if (!doc) {
+    doc = new Y.Doc();
+
+    const persistedDoc = await persistence.getYDoc(docName);
+    const state = Y.encodeStateAsUpdate(persistedDoc);
+    Y.applyUpdate(doc, state);
+
+    doc.on('update', (update: Uint8Array) => {
+      persistence.storeUpdate(docName, update);
+    });
+
+    docs.set(docName, doc);
+
+    const awareness = new awarenessProtocol.Awareness(doc);
+    awarenessMap.set(docName, awareness);
+
+    // Attach observers for subscription notifications
+    attachObservers(docName, doc);
+  }
+  return doc;
+}
+
+/**
+ * Gets or creates a Y.Doc by name. Exported for use by MCP tools.
+ * This function ensures persistence is initialized before accessing docs.
+ */
+export async function getOrCreateDoc(docName: string): Promise<Y.Doc> {
+  return getDoc(docName);
+}
+
+/**
+ * Checks if there are any active WebSocket connections for a given plan.
+ * Used to avoid opening duplicate browser tabs.
+ */
+export function hasActiveConnections(planId: string): boolean {
+  const connections = conns.get(planId);
+  return connections !== undefined && connections.size > 0;
+}
+
+function send(ws: WebSocket, message: Uint8Array) {
+  if (ws.readyState === ws.OPEN) {
+    ws.send(message);
+  }
+}
+
+function broadcastUpdate(docName: string, update: Uint8Array, origin: unknown) {
+  const docConns = conns.get(docName);
+  if (!docConns) return;
+
+  const encoder = encoding.createEncoder();
+  encoding.writeVarUint(encoder, messageSync);
+  syncProtocol.writeUpdate(encoder, update);
+  const message = encoding.toUint8Array(encoder);
+
+  for (const conn of docConns) {
+    if (conn !== origin) {
+      send(conn, message);
+    }
+  }
+}
+
+function handleWebSocketConnection(ws: WebSocket, req: http.IncomingMessage): void {
+  const planId = req.url?.slice(1) || 'default';
+  logger.info({ planId }, 'WebSocket client connected to registry');
+
+  // Use an async IIFE to handle the async operations
+  (async () => {
+    try {
+      const doc = await getDoc(planId);
+      const awareness = awarenessMap.get(planId);
+      if (!awareness) {
+        throw new Error(`Awareness not found for planId: ${planId}`);
+      }
+      logger.debug({ planId }, 'Got doc and awareness');
+
+      if (!conns.has(planId)) {
+        conns.set(planId, new Set());
+      }
+      const planConns = conns.get(planId);
+      planConns?.add(ws);
+
+      const updateHandler = (update: Uint8Array, origin: unknown) => {
+        broadcastUpdate(planId, update, origin);
+      };
+      doc.on('update', updateHandler);
+
+      const awarenessHandler = (
+        { added, updated, removed }: { added: number[]; updated: number[]; removed: number[] },
+        _origin: unknown
+      ) => {
+        const changedClients = added.concat(updated, removed);
+        const encoder = encoding.createEncoder();
+        encoding.writeVarUint(encoder, messageAwareness);
+        encoding.writeVarUint8Array(
+          encoder,
+          awarenessProtocol.encodeAwarenessUpdate(awareness, changedClients)
+        );
+        const message = encoding.toUint8Array(encoder);
+        for (const conn of conns.get(planId) || []) {
+          send(conn, message);
+        }
+      };
+      awareness.on('update', awarenessHandler);
+
+      // Send initial sync state
+      const encoder = encoding.createEncoder();
+      encoding.writeVarUint(encoder, messageSync);
+      syncProtocol.writeSyncStep1(encoder, doc);
+      send(ws, encoding.toUint8Array(encoder));
+
+      // Send current awareness states
+      const awarenessStates = awareness.getStates();
+      if (awarenessStates.size > 0) {
+        const awarenessEncoder = encoding.createEncoder();
+        encoding.writeVarUint(awarenessEncoder, messageAwareness);
+        encoding.writeVarUint8Array(
+          awarenessEncoder,
+          awarenessProtocol.encodeAwarenessUpdate(awareness, Array.from(awarenessStates.keys()))
+        );
+        send(ws, encoding.toUint8Array(awarenessEncoder));
+      }
+
+      ws.on('message', (message: Buffer) => {
+        try {
+          const decoder = decoding.createDecoder(new Uint8Array(message));
+          const messageType = decoding.readVarUint(decoder);
+
+          switch (messageType) {
+            case messageSync: {
+              const encoder = encoding.createEncoder();
+              encoding.writeVarUint(encoder, messageSync);
+              syncProtocol.readSyncMessage(decoder, encoder, doc, ws);
+              if (encoding.length(encoder) > 1) {
+                send(ws, encoding.toUint8Array(encoder));
+              }
+              break;
+            }
+            case messageAwareness: {
+              awarenessProtocol.applyAwarenessUpdate(
+                awareness,
+                decoding.readVarUint8Array(decoder),
+                ws
+              );
+              break;
+            }
+          }
+        } catch (err) {
+          logger.error({ err, planId }, 'Failed to process message');
+        }
+      });
+
+      ws.on('close', () => {
+        logger.info({ planId }, 'WebSocket client disconnected from registry');
+        doc.off('update', updateHandler);
+        awareness.off('update', awarenessHandler);
+        conns.get(planId)?.delete(ws);
+        awarenessProtocol.removeAwarenessStates(awareness, [doc.clientID], null);
+      });
+
+      ws.on('error', (err: Error) => {
+        logger.error({ err, planId }, 'WebSocket error');
+      });
+    } catch (err) {
+      logger.error({ err, planId }, 'Error handling WebSocket connection');
+      ws.close();
+    }
+  })();
+}
 
 interface ServerEntry {
   port: number;
@@ -407,8 +616,9 @@ async function handleGetTranscript(req: Request, res: Response): Promise<void> {
   }
 }
 
-function createApp(): express.Express {
+function createApp(): { app: express.Express; httpServer: http.Server } {
   const app = express();
+  const httpServer = http.createServer(app);
 
   app.use(express.json());
   app.use((_req, res, next) => {
@@ -440,7 +650,7 @@ function createApp(): express.Express {
 
   app.post('/api/conversation/import', handleImportConversation);
 
-  return app;
+  return { app, httpServer };
 }
 
 export async function startRegistryServer(): Promise<number | null> {
@@ -448,19 +658,35 @@ export async function startRegistryServer(): Promise<number | null> {
     ? [Number.parseInt(process.env.REGISTRY_PORT, 10)]
     : DEFAULT_REGISTRY_PORTS;
 
-  const app = createApp();
+  const { httpServer } = createApp();
+
+  // Create WebSocket server with noServer mode for upgrade handling
+  const wss = new WebSocketServer({ noServer: true });
+
+  // Handle HTTP upgrade requests for WebSocket connections
+  httpServer.on('upgrade', (request, socket, head) => {
+    wss.handleUpgrade(request, socket, head, (ws) => {
+      wss.emit('connection', ws, request);
+    });
+  });
+
+  // Handle WebSocket connections
+  wss.on('connection', handleWebSocketConnection);
 
   for (const port of ports) {
     try {
       await new Promise<void>((resolve, reject) => {
-        const server = app.listen(port, '127.0.0.1', () => {
-          logger.info({ port }, 'Registry server started');
+        httpServer.listen(port, '127.0.0.1', () => {
+          logger.info(
+            { port, persistence: PERSISTENCE_DIR },
+            'Registry server started with WebSocket support'
+          );
           setInterval(healthCheck, HEALTH_CHECK_INTERVAL);
           startCleanupInterval();
           resolve();
         });
 
-        server.on('error', (err: NodeJS.ErrnoException) => {
+        httpServer.on('error', (err: NodeJS.ErrnoException) => {
           if (err.code === 'EADDRINUSE') {
             reject(err);
           } else {

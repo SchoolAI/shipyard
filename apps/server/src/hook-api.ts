@@ -21,9 +21,9 @@ import {
 } from '@peer-plan/schema';
 import type { Request, Response } from 'express';
 import { nanoid } from 'nanoid';
+import { getOrCreateDoc } from './doc-store.js';
 import { logger } from './logger.js';
 import { getGitHubUsername, getRepositoryFullName } from './server-identity.js';
-import { getOrCreateDoc } from './ws-server.js';
 
 async function parseMarkdownToBlocks(markdown: string): Promise<Block[]> {
   const editor = ServerBlockNoteEditor.create();

@@ -11,10 +11,10 @@ import {
 import { nanoid } from 'nanoid';
 import open from 'open';
 import { z } from 'zod';
+import { getOrCreateDoc, hasActiveConnections } from '../doc-store.js';
 import { logger } from '../logger.js';
 import { getGitHubUsername, getRepositoryFullName } from '../server-identity.js';
 import { generateSessionToken, hashSessionToken } from '../session-token.js';
-import { getOrCreateDoc, hasActiveConnections } from '../ws-server.js';
 import { TOOL_NAMES } from './tool-names.js';
 
 // --- Input Schema ---

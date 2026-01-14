@@ -180,7 +180,6 @@ export const SORT_OPTIONS: { value: SortOption; label: string }[] = [
 export const STATUS_FILTER_OPTIONS: { value: PlanStatusType; label: string; color: string }[] = [
   { value: 'draft', label: 'Draft', color: 'default' },
   { value: 'pending_review', label: 'Pending Review', color: 'warning' },
-  { value: 'approved', label: 'Approved', color: 'success' },
   { value: 'changes_requested', label: 'Changes Requested', color: 'danger' },
   { value: 'in_progress', label: 'In Progress', color: 'primary' },
   { value: 'completed', label: 'Completed', color: 'success' },

@@ -14,10 +14,10 @@ import {
 } from '@peer-plan/schema';
 import type * as Y from 'yjs';
 import { z } from 'zod';
+import { getOrCreateDoc } from '../doc-store.js';
 import { getOctokit, parseRepoString } from '../github-artifacts.js';
 import { logger } from '../logger.js';
 import { verifySessionToken } from '../session-token.js';
-import { getOrCreateDoc } from '../ws-server.js';
 import { TOOL_NAMES } from './tool-names.js';
 
 const CompleteTaskInput = z.object({
@@ -39,7 +39,7 @@ USE THIS TOOL ONLY IF:
 - Auto-complete didn't trigger for some reason
 
 REQUIREMENTS:
-- Plan status must be 'approved' or 'in_progress'
+- Plan status must be 'in_progress'
 - At least one artifact should be uploaded
 
 RETURNS:
@@ -83,13 +83,13 @@ RETURNS:
       };
     }
 
-    // Validate status (must be approved or in_progress)
-    if (metadata.status !== 'in_progress' && metadata.status !== 'approved') {
+    // Validate status (must be in_progress)
+    if (metadata.status !== 'in_progress') {
       return {
         content: [
           {
             type: 'text',
-            text: `Cannot complete: plan status is '${metadata.status}', must be 'approved' or 'in_progress'`,
+            text: `Cannot complete: plan status is '${metadata.status}', must be 'in_progress'`,
           },
         ],
         isError: true,

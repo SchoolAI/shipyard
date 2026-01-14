@@ -5,9 +5,9 @@ import {
   getPlanMetadata,
 } from '@peer-plan/schema';
 import { z } from 'zod';
+import { getOrCreateDoc } from '../doc-store.js';
 import { exportPlanToMarkdown } from '../export-markdown.js';
 import { verifySessionToken } from '../session-token.js';
-import { getOrCreateDoc } from '../ws-server.js';
 import { TOOL_NAMES } from './tool-names.js';
 
 const ReadPlanInput = z.object({

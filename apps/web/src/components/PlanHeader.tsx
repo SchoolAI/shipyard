@@ -95,18 +95,18 @@ function MessagePreviewItem({ msg, idx }: MessagePreviewItemProps) {
 
 /** Props for the presence indicators */
 interface PresenceIndicatorsProps {
-  activeCount: number;
+  hubConnected: boolean;
   peerCount: number;
 }
 
-/** Renders agent and peer presence indicators */
-function PresenceIndicators({ activeCount, peerCount }: PresenceIndicatorsProps) {
+/** Renders hub connection and peer presence indicators */
+function PresenceIndicators({ hubConnected, peerCount }: PresenceIndicatorsProps) {
   return (
     <>
-      {activeCount > 0 && (
+      {hubConnected && (
         <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
           <span className="w-1.5 h-1.5 rounded-full bg-success" />
-          {activeCount} {activeCount === 1 ? 'agent' : 'agents'}
+          hub
         </span>
       )}
       {peerCount > 0 && (
@@ -366,7 +366,7 @@ interface PlanHeaderProps {
   /** Called when user needs to set up identity */
   onRequestIdentity: () => void;
   /** Called after status is successfully updated in the plan doc */
-  onStatusChange?: (newStatus: 'approved' | 'changes_requested') => void;
+  onStatusChange?: (newStatus: 'in_progress' | 'changes_requested') => void;
   /** When true, shows snapshot indicator and hides interactive elements */
   isSnapshot?: boolean;
   /** WebRTC provider for P2P sync and awareness (needed for approval panel) */
@@ -554,7 +554,7 @@ export function PlanHeader({
           {/* Presence indicators */}
           {syncState && (
             <PresenceIndicators
-              activeCount={syncState.activeCount}
+              hubConnected={syncState.connected}
               peerCount={syncState.peerCount}
             />
           )}

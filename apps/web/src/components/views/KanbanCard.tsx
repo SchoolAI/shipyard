@@ -22,6 +22,7 @@ import { CheckSquare, GitPullRequest } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { usePlanMetadata } from '@/hooks/usePlanMetadata';
 import { formatRelativeTime } from '@/utils/formatters';
+import { SubstatusBadge } from './SubstatusBadge';
 
 interface KanbanCardProps {
   plan: PlanIndexEntry;
@@ -42,11 +43,13 @@ function getStatusBorderColor(status: PlanStatusType): string {
       return 'border-l-warning';
     case 'changes_requested':
       return 'border-l-danger';
-    case 'approved':
     case 'completed':
       return 'border-l-success';
-    default:
+    default: {
+      // @ts-expect-error: Exhaustive type check
+      const _exhaustive: never = status;
       return 'border-l-gray-500';
+    }
   }
 }
 
@@ -125,6 +128,8 @@ export function KanbanCard({ plan, onHover }: KanbanCardProps) {
         {/* Metadata footer */}
         <Card.Content className="px-3 pb-3 pt-0">
           <div className="flex items-center gap-1.5 flex-wrap">
+            <SubstatusBadge status={plan.status} />
+
             {/* Owner badge */}
             {plan.ownerId && (
               <div className="flex items-center gap-1 bg-surface-hover/60 rounded-full px-1.5 py-0.5">

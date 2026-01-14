@@ -1,9 +1,9 @@
 import { addPRReviewComment, getPlanMetadata, type PRReviewComment } from '@peer-plan/schema';
 import { nanoid } from 'nanoid';
 import { z } from 'zod';
+import { getOrCreateDoc } from '../doc-store.js';
 import { logger } from '../logger.js';
 import { verifySessionToken } from '../session-token.js';
-import { getOrCreateDoc } from '../ws-server.js';
 import { TOOL_NAMES } from './tool-names.js';
 
 // --- Input Schema ---

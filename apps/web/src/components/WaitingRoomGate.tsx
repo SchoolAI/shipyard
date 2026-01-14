@@ -43,10 +43,10 @@ export function WaitingRoomGate({
     githubIdentity
   );
 
-  // If connected to local MCP server (WebSocket), skip auth entirely
+  // If connected to the hub WebSocket, skip auth entirely
   // This allows local development without authentication
-  // Shared links (P2P only) will still require auth since activeCount === 0
-  const isLocalViewing = syncState.activeCount > 0;
+  // Shared links (P2P only) will still require auth since connected === false
+  const isLocalViewing = syncState.connected && syncState.synced;
 
   if (isLocalViewing) {
     return <>{children}</>;

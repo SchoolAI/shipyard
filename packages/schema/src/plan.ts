@@ -3,14 +3,16 @@ import { z } from 'zod';
 /**
  * Valid status values for a plan.
  *
- * Flow: draft → pending_review → approved → in_progress → completed
- *                    ↓                          ↓
- *              changes_requested ←──────────────┘
+ * Flow: draft → pending_review → in_progress → completed
+ *                    ↓                ↑
+ *              changes_requested ─────┘
+ *
+ * Note: 'approved' is now an EVENT, not a status. When a plan is approved,
+ * it transitions directly to 'in_progress' and an 'approved' event is logged.
  */
 export const PlanStatusValues = [
   'draft',
   'pending_review',
-  'approved',
   'changes_requested',
   'in_progress',
   'completed',
@@ -118,6 +120,44 @@ export const ConversationVersionSchema = z.object({
   handedOffTo: z.string().optional(),
 });
 
+export const PlanEventTypes = [
+  'plan_created',
+  'status_changed',
+  'comment_added',
+  'comment_resolved',
+  'artifact_uploaded',
+  'deliverable_linked',
+  'pr_linked',
+  'content_edited',
+  'approved',
+  'changes_requested',
+  'completed',
+] as const;
+export type PlanEventType = (typeof PlanEventTypes)[number];
+
+export interface PlanEvent {
+  id: string;
+  type: PlanEventType;
+  actor: string;
+  timestamp: number;
+  data?: {
+    fromStatus?: PlanStatusType;
+    toStatus?: PlanStatusType;
+    artifactId?: string;
+    commentId?: string;
+    prNumber?: number;
+    [key: string]: unknown;
+  };
+}
+
+export const PlanEventSchema = z.object({
+  id: z.string(),
+  type: z.enum(PlanEventTypes),
+  actor: z.string(),
+  timestamp: z.number(),
+  data: z.record(z.string(), z.unknown()).optional(),
+});
+
 export interface PlanMetadata {
   id: string;
   title: string;
@@ -169,6 +209,9 @@ export interface PlanMetadata {
    * Actual content is transferred on-demand via P2P.
    */
   conversationVersions?: ConversationVersion[];
+
+  /** Event log for timeline display and audit trail */
+  events?: PlanEvent[];
 }
 
 export const PlanMetadataSchema = z.object({
@@ -197,6 +240,7 @@ export const PlanMetadataSchema = z.object({
   viewedBy: z.record(z.string(), z.number()).optional(),
   reviewRequestId: z.string().optional(),
   conversationVersions: z.array(ConversationVersionSchema).optional(),
+  events: z.array(PlanEventSchema).optional(),
 });
 
 export type ArtifactType = 'screenshot' | 'video' | 'test_results' | 'diff';

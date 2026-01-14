@@ -7,23 +7,30 @@ import {
   ListToolsRequestSchema,
   McpError,
 } from '@modelcontextprotocol/sdk/types.js';
+import { initAsClient, initAsHub } from './doc-store.js';
 import { logger } from './logger.js';
 import { isRegistryRunning, startRegistryServer } from './registry-server.js';
 import { executeCodeTool } from './tools/execute-code.js';
 import { TOOL_NAMES } from './tools/tool-names.js';
-import { startWebSocketServer } from './ws-server.js';
 
-// Start registry server if not already running (singleton)
+// Determine if we're the Registry Hub or a client
 const registryPort = await isRegistryRunning();
 if (!registryPort) {
-  logger.info('Starting registry server');
-  await startRegistryServer();
+  // This instance becomes the Registry Hub
+  logger.info('Starting registry hub');
+  const hubPort = await startRegistryServer();
+  if (!hubPort) {
+    logger.error('Failed to start registry hub - all ports in use');
+    process.exit(1);
+  }
+  // Hub mode: run our own WebSocket server for Y.Doc sync
+  initAsHub();
+  logger.info({ hubPort }, 'Registry hub started successfully');
 } else {
-  logger.info({ registryPort }, 'Registry server already running');
+  // Another instance is already the Registry Hub - connect as client
+  logger.info({ registryPort }, 'Connecting to registry hub as client');
+  await initAsClient(registryPort);
 }
-
-// Start WebSocket server for Yjs sync (runs alongside MCP)
-startWebSocketServer();
 
 const server = new Server(
   {

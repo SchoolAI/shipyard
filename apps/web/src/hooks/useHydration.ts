@@ -24,7 +24,12 @@ export function useHydration(ydoc: Y.Doc, urlPlan: UrlEncodedPlan): void {
         initPlanMetadata(ydoc, {
           id: urlPlan.id,
           title: urlPlan.title,
-          status: urlPlan.status as 'draft' | 'pending_review' | 'approved' | 'changes_requested',
+          status: urlPlan.status as
+            | 'draft'
+            | 'pending_review'
+            | 'changes_requested'
+            | 'in_progress'
+            | 'completed',
           repo: urlPlan.repo,
           pr: urlPlan.pr,
         });

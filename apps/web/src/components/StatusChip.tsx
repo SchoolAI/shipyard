@@ -16,7 +16,6 @@ interface StatusConfig {
 const statusConfig: Record<PlanStatusType, StatusConfig> = {
   draft: { color: 'default', variant: 'soft', icon: Circle, label: 'draft' },
   pending_review: { color: 'warning', variant: 'soft', icon: Clock, label: 'pending review' },
-  approved: { color: 'accent', variant: 'primary', icon: Check, label: 'approved' },
   changes_requested: { color: 'danger', variant: 'soft', icon: X, label: 'changes requested' },
   in_progress: { color: 'accent', variant: 'soft', icon: CircleDot, label: 'in progress' },
   completed: { color: 'success', variant: 'primary', icon: Check, label: 'completed' },

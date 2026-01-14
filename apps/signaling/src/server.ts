@@ -41,6 +41,7 @@ import type {
 import * as map from 'lib0/map';
 import { nanoid } from 'nanoid';
 import { type WebSocket, WebSocketServer } from 'ws';
+import { logger } from './logger.js';
 
 // --- WebSocket Ready States ---
 const WS_READY_STATE_CONNECTING = 0;
@@ -314,8 +315,13 @@ function cleanupExpiredData(): void {
   }
 
   if (tokensRemoved > 0 || redemptionsRemoved > 0 || approvalsRemoved > 0) {
-    console.log(
-      `[cleanup] Removed ${tokensRemoved} expired tokens, ${redemptionsRemoved} old redemptions, ${approvalsRemoved} stale approvals`
+    logger.info(
+      {
+        tokensRemoved,
+        redemptionsRemoved,
+        approvalsRemoved,
+      },
+      '[cleanup] Removed expired data'
     );
   }
 }
@@ -339,32 +345,46 @@ function handleApprovalState(conn: WebSocket, message: ApprovalStateMessage): vo
     // Infer userId from ownerId in the message (owner is sending this)
     userId = message.ownerId;
     connectionUserIds.set(conn, userId);
-    console.log(`[handleApprovalState] Conn #${connId}: Inferred userId from ownerId:`, userId);
+    logger.info(
+      { connId, userId },
+      '[handleApprovalState] Inferred userId from ownerId'
+    );
   }
 
-  console.log(`[handleApprovalState] Conn #${connId}:`, {
-    planId: message.planId,
-    ownerId: message.ownerId,
-    userId,
-    approvedCount: message.approvedUsers.length,
-    rejectedCount: message.rejectedUsers.length,
-  });
+  logger.info(
+    {
+      connId,
+      planId: message.planId,
+      ownerId: message.ownerId,
+      userId,
+      approvedCount: message.approvedUsers.length,
+      rejectedCount: message.rejectedUsers.length,
+    },
+    '[handleApprovalState] Processing approval state'
+  );
 
   if (!userId) {
-    console.warn('[handleApprovalState] No userId even after inference - rejecting');
+    logger.warn(
+      { connId },
+      '[handleApprovalState] No userId even after inference - rejecting'
+    );
     return;
   }
 
   const existingApproval = planApprovals.get(message.planId);
   if (existingApproval && existingApproval.ownerId !== userId) {
-    console.warn(
-      `Rejected approval_state: sender ${userId} is not owner ${existingApproval.ownerId}`
+    logger.warn(
+      { userId, existingOwnerId: existingApproval.ownerId },
+      'Rejected approval_state: sender is not owner'
     );
     return;
   }
 
   if (!existingApproval && message.ownerId !== userId) {
-    console.warn(`Rejected approval_state: sender ${userId} claims to be owner ${message.ownerId}`);
+    logger.warn(
+      { userId, claimedOwnerId: message.ownerId },
+      'Rejected approval_state: sender claims to be different owner'
+    );
     return;
   }
 
@@ -390,8 +410,13 @@ function handleApprovalState(conn: WebSocket, message: ApprovalStateMessage): vo
   };
 
   planApprovals.set(message.planId, approvalState);
-  console.log(
-    `Approval state for plan ${message.planId}: ${finalApprovedUsers.length} approved, ${message.rejectedUsers.length} rejected`
+  logger.info(
+    {
+      planId: message.planId,
+      approvedCount: finalApprovedUsers.length,
+      rejectedCount: message.rejectedUsers.length,
+    },
+    'Approval state updated'
   );
 }
 
@@ -502,28 +527,36 @@ function handleCreateInvite(conn: WebSocket, message: CreateInviteRequest): void
   const connId = connectionDebugIds.get(conn);
   const userId = connectionUserIds.get(conn);
 
-  console.log(`[handleCreateInvite] Conn #${connId}:`, {
-    planId: message.planId,
-    userId,
-    hasApproval: planApprovals.has(message.planId),
-  });
+  logger.info(
+    {
+      connId,
+      planId: message.planId,
+      userId,
+      hasApproval: planApprovals.has(message.planId),
+    },
+    '[handleCreateInvite] Processing create invite request'
+  );
 
   if (!userId) {
-    console.warn(`[handleCreateInvite] Conn #${connId}: No userId - unauthenticated`);
+    logger.warn({ connId }, '[handleCreateInvite] No userId - unauthenticated');
     send(conn, { type: 'error', error: 'unauthenticated' });
     return;
   }
 
   const approval = planApprovals.get(message.planId);
-  console.log(`[handleCreateInvite] Conn #${connId}: Approval check:`, {
-    hasApproval: !!approval,
-    ownerId: approval?.ownerId,
-    userId,
-    matches: approval?.ownerId === userId,
-  });
+  logger.info(
+    {
+      connId,
+      hasApproval: !!approval,
+      ownerId: approval?.ownerId,
+      userId,
+      matches: approval?.ownerId === userId,
+    },
+    '[handleCreateInvite] Approval check'
+  );
 
   if (!approval || approval.ownerId !== userId) {
-    console.warn('[handleCreateInvite] Not owner or no approval state');
+    logger.warn({ connId }, '[handleCreateInvite] Not owner or no approval state');
     send(conn, { type: 'error', error: 'not_owner' });
     return;
   }
@@ -548,8 +581,13 @@ function handleCreateInvite(conn: WebSocket, message: CreateInviteRequest): void
   const storageKey = `${message.planId}:${tokenId}`;
   inviteTokens.set(storageKey, token);
 
-  console.log(
-    `Created invite token ${tokenId} for plan ${message.planId}, expires in ${message.ttlMinutes ?? 30}m`
+  logger.info(
+    {
+      tokenId,
+      planId: message.planId,
+      ttlMinutes: message.ttlMinutes ?? 30,
+    },
+    'Created invite token'
   );
 
   const response: InviteCreatedResponse = {
@@ -619,7 +657,10 @@ function handleRedeemInvite(conn: WebSocket, message: RedeemInviteRequest): void
   // Auto-approve user
   autoApproveUserFromInvite(planId, userId, validToken);
 
-  console.log(`User ${userId} redeemed invite ${tokenId} for plan ${planId}`);
+  logger.info(
+    { userId, tokenId, planId },
+    'User redeemed invite token'
+  );
 
   // Send success to guest
   const response: InviteRedemptionResult = {
@@ -679,7 +720,10 @@ function handleRevokeInvite(conn: WebSocket, message: RevokeInviteRequest): void
   token.revoked = true;
   inviteTokens.set(storageKey, token);
 
-  console.log(`Revoked invite token ${message.tokenId} for plan ${message.planId}`);
+  logger.info(
+    { tokenId: message.tokenId, planId: message.planId },
+    'Revoked invite token'
+  );
 
   const response: InviteRevokedResponse = {
     type: 'invite_revoked',
@@ -762,7 +806,10 @@ function handleSubscribe(
 
   // Store userId if provided (for approval checking)
   if (message.userId) {
-    console.log(`[handleSubscribe] Conn #${connId}: Storing userId:`, message.userId);
+    logger.info(
+      { connId, userId: message.userId },
+      '[handleSubscribe] Storing userId'
+    );
     connectionUserIds.set(conn, message.userId);
   }
 
@@ -877,7 +924,7 @@ function onConnection(conn: WebSocket): void {
   // Assign debug ID to track this connection
   const connId = ++connectionIdCounter;
   connectionDebugIds.set(conn, connId);
-  console.log(`[onConnection] New connection #${connId}`);
+  logger.info({ connId }, '[onConnection] New connection');
 
   const subscribedTopics = new Set<string>();
   let closed = false;
@@ -974,7 +1021,7 @@ function onConnection(conn: WebSocket): void {
           assertNever(message);
       }
     } catch (error) {
-      console.error('Error handling message:', error);
+      logger.error({ error }, 'Error handling message');
     }
   });
 }
@@ -991,7 +1038,7 @@ server.on('upgrade', (request: IncomingMessage, socket: import('stream').Duplex,
 
 server.listen(port);
 
-console.log(`Signaling server running on localhost:${port}`);
+logger.info({ port }, 'Signaling server running');
 
 // --- Periodic Cleanup ---
 

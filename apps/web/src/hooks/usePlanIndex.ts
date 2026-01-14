@@ -74,10 +74,11 @@ export interface PlanIndexState {
   /** Plans needing attention (pending_review, changes_requested) AND unread */
   inboxPlans: PlanIndexEntryWithReadState[];
   archivedPlans: PlanIndexEntry[];
+  /** Connected to hub WebSocket or WebRTC peers */
   connected: boolean;
+  /** Hub WebSocket has completed initial sync */
   synced: boolean;
-  serverCount: number;
-  activeCount: number;
+  /** Number of peers connected via WebRTC P2P */
   peerCount: number;
   navigationTarget: string | null;
   clearNavigation: () => void;
@@ -418,8 +419,6 @@ export function usePlanIndex(currentUsername: string | undefined): PlanIndexStat
     archivedPlans,
     connected: syncState.connected,
     synced: syncState.synced,
-    serverCount: syncState.serverCount,
-    activeCount: syncState.activeCount,
     peerCount: syncState.peerCount,
     navigationTarget,
     clearNavigation,

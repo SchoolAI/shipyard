@@ -89,14 +89,7 @@ export type UpdatePlanContentResponse = z.infer<typeof UpdatePlanContentResponse
  * GET /api/hook/plan/:id/review - Get review status
  */
 export const GetReviewStatusResponseSchema = z.object({
-  status: z.enum([
-    'draft',
-    'pending_review',
-    'approved',
-    'changes_requested',
-    'in_progress',
-    'completed',
-  ]),
+  status: z.enum(['draft', 'pending_review', 'changes_requested', 'in_progress', 'completed']),
   reviewedAt: z.number().optional(),
   reviewedBy: z.string().optional(),
   reviewComment: z.string().optional(),

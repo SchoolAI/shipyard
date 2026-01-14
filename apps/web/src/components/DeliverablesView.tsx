@@ -86,16 +86,17 @@ function EmptyState({ status }: { status: PlanMetadata['status'] }) {
         return 'Deliverables will appear once the plan is approved and work begins.';
       case 'pending_review':
         return 'Deliverables will appear once the plan is approved and work begins.';
-      case 'approved':
-        return 'The agent will upload deliverables as proof of completed work.';
       case 'in_progress':
         return 'Waiting for the agent to upload deliverables as proof of completed work.';
       case 'changes_requested':
         return 'Deliverables will appear once the plan is approved and work begins.';
       case 'completed':
         return 'This task was completed without additional deliverables.';
-      default:
+      default: {
+        // @ts-expect-error: Exhaustive type check
+        const _exhaustive: never = status;
         return 'Deliverables are added when the agent uploads artifacts.';
+      }
     }
   };
 

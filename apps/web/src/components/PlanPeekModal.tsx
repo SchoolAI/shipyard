@@ -34,12 +34,13 @@ function getStatusLabel(status: PlanStatusType): string {
       return 'Pending Review';
     case 'changes_requested':
       return 'Changes Requested';
-    case 'approved':
-      return 'Approved';
     case 'completed':
       return 'Completed';
-    default:
+    default: {
+      // @ts-expect-error: Exhaustive type check
+      const _exhaustive: never = status;
       return status;
+    }
   }
 }
 
@@ -56,11 +57,13 @@ function getStatusColor(
       return 'warning';
     case 'changes_requested':
       return 'danger';
-    case 'approved':
     case 'completed':
       return 'success';
-    default:
+    default: {
+      // @ts-expect-error: Exhaustive type check
+      const _exhaustive: never = status;
       return 'default';
+    }
   }
 }
 

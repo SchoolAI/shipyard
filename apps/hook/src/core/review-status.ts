@@ -399,13 +399,6 @@ export async function checkReviewStatus(
   const baseUrl = process.env.PEER_PLAN_WEB_URL ?? DEFAULT_WEB_URL;
 
   switch (status.status) {
-    case 'approved':
-      return {
-        allow: true,
-        message: status.reviewedBy ? `Plan approved by ${status.reviewedBy}` : 'Plan approved',
-        planId,
-      };
-
     case 'changes_requested':
       return {
         allow: false,

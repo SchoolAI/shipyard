@@ -42,7 +42,6 @@ function StatusBadge({ status }: StatusBadgeProps) {
       icon: <AlertTriangle className="w-3 h-3" />,
     },
     draft: { label: 'Draft', color: 'default', icon: null },
-    approved: { label: 'Approved', color: 'success', icon: <Check className="w-3 h-3" /> },
     in_progress: { label: 'In Progress', color: 'accent', icon: null },
     completed: { label: 'Completed', color: 'success', icon: <Check className="w-3 h-3" /> },
   };
@@ -166,7 +165,7 @@ export function InboxPage() {
     if (entry) {
       setPlanIndexEntry(indexDoc, {
         ...entry,
-        status: 'approved',
+        status: 'in_progress',
         updatedAt: now,
       });
     }
@@ -178,7 +177,7 @@ export function InboxPage() {
 
       planDoc.transact(() => {
         const metadata = planDoc.getMap('metadata');
-        metadata.set('status', 'approved');
+        metadata.set('status', 'in_progress');
         metadata.set('updatedAt', now);
       });
 

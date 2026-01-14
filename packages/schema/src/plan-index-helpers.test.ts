@@ -55,7 +55,13 @@ describe('Plan Index Helpers', () => {
 
     it('handles all status values', () => {
       const ydoc = new Y.Doc();
-      const statuses = ['draft', 'pending_review', 'approved', 'changes_requested'] as const;
+      const statuses = [
+        'draft',
+        'pending_review',
+        'in_progress',
+        'completed',
+        'changes_requested',
+      ] as const;
 
       for (const status of statuses) {
         const entry = createEntry({ id: `plan-${status}`, status });

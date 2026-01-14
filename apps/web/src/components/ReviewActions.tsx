@@ -17,7 +17,7 @@ interface ReviewActionsProps {
   identity: UserIdentity | null;
   onRequestIdentity: () => void;
   /** Called after status is successfully updated in the plan doc */
-  onStatusChange?: (newStatus: 'approved' | 'changes_requested') => void;
+  onStatusChange?: (newStatus: 'in_progress' | 'changes_requested') => void;
 }
 
 type PopoverType = 'approve' | 'changes' | null;
@@ -71,7 +71,7 @@ export function ReviewActions({
 
     setIsSubmitting(true);
     try {
-      const newStatus = action === 'approve' ? 'approved' : 'changes_requested';
+      const newStatus = action === 'approve' ? 'in_progress' : 'changes_requested';
       const trimmedComment = comment.trim();
 
       // Update Y.Doc - hook observes this for distributed approval
@@ -109,9 +109,11 @@ export function ReviewActions({
           size="sm"
           className="bg-success hover:bg-success-dark text-white text-xs px-4 rounded-lg min-h-[36px]"
           onPress={() => handleButtonPress('approve')}
-          isDisabled={isSubmitting || currentStatus === 'approved'}
+          isDisabled={
+            isSubmitting || currentStatus === 'in_progress' || currentStatus === 'completed'
+          }
         >
-          {currentStatus === 'approved' ? 'Approved' : 'Approve'}
+          Approve
         </Button>
 
         <Popover.Content placement="top" className="w-80">

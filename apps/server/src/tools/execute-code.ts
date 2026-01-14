@@ -1,8 +1,8 @@
 import * as vm from 'node:vm';
 import { getArtifacts, getDeliverables, getPlanMetadata } from '@peer-plan/schema';
 import { z } from 'zod';
+import { getOrCreateDoc } from '../doc-store.js';
 import { logger } from '../logger.js';
-import { getOrCreateDoc } from '../ws-server.js';
 import { addArtifactTool } from './add-artifact.js';
 import { addPRReviewCommentTool } from './add-pr-review-comment.js';
 import { completeTaskTool } from './complete-task.js';
@@ -57,7 +57,7 @@ Parameters:
 
 Returns:
 - content: Full markdown (with block IDs, annotations, and linked PRs if requested)
-- status: Plan status (e.g., "draft", "pending_review", "approved", "changes_requested")
+- status: Plan status (e.g., "draft", "pending_review", "changes_requested")
 - title: Plan title
 - repo: GitHub repo (if set)
 - pr: PR number (if set)
@@ -86,7 +86,7 @@ Parameters:
 - planId (string): The plan ID
 - sessionToken (string): Session token
 - updates.title (string, optional): New title
-- updates.status (string, optional): 'draft' | 'pending_review' | 'approved' | 'changes_requested' | 'in_progress'
+- updates.status (string, optional): 'draft' | 'pending_review' | 'changes_requested' | 'in_progress'
 
 Note: Most status transitions are automatic. Rarely needed.
 
@@ -183,7 +183,7 @@ Parameters:
 - pollIntervalSeconds (number, optional): Polling interval (default: 30)
 
 Returns:
-- script: Bash script that polls registry server and exits when status becomes 'approved' or 'changes_requested'
+- script: Bash script that polls registry server and exits when status becomes 'changes_requested' or 'in_progress'
 
 Use this for agents WITHOUT hook support (Cursor, Devin, etc). The script can be run in background.
 

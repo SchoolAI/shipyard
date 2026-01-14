@@ -19,6 +19,7 @@ import {
 import { nanoid } from 'nanoid';
 import type * as Y from 'yjs';
 import { z } from 'zod';
+import { getOrCreateDoc } from '../doc-store.js';
 import {
   GitHubAuthError,
   getOctokit,
@@ -29,7 +30,6 @@ import {
 } from '../github-artifacts.js';
 import { logger } from '../logger.js';
 import { verifySessionToken } from '../session-token.js';
-import { getOrCreateDoc } from '../ws-server.js';
 import { TOOL_NAMES } from './tool-names.js';
 
 // --- Input Schema ---

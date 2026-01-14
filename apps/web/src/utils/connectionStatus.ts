@@ -1,33 +1,25 @@
 /**
- * Utility for determining connection status based on MCP and P2P peer counts.
- * Used by both SyncStatus and Sidebar to ensure consistent state display.
+ * Utility for determining connection status based on hub and P2P peer counts.
+ * Used to ensure consistent state display across components.
  */
 
 /**
- * Check if there are any active connections (MCP or P2P).
+ * Check if there are any active connections (hub WebSocket or P2P).
  * Used to determine if showing "Offline" vs "Connected/Syncing".
  */
-export function hasAnyConnection(mcpCount: number, peerCount: number): boolean {
-  return mcpCount > 0 || peerCount > 0;
+export function hasAnyConnection(hubConnected: boolean, peerCount: number): boolean {
+  return hubConnected || peerCount > 0;
 }
 
 /**
  * Format connection details for display.
- * Returns string like "(1 MCP, 2 P2P)" or null if no connections.
+ * Returns string like "(hub, 2 P2P)" or null if no connections.
  */
-export function formatConnectionInfo(
-  mcpActive: number,
-  mcpTotal: number,
-  peerCount: number
-): string | null {
+export function formatConnectionInfo(hubConnected: boolean, peerCount: number): string | null {
   const parts: string[] = [];
 
-  if (mcpTotal > 0) {
-    if (mcpActive === mcpTotal) {
-      parts.push(`${mcpActive} MCP`);
-    } else {
-      parts.push(`${mcpActive}/${mcpTotal} MCP`);
-    }
+  if (hubConnected) {
+    parts.push('hub');
   }
 
   if (peerCount > 0) {
