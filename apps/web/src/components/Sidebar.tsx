@@ -641,7 +641,6 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
           {/* Note: Archived plans are NOT shown here - they only appear on /archive route */}
         </ListBox>
 
-        {/* Loading state with skeleton */}
         {isLoading && (
           <div className="space-y-1 p-2">
             {Array.from({ length: 3 }).map((_, i) => (
@@ -653,7 +652,6 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
           </div>
         )}
 
-        {/* Empty state - only show when not loading and no plans */}
         {!isLoading &&
           filteredMyPlans.length === 0 &&
           filteredSharedPlans.length === 0 &&
@@ -664,7 +662,6 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
           )}
       </nav>
 
-      {/* Footer with GitHub account and theme toggle */}
       <div className="px-3 py-2 border-t border-separator flex items-center justify-between gap-2 shrink-0 mt-auto">
         <AccountSection />
         <ThemeToggle />
@@ -672,12 +669,10 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
     </>
   );
 
-  // In drawer mode, render content directly (drawer provides wrapper)
   if (inDrawer) {
     return <div className="flex flex-col h-full bg-surface">{content}</div>;
   }
 
-  // Desktop mode: wrap in CollapsiblePanel
   return (
     <CollapsiblePanel
       side="left"

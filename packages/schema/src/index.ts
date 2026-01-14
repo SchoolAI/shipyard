@@ -169,7 +169,6 @@ export {
   PLAN_INDEX_DOC_NAME,
   PLAN_INDEX_VIEWED_BY_KEY,
   PlanIndexEntrySchema,
-  PlanStatus,
 } from './plan-index.js';
 export {
   getAllViewedByFromIndex,

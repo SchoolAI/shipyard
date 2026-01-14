@@ -340,7 +340,6 @@ export function PlanPage() {
       rtcProvider={rtcProvider}
       onStartAuth={startAuth}
     >
-      {/* P2P conversation receive handler - shows toast notifications and review modal */}
       {!isSnapshot && (
         <ImportConversationHandler planId={planId} ydoc={ydoc} rtcProvider={rtcProvider} />
       )}

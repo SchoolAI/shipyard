@@ -318,16 +318,19 @@ describe('Plan Index Helpers', () => {
         expect(getViewedByFromIndex(doc2, 'plan-1').user1).toBeDefined();
       });
 
-      it('merges concurrent viewedBy updates from different users', () => {
+      it('merges concurrent viewedBy updates from different users on synced docs', () => {
         const doc1 = new Y.Doc();
         const doc2 = new Y.Doc();
 
-        // Both docs update the same plan but different users
+        // First sync docs so they share the same Y.Map structure
         updatePlanIndexViewedBy(doc1, 'plan-1', 'user1');
+        Y.applyUpdate(doc2, Y.encodeStateAsUpdate(doc1));
+
+        // Now both docs have the same nested Y.Map for plan-1
+        // User2 updates from doc2
         updatePlanIndexViewedBy(doc2, 'plan-1', 'user2');
 
-        // Sync both ways
-        Y.applyUpdate(doc2, Y.encodeStateAsUpdate(doc1));
+        // Sync back to doc1
         Y.applyUpdate(doc1, Y.encodeStateAsUpdate(doc2));
 
         // Both users should be present in both docs

@@ -219,27 +219,35 @@ See [08-waiting-room.md](./08-waiting-room.md) for full details.
 
 **Goal:** Multi-view interface for managing AI agent work at scale
 
-**Status:** Phase 1 partially complete, Phase 2 ready to start
+**Status:** Phase 1-2 complete with major UX enhancements beyond original scope
 
 ### Completed:
-- ✅ **Phase 1a: Sidebar Navigation** - NavItem component with routes to `/inbox`, `/archive`
-- ✅ **Phase 1c: Inbox Page** - Dedicated `/inbox` route with quick actions (Approve, Request Changes)
+- ✅ **Phase 1a: Sidebar Navigation** - NavItem component with routes to `/inbox`, `/archive`, `/board`
+- ✅ **Phase 1c: Inbox Page** - Dedicated `/inbox` route with quick actions
+- ✅ **Inbox Bug Fix** (#57 partial) - markPlanAsRead() called on click, badge count works
 - ✅ **Filters in Sidebar** - Search, sort (with direction toggle), status filter chips
-- ✅ **Read/Unread Infrastructure** - `viewedBy` field, `markPlanAsRead()`, `isPlanUnread()` helpers
-- ✅ **Inbox Badge Count** - Shows unread plans needing attention
+- ✅ **Read/Unread Infrastructure** - `viewedBy` field, helpers, React hooks ordering fixed
+- ✅ **Phase 2: Kanban Board** - `/board` route with drag-drop status changes (@dnd-kit)
+
+**Phase 2 UX Enhancements** (based on Linear/Notion/OSS research):
+- ✅ **Card Information Density** - Deliverable count, owner avatar, PR status, colored borders
+- ✅ **Keyboard Navigation** - Arrow keys, Space/Enter, Escape, screen reader announcements
+- ✅ **Space Bar Peek Preview** - Hold Space to preview plan without navigation
+- ✅ **Hide Empty Columns** - Toggle to show/hide empty columns (persists to localStorage)
+- ✅ **Natural Drag UX** - Entire card draggable (no visible handle), cursor-grab styling
+- ✅ **Enhanced Animations** - Lift on hover, spring physics, smooth transitions
+- ✅ **usePlanMetadata Hook** - Cached async loading of deliverables/PRs (30s cache)
 
 ### Diverged from Plan:
-- ⚠️ **Phase 1b: /plans route** - NOT DONE. Filters went into sidebar instead of dedicated route
-- ⚠️ **Inbox Groupings** - No "Needs Your Review" / "Needs Your Action" sections yet
-- ⚠️ **Active Route** - No `/plans?status=active` - have "My Plans" / "Shared With Me" sections instead
+- ⚠️ **Phase 1b: /plans route** - NOT DONE. Filters in sidebar instead
+- ⚠️ **Inbox Groupings** - No "Needs Your Review" / "Needs Your Action" sections
+- ⚠️ **Active Route** - Using "My Plans" / "Shared With Me" sections instead
 
 ### Known Issues:
-- 🐛 **GitHub identity race condition** - Fix applied (eager cache init in `useGitHubAuth.ts`), not fully verified
-- 🐛 **Read/unread reliability** - Depends on identity fix; may need verification
+- ⚠️ **#61 - Kanban column consolidation** - Current 6-column layout works, but issue proposes consolidating review states
 
 ### Pending:
-- ⏳ Phase 2: View switcher & Kanban board (drag-drop status changes)
-- ⏳ Phase 3: Tags & filtering infrastructure
+- ⏳ Phase 3: Tags & filtering infrastructure (#37 - P1, architecture ready)
 - ⏳ Phase 4: Artifact gallery view
 - ⏳ Phase 5: Table view for power users
 

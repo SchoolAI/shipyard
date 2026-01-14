@@ -407,10 +407,6 @@ export function usePlanIndex(currentUsername: string | undefined): PlanIndexStat
     [currentUsername, ydoc]
   );
 
-  /**
-   * Force refresh of inbox unread states.
-   * Useful after external changes to viewedBy.
-   */
   const refreshInboxUnreadState = useCallback(() => {
     setInboxRefreshTrigger((prev) => prev + 1);
   }, []);
