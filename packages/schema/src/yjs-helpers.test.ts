@@ -2,12 +2,34 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import * as Y from 'yjs';
 import {
   addArtifact,
+  addDeliverable,
+  approveUser,
+  getApprovedUsers,
   getArtifacts,
+  getDeliverables,
+  getLinkedPR,
+  getLinkedPRs,
+  getPlanMetadata,
+  getPlanOwnerId,
+  getRejectedUsers,
   getViewedBy,
+  initPlanMetadata,
+  isApprovalRequired,
   isPlanUnread,
+  isUserApproved,
+  isUserRejected,
+  linkArtifactToDeliverable,
+  linkPR,
   markPlanAsViewed,
+  rejectUser,
   removeArtifact,
+  revokeUser,
+  setPlanMetadata,
+  unlinkPR,
+  unrejectUser,
+  updateLinkedPRStatus,
 } from './yjs-helpers.js';
+import type { Deliverable, LinkedPR } from './plan.js';
 
 describe('Artifact helpers', () => {
   let ydoc: Y.Doc;
@@ -207,5 +229,789 @@ describe('ViewedBy helpers', () => {
     expect(Object.keys(viewedBy).sort()).toEqual(['user1', 'user2']);
     expect(typeof viewedBy.user1).toBe('number');
     expect(typeof viewedBy.user2).toBe('number');
+  });
+});
+
+describe('User access control helpers', () => {
+  let ydoc: Y.Doc;
+
+  beforeEach(() => {
+    ydoc = new Y.Doc();
+  });
+
+  describe('getApprovedUsers', () => {
+    it('returns empty array for new doc', () => {
+      expect(getApprovedUsers(ydoc)).toEqual([]);
+    });
+
+    it('returns empty array when approvedUsers is not an array', () => {
+      const map = ydoc.getMap('metadata');
+      map.set('approvedUsers', 'not-an-array');
+      expect(getApprovedUsers(ydoc)).toEqual([]);
+    });
+
+    it('filters out non-string entries', () => {
+      const map = ydoc.getMap('metadata');
+      map.set('approvedUsers', ['user1', 123, null, 'user2', undefined]);
+      expect(getApprovedUsers(ydoc)).toEqual(['user1', 'user2']);
+    });
+
+    it('returns approved users list', () => {
+      const map = ydoc.getMap('metadata');
+      map.set('approvedUsers', ['user1', 'user2']);
+      expect(getApprovedUsers(ydoc)).toEqual(['user1', 'user2']);
+    });
+  });
+
+  describe('getRejectedUsers', () => {
+    it('returns empty array for new doc', () => {
+      expect(getRejectedUsers(ydoc)).toEqual([]);
+    });
+
+    it('returns empty array when rejectedUsers is not an array', () => {
+      const map = ydoc.getMap('metadata');
+      map.set('rejectedUsers', 'not-an-array');
+      expect(getRejectedUsers(ydoc)).toEqual([]);
+    });
+
+    it('filters out non-string entries', () => {
+      const map = ydoc.getMap('metadata');
+      map.set('rejectedUsers', ['bad1', 456, null, 'bad2']);
+      expect(getRejectedUsers(ydoc)).toEqual(['bad1', 'bad2']);
+    });
+
+    it('returns rejected users list', () => {
+      const map = ydoc.getMap('metadata');
+      map.set('rejectedUsers', ['bad1', 'bad2']);
+      expect(getRejectedUsers(ydoc)).toEqual(['bad1', 'bad2']);
+    });
+  });
+
+  describe('isUserApproved', () => {
+    it('returns false for new doc without any approvedUsers', () => {
+      expect(isUserApproved(ydoc, 'user1')).toBe(false);
+    });
+
+    it('returns true when user is in approvedUsers', () => {
+      const map = ydoc.getMap('metadata');
+      map.set('approvedUsers', ['user1', 'user2']);
+      expect(isUserApproved(ydoc, 'user1')).toBe(true);
+      expect(isUserApproved(ydoc, 'user2')).toBe(true);
+    });
+
+    it('returns false when user is not in approvedUsers', () => {
+      const map = ydoc.getMap('metadata');
+      map.set('approvedUsers', ['user1']);
+      expect(isUserApproved(ydoc, 'user2')).toBe(false);
+    });
+
+    it('returns true when user is the owner (even if not in approvedUsers)', () => {
+      const map = ydoc.getMap('metadata');
+      map.set('ownerId', 'owner1');
+      map.set('approvedUsers', ['other-user']);
+      expect(isUserApproved(ydoc, 'owner1')).toBe(true);
+    });
+  });
+
+  describe('isUserRejected', () => {
+    it('returns false for new doc', () => {
+      expect(isUserRejected(ydoc, 'user1')).toBe(false);
+    });
+
+    it('returns true when user is in rejectedUsers', () => {
+      const map = ydoc.getMap('metadata');
+      map.set('rejectedUsers', ['bad1', 'bad2']);
+      expect(isUserRejected(ydoc, 'bad1')).toBe(true);
+    });
+
+    it('returns false when user is not in rejectedUsers', () => {
+      const map = ydoc.getMap('metadata');
+      map.set('rejectedUsers', ['bad1']);
+      expect(isUserRejected(ydoc, 'good-user')).toBe(false);
+    });
+  });
+
+  describe('approveUser', () => {
+    it('adds user to approvedUsers', () => {
+      approveUser(ydoc, 'user1');
+      expect(getApprovedUsers(ydoc)).toContain('user1');
+    });
+
+    it('preserves existing approved users', () => {
+      const map = ydoc.getMap('metadata');
+      map.set('approvedUsers', ['existing-user']);
+
+      approveUser(ydoc, 'new-user');
+
+      const approved = getApprovedUsers(ydoc);
+      expect(approved).toContain('existing-user');
+      expect(approved).toContain('new-user');
+    });
+
+    it('does not duplicate already approved user', () => {
+      approveUser(ydoc, 'user1');
+      approveUser(ydoc, 'user1');
+
+      const approved = getApprovedUsers(ydoc);
+      expect(approved.filter((u) => u === 'user1')).toHaveLength(1);
+    });
+
+    it('updates updatedAt timestamp', () => {
+      const map = ydoc.getMap('metadata');
+      const before = Date.now();
+
+      approveUser(ydoc, 'user1');
+
+      const updatedAt = map.get('updatedAt') as number;
+      expect(updatedAt).toBeGreaterThanOrEqual(before);
+    });
+  });
+
+  describe('revokeUser', () => {
+    it('returns false when user is not in approvedUsers', () => {
+      expect(revokeUser(ydoc, 'user1')).toBe(false);
+    });
+
+    it('removes user from approvedUsers and returns true', () => {
+      const map = ydoc.getMap('metadata');
+      map.set('approvedUsers', ['user1', 'user2']);
+
+      expect(revokeUser(ydoc, 'user1')).toBe(true);
+      expect(getApprovedUsers(ydoc)).toEqual(['user2']);
+    });
+
+    it('updates updatedAt timestamp when successful', () => {
+      const map = ydoc.getMap('metadata');
+      map.set('approvedUsers', ['user1']);
+      const before = Date.now();
+
+      revokeUser(ydoc, 'user1');
+
+      const updatedAt = map.get('updatedAt') as number;
+      expect(updatedAt).toBeGreaterThanOrEqual(before);
+    });
+
+    it('cannot revoke the plan owner', () => {
+      const map = ydoc.getMap('metadata');
+      map.set('ownerId', 'owner123');
+      map.set('approvedUsers', ['owner123', 'user1']);
+
+      // Attempt to revoke owner
+      const result = revokeUser(ydoc, 'owner123');
+
+      // Should return false and leave owner in approved list
+      expect(result).toBe(false);
+      expect(getApprovedUsers(ydoc)).toContain('owner123');
+    });
+  });
+
+  describe('rejectUser', () => {
+    it('adds user to rejectedUsers', () => {
+      rejectUser(ydoc, 'bad-user');
+      expect(getRejectedUsers(ydoc)).toContain('bad-user');
+    });
+
+    it('removes user from approvedUsers when rejecting', () => {
+      const map = ydoc.getMap('metadata');
+      map.set('approvedUsers', ['user1', 'user2']);
+
+      rejectUser(ydoc, 'user1');
+
+      expect(getApprovedUsers(ydoc)).toEqual(['user2']);
+      expect(getRejectedUsers(ydoc)).toContain('user1');
+    });
+
+    it('does not duplicate already rejected user', () => {
+      rejectUser(ydoc, 'bad-user');
+      rejectUser(ydoc, 'bad-user');
+
+      const rejected = getRejectedUsers(ydoc);
+      expect(rejected.filter((u) => u === 'bad-user')).toHaveLength(1);
+    });
+
+    it('updates updatedAt timestamp', () => {
+      const before = Date.now();
+      rejectUser(ydoc, 'bad-user');
+
+      const map = ydoc.getMap('metadata');
+      const updatedAt = map.get('updatedAt') as number;
+      expect(updatedAt).toBeGreaterThanOrEqual(before);
+    });
+
+    it('cannot reject the plan owner', () => {
+      const map = ydoc.getMap('metadata');
+      map.set('ownerId', 'owner123');
+      map.set('approvedUsers', ['owner123', 'user1']);
+
+      // Attempt to reject owner
+      rejectUser(ydoc, 'owner123');
+
+      // Owner should remain in approved, not added to rejected
+      expect(getApprovedUsers(ydoc)).toContain('owner123');
+      expect(getRejectedUsers(ydoc)).not.toContain('owner123');
+    });
+  });
+
+  describe('unrejectUser', () => {
+    it('returns false when user is not in rejectedUsers', () => {
+      expect(unrejectUser(ydoc, 'user1')).toBe(false);
+    });
+
+    it('removes user from rejectedUsers and returns true', () => {
+      const map = ydoc.getMap('metadata');
+      map.set('rejectedUsers', ['bad1', 'bad2']);
+
+      expect(unrejectUser(ydoc, 'bad1')).toBe(true);
+      expect(getRejectedUsers(ydoc)).toEqual(['bad2']);
+    });
+
+    it('updates updatedAt timestamp when successful', () => {
+      const map = ydoc.getMap('metadata');
+      map.set('rejectedUsers', ['bad-user']);
+      const before = Date.now();
+
+      unrejectUser(ydoc, 'bad-user');
+
+      const updatedAt = map.get('updatedAt') as number;
+      expect(updatedAt).toBeGreaterThanOrEqual(before);
+    });
+  });
+
+  describe('getPlanOwnerId', () => {
+    it('returns null for new doc', () => {
+      expect(getPlanOwnerId(ydoc)).toBe(null);
+    });
+
+    it('returns ownerId when set', () => {
+      const map = ydoc.getMap('metadata');
+      map.set('ownerId', 'owner123');
+      expect(getPlanOwnerId(ydoc)).toBe('owner123');
+    });
+
+    it('returns null when ownerId is not a string', () => {
+      const map = ydoc.getMap('metadata');
+      map.set('ownerId', 123);
+      expect(getPlanOwnerId(ydoc)).toBe(null);
+    });
+  });
+
+  describe('isApprovalRequired', () => {
+    it('returns false for new doc without owner', () => {
+      expect(isApprovalRequired(ydoc)).toBe(false);
+    });
+
+    it('returns true when ownerId is set (default behavior)', () => {
+      const map = ydoc.getMap('metadata');
+      map.set('ownerId', 'owner1');
+      expect(isApprovalRequired(ydoc)).toBe(true);
+    });
+
+    it('respects explicit approvalRequired=false', () => {
+      const map = ydoc.getMap('metadata');
+      map.set('ownerId', 'owner1');
+      map.set('approvalRequired', false);
+      expect(isApprovalRequired(ydoc)).toBe(false);
+    });
+
+    it('respects explicit approvalRequired=true', () => {
+      const map = ydoc.getMap('metadata');
+      map.set('approvalRequired', true);
+      expect(isApprovalRequired(ydoc)).toBe(true);
+    });
+  });
+});
+
+describe('PR linking helpers', () => {
+  let ydoc: Y.Doc;
+
+  const createPR = (prNumber: number, overrides?: Partial<LinkedPR>): LinkedPR => ({
+    prNumber,
+    url: `https://github.com/org/repo/pull/${prNumber}`,
+    linkedAt: Date.now(),
+    status: 'open',
+    ...overrides,
+  });
+
+  beforeEach(() => {
+    ydoc = new Y.Doc();
+  });
+
+  describe('getLinkedPRs', () => {
+    it('returns empty array for new doc', () => {
+      expect(getLinkedPRs(ydoc)).toEqual([]);
+    });
+
+    it('returns linked PRs', () => {
+      const pr1 = createPR(1);
+      const pr2 = createPR(2, { status: 'merged' });
+
+      linkPR(ydoc, pr1);
+      linkPR(ydoc, pr2);
+
+      const prs = getLinkedPRs(ydoc);
+      expect(prs).toHaveLength(2);
+      expect(prs[0]?.prNumber).toBe(1);
+      expect(prs[1]?.prNumber).toBe(2);
+    });
+
+    it('filters out invalid entries', () => {
+      const array = ydoc.getArray('linkedPRs');
+
+      // Valid PR
+      array.push([createPR(1)]);
+
+      // Invalid entries
+      array.push([{ prNumber: 2 }]); // Missing required fields
+      array.push([null]);
+
+      const prs = getLinkedPRs(ydoc);
+      expect(prs).toHaveLength(1);
+      expect(prs[0]?.prNumber).toBe(1);
+    });
+  });
+
+  describe('linkPR', () => {
+    it('adds PR to linkedPRs', () => {
+      const pr = createPR(42, { title: 'Fix bug' });
+      linkPR(ydoc, pr);
+
+      const prs = getLinkedPRs(ydoc);
+      expect(prs).toHaveLength(1);
+      expect(prs[0]?.prNumber).toBe(42);
+      expect(prs[0]?.title).toBe('Fix bug');
+    });
+
+    it('replaces existing PR with same number', () => {
+      const pr1 = createPR(42, { status: 'open', title: 'Old title' });
+      const pr2 = createPR(42, { status: 'merged', title: 'New title' });
+
+      linkPR(ydoc, pr1);
+      linkPR(ydoc, pr2);
+
+      const prs = getLinkedPRs(ydoc);
+      expect(prs).toHaveLength(1);
+      expect(prs[0]?.status).toBe('merged');
+      expect(prs[0]?.title).toBe('New title');
+    });
+
+    it('can link multiple different PRs', () => {
+      linkPR(ydoc, createPR(1));
+      linkPR(ydoc, createPR(2));
+      linkPR(ydoc, createPR(3));
+
+      expect(getLinkedPRs(ydoc)).toHaveLength(3);
+    });
+  });
+
+  describe('unlinkPR', () => {
+    it('returns false when PR does not exist', () => {
+      expect(unlinkPR(ydoc, 999)).toBe(false);
+    });
+
+    it('removes PR and returns true', () => {
+      linkPR(ydoc, createPR(1));
+      linkPR(ydoc, createPR(2));
+
+      expect(unlinkPR(ydoc, 1)).toBe(true);
+
+      const prs = getLinkedPRs(ydoc);
+      expect(prs).toHaveLength(1);
+      expect(prs[0]?.prNumber).toBe(2);
+    });
+
+    it('returns false for empty array', () => {
+      expect(unlinkPR(ydoc, 1)).toBe(false);
+    });
+  });
+
+  describe('getLinkedPR', () => {
+    it('returns null when PR does not exist', () => {
+      expect(getLinkedPR(ydoc, 999)).toBe(null);
+    });
+
+    it('returns the PR when it exists', () => {
+      const pr = createPR(42, { title: 'My PR', branch: 'feature/test' });
+      linkPR(ydoc, pr);
+
+      const result = getLinkedPR(ydoc, 42);
+      expect(result).not.toBe(null);
+      expect(result?.prNumber).toBe(42);
+      expect(result?.title).toBe('My PR');
+      expect(result?.branch).toBe('feature/test');
+    });
+
+    it('finds correct PR among multiple', () => {
+      linkPR(ydoc, createPR(1, { title: 'PR 1' }));
+      linkPR(ydoc, createPR(2, { title: 'PR 2' }));
+      linkPR(ydoc, createPR(3, { title: 'PR 3' }));
+
+      expect(getLinkedPR(ydoc, 2)?.title).toBe('PR 2');
+    });
+  });
+
+  describe('updateLinkedPRStatus', () => {
+    it('returns false when PR does not exist', () => {
+      expect(updateLinkedPRStatus(ydoc, 999, 'merged')).toBe(false);
+    });
+
+    it('updates PR status and returns true', () => {
+      linkPR(ydoc, createPR(42, { status: 'open' }));
+
+      expect(updateLinkedPRStatus(ydoc, 42, 'merged')).toBe(true);
+      expect(getLinkedPR(ydoc, 42)?.status).toBe('merged');
+    });
+
+    it('preserves other PR fields when updating status', () => {
+      linkPR(ydoc, createPR(42, { title: 'My PR', branch: 'main', status: 'draft' }));
+
+      updateLinkedPRStatus(ydoc, 42, 'open');
+
+      const pr = getLinkedPR(ydoc, 42);
+      expect(pr?.status).toBe('open');
+      expect(pr?.title).toBe('My PR');
+      expect(pr?.branch).toBe('main');
+    });
+
+    it('handles all valid status values', () => {
+      const statuses: LinkedPR['status'][] = ['draft', 'open', 'merged', 'closed'];
+
+      for (const status of statuses) {
+        linkPR(ydoc, createPR(1, { status: 'draft' }));
+        updateLinkedPRStatus(ydoc, 1, status);
+        expect(getLinkedPR(ydoc, 1)?.status).toBe(status);
+      }
+    });
+  });
+});
+
+describe('Deliverables helpers', () => {
+  let ydoc: Y.Doc;
+
+  const createDeliverable = (id: string, text: string, overrides?: Partial<Deliverable>): Deliverable => ({
+    id,
+    text,
+    ...overrides,
+  });
+
+  beforeEach(() => {
+    ydoc = new Y.Doc();
+  });
+
+  describe('getDeliverables', () => {
+    it('returns empty array for new doc', () => {
+      expect(getDeliverables(ydoc)).toEqual([]);
+    });
+
+    it('returns deliverables', () => {
+      addDeliverable(ydoc, createDeliverable('del-1', 'Screenshot of login'));
+      addDeliverable(ydoc, createDeliverable('del-2', 'Video demo'));
+
+      const deliverables = getDeliverables(ydoc);
+      expect(deliverables).toHaveLength(2);
+      expect(deliverables[0]?.text).toBe('Screenshot of login');
+      expect(deliverables[1]?.text).toBe('Video demo');
+    });
+
+    it('filters out invalid entries', () => {
+      const array = ydoc.getArray('deliverables');
+
+      // Valid deliverable
+      array.push([createDeliverable('del-1', 'Valid')]);
+
+      // Invalid entries
+      array.push([{ id: 'del-2' }]); // Missing text
+      array.push([{ text: 'No ID' }]); // Missing id
+      array.push([null]);
+
+      const deliverables = getDeliverables(ydoc);
+      expect(deliverables).toHaveLength(1);
+      expect(deliverables[0]?.id).toBe('del-1');
+    });
+  });
+
+  describe('addDeliverable', () => {
+    it('adds deliverable to array', () => {
+      const deliverable = createDeliverable('del-1', 'Test deliverable');
+      addDeliverable(ydoc, deliverable);
+
+      const deliverables = getDeliverables(ydoc);
+      expect(deliverables).toHaveLength(1);
+      expect(deliverables[0]).toEqual(deliverable);
+    });
+
+    it('can add multiple deliverables', () => {
+      addDeliverable(ydoc, createDeliverable('del-1', 'First'));
+      addDeliverable(ydoc, createDeliverable('del-2', 'Second'));
+      addDeliverable(ydoc, createDeliverable('del-3', 'Third'));
+
+      expect(getDeliverables(ydoc)).toHaveLength(3);
+    });
+
+    it('preserves order of deliverables', () => {
+      addDeliverable(ydoc, createDeliverable('a', 'First'));
+      addDeliverable(ydoc, createDeliverable('b', 'Second'));
+      addDeliverable(ydoc, createDeliverable('c', 'Third'));
+
+      const deliverables = getDeliverables(ydoc);
+      expect(deliverables.map((d) => d.id)).toEqual(['a', 'b', 'c']);
+    });
+  });
+
+  describe('linkArtifactToDeliverable', () => {
+    it('returns false when deliverable does not exist', () => {
+      expect(linkArtifactToDeliverable(ydoc, 'nonexistent', 'art-1')).toBe(false);
+    });
+
+    it('links artifact to deliverable and returns true', () => {
+      addDeliverable(ydoc, createDeliverable('del-1', 'Screenshot'));
+
+      const before = Date.now();
+      expect(linkArtifactToDeliverable(ydoc, 'del-1', 'art-123')).toBe(true);
+
+      const deliverables = getDeliverables(ydoc);
+      expect(deliverables[0]?.linkedArtifactId).toBe('art-123');
+      expect(deliverables[0]?.linkedAt).toBeGreaterThanOrEqual(before);
+    });
+
+    it('preserves other deliverable fields', () => {
+      addDeliverable(ydoc, createDeliverable('del-1', 'My deliverable text'));
+
+      linkArtifactToDeliverable(ydoc, 'del-1', 'art-1');
+
+      const deliverable = getDeliverables(ydoc)[0];
+      expect(deliverable?.id).toBe('del-1');
+      expect(deliverable?.text).toBe('My deliverable text');
+      expect(deliverable?.linkedArtifactId).toBe('art-1');
+    });
+
+    it('can update artifact link on same deliverable', () => {
+      addDeliverable(ydoc, createDeliverable('del-1', 'Test'));
+
+      linkArtifactToDeliverable(ydoc, 'del-1', 'art-1');
+      linkArtifactToDeliverable(ydoc, 'del-1', 'art-2');
+
+      expect(getDeliverables(ydoc)[0]?.linkedArtifactId).toBe('art-2');
+    });
+
+    it('links correct deliverable among multiple', () => {
+      addDeliverable(ydoc, createDeliverable('del-1', 'First'));
+      addDeliverable(ydoc, createDeliverable('del-2', 'Second'));
+      addDeliverable(ydoc, createDeliverable('del-3', 'Third'));
+
+      linkArtifactToDeliverable(ydoc, 'del-2', 'art-middle');
+
+      const deliverables = getDeliverables(ydoc);
+      expect(deliverables[0]?.linkedArtifactId).toBeUndefined();
+      expect(deliverables[1]?.linkedArtifactId).toBe('art-middle');
+      expect(deliverables[2]?.linkedArtifactId).toBeUndefined();
+    });
+  });
+});
+
+describe('Plan metadata helpers', () => {
+  let ydoc: Y.Doc;
+
+  beforeEach(() => {
+    ydoc = new Y.Doc();
+  });
+
+  describe('getPlanMetadata', () => {
+    it('returns null for new doc', () => {
+      expect(getPlanMetadata(ydoc)).toBe(null);
+    });
+
+    it('returns null for invalid metadata', () => {
+      const map = ydoc.getMap('metadata');
+      map.set('id', 'plan-1');
+      // Missing required fields like title, status, createdAt, updatedAt
+      expect(getPlanMetadata(ydoc)).toBe(null);
+    });
+
+    it('returns metadata when valid', () => {
+      const map = ydoc.getMap('metadata');
+      const now = Date.now();
+      map.set('id', 'plan-1');
+      map.set('title', 'Test Plan');
+      map.set('status', 'draft');
+      map.set('createdAt', now);
+      map.set('updatedAt', now);
+
+      const metadata = getPlanMetadata(ydoc);
+      expect(metadata).not.toBe(null);
+      expect(metadata?.id).toBe('plan-1');
+      expect(metadata?.title).toBe('Test Plan');
+      expect(metadata?.status).toBe('draft');
+    });
+
+    it('includes optional fields when present', () => {
+      const map = ydoc.getMap('metadata');
+      const now = Date.now();
+      map.set('id', 'plan-1');
+      map.set('title', 'Test Plan');
+      map.set('status', 'pending_review');
+      map.set('createdAt', now);
+      map.set('updatedAt', now);
+      map.set('repo', 'org/repo');
+      map.set('pr', 42);
+      map.set('ownerId', 'owner1');
+
+      const metadata = getPlanMetadata(ydoc);
+      expect(metadata?.repo).toBe('org/repo');
+      expect(metadata?.pr).toBe(42);
+      expect(metadata?.ownerId).toBe('owner1');
+    });
+  });
+
+  describe('setPlanMetadata', () => {
+    it('sets metadata fields', () => {
+      setPlanMetadata(ydoc, { title: 'New Title', status: 'in_progress' });
+
+      const map = ydoc.getMap('metadata');
+      expect(map.get('title')).toBe('New Title');
+      expect(map.get('status')).toBe('in_progress');
+    });
+
+    it('updates updatedAt timestamp', () => {
+      const before = Date.now();
+      setPlanMetadata(ydoc, { title: 'Test' });
+
+      const map = ydoc.getMap('metadata');
+      const updatedAt = map.get('updatedAt') as number;
+      expect(updatedAt).toBeGreaterThanOrEqual(before);
+    });
+
+    it('ignores undefined values', () => {
+      const map = ydoc.getMap('metadata');
+      map.set('title', 'Original');
+
+      setPlanMetadata(ydoc, { title: undefined, status: 'draft' });
+
+      expect(map.get('title')).toBe('Original');
+      expect(map.get('status')).toBe('draft');
+    });
+
+    it('can update partial metadata', () => {
+      const map = ydoc.getMap('metadata');
+      map.set('id', 'plan-1');
+      map.set('title', 'Original Title');
+      map.set('status', 'draft');
+
+      setPlanMetadata(ydoc, { status: 'pending_review' });
+
+      expect(map.get('title')).toBe('Original Title');
+      expect(map.get('status')).toBe('pending_review');
+    });
+  });
+
+  describe('initPlanMetadata', () => {
+    it('initializes all required fields', () => {
+      const before = Date.now();
+
+      initPlanMetadata(ydoc, {
+        id: 'plan-1',
+        title: 'My Plan',
+        status: 'draft',
+      });
+
+      const map = ydoc.getMap('metadata');
+      expect(map.get('id')).toBe('plan-1');
+      expect(map.get('title')).toBe('My Plan');
+      expect(map.get('status')).toBe('draft');
+      expect(map.get('createdAt')).toBeGreaterThanOrEqual(before);
+      expect(map.get('updatedAt')).toBeGreaterThanOrEqual(before);
+    });
+
+    it('sets createdAt and updatedAt to same value', () => {
+      initPlanMetadata(ydoc, {
+        id: 'plan-1',
+        title: 'Test',
+        status: 'draft',
+      });
+
+      const map = ydoc.getMap('metadata');
+      expect(map.get('createdAt')).toBe(map.get('updatedAt'));
+    });
+
+    it('sets optional repo and pr when provided', () => {
+      initPlanMetadata(ydoc, {
+        id: 'plan-1',
+        title: 'Test',
+        status: 'draft',
+        repo: 'org/repo',
+        pr: 123,
+      });
+
+      const map = ydoc.getMap('metadata');
+      expect(map.get('repo')).toBe('org/repo');
+      expect(map.get('pr')).toBe(123);
+    });
+
+    it('sets ownerId and adds owner to approvedUsers', () => {
+      initPlanMetadata(ydoc, {
+        id: 'plan-1',
+        title: 'Test',
+        status: 'draft',
+        ownerId: 'owner-user',
+      });
+
+      const map = ydoc.getMap('metadata');
+      expect(map.get('ownerId')).toBe('owner-user');
+      expect(map.get('approvedUsers')).toEqual(['owner-user']);
+    });
+
+    it('sets approvalRequired to true by default when ownerId is set', () => {
+      initPlanMetadata(ydoc, {
+        id: 'plan-1',
+        title: 'Test',
+        status: 'draft',
+        ownerId: 'owner-user',
+      });
+
+      const map = ydoc.getMap('metadata');
+      expect(map.get('approvalRequired')).toBe(true);
+    });
+
+    it('respects explicit approvalRequired=false', () => {
+      initPlanMetadata(ydoc, {
+        id: 'plan-1',
+        title: 'Test',
+        status: 'draft',
+        ownerId: 'owner-user',
+        approvalRequired: false,
+      });
+
+      const map = ydoc.getMap('metadata');
+      expect(map.get('approvalRequired')).toBe(false);
+    });
+
+    it('sets sessionTokenHash when provided', () => {
+      initPlanMetadata(ydoc, {
+        id: 'plan-1',
+        title: 'Test',
+        status: 'draft',
+        sessionTokenHash: 'hash123',
+      });
+
+      const map = ydoc.getMap('metadata');
+      expect(map.get('sessionTokenHash')).toBe('hash123');
+    });
+
+    it('sets origin metadata when provided', () => {
+      initPlanMetadata(ydoc, {
+        id: 'plan-1',
+        title: 'Test',
+        status: 'draft',
+        origin: {
+          platform: 'claude-code',
+          sessionId: 'session-123',
+          transcriptPath: '/path/to/transcript',
+        },
+      });
+
+      const map = ydoc.getMap('metadata');
+      const origin = map.get('origin') as { platform: string; sessionId: string };
+      expect(origin.platform).toBe('claude-code');
+      expect(origin.sessionId).toBe('session-123');
+    });
   });
 });

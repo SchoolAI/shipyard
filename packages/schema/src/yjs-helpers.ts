@@ -234,6 +234,13 @@ export function approveUser(ydoc: Y.Doc, userId: string): void {
 
 export function revokeUser(ydoc: Y.Doc, userId: string): boolean {
   const map = ydoc.getMap('metadata');
+  const ownerId = getPlanOwnerId(ydoc);
+
+  // Cannot revoke the plan owner
+  if (userId === ownerId) {
+    return false;
+  }
+
   const currentApproved = getApprovedUsers(ydoc);
   const index = currentApproved.indexOf(userId);
   if (index === -1) {
@@ -262,6 +269,13 @@ export function isUserRejected(ydoc: Y.Doc, userId: string): boolean {
 
 export function rejectUser(ydoc: Y.Doc, userId: string): void {
   const map = ydoc.getMap('metadata');
+  const ownerId = getPlanOwnerId(ydoc);
+
+  // Cannot reject the plan owner
+  if (userId === ownerId) {
+    return;
+  }
+
   const currentRejected = getRejectedUsers(ydoc);
   const currentApproved = getApprovedUsers(ydoc);
 
