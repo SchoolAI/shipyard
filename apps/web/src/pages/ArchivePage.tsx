@@ -9,6 +9,8 @@ import { ArchiveRestore } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
+import { IndexeddbPersistence } from 'y-indexeddb';
+import * as Y from 'yjs';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
 import { useMultiProviderSync } from '@/hooks/useMultiProviderSync';
 import { usePlanIndex } from '@/hooks/usePlanIndex';
@@ -40,8 +42,7 @@ function ArchiveItem({ plan, onUnarchive }: ArchiveItemProps) {
         variant="ghost"
         size="sm"
         aria-label="Unarchive plan"
-        onPress={(e) => {
-          e.continuePropagation?.();
+        onPress={() => {
           onUnarchive(plan.id);
         }}
         className="w-8 h-8"
@@ -102,8 +103,8 @@ export function ArchivePage() {
     const now = Date.now();
 
     try {
-      const planDoc = new (await import('yjs')).Doc();
-      const idb = new (await import('y-indexeddb')).IndexeddbPersistence(planId, planDoc);
+      const planDoc = new Y.Doc();
+      const idb = new IndexeddbPersistence(planId, planDoc);
       await idb.whenSynced;
 
       planDoc.transact(() => {

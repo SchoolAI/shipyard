@@ -22,7 +22,8 @@ import { getPlanIndexEntry, PLAN_INDEX_DOC_NAME, setPlanIndexEntry } from '@peer
 import { Eye, EyeOff } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import type * as Y from 'yjs';
+import { IndexeddbPersistence } from 'y-indexeddb';
+import * as Y from 'yjs';
 import { PlanPeekModal } from '@/components/PlanPeekModal';
 import { KanbanSkeleton } from '@/components/ui/KanbanSkeleton';
 import { KanbanCard } from '@/components/views/KanbanCard';
@@ -79,8 +80,8 @@ async function updatePlanStatus(
 
   // Also update the plan's own metadata
   try {
-    const planDoc = new (await import('yjs')).Doc();
-    const idb = new (await import('y-indexeddb')).IndexeddbPersistence(planId, planDoc);
+    const planDoc = new Y.Doc();
+    const idb = new IndexeddbPersistence(planId, planDoc);
     await idb.whenSynced;
 
     planDoc.transact(() => {

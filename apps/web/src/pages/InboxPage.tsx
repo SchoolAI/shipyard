@@ -10,6 +10,8 @@ import { AlertTriangle, Check, Clock, ExternalLink, MessageSquare } from 'lucide
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
+import { IndexeddbPersistence } from 'y-indexeddb';
+import * as Y from 'yjs';
 import { InboxSkeleton } from '@/components/ui/InboxSkeleton';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
 import { useMultiProviderSync } from '@/hooks/useMultiProviderSync';
@@ -83,8 +85,7 @@ function InboxItem({ plan, onApprove, onRequestChanges, onViewPlan }: InboxItemP
               variant="ghost"
               size="sm"
               aria-label="Approve plan"
-              onPress={(e) => {
-                e.continuePropagation?.();
+              onPress={() => {
                 onApprove(plan.id);
               }}
               className="w-8 h-8"
@@ -102,8 +103,7 @@ function InboxItem({ plan, onApprove, onRequestChanges, onViewPlan }: InboxItemP
               variant="ghost"
               size="sm"
               aria-label="Request changes"
-              onPress={(e) => {
-                e.continuePropagation?.();
+              onPress={() => {
                 onRequestChanges(plan.id);
               }}
               className="w-8 h-8"
@@ -172,8 +172,8 @@ export function InboxPage() {
     }
 
     try {
-      const planDoc = new (await import('yjs')).Doc();
-      const idb = new (await import('y-indexeddb')).IndexeddbPersistence(planId, planDoc);
+      const planDoc = new Y.Doc();
+      const idb = new IndexeddbPersistence(planId, planDoc);
       await idb.whenSynced;
 
       planDoc.transact(() => {

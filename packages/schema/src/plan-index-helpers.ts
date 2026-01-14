@@ -82,8 +82,6 @@ export function touchPlanIndexEntry(ydoc: Y.Doc, planId: string): void {
   }
 }
 
-// --- ViewedBy Helpers for Cross-Device Inbox Sync ---
-
 /**
  * Gets the viewedBy map for a plan from the plan-index.
  * Returns empty object if no viewedBy data exists.
@@ -113,14 +111,12 @@ export function updatePlanIndexViewedBy(ydoc: Y.Doc, planId: string, username: s
   ydoc.transact(() => {
     const viewedByRoot = ydoc.getMap<Y.Map<number>>(PLAN_INDEX_VIEWED_BY_KEY);
 
-    // Get or create the Y.Map for this plan
     let planViewedBy = viewedByRoot.get(planId);
     if (!planViewedBy || !(planViewedBy instanceof Y.Map)) {
       planViewedBy = new Y.Map<number>();
       viewedByRoot.set(planId, planViewedBy);
     }
 
-    // Update the timestamp for this user
     planViewedBy.set(username, Date.now());
   });
 }

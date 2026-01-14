@@ -24,6 +24,8 @@ import {
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
+import { IndexeddbPersistence } from 'y-indexeddb';
+import * as Y from 'yjs';
 import { AccountSection } from '@/components/account';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { CollapsiblePanel } from '@/components/ui/collapsible-panel';
@@ -360,8 +362,8 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
 
     // Update the plan's own metadata (for shared plans to be filtered)
     try {
-      const planDoc = new (await import('yjs')).Doc();
-      const idb = new (await import('y-indexeddb')).IndexeddbPersistence(planId, planDoc);
+      const planDoc = new Y.Doc();
+      const idb = new IndexeddbPersistence(planId, planDoc);
       await idb.whenSynced;
 
       planDoc.transact(() => {
