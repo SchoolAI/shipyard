@@ -14,6 +14,7 @@ describe('YDOC_KEYS', () => {
       PRESENCE: 'presence',
       LINKED_PRS: 'linkedPRs',
       PR_REVIEW_COMMENTS: 'prReviewComments',
+      EVENTS: 'events',
     });
   });
 
