@@ -365,8 +365,8 @@ interface PlanHeaderProps {
   identity: UserIdentity | null;
   /** Called when user needs to set up identity */
   onRequestIdentity: () => void;
-  /** Called after status is successfully updated in the plan doc */
-  onStatusChange?: (newStatus: 'in_progress' | 'changes_requested') => void;
+  /** Called after status is successfully updated in the plan doc, with the timestamp used */
+  onStatusChange?: (newStatus: 'in_progress' | 'changes_requested', updatedAt: number) => void;
   /** When true, shows snapshot indicator and hides interactive elements */
   isSnapshot?: boolean;
   /** WebRTC provider for P2P sync and awareness (needed for approval panel) */

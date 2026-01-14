@@ -369,19 +369,21 @@ export function InboxPage() {
   const handlePanelApprove = async () => {
     if (!selectedPlanId || !panelMetadata) return;
 
+    const now = Date.now();
+
     panelYdoc.transact(() => {
       const metadata = panelYdoc.getMap('metadata');
       metadata.set('status', 'in_progress');
-      metadata.set('updatedAt', Date.now());
+      metadata.set('updatedAt', now);
     });
 
-    // Also update index
+    // Also update index with the same timestamp
     const entry = getPlanIndexEntry(indexDoc, selectedPlanId);
     if (entry) {
       setPlanIndexEntry(indexDoc, {
         ...entry,
         status: 'in_progress',
-        updatedAt: Date.now(),
+        updatedAt: now,
       });
     }
 

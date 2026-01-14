@@ -64,7 +64,12 @@ function getTargetColumnId(event: DragEndEvent, allPlans: PlanIndexEntry[]): Col
   if (over.data.current?.type === 'column') {
     const columnId = over.id as string;
     // Validate that it's a valid ColumnId
-    if (columnId === 'draft' || columnId === 'in_review' || columnId === 'in_progress' || columnId === 'completed') {
+    if (
+      columnId === 'draft' ||
+      columnId === 'in_review' ||
+      columnId === 'in_progress' ||
+      columnId === 'completed'
+    ) {
       return columnId;
     }
     return null;
@@ -356,19 +361,21 @@ export function KanbanPage() {
   const handleApprove = useCallback(async () => {
     if (!selectedPlanId || !panelMetadata) return;
 
+    const now = Date.now();
+
     panelYdoc.transact(() => {
       const metadata = panelYdoc.getMap('metadata');
       metadata.set('status', 'in_progress');
-      metadata.set('updatedAt', Date.now());
+      metadata.set('updatedAt', now);
     });
 
-    // Also update index
+    // Also update index with the same timestamp
     const entry = getPlanIndexEntry(indexDoc, selectedPlanId);
     if (entry) {
       setPlanIndexEntry(indexDoc, {
         ...entry,
         status: 'in_progress',
-        updatedAt: Date.now(),
+        updatedAt: now,
       });
     }
 

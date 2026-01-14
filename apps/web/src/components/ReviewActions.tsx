@@ -16,8 +16,8 @@ interface ReviewActionsProps {
   currentStatus: PlanStatusType;
   identity: UserIdentity | null;
   onRequestIdentity: () => void;
-  /** Called after status is successfully updated in the plan doc */
-  onStatusChange?: (newStatus: 'in_progress' | 'changes_requested') => void;
+  /** Called after status is successfully updated in the plan doc, with the timestamp used for the update */
+  onStatusChange?: (newStatus: 'in_progress' | 'changes_requested', updatedAt: number) => void;
 }
 
 type PopoverType = 'approve' | 'changes' | null;
@@ -73,14 +73,15 @@ export function ReviewActions({
     try {
       const newStatus = action === 'approve' ? 'in_progress' : 'changes_requested';
       const trimmedComment = comment.trim();
+      const now = Date.now();
 
       // Update Y.Doc - hook observes this for distributed approval
       ydoc.transact(() => {
         const metadata = ydoc.getMap('metadata');
         metadata.set('status', newStatus);
-        metadata.set('reviewedAt', Date.now());
+        metadata.set('reviewedAt', now);
         metadata.set('reviewedBy', identity.name);
-        metadata.set('updatedAt', Date.now());
+        metadata.set('updatedAt', now);
 
         // Set or clear reviewComment
         if (trimmedComment) {
@@ -95,7 +96,7 @@ export function ReviewActions({
 
       setOpenPopover(null);
       setComment('');
-      onStatusChange?.(newStatus);
+      onStatusChange?.(newStatus, now);
     } finally {
       setIsSubmitting(false);
     }

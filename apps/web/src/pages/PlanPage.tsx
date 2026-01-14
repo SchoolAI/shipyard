@@ -159,17 +159,18 @@ export function PlanPage() {
   }, [startAuth]);
 
   const handleStatusChange = useCallback(
-    (newStatus: 'in_progress' | 'changes_requested') => {
+    (newStatus: 'in_progress' | 'changes_requested', updatedAt: number) => {
       if (!metadata) return;
 
       // Only update plan-index if the plan is already there (owned by this user's MCP server)
       const existingEntry = getPlanIndexEntry(indexDoc, planId);
       if (!existingEntry) return;
 
+      // Use the same timestamp that was used to update the plan doc
       setPlanIndexEntry(indexDoc, {
         ...existingEntry,
         status: newStatus,
-        updatedAt: Date.now(),
+        updatedAt,
       });
     },
     [indexDoc, planId, metadata]
