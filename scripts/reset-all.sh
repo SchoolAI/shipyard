@@ -160,7 +160,7 @@ else
   # Start Vite in background with output to temp file for debugging
   cd "$PROJECT_DIR"
   VITE_LOG=$(mktemp)
-  pnpm dev:web --port "$VITE_PORT" > "$VITE_LOG" 2>&1 &
+  pnpm dev:web -- --port "$VITE_PORT" --no-open > "$VITE_LOG" 2>&1 &
   VITE_PID=$!
 
   # Wait for Vite to start (up to 30 seconds)
