@@ -14,6 +14,7 @@ import {
 } from '@peer-plan/schema';
 import type * as Y from 'yjs';
 import { z } from 'zod';
+import { webConfig } from '../config/env/web.js';
 import { getOrCreateDoc } from '../doc-store.js';
 import { getOctokit, parseRepoString } from '../github-artifacts.js';
 import { logger } from '../logger.js';
@@ -133,7 +134,7 @@ RETURNS:
     const blocks = editor.yXmlFragmentToBlocks(fragment);
 
     // Generate snapshot URL
-    const baseUrl = process.env.PEER_PLAN_BASE_URL || 'http://localhost:5173';
+    const baseUrl = webConfig.PEER_PLAN_WEB_URL;
     const snapshotUrl = createPlanUrl(baseUrl, {
       v: 1,
       id: input.planId,

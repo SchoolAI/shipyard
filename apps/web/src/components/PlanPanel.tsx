@@ -69,7 +69,7 @@ export function PlanPanel({ planId, width, onClose, children }: PlanPanelProps) 
               : // Side panel (peek/full modes)
                 'top-0 right-0 h-full border-l border-separator animate-in slide-in-from-right duration-300 ease-out'
           }
-          ${isPeek ? 'w-[512px] max-w-[90vw]' : ''}
+          ${isPeek ? 'w-1/3 max-w-[90vw]' : ''}
           ${isFullScreen ? 'w-full' : ''}
         `}
         role="dialog"

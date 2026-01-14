@@ -261,9 +261,9 @@ export function InboxPage() {
     }, [selectedPlanId, cycleWidth]),
     onFullScreen: useCallback(() => {
       if (selectedPlanId) {
-        setPanelWidth(panelWidth === 'full' ? 'peek' : 'full');
+        navigate(`/plan/${selectedPlanId}`);
       }
-    }, [selectedPlanId, panelWidth]),
+    }, [selectedPlanId, navigate]),
     onClose: handleClosePanel,
     onNextItem: useCallback(() => {
       if (!selectedPlanId) return;
@@ -495,7 +495,11 @@ export function InboxPage() {
               onRequestChanges={handlePanelRequestChanges}
               onClose={handleClosePanel}
               onExpand={() => cycleWidth(panelWidth === 'peek' ? 'expand' : 'collapse')}
-              onFullScreen={() => setPanelWidth(panelWidth === 'full' ? 'peek' : 'full')}
+              onFullScreen={() => {
+                if (selectedPlanId) {
+                  navigate(`/plan/${selectedPlanId}`);
+                }
+              }}
               width={panelWidth}
             />
             <PlanContent

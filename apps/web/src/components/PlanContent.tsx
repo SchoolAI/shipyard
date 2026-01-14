@@ -3,6 +3,7 @@
  * Extracted from PlanPage to support both full-page and panel views.
  */
 
+import type { Block } from '@blocknote/core';
 import type { PlanMetadata } from '@peer-plan/schema';
 import { extractDeliverables, getDeliverables, YDOC_KEYS } from '@peer-plan/schema';
 import { FileText, GitPullRequest, Package } from 'lucide-react';
@@ -65,7 +66,7 @@ export function PlanContent({
 
   useEffect(() => {
     if (isSnapshot && initialContent) {
-      const deliverables = extractDeliverables(initialContent);
+      const deliverables = extractDeliverables(initialContent as Block[]);
       const deliverablesArray = ydoc.getArray(YDOC_KEYS.DELIVERABLES);
       deliverablesArray.delete(0, deliverablesArray.length);
       deliverablesArray.push(deliverables);

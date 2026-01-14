@@ -9,10 +9,10 @@ import {
   AlertTriangle,
   Check,
   Clock,
-  Maximize2,
-  Minimize2,
-  Minimize,
   Maximize,
+  Maximize2,
+  Minimize,
+  Minimize2,
   X,
 } from 'lucide-react';
 import type { PanelWidth } from './PlanPanel';
@@ -120,7 +120,11 @@ export function PlanPanelHeader({
               onPress={onExpand}
               aria-label={width === 'peek' ? 'Expand to modal' : 'Collapse to peek'}
             >
-              {width === 'peek' ? <Maximize className="w-4 h-4" /> : <Minimize className="w-4 h-4" />}
+              {width === 'peek' ? (
+                <Maximize className="w-4 h-4" />
+              ) : (
+                <Minimize className="w-4 h-4" />
+              )}
             </Button>
           )}
 
@@ -132,7 +136,11 @@ export function PlanPanelHeader({
             onPress={onFullScreen}
             aria-label={width === 'full' ? 'Exit full screen' : 'Full screen'}
           >
-            {width === 'full' ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+            {width === 'full' ? (
+              <Minimize2 className="w-4 h-4" />
+            ) : (
+              <Maximize2 className="w-4 h-4" />
+            )}
           </Button>
 
           {/* Close */}
