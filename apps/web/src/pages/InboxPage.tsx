@@ -10,6 +10,7 @@ import { AlertTriangle, Check, Clock, ExternalLink, MessageSquare } from 'lucide
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
+import { InboxSkeleton } from '@/components/ui/InboxSkeleton';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
 import { useMultiProviderSync } from '@/hooks/useMultiProviderSync';
 import { usePlanIndex } from '@/hooks/usePlanIndex';
@@ -144,7 +145,7 @@ function InboxItem({ plan, onApprove, onRequestChanges, onViewPlan }: InboxItemP
 
 export function InboxPage() {
   const { identity: githubIdentity } = useGitHubAuth();
-  const { inboxPlans, markPlanAsRead } = usePlanIndex(githubIdentity?.username);
+  const { inboxPlans, markPlanAsRead, isLoading } = usePlanIndex(githubIdentity?.username);
   const { ydoc: indexDoc } = useMultiProviderSync(PLAN_INDEX_DOC_NAME);
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
@@ -158,6 +159,10 @@ export function InboxPage() {
     const query = searchQuery.toLowerCase();
     return sorted.filter((plan) => plan.title.toLowerCase().includes(query));
   }, [inboxPlans, searchQuery]);
+
+  if (isLoading) {
+    return <InboxSkeleton />;
+  }
 
   const handleApprove = async (planId: string) => {
     if (!githubIdentity) {

@@ -25,6 +25,7 @@ export interface ViewPreferences {
 const SIDEBAR_COLLAPSED_KEY = 'peer-plan-sidebar-collapsed';
 const SHOW_ARCHIVED_KEY = 'peer-plan-show-archived';
 const VIEW_PREFERENCES_KEY = 'peer-plan-view-preferences';
+const KANBAN_HIDE_EMPTY_COLUMNS_KEY = 'kanban-hide-empty-columns';
 
 /** Get sidebar collapsed state from localStorage */
 export function getSidebarCollapsed(): boolean {
@@ -95,6 +96,26 @@ export function setViewPreferences(preferences: Partial<ViewPreferences>): void 
     const current = getViewPreferences();
     const updated = { ...current, ...preferences };
     localStorage.setItem(VIEW_PREFERENCES_KEY, JSON.stringify(updated));
+  } catch {
+    // Ignore storage errors (e.g., private browsing)
+  }
+}
+
+// --- Kanban Board Preferences ---
+
+/** Get hide empty columns preference from localStorage */
+export function getHideEmptyColumns(): boolean {
+  try {
+    return localStorage.getItem(KANBAN_HIDE_EMPTY_COLUMNS_KEY) === 'true';
+  } catch {
+    return false; // default: show all columns
+  }
+}
+
+/** Save hide empty columns preference to localStorage */
+export function setHideEmptyColumns(hide: boolean): void {
+  try {
+    localStorage.setItem(KANBAN_HIDE_EMPTY_COLUMNS_KEY, String(hide));
   } catch {
     // Ignore storage errors (e.g., private browsing)
   }

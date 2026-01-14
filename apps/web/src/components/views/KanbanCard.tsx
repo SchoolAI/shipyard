@@ -1,22 +1,58 @@
 /**
  * Draggable Kanban card representing a plan.
  * Uses @dnd-kit for drag-drop functionality.
+ *
+ * The entire card is draggable (like Linear/Notion) - no visible drag handle.
+ * Click vs drag is differentiated by the activation constraint (8px movement).
+ *
+ * Shows:
+ * - Plan title (with proper truncation)
+ * - Owner avatar/username
+ * - Deliverable progress
+ * - PR indicator
+ * - Last updated time
+ * - Status-colored left border
  */
 
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Card } from '@heroui/react';
-import type { PlanIndexEntry } from '@peer-plan/schema';
-import { GripVertical } from 'lucide-react';
+import { Avatar, Card, Chip } from '@heroui/react';
+import type { PlanIndexEntry, PlanStatusType } from '@peer-plan/schema';
+import { CheckSquare, GitPullRequest } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { usePlanMetadata } from '@/hooks/usePlanMetadata';
 import { formatRelativeTime } from '@/utils/formatters';
 
 interface KanbanCardProps {
   plan: PlanIndexEntry;
+  /** Callback when card is hovered (for Space bar peek preview) */
+  onHover?: (planId: string | null) => void;
 }
 
-export function KanbanCard({ plan }: KanbanCardProps) {
+/**
+ * Map status to Tailwind border color class.
+ */
+function getStatusBorderColor(status: PlanStatusType): string {
+  switch (status) {
+    case 'draft':
+      return 'border-l-gray-500';
+    case 'in_progress':
+      return 'border-l-accent';
+    case 'pending_review':
+      return 'border-l-warning';
+    case 'changes_requested':
+      return 'border-l-danger';
+    case 'approved':
+    case 'completed':
+      return 'border-l-success';
+    default:
+      return 'border-l-gray-500';
+  }
+}
+
+export function KanbanCard({ plan, onHover }: KanbanCardProps) {
   const navigate = useNavigate();
+  const metadata = usePlanMetadata(plan.id);
 
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: plan.id,
@@ -33,40 +69,118 @@ export function KanbanCard({ plan }: KanbanCardProps) {
   };
 
   const handleClick = () => {
+    // Only navigate if not dragging (activation constraint handles this)
     navigate(`/plan/${plan.id}`);
   };
 
+  const hasDeliverables = metadata.deliverableCount > 0;
+  const hasPR = metadata.linkedPRs.length > 0;
+  const borderColorClass = getStatusBorderColor(plan.status);
+
   return (
-    <div ref={setNodeRef} style={style}>
+    // biome-ignore lint/a11y/useSemanticElements: div required for dnd-kit sortable - button breaks drag behavior
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...listeners}
+      onClick={handleClick}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          handleClick();
+        }
+      }}
+      onMouseEnter={() => onHover?.(plan.id)}
+      onMouseLeave={() => onHover?.(null)}
+      role="button"
+      tabIndex={0}
+      className={isDragging ? 'cursor-grabbing' : 'cursor-grab'}
+    >
       <Card
         variant="secondary"
         className={`
-          group cursor-pointer transition-shadow hover:shadow-md
-          ${isDragging ? 'shadow-lg ring-2 ring-accent' : ''}
+          group transition-all duration-150 pointer-events-none
+          border-l-4 ${borderColorClass}
+          hover:translate-y-[-2px] hover:shadow-lg
+          ${isDragging ? 'shadow-xl ring-2 ring-accent' : 'shadow-sm'}
         `}
       >
-        <Card.Header className="p-3">
-          <div className="flex items-start gap-2">
-            {/* Drag handle */}
-            <button
-              type="button"
-              {...attributes}
-              {...listeners}
-              className="mt-0.5 p-0.5 rounded hover:bg-surface-hover cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity"
-              aria-label="Drag to reorder"
-            >
-              <GripVertical className="w-4 h-4 text-muted-foreground" />
-            </button>
-
-            {/* Card content */}
-            <button type="button" onClick={handleClick} className="flex-1 text-left">
-              <Card.Title className="text-sm font-medium truncate">{plan.title}</Card.Title>
-              <Card.Description className="text-xs mt-1">
-                {formatRelativeTime(plan.updatedAt)}
-              </Card.Description>
-            </button>
-          </div>
+        <Card.Header className="p-3 pb-2">
+          {/* Title with proper truncation */}
+          <Card.Title
+            className="text-sm font-medium leading-snug"
+            style={{
+              display: '-webkit-box',
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: 'vertical',
+              overflow: 'hidden',
+              wordBreak: 'break-word',
+            }}
+          >
+            {plan.title}
+          </Card.Title>
         </Card.Header>
+
+        {/* Metadata footer */}
+        <Card.Content className="px-3 pb-3 pt-0">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {/* Owner badge */}
+            {plan.ownerId && (
+              <div className="flex items-center gap-1 bg-surface-hover/60 rounded-full px-1.5 py-0.5">
+                <Avatar size="sm" className="w-4 h-4">
+                  <Avatar.Image
+                    src={`https://github.com/${plan.ownerId}.png?size=32`}
+                    alt={plan.ownerId}
+                  />
+                  <Avatar.Fallback className="text-[8px]">
+                    {plan.ownerId.slice(0, 2).toUpperCase()}
+                  </Avatar.Fallback>
+                </Avatar>
+                <span className="text-[10px] text-muted-foreground truncate max-w-[60px]">
+                  {plan.ownerId}
+                </span>
+              </div>
+            )}
+
+            {/* PR indicator */}
+            {hasPR && (
+              <Chip
+                size="sm"
+                variant="soft"
+                color="accent"
+                className="h-5 text-[10px] px-1.5 gap-0.5"
+              >
+                <GitPullRequest className="w-3 h-3" />
+                <span>{metadata.linkedPRs.length > 1 ? metadata.linkedPRs.length : ''}</span>
+              </Chip>
+            )}
+
+            {/* Deliverables progress */}
+            {hasDeliverables && (
+              <Chip
+                size="sm"
+                variant="soft"
+                color={
+                  metadata.completedDeliverables === metadata.deliverableCount
+                    ? 'success'
+                    : 'default'
+                }
+                className="h-5 text-[10px] px-1.5 gap-0.5"
+              >
+                <CheckSquare className="w-3 h-3" />
+                <span>
+                  {metadata.completedDeliverables}/{metadata.deliverableCount}
+                </span>
+              </Chip>
+            )}
+          </div>
+
+          {/* Updated time - separate row for cleaner layout */}
+          <div className="mt-2 text-[10px] text-muted-foreground">
+            Updated {formatRelativeTime(plan.updatedAt)}
+          </div>
+        </Card.Content>
       </Card>
     </div>
   );

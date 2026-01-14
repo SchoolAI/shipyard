@@ -2,7 +2,7 @@
  * Archive Page - Shows archived plans with unarchive capability.
  */
 
-import { Button, ListBox, ListBoxItem, SearchField } from '@heroui/react';
+import { Button, ListBox, ListBoxItem, SearchField, Skeleton } from '@heroui/react';
 import type { PlanIndexEntry } from '@peer-plan/schema';
 import { getPlanIndexEntry, PLAN_INDEX_DOC_NAME, setPlanIndexEntry } from '@peer-plan/schema';
 import { ArchiveRestore } from 'lucide-react';
@@ -59,7 +59,7 @@ function ArchiveItem({ plan, onUnarchive }: ArchiveItemProps) {
 export function ArchivePage() {
   const navigate = useNavigate();
   const { identity: githubIdentity } = useGitHubAuth();
-  const { archivedPlans } = usePlanIndex(githubIdentity?.username);
+  const { archivedPlans, isLoading } = usePlanIndex(githubIdentity?.username);
   const { ydoc: indexDoc } = useMultiProviderSync(PLAN_INDEX_DOC_NAME);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -74,6 +74,30 @@ export function ArchivePage() {
     const query = searchQuery.toLowerCase();
     return sorted.filter((plan) => plan.title.toLowerCase().includes(query));
   }, [archivedPlans, searchQuery]);
+
+  if (isLoading) {
+    return (
+      <div className="h-full flex flex-col p-4 max-w-3xl mx-auto">
+        <div className="flex flex-col gap-3 mb-4">
+          <Skeleton className="h-6 w-20 rounded" />
+          <Skeleton className="h-4 w-32 rounded" />
+          <Skeleton className="h-10 w-full rounded-lg" />
+        </div>
+        <div className="flex-1 space-y-2">
+          {/* biome-ignore lint/suspicious/noArrayIndexKey: Static skeleton items never reorder */}
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="flex items-center justify-between gap-3 py-3 px-3 rounded-lg">
+              <div className="flex flex-col gap-2 flex-1">
+                <Skeleton className="h-5 w-48 rounded" />
+                <Skeleton className="h-3 w-24 rounded" />
+              </div>
+              <Skeleton className="h-8 w-8 rounded" />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   const handleUnarchive = async (planId: string) => {
     if (!githubIdentity) {
