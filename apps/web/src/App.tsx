@@ -1,4 +1,5 @@
 import { BrowserRouter, Navigate, Route, Routes, useSearchParams } from 'react-router-dom';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { Layout } from './components/Layout';
 import { ActivePlanSyncProvider } from './contexts/ActivePlanSyncContext';
 import { ArchivePage } from './pages/ArchivePage';
@@ -53,8 +54,10 @@ function AppWithLayout() {
 
 export function App() {
   return (
-    <BrowserRouter basename={basename}>
-      <AppWithLayout />
-    </BrowserRouter>
+    <ErrorBoundary>
+      <BrowserRouter basename={basename}>
+        <AppWithLayout />
+      </BrowserRouter>
+    </ErrorBoundary>
   );
 }
