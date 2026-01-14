@@ -2,6 +2,14 @@
 
 > Instructions for AI agents working on this codebase.
 
+## Documentation Structure
+
+- **[README.md](./README.md)** — Project overview only (not a runbook)
+- **[docs/SETUP.md](./docs/SETUP.md)** — **Runbook**: How to start the app, common operations, troubleshooting
+- **[docs/](./docs/)** — Architecture, design decisions, milestones
+
+**README is NOT documentation** — it's just the project introduction. For operational tasks (setup, reset, troubleshooting), always use SETUP.md.
+
 ## Before Starting Any Task
 
 **Always read these docs first:**
@@ -130,4 +138,4 @@ Follow the **3+ Rule** from engineering-standards.md:
 
 ---
 
-*Last updated: 2026-01-07*
+*Last updated: 2026-01-14*

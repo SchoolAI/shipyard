@@ -105,6 +105,15 @@ window.__resetPeerPlan()
 
 Both options only work in development mode.
 
+### Production Reset (GitHub Pages)
+
+The `?reset=all` URL parameter only works in development mode. To reset production storage:
+
+1. Close all peer-plan browser tabs
+2. Kill any local MCP servers: `pkill -f "peer-plan"`
+3. Open GitHub Pages: https://schoolai.github.io/peer-plan/
+4. Open DevTools → Application → Storage → **Clear site data**
+
 ### Manual Reset
 
 If the script doesn't work:
@@ -151,4 +160,4 @@ The IDE needs the built `.d.mts` files from schema package.
 
 ---
 
-*Last updated: 2026-01-13*
+*Last updated: 2026-01-14*

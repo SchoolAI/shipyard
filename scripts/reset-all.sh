@@ -134,25 +134,9 @@ if [ "$VITE_RUNNING" = true ]; then
   echo ""
   echo "If the browser didn't open, manually visit:"
   echo "  $RESET_URL"
-
-  # Also reset GitHub Pages storage (different origin)
   echo ""
-  echo "🌐 Also clearing GitHub Pages storage..."
-  GITHUB_PAGES_RESET="https://schoolai.github.io/peer-plan/?reset=all"
-  echo "  Opening: $GITHUB_PAGES_RESET"
-
-  sleep 2  # Brief delay to avoid overwhelming the browser
-
-  if command -v open &>/dev/null; then
-    open "$GITHUB_PAGES_RESET"
-  elif command -v xdg-open &>/dev/null; then
-    xdg-open "$GITHUB_PAGES_RESET"
-  elif command -v wslview &>/dev/null; then
-    wslview "$GITHUB_PAGES_RESET"
-  else
-    echo "  ⚠️  Could not open browser. Please manually visit:"
-    echo "  $GITHUB_PAGES_RESET"
-  fi
+  echo "📝 Note: To reset GitHub Pages (production), use DevTools:"
+  echo "   Application → Storage → Clear site data"
 else
   # Vite is not running - start it temporarily for reset
   echo "  Vite not running. Starting temporarily for reset..."
@@ -211,34 +195,13 @@ else
   echo "Press Enter after the browser shows 'Reset Complete'..."
   read -r
 
-  # Also reset GitHub Pages storage (different origin)
-  echo ""
-  echo "🌐 Also clearing GitHub Pages storage..."
-  GITHUB_PAGES_RESET="https://schoolai.github.io/peer-plan/?reset=all"
-  echo "  Opening: $GITHUB_PAGES_RESET"
-
-  sleep 2  # Brief delay to avoid overwhelming the browser
-
-  if command -v open &>/dev/null; then
-    open "$GITHUB_PAGES_RESET"
-  elif command -v xdg-open &>/dev/null; then
-    xdg-open "$GITHUB_PAGES_RESET"
-  elif command -v wslview &>/dev/null; then
-    wslview "$GITHUB_PAGES_RESET"
-  else
-    echo "  ⚠️  Could not open browser. Please manually visit:"
-    echo "  $GITHUB_PAGES_RESET"
-  fi
-
-  echo ""
-  echo "Press Enter after GitHub Pages also shows 'Reset Complete'..."
-  read -r
-
   # Stop Vite
   echo "Stopping Vite..."
   kill $VITE_PID 2>/dev/null || true
 
   echo ""
-  echo "🎉 Full reset complete! All peer-plan data has been cleared."
-  echo "   (Both localhost and GitHub Pages origins)"
+  echo "🎉 Reset complete! Local peer-plan data has been cleared."
+  echo ""
+  echo "📝 Note: To reset GitHub Pages (production), use DevTools:"
+  echo "   Application → Storage → Clear site data"
 fi
