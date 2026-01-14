@@ -245,7 +245,8 @@ describe('Plan Index Helpers', () => {
         updatePlanIndexViewedBy(ydoc, 'plan-1', 'user1');
         const secondTime = getViewedByFromIndex(ydoc, 'plan-1').user1;
 
-        expect(secondTime).toBeGreaterThan(firstTime!);
+        expect(firstTime).toBeDefined();
+        expect(secondTime).toBeGreaterThan(firstTime as number);
       });
 
       it('handles multiple plans independently', () => {
