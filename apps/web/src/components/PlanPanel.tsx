@@ -65,7 +65,7 @@ export function PlanPanel({ planId, width, onClose, children }: PlanPanelProps) 
           ${
             isCenterModal
               ? // Center modal (expanded mode)
-                'top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[900px] max-w-[90vw] h-[90vh] rounded-lg border border-separator animate-in zoom-in-95 fade-in duration-200'
+                'top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[1100px] max-w-[90vw] h-[95vh] rounded-lg border border-separator animate-in zoom-in-95 fade-in duration-200'
               : // Side panel (peek/full modes)
                 'top-0 right-0 h-full border-l border-separator animate-in slide-in-from-right duration-300 ease-out'
           }

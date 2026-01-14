@@ -51,6 +51,7 @@ import { formatRelativeTime } from '@/utils/formatters';
 import {
   getHideEmptyColumns,
   setHideEmptyColumns as saveHideEmptyColumns,
+  setSidebarCollapsed,
 } from '@/utils/uiPreferences';
 
 /**
@@ -331,6 +332,7 @@ export function KanbanPage() {
     }, [selectedPlanId, cycleWidth]),
     onFullScreen: useCallback(() => {
       if (selectedPlanId) {
+        setSidebarCollapsed(true);
         navigate(`/plan/${selectedPlanId}`);
       }
     }, [selectedPlanId, navigate]),
@@ -576,6 +578,7 @@ export function KanbanPage() {
               onExpand={() => cycleWidth(panelWidth === 'peek' ? 'expand' : 'collapse')}
               onFullScreen={() => {
                 if (selectedPlanId) {
+                  setSidebarCollapsed(true);
                   navigate(`/plan/${selectedPlanId}`);
                 }
               }}

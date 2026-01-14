@@ -30,6 +30,7 @@ import { useMultiProviderSync } from '@/hooks/useMultiProviderSync';
 import { usePlanIndex } from '@/hooks/usePlanIndex';
 import { colorFromString } from '@/utils/color';
 import { formatRelativeTime } from '@/utils/formatters';
+import { setSidebarCollapsed } from '@/utils/uiPreferences';
 
 interface StatusBadgeProps {
   status: PlanStatusType;
@@ -261,6 +262,7 @@ export function InboxPage() {
     }, [selectedPlanId, cycleWidth]),
     onFullScreen: useCallback(() => {
       if (selectedPlanId) {
+        setSidebarCollapsed(true);
         navigate(`/plan/${selectedPlanId}`);
       }
     }, [selectedPlanId, navigate]),
@@ -499,6 +501,7 @@ export function InboxPage() {
               onExpand={() => cycleWidth(panelWidth === 'peek' ? 'expand' : 'collapse')}
               onFullScreen={() => {
                 if (selectedPlanId) {
+                  setSidebarCollapsed(true);
                   navigate(`/plan/${selectedPlanId}`);
                 }
               }}
