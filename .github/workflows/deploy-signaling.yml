@@ -28,7 +28,6 @@ jobs:
           cache: 'pnpm'
 
       - name: Install dependencies
-        working-directory: apps/signaling/cloudflare
         run: pnpm install --frozen-lockfile
 
       - name: Deploy to Cloudflare Workers
@@ -37,6 +36,7 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           workingDirectory: apps/signaling/cloudflare
           command: deploy
+          packageManager: pnpm
 
       - name: Summary
         run: |
