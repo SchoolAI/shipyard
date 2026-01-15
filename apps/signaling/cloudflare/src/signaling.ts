@@ -18,89 +18,26 @@
  */
 
 import { DurableObject } from 'cloudflare:workers';
-import type { InviteRedemption, InviteToken } from '@peer-plan/schema';
+import type {
+  ApprovalStateMessage,
+  CreateInviteRequest,
+  InviteRedemption,
+  InviteToken,
+  ListInvitesRequest,
+  PlanApprovalState,
+  PublishMessage,
+  RedeemInviteRequest,
+  RevokeInviteRequest,
+  SignalingMessage,
+  SubscribeMessage,
+  TokenValidationError,
+  UnsubscribeMessage,
+} from '../core/types.js';
 import { logger } from './logger.js';
 
 interface Env {
   SIGNALING_ROOM: DurableObjectNamespace;
 }
-
-// Message types from y-webrtc signaling protocol
-interface SubscribeMessage {
-  type: 'subscribe';
-  topics: string[];
-  userId?: string; // GitHub username for approval checking
-}
-
-interface UnsubscribeMessage {
-  type: 'unsubscribe';
-  topics: string[];
-}
-
-interface PublishMessage {
-  type: 'publish';
-  topic: string;
-  from?: string; // y-webrtc client ID (not user ID)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  [key: string]: any; // y-webrtc adds various fields (to, signal, etc.)
-}
-
-interface PingMessage {
-  type: 'ping';
-}
-
-// Approval state message from plan owner
-interface ApprovalStateMessage {
-  type: 'approval_state';
-  planId: string;
-  ownerId: string;
-  approvedUsers: string[];
-  rejectedUsers: string[];
-}
-
-// --- Invite Token Messages ---
-
-// Request to create a new invite token (owner only)
-interface CreateInviteMessage {
-  type: 'create_invite';
-  planId: string;
-  ttlMinutes?: number; // Default: 30
-  maxUses?: number | null; // Default: null (unlimited)
-  label?: string;
-}
-
-// Request to redeem an invite token (guest)
-interface RedeemInviteMessage {
-  type: 'redeem_invite';
-  planId: string;
-  tokenId: string;
-  tokenValue: string;
-  userId: string; // Guest's GitHub username
-}
-
-// Request to revoke an invite token (owner only)
-interface RevokeInviteMessage {
-  type: 'revoke_invite';
-  planId: string;
-  tokenId: string;
-}
-
-// Request to list active invites (owner only)
-interface ListInvitesMessage {
-  type: 'list_invites';
-  planId: string;
-}
-
-type SignalingMessage =
-  | SubscribeMessage
-  | UnsubscribeMessage
-  | PublishMessage
-  | PingMessage
-  | ApprovalStateMessage
-  | CreateInviteMessage
-  | RedeemInviteMessage
-  | RevokeInviteMessage
-  | ListInvitesMessage;
 
 // Per-connection state stored as WebSocket attachment
 interface ConnectionState {
@@ -116,16 +53,7 @@ interface SerializedConnectionState {
   userId?: string;
 }
 
-// Plan approval state (stored per plan)
-interface PlanApprovalState {
-  planId: string;
-  ownerId: string;
-  approvedUsers: string[];
-  rejectedUsers: string[];
-  lastUpdated: number;
-}
-
-// InviteToken and InviteRedemption types imported from @peer-plan/schema
+// PlanApprovalState, InviteToken, and InviteRedemption types imported from core/types.ts
 
 export class SignalingRoom extends DurableObject<Env> {
   // In-memory topic -> WebSocket mapping (rebuilt on wake from hibernation)
@@ -661,7 +589,7 @@ export class SignalingRoom extends DurableObject<Env> {
    * Handle create_invite message from owner.
    * Creates a new time-limited invite token.
    */
-  private async handleCreateInvite(ws: WebSocket, message: CreateInviteMessage): Promise<void> {
+  private async handleCreateInvite(ws: WebSocket, message: CreateInviteRequest): Promise<void> {
     const state = this.getState(ws);
     if (!state?.userId) {
       ws.send(JSON.stringify({ type: 'error', error: 'unauthenticated' }));
@@ -723,7 +651,7 @@ export class SignalingRoom extends DurableObject<Env> {
    * Handle redeem_invite message from guest.
    * Validates token and auto-approves the user if valid.
    */
-  private async handleRedeemInvite(ws: WebSocket, message: RedeemInviteMessage): Promise<void> {
+  private async handleRedeemInvite(ws: WebSocket, message: RedeemInviteRequest): Promise<void> {
     const { planId, tokenId, tokenValue, userId } = message;
     const storageKey = `${planId}:${tokenId}`;
 
@@ -795,7 +723,7 @@ export class SignalingRoom extends DurableObject<Env> {
     token: InviteToken | undefined,
     tokenValue: string,
     _userId: string
-  ): Promise<'invalid' | 'revoked' | 'expired' | 'exhausted' | null> {
+  ): Promise<TokenValidationError | null> {
     if (!token) return 'invalid';
     if (token.revoked) return 'revoked';
     if (Date.now() > token.expiresAt) return 'expired';
@@ -887,7 +815,7 @@ export class SignalingRoom extends DurableObject<Env> {
    * Handle revoke_invite message from owner.
    * Marks the invite as revoked (prevents future redemptions).
    */
-  private async handleRevokeInvite(ws: WebSocket, message: RevokeInviteMessage): Promise<void> {
+  private async handleRevokeInvite(ws: WebSocket, message: RevokeInviteRequest): Promise<void> {
     const state = this.getState(ws);
     if (!state?.userId) {
       ws.send(JSON.stringify({ type: 'invite_revoked', tokenId: message.tokenId, success: false }));
@@ -925,7 +853,7 @@ export class SignalingRoom extends DurableObject<Env> {
    * Handle list_invites message from owner.
    * Returns list of active (non-expired, non-revoked) invites.
    */
-  private async handleListInvites(ws: WebSocket, message: ListInvitesMessage): Promise<void> {
+  private async handleListInvites(ws: WebSocket, message: ListInvitesRequest): Promise<void> {
     const state = this.getState(ws);
     if (!state?.userId) {
       ws.send(JSON.stringify({ type: 'invites_list', planId: message.planId, invites: [] }));

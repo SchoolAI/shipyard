@@ -383,8 +383,9 @@ export function usePlanIndex(currentUsername: string | undefined): PlanIndexStat
     setNavigationTarget(null);
   };
 
-  // Loading until IndexedDB has synced - this is when local data becomes available
-  const isLoading = !syncState.idbSynced;
+  // Loading until WebSocket has synced - ensures plans are fetched and filtered
+  // before showing content or empty state (prevents flicker)
+  const isLoading = !syncState.synced;
 
   const markPlanAsRead = useCallback(
     (planId: string): Promise<void> => {

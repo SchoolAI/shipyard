@@ -4,7 +4,6 @@ import {
   ListBox,
   ListBoxItem,
   Popover,
-  SearchField,
   Select,
   Skeleton,
   Tooltip,
@@ -19,6 +18,7 @@ import {
   Filter,
   Inbox,
   LayoutGrid,
+  Search,
   Users,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
@@ -29,6 +29,7 @@ import * as Y from 'yjs';
 import { AccountSection } from '@/components/account';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { CollapsiblePanel } from '@/components/ui/collapsible-panel';
+import { SearchPlanInput } from '@/components/ui/SearchPlanInput';
 import { useActivePlanSync } from '@/contexts/ActivePlanSyncContext';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
 import { useMultiProviderSync } from '@/hooks/useMultiProviderSync';
@@ -262,7 +263,7 @@ function CollapsedSidebar({
               aria-label="Search plans"
               className="w-10 h-10"
             >
-              <SearchField.SearchIcon />
+              <Search className="w-4 h-4" />
             </Button>
           </Tooltip.Trigger>
           <Tooltip.Content>Search</Tooltip.Content>
@@ -480,13 +481,13 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
       <div className="px-3 py-2 border-b border-separator">
         <div className="flex items-center gap-1.5">
           <div className="flex-1 min-w-0">
-            <SearchField aria-label="Search plans" value={searchQuery} onChange={setSearchQuery}>
-              <SearchField.Group>
-                <SearchField.SearchIcon />
-                <SearchField.Input placeholder="Search..." className="text-sm" />
-                {searchQuery.length > 0 && <SearchField.ClearButton />}
-              </SearchField.Group>
-            </SearchField>
+            <SearchPlanInput
+              aria-label="Search plans"
+              value={searchQuery}
+              onChange={setSearchQuery}
+              placeholder="Search..."
+              className="text-sm"
+            />
           </div>
 
           <Popover>

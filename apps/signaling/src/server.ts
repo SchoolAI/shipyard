@@ -26,7 +26,9 @@ import { createHash, randomBytes } from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import http from 'node:http';
 import type {
+  ApprovalStateMessage,
   CreateInviteRequest,
+  ErrorMessage,
   InviteCreatedResponse,
   InviteRedeemedNotification,
   InviteRedemption,
@@ -35,9 +37,18 @@ import type {
   InvitesListResponse,
   InviteToken,
   ListInvitesRequest,
+  OutgoingMessage,
+  PingMessage,
+  PlanApprovalState,
+  PongMessage,
+  PublishMessage,
   RedeemInviteRequest,
   RevokeInviteRequest,
-} from '@peer-plan/schema';
+  SignalingMessage,
+  SubscribeMessage,
+  TokenValidationError,
+  UnsubscribeMessage,
+} from '../core/types.js';
 import * as map from 'lib0/map';
 import { nanoid } from 'nanoid';
 import { type WebSocket, WebSocketServer } from 'ws';
@@ -45,7 +56,6 @@ import {
   extractPlanId,
   isUserApproved as isUserApprovedBase,
   isUserRejected as isUserRejectedBase,
-  type PlanApprovalState,
   send,
   WS_READY_STATE_CONNECTING,
   WS_READY_STATE_OPEN,
@@ -59,81 +69,6 @@ const CLEANUP_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 const REDEMPTION_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
 const PLAN_APPROVAL_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours of inactivity
 const port = serverConfig.PORT;
-
-// --- Message Types for y-webrtc signaling protocol ---
-
-interface SubscribeMessage {
-  type: 'subscribe';
-  topics: string[];
-  userId?: string;
-}
-
-interface UnsubscribeMessage {
-  type: 'unsubscribe';
-  topics: string[];
-}
-
-interface PublishMessage {
-  type: 'publish';
-  topic: string;
-  from?: string;
-  clients?: number;
-  [key: string]: unknown;
-}
-
-interface PingMessage {
-  type: 'ping';
-}
-
-interface PongMessage {
-  type: 'pong';
-}
-
-interface ApprovalStateMessage {
-  type: 'approval_state';
-  planId: string;
-  ownerId: string;
-  approvedUsers: string[];
-  rejectedUsers: string[];
-}
-
-interface ErrorMessage {
-  type: 'error';
-  error: string;
-}
-
-/**
- * Discriminated union of all signaling message types.
- */
-type SignalingMessage =
-  | SubscribeMessage
-  | UnsubscribeMessage
-  | PublishMessage
-  | PingMessage
-  | ApprovalStateMessage
-  | CreateInviteRequest
-  | RedeemInviteRequest
-  | RevokeInviteRequest
-  | ListInvitesRequest;
-
-/**
- * All possible outgoing message types.
- */
-type OutgoingMessage =
-  | PublishMessage
-  | PongMessage
-  | ErrorMessage
-  | InviteCreatedResponse
-  | InviteRedemptionResult
-  | InviteRevokedResponse
-  | InvitesListResponse
-  | InviteRedeemedNotification;
-
-// --- Plan Approval State ---
-// Type imported from access-control.ts
-
-// --- Token Validation Error Types ---
-type TokenValidationError = 'invalid' | 'revoked' | 'expired' | 'exhausted';
 
 // --- Storage Maps ---
 

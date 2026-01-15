@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import * as Y from 'yjs';
+import type { Deliverable, LinkedPR } from './plan.js';
 import {
   addArtifact,
   addDeliverable,
@@ -29,7 +30,6 @@ import {
   unrejectUser,
   updateLinkedPRStatus,
 } from './yjs-helpers.js';
-import type { Deliverable, LinkedPR } from './plan.js';
 
 describe('Artifact helpers', () => {
   let ydoc: Y.Doc;
@@ -687,7 +687,11 @@ describe('PR linking helpers', () => {
 describe('Deliverables helpers', () => {
   let ydoc: Y.Doc;
 
-  const createDeliverable = (id: string, text: string, overrides?: Partial<Deliverable>): Deliverable => ({
+  const createDeliverable = (
+    id: string,
+    text: string,
+    overrides?: Partial<Deliverable>
+  ): Deliverable => ({
     id,
     text,
     ...overrides,

@@ -96,6 +96,7 @@ function getTargetColumnId(event: DragEndEvent, allPlans: PlanIndexEntry[]): Col
       default: {
         // Exhaustive check - this should never happen
         const _exhaustive: never = status;
+        // biome-ignore lint/suspicious/noConsole: fine if it prints this
         console.error('Unexpected plan status:', _exhaustive);
         return null;
       }

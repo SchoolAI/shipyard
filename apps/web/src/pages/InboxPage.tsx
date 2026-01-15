@@ -3,7 +3,7 @@
  * Includes search filtering and slide-out panel for viewing plans.
  */
 
-import { Button, Chip, ListBox, ListBoxItem, SearchField, Spinner, Tooltip } from '@heroui/react';
+import { Button, Chip, ListBox, ListBoxItem, Spinner, Tooltip } from '@heroui/react';
 import {
   getDeliverables,
   getPlanIndexEntry,
@@ -14,7 +14,7 @@ import {
   type PlanStatusType,
   setPlanIndexEntry,
 } from '@peer-plan/schema';
-import { AlertTriangle, Check, Clock, ExternalLink, MessageSquare } from 'lucide-react';
+import { AlertTriangle, Check, Clock, MessageSquare, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -24,6 +24,7 @@ import { PlanContent } from '@/components/PlanContent';
 import { type PanelWidth, PlanPanel } from '@/components/PlanPanel';
 import { PlanPanelHeader } from '@/components/PlanPanelHeader';
 import { InboxSkeleton } from '@/components/ui/InboxSkeleton';
+import { SearchPlanInput } from '@/components/ui/SearchPlanInput';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useMultiProviderSync } from '@/hooks/useMultiProviderSync';
@@ -74,10 +75,10 @@ interface InboxItemProps {
   plan: PlanIndexEntry;
   onApprove: (planId: string) => void;
   onRequestChanges: (planId: string) => void;
-  onViewPlan: (planId: string) => void;
+  onDismiss: (planId: string) => void;
 }
 
-function InboxItem({ plan, onApprove, onRequestChanges, onViewPlan }: InboxItemProps) {
+function InboxItem({ plan, onApprove, onRequestChanges, onDismiss }: InboxItemProps) {
   return (
     <div className="flex items-center justify-between gap-3 w-full py-2">
       <div className="flex flex-col gap-1 flex-1 min-w-0">
@@ -133,14 +134,14 @@ function InboxItem({ plan, onApprove, onRequestChanges, onViewPlan }: InboxItemP
               isIconOnly
               variant="ghost"
               size="sm"
-              aria-label="View plan"
-              onPress={() => onViewPlan(plan.id)}
+              aria-label="Dismiss plan"
+              onPress={() => onDismiss(plan.id)}
               className="w-8 h-8"
             >
-              <ExternalLink className="w-4 h-4" />
+              <X className="w-4 h-4" />
             </Button>
           </Tooltip.Trigger>
-          <Tooltip.Content>View Plan</Tooltip.Content>
+          <Tooltip.Content>Dismiss</Tooltip.Content>
         </Tooltip>
       </div>
     </div>
@@ -304,6 +305,59 @@ export function InboxPage() {
     startAuth();
   }, [startAuth]);
 
+  // Show skeleton while loading
+  const handleDismiss = useCallback(
+    async (planId: string) => {
+      await markPlanAsRead(planId);
+      toast.success('Marked as read');
+    },
+    [markPlanAsRead]
+  );
+
+  // Helper to find the next plan to select after dismissal
+  const getNextSelectedId = useCallback(
+    (currentIndex: number): string | null => {
+      if (currentIndex < sortedInboxPlans.length - 1) {
+        return sortedInboxPlans[currentIndex + 1]?.id ?? null;
+      }
+      if (currentIndex > 0) {
+        return sortedInboxPlans[currentIndex - 1]?.id ?? null;
+      }
+      return null;
+    },
+    [sortedInboxPlans]
+  );
+
+  // Keyboard shortcut for dismissing inbox items
+  useEffect(() => {
+    const isTypingInInput = (target: EventTarget | null): boolean => {
+      return target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement;
+    };
+
+    const handleDismissKeyDown = async () => {
+      if (!selectedPlanId) return;
+      const idx = sortedInboxPlans.findIndex((p) => p.id === selectedPlanId);
+      if (idx === -1) return;
+
+      const currentPlan = sortedInboxPlans[idx];
+      if (!currentPlan) return;
+
+      await handleDismiss(currentPlan.id);
+      setSelectedPlanId(getNextSelectedId(idx));
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (isTypingInInput(e.target)) return;
+      if (e.key === 'd') {
+        e.preventDefault();
+        handleDismissKeyDown();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedPlanId, sortedInboxPlans, handleDismiss, getNextSelectedId]);
+
   if (isLoading) {
     return <InboxSkeleton />;
   }
@@ -351,12 +405,6 @@ export function InboxPage() {
     toast.info('Open panel to add comments and request changes');
   };
 
-  const handleViewPlan = (planId: string) => {
-    markPlanAsRead(planId);
-    setSelectedPlanId(planId);
-    setPanelWidth('peek');
-  };
-
   const handleListSelection = (keys: Set<unknown> | 'all') => {
     if (keys === 'all') return;
     const key = Array.from(keys)[0];
@@ -399,6 +447,10 @@ export function InboxPage() {
     toast.info('Navigate to add comments and request changes');
   };
 
+  if (isLoading) {
+    return <InboxSkeleton />;
+  }
+
   // Prefer WebSocket when connected, fall back to WebRTC
   const activeProvider = panelWsProvider ?? panelRtcProvider;
 
@@ -432,18 +484,13 @@ export function InboxPage() {
           </div>
         </div>
 
-        <SearchField
+        <SearchPlanInput
           aria-label="Search inbox"
           value={searchQuery}
           onChange={setSearchQuery}
-          onClear={() => setSearchQuery('')}
-        >
-          <SearchField.Group>
-            <SearchField.SearchIcon />
-            <SearchField.Input placeholder="Search inbox..." className="w-full" />
-            <SearchField.ClearButton />
-          </SearchField.Group>
-        </SearchField>
+          placeholder="Search inbox..."
+          className="w-full"
+        />
       </div>
 
       <div className="flex-1 overflow-y-auto">
@@ -474,7 +521,7 @@ export function InboxPage() {
                   plan={plan}
                   onApprove={handleApprove}
                   onRequestChanges={handleRequestChanges}
-                  onViewPlan={handleViewPlan}
+                  onDismiss={handleDismiss}
                 />
               </ListBoxItem>
             ))}

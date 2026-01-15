@@ -2,7 +2,7 @@
  * Archive Page - Shows archived plans with unarchive capability.
  */
 
-import { Button, ListBox, ListBoxItem, SearchField, Skeleton } from '@heroui/react';
+import { Button, ListBox, ListBoxItem, Skeleton } from '@heroui/react';
 import type { PlanIndexEntry } from '@peer-plan/schema';
 import { getPlanIndexEntry, PLAN_INDEX_DOC_NAME, setPlanIndexEntry } from '@peer-plan/schema';
 import { ArchiveRestore } from 'lucide-react';
@@ -11,6 +11,7 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { IndexeddbPersistence } from 'y-indexeddb';
 import * as Y from 'yjs';
+import { SearchPlanInput } from '@/components/ui/SearchPlanInput';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
 import { useMultiProviderSync } from '@/hooks/useMultiProviderSync';
 import { usePlanIndex } from '@/hooks/usePlanIndex';
@@ -164,18 +165,13 @@ export function ArchivePage() {
           </div>
         </div>
 
-        <SearchField
+        <SearchPlanInput
           aria-label="Search archive"
           value={searchQuery}
           onChange={setSearchQuery}
-          onClear={() => setSearchQuery('')}
-        >
-          <SearchField.Group>
-            <SearchField.SearchIcon />
-            <SearchField.Input placeholder="Search archive..." className="w-full" />
-            <SearchField.ClearButton />
-          </SearchField.Group>
-        </SearchField>
+          placeholder="Search archive..."
+          className="w-full"
+        />
       </div>
 
       <div className="flex-1 overflow-y-auto">
