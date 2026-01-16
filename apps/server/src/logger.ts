@@ -1,6 +1,8 @@
 import pino from 'pino';
 import { serverConfig } from './config/env/server.js';
 
+// TODO: where do these go for MCP? can we also write to a file like the hook?
+// would be nice to figure out where these are currently going as well/
 const transport =
   serverConfig.NODE_ENV === 'development'
     ? {

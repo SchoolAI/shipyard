@@ -18,7 +18,7 @@ import { logger } from './logger.js';
 export interface Env {
   GITHUB_CLIENT_ID: string;
   GITHUB_CLIENT_SECRET: string;
-  ENVIRONMENT: string;
+  ENVIRONMENT: 'development' | 'production';
 }
 
 interface TokenRequest {
@@ -35,7 +35,7 @@ interface GitHubTokenResponse {
 }
 
 // Allowed origins by environment - restrict CORS to prevent phishing attacks
-const ALLOWED_ORIGINS: Record<string, string[]> = {
+const ALLOWED_ORIGINS = {
   development: [
     'http://localhost:5173',
     'http://localhost:5174',
@@ -75,7 +75,6 @@ export default {
       });
     }
 
-    // Reject unauthorized origins before processing any request
     if (!corsHeaders) {
       return new Response(JSON.stringify({ error: 'Origin not allowed' }), {
         status: 403,
@@ -83,12 +82,10 @@ export default {
       });
     }
 
-    // Handle CORS preflight
     if (request.method === 'OPTIONS') {
       return new Response(null, { headers: corsHeaders });
     }
 
-    // Only allow POST to /token-exchange
     if (url.pathname !== '/token-exchange') {
       return new Response(
         JSON.stringify({
@@ -97,7 +94,7 @@ export default {
           endpoint: 'POST /token-exchange',
         }),
         {
-          status: 200,
+          status: 404,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         }
       );
@@ -110,7 +107,6 @@ export default {
       });
     }
 
-    // Validate environment secrets are configured
     if (!env.GITHUB_CLIENT_ID || !env.GITHUB_CLIENT_SECRET) {
       logger.error('Missing GITHUB_CLIENT_ID or GITHUB_CLIENT_SECRET');
       return new Response(JSON.stringify({ error: 'Server misconfigured' }), {
@@ -119,7 +115,6 @@ export default {
       });
     }
 
-    // Parse request body
     let body: TokenRequest;
     try {
       body = await request.json();
@@ -139,7 +134,6 @@ export default {
       });
     }
 
-    // Exchange code for token with GitHub
     try {
       const response = await fetch('https://github.com/login/oauth/access_token', {
         method: 'POST',
@@ -158,7 +152,6 @@ export default {
 
       const data: GitHubTokenResponse = await response.json();
 
-      // GitHub returns 200 even on errors, check for error field
       if (data.error) {
         logger.error(
           { error: data.error, description: data.error_description },
@@ -176,7 +169,6 @@ export default {
         );
       }
 
-      // Return token to browser
       return new Response(
         JSON.stringify({
           access_token: data.access_token,

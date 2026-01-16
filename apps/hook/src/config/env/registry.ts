@@ -1,9 +1,8 @@
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { DEFAULT_REGISTRY_PORTS } from '@peer-plan/shared';
 import { z } from 'zod';
 import { loadEnv } from '../config.js';
-
-const DEFAULT_REGISTRY_PORTS = [32191, 32192];
 
 const schema = z.object({
   REGISTRY_PORT: z

@@ -35,6 +35,7 @@ export function getRepositoryFullName(): string | null {
 }
 
 export function getGitHubUsername(): string {
+  // TODO: probably need some sort of expiration here
   if (cachedUsername) {
     return cachedUsername;
   }

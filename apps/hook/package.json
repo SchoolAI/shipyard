@@ -28,6 +28,7 @@
   },
   "dependencies": {
     "@peer-plan/schema": "workspace:*",
+    "@peer-plan/shared": "workspace:*",
     "nanoid": "^5.0.9",
     "open": "^11.0.0",
     "pino": "^10.1.0",

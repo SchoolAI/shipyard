@@ -2,7 +2,7 @@
  * Review status checking and feedback formatting.
  * Uses Y.Doc observer for distributed approval flow.
  */
-
+// TODO: i think a lot of this is shared with the server and should be centralized
 import {
   createUserResolver,
   type Deliverable,
@@ -52,7 +52,10 @@ const REVIEW_TIMEOUT_MS = 25 * 60 * 1000; // 25 minutes
  * Connects to MCP server's WebSocket and watches for status changes.
  * Uses a unique reviewRequestId to prevent stale decisions from previous cycles.
  */
-async function waitForReviewDecision(planId: string, wsUrl: string): Promise<ReviewDecision> {
+async function waitForReviewDecision(
+  planId: string,
+  wsUrl: string
+): Promise<ReviewDecision & { reviewComment?: string; reviewedBy?: string; status?: string }> {
   const ydoc = new Y.Doc();
 
   // Generate unique ID for this review request to prevent stale decisions
@@ -103,14 +106,20 @@ async function waitForReviewDecision(planId: string, wsUrl: string): Promise<Rev
         logger.info({ planId, reviewRequestId }, 'Plan approved via Y.Doc');
         // Extract deliverables to include in approval response
         const deliverables = getDeliverables(ydoc);
+        // Extract reviewer metadata
+        const reviewComment = metadata.get('reviewComment') as string | undefined;
+        const reviewedBy = metadata.get('reviewedBy') as string | undefined;
         cleanup();
-        resolve({ approved: true, deliverables });
+        resolve({ approved: true, deliverables, reviewComment, reviewedBy, status });
       } else if (status === 'changes_requested') {
         // Extract feedback from threads if available
         const feedback = extractFeedbackFromYDoc(ydoc);
+        // Extract reviewer metadata
+        const reviewComment = metadata.get('reviewComment') as string | undefined;
+        const reviewedBy = metadata.get('reviewedBy') as string | undefined;
         logger.info({ planId, reviewRequestId, feedback }, 'Changes requested via Y.Doc');
         cleanup();
-        resolve({ approved: false, feedback });
+        resolve({ approved: false, feedback, reviewComment, reviewedBy, status });
       }
     };
 
@@ -298,7 +307,7 @@ export async function checkReviewStatus(
     logger.info({ planId }, 'Syncing plan content');
     await updatePlanContent(planId, {
       content: planContent,
-      filePath: '/.claude/plans/plan.md',
+      // filePath removed - server doesn't use it, was metadata only
     });
 
     state = getSessionState(sessionId);
@@ -338,6 +347,9 @@ export async function checkReviewStatus(
             url,
             approvedAt: Date.now(),
             deliverables: deliverableInfos,
+            reviewComment: decision.reviewComment,
+            reviewedBy: decision.reviewedBy,
+            reviewStatus: decision.status,
           });
         }
 

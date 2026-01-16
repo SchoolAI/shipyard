@@ -1,3 +1,5 @@
+// TODO: Convert to a runbook
+
 # @peer-plan/hook
 
 Claude Code integration hook for peer-plan. Automatically creates and syncs plans when agents enter plan mode.

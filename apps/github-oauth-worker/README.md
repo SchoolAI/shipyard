@@ -1,3 +1,5 @@
+// TODO: turn this into a rundoc and move other docs to a ./docs dir
+
 # GitHub OAuth Worker
 
 Cloudflare Worker that proxies GitHub OAuth token exchange for browser clients.

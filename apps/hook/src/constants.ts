@@ -6,11 +6,6 @@
 // --- Claude Code Specific Constants ---
 
 /**
- * Directory where Claude Code stores plan files
- */
-export const CLAUDE_PLANS_DIR = '/.claude/plans/';
-
-/**
  * Claude Code tool names
  */
 export const CLAUDE_TOOL_NAMES = {

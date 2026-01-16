@@ -2,6 +2,7 @@
  * Core plan management logic.
  * Creates plans, updates content, and manages session state.
  */
+// TODO: is some of this shared by the mcp server?
 
 import { createHash } from 'node:crypto';
 import type { CreateHookSessionResponse } from '@peer-plan/schema';

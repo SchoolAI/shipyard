@@ -16,6 +16,7 @@
  * because y-websocket confirms sync before returning from operations.
  */
 
+import { ROUTES } from '@peer-plan/schema';
 import { WebsocketProvider } from 'y-websocket';
 import * as Y from 'yjs';
 import { logger } from './logger.js';
@@ -112,7 +113,7 @@ export async function hasActiveConnections(planId: string): Promise<boolean> {
   if (!hubPort) return false;
 
   try {
-    const res = await fetch(`http://localhost:${hubPort}/api/plan/${planId}/has-connections`, {
+    const res = await fetch(`http://localhost:${hubPort}${ROUTES.PLAN_HAS_CONNECTIONS(planId)}`, {
       signal: AbortSignal.timeout(500),
     });
 

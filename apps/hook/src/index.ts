@@ -50,6 +50,9 @@ async function handlePlanStart(
       url: result.url,
     };
   } catch (err) {
+    // TODO: we need to figure out where these logs are and how we can retrieve them
+    // Not sure if fail open is a good approach tbh, should just fail? is that possible? or not do anything?
+    // We should audit all places where it returns something on the error case and make sure we are intentional
     logger.error({ err }, 'Failed to create plan');
     // Fail open - allow the operation to proceed
     return { allow: true };
@@ -73,8 +76,7 @@ async function handleContentUpdate(
     return { allow: true };
   } catch (err) {
     logger.error({ err }, 'Failed to update content');
-    // Fail open - allow the operation to proceed
-    return { allow: true };
+    throw err;
   }
 }
 
@@ -88,8 +90,11 @@ async function handlePlanExit(
     return await checkReviewStatus(event.sessionId, event.planContent, event.metadata);
   } catch (err) {
     logger.error({ err }, 'Failed to check review status');
-    // Fail open - allow the operation to proceed
-    return { allow: true };
+    return {
+      allow: false,
+      message:
+        'Review system unavailable. Please ensure the registry server is running and try again, or check the plan URL manually for approval status.',
+    };
   }
 }
 
@@ -111,7 +116,8 @@ async function handlePostExit(
     };
   }
 
-  const { planId, sessionToken, url, deliverables } = state;
+  const { planId, sessionToken, url, deliverables, reviewComment, reviewedBy, reviewStatus } =
+    state;
 
   logger.info(
     { planId, deliverableCount: deliverables?.length ?? 0 },
@@ -132,8 +138,20 @@ async function handlePostExit(
     deliverablesSection = `\n## Deliverables\n\nNo deliverables marked in this plan. You can still upload artifacts without linking them.`;
   }
 
-  const context = `[PEER-PLAN] Plan approved! 🎉
-${deliverablesSection}
+  // Build feedback section if reviewer provided a comment
+  let feedbackSection = '';
+  if (reviewComment?.trim()) {
+    feedbackSection = `\n## Reviewer Feedback\n\n${reviewedBy ? `**From:** ${reviewedBy}\n\n` : ''}${reviewComment}\n\n`;
+  }
+
+  // Build approval message based on status
+  const approvalMessage =
+    reviewStatus === 'changes_requested'
+      ? '[PEER-PLAN] Changes requested on your plan ⚠️'
+      : '[PEER-PLAN] Plan approved! 🎉';
+
+  const context = `${approvalMessage}
+${deliverablesSection}${feedbackSection}
 ## Session Info
 
 planId="${planId}"
@@ -195,6 +213,7 @@ async function processEvent(_adapter: AgentAdapter, event: AdapterEvent): Promis
       // Exhaustive check
       const _exhaustive: never = event;
       logger.warn({ event: _exhaustive }, 'Unknown event type');
+      // Fail-open for unknown events - forward compatibility with future hook types
       return { allow: true };
     }
   }
@@ -216,6 +235,7 @@ async function readStdin(): Promise<string> {
 /**
  * Output SessionStart context for Claude to see.
  */
+// TODO: would be nice to centralize this or just rely on the skill?
 function outputSessionStartContext(): void {
   const context = `[PEER-PLAN] Collaborative planning with human review & proof-of-work tracking.
 

@@ -4,6 +4,9 @@
 # Simulates Claude Code hook events for local testing
 #
 
+# TODO: do we use this?
+# TODO: we need MUCH better integration testing on the hook
+
 set -e
 
 HOOK_BIN="../dist/index.mjs"

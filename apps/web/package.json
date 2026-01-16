@@ -27,6 +27,7 @@
     "@mantine/hooks": "^8.3.10",
     "@monaco-editor/react": "^4.7.0",
     "@peer-plan/schema": "workspace:*",
+    "@peer-plan/shared": "workspace:*",
     "@radix-ui/react-avatar": "^1.1.11",
     "@radix-ui/react-separator": "^1.1.8",
     "@radix-ui/react-slot": "^1.2.4",

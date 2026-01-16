@@ -37,6 +37,10 @@ const SessionStateSchema = z.object({
   approvedAt: z.number().optional(),
   // Deliverables to inject into Claude's context after approval
   deliverables: z.array(DeliverableInfoSchema).optional(),
+  // Reviewer feedback to include in PostExit injection
+  reviewComment: z.string().optional(),
+  reviewedBy: z.string().optional(),
+  reviewStatus: z.string().optional(),
 });
 
 export type SessionState = z.infer<typeof SessionStateSchema>;

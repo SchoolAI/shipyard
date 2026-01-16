@@ -185,6 +185,8 @@ export {
   touchPlanIndexEntry,
   updatePlanIndexViewedBy,
 } from './plan-index-helpers.js';
+export type { RoutePath } from './routes.js';
+export { ROUTES } from './routes.js';
 export type { CommentBody, Thread, ThreadComment } from './thread.js';
 export {
   extractTextFromCommentBody,

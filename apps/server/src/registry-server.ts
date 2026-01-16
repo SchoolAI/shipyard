@@ -135,6 +135,8 @@ export async function releaseHubLock(): Promise<void> {
  * Handles lock errors by checking if the lock holder process is still alive.
  * If the lock is stale (process dead), removes it and retries initialization.
  */
+
+// TODO: reduce complexity
 function initPersistence(): void {
   if (!ldb) {
     mkdirSync(PERSISTENCE_DIR, { recursive: true });
@@ -742,6 +744,10 @@ async function handleGetTranscript(req: Request, res: Response): Promise<void> {
   }
 }
 
+// TODO: is there a way to simplify this server without reducing functionality?
+// Or at a minimum, make some routes and use separate files?
+// Express is great, but wonder if there is another framework that can handle a lot of this
+// http middle ware stuff in each route? or we can just create middleware that simplifies the routes
 function createApp(): { app: express.Express; httpServer: http.Server } {
   const app = express();
   const httpServer = http.createServer(app);
