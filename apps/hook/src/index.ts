@@ -330,15 +330,16 @@ async function main(): Promise<void> {
     console.log(output);
     process.exit(0);
   } catch (err) {
-    // On any error, fail open with allow
-    logger.error({ err }, 'Hook error, failing open');
+    // On any error, fail closed with deny
+    logger.error({ err }, 'Hook error, failing closed');
     // biome-ignore lint/suspicious/noConsole: Hook output MUST go to stdout
     console.log(
       JSON.stringify({
         hookSpecificOutput: {
           hookEventName: 'PermissionRequest',
           decision: {
-            behavior: 'allow',
+            behavior: 'deny',
+            message: `Hook error: ${(err as Error).message}. Please report this bug.`,
           },
         },
       })

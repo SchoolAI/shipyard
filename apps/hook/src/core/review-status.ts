@@ -17,6 +17,7 @@ import {
   parseThreads,
   type ReviewFeedback,
 } from '@peer-plan/schema';
+import { computeHash } from '@peer-plan/shared';
 import { nanoid } from 'nanoid';
 import { WebsocketProvider } from 'y-websocket';
 import * as Y from 'yjs';
@@ -35,6 +36,7 @@ import {
   type DeliverableInfo,
   deleteSessionState,
   getSessionState,
+  type SessionState,
   setSessionState,
 } from '../state.js';
 import { createPlan } from './plan-manager.js';
@@ -71,12 +73,21 @@ async function waitForReviewDecision(
     connect: true,
   });
 
+  // Add ping/pong keep-alive every 30 seconds
+  const pingInterval = setInterval(() => {
+    if (provider.wsconnected && provider.ws?.readyState === provider.ws?.OPEN) {
+      // In Node.js, y-websocket uses the 'ws' package which has a ping() method
+      (provider.ws as unknown as { ping: () => void }).ping();
+    }
+  }, 30000);
+
   return new Promise((resolve) => {
     const metadata = ydoc.getMap('metadata');
     let resolved = false;
     let syncComplete = false;
 
     const cleanup = () => {
+      clearInterval(pingInterval);
       if (!resolved) {
         resolved = true;
         provider.destroy();
@@ -265,6 +276,116 @@ function extractFeedbackFromYDoc(ydoc: Y.Doc): string | undefined {
 // --- Review Status Check ---
 
 /**
+ * Handle review of updated plan content.
+ * Called when plan content has changed since last approval.
+ * Re-syncs content and blocks for new review decision.
+ */
+async function handleUpdatedPlanReview(
+  sessionId: string,
+  planId: string,
+  planContent: string,
+  sessionState: SessionState,
+  _originMetadata?: Record<string, unknown>
+): Promise<CoreResponse> {
+  logger.info(
+    { planId, contentLength: planContent.length },
+    'Plan content changed, triggering re-review'
+  );
+
+  // Get WebSocket URL from registry
+  const wsUrl = await getWebSocketUrl();
+  if (!wsUrl) {
+    logger.error({ planId }, 'No WebSocket server available - MCP server not running?');
+    // Fail closed if we can't connect
+    return {
+      allow: false,
+      message: 'Cannot connect to peer-plan server. Please start the MCP server and try again.',
+    };
+  }
+
+  // Sync updated content
+  logger.info({ planId }, 'Syncing updated plan content');
+  await updatePlanContent(planId, {
+    content: planContent,
+  });
+
+  const baseUrl = webConfig.PEER_PLAN_WEB_URL;
+  logger.info(
+    { planId, url: `${baseUrl}/plan/${planId}` },
+    'Content synced, browser already open. Waiting for Y.Doc status change...'
+  );
+
+  // Block until user approves/denies via Y.Doc observer
+  const decision = await waitForReviewDecision(planId, wsUrl);
+  logger.info({ planId, approved: decision.approved }, 'Decision received via Y.Doc');
+
+  if (decision.approved) {
+    // Generate NEW session token on re-approval
+    const sessionToken = generateSessionToken();
+    const sessionTokenHash = hashSessionToken(sessionToken);
+
+    logger.info({ planId }, 'Generating new session token for re-approved plan');
+
+    try {
+      // Set the token hash on the server
+      const tokenResult = await setSessionToken(planId, sessionTokenHash);
+      const url = tokenResult.url;
+
+      // Convert deliverables to simplified format for state storage
+      const deliverableInfos: DeliverableInfo[] = (decision.deliverables ?? []).map((d) => ({
+        id: d.id,
+        text: d.text,
+      }));
+
+      // Update state with new token and content hash
+      const newContentHash = computeHash(planContent);
+      setSessionState(sessionId, {
+        ...sessionState,
+        sessionToken,
+        url,
+        approvedAt: Date.now(),
+        contentHash: newContentHash,
+        deliverables: deliverableInfos,
+        reviewComment: decision.reviewComment,
+        reviewedBy: decision.reviewedBy,
+        reviewStatus: decision.status,
+      });
+
+      logger.info(
+        { planId, url, deliverableCount: deliverableInfos.length },
+        'Session token set and stored with updated content hash'
+      );
+
+      return {
+        allow: true,
+        message: 'Updated plan approved',
+        planId,
+        sessionToken,
+        url,
+      };
+    } catch (err) {
+      logger.error({ err, planId }, 'Failed to set session token, approving without it');
+      // Still approve, just without token - keep state as is
+      return {
+        allow: true,
+        message: 'Updated plan approved (session token unavailable)',
+        planId,
+      };
+    }
+  }
+
+  // Changes requested - clear state for fresh review cycle
+  deleteSessionState(sessionId);
+  logger.debug({ planId }, 'Cleared session state for fresh review cycle');
+
+  return {
+    allow: false,
+    message: decision.feedback || 'Changes requested',
+    planId,
+  };
+}
+
+/**
  * Check review status for a session's plan.
  * Called when agent tries to exit plan mode.
  */
@@ -288,10 +409,10 @@ export async function checkReviewStatus(
     const wsUrl = await getWebSocketUrl();
     if (!wsUrl) {
       logger.error({ sessionId }, 'No WebSocket server available - MCP server not running?');
-      // Fail open if we can't connect
+      // Fail closed if we can't connect
       return {
-        allow: true,
-        message: 'Warning: Could not connect to peer-plan server. Plan review skipped.',
+        allow: false,
+        message: 'Cannot connect to peer-plan server. Please start the MCP server and try again.',
       };
     }
 
@@ -363,7 +484,7 @@ export async function checkReviewStatus(
         );
 
         return {
-          allow: true,
+          allow: false,
           message: 'Plan approved',
           planId,
           sessionToken,
@@ -374,7 +495,7 @@ export async function checkReviewStatus(
         // Still approve, just without token - clear state
         deleteSessionState(sessionId);
         return {
-          allow: true,
+          allow: false,
           message: 'Plan approved (session token unavailable)',
           planId,
         };
@@ -398,6 +519,26 @@ export async function checkReviewStatus(
     return { allow: true };
   }
 
+  // Check if content has changed since last approval
+  if (state && planContent) {
+    const newHash = computeHash(planContent);
+    if (state.contentHash && state.contentHash !== newHash) {
+      logger.info(
+        { planId: state.planId, oldHash: state.contentHash, newHash },
+        'Plan content changed, triggering re-review'
+      );
+      return await handleUpdatedPlanReview(
+        sessionId,
+        state.planId,
+        planContent,
+        state,
+        originMetadata
+      );
+    }
+    // Hash matches - fall through to normal status check
+    logger.debug({ planId: state.planId }, 'Plan content unchanged, checking status');
+  }
+
   planId = state.planId;
 
   logger.info({ sessionId, planId }, 'Checking review status');
@@ -406,9 +547,13 @@ export async function checkReviewStatus(
   try {
     status = await getReviewStatus(planId);
   } catch (err) {
-    // If we can't check status, fail open
-    logger.warn({ err, planId }, 'Failed to get review status, allowing exit');
-    return { allow: true };
+    // If we can't check status, fail closed
+    logger.warn({ err, planId }, 'Failed to get review status, blocking exit');
+    return {
+      allow: false,
+      message: 'Cannot verify plan approval status. Please check the peer-plan server.',
+      planId,
+    };
   }
 
   logger.info({ sessionId, planId, status: status.status }, 'Review status retrieved');
@@ -441,7 +586,7 @@ export async function checkReviewStatus(
     case 'in_progress':
       // Plan is approved and work is in progress - allow exit to continue work
       return {
-        allow: true,
+        allow: false,
         message: 'Plan approved. Work is in progress.',
         planId,
       };
@@ -449,7 +594,7 @@ export async function checkReviewStatus(
     case 'completed':
       // Task is completed - allow exit
       return {
-        allow: true,
+        allow: false,
         message: status.reviewedBy ? `Task completed by ${status.reviewedBy}` : 'Task completed',
         planId,
       };

@@ -9,8 +9,8 @@
  * - Server hook-api: HTTP handlers that this code calls
  */
 
-import { createHash } from 'node:crypto';
 import type { CreateHookSessionResponse } from '@peer-plan/schema';
+import { computeHash } from '@peer-plan/shared';
 import open from 'open';
 import { DEFAULT_AGENT_TYPE } from '../constants.js';
 import { createSession, updatePlanContent, updatePresence } from '../http-client.js';
@@ -138,10 +138,4 @@ export async function updateContent(options: UpdateContentOptions): Promise<bool
 }
 
 // --- Helpers ---
-
-/**
- * Compute a hash of content for change detection.
- */
-function computeHash(content: string): string {
-  return createHash('sha256').update(content).digest('hex').slice(0, 16);
-}
+// computeHash moved to @peer-plan/shared
