@@ -68,7 +68,7 @@ STATUSES:
     const existingMetadata = getPlanMetadata(doc);
 
     // Get actor name for event logging
-    const actorName = getGitHubUsername();
+    const actorName = await getGitHubUsername();
 
     if (!existingMetadata) {
       return {

@@ -76,7 +76,7 @@ export async function createWebRtcProvider(ydoc: Y.Doc, planId: string): Promise
   // Broadcast MCP identity via awareness protocol and push to signaling
   let username: string | undefined;
   try {
-    username = getGitHubUsername();
+    username = await getGitHubUsername();
     const awarenessState: McpAwarenessState = {
       user: {
         id: `mcp-${username}`,

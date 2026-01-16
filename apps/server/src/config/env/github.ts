@@ -23,6 +23,7 @@ function getTokenFromGhCli(): string | null {
 }
 
 const schema = z.object({
+  GITHUB_USERNAME: z.string().optional(),
   GITHUB_TOKEN: z
     .string()
     .optional()

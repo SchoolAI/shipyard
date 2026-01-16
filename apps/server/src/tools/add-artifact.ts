@@ -133,7 +133,7 @@ ARTIFACT TYPES:
     const { planId, sessionToken, type, filename } = input;
 
     // Get actor name for event logging
-    const actorName = getGitHubUsername();
+    const actorName = await getGitHubUsername();
 
     logger.info({ planId, type, filename }, 'Adding artifact');
 
@@ -501,7 +501,7 @@ async function tryAutoLinkPR(ydoc: Y.Doc, repo: string): Promise<LinkedPR | null
 
     // Store in Y.Doc
     linkPR(ydoc, linkedPR);
-    const actorName = getGitHubUsername();
+    const actorName = await getGitHubUsername();
     logPlanEvent(ydoc, 'pr_linked', actorName, {
       prNumber: linkedPR.prNumber,
     });

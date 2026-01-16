@@ -115,7 +115,7 @@ Bad deliverables (not provable):
     logger.info({ planId, title: input.title, repo }, 'Creating plan');
 
     const ydoc = await getOrCreateDoc(planId);
-    const ownerId = getGitHubUsername();
+    const ownerId = await getGitHubUsername();
     logger.info({ ownerId }, 'GitHub username for plan ownership');
 
     // Construct origin metadata if platform is specified

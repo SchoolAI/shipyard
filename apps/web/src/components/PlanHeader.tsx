@@ -98,7 +98,6 @@ function MessagePreviewItem({ msg, idx }: MessagePreviewItemProps) {
 
 /** Props for the presence indicators */
 interface PresenceIndicatorsProps {
-  hubConnected: boolean;
   connectedPeers: ConnectedPeer[];
 }
 
@@ -128,7 +127,7 @@ function formatPlatformName(platform: string): string {
 }
 
 /** Renders hub connection and peer presence indicators */
-function PresenceIndicators({ hubConnected, connectedPeers }: PresenceIndicatorsProps) {
+function PresenceIndicators({ connectedPeers }: PresenceIndicatorsProps) {
   // Group peers by type (agent vs browser)
   const agents = connectedPeers.filter((p) => isAgentPlatform(p.platform));
   const browsers = connectedPeers.filter((p) => !isAgentPlatform(p.platform));
@@ -209,18 +208,14 @@ function PresenceIndicators({ hubConnected, connectedPeers }: PresenceIndicators
 
   return (
     <>
-      {hubConnected && (
-        <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <span className="w-1.5 h-1.5 rounded-full bg-success" />
-          server
-        </span>
-      )}
       {peerDisplay && (
         <Tooltip delay={0}>
-          <span className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-default">
-            <span className="w-1.5 h-1.5 rounded-full bg-info" />
-            {peerDisplay}
-          </span>
+          <Tooltip.Trigger>
+            <span className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-default">
+              <span className="w-1.5 h-1.5 rounded-full bg-info" />
+              {peerDisplay}
+            </span>
+          </Tooltip.Trigger>
           <Tooltip.Content className="text-xs">{tooltipContent}</Tooltip.Content>
         </Tooltip>
       )}
@@ -662,12 +657,7 @@ export function PlanHeader({
       {!isSnapshot && (
         <div className="flex items-center gap-2 ml-auto shrink-0">
           {/* Presence indicators */}
-          {syncState && (
-            <PresenceIndicators
-              hubConnected={syncState.connected}
-              connectedPeers={connectedPeers}
-            />
-          )}
+          {syncState && <PresenceIndicators connectedPeers={connectedPeers} />}
 
           {/* Approval panel for plan owners - shows pending access requests */}
           <ApprovalPanel

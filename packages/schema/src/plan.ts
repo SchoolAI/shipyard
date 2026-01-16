@@ -3,12 +3,11 @@ import { z } from 'zod';
 /**
  * Valid status values for a plan.
  *
- * Flow: draft → pending_review → in_progress → completed
- *                    ↓                ↑
- *              changes_requested ─────┘
+ * Flow: draft → pending_review ⟷ changes_requested (loop) → in_progress → completed
  *
- * Note: 'approved' is now an EVENT, not a status. When a plan is approved,
- * it transitions directly to 'in_progress' and an 'approved' event is logged.
+ * When reviewer approves: pending_review → in_progress (with matching reviewRequestId)
+ * When reviewer requests changes: pending_review → changes_requested (with matching reviewRequestId)
+ * Agent fixes and re-submits: changes_requested → pending_review (new reviewRequestId)
  */
 export const PlanStatusValues = [
   'draft',

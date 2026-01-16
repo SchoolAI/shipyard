@@ -68,7 +68,7 @@ export async function handleCreateSession(req: Request, res: Response): Promise<
 
     const PLAN_IN_PROGRESS = 'Plan in progress...';
 
-    const ownerId = getGitHubUsername();
+    const ownerId = await getGitHubUsername();
     logger.info({ ownerId }, 'GitHub username for plan ownership');
 
     const repo = getRepositoryFullName() || undefined;

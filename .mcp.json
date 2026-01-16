@@ -5,7 +5,8 @@
       "command": "node",
       "args": ["apps/server/dist/index.mjs"],
       "env": {
-        "NODE_ENV": "development"
+        "NODE_ENV": "development",
+        "SIGNALING_URL": "ws://localhost:4444"
       }
     },
     "heroui-react": {

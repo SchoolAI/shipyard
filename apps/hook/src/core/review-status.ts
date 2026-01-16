@@ -117,7 +117,7 @@ async function waitForReviewDecision(
       const status = metadata.get('status') as string | undefined;
       logger.debug({ planId, status, reviewRequestId }, 'Checking Y.Doc status');
 
-      if (status === 'approved') {
+      if (status === 'in_progress') {
         logger.info({ planId, reviewRequestId }, 'Plan approved via Y.Doc');
         // Extract deliverables to include in approval response
         const deliverables = getDeliverables(ydoc);
@@ -305,9 +305,26 @@ async function handleUpdatedPlanReview(
 
   // Sync updated content
   logger.info({ planId }, 'Syncing updated plan content');
-  await updatePlanContent(planId, {
-    content: planContent,
-  });
+  try {
+    await updatePlanContent(planId, {
+      content: planContent,
+    });
+  } catch (err) {
+    const error = err as Error;
+    // If plan doesn't exist (404), create a new plan seamlessly
+    if (error.message?.includes('404')) {
+      logger.warn(
+        { planId, sessionId },
+        'Plan not found (404), creating new plan with updated content'
+      );
+      deleteSessionState(sessionId);
+
+      // Recursively call the new plan creation path
+      // This will create the plan, sync content, and block for approval
+      return await checkReviewStatus(sessionId, planContent, _originMetadata);
+    }
+    throw err;
+  }
 
   const baseUrl = webConfig.PEER_PLAN_WEB_URL;
   logger.info(
@@ -364,8 +381,9 @@ async function handleUpdatedPlanReview(
         url,
       };
     } catch (err) {
-      logger.error({ err, planId }, 'Failed to set session token, approving without it');
-      // Still approve, just without token - keep state as is
+      logger.error({ err, planId }, 'Failed to set session token, but plan was approved');
+      // Still approve since human approved, just without token
+      deleteSessionState(sessionId);
       return {
         allow: true,
         message: 'Updated plan approved (session token unavailable)',
@@ -484,7 +502,7 @@ export async function checkReviewStatus(
         );
 
         return {
-          allow: false,
+          allow: true,
           message: 'Plan approved',
           planId,
           sessionToken,
@@ -495,7 +513,7 @@ export async function checkReviewStatus(
         // Still approve, just without token - clear state
         deleteSessionState(sessionId);
         return {
-          allow: false,
+          allow: true,
           message: 'Plan approved (session token unavailable)',
           planId,
         };
@@ -522,7 +540,8 @@ export async function checkReviewStatus(
   // Check if content has changed since last approval
   if (state && planContent) {
     const newHash = computeHash(planContent);
-    if (state.contentHash && state.contentHash !== newHash) {
+    // Treat missing contentHash as "changed" to handle legacy state
+    if (!state.contentHash || state.contentHash !== newHash) {
       logger.info(
         { planId: state.planId, oldHash: state.contentHash, newHash },
         'Plan content changed, triggering re-review'
@@ -586,7 +605,7 @@ export async function checkReviewStatus(
     case 'in_progress':
       // Plan is approved and work is in progress - allow exit to continue work
       return {
-        allow: false,
+        allow: true,
         message: 'Plan approved. Work is in progress.',
         planId,
       };
@@ -594,7 +613,7 @@ export async function checkReviewStatus(
     case 'completed':
       // Task is completed - allow exit
       return {
-        allow: false,
+        allow: true,
         message: status.reviewedBy ? `Task completed by ${status.reviewedBy}` : 'Task completed',
         planId,
       };
