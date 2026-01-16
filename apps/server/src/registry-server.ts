@@ -11,14 +11,12 @@ import {
   CreateSubscriptionRequestSchema,
   formatAsClaudeCodeJSONL,
   getPlanMetadata,
-  RegisterServerRequestSchema,
-  UnregisterServerRequestSchema,
 } from '@peer-plan/schema';
 import express, { type Request, type Response } from 'express';
 import * as decoding from 'lib0/decoding';
 import * as encoding from 'lib0/encoding';
 import { nanoid } from 'nanoid';
-import { WebSocket, WebSocketServer } from 'ws';
+import { type WebSocket, WebSocketServer } from 'ws';
 import { LeveldbPersistence } from 'y-leveldb';
 import * as awarenessProtocol from 'y-protocols/awareness';
 import * as syncProtocol from 'y-protocols/sync';
@@ -42,9 +40,6 @@ import {
   getChanges,
   startCleanupInterval,
 } from './subscriptions/index.js';
-
-const HEALTH_CHECK_INTERVAL = 10000;
-const HEALTH_CHECK_TIMEOUT = 2000;
 
 // Shared LevelDB for all plans (no session-pid isolation)
 const PERSISTENCE_DIR = join(homedir(), '.peer-plan', 'plans');
@@ -131,60 +126,89 @@ export async function releaseHubLock(): Promise<void> {
 }
 
 /**
+ * Checks if an error is a LevelDB lock error.
+ */
+function isLevelDbLockError(error: Error): boolean {
+  return error.message?.includes('LOCK') || error.message?.includes('lock');
+}
+
+/**
+ * Checks if a process with given PID is alive.
+ * Returns true if process is alive, false if dead.
+ */
+function isProcessAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0); // Signal 0 doesn't kill, just checks
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Attempts to recover from a stale LevelDB lock by removing the lock file.
+ * Returns true if recovery was successful, false if lock is held by active process.
+ * Throws if recovery fails for other reasons.
+ */
+function tryRecoverStaleLock(originalError: Error): boolean {
+  const lockFile = join(PERSISTENCE_DIR, 'LOCK');
+
+  // Try to read hub.lock to check if holder is alive
+  // LevelDB doesn't store PID, so we use our hub.lock
+  try {
+    const hubLockContent = readFileSync(HUB_LOCK_FILE, 'utf-8');
+    const pidStr = hubLockContent.split('\n')[0] ?? '';
+    const pid = Number.parseInt(pidStr, 10);
+
+    if (isProcessAlive(pid)) {
+      logger.error({ holderPid: pid }, 'LevelDB locked by active process, cannot recover');
+      throw originalError;
+    }
+
+    // Process dead, safe to remove lock
+    logger.warn('Hub process dead, removing stale LevelDB lock');
+    unlinkSync(lockFile);
+    return true;
+  } catch (hubLockErr) {
+    // Re-throw if it's the original error (lock is valid)
+    if (hubLockErr === originalError) {
+      throw hubLockErr;
+    }
+    // No hub.lock file - assume lock is stale (no process running)
+    logger.warn('No hub.lock found, assuming LevelDB lock is stale');
+    unlinkSync(lockFile);
+    return true;
+  }
+}
+
+/**
  * Ensures LevelDB persistence is initialized.
  * Handles lock errors by checking if the lock holder process is still alive.
  * If the lock is stale (process dead), removes it and retries initialization.
  */
-
-// TODO: reduce complexity
 function initPersistence(): void {
-  if (!ldb) {
-    mkdirSync(PERSISTENCE_DIR, { recursive: true });
+  if (ldb) return;
 
-    try {
-      ldb = new LeveldbPersistence(PERSISTENCE_DIR);
-      logger.info({ dir: PERSISTENCE_DIR }, 'LevelDB persistence initialized');
-    } catch (err) {
-      const error = err as Error;
+  mkdirSync(PERSISTENCE_DIR, { recursive: true });
 
-      // Check if this is a lock error
-      if (error.message?.includes('LOCK') || error.message?.includes('lock')) {
-        logger.warn({ err: error }, 'LevelDB locked, checking for stale lock');
+  try {
+    ldb = new LeveldbPersistence(PERSISTENCE_DIR);
+    logger.info({ dir: PERSISTENCE_DIR }, 'LevelDB persistence initialized');
+    return;
+  } catch (err) {
+    const error = err as Error;
 
-        const lockFile = join(PERSISTENCE_DIR, 'LOCK');
-
-        // Try to read lock file to check if holder is alive
-        // LevelDB doesn't store PID, so we use hub.lock
-        try {
-          // If hub.lock exists and has live process, lock is valid
-          const hubLockContent = readFileSync(HUB_LOCK_FILE, 'utf-8');
-          const pidStr = hubLockContent.split('\n')[0] ?? '';
-          const pid = Number.parseInt(pidStr, 10);
-
-          try {
-            process.kill(pid, 0); // Check if process alive
-            logger.error({ holderPid: pid }, 'LevelDB locked by active process, cannot recover');
-            throw error; // Lock is valid, can't remove
-          } catch {
-            // Process dead, safe to remove lock
-            logger.warn('Hub process dead, removing stale LevelDB lock');
-            unlinkSync(lockFile);
-            ldb = new LeveldbPersistence(PERSISTENCE_DIR);
-            logger.info('Recovered from stale LevelDB lock');
-          }
-        } catch (_hubLockErr) {
-          // No hub.lock file - assume lock is stale (no process running)
-          logger.warn('No hub.lock found, assuming LevelDB lock is stale');
-          unlinkSync(lockFile);
-          ldb = new LeveldbPersistence(PERSISTENCE_DIR);
-          logger.info('Recovered from stale LevelDB lock');
-        }
-      } else {
-        // Not a lock error, re-throw
-        logger.error({ err: error }, 'Failed to initialize LevelDB persistence');
-        throw error;
-      }
+    if (!isLevelDbLockError(error)) {
+      logger.error({ err: error }, 'Failed to initialize LevelDB persistence');
+      throw error;
     }
+
+    logger.warn({ err: error }, 'LevelDB locked, checking for stale lock');
+    tryRecoverStaleLock(error);
+
+    // Lock removed, retry initialization
+    ldb = new LeveldbPersistence(PERSISTENCE_DIR);
+    logger.info('Recovered from stale LevelDB lock');
   }
 }
 
@@ -365,85 +389,12 @@ function handleWebSocketConnection(ws: WebSocket, req: http.IncomingMessage): vo
   })();
 }
 
-interface ServerEntry {
-  port: number;
-  pid: number;
-  url: string;
-  registeredAt: number;
-}
-
-const servers = new Map<number, ServerEntry>();
-
-async function isServerAlive(entry: ServerEntry): Promise<boolean> {
-  return new Promise((resolve) => {
-    const ws = new WebSocket(entry.url);
-    const timeout = setTimeout(() => {
-      ws.close();
-      resolve(false);
-    }, HEALTH_CHECK_TIMEOUT);
-
-    ws.on('open', () => {
-      clearTimeout(timeout);
-      ws.close();
-      resolve(true);
-    });
-
-    ws.on('error', () => {
-      clearTimeout(timeout);
-      resolve(false);
-    });
-  });
-}
-
-async function healthCheck(): Promise<void> {
-  const entries = Array.from(servers.entries());
-
-  for (const [pid, entry] of entries) {
-    const alive = await isServerAlive(entry);
-    if (!alive) {
-      servers.delete(pid);
-      logger.info({ pid, port: entry.port }, 'Removed dead server from registry');
-    }
-  }
-}
-
-async function handleGetRegistry(_req: Request, res: Response): Promise<void> {
-  const serverList = Array.from(servers.values());
-  logger.debug({ count: serverList.length }, 'Served registry');
-  res.json({ servers: serverList });
-}
-
-async function handleRegister(req: Request, res: Response): Promise<void> {
-  try {
-    const input = RegisterServerRequestSchema.parse(req.body);
-
-    const entry: ServerEntry = {
-      port: input.port,
-      pid: input.pid,
-      url: `ws://localhost:${input.port}`,
-      registeredAt: Date.now(),
-    };
-
-    servers.set(input.pid, entry);
-    logger.info({ port: input.port, pid: input.pid }, 'Server registered');
-    res.json({ success: true, entry });
-  } catch (err) {
-    logger.error({ err }, 'Failed to register server');
-    res.status(400).json({ error: 'Invalid request body' });
-  }
-}
-
-async function handleUnregister(req: Request, res: Response): Promise<void> {
-  try {
-    const input = UnregisterServerRequestSchema.parse(req.body);
-
-    const existed = servers.delete(input.pid);
-    logger.info({ pid: input.pid, existed }, 'Server unregistered');
-    res.json({ success: true, existed });
-  } catch (err) {
-    logger.error({ err }, 'Failed to unregister server');
-    res.status(400).json({ error: 'Invalid request body' });
-  }
+/**
+ * Health check endpoint - used by browser and hook to discover if server is running.
+ * No longer tracks registered servers - just returns OK status.
+ */
+async function handleHealthCheck(_req: Request, res: Response): Promise<void> {
+  res.json({ status: 'ok' });
 }
 
 async function handlePlanStatus(req: Request, res: Response): Promise<void> {
@@ -744,10 +695,19 @@ async function handleGetTranscript(req: Request, res: Response): Promise<void> {
   }
 }
 
-// TODO: is there a way to simplify this server without reducing functionality?
-// Or at a minimum, make some routes and use separate files?
-// Express is great, but wonder if there is another framework that can handle a lot of this
-// http middle ware stuff in each route? or we can just create middleware that simplifies the routes
+/**
+ * Creates the Express app with all HTTP routes.
+ *
+ * Architecture note: Routes are intentionally grouped by domain (plan, hook, conversation).
+ * Hook handlers are already factored out to hook-api.ts. Further splitting would scatter
+ * related routes across files without meaningful benefit. The current structure:
+ * - Plan API: status, connections, subscriptions, PR diff/files
+ * - Hook API: session, content, review, presence (handlers in hook-api.ts)
+ * - Conversation API: import
+ *
+ * Express Router could organize routes, but wouldn't reduce actual complexity.
+ * If this file grows significantly, consider extracting plan-api.ts handlers.
+ */
 function createApp(): { app: express.Express; httpServer: http.Server } {
   const app = express();
   const httpServer = http.createServer(app);
@@ -760,9 +720,8 @@ function createApp(): { app: express.Express; httpServer: http.Server } {
     next();
   });
 
-  app.get('/registry', handleGetRegistry);
-  app.post('/register', handleRegister);
-  app.delete('/unregister', handleUnregister);
+  // Health check endpoint - used by browser and hook to discover if server is running
+  app.get('/registry', handleHealthCheck);
 
   app.get('/api/plan/:id/status', handlePlanStatus);
   app.get('/api/plan/:id/has-connections', handleHasConnections);
@@ -823,7 +782,6 @@ export async function startRegistryServer(): Promise<number | null> {
             { port, persistence: PERSISTENCE_DIR },
             'Registry server started with WebSocket support'
           );
-          setInterval(healthCheck, HEALTH_CHECK_INTERVAL);
           startCleanupInterval();
           resolve();
         });

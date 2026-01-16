@@ -2,6 +2,17 @@
  * Logger for the hook process.
  * CRITICAL: Must log to stderr since stdout is reserved for hook JSON response.
  * Also logs to ~/.peer-plan/hook-debug.log for debugging.
+ *
+ * Log destinations:
+ * - stderr: Visible in Claude Code's hook output during execution
+ * - file: ~/.peer-plan/hook-debug.log for post-mortem debugging
+ *
+ * Expected warnings/errors in the log file:
+ * - "No registry server found on any port" - Normal when MCP server isn't running
+ * - "No WebSocket server available" - Same as above
+ * - "Failed to read state file, starting fresh" - Normal on first run or after cleanup
+ * - "WebSocket connection error/closed" - Normal during server restarts
+ * - "Review timeout" - Normal during testing when no human reviews
  */
 
 import { homedir } from 'node:os';
@@ -12,7 +23,6 @@ import { serverConfig } from './config/env/server.js';
 const LOG_FILE = join(homedir(), '.peer-plan', 'hook-debug.log');
 
 // Create logger that writes to BOTH stderr and a file
-// TODO: review all logs in the debug file for warnings and errors and see if we can fix all issues that have come up
 export const logger = pino(
   {
     level: serverConfig.LOG_LEVEL,

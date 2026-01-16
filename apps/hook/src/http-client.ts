@@ -53,47 +53,21 @@ async function getRegistryUrl(): Promise<string | null> {
 // --- API Methods ---
 
 /**
- * Get WebSocket URL from registry for Y.Doc sync.
- * Returns the first available WebSocket server URL.
+ * Get WebSocket URL for Y.Doc sync.
+ * Uses direct port scanning - the hub's WebSocket server runs on the same port as HTTP.
  */
 export async function getWebSocketUrl(): Promise<string | null> {
   const baseUrl = await getRegistryUrl();
   if (!baseUrl) {
-    logger.warn('getWebSocketUrl: No registry URL available');
+    logger.warn('getWebSocketUrl: No server available');
     return null;
   }
 
-  try {
-    const res = await fetch(`${baseUrl}/registry`, {
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-    });
-
-    if (!res.ok) {
-      logger.warn({ status: res.status }, 'getWebSocketUrl: Registry returned non-ok status');
-      return null;
-    }
-
-    const data = (await res.json()) as { servers?: Array<{ url: string }> };
-
-    // Return first available WebSocket server
-    const firstServer = data.servers?.[0];
-    if (firstServer) {
-      logger.debug(
-        { wsUrl: firstServer.url, serverCount: data.servers?.length },
-        'Found WebSocket server'
-      );
-      return firstServer.url;
-    }
-
-    logger.warn(
-      { serverCount: data.servers?.length ?? 0 },
-      'getWebSocketUrl: No WebSocket servers registered'
-    );
-    return null;
-  } catch (err) {
-    logger.warn({ err }, 'Failed to get WebSocket URL from registry');
-    return null;
-  }
+  // The hub's WebSocket server runs on the same port as HTTP
+  // Just convert http:// to ws://
+  const wsUrl = baseUrl.replace('http://', 'ws://');
+  logger.debug({ wsUrl }, 'Constructed WebSocket URL from hub');
+  return wsUrl;
 }
 
 /**

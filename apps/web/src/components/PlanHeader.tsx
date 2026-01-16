@@ -19,11 +19,13 @@ import {
 import {
   Archive,
   ArchiveRestore,
+  Bot,
   Check,
   GitPullRequest,
   MessageSquare,
   MessageSquareReply,
   MessageSquareShare,
+  Monitor,
   MoreVertical,
   Share2,
 } from 'lucide-react';
@@ -43,6 +45,7 @@ import { useConversationTransfer } from '@/hooks/useConversationTransfer';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { useMultiProviderSync } from '@/hooks/useMultiProviderSync';
+import { type ConnectedPeer, useP2PPeers } from '@/hooks/useP2PPeers';
 
 // ============================================================================
 // Helper Functions & Sub-Components
@@ -96,24 +99,130 @@ function MessagePreviewItem({ msg, idx }: MessagePreviewItemProps) {
 /** Props for the presence indicators */
 interface PresenceIndicatorsProps {
   hubConnected: boolean;
-  peerCount: number;
+  connectedPeers: ConnectedPeer[];
+}
+
+/**
+ * Check if a platform represents an AI agent (not a browser).
+ * Known agent platforms: claude-code, devin, cursor, aider, etc.
+ */
+function isAgentPlatform(platform: string): boolean {
+  const agentPlatforms = ['claude-code', 'devin', 'cursor', 'aider', 'copilot', 'cody'];
+  return agentPlatforms.includes(platform.toLowerCase());
+}
+
+/**
+ * Format platform name for display (e.g., 'claude-code' -> 'Claude Code')
+ */
+function formatPlatformName(platform: string): string {
+  const platformNames: Record<string, string> = {
+    'claude-code': 'Claude Code',
+    devin: 'Devin',
+    cursor: 'Cursor',
+    aider: 'Aider',
+    copilot: 'GitHub Copilot',
+    cody: 'Sourcegraph Cody',
+    browser: 'Browser',
+  };
+  return platformNames[platform.toLowerCase()] ?? platform;
 }
 
 /** Renders hub connection and peer presence indicators */
-function PresenceIndicators({ hubConnected, peerCount }: PresenceIndicatorsProps) {
+function PresenceIndicators({ hubConnected, connectedPeers }: PresenceIndicatorsProps) {
+  // Group peers by type (agent vs browser)
+  const agents = connectedPeers.filter((p) => isAgentPlatform(p.platform));
+  const browsers = connectedPeers.filter((p) => !isAgentPlatform(p.platform));
+
+  const agentCount = agents.length;
+  const browserCount = browsers.length;
+  const totalPeers = connectedPeers.length;
+
+  // Generate display text based on peer composition
+  const getPeerDisplayText = () => {
+    if (totalPeers === 0) return null;
+
+    if (browserCount === 0 && agentCount > 0) {
+      // Only agents
+      return (
+        <span className="flex items-center gap-1.5">
+          <Bot className="w-3 h-3" />
+          {agentCount} {agentCount === 1 ? 'agent' : 'agents'}
+        </span>
+      );
+    }
+
+    if (agentCount === 0 && browserCount > 0) {
+      // Only browsers
+      return (
+        <span className="flex items-center gap-1.5">
+          <Monitor className="w-3 h-3" />
+          {browserCount} {browserCount === 1 ? 'browser' : 'browsers'}
+        </span>
+      );
+    }
+
+    // Mixed: browsers and agents
+    return (
+      <span className="flex items-center gap-1.5">
+        <Monitor className="w-3 h-3" />
+        {browserCount}
+        <span className="text-muted-foreground/50 mx-0.5">+</span>
+        <Bot className="w-3 h-3" />
+        {agentCount}
+      </span>
+    );
+  };
+
+  // Generate tooltip content with peer details
+  const getTooltipContent = () => {
+    if (totalPeers === 0) return null;
+
+    return (
+      <div className="flex flex-col gap-1.5 py-1">
+        {agents.length > 0 && (
+          <div className="flex flex-col gap-1">
+            {agents.map((agent, idx) => (
+              <div key={`agent-${idx}`} className="flex items-center gap-2">
+                <Bot className="w-3.5 h-3.5 text-accent" />
+                <span className="font-medium">{formatPlatformName(agent.platform)}</span>
+                {agent.name && agent.name !== `Peer ${idx}` && (
+                  <span className="text-muted-foreground">({agent.name})</span>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+        {browsers.length > 0 && (
+          <div className="flex items-center gap-2">
+            <Monitor className="w-3.5 h-3.5 text-info" />
+            <span>
+              {browserCount} {browserCount === 1 ? 'browser' : 'browsers'}
+            </span>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const peerDisplay = getPeerDisplayText();
+  const tooltipContent = getTooltipContent();
+
   return (
     <>
       {hubConnected && (
         <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
           <span className="w-1.5 h-1.5 rounded-full bg-success" />
-          hub
+          server
         </span>
       )}
-      {peerCount > 0 && (
-        <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <span className="w-1.5 h-1.5 rounded-full bg-info" />
-          {peerCount} {peerCount === 1 ? 'peer' : 'peers'}
-        </span>
+      {peerDisplay && (
+        <Tooltip delay={0}>
+          <span className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-default">
+            <span className="w-1.5 h-1.5 rounded-full bg-info" />
+            {peerDisplay}
+          </span>
+          <Tooltip.Content className="text-xs">{tooltipContent}</Tooltip.Content>
+        </Tooltip>
       )}
     </>
   );
@@ -391,6 +500,7 @@ export function PlanHeader({
   const { identity: githubIdentity } = useGitHubAuth();
   const { ydoc: indexDoc } = useMultiProviderSync(PLAN_INDEX_DOC_NAME);
   const ownerId = getPlanOwnerId(ydoc);
+  const { connectedPeers } = useP2PPeers(rtcProvider);
 
   // Handoff conversation dialog state
   const [isHandoffDialogOpen, setIsHandoffDialogOpen] = useState(false);
@@ -555,7 +665,7 @@ export function PlanHeader({
           {syncState && (
             <PresenceIndicators
               hubConnected={syncState.connected}
-              peerCount={syncState.peerCount}
+              connectedPeers={connectedPeers}
             />
           )}
 

@@ -35,7 +35,10 @@ export function getRepositoryFullName(): string | null {
 }
 
 export function getGitHubUsername(): string {
-  // TODO: probably need some sort of expiration here
+  // No cache expiration needed: The MCP server runs as an ephemeral child process of
+  // Claude Code. Each Claude session spawns a fresh server process with empty cache.
+  // The username is fetched once per session and cached for the process lifetime,
+  // which is inherently bounded by the session duration.
   if (cachedUsername) {
     return cachedUsername;
   }

@@ -50,11 +50,10 @@ async function handlePlanStart(
       url: result.url,
     };
   } catch (err) {
-    // TODO: we need to figure out where these logs are and how we can retrieve them
-    // Not sure if fail open is a good approach tbh, should just fail? is that possible? or not do anything?
-    // We should audit all places where it returns something on the error case and make sure we are intentional
+    // Logs go to: stderr (visible in Claude Code) + ~/.peer-plan/hook-debug.log
+    // Fail open here because plan creation failure shouldn't block the agent's work.
+    // The agent can still proceed without peer-plan features.
     logger.error({ err }, 'Failed to create plan');
-    // Fail open - allow the operation to proceed
     return { allow: true };
   }
 }
@@ -234,8 +233,12 @@ async function readStdin(): Promise<string> {
 
 /**
  * Output SessionStart context for Claude to see.
+ *
+ * NOTE: This context is duplicated in the skill (peer-plan-skill/SKILL.md) but serves
+ * a different purpose. The hook context is for Claude Code users who have the hook
+ * installed and use native plan mode (Shift+Tab). The skill documentation is for
+ * agents invoking the MCP tool directly without native plan mode. Both are needed.
  */
-// TODO: would be nice to centralize this or just rely on the skill?
 function outputSessionStartContext(): void {
   const context = `[PEER-PLAN] Collaborative planning with human review & proof-of-work tracking.
 

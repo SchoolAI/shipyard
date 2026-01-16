@@ -1,8 +1,13 @@
 /**
  * Core plan management logic.
  * Creates plans, updates content, and manages session state.
+ *
+ * NOTE: This is hook-specific orchestration that calls server APIs via HTTP.
+ * The server's create-plan.ts tool and hook-api.ts serve different purposes:
+ * - Hook: Client-side orchestration, session state, browser opening
+ * - Server tool: MCP tool for agents without hook support (Cursor, Devin)
+ * - Server hook-api: HTTP handlers that this code calls
  */
-// TODO: is some of this shared by the mcp server?
 
 import { createHash } from 'node:crypto';
 import type { CreateHookSessionResponse } from '@peer-plan/schema';

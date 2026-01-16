@@ -1,8 +1,12 @@
 /**
  * Review status checking and feedback formatting.
  * Uses Y.Doc observer for distributed approval flow.
+ *
+ * NOTE: Shared formatting utilities (parseThreads, formatThreadsForLLM, formatDeliverablesForLLM,
+ * getDeliverables, createUserResolver) are already extracted to @peer-plan/schema.
+ * Hook-specific logic (waitForReviewDecision, extractFeedbackFromYDoc, checkReviewStatus)
+ * remains here because it handles the hook's blocking Y.Doc observer pattern.
  */
-// TODO: i think a lot of this is shared with the server and should be centralized
 import {
   createUserResolver,
   type Deliverable,
