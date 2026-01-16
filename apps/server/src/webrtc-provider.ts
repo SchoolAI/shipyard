@@ -1,7 +1,7 @@
 import type { OriginPlatform } from '@peer-plan/schema';
+import wrtc from '@roamhq/wrtc';
 import { WebrtcProvider } from 'y-webrtc';
 import type * as Y from 'yjs';
-import wrtc from '@roamhq/wrtc';
 import { logger } from './logger.js';
 import { getGitHubUsername } from './server-identity.js';
 
@@ -33,18 +33,16 @@ const SIGNALING_SERVER =
  * @returns WebrtcProvider instance
  */
 // Polyfill global WebRTC objects for simple-peer (done once at module load)
-// @ts-expect-error - Polyfilling browser WebRTC APIs for Node.js
 if (typeof globalThis.RTCPeerConnection === 'undefined') {
+  // @ts-expect-error - Polyfilling browser WebRTC APIs for Node.js
   globalThis.RTCPeerConnection = wrtc.RTCPeerConnection;
+  // @ts-expect-error - Polyfilling browser WebRTC APIs for Node.js
   globalThis.RTCSessionDescription = wrtc.RTCSessionDescription;
+  // @ts-expect-error - Polyfilling browser WebRTC APIs for Node.js
   globalThis.RTCIceCandidate = wrtc.RTCIceCandidate;
 }
 
-export async function createWebRtcProvider(
-  ydoc: Y.Doc,
-  planId: string
-): Promise<WebrtcProvider> {
-
+export async function createWebRtcProvider(ydoc: Y.Doc, planId: string): Promise<WebrtcProvider> {
   // Build ICE servers configuration
   const iceServers: Array<{ urls: string; username?: string; credential?: string }> = [
     { urls: 'stun:stun.l.google.com:19302' },
@@ -66,16 +64,18 @@ export async function createWebRtcProvider(
   const provider = new WebrtcProvider(roomName, ydoc, {
     signaling: [SIGNALING_SERVER],
     peerOpts: {
-      wrtc: wrtc.default || wrtc,  // Pass wrtc polyfill to simple-peer
+      // @ts-expect-error - wrtc type definitions don't match runtime structure
+      wrtc: wrtc.default || wrtc, // Pass wrtc polyfill to simple-peer
       config: {
         iceServers,
       },
     },
   });
 
-  // Broadcast MCP identity via awareness protocol
+  // Broadcast MCP identity via awareness protocol and push to signaling
+  let username: string | undefined;
   try {
-    const username = getGitHubUsername();
+    username = getGitHubUsername();
     const awarenessState: McpAwarenessState = {
       user: {
         id: `mcp-${username}`,
@@ -89,6 +89,9 @@ export async function createWebRtcProvider(
     };
     provider.awareness.setLocalStateField('planStatus', awarenessState);
     logger.info({ username, platform: 'claude-code' }, 'MCP awareness state set');
+
+    // Push approval state to signaling server (required for access control)
+    sendApprovalStateToSignaling(provider, planId, username);
   } catch (error) {
     logger.warn(
       { error },
@@ -110,6 +113,55 @@ export async function createWebRtcProvider(
   );
 
   return provider;
+}
+
+/**
+ * Push approval state to signaling server.
+ * Required for signaling server access control - without this, peers can't communicate.
+ *
+ * @param provider - The WebRTC provider instance
+ * @param planId - The plan ID
+ * @param username - The GitHub username (owner)
+ */
+function sendApprovalStateToSignaling(
+  provider: WebrtcProvider,
+  planId: string,
+  username: string
+): void {
+  // Access signaling connections (internal y-webrtc API)
+  const signalingConns = (provider as unknown as { signalingConns?: Array<{ ws?: unknown }> })
+    .signalingConns;
+
+  if (!signalingConns || signalingConns.length === 0) {
+    // Schedule approval state push after signaling connects
+    setTimeout(() => sendApprovalStateToSignaling(provider, planId, username), 1000);
+    return;
+  }
+
+  // Send user identity first (so signaling knows which user this connection belongs to)
+  const identifyMessage = JSON.stringify({
+    type: 'subscribe',
+    topics: [], // Empty topics - just identifying the user
+    userId: username,
+  });
+
+  // Then send approval state (MCP is owner, so approve itself)
+  const approvalStateMessage = JSON.stringify({
+    type: 'approval_state',
+    planId,
+    ownerId: username,
+    approvedUsers: [username], // Owner is always approved
+    rejectedUsers: [],
+  });
+
+  for (const conn of signalingConns) {
+    if (conn.ws && conn.ws.readyState === 1) {
+      // WebSocket.OPEN = 1
+      conn.ws.send(identifyMessage);
+      conn.ws.send(approvalStateMessage);
+      logger.info({ planId, username }, 'Pushed identity and approval state to signaling server');
+    }
+  }
 }
 
 /**

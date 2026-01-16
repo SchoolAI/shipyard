@@ -63,10 +63,9 @@ async function withTokenRetry<T>(operation: () => Promise<T>): Promise<T> {
     return await operation();
   } catch (error: unknown) {
     if (isAuthError(error)) {
-      logger.info('GitHub auth error, refreshing token and retrying...');
-      resetTokenCache();
+      logger.info('GitHub auth error, checking token and retrying...');
 
-      // Check if we got a new token
+      // Check if we have a token (token is loaded once at startup)
       const newToken = resolveGitHubToken();
       if (!newToken) {
         throw new GitHubAuthError(

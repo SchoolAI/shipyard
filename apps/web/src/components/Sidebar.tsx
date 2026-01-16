@@ -153,6 +153,7 @@ interface CollapsedSidebarProps {
   isLoading: boolean;
   onToggle: () => void;
   onNavigate?: () => void;
+  searchInputRef: React.RefObject<SearchPlanInputHandle>;
 }
 
 function CollapsedSidebar({
@@ -161,6 +162,7 @@ function CollapsedSidebar({
   isLoading,
   onToggle,
   onNavigate,
+  searchInputRef,
 }: CollapsedSidebarProps) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -260,17 +262,17 @@ function CollapsedSidebar({
               variant="ghost"
               size="sm"
               onPress={() => {
-                setCollapsed(false);
-                // Focus search after sidebar expands
-                setTimeout(() => searchInputRef.current?.focus(), 100);
+                onToggle();
+                // Focus search input after sidebar expands
+                setTimeout(() => searchInputRef.current?.focus(), 150);
               }}
-              aria-label="Search plans"
+              aria-label="Expand to search"
               className="w-10 h-10"
             >
               <Search className="w-4 h-4" />
             </Button>
           </Tooltip.Trigger>
-          <Tooltip.Content>Search</Tooltip.Content>
+          <Tooltip.Content>Expand to search</Tooltip.Content>
         </Tooltip>
       </nav>
 
@@ -430,6 +432,7 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
       isLoading={isLoading}
       onToggle={handleToggle}
       onNavigate={onNavigate}
+      searchInputRef={searchInputRef}
     />
   );
 

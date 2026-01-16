@@ -462,7 +462,7 @@ export function InboxPage() {
             <Check className="w-8 h-8 text-success" />
           </div>
           <h1 className="text-xl font-bold text-foreground mb-2">Inbox Zero!</h1>
-          <p className="text-sm text-muted-foreground">No plans need your review right now.</p>
+          <p className="text-sm text-muted-foreground">No plans need your attention right now.</p>
         </div>
       </div>
     );
@@ -476,7 +476,7 @@ export function InboxPage() {
             <h1 className="text-xl font-bold text-foreground">Inbox</h1>
             <p className="text-sm text-muted-foreground">
               {sortedInboxPlans.length}{' '}
-              {sortedInboxPlans.length === 1 ? 'plan needs' : 'plans need'} your review
+              {sortedInboxPlans.length === 1 ? 'plan needs' : 'plans need'} your attention
               {searchQuery && inboxPlans.length !== sortedInboxPlans.length && (
                 <span className="text-muted-foreground"> (filtered from {inboxPlans.length})</span>
               )}

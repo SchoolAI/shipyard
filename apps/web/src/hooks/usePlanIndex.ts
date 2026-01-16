@@ -286,7 +286,9 @@ export function usePlanIndex(currentUsername: string | undefined): PlanIndexStat
       allActivePlans.filter(
         (p) =>
           p.ownerId === currentUsername &&
-          (p.status === 'changes_requested' || p.status === 'pending_review')
+          (p.status === 'draft' ||
+            p.status === 'changes_requested' ||
+            p.status === 'pending_review')
       ),
     [allActivePlans, currentUsername]
   );
@@ -347,6 +349,7 @@ export function usePlanIndex(currentUsername: string | undefined): PlanIndexStat
       allActivePlans.filter(
         (p) =>
           p.ownerId === currentUsername &&
+          p.status !== 'draft' &&
           p.status !== 'changes_requested' &&
           p.status !== 'pending_review'
       ),
