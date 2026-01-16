@@ -4,6 +4,7 @@ import {
   addConversationVersion,
   type ConversationExportMeta,
   type ConversationVersion,
+  logPlanEvent,
   type OriginPlatform,
 } from '@peer-plan/schema';
 import { Check, Download, MessageSquare, MessageSquareReply, Terminal } from 'lucide-react';
@@ -276,6 +277,35 @@ export type { ReceivedConversation } from '@/hooks/useConversationTransfer';
 
 const REGISTRY_URL = 'http://localhost:32191';
 
+interface ImportApiResponse {
+  success: boolean;
+  sessionId?: string;
+  transcriptPath?: string;
+  messageCount?: number;
+  error?: string;
+}
+
+/** Parse API response, returning null with toast on error */
+async function parseImportResponse(res: Response): Promise<ImportApiResponse | null> {
+  if (res.status === 413) {
+    toast.error('Conversation too large. Try downloading instead.');
+    return null;
+  }
+
+  try {
+    return (await res.json()) as ImportApiResponse;
+  } catch {
+    const message = res.ok
+      ? 'Invalid response from server'
+      : `Server error (${res.status}). Try downloading instead.`;
+    toast.error(message);
+    return null;
+  }
+}
+
+// TODO(#9): Platform detection - Currently hard-coded to only detect Claude Code
+// Should detect available platforms (Cursor, Devin, Windsurf, etc.) and show
+// appropriate import buttons. See: https://github.com/jacobpetterle/peer-plan/issues/9
 function useRegistryAvailable(): boolean {
   const [available, setAvailable] = useState(false);
 
@@ -310,7 +340,6 @@ function ReceivedReviewModal({
   isOpen,
   onClose,
   received,
-  onConfirm,
   onDownload,
   onImportToClaudeCode,
   isImporting,
@@ -319,7 +348,6 @@ function ReceivedReviewModal({
   isOpen: boolean;
   onClose: () => void;
   received: ReceivedConversation;
-  onConfirm: () => void;
   onDownload: () => void;
   onImportToClaudeCode: () => void;
   isImporting: boolean;
@@ -393,24 +421,31 @@ function ReceivedReviewModal({
             <Button variant="secondary" onPress={onClose}>
               Dismiss
             </Button>
-            <Button variant="secondary" onPress={onDownload}>
-              <Download className="w-4 h-4" />
-              Download
-            </Button>
-            {registryAvailable && (
-              <Button variant="secondary" onPress={onImportToClaudeCode} isDisabled={isImporting}>
-                {isImporting ? (
-                  <Spinner size="sm" color="current" />
-                ) : (
-                  <Terminal className="w-4 h-4" />
-                )}
-                Import to Claude Code
+            {/* TODO(#9): Platform-specific import buttons
+                Currently only shows "Import to Claude Code" if registry is available.
+                Should detect which platforms are running (Cursor, Devin, etc.) and show
+                only relevant buttons. See A2A research in docs/research/ */}
+            {registryAvailable ? (
+              <>
+                <Button variant="secondary" onPress={onDownload}>
+                  <Download className="w-4 h-4" />
+                  Download
+                </Button>
+                <Button onPress={onImportToClaudeCode} isDisabled={isImporting}>
+                  {isImporting ? (
+                    <Spinner size="sm" color="current" />
+                  ) : (
+                    <Terminal className="w-4 h-4" />
+                  )}
+                  Import to Claude Code
+                </Button>
+              </>
+            ) : (
+              <Button onPress={onDownload}>
+                <Download className="w-4 h-4" />
+                Download File
               </Button>
             )}
-            <Button onPress={onConfirm}>
-              <Check className="w-4 h-4" />
-              Accept
-            </Button>
           </Modal.Footer>
         </Modal.Dialog>
       </Modal.Container>
@@ -422,12 +457,10 @@ export function ImportConversationHandler({
   planId,
   ydoc,
   rtcProvider,
-  onImportConfirmed,
 }: {
   planId: string;
   ydoc: Y.Doc;
   rtcProvider: WebrtcProvider | null;
-  onImportConfirmed?: (messages: A2AMessage[], meta: ConversationExportMeta) => void;
 }) {
   const [selectedReceived, setSelectedReceived] = useState<ReceivedConversation | null>(null);
   const [isReviewOpen, setIsReviewOpen] = useState(false);
@@ -439,28 +472,6 @@ export function ImportConversationHandler({
     setSelectedReceived(received);
     setIsReviewOpen(true);
   });
-
-  function handleConfirm() {
-    if (selectedReceived) {
-      const newVersion: ConversationVersion = {
-        versionId: crypto.randomUUID(),
-        creator: identity?.username || 'anonymous',
-        platform: (selectedReceived.meta.sourcePlatform || 'unknown') as OriginPlatform,
-        sessionId: selectedReceived.meta.sourceSessionId,
-        messageCount: selectedReceived.meta.messageCount,
-        createdAt: Date.now(),
-      };
-
-      addConversationVersion(ydoc, newVersion);
-
-      onImportConfirmed?.(selectedReceived.messages, selectedReceived.meta);
-      toast.success(
-        `Accepted ${selectedReceived.meta.messageCount} messages from ${selectedReceived.meta.sourcePlatform}`
-      );
-    }
-    setIsReviewOpen(false);
-    setSelectedReceived(null);
-  }
 
   function handleDownload() {
     if (!selectedReceived) return;
@@ -499,28 +510,45 @@ export function ImportConversationHandler({
         }),
       });
 
-      const result = (await res.json()) as {
-        success: boolean;
-        sessionId?: string;
-        transcriptPath?: string;
-        messageCount?: number;
-        error?: string;
-      };
+      const result = await parseImportResponse(res);
+      if (!result) return;
 
-      if (result.success) {
-        toast.success(
-          `Created Claude Code session: ${result.sessionId}\nPath: ${result.transcriptPath}`,
-          { duration: 8000 }
-        );
-      } else {
+      if (!result.success) {
         toast.error(result.error ?? 'Import failed');
+        return;
       }
+
+      // Track conversation import in CRDT
+      const newVersion: ConversationVersion = {
+        versionId: crypto.randomUUID(),
+        creator: identity?.username || 'anonymous',
+        platform: (selectedReceived.meta.sourcePlatform || 'unknown') as OriginPlatform,
+        sessionId: selectedReceived.meta.sourceSessionId,
+        messageCount: selectedReceived.meta.messageCount,
+        createdAt: Date.now(),
+      };
+      addConversationVersion(ydoc, newVersion);
+
+      // Log activity event
+      logPlanEvent(ydoc, 'conversation_imported', identity?.username || 'anonymous', {
+        sourcePlatform: selectedReceived.meta.sourcePlatform,
+        messageCount: selectedReceived.meta.messageCount,
+        sourceSessionId: selectedReceived.meta.sourceSessionId.slice(0, 8),
+      });
+
+      toast.success(
+        `Created Claude Code session: ${result.sessionId}\nPath: ${result.transcriptPath}`,
+        { duration: 8000 }
+      );
+
+      setIsReviewOpen(false);
+      setSelectedReceived(null);
     } catch {
-      toast.error('Registry server not reachable. Download file instead.');
+      toast.error('Registry server not available. Download file instead.');
     } finally {
       setIsImporting(false);
     }
-  }, [selectedReceived]);
+  }, [selectedReceived, ydoc, identity?.username]);
 
   function handleClose() {
     setIsReviewOpen(false);
@@ -536,7 +564,6 @@ export function ImportConversationHandler({
       isOpen={isReviewOpen}
       onClose={handleClose}
       received={selectedReceived}
-      onConfirm={handleConfirm}
       onDownload={handleDownload}
       onImportToClaudeCode={handleImportToClaudeCode}
       isImporting={isImporting}

@@ -131,6 +131,8 @@ export const PlanEventTypes = [
   'approved',
   'changes_requested',
   'completed',
+  'conversation_imported',
+  'conversation_handed_off',
 ] as const;
 export type PlanEventType = (typeof PlanEventTypes)[number];
 

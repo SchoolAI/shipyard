@@ -712,13 +712,23 @@ function createApp(): { app: express.Express; httpServer: http.Server } {
   const app = express();
   const httpServer = http.createServer(app);
 
-  app.use(express.json());
+  // CORS headers FIRST - apply to ALL responses including errors
+  // This MUST come before body-parser so error responses (like 413) get CORS headers
   app.use((_req, res, next) => {
     res.header('Access-Control-Allow-Origin', '*');
     res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
     res.header('Access-Control-Allow-Headers', 'Content-Type');
     next();
   });
+
+  // Handle OPTIONS preflight requests
+  // Note: Express 5 uses path-to-regexp v8 which requires named wildcards
+  app.options('{*splat}', (_req, res) => {
+    res.sendStatus(204);
+  });
+
+  // Body parser AFTER CORS - 10mb limit for large conversation imports
+  app.use(express.json({ limit: '10mb' }));
 
   // Health check endpoint - used by browser and hook to discover if server is running
   app.get('/registry', handleHealthCheck);

@@ -1,5 +1,5 @@
 import { Avatar, Button, Card, Modal, Spinner } from '@heroui/react';
-import { getConversationVersions, markVersionHandedOff } from '@peer-plan/schema';
+import { getConversationVersions, logPlanEvent, markVersionHandedOff } from '@peer-plan/schema';
 import { Download, Send, Upload, Users, X } from 'lucide-react';
 import type React from 'react';
 import { useEffect, useRef, useState } from 'react';
@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import type { WebrtcProvider } from 'y-webrtc';
 import type * as Y from 'yjs';
 import { useConversationTransfer } from '@/hooks/useConversationTransfer';
+import { useGitHubAuth } from '@/hooks/useGitHubAuth';
 import { type ConnectedPeer, useP2PPeers } from '@/hooks/useP2PPeers';
 
 // Avatar compound components have type issues in HeroUI v3 beta
@@ -177,6 +178,7 @@ export function HandoffConversationDialog({
     ydoc,
     rtcProvider
   );
+  const { identity } = useGitHubAuth();
   const [_selectedPeer, setSelectedPeer] = useState<ConnectedPeer | null>(null);
 
   const [transcriptContent, setTranscriptContent] = useState<string | null>(null);
@@ -297,6 +299,11 @@ export function HandoffConversationDialog({
           if (myVersion) {
             markVersionHandedOff(ydoc, myVersion.versionId, peer.name);
           }
+
+          logPlanEvent(ydoc, 'conversation_handed_off', identity?.username || 'anonymous', {
+            handedOffTo: peer.name,
+            messageCount: a2aMessages.length,
+          });
 
           toast.success(`Handed off ${a2aMessages.length} messages to ${peer.name}`);
           onClose();

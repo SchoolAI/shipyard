@@ -1,8 +1,10 @@
 import type { PlanEvent, PlanEventType } from '@peer-plan/schema';
 import {
   AlertTriangle,
+  ArrowRightLeft,
   Check,
   CheckCircle,
+  Download,
   FileEdit,
   GitPullRequest,
   Link as LinkIcon,
@@ -41,6 +43,10 @@ function getEventIcon(type: PlanEventType): ReactNode {
       return <AlertTriangle className="w-3.5 h-3.5 text-danger" />;
     case 'completed':
       return <CheckCircle className="w-3.5 h-3.5 text-success" />;
+    case 'conversation_imported':
+      return <Download className="w-3.5 h-3.5 text-accent" />;
+    case 'conversation_handed_off':
+      return <ArrowRightLeft className="w-3.5 h-3.5 text-accent" />;
     default: {
       const exhaustive: never = type;
       throw new Error(`Unhandled event type: ${exhaustive}`);
@@ -77,6 +83,16 @@ function getEventDescription(event: PlanEvent): string {
       return 'requested changes';
     case 'completed':
       return 'marked the plan as completed';
+    case 'conversation_imported': {
+      const platform = event.data?.sourcePlatform ?? 'unknown';
+      const count = event.data?.messageCount ?? 0;
+      return `imported conversation from ${platform} (${count} messages)`;
+    }
+    case 'conversation_handed_off': {
+      const handedOffTo = event.data?.handedOffTo ?? 'peer';
+      const count = event.data?.messageCount ?? 0;
+      return `handed off conversation to ${handedOffTo} (${count} messages)`;
+    }
     default: {
       const exhaustive: never = event.type;
       throw new Error(`Unhandled event type: ${exhaustive}`);
