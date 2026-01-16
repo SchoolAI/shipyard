@@ -143,12 +143,7 @@ export function PlanPeekModal({ plan, isOpen, onClose }: PlanPeekModalProps) {
   const totalCount = peekData.deliverables.length;
 
   return (
-    <Modal.Backdrop
-      isOpen={isOpen}
-      onOpenChange={(open) => !open && onClose()}
-      variant="blur"
-      isDismissable
-    >
+    <Modal.Backdrop isOpen={isOpen} onOpenChange={(open) => !open && onClose()} isDismissable>
       <Modal.Container placement="center" size="md">
         <Modal.Dialog className="sm:max-w-[480px]">
           {/* Custom close button */}
