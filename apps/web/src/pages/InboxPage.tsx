@@ -386,8 +386,15 @@ export function InboxPage() {
 
       planDoc.transact(() => {
         const metadata = planDoc.getMap('metadata');
+        const reviewRequestId = metadata.get('reviewRequestId') as string | undefined;
+
         metadata.set('status', 'in_progress');
         metadata.set('updatedAt', now);
+
+        // Preserve reviewRequestId if present (hook needs this to match)
+        if (reviewRequestId !== undefined) {
+          metadata.set('reviewRequestId', reviewRequestId);
+        }
       });
 
       idb.destroy();
@@ -423,8 +430,15 @@ export function InboxPage() {
 
     panelYdoc.transact(() => {
       const metadata = panelYdoc.getMap('metadata');
+      const reviewRequestId = metadata.get('reviewRequestId') as string | undefined;
+
       metadata.set('status', 'in_progress');
       metadata.set('updatedAt', now);
+
+      // Preserve reviewRequestId if present (hook needs this to match)
+      if (reviewRequestId !== undefined) {
+        metadata.set('reviewRequestId', reviewRequestId);
+      }
     });
 
     // Also update index with the same timestamp

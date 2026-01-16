@@ -78,10 +78,17 @@ export function ReviewActions({
       // Update Y.Doc - hook observes this for distributed approval
       ydoc.transact(() => {
         const metadata = ydoc.getMap('metadata');
+        const reviewRequestId = metadata.get('reviewRequestId') as string | undefined;
+
         metadata.set('status', newStatus);
         metadata.set('reviewedAt', now);
         metadata.set('reviewedBy', identity.name);
         metadata.set('updatedAt', now);
+
+        // Preserve reviewRequestId if present (hook needs this to match)
+        if (reviewRequestId !== undefined) {
+          metadata.set('reviewRequestId', reviewRequestId);
+        }
 
         // Set or clear reviewComment
         if (trimmedComment) {

@@ -180,10 +180,17 @@ export function DeliverablesView({
     // Update Y.Doc to mark as completed
     ydoc.transact(() => {
       const metadataMap = ydoc.getMap('metadata');
+      const reviewRequestId = metadataMap.get('reviewRequestId') as string | undefined;
+
       metadataMap.set('status', 'completed');
       metadataMap.set('completedAt', Date.now());
       metadataMap.set('completedBy', identity.name);
       metadataMap.set('updatedAt', Date.now());
+
+      // Preserve reviewRequestId if present (hook needs this to match)
+      if (reviewRequestId !== undefined) {
+        metadataMap.set('reviewRequestId', reviewRequestId);
+      }
     });
   };
 

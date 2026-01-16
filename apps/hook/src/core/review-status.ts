@@ -143,6 +143,10 @@ async function waitForReviewDecision(
       if (isSynced && !syncComplete) {
         logger.info({ planId, reviewRequestId }, 'Y.Doc synced, setting review request ID');
 
+        // Mark sync as complete BEFORE transaction to prevent race condition
+        // where browser updates status between transaction commit and flag set
+        syncComplete = true;
+
         // Set unique review request ID and reset status
         // This prevents using stale approve/deny from previous review cycle
         ydoc.transact(() => {
@@ -151,10 +155,14 @@ async function waitForReviewDecision(
           metadata.set('updatedAt', Date.now());
         });
 
-        // Mark sync as complete so checkStatus can now process changes
-        syncComplete = true;
-
         logger.info({ planId, reviewRequestId }, 'Review request ID set, waiting for decision');
+
+        // Check status immediately in case browser already updated before observer registered
+        checkStatus();
+      } else if (isSynced && syncComplete) {
+        // Reconnection after disconnect - check status again
+        logger.info({ planId }, 'Reconnected, checking current status');
+        checkStatus();
       }
     });
 
@@ -185,9 +193,44 @@ async function waitForReviewDecision(
       logger.error({ planId, event }, 'WebSocket connection error');
     });
 
+    // Track reconnection attempts
+    let reconnectAttempts = 0;
+    const MAX_RECONNECT_ATTEMPTS = 5;
+
+    const validateReconnection = () => {
+      if (!resolved && !provider.wsconnected) {
+        logger.error({ planId, attempts: reconnectAttempts }, 'Reconnection failed');
+        if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+          cleanup();
+          resolve({
+            approved: false,
+            feedback: 'Connection lost and could not reconnect. Please try again.',
+          });
+        }
+      } else if (!resolved && provider.wsconnected) {
+        // Reconnection successful, reset attempt counter
+        logger.info({ planId, attempt: reconnectAttempts }, 'Reconnection successful');
+        reconnectAttempts = 0;
+      }
+    };
+
     provider.on('connection-close', (event: CloseEvent | null) => {
-      if (!resolved) {
-        logger.warn({ planId, code: event?.code }, 'WebSocket connection closed unexpectedly');
+      if (!resolved && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+        reconnectAttempts++;
+        logger.warn(
+          { planId, code: event?.code, attempt: reconnectAttempts },
+          'WebSocket closed, attempting reconnect'
+        );
+
+        // y-websocket will auto-reconnect, validate it worked
+        setTimeout(validateReconnection, 5000);
+      } else if (!resolved) {
+        logger.error({ planId }, 'Max reconnection attempts reached, aborting');
+        cleanup();
+        resolve({
+          approved: false,
+          feedback: 'Connection lost after multiple reconnection attempts.',
+        });
       }
     });
   });
