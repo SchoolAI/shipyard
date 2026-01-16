@@ -1,26 +1,20 @@
 /**
  * HTTP client for communicating with the peer-plan registry server.
+ * Uses tRPC for type-safe RPC calls.
  */
 
-import {
-  type CreateHookSessionRequest,
-  CreateHookSessionRequestSchema,
-  type CreateHookSessionResponse,
-  CreateHookSessionResponseSchema,
-  type GetReviewStatusResponse,
-  GetReviewStatusResponseSchema,
-  type UpdatePlanContentRequest,
-  UpdatePlanContentRequestSchema,
-  type UpdatePlanContentResponse,
-  UpdatePlanContentResponseSchema,
-  type UpdatePresenceRequest,
-  UpdatePresenceRequestSchema,
-  type UpdatePresenceResponse,
-  UpdatePresenceResponseSchema,
+import type {
+  CreateHookSessionRequest,
+  CreateHookSessionResponse,
+  GetReviewStatusResponse,
+  UpdatePlanContentRequest,
+  UpdatePlanContentResponse,
+  UpdatePresenceRequest,
+  UpdatePresenceResponse,
 } from '@peer-plan/schema';
 import { registryConfig } from './config/env/registry.js';
-import { REQUEST_TIMEOUT_MS } from './constants.js';
 import { logger } from './logger.js';
+import { getTRPCClient } from './trpc-client.js';
 
 /**
  * Get the registry server base URL.
@@ -81,23 +75,8 @@ export async function createSession(
     throw new Error('Registry server not available');
   }
 
-  // Validate request
-  CreateHookSessionRequestSchema.parse(request);
-
-  const res = await fetch(`${baseUrl}/api/hook/session`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(request),
-    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-  });
-
-  if (!res.ok) {
-    const error = await res.text();
-    throw new Error(`Failed to create session: ${res.status} ${error}`);
-  }
-
-  const data = await res.json();
-  return CreateHookSessionResponseSchema.parse(data);
+  const trpc = getTRPCClient(baseUrl);
+  return trpc.hook.createSession.mutate(request);
 }
 
 /**
@@ -112,23 +91,8 @@ export async function updatePlanContent(
     throw new Error('Registry server not available');
   }
 
-  // Validate request
-  UpdatePlanContentRequestSchema.parse(request);
-
-  const res = await fetch(`${baseUrl}/api/hook/plan/${encodeURIComponent(planId)}/content`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(request),
-    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-  });
-
-  if (!res.ok) {
-    const error = await res.text();
-    throw new Error(`Failed to update plan content: ${res.status} ${error}`);
-  }
-
-  const data = await res.json();
-  return UpdatePlanContentResponseSchema.parse(data);
+  const trpc = getTRPCClient(baseUrl);
+  return trpc.hook.updateContent.mutate({ planId, ...request });
 }
 
 /**
@@ -140,18 +104,8 @@ export async function getReviewStatus(planId: string): Promise<GetReviewStatusRe
     throw new Error('Registry server not available');
   }
 
-  const res = await fetch(`${baseUrl}/api/hook/plan/${encodeURIComponent(planId)}/review`, {
-    method: 'GET',
-    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-  });
-
-  if (!res.ok) {
-    const error = await res.text();
-    throw new Error(`Failed to get review status: ${res.status} ${error}`);
-  }
-
-  const data = await res.json();
-  return GetReviewStatusResponseSchema.parse(data);
+  const trpc = getTRPCClient(baseUrl);
+  return trpc.hook.getReviewStatus.query({ planId });
 }
 
 /**
@@ -166,23 +120,8 @@ export async function updatePresence(
     throw new Error('Registry server not available');
   }
 
-  // Validate request
-  UpdatePresenceRequestSchema.parse(request);
-
-  const res = await fetch(`${baseUrl}/api/hook/plan/${encodeURIComponent(planId)}/presence`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(request),
-    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-  });
-
-  if (!res.ok) {
-    const error = await res.text();
-    throw new Error(`Failed to update presence: ${res.status} ${error}`);
-  }
-
-  const data = await res.json();
-  return UpdatePresenceResponseSchema.parse(data);
+  const trpc = getTRPCClient(baseUrl);
+  return trpc.hook.updatePresence.mutate({ planId, ...request });
 }
 
 /**
@@ -198,42 +137,6 @@ export async function setSessionToken(
     throw new Error('Registry server not available');
   }
 
-  const res = await fetch(`${baseUrl}/api/hook/plan/${encodeURIComponent(planId)}/session-token`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ sessionTokenHash }),
-    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-  });
-
-  if (!res.ok) {
-    const error = await res.text();
-    throw new Error(`Failed to set session token: ${res.status} ${error}`);
-  }
-
-  const data = (await res.json()) as { url: string };
-  return data;
-}
-
-/**
- * Clear agent presence.
- */
-export async function clearPresence(planId: string, sessionId: string): Promise<void> {
-  const baseUrl = await getRegistryUrl();
-  if (!baseUrl) {
-    logger.warn('Registry server not available, skipping presence clear');
-    return;
-  }
-
-  try {
-    await fetch(
-      `${baseUrl}/api/hook/plan/${encodeURIComponent(planId)}/presence?sessionId=${encodeURIComponent(sessionId)}`,
-      {
-        method: 'DELETE',
-        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-      }
-    );
-  } catch (err) {
-    // Non-critical, just log
-    logger.warn({ err, planId, sessionId }, 'Failed to clear presence');
-  }
+  const trpc = getTRPCClient(baseUrl);
+  return trpc.hook.setSessionToken.mutate({ planId, sessionTokenHash });
 }

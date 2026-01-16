@@ -197,6 +197,53 @@ export {
 } from './thread.js';
 export type { FormatThreadsOptions } from './thread-formatter.js';
 export { formatThreadsForLLM } from './thread-formatter.js';
+export type {
+  AppRouter,
+  Change,
+  ChangesResponse,
+  ChangeType,
+  Context,
+  ConversationContext,
+  ConversationHandlers,
+  CreateContextFn,
+  DeleteSubscriptionResponse,
+  HasConnectionsResponse,
+  HookContext,
+  HookHandlers,
+  ImportConversationRequest,
+  ImportConversationResponse,
+  Logger,
+  PlanIdInput,
+  PlanStatusResponse,
+  PlanStore,
+  SetSessionTokenRequest,
+  SetSessionTokenResponse,
+  SubscriptionClientIdInput,
+  SubscriptionCreateParams,
+} from './trpc/index.js';
+// tRPC router and types - Issue #XX
+export {
+  appRouter,
+  ChangeSchema,
+  ChangesResponseSchema,
+  ChangeTypeSchema,
+  conversationRouter,
+  DeleteSubscriptionResponseSchema,
+  HasConnectionsResponseSchema,
+  hookRouter,
+  ImportConversationRequestSchema,
+  ImportConversationResponseSchema,
+  middleware,
+  PlanIdSchema,
+  PlanStatusResponseSchema,
+  planRouter,
+  publicProcedure,
+  router,
+  SetSessionTokenRequestSchema,
+  SetSessionTokenResponseSchema,
+  SubscriptionClientIdSchema,
+  subscriptionRouter,
+} from './trpc/index.js';
 export type { UrlEncodedPlan } from './url-encoding.js';
 export {
   createPlanUrl,

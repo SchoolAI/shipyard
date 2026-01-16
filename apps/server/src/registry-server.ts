@@ -1,36 +1,23 @@
 import { mkdirSync, readFileSync, unlinkSync } from 'node:fs';
-import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
+import { readFile, unlink, writeFile } from 'node:fs/promises';
 import http from 'node:http';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
-import {
-  type A2AMessage,
-  a2aToClaudeCode,
-  type ConversationExportMeta,
-  CreateSubscriptionRequestSchema,
-  formatAsClaudeCodeJSONL,
-  getPlanMetadata,
-} from '@peer-plan/schema';
+import { appRouter, type Context, getPlanMetadata, type PlanStore } from '@peer-plan/schema';
+import { createExpressMiddleware } from '@trpc/server/adapters/express';
 import express, { type Request, type Response } from 'express';
 import * as decoding from 'lib0/decoding';
 import * as encoding from 'lib0/encoding';
-import { nanoid } from 'nanoid';
 import { type WebSocket, WebSocketServer } from 'ws';
 import { LeveldbPersistence } from 'y-leveldb';
 import * as awarenessProtocol from 'y-protocols/awareness';
 import * as syncProtocol from 'y-protocols/sync';
 import * as Y from 'yjs';
 import { registryConfig } from './config/env/registry.js';
+import { createConversationHandlers } from './conversation-handlers.js';
 import { getOctokit, parseRepoString } from './github-artifacts.js';
-import {
-  handleClearPresence,
-  handleCreateSession,
-  handleGetReview,
-  handleSetSessionToken,
-  handleUpdateContent,
-  handleUpdatePresence,
-} from './hook-api.js';
+import { createHookHandlers } from './hook-handlers.js';
 import { logger } from './logger.js';
 import {
   attachObservers,
@@ -397,106 +384,6 @@ async function handleHealthCheck(_req: Request, res: Response): Promise<void> {
   res.json({ status: 'ok' });
 }
 
-async function handlePlanStatus(req: Request, res: Response): Promise<void> {
-  const planId = req.params.id;
-  if (!planId) {
-    res.status(400).type('text/plain').send('missing_id');
-    return;
-  }
-
-  try {
-    const doc = await getOrCreateDoc(planId);
-    const metadata = getPlanMetadata(doc);
-
-    if (!metadata) {
-      res.status(404).type('text/plain').send('not_found');
-      return;
-    }
-
-    res.type('text/plain').send(metadata.status);
-  } catch (err) {
-    logger.error({ err, planId }, 'Failed to get plan status');
-    res.status(500).type('text/plain').send('error');
-  }
-}
-
-async function handleHasConnections(req: Request, res: Response): Promise<void> {
-  const planId = req.params.id;
-  if (!planId) {
-    res.status(400).json({ error: 'Missing plan ID' });
-    return;
-  }
-
-  const has = hasActiveConnections(planId);
-  res.json({ hasConnections: has });
-}
-
-async function handleSubscribe(req: Request, res: Response): Promise<void> {
-  const planId = req.params.id;
-  if (!planId) {
-    res.status(400).json({ error: 'Missing plan ID' });
-    return;
-  }
-
-  try {
-    const input = CreateSubscriptionRequestSchema.parse(req.body);
-
-    const clientId = createSubscription({
-      planId,
-      subscribe: (input.subscribe || ['status']) as ChangeType[],
-      windowMs: input.windowMs ?? 5000,
-      maxWindowMs: input.maxWindowMs ?? 30000,
-      threshold: input.threshold ?? 1,
-    });
-
-    res.json({ clientId });
-  } catch (err) {
-    logger.error({ err, planId }, 'Failed to create subscription');
-    res.status(400).json({ error: 'Invalid request body' });
-  }
-}
-
-async function handleGetChanges(req: Request, res: Response): Promise<void> {
-  const planId = req.params.id;
-  if (!planId) {
-    res.status(400).json({ error: 'Missing plan ID' });
-    return;
-  }
-
-  const clientId = req.query.clientId as string | undefined;
-
-  if (!clientId) {
-    res.status(400).json({ error: 'Missing clientId' });
-    return;
-  }
-
-  const result = getChanges(planId, clientId);
-  if (!result) {
-    res.status(404).json({ error: 'Subscription not found' });
-    return;
-  }
-
-  res.json(result);
-}
-
-async function handleUnsubscribe(req: Request, res: Response): Promise<void> {
-  const planId = req.params.id;
-  if (!planId) {
-    res.status(400).json({ error: 'Missing plan ID' });
-    return;
-  }
-
-  const clientId = req.query.clientId as string | undefined;
-
-  if (!clientId) {
-    res.status(400).json({ error: 'Missing clientId' });
-    return;
-  }
-
-  const deleted = deleteSubscription(planId, clientId);
-  res.json({ success: deleted });
-}
-
 async function handleGetPRDiff(req: Request, res: Response): Promise<void> {
   const { id: planId, prNumber } = req.params;
 
@@ -591,70 +478,6 @@ async function handleGetPRFiles(req: Request, res: Response): Promise<void> {
   }
 }
 
-async function handleImportConversation(req: Request, res: Response): Promise<void> {
-  try {
-    const body = req.body as {
-      a2aMessages?: A2AMessage[];
-      meta?: ConversationExportMeta;
-    };
-
-    const { a2aMessages, meta } = body;
-
-    if (!a2aMessages || !Array.isArray(a2aMessages)) {
-      res.status(400).json({
-        success: false,
-        error: 'Missing or invalid a2aMessages',
-      });
-      return;
-    }
-
-    if (a2aMessages.length === 0) {
-      res.status(400).json({
-        success: false,
-        error: 'a2aMessages array is empty',
-      });
-      return;
-    }
-
-    const sessionId = nanoid();
-    const claudeMessages = a2aToClaudeCode(a2aMessages, sessionId);
-    const jsonl = formatAsClaudeCodeJSONL(claudeMessages);
-
-    const projectName = meta?.planId
-      ? `peer-plan-${meta.planId.slice(0, 8)}`
-      : process.cwd().split('/').pop() || 'peer-plan';
-
-    const projectPath = join(homedir(), '.claude', 'projects', projectName);
-    await mkdir(projectPath, { recursive: true });
-    const transcriptPath = join(projectPath, `${sessionId}.jsonl`);
-
-    await writeFile(transcriptPath, jsonl, 'utf-8');
-
-    logger.info(
-      {
-        sessionId,
-        transcriptPath,
-        messageCount: claudeMessages.length,
-        sourcePlatform: meta?.sourcePlatform,
-      },
-      'Created Claude Code session from imported conversation'
-    );
-
-    res.json({
-      success: true,
-      sessionId,
-      transcriptPath,
-      messageCount: claudeMessages.length,
-    });
-  } catch (error) {
-    logger.error({ error }, 'Failed to import conversation');
-    res.status(500).json({
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
-    });
-  }
-}
-
 async function handleGetTranscript(req: Request, res: Response): Promise<void> {
   const planId = req.params.id;
   if (!planId) {
@@ -695,18 +518,55 @@ async function handleGetTranscript(req: Request, res: Response): Promise<void> {
   }
 }
 
+// --- tRPC Context Factory ---
+
 /**
- * Creates the Express app with all HTTP routes.
+ * Creates the plan store adapter for tRPC context.
+ * Wraps the subscription manager functions.
+ */
+function createPlanStore(): PlanStore {
+  return {
+    createSubscription: (params) =>
+      createSubscription({
+        planId: params.planId,
+        subscribe: params.subscribe as ChangeType[],
+        windowMs: params.windowMs,
+        maxWindowMs: params.maxWindowMs,
+        threshold: params.threshold,
+      }),
+    getChanges: (planId, clientId) => getChanges(planId, clientId),
+    deleteSubscription: (planId, clientId) => deleteSubscription(planId, clientId),
+    hasActiveConnections: async (planId) => hasActiveConnections(planId),
+  };
+}
+
+/**
+ * Creates tRPC context for each request.
+ * Provides dependencies to all tRPC procedures.
+ */
+function createContext(): Context & {
+  hookHandlers: ReturnType<typeof createHookHandlers>;
+  conversationHandlers: ReturnType<typeof createConversationHandlers>;
+} {
+  return {
+    getOrCreateDoc,
+    getPlanStore: createPlanStore,
+    logger,
+    hookHandlers: createHookHandlers(),
+    conversationHandlers: createConversationHandlers(),
+  };
+}
+
+/**
+ * Creates the Express app with tRPC middleware and remaining HTTP routes.
  *
- * Architecture note: Routes are intentionally grouped by domain (plan, hook, conversation).
- * Hook handlers are already factored out to hook-api.ts. Further splitting would scatter
- * related routes across files without meaningful benefit. The current structure:
- * - Plan API: status, connections, subscriptions, PR diff/files
- * - Hook API: session, content, review, presence (handlers in hook-api.ts)
- * - Conversation API: import
- *
- * Express Router could organize routes, but wouldn't reduce actual complexity.
- * If this file grows significantly, consider extracting plan-api.ts handlers.
+ * Architecture note: Most routes are now handled by tRPC at /trpc.
+ * Remaining Express routes:
+ * - /registry: Health check
+ * - /api/plan/:id/transcript: Returns raw text file (not JSON)
+ * - /api/plans/:id/pr-diff/:prNumber: Returns raw diff text
+ * - /api/plans/:id/pr-files/:prNumber: PR file listing
+ * - WebSocket: Yjs sync protocol
  */
 function createApp(): { app: express.Express; httpServer: http.Server } {
   const app = express();
@@ -730,27 +590,22 @@ function createApp(): { app: express.Express; httpServer: http.Server } {
   // Body parser AFTER CORS - 10mb limit for large conversation imports
   app.use(express.json({ limit: '10mb' }));
 
+  // tRPC middleware - handles all migrated routes
+  app.use(
+    '/trpc',
+    createExpressMiddleware({
+      router: appRouter,
+      createContext,
+    })
+  );
+
   // Health check endpoint - used by browser and hook to discover if server is running
   app.get('/registry', handleHealthCheck);
 
-  app.get('/api/plan/:id/status', handlePlanStatus);
-  app.get('/api/plan/:id/has-connections', handleHasConnections);
+  // Remaining Express routes (non-JSON responses or special handling)
   app.get('/api/plan/:id/transcript', handleGetTranscript);
-  app.post('/api/plan/:id/subscribe', handleSubscribe);
-  app.get('/api/plan/:id/changes', handleGetChanges);
-  app.delete('/api/plan/:id/unsubscribe', handleUnsubscribe);
-
   app.get('/api/plans/:id/pr-diff/:prNumber', handleGetPRDiff);
   app.get('/api/plans/:id/pr-files/:prNumber', handleGetPRFiles);
-
-  app.post('/api/hook/session', handleCreateSession);
-  app.put('/api/hook/plan/:id/content', handleUpdateContent);
-  app.get('/api/hook/plan/:id/review', handleGetReview);
-  app.post('/api/hook/plan/:id/session-token', handleSetSessionToken);
-  app.post('/api/hook/plan/:id/presence', handleUpdatePresence);
-  app.delete('/api/hook/plan/:id/presence', handleClearPresence);
-
-  app.post('/api/conversation/import', handleImportConversation);
 
   return { app, httpServer };
 }
@@ -790,7 +645,7 @@ export async function startRegistryServer(): Promise<number | null> {
         httpServer.listen(port, '127.0.0.1', () => {
           logger.info(
             { port, persistence: PERSISTENCE_DIR },
-            'Registry server started with WebSocket support'
+            'Registry server started with WebSocket and tRPC support'
           );
           startCleanupInterval();
           resolve();
