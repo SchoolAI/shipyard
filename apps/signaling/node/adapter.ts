@@ -10,7 +10,7 @@
  * Logging: Uses pino logger
  */
 
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import type { InviteRedemption, InviteToken } from '@peer-plan/schema';
 import { nanoid } from 'nanoid';
 import type { WebSocket } from 'ws';
@@ -33,8 +33,8 @@ export class NodePlatformAdapter implements PlatformAdapter {
 	private planApprovals = new Map<string, PlanApprovalState>();
 
 	/**
-	 * Invite tokens storage (tokenId -> token).
-	 * Note: Different from original which used "planId:tokenId" keys.
+	 * Invite tokens storage (planId:tokenId -> token).
+	 * Uses composite key for efficient per-plan lookups.
 	 */
 	private inviteTokens = new Map<string, InviteToken>();
 
@@ -70,24 +70,40 @@ export class NodePlatformAdapter implements PlatformAdapter {
 		this.planApprovals.set(planId, state);
 	}
 
-	async getInviteToken(tokenId: string): Promise<InviteToken | undefined> {
-		return this.inviteTokens.get(tokenId);
+	async getInviteToken(planId: string, tokenId: string): Promise<InviteToken | undefined> {
+		const key = `${planId}:${tokenId}`;
+		return this.inviteTokens.get(key);
 	}
 
-	async setInviteToken(tokenId: string, token: InviteToken): Promise<void> {
-		this.inviteTokens.set(tokenId, token);
+	async setInviteToken(planId: string, tokenId: string, token: InviteToken): Promise<void> {
+		const key = `${planId}:${tokenId}`;
+		this.inviteTokens.set(key, token);
 	}
 
-	async deleteInviteToken(tokenId: string): Promise<void> {
-		this.inviteTokens.delete(tokenId);
+	async deleteInviteToken(planId: string, tokenId: string): Promise<void> {
+		const key = `${planId}:${tokenId}`;
+		this.inviteTokens.delete(key);
 	}
 
 	async listInviteTokens(planId: string): Promise<InviteToken[]> {
 		const tokens: InviteToken[] = [];
-		for (const token of this.inviteTokens.values()) {
-			if (token.planId === planId) {
-				tokens.push(token);
-			}
+		const now = Date.now();
+		const prefix = `${planId}:`;
+
+		for (const [key, token] of this.inviteTokens.entries()) {
+			// Only include tokens for this plan
+			if (!key.startsWith(prefix)) continue;
+
+			// Filter out expired tokens
+			if (token.expiresAt < now) continue;
+
+			// Filter out revoked tokens
+			if (token.revoked) continue;
+
+			// Filter out exhausted tokens (all uses consumed)
+			if (token.maxUses !== null && token.useCount >= token.maxUses) continue;
+
+			tokens.push(token);
 		}
 		return tokens;
 	}
@@ -133,7 +149,22 @@ export class NodePlatformAdapter implements PlatformAdapter {
 
 	async verifyTokenHash(value: string, hash: string): Promise<boolean> {
 		const computedHash = createHash('sha256').update(value).digest('hex');
-		return computedHash === hash;
+
+		// Use constant-time comparison to prevent timing attacks
+		try {
+			const computedHashBuffer = Buffer.from(computedHash, 'hex');
+			const hashBuffer = Buffer.from(hash, 'hex');
+
+			// timingSafeEqual throws if lengths don't match
+			if (computedHashBuffer.length !== hashBuffer.length) {
+				return false;
+			}
+
+			return timingSafeEqual(computedHashBuffer, hashBuffer);
+		} catch {
+			// Invalid hex or other error - reject the token
+			return false;
+		}
 	}
 
 	// --- WebSocket Operations ---
@@ -265,5 +296,94 @@ export class NodePlatformAdapter implements PlatformAdapter {
 		} else {
 			logger.debug(message);
 		}
+	}
+
+	// --- Cleanup Methods ---
+	// These should be called periodically by the server to prevent memory leaks.
+
+	/**
+	 * Remove expired invite tokens from storage.
+	 * Returns the number of tokens removed.
+	 */
+	cleanupExpiredTokens(): number {
+		const now = Date.now();
+		let removed = 0;
+
+		for (const [key, token] of this.inviteTokens.entries()) {
+			if (token.expiresAt < now) {
+				this.inviteTokens.delete(key);
+				removed++;
+			}
+		}
+
+		if (removed > 0) {
+			this.info('Cleaned up expired tokens', { count: removed });
+		}
+
+		return removed;
+	}
+
+	/**
+	 * Remove old redemption records.
+	 * Keeps redemptions for a configurable period (default 30 days).
+	 * Returns the number of redemptions removed.
+	 */
+	cleanupOldRedemptions(maxAgeMs: number = 30 * 24 * 60 * 60 * 1000): number {
+		const cutoff = Date.now() - maxAgeMs;
+		let removed = 0;
+
+		for (const [key, redemption] of this.redemptions.entries()) {
+			if (redemption.redeemedAt < cutoff) {
+				this.redemptions.delete(key);
+				removed++;
+			}
+		}
+
+		if (removed > 0) {
+			this.info('Cleaned up old redemptions', { count: removed });
+		}
+
+		return removed;
+	}
+
+	/**
+	 * Remove stale approval states (plans with no recent activity).
+	 * Plans without active subscribers and older than maxAge are removed.
+	 * Returns the number of approvals removed.
+	 */
+	cleanupStaleApprovals(maxAgeMs: number = 7 * 24 * 60 * 60 * 1000): number {
+		const cutoff = Date.now() - maxAgeMs;
+		let removed = 0;
+
+		for (const [planId, state] of this.planApprovals.entries()) {
+			// Check if plan has any active subscribers
+			const topic = planId;
+			const subscribers = this.topics.get(topic);
+			const hasActiveSubscribers = subscribers && subscribers.size > 0;
+
+			// Only remove if no active subscribers and state is old
+			if (!hasActiveSubscribers && state.lastUpdated < cutoff) {
+				this.planApprovals.delete(planId);
+				removed++;
+			}
+		}
+
+		if (removed > 0) {
+			this.info('Cleaned up stale approvals', { count: removed });
+		}
+
+		return removed;
+	}
+
+	/**
+	 * Run all cleanup tasks.
+	 * Returns object with counts of items removed.
+	 */
+	runCleanup(): { tokens: number; redemptions: number; approvals: number } {
+		return {
+			tokens: this.cleanupExpiredTokens(),
+			redemptions: this.cleanupOldRedemptions(),
+			approvals: this.cleanupStaleApprovals(),
+		};
 	}
 }

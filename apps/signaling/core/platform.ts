@@ -35,22 +35,24 @@ export interface PlatformAdapter {
 	setApprovalState(planId: string, state: PlanApprovalState): Promise<void>;
 
 	/**
-	 * Get invite token by token ID.
+	 * Get invite token by plan ID and token ID.
 	 * Returns undefined if token doesn't exist.
+	 * Key format: 'invite:{planId}:{tokenId}'
 	 */
-	getInviteToken(tokenId: string): Promise<InviteToken | undefined>;
+	getInviteToken(planId: string, tokenId: string): Promise<InviteToken | undefined>;
 
 	/**
 	 * Set invite token.
-	 * Key format: 'invite:{tokenId}'
+	 * Key format: 'invite:{planId}:{tokenId}'
 	 */
-	setInviteToken(tokenId: string, token: InviteToken): Promise<void>;
+	setInviteToken(planId: string, tokenId: string, token: InviteToken): Promise<void>;
 
 	/**
 	 * Delete invite token.
 	 * Used when revoking tokens.
+	 * Key format: 'invite:{planId}:{tokenId}'
 	 */
-	deleteInviteToken(tokenId: string): Promise<void>;
+	deleteInviteToken(planId: string, tokenId: string): Promise<void>;
 
 	/**
 	 * List all invite tokens for a plan.
@@ -70,10 +72,12 @@ export interface PlatformAdapter {
 
 	/**
 	 * Set invite redemption.
-	 * Key format: 'redemption:{planId}:{userId}'
+	 * Key format: 'redemption:{planId}:{tokenId}:{userId}'
+	 * Tracks which user redeemed which specific token (allows multiple tokens per user).
 	 */
 	setInviteRedemption(
 		planId: string,
+		tokenId: string,
 		userId: string,
 		redemption: InviteRedemption,
 	): Promise<void>;

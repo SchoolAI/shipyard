@@ -199,9 +199,8 @@ async function handleCreateInvite(
 		label: message.label,
 	};
 
-	// Store the token using combined key format
-	const storageKey = `${message.planId}:${tokenId}`;
-	await platform.setInviteToken(storageKey, token);
+	// Store the token using planId and tokenId
+	await platform.setInviteToken(message.planId, tokenId, token);
 
 	platform.info(
 		'[handleCreateInvite] Created invite token',
@@ -238,9 +237,8 @@ async function handleRedeemInvite(
 	message: RedeemInviteRequest,
 ): Promise<void> {
 	const { planId, tokenId, tokenValue, userId } = message;
-	const storageKey = `${planId}:${tokenId}`;
 
-	const token = await platform.getInviteToken(storageKey);
+	const token = await platform.getInviteToken(planId, tokenId);
 	const error = await validateInviteToken(platform, token, tokenValue);
 
 	if (error) {
@@ -272,7 +270,7 @@ async function handleRedeemInvite(
 
 	// Increment use count
 	validToken.useCount++;
-	await platform.setInviteToken(storageKey, validToken);
+	await platform.setInviteToken(planId, tokenId, validToken);
 
 	// Record redemption (key includes tokenId to allow multiple token redemptions per user)
 	const redemption: InviteRedemption = {
@@ -341,8 +339,7 @@ async function handleRevokeInvite(
 		return;
 	}
 
-	const storageKey = `${message.planId}:${message.tokenId}`;
-	const token = await platform.getInviteToken(storageKey);
+	const token = await platform.getInviteToken(message.planId, message.tokenId);
 
 	if (!token) {
 		const response: InviteRevokedResponse = {
@@ -356,7 +353,7 @@ async function handleRevokeInvite(
 
 	// Mark as revoked
 	token.revoked = true;
-	await platform.setInviteToken(storageKey, token);
+	await platform.setInviteToken(message.planId, message.tokenId, token);
 
 	platform.info(
 		'[handleRevokeInvite] Revoked invite token',

@@ -61,10 +61,17 @@ export class CloudflarePlatformAdapter implements PlatformAdapter {
 
 	/**
 	 * In-memory cache of invite tokens.
-	 * Backed by persistent storage with 'invite:' prefix.
-	 * Key format: tokenId (not planId:tokenId as in original signaling.ts)
+	 * Backed by persistent storage with 'invite:{planId}:{tokenId}' prefix.
+	 * Key format: planId:tokenId for efficient per-plan lookups.
 	 */
 	private inviteTokens = new Map<string, InviteToken>();
+
+	/**
+	 * In-memory cache of invite redemptions.
+	 * Backed by persistent storage with 'redemption:' prefix.
+	 * Key format: planId:tokenId:userId
+	 */
+	private redemptions = new Map<string, InviteRedemption>();
 
 	/**
 	 * Map from topic name to set of subscribed WebSockets.
@@ -80,12 +87,13 @@ export class CloudflarePlatformAdapter implements PlatformAdapter {
 
 	/**
 	 * Initialize the adapter by restoring state from storage.
-	 * Must be called during Durable Object construction.
+	 * Must be called during Durable Object construction using blockConcurrencyWhile().
 	 */
 	async initialize(): Promise<void> {
 		await Promise.all([
 			this.restoreApprovalStateFromStorage(),
 			this.restoreInviteTokensFromStorage(),
+			this.restoreRedemptionsFromStorage(),
 		]);
 		this.restoreTopicsFromHibernation();
 	}
@@ -115,6 +123,7 @@ export class CloudflarePlatformAdapter implements PlatformAdapter {
 	/**
 	 * Restore invite tokens from Durable Object storage.
 	 * Also cleans up expired tokens during restoration.
+	 * Key format in storage: 'invite:{planId}:{tokenId}'
 	 */
 	private async restoreInviteTokensFromStorage(): Promise<void> {
 		try {
@@ -131,8 +140,10 @@ export class CloudflarePlatformAdapter implements PlatformAdapter {
 					expiredCount++;
 					continue;
 				}
-				// Store by tokenId only (strip 'invite:' prefix)
-				this.inviteTokens.set(key.replace('invite:', ''), token);
+				// Store by planId:tokenId (strip 'invite:' prefix)
+				// Key format: 'invite:{planId}:{tokenId}' -> '{planId}:{tokenId}'
+				const cacheKey = key.replace('invite:', '');
+				this.inviteTokens.set(cacheKey, token);
 			}
 
 			logger.info(
@@ -144,6 +155,30 @@ export class CloudflarePlatformAdapter implements PlatformAdapter {
 			);
 		} catch (error) {
 			logger.error({ error }, 'Failed to restore invite tokens');
+		}
+	}
+
+	/**
+	 * Restore redemptions from Durable Object storage into in-memory cache.
+	 */
+	private async restoreRedemptionsFromStorage(): Promise<void> {
+		try {
+			const stored = await this.ctx.storage.list<InviteRedemption>({
+				prefix: 'redemption:',
+			});
+
+			for (const [key, redemption] of stored) {
+				// Store by planId:tokenId:userId (strip 'redemption:' prefix)
+				const cacheKey = key.replace('redemption:', '');
+				this.redemptions.set(cacheKey, redemption);
+			}
+
+			logger.info(
+				{ count: this.redemptions.size },
+				'Restored redemptions from storage'
+			);
+		} catch (error) {
+			logger.error({ error }, 'Failed to restore redemptions');
 		}
 	}
 
@@ -208,48 +243,62 @@ export class CloudflarePlatformAdapter implements PlatformAdapter {
 		await this.ctx.storage.put(`approval:${planId}`, state);
 	}
 
-	async getInviteToken(tokenId: string): Promise<InviteToken | undefined> {
+	async getInviteToken(planId: string, tokenId: string): Promise<InviteToken | undefined> {
+		const cacheKey = `${planId}:${tokenId}`;
+
 		// Check in-memory cache first
-		const cached = this.inviteTokens.get(tokenId);
+		const cached = this.inviteTokens.get(cacheKey);
 		if (cached) return cached;
 
 		// Fall back to storage
-		const stored = await this.ctx.storage.get<InviteToken>(`invite:${tokenId}`);
+		const storageKey = `invite:${cacheKey}`;
+		const stored = await this.ctx.storage.get<InviteToken>(storageKey);
 		if (stored) {
-			this.inviteTokens.set(tokenId, stored);
+			this.inviteTokens.set(cacheKey, stored);
 		}
 		return stored;
 	}
 
-	async setInviteToken(tokenId: string, token: InviteToken): Promise<void> {
+	async setInviteToken(planId: string, tokenId: string, token: InviteToken): Promise<void> {
+		const cacheKey = `${planId}:${tokenId}`;
+
 		// Update in-memory cache
-		this.inviteTokens.set(tokenId, token);
+		this.inviteTokens.set(cacheKey, token);
 
 		// Persist to Durable Object storage
-		await this.ctx.storage.put(`invite:${tokenId}`, token);
+		await this.ctx.storage.put(`invite:${cacheKey}`, token);
 	}
 
-	async deleteInviteToken(tokenId: string): Promise<void> {
+	async deleteInviteToken(planId: string, tokenId: string): Promise<void> {
+		const cacheKey = `${planId}:${tokenId}`;
+
 		// Remove from in-memory cache
-		this.inviteTokens.delete(tokenId);
+		this.inviteTokens.delete(cacheKey);
 
 		// Remove from Durable Object storage
-		await this.ctx.storage.delete(`invite:${tokenId}`);
+		await this.ctx.storage.delete(`invite:${cacheKey}`);
 	}
 
 	async listInviteTokens(planId: string): Promise<InviteToken[]> {
 		const tokens: InviteToken[] = [];
 		const now = Date.now();
+		const prefix = `${planId}:`;
 
 		// Iterate through in-memory cache
-		for (const token of this.inviteTokens.values()) {
-			if (token.planId === planId) {
-				// Skip expired or revoked tokens
-				if (token.revoked || token.expiresAt < now) continue;
-				// Skip exhausted tokens
-				if (token.maxUses !== null && token.useCount >= token.maxUses) continue;
-				tokens.push(token);
-			}
+		for (const [key, token] of this.inviteTokens.entries()) {
+			// Only include tokens for this plan
+			if (!key.startsWith(prefix)) continue;
+
+			// Filter out expired tokens
+			if (token.expiresAt < now) continue;
+
+			// Filter out revoked tokens
+			if (token.revoked) continue;
+
+			// Filter out exhausted tokens (all uses consumed)
+			if (token.maxUses !== null && token.useCount >= token.maxUses) continue;
+
+			tokens.push(token);
 		}
 
 		return tokens;
@@ -260,12 +309,27 @@ export class CloudflarePlatformAdapter implements PlatformAdapter {
 		userId: string
 	): Promise<InviteRedemption | undefined> {
 		// Search for ANY redemption by this user for this plan
-		// Key format in storage: redemption:{planId}:{tokenId}:{userId}
+		// Key format: planId:tokenId:userId
+		const prefix = `${planId}:`;
+
+		// First check in-memory cache
+		for (const [key, redemption] of this.redemptions.entries()) {
+			if (key.startsWith(prefix) && redemption.redeemedBy === userId) {
+				return redemption;
+			}
+		}
+
+		// Fall back to storage if not in cache
+		// This handles edge cases where cache might be incomplete
 		const stored = await this.ctx.storage.list<InviteRedemption>({
 			prefix: `redemption:${planId}:`,
 		});
 
 		for (const [key, redemption] of stored) {
+			// Add to cache for future lookups
+			const cacheKey = key.replace('redemption:', '');
+			this.redemptions.set(cacheKey, redemption);
+
 			if (redemption.redeemedBy === userId) {
 				return redemption;
 			}
@@ -280,8 +344,14 @@ export class CloudflarePlatformAdapter implements PlatformAdapter {
 		userId: string,
 		redemption: InviteRedemption
 	): Promise<void> {
-		const key = `redemption:${planId}:${tokenId}:${userId}`;
-		await this.ctx.storage.put(key, redemption);
+		const cacheKey = `${planId}:${tokenId}:${userId}`;
+
+		// Update in-memory cache
+		this.redemptions.set(cacheKey, redemption);
+
+		// Persist to Durable Object storage
+		const storageKey = `redemption:${cacheKey}`;
+		await this.ctx.storage.put(storageKey, redemption);
 	}
 
 	// --- Crypto Operations (Web Crypto API - all async) ---
@@ -316,9 +386,36 @@ export class CloudflarePlatformAdapter implements PlatformAdapter {
 
 	async verifyTokenHash(value: string, hash: string): Promise<boolean> {
 		const computedHash = await this.hashTokenValue(value);
-		// Note: This is not timing-safe, but sufficient for our use case
-		// Web Crypto API doesn't provide timing-safe comparison
-		return computedHash === hash;
+
+		// Implement timing-safe comparison to prevent timing attacks
+		// Web Crypto API doesn't provide timingSafeEqual, so we implement it manually
+		return this.timingSafeCompare(computedHash, hash);
+	}
+
+	/**
+	 * Timing-safe string comparison to prevent timing attacks.
+	 * Compares strings in constant time regardless of where they differ.
+	 */
+	private timingSafeCompare(a: string, b: string): boolean {
+		// If lengths differ, still do full comparison to avoid timing leak
+		// We'll use XOR to compare byte by byte
+		const aBytes = new TextEncoder().encode(a);
+		const bBytes = new TextEncoder().encode(b);
+
+		// If lengths don't match, comparison should still take constant time
+		// Use the longer length and pad the shorter one
+		const maxLen = Math.max(aBytes.length, bBytes.length);
+
+		let result = aBytes.length === bBytes.length ? 0 : 1;
+
+		for (let i = 0; i < maxLen; i++) {
+			// Use 0 for out-of-bounds to avoid timing leaks
+			const aByte = i < aBytes.length ? aBytes[i] : 0;
+			const bByte = i < bBytes.length ? bBytes[i] : 0;
+			result |= aByte ^ bByte;
+		}
+
+		return result === 0;
 	}
 
 	// --- WebSocket Operations ---
