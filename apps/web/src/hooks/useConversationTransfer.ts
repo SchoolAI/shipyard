@@ -273,18 +273,26 @@ export function useConversationTransfer(
 
     rtcProvider.on('peers', handlePeersChange);
 
-    // Poll for changes (backup for missed events)
+    // Also update on 'synced' event - connections may be established after sync
+    const handleSynced = (): void => {
+      updatePeerList();
+    };
+    rtcProvider.on('synced', handleSynced);
+
+    // Poll for changes more frequently (500ms instead of 2s)
+    // This catches race conditions where awareness is ahead of actual connections
     const pollInterval = setInterval(() => {
       const currentPeers = extractPeersFromProvider(rtcProvider);
       if (currentPeers.size !== lastPeerCountRef.current) {
         lastPeerCountRef.current = currentPeers.size;
         updatePeerList();
       }
-    }, 2000);
+    }, 500);
 
     return () => {
       cleanupReceive();
       rtcProvider.off('peers', handlePeersChange);
+      rtcProvider.off('synced', handleSynced);
       clearInterval(pollInterval);
       manager.dispose();
       managerRef.current = null;
@@ -440,10 +448,23 @@ export function useConversationTransfer(
    * Send conversation to P2P peer via WebRTC.
    */
   const sendToPeer = useCallback(
+    // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Complex but straightforward P2P transfer logic
     async (peerId: string, messages: A2AMessage[], options: SendOptions = {}): Promise<boolean> => {
       const manager = managerRef.current;
       if (!manager) {
         return false;
+      }
+
+      // Last-minute sync: extract fresh peers from provider to catch any race conditions
+      // where awareness is ahead of the manager's peer tracking
+      if (rtcProvider) {
+        const currentPeers = extractPeersFromProvider(rtcProvider);
+        for (const [pid, peer] of currentPeers) {
+          if (!trackedPeersRef.current.has(pid)) {
+            manager.addPeer(pid, peer);
+            trackedPeersRef.current.set(pid, peer);
+          }
+        }
       }
 
       const metadata = getPlanMetadata();
@@ -522,7 +543,7 @@ export function useConversationTransfer(
         return false;
       }
     },
-    [getPlanMetadata, planId]
+    [getPlanMetadata, planId, rtcProvider]
   );
 
   /**

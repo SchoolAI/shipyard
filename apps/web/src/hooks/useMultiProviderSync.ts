@@ -241,6 +241,9 @@ export function useMultiProviderSync(
       return isUserApproved(ydoc, userId) ? 'approved' : 'pending';
     }
 
+    // Track the last broadcast webrtcPeerId to avoid redundant updates
+    let lastBroadcastPeerId: string | undefined;
+
     function setLocalAwarenessState() {
       if (!rtc || !githubIdentity) return;
 
@@ -267,6 +270,36 @@ export function useMultiProviderSync(
       };
 
       rtc.awareness.setLocalStateField('planStatus', awarenessState);
+      lastBroadcastPeerId = webrtcPeerId;
+    }
+
+    // Watch for room.peerId to become available and update awareness
+    // This fixes P2P transfers failing with "Peer not found" because
+    // webrtcPeerId was undefined when awareness was first set
+    let roomPeerIdWatcher: ReturnType<typeof setInterval> | null = null;
+
+    function startWatchingForRoomPeerId() {
+      if (!rtc) return;
+
+      // Check immediately
+      const room = (rtc as unknown as { room?: { peerId?: string } }).room;
+      if (room?.peerId && room.peerId !== lastBroadcastPeerId) {
+        setLocalAwarenessState();
+        return; // peerId is already available
+      }
+
+      // Poll until room.peerId is available (y-webrtc doesn't emit an event for this)
+      roomPeerIdWatcher = setInterval(() => {
+        const room = (rtc as unknown as { room?: { peerId?: string } }).room;
+        if (room?.peerId && room.peerId !== lastBroadcastPeerId) {
+          setLocalAwarenessState();
+          // Stop watching once we've broadcast the real peerId
+          if (roomPeerIdWatcher) {
+            clearInterval(roomPeerIdWatcher);
+            roomPeerIdWatcher = null;
+          }
+        }
+      }, 100); // Check every 100ms until room is ready
     }
 
     function updateApprovalStatus() {
@@ -359,6 +392,8 @@ export function useMultiProviderSync(
       // No delay - we need this before any WebRTC messages are relayed
       sendUserIdentityToSignaling();
       pushApprovalStateToSignaling();
+      // Watch for room.peerId to become available (fixes P2P transfer "Peer not found")
+      startWatchingForRoomPeerId();
     }
 
     function updateSyncState() {
@@ -385,6 +420,10 @@ export function useMultiProviderSync(
       setWsProvider(null);
       metadataMap.unobserve(handleMetadataChange);
       idbProvider.destroy();
+      if (roomPeerIdWatcher) {
+        clearInterval(roomPeerIdWatcher);
+        roomPeerIdWatcher = null;
+      }
       if (rtc) {
         // Clear awareness before destroying so other peers see us leave
         rtc.awareness.setLocalState(null);
