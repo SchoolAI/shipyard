@@ -19,6 +19,7 @@ import {
   useConversationTransfer,
 } from '@/hooks/useConversationTransfer';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
+import { createVanillaTRPCClient } from '@/utils/trpc-client';
 
 // Avatar compound components have type issues in HeroUI v3 beta
 const AvatarRoot = Avatar as unknown as React.FC<{
@@ -277,32 +278,6 @@ export type { ReceivedConversation } from '@/hooks/useConversationTransfer';
 
 const REGISTRY_URL = 'http://localhost:32191';
 
-interface ImportApiResponse {
-  success: boolean;
-  sessionId?: string;
-  transcriptPath?: string;
-  messageCount?: number;
-  error?: string;
-}
-
-/** Parse API response, returning null with toast on error */
-async function parseImportResponse(res: Response): Promise<ImportApiResponse | null> {
-  if (res.status === 413) {
-    toast.error('Conversation too large. Try downloading instead.');
-    return null;
-  }
-
-  try {
-    return (await res.json()) as ImportApiResponse;
-  } catch {
-    const message = res.ok
-      ? 'Invalid response from server'
-      : `Server error (${res.status}). Try downloading instead.`;
-    toast.error(message);
-    return null;
-  }
-}
-
 // TODO(#9): Platform detection - Currently hard-coded to only detect Claude Code
 // Should detect available platforms (Cursor, Devin, Windsurf, etc.) and show
 // appropriate import buttons. See: https://github.com/jacobpetterle/peer-plan/issues/9
@@ -501,22 +476,12 @@ export function ImportConversationHandler({
     setIsImporting(true);
 
     try {
-      const res = await fetch(`${REGISTRY_URL}/api/conversation/import`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          a2aMessages: selectedReceived.messages,
-          meta: selectedReceived.meta,
-        }),
+      // Use vanilla tRPC client for imperative code
+      const trpcClient = createVanillaTRPCClient(REGISTRY_URL);
+      const result = await trpcClient.conversation.import.mutate({
+        a2aMessages: selectedReceived.messages,
+        meta: selectedReceived.meta,
       });
-
-      const result = await parseImportResponse(res);
-      if (!result) return;
-
-      if (!result.success) {
-        toast.error(result.error ?? 'Import failed');
-        return;
-      }
 
       // Track conversation import in CRDT
       const newVersion: ConversationVersion = {
@@ -543,8 +508,13 @@ export function ImportConversationHandler({
 
       setIsReviewOpen(false);
       setSelectedReceived(null);
-    } catch {
-      toast.error('Registry server not available. Download file instead.');
+    } catch (error) {
+      // tRPC throws on errors - handle gracefully
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Registry server not available. Download file instead.';
+      toast.error(message);
     } finally {
       setIsImporting(false);
     }

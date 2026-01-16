@@ -29,6 +29,7 @@
   "dependencies": {
     "@peer-plan/schema": "workspace:*",
     "@peer-plan/shared": "workspace:*",
+    "@trpc/client": "^11.8.1",
     "nanoid": "^5.0.9",
     "open": "^11.0.0",
     "pino": "^10.1.0",

@@ -41,19 +41,21 @@ USAGE (for non-hook agents):
     const { planId, pollIntervalSeconds = 30 } = input;
 
     const registryPort = registryConfig.REGISTRY_PORT[0];
-    const baseUrl = `http://localhost:${registryPort}/api/plan/${encodeURIComponent(planId)}`;
+    const trpcUrl = `http://localhost:${registryPort}/trpc`;
 
-    const script = `# Subscribe to status and comment changes
-CLIENT_ID=$(curl -sf -X POST "${baseUrl}/subscribe" \\
+    const script = `# Subscribe to status and comment changes via tRPC
+CLIENT_ID=$(curl -sf -X POST "${trpcUrl}/subscription.create" \\
   -H "Content-Type: application/json" \\
-  -d '{"subscribe":["status","comments"],"windowMs":5000,"threshold":1}' \\
+  -d '{"planId":"${planId}","subscribe":["status","comments"],"windowMs":5000,"threshold":1}' \\
   | grep -o '"clientId":"[^"]*"' | cut -d'"' -f4)
 
 echo "Subscribed. Monitoring plan..."
 
-# Poll for changes
+# Poll for changes via tRPC
 while sleep ${pollIntervalSeconds}; do
-  result=$(curl -sf "${baseUrl}/changes?clientId=$CLIENT_ID" 2>/dev/null)
+  result=$(curl -sf -X POST "${trpcUrl}/subscription.getChanges" \\
+    -H "Content-Type: application/json" \\
+    -d '{"planId":"${planId}","clientId":"'"$CLIENT_ID"'"}' 2>/dev/null)
   ready=$(echo "$result" | grep -o '"ready":true')
   if [ -n "$ready" ]; then
     changes=$(echo "$result" | grep -o '"changes":"[^"]*"' | cut -d'"' -f4)
