@@ -32,7 +32,7 @@ import type {
   SubscribeMessage,
   TokenValidationError,
   UnsubscribeMessage,
-} from '../core/types.js';
+} from '../../core/types.js';
 import { logger } from './logger.js';
 
 interface Env {
