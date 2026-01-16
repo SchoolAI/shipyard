@@ -33,6 +33,7 @@ const SIGNALING_SERVER =
  * @returns WebrtcProvider instance
  */
 // Polyfill global WebRTC objects for simple-peer (done once at module load)
+// @ts-expect-error - Checking for browser WebRTC API availability
 if (typeof globalThis.RTCPeerConnection === 'undefined') {
   // @ts-expect-error - Polyfilling browser WebRTC APIs for Node.js
   globalThis.RTCPeerConnection = wrtc.RTCPeerConnection;
@@ -155,10 +156,12 @@ function sendApprovalStateToSignaling(
   });
 
   for (const conn of signalingConns) {
-    if (conn.ws && conn.ws.readyState === 1) {
+    // Type assertion for internal y-webrtc WebSocket connection
+    const ws = conn.ws as { readyState?: number; send?: (data: string) => void } | undefined;
+    if (ws?.readyState === 1) {
       // WebSocket.OPEN = 1
-      conn.ws.send(identifyMessage);
-      conn.ws.send(approvalStateMessage);
+      ws.send?.(identifyMessage);
+      ws.send?.(approvalStateMessage);
       logger.info({ planId, username }, 'Pushed identity and approval state to signaling server');
     }
   }

@@ -153,7 +153,7 @@ interface CollapsedSidebarProps {
   isLoading: boolean;
   onToggle: () => void;
   onNavigate?: () => void;
-  searchInputRef: React.RefObject<SearchPlanInputHandle>;
+  searchInputRef: React.RefObject<SearchPlanInputHandle | null>;
 }
 
 function CollapsedSidebar({
