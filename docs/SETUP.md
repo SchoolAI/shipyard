@@ -108,15 +108,26 @@ The CRDT sync means data self-heals across peers. To fully reset for testing, yo
 
 ### Nuclear Reset (Recommended)
 
+**CRITICAL: When using Claude Code, disable MCP first:**
+
+```bash
+# In Claude Code session:
+/mcp disable
+
+# Then run reset:
+pnpm reset
+
+# After reset completes, re-enable if needed:
+/mcp enable
+```
+
+**Why?** Claude Code auto-restarts the hub MCP server, causing it to re-sync data before the reset completes.
+
 **Before running:** Close ALL peer-plan browser tabs (regular AND incognito). Open tabs block IndexedDB deletion.
 
 **Limitation:** If remote P2P peers are connected, they'll re-sync data back. This reset is for local development only.
 
-```bash
-pnpm reset
-```
-
-This command:
+The reset command:
 1. Kills all peer-plan processes (MCP servers, registry, signaling, Vite)
 2. Clears server-side LevelDB storage (`~/.peer-plan/plans/`)
 3. Opens browser to clear IndexedDB + localStorage

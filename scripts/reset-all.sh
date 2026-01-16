@@ -6,12 +6,20 @@ set -euo pipefail
 #
 # Usage: pnpm reset
 #
+# IMPORTANT: Disable MCP servers first in Claude Code:
+#   Run: /mcp disable
+#   Then: pnpm reset
+#   This prevents Claude Code from auto-restarting the hub during reset.
+#
 # This script:
 # 1. Kills all peer-plan dev processes (MCP servers, registry, signaling)
 # 2. Clears server-side LevelDB storage (~/.peer-plan/plans/)
 # 3. Opens browser to trigger client-side reset (?reset=all)
 
 echo "🧨 Nuclear Reset: Clearing ALL peer-plan data..."
+echo ""
+echo "⚠️  If running via Claude Code, please run /mcp disable first!"
+echo "   (This prevents the hub from auto-restarting)"
 echo ""
 
 # --- Step 0: Preparation ---

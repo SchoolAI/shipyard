@@ -18,10 +18,13 @@ export function ResetPage() {
         setState('complete');
 
         // Wait a moment then redirect to clean URL
+        // Wait longer if there were IndexedDB errors so user can see them
+        const hasErrors = resetResult.indexedDB.errors.length > 0;
+        const delay = hasErrors ? 8000 : 3000;
         setTimeout(() => {
           removeResetParam();
           window.location.href = '/';
-        }, 3000);
+        }, delay);
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e));
         setState('error');
@@ -48,6 +51,9 @@ export function ResetPage() {
             </div>
             <p className="text-sm text-gray-500">
               This will clear all plan data, identity, and preferences.
+            </p>
+            <p className="text-sm text-gray-600">
+              This may take up to 10 seconds if databases have open connections.
             </p>
           </div>
         )}
@@ -119,7 +125,10 @@ export function ResetPage() {
                 )}
             </div>
 
-            <p className="text-sm text-gray-500">Redirecting to home page in 3 seconds...</p>
+            <p className="text-sm text-gray-500">
+              Redirecting to home page in {result.indexedDB.errors.length > 0 ? '8' : '3'}{' '}
+              seconds...
+            </p>
           </div>
         )}
 

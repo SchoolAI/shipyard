@@ -11,6 +11,8 @@ const LOCAL_STORAGE_KEYS = [
   'peer-plan-sidebar-collapsed',
   'peer-plan-show-archived',
   'peer-plan-view-preferences',
+  'kanban-hide-empty-columns',
+  'peer-plan:diff-view-mode',
   'theme',
 ] as const;
 
@@ -45,15 +47,45 @@ interface DeleteResult {
 }
 
 /**
- * Delete a single IndexedDB database by name
+ * Delete a single IndexedDB database by name.
+ *
+ * IMPORTANT: The `onblocked` event is just a warning that connections exist.
+ * The deletion WILL still proceed once all connections close. We need to wait
+ * for `onsuccess`, not bail early on `onblocked`.
+ *
+ * @param name Database name to delete
+ * @param timeoutMs Maximum time to wait for deletion (default: 10 seconds)
  */
-function deleteDatabase(name: string): Promise<DeleteResult> {
+function deleteDatabase(name: string, timeoutMs = 10000): Promise<DeleteResult> {
   return new Promise((resolve) => {
+    let wasBlocked = false;
     const request = indexedDB.deleteDatabase(name);
-    request.onsuccess = () => resolve({ success: true });
-    request.onerror = () =>
+
+    const timeout = setTimeout(() => {
+      // If still waiting after timeout, report as blocked
+      resolve({
+        success: false,
+        blocked: wasBlocked,
+        error: wasBlocked ? 'Timed out waiting for connections to close' : 'Deletion timed out',
+      });
+    }, timeoutMs);
+
+    request.onsuccess = () => {
+      clearTimeout(timeout);
+      resolve({ success: true });
+    };
+
+    request.onerror = () => {
+      clearTimeout(timeout);
       resolve({ success: false, error: request.error?.message ?? 'Unknown error' });
-    request.onblocked = () => resolve({ success: false, blocked: true });
+    };
+
+    // onblocked means there are open connections, but deletion will proceed
+    // once they close. We just note it and keep waiting for onsuccess.
+    request.onblocked = () => {
+      wasBlocked = true;
+      // Don't resolve here - wait for onsuccess or timeout
+    };
   });
 }
 
