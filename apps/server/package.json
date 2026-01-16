@@ -21,6 +21,7 @@
     "@modelcontextprotocol/sdk": "^1.22.0",
     "@octokit/rest": "^21.0.0",
     "@peer-plan/schema": "workspace:*",
+    "@peer-plan/shared": "workspace:*",
     "express": "^5.2.1",
     "lib0": "^0.2.117",
     "nanoid": "^5.0.9",

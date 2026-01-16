@@ -1,10 +1,11 @@
+import { ROUTES } from '@peer-plan/schema';
 import { registryConfig } from './config/env/registry.js';
 import { logger } from './logger.js';
 
 /**
  * Get registry port from config
  */
-function getRegistryPorts(): number[] {
+function getRegistryPorts(): readonly number[] {
   return registryConfig.REGISTRY_PORT;
 }
 
@@ -16,7 +17,7 @@ async function findRegistryPort(): Promise<number | null> {
 
   for (const port of ports) {
     try {
-      const res = await fetch(`http://localhost:${port}/registry`, {
+      const res = await fetch(`http://localhost:${port}${ROUTES.REGISTRY_LIST}`, {
         signal: AbortSignal.timeout(1000),
       });
       if (res.ok) {
@@ -42,7 +43,7 @@ export async function registerWithRegistry(wsPort: number): Promise<boolean> {
   }
 
   try {
-    const res = await fetch(`http://localhost:${registryPort}/register`, {
+    const res = await fetch(`http://localhost:${registryPort}${ROUTES.REGISTRY_REGISTER}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ port: wsPort, pid: process.pid }),
@@ -72,7 +73,7 @@ export async function unregisterFromRegistry(): Promise<void> {
 
   for (const port of ports) {
     try {
-      const res = await fetch(`http://localhost:${port}/unregister`, {
+      const res = await fetch(`http://localhost:${port}${ROUTES.REGISTRY_UNREGISTER}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ pid: process.pid }),

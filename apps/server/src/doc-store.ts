@@ -7,6 +7,7 @@
  * from registry-server.ts or hub-client.ts.
  */
 
+import type { WebrtcProvider } from 'y-webrtc';
 import type * as Y from 'yjs';
 import {
   destroyHubClient,
@@ -20,10 +21,14 @@ import {
   getOrCreateDoc as registryGetOrCreateDoc,
   hasActiveConnections as registryHasActiveConnections,
 } from './registry-server.js';
+import { createWebRtcProvider, destroyWebRtcProvider } from './webrtc-provider.js';
 
 type Mode = 'hub' | 'client' | 'uninitialized';
 
 let currentMode: Mode = 'uninitialized';
+
+// WebRTC providers for P2P sync (shared across both hub and client modes)
+const webrtcProviders = new Map<string, WebrtcProvider>();
 
 /**
  * Initialize the doc store in "hub" mode.
@@ -59,25 +64,45 @@ export async function initAsClient(registryPort: number): Promise<void> {
 /**
  * Get or create a Y.Doc by name.
  * Routes to the appropriate implementation based on initialization mode.
+ * Also initializes WebRTC P2P provider for remote browser sync.
  */
 export async function getOrCreateDoc(docName: string): Promise<Y.Doc> {
+  // Get doc from hub or client
+  let doc: Y.Doc;
   switch (currentMode) {
     case 'hub':
-      return registryGetOrCreateDoc(docName);
+      doc = await registryGetOrCreateDoc(docName);
+      break;
     case 'client':
-      return hubGetOrCreateDoc(docName);
+      doc = await hubGetOrCreateDoc(docName);
+      break;
     case 'uninitialized':
       // Fallback: if doc-store wasn't explicitly initialized, check if hub-client
       // was initialized directly (for backwards compatibility during transition)
       if (isHubClientInitialized()) {
         currentMode = 'client';
-        return hubGetOrCreateDoc(docName);
+        doc = await hubGetOrCreateDoc(docName);
+      } else {
+        // Default to registry-server behavior for backwards compatibility
+        logger.warn('Doc store not initialized, defaulting to registry server mode');
+        currentMode = 'hub';
+        doc = await registryGetOrCreateDoc(docName);
       }
-      // Default to registry-server behavior for backwards compatibility
-      logger.warn('Doc store not initialized, defaulting to registry server mode');
-      currentMode = 'hub';
-      return registryGetOrCreateDoc(docName);
   }
+
+  // Add WebRTC provider for P2P sync (enabled by default)
+  if (!webrtcProviders.has(docName)) {
+    try {
+      const provider = await createWebRtcProvider(doc, docName);
+      webrtcProviders.set(docName, provider);
+      logger.info({ docName }, 'WebRTC P2P sync enabled for plan');
+    } catch (error) {
+      logger.error({ error, docName }, 'Failed to create WebRTC provider - P2P sync unavailable');
+      // Continue without WebRTC - local sync still works
+    }
+  }
+
+  return doc;
 }
 
 /**
@@ -108,11 +133,19 @@ export function getMode(): Mode {
 
 /**
  * Cleanup function for graceful shutdown.
- * Only needed in client mode; hub mode cleanup is handled by registry-server.
+ * Destroys WebRTC providers and client connections.
  */
 export async function destroy(): Promise<void> {
+  // Clean up all WebRTC providers
+  for (const [docName, provider] of webrtcProviders.entries()) {
+    destroyWebRtcProvider(provider, docName);
+  }
+  webrtcProviders.clear();
+
+  // Clean up hub client if in client mode
   if (currentMode === 'client') {
     await destroyHubClient();
   }
+
   currentMode = 'uninitialized';
 }

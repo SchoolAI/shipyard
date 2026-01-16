@@ -44,6 +44,7 @@ function extractPeerInfo(peerId: number, state: Record<string, unknown>): Connec
         user?: { id: string; name: string; color: string };
         isOwner?: boolean;
         webrtcPeerId?: string;
+        platform?: string;
       }
     | undefined;
 
@@ -51,7 +52,7 @@ function extractPeerInfo(peerId: number, state: Record<string, unknown>): Connec
     // Unknown peer without identity - still track them
     return {
       webrtcPeerId: planStatus?.webrtcPeerId,
-      platform: 'browser',
+      platform: planStatus?.platform ?? 'browser',
       name: `Peer ${peerId}`,
       color: '#888888',
       isOwner: false,
@@ -61,7 +62,7 @@ function extractPeerInfo(peerId: number, state: Record<string, unknown>): Connec
 
   return {
     webrtcPeerId: planStatus.webrtcPeerId,
-    platform: 'browser', // TODO: Could be enhanced to detect platform
+    platform: planStatus.platform ?? 'browser',
     name: planStatus.user.name,
     color: planStatus.user.color,
     isOwner: planStatus.isOwner ?? false,

@@ -4,7 +4,9 @@ import {
   getRejectedUsers,
   isUserApproved,
   isUserRejected,
+  type OriginPlatform,
 } from '@peer-plan/schema';
+import { DEFAULT_REGISTRY_PORTS } from '@peer-plan/shared/registry-config';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { IndexeddbPersistence } from 'y-indexeddb';
 import { WebrtcProvider } from 'y-webrtc';
@@ -13,8 +15,6 @@ import * as Y from 'yjs';
 import { useGitHubAuth } from './useGitHubAuth';
 
 const DEFAULT_SIGNALING_SERVER = 'wss://peer-plan-signaling.jacob-191.workers.dev';
-
-const DEFAULT_REGISTRY_PORTS = [32191, 32192];
 
 /**
  * Discover the hub URL by checking registry endpoints.
@@ -63,6 +63,11 @@ export interface PlanAwarenessState {
     name: string;
     color: string;
   };
+  /**
+   * Platform type for this peer (browser, MCP server, etc.)
+   * Used to distinguish between different types of participants.
+   */
+  platform?: OriginPlatform;
   status: ApprovalStatus;
   isOwner: boolean;
   requestedAt?: number;
