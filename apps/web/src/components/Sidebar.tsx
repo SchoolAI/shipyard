@@ -21,7 +21,7 @@ import {
   Search,
   Users,
 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { IndexeddbPersistence } from 'y-indexeddb';
@@ -29,7 +29,7 @@ import * as Y from 'yjs';
 import { AccountSection } from '@/components/account';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { CollapsiblePanel } from '@/components/ui/collapsible-panel';
-import { SearchPlanInput } from '@/components/ui/SearchPlanInput';
+import { SearchPlanInput, type SearchPlanInputHandle } from '@/components/ui/SearchPlanInput';
 import { useActivePlanSync } from '@/contexts/ActivePlanSyncContext';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
 import { useMultiProviderSync } from '@/hooks/useMultiProviderSync';
@@ -253,13 +253,17 @@ function CollapsedSidebar({
 
         <div className="w-8 h-px bg-separator my-1" />
 
-        {/* TODO: Add search functionality when clicked */}
         <Tooltip>
           <Tooltip.Trigger>
             <Button
               isIconOnly
               variant="ghost"
               size="sm"
+              onPress={() => {
+                setCollapsed(false);
+                // Focus search after sidebar expands
+                setTimeout(() => searchInputRef.current?.focus(), 100);
+              }}
               aria-label="Search plans"
               className="w-10 h-10"
             >
@@ -301,6 +305,7 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
   } = usePlanIndex(githubIdentity?.username);
   const { activePlanId, syncState } = useActivePlanSync();
   const [collapsed, setCollapsed] = useState(getSidebarCollapsed);
+  const searchInputRef = useRef<SearchPlanInputHandle>(null);
   const navigate = useNavigate();
   const location = useLocation();
   const { ydoc: indexDoc } = useMultiProviderSync(PLAN_INDEX_DOC_NAME);
@@ -482,6 +487,7 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
         <div className="flex items-center gap-1.5">
           <div className="flex-1 min-w-0">
             <SearchPlanInput
+              ref={searchInputRef}
               aria-label="Search plans"
               value={searchQuery}
               onChange={setSearchQuery}

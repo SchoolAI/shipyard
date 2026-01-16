@@ -1,4 +1,5 @@
 import { SearchField } from '@heroui/react';
+import { type ForwardedRef, forwardRef, useImperativeHandle, useRef } from 'react';
 
 interface SearchPlanInputProps {
   value: string;
@@ -8,6 +9,10 @@ interface SearchPlanInputProps {
   className?: string;
 }
 
+export interface SearchPlanInputHandle {
+  focus: () => void;
+}
+
 /**
  * Shared search input component for filtering plans.
  * Used in Sidebar, Inbox page, and Archive page.
@@ -15,13 +20,24 @@ interface SearchPlanInputProps {
  * Follows HeroUI v3 pattern: Always render ClearButton and let HeroUI manage visibility.
  * Do NOT conditionally render ClearButton based on value - breaks internal state management.
  */
-export function SearchPlanInput({
-  value,
-  onChange,
-  placeholder = 'Search...',
-  'aria-label': ariaLabel,
-  className,
-}: SearchPlanInputProps) {
+export const SearchPlanInput = forwardRef(function SearchPlanInput(
+  {
+    value,
+    onChange,
+    placeholder = 'Search...',
+    'aria-label': ariaLabel,
+    className,
+  }: SearchPlanInputProps,
+  ref: ForwardedRef<SearchPlanInputHandle>
+) {
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useImperativeHandle(ref, () => ({
+    focus: () => {
+      inputRef.current?.focus();
+    },
+  }));
+
   return (
     <SearchField
       aria-label={ariaLabel}
@@ -32,9 +48,9 @@ export function SearchPlanInput({
     >
       <SearchField.Group>
         <SearchField.SearchIcon />
-        <SearchField.Input placeholder={placeholder} />
+        <SearchField.Input ref={inputRef} placeholder={placeholder} />
         <SearchField.ClearButton />
       </SearchField.Group>
     </SearchField>
   );
-}
+});

@@ -37,6 +37,15 @@ After completing session-token and registry-config extraction, these TODOs remai
 
 ---
 
+## Documentation
+
+- [ ] **Convert hook README to runbook** (apps/hook/README.md:1)
+  - Current: Installation-focused README
+  - Needed: Operational runbook format (like docs/SETUP.md)
+  - Consider: README.md (what it is) + docs/HOOK-SETUP.md (how to use)
+
+---
+
 ## Minor Cleanups
 
 - [ ] **Remove deprecated `PEER_PLAN_WEB_URL`** (apps/hook/src/config/env/web.ts:5)

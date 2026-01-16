@@ -1,6 +1,7 @@
 import type { OriginPlatform } from '@peer-plan/schema';
-import type { WebrtcProvider as WebrtcProviderType } from 'y-webrtc';
+import { WebrtcProvider } from 'y-webrtc';
 import type * as Y from 'yjs';
+import wrtc from '@roamhq/wrtc';
 import { logger } from './logger.js';
 import { getGitHubUsername } from './server-identity.js';
 
@@ -31,12 +32,18 @@ const SIGNALING_SERVER =
  * @param planId - The plan ID (used as room name)
  * @returns WebrtcProvider instance
  */
+// Polyfill global WebRTC objects for simple-peer (done once at module load)
+// @ts-expect-error - Polyfilling browser WebRTC APIs for Node.js
+if (typeof globalThis.RTCPeerConnection === 'undefined') {
+  globalThis.RTCPeerConnection = wrtc.RTCPeerConnection;
+  globalThis.RTCSessionDescription = wrtc.RTCSessionDescription;
+  globalThis.RTCIceCandidate = wrtc.RTCIceCandidate;
+}
+
 export async function createWebRtcProvider(
   ydoc: Y.Doc,
   planId: string
-): Promise<WebrtcProviderType> {
-  // Dynamic import to avoid loading wrtc unless WebRTC sync is enabled
-  const { WebrtcProvider } = await import('y-webrtc');
+): Promise<WebrtcProvider> {
 
   // Build ICE servers configuration
   const iceServers: Array<{ urls: string; username?: string; credential?: string }> = [
@@ -59,6 +66,7 @@ export async function createWebRtcProvider(
   const provider = new WebrtcProvider(roomName, ydoc, {
     signaling: [SIGNALING_SERVER],
     peerOpts: {
+      wrtc: wrtc.default || wrtc,  // Pass wrtc polyfill to simple-peer
       config: {
         iceServers,
       },
@@ -110,7 +118,7 @@ export async function createWebRtcProvider(
  * @param provider - The WebRTC provider instance
  * @param planId - The plan ID for logging context
  */
-function setupProviderListeners(provider: WebrtcProviderType, planId: string): void {
+function setupProviderListeners(provider: WebrtcProvider, planId: string): void {
   // Track peer connections
   provider.on('peers', (event: { added: string[]; removed: string[]; webrtcPeers: string[] }) => {
     const peerCount = event.webrtcPeers.length;
@@ -167,7 +175,7 @@ function setupProviderListeners(provider: WebrtcProviderType, planId: string): v
  * @param provider - The WebRTC provider to destroy
  * @param planId - The plan ID for logging context
  */
-export function destroyWebRtcProvider(provider: WebrtcProviderType, planId: string): void {
+export function destroyWebRtcProvider(provider: WebrtcProvider, planId: string): void {
   logger.info({ planId }, 'Destroying WebRTC provider');
   provider.destroy();
 }
