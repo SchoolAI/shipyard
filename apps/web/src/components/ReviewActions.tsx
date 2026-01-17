@@ -203,39 +203,12 @@ export function ReviewActions({
     setIsSubmitting(true);
 
     try {
-<<<<<<< HEAD
       const { newStatus, timestamp } = executeReviewAction(
         action,
         editor,
         comment.trim(),
         Date.now()
       );
-=======
-      const trimmedComment = comment.trim();
-      const now = Date.now();
-
-      const newStatus = updateReviewStatus(action, trimmedComment, now);
-
-      const eventType = action === 'approve' ? 'approved' : 'changes_requested';
-      logPlanEvent(ydoc, eventType, actor);
-
-      // Editor is validated in validateReviewAction, safe to use here
-      if (!editor) {
-        throw new Error('Editor not ready');
-      }
-
-      const blocks = editor.document;
-      const reason =
-        action === 'approve'
-          ? `Approved by ${identity?.name}`
-          : `Changes requested by ${identity?.name}`;
-      const snapshot = createPlanSnapshot(ydoc, reason, identity?.name ?? 'Unknown', newStatus, blocks);
-      addSnapshot(ydoc, snapshot);
-
-      const successMessage =
-        action === 'approve' ? 'Plan approved successfully!' : 'Changes requested successfully!';
-      toast.success(successMessage);
->>>>>>> e1090e1 (feat(events): implement centralized observer pattern for comprehensive event logging)
 
       toast.success(getSuccessMessage(action));
       setOpenPopover(null);
