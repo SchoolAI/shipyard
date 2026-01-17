@@ -27,6 +27,7 @@
     "postinstall": "node ./scripts/postinstall.mjs"
   },
   "dependencies": {
+    "@blocknote/server-util": "^0.45.0",
     "@peer-plan/schema": "workspace:*",
     "@peer-plan/shared": "workspace:*",
     "nanoid": "^5.0.9",

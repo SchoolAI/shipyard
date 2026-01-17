@@ -145,6 +145,20 @@ export const YDOC_KEYS = {
    * - Web: apps/web/src/components/Timeline.tsx (read)
    */
   EVENTS: 'events' as const,
+
+  /**
+   * Plan snapshots (Y.Array<PlanSnapshot>)
+   * Contains version history snapshots taken at significant status changes.
+   * Each snapshot captures content, threads summary, artifacts, and deliverables.
+   * Synced via CRDT to all peers.
+   *
+   * Used by:
+   * - Server: apps/server/src/tools/*.ts (write on status changes)
+   * - Web: apps/web/src/components/VersionHistory.tsx (read)
+   * - Web: apps/web/src/hooks/useSnapshots.ts (read)
+   * - Helpers: packages/schema/src/yjs-helpers.ts (read/write)
+   */
+  SNAPSHOTS: 'snapshots' as const,
 } as const;
 
 /**

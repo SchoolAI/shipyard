@@ -4,11 +4,14 @@ import { ServerBlockNoteEditor } from '@blocknote/server-util';
 import {
   type ArtifactType,
   addArtifact,
-  createPlanUrl,
+  addSnapshot,
+  createPlanSnapshot,
+  createPlanUrlWithHistory,
   getArtifacts,
   getDeliverables,
   getLinkedPRs,
   getPlanMetadata,
+  getSnapshots,
   type LinkedPR,
   linkArtifactToDeliverable,
   linkPR,
@@ -287,6 +290,20 @@ ARTIFACT TYPES:
               fromStatus: 'draft',
               toStatus: 'in_progress',
             });
+
+            // Create snapshot on status change (Issue #42)
+            const editor = ServerBlockNoteEditor.create();
+            const fragment = doc.getXmlFragment('document');
+            const blocks = editor.yXmlFragmentToBlocks(fragment);
+            const snapshot = createPlanSnapshot(
+              doc,
+              'First deliverable linked',
+              actorName,
+              'in_progress',
+              blocks
+            );
+            addSnapshot(doc, snapshot);
+
             statusChanged = true;
             logger.info({ planId }, 'Plan status auto-changed to in_progress');
           }
@@ -324,24 +341,40 @@ ARTIFACT TYPES:
           }
         }
 
-        // Generate snapshot URL
+        // Generate snapshot URL with version history
         const editor = ServerBlockNoteEditor.create();
         const fragment = doc.getXmlFragment('document');
         const blocks = editor.yXmlFragmentToBlocks(fragment);
         const artifacts = getArtifacts(doc);
 
+        // Create completion snapshot (Issue #42)
+        const completionSnapshot = createPlanSnapshot(
+          doc,
+          'Task completed - all deliverables fulfilled',
+          actorName,
+          'completed',
+          blocks
+        );
+        addSnapshot(doc, completionSnapshot);
+
+        // Get all snapshots for URL encoding
+        const allSnapshots = getSnapshots(doc);
+
         const baseUrl = webConfig.PEER_PLAN_WEB_URL;
-        const snapshotUrl = createPlanUrl(baseUrl, {
-          v: 1,
-          id: planId,
-          title: metadata.title,
-          status: 'completed',
-          repo: metadata.repo,
-          pr: metadata.pr,
-          content: blocks,
-          artifacts,
-          deliverables,
-        });
+        const snapshotUrl = createPlanUrlWithHistory(
+          baseUrl,
+          {
+            id: planId,
+            title: metadata.title,
+            status: 'completed',
+            repo: metadata.repo,
+            pr: metadata.pr,
+            content: blocks,
+            artifacts,
+            deliverables,
+          },
+          allSnapshots
+        );
 
         // Update metadata
         setPlanMetadata(doc, {

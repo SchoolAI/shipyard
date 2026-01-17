@@ -3,7 +3,7 @@
  * Extracted from PlanPage to support both full-page and panel views.
  */
 
-import type { Block } from '@blocknote/core';
+import type { Block, BlockNoteEditor } from '@blocknote/core';
 import type { PlanMetadata } from '@peer-plan/schema';
 import { extractDeliverables, getDeliverables, YDOC_KEYS } from '@peer-plan/schema';
 import { Clock, FileText, GitPullRequest, Package } from 'lucide-react';
@@ -47,6 +47,10 @@ export interface PlanContentProps {
   initialContent?: unknown[];
   /** Whether this is a snapshot view (no sync) */
   isSnapshot?: boolean;
+  /** Snapshot to view (when viewing version history) - Issue #42 */
+  currentSnapshot?: { content: unknown[] } | null;
+  /** Callback to receive editor instance for snapshots - Issue #42 */
+  onEditorReady?: (editor: BlockNoteEditor) => void;
 }
 
 /**
@@ -61,6 +65,8 @@ export function PlanContent({
   provider,
   initialContent,
   isSnapshot = false,
+  currentSnapshot = null,
+  onEditorReady,
 }: PlanContentProps) {
   const [activeView, setActiveView] = useState<ViewType>('plan');
   const [deliverableCount, setDeliverableCount] = useState({ completed: 0, total: 0 });
@@ -160,6 +166,8 @@ export function PlanContent({
               provider={provider}
               onRequestIdentity={isSnapshot ? undefined : onRequestIdentity}
               initialContent={isSnapshot ? initialContent : undefined}
+              currentSnapshot={currentSnapshot}
+              onEditorReady={onEditorReady}
             />
             <Attachments ydoc={ydoc} />
           </div>

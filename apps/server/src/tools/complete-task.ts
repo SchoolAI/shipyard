@@ -1,13 +1,17 @@
 import { execSync } from 'node:child_process';
 import { ServerBlockNoteEditor } from '@blocknote/server-util';
 import {
-  createPlanUrl,
+  addSnapshot,
+  createPlanSnapshot,
+  createPlanUrlWithHistory,
   getArtifacts,
   getDeliverables,
   getLinkedPRs,
   getPlanMetadata,
+  getSnapshots,
   type LinkedPR,
   linkPR,
+  logPlanEvent,
   PLAN_INDEX_DOC_NAME,
   setPlanIndexEntry,
   setPlanMetadata,
@@ -18,6 +22,7 @@ import { webConfig } from '../config/env/web.js';
 import { getOrCreateDoc } from '../doc-store.js';
 import { getOctokit, parseRepoString } from '../github-artifacts.js';
 import { logger } from '../logger.js';
+import { getGitHubUsername } from '../server-identity.js';
 import { verifySessionToken } from '../session-token.js';
 import { TOOL_NAMES } from './tool-names.js';
 
@@ -133,27 +138,49 @@ RETURNS:
     const fragment = ydoc.getXmlFragment('document');
     const blocks = editor.yXmlFragmentToBlocks(fragment);
 
-    // Generate snapshot URL
+    // Get GitHub username for actor
+    const actorName = await getGitHubUsername();
+
+    // Create completion snapshot (Issue #42)
+    const completionSnapshot = createPlanSnapshot(
+      ydoc,
+      'Task marked complete',
+      actorName,
+      'completed',
+      blocks
+    );
+    addSnapshot(ydoc, completionSnapshot);
+
+    // Get all snapshots for URL encoding
+    const allSnapshots = getSnapshots(ydoc);
+
+    // Generate snapshot URL with version history
     const baseUrl = webConfig.PEER_PLAN_WEB_URL;
-    const snapshotUrl = createPlanUrl(baseUrl, {
-      v: 1,
-      id: input.planId,
-      title: metadata.title,
-      status: 'completed',
-      repo: metadata.repo,
-      pr: metadata.pr,
-      content: blocks,
-      artifacts,
-      deliverables,
-    });
+    const snapshotUrl = createPlanUrlWithHistory(
+      baseUrl,
+      {
+        id: input.planId,
+        title: metadata.title,
+        status: 'completed',
+        repo: metadata.repo,
+        pr: metadata.pr,
+        content: blocks,
+        artifacts,
+        deliverables,
+      },
+      allSnapshots
+    );
 
     // Update metadata
     setPlanMetadata(ydoc, {
       status: 'completed',
       completedAt: Date.now(),
-      completedBy: 'agent',
+      completedBy: actorName,
       snapshotUrl,
     });
+
+    // Log completion event (Issue #42 - was missing!)
+    logPlanEvent(ydoc, 'completed', actorName);
 
     // Update plan index
     const indexDoc = await getOrCreateDoc(PLAN_INDEX_DOC_NAME);

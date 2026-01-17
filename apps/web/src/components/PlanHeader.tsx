@@ -1,3 +1,4 @@
+import type { BlockNoteEditor } from '@blocknote/core';
 import {
   Avatar,
   Button,
@@ -9,7 +10,12 @@ import {
   Separator,
   Tooltip,
 } from '@heroui/react';
-import type { A2AMessage, ConversationExportMeta, PlanMetadata } from '@peer-plan/schema';
+import type {
+  A2AMessage,
+  ConversationExportMeta,
+  PlanMetadata,
+  PlanSnapshot,
+} from '@peer-plan/schema';
 import {
   getPlanIndexEntry,
   getPlanOwnerId,
@@ -40,6 +46,7 @@ import { LinkPRButton } from '@/components/LinkPRButton';
 import { ReviewActions } from '@/components/ReviewActions';
 import { ShareButton } from '@/components/ShareButton';
 import { StatusChip } from '@/components/StatusChip';
+import { VersionSelector } from '@/components/VersionSelector';
 import { useActivePlanSync } from '@/contexts/ActivePlanSyncContext';
 import { useConversationTransfer } from '@/hooks/useConversationTransfer';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
@@ -459,6 +466,18 @@ interface UserIdentity {
   color: string;
 }
 
+interface VersionNavigationState {
+  snapshots: PlanSnapshot[];
+  currentIndex: number;
+  currentSnapshot: PlanSnapshot | null;
+  isViewingHistory: boolean;
+  goToPrevious: () => void;
+  goToNext: () => void;
+  goToCurrent: () => void;
+  canGoPrevious: boolean;
+  canGoNext: boolean;
+}
+
 interface PlanHeaderProps {
   ydoc: Y.Doc;
   /** Plan ID for archive actions */
@@ -475,6 +494,10 @@ interface PlanHeaderProps {
   isSnapshot?: boolean;
   /** WebRTC provider for P2P sync and awareness (needed for approval panel) */
   rtcProvider?: WebrtcProvider | null;
+  /** Version navigation state (Issue #42) */
+  versionNav?: VersionNavigationState;
+  /** BlockNote editor instance for snapshots - Issue #42 */
+  editor?: BlockNoteEditor | null;
 }
 
 export function PlanHeader({
@@ -486,6 +509,8 @@ export function PlanHeader({
   onStatusChange,
   isSnapshot = false,
   rtcProvider = null,
+  versionNav,
+  editor = null,
 }: PlanHeaderProps) {
   // No local state or observer - metadata comes from parent to avoid duplicate observers
   const display = metadata;
@@ -653,6 +678,20 @@ export function PlanHeader({
         </Chip>
       )}
 
+      {/* Version navigation (Issue #42) */}
+      {!isSnapshot && versionNav && versionNav.snapshots.length > 0 && (
+        <VersionSelector
+          currentSnapshot={versionNav.currentSnapshot}
+          totalSnapshots={versionNav.snapshots.length}
+          currentIndex={versionNav.currentIndex}
+          canGoPrevious={versionNav.canGoPrevious}
+          canGoNext={versionNav.canGoNext}
+          onPrevious={versionNav.goToPrevious}
+          onNext={versionNav.goToNext}
+          onCurrent={versionNav.goToCurrent}
+        />
+      )}
+
       {/* Right side: agents/peers, review actions, share - hidden for snapshots */}
       {!isSnapshot && (
         <div className="flex items-center gap-2 ml-auto shrink-0">
@@ -676,6 +715,7 @@ export function PlanHeader({
                 identity={identity}
                 onRequestIdentity={onRequestIdentity}
                 onStatusChange={onStatusChange}
+                editor={editor}
               />
 
               {/* Divider between review actions and utility icons */}
