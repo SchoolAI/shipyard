@@ -5,8 +5,12 @@
       "path": "."
     },
     {
-      "name": "\ud83c\udf33\ud83d\udcdc 42-plan-history",
+      "name": "🌳📜 42-plan-history",
       "path": "../peer-plan-wt/42-plan-history"
+    },
+    {
+      "name": "🌳💬 72-request-user-input",
+      "path": "../peer-plan-wt/72-request-user-input"
     }
   ],
   "settings": {}

@@ -134,6 +134,11 @@ dist
 # Stores VSCode versions used for testing VSCode extensions
 .vscode-test
 
+# VSCode workspace files (managed in main repo only)
+# Ignore all workspace files except the one in the main repo
+**/*.code-workspace
+!peer-plan.code-workspace
+
 # yarn v3
 .pnp.*
 .yarn/*

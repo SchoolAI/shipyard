@@ -1,100 +1,13 @@
-import {
-  Button,
-  Chip,
-  ListBox,
-  ListBoxItem,
-  Popover,
-  Select,
-  Skeleton,
-  Tooltip,
-} from '@heroui/react';
-import type { PlanIndexEntry } from '@peer-plan/schema';
-import { getPlanIndexEntry, PLAN_INDEX_DOC_NAME, setPlanIndexEntry } from '@peer-plan/schema';
-import {
-  Archive,
-  ArchiveRestore,
-  ArrowUpDown,
-  ChevronRight,
-  Filter,
-  Inbox,
-  LayoutGrid,
-  Search,
-  Users,
-} from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Button, Chip, Tooltip } from '@heroui/react';
+import { Archive, ChevronRight, Inbox, LayoutGrid, Search } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { toast } from 'sonner';
-import { IndexeddbPersistence } from 'y-indexeddb';
-import * as Y from 'yjs';
 import { AccountSection } from '@/components/account';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { CollapsiblePanel } from '@/components/ui/collapsible-panel';
-import { SearchPlanInput, type SearchPlanInputHandle } from '@/components/ui/SearchPlanInput';
-import { useActivePlanSync } from '@/contexts/ActivePlanSyncContext';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
-import { useMultiProviderSync } from '@/hooks/useMultiProviderSync';
 import { usePlanIndex } from '@/hooks/usePlanIndex';
-import {
-  filterAndSortPlans,
-  SORT_OPTIONS,
-  STATUS_FILTER_OPTIONS,
-  useViewFilters,
-} from '@/hooks/useViewFilters';
 import { getSidebarCollapsed, setSidebarCollapsed } from '@/utils/uiPreferences';
-
-interface PlanItemProps {
-  plan: PlanIndexEntry;
-  isShared?: boolean;
-  peerCount?: number;
-  onArchive?: (planId: string) => void;
-  onUnarchive?: (planId: string) => void;
-  isArchived?: boolean;
-}
-
-function PlanItem({
-  plan,
-  isShared,
-  peerCount,
-  onArchive,
-  onUnarchive,
-  isArchived,
-}: PlanItemProps) {
-  return (
-    <div className="flex items-center justify-between gap-2 w-full">
-      <span className="truncate flex-1 text-foreground">{plan.title}</span>
-      <div className="flex items-center gap-2 shrink-0">
-        {peerCount !== undefined && peerCount > 0 && (
-          <span className="flex items-center gap-1 text-xs text-muted-foreground">
-            <Users className="w-3 h-3" />
-            {peerCount}
-          </span>
-        )}
-        {isShared && !peerCount && <Users className="w-3 h-3 text-muted-foreground" />}
-
-        <Button
-          isIconOnly
-          variant="ghost"
-          size="sm"
-          aria-label={isArchived ? 'Unarchive' : 'Archive'}
-          onPress={() => {
-            if (isArchived) {
-              onUnarchive?.(plan.id);
-            } else {
-              onArchive?.(plan.id);
-            }
-          }}
-          className="w-6 h-6 min-w-0 !p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-        >
-          {isArchived ? (
-            <ArchiveRestore className="w-3.5 h-3.5" />
-          ) : (
-            <Archive className="w-3.5 h-3.5" />
-          )}
-        </Button>
-      </div>
-    </div>
-  );
-}
 
 interface NavItemProps {
   icon: React.ReactNode;
@@ -153,7 +66,6 @@ interface CollapsedSidebarProps {
   isLoading: boolean;
   onToggle: () => void;
   onNavigate?: () => void;
-  searchInputRef: React.RefObject<SearchPlanInputHandle | null>;
 }
 
 function CollapsedSidebar({
@@ -162,7 +74,6 @@ function CollapsedSidebar({
   isLoading,
   onToggle,
   onNavigate,
-  searchInputRef,
 }: CollapsedSidebarProps) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -259,20 +170,19 @@ function CollapsedSidebar({
           <Tooltip.Trigger>
             <Button
               isIconOnly
-              variant="ghost"
+              variant={location.pathname === '/search' ? 'secondary' : 'ghost'}
               size="sm"
               onPress={() => {
-                onToggle();
-                // Focus search input after sidebar expands
-                setTimeout(() => searchInputRef.current?.focus(), 150);
+                onNavigate?.();
+                navigate('/search');
               }}
-              aria-label="Expand to search"
+              aria-label="Search"
               className="w-10 h-10"
             >
               <Search className="w-4 h-4" />
             </Button>
           </Tooltip.Trigger>
-          <Tooltip.Content>Expand to search</Tooltip.Content>
+          <Tooltip.Content>Search plans</Tooltip.Content>
         </Tooltip>
       </nav>
 
@@ -295,120 +205,12 @@ interface SidebarProps {
 
 export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
   const { identity: githubIdentity } = useGitHubAuth();
-  const {
-    myPlans,
-    sharedPlans,
-    inboxPlans,
-    archivedPlans,
-    navigationTarget,
-    clearNavigation,
-    isLoading,
-    markPlanAsRead,
-  } = usePlanIndex(githubIdentity?.username);
-  const { activePlanId, syncState } = useActivePlanSync();
+  const { inboxPlans, archivedPlans, navigationTarget, clearNavigation, isLoading } = usePlanIndex(
+    githubIdentity?.username
+  );
   const [collapsed, setCollapsed] = useState(getSidebarCollapsed);
-  const searchInputRef = useRef<SearchPlanInputHandle>(null);
   const navigate = useNavigate();
   const location = useLocation();
-  const { ydoc: indexDoc } = useMultiProviderSync(PLAN_INDEX_DOC_NAME);
-
-  // View filters
-  const {
-    searchQuery,
-    sortBy,
-    sortDirection,
-    statusFilters,
-    setSearchQuery,
-    setSortBy,
-    toggleSortDirection,
-    toggleStatusFilter,
-    clearFilters,
-  } = useViewFilters();
-
-  const filteredInboxPlans = useMemo(() => {
-    const { filteredPlans } = filterAndSortPlans(
-      inboxPlans,
-      searchQuery,
-      sortBy,
-      statusFilters,
-      sortDirection
-    );
-    return filteredPlans;
-  }, [inboxPlans, searchQuery, sortBy, statusFilters, sortDirection]);
-
-  const filteredMyPlans = useMemo(() => {
-    const { filteredPlans } = filterAndSortPlans(
-      myPlans,
-      searchQuery,
-      sortBy,
-      statusFilters,
-      sortDirection
-    );
-    return filteredPlans;
-  }, [myPlans, searchQuery, sortBy, statusFilters, sortDirection]);
-
-  const filteredSharedPlans = useMemo(() => {
-    const { filteredPlans } = filterAndSortPlans(
-      sharedPlans,
-      searchQuery,
-      sortBy,
-      statusFilters,
-      sortDirection
-    );
-    return filteredPlans;
-  }, [sharedPlans, searchQuery, sortBy, statusFilters, sortDirection]);
-
-  const hasActiveFilters = searchQuery.trim() !== '' || statusFilters.length > 0;
-
-  const handleArchive = async (planId: string) => {
-    if (!githubIdentity) {
-      toast.error('Please sign in with GitHub first');
-      return;
-    }
-
-    const now = Date.now();
-
-    // Update the plan's own metadata (for shared plans to be filtered)
-    try {
-      const planDoc = new Y.Doc();
-      const idb = new IndexeddbPersistence(planId, planDoc);
-      await idb.whenSynced;
-
-      planDoc.transact(() => {
-        const metadata = planDoc.getMap('metadata');
-        metadata.set('archivedAt', now);
-        metadata.set('archivedBy', githubIdentity.displayName);
-        metadata.set('updatedAt', now);
-      });
-
-      idb.destroy();
-    } catch {
-      // If plan doc doesn't exist, that's fine
-    }
-
-    // Also update plan-index
-    const entry = getPlanIndexEntry(indexDoc, planId);
-    if (entry) {
-      setPlanIndexEntry(indexDoc, {
-        ...entry,
-        deletedAt: now,
-        deletedBy: githubIdentity.displayName,
-        updatedAt: now,
-      });
-    } else {
-      const plan = [...sharedPlans, ...inboxPlans, ...myPlans].find((p) => p.id === planId);
-      if (plan) {
-        setPlanIndexEntry(indexDoc, {
-          ...plan,
-          deletedAt: now,
-          deletedBy: githubIdentity.displayName,
-          updatedAt: now,
-        });
-      }
-    }
-
-    toast.success('Plan archived');
-  };
 
   useEffect(() => {
     if (!navigationTarget) return;
@@ -432,7 +234,6 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
       isLoading={isLoading}
       onToggle={handleToggle}
       onNavigate={onNavigate}
-      searchInputRef={searchInputRef}
     />
   );
 
@@ -440,20 +241,36 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
     <>
       <div className="px-3 py-3 border-b border-separator flex items-center justify-between">
         <h2 className="font-semibold text-lg text-foreground">Plans</h2>
-        <Tooltip>
-          <Tooltip.Trigger>
-            <Button
-              isIconOnly
-              variant="ghost"
-              size="sm"
-              aria-label="Collapse sidebar"
-              onPress={handleToggle}
-            >
-              <ChevronRight className="w-4 h-4 text-foreground rotate-180" />
-            </Button>
-          </Tooltip.Trigger>
-          <Tooltip.Content>Collapse sidebar</Tooltip.Content>
-        </Tooltip>
+        <div className="flex items-center gap-1">
+          <Tooltip>
+            <Tooltip.Trigger>
+              <Button
+                isIconOnly
+                variant="ghost"
+                size="sm"
+                aria-label="Search"
+                onPress={() => navigate('/search')}
+              >
+                <Search className="w-4 h-4" />
+              </Button>
+            </Tooltip.Trigger>
+            <Tooltip.Content>Search plans</Tooltip.Content>
+          </Tooltip>
+          <Tooltip>
+            <Tooltip.Trigger>
+              <Button
+                isIconOnly
+                variant="ghost"
+                size="sm"
+                aria-label="Collapse sidebar"
+                onPress={handleToggle}
+              >
+                <ChevronRight className="w-4 h-4 text-foreground rotate-180" />
+              </Button>
+            </Tooltip.Trigger>
+            <Tooltip.Content>Collapse sidebar</Tooltip.Content>
+          </Tooltip>
+        </div>
       </div>
 
       <div className="px-3 py-2 border-b border-separator space-y-1">
@@ -486,193 +303,8 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
         />
       </div>
 
-      <div className="px-3 py-2 border-b border-separator">
-        <div className="flex items-center gap-1.5">
-          <div className="flex-1 min-w-0">
-            <SearchPlanInput
-              ref={searchInputRef}
-              aria-label="Search plans"
-              value={searchQuery}
-              onChange={setSearchQuery}
-              placeholder="Search..."
-              className="text-sm"
-            />
-          </div>
-
-          <Popover>
-            <Popover.Trigger>
-              <Button
-                isIconOnly
-                variant="ghost"
-                size="sm"
-                aria-label="Filters"
-                className={`w-9 h-9 shrink-0 relative ${hasActiveFilters ? 'text-accent' : ''}`}
-              >
-                <Filter className="w-4 h-4" />
-                {hasActiveFilters && (
-                  <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-accent text-accent-foreground text-[8px] flex items-center justify-center font-semibold">
-                    {(searchQuery.trim() ? 1 : 0) + statusFilters.length}
-                  </span>
-                )}
-              </Button>
-            </Popover.Trigger>
-            <Popover.Content className="w-64">
-              <div className="p-3 space-y-3">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-semibold">Filters</h3>
-                  {hasActiveFilters && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onPress={clearFilters}
-                      className="h-6 text-xs"
-                    >
-                      Clear all
-                    </Button>
-                  )}
-                </div>
-
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-muted-foreground">Sort by</span>
-                    <Button
-                      isIconOnly
-                      variant="ghost"
-                      size="sm"
-                      onPress={toggleSortDirection}
-                      className="w-6 h-6"
-                      aria-label={`Sort direction: ${sortDirection}`}
-                    >
-                      <ArrowUpDown className="w-3 h-3" />
-                    </Button>
-                  </div>
-                  <Select
-                    aria-label="Sort plans"
-                    selectedKey={sortBy}
-                    onSelectionChange={(key) =>
-                      setSortBy(key as 'name' | 'newest' | 'updated' | 'status')
-                    }
-                    className="w-full"
-                  >
-                    <Select.Trigger className="h-8">
-                      <Select.Value />
-                    </Select.Trigger>
-                    <Select.Popover>
-                      <ListBox>
-                        {SORT_OPTIONS.map((option) => (
-                          <ListBoxItem key={option.value} id={option.value}>
-                            {option.label}
-                          </ListBoxItem>
-                        ))}
-                      </ListBox>
-                    </Select.Popover>
-                  </Select>
-                </div>
-
-                <div className="space-y-1.5">
-                  <span className="text-xs text-muted-foreground">Status</span>
-                  <div className="flex flex-wrap gap-1">
-                    {STATUS_FILTER_OPTIONS.map((option) => {
-                      const isActive = statusFilters.includes(option.value);
-                      const chipColor =
-                        option.color === 'primary'
-                          ? 'accent'
-                          : (option.color as
-                              | 'default'
-                              | 'warning'
-                              | 'success'
-                              | 'danger'
-                              | 'accent');
-                      return (
-                        <Chip
-                          key={option.value}
-                          size="sm"
-                          variant={isActive ? 'soft' : 'soft'}
-                          color={isActive ? chipColor : 'default'}
-                          className={`cursor-pointer text-[10px] h-5 px-1.5 ${isActive ? 'ring-1 ring-current' : 'opacity-60'}`}
-                          onClick={() => toggleStatusFilter(option.value)}
-                        >
-                          {option.label}
-                        </Chip>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-            </Popover.Content>
-          </Popover>
-        </div>
-      </div>
-
-      <nav className="flex-1 flex flex-col overflow-y-auto px-3 pt-3 pb-0">
-        <ListBox
-          className="p-0"
-          aria-label="All plans"
-          selectionMode="single"
-          selectedKeys={activePlanId ? [activePlanId] : []}
-          onSelectionChange={(keys) => {
-            const key = Array.from(keys)[0];
-            if (key) {
-              markPlanAsRead(String(key));
-              onNavigate?.();
-              navigate(`/plan/${key}`);
-            }
-          }}
-        >
-          {filteredInboxPlans.map((plan) => (
-            <ListBoxItem id={plan.id} key={plan.id} textValue={plan.title} className="group">
-              <PlanItem
-                plan={plan}
-                peerCount={plan.id === activePlanId ? syncState?.peerCount : undefined}
-                onArchive={handleArchive}
-              />
-            </ListBoxItem>
-          ))}
-
-          {filteredMyPlans.map((plan) => (
-            <ListBoxItem id={plan.id} key={plan.id} textValue={plan.title} className="group">
-              <PlanItem
-                plan={plan}
-                peerCount={plan.id === activePlanId ? syncState?.peerCount : undefined}
-                onArchive={handleArchive}
-              />
-            </ListBoxItem>
-          ))}
-
-          {filteredSharedPlans.map((plan) => (
-            <ListBoxItem id={plan.id} key={plan.id} textValue={plan.title} className="group">
-              <PlanItem
-                plan={plan}
-                isShared
-                peerCount={plan.id === activePlanId ? syncState?.peerCount : undefined}
-                onArchive={handleArchive}
-              />
-            </ListBoxItem>
-          ))}
-
-          {/* Note: Archived plans are NOT shown here - they only appear on /archive route */}
-        </ListBox>
-
-        {isLoading && (
-          <div className="space-y-1 p-2">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="flex items-center gap-3 px-3 py-2 rounded-lg">
-                <Skeleton className="h-4 flex-1 rounded" />
-                <Skeleton className="h-4 w-8 rounded" />
-              </div>
-            ))}
-          </div>
-        )}
-
-        {!isLoading &&
-          filteredMyPlans.length === 0 &&
-          filteredSharedPlans.length === 0 &&
-          filteredInboxPlans.length === 0 && (
-            <p className="text-muted-foreground text-sm p-2 text-center">
-              {hasActiveFilters ? 'No matching plans' : 'No plans yet'}
-            </p>
-          )}
-      </nav>
+      {/* Spacer to push footer to bottom */}
+      <div className="flex-1" />
 
       <div className="px-3 py-2 border-t border-separator flex items-center justify-between gap-2 shrink-0 mt-auto">
         <AccountSection />

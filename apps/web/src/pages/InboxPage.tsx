@@ -1,16 +1,13 @@
 /**
  * Inbox Page - Shows plans needing review (pending_review or changes_requested).
- * Includes search filtering and slide-out panel for viewing plans.
+ * Two-column layout with inbox list on left and detail panel on right.
  */
 
-import { Button, Chip, ListBox, ListBoxItem, Spinner, Tooltip } from '@heroui/react';
+import { Button, Chip, ListBox, ListBoxItem, Skeleton, Switch, Tooltip } from '@heroui/react';
 import {
-  getDeliverables,
   getPlanIndexEntry,
-  getPlanMetadata,
   PLAN_INDEX_DOC_NAME,
   type PlanIndexEntry,
-  type PlanMetadata,
   type PlanStatusType,
   setPlanIndexEntry,
 } from '@peer-plan/schema';
@@ -20,16 +17,11 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { IndexeddbPersistence } from 'y-indexeddb';
 import * as Y from 'yjs';
-import { PlanContent } from '@/components/PlanContent';
-import { type PanelWidth, PlanPanel } from '@/components/PlanPanel';
-import { PlanPanelHeader } from '@/components/PlanPanelHeader';
-import { InboxSkeleton } from '@/components/ui/InboxSkeleton';
-import { SearchPlanInput } from '@/components/ui/SearchPlanInput';
+import { InlinePlanDetail, type PlanActionContext } from '@/components/InlinePlanDetail';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useMultiProviderSync } from '@/hooks/useMultiProviderSync';
 import { usePlanIndex } from '@/hooks/usePlanIndex';
-import { colorFromString } from '@/utils/color';
 import { formatRelativeTime } from '@/utils/formatters';
 import { setSidebarCollapsed } from '@/utils/uiPreferences';
 
@@ -149,113 +141,39 @@ function InboxItem({ plan, onApprove, onRequestChanges, onDismiss }: InboxItemPr
 }
 
 export function InboxPage() {
-  const { identity: githubIdentity, startAuth } = useGitHubAuth();
-  const { inboxPlans, markPlanAsRead, isLoading } = usePlanIndex(githubIdentity?.username);
-  const { ydoc: indexDoc } = useMultiProviderSync(PLAN_INDEX_DOC_NAME);
+  // All hooks at top of component - called in same order every render
   const navigate = useNavigate();
   const location = useLocation();
-  const [searchQuery, setSearchQuery] = useState('');
+  const { identity: githubIdentity } = useGitHubAuth();
+  const { inboxPlans, markPlanAsRead, isLoading } = usePlanIndex(githubIdentity?.username);
+  const { ydoc: indexDoc } = useMultiProviderSync(PLAN_INDEX_DOC_NAME);
+  const [showRead, setShowRead] = useState(false);
 
-  // Slide-out panel state - read from URL on mount
+  // Selected plan state - read from URL on mount
   const searchParams = new URLSearchParams(location.search);
   const initialPanelId = searchParams.get('panel');
-  const rawWidth = searchParams.get('width');
-  const validWidths: PanelWidth[] = ['peek', 'expanded', 'full'];
-  const initialWidth: PanelWidth = validWidths.includes(rawWidth as PanelWidth)
-    ? (rawWidth as PanelWidth)
-    : 'peek';
-
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(initialPanelId);
-  const [panelWidth, setPanelWidth] = useState<PanelWidth>(initialWidth);
 
-  // Plan data for panel
-  const [panelMetadata, setPanelMetadata] = useState<PlanMetadata | null>(null);
-  const [panelDeliverableStats, setPanelDeliverableStats] = useState({ completed: 0, total: 0 });
-  const [panelLastActivity, setPanelLastActivity] = useState('');
-
-  // Sync providers for selected plan
-  const {
-    ydoc: panelYdoc,
-    syncState: panelSyncState,
-    wsProvider: panelWsProvider,
-    rtcProvider: panelRtcProvider,
-  } = useMultiProviderSync(selectedPlanId || '');
-
+  // Note: inboxPlans from usePlanIndex is already filtered to unread only.
+  // The "show read" toggle would require usePlanIndex to expose all inbox candidates.
+  // For now, this toggle is a placeholder for future implementation.
   const sortedInboxPlans = useMemo(() => {
-    const sorted = [...inboxPlans].sort((a, b) => b.updatedAt - a.updatedAt);
-    if (!searchQuery.trim()) {
-      return sorted;
-    }
-    const query = searchQuery.toLowerCase();
-    return sorted.filter((plan) => plan.title.toLowerCase().includes(query));
-  }, [inboxPlans, searchQuery]);
+    return [...inboxPlans].sort((a, b) => b.updatedAt - a.updatedAt);
+  }, [inboxPlans]);
 
   // Update URL when panel state changes
   useEffect(() => {
-    let mounted = true;
-
-    if (mounted) {
-      if (selectedPlanId) {
-        navigate(`?panel=${selectedPlanId}&width=${panelWidth}`, { replace: true });
-      } else {
-        navigate('', { replace: true });
-      }
+    if (selectedPlanId) {
+      navigate(`?panel=${selectedPlanId}`, { replace: true });
+    } else {
+      navigate('', { replace: true });
     }
-
-    return () => {
-      mounted = false;
-    };
-  }, [selectedPlanId, panelWidth, navigate]);
-
-  // Load panel metadata when plan is selected
-  useEffect(() => {
-    if (!selectedPlanId || !panelSyncState.idbSynced) {
-      setPanelMetadata(null);
-      return;
-    }
-
-    const metaMap = panelYdoc.getMap('metadata');
-    const update = () => {
-      const metadata = getPlanMetadata(panelYdoc);
-      setPanelMetadata(metadata);
-
-      // Update deliverable stats
-      const deliverables = getDeliverables(panelYdoc);
-      const completed = deliverables.filter((d) => d.linkedArtifactId).length;
-      setPanelDeliverableStats({ completed, total: deliverables.length });
-
-      // Format last activity
-      if (metadata?.updatedAt) {
-        setPanelLastActivity(`Updated ${formatRelativeTime(metadata.updatedAt)}`);
-      }
-    };
-    update();
-    metaMap.observe(update);
-    return () => metaMap.unobserve(update);
-  }, [selectedPlanId, panelYdoc, panelSyncState.idbSynced]);
+  }, [selectedPlanId, navigate]);
 
   // Panel handlers
   const handleClosePanel = useCallback(() => {
     setSelectedPlanId(null);
   }, []);
-
-  const handleChangeWidth = useCallback((width: PanelWidth) => {
-    setPanelWidth(width);
-  }, []);
-
-  // Panel width cycling
-  const cycleWidth = useCallback(
-    (direction: 'expand' | 'collapse') => {
-      const widths: PanelWidth[] = ['peek', 'expanded', 'full'];
-      const currentIndex = widths.indexOf(panelWidth);
-      if (direction === 'expand' && currentIndex < widths.length - 1) {
-        setPanelWidth(widths[currentIndex + 1] as PanelWidth);
-      } else if (direction === 'collapse' && currentIndex > 0) {
-        setPanelWidth(widths[currentIndex - 1] as PanelWidth);
-      }
-    },
-    [panelWidth]
-  );
 
   // Dismiss handler
   const handleDismiss = useCallback(
@@ -280,101 +198,85 @@ export function InboxPage() {
     [sortedInboxPlans]
   );
 
-  // Keyboard shortcuts for panel
-  useKeyboardShortcuts({
-    onTogglePanel: useCallback(() => {
-      if (selectedPlanId) {
-        cycleWidth('collapse');
+  // Approve handler
+  const handleApprove = useCallback(
+    async (planId: string) => {
+      if (!githubIdentity) {
+        toast.error('Please sign in with GitHub first');
+        return;
       }
-    }, [selectedPlanId, cycleWidth]),
-    onExpandPanel: useCallback(() => {
-      if (selectedPlanId) {
-        cycleWidth('expand');
+
+      const now = Date.now();
+
+      const entry = getPlanIndexEntry(indexDoc, planId);
+      if (entry) {
+        setPlanIndexEntry(indexDoc, {
+          ...entry,
+          status: 'in_progress',
+          updatedAt: now,
+        });
       }
-    }, [selectedPlanId, cycleWidth]),
-    onFullScreen: useCallback(() => {
-      if (selectedPlanId) {
-        setSidebarCollapsed(true);
-        navigate(`/plan/${selectedPlanId}`);
+
+      try {
+        const planDoc = new Y.Doc();
+        const idb = new IndexeddbPersistence(planId, planDoc);
+        await idb.whenSynced;
+
+        planDoc.transact(() => {
+          const metadata = planDoc.getMap('metadata');
+          const reviewRequestId = metadata.get('reviewRequestId') as string | undefined;
+
+          metadata.set('status', 'in_progress');
+          metadata.set('updatedAt', now);
+
+          // Preserve reviewRequestId if present (hook needs this to match)
+          if (reviewRequestId !== undefined) {
+            metadata.set('reviewRequestId', reviewRequestId);
+          }
+        });
+
+        idb.destroy();
+      } catch {
+        // Plan doc may not exist locally
       }
-    }, [selectedPlanId, navigate]),
-    onClose: handleClosePanel,
-    onNextItem: useCallback(() => {
-      if (!selectedPlanId) return;
-      const currentIndex = sortedInboxPlans.findIndex((p) => p.id === selectedPlanId);
-      if (currentIndex < sortedInboxPlans.length - 1) {
-        const nextPlan = sortedInboxPlans[currentIndex + 1];
-        if (nextPlan) {
-          setSelectedPlanId(nextPlan.id);
-          markPlanAsRead(nextPlan.id);
-        }
+
+      toast.success('Plan approved');
+    },
+    [githubIdentity, indexDoc]
+  );
+
+  // Request changes handler
+  const handleRequestChanges = useCallback(
+    (planId: string) => {
+      markPlanAsRead(planId);
+      setSelectedPlanId(planId);
+      toast.info('Open panel to add comments and request changes');
+    },
+    [markPlanAsRead]
+  );
+
+  // List selection handler
+  const handleListSelection = useCallback(
+    (keys: Set<unknown> | 'all') => {
+      if (keys === 'all') return;
+      const key = Array.from(keys)[0];
+      if (key) {
+        markPlanAsRead(String(key));
+        setSelectedPlanId(String(key));
       }
-    }, [selectedPlanId, sortedInboxPlans, markPlanAsRead]),
-    onPrevItem: useCallback(() => {
-      if (!selectedPlanId) return;
-      const currentIndex = sortedInboxPlans.findIndex((p) => p.id === selectedPlanId);
-      if (currentIndex > 0) {
-        const prevPlan = sortedInboxPlans[currentIndex - 1];
-        if (prevPlan) {
-          setSelectedPlanId(prevPlan.id);
-          markPlanAsRead(prevPlan.id);
-        }
-      }
-    }, [selectedPlanId, sortedInboxPlans, markPlanAsRead]),
-    onDismiss: useCallback(async () => {
-      if (!selectedPlanId) return;
-      const idx = sortedInboxPlans.findIndex((p) => p.id === selectedPlanId);
-      if (idx === -1) return;
+    },
+    [markPlanAsRead]
+  );
 
-      const currentPlan = sortedInboxPlans[idx];
-      if (!currentPlan) return;
+  // Panel approve handler
+  const handlePanelApprove = useCallback(
+    async (context: PlanActionContext) => {
+      const { planId, ydoc } = context;
 
-      await handleDismiss(currentPlan.id);
-      setSelectedPlanId(getNextSelectedId(idx));
-    }, [selectedPlanId, sortedInboxPlans, handleDismiss, getNextSelectedId]),
-  });
+      const now = Date.now();
 
-  // Identity for comments
-  const identity = githubIdentity
-    ? {
-        id: githubIdentity.username,
-        name: githubIdentity.displayName,
-        color: colorFromString(githubIdentity.username),
-      }
-    : null;
-
-  const handleRequestIdentity = useCallback(() => {
-    startAuth();
-  }, [startAuth]);
-
-  if (isLoading) {
-    return <InboxSkeleton />;
-  }
-
-  const handleApprove = async (planId: string) => {
-    if (!githubIdentity) {
-      toast.error('Please sign in with GitHub first');
-      return;
-    }
-
-    const now = Date.now();
-
-    const entry = getPlanIndexEntry(indexDoc, planId);
-    if (entry) {
-      setPlanIndexEntry(indexDoc, {
-        ...entry,
-        status: 'in_progress',
-        updatedAt: now,
-      });
-    }
-
-    try {
-      const planDoc = new Y.Doc();
-      const idb = new IndexeddbPersistence(planId, planDoc);
-      await idb.whenSynced;
-
-      planDoc.transact(() => {
-        const metadata = planDoc.getMap('metadata');
+      ydoc.transact(() => {
+        const metadata = ydoc.getMap('metadata');
         const reviewRequestId = metadata.get('reviewRequestId') as string | undefined;
 
         metadata.set('status', 'in_progress');
@@ -386,76 +288,115 @@ export function InboxPage() {
         }
       });
 
-      idb.destroy();
-    } catch {
-      // Plan doc may not exist locally
-    }
-
-    toast.success('Plan approved');
-  };
-
-  const handleRequestChanges = (planId: string) => {
-    markPlanAsRead(planId);
-    setSelectedPlanId(planId);
-    setPanelWidth('expanded');
-    toast.info('Open panel to add comments and request changes');
-  };
-
-  const handleListSelection = (keys: Set<unknown> | 'all') => {
-    if (keys === 'all') return;
-    const key = Array.from(keys)[0];
-    if (key) {
-      markPlanAsRead(String(key));
-      setSelectedPlanId(String(key));
-      setPanelWidth('peek');
-    }
-  };
-
-  // Panel approve handler
-  const handlePanelApprove = async () => {
-    if (!selectedPlanId || !panelMetadata) return;
-
-    const now = Date.now();
-
-    panelYdoc.transact(() => {
-      const metadata = panelYdoc.getMap('metadata');
-      const reviewRequestId = metadata.get('reviewRequestId') as string | undefined;
-
-      metadata.set('status', 'in_progress');
-      metadata.set('updatedAt', now);
-
-      // Preserve reviewRequestId if present (hook needs this to match)
-      if (reviewRequestId !== undefined) {
-        metadata.set('reviewRequestId', reviewRequestId);
+      // Also update index with the same timestamp
+      const entry = getPlanIndexEntry(indexDoc, planId);
+      if (entry) {
+        setPlanIndexEntry(indexDoc, {
+          ...entry,
+          status: 'in_progress',
+          updatedAt: now,
+        });
       }
-    });
 
-    // Also update index with the same timestamp
-    const entry = getPlanIndexEntry(indexDoc, selectedPlanId);
-    if (entry) {
-      setPlanIndexEntry(indexDoc, {
-        ...entry,
-        status: 'in_progress',
-        updatedAt: now,
-      });
+      toast.success('Plan approved');
+    },
+    [indexDoc]
+  );
+
+  // Panel request changes handler
+  const handlePanelRequestChanges = useCallback(
+    (context: PlanActionContext) => {
+      const { planId } = context;
+      // Navigate to full plan page for adding comments
+      navigate(`/plan/${planId}`);
+      toast.info('Navigate to add comments and request changes');
+    },
+    [navigate]
+  );
+
+  // Keyboard shortcut handlers - all extracted to top level
+  const handleFullScreen = useCallback(() => {
+    if (selectedPlanId) {
+      setSidebarCollapsed(true);
+      navigate(`/plan/${selectedPlanId}`);
     }
+  }, [selectedPlanId, navigate]);
 
-    toast.success('Plan approved');
-  };
-
-  const handlePanelRequestChanges = () => {
+  const handleNextItem = useCallback(() => {
     if (!selectedPlanId) return;
-    // Navigate to full plan page for adding comments
-    navigate(`/plan/${selectedPlanId}`);
-    toast.info('Navigate to add comments and request changes');
-  };
+    const currentIndex = sortedInboxPlans.findIndex((p) => p.id === selectedPlanId);
+    if (currentIndex < sortedInboxPlans.length - 1) {
+      const nextPlan = sortedInboxPlans[currentIndex + 1];
+      if (nextPlan) {
+        setSelectedPlanId(nextPlan.id);
+        markPlanAsRead(nextPlan.id);
+      }
+    }
+  }, [selectedPlanId, sortedInboxPlans, markPlanAsRead]);
+
+  const handlePrevItem = useCallback(() => {
+    if (!selectedPlanId) return;
+    const currentIndex = sortedInboxPlans.findIndex((p) => p.id === selectedPlanId);
+    if (currentIndex > 0) {
+      const prevPlan = sortedInboxPlans[currentIndex - 1];
+      if (prevPlan) {
+        setSelectedPlanId(prevPlan.id);
+        markPlanAsRead(prevPlan.id);
+      }
+    }
+  }, [selectedPlanId, sortedInboxPlans, markPlanAsRead]);
+
+  const handleKeyboardDismiss = useCallback(async () => {
+    if (!selectedPlanId) return;
+    const idx = sortedInboxPlans.findIndex((p) => p.id === selectedPlanId);
+    if (idx === -1) return;
+
+    const currentPlan = sortedInboxPlans[idx];
+    if (!currentPlan) return;
+
+    await handleDismiss(currentPlan.id);
+    setSelectedPlanId(getNextSelectedId(idx));
+  }, [selectedPlanId, sortedInboxPlans, handleDismiss, getNextSelectedId]);
+
+  // Keyboard shortcuts for panel
+  useKeyboardShortcuts({
+    onFullScreen: handleFullScreen,
+    onClose: handleClosePanel,
+    onNextItem: handleNextItem,
+    onPrevItem: handlePrevItem,
+    onDismiss: handleKeyboardDismiss,
+  });
 
   if (isLoading) {
-    return <InboxSkeleton />;
+    return (
+      <div className="h-full grid grid-cols-[minmax(300px,400px)_1fr]">
+        <div className="flex flex-col h-full overflow-hidden border-r border-separator">
+          <div className="border-b border-separator shrink-0 p-4">
+            <div className="flex flex-col gap-3 mb-4">
+              <Skeleton className="h-6 w-20 rounded" />
+              <Skeleton className="h-4 w-32 rounded" />
+            </div>
+          </div>
+          <div className="flex-1 overflow-y-auto p-2 space-y-2">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="flex items-center justify-between gap-3 py-3 px-3 rounded-lg">
+                <div className="flex flex-col gap-2 flex-1">
+                  <Skeleton className="h-5 w-48 rounded" />
+                  <Skeleton className="h-3 w-24 rounded" />
+                </div>
+                <div className="flex gap-1">
+                  <Skeleton className="h-8 w-8 rounded" />
+                  <Skeleton className="h-8 w-8 rounded" />
+                  <Skeleton className="h-8 w-8 rounded" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="flex flex-col h-full overflow-hidden" />
+      </div>
+    );
   }
-
-  // Prefer WebSocket when connected, fall back to WebRTC
-  const activeProvider = panelWsProvider ?? panelRtcProvider;
 
   if (inboxPlans.length === 0) {
     return (
@@ -472,109 +413,72 @@ export function InboxPage() {
   }
 
   return (
-    <div className="h-full flex flex-col p-4 max-w-3xl mx-auto">
-      <div className="flex flex-col gap-3 mb-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-bold text-foreground">Inbox</h1>
-            <p className="text-sm text-muted-foreground">
-              {sortedInboxPlans.length}{' '}
-              {sortedInboxPlans.length === 1 ? 'plan needs' : 'plans need'} your attention
-              {searchQuery && inboxPlans.length !== sortedInboxPlans.length && (
-                <span className="text-muted-foreground"> (filtered from {inboxPlans.length})</span>
-              )}
-            </p>
+    <div className="h-full grid grid-cols-[minmax(300px,400px)_1fr]">
+      {/* Inbox list */}
+      <div className="flex flex-col h-full overflow-hidden border-r border-separator">
+        {/* Header with show read toggle */}
+        <div className="border-b border-separator shrink-0 p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h1 className="text-xl font-bold text-foreground">Inbox</h1>
+              <p className="text-sm text-muted-foreground">
+                {sortedInboxPlans.length}{' '}
+                {sortedInboxPlans.length === 1 ? 'plan needs' : 'plans need'} your attention
+              </p>
+            </div>
+            <Switch size="sm" isSelected={showRead} onChange={setShowRead}>
+              Show read
+            </Switch>
           </div>
         </div>
 
-        <SearchPlanInput
-          aria-label="Search inbox"
-          value={searchQuery}
-          onChange={setSearchQuery}
-          placeholder="Search inbox..."
-          className="w-full"
+        {/* Inbox results */}
+        <div className="flex-1 overflow-y-auto p-2">
+          {sortedInboxPlans.length === 0 ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="text-center">
+                <p className="text-muted-foreground">No plans in inbox</p>
+              </div>
+            </div>
+          ) : (
+            <ListBox
+              aria-label="Inbox plans"
+              selectionMode="single"
+              selectedKeys={selectedPlanId ? new Set([selectedPlanId]) : new Set()}
+              onSelectionChange={handleListSelection}
+              className="divide-y divide-separator"
+            >
+              {sortedInboxPlans.map((plan) => (
+                <ListBoxItem
+                  id={plan.id}
+                  key={plan.id}
+                  textValue={plan.title}
+                  className="px-3 rounded-lg hover:bg-surface"
+                >
+                  <InboxItem
+                    plan={plan}
+                    onApprove={handleApprove}
+                    onRequestChanges={handleRequestChanges}
+                    onDismiss={handleDismiss}
+                  />
+                </ListBoxItem>
+              ))}
+            </ListBox>
+          )}
+        </div>
+      </div>
+
+      {/* Right: Detail panel */}
+      <div className="flex flex-col h-full overflow-hidden">
+        <InlinePlanDetail
+          planId={selectedPlanId}
+          onClose={handleClosePanel}
+          onApprove={handlePanelApprove}
+          onRequestChanges={handlePanelRequestChanges}
+          width="expanded"
+          emptyMessage="Select a plan to view details"
         />
       </div>
-
-      <div className="flex-1 overflow-y-auto">
-        {sortedInboxPlans.length === 0 ? (
-          <div className="flex items-center justify-center py-12">
-            <div className="text-center">
-              <p className="text-muted-foreground">No plans match "{searchQuery}"</p>
-              <Button variant="ghost" size="sm" onPress={() => setSearchQuery('')} className="mt-2">
-                Clear search
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <ListBox
-            aria-label="Inbox plans"
-            selectionMode="single"
-            onSelectionChange={handleListSelection}
-            className="divide-y divide-separator"
-          >
-            {sortedInboxPlans.map((plan) => (
-              <ListBoxItem
-                id={plan.id}
-                key={plan.id}
-                textValue={plan.title}
-                className="px-3 rounded-lg hover:bg-surface"
-              >
-                <InboxItem
-                  plan={plan}
-                  onApprove={handleApprove}
-                  onRequestChanges={handleRequestChanges}
-                  onDismiss={handleDismiss}
-                />
-              </ListBoxItem>
-            ))}
-          </ListBox>
-        )}
-      </div>
-
-      {/* Slide-out panel */}
-      <PlanPanel
-        planId={selectedPlanId}
-        width={panelWidth}
-        onClose={handleClosePanel}
-        onChangeWidth={handleChangeWidth}
-      >
-        {selectedPlanId && panelMetadata ? (
-          <>
-            <PlanPanelHeader
-              metadata={panelMetadata}
-              deliverableStats={panelDeliverableStats}
-              lastActivityText={panelLastActivity}
-              onApprove={handlePanelApprove}
-              onRequestChanges={handlePanelRequestChanges}
-              onClose={handleClosePanel}
-              onExpand={() => cycleWidth(panelWidth === 'peek' ? 'expand' : 'collapse')}
-              onFullScreen={() => {
-                if (selectedPlanId) {
-                  setSidebarCollapsed(true);
-                  navigate(`/plan/${selectedPlanId}`);
-                }
-              }}
-              width={panelWidth}
-            />
-            <PlanContent
-              ydoc={panelYdoc}
-              metadata={panelMetadata}
-              syncState={panelSyncState}
-              identity={identity}
-              onRequestIdentity={handleRequestIdentity}
-              provider={activeProvider}
-            />
-          </>
-        ) : selectedPlanId ? (
-          <div className="flex items-center justify-center h-full">
-            <div className="flex flex-col items-center gap-4">
-              <Spinner size="lg" />
-              <p className="text-muted-foreground">Loading plan...</p>
-            </div>
-          </div>
-        ) : null}
-      </PlanPanel>
     </div>
   );
 }

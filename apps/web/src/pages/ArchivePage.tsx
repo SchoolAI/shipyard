@@ -13,7 +13,6 @@ import { toast } from 'sonner';
 import { IndexeddbPersistence } from 'y-indexeddb';
 import * as Y from 'yjs';
 import { InlinePlanDetail } from '@/components/InlinePlanDetail';
-import { SearchPlanInput } from '@/components/ui/SearchPlanInput';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useMultiProviderSync } from '@/hooks/useMultiProviderSync';
@@ -58,7 +57,6 @@ export function ArchivePage() {
   const { identity: githubIdentity } = useGitHubAuth();
   const { archivedPlans, isLoading } = usePlanIndex(githubIdentity?.username);
   const { ydoc: indexDoc } = useMultiProviderSync(PLAN_INDEX_DOC_NAME);
-  const [searchQuery, setSearchQuery] = useState('');
 
   // Selected plan state - read from URL on mount
   const searchParams = new URLSearchParams(location.search);
@@ -66,15 +64,10 @@ export function ArchivePage() {
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(initialPanelId);
 
   const sortedArchivedPlans = useMemo(() => {
-    const sorted = [...archivedPlans].sort(
+    return [...archivedPlans].sort(
       (a, b) => (b.deletedAt || b.updatedAt) - (a.deletedAt || a.updatedAt)
     );
-    if (!searchQuery.trim()) {
-      return sorted;
-    }
-    const query = searchQuery.toLowerCase();
-    return sorted.filter((plan) => plan.title.toLowerCase().includes(query));
-  }, [archivedPlans, searchQuery]);
+  }, [archivedPlans]);
 
   // Update URL when panel state changes
   useEffect(() => {
@@ -209,51 +202,26 @@ export function ArchivePage() {
   }
 
   return (
-    <div
-      className={`h-full ${selectedPlanId ? 'grid grid-cols-[minmax(300px,400px)_1fr]' : 'flex flex-col'}`}
-    >
+    <div className="h-full grid grid-cols-[minmax(300px,400px)_1fr]">
       {/* Archive list */}
-      <div
-        className={`flex flex-col h-full overflow-hidden ${selectedPlanId ? 'border-r border-separator' : 'max-w-3xl mx-auto w-full p-4'}`}
-      >
-        {/* Header with search */}
-        <div className={`border-b border-separator shrink-0 ${selectedPlanId ? 'p-4' : 'mb-4'}`}>
+      <div className="flex flex-col h-full overflow-hidden border-r border-separator">
+        {/* Header */}
+        <div className="border-b border-separator shrink-0 p-4">
           <div className="mb-3">
             <h1 className="text-xl font-bold text-foreground">Archive</h1>
             <p className="text-sm text-muted-foreground">
               {sortedArchivedPlans.length}{' '}
               {sortedArchivedPlans.length === 1 ? 'archived plan' : 'archived plans'}
-              {searchQuery && archivedPlans.length !== sortedArchivedPlans.length && (
-                <span className="text-muted-foreground">
-                  {' '}
-                  (filtered from {archivedPlans.length})
-                </span>
-              )}
             </p>
           </div>
-          <SearchPlanInput
-            aria-label="Search archive"
-            value={searchQuery}
-            onChange={setSearchQuery}
-            placeholder="Search archive..."
-            className="w-full"
-          />
         </div>
 
         {/* Archive results */}
-        <div className={`flex-1 overflow-y-auto ${selectedPlanId ? 'p-2' : ''}`}>
+        <div className="flex-1 overflow-y-auto p-2">
           {sortedArchivedPlans.length === 0 ? (
             <div className="flex items-center justify-center py-12">
               <div className="text-center">
-                <p className="text-muted-foreground">No plans match "{searchQuery}"</p>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onPress={() => setSearchQuery('')}
-                  className="mt-2"
-                >
-                  Clear search
-                </Button>
+                <p className="text-muted-foreground">No archived plans</p>
               </div>
             </div>
           ) : (

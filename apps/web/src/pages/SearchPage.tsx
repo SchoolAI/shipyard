@@ -3,9 +3,9 @@
  * Two-column layout with search input + results list on left and detail panel on right.
  */
 
-import { ListBox, ListBoxItem, Spinner } from '@heroui/react';
+import { Button, Checkbox, ListBox, ListBoxItem, Popover, Spinner } from '@heroui/react';
 import { PLAN_INDEX_DOC_NAME, type PlanIndexEntry } from '@peer-plan/schema';
-import { Search } from 'lucide-react';
+import { Filter, LayoutGrid, Search } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { InlinePlanDetail } from '@/components/InlinePlanDetail';
@@ -15,6 +15,7 @@ import { useGitHubAuth } from '@/hooks/useGitHubAuth';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useMultiProviderSync } from '@/hooks/useMultiProviderSync';
 import { usePlanIndex } from '@/hooks/usePlanIndex';
+import { STATUS_FILTER_OPTIONS, useViewFilters } from '@/hooks/useViewFilters';
 import { formatRelativeTime } from '@/utils/formatters';
 import { setSidebarCollapsed } from '@/utils/uiPreferences';
 
@@ -38,6 +39,101 @@ function SearchResultItem({ plan }: SearchResultItemProps) {
   );
 }
 
+interface FilterBarProps {
+  ownershipFilter: OwnershipFilter;
+  onOwnershipFilterChange: (filter: OwnershipFilter) => void;
+  statusFilters: ReturnType<typeof useViewFilters>['statusFilters'];
+  onToggleStatusFilter: ReturnType<typeof useViewFilters>['toggleStatusFilter'];
+}
+
+function FilterBar({
+  ownershipFilter,
+  onOwnershipFilterChange,
+  statusFilters,
+  onToggleStatusFilter,
+}: FilterBarProps) {
+  return (
+    <div className="flex items-center gap-2">
+      {/* Ownership Tabs */}
+      <div className="flex items-center gap-1 flex-1">
+        <button
+          type="button"
+          onClick={() => onOwnershipFilterChange('all')}
+          className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+            ownershipFilter === 'all'
+              ? 'bg-accent/10 text-accent font-medium'
+              : 'text-muted-foreground hover:text-foreground hover:bg-surface-hover'
+          }`}
+        >
+          All
+        </button>
+        <button
+          type="button"
+          onClick={() => onOwnershipFilterChange('my-plans')}
+          className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+            ownershipFilter === 'my-plans'
+              ? 'bg-accent/10 text-accent font-medium'
+              : 'text-muted-foreground hover:text-foreground hover:bg-surface-hover'
+          }`}
+        >
+          My Plans
+        </button>
+        <button
+          type="button"
+          onClick={() => onOwnershipFilterChange('shared')}
+          className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+            ownershipFilter === 'shared'
+              ? 'bg-accent/10 text-accent font-medium'
+              : 'text-muted-foreground hover:text-foreground hover:bg-surface-hover'
+          }`}
+        >
+          Shared
+        </button>
+      </div>
+
+      {/* Filter Button */}
+      <Popover>
+        <Button variant="ghost" size="sm" className="gap-2">
+          <Filter className="w-4 h-4" />
+          Filter
+          {statusFilters.length > 0 && (
+            <span className="ml-1 px-1.5 py-0.5 text-xs bg-accent/20 text-accent rounded">
+              {statusFilters.length}
+            </span>
+          )}
+        </Button>
+
+        <Popover.Content placement="bottom end" className="w-64">
+          <Popover.Dialog>
+            <Popover.Arrow />
+            <Popover.Heading>Filter by Status</Popover.Heading>
+            <div className="mt-3 space-y-2">
+              {STATUS_FILTER_OPTIONS.map((option) => (
+                <Checkbox
+                  key={option.value}
+                  isSelected={statusFilters.includes(option.value)}
+                  onChange={() => onToggleStatusFilter(option.value)}
+                  className="w-full"
+                >
+                  {option.label}
+                </Checkbox>
+              ))}
+            </div>
+          </Popover.Dialog>
+        </Popover.Content>
+      </Popover>
+
+      {/* Display Button (placeholder) */}
+      <Button variant="ghost" size="sm" className="gap-2" isDisabled>
+        <LayoutGrid className="w-4 h-4" />
+        Display
+      </Button>
+    </div>
+  );
+}
+
+type OwnershipFilter = 'all' | 'my-plans' | 'shared';
+
 export function SearchPage() {
   const { identity: githubIdentity } = useGitHubAuth();
   const { myPlans, sharedPlans, inboxPlans, isLoading } = usePlanIndex(githubIdentity?.username);
@@ -45,8 +141,10 @@ export function SearchPage() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Search state
+  // Filters
   const [searchQuery, setSearchQuery] = useState('');
+  const [ownershipFilter, setOwnershipFilter] = useState<OwnershipFilter>('all');
+  const { statusFilters, toggleStatusFilter } = useViewFilters();
 
   // Selected plan state - read from URL on mount
   const searchParams = new URLSearchParams(location.search);
@@ -64,12 +162,35 @@ export function SearchPage() {
     return Array.from(planMap.values());
   }, [inboxPlans, myPlans, sharedPlans]);
 
-  // Filter by search query
+  // Apply ownership filter
+  const ownershipFilteredPlans = useMemo(() => {
+    switch (ownershipFilter) {
+      case 'my-plans':
+        return myPlans;
+      case 'shared':
+        return sharedPlans;
+      default:
+        return allPlans;
+    }
+  }, [ownershipFilter, myPlans, sharedPlans, allPlans]);
+
+  // Filter by search query and status
   const filteredPlans = useMemo(() => {
-    if (!searchQuery.trim()) return allPlans;
-    const query = searchQuery.toLowerCase();
-    return allPlans.filter((plan) => plan.title.toLowerCase().includes(query));
-  }, [allPlans, searchQuery]);
+    let plans = ownershipFilteredPlans;
+
+    // Search query filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      plans = plans.filter((plan) => plan.title.toLowerCase().includes(query));
+    }
+
+    // Status filter
+    if (statusFilters.length > 0) {
+      plans = plans.filter((plan) => statusFilters.includes(plan.status));
+    }
+
+    return plans;
+  }, [ownershipFilteredPlans, searchQuery, statusFilters]);
 
   // Sort by updated time
   const sortedPlans = useMemo(() => {
@@ -168,33 +289,44 @@ export function SearchPage() {
             value={searchQuery}
             onChange={setSearchQuery}
             placeholder="Search plans..."
-            className="w-full"
+            className="w-full mb-3"
+          />
+
+          {/* Filter Bar - Linear Style */}
+          <FilterBar
+            ownershipFilter={ownershipFilter}
+            onOwnershipFilterChange={setOwnershipFilter}
+            statusFilters={statusFilters}
+            onToggleStatusFilter={toggleStatusFilter}
           />
         </div>
 
         {/* Results */}
         <div className={`flex-1 overflow-y-auto ${selectedPlanId ? 'p-2' : ''}`}>
-          {/* No search query - prompt to search */}
-          {!searchQuery && (
+          {/* No search query and no filters - prompt to search */}
+          {!searchQuery && statusFilters.length === 0 && (
             <div className="flex items-center justify-center py-12">
               <div className="text-center">
                 <Search className="w-12 h-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-                <p className="text-muted-foreground">Type to search plans</p>
+                <p className="text-muted-foreground">Type to search plans or use filters</p>
               </div>
             </div>
           )}
 
-          {/* Search query but no results */}
-          {searchQuery && sortedPlans.length === 0 && (
+          {/* No results */}
+          {(searchQuery || statusFilters.length > 0) && sortedPlans.length === 0 && (
             <div className="flex items-center justify-center py-12">
               <div className="text-center">
-                <p className="text-muted-foreground">No plans match "{searchQuery}"</p>
+                <p className="text-muted-foreground">
+                  No plans match your search
+                  {searchQuery && ` for "${searchQuery}"`}
+                </p>
               </div>
             </div>
           )}
 
-          {/* Search results */}
-          {searchQuery && sortedPlans.length > 0 && (
+          {/* Results */}
+          {(searchQuery || statusFilters.length > 0) && sortedPlans.length > 0 && (
             <>
               <p className="text-sm text-muted-foreground px-2 mb-2">
                 {sortedPlans.length} {sortedPlans.length === 1 ? 'result' : 'results'}
