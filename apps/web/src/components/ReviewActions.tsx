@@ -137,7 +137,7 @@ export function ReviewActions({
     action: 'approve' | 'request_changes',
     trimmedComment: string,
     now: number
-  ) => {
+  ): 'in_progress' | 'changes_requested' => {
     const newStatus = action === 'approve' ? 'in_progress' : 'changes_requested';
 
     const metadata = ydoc.getMap('metadata');
@@ -171,7 +171,7 @@ export function ReviewActions({
     validEditor: BlockNoteEditor,
     trimmedComment: string,
     timestamp: number
-  ) => {
+  ): { newStatus: 'in_progress' | 'changes_requested'; timestamp: number } => {
     const reviewerName = identity?.name ?? 'Unknown';
     const newStatus = updateReviewStatus(action, trimmedComment, timestamp);
 
