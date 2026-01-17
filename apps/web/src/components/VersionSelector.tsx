@@ -61,6 +61,13 @@ export function VersionSelector({
 
   return (
     <div className="flex items-center gap-2 text-sm">
+      {/* Return to current button (when viewing history) - on left to avoid shifting navigation */}
+      {isViewingHistory && (
+        <Button size="sm" variant="secondary" onPress={onCurrent} className="mr-2">
+          View Current
+        </Button>
+      )}
+
       {/* Previous version button */}
       <Button
         size="sm"
@@ -96,13 +103,6 @@ export function VersionSelector({
       >
         <ChevronRight className="h-4 w-4" />
       </Button>
-
-      {/* Return to current button (when viewing history) */}
-      {isViewingHistory && (
-        <Button size="sm" variant="secondary" onPress={onCurrent} className="ml-2">
-          View Current
-        </Button>
-      )}
     </div>
   );
 }
