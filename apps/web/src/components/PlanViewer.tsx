@@ -19,10 +19,12 @@ import {
   UnnestBlockButton,
   useCreateBlockNote,
 } from '@blocknote/react';
+import type { PlanSnapshot } from '@peer-plan/schema';
 import { useEffect, useRef } from 'react';
 import type { WebrtcProvider } from 'y-webrtc';
 import type { WebsocketProvider } from 'y-websocket';
 import type * as Y from 'yjs';
+import { VersionSelector } from '@/components/VersionSelector';
 import { useTheme } from '@/hooks/useTheme';
 import { RedoButton } from './editor/RedoButton';
 import { UndoButton } from './editor/UndoButton';
@@ -36,6 +38,19 @@ interface UserIdentity {
 
 /** Provider type that BlockNote can use for collaboration (WebSocket or WebRTC) */
 type CollaborationProvider = WebsocketProvider | WebrtcProvider;
+
+/** Version navigation state from useVersionNavigation hook */
+interface VersionNavigationState {
+  snapshots: PlanSnapshot[];
+  currentIndex: number;
+  currentSnapshot: PlanSnapshot | null;
+  isViewingHistory: boolean;
+  goToPrevious: () => void;
+  goToNext: () => void;
+  goToCurrent: () => void;
+  canGoPrevious: boolean;
+  canGoNext: boolean;
+}
 
 interface PlanViewerProps {
   ydoc: Y.Doc;
@@ -51,6 +66,8 @@ interface PlanViewerProps {
   currentSnapshot?: { content: unknown[] } | null;
   /** Callback to receive editor instance for snapshots - Issue #42 */
   onEditorReady?: (editor: BlockNoteEditor) => void;
+  /** Version navigation state - Issue #42 */
+  versionNav?: VersionNavigationState;
 }
 
 /**
@@ -168,6 +185,7 @@ export function PlanViewer({
   initialContent: _initialContent,
   currentSnapshot = null,
   onEditorReady,
+  versionNav,
 }: PlanViewerProps) {
   // Comments are fully enabled only when identity is set
   const hasComments = identity !== null;
@@ -471,6 +489,21 @@ export function PlanViewer({
       role="application"
       aria-label="Plan viewer with comments"
     >
+      {/* Version navigation - positioned in top-right corner inside the editor */}
+      {versionNav && versionNav.snapshots.length > 0 && (
+        <div className="absolute top-2 right-2 z-10">
+          <VersionSelector
+            currentSnapshot={versionNav.currentSnapshot}
+            totalSnapshots={versionNav.snapshots.length}
+            currentIndex={versionNav.currentIndex}
+            canGoPrevious={versionNav.canGoPrevious}
+            canGoNext={versionNav.canGoNext}
+            onPrevious={versionNav.goToPrevious}
+            onNext={versionNav.goToNext}
+            onCurrent={versionNav.goToCurrent}
+          />
+        </div>
+      )}
       <BlockNoteView
         key={editorKey}
         editor={editor}

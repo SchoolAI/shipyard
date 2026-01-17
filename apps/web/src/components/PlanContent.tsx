@@ -16,7 +16,6 @@ import { Attachments } from '@/components/Attachments';
 import { ChangesView } from '@/components/ChangesView';
 import { DeliverablesView } from '@/components/DeliverablesView';
 import { PlanViewer } from '@/components/PlanViewer';
-import { VersionSelector } from '@/components/VersionSelector';
 import type { SyncState } from '@/hooks/useMultiProviderSync';
 
 type ViewType = 'plan' | 'activity' | 'deliverables' | 'changes';
@@ -176,34 +175,17 @@ export function PlanContent({
       {activeView === 'plan' && (
         <div className="flex-1 overflow-y-auto bg-background">
           <div className="max-w-4xl mx-auto px-1 py-2 md:p-6 space-y-3 md:space-y-6">
-            {/* Plan viewer with version navigation overlay */}
-            <div className="relative">
-              {/* Version navigation - positioned in top-right corner of editor */}
-              {!isSnapshot && versionNav && versionNav.snapshots.length > 0 && (
-                <div className="absolute top-2 right-2 z-10 bg-surface/90 backdrop-blur-sm rounded-lg shadow-sm border border-separator/50">
-                  <VersionSelector
-                    currentSnapshot={versionNav.currentSnapshot}
-                    totalSnapshots={versionNav.snapshots.length}
-                    currentIndex={versionNav.currentIndex}
-                    canGoPrevious={versionNav.canGoPrevious}
-                    canGoNext={versionNav.canGoNext}
-                    onPrevious={versionNav.goToPrevious}
-                    onNext={versionNav.goToNext}
-                    onCurrent={versionNav.goToCurrent}
-                  />
-                </div>
-              )}
-              <PlanViewer
-                key={identity?.id ?? 'anonymous'}
-                ydoc={ydoc}
-                identity={isSnapshot ? null : identity}
-                provider={provider}
-                onRequestIdentity={isSnapshot ? undefined : onRequestIdentity}
-                initialContent={isSnapshot ? initialContent : undefined}
-                currentSnapshot={currentSnapshot}
-                onEditorReady={onEditorReady}
-              />
-            </div>
+            <PlanViewer
+              key={identity?.id ?? 'anonymous'}
+              ydoc={ydoc}
+              identity={isSnapshot ? null : identity}
+              provider={provider}
+              onRequestIdentity={isSnapshot ? undefined : onRequestIdentity}
+              initialContent={isSnapshot ? initialContent : undefined}
+              currentSnapshot={currentSnapshot}
+              onEditorReady={onEditorReady}
+              versionNav={!isSnapshot ? versionNav : undefined}
+            />
             <Attachments ydoc={ydoc} />
           </div>
         </div>
