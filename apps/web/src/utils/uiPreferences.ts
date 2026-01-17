@@ -26,6 +26,7 @@ const SIDEBAR_COLLAPSED_KEY = 'peer-plan-sidebar-collapsed';
 const SHOW_ARCHIVED_KEY = 'peer-plan-show-archived';
 const VIEW_PREFERENCES_KEY = 'peer-plan-view-preferences';
 const KANBAN_HIDE_EMPTY_COLUMNS_KEY = 'kanban-hide-empty-columns';
+const INBOX_SHOW_READ_KEY = 'peer-plan-inbox-show-read';
 
 /** Get sidebar collapsed state from localStorage */
 export function getSidebarCollapsed(): boolean {
@@ -118,5 +119,25 @@ export function setHideEmptyColumns(hide: boolean): void {
     localStorage.setItem(KANBAN_HIDE_EMPTY_COLUMNS_KEY, String(hide));
   } catch {
     // Ignore storage errors (e.g., private browsing)
+  }
+}
+
+// --- Inbox Preferences ---
+
+/** Get inbox show read preference from localStorage */
+export function getInboxShowRead(): boolean {
+  try {
+    return localStorage.getItem(INBOX_SHOW_READ_KEY) === 'true';
+  } catch {
+    return false; // default: show unread only
+  }
+}
+
+/** Save inbox show read preference to localStorage */
+export function setInboxShowRead(show: boolean): void {
+  try {
+    localStorage.setItem(INBOX_SHOW_READ_KEY, String(show));
+  } catch {
+    // Ignore storage errors (e.g., private browsing mode)
   }
 }

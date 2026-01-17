@@ -99,6 +99,13 @@ else
   echo "  ✓ No server storage to clear"
 fi
 
+# Clear hook state (Claude Code session metadata)
+HOOK_STATE_FILE="$PEER_PLAN_DIR/hook-state.json"
+if [ -f "$HOOK_STATE_FILE" ]; then
+  rm -f "$HOOK_STATE_FILE"
+  echo "  ✓ Cleared hook state (session metadata)"
+fi
+
 # Clear Playwright's IndexedDB cache (survives browser restarts)
 PLAYWRIGHT_CACHE="$HOME/Library/Caches/ms-playwright"
 if [ -d "$PLAYWRIGHT_CACHE" ]; then

@@ -73,6 +73,8 @@ export interface PlanIndexState {
   sharedPlans: PlanIndexEntry[];
   /** Plans needing attention (pending_review, changes_requested) AND unread */
   inboxPlans: PlanIndexEntryWithReadState[];
+  /** All plans matching inbox criteria, including both read and unread */
+  allInboxPlans: PlanIndexEntryWithReadState[];
   archivedPlans: PlanIndexEntry[];
   /** Connected to hub WebSocket or WebRTC peers */
   connected: boolean;
@@ -328,21 +330,23 @@ export function usePlanIndex(currentUsername: string | undefined): PlanIndexStat
     };
   }, [ydoc, inboxCandidates, currentUsername, inboxRefreshTrigger]);
 
-  // Filter inbox to only unread plans
-  const inboxPlans: PlanIndexEntryWithReadState[] = useMemo(() => {
+  // All inbox plans with read state (unfiltered)
+  const allInboxPlans: PlanIndexEntryWithReadState[] = useMemo(() => {
     if (!currentUsername) {
       return [];
     }
 
-    const result = inboxCandidates
-      .map((plan) => {
-        const viewedBy = planViewedBy[plan.id] ?? {};
-        const isUnread = isPlanUnread(plan, currentUsername, viewedBy);
-        return { ...plan, isUnread };
-      })
-      .filter((plan) => plan.isUnread);
-    return result;
+    return inboxCandidates.map((plan) => {
+      const viewedBy = planViewedBy[plan.id] ?? {};
+      const isUnread = isPlanUnread(plan, currentUsername, viewedBy);
+      return { ...plan, isUnread };
+    });
   }, [inboxCandidates, currentUsername, planViewedBy]);
+
+  // Filter inbox to only unread plans
+  const inboxPlans: PlanIndexEntryWithReadState[] = useMemo(() => {
+    return allInboxPlans.filter((plan) => plan.isUnread);
+  }, [allInboxPlans]);
 
   const myPlans = useMemo(
     () =>
@@ -420,6 +424,7 @@ export function usePlanIndex(currentUsername: string | undefined): PlanIndexStat
     myPlans,
     sharedPlans,
     inboxPlans,
+    allInboxPlans,
     archivedPlans,
     connected: syncState.connected,
     synced: syncState.synced,

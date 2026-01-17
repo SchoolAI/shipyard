@@ -24,7 +24,7 @@ import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useMultiProviderSync } from '@/hooks/useMultiProviderSync';
 import { usePlanIndex } from '@/hooks/usePlanIndex';
 import { formatRelativeTime } from '@/utils/formatters';
-import { setSidebarCollapsed } from '@/utils/uiPreferences';
+import { getInboxShowRead, setInboxShowRead, setSidebarCollapsed } from '@/utils/uiPreferences';
 
 interface StatusBadgeProps {
   status: PlanStatusType;
@@ -146,21 +146,33 @@ export function InboxPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { identity: githubIdentity } = useGitHubAuth();
-  const { inboxPlans, markPlanAsRead, isLoading } = usePlanIndex(githubIdentity?.username);
+  const { allInboxPlans, markPlanAsRead, isLoading } = usePlanIndex(githubIdentity?.username);
   const { ydoc: indexDoc } = useMultiProviderSync(PLAN_INDEX_DOC_NAME);
-  const [showRead, setShowRead] = useState(false);
+  const [showRead, setShowRead] = useState(getInboxShowRead);
 
   // Selected plan state - read from URL on mount
   const searchParams = new URLSearchParams(location.search);
   const initialPanelId = searchParams.get('panel');
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(initialPanelId);
 
-  // Note: inboxPlans from usePlanIndex is already filtered to unread only.
-  // The "show read" toggle would require usePlanIndex to expose all inbox candidates.
-  // For now, this toggle is a placeholder for future implementation.
+  // Update show read preference
+  const handleToggleShowRead = useCallback((value: boolean) => {
+    setShowRead(value);
+    setInboxShowRead(value);
+  }, []);
+
+  // Filter inbox plans with selection awareness
   const sortedInboxPlans = useMemo(() => {
-    return [...inboxPlans].sort((a, b) => b.updatedAt - a.updatedAt);
-  }, [inboxPlans]);
+    const filtered = allInboxPlans.filter((plan) => {
+      // Show all plans when toggle is ON
+      if (showRead) return true;
+
+      // Show unread plans OR currently selected plan
+      return plan.isUnread || plan.id === selectedPlanId;
+    });
+
+    return filtered.sort((a, b) => b.updatedAt - a.updatedAt);
+  }, [allInboxPlans, showRead, selectedPlanId]);
 
   // Update URL when panel state changes
   useEffect(() => {
@@ -372,7 +384,7 @@ export function InboxPage() {
     return <TwoColumnSkeleton itemCount={3} showActions={true} titleWidth="w-20" />;
   }
 
-  if (inboxPlans.length === 0) {
+  if (sortedInboxPlans.length === 0) {
     return (
       <div className="h-full flex items-center justify-center p-4">
         <div className="text-center">
@@ -400,7 +412,7 @@ export function InboxPage() {
                 {sortedInboxPlans.length === 1 ? 'plan needs' : 'plans need'} your attention
               </p>
             </div>
-            <Switch size="sm" isSelected={showRead} onChange={setShowRead}>
+            <Switch size="sm" isSelected={showRead} onChange={handleToggleShowRead}>
               Show read
             </Switch>
           </div>
