@@ -466,7 +466,7 @@ export function PlanViewer({
     // biome-ignore lint/a11y/noNoninteractiveElementInteractions: Container needs keyboard handler for Ctrl+Enter comment submission
     <div
       ref={containerRef}
-      className="relative mobile-blocknote bg-surface rounded-lg px-3 md:px-0"
+      className="relative mobile-blocknote bg-surface rounded-lg px-3 md:px-0 min-h-[80px]"
       onKeyDown={handleKeyDown}
       role="application"
       aria-label="Plan viewer with comments"
