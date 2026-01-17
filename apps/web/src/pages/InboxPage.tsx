@@ -461,7 +461,6 @@ export function InboxPage() {
           onClose={handleClosePanel}
           onApprove={handlePanelApprove}
           onRequestChanges={handlePanelRequestChanges}
-          width="expanded"
           emptyMessage="Select a plan to view details"
         />
       </div>

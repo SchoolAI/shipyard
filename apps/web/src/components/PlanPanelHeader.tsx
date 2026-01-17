@@ -5,16 +5,8 @@
 
 import { Button, Chip } from '@heroui/react';
 import type { PlanMetadata, PlanStatusType } from '@peer-plan/schema';
-import {
-  AlertTriangle,
-  Check,
-  Clock,
-  Maximize,
-  Maximize2,
-  Minimize,
-  Minimize2,
-  X,
-} from 'lucide-react';
+import { AlertTriangle, Check, Clock } from 'lucide-react';
+import { PanelControlButtons } from './PanelControlButtons';
 import type { PanelWidth } from './PlanPanel';
 
 export interface PlanPanelHeaderProps {
@@ -30,8 +22,8 @@ export interface PlanPanelHeaderProps {
   onRequestChanges: () => void;
   /** Close panel */
   onClose: () => void;
-  /** Expand panel to next size */
-  onExpand: () => void;
+  /** Expand panel to next size. If not provided, expand button is hidden. */
+  onExpand?: () => void;
   /** Toggle full screen */
   onFullScreen: () => void;
   /** Current panel width */
@@ -110,44 +102,12 @@ export function PlanPanelHeader({
           {metadata.title}
         </h2>
 
-        <div className="flex items-center gap-0.5 shrink-0">
-          {/* Expand/Collapse (peek <-> expanded) */}
-          {width !== 'full' && (
-            <Button
-              isIconOnly
-              variant="ghost"
-              size="sm"
-              onPress={onExpand}
-              aria-label={width === 'peek' ? 'Expand to modal' : 'Collapse to peek'}
-            >
-              {width === 'peek' ? (
-                <Maximize className="w-4 h-4" />
-              ) : (
-                <Minimize className="w-4 h-4" />
-              )}
-            </Button>
-          )}
-
-          {/* Full screen toggle */}
-          <Button
-            isIconOnly
-            variant="ghost"
-            size="sm"
-            onPress={onFullScreen}
-            aria-label={width === 'full' ? 'Exit full screen' : 'Full screen'}
-          >
-            {width === 'full' ? (
-              <Minimize2 className="w-4 h-4" />
-            ) : (
-              <Maximize2 className="w-4 h-4" />
-            )}
-          </Button>
-
-          {/* Close */}
-          <Button isIconOnly variant="ghost" size="sm" onPress={onClose} aria-label="Close panel">
-            <X className="w-4 h-4" />
-          </Button>
-        </div>
+        <PanelControlButtons
+          width={width}
+          onExpand={onExpand}
+          onFullScreen={onFullScreen}
+          onClose={onClose}
+        />
       </div>
 
       {/* Status and metadata row */}

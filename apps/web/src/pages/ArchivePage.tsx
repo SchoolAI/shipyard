@@ -234,7 +234,6 @@ export function ArchivePage() {
         <InlinePlanDetail
           planId={selectedPlanId}
           onClose={handleClosePanel}
-          width="expanded"
           emptyMessage="Select a plan to view details"
         />
       </div>

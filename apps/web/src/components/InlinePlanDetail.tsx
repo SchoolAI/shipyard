@@ -33,7 +33,9 @@ export interface InlinePlanDetailProps {
   onApprove?: (context: PlanActionContext) => void;
   /** Called when request changes action is triggered. Receives plan context. If not provided, navigates to plan page. */
   onRequestChanges?: (context: PlanActionContext) => void;
-  /** Panel width for header display */
+  /** Called when expand button is pressed. If not provided, expand button is hidden. */
+  onExpand?: () => void;
+  /** Panel width for header display. Defaults to 'peek' for inline panels. */
   width?: PanelWidth;
   /** Message shown when no plan is selected */
   emptyMessage?: string;
@@ -48,7 +50,8 @@ export function InlinePlanDetail({
   onClose,
   onApprove,
   onRequestChanges,
-  width = 'expanded',
+  onExpand,
+  width = 'peek',
   emptyMessage = 'Select a plan to view details',
 }: InlinePlanDetailProps) {
   const navigate = useNavigate();
@@ -165,9 +168,7 @@ export function InlinePlanDetail({
           onApprove={handleApprove}
           onRequestChanges={handleRequestChanges}
           onClose={onClose}
-          onExpand={() => {
-            // No-op in inline mode - expand is for modal width changes
-          }}
+          onExpand={onExpand}
           onFullScreen={handleFullScreen}
           width={width}
         />
