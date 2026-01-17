@@ -88,11 +88,17 @@ async function handlePlanExit(
   try {
     return await checkReviewStatus(event.sessionId, event.planContent, event.metadata);
   } catch (err) {
-    const error = err as Error;
-    logger.error({ err: error, message: error.message }, 'Failed to check review status');
+    const error = err as Error & { code?: string; cause?: Error };
+    logger.error({ err: error, message: error.message, code: error.code }, 'Failed to check review status');
 
-    // Check if it's specifically a registry connection issue
+    // Check error type using structured properties instead of string matching
+    // Prefer error.code over message string matching for better reliability
     const isConnectionError =
+      error.code === 'ECONNREFUSED' ||
+      error.code === 'ECONNRESET' ||
+      error.code === 'ETIMEDOUT' ||
+      error.code === 'ENOTFOUND' ||
+      // Fallback to message matching for errors without structured codes
       error.message?.includes('connect') ||
       error.message?.includes('timeout') ||
       error.message?.includes('WebSocket') ||

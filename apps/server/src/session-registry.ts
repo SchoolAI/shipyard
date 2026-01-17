@@ -45,6 +45,12 @@ const planToSession = new Map<string, string>();
 
 /**
  * Default TTL: 1 hour (in milliseconds)
+ *
+ * NOTE: This is intentionally longer than the subscription TTL (5 minutes).
+ * Rationale:
+ * - Sessions represent hook/agent state and should persist longer for post-exit injection
+ * - Subscriptions are ephemeral browser polling state and can be cleaned up more aggressively
+ * - A session may outlive multiple browser disconnects/reconnects
  */
 const DEFAULT_TTL_MS = 60 * 60 * 1000;
 
@@ -120,8 +126,12 @@ export function cleanStaleSessions(ttlMs: number = DEFAULT_TTL_MS): number {
 
   for (const [sessionId, session] of sessions.entries()) {
     if (now - session.lastSyncedAt > ttlMs) {
-      // Clean up reverse index
-      planToSession.delete(session.planId);
+      // Clean up reverse index only if it still points to this stale session
+      // This prevents orphaning planToSession entries when a new session reuses the same planId
+      const currentSessionId = planToSession.get(session.planId);
+      if (currentSessionId === sessionId) {
+        planToSession.delete(session.planId);
+      }
       sessions.delete(sessionId);
       cleaned++;
     }
@@ -171,6 +181,7 @@ export function startPeriodicCleanup(intervalMs: number = 15 * 60 * 1000): void 
 
 /**
  * Stop periodic cleanup.
+ * Should be called on graceful server shutdown to clean up the interval.
  */
 export function stopPeriodicCleanup(): void {
   if (cleanupInterval) {

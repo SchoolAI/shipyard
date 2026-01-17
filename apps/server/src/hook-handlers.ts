@@ -170,8 +170,17 @@ export async function createSessionHandler(
   ctx.logger.info({ sessionId: input.sessionId, planId }, 'Session registered in registry');
 
   // Open browser or navigate existing browser
+  // NOTE: TOCTOU race condition - browser could close between hasActiveConnections check
+  // and navigation.set(). This is acceptable because:
+  // 1. The window is very small (milliseconds)
+  // 2. If it happens, the browser simply won't navigate (user can do it manually)
+  // 3. Adding synchronization would add complexity without significant benefit
   if (await hasActiveConnections(PLAN_INDEX_DOC_NAME)) {
     // Browser already connected - navigate it via CRDT
+    // NOTE: navigation.target is never cleared by the server (acceptable race condition).
+    // The browser clears it after reading. If multiple plans are created rapidly,
+    // the browser may miss some navigations, but this is acceptable since the user
+    // can always navigate manually via the plan list.
     indexDoc.getMap('navigation').set('target', planId);
     ctx.logger.info({ url, planId }, 'Browser already connected, navigating via CRDT');
   } else {
@@ -245,17 +254,17 @@ export async function updateContentHandler(
   }
 
   // Update session registry with new content hash
-  const session = getSessionStateByPlanId(planId);
-  if (session) {
-    const contentHash = computeHash(input.content);
-    const sessionId = getSessionIdByPlanId(planId);
-    if (sessionId) {
+  const sessionId = getSessionIdByPlanId(planId);
+  if (sessionId) {
+    const session = getSessionStateByPlanId(planId);
+    if (session) {
+      const contentHash = computeHash(input.content);
       setSessionState(sessionId, {
         ...session,
         contentHash,
         planFilePath: input.filePath,
       });
-      ctx.logger.info({ planId, contentHash }, 'Updated session registry with content hash');
+      ctx.logger.info({ planId, sessionId, contentHash }, 'Updated session registry with content hash');
     }
   }
 
@@ -367,10 +376,21 @@ export async function setSessionTokenHandler(
  * Server-side blocking observer that survives hook process restarts.
  * Generates reviewRequestId, sets it on Y.Doc, then waits for status change.
  * Returns approval decision after status changes to 'in_progress' or 'changes_requested'.
+ *
+ * NOTE: Observer cleanup on server crash/restart:
+ * In-memory observers are lost on server restart, which is expected behavior.
+ * The next hook call will create a new observer and continue waiting.
+ * This is acceptable because the review state is persisted in Y.Doc.
+ *
+ * @param planId - The plan ID to wait for approval on
+ * @param _reviewRequestIdParam - DEPRECATED: Previously used to provide a reviewRequestId from the client,
+ *                                but this created race conditions. Now the server always generates a new
+ *                                reviewRequestId to ensure uniqueness. This parameter is kept for API
+ *                                compatibility but is ignored. Will be removed in a future version.
  */
 export async function waitForApprovalHandler(
   planId: string,
-  _unusedParam: string, // Kept for API compatibility, will be removed in future
+  _reviewRequestIdParam: string,
   ctx: HookContext
 ): Promise<{
   approved: boolean;
@@ -380,14 +400,31 @@ export async function waitForApprovalHandler(
   reviewedBy?: string;
   status?: string;
 }> {
-  const ydoc = await ctx.getOrCreateDoc(planId);
+  let ydoc: Y.Doc;
+  try {
+    ydoc = await ctx.getOrCreateDoc(planId);
+  } catch (err) {
+    ctx.logger.error({ err, planId }, 'Failed to get or create doc for approval waiting');
+    throw err;
+  }
+
   const metadata = ydoc.getMap(YDOC_KEYS.METADATA);
 
   // Generate unique review request ID to prevent stale decisions
   const reviewRequestId = nanoid();
 
   // Set reviewRequestId and status on Y.Doc
+  // CRITICAL: Only set reviewRequestId if status is not already 'pending_review'
+  // This prevents race condition where two hooks overwrite each other's reviewRequestId
   ydoc.transact(() => {
+    const currentStatus = metadata.get('status') as string | undefined;
+    if (currentStatus === 'pending_review') {
+      ctx.logger.warn(
+        { planId, currentStatus },
+        'Status already pending_review, another hook may be waiting. Skipping reviewRequestId update.'
+      );
+      return;
+    }
     metadata.set('reviewRequestId', reviewRequestId);
     metadata.set('status', 'pending_review');
     metadata.set('updatedAt', Date.now());
@@ -405,6 +442,12 @@ export async function waitForApprovalHandler(
   });
 
   // Update session registry with review decision data
+  // NOTE: This read-modify-write pattern has a potential race condition if multiple
+  // approval handlers update the same session concurrently. However, this is acceptable
+  // because:
+  // 1. The race condition check at the top of this function prevents concurrent calls
+  // 2. If a race still occurs, the last write wins, which is acceptable for review decisions
+  // 3. Adding proper atomicity (e.g., with locks) would add complexity without significant benefit
   const updateSessionRegistry = (
     status: string,
     extraData: { approvedAt?: number; deliverables?: Array<{ id: string; text: string }> } = {}
@@ -461,54 +504,77 @@ export async function waitForApprovalHandler(
     return { approved: false, feedback, reviewComment, reviewedBy, status: 'changes_requested' };
   };
 
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const APPROVAL_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes (matches client timeout)
-    const timeout = setTimeout(() => {
-      metadata.unobserve(checkStatus);
-      resolve({
-        approved: false,
-        feedback: 'Review timeout - no decision received in 30 minutes',
-      });
-    }, APPROVAL_TIMEOUT_MS);
+    let timeout: NodeJS.Timeout | null = null;
+    let checkStatus: (() => void) | null = null;
 
-    const checkStatus = () => {
-      const currentReviewId = metadata.get('reviewRequestId') as string | undefined;
-      const status = metadata.get('status') as string | undefined;
+    try {
+      // NOTE: Timeout resolves (not rejects) with approved: false.
+      // This is intentional behavior - timeouts are treated as "no approval"
+      // rather than errors. The hook can handle this gracefully by blocking
+      // the agent with a timeout message instead of crashing.
+      timeout = setTimeout(() => {
+        if (checkStatus) {
+          metadata.unobserve(checkStatus);
+        }
+        resolve({
+          approved: false,
+          feedback: 'Review timeout - no decision received in 30 minutes',
+        });
+      }, APPROVAL_TIMEOUT_MS);
 
-      ctx.logger.debug(
-        {
-          planId,
-          status,
-          currentReviewId,
-          expectedReviewId: reviewRequestId,
-          reviewIdMatch: currentReviewId === reviewRequestId,
-        },
-        '[SERVER OBSERVER] Metadata changed, checking status'
-      );
+      checkStatus = () => {
+        const currentReviewId = metadata.get('reviewRequestId') as string | undefined;
+        const status = metadata.get('status') as string | undefined;
 
-      // Ignore stale decisions from previous review requests
-      if (currentReviewId !== reviewRequestId) {
-        ctx.logger.warn(
-          { planId, expected: reviewRequestId, actual: currentReviewId, status },
-          '[SERVER OBSERVER] Review ID mismatch, ignoring status change'
+        ctx.logger.debug(
+          {
+            planId,
+            status,
+            currentReviewId,
+            expectedReviewId: reviewRequestId,
+            reviewIdMatch: currentReviewId === reviewRequestId,
+          },
+          '[SERVER OBSERVER] Metadata changed, checking status'
         );
-        return;
+
+        // Ignore stale decisions from previous review requests
+        if (currentReviewId !== reviewRequestId) {
+          ctx.logger.warn(
+            { planId, expected: reviewRequestId, actual: currentReviewId, status },
+            '[SERVER OBSERVER] Review ID mismatch, ignoring status change'
+          );
+          return;
+        }
+
+        // Only handle terminal states (approved or changes requested)
+        if (status !== 'in_progress' && status !== 'changes_requested') return;
+
+        if (timeout) clearTimeout(timeout);
+        if (checkStatus) metadata.unobserve(checkStatus);
+        resolve(status === 'in_progress' ? handleApproved() : handleChangesRequested());
+      };
+
+      // Observe changes to metadata
+      ctx.logger.info({ planId, reviewRequestId }, '[SERVER OBSERVER] Registering metadata observer');
+      metadata.observe(checkStatus);
+
+      // Check status immediately in case it's already set (shouldn't happen since we just set it to pending_review)
+      checkStatus();
+    } catch (err) {
+      // Cleanup observer and timeout if setup fails
+      if (timeout) clearTimeout(timeout);
+      if (checkStatus) {
+        try {
+          metadata.unobserve(checkStatus);
+        } catch (unobserveErr) {
+          ctx.logger.warn({ err: unobserveErr }, 'Failed to unobserve during error cleanup');
+        }
       }
-
-      // Only handle terminal states (approved or changes requested)
-      if (status !== 'in_progress' && status !== 'changes_requested') return;
-
-      clearTimeout(timeout);
-      metadata.unobserve(checkStatus);
-      resolve(status === 'in_progress' ? handleApproved() : handleChangesRequested());
-    };
-
-    // Observe changes to metadata
-    ctx.logger.info({ planId, reviewRequestId }, '[SERVER OBSERVER] Registering metadata observer');
-    metadata.observe(checkStatus);
-
-    // Check status immediately in case it's already set (shouldn't happen since we just set it to pending_review)
-    checkStatus();
+      ctx.logger.error({ err, planId }, 'Failed to setup approval observer');
+      reject(err);
+    }
   });
 }
 

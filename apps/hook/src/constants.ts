@@ -55,15 +55,3 @@ export const DEFAULT_PLAN_TITLES = {
  * HTTP request timeout in milliseconds
  */
 export const REQUEST_TIMEOUT_MS = 10000; // 10 seconds
-
-// --- State Management ---
-
-/**
- * State file name
- */
-export const STATE_FILE_NAME = 'hook-state.json';
-
-/**
- * Maximum age for session state before cleanup (24 hours)
- */
-export const STALE_SESSION_MAX_AGE_MS = 24 * 60 * 60 * 1000;

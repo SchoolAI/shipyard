@@ -49,8 +49,11 @@ let ldb: LeveldbPersistence | null = null;
  * Attempts to acquire exclusive lock for hub startup.
  * Uses atomic file creation (wx flag) to prevent race conditions.
  * Returns true if lock acquired, false if another process holds the lock.
+ * Max retries: 3 attempts to remove stale locks before giving up.
  */
-export async function tryAcquireHubLock(): Promise<boolean> {
+export async function tryAcquireHubLock(retryCount = 0): Promise<boolean> {
+  const MAX_RETRIES = 3;
+
   try {
     // Ensure directory exists
     mkdirSync(join(homedir(), '.peer-plan'), { recursive: true });
@@ -83,10 +86,22 @@ export async function tryAcquireHubLock(): Promise<boolean> {
           logger.debug({ holderPid: pid }, 'Hub lock held by active process');
           return false; // Process alive, lock valid
         } catch {
-          // Process dead, remove stale lock and retry
-          logger.warn({ stalePid: pid }, 'Removing stale hub lock');
-          await unlink(HUB_LOCK_FILE);
-          return tryAcquireHubLock(); // Recursive retry
+          // Process dead, remove stale lock and retry (with max retry limit)
+          if (retryCount >= MAX_RETRIES) {
+            logger.error({ stalePid: pid, retryCount }, 'Max retries exceeded while removing stale hub lock');
+            return false;
+          }
+          logger.warn({ stalePid: pid, retryCount }, 'Removing stale hub lock');
+          try {
+            await unlink(HUB_LOCK_FILE);
+            return tryAcquireHubLock(retryCount + 1); // Retry with incremented counter
+          } catch (unlinkErr) {
+            logger.error({ err: unlinkErr, stalePid: pid, retryCount }, 'Failed to remove stale hub lock');
+            if (retryCount < MAX_RETRIES) {
+              return tryAcquireHubLock(retryCount + 1); // Retry even if unlink fails
+            }
+            return false;
+          }
         }
       } catch (readErr) {
         logger.error({ err: readErr }, 'Failed to read hub lock file');
@@ -240,6 +255,13 @@ export async function getOrCreateDoc(docName: string): Promise<Y.Doc> {
 /**
  * Checks if there are any active WebSocket connections for a given plan.
  * Used to avoid opening duplicate browser tabs.
+ *
+ * TOCTOU Race Condition (Time-Of-Check-Time-Of-Use):
+ * A browser could close its connection between the time this check returns true
+ * and the time the navigation actually occurs. This is acceptable because:
+ * 1. It's a rare edge case (millisecond window)
+ * 2. Opening a duplicate tab is not harmful (user can close it)
+ * 3. Adding synchronization would be overly complex for this minor scenario
  */
 export function hasActiveConnections(planId: string): boolean {
   const connections = conns.get(planId);
@@ -683,11 +705,17 @@ export async function startRegistryServer(): Promise<number | null> {
 
   // Register signal handlers for graceful shutdown with lock cleanup
   process.once('SIGINT', async () => {
+    logger.info('SIGINT received, shutting down gracefully');
+    const { stopPeriodicCleanup } = await import('./session-registry.js');
+    stopPeriodicCleanup();
     await releaseHubLock();
     process.exit(0);
   });
 
   process.once('SIGTERM', async () => {
+    logger.info('SIGTERM received, shutting down gracefully');
+    const { stopPeriodicCleanup } = await import('./session-registry.js');
+    stopPeriodicCleanup();
     await releaseHubLock();
     process.exit(0);
   });
@@ -714,7 +742,9 @@ export async function startRegistryServer(): Promise<number | null> {
       });
 
       return port;
-    } catch {}
+    } catch (err) {
+      logger.debug({ err, port }, 'Port unavailable or server failed to start');
+    }
   }
 
   logger.warn({ ports }, 'All registry ports in use');
