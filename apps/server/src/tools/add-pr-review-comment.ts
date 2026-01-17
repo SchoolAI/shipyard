@@ -1,8 +1,14 @@
-import { addPRReviewComment, getPlanMetadata, type PRReviewComment } from '@peer-plan/schema';
+import {
+  addPRReviewComment,
+  getPlanMetadata,
+  logPlanEvent,
+  type PRReviewComment,
+} from '@peer-plan/schema';
 import { nanoid } from 'nanoid';
 import { z } from 'zod';
 import { getOrCreateDoc } from '../doc-store.js';
 import { logger } from '../logger.js';
+import { getGitHubUsername } from '../server-identity.js';
 import { verifySessionToken } from '../session-token.js';
 import { TOOL_NAMES } from './tool-names.js';
 
@@ -85,6 +91,9 @@ add_pr_review_comment({
       };
     }
 
+    // Get actor name for event logging
+    const actorName = await getGitHubUsername();
+
     const comment: PRReviewComment = {
       id: nanoid(),
       prNumber: input.prNumber,
@@ -96,7 +105,13 @@ add_pr_review_comment({
       resolved: false,
     };
 
-    addPRReviewComment(ydoc, comment);
+    addPRReviewComment(ydoc, comment, actorName);
+
+    // Log comment added event (semantic action)
+    logPlanEvent(ydoc, 'comment_added', actorName, {
+      commentId: comment.id,
+      prNumber: input.prNumber,
+    });
 
     logger.info(
       { planId: input.planId, commentId: comment.id, prNumber: input.prNumber },

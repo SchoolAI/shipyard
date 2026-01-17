@@ -3,7 +3,6 @@ import {
   addSnapshot,
   createPlanSnapshot,
   getPlanMetadata,
-  logPlanEvent,
   PLAN_INDEX_DOC_NAME,
   type PlanStatusType,
   setPlanIndexEntry,
@@ -110,11 +109,6 @@ STATUSES:
     const statusChanged = input.status && input.status !== existingMetadata.status;
 
     if (statusChanged && input.status) {
-      logPlanEvent(doc, 'status_changed', actorName, {
-        fromStatus: existingMetadata.status,
-        toStatus: input.status,
-      });
-
       // Create snapshot on status change (Issue #42)
       const editor = ServerBlockNoteEditor.create();
       const fragment = doc.getXmlFragment('document');
@@ -125,7 +119,7 @@ STATUSES:
       addSnapshot(doc, snapshot);
     }
 
-    setPlanMetadata(doc, updates);
+    setPlanMetadata(doc, updates, actorName);
 
     const indexDoc = await getOrCreateDoc(PLAN_INDEX_DOC_NAME);
     if (existingMetadata.ownerId) {

@@ -6,8 +6,8 @@ import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import type { WebrtcProvider } from 'y-webrtc';
 import type * as Y from 'yjs';
+import { useUserIdentity } from '@/contexts/UserIdentityContext';
 import { useConversationTransfer } from '@/hooks/useConversationTransfer';
-import { useGitHubAuth } from '@/hooks/useGitHubAuth';
 import { type ConnectedPeer, useP2PPeers } from '@/hooks/useP2PPeers';
 
 // Avatar compound components have type issues in HeroUI v3 beta
@@ -178,7 +178,7 @@ export function HandoffConversationDialog({
     ydoc,
     rtcProvider
   );
-  const { identity } = useGitHubAuth();
+  const { actor } = useUserIdentity();
   const [_selectedPeer, setSelectedPeer] = useState<ConnectedPeer | null>(null);
 
   const [transcriptContent, setTranscriptContent] = useState<string | null>(null);
@@ -258,6 +258,11 @@ export function HandoffConversationDialog({
     const result = await exportToFile(transcriptContent);
 
     if (result.success) {
+      // Log conversation export event
+      logPlanEvent(ydoc, 'conversation_exported', actor, {
+        messageCount: result.messageCount,
+      });
+
       toast.success(`Handed off ${result.messageCount} messages to ${result.filename}`);
       onClose();
     } else {
@@ -300,7 +305,7 @@ export function HandoffConversationDialog({
             markVersionHandedOff(ydoc, myVersion.versionId, peer.name);
           }
 
-          logPlanEvent(ydoc, 'conversation_handed_off', identity?.username || 'anonymous', {
+          logPlanEvent(ydoc, 'conversation_handed_off', actor, {
             handedOffTo: peer.name,
             messageCount: a2aMessages.length,
           });

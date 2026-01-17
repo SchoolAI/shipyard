@@ -13,6 +13,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import type { WebrtcProvider } from 'y-webrtc';
 import type * as Y from 'yjs';
+import { useUserIdentity } from '@/contexts/UserIdentityContext';
 import {
   type ImportResult,
   type ReceivedConversation,
@@ -442,6 +443,7 @@ export function ImportConversationHandler({
   const [isImporting, setIsImporting] = useState(false);
   const registryAvailable = useRegistryAvailable();
   const { identity } = useGitHubAuth();
+  const { actor } = useUserIdentity();
 
   useImportConversationToast(planId, ydoc, rtcProvider, (received) => {
     setSelectedReceived(received);
@@ -495,7 +497,7 @@ export function ImportConversationHandler({
       addConversationVersion(ydoc, newVersion);
 
       // Log activity event
-      logPlanEvent(ydoc, 'conversation_imported', identity?.username || 'anonymous', {
+      logPlanEvent(ydoc, 'conversation_imported', actor, {
         sourcePlatform: selectedReceived.meta.sourcePlatform,
         messageCount: selectedReceived.meta.messageCount,
         sourceSessionId: selectedReceived.meta.sourceSessionId.slice(0, 8),
@@ -518,7 +520,7 @@ export function ImportConversationHandler({
     } finally {
       setIsImporting(false);
     }
-  }, [selectedReceived, ydoc, identity?.username]);
+  }, [selectedReceived, ydoc, identity?.username, actor]);
 
   function handleClose() {
     setIsReviewOpen(false);

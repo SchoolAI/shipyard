@@ -19,6 +19,7 @@ import { IndexeddbPersistence } from 'y-indexeddb';
 import * as Y from 'yjs';
 import { InlinePlanDetail, type PlanActionContext } from '@/components/InlinePlanDetail';
 import { TwoColumnSkeleton } from '@/components/ui/TwoColumnSkeleton';
+import { useUserIdentity } from '@/contexts/UserIdentityContext';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useMultiProviderSync } from '@/hooks/useMultiProviderSync';
@@ -149,6 +150,7 @@ export function InboxPage() {
   const { allInboxPlans, markPlanAsRead, isLoading } = usePlanIndex(githubIdentity?.username);
   const { ydoc: indexDoc } = useMultiProviderSync(PLAN_INDEX_DOC_NAME);
   const [showRead, setShowRead] = useState(getInboxShowRead);
+  const { actor } = useUserIdentity();
 
   // Selected plan state - read from URL on mount
   const searchParams = new URLSearchParams(location.search);
@@ -235,18 +237,21 @@ export function InboxPage() {
         const idb = new IndexeddbPersistence(planId, planDoc);
         await idb.whenSynced;
 
-        planDoc.transact(() => {
-          const metadata = planDoc.getMap('metadata');
-          const reviewRequestId = metadata.get('reviewRequestId') as string | undefined;
+        planDoc.transact(
+          () => {
+            const metadata = planDoc.getMap('metadata');
+            const reviewRequestId = metadata.get('reviewRequestId') as string | undefined;
 
-          metadata.set('status', 'in_progress');
-          metadata.set('updatedAt', now);
+            metadata.set('status', 'in_progress');
+            metadata.set('updatedAt', now);
 
-          // Preserve reviewRequestId if present (hook needs this to match)
-          if (reviewRequestId !== undefined) {
-            metadata.set('reviewRequestId', reviewRequestId);
-          }
-        });
+            // Preserve reviewRequestId if present (hook needs this to match)
+            if (reviewRequestId !== undefined) {
+              metadata.set('reviewRequestId', reviewRequestId);
+            }
+          },
+          { actor }
+        );
 
         idb.destroy();
       } catch {
@@ -255,7 +260,7 @@ export function InboxPage() {
 
       toast.success('Plan approved');
     },
-    [githubIdentity, indexDoc]
+    [githubIdentity, indexDoc, actor]
   );
 
   // Request changes handler
@@ -288,18 +293,21 @@ export function InboxPage() {
 
       const now = Date.now();
 
-      ydoc.transact(() => {
-        const metadata = ydoc.getMap('metadata');
-        const reviewRequestId = metadata.get('reviewRequestId') as string | undefined;
+      ydoc.transact(
+        () => {
+          const metadata = ydoc.getMap('metadata');
+          const reviewRequestId = metadata.get('reviewRequestId') as string | undefined;
 
-        metadata.set('status', 'in_progress');
-        metadata.set('updatedAt', now);
+          metadata.set('status', 'in_progress');
+          metadata.set('updatedAt', now);
 
-        // Preserve reviewRequestId if present (hook needs this to match)
-        if (reviewRequestId !== undefined) {
-          metadata.set('reviewRequestId', reviewRequestId);
-        }
-      });
+          // Preserve reviewRequestId if present (hook needs this to match)
+          if (reviewRequestId !== undefined) {
+            metadata.set('reviewRequestId', reviewRequestId);
+          }
+        },
+        { actor }
+      );
 
       // Also update index with the same timestamp
       const entry = getPlanIndexEntry(indexDoc, planId);
@@ -313,7 +321,7 @@ export function InboxPage() {
 
       toast.success('Plan approved');
     },
-    [indexDoc]
+    [indexDoc, actor]
   );
 
   // Panel request changes handler

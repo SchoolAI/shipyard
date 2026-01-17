@@ -2,6 +2,8 @@ import { BrowserRouter, Navigate, Route, Routes, useSearchParams } from 'react-r
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { Layout } from './components/Layout';
 import { ActivePlanSyncProvider } from './contexts/ActivePlanSyncContext';
+import { UserIdentityProvider } from './contexts/UserIdentityContext';
+import { useGitHubAuth } from './hooks/useGitHubAuth';
 import { ArchivePage } from './pages/ArchivePage';
 import { InboxPage } from './pages/InboxPage';
 import { KanbanPage } from './pages/KanbanPage';
@@ -37,6 +39,8 @@ function AppRoutes() {
 const basename = import.meta.env.BASE_URL;
 
 function AppWithLayout() {
+  const { identity } = useGitHubAuth();
+
   // Check for reset param before any providers initialize
   // This prevents sync attempts that would re-populate storage
   // ONLY available in development mode for safety
@@ -45,11 +49,13 @@ function AppWithLayout() {
   }
 
   return (
-    <ActivePlanSyncProvider>
-      <Layout>
-        <AppRoutes />
-      </Layout>
-    </ActivePlanSyncProvider>
+    <UserIdentityProvider githubIdentity={identity}>
+      <ActivePlanSyncProvider>
+        <Layout>
+          <AppRoutes />
+        </Layout>
+      </ActivePlanSyncProvider>
+    </UserIdentityProvider>
   );
 }
 

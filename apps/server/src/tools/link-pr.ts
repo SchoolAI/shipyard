@@ -1,8 +1,9 @@
-import { getPlanMetadata, type LinkedPR, linkPR } from '@peer-plan/schema';
+import { getPlanMetadata, type LinkedPR, linkPR, logPlanEvent } from '@peer-plan/schema';
 import { z } from 'zod';
 import { getOrCreateDoc } from '../doc-store.js';
 import { getOctokit, parseRepoString } from '../github-artifacts.js';
 import { logger } from '../logger.js';
+import { getGitHubUsername } from '../server-identity.js';
 import { verifySessionToken } from '../session-token.js';
 import { TOOL_NAMES } from './tool-names.js';
 
@@ -148,8 +149,17 @@ link_pr({
         title: pr.title,
       };
 
+      // Get actor name for event logging
+      const actorName = await getGitHubUsername();
+
       // Store in Y.Doc
-      linkPR(ydoc, linkedPR);
+      linkPR(ydoc, linkedPR, actorName);
+
+      // Log PR linked event (semantic action)
+      logPlanEvent(ydoc, 'pr_linked', actorName, {
+        prNumber: linkedPR.prNumber,
+        url: linkedPR.url,
+      });
 
       logger.info(
         { planId: input.planId, prNumber: input.prNumber, status: linkedPR.status },

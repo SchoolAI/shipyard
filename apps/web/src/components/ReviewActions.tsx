@@ -10,6 +10,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import type * as Y from 'yjs';
 import { VoiceInputButton } from '@/components/voice-input';
+import { useUserIdentity } from '@/contexts/UserIdentityContext';
 
 // Helper functions to reduce complexity in the main component
 // These are pure functions that map action types to display values
@@ -71,6 +72,7 @@ export function ReviewActions({
   const [openPopover, setOpenPopover] = useState<PopoverType>(null);
   const [comment, setComment] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const { actor } = useUserIdentity();
 
   // Auto-focus textarea when Request Changes popover opens
   useEffect(() => {
@@ -140,27 +142,28 @@ export function ReviewActions({
   ): 'in_progress' | 'changes_requested' => {
     const newStatus = action === 'approve' ? 'in_progress' : 'changes_requested';
 
-    const metadata = ydoc.getMap('metadata');
+    ydoc.transact(
+      () => {
+        const metadata = ydoc.getMap('metadata');
+        const reviewRequestId = metadata.get('reviewRequestId') as string | undefined;
 
-    ydoc.transact(() => {
-      const reviewRequestId = metadata.get('reviewRequestId') as string | undefined;
+        metadata.set('status', newStatus);
+        metadata.set('reviewedAt', now);
+        metadata.set('reviewedBy', identity?.name ?? 'Unknown');
+        metadata.set('updatedAt', now);
 
-      metadata.set('status', newStatus);
-      metadata.set('reviewedAt', now);
-      metadata.set('reviewedBy', identity?.name ?? 'Unknown');
-      metadata.set('updatedAt', now);
+        if (reviewRequestId !== undefined) {
+          metadata.set('reviewRequestId', reviewRequestId);
+        }
 
-      if (reviewRequestId !== undefined) {
-        metadata.set('reviewRequestId', reviewRequestId);
-      } else {
-      }
-
-      if (trimmedComment) {
-        metadata.set('reviewComment', trimmedComment);
-      } else {
-        metadata.delete('reviewComment');
-      }
-    });
+        if (trimmedComment) {
+          metadata.set('reviewComment', trimmedComment);
+        } else {
+          metadata.delete('reviewComment');
+        }
+      },
+      { actor }
+    );
 
     return newStatus;
   };
@@ -200,12 +203,34 @@ export function ReviewActions({
     setIsSubmitting(true);
 
     try {
+<<<<<<< HEAD
       const { newStatus, timestamp } = executeReviewAction(
         action,
         editor,
         comment.trim(),
         Date.now()
       );
+=======
+      const trimmedComment = comment.trim();
+      const now = Date.now();
+
+      const newStatus = updateReviewStatus(action, trimmedComment, now);
+
+      const eventType = action === 'approve' ? 'approved' : 'changes_requested';
+      logPlanEvent(ydoc, eventType, actor);
+
+      const blocks = editor.document;
+      const reason =
+        action === 'approve'
+          ? `Approved by ${identity?.name}`
+          : `Changes requested by ${identity?.name}`;
+      const snapshot = createPlanSnapshot(ydoc, reason, identity?.name ?? 'Unknown', newStatus, blocks);
+      addSnapshot(ydoc, snapshot);
+
+      const successMessage =
+        action === 'approve' ? 'Plan approved successfully!' : 'Changes requested successfully!';
+      toast.success(successMessage);
+>>>>>>> e1090e1 (feat(events): implement centralized observer pattern for comprehensive event logging)
 
       toast.success(getSuccessMessage(action));
       setOpenPopover(null);

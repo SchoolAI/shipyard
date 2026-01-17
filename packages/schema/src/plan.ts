@@ -133,6 +133,11 @@ export const PlanEventTypes = [
   'completed',
   'conversation_imported',
   'conversation_handed_off',
+  'step_completed',
+  'plan_archived',
+  'plan_unarchived',
+  'conversation_exported',
+  'plan_shared',
 ] as const;
 export type PlanEventType = (typeof PlanEventTypes)[number];
 
@@ -147,6 +152,10 @@ export interface PlanEvent {
     artifactId?: string;
     commentId?: string;
     prNumber?: number;
+    stepId?: string;
+    completed?: boolean;
+    conversationId?: string;
+    messageCount?: number;
     [key: string]: unknown;
   };
 }

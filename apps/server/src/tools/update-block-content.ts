@@ -171,17 +171,20 @@ Example with deliverables:
     const actorName = await getGitHubUsername();
 
     // Write updated blocks back to document fragment
-    ydoc.transact(() => {
-      // Clear existing content
-      while (fragment.length > 0) {
-        fragment.delete(0, 1);
-      }
-      // Write new blocks
-      editor.blocksToYXmlFragment(blocks, fragment);
+    ydoc.transact(
+      () => {
+        // Clear existing content
+        while (fragment.length > 0) {
+          fragment.delete(0, 1);
+        }
+        // Write new blocks
+        editor.blocksToYXmlFragment(blocks, fragment);
 
-      // Update metadata timestamp
-      setPlanMetadata(ydoc, { updatedAt: Date.now() });
-    });
+        // Update metadata timestamp
+        setPlanMetadata(ydoc, { updatedAt: Date.now() });
+      },
+      { actor: actorName }
+    );
 
     // Create a snapshot for this content update (Issue #42)
     // Each call to update_block_content creates one version (batches all operations)

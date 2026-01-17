@@ -265,13 +265,12 @@ ARTIFACT TYPES:
         description: input.description,
         uploadedAt: Date.now(),
       };
-      addArtifact(doc, artifact);
-      logPlanEvent(doc, 'artifact_uploaded', actorName, { artifactId: artifact.id });
+      addArtifact(doc, artifact, actorName);
 
       // Link to deliverable if specified
       let statusChanged = false;
       if (input.deliverableId) {
-        const linked = linkArtifactToDeliverable(doc, input.deliverableId, artifact.id);
+        const linked = linkArtifactToDeliverable(doc, input.deliverableId, artifact.id, actorName);
         if (linked) {
           logPlanEvent(doc, 'deliverable_linked', actorName, {
             deliverableId: input.deliverableId,
@@ -285,11 +284,7 @@ ARTIFACT TYPES:
 
           // Auto-progress status to in_progress when a deliverable is fulfilled
           if (metadata.status === 'draft') {
-            setPlanMetadata(doc, { status: 'in_progress' });
-            logPlanEvent(doc, 'status_changed', actorName, {
-              fromStatus: 'draft',
-              toStatus: 'in_progress',
-            });
+            setPlanMetadata(doc, { status: 'in_progress' }, actorName);
 
             // Create snapshot on status change (Issue #42)
             const editor = ServerBlockNoteEditor.create();
@@ -377,12 +372,16 @@ ARTIFACT TYPES:
         );
 
         // Update metadata
-        setPlanMetadata(doc, {
-          status: 'completed',
-          completedAt: Date.now(),
-          completedBy: actorName,
-          snapshotUrl,
-        });
+        setPlanMetadata(
+          doc,
+          {
+            status: 'completed',
+            completedAt: Date.now(),
+            completedBy: actorName,
+            snapshotUrl,
+          },
+          actorName
+        );
         logPlanEvent(doc, 'completed', actorName);
 
         // Update plan index
@@ -533,10 +532,11 @@ async function tryAutoLinkPR(ydoc: Y.Doc, repo: string): Promise<LinkedPR | null
     };
 
     // Store in Y.Doc
-    linkPR(ydoc, linkedPR);
     const actorName = await getGitHubUsername();
+    linkPR(ydoc, linkedPR, actorName);
     logPlanEvent(ydoc, 'pr_linked', actorName, {
       prNumber: linkedPR.prNumber,
+      url: linkedPR.url,
     });
 
     return linkedPR;

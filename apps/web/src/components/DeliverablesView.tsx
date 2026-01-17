@@ -10,6 +10,7 @@ import {
 import { Package } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type * as Y from 'yjs';
+import { useUserIdentity } from '@/contexts/UserIdentityContext';
 import { DeliverableCard } from './DeliverableCard';
 
 /** Simple identity type for display purposes */
@@ -151,6 +152,7 @@ export function DeliverablesView({
 }: DeliverablesViewProps) {
   const deliverables = useDeliverables(ydoc);
   const artifacts = useArtifacts(ydoc);
+  const { actor } = useUserIdentity();
 
   // Create map of artifactId → artifact for fast lookup
   const artifactMap = new Map(artifacts.map((a) => [a.id, a]));
@@ -178,20 +180,23 @@ export function DeliverablesView({
     }
 
     // Update Y.Doc to mark as completed
-    ydoc.transact(() => {
-      const metadataMap = ydoc.getMap('metadata');
-      const reviewRequestId = metadataMap.get('reviewRequestId') as string | undefined;
+    ydoc.transact(
+      () => {
+        const metadataMap = ydoc.getMap('metadata');
+        const reviewRequestId = metadataMap.get('reviewRequestId') as string | undefined;
 
-      metadataMap.set('status', 'completed');
-      metadataMap.set('completedAt', Date.now());
-      metadataMap.set('completedBy', identity.name);
-      metadataMap.set('updatedAt', Date.now());
+        metadataMap.set('status', 'completed');
+        metadataMap.set('completedAt', Date.now());
+        metadataMap.set('completedBy', identity.name);
+        metadataMap.set('updatedAt', Date.now());
 
-      // Preserve reviewRequestId if present (hook needs this to match)
-      if (reviewRequestId !== undefined) {
-        metadataMap.set('reviewRequestId', reviewRequestId);
-      }
-    });
+        // Preserve reviewRequestId if present (hook needs this to match)
+        if (reviewRequestId !== undefined) {
+          metadataMap.set('reviewRequestId', reviewRequestId);
+        }
+      },
+      { actor }
+    );
   };
 
   // Determine chip color based on completion status
