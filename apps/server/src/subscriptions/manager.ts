@@ -5,6 +5,7 @@
 
 import { nanoid } from 'nanoid';
 import { logger } from '../logger.js';
+import { startPeriodicCleanup as startSessionCleanup } from '../session-registry.js';
 import type { Change, ChangesResponse, Subscription, SubscriptionConfig } from './types.js';
 
 // --- State ---
@@ -119,6 +120,10 @@ export function getChanges(planId: string, subscriptionId: string): ChangesRespo
 }
 
 export function startCleanupInterval(): void {
+  // Start session registry cleanup (runs every 15 minutes)
+  startSessionCleanup();
+
+  // Start subscription cleanup (runs every 60 seconds)
   setInterval(() => {
     const now = Date.now();
     let cleanedCount = 0;

@@ -12,8 +12,29 @@ let cachedBaseUrl: string | null = null;
 /**
  * Get a tRPC client configured for the given base URL.
  * Caches the client to avoid recreating it on every call.
+ *
+ * @param baseUrl - The base URL of the registry server
+ * @param timeoutMs - Request timeout in milliseconds (default: 10000)
  */
-export function getTRPCClient(baseUrl: string) {
+export function getTRPCClient(baseUrl: string, timeoutMs = 10000) {
+  // Don't cache clients with custom timeouts - they're used for specific long-polling operations
+  if (timeoutMs !== 10000) {
+    return createTRPCClient<AppRouter>({
+      links: [
+        httpBatchLink({
+          url: `${baseUrl}/trpc`,
+          fetch: (url, options) => {
+            return fetch(url, {
+              ...options,
+              signal: AbortSignal.timeout(timeoutMs),
+            });
+          },
+        }),
+      ],
+    });
+  }
+
+  // Use cached client for default timeout
   if (cachedClient && cachedBaseUrl === baseUrl) {
     return cachedClient;
   }
@@ -25,7 +46,7 @@ export function getTRPCClient(baseUrl: string) {
         fetch: (url, options) => {
           return fetch(url, {
             ...options,
-            signal: AbortSignal.timeout(10000), // 10 seconds
+            signal: AbortSignal.timeout(timeoutMs),
           });
         },
       }),

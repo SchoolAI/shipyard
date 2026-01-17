@@ -35,6 +35,7 @@ import {
   type UpdatePresenceResponse,
   YDOC_KEYS,
 } from '@peer-plan/schema';
+import { computeHash } from '@peer-plan/shared';
 import { TRPCError } from '@trpc/server';
 import { nanoid } from 'nanoid';
 import open from 'open';
@@ -42,6 +43,12 @@ import type * as Y from 'yjs';
 import { webConfig } from './config/env/web.js';
 import { hasActiveConnections } from './doc-store.js';
 import { getGitHubUsername, getRepositoryFullName } from './server-identity.js';
+import {
+  getSessionIdByPlanId,
+  getSessionState,
+  getSessionStateByPlanId,
+  setSessionState,
+} from './session-registry.js';
 
 // --- Internal Helpers ---
 
@@ -153,6 +160,15 @@ export async function createSessionHandler(
 
   ctx.logger.info({ url }, 'Plan URL generated');
 
+  // Register session in registry
+  setSessionState(input.sessionId, {
+    planId,
+    createdAt: now,
+    lastSyncedAt: now,
+    url,
+  });
+  ctx.logger.info({ sessionId: input.sessionId, planId }, 'Session registered in registry');
+
   // Open browser or navigate existing browser
   if (await hasActiveConnections(PLAN_INDEX_DOC_NAME)) {
     // Browser already connected - navigate it via CRDT
@@ -226,6 +242,21 @@ export async function updateContentHandler(
     });
   } else {
     ctx.logger.warn({ planId }, 'Cannot update plan index: missing ownerId');
+  }
+
+  // Update session registry with new content hash
+  const session = getSessionStateByPlanId(planId);
+  if (session) {
+    const contentHash = computeHash(input.content);
+    const sessionId = getSessionIdByPlanId(planId);
+    if (sessionId) {
+      setSessionState(sessionId, {
+        ...session,
+        contentHash,
+        planFilePath: input.filePath,
+      });
+      ctx.logger.info({ planId, contentHash }, 'Updated session registry with content hash');
+    }
   }
 
   ctx.logger.info({ planId, title, blockCount: blocks.length }, 'Plan content updated');
@@ -314,6 +345,18 @@ export async function setSessionTokenHandler(
   const webUrl = webConfig.PEER_PLAN_WEB_URL;
   const url = `${webUrl}/plan/${planId}`;
 
+  // Update session registry with session token hash
+  const session = getSessionStateByPlanId(planId);
+  const sessionId = getSessionIdByPlanId(planId);
+  if (session && sessionId) {
+    setSessionState(sessionId, {
+      ...session,
+      sessionToken: sessionTokenHash,
+      url,
+    });
+    ctx.logger.info({ planId, sessionId }, 'Stored session token in registry');
+  }
+
   ctx.logger.info({ planId }, 'Session token set successfully');
 
   return { url };
@@ -356,16 +399,17 @@ export async function waitForApprovalHandler(
   );
 
   return new Promise((resolve) => {
+    const APPROVAL_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes (matches client timeout)
     const timeout = setTimeout(
       () => {
         metadata.unobserve(checkStatus);
         resolve({
           approved: false,
-          feedback: 'Review timeout - no decision received in 25 minutes',
+          feedback: 'Review timeout - no decision received in 30 minutes',
         });
       },
-      25 * 60 * 1000
-    ); // 25 minutes
+      APPROVAL_TIMEOUT_MS
+    );
 
     const checkStatus = () => {
       const currentReviewId = metadata.get('reviewRequestId') as string | undefined;
@@ -402,6 +446,26 @@ export async function waitForApprovalHandler(
         const deliverables = getDeliverables(ydoc);
         const reviewComment = metadata.get('reviewComment') as string | undefined;
         const reviewedBy = metadata.get('reviewedBy') as string | undefined;
+
+        // Update session registry with approval data
+        const session = getSessionStateByPlanId(planId);
+        const sessionId = getSessionIdByPlanId(planId);
+        if (session && sessionId) {
+          const deliverableInfos = deliverables.map((d) => ({ id: d.id, text: d.text }));
+          setSessionState(sessionId, {
+            ...session,
+            approvedAt: Date.now(),
+            deliverables: deliverableInfos,
+            reviewComment,
+            reviewedBy,
+            reviewStatus: status,
+          });
+          ctx.logger.info(
+            { planId, sessionId, deliverableCount: deliverableInfos.length },
+            'Stored approval data in session registry'
+          );
+        }
+
         ctx.logger.info(
           { planId, reviewRequestId, reviewedBy },
           '[SERVER OBSERVER] Plan approved via Y.Doc - resolving promise'
@@ -413,6 +477,20 @@ export async function waitForApprovalHandler(
         const feedback = extractFeedbackFromYDoc(ydoc, ctx);
         const reviewComment = metadata.get('reviewComment') as string | undefined;
         const reviewedBy = metadata.get('reviewedBy') as string | undefined;
+
+        // Update session registry with rejection data
+        const session = getSessionStateByPlanId(planId);
+        const sessionId = getSessionIdByPlanId(planId);
+        if (session && sessionId) {
+          setSessionState(sessionId, {
+            ...session,
+            reviewComment,
+            reviewedBy,
+            reviewStatus: status,
+          });
+          ctx.logger.info({ planId, sessionId }, 'Stored rejection data in session registry');
+        }
+
         ctx.logger.info(
           { planId, reviewRequestId, feedback },
           '[SERVER OBSERVER] Changes requested via Y.Doc'
@@ -511,6 +589,128 @@ function extractFeedbackFromYDoc(ydoc: Y.Doc, ctx: HookContext): string | undefi
 }
 
 /**
+ * Get formatted deliverable context for Claude Code injection.
+ * Formats session info, deliverables, and reviewer feedback for post-exit injection.
+ * @param planId - Plan ID
+ * @param sessionToken - Plaintext session token (stored in hook's local state, not on server)
+ * @param ctx - Hook context
+ */
+export async function getDeliverableContextHandler(
+  planId: string,
+  sessionToken: string,
+  ctx: HookContext
+): Promise<{ context: string }> {
+  const ydoc = await ctx.getOrCreateDoc(planId);
+  const metadata = getPlanMetadata(ydoc);
+
+  if (!metadata) {
+    throw new TRPCError({
+      code: 'NOT_FOUND',
+      message: 'Plan not found',
+    });
+  }
+
+  const deliverables = getDeliverables(ydoc);
+  const webUrl = webConfig.PEER_PLAN_WEB_URL;
+  const url = `${webUrl}/plan/${planId}`;
+
+  // Format deliverables section
+  let deliverablesSection = '';
+  if (deliverables.length > 0) {
+    deliverablesSection = `\n## Deliverables\n\nAttach proof to each deliverable using add_artifact:\n\n`;
+    for (const d of deliverables) {
+      deliverablesSection += `- ${d.text}\n  deliverableId="${d.id}"\n`;
+    }
+  } else {
+    deliverablesSection = `\n## Deliverables\n\nNo deliverables marked in this plan. You can still upload artifacts without linking them.`;
+  }
+
+  // Build feedback section if reviewer provided a comment
+  let feedbackSection = '';
+  const reviewComment = metadata.reviewComment;
+  const reviewedBy = metadata.reviewedBy;
+  if (reviewComment?.trim()) {
+    feedbackSection = `\n## Reviewer Feedback\n\n${reviewedBy ? `**From:** ${reviewedBy}\n\n` : ''}${reviewComment}\n\n`;
+  }
+
+  // Build approval message based on status
+  const approvalMessage =
+    metadata.status === 'changes_requested'
+      ? '[PEER-PLAN] Changes requested on your plan ⚠️'
+      : '[PEER-PLAN] Plan approved! 🎉';
+
+  const context = `${approvalMessage}
+${deliverablesSection}${feedbackSection}
+## Session Info
+
+planId="${planId}"
+sessionToken="${sessionToken}"
+url="${url}"
+
+## How to Attach Proof
+
+For each deliverable above, call:
+\`\`\`
+add_artifact(
+  planId="${planId}",
+  sessionToken="${sessionToken}",
+  type="screenshot",  // or "video", "test_results", "diff"
+  filePath="/path/to/file.png",
+  deliverableId="<id from above>"
+)
+\`\`\`
+
+When the LAST deliverable gets an artifact, the task auto-completes and returns a snapshot URL for your PR.`;
+
+  return { context };
+}
+
+/**
+ * Get session context for post-exit injection.
+ * Returns session data from registry without deleting it (idempotent).
+ * TTL cleanup will handle deletion of stale sessions.
+ * This eliminates the need for hook's local state.ts file.
+ */
+export async function getSessionContextHandler(
+  sessionId: string,
+  ctx: HookContext
+): Promise<{
+  planId?: string;
+  sessionToken?: string;
+  url?: string;
+  deliverables?: Array<{ id: string; text: string }>;
+  reviewComment?: string;
+  reviewedBy?: string;
+  reviewStatus?: string;
+}> {
+  ctx.logger.info({ sessionId }, 'Getting session context for post-exit injection');
+
+  // Get session from registry (idempotent read)
+  const sessionState = getSessionState(sessionId);
+
+  if (!sessionState) {
+    ctx.logger.warn({ sessionId }, 'Session not found in registry');
+    return {};
+  }
+
+  // Don't delete - let TTL cleanup handle it (makes this idempotent)
+  ctx.logger.info(
+    { sessionId, planId: sessionState.planId },
+    'Session context retrieved (idempotent)'
+  );
+
+  return {
+    planId: sessionState.planId,
+    sessionToken: sessionState.sessionToken,
+    url: sessionState.url,
+    deliverables: sessionState.deliverables,
+    reviewComment: sessionState.reviewComment,
+    reviewedBy: sessionState.reviewedBy,
+    reviewStatus: sessionState.reviewStatus,
+  };
+}
+
+/**
  * Creates hook handlers that use the provided context.
  * This is the factory function used by the tRPC context.
  */
@@ -524,5 +724,9 @@ export function createHookHandlers(): HookHandlers {
       setSessionTokenHandler(planId, sessionTokenHash, ctx),
     waitForApproval: (planId: string, reviewRequestId: string, ctx: HookContext) =>
       waitForApprovalHandler(planId, reviewRequestId, ctx),
+    getDeliverableContext: (planId: string, sessionToken: string, ctx: HookContext) =>
+      getDeliverableContextHandler(planId, sessionToken, ctx),
+    getSessionContext: (sessionId: string, ctx: HookContext) =>
+      getSessionContextHandler(sessionId, ctx),
   };
 }

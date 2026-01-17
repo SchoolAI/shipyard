@@ -9,6 +9,8 @@ import type { Logger } from '../context.js';
 import {
   CreateHookSessionRequestSchema,
   CreateHookSessionResponseSchema,
+  GetDeliverableContextRequestSchema,
+  GetDeliverableContextResponseSchema,
   GetReviewStatusResponseSchema,
   PlanIdSchema,
   SetSessionTokenRequestSchema,
@@ -113,6 +115,43 @@ export const hookRouter = router({
       const handlers = ctx.hookHandlers;
       return handlers.waitForApproval(planId, reviewRequestId, ctx);
     }),
+
+  /**
+   * Get formatted deliverable context for post-exit injection.
+   * Returns pre-formatted context string for Claude Code.
+   * GET /api/hook/plan/:id/deliverable-context
+   */
+  getDeliverableContext: publicProcedure
+    .input(PlanIdSchema.merge(GetDeliverableContextRequestSchema))
+    .output(GetDeliverableContextResponseSchema)
+    .query(async ({ input, ctx }) => {
+      const { planId, sessionToken } = input;
+      const handlers = ctx.hookHandlers;
+      return handlers.getDeliverableContext(planId, sessionToken, ctx);
+    }),
+
+  /**
+   * Get session context (for post-exit injection).
+   * Returns session data and deletes it from server registry.
+   * GET /api/hook/session/:sessionId/context
+   */
+  getSessionContext: publicProcedure
+    .input(z.object({ sessionId: z.string() }))
+    .output(
+      z.object({
+        planId: z.string().optional(),
+        sessionToken: z.string().optional(),
+        url: z.string().optional(),
+        deliverables: z.array(z.object({ id: z.string(), text: z.string() })).optional(),
+        reviewComment: z.string().optional(),
+        reviewedBy: z.string().optional(),
+        reviewStatus: z.string().optional(),
+      })
+    )
+    .query(async ({ input, ctx }) => {
+      const handlers = ctx.hookHandlers;
+      return handlers.getSessionContext(input.sessionId, ctx);
+    }),
 });
 
 /**
@@ -168,6 +207,25 @@ export interface HookHandlers {
     reviewComment?: string;
     reviewedBy?: string;
     status?: string;
+  }>;
+
+  getDeliverableContext: (
+    planId: string,
+    sessionToken: string,
+    ctx: HookContext
+  ) => Promise<z.infer<typeof GetDeliverableContextResponseSchema>>;
+
+  getSessionContext: (
+    sessionId: string,
+    ctx: HookContext
+  ) => Promise<{
+    planId?: string;
+    sessionToken?: string;
+    url?: string;
+    deliverables?: Array<{ id: string; text: string }>;
+    reviewComment?: string;
+    reviewedBy?: string;
+    reviewStatus?: string;
   }>;
 }
 

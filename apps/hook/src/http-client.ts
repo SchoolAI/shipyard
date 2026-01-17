@@ -198,6 +198,7 @@ export async function setSessionToken(
 /**
  * Wait for approval decision (blocking call to server).
  * Server observes Y.Doc and returns when status changes to approved or rejected.
+ * Uses a 30-minute timeout to accommodate the 25-minute max wait time.
  */
 export async function waitForApproval(
   planId: string,
@@ -215,6 +216,48 @@ export async function waitForApproval(
     throw new Error('Registry server not available');
   }
 
-  const trpc = getTRPCClient(baseUrl);
+  // Create tRPC client with 30-minute timeout for long-polling
+  // (server waits up to 25 minutes for approval)
+  const trpc = getTRPCClient(baseUrl, 30 * 60 * 1000);
   return trpc.hook.waitForApproval.mutate({ planId, reviewRequestId });
+}
+
+/**
+ * Get session context for post-exit injection.
+ * Returns session data from server registry and deletes it (one-time use).
+ * This replaces the hook's local state.ts file.
+ */
+export async function getSessionContext(sessionId: string): Promise<{
+  planId?: string;
+  sessionToken?: string;
+  url?: string;
+  deliverables?: Array<{ id: string; text: string }>;
+  reviewComment?: string;
+  reviewedBy?: string;
+  reviewStatus?: string;
+}> {
+  const baseUrl = await getRegistryUrl();
+  if (!baseUrl) {
+    throw new Error('Registry server not available');
+  }
+
+  const trpc = getTRPCClient(baseUrl);
+  return trpc.hook.getSessionContext.query({ sessionId });
+}
+
+/**
+ * Get formatted deliverable context for post-exit injection.
+ * Returns pre-formatted context string from server.
+ */
+export async function getDeliverableContext(
+  planId: string,
+  sessionToken: string
+): Promise<{ context: string }> {
+  const baseUrl = await getRegistryUrl();
+  if (!baseUrl) {
+    throw new Error('Registry server not available');
+  }
+
+  const trpc = getTRPCClient(baseUrl);
+  return trpc.hook.getDeliverableContext.query({ planId, sessionToken });
 }

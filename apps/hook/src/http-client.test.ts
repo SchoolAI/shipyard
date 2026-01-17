@@ -82,7 +82,6 @@ describe('retryWithBackoff', () => {
   });
 
   it('should use exponential backoff delays', async () => {
-    const delays: number[] = [];
     let attempts = 0;
 
     try {

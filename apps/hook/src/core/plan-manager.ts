@@ -14,7 +14,14 @@ import { computeHash } from '@peer-plan/shared';
 import { DEFAULT_AGENT_TYPE } from '../constants.js';
 import { createSession, updatePlanContent, updatePresence } from '../http-client.js';
 import { logger } from '../logger.js';
-import { getSessionState, setSessionState } from '../state.js';
+
+// --- In-Memory Session Tracking ---
+// Simple in-memory map for tracking sessionId → planId during hook process lifetime
+// Server handles persistence in session registry
+const sessionToPlan = new Map<
+  string,
+  { planId: string; lastContentHash?: string; filePath?: string }
+>();
 
 // --- Plan Creation ---
 
@@ -39,11 +46,9 @@ export async function createPlan(options: CreatePlanOptions): Promise<CreateHook
     metadata,
   });
 
-  // Store session state
-  setSessionState(sessionId, {
+  // Track session → planId in memory (server handles persistence)
+  sessionToPlan.set(sessionId, {
     planId: response.planId,
-    createdAt: Date.now(),
-    lastSyncedAt: Date.now(),
   });
 
   // Set initial presence
@@ -74,10 +79,10 @@ export interface UpdateContentOptions {
 export async function updateContent(options: UpdateContentOptions): Promise<boolean> {
   const { sessionId, filePath, content, agentType } = options;
 
-  let state = getSessionState(sessionId);
+  let session = sessionToPlan.get(sessionId);
 
   // First write - create the plan
-  if (!state) {
+  if (!session) {
     logger.info({ sessionId, filePath }, 'First write detected, creating plan');
 
     await createPlan({
@@ -86,38 +91,37 @@ export async function updateContent(options: UpdateContentOptions): Promise<bool
       metadata: { filePath },
     });
 
-    state = getSessionState(sessionId);
-    if (!state) {
-      logger.error({ sessionId }, 'Failed to create session state after plan creation');
+    session = sessionToPlan.get(sessionId);
+    if (!session) {
+      logger.error({ sessionId }, 'Failed to track session after plan creation');
       return false;
     }
   }
 
   // Check if content actually changed
   const contentHash = computeHash(content);
-  if (state.contentHash === contentHash) {
+  if (session.lastContentHash === contentHash) {
     logger.debug({ sessionId }, 'Content unchanged, skipping update');
     return true;
   }
 
-  logger.info({ sessionId, planId: state.planId, filePath }, 'Updating plan content');
+  logger.info({ sessionId, planId: session.planId, filePath }, 'Updating plan content');
 
-  await updatePlanContent(state.planId, {
+  await updatePlanContent(session.planId, {
     content,
     filePath,
   });
 
-  // Update session state
-  setSessionState(sessionId, {
-    ...state,
-    planFilePath: filePath,
-    lastSyncedAt: Date.now(),
-    contentHash,
+  // Update in-memory tracking
+  sessionToPlan.set(sessionId, {
+    ...session,
+    filePath,
+    lastContentHash: contentHash,
   });
 
   // Update presence (heartbeat)
   if (agentType) {
-    await updatePresence(state.planId, {
+    await updatePresence(session.planId, {
       agentType,
       sessionId,
     });

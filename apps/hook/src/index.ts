@@ -14,8 +14,8 @@ import type { AdapterEvent, AgentAdapter, CoreResponse } from './adapters/types.
 import { DEFAULT_AGENT_TYPE } from './constants.js';
 import { createPlan, updateContent } from './core/plan-manager.js';
 import { checkReviewStatus } from './core/review-status.js';
+import { getDeliverableContext, getSessionContext } from './http-client.js';
 import { logger } from './logger.js';
-import { cleanStaleSessions, deleteSessionState, getSessionState } from './state.js';
 
 // --- Adapter Selection ---
 
@@ -113,86 +113,48 @@ async function handlePlanExit(
 /**
  * Handle post_exit event (after ExitPlanMode completes).
  * Injects session context (sessionToken, planId, URL, deliverables) for Claude to use.
+ * Fetches context from server registry (replaces local state.ts).
  */
 async function handlePostExit(
   event: Extract<AdapterEvent, { type: 'post_exit' }>
 ): Promise<CoreResponse> {
-  const state = getSessionState(event.sessionId);
+  try {
+    // Get session context from server registry (replaces local state.ts)
+    const sessionContext = await getSessionContext(event.sessionId);
 
-  if (!state?.sessionToken) {
-    logger.debug({ sessionId: event.sessionId }, 'No session token found for PostToolUse');
+    if (!sessionContext.sessionToken || !sessionContext.planId) {
+      logger.debug({ sessionId: event.sessionId }, 'No session token found in registry');
+      return {
+        allow: true,
+        hookType: 'post_tool_use',
+        additionalContext: '',
+      };
+    }
+
+    const { planId, sessionToken, url } = sessionContext;
+
+    logger.info({ planId, sessionId: event.sessionId }, 'Injecting session context via PostToolUse');
+
+    // Get pre-formatted context from server
+    const result = await getDeliverableContext(planId, sessionToken);
+
+    return {
+      allow: true,
+      hookType: 'post_tool_use',
+      additionalContext: result.context,
+      planId,
+      sessionToken,
+      url,
+    };
+  } catch (err) {
+    logger.error({ err, sessionId: event.sessionId }, 'Failed to get session context from server');
+    // Fail gracefully - still allow exit, but without formatted context
     return {
       allow: true,
       hookType: 'post_tool_use',
       additionalContext: '',
     };
   }
-
-  const { planId, sessionToken, url, deliverables, reviewComment, reviewedBy, reviewStatus } =
-    state;
-
-  logger.info(
-    { planId, deliverableCount: deliverables?.length ?? 0 },
-    'Injecting session context via PostToolUse'
-  );
-
-  // Clear the session state now that we've delivered the token
-  deleteSessionState(event.sessionId);
-
-  // Format deliverables for Claude
-  let deliverablesSection = '';
-  if (deliverables && deliverables.length > 0) {
-    deliverablesSection = `\n## Deliverables\n\nAttach proof to each deliverable using add_artifact:\n\n`;
-    for (const d of deliverables) {
-      deliverablesSection += `- ${d.text}\n  deliverableId="${d.id}"\n`;
-    }
-  } else {
-    deliverablesSection = `\n## Deliverables\n\nNo deliverables marked in this plan. You can still upload artifacts without linking them.`;
-  }
-
-  // Build feedback section if reviewer provided a comment
-  let feedbackSection = '';
-  if (reviewComment?.trim()) {
-    feedbackSection = `\n## Reviewer Feedback\n\n${reviewedBy ? `**From:** ${reviewedBy}\n\n` : ''}${reviewComment}\n\n`;
-  }
-
-  // Build approval message based on status
-  const approvalMessage =
-    reviewStatus === 'changes_requested'
-      ? '[PEER-PLAN] Changes requested on your plan ⚠️'
-      : '[PEER-PLAN] Plan approved! 🎉';
-
-  const context = `${approvalMessage}
-${deliverablesSection}${feedbackSection}
-## Session Info
-
-planId="${planId}"
-sessionToken="${sessionToken}"
-url="${url}"
-
-## How to Attach Proof
-
-For each deliverable above, call:
-\`\`\`
-add_artifact(
-  planId="${planId}",
-  sessionToken="${sessionToken}",
-  type="screenshot",  // or "video", "test_results", "diff"
-  filePath="/path/to/file.png",
-  deliverableId="<id from above>"
-)
-\`\`\`
-
-When the LAST deliverable gets an artifact, the task auto-completes and returns a snapshot URL for your PR.`;
-
-  return {
-    allow: true,
-    hookType: 'post_tool_use',
-    additionalContext: context,
-    planId,
-    sessionToken,
-    url,
-  };
 }
 
 // --- Main Entry Point ---
@@ -314,8 +276,7 @@ async function main(): Promise<void> {
       return;
     }
 
-    // Clean stale sessions periodically
-    cleanStaleSessions();
+    // Session cleanup is now handled server-side (no local state)
 
     // Read input from stdin
     const stdin = await readStdin();

@@ -6,25 +6,18 @@
  * The hook simply calls the server API and waits for the response.
  */
 import type { Deliverable, GetReviewStatusResponse, ReviewFeedback } from '@peer-plan/schema';
-import { computeHash } from '@peer-plan/shared';
 import type { CoreResponse } from '../adapters/types.js';
 import { webConfig } from '../config/env/web.js';
 import { DEFAULT_AGENT_TYPE } from '../constants.js';
 import {
   getReviewStatus,
+  getSessionContext,
   setSessionToken,
   updatePlanContent,
   waitForApproval,
 } from '../http-client.js';
 import { logger } from '../logger.js';
 import { generateSessionToken, hashSessionToken } from '../session-token.js';
-import {
-  type DeliverableInfo,
-  deleteSessionState,
-  getSessionState,
-  type SessionState,
-  setSessionState,
-} from '../state.js';
 import { createPlan } from './plan-manager.js';
 
 // --- Review Decision Types ---
@@ -75,7 +68,6 @@ async function handleUpdatedPlanReview(
   sessionId: string,
   planId: string,
   planContent: string,
-  sessionState: SessionState,
   _originMetadata?: Record<string, unknown>
 ): Promise<CoreResponse> {
   logger.info(
@@ -97,7 +89,7 @@ async function handleUpdatedPlanReview(
         { planId, sessionId },
         'Plan not found (404), creating new plan with updated content'
       );
-      deleteSessionState(sessionId);
+      // Server manages state cleanup
 
       // Recursively call the new plan creation path
       // This will create the plan, sync content, and block for approval
@@ -128,29 +120,12 @@ async function handleUpdatedPlanReview(
       const tokenResult = await setSessionToken(planId, sessionTokenHash);
       const url = tokenResult.url;
 
-      // Convert deliverables to simplified format for state storage
-      const deliverableInfos: DeliverableInfo[] = (decision.deliverables ?? []).map((d) => ({
-        id: d.id,
-        text: d.text,
-      }));
-
-      // Update state with new token and content hash
-      const newContentHash = computeHash(planContent);
-      setSessionState(sessionId, {
-        ...sessionState,
-        sessionToken,
-        url,
-        approvedAt: Date.now(),
-        contentHash: newContentHash,
-        deliverables: deliverableInfos,
-        reviewComment: decision.reviewComment,
-        reviewedBy: decision.reviewedBy,
-        reviewStatus: decision.status,
-      });
+      // Deliverables are stored by the server in waitForApprovalHandler
+      const deliverableCount = (decision.deliverables ?? []).length;
 
       logger.info(
-        { planId, url, deliverableCount: deliverableInfos.length },
-        'Session token set and stored with updated content hash'
+        { planId, url, deliverableCount },
+        'Session token set and stored by server with updated content hash'
       );
 
       return {
@@ -163,7 +138,6 @@ async function handleUpdatedPlanReview(
     } catch (err) {
       logger.error({ err, planId }, 'Failed to set session token, but plan was approved');
       // Still approve since human approved, just without token
-      deleteSessionState(sessionId);
       return {
         allow: true,
         message: 'Updated plan approved (session token unavailable)',
@@ -172,9 +146,8 @@ async function handleUpdatedPlanReview(
     }
   }
 
-  // Changes requested - clear state for fresh review cycle
-  deleteSessionState(sessionId);
-  logger.debug({ planId }, 'Cleared session state for fresh review cycle');
+  // Changes requested - server manages state cleanup
+  logger.debug({ planId }, 'Changes requested - server will manage state cleanup');
 
   return {
     allow: false,
@@ -193,7 +166,8 @@ export async function checkReviewStatus(
   planContent?: string,
   originMetadata?: Record<string, unknown>
 ): Promise<CoreResponse> {
-  let state = getSessionState(sessionId);
+  // Query server for session state
+  const state = await getSessionContext(sessionId);
   let planId: string;
 
   // Blocking approach: Create plan from ExitPlanMode if we have content
@@ -222,7 +196,6 @@ export async function checkReviewStatus(
       // filePath removed - server doesn't use it, was metadata only
     });
 
-    state = getSessionState(sessionId);
     logger.info(
       { planId, url: result.url },
       'Plan created and synced, browser opened. Waiting for server approval...'
@@ -244,30 +217,12 @@ export async function checkReviewStatus(
         const tokenResult = await setSessionToken(planId, sessionTokenHash);
         const url = tokenResult.url;
 
-        // Convert deliverables to simplified format for state storage
-        const deliverableInfos: DeliverableInfo[] = (decision.deliverables ?? []).map((d) => ({
-          id: d.id,
-          text: d.text,
-        }));
-
-        // Store in state for PostToolUse hook to read
-        const currentState = getSessionState(sessionId);
-        if (currentState) {
-          setSessionState(sessionId, {
-            ...currentState,
-            sessionToken,
-            url,
-            approvedAt: Date.now(),
-            deliverables: deliverableInfos,
-            reviewComment: decision.reviewComment,
-            reviewedBy: decision.reviewedBy,
-            reviewStatus: decision.status,
-          });
-        }
+        // Server stores deliverables and session data via waitForApprovalHandler
+        const deliverableCount = (decision.deliverables ?? []).length;
 
         logger.info(
-          { planId, url, deliverableCount: deliverableInfos.length },
-          'Session token set and stored with deliverables'
+          { planId, url, deliverableCount },
+          'Session token set and stored by server with deliverables'
         );
 
         return {
@@ -279,8 +234,7 @@ export async function checkReviewStatus(
         };
       } catch (err) {
         logger.error({ err, planId }, 'Failed to set session token, approving without it');
-        // Still approve, just without token - clear state
-        deleteSessionState(sessionId);
+        // Still approve, just without token
         return {
           allow: true,
           message: 'Plan approved (session token unavailable)',
@@ -289,9 +243,8 @@ export async function checkReviewStatus(
       }
     }
 
-    // Changes requested - clear state for fresh review cycle
-    deleteSessionState(sessionId);
-    logger.debug({ sessionId }, 'Cleared session state for fresh review cycle');
+    // Changes requested - server manages state cleanup
+    logger.debug({ sessionId }, 'Changes requested - server will manage state cleanup');
 
     return {
       allow: false,
@@ -300,31 +253,25 @@ export async function checkReviewStatus(
     };
   }
 
-  if (!state) {
+  if (!state || !state.planId) {
     // No state and no plan content - allow exit
     logger.info({ sessionId }, 'No session state or plan content, allowing exit');
     return { allow: true };
   }
 
-  // Check if content has changed since last approval
-  if (state && planContent) {
-    const newHash = computeHash(planContent);
-    // Treat missing contentHash as "changed" to handle legacy state
-    if (!state.contentHash || state.contentHash !== newHash) {
-      logger.info(
-        { planId: state.planId, oldHash: state.contentHash, newHash },
-        'Plan content changed, triggering re-review'
-      );
-      return await handleUpdatedPlanReview(
-        sessionId,
-        state.planId,
-        planContent,
-        state,
-        originMetadata
-      );
-    }
-    // Hash matches - fall through to normal status check
-    logger.debug({ planId: state.planId }, 'Plan content unchanged, checking status');
+  // Note: Server no longer tracks contentHash, so we always treat new content as changed
+  // If we have new plan content, trigger re-review
+  if (planContent) {
+    logger.info(
+      { planId: state.planId },
+      'Plan content provided, triggering re-review'
+    );
+    return await handleUpdatedPlanReview(
+      sessionId,
+      state.planId,
+      planContent,
+      originMetadata
+    );
   }
 
   planId = state.planId;

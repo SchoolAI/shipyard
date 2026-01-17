@@ -98,6 +98,18 @@ export const SetSessionTokenRequestSchema = z.object({
 
 export type SetSessionTokenRequest = z.infer<typeof SetSessionTokenRequestSchema>;
 
+export const GetDeliverableContextRequestSchema = z.object({
+  sessionToken: z.string().min(1),
+});
+
+export type GetDeliverableContextRequest = z.infer<typeof GetDeliverableContextRequestSchema>;
+
+export const GetDeliverableContextResponseSchema = z.object({
+  context: z.string(),
+});
+
+export type GetDeliverableContextResponse = z.infer<typeof GetDeliverableContextResponseSchema>;
+
 export const SetSessionTokenResponseSchema = z.object({
   url: z.string(),
 });
