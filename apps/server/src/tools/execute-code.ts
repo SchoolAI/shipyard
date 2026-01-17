@@ -1,5 +1,10 @@
 import * as vm from 'node:vm';
-import { getArtifacts, getDeliverables, getPlanMetadata } from '@peer-plan/schema';
+import {
+	PLAN_INDEX_DOC_NAME,
+	getArtifacts,
+	getDeliverables,
+	getPlanMetadata,
+} from '@peer-plan/schema';
 import { z } from 'zod';
 import { getOrCreateDoc } from '../doc-store.js';
 import { logger } from '../logger.js';
@@ -207,7 +212,7 @@ Parameters:
 - options (string[], optional): For 'choice' type - available options (required for choice)
 - defaultValue (string, optional): Pre-filled value for text/multiline inputs
 - timeout (number, optional): Timeout in seconds (default: 300, min: 10, max: 600)
-- planId (string, optional): Plan ID to associate with (uses global doc if omitted)
+- planId (string, optional): Optional metadata to link request to plan (for activity log filtering)
 
 Returns:
 - success: Boolean indicating if user responded
@@ -484,9 +489,9 @@ async function requestUserInput(opts: {
 }) {
   const { InputRequestManager } = await import('../services/input-request-manager.js');
 
-  // Get or create Y.Doc
-  const docName = opts.planId || '__global_input_requests__';
-  const ydoc = await getOrCreateDoc(docName);
+  // Always use plan-index doc so browser can see requests from all agents
+  // Browser is already connected to plan-index for plan discovery
+  const ydoc = await getOrCreateDoc(PLAN_INDEX_DOC_NAME);
 
   // Create manager and make request
   const manager = new InputRequestManager();
