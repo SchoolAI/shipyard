@@ -70,6 +70,16 @@ export async function handleCallback(
   return response.json() as Promise<{ access_token: string; scope?: string }>;
 }
 
+export class TokenValidationError extends Error {
+  constructor(
+    message: string,
+    public readonly isInvalidToken: boolean
+  ) {
+    super(message);
+    this.name = 'TokenValidationError';
+  }
+}
+
 export async function getGitHubUser(token: string): Promise<GitHubUser> {
   const response = await fetch('https://api.github.com/user', {
     headers: {
@@ -80,20 +90,37 @@ export async function getGitHubUser(token: string): Promise<GitHubUser> {
 
   if (!response.ok) {
     if (response.status === 401) {
-      throw new Error('Token is invalid or has been revoked');
+      throw new TokenValidationError('Token is invalid or has been revoked', true);
     }
-    throw new Error(`Failed to fetch user info: ${response.status}`);
+    // 403 (rate limit), 5xx (server errors) - token might still be valid
+    throw new TokenValidationError(`Failed to fetch user info: ${response.status}`, false);
   }
 
   return response.json();
 }
 
-export async function validateToken(token: string): Promise<boolean> {
+export type TokenValidationResult =
+  | { status: 'valid' }
+  | { status: 'invalid' } // Token is genuinely invalid (401) - should logout
+  | { status: 'error'; message: string }; // Network/server error - should NOT logout
+
+export async function validateToken(token: string): Promise<TokenValidationResult> {
   try {
     await getGitHubUser(token);
-    return true;
-  } catch {
-    return false;
+    return { status: 'valid' };
+  } catch (err) {
+    if (err instanceof TokenValidationError) {
+      if (err.isInvalidToken) {
+        return { status: 'invalid' };
+      }
+      // Server error, rate limit, etc. - don't invalidate the token
+      return { status: 'error', message: err.message };
+    }
+    // Network error (fetch failed) - don't invalidate the token
+    return {
+      status: 'error',
+      message: err instanceof Error ? err.message : 'Network error',
+    };
   }
 }
 

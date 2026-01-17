@@ -208,6 +208,7 @@ export function useGitHubAuth(): UseGitHubAuthReturn {
   const hasRepoScope = identity?.scope?.includes('repo') ?? false;
 
   // Validate existing token on mount
+  // Only clears auth on confirmed 401 (invalid token), NOT on network/server errors
   useEffect(() => {
     if (!identity) return;
 
@@ -216,12 +217,15 @@ export function useGitHubAuth(): UseGitHubAuthReturn {
 
     async function validate() {
       setIsValidating(true);
-      const isValid = await validateToken(token);
+      const result = await validateToken(token);
       if (cancelled) return;
 
-      if (!isValid) {
+      if (result.status === 'invalid') {
+        // Token is genuinely invalid (401 from GitHub) - clear auth
         clearStoredIdentity();
       }
+      // For 'valid' or 'error' status, keep the session
+      // Network errors, rate limits, server errors shouldn't log users out
       setIsValidating(false);
     }
 
