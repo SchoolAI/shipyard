@@ -219,6 +219,11 @@ export function ReviewActions({
       const eventType = action === 'approve' ? 'approved' : 'changes_requested';
       logPlanEvent(ydoc, eventType, actor);
 
+      // Editor is validated in validateReviewAction, safe to use here
+      if (!editor) {
+        throw new Error('Editor not ready');
+      }
+
       const blocks = editor.document;
       const reason =
         action === 'approve'

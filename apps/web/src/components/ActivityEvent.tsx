@@ -59,6 +59,8 @@ function getEventIcon(type: PlanEventType): ReactNode {
       return <Download className="w-3.5 h-3.5" />;
     case 'plan_shared':
       return <Share2 className="w-3.5 h-3.5" />;
+    case 'approval_requested':
+      return <AlertTriangle className="w-3.5 h-3.5 text-warning" />;
     default: {
       const exhaustive: never = type;
       throw new Error(`Unhandled event type: ${exhaustive}`);
@@ -119,6 +121,10 @@ function getEventDescription(event: PlanEvent): string {
     }
     case 'plan_shared':
       return 'shared the plan';
+    case 'approval_requested': {
+      const requesterName = event.data?.requesterName as string | undefined;
+      return requesterName ? `${requesterName} requested access` : 'requested access to the plan';
+    }
     default: {
       const exhaustive: never = event.type;
       throw new Error(`Unhandled event type: ${exhaustive}`);

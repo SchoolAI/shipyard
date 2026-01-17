@@ -611,7 +611,11 @@ export function logPlanEvent(
   ydoc: Y.Doc,
   type: PlanEventType,
   actor: string,
-  data?: PlanEvent['data']
+  data?: PlanEvent['data'],
+  options?: {
+    inboxWorthy?: boolean;
+    inboxFor?: string | string[];
+  }
 ): void {
   const eventsArray = ydoc.getArray(YDOC_KEYS.EVENTS);
   const event: PlanEvent = {
@@ -620,6 +624,8 @@ export function logPlanEvent(
     actor,
     timestamp: Date.now(),
     data,
+    inboxWorthy: options?.inboxWorthy,
+    inboxFor: options?.inboxFor,
   };
   eventsArray.push([event]);
 }

@@ -1,9 +1,11 @@
 import { Button } from '@heroui/react';
-import { buildInviteUrl, type InviteCreatedResponse } from '@peer-plan/schema';
+import { buildInviteUrl, type InviteCreatedResponse, logPlanEvent } from '@peer-plan/schema';
 import { Check, Loader2, Share2 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import type { WebrtcProvider } from 'y-webrtc';
+import type * as Y from 'yjs';
+import { useUserIdentity } from '@/contexts/UserIdentityContext';
 
 // Extend Window interface for temporary timeout storage
 declare global {
@@ -17,6 +19,7 @@ interface ShareButtonProps {
   rtcProvider?: WebrtcProvider | null;
   isOwner?: boolean;
   className?: string;
+  ydoc?: Y.Doc;
 }
 
 /**
@@ -25,9 +28,16 @@ interface ShareButtonProps {
  * For owners: Creates time-limited invite tokens (30min TTL, unlimited uses).
  * For non-owners: Copies current URL to clipboard.
  */
-export function ShareButton({ planId, rtcProvider, isOwner = false, className }: ShareButtonProps) {
+export function ShareButton({
+  planId,
+  rtcProvider,
+  isOwner = false,
+  className,
+  ydoc,
+}: ShareButtonProps) {
   const [copied, setCopied] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+  const { actor } = useUserIdentity();
 
   const copyToClipboard = useCallback(async (text: string) => {
     try {
@@ -121,6 +131,21 @@ export function ShareButton({ planId, rtcProvider, isOwner = false, className }:
           // Copy to clipboard
           await copyToClipboard(inviteUrl);
 
+          // Log plan_shared event
+          if (ydoc) {
+            logPlanEvent(
+              ydoc,
+              'plan_shared',
+              actor,
+              {
+                inviteId: data.tokenId,
+              },
+              {
+                inboxWorthy: false, // Sharing action doesn't need owner action
+              }
+            );
+          }
+
           setIsCreating(false);
           setCopied(true);
           setTimeout(() => setCopied(false), 2000);
@@ -151,7 +176,7 @@ export function ShareButton({ planId, rtcProvider, isOwner = false, className }:
         }
       }
     };
-  }, [rtcProvider, isOwner, planId, copyToClipboard]);
+  }, [rtcProvider, isOwner, planId, copyToClipboard, actor, ydoc]);
 
   // Owner creates invite link, non-owner copies plain URL
   const handleShare = isOwner && rtcProvider && planId ? createInvite : handleSimpleShare;

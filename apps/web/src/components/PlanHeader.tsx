@@ -251,7 +251,7 @@ function DesktopActions({
 }: DesktopActionsProps) {
   return (
     <>
-      <ShareButton planId={planId} rtcProvider={rtcProvider} isOwner={isOwner} />
+      <ShareButton planId={planId} rtcProvider={rtcProvider} isOwner={isOwner} ydoc={ydoc} />
 
       {/* Resume conversation button */}
       <Tooltip delay={0}>

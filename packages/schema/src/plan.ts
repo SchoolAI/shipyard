@@ -138,6 +138,7 @@ export const PlanEventTypes = [
   'plan_unarchived',
   'conversation_exported',
   'plan_shared',
+  'approval_requested',
 ] as const;
 export type PlanEventType = (typeof PlanEventTypes)[number];
 
@@ -158,6 +159,13 @@ export interface PlanEvent {
     messageCount?: number;
     [key: string]: unknown;
   };
+  /** Whether this event should appear in the user's inbox (requires action) */
+  inboxWorthy?: boolean;
+  /**
+   * Who should see this event in their inbox.
+   * Can be: GitHub username(s), 'owner', 'mentioned', 'shared_recipient'
+   */
+  inboxFor?: string | string[];
 }
 
 export const PlanEventSchema = z.object({
@@ -166,7 +174,36 @@ export const PlanEventSchema = z.object({
   actor: z.string(),
   timestamp: z.number(),
   data: z.record(z.string(), z.unknown()).optional(),
+  inboxWorthy: z.boolean().optional(),
+  inboxFor: z.union([z.string(), z.array(z.string())]).optional(),
 });
+
+/**
+ * Check if an event should appear in a user's inbox.
+ *
+ * @param event - The event to check
+ * @param username - GitHub username to check against
+ * @returns true if the event is inbox-worthy for this user
+ */
+export function isInboxWorthy(event: PlanEvent, username: string): boolean {
+  // Not inbox-worthy if flag is explicitly false or missing
+  if (!event.inboxWorthy) {
+    return false;
+  }
+
+  // No inboxFor means inbox-worthy for everyone
+  if (!event.inboxFor) {
+    return true;
+  }
+
+  // Handle array of usernames
+  if (Array.isArray(event.inboxFor)) {
+    return event.inboxFor.includes(username);
+  }
+
+  // Handle single username or role
+  return event.inboxFor === username;
+}
 
 export interface PlanMetadata {
   id: string;
