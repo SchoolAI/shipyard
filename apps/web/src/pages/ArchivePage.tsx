@@ -3,7 +3,7 @@
  * Two-column layout with archive list on left and detail panel on right.
  */
 
-import { Button, ListBox, ListBoxItem, Skeleton } from '@heroui/react';
+import { Button, ListBox, ListBoxItem } from '@heroui/react';
 import type { PlanIndexEntry } from '@peer-plan/schema';
 import { getPlanIndexEntry, PLAN_INDEX_DOC_NAME, setPlanIndexEntry } from '@peer-plan/schema';
 import { ArchiveRestore } from 'lucide-react';
@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 import { IndexeddbPersistence } from 'y-indexeddb';
 import * as Y from 'yjs';
 import { InlinePlanDetail } from '@/components/InlinePlanDetail';
+import { TwoColumnSkeleton } from '@/components/ui/TwoColumnSkeleton';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useMultiProviderSync } from '@/hooks/useMultiProviderSync';
@@ -115,26 +116,7 @@ export function ArchivePage() {
   });
 
   if (isLoading) {
-    return (
-      <div className="h-full flex flex-col p-4 max-w-3xl mx-auto">
-        <div className="flex flex-col gap-3 mb-4">
-          <Skeleton className="h-6 w-20 rounded" />
-          <Skeleton className="h-4 w-32 rounded" />
-          <Skeleton className="h-10 w-full rounded-lg" />
-        </div>
-        <div className="flex-1 space-y-2">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="flex items-center justify-between gap-3 py-3 px-3 rounded-lg">
-              <div className="flex flex-col gap-2 flex-1">
-                <Skeleton className="h-5 w-48 rounded" />
-                <Skeleton className="h-3 w-24 rounded" />
-              </div>
-              <Skeleton className="h-8 w-8 rounded" />
-            </div>
-          ))}
-        </div>
-      </div>
-    );
+    return <TwoColumnSkeleton itemCount={3} showActions={false} titleWidth="w-20" />;
   }
 
   const handleUnarchive = async (planId: string) => {

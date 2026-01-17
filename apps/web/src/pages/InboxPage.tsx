@@ -3,7 +3,7 @@
  * Two-column layout with inbox list on left and detail panel on right.
  */
 
-import { Button, Chip, ListBox, ListBoxItem, Skeleton, Switch, Tooltip } from '@heroui/react';
+import { Button, Chip, ListBox, ListBoxItem, Switch, Tooltip } from '@heroui/react';
 import {
   getPlanIndexEntry,
   PLAN_INDEX_DOC_NAME,
@@ -18,6 +18,7 @@ import { toast } from 'sonner';
 import { IndexeddbPersistence } from 'y-indexeddb';
 import * as Y from 'yjs';
 import { InlinePlanDetail, type PlanActionContext } from '@/components/InlinePlanDetail';
+import { TwoColumnSkeleton } from '@/components/ui/TwoColumnSkeleton';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useMultiProviderSync } from '@/hooks/useMultiProviderSync';
@@ -368,34 +369,7 @@ export function InboxPage() {
   });
 
   if (isLoading) {
-    return (
-      <div className="h-full grid grid-cols-[minmax(300px,400px)_1fr]">
-        <div className="flex flex-col h-full overflow-hidden border-r border-separator">
-          <div className="border-b border-separator shrink-0 p-4">
-            <div className="flex flex-col gap-3 mb-4">
-              <Skeleton className="h-6 w-20 rounded" />
-              <Skeleton className="h-4 w-32 rounded" />
-            </div>
-          </div>
-          <div className="flex-1 overflow-y-auto p-2 space-y-2">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="flex items-center justify-between gap-3 py-3 px-3 rounded-lg">
-                <div className="flex flex-col gap-2 flex-1">
-                  <Skeleton className="h-5 w-48 rounded" />
-                  <Skeleton className="h-3 w-24 rounded" />
-                </div>
-                <div className="flex gap-1">
-                  <Skeleton className="h-8 w-8 rounded" />
-                  <Skeleton className="h-8 w-8 rounded" />
-                  <Skeleton className="h-8 w-8 rounded" />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-        <div className="flex flex-col h-full overflow-hidden" />
-      </div>
-    );
+    return <TwoColumnSkeleton itemCount={3} showActions={true} titleWidth="w-20" />;
   }
 
   if (inboxPlans.length === 0) {
