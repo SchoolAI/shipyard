@@ -17,8 +17,41 @@ import { logger } from './logger.js';
 import { getTRPCClient } from './trpc-client.js';
 
 /**
- * Get the registry server base URL.
- * Tries each port until one responds.
+ * Retries an async operation with exponential backoff.
+ * @param fn - Async function to retry
+ * @param maxAttempts - Maximum retry attempts (default: 3)
+ * @param baseDelay - Base delay in ms (default: 1000)
+ * @returns Result of fn or throws last error
+ */
+async function retryWithBackoff<T>(
+  fn: () => Promise<T>,
+  maxAttempts = 3,
+  baseDelay = 1000
+): Promise<T> {
+  let lastError: Error | null = null;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastError = err as Error;
+      if (attempt < maxAttempts - 1) {
+        const delay = attempt === 0 ? 0 : baseDelay * 2 ** (attempt - 1);
+        logger.debug(
+          { attempt: attempt + 1, maxAttempts, delay },
+          'Registry health check failed, retrying...'
+        );
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
+    }
+  }
+
+  throw lastError || new Error('Retry failed');
+}
+
+/**
+ * Discovers the registry server URL by checking health endpoints with retry logic.
+ * Returns null if no server found after all retries.
  */
 async function getRegistryUrl(): Promise<string | null> {
   const ports = registryConfig.REGISTRY_PORT;
@@ -26,21 +59,42 @@ async function getRegistryUrl(): Promise<string | null> {
   for (const port of ports) {
     try {
       const url = `http://localhost:${port}`;
-      const res = await fetch(`${url}/registry`, {
-        signal: AbortSignal.timeout(3000), // Increased from 1000ms to handle slow responses
-      });
-      if (res.ok) {
-        logger.debug({ port }, 'Found registry server');
-        return url;
-      }
-      logger.debug({ port, status: res.status }, 'Registry responded but not ok');
+
+      // Retry health check with exponential backoff
+      await retryWithBackoff(
+        async () => {
+          const res = await fetch(`${url}/registry`, {
+            signal: AbortSignal.timeout(5000), // Increased from 3s to 5s
+          });
+          if (!res.ok) {
+            throw new Error(`Registry responded with status ${res.status}`);
+          }
+        },
+        3, // 3 attempts total
+        1000 // Start with 1s delay
+      );
+
+      logger.debug({ port }, 'Found registry server (with retry)');
+      return url;
     } catch (err) {
-      logger.debug({ port, error: (err as Error).message }, 'Failed to connect to registry port');
-      // Try next port
+      const error = err as Error;
+      logger.debug(
+        { port, error: error.message },
+        'Failed to connect to registry port after retries'
+      );
     }
   }
 
-  logger.warn({ ports }, 'No registry server found on any port');
+  // Add diagnostic logging before returning null
+  logger.error(
+    {
+      ports,
+      attemptsPerPort: 3,
+      totalTimeout: '15s (5s per attempt * 3 attempts)',
+    },
+    'Registry server not reachable - check if `pnpm dev` is running'
+  );
+
   return null;
 }
 

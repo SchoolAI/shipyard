@@ -7,6 +7,7 @@ import {
   type PlanStatusType,
 } from '@peer-plan/schema';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner';
 import type * as Y from 'yjs';
 import { VoiceInputButton } from '@/components/voice-input';
 
@@ -75,57 +76,111 @@ export function ReviewActions({
     setComment((prev) => (prev ? `${prev} ${text}` : text));
   }, []);
 
+  // Validate state before review action
+  const validateReviewAction = (
+    action: 'approve' | 'request_changes'
+  ): { valid: boolean; currentStatus?: PlanStatusType } => {
+    if (!identity) {
+      toast.error('No identity set - please set up your profile first');
+      return { valid: false };
+    }
+
+    if (!ydoc) {
+      toast.error('Document not loaded - please refresh the page');
+      return { valid: false };
+    }
+
+    if (!editor) {
+      toast.error('Editor not ready - please try again in a moment');
+      return { valid: false };
+    }
+
+    const metadata = ydoc.getMap('metadata');
+    const currentStatus = metadata.get('status') as PlanStatusType;
+
+    if (
+      (action === 'approve' && currentStatus === 'in_progress') ||
+      (action === 'request_changes' && currentStatus === 'changes_requested')
+    ) {
+      const statusLabel =
+        currentStatus === 'in_progress' ? 'already in progress' : 'already has changes requested';
+      toast.info(`Plan ${statusLabel}`);
+      return { valid: false };
+    }
+
+    return { valid: true, currentStatus };
+  };
+
+  // Update Y.Doc with new review status
+  const updateReviewStatus = (
+    action: 'approve' | 'request_changes',
+    trimmedComment: string,
+    now: number
+  ) => {
+    const newStatus = action === 'approve' ? 'in_progress' : 'changes_requested';
+
+    ydoc.transact(() => {
+      const metadata = ydoc.getMap('metadata');
+      const reviewRequestId = metadata.get('reviewRequestId') as string | undefined;
+
+      metadata.set('status', newStatus);
+      metadata.set('reviewedAt', now);
+      metadata.set('reviewedBy', identity?.name ?? 'Unknown');
+      metadata.set('updatedAt', now);
+
+      if (reviewRequestId !== undefined) {
+        metadata.set('reviewRequestId', reviewRequestId);
+      }
+
+      if (trimmedComment) {
+        metadata.set('reviewComment', trimmedComment);
+      } else {
+        metadata.delete('reviewComment');
+      }
+    });
+
+    return newStatus;
+  };
+
   const handleConfirm = async (action: 'approve' | 'request_changes') => {
-    if (!identity) return;
+    const validation = validateReviewAction(action);
+    if (!validation.valid) {
+      setOpenPopover(null);
+      return;
+    }
 
     setIsSubmitting(true);
+
     try {
-      const newStatus = action === 'approve' ? 'in_progress' : 'changes_requested';
       const trimmedComment = comment.trim();
       const now = Date.now();
 
-      // Update Y.Doc - hook observes this for distributed approval
-      ydoc.transact(() => {
-        const metadata = ydoc.getMap('metadata');
-        const reviewRequestId = metadata.get('reviewRequestId') as string | undefined;
-
-        metadata.set('status', newStatus);
-        metadata.set('reviewedAt', now);
-        metadata.set('reviewedBy', identity.name);
-        metadata.set('updatedAt', now);
-
-        // Preserve reviewRequestId if present (hook needs this to match)
-        if (reviewRequestId !== undefined) {
-          metadata.set('reviewRequestId', reviewRequestId);
-        }
-
-        // Set or clear reviewComment
-        if (trimmedComment) {
-          metadata.set('reviewComment', trimmedComment);
-        } else {
-          metadata.delete('reviewComment');
-        }
-      });
+      const newStatus = updateReviewStatus(action, trimmedComment, now);
 
       const eventType = action === 'approve' ? 'approved' : 'changes_requested';
-      logPlanEvent(ydoc, eventType, identity.name);
+      logPlanEvent(ydoc, eventType, identity?.name ?? 'Unknown');
 
-      // Create snapshot on review decision (Issue #42)
-      // Get current blocks from editor if available
-      if (editor) {
-        const blocks = editor.document;
+      const blocks = editor.document;
+      const reason =
+        action === 'approve'
+          ? `Approved by ${identity?.name}`
+          : `Changes requested by ${identity?.name}`;
+      const snapshot = createPlanSnapshot(ydoc, reason, identity?.name ?? 'Unknown', newStatus, blocks);
+      addSnapshot(ydoc, snapshot);
 
-        const reason =
-          action === 'approve'
-            ? `Approved by ${identity.name}`
-            : `Changes requested by ${identity.name}`;
-        const snapshot = createPlanSnapshot(ydoc, reason, identity.name, newStatus, blocks);
-        addSnapshot(ydoc, snapshot);
-      }
+      const successMessage =
+        action === 'approve' ? 'Plan approved successfully!' : 'Changes requested successfully!';
+      toast.success(successMessage);
 
       setOpenPopover(null);
       setComment('');
       onStatusChange?.(newStatus, now);
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error during status update';
+
+      const actionLabel = action === 'approve' ? 'approve' : 'request changes';
+      toast.error(`Failed to ${actionLabel}: ${errorMessage}`);
     } finally {
       setIsSubmitting(false);
     }

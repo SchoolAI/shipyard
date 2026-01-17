@@ -88,11 +88,24 @@ async function handlePlanExit(
   try {
     return await checkReviewStatus(event.sessionId, event.planContent, event.metadata);
   } catch (err) {
-    logger.error({ err }, 'Failed to check review status');
+    const error = err as Error;
+    logger.error({ err: error, message: error.message }, 'Failed to check review status');
+
+    // Check if it's specifically a registry connection issue
+    const isConnectionError =
+      error.message?.includes('connect') ||
+      error.message?.includes('timeout') ||
+      error.message?.includes('WebSocket') ||
+      error.message?.includes('not available');
+
+    const message = isConnectionError
+      ? 'Cannot connect to peer-plan registry server after multiple retries. ' +
+        'Please ensure the server is running: `pnpm dev` in the peer-plan directory.'
+      : `Review system error: ${error.message}`;
+
     return {
       allow: false,
-      message:
-        'Review system unavailable. Please ensure the registry server is running and try again, or check the plan URL manually for approval status.',
+      message,
     };
   }
 }
