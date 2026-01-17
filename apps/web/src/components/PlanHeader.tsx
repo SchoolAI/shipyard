@@ -14,6 +14,7 @@ import type { A2AMessage, ConversationExportMeta, PlanMetadata } from '@peer-pla
 import {
   getPlanIndexEntry,
   getPlanOwnerId,
+  logPlanEvent,
   PLAN_INDEX_DOC_NAME,
   setPlanIndexEntry,
 } from '@peer-plan/schema';
@@ -42,6 +43,7 @@ import { ReviewActions } from '@/components/ReviewActions';
 import { ShareButton } from '@/components/ShareButton';
 import { StatusChip } from '@/components/StatusChip';
 import { useActivePlanSync } from '@/contexts/ActivePlanSyncContext';
+import { useUserIdentity } from '@/contexts/UserIdentityContext';
 import { useConversationTransfer } from '@/hooks/useConversationTransfer';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
 import { useIsMobile } from '@/hooks/useIsMobile';
@@ -249,7 +251,7 @@ function DesktopActions({
 }: DesktopActionsProps) {
   return (
     <>
-      <ShareButton planId={planId} rtcProvider={rtcProvider} isOwner={isOwner} />
+      <ShareButton planId={planId} rtcProvider={rtcProvider} isOwner={isOwner} ydoc={ydoc} />
 
       {/* Resume conversation button */}
       <Tooltip delay={0}>
@@ -497,6 +499,7 @@ export function PlanHeader({
   const isMobile = useIsMobile();
   const isArchived = !!display.archivedAt;
   const { identity: githubIdentity } = useGitHubAuth();
+  const { actor } = useUserIdentity();
   const { ydoc: indexDoc } = useMultiProviderSync(PLAN_INDEX_DOC_NAME);
   const ownerId = getPlanOwnerId(ydoc);
   const { connectedPeers } = useP2PPeers(rtcProvider);
@@ -531,17 +534,23 @@ export function PlanHeader({
 
     const now = Date.now();
 
-    ydoc.transact(() => {
-      const metadataMap = ydoc.getMap('metadata');
-      if (isArchived) {
-        metadataMap.delete('archivedAt');
-        metadataMap.delete('archivedBy');
-      } else {
-        metadataMap.set('archivedAt', now);
-        metadataMap.set('archivedBy', githubIdentity.displayName);
-      }
-      metadataMap.set('updatedAt', now);
-    });
+    ydoc.transact(
+      () => {
+        const metadataMap = ydoc.getMap('metadata');
+        if (isArchived) {
+          metadataMap.delete('archivedAt');
+          metadataMap.delete('archivedBy');
+        } else {
+          metadataMap.set('archivedAt', now);
+          metadataMap.set('archivedBy', githubIdentity.displayName);
+        }
+        metadataMap.set('updatedAt', now);
+      },
+      { actor }
+    );
+
+    // Log archive/unarchive event
+    logPlanEvent(ydoc, isArchived ? 'plan_unarchived' : 'plan_archived', actor);
 
     const entry = getPlanIndexEntry(indexDoc, planId);
     if (entry) {
@@ -565,6 +574,9 @@ export function PlanHeader({
     try {
       await navigator.clipboard.writeText(window.location.href);
       toast.success('Link copied to clipboard');
+
+      // Log plan shared event
+      logPlanEvent(ydoc, 'plan_shared', actor);
     } catch {
       // Fallback for older browsers
       const textArea = document.createElement('textarea');
@@ -574,6 +586,9 @@ export function PlanHeader({
       document.execCommand('copy');
       document.body.removeChild(textArea);
       toast.success('Link copied to clipboard');
+
+      // Log plan shared event
+      logPlanEvent(ydoc, 'plan_shared', actor);
     }
   };
 

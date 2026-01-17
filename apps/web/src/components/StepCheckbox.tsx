@@ -1,7 +1,8 @@
 import { Checkbox, Label } from '@heroui/react';
-import { toggleStepCompletion } from '@peer-plan/schema';
+import { logPlanEvent, toggleStepCompletion } from '@peer-plan/schema';
 import { useEffect, useState } from 'react';
 import type * as Y from 'yjs';
+import { useUserIdentity } from '@/contexts/UserIdentityContext';
 
 interface StepCheckboxProps {
   ydoc: Y.Doc;
@@ -11,6 +12,7 @@ interface StepCheckboxProps {
 
 export function StepCheckbox({ ydoc, stepId, label }: StepCheckboxProps) {
   const [checked, setChecked] = useState(false);
+  const { actor } = useUserIdentity();
 
   useEffect(() => {
     const steps = ydoc.getMap<boolean>('stepCompletions');
@@ -23,7 +25,14 @@ export function StepCheckbox({ ydoc, stepId, label }: StepCheckboxProps) {
   }, [ydoc, stepId]);
 
   const handleToggle = () => {
-    toggleStepCompletion(ydoc, stepId);
+    const newValue = !checked;
+    toggleStepCompletion(ydoc, stepId, actor);
+
+    // Log step completion event
+    logPlanEvent(ydoc, 'step_completed', actor, {
+      stepId,
+      completed: newValue,
+    });
   };
 
   return (

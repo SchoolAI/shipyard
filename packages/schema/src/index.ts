@@ -157,6 +157,7 @@ export {
   DeliverableSchema,
   DevinOriginMetadataSchema,
   getArtifactUrl,
+  isInboxWorthy,
   LinkedPRSchema,
   LinkedPRStatusValues,
   OriginMetadataSchema,
@@ -191,6 +192,7 @@ export type { RoutePath } from './routes.js';
 export { ROUTES } from './routes.js';
 export type { CommentBody, Thread, ThreadComment } from './thread.js';
 export {
+  extractMentions,
   extractTextFromCommentBody,
   isThread,
   parseThreads,

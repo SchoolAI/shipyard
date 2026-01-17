@@ -166,29 +166,32 @@ Bad deliverables (not provable):
 
     const editor = ServerBlockNoteEditor.create();
 
-    ydoc.transact(() => {
-      // Store in document fragment for BlockNote collaboration (source of truth)
-      const fragment = ydoc.getXmlFragment('document');
-      // Clear existing content first to avoid duplicates or conflicts
-      while (fragment.length > 0) {
-        fragment.delete(0, 1);
-      }
-      editor.blocksToYXmlFragment(blocks, fragment);
+    ydoc.transact(
+      () => {
+        // Store in document fragment for BlockNote collaboration (source of truth)
+        const fragment = ydoc.getXmlFragment('document');
+        // Clear existing content first to avoid duplicates or conflicts
+        while (fragment.length > 0) {
+          fragment.delete(0, 1);
+        }
+        editor.blocksToYXmlFragment(blocks, fragment);
 
-      // Extract and store deliverables
-      const deliverables = extractDeliverables(blocks);
-      for (const deliverable of deliverables) {
-        addDeliverable(ydoc, deliverable);
-      }
+        // Extract and store deliverables
+        const deliverables = extractDeliverables(blocks);
+        for (const deliverable of deliverables) {
+          addDeliverable(ydoc, deliverable);
+        }
 
-      if (deliverables.length > 0) {
-        logger.info({ count: deliverables.length }, 'Deliverables extracted and stored');
-      }
+        if (deliverables.length > 0) {
+          logger.info({ count: deliverables.length }, 'Deliverables extracted and stored');
+        }
 
-      logPlanEvent(ydoc, 'plan_created', ownerId ?? 'unknown');
-      // Note: Initial snapshot is NOT created here - snapshots are only created
-      // when content is updated via update_block_content (Issue #42)
-    });
+        logPlanEvent(ydoc, 'plan_created', ownerId ?? 'unknown');
+        // Note: Initial snapshot is NOT created here - snapshots are only created
+        // when content is updated via update_block_content (Issue #42)
+      },
+      { actor: ownerId ?? 'unknown' }
+    );
 
     logger.info('Content stored in Y.Doc document fragment');
 

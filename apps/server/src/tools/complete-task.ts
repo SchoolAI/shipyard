@@ -172,12 +172,16 @@ RETURNS:
     );
 
     // Update metadata
-    setPlanMetadata(ydoc, {
-      status: 'completed',
-      completedAt: Date.now(),
-      completedBy: actorName,
-      snapshotUrl,
-    });
+    setPlanMetadata(
+      ydoc,
+      {
+        status: 'completed',
+        completedAt: Date.now(),
+        completedBy: actorName,
+        snapshotUrl,
+      },
+      actorName
+    );
 
     // Log completion event (Issue #42 - was missing!)
     logPlanEvent(ydoc, 'completed', actorName);
@@ -303,7 +307,14 @@ async function tryAutoLinkPR(ydoc: Y.Doc, repo: string): Promise<LinkedPR | null
     };
 
     // Store in Y.Doc
-    linkPR(ydoc, linkedPR);
+    const actorName = await getGitHubUsername();
+    linkPR(ydoc, linkedPR, actorName);
+
+    // Log PR linked event (semantic action)
+    logPlanEvent(ydoc, 'pr_linked', actorName, {
+      prNumber: linkedPR.prNumber,
+      url: linkedPR.url,
+    });
 
     return linkedPR;
   } catch (error) {

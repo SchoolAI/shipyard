@@ -3,7 +3,7 @@
  * Two-column layout with inbox list on left and detail panel on right.
  */
 
-import { Button, Chip, ListBox, ListBoxItem, Switch, Tooltip } from '@heroui/react';
+import { Accordion, Button, Chip, ListBox, ListBoxItem, Switch, Tooltip } from '@heroui/react';
 import {
   getPlanIndexEntry,
   PLAN_INDEX_DOC_NAME,
@@ -11,7 +11,17 @@ import {
   type PlanStatusType,
   setPlanIndexEntry,
 } from '@peer-plan/schema';
-import { AlertTriangle, Check, Clock, MessageSquare, X } from 'lucide-react';
+import {
+  AlertTriangle,
+  AtSign,
+  Check,
+  CheckCircle,
+  ChevronDown,
+  Clock,
+  MessageSquare,
+  UserPlus,
+  X,
+} from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -19,7 +29,9 @@ import { IndexeddbPersistence } from 'y-indexeddb';
 import * as Y from 'yjs';
 import { InlinePlanDetail, type PlanActionContext } from '@/components/InlinePlanDetail';
 import { TwoColumnSkeleton } from '@/components/ui/TwoColumnSkeleton';
+import { useUserIdentity } from '@/contexts/UserIdentityContext';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
+import { type InboxEventItem, useInboxEvents } from '@/hooks/useInboxEvents';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useMultiProviderSync } from '@/hooks/useMultiProviderSync';
 import { usePlanIndex } from '@/hooks/usePlanIndex';
@@ -141,6 +153,84 @@ function InboxItem({ plan, onApprove, onRequestChanges, onDismiss }: InboxItemPr
   );
 }
 
+interface EventInboxItemProps {
+  item: InboxEventItem;
+  onView: (planId: string) => void;
+}
+
+function EventInboxItem({ item, onView }: EventInboxItemProps) {
+  const { plan, event } = item;
+
+  // Determine icon and description based on event type
+  const getEventDisplay = () => {
+    switch (event.type) {
+      case 'comment_added':
+        if (event.data?.mentions) {
+          return {
+            icon: <AtSign className="w-4 h-4" />,
+            description: `${event.actor} mentioned you`,
+            color: 'accent' as const,
+          };
+        }
+        return {
+          icon: <MessageSquare className="w-4 h-4" />,
+          description: `${event.actor} commented`,
+          color: 'default' as const,
+        };
+      case 'approval_requested':
+        return {
+          icon: <UserPlus className="w-4 h-4" />,
+          description: `${event.actor} requested your approval`,
+          color: 'warning' as const,
+        };
+      case 'deliverable_linked':
+        if (event.data?.allFulfilled) {
+          return {
+            icon: <CheckCircle className="w-4 h-4" />,
+            description: 'All deliverables fulfilled',
+            color: 'success' as const,
+          };
+        }
+        return {
+          icon: <CheckCircle className="w-4 h-4" />,
+          description: 'Deliverable linked',
+          color: 'default' as const,
+        };
+      default:
+        return {
+          icon: <MessageSquare className="w-4 h-4" />,
+          description: event.type,
+          color: 'default' as const,
+        };
+    }
+  };
+
+  const { icon, description, color } = getEventDisplay();
+
+  return (
+    <div className="flex items-center justify-between gap-3 w-full py-2">
+      <div className="flex flex-col gap-1 flex-1 min-w-0">
+        <span className="font-medium text-foreground truncate">{plan.title}</span>
+        <div className="flex items-center gap-2">
+          <Chip size="sm" variant="soft" color={color} className="gap-1">
+            {icon}
+            {description}
+          </Chip>
+          <span className="text-xs text-muted-foreground">
+            {formatRelativeTime(event.timestamp)}
+          </span>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-1 shrink-0">
+        <Button variant="ghost" size="sm" onPress={() => onView(plan.id)}>
+          View
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 export function InboxPage() {
   // All hooks at top of component - called in same order every render
   const navigate = useNavigate();
@@ -149,6 +239,10 @@ export function InboxPage() {
   const { allInboxPlans, markPlanAsRead, isLoading } = usePlanIndex(githubIdentity?.username);
   const { ydoc: indexDoc } = useMultiProviderSync(PLAN_INDEX_DOC_NAME);
   const [showRead, setShowRead] = useState(getInboxShowRead);
+  const { actor } = useUserIdentity();
+
+  // Load event-based inbox items
+  const eventBasedInbox = useInboxEvents(allInboxPlans, githubIdentity?.username ?? null);
 
   // Selected plan state - read from URL on mount
   const searchParams = new URLSearchParams(location.search);
@@ -173,6 +267,25 @@ export function InboxPage() {
 
     return filtered.sort((a, b) => b.updatedAt - a.updatedAt);
   }, [allInboxPlans, showRead, selectedPlanId]);
+
+  // Group inbox items by category
+  const inboxGroups = useMemo(() => {
+    const statusBasedInbox = sortedInboxPlans;
+
+    return {
+      needsReview: statusBasedInbox.filter((p) => p.status === 'pending_review'),
+      needsAction: statusBasedInbox.filter((p) => p.status === 'changes_requested'),
+      approvalRequests: eventBasedInbox.filter(
+        (e: InboxEventItem) => e.event.type === 'approval_requested'
+      ),
+      mentions: eventBasedInbox.filter(
+        (e: InboxEventItem) => e.event.type === 'comment_added' && e.event.data?.mentions
+      ),
+      readyToComplete: eventBasedInbox.filter(
+        (e: InboxEventItem) => e.event.type === 'deliverable_linked' && e.event.data?.allFulfilled
+      ),
+    };
+  }, [sortedInboxPlans, eventBasedInbox]);
 
   // Update URL when panel state changes
   useEffect(() => {
@@ -235,18 +348,21 @@ export function InboxPage() {
         const idb = new IndexeddbPersistence(planId, planDoc);
         await idb.whenSynced;
 
-        planDoc.transact(() => {
-          const metadata = planDoc.getMap('metadata');
-          const reviewRequestId = metadata.get('reviewRequestId') as string | undefined;
+        planDoc.transact(
+          () => {
+            const metadata = planDoc.getMap('metadata');
+            const reviewRequestId = metadata.get('reviewRequestId') as string | undefined;
 
-          metadata.set('status', 'in_progress');
-          metadata.set('updatedAt', now);
+            metadata.set('status', 'in_progress');
+            metadata.set('updatedAt', now);
 
-          // Preserve reviewRequestId if present (hook needs this to match)
-          if (reviewRequestId !== undefined) {
-            metadata.set('reviewRequestId', reviewRequestId);
-          }
-        });
+            // Preserve reviewRequestId if present (hook needs this to match)
+            if (reviewRequestId !== undefined) {
+              metadata.set('reviewRequestId', reviewRequestId);
+            }
+          },
+          { actor }
+        );
 
         idb.destroy();
       } catch {
@@ -255,7 +371,7 @@ export function InboxPage() {
 
       toast.success('Plan approved');
     },
-    [githubIdentity, indexDoc]
+    [githubIdentity, indexDoc, actor]
   );
 
   // Request changes handler
@@ -281,6 +397,15 @@ export function InboxPage() {
     [markPlanAsRead]
   );
 
+  // Event item view handler
+  const handleViewEvent = useCallback(
+    (planId: string) => {
+      markPlanAsRead(planId);
+      setSelectedPlanId(planId);
+    },
+    [markPlanAsRead]
+  );
+
   // Panel approve handler
   const handlePanelApprove = useCallback(
     async (context: PlanActionContext) => {
@@ -288,18 +413,21 @@ export function InboxPage() {
 
       const now = Date.now();
 
-      ydoc.transact(() => {
-        const metadata = ydoc.getMap('metadata');
-        const reviewRequestId = metadata.get('reviewRequestId') as string | undefined;
+      ydoc.transact(
+        () => {
+          const metadata = ydoc.getMap('metadata');
+          const reviewRequestId = metadata.get('reviewRequestId') as string | undefined;
 
-        metadata.set('status', 'in_progress');
-        metadata.set('updatedAt', now);
+          metadata.set('status', 'in_progress');
+          metadata.set('updatedAt', now);
 
-        // Preserve reviewRequestId if present (hook needs this to match)
-        if (reviewRequestId !== undefined) {
-          metadata.set('reviewRequestId', reviewRequestId);
-        }
-      });
+          // Preserve reviewRequestId if present (hook needs this to match)
+          if (reviewRequestId !== undefined) {
+            metadata.set('reviewRequestId', reviewRequestId);
+          }
+        },
+        { actor }
+      );
 
       // Also update index with the same timestamp
       const entry = getPlanIndexEntry(indexDoc, planId);
@@ -313,7 +441,7 @@ export function InboxPage() {
 
       toast.success('Plan approved');
     },
-    [indexDoc]
+    [indexDoc, actor]
   );
 
   // Panel request changes handler
@@ -384,7 +512,14 @@ export function InboxPage() {
     return <TwoColumnSkeleton itemCount={3} showActions={true} titleWidth="w-20" />;
   }
 
-  if (sortedInboxPlans.length === 0) {
+  // Calculate total inbox items
+  const totalInboxItems =
+    sortedInboxPlans.length +
+    inboxGroups.mentions.length +
+    inboxGroups.readyToComplete.length +
+    inboxGroups.approvalRequests.length;
+
+  if (totalInboxItems === 0) {
     return (
       <div className="h-full flex items-center justify-center p-4">
         <div className="text-center">
@@ -408,8 +543,8 @@ export function InboxPage() {
             <div>
               <h1 className="text-xl font-bold text-foreground">Inbox</h1>
               <p className="text-sm text-muted-foreground">
-                {sortedInboxPlans.length}{' '}
-                {sortedInboxPlans.length === 1 ? 'plan needs' : 'plans need'} your attention
+                {totalInboxItems} {totalInboxItems === 1 ? 'item needs' : 'items need'} your
+                attention
               </p>
             </div>
             <Switch size="sm" isSelected={showRead} onChange={handleToggleShowRead}>
@@ -420,37 +555,184 @@ export function InboxPage() {
 
         {/* Inbox results */}
         <div className="flex-1 overflow-y-auto p-2">
-          {sortedInboxPlans.length === 0 ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="text-center">
-                <p className="text-muted-foreground">No plans in inbox</p>
-              </div>
-            </div>
-          ) : (
-            <ListBox
-              aria-label="Inbox plans"
-              selectionMode="single"
-              selectedKeys={selectedPlanId ? new Set([selectedPlanId]) : new Set()}
-              onSelectionChange={handleListSelection}
-              className="divide-y divide-separator"
-            >
-              {sortedInboxPlans.map((plan) => (
-                <ListBoxItem
-                  id={plan.id}
-                  key={plan.id}
-                  textValue={plan.title}
-                  className="px-3 rounded-lg hover:bg-surface"
-                >
-                  <InboxItem
-                    plan={plan}
-                    onApprove={handleApprove}
-                    onRequestChanges={handleRequestChanges}
-                    onDismiss={handleDismiss}
-                  />
-                </ListBoxItem>
-              ))}
-            </ListBox>
-          )}
+          <Accordion allowsMultipleExpanded defaultExpandedKeys={['needsReview', 'mentions']}>
+            {/* Needs Review */}
+            {inboxGroups.needsReview.length > 0 && (
+              <Accordion.Item id="needsReview">
+                <Accordion.Heading>
+                  <Accordion.Trigger>
+                    <Clock className="w-4 h-4 mr-2 shrink-0 text-warning" />
+                    <span className="flex-1 text-left">Needs Review</span>
+                    <Chip size="sm" variant="soft" color="warning" className="mr-2">
+                      {inboxGroups.needsReview.length}
+                    </Chip>
+                    <Accordion.Indicator>
+                      <ChevronDown />
+                    </Accordion.Indicator>
+                  </Accordion.Trigger>
+                </Accordion.Heading>
+                <Accordion.Panel>
+                  <Accordion.Body>
+                    <ListBox
+                      aria-label="Plans needing review"
+                      selectionMode="single"
+                      selectedKeys={selectedPlanId ? new Set([selectedPlanId]) : new Set()}
+                      onSelectionChange={handleListSelection}
+                      className="divide-y divide-separator"
+                    >
+                      {inboxGroups.needsReview.map((plan) => (
+                        <ListBoxItem
+                          id={plan.id}
+                          key={plan.id}
+                          textValue={plan.title}
+                          className="px-3 rounded-lg hover:bg-surface"
+                        >
+                          <InboxItem
+                            plan={plan}
+                            onApprove={handleApprove}
+                            onRequestChanges={handleRequestChanges}
+                            onDismiss={handleDismiss}
+                          />
+                        </ListBoxItem>
+                      ))}
+                    </ListBox>
+                  </Accordion.Body>
+                </Accordion.Panel>
+              </Accordion.Item>
+            )}
+
+            {/* Needs Your Action */}
+            {inboxGroups.needsAction.length > 0 && (
+              <Accordion.Item id="needsAction">
+                <Accordion.Heading>
+                  <Accordion.Trigger>
+                    <AlertTriangle className="w-4 h-4 mr-2 shrink-0 text-danger" />
+                    <span className="flex-1 text-left">Needs Your Action</span>
+                    <Chip size="sm" variant="soft" color="danger" className="mr-2">
+                      {inboxGroups.needsAction.length}
+                    </Chip>
+                    <Accordion.Indicator>
+                      <ChevronDown />
+                    </Accordion.Indicator>
+                  </Accordion.Trigger>
+                </Accordion.Heading>
+                <Accordion.Panel>
+                  <Accordion.Body>
+                    <ListBox
+                      aria-label="Plans needing your action"
+                      selectionMode="single"
+                      selectedKeys={selectedPlanId ? new Set([selectedPlanId]) : new Set()}
+                      onSelectionChange={handleListSelection}
+                      className="divide-y divide-separator"
+                    >
+                      {inboxGroups.needsAction.map((plan) => (
+                        <ListBoxItem
+                          id={plan.id}
+                          key={plan.id}
+                          textValue={plan.title}
+                          className="px-3 rounded-lg hover:bg-surface"
+                        >
+                          <InboxItem
+                            plan={plan}
+                            onApprove={handleApprove}
+                            onRequestChanges={handleRequestChanges}
+                            onDismiss={handleDismiss}
+                          />
+                        </ListBoxItem>
+                      ))}
+                    </ListBox>
+                  </Accordion.Body>
+                </Accordion.Panel>
+              </Accordion.Item>
+            )}
+
+            {/* Mentions */}
+            {inboxGroups.mentions.length > 0 && (
+              <Accordion.Item id="mentions">
+                <Accordion.Heading>
+                  <Accordion.Trigger>
+                    <AtSign className="w-4 h-4 mr-2 shrink-0 text-accent" />
+                    <span className="flex-1 text-left">Mentions</span>
+                    <Chip size="sm" variant="soft" color="accent" className="mr-2">
+                      {inboxGroups.mentions.length}
+                    </Chip>
+                    <Accordion.Indicator>
+                      <ChevronDown />
+                    </Accordion.Indicator>
+                  </Accordion.Trigger>
+                </Accordion.Heading>
+                <Accordion.Panel>
+                  <Accordion.Body>
+                    <div className="divide-y divide-separator">
+                      {inboxGroups.mentions.map((item: InboxEventItem) => (
+                        <div key={`${item.plan.id}-${item.event.id}`} className="px-3">
+                          <EventInboxItem item={item} onView={handleViewEvent} />
+                        </div>
+                      ))}
+                    </div>
+                  </Accordion.Body>
+                </Accordion.Panel>
+              </Accordion.Item>
+            )}
+
+            {/* Ready to Complete */}
+            {inboxGroups.readyToComplete.length > 0 && (
+              <Accordion.Item id="readyToComplete">
+                <Accordion.Heading>
+                  <Accordion.Trigger>
+                    <CheckCircle className="w-4 h-4 mr-2 shrink-0 text-success" />
+                    <span className="flex-1 text-left">Ready to Complete</span>
+                    <Chip size="sm" variant="soft" color="success" className="mr-2">
+                      {inboxGroups.readyToComplete.length}
+                    </Chip>
+                    <Accordion.Indicator>
+                      <ChevronDown />
+                    </Accordion.Indicator>
+                  </Accordion.Trigger>
+                </Accordion.Heading>
+                <Accordion.Panel>
+                  <Accordion.Body>
+                    <div className="divide-y divide-separator">
+                      {inboxGroups.readyToComplete.map((item: InboxEventItem) => (
+                        <div key={`${item.plan.id}-${item.event.id}`} className="px-3">
+                          <EventInboxItem item={item} onView={handleViewEvent} />
+                        </div>
+                      ))}
+                    </div>
+                  </Accordion.Body>
+                </Accordion.Panel>
+              </Accordion.Item>
+            )}
+
+            {/* Approval Requests */}
+            {inboxGroups.approvalRequests.length > 0 && (
+              <Accordion.Item id="approvalRequests">
+                <Accordion.Heading>
+                  <Accordion.Trigger>
+                    <UserPlus className="w-4 h-4 mr-2 shrink-0 text-warning" />
+                    <span className="flex-1 text-left">Approval Requests</span>
+                    <Chip size="sm" variant="soft" color="warning" className="mr-2">
+                      {inboxGroups.approvalRequests.length}
+                    </Chip>
+                    <Accordion.Indicator>
+                      <ChevronDown />
+                    </Accordion.Indicator>
+                  </Accordion.Trigger>
+                </Accordion.Heading>
+                <Accordion.Panel>
+                  <Accordion.Body>
+                    <div className="divide-y divide-separator">
+                      {inboxGroups.approvalRequests.map((item: InboxEventItem) => (
+                        <div key={`${item.plan.id}-${item.event.id}`} className="px-3">
+                          <EventInboxItem item={item} onView={handleViewEvent} />
+                        </div>
+                      ))}
+                    </div>
+                  </Accordion.Body>
+                </Accordion.Panel>
+              </Accordion.Item>
+            )}
+          </Accordion>
         </div>
       </div>
 

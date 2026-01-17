@@ -105,3 +105,27 @@ export function extractTextFromCommentBody(body: CommentBody): string {
     })
     .join('\n');
 }
+
+/**
+ * Extract @mentions from comment body.
+ * Looks for patterns like @username in the text.
+ *
+ * @param body - Comment body (string or structured content)
+ * @returns Array of mentioned GitHub usernames (without @ prefix)
+ */
+export function extractMentions(body: CommentBody): string[] {
+  const text = extractTextFromCommentBody(body);
+  const mentionRegex = /@([a-zA-Z0-9_-]+)/g;
+  const mentions: string[] = [];
+  let match: RegExpExecArray | null;
+
+  // biome-ignore lint/suspicious/noAssignInExpressions: Standard regex exec loop pattern
+  while ((match = mentionRegex.exec(text)) !== null) {
+    if (match[1]) {
+      mentions.push(match[1]);
+    }
+  }
+
+  // Remove duplicates
+  return [...new Set(mentions)];
+}

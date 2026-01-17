@@ -11,11 +11,12 @@ import {
   Spinner,
   TextField,
 } from '@heroui/react';
-import { getPlanMetadata, type LinkedPR, linkPR } from '@peer-plan/schema';
+import { getPlanMetadata, type LinkedPR, linkPR, logPlanEvent } from '@peer-plan/schema';
 import { GitPullRequest } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import type * as Y from 'yjs';
+import { useUserIdentity } from '@/contexts/UserIdentityContext';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
 
 interface LinkPRButtonProps {
@@ -44,6 +45,7 @@ export function LinkPRButton({
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { identity } = useGitHubAuth();
+  const { actor } = useUserIdentity();
 
   // Use controlled state if provided, otherwise use internal state
   const isOpen = controlledIsOpen ?? internalIsOpen;
@@ -110,6 +112,12 @@ export function LinkPRButton({
 
       // Store in Y.Doc
       linkPR(ydoc, linkedPR);
+
+      // Log PR linked event
+      logPlanEvent(ydoc, 'pr_linked', actor, {
+        prNumber,
+        url: linkedPR.url,
+      });
 
       toast.success(`PR #${prNumber} linked successfully!`);
       setIsOpen(false);

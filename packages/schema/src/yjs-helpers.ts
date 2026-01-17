@@ -35,16 +35,25 @@ export function getPlanMetadata(ydoc: Y.Doc): PlanMetadata | null {
   return result.data;
 }
 
-export function setPlanMetadata(ydoc: Y.Doc, metadata: Partial<PlanMetadata>): void {
-  const map = ydoc.getMap('metadata');
+export function setPlanMetadata(
+  ydoc: Y.Doc,
+  metadata: Partial<PlanMetadata>,
+  actor?: string
+): void {
+  ydoc.transact(
+    () => {
+      const map = ydoc.getMap('metadata');
 
-  for (const [key, value] of Object.entries(metadata)) {
-    if (value !== undefined) {
-      map.set(key, value);
-    }
-  }
+      for (const [key, value] of Object.entries(metadata)) {
+        if (value !== undefined) {
+          map.set(key, value);
+        }
+      }
 
-  map.set('updatedAt', Date.now());
+      map.set('updatedAt', Date.now());
+    },
+    actor ? { actor } : undefined
+  );
 }
 
 export function initPlanMetadata(
@@ -84,10 +93,15 @@ export function getStepCompletions(ydoc: Y.Doc): Map<string, boolean> {
   return new Map(steps.entries());
 }
 
-export function toggleStepCompletion(ydoc: Y.Doc, stepId: string): void {
-  const steps = ydoc.getMap<boolean>('stepCompletions');
-  const current = steps.get(stepId) || false;
-  steps.set(stepId, !current);
+export function toggleStepCompletion(ydoc: Y.Doc, stepId: string, actor?: string): void {
+  ydoc.transact(
+    () => {
+      const steps = ydoc.getMap<boolean>('stepCompletions');
+      const current = steps.get(stepId) || false;
+      steps.set(stepId, !current);
+    },
+    actor ? { actor } : undefined
+  );
 }
 
 export function isStepCompleted(ydoc: Y.Doc, stepId: string): boolean {
@@ -105,9 +119,14 @@ export function getArtifacts(ydoc: Y.Doc): Artifact[] {
     .map((result) => result.data);
 }
 
-export function addArtifact(ydoc: Y.Doc, artifact: Artifact): void {
-  const array = ydoc.getArray(YDOC_KEYS.ARTIFACTS);
-  array.push([artifact]);
+export function addArtifact(ydoc: Y.Doc, artifact: Artifact, actor?: string): void {
+  ydoc.transact(
+    () => {
+      const array = ydoc.getArray(YDOC_KEYS.ARTIFACTS);
+      array.push([artifact]);
+    },
+    actor ? { actor } : undefined
+  );
 }
 
 export function removeArtifact(ydoc: Y.Doc, artifactId: string): boolean {
@@ -135,9 +154,14 @@ export function getAgentPresences(ydoc: Y.Doc): Map<string, AgentPresence> {
   return result;
 }
 
-export function setAgentPresence(ydoc: Y.Doc, presence: AgentPresence): void {
-  const map = ydoc.getMap(YDOC_KEYS.PRESENCE);
-  map.set(presence.sessionId, presence);
+export function setAgentPresence(ydoc: Y.Doc, presence: AgentPresence, actor?: string): void {
+  ydoc.transact(
+    () => {
+      const map = ydoc.getMap(YDOC_KEYS.PRESENCE);
+      map.set(presence.sessionId, presence);
+    },
+    actor ? { actor } : undefined
+  );
 }
 
 export function clearAgentPresence(ydoc: Y.Doc, sessionId: string): boolean {
@@ -166,15 +190,21 @@ export function getDeliverables(ydoc: Y.Doc): Deliverable[] {
     .map((result) => result.data);
 }
 
-export function addDeliverable(ydoc: Y.Doc, deliverable: Deliverable): void {
-  const array = ydoc.getArray(YDOC_KEYS.DELIVERABLES);
-  array.push([deliverable]);
+export function addDeliverable(ydoc: Y.Doc, deliverable: Deliverable, actor?: string): void {
+  ydoc.transact(
+    () => {
+      const array = ydoc.getArray(YDOC_KEYS.DELIVERABLES);
+      array.push([deliverable]);
+    },
+    actor ? { actor } : undefined
+  );
 }
 
 export function linkArtifactToDeliverable(
   ydoc: Y.Doc,
   deliverableId: string,
-  artifactId: string
+  artifactId: string,
+  actor?: string
 ): boolean {
   const array = ydoc.getArray(YDOC_KEYS.DELIVERABLES);
   const deliverables = array.toJSON() as Deliverable[];
@@ -192,8 +222,14 @@ export function linkArtifactToDeliverable(
     linkedAt: Date.now(),
   };
 
-  array.delete(index, 1);
-  array.insert(index, [updated]);
+  ydoc.transact(
+    () => {
+      array.delete(index, 1);
+      array.insert(index, [updated]);
+    },
+    actor ? { actor } : undefined
+  );
+
   return true;
 }
 
@@ -230,18 +266,23 @@ export function isUserApproved(ydoc: Y.Doc, userId: string): boolean {
   return getApprovedUsers(ydoc).includes(userId);
 }
 
-export function approveUser(ydoc: Y.Doc, userId: string): void {
-  const map = ydoc.getMap('metadata');
+export function approveUser(ydoc: Y.Doc, userId: string, actor?: string): void {
   const currentApproved = getApprovedUsers(ydoc);
   if (currentApproved.includes(userId)) {
     return;
   }
-  map.set('approvedUsers', [...currentApproved, userId]);
-  map.set('updatedAt', Date.now());
+
+  ydoc.transact(
+    () => {
+      const map = ydoc.getMap('metadata');
+      map.set('approvedUsers', [...currentApproved, userId]);
+      map.set('updatedAt', Date.now());
+    },
+    actor ? { actor } : undefined
+  );
 }
 
-export function revokeUser(ydoc: Y.Doc, userId: string): boolean {
-  const map = ydoc.getMap('metadata');
+export function revokeUser(ydoc: Y.Doc, userId: string, actor?: string): boolean {
   const ownerId = getPlanOwnerId(ydoc);
 
   // Cannot revoke the plan owner
@@ -254,11 +295,19 @@ export function revokeUser(ydoc: Y.Doc, userId: string): boolean {
   if (index === -1) {
     return false;
   }
-  map.set(
-    'approvedUsers',
-    currentApproved.filter((id) => id !== userId)
+
+  ydoc.transact(
+    () => {
+      const map = ydoc.getMap('metadata');
+      map.set(
+        'approvedUsers',
+        currentApproved.filter((id) => id !== userId)
+      );
+      map.set('updatedAt', Date.now());
+    },
+    actor ? { actor } : undefined
   );
-  map.set('updatedAt', Date.now());
+
   return true;
 }
 
@@ -275,8 +324,7 @@ export function isUserRejected(ydoc: Y.Doc, userId: string): boolean {
   return getRejectedUsers(ydoc).includes(userId);
 }
 
-export function rejectUser(ydoc: Y.Doc, userId: string): void {
-  const map = ydoc.getMap('metadata');
+export function rejectUser(ydoc: Y.Doc, userId: string, actor?: string): void {
   const ownerId = getPlanOwnerId(ydoc);
 
   // Cannot reject the plan owner
@@ -287,34 +335,48 @@ export function rejectUser(ydoc: Y.Doc, userId: string): void {
   const currentRejected = getRejectedUsers(ydoc);
   const currentApproved = getApprovedUsers(ydoc);
 
-  // Add to rejected list if not already there
-  if (!currentRejected.includes(userId)) {
-    map.set('rejectedUsers', [...currentRejected, userId]);
-  }
+  ydoc.transact(
+    () => {
+      const map = ydoc.getMap('metadata');
 
-  // Remove from approved list if present
-  if (currentApproved.includes(userId)) {
-    map.set(
-      'approvedUsers',
-      currentApproved.filter((id) => id !== userId)
-    );
-  }
+      // Add to rejected list if not already there
+      if (!currentRejected.includes(userId)) {
+        map.set('rejectedUsers', [...currentRejected, userId]);
+      }
 
-  map.set('updatedAt', Date.now());
+      // Remove from approved list if present
+      if (currentApproved.includes(userId)) {
+        map.set(
+          'approvedUsers',
+          currentApproved.filter((id) => id !== userId)
+        );
+      }
+
+      map.set('updatedAt', Date.now());
+    },
+    actor ? { actor } : undefined
+  );
 }
 
-export function unrejectUser(ydoc: Y.Doc, userId: string): boolean {
-  const map = ydoc.getMap('metadata');
+export function unrejectUser(ydoc: Y.Doc, userId: string, actor?: string): boolean {
   const currentRejected = getRejectedUsers(ydoc);
   const index = currentRejected.indexOf(userId);
   if (index === -1) {
     return false;
   }
-  map.set(
-    'rejectedUsers',
-    currentRejected.filter((id) => id !== userId)
+
+  ydoc.transact(
+    () => {
+      const map = ydoc.getMap('metadata');
+      map.set(
+        'rejectedUsers',
+        currentRejected.filter((id) => id !== userId)
+      );
+      map.set('updatedAt', Date.now());
+    },
+    actor ? { actor } : undefined
   );
-  map.set('updatedAt', Date.now());
+
   return true;
 }
 
@@ -328,17 +390,22 @@ export function getLinkedPRs(ydoc: Y.Doc): LinkedPR[] {
     .map((result) => result.data);
 }
 
-export function linkPR(ydoc: Y.Doc, pr: LinkedPR): void {
-  const array = ydoc.getArray(YDOC_KEYS.LINKED_PRS);
-  const existing = array.toJSON() as LinkedPR[];
-  const index = existing.findIndex((p) => p.prNumber === pr.prNumber);
+export function linkPR(ydoc: Y.Doc, pr: LinkedPR, actor?: string): void {
+  ydoc.transact(
+    () => {
+      const array = ydoc.getArray(YDOC_KEYS.LINKED_PRS);
+      const existing = array.toJSON() as LinkedPR[];
+      const index = existing.findIndex((p) => p.prNumber === pr.prNumber);
 
-  // Remove existing PR with same number if present
-  if (index !== -1) {
-    array.delete(index, 1);
-  }
+      // Remove existing PR with same number if present
+      if (index !== -1) {
+        array.delete(index, 1);
+      }
 
-  array.push([pr]);
+      array.push([pr]);
+    },
+    actor ? { actor } : undefined
+  );
 }
 
 export function unlinkPR(ydoc: Y.Doc, prNumber: number): boolean {
@@ -392,9 +459,14 @@ export function getPRReviewCommentsForPR(ydoc: Y.Doc, prNumber: number): PRRevie
   return getPRReviewComments(ydoc).filter((c) => c.prNumber === prNumber);
 }
 
-export function addPRReviewComment(ydoc: Y.Doc, comment: PRReviewComment): void {
-  const array = ydoc.getArray(YDOC_KEYS.PR_REVIEW_COMMENTS);
-  array.push([comment]);
+export function addPRReviewComment(ydoc: Y.Doc, comment: PRReviewComment, actor?: string): void {
+  ydoc.transact(
+    () => {
+      const array = ydoc.getArray(YDOC_KEYS.PR_REVIEW_COMMENTS);
+      array.push([comment]);
+    },
+    actor ? { actor } : undefined
+  );
 }
 
 export function resolvePRReviewComment(ydoc: Y.Doc, commentId: string, resolved: boolean): boolean {
@@ -499,28 +571,51 @@ export function getConversationVersions(ydoc: Y.Doc): ConversationVersion[] {
   return metadata?.conversationVersions || [];
 }
 
-export function addConversationVersion(ydoc: Y.Doc, version: ConversationVersion): void {
-  const metadata = ydoc.getMap(YDOC_KEYS.METADATA);
-  const versions = (metadata.get('conversationVersions') as ConversationVersion[]) || [];
-  metadata.set('conversationVersions', [version, ...versions]);
-  metadata.set('updatedAt', Date.now());
+export function addConversationVersion(
+  ydoc: Y.Doc,
+  version: ConversationVersion,
+  actor?: string
+): void {
+  ydoc.transact(
+    () => {
+      const metadata = ydoc.getMap(YDOC_KEYS.METADATA);
+      const versions = (metadata.get('conversationVersions') as ConversationVersion[]) || [];
+      metadata.set('conversationVersions', [version, ...versions]);
+      metadata.set('updatedAt', Date.now());
+    },
+    actor ? { actor } : undefined
+  );
 }
 
-export function markVersionHandedOff(ydoc: Y.Doc, versionId: string, handedOffTo: string): void {
-  const metadata = ydoc.getMap(YDOC_KEYS.METADATA);
-  const versions = (metadata.get('conversationVersions') as ConversationVersion[]) || [];
-  const updated = versions.map((v) =>
-    v.versionId === versionId ? { ...v, handedOffAt: Date.now(), handedOffTo } : v
+export function markVersionHandedOff(
+  ydoc: Y.Doc,
+  versionId: string,
+  handedOffTo: string,
+  actor?: string
+): void {
+  ydoc.transact(
+    () => {
+      const metadata = ydoc.getMap(YDOC_KEYS.METADATA);
+      const versions = (metadata.get('conversationVersions') as ConversationVersion[]) || [];
+      const updated = versions.map((v) =>
+        v.versionId === versionId ? { ...v, handedOffAt: Date.now(), handedOffTo } : v
+      );
+      metadata.set('conversationVersions', updated);
+      metadata.set('updatedAt', Date.now());
+    },
+    actor ? { actor } : undefined
   );
-  metadata.set('conversationVersions', updated);
-  metadata.set('updatedAt', Date.now());
 }
 
 export function logPlanEvent(
   ydoc: Y.Doc,
   type: PlanEventType,
   actor: string,
-  data?: PlanEvent['data']
+  data?: PlanEvent['data'],
+  options?: {
+    inboxWorthy?: boolean;
+    inboxFor?: string | string[];
+  }
 ): void {
   const eventsArray = ydoc.getArray(YDOC_KEYS.EVENTS);
   const event: PlanEvent = {
@@ -529,6 +624,8 @@ export function logPlanEvent(
     actor,
     timestamp: Date.now(),
     data,
+    inboxWorthy: options?.inboxWorthy,
+    inboxFor: options?.inboxFor,
   };
   eventsArray.push([event]);
 }
@@ -564,9 +661,14 @@ export function getSnapshots(ydoc: Y.Doc): PlanSnapshot[] {
  * Add a snapshot to the Y.Doc.
  * Snapshots are append-only for CRDT correctness.
  */
-export function addSnapshot(ydoc: Y.Doc, snapshot: PlanSnapshot): void {
-  const array = ydoc.getArray(YDOC_KEYS.SNAPSHOTS);
-  array.push([snapshot]);
+export function addSnapshot(ydoc: Y.Doc, snapshot: PlanSnapshot, actor?: string): void {
+  ydoc.transact(
+    () => {
+      const array = ydoc.getArray(YDOC_KEYS.SNAPSHOTS);
+      array.push([snapshot]);
+    },
+    actor ? { actor } : undefined
+  );
 }
 
 /**

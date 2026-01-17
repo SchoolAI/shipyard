@@ -167,23 +167,27 @@ export async function handleUpdateContent(req: Request, res: Response): Promise<
     const blocks = await parseMarkdownToBlocks(input.content);
     const title = extractTitleFromBlocks(blocks);
 
+    const actorName = await getGitHubUsername();
     const editor = ServerBlockNoteEditor.create();
-    ydoc.transact(() => {
-      const fragment = ydoc.getXmlFragment('document');
-      while (fragment.length > 0) {
-        fragment.delete(0, 1);
-      }
-      editor.blocksToYXmlFragment(blocks, fragment);
+    ydoc.transact(
+      () => {
+        const fragment = ydoc.getXmlFragment('document');
+        while (fragment.length > 0) {
+          fragment.delete(0, 1);
+        }
+        editor.blocksToYXmlFragment(blocks, fragment);
 
-      const deliverables = extractDeliverables(blocks);
-      for (const deliverable of deliverables) {
-        addDeliverable(ydoc, deliverable);
-      }
+        const deliverables = extractDeliverables(blocks);
+        for (const deliverable of deliverables) {
+          addDeliverable(ydoc, deliverable);
+        }
 
-      if (deliverables.length > 0) {
-        logger.info({ count: deliverables.length }, 'Deliverables extracted from hook content');
-      }
-    });
+        if (deliverables.length > 0) {
+          logger.info({ count: deliverables.length }, 'Deliverables extracted from hook content');
+        }
+      },
+      { actor: actorName }
+    );
 
     const now = Date.now();
     setPlanMetadata(ydoc, {

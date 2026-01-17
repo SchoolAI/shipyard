@@ -18,6 +18,7 @@ import type { WebrtcProvider } from 'y-webrtc';
 import type * as Y from 'yjs';
 import { HandoffConversationDialog } from '@/components/HandoffConversationDialog';
 import { LinkPRButton } from '@/components/LinkPRButton';
+import { useUserIdentity } from '@/contexts/UserIdentityContext';
 import { useConversationTransfer } from '@/hooks/useConversationTransfer';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
 import { useMultiProviderSync } from '@/hooks/useMultiProviderSync';
@@ -185,6 +186,7 @@ export function MobileActionsMenu({ planId, ydoc, rtcProvider, metadata }: Mobil
   const { identity: githubIdentity } = useGitHubAuth();
   const { ydoc: indexDoc } = useMultiProviderSync(PLAN_INDEX_DOC_NAME);
   const isArchived = !!metadata.archivedAt;
+  const { actor } = useUserIdentity();
 
   // Handoff conversation dialog state
   const [isHandoffDialogOpen, setIsHandoffDialogOpen] = useState(false);
@@ -215,17 +217,20 @@ export function MobileActionsMenu({ planId, ydoc, rtcProvider, metadata }: Mobil
 
     const now = Date.now();
 
-    ydoc.transact(() => {
-      const metadataMap = ydoc.getMap('metadata');
-      if (isArchived) {
-        metadataMap.delete('archivedAt');
-        metadataMap.delete('archivedBy');
-      } else {
-        metadataMap.set('archivedAt', now);
-        metadataMap.set('archivedBy', githubIdentity.displayName);
-      }
-      metadataMap.set('updatedAt', now);
-    });
+    ydoc.transact(
+      () => {
+        const metadataMap = ydoc.getMap('metadata');
+        if (isArchived) {
+          metadataMap.delete('archivedAt');
+          metadataMap.delete('archivedBy');
+        } else {
+          metadataMap.set('archivedAt', now);
+          metadataMap.set('archivedBy', githubIdentity.displayName);
+        }
+        metadataMap.set('updatedAt', now);
+      },
+      { actor }
+    );
 
     const entry = getPlanIndexEntry(indexDoc, planId);
     if (entry) {
