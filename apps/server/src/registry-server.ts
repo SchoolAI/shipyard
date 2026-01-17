@@ -268,18 +268,81 @@ function broadcastUpdate(docName: string, update: Uint8Array, origin: unknown) {
   }
 }
 
+/**
+ * Processes a single WebSocket message for Yjs sync protocol.
+ * Handles both sync messages (document updates) and awareness messages (presence).
+ */
+function processMessage(
+  message: Buffer,
+  doc: Y.Doc,
+  awareness: awarenessProtocol.Awareness,
+  planId: string,
+  ws: WebSocket
+): void {
+  try {
+    const decoder = decoding.createDecoder(new Uint8Array(message));
+    const messageType = decoding.readVarUint(decoder);
+
+    switch (messageType) {
+      case messageSync: {
+        const encoder = encoding.createEncoder();
+        encoding.writeVarUint(encoder, messageSync);
+        syncProtocol.readSyncMessage(decoder, encoder, doc, ws);
+        if (encoding.length(encoder) > 1) {
+          send(ws, encoding.toUint8Array(encoder));
+        }
+        break;
+      }
+      case messageAwareness: {
+        awarenessProtocol.applyAwarenessUpdate(awareness, decoding.readVarUint8Array(decoder), ws);
+        break;
+      }
+    }
+  } catch (err) {
+    logger.error({ err, planId }, 'Failed to process message');
+  }
+}
+
 function handleWebSocketConnection(ws: WebSocket, req: http.IncomingMessage): void {
   const planId = req.url?.slice(1) || 'default';
   logger.info({ planId }, 'WebSocket client connected to registry');
 
-  // Use an async IIFE to handle the async operations
+  // CRITICAL: Buffer for messages that arrive before doc is ready.
+  // The client may send SyncStep1 immediately upon connection, but getDoc() is async.
+  // Without buffering, those early messages are lost and sync fails with timeout.
+  const pendingMessages: Buffer[] = [];
+  let docReady = false;
+  let doc: Y.Doc;
+  let awareness: awarenessProtocol.Awareness;
+
+  // Attach message handler IMMEDIATELY (synchronously) to avoid missing any messages.
+  // Messages received before doc initialization are buffered and processed later.
+  ws.on('message', (message: Buffer) => {
+    if (!docReady) {
+      pendingMessages.push(message);
+      logger.debug(
+        { planId, bufferedCount: pendingMessages.length },
+        'Buffering message (doc not ready)'
+      );
+      return;
+    }
+    processMessage(message, doc, awareness, planId, ws);
+  });
+
+  // Error handler also attached synchronously
+  ws.on('error', (err: Error) => {
+    logger.error({ err, planId }, 'WebSocket error');
+  });
+
+  // Async initialization
   (async () => {
     try {
-      const doc = await getDoc(planId);
-      const awareness = awarenessMap.get(planId);
-      if (!awareness) {
+      doc = await getDoc(planId);
+      const awarenessResult = awarenessMap.get(planId);
+      if (!awarenessResult) {
         throw new Error(`Awareness not found for planId: ${planId}`);
       }
+      awareness = awarenessResult;
       logger.debug({ planId }, 'Got doc and awareness');
 
       if (!conns.has(planId)) {
@@ -311,7 +374,19 @@ function handleWebSocketConnection(ws: WebSocket, req: http.IncomingMessage): vo
       };
       awareness.on('update', awarenessHandler);
 
-      // Send initial sync state
+      // Mark doc as ready BEFORE processing buffered messages
+      docReady = true;
+
+      // Process any messages that arrived during initialization
+      if (pendingMessages.length > 0) {
+        logger.debug({ planId, count: pendingMessages.length }, 'Processing buffered messages');
+        for (const msg of pendingMessages) {
+          processMessage(msg, doc, awareness, planId, ws);
+        }
+        pendingMessages.length = 0; // Clear buffer
+      }
+
+      // Send initial sync state (SyncStep1) to start handshake
       const encoder = encoding.createEncoder();
       encoding.writeVarUint(encoder, messageSync);
       syncProtocol.writeSyncStep1(encoder, doc);
@@ -329,45 +404,12 @@ function handleWebSocketConnection(ws: WebSocket, req: http.IncomingMessage): vo
         send(ws, encoding.toUint8Array(awarenessEncoder));
       }
 
-      ws.on('message', (message: Buffer) => {
-        try {
-          const decoder = decoding.createDecoder(new Uint8Array(message));
-          const messageType = decoding.readVarUint(decoder);
-
-          switch (messageType) {
-            case messageSync: {
-              const encoder = encoding.createEncoder();
-              encoding.writeVarUint(encoder, messageSync);
-              syncProtocol.readSyncMessage(decoder, encoder, doc, ws);
-              if (encoding.length(encoder) > 1) {
-                send(ws, encoding.toUint8Array(encoder));
-              }
-              break;
-            }
-            case messageAwareness: {
-              awarenessProtocol.applyAwarenessUpdate(
-                awareness,
-                decoding.readVarUint8Array(decoder),
-                ws
-              );
-              break;
-            }
-          }
-        } catch (err) {
-          logger.error({ err, planId }, 'Failed to process message');
-        }
-      });
-
       ws.on('close', () => {
         logger.info({ planId }, 'WebSocket client disconnected from registry');
         doc.off('update', updateHandler);
         awareness.off('update', awarenessHandler);
         conns.get(planId)?.delete(ws);
         awarenessProtocol.removeAwarenessStates(awareness, [doc.clientID], null);
-      });
-
-      ws.on('error', (err: Error) => {
-        logger.error({ err, planId }, 'WebSocket error');
       });
     } catch (err) {
       logger.error({ err, planId }, 'Error handling WebSocket connection');
@@ -601,6 +643,17 @@ function createApp(): { app: express.Express; httpServer: http.Server } {
 
   // Health check endpoint - used by browser and hook to discover if server is running
   app.get('/registry', handleHealthCheck);
+
+  // Connection status endpoint - used by hub-client to check for active browser connections
+  app.get('/api/plan/:planId/has-connections', (req, res) => {
+    const planId = req.params.planId;
+    if (!planId) {
+      res.status(400).json({ error: 'Missing plan ID' });
+      return;
+    }
+    const hasConnections = hasActiveConnections(planId);
+    res.json({ hasConnections });
+  });
 
   // Remaining Express routes (non-JSON responses or special handling)
   app.get('/api/plan/:id/transcript', handleGetTranscript);
