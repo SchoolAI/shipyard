@@ -20,6 +20,7 @@ import {
   useConversationTransfer,
 } from '@/hooks/useConversationTransfer';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
+import { useImportConversationToast } from '@/hooks/useImportConversationToast';
 import { createVanillaTRPCClient } from '@/utils/trpc-client';
 
 // Avatar compound components have type issues in HeroUI v3 beta
@@ -232,50 +233,6 @@ export function ImportConversationButton({
     </>
   );
 }
-
-export function useImportConversationToast(
-  planId: string,
-  ydoc: Y.Doc,
-  rtcProvider: WebrtcProvider | null,
-  onReviewRequest?: (received: ReceivedConversation) => void
-) {
-  const { receivedConversations, clearReceived } = useConversationTransfer(
-    planId,
-    ydoc,
-    rtcProvider
-  );
-
-  const shownToastsRef = useRef<Set<string>>(new Set());
-
-  useEffect(() => {
-    for (const received of receivedConversations) {
-      const toastKey = `${received.meta.exportId}-${received.receivedAt}`;
-
-      if (shownToastsRef.current.has(toastKey)) {
-        continue;
-      }
-
-      shownToastsRef.current.add(toastKey);
-
-      toast.info(
-        `Received conversation from ${received.meta.sourcePlatform} (${received.meta.messageCount} messages)`,
-        {
-          duration: 10000,
-          action: {
-            label: 'Review',
-            onClick: () => {
-              onReviewRequest?.(received);
-            },
-          },
-        }
-      );
-    }
-  }, [receivedConversations, onReviewRequest]);
-
-  return { receivedConversations, clearReceived };
-}
-
-export type { ReceivedConversation } from '@/hooks/useConversationTransfer';
 
 const REGISTRY_URL = 'http://localhost:32191';
 
