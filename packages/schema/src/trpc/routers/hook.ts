@@ -90,6 +90,29 @@ export const hookRouter = router({
       const handlers = ctx.hookHandlers;
       return handlers.setSessionToken(planId, sessionTokenHash, ctx);
     }),
+
+  /**
+   * Wait for approval decision (blocking).
+   * Called by hook to wait for browser approval/rejection.
+   * POST /api/hook/plan/:id/wait-approval
+   */
+  waitForApproval: publicProcedure
+    .input(z.object({ planId: z.string(), reviewRequestId: z.string() }))
+    .output(
+      z.object({
+        approved: z.boolean(),
+        feedback: z.string().optional(),
+        deliverables: z.array(z.any()).optional(),
+        reviewComment: z.string().optional(),
+        reviewedBy: z.string().optional(),
+        status: z.string().optional(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const { planId, reviewRequestId } = input;
+      const handlers = ctx.hookHandlers;
+      return handlers.waitForApproval(planId, reviewRequestId, ctx);
+    }),
 });
 
 /**
@@ -133,6 +156,19 @@ export interface HookHandlers {
     sessionTokenHash: string,
     ctx: HookContext
   ) => Promise<z.infer<typeof SetSessionTokenResponseSchema>>;
+
+  waitForApproval: (
+    planId: string,
+    reviewRequestId: string,
+    ctx: HookContext
+  ) => Promise<{
+    approved: boolean;
+    feedback?: string;
+    deliverables?: unknown[];
+    reviewComment?: string;
+    reviewedBy?: string;
+    status?: string;
+  }>;
 }
 
 export type HookRouter = typeof hookRouter;

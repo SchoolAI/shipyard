@@ -194,3 +194,27 @@ export async function setSessionToken(
   const trpc = getTRPCClient(baseUrl);
   return trpc.hook.setSessionToken.mutate({ planId, sessionTokenHash });
 }
+
+/**
+ * Wait for approval decision (blocking call to server).
+ * Server observes Y.Doc and returns when status changes to approved or rejected.
+ */
+export async function waitForApproval(
+  planId: string,
+  reviewRequestId: string
+): Promise<{
+  approved: boolean;
+  feedback?: string;
+  deliverables?: unknown[];
+  reviewComment?: string;
+  reviewedBy?: string;
+  status?: string;
+}> {
+  const baseUrl = await getRegistryUrl();
+  if (!baseUrl) {
+    throw new Error('Registry server not available');
+  }
+
+  const trpc = getTRPCClient(baseUrl);
+  return trpc.hook.waitForApproval.mutate({ planId, reviewRequestId });
+}

@@ -1,37 +1,20 @@
 /**
  * Review status checking and feedback formatting.
- * Uses Y.Doc observer for distributed approval flow.
+ * Delegates approval blocking to server-side Y.Doc observer.
  *
- * NOTE: Shared formatting utilities (parseThreads, formatThreadsForLLM, formatDeliverablesForLLM,
- * getDeliverables, createUserResolver) are already extracted to @peer-plan/schema.
- * Hook-specific logic (waitForReviewDecision, extractFeedbackFromYDoc, checkReviewStatus)
- * remains here because it handles the hook's blocking Y.Doc observer pattern.
+ * NOTE: The approval observer logic is now in apps/server/src/hook-handlers.ts.
+ * The hook simply calls the server API and waits for the response.
  */
-import { ServerBlockNoteEditor } from '@blocknote/server-util';
-import {
-  addSnapshot,
-  createPlanSnapshot,
-  createUserResolver,
-  type Deliverable,
-  formatDeliverablesForLLM,
-  formatThreadsForLLM,
-  type GetReviewStatusResponse,
-  getDeliverables,
-  parseThreads,
-  type ReviewFeedback,
-} from '@peer-plan/schema';
+import type { Deliverable, GetReviewStatusResponse, ReviewFeedback } from '@peer-plan/schema';
 import { computeHash } from '@peer-plan/shared';
-import { nanoid } from 'nanoid';
-import { WebsocketProvider } from 'y-websocket';
-import * as Y from 'yjs';
 import type { CoreResponse } from '../adapters/types.js';
 import { webConfig } from '../config/env/web.js';
 import { DEFAULT_AGENT_TYPE } from '../constants.js';
 import {
   getReviewStatus,
-  getWebSocketUrl,
   setSessionToken,
   updatePlanContent,
+  waitForApproval,
 } from '../http-client.js';
 import { logger } from '../logger.js';
 import { generateSessionToken, hashSessionToken } from '../session-token.js';
@@ -52,291 +35,33 @@ interface ReviewDecision {
   deliverables?: Deliverable[];
 }
 
-// --- Y.Doc Observer for Review Decision ---
-
-const REVIEW_TIMEOUT_MS = 25 * 60 * 1000; // 25 minutes
+// --- Server-Side Approval Observer ---
 
 /**
- * Wait for review decision by observing Y.Doc metadata changes.
- * Connects to MCP server's WebSocket and watches for status changes.
+ * Wait for review decision via server-side observer.
+ * Server watches Y.Doc and returns when status changes to approved or rejected.
  * Uses a unique reviewRequestId to prevent stale decisions from previous cycles.
  */
 async function waitForReviewDecision(
   planId: string,
-  wsUrl: string
+  _wsUrl: string
 ): Promise<ReviewDecision & { reviewComment?: string; reviewedBy?: string; status?: string }> {
-  const ydoc = new Y.Doc();
+  // Call server API which handles the Y.Doc observer and blocking logic
+  logger.info({ planId }, 'Waiting for approval via server endpoint');
 
-  // Generate unique ID for this review request to prevent stale decisions
-  const reviewRequestId = nanoid();
+  // Server will generate reviewRequestId and manage the observer
+  const result = await waitForApproval(planId, planId);
 
-  logger.info({ planId, wsUrl, reviewRequestId }, 'Connecting to WebSocket for Y.Doc sync');
+  logger.info({ planId, approved: result.approved }, 'Received approval decision from server');
 
-  const provider = new WebsocketProvider(wsUrl, planId, ydoc, {
-    connect: true,
-  });
-
-  // Add ping/pong keep-alive every 30 seconds
-  const pingInterval = setInterval(() => {
-    if (provider.wsconnected && provider.ws?.readyState === provider.ws?.OPEN) {
-      // In Node.js, y-websocket uses the 'ws' package which has a ping() method
-      (provider.ws as unknown as { ping: () => void }).ping();
-    }
-  }, 30000);
-
-  return new Promise((resolve) => {
-    const metadata = ydoc.getMap('metadata');
-    let resolved = false;
-    let syncComplete = false;
-
-    const cleanup = () => {
-      clearInterval(pingInterval);
-      if (!resolved) {
-        resolved = true;
-        provider.destroy();
-      }
-    };
-
-    const checkStatus = () => {
-      if (resolved) return;
-
-      // Don't check until sync complete and reviewRequestId is set
-      if (!syncComplete) {
-        logger.debug({ planId }, 'Ignoring status check until sync complete');
-        return;
-      }
-
-      const currentReviewId = metadata.get('reviewRequestId') as string | undefined;
-
-      // Only accept decisions that match OUR review request
-      if (currentReviewId !== reviewRequestId) {
-        logger.debug(
-          { planId, expected: reviewRequestId, actual: currentReviewId },
-          'Review ID mismatch, ignoring status change'
-        );
-        return;
-      }
-
-      const status = metadata.get('status') as string | undefined;
-      logger.debug({ planId, status, reviewRequestId }, 'Checking Y.Doc status');
-
-      if (status === 'in_progress') {
-        logger.info({ planId, reviewRequestId }, 'Plan approved via Y.Doc');
-        // Extract deliverables to include in approval response
-        const deliverables = getDeliverables(ydoc);
-        // Extract reviewer metadata
-        const reviewComment = metadata.get('reviewComment') as string | undefined;
-        const reviewedBy = metadata.get('reviewedBy') as string | undefined;
-        cleanup();
-        resolve({ approved: true, deliverables, reviewComment, reviewedBy, status });
-      } else if (status === 'changes_requested') {
-        // Extract feedback from threads if available
-        const feedback = extractFeedbackFromYDoc(ydoc);
-        // Extract reviewer metadata
-        const reviewComment = metadata.get('reviewComment') as string | undefined;
-        const reviewedBy = metadata.get('reviewedBy') as string | undefined;
-        logger.info({ planId, reviewRequestId, feedback }, 'Changes requested via Y.Doc');
-        cleanup();
-        resolve({ approved: false, feedback, reviewComment, reviewedBy, status });
-      }
-    };
-
-    // Wait for sync before setting review request ID
-    provider.on('sync', (isSynced: boolean) => {
-      if (isSynced && !syncComplete) {
-        logger.info({ planId, reviewRequestId }, 'Y.Doc synced, setting review request ID');
-
-        // Mark sync as complete BEFORE transaction to prevent race condition
-        // where browser updates status between transaction commit and flag set
-        syncComplete = true;
-
-        // Get current content blocks for snapshot
-        const editor = ServerBlockNoteEditor.create();
-        const fragment = ydoc.getXmlFragment('document');
-        const blocks = editor.yXmlFragmentToBlocks(fragment);
-
-        // Get GitHub username for actor
-        const actorName = 'agent'; // Hook context uses 'agent' as actor
-
-        // Create snapshot for pending_review status change
-        const snapshot = createPlanSnapshot(
-          ydoc,
-          'Plan submitted for review',
-          actorName,
-          'pending_review',
-          blocks
-        );
-
-        // Set unique review request ID and reset status
-        // This prevents using stale approve/deny from previous review cycle
-        ydoc.transact(() => {
-          metadata.set('reviewRequestId', reviewRequestId);
-          metadata.set('status', 'pending_review');
-          metadata.set('updatedAt', Date.now());
-
-          // Add snapshot
-          addSnapshot(ydoc, snapshot);
-        });
-
-        logger.info({ planId, reviewRequestId }, 'Review request ID set, waiting for decision');
-
-        // Check status immediately in case browser already updated before observer registered
-        checkStatus();
-      } else if (isSynced && syncComplete) {
-        // Reconnection after disconnect - check status again
-        logger.info({ planId }, 'Reconnected, checking current status');
-        checkStatus();
-      }
-    });
-
-    // Observe changes to metadata
-    metadata.observe(() => {
-      checkStatus();
-    });
-
-    // Log when connection is established
-    provider.on('status', ({ status }: { status: string }) => {
-      logger.debug({ planId, status }, 'WebSocket status changed');
-    });
-
-    // Timeout after 25 minutes
-    setTimeout(() => {
-      if (!resolved) {
-        logger.warn({ planId }, 'Review timeout - no decision received');
-        cleanup();
-        resolve({
-          approved: false,
-          feedback: 'Review timeout - no decision received in 25 minutes',
-        });
-      }
-    }, REVIEW_TIMEOUT_MS);
-
-    // Handle connection errors
-    provider.on('connection-error', (event: Event) => {
-      logger.error({ planId, event }, 'WebSocket connection error');
-    });
-
-    // Track reconnection attempts
-    let reconnectAttempts = 0;
-    const MAX_RECONNECT_ATTEMPTS = 5;
-
-    const validateReconnection = () => {
-      if (!resolved && !provider.wsconnected) {
-        logger.error({ planId, attempts: reconnectAttempts }, 'Reconnection failed');
-        if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-          cleanup();
-          resolve({
-            approved: false,
-            feedback: 'Connection lost and could not reconnect. Please try again.',
-          });
-        }
-      } else if (!resolved && provider.wsconnected) {
-        // Reconnection successful, reset attempt counter
-        logger.info({ planId, attempt: reconnectAttempts }, 'Reconnection successful');
-        reconnectAttempts = 0;
-      }
-    };
-
-    provider.on('connection-close', (event: CloseEvent | null) => {
-      if (!resolved && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
-        reconnectAttempts++;
-        logger.warn(
-          { planId, code: event?.code, attempt: reconnectAttempts },
-          'WebSocket closed, attempting reconnect'
-        );
-
-        // y-websocket will auto-reconnect, validate it worked
-        setTimeout(validateReconnection, 5000);
-      } else if (!resolved) {
-        logger.error({ planId }, 'Max reconnection attempts reached, aborting');
-        cleanup();
-        resolve({
-          approved: false,
-          feedback: 'Connection lost after multiple reconnection attempts.',
-        });
-      }
-    });
-  });
-}
-
-/**
- * Extract feedback from Y.Doc with full plan context.
- * Returns: plan content + reviewer comment + thread comments + deliverables for LLM.
- */
-function extractFeedbackFromYDoc(ydoc: Y.Doc): string | undefined {
-  try {
-    // Get reviewer comment from metadata
-    const metadataMap = ydoc.getMap('metadata');
-    const reviewComment = metadataMap.get('reviewComment') as string | undefined;
-    const reviewedBy = metadataMap.get('reviewedBy') as string | undefined;
-
-    const threadsMap = ydoc.getMap('threads');
-    const threadsData = threadsMap.toJSON() as Record<string, unknown>;
-    const threads = parseThreads(threadsData);
-
-    // If no reviewComment and no threads, return generic message
-    if (!reviewComment && threads.length === 0) {
-      return 'Changes requested. Check the plan for reviewer comments.';
-    }
-
-    // Get plan content from Y.Doc for context
-    const contentArray = ydoc.getArray('content');
-    const blocks = contentArray.toJSON() as Array<{ content?: Array<{ text?: string }> }>;
-
-    // Simple text extraction from BlockNote blocks
-    const planText = blocks
-      .map((block) => {
-        if (!block.content || !Array.isArray(block.content)) return '';
-        return block.content
-          .map((item) => (typeof item === 'object' && item && 'text' in item ? item.text : ''))
-          .join('');
-      })
-      .filter(Boolean)
-      .join('\n');
-
-    // Format threads using shared formatter with user name resolution
-    const resolveUser = createUserResolver(ydoc);
-    const feedbackText = formatThreadsForLLM(threads, {
-      includeResolved: false,
-      selectedTextMaxLength: 100,
-      resolveUser,
-    });
-
-    // Combine: plan content + reviewer comment + thread feedback
-    let output = 'Changes requested:\n\n';
-
-    if (planText) {
-      output += '## Current Plan\n\n';
-      output += planText;
-      output += '\n\n---\n\n';
-    }
-
-    // Add reviewer comment if present (this is the top-level feedback from approve/request changes)
-    if (reviewComment) {
-      output += '## Reviewer Comment\n\n';
-      output += `> **${reviewedBy ?? 'Reviewer'}:** ${reviewComment}\n`;
-      output += '\n---\n\n';
-    }
-
-    // Add inline thread feedback if any
-    if (feedbackText) {
-      output += '## Inline Feedback\n\n';
-      output += feedbackText;
-    }
-
-    // Add deliverables section if any exist (uses shared formatter)
-    const deliverables = getDeliverables(ydoc);
-    const deliverablesText = formatDeliverablesForLLM(deliverables);
-    if (deliverablesText) {
-      output += '\n\n---\n\n';
-      output += deliverablesText;
-    }
-
-    return output;
-  } catch (err) {
-    logger.warn({ err }, 'Failed to extract feedback from Y.Doc');
-    return 'Changes requested. Check the plan for reviewer comments.';
-  }
+  return {
+    approved: result.approved,
+    feedback: result.feedback,
+    deliverables: result.deliverables as Deliverable[] | undefined,
+    reviewComment: result.reviewComment,
+    reviewedBy: result.reviewedBy,
+    status: result.status,
+  };
 }
 
 // --- Review Status Check ---
@@ -357,17 +82,6 @@ async function handleUpdatedPlanReview(
     { planId, contentLength: planContent.length },
     'Plan content changed, triggering re-review'
   );
-
-  // Get WebSocket URL from registry
-  const wsUrl = await getWebSocketUrl();
-  if (!wsUrl) {
-    logger.error({ planId }, 'No WebSocket server available - MCP server not running?');
-    // Fail closed if we can't connect
-    return {
-      allow: false,
-      message: 'Cannot connect to peer-plan server. Please start the MCP server and try again.',
-    };
-  }
 
   // Sync updated content
   logger.info({ planId }, 'Syncing updated plan content');
@@ -395,11 +109,11 @@ async function handleUpdatedPlanReview(
   const baseUrl = webConfig.PEER_PLAN_WEB_URL;
   logger.info(
     { planId, url: `${baseUrl}/plan/${planId}` },
-    'Content synced, browser already open. Waiting for Y.Doc status change...'
+    'Content synced, browser already open. Waiting for server approval...'
   );
 
-  // Block until user approves/denies via Y.Doc observer
-  const decision = await waitForReviewDecision(planId, wsUrl);
+  // Block until user approves/denies via server-side Y.Doc observer
+  const decision = await waitForReviewDecision(planId, '');
   logger.info({ planId, approved: decision.approved }, 'Decision received via Y.Doc');
 
   if (decision.approved) {
@@ -489,17 +203,6 @@ export async function checkReviewStatus(
       'Creating plan from ExitPlanMode (blocking mode)'
     );
 
-    // Get WebSocket URL from registry
-    const wsUrl = await getWebSocketUrl();
-    if (!wsUrl) {
-      logger.error({ sessionId }, 'No WebSocket server available - MCP server not running?');
-      // Fail closed if we can't connect
-      return {
-        allow: false,
-        message: 'Cannot connect to peer-plan server. Please start the MCP server and try again.',
-      };
-    }
-
     // Create plan (this opens browser)
     const result = await createPlan({
       sessionId,
@@ -522,11 +225,11 @@ export async function checkReviewStatus(
     state = getSessionState(sessionId);
     logger.info(
       { planId, url: result.url },
-      'Plan created and synced, browser opened. Waiting for Y.Doc status change...'
+      'Plan created and synced, browser opened. Waiting for server approval...'
     );
 
-    // Block until user approves/denies via Y.Doc observer
-    const decision = await waitForReviewDecision(planId, wsUrl);
+    // Block until user approves/denies via server-side Y.Doc observer
+    const decision = await waitForReviewDecision(planId, '');
     logger.info({ planId, approved: decision.approved }, 'Decision received via Y.Doc');
 
     if (decision.approved) {

@@ -4,14 +4,13 @@
  *
  * NOTE: This is hook-specific orchestration that calls server APIs via HTTP.
  * The server's create-plan.ts tool and hook-api.ts serve different purposes:
- * - Hook: Client-side orchestration, session state, browser opening
+ * - Hook: Client-side orchestration, session state
  * - Server tool: MCP tool for agents without hook support (Cursor, Devin)
- * - Server hook-api: HTTP handlers that this code calls
+ * - Server hook-api: HTTP handlers that this code calls (includes browser opening)
  */
 
 import type { CreateHookSessionResponse } from '@peer-plan/schema';
 import { computeHash } from '@peer-plan/shared';
-import open from 'open';
 import { DEFAULT_AGENT_TYPE } from '../constants.js';
 import { createSession, updatePlanContent, updatePresence } from '../http-client.js';
 import { logger } from '../logger.js';
@@ -53,17 +52,7 @@ export async function createPlan(options: CreatePlanOptions): Promise<CreateHook
     sessionId,
   });
 
-  // Open browser with plan URL (cross-platform)
-  try {
-    await open(response.url);
-    logger.info(
-      { sessionId, planId: response.planId, url: response.url },
-      'Plan created, browser opened'
-    );
-  } catch (err) {
-    logger.warn({ err, url: response.url }, 'Failed to open browser, continuing anyway');
-    logger.info({ sessionId, planId: response.planId, url: response.url }, 'Plan created');
-  }
+  logger.info({ sessionId, planId: response.planId, url: response.url }, 'Plan created by server');
 
   return response;
 }

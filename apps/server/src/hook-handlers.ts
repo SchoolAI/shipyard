@@ -10,8 +10,13 @@ import {
   addDeliverable,
   type CreateHookSessionRequest,
   type CreateHookSessionResponse,
+  createUserResolver,
+  type Deliverable,
   extractDeliverables,
+  formatDeliverablesForLLM,
+  formatThreadsForLLM,
   type GetReviewStatusResponse,
+  getDeliverables,
   getPlanMetadata,
   type HookContext,
   type HookHandlers,
@@ -28,10 +33,14 @@ import {
   type UpdatePlanContentResponse,
   type UpdatePresenceRequest,
   type UpdatePresenceResponse,
+  YDOC_KEYS,
 } from '@peer-plan/schema';
 import { TRPCError } from '@trpc/server';
 import { nanoid } from 'nanoid';
+import open from 'open';
+import type * as Y from 'yjs';
 import { webConfig } from './config/env/web.js';
+import { hasActiveConnections } from './doc-store.js';
 import { getGitHubUsername, getRepositoryFullName } from './server-identity.js';
 
 // --- Internal Helpers ---
@@ -143,6 +152,17 @@ export async function createSessionHandler(
   const url = `${webUrl}/plan/${planId}`;
 
   ctx.logger.info({ url }, 'Plan URL generated');
+
+  // Open browser or navigate existing browser
+  if (await hasActiveConnections(PLAN_INDEX_DOC_NAME)) {
+    // Browser already connected - navigate it via CRDT
+    indexDoc.getMap('navigation').set('target', planId);
+    ctx.logger.info({ url, planId }, 'Browser already connected, navigating via CRDT');
+  } else {
+    // No browser connected - open new one
+    await open(url);
+    ctx.logger.info({ url }, 'Browser launched by server');
+  }
 
   return { planId, url };
 }
@@ -300,6 +320,197 @@ export async function setSessionTokenHandler(
 }
 
 /**
+ * Wait for approval decision by observing Y.Doc metadata changes.
+ * Server-side blocking observer that survives hook process restarts.
+ * Generates reviewRequestId, sets it on Y.Doc, then waits for status change.
+ * Returns approval decision after status changes to 'in_progress' or 'changes_requested'.
+ */
+export async function waitForApprovalHandler(
+  planId: string,
+  _unusedParam: string, // Kept for API compatibility, will be removed in future
+  ctx: HookContext
+): Promise<{
+  approved: boolean;
+  feedback?: string;
+  deliverables?: Deliverable[];
+  reviewComment?: string;
+  reviewedBy?: string;
+  status?: string;
+}> {
+  const ydoc = await ctx.getOrCreateDoc(planId);
+  const metadata = ydoc.getMap(YDOC_KEYS.METADATA);
+
+  // Generate unique review request ID to prevent stale decisions
+  const reviewRequestId = nanoid();
+
+  // Set reviewRequestId and status on Y.Doc
+  ydoc.transact(() => {
+    metadata.set('reviewRequestId', reviewRequestId);
+    metadata.set('status', 'pending_review');
+    metadata.set('updatedAt', Date.now());
+  });
+
+  ctx.logger.info(
+    { planId, reviewRequestId },
+    '[SERVER OBSERVER] Set reviewRequestId and status, starting observation'
+  );
+
+  return new Promise((resolve) => {
+    const timeout = setTimeout(
+      () => {
+        metadata.unobserve(checkStatus);
+        resolve({
+          approved: false,
+          feedback: 'Review timeout - no decision received in 25 minutes',
+        });
+      },
+      25 * 60 * 1000
+    ); // 25 minutes
+
+    const checkStatus = () => {
+      const currentReviewId = metadata.get('reviewRequestId') as string | undefined;
+      const status = metadata.get('status') as string | undefined;
+
+      ctx.logger.debug(
+        {
+          planId,
+          status,
+          currentReviewId,
+          expectedReviewId: reviewRequestId,
+          reviewIdMatch: currentReviewId === reviewRequestId,
+        },
+        '[SERVER OBSERVER] Metadata changed, checking status'
+      );
+
+      // Only accept decisions that match the review request
+      if (currentReviewId !== reviewRequestId) {
+        ctx.logger.warn(
+          {
+            planId,
+            expected: reviewRequestId,
+            actual: currentReviewId,
+            status,
+          },
+          '[SERVER OBSERVER] Review ID mismatch, ignoring status change'
+        );
+        return;
+      }
+
+      if (status === 'in_progress') {
+        clearTimeout(timeout);
+        metadata.unobserve(checkStatus);
+        const deliverables = getDeliverables(ydoc);
+        const reviewComment = metadata.get('reviewComment') as string | undefined;
+        const reviewedBy = metadata.get('reviewedBy') as string | undefined;
+        ctx.logger.info(
+          { planId, reviewRequestId, reviewedBy },
+          '[SERVER OBSERVER] Plan approved via Y.Doc - resolving promise'
+        );
+        resolve({ approved: true, deliverables, reviewComment, reviewedBy, status });
+      } else if (status === 'changes_requested') {
+        clearTimeout(timeout);
+        metadata.unobserve(checkStatus);
+        const feedback = extractFeedbackFromYDoc(ydoc, ctx);
+        const reviewComment = metadata.get('reviewComment') as string | undefined;
+        const reviewedBy = metadata.get('reviewedBy') as string | undefined;
+        ctx.logger.info(
+          { planId, reviewRequestId, feedback },
+          '[SERVER OBSERVER] Changes requested via Y.Doc'
+        );
+        resolve({ approved: false, feedback, reviewComment, reviewedBy, status });
+      }
+    };
+
+    // Observe changes to metadata
+    ctx.logger.info({ planId, reviewRequestId }, '[SERVER OBSERVER] Registering metadata observer');
+    metadata.observe(checkStatus);
+
+    // Check status immediately in case it's already set (shouldn't happen since we just set it to pending_review)
+    checkStatus();
+  });
+}
+
+/**
+ * Extract feedback from Y.Doc with full plan context.
+ * Returns: plan content + reviewer comment + thread comments + deliverables for LLM.
+ * Copied from hook's review-status.ts for server-side use.
+ */
+function extractFeedbackFromYDoc(ydoc: Y.Doc, ctx: HookContext): string | undefined {
+  try {
+    const metadataMap = ydoc.getMap(YDOC_KEYS.METADATA);
+    const reviewComment = metadataMap.get('reviewComment') as string | undefined;
+    const reviewedBy = metadataMap.get('reviewedBy') as string | undefined;
+
+    const threadsMap = ydoc.getMap(YDOC_KEYS.THREADS);
+    const threadsData = threadsMap.toJSON() as Record<string, unknown>;
+    const threads = parseThreads(threadsData);
+
+    // If no reviewComment and no threads, return generic message
+    if (!reviewComment && threads.length === 0) {
+      return 'Changes requested. Check the plan for reviewer comments.';
+    }
+
+    // Get plan content from Y.Doc for context
+    const contentArray = ydoc.getArray('content');
+    const blocks = contentArray.toJSON() as Array<{ content?: Array<{ text?: string }> }>;
+
+    // Simple text extraction from BlockNote blocks
+    const planText = blocks
+      .map((block) => {
+        if (!block.content || !Array.isArray(block.content)) return '';
+        return block.content
+          .map((item) => (typeof item === 'object' && item && 'text' in item ? item.text : ''))
+          .join('');
+      })
+      .filter(Boolean)
+      .join('\n');
+
+    // Format threads using shared formatter with user name resolution
+    const resolveUser = createUserResolver(ydoc);
+    const feedbackText = formatThreadsForLLM(threads, {
+      includeResolved: false,
+      selectedTextMaxLength: 100,
+      resolveUser,
+    });
+
+    // Combine: plan content + reviewer comment + thread feedback
+    let output = 'Changes requested:\n\n';
+
+    if (planText) {
+      output += '## Current Plan\n\n';
+      output += planText;
+      output += '\n\n---\n\n';
+    }
+
+    // Add reviewer comment if present
+    if (reviewComment) {
+      output += '## Reviewer Comment\n\n';
+      output += `> **${reviewedBy ?? 'Reviewer'}:** ${reviewComment}\n`;
+      output += '\n---\n\n';
+    }
+
+    // Add inline thread feedback if any
+    if (feedbackText) {
+      output += '## Inline Feedback\n\n';
+      output += feedbackText;
+    }
+
+    // Add deliverables section if any exist
+    const deliverables = getDeliverables(ydoc);
+    const deliverablesText = formatDeliverablesForLLM(deliverables);
+    if (deliverablesText) {
+      output += '\n\n---\n\n';
+      output += deliverablesText;
+    }
+
+    return output;
+  } catch (err) {
+    ctx.logger.warn({ err }, 'Failed to extract feedback from Y.Doc');
+    return 'Changes requested. Check the plan for reviewer comments.';
+  }
+}
+
+/**
  * Creates hook handlers that use the provided context.
  * This is the factory function used by the tRPC context.
  */
@@ -311,5 +522,7 @@ export function createHookHandlers(): HookHandlers {
     updatePresence: (planId, input, ctx) => updatePresenceHandler(planId, input, ctx),
     setSessionToken: (planId, sessionTokenHash, ctx) =>
       setSessionTokenHandler(planId, sessionTokenHash, ctx),
+    waitForApproval: (planId: string, reviewRequestId: string, ctx: HookContext) =>
+      waitForApprovalHandler(planId, reviewRequestId, ctx),
   };
 }
