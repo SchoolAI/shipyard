@@ -4,7 +4,7 @@
  */
 
 import type { Block, BlockNoteEditor } from '@blocknote/core';
-import type { PlanMetadata } from '@peer-plan/schema';
+import type { PlanMetadata, PlanSnapshot } from '@peer-plan/schema';
 import { extractDeliverables, getDeliverables, YDOC_KEYS } from '@peer-plan/schema';
 import { Clock, FileText, GitPullRequest, Package } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -16,6 +16,7 @@ import { Attachments } from '@/components/Attachments';
 import { ChangesView } from '@/components/ChangesView';
 import { DeliverablesView } from '@/components/DeliverablesView';
 import { PlanViewer } from '@/components/PlanViewer';
+import { VersionSelector } from '@/components/VersionSelector';
 import type { SyncState } from '@/hooks/useMultiProviderSync';
 
 type ViewType = 'plan' | 'activity' | 'deliverables' | 'changes';
@@ -29,6 +30,19 @@ interface UserIdentity {
 
 /** Provider type that BlockNote can use for collaboration */
 type CollaborationProvider = WebsocketProvider | WebrtcProvider;
+
+/** Version navigation state from useVersionNavigation hook */
+interface VersionNavigationState {
+  snapshots: PlanSnapshot[];
+  currentIndex: number;
+  currentSnapshot: PlanSnapshot | null;
+  isViewingHistory: boolean;
+  goToPrevious: () => void;
+  goToNext: () => void;
+  goToCurrent: () => void;
+  canGoPrevious: boolean;
+  canGoNext: boolean;
+}
 
 export interface PlanContentProps {
   /** The Yjs document containing plan data */
@@ -51,6 +65,8 @@ export interface PlanContentProps {
   currentSnapshot?: { content: unknown[] } | null;
   /** Callback to receive editor instance for snapshots - Issue #42 */
   onEditorReady?: (editor: BlockNoteEditor) => void;
+  /** Version navigation state - Issue #42 */
+  versionNav?: VersionNavigationState;
 }
 
 /**
@@ -67,6 +83,7 @@ export function PlanContent({
   isSnapshot = false,
   currentSnapshot = null,
   onEditorReady,
+  versionNav,
 }: PlanContentProps) {
   const [activeView, setActiveView] = useState<ViewType>('plan');
   const [deliverableCount, setDeliverableCount] = useState({ completed: 0, total: 0 });
@@ -159,16 +176,34 @@ export function PlanContent({
       {activeView === 'plan' && (
         <div className="flex-1 overflow-y-auto bg-background">
           <div className="max-w-4xl mx-auto px-1 py-2 md:p-6 space-y-3 md:space-y-6">
-            <PlanViewer
-              key={identity?.id ?? 'anonymous'}
-              ydoc={ydoc}
-              identity={isSnapshot ? null : identity}
-              provider={provider}
-              onRequestIdentity={isSnapshot ? undefined : onRequestIdentity}
-              initialContent={isSnapshot ? initialContent : undefined}
-              currentSnapshot={currentSnapshot}
-              onEditorReady={onEditorReady}
-            />
+            {/* Plan viewer with version navigation overlay */}
+            <div className="relative min-h-[60px]">
+              {/* Version navigation - positioned in top-right corner of editor */}
+              {!isSnapshot && versionNav && versionNav.snapshots.length > 0 && (
+                <div className="absolute top-2 right-2 z-10 bg-surface/90 backdrop-blur-sm rounded-lg shadow-sm border border-separator/50">
+                  <VersionSelector
+                    currentSnapshot={versionNav.currentSnapshot}
+                    totalSnapshots={versionNav.snapshots.length}
+                    currentIndex={versionNav.currentIndex}
+                    canGoPrevious={versionNav.canGoPrevious}
+                    canGoNext={versionNav.canGoNext}
+                    onPrevious={versionNav.goToPrevious}
+                    onNext={versionNav.goToNext}
+                    onCurrent={versionNav.goToCurrent}
+                  />
+                </div>
+              )}
+              <PlanViewer
+                key={identity?.id ?? 'anonymous'}
+                ydoc={ydoc}
+                identity={isSnapshot ? null : identity}
+                provider={provider}
+                onRequestIdentity={isSnapshot ? undefined : onRequestIdentity}
+                initialContent={isSnapshot ? initialContent : undefined}
+                currentSnapshot={currentSnapshot}
+                onEditorReady={onEditorReady}
+              />
+            </div>
             <Attachments ydoc={ydoc} />
           </div>
         </div>

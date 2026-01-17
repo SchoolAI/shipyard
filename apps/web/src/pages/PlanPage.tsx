@@ -327,7 +327,6 @@ export function PlanPage() {
               onStatusChange={handleStatusChange}
               isSnapshot={isSnapshot}
               rtcProvider={rtcProvider}
-              versionNav={versionNav}
               editor={editor}
             />
           </div>
@@ -345,6 +344,7 @@ export function PlanPage() {
           currentSnapshot={versionNav.currentSnapshot}
           isSnapshot={isSnapshot}
           onEditorReady={handleEditorReady}
+          versionNav={versionNav}
         />
 
         {/* Mobile review actions */}

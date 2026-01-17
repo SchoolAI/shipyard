@@ -1,6 +1,8 @@
 import type { Block } from '@blocknote/core';
 import { ServerBlockNoteEditor } from '@blocknote/server-util';
 import {
+  addSnapshot,
+  createPlanSnapshot,
   getPlanMetadata,
   PLAN_INDEX_DOC_NAME,
   setPlanMetadata,
@@ -9,6 +11,7 @@ import {
 import { z } from 'zod';
 import { getOrCreateDoc } from '../doc-store.js';
 import { logger } from '../logger.js';
+import { getGitHubUsername } from '../server-identity.js';
 import { verifySessionToken } from '../session-token.js';
 import { TOOL_NAMES } from './tool-names.js';
 
@@ -164,6 +167,9 @@ Example with deliverables:
       results.push(result.message);
     }
 
+    // Get actor name for snapshot
+    const actorName = await getGitHubUsername();
+
     // Write updated blocks back to document fragment
     ydoc.transact(() => {
       // Clear existing content
@@ -176,6 +182,16 @@ Example with deliverables:
       // Update metadata timestamp
       setPlanMetadata(ydoc, { updatedAt: Date.now() });
     });
+
+    // Create a snapshot for this content update (Issue #42)
+    // Each call to update_block_content creates one version (batches all operations)
+    const operationSummary =
+      operations.length === 1
+        ? (results[0] ?? 'Content updated')
+        : `${operations.length} operations: ${results.join(', ')}`;
+    const snapshot = createPlanSnapshot(ydoc, operationSummary, actorName, metadata.status, blocks);
+    addSnapshot(ydoc, snapshot);
+    logger.info({ planId, snapshotId: snapshot.id }, 'Content snapshot created');
 
     // Update plan index
     const indexDoc = await getOrCreateDoc(PLAN_INDEX_DOC_NAME);

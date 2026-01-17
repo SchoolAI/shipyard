@@ -2,8 +2,6 @@ import type { Block } from '@blocknote/core';
 import { ServerBlockNoteEditor } from '@blocknote/server-util';
 import {
   addDeliverable,
-  addSnapshot,
-  createPlanSnapshot,
   extractDeliverables,
   initPlanMetadata,
   logPlanEvent,
@@ -188,16 +186,8 @@ Bad deliverables (not provable):
       }
 
       logPlanEvent(ydoc, 'plan_created', ownerId ?? 'unknown');
-
-      // Create initial snapshot (Issue #42)
-      const snapshot = createPlanSnapshot(
-        ydoc,
-        'Plan created',
-        ownerId ?? 'unknown',
-        'draft',
-        blocks
-      );
-      addSnapshot(ydoc, snapshot);
+      // Note: Initial snapshot is NOT created here - snapshots are only created
+      // when content is updated via update_block_content (Issue #42)
     });
 
     logger.info('Content stored in Y.Doc document fragment');
