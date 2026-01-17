@@ -347,7 +347,6 @@ export function InboxPage() {
     startAuth();
   }, [startAuth]);
 
-
   if (isLoading) {
     return <InboxSkeleton />;
   }

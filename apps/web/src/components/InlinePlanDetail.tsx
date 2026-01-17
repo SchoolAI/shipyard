@@ -192,7 +192,9 @@ export function InlinePlanDetail({
         <div className="flex items-center justify-center h-full">
           <div className="text-center">
             <p className="text-danger mb-2">Plan not found</p>
-            <p className="text-sm text-muted-foreground">This plan may have been deleted or is invalid.</p>
+            <p className="text-sm text-muted-foreground">
+              This plan may have been deleted or is invalid.
+            </p>
           </div>
         </div>
       );

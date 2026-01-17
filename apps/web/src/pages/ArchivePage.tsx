@@ -246,7 +246,12 @@ export function ArchivePage() {
             <div className="flex items-center justify-center py-12">
               <div className="text-center">
                 <p className="text-muted-foreground">No plans match "{searchQuery}"</p>
-                <Button variant="ghost" size="sm" onPress={() => setSearchQuery('')} className="mt-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onPress={() => setSearchQuery('')}
+                  className="mt-2"
+                >
                   Clear search
                 </Button>
               </div>

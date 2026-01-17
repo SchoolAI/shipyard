@@ -67,5 +67,7 @@ export {
   SetSessionTokenResponseSchema,
   SubscriptionClientIdSchema,
 } from './schemas.js';
-// Re-export tRPC primitives for extension
-export { middleware, publicProcedure, router } from './trpc.js';
+
+// NOTE: middleware, publicProcedure, and router are NOT exported here
+// to prevent bundling @trpc/server in browser builds.
+// Server code should import these directly from './trpc.js' if needed.

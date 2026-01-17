@@ -18,6 +18,8 @@ import { updatePlanTool } from './update-plan.js';
 
 const BUNDLED_DOCS = `Execute TypeScript code that calls Peer-Plan APIs. Use this for multi-step workflows to reduce round-trips.
 
+⚠️ IMPORTANT LIMITATION: Dynamic imports (\`await import()\`) are NOT supported in the VM execution context. Use only the pre-provided functions in the execution environment (createPlan, readPlan, updatePlan, addArtifact, completeTask, updateBlockContent, linkPR, addPRReviewComment, setupReviewNotification). All necessary APIs are already available in the sandbox.
+
 ## Available APIs
 
 ### createPlan(opts): Promise<{ planId, sessionToken, url, deliverables }>

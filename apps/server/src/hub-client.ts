@@ -80,18 +80,33 @@ export async function getOrCreateDoc(docName: string): Promise<Y.Doc> {
 
   // Wait for initial sync before returning - REQUIRED for data integrity
   await new Promise<void>((resolve, reject) => {
+    // Check if already synced (can happen if WebSocket connects immediately)
     if (provider.synced) {
+      logger.debug({ docName }, 'Provider already synced');
       resolve();
       return;
     }
-    provider.once('sync', () => {
-      resolve();
-    });
+
+    // Use 'sync' event with isSynced parameter (more reliable than 'once')
+    // The 'sync' event fires when the document is synchronized with the server.
+    // For empty documents, this happens immediately after WebSocket connection.
+    const onSync = (isSynced: boolean) => {
+      if (isSynced) {
+        logger.debug({ docName }, 'Provider synced via sync event');
+        provider.off('sync', onSync);
+        clearTimeout(timeoutId);
+        resolve();
+      }
+    };
+
+    provider.on('sync', onSync);
+
     // Timeout after 10 seconds - FAIL instead of proceeding with empty doc
     // Client MCPs MUST sync with hub to avoid data divergence
-    setTimeout(() => {
+    const timeoutId = setTimeout(() => {
       if (!provider.synced) {
-        logger.error({ docName }, 'Hub sync timeout - cannot proceed with empty doc');
+        provider.off('sync', onSync);
+        logger.error({ docName, synced: provider.synced }, 'Hub sync timeout - cannot proceed');
         reject(new Error(`Failed to sync document '${docName}' with hub within 10 seconds`));
       }
     }, 10000);
