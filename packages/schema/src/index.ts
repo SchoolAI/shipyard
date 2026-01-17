@@ -1,4 +1,6 @@
 // Conversation export (A2A protocol) - Issue #41
+
+export { assertNever } from './assert-never.js';
 export type {
   A2ADataPart,
   A2AFilePart,

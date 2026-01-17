@@ -88,6 +88,7 @@ export class InputRequestManager {
       const requestsArray = ydoc.getArray<InputRequest>(YDOC_KEYS.INPUT_REQUESTS);
       let resolved = false;
       let timeoutHandle: NodeJS.Timeout | undefined;
+      let observerFn: (() => void) | undefined;
 
       // Find the request in the array
       const findRequest = (): InputRequest | undefined => {
@@ -96,10 +97,19 @@ export class InputRequestManager {
       };
 
       const cleanup = () => {
+        // Clean up observer to prevent memory leaks
+        // Must unobserve in all code paths (success, timeout, cancellation)
+        if (observerFn) {
+          requestsArray.unobserve(observerFn);
+          observerFn = undefined;
+        }
+        // Clean up timeout timer if still active
         if (timeoutHandle) {
           clearTimeout(timeoutHandle);
           timeoutHandle = undefined;
         }
+        // Set resolved flag to prevent multiple cleanup calls
+        // (can be triggered by observer, timeout, or cancellation)
         if (!resolved) {
           resolved = true;
         }
@@ -111,6 +121,7 @@ export class InputRequestManager {
         const request = findRequest();
         if (!request) {
           logger.warn({ requestId }, 'Request not found, treating as cancelled');
+          resolved = true; // Bug #3 fix: Set flag before resolving
           cleanup();
           resolve({
             success: false,
@@ -124,6 +135,7 @@ export class InputRequestManager {
 
         if (request.status === 'answered') {
           logger.info({ requestId, answeredBy: request.answeredBy }, 'Input request answered');
+          resolved = true; // Bug #3 fix: Set flag before resolving
           cleanup();
           resolve({
             success: true,
@@ -132,19 +144,24 @@ export class InputRequestManager {
             answeredBy: request.answeredBy,
             answeredAt: request.answeredAt,
           });
-        } else if (request.status === 'cancelled') {
+          return; // Bug #3 fix: Prevent further execution
+        }
+
+        if (request.status === 'cancelled') {
           logger.info({ requestId }, 'Input request cancelled');
+          resolved = true; // Bug #3 fix: Set flag before resolving
           cleanup();
           resolve({
             success: false,
             status: 'cancelled',
             reason: 'Request was cancelled',
           });
+          return; // Bug #3 fix: Prevent further execution
         }
       };
 
       // Observe changes to the requests array
-      const observer = () => {
+      observerFn = () => {
         checkStatus();
       };
 
@@ -157,7 +174,7 @@ export class InputRequestManager {
       }
 
       // Set up observer for future changes
-      requestsArray.observe(observer);
+      requestsArray.observe(observerFn);
 
       // Determine timeout value
       const request = findRequest();
@@ -171,31 +188,41 @@ export class InputRequestManager {
       // Set up timeout if specified (0 = no timeout)
       if (effectiveTimeout > 0) {
         timeoutHandle = setTimeout(() => {
-          if (!resolved) {
-            logger.warn({ requestId, timeout: effectiveTimeout }, 'Input request timed out');
+          // Bug #2 fix: Check resolved flag before transaction
+          if (resolved) return;
 
-            // Mark request as cancelled in Y.Doc
-            ydoc.transact(() => {
-              const currentRequest = findRequest();
-              if (currentRequest && currentRequest.status === 'pending') {
-                // Update the request in place
-                const requests = requestsArray.toJSON();
-                const index = requests.findIndex((r) => r.id === requestId);
-                if (index !== -1) {
-                  requestsArray.delete(index, 1);
-                  requestsArray.insert(index, [{ ...currentRequest, status: 'cancelled' }]);
-                }
-              }
-            });
+          logger.warn({ requestId, timeout: effectiveTimeout }, 'Input request timed out');
 
-            cleanup();
-            requestsArray.unobserve(observer);
-            resolve({
-              success: false,
-              status: 'cancelled',
-              reason: `Timeout after ${effectiveTimeout} seconds`,
-            });
-          }
+          // Mark request as cancelled in Y.Doc
+          // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Timeout handling requires multiple race condition checks
+          ydoc.transact(() => {
+            // Bug #2 fix: Check again inside transaction
+            if (resolved) return;
+
+            const currentRequest = findRequest();
+            if (!currentRequest || currentRequest.status !== 'pending') {
+              return; // Already handled
+            }
+
+            // Update the request in place
+            const requests = requestsArray.toJSON();
+            const index = requests.findIndex((r) => r.id === requestId);
+            if (index !== -1) {
+              requestsArray.delete(index, 1);
+              requestsArray.insert(index, [{ ...currentRequest, status: 'cancelled' }]);
+            }
+          });
+
+          // Bug #2 fix: Final check before cleanup
+          if (resolved) return;
+
+          resolved = true; // Bug #3 fix: Set flag before resolving
+          cleanup();
+          resolve({
+            success: false,
+            status: 'cancelled',
+            reason: `Timeout after ${effectiveTimeout} seconds`,
+          });
         }, effectiveTimeout * 1000);
       }
     });

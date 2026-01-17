@@ -3,7 +3,7 @@
  * Translates between Claude Code hook JSON format and our common event types.
  */
 
-import { formatThreadsForLLM } from '@peer-plan/schema';
+import { assertNever, formatThreadsForLLM } from '@peer-plan/schema';
 import { z } from 'zod';
 import {
   CLAUDE_HOOK_EVENTS,
@@ -63,13 +63,19 @@ function handlePreToolUse(input: ClaudeCodeHookInput): AdapterEvent {
         toolInput as unknown as Parameters<typeof transformToAskUserQuestion>[0]
       );
 
-      if (transformResult.type === 'transform') {
-        return {
-          type: 'tool_transform',
-          originalTool: MCP_TOOL_NAMES.REQUEST_USER_INPUT,
-          newTool: transformResult.tool_name,
-          newInput: transformResult.tool_input as unknown as Record<string, unknown>,
-        };
+      // Exhaustive switch ensures all HookResponse types are handled
+      switch (transformResult.type) {
+        case 'transform':
+          return {
+            type: 'tool_transform',
+            originalTool: MCP_TOOL_NAMES.REQUEST_USER_INPUT,
+            newTool: transformResult.tool_name,
+            newInput: transformResult.tool_input as unknown as Record<string, unknown>,
+          };
+        case 'passthrough':
+          return { type: 'passthrough' };
+        default:
+          return assertNever(transformResult);
       }
     }
   }

@@ -270,13 +270,13 @@ describe('InputRequestManager', () => {
       const requestId = manager.createRequest(ydoc, {
         message: 'Test',
         type: 'text',
-        timeout: 3, // Request has 3 second timeout
+        timeout: 10, // Request has 10 second timeout (minimum allowed)
       });
 
       const responsePromise = manager.waitForResponse(ydoc, requestId); // No timeout param
 
-      // Fast-forward by 3 seconds
-      await vi.advanceTimersByTimeAsync(3000);
+      // Fast-forward by 10 seconds
+      await vi.advanceTimersByTimeAsync(10000);
 
       const response = await responsePromise;
 
@@ -314,7 +314,7 @@ describe('InputRequestManager', () => {
     });
 
     it('excludes answered requests', () => {
-      const id1 = manager.createRequest(ydoc, { message: 'Q1', type: 'text' });
+      manager.createRequest(ydoc, { message: 'Q1', type: 'text' });
 
       // Answer it
       ydoc.transact(() => {

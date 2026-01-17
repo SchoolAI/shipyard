@@ -166,7 +166,7 @@ describe('transformToAskUserQuestion', () => {
       expect(result.type).toBe('transform');
       if (result.type === 'transform') {
         const header = result.tool_input.questions[0]?.header;
-        expect(header[0]).toBe(header[0].toUpperCase());
+        expect(header?.[0]).toBe(header?.[0]?.toUpperCase());
       }
     });
   });

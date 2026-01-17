@@ -30,7 +30,7 @@ export const InputRequestSchema = z.object({
   /** When the request was created (Unix timestamp in ms) */
   createdAt: z.number(),
   /** Prompt message shown to the user */
-  message: z.string(),
+  message: z.string().min(1, 'Message cannot be empty'),
   /** Type of input being requested */
   type: z.enum(InputRequestTypeValues),
   /** Available options (required for 'choice' type) */
@@ -46,7 +46,12 @@ export const InputRequestSchema = z.object({
   /** Who answered (username or "agent") */
   answeredBy: z.string().optional(),
   /** Timeout in seconds (0 = no timeout) */
-  timeout: z.number().optional(),
+  timeout: z
+    .number()
+    .int()
+    .min(10, 'Timeout must be at least 10 seconds')
+    .max(600, 'Timeout cannot exceed 10 minutes')
+    .optional(),
 });
 
 export type InputRequest = z.infer<typeof InputRequestSchema>;
@@ -76,14 +81,23 @@ export function createInputRequest(params: CreateInputRequestParams): InputReque
     throw new Error("Input requests of type 'choice' must include at least one option");
   }
 
-  return {
+  const request = {
     id: nanoid(),
     createdAt: Date.now(),
     message: params.message,
     type: params.type,
     options: params.options,
     defaultValue: params.defaultValue,
-    status: 'pending',
+    status: 'pending' as const,
     timeout: params.timeout,
   };
+
+  // Validate the complete request against the schema
+  // This ensures message is not empty and timeout is within valid range
+  const parseResult = InputRequestSchema.safeParse(request);
+  if (!parseResult.success) {
+    throw new Error(`Invalid input request: ${parseResult.error.issues[0]?.message}`);
+  }
+
+  return parseResult.data;
 }

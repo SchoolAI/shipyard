@@ -20,8 +20,6 @@ interface RequestUserInputParams {
   options?: string[];
   defaultValue?: string;
   timeout?: number;
-  schema?: Record<string, unknown>;
-  planId?: string;
 }
 
 /**
