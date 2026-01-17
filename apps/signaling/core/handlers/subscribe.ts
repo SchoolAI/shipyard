@@ -18,25 +18,18 @@ import type { SubscribeMessage, UnsubscribeMessage } from '../types.js';
  * @param ws - WebSocket connection (platform-specific type)
  * @param message - Subscribe message with topics and optional userId
  */
-function handleSubscribe(
-	platform: PlatformAdapter,
-	ws: unknown,
-	message: SubscribeMessage,
-): void {
-	// Store userId if provided (for approval checking)
-	if (message.userId) {
-		platform.setUserId(ws, message.userId);
-		platform.debug(
-			'[handleSubscribe] Stored userId for connection',
-			{ userId: message.userId },
-		);
-	}
+function handleSubscribe(platform: PlatformAdapter, ws: unknown, message: SubscribeMessage): void {
+  // Store userId if provided (for approval checking)
+  if (message.userId) {
+    platform.setUserId(ws, message.userId);
+    platform.debug('[handleSubscribe] Stored userId for connection', { userId: message.userId });
+  }
 
-	// Subscribe to each topic
-	for (const topic of message.topics ?? []) {
-		if (typeof topic !== 'string') continue;
-		platform.subscribeToTopic(ws, topic);
-	}
+  // Subscribe to each topic
+  for (const topic of message.topics ?? []) {
+    if (typeof topic !== 'string') continue;
+    platform.subscribeToTopic(ws, topic);
+  }
 }
 
 /**
@@ -48,12 +41,12 @@ function handleSubscribe(
  * @param message - Unsubscribe message with topics
  */
 function handleUnsubscribe(
-	platform: PlatformAdapter,
-	ws: unknown,
-	message: UnsubscribeMessage,
+  platform: PlatformAdapter,
+  ws: unknown,
+  message: UnsubscribeMessage
 ): void {
-	for (const topic of message.topics ?? []) {
-		if (typeof topic !== 'string') continue;
-		platform.unsubscribeFromTopic(ws, topic);
-	}
+  for (const topic of message.topics ?? []) {
+    if (typeof topic !== 'string') continue;
+    platform.unsubscribeFromTopic(ws, topic);
+  }
 }

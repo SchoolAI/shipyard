@@ -398,18 +398,78 @@ export async function waitForApprovalHandler(
     '[SERVER OBSERVER] Set reviewRequestId and status, starting observation'
   );
 
+  // Extract common review data from Y.Doc metadata
+  const getReviewData = () => ({
+    reviewComment: metadata.get('reviewComment') as string | undefined,
+    reviewedBy: metadata.get('reviewedBy') as string | undefined,
+  });
+
+  // Update session registry with review decision data
+  const updateSessionRegistry = (
+    status: string,
+    extraData: { approvedAt?: number; deliverables?: Array<{ id: string; text: string }> } = {}
+  ) => {
+    const session = getSessionStateByPlanId(planId);
+    const sessionId = getSessionIdByPlanId(planId);
+    if (!session || !sessionId) return;
+
+    const { reviewComment, reviewedBy } = getReviewData();
+    setSessionState(sessionId, {
+      ...session,
+      ...extraData,
+      reviewComment,
+      reviewedBy,
+      reviewStatus: status,
+    });
+    ctx.logger.info(
+      {
+        planId,
+        sessionId,
+        ...(extraData.deliverables && { deliverableCount: extraData.deliverables.length }),
+      },
+      `Stored ${status === 'in_progress' ? 'approval' : 'rejection'} data in session registry`
+    );
+  };
+
+  // Handle approved status - plan is ready for implementation
+  const handleApproved = () => {
+    const deliverables = getDeliverables(ydoc);
+    const deliverableInfos = deliverables.map((d) => ({ id: d.id, text: d.text }));
+    updateSessionRegistry('in_progress', {
+      approvedAt: Date.now(),
+      deliverables: deliverableInfos,
+    });
+
+    const { reviewComment, reviewedBy } = getReviewData();
+    ctx.logger.info(
+      { planId, reviewRequestId, reviewedBy },
+      '[SERVER OBSERVER] Plan approved via Y.Doc - resolving promise'
+    );
+    return { approved: true, deliverables, reviewComment, reviewedBy, status: 'in_progress' };
+  };
+
+  // Handle changes_requested status - reviewer wants modifications
+  const handleChangesRequested = () => {
+    updateSessionRegistry('changes_requested');
+    const feedback = extractFeedbackFromYDoc(ydoc, ctx);
+    const { reviewComment, reviewedBy } = getReviewData();
+
+    ctx.logger.info(
+      { planId, reviewRequestId, feedback },
+      '[SERVER OBSERVER] Changes requested via Y.Doc'
+    );
+    return { approved: false, feedback, reviewComment, reviewedBy, status: 'changes_requested' };
+  };
+
   return new Promise((resolve) => {
     const APPROVAL_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes (matches client timeout)
-    const timeout = setTimeout(
-      () => {
-        metadata.unobserve(checkStatus);
-        resolve({
-          approved: false,
-          feedback: 'Review timeout - no decision received in 30 minutes',
-        });
-      },
-      APPROVAL_TIMEOUT_MS
-    );
+    const timeout = setTimeout(() => {
+      metadata.unobserve(checkStatus);
+      resolve({
+        approved: false,
+        feedback: 'Review timeout - no decision received in 30 minutes',
+      });
+    }, APPROVAL_TIMEOUT_MS);
 
     const checkStatus = () => {
       const currentReviewId = metadata.get('reviewRequestId') as string | undefined;
@@ -426,77 +486,21 @@ export async function waitForApprovalHandler(
         '[SERVER OBSERVER] Metadata changed, checking status'
       );
 
-      // Only accept decisions that match the review request
+      // Ignore stale decisions from previous review requests
       if (currentReviewId !== reviewRequestId) {
         ctx.logger.warn(
-          {
-            planId,
-            expected: reviewRequestId,
-            actual: currentReviewId,
-            status,
-          },
+          { planId, expected: reviewRequestId, actual: currentReviewId, status },
           '[SERVER OBSERVER] Review ID mismatch, ignoring status change'
         );
         return;
       }
 
-      if (status === 'in_progress') {
-        clearTimeout(timeout);
-        metadata.unobserve(checkStatus);
-        const deliverables = getDeliverables(ydoc);
-        const reviewComment = metadata.get('reviewComment') as string | undefined;
-        const reviewedBy = metadata.get('reviewedBy') as string | undefined;
+      // Only handle terminal states (approved or changes requested)
+      if (status !== 'in_progress' && status !== 'changes_requested') return;
 
-        // Update session registry with approval data
-        const session = getSessionStateByPlanId(planId);
-        const sessionId = getSessionIdByPlanId(planId);
-        if (session && sessionId) {
-          const deliverableInfos = deliverables.map((d) => ({ id: d.id, text: d.text }));
-          setSessionState(sessionId, {
-            ...session,
-            approvedAt: Date.now(),
-            deliverables: deliverableInfos,
-            reviewComment,
-            reviewedBy,
-            reviewStatus: status,
-          });
-          ctx.logger.info(
-            { planId, sessionId, deliverableCount: deliverableInfos.length },
-            'Stored approval data in session registry'
-          );
-        }
-
-        ctx.logger.info(
-          { planId, reviewRequestId, reviewedBy },
-          '[SERVER OBSERVER] Plan approved via Y.Doc - resolving promise'
-        );
-        resolve({ approved: true, deliverables, reviewComment, reviewedBy, status });
-      } else if (status === 'changes_requested') {
-        clearTimeout(timeout);
-        metadata.unobserve(checkStatus);
-        const feedback = extractFeedbackFromYDoc(ydoc, ctx);
-        const reviewComment = metadata.get('reviewComment') as string | undefined;
-        const reviewedBy = metadata.get('reviewedBy') as string | undefined;
-
-        // Update session registry with rejection data
-        const session = getSessionStateByPlanId(planId);
-        const sessionId = getSessionIdByPlanId(planId);
-        if (session && sessionId) {
-          setSessionState(sessionId, {
-            ...session,
-            reviewComment,
-            reviewedBy,
-            reviewStatus: status,
-          });
-          ctx.logger.info({ planId, sessionId }, 'Stored rejection data in session registry');
-        }
-
-        ctx.logger.info(
-          { planId, reviewRequestId, feedback },
-          '[SERVER OBSERVER] Changes requested via Y.Doc'
-        );
-        resolve({ approved: false, feedback, reviewComment, reviewedBy, status });
-      }
+      clearTimeout(timeout);
+      metadata.unobserve(checkStatus);
+      resolve(status === 'in_progress' ? handleApproved() : handleChangesRequested());
     };
 
     // Observe changes to metadata

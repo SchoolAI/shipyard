@@ -29,8 +29,6 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import http from 'node:http';
 import type { WebSocket } from 'ws';
 import { WebSocketServer } from 'ws';
-
-import type { SignalingMessage } from '../core/types.js';
 import {
   handleApprovalState,
   handleCreateInvite,
@@ -41,6 +39,7 @@ import {
   handleSubscribe,
   handleUnsubscribe,
 } from '../core/handlers/index.js';
+import type { SignalingMessage } from '../core/types.js';
 import { NodePlatformAdapter } from '../node/adapter.js';
 import { serverConfig } from './config/env/server.js';
 import { logger } from './logger.js';

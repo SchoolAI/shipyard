@@ -174,18 +174,21 @@ export function PlanContent({
           </div>
 
           {/* Version selector on the right - only show on Plan tab when versions exist */}
-          {activeView === 'plan' && !isSnapshot && versionNav && versionNav.snapshots.length > 0 && (
-            <VersionSelector
-              currentSnapshot={versionNav.currentSnapshot}
-              totalSnapshots={versionNav.snapshots.length}
-              currentIndex={versionNav.currentIndex}
-              canGoPrevious={versionNav.canGoPrevious}
-              canGoNext={versionNav.canGoNext}
-              onPrevious={versionNav.goToPrevious}
-              onNext={versionNav.goToNext}
-              onCurrent={versionNav.goToCurrent}
-            />
-          )}
+          {activeView === 'plan' &&
+            !isSnapshot &&
+            versionNav &&
+            versionNav.snapshots.length > 0 && (
+              <VersionSelector
+                currentSnapshot={versionNav.currentSnapshot}
+                totalSnapshots={versionNav.snapshots.length}
+                currentIndex={versionNav.currentIndex}
+                canGoPrevious={versionNav.canGoPrevious}
+                canGoNext={versionNav.canGoNext}
+                onPrevious={versionNav.goToPrevious}
+                onNext={versionNav.goToNext}
+                onCurrent={versionNav.goToCurrent}
+              />
+            )}
         </div>
       </div>
 

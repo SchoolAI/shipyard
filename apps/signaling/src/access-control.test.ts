@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { WebSocket } from 'ws';
 import {
   extractPlanId,
   isUserApproved,
@@ -11,7 +12,6 @@ import {
   WS_READY_STATE_CONNECTING,
   WS_READY_STATE_OPEN,
 } from './access-control.js';
-import type { WebSocket } from 'ws';
 
 /**
  * Extended message type for tests with additional properties.
@@ -125,10 +125,7 @@ describe('isUserRejected', () => {
 
   it('returns false when userId is undefined', () => {
     const planApprovals = new Map<string, PlanApprovalState>();
-    planApprovals.set(
-      'plan-1',
-      createApprovalState('plan-1', 'owner-1', [], ['user-1'])
-    );
+    planApprovals.set('plan-1', createApprovalState('plan-1', 'owner-1', [], ['user-1']));
     const result = isUserRejected(planApprovals, 'plan-1', undefined);
     expect(result).toBe(false);
   });
@@ -144,20 +141,14 @@ describe('isUserRejected', () => {
 
   it('returns true when user is in rejectedUsers', () => {
     const planApprovals = new Map<string, PlanApprovalState>();
-    planApprovals.set(
-      'plan-1',
-      createApprovalState('plan-1', 'owner-1', [], ['user-1', 'user-2'])
-    );
+    planApprovals.set('plan-1', createApprovalState('plan-1', 'owner-1', [], ['user-1', 'user-2']));
     expect(isUserRejected(planApprovals, 'plan-1', 'user-1')).toBe(true);
     expect(isUserRejected(planApprovals, 'plan-1', 'user-2')).toBe(true);
   });
 
   it('returns false when user is not in rejectedUsers', () => {
     const planApprovals = new Map<string, PlanApprovalState>();
-    planApprovals.set(
-      'plan-1',
-      createApprovalState('plan-1', 'owner-1', ['user-1'], ['user-2'])
-    );
+    planApprovals.set('plan-1', createApprovalState('plan-1', 'owner-1', ['user-1'], ['user-2']));
     expect(isUserRejected(planApprovals, 'plan-1', 'user-1')).toBe(false);
     expect(isUserRejected(planApprovals, 'plan-1', 'user-3')).toBe(false);
   });

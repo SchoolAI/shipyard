@@ -22,10 +22,10 @@ const PLAN_TOPIC_PREFIX = 'peer-plan-';
  * Returns null if not a plan topic.
  */
 function extractPlanId(topic: string): string | null {
-	if (topic.startsWith(PLAN_TOPIC_PREFIX)) {
-		return topic.slice(PLAN_TOPIC_PREFIX.length);
-	}
-	return null;
+  if (topic.startsWith(PLAN_TOPIC_PREFIX)) {
+    return topic.slice(PLAN_TOPIC_PREFIX.length);
+  }
+  return null;
 }
 
 /**
@@ -34,24 +34,24 @@ function extractPlanId(topic: string): string | null {
  * Returns false if no approval state exists (deny by default until owner pushes state).
  */
 function isUserApproved(
-	approval: PlanApprovalState | undefined,
-	userId: string | undefined,
+  approval: PlanApprovalState | undefined,
+  userId: string | undefined
 ): boolean {
-	// No approval state - deny by default
-	// Prevents race conditions where pending users connect before owner pushes state
-	if (!approval) return false;
+  // No approval state - deny by default
+  // Prevents race conditions where pending users connect before owner pushes state
+  if (!approval) return false;
 
-	// No userId - deny (must authenticate to access plans)
-	if (!userId) return false;
+  // No userId - deny (must authenticate to access plans)
+  if (!userId) return false;
 
-	// Owner is always approved
-	if (userId === approval.ownerId) return true;
+  // Owner is always approved
+  if (userId === approval.ownerId) return true;
 
-	// Check rejected first (takes precedence)
-	if (approval.rejectedUsers.includes(userId)) return false;
+  // Check rejected first (takes precedence)
+  if (approval.rejectedUsers.includes(userId)) return false;
 
-	// Check if in approved list
-	return approval.approvedUsers.includes(userId);
+  // Check if in approved list
+  return approval.approvedUsers.includes(userId);
 }
 
 /**
@@ -59,15 +59,15 @@ function isUserApproved(
  * Plan owner can never be rejected.
  */
 function isUserRejected(
-	approval: PlanApprovalState | undefined,
-	userId: string | undefined,
+  approval: PlanApprovalState | undefined,
+  userId: string | undefined
 ): boolean {
-	if (!approval || !userId) return false;
+  if (!approval || !userId) return false;
 
-	// Owner can never be rejected
-	if (userId === approval.ownerId) return false;
+  // Owner can never be rejected
+  if (userId === approval.ownerId) return false;
 
-	return approval.rejectedUsers.includes(userId);
+  return approval.rejectedUsers.includes(userId);
 }
 
 /**
@@ -84,68 +84,68 @@ function isUserRejected(
  * @param message - Publish message to broadcast
  */
 async function handlePublish(
-	platform: PlatformAdapter,
-	ws: unknown,
-	message: PublishMessage,
+  platform: PlatformAdapter,
+  ws: unknown,
+  message: PublishMessage
 ): Promise<void> {
-	if (!message.topic) return;
+  if (!message.topic) return;
 
-	const subscribers = platform.getTopicSubscribers(message.topic);
-	if (subscribers.length === 0) return;
+  const subscribers = platform.getTopicSubscribers(message.topic);
+  if (subscribers.length === 0) return;
 
-	const senderUserId = platform.getUserId(ws);
-	const planId = extractPlanId(message.topic);
+  const senderUserId = platform.getUserId(ws);
+  const planId = extractPlanId(message.topic);
 
-	// For plan document topics, enforce approval-based filtering
-	if (planId) {
-		const approval = await platform.getApprovalState(planId);
+  // For plan document topics, enforce approval-based filtering
+  if (planId) {
+    const approval = await platform.getApprovalState(planId);
 
-		// Block rejected senders completely
-		if (isUserRejected(approval, senderUserId)) {
-			return;
-		}
+    // Block rejected senders completely
+    if (isUserRejected(approval, senderUserId)) {
+      return;
+    }
 
-		const senderApproved = isUserApproved(approval, senderUserId);
+    const senderApproved = isUserApproved(approval, senderUserId);
 
-		// Add client count to message (y-webrtc uses this)
-		const outMessage: PublishMessage = {
-			...message,
-			clients: subscribers.length,
-		};
+    // Add client count to message (y-webrtc uses this)
+    const outMessage: PublishMessage = {
+      ...message,
+      clients: subscribers.length,
+    };
 
-		// Broadcast to filtered subscribers based on approval
-		for (const subscriber of subscribers) {
-			// Don't send back to sender
-			if (subscriber === ws) continue;
+    // Broadcast to filtered subscribers based on approval
+    for (const subscriber of subscribers) {
+      // Don't send back to sender
+      if (subscriber === ws) continue;
 
-			const subscriberUserId = platform.getUserId(subscriber);
+      const subscriberUserId = platform.getUserId(subscriber);
 
-			// Block rejected recipients
-			if (isUserRejected(approval, subscriberUserId)) {
-				continue;
-			}
+      // Block rejected recipients
+      if (isUserRejected(approval, subscriberUserId)) {
+        continue;
+      }
 
-			const subscriberApproved = isUserApproved(approval, subscriberUserId);
+      const subscriberApproved = isUserApproved(approval, subscriberUserId);
 
-			// Relay logic:
-			// - If sender is approved, only send to other approved users
-			// - If sender is pending, only send to other pending users (awareness sync)
-			// This prevents approved content from leaking to pending users
-			if (senderApproved === subscriberApproved) {
-				platform.sendMessage(subscriber, outMessage);
-			}
-		}
-	} else {
-		// Non-plan topics (e.g., plan-index) - broadcast to all without filtering
-		const outMessage: PublishMessage = {
-			...message,
-			clients: subscribers.length,
-		};
+      // Relay logic:
+      // - If sender is approved, only send to other approved users
+      // - If sender is pending, only send to other pending users (awareness sync)
+      // This prevents approved content from leaking to pending users
+      if (senderApproved === subscriberApproved) {
+        platform.sendMessage(subscriber, outMessage);
+      }
+    }
+  } else {
+    // Non-plan topics (e.g., plan-index) - broadcast to all without filtering
+    const outMessage: PublishMessage = {
+      ...message,
+      clients: subscribers.length,
+    };
 
-		// Non-plan topics broadcast to ALL subscribers (including sender)
-		// This matches the original y-webrtc protocol behavior
-		for (const subscriber of subscribers) {
-			platform.sendMessage(subscriber, outMessage);
-		}
-	}
+    // Non-plan topics broadcast to ALL subscribers (including sender)
+    // This matches the original y-webrtc protocol behavior
+    for (const subscriber of subscribers) {
+      platform.sendMessage(subscriber, outMessage);
+    }
+  }
 }

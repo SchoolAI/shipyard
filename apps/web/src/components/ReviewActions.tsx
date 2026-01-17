@@ -11,6 +11,27 @@ import { toast } from 'sonner';
 import type * as Y from 'yjs';
 import { VoiceInputButton } from '@/components/voice-input';
 
+// Helper functions to reduce complexity in the main component
+// These are pure functions that map action types to display values
+
+type ReviewAction = 'approve' | 'request_changes';
+
+/** Maps action to event type for logging */
+const getEventType = (action: ReviewAction): 'approved' | 'changes_requested' =>
+  action === 'approve' ? 'approved' : 'changes_requested';
+
+/** Creates the reason string for snapshot metadata */
+const getSnapshotReason = (action: ReviewAction, reviewerName: string): string =>
+  action === 'approve' ? `Approved by ${reviewerName}` : `Changes requested by ${reviewerName}`;
+
+/** Maps action to user-facing success message */
+const getSuccessMessage = (action: ReviewAction): string =>
+  action === 'approve' ? 'Plan approved successfully!' : 'Changes requested successfully!';
+
+/** Maps action to user-facing error action label */
+const getErrorActionLabel = (action: ReviewAction): string =>
+  action === 'approve' ? 'approve' : 'request changes';
+
 /** Simple identity type for display purposes */
 interface UserIdentity {
   id: string;
@@ -119,8 +140,9 @@ export function ReviewActions({
   ) => {
     const newStatus = action === 'approve' ? 'in_progress' : 'changes_requested';
 
+    const metadata = ydoc.getMap('metadata');
+
     ydoc.transact(() => {
-      const metadata = ydoc.getMap('metadata');
       const reviewRequestId = metadata.get('reviewRequestId') as string | undefined;
 
       metadata.set('status', newStatus);
@@ -130,6 +152,7 @@ export function ReviewActions({
 
       if (reviewRequestId !== undefined) {
         metadata.set('reviewRequestId', reviewRequestId);
+      } else {
       }
 
       if (trimmedComment) {
@@ -142,9 +165,34 @@ export function ReviewActions({
     return newStatus;
   };
 
-  const handleConfirm = async (action: 'approve' | 'request_changes') => {
+  // Execute the review action - updates doc, logs event, creates snapshot
+  const executeReviewAction = (
+    action: ReviewAction,
+    validEditor: BlockNoteEditor,
+    trimmedComment: string,
+    timestamp: number
+  ) => {
+    const reviewerName = identity?.name ?? 'Unknown';
+    const newStatus = updateReviewStatus(action, trimmedComment, timestamp);
+
+    logPlanEvent(ydoc, getEventType(action), reviewerName);
+
+    const snapshot = createPlanSnapshot(
+      ydoc,
+      getSnapshotReason(action, reviewerName),
+      reviewerName,
+      newStatus,
+      validEditor.document
+    );
+    addSnapshot(ydoc, snapshot);
+
+    return { newStatus, timestamp };
+  };
+
+  const handleConfirm = async (action: ReviewAction) => {
     const validation = validateReviewAction(action);
-    if (!validation.valid) {
+    if (!validation.valid || !editor) {
+      if (!editor) toast.error('Editor not ready');
       setOpenPopover(null);
       return;
     }
@@ -152,35 +200,21 @@ export function ReviewActions({
     setIsSubmitting(true);
 
     try {
-      const trimmedComment = comment.trim();
-      const now = Date.now();
+      const { newStatus, timestamp } = executeReviewAction(
+        action,
+        editor,
+        comment.trim(),
+        Date.now()
+      );
 
-      const newStatus = updateReviewStatus(action, trimmedComment, now);
-
-      const eventType = action === 'approve' ? 'approved' : 'changes_requested';
-      logPlanEvent(ydoc, eventType, identity?.name ?? 'Unknown');
-
-      const blocks = editor.document;
-      const reason =
-        action === 'approve'
-          ? `Approved by ${identity?.name}`
-          : `Changes requested by ${identity?.name}`;
-      const snapshot = createPlanSnapshot(ydoc, reason, identity?.name ?? 'Unknown', newStatus, blocks);
-      addSnapshot(ydoc, snapshot);
-
-      const successMessage =
-        action === 'approve' ? 'Plan approved successfully!' : 'Changes requested successfully!';
-      toast.success(successMessage);
-
+      toast.success(getSuccessMessage(action));
       setOpenPopover(null);
       setComment('');
-      onStatusChange?.(newStatus, now);
+      onStatusChange?.(newStatus, timestamp);
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error during status update';
-
-      const actionLabel = action === 'approve' ? 'approve' : 'request changes';
-      toast.error(`Failed to ${actionLabel}: ${errorMessage}`);
+      toast.error(`Failed to ${getErrorActionLabel(action)}: ${errorMessage}`);
     } finally {
       setIsSubmitting(false);
     }

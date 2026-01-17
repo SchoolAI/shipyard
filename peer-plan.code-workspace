@@ -5,12 +5,12 @@
       "path": "."
     },
     {
-      "name": "🌳📜 42-plan-history",
-      "path": "../peer-plan-wt/42-plan-history"
-    },
-    {
       "name": "🌳💬 72-request-user-input",
       "path": "../peer-plan-wt/72-request-user-input"
+    },
+    {
+      "name": "🌳👀 71-central-crdt-observer-and-event-tracking",
+      "path": "../peer-plan-wt/71-central-crdt-observer-and-event-tracking"
     }
   ],
   "settings": {}

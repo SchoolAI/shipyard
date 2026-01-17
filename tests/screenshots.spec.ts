@@ -1,6 +1,6 @@
-import { test, expect } from '@playwright/test';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { expect, test } from '@playwright/test';
 
 const SCREENSHOTS_DIR = join(process.cwd(), 'screenshots');
 
@@ -20,9 +20,11 @@ test.describe('Three-Column Layout Screenshots', () => {
     await page.waitForSelector('h2:has-text("Plans")', { timeout: 10000 });
 
     // Take screenshot of just the sidebar
-    const sidebar = page.locator('aside, [role="complementary"], .flex.flex-col.h-full.bg-surface').first();
+    const sidebar = page
+      .locator('aside, [role="complementary"], .flex.flex-col.h-full.bg-surface')
+      .first();
     await sidebar.screenshot({
-      path: join(SCREENSHOTS_DIR, '1-sidebar-with-search-icon.png')
+      path: join(SCREENSHOTS_DIR, '1-sidebar-with-search-icon.png'),
     });
   });
 
@@ -37,7 +39,7 @@ test.describe('Three-Column Layout Screenshots', () => {
     // Take full page screenshot
     await page.screenshot({
       path: join(SCREENSHOTS_DIR, '2-inbox-empty.png'),
-      fullPage: true
+      fullPage: true,
     });
   });
 
@@ -49,7 +51,7 @@ test.describe('Three-Column Layout Screenshots', () => {
 
     // Try to click the first plan if it exists
     const firstPlan = page.locator('[role="option"]').first();
-    const planExists = await firstPlan.count() > 0;
+    const planExists = (await firstPlan.count()) > 0;
 
     if (planExists) {
       await firstPlan.click();
@@ -59,7 +61,7 @@ test.describe('Three-Column Layout Screenshots', () => {
 
     await page.screenshot({
       path: join(SCREENSHOTS_DIR, '3-inbox-with-selection.png'),
-      fullPage: true
+      fullPage: true,
     });
   });
 
@@ -72,7 +74,7 @@ test.describe('Three-Column Layout Screenshots', () => {
 
     await page.screenshot({
       path: join(SCREENSHOTS_DIR, '4-board-view.png'),
-      fullPage: true
+      fullPage: true,
     });
   });
 
@@ -85,7 +87,7 @@ test.describe('Three-Column Layout Screenshots', () => {
 
     await page.screenshot({
       path: join(SCREENSHOTS_DIR, '5-archive-view.png'),
-      fullPage: true
+      fullPage: true,
     });
   });
 
@@ -98,7 +100,7 @@ test.describe('Three-Column Layout Screenshots', () => {
 
     // Type a search query if there's a search input
     const searchInput = page.locator('input[placeholder*="Search"]').first();
-    const inputExists = await searchInput.count() > 0;
+    const inputExists = (await searchInput.count()) > 0;
 
     if (inputExists) {
       await searchInput.fill('test');
@@ -107,7 +109,7 @@ test.describe('Three-Column Layout Screenshots', () => {
 
     await page.screenshot({
       path: join(SCREENSHOTS_DIR, '6-search-results.png'),
-      fullPage: true
+      fullPage: true,
     });
   });
 
@@ -117,7 +119,7 @@ test.describe('Three-Column Layout Screenshots', () => {
 
     // Type a search query
     const searchInput = page.locator('input[placeholder*="Search"]').first();
-    const inputExists = await searchInput.count() > 0;
+    const inputExists = (await searchInput.count()) > 0;
 
     if (inputExists) {
       await searchInput.fill('test');
@@ -125,7 +127,7 @@ test.describe('Three-Column Layout Screenshots', () => {
 
       // Click first result if it exists
       const firstResult = page.locator('[role="option"]').first();
-      const resultExists = await firstResult.count() > 0;
+      const resultExists = (await firstResult.count()) > 0;
 
       if (resultExists) {
         await firstResult.click();
@@ -135,7 +137,7 @@ test.describe('Three-Column Layout Screenshots', () => {
 
     await page.screenshot({
       path: join(SCREENSHOTS_DIR, '7-search-with-selection.png'),
-      fullPage: true
+      fullPage: true,
     });
   });
 });

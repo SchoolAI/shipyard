@@ -133,7 +133,10 @@ async function handlePostExit(
 
     const { planId, sessionToken, url } = sessionContext;
 
-    logger.info({ planId, sessionId: event.sessionId }, 'Injecting session context via PostToolUse');
+    logger.info(
+      { planId, sessionId: event.sessionId },
+      'Injecting session context via PostToolUse'
+    );
 
     // Get pre-formatted context from server
     const result = await getDeliverableContext(planId, sessionToken);

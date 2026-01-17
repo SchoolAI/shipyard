@@ -21,7 +21,6 @@
  */
 
 import { DurableObject } from 'cloudflare:workers';
-import type { SignalingMessage } from '../../core/types.js';
 import {
   handleApprovalState,
   handleCreateInvite,
@@ -32,6 +31,7 @@ import {
   handleSubscribe,
   handleUnsubscribe,
 } from '../../core/handlers/index.js';
+import type { SignalingMessage } from '../../core/types.js';
 import { CloudflarePlatformAdapter } from './adapter.js';
 import { logger } from './logger.js';
 

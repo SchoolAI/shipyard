@@ -11,10 +11,10 @@
 
 export { handleApprovalState } from './approval-state.js';
 export {
-	handleCreateInvite,
-	handleListInvites,
-	handleRedeemInvite,
-	handleRevokeInvite,
+  handleCreateInvite,
+  handleListInvites,
+  handleRedeemInvite,
+  handleRevokeInvite,
 } from './invites.js';
 export { handlePublish } from './publish.js';
 export { handleSubscribe, handleUnsubscribe } from './subscribe.js';

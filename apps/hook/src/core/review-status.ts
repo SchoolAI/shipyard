@@ -262,16 +262,8 @@ export async function checkReviewStatus(
   // Note: Server no longer tracks contentHash, so we always treat new content as changed
   // If we have new plan content, trigger re-review
   if (planContent) {
-    logger.info(
-      { planId: state.planId },
-      'Plan content provided, triggering re-review'
-    );
-    return await handleUpdatedPlanReview(
-      sessionId,
-      state.planId,
-      planContent,
-      originMetadata
-    );
+    logger.info({ planId: state.planId }, 'Plan content provided, triggering re-review');
+    return await handleUpdatedPlanReview(sessionId, state.planId, planContent, originMetadata);
   }
 
   planId = state.planId;
