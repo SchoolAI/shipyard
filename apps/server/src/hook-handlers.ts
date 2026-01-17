@@ -264,7 +264,10 @@ export async function updateContentHandler(
         contentHash,
         planFilePath: input.filePath,
       });
-      ctx.logger.info({ planId, sessionId, contentHash }, 'Updated session registry with content hash');
+      ctx.logger.info(
+        { planId, sessionId, contentHash },
+        'Updated session registry with content hash'
+      );
     }
   }
 
@@ -509,6 +512,30 @@ export async function waitForApprovalHandler(
     let timeout: NodeJS.Timeout | null = null;
     let checkStatus: (() => void) | null = null;
 
+    // Helper: Check if status change should be processed (matching review ID + terminal state)
+    const shouldProcessStatusChange = (
+      currentReviewId: string | undefined,
+      status: string | undefined
+    ): boolean => {
+      // Ignore stale decisions from previous review requests
+      if (currentReviewId !== reviewRequestId) {
+        ctx.logger.warn(
+          { planId, expected: reviewRequestId, actual: currentReviewId, status },
+          '[SERVER OBSERVER] Review ID mismatch, ignoring status change'
+        );
+        return false;
+      }
+      // Only handle terminal states (approved or changes requested)
+      const isTerminalState = status === 'in_progress' || status === 'changes_requested';
+      return isTerminalState;
+    };
+
+    // Helper: Clean up observer and timeout
+    const cleanupObserver = () => {
+      if (timeout) clearTimeout(timeout);
+      if (checkStatus) metadata.unobserve(checkStatus);
+    };
+
     try {
       // NOTE: Timeout resolves (not rejects) with approved: false.
       // This is intentional behavior - timeouts are treated as "no approval"
@@ -529,35 +556,21 @@ export async function waitForApprovalHandler(
         const status = metadata.get('status') as string | undefined;
 
         ctx.logger.debug(
-          {
-            planId,
-            status,
-            currentReviewId,
-            expectedReviewId: reviewRequestId,
-            reviewIdMatch: currentReviewId === reviewRequestId,
-          },
+          { planId, status, currentReviewId, expectedReviewId: reviewRequestId },
           '[SERVER OBSERVER] Metadata changed, checking status'
         );
 
-        // Ignore stale decisions from previous review requests
-        if (currentReviewId !== reviewRequestId) {
-          ctx.logger.warn(
-            { planId, expected: reviewRequestId, actual: currentReviewId, status },
-            '[SERVER OBSERVER] Review ID mismatch, ignoring status change'
-          );
-          return;
-        }
+        if (!shouldProcessStatusChange(currentReviewId, status)) return;
 
-        // Only handle terminal states (approved or changes requested)
-        if (status !== 'in_progress' && status !== 'changes_requested') return;
-
-        if (timeout) clearTimeout(timeout);
-        if (checkStatus) metadata.unobserve(checkStatus);
+        cleanupObserver();
         resolve(status === 'in_progress' ? handleApproved() : handleChangesRequested());
       };
 
       // Observe changes to metadata
-      ctx.logger.info({ planId, reviewRequestId }, '[SERVER OBSERVER] Registering metadata observer');
+      ctx.logger.info(
+        { planId, reviewRequestId },
+        '[SERVER OBSERVER] Registering metadata observer'
+      );
       metadata.observe(checkStatus);
 
       // Check status immediately in case it's already set (shouldn't happen since we just set it to pending_review)

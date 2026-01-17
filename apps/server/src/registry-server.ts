@@ -33,6 +33,8 @@ const PERSISTENCE_DIR = join(homedir(), '.peer-plan', 'plans');
 
 // Lock file to prevent multiple processes from starting the hub simultaneously
 const HUB_LOCK_FILE = join(homedir(), '.peer-plan', 'hub.lock');
+const PEER_PLAN_DIR = join(homedir(), '.peer-plan');
+const MAX_LOCK_RETRIES = 3;
 
 // Message types matching y-websocket protocol
 const messageSync = 0;
@@ -46,67 +48,105 @@ const conns = new Map<string, Set<WebSocket>>();
 let ldb: LeveldbPersistence | null = null;
 
 /**
+ * Reads the lock file and returns the PID of the lock holder, or null if unreadable.
+ */
+async function readLockHolderPid(): Promise<number | null> {
+  try {
+    const content = await readFile(HUB_LOCK_FILE, 'utf-8');
+    const pidStr = content.split('\n')[0] ?? '';
+    return Number.parseInt(pidStr, 10);
+  } catch (readErr) {
+    logger.error({ err: readErr }, 'Failed to read hub lock file');
+    return null;
+  }
+}
+
+/**
+ * Checks if the lock holder process is alive.
+ * Returns true if process is alive, false if dead or unknown.
+ */
+function isLockHolderAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0); // Signal 0 doesn't kill, just checks
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Attempts to remove a stale lock file.
+ * Returns true if removal succeeded or was unnecessary.
+ */
+async function tryRemoveStaleLock(stalePid: number, retryCount: number): Promise<boolean> {
+  logger.warn({ stalePid, retryCount }, 'Removing stale hub lock');
+  try {
+    await unlink(HUB_LOCK_FILE);
+    return true;
+  } catch (unlinkErr) {
+    logger.error({ err: unlinkErr, stalePid, retryCount }, 'Failed to remove stale hub lock');
+    return false;
+  }
+}
+
+/**
+ * Registers cleanup handler to remove lock file on process exit.
+ */
+function registerLockCleanupHandler(): void {
+  process.once('exit', () => {
+    try {
+      unlinkSync(HUB_LOCK_FILE);
+    } catch {
+      // Lock may already be cleaned up
+    }
+  });
+}
+
+/**
+ * Handles the case when lock file already exists.
+ * Checks if holder is alive, and if not, removes stale lock and retries.
+ * Returns true if lock was acquired on retry, false otherwise.
+ */
+async function handleExistingLock(retryCount: number): Promise<boolean> {
+  const pid = await readLockHolderPid();
+  if (pid === null) return false;
+
+  if (isLockHolderAlive(pid)) {
+    logger.debug({ holderPid: pid }, 'Hub lock held by active process');
+    return false;
+  }
+
+  // Process dead - check retry limit before attempting removal
+  if (retryCount >= MAX_LOCK_RETRIES) {
+    logger.error(
+      { stalePid: pid, retryCount },
+      'Max retries exceeded while removing stale hub lock'
+    );
+    return false;
+  }
+
+  // Attempt to remove stale lock and retry
+  await tryRemoveStaleLock(pid, retryCount);
+  return tryAcquireHubLock(retryCount + 1);
+}
+
+/**
  * Attempts to acquire exclusive lock for hub startup.
  * Uses atomic file creation (wx flag) to prevent race conditions.
  * Returns true if lock acquired, false if another process holds the lock.
  * Max retries: 3 attempts to remove stale locks before giving up.
  */
 export async function tryAcquireHubLock(retryCount = 0): Promise<boolean> {
-  const MAX_RETRIES = 3;
-
   try {
-    // Ensure directory exists
-    mkdirSync(join(homedir(), '.peer-plan'), { recursive: true });
-
-    // Atomic create-only write (fails if exists)
+    mkdirSync(PEER_PLAN_DIR, { recursive: true });
     await writeFile(HUB_LOCK_FILE, `${process.pid}\n${Date.now()}`, { flag: 'wx' });
-
-    // Clean up lock on process exit
-    process.once('exit', () => {
-      try {
-        unlinkSync(HUB_LOCK_FILE);
-      } catch {
-        // Lock may already be cleaned up
-      }
-    });
-
+    registerLockCleanupHandler();
     logger.info({ pid: process.pid }, 'Acquired hub lock');
     return true;
   } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === 'EEXIST') {
-      // Lock exists - check if holder is still alive
-      try {
-        const content = await readFile(HUB_LOCK_FILE, 'utf-8');
-        const pidStr = content.split('\n')[0] ?? '';
-        const pid = Number.parseInt(pidStr, 10);
-
-        // Check if process is alive (signal 0 doesn't kill, just checks)
-        try {
-          process.kill(pid, 0);
-          logger.debug({ holderPid: pid }, 'Hub lock held by active process');
-          return false; // Process alive, lock valid
-        } catch {
-          // Process dead, remove stale lock and retry (with max retry limit)
-          if (retryCount >= MAX_RETRIES) {
-            logger.error({ stalePid: pid, retryCount }, 'Max retries exceeded while removing stale hub lock');
-            return false;
-          }
-          logger.warn({ stalePid: pid, retryCount }, 'Removing stale hub lock');
-          try {
-            await unlink(HUB_LOCK_FILE);
-            return tryAcquireHubLock(retryCount + 1); // Retry with incremented counter
-          } catch (unlinkErr) {
-            logger.error({ err: unlinkErr, stalePid: pid, retryCount }, 'Failed to remove stale hub lock');
-            if (retryCount < MAX_RETRIES) {
-              return tryAcquireHubLock(retryCount + 1); // Retry even if unlink fails
-            }
-            return false;
-          }
-        }
-      } catch (readErr) {
-        logger.error({ err: readErr }, 'Failed to read hub lock file');
-        return false;
-      }
+    const isLockExists = (err as NodeJS.ErrnoException).code === 'EEXIST';
+    if (isLockExists) {
+      return handleExistingLock(retryCount);
     }
     logger.error({ err }, 'Failed to acquire hub lock');
     return false;

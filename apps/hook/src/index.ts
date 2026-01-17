@@ -89,7 +89,10 @@ async function handlePlanExit(
     return await checkReviewStatus(event.sessionId, event.planContent, event.metadata);
   } catch (err) {
     const error = err as Error & { code?: string; cause?: Error };
-    logger.error({ err: error, message: error.message, code: error.code }, 'Failed to check review status');
+    logger.error(
+      { err: error, message: error.message, code: error.code },
+      'Failed to check review status'
+    );
 
     // Check error type using structured properties instead of string matching
     // Prefer error.code over message string matching for better reliability
