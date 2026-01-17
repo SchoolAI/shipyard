@@ -1,4 +1,6 @@
 // Conversation export (A2A protocol) - Issue #41
+
+export { assertNever } from './assert-never.js';
 export type {
   A2ADataPart,
   A2AFilePart,
@@ -80,6 +82,18 @@ export {
   asPlanId,
   asWebRTCPeerId,
 } from './ids.js';
+export type {
+  CreateInputRequestParams,
+  InputRequest,
+  InputRequestStatus,
+  InputRequestType,
+} from './input-request.js';
+export {
+  createInputRequest,
+  InputRequestSchema,
+  InputRequestStatusValues,
+  InputRequestTypeValues,
+} from './input-request.js';
 // Invite tokens for P2P room authentication - Issue #12
 export type {
   CreateInviteRequest,

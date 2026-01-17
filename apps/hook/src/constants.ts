@@ -12,6 +12,14 @@ export const CLAUDE_TOOL_NAMES = {
   WRITE: 'Write',
   EDIT: 'Edit',
   EXIT_PLAN_MODE: 'ExitPlanMode',
+  ASK_USER_QUESTION: 'AskUserQuestion',
+} as const;
+
+/**
+ * MCP tool names (peer-plan specific)
+ */
+export const MCP_TOOL_NAMES = {
+  REQUEST_USER_INPUT: 'request_user_input',
 } as const;
 
 /**

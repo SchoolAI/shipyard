@@ -36,6 +36,7 @@ export type AdapterEvent =
   | PlanExitEvent
   | PostExitEvent
   | DisconnectEvent
+  | ToolTransformEvent
   | PassthroughEvent;
 
 /** Agent is starting/entering plan mode */
@@ -80,6 +81,17 @@ export interface DisconnectEvent {
   sessionId: string;
 }
 
+/** Tool call should be transformed to a different tool */
+export interface ToolTransformEvent {
+  type: 'tool_transform';
+  /** Original tool name being intercepted */
+  originalTool: string;
+  /** New tool name to call instead */
+  newTool: string;
+  /** New tool input parameters */
+  newInput: Record<string, unknown>;
+}
+
 /** Event is not relevant to peer-plan, pass through */
 export interface PassthroughEvent {
   type: 'passthrough';
@@ -105,9 +117,13 @@ export interface CoreResponse {
   /** Session token for MCP tool calls (returned on approval) */
   sessionToken?: string;
   /** Hook type to determine output format */
-  hookType?: 'permission_request' | 'post_tool_use';
+  hookType?: 'permission_request' | 'post_tool_use' | 'tool_transform';
   /** Additional context to inject (for PostToolUse) */
   additionalContext?: string;
+  /** Transformed tool name (for tool_transform) */
+  transformedTool?: string;
+  /** Transformed tool input (for tool_transform) */
+  transformedInput?: Record<string, unknown>;
 }
 
 // Note: AgentPresence is re-exported from @peer-plan/schema above

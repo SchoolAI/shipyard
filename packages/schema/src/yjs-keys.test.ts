@@ -16,6 +16,7 @@ describe('YDOC_KEYS', () => {
       PR_REVIEW_COMMENTS: 'prReviewComments',
       EVENTS: 'events',
       SNAPSHOTS: 'snapshots',
+      INPUT_REQUESTS: 'inputRequests',
     });
   });
 
