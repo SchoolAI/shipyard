@@ -51,40 +51,38 @@ PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 # --- Step 1: Kill all peer-plan processes ---
 echo "🔪 Step 1: Killing all peer-plan processes..."
 
-# Function to safely kill processes by pattern
-kill_by_pattern() {
-  local pattern="$1"
-  local description="$2"
-  pids=$(pgrep -f "$pattern" 2>/dev/null || true)
-  if [ -n "$pids" ]; then
-    echo "  Killing $description..."
-    echo "$pids" | xargs kill 2>/dev/null || true
-    sleep 0.5
-    # Force kill any remaining
-    remaining=$(pgrep -f "$pattern" 2>/dev/null || true)
-    if [ -n "$remaining" ]; then
-      echo "$remaining" | xargs kill -9 2>/dev/null || true
-    fi
+# Get all PIDs for peer-plan directory (excludes worktrees and VS Code)
+# Matches: Working Directory/peer-plan/
+# Excludes: peer-plan-wt/, biome lsp-proxy, tmux sessions
+echo "  Finding peer-plan processes..."
+pids=$(ps aux | \
+  grep "Working Directory/peer-plan/" | \
+  grep -v "peer-plan-wt" | \
+  grep -v "biome lsp-proxy" | \
+  grep -v "biome __run_server" | \
+  grep -v "tmux" | \
+  grep -v grep | \
+  awk '{print $2}' || true)
+
+if [ -n "$pids" ]; then
+  pid_count=$(echo "$pids" | wc -l | tr -d ' ')
+  echo "  Found $pid_count processes to kill"
+
+  # First try graceful shutdown
+  echo "$pids" | xargs kill 2>/dev/null || true
+  sleep 1
+
+  # Force kill any remaining (check if still alive)
+  still_alive=$(ps -p $(echo "$pids" | tr '\n' ',' | sed 's/,$//') 2>/dev/null | grep -v PID | awk '{print $1}' || true)
+  if [ -n "$still_alive" ]; then
+    echo "  Force killing stubborn processes..."
+    echo "$still_alive" | xargs kill -9 2>/dev/null || true
   fi
-}
 
-# Kill MCP servers
-kill_by_pattern "node.*server.*index.mjs" "MCP servers"
-kill_by_pattern "tsx.*apps/server" "MCP dev servers"
-
-# Kill registry server
-kill_by_pattern "registry-server" "registry server"
-kill_by_pattern "tsx.*registry" "registry server (tsx)"
-
-# Kill signaling server
-kill_by_pattern "tsx.*signaling" "signaling server"
-
-# Kill vite if running
-kill_by_pattern "vite.*apps/web" "Vite dev server"
-
-# Give processes time to exit
-sleep 1
-echo "  ✓ Processes killed"
+  echo "  ✓ Processes killed"
+else
+  echo "  ✓ No processes to kill"
+fi
 
 # --- Step 2: Clear server-side storage ---
 echo ""
@@ -99,6 +97,25 @@ if [ -d "$PEER_PLAN_DIR/plans" ]; then
   echo "  ✓ Cleared $plan_count session(s) from ~/.peer-plan/plans/"
 else
   echo "  ✓ No server storage to clear"
+fi
+
+# Clear Playwright's IndexedDB cache (survives browser restarts)
+PLAYWRIGHT_CACHE="$HOME/Library/Caches/ms-playwright"
+if [ -d "$PLAYWRIGHT_CACHE" ]; then
+  playwright_dbs=$(find "$PLAYWRIGHT_CACHE" -name "http_localhost_5173.indexeddb.leveldb" 2>/dev/null)
+  if [ -n "$playwright_dbs" ]; then
+    echo "$playwright_dbs" | while read -r db_path; do
+      rm -rf "$db_path"
+    done
+    echo "  ✓ Cleared Playwright IndexedDB cache"
+  fi
+fi
+
+# Clear Chrome's IndexedDB cache (if using Chrome instead of Playwright)
+CHROME_INDEXEDDB="$HOME/Library/Application Support/Google/Chrome/Default/IndexedDB"
+if [ -d "$CHROME_INDEXEDDB/http_localhost_5173.indexeddb.leveldb" ]; then
+  rm -rf "$CHROME_INDEXEDDB/http_localhost_5173.indexeddb.leveldb"
+  echo "  ✓ Cleared Chrome IndexedDB cache"
 fi
 
 # --- Step 3: Open browser for client-side reset ---
@@ -203,9 +220,27 @@ else
   echo "Press Enter after the browser shows 'Reset Complete'..."
   read -r
 
-  # Stop Vite
+  # Stop Vite - kill all processes including child processes
   echo "Stopping Vite..."
-  kill $VITE_PID 2>/dev/null || true
+
+  # Kill the process group (including all children)
+  if ps -p $VITE_PID > /dev/null 2>&1; then
+    # Get the process group ID
+    pgid=$(ps -o pgid= -p $VITE_PID | tr -d ' ')
+    if [ -n "$pgid" ]; then
+      # Kill entire process group
+      kill -TERM -$pgid 2>/dev/null || true
+      sleep 1
+      # Force kill if still running
+      kill -9 -$pgid 2>/dev/null || true
+    fi
+  fi
+
+  # Double-check: kill any remaining Vite processes on this port
+  vite_pids=$(lsof -ti :$VITE_PORT 2>/dev/null || true)
+  if [ -n "$vite_pids" ]; then
+    echo "$vite_pids" | xargs kill -9 2>/dev/null || true
+  fi
 
   echo ""
   echo "🎉 Reset complete! Local peer-plan data has been cleared."

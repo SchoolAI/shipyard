@@ -37,6 +37,9 @@ function isPeerPlanDatabase(name: string): boolean {
 
   if (name.startsWith('plan-')) return true;
 
+  // Empty database name (sometimes created by y-indexeddb)
+  if (name === '') return true;
+
   return false;
 }
 
