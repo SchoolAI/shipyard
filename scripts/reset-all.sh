@@ -106,6 +106,13 @@ if [ -f "$HOOK_STATE_FILE" ]; then
   echo "  ✓ Cleared hook state (session metadata)"
 fi
 
+# Clear hub.lock (contains stale PID from killed MCP server)
+HUB_LOCK_FILE="$PEER_PLAN_DIR/hub.lock"
+if [ -f "$HUB_LOCK_FILE" ]; then
+  rm -f "$HUB_LOCK_FILE"
+  echo "  ✓ Cleared hub.lock (stale process lock)"
+fi
+
 # Clear Playwright's IndexedDB cache (survives browser restarts)
 PLAYWRIGHT_CACHE="$HOME/Library/Caches/ms-playwright"
 if [ -d "$PLAYWRIGHT_CACHE" ]; then
@@ -118,11 +125,31 @@ if [ -d "$PLAYWRIGHT_CACHE" ]; then
   fi
 fi
 
-# Clear Chrome's IndexedDB cache (if using Chrome instead of Playwright)
-CHROME_INDEXEDDB="$HOME/Library/Application Support/Google/Chrome/Default/IndexedDB"
-if [ -d "$CHROME_INDEXEDDB/http_localhost_5173.indexeddb.leveldb" ]; then
-  rm -rf "$CHROME_INDEXEDDB/http_localhost_5173.indexeddb.leveldb"
-  echo "  ✓ Cleared Chrome IndexedDB cache"
+# Clear Chrome's IndexedDB cache for ALL profiles (Default, Profile 1, Profile 2, etc.)
+CHROME_DIR="$HOME/Library/Application Support/Google/Chrome"
+if [ -d "$CHROME_DIR" ]; then
+  cleared_count=0
+
+  # Find all Chrome profiles (Default, Profile 1, Profile 2, etc.)
+  for profile_dir in "$CHROME_DIR"/Default "$CHROME_DIR"/Profile*; do
+    [ -d "$profile_dir" ] || continue
+    profile_name=$(basename "$profile_dir")
+
+    # Clear both .leveldb (structure) and .blob (binary data) directories
+    for db_type in leveldb blob; do
+      db_path="$profile_dir/IndexedDB/http_localhost_5173.indexeddb.$db_type"
+      if [ -d "$db_path" ]; then
+        size=$(du -sh "$db_path" 2>/dev/null | cut -f1)
+        rm -rf "$db_path"
+        echo "  ✓ Cleared Chrome $profile_name IndexedDB ($db_type, $size)"
+        cleared_count=$((cleared_count + 1))
+      fi
+    done
+  done
+
+  if [ $cleared_count -eq 0 ]; then
+    echo "  ✓ No Chrome IndexedDB to clear"
+  fi
 fi
 
 # --- Step 3: Open browser for client-side reset ---
