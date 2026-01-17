@@ -205,9 +205,11 @@ export function PlanViewer({
     {
       // When viewing history, use snapshot content in read-only mode
       // When collaboration is enabled, content comes from the Yjs fragment.
-      // For snapshots (no provider), use initialContent from URL.
+      // For snapshots (no provider) OR viewing version history, use initialContent.
       initialContent:
-        !provider && effectiveInitialContent ? (effectiveInitialContent as never) : undefined,
+        (!provider || isViewingHistory) && effectiveInitialContent
+          ? (effectiveInitialContent as never)
+          : undefined,
       // Disable collaboration when viewing history (read-only snapshot mode)
       collaboration:
         provider && !isViewingHistory
