@@ -16,6 +16,7 @@ import { Attachments } from '@/components/Attachments';
 import { ChangesView } from '@/components/ChangesView';
 import { DeliverablesView } from '@/components/DeliverablesView';
 import { PlanViewer } from '@/components/PlanViewer';
+import { VersionSelector } from '@/components/VersionSelector';
 import type { SyncState } from '@/hooks/useMultiProviderSync';
 
 type ViewType = 'plan' | 'activity' | 'deliverables' | 'changes';
@@ -114,60 +115,77 @@ export function PlanContent({
     <div className="flex flex-col h-full overflow-hidden">
       {/* Tab navigation */}
       <div className="border-b border-separator bg-surface px-2 md:px-6 py-1 md:py-2 shrink-0">
-        <div className="flex gap-0 md:gap-4">
-          <button
-            type="button"
-            onClick={() => setActiveView('plan')}
-            className={`flex items-center justify-center gap-2 pb-2 px-2 font-medium text-sm transition-colors flex-1 md:flex-initial ${
-              activeView === 'plan'
-                ? 'text-primary border-b-2 border-primary'
-                : 'text-muted-foreground hover:text-foreground border-b-2 border-transparent'
-            }`}
-          >
-            <FileText className="w-4 h-4" />
-            Plan
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveView('activity')}
-            className={`flex items-center justify-center gap-2 pb-2 px-2 font-medium text-sm transition-colors flex-1 md:flex-initial ${
-              activeView === 'activity'
-                ? 'text-primary border-b-2 border-primary'
-                : 'text-muted-foreground hover:text-foreground border-b-2 border-transparent'
-            }`}
-          >
-            <Clock className="w-4 h-4" />
-            Activity
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveView('deliverables')}
-            className={`flex items-center justify-center gap-2 pb-2 px-2 font-medium text-sm transition-colors flex-1 md:flex-initial ${
-              activeView === 'deliverables'
-                ? 'text-primary border-b-2 border-primary'
-                : 'text-muted-foreground hover:text-foreground border-b-2 border-transparent'
-            }`}
-          >
-            <Package className="w-4 h-4" />
-            Deliverables
-            {deliverableCount.total > 0 && (
-              <span className="text-xs opacity-70">
-                ({deliverableCount.completed}/{deliverableCount.total})
-              </span>
-            )}
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveView('changes')}
-            className={`flex items-center justify-center gap-2 pb-2 px-2 font-medium text-sm transition-colors flex-1 md:flex-initial ${
-              activeView === 'changes'
-                ? 'text-primary border-b-2 border-primary'
-                : 'text-muted-foreground hover:text-foreground border-b-2 border-transparent'
-            }`}
-          >
-            <GitPullRequest className="w-4 h-4" />
-            Changes
-          </button>
+        <div className="flex items-center justify-between">
+          {/* Tabs on the left */}
+          <div className="flex gap-0 md:gap-4">
+            <button
+              type="button"
+              onClick={() => setActiveView('plan')}
+              className={`flex items-center justify-center gap-2 pb-2 px-2 font-medium text-sm transition-colors flex-1 md:flex-initial ${
+                activeView === 'plan'
+                  ? 'text-primary border-b-2 border-primary'
+                  : 'text-muted-foreground hover:text-foreground border-b-2 border-transparent'
+              }`}
+            >
+              <FileText className="w-4 h-4" />
+              Plan
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveView('activity')}
+              className={`flex items-center justify-center gap-2 pb-2 px-2 font-medium text-sm transition-colors flex-1 md:flex-initial ${
+                activeView === 'activity'
+                  ? 'text-primary border-b-2 border-primary'
+                  : 'text-muted-foreground hover:text-foreground border-b-2 border-transparent'
+              }`}
+            >
+              <Clock className="w-4 h-4" />
+              Activity
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveView('deliverables')}
+              className={`flex items-center justify-center gap-2 pb-2 px-2 font-medium text-sm transition-colors flex-1 md:flex-initial ${
+                activeView === 'deliverables'
+                  ? 'text-primary border-b-2 border-primary'
+                  : 'text-muted-foreground hover:text-foreground border-b-2 border-transparent'
+              }`}
+            >
+              <Package className="w-4 h-4" />
+              Deliverables
+              {deliverableCount.total > 0 && (
+                <span className="text-xs opacity-70">
+                  ({deliverableCount.completed}/{deliverableCount.total})
+                </span>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveView('changes')}
+              className={`flex items-center justify-center gap-2 pb-2 px-2 font-medium text-sm transition-colors flex-1 md:flex-initial ${
+                activeView === 'changes'
+                  ? 'text-primary border-b-2 border-primary'
+                  : 'text-muted-foreground hover:text-foreground border-b-2 border-transparent'
+              }`}
+            >
+              <GitPullRequest className="w-4 h-4" />
+              Changes
+            </button>
+          </div>
+
+          {/* Version selector on the right - only show on Plan tab when versions exist */}
+          {activeView === 'plan' && !isSnapshot && versionNav && versionNav.snapshots.length > 0 && (
+            <VersionSelector
+              currentSnapshot={versionNav.currentSnapshot}
+              totalSnapshots={versionNav.snapshots.length}
+              currentIndex={versionNav.currentIndex}
+              canGoPrevious={versionNav.canGoPrevious}
+              canGoNext={versionNav.canGoNext}
+              onPrevious={versionNav.goToPrevious}
+              onNext={versionNav.goToNext}
+              onCurrent={versionNav.goToCurrent}
+            />
+          )}
         </div>
       </div>
 
@@ -184,7 +202,6 @@ export function PlanContent({
               initialContent={isSnapshot ? initialContent : undefined}
               currentSnapshot={currentSnapshot}
               onEditorReady={onEditorReady}
-              versionNav={!isSnapshot ? versionNav : undefined}
             />
             <Attachments ydoc={ydoc} />
           </div>
