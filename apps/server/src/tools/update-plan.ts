@@ -1,4 +1,7 @@
+import { ServerBlockNoteEditor } from '@blocknote/server-util';
 import {
+  addSnapshot,
+  createPlanSnapshot,
   getPlanMetadata,
   logPlanEvent,
   PLAN_INDEX_DOC_NAME,
@@ -104,11 +107,22 @@ STATUSES:
     if (input.title) updates.title = input.title;
     if (input.status) updates.status = input.status;
 
-    if (input.status && input.status !== existingMetadata.status) {
+    const statusChanged = input.status && input.status !== existingMetadata.status;
+
+    if (statusChanged && input.status) {
       logPlanEvent(doc, 'status_changed', actorName, {
         fromStatus: existingMetadata.status,
         toStatus: input.status,
       });
+
+      // Create snapshot on status change (Issue #42)
+      const editor = ServerBlockNoteEditor.create();
+      const fragment = doc.getXmlFragment('document');
+      const blocks = editor.yXmlFragmentToBlocks(fragment);
+
+      const reason = `Status changed to ${input.status}`;
+      const snapshot = createPlanSnapshot(doc, reason, actorName, input.status, blocks);
+      addSnapshot(doc, snapshot);
     }
 
     setPlanMetadata(doc, updates);

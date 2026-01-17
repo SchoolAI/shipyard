@@ -299,6 +299,52 @@ export const DeliverableSchema = z.object({
   linkedAt: z.number().optional(),
 });
 
+/**
+ * A point-in-time snapshot of plan state.
+ * Created at significant status transitions for version history.
+ * Stored in Y.Array(YDOC_KEYS.SNAPSHOTS) for CRDT sync.
+ */
+export interface PlanSnapshot {
+  /** Unique snapshot ID */
+  id: string;
+  /** Status at time of snapshot */
+  status: PlanStatusType;
+  /** Who created this snapshot (agent or human name) */
+  createdBy: string;
+  /** Why this snapshot was created (e.g., "Approved by reviewer") */
+  reason: string;
+  /** Timestamp when snapshot was taken */
+  createdAt: number;
+  /** Plan content blocks at this point (BlockNote Block[]) */
+  content: unknown[];
+  /** Thread summary (lightweight, not full threads) */
+  threadSummary?: {
+    total: number;
+    unresolved: number;
+  };
+  /** Artifacts at this point */
+  artifacts?: Artifact[];
+  /** Deliverables with linkage state */
+  deliverables?: Deliverable[];
+}
+
+export const PlanSnapshotSchema = z.object({
+  id: z.string(),
+  status: z.enum(PlanStatusValues),
+  createdBy: z.string(),
+  reason: z.string(),
+  createdAt: z.number(),
+  content: z.array(z.unknown()),
+  threadSummary: z
+    .object({
+      total: z.number(),
+      unresolved: z.number(),
+    })
+    .optional(),
+  artifacts: z.array(ArtifactSchema).optional(),
+  deliverables: z.array(DeliverableSchema).optional(),
+});
+
 export const LinkedPRStatusValues = ['draft', 'open', 'merged', 'closed'] as const;
 export type LinkedPRStatus = (typeof LinkedPRStatusValues)[number];
 

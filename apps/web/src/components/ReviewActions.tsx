@@ -1,5 +1,11 @@
+import type { BlockNoteEditor } from '@blocknote/core';
 import { Button, Popover, TextArea } from '@heroui/react';
-import { logPlanEvent, type PlanStatusType } from '@peer-plan/schema';
+import {
+  addSnapshot,
+  createPlanSnapshot,
+  logPlanEvent,
+  type PlanStatusType,
+} from '@peer-plan/schema';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type * as Y from 'yjs';
 import { VoiceInputButton } from '@/components/voice-input';
@@ -16,6 +22,8 @@ interface ReviewActionsProps {
   currentStatus: PlanStatusType;
   identity: UserIdentity | null;
   onRequestIdentity: () => void;
+  /** BlockNote editor instance to get current content for snapshots */
+  editor: BlockNoteEditor | null;
   /** Called after status is successfully updated in the plan doc, with the timestamp used for the update */
   onStatusChange?: (newStatus: 'in_progress' | 'changes_requested', updatedAt: number) => void;
 }
@@ -34,6 +42,7 @@ export function ReviewActions({
   currentStatus,
   identity,
   onRequestIdentity,
+  editor,
   onStatusChange,
 }: ReviewActionsProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -100,6 +109,19 @@ export function ReviewActions({
 
       const eventType = action === 'approve' ? 'approved' : 'changes_requested';
       logPlanEvent(ydoc, eventType, identity.name);
+
+      // Create snapshot on review decision (Issue #42)
+      // Get current blocks from editor if available
+      if (editor) {
+        const blocks = editor.document;
+
+        const reason =
+          action === 'approve'
+            ? `Approved by ${identity.name}`
+            : `Changes requested by ${identity.name}`;
+        const snapshot = createPlanSnapshot(ydoc, reason, identity.name, newStatus, blocks);
+        addSnapshot(ydoc, snapshot);
+      }
 
       setOpenPopover(null);
       setComment('');

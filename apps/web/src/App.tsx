@@ -3,11 +3,11 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { Layout } from './components/Layout';
 import { ActivePlanSyncProvider } from './contexts/ActivePlanSyncContext';
 import { ArchivePage } from './pages/ArchivePage';
-import { HomePage } from './pages/HomePage';
 import { InboxPage } from './pages/InboxPage';
 import { KanbanPage } from './pages/KanbanPage';
 import { PlanPage } from './pages/PlanPage';
 import { ResetPage } from './pages/ResetPage';
+import { SearchPage } from './pages/SearchPage';
 import { hasResetParam } from './utils/resetStorage';
 
 function AppRoutes() {
@@ -21,13 +21,14 @@ function AppRoutes() {
 
   return (
     <Routes>
-      <Route path="/" element={<HomePage />} />
+      <Route path="/" element={<Navigate to="/inbox" replace />} />
       <Route path="/inbox" element={<InboxPage />} />
+      <Route path="/search" element={<SearchPage />} />
       <Route path="/board" element={<KanbanPage />} />
       <Route path="/archive" element={<ArchivePage />} />
       {/* PlanPage handles both normal plans (/plan/:id) and snapshots (/?d=...) */}
       <Route path="/plan/:id" element={<PlanPage />} />
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route path="*" element={<Navigate to="/inbox" replace />} />
     </Routes>
   );
 }

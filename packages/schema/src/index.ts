@@ -144,6 +144,7 @@ export type {
   PlanEvent,
   PlanEventType,
   PlanMetadata,
+  PlanSnapshot,
   PlanStatusType,
   PRReviewComment,
   StepCompletion,
@@ -163,6 +164,7 @@ export {
   PlanEventSchema,
   PlanEventTypes,
   PlanMetadataSchema,
+  PlanSnapshotSchema,
   PlanStatusValues,
   PRReviewCommentSchema,
   parseClaudeCodeOrigin,
@@ -244,12 +246,21 @@ export {
   SubscriptionClientIdSchema,
   subscriptionRouter,
 } from './trpc/index.js';
-export type { UrlEncodedPlan } from './url-encoding.js';
+export type {
+  UrlEncodedPlan,
+  UrlEncodedPlanV1,
+  UrlEncodedPlanV2,
+  UrlKeyVersion,
+  UrlSnapshotRef,
+} from './url-encoding.js';
 export {
   createPlanUrl,
+  createPlanUrlWithHistory,
   decodePlan,
   encodePlan,
   getPlanFromUrl,
+  isUrlEncodedPlanV1,
+  isUrlEncodedPlanV2,
 } from './url-encoding.js';
 export type { UserProfile } from './user-helpers.js';
 export { createUserResolver } from './user-helpers.js';
@@ -258,14 +269,17 @@ export {
   addConversationVersion,
   addDeliverable,
   addPRReviewComment,
+  addSnapshot,
   approveUser,
   clearAgentPresence,
+  createPlanSnapshot,
   getAgentPresence,
   getAgentPresences,
   getApprovedUsers,
   getArtifacts,
   getConversationVersions,
   getDeliverables,
+  getLatestSnapshot,
   getLinkedPR,
   getLinkedPRs,
   getPlanEvents,
@@ -274,6 +288,7 @@ export {
   getPRReviewComments,
   getPRReviewCommentsForPR,
   getRejectedUsers,
+  getSnapshots,
   getStepCompletions,
   getViewedBy,
   initPlanMetadata,

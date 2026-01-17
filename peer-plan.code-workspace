@@ -1,0 +1,13 @@
+{
+  "folders": [
+    {
+      "name": "peer-plan (main)",
+      "path": "."
+    },
+    {
+      "name": "\ud83c\udf33\ud83d\udcdc 42-plan-history",
+      "path": "../peer-plan-wt/42-plan-history"
+    }
+  ],
+  "settings": {}
+}

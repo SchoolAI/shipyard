@@ -18,6 +18,8 @@ export interface ShortcutHandlers {
   onNextItem?: () => void;
   /** Navigate to previous item (k key) */
   onPrevItem?: () => void;
+  /** Dismiss current item (d key) */
+  onDismiss?: () => void;
 }
 
 /**
@@ -76,6 +78,13 @@ export function useKeyboardShortcuts(handlers: ShortcutHandlers): void {
       if (e.key === 'k' && !e.metaKey && !e.ctrlKey && !e.altKey) {
         e.preventDefault();
         handlers.onPrevItem?.();
+        return;
+      }
+
+      // d - dismiss current item
+      if (e.key === 'd' && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        e.preventDefault();
+        handlers.onDismiss?.();
         return;
       }
     };

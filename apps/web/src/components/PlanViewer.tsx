@@ -1,3 +1,4 @@
+import type { BlockNoteEditor } from '@blocknote/core';
 import {
   CommentsExtension,
   DefaultThreadStoreAuth,
@@ -46,6 +47,10 @@ interface PlanViewerProps {
   onRequestIdentity?: () => void;
   /** Initial content for snapshots (when no provider) */
   initialContent?: unknown[];
+  /** Snapshot to view (when viewing version history) - Issue #42 */
+  currentSnapshot?: { content: unknown[] } | null;
+  /** Callback to receive editor instance for snapshots - Issue #42 */
+  onEditorReady?: (editor: BlockNoteEditor) => void;
 }
 
 /**
@@ -161,10 +166,16 @@ export function PlanViewer({
   provider,
   onRequestIdentity,
   initialContent: _initialContent,
+  currentSnapshot = null,
+  onEditorReady,
 }: PlanViewerProps) {
   // Comments are fully enabled only when identity is set
   const hasComments = identity !== null;
   const { theme } = useTheme();
+
+  // When viewing a snapshot, use its content and make editor read-only
+  const isViewingHistory = currentSnapshot !== null;
+  const effectiveInitialContent = isViewingHistory ? currentSnapshot.content : _initialContent;
 
   // Determine effective theme for BlockNote
   const effectiveTheme: 'light' | 'dark' = (() => {
@@ -192,25 +203,31 @@ export function PlanViewer({
   // When identity is set, we create the threadStore and extension inline.
   const editor = useCreateBlockNote(
     {
+      // When viewing history, use snapshot content in read-only mode
       // When collaboration is enabled, content comes from the Yjs fragment.
       // For snapshots (no provider), use initialContent from URL.
-      initialContent: !provider && _initialContent ? (_initialContent as never) : undefined,
-      collaboration: provider
-        ? {
-            provider,
-            // Use 'document' key - this is the DOCUMENT_FRAGMENT (source of truth)
-            fragment: ydoc.getXmlFragment('document'),
-            user: identity
-              ? {
-                  name: identity.name,
-                  color: identity.color,
-                }
-              : {
-                  name: 'Anonymous',
-                  color: 'hsl(0, 0%, 55%)', // Neutral gray works in light and dark modes
-                },
-          }
-        : undefined,
+      initialContent:
+        !provider && effectiveInitialContent ? (effectiveInitialContent as never) : undefined,
+      // Disable collaboration when viewing history (read-only snapshot mode)
+      collaboration:
+        provider && !isViewingHistory
+          ? {
+              provider,
+              // Use 'document' key - this is the DOCUMENT_FRAGMENT (source of truth)
+              fragment: ydoc.getXmlFragment('document'),
+              user: identity
+                ? {
+                    name: identity.name,
+                    color: identity.color,
+                  }
+                : {
+                    name: 'Anonymous',
+                    color: 'hsl(0, 0%, 55%)', // Neutral gray works in light and dark modes
+                  },
+            }
+          : undefined,
+      // Make editor read-only when viewing history
+      editable: !isViewingHistory,
       // ALWAYS load CommentsExtension to properly render comment marks in the document.
       // Without this, documents with comment marks will render incorrectly when
       // identity is null (e.g., after clearing browser data).
@@ -229,16 +246,18 @@ export function PlanViewer({
         }),
       ],
     },
-    // Dependencies: recreate editor when ydoc, identity, or theme changes.
+    // Dependencies: recreate editor when ydoc, identity, theme, or viewing version changes.
     // This ensures the extension is properly registered when identity becomes available,
     // and the editor re-renders with the correct theme when toggling dark mode.
-    [ydoc, identity?.id, effectiveTheme]
+    // Adding currentSnapshot ensures editor recreates when viewing different versions.
+    [ydoc, identity?.id, effectiveTheme, currentSnapshot?.content]
   );
 
-  // Force BlockNoteView remount when switching plans or theme.
+  // Force BlockNoteView remount when switching plans, theme, or versions.
   // Identity changes are handled by the parent's key prop on PlanViewer.
   // Adding theme to key ensures BlockNote updates immediately without refresh.
-  const editorKey = `${ydoc.guid}-${effectiveTheme}`;
+  // Adding snapshot state ensures proper remount when toggling versions.
+  const editorKey = `${ydoc.guid}-${effectiveTheme}-${isViewingHistory ? 'history' : 'live'}`;
 
   // Ref for the container to observe cursor elements
   const containerRef = useRef<HTMLDivElement>(null);
@@ -336,6 +355,13 @@ export function PlanViewer({
 
     return () => observer.disconnect();
   }, [hasComments]);
+
+  // Notify parent when editor is ready (for snapshots - Issue #42)
+  useEffect(() => {
+    if (editor && onEditorReady) {
+      onEditorReady(editor);
+    }
+  }, [editor, onEditorReady]);
 
   // Global keyboard shortcuts for undo/redo (works even when editor not focused)
   useEffect(() => {
@@ -448,8 +474,8 @@ export function PlanViewer({
       <BlockNoteView
         key={editorKey}
         editor={editor}
-        editable={true}
         theme={effectiveTheme}
+        editable={!isViewingHistory}
         // Use custom formatting toolbar with comments integration
         formattingToolbar={false}
         // Disable default comments UI - we use ThreadsSidebar instead

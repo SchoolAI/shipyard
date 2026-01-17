@@ -1,3 +1,4 @@
+import type { BlockNoteEditor } from '@blocknote/core';
 import { Button, Spinner, useOverlayState } from '@heroui/react';
 import {
   addArtifact,
@@ -29,6 +30,7 @@ import { useGitHubAuth } from '@/hooks/useGitHubAuth';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { useMultiProviderSync } from '@/hooks/useMultiProviderSync';
 import { usePendingUserNotifications } from '@/hooks/usePendingUserNotifications';
+import { useVersionNavigation } from '@/hooks/useVersionNavigation';
 import { colorFromString } from '@/utils/color';
 
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: page component handles complex sync state machine
@@ -95,6 +97,9 @@ export function PlanPage() {
   // Prefer WebSocket provider when connected, fall back to WebRTC for P2P-only mode.
   const activeProvider = isSnapshot ? null : (wsProvider ?? rtcProvider);
 
+  // Store editor instance for snapshots (Issue #42)
+  const [editor, setEditor] = useState<BlockNoteEditor | null>(null);
+
   // P2P grace period: when opening a shared URL, IndexedDB syncs immediately (empty)
   // but we need to wait for WebRTC to deliver the plan data before showing "Not Found"
   const [p2pGracePeriodExpired, setP2pGracePeriodExpired] = useState(false);
@@ -105,6 +110,9 @@ export function PlanPage() {
 
   // Show toast notifications when new users request access (only for owners)
   usePendingUserNotifications(rtcProvider, isOwner);
+
+  // Version navigation for viewing plan history (Issue #42)
+  const versionNav = useVersionNavigation(isSnapshot ? null : ydoc);
 
   // Start timeout when in P2P-only mode without metadata
   useEffect(() => {
@@ -157,6 +165,11 @@ export function PlanPage() {
   const handleRequestIdentity = useCallback(() => {
     startAuth();
   }, [startAuth]);
+
+  // Store editor instance when ready (Issue #42)
+  const handleEditorReady = useCallback((editorInstance: BlockNoteEditor) => {
+    setEditor(editorInstance);
+  }, []);
 
   const handleStatusChange = useCallback(
     (newStatus: 'in_progress' | 'changes_requested', updatedAt: number) => {
@@ -314,6 +327,8 @@ export function PlanPage() {
               onStatusChange={handleStatusChange}
               isSnapshot={isSnapshot}
               rtcProvider={rtcProvider}
+              versionNav={versionNav}
+              editor={editor}
             />
           </div>
         )}
@@ -327,7 +342,9 @@ export function PlanPage() {
           onRequestIdentity={handleRequestIdentity}
           provider={activeProvider}
           initialContent={isSnapshot ? urlPlan?.content : undefined}
+          currentSnapshot={versionNav.currentSnapshot}
           isSnapshot={isSnapshot}
+          onEditorReady={handleEditorReady}
         />
 
         {/* Mobile review actions */}
@@ -340,6 +357,7 @@ export function PlanPage() {
                 identity={identity}
                 onRequestIdentity={handleRequestIdentity}
                 onStatusChange={handleStatusChange}
+                editor={editor}
               />
             </div>
           </div>

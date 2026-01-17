@@ -192,11 +192,19 @@ export function InboxPage() {
 
   // Update URL when panel state changes
   useEffect(() => {
-    if (selectedPlanId) {
-      navigate(`?panel=${selectedPlanId}&width=${panelWidth}`, { replace: true });
-    } else {
-      navigate('', { replace: true });
+    let mounted = true;
+
+    if (mounted) {
+      if (selectedPlanId) {
+        navigate(`?panel=${selectedPlanId}&width=${panelWidth}`, { replace: true });
+      } else {
+        navigate('', { replace: true });
+      }
     }
+
+    return () => {
+      mounted = false;
+    };
   }, [selectedPlanId, panelWidth, navigate]);
 
   // Load panel metadata when plan is selected
@@ -249,6 +257,29 @@ export function InboxPage() {
     [panelWidth]
   );
 
+  // Dismiss handler
+  const handleDismiss = useCallback(
+    async (planId: string) => {
+      await markPlanAsRead(planId);
+      toast.success('Marked as read');
+    },
+    [markPlanAsRead]
+  );
+
+  // Helper to find the next plan to select after dismissal
+  const getNextSelectedId = useCallback(
+    (currentIndex: number): string | null => {
+      if (currentIndex < sortedInboxPlans.length - 1) {
+        return sortedInboxPlans[currentIndex + 1]?.id ?? null;
+      }
+      if (currentIndex > 0) {
+        return sortedInboxPlans[currentIndex - 1]?.id ?? null;
+      }
+      return null;
+    },
+    [sortedInboxPlans]
+  );
+
   // Keyboard shortcuts for panel
   useKeyboardShortcuts({
     onTogglePanel: useCallback(() => {
@@ -290,6 +321,17 @@ export function InboxPage() {
         }
       }
     }, [selectedPlanId, sortedInboxPlans, markPlanAsRead]),
+    onDismiss: useCallback(async () => {
+      if (!selectedPlanId) return;
+      const idx = sortedInboxPlans.findIndex((p) => p.id === selectedPlanId);
+      if (idx === -1) return;
+
+      const currentPlan = sortedInboxPlans[idx];
+      if (!currentPlan) return;
+
+      await handleDismiss(currentPlan.id);
+      setSelectedPlanId(getNextSelectedId(idx));
+    }, [selectedPlanId, sortedInboxPlans, handleDismiss, getNextSelectedId]),
   });
 
   // Identity for comments
@@ -305,58 +347,6 @@ export function InboxPage() {
     startAuth();
   }, [startAuth]);
 
-  // Show skeleton while loading
-  const handleDismiss = useCallback(
-    async (planId: string) => {
-      await markPlanAsRead(planId);
-      toast.success('Marked as read');
-    },
-    [markPlanAsRead]
-  );
-
-  // Helper to find the next plan to select after dismissal
-  const getNextSelectedId = useCallback(
-    (currentIndex: number): string | null => {
-      if (currentIndex < sortedInboxPlans.length - 1) {
-        return sortedInboxPlans[currentIndex + 1]?.id ?? null;
-      }
-      if (currentIndex > 0) {
-        return sortedInboxPlans[currentIndex - 1]?.id ?? null;
-      }
-      return null;
-    },
-    [sortedInboxPlans]
-  );
-
-  // Keyboard shortcut for dismissing inbox items
-  useEffect(() => {
-    const isTypingInInput = (target: EventTarget | null): boolean => {
-      return target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement;
-    };
-
-    const handleDismissKeyDown = async () => {
-      if (!selectedPlanId) return;
-      const idx = sortedInboxPlans.findIndex((p) => p.id === selectedPlanId);
-      if (idx === -1) return;
-
-      const currentPlan = sortedInboxPlans[idx];
-      if (!currentPlan) return;
-
-      await handleDismiss(currentPlan.id);
-      setSelectedPlanId(getNextSelectedId(idx));
-    };
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (isTypingInInput(e.target)) return;
-      if (e.key === 'd') {
-        e.preventDefault();
-        handleDismissKeyDown();
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedPlanId, sortedInboxPlans, handleDismiss, getNextSelectedId]);
 
   if (isLoading) {
     return <InboxSkeleton />;

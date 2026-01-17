@@ -7,7 +7,10 @@
  * Hook-specific logic (waitForReviewDecision, extractFeedbackFromYDoc, checkReviewStatus)
  * remains here because it handles the hook's blocking Y.Doc observer pattern.
  */
+import { ServerBlockNoteEditor } from '@blocknote/server-util';
 import {
+  addSnapshot,
+  createPlanSnapshot,
   createUserResolver,
   type Deliverable,
   formatDeliverablesForLLM,
@@ -147,12 +150,32 @@ async function waitForReviewDecision(
         // where browser updates status between transaction commit and flag set
         syncComplete = true;
 
+        // Get current content blocks for snapshot
+        const editor = ServerBlockNoteEditor.create();
+        const fragment = ydoc.getXmlFragment('document');
+        const blocks = editor.yXmlFragmentToBlocks(fragment);
+
+        // Get GitHub username for actor
+        const actorName = 'agent'; // Hook context uses 'agent' as actor
+
+        // Create snapshot for pending_review status change
+        const snapshot = createPlanSnapshot(
+          ydoc,
+          'Plan submitted for review',
+          actorName,
+          'pending_review',
+          blocks
+        );
+
         // Set unique review request ID and reset status
         // This prevents using stale approve/deny from previous review cycle
         ydoc.transact(() => {
           metadata.set('reviewRequestId', reviewRequestId);
           metadata.set('status', 'pending_review');
           metadata.set('updatedAt', Date.now());
+
+          // Add snapshot
+          addSnapshot(ydoc, snapshot);
         });
 
         logger.info({ planId, reviewRequestId }, 'Review request ID set, waiting for decision');

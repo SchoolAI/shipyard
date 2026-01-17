@@ -14,9 +14,13 @@ import {
   type PlanEventType,
   type PlanMetadata,
   PlanMetadataSchema,
+  type PlanSnapshot,
+  PlanSnapshotSchema,
+  type PlanStatusType,
   type PRReviewComment,
   PRReviewCommentSchema,
 } from './plan.js';
+import { parseThreads } from './thread.js';
 import { YDOC_KEYS } from './yjs-keys.js';
 
 export function getPlanMetadata(ydoc: Y.Doc): PlanMetadata | null {
@@ -537,4 +541,87 @@ export function getPlanEvents(ydoc: Y.Doc): PlanEvent[] {
     .map((item) => PlanEventSchema.safeParse(item))
     .filter((result) => result.success)
     .map((result) => result.data);
+}
+
+// --- Plan Snapshots (Issue #42) ---
+
+/**
+ * Get all snapshots from the Y.Doc.
+ * Returns snapshots sorted by createdAt (oldest first).
+ */
+export function getSnapshots(ydoc: Y.Doc): PlanSnapshot[] {
+  const array = ydoc.getArray(YDOC_KEYS.SNAPSHOTS);
+  const data = array.toJSON() as unknown[];
+
+  return data
+    .map((item) => PlanSnapshotSchema.safeParse(item))
+    .filter((result) => result.success)
+    .map((result) => result.data)
+    .sort((a, b) => a.createdAt - b.createdAt);
+}
+
+/**
+ * Add a snapshot to the Y.Doc.
+ * Snapshots are append-only for CRDT correctness.
+ */
+export function addSnapshot(ydoc: Y.Doc, snapshot: PlanSnapshot): void {
+  const array = ydoc.getArray(YDOC_KEYS.SNAPSHOTS);
+  array.push([snapshot]);
+}
+
+/**
+ * Create a snapshot of the current plan state.
+ * Captures content, thread summary, artifacts, and deliverables.
+ *
+ * @param ydoc - The Y.Doc containing the plan
+ * @param reason - Why this snapshot was created (e.g., "Approved by reviewer")
+ * @param actor - Who triggered the snapshot (agent or human name)
+ * @param status - The plan status at time of snapshot
+ * @param blocks - The content blocks (BlockNote Block[])
+ * @returns The created snapshot (not yet added to Y.Doc - call addSnapshot separately)
+ */
+export function createPlanSnapshot(
+  ydoc: Y.Doc,
+  reason: string,
+  actor: string,
+  status: PlanStatusType,
+  blocks: unknown[]
+): PlanSnapshot {
+  // Get thread summary
+  const threadsMap = ydoc.getMap(YDOC_KEYS.THREADS);
+  const threadsData = threadsMap.toJSON() as Record<string, unknown>;
+  const threads = parseThreads(threadsData);
+  const unresolved = threads.filter((t) => !t.resolved).length;
+
+  // Get artifacts and deliverables
+  const artifacts = getArtifacts(ydoc);
+  const deliverables = getDeliverables(ydoc);
+
+  return {
+    id: nanoid(),
+    status,
+    createdBy: actor,
+    reason,
+    createdAt: Date.now(),
+    content: blocks,
+    threadSummary:
+      threads.length > 0
+        ? {
+            total: threads.length,
+            unresolved,
+          }
+        : undefined,
+    artifacts: artifacts.length > 0 ? artifacts : undefined,
+    deliverables: deliverables.length > 0 ? deliverables : undefined,
+  };
+}
+
+/**
+ * Get the latest snapshot from the Y.Doc.
+ * Returns null if no snapshots exist.
+ */
+export function getLatestSnapshot(ydoc: Y.Doc): PlanSnapshot | null {
+  const snapshots = getSnapshots(ydoc);
+  if (snapshots.length === 0) return null;
+  return snapshots[snapshots.length - 1] ?? null;
 }
