@@ -5,7 +5,13 @@
 
 import { formatThreadsForLLM } from '@peer-plan/schema';
 import { z } from 'zod';
-import { CLAUDE_HOOK_EVENTS, CLAUDE_PERMISSION_MODES, CLAUDE_TOOL_NAMES } from '../constants.js';
+import {
+  CLAUDE_HOOK_EVENTS,
+  CLAUDE_PERMISSION_MODES,
+  CLAUDE_TOOL_NAMES,
+  MCP_TOOL_NAMES,
+} from '../constants.js';
+import { transformToAskUserQuestion } from '../transforms/ask-user-question.js';
 import type {
   AdapterEvent,
   AgentAdapter,
@@ -39,8 +45,35 @@ type ClaudeCodeHookInput = z.infer<typeof ClaudeCodeHookBaseSchema>;
 
 // --- Event Handlers ---
 
-function handlePreToolUse(_input: ClaudeCodeHookInput): AdapterEvent {
-  // Not handling Write/Edit - using blocking approach with ExitPlanMode only
+/**
+ * Handle PreToolUse events - intercept tool calls before execution.
+ *
+ * Currently transforms:
+ * - request_user_input → AskUserQuestion (when applicable)
+ */
+function handlePreToolUse(input: ClaudeCodeHookInput): AdapterEvent {
+  const toolName = input.tool_name;
+
+  // Intercept request_user_input and transform to AskUserQuestion when applicable
+  if (toolName === MCP_TOOL_NAMES.REQUEST_USER_INPUT && input.tool_input) {
+    // Parse tool input - should have at minimum message and type
+    const toolInput = input.tool_input;
+    if (typeof toolInput.message === 'string' && typeof toolInput.type === 'string') {
+      const transformResult = transformToAskUserQuestion(
+        toolInput as unknown as Parameters<typeof transformToAskUserQuestion>[0]
+      );
+
+      if (transformResult.type === 'transform') {
+        return {
+          type: 'tool_transform',
+          originalTool: MCP_TOOL_NAMES.REQUEST_USER_INPUT,
+          newTool: transformResult.tool_name,
+          newInput: transformResult.tool_input as unknown as Record<string, unknown>,
+        };
+      }
+    }
+  }
+
   return { type: 'passthrough' };
 }
 
@@ -110,16 +143,17 @@ export const claudeCodeAdapter: AgentAdapter = {
       return { type: 'passthrough' };
     }
 
-    // Only handle plan mode events
+    // Handle PreToolUse in all modes (for tool transformations like request_user_input)
+    if (input.hook_event_name === CLAUDE_HOOK_EVENTS.PRE_TOOL_USE) {
+      return handlePreToolUse(input);
+    }
+
+    // Only handle plan mode events for other hook types
     if (input.permission_mode !== CLAUDE_PERMISSION_MODES.PLAN) {
       return { type: 'passthrough' };
     }
 
     // Dispatch to appropriate handler
-    if (input.hook_event_name === CLAUDE_HOOK_EVENTS.PRE_TOOL_USE) {
-      return handlePreToolUse(input);
-    }
-
     if (input.hook_event_name === CLAUDE_HOOK_EVENTS.PERMISSION_REQUEST) {
       return handlePermissionRequest(input);
     }
@@ -132,6 +166,20 @@ export const claudeCodeAdapter: AgentAdapter = {
   },
 
   formatOutput(response: CoreResponse): string {
+    // Handle tool transformation - PreToolUse with tool replacement
+    if (response.hookType === 'tool_transform') {
+      return JSON.stringify({
+        hookSpecificOutput: {
+          hookEventName: CLAUDE_HOOK_EVENTS.PRE_TOOL_USE,
+          decision: {
+            behavior: 'transform',
+            transformedToolName: response.transformedTool,
+            transformedToolInput: response.transformedInput,
+          },
+        },
+      });
+    }
+
     // Handle PostToolUse responses - inject additionalContext
     if (response.hookType === 'post_tool_use') {
       return JSON.stringify({

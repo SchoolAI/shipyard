@@ -80,6 +80,18 @@ export {
   asPlanId,
   asWebRTCPeerId,
 } from './ids.js';
+export type {
+  CreateInputRequestParams,
+  InputRequest,
+  InputRequestStatus,
+  InputRequestType,
+} from './input-request.js';
+export {
+  createInputRequest,
+  InputRequestSchema,
+  InputRequestStatusValues,
+  InputRequestTypeValues,
+} from './input-request.js';
 // Invite tokens for P2P room authentication - Issue #12
 export type {
   CreateInviteRequest,

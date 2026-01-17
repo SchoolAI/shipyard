@@ -198,6 +198,46 @@ console.log(script);
 
 ---
 
+### requestUserInput(opts): Promise<{ success, response?, status, reason? }>
+Request input from the user via browser modal.
+
+Parameters:
+- message (string, required): The question to ask the user
+- type (string, required): 'text' | 'choice' | 'confirm' | 'multiline'
+- options (string[], optional): For 'choice' type - available options (required for choice)
+- defaultValue (string, optional): Pre-filled value for text/multiline inputs
+- timeout (number, optional): Timeout in seconds (default: 300, min: 10, max: 600)
+- planId (string, optional): Plan ID to associate with (uses global doc if omitted)
+
+Returns:
+- success: Boolean indicating if user responded
+- response: User's answer (if success=true)
+- status: 'answered' | 'cancelled'
+- reason: Reason for failure (if success=false): 'cancelled' | timeout message
+
+The request appears as a modal in the browser. The function blocks until:
+- User responds (success=true)
+- User cancels (success=false)
+- Timeout occurs (success=false)
+
+Example:
+\`\`\`typescript
+const result = await requestUserInput({
+  message: "Which database should we use?",
+  type: "choice",
+  options: ["PostgreSQL", "SQLite", "MongoDB"],
+  timeout: 120  // 2 minutes
+});
+
+if (result.success) {
+  console.log("User chose:", result.response);
+} else {
+  console.log("Request failed:", result.reason);
+}
+\`\`\`
+
+---
+
 ## Common Pattern
 
 \`\`\`typescript
@@ -434,6 +474,41 @@ async function setupReviewNotification(planId: string, pollIntervalSeconds?: num
   return { script, fullResponse: text };
 }
 
+async function requestUserInput(opts: {
+  message: string;
+  type: 'text' | 'choice' | 'confirm' | 'multiline';
+  options?: string[];
+  defaultValue?: string;
+  timeout?: number;
+  planId?: string;
+}) {
+  const { InputRequestManager } = await import('../services/input-request-manager.js');
+
+  // Get or create Y.Doc
+  const docName = opts.planId || '__global_input_requests__';
+  const ydoc = await getOrCreateDoc(docName);
+
+  // Create manager and make request
+  const manager = new InputRequestManager();
+  const requestId = manager.createRequest(ydoc, {
+    message: opts.message,
+    type: opts.type,
+    options: opts.options,
+    defaultValue: opts.defaultValue,
+    timeout: opts.timeout,
+  });
+
+  // Wait for response
+  const result = await manager.waitForResponse(ydoc, requestId, opts.timeout);
+
+  return {
+    success: result.success,
+    response: result.response,
+    status: result.status,
+    reason: result.success ? undefined : result.reason,
+  };
+}
+
 // --- Public Export ---
 
 export const executeCodeTool = {
@@ -469,6 +544,7 @@ export const executeCodeTool = {
         linkPR,
         addPRReviewComment,
         setupReviewNotification,
+        requestUserInput,
         console: {
           log: (...logArgs: unknown[]) => logger.info({ output: logArgs }, 'console.log'),
           error: (...logArgs: unknown[]) => logger.error({ output: logArgs }, 'console.error'),

@@ -159,6 +159,18 @@ export const YDOC_KEYS = {
    * - Helpers: packages/schema/src/yjs-helpers.ts (read/write)
    */
   SNAPSHOTS: 'snapshots' as const,
+
+  /**
+   * User input requests (Y.Array<InputRequest>)
+   * Contains requests for user input from MCP tools or Hook API.
+   * Allows blocking until user provides a response in the browser UI.
+   *
+   * Used by:
+   * - Server: apps/server/src/services/input-request-manager.ts (read/write)
+   * - Server: apps/server/src/tools/request-user-input.ts (create requests)
+   * - Web: apps/web/src/components/InputRequestDialog.tsx (read/write responses)
+   */
+  INPUT_REQUESTS: 'inputRequests' as const,
 } as const;
 
 /**
