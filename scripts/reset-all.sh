@@ -233,7 +233,7 @@ else
   # Kill the process group (including all children)
   if ps -p $VITE_PID > /dev/null 2>&1; then
     # Get the process group ID
-    pgid=$(ps -o pgid= -p $VITE_PID | tr -d ' ')
+    pgid=$(ps -o pgid= -p $VITE_PID | tr -d ' ') || true
     if [ -n "$pgid" ]; then
       # Kill entire process group
       kill -TERM -$pgid 2>/dev/null || true
@@ -249,9 +249,13 @@ else
     echo "$vite_pids" | xargs kill -9 2>/dev/null || true
   fi
 
+  echo "  ✓ Vite stopped"
   echo ""
   echo "🎉 Reset complete! Local peer-plan data has been cleared."
   echo ""
   echo "📝 Note: To reset GitHub Pages (production), use DevTools:"
   echo "   Application → Storage → Clear site data"
 fi
+
+# Ensure script exits with success even if cleanup had issues
+exit 0
