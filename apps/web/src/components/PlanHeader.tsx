@@ -39,6 +39,7 @@ import { ApprovalPanel } from '@/components/ApprovalPanel';
 import { HandoffConversationDialog } from '@/components/HandoffConversationDialog';
 import { ImportConversationButton } from '@/components/ImportConversationHandler';
 import { LinkPRButton } from '@/components/LinkPRButton';
+import { NotificationsButton } from '@/components/NotificationsButton';
 import { ReviewActions } from '@/components/ReviewActions';
 import { ShareButton } from '@/components/ShareButton';
 import { StatusChip } from '@/components/StatusChip';
@@ -685,6 +686,9 @@ export function PlanHeader({
             currentUsername={githubIdentity?.username ?? null}
             ownerId={ownerId}
           />
+
+          {/* Input request notifications */}
+          <NotificationsButton ydoc={ydoc} />
 
           {/* Review actions - inline on desktop, floating on mobile */}
           {!isMobile && (

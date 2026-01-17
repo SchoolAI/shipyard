@@ -1,48 +1,63 @@
 import { Button, Tooltip } from '@heroui/react';
+import { Bell } from 'lucide-react';
+import type * as Y from 'yjs';
+import { useInputRequests } from '@/hooks/useInputRequests';
+
+interface NotificationsButtonProps {
+  /** Y.Doc to monitor for input requests */
+  ydoc: Y.Doc | null;
+}
 
 /**
- * Placeholder notification bell button.
- *
- * For now, just shows "Coming soon" tooltip on hover.
- * Will be implemented fully in a future milestone.
+ * Notification bell button that shows pending input request count.
+ * Clicking opens the first pending input request modal via custom event.
  */
-export function NotificationsButton() {
+export function NotificationsButton({ ydoc }: NotificationsButtonProps) {
+  const { pendingRequests } = useInputRequests({
+    ydoc,
+    onRequestReceived: () => {
+      // Toast notification is handled by the hook
+    },
+  });
+
+  const handlePress = () => {
+    if (pendingRequests.length > 0) {
+      // Dispatch custom event to open modal with first request
+      document.dispatchEvent(
+        new CustomEvent('open-input-request', {
+          detail: pendingRequests[0],
+        })
+      );
+    }
+  };
+
+  const tooltipContent =
+    pendingRequests.length > 0
+      ? `${pendingRequests.length} pending ${pendingRequests.length === 1 ? 'request' : 'requests'}`
+      : 'No pending notifications';
+
   return (
-    <Tooltip>
+    <Tooltip delay={0}>
       <Tooltip.Trigger>
         <Button
           isIconOnly
           variant="ghost"
-          onPress={() => {
-            // TODO: Implement notifications in future milestone
-          }}
-          aria-label="Notifications"
-          className="relative"
+          size="sm"
+          onPress={handlePress}
+          aria-label={`Notifications (${pendingRequests.length} pending)`}
+          className="relative touch-target"
         >
-          {/* Bell icon */}
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="20"
-            height="20"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <title>Notifications bell icon</title>
-            <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
-            <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
-          </svg>
+          <Bell className="w-4 h-4" />
 
-          {/* Badge (always 0 for now) */}
-          <span className="absolute -top-1 -right-1 w-4 h-4 bg-muted text-foreground text-xs rounded-full flex items-center justify-center">
-            0
-          </span>
+          {/* Badge - only shown when count > 0 */}
+          {pendingRequests.length > 0 && (
+            <span className="absolute -top-1 -right-1 w-4 h-4 bg-danger text-white text-[10px] rounded-full flex items-center justify-center font-semibold">
+              {pendingRequests.length}
+            </span>
+          )}
         </Button>
       </Tooltip.Trigger>
-      <Tooltip.Content>Notifications coming soon</Tooltip.Content>
+      <Tooltip.Content>{tooltipContent}</Tooltip.Content>
     </Tooltip>
   );
 }

@@ -1,9 +1,9 @@
 import * as vm from 'node:vm';
 import {
-	PLAN_INDEX_DOC_NAME,
-	getArtifacts,
-	getDeliverables,
-	getPlanMetadata,
+  getArtifacts,
+  getDeliverables,
+  getPlanMetadata,
+  PLAN_INDEX_DOC_NAME,
 } from '@peer-plan/schema';
 import { z } from 'zod';
 import { getOrCreateDoc } from '../doc-store.js';

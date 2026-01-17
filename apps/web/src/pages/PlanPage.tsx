@@ -7,6 +7,7 @@ import {
   getPlanIndexEntry,
   getPlanMetadata,
   getPlanOwnerId,
+  type InputRequest,
   PLAN_INDEX_DOC_NAME,
   type PlanMetadata,
   setPlanIndexEntry,
@@ -17,6 +18,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import * as Y from 'yjs';
 import { ImportConversationHandler } from '@/components/ImportConversationHandler';
+import { InputRequestModal } from '@/components/InputRequestModal';
 import { MobileActionsMenu } from '@/components/MobileActionsMenu';
 import { MobileHeader } from '@/components/MobileHeader';
 import { PlanContent } from '@/components/PlanContent';
@@ -104,6 +106,10 @@ export function PlanPage() {
   // but we need to wait for WebRTC to deliver the plan data before showing "Not Found"
   const [p2pGracePeriodExpired, setP2pGracePeriodExpired] = useState(false);
 
+  // Input request modal state
+  const [inputRequestModalOpen, setInputRequestModalOpen] = useState(false);
+  const [currentInputRequest, setCurrentInputRequest] = useState<InputRequest | null>(null);
+
   // Check if current user is the plan owner (for notifications)
   const ownerId = getPlanOwnerId(ydoc);
   const isOwner = !!(githubIdentity && ownerId && githubIdentity.username === ownerId);
@@ -113,6 +119,27 @@ export function PlanPage() {
 
   // Version navigation for viewing plan history (Issue #42)
   const versionNav = useVersionNavigation(isSnapshot ? null : ydoc);
+
+  // Listen for 'open-input-request' custom events
+  useEffect(() => {
+    let isMounted = true;
+
+    const handleOpenInputRequest = (event: Event) => {
+      // Prevent state updates after component unmounts
+      if (!isMounted) return;
+
+      const customEvent = event as CustomEvent<InputRequest>;
+      setCurrentInputRequest(customEvent.detail);
+      setInputRequestModalOpen(true);
+    };
+
+    document.addEventListener('open-input-request', handleOpenInputRequest);
+
+    return () => {
+      isMounted = false;
+      document.removeEventListener('open-input-request', handleOpenInputRequest);
+    };
+  }, []);
 
   // Start timeout when in P2P-only mode without metadata
   useEffect(() => {
@@ -391,9 +418,31 @@ export function PlanPage() {
           <Sidebar inDrawer onNavigate={drawerState.close} />
         </Drawer>
         {pageContent}
+        <InputRequestModal
+          isOpen={inputRequestModalOpen}
+          request={currentInputRequest}
+          ydoc={ydoc}
+          onClose={() => {
+            setInputRequestModalOpen(false);
+            setCurrentInputRequest(null);
+          }}
+        />
       </>
     );
   }
 
-  return pageContent;
+  return (
+    <>
+      {pageContent}
+      <InputRequestModal
+        isOpen={inputRequestModalOpen}
+        request={currentInputRequest}
+        ydoc={ydoc}
+        onClose={() => {
+          setInputRequestModalOpen(false);
+          setCurrentInputRequest(null);
+        }}
+      />
+    </>
+  );
 }
