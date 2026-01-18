@@ -571,22 +571,68 @@ export async function waitForApprovalHandler(
     status: string,
     extraData: { approvedAt?: number; deliverables?: Array<{ id: string; text: string }> } = {}
   ): void => {
+    const sessionData = getSessionData();
+    if (!sessionData) return;
+
+    const { session, sessionId } = sessionData;
+    validateSessionStateForTransition(session);
+
+    const baseState = buildBaseState(session);
+    const syncedFields = buildSyncedFields(session);
+    const { reviewComment, reviewedBy } = getReviewData();
+
+    if (status === 'in_progress') {
+      handleApprovedTransition(
+        sessionId,
+        baseState,
+        syncedFields,
+        extraData,
+        reviewComment,
+        reviewedBy
+      );
+    } else if (status === 'changes_requested') {
+      handleReviewedTransition(
+        sessionId,
+        baseState,
+        syncedFields,
+        session,
+        extraData,
+        reviewComment,
+        reviewedBy
+      );
+    } else {
+      throw new Error(
+        `Invalid session state transition: missing required fields. ` +
+          `status=${status}, hasApprovedAt=${!!extraData.approvedAt}, ` +
+          `hasDeliverables=${!!extraData.deliverables}, hasReviewedBy=${!!reviewedBy}`
+      );
+    }
+
+    logRegistryUpdate(status, extraData);
+  };
+
+  // Helper: Get session data or log warning if not found
+  const getSessionData = () => {
     const session = getSessionStateByPlanId(planId);
     const sessionId = getSessionIdByPlanId(planId);
 
     if (!session || !sessionId) {
-      // Session not found is not a critical error - hook may have been restarted
-      // Log as warning but don't throw to allow approval to proceed
       ctx.logger.warn(
         { planId },
         'Session not found in registry during approval - post-exit injection will not work'
       );
-      return;
+      return null;
     }
 
-    const { reviewComment, reviewedBy } = getReviewData();
+    return { session, sessionId };
+  };
 
-    // Must be synced, approved, or reviewed to transition
+  // Helper: Validate session can transition
+  const validateSessionStateForTransition = (
+    session: ReturnType<typeof getSessionStateByPlanId>
+  ) => {
+    if (!session) return;
+
     if (
       !isSessionStateSynced(session) &&
       !isSessionStateApproved(session) &&
@@ -597,59 +643,98 @@ export async function waitForApprovalHandler(
           `Session must be in 'synced', 'approved', or 'reviewed' state.`
       );
     }
+  };
 
-    // Base fields from current session
-    const baseState = {
-      planId: session.planId,
-      planFilePath: session.planFilePath,
-      createdAt: session.createdAt,
-      lastSyncedAt: session.lastSyncedAt,
-    };
+  // Helper: Build base state fields
+  const buildBaseState = (session: NonNullable<ReturnType<typeof getSessionStateByPlanId>>) => ({
+    planId: session.planId,
+    planFilePath: session.planFilePath,
+    createdAt: session.createdAt,
+    lastSyncedAt: session.lastSyncedAt,
+  });
 
-    // Get synced state fields (contentHash, sessionToken, url) using type guards
-    const syncedFields = {
+  // Helper: Build synced state fields (requires session to be in synced or later state)
+  const buildSyncedFields = (session: NonNullable<ReturnType<typeof getSessionStateByPlanId>>) => {
+    // TypeScript knows session is in synced/approved/reviewed state due to validateSessionStateForTransition
+    // These properties are guaranteed to exist
+    if (
+      !isSessionStateSynced(session) &&
+      !isSessionStateApproved(session) &&
+      !isSessionStateReviewed(session)
+    ) {
+      throw new Error('Cannot build synced fields from session in created state');
+    }
+    return {
       contentHash: session.contentHash,
       sessionToken: session.sessionToken,
       url: session.url,
     };
+  };
 
-    if (status === 'in_progress' && extraData.approvedAt && extraData.deliverables) {
-      // Transition to approved state
-      setSessionState(sessionId, {
-        lifecycle: 'approved',
-        ...baseState,
-        ...syncedFields,
-        approvedAt: extraData.approvedAt,
-        deliverables: extraData.deliverables,
-        reviewComment,
-        reviewedBy,
-      });
-    } else if (status === 'changes_requested' && reviewedBy) {
-      // Transition to reviewed state
-      // Get deliverables from current session or from extraData
-      const deliverables =
-        extraData.deliverables ||
-        (isSessionStateApproved(session) || isSessionStateReviewed(session)
-          ? session.deliverables
-          : []);
-
-      setSessionState(sessionId, {
-        lifecycle: 'reviewed',
-        ...baseState,
-        ...syncedFields,
-        deliverables,
-        reviewComment: reviewComment || '',
-        reviewedBy,
-        reviewStatus: status,
-      });
-    } else {
+  // Helper: Handle transition to approved state
+  const handleApprovedTransition = (
+    sessionId: string,
+    baseState: ReturnType<typeof buildBaseState>,
+    syncedFields: ReturnType<typeof buildSyncedFields>,
+    extraData: { approvedAt?: number; deliverables?: Array<{ id: string; text: string }> },
+    reviewComment: string | undefined,
+    reviewedBy: string | undefined
+  ) => {
+    if (!extraData.approvedAt || !extraData.deliverables) {
       throw new Error(
-        `Invalid session state transition: missing required fields. ` +
-          `status=${status}, hasApprovedAt=${!!extraData.approvedAt}, ` +
-          `hasDeliverables=${!!extraData.deliverables}, hasReviewedBy=${!!reviewedBy}`
+        `Invalid session state transition: missing required fields for approval. ` +
+          `hasApprovedAt=${!!extraData.approvedAt}, hasDeliverables=${!!extraData.deliverables}`
       );
     }
 
+    setSessionState(sessionId, {
+      lifecycle: 'approved',
+      ...baseState,
+      ...syncedFields,
+      approvedAt: extraData.approvedAt,
+      deliverables: extraData.deliverables,
+      reviewComment,
+      reviewedBy,
+    });
+  };
+
+  // Helper: Handle transition to reviewed state
+  const handleReviewedTransition = (
+    sessionId: string,
+    baseState: ReturnType<typeof buildBaseState>,
+    syncedFields: ReturnType<typeof buildSyncedFields>,
+    session: NonNullable<ReturnType<typeof getSessionStateByPlanId>>,
+    extraData: { deliverables?: Array<{ id: string; text: string }> },
+    reviewComment: string | undefined,
+    reviewedBy: string | undefined
+  ) => {
+    if (!reviewedBy) {
+      throw new Error(`Invalid session state transition: missing reviewedBy for changes_requested`);
+    }
+
+    const deliverables =
+      extraData.deliverables ||
+      (isSessionStateApproved(session) || isSessionStateReviewed(session)
+        ? session.deliverables
+        : []);
+
+    setSessionState(sessionId, {
+      lifecycle: 'reviewed',
+      ...baseState,
+      ...syncedFields,
+      deliverables,
+      reviewComment: reviewComment || '',
+      reviewedBy,
+      reviewStatus: 'changes_requested',
+    });
+  };
+
+  // Helper: Log registry update
+  const logRegistryUpdate = (
+    status: string,
+    extraData: { deliverables?: Array<{ id: string; text: string }> }
+  ) => {
+    const sessionId = getSessionIdByPlanId(planId);
     ctx.logger.info(
       {
         planId,

@@ -97,6 +97,7 @@ export function useInviteToken(
   useEffect(() => {
     if (!rtcProvider) return;
 
+    // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Message handling with multiple response types requires comprehensive validation
     const handleMessage = (event: MessageEvent) => {
       try {
         const data = JSON.parse(event.data);

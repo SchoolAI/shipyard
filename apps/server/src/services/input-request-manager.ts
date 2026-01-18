@@ -146,56 +146,69 @@ export class InputRequestManager {
 
         const request = findRequest();
         if (!request) {
-          logger.warn({ requestId }, 'Request not found, treating as cancelled');
-          resolved = true; // Bug #3 fix: Set flag before resolving
-          cleanup();
-          resolve({
-            success: false,
-            status: 'cancelled',
-            reason: 'Request not found in Y.Doc',
-          });
+          handleRequestNotFound();
           return;
         }
 
         logger.debug({ requestId, status: request.status }, 'Checking input request status');
 
         if (request.status === 'answered') {
-          logger.info({ requestId, answeredBy: request.answeredBy }, 'Input request answered');
-          resolved = true; // Bug #3 fix: Set flag before resolving
-          cleanup();
-          resolve({
-            success: true,
-            response: request.response,
-            status: 'answered',
-            answeredBy: request.answeredBy ?? 'unknown',
-            answeredAt: request.answeredAt ?? Date.now(),
-          });
-          return; // Bug #3 fix: Prevent further execution
+          handleAnsweredStatus(request);
+        } else if (request.status === 'declined') {
+          handleDeclinedStatus();
+        } else if (request.status === 'cancelled') {
+          handleCancelledStatus();
         }
+      };
 
-        if (request.status === 'declined') {
-          logger.info({ requestId }, 'Input request declined by user');
-          resolved = true; // Bug #3 fix: Set flag before resolving
-          cleanup();
-          resolve({
-            success: true,
-            status: 'declined',
-            reason: 'User declined to answer',
-          });
-          return; // Bug #3 fix: Prevent further execution
-        }
+      // Helper: Handle request not found
+      const handleRequestNotFound = () => {
+        logger.warn({ requestId }, 'Request not found, treating as cancelled');
+        resolved = true;
+        cleanup();
+        resolve({
+          success: false,
+          status: 'cancelled',
+          reason: 'Request not found in Y.Doc',
+        });
+      };
 
-        if (request.status === 'cancelled') {
-          logger.info({ requestId }, 'Input request cancelled (timeout)');
-          resolved = true; // Bug #3 fix: Set flag before resolving
-          cleanup();
-          resolve({
-            success: false,
-            status: 'cancelled',
-            reason: 'Request timed out',
-          });
-          return; // Bug #3 fix: Prevent further execution
-        }
+      // Helper: Handle answered status
+      const handleAnsweredStatus = (request: InputRequest) => {
+        logger.info({ requestId, answeredBy: request.answeredBy }, 'Input request answered');
+        resolved = true;
+        cleanup();
+        resolve({
+          success: true,
+          response: request.response,
+          status: 'answered',
+          answeredBy: request.answeredBy ?? 'unknown',
+          answeredAt: request.answeredAt ?? Date.now(),
+        });
+      };
+
+      // Helper: Handle declined status
+      const handleDeclinedStatus = () => {
+        logger.info({ requestId }, 'Input request declined by user');
+        resolved = true;
+        cleanup();
+        resolve({
+          success: true,
+          status: 'declined',
+          reason: 'User declined to answer',
+        });
+      };
+
+      // Helper: Handle cancelled status
+      const handleCancelledStatus = () => {
+        logger.info({ requestId }, 'Input request cancelled (timeout)');
+        resolved = true;
+        cleanup();
+        resolve({
+          success: false,
+          status: 'cancelled',
+          reason: 'Request timed out',
+        });
       };
 
       // Observe changes to the requests array
@@ -223,45 +236,47 @@ export class InputRequestManager {
             ? request.timeout
             : 0;
 
+      // Helper: Handle timeout by marking request as cancelled
+      const handleTimeout = () => {
+        if (resolved) return;
+
+        logger.warn({ requestId, timeout: effectiveTimeout }, 'Input request timed out');
+
+        markRequestAsCancelled();
+
+        if (resolved) return;
+
+        resolved = true;
+        cleanup();
+        resolve({
+          success: false,
+          status: 'cancelled',
+          reason: `Timeout after ${effectiveTimeout} seconds`,
+        });
+      };
+
+      // Helper: Mark request as cancelled in Y.Doc
+      const markRequestAsCancelled = () => {
+        ydoc.transact(() => {
+          if (resolved) return;
+
+          const currentRequest = findRequest();
+          if (!currentRequest || currentRequest.status !== 'pending') {
+            return;
+          }
+
+          const requests = requestsArray.toJSON();
+          const index = requests.findIndex((r) => r.id === requestId);
+          if (index !== -1) {
+            requestsArray.delete(index, 1);
+            requestsArray.insert(index, [{ ...currentRequest, status: 'cancelled' }]);
+          }
+        });
+      };
+
       // Set up timeout if specified (0 = no timeout)
       if (effectiveTimeout > 0) {
-        timeoutHandle = setTimeout(() => {
-          // Bug #2 fix: Check resolved flag before transaction
-          if (resolved) return;
-
-          logger.warn({ requestId, timeout: effectiveTimeout }, 'Input request timed out');
-
-          // Mark request as cancelled in Y.Doc
-          // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Timeout handling requires multiple race condition checks
-          ydoc.transact(() => {
-            // Bug #2 fix: Check again inside transaction
-            if (resolved) return;
-
-            const currentRequest = findRequest();
-            if (!currentRequest || currentRequest.status !== 'pending') {
-              return; // Already handled
-            }
-
-            // Update the request in place
-            const requests = requestsArray.toJSON();
-            const index = requests.findIndex((r) => r.id === requestId);
-            if (index !== -1) {
-              requestsArray.delete(index, 1);
-              requestsArray.insert(index, [{ ...currentRequest, status: 'cancelled' }]);
-            }
-          });
-
-          // Bug #2 fix: Final check before cleanup
-          if (resolved) return;
-
-          resolved = true; // Bug #3 fix: Set flag before resolving
-          cleanup();
-          resolve({
-            success: false,
-            status: 'cancelled',
-            reason: `Timeout after ${effectiveTimeout} seconds`,
-          });
-        }, effectiveTimeout * 1000);
+        timeoutHandle = setTimeout(handleTimeout, effectiveTimeout * 1000);
       }
     });
   }

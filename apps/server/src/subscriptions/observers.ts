@@ -79,7 +79,7 @@ export function attachObservers(planId: string, doc: Y.Doc): void {
           ? (rawStatus as PlanStatusType)
           : undefined;
 
-      if (prev && prev.status && prev.status !== newStatus && newStatus) {
+      if (prev?.status && prev.status !== newStatus && newStatus) {
         const actor = transaction.origin?.actor || 'System';
 
         // Log event
