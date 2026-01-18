@@ -130,6 +130,7 @@ STATUSES:
         createdAt: existingMetadata.createdAt ?? Date.now(),
         updatedAt: Date.now(),
         ownerId: existingMetadata.ownerId,
+        deleted: false,
       });
     } else {
       logger.warn({ planId: input.planId }, 'Cannot update plan index: missing ownerId');

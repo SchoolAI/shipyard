@@ -32,7 +32,7 @@ function ArchiveItem({ plan, onUnarchive }: ArchiveItemProps) {
       <div className="flex flex-col gap-1 flex-1 min-w-0">
         <span className="font-medium text-foreground truncate opacity-70">{plan.title}</span>
         <span className="text-xs text-muted-foreground">
-          Archived {formatRelativeTime(plan.deletedAt || plan.updatedAt)}
+          Archived {formatRelativeTime(plan.deleted ? plan.deletedAt : plan.updatedAt)}
         </span>
       </div>
 
@@ -66,7 +66,7 @@ export function ArchivePage() {
 
   const sortedArchivedPlans = useMemo(() => {
     return [...archivedPlans].sort(
-      (a, b) => (b.deletedAt || b.updatedAt) - (a.deletedAt || a.updatedAt)
+      (a, b) => (b.deleted ? b.deletedAt : b.updatedAt) - (a.deleted ? a.deletedAt : a.updatedAt)
     );
   }, [archivedPlans]);
 
@@ -146,10 +146,14 @@ export function ArchivePage() {
 
     const entry = getPlanIndexEntry(indexDoc, planId);
     if (entry) {
-      const { deletedAt: _removed1, deletedBy: _removed2, ...rest } = entry;
       setPlanIndexEntry(indexDoc, {
-        ...rest,
+        id: entry.id,
+        title: entry.title,
+        status: entry.status,
+        createdAt: entry.createdAt,
         updatedAt: now,
+        ownerId: entry.ownerId,
+        deleted: false,
       });
     }
 

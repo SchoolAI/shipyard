@@ -57,27 +57,48 @@ function colorFromString(str: string): string {
 
 export type ApprovalStatus = 'pending' | 'approved' | 'rejected';
 
-export interface PlanAwarenessState {
-  user: {
-    id: string;
-    name: string;
-    color: string;
-  };
-  /**
-   * Platform type for this peer (browser, MCP server, etc.)
-   * Used to distinguish between different types of participants.
-   */
-  platform?: OriginPlatform;
-  status: ApprovalStatus;
-  isOwner: boolean;
-  requestedAt?: number;
-  /**
-   * WebRTC peerId (UUID) for P2P transfers.
-   * This is different from the awareness clientID (number).
-   * The webrtcPeerId is used as the key in room.webrtcConns.
-   */
-  webrtcPeerId?: string;
-}
+export type PlanAwarenessState =
+  | {
+      status: 'pending';
+      user: {
+        id: string;
+        name: string;
+        color: string;
+      };
+      isOwner: boolean;
+      requestedAt: number;
+      /**
+       * Platform type for this peer (browser, MCP server, etc.)
+       * Used to distinguish between different types of participants.
+       */
+      platform?: OriginPlatform;
+      /**
+       * WebRTC peerId (UUID) for P2P transfers.
+       * This is different from the awareness clientID (number).
+       * The webrtcPeerId is used as the key in room.webrtcConns.
+       */
+      webrtcPeerId?: string;
+    }
+  | {
+      status: 'approved' | 'rejected';
+      user: {
+        id: string;
+        name: string;
+        color: string;
+      };
+      isOwner: boolean;
+      /**
+       * Platform type for this peer (browser, MCP server, etc.)
+       * Used to distinguish between different types of participants.
+       */
+      platform?: OriginPlatform;
+      /**
+       * WebRTC peerId (UUID) for P2P transfers.
+       * This is different from the awareness clientID (number).
+       * The webrtcPeerId is used as the key in room.webrtcConns.
+       */
+      webrtcPeerId?: string;
+    };
 
 export interface SyncState {
   /** Connected to hub WebSocket or WebRTC peers */
@@ -269,18 +290,27 @@ export function useMultiProviderSync(
       // Get WebRTC peerId from the room (may be undefined if room not initialized yet)
       const webrtcPeerId = (rtc as unknown as { room?: { peerId?: string } }).room?.peerId;
 
-      const awarenessState: PlanAwarenessState = {
+      const baseAwarenessState = {
         user: {
           id: githubIdentity.username,
           name: githubIdentity.displayName,
           color: colorFromString(githubIdentity.username),
         },
-        status,
         isOwner: ownerId === githubIdentity.username,
-        requestedAt: status === 'pending' ? Date.now() : undefined,
-        // Include WebRTC peerId for P2P transfers (used as key in room.webrtcConns)
         webrtcPeerId,
       };
+
+      const awarenessState: PlanAwarenessState =
+        status === 'pending'
+          ? {
+              ...baseAwarenessState,
+              status: 'pending',
+              requestedAt: Date.now(),
+            }
+          : {
+              ...baseAwarenessState,
+              status,
+            };
 
       rtc.awareness.setLocalStateField('planStatus', awarenessState);
       lastBroadcastPeerId = webrtcPeerId;

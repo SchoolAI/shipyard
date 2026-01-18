@@ -53,23 +53,35 @@ interface WebrtcProviderInternal {
 
 /**
  * Progress callback for transfer operations.
+ * Discriminated union based on transfer stage.
  */
-export interface TransferProgress {
-  /** Unique ID for this transfer */
-  exportId?: string;
-  /** Direction of transfer */
-  direction?: 'sending' | 'receiving';
-  /** Target peer ID (for P2P) */
-  peerId?: string;
-  /** Current chunk being processed */
-  current: number;
-  /** Total chunks */
-  total: number;
-  /** Transfer stage */
-  stage: 'preparing' | 'compressing' | 'transferring' | 'done';
-  /** Progress percentage (0-100) */
-  percentage?: number;
-}
+export type TransferProgress =
+  | {
+      /** Transfer stage: preparing or compressing */
+      stage: 'preparing' | 'compressing';
+      /** Current chunk being processed */
+      current: number;
+      /** Total chunks */
+      total: number;
+    }
+  | {
+      /** Transfer stage: actively transferring data */
+      stage: 'transferring';
+      /** Unique ID for this transfer */
+      exportId: string;
+      /** Direction of transfer */
+      direction: 'sending' | 'receiving';
+      /** Target peer ID (for P2P) */
+      peerId: string;
+      /** Progress percentage (0-100) */
+      percentage: number;
+    }
+  | {
+      /** Transfer stage: completed */
+      stage: 'done';
+      /** Unique ID for this transfer */
+      exportId: string;
+    };
 
 /**
  * Schema for imported conversation files.
@@ -91,23 +103,21 @@ const ImportedConversationSchema = z.object({
 /**
  * Result of an export operation.
  */
-export interface ExportResult {
-  success: boolean;
-  filename?: string;
-  messageCount?: number;
-  error?: string;
-}
+export type ExportResult =
+  | { success: true; filename: string; messageCount: number }
+  | { success: false; error: string };
 
 /**
  * Result of an import operation.
  */
-export interface ImportResult {
-  success: boolean;
-  messages?: A2AMessage[];
-  meta?: ConversationExportMeta;
-  summary?: { title: string; text: string };
-  error?: string;
-}
+export type ImportResult =
+  | {
+      success: true;
+      messages: A2AMessage[];
+      meta: ConversationExportMeta;
+      summary: { title: string; text: string };
+    }
+  | { success: false; error: string };
 
 /**
  * Received conversation from P2P transfer.
@@ -346,7 +356,7 @@ export function useConversationTransfer(
         const jsonString = JSON.stringify(exportPackage, null, 2);
         exportMeta.uncompressedBytes = jsonString.length;
 
-        setProgress({ current: 2, total: 3, stage: 'transferring' });
+        setProgress({ current: 2, total: 3, stage: 'compressing' });
 
         // 4. Download as file
         const blob = new Blob([jsonString], { type: 'application/json' });
@@ -359,7 +369,10 @@ export function useConversationTransfer(
         anchor.click();
         URL.revokeObjectURL(url);
 
-        setProgress({ current: 3, total: 3, stage: 'done' });
+        setProgress({
+          stage: 'done',
+          exportId: exportMeta.exportId,
+        });
 
         return {
           success: true,
@@ -401,7 +414,7 @@ export function useConversationTransfer(
         };
       }
 
-      setProgress({ current: 2, total: 3, stage: 'transferring' });
+      setProgress({ current: 2, total: 3, stage: 'compressing' });
 
       // 3. Validate messages
       const { valid, errors } = validateA2AMessages(validated.data.messages);
@@ -416,7 +429,11 @@ export function useConversationTransfer(
       // 4. Generate summary
       const summary = summarizeA2AConversation(valid);
 
-      setProgress({ current: 3, total: 3, stage: 'done' });
+      const exportId = validated.data.meta.exportId;
+      setProgress({
+        stage: 'done',
+        exportId,
+      });
 
       const meta: ConversationExportMeta = {
         exportId: validated.data.meta.exportId,
@@ -472,13 +489,9 @@ export function useConversationTransfer(
 
       setIsProcessing(true);
       setProgress({
-        exportId,
-        direction: 'sending',
-        peerId,
+        stage: 'preparing',
         current: 0,
         total: 1,
-        stage: 'preparing',
-        percentage: 0,
       });
 
       try {
@@ -500,25 +513,18 @@ export function useConversationTransfer(
             onProgress: (sent, total) => {
               const percentage = Math.round((sent / total) * 100);
               setProgress({
+                stage: 'transferring',
                 exportId,
                 direction: 'sending',
                 peerId,
-                current: sent,
-                total,
-                stage: 'transferring',
                 percentage,
               });
               options.onProgress?.(sent, total);
             },
             onComplete: () => {
               setProgress({
-                exportId,
-                direction: 'sending',
-                peerId,
-                current: 1,
-                total: 1,
                 stage: 'done',
-                percentage: 100,
+                exportId,
               });
               setTimeout(() => {
                 setProgress(null);

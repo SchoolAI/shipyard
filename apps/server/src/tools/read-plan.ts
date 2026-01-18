@@ -120,7 +120,7 @@ OUTPUT INCLUDES:
     }
     output += `**Created:** ${new Date(metadata.createdAt).toISOString()}\n`;
     output += `**Updated:** ${new Date(metadata.updatedAt).toISOString()}\n`;
-    if (metadata.reviewComment) {
+    if (metadata.status === 'changes_requested' && metadata.reviewComment) {
       output += `\n**Reviewer Comment:** ${metadata.reviewComment}\n`;
     }
     output += '\n---\n\n';

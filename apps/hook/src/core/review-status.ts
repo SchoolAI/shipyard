@@ -5,7 +5,12 @@
  * NOTE: The approval observer logic is now in apps/server/src/hook-handlers.ts.
  * The hook simply calls the server API and waits for the response.
  */
-import type { Deliverable, GetReviewStatusResponse, ReviewFeedback } from '@peer-plan/schema';
+import {
+  assertNever,
+  type Deliverable,
+  type GetReviewStatusResponse,
+  type ReviewFeedback,
+} from '@peer-plan/schema';
 import type { CoreResponse } from '../adapters/types.js';
 import { webConfig } from '../config/env/web.js';
 import { DEFAULT_AGENT_TYPE } from '../constants.js';
@@ -170,8 +175,8 @@ export async function checkReviewStatus(
   const state = await getSessionContext(sessionId);
   let planId: string;
 
-  // Create plan if no session exists (server returns {} for new sessions)
-  if ((!state || !state.planId) && planContent) {
+  // Blocking approach: Create plan from ExitPlanMode if we have content
+  if (!state.found && planContent) {
     logger.info(
       { sessionId, contentLength: planContent.length, hasState: !!state },
       'Creating plan from ExitPlanMode (blocking mode)'
@@ -254,9 +259,9 @@ export async function checkReviewStatus(
     };
   }
 
-  // Only allow exit without blocking if truly no context to review
-  if ((!state || !state.planId) && !planContent) {
-    logger.info({ sessionId }, 'No session state and no plan content - allowing exit');
+  if (!state.found) {
+    // No state and no plan content - allow exit
+    logger.info({ sessionId }, 'No session state or plan content, allowing exit');
     return { allow: true };
   }
 
@@ -338,20 +343,13 @@ export async function checkReviewStatus(
     case 'completed':
       return {
         allow: true,
-        message: status.reviewedBy
-          ? `Task completed and approved by ${status.reviewedBy}. All deliverables fulfilled.`
-          : 'Task completed. All deliverables fulfilled.',
+        message: `Task completed by ${status.completedBy}`,
         planId,
       };
 
     default: {
-      const _exhaustive: never = status.status;
-      logger.warn({ status: _exhaustive }, 'Unknown plan status');
-      return {
-        allow: false,
-        message: `Unexpected plan status. Refresh the browser at ${baseUrl}/plan/${planId} or check ~/.peer-plan/server-debug.log for details.`,
-        planId,
-      };
+      // Exhaustive check for unknown status values
+      assertNever(status);
     }
   }
 }

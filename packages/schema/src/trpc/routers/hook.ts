@@ -28,6 +28,38 @@ import { publicProcedure, router } from '../trpc.js';
  * Handler logic is injected via context to keep this router package-agnostic.
  * The actual business logic lives in the server package's hook-handlers.ts.
  */
+
+// --- Result Types ---
+
+export type ApprovalResult =
+  | {
+      approved: true;
+      deliverables: unknown[];
+      reviewComment?: string;
+      reviewedBy: string;
+      status: 'in_progress';
+    }
+  | {
+      approved: false;
+      feedback: string;
+      status: 'changes_requested' | 'timeout';
+      reviewComment?: string;
+      reviewedBy?: string;
+    };
+
+export type SessionContextResult =
+  | {
+      found: true;
+      planId: string;
+      sessionToken: string;
+      url: string;
+      deliverables: Array<{ id: string; text: string }>;
+      reviewComment?: string;
+      reviewedBy?: string;
+      reviewStatus?: string;
+    }
+  | { found: false };
+
 export const hookRouter = router({
   /**
    * Create a new plan session.
@@ -138,15 +170,19 @@ export const hookRouter = router({
   getSessionContext: publicProcedure
     .input(z.object({ sessionId: z.string() }))
     .output(
-      z.object({
-        planId: z.string().optional(),
-        sessionToken: z.string().optional(),
-        url: z.string().optional(),
-        deliverables: z.array(z.object({ id: z.string(), text: z.string() })).optional(),
-        reviewComment: z.string().optional(),
-        reviewedBy: z.string().optional(),
-        reviewStatus: z.string().optional(),
-      })
+      z.discriminatedUnion('found', [
+        z.object({
+          found: z.literal(true),
+          planId: z.string(),
+          sessionToken: z.string(),
+          url: z.string(),
+          deliverables: z.array(z.object({ id: z.string(), text: z.string() })),
+          reviewComment: z.string().optional(),
+          reviewedBy: z.string().optional(),
+          reviewStatus: z.string().optional(),
+        }),
+        z.object({ found: z.literal(false) }),
+      ])
     )
     .query(async ({ input, ctx }) => {
       const handlers = ctx.hookHandlers;
@@ -200,14 +236,7 @@ export interface HookHandlers {
     planId: string,
     reviewRequestId: string,
     ctx: HookContext
-  ) => Promise<{
-    approved: boolean;
-    feedback?: string;
-    deliverables?: unknown[];
-    reviewComment?: string;
-    reviewedBy?: string;
-    status?: string;
-  }>;
+  ) => Promise<ApprovalResult>;
 
   getDeliverableContext: (
     planId: string,
@@ -215,18 +244,7 @@ export interface HookHandlers {
     ctx: HookContext
   ) => Promise<z.infer<typeof GetDeliverableContextResponseSchema>>;
 
-  getSessionContext: (
-    sessionId: string,
-    ctx: HookContext
-  ) => Promise<{
-    planId?: string;
-    sessionToken?: string;
-    url?: string;
-    deliverables?: Array<{ id: string; text: string }>;
-    reviewComment?: string;
-    reviewedBy?: string;
-    reviewStatus?: string;
-  }>;
+  getSessionContext: (sessionId: string, ctx: HookContext) => Promise<SessionContextResult>;
 }
 
 export type HookRouter = typeof hookRouter;

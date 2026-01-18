@@ -44,7 +44,9 @@ interface VersionNavigationState {
   canGoNext: boolean;
 }
 
-export interface PlanContentProps {
+/** Props for live mode with collaboration */
+interface LivePlanContentProps {
+  mode: 'live';
   /** The Yjs document containing plan data */
   ydoc: Y.Doc;
   /** Plan metadata */
@@ -56,11 +58,7 @@ export interface PlanContentProps {
   /** Called when user needs to authenticate for commenting */
   onRequestIdentity: () => void;
   /** Provider for collaboration (WebSocket or WebRTC) */
-  provider?: CollaborationProvider | null;
-  /** Initial content for snapshots (when no provider) */
-  initialContent?: unknown[];
-  /** Whether this is a snapshot view (no sync) */
-  isSnapshot?: boolean;
+  provider: CollaborationProvider | null;
   /** Snapshot to view (when viewing version history) - Issue #42 */
   currentSnapshot?: { content: unknown[] } | null;
   /** Callback to receive editor instance for snapshots - Issue #42 */
@@ -69,29 +67,33 @@ export interface PlanContentProps {
   versionNav?: VersionNavigationState;
 }
 
+/** Props for snapshot mode (read-only) */
+interface SnapshotPlanContentProps {
+  mode: 'snapshot';
+  /** The Yjs document containing plan data */
+  ydoc: Y.Doc;
+  /** Plan metadata */
+  metadata: PlanMetadata;
+  /** Current sync state */
+  syncState: SyncState;
+  /** Initial content for snapshots */
+  initialContent: unknown[];
+}
+
+export type PlanContentProps = LivePlanContentProps | SnapshotPlanContentProps;
+
 /**
  * Tabbed plan content viewer.
  * Shows Plan, Deliverables, and Changes tabs with their respective content.
  */
-export function PlanContent({
-  ydoc,
-  metadata,
-  syncState,
-  identity,
-  onRequestIdentity,
-  provider,
-  initialContent,
-  isSnapshot = false,
-  currentSnapshot = null,
-  onEditorReady,
-  versionNav,
-}: PlanContentProps) {
+export function PlanContent(props: PlanContentProps) {
+  const { ydoc, metadata, syncState } = props;
   const [activeView, setActiveView] = useState<ViewType>('plan');
   const [deliverableCount, setDeliverableCount] = useState({ completed: 0, total: 0 });
 
   useEffect(() => {
-    if (isSnapshot && initialContent) {
-      const deliverables = extractDeliverables(initialContent as Block[]);
+    if (props.mode === 'snapshot') {
+      const deliverables = extractDeliverables(props.initialContent as Block[]);
       const deliverablesArray = ydoc.getArray(YDOC_KEYS.DELIVERABLES);
       deliverablesArray.delete(0, deliverablesArray.length);
       deliverablesArray.push(deliverables);
@@ -110,7 +112,7 @@ export function PlanContent({
     updateCount();
     deliverablesArray.observe(updateCount);
     return () => deliverablesArray.unobserve(updateCount);
-  }, [ydoc, isSnapshot, initialContent]);
+  }, [ydoc, props]);
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -176,18 +178,18 @@ export function PlanContent({
 
           {/* Version selector on the right - only show on Plan tab when versions exist */}
           {activeView === 'plan' &&
-            !isSnapshot &&
-            versionNav &&
-            versionNav.snapshots.length > 0 && (
+            props.mode === 'live' &&
+            props.versionNav &&
+            props.versionNav.snapshots.length > 0 && (
               <VersionSelector
-                currentSnapshot={versionNav.currentSnapshot}
-                totalSnapshots={versionNav.snapshots.length}
-                currentIndex={versionNav.currentIndex}
-                canGoPrevious={versionNav.canGoPrevious}
-                canGoNext={versionNav.canGoNext}
-                onPrevious={versionNav.goToPrevious}
-                onNext={versionNav.goToNext}
-                onCurrent={versionNav.goToCurrent}
+                currentSnapshot={props.versionNav.currentSnapshot}
+                totalSnapshots={props.versionNav.snapshots.length}
+                currentIndex={props.versionNav.currentIndex}
+                canGoPrevious={props.versionNav.canGoPrevious}
+                canGoNext={props.versionNav.canGoNext}
+                onPrevious={props.versionNav.goToPrevious}
+                onNext={props.versionNav.goToNext}
+                onCurrent={props.versionNav.goToCurrent}
               />
             )}
         </div>
@@ -197,16 +199,25 @@ export function PlanContent({
       {activeView === 'plan' && (
         <div className="flex-1 overflow-y-auto bg-background">
           <div className="max-w-4xl mx-auto px-1 py-2 md:p-6 space-y-3 md:space-y-6">
-            <PlanViewer
-              key={identity?.id ?? 'anonymous'}
-              ydoc={ydoc}
-              identity={isSnapshot ? null : identity}
-              provider={provider}
-              onRequestIdentity={isSnapshot ? undefined : onRequestIdentity}
-              initialContent={isSnapshot ? initialContent : undefined}
-              currentSnapshot={currentSnapshot}
-              onEditorReady={onEditorReady}
-            />
+            {props.mode === 'live' ? (
+              <PlanViewer
+                key={props.identity?.id ?? 'anonymous'}
+                ydoc={ydoc}
+                identity={props.identity}
+                provider={props.provider}
+                onRequestIdentity={props.onRequestIdentity}
+                currentSnapshot={props.currentSnapshot}
+                onEditorReady={props.onEditorReady}
+              />
+            ) : (
+              <PlanViewer
+                key="snapshot"
+                ydoc={ydoc}
+                identity={null}
+                provider={null}
+                initialContent={props.initialContent}
+              />
+            )}
             <Attachments ydoc={ydoc} registryPort={syncState.registryPort} />
           </div>
         </div>
@@ -225,8 +236,8 @@ export function PlanContent({
           <DeliverablesView
             ydoc={ydoc}
             metadata={metadata}
-            identity={identity}
-            onRequestIdentity={onRequestIdentity}
+            identity={props.mode === 'live' ? props.identity : null}
+            onRequestIdentity={props.mode === 'live' ? props.onRequestIdentity : undefined}
             registryPort={syncState.registryPort}
           />
         </div>

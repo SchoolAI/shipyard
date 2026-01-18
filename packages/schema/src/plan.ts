@@ -96,7 +96,7 @@ export function parseClaudeCodeOrigin(
  * Content is NOT stored in CRDT - only metadata for provenance tracking.
  * Actual content is transferred on-demand via P2P during handoff.
  */
-export interface ConversationVersion {
+interface ConversationVersionBase {
   versionId: string;
   creator: string;
   platform: OriginPlatform;
@@ -104,20 +104,31 @@ export interface ConversationVersion {
   sessionId: string;
   messageCount: number;
   createdAt: number;
-  handedOffAt?: number;
-  handedOffTo?: string;
 }
 
-export const ConversationVersionSchema = z.object({
+export type ConversationVersion =
+  | (ConversationVersionBase & { handedOff: false })
+  | (ConversationVersionBase & { handedOff: true; handedOffAt: number; handedOffTo: string });
+
+const ConversationVersionBaseSchema = z.object({
   versionId: z.string(),
   creator: z.string(),
   platform: z.enum(OriginPlatformValues),
   sessionId: z.string(),
   messageCount: z.number(),
   createdAt: z.number(),
-  handedOffAt: z.number().optional(),
-  handedOffTo: z.string().optional(),
 });
+
+export const ConversationVersionSchema = z.discriminatedUnion('handedOff', [
+  ConversationVersionBaseSchema.extend({
+    handedOff: z.literal(false),
+  }),
+  ConversationVersionBaseSchema.extend({
+    handedOff: z.literal(true),
+    handedOffAt: z.number(),
+    handedOffTo: z.string(),
+  }),
+]);
 
 export const PlanEventTypes = [
   'plan_created',
@@ -142,23 +153,11 @@ export const PlanEventTypes = [
 ] as const;
 export type PlanEventType = (typeof PlanEventTypes)[number];
 
-export interface PlanEvent {
+/** Base fields shared by all plan events */
+interface PlanEventBase {
   id: string;
-  type: PlanEventType;
   actor: string;
   timestamp: number;
-  data?: {
-    fromStatus?: PlanStatusType;
-    toStatus?: PlanStatusType;
-    artifactId?: string;
-    commentId?: string;
-    prNumber?: number;
-    stepId?: string;
-    completed?: boolean;
-    conversationId?: string;
-    messageCount?: number;
-    [key: string]: unknown;
-  };
   /** Whether this event should appear in the user's inbox (requires action) */
   inboxWorthy?: boolean;
   /**
@@ -168,15 +167,233 @@ export interface PlanEvent {
   inboxFor?: string | string[];
 }
 
-export const PlanEventSchema = z.object({
+/** Discriminated union of all plan event types with type-safe data payloads */
+export type PlanEvent =
+  // Events with no data
+  | (PlanEventBase & {
+      type: 'plan_created' | 'content_edited' | 'plan_archived' | 'plan_unarchived' | 'plan_shared';
+    })
+  // Status changed
+  | (PlanEventBase & {
+      type: 'status_changed';
+      data: {
+        fromStatus: PlanStatusType;
+        toStatus: PlanStatusType;
+      };
+    })
+  // Artifact uploaded
+  | (PlanEventBase & {
+      type: 'artifact_uploaded';
+      data: {
+        artifactId: string;
+      };
+    })
+  // Comment events
+  | (PlanEventBase & {
+      type: 'comment_added';
+      data?: {
+        commentId?: string;
+        prNumber?: number;
+        mentions?: boolean;
+      };
+    })
+  | (PlanEventBase & {
+      type: 'comment_resolved';
+      data?: {
+        commentId?: string;
+        resolvedCount?: number;
+      };
+    })
+  // Deliverable linked
+  | (PlanEventBase & {
+      type: 'deliverable_linked';
+      data?: {
+        deliverableId?: string;
+        artifactId?: string;
+        allFulfilled?: boolean;
+      };
+    })
+  // PR linked
+  | (PlanEventBase & {
+      type: 'pr_linked';
+      data: {
+        prNumber: number;
+        url?: string;
+      };
+    })
+  // Review events
+  | (PlanEventBase & {
+      type: 'approved' | 'changes_requested';
+    })
+  // Completion events
+  | (PlanEventBase & {
+      type: 'completed';
+    })
+  // Step completed
+  | (PlanEventBase & {
+      type: 'step_completed';
+      data: {
+        stepId: string;
+        completed: boolean;
+      };
+    })
+  // Conversation imported
+  | (PlanEventBase & {
+      type: 'conversation_imported';
+      data: {
+        sourcePlatform?: string;
+        messageCount: number;
+        sourceSessionId?: string;
+      };
+    })
+  // Conversation exported
+  | (PlanEventBase & {
+      type: 'conversation_exported';
+      data: {
+        messageCount: number;
+      };
+    })
+  // Conversation handed off
+  | (PlanEventBase & {
+      type: 'conversation_handed_off';
+      data: {
+        handedOffTo: string;
+        messageCount: number;
+      };
+    })
+  // Approval requested
+  | (PlanEventBase & {
+      type: 'approval_requested';
+      data?: {
+        requesterName?: string;
+      };
+    });
+
+/** Base schema shared by all plan events */
+const PlanEventBaseSchema = z.object({
   id: z.string(),
-  type: z.enum(PlanEventTypes),
   actor: z.string(),
   timestamp: z.number(),
-  data: z.record(z.string(), z.unknown()).optional(),
   inboxWorthy: z.boolean().optional(),
   inboxFor: z.union([z.string(), z.array(z.string())]).optional(),
 });
+
+/** Discriminated union schema for plan events */
+export const PlanEventSchema = z.discriminatedUnion('type', [
+  // Events with no data
+  PlanEventBaseSchema.extend({
+    type: z.enum([
+      'plan_created',
+      'content_edited',
+      'plan_archived',
+      'plan_unarchived',
+      'plan_shared',
+    ]),
+  }),
+  // Status changed
+  PlanEventBaseSchema.extend({
+    type: z.literal('status_changed'),
+    data: z.object({
+      fromStatus: z.enum(PlanStatusValues),
+      toStatus: z.enum(PlanStatusValues),
+    }),
+  }),
+  // Artifact uploaded
+  PlanEventBaseSchema.extend({
+    type: z.literal('artifact_uploaded'),
+    data: z.object({
+      artifactId: z.string(),
+    }),
+  }),
+  // Comment events
+  PlanEventBaseSchema.extend({
+    type: z.literal('comment_added'),
+    data: z
+      .object({
+        commentId: z.string().optional(),
+        prNumber: z.number().optional(),
+        mentions: z.boolean().optional(),
+      })
+      .optional(),
+  }),
+  PlanEventBaseSchema.extend({
+    type: z.literal('comment_resolved'),
+    data: z
+      .object({
+        commentId: z.string().optional(),
+        resolvedCount: z.number().optional(),
+      })
+      .optional(),
+  }),
+  // Deliverable linked
+  PlanEventBaseSchema.extend({
+    type: z.literal('deliverable_linked'),
+    data: z
+      .object({
+        deliverableId: z.string().optional(),
+        artifactId: z.string().optional(),
+        allFulfilled: z.boolean().optional(),
+      })
+      .optional(),
+  }),
+  // PR linked
+  PlanEventBaseSchema.extend({
+    type: z.literal('pr_linked'),
+    data: z.object({
+      prNumber: z.number(),
+      url: z.string().optional(),
+    }),
+  }),
+  // Review events
+  PlanEventBaseSchema.extend({
+    type: z.enum(['approved', 'changes_requested']),
+  }),
+  // Completion events
+  PlanEventBaseSchema.extend({
+    type: z.literal('completed'),
+  }),
+  // Step completed
+  PlanEventBaseSchema.extend({
+    type: z.literal('step_completed'),
+    data: z.object({
+      stepId: z.string(),
+      completed: z.boolean(),
+    }),
+  }),
+  // Conversation imported
+  PlanEventBaseSchema.extend({
+    type: z.literal('conversation_imported'),
+    data: z.object({
+      sourcePlatform: z.string().optional(),
+      messageCount: z.number(),
+      sourceSessionId: z.string().optional(),
+    }),
+  }),
+  // Conversation exported
+  PlanEventBaseSchema.extend({
+    type: z.literal('conversation_exported'),
+    data: z.object({
+      messageCount: z.number(),
+    }),
+  }),
+  // Conversation handed off
+  PlanEventBaseSchema.extend({
+    type: z.literal('conversation_handed_off'),
+    data: z.object({
+      handedOffTo: z.string(),
+      messageCount: z.number(),
+    }),
+  }),
+  // Approval requested
+  PlanEventBaseSchema.extend({
+    type: z.literal('approval_requested'),
+    data: z
+      .object({
+        requesterName: z.string().optional(),
+      })
+      .optional(),
+  }),
+]);
 
 /**
  * Check if an event should appear in a user's inbox.
@@ -205,25 +422,14 @@ export function isInboxWorthy(event: PlanEvent, username: string): boolean {
   return event.inboxFor === username;
 }
 
-export interface PlanMetadata {
+/** Base fields shared by all plan statuses */
+interface PlanMetadataBase {
   id: string;
   title: string;
-  status: PlanStatusType;
   createdAt: number;
   updatedAt: number;
   repo?: string;
   pr?: number;
-  /** When the plan was reviewed (approved or changes requested) */
-  reviewedAt?: number;
-  /** Display name of the reviewer */
-  reviewedBy?: string;
-  reviewComment?: string;
-  /** When the task was marked complete */
-  completedAt?: number;
-  /** Who marked the task complete (agent or reviewer name) */
-  completedBy?: string;
-  /** Snapshot URL generated on completion */
-  snapshotUrl?: string;
   ownerId?: string;
   /** Defaults to true when ownerId is set */
   approvalRequired?: boolean;
@@ -236,45 +442,68 @@ export interface PlanMetadata {
   archivedAt?: number;
   /** Display name of who archived the plan */
   archivedBy?: string;
-
   /** Origin metadata for conversation export (platform-specific) */
   origin?: OriginMetadata;
-
   /** Records when each user last viewed the plan (username → timestamp) */
   viewedBy?: Record<string, number>;
-
-  /**
-   * Unique identifier for current review request.
-   * Set by hook when requesting review, checked before accepting approval/denial.
-   * Prevents stale review decisions from previous cycles.
-   */
-  reviewRequestId?: string;
-
   /**
    * Conversation versions tracked on this plan.
    * Content is NOT stored - only metadata for provenance tracking.
    * Actual content is transferred on-demand via P2P.
    */
   conversationVersions?: ConversationVersion[];
-
   /** Event log for timeline display and audit trail */
   events?: PlanEvent[];
 }
 
-export const PlanMetadataSchema = z.object({
+/** Discriminated union based on status field */
+export type PlanMetadata =
+  | (PlanMetadataBase & {
+      status: 'draft';
+    })
+  | (PlanMetadataBase & {
+      status: 'pending_review';
+      /**
+       * Unique identifier for current review request.
+       * Set by hook when requesting review, checked before accepting approval/denial.
+       * Prevents stale review decisions from previous cycles.
+       */
+      reviewRequestId: string;
+    })
+  | (PlanMetadataBase & {
+      status: 'changes_requested';
+      /** When the plan was reviewed (changes requested) */
+      reviewedAt: number;
+      /** Display name of the reviewer */
+      reviewedBy: string;
+      /** Feedback from reviewer about requested changes */
+      reviewComment?: string;
+    })
+  | (PlanMetadataBase & {
+      status: 'in_progress';
+      /** When the plan was approved */
+      reviewedAt: number;
+      /** Display name of the reviewer who approved */
+      reviewedBy: string;
+    })
+  | (PlanMetadataBase & {
+      status: 'completed';
+      /** When the task was marked complete */
+      completedAt: number;
+      /** Who marked the task complete (agent or reviewer name) */
+      completedBy: string;
+      /** Snapshot URL generated on completion */
+      snapshotUrl?: string;
+    });
+
+/** Base schema shared by all statuses */
+const PlanMetadataBaseSchema = z.object({
   id: z.string(),
   title: z.string(),
-  status: z.enum(PlanStatusValues),
   createdAt: z.number(),
   updatedAt: z.number(),
   repo: z.string().optional(),
   pr: z.number().optional(),
-  reviewedAt: z.number().optional(),
-  reviewedBy: z.string().optional(),
-  reviewComment: z.string().optional(),
-  completedAt: z.number().optional(),
-  completedBy: z.string().optional(),
-  snapshotUrl: z.string().optional(),
   ownerId: z.string().optional(),
   approvalRequired: z.boolean().optional(),
   approvedUsers: z.array(z.string()).optional(),
@@ -282,13 +511,38 @@ export const PlanMetadataSchema = z.object({
   sessionTokenHash: z.string().optional(),
   archivedAt: z.number().optional(),
   archivedBy: z.string().optional(),
-
   origin: OriginMetadataSchema.optional(),
   viewedBy: z.record(z.string(), z.number()).optional(),
-  reviewRequestId: z.string().optional(),
   conversationVersions: z.array(ConversationVersionSchema).optional(),
   events: z.array(PlanEventSchema).optional(),
 });
+
+export const PlanMetadataSchema = z.discriminatedUnion('status', [
+  PlanMetadataBaseSchema.extend({
+    status: z.literal('draft'),
+  }),
+  PlanMetadataBaseSchema.extend({
+    status: z.literal('pending_review'),
+    reviewRequestId: z.string(),
+  }),
+  PlanMetadataBaseSchema.extend({
+    status: z.literal('changes_requested'),
+    reviewedAt: z.number(),
+    reviewedBy: z.string(),
+    reviewComment: z.string().optional(),
+  }),
+  PlanMetadataBaseSchema.extend({
+    status: z.literal('in_progress'),
+    reviewedAt: z.number(),
+    reviewedBy: z.string(),
+  }),
+  PlanMetadataBaseSchema.extend({
+    status: z.literal('completed'),
+    completedAt: z.number(),
+    completedBy: z.string(),
+    snapshotUrl: z.string().optional(),
+  }),
+]);
 
 export type ArtifactType = 'screenshot' | 'video' | 'test_results' | 'diff';
 

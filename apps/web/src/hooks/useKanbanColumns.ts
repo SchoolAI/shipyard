@@ -5,6 +5,7 @@
 
 import type { PlanIndexEntry, PlanStatusType } from '@peer-plan/schema';
 import { useMemo } from 'react';
+import { assertNever } from '@/utils/assert-never';
 
 /** Column IDs - exhaustive list */
 export type ColumnId = 'draft' | 'in_review' | 'in_progress' | 'completed';
@@ -64,10 +65,8 @@ export function columnIdToStatus(columnId: ColumnId): PlanStatusType {
       return 'in_progress';
     case 'completed':
       return 'completed';
-    default: {
-      const _exhaustive: never = columnId;
-      throw new Error(`Unhandled column ID: ${_exhaustive}`);
-    }
+    default:
+      assertNever(columnId);
   }
 }
 
@@ -80,7 +79,7 @@ export function columnIdToStatus(columnId: ColumnId): PlanStatusType {
 export function useKanbanColumns(plans: PlanIndexEntry[]): ColumnWithPlans[] {
   return useMemo(() => {
     // Filter out archived plans
-    const activePlans = plans.filter((p) => !p.deletedAt);
+    const activePlans = plans.filter((p) => !p.deleted);
 
     return STATUS_COLUMNS.map((column) => ({
       ...column,

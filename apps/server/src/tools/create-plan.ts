@@ -151,7 +151,6 @@ Bad deliverables (not provable):
     initPlanMetadata(ydoc, {
       id: planId,
       title: input.title,
-      status: 'pending_review',
       repo,
       pr: input.prNumber,
       ownerId,
@@ -203,6 +202,7 @@ Bad deliverables (not provable):
       createdAt: now,
       updatedAt: now,
       ownerId,
+      deleted: false,
     });
 
     logger.info({ planId }, 'Plan index updated');

@@ -300,7 +300,7 @@ export function HandoffConversationDialog({
       const success = await sendToPeer(peer.webrtcPeerId, a2aMessages, {
         onComplete: () => {
           const versions = getConversationVersions(ydoc);
-          const myVersion = versions.find((v) => !v.handedOffAt);
+          const myVersion = versions.find((v) => !v.handedOff);
           if (myVersion) {
             markVersionHandedOff(ydoc, myVersion.versionId, peer.name);
           }
@@ -328,7 +328,13 @@ export function HandoffConversationDialog({
     }
   }
 
-  const progressPercent = progress ? (progress.current / progress.total) * 100 : 0;
+  const progressPercent = progress
+    ? progress.stage === 'transferring'
+      ? progress.percentage
+      : progress.stage === 'done'
+        ? 100
+        : (progress.current / progress.total) * 100
+    : 0;
 
   return (
     <Modal.Backdrop isOpen={isOpen} onOpenChange={(open) => !open && onClose()}>

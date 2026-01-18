@@ -26,9 +26,9 @@ export const NON_PLAN_DB_NAMES = [
 export type { PlanStatusType };
 
 /**
- * Plan summary for the index (minimal data for sidebar display).
+ * Base fields shared by all plan index entries.
  */
-export interface PlanIndexEntry {
+interface PlanIndexEntryBase {
   id: string;
   title: string;
   status: PlanStatusType;
@@ -36,22 +36,45 @@ export interface PlanIndexEntry {
   updatedAt: number;
   /** GitHub username of the plan owner */
   ownerId: string;
-  /** Timestamp when plan was archived/deleted (hidden from sidebar by default) */
-  deletedAt?: number;
-  /** Display name of who archived/deleted the plan */
-  deletedBy?: string;
 }
 
 /**
- * Zod schema for validating plan index entries from Y.Map.
+ * Plan summary for the index (minimal data for sidebar display).
+ * Uses a discriminated union to ensure deletedAt and deletedBy always appear together.
  */
-export const PlanIndexEntrySchema = z.object({
-  id: z.string(),
-  title: z.string(),
-  status: z.enum(PlanStatusValues),
-  createdAt: z.number(),
-  updatedAt: z.number(),
-  ownerId: z.string(),
-  deletedAt: z.number().optional(),
-  deletedBy: z.string().optional(),
-});
+export type PlanIndexEntry =
+  | (PlanIndexEntryBase & { deleted: false })
+  | (PlanIndexEntryBase & {
+      deleted: true;
+      /** Timestamp when plan was archived/deleted (hidden from sidebar by default) */
+      deletedAt: number;
+      /** Display name of who archived/deleted the plan */
+      deletedBy: string;
+    });
+
+/**
+ * Zod schema for validating plan index entries from Y.Map.
+ * Uses discriminated union on 'deleted' field for better validation performance.
+ */
+export const PlanIndexEntrySchema = z.discriminatedUnion('deleted', [
+  z.object({
+    deleted: z.literal(false),
+    id: z.string(),
+    title: z.string(),
+    status: z.enum(PlanStatusValues),
+    createdAt: z.number(),
+    updatedAt: z.number(),
+    ownerId: z.string(),
+  }),
+  z.object({
+    deleted: z.literal(true),
+    id: z.string(),
+    title: z.string(),
+    status: z.enum(PlanStatusValues),
+    createdAt: z.number(),
+    updatedAt: z.number(),
+    ownerId: z.string(),
+    deletedAt: z.number(),
+    deletedBy: z.string(),
+  }),
+]);

@@ -2,6 +2,7 @@ import type { Block } from '@blocknote/core';
 import { ServerBlockNoteEditor } from '@blocknote/server-util';
 import {
   addDeliverable,
+  assertNever,
   CreateHookSessionRequestSchema,
   type CreateHookSessionResponse,
   clearAgentPresence,
@@ -87,7 +88,6 @@ export async function handleCreateSession(req: Request, res: Response): Promise<
     initPlanMetadata(ydoc, {
       id: planId,
       title: PLAN_IN_PROGRESS,
-      status: 'draft',
       ownerId,
       repo,
       origin,
@@ -125,6 +125,7 @@ export async function handleCreateSession(req: Request, res: Response): Promise<
       createdAt: now,
       updatedAt: now,
       ownerId,
+      deleted: false,
     });
 
     const webUrl = webConfig.PEER_PLAN_WEB_URL;
@@ -192,7 +193,6 @@ export async function handleUpdateContent(req: Request, res: Response): Promise<
     const now = Date.now();
     setPlanMetadata(ydoc, {
       title,
-      updatedAt: now,
     });
 
     const indexDoc = await getOrCreateDoc(PLAN_INDEX_DOC_NAME);
@@ -204,6 +204,7 @@ export async function handleUpdateContent(req: Request, res: Response): Promise<
         createdAt: metadata.createdAt ?? now,
         updatedAt: now,
         ownerId: metadata.ownerId,
+        deleted: false,
       });
     } else {
       logger.warn({ planId }, 'Cannot update plan index: missing ownerId');
@@ -234,28 +235,65 @@ export async function handleGetReview(req: Request, res: Response): Promise<void
       return;
     }
 
-    let feedback: ReviewFeedback[] | undefined;
-    if (metadata.status === 'changes_requested') {
-      const threadsMap = ydoc.getMap('threads');
-      const threadsData = threadsMap.toJSON() as Record<string, unknown>;
-      const threads = parseThreads(threadsData);
-      feedback = threads.map((thread) => ({
-        threadId: thread.id,
-        blockId: thread.selectedText, // Use selectedText as a proxy for block context
-        comments: thread.comments.map((c) => ({
-          author: c.userId ?? 'Reviewer',
-          content: typeof c.body === 'string' ? c.body : JSON.stringify(c.body),
-          createdAt: c.createdAt ?? Date.now(),
-        })),
-      }));
-    }
+    // Build discriminated union response based on status
+    let response: GetReviewStatusResponse;
 
-    const response: GetReviewStatusResponse = {
-      status: metadata.status,
-      reviewedAt: metadata.reviewedAt,
-      reviewedBy: metadata.reviewedBy,
-      feedback,
-    };
+    switch (metadata.status) {
+      case 'draft':
+        response = { status: 'draft' };
+        break;
+
+      case 'pending_review':
+        response = {
+          status: 'pending_review',
+          reviewRequestId: metadata.reviewRequestId,
+        };
+        break;
+
+      case 'changes_requested': {
+        const threadsMap = ydoc.getMap('threads');
+        const threadsData = threadsMap.toJSON() as Record<string, unknown>;
+        const threads = parseThreads(threadsData);
+        const feedback: ReviewFeedback[] = threads.map((thread) => ({
+          threadId: thread.id,
+          blockId: thread.selectedText,
+          comments: thread.comments.map((c) => ({
+            author: c.userId ?? 'Reviewer',
+            content: typeof c.body === 'string' ? c.body : JSON.stringify(c.body),
+            createdAt: c.createdAt ?? Date.now(),
+          })),
+        }));
+
+        response = {
+          status: 'changes_requested',
+          reviewedAt: metadata.reviewedAt,
+          reviewedBy: metadata.reviewedBy,
+          reviewComment: metadata.reviewComment,
+          feedback: feedback.length > 0 ? feedback : undefined,
+        };
+        break;
+      }
+
+      case 'in_progress':
+        response = {
+          status: 'in_progress',
+          reviewedAt: metadata.reviewedAt,
+          reviewedBy: metadata.reviewedBy,
+        };
+        break;
+
+      case 'completed':
+        response = {
+          status: 'completed',
+          completedAt: metadata.completedAt,
+          completedBy: metadata.completedBy,
+          snapshotUrl: metadata.snapshotUrl,
+        };
+        break;
+
+      default:
+        assertNever(metadata);
+    }
 
     res.json(response);
   } catch (err) {
@@ -290,7 +328,6 @@ export async function handleSetSessionToken(req: Request, res: Response): Promis
 
     setPlanMetadata(ydoc, {
       sessionTokenHash,
-      updatedAt: Date.now(),
     });
 
     const webUrl = webConfig.PEER_PLAN_WEB_URL;

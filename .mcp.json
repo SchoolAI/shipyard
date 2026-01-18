@@ -3,9 +3,7 @@
     "peer-plan": {
       "type": "stdio",
       "command": "node",
-      "args": [
-        "apps/server/dist/index.mjs"
-      ],
+      "args": ["apps/server/dist/index.mjs"],
       "env": {
         "NODE_ENV": "development",
         "SIGNALING_URL": "ws://localhost:4444"
@@ -13,17 +11,11 @@
     },
     "heroui-react": {
       "command": "npx",
-      "args": [
-        "-y",
-        "@heroui/react-mcp@latest"
-      ]
+      "args": ["-y", "@heroui/react-mcp@latest"]
     },
     "playwright": {
       "command": "npx",
-      "args": [
-        "@playwright/mcp@latest",
-        "--user-data-dir=/tmp/pw-72-request-user-input"
-      ]
+      "args": ["@playwright/mcp@latest", "--user-data-dir=/tmp/pw-77-type-clean-up"]
     }
   }
 }

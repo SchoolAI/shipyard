@@ -87,14 +87,35 @@ export type UpdatePlanContentResponse = z.infer<typeof UpdatePlanContentResponse
 
 /**
  * GET /api/hook/plan/:id/review - Get review status
+ * Uses discriminated union to match PlanMetadata structure
  */
-export const GetReviewStatusResponseSchema = z.object({
-  status: z.enum(['draft', 'pending_review', 'changes_requested', 'in_progress', 'completed']),
-  reviewedAt: z.number().optional(),
-  reviewedBy: z.string().optional(),
-  reviewComment: z.string().optional(),
-  feedback: z.array(ReviewFeedbackSchema).optional(),
-});
+export const GetReviewStatusResponseSchema = z.discriminatedUnion('status', [
+  z.object({
+    status: z.literal('draft'),
+  }),
+  z.object({
+    status: z.literal('pending_review'),
+    reviewRequestId: z.string(),
+  }),
+  z.object({
+    status: z.literal('changes_requested'),
+    reviewedAt: z.number(),
+    reviewedBy: z.string(),
+    reviewComment: z.string().optional(),
+    feedback: z.array(ReviewFeedbackSchema).optional(),
+  }),
+  z.object({
+    status: z.literal('in_progress'),
+    reviewedAt: z.number(),
+    reviewedBy: z.string(),
+  }),
+  z.object({
+    status: z.literal('completed'),
+    completedAt: z.number(),
+    completedBy: z.string(),
+    snapshotUrl: z.string().optional(),
+  }),
+]);
 
 export type GetReviewStatusResponse = z.infer<typeof GetReviewStatusResponseSchema>;
 

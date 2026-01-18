@@ -65,13 +65,18 @@ export const ChangeSchema = z.object({
 
 export type Change = z.infer<typeof ChangeSchema>;
 
-export const ChangesResponseSchema = z.object({
-  ready: z.boolean(),
-  changes: z.string().optional(),
-  details: z.array(ChangeSchema).optional(),
-  pending: z.number().optional(),
-  windowExpiresIn: z.number().optional(),
-});
+export const ChangesResponseSchema = z.discriminatedUnion('ready', [
+  z.object({
+    ready: z.literal(true),
+    changes: z.string(),
+    details: z.array(ChangeSchema),
+  }),
+  z.object({
+    ready: z.literal(false),
+    pending: z.number(),
+    windowExpiresIn: z.number(),
+  }),
+]);
 
 export type ChangesResponse = z.infer<typeof ChangesResponseSchema>;
 
@@ -131,12 +136,17 @@ export const ImportConversationRequestSchema = z.object({
 
 export type ImportConversationRequest = z.infer<typeof ImportConversationRequestSchema>;
 
-export const ImportConversationResponseSchema = z.object({
-  success: z.boolean(),
-  sessionId: z.string().optional(),
-  transcriptPath: z.string().optional(),
-  messageCount: z.number().optional(),
-  error: z.string().optional(),
-});
+export const ImportConversationResponseSchema = z.discriminatedUnion('success', [
+  z.object({
+    success: z.literal(true),
+    sessionId: z.string(),
+    transcriptPath: z.string(),
+    messageCount: z.number(),
+  }),
+  z.object({
+    success: z.literal(false),
+    error: z.string(),
+  }),
+]);
 
 export type ImportConversationResponse = z.infer<typeof ImportConversationResponseSchema>;

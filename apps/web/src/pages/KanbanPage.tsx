@@ -53,6 +53,7 @@ import {
   setHideEmptyColumns as saveHideEmptyColumns,
   setSidebarCollapsed,
 } from '@/utils/uiPreferences';
+import { assertNever } from '../utils/assert-never';
 
 /**
  * Determine the target column ID from a drag-drop event.
@@ -93,13 +94,8 @@ function getTargetColumnId(event: DragEndEvent, allPlans: PlanIndexEntry[]): Col
         return 'in_progress';
       case 'completed':
         return 'completed';
-      default: {
-        // Exhaustive check - this should never happen
-        const _exhaustive: never = status;
-        // biome-ignore lint/suspicious/noConsole: fine if it prints this
-        console.error('Unexpected plan status:', _exhaustive);
-        return null;
-      }
+      default:
+        assertNever(status);
     }
   }
 
@@ -600,6 +596,7 @@ export function KanbanPage() {
               width={panelWidth}
             />
             <PlanContent
+              mode="live"
               ydoc={panelYdoc}
               metadata={panelMetadata}
               syncState={panelSyncState}

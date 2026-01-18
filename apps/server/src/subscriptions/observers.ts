@@ -8,6 +8,7 @@ import {
   getPlanMetadata,
   logPlanEvent,
   type PlanStatusType,
+  PlanStatusValues,
   parseThreads,
   type Thread,
   type ThreadComment,
@@ -71,9 +72,14 @@ export function attachObservers(planId: string, doc: Y.Doc): void {
   doc.getMap('metadata').observe((event, transaction) => {
     if (event.keysChanged.has('status')) {
       const prev = previousState.get(planId);
-      const newStatus = doc.getMap('metadata').get('status') as PlanStatusType | undefined;
+      // Runtime validation: ensure status value is a valid PlanStatusType
+      const rawStatus = doc.getMap('metadata').get('status');
+      const newStatus =
+        typeof rawStatus === 'string' && PlanStatusValues.includes(rawStatus as PlanStatusType)
+          ? (rawStatus as PlanStatusType)
+          : undefined;
 
-      if (prev && prev.status !== newStatus && newStatus) {
+      if (prev && prev.status && prev.status !== newStatus && newStatus) {
         const actor = transaction.origin?.actor || 'System';
 
         // Log event
@@ -179,7 +185,6 @@ export function attachObservers(planId: string, doc: Y.Doc): void {
         'deliverable_linked',
         actor,
         {
-          deliverableCount: deliverables.length,
           allFulfilled: true,
         },
         {
@@ -244,7 +249,7 @@ function logCommentWithMentions(
     doc,
     'comment_added',
     actor,
-    { commentId: comment.id, mentions },
+    { commentId: comment.id, mentions: hasMentions },
     {
       inboxWorthy: hasMentions,
       inboxFor: hasMentions ? mentions : undefined,

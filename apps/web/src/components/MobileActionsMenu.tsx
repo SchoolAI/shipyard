@@ -228,15 +228,27 @@ export function MobileActionsMenu({ planId, ydoc, rtcProvider, metadata }: Mobil
     const entry = getPlanIndexEntry(indexDoc, planId);
     if (entry) {
       if (isArchived) {
-        const { deletedAt: _removed1, deletedBy: _removed2, ...rest } = entry;
-        setPlanIndexEntry(indexDoc, { ...rest, updatedAt: now });
+        setPlanIndexEntry(indexDoc, {
+          id: entry.id,
+          title: entry.title,
+          status: entry.status,
+          createdAt: entry.createdAt,
+          updatedAt: now,
+          ownerId: entry.ownerId,
+          deleted: false,
+        });
         toast.success('Plan unarchived');
       } else {
         setPlanIndexEntry(indexDoc, {
-          ...entry,
+          id: entry.id,
+          title: entry.title,
+          status: entry.status,
+          createdAt: entry.createdAt,
+          updatedAt: now,
+          ownerId: entry.ownerId,
+          deleted: true,
           deletedAt: now,
           deletedBy: actor,
-          updatedAt: now,
         });
         toast.success('Plan archived');
       }
@@ -292,7 +304,7 @@ export function MobileActionsMenu({ planId, ydoc, rtcProvider, metadata }: Mobil
 
     const result = await importFromFile(file);
 
-    if (result.success && result.messages && result.meta && result.summary) {
+    if (result.success) {
       setImportData({
         messages: result.messages,
         meta: result.meta,
@@ -300,7 +312,7 @@ export function MobileActionsMenu({ planId, ydoc, rtcProvider, metadata }: Mobil
       });
       setIsReviewOpen(true);
     } else {
-      toast.error(result.error ?? 'Import failed');
+      toast.error(result.error);
     }
   }
 

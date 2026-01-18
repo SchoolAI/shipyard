@@ -18,22 +18,31 @@ import { logger } from '../logger.js';
 
 /**
  * Response from waiting for a user input request.
- * Includes the response value and metadata about who answered.
+ * Uses discriminated union on 'success' to ensure type safety:
+ * - success=true: response, answeredBy, answeredAt are REQUIRED
+ * - success=false: reason is available, response fields are absent
  */
-export interface InputRequestResponse {
-  /** Whether a valid response was received */
-  success: boolean;
-  /** The user's response (undefined if cancelled/timeout) */
-  response?: unknown;
-  /** Status when response was returned */
-  status: 'answered' | 'cancelled';
-  /** Who answered the request (if answered) */
-  answeredBy?: string;
-  /** When the request was answered (if answered) */
-  answeredAt?: number;
-  /** Cancellation reason (if cancelled) */
-  reason?: string;
-}
+export type InputRequestResponse =
+  | {
+      /** Whether a valid response was received */
+      success: true;
+      /** Status when response was returned */
+      status: 'answered';
+      /** The user's response */
+      response: unknown;
+      /** Who answered the request */
+      answeredBy: string;
+      /** When the request was answered */
+      answeredAt: number;
+    }
+  | {
+      /** Whether a valid response was received */
+      success: false;
+      /** Status when response was returned */
+      status: 'cancelled';
+      /** Cancellation reason */
+      reason: string;
+    };
 
 /**
  * Manager for user input requests stored in Y.Doc.
@@ -141,8 +150,8 @@ export class InputRequestManager {
             success: true,
             response: request.response,
             status: 'answered',
-            answeredBy: request.answeredBy,
-            answeredAt: request.answeredAt,
+            answeredBy: request.answeredBy ?? 'unknown',
+            answeredAt: request.answeredAt ?? Date.now(),
           });
           return; // Bug #3 fix: Prevent further execution
         }

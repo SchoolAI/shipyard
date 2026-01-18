@@ -10,7 +10,19 @@ export type RedemptionState =
   | { status: 'waiting_for_auth' }
   | { status: 'redeeming' }
   | { status: 'success' }
-  | { status: 'error'; error: InviteRedemptionResult['error'] };
+  | { status: 'error'; error: Extract<InviteRedemptionResult, { success: false }>['error'] };
+
+type InviteErrorType = Extract<InviteRedemptionResult, { success: false }>['error'];
+
+function isValidInviteError(value: string): value is InviteErrorType {
+  return (
+    value === 'expired' ||
+    value === 'exhausted' ||
+    value === 'revoked' ||
+    value === 'invalid' ||
+    value === 'already_redeemed'
+  );
+}
 
 export interface UseInviteTokenReturn {
   /** Current redemption state */
@@ -89,15 +101,16 @@ export function useInviteToken(
       try {
         const data = JSON.parse(event.data);
         if (data.type === 'invite_redemption_result') {
-          const result = data as InviteRedemptionResult;
-          if (result.success) {
+          if (data.success === true && typeof data.planId === 'string') {
+            // Success variant
             setRedemptionState({ status: 'success' });
             // Clean up URL after short delay to show success state
             setTimeout(() => {
               clearInviteToken();
             }, 500);
-          } else {
-            setRedemptionState({ status: 'error', error: result.error });
+          } else if (data.success === false && isValidInviteError(data.error)) {
+            // Failure variant
+            setRedemptionState({ status: 'error', error: data.error });
           }
         }
       } catch {
@@ -172,7 +185,8 @@ export function useInviteToken(
 
     const sent = sendToSignaling(redeemMessage);
     if (!sent) {
-      setRedemptionState({ status: 'error', error: 'invalid' });
+      const errorState: RedemptionState = { status: 'error', error: 'invalid' };
+      setRedemptionState(errorState);
       hasAttemptedRef.current = false;
     }
   }, [planId, githubIdentity, sendToSignaling]);

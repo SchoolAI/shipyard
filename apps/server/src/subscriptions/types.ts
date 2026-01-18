@@ -2,7 +2,9 @@
  * Types for the notification subscription system.
  */
 
-export type ChangeType = 'status' | 'comments' | 'resolved' | 'content' | 'artifacts';
+import type { Change, ChangesResponse, ChangeType } from '@peer-plan/schema';
+
+export type { Change, ChangesResponse, ChangeType };
 
 export interface SubscriptionConfig {
   planId: string;
@@ -10,13 +12,6 @@ export interface SubscriptionConfig {
   windowMs: number;
   maxWindowMs: number;
   threshold: number;
-}
-
-export interface Change {
-  type: ChangeType;
-  timestamp: number;
-  summary: string;
-  details?: Record<string, unknown>;
 }
 
 export interface Subscription {
@@ -27,12 +22,4 @@ export interface Subscription {
   lastFlushedAt: number;
   lastActivityAt: number;
   ready: boolean;
-}
-
-export interface ChangesResponse {
-  ready: boolean;
-  changes?: string;
-  details?: Change[];
-  pending?: number;
-  windowExpiresIn?: number;
 }

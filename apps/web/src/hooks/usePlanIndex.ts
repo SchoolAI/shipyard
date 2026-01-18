@@ -61,10 +61,10 @@ function mergeViewedByState(prevState: ViewedByRecord, newData: ViewedByRecord):
 }
 
 /** Extended plan entry with unread status */
-export interface PlanIndexEntryWithReadState extends PlanIndexEntry {
+export type PlanIndexEntryWithReadState = PlanIndexEntry & {
   /** True if the plan is unread by the current user */
   isUnread?: boolean;
-}
+};
 
 export interface PlanIndexState {
   /** Plans owned by the current user */
@@ -132,7 +132,7 @@ export function usePlanIndex(currentUsername: string | undefined): PlanIndexStat
 
       const activePlans = getPlanIndex(ydoc, false);
       const allPlans = getPlanIndex(ydoc, true);
-      const archived = allPlans.filter((p) => p.deletedAt);
+      const archived = allPlans.filter((p) => p.deleted);
 
       // Build key strings for comparison - include updatedAt so sorting triggers when timestamps change
       const activeKeys = activePlans
@@ -230,6 +230,7 @@ export function usePlanIndex(currentUsername: string | undefined): PlanIndexStat
                 createdAt: metadata.createdAt ?? Date.now(),
                 updatedAt: metadata.updatedAt ?? Date.now(),
                 ownerId,
+                deleted: false,
               };
             } catch {
               return null;

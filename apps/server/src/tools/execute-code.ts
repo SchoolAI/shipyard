@@ -107,10 +107,12 @@ Parameters:
 - sessionToken (string): Session token
 - type (string): 'screenshot' | 'video' | 'test_results' | 'diff'
 - filename (string): e.g., "screenshot.png"
-- filePath (string, optional): Local file path (RECOMMENDED)
-- contentUrl (string, optional): URL to fetch from
-- content (string, optional): Base64 encoded (legacy)
+- source (string): Content source type - 'file' | 'url' | 'base64'
+- filePath (string): Local file path (required when source='file') - RECOMMENDED
+- contentUrl (string): URL to fetch from (required when source='url')
+- content (string): Base64 encoded (required when source='base64', legacy)
 - deliverableId (string, optional): Links artifact to deliverable
+- description (string, optional): What this artifact proves
 
 Auto-complete: When ALL deliverables have artifacts, returns snapshotUrl.
 
@@ -120,6 +122,7 @@ const result = await addArtifact({
   planId, sessionToken,
   type: 'screenshot',
   filename: 'login.png',
+  source: 'file',
   filePath: '/tmp/screenshot.png',
   deliverableId: 'del_abc'
 });
@@ -259,6 +262,8 @@ await addArtifact({
   planId: plan.planId,
   sessionToken: plan.sessionToken,
   type: 'screenshot',
+  source: 'file',
+  filename: 'screenshot.png',
   filePath: './screenshot.png',
   deliverableId: plan.deliverables[0].id  // Use actual deliverable ID
 });
@@ -267,6 +272,8 @@ const result = await addArtifact({
   planId: plan.planId,
   sessionToken: plan.sessionToken,
   type: 'video',
+  source: 'file',
+  filename: 'demo.mp4',
   filePath: './demo.mp4',
   deliverableId: plan.deliverables[1].id  // Use actual deliverable ID
 });
@@ -350,17 +357,20 @@ async function updatePlan(
   await updatePlanTool.handler({ planId, sessionToken, ...updates });
 }
 
-async function addArtifact(opts: {
+type AddArtifactOpts = {
   planId: string;
   sessionToken: string;
   type: string;
   filename: string;
-  filePath?: string;
-  contentUrl?: string;
-  content?: string;
   description?: string;
   deliverableId?: string;
-}) {
+} & (
+  | { source: 'file'; filePath: string }
+  | { source: 'url'; contentUrl: string }
+  | { source: 'base64'; content: string }
+);
+
+async function addArtifact(opts: AddArtifactOpts) {
   const result = await addArtifactTool.handler(opts);
   const text = (result.content[0] as { text: string })?.text || '';
 
@@ -383,11 +393,20 @@ async function addArtifact(opts: {
   // Get snapshot URL from metadata if task was completed
   const metadata = getPlanMetadata(ydoc);
 
+  // Get URL from discriminated union
+  let artifactUrl = '';
+  if (addedArtifact) {
+    artifactUrl =
+      addedArtifact.storage === 'github'
+        ? addedArtifact.url
+        : `http://localhost:${process.env.REGISTRY_PORT || 3000}/artifacts/${addedArtifact.localArtifactId}`;
+  }
+
   return {
     artifactId: addedArtifact?.id || '',
-    url: addedArtifact?.url || '',
+    url: artifactUrl,
     allDeliverablesComplete,
-    snapshotUrl: metadata?.snapshotUrl,
+    snapshotUrl: metadata?.status === 'completed' ? metadata.snapshotUrl : undefined,
     isError: false,
   };
 }
@@ -405,7 +424,7 @@ async function completeTask(planId: string, sessionToken: string, summary?: stri
   const metadata = getPlanMetadata(ydoc);
 
   return {
-    snapshotUrl: metadata?.snapshotUrl || '',
+    snapshotUrl: metadata?.status === 'completed' ? metadata.snapshotUrl || '' : '',
     status: metadata?.status || '',
     isError: false,
   };
@@ -495,22 +514,44 @@ async function requestUserInput(opts: {
 
   // Create manager and make request
   const manager = new InputRequestManager();
-  const requestId = manager.createRequest(ydoc, {
-    message: opts.message,
-    type: opts.type,
-    options: opts.options,
-    defaultValue: opts.defaultValue,
-    timeout: opts.timeout,
-  });
+
+  // Build params based on type - choice requires options
+  const params =
+    opts.type === 'choice'
+      ? {
+          message: opts.message,
+          type: 'choice' as const,
+          options: opts.options ?? [],
+          defaultValue: opts.defaultValue,
+          timeout: opts.timeout,
+        }
+      : {
+          message: opts.message,
+          type: opts.type,
+          defaultValue: opts.defaultValue,
+          timeout: opts.timeout,
+        };
+
+  const requestId = manager.createRequest(ydoc, params);
 
   // Wait for response
   const result = await manager.waitForResponse(ydoc, requestId, opts.timeout);
 
+  // Narrow the discriminated union to access appropriate fields
+  if (result.success) {
+    return {
+      success: true as const,
+      response: result.response,
+      status: result.status,
+      reason: undefined,
+    };
+  }
+
   return {
-    success: result.success,
-    response: result.response,
+    success: false as const,
+    response: undefined,
     status: result.status,
-    reason: result.success ? undefined : result.reason,
+    reason: result.reason,
   };
 }
 
