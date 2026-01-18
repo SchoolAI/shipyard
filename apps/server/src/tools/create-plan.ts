@@ -151,7 +151,7 @@ Bad deliverables (not provable):
     initPlanMetadata(ydoc, {
       id: planId,
       title: input.title,
-      status: 'draft',
+      status: 'pending_review',
       repo,
       pr: input.prNumber,
       ownerId,
@@ -199,7 +199,7 @@ Bad deliverables (not provable):
     setPlanIndexEntry(indexDoc, {
       id: planId,
       title: input.title,
-      status: 'draft',
+      status: 'pending_review',
       createdAt: now,
       updatedAt: now,
       ownerId,
