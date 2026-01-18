@@ -95,7 +95,7 @@ export function PlanPage() {
       }
     : null;
 
-  const { ydoc: indexDoc } = useMultiProviderSync(PLAN_INDEX_DOC_NAME);
+  const { ydoc: indexDoc, syncState: indexSyncState } = useMultiProviderSync(PLAN_INDEX_DOC_NAME);
   // Prefer WebSocket provider when connected, fall back to WebRTC for P2P-only mode.
   const activeProvider = isSnapshot ? null : (wsProvider ?? rtcProvider);
 
@@ -347,6 +347,7 @@ export function PlanPage() {
           <div className="border-b border-separator bg-surface px-2 md:px-6 py-1 md:py-3 shrink-0">
             <PlanHeader
               ydoc={ydoc}
+              indexDoc={indexSyncState.synced ? indexDoc : null}
               planId={planId}
               metadata={metadata}
               identity={identity}
@@ -404,6 +405,7 @@ export function PlanPage() {
             status={metadata.status}
             hubConnected={syncState?.connected}
             peerCount={syncState?.peerCount}
+            indexDoc={indexSyncState.synced ? indexDoc : null}
             rightContent={
               <MobileActionsMenu
                 planId={planId}
@@ -421,7 +423,7 @@ export function PlanPage() {
         <InputRequestModal
           isOpen={inputRequestModalOpen}
           request={currentInputRequest}
-          ydoc={ydoc}
+          ydoc={indexSyncState.synced ? indexDoc : null}
           onClose={() => {
             setInputRequestModalOpen(false);
             setCurrentInputRequest(null);
@@ -437,7 +439,7 @@ export function PlanPage() {
       <InputRequestModal
         isOpen={inputRequestModalOpen}
         request={currentInputRequest}
-        ydoc={ydoc}
+        ydoc={indexSyncState.synced ? indexDoc : null}
         onClose={() => {
           setInputRequestModalOpen(false);
           setCurrentInputRequest(null);

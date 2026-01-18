@@ -20,6 +20,7 @@ import type { InputRequest } from '@peer-plan/schema';
 import { YDOC_KEYS } from '@peer-plan/schema';
 import type React from 'react';
 import { useCallback, useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import type * as Y from 'yjs';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
 import { assertNever } from '@/utils/assert-never';
@@ -99,6 +100,9 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
     setIsSubmitting(true);
 
     try {
+      // Track if transaction actually performed an update
+      let wasUpdated = false;
+
       ydoc.transact(() => {
         const requestsArray = ydoc.getArray(YDOC_KEYS.INPUT_REQUESTS);
         const requests = requestsArray.toJSON() as InputRequest[];
@@ -123,11 +127,20 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
               answeredBy: identity.username,
             },
           ]);
+
+          wasUpdated = true;
         }
       });
 
-      setValue('');
-      onClose();
+      // Only close modal and clear value if update succeeded
+      if (wasUpdated) {
+        setValue('');
+        onClose();
+      } else {
+        // Show toast indicating race condition
+        toast.error('This request was already answered by another user');
+        // Keep modal open so user can see the message and close manually
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -146,6 +159,9 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
       setIsSubmitting(true);
 
       try {
+        // Track if transaction actually performed an update
+        let wasUpdated = false;
+
         ydoc.transact(() => {
           const requestsArray = ydoc.getArray(YDOC_KEYS.INPUT_REQUESTS);
           const requests = requestsArray.toJSON() as InputRequest[];
@@ -170,11 +186,20 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
                 answeredBy: identity.username,
               },
             ]);
+
+            wasUpdated = true;
           }
         });
 
-        setValue('');
-        onClose();
+        // Only close modal and clear value if update succeeded
+        if (wasUpdated) {
+          setValue('');
+          onClose();
+        } else {
+          // Show toast indicating race condition
+          toast.error('This request was already answered by another user');
+          // Keep modal open so user can see the message and close manually
+        }
       } finally {
         setIsSubmitting(false);
       }

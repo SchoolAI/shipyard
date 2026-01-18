@@ -189,6 +189,7 @@ export function useInputRequests({
     // Cleanup: unobserve on unmount or ydoc change
     return () => {
       requestsArray.unobserve(updateRequests);
+      previousRequestIdsRef.current.clear(); // Clear on ydoc change
     };
   }, [ydoc]);
 

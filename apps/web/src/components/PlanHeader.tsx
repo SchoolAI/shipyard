@@ -15,7 +15,6 @@ import {
   getPlanIndexEntry,
   getPlanOwnerId,
   logPlanEvent,
-  PLAN_INDEX_DOC_NAME,
   setPlanIndexEntry,
 } from '@peer-plan/schema';
 import {
@@ -48,7 +47,6 @@ import { useUserIdentity } from '@/contexts/UserIdentityContext';
 import { useConversationTransfer } from '@/hooks/useConversationTransfer';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
 import { useIsMobile } from '@/hooks/useIsMobile';
-import { useMultiProviderSync } from '@/hooks/useMultiProviderSync';
 import { type ConnectedPeer, useP2PPeers } from '@/hooks/useP2PPeers';
 
 // ============================================================================
@@ -465,6 +463,8 @@ interface UserIdentity {
 
 interface PlanHeaderProps {
   ydoc: Y.Doc;
+  /** Index doc for input requests (separate from plan doc). Null if not synced yet. */
+  indexDoc: Y.Doc | null;
   /** Plan ID for archive actions */
   planId: string;
   /** Current metadata from parent component */
@@ -485,6 +485,7 @@ interface PlanHeaderProps {
 
 export function PlanHeader({
   ydoc,
+  indexDoc,
   planId,
   metadata,
   identity,
@@ -501,7 +502,7 @@ export function PlanHeader({
   const isArchived = !!display.archivedAt;
   const { identity: githubIdentity } = useGitHubAuth();
   const { actor } = useUserIdentity();
-  const { ydoc: indexDoc } = useMultiProviderSync(PLAN_INDEX_DOC_NAME);
+  // indexDoc is now passed as a prop (fixed Y.Doc mismatch bug)
   const ownerId = getPlanOwnerId(ydoc);
   const { connectedPeers } = useP2PPeers(rtcProvider);
 
@@ -528,11 +529,6 @@ export function PlanHeader({
   );
 
   const handleArchiveToggle = () => {
-    if (!githubIdentity) {
-      toast.error('Please sign in with GitHub first');
-      return;
-    }
-
     const now = Date.now();
 
     ydoc.transact(
@@ -543,7 +539,7 @@ export function PlanHeader({
           metadataMap.delete('archivedBy');
         } else {
           metadataMap.set('archivedAt', now);
-          metadataMap.set('archivedBy', githubIdentity.displayName);
+          metadataMap.set('archivedBy', actor);
         }
         metadataMap.set('updatedAt', now);
       },
@@ -553,20 +549,23 @@ export function PlanHeader({
     // Log archive/unarchive event
     logPlanEvent(ydoc, isArchived ? 'plan_unarchived' : 'plan_archived', actor);
 
-    const entry = getPlanIndexEntry(indexDoc, planId);
-    if (entry) {
-      if (isArchived) {
-        const { deletedAt: _removed1, deletedBy: _removed2, ...rest } = entry;
-        setPlanIndexEntry(indexDoc, { ...rest, updatedAt: now });
-        toast.success('Plan unarchived');
-      } else {
-        setPlanIndexEntry(indexDoc, {
-          ...entry,
-          deletedAt: now,
-          deletedBy: githubIdentity.displayName,
-          updatedAt: now,
-        });
-        toast.success('Plan archived');
+    // Update index entry if indexDoc is synced
+    if (indexDoc) {
+      const entry = getPlanIndexEntry(indexDoc, planId);
+      if (entry) {
+        if (isArchived) {
+          const { deletedAt: _removed1, deletedBy: _removed2, ...rest } = entry;
+          setPlanIndexEntry(indexDoc, { ...rest, updatedAt: now });
+          toast.success('Plan unarchived');
+        } else {
+          setPlanIndexEntry(indexDoc, {
+            ...entry,
+            deletedAt: now,
+            deletedBy: actor,
+            updatedAt: now,
+          });
+          toast.success('Plan archived');
+        }
       }
     }
   };
@@ -688,7 +687,7 @@ export function PlanHeader({
           />
 
           {/* Input request notifications */}
-          <NotificationsButton ydoc={ydoc} />
+          <NotificationsButton ydoc={indexDoc} />
 
           {/* Review actions - inline on desktop, floating on mobile */}
           {!isMobile && (

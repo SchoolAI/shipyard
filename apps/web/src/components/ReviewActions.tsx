@@ -145,16 +145,15 @@ export function ReviewActions({
     ydoc.transact(
       () => {
         const metadata = ydoc.getMap('metadata');
-        const reviewRequestId = metadata.get('reviewRequestId') as string | undefined;
 
         metadata.set('status', newStatus);
         metadata.set('reviewedAt', now);
         metadata.set('reviewedBy', identity?.name ?? 'Unknown');
         metadata.set('updatedAt', now);
 
-        if (reviewRequestId !== undefined) {
-          metadata.set('reviewRequestId', reviewRequestId);
-        }
+        // NOTE: Do NOT set reviewRequestId here - server manages it
+        // Setting it would overwrite the server's current reviewRequestId
+        // and cause a mismatch, preventing the hook from seeing the status change
 
         if (trimmedComment) {
           metadata.set('reviewComment', trimmedComment);

@@ -2,6 +2,8 @@ import { Button } from '@heroui/react';
 import type { PlanStatusType } from '@peer-plan/schema';
 import { Menu } from 'lucide-react';
 import type { ReactNode } from 'react';
+import type * as Y from 'yjs';
+import { NotificationsButton } from '@/components/NotificationsButton';
 import { StatusChip } from '@/components/StatusChip';
 
 interface MobileHeaderProps {
@@ -17,6 +19,8 @@ interface MobileHeaderProps {
   peerCount?: number;
   /** Share button action */
   onShare?: () => void;
+  /** Index doc for input request notifications */
+  indexDoc?: Y.Doc | null;
   /** Additional content to show (e.g., share button component) */
   rightContent?: ReactNode;
 }
@@ -31,6 +35,7 @@ export function MobileHeader({
   status,
   hubConnected,
   peerCount,
+  indexDoc,
   rightContent,
 }: MobileHeaderProps) {
   return (
@@ -63,6 +68,9 @@ export function MobileHeader({
           {peerCount}
         </span>
       )}
+
+      {/* Notifications button for input requests */}
+      {indexDoc && <NotificationsButton ydoc={indexDoc} />}
 
       {rightContent}
     </header>
