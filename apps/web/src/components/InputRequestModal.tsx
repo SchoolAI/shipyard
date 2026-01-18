@@ -8,6 +8,8 @@ import {
   Alert,
   Button,
   Card,
+  Checkbox,
+  CheckboxGroup,
   Form,
   Input,
   Label,
@@ -18,7 +20,7 @@ import {
   TextField,
 } from '@heroui/react';
 import type { InputRequest } from '@peer-plan/schema';
-import { YDOC_KEYS } from '@peer-plan/schema';
+import { logPlanEvent, YDOC_KEYS } from '@peer-plan/schema';
 import type React from 'react';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
@@ -33,7 +35,7 @@ interface InputRequestModalProps {
 }
 
 export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputRequestModalProps) {
-  const [value, setValue] = useState('');
+  const [value, setValue] = useState<string | string[]>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   // Use -1 as sentinel value to indicate "not yet initialized"
   // This prevents race condition where auto-cancel fires before countdown is set
@@ -43,7 +45,12 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
   // Reset state when request changes
   useEffect(() => {
     if (request) {
-      setValue(request.defaultValue || '');
+      // multiSelect only exists on 'choice' type requests
+      if (request.type === 'choice' && request.multiSelect) {
+        setValue(request.defaultValue ? [request.defaultValue] : []);
+      } else {
+        setValue(request.defaultValue || '');
+      }
     }
     // Reset countdown to sentinel value when request changes
     // This prevents stale timeout values from previous requests
@@ -63,15 +70,21 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
         requestsArray.insert(index, [
           {
             ...request,
-            status: 'cancelled',
+            status: 'declined',
           },
         ]);
+
+        // Log activity event
+        logPlanEvent(ydoc, 'input_request_declined', identity?.username || 'User', {
+          requestId: request.id,
+        });
       }
     });
 
-    setValue('');
+    // multiSelect only exists on 'choice' type requests
+    setValue(request.type === 'choice' && request.multiSelect ? [] : '');
     onClose();
-  }, [ydoc, request, onClose]);
+  }, [ydoc, request, identity, onClose]);
 
   const handleModalClose = useCallback(() => {
     // Only close modal, don't cancel request
@@ -107,6 +120,7 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
     }
   }, [remainingTime, isOpen, request, handleCancel]);
 
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Transaction logic with race condition checks requires comprehensive validation
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!ydoc || !request || !identity || isSubmitting) return;
@@ -148,12 +162,20 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
           },
         ]);
 
+        // Log activity event
+        logPlanEvent(ydoc, 'input_request_answered', identity.username, {
+          requestId: request.id,
+          response: value,
+          answeredBy: identity.username,
+        });
+
         wasUpdated = true;
       });
 
       // Only close modal and clear value if update succeeded
       if (wasUpdated) {
-        setValue('');
+        // multiSelect only exists on 'choice' type requests
+        setValue(request.type === 'choice' && request.multiSelect ? [] : '');
         onClose();
       } else {
         // Show appropriate error message based on failure reason
@@ -183,6 +205,7 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
   };
 
   const handleConfirmResponse = useCallback(
+    // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Transaction logic with race condition checks requires comprehensive validation
     (response: 'yes' | 'no') => {
       if (!ydoc || !request || !identity || isSubmitting) return;
 
@@ -223,12 +246,20 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
             },
           ]);
 
+          // Log activity event
+          logPlanEvent(ydoc, 'input_request_answered', identity.username, {
+            requestId: request.id,
+            response,
+            answeredBy: identity.username,
+          });
+
           wasUpdated = true;
         });
 
         // Only close modal and clear value if update succeeded
         if (wasUpdated) {
-          setValue('');
+          // multiSelect only exists on 'choice' type requests
+          setValue(request.type === 'choice' && request.multiSelect ? [] : '');
           onClose();
         } else {
           // Show appropriate error message based on failure reason
@@ -251,6 +282,7 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
     [ydoc, request, identity, isSubmitting, onClose]
   );
 
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Input type switching with form validation requires comprehensive handling
   const renderInput = () => {
     if (!request) return null;
 
@@ -303,9 +335,42 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
           );
         }
 
+        // Multi-select mode with checkboxes
+        if (request.multiSelect) {
+          return (
+            <div className="space-y-3">
+              <CheckboxGroup
+                isRequired
+                value={Array.isArray(value) ? value : []}
+                onChange={setValue}
+                isDisabled={isSubmitting}
+              >
+                <Label className="text-sm font-medium text-foreground">{request.message}</Label>
+                <p className="text-xs text-muted-foreground mt-1">(Select one or more options)</p>
+                {options.map((opt) => (
+                  <Checkbox key={opt} value={opt}>
+                    <Checkbox.Control>
+                      <Checkbox.Indicator />
+                    </Checkbox.Control>
+                    <Checkbox.Content>
+                      <Label>{opt}</Label>
+                    </Checkbox.Content>
+                  </Checkbox>
+                ))}
+              </CheckboxGroup>
+            </div>
+          );
+        }
+
+        // Single-select mode with radio buttons (existing code)
         return (
           <div className="space-y-3">
-            <RadioGroup isRequired value={value} onChange={setValue} isDisabled={isSubmitting}>
+            <RadioGroup
+              isRequired
+              value={typeof value === 'string' ? value : ''}
+              onChange={setValue}
+              isDisabled={isSubmitting}
+            >
               <Label className="text-sm font-medium text-foreground">{request.message}</Label>
               {options.map((opt) => (
                 <Radio key={opt} value={opt}>
@@ -403,7 +468,7 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
                     </span>
                     <div className="flex gap-2">
                       <Button variant="secondary" onPress={handleCancel} isDisabled={isSubmitting}>
-                        Cancel
+                        Decline
                       </Button>
                       <Button onPress={() => startAuth()}>Sign in with GitHub</Button>
                     </div>
@@ -447,13 +512,13 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
                     </span>
                     <div className="flex gap-2">
                       <Button variant="secondary" onPress={handleCancel} isDisabled={isSubmitting}>
-                        Cancel
+                        Decline
                       </Button>
                       <Button
                         type="submit"
                         isDisabled={
                           isSubmitting ||
-                          !value ||
+                          (Array.isArray(value) ? value.length === 0 : !value) ||
                           (request.type === 'choice' && !request.options?.length)
                         }
                         isPending={isSubmitting}

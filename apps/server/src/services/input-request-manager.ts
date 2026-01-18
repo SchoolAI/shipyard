@@ -11,6 +11,7 @@ import {
   createInputRequest,
   type InputRequest,
   InputRequestSchema,
+  logPlanEvent,
   YDOC_KEYS,
 } from '@peer-plan/schema';
 import type * as Y from 'yjs';
@@ -19,8 +20,9 @@ import { logger } from '../logger.js';
 /**
  * Response from waiting for a user input request.
  * Uses discriminated union on 'success' to ensure type safety:
- * - success=true: response, answeredBy, answeredAt are REQUIRED
- * - success=false: reason is available, response fields are absent
+ * - success=true + status='answered': response, answeredBy, answeredAt are REQUIRED
+ * - success=true + status='declined': reason is available, user explicitly declined
+ * - success=false + status='cancelled': reason is available (timeout or other cancellation)
  */
 export type InputRequestResponse =
   | {
@@ -36,7 +38,15 @@ export type InputRequestResponse =
       answeredAt: number;
     }
   | {
-      /** Whether a valid response was received */
+      /** User explicitly declined to answer */
+      success: true;
+      /** Status when response was returned */
+      status: 'declined';
+      /** Reason for declining */
+      reason: string;
+    }
+  | {
+      /** Request was cancelled (timeout or error) */
       success: false;
       /** Status when response was returned */
       status: 'cancelled';
@@ -64,6 +74,13 @@ export class InputRequestManager {
     ydoc.transact(() => {
       const requestsArray = ydoc.getArray<InputRequest>(YDOC_KEYS.INPUT_REQUESTS);
       requestsArray.push([request]);
+
+      // Log activity event
+      logPlanEvent(ydoc, 'input_request_created', 'Agent', {
+        requestId: request.id,
+        requestType: request.type,
+        requestMessage: request.message,
+      });
     });
 
     logger.info(
@@ -156,14 +173,26 @@ export class InputRequestManager {
           return; // Bug #3 fix: Prevent further execution
         }
 
+        if (request.status === 'declined') {
+          logger.info({ requestId }, 'Input request declined by user');
+          resolved = true; // Bug #3 fix: Set flag before resolving
+          cleanup();
+          resolve({
+            success: true,
+            status: 'declined',
+            reason: 'User declined to answer',
+          });
+          return; // Bug #3 fix: Prevent further execution
+        }
+
         if (request.status === 'cancelled') {
-          logger.info({ requestId }, 'Input request cancelled');
+          logger.info({ requestId }, 'Input request cancelled (timeout)');
           resolved = true; // Bug #3 fix: Set flag before resolving
           cleanup();
           resolve({
             success: false,
             status: 'cancelled',
-            reason: 'Request was cancelled',
+            reason: 'Request timed out',
           });
           return; // Bug #3 fix: Prevent further execution
         }

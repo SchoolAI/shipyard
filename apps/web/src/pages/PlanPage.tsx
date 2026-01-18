@@ -436,6 +436,7 @@ export function PlanPage() {
             hubConnected={syncState?.connected}
             peerCount={syncState?.peerCount}
             indexDoc={indexDoc}
+            planId={planId}
             rightContent={
               <MobileActionsMenu
                 planId={planId}

@@ -150,6 +150,9 @@ export const PlanEventTypes = [
   'conversation_exported',
   'plan_shared',
   'approval_requested',
+  'input_request_created',
+  'input_request_answered',
+  'input_request_declined',
 ] as const;
 export type PlanEventType = (typeof PlanEventTypes)[number];
 
@@ -266,6 +269,31 @@ export type PlanEvent =
       type: 'approval_requested';
       data?: {
         requesterName?: string;
+      };
+    })
+  // Input request created
+  | (PlanEventBase & {
+      type: 'input_request_created';
+      data: {
+        requestId: string;
+        requestType: 'text' | 'multiline' | 'choice' | 'confirm';
+        requestMessage: string;
+      };
+    })
+  // Input request answered
+  | (PlanEventBase & {
+      type: 'input_request_answered';
+      data: {
+        requestId: string;
+        response: unknown;
+        answeredBy: string;
+      };
+    })
+  // Input request declined
+  | (PlanEventBase & {
+      type: 'input_request_declined';
+      data: {
+        requestId: string;
       };
     });
 
@@ -392,6 +420,31 @@ export const PlanEventSchema = z.discriminatedUnion('type', [
         requesterName: z.string().optional(),
       })
       .optional(),
+  }),
+  // Input request created
+  PlanEventBaseSchema.extend({
+    type: z.literal('input_request_created'),
+    data: z.object({
+      requestId: z.string(),
+      requestType: z.enum(['text', 'multiline', 'choice', 'confirm']),
+      requestMessage: z.string(),
+    }),
+  }),
+  // Input request answered
+  PlanEventBaseSchema.extend({
+    type: z.literal('input_request_answered'),
+    data: z.object({
+      requestId: z.string(),
+      response: z.unknown(),
+      answeredBy: z.string(),
+    }),
+  }),
+  // Input request declined
+  PlanEventBaseSchema.extend({
+    type: z.literal('input_request_declined'),
+    data: z.object({
+      requestId: z.string(),
+    }),
   }),
 ]);
 

@@ -1,11 +1,14 @@
 import { Button, Chip, Tooltip } from '@heroui/react';
+import { PLAN_INDEX_DOC_NAME } from '@peer-plan/schema';
 import { Archive, ChevronRight, Inbox, LayoutGrid, Search } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { AccountSection } from '@/components/account';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { CollapsiblePanel } from '@/components/ui/collapsible-panel';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
+import { useInputRequests } from '@/hooks/useInputRequests';
+import { useMultiProviderSync } from '@/hooks/useMultiProviderSync';
 import { usePlanIndex } from '@/hooks/usePlanIndex';
 import { getSidebarCollapsed, setSidebarCollapsed } from '@/utils/uiPreferences';
 
@@ -208,9 +211,16 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
   const { inboxPlans, archivedPlans, navigationTarget, clearNavigation, isLoading } = usePlanIndex(
     githubIdentity?.username
   );
+  const { ydoc: indexDoc } = useMultiProviderSync(PLAN_INDEX_DOC_NAME);
+  const { pendingRequests } = useInputRequests({ ydoc: indexDoc });
   const [collapsed, setCollapsed] = useState(getSidebarCollapsed);
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Calculate total inbox count (plans + input requests)
+  const totalInboxCount = useMemo(() => {
+    return inboxPlans.length + pendingRequests.length;
+  }, [inboxPlans, pendingRequests]);
 
   useEffect(() => {
     if (!navigationTarget) return;
@@ -229,7 +239,7 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
 
   const collapsedContent = (
     <CollapsedSidebar
-      inboxCount={inboxPlans.length}
+      inboxCount={totalInboxCount}
       archivedCount={archivedPlans.length}
       isLoading={isLoading}
       onToggle={handleToggle}
@@ -277,13 +287,13 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
         <NavItem
           icon={
             <Inbox
-              className={`w-4 h-4 ${!isLoading && inboxPlans.length > 0 ? 'text-warning' : ''}`}
+              className={`w-4 h-4 ${!isLoading && totalInboxCount > 0 ? 'text-warning' : ''}`}
             />
           }
           label="Inbox"
           href="/inbox"
           isActive={location.pathname === '/inbox'}
-          badge={isLoading ? undefined : inboxPlans.length}
+          badge={isLoading ? undefined : totalInboxCount}
           badgeColor="warning"
           onClick={onNavigate}
         />

@@ -700,9 +700,6 @@ export function PlanHeader({
             ownerId={ownerId}
           />
 
-          {/* Input request notifications */}
-          <NotificationsButton ydoc={indexDoc} />
-
           {/* Review actions - inline on desktop, floating on mobile */}
           {!isMobile && (
             <>
@@ -733,6 +730,9 @@ export function PlanHeader({
               onArchiveToggle={handleArchiveToggle}
             />
             <LinkPRButton ydoc={ydoc} isOpen={isLinkPROpen} onOpenChange={setIsLinkPROpen} />
+
+            {/* Input request notifications */}
+            <NotificationsButton ydoc={indexDoc} planId={planId} />
           </div>
 
           {/* Mobile: Show dropdown menu with all actions */}

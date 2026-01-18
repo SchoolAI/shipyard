@@ -8,11 +8,13 @@ import {
   Download,
   FileEdit,
   GitPullRequest,
+  HelpCircle,
   Link as LinkIcon,
   MessageSquare,
   RefreshCw,
   Share2,
   Upload,
+  X,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { formatRelativeTime } from '@/utils/formatters';
@@ -61,11 +63,18 @@ function getEventIcon(type: PlanEventType): ReactNode {
       return <Share2 className="w-3.5 h-3.5" />;
     case 'approval_requested':
       return <AlertTriangle className="w-3.5 h-3.5 text-warning" />;
+    case 'input_request_created':
+      return <HelpCircle className="w-3.5 h-3.5 text-accent" />;
+    case 'input_request_answered':
+      return <Check className="w-3.5 h-3.5 text-success" />;
+    case 'input_request_declined':
+      return <X className="w-3.5 h-3.5 text-muted-foreground" />;
     default:
       return assertNever(type);
   }
 }
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Event descriptions require comprehensive switch handling
 function getEventDescription(event: PlanEvent): string {
   switch (event.type) {
     case 'plan_created':
@@ -123,6 +132,27 @@ function getEventDescription(event: PlanEvent): string {
       const requesterName = event.data?.requesterName;
       return requesterName ? `${requesterName} requested access` : 'requested access to the plan';
     }
+    case 'input_request_created': {
+      const requestMessage = event.data?.requestMessage;
+      const requestType = event.data?.requestType;
+      if (requestMessage) {
+        return `requested input: "${requestMessage}"`;
+      }
+      return requestType ? `requested ${requestType} input` : 'requested input';
+    }
+    case 'input_request_answered': {
+      const answeredBy = event.data?.answeredBy;
+      const response = event.data?.response;
+      if (answeredBy && response !== undefined) {
+        // Format response for display
+        const responseStr = typeof response === 'string' ? response : JSON.stringify(response);
+        const truncated = responseStr.length > 50 ? `${responseStr.slice(0, 50)}...` : responseStr;
+        return `${answeredBy} responded: "${truncated}"`;
+      }
+      return answeredBy ? `${answeredBy} answered input request` : 'answered input request';
+    }
+    case 'input_request_declined':
+      return 'declined input request';
     default:
       return assertNever(event);
   }

@@ -213,6 +213,7 @@ Parameters:
 - message (string, required): The question to ask the user
 - type (string, required): 'text' | 'choice' | 'confirm' | 'multiline'
 - options (string[], optional): For 'choice' type - available options (required for choice)
+- multiSelect (boolean, optional): For 'choice' type - allow selecting multiple options (uses checkboxes instead of radio buttons)
 - defaultValue (string, optional): Pre-filled value for text/multiline inputs
 - timeout (number, optional): Timeout in seconds (default: 300, min: 10, max: 600)
 - planId (string, optional): Optional metadata to link request to plan (for activity log filtering)
@@ -502,6 +503,7 @@ async function requestUserInput(opts: {
   message: string;
   type: 'text' | 'choice' | 'confirm' | 'multiline';
   options?: string[];
+  multiSelect?: boolean;
   defaultValue?: string;
   timeout?: number;
   planId?: string;
@@ -522,14 +524,17 @@ async function requestUserInput(opts: {
           message: opts.message,
           type: 'choice' as const,
           options: opts.options ?? [],
+          multiSelect: opts.multiSelect,
           defaultValue: opts.defaultValue,
           timeout: opts.timeout,
+          planId: opts.planId,
         }
       : {
           message: opts.message,
           type: opts.type,
           defaultValue: opts.defaultValue,
           timeout: opts.timeout,
+          planId: opts.planId,
         };
 
   const requestId = manager.createRequest(ydoc, params);
@@ -538,12 +543,21 @@ async function requestUserInput(opts: {
   const result = await manager.waitForResponse(ydoc, requestId, opts.timeout);
 
   // Narrow the discriminated union to access appropriate fields
-  if (result.success) {
+  if (result.status === 'answered') {
     return {
       success: true as const,
       response: result.response,
       status: result.status,
       reason: undefined,
+    };
+  }
+
+  if (result.status === 'declined') {
+    return {
+      success: false as const,
+      response: undefined,
+      status: result.status,
+      reason: result.reason,
     };
   }
 

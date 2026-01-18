@@ -6,6 +6,7 @@
 import { Accordion, Button, Chip, ListBox, ListBoxItem, Switch, Tooltip } from '@heroui/react';
 import {
   getPlanIndexEntry,
+  type InputRequest,
   PLAN_INDEX_DOC_NAME,
   type PlanIndexEntry,
   type PlanStatusType,
@@ -28,10 +29,13 @@ import { toast } from 'sonner';
 import { IndexeddbPersistence } from 'y-indexeddb';
 import * as Y from 'yjs';
 import { InlinePlanDetail, type PlanActionContext } from '@/components/InlinePlanDetail';
+import { InputRequestInboxItem } from '@/components/InputRequestInboxItem';
+import { InputRequestModal } from '@/components/InputRequestModal';
 import { TwoColumnSkeleton } from '@/components/ui/TwoColumnSkeleton';
 import { useUserIdentity } from '@/contexts/UserIdentityContext';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
 import { type InboxEventItem, useInboxEvents } from '@/hooks/useInboxEvents';
+import { useInputRequests } from '@/hooks/useInputRequests';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useMultiProviderSync } from '@/hooks/useMultiProviderSync';
 import { usePlanIndex } from '@/hooks/usePlanIndex';
@@ -244,6 +248,15 @@ export function InboxPage() {
   // Load event-based inbox items
   const eventBasedInbox = useInboxEvents(allInboxPlans, githubIdentity?.username ?? null);
 
+  // Load input requests from the plan index doc
+  const { pendingRequests } = useInputRequests({
+    ydoc: indexDoc,
+  });
+
+  // Input request modal state
+  const [inputRequestModalOpen, setInputRequestModalOpen] = useState(false);
+  const [currentInputRequest, setCurrentInputRequest] = useState<InputRequest | null>(null);
+
   // Selected plan state - read from URL on mount
   const searchParams = new URLSearchParams(location.search);
   const initialPanelId = searchParams.get('panel');
@@ -295,6 +308,20 @@ export function InboxPage() {
       navigate('', { replace: true });
     }
   }, [selectedPlanId, navigate]);
+
+  // Listen for open-input-request events
+  useEffect(() => {
+    const handleOpenInputRequest = (event: Event) => {
+      const customEvent = event as CustomEvent<InputRequest>;
+      setCurrentInputRequest(customEvent.detail);
+      setInputRequestModalOpen(true);
+    };
+
+    document.addEventListener('open-input-request', handleOpenInputRequest);
+    return () => {
+      document.removeEventListener('open-input-request', handleOpenInputRequest);
+    };
+  }, []);
 
   // Panel handlers
   const handleClosePanel = useCallback(() => {
@@ -517,7 +544,8 @@ export function InboxPage() {
     sortedInboxPlans.length +
     inboxGroups.mentions.length +
     inboxGroups.readyToComplete.length +
-    inboxGroups.approvalRequests.length;
+    inboxGroups.approvalRequests.length +
+    pendingRequests.length;
 
   if (totalInboxItems === 0) {
     return (
@@ -555,7 +583,47 @@ export function InboxPage() {
 
         {/* Inbox results */}
         <div className="flex-1 overflow-y-auto p-2">
-          <Accordion allowsMultipleExpanded defaultExpandedKeys={['needsReview', 'mentions']}>
+          <Accordion
+            allowsMultipleExpanded
+            defaultExpandedKeys={['agentInputNeeded', 'needsReview', 'mentions']}
+          >
+            {/* Agent Input Needed */}
+            {pendingRequests.length > 0 && (
+              <Accordion.Item id="agentInputNeeded">
+                <Accordion.Heading>
+                  <Accordion.Trigger>
+                    <MessageSquare className="w-4 h-4 mr-2 shrink-0 text-accent" />
+                    <span className="flex-1 text-left">Agent Input Needed</span>
+                    <Chip size="sm" variant="soft" color="accent" className="mr-2">
+                      {pendingRequests.length}
+                    </Chip>
+                    <Accordion.Indicator>
+                      <ChevronDown />
+                    </Accordion.Indicator>
+                  </Accordion.Trigger>
+                </Accordion.Heading>
+                <Accordion.Panel>
+                  <Accordion.Body>
+                    <div className="space-y-2 px-3">
+                      {pendingRequests.map((request) => (
+                        <InputRequestInboxItem
+                          key={request.id}
+                          request={request}
+                          onClick={() => {
+                            document.dispatchEvent(
+                              new CustomEvent('open-input-request', {
+                                detail: request,
+                              })
+                            );
+                          }}
+                        />
+                      ))}
+                    </div>
+                  </Accordion.Body>
+                </Accordion.Panel>
+              </Accordion.Item>
+            )}
+
             {/* Needs Review */}
             {inboxGroups.needsReview.length > 0 && (
               <Accordion.Item id="needsReview">
@@ -746,6 +814,17 @@ export function InboxPage() {
           emptyMessage="Select a plan to view details"
         />
       </div>
+
+      {/* Input Request Modal */}
+      <InputRequestModal
+        isOpen={inputRequestModalOpen}
+        request={currentInputRequest}
+        ydoc={indexDoc}
+        onClose={() => {
+          setInputRequestModalOpen(false);
+          setCurrentInputRequest(null);
+        }}
+      />
     </div>
   );
 }

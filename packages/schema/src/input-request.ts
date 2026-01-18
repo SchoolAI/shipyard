@@ -15,9 +15,10 @@ export type InputRequestType = (typeof InputRequestTypeValues)[number];
  * Valid status values for an input request.
  * - pending: Awaiting user response
  * - answered: User has responded
- * - cancelled: Request cancelled (timeout or explicit cancellation)
+ * - declined: User explicitly declined to answer
+ * - cancelled: Request cancelled (timeout)
  */
-export const InputRequestStatusValues = ['pending', 'answered', 'cancelled'] as const;
+export const InputRequestStatusValues = ['pending', 'answered', 'declined', 'cancelled'] as const;
 export type InputRequestStatus = (typeof InputRequestStatusValues)[number];
 
 // =============================================================================
@@ -42,6 +43,8 @@ const InputRequestBaseSchema = z.object({
     .min(10, 'Timeout must be at least 10 seconds')
     .max(600, 'Timeout cannot exceed 10 minutes')
     .optional(),
+  /** Optional plan ID to associate request with a specific plan (null/undefined = global) */
+  planId: z.string().optional(),
   // Status-dependent fields: optional at base level
   /** User's response (any JSON-serializable value) */
   response: z.unknown().optional(),
@@ -70,6 +73,8 @@ const ChoiceInputSchema = InputRequestBaseSchema.extend({
   type: z.literal('choice'),
   /** Available options - REQUIRED for choice type */
   options: z.array(z.string()).min(1, 'Choice requests must have at least one option'),
+  /** Enable multi-select for 'choice' type (uses checkboxes instead of radio buttons) */
+  multiSelect: z.boolean().optional(),
 });
 
 /** Confirm input request - boolean yes/no question */
@@ -107,6 +112,7 @@ interface CreateInputRequestBaseParams {
   message: string;
   defaultValue?: string;
   timeout?: number;
+  planId?: string;
 }
 
 /** Params for creating a text input request */
@@ -124,6 +130,8 @@ export interface CreateChoiceInputParams extends CreateInputRequestBaseParams {
   type: 'choice';
   /** Required: available options for selection */
   options: string[];
+  /** Enable multi-select (uses checkboxes instead of radio buttons) */
+  multiSelect?: boolean;
 }
 
 /** Params for creating a confirm input request */
@@ -160,6 +168,7 @@ export function createInputRequest(params: CreateInputRequestParams): InputReque
     defaultValue: params.defaultValue,
     status: 'pending' as const,
     timeout: params.timeout,
+    planId: params.planId,
   };
 
   let request: unknown;
@@ -172,7 +181,12 @@ export function createInputRequest(params: CreateInputRequestParams): InputReque
       request = { ...baseFields, type: 'multiline' as const };
       break;
     case 'choice':
-      request = { ...baseFields, type: 'choice' as const, options: params.options };
+      request = {
+        ...baseFields,
+        type: 'choice' as const,
+        options: params.options,
+        multiSelect: params.multiSelect,
+      };
       break;
     case 'confirm':
       request = { ...baseFields, type: 'confirm' as const };

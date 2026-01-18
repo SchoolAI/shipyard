@@ -181,8 +181,8 @@ describe('InputRequestManager', () => {
 
       expect(response.success).toBe(true);
       expect(response.status).toBe('answered');
-      // Narrow the discriminated union before accessing success-specific fields
-      if (response.success) {
+      // Narrow the discriminated union before accessing status-specific fields
+      if (response.status === 'answered') {
         expect(response.response).toBe('My answer');
         expect(response.answeredBy).toBe('user123');
       }
@@ -215,8 +215,8 @@ describe('InputRequestManager', () => {
       const response = await manager.waitForResponse(ydoc, requestId, 5);
 
       expect(response.success).toBe(true);
-      // Narrow the discriminated union before accessing success-specific fields
-      if (response.success) {
+      // Narrow the discriminated union before accessing status-specific fields
+      if (response.status === 'answered') {
         expect(response.response).toBe('Delayed answer');
       }
     });
@@ -463,8 +463,8 @@ describe('InputRequestManager', () => {
       const response = await responsePromise;
 
       expect(response.success).toBe(true);
-      // Narrow the discriminated union before accessing success-specific fields
-      if (response.success) {
+      // Narrow the discriminated union before accessing status-specific fields
+      if (response.status === 'answered') {
         expect(response.response).toBe('blue');
         expect(response.answeredBy).toBe('user123');
       }

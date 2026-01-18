@@ -21,6 +21,8 @@ interface MobileHeaderProps {
   onShare?: () => void;
   /** Index doc for input request notifications */
   indexDoc?: Y.Doc | null;
+  /** Optional plan ID to filter notifications (only show requests for this specific plan) */
+  planId?: string;
   /** Additional content to show (e.g., share button component) */
   rightContent?: ReactNode;
 }
@@ -36,6 +38,7 @@ export function MobileHeader({
   hubConnected,
   peerCount,
   indexDoc,
+  planId,
   rightContent,
 }: MobileHeaderProps) {
   return (
@@ -70,7 +73,7 @@ export function MobileHeader({
       )}
 
       {/* Notifications button for input requests */}
-      {indexDoc && <NotificationsButton ydoc={indexDoc} />}
+      {indexDoc && <NotificationsButton ydoc={indexDoc} planId={planId} />}
 
       {rightContent}
     </header>
