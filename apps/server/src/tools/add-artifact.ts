@@ -206,6 +206,11 @@ ARTIFACT TYPES:
         content = input.content;
         break;
       }
+
+      default: {
+        const _exhaustive: never = input;
+        throw new Error(`Unhandled source type: ${JSON.stringify(_exhaustive)}`);
+      }
     }
 
     // Check if artifacts feature is disabled

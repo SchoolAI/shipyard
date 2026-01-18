@@ -54,26 +54,26 @@ export type PlanIndexEntry =
 
 /**
  * Zod schema for validating plan index entries from Y.Map.
- * Validates the discriminated union structure.
+ * Uses discriminated union on 'deleted' field for better validation performance.
  */
-export const PlanIndexEntrySchema = z.union([
+export const PlanIndexEntrySchema = z.discriminatedUnion('deleted', [
   z.object({
+    deleted: z.literal(false),
     id: z.string(),
     title: z.string(),
     status: z.enum(PlanStatusValues),
     createdAt: z.number(),
     updatedAt: z.number(),
     ownerId: z.string(),
-    deleted: z.literal(false),
   }),
   z.object({
+    deleted: z.literal(true),
     id: z.string(),
     title: z.string(),
     status: z.enum(PlanStatusValues),
     createdAt: z.number(),
     updatedAt: z.number(),
     ownerId: z.string(),
-    deleted: z.literal(true),
     deletedAt: z.number(),
     deletedBy: z.string(),
   }),
