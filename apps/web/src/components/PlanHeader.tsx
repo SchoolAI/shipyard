@@ -625,7 +625,7 @@ export function PlanHeader({
 
     const result = await importFromFile(file);
 
-    if (result.success && result.messages && result.meta && result.summary) {
+    if (result.success) {
       setMobileImportData({
         messages: result.messages,
         meta: result.meta,
@@ -633,7 +633,7 @@ export function PlanHeader({
       });
       setIsMobileReviewOpen(true);
     } else {
-      toast.error(result.error ?? 'Import failed');
+      toast.error(result.error);
     }
   }
 

@@ -142,23 +142,11 @@ export const PlanEventTypes = [
 ] as const;
 export type PlanEventType = (typeof PlanEventTypes)[number];
 
-export interface PlanEvent {
+/** Base fields shared by all plan events */
+interface PlanEventBase {
   id: string;
-  type: PlanEventType;
   actor: string;
   timestamp: number;
-  data?: {
-    fromStatus?: PlanStatusType;
-    toStatus?: PlanStatusType;
-    artifactId?: string;
-    commentId?: string;
-    prNumber?: number;
-    stepId?: string;
-    completed?: boolean;
-    conversationId?: string;
-    messageCount?: number;
-    [key: string]: unknown;
-  };
   /** Whether this event should appear in the user's inbox (requires action) */
   inboxWorthy?: boolean;
   /**
@@ -168,15 +156,233 @@ export interface PlanEvent {
   inboxFor?: string | string[];
 }
 
-export const PlanEventSchema = z.object({
+/** Discriminated union of all plan event types with type-safe data payloads */
+export type PlanEvent =
+  // Events with no data
+  | (PlanEventBase & {
+      type: 'plan_created' | 'content_edited' | 'plan_archived' | 'plan_unarchived' | 'plan_shared';
+    })
+  // Status changed
+  | (PlanEventBase & {
+      type: 'status_changed';
+      data: {
+        fromStatus: PlanStatusType;
+        toStatus: PlanStatusType;
+      };
+    })
+  // Artifact uploaded
+  | (PlanEventBase & {
+      type: 'artifact_uploaded';
+      data: {
+        artifactId: string;
+      };
+    })
+  // Comment events
+  | (PlanEventBase & {
+      type: 'comment_added';
+      data?: {
+        commentId?: string;
+        prNumber?: number;
+        mentions?: boolean;
+      };
+    })
+  | (PlanEventBase & {
+      type: 'comment_resolved';
+      data?: {
+        commentId?: string;
+        resolvedCount?: number;
+      };
+    })
+  // Deliverable linked
+  | (PlanEventBase & {
+      type: 'deliverable_linked';
+      data?: {
+        deliverableId?: string;
+        artifactId?: string;
+        allFulfilled?: boolean;
+      };
+    })
+  // PR linked
+  | (PlanEventBase & {
+      type: 'pr_linked';
+      data: {
+        prNumber: number;
+        url?: string;
+      };
+    })
+  // Review events
+  | (PlanEventBase & {
+      type: 'approved' | 'changes_requested';
+    })
+  // Completion events
+  | (PlanEventBase & {
+      type: 'completed';
+    })
+  // Step completed
+  | (PlanEventBase & {
+      type: 'step_completed';
+      data: {
+        stepId: string;
+        completed: boolean;
+      };
+    })
+  // Conversation imported
+  | (PlanEventBase & {
+      type: 'conversation_imported';
+      data: {
+        sourcePlatform?: string;
+        messageCount: number;
+        sourceSessionId?: string;
+      };
+    })
+  // Conversation exported
+  | (PlanEventBase & {
+      type: 'conversation_exported';
+      data: {
+        messageCount: number;
+      };
+    })
+  // Conversation handed off
+  | (PlanEventBase & {
+      type: 'conversation_handed_off';
+      data: {
+        handedOffTo: string;
+        messageCount: number;
+      };
+    })
+  // Approval requested
+  | (PlanEventBase & {
+      type: 'approval_requested';
+      data?: {
+        requesterName?: string;
+      };
+    });
+
+/** Base schema shared by all plan events */
+const PlanEventBaseSchema = z.object({
   id: z.string(),
-  type: z.enum(PlanEventTypes),
   actor: z.string(),
   timestamp: z.number(),
-  data: z.record(z.string(), z.unknown()).optional(),
   inboxWorthy: z.boolean().optional(),
   inboxFor: z.union([z.string(), z.array(z.string())]).optional(),
 });
+
+/** Discriminated union schema for plan events */
+export const PlanEventSchema = z.discriminatedUnion('type', [
+  // Events with no data
+  PlanEventBaseSchema.extend({
+    type: z.enum([
+      'plan_created',
+      'content_edited',
+      'plan_archived',
+      'plan_unarchived',
+      'plan_shared',
+    ]),
+  }),
+  // Status changed
+  PlanEventBaseSchema.extend({
+    type: z.literal('status_changed'),
+    data: z.object({
+      fromStatus: z.enum(PlanStatusValues),
+      toStatus: z.enum(PlanStatusValues),
+    }),
+  }),
+  // Artifact uploaded
+  PlanEventBaseSchema.extend({
+    type: z.literal('artifact_uploaded'),
+    data: z.object({
+      artifactId: z.string(),
+    }),
+  }),
+  // Comment events
+  PlanEventBaseSchema.extend({
+    type: z.literal('comment_added'),
+    data: z
+      .object({
+        commentId: z.string().optional(),
+        prNumber: z.number().optional(),
+        mentions: z.boolean().optional(),
+      })
+      .optional(),
+  }),
+  PlanEventBaseSchema.extend({
+    type: z.literal('comment_resolved'),
+    data: z
+      .object({
+        commentId: z.string().optional(),
+        resolvedCount: z.number().optional(),
+      })
+      .optional(),
+  }),
+  // Deliverable linked
+  PlanEventBaseSchema.extend({
+    type: z.literal('deliverable_linked'),
+    data: z
+      .object({
+        deliverableId: z.string().optional(),
+        artifactId: z.string().optional(),
+        allFulfilled: z.boolean().optional(),
+      })
+      .optional(),
+  }),
+  // PR linked
+  PlanEventBaseSchema.extend({
+    type: z.literal('pr_linked'),
+    data: z.object({
+      prNumber: z.number(),
+      url: z.string().optional(),
+    }),
+  }),
+  // Review events
+  PlanEventBaseSchema.extend({
+    type: z.enum(['approved', 'changes_requested']),
+  }),
+  // Completion events
+  PlanEventBaseSchema.extend({
+    type: z.literal('completed'),
+  }),
+  // Step completed
+  PlanEventBaseSchema.extend({
+    type: z.literal('step_completed'),
+    data: z.object({
+      stepId: z.string(),
+      completed: z.boolean(),
+    }),
+  }),
+  // Conversation imported
+  PlanEventBaseSchema.extend({
+    type: z.literal('conversation_imported'),
+    data: z.object({
+      sourcePlatform: z.string().optional(),
+      messageCount: z.number(),
+      sourceSessionId: z.string().optional(),
+    }),
+  }),
+  // Conversation exported
+  PlanEventBaseSchema.extend({
+    type: z.literal('conversation_exported'),
+    data: z.object({
+      messageCount: z.number(),
+    }),
+  }),
+  // Conversation handed off
+  PlanEventBaseSchema.extend({
+    type: z.literal('conversation_handed_off'),
+    data: z.object({
+      handedOffTo: z.string(),
+      messageCount: z.number(),
+    }),
+  }),
+  // Approval requested
+  PlanEventBaseSchema.extend({
+    type: z.literal('approval_requested'),
+    data: z
+      .object({
+        requesterName: z.string().optional(),
+      })
+      .optional(),
+  }),
+]);
 
 /**
  * Check if an event should appear in a user's inbox.

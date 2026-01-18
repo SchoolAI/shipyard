@@ -137,9 +137,7 @@ export function ShareButton({
               ydoc,
               'plan_shared',
               actor,
-              {
-                inviteId: data.tokenId,
-              },
+              undefined,
               {
                 inboxWorthy: false, // Sharing action doesn't need owner action
               }

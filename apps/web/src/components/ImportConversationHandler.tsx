@@ -174,16 +174,16 @@ export function ImportConversationButton({
 
     const result = await importFromFile(file);
 
-    if (result.success && result.messages && result.meta && result.summary) {
+    if (result.success) {
       setImportedData(result);
       setIsReviewOpen(true);
     } else {
-      toast.error(result.error ?? 'Import failed');
+      toast.error(result.error);
     }
   }
 
   function handleConfirmImport() {
-    if (importedData?.messages && importedData?.meta) {
+    if (importedData && importedData.success) {
       onImportConfirmed?.(importedData.messages, importedData.meta);
       toast.success(`Imported ${importedData.meta.messageCount} messages`);
     }
@@ -217,7 +217,7 @@ export function ImportConversationButton({
         )}
       </Button>
 
-      {importedData?.messages && importedData?.meta && importedData?.summary && (
+      {importedData && importedData.success && (
         <ImportReviewModal
           isOpen={isReviewOpen}
           onClose={() => {

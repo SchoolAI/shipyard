@@ -292,7 +292,7 @@ export function MobileActionsMenu({ planId, ydoc, rtcProvider, metadata }: Mobil
 
     const result = await importFromFile(file);
 
-    if (result.success && result.messages && result.meta && result.summary) {
+    if (result.success) {
       setImportData({
         messages: result.messages,
         meta: result.meta,
@@ -300,7 +300,7 @@ export function MobileActionsMenu({ planId, ydoc, rtcProvider, metadata }: Mobil
       });
       setIsReviewOpen(true);
     } else {
-      toast.error(result.error ?? 'Import failed');
+      toast.error(result.error);
     }
   }
 

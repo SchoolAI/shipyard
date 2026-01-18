@@ -623,26 +623,49 @@ export function markVersionHandedOff(
   );
 }
 
-export function logPlanEvent(
+/**
+ * Type-safe helper to extract data type for a specific event type.
+ * Used to ensure correct data payload for each event type.
+ * Handles both required and optional data fields.
+ */
+type EventDataForType<T extends PlanEventType> = Extract<PlanEvent, { type: T }> extends infer E
+  ? E extends { data: infer D }
+    ? D
+    : E extends { data?: infer D }
+      ? D | undefined
+      : undefined
+  : never;
+
+/**
+ * Log a plan event with type-safe data payload.
+ * TypeScript will enforce that the data parameter matches the event type.
+ */
+export function logPlanEvent<T extends PlanEventType>(
   ydoc: Y.Doc,
-  type: PlanEventType,
+  type: T,
   actor: string,
-  data?: PlanEvent['data'],
-  options?: {
-    inboxWorthy?: boolean;
-    inboxFor?: string | string[];
-  }
+  ...args: EventDataForType<T> extends undefined
+    ? [
+        data?: undefined,
+        options?: {
+          inboxWorthy?: boolean;
+          inboxFor?: string | string[];
+        },
+      ]
+    : [
+        data: EventDataForType<T>,
+        options?: {
+          inboxWorthy?: boolean;
+          inboxFor?: string | string[];
+        },
+      ]
 ): void {
   const eventsArray = ydoc.getArray(YDOC_KEYS.EVENTS);
-  const event: PlanEvent = {
-    id: nanoid(),
-    type,
-    actor,
-    timestamp: Date.now(),
-    data,
-    inboxWorthy: options?.inboxWorthy,
-    inboxFor: options?.inboxFor,
-  };
+  const [data, options] = args;
+
+  // Add data if present - TypeScript knows the correct shape based on type parameter
+  const event = (data !== undefined ? { id: nanoid(), type, actor, timestamp: Date.now(), inboxWorthy: options?.inboxWorthy, inboxFor: options?.inboxFor, data } : { id: nanoid(), type, actor, timestamp: Date.now(), inboxWorthy: options?.inboxWorthy, inboxFor: options?.inboxFor }) as PlanEvent;
+
   eventsArray.push([event]);
 }
 

@@ -91,23 +91,21 @@ const ImportedConversationSchema = z.object({
 /**
  * Result of an export operation.
  */
-export interface ExportResult {
-  success: boolean;
-  filename?: string;
-  messageCount?: number;
-  error?: string;
-}
+export type ExportResult =
+  | { success: true; filename: string; messageCount: number }
+  | { success: false; error: string };
 
 /**
  * Result of an import operation.
  */
-export interface ImportResult {
-  success: boolean;
-  messages?: A2AMessage[];
-  meta?: ConversationExportMeta;
-  summary?: { title: string; text: string };
-  error?: string;
-}
+export type ImportResult =
+  | {
+      success: true;
+      messages: A2AMessage[];
+      meta: ConversationExportMeta;
+      summary: { title: string; text: string };
+    }
+  | { success: false; error: string };
 
 /**
  * Received conversation from P2P transfer.
