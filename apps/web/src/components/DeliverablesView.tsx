@@ -11,6 +11,7 @@ import { Package } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type * as Y from 'yjs';
 import { useUserIdentity } from '@/contexts/UserIdentityContext';
+import { assertNever } from '@/utils/assert-never';
 import { DeliverableCard } from './DeliverableCard';
 
 /** Simple identity type for display purposes */
@@ -94,11 +95,8 @@ function EmptyState({ status }: { status: PlanMetadata['status'] }) {
         return 'Deliverables will appear once the plan is approved and work begins.';
       case 'completed':
         return 'This task was completed without additional deliverables.';
-      default: {
-        // @ts-expect-error: Exhaustive type check
-        const _exhaustive: never = status;
-        return 'Deliverables are added when the agent uploads artifacts.';
-      }
+      default:
+        assertNever(status);
     }
   };
 
@@ -115,15 +113,17 @@ function EmptyState({ status }: { status: PlanMetadata['status'] }) {
  * Completion banner shown when task is already completed.
  */
 function CompletionBanner({ metadata }: { metadata: PlanMetadata }) {
-  const completedDate = metadata.completedAt
-    ? new Date(metadata.completedAt).toLocaleDateString(undefined, {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      })
-    : null;
+  if (metadata.status !== 'completed') {
+    return null;
+  }
+
+  const completedDate = new Date(metadata.completedAt).toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 
   return (
     <Alert status="success" className="mt-4">
@@ -131,10 +131,8 @@ function CompletionBanner({ metadata }: { metadata: PlanMetadata }) {
       <Alert.Content>
         <Alert.Title>Task completed</Alert.Title>
         <Alert.Description>
-          {metadata.completedBy && <span>Marked complete by {metadata.completedBy}</span>}
-          {completedDate && (
-            <span className="block text-muted-foreground text-xs mt-1">{completedDate}</span>
-          )}
+          <span>Marked complete by {metadata.completedBy}</span>
+          <span className="block text-muted-foreground text-xs mt-1">{completedDate}</span>
         </Alert.Description>
       </Alert.Content>
     </Alert>

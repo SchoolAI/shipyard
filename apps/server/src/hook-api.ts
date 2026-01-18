@@ -234,28 +234,67 @@ export async function handleGetReview(req: Request, res: Response): Promise<void
       return;
     }
 
-    let feedback: ReviewFeedback[] | undefined;
-    if (metadata.status === 'changes_requested') {
-      const threadsMap = ydoc.getMap('threads');
-      const threadsData = threadsMap.toJSON() as Record<string, unknown>;
-      const threads = parseThreads(threadsData);
-      feedback = threads.map((thread) => ({
-        threadId: thread.id,
-        blockId: thread.selectedText, // Use selectedText as a proxy for block context
-        comments: thread.comments.map((c) => ({
-          author: c.userId ?? 'Reviewer',
-          content: typeof c.body === 'string' ? c.body : JSON.stringify(c.body),
-          createdAt: c.createdAt ?? Date.now(),
-        })),
-      }));
-    }
+    // Build discriminated union response based on status
+    let response: GetReviewStatusResponse;
 
-    const response: GetReviewStatusResponse = {
-      status: metadata.status,
-      reviewedAt: metadata.reviewedAt,
-      reviewedBy: metadata.reviewedBy,
-      feedback,
-    };
+    switch (metadata.status) {
+      case 'draft':
+        response = { status: 'draft' };
+        break;
+
+      case 'pending_review':
+        response = {
+          status: 'pending_review',
+          reviewRequestId: metadata.reviewRequestId,
+        };
+        break;
+
+      case 'changes_requested': {
+        const threadsMap = ydoc.getMap('threads');
+        const threadsData = threadsMap.toJSON() as Record<string, unknown>;
+        const threads = parseThreads(threadsData);
+        const feedback: ReviewFeedback[] = threads.map((thread) => ({
+          threadId: thread.id,
+          blockId: thread.selectedText,
+          comments: thread.comments.map((c) => ({
+            author: c.userId ?? 'Reviewer',
+            content: typeof c.body === 'string' ? c.body : JSON.stringify(c.body),
+            createdAt: c.createdAt ?? Date.now(),
+          })),
+        }));
+
+        response = {
+          status: 'changes_requested',
+          reviewedAt: metadata.reviewedAt,
+          reviewedBy: metadata.reviewedBy,
+          reviewComment: metadata.reviewComment,
+          feedback: feedback.length > 0 ? feedback : undefined,
+        };
+        break;
+      }
+
+      case 'in_progress':
+        response = {
+          status: 'in_progress',
+          reviewedAt: metadata.reviewedAt,
+          reviewedBy: metadata.reviewedBy,
+        };
+        break;
+
+      case 'completed':
+        response = {
+          status: 'completed',
+          completedAt: metadata.completedAt,
+          completedBy: metadata.completedBy,
+          snapshotUrl: metadata.snapshotUrl,
+        };
+        break;
+
+      default: {
+        const _exhaustive: never = metadata;
+        throw new Error(`Unhandled status: ${JSON.stringify(_exhaustive)}`);
+      }
+    }
 
     res.json(response);
   } catch (err) {

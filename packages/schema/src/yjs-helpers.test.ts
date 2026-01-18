@@ -853,6 +853,7 @@ describe('Plan metadata helpers', () => {
       map.set('id', 'plan-1');
       map.set('title', 'Test Plan');
       map.set('status', 'pending_review');
+      map.set('reviewRequestId', 'req-123'); // Required for pending_review status
       map.set('createdAt', now);
       map.set('updatedAt', now);
       map.set('repo', 'org/repo');

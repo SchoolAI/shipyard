@@ -172,10 +172,12 @@ export function PlanPage() {
   // Set metadata from URL for snapshots, or from Y.Doc for normal plans
   useEffect(() => {
     if (isSnapshot && urlPlan) {
+      // For snapshots from URL, we only have minimal metadata
+      // Treat as draft since we don't have full status-specific fields
       setMetadata({
         id: urlPlan.id,
         title: urlPlan.title,
-        status: urlPlan.status,
+        status: 'draft',
         repo: urlPlan.repo,
         pr: urlPlan.pr,
         createdAt: 0,

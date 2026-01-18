@@ -387,7 +387,7 @@ async function addArtifact(opts: {
     artifactId: addedArtifact?.id || '',
     url: addedArtifact?.url || '',
     allDeliverablesComplete,
-    snapshotUrl: metadata?.snapshotUrl,
+    snapshotUrl: metadata?.status === 'completed' ? metadata.snapshotUrl : undefined,
     isError: false,
   };
 }
@@ -405,7 +405,7 @@ async function completeTask(planId: string, sessionToken: string, summary?: stri
   const metadata = getPlanMetadata(ydoc);
 
   return {
-    snapshotUrl: metadata?.snapshotUrl || '',
+    snapshotUrl: metadata?.status === 'completed' ? metadata.snapshotUrl || '' : '',
     status: metadata?.status || '',
     isError: false,
   };
@@ -495,23 +495,24 @@ async function requestUserInput(opts: {
 
   // Create manager and make request
   const manager = new InputRequestManager();
-  
+
   // Build params based on type - choice requires options
-  const params = opts.type === 'choice'
-    ? {
-        message: opts.message,
-        type: 'choice' as const,
-        options: opts.options ?? [],
-        defaultValue: opts.defaultValue,
-        timeout: opts.timeout,
-      }
-    : {
-        message: opts.message,
-        type: opts.type,
-        defaultValue: opts.defaultValue,
-        timeout: opts.timeout,
-      };
-  
+  const params =
+    opts.type === 'choice'
+      ? {
+          message: opts.message,
+          type: 'choice' as const,
+          options: opts.options ?? [],
+          defaultValue: opts.defaultValue,
+          timeout: opts.timeout,
+        }
+      : {
+          message: opts.message,
+          type: opts.type,
+          defaultValue: opts.defaultValue,
+          timeout: opts.timeout,
+        };
+
   const requestId = manager.createRequest(ydoc, params);
 
   // Wait for response
@@ -526,7 +527,7 @@ async function requestUserInput(opts: {
       reason: undefined,
     };
   }
-  
+
   return {
     success: false as const,
     response: undefined,

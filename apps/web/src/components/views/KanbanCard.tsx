@@ -33,6 +33,7 @@ import type { PlanIndexEntry, PlanStatusType } from '@peer-plan/schema';
 import { CheckSquare, GitPullRequest } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { usePlanMetadata } from '@/hooks/usePlanMetadata';
+import { assertNever } from '@/utils/assert-never';
 import { formatRelativeTime } from '@/utils/formatters';
 import { SubstatusBadge } from './SubstatusBadge';
 
@@ -59,11 +60,8 @@ function getStatusBorderColor(status: PlanStatusType): string {
       return 'border-l-danger';
     case 'completed':
       return 'border-l-success';
-    default: {
-      // @ts-expect-error: Exhaustive type check
-      const _exhaustive: never = status;
-      return 'border-l-gray-500';
-    }
+    default:
+      assertNever(status);
   }
 }
 

@@ -24,6 +24,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { IndexeddbPersistence } from 'y-indexeddb';
 import * as Y from 'yjs';
+import { assertNever } from '@/utils/assert-never';
 import { formatRelativeTime } from '@/utils/formatters';
 
 interface PlanPeekModalProps {
@@ -48,11 +49,8 @@ function getStatusLabel(status: PlanStatusType): string {
       return 'Changes Requested';
     case 'completed':
       return 'Completed';
-    default: {
-      // @ts-expect-error: Exhaustive type check
-      const _exhaustive: never = status;
-      return status;
-    }
+    default:
+      assertNever(status);
   }
 }
 
@@ -71,11 +69,8 @@ function getStatusColor(
       return 'danger';
     case 'completed':
       return 'success';
-    default: {
-      // @ts-expect-error: Exhaustive type check
-      const _exhaustive: never = status;
-      return 'default';
-    }
+    default:
+      assertNever(status);
   }
 }
 

@@ -7,8 +7,8 @@
 import type { Block } from '@blocknote/core';
 import { ServerBlockNoteEditor } from '@blocknote/server-util';
 import {
-  addDeliverable,
   type ApprovalResult,
+  addDeliverable,
   type CreateHookSessionRequest,
   type CreateHookSessionResponse,
   createUserResolver,
@@ -333,28 +333,59 @@ export async function getReviewStatusHandler(
     });
   }
 
-  let feedback: ReviewFeedback[] | undefined;
-  if (metadata.status === 'changes_requested') {
-    const threadsMap = ydoc.getMap('threads');
-    const threadsData = threadsMap.toJSON() as Record<string, unknown>;
-    const threads = parseThreads(threadsData);
-    feedback = threads.map((thread) => ({
-      threadId: thread.id,
-      blockId: thread.selectedText,
-      comments: thread.comments.map((c) => ({
-        author: c.userId ?? 'Reviewer',
-        content: typeof c.body === 'string' ? c.body : JSON.stringify(c.body),
-        createdAt: c.createdAt ?? Date.now(),
-      })),
-    }));
-  }
+  // Return discriminated union based on status
+  switch (metadata.status) {
+    case 'draft':
+      return { status: 'draft' };
 
-  return {
-    status: metadata.status,
-    reviewedAt: metadata.reviewedAt,
-    reviewedBy: metadata.reviewedBy,
-    feedback,
-  };
+    case 'pending_review':
+      return {
+        status: 'pending_review',
+        reviewRequestId: metadata.reviewRequestId,
+      };
+
+    case 'changes_requested': {
+      // Extract feedback from threads
+      const threadsMap = ydoc.getMap('threads');
+      const threadsData = threadsMap.toJSON() as Record<string, unknown>;
+      const threads = parseThreads(threadsData);
+      const feedback: ReviewFeedback[] = threads.map((thread) => ({
+        threadId: thread.id,
+        blockId: thread.selectedText,
+        comments: thread.comments.map((c) => ({
+          author: c.userId ?? 'Reviewer',
+          content: typeof c.body === 'string' ? c.body : JSON.stringify(c.body),
+          createdAt: c.createdAt ?? Date.now(),
+        })),
+      }));
+
+      return {
+        status: 'changes_requested',
+        reviewedAt: metadata.reviewedAt,
+        reviewedBy: metadata.reviewedBy,
+        reviewComment: metadata.reviewComment,
+        feedback: feedback.length > 0 ? feedback : undefined,
+      };
+    }
+
+    case 'in_progress':
+      return {
+        status: 'in_progress',
+        reviewedAt: metadata.reviewedAt,
+        reviewedBy: metadata.reviewedBy,
+      };
+
+    case 'completed':
+      return {
+        status: 'completed',
+        completedAt: metadata.completedAt,
+        completedBy: metadata.completedBy,
+        snapshotUrl: metadata.snapshotUrl,
+      };
+
+    default:
+      assertNever(metadata);
+  }
 }
 
 export async function updatePresenceHandler(
@@ -542,7 +573,11 @@ export async function waitForApprovalHandler(
     const { reviewComment, reviewedBy } = getReviewData();
 
     // Must be synced, approved, or reviewed to transition
-    if (!isSessionStateSynced(session) && !isSessionStateApproved(session) && !isSessionStateReviewed(session)) {
+    if (
+      !isSessionStateSynced(session) &&
+      !isSessionStateApproved(session) &&
+      !isSessionStateReviewed(session)
+    ) {
       ctx.logger.warn(
         { sessionId, lifecycle: session.lifecycle },
         'Cannot transition to approved/reviewed from non-synced state'
@@ -579,8 +614,11 @@ export async function waitForApprovalHandler(
     } else if (status === 'changes_requested' && reviewedBy) {
       // Transition to reviewed state
       // Get deliverables from current session or from extraData
-      const deliverables = extraData.deliverables ||
-        (isSessionStateApproved(session) || isSessionStateReviewed(session) ? session.deliverables : []);
+      const deliverables =
+        extraData.deliverables ||
+        (isSessionStateApproved(session) || isSessionStateReviewed(session)
+          ? session.deliverables
+          : []);
 
       setSessionState(sessionId, {
         lifecycle: 'reviewed',
@@ -593,7 +631,13 @@ export async function waitForApprovalHandler(
       });
     } else {
       ctx.logger.warn(
-        { sessionId, status, hasApprovedAt: !!extraData.approvedAt, hasDeliverables: !!extraData.deliverables, hasReviewedBy: !!reviewedBy },
+        {
+          sessionId,
+          status,
+          hasApprovedAt: !!extraData.approvedAt,
+          hasDeliverables: !!extraData.deliverables,
+          hasReviewedBy: !!reviewedBy,
+        },
         'Cannot transition - missing required fields for lifecycle transition'
       );
       return;
@@ -855,10 +899,8 @@ export async function getDeliverableContextHandler(
 
   // Build feedback section if reviewer provided a comment
   let feedbackSection = '';
-  const reviewComment = metadata.reviewComment;
-  const reviewedBy = metadata.reviewedBy;
-  if (reviewComment?.trim()) {
-    feedbackSection = `\n## Reviewer Feedback\n\n${reviewedBy ? `**From:** ${reviewedBy}\n\n` : ''}${reviewComment}\n\n`;
+  if (metadata.status === 'changes_requested' && metadata.reviewComment?.trim()) {
+    feedbackSection = `\n## Reviewer Feedback\n\n${metadata.reviewedBy ? `**From:** ${metadata.reviewedBy}\n\n` : ''}${metadata.reviewComment}\n\n`;
   }
 
   // Build approval message based on status

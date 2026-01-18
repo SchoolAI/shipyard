@@ -6,6 +6,7 @@
 import { Button, Chip } from '@heroui/react';
 import type { PlanMetadata, PlanStatusType } from '@peer-plan/schema';
 import { AlertTriangle, Check, Clock } from 'lucide-react';
+import { assertNever } from '../utils/assert-never';
 import { PanelControlButtons } from './PanelControlButtons';
 import type { PanelWidth } from './PlanPanel';
 
@@ -73,10 +74,8 @@ function getStatusConfig(status: PlanStatusType): {
         icon: <Check className="w-3 h-3" />,
         needsReview: false,
       };
-    default: {
-      const _exhaustive: never = status;
-      throw new Error(`Unhandled status: ${JSON.stringify(_exhaustive)}`);
-    }
+    default:
+      assertNever(status);
   }
 }
 
