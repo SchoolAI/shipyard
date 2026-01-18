@@ -14,19 +14,74 @@ import { logger } from './logger.js';
 
 // --- Session State Types ---
 
-export interface SessionState {
+interface SessionStateBase {
   planId: string;
   planFilePath?: string;
   createdAt: number;
   lastSyncedAt: number;
-  contentHash?: string;
-  sessionToken?: string;
-  url?: string;
-  approvedAt?: number;
-  deliverables?: Array<{ id: string; text: string }>;
+}
+
+export interface SessionStateCreated extends SessionStateBase {
+  lifecycle: 'created';
+}
+
+export interface SessionStateSynced extends SessionStateBase {
+  lifecycle: 'synced';
+  contentHash: string;
+  sessionToken: string;
+  url: string;
+}
+
+export interface SessionStateApproved extends SessionStateBase {
+  lifecycle: 'approved';
+  contentHash: string;
+  sessionToken: string;
+  url: string;
+  approvedAt: number;
+  deliverables: Array<{ id: string; text: string }>;
   reviewComment?: string;
   reviewedBy?: string;
-  reviewStatus?: string;
+}
+
+export interface SessionStateReviewed extends SessionStateBase {
+  lifecycle: 'reviewed';
+  contentHash: string;
+  sessionToken: string;
+  url: string;
+  deliverables: Array<{ id: string; text: string }>;
+  reviewComment: string;
+  reviewedBy: string;
+  reviewStatus: string;
+}
+
+export type SessionState =
+  | SessionStateCreated
+  | SessionStateSynced
+  | SessionStateApproved
+  | SessionStateReviewed;
+
+// --- Type Guards ---
+
+export function isSessionStateCreated(state: SessionState): state is SessionStateCreated {
+  return state.lifecycle === 'created';
+}
+
+export function isSessionStateSynced(state: SessionState): state is SessionStateSynced {
+  return state.lifecycle === 'synced';
+}
+
+export function isSessionStateApproved(state: SessionState): state is SessionStateApproved {
+  return state.lifecycle === 'approved';
+}
+
+export function isSessionStateReviewed(state: SessionState): state is SessionStateReviewed {
+  return state.lifecycle === 'reviewed';
+}
+
+// --- Helper for Exhaustive Checks ---
+
+export function assertNever(value: never): never {
+  throw new Error(`Unhandled discriminated union member: ${JSON.stringify(value)}`);
 }
 
 // --- Registry State ---

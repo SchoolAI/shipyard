@@ -495,22 +495,43 @@ async function requestUserInput(opts: {
 
   // Create manager and make request
   const manager = new InputRequestManager();
-  const requestId = manager.createRequest(ydoc, {
-    message: opts.message,
-    type: opts.type,
-    options: opts.options,
-    defaultValue: opts.defaultValue,
-    timeout: opts.timeout,
-  });
+  
+  // Build params based on type - choice requires options
+  const params = opts.type === 'choice'
+    ? {
+        message: opts.message,
+        type: 'choice' as const,
+        options: opts.options ?? [],
+        defaultValue: opts.defaultValue,
+        timeout: opts.timeout,
+      }
+    : {
+        message: opts.message,
+        type: opts.type,
+        defaultValue: opts.defaultValue,
+        timeout: opts.timeout,
+      };
+  
+  const requestId = manager.createRequest(ydoc, params);
 
   // Wait for response
   const result = await manager.waitForResponse(ydoc, requestId, opts.timeout);
 
+  // Narrow the discriminated union to access appropriate fields
+  if (result.success) {
+    return {
+      success: true as const,
+      response: result.response,
+      status: result.status,
+      reason: undefined,
+    };
+  }
+  
   return {
-    success: result.success,
-    response: result.response,
+    success: false as const,
+    response: undefined,
     status: result.status,
-    reason: result.success ? undefined : result.reason,
+    reason: result.reason,
   };
 }
 

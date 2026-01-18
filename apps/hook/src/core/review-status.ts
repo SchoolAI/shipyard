@@ -170,8 +170,8 @@ export async function checkReviewStatus(
   const state = await getSessionContext(sessionId);
   let planId: string;
 
-  // Create plan if no session exists (server returns {} for new sessions)
-  if ((!state || !state.planId) && planContent) {
+  // Blocking approach: Create plan from ExitPlanMode if we have content
+  if (!state.found && planContent) {
     logger.info(
       { sessionId, contentLength: planContent.length, hasState: !!state },
       'Creating plan from ExitPlanMode (blocking mode)'
@@ -254,9 +254,9 @@ export async function checkReviewStatus(
     };
   }
 
-  // Only allow exit without blocking if truly no context to review
-  if ((!state || !state.planId) && !planContent) {
-    logger.info({ sessionId }, 'No session state and no plan content - allowing exit');
+  if (!state.found) {
+    // No state and no plan content - allow exit
+    logger.info({ sessionId }, 'No session state or plan content, allowing exit');
     return { allow: true };
   }
 

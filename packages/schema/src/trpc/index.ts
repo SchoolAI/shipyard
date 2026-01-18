@@ -32,7 +32,12 @@ export type { Context, CreateContextFn, Logger, PlanStore } from './context.js';
 export type { ConversationContext, ConversationHandlers } from './routers/conversation.js';
 // Re-export individual routers for composition
 export { conversationRouter } from './routers/conversation.js';
-export type { HookContext, HookHandlers } from './routers/hook.js';
+export type {
+  ApprovalResult,
+  HookContext,
+  HookHandlers,
+  SessionContextResult,
+} from './routers/hook.js';
 export { hookRouter } from './routers/hook.js';
 export { planRouter } from './routers/plan.js';
 export { subscriptionRouter } from './routers/subscription.js';

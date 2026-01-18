@@ -7,6 +7,7 @@ import type {
   CreateHookSessionRequest,
   CreateHookSessionResponse,
   GetReviewStatusResponse,
+  SessionContextResult,
   UpdatePlanContentRequest,
   UpdatePlanContentResponse,
   UpdatePresenceRequest,
@@ -227,15 +228,7 @@ export async function waitForApproval(
  * Returns session data from server registry and deletes it (one-time use).
  * This replaces the hook's local state.ts file.
  */
-export async function getSessionContext(sessionId: string): Promise<{
-  planId?: string;
-  sessionToken?: string;
-  url?: string;
-  deliverables?: Array<{ id: string; text: string }>;
-  reviewComment?: string;
-  reviewedBy?: string;
-  reviewStatus?: string;
-}> {
+export async function getSessionContext(sessionId: string): Promise<SessionContextResult> {
   const baseUrl = await getRegistryUrl();
   if (!baseUrl) {
     throw new Error('Registry server not available');

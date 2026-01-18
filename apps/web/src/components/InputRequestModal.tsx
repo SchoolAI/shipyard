@@ -24,7 +24,6 @@ import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import type * as Y from 'yjs';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
-import { assertNever } from '@/utils/assert-never';
 
 interface InputRequestModalProps {
   isOpen: boolean;
@@ -350,8 +349,11 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
           </div>
         );
 
-      default:
-        return assertNever(request.type);
+      default: {
+        // Exhaustive check - TypeScript will error if new type added without case
+        const _exhaustiveCheck: never = request;
+        return _exhaustiveCheck;
+      }
     }
   };
 

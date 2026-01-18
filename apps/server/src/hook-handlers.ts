@@ -8,10 +8,10 @@ import type { Block } from '@blocknote/core';
 import { ServerBlockNoteEditor } from '@blocknote/server-util';
 import {
   addDeliverable,
+  type ApprovalResult,
   type CreateHookSessionRequest,
   type CreateHookSessionResponse,
   createUserResolver,
-  type Deliverable,
   extractDeliverables,
   formatDeliverablesForLLM,
   formatThreadsForLLM,
@@ -25,6 +25,7 @@ import {
   parseClaudeCodeOrigin,
   parseThreads,
   type ReviewFeedback,
+  type SessionContextResult,
   type SetSessionTokenResponse,
   setAgentPresence,
   setPlanIndexEntry,
@@ -44,9 +45,13 @@ import { webConfig } from './config/env/web.js';
 import { hasActiveConnections } from './doc-store.js';
 import { getGitHubUsername, getRepositoryFullName } from './server-identity.js';
 import {
+  assertNever,
   getSessionIdByPlanId,
   getSessionState,
   getSessionStateByPlanId,
+  isSessionStateApproved,
+  isSessionStateReviewed,
+  isSessionStateSynced,
   setSessionState,
 } from './session-registry.js';
 
@@ -162,10 +167,10 @@ export async function createSessionHandler(
 
   // Register session in registry
   setSessionState(input.sessionId, {
+    lifecycle: 'created',
     planId,
     createdAt: now,
     lastSyncedAt: now,
-    url,
   });
   ctx.logger.info({ sessionId: input.sessionId, planId }, 'Session registered in registry');
 
@@ -259,13 +264,51 @@ export async function updateContentHandler(
     const session = getSessionStateByPlanId(planId);
     if (session) {
       const contentHash = computeHash(input.content);
-      setSessionState(sessionId, {
-        ...session,
-        contentHash,
-        planFilePath: input.filePath,
-      });
+
+      // Preserve lifecycle state and add contentHash if applicable
+      switch (session.lifecycle) {
+        case 'created':
+          // Can't add contentHash to created state - it doesn't have that field yet
+          // Just update planFilePath if needed
+          setSessionState(sessionId, {
+            ...session,
+            planFilePath: input.filePath,
+          });
+          break;
+
+        case 'synced':
+          // Update contentHash and planFilePath
+          setSessionState(sessionId, {
+            ...session,
+            contentHash,
+            planFilePath: input.filePath,
+          });
+          break;
+
+        case 'approved':
+          // Update contentHash and planFilePath, preserve all approved fields
+          setSessionState(sessionId, {
+            ...session,
+            contentHash,
+            planFilePath: input.filePath,
+          });
+          break;
+
+        case 'reviewed':
+          // Update contentHash and planFilePath, preserve all reviewed fields
+          setSessionState(sessionId, {
+            ...session,
+            contentHash,
+            planFilePath: input.filePath,
+          });
+          break;
+
+        default:
+          assertNever(session);
+      }
+
       ctx.logger.info(
-        { planId, sessionId, contentHash },
+        { planId, sessionId, contentHash, lifecycle: session.lifecycle },
         'Updated session registry with content hash'
       );
     }
@@ -357,16 +400,60 @@ export async function setSessionTokenHandler(
   const webUrl = webConfig.PEER_PLAN_WEB_URL;
   const url = `${webUrl}/plan/${planId}`;
 
-  // Update session registry with session token hash
+  // Update session registry with session token hash - transition to 'synced' if needed
   const session = getSessionStateByPlanId(planId);
   const sessionId = getSessionIdByPlanId(planId);
   if (session && sessionId) {
-    setSessionState(sessionId, {
-      ...session,
-      sessionToken: sessionTokenHash,
-      url,
-    });
-    ctx.logger.info({ planId, sessionId }, 'Stored session token in registry');
+    switch (session.lifecycle) {
+      case 'created':
+        // Transition from created to synced
+        // Note: contentHash may not be set yet (happens in updateContent after token)
+        setSessionState(sessionId, {
+          lifecycle: 'synced',
+          planId: session.planId,
+          planFilePath: session.planFilePath,
+          createdAt: session.createdAt,
+          lastSyncedAt: session.lastSyncedAt,
+          contentHash: '', // Will be updated by next updateContent call
+          sessionToken: sessionTokenHash,
+          url,
+        });
+        ctx.logger.info({ planId, sessionId }, 'Transitioned session to synced state');
+        break;
+
+      case 'synced':
+        // Update sessionToken and url
+        setSessionState(sessionId, {
+          ...session,
+          sessionToken: sessionTokenHash,
+          url,
+        });
+        ctx.logger.info({ planId, sessionId }, 'Updated session token in synced state');
+        break;
+
+      case 'approved':
+        // Update sessionToken and url, preserve all approved fields
+        setSessionState(sessionId, {
+          ...session,
+          sessionToken: sessionTokenHash,
+          url,
+        });
+        ctx.logger.info({ planId, sessionId }, 'Updated session token in approved state');
+        break;
+
+      case 'reviewed':
+        // Update sessionToken and url, preserve all reviewed fields
+        setSessionState(sessionId, {
+          ...session,
+          sessionToken: sessionTokenHash,
+          url,
+        });
+        ctx.logger.info({ planId, sessionId }, 'Updated session token in reviewed state');
+        break;
+
+      default:
+        assertNever(session);
+    }
   }
 
   ctx.logger.info({ planId }, 'Session token set successfully');
@@ -395,14 +482,7 @@ export async function waitForApprovalHandler(
   planId: string,
   _reviewRequestIdParam: string,
   ctx: HookContext
-): Promise<{
-  approved: boolean;
-  feedback?: string;
-  deliverables?: Deliverable[];
-  reviewComment?: string;
-  reviewedBy?: string;
-  status?: string;
-}> {
+): Promise<ApprovalResult> {
   let ydoc: Y.Doc;
   try {
     ydoc = await ctx.getOrCreateDoc(planId);
@@ -460,13 +540,65 @@ export async function waitForApprovalHandler(
     if (!session || !sessionId) return;
 
     const { reviewComment, reviewedBy } = getReviewData();
-    setSessionState(sessionId, {
-      ...session,
-      ...extraData,
-      reviewComment,
-      reviewedBy,
-      reviewStatus: status,
-    });
+
+    // Must be synced, approved, or reviewed to transition
+    if (!isSessionStateSynced(session) && !isSessionStateApproved(session) && !isSessionStateReviewed(session)) {
+      ctx.logger.warn(
+        { sessionId, lifecycle: session.lifecycle },
+        'Cannot transition to approved/reviewed from non-synced state'
+      );
+      return;
+    }
+
+    // Base fields from current session
+    const baseState = {
+      planId: session.planId,
+      planFilePath: session.planFilePath,
+      createdAt: session.createdAt,
+      lastSyncedAt: session.lastSyncedAt,
+    };
+
+    // Get synced state fields (contentHash, sessionToken, url) using type guards
+    const syncedFields = {
+      contentHash: session.contentHash,
+      sessionToken: session.sessionToken,
+      url: session.url,
+    };
+
+    if (status === 'in_progress' && extraData.approvedAt && extraData.deliverables) {
+      // Transition to approved state
+      setSessionState(sessionId, {
+        lifecycle: 'approved',
+        ...baseState,
+        ...syncedFields,
+        approvedAt: extraData.approvedAt,
+        deliverables: extraData.deliverables,
+        reviewComment,
+        reviewedBy,
+      });
+    } else if (status === 'changes_requested' && reviewedBy) {
+      // Transition to reviewed state
+      // Get deliverables from current session or from extraData
+      const deliverables = extraData.deliverables ||
+        (isSessionStateApproved(session) || isSessionStateReviewed(session) ? session.deliverables : []);
+
+      setSessionState(sessionId, {
+        lifecycle: 'reviewed',
+        ...baseState,
+        ...syncedFields,
+        deliverables,
+        reviewComment: reviewComment || '',
+        reviewedBy,
+        reviewStatus: status,
+      });
+    } else {
+      ctx.logger.warn(
+        { sessionId, status, hasApprovedAt: !!extraData.approvedAt, hasDeliverables: !!extraData.deliverables, hasReviewedBy: !!reviewedBy },
+        'Cannot transition - missing required fields for lifecycle transition'
+      );
+      return;
+    }
+
     ctx.logger.info(
       {
         planId,
@@ -478,7 +610,7 @@ export async function waitForApprovalHandler(
   };
 
   // Handle approved status - plan is ready for implementation
-  const handleApproved = () => {
+  const handleApproved = (): ApprovalResult => {
     const deliverables = getDeliverables(ydoc);
     const deliverableInfos = deliverables.map((d) => ({ id: d.id, text: d.text }));
     updateSessionRegistry('in_progress', {
@@ -491,11 +623,17 @@ export async function waitForApprovalHandler(
       { planId, reviewRequestId, reviewedBy },
       '[SERVER OBSERVER] Plan approved via Y.Doc - resolving promise'
     );
-    return { approved: true, deliverables, reviewComment, reviewedBy, status: 'in_progress' };
+    return {
+      approved: true,
+      deliverables,
+      reviewComment,
+      reviewedBy: reviewedBy || 'unknown', // Required by schema
+      status: 'in_progress' as const,
+    };
   };
 
   // Handle changes_requested status - reviewer wants modifications
-  const handleChangesRequested = () => {
+  const handleChangesRequested = (): ApprovalResult => {
     updateSessionRegistry('changes_requested');
     const feedback = extractFeedbackFromYDoc(ydoc, ctx);
     const { reviewComment, reviewedBy } = getReviewData();
@@ -504,7 +642,13 @@ export async function waitForApprovalHandler(
       { planId, reviewRequestId, feedback },
       '[SERVER OBSERVER] Changes requested via Y.Doc'
     );
-    return { approved: false, feedback, reviewComment, reviewedBy, status: 'changes_requested' };
+    return {
+      approved: false,
+      feedback: feedback || 'Changes requested', // Required by schema
+      status: 'changes_requested' as const,
+      reviewComment,
+      reviewedBy,
+    };
   };
 
   return new Promise((resolve, reject) => {
@@ -548,6 +692,7 @@ export async function waitForApprovalHandler(
         resolve({
           approved: false,
           feedback: 'Review timeout - no decision received in 30 minutes',
+          status: 'timeout' as const,
         });
       }, APPROVAL_TIMEOUT_MS);
 
@@ -757,15 +902,7 @@ When the LAST deliverable gets an artifact, the task auto-completes and returns 
 export async function getSessionContextHandler(
   sessionId: string,
   ctx: HookContext
-): Promise<{
-  planId?: string;
-  sessionToken?: string;
-  url?: string;
-  deliverables?: Array<{ id: string; text: string }>;
-  reviewComment?: string;
-  reviewedBy?: string;
-  reviewStatus?: string;
-}> {
+): Promise<SessionContextResult> {
   ctx.logger.info({ sessionId }, 'Getting session context for post-exit injection');
 
   // Get session from registry (idempotent read)
@@ -773,24 +910,51 @@ export async function getSessionContextHandler(
 
   if (!sessionState) {
     ctx.logger.warn({ sessionId }, 'Session not found in registry');
-    return {};
+    return { found: false };
   }
 
-  // Don't delete - let TTL cleanup handle it (makes this idempotent)
-  ctx.logger.info(
-    { sessionId, planId: sessionState.planId },
-    'Session context retrieved (idempotent)'
-  );
+  // Only approved or reviewed sessions have the required fields for post-exit injection
+  if (isSessionStateApproved(sessionState)) {
+    ctx.logger.info(
+      { sessionId, planId: sessionState.planId },
+      'Session context retrieved (approved state, idempotent)'
+    );
 
-  return {
-    planId: sessionState.planId,
-    sessionToken: sessionState.sessionToken,
-    url: sessionState.url,
-    deliverables: sessionState.deliverables,
-    reviewComment: sessionState.reviewComment,
-    reviewedBy: sessionState.reviewedBy,
-    reviewStatus: sessionState.reviewStatus,
-  };
+    return {
+      found: true,
+      planId: sessionState.planId,
+      sessionToken: sessionState.sessionToken,
+      url: sessionState.url,
+      deliverables: sessionState.deliverables,
+      reviewComment: sessionState.reviewComment,
+      reviewedBy: sessionState.reviewedBy,
+    };
+  }
+
+  if (isSessionStateReviewed(sessionState)) {
+    ctx.logger.info(
+      { sessionId, planId: sessionState.planId },
+      'Session context retrieved (reviewed state, idempotent)'
+    );
+
+    return {
+      found: true,
+      planId: sessionState.planId,
+      sessionToken: sessionState.sessionToken,
+      url: sessionState.url,
+      deliverables: sessionState.deliverables,
+      reviewComment: sessionState.reviewComment,
+      reviewedBy: sessionState.reviewedBy,
+      reviewStatus: sessionState.reviewStatus,
+    };
+  }
+
+  // Session exists but not in a terminal state yet
+  ctx.logger.warn(
+    { sessionId, lifecycle: sessionState.lifecycle },
+    'Session not ready for post-exit injection'
+  );
+  return { found: false };
 }
 
 /**

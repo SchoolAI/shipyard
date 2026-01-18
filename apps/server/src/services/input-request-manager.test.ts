@@ -43,7 +43,11 @@ describe('InputRequestManager', () => {
       });
 
       const request = manager.getRequest(ydoc, requestId);
-      expect(request?.options).toEqual(['red', 'blue', 'green']);
+      // Narrow the type to ChoiceInputRequest to access options
+      expect(request?.type).toBe('choice');
+      if (request?.type === 'choice') {
+        expect(request.options).toEqual(['red', 'blue', 'green']);
+      }
     });
 
     it('creates a confirm input request', () => {
@@ -177,8 +181,11 @@ describe('InputRequestManager', () => {
 
       expect(response.success).toBe(true);
       expect(response.status).toBe('answered');
-      expect(response.response).toBe('My answer');
-      expect(response.answeredBy).toBe('user123');
+      // Narrow the discriminated union before accessing success-specific fields
+      if (response.success) {
+        expect(response.response).toBe('My answer');
+        expect(response.answeredBy).toBe('user123');
+      }
     });
 
     it('resolves when request is answered after waiting', async () => {
@@ -208,7 +215,10 @@ describe('InputRequestManager', () => {
       const response = await manager.waitForResponse(ydoc, requestId, 5);
 
       expect(response.success).toBe(true);
-      expect(response.response).toBe('Delayed answer');
+      // Narrow the discriminated union before accessing success-specific fields
+      if (response.success) {
+        expect(response.response).toBe('Delayed answer');
+      }
     });
 
     it('handles cancellation status', async () => {
@@ -246,8 +256,10 @@ describe('InputRequestManager', () => {
       // Should be cancelled due to timeout
       expect(response.success).toBe(false);
       expect(response.status).toBe('cancelled');
-      // Reason may be from timeout or from Y.Doc observer detecting cancelled status
-      expect(response.reason).toBeDefined();
+      // Narrow the discriminated union before accessing failure-specific fields
+      if (!response.success) {
+        expect(response.reason).toBeDefined();
+      }
 
       // Verify the request was marked as cancelled in Y.Doc
       const request = manager.getRequest(ydoc, requestId);
@@ -261,7 +273,10 @@ describe('InputRequestManager', () => {
 
       expect(response.success).toBe(false);
       expect(response.status).toBe('cancelled');
-      expect(response.reason).toContain('not found');
+      // Narrow the discriminated union before accessing failure-specific fields
+      if (!response.success) {
+        expect(response.reason).toContain('not found');
+      }
     });
 
     it('uses request timeout if no timeout specified', async () => {
@@ -283,8 +298,10 @@ describe('InputRequestManager', () => {
       // Should be cancelled due to timeout
       expect(response.success).toBe(false);
       expect(response.status).toBe('cancelled');
-      // Reason may be from timeout or from Y.Doc observer detecting cancelled status
-      expect(response.reason).toBeDefined();
+      // Narrow the discriminated union before accessing failure-specific fields
+      if (!response.success) {
+        expect(response.reason).toBeDefined();
+      }
 
       // Verify the request was marked as cancelled in Y.Doc
       const request = manager.getRequest(ydoc, requestId);
@@ -446,8 +463,11 @@ describe('InputRequestManager', () => {
       const response = await responsePromise;
 
       expect(response.success).toBe(true);
-      expect(response.response).toBe('blue');
-      expect(response.answeredBy).toBe('user123');
+      // Narrow the discriminated union before accessing success-specific fields
+      if (response.success) {
+        expect(response.response).toBe('blue');
+        expect(response.answeredBy).toBe('user123');
+      }
     });
   });
 });

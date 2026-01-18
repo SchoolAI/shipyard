@@ -83,10 +83,18 @@ export {
   asWebRTCPeerId,
 } from './ids.js';
 export type {
+  ChoiceInputRequest,
+  ConfirmInputRequest,
+  CreateChoiceInputParams,
+  CreateConfirmInputParams,
   CreateInputRequestParams,
+  CreateMultilineInputParams,
+  CreateTextInputParams,
   InputRequest,
   InputRequestStatus,
   InputRequestType,
+  MultilineInputRequest,
+  TextInputRequest,
 } from './input-request.js';
 export {
   createInputRequest,
@@ -217,6 +225,7 @@ export type { FormatThreadsOptions } from './thread-formatter.js';
 export { formatThreadsForLLM } from './thread-formatter.js';
 export type {
   AppRouter,
+  ApprovalResult,
   Change,
   ChangesResponse,
   ChangeType,
@@ -234,6 +243,7 @@ export type {
   PlanIdInput,
   PlanStatusResponse,
   PlanStore,
+  SessionContextResult,
   SetSessionTokenRequest,
   SetSessionTokenResponse,
   SubscriptionClientIdInput,

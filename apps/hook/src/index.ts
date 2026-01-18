@@ -130,8 +130,8 @@ async function handlePostExit(
     // Get session context from server registry (replaces local state.ts)
     const sessionContext = await getSessionContext(event.sessionId);
 
-    if (!sessionContext.sessionToken || !sessionContext.planId) {
-      logger.debug({ sessionId: event.sessionId }, 'No session token found in registry');
+    if (!sessionContext.found) {
+      logger.debug({ sessionId: event.sessionId }, 'No session found in registry');
       return {
         allow: true,
         hookType: 'post_tool_use',

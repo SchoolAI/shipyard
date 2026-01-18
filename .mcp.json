@@ -22,7 +22,7 @@
       "command": "npx",
       "args": [
         "@playwright/mcp@latest",
-        "--user-data-dir=/tmp/pw-72-request-user-input"
+        "--user-data-dir=/tmp/pw-77-type-clean-up"
       ]
     }
   }
