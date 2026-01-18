@@ -154,6 +154,8 @@ export {
   P2PMessageType,
 } from './p2p-messages.js';
 export type {
+  AgentActivityData,
+  AgentActivityType,
   Artifact,
   ArtifactType,
   ClaudeCodeOriginMetadata,
@@ -176,6 +178,8 @@ export type {
   StepCompletion,
 } from './plan.js';
 export {
+  AgentActivityDataSchema,
+  AgentActivityTypes,
   ArtifactSchema,
   ClaudeCodeOriginMetadataSchema,
   ConversationVersionSchema,

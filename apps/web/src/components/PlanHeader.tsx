@@ -41,6 +41,7 @@ import { useRef, useState } from 'react';
 import { toast } from 'sonner';
 import type { WebrtcProvider } from 'y-webrtc';
 import type * as Y from 'yjs';
+import { AgentStatusBadge } from '@/components/AgentStatusBadge';
 import { ApprovalPanel } from '@/components/ApprovalPanel';
 import { HandoffConversationDialog } from '@/components/HandoffConversationDialog';
 import { ImportConversationButton } from '@/components/ImportConversationHandler';
@@ -686,6 +687,7 @@ export function PlanHeader({
       {/* Title and status */}
       <h1 className="text-lg md:text-xl font-semibold text-foreground truncate">{display.title}</h1>
       <StatusChip status={display.status} className="shrink-0" />
+      <AgentStatusBadge ydoc={ydoc} />
       {isSnapshot && (
         <Chip color="warning" variant="soft" className="shrink-0">
           snapshot

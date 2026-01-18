@@ -1,26 +1,112 @@
-import { assertNever, type PlanEvent, type PlanEventType } from '@peer-plan/schema';
 import {
+  type AgentActivityData,
+  assertNever,
+  type PlanEvent,
+  type PlanEventType,
+} from '@peer-plan/schema';
+import {
+  AlertOctagon,
   AlertTriangle,
   Archive,
   ArrowRightLeft,
   Check,
   CheckCircle,
+  Circle,
+  Clock,
   Download,
   FileEdit,
+  FileText,
+  Flag,
   GitPullRequest,
   HelpCircle,
   Link as LinkIcon,
   MessageSquare,
+  Pause,
   RefreshCw,
   Share2,
   Upload,
   X,
+  Zap,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { formatRelativeTime } from '@/utils/formatters';
 
 interface ActivityEventProps {
   event: PlanEvent;
+}
+
+/**
+ * Get icon for agent activity events based on activity type and sub-type.
+ * Each activity type has specific visual representation.
+ */
+function getAgentActivityIcon(data: AgentActivityData): ReactNode {
+  switch (data.activityType) {
+    case 'status':
+      switch (data.status) {
+        case 'working':
+          return <Zap className="w-4 h-4 text-accent" />;
+        case 'blocked':
+          return <Pause className="w-4 h-4 text-danger" />;
+        case 'idle':
+          return <Circle className="w-4 h-4 text-muted-foreground" />;
+        case 'waiting':
+          return <Clock className="w-4 h-4 text-warning" />;
+        default: {
+          const _exhaustive: never = data.status;
+          void _exhaustive;
+          return <Circle className="w-4 h-4" />;
+        }
+      }
+    case 'note':
+      return <FileText className="w-4 h-4" />;
+    case 'help_request':
+      return <HelpCircle className="w-4 h-4 text-warning" />;
+    case 'help_request_resolved':
+      return <CheckCircle className="w-4 h-4 text-success" />;
+    case 'milestone':
+      return <Flag className="w-4 h-4 text-success" />;
+    case 'blocker':
+      return <AlertOctagon className="w-4 h-4 text-danger" />;
+    case 'blocker_resolved':
+      return <CheckCircle className="w-4 h-4 text-success" />;
+    default: {
+      const _exhaustive: never = data;
+      void _exhaustive;
+      return <Circle className="w-4 h-4" />;
+    }
+  }
+}
+
+/**
+ * Get human-readable description for agent activity events.
+ * Formats messages based on activity type and available data.
+ */
+function getAgentActivityDescription(data: AgentActivityData): string {
+  switch (data.activityType) {
+    case 'status': {
+      const action = data.status === 'working' ? 'started working' : `is ${data.status}`;
+      return data.message ? `${action} on ${data.message}` : action;
+    }
+    case 'note':
+      return data.message;
+    case 'help_request':
+      return `needs help: ${data.message}`;
+    case 'help_request_resolved':
+      return data.resolution
+        ? `resolved help request: ${data.resolution}`
+        : 'resolved help request';
+    case 'milestone':
+      return `reached milestone: ${data.message}`;
+    case 'blocker':
+      return `hit blocker: ${data.message}`;
+    case 'blocker_resolved':
+      return data.resolution ? `resolved blocker: ${data.resolution}` : 'resolved blocker';
+    default: {
+      const _exhaustive: never = data;
+      void _exhaustive;
+      return 'agent activity';
+    }
+  }
 }
 
 function getEventIcon(type: PlanEventType): ReactNode {
@@ -69,6 +155,9 @@ function getEventIcon(type: PlanEventType): ReactNode {
       return <Check className="w-3.5 h-3.5 text-success" />;
     case 'input_request_declined':
       return <X className="w-3.5 h-3.5 text-muted-foreground" />;
+    case 'agent_activity':
+      // agent_activity uses special helper - will be called separately
+      return <Circle className="w-3.5 h-3.5" />;
     default:
       return assertNever(type);
   }
@@ -153,13 +242,18 @@ function getEventDescription(event: PlanEvent): string {
     }
     case 'input_request_declined':
       return 'declined input request';
+    case 'agent_activity':
+      // agent_activity uses special helper with sub-type logic
+      return getAgentActivityDescription(event.data);
     default:
       return assertNever(event);
   }
 }
 
 export function ActivityEvent({ event }: ActivityEventProps) {
-  const icon = getEventIcon(event.type);
+  // Use special icon helper for agent_activity events
+  const icon =
+    event.type === 'agent_activity' ? getAgentActivityIcon(event.data) : getEventIcon(event.type);
   const description = getEventDescription(event);
 
   return (
