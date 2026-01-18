@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { AuthChoiceModal } from '@/components/AuthChoiceModal';
 import { GitHubAuthOverlay } from '@/components/GitHubAuthModal';
 import { SignInModal } from '@/components/SignInModal';
-import { useGitHubAuth } from '@/hooks/useGitHubAuth';
+import { type GitHubIdentity, useGitHubAuth } from '@/hooks/useGitHubAuth';
 import { useLocalIdentity } from '@/hooks/useLocalIdentity';
 import { SignInButton } from './SignInButton';
 import { UserMenu } from './UserMenu';
@@ -12,14 +12,48 @@ interface AccountSectionProps {
 }
 
 export function AccountSection({ collapsed = false }: AccountSectionProps) {
-  const { identity, isValidating, authState, startAuth, clearAuth } = useGitHubAuth();
-  const { setLocalIdentity } = useLocalIdentity();
+  const {
+    identity: githubIdentity,
+    isValidating,
+    authState,
+    startAuth,
+    clearAuth,
+  } = useGitHubAuth();
+  const { localIdentity, setLocalIdentity, clearLocalIdentity } = useLocalIdentity();
   const [showAuthChoice, setShowAuthChoice] = useState(false);
   const [showLocalSignIn, setShowLocalSignIn] = useState(false);
 
+  // Convert local identity to GitHubIdentity format for UI consistency
+  const unifiedIdentity = useMemo((): GitHubIdentity | null => {
+    if (githubIdentity) return githubIdentity;
+    if (localIdentity) {
+      return {
+        token: '', // Local identity doesn't have a token
+        username: localIdentity.username,
+        displayName: localIdentity.username,
+        createdAt: localIdentity.createdAt,
+        scope: '',
+      };
+    }
+    return null;
+  }, [githubIdentity, localIdentity]);
+
   const handleSwitchAccount = () => {
+    // Clear both auth types and show choice modal (don't force GitHub)
     clearAuth();
-    startAuth(true);
+    clearLocalIdentity();
+    setShowAuthChoice(true);
+  };
+
+  const handleSignOut = () => {
+    clearAuth();
+    clearLocalIdentity();
+  };
+
+  const handleUpgrade = () => {
+    // Clear local identity and launch GitHub OAuth
+    clearLocalIdentity();
+    startAuth();
   };
 
   const handleLocalSignIn = (username: string) => {
@@ -27,7 +61,7 @@ export function AccountSection({ collapsed = false }: AccountSectionProps) {
     setShowLocalSignIn(false);
   };
 
-  if (!identity) {
+  if (!unifiedIdentity) {
     return (
       <>
         <SignInButton collapsed={collapsed} onPress={() => setShowAuthChoice(true)} />
@@ -50,11 +84,13 @@ export function AccountSection({ collapsed = false }: AccountSectionProps) {
   return (
     <>
       <UserMenu
-        identity={identity}
+        identity={unifiedIdentity}
         isValidating={isValidating}
         collapsed={collapsed}
-        onSignOut={clearAuth}
+        isGitHubAuth={githubIdentity !== null}
+        onSignOut={handleSignOut}
         onSwitchAccount={handleSwitchAccount}
+        onUpgrade={handleUpgrade}
       />
       <GitHubAuthOverlay authState={authState} />
     </>

@@ -1,5 +1,5 @@
 import { Dropdown, Label, Separator } from '@heroui/react';
-import { ExternalLink, LogOut, RefreshCw } from 'lucide-react';
+import { ExternalLink, LogOut, RefreshCw, Star } from 'lucide-react';
 import type { Key } from 'react';
 import type { GitHubIdentity } from '@/hooks/useGitHubAuth';
 import { UserInfoHeader } from './UserInfoHeader';
@@ -9,21 +9,30 @@ interface UserMenuProps {
   identity: GitHubIdentity;
   isValidating: boolean;
   collapsed?: boolean;
+  isGitHubAuth: boolean;
   onSignOut: () => void;
   onSwitchAccount: () => void;
+  onUpgrade?: () => void;
 }
 
 export function UserMenu({
   identity,
   isValidating,
   collapsed,
+  isGitHubAuth,
   onSignOut,
   onSwitchAccount,
+  onUpgrade,
 }: UserMenuProps) {
   const handleAction = (key: Key) => {
     switch (key) {
       case 'view-profile':
-        window.open(`https://github.com/${identity.username}`, '_blank', 'noopener');
+        if (isGitHubAuth) {
+          window.open(`https://github.com/${identity.username}`, '_blank', 'noopener');
+        }
+        break;
+      case 'upgrade':
+        onUpgrade?.();
         break;
       case 'switch-account':
         onSwitchAccount();
@@ -40,16 +49,28 @@ export function UserMenu({
         className={collapsed ? 'rounded-full' : 'w-full rounded-md'}
         aria-label={`Account menu for ${identity.username}`}
       >
-        <UserProfileButton identity={identity} isValidating={isValidating} collapsed={collapsed} />
+        <UserProfileButton
+          identity={identity}
+          isValidating={isValidating}
+          collapsed={collapsed}
+          isGitHubAuth={isGitHubAuth}
+        />
       </Dropdown.Trigger>
       <Dropdown.Popover placement="top start" className="min-w-[220px]">
-        <UserInfoHeader identity={identity} />
+        <UserInfoHeader identity={identity} isGitHubAuth={isGitHubAuth} />
         <Separator />
         <Dropdown.Menu onAction={handleAction}>
-          <Dropdown.Item id="view-profile" textValue="View GitHub Profile">
-            <ExternalLink className="w-4 h-4 shrink-0 text-muted-foreground" />
-            <Label>View GitHub Profile</Label>
-          </Dropdown.Item>
+          {isGitHubAuth ? (
+            <Dropdown.Item id="view-profile" textValue="View GitHub Profile">
+              <ExternalLink className="w-4 h-4 shrink-0 text-muted-foreground" />
+              <Label>View GitHub Profile</Label>
+            </Dropdown.Item>
+          ) : (
+            <Dropdown.Item id="upgrade" textValue="Upgrade to GitHub Account">
+              <Star className="w-4 h-4 shrink-0 text-warning" />
+              <Label className="font-semibold text-warning">Upgrade to GitHub</Label>
+            </Dropdown.Item>
+          )}
           <Dropdown.Item id="switch-account" textValue="Switch Account">
             <RefreshCw className="w-4 h-4 shrink-0 text-muted-foreground" />
             <Label>Switch Account</Label>

@@ -1,10 +1,11 @@
-import { Avatar, Spinner } from '@heroui/react';
+import { Avatar, Chip, Spinner } from '@heroui/react';
 import type { GitHubIdentity } from '@/hooks/useGitHubAuth';
 
 interface UserProfileButtonProps {
   identity: GitHubIdentity;
   isValidating: boolean;
   collapsed?: boolean;
+  isGitHubAuth: boolean;
 }
 
 // Note: Avatar compound components have type issues in HeroUI v3 beta
@@ -17,7 +18,12 @@ const AvatarRoot = Avatar as unknown as React.FC<{
 const AvatarImage = Avatar.Image as React.FC<{ src?: string; alt: string }>;
 const AvatarFallback = Avatar.Fallback as React.FC<{ children: React.ReactNode }>;
 
-export function UserProfileButton({ identity, isValidating, collapsed }: UserProfileButtonProps) {
+export function UserProfileButton({
+  identity,
+  isValidating,
+  collapsed,
+  isGitHubAuth,
+}: UserProfileButtonProps) {
   if (collapsed) {
     return (
       <div className="relative">
@@ -25,6 +31,16 @@ export function UserProfileButton({ identity, isValidating, collapsed }: UserPro
           <AvatarImage src={identity.avatarUrl} alt={identity.username} />
           <AvatarFallback>{identity.username[0]?.toUpperCase() ?? '?'}</AvatarFallback>
         </AvatarRoot>
+        {!isGitHubAuth && (
+          <Chip
+            size="sm"
+            className="absolute -bottom-0.5 -right-0.5 border-2 border-surface text-xs px-1 min-w-fit"
+            color="warning"
+            variant="soft"
+          >
+            L
+          </Chip>
+        )}
         {isValidating && (
           <div className="absolute inset-0 flex items-center justify-center">
             <Spinner size="sm" />
@@ -36,10 +52,22 @@ export function UserProfileButton({ identity, isValidating, collapsed }: UserPro
 
   return (
     <div className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-surface-elevated transition-colors w-full">
-      <AvatarRoot size="sm" className={isValidating ? 'opacity-50' : ''}>
-        <AvatarImage src={identity.avatarUrl} alt={identity.username} />
-        <AvatarFallback>{identity.username[0]?.toUpperCase() ?? '?'}</AvatarFallback>
-      </AvatarRoot>
+      <div className="relative">
+        <AvatarRoot size="sm" className={isValidating ? 'opacity-50' : ''}>
+          <AvatarImage src={identity.avatarUrl} alt={identity.username} />
+          <AvatarFallback>{identity.username[0]?.toUpperCase() ?? '?'}</AvatarFallback>
+        </AvatarRoot>
+        {!isGitHubAuth && (
+          <Chip
+            size="sm"
+            className="absolute -bottom-0.5 -right-0.5 border-2 border-surface text-xs px-1 min-w-fit"
+            color="warning"
+            variant="soft"
+          >
+            L
+          </Chip>
+        )}
+      </div>
       <span className="text-sm truncate flex-1 text-left">{identity.username}</span>
       {isValidating && <Spinner size="sm" />}
     </div>
