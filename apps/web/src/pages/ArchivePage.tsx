@@ -66,8 +66,7 @@ export function ArchivePage() {
 
   const sortedArchivedPlans = useMemo(() => {
     return [...archivedPlans].sort(
-      (a, b) =>
-        (b.deleted ? b.deletedAt : b.updatedAt) - (a.deleted ? a.deletedAt : a.updatedAt)
+      (a, b) => (b.deleted ? b.deletedAt : b.updatedAt) - (a.deleted ? a.deletedAt : a.updatedAt)
     );
   }, [archivedPlans]);
 

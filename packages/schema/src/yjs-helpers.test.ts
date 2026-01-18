@@ -47,6 +47,7 @@ describe('Artifact helpers', () => {
       id: 'art-1',
       type: 'screenshot' as const,
       filename: 'test.png',
+      storage: 'github' as const,
       url: 'https://example.com/test.png',
     };
 
@@ -59,11 +60,14 @@ describe('Artifact helpers', () => {
       id: 'art-1',
       type: 'screenshot' as const,
       filename: 'test.png',
+      storage: 'github' as const,
+      url: 'https://example.com/test.png',
     };
     const artifact2 = {
       id: 'art-2',
       type: 'video' as const,
       filename: 'demo.mp4',
+      storage: 'github' as const,
       url: 'https://example.com/demo.mp4',
     };
 
@@ -77,8 +81,20 @@ describe('Artifact helpers', () => {
   });
 
   it('removeArtifact removes by ID', () => {
-    addArtifact(ydoc, { id: 'art-1', type: 'screenshot', filename: 'a.png' });
-    addArtifact(ydoc, { id: 'art-2', type: 'video', filename: 'b.mp4' });
+    addArtifact(ydoc, {
+      id: 'art-1',
+      type: 'screenshot',
+      filename: 'a.png',
+      storage: 'github',
+      url: 'https://example.com/a.png',
+    });
+    addArtifact(ydoc, {
+      id: 'art-2',
+      type: 'video',
+      filename: 'b.mp4',
+      storage: 'github',
+      url: 'https://example.com/b.mp4',
+    });
 
     expect(removeArtifact(ydoc, 'art-1')).toBe(true);
 
@@ -100,7 +116,15 @@ describe('Artifact helpers', () => {
     const array = ydoc.getArray('artifacts');
 
     // Valid artifact
-    array.push([{ id: 'art-1', type: 'screenshot', filename: 'valid.png' }]);
+    array.push([
+      {
+        id: 'art-1',
+        type: 'screenshot',
+        filename: 'valid.png',
+        storage: 'github',
+        url: 'https://example.com/valid.png',
+      },
+    ]);
 
     // Invalid entries (missing required fields)
     array.push([{ id: 'art-2', filename: 'no-type.png' }]); // Missing type
@@ -124,7 +148,12 @@ describe('Artifact helpers', () => {
     ];
 
     for (const item of types) {
-      addArtifact(ydoc, { id: `id-${item.type}`, ...item });
+      addArtifact(ydoc, {
+        id: `id-${item.type}`,
+        ...item,
+        storage: 'github',
+        url: `https://example.com/${item.filename}`,
+      });
     }
 
     const artifacts = getArtifacts(ydoc);

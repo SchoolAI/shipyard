@@ -117,9 +117,7 @@ export type StatusTransition =
 /**
  * Result type for status transition operations.
  */
-export type TransitionResult =
-  | { success: true }
-  | { success: false; error: string };
+export type TransitionResult = { success: true } | { success: false; error: string };
 
 /**
  * Result type for getPlanMetadata with validation errors.
@@ -345,6 +343,10 @@ export function getArtifacts(ydoc: Y.Doc): Artifact[] {
     data
       // Migrate legacy artifacts: if has url but no storage, assume GitHub
       .map((item: unknown) => {
+        // Skip null/non-object entries
+        if (!item || typeof item !== 'object') {
+          return null;
+        }
         const artifact = item as Record<string, unknown>;
         if (artifact.url && !artifact.storage) {
           return { ...artifact, storage: 'github' };
@@ -356,7 +358,7 @@ export function getArtifacts(ydoc: Y.Doc): Artifact[] {
         return artifact;
       })
       // Filter out null entries and validate with schema
-      .filter((item): item is unknown => item !== null)
+      .filter((item): item is Record<string, unknown> => item !== null)
       .map((item) => ArtifactSchema.safeParse(item))
       .filter((result) => result.success)
       .map((result) => result.data)
@@ -858,13 +860,14 @@ export function markVersionHandedOff(
  * Used to ensure correct data payload for each event type.
  * Handles both required and optional data fields.
  */
-type EventDataForType<T extends PlanEventType> = Extract<PlanEvent, { type: T }> extends infer E
-  ? E extends { data: infer D }
-    ? D
-    : E extends { data?: infer D }
-      ? D | undefined
-      : undefined
-  : never;
+type EventDataForType<T extends PlanEventType> =
+  Extract<PlanEvent, { type: T }> extends infer E
+    ? E extends { data: infer D }
+      ? D
+      : E extends { data?: infer D }
+        ? D | undefined
+        : undefined
+    : never;
 
 /**
  * Log a plan event with type-safe data payload.

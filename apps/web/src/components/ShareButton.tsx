@@ -133,15 +133,9 @@ export function ShareButton({
 
           // Log plan_shared event
           if (ydoc) {
-            logPlanEvent(
-              ydoc,
-              'plan_shared',
-              actor,
-              undefined,
-              {
-                inboxWorthy: false, // Sharing action doesn't need owner action
-              }
-            );
+            logPlanEvent(ydoc, 'plan_shared', actor, undefined, {
+              inboxWorthy: false, // Sharing action doesn't need owner action
+            });
           }
 
           setIsCreating(false);

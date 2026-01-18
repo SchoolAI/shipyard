@@ -393,9 +393,18 @@ async function addArtifact(opts: AddArtifactOpts) {
   // Get snapshot URL from metadata if task was completed
   const metadata = getPlanMetadata(ydoc);
 
+  // Get URL from discriminated union
+  let artifactUrl = '';
+  if (addedArtifact) {
+    artifactUrl =
+      addedArtifact.storage === 'github'
+        ? addedArtifact.url
+        : `http://localhost:${process.env.REGISTRY_PORT || 3000}/artifacts/${addedArtifact.localArtifactId}`;
+  }
+
   return {
     artifactId: addedArtifact?.id || '',
-    url: addedArtifact?.url || '',
+    url: artifactUrl,
     allDeliverablesComplete,
     snapshotUrl: metadata?.status === 'completed' ? metadata.snapshotUrl : undefined,
     isError: false,

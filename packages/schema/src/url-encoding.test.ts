@@ -28,6 +28,8 @@ describe('URL Encoding', () => {
         id: 'art-1',
         type: 'screenshot',
         filename: 'login-ui.png',
+        storage: 'github',
+        url: 'https://example.com/login-ui.png',
       },
     ],
   };

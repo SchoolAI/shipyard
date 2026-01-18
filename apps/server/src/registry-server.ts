@@ -723,22 +723,30 @@ function createApp(): { app: express.Express; httpServer: http.Server } {
   app.get('/api/plans/:id/pr-files/:prNumber', handleGetPRFiles);
 
   // Artifact serving endpoint with path traversal protection
-  app.get('/artifacts/:planId/:filename', async (req: Request, res: Response) => {
-    const { planId, filename } = req.params;
+  app.get('/artifacts/:planId/:filename', async (req: Request, res: Response): Promise<void> => {
+    const planId = req.params.planId;
+    const filename = req.params.filename;
+
+    if (!planId || !filename) {
+      res.status(400).json({ error: 'Missing planId or filename' });
+      return;
+    }
 
     // Path traversal protection: resolve full path and verify it's within artifacts directory
     const ARTIFACTS_DIR = join(homedir(), '.peer-plan', 'artifacts');
     const fullPath = resolve(ARTIFACTS_DIR, planId, filename);
 
     if (!fullPath.startsWith(ARTIFACTS_DIR + sep)) {
-      return res.status(400).json({ error: 'Invalid artifact path' });
+      res.status(400).json({ error: 'Invalid artifact path' });
+      return;
     }
 
     // Read file directly using resolved path
     const buffer = await readFile(fullPath).catch(() => null);
 
     if (!buffer) {
-      return res.status(404).json({ error: 'Artifact not found' });
+      res.status(404).json({ error: 'Artifact not found' });
+      return;
     }
 
     // Content-Type affects browser rendering (inline vs download)

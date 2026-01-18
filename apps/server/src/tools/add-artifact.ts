@@ -124,7 +124,8 @@ ARTIFACT TYPES:
         source: {
           type: 'string',
           enum: ['file', 'url', 'base64'],
-          description: 'Content source type: file (local path), url (fetch from URL), or base64 (direct content)',
+          description:
+            'Content source type: file (local path), url (fetch from URL), or base64 (direct content)',
         },
         filePath: {
           type: 'string',
