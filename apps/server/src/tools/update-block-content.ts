@@ -180,8 +180,8 @@ Example with deliverables:
         // Write new blocks
         editor.blocksToYXmlFragment(blocks, fragment);
 
-        // Update metadata timestamp
-        setPlanMetadata(ydoc, { updatedAt: Date.now() });
+        // Update metadata timestamp (setPlanMetadata automatically updates updatedAt)
+        setPlanMetadata(ydoc, {});
       },
       { actor: actorName }
     );

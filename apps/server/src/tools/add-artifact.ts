@@ -21,7 +21,7 @@ import {
   logPlanEvent,
   PLAN_INDEX_DOC_NAME,
   setPlanIndexEntry,
-  setPlanMetadata,
+  transitionPlanStatus,
 } from '@peer-plan/schema';
 import { nanoid } from 'nanoid';
 import type * as Y from 'yjs';
@@ -333,7 +333,21 @@ ARTIFACT TYPES:
 
           // Auto-progress status to in_progress when a deliverable is fulfilled
           if (metadata.status === 'draft') {
-            setPlanMetadata(doc, { status: 'in_progress' }, actorName);
+            const transitionResult = transitionPlanStatus(
+              doc,
+              {
+                status: 'in_progress',
+                reviewedAt: Date.now(),
+                reviewedBy: actorName,
+              },
+              actorName
+            );
+            if (!transitionResult.success) {
+              logger.warn(
+                { planId, error: transitionResult.error },
+                'Failed to auto-progress status to in_progress'
+              );
+            }
 
             // Create snapshot on status change (Issue #42)
             const editor = ServerBlockNoteEditor.create();
@@ -427,11 +441,12 @@ ARTIFACT TYPES:
         );
 
         // Update metadata
-        setPlanMetadata(
+        const completedAt = Date.now();
+        transitionPlanStatus(
           doc,
           {
             status: 'completed',
-            completedAt: Date.now(),
+            completedAt,
             completedBy: actorName,
             snapshotUrl,
           },

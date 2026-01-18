@@ -1,5 +1,6 @@
 import { nanoid } from 'nanoid';
 import * as Y from 'yjs';
+import { assertNever } from './assert-never.js';
 import { type AgentPresence, AgentPresenceSchema } from './hook-api.js';
 import {
   type Artifact,
@@ -9,6 +10,7 @@ import {
   DeliverableSchema,
   type LinkedPR,
   LinkedPRSchema,
+  type OriginMetadata,
   type PlanEvent,
   PlanEventSchema,
   type PlanEventType,
@@ -23,21 +25,150 @@ import {
 import { parseThreads } from './thread.js';
 import { YDOC_KEYS } from './yjs-keys.js';
 
+// --- Type-Safe Metadata Updates ---
+
+/**
+ * Fields that can be safely updated without changing status.
+ * These are the common base fields that don't have invariants with status.
+ */
+export interface PlanMetadataBaseUpdate {
+  title?: string;
+  repo?: string;
+  pr?: number;
+  ownerId?: string;
+  approvalRequired?: boolean;
+  approvedUsers?: string[];
+  rejectedUsers?: string[];
+  sessionTokenHash?: string;
+  archivedAt?: number;
+  archivedBy?: string;
+  origin?: OriginMetadata;
+  viewedBy?: Record<string, number>;
+  conversationVersions?: ConversationVersion[];
+  events?: PlanEvent[];
+}
+
+/**
+ * Valid status transitions in the plan lifecycle.
+ *
+ * Flow: draft -> (pending_review | in_progress) <-> changes_requested -> in_progress -> completed
+ *
+ * Plans can go directly from draft to in_progress if approval is not required.
+ * Plans requiring approval must go through: draft -> pending_review -> in_progress.
+ *
+ * Each transition requires specific fields to be provided.
+ */
+export const VALID_STATUS_TRANSITIONS: Record<PlanStatusType, PlanStatusType[]> = {
+  draft: ['pending_review', 'in_progress'],
+  pending_review: ['in_progress', 'changes_requested'],
+  changes_requested: ['pending_review'],
+  in_progress: ['completed'],
+  completed: [], // Terminal state
+};
+
+/**
+ * Type for transitioning to pending_review status.
+ */
+export interface TransitionToPendingReview {
+  status: 'pending_review';
+  reviewRequestId: string;
+}
+
+/**
+ * Type for transitioning to changes_requested status.
+ */
+export interface TransitionToChangesRequested {
+  status: 'changes_requested';
+  reviewedAt: number;
+  reviewedBy: string;
+  reviewComment?: string;
+}
+
+/**
+ * Type for transitioning to in_progress status.
+ * When coming from pending_review, requires review fields.
+ * When coming from draft (no approval required), review fields are optional.
+ */
+export interface TransitionToInProgress {
+  status: 'in_progress';
+  reviewedAt?: number;
+  reviewedBy?: string;
+}
+
+/**
+ * Type for transitioning to completed status.
+ */
+export interface TransitionToCompleted {
+  status: 'completed';
+  completedAt: number;
+  completedBy: string;
+  snapshotUrl?: string;
+}
+
+/**
+ * Union of all valid status transitions.
+ */
+export type StatusTransition =
+  | TransitionToPendingReview
+  | TransitionToChangesRequested
+  | TransitionToInProgress
+  | TransitionToCompleted;
+
+/**
+ * Result type for status transition operations.
+ */
+export type TransitionResult =
+  | { success: true }
+  | { success: false; error: string };
+
+/**
+ * Result type for getPlanMetadata with validation errors.
+ */
+export type GetPlanMetadataResult =
+  | { success: true; data: PlanMetadata }
+  | { success: false; error: string };
+
+/**
+ * Get plan metadata from Y.Doc with validation.
+ * @returns PlanMetadata if valid, null if data is missing or invalid.
+ * @deprecated Use getPlanMetadataWithValidation for error details.
+ */
 export function getPlanMetadata(ydoc: Y.Doc): PlanMetadata | null {
+  const result = getPlanMetadataWithValidation(ydoc);
+  return result.success ? result.data : null;
+}
+
+/**
+ * Get plan metadata from Y.Doc with detailed validation errors.
+ * Surfaces corruption errors instead of silently swallowing them.
+ */
+export function getPlanMetadataWithValidation(ydoc: Y.Doc): GetPlanMetadataResult {
   const map = ydoc.getMap('metadata');
   const data = map.toJSON();
 
-  const result = PlanMetadataSchema.safeParse(data);
-  if (!result.success) {
-    return null;
+  // Check if metadata exists
+  if (!data || Object.keys(data).length === 0) {
+    return { success: false, error: 'No metadata found in Y.Doc' };
   }
 
-  return result.data;
+  const result = PlanMetadataSchema.safeParse(data);
+  if (!result.success) {
+    return { success: false, error: `Invalid metadata: ${result.error.message}` };
+  }
+
+  return { success: true, data: result.data };
 }
 
+/**
+ * Update plan metadata base fields (non-status fields).
+ * Use transitionPlanStatus() for status changes.
+ *
+ * This function only allows updating fields that don't have status invariants.
+ * Status changes must go through transitionPlanStatus() to ensure valid transitions.
+ */
 export function setPlanMetadata(
   ydoc: Y.Doc,
-  metadata: Partial<PlanMetadata>,
+  metadata: PlanMetadataBaseUpdate,
   actor?: string
 ): void {
   ydoc.transact(
@@ -56,16 +187,113 @@ export function setPlanMetadata(
   );
 }
 
-export function initPlanMetadata(
+/**
+ * Transition plan status with state machine validation.
+ * Enforces valid status transitions and ensures required fields are provided.
+ *
+ * Valid transitions:
+ * - draft -> pending_review (requires reviewRequestId)
+ * - pending_review -> in_progress (requires reviewedAt, reviewedBy)
+ * - pending_review -> changes_requested (requires reviewedAt, reviewedBy, optional reviewComment)
+ * - changes_requested -> pending_review (requires reviewRequestId)
+ * - in_progress -> completed (requires completedAt, completedBy, optional snapshotUrl)
+ */
+export function transitionPlanStatus(
   ydoc: Y.Doc,
-  init: Omit<PlanMetadata, 'createdAt' | 'updatedAt'>
-): void {
+  transition: StatusTransition,
+  actor?: string
+): TransitionResult {
+  const metadataResult = getPlanMetadataWithValidation(ydoc);
+  if (!metadataResult.success) {
+    return { success: false, error: metadataResult.error };
+  }
+
+  const currentStatus = metadataResult.data.status;
+  const validTargets = VALID_STATUS_TRANSITIONS[currentStatus];
+
+  if (!validTargets.includes(transition.status)) {
+    return {
+      success: false,
+      error: `Invalid transition: cannot go from '${currentStatus}' to '${transition.status}'. Valid targets: ${validTargets.join(', ') || 'none (terminal state)'}`,
+    };
+  }
+
+  ydoc.transact(
+    () => {
+      const map = ydoc.getMap('metadata');
+
+      // Set status
+      map.set('status', transition.status);
+
+      // Set status-specific fields based on transition type
+      switch (transition.status) {
+        case 'pending_review':
+          map.set('reviewRequestId', transition.reviewRequestId);
+          break;
+
+        case 'changes_requested':
+          map.set('reviewedAt', transition.reviewedAt);
+          map.set('reviewedBy', transition.reviewedBy);
+          if (transition.reviewComment !== undefined) {
+            map.set('reviewComment', transition.reviewComment);
+          }
+          break;
+
+        case 'in_progress':
+          if (transition.reviewedAt !== undefined) {
+            map.set('reviewedAt', transition.reviewedAt);
+          }
+          if (transition.reviewedBy !== undefined) {
+            map.set('reviewedBy', transition.reviewedBy);
+          }
+          break;
+
+        case 'completed':
+          map.set('completedAt', transition.completedAt);
+          map.set('completedBy', transition.completedBy);
+          if (transition.snapshotUrl !== undefined) {
+            map.set('snapshotUrl', transition.snapshotUrl);
+          }
+          break;
+
+        default:
+          assertNever(transition);
+      }
+
+      map.set('updatedAt', Date.now());
+    },
+    actor ? { actor } : undefined
+  );
+
+  return { success: true };
+}
+
+/**
+ * Initialize plan metadata for a new draft plan.
+ * Only creates plans in 'draft' status - use transitionPlanStatus() to change status.
+ *
+ * Note: This function is intentionally restricted to draft status.
+ * Other statuses require specific fields (reviewRequestId for pending_review, etc.)
+ * that should be set via transitionPlanStatus() for proper validation.
+ */
+export interface InitPlanMetadataParams {
+  id: string;
+  title: string;
+  repo?: string;
+  pr?: number;
+  ownerId?: string;
+  approvalRequired?: boolean;
+  sessionTokenHash?: string;
+  origin?: OriginMetadata;
+}
+
+export function initPlanMetadata(ydoc: Y.Doc, init: InitPlanMetadataParams): void {
   const map = ydoc.getMap('metadata');
   const now = Date.now();
 
   map.set('id', init.id);
   map.set('title', init.title);
-  map.set('status', init.status);
+  map.set('status', 'draft'); // Always initialize as draft
   map.set('createdAt', now);
   map.set('updatedAt', now);
 
@@ -663,10 +891,27 @@ export function logPlanEvent<T extends PlanEventType>(
   const eventsArray = ydoc.getArray(YDOC_KEYS.EVENTS);
   const [data, options] = args;
 
-  // Add data if present - TypeScript knows the correct shape based on type parameter
-  const event = (data !== undefined ? { id: nanoid(), type, actor, timestamp: Date.now(), inboxWorthy: options?.inboxWorthy, inboxFor: options?.inboxFor, data } : { id: nanoid(), type, actor, timestamp: Date.now(), inboxWorthy: options?.inboxWorthy, inboxFor: options?.inboxFor }) as PlanEvent;
+  // Build event object - only include data if present
+  const baseEvent = {
+    id: nanoid(),
+    type,
+    actor,
+    timestamp: Date.now(),
+    inboxWorthy: options?.inboxWorthy,
+    inboxFor: options?.inboxFor,
+  };
 
-  eventsArray.push([event]);
+  // Construct event with or without data - TypeScript enforces correct data shape via generics
+  const rawEvent = data !== undefined ? { ...baseEvent, data } : baseEvent;
+
+  // Runtime validation ensures event matches PlanEvent discriminated union
+  // This replaces the unsafe `as PlanEvent` cast with proper validation
+  const parsed = PlanEventSchema.safeParse(rawEvent);
+  if (!parsed.success) {
+    throw new Error(`Invalid plan event: ${parsed.error.message}`);
+  }
+
+  eventsArray.push([parsed.data]);
 }
 
 export function getPlanEvents(ydoc: Y.Doc): PlanEvent[] {

@@ -7,6 +7,7 @@ import {
   getDeliverables,
   getPlanMetadata,
   logPlanEvent,
+  PlanStatusValues,
   type PlanStatusType,
   parseThreads,
   type Thread,
@@ -71,7 +72,11 @@ export function attachObservers(planId: string, doc: Y.Doc): void {
   doc.getMap('metadata').observe((event, transaction) => {
     if (event.keysChanged.has('status')) {
       const prev = previousState.get(planId);
-      const newStatus = doc.getMap('metadata').get('status') as PlanStatusType | undefined;
+      // Runtime validation: ensure status value is a valid PlanStatusType
+      const rawStatus = doc.getMap('metadata').get('status');
+      const newStatus = typeof rawStatus === 'string' && PlanStatusValues.includes(rawStatus as PlanStatusType)
+        ? (rawStatus as PlanStatusType)
+        : undefined;
 
       if (prev && prev.status && prev.status !== newStatus && newStatus) {
         const actor = transaction.origin?.actor || 'System';

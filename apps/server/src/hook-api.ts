@@ -2,6 +2,7 @@ import type { Block } from '@blocknote/core';
 import { ServerBlockNoteEditor } from '@blocknote/server-util';
 import {
   addDeliverable,
+  assertNever,
   CreateHookSessionRequestSchema,
   type CreateHookSessionResponse,
   clearAgentPresence,
@@ -87,7 +88,6 @@ export async function handleCreateSession(req: Request, res: Response): Promise<
     initPlanMetadata(ydoc, {
       id: planId,
       title: PLAN_IN_PROGRESS,
-      status: 'draft',
       ownerId,
       repo,
       origin,
@@ -192,7 +192,6 @@ export async function handleUpdateContent(req: Request, res: Response): Promise<
     const now = Date.now();
     setPlanMetadata(ydoc, {
       title,
-      updatedAt: now,
     });
 
     const indexDoc = await getOrCreateDoc(PLAN_INDEX_DOC_NAME);
@@ -290,10 +289,8 @@ export async function handleGetReview(req: Request, res: Response): Promise<void
         };
         break;
 
-      default: {
-        const _exhaustive: never = metadata;
-        throw new Error(`Unhandled status: ${JSON.stringify(_exhaustive)}`);
-      }
+      default:
+        assertNever(metadata);
     }
 
     res.json(response);
@@ -329,7 +326,6 @@ export async function handleSetSessionToken(req: Request, res: Response): Promis
 
     setPlanMetadata(ydoc, {
       sessionTokenHash,
-      updatedAt: Date.now(),
     });
 
     const webUrl = webConfig.PEER_PLAN_WEB_URL;

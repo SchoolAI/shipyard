@@ -14,7 +14,7 @@ import {
   logPlanEvent,
   PLAN_INDEX_DOC_NAME,
   setPlanIndexEntry,
-  setPlanMetadata,
+  transitionPlanStatus,
 } from '@peer-plan/schema';
 import type * as Y from 'yjs';
 import { z } from 'zod';
@@ -172,11 +172,12 @@ RETURNS:
     );
 
     // Update metadata
-    setPlanMetadata(
+    const completedAt = Date.now();
+    transitionPlanStatus(
       ydoc,
       {
         status: 'completed',
-        completedAt: Date.now(),
+        completedAt,
         completedBy: actorName,
         snapshotUrl,
       },

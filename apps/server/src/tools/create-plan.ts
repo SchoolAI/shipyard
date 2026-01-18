@@ -151,7 +151,6 @@ Bad deliverables (not provable):
     initPlanMetadata(ydoc, {
       id: planId,
       title: input.title,
-      status: 'pending_review',
       repo,
       pr: input.prNumber,
       ownerId,

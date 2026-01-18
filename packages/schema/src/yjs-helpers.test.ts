@@ -869,11 +869,11 @@ describe('Plan metadata helpers', () => {
 
   describe('setPlanMetadata', () => {
     it('sets metadata fields', () => {
-      setPlanMetadata(ydoc, { title: 'New Title', status: 'in_progress' });
+      setPlanMetadata(ydoc, { title: 'New Title', repo: 'org/repo' });
 
       const map = ydoc.getMap('metadata');
       expect(map.get('title')).toBe('New Title');
-      expect(map.get('status')).toBe('in_progress');
+      expect(map.get('repo')).toBe('org/repo');
     });
 
     it('updates updatedAt timestamp', () => {
@@ -888,23 +888,24 @@ describe('Plan metadata helpers', () => {
     it('ignores undefined values', () => {
       const map = ydoc.getMap('metadata');
       map.set('title', 'Original');
+      map.set('repo', 'original/repo');
 
-      setPlanMetadata(ydoc, { title: undefined, status: 'draft' });
+      setPlanMetadata(ydoc, { title: undefined, repo: 'new/repo' });
 
       expect(map.get('title')).toBe('Original');
-      expect(map.get('status')).toBe('draft');
+      expect(map.get('repo')).toBe('new/repo');
     });
 
     it('can update partial metadata', () => {
       const map = ydoc.getMap('metadata');
       map.set('id', 'plan-1');
       map.set('title', 'Original Title');
-      map.set('status', 'draft');
+      map.set('repo', 'original/repo');
 
-      setPlanMetadata(ydoc, { status: 'pending_review' });
+      setPlanMetadata(ydoc, { repo: 'new/repo' });
 
       expect(map.get('title')).toBe('Original Title');
-      expect(map.get('status')).toBe('pending_review');
+      expect(map.get('repo')).toBe('new/repo');
     });
   });
 
@@ -915,13 +916,12 @@ describe('Plan metadata helpers', () => {
       initPlanMetadata(ydoc, {
         id: 'plan-1',
         title: 'My Plan',
-        status: 'draft',
       });
 
       const map = ydoc.getMap('metadata');
       expect(map.get('id')).toBe('plan-1');
       expect(map.get('title')).toBe('My Plan');
-      expect(map.get('status')).toBe('draft');
+      expect(map.get('status')).toBe('draft'); // Always initialized as draft
       expect(map.get('createdAt')).toBeGreaterThanOrEqual(before);
       expect(map.get('updatedAt')).toBeGreaterThanOrEqual(before);
     });
@@ -930,7 +930,6 @@ describe('Plan metadata helpers', () => {
       initPlanMetadata(ydoc, {
         id: 'plan-1',
         title: 'Test',
-        status: 'draft',
       });
 
       const map = ydoc.getMap('metadata');
@@ -941,7 +940,6 @@ describe('Plan metadata helpers', () => {
       initPlanMetadata(ydoc, {
         id: 'plan-1',
         title: 'Test',
-        status: 'draft',
         repo: 'org/repo',
         pr: 123,
       });
@@ -955,7 +953,6 @@ describe('Plan metadata helpers', () => {
       initPlanMetadata(ydoc, {
         id: 'plan-1',
         title: 'Test',
-        status: 'draft',
         ownerId: 'owner-user',
       });
 
@@ -968,7 +965,6 @@ describe('Plan metadata helpers', () => {
       initPlanMetadata(ydoc, {
         id: 'plan-1',
         title: 'Test',
-        status: 'draft',
         ownerId: 'owner-user',
       });
 
@@ -980,7 +976,6 @@ describe('Plan metadata helpers', () => {
       initPlanMetadata(ydoc, {
         id: 'plan-1',
         title: 'Test',
-        status: 'draft',
         ownerId: 'owner-user',
         approvalRequired: false,
       });
@@ -993,7 +988,6 @@ describe('Plan metadata helpers', () => {
       initPlanMetadata(ydoc, {
         id: 'plan-1',
         title: 'Test',
-        status: 'draft',
         sessionTokenHash: 'hash123',
       });
 
@@ -1005,7 +999,6 @@ describe('Plan metadata helpers', () => {
       initPlanMetadata(ydoc, {
         id: 'plan-1',
         title: 'Test',
-        status: 'draft',
         origin: {
           platform: 'claude-code',
           sessionId: 'session-123',

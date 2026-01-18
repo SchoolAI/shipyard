@@ -289,6 +289,17 @@ export {
 } from './url-encoding.js';
 export type { UserProfile } from './user-helpers.js';
 export { createUserResolver } from './user-helpers.js';
+export type {
+  GetPlanMetadataResult,
+  InitPlanMetadataParams,
+  PlanMetadataBaseUpdate,
+  StatusTransition,
+  TransitionResult,
+  TransitionToChangesRequested,
+  TransitionToCompleted,
+  TransitionToInProgress,
+  TransitionToPendingReview,
+} from './yjs-helpers.js';
 export {
   addArtifact,
   addConversationVersion,
@@ -309,6 +320,7 @@ export {
   getLinkedPRs,
   getPlanEvents,
   getPlanMetadata,
+  getPlanMetadataWithValidation,
   getPlanOwnerId,
   getPRReviewComments,
   getPRReviewCommentsForPR,
@@ -335,9 +347,11 @@ export {
   setAgentPresence,
   setPlanMetadata,
   toggleStepCompletion,
+  transitionPlanStatus,
   unlinkPR,
   unrejectUser,
   updateLinkedPRStatus,
+  VALID_STATUS_TRANSITIONS,
 } from './yjs-helpers.js';
 export type { YDocKey } from './yjs-keys.js';
 export { isValidYDocKey, YDOC_KEYS } from './yjs-keys.js';

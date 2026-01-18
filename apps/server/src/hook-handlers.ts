@@ -120,7 +120,6 @@ export async function createSessionHandler(
   initPlanMetadata(ydoc, {
     id: planId,
     title: PLAN_IN_PROGRESS,
-    status: 'draft',
     ownerId,
     repo,
     origin,
@@ -219,6 +218,7 @@ export async function updateContentHandler(
 
   const blocks = await parseMarkdownToBlocks(input.content);
   const title = extractTitleFromBlocks(blocks);
+  const now = Date.now();
 
   const editor = ServerBlockNoteEditor.create();
   ydoc.transact(() => {
@@ -238,10 +238,8 @@ export async function updateContentHandler(
     }
   });
 
-  const now = Date.now();
   setPlanMetadata(ydoc, {
     title,
-    updatedAt: now,
   });
 
   const indexDoc = await ctx.getOrCreateDoc(PLAN_INDEX_DOC_NAME);
@@ -425,7 +423,6 @@ export async function setSessionTokenHandler(
 
   setPlanMetadata(ydoc, {
     sessionTokenHash,
-    updatedAt: Date.now(),
   });
 
   const webUrl = webConfig.PEER_PLAN_WEB_URL;
@@ -555,20 +552,35 @@ export async function waitForApprovalHandler(
     reviewedBy: metadata.get('reviewedBy') as string | undefined,
   });
 
-  // Update session registry with review decision data
-  // NOTE: This read-modify-write pattern has a potential race condition if multiple
-  // approval handlers update the same session concurrently. However, this is acceptable
-  // because:
-  // 1. The race condition check at the top of this function prevents concurrent calls
-  // 2. If a race still occurs, the last write wins, which is acceptable for review decisions
-  // 3. Adding proper atomicity (e.g., with locks) would add complexity without significant benefit
+  /**
+   * Update session registry with review decision data.
+   * Throws an error if the transition fails, ensuring callers know about failures.
+   *
+   * NOTE: This read-modify-write pattern has a potential race condition if multiple
+   * approval handlers update the same session concurrently. However, this is acceptable
+   * because:
+   * 1. The race condition check at the top of this function prevents concurrent calls
+   * 2. If a race still occurs, the last write wins, which is acceptable for review decisions
+   * 3. Adding proper atomicity (e.g., with locks) would add complexity without significant benefit
+   *
+   * @throws Error if session not found or transition is invalid
+   */
   const updateSessionRegistry = (
     status: string,
     extraData: { approvedAt?: number; deliverables?: Array<{ id: string; text: string }> } = {}
-  ) => {
+  ): void => {
     const session = getSessionStateByPlanId(planId);
     const sessionId = getSessionIdByPlanId(planId);
-    if (!session || !sessionId) return;
+
+    if (!session || !sessionId) {
+      // Session not found is not a critical error - hook may have been restarted
+      // Log as warning but don't throw to allow approval to proceed
+      ctx.logger.warn(
+        { planId },
+        'Session not found in registry during approval - post-exit injection will not work'
+      );
+      return;
+    }
 
     const { reviewComment, reviewedBy } = getReviewData();
 
@@ -578,11 +590,10 @@ export async function waitForApprovalHandler(
       !isSessionStateApproved(session) &&
       !isSessionStateReviewed(session)
     ) {
-      ctx.logger.warn(
-        { sessionId, lifecycle: session.lifecycle },
-        'Cannot transition to approved/reviewed from non-synced state'
+      throw new Error(
+        `Invalid session state transition: cannot transition from '${session.lifecycle}' to 'approved' or 'reviewed'. ` +
+          `Session must be in 'synced', 'approved', or 'reviewed' state.`
       );
-      return;
     }
 
     // Base fields from current session
@@ -630,17 +641,11 @@ export async function waitForApprovalHandler(
         reviewStatus: status,
       });
     } else {
-      ctx.logger.warn(
-        {
-          sessionId,
-          status,
-          hasApprovedAt: !!extraData.approvedAt,
-          hasDeliverables: !!extraData.deliverables,
-          hasReviewedBy: !!reviewedBy,
-        },
-        'Cannot transition - missing required fields for lifecycle transition'
+      throw new Error(
+        `Invalid session state transition: missing required fields. ` +
+          `status=${status}, hasApprovedAt=${!!extraData.approvedAt}, ` +
+          `hasDeliverables=${!!extraData.deliverables}, hasReviewedBy=${!!reviewedBy}`
       );
-      return;
     }
 
     ctx.logger.info(
