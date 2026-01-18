@@ -596,6 +596,7 @@ export function KanbanPage() {
               width={panelWidth}
             />
             <PlanContent
+              mode="live"
               ydoc={panelYdoc}
               metadata={panelMetadata}
               syncState={panelSyncState}

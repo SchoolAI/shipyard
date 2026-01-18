@@ -45,22 +45,29 @@ import { TOOL_NAMES } from './tool-names.js';
 
 // --- Input Schema ---
 
-const AddArtifactInput = z
-  .object({
-    planId: z.string().describe('The plan ID to add artifact to'),
-    sessionToken: z.string().describe('Session token from create_plan'),
-    type: z.enum(['screenshot', 'video', 'test_results', 'diff']).describe('Artifact type'),
-    filename: z.string().describe('Filename for the artifact'),
-    content: z.string().optional().describe('Base64 encoded file content'),
-    filePath: z.string().optional().describe('Local file path to upload'),
-    contentUrl: z.string().optional().describe('URL to fetch content from'),
-    description: z.string().optional().describe('What this artifact proves (deliverable name)'),
-    deliverableId: z.string().optional().describe('ID of the deliverable this artifact fulfills'),
-  })
-  .refine((data) => {
-    const provided = [data.content, data.filePath, data.contentUrl].filter(Boolean).length;
-    return provided === 1;
-  }, 'Exactly one of content, filePath, or contentUrl must be provided');
+const AddArtifactInputBase = z.object({
+  planId: z.string().describe('The plan ID to add artifact to'),
+  sessionToken: z.string().describe('Session token from create_plan'),
+  type: z.enum(['screenshot', 'video', 'test_results', 'diff']).describe('Artifact type'),
+  filename: z.string().describe('Filename for the artifact'),
+  description: z.string().optional().describe('What this artifact proves (deliverable name)'),
+  deliverableId: z.string().optional().describe('ID of the deliverable this artifact fulfills'),
+});
+
+const AddArtifactInput = z.discriminatedUnion('source', [
+  AddArtifactInputBase.extend({
+    source: z.literal('file'),
+    filePath: z.string().describe('Local file path to upload'),
+  }),
+  AddArtifactInputBase.extend({
+    source: z.literal('url'),
+    contentUrl: z.string().describe('URL to fetch content from'),
+  }),
+  AddArtifactInputBase.extend({
+    source: z.literal('base64'),
+    content: z.string().describe('Base64 encoded file content'),
+  }),
+]);
 
 // --- Public Export ---
 
@@ -85,10 +92,10 @@ REQUIREMENTS:
 - For GitHub storage: repo must be set + 'gh auth login' or GITHUB_TOKEN
 - For local storage: no requirements (automatic fallback)
 
-CONTENT OPTIONS (provide exactly one):
-- filePath: Local file path (e.g., "/path/to/screenshot.png") - RECOMMENDED
-- contentUrl: URL to fetch content from
-- content: Base64 encoded (legacy)
+CONTENT SOURCE (specify via 'source' field):
+- source='file' + filePath: Local file path (e.g., "/path/to/screenshot.png") - RECOMMENDED
+- source='url' + contentUrl: URL to fetch content from
+- source='base64' + content: Base64 encoded (legacy)
 
 DELIVERABLE LINKING:
 - Pass deliverableId to link artifact to a deliverable
@@ -114,17 +121,22 @@ ARTIFACT TYPES:
           type: 'string',
           description: 'Filename with extension (e.g., screenshot.png, demo.mp4)',
         },
-        content: {
+        source: {
           type: 'string',
-          description: 'Base64 encoded file content (legacy, prefer filePath or contentUrl)',
+          enum: ['file', 'url', 'base64'],
+          description: 'Content source type: file (local path), url (fetch from URL), or base64 (direct content)',
         },
         filePath: {
           type: 'string',
-          description: 'Local file path to upload (e.g., "/path/to/screenshot.png")',
+          description: 'Local file path to upload (required when source=file)',
         },
         contentUrl: {
           type: 'string',
-          description: 'URL to fetch content from (e.g., "https://example.com/image.png")',
+          description: 'URL to fetch content from (required when source=url)',
+        },
+        content: {
+          type: 'string',
+          description: 'Base64 encoded file content (required when source=base64)',
         },
         description: {
           type: 'string',
@@ -136,7 +148,7 @@ ARTIFACT TYPES:
             'ID of the deliverable this fulfills (from read_plan output). Automatically marks deliverable as completed.',
         },
       },
-      required: ['planId', 'sessionToken', 'type', 'filename'],
+      required: ['planId', 'sessionToken', 'type', 'filename', 'source'],
     },
   },
 
@@ -150,50 +162,50 @@ ARTIFACT TYPES:
 
     logger.info({ planId, type, filename }, 'Adding artifact');
 
-    // Resolve content from filePath, contentUrl, or direct content
+    // Resolve content based on discriminated source type
     let content: string;
-    if (input.filePath) {
-      logger.info({ filePath: input.filePath }, 'Reading file from path');
-      try {
-        const fileBuffer = await readFile(input.filePath);
-        content = fileBuffer.toString('base64');
-      } catch (error) {
-        logger.error({ error, filePath: input.filePath }, 'Failed to read file');
-        const message = error instanceof Error ? error.message : 'Unknown error';
-        return {
-          content: [{ type: 'text', text: `Failed to read file: ${message}` }],
-          isError: true,
-        };
-      }
-    } else if (input.contentUrl) {
-      logger.info({ contentUrl: input.contentUrl }, 'Fetching content from URL');
-      try {
-        const response = await fetch(input.contentUrl);
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+
+    switch (input.source) {
+      case 'file': {
+        logger.info({ filePath: input.filePath }, 'Reading file from path');
+        try {
+          const fileBuffer = await readFile(input.filePath);
+          content = fileBuffer.toString('base64');
+        } catch (error) {
+          logger.error({ error, filePath: input.filePath }, 'Failed to read file');
+          const message = error instanceof Error ? error.message : 'Unknown error';
+          return {
+            content: [{ type: 'text', text: `Failed to read file: ${message}` }],
+            isError: true,
+          };
         }
-        const arrayBuffer = await response.arrayBuffer();
-        content = Buffer.from(arrayBuffer).toString('base64');
-      } catch (error) {
-        logger.error({ error, contentUrl: input.contentUrl }, 'Failed to fetch URL');
-        const message = error instanceof Error ? error.message : 'Unknown error';
-        return {
-          content: [{ type: 'text', text: `Failed to fetch URL: ${message}` }],
-          isError: true,
-        };
+        break;
       }
-    } else if (input.content) {
-      content = input.content;
-    } else {
-      return {
-        content: [
-          {
-            type: 'text',
-            text: 'Must provide exactly one of: content, filePath, or contentUrl',
-          },
-        ],
-        isError: true,
-      };
+
+      case 'url': {
+        logger.info({ contentUrl: input.contentUrl }, 'Fetching content from URL');
+        try {
+          const response = await fetch(input.contentUrl);
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+          const arrayBuffer = await response.arrayBuffer();
+          content = Buffer.from(arrayBuffer).toString('base64');
+        } catch (error) {
+          logger.error({ error, contentUrl: input.contentUrl }, 'Failed to fetch URL');
+          const message = error instanceof Error ? error.message : 'Unknown error';
+          return {
+            content: [{ type: 'text', text: `Failed to fetch URL: ${message}` }],
+            isError: true,
+          };
+        }
+        break;
+      }
+
+      case 'base64': {
+        content = input.content;
+        break;
+      }
     }
 
     // Check if artifacts feature is disabled
@@ -464,6 +476,7 @@ ARTIFACT TYPES:
             createdAt: metadata.createdAt ?? Date.now(),
             updatedAt: Date.now(),
             ownerId: metadata.ownerId,
+            deleted: false,
           });
         } else {
           logger.warn({ planId }, 'Cannot update plan index: missing ownerId');

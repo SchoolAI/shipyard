@@ -17,7 +17,7 @@ export function getPlanIndex(ydoc: Y.Doc, includeArchived = false): PlanIndexEnt
     const result = PlanIndexEntrySchema.safeParse(data);
     if (result.success) {
       // Filter archived plans unless explicitly requested
-      if (!includeArchived && result.data.deletedAt) {
+      if (!includeArchived && result.data.deleted) {
         continue;
       }
       entries.push(result.data);
@@ -52,12 +52,11 @@ export function setPlanIndexEntry(ydoc: Y.Doc, entry: PlanIndexEntry): void {
     createdAt: entry.createdAt,
     updatedAt: entry.updatedAt,
     ownerId: entry.ownerId,
+    deleted: entry.deleted,
   };
-  // Include archive fields if present
-  if (entry.deletedAt !== undefined) {
+  // Include archive fields if deleted
+  if (entry.deleted) {
     data.deletedAt = entry.deletedAt;
-  }
-  if (entry.deletedBy !== undefined) {
     data.deletedBy = entry.deletedBy;
   }
   plansMap.set(entry.id, data);

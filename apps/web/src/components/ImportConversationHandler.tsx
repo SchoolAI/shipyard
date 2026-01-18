@@ -450,6 +450,7 @@ export function ImportConversationHandler({
         sessionId: selectedReceived.meta.sourceSessionId,
         messageCount: selectedReceived.meta.messageCount,
         createdAt: Date.now(),
+        handedOff: false,
       };
       addConversationVersion(ydoc, newVersion);
 
@@ -460,10 +461,12 @@ export function ImportConversationHandler({
         sourceSessionId: selectedReceived.meta.sourceSessionId.slice(0, 8),
       });
 
-      toast.success(
-        `Created Claude Code session: ${result.sessionId}\nPath: ${result.transcriptPath}`,
-        { duration: 8000 }
-      );
+      if (result.success) {
+        toast.success(
+          `Created Claude Code session: ${result.sessionId}\nPath: ${result.transcriptPath}`,
+          { duration: 8000 }
+        );
+      }
 
       setIsReviewOpen(false);
       setSelectedReceived(null);

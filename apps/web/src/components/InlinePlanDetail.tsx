@@ -174,6 +174,7 @@ export function InlinePlanDetail({
         />
         <div className="flex-1 overflow-y-auto">
           <PlanContent
+            mode="live"
             ydoc={panelYdoc}
             metadata={panelMetadata}
             syncState={panelSyncState}

@@ -102,12 +102,17 @@ export interface RedeemInviteRequest {
 /**
  * Response to invite redemption attempt.
  */
-export interface InviteRedemptionResult {
-  type: 'invite_redemption_result';
-  success: boolean;
-  error?: 'expired' | 'exhausted' | 'revoked' | 'invalid' | 'already_redeemed';
-  planId?: string;
-}
+export type InviteRedemptionResult =
+  | {
+      type: 'invite_redemption_result';
+      success: true;
+      planId: string;
+    }
+  | {
+      type: 'invite_redemption_result';
+      success: false;
+      error: 'expired' | 'exhausted' | 'revoked' | 'invalid' | 'already_redeemed';
+    };
 
 /**
  * Request to revoke an invite token (owner only).

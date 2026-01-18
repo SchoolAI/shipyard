@@ -202,6 +202,7 @@ Bad deliverables (not provable):
       createdAt: now,
       updatedAt: now,
       ownerId,
+      deleted: false,
     });
 
     logger.info({ planId }, 'Plan index updated');

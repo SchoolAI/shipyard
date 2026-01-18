@@ -98,7 +98,7 @@ export function getChanges(planId: string, subscriptionId: string): ChangesRespo
       pending: sub.pendingChanges.length,
       windowExpiresIn: sub.windowStartedAt
         ? Math.max(0, sub.config.windowMs - (now - sub.windowStartedAt))
-        : undefined,
+        : sub.config.windowMs,
     };
   }
 

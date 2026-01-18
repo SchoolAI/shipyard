@@ -52,7 +52,7 @@ export function usePendingUsers(rtcProvider: WebrtcProvider | null): PendingUser
           id: planStatus.user.id,
           name: planStatus.user.name,
           color: planStatus.user.color,
-          requestedAt: planStatus.requestedAt ?? Date.now(),
+          requestedAt: planStatus.requestedAt,
         });
       }
 

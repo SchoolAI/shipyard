@@ -125,6 +125,7 @@ export async function handleCreateSession(req: Request, res: Response): Promise<
       createdAt: now,
       updatedAt: now,
       ownerId,
+      deleted: false,
     });
 
     const webUrl = webConfig.PEER_PLAN_WEB_URL;
@@ -203,6 +204,7 @@ export async function handleUpdateContent(req: Request, res: Response): Promise<
         createdAt: metadata.createdAt ?? now,
         updatedAt: now,
         ownerId: metadata.ownerId,
+        deleted: false,
       });
     } else {
       logger.warn({ planId }, 'Cannot update plan index: missing ownerId');

@@ -157,6 +157,7 @@ export async function createSessionHandler(
     createdAt: now,
     updatedAt: now,
     ownerId,
+    deleted: false,
   });
 
   const webUrl = webConfig.PEER_PLAN_WEB_URL;
@@ -251,6 +252,7 @@ export async function updateContentHandler(
       createdAt: metadata.createdAt ?? now,
       updatedAt: now,
       ownerId: metadata.ownerId,
+      deleted: false,
     });
   } else {
     ctx.logger.warn({ planId }, 'Cannot update plan index: missing ownerId');

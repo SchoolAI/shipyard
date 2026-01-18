@@ -14,12 +14,11 @@ import type { Artifact } from '@peer-plan/schema';
 
 export type FetchArtifactStatus = 'success' | 'needs_auth' | 'not_found' | 'error';
 
-export interface FetchArtifactResult {
-  status: FetchArtifactStatus;
-  blobUrl?: string;
-  textContent?: string;
-  error?: string;
-}
+export type FetchArtifactResult =
+  | { status: 'success'; blobUrl?: string; textContent?: string }
+  | { status: 'needs_auth' }
+  | { status: 'not_found' }
+  | { status: 'error'; error: string };
 
 export interface ParsedArtifactUrl {
   owner: string;

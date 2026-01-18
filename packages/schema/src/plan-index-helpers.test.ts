@@ -14,15 +14,41 @@ import {
 } from './plan-index-helpers.js';
 
 describe('Plan Index Helpers', () => {
-  const createEntry = (overrides: Partial<PlanIndexEntry> = {}): PlanIndexEntry => ({
-    id: 'plan-1',
-    title: 'Test Plan',
-    status: 'draft',
-    createdAt: Date.now(),
-    updatedAt: Date.now(),
-    ownerId: 'test-user',
-    ...overrides,
-  });
+  const createEntry = (
+    overrides: Partial<{
+      id: string;
+      title: string;
+      status: PlanIndexEntry['status'];
+      createdAt: number;
+      updatedAt: number;
+      ownerId: string;
+      deleted: boolean;
+      deletedAt: number;
+      deletedBy: string;
+    }> = {}
+  ): PlanIndexEntry => {
+    const { deleted = false, deletedAt, deletedBy, ...rest } = overrides;
+    const base = {
+      id: 'plan-1',
+      title: 'Test Plan',
+      status: 'draft' as const,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      ownerId: 'test-user',
+      ...rest,
+    };
+
+    if (deleted) {
+      return {
+        ...base,
+        deleted: true,
+        deletedAt: deletedAt ?? Date.now(),
+        deletedBy: deletedBy ?? 'test-user',
+      };
+    }
+
+    return { ...base, deleted: false };
+  };
 
   describe('setPlanIndexEntry / getPlanIndexEntry', () => {
     it('round-trips plan entries correctly', () => {

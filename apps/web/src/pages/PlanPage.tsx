@@ -234,10 +234,17 @@ export function PlanPage() {
   useEffect(() => {
     if (syncState.synced && syncState.connected && !metadata) {
       const existingEntry = getPlanIndexEntry(indexDoc, planId);
-      if (existingEntry && !existingEntry.deletedAt) {
+      if (existingEntry && !existingEntry.deleted) {
         setPlanIndexEntry(indexDoc, {
-          ...existingEntry,
+          id: existingEntry.id,
+          title: existingEntry.title,
+          status: existingEntry.status,
+          createdAt: existingEntry.createdAt,
+          updatedAt: existingEntry.updatedAt,
+          ownerId: existingEntry.ownerId,
+          deleted: true,
           deletedAt: Date.now(),
+          deletedBy: 'Unknown',
         });
       }
     }
@@ -375,19 +382,28 @@ export function PlanPage() {
         )}
 
         {/* Tabbed content using PlanContent component */}
-        <PlanContent
-          ydoc={ydoc}
-          metadata={metadata}
-          syncState={syncState}
-          identity={identity}
-          onRequestIdentity={handleRequestIdentity}
-          provider={activeProvider}
-          initialContent={isSnapshot ? urlPlan?.content : undefined}
-          currentSnapshot={versionNav.currentSnapshot}
-          isSnapshot={isSnapshot}
-          onEditorReady={handleEditorReady}
-          versionNav={versionNav}
-        />
+        {isSnapshot && urlPlan?.content ? (
+          <PlanContent
+            mode="snapshot"
+            ydoc={ydoc}
+            metadata={metadata}
+            syncState={syncState}
+            initialContent={urlPlan.content}
+          />
+        ) : (
+          <PlanContent
+            mode="live"
+            ydoc={ydoc}
+            metadata={metadata}
+            syncState={syncState}
+            identity={identity}
+            onRequestIdentity={handleRequestIdentity}
+            provider={activeProvider}
+            currentSnapshot={versionNav.currentSnapshot}
+            onEditorReady={handleEditorReady}
+            versionNav={versionNav}
+          />
+        )}
 
         {/* Mobile review actions */}
         {isMobile && metadata && !isSnapshot && (

@@ -96,7 +96,7 @@ export function parseClaudeCodeOrigin(
  * Content is NOT stored in CRDT - only metadata for provenance tracking.
  * Actual content is transferred on-demand via P2P during handoff.
  */
-export interface ConversationVersion {
+interface ConversationVersionBase {
   versionId: string;
   creator: string;
   platform: OriginPlatform;
@@ -104,20 +104,31 @@ export interface ConversationVersion {
   sessionId: string;
   messageCount: number;
   createdAt: number;
-  handedOffAt?: number;
-  handedOffTo?: string;
 }
 
-export const ConversationVersionSchema = z.object({
+export type ConversationVersion =
+  | (ConversationVersionBase & { handedOff: false })
+  | (ConversationVersionBase & { handedOff: true; handedOffAt: number; handedOffTo: string });
+
+const ConversationVersionBaseSchema = z.object({
   versionId: z.string(),
   creator: z.string(),
   platform: z.enum(OriginPlatformValues),
   sessionId: z.string(),
   messageCount: z.number(),
   createdAt: z.number(),
-  handedOffAt: z.number().optional(),
-  handedOffTo: z.string().optional(),
 });
+
+export const ConversationVersionSchema = z.discriminatedUnion('handedOff', [
+  ConversationVersionBaseSchema.extend({
+    handedOff: z.literal(false),
+  }),
+  ConversationVersionBaseSchema.extend({
+    handedOff: z.literal(true),
+    handedOffAt: z.number(),
+    handedOffTo: z.string(),
+  }),
+]);
 
 export const PlanEventTypes = [
   'plan_created',

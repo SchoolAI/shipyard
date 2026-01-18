@@ -51,13 +51,10 @@ export interface ConversationHandlers {
       };
     },
     ctx: ConversationContext
-  ) => Promise<{
-    success: boolean;
-    sessionId?: string;
-    transcriptPath?: string;
-    messageCount?: number;
-    error?: string;
-  }>;
+  ) => Promise<
+    | { success: true; sessionId: string; transcriptPath: string; messageCount: number }
+    | { success: false; error: string }
+  >;
 }
 
 export type ConversationRouter = typeof conversationRouter;

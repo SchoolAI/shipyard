@@ -79,7 +79,7 @@ export function columnIdToStatus(columnId: ColumnId): PlanStatusType {
 export function useKanbanColumns(plans: PlanIndexEntry[]): ColumnWithPlans[] {
   return useMemo(() => {
     // Filter out archived plans
-    const activePlans = plans.filter((p) => !p.deletedAt);
+    const activePlans = plans.filter((p) => !p.deleted);
 
     return STATUS_COLUMNS.map((column) => ({
       ...column,

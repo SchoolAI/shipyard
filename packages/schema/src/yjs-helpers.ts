@@ -842,7 +842,9 @@ export function markVersionHandedOff(
       const metadata = ydoc.getMap(YDOC_KEYS.METADATA);
       const versions = (metadata.get('conversationVersions') as ConversationVersion[]) || [];
       const updated = versions.map((v) =>
-        v.versionId === versionId ? { ...v, handedOffAt: Date.now(), handedOffTo } : v
+        v.versionId === versionId
+          ? { ...v, handedOff: true as const, handedOffAt: Date.now(), handedOffTo }
+          : v
       );
       metadata.set('conversationVersions', updated);
       metadata.set('updatedAt', Date.now());

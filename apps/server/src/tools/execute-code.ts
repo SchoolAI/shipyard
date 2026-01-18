@@ -107,10 +107,12 @@ Parameters:
 - sessionToken (string): Session token
 - type (string): 'screenshot' | 'video' | 'test_results' | 'diff'
 - filename (string): e.g., "screenshot.png"
-- filePath (string, optional): Local file path (RECOMMENDED)
-- contentUrl (string, optional): URL to fetch from
-- content (string, optional): Base64 encoded (legacy)
+- source (string): Content source type - 'file' | 'url' | 'base64'
+- filePath (string): Local file path (required when source='file') - RECOMMENDED
+- contentUrl (string): URL to fetch from (required when source='url')
+- content (string): Base64 encoded (required when source='base64', legacy)
 - deliverableId (string, optional): Links artifact to deliverable
+- description (string, optional): What this artifact proves
 
 Auto-complete: When ALL deliverables have artifacts, returns snapshotUrl.
 
@@ -120,6 +122,7 @@ const result = await addArtifact({
   planId, sessionToken,
   type: 'screenshot',
   filename: 'login.png',
+  source: 'file',
   filePath: '/tmp/screenshot.png',
   deliverableId: 'del_abc'
 });
@@ -259,6 +262,8 @@ await addArtifact({
   planId: plan.planId,
   sessionToken: plan.sessionToken,
   type: 'screenshot',
+  source: 'file',
+  filename: 'screenshot.png',
   filePath: './screenshot.png',
   deliverableId: plan.deliverables[0].id  // Use actual deliverable ID
 });
@@ -267,6 +272,8 @@ const result = await addArtifact({
   planId: plan.planId,
   sessionToken: plan.sessionToken,
   type: 'video',
+  source: 'file',
+  filename: 'demo.mp4',
   filePath: './demo.mp4',
   deliverableId: plan.deliverables[1].id  // Use actual deliverable ID
 });
@@ -350,17 +357,20 @@ async function updatePlan(
   await updatePlanTool.handler({ planId, sessionToken, ...updates });
 }
 
-async function addArtifact(opts: {
+type AddArtifactOpts = {
   planId: string;
   sessionToken: string;
   type: string;
   filename: string;
-  filePath?: string;
-  contentUrl?: string;
-  content?: string;
   description?: string;
   deliverableId?: string;
-}) {
+} & (
+  | { source: 'file'; filePath: string }
+  | { source: 'url'; contentUrl: string }
+  | { source: 'base64'; content: string }
+);
+
+async function addArtifact(opts: AddArtifactOpts) {
   const result = await addArtifactTool.handler(opts);
   const text = (result.content[0] as { text: string })?.text || '';
 

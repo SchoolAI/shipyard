@@ -25,7 +25,7 @@ interface DeliverablesViewProps {
   ydoc: Y.Doc;
   metadata: PlanMetadata;
   identity: UserIdentity | null;
-  onRequestIdentity: () => void;
+  onRequestIdentity?: () => void;
   registryPort: number | null;
 }
 
@@ -175,7 +175,7 @@ export function DeliverablesView({
 
   const handleComplete = () => {
     if (!identity) {
-      onRequestIdentity();
+      onRequestIdentity?.();
       return;
     }
 
