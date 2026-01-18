@@ -45,7 +45,7 @@ async function handlePlanStart(
 
     return {
       allow: true,
-      message: `Plan created: ${result.url}`,
+      message: `Plan created at ${result.url}. Write your plan, mark deliverables with {#deliverable}, then exit plan mode to await approval.`,
       planId: result.planId,
       url: result.url,
     };
@@ -108,9 +108,8 @@ async function handlePlanExit(
       error.message?.includes('not available');
 
     const message = isConnectionError
-      ? 'Cannot connect to peer-plan registry server after multiple retries. ' +
-        'Please ensure the server is running: `pnpm dev` in the peer-plan directory.'
-      : `Review system error: ${error.message}`;
+      ? 'Cannot connect to peer-plan server. Ensure the peer-plan MCP server is running. Check ~/.peer-plan/hook-debug.log for details.'
+      : `Review system error: ${error.message}. Check ~/.peer-plan/hook-debug.log for details.`;
 
     return {
       allow: false,
@@ -325,7 +324,6 @@ async function main(): Promise<void> {
     console.log(output);
     process.exit(0);
   } catch (err) {
-    // On any error, fail closed with deny
     logger.error({ err }, 'Hook error, failing closed');
     // biome-ignore lint/suspicious/noConsole: Hook output MUST go to stdout
     console.log(
@@ -334,7 +332,7 @@ async function main(): Promise<void> {
           hookEventName: 'PermissionRequest',
           decision: {
             behavior: 'deny',
-            message: `Hook error: ${(err as Error).message}. Please report this bug.`,
+            message: `Hook error: ${(err as Error).message}. Check ~/.peer-plan/hook-debug.log for details.`,
           },
         },
       })

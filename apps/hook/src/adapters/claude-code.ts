@@ -11,6 +11,7 @@ import {
   CLAUDE_TOOL_NAMES,
   MCP_TOOL_NAMES,
 } from '../constants.js';
+import { logger } from '../logger.js';
 import { transformToAskUserQuestion } from '../transforms/ask-user-question.js';
 import type {
   AdapterEvent,
@@ -96,8 +97,22 @@ function handlePermissionRequest(input: ClaudeCodeHookInput): AdapterEvent {
 
   // ExitPlanMode triggers review - gets full plan content
   if (toolName === CLAUDE_TOOL_NAMES.EXIT_PLAN_MODE) {
+    // DEBUG: Log what Claude Code actually sends
+    logger.info(
+      {
+        toolInput: input.tool_input,
+        toolInputKeys: input.tool_input ? Object.keys(input.tool_input) : [],
+      },
+      'ExitPlanMode tool_input received'
+    );
+
     const parsed = ExitPlanModeToolInputSchema.safeParse(input.tool_input);
     if (!parsed.success) {
+      // DEBUG: Log parse failure
+      logger.warn(
+        { parseError: parsed.error?.issues, toolInput: input.tool_input },
+        'ExitPlanMode tool_input parse failed - no plan content'
+      );
       // No plan content - just do status check
       return { type: 'plan_exit', sessionId };
     }

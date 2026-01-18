@@ -130,7 +130,7 @@ async function handleUpdatedPlanReview(
 
       return {
         allow: true,
-        message: 'Updated plan approved',
+        message: `Plan re-approved with updates! You have ${deliverableCount} deliverable${deliverableCount === 1 ? '' : 's'}. Use add_artifact(filePath, deliverableId) to upload proof-of-work.`,
         planId,
         sessionToken,
         url,
@@ -170,10 +170,10 @@ export async function checkReviewStatus(
   const state = await getSessionContext(sessionId);
   let planId: string;
 
-  // Blocking approach: Create plan from ExitPlanMode if we have content
-  if (!state && planContent) {
+  // Create plan if no session exists (server returns {} for new sessions)
+  if ((!state || !state.planId) && planContent) {
     logger.info(
-      { sessionId, contentLength: planContent.length },
+      { sessionId, contentLength: planContent.length, hasState: !!state },
       'Creating plan from ExitPlanMode (blocking mode)'
     );
 
@@ -227,7 +227,7 @@ export async function checkReviewStatus(
 
         return {
           allow: true,
-          message: 'Plan approved',
+          message: `Plan approved! You have ${deliverableCount} deliverable${deliverableCount === 1 ? '' : 's'}. Use add_artifact(filePath, deliverableId) to upload proof-of-work.`,
           planId,
           sessionToken,
           url,
@@ -237,7 +237,8 @@ export async function checkReviewStatus(
         // Still approve, just without token
         return {
           allow: true,
-          message: 'Plan approved (session token unavailable)',
+          message:
+            'Plan approved, but session token unavailable. You may need to refresh the plan in the browser. Check ~/.peer-plan/server-debug.log for details.',
           planId,
         };
       }
@@ -253,20 +254,36 @@ export async function checkReviewStatus(
     };
   }
 
-  if (!state || !state.planId) {
-    // No state and no plan content - allow exit
-    logger.info({ sessionId }, 'No session state or plan content, allowing exit');
+  // Only allow exit without blocking if truly no context to review
+  if ((!state || !state.planId) && !planContent) {
+    logger.info({ sessionId }, 'No session state and no plan content - allowing exit');
     return { allow: true };
   }
 
-  // Note: Server no longer tracks contentHash, so we always treat new content as changed
-  // If we have new plan content, trigger re-review
-  if (planContent) {
-    logger.info({ planId: state.planId }, 'Plan content provided, triggering re-review');
-    return await handleUpdatedPlanReview(sessionId, state.planId, planContent, originMetadata);
+  // Unreachable: if we have content but no state, should have been handled above
+  if ((!state || !state.planId) && planContent) {
+    logger.error(
+      { sessionId, hasPlanContent: !!planContent, hasState: !!state, statePlanId: state?.planId },
+      'Unreachable state: plan content exists but no session state'
+    );
+    return {
+      allow: false,
+      message:
+        'Internal error: Plan content found but session state missing. Check ~/.peer-plan/hook-debug.log and report this issue.',
+    };
   }
 
+  // At this point, state.planId must exist (checked above)
+  if (!state.planId) {
+    throw new Error('Unreachable: state.planId should exist at this point');
+  }
   planId = state.planId;
+
+  // If we have new plan content, trigger re-review
+  if (planContent) {
+    logger.info({ planId }, 'Plan content provided, triggering re-review');
+    return await handleUpdatedPlanReview(sessionId, planId, planContent, originMetadata);
+  }
 
   logger.info({ sessionId, planId }, 'Checking review status');
 
@@ -274,11 +291,11 @@ export async function checkReviewStatus(
   try {
     status = await getReviewStatus(planId);
   } catch (err) {
-    // If we can't check status, fail closed
     logger.warn({ err, planId }, 'Failed to get review status, blocking exit');
     return {
       allow: false,
-      message: 'Cannot verify plan approval status. Please check the peer-plan server.',
+      message:
+        'Cannot verify plan approval status. Ensure the peer-plan MCP server is running. Check ~/.peer-plan/server-debug.log for details.',
       planId,
     };
   }
@@ -311,28 +328,28 @@ export async function checkReviewStatus(
       };
 
     case 'in_progress':
-      // Plan is approved and work is in progress - allow exit to continue work
       return {
         allow: true,
-        message: 'Plan approved. Work is in progress.',
+        message:
+          'Plan approved. Work is in progress. Use add_artifact(filePath, deliverableId) to upload deliverable proofs.',
         planId,
       };
 
     case 'completed':
-      // Task is completed - allow exit
       return {
         allow: true,
-        message: status.reviewedBy ? `Task completed by ${status.reviewedBy}` : 'Task completed',
+        message: status.reviewedBy
+          ? `Task completed and approved by ${status.reviewedBy}. All deliverables fulfilled.`
+          : 'Task completed. All deliverables fulfilled.',
         planId,
       };
 
     default: {
-      // Exhaustive check for unknown status values
       const _exhaustive: never = status.status;
-      logger.warn({ status: _exhaustive }, 'Unknown plan status, treating as draft');
+      logger.warn({ status: _exhaustive }, 'Unknown plan status');
       return {
         allow: false,
-        message: `Plan status unknown.\n\nOpen: ${baseUrl}/plan/${planId}`,
+        message: `Unexpected plan status. Refresh the browser at ${baseUrl}/plan/${planId} or check ~/.peer-plan/server-debug.log for details.`,
         planId,
       };
     }
