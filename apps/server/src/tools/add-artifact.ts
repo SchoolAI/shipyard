@@ -2,7 +2,10 @@ import { execSync } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import { ServerBlockNoteEditor } from '@blocknote/server-util';
 import {
+  type Artifact,
   type ArtifactType,
+  type GitHubArtifact,
+  type LocalArtifact,
   addArtifact,
   addSnapshot,
   createPlanSnapshot,
@@ -23,6 +26,7 @@ import {
 import { nanoid } from 'nanoid';
 import type * as Y from 'yjs';
 import { z } from 'zod';
+import { registryConfig } from '../config/env/registry.js';
 import { webConfig } from '../config/env/web.js';
 import { getOrCreateDoc } from '../doc-store.js';
 import {
@@ -33,6 +37,7 @@ import {
   parseRepoString,
   uploadArtifact,
 } from '../github-artifacts.js';
+import { deleteLocalArtifact, storeLocalArtifact } from '../local-artifacts.js';
 import { logger } from '../logger.js';
 import { getGitHubUsername } from '../server-identity.js';
 import { verifySessionToken } from '../session-token.js';
@@ -71,9 +76,14 @@ AUTO-COMPLETE: When ALL deliverables have artifacts attached, the task automatic
 
 This means you usually don't need to call complete_task - just upload artifacts for all deliverables.
 
+STORAGE STRATEGY:
+- Tries GitHub upload first (if configured and repo is set)
+- Falls back to local storage if GitHub fails or isn't configured
+- Local artifacts served via HTTP endpoint on registry server
+
 REQUIREMENTS:
-- Plan must have repo set (from create_plan or auto-detected)
-- GitHub authentication: run 'gh auth login' or set GITHUB_TOKEN env var
+- For GitHub storage: repo must be set + 'gh auth login' or GITHUB_TOKEN
+- For local storage: no requirements (automatic fallback)
 
 CONTENT OPTIONS (provide exactly one):
 - filePath: Local file path (e.g., "/path/to/screenshot.png") - RECOMMENDED
@@ -199,19 +209,6 @@ ARTIFACT TYPES:
       };
     }
 
-    // Check GitHub authentication
-    if (!isGitHubConfigured()) {
-      return {
-        content: [
-          {
-            type: 'text',
-            text: 'GitHub authentication required for artifact uploads.\n\nTo authenticate, run this in your terminal:\n  gh auth login\n\nAlternatives:\n• Set GITHUB_TOKEN environment variable\n• Set PEER_PLAN_ARTIFACTS=disabled to skip artifact uploads',
-          },
-        ],
-        isError: true,
-      };
-    }
-
     // Get the plan
     const doc = await getOrCreateDoc(planId);
     const metadata = getPlanMetadata(doc);
@@ -234,37 +231,89 @@ ARTIFACT TYPES:
       };
     }
 
-    // Check for repo
-    if (!metadata.repo) {
-      return {
-        content: [
-          {
-            type: 'text',
-            text: 'Plan must have repo set to upload artifacts.\n\nUse create_plan with repo parameter first.',
-          },
-        ],
-        isError: true,
-      };
-    }
+    // Determine storage strategy: Try GitHub first (if configured), fall back to local
+    // Store artifact and track cleanup handler in case Y.Doc update fails
+    let artifact: Artifact;
+    let cleanupOnFailure: (() => Promise<void>) | null = null;
+    const githubConfigured = isGitHubConfigured();
+    const hasRepo = !!metadata.repo;
 
     try {
-      // Upload to GitHub
-      const url = await uploadArtifact({
-        repo: metadata.repo,
-        planId,
-        filename,
-        content,
-      });
+      if (githubConfigured && hasRepo) {
+        try {
+          // Try GitHub upload (repo is guaranteed by hasRepo check above)
+          const url = await uploadArtifact({
+            repo: metadata.repo as string,
+            planId,
+            filename,
+            content,
+          });
+
+          // Type-safe: GitHubArtifact MUST have url
+          artifact = {
+            id: nanoid(),
+            type: type as ArtifactType,
+            filename,
+            storage: 'github',
+            url,
+            description: input.description,
+            uploadedAt: Date.now(),
+          } satisfies GitHubArtifact;
+
+          logger.info({ planId, artifactId: artifact.id }, 'Artifact uploaded to GitHub');
+          // No cleanup needed for GitHub - artifacts persist independently
+        } catch (error) {
+          // GitHub upload failed - fall back to local
+          logger.warn({ error, planId }, 'GitHub upload failed, falling back to local storage');
+
+          const buffer = Buffer.from(content, 'base64');
+          const localArtifactId = await storeLocalArtifact(planId, filename, buffer);
+
+          artifact = {
+            id: nanoid(),
+            type: type as ArtifactType,
+            filename,
+            storage: 'local',
+            localArtifactId,
+            description: input.description,
+            uploadedAt: Date.now(),
+          } satisfies LocalArtifact;
+
+          // Set cleanup handler for local artifacts
+          cleanupOnFailure = async () => {
+            await deleteLocalArtifact(localArtifactId);
+          };
+
+          logger.info(
+            { planId, artifactId: artifact.id },
+            'Artifact stored locally (GitHub fallback)'
+          );
+        }
+      } else {
+        // Use local storage directly
+        const buffer = Buffer.from(content, 'base64');
+        const localArtifactId = await storeLocalArtifact(planId, filename, buffer);
+
+        artifact = {
+          id: nanoid(),
+          type: type as ArtifactType,
+          filename,
+          storage: 'local',
+          localArtifactId,
+          description: input.description,
+          uploadedAt: Date.now(),
+        } satisfies LocalArtifact;
+
+        // Set cleanup handler for local artifacts
+        cleanupOnFailure = async () => {
+          await deleteLocalArtifact(localArtifactId);
+        };
+
+        const reason = !githubConfigured ? 'GitHub not configured' : 'No repo set';
+        logger.info({ planId, artifactId: artifact.id, reason }, 'Artifact stored locally');
+      }
 
       // Add to Y.Doc
-      const artifact = {
-        id: nanoid(),
-        type: type as ArtifactType,
-        filename,
-        url,
-        description: input.description,
-        uploadedAt: Date.now(),
-      };
       addArtifact(doc, artifact, actorName);
 
       // Link to deliverable if specified
@@ -310,7 +359,13 @@ ARTIFACT TYPES:
         }
       }
 
-      logger.info({ planId, artifactId: artifact.id, url }, 'Artifact added');
+      // Compute artifact URL from discriminated union
+      const artifactUrl =
+        artifact.storage === 'github'
+          ? artifact.url
+          : `http://localhost:${registryConfig.REGISTRY_PORT}/artifacts/${artifact.localArtifactId}`;
+
+      logger.info({ planId, artifactId: artifact.id, url: artifactUrl }, 'Artifact added');
 
       const linkedText = input.deliverableId
         ? `\nLinked to deliverable: ${input.deliverableId}`
@@ -409,11 +464,14 @@ ARTIFACT TYPES:
           prText = `\n\nExisting linked PR: #${existingLinkedPRs[0]?.prNumber}`;
         }
 
+        // Success - no cleanup needed
+        cleanupOnFailure = null;
+
         return {
           content: [
             {
               type: 'text',
-              text: `Artifact uploaded!\nID: ${artifact.id}\nType: ${type}\nFilename: ${filename}\nURL: ${url}${linkedText}
+              text: `Artifact uploaded!\nID: ${artifact.id}\nType: ${type}\nFilename: ${filename}\nURL: ${artifactUrl}${linkedText}
 
 🎉 ALL DELIVERABLES COMPLETE! Task auto-completed.
 
@@ -431,16 +489,24 @@ Embed this snapshot URL in your PR description as proof of completed work.`,
       const remainingText =
         remainingCount > 0 ? `\n\n${remainingCount} deliverable(s) remaining.` : '';
 
+      // Success - no cleanup needed
+      cleanupOnFailure = null;
+
       return {
         content: [
           {
             type: 'text',
-            text: `Artifact uploaded!\nID: ${artifact.id}\nType: ${type}\nFilename: ${filename}\nURL: ${url}${linkedText}${statusText}${remainingText}`,
+            text: `Artifact uploaded!\nID: ${artifact.id}\nType: ${type}\nFilename: ${filename}\nURL: ${artifactUrl}${linkedText}${statusText}${remainingText}`,
           },
         ],
       };
     } catch (error) {
-      logger.error({ error, planId, filename }, 'Failed to upload artifact');
+      logger.error({ error, planId, filename }, 'Failed to add artifact to Y.Doc');
+
+      // Cleanup orphaned local artifact
+      if (cleanupOnFailure) {
+        await cleanupOnFailure();
+      }
 
       // Provide clear, actionable error message for auth failures
       if (error instanceof GitHubAuthError) {
@@ -522,24 +588,38 @@ async function tryAutoLinkPR(ydoc: Y.Doc, repo: string): Promise<LinkedPR | null
     const pr = prs[0];
     if (!pr) return null;
 
-    const linkedPR: LinkedPR = {
-      prNumber: pr.number,
-      url: pr.html_url,
-      linkedAt: Date.now(),
-      status: pr.draft ? 'draft' : 'open',
-      branch,
-      title: pr.title,
-    };
+    // Handle all PR states exhaustively
+    const prState = pr.state as 'open' | 'closed';
+    switch (prState) {
+      case 'open': {
+        const linkedPR: LinkedPR = {
+          prNumber: pr.number,
+          url: pr.html_url,
+          linkedAt: Date.now(),
+          status: pr.draft ? 'draft' : 'open',
+          branch,
+          title: pr.title,
+        };
 
-    // Store in Y.Doc
-    const actorName = await getGitHubUsername();
-    linkPR(ydoc, linkedPR, actorName);
-    logPlanEvent(ydoc, 'pr_linked', actorName, {
-      prNumber: linkedPR.prNumber,
-      url: linkedPR.url,
-    });
+        // Store in Y.Doc
+        const actorName = await getGitHubUsername();
+        linkPR(ydoc, linkedPR, actorName);
+        logPlanEvent(ydoc, 'pr_linked', actorName, {
+          prNumber: linkedPR.prNumber,
+          url: linkedPR.url,
+        });
 
-    return linkedPR;
+        return linkedPR;
+      }
+      case 'closed':
+        logger.warn({ prNumber: pr.number }, 'PR is already closed, not linking');
+        return null;
+      default: {
+        const _exhaustive: never = prState;
+        logger.error({ state: _exhaustive }, 'Unhandled PR state');
+        return null;
+      }
+    }
   } catch (error) {
     logger.warn({ error, repo, branch }, 'Failed to lookup PR from GitHub');
     return null;

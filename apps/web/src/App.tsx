@@ -4,6 +4,7 @@ import { Layout } from './components/Layout';
 import { ActivePlanSyncProvider } from './contexts/ActivePlanSyncContext';
 import { UserIdentityProvider } from './contexts/UserIdentityContext';
 import { useGitHubAuth } from './hooks/useGitHubAuth';
+import { useLocalIdentity } from './hooks/useLocalIdentity';
 import { ArchivePage } from './pages/ArchivePage';
 import { InboxPage } from './pages/InboxPage';
 import { KanbanPage } from './pages/KanbanPage';
@@ -40,6 +41,7 @@ const basename = import.meta.env.BASE_URL;
 
 function AppWithLayout() {
   const { identity } = useGitHubAuth();
+  const { localIdentity } = useLocalIdentity();
 
   // Check for reset param before any providers initialize
   // This prevents sync attempts that would re-populate storage
@@ -49,7 +51,7 @@ function AppWithLayout() {
   }
 
   return (
-    <UserIdentityProvider githubIdentity={identity}>
+    <UserIdentityProvider githubIdentity={identity} localIdentity={localIdentity}>
       <ActivePlanSyncProvider>
         <Layout>
           <AppRoutes />

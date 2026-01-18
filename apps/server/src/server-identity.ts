@@ -83,7 +83,21 @@ export async function getGitHubUsername(): Promise<string> {
     return cachedUsername;
   }
 
-  // 5. All failed
+  // 5. Try OS username (unverified)
+  const osUsername = process.env.USER || process.env.USERNAME;
+  if (osUsername) {
+    // Issue 3: Sanitize OS username - Windows usernames can contain spaces/special characters
+    // Replace invalid characters with underscores to match GitHub username format
+    cachedUsername = osUsername.replace(/[^a-zA-Z0-9_-]/g, '_');
+    usernameResolved = true;
+    logger.warn(
+      { username: cachedUsername, original: osUsername },
+      'Using sanitized OS username (UNVERIFIED)'
+    );
+    return cachedUsername;
+  }
+
+  // 6. All failed
   usernameResolved = true;
   throw new Error(
     'GitHub username required but could not be determined.\n\n' +
@@ -91,7 +105,8 @@ export async function getGitHubUsername(): Promise<string> {
       '1. GITHUB_USERNAME=your-username (explicit)\n' +
       '2. GITHUB_TOKEN=ghp_xxx (will fetch from API)\n' +
       '3. gh auth login (uses CLI)\n' +
-      '4. git config --global user.name "your-username"\n\n' +
+      '4. git config --global user.name "your-username"\n' +
+      '5. Set USER or USERNAME environment variable\n\n' +
       'For remote agents: Use option 1 or 2'
   );
 }

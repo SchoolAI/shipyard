@@ -6,6 +6,8 @@
  * - GitHub API supports Bearer token auth with CORS
  */
 
+import type { Artifact } from '@peer-plan/schema';
+
 // ============================================================================
 // Public Types
 // ============================================================================
@@ -29,6 +31,31 @@ export interface ParsedArtifactUrl {
 // ============================================================================
 // Public Functions
 // ============================================================================
+
+/**
+ * Get the URL for an artifact based on its storage type.
+ * Uses exhaustive switch to ensure all storage types are handled.
+ *
+ * @param artifact - The artifact to get the URL for
+ * @param registryPort - Registry server port (defaults to 32191 if not provided)
+ * @returns The URL to fetch the artifact from
+ */
+export function getArtifactUrl(artifact: Artifact, registryPort: number | null): string {
+  switch (artifact.storage) {
+    case 'github':
+      return artifact.url;
+    case 'local': {
+      const port = registryPort ?? 32191;
+      // Local artifacts only accessible on same machine (localhost)
+      // Remote access requires GitHub storage
+      return `http://localhost:${port}/artifacts/${artifact.localArtifactId}`;
+    }
+    default: {
+      const _exhaustive: never = artifact;
+      throw new Error(`Unhandled artifact storage type: ${JSON.stringify(_exhaustive)}`);
+    }
+  }
+}
 
 /**
  * Parse a raw.githubusercontent.com URL to extract GitHub repo info.

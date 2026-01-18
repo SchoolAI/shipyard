@@ -6,6 +6,7 @@ import { ArtifactRenderer } from './ArtifactRenderer';
 
 interface DeliverableCardProps {
   artifact: Artifact;
+  registryPort: number | null;
 }
 
 /**
@@ -94,8 +95,9 @@ function ArtifactTypeIcon({ type }: { type: Artifact['type'] }) {
  * Individual deliverable card showing artifact status and preview.
  * Uses HeroUI v3 compound components.
  */
-export function DeliverableCard({ artifact }: DeliverableCardProps) {
-  const isAttached = !!artifact.url;
+export function DeliverableCard({ artifact, registryPort }: DeliverableCardProps) {
+  // Check if artifact is attached based on storage type
+  const isAttached = artifact.storage === 'github' ? !!artifact.url : !!artifact.localArtifactId;
   const displayName = artifact.description || artifact.filename;
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -119,8 +121,8 @@ export function DeliverableCard({ artifact }: DeliverableCardProps) {
             </Chip>
           </div>
 
-          {/* Collapsible preview (only if URL exists) */}
-          {artifact.url && (
+          {/* Collapsible preview (only if artifact is attached) */}
+          {isAttached && (
             <Disclosure className="mt-3" isExpanded={isExpanded} onExpandedChange={setIsExpanded}>
               <Disclosure.Heading>
                 <Button slot="trigger" variant="tertiary" size="sm">
@@ -131,7 +133,9 @@ export function DeliverableCard({ artifact }: DeliverableCardProps) {
               <Disclosure.Content>
                 <div className="mt-2">
                   {/* Only render when expanded - fixes loading spinner issue */}
-                  {isExpanded && <ArtifactRenderer artifact={artifact} />}
+                  {isExpanded && (
+                    <ArtifactRenderer artifact={artifact} registryPort={registryPort} />
+                  )}
                 </div>
               </Disclosure.Content>
             </Disclosure>

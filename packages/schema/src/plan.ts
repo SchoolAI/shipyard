@@ -292,25 +292,50 @@ export const PlanMetadataSchema = z.object({
 
 export type ArtifactType = 'screenshot' | 'video' | 'test_results' | 'diff';
 
-export interface Artifact {
+// Base fields shared by both storage types
+interface BaseArtifact {
   id: string;
   type: ArtifactType;
   filename: string;
-  url?: string;
-  /** Description of what this artifact proves (deliverable name) */
   description?: string;
-  /** When the artifact was uploaded */
   uploadedAt?: number;
 }
 
-export const ArtifactSchema = z.object({
-  id: z.string(),
-  type: z.enum(['screenshot', 'video', 'test_results', 'diff']),
-  filename: z.string(),
-  url: z.string().optional(),
-  description: z.string().optional(),
-  uploadedAt: z.number().optional(),
-});
+// GitHub storage: MUST have url
+export interface GitHubArtifact extends BaseArtifact {
+  storage: 'github';
+  url: string;
+}
+
+// Local storage: MUST have localArtifactId
+export interface LocalArtifact extends BaseArtifact {
+  storage: 'local';
+  localArtifactId: string;
+}
+
+// Discriminated union - TypeScript enforces correctness
+export type Artifact = GitHubArtifact | LocalArtifact;
+
+export const ArtifactSchema = z.discriminatedUnion('storage', [
+  z.object({
+    id: z.string(),
+    type: z.enum(['screenshot', 'video', 'test_results', 'diff']),
+    filename: z.string(),
+    storage: z.literal('github'),
+    url: z.string(),
+    description: z.string().optional(),
+    uploadedAt: z.number().optional(),
+  }),
+  z.object({
+    id: z.string(),
+    type: z.enum(['screenshot', 'video', 'test_results', 'diff']),
+    filename: z.string(),
+    storage: z.literal('local'),
+    localArtifactId: z.string(),
+    description: z.string().optional(),
+    uploadedAt: z.number().optional(),
+  }),
+]);
 
 export function getArtifactUrl(repo: string, pr: number, planId: string, filename: string): string {
   return `https://raw.githubusercontent.com/${repo}/plan-artifacts/pr-${pr}/${planId}/${filename}`;

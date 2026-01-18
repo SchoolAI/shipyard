@@ -1,12 +1,10 @@
 /**
- * Transformation layer: request_user_input → AskUserQuestion
+ * Transformation layer: request_user_input → Browser Modal
  *
- * Converts MCP tool calls to Claude Code's native AskUserQuestion when applicable.
- * This provides a better UX for Claude Code users by using native UI instead of browser modals.
+ * All request_user_input calls now passthrough to browser modal for consistent UX.
  *
  * Transformation Rules:
- * - Transform: type='choice' AND 2-4 options → AskUserQuestion
- * - Passthrough: All other types → Browser modal via MCP tool
+ * - Passthrough: All types → Browser modal via MCP tool
  */
 
 import { logger } from '../logger.js';
@@ -55,89 +53,10 @@ type HookResponse = TransformResponse | PassthroughResponse;
 /**
  * Transform request_user_input to AskUserQuestion when applicable.
  *
- * Only transforms 'choice' type requests with 2-4 options.
- * Other types fall back to browser modal.
+ * All types now use browser modal for consistent UX.
  */
 export function transformToAskUserQuestion(params: RequestUserInputParams): HookResponse {
-  // Only transform 'choice' type
-  if (params.type !== 'choice') {
-    logger.debug({ type: params.type }, 'Falling back to browser modal for non-choice type');
-    return { type: 'passthrough' };
-  }
-
-  // Validate options exist and are in range
-  if (!params.options || params.options.length < 2 || params.options.length > 4) {
-    logger.debug(
-      { optionCount: params.options?.length ?? 0 },
-      'Falling back to browser modal: options must be 2-4'
-    );
-    return { type: 'passthrough' };
-  }
-
-  logger.info(
-    {
-      message: params.message,
-      optionCount: params.options.length,
-    },
-    'Transforming request_user_input to AskUserQuestion'
-  );
-
-  // Generate header from message (max 12 chars)
-  const header = generateHeader(params.message);
-
-  return {
-    type: 'transform',
-    tool_name: 'AskUserQuestion',
-    tool_input: {
-      questions: [
-        {
-          question: params.message,
-          header,
-          multiSelect: false,
-          options: params.options.map((opt) => ({
-            label: opt,
-            description: opt,
-          })),
-        },
-      ],
-    },
-  };
-}
-
-/**
- * Generate a short header (max 12 chars) from a question message.
- *
- * Strategy:
- * 1. Extract first meaningful word
- * 2. Truncate to 12 chars
- * 3. Capitalize first letter
- */
-function generateHeader(message: string): string {
-  // Remove question mark and trim
-  const cleaned = message.replace(/\?/g, '').trim();
-
-  // Extract first few meaningful words
-  const words = cleaned.split(/\s+/);
-
-  // Common question starters to skip
-  const skipWords = new Set(['which', 'what', 'how', 'should', 'would', 'can', 'do', 'does']);
-
-  // Find first meaningful word
-  let header = '';
-  for (const word of words) {
-    const lower = word.toLowerCase();
-    if (!skipWords.has(lower) && word.length > 0) {
-      header = word;
-      break;
-    }
-  }
-
-  // Fallback to "Choice" if no meaningful word found
-  if (!header) {
-    header = 'Choice';
-  }
-
-  // Truncate to 12 chars and capitalize
-  header = header.slice(0, 12);
-  return header.charAt(0).toUpperCase() + header.slice(1);
+  // Always passthrough to browser modal - all types use consistent UI
+  logger.debug({ type: params.type }, 'Passing through to browser modal (all types)');
+  return { type: 'passthrough' };
 }

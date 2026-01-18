@@ -2,7 +2,7 @@ import { mkdirSync, readFileSync, unlinkSync } from 'node:fs';
 import { readFile, unlink, writeFile } from 'node:fs/promises';
 import http from 'node:http';
 import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve, sep } from 'node:path';
 
 import { appRouter, type Context, getPlanMetadata, type PlanStore } from '@peer-plan/schema';
 import { createExpressMiddleware } from '@trpc/server/adapters/express';
@@ -18,6 +18,7 @@ import { registryConfig } from './config/env/registry.js';
 import { createConversationHandlers } from './conversation-handlers.js';
 import { getOctokit, parseRepoString } from './github-artifacts.js';
 import { createHookHandlers } from './hook-handlers.js';
+import { getLocalArtifact } from './local-artifacts.js';
 import { logger } from './logger.js';
 import {
   attachObservers,
@@ -721,6 +722,44 @@ function createApp(): { app: express.Express; httpServer: http.Server } {
   app.get('/api/plan/:id/transcript', handleGetTranscript);
   app.get('/api/plans/:id/pr-diff/:prNumber', handleGetPRDiff);
   app.get('/api/plans/:id/pr-files/:prNumber', handleGetPRFiles);
+
+  // Artifact serving endpoint with path traversal protection
+  app.get('/artifacts/:planId/:filename', async (req: Request, res: Response) => {
+    const { planId, filename } = req.params;
+
+    // Path traversal protection: resolve full path and verify it's within artifacts directory
+    const ARTIFACTS_DIR = join(homedir(), '.peer-plan', 'artifacts');
+    const fullPath = resolve(ARTIFACTS_DIR, planId, filename);
+
+    if (!fullPath.startsWith(ARTIFACTS_DIR + sep)) {
+      return res.status(400).json({ error: 'Invalid artifact path' });
+    }
+
+    // Read file directly using resolved path
+    const buffer = await readFile(fullPath).catch(() => null);
+
+    if (!buffer) {
+      return res.status(404).json({ error: 'Artifact not found' });
+    }
+
+    // Content-Type affects browser rendering (inline vs download)
+    const ext = filename.split('.').pop()?.toLowerCase();
+    const mimeTypes: Record<string, string> = {
+      png: 'image/png',
+      jpg: 'image/jpeg',
+      jpeg: 'image/jpeg',
+      mp4: 'video/mp4',
+      webm: 'video/webm',
+      json: 'application/json',
+      txt: 'text/plain',
+    };
+    const contentType = mimeTypes[ext || ''] || 'application/octet-stream';
+
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Length', buffer.length);
+    res.setHeader('Cache-Control', 'public, max-age=31536000');
+    res.send(buffer);
+  });
 
   return { app, httpServer };
 }

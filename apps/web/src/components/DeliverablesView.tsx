@@ -25,6 +25,7 @@ interface DeliverablesViewProps {
   metadata: PlanMetadata;
   identity: UserIdentity | null;
   onRequestIdentity: () => void;
+  registryPort: number | null;
 }
 
 /**
@@ -149,6 +150,7 @@ export function DeliverablesView({
   metadata,
   identity,
   onRequestIdentity,
+  registryPort,
 }: DeliverablesViewProps) {
   const deliverables = useDeliverables(ydoc);
   const artifacts = useArtifacts(ydoc);
@@ -168,7 +170,7 @@ export function DeliverablesView({
   const itemsToShow = useDeliverablesView ? enrichedDeliverables : artifacts;
   const completedCount = useDeliverablesView
     ? enrichedDeliverables.filter((d) => d.deliverable.linkedArtifactId).length
-    : artifacts.filter((a) => a.url).length;
+    : artifacts.filter((a) => (a.storage === 'github' ? a.url : a.localArtifactId)).length;
   const totalCount = itemsToShow.length;
 
   const canComplete = totalCount > 0 && metadata.status === 'in_progress';
@@ -225,19 +227,31 @@ export function DeliverablesView({
           {useDeliverablesView
             ? enrichedDeliverables.map((item) => {
                 // Create a synthetic artifact for the DeliverableCard
+                // If no artifact, create a stub GitHub artifact for display purposes
                 const syntheticArtifact: Artifact = item.artifact || {
                   id: item.deliverable.id,
                   type: 'screenshot', // default type for unlinked deliverables
+                  storage: 'github',
                   filename: '',
                   description: item.deliverable.text,
-                  url: undefined,
+                  url: '', // Empty URL for unlinked deliverables
                   uploadedAt: item.deliverable.linkedAt,
                 };
 
-                return <DeliverableCard key={item.deliverable.id} artifact={syntheticArtifact} />;
+                return (
+                  <DeliverableCard
+                    key={item.deliverable.id}
+                    artifact={syntheticArtifact}
+                    registryPort={registryPort}
+                  />
+                );
               })
             : artifacts.map((artifact) => (
-                <DeliverableCard key={artifact.id} artifact={artifact} />
+                <DeliverableCard
+                  key={artifact.id}
+                  artifact={artifact}
+                  registryPort={registryPort}
+                />
               ))}
         </div>
       )}

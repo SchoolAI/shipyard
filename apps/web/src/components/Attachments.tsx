@@ -7,13 +7,14 @@ export { useArtifactCount } from '@/hooks/useArtifactCount';
 
 interface AttachmentsProps {
   ydoc: Y.Doc;
+  registryPort: number | null;
 }
 
 /**
  * Section showing all artifacts attached to a plan.
  * Subscribes to Y.Doc changes for real-time updates.
  */
-export function Attachments({ ydoc }: AttachmentsProps) {
+export function Attachments({ ydoc, registryPort }: AttachmentsProps) {
   const [artifacts, setArtifacts] = useState<Artifact[]>([]);
 
   useEffect(() => {
@@ -50,7 +51,7 @@ export function Attachments({ ydoc }: AttachmentsProps) {
                 {artifact.type.replace('_', ' ')}
               </span>
             </div>
-            <ArtifactRenderer artifact={artifact} />
+            <ArtifactRenderer artifact={artifact} registryPort={registryPort} />
           </div>
         ))}
       </div>

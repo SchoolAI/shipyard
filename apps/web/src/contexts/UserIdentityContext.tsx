@@ -1,9 +1,13 @@
 import { createContext, useContext } from 'react';
 import type { GitHubIdentity } from '@/hooks/useGitHubAuth';
+import type { LocalIdentity } from '@/hooks/useLocalIdentity';
 
 interface UserIdentityContextValue {
   identity: GitHubIdentity | null;
-  actor: string; // Computed: identity?.username || 'Anonymous'
+  localIdentity: LocalIdentity | null;
+  actor: string; // Computed: GitHub username > Local username (prefixed) > 'Anonymous'
+  hasIdentity: boolean; // True if either GitHub or local identity exists
+  canAccessPrivateRepos: boolean; // True only if GitHub identity with repo scope
 }
 
 const UserIdentityContext = createContext<UserIdentityContextValue | null>(null);
@@ -19,14 +23,26 @@ export function useUserIdentity() {
 export function UserIdentityProvider({
   children,
   githubIdentity,
+  localIdentity,
 }: {
   children: React.ReactNode;
   githubIdentity: GitHubIdentity | null;
+  localIdentity: LocalIdentity | null;
 }) {
-  const actor = githubIdentity?.username || 'Anonymous';
+  // Priority: GitHub > Local (prefixed) > Anonymous
+  const actor = githubIdentity?.username
+    ? githubIdentity.username
+    : localIdentity?.username
+      ? `local:${localIdentity.username}`
+      : 'Anonymous';
+
+  const hasIdentity = githubIdentity !== null || localIdentity !== null;
+  const canAccessPrivateRepos = githubIdentity?.scope?.includes('repo') ?? false;
 
   return (
-    <UserIdentityContext.Provider value={{ identity: githubIdentity, actor }}>
+    <UserIdentityContext.Provider
+      value={{ identity: githubIdentity, localIdentity, actor, hasIdentity, canAccessPrivateRepos }}
+    >
       {children}
     </UserIdentityContext.Provider>
   );

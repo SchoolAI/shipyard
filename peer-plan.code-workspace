@@ -5,8 +5,12 @@
       "path": "."
     },
     {
-      "name": "🌳🧹 77-type-clean-up",
+      "name": "\ud83c\udf33\ud83e\uddf9 77-type-clean-up",
       "path": "../peer-plan-wt/77-type-clean-up"
+    },
+    {
+      "name": "\ud83c\udf33\ud83d\udce6 79-packaging",
+      "path": "../peer-plan-wt/79-packaging"
     }
   ]
 }

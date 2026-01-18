@@ -90,6 +90,8 @@ export interface SyncState {
   idbSynced: boolean;
   /** User's approval status for this plan (undefined if approval not required) */
   approvalStatus?: ApprovalStatus;
+  /** Registry server port (for local artifact URLs) */
+  registryPort: number | null;
 }
 
 /**
@@ -121,9 +123,11 @@ export function useMultiProviderSync(
     synced: false,
     peerCount: 0,
     idbSynced: false,
+    registryPort: null,
   });
   const idbSyncedRef = useRef(false);
   const approvalStatusRef = useRef<ApprovalStatus | undefined>(undefined);
+  const registryPortRef = useRef<number | null>(null);
   const [rtcProvider, setRtcProvider] = useState<WebrtcProvider | null>(null);
   const [wsProvider, setWsProvider] = useState<WebsocketProvider | null>(null);
 
@@ -159,6 +163,15 @@ export function useMultiProviderSync(
         : await discoverHubUrl();
 
       if (!mounted) return;
+
+      // Extract port from hub URL for local artifact URLs
+      try {
+        const url = new URL(hubUrl);
+        const port = Number.parseInt(url.port || '32191', 10);
+        registryPortRef.current = port;
+      } catch {
+        registryPortRef.current = null;
+      }
 
       ws = new WebsocketProvider(hubUrl, docName, ydoc, {
         connect: true,
@@ -407,6 +420,7 @@ export function useMultiProviderSync(
         peerCount: peerCountRef.current,
         idbSynced: idbSyncedRef.current,
         approvalStatus: approvalStatusRef.current,
+        registryPort: registryPortRef.current,
       });
     }
 

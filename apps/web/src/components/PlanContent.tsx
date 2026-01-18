@@ -76,6 +76,7 @@ export interface PlanContentProps {
 export function PlanContent({
   ydoc,
   metadata,
+  syncState,
   identity,
   onRequestIdentity,
   provider,
@@ -206,7 +207,7 @@ export function PlanContent({
               currentSnapshot={currentSnapshot}
               onEditorReady={onEditorReady}
             />
-            <Attachments ydoc={ydoc} />
+            <Attachments ydoc={ydoc} registryPort={syncState.registryPort} />
           </div>
         </div>
       )}
@@ -226,6 +227,7 @@ export function PlanContent({
             metadata={metadata}
             identity={identity}
             onRequestIdentity={onRequestIdentity}
+            registryPort={syncState.registryPort}
           />
         </div>
       )}

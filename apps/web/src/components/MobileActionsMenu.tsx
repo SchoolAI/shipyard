@@ -20,7 +20,6 @@ import { HandoffConversationDialog } from '@/components/HandoffConversationDialo
 import { LinkPRButton } from '@/components/LinkPRButton';
 import { useUserIdentity } from '@/contexts/UserIdentityContext';
 import { useConversationTransfer } from '@/hooks/useConversationTransfer';
-import { useGitHubAuth } from '@/hooks/useGitHubAuth';
 import { useMultiProviderSync } from '@/hooks/useMultiProviderSync';
 
 // ============================================================================
@@ -183,7 +182,6 @@ interface MobileActionsMenuProps {
  * Designed for use in MobileHeader as a replacement for individual action buttons.
  */
 export function MobileActionsMenu({ planId, ydoc, rtcProvider, metadata }: MobileActionsMenuProps) {
-  const { identity: githubIdentity } = useGitHubAuth();
   const { ydoc: indexDoc } = useMultiProviderSync(PLAN_INDEX_DOC_NAME);
   const isArchived = !!metadata.archivedAt;
   const { actor } = useUserIdentity();
@@ -210,11 +208,6 @@ export function MobileActionsMenu({ planId, ydoc, rtcProvider, metadata }: Mobil
   );
 
   const handleArchiveToggle = () => {
-    if (!githubIdentity) {
-      toast.error('Please sign in with GitHub first');
-      return;
-    }
-
     const now = Date.now();
 
     ydoc.transact(
@@ -225,7 +218,7 @@ export function MobileActionsMenu({ planId, ydoc, rtcProvider, metadata }: Mobil
           metadataMap.delete('archivedBy');
         } else {
           metadataMap.set('archivedAt', now);
-          metadataMap.set('archivedBy', githubIdentity.displayName);
+          metadataMap.set('archivedBy', actor);
         }
         metadataMap.set('updatedAt', now);
       },
@@ -242,7 +235,7 @@ export function MobileActionsMenu({ planId, ydoc, rtcProvider, metadata }: Mobil
         setPlanIndexEntry(indexDoc, {
           ...entry,
           deletedAt: now,
-          deletedBy: githubIdentity.displayName,
+          deletedBy: actor,
           updatedAt: now,
         });
         toast.success('Plan archived');

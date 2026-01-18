@@ -1,31 +1,52 @@
-import { Button, Card } from '@heroui/react';
+import { Alert, Button, Card } from '@heroui/react';
 import type { Artifact, ArtifactType } from '@peer-plan/schema';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useGitHubAuth } from '../hooks/useGitHubAuth';
-import { type FetchArtifactStatus, fetchArtifact } from '../utils/github-artifact-fetcher';
+import {
+  type FetchArtifactStatus,
+  fetchArtifact,
+  getArtifactUrl,
+} from '../utils/github-artifact-fetcher';
 
 interface ArtifactRendererProps {
   artifact: Artifact;
+  registryPort: number | null;
 }
 
 /**
  * Renders an artifact based on its type with GitHub authentication support.
  * Handles private repo artifacts by prompting for GitHub sign-in when needed.
+ * For local artifacts, checks availability and shows warning if not accessible.
  */
-export function ArtifactRenderer({ artifact }: ArtifactRendererProps) {
+export function ArtifactRenderer({ artifact, registryPort }: ArtifactRendererProps) {
   const { identity, hasRepoScope, startAuth, requestRepoAccess } = useGitHubAuth();
   const token = identity?.token ?? null;
   const isSignedIn = identity !== null;
 
-  if (!artifact.url) {
-    return <ArtifactPlaceholder filename={artifact.filename} message="URL not available" />;
+  // For local artifacts, check availability before rendering
+  // Local artifacts may not be available if viewing on a different machine
+  if (artifact.storage === 'local') {
+    return (
+      <LocalArtifactViewer
+        artifact={artifact}
+        registryPort={registryPort}
+        token={token}
+        isSignedIn={isSignedIn}
+        hasRepoScope={hasRepoScope}
+        onSignIn={startAuth}
+        onRequestRepoAccess={requestRepoAccess}
+      />
+    );
   }
+
+  // GitHub artifacts - use existing viewer logic
+  const url = artifact.url;
 
   switch (artifact.type) {
     case 'screenshot':
       return (
         <BinaryArtifactViewer
-          url={artifact.url}
+          url={url}
           filename={artifact.filename}
           token={token}
           isSignedIn={isSignedIn}
@@ -45,7 +66,7 @@ export function ArtifactRenderer({ artifact }: ArtifactRendererProps) {
     case 'video':
       return (
         <BinaryArtifactViewer
-          url={artifact.url}
+          url={url}
           filename={artifact.filename}
           token={token}
           isSignedIn={isSignedIn}
@@ -64,7 +85,7 @@ export function ArtifactRenderer({ artifact }: ArtifactRendererProps) {
     case 'test_results':
       return (
         <TextArtifactViewer
-          url={artifact.url}
+          url={url}
           filename={artifact.filename}
           token={token}
           isSignedIn={isSignedIn}
@@ -80,7 +101,7 @@ export function ArtifactRenderer({ artifact }: ArtifactRendererProps) {
     case 'diff':
       return (
         <TextArtifactViewer
-          url={artifact.url}
+          url={url}
           filename={artifact.filename}
           token={token}
           isSignedIn={isSignedIn}
@@ -286,6 +307,167 @@ function TextArtifactViewer({
   }
 
   return <>{renderContent(content)}</>;
+}
+
+// ============================================================================
+// Local Artifact Viewer (With Availability Check)
+// ============================================================================
+
+interface LocalArtifactViewerProps extends ArtifactViewerAuthProps {
+  artifact: Artifact & { storage: 'local' };
+  registryPort: number | null;
+}
+
+/**
+ * Viewer for local artifacts served by the MCP server.
+ * Checks availability first and shows warning if artifact is not accessible
+ * (e.g., viewing plan on a different machine than where it was created).
+ */
+function LocalArtifactViewer({
+  artifact,
+  registryPort,
+  token,
+  isSignedIn,
+  hasRepoScope,
+  onSignIn,
+  onRequestRepoAccess,
+}: LocalArtifactViewerProps) {
+  const [isAvailable, setIsAvailable] = useState<boolean | null>(null);
+  const url = getArtifactUrl(artifact, registryPort);
+
+  // Check if artifact is available on this machine
+  useEffect(() => {
+    let mounted = true;
+    const controller = new AbortController();
+
+    const checkAvailability = async () => {
+      try {
+        const response = await fetch(url, {
+          method: 'HEAD',
+          signal: controller.signal,
+        });
+        if (mounted) {
+          setIsAvailable(response.ok);
+        }
+      } catch (error) {
+        if ((error as Error).name !== 'AbortError' && mounted) {
+          setIsAvailable(false);
+        }
+      }
+    };
+
+    checkAvailability();
+
+    return () => {
+      mounted = false;
+      controller.abort();
+    };
+  }, [url]);
+
+  // Show loading while checking availability
+  if (isAvailable === null) {
+    return (
+      <div className="relative min-h-[100px]">
+        <LoadingSpinner />
+      </div>
+    );
+  }
+
+  // Show warning if artifact is not available
+  if (!isAvailable) {
+    return (
+      <Alert status="warning">
+        <Alert.Indicator />
+        <Alert.Content>
+          <Alert.Title>Artifact not available</Alert.Title>
+          <Alert.Description>
+            This artifact is stored locally and is not accessible on this device. It may have been
+            created on a different machine.
+          </Alert.Description>
+        </Alert.Content>
+      </Alert>
+    );
+  }
+
+  // Artifact is available - render based on type using exhaustive switch
+  switch (artifact.type) {
+    case 'screenshot':
+      return (
+        <BinaryArtifactViewer
+          url={url}
+          filename={artifact.filename}
+          token={token}
+          isSignedIn={isSignedIn}
+          hasRepoScope={hasRepoScope}
+          onSignIn={onSignIn}
+          onRequestRepoAccess={onRequestRepoAccess}
+          renderContent={(blobUrl) => (
+            <img
+              src={blobUrl}
+              alt={artifact.filename}
+              className="max-w-full rounded-lg border border-separator"
+            />
+          )}
+        />
+      );
+    case 'video':
+      return (
+        <BinaryArtifactViewer
+          url={url}
+          filename={artifact.filename}
+          token={token}
+          isSignedIn={isSignedIn}
+          hasRepoScope={hasRepoScope}
+          onSignIn={onSignIn}
+          onRequestRepoAccess={onRequestRepoAccess}
+          renderContent={(blobUrl) => (
+            <video src={blobUrl} controls className="max-w-full rounded-lg border border-separator">
+              <track kind="captions" />
+              Your browser does not support video playback.
+            </video>
+          )}
+        />
+      );
+    case 'test_results':
+      return (
+        <TextArtifactViewer
+          url={url}
+          filename={artifact.filename}
+          token={token}
+          isSignedIn={isSignedIn}
+          hasRepoScope={hasRepoScope}
+          onSignIn={onSignIn}
+          onRequestRepoAccess={onRequestRepoAccess}
+          renderContent={(content) => (
+            <JsonContent content={content} filename={artifact.filename} />
+          )}
+        />
+      );
+    case 'diff':
+      return (
+        <TextArtifactViewer
+          url={url}
+          filename={artifact.filename}
+          token={token}
+          isSignedIn={isSignedIn}
+          hasRepoScope={hasRepoScope}
+          onSignIn={onSignIn}
+          onRequestRepoAccess={onRequestRepoAccess}
+          renderContent={(content) => (
+            <DiffContent content={content} filename={artifact.filename} />
+          )}
+        />
+      );
+    default: {
+      const _exhaustive: never = artifact.type;
+      return (
+        <ArtifactPlaceholder
+          filename={artifact.filename}
+          message={`Unknown type: ${_exhaustive as ArtifactType}`}
+        />
+      );
+    }
+  }
 }
 
 // ============================================================================

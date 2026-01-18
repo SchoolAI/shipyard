@@ -19,13 +19,18 @@ import {
   UnnestBlockButton,
   useCreateBlockNote,
 } from '@blocknote/react';
-import { useEffect, useRef } from 'react';
+import { Alert, Button } from '@heroui/react';
+import { User } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import type { WebrtcProvider } from 'y-webrtc';
 import type { WebsocketProvider } from 'y-websocket';
 import type * as Y from 'yjs';
+import { useUserIdentity } from '@/contexts/UserIdentityContext';
+import { useLocalIdentity } from '@/hooks/useLocalIdentity';
 import { useTheme } from '@/hooks/useTheme';
 import { RedoButton } from './editor/RedoButton';
 import { UndoButton } from './editor/UndoButton';
+import { SignInModal } from './SignInModal';
 
 /** Simple identity type for display purposes */
 interface UserIdentity {
@@ -54,7 +59,8 @@ interface PlanViewerProps {
 }
 
 /**
- * Convert HSL color values to RGB.
+ * Convert HSL to RGB using standard color space conversion.
+ * Formula from CSS Color Module Level 3 spec.
  * h: 0-360, s: 0-100, l: 0-100
  */
 function hslToRgb(h: number, s: number, l: number): [number, number, number] {
@@ -172,6 +178,14 @@ export function PlanViewer({
   // Comments are fully enabled only when identity is set
   const hasComments = identity !== null;
   const { theme } = useTheme();
+  const { hasIdentity } = useUserIdentity();
+  const { setLocalIdentity } = useLocalIdentity();
+  const [showSignInModal, setShowSignInModal] = useState(false);
+
+  // Handler for local identity sign-in
+  const handleSignIn = (username: string) => {
+    setLocalIdentity(username);
+  };
 
   // When viewing a snapshot, use its content and make editor read-only
   const isViewingHistory = currentSnapshot !== null;
@@ -473,6 +487,22 @@ export function PlanViewer({
       role="application"
       aria-label="Plan viewer with comments"
     >
+      {!hasIdentity && (
+        <Alert status="default" className="mb-4">
+          <Alert.Indicator>
+            <User className="w-4 h-4" />
+          </Alert.Indicator>
+          <Alert.Content className="flex-1">
+            <Alert.Title>Set a username to add comments</Alert.Title>
+            <Alert.Description>
+              Choose a local username or sign in with GitHub to participate in discussions.
+            </Alert.Description>
+          </Alert.Content>
+          <Button size="sm" variant="secondary" onPress={() => setShowSignInModal(true)}>
+            Set Username
+          </Button>
+        </Alert>
+      )}
       <BlockNoteView
         key={editorKey}
         editor={editor}
@@ -544,6 +574,12 @@ export function PlanViewer({
         {/* Floating thread controller - shows comments when clicking highlighted text */}
         <FloatingThreadController />
       </BlockNoteView>
+
+      <SignInModal
+        isOpen={showSignInModal}
+        onClose={() => setShowSignInModal(false)}
+        onSignIn={handleSignIn}
+      />
     </div>
   );
 }

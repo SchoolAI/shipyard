@@ -95,7 +95,8 @@ export function PlanPage() {
       }
     : null;
 
-  const { ydoc: indexDoc, syncState: indexSyncState } = useMultiProviderSync(PLAN_INDEX_DOC_NAME);
+  const { ydoc: indexDoc } = useMultiProviderSync(PLAN_INDEX_DOC_NAME);
+
   // Prefer WebSocket provider when connected, fall back to WebRTC for P2P-only mode.
   const activeProvider = isSnapshot ? null : (wsProvider ?? rtcProvider);
 
@@ -126,9 +127,20 @@ export function PlanPage() {
 
     const handleOpenInputRequest = (event: Event) => {
       // Prevent state updates after component unmounts
-      if (!isMounted) return;
+      if (!isMounted) {
+        return;
+      }
 
       const customEvent = event as CustomEvent<InputRequest>;
+
+      // Prevent duplicate opens - if modal is already open with this request, ignore
+      // Note: This only prevents duplicates within a single tab. Multi-tab coordination
+      // would require BroadcastChannel or localStorage, but current UX is acceptable
+      // (user sees "already answered" error if they try to answer in second tab)
+      if (inputRequestModalOpen && currentInputRequest?.id === customEvent.detail.id) {
+        return;
+      }
+
       setCurrentInputRequest(customEvent.detail);
       setInputRequestModalOpen(true);
     };
@@ -139,7 +151,7 @@ export function PlanPage() {
       isMounted = false;
       document.removeEventListener('open-input-request', handleOpenInputRequest);
     };
-  }, []);
+  }, [inputRequestModalOpen, currentInputRequest]);
 
   // Start timeout when in P2P-only mode without metadata
   useEffect(() => {
@@ -347,7 +359,7 @@ export function PlanPage() {
           <div className="border-b border-separator bg-surface px-2 md:px-6 py-1 md:py-3 shrink-0">
             <PlanHeader
               ydoc={ydoc}
-              indexDoc={indexSyncState.synced ? indexDoc : null}
+              indexDoc={indexDoc}
               planId={planId}
               metadata={metadata}
               identity={identity}
@@ -405,7 +417,7 @@ export function PlanPage() {
             status={metadata.status}
             hubConnected={syncState?.connected}
             peerCount={syncState?.peerCount}
-            indexDoc={indexSyncState.synced ? indexDoc : null}
+            indexDoc={indexDoc}
             rightContent={
               <MobileActionsMenu
                 planId={planId}
@@ -423,7 +435,7 @@ export function PlanPage() {
         <InputRequestModal
           isOpen={inputRequestModalOpen}
           request={currentInputRequest}
-          ydoc={indexSyncState.synced ? indexDoc : null}
+          ydoc={indexDoc}
           onClose={() => {
             setInputRequestModalOpen(false);
             setCurrentInputRequest(null);
@@ -439,7 +451,7 @@ export function PlanPage() {
       <InputRequestModal
         isOpen={inputRequestModalOpen}
         request={currentInputRequest}
-        ydoc={indexSyncState.synced ? indexDoc : null}
+        ydoc={indexDoc}
         onClose={() => {
           setInputRequestModalOpen(false);
           setCurrentInputRequest(null);

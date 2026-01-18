@@ -160,13 +160,9 @@ export function useInputRequests({
 
       // Handle new requests
       if (newRequests.length > 0) {
-        // Dispatch custom event for modal to listen to
         const firstRequest = pending[0];
-        if (firstRequest) {
-          dispatchOpenInputRequestEvent(firstRequest);
-        }
 
-        // Show toast notification (clicking toast will dispatch event via modal opening)
+        // Show toast notification (clicking toast will dispatch event to open modal)
         showInputRequestToast(newRequests, pending.length, () => {
           if (firstRequest) {
             dispatchOpenInputRequestEvent(firstRequest);
@@ -188,6 +184,8 @@ export function useInputRequests({
 
     // Cleanup: unobserve on unmount or ydoc change
     return () => {
+      // Capture requestsArray in closure to ensure correct cleanup
+      // even if ydoc changes during async state update
       requestsArray.unobserve(updateRequests);
       previousRequestIdsRef.current.clear(); // Clear on ydoc change
     };

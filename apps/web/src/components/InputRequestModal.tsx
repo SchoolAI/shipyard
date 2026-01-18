@@ -7,6 +7,7 @@
 import {
   Alert,
   Button,
+  Card,
   Form,
   Input,
   Label,
@@ -35,14 +36,19 @@ interface InputRequestModalProps {
 export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputRequestModalProps) {
   const [value, setValue] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [remainingTime, setRemainingTime] = useState(0);
+  // Use -1 as sentinel value to indicate "not yet initialized"
+  // This prevents race condition where auto-cancel fires before countdown is set
+  const [remainingTime, setRemainingTime] = useState(-1);
   const { identity, startAuth } = useGitHubAuth();
 
-  // Reset value when request changes
+  // Reset state when request changes
   useEffect(() => {
     if (request) {
       setValue(request.defaultValue || '');
     }
+    // Reset countdown to sentinel value when request changes
+    // This prevents stale timeout values from previous requests
+    setRemainingTime(-1);
   }, [request]);
 
   const handleCancel = useCallback(() => {
@@ -68,6 +74,12 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
     onClose();
   }, [ydoc, request, onClose]);
 
+  const handleModalClose = useCallback(() => {
+    // Only close modal, don't cancel request
+    // User must explicitly click Cancel button or let timeout expire
+    onClose();
+  }, [onClose]);
+
   // Countdown timer - calculate from createdAt
   useEffect(() => {
     if (!request || !isOpen) return;
@@ -75,6 +87,7 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
     const timeout = request.timeout || 300; // default 5 min
     const elapsed = Math.floor((Date.now() - request.createdAt) / 1000);
     const remaining = Math.max(0, timeout - elapsed);
+
     setRemainingTime(remaining);
 
     const interval = setInterval(() => {
@@ -87,6 +100,8 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
   }, [request, isOpen]);
 
   // Auto-cancel on timeout
+  // Note: Uses remainingTime === 0 (not < 0) to skip initial state (-1)
+  // This prevents race condition where auto-cancel fires before countdown timer sets actual value
   useEffect(() => {
     if (remainingTime === 0 && isOpen && request) {
       handleCancel();
@@ -102,34 +117,39 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
     try {
       // Track if transaction actually performed an update
       let wasUpdated = false;
+      let failureReason: 'answered' | 'cancelled' | 'not_found' | null = null;
 
       ydoc.transact(() => {
         const requestsArray = ydoc.getArray(YDOC_KEYS.INPUT_REQUESTS);
         const requests = requestsArray.toJSON() as InputRequest[];
         const index = requests.findIndex((r) => r.id === request.id);
 
-        if (index !== -1) {
-          const currentRequest = requests[index];
-          if (!currentRequest) return;
-
-          // Check if request is still pending to avoid race condition
-          if (currentRequest.status !== 'pending') {
-            return;
-          }
-
-          requestsArray.delete(index, 1);
-          requestsArray.insert(index, [
-            {
-              ...request,
-              status: 'answered',
-              response: value,
-              answeredAt: Date.now(),
-              answeredBy: identity.username,
-            },
-          ]);
-
-          wasUpdated = true;
+        if (index === -1) {
+          failureReason = 'not_found';
+          return;
         }
+
+        const currentRequest = requests[index];
+        if (!currentRequest) return;
+
+        // Check if request is still pending to avoid race condition
+        if (currentRequest.status !== 'pending') {
+          failureReason = currentRequest.status === 'answered' ? 'answered' : 'cancelled';
+          return;
+        }
+
+        requestsArray.delete(index, 1);
+        requestsArray.insert(index, [
+          {
+            ...request,
+            status: 'answered',
+            response: value,
+            answeredAt: Date.now(),
+            answeredBy: identity.username,
+          },
+        ]);
+
+        wasUpdated = true;
       });
 
       // Only close modal and clear value if update succeeded
@@ -137,9 +157,18 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
         setValue('');
         onClose();
       } else {
-        // Show toast indicating race condition
-        toast.error('This request was already answered by another user');
-        // Keep modal open so user can see the message and close manually
+        // Show appropriate error message based on failure reason
+        if (failureReason === 'answered') {
+          toast.error('This request was already answered by another user');
+        } else if (failureReason === 'cancelled') {
+          toast.error('This request has expired or was cancelled');
+          // Auto-close modal for cancelled requests since they're no longer valid
+          onClose();
+        } else {
+          toast.error('This request could not be found');
+          onClose();
+        }
+        // Keep modal open for 'answered' case so user can see the message
       }
     } finally {
       setIsSubmitting(false);
@@ -147,6 +176,8 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
   };
 
   const formatTime = (seconds: number) => {
+    // Handle sentinel value (-1 = not yet initialized)
+    if (seconds < 0) return '--:--';
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins}:${secs.toString().padStart(2, '0')}`;
@@ -161,34 +192,39 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
       try {
         // Track if transaction actually performed an update
         let wasUpdated = false;
+        let failureReason: 'answered' | 'cancelled' | 'not_found' | null = null;
 
         ydoc.transact(() => {
           const requestsArray = ydoc.getArray(YDOC_KEYS.INPUT_REQUESTS);
           const requests = requestsArray.toJSON() as InputRequest[];
           const index = requests.findIndex((r) => r.id === request.id);
 
-          if (index !== -1) {
-            const currentRequest = requests[index];
-            if (!currentRequest) return;
-
-            // Check if request is still pending to avoid race condition
-            if (currentRequest.status !== 'pending') {
-              return;
-            }
-
-            requestsArray.delete(index, 1);
-            requestsArray.insert(index, [
-              {
-                ...request,
-                status: 'answered',
-                response,
-                answeredAt: Date.now(),
-                answeredBy: identity.username,
-              },
-            ]);
-
-            wasUpdated = true;
+          if (index === -1) {
+            failureReason = 'not_found';
+            return;
           }
+
+          const currentRequest = requests[index];
+          if (!currentRequest) return;
+
+          // Check if request is still pending to avoid race condition
+          if (currentRequest.status !== 'pending') {
+            failureReason = currentRequest.status === 'answered' ? 'answered' : 'cancelled';
+            return;
+          }
+
+          requestsArray.delete(index, 1);
+          requestsArray.insert(index, [
+            {
+              ...request,
+              status: 'answered',
+              response,
+              answeredAt: Date.now(),
+              answeredBy: identity.username,
+            },
+          ]);
+
+          wasUpdated = true;
         });
 
         // Only close modal and clear value if update succeeded
@@ -196,9 +232,18 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
           setValue('');
           onClose();
         } else {
-          // Show toast indicating race condition
-          toast.error('This request was already answered by another user');
-          // Keep modal open so user can see the message and close manually
+          // Show appropriate error message based on failure reason
+          if (failureReason === 'answered') {
+            toast.error('This request was already answered by another user');
+          } else if (failureReason === 'cancelled') {
+            toast.error('This request has expired or was cancelled');
+            // Auto-close modal for cancelled requests since they're no longer valid
+            onClose();
+          } else {
+            toast.error('This request could not be found');
+            onClose();
+          }
+          // Keep modal open for 'answered' case so user can see the message
         }
       } finally {
         setIsSubmitting(false);
@@ -213,30 +258,34 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
     switch (request.type) {
       case 'text':
         return (
-          <TextField isRequired isDisabled={isSubmitting}>
-            <Label>{request.message}</Label>
-            <Input
-              value={value}
-              onChange={(e) => setValue(e.target.value)}
-              placeholder={request.defaultValue}
-              autoFocus
-            />
-          </TextField>
+          <div className="space-y-3">
+            <TextField isRequired isDisabled={isSubmitting}>
+              <Label className="text-sm font-medium text-foreground">{request.message}</Label>
+              <Input
+                value={value}
+                onChange={(e) => setValue(e.target.value)}
+                placeholder={request.defaultValue}
+                autoFocus
+              />
+            </TextField>
+          </div>
         );
 
       case 'multiline':
         return (
-          <TextField isRequired isDisabled={isSubmitting}>
-            <Label>{request.message}</Label>
-            <TextArea
-              value={value}
-              onChange={(e) => setValue(e.target.value)}
-              placeholder={request.defaultValue}
-              rows={4}
-              autoFocus
-            />
-            <p className="text-xs text-muted-foreground mt-1">{value.length} characters</p>
-          </TextField>
+          <div className="space-y-3">
+            <TextField isRequired isDisabled={isSubmitting}>
+              <Label className="text-sm font-medium text-foreground">{request.message}</Label>
+              <TextArea
+                value={value}
+                onChange={(e) => setValue(e.target.value)}
+                placeholder={request.defaultValue}
+                rows={4}
+                autoFocus
+              />
+            </TextField>
+            <p className="text-xs text-muted-foreground">{value.length} characters</p>
+          </div>
         );
 
       case 'choice': {
@@ -256,32 +305,47 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
         }
 
         return (
-          <RadioGroup isRequired value={value} onChange={setValue} isDisabled={isSubmitting}>
-            <Label>{request.message}</Label>
-            {options.map((opt) => (
-              <Radio key={opt} value={opt}>
-                {opt}
-              </Radio>
-            ))}
-          </RadioGroup>
+          <div className="space-y-3">
+            <RadioGroup isRequired value={value} onChange={setValue} isDisabled={isSubmitting}>
+              <Label className="text-sm font-medium text-foreground">{request.message}</Label>
+              {options.map((opt) => (
+                <Radio key={opt} value={opt}>
+                  <Radio.Control>
+                    <Radio.Indicator />
+                  </Radio.Control>
+                  <Radio.Content>
+                    <Label>{opt}</Label>
+                  </Radio.Content>
+                </Radio>
+              ))}
+            </RadioGroup>
+          </div>
         );
       }
 
       case 'confirm':
         return (
           <div className="space-y-4">
-            <p className="text-foreground">{request.message}</p>
-            <div className="flex gap-2 justify-end">
-              <Button
-                onPress={() => handleConfirmResponse('no')}
-                variant="secondary"
-                isDisabled={isSubmitting}
+            <p className="text-sm text-foreground">{request.message}</p>
+            <div className="flex justify-between items-center pt-2">
+              <span
+                className={`text-sm ${remainingTime >= 0 && remainingTime < 30 ? 'text-warning' : 'text-muted-foreground'}`}
               >
-                No
-              </Button>
-              <Button onPress={() => handleConfirmResponse('yes')} isDisabled={isSubmitting}>
-                Yes
-              </Button>
+                {remainingTime >= 0 && remainingTime < 30 && '⚠️ '}Timeout:{' '}
+                {formatTime(remainingTime)}
+              </span>
+              <div className="flex gap-2">
+                <Button
+                  onPress={() => handleConfirmResponse('no')}
+                  variant="secondary"
+                  isDisabled={isSubmitting}
+                >
+                  No
+                </Button>
+                <Button onPress={() => handleConfirmResponse('yes')} isDisabled={isSubmitting}>
+                  Yes
+                </Button>
+              </div>
             </div>
           </div>
         );
@@ -298,50 +362,53 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
     return (
       <Modal.Backdrop
         isOpen={isOpen}
-        onOpenChange={(open) => !open && handleCancel()}
-        isDismissable={!isSubmitting}
-        isKeyboardDismissDisabled={isSubmitting}
+        onOpenChange={(open) => !open && handleModalClose()}
+        isDismissable={false}
+        isKeyboardDismissDisabled={true}
       >
         <Modal.Container placement="center" size="md">
           <Modal.Dialog>
             <Modal.CloseTrigger />
 
-            <Modal.Header>
-              <Modal.Heading>Agent is requesting input</Modal.Heading>
-            </Modal.Header>
+            <Card>
+              <Card.Header>
+                <h2 className="text-xl font-semibold">Agent is requesting input</h2>
+              </Card.Header>
 
-            <Modal.Body className="space-y-4">
-              <div className="space-y-3">
-                <p className="text-foreground">
-                  <strong>Agent is asking:</strong>
-                </p>
-                <p className="text-foreground">{request.message}</p>
-                <Alert status="warning">
-                  <Alert.Indicator />
-                  <Alert.Content>
-                    <Alert.Title>Sign in required</Alert.Title>
-                    <Alert.Description>
-                      You need to sign in with GitHub to respond to this request. Your identity will
-                      be recorded with your response.
-                    </Alert.Description>
-                  </Alert.Content>
-                </Alert>
-              </div>
-            </Modal.Body>
+              <Card.Content>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-foreground">Agent is asking:</p>
+                    <p className="text-sm text-foreground">{request.message}</p>
+                  </div>
+                  <Alert status="warning">
+                    <Alert.Indicator />
+                    <Alert.Content>
+                      <Alert.Title>Sign in required</Alert.Title>
+                      <Alert.Description>
+                        You need to sign in with GitHub to respond to this request. Your identity
+                        will be recorded with your response.
+                      </Alert.Description>
+                    </Alert.Content>
+                  </Alert>
 
-            <Modal.Footer className="flex justify-between items-center">
-              <span
-                className={`text-sm ${remainingTime < 30 ? 'text-warning' : 'text-muted-foreground'}`}
-              >
-                {remainingTime < 30 && '⚠️ '}Timeout: {formatTime(remainingTime)}
-              </span>
-              <div className="flex gap-2">
-                <Button variant="secondary" onPress={handleCancel} isDisabled={isSubmitting}>
-                  Cancel
-                </Button>
-                <Button onPress={() => startAuth()}>Sign in with GitHub</Button>
-              </div>
-            </Modal.Footer>
+                  <div className="flex justify-between items-center pt-2">
+                    <span
+                      className={`text-sm ${remainingTime >= 0 && remainingTime < 30 ? 'text-warning' : 'text-muted-foreground'}`}
+                    >
+                      {remainingTime >= 0 && remainingTime < 30 && '⚠️ '}Timeout:{' '}
+                      {formatTime(remainingTime)}
+                    </span>
+                    <div className="flex gap-2">
+                      <Button variant="secondary" onPress={handleCancel} isDisabled={isSubmitting}>
+                        Cancel
+                      </Button>
+                      <Button onPress={() => startAuth()}>Sign in with GitHub</Button>
+                    </div>
+                  </div>
+                </div>
+              </Card.Content>
+            </Card>
           </Modal.Dialog>
         </Modal.Container>
       </Modal.Backdrop>
@@ -351,47 +418,52 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
   return (
     <Modal.Backdrop
       isOpen={isOpen}
-      onOpenChange={(open) => !open && handleCancel()}
-      isDismissable={!isSubmitting}
-      isKeyboardDismissDisabled={isSubmitting}
+      onOpenChange={(open) => !open && handleModalClose()}
+      isDismissable={false}
+      isKeyboardDismissDisabled={true}
     >
       <Modal.Container placement="center" size="md">
         <Modal.Dialog>
           <Modal.CloseTrigger />
 
-          <Modal.Header>
-            <Modal.Heading>Agent is requesting input</Modal.Heading>
-          </Modal.Header>
+          <Card>
+            <Card.Header>
+              <h2 className="text-xl font-semibold">Agent is requesting input</h2>
+            </Card.Header>
 
-          <Form onSubmit={handleSubmit}>
-            <Modal.Body className="space-y-4">{renderInput()}</Modal.Body>
+            <Card.Content>
+              <Form onSubmit={handleSubmit} className="space-y-4">
+                <div>{renderInput()}</div>
 
-            {request.type !== 'confirm' && (
-              <Modal.Footer className="flex justify-between items-center">
-                <span
-                  className={`text-sm ${remainingTime < 30 ? 'text-warning' : 'text-muted-foreground'}`}
-                >
-                  {remainingTime < 30 && '⚠️ '}Timeout: {formatTime(remainingTime)}
-                </span>
-                <div className="flex gap-2">
-                  <Button variant="secondary" onPress={handleCancel} isDisabled={isSubmitting}>
-                    Cancel
-                  </Button>
-                  <Button
-                    type="submit"
-                    isDisabled={
-                      isSubmitting ||
-                      !value ||
-                      (request.type === 'choice' && !request.options?.length)
-                    }
-                    isPending={isSubmitting}
-                  >
-                    Submit
-                  </Button>
-                </div>
-              </Modal.Footer>
-            )}
-          </Form>
+                {request.type !== 'confirm' && (
+                  <div className="flex justify-between items-center pt-2">
+                    <span
+                      className={`text-sm ${remainingTime >= 0 && remainingTime < 30 ? 'text-warning' : 'text-muted-foreground'}`}
+                    >
+                      {remainingTime >= 0 && remainingTime < 30 && '⚠️ '}Timeout:{' '}
+                      {formatTime(remainingTime)}
+                    </span>
+                    <div className="flex gap-2">
+                      <Button variant="secondary" onPress={handleCancel} isDisabled={isSubmitting}>
+                        Cancel
+                      </Button>
+                      <Button
+                        type="submit"
+                        isDisabled={
+                          isSubmitting ||
+                          !value ||
+                          (request.type === 'choice' && !request.options?.length)
+                        }
+                        isPending={isSubmitting}
+                      >
+                        Submit
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </Form>
+            </Card.Content>
+          </Card>
         </Modal.Dialog>
       </Modal.Container>
     </Modal.Backdrop>

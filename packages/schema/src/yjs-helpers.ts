@@ -113,10 +113,26 @@ export function getArtifacts(ydoc: Y.Doc): Artifact[] {
   const array = ydoc.getArray(YDOC_KEYS.ARTIFACTS);
   const data = array.toJSON() as unknown[];
 
-  return data
-    .map((item) => ArtifactSchema.safeParse(item))
-    .filter((result) => result.success)
-    .map((result) => result.data);
+  return (
+    data
+      // Migrate legacy artifacts: if has url but no storage, assume GitHub
+      .map((item: unknown) => {
+        const artifact = item as Record<string, unknown>;
+        if (artifact.url && !artifact.storage) {
+          return { ...artifact, storage: 'github' };
+        }
+        // Skip corrupted artifacts without storage info (silent filter)
+        if (!artifact.storage && !artifact.url && !artifact.localArtifactId) {
+          return null;
+        }
+        return artifact;
+      })
+      // Filter out null entries and validate with schema
+      .filter((item): item is unknown => item !== null)
+      .map((item) => ArtifactSchema.safeParse(item))
+      .filter((result) => result.success)
+      .map((result) => result.data)
+  );
 }
 
 export function addArtifact(ydoc: Y.Doc, artifact: Artifact, actor?: string): void {
