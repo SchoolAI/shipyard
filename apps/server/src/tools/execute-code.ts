@@ -662,27 +662,28 @@ async function postActivityUpdate(opts: {
   status?: 'working' | 'blocked' | 'idle' | 'waiting';
   category?: 'info' | 'progress' | 'decision' | 'question';
 }): Promise<{ success: boolean; eventId: string; requestId?: string }> {
-  const { logPlanEvent, getPlanEvents } = await import('@peer-plan/schema');
+  const { logPlanEvent } = await import('@peer-plan/schema');
   const { getGitHubUsername } = await import('../server-identity.js');
   const { nanoid } = await import('nanoid');
 
   const doc = await getOrCreateDoc(opts.planId);
   const actorName = await getGitHubUsername();
 
-  // Build data based on activity type
+  // Build data based on activity type and capture returned eventId
   let requestId: string | undefined;
+  let eventId: string;
 
   switch (opts.activityType) {
     case 'status':
       if (!opts.status) throw new Error('status required for activityType=status');
-      logPlanEvent(doc, 'agent_activity', actorName, {
+      eventId = logPlanEvent(doc, 'agent_activity', actorName, {
         activityType: 'status',
         status: opts.status,
         message: opts.message,
       });
       break;
     case 'note':
-      logPlanEvent(doc, 'agent_activity', actorName, {
+      eventId = logPlanEvent(doc, 'agent_activity', actorName, {
         activityType: 'note',
         message: opts.message,
         category: opts.category,
@@ -691,14 +692,14 @@ async function postActivityUpdate(opts: {
     case 'help_request':
     case 'blocker':
       requestId = nanoid();
-      logPlanEvent(doc, 'agent_activity', actorName, {
+      eventId = logPlanEvent(doc, 'agent_activity', actorName, {
         activityType: opts.activityType,
         requestId,
         message: opts.message,
       });
       break;
     case 'milestone':
-      logPlanEvent(doc, 'agent_activity', actorName, {
+      eventId = logPlanEvent(doc, 'agent_activity', actorName, {
         activityType: 'milestone',
         message: opts.message,
       });
@@ -708,11 +709,6 @@ async function postActivityUpdate(opts: {
       throw new Error(`Unknown activity type: ${_exhaustive}`);
     }
   }
-
-  // Get the event we just logged (last event in the array)
-  const events = getPlanEvents(doc);
-  const lastEvent = events[events.length - 1];
-  const eventId = lastEvent?.id ?? nanoid();
 
   return { success: true, eventId, requestId };
 }
@@ -729,17 +725,33 @@ async function resolveActivityRequest(opts: {
   const actorName = await getGitHubUsername();
   const events = getPlanEvents(doc);
 
-  // Find original request
+  // Find original unresolved request (help_request or blocker only)
   const originalEvent = events.find(
     (e) =>
       e.type === 'agent_activity' &&
       e.data &&
       'requestId' in e.data &&
-      e.data.requestId === opts.requestId
+      e.data.requestId === opts.requestId &&
+      (e.data.activityType === 'help_request' || e.data.activityType === 'blocker')
   );
 
   if (!originalEvent || originalEvent.type !== 'agent_activity') {
-    throw new Error(`Request ${opts.requestId} not found`);
+    throw new Error(`Unresolved request ${opts.requestId} not found`);
+  }
+
+  // Check if already resolved
+  const existingResolution = events.find(
+    (e) =>
+      e.type === 'agent_activity' &&
+      e.data &&
+      'requestId' in e.data &&
+      e.data.requestId === opts.requestId &&
+      (e.data.activityType === 'help_request_resolved' ||
+        e.data.activityType === 'blocker_resolved')
+  );
+
+  if (existingResolution) {
+    throw new Error(`Request ${opts.requestId} has already been resolved`);
   }
 
   // Determine resolution type - TypeScript narrowing ensures data exists

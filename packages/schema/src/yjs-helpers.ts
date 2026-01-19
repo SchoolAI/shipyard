@@ -918,6 +918,7 @@ type EventDataForType<T extends PlanEventType> =
 /**
  * Log a plan event with type-safe data payload.
  * TypeScript will enforce that the data parameter matches the event type.
+ * @returns The ID of the created event (either provided or generated)
  */
 export function logPlanEvent<T extends PlanEventType>(
   ydoc: Y.Doc,
@@ -927,6 +928,7 @@ export function logPlanEvent<T extends PlanEventType>(
     ? [
         data?: undefined,
         options?: {
+          id?: string;
           inboxWorthy?: boolean;
           inboxFor?: string | string[];
         },
@@ -934,17 +936,21 @@ export function logPlanEvent<T extends PlanEventType>(
     : [
         data: EventDataForType<T>,
         options?: {
+          id?: string;
           inboxWorthy?: boolean;
           inboxFor?: string | string[];
         },
       ]
-): void {
+): string {
   const eventsArray = ydoc.getArray<PlanEvent>(YDOC_KEYS.EVENTS);
   const [data, options] = args;
 
+  // Use provided ID or generate a new one
+  const eventId = options?.id ?? nanoid();
+
   // Build event object - only include data if present
   const baseEvent = {
-    id: nanoid(),
+    id: eventId,
     type,
     actor,
     timestamp: Date.now(),
@@ -963,6 +969,7 @@ export function logPlanEvent<T extends PlanEventType>(
   }
 
   eventsArray.push([parsed.data]);
+  return eventId;
 }
 
 export function getPlanEvents(ydoc: Y.Doc): PlanEvent[] {
