@@ -4,13 +4,14 @@
  */
 
 import { Button, Checkbox, ListBox, ListBoxItem, Popover, Spinner } from '@heroui/react';
-import { PLAN_INDEX_DOC_NAME, type PlanIndexEntry } from '@peer-plan/schema';
+import { getAllTagsFromIndex, PLAN_INDEX_DOC_NAME, type PlanIndexEntry } from '@peer-plan/schema';
 import { Filter, LayoutGrid, Search } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { InlinePlanDetail } from '@/components/InlinePlanDetail';
 import { OfflineBanner } from '@/components/OfflineBanner';
 import { StatusChip } from '@/components/StatusChip';
+import { TagChip } from '@/components/TagChip';
 import { SearchPlanInput } from '@/components/ui/SearchPlanInput';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
@@ -29,11 +30,22 @@ function SearchResultItem({ plan }: SearchResultItemProps) {
     <div className="flex items-center justify-between gap-3 w-full py-2">
       <div className="flex flex-col gap-1 flex-1 min-w-0">
         <span className="font-medium text-foreground truncate">{plan.title}</span>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <StatusChip status={plan.status} />
           <span className="text-xs text-muted-foreground">
             {formatRelativeTime(plan.updatedAt)}
           </span>
+          {/* Show first 3 tags */}
+          {plan.tags && plan.tags.length > 0 && (
+            <div className="flex gap-1 items-center">
+              {plan.tags.slice(0, 3).map((tag) => (
+                <TagChip key={tag} tag={tag} size="sm" />
+              ))}
+              {plan.tags.length > 3 && (
+                <span className="text-xs text-muted-foreground">+{plan.tags.length - 3}</span>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -45,6 +57,9 @@ interface FilterBarProps {
   onOwnershipFilterChange: (filter: OwnershipFilter) => void;
   statusFilters: ReturnType<typeof useViewFilters>['statusFilters'];
   onToggleStatusFilter: ReturnType<typeof useViewFilters>['toggleStatusFilter'];
+  tagFilters: ReturnType<typeof useViewFilters>['tagFilters'];
+  onToggleTagFilter: ReturnType<typeof useViewFilters>['toggleTagFilter'];
+  allPlans: PlanIndexEntry[];
 }
 
 function FilterBar({
@@ -52,7 +67,11 @@ function FilterBar({
   onOwnershipFilterChange,
   statusFilters,
   onToggleStatusFilter,
+  tagFilters,
+  onToggleTagFilter,
+  allPlans,
 }: FilterBarProps) {
+  const allTags = getAllTagsFromIndex(allPlans);
   return (
     <div className="flex items-center gap-2">
       {/* Ownership Tabs */}
@@ -124,6 +143,42 @@ function FilterBar({
         </Popover.Content>
       </Popover>
 
+      {/* Tag Filter */}
+      {allTags.length > 0 && (
+        <Popover>
+          <Button variant="ghost" size="sm" className="gap-2">
+            <Filter className="w-4 h-4" />
+            Tags
+            {tagFilters.length > 0 && (
+              <span className="ml-1 px-1.5 py-0.5 text-xs bg-accent/20 text-accent rounded">
+                {tagFilters.length}
+              </span>
+            )}
+          </Button>
+
+          <Popover.Content placement="bottom end" className="w-64">
+            <Popover.Dialog>
+              <Popover.Arrow />
+              <Popover.Heading>Filter by Tags</Popover.Heading>
+              <div className="mt-3 space-y-2 max-h-64 overflow-y-auto">
+                {allTags.map((tag) => (
+                  <Checkbox
+                    key={tag}
+                    isSelected={tagFilters.includes(tag)}
+                    onChange={() => onToggleTagFilter(tag)}
+                    className="w-full"
+                  >
+                    <div className="flex items-center gap-2">
+                      <TagChip tag={tag} />
+                    </div>
+                  </Checkbox>
+                ))}
+              </div>
+            </Popover.Dialog>
+          </Popover.Content>
+        </Popover>
+      )}
+
       {/* Display Button (placeholder) */}
       <Button variant="ghost" size="sm" className="gap-2" isDisabled>
         <LayoutGrid className="w-4 h-4" />
@@ -147,7 +202,7 @@ export function SearchPage() {
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
   const [ownershipFilter, setOwnershipFilter] = useState<OwnershipFilter>('all');
-  const { statusFilters, toggleStatusFilter } = useViewFilters();
+  const { statusFilters, toggleStatusFilter, tagFilters, toggleTagFilter } = useViewFilters();
 
   // Selected plan state - read from URL on mount
   const searchParams = new URLSearchParams(location.search);
@@ -192,8 +247,13 @@ export function SearchPage() {
       plans = plans.filter((plan) => statusFilters.includes(plan.status));
     }
 
+    // Tag filter (OR logic - match ANY selected tag)
+    if (tagFilters.length > 0) {
+      plans = plans.filter((plan) => plan.tags?.some((tag) => tagFilters.includes(tag)));
+    }
+
     return plans;
-  }, [ownershipFilteredPlans, searchQuery, statusFilters]);
+  }, [ownershipFilteredPlans, searchQuery, statusFilters, tagFilters]);
 
   // Sort by updated time
   const sortedPlans = useMemo(() => {
@@ -304,13 +364,16 @@ export function SearchPage() {
             onOwnershipFilterChange={setOwnershipFilter}
             statusFilters={statusFilters}
             onToggleStatusFilter={toggleStatusFilter}
+            tagFilters={tagFilters}
+            onToggleTagFilter={toggleTagFilter}
+            allPlans={allPlans}
           />
         </div>
 
         {/* Results */}
         <div className={`flex-1 overflow-y-auto ${selectedPlanId ? 'p-2' : ''}`}>
           {/* No search query and no filters - prompt to search */}
-          {!searchQuery && statusFilters.length === 0 && (
+          {!searchQuery && statusFilters.length === 0 && tagFilters.length === 0 && (
             <div className="flex items-center justify-center py-12">
               <div className="text-center">
                 <Search className="w-12 h-12 mx-auto mb-4 text-muted-foreground opacity-50" />

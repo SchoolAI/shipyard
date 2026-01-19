@@ -32,6 +32,7 @@ const AvatarFallback = Avatar.Fallback as React.FC<{
 import type { PlanIndexEntry, PlanStatusType } from '@peer-plan/schema';
 import { CheckSquare, GitPullRequest } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { TagChip } from '@/components/TagChip';
 import { usePlanMetadata } from '@/hooks/usePlanMetadata';
 import { assertNever } from '@/utils/assert-never';
 import { formatRelativeTime } from '@/utils/formatters';
@@ -195,6 +196,10 @@ export function KanbanCard({ plan, onHover, onPanelOpen }: KanbanCardProps) {
                 </span>
               </Chip>
             )}
+
+            {/* Tags (show first 2 to save space) */}
+            {plan.tags &&
+              plan.tags.slice(0, 2).map((tag) => <TagChip key={tag} tag={tag} size="sm" />)}
           </div>
 
           {/* Updated time - separate row for cleaner layout */}

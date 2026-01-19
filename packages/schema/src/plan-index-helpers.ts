@@ -57,6 +57,10 @@ export function setPlanIndexEntry(ydoc: Y.Doc, entry: PlanIndexEntry): void {
     ownerId: validated.ownerId,
     deleted: validated.deleted,
   };
+  // Include tags if present
+  if (entry.tags) {
+    data.tags = entry.tags;
+  }
   // Include archive fields if deleted
   if (validated.deleted) {
     data.deletedAt = validated.deletedAt;

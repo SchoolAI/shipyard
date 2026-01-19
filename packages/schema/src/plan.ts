@@ -508,6 +508,8 @@ interface PlanMetadataBase {
   conversationVersions?: ConversationVersion[];
   /** Event log for timeline display and audit trail */
   events?: PlanEvent[];
+  /** Free-form tags for flexible categorization (e.g., "ui", "bug", "project:mobile-app") */
+  tags?: string[];
 }
 
 /** Discriminated union based on status field */
@@ -569,6 +571,7 @@ const PlanMetadataBaseSchema = z.object({
   viewedBy: z.record(z.string(), z.number()).optional(),
   conversationVersions: z.array(ConversationVersionSchema).optional(),
   events: z.array(PlanEventSchema).optional(),
+  tags: z.array(z.string()).optional(),
 });
 
 export const PlanMetadataSchema = z.discriminatedUnion('status', [

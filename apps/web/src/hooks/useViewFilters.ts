@@ -20,10 +20,12 @@ export interface ViewFiltersState {
   sortBy: SortOption;
   sortDirection: 'asc' | 'desc';
   statusFilters: PlanStatusType[];
+  tagFilters: string[];
   setSearchQuery: (query: string) => void;
   setSortBy: (sort: SortOption) => void;
   toggleSortDirection: () => void;
   toggleStatusFilter: (status: PlanStatusType) => void;
+  toggleTagFilter: (tag: string) => void;
   clearFilters: () => void;
 }
 
@@ -88,12 +90,24 @@ export function useViewFilters(): ViewFiltersState {
     });
   }, []);
 
+  const toggleTagFilter = useCallback((tag: string) => {
+    setPreferencesState((prev) => {
+      const newFilters = prev.tagFilters.includes(tag)
+        ? prev.tagFilters.filter((t) => t !== tag)
+        : [...prev.tagFilters, tag];
+      const updated = { ...prev, tagFilters: newFilters };
+      setViewPreferences(updated);
+      return updated;
+    });
+  }, []);
+
   const clearFilters = useCallback(() => {
     const cleared: ViewPreferences = {
       searchQuery: '',
       sortBy: 'updated',
       sortDirection: 'desc',
       statusFilters: [],
+      tagFilters: [],
     };
     setDebouncedSearchQuery('');
     setPreferencesState(cleared);
@@ -105,10 +119,12 @@ export function useViewFilters(): ViewFiltersState {
     sortBy: preferences.sortBy,
     sortDirection: preferences.sortDirection,
     statusFilters: preferences.statusFilters,
+    tagFilters: preferences.tagFilters,
     setSearchQuery,
     setSortBy,
     toggleSortDirection,
     toggleStatusFilter,
+    toggleTagFilter,
     clearFilters,
   };
 }
@@ -122,7 +138,8 @@ export function filterAndSortPlans(
   searchQuery: string,
   sortBy: SortOption,
   statusFilters: PlanStatusType[],
-  sortDirection: 'asc' | 'desc' = 'desc'
+  sortDirection: 'asc' | 'desc' = 'desc',
+  tagFilters: string[] = []
 ): FilteredPlansResult {
   let filtered = plans;
 
@@ -137,12 +154,18 @@ export function filterAndSortPlans(
     filtered = filtered.filter((plan) => statusFilters.includes(plan.status));
   }
 
+  // Apply tag filter (OR logic - show plans matching any selected tag)
+  if (tagFilters.length > 0) {
+    filtered = filtered.filter((plan) => plan.tags?.some((tag) => tagFilters.includes(tag)));
+  }
+
   // Sort plans
   const sorted = sortPlans(filtered, sortBy, sortDirection);
 
   return {
     filteredPlans: sorted,
-    hasActiveFilters: searchQuery.trim() !== '' || statusFilters.length > 0,
+    hasActiveFilters:
+      searchQuery.trim() !== '' || statusFilters.length > 0 || tagFilters.length > 0,
   };
 }
 
@@ -160,9 +183,17 @@ export function useFilteredPlans(plans: PlanIndexEntry[]): FilteredPlansResult &
         filters.searchQuery,
         filters.sortBy,
         filters.statusFilters,
-        filters.sortDirection
+        filters.sortDirection,
+        filters.tagFilters
       ),
-    [plans, filters.searchQuery, filters.sortBy, filters.statusFilters, filters.sortDirection]
+    [
+      plans,
+      filters.searchQuery,
+      filters.sortBy,
+      filters.statusFilters,
+      filters.sortDirection,
+      filters.tagFilters,
+    ]
   );
 
   return { ...result, ...filters };

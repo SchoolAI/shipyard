@@ -33,6 +33,7 @@ import { InlinePlanDetail, type PlanActionContext } from '@/components/InlinePla
 import { InputRequestInboxItem } from '@/components/InputRequestInboxItem';
 import { InputRequestModal } from '@/components/InputRequestModal';
 import { OfflineBanner } from '@/components/OfflineBanner';
+import { TagChip } from '@/components/TagChip';
 import { TwoColumnSkeleton } from '@/components/ui/TwoColumnSkeleton';
 import { useUserIdentity } from '@/contexts/UserIdentityContext';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
@@ -105,11 +106,22 @@ function InboxItem({ plan, onApprove, onRequestChanges, onDismiss, onMarkUnread 
             {plan.title}
           </span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <StatusBadge status={plan.status} />
           <span className="text-xs text-muted-foreground">
             {formatRelativeTime(plan.updatedAt)}
           </span>
+          {/* Show first 3 tags */}
+          {plan.tags && plan.tags.length > 0 && (
+            <div className="flex gap-1 items-center">
+              {plan.tags.slice(0, 3).map((tag) => (
+                <TagChip key={tag} tag={tag} size="sm" />
+              ))}
+              {plan.tags.length > 3 && (
+                <span className="text-xs text-muted-foreground">+{plan.tags.length - 3}</span>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
