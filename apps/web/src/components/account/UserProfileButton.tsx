@@ -31,16 +31,6 @@ export function UserProfileButton({
           <AvatarImage src={identity.avatarUrl} alt={identity.username} />
           <AvatarFallback>{identity.username[0]?.toUpperCase() ?? '?'}</AvatarFallback>
         </AvatarRoot>
-        {!isGitHubAuth && (
-          <Chip
-            size="sm"
-            className="absolute -bottom-0.5 -right-1 border-2 border-surface px-0.5 h-4 text-[9px] leading-none"
-            color="warning"
-            variant="soft"
-          >
-            Local
-          </Chip>
-        )}
         {isValidating && (
           <div className="absolute inset-0 flex items-center justify-center">
             <Spinner size="sm" />
@@ -52,22 +42,10 @@ export function UserProfileButton({
 
   return (
     <div className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-surface-elevated transition-colors w-full">
-      <div className="relative">
-        <AvatarRoot size="sm" className={isValidating ? 'opacity-50' : ''}>
-          <AvatarImage src={identity.avatarUrl} alt={identity.username} />
-          <AvatarFallback>{identity.username[0]?.toUpperCase() ?? '?'}</AvatarFallback>
-        </AvatarRoot>
-        {!isGitHubAuth && (
-          <Chip
-            size="sm"
-            className="absolute -bottom-0.5 -right-1 border-2 border-surface px-0.5 h-4 text-[9px] leading-none"
-            color="warning"
-            variant="soft"
-          >
-            Local
-          </Chip>
-        )}
-      </div>
+      <AvatarRoot size="sm" className={isValidating ? 'opacity-50' : ''}>
+        <AvatarImage src={identity.avatarUrl} alt={identity.username} />
+        <AvatarFallback>{identity.username[0]?.toUpperCase() ?? '?'}</AvatarFallback>
+      </AvatarRoot>
       <span className="text-sm truncate flex-1 text-left">{identity.username}</span>
       {isValidating && <Spinner size="sm" />}
     </div>

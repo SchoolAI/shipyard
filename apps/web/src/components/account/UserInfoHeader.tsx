@@ -39,7 +39,7 @@ export function UserInfoHeader({ identity, isGitHubAuth }: UserInfoHeaderProps) 
           {!isGitHubAuth && (
             <Chip
               size="sm"
-              className="absolute -bottom-0.5 -right-1 border-2 border-surface px-0.5 h-4 text-[9px] leading-none"
+              className="absolute -bottom-0.5 -right-1.5 border-2 border-surface px-0.5 h-4 text-[9px] leading-none"
               color="warning"
               variant="soft"
             >
