@@ -1,5 +1,5 @@
 import { Dropdown, Label, Separator } from '@heroui/react';
-import { ExternalLink, LogOut, RefreshCw, Star } from 'lucide-react';
+import { ExternalLink, LogOut, RefreshCw } from 'lucide-react';
 import type { Key } from 'react';
 import type { GitHubIdentity } from '@/hooks/useGitHubAuth';
 import { UserInfoHeader } from './UserInfoHeader';
@@ -12,7 +12,6 @@ interface UserMenuProps {
   isGitHubAuth: boolean;
   onSignOut: () => void;
   onSwitchAccount: () => void;
-  onUpgrade?: () => void;
 }
 
 export function UserMenu({
@@ -22,7 +21,6 @@ export function UserMenu({
   isGitHubAuth,
   onSignOut,
   onSwitchAccount,
-  onUpgrade,
 }: UserMenuProps) {
   const handleAction = (key: Key) => {
     switch (key) {
@@ -30,9 +28,6 @@ export function UserMenu({
         if (isGitHubAuth) {
           window.open(`https://github.com/${identity.username}`, '_blank', 'noopener');
         }
-        break;
-      case 'upgrade':
-        onUpgrade?.();
         break;
       case 'switch-account':
         onSwitchAccount();
@@ -60,15 +55,10 @@ export function UserMenu({
         <UserInfoHeader identity={identity} isGitHubAuth={isGitHubAuth} />
         <Separator />
         <Dropdown.Menu onAction={handleAction}>
-          {isGitHubAuth ? (
+          {isGitHubAuth && (
             <Dropdown.Item id="view-profile" textValue="View GitHub Profile">
               <ExternalLink className="w-4 h-4 shrink-0 text-muted-foreground" />
               <Label>View GitHub Profile</Label>
-            </Dropdown.Item>
-          ) : (
-            <Dropdown.Item id="upgrade" textValue="Upgrade to GitHub Account">
-              <Star className="w-4 h-4 shrink-0 text-warning" />
-              <Label className="font-semibold text-warning">Upgrade to GitHub</Label>
             </Dropdown.Item>
           )}
           <Dropdown.Item id="switch-account" textValue="Switch Account">

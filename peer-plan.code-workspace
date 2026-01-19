@@ -5,8 +5,16 @@
       "path": "."
     },
     {
-      "name": "🌳📦 79-packaging",
+      "name": "\ud83c\udf33\ud83d\udce6 79-packaging",
       "path": "../peer-plan-wt/79-packaging"
+    },
+    {
+      "name": "\ud83c\udf33\ud83d\udce2 39-agent-activity-feed",
+      "path": "../peer-plan-wt/39-agent-activity-feed"
+    },
+    {
+      "name": "\ud83c\udf33\ud83c\udff7\ufe0f 37-tagging",
+      "path": "../peer-plan-wt/37-tagging"
     }
   ]
 }

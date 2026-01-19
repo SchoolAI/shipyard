@@ -12,7 +12,6 @@ import {
   MCP_TOOL_NAMES,
 } from '../constants.js';
 import { logger } from '../logger.js';
-import { transformToAskUserQuestion } from '../transforms/ask-user-question.js';
 import type {
   AdapterEvent,
   AgentAdapter,
@@ -49,36 +48,21 @@ type ClaudeCodeHookInput = z.infer<typeof ClaudeCodeHookBaseSchema>;
 /**
  * Handle PreToolUse events - intercept tool calls before execution.
  *
- * Currently transforms:
- * - request_user_input → AskUserQuestion (when applicable)
+ * Currently blocks:
+ * - AskUserQuestion → redirects to request_user_input MCP tool for consistent browser UX
  */
 function handlePreToolUse(input: ClaudeCodeHookInput): AdapterEvent {
   const toolName = input.tool_name;
 
-  // Intercept request_user_input and transform to AskUserQuestion when applicable
-  if (toolName === MCP_TOOL_NAMES.REQUEST_USER_INPUT && input.tool_input) {
-    // Parse tool input - should have at minimum message and type
-    const toolInput = input.tool_input;
-    if (typeof toolInput.message === 'string' && typeof toolInput.type === 'string') {
-      const transformResult = transformToAskUserQuestion(
-        toolInput as unknown as Parameters<typeof transformToAskUserQuestion>[0]
-      );
-
-      // Exhaustive switch ensures all HookResponse types are handled
-      switch (transformResult.type) {
-        case 'transform':
-          return {
-            type: 'tool_transform',
-            originalTool: MCP_TOOL_NAMES.REQUEST_USER_INPUT,
-            newTool: transformResult.tool_name,
-            newInput: transformResult.tool_input as unknown as Record<string, unknown>,
-          };
-        case 'passthrough':
-          return { type: 'passthrough' };
-        default:
-          return assertNever(transformResult);
-      }
-    }
+  // Block native AskUserQuestion - use browser modal via request_user_input instead
+  if (toolName === CLAUDE_TOOL_NAMES.ASK_USER_QUESTION) {
+    logger.info({ toolName }, 'Blocking AskUserQuestion - redirecting to request_user_input MCP tool');
+    return {
+      type: 'tool_deny',
+      reason:
+        'Please use the request_user_input MCP tool for consistent browser UI experience. ' +
+        'Call it via execute_code: await requestUserInput({message: "...", type: "choice", options: [...]});',
+    };
   }
 
   return { type: 'passthrough' };
@@ -187,16 +171,13 @@ export const claudeCodeAdapter: AgentAdapter = {
   },
 
   formatOutput(response: CoreResponse): string {
-    // Handle tool transformation - PreToolUse with tool replacement
-    if (response.hookType === 'tool_transform') {
+    // Handle tool denial - PreToolUse with deny decision
+    if (response.hookType === 'tool_deny') {
       return JSON.stringify({
         hookSpecificOutput: {
           hookEventName: CLAUDE_HOOK_EVENTS.PRE_TOOL_USE,
-          decision: {
-            behavior: 'transform',
-            transformedToolName: response.transformedTool,
-            transformedToolInput: response.transformedInput,
-          },
+          permissionDecision: 'deny',
+          permissionDecisionReason: response.denyReason || 'Tool call denied by hook',
         },
       });
     }

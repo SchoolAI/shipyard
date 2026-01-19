@@ -50,12 +50,6 @@ export function AccountSection({ collapsed = false }: AccountSectionProps) {
     clearLocalIdentity();
   };
 
-  const handleUpgrade = () => {
-    // Clear local identity and launch GitHub OAuth
-    clearLocalIdentity();
-    startAuth();
-  };
-
   const handleLocalSignIn = (username: string) => {
     setLocalIdentity(username);
     setShowLocalSignIn(false);
@@ -90,7 +84,6 @@ export function AccountSection({ collapsed = false }: AccountSectionProps) {
         isGitHubAuth={githubIdentity !== null}
         onSignOut={handleSignOut}
         onSwitchAccount={handleSwitchAccount}
-        onUpgrade={handleUpgrade}
       />
       <GitHubAuthOverlay authState={authState} />
     </>

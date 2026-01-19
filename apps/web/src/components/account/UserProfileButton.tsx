@@ -34,7 +34,7 @@ export function UserProfileButton({
         {!isGitHubAuth && (
           <Chip
             size="sm"
-            className="absolute -bottom-0.5 -right-0.5 border-2 border-surface text-xs px-1 min-w-fit"
+            className="absolute -bottom-0.5 -right-0.5 border-2 border-surface w-3.5 h-3.5 p-0 flex items-center justify-center text-[8px] leading-none"
             color="warning"
             variant="soft"
           >
@@ -60,7 +60,7 @@ export function UserProfileButton({
         {!isGitHubAuth && (
           <Chip
             size="sm"
-            className="absolute -bottom-0.5 -right-0.5 border-2 border-surface text-xs px-1 min-w-fit"
+            className="absolute -bottom-0.5 -right-0.5 border-2 border-surface w-3.5 h-3.5 p-0 flex items-center justify-center text-[8px] leading-none"
             color="warning"
             variant="soft"
           >
