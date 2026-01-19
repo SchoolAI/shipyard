@@ -84,8 +84,14 @@ function getAgentActivityIcon(data: AgentActivityData): ReactNode {
 function getAgentActivityDescription(data: AgentActivityData): string {
   switch (data.activityType) {
     case 'status': {
-      const action = data.status === 'working' ? 'started working' : `is ${data.status}`;
-      return data.message ? `${action} on ${data.message}` : action;
+      const actions = {
+        working: 'started working',
+        blocked: 'became blocked',
+        idle: 'became idle',
+        waiting: 'started waiting',
+      };
+      const action = actions[data.status];
+      return data.message ? `${action}: ${data.message}` : action;
     }
     case 'note':
       return data.message;

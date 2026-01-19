@@ -15,16 +15,23 @@ export function AgentStatusBadge({ ydoc }: AgentStatusBadgeProps) {
   } | null>(null);
 
   useEffect(() => {
+    let mounted = true;
+
     const update = () => {
+      if (!mounted) return; // Guard against unmounted component
+
       const events = getPlanEvents(ydoc);
 
-      // Find most recent agent_activity with activityType='status'
-      const statusEvents = events
-        .filter((e) => e.type === 'agent_activity' && e.data.activityType === 'status')
-        .sort((a, b) => b.timestamp - a.timestamp);
+      // Find most recent status event by array position (Yjs guarantees causal ordering)
+      // Last event in array is actually most recent; wall-clock timestamps can be out of order in P2P
+      const statusEvents = events.filter(
+        (e) => e.type === 'agent_activity' && e.data.activityType === 'status'
+      );
 
       if (statusEvents.length > 0) {
-        const latest = statusEvents[0];
+        // Use array position, not timestamp sorting
+        const latest = statusEvents[statusEvents.length - 1];
+        // TypeScript knows latest is agent_activity with activityType='status' from filter
         if (latest && latest.type === 'agent_activity' && latest.data.activityType === 'status') {
           setStatus({
             status: latest.data.status,
@@ -39,7 +46,11 @@ export function AgentStatusBadge({ ydoc }: AgentStatusBadgeProps) {
     const eventsArray = ydoc.getArray(YDOC_KEYS.EVENTS);
     update();
     eventsArray.observe(update);
-    return () => eventsArray.unobserve(update);
+
+    return () => {
+      mounted = false; // Set before unobserve to prevent race conditions
+      eventsArray.unobserve(update);
+    };
   }, [ydoc]);
 
   if (!status) return null;

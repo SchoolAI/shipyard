@@ -173,23 +173,6 @@ export const AgentActivityTypes = [
 ] as const;
 export type AgentActivityType = (typeof AgentActivityTypes)[number];
 
-/**
- * Discriminated union for agent activity event data.
- * Each activity type has specific required/optional fields.
- */
-export type AgentActivityData =
-  | { activityType: 'status'; status: 'working' | 'blocked' | 'idle' | 'waiting'; message?: string }
-  | {
-      activityType: 'note';
-      message: string;
-      category?: 'info' | 'progress' | 'decision' | 'question';
-    }
-  | { activityType: 'help_request'; requestId: string; message: string }
-  | { activityType: 'help_request_resolved'; requestId: string; resolution?: string }
-  | { activityType: 'milestone'; message: string }
-  | { activityType: 'blocker'; message: string; requestId: string }
-  | { activityType: 'blocker_resolved'; requestId: string; resolution?: string };
-
 /** Base fields shared by all plan events */
 interface PlanEventBase {
   id: string;
@@ -382,6 +365,13 @@ export const AgentActivityDataSchema = z.discriminatedUnion('activityType', [
     resolution: z.string().optional(),
   }),
 ]);
+
+/**
+ * Discriminated union for agent activity event data.
+ * Each activity type has specific required/optional fields.
+ * Derived from AgentActivityDataSchema to prevent drift.
+ */
+export type AgentActivityData = z.infer<typeof AgentActivityDataSchema>;
 
 /** Discriminated union schema for plan events */
 export const PlanEventSchema = z.discriminatedUnion('type', [
