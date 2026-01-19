@@ -34,6 +34,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { IndexeddbPersistence } from 'y-indexeddb';
 import * as Y from 'yjs';
+import { OfflineBanner } from '@/components/OfflineBanner';
 import { PlanContent } from '@/components/PlanContent';
 import { type PanelWidth, PlanPanel } from '@/components/PlanPanel';
 import { PlanPanelHeader } from '@/components/PlanPanelHeader';
@@ -150,7 +151,9 @@ async function updatePlanStatus(
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: page component orchestrates multiple state machines
 export function KanbanPage() {
   const { identity: githubIdentity, startAuth } = useGitHubAuth();
-  const { myPlans, sharedPlans, inboxPlans, isLoading } = usePlanIndex(githubIdentity?.username);
+  const { myPlans, sharedPlans, inboxPlans, isLoading, timedOut } = usePlanIndex(
+    githubIdentity?.username
+  );
   const { ydoc: indexDoc } = useMultiProviderSync(PLAN_INDEX_DOC_NAME);
   const navigate = useNavigate();
   const location = useLocation();
@@ -510,6 +513,9 @@ export function KanbanPage() {
 
   return (
     <div className="h-full flex flex-col">
+      {/* Offline banner */}
+      {timedOut && <OfflineBanner />}
+
       <header className="flex items-center justify-between px-4 py-3 border-b border-separator shrink-0">
         <div>
           <h1 className="text-xl font-bold text-foreground">Board</h1>

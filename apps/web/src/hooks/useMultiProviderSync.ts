@@ -113,6 +113,10 @@ export interface SyncState {
   approvalStatus?: ApprovalStatus;
   /** Registry server port (for local artifact URLs) */
   registryPort: number | null;
+  /** Error message if connection failed or timed out */
+  error?: string;
+  /** Whether connection timeout has been reached */
+  timedOut: boolean;
 }
 
 /**
@@ -145,10 +149,13 @@ export function useMultiProviderSync(
     peerCount: 0,
     idbSynced: false,
     registryPort: null,
+    timedOut: false,
   });
   const idbSyncedRef = useRef(false);
   const approvalStatusRef = useRef<ApprovalStatus | undefined>(undefined);
   const registryPortRef = useRef<number | null>(null);
+  const timedOutRef = useRef(false);
+  const errorRef = useRef<string | undefined>(undefined);
   const [rtcProvider, setRtcProvider] = useState<WebrtcProvider | null>(null);
   const [wsProvider, setWsProvider] = useState<WebsocketProvider | null>(null);
 
@@ -203,13 +210,37 @@ export function useMultiProviderSync(
       setWsProvider(ws);
 
       ws.on('status', () => {
-        if (mounted) updateSyncState();
+        if (mounted) {
+          // Clear timeout when connection succeeds
+          const wsConnected = ws?.wsconnected ?? false;
+          if (wsConnected && timedOutRef.current) {
+            timedOutRef.current = false;
+            errorRef.current = undefined;
+          }
+          updateSyncState();
+        }
       });
 
       ws.on('sync', () => {
         if (mounted) updateSyncState();
       });
     })();
+
+    // Connection timeout: If not connected within 10 seconds, show offline state
+    const CONNECTION_TIMEOUT = 10000;
+    const timeoutId = setTimeout(() => {
+      if (!mounted) return;
+
+      const wsConnected = wsProviderRef.current?.wsconnected ?? false;
+      const hasP2PPeers = peerCountRef.current > 0;
+
+      // Only timeout if we have no connection at all (no hub, no peers)
+      if (!wsConnected && !hasP2PPeers) {
+        timedOutRef.current = true;
+        errorRef.current = 'Connection timeout - check network or start MCP server';
+        updateSyncState();
+      }
+    }, CONNECTION_TIMEOUT);
 
     let rtc: WebrtcProvider | null = null;
     let handleBeforeUnload: (() => void) | null = null;
@@ -451,11 +482,14 @@ export function useMultiProviderSync(
         idbSynced: idbSyncedRef.current,
         approvalStatus: approvalStatusRef.current,
         registryPort: registryPortRef.current,
+        timedOut: timedOutRef.current,
+        error: errorRef.current,
       });
     }
 
     return () => {
       mounted = false;
+      clearTimeout(timeoutId);
       if (ws) {
         ws.disconnect();
         ws.destroy();

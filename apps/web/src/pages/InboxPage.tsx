@@ -31,6 +31,7 @@ import * as Y from 'yjs';
 import { InlinePlanDetail, type PlanActionContext } from '@/components/InlinePlanDetail';
 import { InputRequestInboxItem } from '@/components/InputRequestInboxItem';
 import { InputRequestModal } from '@/components/InputRequestModal';
+import { OfflineBanner } from '@/components/OfflineBanner';
 import { TwoColumnSkeleton } from '@/components/ui/TwoColumnSkeleton';
 import { useUserIdentity } from '@/contexts/UserIdentityContext';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
@@ -240,7 +241,9 @@ export function InboxPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { identity: githubIdentity } = useGitHubAuth();
-  const { allInboxPlans, markPlanAsRead, isLoading } = usePlanIndex(githubIdentity?.username);
+  const { allInboxPlans, markPlanAsRead, isLoading, timedOut } = usePlanIndex(
+    githubIdentity?.username
+  );
   const { ydoc: indexDoc } = useMultiProviderSync(PLAN_INDEX_DOC_NAME);
   const [showRead, setShowRead] = useState(getInboxShowRead);
   const { actor } = useUserIdentity();
@@ -565,6 +568,9 @@ export function InboxPage() {
     <div className="h-full grid grid-cols-[minmax(300px,400px)_1fr]">
       {/* Inbox list */}
       <div className="flex flex-col h-full overflow-hidden border-r border-separator">
+        {/* Offline banner */}
+        {timedOut && <OfflineBanner />}
+
         {/* Header with show read toggle */}
         <div className="border-b border-separator shrink-0 p-4">
           <div className="flex items-center justify-between mb-3">

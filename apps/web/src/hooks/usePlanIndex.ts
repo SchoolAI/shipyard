@@ -82,6 +82,10 @@ export interface PlanIndexState {
   synced: boolean;
   /** Number of peers connected via WebRTC P2P */
   peerCount: number;
+  /** Whether connection timeout has been reached */
+  timedOut: boolean;
+  /** Error message if connection failed or timed out */
+  error?: string;
   navigationTarget: string | null;
   clearNavigation: () => void;
   /** True while IndexedDB is loading local data */
@@ -395,7 +399,8 @@ export function usePlanIndex(currentUsername: string | undefined): PlanIndexStat
 
   // Loading until WebSocket has synced - ensures plans are fetched and filtered
   // before showing content or empty state (prevents flicker)
-  const isLoading = !syncState.synced;
+  // However, if connection has timed out and we have IndexedDB data, show cached data
+  const isLoading = !syncState.synced && !syncState.timedOut;
 
   const markPlanAsRead = useCallback(
     (planId: string): Promise<void> => {
@@ -432,6 +437,8 @@ export function usePlanIndex(currentUsername: string | undefined): PlanIndexStat
     connected: syncState.connected,
     synced: syncState.synced,
     peerCount: syncState.peerCount,
+    timedOut: syncState.timedOut,
+    error: syncState.error,
     navigationTarget,
     clearNavigation,
     isLoading,

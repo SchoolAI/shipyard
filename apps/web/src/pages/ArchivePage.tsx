@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 import { IndexeddbPersistence } from 'y-indexeddb';
 import * as Y from 'yjs';
 import { InlinePlanDetail } from '@/components/InlinePlanDetail';
+import { OfflineBanner } from '@/components/OfflineBanner';
 import { TwoColumnSkeleton } from '@/components/ui/TwoColumnSkeleton';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
@@ -56,7 +57,7 @@ export function ArchivePage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { identity: githubIdentity } = useGitHubAuth();
-  const { archivedPlans, isLoading } = usePlanIndex(githubIdentity?.username);
+  const { archivedPlans, isLoading, timedOut } = usePlanIndex(githubIdentity?.username);
   const { ydoc: indexDoc } = useMultiProviderSync(PLAN_INDEX_DOC_NAME);
 
   // Selected plan state - read from URL on mount
@@ -191,6 +192,9 @@ export function ArchivePage() {
     <div className="h-full grid grid-cols-[minmax(300px,400px)_1fr]">
       {/* Archive list */}
       <div className="flex flex-col h-full overflow-hidden border-r border-separator">
+        {/* Offline banner */}
+        {timedOut && <OfflineBanner />}
+
         {/* Header */}
         <div className="border-b border-separator shrink-0 p-4">
           <div className="mb-3">

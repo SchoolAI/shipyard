@@ -9,6 +9,7 @@ import { Filter, LayoutGrid, Search } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { InlinePlanDetail } from '@/components/InlinePlanDetail';
+import { OfflineBanner } from '@/components/OfflineBanner';
 import { StatusChip } from '@/components/StatusChip';
 import { SearchPlanInput } from '@/components/ui/SearchPlanInput';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
@@ -136,7 +137,9 @@ type OwnershipFilter = 'all' | 'my-plans' | 'shared';
 
 export function SearchPage() {
   const { identity: githubIdentity } = useGitHubAuth();
-  const { myPlans, sharedPlans, inboxPlans, isLoading } = usePlanIndex(githubIdentity?.username);
+  const { myPlans, sharedPlans, inboxPlans, isLoading, timedOut } = usePlanIndex(
+    githubIdentity?.username
+  );
   useMultiProviderSync(PLAN_INDEX_DOC_NAME); // Keep index synced
   const navigate = useNavigate();
   const location = useLocation();
@@ -281,6 +284,9 @@ export function SearchPage() {
       <div
         className={`flex flex-col h-full overflow-hidden ${selectedPlanId ? 'border-r border-separator' : 'max-w-3xl mx-auto w-full p-4'}`}
       >
+        {/* Offline banner */}
+        {timedOut && <OfflineBanner />}
+
         {/* Header with search */}
         <div className={`border-b border-separator shrink-0 ${selectedPlanId ? 'p-4' : 'mb-4'}`}>
           <h1 className="text-xl font-bold text-foreground mb-3">Search</h1>
