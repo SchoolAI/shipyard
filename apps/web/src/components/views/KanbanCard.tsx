@@ -198,8 +198,9 @@ export function KanbanCard({ plan, onHover, onPanelOpen }: KanbanCardProps) {
             )}
 
             {/* Tags (show first 2 to save space) */}
-            {plan.tags &&
-              plan.tags.slice(0, 2).map((tag) => <TagChip key={tag} tag={tag} size="sm" />)}
+            {plan.tags?.slice(0, 2).map((tag) => (
+              <TagChip key={tag} tag={tag} size="sm" />
+            ))}
           </div>
 
           {/* Updated time - separate row for cleaner layout */}

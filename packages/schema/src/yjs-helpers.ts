@@ -46,6 +46,7 @@ export interface PlanMetadataBaseUpdate {
   viewedBy?: Record<string, number>;
   conversationVersions?: ConversationVersion[];
   events?: PlanEvent[];
+  tags?: string[];
 }
 
 /**
