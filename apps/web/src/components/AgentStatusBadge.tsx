@@ -65,7 +65,7 @@ export function AgentStatusBadge({ ydoc }: AgentStatusBadgeProps) {
   const { color, icon: Icon, label } = config[status.status];
 
   return (
-    <Chip color={color} variant="soft" size="sm">
+    <Chip color={color} variant="soft">
       <div className="flex items-center gap-1">
         <Icon className="w-3 h-3" />
         <span>Agent: {label}</span>
