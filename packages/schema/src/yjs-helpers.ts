@@ -312,6 +312,12 @@ export function initPlanMetadata(ydoc: Y.Doc, init: InitPlanMetadataParams): voi
   if (init.origin) {
     map.set('origin', init.origin);
   }
+
+  // Validate final state after initialization
+  const result = getPlanMetadataWithValidation(ydoc);
+  if (!result.success) {
+    throw new Error(`Failed to initialize metadata: ${result.error}`);
+  }
 }
 
 export function getStepCompletions(ydoc: Y.Doc): Map<string, boolean> {
@@ -366,10 +372,13 @@ export function getArtifacts(ydoc: Y.Doc): Artifact[] {
 }
 
 export function addArtifact(ydoc: Y.Doc, artifact: Artifact, actor?: string): void {
+  // Validate discriminated union (storage: 'github' | 'local') before writing
+  const validated = ArtifactSchema.parse(artifact);
+
   ydoc.transact(
     () => {
       const array = ydoc.getArray(YDOC_KEYS.ARTIFACTS);
-      array.push([artifact]);
+      array.push([validated]);
     },
     actor ? { actor } : undefined
   );
@@ -637,18 +646,21 @@ export function getLinkedPRs(ydoc: Y.Doc): LinkedPR[] {
 }
 
 export function linkPR(ydoc: Y.Doc, pr: LinkedPR, actor?: string): void {
+  // Validate before writing to catch programmer errors at the source
+  const validated = LinkedPRSchema.parse(pr);
+
   ydoc.transact(
     () => {
       const array = ydoc.getArray(YDOC_KEYS.LINKED_PRS);
       const existing = array.toJSON() as LinkedPR[];
-      const index = existing.findIndex((p) => p.prNumber === pr.prNumber);
+      const index = existing.findIndex((p) => p.prNumber === validated.prNumber);
 
       // Remove existing PR with same number if present
       if (index !== -1) {
         array.delete(index, 1);
       }
 
-      array.push([pr]);
+      array.push([validated]);
     },
     actor ? { actor } : undefined
   );

@@ -7,12 +7,12 @@ import { describe, expect, it } from 'vitest';
 import {
   ArtifactSchema,
   ConversationVersionSchema,
-  LinkedPRSchema,
   createGitHubArtifact,
   createHandedOffConversationVersion,
   createInitialConversationVersion,
   createLinkedPR,
   createLocalArtifact,
+  LinkedPRSchema,
 } from './plan.js';
 
 describe('Factory Functions', () => {
@@ -78,7 +78,6 @@ describe('Factory Functions', () => {
   describe('createGitHubArtifact', () => {
     it('creates valid GitHubArtifact with storage: github', () => {
       const artifact = createGitHubArtifact({
-        id: 'artifact-1',
         type: 'screenshot',
         filename: 'screenshot.png',
         url: 'https://example.com/screenshot.png',
@@ -94,7 +93,6 @@ describe('Factory Functions', () => {
     it('uses provided uploadedAt if given', () => {
       const uploadedAt = 1234567890;
       const artifact = createGitHubArtifact({
-        id: 'artifact-1',
         type: 'video',
         filename: 'demo.mp4',
         url: 'https://example.com/demo.mp4',
@@ -107,7 +105,6 @@ describe('Factory Functions', () => {
     it('defaults uploadedAt to current time if not provided', () => {
       const before = Date.now();
       const artifact = createGitHubArtifact({
-        id: 'artifact-1',
         type: 'test_results',
         filename: 'results.json',
         url: 'https://example.com/results.json',
@@ -122,7 +119,6 @@ describe('Factory Functions', () => {
   describe('createLocalArtifact', () => {
     it('creates valid LocalArtifact with storage: local', () => {
       const artifact = createLocalArtifact({
-        id: 'artifact-1',
         type: 'screenshot',
         filename: 'screenshot.png',
         localArtifactId: 'local-123',
@@ -138,7 +134,6 @@ describe('Factory Functions', () => {
     it('uses provided uploadedAt if given', () => {
       const uploadedAt = 1234567890;
       const artifact = createLocalArtifact({
-        id: 'artifact-1',
         type: 'diff',
         filename: 'changes.diff',
         localArtifactId: 'local-456',
@@ -170,6 +165,8 @@ describe('Factory Functions', () => {
         prNumber: 42,
         url: 'https://github.com/org/repo/pull/42',
         status: 'merged',
+        branch: 'feature/test',
+        title: 'Add new feature',
         linkedAt,
       });
 
@@ -182,6 +179,8 @@ describe('Factory Functions', () => {
         prNumber: 42,
         url: 'https://github.com/org/repo/pull/42',
         status: 'draft',
+        branch: 'feature/test',
+        title: 'Add new feature',
       });
       const after = Date.now();
 
@@ -197,6 +196,8 @@ describe('Factory Functions', () => {
           prNumber: 1,
           url: 'https://github.com/org/repo/pull/1',
           status,
+          branch: 'feature/test',
+          title: 'Test PR',
         });
 
         expect(linkedPR.status).toBe(status);
@@ -220,10 +221,12 @@ describe('Factory Functions', () => {
         prNumber: 42,
         url: 'https://github.com/org/repo/pull/42',
         status: 'open',
+        branch: 'main',
+        title: 'PR Title',
       });
 
-      expect(withoutOptional.branch).toBeUndefined();
-      expect(withoutOptional.title).toBeUndefined();
+      expect(withoutOptional.branch).toBe('main');
+      expect(withoutOptional.title).toBe('PR Title');
     });
   });
 });

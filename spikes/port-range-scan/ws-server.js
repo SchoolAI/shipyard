@@ -82,5 +82,5 @@ process.on('SIGINT', () => {
 });
 
 // Start server
-const portArg = process.argv[2] ? parseInt(process.argv[2]) : null;
+const portArg = process.argv[2] ? parseInt(process.argv[2], 10) : null;
 startServer(portArg);

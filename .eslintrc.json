@@ -4,10 +4,14 @@
   "extends": [],
   "rules": {
     "multiline-comment-style": ["warn", "starred-block"],
-    "spaced-comment": ["warn", "always", {
-      "exceptions": ["-", "+", "*"],
-      "markers": ["/", "!", "*", "@"]
-    }]
+    "spaced-comment": [
+      "warn",
+      "always",
+      {
+        "exceptions": ["-", "+", "*"],
+        "markers": ["/", "!", "*", "@"]
+      }
+    ]
   },
   "overrides": [
     {
@@ -18,11 +22,5 @@
       }
     }
   ],
-  "ignorePatterns": [
-    "node_modules",
-    "dist",
-    "build",
-    "*.config.js",
-    "*.config.ts"
-  ]
+  "ignorePatterns": ["node_modules", "dist", "build", "*.config.js", "*.config.ts"]
 }

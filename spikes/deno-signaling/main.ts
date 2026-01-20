@@ -88,7 +88,7 @@ function handleMessage(conn: WebSocket, data: string): void {
             if (!topics.has(topicName)) {
               topics.set(topicName, new Set());
             }
-            topics.get(topicName)!.add(conn);
+            topics.get(topicName)?.add(conn);
             // Track topic for cleanup
             subscribedTopics.add(topicName);
           }

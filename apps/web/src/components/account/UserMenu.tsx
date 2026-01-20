@@ -44,12 +44,7 @@ export function UserMenu({
         className={collapsed ? 'rounded-full' : 'w-full rounded-md'}
         aria-label={`Account menu for ${identity.username}`}
       >
-        <UserProfileButton
-          identity={identity}
-          isValidating={isValidating}
-          collapsed={collapsed}
-          isGitHubAuth={isGitHubAuth}
-        />
+        <UserProfileButton identity={identity} isValidating={isValidating} collapsed={collapsed} />
       </Dropdown.Trigger>
       <Dropdown.Popover placement="top start" className="min-w-[220px]">
         <UserInfoHeader identity={identity} isGitHubAuth={isGitHubAuth} />

@@ -51,7 +51,7 @@ async function testServer(url) {
         ws.send(
           JSON.stringify({
             type: 'subscribe',
-            topics: ['test-room-' + Date.now()],
+            topics: [`test-room-${Date.now()}`],
           })
         );
         console.log('  ✅ Subscribe sent');

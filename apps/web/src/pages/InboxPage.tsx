@@ -248,12 +248,212 @@ function EventInboxItem({ item, onView }: EventInboxItemProps) {
   );
 }
 
+// --- Helper functions extracted to reduce component complexity ---
+
+/** Filter and sort inbox plans based on show read preference */
+function filterAndSortInboxPlans(
+  allInboxPlans: (PlanIndexEntry & { isUnread?: boolean })[],
+  showRead: boolean,
+  selectedPlanId: string | null
+): (PlanIndexEntry & { isUnread?: boolean })[] {
+  const filtered = allInboxPlans.filter((plan) => {
+    if (showRead) return true;
+    return plan.isUnread || plan.id === selectedPlanId;
+  });
+  return filtered.sort((a, b) => b.updatedAt - a.updatedAt);
+}
+
+/** Group inbox events by category */
+function groupInboxEvents(
+  sortedInboxPlans: (PlanIndexEntry & { isUnread?: boolean })[],
+  eventBasedInbox: InboxEventItem[]
+) {
+  return {
+    needsReview: sortedInboxPlans,
+    approvalRequests: eventBasedInbox.filter(
+      (e: InboxEventItem) => e.event.type === 'approval_requested'
+    ),
+    mentions: eventBasedInbox.filter(
+      (e: InboxEventItem) => e.event.type === 'comment_added' && e.event.data?.mentions
+    ),
+    readyToComplete: eventBasedInbox.filter(
+      (e: InboxEventItem) => e.event.type === 'deliverable_linked' && e.event.data?.allFulfilled
+    ),
+  };
+}
+
+/** Hook for syncing panel selection with URL */
+function usePanelUrlSync(selectedPlanId: string | null, navigate: ReturnType<typeof useNavigate>) {
+  useEffect(() => {
+    const path = selectedPlanId ? `?panel=${selectedPlanId}` : '';
+    navigate(path, { replace: true });
+  }, [selectedPlanId, navigate]);
+}
+
+/** Hook for listening to input request events */
+function useInputRequestEventListener(
+  setCurrentInputRequest: React.Dispatch<React.SetStateAction<InputRequest | null>>,
+  setInputRequestModalOpen: React.Dispatch<React.SetStateAction<boolean>>
+) {
+  useEffect(() => {
+    const handleOpenInputRequest = (event: Event) => {
+      const customEvent = event as CustomEvent<InputRequest>;
+      setCurrentInputRequest(customEvent.detail);
+      setInputRequestModalOpen(true);
+    };
+
+    document.addEventListener('open-input-request', handleOpenInputRequest);
+    return () => {
+      document.removeEventListener('open-input-request', handleOpenInputRequest);
+    };
+  }, [setCurrentInputRequest, setInputRequestModalOpen]);
+}
+
+/** Hook for auto-deselecting read plans */
+function useAutoDeselectReadPlan(
+  selectedPlanId: string | null,
+  allInboxPlans: (PlanIndexEntry & { isUnread?: boolean })[],
+  showRead: boolean,
+  setSelectedPlanId: React.Dispatch<React.SetStateAction<string | null>>
+) {
+  useEffect(() => {
+    if (!selectedPlanId || showRead) return;
+
+    const selectedPlan = allInboxPlans.find((p) => p.id === selectedPlanId);
+    if (selectedPlan && !selectedPlan.isUnread) {
+      setSelectedPlanId(null);
+    }
+  }, [selectedPlanId, allInboxPlans, showRead, setSelectedPlanId]);
+}
+
+/** Helper to get next item in list after current index */
+function getNextOrPrevId(
+  plans: (PlanIndexEntry & { isUnread?: boolean })[],
+  currentIndex: number
+): string | null {
+  if (currentIndex < plans.length - 1) {
+    return plans[currentIndex + 1]?.id ?? null;
+  }
+  if (currentIndex > 0) {
+    return plans[currentIndex - 1]?.id ?? null;
+  }
+  return null;
+}
+
+/** Helper to navigate to adjacent item in list */
+function navigateToAdjacentItem(
+  selectedPlanId: string | null,
+  plans: (PlanIndexEntry & { isUnread?: boolean })[],
+  direction: 'next' | 'prev',
+  setSelectedPlanId: React.Dispatch<React.SetStateAction<string | null>>
+): void {
+  if (!selectedPlanId) return;
+  const currentIndex = plans.findIndex((p) => p.id === selectedPlanId);
+  if (currentIndex === -1) return;
+
+  const targetIndex = direction === 'next' ? currentIndex + 1 : currentIndex - 1;
+  const isValidIndex = direction === 'next' ? currentIndex < plans.length - 1 : currentIndex > 0;
+
+  if (isValidIndex) {
+    const targetPlan = plans[targetIndex];
+    if (targetPlan) {
+      setSelectedPlanId(targetPlan.id);
+    }
+  }
+}
+
+/** Update plan metadata to in_progress status */
+function updatePlanToInProgress(ydoc: Y.Doc, now: number, actor: string): void {
+  ydoc.transact(
+    () => {
+      const metadata = ydoc.getMap('metadata');
+      const reviewRequestId = metadata.get('reviewRequestId') as string | undefined;
+
+      metadata.set('status', 'in_progress');
+      metadata.set('updatedAt', now);
+
+      // Preserve reviewRequestId if present (hook needs this to match)
+      if (reviewRequestId !== undefined) {
+        metadata.set('reviewRequestId', reviewRequestId);
+      }
+    },
+    { actor }
+  );
+}
+
+/** Update plan index entry to in_progress */
+function updateIndexToInProgress(indexDoc: Y.Doc, planId: string, now: number): void {
+  const entry = getPlanIndexEntry(indexDoc, planId);
+  if (entry) {
+    setPlanIndexEntry(indexDoc, {
+      ...entry,
+      status: 'in_progress',
+      updatedAt: now,
+    });
+  }
+}
+
+/** Approve a plan by updating local IDB and index */
+async function approvePlanInLocalDb(planId: string, now: number, actor: string): Promise<void> {
+  try {
+    const planDoc = new Y.Doc();
+    const idb = new IndexeddbPersistence(planId, planDoc);
+    await idb.whenSynced;
+    updatePlanToInProgress(planDoc, now, actor);
+    idb.destroy();
+  } catch {
+    // Plan doc may not exist locally
+  }
+}
+
+/** Extract key from ListBox selection */
+function extractFirstSelectionKey(keys: Set<unknown> | 'all'): string | null {
+  if (keys === 'all') return null;
+  const key = Array.from(keys)[0];
+  return key ? String(key) : null;
+}
+
+/** Get current plan at index or null if not found */
+function getCurrentPlanAtIndex(
+  selectedPlanId: string | null,
+  plans: (PlanIndexEntry & { isUnread?: boolean })[]
+): { plan: PlanIndexEntry & { isUnread?: boolean }; index: number } | null {
+  if (!selectedPlanId) return null;
+  const idx = plans.findIndex((p) => p.id === selectedPlanId);
+  if (idx === -1) return null;
+  const plan = plans[idx];
+  return plan ? { plan, index: idx } : null;
+}
+
+/** Calculate total inbox items count */
+function calculateTotalInboxItems(
+  sortedPlans: (PlanIndexEntry & { isUnread?: boolean })[],
+  inboxGroups: ReturnType<typeof groupInboxEvents>,
+  pendingRequestsCount: number
+): number {
+  return (
+    sortedPlans.length +
+    inboxGroups.mentions.length +
+    inboxGroups.readyToComplete.length +
+    inboxGroups.approvalRequests.length +
+    pendingRequestsCount
+  );
+}
+
+/** Generate inbox status message */
+function getInboxStatusMessage(totalItems: number, allPlansCount: number): string {
+  if (totalItems === 0 && allPlansCount > 0) {
+    return `All caught up! ${allPlansCount} read ${allPlansCount === 1 ? 'item' : 'items'}`;
+  }
+  return `${totalItems} ${totalItems === 1 ? 'item needs' : 'items need'} your attention`;
+}
+
 export function InboxPage() {
   // All hooks at top of component - called in same order every render
   const navigate = useNavigate();
   const location = useLocation();
   const { identity: githubIdentity } = useGitHubAuth();
-  const { allInboxPlans, markPlanAsRead, markPlanAsUnread, isLoading, timedOut } = usePlanIndex(
+  const { allInboxPlans, markPlanAsRead, isLoading, timedOut } = usePlanIndex(
     githubIdentity?.username
   );
   const { ydoc: indexDoc } = useMultiProviderSync(PLAN_INDEX_DOC_NAME);
@@ -283,70 +483,22 @@ export function InboxPage() {
     setInboxShowRead(value);
   }, []);
 
-  // Filter inbox plans
-  const sortedInboxPlans = useMemo(() => {
-    const filtered = allInboxPlans.filter((plan) => {
-      // Show all plans when toggle is ON
-      if (showRead) return true;
+  // Filter inbox plans - extracted to helper
+  const sortedInboxPlans = useMemo(
+    () => filterAndSortInboxPlans(allInboxPlans, showRead, selectedPlanId),
+    [allInboxPlans, showRead, selectedPlanId]
+  );
 
-      // Show unread plans OR currently selected plan (so you can view it)
-      return plan.isUnread || plan.id === selectedPlanId;
-    });
+  // Group inbox items by category - extracted to helper
+  const inboxGroups = useMemo(
+    () => groupInboxEvents(sortedInboxPlans, eventBasedInbox),
+    [sortedInboxPlans, eventBasedInbox]
+  );
 
-    return filtered.sort((a, b) => b.updatedAt - a.updatedAt);
-  }, [allInboxPlans, showRead, selectedPlanId]);
-
-  // Group inbox items by category
-  const inboxGroups = useMemo(() => {
-    const statusBasedInbox = sortedInboxPlans;
-
-    return {
-      needsReview: statusBasedInbox, // All inbox items are pending_review now
-      approvalRequests: eventBasedInbox.filter(
-        (e: InboxEventItem) => e.event.type === 'approval_requested'
-      ),
-      mentions: eventBasedInbox.filter(
-        (e: InboxEventItem) => e.event.type === 'comment_added' && e.event.data?.mentions
-      ),
-      readyToComplete: eventBasedInbox.filter(
-        (e: InboxEventItem) => e.event.type === 'deliverable_linked' && e.event.data?.allFulfilled
-      ),
-    };
-  }, [sortedInboxPlans, eventBasedInbox]);
-
-  // Auto-deselect if selected plan is marked as read (and show read is OFF)
-  useEffect(() => {
-    if (!selectedPlanId || showRead) return;
-
-    const selectedPlan = allInboxPlans.find((p) => p.id === selectedPlanId);
-    // If plan is no longer unread, deselect it
-    if (selectedPlan && !selectedPlan.isUnread) {
-      setSelectedPlanId(null);
-    }
-  }, [selectedPlanId, allInboxPlans, showRead]);
-
-  // Update URL when panel state changes
-  useEffect(() => {
-    if (selectedPlanId) {
-      navigate(`?panel=${selectedPlanId}`, { replace: true });
-    } else {
-      navigate('', { replace: true });
-    }
-  }, [selectedPlanId, navigate]);
-
-  // Listen for open-input-request events
-  useEffect(() => {
-    const handleOpenInputRequest = (event: Event) => {
-      const customEvent = event as CustomEvent<InputRequest>;
-      setCurrentInputRequest(customEvent.detail);
-      setInputRequestModalOpen(true);
-    };
-
-    document.addEventListener('open-input-request', handleOpenInputRequest);
-    return () => {
-      document.removeEventListener('open-input-request', handleOpenInputRequest);
-    };
-  }, []);
+  // Effects extracted to custom hooks
+  useAutoDeselectReadPlan(selectedPlanId, allInboxPlans, showRead, setSelectedPlanId);
+  usePanelUrlSync(selectedPlanId, navigate);
+  useInputRequestEventListener(setCurrentInputRequest, setInputRequestModalOpen);
 
   // Panel handlers
   const handleClosePanel = useCallback(() => {
@@ -362,30 +514,18 @@ export function InboxPage() {
     [markPlanAsRead]
   );
 
-  // Mark as unread handler
-  const handleMarkUnread = useCallback(
-    async (planId: string) => {
-      await markPlanAsUnread(planId);
-      toast.success('Marked as unread');
-    },
-    [markPlanAsUnread]
-  );
+  // Mark as unread handler - not implemented yet, functionality to be added
+  const handleMarkUnread = useCallback(async (_planId: string) => {
+    toast.info('Mark as unread coming soon');
+  }, []);
 
-  // Helper to find the next plan to select after dismissal
+  // Helper to find the next plan to select after dismissal - uses extracted helper
   const getNextSelectedId = useCallback(
-    (currentIndex: number): string | null => {
-      if (currentIndex < sortedInboxPlans.length - 1) {
-        return sortedInboxPlans[currentIndex + 1]?.id ?? null;
-      }
-      if (currentIndex > 0) {
-        return sortedInboxPlans[currentIndex - 1]?.id ?? null;
-      }
-      return null;
-    },
+    (currentIndex: number): string | null => getNextOrPrevId(sortedInboxPlans, currentIndex),
     [sortedInboxPlans]
   );
 
-  // Approve handler
+  // Approve handler - uses extracted helpers to reduce complexity
   const handleApprove = useCallback(
     async (planId: string) => {
       if (!githubIdentity) {
@@ -394,42 +534,8 @@ export function InboxPage() {
       }
 
       const now = Date.now();
-
-      const entry = getPlanIndexEntry(indexDoc, planId);
-      if (entry) {
-        setPlanIndexEntry(indexDoc, {
-          ...entry,
-          status: 'in_progress',
-          updatedAt: now,
-        });
-      }
-
-      try {
-        const planDoc = new Y.Doc();
-        const idb = new IndexeddbPersistence(planId, planDoc);
-        await idb.whenSynced;
-
-        planDoc.transact(
-          () => {
-            const metadata = planDoc.getMap('metadata');
-            const reviewRequestId = metadata.get('reviewRequestId') as string | undefined;
-
-            metadata.set('status', 'in_progress');
-            metadata.set('updatedAt', now);
-
-            // Preserve reviewRequestId if present (hook needs this to match)
-            if (reviewRequestId !== undefined) {
-              metadata.set('reviewRequestId', reviewRequestId);
-            }
-          },
-          { actor }
-        );
-
-        idb.destroy();
-      } catch {
-        // Plan doc may not exist locally
-      }
-
+      updateIndexToInProgress(indexDoc, planId, now);
+      await approvePlanInLocalDb(planId, now, actor);
       toast.success('Plan approved');
     },
     [githubIdentity, indexDoc, actor]
@@ -441,13 +547,10 @@ export function InboxPage() {
     toast.info('Open panel to add comments and request changes');
   }, []);
 
-  // List selection handler
+  // List selection handler - uses extracted helper
   const handleListSelection = useCallback((keys: Set<unknown> | 'all') => {
-    if (keys === 'all') return;
-    const key = Array.from(keys)[0];
-    if (key) {
-      setSelectedPlanId(String(key));
-    }
+    const key = extractFirstSelectionKey(keys);
+    if (key) setSelectedPlanId(key);
   }, []);
 
   // Event item view handler
@@ -455,39 +558,14 @@ export function InboxPage() {
     setSelectedPlanId(planId);
   }, []);
 
-  // Panel approve handler
+  // Panel approve handler - uses extracted helpers
   const handlePanelApprove = useCallback(
     async (context: PlanActionContext) => {
       const { planId, ydoc } = context;
-
       const now = Date.now();
 
-      ydoc.transact(
-        () => {
-          const metadata = ydoc.getMap('metadata');
-          const reviewRequestId = metadata.get('reviewRequestId') as string | undefined;
-
-          metadata.set('status', 'in_progress');
-          metadata.set('updatedAt', now);
-
-          // Preserve reviewRequestId if present (hook needs this to match)
-          if (reviewRequestId !== undefined) {
-            metadata.set('reviewRequestId', reviewRequestId);
-          }
-        },
-        { actor }
-      );
-
-      // Also update index with the same timestamp
-      const entry = getPlanIndexEntry(indexDoc, planId);
-      if (entry) {
-        setPlanIndexEntry(indexDoc, {
-          ...entry,
-          status: 'in_progress',
-          updatedAt: now,
-        });
-      }
-
+      updatePlanToInProgress(ydoc, now, actor);
+      updateIndexToInProgress(indexDoc, planId, now);
       toast.success('Plan approved');
     },
     [indexDoc, actor]
@@ -512,38 +590,21 @@ export function InboxPage() {
     }
   }, [selectedPlanId, navigate]);
 
+  // Navigation handlers use extracted helper to reduce complexity
   const handleNextItem = useCallback(() => {
-    if (!selectedPlanId) return;
-    const currentIndex = sortedInboxPlans.findIndex((p) => p.id === selectedPlanId);
-    if (currentIndex < sortedInboxPlans.length - 1) {
-      const nextPlan = sortedInboxPlans[currentIndex + 1];
-      if (nextPlan) {
-        setSelectedPlanId(nextPlan.id);
-      }
-    }
+    navigateToAdjacentItem(selectedPlanId, sortedInboxPlans, 'next', setSelectedPlanId);
   }, [selectedPlanId, sortedInboxPlans]);
 
   const handlePrevItem = useCallback(() => {
-    if (!selectedPlanId) return;
-    const currentIndex = sortedInboxPlans.findIndex((p) => p.id === selectedPlanId);
-    if (currentIndex > 0) {
-      const prevPlan = sortedInboxPlans[currentIndex - 1];
-      if (prevPlan) {
-        setSelectedPlanId(prevPlan.id);
-      }
-    }
+    navigateToAdjacentItem(selectedPlanId, sortedInboxPlans, 'prev', setSelectedPlanId);
   }, [selectedPlanId, sortedInboxPlans]);
 
   const handleKeyboardDismiss = useCallback(async () => {
-    if (!selectedPlanId) return;
-    const idx = sortedInboxPlans.findIndex((p) => p.id === selectedPlanId);
-    if (idx === -1) return;
+    const current = getCurrentPlanAtIndex(selectedPlanId, sortedInboxPlans);
+    if (!current) return;
 
-    const currentPlan = sortedInboxPlans[idx];
-    if (!currentPlan) return;
-
-    await handleDismiss(currentPlan.id);
-    setSelectedPlanId(getNextSelectedId(idx));
+    await handleDismiss(current.plan.id);
+    setSelectedPlanId(getNextSelectedId(current.index));
   }, [selectedPlanId, sortedInboxPlans, handleDismiss, getNextSelectedId]);
 
   // Keyboard shortcuts for panel
@@ -559,13 +620,13 @@ export function InboxPage() {
     return <TwoColumnSkeleton itemCount={3} showActions={true} titleWidth="w-20" />;
   }
 
-  // Calculate total inbox items
-  const totalInboxItems =
-    sortedInboxPlans.length +
-    inboxGroups.mentions.length +
-    inboxGroups.readyToComplete.length +
-    inboxGroups.approvalRequests.length +
-    pendingRequests.length;
+  // Calculate total inbox items - extracted to helper
+  const totalInboxItems = calculateTotalInboxItems(
+    sortedInboxPlans,
+    inboxGroups,
+    pendingRequests.length
+  );
+  const statusMessage = getInboxStatusMessage(totalInboxItems, allInboxPlans.length);
 
   // Show zero state only if there are no items at all (including read items)
   if (totalInboxItems === 0 && allInboxPlans.length === 0) {
@@ -594,11 +655,7 @@ export function InboxPage() {
           <div className="flex items-center justify-between mb-3">
             <div>
               <h1 className="text-xl font-bold text-foreground">Inbox</h1>
-              <p className="text-sm text-muted-foreground">
-                {totalInboxItems === 0 && allInboxPlans.length > 0
-                  ? `All caught up! ${allInboxPlans.length} read ${allInboxPlans.length === 1 ? 'item' : 'items'}`
-                  : `${totalInboxItems} ${totalInboxItems === 1 ? 'item needs' : 'items need'} your attention`}
-              </p>
+              <p className="text-sm text-muted-foreground">{statusMessage}</p>
             </div>
             <Switch size="sm" isSelected={showRead} onChange={handleToggleShowRead}>
               {showRead ? 'Hide read' : 'Show read'}

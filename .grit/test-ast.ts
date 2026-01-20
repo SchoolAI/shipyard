@@ -1,7 +1,7 @@
 // This is a single-line comment
-const foo = 'bar';
+const _foo = 'bar';
 
 /** This is a JSDoc comment */
-function example() {
+function _example() {
   return 42;
 }

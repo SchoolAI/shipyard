@@ -4,6 +4,7 @@ import {
   addSnapshot,
   createPlanSnapshot,
   createPlanUrlWithHistory,
+  GitHubPRResponseSchema,
   getArtifacts,
   getDeliverables,
   getLinkedPRs,
@@ -298,14 +299,17 @@ async function tryAutoLinkPR(ydoc: Y.Doc, repo: string): Promise<LinkedPR | null
     const pr = prs[0];
     if (!pr) return null;
 
+    // Validate GitHub API response
+    const validatedPR = GitHubPRResponseSchema.parse(pr);
+
     const linkedPR: LinkedPR = {
-      prNumber: pr.number,
-      url: pr.html_url,
+      prNumber: validatedPR.number,
+      url: validatedPR.html_url,
       linkedAt: Date.now(),
       // We query for state: 'open' only, so merged/closed are never returned
-      status: pr.draft ? 'draft' : 'open',
+      status: validatedPR.draft ? 'draft' : 'open',
       branch,
-      title: pr.title,
+      title: validatedPR.title,
     };
 
     // Store in Y.Doc
@@ -320,6 +324,11 @@ async function tryAutoLinkPR(ydoc: Y.Doc, repo: string): Promise<LinkedPR | null
 
     return linkedPR;
   } catch (error) {
+    // Validation errors indicate malformed GitHub API response
+    if (error instanceof z.ZodError) {
+      logger.error({ error, repo, branch }, 'Invalid GitHub PR response during auto-link');
+      return null;
+    }
     logger.warn({ error, repo, branch }, 'Failed to lookup PR from GitHub');
     return null;
   }

@@ -5,9 +5,5 @@ language js
 // Exception: 'as unknown as SpecificType' double-cast (for test mocks) is caught by rule 01.
 
 `$value as unknown` where {
-  register_diagnostic(
-    span = $value,
-    message = "Type cast to 'unknown' is unsafe. Use proper type guards or runtime validation (Zod schema).",
-    severity = "error"
-  )
+  register_diagnostic(span=$value, message="Type cast to 'unknown' is unsafe. Use proper type guards or runtime validation (Zod schema).", severity="error")
 }

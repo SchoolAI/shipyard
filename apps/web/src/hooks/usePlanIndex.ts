@@ -1,5 +1,4 @@
 import {
-  clearPlanIndexViewedBy,
   getAllViewedByFromIndex,
   getPlanIndex,
   getPlanMetadata,
@@ -424,35 +423,6 @@ export function usePlanIndex(currentUsername: string | undefined): PlanIndexStat
     [currentUsername, ydoc]
   );
 
-  const markPlanAsUnread = useCallback(
-    (planId: string): Promise<void> => {
-      if (!currentUsername) {
-        return Promise.resolve();
-      }
-
-      clearPlanIndexViewedBy(ydoc, planId, currentUsername);
-
-      // Optimistically update state - remove user's timestamp
-      setPlanViewedBy((prev) => {
-        const updated = { ...prev };
-        if (updated[planId]) {
-          const planViewedBy = { ...updated[planId] };
-          delete planViewedBy[currentUsername];
-
-          if (Object.keys(planViewedBy).length === 0) {
-            delete updated[planId];
-          } else {
-            updated[planId] = planViewedBy;
-          }
-        }
-        return updated;
-      });
-
-      return Promise.resolve();
-    },
-    [currentUsername, ydoc]
-  );
-
   const refreshInboxUnreadState = useCallback(() => {
     setInboxRefreshTrigger((prev) => prev + 1);
   }, []);
@@ -472,7 +442,6 @@ export function usePlanIndex(currentUsername: string | undefined): PlanIndexStat
     clearNavigation,
     isLoading,
     markPlanAsRead,
-    markPlanAsUnread,
     refreshInboxUnreadState,
   };
 }

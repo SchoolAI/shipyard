@@ -9,6 +9,7 @@ import {
   createPlanSnapshot,
   createPlanUrlWithHistory,
   type GitHubArtifact,
+  GitHubPRResponseSchema,
   getArtifacts,
   getDeliverables,
   getLinkedPRs,
@@ -622,17 +623,20 @@ async function tryAutoLinkPR(ydoc: Y.Doc, repo: string): Promise<LinkedPR | null
     const pr = prs[0];
     if (!pr) return null;
 
+    // Validate GitHub API response
+    const validatedPR = GitHubPRResponseSchema.parse(pr);
+
     // Handle all PR states exhaustively
-    const prState = pr.state as 'open' | 'closed';
+    const prState = validatedPR.state as 'open' | 'closed';
     switch (prState) {
       case 'open': {
         const linkedPR: LinkedPR = {
-          prNumber: pr.number,
-          url: pr.html_url,
+          prNumber: validatedPR.number,
+          url: validatedPR.html_url,
           linkedAt: Date.now(),
-          status: pr.draft ? 'draft' : 'open',
+          status: validatedPR.draft ? 'draft' : 'open',
           branch,
-          title: pr.title,
+          title: validatedPR.title,
         };
 
         // Store in Y.Doc
@@ -646,7 +650,7 @@ async function tryAutoLinkPR(ydoc: Y.Doc, repo: string): Promise<LinkedPR | null
         return linkedPR;
       }
       case 'closed':
-        logger.warn({ prNumber: pr.number }, 'PR is already closed, not linking');
+        logger.warn({ prNumber: validatedPR.number }, 'PR is already closed, not linking');
         return null;
       default: {
         const _exhaustive: never = prState;
@@ -655,6 +659,11 @@ async function tryAutoLinkPR(ydoc: Y.Doc, repo: string): Promise<LinkedPR | null
       }
     }
   } catch (error) {
+    // Validation errors indicate malformed GitHub API response
+    if (error instanceof z.ZodError) {
+      logger.error({ error, repo, branch }, 'Invalid GitHub PR response during auto-link');
+      return null;
+    }
     logger.warn({ error, repo, branch }, 'Failed to lookup PR from GitHub');
     return null;
   }

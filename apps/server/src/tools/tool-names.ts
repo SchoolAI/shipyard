@@ -10,6 +10,7 @@ export const TOOL_NAMES = {
   EXECUTE_CODE: 'execute_code',
   LINK_PR: 'link_pr',
   READ_PLAN: 'read_plan',
+  REQUEST_USER_INPUT: 'request_user_input',
   SETUP_REVIEW_NOTIFICATION: 'setup_review_notification',
   UPDATE_BLOCK_CONTENT: 'update_block_content',
   UPDATE_PLAN: 'update_plan',

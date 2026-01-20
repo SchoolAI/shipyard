@@ -30,7 +30,7 @@ and limitations under the License.
 ***************************************************************************** */
 /* eslint-disable */
 // noinspection JSUnusedGlobalSymbols
-declare var onmessage: never;
+declare let onmessage: never;
 /**
  * The **`DOMException`** interface represents an abnormal event (called an **exception**) that occurs as a result of calling a method or accessing a property of a web API.
  *
@@ -1796,7 +1796,7 @@ declare abstract class Body {
  *
  * [MDN Reference](https://developer.mozilla.org/docs/Web/API/Response)
  */
-declare var Response: {
+declare let Response: {
   prototype: Response;
   new (body?: BodyInit | null, init?: ResponseInit): Response;
   error(): Response;
@@ -1876,7 +1876,7 @@ type RequestInfo<CfHostMetadata = unknown, Cf = CfProperties<CfHostMetadata>> =
  *
  * [MDN Reference](https://developer.mozilla.org/docs/Web/API/Request)
  */
-declare var Request: {
+declare let Request: {
   prototype: Request;
   new <CfHostMetadata = unknown, Cf = CfProperties<CfHostMetadata>>(
     input: RequestInfo<CfProperties> | URL,
@@ -3339,7 +3339,7 @@ type WebSocketEventMap = {
  *
  * [MDN Reference](https://developer.mozilla.org/docs/Web/API/WebSocket)
  */
-declare var WebSocket: {
+declare let WebSocket: {
   prototype: WebSocket;
   new (url: string, protocols?: string[] | string): WebSocket;
   readonly READY_STATE_CONNECTING: number;
@@ -11025,7 +11025,7 @@ declare namespace Rpc {
   export type Stub<T extends Stubable> = Provider<T> & StubBase<T>;
   // This represents all the types that can be sent as-is over an RPC boundary
   type BaseType =
-    | void
+    | undefined
     | undefined
     | null
     | boolean

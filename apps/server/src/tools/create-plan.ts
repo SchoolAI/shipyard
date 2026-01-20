@@ -13,6 +13,7 @@ import {
 } from '@peer-plan/schema';
 import { nanoid } from 'nanoid';
 import open from 'open';
+import type * as Y from 'yjs';
 import { z } from 'zod';
 import { getOrCreateDoc, hasActiveConnections } from '../doc-store.js';
 import { logger } from '../logger.js';
@@ -44,6 +45,82 @@ const CreatePlanInput = z.object({
     .optional()
     .describe('Platform-specific metadata for conversation export'),
 });
+
+// --- Helper Functions ---
+
+/** Construct origin metadata from input platform and session info */
+function buildOriginMetadata(
+  platform: z.infer<typeof OriginPlatformEnum> | undefined,
+  sessionId: string | undefined,
+  metadata: Record<string, unknown> | undefined
+): OriginMetadata | undefined {
+  if (!platform || !sessionId) return undefined;
+
+  switch (platform) {
+    case 'devin':
+      return { platform: 'devin' as const, sessionId };
+    case 'cursor':
+      return {
+        platform: 'cursor' as const,
+        conversationId: sessionId,
+        generationId: metadata?.generationId as string | undefined,
+      };
+    case 'windsurf':
+    case 'aider':
+    case 'unknown':
+      return { platform: 'unknown' as const };
+    default: {
+      const _exhaustive: never = platform;
+      void _exhaustive;
+      return { platform: 'unknown' as const };
+    }
+  }
+}
+
+/** Initialize plan document content with blocks and deliverables */
+function initializePlanContent(ydoc: Y.Doc, blocks: Block[], ownerId: string | null): void {
+  const editor = ServerBlockNoteEditor.create();
+
+  ydoc.transact(
+    () => {
+      // Store in document fragment for BlockNote collaboration (source of truth)
+      const fragment = ydoc.getXmlFragment('document');
+      // Clear existing content first to avoid duplicates or conflicts
+      while (fragment.length > 0) {
+        fragment.delete(0, 1);
+      }
+      editor.blocksToYXmlFragment(blocks, fragment);
+
+      // Extract and store deliverables
+      const deliverables = extractDeliverables(blocks);
+      for (const deliverable of deliverables) {
+        addDeliverable(ydoc, deliverable);
+      }
+
+      if (deliverables.length > 0) {
+        logger.info({ count: deliverables.length }, 'Deliverables extracted and stored');
+      }
+
+      logPlanEvent(ydoc, 'plan_created', ownerId ?? 'unknown');
+      // Note: Initial snapshot is NOT created here - snapshots are only created
+      // when content is updated via update_block_content (Issue #42)
+    },
+    { actor: ownerId ?? 'unknown' }
+  );
+}
+
+/** Open or navigate to plan URL */
+async function openPlanInBrowser(planId: string, url: string): Promise<void> {
+  const indexDoc = await getOrCreateDoc(PLAN_INDEX_DOC_NAME);
+
+  if (await hasActiveConnections(PLAN_INDEX_DOC_NAME)) {
+    indexDoc.getMap('navigation').set('target', planId);
+    logger.info({ url, planId }, 'Browser already connected, navigating via CRDT');
+  } else {
+    await open(url);
+    logger.info({ url }, 'Browser launched');
+  }
+}
 
 // --- Public Export ---
 
@@ -120,35 +197,12 @@ Bad deliverables (not provable):
     const ownerId = await getGitHubUsername();
     logger.info({ ownerId }, 'GitHub username for plan ownership');
 
-    // Construct origin metadata if platform is specified
-    let origin: OriginMetadata | undefined;
-    if (input.originPlatform && input.originSessionId) {
-      switch (input.originPlatform) {
-        case 'devin':
-          origin = {
-            platform: 'devin' as const,
-            sessionId: input.originSessionId,
-          };
-          break;
-        case 'cursor':
-          origin = {
-            platform: 'cursor' as const,
-            conversationId: input.originSessionId,
-            generationId: input.originMetadata?.generationId as string | undefined,
-          };
-          break;
-        case 'windsurf':
-        case 'aider':
-        case 'unknown':
-          origin = { platform: 'unknown' as const };
-          break;
-        default: {
-          const _exhaustive: never = input.originPlatform;
-          void _exhaustive;
-          origin = { platform: 'unknown' as const };
-        }
-      }
-    }
+    // Construct origin metadata - extracted to helper
+    const origin = buildOriginMetadata(
+      input.originPlatform,
+      input.originSessionId,
+      input.originMetadata
+    );
 
     initPlanMetadata(ydoc, {
       id: planId,
@@ -161,13 +215,9 @@ Bad deliverables (not provable):
     });
 
     // Transition from draft to pending_review so plan appears in inbox
-    // The state machine requires a reviewRequestId for this transition
     const transitionResult = transitionPlanStatus(
       ydoc,
-      {
-        status: 'pending_review',
-        reviewRequestId: nanoid(),
-      },
+      { status: 'pending_review', reviewRequestId: nanoid() },
       ownerId ?? 'unknown'
     );
 
@@ -178,40 +228,11 @@ Bad deliverables (not provable):
       );
     }
 
-    // Parse markdown to blocks and store in Y.XmlFragment for BlockNote collaboration
+    // Parse and store content - extracted to helper
     logger.info({ contentLength: input.content.length }, 'About to parse markdown');
     const blocks = await parseMarkdownToBlocks(input.content);
     logger.info({ blockCount: blocks.length }, 'Parsed blocks, storing in Y.Doc');
-
-    const editor = ServerBlockNoteEditor.create();
-
-    ydoc.transact(
-      () => {
-        // Store in document fragment for BlockNote collaboration (source of truth)
-        const fragment = ydoc.getXmlFragment('document');
-        // Clear existing content first to avoid duplicates or conflicts
-        while (fragment.length > 0) {
-          fragment.delete(0, 1);
-        }
-        editor.blocksToYXmlFragment(blocks, fragment);
-
-        // Extract and store deliverables
-        const deliverables = extractDeliverables(blocks);
-        for (const deliverable of deliverables) {
-          addDeliverable(ydoc, deliverable);
-        }
-
-        if (deliverables.length > 0) {
-          logger.info({ count: deliverables.length }, 'Deliverables extracted and stored');
-        }
-
-        logPlanEvent(ydoc, 'plan_created', ownerId ?? 'unknown');
-        // Note: Initial snapshot is NOT created here - snapshots are only created
-        // when content is updated via update_block_content (Issue #42)
-      },
-      { actor: ownerId ?? 'unknown' }
-    );
-
+    initializePlanContent(ydoc, blocks, ownerId);
     logger.info('Content stored in Y.Doc document fragment');
 
     // Get the final metadata after status transition to ensure consistent timestamps
@@ -226,22 +247,14 @@ Bad deliverables (not provable):
       title: input.title,
       status: 'pending_review',
       createdAt: now,
-      updatedAt: finalMetadata.updatedAt, // Use actual updatedAt from Y.Doc
+      updatedAt: finalMetadata.updatedAt,
       ownerId,
       deleted: false,
     });
-
     logger.info({ planId }, 'Plan index updated');
 
     const url = `http://localhost:5173/plan/${planId}`;
-
-    if (await hasActiveConnections(PLAN_INDEX_DOC_NAME)) {
-      indexDoc.getMap('navigation').set('target', planId);
-      logger.info({ url, planId }, 'Browser already connected, navigating via CRDT');
-    } else {
-      await open(url);
-      logger.info({ url }, 'Browser launched');
-    }
+    await openPlanInBrowser(planId, url);
 
     const repoInfo = repo
       ? `Repo: ${repo}${!input.repo ? ' (auto-detected)' : ''}`

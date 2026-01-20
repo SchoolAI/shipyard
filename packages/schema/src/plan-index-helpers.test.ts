@@ -96,6 +96,75 @@ describe('Plan Index Helpers', () => {
         expect(retrieved?.status).toBe(status);
       }
     });
+
+    describe('setPlanIndexEntry validation', () => {
+      it('rejects invalid entry (missing required fields)', () => {
+        const ydoc = new Y.Doc();
+        const invalidEntry = {
+          id: 'plan-1',
+          title: 'Test',
+          // Missing: status, createdAt, updatedAt, ownerId, deleted
+        } as any;
+
+        expect(() => setPlanIndexEntry(ydoc, invalidEntry)).toThrow();
+      });
+
+      it('rejects entry with invalid status', () => {
+        const ydoc = new Y.Doc();
+        const invalidEntry = {
+          id: 'plan-1',
+          title: 'Test',
+          status: 'invalid-status',
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          ownerId: 'user-1',
+          deleted: false,
+        } as any;
+
+        expect(() => setPlanIndexEntry(ydoc, invalidEntry)).toThrow();
+      });
+
+      it('rejects deleted=true without required fields', () => {
+        const ydoc = new Y.Doc();
+        const invalidEntry = {
+          id: 'plan-1',
+          title: 'Test',
+          status: 'draft' as const,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          ownerId: 'user-1',
+          deleted: true,
+          // Missing: deletedAt, deletedBy (required when deleted=true)
+        } as any;
+
+        expect(() => setPlanIndexEntry(ydoc, invalidEntry)).toThrow();
+      });
+
+      it('accepts valid non-deleted entry', () => {
+        const ydoc = new Y.Doc();
+        const validEntry = createEntry({ deleted: false });
+
+        expect(() => setPlanIndexEntry(ydoc, validEntry)).not.toThrow();
+        expect(getPlanIndexEntry(ydoc, 'plan-1')).toEqual(validEntry);
+      });
+
+      it('accepts valid deleted entry', () => {
+        const ydoc = new Y.Doc();
+        const validEntry = createEntry({
+          deleted: true,
+          deletedAt: Date.now(),
+          deletedBy: 'user-1',
+        });
+
+        expect(() => setPlanIndexEntry(ydoc, validEntry)).not.toThrow();
+        const retrieved = getPlanIndexEntry(ydoc, 'plan-1');
+        expect(retrieved?.deleted).toBe(true);
+        if (retrieved?.deleted) {
+          expect(retrieved.deletedAt).toBeDefined();
+          expect(retrieved.deletedBy).toBeDefined();
+        }
+      });
+    });
   });
 
   describe('getPlanIndex', () => {

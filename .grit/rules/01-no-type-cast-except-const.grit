@@ -5,10 +5,6 @@ language js
 // Exception: 'as const' is safe for readonly assertions.
 
 `$value as $type` where {
-    !$type <: r"^const$",
-    register_diagnostic(
-        span = $type,
-        message = "Type casts are not allowed except 'as const'. Fix the types instead.",
-        severity = "error"
-    )
+  ! $type <: r"^const$",
+  register_diagnostic(span=$type, message="Type casts are not allowed except 'as const'. Fix the types instead.", severity="error")
 }

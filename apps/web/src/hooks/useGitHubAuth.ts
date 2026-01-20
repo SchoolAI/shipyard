@@ -156,7 +156,6 @@ async function processOAuthCallback(
 
     // Log mobile detection for debugging deep linking issues
     if (is_mobile) {
-      console.log('[OAuth] Mobile device detected during authentication');
     }
 
     const user = await getGitHubUser(access_token);

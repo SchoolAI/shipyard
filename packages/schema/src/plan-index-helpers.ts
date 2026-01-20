@@ -44,22 +44,25 @@ export function getPlanIndexEntry(ydoc: Y.Doc, planId: string): PlanIndexEntry |
  * Adds or updates a plan in the index.
  */
 export function setPlanIndexEntry(ydoc: Y.Doc, entry: PlanIndexEntry): void {
+  // Validate discriminated union (deleted: true | false) before writing
+  const validated = PlanIndexEntrySchema.parse(entry);
+
   const plansMap = ydoc.getMap<Record<string, unknown>>('plans');
   const data: Record<string, unknown> = {
-    id: entry.id,
-    title: entry.title,
-    status: entry.status,
-    createdAt: entry.createdAt,
-    updatedAt: entry.updatedAt,
-    ownerId: entry.ownerId,
-    deleted: entry.deleted,
+    id: validated.id,
+    title: validated.title,
+    status: validated.status,
+    createdAt: validated.createdAt,
+    updatedAt: validated.updatedAt,
+    ownerId: validated.ownerId,
+    deleted: validated.deleted,
   };
   // Include archive fields if deleted
-  if (entry.deleted) {
-    data.deletedAt = entry.deletedAt;
-    data.deletedBy = entry.deletedBy;
+  if (validated.deleted) {
+    data.deletedAt = validated.deletedAt;
+    data.deletedBy = validated.deletedBy;
   }
-  plansMap.set(entry.id, data);
+  plansMap.set(validated.id, data);
 }
 
 /**

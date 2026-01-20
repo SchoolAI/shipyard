@@ -3,14 +3,9 @@
  * Translates between Claude Code hook JSON format and our common event types.
  */
 
-import { assertNever, formatThreadsForLLM } from '@peer-plan/schema';
+import { formatThreadsForLLM } from '@peer-plan/schema';
 import { z } from 'zod';
-import {
-  CLAUDE_HOOK_EVENTS,
-  CLAUDE_PERMISSION_MODES,
-  CLAUDE_TOOL_NAMES,
-  MCP_TOOL_NAMES,
-} from '../constants.js';
+import { CLAUDE_HOOK_EVENTS, CLAUDE_PERMISSION_MODES, CLAUDE_TOOL_NAMES } from '../constants.js';
 import { logger } from '../logger.js';
 import type {
   AdapterEvent,
@@ -56,7 +51,10 @@ function handlePreToolUse(input: ClaudeCodeHookInput): AdapterEvent {
 
   // Block native AskUserQuestion - use browser modal via request_user_input instead
   if (toolName === CLAUDE_TOOL_NAMES.ASK_USER_QUESTION) {
-    logger.info({ toolName }, 'Blocking AskUserQuestion - redirecting to request_user_input MCP tool');
+    logger.info(
+      { toolName },
+      'Blocking AskUserQuestion - redirecting to request_user_input MCP tool'
+    );
     return {
       type: 'tool_deny',
       reason:

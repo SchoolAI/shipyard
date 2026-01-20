@@ -1,4 +1,10 @@
-import { getPlanMetadata, type LinkedPR, linkPR, logPlanEvent } from '@peer-plan/schema';
+import {
+  GitHubPRResponseSchema,
+  getPlanMetadata,
+  type LinkedPR,
+  linkPR,
+  logPlanEvent,
+} from '@peer-plan/schema';
 import { z } from 'zod';
 import { getOrCreateDoc } from '../doc-store.js';
 import { getOctokit, parseRepoString } from '../github-artifacts.js';
@@ -133,20 +139,23 @@ link_pr({
         pull_number: input.prNumber,
       });
 
+      // Validate GitHub API response
+      const validatedPR = GitHubPRResponseSchema.parse(pr);
+
       // Create LinkedPR object
       const linkedPR: LinkedPR = {
         prNumber: input.prNumber,
-        url: pr.html_url,
+        url: validatedPR.html_url,
         linkedAt: Date.now(),
-        status: pr.merged
+        status: validatedPR.merged
           ? 'merged'
-          : pr.state === 'closed'
+          : validatedPR.state === 'closed'
             ? 'closed'
-            : pr.draft
+            : validatedPR.draft
               ? 'draft'
               : 'open',
-        branch: input.branch || pr.head.ref,
-        title: pr.title,
+        branch: input.branch || validatedPR.head.ref,
+        title: validatedPR.title,
       };
 
       // Get actor name for event logging
@@ -183,6 +192,19 @@ The PR is now visible in the "Changes" tab of your plan.`,
       };
     } catch (error) {
       logger.error({ error, planId: input.planId, prNumber: input.prNumber }, 'Failed to link PR');
+
+      // Check if this is a validation error
+      if (error instanceof z.ZodError) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `GitHub API returned invalid data for PR #${input.prNumber}: ${error.message}`,
+            },
+          ],
+          isError: true,
+        };
+      }
 
       const message =
         error instanceof Error ? error.message : 'Unknown error while fetching PR from GitHub';

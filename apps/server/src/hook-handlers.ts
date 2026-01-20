@@ -852,6 +852,20 @@ export async function waitForApprovalHandler(
         { planId, reviewRequestId },
         '[SERVER OBSERVER] Registering metadata observer'
       );
+
+      // DEBUG: Add a test observer that logs ALL changes
+      metadata.observe((event) => {
+        ctx.logger.info(
+          {
+            planId,
+            reviewRequestId,
+            keysChanged: Array.from(event.keysChanged),
+            target: event.target.constructor.name,
+          },
+          '[SERVER OBSERVER] *** METADATA MAP CHANGED *** (Raw Y.Map observer)'
+        );
+      });
+
       metadata.observe(checkStatus);
 
       // Check status immediately in case it's already set (shouldn't happen since we just set it to pending_review)

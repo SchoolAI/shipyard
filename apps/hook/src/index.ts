@@ -191,13 +191,12 @@ async function processEvent(_adapter: AgentAdapter, event: AdapterEvent): Promis
       // Could clear presence here if needed
       return { allow: true };
 
-    case 'tool_transform':
-      // Tool transformation - return transformed tool call details
+    case 'tool_deny':
+      // Tool call denial - return deny response
       return {
-        allow: true,
-        hookType: 'tool_transform',
-        transformedTool: event.newTool,
-        transformedInput: event.newInput,
+        allow: false,
+        hookType: 'tool_deny',
+        denyReason: event.reason,
       };
 
     case 'passthrough':

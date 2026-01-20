@@ -28,6 +28,8 @@ export {
 } from './conversation-export.js';
 export { formatDeliverablesForLLM } from './deliverable-formatter.js';
 export { extractDeliverables } from './deliverable-parser.js';
+export type { GitHubPRResponse } from './github-validation.js';
+export { GitHubPRResponseSchema } from './github-validation.js';
 export type {
   AgentPresence,
   CreateHookSessionRequest,
@@ -178,6 +180,11 @@ export {
   ClaudeCodeOriginMetadataSchema,
   ConversationVersionSchema,
   CursorOriginMetadataSchema,
+  createGitHubArtifact,
+  createHandedOffConversationVersion,
+  createInitialConversationVersion,
+  createLinkedPR,
+  createLocalArtifact,
   DeliverableSchema,
   DevinOriginMetadataSchema,
   getArtifactUrl,

@@ -183,7 +183,7 @@ export function ImportConversationButton({
   }
 
   function handleConfirmImport() {
-    if (importedData && importedData.success) {
+    if (importedData?.success) {
       onImportConfirmed?.(importedData.messages, importedData.meta);
       toast.success(`Imported ${importedData.meta.messageCount} messages`);
     }
@@ -217,7 +217,7 @@ export function ImportConversationButton({
         )}
       </Button>
 
-      {importedData && importedData.success && (
+      {importedData?.success && (
         <ImportReviewModal
           isOpen={isReviewOpen}
           onClose={() => {

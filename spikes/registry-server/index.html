@@ -266,7 +266,7 @@
     }
 
     async function discoverServers() {
-      log('Fetching registry from ' + REGISTRY_URL + '...', 'system');
+      log(`Fetching registry from ${REGISTRY_URL}...`, 'system');
       updateRegistryStatus('pending', 'Fetching...');
 
       try {

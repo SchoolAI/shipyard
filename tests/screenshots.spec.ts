@@ -1,6 +1,6 @@
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { expect, test } from '@playwright/test';
+import { test } from '@playwright/test';
 
 const SCREENSHOTS_DIR = join(process.cwd(), 'screenshots');
 

@@ -495,7 +495,7 @@
       message.className = `message ${type}`;
 
       const now = new Date();
-      const timestamp = now.toLocaleTimeString() + '.' + now.getMilliseconds();
+      const timestamp = `${now.toLocaleTimeString()}.${now.getMilliseconds()}`;
 
       let content = `<div class="timestamp">[${timestamp}]</div>${text}`;
 

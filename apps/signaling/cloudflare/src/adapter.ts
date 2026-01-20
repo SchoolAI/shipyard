@@ -198,7 +198,7 @@ export class CloudflarePlatformAdapter implements PlatformAdapter {
           if (!this.topics.has(topic)) {
             this.topics.set(topic, new Set());
           }
-          this.topics.get(topic)!.add(ws);
+          this.topics.get(topic)?.add(ws);
         }
 
         // Store in-memory state on WebSocket
@@ -457,7 +457,7 @@ export class CloudflarePlatformAdapter implements PlatformAdapter {
     if (!this.topics.has(topic)) {
       this.topics.set(topic, new Set());
     }
-    this.topics.get(topic)!.add(socket);
+    this.topics.get(topic)?.add(socket);
 
     // Update connection state
     let state = this.getConnectionState(socket);

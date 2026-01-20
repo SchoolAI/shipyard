@@ -5,9 +5,5 @@ language js
 // Exception: Already have biome.json overrides for scripts/ and test files.
 
 `console.log($args)` where {
-  register_diagnostic(
-    span = $args,
-    message = "Use logger.debug() instead of console.log(). Console logs leak to stdout in MCP and can't be filtered in production.",
-    severity = "error"
-  )
+  register_diagnostic(span=$args, message="Use logger.debug() instead of console.log(). Console logs leak to stdout in MCP and can't be filtered in production.", severity="error")
 }

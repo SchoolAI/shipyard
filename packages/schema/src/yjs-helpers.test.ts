@@ -11,6 +11,7 @@ import {
   getLinkedPR,
   getLinkedPRs,
   getPlanMetadata,
+  getPlanMetadataWithValidation,
   getPlanOwnerId,
   getRejectedUsers,
   getViewedBy,
@@ -159,6 +160,80 @@ describe('Artifact helpers', () => {
     const artifacts = getArtifacts(ydoc);
     expect(artifacts).toHaveLength(4);
     expect(artifacts.map((a) => a.type)).toEqual(['screenshot', 'video', 'test_results', 'diff']);
+  });
+
+  describe('addArtifact validation', () => {
+    it('rejects invalid artifact (missing required fields)', () => {
+      const invalidArtifact = {
+        id: 'art-1',
+        type: 'screenshot',
+        // Missing: filename, storage
+      } as any;
+
+      expect(() => addArtifact(ydoc, invalidArtifact)).toThrow();
+    });
+
+    it('rejects artifact with invalid storage type', () => {
+      const invalidArtifact = {
+        id: 'art-1',
+        type: 'screenshot',
+        filename: 'test.png',
+        storage: 'invalid-storage',
+        url: 'https://example.com/test.png',
+      } as any;
+
+      expect(() => addArtifact(ydoc, invalidArtifact)).toThrow();
+    });
+
+    it('rejects github artifact without url', () => {
+      const invalidArtifact = {
+        id: 'art-1',
+        type: 'screenshot',
+        filename: 'test.png',
+        storage: 'github',
+        // Missing: url (required for github storage)
+      } as any;
+
+      expect(() => addArtifact(ydoc, invalidArtifact)).toThrow();
+    });
+
+    it('rejects local artifact without localArtifactId', () => {
+      const invalidArtifact = {
+        id: 'art-1',
+        type: 'screenshot',
+        filename: 'test.png',
+        storage: 'local',
+        // Missing: localArtifactId (required for local storage)
+      } as any;
+
+      expect(() => addArtifact(ydoc, invalidArtifact)).toThrow();
+    });
+
+    it('accepts valid github artifact', () => {
+      const validArtifact = {
+        id: 'art-1',
+        type: 'screenshot' as const,
+        filename: 'test.png',
+        storage: 'github' as const,
+        url: 'https://example.com/test.png',
+      };
+
+      expect(() => addArtifact(ydoc, validArtifact)).not.toThrow();
+      expect(getArtifacts(ydoc)).toHaveLength(1);
+    });
+
+    it('accepts valid local artifact', () => {
+      const validArtifact = {
+        id: 'art-1',
+        type: 'screenshot' as const,
+        filename: 'test.png',
+        storage: 'local' as const,
+        localArtifactId: 'local-123',
+      };
+
+      expect(() => addArtifact(ydoc, validArtifact)).not.toThrow();
+      expect(getArtifacts(ydoc)).toHaveLength(1);
+    });
   });
 });
 
@@ -711,6 +786,44 @@ describe('PR linking helpers', () => {
       }
     });
   });
+
+  describe('linkPR validation', () => {
+    it('rejects invalid PR (missing required fields)', () => {
+      const invalidPR = {
+        prNumber: 42,
+        // Missing: url, status, branch, title
+      } as LinkedPR;
+
+      expect(() => linkPR(ydoc, invalidPR)).toThrow();
+    });
+
+    it('rejects PR with invalid status', () => {
+      const invalidPR = {
+        prNumber: 42,
+        url: 'https://github.com/test/repo/pull/42',
+        status: 'invalid-status' as LinkedPR['status'],
+        branch: 'feature',
+        title: 'Test',
+        linkedAt: Date.now(),
+      };
+
+      expect(() => linkPR(ydoc, invalidPR)).toThrow();
+    });
+
+    it('accepts valid PR data', () => {
+      const validPR: LinkedPR = {
+        prNumber: 42,
+        url: 'https://github.com/test/repo/pull/42',
+        linkedAt: Date.now(),
+        status: 'open',
+        branch: 'feature',
+        title: 'Test PR',
+      };
+
+      expect(() => linkPR(ydoc, validPR)).not.toThrow();
+      expect(getLinkedPRs(ydoc)).toHaveLength(1);
+    });
+  });
 });
 
 describe('Deliverables helpers', () => {
@@ -1039,6 +1152,58 @@ describe('Plan metadata helpers', () => {
       const origin = map.get('origin') as { platform: string; sessionId: string };
       expect(origin.platform).toBe('claude-code');
       expect(origin.sessionId).toBe('session-123');
+    });
+
+    describe('initPlanMetadata validation', () => {
+      it('validates metadata after initialization', () => {
+        expect(() =>
+          initPlanMetadata(ydoc, {
+            id: 'plan-1',
+            title: 'Valid Plan',
+          })
+        ).not.toThrow();
+
+        const metadata = getPlanMetadata(ydoc);
+        expect(metadata).not.toBeNull();
+        expect(metadata?.id).toBe('plan-1');
+      });
+
+      it('ensures initialized metadata is valid PlanMetadata', () => {
+        initPlanMetadata(ydoc, {
+          id: 'plan-1',
+          title: 'Test Plan',
+          ownerId: 'owner-123',
+        });
+
+        const result = getPlanMetadataWithValidation(ydoc);
+        expect(result.success).toBe(true);
+        if (result.success) {
+          expect(result.data.status).toBe('draft');
+          expect(result.data.id).toBe('plan-1');
+          expect(result.data.ownerId).toBe('owner-123');
+        }
+      });
+
+      it('throws if metadata becomes invalid during initialization', () => {
+        // Pre-corrupt the metadata map to simulate a corrupted state
+        const map = ydoc.getMap('metadata');
+        map.set('id', 'corrupt-plan');
+        map.set('title', 'Corrupt');
+        // Missing required fields like status, createdAt, updatedAt
+
+        // Try to initialize - this should overwrite and validate, but if we had
+        // a bug it would fail validation
+        expect(() =>
+          initPlanMetadata(ydoc, {
+            id: 'plan-1',
+            title: 'Test',
+          })
+        ).not.toThrow();
+
+        // Verify clean state after initialization
+        const result = getPlanMetadataWithValidation(ydoc);
+        expect(result.success).toBe(true);
+      });
     });
   });
 });

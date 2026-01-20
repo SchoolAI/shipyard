@@ -1,3 +1,4 @@
+import { nanoid } from 'nanoid';
 import { z } from 'zod';
 
 /**
@@ -787,3 +788,105 @@ export const PRReviewCommentSchema = z.object({
   createdAt: z.number(),
   resolved: z.boolean().optional(),
 });
+
+// --- Factory Functions for Type Safety ---
+
+/**
+ * Create a LinkedPR object with validation.
+ * Ensures all required fields are present and valid.
+ */
+export function createLinkedPR(params: {
+  prNumber: number;
+  url: string;
+  status: LinkedPRStatus;
+  branch: string;
+  title: string;
+  linkedAt?: number;
+}): LinkedPR {
+  const linkedPR: LinkedPR = {
+    ...params,
+    linkedAt: params.linkedAt ?? Date.now(),
+  };
+
+  return LinkedPRSchema.parse(linkedPR);
+}
+
+/**
+ * Create a GitHub artifact with validation.
+ * Ensures storage discriminator is set correctly.
+ */
+export function createGitHubArtifact(params: {
+  type: ArtifactType;
+  filename: string;
+  url: string;
+  description?: string;
+  uploadedAt?: number;
+}): GitHubArtifact {
+  const artifact = {
+    id: nanoid(),
+    ...params,
+    storage: 'github' as const,
+    uploadedAt: params.uploadedAt ?? Date.now(),
+  } satisfies GitHubArtifact;
+
+  return ArtifactSchema.parse(artifact) as GitHubArtifact;
+}
+
+/**
+ * Create a local artifact with validation.
+ * Ensures storage discriminator is set correctly.
+ */
+export function createLocalArtifact(params: {
+  type: ArtifactType;
+  filename: string;
+  localArtifactId: string;
+  description?: string;
+  uploadedAt?: number;
+}): LocalArtifact {
+  const artifact = {
+    id: nanoid(),
+    ...params,
+    storage: 'local' as const,
+    uploadedAt: params.uploadedAt ?? Date.now(),
+  } satisfies LocalArtifact;
+
+  return ArtifactSchema.parse(artifact) as LocalArtifact;
+}
+
+/**
+ * Create initial conversation version with handedOff: false.
+ * Enforces compile-time type safety for the discriminated union.
+ */
+export function createInitialConversationVersion(params: {
+  versionId: string;
+  creator: string;
+  platform: OriginPlatform;
+  sessionId: string;
+  messageCount: number;
+  createdAt: number;
+}): ConversationVersion {
+  return {
+    ...params,
+    handedOff: false as const,
+  } satisfies ConversationVersion;
+}
+
+/**
+ * Create handed-off conversation version.
+ * Enforces compile-time type safety for the discriminated union.
+ */
+export function createHandedOffConversationVersion(params: {
+  versionId: string;
+  creator: string;
+  platform: OriginPlatform;
+  sessionId: string;
+  messageCount: number;
+  createdAt: number;
+  handedOffAt: number;
+  handedOffTo: string;
+}): ConversationVersion {
+  return {
+    ...params,
+    handedOff: true as const,
+  } satisfies ConversationVersion;
+}
