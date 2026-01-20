@@ -29,8 +29,7 @@ function AppRoutes() {
       <Route path="/search" element={<SearchPage />} />
       <Route path="/board" element={<KanbanPage />} />
       <Route path="/archive" element={<ArchivePage />} />
-      {/* PlanPage handles both /plan/:id and /task/:id (legacy) and snapshots (/?d=...) */}
-      <Route path="/plan/:id" element={<PlanPage />} />
+      {/* PlanPage handles both /task/:id and snapshots (/?d=...) */}
       <Route path="/task/:id" element={<PlanPage />} />
       <Route path="*" element={<Navigate to="/inbox" replace />} />
     </Routes>

@@ -44,6 +44,7 @@ import { BaseInboxCard } from '@/components/inbox/BaseInboxCard';
 import { OfflineBanner } from '@/components/OfflineBanner';
 import { TagChip } from '@/components/TagChip';
 import { TwoColumnSkeleton } from '@/components/ui/TwoColumnSkeleton';
+import { getPlanRoute } from '@/constants/routes';
 import { useUserIdentity } from '@/contexts/UserIdentityContext';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
 import { type InboxEventItem, useInboxEvents } from '@/hooks/useInboxEvents';
@@ -813,7 +814,7 @@ export function InboxPage() {
   const handleFullScreen = useCallback(() => {
     if (selectedPlanId) {
       setSidebarCollapsed(true);
-      navigate(`/task/${selectedPlanId}`);
+      navigate(getPlanRoute(selectedPlanId));
     }
   }, [selectedPlanId, navigate]);
 

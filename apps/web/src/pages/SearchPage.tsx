@@ -13,6 +13,7 @@ import { OfflineBanner } from '@/components/OfflineBanner';
 import { StatusChip } from '@/components/StatusChip';
 import { TagChip } from '@/components/TagChip';
 import { SearchPlanInput } from '@/components/ui/SearchPlanInput';
+import { getPlanRoute } from '@/constants/routes';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useMultiProviderSync } from '@/hooks/useMultiProviderSync';
@@ -294,7 +295,7 @@ export function SearchPage() {
     onFullScreen: useCallback(() => {
       if (selectedPlanId) {
         setSidebarCollapsed(true);
-        navigate(`/task/${selectedPlanId}`);
+        navigate(getPlanRoute(selectedPlanId));
       }
     }, [selectedPlanId, navigate]),
     onClose: handleClosePanel,

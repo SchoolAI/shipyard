@@ -210,7 +210,7 @@ export function buildInviteUrl(
   tokenValue: string
 ): string {
   const normalizedBase = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
-  const url = new URL(`${normalizedBase}/plan/${planId}`);
+  const url = new URL(`${normalizedBase}/task/${planId}`);
   url.searchParams.set('invite', `${tokenId}:${tokenValue}`);
   return url.toString();
 }

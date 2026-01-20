@@ -45,6 +45,7 @@ import { PlanPeekModal } from '@/components/PlanPeekModal';
 import { KanbanSkeleton } from '@/components/ui/KanbanSkeleton';
 import { KanbanCard } from '@/components/views/KanbanCard';
 import { KanbanColumn } from '@/components/views/KanbanColumn';
+import { getPlanRoute } from '@/constants/routes';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
 import { type ColumnId, columnIdToStatus, useKanbanColumns } from '@/hooks/useKanbanColumns';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
@@ -372,7 +373,7 @@ export function KanbanPage() {
     onFullScreen: useCallback(() => {
       if (selectedPlanId) {
         setSidebarCollapsed(true);
-        navigate(`/task/${selectedPlanId}`);
+        navigate(getPlanRoute(selectedPlanId));
       }
     }, [selectedPlanId, navigate]),
     onClose: handleClosePanel,
@@ -429,7 +430,7 @@ export function KanbanPage() {
   const handleRequestChanges = useCallback(() => {
     if (!selectedPlanId) return;
     // Navigate to full plan page for adding comments
-    navigate(`/task/${selectedPlanId}`);
+    navigate(getPlanRoute(selectedPlanId));
     toast.info('Navigate to add comments and request changes');
   }, [selectedPlanId, navigate]);
 
@@ -625,7 +626,7 @@ export function KanbanPage() {
               onFullScreen={() => {
                 if (selectedPlanId) {
                   setSidebarCollapsed(true);
-                  navigate(`/task/${selectedPlanId}`);
+                  navigate(getPlanRoute(selectedPlanId));
                 }
               }}
               width={panelWidth}

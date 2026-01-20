@@ -35,22 +35,22 @@ describe('parseInviteFromUrl', () => {
 describe('buildInviteUrl', () => {
   it('should build correct invite URL', () => {
     const url = buildInviteUrl('https://example.com', 'plan123', 'token456', 'secret789');
-    expect(url).toBe('https://example.com/plan/plan123?invite=token456%3Asecret789');
+    expect(url).toBe('https://example.com/task/plan123?invite=token456%3Asecret789');
   });
 
   it('should handle baseUrl with trailing slash', () => {
     const url = buildInviteUrl('https://example.com/', 'plan123', 'token456', 'secret789');
-    expect(url).toBe('https://example.com/plan/plan123?invite=token456%3Asecret789');
+    expect(url).toBe('https://example.com/task/plan123?invite=token456%3Asecret789');
   });
 
   it('should handle baseUrl with subdirectory path', () => {
     const url = buildInviteUrl('https://example.com/shipyard', 'plan123', 'token456', 'secret789');
-    expect(url).toBe('https://example.com/shipyard/plan/plan123?invite=token456%3Asecret789');
+    expect(url).toBe('https://example.com/shipyard/task/plan123?invite=token456%3Asecret789');
   });
 
   it('should handle baseUrl with subdirectory path and trailing slash', () => {
     const url = buildInviteUrl('https://example.com/shipyard/', 'plan123', 'token456', 'secret789');
-    expect(url).toBe('https://example.com/shipyard/plan/plan123?invite=token456%3Asecret789');
+    expect(url).toBe('https://example.com/shipyard/task/plan123?invite=token456%3Asecret789');
   });
 
   it('should round-trip with parseInviteFromUrl', () => {

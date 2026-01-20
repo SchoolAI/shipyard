@@ -33,6 +33,7 @@ import type { PlanIndexEntry, PlanStatusType } from '@shipyard/schema';
 import { CheckSquare, GitPullRequest } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { TagChip } from '@/components/TagChip';
+import { getPlanRoute } from '@/constants/routes';
 import { usePlanMetadata } from '@/hooks/usePlanMetadata';
 import { assertNever } from '@/utils/assert-never';
 import { formatRelativeTime } from '@/utils/formatters';
@@ -88,7 +89,7 @@ export function KanbanCard({ plan, onHover, onPanelOpen }: KanbanCardProps) {
     if (onPanelOpen) {
       onPanelOpen(plan.id);
     } else {
-      navigate(`/task/${plan.id}`);
+      navigate(getPlanRoute(plan.id));
     }
   };
 

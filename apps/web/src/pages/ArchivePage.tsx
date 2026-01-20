@@ -21,6 +21,7 @@ import { InlinePlanDetail } from '@/components/InlinePlanDetail';
 import { OfflineBanner } from '@/components/OfflineBanner';
 import { TagChip } from '@/components/TagChip';
 import { TwoColumnSkeleton } from '@/components/ui/TwoColumnSkeleton';
+import { getPlanRoute } from '@/constants/routes';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useMultiProviderSync } from '@/hooks/useMultiProviderSync';
@@ -109,7 +110,7 @@ export function ArchivePage() {
     onFullScreen: useCallback(() => {
       if (selectedPlanId) {
         setSidebarCollapsed(true);
-        navigate(`/task/${selectedPlanId}`);
+        navigate(getPlanRoute(selectedPlanId));
       }
     }, [selectedPlanId, navigate]),
     onClose: handleClosePanel,

@@ -6,6 +6,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { AccountSection } from '@/components/account';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { CollapsiblePanel } from '@/components/ui/collapsible-panel';
+import { getPlanRoute } from '@/constants/routes';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
 import { useInputRequests } from '@/hooks/useInputRequests';
 import { useMultiProviderSync } from '@/hooks/useMultiProviderSync';
@@ -224,7 +225,7 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
 
   useEffect(() => {
     if (!navigationTarget) return;
-    const targetPath = `/task/${navigationTarget}`;
+    const targetPath = getPlanRoute(navigationTarget);
     if (location.pathname !== targetPath) {
       navigate(targetPath);
     }

@@ -18,6 +18,7 @@ import type * as Y from 'yjs';
 import { PlanContent } from '@/components/PlanContent';
 import type { PanelWidth } from '@/components/PlanPanel';
 import { PlanPanelHeader } from '@/components/PlanPanelHeader';
+import { getPlanRoute } from '@/constants/routes';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
 import { useMultiProviderSync } from '@/hooks/useMultiProviderSync';
 import { colorFromString } from '@/utils/color';
@@ -151,7 +152,7 @@ export function InlinePlanDetail({
   const handleFullScreen = useCallback(() => {
     if (planId) {
       setSidebarCollapsed(true);
-      navigate(`/task/${planId}`);
+      navigate(getPlanRoute(planId));
     }
   }, [planId, navigate]);
 
@@ -160,7 +161,7 @@ export function InlinePlanDetail({
     if (onApprove && planId && panelMetadata) {
       onApprove({ planId, ydoc: panelYdoc, metadata: panelMetadata });
     } else if (planId) {
-      navigate(`/task/${planId}`);
+      navigate(getPlanRoute(planId));
     }
   }, [onApprove, planId, panelYdoc, panelMetadata, navigate]);
 
@@ -169,7 +170,7 @@ export function InlinePlanDetail({
     if (onRequestChanges && planId && panelMetadata) {
       onRequestChanges({ planId, ydoc: panelYdoc, metadata: panelMetadata });
     } else if (planId) {
-      navigate(`/task/${planId}`);
+      navigate(getPlanRoute(planId));
     }
   }, [onRequestChanges, planId, panelYdoc, panelMetadata, navigate]);
 
