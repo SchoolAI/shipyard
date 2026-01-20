@@ -9,6 +9,17 @@ PACKAGES=(
   "apps/hook"
 )
 
+# Must match allowedPatterns in eslint-local-rules.mjs
+ALLOWED_PREFIXES=(
+  "NOTE:"
+  "TODO"
+  "FIXME"
+  "HACK"
+  "XXX"
+  "@ts-"
+  "biome-ignore"
+)
+
 echo "🔍 Checking comment style (ESLint)..."
 
 PATHS=$(printf "%s/src/ " "${PACKAGES[@]}")
@@ -22,11 +33,9 @@ if ! pnpm eslint $PATHS --ext .ts,.tsx --max-warnings 0; then
   echo "   // This function creates a user  ❌"
   echo ""
   echo "✅ Valid single-line comment patterns:"
-  echo "   // NOTE: Explains non-obvious 'why' (security, performance, constraints)"
-  echo "   // TODO: Tracked work items"
-  echo "   // FIXME: Known issues"
-  echo "   // @ts-expect-error: TypeScript directives"
-  echo "   // biome-ignore: Linter exceptions with justification"
+  for prefix in "${ALLOWED_PREFIXES[@]}"; do
+    echo "   // ${prefix}"
+  done
   echo ""
   echo "🔧 To fix violations:"
   echo "   1. DELETE if comment describes 'what' code does (code should be self-documenting)"

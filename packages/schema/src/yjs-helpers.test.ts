@@ -1365,14 +1365,12 @@ describe('transitionPlanStatus', () => {
     });
 
     it('should reject transition to same status (no-op not allowed)', () => {
-      // First transition to pending_review
       transitionPlanStatus(
         ydoc,
         { status: 'pending_review', reviewRequestId: 'req-123' },
         'test-actor'
       );
 
-      // Then try to transition to pending_review again (no-op not allowed)
       const result = transitionPlanStatus(
         ydoc,
         { status: 'pending_review', reviewRequestId: 'req-456' },

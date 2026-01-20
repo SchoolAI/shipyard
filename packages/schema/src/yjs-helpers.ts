@@ -761,7 +761,6 @@ export function markPlanAsViewed(ydoc: Y.Doc, username: string): void {
   const map = ydoc.getMap(YDOC_KEYS.METADATA);
 
   ydoc.transact(() => {
-    // NOTE: Must handle Y.Map properly (can't spread it!)
     const existingViewedBy = map.get('viewedBy');
     let viewedBy: Record<string, number> = {};
 
@@ -777,7 +776,6 @@ export function markPlanAsViewed(ydoc: Y.Doc, username: string): void {
 
     viewedBy[username] = Date.now();
 
-    // NOTE: Use Y.Map for the viewedBy to enable CRDT merging
     const viewedByMap = new Y.Map<number>();
     for (const [user, timestamp] of Object.entries(viewedBy)) {
       viewedByMap.set(user, timestamp);
@@ -832,7 +830,6 @@ export function addConversationVersion(
   version: ConversationVersion,
   actor?: string
 ): void {
-  // Validate discriminated union (handedOff: true | false) before writing
   const validated = ConversationVersionSchema.parse(version);
 
   ydoc.transact(
@@ -862,7 +859,6 @@ export function markVersionHandedOff(
       handedOffTo,
     };
 
-    // Validate discriminated union before returning
     return ConversationVersionSchema.parse(handedOffVersion);
   });
 
@@ -1189,7 +1185,6 @@ export function answerInputRequest(
     answeredBy,
   };
 
-  // Validate discriminated union before writing
   const validated = InputRequestSchema.parse(answeredRequest);
 
   ydoc.transact(() => {
@@ -1230,7 +1225,6 @@ export function cancelInputRequest(
     status: 'cancelled' as const,
   };
 
-  // Validate discriminated union before writing
   const validated = InputRequestSchema.parse(cancelledRequest);
 
   ydoc.transact(() => {
