@@ -44,14 +44,11 @@ import { NodePlatformAdapter } from '../node/adapter.js';
 import { serverConfig } from './config/env/server.js';
 import { logger } from './logger.js';
 
-// --- Configuration ---
 const PING_TIMEOUT_MS = 30000;
 const port = serverConfig.PORT;
 
-// --- Platform Adapter (singleton for this process) ---
 const adapter = new NodePlatformAdapter();
 
-// --- WebSocket Server Setup ---
 const wss = new WebSocketServer({ noServer: true });
 
 const server = http.createServer((_request: IncomingMessage, response: ServerResponse) => {
@@ -59,7 +56,6 @@ const server = http.createServer((_request: IncomingMessage, response: ServerRes
   response.end('okay');
 });
 
-// --- Utility Functions ---
 
 /**
  * Helper function for exhaustive switch statements.
@@ -71,7 +67,6 @@ function assertNever(x: never): never {
   throw new Error(`Unexpected message type: ${JSON.stringify(x)}`);
 }
 
-// --- Connection Handler ---
 
 /**
  * Handle a new WebSocket connection.
@@ -85,7 +80,6 @@ function onConnection(conn: WebSocket): void {
   let closed = false;
   let pongReceived = true;
 
-  // Ping/pong keepalive
   const pingInterval = setInterval(() => {
     if (!pongReceived) {
       conn.close();
@@ -105,7 +99,6 @@ function onConnection(conn: WebSocket): void {
   });
 
   conn.on('close', () => {
-    // Clean up topic subscriptions via adapter
     adapter.unsubscribeFromAllTopics(conn);
     closed = true;
     clearInterval(pingInterval);
@@ -124,8 +117,6 @@ function onConnection(conn: WebSocket): void {
 
       if (!message || !message.type || closed) return;
 
-      // Handle each message type with exhaustive switch
-      // All handlers use the platform adapter for storage/messaging
       switch (message.type) {
         case 'subscribe':
           handleSubscribe(adapter, conn, message);
@@ -164,7 +155,6 @@ function onConnection(conn: WebSocket): void {
           break;
 
         default:
-          // Exhaustive check - will fail at compile time if a case is missing
           assertNever(message);
       }
     } catch (error) {
@@ -173,7 +163,6 @@ function onConnection(conn: WebSocket): void {
   });
 }
 
-// --- Server Setup ---
 
 wss.on('connection', onConnection);
 
@@ -187,7 +176,6 @@ server.listen(port);
 
 logger.info({ port }, 'Signaling server running');
 
-// --- Process Signal Handlers ---
 
 process.on('SIGTERM', () => {
   server.close();

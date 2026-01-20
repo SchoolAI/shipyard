@@ -9,7 +9,7 @@ const transport =
           colorize: true,
           translateTime: 'SYS:standard',
           ignore: 'pid,hostname',
-          destination: 2, // stderr
+          destination: 2,
         },
       }
     : undefined;
@@ -19,5 +19,5 @@ export const logger = pino(
     level: serverConfig.LOG_LEVEL,
     timestamp: pino.stdTimeFunctions.isoTime,
   },
-  transport ? pino.transport(transport) : pino.destination(2) // stderr for production too
+  transport ? pino.transport(transport) : pino.destination(2)
 );

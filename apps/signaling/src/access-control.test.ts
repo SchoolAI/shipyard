@@ -87,7 +87,6 @@ describe('isUserApproved', () => {
 
   it('returns false when user is in rejected list even if in approved list (rejection takes precedence)', () => {
     const planApprovals = new Map<string, PlanApprovalState>();
-    // User is both in approved and rejected lists - rejection should take precedence
     planApprovals.set(
       'plan-1',
       createApprovalState('plan-1', 'owner-1', ['user-1', 'user-2'], ['user-1'])
@@ -99,7 +98,6 @@ describe('isUserApproved', () => {
   it('returns false for empty string userId', () => {
     const planApprovals = new Map<string, PlanApprovalState>();
     planApprovals.set('plan-1', createApprovalState('plan-1', 'owner-1', ['user-1']));
-    // Empty string is falsy in the condition check
     const result = isUserApproved(planApprovals, 'plan-1', '');
     expect(result).toBe(false);
   });
@@ -132,7 +130,6 @@ describe('isUserRejected', () => {
 
   it('returns false for plan owner (even if in rejected list)', () => {
     const planApprovals = new Map<string, PlanApprovalState>();
-    // Owner can never be rejected - they always have access to their own plan
     planApprovals.set('plan-1', createApprovalState('plan-1', 'owner-1', [], ['owner-1']));
 
     const result = isUserRejected(planApprovals, 'plan-1', 'owner-1');
@@ -219,7 +216,6 @@ describe('send', () => {
 
   it('handles serialization errors gracefully', () => {
     const ws = createMockWebSocket(WS_READY_STATE_OPEN);
-    // Create a circular reference that cannot be serialized
     const message: TestMessage = { type: 'test' };
     message.self = message;
 

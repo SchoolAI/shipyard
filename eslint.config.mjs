@@ -8,6 +8,8 @@ export default [
       'packages/shared/**/*.tsx',
       'apps/github-oauth-worker/**/*.ts',
       'apps/github-oauth-worker/**/*.tsx',
+      'apps/signaling/**/*.ts',
+      'apps/signaling/**/*.tsx',
     ],
     languageOptions: {
       parser: tsParser,

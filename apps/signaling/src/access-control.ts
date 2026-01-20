@@ -7,13 +7,11 @@
 
 import type { WebSocket } from 'ws';
 
-// --- WebSocket Ready States ---
 export const WS_READY_STATE_CONNECTING = 0;
 export const WS_READY_STATE_OPEN = 1;
 export const WS_READY_STATE_CLOSING = 2;
 export const WS_READY_STATE_CLOSED = 3;
 
-// --- Plan Approval State ---
 
 export interface PlanApprovalState {
   planId: string;
@@ -69,7 +67,6 @@ export function isUserRejected(
   const approval = planApprovals.get(planId);
   if (!approval || !userId) return false;
 
-  // Plan owner can never be rejected (even if somehow in rejected list)
   if (userId === approval.ownerId) return false;
 
   return approval.rejectedUsers.includes(userId);
@@ -84,7 +81,6 @@ export function isUserRejected(
  * @returns True if the message was sent successfully, false otherwise
  */
 export function send<T extends OutgoingMessageBase>(conn: WebSocket, message: T): boolean {
-  // Only send if connection is CONNECTING or OPEN
   if (conn.readyState !== WS_READY_STATE_CONNECTING && conn.readyState !== WS_READY_STATE_OPEN) {
     conn.close();
     return false;
