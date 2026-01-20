@@ -201,7 +201,7 @@ export function parseInviteFromUrl(url: string): { tokenId: string; tokenValue: 
 
 /**
  * Build invite URL from plan URL and token.
- * baseUrl should include the deployment base path (e.g., https://example.com/peer-plan)
+ * baseUrl should include the deployment base path (e.g., https://example.com/shipyard)
  */
 export function buildInviteUrl(
   baseUrl: string,
