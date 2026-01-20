@@ -64,7 +64,7 @@ describe('getTokenTimeRemaining', () => {
   });
 
   it('should format minutes correctly', () => {
-    const expiresAt = Date.now() + 25 * 60 * 1000; // 25 minutes
+    const expiresAt = Date.now() + 25 * 60 * 1000;
     const result = getTokenTimeRemaining(expiresAt);
     expect(result.expired).toBe(false);
     expect(result.minutes).toBeGreaterThanOrEqual(24);
@@ -73,28 +73,28 @@ describe('getTokenTimeRemaining', () => {
   });
 
   it('should format hours correctly', () => {
-    const expiresAt = Date.now() + 90 * 60 * 1000; // 90 minutes = 1h 30m
+    const expiresAt = Date.now() + 90 * 60 * 1000;
     const result = getTokenTimeRemaining(expiresAt);
     expect(result.expired).toBe(false);
     expect(result.formatted).toMatch(/1h 30m/);
   });
 
   it('should format hours without minutes when exact', () => {
-    const expiresAt = Date.now() + 120 * 60 * 1000; // 2 hours exactly
+    const expiresAt = Date.now() + 120 * 60 * 1000;
     const result = getTokenTimeRemaining(expiresAt);
     expect(result.formatted).toMatch(/2h/);
     expect(result.formatted).not.toMatch(/0m/);
   });
 
   it('should handle exactly 60 minutes', () => {
-    const expiresAt = Date.now() + 60 * 60 * 1000; // 60 minutes
+    const expiresAt = Date.now() + 60 * 60 * 1000;
     const result = getTokenTimeRemaining(expiresAt);
     expect(result.expired).toBe(false);
     expect(result.formatted).toBe('1h');
   });
 
   it('should handle small remaining time', () => {
-    const expiresAt = Date.now() + 1 * 60 * 1000; // 1 minute
+    const expiresAt = Date.now() + 1 * 60 * 1000;
     const result = getTokenTimeRemaining(expiresAt);
     expect(result.expired).toBe(false);
     expect(result.minutes).toBe(1);
@@ -102,10 +102,10 @@ describe('getTokenTimeRemaining', () => {
   });
 
   it('should round up to nearest minute', () => {
-    const expiresAt = Date.now() + 30 * 1000; // 30 seconds
+    const expiresAt = Date.now() + 30 * 1000;
     const result = getTokenTimeRemaining(expiresAt);
     expect(result.expired).toBe(false);
-    expect(result.minutes).toBe(1); // Math.ceil rounds up
+    expect(result.minutes).toBe(1);
     expect(result.formatted).toBe('1m');
   });
 });

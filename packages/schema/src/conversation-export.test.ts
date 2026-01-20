@@ -246,7 +246,7 @@ describe('claudeCodeToA2A', () => {
 
     expect(result[0]?.role).toBe('user');
     expect(result[1]?.role).toBe('agent');
-    expect(result[2]?.role).toBe('user'); // tool_result is from user
+    expect(result[2]?.role).toBe('user');
     expect(result[3]?.role).toBe('agent');
   });
 
@@ -412,7 +412,7 @@ describe('A2AMessageSchema', () => {
   it('rejects invalid role', () => {
     const invalid = {
       messageId: 'test-id',
-      role: 'system', // invalid
+      role: 'system',
       parts: [],
     };
 
@@ -460,7 +460,7 @@ describe('summarizeA2AConversation', () => {
     const a2a = claudeCodeToA2A([longMessage], 'plan-123');
     const result = summarizeA2AConversation(a2a);
 
-    expect(result.title.length).toBe(53); // 50 chars + '...'
+    expect(result.title.length).toBe(53);
     expect(result.title.endsWith('...')).toBe(true);
   });
 

@@ -6,6 +6,8 @@ export default [
     files: [
       'packages/shared/**/*.ts',
       'packages/shared/**/*.tsx',
+      'packages/schema/**/*.ts',
+      'packages/schema/**/*.tsx',
       'apps/github-oauth-worker/**/*.ts',
       'apps/github-oauth-worker/**/*.tsx',
       'apps/signaling/**/*.ts',

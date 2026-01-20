@@ -27,6 +27,7 @@ import {
   removeArtifact,
   revokeUser,
   setPlanMetadata,
+  transitionPlanStatus,
   unlinkPR,
   unrejectUser,
   updateLinkedPRStatus,
@@ -126,9 +127,9 @@ describe('Artifact helpers', () => {
       },
     ]);
 
-    array.push([{ id: 'art-2', filename: 'no-type.png' }]); // Missing type
-    array.push([{ type: 'screenshot' }]); // Missing id and filename
-    array.push([null]); // Completely invalid
+    array.push([{ id: 'art-2', filename: 'no-type.png' }]);
+    array.push([{ type: 'screenshot' }]);
+    array.push([null]);
 
     const artifacts = getArtifacts(ydoc);
     expect(artifacts).toHaveLength(1);
@@ -289,13 +290,13 @@ describe('ViewedBy helpers', () => {
 
   it('isPlanUnread returns false when viewed after update', () => {
     const metadata = { updatedAt: Date.now() - 1000 };
-    const viewedBy = { user1: Date.now() }; // Viewed now (after updatedAt)
+    const viewedBy = { user1: Date.now() };
     expect(isPlanUnread(metadata, 'user1', viewedBy)).toBe(false);
   });
 
   it('isPlanUnread returns true when viewed before update', () => {
     const viewedAt = Date.now() - 2000;
-    const updatedAt = Date.now() - 1000; // Updated after viewed
+    const updatedAt = Date.now() - 1000;
     const metadata = { updatedAt };
     const viewedBy = { user1: viewedAt };
     expect(isPlanUnread(metadata, 'user1', viewedBy)).toBe(true);
@@ -303,7 +304,7 @@ describe('ViewedBy helpers', () => {
 
   it('isPlanUnread is per-user', () => {
     const metadata = { updatedAt: Date.now() - 1000 };
-    const viewedBy = { user1: Date.now() }; // Only user1 viewed
+    const viewedBy = { user1: Date.now() };
 
     expect(isPlanUnread(metadata, 'user1', viewedBy)).toBe(false);
     expect(isPlanUnread(metadata, 'user2', viewedBy)).toBe(true);
@@ -644,7 +645,7 @@ describe('PR linking helpers', () => {
 
       array.push([createPR(1)]);
 
-      array.push([{ prNumber: 2 }]); // Missing required fields
+      array.push([{ prNumber: 2 }]);
       array.push([null]);
 
       const prs = getLinkedPRs(ydoc);
@@ -841,8 +842,8 @@ describe('Deliverables helpers', () => {
 
       array.push([createDeliverable('del-1', 'Valid')]);
 
-      array.push([{ id: 'del-2' }]); // Missing text
-      array.push([{ text: 'No ID' }]); // Missing id
+      array.push([{ id: 'del-2' }]);
+      array.push([{ text: 'No ID' }]);
       array.push([null]);
 
       const deliverables = getDeliverables(ydoc);
@@ -970,7 +971,7 @@ describe('Plan metadata helpers', () => {
       map.set('id', 'plan-1');
       map.set('title', 'Test Plan');
       map.set('status', 'pending_review');
-      map.set('reviewRequestId', 'req-123'); // Required for pending_review status
+      map.set('reviewRequestId', 'req-123');
       map.set('createdAt', now);
       map.set('updatedAt', now);
       map.set('repo', 'org/repo');
@@ -1038,7 +1039,7 @@ describe('Plan metadata helpers', () => {
       const map = ydoc.getMap('metadata');
       expect(map.get('id')).toBe('plan-1');
       expect(map.get('title')).toBe('My Plan');
-      expect(map.get('status')).toBe('draft'); // Always initialized as draft
+      expect(map.get('status')).toBe('draft');
       expect(map.get('createdAt')).toBeGreaterThanOrEqual(before);
       expect(map.get('updatedAt')).toBeGreaterThanOrEqual(before);
     });
@@ -1174,6 +1175,254 @@ describe('Plan metadata helpers', () => {
         const result = getPlanMetadataWithValidation(ydoc);
         expect(result.success).toBe(true);
       });
+    });
+  });
+});
+
+describe('transitionPlanStatus', () => {
+  let ydoc: Y.Doc;
+
+  beforeEach(() => {
+    ydoc = new Y.Doc();
+    initPlanMetadata(ydoc, {
+      id: 'test-plan',
+      title: 'Test Plan',
+    });
+  });
+
+  describe('valid transitions', () => {
+    it('should transition from draft to pending_review', () => {
+      const result = transitionPlanStatus(
+        ydoc,
+        { status: 'pending_review', reviewRequestId: 'req-123' },
+        'test-actor'
+      );
+      expect(result.success).toBe(true);
+
+      const metadata = getPlanMetadata(ydoc);
+      expect(metadata?.status).toBe('pending_review');
+    });
+
+    it('should transition from pending_review to in_progress with reviewer info', () => {
+      transitionPlanStatus(
+        ydoc,
+        { status: 'pending_review', reviewRequestId: 'req-123' },
+        'actor1'
+      );
+
+      const beforeTime = Date.now();
+      const result = transitionPlanStatus(
+        ydoc,
+        { status: 'in_progress', reviewedAt: beforeTime, reviewedBy: 'reviewer1' },
+        'actor1'
+      );
+
+      expect(result.success).toBe(true);
+      const metadata = getPlanMetadata(ydoc);
+      expect(metadata?.status).toBe('in_progress');
+      if (metadata?.status === 'in_progress') {
+        expect(metadata.reviewedAt).toBe(beforeTime);
+        expect(metadata.reviewedBy).toBe('reviewer1');
+      }
+    });
+
+    it('should transition from pending_review to changes_requested', () => {
+      transitionPlanStatus(
+        ydoc,
+        { status: 'pending_review', reviewRequestId: 'req-123' },
+        'actor1'
+      );
+
+      const result = transitionPlanStatus(
+        ydoc,
+        { status: 'changes_requested', reviewedAt: Date.now(), reviewedBy: 'reviewer1' },
+        'actor1'
+      );
+
+      expect(result.success).toBe(true);
+      const metadata = getPlanMetadata(ydoc);
+      expect(metadata?.status).toBe('changes_requested');
+    });
+
+    it('should transition from changes_requested to in_progress', () => {
+      transitionPlanStatus(
+        ydoc,
+        { status: 'pending_review', reviewRequestId: 'req-123' },
+        'actor1'
+      );
+      transitionPlanStatus(
+        ydoc,
+        { status: 'changes_requested', reviewedAt: Date.now(), reviewedBy: 'reviewer1' },
+        'actor1'
+      );
+
+      const result = transitionPlanStatus(
+        ydoc,
+        { status: 'in_progress', reviewedAt: Date.now(), reviewedBy: 'reviewer1' },
+        'actor1'
+      );
+
+      expect(result.success).toBe(true);
+      const metadata = getPlanMetadata(ydoc);
+      expect(metadata?.status).toBe('in_progress');
+    });
+
+    it('should transition from in_progress to completed', () => {
+      transitionPlanStatus(
+        ydoc,
+        { status: 'pending_review', reviewRequestId: 'req-123' },
+        'actor1'
+      );
+      transitionPlanStatus(
+        ydoc,
+        { status: 'in_progress', reviewedAt: Date.now(), reviewedBy: 'reviewer1' },
+        'actor1'
+      );
+
+      const result = transitionPlanStatus(
+        ydoc,
+        { status: 'completed', completedAt: Date.now(), completedBy: 'actor1' },
+        'actor1'
+      );
+
+      expect(result.success).toBe(true);
+      const metadata = getPlanMetadata(ydoc);
+      expect(metadata?.status).toBe('completed');
+    });
+  });
+
+  describe('invalid transitions', () => {
+    it('should reject transition from draft to completed', () => {
+      const result = transitionPlanStatus(
+        ydoc,
+        { status: 'completed', completedAt: Date.now(), completedBy: 'actor' },
+        'test-actor'
+      );
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toContain('Invalid transition');
+      }
+
+      const metadata = getPlanMetadata(ydoc);
+      expect(metadata?.status).toBe('draft');
+    });
+
+    it('should reject transition from draft to changes_requested', () => {
+      const result = transitionPlanStatus(
+        ydoc,
+        { status: 'changes_requested', reviewedAt: Date.now(), reviewedBy: 'actor' },
+        'test-actor'
+      );
+
+      expect(result.success).toBe(false);
+      const metadata = getPlanMetadata(ydoc);
+      expect(metadata?.status).toBe('draft');
+    });
+
+    it('should reject transition from completed to any status', () => {
+      transitionPlanStatus(
+        ydoc,
+        { status: 'pending_review', reviewRequestId: 'req-123' },
+        'actor1'
+      );
+      transitionPlanStatus(
+        ydoc,
+        { status: 'in_progress', reviewedAt: Date.now(), reviewedBy: 'reviewer1' },
+        'actor1'
+      );
+      transitionPlanStatus(
+        ydoc,
+        { status: 'completed', completedAt: Date.now(), completedBy: 'actor1' },
+        'actor1'
+      );
+
+      const result = transitionPlanStatus(
+        ydoc,
+        { status: 'in_progress', reviewedAt: Date.now(), reviewedBy: 'actor1' },
+        'actor1'
+      );
+
+      expect(result.success).toBe(false);
+      const metadata = getPlanMetadata(ydoc);
+      expect(metadata?.status).toBe('completed');
+    });
+  });
+
+  describe('edge cases', () => {
+    it('should handle missing metadata', () => {
+      const emptyDoc = new Y.Doc();
+      const result = transitionPlanStatus(
+        emptyDoc,
+        { status: 'pending_review', reviewRequestId: 'req-123' },
+        'test-actor'
+      );
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toContain('No metadata found in Y.Doc');
+      }
+    });
+
+    it('should reject transition to same status (no-op not allowed)', () => {
+      transitionPlanStatus(
+        ydoc,
+        { status: 'pending_review', reviewRequestId: 'req-123' },
+        'test-actor'
+      );
+
+      const result = transitionPlanStatus(
+        ydoc,
+        { status: 'pending_review', reviewRequestId: 'req-456' },
+        'test-actor'
+      );
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toContain('Invalid transition');
+      }
+      const metadata = getPlanMetadata(ydoc);
+      expect(metadata?.status).toBe('pending_review');
+    });
+  });
+
+  describe('metadata updates', () => {
+    it('should always update updatedAt timestamp', () => {
+      const before = Date.now();
+      transitionPlanStatus(
+        ydoc,
+        { status: 'pending_review', reviewRequestId: 'req-123' },
+        'actor1'
+      );
+
+      const metadata = getPlanMetadata(ydoc);
+      expect(metadata?.updatedAt).toBeGreaterThanOrEqual(before);
+    });
+
+    it('should set completedAt and completedBy when transitioning to completed', () => {
+      transitionPlanStatus(
+        ydoc,
+        { status: 'pending_review', reviewRequestId: 'req-123' },
+        'actor1'
+      );
+      transitionPlanStatus(
+        ydoc,
+        { status: 'in_progress', reviewedAt: Date.now(), reviewedBy: 'reviewer1' },
+        'actor1'
+      );
+
+      const completedTime = Date.now();
+      transitionPlanStatus(
+        ydoc,
+        { status: 'completed', completedAt: completedTime, completedBy: 'completer1' },
+        'actor1'
+      );
+
+      const metadata = getPlanMetadata(ydoc);
+      if (metadata?.status === 'completed') {
+        expect(metadata.completedAt).toBe(completedTime);
+        expect(metadata.completedBy).toBe('completer1');
+      }
     });
   });
 });

@@ -2,10 +2,12 @@ import { nanoid } from 'nanoid';
 import * as Y from 'yjs';
 import { assertNever } from './assert-never.js';
 import { type AgentPresence, AgentPresenceSchema } from './hook-api.js';
+import { type InputRequest, InputRequestSchema } from './input-request.js';
 import {
   type Artifact,
   ArtifactSchema,
   type ConversationVersion,
+  ConversationVersionSchema,
   type Deliverable,
   DeliverableSchema,
   type LinkedPR,
@@ -62,7 +64,7 @@ export const VALID_STATUS_TRANSITIONS: Record<PlanStatusType, PlanStatusType[]> 
   pending_review: ['in_progress', 'changes_requested'],
   changes_requested: ['pending_review', 'in_progress'],
   in_progress: ['completed'],
-  completed: [], // Terminal state
+  completed: [],
 };
 
 /**
@@ -288,7 +290,7 @@ export function initPlanMetadata(ydoc: Y.Doc, init: InitPlanMetadataParams): voi
 
   map.set('id', init.id);
   map.set('title', init.title);
-  map.set('status', 'draft'); // Always initialize as draft
+  map.set('status', 'draft');
   map.set('createdAt', now);
   map.set('updatedAt', now);
 
@@ -411,7 +413,6 @@ export function getAgentPresences(ydoc: Y.Doc): Map<string, AgentPresence> {
 }
 
 export function setAgentPresence(ydoc: Y.Doc, presence: AgentPresence, actor?: string): void {
-  //
   const validated = AgentPresenceSchema.parse(presence);
 
   ydoc.transact(
@@ -474,7 +475,7 @@ export function linkArtifactToDeliverable(
   if (index === -1) return false;
 
   const existing = deliverables[index];
-  if (!existing) return false; // Should never happen, but TypeScript requires check
+  if (!existing) return false;
 
   const updated: Deliverable = {
     id: existing.id,
@@ -648,7 +649,6 @@ export function getLinkedPRs(ydoc: Y.Doc): LinkedPR[] {
 }
 
 export function linkPR(ydoc: Y.Doc, pr: LinkedPR, actor?: string): void {
-  //
   const validated = LinkedPRSchema.parse(pr);
 
   ydoc.transact(
@@ -761,7 +761,6 @@ export function markPlanAsViewed(ydoc: Y.Doc, username: string): void {
   const map = ydoc.getMap(YDOC_KEYS.METADATA);
 
   ydoc.transact(() => {
-    // NOTE: Must handle Y.Map properly (can't spread it!)
     const existingViewedBy = map.get('viewedBy');
     let viewedBy: Record<string, number> = {};
 
@@ -777,7 +776,6 @@ export function markPlanAsViewed(ydoc: Y.Doc, username: string): void {
 
     viewedBy[username] = Date.now();
 
-    // NOTE: Use Y.Map for the viewedBy to enable CRDT merging
     const viewedByMap = new Y.Map<number>();
     for (const [user, timestamp] of Object.entries(viewedBy)) {
       viewedByMap.set(user, timestamp);
@@ -832,12 +830,13 @@ export function addConversationVersion(
   version: ConversationVersion,
   actor?: string
 ): void {
+  const validated = ConversationVersionSchema.parse(version);
+
   ydoc.transact(
     () => {
       const metadata = ydoc.getMap(YDOC_KEYS.METADATA);
       const versions = (metadata.get('conversationVersions') as ConversationVersion[]) || [];
-      metadata.set('conversationVersions', [version, ...versions]);
-      metadata.set('updatedAt', Date.now());
+      metadata.set('conversationVersions', [...versions, validated]);
     },
     actor ? { actor } : undefined
   );
@@ -849,17 +848,24 @@ export function markVersionHandedOff(
   handedOffTo: string,
   actor?: string
 ): void {
+  const versions = getConversationVersions(ydoc);
+  const updated = versions.map((v) => {
+    if (v.versionId !== versionId) return v;
+
+    const handedOffVersion = {
+      ...v,
+      handedOff: true as const,
+      handedOffAt: Date.now(),
+      handedOffTo,
+    };
+
+    return ConversationVersionSchema.parse(handedOffVersion);
+  });
+
   ydoc.transact(
     () => {
       const metadata = ydoc.getMap(YDOC_KEYS.METADATA);
-      const versions = (metadata.get('conversationVersions') as ConversationVersion[]) || [];
-      const updated = versions.map((v) =>
-        v.versionId === versionId
-          ? { ...v, handedOff: true as const, handedOffAt: Date.now(), handedOffTo }
-          : v
-      );
       metadata.set('conversationVersions', updated);
-      metadata.set('updatedAt', Date.now());
     },
     actor ? { actor } : undefined
   );
@@ -1140,6 +1146,91 @@ export function unarchivePlan(ydoc: Y.Doc, actorId: string): ArchiveResult {
     },
     { actor: actorId }
   );
+
+  return { success: true };
+}
+
+/**
+ * Answer a pending input request with validation.
+ * Used by browser UI when user responds to input request modal.
+ */
+export function answerInputRequest(
+  ydoc: Y.Doc,
+  requestId: string,
+  response: string,
+  answeredBy: string
+): { success: boolean; error?: string } {
+  const requestsArray = ydoc.getArray(YDOC_KEYS.INPUT_REQUESTS);
+  const requests = requestsArray.toJSON() as InputRequest[];
+  const index = requests.findIndex((r) => r.id === requestId);
+
+  if (index === -1) {
+    return { success: false, error: 'Request not found' };
+  }
+
+  const request = requests[index];
+  if (!request) {
+    return { success: false, error: 'Request not found' };
+  }
+
+  if (request.status !== 'pending') {
+    return { success: false, error: `Request is not pending` };
+  }
+
+  const answeredRequest = {
+    ...request,
+    status: 'answered' as const,
+    response,
+    answeredAt: Date.now(),
+    answeredBy,
+  };
+
+  const validated = InputRequestSchema.parse(answeredRequest);
+
+  ydoc.transact(() => {
+    requestsArray.delete(index, 1);
+    requestsArray.insert(index, [validated]);
+  });
+
+  return { success: true };
+}
+
+/**
+ * Cancel a pending input request.
+ * Used when user closes modal without responding.
+ */
+export function cancelInputRequest(
+  ydoc: Y.Doc,
+  requestId: string
+): { success: boolean; error?: string } {
+  const requestsArray = ydoc.getArray(YDOC_KEYS.INPUT_REQUESTS);
+  const requests = requestsArray.toJSON() as InputRequest[];
+  const index = requests.findIndex((r) => r.id === requestId);
+
+  if (index === -1) {
+    return { success: false, error: 'Request not found' };
+  }
+
+  const request = requests[index];
+  if (!request) {
+    return { success: false, error: 'Request not found' };
+  }
+
+  if (request.status !== 'pending') {
+    return { success: false, error: `Request is not pending` };
+  }
+
+  const cancelledRequest = {
+    ...request,
+    status: 'cancelled' as const,
+  };
+
+  const validated = InputRequestSchema.parse(cancelledRequest);
+
+  ydoc.transact(() => {
+    requestsArray.delete(index, 1);
+    requestsArray.insert(index, [validated]);
+  });
 
   return { success: true };
 }

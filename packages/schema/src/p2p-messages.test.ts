@@ -164,7 +164,7 @@ describe('Export Start Message', () => {
   });
 
   it('throws on decode of invalid JSON', () => {
-    const invalidJson = new Uint8Array([P2PMessageType.CONVERSATION_EXPORT_START, 123]); // { in ASCII but incomplete
+    const invalidJson = new Uint8Array([P2PMessageType.CONVERSATION_EXPORT_START, 123]);
     expect(() => decodeExportStartMessage(invalidJson)).toThrow();
   });
 
@@ -247,7 +247,7 @@ describe('Chunk Message', () => {
   });
 
   it('throws on decode of message that is too short', () => {
-    const tooShort = new Uint8Array([P2PMessageType.CONVERSATION_CHUNK, 1, 2]); // Need at least 9 bytes
+    const tooShort = new Uint8Array([P2PMessageType.CONVERSATION_CHUNK, 1, 2]);
     expect(() => decodeChunkMessage(tooShort)).toThrow('too short');
   });
 
@@ -255,7 +255,7 @@ describe('Chunk Message', () => {
     const msg = new Uint8Array(9);
     msg[0] = P2PMessageType.CONVERSATION_CHUNK;
     const view = new DataView(msg.buffer);
-    view.setUint32(1, 1000, false); // claim 1000 bytes for exportId
+    view.setUint32(1, 1000, false);
 
     expect(() => decodeChunkMessage(msg)).toThrow('exportId extends beyond');
   });
@@ -361,7 +361,7 @@ describe('Schema Validation', () => {
     });
 
     it('rejects missing required fields', () => {
-      const incomplete = { exportId: 'test' }; // missing other fields
+      const incomplete = { exportId: 'test' };
       const encoder = new TextEncoder();
       const json = encoder.encode(JSON.stringify(incomplete));
       const msg = new Uint8Array(1 + json.length);

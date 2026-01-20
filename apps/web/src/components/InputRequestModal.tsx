@@ -20,7 +20,7 @@ import {
   TextField,
 } from '@heroui/react';
 import type { InputRequest } from '@shipyard/schema';
-import { logPlanEvent, YDOC_KEYS } from '@shipyard/schema';
+import { answerInputRequest, cancelInputRequest } from '@shipyard/schema';
 import type React from 'react';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
@@ -60,31 +60,15 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
   const handleCancel = useCallback(() => {
     if (!ydoc || !request) return;
 
-    ydoc.transact(() => {
-      const requestsArray = ydoc.getArray<InputRequest>(YDOC_KEYS.INPUT_REQUESTS);
-      const requests = requestsArray.toJSON() as InputRequest[];
-      const index = requests.findIndex((r) => r.id === request.id);
-
-      if (index !== -1) {
-        requestsArray.delete(index, 1);
-        requestsArray.insert(index, [
-          {
-            ...request,
-            status: 'declined',
-          },
-        ]);
-
-        // Log activity event
-        logPlanEvent(ydoc, 'input_request_declined', identity?.username || 'User', {
-          requestId: request.id,
-        });
-      }
-    });
+    const result = cancelInputRequest(ydoc, request.id);
+    if (!result.success) {
+      return;
+    }
 
     // multiSelect only exists on 'choice' type requests
     setValue(request.type === 'choice' && request.multiSelect ? [] : '');
     onClose();
-  }, [ydoc, request, identity, onClose]);
+  }, [ydoc, request, onClose]);
 
   const handleModalClose = useCallback(() => {
     // Only close modal, don't cancel request
@@ -120,7 +104,20 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
     }
   }, [remainingTime, isOpen, request, handleCancel]);
 
-  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Transaction logic with race condition checks requires comprehensive validation
+  const handleAnswerError = useCallback((error: string, onCloseFn: () => void) => {
+    if (error === 'Request already answered') {
+      toast.error('This request was already answered by another user');
+    } else if (error === 'Request not found') {
+      toast.error('This request could not be found');
+      onCloseFn();
+    } else if (error === 'Request is not pending') {
+      toast.error('This request has expired or was cancelled');
+      onCloseFn();
+    } else {
+      toast.error('Failed to submit response');
+    }
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!ydoc || !request || !identity || isSubmitting) return;
@@ -128,69 +125,19 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
     setIsSubmitting(true);
 
     try {
-      // Track if transaction actually performed an update
-      let wasUpdated = false;
-      let failureReason: 'answered' | 'cancelled' | 'not_found' | null = null;
+      // Convert array values (from multiSelect choice) to comma-separated string
+      const responseValue = Array.isArray(value) ? value.join(', ') : value;
+      const result = answerInputRequest(ydoc, request.id, responseValue, identity.username);
 
-      ydoc.transact(() => {
-        const requestsArray = ydoc.getArray<InputRequest>(YDOC_KEYS.INPUT_REQUESTS);
-        const requests = requestsArray.toJSON() as InputRequest[];
-        const index = requests.findIndex((r) => r.id === request.id);
-
-        if (index === -1) {
-          failureReason = 'not_found';
-          return;
-        }
-
-        const currentRequest = requests[index];
-        if (!currentRequest) return;
-
-        // Check if request is still pending to avoid race condition
-        if (currentRequest.status !== 'pending') {
-          failureReason = currentRequest.status === 'answered' ? 'answered' : 'cancelled';
-          return;
-        }
-
-        requestsArray.delete(index, 1);
-        requestsArray.insert(index, [
-          {
-            ...request,
-            status: 'answered',
-            response: value,
-            answeredAt: Date.now(),
-            answeredBy: identity.username,
-          },
-        ]);
-
-        // Log activity event
-        logPlanEvent(ydoc, 'input_request_answered', identity.username, {
-          requestId: request.id,
-          response: value,
-          answeredBy: identity.username,
-        });
-
-        wasUpdated = true;
-      });
-
-      // Only close modal and clear value if update succeeded
-      if (wasUpdated) {
-        // multiSelect only exists on 'choice' type requests
-        setValue(request.type === 'choice' && request.multiSelect ? [] : '');
-        onClose();
-      } else {
-        // Show appropriate error message based on failure reason
-        if (failureReason === 'answered') {
-          toast.error('This request was already answered by another user');
-        } else if (failureReason === 'cancelled') {
-          toast.error('This request has expired or was cancelled');
-          // Auto-close modal for cancelled requests since they're no longer valid
-          onClose();
-        } else {
-          toast.error('This request could not be found');
-          onClose();
-        }
-        // Keep modal open for 'answered' case so user can see the message
+      if (!result.success) {
+        handleAnswerError(result.error || 'Unknown error', onClose);
+        return;
       }
+
+      // Success - close modal and clear value
+      // multiSelect only exists on 'choice' type requests
+      setValue(request.type === 'choice' && request.multiSelect ? [] : '');
+      onClose();
     } finally {
       setIsSubmitting(false);
     }
@@ -205,81 +152,28 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
   };
 
   const handleConfirmResponse = useCallback(
-    // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Transaction logic with race condition checks requires comprehensive validation
     (response: 'yes' | 'no') => {
       if (!ydoc || !request || !identity || isSubmitting) return;
 
       setIsSubmitting(true);
 
       try {
-        // Track if transaction actually performed an update
-        let wasUpdated = false;
-        let failureReason: 'answered' | 'cancelled' | 'not_found' | null = null;
+        const result = answerInputRequest(ydoc, request.id, response, identity.username);
 
-        ydoc.transact(() => {
-          const requestsArray = ydoc.getArray<InputRequest>(YDOC_KEYS.INPUT_REQUESTS);
-          const requests = requestsArray.toJSON() as InputRequest[];
-          const index = requests.findIndex((r) => r.id === request.id);
-
-          if (index === -1) {
-            failureReason = 'not_found';
-            return;
-          }
-
-          const currentRequest = requests[index];
-          if (!currentRequest) return;
-
-          // Check if request is still pending to avoid race condition
-          if (currentRequest.status !== 'pending') {
-            failureReason = currentRequest.status === 'answered' ? 'answered' : 'cancelled';
-            return;
-          }
-
-          requestsArray.delete(index, 1);
-          requestsArray.insert(index, [
-            {
-              ...request,
-              status: 'answered',
-              response,
-              answeredAt: Date.now(),
-              answeredBy: identity.username,
-            },
-          ]);
-
-          // Log activity event
-          logPlanEvent(ydoc, 'input_request_answered', identity.username, {
-            requestId: request.id,
-            response,
-            answeredBy: identity.username,
-          });
-
-          wasUpdated = true;
-        });
-
-        // Only close modal and clear value if update succeeded
-        if (wasUpdated) {
-          // multiSelect only exists on 'choice' type requests
-          setValue(request.type === 'choice' && request.multiSelect ? [] : '');
-          onClose();
-        } else {
-          // Show appropriate error message based on failure reason
-          if (failureReason === 'answered') {
-            toast.error('This request was already answered by another user');
-          } else if (failureReason === 'cancelled') {
-            toast.error('This request has expired or was cancelled');
-            // Auto-close modal for cancelled requests since they're no longer valid
-            onClose();
-          } else {
-            toast.error('This request could not be found');
-            onClose();
-          }
-          // Keep modal open for 'answered' case so user can see the message
+        if (!result.success) {
+          handleAnswerError(result.error || 'Unknown error', onClose);
+          return;
         }
+
+        // Success - close modal and clear value
+        // multiSelect only exists on 'choice' type requests
+        setValue(request.type === 'choice' && request.multiSelect ? [] : '');
+        onClose();
       } finally {
         setIsSubmitting(false);
       }
     },
-    [ydoc, request, identity, isSubmitting, onClose]
+    [ydoc, request, identity, isSubmitting, onClose, handleAnswerError]
   );
 
   // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Input type switching with form validation requires comprehensive handling

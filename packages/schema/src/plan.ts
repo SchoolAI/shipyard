@@ -161,10 +161,10 @@ export type PlanEventType = (typeof PlanEventTypes)[number];
  * Used in agent_activity events to communicate agent state to humans.
  */
 export const AgentActivityTypes = [
-  'help_request', // non-blocking request for help
-  'help_request_resolved', // help request resolved
-  'blocker', // hit a blocker
-  'blocker_resolved', // blocker resolved
+  'help_request',
+  'help_request_resolved',
+  'blocker',
+  'blocker_resolved',
 ] as const;
 export type AgentActivityType = (typeof AgentActivityTypes)[number];
 
