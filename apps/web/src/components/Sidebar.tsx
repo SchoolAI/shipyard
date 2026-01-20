@@ -250,7 +250,10 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
   const content = (
     <>
       <div className="px-3 py-3 border-b border-separator flex items-center justify-between">
-        <h2 className="font-semibold text-lg text-foreground">Tasks</h2>
+        <div className="flex items-center gap-2">
+          <img src="/icon.svg" alt="Shipyard" className="w-5 h-5" />
+          <h2 className="font-semibold text-lg text-foreground">Shipyard</h2>
+        </div>
         <div className="flex items-center gap-1">
           <Tooltip>
             <Tooltip.Trigger>
