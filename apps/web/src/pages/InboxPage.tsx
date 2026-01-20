@@ -254,9 +254,8 @@ export function InboxPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { identity: githubIdentity } = useGitHubAuth();
-  const { allInboxPlans, markPlanAsRead, isLoading, timedOut } = usePlanIndex(
-    githubIdentity?.username
-  );
+  const { allInboxPlans, markPlanAsRead, refreshInboxUnreadState, isLoading, timedOut } =
+    usePlanIndex(githubIdentity?.username);
   const { ydoc: indexDoc } = useMultiProviderSync(PLAN_INDEX_DOC_NAME);
   const [showRead, setShowRead] = useState(getInboxShowRead);
   const { actor } = useUserIdentity();
@@ -372,9 +371,10 @@ export function InboxPage() {
       }
 
       clearPlanIndexViewedBy(indexDoc, planId, githubIdentity.username);
+      refreshInboxUnreadState();
       toast.success('Marked as unread');
     },
-    [githubIdentity, indexDoc]
+    [githubIdentity, indexDoc, refreshInboxUnreadState]
   );
 
   // Helper to find the next plan to select after dismissal
