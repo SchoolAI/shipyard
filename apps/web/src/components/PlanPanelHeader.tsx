@@ -49,6 +49,8 @@ export interface PlanPanelHeaderProps {
   onRequestIdentity?: () => void;
   /** BlockNote editor instance */
   editor?: BlockNoteEditor | null;
+  /** Called after status change (for updating plan index) */
+  onStatusChange?: (newStatus: 'in_progress' | 'changes_requested', updatedAt: number) => void;
 }
 
 /** Map status to display config */
@@ -114,6 +116,7 @@ export function PlanPanelHeader({
   identity,
   onRequestIdentity,
   editor,
+  onStatusChange,
 }: PlanPanelHeaderProps) {
   const statusConfig = getStatusConfig(metadata.status);
   const showReviewActions = metadata.status === 'pending_review';
@@ -194,6 +197,7 @@ export function PlanPanelHeader({
                 identity={identity ?? null}
                 onRequestIdentity={onRequestIdentity}
                 editor={editor ?? null}
+                onStatusChange={onStatusChange}
               />
             ) : (
               // Fallback to simple buttons

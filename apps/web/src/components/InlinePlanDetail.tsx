@@ -48,6 +48,8 @@ export interface InlinePlanDetailProps {
   width?: PanelWidth;
   /** Message shown when no plan is selected */
   emptyMessage?: string;
+  /** Called after status change (for updating plan index) */
+  onStatusChange?: (newStatus: 'in_progress' | 'changes_requested', updatedAt: number) => void;
 }
 
 /**
@@ -63,6 +65,7 @@ export function InlinePlanDetail({
   onExpand,
   width = 'peek',
   emptyMessage = 'Select a task to view details',
+  onStatusChange,
 }: InlinePlanDetailProps) {
   const navigate = useNavigate();
   const { identity: githubIdentity, startAuth } = useGitHubAuth();
@@ -192,6 +195,7 @@ export function InlinePlanDetail({
           identity={identity}
           onRequestIdentity={handleRequestIdentity}
           editor={editor}
+          onStatusChange={onStatusChange}
         />
         <div className="flex-1 overflow-y-auto">
           <PlanContent

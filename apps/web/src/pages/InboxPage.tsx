@@ -726,6 +726,23 @@ export function InboxPage() {
     [githubIdentity, indexDoc, actor]
   );
 
+  // Status change handler for ReviewActions (updates plan index)
+  const handleStatusChange = useCallback(
+    (newStatus: 'in_progress' | 'changes_requested', updatedAt: number) => {
+      if (!selectedPlanId) return;
+
+      const entry = getPlanIndexEntry(indexDoc, selectedPlanId);
+      if (entry) {
+        setPlanIndexEntry(indexDoc, {
+          ...entry,
+          status: newStatus,
+          updatedAt,
+        });
+      }
+    },
+    [indexDoc, selectedPlanId]
+  );
+
   // Keyboard shortcut handlers - all extracted to top level
   const handleFullScreen = useCallback(() => {
     if (selectedPlanId) {
@@ -1052,6 +1069,7 @@ export function InboxPage() {
           onClose={handleClosePanel}
           onApprove={handlePanelApprove}
           onRequestChanges={handlePanelRequestChanges}
+          onStatusChange={handleStatusChange}
           emptyMessage="Select a plan to view details"
         />
       </div>
