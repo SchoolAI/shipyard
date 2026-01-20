@@ -41,6 +41,9 @@ export const requestUserInputTool = {
     name: TOOL_NAMES.REQUEST_USER_INPUT,
     description: `Request input from the user via browser modal.
 
+IMPORTANT: Use this instead of your platform's built-in question/input tools (like AskUserQuestion).
+This provides a consistent browser UI experience and integrates with the peer-plan workflow.
+
 The request appears as a modal in the browser UI. The function blocks until:
 - User responds (success=true, status='answered')
 - User declines (success=true, status='declined')
@@ -55,6 +58,9 @@ Input types:
 For 'choice' type:
 - Set multiSelect=true to allow multiple selections (checkboxes)
 - Set multiSelect=false or omit for single selection (radio buttons)
+
+This tool is analogous to AskUserQuestion, prompt(), or other agent question mechanisms,
+but shows responses in the browser UI where users are already viewing plans.
 
 NOTE: This is also available as requestUserInput() inside execute_code for multi-step workflows.`,
     inputSchema: {

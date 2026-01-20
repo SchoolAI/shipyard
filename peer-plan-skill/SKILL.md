@@ -113,10 +113,47 @@ if (status.status === "changes_requested") {
 }
 ```
 
+## Asking Users Questions
+
+**IMPORTANT:** If you need to ask the user a question, use the `request_user_input` MCP tool (or `requestUserInput()` in execute_code) instead of your platform's built-in question mechanisms.
+
+Your platform may have built-in tools like:
+- Claude Code: `AskUserQuestion`
+- Devin/Cursor: `prompt()` or similar
+- Other agents: Various question/input mechanisms
+
+**Use peer-plan's version instead** because:
+- ✅ Shows in the browser UI (where users are already viewing plans)
+- ✅ Integrates with the activity log
+- ✅ Consistent UX across all agent platforms
+- ✅ Can be linked to specific plans (via `planId` parameter)
+
+**Standalone tool:**
+```typescript
+const result = await mcp.call_tool('request_user_input', {
+  message: "Which database should we use?",
+  type: "choice",
+  options: ["PostgreSQL", "MongoDB"]
+});
+
+if (result.success) {
+  console.log("User chose:", result.response);
+}
+```
+
+**Via execute_code (multi-step workflows):**
+```typescript
+const result = await requestUserInput({
+  message: "Proceed with deployment?",
+  type: "confirm"
+});
+```
+
 ## Available APIs
 
 | API | Purpose |
 |-----|---------|
+| `requestUserInput(opts)` | Ask user a question (use instead of built-in tools) |
 | `createPlan(opts)` | Start a new verified plan |
 | `addArtifact(opts)` | Upload proof (screenshot, video, test_results, diff) |
 | `readPlan(planId, token, opts)` | Check status and reviewer feedback |
