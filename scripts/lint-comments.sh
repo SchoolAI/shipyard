@@ -3,6 +3,7 @@ set -e
 
 PACKAGES=(
   "packages/shared"
+  "apps/github-oauth-worker"
 )
 
 echo "🔍 Checking comment style (ESLint)..."

@@ -56,7 +56,6 @@ function getCorsHeaders(origin: string | null, env: Env): Record<string, string>
   const allowedOrigins = ALLOWED_ORIGINS[env.ENVIRONMENT] || ALLOWED_ORIGINS.production;
   const isAllowed = origin && allowedOrigins.includes(origin);
 
-  // Return null for unauthorized origins - caller should reject the request
   if (!isAllowed) {
     return null;
   }
@@ -82,7 +81,6 @@ export default {
     const origin = request.headers.get('Origin');
     const corsHeaders = getCorsHeaders(origin, env);
 
-    // Health check endpoint - includes environment for deployment verification
     // No CORS required - this is for monitoring, not browser calls
     if (url.pathname === '/health') {
       return new Response(JSON.stringify({ status: 'OK', environment: env.ENVIRONMENT }), {

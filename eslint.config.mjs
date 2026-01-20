@@ -3,7 +3,12 @@ import localRules from './eslint-local-rules.mjs';
 
 export default [
   {
-    files: ['packages/shared/**/*.ts', 'packages/shared/**/*.tsx'],
+    files: [
+      'packages/shared/**/*.ts',
+      'packages/shared/**/*.tsx',
+      'apps/github-oauth-worker/**/*.ts',
+      'apps/github-oauth-worker/**/*.tsx',
+    ],
     languageOptions: {
       parser: tsParser,
       parserOptions: {
