@@ -18,10 +18,6 @@ import {
   P2PMessageType,
 } from './p2p-messages.js';
 
-// =============================================================================
-// Test Fixtures
-// =============================================================================
-
 const sampleStartMeta: ConversationExportStartMeta = {
   exportId: 'export-123',
   totalChunks: 10,
@@ -44,10 +40,6 @@ const sampleEnd: ConversationExportEnd = {
   checksum: 'abc123def456',
 };
 
-// =============================================================================
-// Tests: Message Type Constants
-// =============================================================================
-
 describe('P2PMessageType', () => {
   it('defines distinct message type bytes', () => {
     expect(P2PMessageType.CONVERSATION_EXPORT_START).toBe(0xf0);
@@ -68,10 +60,6 @@ describe('P2PMessageType', () => {
     }
   });
 });
-
-// =============================================================================
-// Tests: Type Guards
-// =============================================================================
 
 describe('Type Guards', () => {
   describe('isConversationExportStart', () => {
@@ -146,10 +134,6 @@ describe('Type Guards', () => {
   });
 });
 
-// =============================================================================
-// Tests: Export Start Message Encoding/Decoding
-// =============================================================================
-
 describe('Export Start Message', () => {
   it('encodes and decodes correctly', () => {
     const encoded = encodeExportStartMessage(sampleStartMeta);
@@ -194,10 +178,6 @@ describe('Export Start Message', () => {
     expect(() => decodeExportStartMessage(msg)).toThrow();
   });
 });
-
-// =============================================================================
-// Tests: Chunk Message Encoding/Decoding
-// =============================================================================
 
 describe('Chunk Message', () => {
   it('encodes and decodes correctly', () => {
@@ -274,17 +254,12 @@ describe('Chunk Message', () => {
   it('throws when exportId extends beyond message', () => {
     const msg = new Uint8Array(9);
     msg[0] = P2PMessageType.CONVERSATION_CHUNK;
-    // Set exportId length to a huge value (beyond message)
     const view = new DataView(msg.buffer);
     view.setUint32(1, 1000, false); // claim 1000 bytes for exportId
 
     expect(() => decodeChunkMessage(msg)).toThrow('exportId extends beyond');
   });
 });
-
-// =============================================================================
-// Tests: Export End Message Encoding/Decoding
-// =============================================================================
 
 describe('Export End Message', () => {
   it('encodes and decodes correctly', () => {
@@ -318,10 +293,6 @@ describe('Export End Message', () => {
     expect(() => decodeExportEndMessage(wrongType)).toThrow('wrong type byte');
   });
 });
-
-// =============================================================================
-// Tests: Generic Message Decoding
-// =============================================================================
 
 describe('decodeP2PMessage', () => {
   it('decodes export start message', () => {
@@ -364,28 +335,16 @@ describe('decodeP2PMessage', () => {
   });
 });
 
-// =============================================================================
-// Tests: Exhaustive Handling Helper
-// =============================================================================
-
 describe('assertNeverP2PMessage', () => {
   it('throws with descriptive error', () => {
-    // This tests the exhaustiveness helper
-    // In practice, TypeScript ensures this is never called
-    // but we test it for runtime safety
     const fakeNever = { type: 'unknown', payload: {} } as never;
     expect(() => assertNeverP2PMessage(fakeNever)).toThrow('Unhandled P2P message type');
   });
 });
 
-// =============================================================================
-// Tests: Schema Validation
-// =============================================================================
-
 describe('Schema Validation', () => {
   describe('ConversationExportStartMetaSchema', () => {
     it('validates correct start meta', () => {
-      // Validation happens in decodeExportStartMessage
       const encoded = encodeExportStartMessage(sampleStartMeta);
       expect(() => decodeExportStartMessage(encoded)).not.toThrow();
     });
@@ -420,22 +379,14 @@ describe('Schema Validation', () => {
     });
 
     it('rejects negative chunk index', () => {
-      // This would require manual message construction since our encoder
-      // uses valid values. We test by ensuring the decoder validates.
       const msg = new Uint8Array(20);
       msg[0] = P2PMessageType.CONVERSATION_CHUNK;
       const view = new DataView(msg.buffer);
 
-      // Export ID length = 5
       view.setUint32(1, 5, false);
-      // Export ID = "test\0"
       msg.set(new TextEncoder().encode('test\0'), 5);
-      // Chunk index as max uint32 (but schema expects nonnegative)
-      // Actually nonnegative allows 0 and positive, so max uint32 is valid
-      // We'll test this passes
       view.setUint32(10, 4294967295, false);
 
-      // This should not throw since nonnegative allows any uint32
       expect(() => decodeChunkMessage(msg)).not.toThrow();
     });
   });
@@ -459,16 +410,11 @@ describe('Schema Validation', () => {
   });
 });
 
-// =============================================================================
-// Tests: Round-Trip
-// =============================================================================
-
 describe('Round-Trip Tests', () => {
   it('start message survives encode/decode round-trip', () => {
     const encoded = encodeExportStartMessage(sampleStartMeta);
     const decoded = decodeExportStartMessage(encoded);
 
-    // Re-encode and compare
     const reencoded = encodeExportStartMessage(decoded);
     const redecoded = decodeExportStartMessage(reencoded);
 
@@ -496,7 +442,6 @@ describe('Round-Trip Tests', () => {
   });
 
   it('preserves binary data integrity through chunk encoding', () => {
-    // Create binary data with all possible byte values
     const allBytes = new Uint8Array(256);
     for (let i = 0; i < 256; i++) {
       allBytes[i] = i;

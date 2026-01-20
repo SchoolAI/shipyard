@@ -25,8 +25,6 @@ import {
 import { parseThreads } from './thread.js';
 import { YDOC_KEYS } from './yjs-keys.js';
 
-// --- Type-Safe Metadata Updates ---
-
 /**
  * Fields that can be safely updated without changing status.
  * These are the common base fields that don't have invariants with status.
@@ -145,7 +143,6 @@ export function getPlanMetadataWithValidation(ydoc: Y.Doc): GetPlanMetadataResul
   const map = ydoc.getMap('metadata');
   const data = map.toJSON();
 
-  // Check if metadata exists
   if (!data || Object.keys(data).length === 0) {
     return { success: false, error: 'No metadata found in Y.Doc' };
   }
@@ -221,10 +218,8 @@ export function transitionPlanStatus(
     () => {
       const map = ydoc.getMap('metadata');
 
-      // Set status
       map.set('status', transition.status);
 
-      // Set status-specific fields based on transition type
       switch (transition.status) {
         case 'pending_review':
           map.set('reviewRequestId', transition.reviewRequestId);
@@ -310,17 +305,14 @@ export function initPlanMetadata(ydoc: Y.Doc, init: InitPlanMetadataParams): voi
     map.set('sessionTokenHash', init.sessionTokenHash);
   }
 
-  // Origin tracking for conversation export (Issue #41)
   if (init.origin) {
     map.set('origin', init.origin);
   }
 
-  // Tags for organization (Issue #37)
   if (init.tags) {
     map.set('tags', init.tags);
   }
 
-  // Validate final state after initialization
   const result = getPlanMetadataWithValidation(ydoc);
   if (!result.success) {
     throw new Error(`Failed to initialize metadata: ${result.error}`);
@@ -352,30 +344,24 @@ export function getArtifacts(ydoc: Y.Doc): Artifact[] {
   const array = ydoc.getArray<Artifact>(YDOC_KEYS.ARTIFACTS);
   const data = array.toJSON() as unknown[];
 
-  return (
-    data
-      // Migrate legacy artifacts: if has url but no storage, assume GitHub
-      .map((item: unknown) => {
-        // Skip null/non-object entries
-        if (!item || typeof item !== 'object') {
-          return null;
-        }
-        const artifact = item as Record<string, unknown>;
-        if (artifact.url && !artifact.storage) {
-          return { ...artifact, storage: 'github' };
-        }
-        // Skip corrupted artifacts without storage info (silent filter)
-        if (!artifact.storage && !artifact.url && !artifact.localArtifactId) {
-          return null;
-        }
-        return artifact;
-      })
-      // Filter out null entries and validate with schema
-      .filter((item): item is Record<string, unknown> => item !== null)
-      .map((item) => ArtifactSchema.safeParse(item))
-      .filter((result) => result.success)
-      .map((result) => result.data)
-  );
+  return data
+    .map((item: unknown) => {
+      if (!item || typeof item !== 'object') {
+        return null;
+      }
+      const artifact = item as Record<string, unknown>;
+      if (artifact.url && !artifact.storage) {
+        return { ...artifact, storage: 'github' };
+      }
+      if (!artifact.storage && !artifact.url && !artifact.localArtifactId) {
+        return null;
+      }
+      return artifact;
+    })
+    .filter((item): item is Record<string, unknown> => item !== null)
+    .map((item) => ArtifactSchema.safeParse(item))
+    .filter((result) => result.success)
+    .map((result) => result.data);
 }
 
 export function addArtifact(ydoc: Y.Doc, artifact: Artifact, actor?: string): void {
@@ -425,13 +411,7 @@ export function getAgentPresences(ydoc: Y.Doc): Map<string, AgentPresence> {
 }
 
 export function setAgentPresence(ydoc: Y.Doc, presence: AgentPresence, actor?: string): void {
-  // CRITICAL: Validate BEFORE transaction to prevent partial writes on validation failure
-  // If validation throws mid-transaction, the transaction may have partial state
   //
-  // Why validation-first pattern matters:
-  // - If validation throws inside transaction, Y.Doc may contain partial/corrupted state
-  // - Pre-validation ensures atomic all-or-nothing behavior
-  // - Failed validation returns clear error without touching Y.Doc
   const validated = AgentPresenceSchema.parse(presence);
 
   ydoc.transact(
@@ -470,7 +450,6 @@ export function getDeliverables(ydoc: Y.Doc): Deliverable[] {
 }
 
 export function addDeliverable(ydoc: Y.Doc, deliverable: Deliverable, actor?: string): void {
-  // Validate before writing to catch programmer errors at the source
   const validated = DeliverableSchema.parse(deliverable);
 
   ydoc.transact(
@@ -567,7 +546,6 @@ export function approveUser(ydoc: Y.Doc, userId: string, actor?: string): void {
 export function revokeUser(ydoc: Y.Doc, userId: string, actor?: string): boolean {
   const ownerId = getPlanOwnerId(ydoc);
 
-  // Cannot revoke the plan owner
   if (userId === ownerId) {
     return false;
   }
@@ -609,7 +587,6 @@ export function isUserRejected(ydoc: Y.Doc, userId: string): boolean {
 export function rejectUser(ydoc: Y.Doc, userId: string, actor?: string): void {
   const ownerId = getPlanOwnerId(ydoc);
 
-  // Cannot reject the plan owner
   if (userId === ownerId) {
     return;
   }
@@ -621,12 +598,10 @@ export function rejectUser(ydoc: Y.Doc, userId: string, actor?: string): void {
     () => {
       const map = ydoc.getMap('metadata');
 
-      // Add to rejected list if not already there
       if (!currentRejected.includes(userId)) {
         map.set('rejectedUsers', [...currentRejected, userId]);
       }
 
-      // Remove from approved list if present
       if (currentApproved.includes(userId)) {
         map.set(
           'approvedUsers',
@@ -673,13 +648,7 @@ export function getLinkedPRs(ydoc: Y.Doc): LinkedPR[] {
 }
 
 export function linkPR(ydoc: Y.Doc, pr: LinkedPR, actor?: string): void {
-  // CRITICAL: Validate BEFORE transaction to prevent partial writes on validation failure
-  // If validation throws mid-transaction, the transaction may have partial state
   //
-  // Why validation-first pattern matters:
-  // - If validation throws inside transaction, Y.Doc may contain partial/corrupted state
-  // - Pre-validation ensures atomic all-or-nothing behavior
-  // - Failed validation returns clear error without touching Y.Doc
   const validated = LinkedPRSchema.parse(pr);
 
   ydoc.transact(
@@ -688,7 +657,6 @@ export function linkPR(ydoc: Y.Doc, pr: LinkedPR, actor?: string): void {
       const existing = array.toJSON() as LinkedPR[];
       const index = existing.findIndex((p) => p.prNumber === validated.prNumber);
 
-      // Remove existing PR with same number if present
       if (index !== -1) {
         array.delete(index, 1);
       }
@@ -751,7 +719,6 @@ export function getPRReviewCommentsForPR(ydoc: Y.Doc, prNumber: number): PRRevie
 }
 
 export function addPRReviewComment(ydoc: Y.Doc, comment: PRReviewComment, actor?: string): void {
-  // Validate before writing to catch programmer errors at the source
   const validated = PRReviewCommentSchema.parse(comment);
 
   ydoc.transact(
@@ -799,14 +766,12 @@ export function markPlanAsViewed(ydoc: Y.Doc, username: string): void {
     let viewedBy: Record<string, number> = {};
 
     if (existingViewedBy instanceof Y.Map) {
-      // Convert Y.Map to plain object using iteration (toJSON also works)
       for (const [key, value] of existingViewedBy.entries()) {
         if (typeof value === 'number') {
           viewedBy[key] = value;
         }
       }
     } else if (existingViewedBy && typeof existingViewedBy === 'object') {
-      // Handle plain object (shouldn't happen but be safe)
       viewedBy = { ...(existingViewedBy as Record<string, number>) };
     }
 
@@ -827,7 +792,6 @@ export function getViewedBy(ydoc: Y.Doc): Record<string, number> {
 
   if (!viewedBy) return {};
 
-  // Handle both Y.Map and plain object formats
   if (viewedBy instanceof Y.Map) {
     const result: Record<string, number> = {};
     for (const [key, value] of viewedBy.entries()) {
@@ -853,10 +817,8 @@ export function isPlanUnread(
   const viewed = viewedBy ?? {};
   const lastViewed = viewed[username];
 
-  // Never viewed = unread
   if (!lastViewed) return true;
 
-  // Viewed after last update = read
   return lastViewed < metadata.updatedAt;
 }
 
@@ -947,10 +909,8 @@ export function logPlanEvent<T extends PlanEventType>(
   const eventsArray = ydoc.getArray<PlanEvent>(YDOC_KEYS.EVENTS);
   const [data, options] = args;
 
-  // Use provided ID or generate a new one
   const eventId = options?.id ?? nanoid();
 
-  // Build event object - only include data if present
   const baseEvent = {
     id: eventId,
     type,
@@ -960,11 +920,8 @@ export function logPlanEvent<T extends PlanEventType>(
     inboxFor: options?.inboxFor,
   };
 
-  // Construct event with or without data - TypeScript enforces correct data shape via generics
   const rawEvent = data !== undefined ? { ...baseEvent, data } : baseEvent;
 
-  // Runtime validation ensures event matches PlanEvent discriminated union
-  // This replaces the unsafe `as PlanEvent` cast with proper validation
   const parsed = PlanEventSchema.safeParse(rawEvent);
   if (!parsed.success) {
     throw new Error(`Invalid plan event: ${parsed.error.message}`);
@@ -983,8 +940,6 @@ export function getPlanEvents(ydoc: Y.Doc): PlanEvent[] {
     .filter((result) => result.success)
     .map((result) => result.data);
 }
-
-// --- Plan Snapshots (Issue #42) ---
 
 /**
  * Get all snapshots from the Y.Doc.
@@ -1006,7 +961,6 @@ export function getSnapshots(ydoc: Y.Doc): PlanSnapshot[] {
  * Snapshots are append-only for CRDT correctness.
  */
 export function addSnapshot(ydoc: Y.Doc, snapshot: PlanSnapshot, actor?: string): void {
-  // Validate before writing to catch programmer errors at the source
   const validated = PlanSnapshotSchema.parse(snapshot);
 
   ydoc.transact(
@@ -1036,13 +990,11 @@ export function createPlanSnapshot(
   status: PlanStatusType,
   blocks: unknown[]
 ): PlanSnapshot {
-  // Get thread summary
   const threadsMap = ydoc.getMap<Record<string, unknown>>(YDOC_KEYS.THREADS);
   const threadsData = threadsMap.toJSON() as Record<string, unknown>;
   const threads = parseThreads(threadsData);
   const unresolved = threads.filter((t) => !t.resolved).length;
 
-  // Get artifacts and deliverables
   const artifacts = getArtifacts(ydoc);
   const deliverables = getDeliverables(ydoc);
 
@@ -1075,8 +1027,6 @@ export function getLatestSnapshot(ydoc: Y.Doc): PlanSnapshot | null {
   return snapshots[snapshots.length - 1] ?? null;
 }
 
-// --- Tag Management (Issue #37) ---
-
 /**
  * Add a tag to a plan (automatically normalizes and deduplicates).
  * Tags are normalized to lowercase and trimmed to prevent duplicates.
@@ -1087,7 +1037,6 @@ export function addPlanTag(ydoc: Y.Doc, tag: string, actor?: string): void {
       const map = ydoc.getMap('metadata');
       const currentTags = (map.get('tags') as string[]) || [];
 
-      // Normalize tag (lowercase, trim whitespace)
       const normalizedTag = tag.toLowerCase().trim();
       if (!normalizedTag || currentTags.includes(normalizedTag)) return;
 
@@ -1135,8 +1084,6 @@ export function getAllTagsFromIndex(indexEntries: Array<{ tags?: string[] }>): s
 
   return Array.from(tagSet).sort();
 }
-
-// --- Archive Management ---
 
 /**
  * Result type for archive operations.

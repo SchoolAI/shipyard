@@ -27,7 +27,6 @@ describe('YDOC_KEYS', () => {
   });
 
   it('should be type-safe', () => {
-    // This is a compile-time test - if it compiles, it passes
     const key: YDocKey = YDOC_KEYS.METADATA;
     expect(key).toBe('metadata');
   });
@@ -59,7 +58,6 @@ describe('isValidYDocKey', () => {
     const key = 'metadata' as string;
 
     if (isValidYDocKey(key)) {
-      // TypeScript should know key is YDocKey here
       const typed: YDocKey = key;
       expect(typed).toBe('metadata');
     }
@@ -68,16 +66,7 @@ describe('isValidYDocKey', () => {
 
 describe('Type safety', () => {
   it('should prevent typos at compile time', () => {
-    // This test ensures the constants prevent typos
-
-    // ✅ This compiles - using the constant
     const validKey: YDocKey = YDOC_KEYS.METADATA;
     expect(validKey).toBe('metadata');
-
-    // ❌ This would NOT compile if uncommented:
-    // const invalidKey: YDocKey = 'metdata'; // Typo!
-
-    // The point is that by using YDOC_KEYS.METADATA instead of 'metadata',
-    // we get autocomplete and compile-time checking
   });
 });

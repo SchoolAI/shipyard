@@ -116,7 +116,6 @@ describe('Artifact helpers', () => {
   it('getArtifacts filters out invalid entries', () => {
     const array = ydoc.getArray('artifacts');
 
-    // Valid artifact
     array.push([
       {
         id: 'art-1',
@@ -127,7 +126,6 @@ describe('Artifact helpers', () => {
       },
     ]);
 
-    // Invalid entries (missing required fields)
     array.push([{ id: 'art-2', filename: 'no-type.png' }]); // Missing type
     array.push([{ type: 'screenshot' }]); // Missing id and filename
     array.push([null]); // Completely invalid
@@ -167,7 +165,6 @@ describe('Artifact helpers', () => {
       const invalidArtifact = {
         id: 'art-1',
         type: 'screenshot',
-        // Missing: filename, storage
       } as any;
 
       expect(() => addArtifact(ydoc, invalidArtifact)).toThrow();
@@ -191,7 +188,6 @@ describe('Artifact helpers', () => {
         type: 'screenshot',
         filename: 'test.png',
         storage: 'github',
-        // Missing: url (required for github storage)
       } as any;
 
       expect(() => addArtifact(ydoc, invalidArtifact)).toThrow();
@@ -203,7 +199,6 @@ describe('Artifact helpers', () => {
         type: 'screenshot',
         filename: 'test.png',
         storage: 'local',
-        // Missing: localArtifactId (required for local storage)
       } as any;
 
       expect(() => addArtifact(ydoc, invalidArtifact)).toThrow();
@@ -260,18 +255,12 @@ describe('ViewedBy helpers', () => {
   });
 
   it('markPlanAsViewed preserves other users when adding new user', () => {
-    // First user marks as viewed
     markPlanAsViewed(ydoc, 'user1');
     const user1Timestamp = getViewedBy(ydoc).user1;
 
-    // Wait a bit so timestamps differ
-    // (In practice they might be same millisecond, but the test verifies preservation)
-
-    // Second user marks as viewed
     markPlanAsViewed(ydoc, 'user2');
     const viewedBy = getViewedBy(ydoc);
 
-    // Both users should be present
     expect(Object.keys(viewedBy)).toHaveLength(2);
     expect(viewedBy.user1).toBe(user1Timestamp);
     expect(viewedBy.user2).toBeDefined();
@@ -281,7 +270,6 @@ describe('ViewedBy helpers', () => {
     markPlanAsViewed(ydoc, 'user1');
     const firstTimestamp = getViewedBy(ydoc).user1;
 
-    // Wait to ensure different timestamp
     const start = Date.now();
     while (Date.now() === start) {
       /* spin until next ms */
@@ -322,11 +310,8 @@ describe('ViewedBy helpers', () => {
   });
 
   it('markPlanAsViewed works with existing Y.Map viewedBy (the Y.Map spread bug test)', () => {
-    // This tests the bug where spreading a Y.Map gave internal properties instead of data
-    // First mark creates the Y.Map
     markPlanAsViewed(ydoc, 'user1');
 
-    // Second mark should read the Y.Map correctly and preserve user1
     markPlanAsViewed(ydoc, 'user2');
 
     const viewedBy = getViewedBy(ydoc);
@@ -500,10 +485,8 @@ describe('User access control helpers', () => {
       map.set('ownerId', 'owner123');
       map.set('approvedUsers', ['owner123', 'user1']);
 
-      // Attempt to revoke owner
       const result = revokeUser(ydoc, 'owner123');
 
-      // Should return false and leave owner in approved list
       expect(result).toBe(false);
       expect(getApprovedUsers(ydoc)).toContain('owner123');
     });
@@ -547,10 +530,8 @@ describe('User access control helpers', () => {
       map.set('ownerId', 'owner123');
       map.set('approvedUsers', ['owner123', 'user1']);
 
-      // Attempt to reject owner
       rejectUser(ydoc, 'owner123');
 
-      // Owner should remain in approved, not added to rejected
       expect(getApprovedUsers(ydoc)).toContain('owner123');
       expect(getRejectedUsers(ydoc)).not.toContain('owner123');
     });
@@ -661,10 +642,8 @@ describe('PR linking helpers', () => {
     it('filters out invalid entries', () => {
       const array = ydoc.getArray('linkedPRs');
 
-      // Valid PR
       array.push([createPR(1)]);
 
-      // Invalid entries
       array.push([{ prNumber: 2 }]); // Missing required fields
       array.push([null]);
 
@@ -791,7 +770,6 @@ describe('PR linking helpers', () => {
     it('rejects invalid PR (missing required fields)', () => {
       const invalidPR = {
         prNumber: 42,
-        // Missing: url, status, branch, title
       } as LinkedPR;
 
       expect(() => linkPR(ydoc, invalidPR)).toThrow();
@@ -861,10 +839,8 @@ describe('Deliverables helpers', () => {
     it('filters out invalid entries', () => {
       const array = ydoc.getArray('deliverables');
 
-      // Valid deliverable
       array.push([createDeliverable('del-1', 'Valid')]);
 
-      // Invalid entries
       array.push([{ id: 'del-2' }]); // Missing text
       array.push([{ text: 'No ID' }]); // Missing id
       array.push([null]);
@@ -969,7 +945,6 @@ describe('Plan metadata helpers', () => {
     it('returns null for invalid metadata', () => {
       const map = ydoc.getMap('metadata');
       map.set('id', 'plan-1');
-      // Missing required fields like title, status, createdAt, updatedAt
       expect(getPlanMetadata(ydoc)).toBe(null);
     });
 
@@ -1185,14 +1160,10 @@ describe('Plan metadata helpers', () => {
       });
 
       it('throws if metadata becomes invalid during initialization', () => {
-        // Pre-corrupt the metadata map to simulate a corrupted state
         const map = ydoc.getMap('metadata');
         map.set('id', 'corrupt-plan');
         map.set('title', 'Corrupt');
-        // Missing required fields like status, createdAt, updatedAt
 
-        // Try to initialize - this should overwrite and validate, but if we had
-        // a bug it would fail validation
         expect(() =>
           initPlanMetadata(ydoc, {
             id: 'plan-1',
@@ -1200,7 +1171,6 @@ describe('Plan metadata helpers', () => {
           })
         ).not.toThrow();
 
-        // Verify clean state after initialization
         const result = getPlanMetadataWithValidation(ydoc);
         expect(result.success).toBe(true);
       });

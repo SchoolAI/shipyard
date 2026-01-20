@@ -16,7 +16,6 @@ export function getPlanIndex(ydoc: Y.Doc, includeArchived = false): PlanIndexEnt
   for (const [_id, data] of plansMap.entries()) {
     const result = PlanIndexEntrySchema.safeParse(data);
     if (result.success) {
-      // Filter archived plans unless explicitly requested
       if (!includeArchived && result.data.deleted) {
         continue;
       }
@@ -24,7 +23,6 @@ export function getPlanIndex(ydoc: Y.Doc, includeArchived = false): PlanIndexEnt
     }
   }
 
-  // Sort by updatedAt descending (most recent first)
   return entries.sort((a, b) => b.updatedAt - a.updatedAt);
 }
 
@@ -65,11 +63,9 @@ export function setPlanIndexEntry(ydoc: Y.Doc, entry: PlanIndexEntry): void {
     ownerId: validated.ownerId,
     deleted: validated.deleted,
   };
-  // Include tags if present
   if (entry.tags) {
     data.tags = entry.tags;
   }
-  // Include archive fields if deleted
   if (validated.deleted) {
     data.deletedAt = validated.deletedAt;
     data.deletedBy = validated.deletedBy;

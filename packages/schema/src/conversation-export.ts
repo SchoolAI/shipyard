@@ -14,10 +14,6 @@
 
 import { z } from 'zod';
 
-// =============================================================================
-// A2A Message Schema Definitions
-// =============================================================================
-
 /**
  * A2A Text Part - plain text content
  */
@@ -59,7 +55,6 @@ export const A2APartSchema = z
   })
   .passthrough()
   .superRefine((val, ctx) => {
-    // Validate based on type
     if (val.type === 'text') {
       if (typeof (val as { text?: unknown }).text !== 'string') {
         ctx.addIssue({
@@ -68,7 +63,6 @@ export const A2APartSchema = z
         });
       }
     } else if (val.type === 'data') {
-      // data field can be anything, just needs to exist
       if (!('data' in val)) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
@@ -171,10 +165,6 @@ export const ConversationExportMetaSchema = z.object({
 });
 export type ConversationExportMeta = z.infer<typeof ConversationExportMetaSchema>;
 
-// =============================================================================
-// Claude Code Transcript Schema
-// =============================================================================
-
 /**
  * Claude Code text content block
  */
@@ -250,7 +240,6 @@ const ClaudeCodeContentBlockSchema = z
           message: 'tool_result block must have a string tool_use_id field',
         });
       }
-      // content can be anything, is_error is optional boolean
     }
   });
 type ClaudeCodeContentBlock =
@@ -274,7 +263,6 @@ const ClaudeCodeUsageSchema = z.object({
 const ClaudeCodeMessageInnerSchema = z.object({
   role: z.string(),
   content: z.array(ClaudeCodeContentBlockSchema),
-  // Assistant-specific fields
   id: z.string().optional(),
   model: z.string().optional(),
   usage: ClaudeCodeUsageSchema.optional(),
@@ -295,10 +283,6 @@ export const ClaudeCodeMessageSchema = z.object({
   durationMs: z.number().optional(),
 });
 export type ClaudeCodeMessage = z.infer<typeof ClaudeCodeMessageSchema>;
-
-// =============================================================================
-// Parser Functions
-// =============================================================================
 
 /**
  * Result of parsing a transcript - includes both successful and failed parses
@@ -350,10 +334,6 @@ export function parseClaudeCodeTranscriptString(content: string): ParseTranscrip
 
   return { messages, errors };
 }
-
-// =============================================================================
-// Converter Functions
-// =============================================================================
 
 /**
  * Type guard helper for exhaustive checking in switch statements
@@ -407,7 +387,6 @@ function convertContentBlock(block: ClaudeCodeContentBlock): A2APart[] {
       ];
 
     default:
-      // Exhaustive check - will fail at compile time if we add new block types
       return assertNever(block);
   }
 }
@@ -422,7 +401,6 @@ function convertContentBlock(block: ClaudeCodeContentBlock): A2APart[] {
 function convertMessage(msg: ClaudeCodeMessage, contextId: string): A2AMessage {
   const role = msg.message.role === 'user' ? 'user' : 'agent';
 
-  // Convert all content blocks to A2A parts
   const parts: A2APart[] = msg.message.content.flatMap((block) =>
     convertContentBlock(block as ClaudeCodeContentBlock)
   );
@@ -488,8 +466,6 @@ export function validateA2AMessages(messages: unknown[]): {
 
   return { valid, errors };
 }
-
-// --- Summary Helper Functions ---
 
 /**
  * Get the first text part from a message's parts.
@@ -575,10 +551,6 @@ export function summarizeA2AConversation(
   };
 }
 
-// =============================================================================
-// A2A → Claude Code Converter Functions
-// =============================================================================
-
 /**
  * Type guard for checking if a data part contains tool use info.
  */
@@ -662,7 +634,6 @@ function convertA2APartToContentBlock(part: A2APart): ClaudeCodeContentBlock[] {
         ];
       }
 
-      // Unknown data format - convert to text representation
       return [
         {
           type: 'text',
@@ -672,7 +643,6 @@ function convertA2APartToContentBlock(part: A2APart): ClaudeCodeContentBlock[] {
     }
 
     case 'file':
-      // Files are represented as text in Claude Code format
       return [
         {
           type: 'text',
@@ -681,7 +651,6 @@ function convertA2APartToContentBlock(part: A2APart): ClaudeCodeContentBlock[] {
       ];
 
     default:
-      // Exhaustive check
       return assertNever(part as never);
   }
 }
@@ -702,10 +671,8 @@ function convertA2AToClaudeCodeMessage(
   const role = msg.role === 'user' ? 'user' : 'assistant';
   const type = msg.role === 'user' ? 'user' : 'assistant';
 
-  // Convert all parts to content blocks
   const content = msg.parts.flatMap(convertA2APartToContentBlock);
 
-  // Extract metadata if present
   const metadata = msg.metadata || {};
   const timestamp =
     typeof metadata.timestamp === 'string' ? metadata.timestamp : new Date().toISOString();

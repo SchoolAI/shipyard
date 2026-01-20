@@ -14,10 +14,6 @@
 
 import { z } from 'zod';
 
-// =============================================================================
-// P2P Message Type Constants
-// =============================================================================
-
 /**
  * P2P message type bytes.
  * These are carefully chosen to avoid conflicts with Yjs protocol (0x00-0x04).
@@ -29,10 +25,6 @@ export const P2PMessageType = {
 } as const;
 
 export type P2PMessageTypeValue = (typeof P2PMessageType)[keyof typeof P2PMessageType];
-
-// =============================================================================
-// Message Schemas
-// =============================================================================
 
 /**
  * Metadata sent at the start of a conversation export transfer.
@@ -82,10 +74,6 @@ export const ConversationExportEndSchema = z.object({
 });
 export type ConversationExportEnd = z.infer<typeof ConversationExportEndSchema>;
 
-// =============================================================================
-// Type Guards (for discriminating our messages from Yjs messages)
-// =============================================================================
-
 /**
  * Checks if a Uint8Array is a P2P conversation export start message.
  */
@@ -119,10 +107,6 @@ export function isP2PConversationMessage(data: Uint8Array): boolean {
     type === P2PMessageType.CONVERSATION_EXPORT_END
   );
 }
-
-// =============================================================================
-// Message Encoding/Decoding
-// =============================================================================
 
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
@@ -158,28 +142,22 @@ export function decodeExportStartMessage(data: Uint8Array): ConversationExportSt
  */
 export function encodeChunkMessage(chunk: ChunkMessage): Uint8Array {
   const exportIdBytes = textEncoder.encode(chunk.exportId);
-  // 1 (type) + 4 (exportId length) + exportIdBytes.length + 4 (chunkIndex) + data.length
   const result = new Uint8Array(1 + 4 + exportIdBytes.length + 4 + chunk.data.length);
   let offset = 0;
 
-  // Type byte
   result[offset] = P2PMessageType.CONVERSATION_CHUNK;
   offset += 1;
 
-  // Export ID length (4 bytes, big-endian)
   const view = new DataView(result.buffer);
   view.setUint32(offset, exportIdBytes.length, false);
   offset += 4;
 
-  // Export ID
   result.set(exportIdBytes, offset);
   offset += exportIdBytes.length;
 
-  // Chunk index (4 bytes, big-endian)
   view.setUint32(offset, chunk.chunkIndex, false);
   offset += 4;
 
-  // Data
   result.set(chunk.data, offset);
 
   return result;
@@ -197,7 +175,6 @@ export function decodeChunkMessage(data: Uint8Array): ChunkMessage {
   const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
   let offset = 1;
 
-  // Export ID length
   const exportIdLength = view.getUint32(offset, false);
   offset += 4;
 
@@ -205,15 +182,12 @@ export function decodeChunkMessage(data: Uint8Array): ChunkMessage {
     throw new Error('Invalid chunk message: exportId extends beyond message');
   }
 
-  // Export ID
   const exportId = textDecoder.decode(data.slice(offset, offset + exportIdLength));
   offset += exportIdLength;
 
-  // Chunk index
   const chunkIndex = view.getUint32(offset, false);
   offset += 4;
 
-  // Data
   const chunkData = data.slice(offset);
 
   return ChunkMessageSchema.parse({
@@ -247,10 +221,6 @@ export function decodeExportEndMessage(data: Uint8Array): ConversationExportEnd 
   const parsed: unknown = JSON.parse(jsonStr);
   return ConversationExportEndSchema.parse(parsed);
 }
-
-// =============================================================================
-// Discriminated Union Types for Type-Safe Message Handling
-// =============================================================================
 
 /**
  * Decoded P2P message with discriminated union type.

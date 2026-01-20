@@ -26,11 +26,8 @@ describe('parseInviteFromUrl', () => {
   });
 
   it('should handle invite param with colons in token value', () => {
-    // Note: current implementation splits on all colons and takes first two parts
-    // Token values from the server use base64url encoding without colons, so this is safe
     const url = 'https://example.com/plan/abc123?invite=token123:secret:with:colons';
     const result = parseInviteFromUrl(url);
-    // Only the first two parts are captured
     expect(result).toEqual({ tokenId: 'token123', tokenValue: 'secret' });
   });
 });

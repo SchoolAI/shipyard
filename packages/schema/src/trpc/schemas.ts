@@ -6,9 +6,7 @@
 import { z } from 'zod';
 import { A2AMessageSchema } from '../conversation-export.js';
 
-// Re-export A2A types for conversation import
 export { A2AMessageSchema, ConversationExportMetaSchema } from '../conversation-export.js';
-// Re-export existing schemas from hook-api
 export {
   CreateHookSessionRequestSchema,
   CreateHookSessionResponseSchema,
@@ -20,10 +18,7 @@ export {
   UpdatePresenceRequestSchema,
   UpdatePresenceResponseSchema,
 } from '../hook-api.js';
-// Re-export yjs helpers for plan router
 export { getPlanMetadata } from '../yjs-helpers.js';
-
-// --- Plan Router Schemas ---
 
 export const PlanIdSchema = z.object({
   planId: z.string().min(1),
@@ -42,8 +37,6 @@ export const HasConnectionsResponseSchema = z.object({
 });
 
 export type HasConnectionsResponse = z.infer<typeof HasConnectionsResponseSchema>;
-
-// --- Subscription Router Schemas ---
 
 export const SubscriptionClientIdSchema = z.object({
   planId: z.string().min(1),
@@ -86,7 +79,6 @@ export const DeleteSubscriptionResponseSchema = z.object({
 
 export type DeleteSubscriptionResponse = z.infer<typeof DeleteSubscriptionResponseSchema>;
 
-// Internal type for subscription creation (used by PlanStore)
 export interface SubscriptionCreateParams {
   planId: string;
   subscribe: ChangeType[];
@@ -94,8 +86,6 @@ export interface SubscriptionCreateParams {
   maxWindowMs: number;
   threshold: number;
 }
-
-// --- Hook Router Schemas ---
 
 export const SetSessionTokenRequestSchema = z.object({
   sessionTokenHash: z.string().min(1),
@@ -120,8 +110,6 @@ export const SetSessionTokenResponseSchema = z.object({
 });
 
 export type SetSessionTokenResponse = z.infer<typeof SetSessionTokenResponseSchema>;
-
-// --- Conversation Router Schemas ---
 
 export const ImportConversationRequestSchema = z.object({
   a2aMessages: z.array(A2AMessageSchema),

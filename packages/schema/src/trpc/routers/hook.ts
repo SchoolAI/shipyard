@@ -29,8 +29,6 @@ import { publicProcedure, router } from '../trpc.js';
  * The actual business logic lives in the server package's hook-handlers.ts.
  */
 
-// --- Result Types ---
-
 export type ApprovalResult =
   | {
       approved: true;
@@ -69,7 +67,6 @@ export const hookRouter = router({
     .input(CreateHookSessionRequestSchema)
     .output(CreateHookSessionResponseSchema)
     .mutation(async ({ input, ctx }) => {
-      // Delegate to handler - implementation provided by server
       const handlers = ctx.hookHandlers;
       return handlers.createSession(input, ctx);
     }),

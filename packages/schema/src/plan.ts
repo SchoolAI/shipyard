@@ -47,14 +47,12 @@ export const ClaudeCodeOriginMetadataSchema = z.object({
 export const DevinOriginMetadataSchema = z.object({
   platform: z.literal('devin'),
   sessionId: z.string(),
-  // Add devin-specific fields when implemented
 });
 
 export const CursorOriginMetadataSchema = z.object({
   platform: z.literal('cursor'),
   conversationId: z.string(),
   generationId: z.string().optional(),
-  // Add cursor-specific fields when implemented
 });
 
 export const UnknownOriginMetadataSchema = z.object({
@@ -186,11 +184,9 @@ interface PlanEventBase {
 
 /** Discriminated union of all plan event types with type-safe data payloads */
 export type PlanEvent =
-  // Events with no data
   | (PlanEventBase & {
       type: 'plan_created' | 'content_edited' | 'plan_archived' | 'plan_unarchived' | 'plan_shared';
     })
-  // Status changed
   | (PlanEventBase & {
       type: 'status_changed';
       data: {
@@ -198,14 +194,12 @@ export type PlanEvent =
         toStatus: PlanStatusType;
       };
     })
-  // Artifact uploaded
   | (PlanEventBase & {
       type: 'artifact_uploaded';
       data: {
         artifactId: string;
       };
     })
-  // Comment events
   | (PlanEventBase & {
       type: 'comment_added';
       data?: {
@@ -221,7 +215,6 @@ export type PlanEvent =
         resolvedCount?: number;
       };
     })
-  // Deliverable linked
   | (PlanEventBase & {
       type: 'deliverable_linked';
       data?: {
@@ -230,7 +223,6 @@ export type PlanEvent =
         allFulfilled?: boolean;
       };
     })
-  // PR linked
   | (PlanEventBase & {
       type: 'pr_linked';
       data: {
@@ -238,15 +230,12 @@ export type PlanEvent =
         url?: string;
       };
     })
-  // Review events
   | (PlanEventBase & {
       type: 'approved' | 'changes_requested';
     })
-  // Completion events
   | (PlanEventBase & {
       type: 'completed';
     })
-  // Step completed
   | (PlanEventBase & {
       type: 'step_completed';
       data: {
@@ -254,7 +243,6 @@ export type PlanEvent =
         completed: boolean;
       };
     })
-  // Conversation imported
   | (PlanEventBase & {
       type: 'conversation_imported';
       data: {
@@ -263,14 +251,12 @@ export type PlanEvent =
         sourceSessionId?: string;
       };
     })
-  // Conversation exported
   | (PlanEventBase & {
       type: 'conversation_exported';
       data: {
         messageCount: number;
       };
     })
-  // Conversation handed off
   | (PlanEventBase & {
       type: 'conversation_handed_off';
       data: {
@@ -278,14 +264,12 @@ export type PlanEvent =
         messageCount: number;
       };
     })
-  // Approval requested
   | (PlanEventBase & {
       type: 'approval_requested';
       data?: {
         requesterName?: string;
       };
     })
-  // Input request created
   | (PlanEventBase & {
       type: 'input_request_created';
       data: {
@@ -294,7 +278,6 @@ export type PlanEvent =
         requestMessage: string;
       };
     })
-  // Input request answered
   | (PlanEventBase & {
       type: 'input_request_answered';
       data: {
@@ -303,14 +286,12 @@ export type PlanEvent =
         answeredBy: string;
       };
     })
-  // Input request declined
   | (PlanEventBase & {
       type: 'input_request_declined';
       data: {
         requestId: string;
       };
     })
-  // Agent activity
   | (PlanEventBase & {
       type: 'agent_activity';
       data: AgentActivityData;
@@ -358,7 +339,6 @@ export type AgentActivityData = z.infer<typeof AgentActivityDataSchema>;
 
 /** Discriminated union schema for plan events */
 export const PlanEventSchema = z.discriminatedUnion('type', [
-  // Events with no data
   PlanEventBaseSchema.extend({
     type: z.enum([
       'plan_created',
@@ -368,7 +348,6 @@ export const PlanEventSchema = z.discriminatedUnion('type', [
       'plan_shared',
     ]),
   }),
-  // Status changed
   PlanEventBaseSchema.extend({
     type: z.literal('status_changed'),
     data: z.object({
@@ -376,14 +355,12 @@ export const PlanEventSchema = z.discriminatedUnion('type', [
       toStatus: z.enum(PlanStatusValues),
     }),
   }),
-  // Artifact uploaded
   PlanEventBaseSchema.extend({
     type: z.literal('artifact_uploaded'),
     data: z.object({
       artifactId: z.string(),
     }),
   }),
-  // Comment events
   PlanEventBaseSchema.extend({
     type: z.literal('comment_added'),
     data: z
@@ -403,7 +380,6 @@ export const PlanEventSchema = z.discriminatedUnion('type', [
       })
       .optional(),
   }),
-  // Deliverable linked
   PlanEventBaseSchema.extend({
     type: z.literal('deliverable_linked'),
     data: z
@@ -414,7 +390,6 @@ export const PlanEventSchema = z.discriminatedUnion('type', [
       })
       .optional(),
   }),
-  // PR linked
   PlanEventBaseSchema.extend({
     type: z.literal('pr_linked'),
     data: z.object({
@@ -422,15 +397,12 @@ export const PlanEventSchema = z.discriminatedUnion('type', [
       url: z.string().optional(),
     }),
   }),
-  // Review events
   PlanEventBaseSchema.extend({
     type: z.enum(['approved', 'changes_requested']),
   }),
-  // Completion events
   PlanEventBaseSchema.extend({
     type: z.literal('completed'),
   }),
-  // Step completed
   PlanEventBaseSchema.extend({
     type: z.literal('step_completed'),
     data: z.object({
@@ -438,7 +410,6 @@ export const PlanEventSchema = z.discriminatedUnion('type', [
       completed: z.boolean(),
     }),
   }),
-  // Conversation imported
   PlanEventBaseSchema.extend({
     type: z.literal('conversation_imported'),
     data: z.object({
@@ -447,14 +418,12 @@ export const PlanEventSchema = z.discriminatedUnion('type', [
       sourceSessionId: z.string().optional(),
     }),
   }),
-  // Conversation exported
   PlanEventBaseSchema.extend({
     type: z.literal('conversation_exported'),
     data: z.object({
       messageCount: z.number(),
     }),
   }),
-  // Conversation handed off
   PlanEventBaseSchema.extend({
     type: z.literal('conversation_handed_off'),
     data: z.object({
@@ -462,7 +431,6 @@ export const PlanEventSchema = z.discriminatedUnion('type', [
       messageCount: z.number(),
     }),
   }),
-  // Approval requested
   PlanEventBaseSchema.extend({
     type: z.literal('approval_requested'),
     data: z
@@ -471,7 +439,6 @@ export const PlanEventSchema = z.discriminatedUnion('type', [
       })
       .optional(),
   }),
-  // Input request created
   PlanEventBaseSchema.extend({
     type: z.literal('input_request_created'),
     data: z.object({
@@ -480,7 +447,6 @@ export const PlanEventSchema = z.discriminatedUnion('type', [
       requestMessage: z.string(),
     }),
   }),
-  // Input request answered
   PlanEventBaseSchema.extend({
     type: z.literal('input_request_answered'),
     data: z.object({
@@ -489,14 +455,12 @@ export const PlanEventSchema = z.discriminatedUnion('type', [
       answeredBy: z.string(),
     }),
   }),
-  // Input request declined
   PlanEventBaseSchema.extend({
     type: z.literal('input_request_declined'),
     data: z.object({
       requestId: z.string(),
     }),
   }),
-  // Agent activity
   PlanEventBaseSchema.extend({
     type: z.literal('agent_activity'),
     data: AgentActivityDataSchema,
@@ -511,22 +475,18 @@ export const PlanEventSchema = z.discriminatedUnion('type', [
  * @returns true if the event is inbox-worthy for this user
  */
 export function isInboxWorthy(event: PlanEvent, username: string): boolean {
-  // Not inbox-worthy if flag is explicitly false or missing
   if (!event.inboxWorthy) {
     return false;
   }
 
-  // No inboxFor means inbox-worthy for everyone
   if (!event.inboxFor) {
     return true;
   }
 
-  // Handle array of usernames
   if (Array.isArray(event.inboxFor)) {
     return event.inboxFor.includes(username);
   }
 
-  // Handle single username or role
   return event.inboxFor === username;
 }
 
@@ -657,7 +617,6 @@ export const PlanMetadataSchema = z.discriminatedUnion('status', [
 
 export type ArtifactType = 'screenshot' | 'video' | 'test_results' | 'diff';
 
-// Base fields shared by both storage types
 interface BaseArtifact {
   id: string;
   type: ArtifactType;
@@ -666,19 +625,16 @@ interface BaseArtifact {
   uploadedAt?: number;
 }
 
-// GitHub storage: MUST have url
 export interface GitHubArtifact extends BaseArtifact {
   storage: 'github';
   url: string;
 }
 
-// Local storage: MUST have localArtifactId
 export interface LocalArtifact extends BaseArtifact {
   storage: 'local';
   localArtifactId: string;
 }
 
-// Discriminated union - TypeScript enforces correctness
 export type Artifact = GitHubArtifact | LocalArtifact;
 
 export const ArtifactSchema = z.discriminatedUnion('storage', [
@@ -846,8 +802,6 @@ export const PRReviewCommentSchema = z.object({
   resolved: z.boolean().optional(),
 });
 
-// --- Factory Functions for Type Safety ---
-
 /**
  * Create a LinkedPR object with validation.
  * Ensures all required fields are present and valid.
@@ -927,7 +881,6 @@ export function createInitialConversationVersion(params: {
     handedOff: false as const,
   };
 
-  // Runtime validation for consistency with other factories
   return ConversationVersionSchema.parse(version);
 }
 
@@ -950,6 +903,5 @@ export function createHandedOffConversationVersion(params: {
     handedOff: true as const,
   };
 
-  // Runtime validation for consistency with other factories
   return ConversationVersionSchema.parse(version);
 }

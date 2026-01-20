@@ -33,7 +33,6 @@ export function extractDeliverables(blocks: Block[]): Deliverable[] {
   const deliverables: Deliverable[] = [];
 
   function processBlock(block: Block): void {
-    // Extract text from content array
     const text = extractTextFromBlock(block);
 
     if (text.includes(DELIVERABLE_MARKER)) {
@@ -49,7 +48,6 @@ export function extractDeliverables(blocks: Block[]): Deliverable[] {
       });
     }
 
-    // Recursively process children
     if (block.children && Array.isArray(block.children)) {
       for (const child of block.children) {
         processBlock(child as Block);
@@ -57,7 +55,6 @@ export function extractDeliverables(blocks: Block[]): Deliverable[] {
     }
   }
 
-  // Process all top-level blocks
   for (const block of blocks) {
     processBlock(block);
   }

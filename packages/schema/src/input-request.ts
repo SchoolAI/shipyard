@@ -21,10 +21,6 @@ export type InputRequestType = (typeof InputRequestTypeValues)[number];
 export const InputRequestStatusValues = ['pending', 'answered', 'declined', 'cancelled'] as const;
 export type InputRequestStatus = (typeof InputRequestStatusValues)[number];
 
-// =============================================================================
-// Base schema with fields common to all input request types
-// =============================================================================
-
 const InputRequestBaseSchema = z.object({
   /** Unique request ID */
   id: z.string(),
@@ -45,7 +41,6 @@ const InputRequestBaseSchema = z.object({
     .optional(),
   /** Optional plan ID to associate request with a specific plan (null/undefined = global) */
   planId: z.string().optional(),
-  // Status-dependent fields: optional at base level
   /** User's response (any JSON-serializable value) */
   response: z.unknown().optional(),
   /** When the user answered (Unix timestamp in ms) */
@@ -53,10 +48,6 @@ const InputRequestBaseSchema = z.object({
   /** Who answered (username or "agent") */
   answeredBy: z.string().optional(),
 });
-
-// =============================================================================
-// Type-specific variants (discriminated by 'type' field)
-// =============================================================================
 
 /** Text input request - single line text entry */
 const TextInputSchema = InputRequestBaseSchema.extend({
@@ -97,15 +88,10 @@ export const InputRequestSchema = z.discriminatedUnion('type', [
 
 export type InputRequest = z.infer<typeof InputRequestSchema>;
 
-// Type-specific variants for use when you know the exact type
 export type TextInputRequest = z.infer<typeof TextInputSchema>;
 export type MultilineInputRequest = z.infer<typeof MultilineInputSchema>;
 export type ChoiceInputRequest = z.infer<typeof ChoiceInputSchema>;
 export type ConfirmInputRequest = z.infer<typeof ConfirmInputSchema>;
-
-// =============================================================================
-// Create input request params (discriminated by type)
-// =============================================================================
 
 /** Base params for creating any input request */
 interface CreateInputRequestBaseParams {
@@ -149,10 +135,6 @@ export type CreateInputRequestParams =
   | CreateChoiceInputParams
   | CreateConfirmInputParams;
 
-// =============================================================================
-// Factory function with type-safe return
-// =============================================================================
-
 /**
  * Create a new input request with auto-generated fields.
  * Sets id, createdAt, and status to initial values.
@@ -193,8 +175,6 @@ export function createInputRequest(params: CreateInputRequestParams): InputReque
       break;
   }
 
-  // Validate the complete request against the schema
-  // This ensures message is not empty and timeout is within valid range
   const parseResult = InputRequestSchema.safeParse(request);
   if (!parseResult.success) {
     throw new Error(`Invalid input request: ${parseResult.error.issues[0]?.message}`);

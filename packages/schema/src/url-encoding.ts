@@ -115,7 +115,6 @@ export function decodePlan(encoded: string): UrlEncodedPlan | null {
     const json = lzstring.decompressFromEncodedURIComponent(encoded);
     if (!json) return null;
 
-    // Parse as unknown first to avoid type narrowing issues
     const parsed = JSON.parse(json) as { v?: number };
 
     // NOTE: Accept v1 and v2 (silently accept unknown versions for forward compatibility)
@@ -150,17 +149,14 @@ function selectKeyVersionIds(snapshots: PlanSnapshot[]): string[] {
 
   const ids: string[] = [];
 
-  // Always include first (initial version)
   const first = snapshots[0];
   if (first) ids.push(first.id);
 
-  // Include first approval if exists
   const firstApproval = snapshots.find((s) => s.status === 'in_progress');
   if (firstApproval && !ids.includes(firstApproval.id)) {
     ids.push(firstApproval.id);
   }
 
-  // Always include last (current version)
   const last = snapshots[snapshots.length - 1];
   if (last && !ids.includes(last.id)) {
     ids.push(last.id);
@@ -186,7 +182,6 @@ export function createPlanUrlWithHistory(
   plan: Omit<UrlEncodedPlanV2, 'v' | 'versionRefs' | 'keyVersions'>,
   snapshots: PlanSnapshot[]
 ): string {
-  // Create lightweight refs for all versions
   const versionRefs: UrlSnapshotRef[] = snapshots.map((s) => ({
     id: s.id,
     status: s.status,
@@ -196,7 +191,6 @@ export function createPlanUrlWithHistory(
     threads: s.threadSummary,
   }));
 
-  // Select key versions (max 3) and include their full content
   const keyVersionIds = selectKeyVersionIds(snapshots);
   const keyVersions: UrlKeyVersion[] = snapshots
     .filter((s) => keyVersionIds.includes(s.id))

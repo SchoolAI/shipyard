@@ -5,8 +5,6 @@
 
 import { z } from 'zod';
 
-// --- Agent Presence ---
-
 /**
  * Tracks an agent's presence in a plan session.
  */
@@ -22,8 +20,6 @@ export const AgentPresenceSchema = z.object({
 });
 
 export type AgentPresence = z.infer<typeof AgentPresenceSchema>;
-
-// --- Review Feedback ---
 
 /**
  * A single comment in a review thread.
@@ -46,8 +42,6 @@ export const ReviewFeedbackSchema = z.object({
 });
 
 export type ReviewFeedback = z.infer<typeof ReviewFeedbackSchema>;
-
-// --- Hook API Request/Response Schemas ---
 
 /**
  * POST /api/hook/session - Create a new plan session
@@ -144,8 +138,6 @@ export const HookApiErrorSchema = z.object({
 
 export type HookApiError = z.infer<typeof HookApiErrorSchema>;
 
-// --- Registry API Schemas (for WebSocket server registration) ---
-
 /**
  * POST /register - Register a WebSocket server
  */
@@ -183,8 +175,6 @@ export const UnregisterServerResponseSchema = z.object({
 });
 
 export type UnregisterServerResponse = z.infer<typeof UnregisterServerResponseSchema>;
-
-// --- Subscription API Schemas ---
 
 /**
  * POST /api/plan/:id/subscribe - Create a subscription

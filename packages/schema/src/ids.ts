@@ -59,10 +59,6 @@ export type ReviewRequestId = string & { readonly __brand: 'ReviewRequestId' };
  */
 export type ExportId = string & { readonly __brand: 'ExportId' };
 
-// =============================================================================
-// Type Guards and Utilities
-// =============================================================================
-
 /**
  * Creates a PlanId from a string.
  * Use this when you know the string is a valid plan ID.

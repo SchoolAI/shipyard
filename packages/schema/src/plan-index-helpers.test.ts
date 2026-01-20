@@ -103,7 +103,6 @@ describe('Plan Index Helpers', () => {
         const invalidEntry = {
           id: 'plan-1',
           title: 'Test',
-          // Missing: status, createdAt, updatedAt, ownerId, deleted
         } as any;
 
         expect(() => setPlanIndexEntry(ydoc, invalidEntry)).toThrow();
@@ -134,7 +133,6 @@ describe('Plan Index Helpers', () => {
           updatedAt: Date.now(),
           ownerId: 'user-1',
           deleted: true,
-          // Missing: deletedAt, deletedBy (required when deleted=true)
         } as any;
 
         expect(() => setPlanIndexEntry(ydoc, invalidEntry)).toThrow();
@@ -340,7 +338,6 @@ describe('Plan Index Helpers', () => {
         updatePlanIndexViewedBy(ydoc, 'plan-1', 'user1');
         const firstTime = getViewedByFromIndex(ydoc, 'plan-1').user1;
 
-        // Wait a bit to ensure different timestamp
         await new Promise((resolve) => setTimeout(resolve, 5));
 
         updatePlanIndexViewedBy(ydoc, 'plan-1', 'user1');
@@ -424,18 +421,13 @@ describe('Plan Index Helpers', () => {
         const doc1 = new Y.Doc();
         const doc2 = new Y.Doc();
 
-        // First sync docs so they share the same Y.Map structure
         updatePlanIndexViewedBy(doc1, 'plan-1', 'user1');
         Y.applyUpdate(doc2, Y.encodeStateAsUpdate(doc1));
 
-        // Now both docs have the same nested Y.Map for plan-1
-        // User2 updates from doc2
         updatePlanIndexViewedBy(doc2, 'plan-1', 'user2');
 
-        // Sync back to doc1
         Y.applyUpdate(doc1, Y.encodeStateAsUpdate(doc2));
 
-        // Both users should be present in both docs
         const viewedBy1 = getViewedByFromIndex(doc1, 'plan-1');
         const viewedBy2 = getViewedByFromIndex(doc2, 'plan-1');
 

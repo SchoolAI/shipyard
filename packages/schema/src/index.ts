@@ -1,5 +1,3 @@
-// Conversation export (A2A protocol) - Issue #41
-
 export { assertNever } from './assert-never.js';
 export type {
   A2ADataPart,
@@ -68,7 +66,6 @@ export {
   UpdatePresenceRequestSchema,
   UpdatePresenceResponseSchema,
 } from './hook-api.js';
-// Branded ID types - see docs/ID-SYSTEMS-INVENTORY.md
 export type {
   AwarenessClientId,
   ExportId,
@@ -104,7 +101,6 @@ export {
   InputRequestStatusValues,
   InputRequestTypeValues,
 } from './input-request.js';
-// Invite tokens for P2P room authentication - Issue #12
 export type {
   CreateInviteRequest,
   InviteCreatedResponse,
@@ -127,7 +123,6 @@ export {
   InviteTokenSchema,
   parseInviteFromUrl,
 } from './invite-token.js';
-// P2P message protocol for conversation transfer - Issue #41
 export type {
   ChunkMessage,
   ConversationExportEnd,

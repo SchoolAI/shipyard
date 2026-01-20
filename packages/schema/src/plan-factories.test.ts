@@ -53,7 +53,6 @@ describe('Factory Functions', () => {
     });
 
     it('validates data at runtime with .parse()', () => {
-      // Valid data should not throw
       expect(() =>
         createInitialConversationVersion({
           versionId: 'test-id',
@@ -65,7 +64,6 @@ describe('Factory Functions', () => {
         })
       ).not.toThrow();
 
-      // Invalid data should throw ZodError (bypass TypeScript with 'as any')
       expect(() =>
         createInitialConversationVersion({
           versionId: 'test-id',
@@ -101,7 +99,6 @@ describe('Factory Functions', () => {
     });
 
     it('validates data at runtime with .parse()', () => {
-      // Valid data should not throw
       expect(() =>
         createHandedOffConversationVersion({
           versionId: 'test-id',
@@ -115,7 +112,6 @@ describe('Factory Functions', () => {
         })
       ).not.toThrow();
 
-      // Invalid data should throw ZodError (bypass TypeScript with 'as any')
       expect(() =>
         createHandedOffConversationVersion({
           versionId: 'test-id',

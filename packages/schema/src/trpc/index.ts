@@ -13,8 +13,6 @@ import { planRouter } from './routers/plan.js';
 import { subscriptionRouter } from './routers/subscription.js';
 import { router } from './trpc.js';
 
-// --- Combined Router ---
-
 export const appRouter = router({
   hook: hookRouter,
   plan: planRouter,
@@ -22,15 +20,10 @@ export const appRouter = router({
   conversation: conversationRouter,
 });
 
-// --- Type Exports ---
-
 export type AppRouter = typeof appRouter;
 
-// Re-export context types
 export type { Context, CreateContextFn, Logger, PlanStore } from './context.js';
-// Re-export handler interfaces and their context types
 export type { ConversationContext, ConversationHandlers } from './routers/conversation.js';
-// Re-export individual routers for composition
 export { conversationRouter } from './routers/conversation.js';
 export type {
   ApprovalResult,
@@ -57,7 +50,6 @@ export type {
   SubscriptionCreateParams,
 } from './schemas.js';
 
-// Re-export schemas
 export {
   ChangeSchema,
   ChangesResponseSchema,

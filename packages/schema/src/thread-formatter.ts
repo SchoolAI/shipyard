@@ -34,12 +34,10 @@ export function formatThreadsForLLM(threads: Thread[], options: FormatThreadsOpt
   }
 
   const feedbackLines = threadsToShow.map((thread, index) => {
-    // Show location context
     const location = thread.selectedText
       ? `On: "${truncate(thread.selectedText, selectedTextMaxLength)}"`
       : `Comment ${index + 1}`;
 
-    // Format comments with clean text extraction
     const comments = thread.comments
       .map((c, idx) => {
         const text = extractTextFromCommentBody(c.body);
@@ -58,7 +56,6 @@ export function formatThreadsForLLM(threads: Thread[], options: FormatThreadsOpt
 
   let output = feedbackLines.join('\n\n');
 
-  // Add resolved summary if not showing them
   if (!includeResolved && resolvedCount > 0) {
     output += `\n\n---\n(${resolvedCount} resolved comment(s) not shown)`;
   }

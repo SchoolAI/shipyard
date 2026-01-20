@@ -52,7 +52,6 @@ describe('GitHubPRResponseSchema', () => {
       },
     };
 
-    // Missing draft and merged fields should cause validation to fail
     expect(() => GitHubPRResponseSchema.parse(minimalResponse)).toThrow();
   });
 
@@ -60,7 +59,6 @@ describe('GitHubPRResponseSchema', () => {
     const invalidResponse = {
       number: 42,
       html_url: 'https://github.com/owner/repo/pull/42',
-      // missing title
       state: 'open',
       draft: false,
       merged: false,
@@ -112,9 +110,7 @@ describe('GitHubPRResponseSchema', () => {
       state: 'open' as const,
       draft: false,
       merged: false,
-      head: {
-        // missing ref
-      },
+      head: {},
     };
 
     expect(() => GitHubPRResponseSchema.parse(missingBranchResponse)).toThrow();

@@ -10,10 +10,6 @@ import {
   validateA2AMessages,
 } from './conversation-export.js';
 
-// =============================================================================
-// Test Fixtures
-// =============================================================================
-
 /**
  * Sample Claude Code transcript data for testing.
  * Represents a realistic conversation with text, tool use, and tool result blocks.
@@ -106,7 +102,6 @@ const sampleClaudeCodeMessages: ClaudeCodeMessage[] = [
     costUSD: 0.001,
     durationMs: 800,
   },
-  // Summary message (should be filtered out in conversion)
   {
     sessionId: 'test-session-123',
     type: 'summary',
@@ -131,10 +126,6 @@ const sampleClaudeCodeMessages: ClaudeCodeMessage[] = [
 function createJSONL(messages: ClaudeCodeMessage[]): string {
   return messages.map((m) => JSON.stringify(m)).join('\n');
 }
-
-// =============================================================================
-// Tests: Claude Code Message Schema Validation
-// =============================================================================
 
 describe('ClaudeCodeMessageSchema', () => {
   it('validates a user message with text content', () => {
@@ -164,7 +155,6 @@ describe('ClaudeCodeMessageSchema', () => {
   it('rejects messages with missing required fields', () => {
     const invalid = {
       sessionId: 'test',
-      // missing type, message, uuid, timestamp
     };
     const result = ClaudeCodeMessageSchema.safeParse(invalid);
     expect(result.success).toBe(false);
@@ -179,10 +169,6 @@ describe('ClaudeCodeMessageSchema', () => {
     expect(result.success).toBe(false);
   });
 });
-
-// =============================================================================
-// Tests: Transcript Parser
-// =============================================================================
 
 describe('parseClaudeCodeTranscriptString', () => {
   it('parses valid JSONL content', () => {
@@ -240,15 +226,10 @@ describe('parseClaudeCodeTranscriptString', () => {
   });
 });
 
-// =============================================================================
-// Tests: A2A Conversion
-// =============================================================================
-
 describe('claudeCodeToA2A', () => {
   it('converts messages and filters out summaries', () => {
     const result = claudeCodeToA2A(sampleClaudeCodeMessages, 'plan-123');
 
-    // 5 messages - 1 summary = 4 messages
     expect(result).toHaveLength(4);
   });
 
@@ -284,7 +265,6 @@ describe('claudeCodeToA2A', () => {
     const result = claudeCodeToA2A(sampleClaudeCodeMessages, 'plan-123');
     const assistantMsg = result[1];
 
-    // Should have text part + tool_use part
     expect(assistantMsg?.parts).toHaveLength(2);
 
     const toolUsePart = assistantMsg?.parts[1];
@@ -345,10 +325,6 @@ describe('claudeCodeToA2A', () => {
   });
 });
 
-// =============================================================================
-// Tests: A2A Message Validation
-// =============================================================================
-
 describe('validateA2AMessages', () => {
   it('validates correct A2A messages', () => {
     const messages = claudeCodeToA2A(sampleClaudeCodeMessages, 'plan-123');
@@ -375,10 +351,6 @@ describe('validateA2AMessages', () => {
     expect(result.errors).toHaveLength(0);
   });
 });
-
-// =============================================================================
-// Tests: A2A Schema Validation
-// =============================================================================
 
 describe('A2AMessageSchema', () => {
   it('validates a minimal valid message', () => {
@@ -460,10 +432,6 @@ describe('A2AMessageSchema', () => {
   });
 });
 
-// =============================================================================
-// Tests: Conversation Summary
-// =============================================================================
-
 describe('summarizeA2AConversation', () => {
   it('extracts title from first user message', () => {
     const messages = claudeCodeToA2A(sampleClaudeCodeMessages, 'plan-123');
@@ -526,12 +494,10 @@ describe('summarizeA2AConversation', () => {
     const messages = claudeCodeToA2A(sampleClaudeCodeMessages, 'plan-123');
     const result = summarizeA2AConversation(messages, 2);
 
-    // Should show 2 messages + "and X more"
     expect(result.text).toContain('... and 2 more messages');
   });
 
   it('handles tool interactions in summary', () => {
-    // Message with only tool_use, no text
     const toolOnlyMsg: ClaudeCodeMessage = {
       sessionId: 'test',
       type: 'assistant',
@@ -560,22 +526,15 @@ describe('summarizeA2AConversation', () => {
   });
 });
 
-// =============================================================================
-// Tests: Round-Trip Validation
-// =============================================================================
-
 describe('Round-trip validation', () => {
   it('parsed messages can be converted to A2A and back-validated', () => {
     const content = createJSONL(sampleClaudeCodeMessages);
     const parsed = parseClaudeCodeTranscriptString(content);
 
-    // Parse successful
     expect(parsed.errors).toHaveLength(0);
 
-    // Convert to A2A
     const a2a = claudeCodeToA2A(parsed.messages, 'plan-123');
 
-    // Validate A2A
     const validated = validateA2AMessages(a2a);
     expect(validated.errors).toHaveLength(0);
     expect(validated.valid).toHaveLength(a2a.length);

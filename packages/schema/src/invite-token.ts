@@ -58,8 +58,6 @@ export const InviteRedemptionSchema = z.object({
   tokenId: z.string(),
 });
 
-// --- Signaling Message Types ---
-
 /**
  * Request to create a new invite token (owner only).
  */
@@ -168,8 +166,6 @@ export interface InviteRedeemedNotification {
   useCount: number;
   maxUses: number | null;
 }
-
-// --- Helper Types ---
 
 export type InviteSignalingMessage =
   | CreateInviteRequest

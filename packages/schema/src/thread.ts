@@ -126,6 +126,5 @@ export function extractMentions(body: CommentBody): string[] {
     }
   }
 
-  // Remove duplicates
   return [...new Set(mentions)];
 }
