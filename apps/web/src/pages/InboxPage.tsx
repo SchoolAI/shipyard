@@ -590,7 +590,7 @@ export function InboxPage() {
               </p>
             </div>
             <Switch size="sm" isSelected={showRead} onChange={handleToggleShowRead}>
-              Show read
+              {showRead ? 'Hide read' : 'Show read'}
             </Switch>
           </div>
         </div>
