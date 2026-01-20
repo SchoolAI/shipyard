@@ -349,7 +349,7 @@ export function isStepCompleted(ydoc: Y.Doc, stepId: string): boolean {
 }
 
 export function getArtifacts(ydoc: Y.Doc): Artifact[] {
-  const array = ydoc.getArray(YDOC_KEYS.ARTIFACTS);
+  const array = ydoc.getArray<Artifact>(YDOC_KEYS.ARTIFACTS);
   const data = array.toJSON() as unknown[];
 
   return (
@@ -384,7 +384,7 @@ export function addArtifact(ydoc: Y.Doc, artifact: Artifact, actor?: string): vo
 
   ydoc.transact(
     () => {
-      const array = ydoc.getArray(YDOC_KEYS.ARTIFACTS);
+      const array = ydoc.getArray<Artifact>(YDOC_KEYS.ARTIFACTS);
       array.push([validated]);
     },
     actor ? { actor } : undefined
@@ -392,7 +392,7 @@ export function addArtifact(ydoc: Y.Doc, artifact: Artifact, actor?: string): vo
 }
 
 export function removeArtifact(ydoc: Y.Doc, artifactId: string): boolean {
-  const array = ydoc.getArray(YDOC_KEYS.ARTIFACTS);
+  const array = ydoc.getArray<Artifact>(YDOC_KEYS.ARTIFACTS);
   const artifacts = array.toJSON() as Artifact[];
   const index = artifacts.findIndex((a) => a.id === artifactId);
 
@@ -403,7 +403,7 @@ export function removeArtifact(ydoc: Y.Doc, artifactId: string): boolean {
 }
 
 export function getAgentPresences(ydoc: Y.Doc): Map<string, AgentPresence> {
-  const map = ydoc.getMap(YDOC_KEYS.PRESENCE);
+  const map = ydoc.getMap<AgentPresence>(YDOC_KEYS.PRESENCE);
   const result = new Map<string, AgentPresence>();
 
   for (const [sessionId, value] of map.entries()) {
@@ -419,7 +419,7 @@ export function getAgentPresences(ydoc: Y.Doc): Map<string, AgentPresence> {
 export function setAgentPresence(ydoc: Y.Doc, presence: AgentPresence, actor?: string): void {
   ydoc.transact(
     () => {
-      const map = ydoc.getMap(YDOC_KEYS.PRESENCE);
+      const map = ydoc.getMap<AgentPresence>(YDOC_KEYS.PRESENCE);
       map.set(presence.sessionId, presence);
     },
     actor ? { actor } : undefined
@@ -427,14 +427,14 @@ export function setAgentPresence(ydoc: Y.Doc, presence: AgentPresence, actor?: s
 }
 
 export function clearAgentPresence(ydoc: Y.Doc, sessionId: string): boolean {
-  const map = ydoc.getMap(YDOC_KEYS.PRESENCE);
+  const map = ydoc.getMap<AgentPresence>(YDOC_KEYS.PRESENCE);
   if (!map.has(sessionId)) return false;
   map.delete(sessionId);
   return true;
 }
 
 export function getAgentPresence(ydoc: Y.Doc, sessionId: string): AgentPresence | null {
-  const map = ydoc.getMap(YDOC_KEYS.PRESENCE);
+  const map = ydoc.getMap<AgentPresence>(YDOC_KEYS.PRESENCE);
   const value = map.get(sessionId);
   if (!value) return null;
 
@@ -443,7 +443,7 @@ export function getAgentPresence(ydoc: Y.Doc, sessionId: string): AgentPresence 
 }
 
 export function getDeliverables(ydoc: Y.Doc): Deliverable[] {
-  const array = ydoc.getArray(YDOC_KEYS.DELIVERABLES);
+  const array = ydoc.getArray<Deliverable>(YDOC_KEYS.DELIVERABLES);
   const data = array.toJSON() as unknown[];
 
   return data
@@ -455,7 +455,7 @@ export function getDeliverables(ydoc: Y.Doc): Deliverable[] {
 export function addDeliverable(ydoc: Y.Doc, deliverable: Deliverable, actor?: string): void {
   ydoc.transact(
     () => {
-      const array = ydoc.getArray(YDOC_KEYS.DELIVERABLES);
+      const array = ydoc.getArray<Deliverable>(YDOC_KEYS.DELIVERABLES);
       array.push([deliverable]);
     },
     actor ? { actor } : undefined
@@ -468,7 +468,7 @@ export function linkArtifactToDeliverable(
   artifactId: string,
   actor?: string
 ): boolean {
-  const array = ydoc.getArray(YDOC_KEYS.DELIVERABLES);
+  const array = ydoc.getArray<Deliverable>(YDOC_KEYS.DELIVERABLES);
   const deliverables = array.toJSON() as Deliverable[];
   const index = deliverables.findIndex((d) => d.id === deliverableId);
 
@@ -643,7 +643,7 @@ export function unrejectUser(ydoc: Y.Doc, userId: string, actor?: string): boole
 }
 
 export function getLinkedPRs(ydoc: Y.Doc): LinkedPR[] {
-  const array = ydoc.getArray(YDOC_KEYS.LINKED_PRS);
+  const array = ydoc.getArray<LinkedPR>(YDOC_KEYS.LINKED_PRS);
   const data = array.toJSON() as unknown[];
 
   return data
@@ -658,7 +658,7 @@ export function linkPR(ydoc: Y.Doc, pr: LinkedPR, actor?: string): void {
 
   ydoc.transact(
     () => {
-      const array = ydoc.getArray(YDOC_KEYS.LINKED_PRS);
+      const array = ydoc.getArray<LinkedPR>(YDOC_KEYS.LINKED_PRS);
       const existing = array.toJSON() as LinkedPR[];
       const index = existing.findIndex((p) => p.prNumber === validated.prNumber);
 
@@ -674,7 +674,7 @@ export function linkPR(ydoc: Y.Doc, pr: LinkedPR, actor?: string): void {
 }
 
 export function unlinkPR(ydoc: Y.Doc, prNumber: number): boolean {
-  const array = ydoc.getArray(YDOC_KEYS.LINKED_PRS);
+  const array = ydoc.getArray<LinkedPR>(YDOC_KEYS.LINKED_PRS);
   const existing = array.toJSON() as LinkedPR[];
   const index = existing.findIndex((p) => p.prNumber === prNumber);
 
@@ -695,7 +695,7 @@ export function updateLinkedPRStatus(
   prNumber: number,
   status: LinkedPR['status']
 ): boolean {
-  const array = ydoc.getArray(YDOC_KEYS.LINKED_PRS);
+  const array = ydoc.getArray<LinkedPR>(YDOC_KEYS.LINKED_PRS);
   const existing = array.toJSON() as LinkedPR[];
   const index = existing.findIndex((p) => p.prNumber === prNumber);
 
@@ -711,7 +711,7 @@ export function updateLinkedPRStatus(
 }
 
 export function getPRReviewComments(ydoc: Y.Doc): PRReviewComment[] {
-  const array = ydoc.getArray(YDOC_KEYS.PR_REVIEW_COMMENTS);
+  const array = ydoc.getArray<PRReviewComment>(YDOC_KEYS.PR_REVIEW_COMMENTS);
   const data = array.toJSON() as unknown[];
 
   return data
@@ -727,7 +727,7 @@ export function getPRReviewCommentsForPR(ydoc: Y.Doc, prNumber: number): PRRevie
 export function addPRReviewComment(ydoc: Y.Doc, comment: PRReviewComment, actor?: string): void {
   ydoc.transact(
     () => {
-      const array = ydoc.getArray(YDOC_KEYS.PR_REVIEW_COMMENTS);
+      const array = ydoc.getArray<PRReviewComment>(YDOC_KEYS.PR_REVIEW_COMMENTS);
       array.push([comment]);
     },
     actor ? { actor } : undefined
@@ -735,7 +735,7 @@ export function addPRReviewComment(ydoc: Y.Doc, comment: PRReviewComment, actor?
 }
 
 export function resolvePRReviewComment(ydoc: Y.Doc, commentId: string, resolved: boolean): boolean {
-  const array = ydoc.getArray(YDOC_KEYS.PR_REVIEW_COMMENTS);
+  const array = ydoc.getArray<PRReviewComment>(YDOC_KEYS.PR_REVIEW_COMMENTS);
   const existing = array.toJSON() as PRReviewComment[];
   const index = existing.findIndex((c) => c.id === commentId);
 
@@ -751,7 +751,7 @@ export function resolvePRReviewComment(ydoc: Y.Doc, commentId: string, resolved:
 }
 
 export function removePRReviewComment(ydoc: Y.Doc, commentId: string): boolean {
-  const array = ydoc.getArray(YDOC_KEYS.PR_REVIEW_COMMENTS);
+  const array = ydoc.getArray<PRReviewComment>(YDOC_KEYS.PR_REVIEW_COMMENTS);
   const existing = array.toJSON() as PRReviewComment[];
   const index = existing.findIndex((c) => c.id === commentId);
 
@@ -912,7 +912,7 @@ export function logPlanEvent<T extends PlanEventType>(
         },
       ]
 ): void {
-  const eventsArray = ydoc.getArray(YDOC_KEYS.EVENTS);
+  const eventsArray = ydoc.getArray<PlanEvent>(YDOC_KEYS.EVENTS);
   const [data, options] = args;
 
   // Build event object - only include data if present
@@ -939,7 +939,7 @@ export function logPlanEvent<T extends PlanEventType>(
 }
 
 export function getPlanEvents(ydoc: Y.Doc): PlanEvent[] {
-  const array = ydoc.getArray(YDOC_KEYS.EVENTS);
+  const array = ydoc.getArray<PlanEvent>(YDOC_KEYS.EVENTS);
   const data = array.toJSON() as unknown[];
 
   return data
@@ -955,7 +955,7 @@ export function getPlanEvents(ydoc: Y.Doc): PlanEvent[] {
  * Returns snapshots sorted by createdAt (oldest first).
  */
 export function getSnapshots(ydoc: Y.Doc): PlanSnapshot[] {
-  const array = ydoc.getArray(YDOC_KEYS.SNAPSHOTS);
+  const array = ydoc.getArray<PlanSnapshot>(YDOC_KEYS.SNAPSHOTS);
   const data = array.toJSON() as unknown[];
 
   return data
@@ -972,7 +972,7 @@ export function getSnapshots(ydoc: Y.Doc): PlanSnapshot[] {
 export function addSnapshot(ydoc: Y.Doc, snapshot: PlanSnapshot, actor?: string): void {
   ydoc.transact(
     () => {
-      const array = ydoc.getArray(YDOC_KEYS.SNAPSHOTS);
+      const array = ydoc.getArray<PlanSnapshot>(YDOC_KEYS.SNAPSHOTS);
       array.push([snapshot]);
     },
     actor ? { actor } : undefined
@@ -998,7 +998,7 @@ export function createPlanSnapshot(
   blocks: unknown[]
 ): PlanSnapshot {
   // Get thread summary
-  const threadsMap = ydoc.getMap(YDOC_KEYS.THREADS);
+  const threadsMap = ydoc.getMap<Record<string, unknown>>(YDOC_KEYS.THREADS);
   const threadsData = threadsMap.toJSON() as Record<string, unknown>;
   const threads = parseThreads(threadsData);
   const unresolved = threads.filter((t) => !t.resolved).length;

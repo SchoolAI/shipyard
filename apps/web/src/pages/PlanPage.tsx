@@ -2,6 +2,7 @@ import type { BlockNoteEditor } from '@blocknote/core';
 import { Button, Spinner, useOverlayState } from '@heroui/react';
 import {
   addArtifact,
+  type Deliverable,
   extractDeliverables,
   getPlanFromUrl,
   getPlanIndexEntry,
@@ -68,12 +69,12 @@ export function PlanPage() {
 
     // Populate deliverables from URL if present
     if (urlPlan.deliverables) {
-      const deliverablesArray = doc.getArray(YDOC_KEYS.DELIVERABLES);
+      const deliverablesArray = doc.getArray<Deliverable>(YDOC_KEYS.DELIVERABLES);
       deliverablesArray.push(urlPlan.deliverables);
     } else if (urlPlan.content) {
       // Extract from content as fallback
       const deliverables = extractDeliverables(urlPlan.content);
-      const deliverablesArray = doc.getArray(YDOC_KEYS.DELIVERABLES);
+      const deliverablesArray = doc.getArray<Deliverable>(YDOC_KEYS.DELIVERABLES);
       deliverablesArray.push(deliverables);
     }
 

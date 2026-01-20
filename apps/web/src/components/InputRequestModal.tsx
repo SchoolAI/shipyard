@@ -61,7 +61,7 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
     if (!ydoc || !request) return;
 
     ydoc.transact(() => {
-      const requestsArray = ydoc.getArray(YDOC_KEYS.INPUT_REQUESTS);
+      const requestsArray = ydoc.getArray<InputRequest>(YDOC_KEYS.INPUT_REQUESTS);
       const requests = requestsArray.toJSON() as InputRequest[];
       const index = requests.findIndex((r) => r.id === request.id);
 
@@ -133,7 +133,7 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
       let failureReason: 'answered' | 'cancelled' | 'not_found' | null = null;
 
       ydoc.transact(() => {
-        const requestsArray = ydoc.getArray(YDOC_KEYS.INPUT_REQUESTS);
+        const requestsArray = ydoc.getArray<InputRequest>(YDOC_KEYS.INPUT_REQUESTS);
         const requests = requestsArray.toJSON() as InputRequest[];
         const index = requests.findIndex((r) => r.id === request.id);
 
@@ -217,7 +217,7 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
         let failureReason: 'answered' | 'cancelled' | 'not_found' | null = null;
 
         ydoc.transact(() => {
-          const requestsArray = ydoc.getArray(YDOC_KEYS.INPUT_REQUESTS);
+          const requestsArray = ydoc.getArray<InputRequest>(YDOC_KEYS.INPUT_REQUESTS);
           const requests = requestsArray.toJSON() as InputRequest[];
           const index = requests.findIndex((r) => r.id === request.id);
 

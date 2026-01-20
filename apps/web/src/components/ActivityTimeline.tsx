@@ -43,7 +43,7 @@ export function ActivityTimeline({ ydoc }: ActivityTimelineProps) {
   const [events, setEvents] = useState<PlanEvent[]>([]);
 
   useEffect(() => {
-    const eventsArray = ydoc.getArray(YDOC_KEYS.EVENTS);
+    const eventsArray = ydoc.getArray<PlanEvent>(YDOC_KEYS.EVENTS);
 
     const update = () => {
       setEvents(getPlanEvents(ydoc));

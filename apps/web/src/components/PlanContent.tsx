@@ -4,7 +4,7 @@
  */
 
 import type { Block, BlockNoteEditor } from '@blocknote/core';
-import type { PlanMetadata, PlanSnapshot } from '@peer-plan/schema';
+import type { Deliverable, PlanMetadata, PlanSnapshot } from '@peer-plan/schema';
 import { extractDeliverables, getDeliverables, YDOC_KEYS } from '@peer-plan/schema';
 import { Clock, FileText, GitPullRequest, Package } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -94,7 +94,7 @@ export function PlanContent(props: PlanContentProps) {
   useEffect(() => {
     if (props.mode === 'snapshot') {
       const deliverables = extractDeliverables(props.initialContent as Block[]);
-      const deliverablesArray = ydoc.getArray(YDOC_KEYS.DELIVERABLES);
+      const deliverablesArray = ydoc.getArray<Deliverable>(YDOC_KEYS.DELIVERABLES);
       deliverablesArray.delete(0, deliverablesArray.length);
       deliverablesArray.push(deliverables);
 
@@ -103,7 +103,7 @@ export function PlanContent(props: PlanContentProps) {
       return;
     }
 
-    const deliverablesArray = ydoc.getArray(YDOC_KEYS.DELIVERABLES);
+    const deliverablesArray = ydoc.getArray<Deliverable>(YDOC_KEYS.DELIVERABLES);
     const updateCount = () => {
       const deliverables = getDeliverables(ydoc);
       const completed = deliverables.filter((d) => d.linkedArtifactId).length;

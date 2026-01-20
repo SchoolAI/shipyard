@@ -18,7 +18,7 @@ export function Attachments({ ydoc, registryPort }: AttachmentsProps) {
   const [artifacts, setArtifacts] = useState<Artifact[]>([]);
 
   useEffect(() => {
-    const array = ydoc.getArray('artifacts');
+    const array = ydoc.getArray<Artifact>('artifacts');
 
     const updateArtifacts = () => {
       setArtifacts(getArtifacts(ydoc));
