@@ -8,6 +8,7 @@ import {
   type OriginMetadata,
   PLAN_INDEX_DOC_NAME,
   setPlanIndexEntry,
+  transitionPlanStatus,
 } from '@peer-plan/schema';
 import { nanoid } from 'nanoid';
 import open from 'open';
@@ -157,6 +158,24 @@ Bad deliverables (not provable):
       sessionTokenHash,
       origin,
     });
+
+    // Transition from draft to pending_review so plan appears in inbox
+    // The state machine requires a reviewRequestId for this transition
+    const transitionResult = transitionPlanStatus(
+      ydoc,
+      {
+        status: 'pending_review',
+        reviewRequestId: nanoid(),
+      },
+      ownerId ?? 'unknown'
+    );
+
+    if (!transitionResult.success) {
+      logger.error(
+        { error: transitionResult.error },
+        'Failed to transition plan to pending_review'
+      );
+    }
 
     // Parse markdown to blocks and store in Y.XmlFragment for BlockNote collaboration
     logger.info({ contentLength: input.content.length }, 'About to parse markdown');
