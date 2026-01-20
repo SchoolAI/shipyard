@@ -15,9 +15,9 @@
 
 ## The Problem
 
-AI agents can generate implementation plans, but there's no good way to:
+AI agents can generate implementation tasks, but there's no good way to:
 - **Verify** the agent actually did what it claimed
-- **Review** plans collaboratively with humans in real-time
+- **Review** tasks collaboratively with humans in real-time
 - **Provide feedback** that agents can act on
 
 Shipyard solves this with P2P collaborative review and proof-of-work artifacts.
@@ -60,7 +60,7 @@ Then configure Claude Code to use the MCP server. See **[SETUP.md](./docs/SETUP.
 └─────────────────┘             └─────────────────┘
 ```
 
-1. Agent creates a plan via MCP tool → Browser opens automatically
+1. Agent creates a task via MCP tool → Browser opens automatically
 2. Reviewers join via shared URL → Real-time P2P sync
 3. Add comments, approve, or request changes → Agent sees feedback
 4. Agent uploads artifacts (screenshots, etc.) → Stored in GitHub
@@ -69,11 +69,11 @@ Then configure Claude Code to use the MCP server. See **[SETUP.md](./docs/SETUP.
 
 | Package | Description |
 |---------|-------------|
-| [`@shipyard/server`](./apps/server) | MCP server with plan tools |
+| [`@shipyard/server`](./apps/server) | MCP server with task tools |
 | [`@shipyard/web`](./apps/web) | React app with BlockNote editor |
 | [`@shipyard/schema`](./packages/schema) | Shared types, Yjs helpers, URL encoding |
 | [`@shipyard/signaling`](./apps/signaling) | WebRTC signaling server (Cloudflare Worker) |
-| [`@shipyard/hook`](./apps/hook) | Claude Code hooks for auto-plan creation |
+| [`@shipyard/hook`](./apps/hook) | Claude Code hooks for auto-task creation |
 
 ## Documentation
 

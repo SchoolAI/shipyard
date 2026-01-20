@@ -29,10 +29,10 @@ Add to your Claude Desktop config (`~/Library/Application Support/Claude/claude_
 
 Ask Claude to do verified work:
 
-> "Create a plan to add dark mode and show me screenshots when done"
+> "Create a task to add dark mode and show me screenshots when done"
 
 Claude will:
-1. Create a plan with deliverables
+1. Create a task with deliverables
 2. Do the work
 3. Upload proof (screenshots, test results)
 4. Auto-complete when all deliverables have artifacts

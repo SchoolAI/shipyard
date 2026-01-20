@@ -100,6 +100,21 @@ async function handlePublish(
   if (planId) {
     const approval = await platform.getApprovalState(planId);
 
+    // If no approval state exists, allow P2P sync (open collaboration)
+    // This fixes the case where owner's browser hasn't pushed approval state yet
+    if (!approval) {
+      const outMessage: PublishMessage = {
+        ...message,
+        clients: subscribers.length,
+      };
+      for (const subscriber of subscribers) {
+        if (subscriber === ws) continue;
+        if (platform.isFlushingMessages(subscriber)) continue;
+        platform.sendMessage(subscriber, outMessage);
+      }
+      return;
+    }
+
     // Block rejected senders completely
     if (isUserRejected(approval, senderUserId)) {
       return;

@@ -133,9 +133,9 @@ async function openPlanInBrowser(planId: string, url: string): Promise<void> {
 export const createPlanTool = {
   definition: {
     name: TOOL_NAMES.CREATE_PLAN,
-    description: `Create a new implementation plan and open it in browser.
+    description: `Create a new implementation task and open it in browser.
 
-NOTE FOR CLAUDE CODE USERS: If you have the shipyard hook installed, use native plan mode (Shift+Tab) instead of this tool. The hook handles plan creation automatically and provides a better experience.
+NOTE FOR CLAUDE CODE USERS: If you have the shipyard hook installed, use native plan mode (Shift+Tab) instead of this tool. The hook handles task creation automatically and provides a better experience.
 
 This tool is for agents WITHOUT hook support (Cursor, Devin, etc).
 
@@ -152,11 +152,11 @@ Bad deliverables (not provable):
     inputSchema: {
       type: 'object',
       properties: {
-        title: { type: 'string', description: 'Plan title' },
+        title: { type: 'string', description: 'Task title' },
         content: {
           type: 'string',
           description:
-            'Plan content in markdown. Use {#deliverable} marker on checkbox items to mark them as deliverables that can be linked to artifacts.',
+            'Task content in markdown. Use {#deliverable} marker on checkbox items to mark them as deliverables that can be linked to artifacts.',
         },
         repo: {
           type: 'string',

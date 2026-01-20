@@ -813,7 +813,7 @@ export function InboxPage() {
   const handleFullScreen = useCallback(() => {
     if (selectedPlanId) {
       setSidebarCollapsed(true);
-      navigate(`/plan/${selectedPlanId}`);
+      navigate(`/task/${selectedPlanId}`);
     }
   }, [selectedPlanId, navigate]);
 

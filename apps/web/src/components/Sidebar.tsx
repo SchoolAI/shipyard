@@ -224,7 +224,7 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
 
   useEffect(() => {
     if (!navigationTarget) return;
-    const targetPath = `/plan/${navigationTarget}`;
+    const targetPath = `/task/${navigationTarget}`;
     if (location.pathname !== targetPath) {
       navigate(targetPath);
     }

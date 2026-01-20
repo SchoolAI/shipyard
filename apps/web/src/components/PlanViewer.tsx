@@ -487,7 +487,7 @@ export function PlanViewer({
       className="relative mobile-blocknote bg-surface rounded-lg px-3 md:px-0"
       onKeyDown={handleKeyDown}
       role="application"
-      aria-label="Plan viewer with comments"
+      aria-label="Task viewer with comments"
     >
       {!hasIdentity && (
         <Alert status="default" className="mb-4">

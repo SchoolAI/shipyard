@@ -294,7 +294,7 @@ export function SearchPage() {
     onFullScreen: useCallback(() => {
       if (selectedPlanId) {
         setSidebarCollapsed(true);
-        navigate(`/plan/${selectedPlanId}`);
+        navigate(`/task/${selectedPlanId}`);
       }
     }, [selectedPlanId, navigate]),
     onClose: handleClosePanel,

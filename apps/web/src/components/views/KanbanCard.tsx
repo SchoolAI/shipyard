@@ -88,7 +88,7 @@ export function KanbanCard({ plan, onHover, onPanelOpen }: KanbanCardProps) {
     if (onPanelOpen) {
       onPanelOpen(plan.id);
     } else {
-      navigate(`/plan/${plan.id}`);
+      navigate(`/task/${plan.id}`);
     }
   };
 

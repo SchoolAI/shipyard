@@ -151,7 +151,7 @@ export function InlinePlanDetail({
   const handleFullScreen = useCallback(() => {
     if (planId) {
       setSidebarCollapsed(true);
-      navigate(`/plan/${planId}`);
+      navigate(`/task/${planId}`);
     }
   }, [planId, navigate]);
 
@@ -160,7 +160,7 @@ export function InlinePlanDetail({
     if (onApprove && planId && panelMetadata) {
       onApprove({ planId, ydoc: panelYdoc, metadata: panelMetadata });
     } else if (planId) {
-      navigate(`/plan/${planId}`);
+      navigate(`/task/${planId}`);
     }
   }, [onApprove, planId, panelYdoc, panelMetadata, navigate]);
 
@@ -169,7 +169,7 @@ export function InlinePlanDetail({
     if (onRequestChanges && planId && panelMetadata) {
       onRequestChanges({ planId, ydoc: panelYdoc, metadata: panelMetadata });
     } else if (planId) {
-      navigate(`/plan/${planId}`);
+      navigate(`/task/${planId}`);
     }
   }, [onRequestChanges, planId, panelYdoc, panelMetadata, navigate]);
 

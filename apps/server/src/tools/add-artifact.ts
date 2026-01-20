@@ -76,7 +76,7 @@ const AddArtifactInput = z.discriminatedUnion('source', [
 export const addArtifactTool = {
   definition: {
     name: TOOL_NAMES.ADD_ARTIFACT,
-    description: `Upload an artifact (screenshot, video, test results, diff) to a plan as proof of work.
+    description: `Upload an artifact (screenshot, video, test results, diff) to a task as proof of work.
 
 AUTO-COMPLETE: When ALL deliverables have artifacts attached, the task automatically completes:
 - Status changes to 'completed'

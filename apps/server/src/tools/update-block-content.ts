@@ -57,7 +57,7 @@ type BlockOperation = z.infer<typeof BlockOperationSchema>;
 export const updateBlockContentTool = {
   definition: {
     name: TOOL_NAMES.UPDATE_BLOCK_CONTENT,
-    description: `Modify plan content by updating, inserting, or deleting specific blocks. Use read_plan first to get block IDs.
+    description: `Modify task content by updating, inserting, or deleting specific blocks. Use read_plan first to get block IDs.
 
 DELIVERABLES: When inserting/updating content, you can mark checkbox items as deliverables using {#deliverable} marker. These can later be linked to artifacts via add_artifact tool.
 
@@ -65,14 +65,14 @@ Operations:
 - update: Replace an existing block with new markdown content
 - insert: Add new blocks after a specific block (or at beginning if afterBlockId is null)
 - delete: Remove a specific block
-- replace_all: Replace entire plan content with new markdown
+- replace_all: Replace entire task content with new markdown
 
 Example with deliverables:
 { "type": "insert", "afterBlockId": "block-123", "content": "- [ ] Screenshot of feature {#deliverable}" }`,
     inputSchema: {
       type: 'object',
       properties: {
-        planId: { type: 'string', description: 'The plan ID to modify' },
+        planId: { type: 'string', description: 'The task ID to modify' },
         sessionToken: { type: 'string', description: 'Session token from create_plan' },
         operations: {
           type: 'array',

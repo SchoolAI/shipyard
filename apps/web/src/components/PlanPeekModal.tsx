@@ -132,7 +132,7 @@ export function PlanPeekModal({ plan, isOpen, onClose }: PlanPeekModalProps) {
 
   const handleViewFull = () => {
     onClose();
-    navigate(`/plan/${plan.id}`);
+    navigate(`/task/${plan.id}`);
   };
 
   const completedCount = peekData.deliverables.filter((d) => d.linkedArtifactId).length;

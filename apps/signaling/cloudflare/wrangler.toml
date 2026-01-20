@@ -26,19 +26,6 @@ new_sqlite_classes = ["SignalingRoom"]
 port = 4444
 local_protocol = "http"
 
-# Environment-specific configuration
+# Environment configuration
 [vars]
-ENVIRONMENT = "development"
-
-# Production environment overrides
-[env.production.vars]
 ENVIRONMENT = "production"
-
-# Durable Object binding for production (must be duplicated, not inherited)
-[[env.production.durable_objects.bindings]]
-name = "SIGNALING_ROOM"
-class_name = "SignalingRoom"
-
-[[env.production.migrations]]
-tag = "v1"
-new_sqlite_classes = ["SignalingRoom"]
