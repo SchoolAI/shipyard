@@ -388,26 +388,41 @@ function filterAndSortInboxPlans(
 /** Group inbox events by category */
 function groupInboxEvents(
   sortedInboxPlans: (PlanIndexEntry & { isUnread?: boolean })[],
-  eventBasedInbox: InboxEventItem[]
+  eventBasedInbox: InboxEventItem[],
+  showRead: boolean,
+  selectedPlanId: string | null
 ) {
+  const filterByReadState = (items: InboxEventItem[]) => {
+    if (showRead) return items;
+    return items.filter((item) => item.isUnread || item.plan.id === selectedPlanId);
+  };
+
   return {
     needsReview: sortedInboxPlans,
-    approvalRequests: eventBasedInbox.filter(
-      (e: InboxEventItem) => e.event.type === 'approval_requested'
+    approvalRequests: filterByReadState(
+      eventBasedInbox.filter((e: InboxEventItem) => e.event.type === 'approval_requested')
     ),
-    mentions: eventBasedInbox.filter(
-      (e: InboxEventItem) => e.event.type === 'comment_added' && e.event.data?.mentions
+    mentions: filterByReadState(
+      eventBasedInbox.filter(
+        (e: InboxEventItem) => e.event.type === 'comment_added' && e.event.data?.mentions
+      )
     ),
-    readyToComplete: eventBasedInbox.filter(
-      (e: InboxEventItem) => e.event.type === 'deliverable_linked' && e.event.data?.allFulfilled
+    readyToComplete: filterByReadState(
+      eventBasedInbox.filter(
+        (e: InboxEventItem) => e.event.type === 'deliverable_linked' && e.event.data?.allFulfilled
+      )
     ),
-    agentHelpRequests: eventBasedInbox.filter(
-      (e: InboxEventItem) =>
-        e.event.type === 'agent_activity' && e.event.data?.activityType === 'help_request'
+    agentHelpRequests: filterByReadState(
+      eventBasedInbox.filter(
+        (e: InboxEventItem) =>
+          e.event.type === 'agent_activity' && e.event.data?.activityType === 'help_request'
+      )
     ),
-    agentBlockers: eventBasedInbox.filter(
-      (e: InboxEventItem) =>
-        e.event.type === 'agent_activity' && e.event.data?.activityType === 'blocker'
+    agentBlockers: filterByReadState(
+      eventBasedInbox.filter(
+        (e: InboxEventItem) =>
+          e.event.type === 'agent_activity' && e.event.data?.activityType === 'blocker'
+      )
     ),
   };
 }
@@ -639,8 +654,8 @@ export function InboxPage() {
 
   // Group inbox items by category - extracted to helper
   const inboxGroups = useMemo(
-    () => groupInboxEvents(sortedInboxPlans, eventBasedInbox),
-    [sortedInboxPlans, eventBasedInbox]
+    () => groupInboxEvents(sortedInboxPlans, eventBasedInbox, showRead, selectedPlanId),
+    [sortedInboxPlans, eventBasedInbox, showRead, selectedPlanId]
   );
 
   // Effects extracted to custom hooks

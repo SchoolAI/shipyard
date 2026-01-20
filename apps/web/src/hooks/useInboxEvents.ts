@@ -7,6 +7,7 @@ import {
   getPlanEvents,
   isEventUnread,
   isInboxWorthy,
+  PLAN_INDEX_EVENT_VIEWED_BY_KEY,
   type PlanEvent,
   type PlanIndexEntry,
 } from '@shipyard/schema';
@@ -74,7 +75,23 @@ export function useInboxEvents(
   indexDoc: Y.Doc
 ): InboxEventItem[] {
   const [inboxEvents, setInboxEvents] = useState<InboxEventItem[]>([]);
+  const [eventViewedByVersion, setEventViewedByVersion] = useState(0);
 
+  useEffect(() => {
+    const eventViewedByRoot = indexDoc.getMap(PLAN_INDEX_EVENT_VIEWED_BY_KEY);
+
+    const handleViewedByChange = () => {
+      setEventViewedByVersion((v) => v + 1);
+    };
+
+    eventViewedByRoot.observeDeep(handleViewedByChange);
+
+    return () => {
+      eventViewedByRoot.unobserveDeep(handleViewedByChange);
+    };
+  }, [indexDoc]);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: eventViewedByVersion is intentionally included to reload events when read state changes
   useEffect(() => {
     if (!currentUsername || plans.length === 0) {
       setInboxEvents([]);
@@ -129,7 +146,7 @@ export function useInboxEvents(
     return () => {
       isActive = false;
     };
-  }, [plans, currentUsername, indexDoc]);
+  }, [plans, currentUsername, indexDoc, eventViewedByVersion]);
 
   return inboxEvents;
 }
