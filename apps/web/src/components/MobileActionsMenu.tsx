@@ -237,7 +237,7 @@ export function MobileActionsMenu({ planId, ydoc, rtcProvider, metadata }: Mobil
           ownerId: entry.ownerId,
           deleted: false,
         });
-        toast.success('Plan unarchived');
+        toast.success('Task unarchived');
       } else {
         setPlanIndexEntry(indexDoc, {
           id: entry.id,
@@ -250,7 +250,7 @@ export function MobileActionsMenu({ planId, ydoc, rtcProvider, metadata }: Mobil
           deletedAt: now,
           deletedBy: actor,
         });
-        toast.success('Plan archived');
+        toast.success('Task archived');
       }
     }
   };

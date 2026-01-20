@@ -99,7 +99,7 @@ The GitHub OAuth flow automatically detects mobile browsers (iOS Safari, Android
 - Android Chrome: Same test, verify no unexpected app launches
 - Check browser console for mobile detection log
 
-**Note:** Deep linking to desktop apps during OAuth only occurs if Universal Links (iOS) or App Links (Android) are configured via `.well-known/` files on the domain. Currently, Peer Plan has no such configuration, so mobile OAuth works correctly without intervention.
+**Note:** Deep linking to desktop apps during OAuth only occurs if Universal Links (iOS) or App Links (Android) are configured via `.well-known/` files on the domain. Currently, Shipyard has no such configuration, so mobile OAuth works correctly without intervention.
 
 For more details, see [ADR-0003](./decisions/0003-mobile-oauth-user-agent-detection.md).
 
@@ -161,7 +161,7 @@ http://localhost:5173/?reset=all
 
 **Option 2: Console**
 ```javascript
-window.__resetPeerPlan()
+window.__resetShipyard()
 ```
 
 Both options only work in development mode.

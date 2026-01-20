@@ -1,7 +1,7 @@
 # Fly.io configuration for peer-plan signaling server
 # Optimized for minimum cost with auto-stop capability
 
-app = 'peer-plan-signaling'
+app = 'shipyard-signaling'
 primary_region = 'sjc'  # San Jose - low latency for US West
 
 [build]

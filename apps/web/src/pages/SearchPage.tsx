@@ -96,7 +96,7 @@ function FilterBar({
               : 'text-muted-foreground hover:text-foreground hover:bg-surface-hover'
           }`}
         >
-          My Plans
+          My Tasks
         </button>
         <button
           type="button"
@@ -351,10 +351,10 @@ export function SearchPage() {
         <div className={`border-b border-separator shrink-0 ${selectedPlanId ? 'p-4' : 'mb-4'}`}>
           <h1 className="text-xl font-bold text-foreground mb-3">Search</h1>
           <SearchPlanInput
-            aria-label="Search plans"
+            aria-label="Search tasks"
             value={searchQuery}
             onChange={setSearchQuery}
-            placeholder="Search plans..."
+            placeholder="Search tasks..."
             className="w-full mb-3"
           />
 
@@ -377,7 +377,7 @@ export function SearchPage() {
             <div className="flex items-center justify-center py-12">
               <div className="text-center">
                 <Search className="w-12 h-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-                <p className="text-muted-foreground">Type to search plans or use filters</p>
+                <p className="text-muted-foreground">Type to search tasks or use filters</p>
               </div>
             </div>
           )}
@@ -388,7 +388,7 @@ export function SearchPage() {
               <div className="flex items-center justify-center py-12">
                 <div className="text-center">
                   <p className="text-muted-foreground">
-                    No plans match your search
+                    No tasks match your search
                     {searchQuery && ` for "${searchQuery}"`}
                   </p>
                 </div>
@@ -430,7 +430,7 @@ export function SearchPage() {
         <InlinePlanDetail
           planId={selectedPlanId}
           onClose={handleClosePanel}
-          emptyMessage="Select a plan to view details"
+          emptyMessage="Select a task to view details"
         />
       </div>
     </div>

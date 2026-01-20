@@ -137,7 +137,7 @@ function getEventIcon(type: PlanEventType): ReactNode {
 function getEventDescription(event: PlanEvent): string {
   switch (event.type) {
     case 'plan_created':
-      return 'created the plan';
+      return 'created the task';
     case 'status_changed': {
       const from = event.data?.fromStatus ?? 'unknown';
       const to = event.data?.toStatus ?? 'unknown';
@@ -156,13 +156,13 @@ function getEventDescription(event: PlanEvent): string {
       return prNumber ? `linked PR #${prNumber}` : 'linked a PR';
     }
     case 'content_edited':
-      return 'edited the plan content';
+      return 'edited the task content';
     case 'approved':
-      return 'approved the plan';
+      return 'approved the task';
     case 'changes_requested':
       return 'requested changes';
     case 'completed':
-      return 'marked the plan as completed';
+      return 'marked the task as completed';
     case 'conversation_imported': {
       const platform = event.data?.sourcePlatform ?? 'unknown';
       const count = event.data?.messageCount ?? 0;
@@ -178,18 +178,18 @@ function getEventDescription(event: PlanEvent): string {
       return completed ? 'completed a step' : 'uncompleted a step';
     }
     case 'plan_archived':
-      return 'archived the plan';
+      return 'archived the task';
     case 'plan_unarchived':
-      return 'unarchived the plan';
+      return 'unarchived the task';
     case 'conversation_exported': {
       const count = event.data?.messageCount ?? 0;
       return `exported conversation (${count} messages)`;
     }
     case 'plan_shared':
-      return 'shared the plan';
+      return 'shared the task';
     case 'approval_requested': {
       const requesterName = event.data?.requesterName;
-      return requesterName ? `${requesterName} requested access` : 'requested access to the plan';
+      return requesterName ? `${requesterName} requested access` : 'requested access to the task';
     }
     case 'input_request_created': {
       const requestMessage = event.data?.requestMessage;

@@ -575,7 +575,7 @@ export function PlanHeader({
             ownerId: entry.ownerId,
             deleted: false,
           });
-          toast.success('Plan unarchived');
+          toast.success('Task unarchived');
         } else {
           // Archiving: create a deleted entry
           setPlanIndexEntry(indexDoc, {
@@ -589,7 +589,7 @@ export function PlanHeader({
             deletedAt: Date.now(),
             deletedBy: actor,
           });
-          toast.success('Plan archived');
+          toast.success('Task archived');
         }
       }
     }

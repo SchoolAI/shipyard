@@ -136,7 +136,7 @@ function WaitingRoom({ title, ownerId }: WaitingRoomProps) {
         <p className="text-muted-foreground mb-6">Waiting for approval...</p>
 
         <p className="text-sm text-muted-foreground">
-          The plan owner will be notified of your request. You can close this tab to cancel.
+          The task owner will be notified of your request. You can close this tab to cancel.
         </p>
       </div>
     </div>
@@ -162,7 +162,7 @@ function AccessDenied({ title }: AccessDeniedProps) {
         </p>
 
         <p className="text-sm text-muted-foreground">
-          The plan owner has denied your access request.
+          The task owner has denied your access request.
         </p>
       </div>
     </div>
@@ -189,7 +189,7 @@ function AuthRequired({ title, onStartAuth }: AuthRequiredProps) {
         </p>
 
         <p className="text-sm text-muted-foreground mb-6">
-          After signing in with GitHub, the plan owner will be notified of your access request.
+          After signing in with GitHub, the task owner will be notified of your access request.
         </p>
 
         <Button onPress={() => onStartAuth()} variant="primary" className="w-full">
@@ -217,7 +217,7 @@ function RedeemingInvite({ title }: RedeemingInviteProps) {
           </div>
         </div>
 
-        <h1 className="text-xl font-semibold text-foreground mb-2">Joining Plan</h1>
+        <h1 className="text-xl font-semibold text-foreground mb-2">Joining Task</h1>
 
         <p className="text-muted-foreground">
           Activating your invite link for <span className="font-medium">{title}</span>...
@@ -277,18 +277,18 @@ function InviteError({ title, error, onDismiss, onStartAuth }: InviteErrorProps)
     {
       expired: {
         heading: 'Invite Link Expired',
-        message: 'This invite link has expired. Please ask the plan owner for a new link.',
+        message: 'This invite link has expired. Please ask the task owner for a new link.',
         icon: Clock,
       },
       exhausted: {
         heading: 'Invite Link Used',
         message:
-          'This invite link has reached its maximum number of uses. Please ask the plan owner for a new link.',
+          'This invite link has reached its maximum number of uses. Please ask the task owner for a new link.',
         icon: TicketX,
       },
       revoked: {
         heading: 'Invite Link Revoked',
-        message: 'This invite link has been revoked by the plan owner.',
+        message: 'This invite link has been revoked by the task owner.',
         icon: ShieldX,
       },
       invalid: defaultError,

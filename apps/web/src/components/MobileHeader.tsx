@@ -33,7 +33,7 @@ interface MobileHeaderProps {
  */
 export function MobileHeader({
   onMenuOpen,
-  title = 'Peer Plan',
+  title = 'Shipyard',
   status,
   hubConnected,
   peerCount,

@@ -281,7 +281,7 @@ export function PlanPeekModal({ plan, isOpen, onClose }: PlanPeekModalProps) {
               Press Space to close or click button
             </span>
             <Button variant="primary" size="sm" onPress={handleViewFull}>
-              <span>View Full Plan</span>
+              <span>View Full Task</span>
               <ExternalLink className="w-3.5 h-3.5 ml-1.5" />
             </Button>
           </Modal.Footer>

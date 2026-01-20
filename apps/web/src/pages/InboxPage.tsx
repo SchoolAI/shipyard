@@ -135,7 +135,7 @@ function InboxItem({ plan, onApprove, onRequestChanges, onDismiss, onMarkUnread 
               isIconOnly
               variant="ghost"
               size="sm"
-              aria-label="Approve plan"
+              aria-label="Approve task"
               onPress={() => {
                 onApprove(plan.id);
               }}
@@ -604,7 +604,7 @@ export function InboxPage() {
       const reviewedBy = githubIdentity.displayName || githubIdentity.username;
       updateIndexToInProgress(indexDoc, planId, now);
       await approvePlanInLocalDb(planId, now, actor, reviewedBy);
-      toast.success('Plan approved');
+      toast.success('Task approved');
     },
     [githubIdentity, indexDoc, actor]
   );
@@ -640,7 +640,7 @@ export function InboxPage() {
 
       updatePlanToInProgress(ydoc, now, actor, reviewedBy);
       updateIndexToInProgress(indexDoc, planId, now);
-      toast.success('Plan approved');
+      toast.success('Task approved');
     },
     [githubIdentity, indexDoc, actor]
   );
@@ -711,7 +711,7 @@ export function InboxPage() {
             <Check className="w-8 h-8 text-success" />
           </div>
           <h1 className="text-xl font-bold text-foreground mb-2">Inbox Zero!</h1>
-          <p className="text-sm text-muted-foreground">No plans need your attention right now.</p>
+          <p className="text-sm text-muted-foreground">No tasks need your attention right now.</p>
         </div>
       </div>
     );
@@ -798,7 +798,7 @@ export function InboxPage() {
                 <Accordion.Panel>
                   <Accordion.Body>
                     <ListBox
-                      aria-label="Plans needing review"
+                      aria-label="Tasks needing review"
                       selectionMode="single"
                       selectedKeys={selectedPlanId ? new Set([selectedPlanId]) : new Set()}
                       onSelectionChange={handleListSelection}

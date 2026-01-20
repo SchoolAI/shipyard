@@ -129,7 +129,7 @@ export function ApprovalPanel({ ydoc, rtcProvider, currentUsername, ownerId }: A
       approveUser(ydoc, userId);
       const user = pendingUsers.find((u) => u.id === userId);
       toast.success(`${user?.name ?? userId} approved`, {
-        description: 'They now have access to this plan.',
+        description: 'They now have access to this task.',
       });
     },
     [ydoc, pendingUsers]
@@ -188,7 +188,7 @@ export function ApprovalPanel({ ydoc, rtcProvider, currentUsername, ownerId }: A
           </div>
 
           <p className="mt-3 text-xs text-muted-foreground">
-            Approved users will immediately gain access to this plan.
+            Approved users will immediately gain access to this task.
           </p>
         </Popover.Dialog>
       </Popover.Content>

@@ -185,7 +185,7 @@ function CollapsedSidebar({
               <Search className="w-4 h-4" />
             </Button>
           </Tooltip.Trigger>
-          <Tooltip.Content>Search plans</Tooltip.Content>
+          <Tooltip.Content>Search tasks</Tooltip.Content>
         </Tooltip>
       </nav>
 
@@ -250,7 +250,7 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
   const content = (
     <>
       <div className="px-3 py-3 border-b border-separator flex items-center justify-between">
-        <h2 className="font-semibold text-lg text-foreground">Plans</h2>
+        <h2 className="font-semibold text-lg text-foreground">Tasks</h2>
         <div className="flex items-center gap-1">
           <Tooltip>
             <Tooltip.Trigger>
@@ -264,7 +264,7 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
                 <Search className="w-4 h-4" />
               </Button>
             </Tooltip.Trigger>
-            <Tooltip.Content>Search plans</Tooltip.Content>
+            <Tooltip.Content>Search tasks</Tooltip.Content>
           </Tooltip>
           <Tooltip>
             <Tooltip.Trigger>

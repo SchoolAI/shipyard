@@ -58,11 +58,11 @@ export function AuthChoiceModal({
                     </div>
                     <div className="flex items-center gap-2">
                       <Check className="w-4 h-4 text-success shrink-0" />
-                      <span>Share plans with remote teams</span>
+                      <span>Share tasks with remote teams</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <Check className="w-4 h-4 text-success shrink-0" />
-                      <span>Access private plans</span>
+                      <span>Access private tasks</span>
                     </div>
                   </div>
                   <Button
@@ -87,7 +87,7 @@ export function AuthChoiceModal({
                   <div className="text-sm space-y-1 flex-1">
                     <div className="flex items-center gap-2">
                       <Check className="w-4 h-4 text-success shrink-0" />
-                      <span>View and edit plans locally</span>
+                      <span>View and edit tasks locally</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <Check className="w-4 h-4 text-success shrink-0" />

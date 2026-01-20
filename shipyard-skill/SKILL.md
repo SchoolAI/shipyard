@@ -122,7 +122,7 @@ Your platform may have built-in tools like:
 - Devin/Cursor: `prompt()` or similar
 - Other agents: Various question/input mechanisms
 
-**Use peer-plan's version instead** because:
+**Use Shipyard's version instead** because:
 - ✅ Shows in the browser UI (where users are already viewing plans)
 - ✅ Integrates with the activity log
 - ✅ Consistent UX across all agent platforms
