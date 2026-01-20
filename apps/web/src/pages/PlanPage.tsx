@@ -14,7 +14,7 @@ import {
   setPlanIndexEntry,
   setPlanMetadata,
   YDOC_KEYS,
-} from '@peer-plan/schema';
+} from '@shipyard/schema';
 import { LogIn } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
@@ -286,7 +286,7 @@ export function PlanPage() {
         <div className="flex items-center justify-center min-h-[50vh] p-4">
           <div className="flex flex-col items-center gap-4">
             <Spinner size="lg" />
-            <p className="text-muted-foreground">Loading plan...</p>
+            <p className="text-muted-foreground">Loading task...</p>
           </div>
         </div>
       );
@@ -309,7 +309,7 @@ export function PlanPage() {
                   : 'Waiting for peers...'}
               </p>
               <p className="text-sm text-muted-foreground">
-                This plan is shared via P2P. It may take a moment to connect.
+                This task is shared via P2P. It may take a moment to connect.
               </p>
             </div>
           </div>
@@ -330,10 +330,10 @@ export function PlanPage() {
                 Authentication Required
               </h1>
 
-              <p className="text-muted-foreground mb-4">Sign in with GitHub to access this plan.</p>
+              <p className="text-muted-foreground mb-4">Sign in with GitHub to access this task.</p>
 
               <p className="text-sm text-muted-foreground mb-6">
-                If you own this plan or have been granted access, you'll be able to view it after
+                If you own this task or have been granted access, you'll be able to view it after
                 signing in.
               </p>
 
@@ -348,10 +348,10 @@ export function PlanPage() {
 
       return (
         <div className="p-8 text-center">
-          <h1 className="text-xl font-bold text-foreground">Plan Not Found</h1>
-          <p className="text-muted-foreground">The plan &quot;{id}&quot; does not exist.</p>
+          <h1 className="text-xl font-bold text-foreground">Task Not Found</h1>
+          <p className="text-muted-foreground">The task &quot;{id}&quot; does not exist.</p>
           <p className="text-sm text-muted-foreground mt-2">
-            The plan owner may be offline, or this link may be invalid.
+            The task owner may be offline, or this link may be invalid.
           </p>
         </div>
       );
@@ -363,7 +363,7 @@ export function PlanPage() {
     return (
       <div className="p-8 text-center">
         <h1 className="text-xl font-bold text-foreground">Invalid Snapshot</h1>
-        <p className="text-muted-foreground">The URL does not contain valid plan data.</p>
+        <p className="text-muted-foreground">The URL does not contain valid task data.</p>
       </div>
     );
   }

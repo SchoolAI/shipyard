@@ -12,7 +12,7 @@
 
 The Google A2A (Agent-to-Agent) Protocol does **not** define an explicit "Accept" step for task handoffs. Tasks are implicitly accepted upon receipt and begin processing immediately. The protocol uses an **input-required** state for situations where clarification is needed, but this is mid-task rather than pre-acceptance.
 
-**Key recommendation for Peer-Plan:** The current "Accept" button is semantically incorrect for A2A. Consider removing it in favor of auto-import to the detected platform, or repurpose it as "Import" for user agency.
+**Key recommendation for Shipyard:** The current "Accept" button is semantically incorrect for A2A. Consider removing it in favor of auto-import to the detected platform, or repurpose it as "Import" for user agency.
 
 ---
 
@@ -105,7 +105,7 @@ From Google's ADK documentation:
 
 ---
 
-## 2. What We Have Now in Peer-Plan
+## 2. What We Have Now in Shipyard
 
 ### 2.1 Current Flow
 
@@ -133,7 +133,7 @@ Looking at `ImportConversationHandler.tsx`, the current flow:
 
 ### 2.3 Gap Analysis
 
-| A2A Pattern | Peer-Plan Current | Alignment |
+| A2A Pattern | Shipyard Current | Alignment |
 |-------------|-------------------|-----------|
 | Implicit task acceptance | Manual "Import" step | Misaligned - but reasonable for user agency |
 | input-required for clarification | N/A | Not needed for conversation transfer |
@@ -208,7 +208,7 @@ Current metadata tracking (`ConversationVersion`) includes:
 
 2. **Task semantics**: Could model the entire plan lifecycle as an A2A task with states (draft -> working -> review -> completed).
 
-3. **Agent discovery**: Implement `.well-known/agent.json` for Peer-Plan instances to enable cross-instance discovery.
+3. **Agent discovery**: Implement `.well-known/agent.json` for Shipyard instances to enable cross-instance discovery.
 
 ---
 
@@ -226,7 +226,7 @@ Current metadata tracking (`ConversationVersion`) includes:
 
 ### Q2: Should there be an "Accept" step?
 
-**No.** A2A does not define an acceptance step. Tasks are implicitly accepted on receipt. However, for Peer-Plan's UX, a user confirmation step (called "Import", not "Accept") provides valuable user agency.
+**No.** A2A does not define an acceptance step. Tasks are implicitly accepted on receipt. However, for Shipyard's UX, a user confirmation step (called "Import", not "Accept") provides valuable user agency.
 
 ### Q3: What happens to conversation history after handoff?
 
@@ -238,7 +238,7 @@ The sending agent includes all relevant messages in the transfer payload. The re
 
 ### Q5: What metadata should be tracked?
 
-Current Peer-Plan tracking is good. Key fields:
+Current Shipyard tracking is good. Key fields:
 - Export ID (for tracing)
 - Source platform and session
 - Message count

@@ -13,7 +13,7 @@ import {
   type ConversationHandlers,
   formatAsClaudeCodeJSONL,
   type ImportConversationResponse,
-} from '@peer-plan/schema';
+} from '@shipyard/schema';
 import { nanoid } from 'nanoid';
 
 interface ImportConversationInput {
@@ -51,8 +51,8 @@ export async function importConversationHandler(
     const jsonl = formatAsClaudeCodeJSONL(claudeMessages);
 
     const projectName = meta?.planId
-      ? `peer-plan-${meta.planId.slice(0, 8)}`
-      : process.cwd().split('/').pop() || 'peer-plan';
+      ? `shipyard-${meta.planId.slice(0, 8)}`
+      : process.cwd().split('/').pop() || 'shipyard';
 
     const projectPath = join(homedir(), '.claude', 'projects', projectName);
     await mkdir(projectPath, { recursive: true });

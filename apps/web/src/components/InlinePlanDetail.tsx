@@ -4,7 +4,7 @@
  */
 
 import { Spinner } from '@heroui/react';
-import { getDeliverables, getPlanMetadata, type PlanMetadata } from '@peer-plan/schema';
+import { getDeliverables, getPlanMetadata, type PlanMetadata } from '@shipyard/schema';
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type * as Y from 'yjs';
@@ -52,7 +52,7 @@ export function InlinePlanDetail({
   onRequestChanges,
   onExpand,
   width = 'peek',
-  emptyMessage = 'Select a plan to view details',
+  emptyMessage = 'Select a task to view details',
 }: InlinePlanDetailProps) {
   const navigate = useNavigate();
   const { identity: githubIdentity, startAuth } = useGitHubAuth();
@@ -193,9 +193,9 @@ export function InlinePlanDetail({
       return (
         <div className="flex items-center justify-center h-full">
           <div className="text-center">
-            <p className="text-danger mb-2">Plan not found</p>
+            <p className="text-danger mb-2">Task not found</p>
             <p className="text-sm text-muted-foreground">
-              This plan may have been deleted or is invalid.
+              This task may have been deleted or is invalid.
             </p>
           </div>
         </div>
@@ -206,7 +206,7 @@ export function InlinePlanDetail({
       <div className="flex items-center justify-center h-full">
         <div className="flex flex-col items-center gap-4">
           <Spinner size="lg" />
-          <p className="text-muted-foreground">Loading plan...</p>
+          <p className="text-muted-foreground">Loading task...</p>
         </div>
       </div>
     );

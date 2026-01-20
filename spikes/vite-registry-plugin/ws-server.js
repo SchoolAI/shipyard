@@ -5,8 +5,8 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { WebSocketServer } from 'ws';
 
-// Registry file path in ~/.peer-plan/servers.json
-const REGISTRY_DIR = join(homedir(), '.peer-plan');
+// Registry file path in ~/.shipyard/servers.json
+const REGISTRY_DIR = join(homedir(), '.shipyard');
 const REGISTRY_FILE = join(REGISTRY_DIR, 'servers.json');
 
 /**

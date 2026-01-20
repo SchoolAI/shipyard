@@ -1,12 +1,12 @@
-# peer-plan
+# Shipyard
 
 P2P collaborative review for AI-generated implementation plans.
 
-The Penrose triangle logo represents the "impossible triangle" of AI development: quality, speed, and low effort. Traditionally you sacrifice one. Peer Plan enables all three through collaborative verification loops.
+The Penrose triangle logo represents the "impossible triangle" of AI development: quality, speed, and low effort. Traditionally you sacrifice one. Shipyard enables all three through collaborative verification loops.
 
 ## What is this?
 
-When an AI agent generates an implementation plan, peer-plan enables:
+When an AI agent generates an implementation plan, Shipyard enables:
 - **Real-time collaborative review** between humans and agents
 - **Agent verifiability** through artifacts (screenshots, test results, recordings)
 - **Zero infrastructure** — GitHub Pages + local MCP server, no paid services
@@ -20,7 +20,7 @@ When an AI agent generates an implementation plan, peer-plan enables:
 
 **All core milestones complete!** 🎉 See [PROGRESS.md](./docs/milestones/PROGRESS.md) for implementation details.
 
-> **Test:** Testing peer-plan end-to-end workflow with screenshot artifact and PR creation.
+> **Test:** Testing Shipyard end-to-end workflow with screenshot artifact and PR creation.
 
 ## Quick Start
 
@@ -28,16 +28,16 @@ See [SETUP.md](./docs/SETUP.md) for installation and development instructions.
 
 ## Claude Cowork Integration
 
-Use peer-plan with Claude Cowork via the included skill:
+Use Shipyard with Claude Cowork via the included skill:
 
 ```
-peer-plan-skill/
+shipyard-skill/
 ├── SKILL.md      # Instructions for Claude
 ├── README.md     # Setup guide
 └── examples/     # Usage examples
 ```
 
-See [peer-plan-skill/README.md](./peer-plan-skill/README.md) for installation.
+See [shipyard-skill/README.md](./shipyard-skill/README.md) for installation.
 
 ## License
 

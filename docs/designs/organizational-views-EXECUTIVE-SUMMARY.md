@@ -2,7 +2,7 @@
 
 **Date**: January 12, 2026
 **Research Scope**: 5 parallel Opus agents, 70+ sources, deep codebase analysis
-**Question**: How should Peer-Plan evolve into an "all-in-one agent manager for software verification"?
+**Question**: How should Shipyard evolve into an "all-in-one agent manager for software verification"?
 
 ---
 
@@ -21,7 +21,7 @@
 - Before/After comparisons
 - Verifiable deliverables for compliance
 
-**This is exactly what Peer-Plan already does.** We're not following a trend - we're ahead of it.
+**This is exactly what Shipyard already does.** We're not following a trend - we're ahead of it.
 
 ### 2. Verification is the 2026 Bottleneck
 
@@ -43,7 +43,7 @@
 - Search + Sort + Filter in all views
 - Saved preferences that persist
 
-**What Peer-Plan currently lacks:**
+**What Shipyard currently lacks:**
 - No search
 - No sort options
 - No filters within sections
@@ -65,11 +65,11 @@
 
 ---
 
-## What Makes Peer-Plan Unique
+## What Makes Shipyard Unique
 
 ### Competitive Matrix
 
-|  | Peer-Plan | Cursor 2.0 | Antigravity | Devin | Linear |
+|  | Shipyard | Cursor 2.0 | Antigravity | Devin | Linear |
 |---|:---------:|:----------:|:-----------:|:-----:|:------:|
 | **P2P Collaboration** | ✅ Unique | ❌ | ❌ | ❌ | ❌ |
 | **Artifact Proof** | ✅ | ❌ | ✅ | Limited | ❌ |
@@ -271,7 +271,7 @@ Views must work offline, sync via CRDT, no central server dependency
 
 ### Target Market Segmentation
 
-| Segment | Pain Point | Peer-Plan Solution |
+| Segment | Pain Point | Shipyard Solution |
 |---------|------------|-------------------|
 | **Solo Devs** | "Did my agent actually fix the bug?" | Artifact proof with screenshots |
 | **Teams** | "How do we review agent PRs?" | P2P collaborative review |
@@ -333,7 +333,7 @@ This document synthesizes research from **5 parallel Opus agents** analyzing **7
 
 ### Research Process
 1. **Competitive analysis** - Analyzed UI patterns from 15+ tools
-2. **Codebase review** - Deep dive into current Peer-Plan architecture
+2. **Codebase review** - Deep dive into current Shipyard architecture
 3. **Library evaluation** - Compared 20+ React libraries for drag-drop, tables, masonry
 4. **Trend synthesis** - Connected industry movement toward artifacts-as-proof
 5. **Risk assessment** - Identified technical and UX risks with mitigations

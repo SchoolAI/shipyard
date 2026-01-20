@@ -16,7 +16,7 @@ export const setupReviewNotificationTool = {
     name: TOOL_NAMES.SETUP_REVIEW_NOTIFICATION,
     description: `Returns a bash script to monitor plan review status.
 
-NOTE FOR CLAUDE CODE USERS: If you have the peer-plan hook installed, you DON'T need this tool. The hook automatically blocks until the human approves or requests changes. This tool is only for agents WITHOUT hook support.
+NOTE FOR CLAUDE CODE USERS: If you have the shipyard hook installed, you DON'T need this tool. The hook automatically blocks until the human approves or requests changes. This tool is only for agents WITHOUT hook support.
 
 USAGE (for non-hook agents):
 1. Call this tool to get monitoring script

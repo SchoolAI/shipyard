@@ -7,7 +7,7 @@
  * - useInboxEvents.ts (event monitoring)
  */
 
-import { type InputRequest, YDOC_KEYS } from '@peer-plan/schema';
+import { type InputRequest, YDOC_KEYS } from '@shipyard/schema';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import type * as Y from 'yjs';

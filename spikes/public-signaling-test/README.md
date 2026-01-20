@@ -113,9 +113,9 @@ The y-webrtc signaling protocol (from `apps/signaling/src/server.js`):
 { type: 'pong' }
 ```
 
-## Recommendation for peer-plan
+## Recommendation for shipyard
 
-Since public servers are unreliable, peer-plan should:
+Since public servers are unreliable, shipyard should:
 
 1. **Development**: Use local signaling server (`pnpm dev:signaling`)
 2. **Production**: Deploy `apps/signaling` to a platform like:

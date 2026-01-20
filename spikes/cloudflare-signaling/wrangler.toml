@@ -1,4 +1,4 @@
-name = "peer-plan-signaling"
+name = "shipyard-signaling"
 main = "src/index.ts"
 compatibility_date = "2025-01-01"
 account_id = "191909c2c1a28f6cb73d12e3362b874c"  # Jacob@schoolai.com's Account

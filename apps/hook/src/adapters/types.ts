@@ -1,9 +1,9 @@
 /**
  * Abstract adapter layer for agent integrations.
- * Allows different agent systems (Claude Code, Open Agents, etc.) to plug into peer-plan.
+ * Allows different agent systems (Claude Code, Open Agents, etc.) to plug into shipyard.
  */
 
-import type { AgentPresence, ReviewFeedback } from '@peer-plan/schema';
+import type { AgentPresence, ReviewFeedback } from '@shipyard/schema';
 
 export type { AgentPresence, ReviewFeedback };
 
@@ -58,6 +58,7 @@ export interface ToolDenyEvent {
   reason: string;
 }
 
+/** Event is not relevant to shipyard, pass through */
 export interface PassthroughEvent {
   type: 'passthrough';
 }
@@ -73,3 +74,5 @@ export interface CoreResponse {
   additionalContext?: string;
   denyReason?: string;
 }
+
+// Note: AgentPresence is re-exported from @shipyard/schema above

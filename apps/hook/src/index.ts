@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 /**
- * Peer-Plan Hook Entry Point
+ * Shipyard Hook Entry Point
  *
  * This CLI is invoked by Claude Code (or other agents) as a hook.
  * It reads JSON from stdin, processes the event, and writes JSON to stdout.
  *
  * Usage:
- *   echo '{"session_id": "...", ...}' | peer-plan-hook
+ *   echo '{"session_id": "...", ...}' | shipyard-hook
  */
 
 import { claudeCodeAdapter } from './adapters/claude-code.js';
@@ -41,7 +41,9 @@ async function handlePlanStart(
       url: result.url,
     };
   } catch (err) {
-    // NOTE: Fail-open policy - plan creation failure shouldn't block agent work
+    // Logs go to: stderr (visible in Claude Code) + ~/.shipyard/hook-debug.log
+    // Fail open here because plan creation failure shouldn't block the agent's work.
+    // The agent can still proceed without shipyard features.
     logger.error({ err }, 'Failed to create plan');
     return { allow: true };
   }
@@ -94,8 +96,8 @@ async function handlePlanExit(
       error.message?.includes('not available');
 
     const message = isConnectionError
-      ? 'Cannot connect to peer-plan server. Ensure the peer-plan MCP server is running. Check ~/.peer-plan/hook-debug.log for details.'
-      : `Review system error: ${error.message}. Check ~/.peer-plan/hook-debug.log for details.`;
+      ? 'Cannot connect to Shipyard server. Ensure the Shipyard MCP server is running. Check ~/.shipyard/hook-debug.log for details.'
+      : `Review system error: ${error.message}. Check ~/.shipyard/hook-debug.log for details.`;
 
     return {
       allow: false,
@@ -198,12 +200,15 @@ async function readStdin(): Promise<string> {
 }
 
 /**
- * NOTE: Duplication with peer-plan-skill/SKILL.md is intentional.
- * Hook: For Claude Code users with native plan mode (Shift+Tab)
- * Skill: For agents using MCP tool directly without plan mode
+ * Output SessionStart context for Claude to see.
+ *
+ * NOTE: This context is duplicated in the skill (shipyard-skill/SKILL.md) but serves
+ * a different purpose. The hook context is for Claude Code users who have the hook
+ * installed and use native plan mode (Shift+Tab). The skill documentation is for
+ * agents invoking the MCP tool directly without native plan mode. Both are needed.
  */
 function outputSessionStartContext(): void {
-  const context = `[PEER-PLAN] Collaborative planning with human review & proof-of-work tracking.
+  const context = `[SHIPYARD] Collaborative planning with human review & proof-of-work tracking.
 
 IMPORTANT: Use native plan mode (Shift+Tab) to create plans. The hook handles everything automatically.
 
@@ -291,7 +296,7 @@ async function main(): Promise<void> {
           hookEventName: 'PermissionRequest',
           decision: {
             behavior: 'deny',
-            message: `Hook error: ${(err as Error).message}. Check ~/.peer-plan/hook-debug.log for details.`,
+            message: `Hook error: ${(err as Error).message}. Check ~/.shipyard/hook-debug.log for details.`,
           },
         },
       })

@@ -5,7 +5,7 @@
  * Usage: node scripts/inspect-plan.mjs <planId>
  */
 
-import { getPlanMetadata, YDOC_KEYS } from '@peer-plan/schema';
+import { getPlanMetadata, YDOC_KEYS } from '@shipyard/schema';
 import { WebsocketProvider } from 'y-websocket';
 import * as Y from 'yjs';
 

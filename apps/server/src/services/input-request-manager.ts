@@ -13,7 +13,7 @@ import {
   InputRequestSchema,
   logPlanEvent,
   YDOC_KEYS,
-} from '@peer-plan/schema';
+} from '@shipyard/schema';
 import type * as Y from 'yjs';
 import { logger } from '../logger.js';
 

@@ -10,7 +10,7 @@
  * - Node.js can return resolved Promises for synchronous operations
  */
 
-import type { InviteRedemption, InviteToken } from '@peer-plan/schema';
+import type { InviteRedemption, InviteToken } from '@shipyard/schema';
 import type { PlanApprovalState } from './types.js';
 
 /**

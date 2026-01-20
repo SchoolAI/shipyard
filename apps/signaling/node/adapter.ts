@@ -11,7 +11,7 @@
  */
 
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
-import type { InviteRedemption, InviteToken } from '@peer-plan/schema';
+import type { InviteRedemption, InviteToken } from '@shipyard/schema';
 import { nanoid } from 'nanoid';
 import type { WebSocket } from 'ws';
 import type { PlatformAdapter } from '../core/platform.js';

@@ -1,8 +1,8 @@
 {
-  "name": "@peer-plan/web",
+  "name": "@shipyard/web",
   "version": "0.1.0",
   "type": "module",
-  "description": "Web UI for peer-plan",
+  "description": "Web UI for shipyard",
   "scripts": {
     "dev": "vite --open",
     "build": "vite build",
@@ -26,8 +26,8 @@
     "@mantine/core": "^8.3.10",
     "@mantine/hooks": "^8.3.10",
     "@monaco-editor/react": "^4.7.0",
-    "@peer-plan/schema": "workspace:*",
-    "@peer-plan/shared": "workspace:*",
+    "@shipyard/schema": "workspace:*",
+    "@shipyard/shared": "workspace:*",
     "@radix-ui/react-avatar": "^1.1.11",
     "@radix-ui/react-separator": "^1.1.8",
     "@radix-ui/react-slot": "^1.2.4",

@@ -1,12 +1,12 @@
 {
-  "name": "@peer-plan/hook",
+  "name": "@shipyard/hook",
   "version": "0.1.0",
   "type": "module",
-  "description": "Claude Code integration hook for peer-plan",
+  "description": "Claude Code integration hook for shipyard",
   "main": "./dist/index.mjs",
   "bin": {
-    "peer-plan-hook": "./dist/index.mjs",
-    "peer-plan-hook-install": "./scripts/postinstall.mjs"
+    "shipyard-hook": "./dist/index.mjs",
+    "shipyard-hook-install": "./scripts/postinstall.mjs"
   },
   "files": [
     "dist",
@@ -28,8 +28,8 @@
   },
   "dependencies": {
     "@blocknote/server-util": "^0.45.0",
-    "@peer-plan/schema": "workspace:*",
-    "@peer-plan/shared": "workspace:*",
+    "@shipyard/schema": "workspace:*",
+    "@shipyard/shared": "workspace:*",
     "@trpc/client": "^11.8.1",
     "nanoid": "^5.0.9",
     "open": "^11.0.0",

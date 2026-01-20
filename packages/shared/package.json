@@ -1,8 +1,8 @@
 {
-  "name": "@peer-plan/shared",
+  "name": "@shipyard/shared",
   "version": "0.1.0",
   "type": "module",
-  "description": "Shared utilities for peer-plan",
+  "description": "Shared utilities for shipyard",
   "main": "./dist/index.mjs",
   "types": "./dist/index.d.mts",
   "exports": {

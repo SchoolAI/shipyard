@@ -25,7 +25,7 @@ After completing session-token and registry-config extraction, these TODOs remai
 
 ## Logging Improvements
 
-- [ ] **Review `~/.peer-plan/hook-debug.log`** (apps/hook/src/logger.ts:15)
+- [ ] **Review `~/.shipyard/hook-debug.log`** (apps/hook/src/logger.ts:15)
   - Action: Review debug log for recurring warnings/errors
   - Fix any issues that appear frequently
   - Consider log rotation if file grows large
@@ -33,7 +33,7 @@ After completing session-token and registry-config extraction, these TODOs remai
 - [ ] **Add file logging to MCP server** (apps/server/src/logger.ts:4-5)
   - Action: Add parity with hook (file + stderr logging)
   - Helpful for debugging MCP server issues
-  - Use same pattern as hook: `~/.peer-plan/server-debug.log`
+  - Use same pattern as hook: `~/.shipyard/server-debug.log`
 
 ---
 
@@ -48,7 +48,7 @@ After completing session-token and registry-config extraction, these TODOs remai
 
 ## Minor Cleanups
 
-- [ ] **Remove deprecated `PEER_PLAN_WEB_URL`** (apps/hook/src/config/env/web.ts:5)
+- [ ] **Remove deprecated `SHIPYARD_WEB_URL`** (apps/hook/src/config/env/web.ts:5)
   - Marked as deprecated in schema
   - Check if still used anywhere
   - Remove if safe

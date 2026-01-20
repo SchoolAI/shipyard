@@ -1,6 +1,6 @@
 /**
  * Shared schemas for hook ↔ server HTTP API communication.
- * These types are used by both @peer-plan/hook and @peer-plan/server.
+ * These types are used by both @shipyard/hook and @shipyard/server.
  */
 
 import { z } from 'zod';

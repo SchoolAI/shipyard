@@ -1,10 +1,10 @@
 /**
- * tRPC client for communicating with the peer-plan registry server.
+ * tRPC client for communicating with the shipyard registry server.
  * Provides type-safe RPC calls with automatic request batching.
  */
 
-import type { AppRouter } from '@peer-plan/schema';
-import { DEFAULT_TRPC_TIMEOUT_MS } from '@peer-plan/shared';
+import type { AppRouter } from '@shipyard/schema';
+import { DEFAULT_TRPC_TIMEOUT_MS } from '@shipyard/shared';
 import { createTRPCClient, httpBatchLink } from '@trpc/client';
 
 let cachedClient: ReturnType<typeof createTRPCClient<AppRouter>> | null = null;

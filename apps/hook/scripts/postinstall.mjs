@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 /**
- * Postinstall script for @peer-plan/hook
+ * Postinstall script for @shipyard/hook
  *
  * Automatically configures Claude Code hooks in ~/.claude/settings.json
- * This runs after `npm install -g @peer-plan/hook`
+ * This runs after `npm install -g @shipyard/hook`
  */
 
 import { copyFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
@@ -11,21 +11,21 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 
 const SETTINGS_FILE = join(homedir(), '.claude', 'settings.json');
-const HOOK_COMMAND = 'peer-plan-hook';
-const HOOK_CONTEXT_COMMAND = 'peer-plan-hook --context';
+const HOOK_COMMAND = 'shipyard-hook';
+const HOOK_CONTEXT_COMMAND = 'shipyard-hook --context';
 
 /**
  * Main postinstall function
  */
 function main() {
-  console.log('\n[peer-plan] Configuring Claude Code hooks...\n');
+  console.log('\n[shipyard] Configuring Claude Code hooks...\n');
 
   // Check if settings file exists
   if (!existsSync(SETTINGS_FILE)) {
     console.log('Claude Code settings not found at', SETTINGS_FILE);
     console.log('Please run Claude Code at least once to create settings.\n');
     console.log('After running Claude Code, you can manually run:');
-    console.log('  peer-plan-hook-install\n');
+    console.log('  shipyard-hook-install\n');
     // Don't fail - user might not have Claude Code yet
     return;
   }
@@ -105,7 +105,7 @@ function main() {
     console.log('PostToolUse hook already configured');
   }
 
-  // Add SessionStart hook (injects peer-plan context)
+  // Add SessionStart hook (injects shipyard context)
   if (!settings.hooks.SessionStart) {
     settings.hooks.SessionStart = [];
   }
@@ -144,9 +144,9 @@ function main() {
   console.log('\nNext steps:');
   console.log('1. Restart Claude Code to activate hooks');
   console.log('2. Enter plan mode (Shift+Tab) in any project');
-  console.log('3. Create a plan - browser will auto-open with peer-plan');
+  console.log('3. Create a plan - browser will auto-open with Shipyard');
   console.log('\nTo uninstall:');
-  console.log('  npm uninstall -g @peer-plan/hook');
+  console.log('  npm uninstall -g @shipyard/hook');
   console.log(`  Restore settings: cp ${backupFile} ${SETTINGS_FILE}`);
   console.log('');
 }

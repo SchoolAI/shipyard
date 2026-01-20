@@ -8,12 +8,12 @@ Browser needs to discover which WebSocket servers are running locally without ha
 
 ## Solution
 
-Run a dedicated HTTP registry server on a known port (3001) that serves a JSON registry of active WebSocket servers. Each WS server registers itself by writing to `~/.peer-plan/servers.json` on startup.
+Run a dedicated HTTP registry server on a known port (3001) that serves a JSON registry of active WebSocket servers. Each WS server registers itself by writing to `~/.shipyard/servers.json` on startup.
 
 ## Architecture
 
 ```
-~/.peer-plan/servers.json (file)
+~/.shipyard/servers.json (file)
          ↑
          │ write on startup
          │
@@ -69,7 +69,7 @@ node registry-server.js
 Should output:
 ```
 Registry server running at http://localhost:3001
-Serving registry from: /Users/you/.peer-plan/servers.json
+Serving registry from: /Users/you/.shipyard/servers.json
 ```
 
 #### 3. Start WebSocket servers (in separate terminals)
@@ -88,7 +88,7 @@ node ws-server.js 3102
 Each should output:
 ```
 WebSocket server listening on port 3100
-Registered with registry: /Users/you/.peer-plan/servers.json
+Registered with registry: /Users/you/.shipyard/servers.json
 ```
 
 #### 4. Open browser
@@ -110,7 +110,7 @@ Browser should:
 
 ## Expected Behavior
 
-1. Registry server starts and watches `~/.peer-plan/servers.json`
+1. Registry server starts and watches `~/.shipyard/servers.json`
 2. Each WS server writes its entry to registry file on startup
 3. Browser fetches registry via HTTP GET
 4. Browser establishes WebSocket connections to all discovered servers

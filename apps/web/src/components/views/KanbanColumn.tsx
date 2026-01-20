@@ -49,7 +49,7 @@ export function KanbanColumn({ column, onCardHover, onCardClick }: KanbanColumnP
         <SortableContext items={planIds} strategy={verticalListSortingStrategy}>
           {column.plans.length === 0 ? (
             <div className="flex items-center justify-center h-20 text-xs text-muted-foreground">
-              No plans
+              No tasks
             </div>
           ) : (
             column.plans.map((plan) => (

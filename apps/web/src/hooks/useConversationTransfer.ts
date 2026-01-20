@@ -20,7 +20,7 @@ import {
   parseClaudeCodeTranscriptString,
   summarizeA2AConversation,
   validateA2AMessages,
-} from '@peer-plan/schema';
+} from '@shipyard/schema';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { WebrtcProvider } from 'y-webrtc';
 import type * as Y from 'yjs';

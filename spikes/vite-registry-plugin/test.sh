@@ -21,7 +21,7 @@ sleep 0.5
 
 echo ""
 echo "Registry contents:"
-cat ~/.peer-plan/servers.json
+cat ~/.shipyard/servers.json
 echo ""
 
 echo "Servers running. Press Ctrl+C to stop all servers."
@@ -33,6 +33,6 @@ echo "  3. You should see 3 connected servers"
 echo ""
 
 # Wait for Ctrl+C
-trap 'echo ""; echo "Stopping servers..."; kill $PID1 $PID2 $PID3 2>/dev/null; sleep 2; echo "Registry after cleanup:"; cat ~/.peer-plan/servers.json 2>/dev/null || echo "Registry cleaned up"; exit 0' INT
+trap 'echo ""; echo "Stopping servers..."; kill $PID1 $PID2 $PID3 2>/dev/null; sleep 2; echo "Registry after cleanup:"; cat ~/.shipyard/servers.json 2>/dev/null || echo "Registry cleaned up"; exit 0' INT
 
 wait

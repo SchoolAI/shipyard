@@ -4,7 +4,7 @@ import {
   extractTextFromCommentBody,
   parseThreads,
   type Thread,
-} from '@peer-plan/schema';
+} from '@shipyard/schema';
 import type * as Y from 'yjs';
 
 // --- Constants ---

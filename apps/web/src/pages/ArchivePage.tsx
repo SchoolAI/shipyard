@@ -4,13 +4,13 @@
  */
 
 import { Button, ListBox, ListBoxItem } from '@heroui/react';
-import type { PlanIndexEntry } from '@peer-plan/schema';
+import type { PlanIndexEntry } from '@shipyard/schema';
 import {
   getPlanIndexEntry,
   PLAN_INDEX_DOC_NAME,
   setPlanIndexEntry,
   unarchivePlan,
-} from '@peer-plan/schema';
+} from '@shipyard/schema';
 import { ArchiveRestore } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -60,7 +60,7 @@ function ArchiveItem({ plan, onUnarchive }: ArchiveItemProps) {
         isIconOnly
         variant="ghost"
         size="sm"
-        aria-label="Unarchive plan"
+        aria-label="Unarchive task"
         onPress={() => {
           onUnarchive(plan.id);
         }}
@@ -177,7 +177,7 @@ export function ArchivePage() {
       setSelectedPlanId(null);
     }
 
-    toast.success('Plan unarchived');
+    toast.success('Task unarchived');
   };
 
   const handleListSelection = (keys: Set<unknown> | 'all') => {
@@ -195,8 +195,8 @@ export function ArchivePage() {
           <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-muted flex items-center justify-center">
             <ArchiveRestore className="w-8 h-8 text-muted-foreground" />
           </div>
-          <h1 className="text-xl font-bold text-foreground mb-2">No Archived Plans</h1>
-          <p className="text-sm text-muted-foreground">Your archived plans will appear here.</p>
+          <h1 className="text-xl font-bold text-foreground mb-2">No Archived Tasks</h1>
+          <p className="text-sm text-muted-foreground">Your archived tasks will appear here.</p>
         </div>
       </div>
     );
@@ -215,7 +215,7 @@ export function ArchivePage() {
             <h1 className="text-xl font-bold text-foreground">Archive</h1>
             <p className="text-sm text-muted-foreground">
               {sortedArchivedPlans.length}{' '}
-              {sortedArchivedPlans.length === 1 ? 'archived plan' : 'archived plans'}
+              {sortedArchivedPlans.length === 1 ? 'archived task' : 'archived tasks'}
             </p>
           </div>
         </div>
@@ -225,12 +225,12 @@ export function ArchivePage() {
           {sortedArchivedPlans.length === 0 ? (
             <div className="flex items-center justify-center py-12">
               <div className="text-center">
-                <p className="text-muted-foreground">No archived plans</p>
+                <p className="text-muted-foreground">No archived tasks</p>
               </div>
             </div>
           ) : (
             <ListBox
-              aria-label="Archived plans"
+              aria-label="Archived tasks"
               selectionMode="single"
               selectedKeys={selectedPlanId ? new Set([selectedPlanId]) : new Set()}
               onSelectionChange={handleListSelection}
@@ -256,7 +256,7 @@ export function ArchivePage() {
         <InlinePlanDetail
           planId={selectedPlanId}
           onClose={handleClosePanel}
-          emptyMessage="Select a plan to view details"
+          emptyMessage="Select a task to view details"
         />
       </div>
     </div>

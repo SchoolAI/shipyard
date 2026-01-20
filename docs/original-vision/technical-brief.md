@@ -5,7 +5,7 @@
 
 ---
 
-# Peer-Plan: P2P Collaborative Plan Review
+# Shipyard: P2P Collaborative Plan Review
 
 **Technical Architecture Brief**
 *Draft v0.2 — January 2026*
@@ -478,6 +478,6 @@ https://{org}.github.io/{repo}/plan?repo={org}/{project}&pr={N}&plan={id}
 
 ## Repository Name
 
-Recommended: **peer-plan**
+Recommended: **shipyard**
 
 Punchy, captures both P2P nature and plan focus.

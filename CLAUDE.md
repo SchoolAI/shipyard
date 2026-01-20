@@ -1,4 +1,4 @@
-# Claude Code Instructions for Peer-Plan
+# Claude Code Instructions for Shipyard
 
 > Instructions for AI agents working on this codebase.
 
@@ -69,7 +69,7 @@ Always verify the component exists and check its v3 API:
 ## Project Structure
 
 ```
-peer-plan/
+shipyard/
 ├── docs/
 │   ├── BRIEF.md                # Start here
 │   ├── engineering-standards.md # Code standards

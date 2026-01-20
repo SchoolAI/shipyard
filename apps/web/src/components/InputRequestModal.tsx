@@ -19,8 +19,8 @@ import {
   TextArea,
   TextField,
 } from '@heroui/react';
-import type { InputRequest } from '@peer-plan/schema';
-import { answerInputRequest, cancelInputRequest } from '@peer-plan/schema';
+import type { InputRequest } from '@shipyard/schema';
+import { answerInputRequest, cancelInputRequest } from '@shipyard/schema';
 import type React from 'react';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
@@ -104,22 +104,19 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
     }
   }, [remainingTime, isOpen, request, handleCancel]);
 
-  const handleAnswerError = useCallback(
-    (error: string, onCloseFn: () => void) => {
-      if (error === 'Request already answered') {
-        toast.error('This request was already answered by another user');
-      } else if (error === 'Request not found') {
-        toast.error('This request could not be found');
-        onCloseFn();
-      } else if (error === 'Request is not pending') {
-        toast.error('This request has expired or was cancelled');
-        onCloseFn();
-      } else {
-        toast.error('Failed to submit response');
-      }
-    },
-    []
-  );
+  const handleAnswerError = useCallback((error: string, onCloseFn: () => void) => {
+    if (error === 'Request already answered') {
+      toast.error('This request was already answered by another user');
+    } else if (error === 'Request not found') {
+      toast.error('This request could not be found');
+      onCloseFn();
+    } else if (error === 'Request is not pending') {
+      toast.error('This request has expired or was cancelled');
+      onCloseFn();
+    } else {
+      toast.error('Failed to submit response');
+    }
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

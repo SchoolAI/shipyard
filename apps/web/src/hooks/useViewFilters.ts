@@ -3,8 +3,8 @@
  * Pure functions for logic, React state for UI integration.
  */
 
-import type { PlanIndexEntry, PlanStatusType } from '@peer-plan/schema';
-import { PlanStatusValues } from '@peer-plan/schema';
+import type { PlanIndexEntry, PlanStatusType } from '@shipyard/schema';
+import { PlanStatusValues } from '@shipyard/schema';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   getViewPreferences,

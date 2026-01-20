@@ -18,10 +18,10 @@ export function parseRepoString(repo: string): { owner: string; repoName: string
 
 /**
  * Check if artifacts feature is enabled.
- * Configured via PEER_PLAN_ARTIFACTS environment variable (defaults to enabled).
+ * Configured via SHIPYARD_ARTIFACTS environment variable (defaults to enabled).
  */
 export function isArtifactsEnabled(): boolean {
-  return githubConfig.PEER_PLAN_ARTIFACTS;
+  return githubConfig.SHIPYARD_ARTIFACTS;
 }
 
 /**

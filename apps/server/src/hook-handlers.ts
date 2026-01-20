@@ -38,8 +38,8 @@ import {
   type UpdatePresenceRequest,
   type UpdatePresenceResponse,
   YDOC_KEYS,
-} from '@peer-plan/schema';
-import { computeHash } from '@peer-plan/shared';
+} from '@shipyard/schema';
+import { computeHash } from '@shipyard/shared';
 import { TRPCError } from '@trpc/server';
 import { nanoid } from 'nanoid';
 import open from 'open';
@@ -164,7 +164,7 @@ export async function createSessionHandler(
     deleted: false,
   });
 
-  const webUrl = webConfig.PEER_PLAN_WEB_URL;
+  const webUrl = webConfig.SHIPYARD_WEB_URL;
   const url = `${webUrl}/plan/${planId}`;
 
   ctx.logger.info({ url }, 'Plan URL generated');
@@ -431,7 +431,7 @@ export async function setSessionTokenHandler(
     sessionTokenHash,
   });
 
-  const webUrl = webConfig.PEER_PLAN_WEB_URL;
+  const webUrl = webConfig.SHIPYARD_WEB_URL;
   const url = `${webUrl}/plan/${planId}`;
 
   // Update session registry with session token hash - transition to 'synced' if needed
@@ -1003,7 +1003,7 @@ export async function getDeliverableContextHandler(
   }
 
   const deliverables = getDeliverables(ydoc);
-  const webUrl = webConfig.PEER_PLAN_WEB_URL;
+  const webUrl = webConfig.SHIPYARD_WEB_URL;
   const url = `${webUrl}/plan/${planId}`;
 
   // Format deliverables section
@@ -1026,8 +1026,8 @@ export async function getDeliverableContextHandler(
   // Build approval message based on status
   const approvalMessage =
     metadata.status === 'changes_requested'
-      ? '[PEER-PLAN] Changes requested on your plan ⚠️'
-      : '[PEER-PLAN] Plan approved! 🎉';
+      ? '[SHIPYARD] Changes requested on your plan ⚠️'
+      : '[SHIPYARD] Plan approved! 🎉';
 
   const context = `${approvalMessage}
 ${deliverablesSection}${feedbackSection}

@@ -10,7 +10,7 @@
     "tail": "wrangler tail"
   },
   "dependencies": {
-    "@peer-plan/schema": "workspace:*"
+    "@shipyard/schema": "workspace:*"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260103.0",

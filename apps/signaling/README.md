@@ -1,11 +1,11 @@
 # Signaling Server
 
-WebRTC signaling server for P2P peer discovery in peer-plan.
+WebRTC signaling server for P2P peer discovery in shipyard.
 
 ## What It Does
 
 Helps browsers find each other to establish direct WebRTC P2P connections:
-1. Browser A joins room `peer-plan-{planId}`
+1. Browser A joins room `shipyard-{planId}`
 2. Browser B joins same room
 3. Signaling server brokers connection info exchange (ICE candidates)
 4. Direct P2P connection established
@@ -33,7 +33,7 @@ Uses the Node.js implementation (`src/server.js`).
 
 ## Production Deployment (Cloudflare Workers)
 
-**Deployed:** `wss://peer-plan-signaling.jacob-191.workers.dev`
+**Deployed:** `wss://shipyard-signaling.jacob-191.workers.dev`
 
 **Why Cloudflare:**
 - Zero cost with WebSocket Hibernation (idle connections don't count)
@@ -48,7 +48,7 @@ Uses the Node.js implementation (`src/server.js`).
 1. Go to [Cloudflare API Tokens](https://dash.cloudflare.com/profile/api-tokens)
 2. Create token with template: **Edit Cloudflare Workers**
 3. Permissions: Workers Scripts Edit, Durable Objects Write
-4. Add to [GitHub Secrets](https://github.com/SchoolAI/peer-plan/settings/secrets/actions):
+4. Add to [GitHub Secrets](https://github.com/SchoolAI/shipyard/settings/secrets/actions):
    - Name: `CLOUDFLARE_API_TOKEN`
    - Value: [paste token]
 
@@ -77,7 +77,7 @@ npx wrangler tail
 npx wrangler deployments list
 ```
 
-Dashboard: [Cloudflare Workers](https://dash.cloudflare.com) → peer-plan-signaling → Metrics
+Dashboard: [Cloudflare Workers](https://dash.cloudflare.com) → shipyard-signaling → Metrics
 
 ### Moving to SchoolAI Account (Optional)
 
@@ -97,7 +97,7 @@ Currently on jacob@schoolai.com personal account. To move to organization:
 | Environment | URL |
 |-------------|-----|
 | Local Development | `ws://localhost:4444` |
-| Production | `wss://peer-plan-signaling.jacob-191.workers.dev` |
+| Production | `wss://shipyard-signaling.jacob-191.workers.dev` |
 
 ## WebSocket Hibernation
 
@@ -147,7 +147,7 @@ See `../../spikes/public-signaling-test/` for test results.
 2. Test connection:
    ```bash
    cd ../../spikes/public-signaling-test
-   node test-connection.js wss://peer-plan-signaling.jacob-191.workers.dev
+   node test-connection.js wss://shipyard-signaling.jacob-191.workers.dev
    ```
 3. Check [Cloudflare Dashboard](https://dash.cloudflare.com) for errors
 

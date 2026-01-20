@@ -13,9 +13,9 @@ import type { PlanApprovalState, PublishMessage } from '../types.js';
 
 /**
  * Topic prefix for plan documents.
- * Topics follow format: "peer-plan-{planId}"
+ * Topics follow format: "shipyard-{planId}"
  */
-const PLAN_TOPIC_PREFIX = 'peer-plan-';
+const PLAN_TOPIC_PREFIX = 'shipyard-';
 
 /**
  * Extract plan ID from topic name.

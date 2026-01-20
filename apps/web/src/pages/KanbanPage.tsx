@@ -29,7 +29,7 @@ import {
   type StatusTransition,
   setPlanIndexEntry,
   transitionPlanStatus,
-} from '@peer-plan/schema';
+} from '@shipyard/schema';
 import { Eye, EyeOff } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -422,7 +422,7 @@ export function KanbanPage() {
       });
     }
 
-    toast.success('Plan approved');
+    toast.success('Task approved');
   }, [selectedPlanId, panelMetadata, panelYdoc, indexDoc, githubIdentity]);
 
   const handleRequestChanges = useCallback(() => {
@@ -468,7 +468,7 @@ export function KanbanPage() {
         <header className="flex items-center justify-between px-4 py-3 border-b border-separator shrink-0">
           <div>
             <h1 className="text-xl font-bold text-foreground">Board</h1>
-            <p className="text-sm text-muted-foreground">Loading plans...</p>
+            <p className="text-sm text-muted-foreground">Loading tasks...</p>
           </div>
         </header>
         <div className="flex-1 overflow-x-auto overflow-y-hidden">
@@ -481,29 +481,29 @@ export function KanbanPage() {
   const announcements: Announcements = {
     onDragStart({ active }) {
       const plan = active.data.current?.plan as PlanIndexEntry | undefined;
-      return `Picked up plan: ${plan?.title || 'unknown'}`;
+      return `Picked up task: ${plan?.title || 'unknown'}`;
     },
     onDragOver({ active, over }) {
       const plan = active.data.current?.plan as PlanIndexEntry | undefined;
       if (over) {
         const columnData = over.data.current;
         const status = (columnData?.status || columnData?.column?.id || 'unknown') as string;
-        return `Plan ${plan?.title || 'unknown'} is over ${status.replace('_', ' ')} column`;
+        return `Task ${plan?.title || 'unknown'} is over ${status.replace('_', ' ')} column`;
       }
-      return `Plan ${plan?.title || 'unknown'} is no longer over a droppable area`;
+      return `Task ${plan?.title || 'unknown'} is no longer over a droppable area`;
     },
     onDragEnd({ active, over }) {
       const plan = active.data.current?.plan as PlanIndexEntry | undefined;
       if (over) {
         const columnData = over.data.current;
         const status = (columnData?.status || columnData?.column?.id || 'unknown') as string;
-        return `Plan ${plan?.title || 'unknown'} was moved to ${status.replace('_', ' ')} column`;
+        return `Task ${plan?.title || 'unknown'} was moved to ${status.replace('_', ' ')} column`;
       }
-      return `Drag cancelled for plan: ${plan?.title || 'unknown'}`;
+      return `Drag cancelled for task: ${plan?.title || 'unknown'}`;
     },
     onDragCancel({ active }) {
       const plan = active.data.current?.plan as PlanIndexEntry | undefined;
-      return `Dragging was cancelled. Plan ${plan?.title || 'unknown'} was not moved.`;
+      return `Dragging was cancelled. Task ${plan?.title || 'unknown'} was not moved.`;
     },
   };
 
@@ -548,7 +548,7 @@ export function KanbanPage() {
         <div>
           <h1 className="text-xl font-bold text-foreground">Board</h1>
           <p className="text-sm text-muted-foreground">
-            {allPlans.length} {allPlans.length === 1 ? 'plan' : 'plans'} across{' '}
+            {allPlans.length} {allPlans.length === 1 ? 'task' : 'tasks'} across{' '}
             {visibleColumns.length} {visibleColumns.length === 1 ? 'column' : 'columns'}
           </p>
         </div>
@@ -643,7 +643,7 @@ export function KanbanPage() {
           <div className="flex items-center justify-center h-full">
             <div className="flex flex-col items-center gap-4">
               <Spinner size="lg" />
-              <p className="text-muted-foreground">Loading plan...</p>
+              <p className="text-muted-foreground">Loading task...</p>
             </div>
           </div>
         ) : null}

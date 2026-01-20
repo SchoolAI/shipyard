@@ -4,8 +4,8 @@
  */
 
 import type { Block, BlockNoteEditor } from '@blocknote/core';
-import type { Deliverable, PlanMetadata, PlanSnapshot } from '@peer-plan/schema';
-import { extractDeliverables, getDeliverables, YDOC_KEYS } from '@peer-plan/schema';
+import type { Deliverable, PlanMetadata, PlanSnapshot } from '@shipyard/schema';
+import { extractDeliverables, getDeliverables, YDOC_KEYS } from '@shipyard/schema';
 import { Clock, FileText, GitPullRequest, Package } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { WebrtcProvider } from 'y-webrtc';

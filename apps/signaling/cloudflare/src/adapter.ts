@@ -17,7 +17,7 @@
  * - Must handle hibernation wake (restore topics from WebSocket attachments)
  */
 
-import type { InviteRedemption, InviteToken } from '@peer-plan/schema';
+import type { InviteRedemption, InviteToken } from '@shipyard/schema';
 import type { PlatformAdapter } from '../../core/platform.js';
 import type { PlanApprovalState } from '../../core/types.js';
 import { logger } from './logger.js';

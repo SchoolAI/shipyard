@@ -1,4 +1,4 @@
-import { type InviteRedemptionResult, parseInviteFromUrl } from '@peer-plan/schema';
+import { type InviteRedemptionResult, parseInviteFromUrl } from '@shipyard/schema';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import type { WebrtcProvider } from 'y-webrtc';

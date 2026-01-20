@@ -31,7 +31,7 @@ No GitHub, no sync, no persistence yet. Just plan creation → browser launch.
 - [ ] Accept: title, content (BlockNote blocks), prNumber, repo
 - [ ] Generate plan ID (hash or UUID)
 - [ ] Create Y.Doc with plan data
-- [ ] Encode plan to URL using `@peer-plan/schema`
+- [ ] Encode plan to URL using `@shipyard/schema`
 - [ ] Return plan URL
 
 ```typescript
@@ -82,7 +82,7 @@ server.tool(
 
 - [ ] Create `packages/web/` with Vite + React
 - [ ] Parse `?d=` query param
-- [ ] Decode plan using `@peer-plan/schema`
+- [ ] Decode plan using `@shipyard/schema`
 - [ ] Render as JSON or simple markdown
 - [ ] Deploy to localhost for testing
 
@@ -122,7 +122,7 @@ import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 
 const server = new Server(
-  { name: "peer-plan", version: "0.1.0" },
+  { name: "shipyard", version: "0.1.0" },
   { capabilities: { tools: {} } }
 );
 

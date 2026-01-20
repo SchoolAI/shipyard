@@ -21,7 +21,7 @@ import {
   setPlanMetadata,
   UpdatePlanContentRequestSchema,
   UpdatePresenceRequestSchema,
-} from '@peer-plan/schema';
+} from '@shipyard/schema';
 import type { Request, Response } from 'express';
 import { nanoid } from 'nanoid';
 import { webConfig } from './config/env/web.js';
@@ -131,7 +131,7 @@ export async function handleCreateSession(req: Request, res: Response): Promise<
       deleted: false,
     });
 
-    const webUrl = webConfig.PEER_PLAN_WEB_URL;
+    const webUrl = webConfig.SHIPYARD_WEB_URL;
     const url = `${webUrl}/plan/${planId}`;
 
     logger.info({ url }, 'Plan URL generated');
@@ -333,7 +333,7 @@ export async function handleSetSessionToken(req: Request, res: Response): Promis
       sessionTokenHash,
     });
 
-    const webUrl = webConfig.PEER_PLAN_WEB_URL;
+    const webUrl = webConfig.SHIPYARD_WEB_URL;
     const url = `${webUrl}/plan/${planId}`;
 
     logger.info({ planId }, 'Session token set successfully');

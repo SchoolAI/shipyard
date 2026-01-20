@@ -3,7 +3,7 @@
  * Follows pattern from identity.ts for localStorage management.
  */
 
-import type { PlanStatusType } from '@peer-plan/schema';
+import type { PlanStatusType } from '@shipyard/schema';
 
 // --- Types ---
 
@@ -24,11 +24,11 @@ export interface ViewPreferences {
 
 // --- Storage Keys ---
 
-const SIDEBAR_COLLAPSED_KEY = 'peer-plan-sidebar-collapsed';
-const SHOW_ARCHIVED_KEY = 'peer-plan-show-archived';
-const VIEW_PREFERENCES_KEY = 'peer-plan-view-preferences';
+const SIDEBAR_COLLAPSED_KEY = 'shipyard-sidebar-collapsed';
+const SHOW_ARCHIVED_KEY = 'shipyard-show-archived';
+const VIEW_PREFERENCES_KEY = 'shipyard-view-preferences';
 const KANBAN_HIDE_EMPTY_COLUMNS_KEY = 'kanban-hide-empty-columns';
-const INBOX_SHOW_READ_KEY = 'peer-plan-inbox-show-read';
+const INBOX_SHOW_READ_KEY = 'shipyard-inbox-show-read';
 
 /** Get sidebar collapsed state from localStorage */
 export function getSidebarCollapsed(): boolean {

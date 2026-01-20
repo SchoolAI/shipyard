@@ -1,5 +1,5 @@
 import { Alert, Button, Card } from '@heroui/react';
-import type { Artifact, ArtifactType } from '@peer-plan/schema';
+import type { Artifact, ArtifactType } from '@shipyard/schema';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useGitHubAuth } from '../hooks/useGitHubAuth';
 import {

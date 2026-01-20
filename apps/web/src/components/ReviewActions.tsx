@@ -6,7 +6,7 @@ import {
   logPlanEvent,
   type PlanStatusType,
   transitionPlanStatus,
-} from '@peer-plan/schema';
+} from '@shipyard/schema';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import type * as Y from 'yjs';
@@ -28,7 +28,7 @@ const getSnapshotReason = (action: ReviewAction, reviewerName: string): string =
 
 /** Maps action to user-facing success message */
 const getSuccessMessage = (action: ReviewAction): string =>
-  action === 'approve' ? 'Plan approved successfully!' : 'Changes requested successfully!';
+  action === 'approve' ? 'Task approved successfully!' : 'Changes requested successfully!';
 
 /** Maps action to user-facing error action label */
 const getErrorActionLabel = (action: ReviewAction): string =>
@@ -128,7 +128,7 @@ export function ReviewActions({
     ) {
       const statusLabel =
         currentStatus === 'in_progress' ? 'already in progress' : 'already has changes requested';
-      toast.info(`Plan ${statusLabel}`);
+      toast.info(`Task ${statusLabel}`);
       return { valid: false };
     }
 
@@ -240,7 +240,7 @@ export function ReviewActions({
         <Popover.Content placement="top" className="w-80">
           <Popover.Dialog>
             <Popover.Arrow />
-            <Popover.Heading>Approve Plan</Popover.Heading>
+            <Popover.Heading>Approve Task</Popover.Heading>
 
             <div className="mt-3 space-y-3">
               <label htmlFor="approve-comment" className="block text-xs text-muted-foreground">

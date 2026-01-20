@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Test harness for peer-plan hook
+# Test harness for shipyard hook
 # Simulates Claude Code hook events for local testing
 #
 
@@ -12,7 +12,7 @@ set -e
 HOOK_BIN="../dist/index.mjs"
 SESSION_ID="test-session-$(date +%s)"
 
-echo "🧪 Testing peer-plan hook locally"
+echo "🧪 Testing shipyard hook locally"
 echo "Session ID: $SESSION_ID"
 echo ""
 
@@ -108,4 +108,4 @@ echo -e "${YELLOW}Next steps:${NC}"
 echo "1. Check the browser - a plan should have opened"
 echo "2. Review the plan in the UI"
 echo "3. Try approving it, then re-run Test 4 to see approval flow"
-echo "4. Check ~/.peer-plan/hook-state.json to see session state"
+echo "4. Check ~/.shipyard/hook-state.json to see session state"

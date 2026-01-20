@@ -6,7 +6,7 @@ Complete inventory of all server endpoints and access patterns.
 
 ## Overview
 
-Peer-Plan has **3 server surfaces** that browsers can access:
+Shipyard has **3 server surfaces** that browsers can access:
 
 | Surface | Access Pattern | Port | Purpose |
 |---------|---------------|------|---------|
@@ -109,7 +109,7 @@ const wsUrl = registry.servers[0].url; // ws://localhost:49184
 **Browser Access:** ❌ NO (stdio transport only works for local processes)
 
 **Available Tools:**
-- `execute_code` - Execute TypeScript code with access to Peer-Plan APIs
+- `execute_code` - Execute TypeScript code with access to Shipyard APIs
 
 **Note:** Browser CANNOT call MCP tools directly. Only local AI agents (Claude Code, Cursor, etc.) can.
 
@@ -156,7 +156,7 @@ app.post('/api/conversation/import', async (req, res) => {
 
   // Write to new session file
   const sessionId = nanoid();
-  const projectPath = '~/.claude/projects/peer-plan'; // Or detect from cwd
+  const projectPath = '~/.claude/projects/shipyard'; // Or detect from cwd
   const transcriptPath = `${projectPath}/${sessionId}.jsonl`;
 
   await writeFile(transcriptPath, jsonl, 'utf-8');
@@ -188,7 +188,7 @@ Claude Code
 ```
 
 **Flow:**
-1. Browser calls: `POST https://peer-plan.app/api/conversation/import`
+1. Browser calls: `POST https://shipyard.app/api/conversation/import`
 2. Remote server stores conversation in queue
 3. User's local MCP server (if running) polls queue
 4. Local MCP creates session file

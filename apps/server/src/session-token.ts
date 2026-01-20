@@ -1,8 +1,8 @@
 import { timingSafeEqual } from 'node:crypto';
 
-export { generateSessionToken, hashSessionToken } from '@peer-plan/shared';
+export { generateSessionToken, hashSessionToken } from '@shipyard/shared';
 
-import { hashSessionToken } from '@peer-plan/shared';
+import { hashSessionToken } from '@shipyard/shared';
 
 /**
  * Verify a session token against a stored hash.

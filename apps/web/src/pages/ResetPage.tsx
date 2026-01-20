@@ -50,7 +50,7 @@ export function ResetPage() {
               <p className="text-gray-300">Clearing browser storage...</p>
             </div>
             <p className="text-sm text-gray-500">
-              This will clear all plan data, identity, and preferences.
+              This will clear all task data, identity, and preferences.
             </p>
             <p className="text-sm text-gray-600">
               This may take up to 10 seconds if databases have open connections.
@@ -121,7 +121,7 @@ export function ResetPage() {
               {result.indexedDB.cleared.length === 0 &&
                 result.localStorage.length === 0 &&
                 result.sessionStorage.length === 0 && (
-                  <p className="text-gray-500">No peer-plan data found to clear.</p>
+                  <p className="text-gray-500">No shipyard data found to clear.</p>
                 )}
             </div>
 

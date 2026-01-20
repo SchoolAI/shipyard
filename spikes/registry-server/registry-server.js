@@ -4,7 +4,7 @@
  * Registry Server
  *
  * HTTP server on port 3001 that serves the WebSocket server registry.
- * Reads from ~/.peer-plan/servers.json and serves via GET /registry endpoint.
+ * Reads from ~/.shipyard/servers.json and serves via GET /registry endpoint.
  * Includes CORS headers for browser access.
  */
 
@@ -15,7 +15,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const PORT = 3001;
-const REGISTRY_PATH = join(homedir(), '.peer-plan', 'servers.json');
+const REGISTRY_PATH = join(homedir(), '.shipyard', 'servers.json');
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);

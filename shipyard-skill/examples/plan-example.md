@@ -1,6 +1,6 @@
 # Example: Add User Profile Page
 
-This shows the full agentic loop with Peer-Plan.
+This shows the full agentic loop with Shipyard.
 
 ## Plan Creation
 

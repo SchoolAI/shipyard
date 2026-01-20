@@ -1,5 +1,5 @@
 import { Button, Chip, Tooltip } from '@heroui/react';
-import { PLAN_INDEX_DOC_NAME } from '@peer-plan/schema';
+import { PLAN_INDEX_DOC_NAME } from '@shipyard/schema';
 import { Archive, ChevronRight, Inbox, LayoutGrid, Search } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -185,7 +185,7 @@ function CollapsedSidebar({
               <Search className="w-4 h-4" />
             </Button>
           </Tooltip.Trigger>
-          <Tooltip.Content>Search plans</Tooltip.Content>
+          <Tooltip.Content>Search tasks</Tooltip.Content>
         </Tooltip>
       </nav>
 
@@ -250,7 +250,10 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
   const content = (
     <>
       <div className="px-3 py-3 border-b border-separator flex items-center justify-between">
-        <h2 className="font-semibold text-lg text-foreground">Plans</h2>
+        <div className="flex items-center gap-2">
+          <img src="/icon.svg" alt="Shipyard" className="w-5 h-5" />
+          <h2 className="font-semibold text-lg text-foreground">Shipyard</h2>
+        </div>
         <div className="flex items-center gap-1">
           <Tooltip>
             <Tooltip.Trigger>
@@ -264,7 +267,7 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
                 <Search className="w-4 h-4" />
               </Button>
             </Tooltip.Trigger>
-            <Tooltip.Content>Search plans</Tooltip.Content>
+            <Tooltip.Content>Search tasks</Tooltip.Content>
           </Tooltip>
           <Tooltip>
             <Tooltip.Trigger>

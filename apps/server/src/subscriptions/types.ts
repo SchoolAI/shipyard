@@ -2,7 +2,7 @@
  * Types for the notification subscription system.
  */
 
-import type { Change, ChangesResponse, ChangeType } from '@peer-plan/schema';
+import type { Change, ChangesResponse, ChangeType } from '@shipyard/schema';
 
 export type { Change, ChangesResponse, ChangeType };
 

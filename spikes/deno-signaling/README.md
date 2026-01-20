@@ -1,6 +1,6 @@
 # Deno Deploy Signaling Server Spike
 
-WebRTC signaling server for peer-plan, ported from Node.js to Deno for deployment on Deno Deploy.
+WebRTC signaling server for shipyard, ported from Node.js to Deno for deployment on Deno Deploy.
 
 ## Why Deno Deploy?
 
@@ -73,7 +73,7 @@ Updates deploy automatically on push.
 deno install -Arf jsr:@deno/deployctl
 
 # Deploy (first time - creates project)
-deployctl deploy --project=peer-plan-signaling main.ts
+deployctl deploy --project=shipyard-signaling main.ts
 
 # Subsequent deploys
 deployctl deploy main.ts
@@ -91,7 +91,7 @@ Update the web app to use the deployed signaling server:
 
 ```env
 # In apps/web/.env.production
-VITE_WEBRTC_SIGNALING=wss://peer-plan-signaling.deno.dev
+VITE_WEBRTC_SIGNALING=wss://shipyard-signaling.deno.dev
 ```
 
 ## Free Tier Analysis
@@ -113,7 +113,7 @@ VITE_WEBRTC_SIGNALING=wss://peer-plan-signaling.deno.dev
 - Each message over WebSocket = 0 additional requests
 - Pure signaling overhead is minimal
 
-**Realistic usage for peer-plan:**
+**Realistic usage for shipyard:**
 - Assume 1000 unique plans/month (generous)
 - Assume 5 reviewers per plan average
 - Assume 3 reconnections per session (refreshes, etc.)
@@ -218,7 +218,7 @@ Start without rate limiting. Add simple in-memory protection if you see abuse. O
 ### Built-in Stats Endpoint
 
 ```bash
-curl https://peer-plan-signaling.deno.dev/stats
+curl https://shipyard-signaling.deno.dev/stats
 ```
 
 Returns:
@@ -226,7 +226,7 @@ Returns:
 {
   "topics": 3,
   "connections": 7,
-  "topicList": ["peer-plan-abc123", "peer-plan-def456", "peer-plan-ghi789"]
+  "topicList": ["shipyard-abc123", "shipyard-def456", "shipyard-ghi789"]
 }
 ```
 

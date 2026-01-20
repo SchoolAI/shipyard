@@ -166,7 +166,7 @@ Without hibernation: **$1,185/month** 😱
 
 ---
 
-## Sustainability Model for Peer-Plan
+## Sustainability Model for Shipyard
 
 ### Viability at Different Scales
 
@@ -208,7 +208,7 @@ Without hibernation: **$1,185/month** 😱
 
 ## Conclusion
 
-**WebRTC P2P with TURN fallback is the clear winner** for peer-plan:
+**WebRTC P2P with TURN fallback is the clear winner** for shipyard:
 
 1. **17x cheaper at 1M users** ($35-40 vs $680)
 2. **Proven at scale** (Figma, Excalidraw use this pattern)

@@ -22,7 +22,7 @@ Use this checklist to validate the spike is working correctly.
 - [ ] OPTIONS preflight requests handled correctly
 
 ### File Operations
-- [ ] Creates `~/.peer-plan/` directory if it doesn't exist
+- [ ] Creates `~/.shipyard/` directory if it doesn't exist
 - [ ] Reads `servers.json` file successfully
 - [ ] Returns empty array if file doesn't exist (no crash)
 
@@ -30,7 +30,7 @@ Use this checklist to validate the spike is working correctly.
 
 ### Registration
 - [ ] WS server starts on specified port (e.g., 3100)
-- [ ] WS server creates `~/.peer-plan/servers.json` if needed
+- [ ] WS server creates `~/.shipyard/servers.json` if needed
 - [ ] WS server adds entry to registry file
 - [ ] Entry includes: port, url, pid, startedAt
 - [ ] Multiple WS servers can register without conflicts
@@ -153,4 +153,4 @@ These are acceptable for a spike:
 - Use browser DevTools Network tab to inspect requests
 - Use browser DevTools Console to see WebSocket events
 - Check terminal output for server logs
-- Registry file located at `~/.peer-plan/servers.json`
+- Registry file located at `~/.shipyard/servers.json`

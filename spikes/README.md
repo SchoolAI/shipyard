@@ -1,6 +1,6 @@
 # Spikes (Research & Proof of Concepts)
 
-This directory contains research, experiments, and alternative approaches explored during peer-plan development.
+This directory contains research, experiments, and alternative approaches explored during shipyard development.
 
 ## Purpose
 

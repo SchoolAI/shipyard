@@ -29,7 +29,7 @@ const AvatarFallback = Avatar.Fallback as React.FC<{
   className?: string;
 }>;
 
-import type { PlanIndexEntry, PlanStatusType } from '@peer-plan/schema';
+import type { PlanIndexEntry, PlanStatusType } from '@shipyard/schema';
 import { CheckSquare, GitPullRequest } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { TagChip } from '@/components/TagChip';

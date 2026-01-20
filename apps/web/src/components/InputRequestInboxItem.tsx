@@ -4,7 +4,7 @@
  */
 
 import { Card, Chip } from '@heroui/react';
-import type { InputRequest } from '@peer-plan/schema';
+import type { InputRequest } from '@shipyard/schema';
 import { Clock } from 'lucide-react';
 import { useEffect, useState } from 'react';
 

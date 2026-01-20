@@ -9,8 +9,8 @@
  * - Server hook-api: HTTP handlers that this code calls (includes browser opening)
  */
 
-import type { CreateHookSessionResponse } from '@peer-plan/schema';
-import { computeHash } from '@peer-plan/shared';
+import type { CreateHookSessionResponse } from '@shipyard/schema';
+import { computeHash } from '@shipyard/shared';
 import { DEFAULT_AGENT_TYPE } from '../constants.js';
 import { createSession, updatePlanContent, updatePresence } from '../http-client.js';
 import { logger } from '../logger.js';
@@ -107,3 +107,6 @@ export async function updateContent(options: UpdateContentOptions): Promise<bool
 
   return true;
 }
+
+// --- Helpers ---
+// computeHash moved to @shipyard/shared

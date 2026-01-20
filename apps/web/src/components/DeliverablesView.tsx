@@ -7,7 +7,7 @@ import {
   type PlanMetadata,
   transitionPlanStatus,
   YDOC_KEYS,
-} from '@peer-plan/schema';
+} from '@shipyard/schema';
 import { Package } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type * as Y from 'yjs';
@@ -86,13 +86,13 @@ function EmptyState({ status }: { status: PlanMetadata['status'] }) {
   const getMessage = () => {
     switch (status) {
       case 'draft':
-        return 'Deliverables will appear once the plan is approved and work begins.';
+        return 'Deliverables will appear once the task is approved and work begins.';
       case 'pending_review':
-        return 'Deliverables will appear once the plan is approved and work begins.';
+        return 'Deliverables will appear once the task is approved and work begins.';
       case 'in_progress':
         return 'Waiting for the agent to upload deliverables as proof of completed work.';
       case 'changes_requested':
-        return 'Deliverables will appear once the plan is approved and work begins.';
+        return 'Deliverables will appear once the task is approved and work begins.';
       case 'completed':
         return 'This task was completed without additional deliverables.';
       default:

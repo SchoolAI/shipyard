@@ -19,7 +19,7 @@ Three spikes were created to test different approaches for browser discovery of 
 **Location:** `spikes/vite-registry-plugin/`
 
 ### How It Works
-- Vite plugin serves `~/.peer-plan/servers.json` at `/api/registry`
+- Vite plugin serves `~/.shipyard/servers.json` at `/api/registry`
 - WS servers register on dynamic ports
 - Browser fetches registry from Vite dev server
 
@@ -75,7 +75,7 @@ Three spikes were created to test different approaches for browser discovery of 
 
 ### How It Works
 - Dedicated HTTP server on port 3001
-- WS servers write to `~/.peer-plan/servers.json`
+- WS servers write to `~/.shipyard/servers.json`
 - Browser fetches from `http://localhost:3001/registry`
 
 ### Pros
@@ -112,7 +112,7 @@ Three spikes were created to test different approaches for browser discovery of 
 
 ### Vite Plugin
 ```
-~/.peer-plan/servers.json
+~/.shipyard/servers.json
          ↓
 [Vite Plugin] /api/registry ← [Browser]
          ↓
@@ -130,7 +130,7 @@ Three spikes were created to test different approaches for browser discovery of 
 
 ### Registry Server
 ```
-~/.peer-plan/servers.json
+~/.shipyard/servers.json
          ↓
 [Registry Server :3001] /registry ← [Browser]
          ↓
@@ -141,7 +141,7 @@ Three spikes were created to test different approaches for browser discovery of 
 
 ## Recommendation
 
-### For peer-plan
+### For shipyard
 
 **Use Registry Server approach** for these reasons:
 

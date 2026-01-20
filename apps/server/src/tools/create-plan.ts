@@ -10,7 +10,7 @@ import {
   PLAN_INDEX_DOC_NAME,
   setPlanIndexEntry,
   transitionPlanStatus,
-} from '@peer-plan/schema';
+} from '@shipyard/schema';
 import { nanoid } from 'nanoid';
 import open from 'open';
 import type * as Y from 'yjs';
@@ -135,7 +135,7 @@ export const createPlanTool = {
     name: TOOL_NAMES.CREATE_PLAN,
     description: `Create a new implementation plan and open it in browser.
 
-NOTE FOR CLAUDE CODE USERS: If you have the peer-plan hook installed, use native plan mode (Shift+Tab) instead of this tool. The hook handles plan creation automatically and provides a better experience.
+NOTE FOR CLAUDE CODE USERS: If you have the shipyard hook installed, use native plan mode (Shift+Tab) instead of this tool. The hook handles plan creation automatically and provides a better experience.
 
 This tool is for agents WITHOUT hook support (Cursor, Devin, etc).
 

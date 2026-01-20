@@ -27,8 +27,11 @@ export function AuthChoiceModal({
 
           <Card>
             <Card.Header>
-              <h2 className="text-xl font-semibold">Sign in to Peer-Plan</h2>
-              <p className="text-sm text-muted-foreground mt-1">
+              <div className="flex flex-col items-center mb-2">
+                <img src="/icon.svg" alt="Shipyard" className="w-12 h-12 mb-3 opacity-90" />
+                <h2 className="text-xl font-semibold">Sign in to Shipyard</h2>
+              </div>
+              <p className="text-sm text-muted-foreground mt-1 text-center">
                 Choose how you'd like to identify yourself in this workspace.
               </p>
             </Card.Header>
@@ -58,11 +61,11 @@ export function AuthChoiceModal({
                     </div>
                     <div className="flex items-center gap-2">
                       <Check className="w-4 h-4 text-success shrink-0" />
-                      <span>Share plans with remote teams</span>
+                      <span>Share tasks with remote teams</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <Check className="w-4 h-4 text-success shrink-0" />
-                      <span>Access private plans</span>
+                      <span>Access private tasks</span>
                     </div>
                   </div>
                   <Button
@@ -87,7 +90,7 @@ export function AuthChoiceModal({
                   <div className="text-sm space-y-1 flex-1">
                     <div className="flex items-center gap-2">
                       <Check className="w-4 h-4 text-success shrink-0" />
-                      <span>View and edit plans locally</span>
+                      <span>View and edit tasks locally</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <Check className="w-4 h-4 text-success shrink-0" />

@@ -7,7 +7,7 @@ import { defineConfig, type Plugin } from 'vite';
  * Vite plugin that serves the registry file at /api/registry
  */
 function registryPlugin(): Plugin {
-  const REGISTRY_FILE = join(homedir(), '.peer-plan', 'servers.json');
+  const REGISTRY_FILE = join(homedir(), '.shipyard', 'servers.json');
 
   return {
     name: 'registry-plugin',

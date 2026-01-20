@@ -1,6 +1,6 @@
 # Organizational Views: UI Mockups
 
-Visual mockups of the proposed view system for Peer-Plan.
+Visual mockups of the proposed view system for Shipyard.
 
 ---
 
@@ -11,7 +11,7 @@ Visual mockups of the proposed view system for Peer-Plan.
 ```
 ┌─────────────────────────┐  ┌──────────────────────────────────┐
 │ Plans               [<] │  │                                  │
-├─────────────────────────┤  │    Welcome to Peer-Plan          │
+├─────────────────────────┤  │    Welcome to Shipyard          │
 │                         │  │                                  │
 │ ▼ My Plans (4 agents)   │  │    Select a plan from the       │
 │   (no plans shown)      │  │    sidebar or create one        │
@@ -225,7 +225,7 @@ Columns available:
 
 ```
 ┌──────────────────────────────────────────────────┐
-│ Peer Plan                                        │
+│ Shipyard                                         │
 ├──────────────────────────────────────────────────┤
 │ ┌────┐ ┌────┐ ┌────┐ ┌────┐ ┌────┐             │
 │ │ ≡  │ │ ▦  │ │ ⊞  │ │ ▤  │ │ ▬  │             │
@@ -249,7 +249,7 @@ Icons:
 
 ```
 ┌─────────────────────────┐
-│ ☰  Peer Plan        [⚙] │
+│ ☰  Shipyard         [⚙] │
 ├─────────────────────────┤
 │                         │
 │ [🔍 Search...]          │
@@ -332,8 +332,8 @@ Icons:
 │   [⊗ frontend]  [backend]  [bug]  [feature]  [+Add]        │
 │                                                             │
 │ Filter by Repository:                                       │
-│   [peer-plan ▼]                                             │
-│   • peer-plan (12)                                          │
+│   [shipyard ▼]                                             │
+│   • shipyard (12)                                          │
 │   • other-repo (4)                                          │
 │   • All repositories                                        │
 │                                                             │
@@ -403,4 +403,4 @@ Icons:
 
 ---
 
-*ASCII mockups illustrating the proposed multi-view system for Peer-Plan agent management.*
+*ASCII mockups illustrating the proposed multi-view system for Shipyard agent management.*

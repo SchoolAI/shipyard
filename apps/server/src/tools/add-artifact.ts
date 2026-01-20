@@ -24,7 +24,7 @@ import {
   PLAN_INDEX_DOC_NAME,
   setPlanIndexEntry,
   transitionPlanStatus,
-} from '@peer-plan/schema';
+} from '@shipyard/schema';
 import { nanoid } from 'nanoid';
 import type * as Y from 'yjs';
 import { z } from 'zod';
@@ -222,7 +222,7 @@ ARTIFACT TYPES:
         content: [
           {
             type: 'text',
-            text: 'Artifact uploads are disabled.\n\nTo enable, set PEER_PLAN_ARTIFACTS=enabled in your .mcp.json env config.',
+            text: 'Artifact uploads are disabled.\n\nTo enable, set SHIPYARD_ARTIFACTS=enabled in your .mcp.json env config.',
           },
         ],
         isError: true,
@@ -444,7 +444,7 @@ ARTIFACT TYPES:
         // Get all snapshots for URL encoding
         const allSnapshots = getSnapshots(doc);
 
-        const baseUrl = webConfig.PEER_PLAN_WEB_URL;
+        const baseUrl = webConfig.SHIPYARD_WEB_URL;
         const snapshotUrl = createPlanUrlWithHistory(
           baseUrl,
           {

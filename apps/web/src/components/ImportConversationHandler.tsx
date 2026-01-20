@@ -6,7 +6,7 @@ import {
   type ConversationVersion,
   logPlanEvent,
   type OriginPlatform,
-} from '@peer-plan/schema';
+} from '@shipyard/schema';
 import { Check, Download, MessageSquare, MessageSquareReply, Terminal } from 'lucide-react';
 import type React from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -238,7 +238,7 @@ const REGISTRY_URL = 'http://localhost:32191';
 
 // TODO(#9): Platform detection - Currently hard-coded to only detect Claude Code
 // Should detect available platforms (Cursor, Devin, Windsurf, etc.) and show
-// appropriate import buttons. See: https://github.com/jacobpetterle/peer-plan/issues/9
+// appropriate import buttons. See: https://github.com/jacobpetterle/shipyard/issues/9
 function useRegistryAvailable(): boolean {
   const [available, setAvailable] = useState(false);
 

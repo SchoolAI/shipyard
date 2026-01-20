@@ -1,5 +1,5 @@
 import { Chip } from '@heroui/react';
-import { getPlanEvents, getPlanMetadata, YDOC_KEYS } from '@peer-plan/schema';
+import { getPlanEvents, getPlanMetadata, YDOC_KEYS } from '@shipyard/schema';
 import { AlertOctagon, HelpCircle } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type * as Y from 'yjs';

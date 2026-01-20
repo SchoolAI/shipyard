@@ -1,5 +1,5 @@
 import { Button } from '@heroui/react';
-import type { PlanStatusType } from '@peer-plan/schema';
+import type { PlanStatusType } from '@shipyard/schema';
 import { Menu } from 'lucide-react';
 import type { ReactNode } from 'react';
 import type * as Y from 'yjs';
@@ -33,7 +33,7 @@ interface MobileHeaderProps {
  */
 export function MobileHeader({
   onMenuOpen,
-  title = 'Peer Plan',
+  title = 'Shipyard',
   status,
   hubConnected,
   peerCount,
@@ -54,7 +54,10 @@ export function MobileHeader({
         <Menu className="w-4 h-4" />
       </Button>
 
-      <h1 className="text-xs font-semibold text-foreground truncate flex-1 min-w-0">{title}</h1>
+      <div className="flex items-center gap-1.5 flex-1 min-w-0">
+        <img src="/icon.svg" alt="Shipyard" className="w-4 h-4 shrink-0" />
+        <h1 className="text-xs font-semibold text-foreground truncate">{title}</h1>
+      </div>
 
       {status && <StatusChip status={status} className="text-[11px] h-5 px-2 shrink-0" />}
 

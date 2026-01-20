@@ -66,38 +66,38 @@ describe('registryConfig', () => {
     });
   });
 
-  describe('PEER_PLAN_STATE_DIR', () => {
-    it('should default to ~/.peer-plan when env var not set', async () => {
-      delete process.env.PEER_PLAN_STATE_DIR;
+  describe('SHIPYARD_STATE_DIR', () => {
+    it('should default to ~/.shipyard when env var not set', async () => {
+      delete process.env.SHIPYARD_STATE_DIR;
 
       const { registryConfig } = await import('./registry.js');
 
-      expect(registryConfig.PEER_PLAN_STATE_DIR).toBe(join(homedir(), '.peer-plan'));
+      expect(registryConfig.SHIPYARD_STATE_DIR).toBe(join(homedir(), '.shipyard'));
     });
 
     it('should use env var value when set', async () => {
-      process.env.PEER_PLAN_STATE_DIR = '/custom/path';
+      process.env.SHIPYARD_STATE_DIR = '/custom/path';
 
       const { registryConfig } = await import('./registry.js');
 
-      expect(registryConfig.PEER_PLAN_STATE_DIR).toBe('/custom/path');
+      expect(registryConfig.SHIPYARD_STATE_DIR).toBe('/custom/path');
     });
 
     it('should handle empty string as empty string (Zod default only triggers on undefined)', async () => {
-      process.env.PEER_PLAN_STATE_DIR = '';
+      process.env.SHIPYARD_STATE_DIR = '';
 
       const { registryConfig } = await import('./registry.js');
 
       // Zod's .default() only triggers on undefined, not empty string
-      expect(registryConfig.PEER_PLAN_STATE_DIR).toBe('');
+      expect(registryConfig.SHIPYARD_STATE_DIR).toBe('');
     });
 
     it('should handle relative paths', async () => {
-      process.env.PEER_PLAN_STATE_DIR = './relative/path';
+      process.env.SHIPYARD_STATE_DIR = './relative/path';
 
       const { registryConfig } = await import('./registry.js');
 
-      expect(registryConfig.PEER_PLAN_STATE_DIR).toBe('./relative/path');
+      expect(registryConfig.SHIPYARD_STATE_DIR).toBe('./relative/path');
     });
   });
 });

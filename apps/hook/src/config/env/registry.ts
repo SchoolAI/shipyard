@@ -1,6 +1,6 @@
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { DEFAULT_REGISTRY_PORTS } from '@peer-plan/shared';
+import { DEFAULT_REGISTRY_PORTS } from '@shipyard/shared';
 import { z } from 'zod';
 import { loadEnv } from '../config.js';
 
@@ -16,10 +16,10 @@ const schema = z.object({
       }
       return [port];
     }),
-  PEER_PLAN_STATE_DIR: z
+  SHIPYARD_STATE_DIR: z
     .string()
     .optional()
-    .default(() => join(homedir(), '.peer-plan')),
+    .default(() => join(homedir(), '.shipyard')),
 });
 
 export const registryConfig = loadEnv(schema);

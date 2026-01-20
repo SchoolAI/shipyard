@@ -58,7 +58,7 @@ if (!registryPort) {
 
 const server = new Server(
   {
-    name: 'peer-plan',
+    name: 'shipyard',
     version: '0.1.0',
   },
   {

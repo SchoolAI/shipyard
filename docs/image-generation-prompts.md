@@ -1,8 +1,8 @@
-# Image Generation Prompts for Peer Plan
+# Image Generation Prompts for Shipyard
 
 Prompts for AI image generation (Gemini, Midjourney, DALL-E) to create branding assets.
 
-**Peer Plan** = Collaborative verification for AI coding agents. Humans collab with agents, agents collab with humans, in a constant verification loop until the work is right.
+**Shipyard** = Collaborative verification for AI coding agents. Humans collab with agents, agents collab with humans, in a constant verification loop until the work is right.
 
 **Core Concept:** Collaborative verification. Multiple parties (AI agents + humans) working together in continuous dialogue. Not just "approval" — active collaboration and iteration.
 
@@ -17,7 +17,7 @@ Prompts for AI image generation (Gemini, Midjourney, DALL-E) to create branding 
 - **Speed**: AI-fast delivery
 - **Effort**: Low human overhead
 
-Traditionally you sacrifice one. Peer Plan enables all three.
+Traditionally you sacrifice one. Shipyard enables all three.
 
 **Final Color Palette:**
 - Primary: Teal 600 `#0D9488` (main brand)
@@ -179,9 +179,9 @@ Choose ONE concept direction before generating assets. Each creates a distinct b
 
 ---
 
-### Concept C: "The Interlocking P"
+### Concept C: "The Interlocking S"
 
-**Symbol:** Two letter "P"s that interlock or connect — representing "Peer Plan" but also the two parties (peers) working together. The negative space between them forms something meaningful.
+**Symbol:** Two letter "S"s that interlock or connect — representing "Shipyard" connection and the two parties working together. The negative space between them forms something meaningful.
 
 **Personality:** Clever, memorable, typographic.
 
@@ -264,17 +264,17 @@ DO NOT:
 Reference: The dynamic tension of the Firefox logo, the simplicity of Mastercard's overlapping circles.
 ```
 
-#### Concept C: Interlocking P Icon
+#### Concept C: Interlocking S Icon
 
 ```
-Create a monogram icon from two interlocking letter "P"s for "Peer Plan".
+Create a monogram icon from two interlocking letter "S"s for "Shipyard".
 
 Requirements:
-- Two "P" letterforms that connect, interlock, or share elements
-- Could be: mirrored P's, rotated P's, P's sharing a vertical stem, or overlapping P's
+- Two "S" letterforms that connect, interlock, or share elements
+- Could be: mirrored S's, rotated S's, S's forming a connected flow, or overlapping S's
 - The connection point should feel intentional and elegant
 - Negative space should form an interesting shape
-- Must be recognizable as "PP" but feel like a unified symbol
+- Must be recognizable as a unified Shipyard symbol
 - Must work at 32×32 pixels
 
 Color: Indigo (#4f46e5) — single color for simplicity
@@ -286,7 +286,7 @@ DO NOT:
 - Add serifs or decorative elements
 - Include any other shapes besides the P letters
 
-Reference: The cleverness of the FedEx arrow, the boldness of the Chanel CC.
+Reference: The elegance of the Porsche double S, the boldness of connected letterforms.
 ```
 
 #### Concept D: Dialogue Icon
@@ -320,10 +320,10 @@ Reference: The fluidity of the Headspace logo, the abstract quality of the Notio
 **Output:** SVG or high-res PNG, horizontal orientation
 
 ```
-Create a wordmark for "Peer Plan" — a collaborative verification tool for AI agents.
+Create a wordmark for "Shipyard" — a collaborative verification tool for AI agents.
 
-Text: "Peer Plan" (two words, title case)
-- OR consider: "PeerPlan" (one word, camelCase) if it feels more modern
+Text: "Shipyard" (one word)
+- Modern, distinctive, memorable
 
 Font requirements:
 - Modern geometric sans-serif (think Circular, Outfit, or custom)
@@ -332,7 +332,7 @@ Font requirements:
 - The two P's should feel related — consider a custom "P" that repeats
 
 Layout options:
-1. Icon + Text: [Icon] Peer Plan
+1. Icon + Text: [Icon] Shipyard
 2. Integrated: The icon IS the first letter or replaces a letter
 3. Text only: Stylized letterforms that don't need a separate icon
 
@@ -355,16 +355,16 @@ DO NOT:
 ### 3. Open Graph / Social Preview (1200×630)
 
 ```
-Create a social media preview image for "Peer Plan" — collaborative verification for AI coding agents.
+Create a social media preview image for "Shipyard" — collaborative verification for AI coding agents.
 
 Concept: Show the LOOP visually. Multiple parties in continuous collaboration.
 
 Layout:
-- Left 60%: "Peer Plan" wordmark + tagline
+- Left 60%: "Shipyard" wordmark + tagline
 - Right 40%: Abstract visualization of collaboration
 
 Tagline options:
-- "Collaborative verification for AI agents"
+- "Shipyard: Collaborative verification for AI agents"
 - "Humans + AI, in the loop together"
 - "The verification loop"
 
@@ -380,7 +380,7 @@ Background:
 - Optional: Subtle glow effect behind the visual element
 
 Typography:
-- Wordmark: Large, bold, high contrast
+- Wordmark: "Shipyard" large, bold, high contrast
 - Tagline: Smaller, lighter weight, slightly muted color
 
 Technical requirements:
@@ -407,7 +407,7 @@ Visual:
 - The merge point should feel like creation, not collision
 
 Text:
-- "Peer Plan" wordmark (smaller, in corner)
+- "Shipyard" wordmark (smaller, in corner)
 - Optional subtle tagline
 
 Color:
@@ -465,7 +465,7 @@ The favicon is the HARDEST asset. If the concept doesn't work at 16×16, simplif
 ### 6. Animated Logo Concept (for loading states)
 
 ```
-Animation concept for the Peer Plan logo (implement in CSS/Lottie/SVG):
+Animation concept for the Shipyard logo (implement in CSS/Lottie/SVG):
 
 Based on chosen concept:
 

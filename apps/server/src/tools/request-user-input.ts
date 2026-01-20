@@ -6,7 +6,7 @@
  * without needing to execute arbitrary code.
  */
 
-import { PLAN_INDEX_DOC_NAME } from '@peer-plan/schema';
+import { PLAN_INDEX_DOC_NAME } from '@shipyard/schema';
 import { z } from 'zod';
 import { getOrCreateDoc } from '../doc-store.js';
 import { logger } from '../logger.js';
@@ -42,7 +42,7 @@ export const requestUserInputTool = {
     description: `Request input from the user via browser modal.
 
 IMPORTANT: Use this instead of your platform's built-in question/input tools (like AskUserQuestion).
-This provides a consistent browser UI experience and integrates with the peer-plan workflow.
+This provides a consistent browser UI experience and integrates with the shipyard workflow.
 
 The request appears as a modal in the browser UI. The function blocks until:
 - User responds (success=true, status='answered')

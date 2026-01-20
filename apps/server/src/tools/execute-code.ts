@@ -4,7 +4,7 @@ import {
   getDeliverables,
   getPlanMetadata,
   PLAN_INDEX_DOC_NAME,
-} from '@peer-plan/schema';
+} from '@shipyard/schema';
 import { z } from 'zod';
 import { getOrCreateDoc } from '../doc-store.js';
 import { logger } from '../logger.js';
@@ -21,7 +21,7 @@ import { updatePlanTool } from './update-plan.js';
 
 // --- Bundled API Documentation ---
 
-const BUNDLED_DOCS = `Execute TypeScript code that calls Peer-Plan APIs. Use this for multi-step workflows to reduce round-trips.
+const BUNDLED_DOCS = `Execute TypeScript code that calls Shipyard APIs. Use this for multi-step workflows to reduce round-trips.
 
 ⚠️ IMPORTANT LIMITATION: Dynamic imports (\`await import()\`) are NOT supported in the VM execution context. Use only the pre-provided functions in the execution environment (createPlan, readPlan, updatePlan, addArtifact, completeTask, updateBlockContent, linkPR, addPRReviewComment, setupReviewNotification). All necessary APIs are already available in the sandbox.
 
@@ -660,7 +660,7 @@ async function postActivityUpdate(opts: {
   activityType: 'help_request' | 'blocker';
   message: string;
 }): Promise<{ success: boolean; eventId: string; requestId?: string }> {
-  const { logPlanEvent } = await import('@peer-plan/schema');
+  const { logPlanEvent } = await import('@shipyard/schema');
   const { getGitHubUsername } = await import('../server-identity.js');
   const { nanoid } = await import('nanoid');
 
@@ -692,7 +692,7 @@ async function resolveActivityRequest(opts: {
   requestId: string;
   resolution?: string;
 }): Promise<{ success: boolean }> {
-  const { logPlanEvent, getPlanEvents } = await import('@peer-plan/schema');
+  const { logPlanEvent, getPlanEvents } = await import('@shipyard/schema');
   const { getGitHubUsername } = await import('../server-identity.js');
 
   const doc = await getOrCreateDoc(opts.planId);
@@ -753,7 +753,7 @@ export const executeCodeTool = {
       properties: {
         code: {
           type: 'string',
-          description: 'TypeScript code to execute with access to all Peer-Plan APIs',
+          description: 'TypeScript code to execute with access to all Shipyard APIs',
         },
       },
       required: ['code'],

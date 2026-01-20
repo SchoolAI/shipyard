@@ -78,6 +78,8 @@ const ConfirmInputSchema = InputRequestBaseSchema.extend({
  * Uses discriminated union on 'type' field to ensure:
  * - 'choice' type REQUIRES options array
  * - Other types don't have options
+ *
+ * Follows CRDT patterns from existing Shipyard schemas.
  */
 export const InputRequestSchema = z.discriminatedUnion('type', [
   TextInputSchema,

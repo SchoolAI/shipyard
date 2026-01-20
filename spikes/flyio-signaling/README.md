@@ -1,6 +1,6 @@
 # Fly.io Signaling Server Deployment
 
-Deployment configuration for the peer-plan WebRTC signaling server on Fly.io with Cloudflare protection.
+Deployment configuration for the shipyard WebRTC signaling server on Fly.io with Cloudflare protection.
 
 ## Architecture
 
@@ -26,7 +26,7 @@ Browser --> Cloudflare (CDN/WAF) --> Fly.io --> Signaling Server
 
 **Estimated monthly cost for low traffic (<100 concurrent): $0.50-2.00/month**
 
-With `auto_stop_machines = 'stop'` and `min_machines_running = 0`, you only pay when the server is actually handling connections. For a signaling server that's only used during active peer-plan sessions, this could be as low as a few cents.
+With `auto_stop_machines = 'stop'` and `min_machines_running = 0`, you only pay when the server is actually handling connections. For a signaling server that's only used during active shipyard sessions, this could be as low as a few cents.
 
 ### Cloudflare Costs
 
@@ -68,7 +68,7 @@ fly deploy
 fly status
 ```
 
-After deployment, your server will be available at: `wss://peer-plan-signaling.fly.dev`
+After deployment, your server will be available at: `wss://shipyard-signaling.fly.dev`
 
 ### Step 2: Configure Custom Domain (Optional)
 
@@ -158,7 +158,7 @@ Update your web app to use the deployed signaling server:
 
 ```env
 # apps/web/.env.production
-VITE_WEBRTC_SIGNALING=wss://peer-plan-signaling.fly.dev
+VITE_WEBRTC_SIGNALING=wss://shipyard-signaling.fly.dev
 
 # Or with custom domain:
 VITE_WEBRTC_SIGNALING=wss://signal.yourdomain.com

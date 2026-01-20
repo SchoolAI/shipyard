@@ -1,4 +1,4 @@
-import type { AppRouter } from '@peer-plan/schema';
+import type { AppRouter } from '@shipyard/schema';
 import { createTRPCReact } from '@trpc/react-query';
 
 /**

@@ -242,7 +242,7 @@ describe('send', () => {
     const ws = createMockWebSocket(WS_READY_STATE_OPEN);
     const message: TestMessage = {
       type: 'publish',
-      topic: 'peer-plan-abc123',
+      topic: 'shipyard-abc123',
       clients: 5,
       data: { nested: true },
     };
@@ -256,7 +256,7 @@ describe('send', () => {
 
 describe('extractPlanId', () => {
   it('extracts plan ID from valid topic', () => {
-    expect(extractPlanId('peer-plan-abc123')).toBe('abc123');
+    expect(extractPlanId('shipyard-abc123')).toBe('abc123');
   });
 
   it('returns null for non-plan topics', () => {
@@ -266,11 +266,11 @@ describe('extractPlanId', () => {
   });
 
   it('handles plan IDs with special characters', () => {
-    expect(extractPlanId('peer-plan-abc-123')).toBe('abc-123');
-    expect(extractPlanId('peer-plan-abc_123')).toBe('abc_123');
+    expect(extractPlanId('shipyard-abc-123')).toBe('abc-123');
+    expect(extractPlanId('shipyard-abc_123')).toBe('abc_123');
   });
 
   it('handles empty plan ID after prefix', () => {
-    expect(extractPlanId('peer-plan-')).toBe('');
+    expect(extractPlanId('shipyard-')).toBe('');
   });
 });

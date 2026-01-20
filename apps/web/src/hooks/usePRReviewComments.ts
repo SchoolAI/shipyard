@@ -1,4 +1,4 @@
-import { getPRReviewCommentsForPR, type PRReviewComment, YDOC_KEYS } from '@peer-plan/schema';
+import { getPRReviewCommentsForPR, type PRReviewComment, YDOC_KEYS } from '@shipyard/schema';
 import { useEffect, useState } from 'react';
 import type * as Y from 'yjs';
 

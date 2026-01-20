@@ -95,13 +95,13 @@ export function send<T extends OutgoingMessageBase>(conn: WebSocket, message: T)
 
 /**
  * Extract plan ID from topic name.
- * Topics follow the format: "peer-plan-{planId}" for plan documents.
+ * Topics follow the format: "shipyard-{planId}" for plan documents.
  *
  * @param topic - The topic name to extract from
  * @returns The plan ID or null if not a plan topic
  */
 export function extractPlanId(topic: string): string | null {
-  const prefix = 'peer-plan-';
+  const prefix = 'shipyard-';
   if (topic.startsWith(prefix)) {
     return topic.slice(prefix.length);
   }

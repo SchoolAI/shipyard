@@ -1,6 +1,6 @@
-# Peer-Plan Setup
+# Shipyard Setup
 
-Quick start guide for running peer-plan locally.
+Quick start guide for running Shipyard locally.
 
 ---
 
@@ -15,7 +15,7 @@ Quick start guide for running peer-plan locally.
 ## Installation
 
 ```bash
-cd /Users/jacobpetterle/Working\ Directory/peer-plan
+cd /Users/jacobpetterle/Working\ Directory/Shipyard
 pnpm install
 pnpm build
 ```
@@ -35,8 +35,8 @@ Opens on `http://localhost:5173`
 ### 2. Add MCP Server to Claude Code
 
 ```bash
-claude mcp add --transport stdio peer-plan \
-  -- node "/Users/jacobpetterle/Working Directory/peer-plan/apps/server/dist/index.mjs"
+claude mcp add --transport stdio Shipyard \
+  -- node "/Users/jacobpetterle/Working Directory/Shipyard/apps/server/dist/index.mjs"
 ```
 
 Verify it was added:
@@ -99,7 +99,7 @@ The GitHub OAuth flow automatically detects mobile browsers (iOS Safari, Android
 - Android Chrome: Same test, verify no unexpected app launches
 - Check browser console for mobile detection log
 
-**Note:** Deep linking to desktop apps during OAuth only occurs if Universal Links (iOS) or App Links (Android) are configured via `.well-known/` files on the domain. Currently, Peer Plan has no such configuration, so mobile OAuth works correctly without intervention.
+**Note:** Deep linking to desktop apps during OAuth only occurs if Universal Links (iOS) or App Links (Android) are configured via `.well-known/` files on the domain. Currently, Shipyard has no such configuration, so mobile OAuth works correctly without intervention.
 
 For more details, see [ADR-0003](./decisions/0003-mobile-oauth-user-agent-detection.md).
 
@@ -141,13 +141,13 @@ pnpm reset
 
 **Why?** Claude Code auto-restarts the hub MCP server, causing it to re-sync data before the reset completes.
 
-**Before running:** Close ALL peer-plan browser tabs (regular AND incognito). Open tabs block IndexedDB deletion.
+**Before running:** Close ALL Shipyard browser tabs (regular AND incognito). Open tabs block IndexedDB deletion.
 
 **Limitation:** If remote P2P peers are connected, they'll re-sync data back. This reset is for local development only.
 
 The reset command:
-1. Kills all peer-plan processes (MCP servers, registry, signaling, Vite)
-2. Clears server-side LevelDB storage (`~/.peer-plan/plans/`)
+1. Kills all Shipyard processes (MCP servers, registry, signaling, Vite)
+2. Clears server-side LevelDB storage (`~/.Shipyard/plans/`)
 3. Opens browser to clear IndexedDB + localStorage
 
 ### Browser-Only Reset (Dev Mode)
@@ -161,7 +161,7 @@ http://localhost:5173/?reset=all
 
 **Option 2: Console**
 ```javascript
-window.__resetPeerPlan()
+window.__resetShipyard()
 ```
 
 Both options only work in development mode.
@@ -170,9 +170,9 @@ Both options only work in development mode.
 
 The `?reset=all` URL parameter only works in development mode. To reset production storage:
 
-1. Close all peer-plan browser tabs
-2. Kill any local MCP servers: `pkill -f "peer-plan"`
-3. Open GitHub Pages: https://schoolai.github.io/peer-plan/
+1. Close all Shipyard browser tabs
+2. Kill any local MCP servers: `pkill -f "Shipyard"`
+3. Open GitHub Pages: https://schoolai.github.io/Shipyard/
 4. Open DevTools → Application → Storage → **Clear site data**
 
 ### Manual Reset
@@ -181,10 +181,10 @@ If the script doesn't work:
 
 ```bash
 # 1. Kill all processes
-pkill -f "peer-plan"
+pkill -f "Shipyard"
 
 # 2. Clear server storage
-rm -rf ~/.peer-plan/plans/
+rm -rf ~/.Shipyard/plans/
 
 # 3. Clear browser storage (in DevTools)
 # Application → Storage → Clear site data

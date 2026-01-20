@@ -1,5 +1,5 @@
 /**
- * HTTP client for communicating with the peer-plan registry server.
+ * HTTP client for communicating with the shipyard registry server.
  * Uses tRPC for type-safe RPC calls.
  */
 
@@ -12,8 +12,8 @@ import type {
   UpdatePlanContentResponse,
   UpdatePresenceRequest,
   UpdatePresenceResponse,
-} from '@peer-plan/schema';
-import { APPROVAL_LONG_POLL_TIMEOUT_MS } from '@peer-plan/shared';
+} from '@shipyard/schema';
+import { APPROVAL_LONG_POLL_TIMEOUT_MS } from '@shipyard/shared';
 import { registryConfig } from './config/env/registry.js';
 import { logger } from './logger.js';
 import { getTRPCClient } from './trpc-client.js';

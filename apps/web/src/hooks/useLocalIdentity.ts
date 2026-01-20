@@ -1,6 +1,6 @@
 import { useCallback, useSyncExternalStore } from 'react';
 
-const STORAGE_KEY = 'peer-plan-local-identity';
+const STORAGE_KEY = 'shipyard-local-identity';
 
 export interface LocalIdentity {
   username: string;

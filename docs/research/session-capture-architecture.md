@@ -39,7 +39,7 @@
                            │
                            ▼
 ┌───────────────────────────────────────────────────────────────────┐
-│                    Peer-Plan MCP Server                           │
+│                    Shipyard MCP Server                           │
 │                                                                   │
 │  ┌────────────────────────────────────────────────────────┐     │
 │  │ create_plan({ title, blocks, origin: { ... } })       │     │
@@ -327,10 +327,10 @@
 ┌─────────────────────────────────────────────────────────┐
 │  Step 1: Download Hook Files                            │
 │                                                         │
-│  $ curl -o .cursor/hooks/peer-plan-origin.js \          │
+│  $ curl -o .cursor/hooks/shipyard-origin.js \          │
 │    https://raw.githubusercontent.com/.../hooks/cursor/  │
 │                                                         │
-│  $ chmod +x .cursor/hooks/peer-plan-origin.js           │
+│  $ chmod +x .cursor/hooks/shipyard-origin.js           │
 └─────────────────────────────────────────────────────────┘
                         │
                         ▼
@@ -342,7 +342,7 @@
 │    "version": 1,                                        │
 │    "hooks": {                                           │
 │      "beforeMCPExecution": [{                           │
-│        "command": "node .cursor/hooks/peer-plan-...js", │
+│        "command": "node .cursor/hooks/shipyard-...js", │
 │        "async": false                                   │
 │      }]                                                 │
 │    }                                                    │
@@ -356,7 +356,7 @@
 │  1. Open Cursor Composer                                │
 │  2. Try calling create_plan                             │
 │  3. Verify origin metadata is captured                  │
-│  4. Check plan in Peer-Plan UI                          │
+│  4. Check plan in Shipyard UI                          │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -368,7 +368,7 @@
 │                                                         │
 │  1. Navigate to "Hooks" section                         │
 │  2. Click "Add New Hook"                                │
-│  3. Upload peer-plan-origin.js                          │
+│  3. Upload shipyard-origin.js                          │
 │  4. Configure:                                          │
 │     - Hook event: beforeMCPExecution                    │
 │     - OS: All (or specific)                             │
@@ -547,7 +547,7 @@ Y.Map<"plans"> {
 │     - Read from process.env                             │
 │                                                         │
 │  2. Secure Config File (Better)                         │
-│     - Store in ~/.peer-plan/config.json                 │
+│     - Store in ~/.shipyard/config.json                 │
 │     - Encrypt with user's system keychain               │
 │     - Use node-keytar or similar                        │
 │                                                         │

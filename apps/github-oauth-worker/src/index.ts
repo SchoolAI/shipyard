@@ -51,7 +51,7 @@ const ALLOWED_ORIGINS = {
     'http://127.0.0.1:5173',
     'http://127.0.0.1:5174',
   ],
-  production: ['https://peer-plan.pages.dev', 'https://schoolai.github.io'],
+  production: ['https://shipyard.pages.dev', 'https://schoolai.github.io'],
 };
 
 function getCorsHeaders(origin: string | null, env: Env): Record<string, string> | null {
@@ -155,7 +155,7 @@ export default {
         headers: {
           Accept: 'application/json',
           'Content-Type': 'application/json',
-          'User-Agent': 'peer-plan-oauth-worker',
+          'User-Agent': 'shipyard-oauth-worker',
         },
         body: JSON.stringify({
           client_id: env.GITHUB_CLIENT_ID,

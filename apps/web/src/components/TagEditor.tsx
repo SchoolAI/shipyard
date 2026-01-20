@@ -1,6 +1,6 @@
 import { ComboBox, Input, Label, ListBox } from '@heroui/react';
-import type { PlanIndexEntry } from '@peer-plan/schema';
-import { getAllTagsFromIndex } from '@peer-plan/schema';
+import type { PlanIndexEntry } from '@shipyard/schema';
+import { getAllTagsFromIndex } from '@shipyard/schema';
 import { useState } from 'react';
 import { TagChip } from './TagChip';
 

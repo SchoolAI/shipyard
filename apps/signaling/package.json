@@ -1,5 +1,5 @@
 {
-  "name": "@peer-plan/signaling",
+  "name": "@shipyard/signaling",
   "version": "0.1.0",
   "type": "module",
   "private": true,
@@ -13,7 +13,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@peer-plan/schema": "workspace:*",
+    "@shipyard/schema": "workspace:*",
     "lib0": "^0.2.98",
     "nanoid": "^5.1.6",
     "pino": "^10.1.0",

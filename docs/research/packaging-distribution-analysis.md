@@ -8,13 +8,13 @@
 
 ## Executive Summary
 
-This document synthesizes findings from 5 parallel research agents investigating how to package and distribute peer-plan components for easy installation. The research identified **4 publishable packages** with varying readiness levels and **critical missing infrastructure** for npm publishing.
+This document synthesizes findings from 5 parallel research agents investigating how to package and distribute Shipyard components for easy installation. The research identified **4 publishable packages** with varying readiness levels and **critical missing infrastructure** for npm publishing.
 
 ### Key Findings
 
-1. **Hook is publish-ready** - `@peer-plan/hook` has proper metadata and can be published immediately after workspace dependencies are built
+1. **Hook is publish-ready** - `@shipyard/hook` has proper metadata and can be published immediately after workspace dependencies are built
 2. **MCP server needs work** - Missing `files` field causes 373+ files to be published; workspace dependencies need bundling
-3. **Shared packages should be published** - Both `@peer-plan/schema` and `@peer-plan/shared` are needed by external consumers
+3. **Shared packages should be published** - Both `@shipyard/schema` and `@shipyard/shared` are needed by external consumers
 4. **Skill needs packaging** - Well-structured but missing ZIP creation script
 5. **No publishing infrastructure** - Need Changesets, GitHub Actions workflow, and npm tokens
 
@@ -22,7 +22,7 @@ This document synthesizes findings from 5 parallel research agents investigating
 
 ## Package Analysis
 
-### 1. MCP Server (`@peer-plan/server`)
+### 1. MCP Server (`@shipyard/server`)
 
 **Current State:**
 - Version: 0.1.0
@@ -32,7 +32,7 @@ This document synthesizes findings from 5 parallel research agents investigating
 
 **Critical Blockers:**
 - ❌ Missing `files` field → publishes 373+ files including source code
-- ❌ Workspace dependencies (`@peer-plan/schema`, `@peer-plan/shared`) unresolved
+- ❌ Workspace dependencies (`@shipyard/schema`, `@shipyard/shared`) unresolved
 - ❌ No README.md for npm
 - ❌ No LICENSE.md in package directory
 - ❌ Missing npm metadata (repository, keywords, homepage)
@@ -45,14 +45,14 @@ Bundle workspace dependencies into the server package rather than publishing the
 
 **Installation Method:**
 ```bash
-npx @peer-plan/server
+npx @shipyard/server
 ```
 
 **Reference:** Similar to `@modelcontextprotocol/server-filesystem` pattern
 
 ---
 
-### 2. Hook (`@peer-plan/hook`)
+### 2. Hook (`@shipyard/hook`)
 
 **Current State:**
 - Version: 0.1.0
@@ -64,28 +64,28 @@ npx @peer-plan/server
 - ✅ Has `files` field (dist, scripts, .claude-plugin, hooks)
 - ✅ Has `prepublishOnly` script
 - ✅ Has postinstall script for auto-configuration
-- ✅ Proper bin entries (`peer-plan-hook`, `peer-plan-hook-install`)
+- ✅ Proper bin entries (`shipyard-hook`, `shipyard-hook-install`)
 - ✅ Plugin metadata in `.claude-plugin/`
 - ✅ Single bundle includes all workspace deps
 
 **Blocker:**
-- ⚠️ Needs `@peer-plan/schema` and `@peer-plan/shared` built before publishing
+- ⚠️ Needs `@shipyard/schema` and `@shipyard/shared` built before publishing
 
 **Installation Method:**
 ```bash
-npm install -g @peer-plan/hook
+npm install -g @shipyard/hook
 # Postinstall automatically configures Claude Code
 ```
 
 ---
 
-### 3. Skill (`peer-plan-skill/`)
+### 3. Skill (`shipyard-skill/`)
 
 **Current State:**
-- Location: `/peer-plan-skill/` directory in repo root
+- Location: `/shipyard-skill/` directory in repo root
 - Structure:
   ```
-  peer-plan-skill/
+  shipyard-skill/
   ├── SKILL.md (230 lines - main instructions)
   ├── README.md (51 lines - setup guide)
   └── examples/
@@ -93,13 +93,13 @@ npm install -g @peer-plan/hook
   ```
 
 **Critical Issues:**
-- ❌ README references `peer-plan.zip` that doesn't exist
+- ❌ README references `shipyard.zip` that doesn't exist
 - ❌ No packaging script to create the ZIP
-- ❌ README instructs users to use `npx @peer-plan/server` but package not on npm
+- ❌ README instructs users to use `npx @shipyard/server` but package not on npm
 
 **Distribution Options:**
 1. **Manual ZIP upload** (current README approach)
-   - User downloads peer-plan-skill.zip
+   - User downloads shipyard-skill.zip
    - Claude Desktop → Settings → Skills → Upload
 
 2. **Plugin marketplace** (future)
@@ -117,7 +117,7 @@ npm install -g @peer-plan/hook
 
 ### 4. Shared Packages
 
-#### @peer-plan/schema
+#### @shipyard/schema
 
 **Current State:**
 - Version: 0.1.0
@@ -152,7 +152,7 @@ npm install -g @peer-plan/hook
 - ❌ Add README.md
 - ❌ Add repository/keywords metadata
 
-#### @peer-plan/shared
+#### @shipyard/shared
 
 **Current State:**
 - Version: 0.1.0
@@ -203,9 +203,9 @@ npm install -g @peer-plan/hook
 - [Reference: Turborepo Publishing Libraries](https://turborepo.dev/docs/guides/publishing-libraries)
 
 **Publishing Strategy:** Unified Versioning
-- All packages share same version (e.g., "peer-plan v1.2.3")
+- All packages share same version (e.g., "shipyard v1.2.3")
 - Simpler for users to understand
-- Changesets config: `fixed: [["@peer-plan/*"]]`
+- Changesets config: `fixed: [["@shipyard/*"]]`
 
 **Security:**
 - npm provenance attestation (`--provenance` flag)
@@ -218,7 +218,7 @@ npm install -g @peer-plan/hook
 
 ### 1. npm Registry (Primary)
 - **Packages**: server, hook, schema, shared
-- **Installation**: `npx @peer-plan/server`, `npm install -g @peer-plan/hook`
+- **Installation**: `npx @shipyard/server`, `npm install -g @shipyard/hook`
 - **Status**: Not published yet
 
 ### 2. MCP Server Registries
@@ -251,7 +251,7 @@ npm install -g @peer-plan/hook
 5. Add npm metadata (repository, keywords, homepage)
 6. Change to named bin entry:
    ```json
-   { "bin": { "mcp-server-peer-plan": "./dist/index.mjs" } }
+   { "bin": { "mcp-server-shipyard": "./dist/index.mjs" } }
    ```
 
 #### Schema Package
@@ -280,11 +280,11 @@ npm install -g @peer-plan/hook
 1. Create `scripts/package-skill.sh`:
    ```bash
    #!/bin/bash
-   cd peer-plan-skill
-   zip -r ../peer-plan-skill.zip .
+   cd shipyard-skill
+   zip -r ../shipyard-skill.zip .
    ```
 2. Update README.md to reference GitHub Releases
-3. Remove reference to non-existent peer-plan.zip
+3. Remove reference to non-existent shipyard.zip
 
 ### Phase 2: Publishing Infrastructure (Critical)
 
@@ -298,7 +298,7 @@ npm install -g @peer-plan/hook
    Edit `.changeset/config.json`:
    ```json
    {
-     "fixed": [["@peer-plan/*"]],
+     "fixed": [["@shipyard/*"]],
      "changelog": "@changesets/cli/changelog"
    }
    ```
@@ -328,8 +328,8 @@ npm install -g @peer-plan/hook
 
 2. **Local Testing**
    ```bash
-   pnpm --filter @peer-plan/hook link --global
-   peer-plan-hook --help
+   pnpm --filter @shipyard/hook link --global
+   shipyard-hook --help
    ```
 
 3. **First Publish** (Manual)
@@ -340,6 +340,7 @@ npm install -g @peer-plan/hook
    npm publish apps/server --access public --provenance
    npm publish apps/hook --access public --provenance
    ```
+   All packages will be under the @shipyard organization scope.
 
 4. **Submit to Registries**
    - Smithery.ai
@@ -349,8 +350,8 @@ npm install -g @peer-plan/hook
 ### Phase 4: Documentation & Polish (Post-Launch)
 
 1. Update main README.md with installation instructions
-2. Add npm version badge
-3. Update SETUP.md to use `npx` installation
+2. Add npm version badge (Shipyard packages)
+3. Update SETUP.md to use `npx @shipyard/server` installation
 4. Create video walkthrough for installation
 5. Add troubleshooting guide
 
@@ -362,7 +363,7 @@ npm install -g @peer-plan/hook
 
 **Step 1: Install Hook**
 ```bash
-npm install -g @peer-plan/hook
+npm install -g @shipyard/hook
 # Postinstall script automatically configures Claude Code
 ```
 
@@ -371,9 +372,9 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 ```json
 {
   "mcpServers": {
-    "peer-plan": {
+    "shipyard": {
       "command": "npx",
-      "args": ["-y", "@peer-plan/server"]
+      "args": ["-y", "@shipyard/server"]
     }
   }
 }
@@ -395,7 +396,7 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 **Step 1: Install MCP Server**
 Configure MCP client to use:
 ```bash
-npx @peer-plan/server
+npx @shipyard/server
 ```
 
 **Step 2: Use MCP Tools Directly**
@@ -458,7 +459,7 @@ npx @peer-plan/server
 
 4. **Should we create a CLI installer?**
    - Recommendation: Not needed initially (setup is simple)
-   - Alternative: Create `create-peer-plan` if complexity increases
+   - Alternative: Create `create-shipyard` if complexity increases
 
 ---
 

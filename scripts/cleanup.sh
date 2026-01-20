@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Cleanup script for peer-plan development servers
+# Cleanup script for shipyard development servers
 # Kills only dev server processes, not editors or Claude sessions
 
-echo "🧹 Cleaning up peer-plan dev servers..."
+echo "🧹 Cleaning up shipyard dev servers..."
 
 # Function to safely kill processes by pattern
 kill_by_pattern() {
@@ -54,7 +54,7 @@ kill_by_port() {
 }
 
 # 1. Kill concurrently first (this will cascade to child processes)
-kill_by_pattern "concurrently.*peer-plan" "concurrently orchestrator"
+kill_by_pattern "concurrently.*shipyard" "concurrently orchestrator"
 
 # Give it a moment for cascade
 sleep 1
@@ -74,17 +74,17 @@ kill_by_port "8787" "Wrangler"
 
 echo "🗑️  Removing build artifacts..."
 
-peer_plan_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+shipyard_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 # Clean build artifacts
-rm -rf "$peer_plan_dir/apps/*/dist"
-rm -rf "$peer_plan_dir/packages/*/dist"
-rm -rf "$peer_plan_dir/.turbo"
-rm -rf "$peer_plan_dir/node_modules/.vite"
+rm -rf "$shipyard_dir/apps/*/dist"
+rm -rf "$shipyard_dir/packages/*/dist"
+rm -rf "$shipyard_dir/.turbo"
+rm -rf "$shipyard_dir/node_modules/.vite"
 
 # Clean test artifacts
-rm -rf "$peer_plan_dir/test-results"
-rm -rf "$peer_plan_dir/.playwright"
+rm -rf "$shipyard_dir/test-results"
+rm -rf "$shipyard_dir/.playwright"
 
 echo "✅ Cleanup complete!"
 echo ""

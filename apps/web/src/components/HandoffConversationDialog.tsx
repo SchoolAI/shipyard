@@ -1,5 +1,5 @@
 import { Avatar, Button, Card, Modal, Spinner } from '@heroui/react';
-import { getConversationVersions, logPlanEvent, markVersionHandedOff } from '@peer-plan/schema';
+import { getConversationVersions, logPlanEvent, markVersionHandedOff } from '@shipyard/schema';
 import { Download, Send, Upload, Users, X } from 'lucide-react';
 import type React from 'react';
 import { useEffect, useRef, useState } from 'react';
@@ -279,9 +279,7 @@ export function HandoffConversationDialog({
     setSelectedPeer(peer);
 
     try {
-      const { parseClaudeCodeTranscriptString, claudeCodeToA2A } = await import(
-        '@peer-plan/schema'
-      );
+      const { parseClaudeCodeTranscriptString, claudeCodeToA2A } = await import('@shipyard/schema');
       const parseResult = parseClaudeCodeTranscriptString(transcriptContent);
 
       if (parseResult.messages.length === 0) {

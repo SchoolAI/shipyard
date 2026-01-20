@@ -1,5 +1,5 @@
 {
-  "name": "@peer-plan/github-oauth-worker",
+  "name": "@shipyard/github-oauth-worker",
   "version": "0.0.1",
   "private": true,
   "type": "module",

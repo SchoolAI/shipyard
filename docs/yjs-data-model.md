@@ -1,8 +1,8 @@
 # Yjs Data Model
 
-**The definitive guide to peer-plan's CRDT-based data model.**
+**The definitive guide to shipyard's CRDT-based data model.**
 
-This document explains how peer-plan uses Yjs for collaborative editing, real-time synchronization, and conflict-free state management.
+This document explains how shipyard uses Yjs for collaborative editing, real-time synchronization, and conflict-free state management.
 
 ---
 
@@ -25,7 +25,7 @@ This document explains how peer-plan uses Yjs for collaborative editing, real-ti
 
 ### Why Yjs?
 
-Peer-plan uses **Yjs** as its CRDT (Conflict-free Replicated Data Type) system because:
+Shipyard uses **Yjs** as its CRDT (Conflict-free Replicated Data Type) system because:
 
 1. **BlockNote is Yjs-native**: Our block editor uses Yjs internally (Y.Doc, Y.XmlFragment)
 2. **Built-in comments**: BlockNote's YjsThreadStore provides threaded comments out-of-the-box
@@ -239,7 +239,7 @@ interface PlanMetadata {
 We use **Zod** for runtime validation:
 
 ```typescript
-import { PlanMetadataSchema } from '@peer-plan/schema';
+import { PlanMetadataSchema } from '@shipyard/schema';
 
 // Validates at runtime
 const result = PlanMetadataSchema.safeParse(data);
@@ -351,7 +351,7 @@ interface Thread {
 
 ## Sync Strategy
 
-Peer-plan uses three Yjs sync providers depending on the scenario:
+Shipyard uses three Yjs sync providers depending on the scenario:
 
 ### 1. y-websocket (MCP Server ↔ Browser)
 
@@ -489,7 +489,7 @@ URL snapshots are **compressed JSON representations** of a plan's state at a poi
 ### URL Structure
 
 ```
-https://org.github.io/peer-plan?d={compressed-data}
+https://org.github.io/shipyard?d={compressed-data}
 
 Where compressed-data = lz-string.compressToEncodedURIComponent(JSON.stringify({
   v: 1,                              // Schema version
@@ -507,7 +507,7 @@ Where compressed-data = lz-string.compressToEncodedURIComponent(JSON.stringify({
 Example:
 
 ```
-https://peer-plan.app/?d=NobwRAhg9gxgLgS2A...
+https://shipyard.app/?d=NobwRAhg9gxgLgS2A...
                        ^^^^^^^^^^^^^^^^^^^^^^^^
                        Compressed plan data
 ```
@@ -561,7 +561,7 @@ Generate a new URL snapshot when:
 
 ```typescript
 import * as Y from 'yjs';
-import { initPlanMetadata } from '@peer-plan/schema/yjs';
+import { initPlanMetadata } from '@shipyard/schema/yjs';
 
 // Create a new Y.Doc
 const ydoc = new Y.Doc();
@@ -583,7 +583,7 @@ initPlanMetadata(ydoc, {
 ### Example 2: Read Plan Metadata
 
 ```typescript
-import { getPlanMetadata } from '@peer-plan/schema/yjs';
+import { getPlanMetadata } from '@shipyard/schema/yjs';
 
 const metadata = getPlanMetadata(ydoc);
 
@@ -600,7 +600,7 @@ if (metadata) {
 ### Example 3: Update Plan Metadata
 
 ```typescript
-import { setPlanMetadata } from '@peer-plan/schema/yjs';
+import { setPlanMetadata } from '@shipyard/schema/yjs';
 
 // Update status
 setPlanMetadata(ydoc, {
@@ -643,7 +643,7 @@ import { useEffect, useState } from 'react';
 import * as Y from 'yjs';
 import { WebsocketProvider } from 'y-websocket';
 import { IndexeddbPersistence } from 'y-indexeddb';
-import { getPlanFromUrl, initPlanMetadata } from '@peer-plan/schema';
+import { getPlanFromUrl, initPlanMetadata } from '@shipyard/schema';
 import { useCreateBlockNote } from '@blocknote/react';
 
 function usePlanWithHydration() {
@@ -750,8 +750,8 @@ function PlanEditor() {
 ### Example 7: Generate URL Snapshot
 
 ```typescript
-import { createPlanUrl, encodePlan } from '@peer-plan/schema/url';
-import { getPlanMetadata } from '@peer-plan/schema/yjs';
+import { createPlanUrl, encodePlan } from '@shipyard/schema/url';
+import { getPlanMetadata } from '@shipyard/schema/yjs';
 
 function generateShareableUrl(ydoc: Y.Doc, editor: BlockNoteEditor): string {
   // 1. Get current metadata
@@ -777,7 +777,7 @@ function generateShareableUrl(ydoc: Y.Doc, editor: BlockNoteEditor): string {
   };
 
   // 5. Generate URL
-  const url = createPlanUrl('https://peer-plan.app', snapshot);
+  const url = createPlanUrl('https://shipyard.app', snapshot);
 
   return url;
 }
@@ -847,7 +847,7 @@ function SyncIndicator() {
 
 ### Schema Versioning Strategy
 
-Peer-plan uses explicit versioning for both URL snapshots and Y.Doc metadata.
+Shipyard uses explicit versioning for both URL snapshots and Y.Doc metadata.
 
 ### URL Snapshot Versioning
 
@@ -1120,7 +1120,7 @@ const artifact = {
 
 ## Summary
 
-Peer-plan's Yjs data model provides:
+Shipyard's Yjs data model provides:
 
 - **Three-part structure**: BlockNote content, Plan metadata, Comments/Threads
 - **Clear ownership**: BlockNote manages content/comments, we manage metadata

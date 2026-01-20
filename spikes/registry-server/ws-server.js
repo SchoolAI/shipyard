@@ -5,7 +5,7 @@
  *
  * Minimal WebSocket server that:
  * 1. Starts on given port
- * 2. Registers itself in ~/.peer-plan/servers.json
+ * 2. Registers itself in ~/.shipyard/servers.json
  * 3. Accepts WebSocket connections
  * 4. Echoes messages back to clients
  *
@@ -19,7 +19,7 @@ import { join } from 'node:path';
 import { WebSocketServer } from 'ws';
 
 const PORT = process.argv[2] ? Number.parseInt(process.argv[2], 10) : 3100;
-const REGISTRY_DIR = join(homedir(), '.peer-plan');
+const REGISTRY_DIR = join(homedir(), '.shipyard');
 const REGISTRY_PATH = join(REGISTRY_DIR, 'servers.json');
 
 /**

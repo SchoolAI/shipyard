@@ -260,7 +260,7 @@ We use **tRPC** for internal service communication. It gives us end-to-end type 
 
 ---
 
-# Peer-Plan Tech Stack
+# Shipyard Tech Stack
 
 This project uses a specialized stack for P2P collaborative editing. It follows the core standards above (pnpm, TypeScript, Biome, Vitest) with additions for CRDT sync.
 
