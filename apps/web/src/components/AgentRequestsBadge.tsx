@@ -95,33 +95,35 @@ export function AgentRequestsBadge({ ydoc, isSnapshot = false }: AgentRequestsBa
   // Blockers take priority (more critical)
   if (counts.blocker > 0) {
     return (
-      <Chip
-        color="danger"
-        variant="soft"
+      <button
+        type="button"
         onClick={handleClick}
-        className="cursor-pointer hover:opacity-80 transition-opacity"
+        className="cursor-pointer hover:opacity-80 transition-opacity focus:outline-none focus:ring-2 focus:ring-danger rounded-full"
       >
-        <div className="flex items-center gap-1">
-          <AlertOctagon className="w-3 h-3" />
-          <span>Agent: Blocked{counts.blocker > 1 ? ` (${counts.blocker})` : ''}</span>
-        </div>
-      </Chip>
+        <Chip color="danger" variant="soft">
+          <div className="flex items-center gap-1">
+            <AlertOctagon className="w-3 h-3" />
+            <span>Agent: Blocked{counts.blocker > 1 ? ` (${counts.blocker})` : ''}</span>
+          </div>
+        </Chip>
+      </button>
     );
   }
 
   if (counts.help > 0) {
     return (
-      <Chip
-        color="warning"
-        variant="soft"
+      <button
+        type="button"
         onClick={handleClick}
-        className="cursor-pointer hover:opacity-80 transition-opacity"
+        className="cursor-pointer hover:opacity-80 transition-opacity focus:outline-none focus:ring-2 focus:ring-warning rounded-full"
       >
-        <div className="flex items-center gap-1">
-          <HelpCircle className="w-3 h-3" />
-          <span>Agent: Needs Help{counts.help > 1 ? ` (${counts.help})` : ''}</span>
-        </div>
-      </Chip>
+        <Chip color="warning" variant="soft">
+          <div className="flex items-center gap-1">
+            <HelpCircle className="w-3 h-3" />
+            <span>Agent: Needs Help{counts.help > 1 ? ` (${counts.help})` : ''}</span>
+          </div>
+        </Chip>
+      </button>
     );
   }
 
