@@ -44,6 +44,7 @@ export function Drawer({
       isOpen={isOpen}
       onOpenChange={onOpenChange}
       isDismissable
+      isBlurred={false}
       className="data-[entering]:animate-in data-[entering]:fade-in-0 data-[entering]:duration-300 data-[exiting]:animate-out data-[exiting]:fade-out-0 data-[exiting]:duration-200"
     >
       <Modal.Container
