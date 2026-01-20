@@ -7,10 +7,16 @@ import {
   Dropdown,
   Label,
   Modal,
+  Popover,
   Separator,
   Tooltip,
 } from '@heroui/react';
-import type { A2AMessage, ConversationExportMeta, PlanMetadata } from '@peer-plan/schema';
+import type {
+  A2AMessage,
+  ConversationExportMeta,
+  PlanIndexEntry,
+  PlanMetadata,
+} from '@peer-plan/schema';
 import {
   getPlanIndexEntry,
   getPlanOwnerId,
@@ -29,6 +35,7 @@ import {
   Monitor,
   MoreVertical,
   Share2,
+  Tag,
 } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -42,6 +49,8 @@ import { NotificationsButton } from '@/components/NotificationsButton';
 import { ReviewActions } from '@/components/ReviewActions';
 import { ShareButton } from '@/components/ShareButton';
 import { StatusChip } from '@/components/StatusChip';
+import { TagChip } from '@/components/TagChip';
+import { TagEditor } from '@/components/TagEditor';
 import { useActivePlanSync } from '@/contexts/ActivePlanSyncContext';
 import { useUserIdentity } from '@/contexts/UserIdentityContext';
 import { useConversationTransfer } from '@/hooks/useConversationTransfer';
@@ -481,8 +490,13 @@ interface PlanHeaderProps {
   rtcProvider?: WebrtcProvider | null;
   /** BlockNote editor instance for snapshots - Issue #42 */
   editor?: BlockNoteEditor | null;
+  /** Called when tags are changed */
+  onTagsChange?: (tags: string[]) => void;
+  /** All plans for tag autocomplete */
+  allPlans?: PlanIndexEntry[];
 }
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: component handles complex header state with tag editing
 export function PlanHeader({
   ydoc,
   indexDoc,
@@ -494,6 +508,8 @@ export function PlanHeader({
   isSnapshot = false,
   rtcProvider = null,
   editor = null,
+  onTagsChange,
+  allPlans = [],
 }: PlanHeaderProps) {
   // No local state or observer - metadata comes from parent to avoid duplicate observers
   const display = metadata;
@@ -511,6 +527,9 @@ export function PlanHeader({
 
   // Link PR popover state - managed here for mobile dropdown
   const [isLinkPROpen, setIsLinkPROpen] = useState(false);
+
+  // Tag editor popover state
+  const [isTagEditorOpen, setIsTagEditorOpen] = useState(false);
 
   // File input ref for mobile import
   const mobileImportInputRef = useRef<HTMLInputElement>(null);
@@ -684,6 +703,60 @@ export function PlanHeader({
         <Chip color="default" variant="soft" className="shrink-0">
           archived
         </Chip>
+      )}
+
+      {/* Tags with inline editor - only show for live plans */}
+      {!isSnapshot && display.tags && display.tags.length > 0 && (
+        <div className="flex gap-1 items-center">
+          {display.tags.slice(0, 3).map((tag) => (
+            <TagChip key={tag} tag={tag} size="sm" />
+          ))}
+          {display.tags.length > 3 && (
+            <span className="text-xs text-muted-foreground">+{display.tags.length - 3}</span>
+          )}
+        </div>
+      )}
+
+      {/* Tag editor button - only show for live plans */}
+      {!isSnapshot && onTagsChange && (
+        <Popover isOpen={isTagEditorOpen} onOpenChange={setIsTagEditorOpen}>
+          <Tooltip delay={0}>
+            <Button
+              isIconOnly
+              variant="ghost"
+              size="sm"
+              aria-label="Edit tags"
+              className="touch-target"
+            >
+              <Tag className="w-4 h-4" />
+            </Button>
+            <Tooltip.Content>Edit tags</Tooltip.Content>
+          </Tooltip>
+
+          <Popover.Content placement="bottom" className="w-96">
+            <Popover.Dialog>
+              <Popover.Arrow />
+              <Popover.Heading>Edit Tags</Popover.Heading>
+
+              <div className="mt-3">
+                <TagEditor
+                  tags={display.tags || []}
+                  onTagsChange={(newTags) => {
+                    onTagsChange(newTags);
+                    setIsTagEditorOpen(false);
+                  }}
+                  allPlans={allPlans}
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 mt-4">
+                <Button size="sm" variant="ghost" onPress={() => setIsTagEditorOpen(false)}>
+                  Done
+                </Button>
+              </div>
+            </Popover.Dialog>
+          </Popover.Content>
+        </Popover>
       )}
 
       {/* Right side: agents/peers, review actions, share - hidden for snapshots */}

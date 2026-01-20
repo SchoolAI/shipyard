@@ -26,7 +26,6 @@ import { PlanContent } from '@/components/PlanContent';
 import { PlanHeader } from '@/components/PlanHeader';
 import { ReviewActions } from '@/components/ReviewActions';
 import { Sidebar } from '@/components/Sidebar';
-import { TagEditor } from '@/components/TagEditor';
 import { Drawer } from '@/components/ui/drawer';
 import { WaitingRoomGate } from '@/components/WaitingRoomGate';
 import { useActivePlanSync } from '@/contexts/ActivePlanSyncContext';
@@ -405,15 +404,6 @@ export function PlanPage() {
               isSnapshot={isSnapshot}
               rtcProvider={rtcProvider}
               editor={editor}
-            />
-          </div>
-        )}
-
-        {/* Tag editing section - only show for live plans */}
-        {!isMobile && !isSnapshot && metadata && (
-          <div className="border-b border-separator bg-surface px-2 md:px-6 py-3 shrink-0">
-            <TagEditor
-              tags={metadata.tags || []}
               onTagsChange={handleTagsChange}
               allPlans={allPlans}
             />

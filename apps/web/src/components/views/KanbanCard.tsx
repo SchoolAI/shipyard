@@ -36,7 +36,6 @@ import { TagChip } from '@/components/TagChip';
 import { usePlanMetadata } from '@/hooks/usePlanMetadata';
 import { assertNever } from '@/utils/assert-never';
 import { formatRelativeTime } from '@/utils/formatters';
-import { SubstatusBadge } from './SubstatusBadge';
 
 interface KanbanCardProps {
   plan: PlanIndexEntry;
@@ -121,15 +120,15 @@ export function KanbanCard({ plan, onHover, onPanelOpen }: KanbanCardProps) {
         variant="secondary"
         className={`
           group transition-all duration-150 pointer-events-none
-          border-l-4 ${borderColorClass}
+          border-l-3 ${borderColorClass}
           hover:translate-y-[-2px] hover:shadow-lg
-          ${isDragging ? 'shadow-xl ring-2 ring-accent' : 'shadow-sm'}
+          ${isDragging ? 'shadow-xl ring-2 ring-accent' : 'shadow-md'}
         `}
       >
-        <Card.Header className="p-3 pb-2">
+        <Card.Header className="p-4">
           {/* Title with proper truncation */}
           <Card.Title
-            className="text-sm font-medium leading-snug"
+            className="text-base font-semibold leading-snug"
             style={{
               display: '-webkit-box',
               WebkitLineClamp: 2,
@@ -143,10 +142,8 @@ export function KanbanCard({ plan, onHover, onPanelOpen }: KanbanCardProps) {
         </Card.Header>
 
         {/* Metadata footer */}
-        <Card.Content className="px-3 pb-3 pt-0">
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <SubstatusBadge status={plan.status} />
-
+        <Card.Content className="px-4 pb-4 pt-2">
+          <div className="flex items-center gap-2 flex-wrap">
             {/* Owner badge */}
             {plan.ownerId && (
               <div className="flex items-center gap-1 bg-surface-hover/60 rounded-full px-1.5 py-0.5">
@@ -167,12 +164,7 @@ export function KanbanCard({ plan, onHover, onPanelOpen }: KanbanCardProps) {
 
             {/* PR indicator */}
             {hasPR && (
-              <Chip
-                size="sm"
-                variant="soft"
-                color="accent"
-                className="h-5 text-[10px] px-1.5 gap-0.5"
-              >
+              <Chip size="sm" variant="soft" color="accent" className="gap-1">
                 <GitPullRequest className="w-3 h-3" />
                 <span>{metadata.linkedPRs.length > 1 ? metadata.linkedPRs.length : ''}</span>
               </Chip>
@@ -188,7 +180,7 @@ export function KanbanCard({ plan, onHover, onPanelOpen }: KanbanCardProps) {
                     ? 'success'
                     : 'default'
                 }
-                className="h-5 text-[10px] px-1.5 gap-0.5"
+                className="gap-1"
               >
                 <CheckSquare className="w-3 h-3" />
                 <span>
@@ -198,13 +190,20 @@ export function KanbanCard({ plan, onHover, onPanelOpen }: KanbanCardProps) {
             )}
 
             {/* Tags (show first 2 to save space) */}
-            {plan.tags?.slice(0, 2).map((tag) => (
-              <TagChip key={tag} tag={tag} size="sm" />
-            ))}
+            {plan.tags && plan.tags.length > 0 && (
+              <div className="flex gap-1 items-center">
+                {plan.tags.slice(0, 2).map((tag) => (
+                  <TagChip key={tag} tag={tag} size="sm" />
+                ))}
+                {plan.tags.length > 2 && (
+                  <span className="text-[10px] text-muted-foreground">+{plan.tags.length - 2}</span>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Updated time - separate row for cleaner layout */}
-          <div className="mt-2 text-[10px] text-muted-foreground">
+          <div className="mt-3 text-xs text-muted-foreground">
             Updated {formatRelativeTime(plan.updatedAt)}
           </div>
         </Card.Content>

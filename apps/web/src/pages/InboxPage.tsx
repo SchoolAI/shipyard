@@ -240,7 +240,7 @@ function EventInboxItem({ item, onView }: EventInboxItemProps) {
     <div className="flex items-center justify-between gap-3 w-full py-2">
       <div className="flex flex-col gap-1 flex-1 min-w-0">
         <span className="font-medium text-foreground truncate">{plan.title}</span>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <Chip size="sm" variant="soft" color={color} className="gap-1">
             {icon}
             {description}
@@ -248,6 +248,17 @@ function EventInboxItem({ item, onView }: EventInboxItemProps) {
           <span className="text-xs text-muted-foreground">
             {formatRelativeTime(event.timestamp)}
           </span>
+          {/* Show first 3 tags */}
+          {plan.tags && plan.tags.length > 0 && (
+            <div className="flex gap-1 items-center">
+              {plan.tags.slice(0, 3).map((tag) => (
+                <TagChip key={tag} tag={tag} size="sm" />
+              ))}
+              {plan.tags.length > 3 && (
+                <span className="text-xs text-muted-foreground">+{plan.tags.length - 3}</span>
+              )}
+            </div>
+          )}
         </div>
       </div>
 

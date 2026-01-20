@@ -24,6 +24,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { IndexeddbPersistence } from 'y-indexeddb';
 import * as Y from 'yjs';
+import { TagChip } from '@/components/TagChip';
 import { assertNever } from '@/utils/assert-never';
 import { formatRelativeTime } from '@/utils/formatters';
 
@@ -155,10 +156,21 @@ export function PlanPeekModal({ plan, isOpen, onClose }: PlanPeekModalProps) {
             <Modal.Heading className="text-lg font-semibold leading-snug pr-4">
               {plan.title}
             </Modal.Heading>
-            <div className="flex items-center gap-2 mt-2">
+            <div className="flex items-center gap-2 mt-2 flex-wrap">
               <Chip size="sm" variant="soft" color={getStatusColor(plan.status)}>
                 {getStatusLabel(plan.status)}
               </Chip>
+              {/* Show first 3 tags */}
+              {plan.tags && plan.tags.length > 0 && (
+                <div className="flex gap-1 items-center">
+                  {plan.tags.slice(0, 3).map((tag) => (
+                    <TagChip key={tag} tag={tag} size="sm" />
+                  ))}
+                  {plan.tags.length > 3 && (
+                    <span className="text-xs text-muted-foreground">+{plan.tags.length - 3}</span>
+                  )}
+                </div>
+              )}
               <span className="text-xs text-muted-foreground">
                 Updated {formatRelativeTime(plan.updatedAt)}
               </span>

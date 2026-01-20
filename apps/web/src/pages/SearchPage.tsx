@@ -383,7 +383,7 @@ export function SearchPage() {
           )}
 
           {/* No results */}
-          {(searchQuery || statusFilters.length > 0) && sortedPlans.length === 0 && (
+          {(searchQuery || statusFilters.length > 0 || tagFilters.length > 0) && sortedPlans.length === 0 && (
             <div className="flex items-center justify-center py-12">
               <div className="text-center">
                 <p className="text-muted-foreground">
@@ -395,7 +395,7 @@ export function SearchPage() {
           )}
 
           {/* Results */}
-          {(searchQuery || statusFilters.length > 0) && sortedPlans.length > 0 && (
+          {(searchQuery || statusFilters.length > 0 || tagFilters.length > 0) && sortedPlans.length > 0 && (
             <>
               <p className="text-sm text-muted-foreground px-2 mb-2">
                 {sortedPlans.length} {sortedPlans.length === 1 ? 'result' : 'results'}
