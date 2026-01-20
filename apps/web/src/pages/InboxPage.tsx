@@ -303,6 +303,9 @@ function EventInboxItem({ item, onView, onMarkRead, onMarkUnread }: EventInboxIt
 
   const handleClick = () => {
     onView(plan.id, getTargetTab(event));
+    if (isUnread) {
+      onMarkRead(plan.id, event.id);
+    }
   };
 
   const expandedMessage =
@@ -731,10 +734,19 @@ export function InboxPage() {
   }, []);
 
   // List selection handler - uses extracted helper
-  const handleListSelection = useCallback((keys: Set<unknown> | 'all') => {
-    const key = extractFirstSelectionKey(keys);
-    if (key) setSelectedPlanId(key);
-  }, []);
+  const handleListSelection = useCallback(
+    (keys: Set<unknown> | 'all') => {
+      const key = extractFirstSelectionKey(keys);
+      if (key) {
+        setSelectedPlanId(key);
+        const selectedPlan = sortedInboxPlans.find((p) => p.id === key);
+        if (selectedPlan?.isUnread) {
+          markPlanAsRead(key);
+        }
+      }
+    },
+    [sortedInboxPlans, markPlanAsRead]
+  );
 
   // Event item view handler
   const handleViewEvent = useCallback((planId: string, tab?: PlanViewTab) => {
