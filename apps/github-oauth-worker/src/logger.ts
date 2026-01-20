@@ -60,5 +60,7 @@ class CloudflareLogger {
   }
 }
 
-// Default to 'info' level - Cloudflare Workers don't have process.env at module init
+/**
+ * Default to 'info' level - Cloudflare Workers don't have process.env at module init
+ */
 export const logger = new CloudflareLogger('info');
