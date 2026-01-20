@@ -6,7 +6,15 @@
 
 ---
 
+### Why "Shipyard"?
+
+The name captures two ideas:
+1. **Workspace metaphor** — A shipyard is where work is built, reflecting the collaborative construction of verified AI work
+2. **Dev culture** — "Shipping" features/products/work is how developers talk about delivering value
+
 The Penrose triangle logo represents the "impossible triangle" of AI development: quality, speed, and low effort. Traditionally you sacrifice one. Shipyard enables all three through collaborative verification loops.
+
+> *Formerly "Peer Plan" — see [ADR-0005](./docs/decisions/0005-rebrand-peer-plan-to-shipyard.md) for the full naming rationale.*
 
 ## What is this?
 
