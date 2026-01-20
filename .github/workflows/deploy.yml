@@ -38,6 +38,7 @@ jobs:
       - name: Build web app (with dependencies)
         run: pnpm turbo run build --filter=@shipyard/web
         env:
+          NODE_ENV: production
           VITE_GITHUB_CLIENT_ID: ${{ vars.GH_OAUTH_CLIENT_ID }}
           VITE_GITHUB_OAUTH_WORKER: https://peer-plan-github-oauth.jacob-191.workers.dev
 
