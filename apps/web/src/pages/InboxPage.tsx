@@ -476,7 +476,7 @@ export function InboxPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { identity: githubIdentity } = useGitHubAuth();
-  const { allInboxPlans, markPlanAsRead, isLoading, timedOut } = usePlanIndex(
+  const { allInboxPlans, markPlanAsRead, markPlanAsUnread, isLoading, timedOut } = usePlanIndex(
     githubIdentity?.username
   );
   const { ydoc: indexDoc } = useMultiProviderSync(PLAN_INDEX_DOC_NAME);
@@ -537,10 +537,14 @@ export function InboxPage() {
     [markPlanAsRead]
   );
 
-  // Mark as unread handler - not implemented yet, functionality to be added
-  const handleMarkUnread = useCallback(async (_planId: string) => {
-    toast.info('Mark as unread coming soon');
-  }, []);
+  // Mark as unread handler
+  const handleMarkUnread = useCallback(
+    async (planId: string) => {
+      await markPlanAsUnread(planId);
+      toast.success('Marked as unread');
+    },
+    [markPlanAsUnread]
+  );
 
   // Helper to find the next plan to select after dismissal - uses extracted helper
   const getNextSelectedId = useCallback(
