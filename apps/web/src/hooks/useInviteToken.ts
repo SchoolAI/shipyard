@@ -193,27 +193,57 @@ export function useInviteToken(
   }, [planId, githubIdentity, sendToSignaling]);
 
   // Auto-redeem when conditions are met
+  // Polls for signaling connection to be ready before redeeming
   useEffect(() => {
     if (
-      hasInviteToken &&
-      githubIdentity &&
-      rtcProvider &&
-      !hasAttemptedRef.current &&
-      (redemptionState.status === 'has_invite' || redemptionState.status === 'waiting_for_auth')
+      !hasInviteToken ||
+      !githubIdentity ||
+      !rtcProvider ||
+      hasAttemptedRef.current ||
+      (redemptionState.status !== 'has_invite' && redemptionState.status !== 'waiting_for_auth')
     ) {
-      // Check if signaling is connected before attempting
-      const signalingConns = (
-        rtcProvider as unknown as { signalingConns: Array<{ ws: WebSocket }> }
-      ).signalingConns;
+      return;
+    }
 
-      const hasOpenConnection = signalingConns?.some(
+    const signalingConns = (rtcProvider as unknown as { signalingConns: Array<{ ws: WebSocket }> })
+      .signalingConns;
+
+    const hasOpenConnection = signalingConns?.some(
+      (conn) => conn.ws && conn.ws.readyState === WebSocket.OPEN
+    );
+
+    if (hasOpenConnection) {
+      redeemInvite();
+      return;
+    }
+
+    // WebSocket not ready yet - poll until it opens (max 10 seconds)
+    let attempts = 0;
+    const maxAttempts = 100;
+    const interval = setInterval(() => {
+      attempts++;
+
+      if (attempts > maxAttempts) {
+        clearInterval(interval);
+        return;
+      }
+
+      if (hasAttemptedRef.current) {
+        clearInterval(interval);
+        return;
+      }
+
+      const hasOpen = signalingConns?.some(
         (conn) => conn.ws && conn.ws.readyState === WebSocket.OPEN
       );
 
-      if (hasOpenConnection) {
+      if (hasOpen) {
+        clearInterval(interval);
         redeemInvite();
       }
-    }
+    }, 100);
+
+    return () => clearInterval(interval);
   }, [hasInviteToken, githubIdentity, rtcProvider, redemptionState.status, redeemInvite]);
 
   return {
