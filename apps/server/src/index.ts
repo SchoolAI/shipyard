@@ -16,6 +16,7 @@ import {
   tryAcquireHubLock,
 } from './registry-server.js';
 import { executeCodeTool } from './tools/execute-code.js';
+import { requestUserInputTool } from './tools/request-user-input.js';
 import { TOOL_NAMES } from './tools/tool-names.js';
 
 // Determine if we're the Registry Hub or a client
@@ -67,9 +68,9 @@ const server = new Server(
   }
 );
 
-// Only expose execute_code - all other APIs available through it
+// Expose execute_code (bundled APIs) and request_user_input (standalone)
 server.setRequestHandler(ListToolsRequestSchema, async () => ({
-  tools: [executeCodeTool.definition],
+  tools: [executeCodeTool.definition, requestUserInputTool.definition],
 }));
 
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
@@ -77,6 +78,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
   if (name === TOOL_NAMES.EXECUTE_CODE) {
     return await executeCodeTool.handler(args ?? {});
+  }
+
+  if (name === TOOL_NAMES.REQUEST_USER_INPUT) {
+    return await requestUserInputTool.handler(args ?? {});
   }
 
   throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${name}`);
