@@ -11,7 +11,7 @@ import {
   Spinner,
   TextField,
 } from '@heroui/react';
-import { getPlanMetadata, type LinkedPR, linkPR, logPlanEvent } from '@peer-plan/schema';
+import { createLinkedPR, getPlanMetadata, linkPR, logPlanEvent } from '@peer-plan/schema';
 import { GitPullRequest } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
