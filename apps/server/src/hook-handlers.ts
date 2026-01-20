@@ -24,6 +24,7 @@ import {
   type HookHandlers,
   initPlanMetadata,
   PLAN_INDEX_DOC_NAME,
+  type PlanMetadata,
   parseClaudeCodeOrigin,
   parseThreads,
   type ReviewFeedback,
@@ -32,6 +33,7 @@ import {
   setAgentPresence,
   setPlanIndexEntry,
   setPlanMetadata,
+  type Thread,
   transitionPlanStatus,
   type UpdatePlanContentRequest,
   type UpdatePlanContentResponse,
@@ -190,7 +192,7 @@ export async function createSessionHandler(
     // The browser clears it after reading. If multiple plans are created rapidly,
     // the browser may miss some navigations, but this is acceptable since the user
     // can always navigate manually via the plan list.
-    indexDoc.getMap('navigation').set('target', planId);
+    indexDoc.getMap<string>('navigation').set('target', planId);
     ctx.logger.info({ url, planId }, 'Browser already connected, navigating via CRDT');
   } else {
     // No browser connected - open new one
@@ -350,7 +352,7 @@ export async function getReviewStatusHandler(
 
     case 'changes_requested': {
       // Extract feedback from threads
-      const threadsMap = ydoc.getMap('threads');
+      const threadsMap = ydoc.getMap<Record<string, Thread>>(YDOC_KEYS.THREADS);
       const threadsData = threadsMap.toJSON() as Record<string, unknown>;
       const threads = parseThreads(threadsData);
       const feedback: ReviewFeedback[] = threads.map((thread) => ({
@@ -525,7 +527,7 @@ export async function waitForApprovalHandler(
     throw err;
   }
 
-  const metadata = ydoc.getMap(YDOC_KEYS.METADATA);
+  const metadata = ydoc.getMap<PlanMetadata>(YDOC_KEYS.METADATA);
 
   // Generate unique review request ID to prevent stale decisions
   const reviewRequestId = nanoid();
@@ -642,21 +644,18 @@ export async function waitForApprovalHandler(
   };
 
   // Helper: Validate session can transition
+  // NOTE: We allow transitions from 'created' state because the approval can happen
+  // before setSessionToken() is called (which transitions to 'synced').
+  // The flow is: createSession → waitForApproval → (user clicks approve) → setSessionToken
+  // The approval observer fires when user clicks, which may be before setSessionToken.
   const validateSessionStateForTransition = (
-    session: ReturnType<typeof getSessionStateByPlanId>
+    _session: ReturnType<typeof getSessionStateByPlanId>
   ) => {
-    if (!session) return;
-
-    if (
-      !isSessionStateSynced(session) &&
-      !isSessionStateApproved(session) &&
-      !isSessionStateReviewed(session)
-    ) {
-      throw new Error(
-        `Invalid session state transition: cannot transition from '${session.lifecycle}' to 'approved' or 'reviewed'. ` +
-          `Session must be in 'synced', 'approved', or 'reviewed' state.`
-      );
-    }
+    // All states can transition to approved/reviewed:
+    // - 'created': Initial state, approval can come before token is set
+    // - 'synced': Token was set before approval (normal flow)
+    // - 'approved'/'reviewed': Re-approval after changes
+    // No validation needed - any state can transition
   };
 
   // Helper: Build base state fields
@@ -667,21 +666,28 @@ export async function waitForApprovalHandler(
     lastSyncedAt: session.lastSyncedAt,
   });
 
-  // Helper: Build synced state fields (requires session to be in synced or later state)
+  // Helper: Build synced state fields
+  // For 'created' state, returns placeholders that will be filled by setSessionToken after approval
   const buildSyncedFields = (session: NonNullable<ReturnType<typeof getSessionStateByPlanId>>) => {
-    // TypeScript knows session is in synced/approved/reviewed state due to validateSessionStateForTransition
-    // These properties are guaranteed to exist
     if (
-      !isSessionStateSynced(session) &&
-      !isSessionStateApproved(session) &&
-      !isSessionStateReviewed(session)
+      isSessionStateSynced(session) ||
+      isSessionStateApproved(session) ||
+      isSessionStateReviewed(session)
     ) {
-      throw new Error('Cannot build synced fields from session in created state');
+      return {
+        contentHash: session.contentHash,
+        sessionToken: session.sessionToken,
+        url: session.url,
+      };
     }
+
+    // 'created' state - return placeholder values
+    // These will be properly set by setSessionToken() after approval is received by the hook
+    const webUrl = webConfig.SHIPYARD_WEB_URL;
     return {
-      contentHash: session.contentHash,
-      sessionToken: session.sessionToken,
-      url: session.url,
+      contentHash: '', // Will be set by updateContent or setSessionToken
+      sessionToken: '', // Will be set by setSessionToken after hook receives approval
+      url: `${webUrl}/plan/${session.planId}`,
     };
   };
 
@@ -907,11 +913,11 @@ export async function waitForApprovalHandler(
  */
 function extractFeedbackFromYDoc(ydoc: Y.Doc, ctx: HookContext): string | undefined {
   try {
-    const metadataMap = ydoc.getMap(YDOC_KEYS.METADATA);
+    const metadataMap = ydoc.getMap<PlanMetadata>(YDOC_KEYS.METADATA);
     const reviewComment = metadataMap.get('reviewComment') as string | undefined;
     const reviewedBy = metadataMap.get('reviewedBy') as string | undefined;
 
-    const threadsMap = ydoc.getMap(YDOC_KEYS.THREADS);
+    const threadsMap = ydoc.getMap<Record<string, Thread>>(YDOC_KEYS.THREADS);
     const threadsData = threadsMap.toJSON() as Record<string, unknown>;
     const threads = parseThreads(threadsData);
 
@@ -921,8 +927,10 @@ function extractFeedbackFromYDoc(ydoc: Y.Doc, ctx: HookContext): string | undefi
     }
 
     // Get plan content from Y.Doc for context
-    const contentArray = ydoc.getArray('content');
-    const blocks = contentArray.toJSON() as Array<{ content?: Array<{ text?: string }> }>;
+    const contentFragment = ydoc.getXmlFragment(YDOC_KEYS.DOCUMENT_FRAGMENT);
+    const blocks = contentFragment.toJSON() as unknown as Array<{
+      content?: Array<{ text?: string }>;
+    }>;
 
     // Simple text extraction from BlockNote blocks
     const planText = blocks
