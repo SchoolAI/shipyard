@@ -36,7 +36,7 @@ function useArtifacts(ydoc: Y.Doc): Artifact[] {
   const [artifacts, setArtifacts] = useState<Artifact[]>([]);
 
   useEffect(() => {
-    const array = ydoc.getArray(YDOC_KEYS.ARTIFACTS);
+    const array = ydoc.getArray<Artifact>(YDOC_KEYS.ARTIFACTS);
 
     const updateArtifacts = () => {
       setArtifacts(getArtifacts(ydoc));
@@ -57,7 +57,7 @@ function useDeliverables(ydoc: Y.Doc): Deliverable[] {
   const [deliverables, setDeliverables] = useState<Deliverable[]>([]);
 
   useEffect(() => {
-    const array = ydoc.getArray(YDOC_KEYS.DELIVERABLES);
+    const array = ydoc.getArray<Deliverable>(YDOC_KEYS.DELIVERABLES);
 
     const updateDeliverables = () => {
       setDeliverables(getDeliverables(ydoc));

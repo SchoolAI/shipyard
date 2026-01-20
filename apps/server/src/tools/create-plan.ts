@@ -120,7 +120,7 @@ async function openPlanInBrowser(planId: string, url: string): Promise<void> {
   const indexDoc = await getOrCreateDoc(PLAN_INDEX_DOC_NAME);
 
   if (await hasActiveConnections(PLAN_INDEX_DOC_NAME)) {
-    indexDoc.getMap('navigation').set('target', planId);
+    indexDoc.getMap<string>('navigation').set('target', planId);
     logger.info({ url, planId }, 'Browser already connected, navigating via CRDT');
   } else {
     await open(url);

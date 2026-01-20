@@ -142,7 +142,7 @@ export function getPlanMetadata(ydoc: Y.Doc): PlanMetadata | null {
  * Surfaces corruption errors instead of silently swallowing them.
  */
 export function getPlanMetadataWithValidation(ydoc: Y.Doc): GetPlanMetadataResult {
-  const map = ydoc.getMap('metadata');
+  const map = ydoc.getMap(YDOC_KEYS.METADATA);
   const data = map.toJSON();
 
   if (!data || Object.keys(data).length === 0) {
@@ -171,7 +171,7 @@ export function setPlanMetadata(
 ): void {
   ydoc.transact(
     () => {
-      const map = ydoc.getMap('metadata');
+      const map = ydoc.getMap(YDOC_KEYS.METADATA);
 
       for (const [key, value] of Object.entries(metadata)) {
         if (value !== undefined) {
@@ -218,7 +218,7 @@ export function transitionPlanStatus(
 
   ydoc.transact(
     () => {
-      const map = ydoc.getMap('metadata');
+      const map = ydoc.getMap(YDOC_KEYS.METADATA);
 
       map.set('status', transition.status);
 
@@ -285,7 +285,7 @@ export interface InitPlanMetadataParams {
 }
 
 export function initPlanMetadata(ydoc: Y.Doc, init: InitPlanMetadataParams): void {
-  const map = ydoc.getMap('metadata');
+  const map = ydoc.getMap(YDOC_KEYS.METADATA);
   const now = Date.now();
 
   map.set('id', init.id);
@@ -496,13 +496,13 @@ export function linkArtifactToDeliverable(
 }
 
 export function getPlanOwnerId(ydoc: Y.Doc): string | null {
-  const map = ydoc.getMap('metadata');
+  const map = ydoc.getMap(YDOC_KEYS.METADATA);
   const ownerId = map.get('ownerId');
   return typeof ownerId === 'string' ? ownerId : null;
 }
 
 export function isApprovalRequired(ydoc: Y.Doc): boolean {
-  const map = ydoc.getMap('metadata');
+  const map = ydoc.getMap(YDOC_KEYS.METADATA);
   const approvalRequired = map.get('approvalRequired');
   if (typeof approvalRequired === 'boolean') {
     return approvalRequired;
@@ -512,7 +512,7 @@ export function isApprovalRequired(ydoc: Y.Doc): boolean {
 }
 
 export function getApprovedUsers(ydoc: Y.Doc): string[] {
-  const map = ydoc.getMap('metadata');
+  const map = ydoc.getMap(YDOC_KEYS.METADATA);
   const approvedUsers = map.get('approvedUsers');
   if (!Array.isArray(approvedUsers)) {
     return [];
@@ -536,7 +536,7 @@ export function approveUser(ydoc: Y.Doc, userId: string, actor?: string): void {
 
   ydoc.transact(
     () => {
-      const map = ydoc.getMap('metadata');
+      const map = ydoc.getMap(YDOC_KEYS.METADATA);
       map.set('approvedUsers', [...currentApproved, userId]);
       map.set('updatedAt', Date.now());
     },
@@ -559,7 +559,7 @@ export function revokeUser(ydoc: Y.Doc, userId: string, actor?: string): boolean
 
   ydoc.transact(
     () => {
-      const map = ydoc.getMap('metadata');
+      const map = ydoc.getMap(YDOC_KEYS.METADATA);
       map.set(
         'approvedUsers',
         currentApproved.filter((id) => id !== userId)
@@ -573,7 +573,7 @@ export function revokeUser(ydoc: Y.Doc, userId: string, actor?: string): boolean
 }
 
 export function getRejectedUsers(ydoc: Y.Doc): string[] {
-  const map = ydoc.getMap('metadata');
+  const map = ydoc.getMap(YDOC_KEYS.METADATA);
   const rejectedUsers = map.get('rejectedUsers');
   if (!Array.isArray(rejectedUsers)) {
     return [];
@@ -597,7 +597,7 @@ export function rejectUser(ydoc: Y.Doc, userId: string, actor?: string): void {
 
   ydoc.transact(
     () => {
-      const map = ydoc.getMap('metadata');
+      const map = ydoc.getMap(YDOC_KEYS.METADATA);
 
       if (!currentRejected.includes(userId)) {
         map.set('rejectedUsers', [...currentRejected, userId]);
@@ -625,7 +625,7 @@ export function unrejectUser(ydoc: Y.Doc, userId: string, actor?: string): boole
 
   ydoc.transact(
     () => {
-      const map = ydoc.getMap('metadata');
+      const map = ydoc.getMap(YDOC_KEYS.METADATA);
       map.set(
         'rejectedUsers',
         currentRejected.filter((id) => id !== userId)
@@ -1040,7 +1040,7 @@ export function getLatestSnapshot(ydoc: Y.Doc): PlanSnapshot | null {
 export function addPlanTag(ydoc: Y.Doc, tag: string, actor?: string): void {
   ydoc.transact(
     () => {
-      const map = ydoc.getMap('metadata');
+      const map = ydoc.getMap(YDOC_KEYS.METADATA);
       const currentTags = (map.get('tags') as string[]) || [];
 
       const normalizedTag = tag.toLowerCase().trim();
@@ -1059,7 +1059,7 @@ export function addPlanTag(ydoc: Y.Doc, tag: string, actor?: string): void {
 export function removePlanTag(ydoc: Y.Doc, tag: string, actor?: string): void {
   ydoc.transact(
     () => {
-      const map = ydoc.getMap('metadata');
+      const map = ydoc.getMap(YDOC_KEYS.METADATA);
       const currentTags = (map.get('tags') as string[]) || [];
       const normalizedTag = tag.toLowerCase().trim();
 
@@ -1112,7 +1112,7 @@ export function archivePlan(ydoc: Y.Doc, actorId: string): ArchiveResult {
 
   ydoc.transact(
     () => {
-      const metadataMap = ydoc.getMap('metadata');
+      const metadataMap = ydoc.getMap(YDOC_KEYS.METADATA);
       metadataMap.set('archivedAt', Date.now());
       metadataMap.set('archivedBy', actorId);
       metadataMap.set('updatedAt', Date.now());
@@ -1139,7 +1139,7 @@ export function unarchivePlan(ydoc: Y.Doc, actorId: string): ArchiveResult {
 
   ydoc.transact(
     () => {
-      const metadataMap = ydoc.getMap('metadata');
+      const metadataMap = ydoc.getMap(YDOC_KEYS.METADATA);
       metadataMap.delete('archivedAt');
       metadataMap.delete('archivedBy');
       metadataMap.set('updatedAt', Date.now());
@@ -1160,7 +1160,7 @@ export function answerInputRequest(
   response: string,
   answeredBy: string
 ): { success: boolean; error?: string } {
-  const requestsArray = ydoc.getArray(YDOC_KEYS.INPUT_REQUESTS);
+  const requestsArray = ydoc.getArray<InputRequest>(YDOC_KEYS.INPUT_REQUESTS);
   const requests = requestsArray.toJSON() as InputRequest[];
   const index = requests.findIndex((r) => r.id === requestId);
 
@@ -1203,7 +1203,7 @@ export function cancelInputRequest(
   ydoc: Y.Doc,
   requestId: string
 ): { success: boolean; error?: string } {
-  const requestsArray = ydoc.getArray(YDOC_KEYS.INPUT_REQUESTS);
+  const requestsArray = ydoc.getArray<InputRequest>(YDOC_KEYS.INPUT_REQUESTS);
   const requests = requestsArray.toJSON() as InputRequest[];
   const index = requests.findIndex((r) => r.id === requestId);
 

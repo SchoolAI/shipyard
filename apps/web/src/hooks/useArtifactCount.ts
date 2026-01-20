@@ -1,4 +1,4 @@
-import { getArtifacts } from '@shipyard/schema';
+import { type Artifact, getArtifacts, YDOC_KEYS } from '@shipyard/schema';
 import { useEffect, useState } from 'react';
 import type * as Y from 'yjs';
 
@@ -9,7 +9,7 @@ export function useArtifactCount(ydoc: Y.Doc): number {
   const [count, setCount] = useState(0);
 
   useEffect(() => {
-    const array = ydoc.getArray('artifacts');
+    const array = ydoc.getArray<Artifact>(YDOC_KEYS.ARTIFACTS);
 
     const updateCount = () => {
       setCount(getArtifacts(ydoc).length);

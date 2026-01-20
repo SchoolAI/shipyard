@@ -4,13 +4,14 @@ import {
   type PlanIndexEntry,
   PlanIndexEntrySchema,
 } from './plan-index.js';
+import { YDOC_KEYS } from './yjs-keys.js';
 
 /**
  * Gets all plans from the index Y.Doc, sorted by updatedAt (most recent first).
  * By default, filters out archived plans. Pass includeArchived=true to get all plans.
  */
 export function getPlanIndex(ydoc: Y.Doc, includeArchived = false): PlanIndexEntry[] {
-  const plansMap = ydoc.getMap<Record<string, unknown>>('plans');
+  const plansMap = ydoc.getMap<PlanIndexEntry>(YDOC_KEYS.PLANS);
   const entries: PlanIndexEntry[] = [];
 
   for (const [_id, data] of plansMap.entries()) {
@@ -30,7 +31,7 @@ export function getPlanIndex(ydoc: Y.Doc, includeArchived = false): PlanIndexEnt
  * Gets a single plan entry from the index.
  */
 export function getPlanIndexEntry(ydoc: Y.Doc, planId: string): PlanIndexEntry | null {
-  const plansMap = ydoc.getMap<Record<string, unknown>>('plans');
+  const plansMap = ydoc.getMap<PlanIndexEntry>(YDOC_KEYS.PLANS);
   const data = plansMap.get(planId);
   if (!data) return null;
 
@@ -53,31 +54,15 @@ export function setPlanIndexEntry(ydoc: Y.Doc, entry: PlanIndexEntry): void {
    */
   const validated = PlanIndexEntrySchema.parse(entry);
 
-  const plansMap = ydoc.getMap<Record<string, unknown>>('plans');
-  const data: Record<string, unknown> = {
-    id: validated.id,
-    title: validated.title,
-    status: validated.status,
-    createdAt: validated.createdAt,
-    updatedAt: validated.updatedAt,
-    ownerId: validated.ownerId,
-    deleted: validated.deleted,
-  };
-  if (entry.tags) {
-    data.tags = entry.tags;
-  }
-  if (validated.deleted) {
-    data.deletedAt = validated.deletedAt;
-    data.deletedBy = validated.deletedBy;
-  }
-  plansMap.set(validated.id, data);
+  const plansMap = ydoc.getMap<PlanIndexEntry>(YDOC_KEYS.PLANS);
+  plansMap.set(validated.id, validated);
 }
 
 /**
  * Removes a plan from the index.
  */
 export function removePlanIndexEntry(ydoc: Y.Doc, planId: string): void {
-  const plansMap = ydoc.getMap<Record<string, unknown>>('plans');
+  const plansMap = ydoc.getMap<PlanIndexEntry>(YDOC_KEYS.PLANS);
   plansMap.delete(planId);
 }
 

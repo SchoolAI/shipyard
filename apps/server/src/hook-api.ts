@@ -19,8 +19,10 @@ import {
   setAgentPresence,
   setPlanIndexEntry,
   setPlanMetadata,
+  type Thread,
   UpdatePlanContentRequestSchema,
   UpdatePresenceRequestSchema,
+  YDOC_KEYS,
 } from '@shipyard/schema';
 import type { Request, Response } from 'express';
 import { nanoid } from 'nanoid';
@@ -254,7 +256,7 @@ export async function handleGetReview(req: Request, res: Response): Promise<void
         break;
 
       case 'changes_requested': {
-        const threadsMap = ydoc.getMap('threads');
+        const threadsMap = ydoc.getMap<Record<string, Thread>>(YDOC_KEYS.THREADS);
         const threadsData = threadsMap.toJSON() as Record<string, unknown>;
         const threads = parseThreads(threadsData);
         const feedback: ReviewFeedback[] = threads.map((thread) => ({

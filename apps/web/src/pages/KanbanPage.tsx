@@ -29,6 +29,7 @@ import {
   type StatusTransition,
   setPlanIndexEntry,
   transitionPlanStatus,
+  YDOC_KEYS,
 } from '@shipyard/schema';
 import { Eye, EyeOff } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -259,7 +260,7 @@ export function KanbanPage() {
       return;
     }
 
-    const metaMap = panelYdoc.getMap('metadata');
+    const metaMap = panelYdoc.getMap<PlanMetadata>(YDOC_KEYS.METADATA);
     const update = () => {
       const metadata = getPlanMetadata(panelYdoc);
       setPanelMetadata(metadata);

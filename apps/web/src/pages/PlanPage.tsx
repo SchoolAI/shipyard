@@ -194,7 +194,7 @@ export function PlanPage() {
       return;
     }
 
-    const metaMap = ydoc.getMap('metadata');
+    const metaMap = ydoc.getMap<PlanMetadata>(YDOC_KEYS.METADATA);
     const update = () => {
       const newMetadata = getPlanMetadata(ydoc);
       setMetadata(newMetadata);

@@ -10,7 +10,7 @@ export function useLinkedPRs(ydoc: Y.Doc): LinkedPR[] {
   const [linkedPRs, setLinkedPRs] = useState<LinkedPR[]>([]);
 
   useEffect(() => {
-    const array = ydoc.getArray(YDOC_KEYS.LINKED_PRS);
+    const array = ydoc.getArray<LinkedPR>(YDOC_KEYS.LINKED_PRS);
 
     const update = () => {
       setLinkedPRs(getLinkedPRs(ydoc));

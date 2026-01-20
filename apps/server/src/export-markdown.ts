@@ -2,8 +2,10 @@ import { ServerBlockNoteEditor } from '@blocknote/server-util';
 import {
   createUserResolver,
   extractTextFromCommentBody,
+  type PlanMetadata,
   parseThreads,
   type Thread,
+  YDOC_KEYS,
 } from '@shipyard/schema';
 import type * as Y from 'yjs';
 
@@ -67,7 +69,7 @@ export async function exportPlanToMarkdown(
   const contentMarkdown = markdownParts.join('\n');
 
   // Get threads and extract selected text from document marks
-  const threadsMap = ydoc.getMap('threads');
+  const threadsMap = ydoc.getMap<Record<string, Thread>>(YDOC_KEYS.THREADS);
   const threadsData = threadsMap.toJSON() as Record<string, unknown>;
   const allThreads = parseThreads(threadsData);
 
@@ -89,7 +91,7 @@ export async function exportPlanToMarkdown(
   );
 
   // Get reviewer comment from metadata
-  const metadataMap = ydoc.getMap('metadata');
+  const metadataMap = ydoc.getMap<PlanMetadata>(YDOC_KEYS.METADATA);
   const reviewComment = metadataMap.get('reviewComment') as string | undefined;
   const reviewedBy = metadataMap.get('reviewedBy') as string | undefined;
 

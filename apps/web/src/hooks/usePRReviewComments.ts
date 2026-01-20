@@ -14,7 +14,7 @@ export function usePRReviewComments(ydoc: Y.Doc, prNumber: number): PRReviewComm
   const [comments, setComments] = useState<PRReviewComment[]>([]);
 
   useEffect(() => {
-    const array = ydoc.getArray(YDOC_KEYS.PR_REVIEW_COMMENTS);
+    const array = ydoc.getArray<PRReviewComment>(YDOC_KEYS.PR_REVIEW_COMMENTS);
 
     const update = () => {
       setComments(getPRReviewCommentsForPR(ydoc, prNumber));

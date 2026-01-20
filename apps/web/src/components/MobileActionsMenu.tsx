@@ -1,6 +1,11 @@
 import { Avatar, Button, Card, Dropdown, Label, Modal } from '@heroui/react';
 import type { A2AMessage, ConversationExportMeta, PlanMetadata } from '@shipyard/schema';
-import { getPlanIndexEntry, PLAN_INDEX_DOC_NAME, setPlanIndexEntry } from '@shipyard/schema';
+import {
+  getPlanIndexEntry,
+  PLAN_INDEX_DOC_NAME,
+  setPlanIndexEntry,
+  YDOC_KEYS,
+} from '@shipyard/schema';
 import {
   Archive,
   ArchiveRestore,
@@ -212,7 +217,7 @@ export function MobileActionsMenu({ planId, ydoc, rtcProvider, metadata }: Mobil
 
     ydoc.transact(
       () => {
-        const metadataMap = ydoc.getMap('metadata');
+        const metadataMap = ydoc.getMap<PlanMetadata>(YDOC_KEYS.METADATA) as Y.Map<unknown>;
         if (isArchived) {
           metadataMap.delete('archivedAt');
           metadataMap.delete('archivedBy');

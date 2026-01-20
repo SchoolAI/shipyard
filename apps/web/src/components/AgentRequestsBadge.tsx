@@ -1,5 +1,11 @@
 import { Chip } from '@heroui/react';
-import { getPlanEvents, getPlanMetadata, YDOC_KEYS } from '@shipyard/schema';
+import {
+  getPlanEvents,
+  getPlanMetadata,
+  type PlanEvent,
+  type PlanMetadata,
+  YDOC_KEYS,
+} from '@shipyard/schema';
 import { AlertOctagon, HelpCircle } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type * as Y from 'yjs';
@@ -81,8 +87,8 @@ export function AgentRequestsBadge({ ydoc, isSnapshot = false }: AgentRequestsBa
       setCounts({ help: unresolvedHelp, blocker: unresolvedBlockers });
     };
 
-    const eventsArray = ydoc.getArray(YDOC_KEYS.EVENTS);
-    const metadataMap = ydoc.getMap(YDOC_KEYS.METADATA);
+    const eventsArray = ydoc.getArray<PlanEvent>(YDOC_KEYS.EVENTS);
+    const metadataMap = ydoc.getMap<PlanMetadata>(YDOC_KEYS.METADATA);
 
     update();
     eventsArray.observe(update);

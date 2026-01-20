@@ -4,8 +4,10 @@ import {
   addSnapshot,
   createPlanSnapshot,
   logPlanEvent,
+  type PlanMetadata,
   type PlanStatusType,
   transitionPlanStatus,
+  YDOC_KEYS,
 } from '@shipyard/schema';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -119,7 +121,7 @@ export function ReviewActions({
       return { valid: false };
     }
 
-    const metadata = ydoc.getMap('metadata');
+    const metadata = ydoc.getMap<PlanMetadata>(YDOC_KEYS.METADATA) as Y.Map<unknown>;
     const currentStatus = metadata.get('status') as PlanStatusType;
 
     if (

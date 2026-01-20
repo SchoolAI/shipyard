@@ -1,4 +1,4 @@
-import { getSnapshots, type PlanSnapshot } from '@shipyard/schema';
+import { getSnapshots, type PlanSnapshot, YDOC_KEYS } from '@shipyard/schema';
 import { useEffect, useState } from 'react';
 import type * as Y from 'yjs';
 
@@ -53,7 +53,7 @@ export function useVersionNavigation(ydoc: Y.Doc | null): VersionNavigationState
     updateSnapshots();
 
     // Subscribe to changes
-    const snapshotsArray = ydoc.getArray('snapshots');
+    const snapshotsArray = ydoc.getArray<PlanSnapshot>(YDOC_KEYS.SNAPSHOTS);
     snapshotsArray.observe(updateSnapshots);
 
     return () => snapshotsArray.unobserve(updateSnapshots);

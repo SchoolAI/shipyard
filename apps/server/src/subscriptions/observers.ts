@@ -3,10 +3,12 @@
  */
 
 import {
+  type Artifact,
   extractMentions,
   getDeliverables,
   getPlanMetadata,
   logPlanEvent,
+  type PlanMetadata,
   type PlanStatusType,
   PlanStatusValues,
   parseThreads,
@@ -45,7 +47,7 @@ const CONTENT_EDIT_DEBOUNCE_MS = 5000;
 
 export function attachObservers(planId: string, doc: Y.Doc): void {
   const metadata = getPlanMetadata(doc);
-  const threadsMap = doc.getMap('threads');
+  const threadsMap = doc.getMap<Record<string, Thread>>(YDOC_KEYS.THREADS);
   const threads = parseThreads(threadsMap.toJSON() as Record<string, unknown>);
   const deliverables = getDeliverables(doc);
   const allFulfilled = deliverables.length > 0 && deliverables.every((d) => d.linkedArtifactId);
@@ -63,17 +65,17 @@ export function attachObservers(planId: string, doc: Y.Doc): void {
     commentCount: threads.reduce((acc, t) => acc + t.comments.length, 0),
     resolvedCount: threads.filter((t) => t.resolved).length,
     contentLength: doc.getXmlFragment('document').length,
-    artifactCount: doc.getArray('artifacts').length,
+    artifactCount: doc.getArray<Artifact>(YDOC_KEYS.ARTIFACTS).length,
     deliverablesFulfilled: allFulfilled,
     commentIds: initialCommentIds,
   });
 
   logger.debug({ planId }, 'Attached observers to plan');
-  doc.getMap('metadata').observe((event, transaction) => {
+  doc.getMap<PlanMetadata>(YDOC_KEYS.METADATA).observe((event, transaction) => {
     if (event.keysChanged.has('status')) {
       const prev = previousState.get(planId);
       // Runtime validation: ensure status value is a valid PlanStatusType
-      const rawStatus = doc.getMap('metadata').get('status');
+      const rawStatus = doc.getMap<PlanMetadata>(YDOC_KEYS.METADATA).get('status');
       const newStatus =
         typeof rawStatus === 'string' && PlanStatusValues.includes(rawStatus as PlanStatusType)
           ? (rawStatus as PlanStatusType)
@@ -103,12 +105,12 @@ export function attachObservers(planId: string, doc: Y.Doc): void {
     }
   });
 
-  doc.getMap('threads').observeDeep((_events, transaction) => {
+  doc.getMap<Record<string, Thread>>(YDOC_KEYS.THREADS).observeDeep((_events, transaction) => {
     const prev = previousState.get(planId);
     if (!prev) return;
 
     const actor = transaction.origin?.actor || 'System';
-    const threadsMap = doc.getMap('threads');
+    const threadsMap = doc.getMap<Record<string, Thread>>(YDOC_KEYS.THREADS);
     const threads = parseThreads(threadsMap.toJSON() as Record<string, unknown>);
 
     handleNewComments(doc, planId, threads, prev, actor);
@@ -137,16 +139,16 @@ export function attachObservers(planId: string, doc: Y.Doc): void {
     logger.debug({ planId }, 'Content change detected');
   });
 
-  doc.getArray('artifacts').observe((_event, transaction) => {
+  doc.getArray<Artifact>(YDOC_KEYS.ARTIFACTS).observe((_event, transaction) => {
     const prev = previousState.get(planId);
     if (!prev) return;
 
     const actor = transaction.origin?.actor || 'System';
-    const newCount = doc.getArray('artifacts').length;
+    const newCount = doc.getArray<Artifact>(YDOC_KEYS.ARTIFACTS).length;
 
     if (newCount > prev.artifactCount) {
       const diff = newCount - prev.artifactCount;
-      const artifacts = doc.getArray('artifacts').toArray();
+      const artifacts = doc.getArray<Artifact>(YDOC_KEYS.ARTIFACTS).toArray();
       const newArtifact = artifacts[artifacts.length - 1] as { id: string };
 
       // Log event

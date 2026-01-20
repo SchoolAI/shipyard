@@ -10,6 +10,7 @@ import {
   PLAN_INDEX_VIEWED_BY_KEY,
   type PlanIndexEntry,
   updatePlanIndexViewedBy,
+  YDOC_KEYS,
 } from '@shipyard/schema';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { IndexeddbPersistence } from 'y-indexeddb';
@@ -130,7 +131,7 @@ export function usePlanIndex(currentUsername: string | undefined): PlanIndexStat
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: syncState.idbSynced is intentionally included to re-read plans when IndexedDB finishes loading
   useEffect(() => {
-    const plansMap = ydoc.getMap('plans');
+    const plansMap = ydoc.getMap<PlanIndexEntry>(YDOC_KEYS.PLANS);
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
     let isActive = true;
 

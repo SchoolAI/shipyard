@@ -17,9 +17,11 @@ import {
   type ConversationExportMeta,
   claudeCodeToA2A,
   type OriginMetadata,
+  type PlanMetadata,
   parseClaudeCodeTranscriptString,
   summarizeA2AConversation,
   validateA2AMessages,
+  YDOC_KEYS,
 } from '@shipyard/schema';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { WebrtcProvider } from 'y-webrtc';
@@ -217,7 +219,7 @@ export function useConversationTransfer(
    * Type-safe extraction of origin metadata using discriminated union.
    */
   const getPlanMetadata = useCallback(() => {
-    const metadataMap = ydoc.getMap('metadata');
+    const metadataMap = ydoc.getMap<PlanMetadata>(YDOC_KEYS.METADATA);
     const origin = metadataMap.get('origin') as OriginMetadata | undefined;
     return {
       origin,

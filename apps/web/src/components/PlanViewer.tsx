@@ -20,6 +20,8 @@ import {
   useCreateBlockNote,
 } from '@blocknote/react';
 import { Alert, Button } from '@heroui/react';
+import type { Thread } from '@shipyard/schema';
+import { YDOC_KEYS } from '@shipyard/schema';
 import { User } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import type { WebrtcProvider } from 'y-webrtc';
@@ -252,7 +254,7 @@ export function PlanViewer({
         CommentsExtension({
           threadStore: new YjsThreadStore(
             identity?.id ?? 'anonymous-viewer',
-            ydoc.getMap('threads'),
+            ydoc.getMap<Record<string, Thread>>(YDOC_KEYS.THREADS),
             new DefaultThreadStoreAuth(
               identity?.id ?? 'anonymous-viewer',
               identity ? 'editor' : 'comment'

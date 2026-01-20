@@ -4,7 +4,7 @@
  */
 
 import { Spinner } from '@heroui/react';
-import { getDeliverables, getPlanMetadata, type PlanMetadata } from '@shipyard/schema';
+import { getDeliverables, getPlanMetadata, type PlanMetadata, YDOC_KEYS } from '@shipyard/schema';
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type * as Y from 'yjs';
@@ -95,7 +95,7 @@ export function InlinePlanDetail({
       return;
     }
 
-    const metaMap = panelYdoc.getMap('metadata');
+    const metaMap = panelYdoc.getMap<PlanMetadata>(YDOC_KEYS.METADATA);
     const update = () => {
       const metadata = getPlanMetadata(panelYdoc);
       setPanelMetadata(metadata);

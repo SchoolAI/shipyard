@@ -12,13 +12,21 @@
  */
 
 import {
+  type Artifact,
   ArtifactSchema,
+  type Deliverable,
   DeliverableSchema,
   getPlanMetadataWithValidation,
+  type InputRequest,
   InputRequestSchema,
+  type LinkedPR,
   LinkedPRSchema,
+  type PlanEvent,
   PlanEventSchema,
+  type PlanMetadata,
+  type PlanSnapshot,
   PlanSnapshotSchema,
+  type PRReviewComment,
   PRReviewCommentSchema,
   YDOC_KEYS,
 } from '@shipyard/schema';
@@ -246,7 +254,7 @@ function createArrayObserver<T>(
  */
 export function attachCRDTValidation(planId: string, doc: Y.Doc): void {
   // Validate metadata on every change
-  doc.getMap(YDOC_KEYS.METADATA).observe((_event, transaction) => {
+  doc.getMap<PlanMetadata>(YDOC_KEYS.METADATA).observe((_event, transaction) => {
     const result = validateMetadata(doc, planId);
 
     if (!result.valid) {
@@ -258,38 +266,46 @@ export function attachCRDTValidation(planId: string, doc: Y.Doc): void {
 
   // Validate artifacts array
   doc
-    .getArray(YDOC_KEYS.ARTIFACTS)
-    .observe(createArrayObserver(planId, YDOC_KEYS.ARTIFACTS, ArtifactSchema));
+    .getArray<Artifact>(YDOC_KEYS.ARTIFACTS)
+    .observe(createArrayObserver<Artifact>(planId, YDOC_KEYS.ARTIFACTS, ArtifactSchema));
 
   // Validate deliverables array
   doc
-    .getArray(YDOC_KEYS.DELIVERABLES)
-    .observe(createArrayObserver(planId, YDOC_KEYS.DELIVERABLES, DeliverableSchema));
+    .getArray<Deliverable>(YDOC_KEYS.DELIVERABLES)
+    .observe(createArrayObserver<Deliverable>(planId, YDOC_KEYS.DELIVERABLES, DeliverableSchema));
 
   // Validate linked PRs array
   doc
-    .getArray(YDOC_KEYS.LINKED_PRS)
-    .observe(createArrayObserver(planId, YDOC_KEYS.LINKED_PRS, LinkedPRSchema));
+    .getArray<LinkedPR>(YDOC_KEYS.LINKED_PRS)
+    .observe(createArrayObserver<LinkedPR>(planId, YDOC_KEYS.LINKED_PRS, LinkedPRSchema));
 
   // Validate events array
   doc
-    .getArray(YDOC_KEYS.EVENTS)
-    .observe(createArrayObserver(planId, YDOC_KEYS.EVENTS, PlanEventSchema));
+    .getArray<PlanEvent>(YDOC_KEYS.EVENTS)
+    .observe(createArrayObserver<PlanEvent>(planId, YDOC_KEYS.EVENTS, PlanEventSchema));
 
   // Validate snapshots array
   doc
-    .getArray(YDOC_KEYS.SNAPSHOTS)
-    .observe(createArrayObserver(planId, YDOC_KEYS.SNAPSHOTS, PlanSnapshotSchema));
+    .getArray<PlanSnapshot>(YDOC_KEYS.SNAPSHOTS)
+    .observe(createArrayObserver<PlanSnapshot>(planId, YDOC_KEYS.SNAPSHOTS, PlanSnapshotSchema));
 
   // Validate PR review comments array
   doc
-    .getArray(YDOC_KEYS.PR_REVIEW_COMMENTS)
-    .observe(createArrayObserver(planId, YDOC_KEYS.PR_REVIEW_COMMENTS, PRReviewCommentSchema));
+    .getArray<PRReviewComment>(YDOC_KEYS.PR_REVIEW_COMMENTS)
+    .observe(
+      createArrayObserver<PRReviewComment>(
+        planId,
+        YDOC_KEYS.PR_REVIEW_COMMENTS,
+        PRReviewCommentSchema
+      )
+    );
 
   // Validate input requests array
   doc
-    .getArray(YDOC_KEYS.INPUT_REQUESTS)
-    .observe(createArrayObserver(planId, YDOC_KEYS.INPUT_REQUESTS, InputRequestSchema));
+    .getArray<InputRequest>(YDOC_KEYS.INPUT_REQUESTS)
+    .observe(
+      createArrayObserver<InputRequest>(planId, YDOC_KEYS.INPUT_REQUESTS, InputRequestSchema)
+    );
 
   logger.debug({ planId }, 'CRDT validation observers attached');
 }

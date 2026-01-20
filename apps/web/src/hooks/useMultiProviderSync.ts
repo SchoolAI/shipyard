@@ -5,6 +5,8 @@ import {
   isUserApproved,
   isUserRejected,
   type OriginPlatform,
+  type PlanMetadata,
+  YDOC_KEYS,
 } from '@shipyard/schema';
 import { DEFAULT_REGISTRY_PORTS } from '@shipyard/shared/registry-config';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -450,7 +452,7 @@ export function useMultiProviderSync(
     }
 
     // Watch for metadata changes (e.g., when owner approves user)
-    const metadataMap = ydoc.getMap('metadata');
+    const metadataMap = ydoc.getMap<PlanMetadata>(YDOC_KEYS.METADATA);
 
     function handleMetadataChange() {
       updateApprovalStatus();
