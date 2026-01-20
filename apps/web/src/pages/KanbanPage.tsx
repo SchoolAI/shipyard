@@ -26,7 +26,9 @@ import {
   type PlanIndexEntry,
   type PlanMetadata,
   type PlanStatusType,
+  type StatusTransition,
   setPlanIndexEntry,
+  transitionPlanStatus,
 } from '@peer-plan/schema';
 import { Eye, EyeOff } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -104,16 +106,49 @@ function getTargetColumnId(event: DragEndEvent, allPlans: PlanIndexEntry[]): Col
 }
 
 /**
+ * Build the appropriate status transition for drag-drop operations.
+ * Returns null if the transition is not valid or requires user input.
+ */
+function buildDragDropTransition(
+  newStatus: PlanStatusType,
+  reviewedBy: string,
+  now: number
+): StatusTransition | null {
+  switch (newStatus) {
+    case 'in_progress':
+      // Approval transition (from pending_review or changes_requested)
+      return { status: 'in_progress', reviewedAt: now, reviewedBy };
+    case 'changes_requested':
+      // Request changes transition
+      return { status: 'changes_requested', reviewedAt: now, reviewedBy };
+    case 'completed':
+      // Completion transition
+      return { status: 'completed', completedAt: now, completedBy: reviewedBy };
+    case 'pending_review':
+      // Note: This transition requires a reviewRequestId which we don't have in drag-drop
+      // The index update will still work, but the plan doc won't be updated
+      return null;
+    case 'draft':
+      // Cannot transition back to draft via state machine
+      return null;
+    default:
+      return null;
+  }
+}
+
+/**
  * Update the plan's status in both the index CRDT and the plan's own metadata.
+ * Uses transitionPlanStatus for type-safe status transitions.
  */
 async function updatePlanStatus(
   indexDoc: Y.Doc,
   planId: string,
-  newStatus: PlanStatusType
+  newStatus: PlanStatusType,
+  reviewedBy: string
 ): Promise<void> {
   const now = Date.now();
 
-  // Update in plan-index CRDT
+  // Update in plan-index CRDT (always succeeds for UI consistency)
   const entry = getPlanIndexEntry(indexDoc, planId);
   if (entry) {
     setPlanIndexEntry(indexDoc, {
@@ -123,24 +158,20 @@ async function updatePlanStatus(
     });
   }
 
-  // Also update the plan's own metadata
+  // Build the appropriate transition for the target status
+  const transition = buildDragDropTransition(newStatus, reviewedBy, now);
+
+  // Also update the plan's own metadata using type-safe transition
   try {
     const planDoc = new Y.Doc();
     const idb = new IndexeddbPersistence(planId, planDoc);
     await idb.whenSynced;
 
-    planDoc.transact(() => {
-      const metadata = planDoc.getMap('metadata');
-      const reviewRequestId = metadata.get('reviewRequestId') as string | undefined;
-
-      metadata.set('status', newStatus);
-      metadata.set('updatedAt', now);
-
-      // Preserve reviewRequestId if present (hook needs this to match)
-      if (reviewRequestId !== undefined) {
-        metadata.set('reviewRequestId', reviewRequestId);
-      }
-    });
+    // Transition may fail if plan is in an unexpected state - that's OK for drag-drop UI
+    // The index update is the UI source of truth
+    if (transition) {
+      transitionPlanStatus(planDoc, transition);
+    }
 
     idb.destroy();
   } catch {
@@ -371,19 +402,15 @@ export function KanbanPage() {
     if (!selectedPlanId || !panelMetadata) return;
 
     const now = Date.now();
+    const reviewedBy = githubIdentity?.displayName || githubIdentity?.username || 'Unknown';
 
-    panelYdoc.transact(() => {
-      const metadata = panelYdoc.getMap('metadata');
-      const reviewRequestId = metadata.get('reviewRequestId') as string | undefined;
-
-      metadata.set('status', 'in_progress');
-      metadata.set('updatedAt', now);
-
-      // Preserve reviewRequestId if present (hook needs this to match)
-      if (reviewRequestId !== undefined) {
-        metadata.set('reviewRequestId', reviewRequestId);
-      }
-    });
+    // Use type-safe transition helper for plan doc
+    // Transition may fail if plan is in an unexpected state - that's OK for UI
+    transitionPlanStatus(
+      panelYdoc,
+      { status: 'in_progress', reviewedAt: now, reviewedBy },
+      reviewedBy
+    );
 
     // Also update index with the same timestamp
     const entry = getPlanIndexEntry(indexDoc, selectedPlanId);
@@ -396,7 +423,7 @@ export function KanbanPage() {
     }
 
     toast.success('Plan approved');
-  }, [selectedPlanId, panelMetadata, panelYdoc, indexDoc]);
+  }, [selectedPlanId, panelMetadata, panelYdoc, indexDoc, githubIdentity]);
 
   const handleRequestChanges = useCallback(() => {
     if (!selectedPlanId) return;
@@ -500,7 +527,8 @@ export function KanbanPage() {
     const newStatus = columnIdToStatus(targetColumnId);
     if (plan.status === newStatus) return;
 
-    await updatePlanStatus(indexDoc, planId, newStatus);
+    const reviewedBy = githubIdentity?.displayName || githubIdentity?.username || 'Unknown';
+    await updatePlanStatus(indexDoc, planId, newStatus, reviewedBy);
     toast.success(`Moved to ${newStatus.replace('_', ' ')}`);
   };
 

@@ -11,6 +11,7 @@ import {
   type PlanIndexEntry,
   type PlanStatusType,
   setPlanIndexEntry,
+  transitionPlanStatus,
 } from '@peer-plan/schema';
 import {
   AlertOctagon,
@@ -429,23 +430,11 @@ function navigateToAdjacentItem(
   }
 }
 
-/** Update plan metadata to in_progress status */
-function updatePlanToInProgress(ydoc: Y.Doc, now: number, actor: string): void {
-  ydoc.transact(
-    () => {
-      const metadata = ydoc.getMap('metadata');
-      const reviewRequestId = metadata.get('reviewRequestId') as string | undefined;
-
-      metadata.set('status', 'in_progress');
-      metadata.set('updatedAt', now);
-
-      // Preserve reviewRequestId if present (hook needs this to match)
-      if (reviewRequestId !== undefined) {
-        metadata.set('reviewRequestId', reviewRequestId);
-      }
-    },
-    { actor }
-  );
+/** Update plan metadata to in_progress status using type-safe transition helper */
+function updatePlanToInProgress(ydoc: Y.Doc, now: number, actor: string, reviewedBy: string): void {
+  // Transition may fail if plan is in an unexpected state - that's OK for drag-drop UI
+  // The index update is the primary source of truth
+  transitionPlanStatus(ydoc, { status: 'in_progress', reviewedAt: now, reviewedBy }, actor);
 }
 
 /** Update plan index entry to in_progress */
@@ -461,12 +450,17 @@ function updateIndexToInProgress(indexDoc: Y.Doc, planId: string, now: number): 
 }
 
 /** Approve a plan by updating local IDB and index */
-async function approvePlanInLocalDb(planId: string, now: number, actor: string): Promise<void> {
+async function approvePlanInLocalDb(
+  planId: string,
+  now: number,
+  actor: string,
+  reviewedBy: string
+): Promise<void> {
   try {
     const planDoc = new Y.Doc();
     const idb = new IndexeddbPersistence(planId, planDoc);
     await idb.whenSynced;
-    updatePlanToInProgress(planDoc, now, actor);
+    updatePlanToInProgress(planDoc, now, actor, reviewedBy);
     idb.destroy();
   } catch {
     // Plan doc may not exist locally
@@ -607,8 +601,9 @@ export function InboxPage() {
       }
 
       const now = Date.now();
+      const reviewedBy = githubIdentity.displayName || githubIdentity.username;
       updateIndexToInProgress(indexDoc, planId, now);
-      await approvePlanInLocalDb(planId, now, actor);
+      await approvePlanInLocalDb(planId, now, actor, reviewedBy);
       toast.success('Plan approved');
     },
     [githubIdentity, indexDoc, actor]
@@ -634,14 +629,20 @@ export function InboxPage() {
   // Panel approve handler - uses extracted helpers
   const handlePanelApprove = useCallback(
     async (context: PlanActionContext) => {
+      if (!githubIdentity) {
+        toast.error('Please sign in with GitHub first');
+        return;
+      }
+
       const { planId, ydoc } = context;
       const now = Date.now();
+      const reviewedBy = githubIdentity.displayName || githubIdentity.username;
 
-      updatePlanToInProgress(ydoc, now, actor);
+      updatePlanToInProgress(ydoc, now, actor, reviewedBy);
       updateIndexToInProgress(indexDoc, planId, now);
       toast.success('Plan approved');
     },
-    [indexDoc, actor]
+    [githubIdentity, indexDoc, actor]
   );
 
   // Panel request changes handler

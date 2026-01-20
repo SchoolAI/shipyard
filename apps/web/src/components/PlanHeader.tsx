@@ -18,10 +18,12 @@ import type {
   PlanMetadata,
 } from '@peer-plan/schema';
 import {
+  archivePlan,
   getPlanIndexEntry,
   getPlanOwnerId,
   logPlanEvent,
   setPlanIndexEntry,
+  unarchivePlan,
 } from '@peer-plan/schema';
 import {
   Archive,
@@ -549,22 +551,11 @@ export function PlanHeader({
   );
 
   const handleArchiveToggle = () => {
-    const now = Date.now();
-
-    ydoc.transact(
-      () => {
-        const metadataMap = ydoc.getMap('metadata');
-        if (isArchived) {
-          metadataMap.delete('archivedAt');
-          metadataMap.delete('archivedBy');
-        } else {
-          metadataMap.set('archivedAt', now);
-          metadataMap.set('archivedBy', actor);
-        }
-        metadataMap.set('updatedAt', now);
-      },
-      { actor }
-    );
+    if (isArchived) {
+      unarchivePlan(ydoc, actor);
+    } else {
+      archivePlan(ydoc, actor);
+    }
 
     // Log archive/unarchive event
     logPlanEvent(ydoc, isArchived ? 'plan_unarchived' : 'plan_archived', actor);
@@ -580,7 +571,7 @@ export function PlanHeader({
             title: entry.title,
             status: entry.status,
             createdAt: entry.createdAt,
-            updatedAt: now,
+            updatedAt: Date.now(),
             ownerId: entry.ownerId,
             deleted: false,
           });
@@ -592,10 +583,10 @@ export function PlanHeader({
             title: entry.title,
             status: entry.status,
             createdAt: entry.createdAt,
-            updatedAt: now,
+            updatedAt: Date.now(),
             ownerId: entry.ownerId,
             deleted: true,
-            deletedAt: now,
+            deletedAt: Date.now(),
             deletedBy: actor,
           });
           toast.success('Plan archived');

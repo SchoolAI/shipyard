@@ -51,6 +51,32 @@ describe('Factory Functions', () => {
         handedOff: false,
       });
     });
+
+    it('validates data at runtime with .parse()', () => {
+      // Valid data should not throw
+      expect(() =>
+        createInitialConversationVersion({
+          versionId: 'test-id',
+          creator: 'test-user',
+          platform: 'claude-code',
+          sessionId: 'session-1',
+          messageCount: 5,
+          createdAt: 1234567890,
+        })
+      ).not.toThrow();
+
+      // Invalid data should throw ZodError (bypass TypeScript with 'as any')
+      expect(() =>
+        createInitialConversationVersion({
+          versionId: 'test-id',
+          creator: 'test-user',
+          platform: 'claude-code',
+          sessionId: 'session-1',
+          messageCount: 'invalid' as any, // Should be number
+          createdAt: 1234567890,
+        })
+      ).toThrow();
+    });
   });
 
   describe('createHandedOffConversationVersion', () => {
@@ -72,6 +98,36 @@ describe('Factory Functions', () => {
         expect(typeof version.handedOffAt).toBe('number');
       }
       expect(ConversationVersionSchema.safeParse(version).success).toBe(true);
+    });
+
+    it('validates data at runtime with .parse()', () => {
+      // Valid data should not throw
+      expect(() =>
+        createHandedOffConversationVersion({
+          versionId: 'test-id',
+          creator: 'test-user',
+          platform: 'claude-code',
+          sessionId: 'session-1',
+          messageCount: 10,
+          createdAt: 1234567890,
+          handedOffAt: 1234567900,
+          handedOffTo: 'other-user',
+        })
+      ).not.toThrow();
+
+      // Invalid data should throw ZodError (bypass TypeScript with 'as any')
+      expect(() =>
+        createHandedOffConversationVersion({
+          versionId: 'test-id',
+          creator: 'test-user',
+          platform: 'claude-code',
+          sessionId: 'session-1',
+          messageCount: 10,
+          createdAt: 1234567890,
+          handedOffAt: 'invalid' as any, // Should be number
+          handedOffTo: 'other-user',
+        })
+      ).toThrow();
     });
   });
 

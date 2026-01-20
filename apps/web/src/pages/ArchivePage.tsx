@@ -5,7 +5,12 @@
 
 import { Button, ListBox, ListBoxItem } from '@heroui/react';
 import type { PlanIndexEntry } from '@peer-plan/schema';
-import { getPlanIndexEntry, PLAN_INDEX_DOC_NAME, setPlanIndexEntry } from '@peer-plan/schema';
+import {
+  getPlanIndexEntry,
+  PLAN_INDEX_DOC_NAME,
+  setPlanIndexEntry,
+  unarchivePlan,
+} from '@peer-plan/schema';
 import { ArchiveRestore } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -140,19 +145,14 @@ export function ArchivePage() {
       return;
     }
 
-    const now = Date.now();
+    const actor = githubIdentity.username;
 
     try {
       const planDoc = new Y.Doc();
       const idb = new IndexeddbPersistence(planId, planDoc);
       await idb.whenSynced;
 
-      planDoc.transact(() => {
-        const metadata = planDoc.getMap('metadata');
-        metadata.delete('archivedAt');
-        metadata.delete('archivedBy');
-        metadata.set('updatedAt', now);
-      });
+      unarchivePlan(planDoc, actor);
 
       idb.destroy();
     } catch {
@@ -166,7 +166,7 @@ export function ArchivePage() {
         title: entry.title,
         status: entry.status,
         createdAt: entry.createdAt,
-        updatedAt: now,
+        updatedAt: Date.now(),
         ownerId: entry.ownerId,
         deleted: false,
       });

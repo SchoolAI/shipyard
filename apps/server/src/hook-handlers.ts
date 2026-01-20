@@ -8,6 +8,7 @@ import type { Block } from '@blocknote/core';
 import { ServerBlockNoteEditor } from '@blocknote/server-util';
 import {
   type ApprovalResult,
+  addConversationVersion,
   addDeliverable,
   type CreateHookSessionRequest,
   type CreateHookSessionResponse,
@@ -31,6 +32,7 @@ import {
   setAgentPresence,
   setPlanIndexEntry,
   setPlanMetadata,
+  transitionPlanStatus,
   type UpdatePlanContentRequest,
   type UpdatePlanContentResponse,
   type UpdatePresenceRequest,
@@ -134,7 +136,6 @@ export async function createSessionHandler(
   });
 
   if (origin && origin.platform === 'claude-code') {
-    const metadata = ydoc.getMap('metadata');
     const creator =
       typeof input.metadata?.ownerId === 'string' ? input.metadata.ownerId : 'unknown';
     const initialVersion = createInitialConversationVersion({
@@ -145,7 +146,7 @@ export async function createSessionHandler(
       messageCount: 0,
       createdAt: now,
     });
-    metadata.set('conversationVersions', [initialVersion]);
+    addConversationVersion(ydoc, initialVersion);
     ctx.logger.info(
       { planId, versionId: initialVersion.versionId },
       'Added initial conversation version'
@@ -529,22 +530,32 @@ export async function waitForApprovalHandler(
   // Generate unique review request ID to prevent stale decisions
   const reviewRequestId = nanoid();
 
-  // Set reviewRequestId and status on Y.Doc
-  // CRITICAL: Only set reviewRequestId if status is not already 'pending_review'
+  // Set reviewRequestId and status on Y.Doc using type-safe transition
+  // CRITICAL: Only transition if status is not already 'pending_review'
   // This prevents race condition where two hooks overwrite each other's reviewRequestId
-  ydoc.transact(() => {
-    const currentStatus = metadata.get('status') as string | undefined;
-    if (currentStatus === 'pending_review') {
-      ctx.logger.warn(
-        { planId, currentStatus },
-        'Status already pending_review, another hook may be waiting. Skipping reviewRequestId update.'
-      );
-      return;
+  const planMetadata = getPlanMetadata(ydoc);
+  const ownerId = planMetadata?.ownerId ?? 'unknown';
+
+  if (planMetadata?.status === 'pending_review') {
+    ctx.logger.warn(
+      { planId, currentStatus: planMetadata.status },
+      'Status already pending_review, another hook may be waiting. Skipping reviewRequestId update.'
+    );
+  } else {
+    const result = transitionPlanStatus(
+      ydoc,
+      {
+        status: 'pending_review',
+        reviewRequestId,
+      },
+      ownerId
+    );
+
+    if (!result.success) {
+      ctx.logger.error({ planId, error: result.error }, 'Failed to transition to pending_review');
+      // Continue anyway - observer setup is best-effort
     }
-    metadata.set('reviewRequestId', reviewRequestId);
-    metadata.set('status', 'pending_review');
-    metadata.set('updatedAt', Date.now());
-  });
+  }
 
   ctx.logger.info(
     { planId, reviewRequestId },

@@ -62,7 +62,7 @@ export interface PlanMetadataBaseUpdate {
 export const VALID_STATUS_TRANSITIONS: Record<PlanStatusType, PlanStatusType[]> = {
   draft: ['pending_review', 'in_progress'],
   pending_review: ['in_progress', 'changes_requested'],
-  changes_requested: ['pending_review'],
+  changes_requested: ['pending_review', 'in_progress'],
   in_progress: ['completed'],
   completed: [], // Terminal state
 };
@@ -1132,4 +1132,65 @@ export function getAllTagsFromIndex(indexEntries: Array<{ tags?: string[] }>): s
   }
 
   return Array.from(tagSet).sort();
+}
+
+// --- Archive Management ---
+
+/**
+ * Result type for archive operations.
+ */
+export type ArchiveResult = { success: true } | { success: false; error: string };
+
+/**
+ * Archive a plan - marks it as archived with timestamp and actor.
+ * Validates that the plan exists and is not already archived.
+ */
+export function archivePlan(ydoc: Y.Doc, actorId: string): ArchiveResult {
+  const metadata = getPlanMetadata(ydoc);
+  if (!metadata) {
+    return { success: false, error: 'Plan metadata not found' };
+  }
+
+  if (metadata.archivedAt) {
+    return { success: false, error: 'Plan is already archived' };
+  }
+
+  ydoc.transact(
+    () => {
+      const metadataMap = ydoc.getMap('metadata');
+      metadataMap.set('archivedAt', Date.now());
+      metadataMap.set('archivedBy', actorId);
+      metadataMap.set('updatedAt', Date.now());
+    },
+    { actor: actorId }
+  );
+
+  return { success: true };
+}
+
+/**
+ * Unarchive a plan - removes archived status.
+ * Validates that the plan exists and is currently archived.
+ */
+export function unarchivePlan(ydoc: Y.Doc, actorId: string): ArchiveResult {
+  const metadata = getPlanMetadata(ydoc);
+  if (!metadata) {
+    return { success: false, error: 'Plan metadata not found' };
+  }
+
+  if (!metadata.archivedAt) {
+    return { success: false, error: 'Plan is not archived' };
+  }
+
+  ydoc.transact(
+    () => {
+      const metadataMap = ydoc.getMap('metadata');
+      metadataMap.delete('archivedAt');
+      metadataMap.delete('archivedBy');
+      metadataMap.set('updatedAt', Date.now());
+    },
+    { actor: actorId }
+  );
+
+  return { success: true };
 }

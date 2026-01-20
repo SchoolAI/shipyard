@@ -93,7 +93,7 @@ export interface PlanIndexState {
   isLoading: boolean;
   /** Mark a plan as read by the current user (updates viewedBy in plan's Y.Doc) */
   markPlanAsRead: (planId: string) => Promise<void>;
-  /** Mark a plan as unread by the current user (clears viewedBy for this user) */
+  /** Mark a plan as unread by the current user (clears viewedBy in plan's Y.Doc) */
   markPlanAsUnread: (planId: string) => Promise<void>;
   /** Force refresh of inbox unread states */
   refreshInboxUnreadState: () => void;

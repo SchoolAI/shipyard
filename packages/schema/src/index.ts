@@ -304,6 +304,7 @@ export {
 export type { UserProfile } from './user-helpers.js';
 export { createUserResolver } from './user-helpers.js';
 export type {
+  ArchiveResult,
   GetPlanMetadataResult,
   InitPlanMetadataParams,
   PlanMetadataBaseUpdate,
@@ -322,6 +323,7 @@ export {
   addPRReviewComment,
   addSnapshot,
   approveUser,
+  archivePlan,
   clearAgentPresence,
   createPlanSnapshot,
   getAgentPresence,
@@ -365,6 +367,7 @@ export {
   setPlanMetadata,
   toggleStepCompletion,
   transitionPlanStatus,
+  unarchivePlan,
   unlinkPR,
   unrejectUser,
   updateLinkedPRStatus,

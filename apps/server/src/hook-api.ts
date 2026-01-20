@@ -1,11 +1,13 @@
 import type { Block } from '@blocknote/core';
 import { ServerBlockNoteEditor } from '@blocknote/server-util';
 import {
+  addConversationVersion,
   addDeliverable,
   assertNever,
   CreateHookSessionRequestSchema,
   type CreateHookSessionResponse,
   clearAgentPresence,
+  createInitialConversationVersion,
   extractDeliverables,
   type GetReviewStatusResponse,
   getPlanMetadata,
@@ -101,16 +103,17 @@ export async function handleCreateSession(req: Request, res: Response): Promise<
     });
 
     if (origin && origin.platform === 'claude-code') {
-      const metadata = ydoc.getMap('metadata');
-      const initialVersion = {
+      const creator =
+        typeof input.metadata?.ownerId === 'string' ? input.metadata.ownerId : 'unknown';
+      const initialVersion = createInitialConversationVersion({
         versionId: nanoid(),
-        creator: input.metadata?.ownerId || 'unknown',
+        creator,
         platform: origin.platform,
         sessionId: origin.sessionId,
-        messageCount: 0, // Will be counted on first handoff
+        messageCount: 0,
         createdAt: now,
-      };
-      metadata.set('conversationVersions', [initialVersion]);
+      });
+      addConversationVersion(ydoc, initialVersion);
       logger.info(
         { planId, versionId: initialVersion.versionId },
         'Added initial conversation version'

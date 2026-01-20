@@ -922,10 +922,13 @@ export function createInitialConversationVersion(params: {
   messageCount: number;
   createdAt: number;
 }): ConversationVersion {
-  return {
+  const version = {
     ...params,
     handedOff: false as const,
-  } satisfies ConversationVersion;
+  };
+
+  // Runtime validation for consistency with other factories
+  return ConversationVersionSchema.parse(version);
 }
 
 /**
@@ -942,8 +945,11 @@ export function createHandedOffConversationVersion(params: {
   handedOffAt: number;
   handedOffTo: string;
 }): ConversationVersion {
-  return {
+  const version = {
     ...params,
     handedOff: true as const,
-  } satisfies ConversationVersion;
+  };
+
+  // Runtime validation for consistency with other factories
+  return ConversationVersionSchema.parse(version);
 }

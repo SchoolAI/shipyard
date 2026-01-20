@@ -5,6 +5,7 @@ import {
   createPlanSnapshot,
   logPlanEvent,
   type PlanStatusType,
+  transitionPlanStatus,
 } from '@peer-plan/schema';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -134,35 +135,31 @@ export function ReviewActions({
     return { valid: true, currentStatus };
   };
 
-  // Update Y.Doc with new review status
+  // Update Y.Doc with new review status using type-safe transition helper
   const updateReviewStatus = (
     action: 'approve' | 'request_changes',
     trimmedComment: string,
     now: number
   ): 'in_progress' | 'changes_requested' => {
+    const reviewerName = identity?.name ?? 'Unknown';
     const newStatus = action === 'approve' ? 'in_progress' : 'changes_requested';
 
-    ydoc.transact(
-      () => {
-        const metadata = ydoc.getMap('metadata');
-
-        metadata.set('status', newStatus);
-        metadata.set('reviewedAt', now);
-        metadata.set('reviewedBy', identity?.name ?? 'Unknown');
-        metadata.set('updatedAt', now);
-
-        // NOTE: Do NOT set reviewRequestId here - server manages it
-        // Setting it would overwrite the server's current reviewRequestId
-        // and cause a mismatch, preventing the hook from seeing the status change
-
-        if (trimmedComment) {
-          metadata.set('reviewComment', trimmedComment);
-        } else {
-          metadata.delete('reviewComment');
-        }
-      },
-      { actor }
+    const result = transitionPlanStatus(
+      ydoc,
+      action === 'approve'
+        ? { status: 'in_progress', reviewedAt: now, reviewedBy: reviewerName }
+        : {
+            status: 'changes_requested',
+            reviewedAt: now,
+            reviewedBy: reviewerName,
+            reviewComment: trimmedComment || undefined,
+          },
+      actor
     );
+
+    if (!result.success) {
+      throw new Error(result.error);
+    }
 
     return newStatus;
   };
