@@ -516,15 +516,15 @@ export function InboxPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { identity: githubIdentity } = useGitHubAuth();
-  const { allInboxPlans, markPlanAsRead, markPlanAsUnread, isLoading, timedOut } = usePlanIndex(
-    githubIdentity?.username
-  );
+  const { allInboxPlans, allOwnedPlans, markPlanAsRead, markPlanAsUnread, isLoading, timedOut } =
+    usePlanIndex(githubIdentity?.username);
   const { ydoc: indexDoc } = useMultiProviderSync(PLAN_INDEX_DOC_NAME);
   const [showRead, setShowRead] = useState(getInboxShowRead);
   const { actor } = useUserIdentity();
 
-  // Load event-based inbox items
-  const eventBasedInbox = useInboxEvents(allInboxPlans, githubIdentity?.username ?? null);
+  // Load event-based inbox items from ALL owned plans (not just inbox candidates)
+  // This ensures blockers/help requests show up regardless of plan status
+  const eventBasedInbox = useInboxEvents(allOwnedPlans, githubIdentity?.username ?? null);
 
   // Load input requests from the plan index doc
   const { pendingRequests } = useInputRequests({

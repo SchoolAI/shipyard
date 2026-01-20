@@ -472,9 +472,10 @@ export const PlanEventSchema = z.discriminatedUnion('type', [
  *
  * @param event - The event to check
  * @param username - GitHub username to check against
+ * @param ownerId - Optional plan owner's username (needed to resolve 'owner' in inboxFor)
  * @returns true if the event is inbox-worthy for this user
  */
-export function isInboxWorthy(event: PlanEvent, username: string): boolean {
+export function isInboxWorthy(event: PlanEvent, username: string, ownerId?: string): boolean {
   if (!event.inboxWorthy) {
     return false;
   }
@@ -483,11 +484,13 @@ export function isInboxWorthy(event: PlanEvent, username: string): boolean {
     return true;
   }
 
-  if (Array.isArray(event.inboxFor)) {
-    return event.inboxFor.includes(username);
+  const resolvedInboxFor = event.inboxFor === 'owner' && ownerId ? ownerId : event.inboxFor;
+
+  if (Array.isArray(resolvedInboxFor)) {
+    return resolvedInboxFor.includes(username);
   }
 
-  return event.inboxFor === username;
+  return resolvedInboxFor === username;
 }
 
 /** Base fields shared by all plan statuses */

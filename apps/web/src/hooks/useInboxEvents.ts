@@ -87,9 +87,10 @@ export function useInboxEvents(
 
         // Filter for inbox-worthy events for this user
         // currentUsername is guaranteed non-null by the outer condition
+        // Pass plan.ownerId to resolve 'owner' in inboxFor field
         const inboxWorthyEvents = events.filter((event) => {
           if (!currentUsername) return false;
-          return isInboxWorthy(event, currentUsername);
+          return isInboxWorthy(event, currentUsername, plan.ownerId);
         });
 
         // Map to InboxEventItem

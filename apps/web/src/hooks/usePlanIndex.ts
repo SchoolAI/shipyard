@@ -72,6 +72,8 @@ export interface PlanIndexState {
   inboxPlans: PlanIndexEntryWithReadState[];
   /** All plans matching inbox criteria, including both read and unread */
   allInboxPlans: PlanIndexEntryWithReadState[];
+  /** All plans owned by current user regardless of status (for event-based inbox) */
+  allOwnedPlans: PlanIndexEntry[];
   archivedPlans: PlanIndexEntry[];
   /** Connected to hub WebSocket or WebRTC peers */
   connected: boolean;
@@ -275,6 +277,12 @@ export function usePlanIndex(currentUsername: string | undefined): PlanIndexStat
     [allActivePlans, currentUsername]
   );
 
+  // All plans owned by current user (for event-based inbox - includes all statuses)
+  const allOwnedPlans = useMemo(
+    () => allActivePlans.filter((p) => p.ownerId === currentUsername),
+    [allActivePlans, currentUsername]
+  );
+
   const archivedPlans = useMemo(() => allPlansData.archived, [allPlansData.archived]);
 
   useEffect(() => {
@@ -365,6 +373,7 @@ export function usePlanIndex(currentUsername: string | undefined): PlanIndexStat
     sharedPlans,
     inboxPlans,
     allInboxPlans,
+    allOwnedPlans,
     archivedPlans,
     connected: syncState.connected,
     synced: syncState.synced,
