@@ -56,7 +56,6 @@ const server = http.createServer((_request: IncomingMessage, response: ServerRes
   response.end('okay');
 });
 
-
 /**
  * Helper function for exhaustive switch statements.
  * Ensures all cases are handled at compile time.
@@ -66,7 +65,6 @@ const server = http.createServer((_request: IncomingMessage, response: ServerRes
 function assertNever(x: never): never {
   throw new Error(`Unexpected message type: ${JSON.stringify(x)}`);
 }
-
 
 /**
  * Handle a new WebSocket connection.
@@ -163,7 +161,6 @@ function onConnection(conn: WebSocket): void {
   });
 }
 
-
 wss.on('connection', onConnection);
 
 server.on('upgrade', (request: IncomingMessage, socket: import('stream').Duplex, head: Buffer) => {
@@ -175,7 +172,6 @@ server.on('upgrade', (request: IncomingMessage, socket: import('stream').Duplex,
 server.listen(port);
 
 logger.info({ port }, 'Signaling server running');
-
 
 process.on('SIGTERM', () => {
   server.close();

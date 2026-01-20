@@ -13,6 +13,7 @@ import type {
   UpdatePresenceRequest,
   UpdatePresenceResponse,
 } from '@peer-plan/schema';
+import { APPROVAL_LONG_POLL_TIMEOUT_MS } from '@peer-plan/shared';
 import { registryConfig } from './config/env/registry.js';
 import { logger } from './logger.js';
 import { getTRPCClient } from './trpc-client.js';
