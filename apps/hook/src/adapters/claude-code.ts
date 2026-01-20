@@ -5,7 +5,12 @@
 
 import { formatThreadsForLLM } from '@peer-plan/schema';
 import { z } from 'zod';
-import { CLAUDE_HOOK_EVENTS, CLAUDE_PERMISSION_MODES, CLAUDE_TOOL_NAMES } from '../constants.js';
+import {
+  CLAUDE_HOOK_EVENTS,
+  CLAUDE_PERMISSION_MODES,
+  CLAUDE_TOOL_NAMES,
+  MCP_TOOL_NAMES,
+} from '../constants.js';
 import { logger } from '../logger.js';
 import type {
   AdapterEvent,
@@ -58,8 +63,8 @@ function handlePreToolUse(input: ClaudeCodeHookInput): AdapterEvent {
     return {
       type: 'tool_deny',
       reason:
-        'Please use the request_user_input MCP tool for consistent browser UI experience. ' +
-        'Call it via execute_code: await requestUserInput({message: "...", type: "choice", options: [...]});',
+        `BLOCKED: Use the ${MCP_TOOL_NAMES.REQUEST_USER_INPUT} MCP tool instead for consistent browser UI. ` +
+        'See the tool description for available parameters.',
     };
   }
 
