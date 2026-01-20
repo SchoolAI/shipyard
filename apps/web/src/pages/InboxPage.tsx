@@ -556,7 +556,8 @@ export function InboxPage() {
     inboxGroups.approvalRequests.length +
     pendingRequests.length;
 
-  if (totalInboxItems === 0) {
+  // Show zero state only if there are no items at all (including read items)
+  if (totalInboxItems === 0 && allInboxPlans.length === 0) {
     return (
       <div className="h-full flex items-center justify-center p-4">
         <div className="text-center">
@@ -583,8 +584,9 @@ export function InboxPage() {
             <div>
               <h1 className="text-xl font-bold text-foreground">Inbox</h1>
               <p className="text-sm text-muted-foreground">
-                {totalInboxItems} {totalInboxItems === 1 ? 'item needs' : 'items need'} your
-                attention
+                {totalInboxItems === 0 && allInboxPlans.length > 0
+                  ? `All caught up! ${allInboxPlans.length} read ${allInboxPlans.length === 1 ? 'item' : 'items'}`
+                  : `${totalInboxItems} ${totalInboxItems === 1 ? 'item needs' : 'items need'} your attention`}
               </p>
             </div>
             <Switch size="sm" isSelected={showRead} onChange={handleToggleShowRead}>

@@ -3,6 +3,7 @@ import { ServerBlockNoteEditor } from '@blocknote/server-util';
 import {
   addDeliverable,
   extractDeliverables,
+  getPlanMetadata,
   initPlanMetadata,
   logPlanEvent,
   type OriginMetadata,
