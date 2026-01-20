@@ -163,11 +163,8 @@ export type PlanEventType = (typeof PlanEventTypes)[number];
  * Used in agent_activity events to communicate agent state to humans.
  */
 export const AgentActivityTypes = [
-  'status', // working/blocked/idle/waiting
-  'note', // informational update
   'help_request', // non-blocking request for help
   'help_request_resolved', // help request resolved
-  'milestone', // reached a milestone
   'blocker', // hit a blocker
   'blocker_resolved', // blocker resolved
 ] as const;
@@ -331,16 +328,6 @@ const PlanEventBaseSchema = z.object({
 /** Zod schema for agent activity data discriminated union */
 export const AgentActivityDataSchema = z.discriminatedUnion('activityType', [
   z.object({
-    activityType: z.literal('status'),
-    status: z.enum(['working', 'blocked', 'idle', 'waiting']),
-    message: z.string().optional(),
-  }),
-  z.object({
-    activityType: z.literal('note'),
-    message: z.string(),
-    category: z.enum(['info', 'progress', 'decision', 'question']).optional(),
-  }),
-  z.object({
     activityType: z.literal('help_request'),
     requestId: z.string(),
     message: z.string(),
@@ -349,10 +336,6 @@ export const AgentActivityDataSchema = z.discriminatedUnion('activityType', [
     activityType: z.literal('help_request_resolved'),
     requestId: z.string(),
     resolution: z.string().optional(),
-  }),
-  z.object({
-    activityType: z.literal('milestone'),
-    message: z.string(),
   }),
   z.object({
     activityType: z.literal('blocker'),

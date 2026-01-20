@@ -657,10 +657,8 @@ async function requestUserInput(opts: {
 
 async function postActivityUpdate(opts: {
   planId: string;
-  activityType: 'status' | 'note' | 'help_request' | 'milestone' | 'blocker';
+  activityType: 'help_request' | 'blocker';
   message: string;
-  status?: 'working' | 'blocked' | 'idle' | 'waiting';
-  category?: 'info' | 'progress' | 'decision' | 'question';
 }): Promise<{ success: boolean; eventId: string; requestId?: string }> {
   const { logPlanEvent } = await import('@peer-plan/schema');
   const { getGitHubUsername } = await import('../server-identity.js');
@@ -669,46 +667,22 @@ async function postActivityUpdate(opts: {
   const doc = await getOrCreateDoc(opts.planId);
   const actorName = await getGitHubUsername();
 
-  // Build data based on activity type and capture returned eventId
-  let requestId: string | undefined;
-  let eventId: string;
-
-  switch (opts.activityType) {
-    case 'status':
-      if (!opts.status) throw new Error('status required for activityType=status');
-      eventId = logPlanEvent(doc, 'agent_activity', actorName, {
-        activityType: 'status',
-        status: opts.status,
-        message: opts.message,
-      });
-      break;
-    case 'note':
-      eventId = logPlanEvent(doc, 'agent_activity', actorName, {
-        activityType: 'note',
-        message: opts.message,
-        category: opts.category,
-      });
-      break;
-    case 'help_request':
-    case 'blocker':
-      requestId = nanoid();
-      eventId = logPlanEvent(doc, 'agent_activity', actorName, {
-        activityType: opts.activityType,
-        requestId,
-        message: opts.message,
-      });
-      break;
-    case 'milestone':
-      eventId = logPlanEvent(doc, 'agent_activity', actorName, {
-        activityType: 'milestone',
-        message: opts.message,
-      });
-      break;
-    default: {
-      const _exhaustive: never = opts.activityType;
-      throw new Error(`Unknown activity type: ${_exhaustive}`);
+  // Generate requestId and log event as inbox-worthy for plan owner
+  const requestId = nanoid();
+  const eventId = logPlanEvent(
+    doc,
+    'agent_activity',
+    actorName,
+    {
+      activityType: opts.activityType,
+      requestId,
+      message: opts.message,
+    },
+    {
+      inboxWorthy: true,
+      inboxFor: 'owner',
     }
-  }
+  );
 
   return { success: true, eventId, requestId };
 }

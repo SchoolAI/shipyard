@@ -12,21 +12,16 @@ import {
   Check,
   CheckCircle,
   Circle,
-  Clock,
   Download,
   FileEdit,
-  FileText,
-  Flag,
   GitPullRequest,
   HelpCircle,
   Link as LinkIcon,
   MessageSquare,
-  Pause,
   RefreshCw,
   Share2,
   Upload,
   X,
-  Zap,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { formatRelativeTime } from '@/utils/formatters';
@@ -41,30 +36,10 @@ interface ActivityEventProps {
  */
 function getAgentActivityIcon(data: AgentActivityData): ReactNode {
   switch (data.activityType) {
-    case 'status':
-      switch (data.status) {
-        case 'working':
-          return <Zap className="w-4 h-4 text-accent" />;
-        case 'blocked':
-          return <Pause className="w-4 h-4 text-danger" />;
-        case 'idle':
-          return <Circle className="w-4 h-4 text-muted-foreground" />;
-        case 'waiting':
-          return <Clock className="w-4 h-4 text-warning" />;
-        default: {
-          const _exhaustive: never = data.status;
-          void _exhaustive;
-          return <Circle className="w-4 h-4" />;
-        }
-      }
-    case 'note':
-      return <FileText className="w-4 h-4" />;
     case 'help_request':
       return <HelpCircle className="w-4 h-4 text-warning" />;
     case 'help_request_resolved':
       return <CheckCircle className="w-4 h-4 text-success" />;
-    case 'milestone':
-      return <Flag className="w-4 h-4 text-success" />;
     case 'blocker':
       return <AlertOctagon className="w-4 h-4 text-danger" />;
     case 'blocker_resolved':
@@ -83,26 +58,12 @@ function getAgentActivityIcon(data: AgentActivityData): ReactNode {
  */
 function getAgentActivityDescription(data: AgentActivityData): string {
   switch (data.activityType) {
-    case 'status': {
-      const actions = {
-        working: 'started working',
-        blocked: 'became blocked',
-        idle: 'became idle',
-        waiting: 'started waiting',
-      };
-      const action = actions[data.status];
-      return data.message ? `${action}: ${data.message}` : action;
-    }
-    case 'note':
-      return data.message;
     case 'help_request':
       return `needs help: ${data.message}`;
     case 'help_request_resolved':
       return data.resolution
         ? `resolved help request: ${data.resolution}`
         : 'resolved help request';
-    case 'milestone':
-      return `reached milestone: ${data.message}`;
     case 'blocker':
       return `hit blocker: ${data.message}`;
     case 'blocker_resolved':
