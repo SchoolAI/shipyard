@@ -18,10 +18,7 @@ export const PLAN_INDEX_VIEWED_BY_KEY = 'viewedBy';
  * Known IndexedDB database names that are NOT plan documents.
  * Used to filter when querying for shared plans.
  */
-export const NON_PLAN_DB_NAMES = [
-  'plan-index', // Our plan index doc
-  'idb-keyval', // External library (dependency of UI components)
-] as const;
+export const NON_PLAN_DB_NAMES = ['plan-index', 'idb-keyval'] as const;
 
 export type { PlanStatusType };
 

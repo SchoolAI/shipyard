@@ -70,7 +70,7 @@ describe('Factory Functions', () => {
           creator: 'test-user',
           platform: 'claude-code',
           sessionId: 'session-1',
-          messageCount: 'invalid' as any, // Should be number
+          messageCount: 'invalid' as any,
           createdAt: 1234567890,
         })
       ).toThrow();
@@ -120,7 +120,7 @@ describe('Factory Functions', () => {
           sessionId: 'session-1',
           messageCount: 10,
           createdAt: 1234567890,
-          handedOffAt: 'invalid' as any, // Should be number
+          handedOffAt: 'invalid' as any,
           handedOffTo: 'other-user',
         })
       ).toThrow();
