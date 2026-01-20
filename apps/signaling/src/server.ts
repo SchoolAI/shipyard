@@ -98,6 +98,7 @@ function onConnection(conn: WebSocket): void {
 
   conn.on('close', () => {
     adapter.unsubscribeFromAllTopics(conn);
+    adapter.clearQueuedMessages(conn);
     closed = true;
     clearInterval(pingInterval);
   });
@@ -117,7 +118,7 @@ function onConnection(conn: WebSocket): void {
 
       switch (message.type) {
         case 'subscribe':
-          handleSubscribe(adapter, conn, message);
+          await handleSubscribe(adapter, conn, message);
           break;
 
         case 'unsubscribe':

@@ -115,6 +115,9 @@ export function PlanPage() {
   // but we need to wait for WebRTC to deliver the plan data before showing "Not Found"
   const [p2pGracePeriodExpired, setP2pGracePeriodExpired] = useState(false);
 
+  // Timeout for when we have peers connected but still haven't received plan data
+  const [peerSyncTimedOut, setPeerSyncTimedOut] = useState(false);
+
   // Input request modal state
   const [inputRequestModalOpen, setInputRequestModalOpen] = useState(false);
   const [currentInputRequest, setCurrentInputRequest] = useState<InputRequest | null>(null);
@@ -176,6 +179,20 @@ export function PlanPage() {
     }
     return undefined;
   }, [metadata, syncState.idbSynced, syncState.synced, syncState.connected, syncState.peerCount]);
+
+  // Timeout when peers are connected but no data arrives after 30 seconds
+  useEffect(() => {
+    const hasPeersButNoData = syncState.peerCount > 0 && !metadata;
+
+    if (hasPeersButNoData) {
+      const timeout = setTimeout(() => setPeerSyncTimedOut(true), 30000);
+      return () => clearTimeout(timeout);
+    }
+
+    // Reset timeout state when metadata arrives or peers disconnect
+    setPeerSyncTimedOut(false);
+    return undefined;
+  }, [syncState.peerCount, metadata]);
 
   // Set metadata from URL for snapshots, or from Y.Doc for normal plans
   useEffect(() => {
@@ -296,6 +313,30 @@ export function PlanPage() {
     const inP2POnlyMode = syncState.idbSynced && !syncState.synced && !syncState.connected;
     const waitingForP2P = inP2POnlyMode && !metadata && !p2pGracePeriodExpired;
     const hasPeersButNoData = syncState.peerCount > 0 && !metadata;
+
+    // Show timeout error when peers connected but no data after 30s
+    if (peerSyncTimedOut && !metadata) {
+      return (
+        <div className="flex items-center justify-center min-h-[50vh] p-4">
+          <div className="flex flex-col items-center gap-4 text-center max-w-md">
+            <div className="w-12 h-12 rounded-full bg-danger/10 flex items-center justify-center">
+              <span className="text-danger text-2xl">!</span>
+            </div>
+            <div>
+              <p className="text-foreground font-medium mb-2">Sync Failed</p>
+              <p className="text-sm text-muted-foreground mb-4">
+                Connected to {syncState.peerCount} peer{syncState.peerCount > 1 ? 's' : ''} but
+                couldn&apos;t load task data. The peer may not have the plan you&apos;re looking
+                for.
+              </p>
+            </div>
+            <Button variant="primary" onPress={() => window.location.reload()}>
+              Retry
+            </Button>
+          </div>
+        </div>
+      );
+    }
 
     if (!metadata && (waitingForP2P || hasPeersButNoData)) {
       return (
