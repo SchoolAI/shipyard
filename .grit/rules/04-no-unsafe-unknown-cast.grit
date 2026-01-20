@@ -1,9 +1,5 @@
 language js
 
-// Rule: No type cast to 'unknown' (except double cast to specific type)
-// Rationale: 'as unknown' is a type safety escape hatch. Use Zod validation instead.
-// Exception: 'as unknown as SpecificType' double-cast (for test mocks) is caught by rule 01.
-
 `$value as unknown` where {
   register_diagnostic(span=$value, message="Type cast to 'unknown' is unsafe. Use proper type guards or runtime validation (Zod schema).", severity="error")
 }

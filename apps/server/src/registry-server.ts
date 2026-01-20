@@ -16,6 +16,7 @@ import * as syncProtocol from 'y-protocols/sync';
 import * as Y from 'yjs';
 import { registryConfig } from './config/env/registry.js';
 import { createConversationHandlers } from './conversation-handlers.js';
+import { attachCRDTValidation } from './crdt-validation.js';
 import { getOctokit, parseRepoString } from './github-artifacts.js';
 import { createHookHandlers } from './hook-handlers.js';
 import { logger } from './logger.js';
@@ -280,6 +281,9 @@ async function getDoc(docName: string): Promise<Y.Doc> {
 
     // Attach observers for subscription notifications
     attachObservers(docName, doc);
+
+    // Attach CRDT validation observers (security: validates peer sync data)
+    attachCRDTValidation(docName, doc);
   }
   return doc;
 }

@@ -661,7 +661,10 @@ async function tryAutoLinkPR(ydoc: Y.Doc, repo: string): Promise<LinkedPR | null
   } catch (error) {
     // Validation errors indicate malformed GitHub API response
     if (error instanceof z.ZodError) {
-      logger.error({ error, repo, branch }, 'Invalid GitHub PR response during auto-link');
+      const fieldErrors = error.issues
+        .map((issue) => `${issue.path.join('.')}: ${issue.message}`)
+        .join(', ');
+      logger.error({ fieldErrors, repo, branch }, 'Invalid GitHub PR response during auto-link');
       return null;
     }
     logger.warn({ error, repo, branch }, 'Failed to lookup PR from GitHub');

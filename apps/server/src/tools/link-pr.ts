@@ -195,11 +195,19 @@ The PR is now visible in the "Changes" tab of your plan.`,
 
       // Check if this is a validation error
       if (error instanceof z.ZodError) {
+        // Include field-level errors for better debugging
+        const fieldErrors = error.issues
+          .map((issue) => `${issue.path.join('.')}: ${issue.message}`)
+          .join(', ');
         return {
           content: [
             {
               type: 'text',
-              text: `GitHub API returned invalid data for PR #${input.prNumber}: ${error.message}`,
+              text: `GitHub API returned invalid data for PR #${input.prNumber}
+
+Validation errors: ${fieldErrors}
+
+This usually means GitHub's API response is missing required fields or has unexpected values.`,
             },
           ],
           isError: true,

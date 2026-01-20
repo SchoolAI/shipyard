@@ -1,9 +1,5 @@
 language js
 
-// Rule: No type casts except 'as const'
-// Rationale: Type casts bypass type safety. AI should fix types, not cast them.
-// Exception: 'as const' is safe for readonly assertions.
-
 `$value as $type` where {
   ! $type <: r"^const$",
   register_diagnostic(span=$type, message="Type casts are not allowed except 'as const'. Fix the types instead.", severity="error")

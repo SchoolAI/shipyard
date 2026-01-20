@@ -1,14 +1,21 @@
 import tsParser from '@typescript-eslint/parser';
+import localRules from './eslint-local-rules.mjs';
 
 export default [
   {
-    files: ['**/*.ts', '**/*.tsx'],
+    files: ['packages/shared/**/*.ts', 'packages/shared/**/*.tsx'],
     languageOptions: {
       parser: tsParser,
       parserOptions: {
         ecmaVersion: 'latest',
         sourceType: 'module',
+        ecmaFeatures: {
+          jsx: true,
+        },
       },
+    },
+    plugins: {
+      local: localRules,
     },
     rules: {
       'multiline-comment-style': ['warn', 'starred-block'],
@@ -20,6 +27,7 @@ export default [
           markers: ['/'],
         },
       ],
+      'local/no-noisy-single-line-comments': 'warn',
     },
   },
   {
