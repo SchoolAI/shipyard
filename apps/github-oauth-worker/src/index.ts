@@ -83,9 +83,7 @@ export default {
     const origin = request.headers.get('Origin');
     const corsHeaders = getCorsHeaders(origin, env);
 
-    /*
-     * No CORS required - this is for monitoring, not browser calls
-     */
+    // NOTE: No CORS required - this is for monitoring, not browser calls
     if (url.pathname === '/health') {
       return new Response(JSON.stringify({ status: 'OK', environment: env.ENVIRONMENT }), {
         headers: { 'Content-Type': 'application/json' },
@@ -186,9 +184,7 @@ export default {
         );
       }
 
-      /*
-       * Check if request is from mobile device for deep linking prevention
-       */
+      // NOTE: Check if request is from mobile device for deep linking prevention
       const userAgent = request.headers.get('User-Agent') || '';
       const isMobile = isMobileUserAgent(userAgent);
 

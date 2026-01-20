@@ -25,13 +25,11 @@ import { logger } from '../logger.js';
 import { generateSessionToken, hashSessionToken } from '../session-token.js';
 import { createPlan } from './plan-manager.js';
 
-
 interface ReviewDecision {
   approved: boolean;
   feedback?: string;
   deliverables?: Deliverable[];
 }
-
 
 /**
  * Wait for review decision via server-side observer.

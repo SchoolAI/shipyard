@@ -92,8 +92,7 @@ describe('retryWithBackoff', () => {
         3,
         100
       );
-    } catch {
-    }
+    } catch {}
 
     expect(attempts).toBe(3);
 
@@ -112,8 +111,7 @@ describe('retryWithBackoff', () => {
         5,
         10
       );
-    } catch {
-    }
+    } catch {}
 
     expect(attempts).toBe(5);
   });
@@ -130,8 +128,7 @@ describe('retryWithBackoff', () => {
         2,
         50
       );
-    } catch {
-    }
+    } catch {}
 
     expect(attempts).toBe(2);
   });

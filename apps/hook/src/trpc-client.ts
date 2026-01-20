@@ -18,10 +18,7 @@ let cachedBaseUrl: string | null = null;
  * @param timeoutMs - Request timeout in milliseconds (default: 10000)
  */
 export function getTRPCClient(baseUrl: string, timeoutMs = DEFAULT_TRPC_TIMEOUT_MS) {
-  /*
-   * Don't cache clients with custom timeouts - different timeout configs can't share a client instance.
-   * Long-polling operations need dedicated clients to avoid interfering with normal requests.
-   */
+  // NOTE: Don't cache clients with custom timeouts - long-polling needs dedicated instances
   if (timeoutMs !== DEFAULT_TRPC_TIMEOUT_MS) {
     return createTRPCClient<AppRouter>({
       links: [

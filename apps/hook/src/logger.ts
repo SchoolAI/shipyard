@@ -27,8 +27,5 @@ export const logger = pino(
     level: serverConfig.LOG_LEVEL,
     timestamp: pino.stdTimeFunctions.isoTime,
   },
-  pino.multistream([
-    { stream: pino.destination(2) },
-    { stream: pino.destination(LOG_FILE) },
-  ])
+  pino.multistream([{ stream: pino.destination(2) }, { stream: pino.destination(LOG_FILE) }])
 );

@@ -41,10 +41,7 @@ async function handlePlanStart(
       url: result.url,
     };
   } catch (err) {
-    /*
-     * Fail-open policy: plan creation failure shouldn't block agent work.
-     * The agent can still proceed without peer-plan features.
-     */
+    // NOTE: Fail-open policy - plan creation failure shouldn't block agent work
     logger.error({ err }, 'Failed to create plan');
     return { allow: true };
   }
@@ -184,9 +181,7 @@ async function processEvent(_adapter: AgentAdapter, event: AdapterEvent): Promis
     default: {
       const _exhaustive: never = event;
       logger.warn({ event: _exhaustive }, 'Unknown event type');
-      /*
-       * Forward compatibility: fail-open for unknown events
-       */
+      // NOTE: Forward compatibility - fail-open for unknown events
       return { allow: true };
     }
   }
