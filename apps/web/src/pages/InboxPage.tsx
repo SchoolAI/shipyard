@@ -6,8 +6,10 @@
 import { Accordion, Button, Chip, ListBox, ListBoxItem, Switch, Tooltip } from '@heroui/react';
 import {
   assertNever,
+  clearEventViewedBy,
   getPlanIndexEntry,
   type InputRequest,
+  markEventAsViewed,
   PLAN_INDEX_DOC_NAME,
   type PlanEvent,
   type PlanIndexEntry,
@@ -38,6 +40,7 @@ import * as Y from 'yjs';
 import { InlinePlanDetail, type PlanActionContext } from '@/components/InlinePlanDetail';
 import { InputRequestInboxItem } from '@/components/InputRequestInboxItem';
 import { InputRequestModal } from '@/components/InputRequestModal';
+import { BaseInboxCard } from '@/components/inbox/BaseInboxCard';
 import { OfflineBanner } from '@/components/OfflineBanner';
 import { TagChip } from '@/components/TagChip';
 import { TwoColumnSkeleton } from '@/components/ui/TwoColumnSkeleton';
@@ -191,10 +194,12 @@ function InboxItem({ plan, onApprove, onRequestChanges, onDismiss, onMarkUnread 
 interface EventInboxItemProps {
   item: InboxEventItem;
   onView: (planId: string, tab?: PlanViewTab) => void;
+  onMarkRead: (planId: string, eventId: string) => void;
+  onMarkUnread: (planId: string, eventId: string) => void;
 }
 
-function EventInboxItem({ item, onView }: EventInboxItemProps) {
-  const { plan, event } = item;
+function EventInboxItem({ item, onView, onMarkRead, onMarkUnread }: EventInboxItemProps) {
+  const { plan, event, isUnread } = item;
 
   // Determine icon and description based on event type
   const getEventDisplay = () => {
@@ -235,14 +240,14 @@ function EventInboxItem({ item, onView }: EventInboxItemProps) {
         if (event.data?.activityType === 'help_request') {
           return {
             icon: <HelpCircle className="w-4 h-4" />,
-            description: `needs help: ${event.data.message}`,
+            description: 'needs help',
             color: 'warning' as const,
           };
         }
         if (event.data?.activityType === 'blocker') {
           return {
             icon: <AlertOctagon className="w-4 h-4" />,
-            description: `hit blocker: ${event.data.message}`,
+            description: 'hit blocker',
             color: 'danger' as const,
           };
         }
@@ -261,14 +266,6 @@ function EventInboxItem({ item, onView }: EventInboxItemProps) {
   };
 
   const { icon, description, color } = getEventDisplay();
-
-  // Extract message for agent requests (type-safe)
-  let agentMessage: string | undefined;
-  if (event.type === 'agent_activity') {
-    if (event.data.activityType === 'help_request' || event.data.activityType === 'blocker') {
-      agentMessage = event.data.message;
-    }
-  }
 
   const getTargetTab = (evt: PlanEvent): PlanViewTab => {
     switch (evt.type) {
@@ -304,21 +301,37 @@ function EventInboxItem({ item, onView }: EventInboxItemProps) {
     }
   };
 
+  const handleClick = () => {
+    onView(plan.id, getTargetTab(event));
+    if (isUnread) {
+      onMarkRead(plan.id, event.id);
+    }
+  };
+
+  const expandedMessage =
+    event.type === 'agent_activity' &&
+    (event.data.activityType === 'blocker' || event.data.activityType === 'help_request')
+      ? event.data.message
+      : undefined;
+
   return (
-    <div className="flex items-center justify-between gap-3 w-full py-2">
-      <div className="flex flex-col gap-1 flex-1 min-w-0">
-        <span className="font-medium text-foreground truncate">{plan.title}</span>
-        <div className="flex items-center gap-2 flex-wrap">
-          <Chip size="sm" variant="soft" color={color} className="gap-1">
-            {icon}
-            {event.type === 'agent_activity'
-              ? event.data.activityType.replace('_', ' ')
-              : description}
-          </Chip>
+    <BaseInboxCard
+      title={plan.title}
+      isUnread={isUnread}
+      onClick={handleClick}
+      badge={
+        <Chip size="sm" variant="soft" color={color} className="gap-1">
+          {icon}
+          {event.type === 'agent_activity'
+            ? event.data.activityType.replace('_', ' ')
+            : description}
+        </Chip>
+      }
+      metadata={
+        <>
           <span className="text-xs text-muted-foreground">
             {formatRelativeTime(event.timestamp)}
           </span>
-          {/* Show first 3 tags */}
           {plan.tags && plan.tags.length > 0 && (
             <div className="flex gap-1 items-center">
               {plan.tags.slice(0, 3).map((tag) => (
@@ -329,19 +342,31 @@ function EventInboxItem({ item, onView }: EventInboxItemProps) {
               )}
             </div>
           )}
-        </div>
-        {/* Show full message for agent requests */}
-        {agentMessage && (
-          <p className="text-sm text-muted-foreground mt-1 pl-1">"{agentMessage}"</p>
-        )}
-      </div>
-
-      <div className="flex items-center gap-1 shrink-0">
-        <Button variant="ghost" size="sm" onPress={() => onView(plan.id, getTargetTab(event))}>
-          View
-        </Button>
-      </div>
-    </div>
+        </>
+      }
+      expandedContent={
+        expandedMessage && (
+          <p className="text-sm text-muted-foreground mt-1 pl-1">"{expandedMessage}"</p>
+        )
+      }
+      actions={
+        <Tooltip>
+          <Tooltip.Trigger>
+            <Button
+              variant="ghost"
+              size="sm"
+              isIconOnly
+              onPress={() => {
+                isUnread ? onMarkRead(plan.id, event.id) : onMarkUnread(plan.id, event.id);
+              }}
+            >
+              {isUnread ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+            </Button>
+          </Tooltip.Trigger>
+          <Tooltip.Content>{isUnread ? 'Mark as read' : 'Mark as unread'}</Tooltip.Content>
+        </Tooltip>
+      }
+    />
   );
 }
 
@@ -583,7 +608,7 @@ export function InboxPage() {
 
   // Load event-based inbox items from ALL owned plans (not just inbox candidates)
   // This ensures blockers/help requests show up regardless of plan status
-  const eventBasedInbox = useInboxEvents(allOwnedPlans, githubIdentity?.username ?? null);
+  const eventBasedInbox = useInboxEvents(allOwnedPlans, githubIdentity?.username ?? null, indexDoc);
 
   // Load input requests from the plan index doc
   const { pendingRequests } = useInputRequests({
@@ -645,6 +670,23 @@ export function InboxPage() {
       toast.success('Marked as unread');
     },
     [markPlanAsUnread]
+  );
+
+  // Event read/unread handlers
+  const handleMarkEventRead = useCallback(
+    (planId: string, eventId: string) => {
+      if (!githubIdentity) return;
+      markEventAsViewed(indexDoc, planId, eventId, githubIdentity.username);
+    },
+    [indexDoc, githubIdentity]
+  );
+
+  const handleMarkEventUnread = useCallback(
+    (planId: string, eventId: string) => {
+      if (!githubIdentity) return;
+      clearEventViewedBy(indexDoc, planId, eventId, githubIdentity.username);
+    },
+    [indexDoc, githubIdentity]
   );
 
   // Helper to find the next plan to select after dismissal - uses extracted helper
@@ -933,7 +975,12 @@ export function InboxPage() {
                     <div className="divide-y divide-separator">
                       {inboxGroups.mentions.map((item: InboxEventItem) => (
                         <div key={`${item.plan.id}-${item.event.id}`} className="px-3">
-                          <EventInboxItem item={item} onView={handleViewEvent} />
+                          <EventInboxItem
+                            item={item}
+                            onView={handleViewEvent}
+                            onMarkRead={handleMarkEventRead}
+                            onMarkUnread={handleMarkEventUnread}
+                          />
                         </div>
                       ))}
                     </div>
@@ -962,7 +1009,12 @@ export function InboxPage() {
                     <div className="divide-y divide-separator">
                       {inboxGroups.readyToComplete.map((item: InboxEventItem) => (
                         <div key={`${item.plan.id}-${item.event.id}`} className="px-3">
-                          <EventInboxItem item={item} onView={handleViewEvent} />
+                          <EventInboxItem
+                            item={item}
+                            onView={handleViewEvent}
+                            onMarkRead={handleMarkEventRead}
+                            onMarkUnread={handleMarkEventUnread}
+                          />
                         </div>
                       ))}
                     </div>
@@ -991,7 +1043,12 @@ export function InboxPage() {
                     <div className="divide-y divide-separator">
                       {inboxGroups.approvalRequests.map((item: InboxEventItem) => (
                         <div key={`${item.plan.id}-${item.event.id}`} className="px-3">
-                          <EventInboxItem item={item} onView={handleViewEvent} />
+                          <EventInboxItem
+                            item={item}
+                            onView={handleViewEvent}
+                            onMarkRead={handleMarkEventRead}
+                            onMarkUnread={handleMarkEventUnread}
+                          />
                         </div>
                       ))}
                     </div>
@@ -1020,7 +1077,12 @@ export function InboxPage() {
                     <div className="divide-y divide-separator">
                       {inboxGroups.agentHelpRequests.map((item: InboxEventItem) => (
                         <div key={`${item.plan.id}-${item.event.id}`} className="px-3">
-                          <EventInboxItem item={item} onView={handleViewEvent} />
+                          <EventInboxItem
+                            item={item}
+                            onView={handleViewEvent}
+                            onMarkRead={handleMarkEventRead}
+                            onMarkUnread={handleMarkEventUnread}
+                          />
                         </div>
                       ))}
                     </div>
@@ -1049,7 +1111,12 @@ export function InboxPage() {
                     <div className="divide-y divide-separator">
                       {inboxGroups.agentBlockers.map((item: InboxEventItem) => (
                         <div key={`${item.plan.id}-${item.event.id}`} className="px-3">
-                          <EventInboxItem item={item} onView={handleViewEvent} />
+                          <EventInboxItem
+                            item={item}
+                            onView={handleViewEvent}
+                            onMarkRead={handleMarkEventRead}
+                            onMarkUnread={handleMarkEventUnread}
+                          />
                         </div>
                       ))}
                     </div>

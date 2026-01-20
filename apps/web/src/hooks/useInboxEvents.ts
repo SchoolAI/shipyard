@@ -5,6 +5,7 @@
 
 import {
   getPlanEvents,
+  isEventUnread,
   isInboxWorthy,
   type PlanEvent,
   type PlanIndexEntry,
@@ -20,6 +21,8 @@ export interface InboxEventItem {
   event: PlanEvent;
   /** Event timestamp (for sorting) */
   timestamp: number;
+  /** Whether this event is unread for the current user */
+  isUnread: boolean;
 }
 
 // Cache to avoid reloading the same plan events
@@ -62,11 +65,13 @@ async function loadPlanEvents(planId: string): Promise<PlanEvent[]> {
  *
  * @param plans - List of plans to check for inbox events
  * @param currentUsername - GitHub username to filter events for
- * @returns List of inbox event items, sorted by timestamp descending
+ * @param indexDoc - Plan-index Y.Doc for loading event viewedBy data
+ * @returns List of inbox event items with read state, sorted by timestamp descending
  */
 export function useInboxEvents(
   plans: PlanIndexEntry[],
-  currentUsername: string | null
+  currentUsername: string | null,
+  indexDoc: Y.Doc
 ): InboxEventItem[] {
   const [inboxEvents, setInboxEvents] = useState<InboxEventItem[]>([]);
 
@@ -93,11 +98,15 @@ export function useInboxEvents(
           return isInboxWorthy(event, currentUsername, plan.ownerId);
         });
 
-        // Map to InboxEventItem
+        // Map to InboxEventItem with isUnread
+        // currentUsername is guaranteed non-null by outer guard
         return inboxWorthyEvents.map((event) => ({
           plan,
           event,
           timestamp: event.timestamp,
+          isUnread: currentUsername
+            ? isEventUnread(indexDoc, plan.id, event.id, currentUsername)
+            : true,
         }));
       });
 
@@ -120,7 +129,7 @@ export function useInboxEvents(
     return () => {
       isActive = false;
     };
-  }, [plans, currentUsername]);
+  }, [plans, currentUsername, indexDoc]);
 
   return inboxEvents;
 }

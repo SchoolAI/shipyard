@@ -155,3 +155,97 @@ export function removeViewedByFromIndex(ydoc: Y.Doc, planId: string): void {
   const viewedByRoot = ydoc.getMap<Y.Map<number>>(PLAN_INDEX_VIEWED_BY_KEY);
   viewedByRoot.delete(planId);
 }
+
+/**
+ * Key for event-level read tracking in plan-index.
+ * Structure: event-viewedBy[planId][eventId][username] = timestamp
+ */
+export const PLAN_INDEX_EVENT_VIEWED_BY_KEY = 'event-viewedBy' as const;
+
+/**
+ * Mark an event as viewed by a user.
+ */
+export function markEventAsViewed(
+  ydoc: Y.Doc,
+  planId: string,
+  eventId: string,
+  username: string
+): void {
+  const viewedByRoot = ydoc.getMap(PLAN_INDEX_EVENT_VIEWED_BY_KEY);
+  let planEvents = viewedByRoot.get(planId) as Y.Map<Y.Map<number>> | undefined;
+
+  if (!planEvents) {
+    planEvents = new Y.Map();
+    viewedByRoot.set(planId, planEvents);
+  }
+
+  let eventViews = planEvents.get(eventId) as Y.Map<number> | undefined;
+  if (!eventViews) {
+    eventViews = new Y.Map();
+    planEvents.set(eventId, eventViews);
+  }
+
+  eventViews.set(username, Date.now());
+}
+
+/**
+ * Clear event viewed status for a user (mark as unread).
+ */
+export function clearEventViewedBy(
+  ydoc: Y.Doc,
+  planId: string,
+  eventId: string,
+  username: string
+): void {
+  const viewedByRoot = ydoc.getMap(PLAN_INDEX_EVENT_VIEWED_BY_KEY);
+  const planEvents = viewedByRoot.get(planId) as Y.Map<Y.Map<number>> | undefined;
+
+  if (!planEvents) return;
+
+  const eventViews = planEvents.get(eventId) as Y.Map<number> | undefined;
+  if (!eventViews) return;
+
+  eventViews.delete(username);
+}
+
+/**
+ * Check if an event is unread for a user.
+ */
+export function isEventUnread(
+  ydoc: Y.Doc,
+  planId: string,
+  eventId: string,
+  username: string
+): boolean {
+  const viewedByRoot = ydoc.getMap(PLAN_INDEX_EVENT_VIEWED_BY_KEY);
+  const planEvents = viewedByRoot.get(planId) as Y.Map<Y.Map<number>> | undefined;
+  if (!planEvents) return true;
+
+  const eventViews = planEvents.get(eventId) as Y.Map<number> | undefined;
+  if (!eventViews) return true;
+
+  return !eventViews.has(username);
+}
+
+/**
+ * Get all event viewedBy data for a plan.
+ * Returns map of eventId -> (username -> timestamp).
+ */
+export function getAllEventViewedByForPlan(
+  ydoc: Y.Doc,
+  planId: string
+): Record<string, Record<string, number>> {
+  const viewedByRoot = ydoc.getMap(PLAN_INDEX_EVENT_VIEWED_BY_KEY);
+  const planEvents = viewedByRoot.get(planId) as Y.Map<Y.Map<number>> | undefined;
+
+  if (!planEvents) return {};
+
+  const result: Record<string, Record<string, number>> = {};
+
+  for (const [eventId, eventViews] of planEvents.entries()) {
+    const views = eventViews as Y.Map<number>;
+    result[eventId] = Object.fromEntries(views.entries());
+  }
+
+  return result;
+}

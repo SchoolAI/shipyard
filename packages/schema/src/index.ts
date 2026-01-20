@@ -210,11 +210,16 @@ export {
   PlanIndexEntrySchema,
 } from './plan-index.js';
 export {
+  clearEventViewedBy,
   clearPlanIndexViewedBy,
+  getAllEventViewedByForPlan,
   getAllViewedByFromIndex,
   getPlanIndex,
   getPlanIndexEntry,
   getViewedByFromIndex,
+  isEventUnread,
+  markEventAsViewed,
+  PLAN_INDEX_EVENT_VIEWED_BY_KEY,
   removePlanIndexEntry,
   removeViewedByFromIndex,
   setPlanIndexEntry,

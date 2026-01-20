@@ -28,7 +28,11 @@ export function AuthChoiceModal({
           <Card>
             <Card.Header>
               <div className="flex flex-col items-center mb-2">
-                <img src={`${import.meta.env.BASE_URL}icon.svg`} alt="Shipyard" className="w-12 h-12 mb-3 opacity-90" />
+                <img
+                  src={`${import.meta.env.BASE_URL}icon.svg`}
+                  alt="Shipyard"
+                  className="w-12 h-12 mb-3 opacity-90"
+                />
                 <h2 className="text-xl font-semibold">Sign in to Shipyard</h2>
               </div>
               <p className="text-sm text-muted-foreground mt-1 text-center">

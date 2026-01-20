@@ -55,7 +55,11 @@ export function MobileHeader({
       </Button>
 
       <div className="flex items-center gap-1.5 flex-1 min-w-0">
-        <img src={`${import.meta.env.BASE_URL}icon.svg`} alt="Shipyard" className="w-4 h-4 shrink-0" />
+        <img
+          src={`${import.meta.env.BASE_URL}icon.svg`}
+          alt="Shipyard"
+          className="w-4 h-4 shrink-0"
+        />
         <h1 className="text-xs font-semibold text-foreground truncate">{title}</h1>
       </div>
 
