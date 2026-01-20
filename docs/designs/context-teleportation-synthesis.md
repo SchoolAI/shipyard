@@ -710,12 +710,12 @@ POST https://external-system.com/webhook
 **Example orchestrator logic:**
 ```typescript
 // Orchestrator reads agent cards
-const peerPlanCard = await fetch('https://shipyard.app/.well-known/agent-card.json');
+const shipyardCard = await fetch('https://shipyard.app/.well-known/agent-card.json');
 const claudeCard = await fetch('https://claude.ai/.well-known/agent-card.json');
 
 // Routes planning task to shipyard
 if (task.type === 'collaborative_planning') {
-  await sendMessage(peerPlanCard.uri, task);
+  await sendMessage(shipyardCard.uri, task);
 }
 ```
 
