@@ -271,18 +271,18 @@ export function InboxPage() {
     setInboxShowRead(value);
   }, []);
 
-  // Filter inbox plans with selection awareness
+  // Filter inbox plans - inbox list is source of truth
   const sortedInboxPlans = useMemo(() => {
     const filtered = allInboxPlans.filter((plan) => {
       // Show all plans when toggle is ON
       if (showRead) return true;
 
-      // Show unread plans OR currently selected plan
-      return plan.isUnread || plan.id === selectedPlanId;
+      // Only show unread plans (no special case for selected items)
+      return plan.isUnread;
     });
 
     return filtered.sort((a, b) => b.updatedAt - a.updatedAt);
-  }, [allInboxPlans, showRead, selectedPlanId]);
+  }, [allInboxPlans, showRead]);
 
   // Group inbox items by category
   const inboxGroups = useMemo(() => {
@@ -302,6 +302,13 @@ export function InboxPage() {
       ),
     };
   }, [sortedInboxPlans, eventBasedInbox]);
+
+  // Auto-deselect if selected plan is no longer in inbox (marked as read)
+  useEffect(() => {
+    if (selectedPlanId && !sortedInboxPlans.find((p) => p.id === selectedPlanId)) {
+      setSelectedPlanId(null);
+    }
+  }, [selectedPlanId, sortedInboxPlans]);
 
   // Update URL when panel state changes
   useEffect(() => {
