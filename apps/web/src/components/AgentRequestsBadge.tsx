@@ -2,7 +2,6 @@ import { Chip } from '@heroui/react';
 import { getPlanEvents, getPlanMetadata, YDOC_KEYS } from '@peer-plan/schema';
 import { AlertOctagon, HelpCircle } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
 import type * as Y from 'yjs';
 
 interface AgentRequestsBadgeProps {
@@ -10,9 +9,15 @@ interface AgentRequestsBadgeProps {
   isSnapshot?: boolean;
 }
 
+/**
+ * Custom event to switch the PlanContent tab.
+ * Dispatched by badge clicks, listened to by PlanContent.
+ */
+export type SwitchTabEventDetail = {
+  tab: 'plan' | 'activity' | 'deliverables' | 'changes';
+};
+
 export function AgentRequestsBadge({ ydoc, isSnapshot = false }: AgentRequestsBadgeProps) {
-  const navigate = useNavigate();
-  const location = useLocation();
   const [counts, setCounts] = useState<{
     help: number;
     blocker: number;
@@ -21,14 +26,12 @@ export function AgentRequestsBadge({ ydoc, isSnapshot = false }: AgentRequestsBa
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
 
-    // Get plan ID from metadata to construct URL
-    const metadata = getPlanMetadata(ydoc);
-    if (!metadata) return;
-
-    // Navigate to activity tab
-    const searchParams = new URLSearchParams(location.search);
-    searchParams.set('tab', 'activity');
-    navigate(`/plan/${metadata.id}?${searchParams.toString()}`);
+    // Dispatch custom event to switch tab - PlanContent listens for this
+    const event = new CustomEvent<SwitchTabEventDetail>('switch-plan-tab', {
+      detail: { tab: 'activity' },
+      bubbles: true,
+    });
+    document.dispatchEvent(event);
   };
 
   useEffect(() => {

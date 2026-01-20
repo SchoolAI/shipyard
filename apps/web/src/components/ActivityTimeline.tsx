@@ -1,5 +1,5 @@
 import { getPlanEvents, type PlanEvent, YDOC_KEYS } from '@peer-plan/schema';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type * as Y from 'yjs';
 import { ActivityEvent } from '@/components/ActivityEvent';
 
@@ -39,6 +39,37 @@ function groupEventsByDay(events: PlanEvent[]): Record<DayGroup, PlanEvent[]> {
   return groups;
 }
 
+/**
+ * Build a set of resolved request IDs from agent_activity events.
+ * Used to determine which help_request/blocker events are still unresolved.
+ */
+function getResolvedRequestIds(events: PlanEvent[]): Set<string> {
+  const resolvedIds = new Set<string>();
+
+  for (const event of events) {
+    if (event.type !== 'agent_activity') continue;
+
+    const { activityType } = event.data;
+    if (activityType === 'help_request_resolved' || activityType === 'blocker_resolved') {
+      resolvedIds.add(event.data.requestId);
+    }
+  }
+
+  return resolvedIds;
+}
+
+/**
+ * Check if an event is an unresolved help_request or blocker.
+ */
+function isUnresolvedRequest(event: PlanEvent, resolvedIds: Set<string>): boolean {
+  if (event.type !== 'agent_activity') return false;
+
+  const { activityType } = event.data;
+  if (activityType !== 'help_request' && activityType !== 'blocker') return false;
+
+  return !resolvedIds.has(event.data.requestId);
+}
+
 export function ActivityTimeline({ ydoc }: ActivityTimelineProps) {
   const [events, setEvents] = useState<PlanEvent[]>([]);
 
@@ -54,6 +85,9 @@ export function ActivityTimeline({ ydoc }: ActivityTimelineProps) {
     return () => eventsArray.unobserve(update);
   }, [ydoc]);
 
+  // Compute resolved request IDs once per render
+  const resolvedRequestIds = useMemo(() => getResolvedRequestIds(events), [events]);
+
   const grouped = groupEventsByDay(events);
   const dayOrder: DayGroup[] = ['Today', 'Yesterday', 'This Week', 'Earlier'];
   const nonEmptyGroups = dayOrder.filter((day) => grouped[day].length > 0);
@@ -65,7 +99,11 @@ export function ActivityTimeline({ ydoc }: ActivityTimelineProps) {
           <h3 className="text-xs font-semibold text-muted-foreground uppercase mb-3">{day}</h3>
           <div className="space-y-2">
             {grouped[day].map((event) => (
-              <ActivityEvent key={event.id} event={event} />
+              <ActivityEvent
+                key={event.id}
+                event={event}
+                isUnresolved={isUnresolvedRequest(event, resolvedRequestIds)}
+              />
             ))}
           </div>
         </div>

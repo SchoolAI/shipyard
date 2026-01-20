@@ -1,3 +1,4 @@
+import { Chip } from '@heroui/react';
 import {
   type AgentActivityData,
   assertNever,
@@ -28,6 +29,8 @@ import { formatRelativeTime } from '@/utils/formatters';
 
 interface ActivityEventProps {
   event: PlanEvent;
+  /** Whether this is an unresolved help_request or blocker that needs attention */
+  isUnresolved?: boolean;
 }
 
 /**
@@ -217,21 +220,45 @@ function getEventDescription(event: PlanEvent): string {
   }
 }
 
-export function ActivityEvent({ event }: ActivityEventProps) {
+/**
+ * Determine the highlight color for unresolved events.
+ * Blockers use danger (red), help requests use warning (yellow).
+ */
+function getUnresolvedHighlightColor(event: PlanEvent): 'danger' | 'warning' {
+  if (event.type !== 'agent_activity') return 'warning';
+  return event.data.activityType === 'blocker' ? 'danger' : 'warning';
+}
+
+export function ActivityEvent({ event, isUnresolved = false }: ActivityEventProps) {
   // Use special icon helper for agent_activity events
   const icon =
     event.type === 'agent_activity' ? getAgentActivityIcon(event.data) : getEventIcon(event.type);
   const description = getEventDescription(event);
 
+  // Determine styling based on unresolved status
+  const highlightColor = isUnresolved ? getUnresolvedHighlightColor(event) : null;
+  const borderClass = highlightColor
+    ? highlightColor === 'danger'
+      ? 'border-l-2 border-danger pl-3'
+      : 'border-l-2 border-warning pl-3'
+    : '';
+
   return (
-    <div className="flex gap-3 items-start">
+    <div className={`flex gap-3 items-start ${borderClass}`}>
       <div className="w-6 h-6 rounded-full bg-surface flex items-center justify-center shrink-0">
         {icon}
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm text-foreground">
-          <span className="font-medium">{event.actor}</span> {description}
-        </p>
+        <div className="flex items-center gap-2 flex-wrap">
+          <p className="text-sm text-foreground">
+            <span className="font-medium">{event.actor}</span> {description}
+          </p>
+          {isUnresolved && (
+            <Chip color={highlightColor ?? 'warning'} variant="soft" className="text-xs py-0">
+              Needs Resolution
+            </Chip>
+          )}
+        </div>
         <p className="text-xs text-muted-foreground mt-0.5">
           {formatRelativeTime(event.timestamp)}
         </p>

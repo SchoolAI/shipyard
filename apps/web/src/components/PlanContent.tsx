@@ -91,6 +91,19 @@ export function PlanContent(props: PlanContentProps) {
   const [activeView, setActiveView] = useState<ViewType>('plan');
   const [deliverableCount, setDeliverableCount] = useState({ completed: 0, total: 0 });
 
+  // Listen for external tab switch requests (e.g., from AgentRequestsBadge)
+  useEffect(() => {
+    const handleSwitchTab = (event: Event) => {
+      const customEvent = event as CustomEvent<{ tab: ViewType }>;
+      if (customEvent.detail?.tab) {
+        setActiveView(customEvent.detail.tab);
+      }
+    };
+
+    document.addEventListener('switch-plan-tab', handleSwitchTab);
+    return () => document.removeEventListener('switch-plan-tab', handleSwitchTab);
+  }, []);
+
   useEffect(() => {
     if (props.mode === 'snapshot') {
       const deliverables = extractDeliverables(props.initialContent as Block[]);
