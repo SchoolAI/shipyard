@@ -41,9 +41,10 @@ async function handlePlanStart(
       url: result.url,
     };
   } catch (err) {
-    // Logs go to: stderr (visible in Claude Code) + ~/.shipyard/hook-debug.log
-    // Fail open here because plan creation failure shouldn't block the agent's work.
-    // The agent can still proceed without shipyard features.
+    /**
+     * Fail open here because plan creation failure shouldn't block the agent's work.
+     * The agent can still proceed without shipyard features.
+     */
     logger.error({ err }, 'Failed to create plan');
     return { allow: true };
   }

@@ -75,4 +75,4 @@ export interface CoreResponse {
   denyReason?: string;
 }
 
-// Note: AgentPresence is re-exported from @shipyard/schema above
+// NOTE: AgentPresence is re-exported from @shipyard/schema above

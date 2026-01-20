@@ -26,8 +26,6 @@ export const CLAUDE_HOOK_EVENTS = {
   PERMISSION_REQUEST: 'PermissionRequest',
 } as const;
 
-// --- Defaults ---
-
 /**
  * Default agent type for shipyard hooks
  */

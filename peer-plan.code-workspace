@@ -3,10 +3,6 @@
     {
       "name": "shipyard",
       "path": "."
-    },
-    {
-      "name": "🌳📦 79-packaging",
-      "path": "../peer-plan-wt/79-packaging"
     }
   ]
 }

@@ -108,5 +108,4 @@ export async function updateContent(options: UpdateContentOptions): Promise<bool
   return true;
 }
 
-// --- Helpers ---
-// computeHash moved to @shipyard/shared
+// NOTE: computeHash moved to @shipyard/shared
