@@ -2,10 +2,7 @@ import {
   clearPlanIndexViewedBy,
   getAllViewedByFromIndex,
   getPlanIndex,
-  getPlanMetadata,
-  getPlanOwnerId,
   isPlanUnread,
-  NON_PLAN_DB_NAMES,
   PLAN_INDEX_DOC_NAME,
   PLAN_INDEX_VIEWED_BY_KEY,
   type PlanIndexEntry,
@@ -13,8 +10,6 @@ import {
   YDOC_KEYS,
 } from '@shipyard/schema';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { IndexeddbPersistence } from 'y-indexeddb';
-import * as Y from 'yjs';
 import { useMultiProviderSync } from './useMultiProviderSync';
 
 /** Type alias for viewedBy records: planId -> (username -> timestamp) */
@@ -114,9 +109,7 @@ export function usePlanIndex(currentUsername: string | undefined): PlanIndexStat
     archived: PlanIndexEntry[];
   }>({ active: [], archived: [] });
 
-  const [discoveredPlans, setDiscoveredPlans] = useState<PlanIndexEntry[]>([]);
   const [navigationTarget, setNavigationTarget] = useState<string | null>(null);
-  const lastDiscoveryKeyRef = useRef<string>('');
 
   // Per-plan viewedBy data for inbox unread filtering
   const [planViewedBy, setPlanViewedBy] = useState<Record<string, Record<string, number>>>({});
@@ -189,107 +182,11 @@ export function usePlanIndex(currentUsername: string | undefined): PlanIndexStat
     };
   }, [ydoc, syncState.idbSynced]);
 
-  useEffect(() => {
-    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
-    let isActive = true;
-
-    async function discoverIndexedDBPlans() {
-      try {
-        const databases = await indexedDB.databases();
-        if (!isActive) return;
-
-        const dbNames = databases.map((db) => db.name).filter((name): name is string => !!name);
-        const planIndexIds = new Set(allPlansData.active.map((p) => p.id));
-
-        const planDocIds = dbNames.filter(
-          (name) =>
-            !(NON_PLAN_DB_NAMES as readonly string[]).includes(name) && !planIndexIds.has(name)
-        );
-
-        const plans = await Promise.all(
-          // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Plan discovery from IndexedDB requires async iteration with filtering
-          planDocIds.map(async (id) => {
-            try {
-              const planDoc = new Y.Doc();
-              const idb = new IndexeddbPersistence(id, planDoc);
-              await idb.whenSynced;
-
-              if (!isActive) {
-                idb.destroy();
-                return null;
-              }
-
-              const metadata = getPlanMetadata(planDoc);
-              const ownerId = getPlanOwnerId(planDoc);
-              idb.destroy();
-
-              if (!metadata || !ownerId) {
-                return null;
-              }
-
-              if (metadata.archivedAt) {
-                return null;
-              }
-
-              return {
-                id: metadata.id,
-                title: metadata.title,
-                status: metadata.status,
-                createdAt: metadata.createdAt ?? Date.now(),
-                updatedAt: metadata.updatedAt ?? Date.now(),
-                ownerId,
-                deleted: false,
-              };
-            } catch {
-              return null;
-            }
-          })
-        );
-
-        if (!isActive) return;
-
-        const validPlans = plans.filter((p): p is PlanIndexEntry => p !== null);
-        setDiscoveredPlans(validPlans);
-      } catch {
-        if (isActive) {
-          setDiscoveredPlans([]);
-        }
-      }
-    }
-
-    const discoveryKey = `${allPlansData.active
-      .map((p) => p.id)
-      .sort()
-      .join(',')}|${currentUsername ?? ''}`;
-    if (lastDiscoveryKeyRef.current !== discoveryKey) {
-      lastDiscoveryKeyRef.current = discoveryKey;
-      discoverIndexedDBPlans();
-    }
-
-    const handlePlanSynced = () => {
-      if (debounceTimer) {
-        clearTimeout(debounceTimer);
-      }
-      // Reduced from 500ms to 100ms for faster discovery of new plans
-      debounceTimer = setTimeout(() => {
-        discoverIndexedDBPlans();
-      }, 100);
-    };
-
-    window.addEventListener('indexeddb-plan-synced', handlePlanSynced);
-    return () => {
-      isActive = false;
-      if (debounceTimer) {
-        clearTimeout(debounceTimer);
-      }
-      window.removeEventListener('indexeddb-plan-synced', handlePlanSynced);
-    };
-  }, [allPlansData.active, currentUsername]);
-
-  const allActivePlans = useMemo(
-    () => [...allPlansData.active, ...discoveredPlans],
-    [allPlansData.active, discoveredPlans]
-  );
+  /**
+   * All active plans from the plan-index CRDT.
+   * The plan-index is the single source of truth for plan discovery.
+   */
+  const allActivePlans = allPlansData.active;
 
   /**
    * Inbox shows plans that need attention:
