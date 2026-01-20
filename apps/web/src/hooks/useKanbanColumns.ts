@@ -10,11 +10,14 @@ import { assertNever } from '@/utils/assert-never';
 /** Column IDs - exhaustive list */
 export type ColumnId = 'draft' | 'in_review' | 'in_progress' | 'completed';
 
+/** Valid chip color types from HeroUI v3 */
+type ChipColor = 'default' | 'accent' | 'success' | 'warning' | 'danger';
+
 /** Column definition - extensible for future tag-based columns */
 export interface ColumnDefinition {
   id: ColumnId;
   label: string;
-  color: 'default' | 'warning' | 'success' | 'danger' | 'accent';
+  color: ChipColor;
   filter: (plan: PlanIndexEntry) => boolean;
 }
 
@@ -86,4 +89,72 @@ export function useKanbanColumns(plans: PlanIndexEntry[]): ColumnWithPlans[] {
       plans: activePlans.filter(column.filter).sort((a, b) => b.updatedAt - a.updatedAt), // Most recent first
     }));
   }, [plans]);
+}
+
+/** Tag column definition - same as ColumnDefinition but with string id */
+export interface TagColumnDefinition {
+  id: string;
+  label: string;
+  color: ChipColor;
+  filter: (plan: PlanIndexEntry) => boolean;
+  plans: PlanIndexEntry[];
+}
+
+/**
+ * Hook to group plans into Kanban columns by tags.
+ * Creates one column per unique tag, plus "Untagged" column.
+ * Plans can appear in multiple columns (non-exclusive).
+ *
+ * @param plans - All plans to group
+ * @param selectedTags - Optional array of tags to show as columns (empty = show all tags)
+ * @returns Array of columns with their plans, sorted by updatedAt within each column
+ */
+export function useTagColumns(
+  plans: PlanIndexEntry[],
+  selectedTags?: string[]
+): TagColumnDefinition[] {
+  return useMemo(() => {
+    const activePlans = plans.filter((p) => !p.deleted);
+
+    // Collect all unique tags from active plans
+    const allTags = new Set<string>();
+    for (const plan of activePlans) {
+      if (plan.tags) {
+        for (const tag of plan.tags) {
+          allTags.add(tag);
+        }
+      }
+    }
+
+    // Filter to selected tags if provided
+    const tagsToShow =
+      selectedTags && selectedTags.length > 0
+        ? selectedTags.filter((t) => allTags.has(t))
+        : Array.from(allTags).sort();
+
+    // Create column for each tag
+    const tagColumns: TagColumnDefinition[] = tagsToShow.map((tag) => ({
+      id: `tag-${tag}`,
+      label: tag,
+      color: 'accent',
+      filter: (p: PlanIndexEntry) => p.tags?.includes(tag) ?? false,
+      plans: activePlans
+        .filter((p) => p.tags?.includes(tag))
+        .sort((a, b) => b.updatedAt - a.updatedAt),
+    }));
+
+    // Add "Untagged" column at the end
+    const untaggedPlans = activePlans.filter((p) => !p.tags || p.tags.length === 0);
+    if (untaggedPlans.length > 0) {
+      tagColumns.push({
+        id: 'untagged',
+        label: 'Untagged',
+        color: 'default',
+        filter: (p: PlanIndexEntry) => !p.tags || p.tags.length === 0,
+        plans: untaggedPlans.sort((a, b) => b.updatedAt - a.updatedAt),
+      });
+    }
+
+    return tagColumns;
+  }, [plans, selectedTags]);
 }

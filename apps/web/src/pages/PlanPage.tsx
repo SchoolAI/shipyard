@@ -11,6 +11,7 @@ import {
   PLAN_INDEX_DOC_NAME,
   type PlanMetadata,
   setPlanIndexEntry,
+  setPlanMetadata,
   YDOC_KEYS,
 } from '@peer-plan/schema';
 import { LogIn } from 'lucide-react';
@@ -32,6 +33,7 @@ import { useGitHubAuth } from '@/hooks/useGitHubAuth';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { useMultiProviderSync } from '@/hooks/useMultiProviderSync';
 import { usePendingUserNotifications } from '@/hooks/usePendingUserNotifications';
+import { usePlanIndex } from '@/hooks/usePlanIndex';
 import { useVersionNavigation } from '@/hooks/useVersionNavigation';
 import { colorFromString } from '@/utils/color';
 
@@ -96,6 +98,11 @@ export function PlanPage() {
     : null;
 
   const { ydoc: indexDoc } = useMultiProviderSync(PLAN_INDEX_DOC_NAME);
+  const { myPlans, sharedPlans, inboxPlans } = usePlanIndex(githubIdentity?.username);
+  const allPlans = useMemo(
+    () => [...myPlans, ...sharedPlans, ...inboxPlans],
+    [myPlans, sharedPlans, inboxPlans]
+  );
 
   // Prefer WebSocket provider when connected, fall back to WebRTC for P2P-only mode.
   const activeProvider = isSnapshot ? null : (wsProvider ?? rtcProvider);
@@ -228,6 +235,26 @@ export function PlanPage() {
       });
     },
     [indexDoc, planId, metadata]
+  );
+
+  const handleTagsChange = useCallback(
+    (newTags: string[]) => {
+      if (!metadata || isSnapshot) return;
+
+      // Update plan metadata
+      setPlanMetadata(ydoc, { tags: newTags }, githubIdentity?.username);
+
+      // Update plan index entry
+      const existingEntry = getPlanIndexEntry(indexDoc, planId);
+      if (existingEntry) {
+        setPlanIndexEntry(indexDoc, {
+          ...existingEntry,
+          tags: newTags,
+          updatedAt: Date.now(),
+        });
+      }
+    },
+    [ydoc, indexDoc, planId, metadata, githubIdentity?.username, isSnapshot]
   );
 
   // Mark plan as deleted in index if metadata is missing after sync.
@@ -377,6 +404,8 @@ export function PlanPage() {
               isSnapshot={isSnapshot}
               rtcProvider={rtcProvider}
               editor={editor}
+              onTagsChange={handleTagsChange}
+              allPlans={allPlans}
             />
           </div>
         )}

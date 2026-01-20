@@ -18,6 +18,8 @@ export interface ViewPreferences {
   sortDirection: 'asc' | 'desc';
   /** Active status filters (empty = show all) */
   statusFilters: PlanStatusType[];
+  /** Active tag filters (empty = show all, OR logic) */
+  tagFilters: string[];
 }
 
 // --- Storage Keys ---
@@ -71,6 +73,7 @@ const DEFAULT_VIEW_PREFERENCES: ViewPreferences = {
   sortBy: 'updated',
   sortDirection: 'desc',
   statusFilters: [],
+  tagFilters: [],
 };
 
 /** Get view preferences from localStorage */
@@ -85,6 +88,7 @@ export function getViewPreferences(): ViewPreferences {
       sortBy: parsed.sortBy ?? DEFAULT_VIEW_PREFERENCES.sortBy,
       sortDirection: parsed.sortDirection ?? DEFAULT_VIEW_PREFERENCES.sortDirection,
       statusFilters: parsed.statusFilters ?? DEFAULT_VIEW_PREFERENCES.statusFilters,
+      tagFilters: parsed.tagFilters ?? DEFAULT_VIEW_PREFERENCES.tagFilters,
     };
   } catch {
     return DEFAULT_VIEW_PREFERENCES;

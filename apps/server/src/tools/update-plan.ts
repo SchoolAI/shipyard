@@ -23,6 +23,7 @@ const UpdatePlanInput = z.object({
     .enum(['draft', 'pending_review', 'changes_requested', 'in_progress', 'completed'])
     .optional()
     .describe('New status'),
+  tags: z.array(z.string()).optional().describe('Updated tags (replaces existing tags)'),
 });
 
 export const updatePlanTool = {
@@ -58,6 +59,11 @@ STATUSES:
           enum: ['draft', 'pending_review', 'changes_requested', 'in_progress', 'completed'],
           description:
             "New status (optional). Use 'pending_review' to signal ready for human feedback.",
+        },
+        tags: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Updated tags (optional, replaces existing tags)',
         },
       },
       required: ['planId', 'sessionToken'],
@@ -100,11 +106,13 @@ STATUSES:
       };
     }
 
-    const updates: { title?: string; status?: PlanStatusType; updatedAt: number } = {
-      updatedAt: Date.now(),
-    };
+    const updates: { title?: string; status?: PlanStatusType; tags?: string[]; updatedAt: number } =
+      {
+        updatedAt: Date.now(),
+      };
     if (input.title) updates.title = input.title;
     if (input.status) updates.status = input.status;
+    if (input.tags !== undefined) updates.tags = input.tags;
 
     const statusChanged = input.status && input.status !== existingMetadata.status;
 
@@ -130,6 +138,7 @@ STATUSES:
         createdAt: existingMetadata.createdAt ?? Date.now(),
         updatedAt: Date.now(),
         ownerId: existingMetadata.ownerId,
+        tags: input.tags ?? existingMetadata.tags,
         deleted: false,
       });
     } else {

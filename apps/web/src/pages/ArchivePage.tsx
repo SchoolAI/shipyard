@@ -14,6 +14,7 @@ import { IndexeddbPersistence } from 'y-indexeddb';
 import * as Y from 'yjs';
 import { InlinePlanDetail } from '@/components/InlinePlanDetail';
 import { OfflineBanner } from '@/components/OfflineBanner';
+import { TagChip } from '@/components/TagChip';
 import { TwoColumnSkeleton } from '@/components/ui/TwoColumnSkeleton';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
@@ -32,9 +33,22 @@ function ArchiveItem({ plan, onUnarchive }: ArchiveItemProps) {
     <div className="flex items-center justify-between gap-3 w-full py-2">
       <div className="flex flex-col gap-1 flex-1 min-w-0">
         <span className="font-medium text-foreground truncate opacity-70">{plan.title}</span>
-        <span className="text-xs text-muted-foreground">
-          Archived {formatRelativeTime(plan.deleted ? plan.deletedAt : plan.updatedAt)}
-        </span>
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-xs text-muted-foreground">
+            Archived {formatRelativeTime(plan.deleted ? plan.deletedAt : plan.updatedAt)}
+          </span>
+          {/* Show first 3 tags */}
+          {plan.tags && plan.tags.length > 0 && (
+            <div className="flex gap-1 items-center">
+              {plan.tags.slice(0, 3).map((tag) => (
+                <TagChip key={tag} tag={tag} size="sm" />
+              ))}
+              {plan.tags.length > 3 && (
+                <span className="text-xs text-muted-foreground">+{plan.tags.length - 3}</span>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       <Button

@@ -46,6 +46,7 @@ export interface PlanMetadataBaseUpdate {
   viewedBy?: Record<string, number>;
   conversationVersions?: ConversationVersion[];
   events?: PlanEvent[];
+  tags?: string[];
 }
 
 /**
@@ -283,6 +284,7 @@ export interface InitPlanMetadataParams {
   approvalRequired?: boolean;
   sessionTokenHash?: string;
   origin?: OriginMetadata;
+  tags?: string[];
 }
 
 export function initPlanMetadata(ydoc: Y.Doc, init: InitPlanMetadataParams): void {
@@ -311,6 +313,11 @@ export function initPlanMetadata(ydoc: Y.Doc, init: InitPlanMetadataParams): voi
   // Origin tracking for conversation export (Issue #41)
   if (init.origin) {
     map.set('origin', init.origin);
+  }
+
+  // Tags for organization (Issue #37)
+  if (init.tags) {
+    map.set('tags', init.tags);
   }
 
   // Validate final state after initialization
@@ -1027,4 +1034,65 @@ export function getLatestSnapshot(ydoc: Y.Doc): PlanSnapshot | null {
   const snapshots = getSnapshots(ydoc);
   if (snapshots.length === 0) return null;
   return snapshots[snapshots.length - 1] ?? null;
+}
+
+// --- Tag Management (Issue #37) ---
+
+/**
+ * Add a tag to a plan (automatically normalizes and deduplicates).
+ * Tags are normalized to lowercase and trimmed to prevent duplicates.
+ */
+export function addPlanTag(ydoc: Y.Doc, tag: string, actor?: string): void {
+  ydoc.transact(
+    () => {
+      const map = ydoc.getMap('metadata');
+      const currentTags = (map.get('tags') as string[]) || [];
+
+      // Normalize tag (lowercase, trim whitespace)
+      const normalizedTag = tag.toLowerCase().trim();
+      if (!normalizedTag || currentTags.includes(normalizedTag)) return;
+
+      map.set('tags', [...currentTags, normalizedTag]);
+      map.set('updatedAt', Date.now());
+    },
+    actor ? { actor } : undefined
+  );
+}
+
+/**
+ * Remove a tag from a plan.
+ */
+export function removePlanTag(ydoc: Y.Doc, tag: string, actor?: string): void {
+  ydoc.transact(
+    () => {
+      const map = ydoc.getMap('metadata');
+      const currentTags = (map.get('tags') as string[]) || [];
+      const normalizedTag = tag.toLowerCase().trim();
+
+      map.set(
+        'tags',
+        currentTags.filter((t) => t !== normalizedTag)
+      );
+      map.set('updatedAt', Date.now());
+    },
+    actor ? { actor } : undefined
+  );
+}
+
+/**
+ * Get all unique tags from a list of plan index entries (for autocomplete).
+ * Returns sorted array of unique tags.
+ */
+export function getAllTagsFromIndex(indexEntries: Array<{ tags?: string[] }>): string[] {
+  const tagSet = new Set<string>();
+
+  for (const entry of indexEntries) {
+    if (entry.tags) {
+      for (const tag of entry.tags) {
+        tagSet.add(tag);
+      }
+    }
+  }
+
+  return Array.from(tagSet).sort();
 }

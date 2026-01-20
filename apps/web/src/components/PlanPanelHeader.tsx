@@ -9,6 +9,7 @@ import { AlertTriangle, Check, Clock } from 'lucide-react';
 import { assertNever } from '../utils/assert-never';
 import { PanelControlButtons } from './PanelControlButtons';
 import type { PanelWidth } from './PlanPanel';
+import { TagChip } from './TagChip';
 
 export interface PlanPanelHeaderProps {
   /** Plan metadata */
@@ -123,6 +124,18 @@ export function PlanPanelHeader({
               {statusConfig.icon}
               {statusConfig.label}
             </Chip>
+          )}
+
+          {/* Tags */}
+          {metadata.tags && metadata.tags.length > 0 && (
+            <div className="flex gap-1 items-center flex-wrap">
+              {metadata.tags.slice(0, 3).map((tag) => (
+                <TagChip key={tag} tag={tag} size="sm" />
+              ))}
+              {metadata.tags.length > 3 && (
+                <span className="text-xs text-muted-foreground">+{metadata.tags.length - 3}</span>
+              )}
+            </div>
           )}
 
           {/* Progress and activity on same line */}

@@ -44,6 +44,12 @@ const CreatePlanInput = z.object({
     .record(z.string(), z.unknown())
     .optional()
     .describe('Platform-specific metadata for conversation export'),
+
+  // Tags for organization (Issue #37)
+  tags: z
+    .array(z.string())
+    .optional()
+    .describe('Tags for categorization (e.g., ["ui", "bug", "project:mobile-app"])'),
 });
 
 // --- Helper Functions ---
@@ -173,6 +179,12 @@ Bad deliverables (not provable):
           type: 'object',
           description: 'Platform-specific metadata for conversation export.',
         },
+        tags: {
+          type: 'array',
+          items: { type: 'string' },
+          description:
+            'Tags for categorization (e.g., ["ui", "bug", "project:mobile-app"]). Use conventions like "project:name" for grouping.',
+        },
       },
       required: ['title', 'content'],
     },
@@ -212,6 +224,7 @@ Bad deliverables (not provable):
       ownerId,
       sessionTokenHash,
       origin,
+      tags: input.tags,
     });
 
     // Transition from draft to pending_review so plan appears in inbox
@@ -249,6 +262,7 @@ Bad deliverables (not provable):
       createdAt: now,
       updatedAt: finalMetadata.updatedAt,
       ownerId,
+      tags: input.tags,
       deleted: false,
     });
     logger.info({ planId }, 'Plan index updated');
