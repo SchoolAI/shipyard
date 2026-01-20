@@ -356,6 +356,7 @@ export function useMultiProviderSync(
     // This fixes P2P transfers failing with "Peer not found" because
     // webrtcPeerId was undefined when awareness was first set
     let roomPeerIdWatcher: ReturnType<typeof setInterval> | null = null;
+    let signalingOpenWatcher: ReturnType<typeof setInterval> | null = null;
 
     function startWatchingForRoomPeerId() {
       if (!rtc) return;
@@ -379,6 +380,54 @@ export function useMultiProviderSync(
           }
         }
       }, 100); // Check every 100ms until room is ready
+    }
+
+    // Watch for signaling WebSocket to open, then send identity
+    // Fixes "unauthenticated" error when WebSocket wasn't ready during initial send
+    // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Polling with early returns
+    function startWatchingForSignalingOpen() {
+      if (!rtc || !githubIdentity) return;
+
+      const signalingConns = (rtc as unknown as { signalingConns: Array<{ ws: WebSocket }> })
+        .signalingConns;
+
+      if (!signalingConns || signalingConns.length === 0) return;
+
+      // Check immediately if any connection is already open
+      for (const conn of signalingConns) {
+        if (conn.ws && conn.ws.readyState === WebSocket.OPEN) {
+          return; // Already connected, sendUserIdentityToSignaling already ran
+        }
+      }
+
+      // Poll until at least one signaling WebSocket is open
+      let attempts = 0;
+      const maxAttempts = 100; // 10 seconds max
+      // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Polling until WebSocket ready
+      signalingOpenWatcher = setInterval(() => {
+        attempts++;
+
+        if (attempts > maxAttempts) {
+          if (signalingOpenWatcher) {
+            clearInterval(signalingOpenWatcher);
+            signalingOpenWatcher = null;
+          }
+          return;
+        }
+
+        for (const conn of signalingConns) {
+          if (conn.ws && conn.ws.readyState === WebSocket.OPEN) {
+            // WebSocket is now open - send identity and approval
+            sendUserIdentityToSignaling();
+            pushApprovalStateToSignaling();
+            if (signalingOpenWatcher) {
+              clearInterval(signalingOpenWatcher);
+              signalingOpenWatcher = null;
+            }
+            return;
+          }
+        }
+      }, 100);
     }
 
     function updateApprovalStatus() {
@@ -467,12 +516,14 @@ export function useMultiProviderSync(
     // Set initial awareness state when GitHub identity is available
     if (githubIdentity && rtc) {
       updateApprovalStatus();
-      // Send user identity and approval state immediately
+      // Send user identity and approval state immediately (or when WebSocket opens)
       // No delay - we need this before any WebRTC messages are relayed
       sendUserIdentityToSignaling();
       pushApprovalStateToSignaling();
       // Watch for room.peerId to become available (fixes P2P transfer "Peer not found")
       startWatchingForRoomPeerId();
+      // Retry sending identity until WebSocket is open (fixes "unauthenticated" error)
+      startWatchingForSignalingOpen();
     }
 
     function updateSyncState() {
@@ -507,6 +558,10 @@ export function useMultiProviderSync(
       if (roomPeerIdWatcher) {
         clearInterval(roomPeerIdWatcher);
         roomPeerIdWatcher = null;
+      }
+      if (signalingOpenWatcher) {
+        clearInterval(signalingOpenWatcher);
+        signalingOpenWatcher = null;
       }
       if (rtc) {
         // Clear awareness before destroying so other peers see us leave
