@@ -213,13 +213,19 @@ Bad deliverables (not provable):
 
     logger.info('Content stored in Y.Doc document fragment');
 
+    // Get the final metadata after status transition to ensure consistent timestamps
+    const finalMetadata = getPlanMetadata(ydoc);
+    if (!finalMetadata) {
+      throw new Error('Failed to get plan metadata after initialization');
+    }
+
     const indexDoc = await getOrCreateDoc(PLAN_INDEX_DOC_NAME);
     setPlanIndexEntry(indexDoc, {
       id: planId,
       title: input.title,
       status: 'pending_review',
       createdAt: now,
-      updatedAt: now,
+      updatedAt: finalMetadata.updatedAt, // Use actual updatedAt from Y.Doc
       ownerId,
       deleted: false,
     });

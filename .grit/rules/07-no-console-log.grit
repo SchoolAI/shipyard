@@ -1,0 +1,13 @@
+language js
+
+// Rule: No console.log (use logger instead)
+// Rationale: console.log doesn't work in production, can't be filtered, and leaks to stdout in MCP.
+// Exception: Already have biome.json overrides for scripts/ and test files.
+
+`console.log($args)` where {
+  register_diagnostic(
+    span = $args,
+    message = "Use logger.debug() instead of console.log(). Console logs leak to stdout in MCP and can't be filtered in production.",
+    severity = "error"
+  )
+}

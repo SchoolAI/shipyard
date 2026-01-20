@@ -1,0 +1,17 @@
+language js
+
+// Rule: No biome-ignore suppressions
+// Rationale: AI should fix the underlying issue, not suppress warnings.
+// Exception: None. If a rule is wrong, disable it in biome.json with a comment explaining why.
+
+or {
+  `// biome-ignore` as $comment,
+  `// biome-ignore-start` as $comment,
+  `// biome-ignore-all` as $comment
+} where {
+  register_diagnostic(
+    span = $comment,
+    message = "biome-ignore suppressions are not allowed. Fix the underlying issue or disable the rule in biome.json.",
+    severity = "error"
+  )
+}

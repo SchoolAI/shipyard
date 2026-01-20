@@ -309,9 +309,12 @@ export function usePlanIndex(currentUsername: string | undefined): PlanIndexStat
     let isActive = true;
 
     function loadViewedByFromPlanIndex() {
-      if (!currentUsername || inboxCandidates.length === 0) {
-        setPlanViewedBy({});
-        return;
+      if (!currentUsername) {
+        return; // Don't clear state - just skip loading
+      }
+
+      if (inboxCandidates.length === 0) {
+        return; // Don't clear state for empty candidates
       }
 
       const planIds = inboxCandidates.map((p) => p.id);
