@@ -303,9 +303,6 @@ function EventInboxItem({ item, onView, onMarkRead, onMarkUnread }: EventInboxIt
 
   const handleClick = () => {
     onView(plan.id, getTargetTab(event));
-    if (isUnread) {
-      onMarkRead(plan.id, event.id);
-    }
   };
 
   const expandedMessage =
@@ -360,7 +357,7 @@ function EventInboxItem({ item, onView, onMarkRead, onMarkUnread }: EventInboxIt
                 isUnread ? onMarkRead(plan.id, event.id) : onMarkUnread(plan.id, event.id);
               }}
             >
-              {isUnread ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+              {isUnread ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </Button>
           </Tooltip.Trigger>
           <Tooltip.Content>{isUnread ? 'Mark as read' : 'Mark as unread'}</Tooltip.Content>

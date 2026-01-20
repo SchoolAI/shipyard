@@ -36,30 +36,23 @@ export function BaseInboxCard({
   actions,
 }: BaseInboxCardProps) {
   return (
-    <button
-      type="button"
-      className={`flex items-center justify-between gap-3 w-full py-2 px-3 hover:bg-surface-hover transition-colors rounded-md text-left ${
-        isUnread ? 'opacity-100' : 'opacity-60'
-      }`}
-      onClick={onClick}
-    >
-      <div className="flex flex-col gap-1 flex-1 min-w-0">
+    <div className="flex items-center justify-between gap-3 w-full py-2 px-3 rounded-md">
+      <button
+        type="button"
+        className={`flex flex-col gap-1 flex-1 min-w-0 cursor-pointer hover:opacity-80 transition-opacity text-left ${
+          isUnread ? 'opacity-100' : 'opacity-60'
+        }`}
+        onClick={onClick}
+      >
         <span className="font-medium text-foreground truncate">{title}</span>
         <div className="flex items-center gap-2 flex-wrap">
           {badge}
           {metadata}
         </div>
         {expandedContent}
-      </div>
+      </button>
 
-      {actions && (
-        <div
-          className="flex items-center gap-1 shrink-0"
-          onClickCapture={(e) => e.stopPropagation()}
-        >
-          {actions}
-        </div>
-      )}
-    </button>
+      {actions && <div className="flex items-center gap-1 shrink-0">{actions}</div>}
+    </div>
   );
 }
