@@ -20,6 +20,13 @@ export const PlanStatusValues = [
 export type PlanStatusType = (typeof PlanStatusValues)[number];
 
 /**
+ * Valid tab/view types for plan content display.
+ * Used for tab navigation in PlanContent component and URL routing.
+ */
+export const PlanViewTabValues = ['plan', 'activity', 'deliverables', 'changes'] as const;
+export type PlanViewTab = (typeof PlanViewTabValues)[number];
+
+/**
  * Supported origin platforms for conversation export.
  * Used to identify where a plan/conversation originated.
  */

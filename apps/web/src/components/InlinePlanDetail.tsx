@@ -3,8 +3,15 @@
  * Used by InboxPage, ArchivePage, and SearchPage for consistent plan viewing.
  */
 
+import type { BlockNoteEditor } from '@blocknote/core';
 import { Spinner } from '@heroui/react';
-import { getDeliverables, getPlanMetadata, type PlanMetadata, YDOC_KEYS } from '@shipyard/schema';
+import {
+  getDeliverables,
+  getPlanMetadata,
+  type PlanMetadata,
+  type PlanViewTab,
+  YDOC_KEYS,
+} from '@shipyard/schema';
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type * as Y from 'yjs';
@@ -27,6 +34,8 @@ export interface PlanActionContext {
 export interface InlinePlanDetailProps {
   /** Plan ID to display, null if no plan selected */
   planId: string | null;
+  /** Initial tab to show when plan loads (defaults to 'plan') */
+  initialTab?: PlanViewTab;
   /** Called when panel should close */
   onClose: () => void;
   /** Called when approve action is triggered. Receives plan context. If not provided, navigates to plan page. */
@@ -47,6 +56,7 @@ export interface InlinePlanDetailProps {
  */
 export function InlinePlanDetail({
   planId,
+  initialTab,
   onClose,
   onApprove,
   onRequestChanges,
@@ -62,6 +72,7 @@ export function InlinePlanDetail({
   const [panelDeliverableStats, setPanelDeliverableStats] = useState({ completed: 0, total: 0 });
   const [panelLastActivity, setPanelLastActivity] = useState('');
   const [loadTimeout, setLoadTimeout] = useState(false);
+  const [editor, setEditor] = useState<BlockNoteEditor | null>(null);
 
   // Sync providers for selected plan
   const {
@@ -128,6 +139,11 @@ export function InlinePlanDetail({
     startAuth();
   }, [startAuth]);
 
+  // Store editor instance when ready (for ReviewActions)
+  const handleEditorReady = useCallback((editorInstance: BlockNoteEditor) => {
+    setEditor(editorInstance);
+  }, []);
+
   // Navigate to full plan page
   const handleFullScreen = useCallback(() => {
     if (planId) {
@@ -171,6 +187,11 @@ export function InlinePlanDetail({
           onExpand={onExpand}
           onFullScreen={handleFullScreen}
           width={width}
+          // Props for ReviewActions (comment popover support)
+          ydoc={panelYdoc}
+          identity={identity}
+          onRequestIdentity={handleRequestIdentity}
+          editor={editor}
         />
         <div className="flex-1 overflow-y-auto">
           <PlanContent
@@ -181,6 +202,8 @@ export function InlinePlanDetail({
             identity={identity}
             onRequestIdentity={handleRequestIdentity}
             provider={activeProvider}
+            initialTab={initialTab}
+            onEditorReady={handleEditorReady}
           />
         </div>
       </div>

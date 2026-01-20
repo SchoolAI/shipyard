@@ -5,11 +5,14 @@
 
 import { Accordion, Button, Chip, ListBox, ListBoxItem, Switch, Tooltip } from '@heroui/react';
 import {
+  assertNever,
   getPlanIndexEntry,
   type InputRequest,
   PLAN_INDEX_DOC_NAME,
+  type PlanEvent,
   type PlanIndexEntry,
   type PlanStatusType,
+  type PlanViewTab,
   setPlanIndexEntry,
   transitionPlanStatus,
 } from '@shipyard/schema';
@@ -187,7 +190,7 @@ function InboxItem({ plan, onApprove, onRequestChanges, onDismiss, onMarkUnread 
 
 interface EventInboxItemProps {
   item: InboxEventItem;
-  onView: (planId: string) => void;
+  onView: (planId: string, tab?: PlanViewTab) => void;
 }
 
 function EventInboxItem({ item, onView }: EventInboxItemProps) {
@@ -267,6 +270,40 @@ function EventInboxItem({ item, onView }: EventInboxItemProps) {
     }
   }
 
+  const getTargetTab = (evt: PlanEvent): PlanViewTab => {
+    switch (evt.type) {
+      case 'plan_created':
+      case 'comment_added':
+      case 'comment_resolved':
+      case 'content_edited':
+        return 'plan';
+      case 'deliverable_linked':
+      case 'step_completed':
+        return 'deliverables';
+      case 'pr_linked':
+      case 'conversation_imported':
+      case 'conversation_handed_off':
+      case 'conversation_exported':
+        return 'changes';
+      case 'status_changed':
+      case 'artifact_uploaded':
+      case 'approved':
+      case 'changes_requested':
+      case 'completed':
+      case 'plan_archived':
+      case 'plan_unarchived':
+      case 'plan_shared':
+      case 'approval_requested':
+      case 'input_request_created':
+      case 'input_request_answered':
+      case 'input_request_declined':
+      case 'agent_activity':
+        return 'activity';
+      default:
+        return assertNever(evt);
+    }
+  };
+
   return (
     <div className="flex items-center justify-between gap-3 w-full py-2">
       <div className="flex flex-col gap-1 flex-1 min-w-0">
@@ -300,7 +337,7 @@ function EventInboxItem({ item, onView }: EventInboxItemProps) {
       </div>
 
       <div className="flex items-center gap-1 shrink-0">
-        <Button variant="ghost" size="sm" onPress={() => onView(plan.id)}>
+        <Button variant="ghost" size="sm" onPress={() => onView(plan.id, getTargetTab(event))}>
           View
         </Button>
       </div>
@@ -449,6 +486,28 @@ function updateIndexToInProgress(indexDoc: Y.Doc, planId: string, now: number): 
   }
 }
 
+/** Update plan metadata to changes_requested status using type-safe transition helper */
+function updatePlanToChangesRequested(
+  ydoc: Y.Doc,
+  now: number,
+  actor: string,
+  reviewedBy: string
+): void {
+  transitionPlanStatus(ydoc, { status: 'changes_requested', reviewedAt: now, reviewedBy }, actor);
+}
+
+/** Update plan index entry to changes_requested */
+function updateIndexToChangesRequested(indexDoc: Y.Doc, planId: string, now: number): void {
+  const entry = getPlanIndexEntry(indexDoc, planId);
+  if (entry) {
+    setPlanIndexEntry(indexDoc, {
+      ...entry,
+      status: 'changes_requested',
+      updatedAt: now,
+    });
+  }
+}
+
 /** Approve a plan by updating local IDB and index */
 async function approvePlanInLocalDb(
   planId: string,
@@ -539,6 +598,7 @@ export function InboxPage() {
   const searchParams = new URLSearchParams(location.search);
   const initialPanelId = searchParams.get('panel');
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(initialPanelId);
+  const [selectedTab, setSelectedTab] = useState<PlanViewTab>('plan');
 
   // Update show read preference
   const handleToggleShowRead = useCallback((value: boolean) => {
@@ -566,6 +626,7 @@ export function InboxPage() {
   // Panel handlers
   const handleClosePanel = useCallback(() => {
     setSelectedPlanId(null);
+    setSelectedTab('plan');
   }, []);
 
   // Dismiss handler (mark as read)
@@ -622,8 +683,9 @@ export function InboxPage() {
   }, []);
 
   // Event item view handler
-  const handleViewEvent = useCallback((planId: string) => {
+  const handleViewEvent = useCallback((planId: string, tab?: PlanViewTab) => {
     setSelectedPlanId(planId);
+    setSelectedTab(tab || 'plan');
   }, []);
 
   // Panel approve handler - uses extracted helpers
@@ -645,15 +707,23 @@ export function InboxPage() {
     [githubIdentity, indexDoc, actor]
   );
 
-  // Panel request changes handler
+  // Panel request changes handler - works inline like approve
   const handlePanelRequestChanges = useCallback(
     (context: PlanActionContext) => {
-      const { planId } = context;
-      // Navigate to full plan page for adding comments
-      navigate(`/plan/${planId}`);
-      toast.info('Navigate to add comments and request changes');
+      if (!githubIdentity) {
+        toast.error('Please sign in with GitHub first');
+        return;
+      }
+
+      const { planId, ydoc } = context;
+      const now = Date.now();
+      const reviewedBy = githubIdentity.displayName || githubIdentity.username;
+
+      updatePlanToChangesRequested(ydoc, now, actor, reviewedBy);
+      updateIndexToChangesRequested(indexDoc, planId, now);
+      toast.success('Changes requested - add comments below');
     },
-    [navigate]
+    [githubIdentity, indexDoc, actor]
   );
 
   // Keyboard shortcut handlers - all extracted to top level
@@ -978,6 +1048,7 @@ export function InboxPage() {
       <div className="flex flex-col h-full overflow-hidden">
         <InlinePlanDetail
           planId={selectedPlanId}
+          initialTab={selectedTab}
           onClose={handleClosePanel}
           onApprove={handlePanelApprove}
           onRequestChanges={handlePanelRequestChanges}

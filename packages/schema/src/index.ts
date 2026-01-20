@@ -169,6 +169,7 @@ export type {
   PlanMetadata,
   PlanSnapshot,
   PlanStatusType,
+  PlanViewTab,
   PRReviewComment,
   StepCompletion,
 } from './plan.js';
@@ -197,6 +198,7 @@ export {
   PlanMetadataSchema,
   PlanSnapshotSchema,
   PlanStatusValues,
+  PlanViewTabValues,
   PRReviewCommentSchema,
   parseClaudeCodeOrigin,
 } from './plan.js';

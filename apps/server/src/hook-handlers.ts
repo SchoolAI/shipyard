@@ -96,6 +96,18 @@ export async function createSessionHandler(
   input: CreateHookSessionRequest,
   ctx: HookContext
 ): Promise<CreateHookSessionResponse> {
+  // Check if session already exists (idempotent - handles CLI process restarts)
+  const existingSession = getSessionState(input.sessionId);
+  if (existingSession) {
+    const webUrl = webConfig.SHIPYARD_WEB_URL;
+    const url = `${webUrl}/plan/${existingSession.planId}`;
+    ctx.logger.info(
+      { planId: existingSession.planId, sessionId: input.sessionId },
+      'Returning existing session (idempotent)'
+    );
+    return { planId: existingSession.planId, url };
+  }
+
   const planId = nanoid();
   const now = Date.now();
 
