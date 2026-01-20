@@ -105,6 +105,8 @@ export type PlanAwarenessState =
 export interface SyncState {
   /** Connected to hub WebSocket or WebRTC peers */
   connected: boolean;
+  /** Connected specifically to hub WebSocket (for detecting P2P-only mode) */
+  hubConnected: boolean;
   /** Hub WebSocket has completed initial sync */
   synced: boolean;
   /** Number of peers connected via WebRTC P2P */
@@ -147,6 +149,7 @@ export function useMultiProviderSync(
   const ydoc = useMemo(() => new Y.Doc(), [docName]);
   const [syncState, setSyncState] = useState<SyncState>({
     connected: false,
+    hubConnected: false,
     synced: false,
     peerCount: 0,
     idbSynced: false,
@@ -479,6 +482,7 @@ export function useMultiProviderSync(
 
       setSyncState({
         connected: anyConnected,
+        hubConnected: wsConnected,
         synced: wsSynced,
         peerCount: peerCountRef.current,
         idbSynced: idbSyncedRef.current,

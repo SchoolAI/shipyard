@@ -166,7 +166,7 @@ export function PlanPage() {
 
   // Start timeout when in P2P-only mode without metadata
   useEffect(() => {
-    const inP2POnlyMode = syncState.idbSynced && !syncState.synced && !syncState.connected;
+    const inP2POnlyMode = syncState.idbSynced && !syncState.hubConnected;
     const needsP2PData = !metadata && inP2POnlyMode;
 
     if (needsP2PData) {
@@ -178,7 +178,7 @@ export function PlanPage() {
       setP2pGracePeriodExpired(false);
     }
     return undefined;
-  }, [metadata, syncState.idbSynced, syncState.synced, syncState.connected, syncState.peerCount]);
+  }, [metadata, syncState.idbSynced, syncState.hubConnected, syncState.peerCount]);
 
   // Timeout when peers are connected but no data arrives after 30 seconds
   useEffect(() => {
@@ -310,7 +310,7 @@ export function PlanPage() {
     }
 
     // Phase 2: P2P-only mode - waiting for peers to sync data
-    const inP2POnlyMode = syncState.idbSynced && !syncState.synced && !syncState.connected;
+    const inP2POnlyMode = syncState.idbSynced && !syncState.hubConnected;
     const waitingForP2P = inP2POnlyMode && !metadata && !p2pGracePeriodExpired;
     const hasPeersButNoData = syncState.peerCount > 0 && !metadata;
 

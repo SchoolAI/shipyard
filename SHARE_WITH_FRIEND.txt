@@ -1,0 +1,53 @@
+Hey! :wave:
+
+I'm sending you my git worktree management skills for Claude Code. These make working with multiple branches incredibly smooth.
+
+*What's Included*
+
+Three Claude Code skills:
+• `/wt` - Create worktree with automatic emoji tagging & full setup
+• `/wt-rm` - Remove worktree safely
+• `/wts` - Show beautiful dashboard of all your worktrees
+
+*Installation*
+
+1. Extract: `unzip worktree-skills.zip`
+2. Install: `cd worktree-skills-distribution && ./install.sh`
+3. Restart Claude Code
+4. Try it: `/wts` (in any git repo)
+
+*Quick Example*
+
+```bash
+# Create a new feature branch
+/wt my-awesome-feature
+
+# Claude will:
+# :sparkles: Pick an emoji automatically (based on branch name)
+# :package: Run pnpm install
+# :wrench: Set up everything (env files, tasks, VSCode)
+# :clipboard: Add to your workspace
+
+# Check all your worktrees
+/wts
+
+# When done
+/wt-rm my-awesome-feature
+```
+
+*Documentation*
+
+• *QUICKSTART.md* - Get running in 2 minutes
+• *README.md* - Full documentation, FAQ, troubleshooting
+
+*Features You'll Love*
+
+:art: Contextual emoji selection (feat/ → :sparkles:, fix/ → :bug:, etc.)
+:bar_chart: ASCII status dashboard with PR integration
+:wrench: Full VSCode integration with tasks
+:clipboard: Clipboard resume commands
+:zap: Works with pnpm, npm, or yarn
+
+Try it out and let me know what you think!
+
+_P.S. - If you don't have Claude Code yet, get it at: <https://claude.ai/download>_

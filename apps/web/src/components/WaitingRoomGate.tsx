@@ -45,8 +45,8 @@ export function WaitingRoomGate({
 
   // If connected to the hub WebSocket, skip auth entirely
   // This allows local development without authentication
-  // Shared links (P2P only) will still require auth since connected === false
-  const isLocalViewing = syncState.connected && syncState.synced;
+  // Shared links (P2P only) will still require auth since hubConnected === false
+  const isLocalViewing = syncState.hubConnected && syncState.synced;
 
   if (isLocalViewing) {
     return <>{children}</>;
