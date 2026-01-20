@@ -68,6 +68,55 @@ export type PlanIndexEntryWithReadState = PlanIndexEntry & {
   isUnread?: boolean;
 };
 
+/**
+ * Load a single plan from IndexedDB and extract its metadata.
+ * Returns null if the plan cannot be loaded, has no metadata/owner, or is archived.
+ *
+ * @param id - The plan document ID (IndexedDB database name)
+ * @param isActive - Ref-like object to check if the operation should continue
+ * @returns Plan index entry or null if plan should be skipped
+ */
+async function loadPlanFromIndexedDB(
+  id: string,
+  isActive: { current: boolean }
+): Promise<PlanIndexEntry | null> {
+  const planDoc = new Y.Doc();
+  const idb = new IndexeddbPersistence(id, planDoc);
+
+  try {
+    await idb.whenSynced;
+
+    if (!isActive.current) {
+      return null;
+    }
+
+    const metadata = getPlanMetadata(planDoc);
+    const ownerId = getPlanOwnerId(planDoc);
+
+    if (!metadata || !ownerId) {
+      return null;
+    }
+
+    if (metadata.archivedAt) {
+      return null;
+    }
+
+    return {
+      id: metadata.id,
+      title: metadata.title,
+      status: metadata.status,
+      createdAt: metadata.createdAt ?? Date.now(),
+      updatedAt: metadata.updatedAt ?? Date.now(),
+      ownerId,
+      deleted: false as const,
+    };
+  } catch {
+    return null;
+  } finally {
+    idb.destroy();
+  }
+}
+
 export interface PlanIndexState {
   /** Plans owned by the current user */
   myPlans: PlanIndexEntry[];
@@ -196,9 +245,12 @@ export function usePlanIndex(currentUsername: string | undefined): PlanIndexStat
     let isActive = true;
 
     async function discoverIndexedDBPlans() {
+      // Wrap isActive in an object so it can be passed by reference to async helpers
+      const activeRef = { current: isActive };
+
       try {
         const databases = await indexedDB.databases();
-        if (!isActive) return;
+        if (!activeRef.current) return;
 
         const dbNames = databases.map((db) => db.name).filter((name): name is string => !!name);
         const planIndexIds = new Set(allPlansData.active.map((p) => p.id));
@@ -209,51 +261,15 @@ export function usePlanIndex(currentUsername: string | undefined): PlanIndexStat
         );
 
         const plans = await Promise.all(
-          // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Plan discovery from IndexedDB requires async iteration with filtering
-          planDocIds.map(async (id) => {
-            try {
-              const planDoc = new Y.Doc();
-              const idb = new IndexeddbPersistence(id, planDoc);
-              await idb.whenSynced;
-
-              if (!isActive) {
-                idb.destroy();
-                return null;
-              }
-
-              const metadata = getPlanMetadata(planDoc);
-              const ownerId = getPlanOwnerId(planDoc);
-              idb.destroy();
-
-              if (!metadata || !ownerId) {
-                return null;
-              }
-
-              if (metadata.archivedAt) {
-                return null;
-              }
-
-              return {
-                id: metadata.id,
-                title: metadata.title,
-                status: metadata.status,
-                createdAt: metadata.createdAt ?? Date.now(),
-                updatedAt: metadata.updatedAt ?? Date.now(),
-                ownerId,
-                deleted: false as const,
-              } as PlanIndexEntry;
-            } catch {
-              return null;
-            }
-          })
+          planDocIds.map((id) => loadPlanFromIndexedDB(id, activeRef))
         );
 
-        if (!isActive) return;
+        if (!activeRef.current) return;
 
         const validPlans = plans.filter((p): p is PlanIndexEntry => p !== null);
         setDiscoveredPlans(validPlans);
       } catch {
-        if (isActive) {
+        if (activeRef.current) {
           setDiscoveredPlans([]);
         }
       }
