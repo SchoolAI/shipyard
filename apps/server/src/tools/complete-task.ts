@@ -17,7 +17,7 @@ import {
   PLAN_INDEX_DOC_NAME,
   setPlanIndexEntry,
   transitionPlanStatus,
-} from '@peer-plan/schema';
+} from '@shipyard/schema';
 import type * as Y from 'yjs';
 import { z } from 'zod';
 import { webConfig } from '../config/env/web.js';
@@ -157,7 +157,7 @@ RETURNS:
     const allSnapshots = getSnapshots(ydoc);
 
     // Generate snapshot URL with version history
-    const baseUrl = webConfig.PEER_PLAN_WEB_URL;
+    const baseUrl = webConfig.SHIPYARD_WEB_URL;
     const snapshotUrl = createPlanUrlWithHistory(
       baseUrl,
       {
@@ -232,7 +232,7 @@ ${input.summary || 'Task completed.'}
 [View Plan + Artifacts](${snapshotUrl})
 
 ---
-Generated with [Peer-Plan](https://github.com/SchoolAI/peer-plan)"
+Generated with [Shipyard](https://github.com/SchoolAI/shipyard)"
 \`\`\`
 
 2. Or link an existing PR manually:

@@ -1,4 +1,4 @@
-# Peer-Plan Skill for Claude Cowork
+# Shipyard Skill for Claude Cowork
 
 Proof-of-work tracking for AI agent tasks.
 
@@ -11,9 +11,9 @@ Add to your Claude Desktop config (`~/Library/Application Support/Claude/claude_
 ```json
 {
   "mcpServers": {
-    "peer-plan": {
+    "shipyard": {
       "command": "npx",
-      "args": ["-y", "@peer-plan/server"]
+      "args": ["-y", "@shipyard/server"]
     }
   }
 }
@@ -21,7 +21,7 @@ Add to your Claude Desktop config (`~/Library/Application Support/Claude/claude_
 
 ### 2. Install Skill
 
-1. Download `peer-plan.zip`
+1. Download `shipyard.zip`
 2. Claude Desktop → Settings → Skills → Upload
 3. Enable the skill
 
@@ -47,5 +47,5 @@ Something you can **prove** with an artifact:
 
 ## Links
 
-- [Peer-Plan Docs](https://github.com/SchoolAI/peer-plan)
+- [Shipyard Docs](https://github.com/SchoolAI/shipyard)
 - [SKILL.md](./SKILL.md) - Full instructions for Claude

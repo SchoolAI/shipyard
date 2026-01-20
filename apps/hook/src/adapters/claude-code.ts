@@ -3,7 +3,7 @@
  * Translates between Claude Code hook JSON format and our common event types.
  */
 
-import { formatThreadsForLLM } from '@peer-plan/schema';
+import { formatThreadsForLLM } from '@shipyard/schema';
 import { z } from 'zod';
 import {
   CLAUDE_HOOK_EVENTS,

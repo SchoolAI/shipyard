@@ -4,7 +4,7 @@
 
 ---
 
-# Peer-Plan Diagrams (Mermaid)
+# Shipyard Diagrams (Mermaid)
 
 Render these at [mermaid.live](https://mermaid.live) or any Mermaid-compatible tool.
 

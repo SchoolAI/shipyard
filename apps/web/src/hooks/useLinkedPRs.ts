@@ -1,4 +1,4 @@
-import { getLinkedPRs, type LinkedPR, YDOC_KEYS } from '@peer-plan/schema';
+import { getLinkedPRs, type LinkedPR, YDOC_KEYS } from '@shipyard/schema';
 import { useEffect, useState } from 'react';
 import type * as Y from 'yjs';
 

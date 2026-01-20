@@ -7,7 +7,7 @@ import {
   type PlanMetadata,
   transitionPlanStatus,
   YDOC_KEYS,
-} from '@peer-plan/schema';
+} from '@shipyard/schema';
 import { Package } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type * as Y from 'yjs';

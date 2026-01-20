@@ -1,8 +1,8 @@
 {
   "id": "/",
-  "name": "Peer Plan",
-  "short_name": "Peer Plan",
-  "description": "Collaborative review system for AI-generated implementation plans. Create, review, and annotate plans in real-time with P2P sync.",
+  "name": "Shipyard",
+  "short_name": "Shipyard",
+  "description": "Agent verification workspace. Build, track, and ship verified work with human-in-the-loop collaboration and P2P sync.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

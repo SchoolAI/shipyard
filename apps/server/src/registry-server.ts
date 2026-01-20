@@ -4,7 +4,7 @@ import http from 'node:http';
 import { homedir } from 'node:os';
 import { join, resolve, sep } from 'node:path';
 
-import { appRouter, type Context, getPlanMetadata, type PlanStore } from '@peer-plan/schema';
+import { appRouter, type Context, getPlanMetadata, type PlanStore } from '@shipyard/schema';
 import { createExpressMiddleware } from '@trpc/server/adapters/express';
 import express, { type Request, type Response } from 'express';
 import * as decoding from 'lib0/decoding';
@@ -30,11 +30,11 @@ import {
 } from './subscriptions/index.js';
 
 // Shared LevelDB for all plans (no session-pid isolation)
-const PERSISTENCE_DIR = join(homedir(), '.peer-plan', 'plans');
+const PERSISTENCE_DIR = join(homedir(), '.shipyard', 'plans');
 
 // Lock file to prevent multiple processes from starting the hub simultaneously
-const HUB_LOCK_FILE = join(homedir(), '.peer-plan', 'hub.lock');
-const PEER_PLAN_DIR = join(homedir(), '.peer-plan');
+const HUB_LOCK_FILE = join(homedir(), '.shipyard', 'hub.lock');
+const SHIPYARD_DIR = join(homedir(), '.shipyard');
 const MAX_LOCK_RETRIES = 3;
 
 // Message types matching y-websocket protocol
@@ -139,7 +139,7 @@ async function handleExistingLock(retryCount: number): Promise<boolean> {
  */
 export async function tryAcquireHubLock(retryCount = 0): Promise<boolean> {
   try {
-    mkdirSync(PEER_PLAN_DIR, { recursive: true });
+    mkdirSync(SHIPYARD_DIR, { recursive: true });
     await writeFile(HUB_LOCK_FILE, `${process.pid}\n${Date.now()}`, { flag: 'wx' });
     registerLockCleanupHandler();
     logger.info({ pid: process.pid }, 'Acquired hub lock');
@@ -737,7 +737,7 @@ function createApp(): { app: express.Express; httpServer: http.Server } {
     }
 
     // Path traversal protection: resolve full path and verify it's within artifacts directory
-    const ARTIFACTS_DIR = join(homedir(), '.peer-plan', 'artifacts');
+    const ARTIFACTS_DIR = join(homedir(), '.shipyard', 'artifacts');
     const fullPath = resolve(ARTIFACTS_DIR, planId, filename);
 
     if (!fullPath.startsWith(ARTIFACTS_DIR + sep)) {

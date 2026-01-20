@@ -1,6 +1,6 @@
 {
   "mcpServers": {
-    "peer-plan": {
+    "shipyard": {
       "type": "stdio",
       "command": "node",
       "args": ["apps/server/dist/index.mjs"],
@@ -15,7 +15,10 @@
     },
     "playwright": {
       "command": "npx",
-      "args": ["@playwright/mcp@latest", "--user-data-dir=/tmp/pw-77-type-clean-up"]
+      "args": [
+        "@playwright/mcp@latest",
+        "--user-data-dir=/tmp/pw-79-packaging"
+      ]
     }
   }
 }

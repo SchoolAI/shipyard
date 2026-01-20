@@ -127,7 +127,7 @@ export function decodePlan(encoded: string): UrlEncodedPlan | null {
 /**
  * Creates a complete plan URL from a plan object.
  *
- * @param baseUrl - Base URL for the app (e.g., "https://org.github.io/peer-plan")
+ * @param baseUrl - Base URL for the app (e.g., "https://org.github.io/shipyard")
  * @param plan - Plan object to encode
  * @returns Complete URL with encoded plan
  */

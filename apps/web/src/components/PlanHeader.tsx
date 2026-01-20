@@ -16,7 +16,7 @@ import type {
   ConversationExportMeta,
   PlanIndexEntry,
   PlanMetadata,
-} from '@peer-plan/schema';
+} from '@shipyard/schema';
 import {
   archivePlan,
   getPlanIndexEntry,
@@ -24,7 +24,7 @@ import {
   logPlanEvent,
   setPlanIndexEntry,
   unarchivePlan,
-} from '@peer-plan/schema';
+} from '@shipyard/schema';
 import {
   Archive,
   ArchiveRestore,

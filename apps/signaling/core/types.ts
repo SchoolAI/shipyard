@@ -9,7 +9,7 @@
  * and avoid duplication.
  */
 
-// Import and re-export types from @peer-plan/schema that are used in signaling
+// Import and re-export types from @shipyard/schema that are used in signaling
 import type {
   CreateInviteRequest,
   InviteCreatedResponse,
@@ -22,7 +22,7 @@ import type {
   ListInvitesRequest,
   RedeemInviteRequest,
   RevokeInviteRequest,
-} from '@peer-plan/schema';
+} from '@shipyard/schema';
 
 export type {
   CreateInviteRequest,

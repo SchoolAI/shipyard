@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 #
-# Install script for @peer-plan/hook
+# Install script for @shipyard/hook
 # Adds hook configuration to Claude Code settings.json
 #
 
 set -e
 
 SETTINGS_FILE="$HOME/.claude/settings.json"
-HOOK_COMMAND="peer-plan-hook"
+HOOK_COMMAND="shipyard-hook"
 
-echo "🔧 Installing peer-plan hook configuration..."
+echo "🔧 Installing shipyard hook configuration..."
 
 # Check if settings file exists
 if [ ! -f "$SETTINGS_FILE" ]; then
@@ -40,9 +40,9 @@ if (!settings.hooks.PreToolUse) {
   settings.hooks.PreToolUse = [];
 }
 
-// Check if peer-plan hook already exists
+// Check if shipyard hook already exists
 const existingHook = settings.hooks.PreToolUse.find(h =>
-  h.hooks?.some(hook => hook.command?.includes('peer-plan-hook'))
+  h.hooks?.some(hook => hook.command?.includes('shipyard-hook'))
 );
 
 if (!existingHook) {
@@ -50,7 +50,7 @@ if (!existingHook) {
     matcher: "*",
     hooks: [{
       type: "command",
-      command: "peer-plan-hook"
+      command: "shipyard-hook"
     }]
   });
   console.log('✅ Added PreToolUse hook');
@@ -64,7 +64,7 @@ if (!settings.hooks.PermissionRequest) {
 }
 
 const existingPermHook = settings.hooks.PermissionRequest.find(h =>
-  h.hooks?.some(hook => hook.command?.includes('peer-plan-hook'))
+  h.hooks?.some(hook => hook.command?.includes('shipyard-hook'))
 );
 
 if (!existingPermHook) {
@@ -72,7 +72,7 @@ if (!existingPermHook) {
     matcher: "ExitPlanMode",
     hooks: [{
       type: "command",
-      command: "peer-plan-hook",
+      command: "shipyard-hook",
       timeout: 1800
     }]
   });
@@ -87,7 +87,7 @@ if (!settings.hooks.PostToolUse) {
 }
 
 const existingPostHook = settings.hooks.PostToolUse.find(h =>
-  h.hooks?.some(hook => hook.command?.includes('peer-plan-hook'))
+  h.hooks?.some(hook => hook.command?.includes('shipyard-hook'))
 );
 
 if (!existingPostHook) {
@@ -95,7 +95,7 @@ if (!existingPostHook) {
     matcher: "ExitPlanMode",
     hooks: [{
       type: "command",
-      command: "peer-plan-hook"
+      command: "shipyard-hook"
     }]
   });
   console.log('✅ Added PostToolUse hook');
@@ -103,20 +103,20 @@ if (!existingPostHook) {
   console.log('ℹ️  PostToolUse hook already configured');
 }
 
-// Add SessionStart hook (injects peer-plan context)
+// Add SessionStart hook (injects shipyard context)
 if (!settings.hooks.SessionStart) {
   settings.hooks.SessionStart = [];
 }
 
 const existingSessionHook = settings.hooks.SessionStart.find(h =>
-  h.hooks?.some(hook => hook.command?.includes('peer-plan-hook --context'))
+  h.hooks?.some(hook => hook.command?.includes('shipyard-hook --context'))
 );
 
 if (!existingSessionHook) {
   settings.hooks.SessionStart.push({
     hooks: [{
       type: "command",
-      command: "peer-plan-hook --context"
+      command: "shipyard-hook --context"
     }]
   });
   console.log('✅ Added SessionStart hook');
@@ -134,8 +134,8 @@ echo ""
 echo "Next steps:"
 echo "1. Restart Claude Code to activate hooks"
 echo "2. Enter plan mode (Shift+Tab) in any project"
-echo "3. Create a plan - browser should auto-open with peer-plan"
+echo "3. Create a plan - browser should auto-open with shipyard"
 echo ""
 echo "To uninstall:"
-echo "  npm uninstall -g @peer-plan/hook"
+echo "  npm uninstall -g @shipyard/hook"
 echo "  Restore settings: cp $BACKUP_FILE $SETTINGS_FILE"

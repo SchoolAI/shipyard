@@ -1,7 +1,7 @@
 import { DiffModeEnum, DiffView } from '@git-diff-view/react';
 import '@git-diff-view/react/styles/diff-view.css';
 import { Alert, Button, ButtonGroup, Card, Chip, Link as HeroLink } from '@heroui/react';
-import { type LinkedPR, type PlanMetadata, updateLinkedPRStatus } from '@peer-plan/schema';
+import { type LinkedPR, type PlanMetadata, updateLinkedPRStatus } from '@shipyard/schema';
 import {
   ChevronRight,
   Columns2,
@@ -27,7 +27,7 @@ type DiffViewMode = 'unified' | 'split';
 
 // --- LocalStorage Helpers ---
 
-const DIFF_VIEW_MODE_KEY = 'peer-plan:diff-view-mode';
+const DIFF_VIEW_MODE_KEY = 'shipyard:diff-view-mode';
 
 function getDiffViewModePreference(): DiffViewMode {
   try {

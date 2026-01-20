@@ -1,6 +1,6 @@
 # Cloudflare Workers Signaling Server Spike
 
-WebRTC signaling server for peer-plan using Cloudflare Workers and Durable Objects with WebSocket Hibernation.
+WebRTC signaling server for shipyard using Cloudflare Workers and Durable Objects with WebSocket Hibernation.
 
 ## Overview
 
@@ -57,7 +57,7 @@ This is critical for cost savings since signaling connections are mostly idle (b
 
 **WebSocket Message Math:**
 - 100,000 requests/day = 2,000,000 WebSocket messages/day (20:1 ratio)
-- For peer-plan: Signaling is ~10-20 messages per peer connection
+- For shipyard: Signaling is ~10-20 messages per peer connection
 - Free tier supports: ~100,000+ peer connections/day
 
 ### Paid Tier ($5/month minimum)
@@ -136,7 +136,7 @@ wrangler deploy --env staging
 After deployment, update the web app:
 ```env
 # apps/web/.env.production
-VITE_WEBRTC_SIGNALING=wss://peer-plan-signaling.<your-subdomain>.workers.dev
+VITE_WEBRTC_SIGNALING=wss://shipyard-signaling.<your-subdomain>.workers.dev
 ```
 
 ### Custom Domain (Optional)
@@ -230,4 +230,4 @@ spikes/cloudflare-signaling/
 - Built-in DDoS protection
 - Simpler deployment (no container management)
 
-The free tier should handle peer-plan's expected load easily. The $5/month paid tier provides massive headroom if needed.
+The free tier should handle shipyard's expected load easily. The $5/month paid tier provides massive headroom if needed.

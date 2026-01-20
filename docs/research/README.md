@@ -1,6 +1,6 @@
 # Research Directory
 
-This directory contains research and analysis documents for Peer-Plan features and integrations.
+This directory contains research and analysis documents for Shipyard features and integrations.
 
 ## Contents
 
@@ -39,7 +39,7 @@ This directory contains research and analysis documents for Peer-Plan features a
 **Research Date:** 2026-01-13
 
 **Related Issues:**
-- [#41: Exporting conversation transcripts from AI agent sessions](https://github.com/YOUR_ORG/peer-plan/issues/41)
+- [#41: Exporting conversation transcripts from AI agent sessions](https://github.com/YOUR_ORG/shipyard/issues/41)
 
 ---
 

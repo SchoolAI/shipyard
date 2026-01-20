@@ -8,13 +8,13 @@
 
 ## Executive Summary
 
-After comprehensive research, the recommended approach is **NOT base64-encoded export/import** as originally proposed. Instead, leverage peer-plan's existing P2P infrastructure to store conversation context as **another synced CRDT data type**. This aligns with the A2A (Agent2Agent) protocol's philosophy and requires minimal new infrastructure.
+After comprehensive research, the recommended approach is **NOT base64-encoded export/import** as originally proposed. Instead, leverage shipyard's existing P2P infrastructure to store conversation context as **another synced CRDT data type**. This aligns with the A2A (Agent2Agent) protocol's philosophy and requires minimal new infrastructure.
 
 ---
 
 ## Key Insight: We Already Have the Infrastructure
 
-**Current peer-plan architecture:**
+**Current shipyard architecture:**
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                  Yjs P2P Sync Network                           │
@@ -118,7 +118,7 @@ export const ActivityUpdateSchema = z.object({
   taskId: z.string().optional(),            // A2A: taskId
   referenceTaskIds: z.array(z.string()).optional(),  // A2A: referenceTaskIds
 
-  // Peer-plan specific
+  // Shipyard specific
   createdAt: z.number(),               // Timestamp
   activityType: z.enum([
     'agent_action',
@@ -319,7 +319,7 @@ interface DataPart {
 }
 ```
 
-**Key advantages for peer-plan:**
+**Key advantages for shipyard:**
 1. **Multi-part messages**: Single activity update can contain text + metadata + file references
 2. **Extensibility**: `metadata` and `extensions` provide future-proof schema evolution
 3. **Task linking**: `referenceTaskIds[]` connects activity to multiple deliverables
@@ -327,7 +327,7 @@ interface DataPart {
 
 ### What We Can Leverage from A2A
 
-| A2A Concept | Peer-Plan Mapping | Benefit |
+| A2A Concept | Shipyard Mapping | Benefit |
 |-------------|-------------------|---------|
 | **Message.parts[]** | Multi-part activity updates (text + data + file) | Richer activity entries |
 | **contextId** | Plan ID (groups all activity for this plan) | Standard context grouping |
@@ -349,7 +349,7 @@ A2A supports controlled history retrieval:
 - `historyLength: 0` - No history (minimal context)
 - `historyLength: 100` - Last 100 messages
 
-**Application to peer-plan:**
+**Application to shipyard:**
 ```typescript
 // MCP tool: read_plan with history control
 read_plan({
@@ -363,7 +363,7 @@ read_plan({
 
 **2. Extensions Array for Capability Tracking**
 
-Track which peer-plan features contributed to an activity:
+Track which shipyard features contributed to an activity:
 
 ```typescript
 addActivityUpdate(ydoc, {
@@ -371,8 +371,8 @@ addActivityUpdate(ydoc, {
   role: 'agent',
   parts: [{ type: 'text', text: 'Uploaded screenshot' }],
   extensions: [
-    'https://peer-plan.app/extensions/artifacts/v1',
-    'https://peer-plan.app/extensions/screenshots/v1'
+    'https://shipyard.app/extensions/artifacts/v1',
+    'https://shipyard.app/extensions/screenshots/v1'
   ]
 });
 ```
@@ -381,9 +381,9 @@ addActivityUpdate(ydoc, {
 
 **3. Task State Machine**
 
-A2A task states map to peer-plan flow:
+A2A task states map to shipyard flow:
 
-| A2A State | Peer-Plan Equivalent |
+| A2A State | Shipyard Equivalent |
 |-----------|---------------------|
 | `submitted` | Plan created (draft) |
 | `working` | Agent actively working (in_progress) |
@@ -413,22 +413,22 @@ POST https://ci-system.com/webhook
 - Notify Slack when agent requests review
 - Alert monitoring when blocker posted
 
-### Optional: Agent Card for Peer-Plan
+### Optional: Agent Card for Shipyard
 
 ```json
-// https://peer-plan.app/.well-known/agent-card.json
+// https://shipyard.app/.well-known/agent-card.json
 {
   "protocolVersion": "1.0",
-  "name": "peer-plan",
+  "name": "shipyard",
   "description": "P2P collaborative planning and review system",
   "supportedInterfaces": [
     {
       "protocol": "a2a/json-rpc",
-      "uri": "wss://signaling.peer-plan.app"
+      "uri": "wss://signaling.shipyard.app"
     },
     {
       "protocol": "mcp",
-      "uri": "stdio://peer-plan-mcp"
+      "uri": "stdio://shipyard-mcp"
     }
   ],
   "capabilities": {
@@ -455,7 +455,7 @@ POST https://ci-system.com/webhook
 }
 ```
 
-This makes peer-plan discoverable to A2A-compatible orchestrators.
+This makes shipyard discoverable to A2A-compatible orchestrators.
 
 ---
 
@@ -541,7 +541,7 @@ Repo A (Claude) → Export context → Repo B (Devin) → Import
 **Effort:** 2-3 days
 
 1. Implement `import_conversation_context` MCP tool
-2. Parse A2A-compatible or peer-plan format
+2. Parse A2A-compatible or shipyard format
 3. Create new plan with imported activity
 4. Map external IDs to local IDs
 5. Preserve provenance (who created original context)
@@ -553,10 +553,10 @@ Repo A (Claude) → Export context → Repo B (Devin) → Import
 **Effort:** 1 day
 
 1. Create static `/.well-known/agent-card.json`
-2. Declare peer-plan capabilities
+2. Declare shipyard capabilities
 3. Deploy on GitHub Pages
 
-**Result:** A2A-compatible orchestrators can discover peer-plan.
+**Result:** A2A-compatible orchestrators can discover shipyard.
 
 ---
 
@@ -661,7 +661,7 @@ addActivityUpdate(ydoc, {
 
 **Use case:** Large artifacts (video, test results) streamed incrementally.
 
-Current peer-plan implementation:
+Current shipyard implementation:
 - Artifacts stored in GitHub (already works)
 - Could add streaming upload if artifacts get very large (>100MB)
 
@@ -696,7 +696,7 @@ POST https://external-system.com/webhook
 }
 ```
 
-**Application to peer-plan:**
+**Application to shipyard:**
 - Notify CI/CD when plan approved
 - Alert Slack channel when agent requests review
 - Trigger downstream agents when deliverable complete
@@ -705,21 +705,21 @@ POST https://external-system.com/webhook
 
 ### 4. Agent Cards for Discovery
 
-**Use case:** Multi-agent orchestrator discovers peer-plan capabilities.
+**Use case:** Multi-agent orchestrator discovers shipyard capabilities.
 
 **Example orchestrator logic:**
 ```typescript
 // Orchestrator reads agent cards
-const peerPlanCard = await fetch('https://peer-plan.app/.well-known/agent-card.json');
+const peerPlanCard = await fetch('https://shipyard.app/.well-known/agent-card.json');
 const claudeCard = await fetch('https://claude.ai/.well-known/agent-card.json');
 
-// Routes planning task to peer-plan
+// Routes planning task to shipyard
 if (task.type === 'collaborative_planning') {
   await sendMessage(peerPlanCard.uri, task);
 }
 ```
 
-**Recommendation:** Implement when we want peer-plan to participate in broader agent ecosystems.
+**Recommendation:** Implement when we want shipyard to participate in broader agent ecosystems.
 
 ---
 
@@ -1061,7 +1061,7 @@ This is more powerful than linear activity logs.
 
 Instead of schema versioning (`v1`, `v2`), A2A uses:
 ```typescript
-extensions: ['https://peer-plan.app/extensions/screenshots/v1']
+extensions: ['https://shipyard.app/extensions/screenshots/v1']
 ```
 
 This allows **additive evolution** - old clients ignore unknown extensions.
@@ -1161,7 +1161,7 @@ Only if needed for:
 
 ### Phase 3 (Future): A2A Compatibility
 
-When A2A protocol matures and peer-plan needs to integrate with A2A orchestrators.
+When A2A protocol matures and shipyard needs to integrate with A2A orchestrators.
 
 ---
 

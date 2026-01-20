@@ -16,7 +16,7 @@
  * @see docs/designs/webrtc-custom-messages-research.md
  */
 
-import type { A2AMessage, ConversationExportMeta } from '@peer-plan/schema';
+import type { A2AMessage, ConversationExportMeta } from '@shipyard/schema';
 import {
   assertNeverP2PMessage,
   type ChunkMessage,
@@ -28,7 +28,7 @@ import {
   encodeExportEndMessage,
   encodeExportStartMessage,
   isP2PConversationMessage,
-} from '@peer-plan/schema';
+} from '@shipyard/schema';
 import lzstring from 'lz-string';
 
 // =============================================================================

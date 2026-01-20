@@ -5,6 +5,9 @@ export const CLAUDE_TOOL_NAMES = {
   ASK_USER_QUESTION: 'AskUserQuestion',
 } as const;
 
+/**
+ * MCP tool names (shipyard specific)
+ */
 export const MCP_TOOL_NAMES = {
   REQUEST_USER_INPUT: 'request_user_input',
 } as const;
@@ -23,6 +26,11 @@ export const CLAUDE_HOOK_EVENTS = {
   PERMISSION_REQUEST: 'PermissionRequest',
 } as const;
 
+// --- Defaults ---
+
+/**
+ * Default agent type for shipyard hooks
+ */
 export const DEFAULT_AGENT_TYPE = 'claude-code';
 
 export const DEFAULT_PLAN_TITLES = {

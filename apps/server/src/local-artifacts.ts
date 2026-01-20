@@ -89,4 +89,4 @@ export async function deleteArtifactsForPlan(planId: string): Promise<void> {
 
 // ============ PRIVATE IMPLEMENTATION ============
 
-const ARTIFACTS_DIR = join(homedir(), '.peer-plan', 'artifacts');
+const ARTIFACTS_DIR = join(homedir(), '.shipyard', 'artifacts');

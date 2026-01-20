@@ -7,7 +7,7 @@
 
 ## Overview
 
-Transform Peer-Plan from a single-plan viewer into an "all-in-one agent manager" with multiple organizational views. This enables:
+Transform Shipyard from a single-plan viewer into an "all-in-one agent manager" with multiple organizational views. This enables:
 
 1. **Quick discovery** - Find plans instantly via search, sort, and filter
 2. **Workflow visualization** - Kanban board for status management
@@ -306,7 +306,7 @@ apps/web/src/hooks/useInboxPlans.ts        -- New: Filter for inbox items
 ### Demo Checkpoint
 
 ```
-1. User opens Peer-Plan -> lands on /inbox
+1. User opens Shipyard -> lands on /inbox
 2. Sees 3 plans needing review with quick action buttons
 3. Clicks "Approve" on one -> plan moves to approved
 4. Clicks "All Plans" in sidebar -> navigates to /plans
@@ -357,7 +357,7 @@ apps/web/src/hooks/useInboxPlans.ts        -- New: Filter for inbox items
 ### Dependencies
 
 ```bash
-pnpm add @dnd-kit/core @dnd-kit/sortable @dnd-kit/utilities --filter @peer-plan/web
+pnpm add @dnd-kit/core @dnd-kit/sortable @dnd-kit/utilities --filter @shipyard/web
 ```
 
 ### Files to Create/Modify
@@ -418,7 +418,7 @@ function handleDragEnd(event: DragEndEvent) {
 ### Demo Checkpoint
 
 ```
-1. User opens Peer-Plan, sees Inbox view by default
+1. User opens Shipyard, sees Inbox view by default
 2. Clicks Kanban icon in view switcher
 3. Sees 6 columns with plans distributed by status
 4. Drags a "draft" plan to "pending_review" column
@@ -565,7 +565,7 @@ function getAllTagsFromIndex(indexDoc: Y.Doc): string[] {
 ### Dependencies
 
 ```bash
-pnpm add masonic react-compare-image --filter @peer-plan/web
+pnpm add masonic react-compare-image --filter @shipyard/web
 ```
 
 ### Files to Create
@@ -668,7 +668,7 @@ import ReactCompareImage from 'react-compare-image';
 ### Dependencies
 
 ```bash
-pnpm add @tanstack/react-table --filter @peer-plan/web
+pnpm add @tanstack/react-table --filter @shipyard/web
 ```
 
 ### Files to Create

@@ -1,6 +1,6 @@
 import { Avatar, Button, Card, Dropdown, Label, Modal } from '@heroui/react';
-import type { A2AMessage, ConversationExportMeta, PlanMetadata } from '@peer-plan/schema';
-import { getPlanIndexEntry, PLAN_INDEX_DOC_NAME, setPlanIndexEntry } from '@peer-plan/schema';
+import type { A2AMessage, ConversationExportMeta, PlanMetadata } from '@shipyard/schema';
+import { getPlanIndexEntry, PLAN_INDEX_DOC_NAME, setPlanIndexEntry } from '@shipyard/schema';
 import {
   Archive,
   ArchiveRestore,

@@ -1,5 +1,5 @@
 import { Avatar, Button, Popover } from '@heroui/react';
-import { approveUser, rejectUser } from '@peer-plan/schema';
+import { approveUser, rejectUser } from '@shipyard/schema';
 import { Check, Clock, UserPlus, Users, X } from 'lucide-react';
 import { useCallback } from 'react';
 import { toast } from 'sonner';

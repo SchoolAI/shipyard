@@ -4,13 +4,13 @@
  */
 
 import { Button, ListBox, ListBoxItem } from '@heroui/react';
-import type { PlanIndexEntry } from '@peer-plan/schema';
+import type { PlanIndexEntry } from '@shipyard/schema';
 import {
   getPlanIndexEntry,
   PLAN_INDEX_DOC_NAME,
   setPlanIndexEntry,
   unarchivePlan,
-} from '@peer-plan/schema';
+} from '@shipyard/schema';
 import { ArchiveRestore } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -195,7 +195,7 @@ export function ArchivePage() {
           <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-muted flex items-center justify-center">
             <ArchiveRestore className="w-8 h-8 text-muted-foreground" />
           </div>
-          <h1 className="text-xl font-bold text-foreground mb-2">No Archived Plans</h1>
+          <h1 className="text-xl font-bold text-foreground mb-2">No Archived Tasks</h1>
           <p className="text-sm text-muted-foreground">Your archived plans will appear here.</p>
         </div>
       </div>

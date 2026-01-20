@@ -1,7 +1,7 @@
 # Issue #72: Request User Input - Comprehensive Research
 
 **Status**: Research Complete
-**Issue**: [#72](https://github.com/SchoolAI/peer-plan/issues/72)
+**Issue**: [#72](https://github.com/SchoolAI/shipyard/issues/72)
 **Research Date**: 2026-01-16
 
 ---
@@ -13,7 +13,7 @@ This document synthesizes research from 5 parallel research agents covering:
 2. Claude Code's AskUserQuestion tool implementation
 3. Industry patterns from Cursor, Devin, Cline, Copilot, Aider
 4. Existing MCP server implementations
-5. Peer-plan's current architecture and integration points
+5. Shipyard's current architecture and integration points
 
 **Key Finding**: The industry has converged on **three distinct patterns** for user input requests, each with different trade-offs. We recommend implementing **all three** in phases.
 
@@ -25,7 +25,7 @@ This document synthesizes research from 5 parallel research agents covering:
 2. [Claude Code AskUserQuestion Tool](#2-claude-code-askuserquestion-tool)
 3. [Existing MCP Server Implementations](#3-existing-mcp-server-implementations)
 4. [Industry Patterns Analysis](#4-industry-patterns-analysis)
-5. [Peer-Plan Architecture Integration Points](#5-peer-plan-architecture-integration-points)
+5. [Shipyard Architecture Integration Points](#5-shipyard-architecture-integration-points)
 6. [Implementation Strategy](#6-implementation-strategy)
 7. [Sources](#sources)
 
@@ -658,7 +658,7 @@ Claude → MCP Client → HTTP (port 4444) → FastAPI Server → Renders UI →
 
 ---
 
-## 5. Peer-Plan Architecture Integration Points
+## 5. Shipyard Architecture Integration Points
 
 ### 5.1 Current Hook System
 
@@ -930,7 +930,7 @@ server.tool(
 
 ```typescript
 import * as Y from 'yjs';
-import { YDOC_KEYS } from '@peer-plan/schema';
+import { YDOC_KEYS } from '@shipyard/schema';
 
 interface InputResponse {
   status: 'answered' | 'cancelled' | 'timeout';
@@ -1069,7 +1069,7 @@ export function createInputRequest(
 
 ```typescript
 import { Button, Input, Modal, RadioGroup, TextArea } from '@heroui/react';
-import { YDOC_KEYS, type InputRequest } from '@peer-plan/schema';
+import { YDOC_KEYS, type InputRequest } from '@shipyard/schema';
 import { useState } from 'react';
 import type * as Y from 'yjs';
 
@@ -1194,7 +1194,7 @@ export function InputRequestModal({ request, ydoc, userIdentity }: InputRequestM
 **File**: `apps/web/src/hooks/useInputRequests.ts` (new)
 
 ```typescript
-import { YDOC_KEYS, type InputRequest } from '@peer-plan/schema';
+import { YDOC_KEYS, type InputRequest } from '@shipyard/schema';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import type * as Y from 'yjs';

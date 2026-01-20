@@ -1,5 +1,5 @@
 {
-  "name": "@peer-plan/deno-signaling",
+  "name": "@shipyard/deno-signaling",
   "version": "0.1.0",
   "exports": "./main.ts",
   "tasks": {
@@ -13,7 +13,7 @@
     "strict": true
   },
   "deploy": {
-    "project": "peer-plan-signaling",
+    "project": "shipyard-signaling",
     "exclude": ["README.md"]
   }
 }

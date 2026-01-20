@@ -1,4 +1,4 @@
-import { getSnapshots, type PlanSnapshot } from '@peer-plan/schema';
+import { getSnapshots, type PlanSnapshot } from '@shipyard/schema';
 import { useEffect, useState } from 'react';
 import type * as Y from 'yjs';
 

@@ -8,7 +8,7 @@
 
 ## Executive Summary
 
-This research explores how to enable AI agents to export and import conversation context for seamless handoffs between different agent types (Claude ↔ Devin ↔ Cursor, etc.). The key finding is that **no universal conversation interchange format exists**, but several emerging protocols and patterns provide a foundation for peer-plan to build upon.
+This research explores how to enable AI agents to export and import conversation context for seamless handoffs between different agent types (Claude ↔ Devin ↔ Cursor, etc.). The key finding is that **no universal conversation interchange format exists**, but several emerging protocols and patterns provide a foundation for shipyard to build upon.
 
 ---
 
@@ -223,7 +223,7 @@ HandoffInputData  # Structure for filtered context
 
 ---
 
-## 6. Recommendations for Peer-Plan
+## 6. Recommendations for Shipyard
 
 ### Option A: A2A-Compatible Export (Recommended)
 
@@ -235,7 +235,7 @@ interface ConversationExport {
   contextId: string;        // Matches A2A contextId concept
   messages: A2AMessage[];   // A2A-compatible message format
 
-  // Peer-plan specific
+  // Shipyard specific
   planId: string;
   title: string;
   content: BlockNoteBlock[];
@@ -346,7 +346,7 @@ interface ConversationExport {
 
 ### Size Constraints
 
-Based on URL encoding research from peer-plan architecture:
+Based on URL encoding research from shipyard architecture:
 - Target: ~10-50KB compressed
 - Max safe: 100KB for clipboard/URLs
 - Use `lz-string.compressToEncodedURIComponent()` for 40-60% reduction
@@ -371,9 +371,9 @@ The problem is real but the space is immature:
 - Third-party tools filling gaps (SpecStory, cursor-chat-export)
 - Industry converging but not standardized yet
 
-### Peer-Plan Opportunity
+### Shipyard Opportunity
 
-Peer-plan can be the **portable handoff layer** that:
+Shipyard can be the **portable handoff layer** that:
 1. Captures context during collaborative review
 2. Exports in multiple formats (A2A-compatible + markdown)
 3. Imports from other agents via URL or file

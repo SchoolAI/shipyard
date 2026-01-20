@@ -1,5 +1,5 @@
 import { Button, Chip, Tooltip } from '@heroui/react';
-import { PLAN_INDEX_DOC_NAME } from '@peer-plan/schema';
+import { PLAN_INDEX_DOC_NAME } from '@shipyard/schema';
 import { Archive, ChevronRight, Inbox, LayoutGrid, Search } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';

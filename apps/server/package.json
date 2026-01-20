@@ -1,8 +1,8 @@
 {
-  "name": "@peer-plan/server",
+  "name": "@shipyard/server",
   "version": "0.1.0",
   "type": "module",
-  "description": "MCP server for peer-plan",
+  "description": "MCP server for shipyard",
   "main": "./dist/index.mjs",
   "bin": "./dist/index.mjs",
   "scripts": {
@@ -20,8 +20,8 @@
     "@blocknote/server-util": "^0.45.0",
     "@modelcontextprotocol/sdk": "^1.22.0",
     "@octokit/rest": "^21.0.0",
-    "@peer-plan/schema": "workspace:*",
-    "@peer-plan/shared": "workspace:*",
+    "@shipyard/schema": "workspace:*",
+    "@shipyard/shared": "workspace:*",
     "@roamhq/wrtc": "^0.9.1",
     "@trpc/server": "^11.8.1",
     "express": "^5.2.1",

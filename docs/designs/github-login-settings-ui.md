@@ -8,7 +8,7 @@
 
 ## Overview
 
-This document defines the UX and component architecture for GitHub authentication and account settings in peer-plan. The goal is to provide a clear, accessible authentication flow in the bottom-left corner of the sidebar.
+This document defines the UX and component architecture for GitHub authentication and account settings in shipyard. The goal is to provide a clear, accessible authentication flow in the bottom-left corner of the sidebar.
 
 ---
 

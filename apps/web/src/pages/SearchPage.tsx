@@ -4,7 +4,7 @@
  */
 
 import { Button, Checkbox, ListBox, ListBoxItem, Popover, Spinner } from '@heroui/react';
-import { getAllTagsFromIndex, PLAN_INDEX_DOC_NAME, type PlanIndexEntry } from '@peer-plan/schema';
+import { getAllTagsFromIndex, PLAN_INDEX_DOC_NAME, type PlanIndexEntry } from '@shipyard/schema';
 import { Filter, LayoutGrid, Search } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';

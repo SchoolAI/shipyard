@@ -56,7 +56,7 @@
             "patterns": [
               {
                 "group": ["../../**"],
-                "message": "Cross-package imports must use workspace protocol (@peer-plan/...). Use import from '@peer-plan/package-name' instead."
+                "message": "Cross-package imports must use workspace protocol (@shipyard/...). Use import from '@shipyard/package-name' instead."
               }
             ]
           }

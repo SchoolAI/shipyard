@@ -28,7 +28,7 @@ const schema = z.object({
     .string()
     .optional()
     .transform((val) => val || getTokenFromGhCli() || null),
-  PEER_PLAN_ARTIFACTS: z
+  SHIPYARD_ARTIFACTS: z
     .string()
     .optional()
     .transform((val) => {

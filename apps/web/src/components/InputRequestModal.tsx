@@ -19,8 +19,8 @@ import {
   TextArea,
   TextField,
 } from '@heroui/react';
-import type { InputRequest } from '@peer-plan/schema';
-import { logPlanEvent, YDOC_KEYS } from '@peer-plan/schema';
+import type { InputRequest } from '@shipyard/schema';
+import { logPlanEvent, YDOC_KEYS } from '@shipyard/schema';
 import type React from 'react';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';

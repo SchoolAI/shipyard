@@ -137,7 +137,7 @@ dist
 # VSCode workspace files (managed in main repo only)
 # Ignore all workspace files except the one in the main repo
 **/*.code-workspace
-!peer-plan.code-workspace
+!shipyard.code-workspace
 
 # yarn v3
 .pnp.*

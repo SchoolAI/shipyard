@@ -95,7 +95,7 @@ File sync will always be "jumpier" because we're reconstructing operations from 
 
 ## Recommendations
 
-### For Peer-Plan Architecture
+### For Shipyard Architecture
 
 1. **Primary editing: Web app (BlockNote)**
    - You control the UX, no conflict dialogs
@@ -248,7 +248,7 @@ function onFileChange(path) {
 
 ### Path Forward
 
-To enable "bring your own editor" for peer-plan:
+To enable "bring your own editor" for shipyard:
 
 1. **Tier 1: Web app (BlockNote)** - Primary editing experience, no compromises
 2. **Tier 2: Obsidian** - Test with real Obsidian vault, handles external changes well

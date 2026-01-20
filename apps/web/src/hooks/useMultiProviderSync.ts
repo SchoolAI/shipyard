@@ -5,8 +5,8 @@ import {
   isUserApproved,
   isUserRejected,
   type OriginPlatform,
-} from '@peer-plan/schema';
-import { DEFAULT_REGISTRY_PORTS } from '@peer-plan/shared/registry-config';
+} from '@shipyard/schema';
+import { DEFAULT_REGISTRY_PORTS } from '@shipyard/shared/registry-config';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { IndexeddbPersistence } from 'y-indexeddb';
 import { WebrtcProvider } from 'y-webrtc';
@@ -14,7 +14,7 @@ import { WebsocketProvider } from 'y-websocket';
 import * as Y from 'yjs';
 import { useGitHubAuth } from './useGitHubAuth';
 
-const DEFAULT_SIGNALING_SERVER = 'wss://peer-plan-signaling.jacob-191.workers.dev';
+const DEFAULT_SIGNALING_SERVER = 'wss://shipyard-signaling.jacob-191.workers.dev';
 
 /**
  * Discover the hub URL by checking registry endpoints.
@@ -249,7 +249,7 @@ export function useMultiProviderSync(
       const signalingServer =
         (import.meta.env.VITE_WEBRTC_SIGNALING as string) || DEFAULT_SIGNALING_SERVER;
 
-      rtc = new WebrtcProvider(`peer-plan-${docName}`, ydoc, {
+      rtc = new WebrtcProvider(`shipyard-${docName}`, ydoc, {
         signaling: [signalingServer],
       });
       setRtcProvider(rtc);

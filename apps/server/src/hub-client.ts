@@ -16,7 +16,7 @@
  * because y-websocket confirms sync before returning from operations.
  */
 
-import { ROUTES } from '@peer-plan/schema';
+import { ROUTES } from '@shipyard/schema';
 import { WebsocketProvider } from 'y-websocket';
 import * as Y from 'yjs';
 import { logger } from './logger.js';

@@ -20,7 +20,7 @@ import '@heroui/styles';
 import './index.css';
 
 import { MantineProvider } from '@mantine/core';
-import { DEFAULT_REGISTRY_PORTS } from '@peer-plan/shared/registry-config';
+import { DEFAULT_REGISTRY_PORTS } from '@shipyard/shared/registry-config';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { httpBatchLink } from '@trpc/client';
 import React from 'react';
@@ -31,13 +31,13 @@ import { resetAllBrowserStorage } from './utils/resetStorage';
 import { trpc } from './utils/trpc';
 
 // Expose reset function in development for console access
-// Usage: window.__resetPeerPlan() or just __resetPeerPlan()
+// Usage: window.__resetShipyard() or just __resetShipyard()
 if (import.meta.env.DEV) {
-  (window as unknown as { __resetPeerPlan: typeof resetAllBrowserStorage }).__resetPeerPlan =
+  (window as unknown as { __resetShipyard: typeof resetAllBrowserStorage }).__resetShipyard =
     resetAllBrowserStorage;
   // biome-ignore lint/suspicious/noConsole: Dev-only helpful message
   console.log(
-    '%c[Peer-Plan Dev] %cReset available: window.__resetPeerPlan() or navigate to ?reset=all',
+    '%c[Shipyard Dev] %cReset available: window.__resetShipyard() or navigate to ?reset=all',
     'color: #8b5cf6; font-weight: bold',
     'color: #9ca3af'
   );

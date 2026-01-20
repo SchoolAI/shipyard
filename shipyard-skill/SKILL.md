@@ -1,9 +1,9 @@
 ---
-name: peer-plan
+name: shipyard
 description: Create verified work plans with proof-of-work tracking. Use when tasks need human review, artifact evidence, or collaboration.
 ---
 
-# Peer-Plan: Verified Work Plans
+# Shipyard: Verified Work Plans
 
 Use this skill when doing work that needs:
 - Human review before completion
@@ -34,7 +34,7 @@ Deliverables are outcomes you can PROVE with artifacts. Mark them with `{#delive
 
 ## How It Works: execute_code
 
-Peer-Plan uses ONE tool called `execute_code` that runs TypeScript code.
+Shipyard uses ONE tool called `execute_code` that runs TypeScript code.
 Write code that calls our APIs - NOT individual MCP tool calls.
 
 ### Step 1: Create Plan

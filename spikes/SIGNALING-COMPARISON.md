@@ -1,6 +1,6 @@
 # Signaling Server Deployment Comparison
 
-Research and findings from evaluating deployment options for the peer-plan WebRTC signaling server.
+Research and findings from evaluating deployment options for the shipyard WebRTC signaling server.
 
 **Date:** January 4, 2026
 **Context:** All public y-webrtc signaling servers are down. We need to deploy our own.
@@ -18,7 +18,7 @@ Research and findings from evaluating deployment options for the peer-plan WebRT
 
 **Decision:** Deploy to Cloudflare Workers with Durable Objects and WebSocket Hibernation.
 
-**Deployed URL:** `wss://peer-plan-signaling.jacob-191.workers.dev`
+**Deployed URL:** `wss://shipyard-signaling.jacob-191.workers.dev`
 
 ---
 
@@ -72,7 +72,7 @@ For signaling (brief bursts of activity, then idle):
 | Duration | 13,000 GB-s/day | Hibernation makes this near-zero |
 | Storage | 5 GB | Not used (stateless) |
 
-**For peer-plan:**
+**For shipyard:**
 - Estimated usage: 15,000 connections/month
 - **Uses < 2% of free tier limits**
 - Would need 200K+ plan reviews/month to exceed free tier
@@ -121,7 +121,7 @@ No additional rate limiting needed for expected usage.
 ### Test Results
 
 ```
-✅ WORKING: wss://peer-plan-signaling.jacob-191.workers.dev
+✅ WORKING: wss://shipyard-signaling.jacob-191.workers.dev
   Connected: 428ms
   Ping/Pong: 25ms
 ```
@@ -163,7 +163,7 @@ No additional rate limiting needed for expected usage.
 
 Free tier: 1M requests, 100GB bandwidth/month
 
-For peer-plan:
+For shipyard:
 - 15,000 connections/month = 1.5% of request budget
 - Bandwidth: 375MB = 0.4% of bandwidth budget
 - **Effectively free**
@@ -416,7 +416,7 @@ Currently deployed on jacob@schoolai.com's personal account. To move to SchoolAI
 
 4. **Update web app:**
    ```env
-   VITE_WEBRTC_SIGNALING=wss://peer-plan-signaling.<schoolai-subdomain>.workers.dev
+   VITE_WEBRTC_SIGNALING=wss://shipyard-signaling.<schoolai-subdomain>.workers.dev
    ```
 
 ---
@@ -440,7 +440,7 @@ Research compiled from:
 
 ## Recommendation Summary
 
-**For peer-plan:**
+**For shipyard:**
 - ✅ Use Cloudflare Workers (deployed and working)
 - ✅ Hibernation enabled (zero idle cost)
 - ✅ Free tier sufficient for expected scale

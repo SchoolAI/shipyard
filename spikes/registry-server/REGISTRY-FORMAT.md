@@ -1,11 +1,11 @@
 # Registry File Format
 
-The registry file is stored at `~/.peer-plan/servers.json` and contains a list of active WebSocket servers.
+The registry file is stored at `~/.shipyard/servers.json` and contains a list of active WebSocket servers.
 
 ## Location
 
 ```
-~/.peer-plan/servers.json
+~/.shipyard/servers.json
 ```
 
 ## Format
@@ -97,7 +97,7 @@ The registry file is stored at `~/.peer-plan/servers.json` and contains a list o
 
 ## Notes
 
-- File is created automatically in `~/.peer-plan/` if directory doesn't exist
+- File is created automatically in `~/.shipyard/` if directory doesn't exist
 - Each server manages its own entry (add on start, remove on stop)
 - Registry server only reads the file, never writes
 - Browser fetches registry via HTTP GET from registry server

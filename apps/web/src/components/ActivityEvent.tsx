@@ -4,7 +4,7 @@ import {
   assertNever,
   type PlanEvent,
   type PlanEventType,
-} from '@peer-plan/schema';
+} from '@shipyard/schema';
 import {
   AlertOctagon,
   AlertTriangle,

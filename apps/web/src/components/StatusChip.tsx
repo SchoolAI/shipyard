@@ -1,5 +1,5 @@
 import { Chip } from '@heroui/react';
-import type { PlanStatusType } from '@peer-plan/schema';
+import type { PlanStatusType } from '@shipyard/schema';
 import { Check, Circle, CircleDot, Clock, X } from 'lucide-react';
 import type { ComponentProps } from 'react';
 

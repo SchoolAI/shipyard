@@ -1,5 +1,5 @@
-import type { OriginPlatform } from '@peer-plan/schema';
 import wrtc from '@roamhq/wrtc';
+import type { OriginPlatform } from '@shipyard/schema';
 import { WebrtcProvider } from 'y-webrtc';
 import type * as Y from 'yjs';
 import { logger } from './logger.js';
@@ -22,7 +22,7 @@ interface McpAwarenessState {
 }
 
 const SIGNALING_SERVER =
-  process.env.SIGNALING_URL || 'wss://peer-plan-signaling.jacob-191.workers.dev';
+  process.env.SIGNALING_URL || 'wss://shipyard-signaling.jacob-191.workers.dev';
 
 /**
  * Create a WebRTC provider that connects MCP to the peer mesh.
@@ -61,7 +61,7 @@ export async function createWebRtcProvider(ydoc: Y.Doc, planId: string): Promise
   }
 
   // Create provider with room name based on plan ID
-  const roomName = `peer-plan-${planId}`;
+  const roomName = `shipyard-${planId}`;
   const provider = new WebrtcProvider(roomName, ydoc, {
     signaling: [SIGNALING_SERVER],
     peerOpts: {

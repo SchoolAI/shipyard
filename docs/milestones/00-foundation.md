@@ -23,7 +23,7 @@ This milestone establishes the foundational pieces that everything else builds o
 - [ ] Set up shared tsconfig
 - [ ] Create package structure:
   ```
-  peer-plan/
+  shipyard/
   ├── packages/
   │   ├── schema/     # Shared types + loro Shape definitions
   │   ├── server/     # MCP server (future)
@@ -66,7 +66,7 @@ This milestone establishes the foundational pieces that everything else builds o
 ## Success Criteria
 
 1. `pnpm build` succeeds across all packages
-2. Schema types can be imported from `@peer-plan/schema`
+2. Schema types can be imported from `@shipyard/schema`
 3. URL encoding round-trips correctly with various inputs
 4. Tests pass
 

@@ -7,7 +7,7 @@ import {
   validateToken,
 } from '@/utils/github-web-flow';
 
-const STORAGE_KEY = 'peer-plan-github-identity';
+const STORAGE_KEY = 'shipyard-github-identity';
 const RETURN_URL_KEY = 'github-oauth-return-url';
 
 export interface GitHubIdentity {

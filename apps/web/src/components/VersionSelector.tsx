@@ -1,5 +1,5 @@
 import { Button } from '@heroui/react';
-import type { PlanSnapshot } from '@peer-plan/schema';
+import type { PlanSnapshot } from '@shipyard/schema';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 /**

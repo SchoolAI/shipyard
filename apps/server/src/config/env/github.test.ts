@@ -93,93 +93,93 @@ describe('githubConfig', () => {
     });
   });
 
-  describe('PEER_PLAN_ARTIFACTS', () => {
+  describe('SHIPYARD_ARTIFACTS', () => {
     it('should default to true when env var not set', async () => {
-      delete process.env.PEER_PLAN_ARTIFACTS;
+      delete process.env.SHIPYARD_ARTIFACTS;
 
       const { githubConfig } = await import('./github.js');
 
-      expect(githubConfig.PEER_PLAN_ARTIFACTS).toBe(true);
+      expect(githubConfig.SHIPYARD_ARTIFACTS).toBe(true);
     });
 
     it('should return false for "disabled"', async () => {
-      process.env.PEER_PLAN_ARTIFACTS = 'disabled';
+      process.env.SHIPYARD_ARTIFACTS = 'disabled';
 
       const { githubConfig } = await import('./github.js');
 
-      expect(githubConfig.PEER_PLAN_ARTIFACTS).toBe(false);
+      expect(githubConfig.SHIPYARD_ARTIFACTS).toBe(false);
     });
 
     it('should return false for "DISABLED" (case-insensitive)', async () => {
-      process.env.PEER_PLAN_ARTIFACTS = 'DISABLED';
+      process.env.SHIPYARD_ARTIFACTS = 'DISABLED';
 
       const { githubConfig } = await import('./github.js');
 
-      expect(githubConfig.PEER_PLAN_ARTIFACTS).toBe(false);
+      expect(githubConfig.SHIPYARD_ARTIFACTS).toBe(false);
     });
 
     it('should return false for "false"', async () => {
-      process.env.PEER_PLAN_ARTIFACTS = 'false';
+      process.env.SHIPYARD_ARTIFACTS = 'false';
 
       const { githubConfig } = await import('./github.js');
 
-      expect(githubConfig.PEER_PLAN_ARTIFACTS).toBe(false);
+      expect(githubConfig.SHIPYARD_ARTIFACTS).toBe(false);
     });
 
     it('should return false for "FALSE" (case-insensitive)', async () => {
-      process.env.PEER_PLAN_ARTIFACTS = 'FALSE';
+      process.env.SHIPYARD_ARTIFACTS = 'FALSE';
 
       const { githubConfig } = await import('./github.js');
 
-      expect(githubConfig.PEER_PLAN_ARTIFACTS).toBe(false);
+      expect(githubConfig.SHIPYARD_ARTIFACTS).toBe(false);
     });
 
     it('should return false for "0"', async () => {
-      process.env.PEER_PLAN_ARTIFACTS = '0';
+      process.env.SHIPYARD_ARTIFACTS = '0';
 
       const { githubConfig } = await import('./github.js');
 
-      expect(githubConfig.PEER_PLAN_ARTIFACTS).toBe(false);
+      expect(githubConfig.SHIPYARD_ARTIFACTS).toBe(false);
     });
 
     it('should return true for "enabled"', async () => {
-      process.env.PEER_PLAN_ARTIFACTS = 'enabled';
+      process.env.SHIPYARD_ARTIFACTS = 'enabled';
 
       const { githubConfig } = await import('./github.js');
 
-      expect(githubConfig.PEER_PLAN_ARTIFACTS).toBe(true);
+      expect(githubConfig.SHIPYARD_ARTIFACTS).toBe(true);
     });
 
     it('should return true for "true"', async () => {
-      process.env.PEER_PLAN_ARTIFACTS = 'true';
+      process.env.SHIPYARD_ARTIFACTS = 'true';
 
       const { githubConfig } = await import('./github.js');
 
-      expect(githubConfig.PEER_PLAN_ARTIFACTS).toBe(true);
+      expect(githubConfig.SHIPYARD_ARTIFACTS).toBe(true);
     });
 
     it('should return true for "1"', async () => {
-      process.env.PEER_PLAN_ARTIFACTS = '1';
+      process.env.SHIPYARD_ARTIFACTS = '1';
 
       const { githubConfig } = await import('./github.js');
 
-      expect(githubConfig.PEER_PLAN_ARTIFACTS).toBe(true);
+      expect(githubConfig.SHIPYARD_ARTIFACTS).toBe(true);
     });
 
     it('should return true for any other value', async () => {
-      process.env.PEER_PLAN_ARTIFACTS = 'random-value';
+      process.env.SHIPYARD_ARTIFACTS = 'random-value';
 
       const { githubConfig } = await import('./github.js');
 
-      expect(githubConfig.PEER_PLAN_ARTIFACTS).toBe(true);
+      expect(githubConfig.SHIPYARD_ARTIFACTS).toBe(true);
     });
 
     it('should return true for empty string', async () => {
-      process.env.PEER_PLAN_ARTIFACTS = '';
+      process.env.SHIPYARD_ARTIFACTS = '';
 
       const { githubConfig } = await import('./github.js');
 
-      expect(githubConfig.PEER_PLAN_ARTIFACTS).toBe(true);
+      expect(githubConfig.SHIPYARD_ARTIFACTS).toBe(true);
     });
   });
 });

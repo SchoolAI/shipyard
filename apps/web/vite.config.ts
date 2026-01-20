@@ -44,16 +44,16 @@ function githubPagesSpa(): Plugin {
 }
 
 export default defineConfig(({ mode }) => ({
-  // Base path for GitHub Pages: https://schoolai.github.io/peer-plan/
-  // Use '/' for development, '/peer-plan/' for production
-  base: mode === 'production' ? '/peer-plan/' : '/',
+  // Base path for GitHub Pages: https://schoolai.github.io/shipyard/
+  // Use '/' for development, '/shipyard/' for production
+  base: mode === 'production' ? '/shipyard/' : '/',
   plugins: [tailwindcss(), react(), githubPagesSpa()],
   server: {
     port: 5173,
     open: true,
     // Watch workspace packages for changes
     watch: {
-      ignored: ['!**/node_modules/@peer-plan/**'],
+      ignored: ['!**/node_modules/@shipyard/**'],
     },
   },
   resolve: {
@@ -63,6 +63,6 @@ export default defineConfig(({ mode }) => ({
   },
   // Don't pre-bundle workspace packages - use them directly from dist
   optimizeDeps: {
-    exclude: ['@peer-plan/schema'],
+    exclude: ['@shipyard/schema'],
   },
 }));

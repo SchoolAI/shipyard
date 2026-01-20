@@ -1,4 +1,4 @@
-# Peer-Plan Architecture
+# Shipyard Architecture
 
 This document captures the current architecture based on research and spikes conducted on 2026-01-02.
 
@@ -10,7 +10,7 @@ This document captures the current architecture based on research and spikes con
 
 ## Data Model
 
-Peer-Plan uses a layered data model where different types of data live in different places:
+Shipyard uses a layered data model where different types of data live in different places:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -160,7 +160,7 @@ The distributed nature of P2P means data naturally replicates across peers.
 | Linting | Biome | `biome@1.9.4` | 20-50x faster than ESLint |
 | Testing | Vitest | `vitest@2.1.0` | Fast, parallel execution |
 
-See [engineering-standards.md](./engineering-standards.md#peer-plan-tech-stack) for full stack details and [decisions/0001-use-yjs-not-loro.md](./decisions/0001-use-yjs-not-loro.md) for decision rationale.
+See [engineering-standards.md](./engineering-standards.md#shipyard-tech-stack) for full stack details and [decisions/0001-use-yjs-not-loro.md](./decisions/0001-use-yjs-not-loro.md) for decision rationale.
 
 ---
 

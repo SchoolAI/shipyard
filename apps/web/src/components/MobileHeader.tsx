@@ -1,5 +1,5 @@
 import { Button } from '@heroui/react';
-import type { PlanStatusType } from '@peer-plan/schema';
+import type { PlanStatusType } from '@shipyard/schema';
 import { Menu } from 'lucide-react';
 import type { ReactNode } from 'react';
 import type * as Y from 'yjs';

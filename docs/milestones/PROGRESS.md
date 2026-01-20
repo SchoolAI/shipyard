@@ -8,7 +8,7 @@ Quick reference for current implementation status.
 
 **Completed:**
 - ✅ Monorepo with pnpm workspaces + Turborepo
-- ✅ `@peer-plan/schema` package (URL encoding, Yjs helpers, types)
+- ✅ `@shipyard/schema` package (URL encoding, Yjs helpers, types)
 - ✅ ADR system (decision 0001: Yjs + BlockNote)
 - ✅ Maximum strictness (Biome v2, TypeScript strict, pre-commit hooks)
 - ✅ Engineering standards documented
@@ -78,7 +78,7 @@ Claude: "Create a plan for adding dark mode"
 
 **Completed:**
 - ✅ Registry server on ports 32191/32192 (in-memory)
-- ✅ Per-instance LevelDB (`~/.peer-plan/plans/session-{pid}/`)
+- ✅ Per-instance LevelDB (`~/.shipyard/plans/session-{pid}/`)
 - ✅ Dynamic WebSocket port allocation (port 0)
 - ✅ Browser multi-provider sync (connects to all MCP instances)
 - ✅ Sidebar with plan list (Notion-like UI)
@@ -137,7 +137,7 @@ Browser discovers all → Multi-provider Yjs merge
 - `apps/web/src/components/ShareButton.tsx` - Copy URL to clipboard
 - `apps/web/src/components/Sidebar.tsx` - P2P peer count display
 
-**Future enhancement:** [Token-based room auth](https://github.com/SchoolAI/peer-plan/issues/12)
+**Future enhancement:** [Token-based room auth](https://github.com/SchoolAI/shipyard/issues/12)
 
 ---
 
@@ -166,7 +166,7 @@ Browser discovers all → Multi-provider Yjs merge
 - Orphan branch: `plan-artifacts`
 - Authentication: GitHub PAT via `GITHUB_TOKEN` env var
 
-**Future enhancement:** [OAuth for private repos](https://github.com/SchoolAI/peer-plan/issues/13)
+**Future enhancement:** [OAuth for private repos](https://github.com/SchoolAI/shipyard/issues/13)
 
 ---
 
@@ -264,10 +264,10 @@ See [10-organizational-views.md](./10-organizational-views.md) for full implemen
 
 ## Claude Cowork Integration (Issue #60 Phase 1) ✅ COMPLETE
 
-**Goal:** Enable Peer-Plan to work with Claude Cowork via a Skill
+**Goal:** Enable Shipyard to work with Claude Cowork via a Skill
 
 **Completed:**
-- ✅ Created `peer-plan-skill/` directory with Skill structure
+- ✅ Created `shipyard-skill/` directory with Skill structure
 - ✅ `SKILL.md` with execute_code pattern (not individual MCP tools)
 - ✅ `README.md` for human setup instructions
 - ✅ `examples/plan-example.md` showing agentic loop workflow
@@ -276,9 +276,9 @@ See [10-organizational-views.md](./10-organizational-views.md) for full implemen
 **Key insight:** Cowork doesn't have plan mode hooks like Claude Code. Uses Skills to learn workflows. The skill teaches Cowork to use `execute_code` with TypeScript code blocks.
 
 **Key files:**
-- `peer-plan-skill/SKILL.md` - Main Cowork instructions
-- `peer-plan-skill/README.md` - Setup guide
-- `peer-plan-skill/examples/` - Usage examples
+- `shipyard-skill/SKILL.md` - Main Cowork instructions
+- `shipyard-skill/README.md` - Setup guide
+- `shipyard-skill/examples/` - Usage examples
 
 **Phase 2 (Future):** Signaling server relay for remote sync without localhost browser - tracked in Issue #60.
 

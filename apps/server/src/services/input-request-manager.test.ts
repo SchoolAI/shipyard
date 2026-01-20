@@ -1,4 +1,4 @@
-import { YDOC_KEYS } from '@peer-plan/schema';
+import { YDOC_KEYS } from '@shipyard/schema';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as Y from 'yjs';
 import { InputRequestManager } from './input-request-manager.js';

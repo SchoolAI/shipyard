@@ -1,11 +1,11 @@
 /**
  * Logger for the hook process.
  * CRITICAL: Must log to stderr since stdout is reserved for hook JSON response.
- * Also logs to ~/.peer-plan/hook-debug.log for debugging.
+ * Also logs to ~/.shipyard/hook-debug.log for debugging.
  *
  * Log destinations:
  * - stderr: Visible in Claude Code's hook output during execution
- * - file: ~/.peer-plan/hook-debug.log for post-mortem debugging
+ * - file: ~/.shipyard/hook-debug.log for post-mortem debugging
  *
  * Expected warnings/errors in the log file:
  * - "No registry server found on any port" - Normal when MCP server isn't running
@@ -20,7 +20,7 @@ import { join } from 'node:path';
 import pino from 'pino';
 import { serverConfig } from './config/env/server.js';
 
-const LOG_FILE = join(homedir(), '.peer-plan', 'hook-debug.log');
+const LOG_FILE = join(homedir(), '.shipyard', 'hook-debug.log');
 
 export const logger = pino(
   {

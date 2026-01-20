@@ -1,4 +1,4 @@
-# Peer-Plan: Agent Briefing
+# Shipyard: Agent Briefing
 
 > Quick context for agents working on this project. Read this first, then dive into the relevant milestone.
 >
@@ -87,7 +87,7 @@ See [decisions/0001-use-yjs-not-loro.md](./decisions/0001-use-yjs-not-loro.md) f
 ## Project Structure
 
 ```
-peer-plan/
+shipyard/
 ├── apps/               # Deployable applications
 │   ├── server/         # MCP server (WebSocket + tools)
 │   ├── web/            # React app (BlockNote UI)

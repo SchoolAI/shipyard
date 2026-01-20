@@ -36,7 +36,7 @@ $ curl http://localhost:3001/registry
 
 ```bash
 $ node ws-server.js 3100 &
-$ cat ~/.peer-plan/servers.json
+$ cat ~/.shipyard/servers.json
 ```
 
 **Output:**
@@ -55,7 +55,7 @@ $ cat ~/.peer-plan/servers.json
 
 **Verification:**
 - WS server starts on port 3100
-- Creates `~/.peer-plan/servers.json`
+- Creates `~/.shipyard/servers.json`
 - Registers with correct format
 - All fields present (port, url, pid, startedAt)
 
@@ -64,7 +64,7 @@ $ cat ~/.peer-plan/servers.json
 
 ```bash
 $ kill -INT <pid>
-$ cat ~/.peer-plan/servers.json
+$ cat ~/.shipyard/servers.json
 ```
 
 **Output:**
@@ -141,7 +141,7 @@ The file-based registry with dedicated HTTP server approach works reliably for b
 - WS servers clean up on shutdown
 - No crashes or unhandled errors
 
-This approach is suitable for integration into peer-plan's MCP server and web client.
+This approach is suitable for integration into shipyard's MCP server and web client.
 
 ## Next Actions
 

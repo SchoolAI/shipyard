@@ -1,10 +1,10 @@
 # ID Systems Inventory
 
-> Comprehensive documentation of all identity systems used in peer-plan.
+> Comprehensive documentation of all identity systems used in shipyard.
 
 ## Overview
 
-Peer-plan uses multiple ID systems that serve different purposes. This document catalogs each system to prevent confusion and type mismatches.
+Shipyard uses multiple ID systems that serve different purposes. This document catalogs each system to prevent confusion and type mismatches.
 
 ---
 
@@ -45,7 +45,7 @@ const planId = nanoid();
 - URL path: `/plan/{planId}`
 - Y.Doc document name
 - IndexedDB persistence key
-- WebRTC room name (prefixed with `peer-plan-`)
+- WebRTC room name (prefixed with `shipyard-`)
 
 **Flow:**
 1. Claude Code hook calls `POST /api/hook/session`

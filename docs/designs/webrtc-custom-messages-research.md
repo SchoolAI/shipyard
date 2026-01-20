@@ -189,7 +189,7 @@ function createCustomMessage(payload: Uint8Array): Uint8Array {
 
 #### Current Codebase Pattern
 
-From `/Users/jacobpetterle/Working Directory/peer-plan/apps/web/src/hooks/useMultiProviderSync.ts`, the codebase already accesses internal y-webrtc state:
+From `/Users/jacobpetterle/Working Directory/shipyard/apps/web/src/hooks/useMultiProviderSync.ts`, the codebase already accesses internal y-webrtc state:
 
 ```typescript
 // Access internal signaling connections (lines 306-315, 343-353)
@@ -459,7 +459,7 @@ rtc.awareness.setLocalStateField('planStatus', awarenessState);
 
 ---
 
-## 7. Recommendations for Peer-Plan
+## 7. Recommendations for Shipyard
 
 ### For Conversation Export Feature (MB-scale binary blobs)
 

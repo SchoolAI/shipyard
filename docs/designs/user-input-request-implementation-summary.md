@@ -6,7 +6,7 @@
 
 ## Overview
 
-Implemented the core backend service layer for user input requests in Peer-Plan. This provides a blocking API that allows MCP tools and Hook API to request input from users via the browser UI.
+Implemented the core backend service layer for user input requests in Shipyard. This provides a blocking API that allows MCP tools and Hook API to request input from users via the browser UI.
 
 ## Files Created
 

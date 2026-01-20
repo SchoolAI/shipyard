@@ -7,7 +7,7 @@ import {
   type PlanStatusType,
   setPlanIndexEntry,
   setPlanMetadata,
-} from '@peer-plan/schema';
+} from '@shipyard/schema';
 import { z } from 'zod';
 import { getOrCreateDoc } from '../doc-store.js';
 import { logger } from '../logger.js';

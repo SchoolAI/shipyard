@@ -4,7 +4,7 @@ import {
   getPlanMetadata,
   linkPR,
   logPlanEvent,
-} from '@peer-plan/schema';
+} from '@shipyard/schema';
 import { z } from 'zod';
 import { getOrCreateDoc } from '../doc-store.js';
 import { getOctokit, parseRepoString } from '../github-artifacts.js';

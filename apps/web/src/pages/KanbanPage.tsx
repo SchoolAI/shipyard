@@ -29,7 +29,7 @@ import {
   type StatusTransition,
   setPlanIndexEntry,
   transitionPlanStatus,
-} from '@peer-plan/schema';
+} from '@shipyard/schema';
 import { Eye, EyeOff } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';

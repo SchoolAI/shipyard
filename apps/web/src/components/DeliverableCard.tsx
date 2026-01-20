@@ -1,5 +1,5 @@
 import { Button, Checkbox, Chip, Disclosure } from '@heroui/react';
-import type { Artifact } from '@peer-plan/schema';
+import type { Artifact } from '@shipyard/schema';
 import { useState } from 'react';
 import { formatRelativeTime } from '@/utils/formatters';
 import { ArtifactRenderer } from './ArtifactRenderer';

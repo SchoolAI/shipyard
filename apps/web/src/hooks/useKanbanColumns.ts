@@ -3,7 +3,7 @@
  * Architecture supports future extension to tag-based columns.
  */
 
-import type { PlanIndexEntry, PlanStatusType } from '@peer-plan/schema';
+import type { PlanIndexEntry, PlanStatusType } from '@shipyard/schema';
 import { useMemo } from 'react';
 import { assertNever } from '@/utils/assert-never';
 

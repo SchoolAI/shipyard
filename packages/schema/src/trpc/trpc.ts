@@ -1,5 +1,5 @@
 /**
- * tRPC initialization for peer-plan.
+ * tRPC initialization for shipyard.
  * Provides the base router and procedure builders.
  */
 

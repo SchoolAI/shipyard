@@ -14,7 +14,7 @@ import {
   setPlanIndexEntry,
   setPlanMetadata,
   YDOC_KEYS,
-} from '@peer-plan/schema';
+} from '@shipyard/schema';
 import { LogIn } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';

@@ -117,7 +117,7 @@ async function getUsernameFromToken(token: string): Promise<string | null> {
       headers: {
         Authorization: `Bearer ${token}`,
         Accept: 'application/vnd.github.v3+json',
-        'User-Agent': 'peer-plan-mcp-server',
+        'User-Agent': 'shipyard-mcp-server',
       },
       signal: AbortSignal.timeout(5000),
     });

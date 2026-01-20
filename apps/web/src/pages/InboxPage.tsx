@@ -12,7 +12,7 @@ import {
   type PlanStatusType,
   setPlanIndexEntry,
   transitionPlanStatus,
-} from '@peer-plan/schema';
+} from '@shipyard/schema';
 import {
   AlertOctagon,
   AlertTriangle,

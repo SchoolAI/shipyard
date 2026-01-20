@@ -1,5 +1,5 @@
 import { Button } from '@heroui/react';
-import { buildInviteUrl, type InviteCreatedResponse, logPlanEvent } from '@peer-plan/schema';
+import { buildInviteUrl, type InviteCreatedResponse, logPlanEvent } from '@shipyard/schema';
 import { Check, Loader2, Share2 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';

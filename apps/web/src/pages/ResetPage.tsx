@@ -121,7 +121,7 @@ export function ResetPage() {
               {result.indexedDB.cleared.length === 0 &&
                 result.localStorage.length === 0 &&
                 result.sessionStorage.length === 0 && (
-                  <p className="text-gray-500">No peer-plan data found to clear.</p>
+                  <p className="text-gray-500">No shipyard data found to clear.</p>
                 )}
             </div>
 

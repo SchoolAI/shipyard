@@ -8,7 +8,7 @@ import {
   isInboxWorthy,
   type PlanEvent,
   type PlanIndexEntry,
-} from '@peer-plan/schema';
+} from '@shipyard/schema';
 import { useEffect, useState } from 'react';
 import { IndexeddbPersistence } from 'y-indexeddb';
 import * as Y from 'yjs';

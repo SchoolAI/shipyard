@@ -17,8 +17,8 @@ const AvatarFallback = Avatar.Fallback as React.FC<{
   className?: string;
 }>;
 
-import type { Deliverable, LinkedPR, PlanIndexEntry, PlanStatusType } from '@peer-plan/schema';
-import { getDeliverables, getLinkedPRs } from '@peer-plan/schema';
+import type { Deliverable, LinkedPR, PlanIndexEntry, PlanStatusType } from '@shipyard/schema';
+import { getDeliverables, getLinkedPRs } from '@shipyard/schema';
 import { CheckSquare, ExternalLink, GitPullRequest, Square, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';

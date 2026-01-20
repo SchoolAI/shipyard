@@ -6,7 +6,7 @@
  * - GitHub API supports Bearer token auth with CORS
  */
 
-import type { Artifact } from '@peer-plan/schema';
+import type { Artifact } from '@shipyard/schema';
 
 // ============================================================================
 // Public Types

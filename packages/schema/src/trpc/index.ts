@@ -1,5 +1,5 @@
 /**
- * tRPC router exports for peer-plan.
+ * tRPC router exports for shipyard.
  *
  * This module provides:
  * - Combined app router with all sub-routers

@@ -179,7 +179,7 @@ Simple JSON messages:
 - No automatic reconnection (could be added)
 - No service discovery metadata (servers just echo, don't advertise capabilities)
 
-## Next Steps for peer-plan
+## Next Steps for shipyard
 
 This spike proves the concept. For production:
 

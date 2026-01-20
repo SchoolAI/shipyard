@@ -27,7 +27,7 @@ export function AuthChoiceModal({
 
           <Card>
             <Card.Header>
-              <h2 className="text-xl font-semibold">Sign in to Peer-Plan</h2>
+              <h2 className="text-xl font-semibold">Sign in to Shipyard</h2>
               <p className="text-sm text-muted-foreground mt-1">
                 Choose how you'd like to identify yourself in this workspace.
               </p>

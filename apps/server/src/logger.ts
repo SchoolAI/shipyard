@@ -1,11 +1,11 @@
 /**
  * Logger for the MCP server process.
  * CRITICAL: Must log to stderr since stdout is reserved for MCP JSON-RPC protocol.
- * Also logs to ~/.peer-plan/server-debug.log for debugging.
+ * Also logs to ~/.shipyard/server-debug.log for debugging.
  *
  * Log destinations:
- * - stderr: Visible in Claude Code's MCP server output (Settings > MCP > peer-plan > output)
- * - file: ~/.peer-plan/server-debug.log for post-mortem debugging
+ * - stderr: Visible in Claude Code's MCP server output (Settings > MCP > shipyard > output)
+ * - file: ~/.shipyard/server-debug.log for post-mortem debugging
  */
 
 import { mkdirSync } from 'node:fs';
@@ -14,7 +14,7 @@ import { dirname, join } from 'node:path';
 import pino from 'pino';
 import { serverConfig } from './config/env/server.js';
 
-const LOG_FILE = join(homedir(), '.peer-plan', 'server-debug.log');
+const LOG_FILE = join(homedir(), '.shipyard', 'server-debug.log');
 
 // Ensure log directory exists
 try {

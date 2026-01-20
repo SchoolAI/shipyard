@@ -1,4 +1,4 @@
-import { type Artifact, getArtifacts } from '@peer-plan/schema';
+import { type Artifact, getArtifacts } from '@shipyard/schema';
 import { useEffect, useState } from 'react';
 import type * as Y from 'yjs';
 import { ArtifactRenderer } from './ArtifactRenderer';

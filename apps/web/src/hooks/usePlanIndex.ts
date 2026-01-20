@@ -10,7 +10,7 @@ import {
   PLAN_INDEX_VIEWED_BY_KEY,
   type PlanIndexEntry,
   updatePlanIndexViewedBy,
-} from '@peer-plan/schema';
+} from '@shipyard/schema';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { IndexeddbPersistence } from 'y-indexeddb';
 import * as Y from 'yjs';

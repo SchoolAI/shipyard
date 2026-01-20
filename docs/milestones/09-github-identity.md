@@ -8,7 +8,7 @@
 ## Overview
 
 Currently we have an identity mismatch:
-- **Server**: `ownerId = random-server-id` (from `~/.peer-plan/server-id`)
+- **Server**: `ownerId = random-server-id` (from `~/.shipyard/server-id`)
 - **Browser**: `identity.id = random-browser-id` (from localStorage)
 - **Problem**: Even YOU see waiting room on YOUR OWN plans
 
@@ -218,13 +218,13 @@ interface GitHubIdentity {
 
 export function useGitHubAuth() {
   const [identity, setIdentity] = useState<GitHubIdentity | null>(() => {
-    const stored = localStorage.getItem('peer-plan-github-identity');
+    const stored = localStorage.getItem('shipyard-github-identity');
     if (!stored) return null;
 
     const parsed = JSON.parse(stored);
     // Check expiry
     if (parsed.expiresAt < Date.now()) {
-      localStorage.removeItem('peer-plan-github-identity');
+      localStorage.removeItem('shipyard-github-identity');
       return null;
     }
     return parsed;
@@ -240,7 +240,7 @@ export function useGitHubAuth() {
       username: user.login,
       expiresAt: Date.now() + (60 * 24 * 60 * 60 * 1000), // 60 days
     };
-    localStorage.setItem('peer-plan-github-identity', JSON.stringify(identity));
+    localStorage.setItem('shipyard-github-identity', JSON.stringify(identity));
     setIdentity(identity);
   };
 
@@ -293,7 +293,7 @@ computeApprovalStatus(userId);
 1. Go to github.com/settings/developers
 2. Create new OAuth App
 3. Settings:
-   - Name: "Peer-Plan"
+   - Name: "Shipyard"
    - Homepage: Your static site URL
    - Callback: Leave blank (Device Flow doesn't use it)
 4. Get Client ID
@@ -367,7 +367,7 @@ Remote agent (Devin) doesn't have gh CLI
 ### Token Storage
 ```typescript
 // Store in localStorage
-localStorage.setItem('peer-plan-github-identity', JSON.stringify({
+localStorage.setItem('shipyard-github-identity', JSON.stringify({
   token: "ghp_...",  // GitHub PAT
   username: "jacobpetterle",
   expiresAt: timestamp,

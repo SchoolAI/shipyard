@@ -9,7 +9,7 @@ Prove that a browser can discover multiple WebSocket servers running on dynamic 
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                                                             │
-│  ~/.peer-plan/servers.json (Registry File)                 │
+│  ~/.shipyard/servers.json (Registry File)                 │
 │  {                                                          │
 │    "servers": [                                             │
 │      { "id": "server-1", "port": 54321, "pid": 12345 },    │
@@ -51,13 +51,13 @@ Prove that a browser can discover multiple WebSocket servers running on dynamic 
 ### 1. ws-server.js
 - Simple WebSocket echo server
 - Uses port 0 to get a random available port
-- Writes port to `~/.peer-plan/servers.json` on startup
+- Writes port to `~/.shipyard/servers.json` on startup
 - Removes entry from registry on shutdown (SIGINT/SIGTERM)
 - Each server has a unique ID
 
 ### 2. vite.config.ts
 - Custom Vite plugin that serves the registry file at `/api/registry`
-- Reads from `~/.peer-plan/servers.json`
+- Reads from `~/.shipyard/servers.json`
 - Sets CORS headers for browser access
 - Returns empty array if no registry file exists
 
@@ -111,7 +111,7 @@ npm run server
 
 Each server will:
 1. Start on a random port (e.g., 54321, 54322, 54323)
-2. Register itself in `~/.peer-plan/servers.json`
+2. Register itself in `~/.shipyard/servers.json`
 3. Log: `[server-xxx] WebSocket server listening on port 54321`
 
 ### Step 3: Open the browser
@@ -163,7 +163,7 @@ You should see:
 
 ## Registry File Format
 
-The registry file at `~/.peer-plan/servers.json` has this structure:
+The registry file at `~/.shipyard/servers.json` has this structure:
 
 ```json
 {
@@ -197,10 +197,10 @@ npm run server
 ./test.sh
 
 # Check registry file
-cat ~/.peer-plan/servers.json
+cat ~/.shipyard/servers.json
 
 # Manual cleanup
-rm ~/.peer-plan/servers.json
+rm ~/.shipyard/servers.json
 ```
 
 ## Cleanup
@@ -208,7 +208,7 @@ rm ~/.peer-plan/servers.json
 To manually clean the registry:
 
 ```bash
-rm ~/.peer-plan/servers.json
+rm ~/.shipyard/servers.json
 ```
 
 Servers automatically clean up their entries when they shut down gracefully (Ctrl+C).

@@ -1,1 +1,1 @@
-export * from '@peer-plan/shared';
+export * from '@shipyard/shared';

@@ -4,7 +4,7 @@
  */
 
 import { Spinner } from '@heroui/react';
-import { getDeliverables, getPlanMetadata, type PlanMetadata } from '@peer-plan/schema';
+import { getDeliverables, getPlanMetadata, type PlanMetadata } from '@shipyard/schema';
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type * as Y from 'yjs';

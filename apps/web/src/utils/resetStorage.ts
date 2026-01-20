@@ -1,34 +1,34 @@
 /**
- * Nuclear reset utility for clearing all peer-plan storage.
+ * Nuclear reset utility for clearing all shipyard storage.
  * Used for local testing when you need a clean slate across all peers.
  */
 
 /**
- * All localStorage keys used by peer-plan
+ * All localStorage keys used by shipyard
  */
 const LOCAL_STORAGE_KEYS = [
-  'peer-plan-github-identity',
-  'peer-plan-sidebar-collapsed',
-  'peer-plan-show-archived',
-  'peer-plan-view-preferences',
+  'shipyard-github-identity',
+  'shipyard-sidebar-collapsed',
+  'shipyard-show-archived',
+  'shipyard-view-preferences',
   'kanban-hide-empty-columns',
-  'peer-plan:diff-view-mode',
+  'shipyard:diff-view-mode',
   'theme',
 ] as const;
 
 /**
- * All sessionStorage keys used by peer-plan
+ * All sessionStorage keys used by shipyard
  */
 const SESSION_STORAGE_KEYS = [
   'github-oauth-state',
   'github-oauth-return-url',
-  'peer-plan-removed-servers',
+  'shipyard-removed-servers',
 ] as const;
 
 /**
- * Check if an IndexedDB database name belongs to peer-plan
+ * Check if an IndexedDB database name belongs to shipyard
  */
-function isPeerPlanDatabase(name: string): boolean {
+function isShipyardDatabase(name: string): boolean {
   if (name === 'plan-index') return true;
 
   // UUID pattern: 8-4-4-4-12 hex chars
@@ -127,7 +127,7 @@ async function clearIndexedDBFallback(): Promise<{ cleared: string[]; errors: st
 }
 
 /**
- * Clear all IndexedDB databases created by peer-plan
+ * Clear all IndexedDB databases created by shipyard
  */
 async function clearIndexedDB(): Promise<{ cleared: string[]; errors: string[] }> {
   // Fallback for browsers without indexedDB.databases()
@@ -141,7 +141,7 @@ async function clearIndexedDB(): Promise<{ cleared: string[]; errors: string[] }
 
   for (const db of databases) {
     const name = db.name;
-    if (!name || !isPeerPlanDatabase(name)) continue;
+    if (!name || !isShipyardDatabase(name)) continue;
 
     const result = await deleteDatabase(name);
     processDeleteResult(name, result, cleared, errors);
@@ -151,7 +151,7 @@ async function clearIndexedDB(): Promise<{ cleared: string[]; errors: string[] }
 }
 
 /**
- * Clear all localStorage keys used by peer-plan
+ * Clear all localStorage keys used by shipyard
  */
 function clearLocalStorage(): string[] {
   const cleared: string[] = [];
@@ -165,7 +165,7 @@ function clearLocalStorage(): string[] {
 }
 
 /**
- * Clear all sessionStorage keys used by peer-plan
+ * Clear all sessionStorage keys used by shipyard
  */
 function clearSessionStorage(): string[] {
   const cleared: string[] = [];
@@ -185,12 +185,12 @@ export interface ResetResult {
 }
 
 /**
- * Clear all peer-plan storage from the browser.
+ * Clear all shipyard storage from the browser.
  * This is the browser-side component of the full reset flow.
  *
  * NOTE: For a complete reset, you also need to:
  * 1. Stop all MCP server instances
- * 2. Clear ~/.peer-plan/plans/ on the server side
+ * 2. Clear ~/.shipyard/plans/ on the server side
  */
 export async function resetAllBrowserStorage(): Promise<ResetResult> {
   const indexedDBResult = await clearIndexedDB();

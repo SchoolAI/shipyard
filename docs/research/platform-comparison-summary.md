@@ -186,7 +186,7 @@ gh agent-task view SESSION_ID --log > session.json
   "hooks": {
     "beforeMCPExecution": [
       {
-        "command": "node .cursor/hooks/peer-plan-origin.js",
+        "command": "node .cursor/hooks/shipyard-origin.js",
         "async": false
       }
     ]
@@ -197,11 +197,11 @@ gh agent-task view SESSION_ID --log > session.json
 **Installation:**
 ```bash
 # Copy hook files to your workspace
-curl -o .cursor/hooks/peer-plan-origin.js \
-  https://raw.githubusercontent.com/YOUR_ORG/peer-plan/main/hooks/cursor/peer-plan-origin.js
+curl -o .cursor/hooks/shipyard-origin.js \
+  https://raw.githubusercontent.com/YOUR_ORG/shipyard/main/hooks/cursor/shipyard-origin.js
 
 # Make executable
-chmod +x .cursor/hooks/peer-plan-origin.js
+chmod +x .cursor/hooks/shipyard-origin.js
 ```
 
 **Enterprise Distribution:**
@@ -218,7 +218,7 @@ chmod +x .cursor/hooks/peer-plan-origin.js
   "hooks": {
     "pre_mcp_tool_use": [
       {
-        "command": "python3 .windsurf/hooks/peer-plan-origin.py",
+        "command": "python3 .windsurf/hooks/shipyard-origin.py",
         "show_output": false
       }
     ]
@@ -229,11 +229,11 @@ chmod +x .cursor/hooks/peer-plan-origin.js
 **Installation:**
 ```bash
 # Copy hook files
-curl -o .windsurf/hooks/peer-plan-origin.py \
-  https://raw.githubusercontent.com/YOUR_ORG/peer-plan/main/hooks/windsurf/peer-plan-origin.py
+curl -o .windsurf/hooks/shipyard-origin.py \
+  https://raw.githubusercontent.com/YOUR_ORG/shipyard/main/hooks/windsurf/shipyard-origin.py
 
 # Make executable
-chmod +x .windsurf/hooks/peer-plan-origin.py
+chmod +x .windsurf/hooks/shipyard-origin.py
 ```
 
 ### Claude Code (Current)

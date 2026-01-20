@@ -3,7 +3,7 @@ import {
   getPlanMetadata,
   logPlanEvent,
   type PRReviewComment,
-} from '@peer-plan/schema';
+} from '@shipyard/schema';
 import { nanoid } from 'nanoid';
 import { z } from 'zod';
 import { getOrCreateDoc } from '../doc-store.js';

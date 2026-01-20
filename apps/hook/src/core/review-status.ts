@@ -10,7 +10,7 @@ import {
   type Deliverable,
   type GetReviewStatusResponse,
   type ReviewFeedback,
-} from '@peer-plan/schema';
+} from '@shipyard/schema';
 import type { CoreResponse } from '../adapters/types.js';
 import { webConfig } from '../config/env/web.js';
 import { DEFAULT_AGENT_TYPE } from '../constants.js';
@@ -85,7 +85,7 @@ async function handleUpdatedPlanReview(
     throw err;
   }
 
-  const baseUrl = webConfig.PEER_PLAN_WEB_URL;
+  const baseUrl = webConfig.SHIPYARD_WEB_URL;
   logger.info(
     { planId, url: `${baseUrl}/plan/${planId}` },
     'Content synced, browser already open. Waiting for server approval...'
@@ -205,7 +205,7 @@ export async function checkReviewStatus(
         return {
           allow: true,
           message:
-            'Plan approved, but session token unavailable. You may need to refresh the plan in the browser. Check ~/.peer-plan/server-debug.log for details.',
+            'Plan approved, but session token unavailable. You may need to refresh the plan in the browser. Check ~/.shipyard/server-debug.log for details.',
           planId,
         };
       }
@@ -233,7 +233,7 @@ export async function checkReviewStatus(
     return {
       allow: false,
       message:
-        'Internal error: Plan content found but session state missing. Check ~/.peer-plan/hook-debug.log and report this issue.',
+        'Internal error: Plan content found but session state missing. Check ~/.shipyard/hook-debug.log and report this issue.',
     };
   }
 
@@ -257,14 +257,14 @@ export async function checkReviewStatus(
     return {
       allow: false,
       message:
-        'Cannot verify plan approval status. Ensure the peer-plan MCP server is running. Check ~/.peer-plan/server-debug.log for details.',
+        'Cannot verify plan approval status. Ensure the Shipyard MCP server is running. Check ~/.shipyard/server-debug.log for details.',
       planId,
     };
   }
 
   logger.info({ sessionId, planId, status: status.status }, 'Review status retrieved');
 
-  const baseUrl = webConfig.PEER_PLAN_WEB_URL;
+  const baseUrl = webConfig.SHIPYARD_WEB_URL;
 
   switch (status.status) {
     case 'changes_requested':

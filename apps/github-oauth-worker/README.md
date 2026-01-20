@@ -104,9 +104,9 @@ curl -X POST http://localhost:4445/token-exchange \
 1. Go to [GitHub Developer Settings](https://github.com/settings/developers)
 2. Click "New OAuth App"
 3. Fill in:
-   - Application name: `peer-plan`
-   - Homepage URL: `https://peer-plan.pages.dev` (or your domain)
-   - Authorization callback URL: `https://peer-plan.pages.dev` (must match exactly)
+   - Application name: `shipyard`
+   - Homepage URL: `https://shipyard.pages.dev` (or your domain)
+   - Authorization callback URL: `https://shipyard.pages.dev` (must match exactly)
 4. Click "Register application"
 5. Copy Client ID
 6. Click "Generate a new client secret" and copy it immediately
@@ -144,7 +144,7 @@ pnpm deploy
 pnpm deploy:production
 ```
 
-**Deployed URL:** `https://peer-plan-github-oauth.jacob-191.workers.dev`
+**Deployed URL:** `https://shipyard-github-oauth.jacob-191.workers.dev`
 
 ### Monitoring
 
@@ -153,7 +153,7 @@ pnpm deploy:production
 pnpm tail
 ```
 
-Dashboard: [Cloudflare Workers](https://dash.cloudflare.com) -> peer-plan-github-oauth -> Metrics
+Dashboard: [Cloudflare Workers](https://dash.cloudflare.com) -> shipyard-github-oauth -> Metrics
 
 ## Security Notes
 

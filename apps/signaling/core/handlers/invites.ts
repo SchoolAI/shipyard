@@ -10,7 +10,7 @@
 
 export { handleCreateInvite, handleListInvites, handleRedeemInvite, handleRevokeInvite };
 
-import type { InviteToken } from '@peer-plan/schema';
+import type { InviteToken } from '@shipyard/schema';
 import type { PlatformAdapter } from '../platform.js';
 import type {
   CreateInviteRequest,
@@ -30,7 +30,7 @@ import type {
 /**
  * Topic prefix for plan documents.
  */
-const PLAN_TOPIC_PREFIX = 'peer-plan-';
+const PLAN_TOPIC_PREFIX = 'shipyard-';
 
 /**
  * Validate an invite token.

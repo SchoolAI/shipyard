@@ -1,5 +1,5 @@
 import { Checkbox, Label } from '@heroui/react';
-import { logPlanEvent, toggleStepCompletion } from '@peer-plan/schema';
+import { logPlanEvent, toggleStepCompletion } from '@shipyard/schema';
 import { useEffect, useState } from 'react';
 import type * as Y from 'yjs';
 import { useUserIdentity } from '@/contexts/UserIdentityContext';

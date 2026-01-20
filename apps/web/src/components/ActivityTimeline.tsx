@@ -1,4 +1,4 @@
-import { getPlanEvents, type PlanEvent, YDOC_KEYS } from '@peer-plan/schema';
+import { getPlanEvents, type PlanEvent, YDOC_KEYS } from '@shipyard/schema';
 import { useEffect, useMemo, useState } from 'react';
 import type * as Y from 'yjs';
 import { ActivityEvent } from '@/components/ActivityEvent';

@@ -41,4 +41,4 @@ jobs:
       - name: Summary
         run: |
           echo "✅ Signaling server deployed"
-          echo "URL: wss://peer-plan-signaling.jacob-191.workers.dev"
+          echo "URL: wss://shipyard-signaling.jacob-191.workers.dev"

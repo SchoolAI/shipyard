@@ -3,7 +3,7 @@
  * Used by KanbanCard to display plan details without blocking render.
  */
 
-import { getDeliverables, getLinkedPRs, type LinkedPR } from '@peer-plan/schema';
+import { getDeliverables, getLinkedPRs, type LinkedPR } from '@shipyard/schema';
 import { useEffect, useState } from 'react';
 import { IndexeddbPersistence } from 'y-indexeddb';
 import * as Y from 'yjs';

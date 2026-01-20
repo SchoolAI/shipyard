@@ -6,7 +6,7 @@ import {
   logPlanEvent,
   type PlanStatusType,
   transitionPlanStatus,
-} from '@peer-plan/schema';
+} from '@shipyard/schema';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import type * as Y from 'yjs';

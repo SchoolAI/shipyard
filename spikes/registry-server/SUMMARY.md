@@ -2,7 +2,7 @@
 
 ## What This Spike Proves
 
-This spike validates that a **file-based registry with dedicated HTTP server** is a viable approach for browser discovery of WebSocket servers in peer-plan.
+This spike validates that a **file-based registry with dedicated HTTP server** is a viable approach for browser discovery of WebSocket servers in shipyard.
 
 ## Key Findings
 
@@ -18,7 +18,7 @@ This spike validates that a **file-based registry with dedicated HTTP server** i
 - OPTIONS preflight must be handled for cross-origin requests
 
 ### 3. File-Based Registry Is Adequate
-- Simple JSON file at `~/.peer-plan/servers.json`
+- Simple JSON file at `~/.shipyard/servers.json`
 - Each WS server manages its own entry
 - Registry server only reads (never writes)
 - Works for local development without database
@@ -43,7 +43,7 @@ OPTIONS /*         - CORS preflight
 ```javascript
 // Lifecycle:
 1. Start on port (e.g., 3100)
-2. Register in ~/.peer-plan/servers.json
+2. Register in ~/.shipyard/servers.json
 3. Accept WebSocket connections
 4. On shutdown: unregister from file
 ```
@@ -98,13 +98,13 @@ These are acceptable for the spike but should be addressed in production:
 
 ## Integration Path
 
-To integrate into peer-plan:
+To integrate into shipyard:
 
 ### 1. MCP Server (`packages/server/`)
 ```typescript
 // On startup:
 - Start WebSocket server on dynamic port
-- Register in ~/.peer-plan/servers.json
+- Register in ~/.shipyard/servers.json
 - Start registry server on port 3001 (if not running)
 
 // On shutdown:
@@ -157,7 +157,7 @@ See `TEST-CHECKLIST.md` for comprehensive test scenarios.
 
 Quick test:
 ```bash
-cd /Users/jacobpetterle/Working Directory/peer-plan/spikes/registry-server
+cd /Users/jacobpetterle/Working Directory/shipyard/spikes/registry-server
 pnpm install
 ./start-all.sh
 # Open http://localhost:3001 in browser

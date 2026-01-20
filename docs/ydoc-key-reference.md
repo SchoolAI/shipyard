@@ -1,11 +1,11 @@
 # Y.Doc Key Reference
 
-Quick reference for all Y.Doc keys used in peer-plan.
+Quick reference for all Y.Doc keys used in shipyard.
 
 ## Import
 
 ```typescript
-import { YDOC_KEYS } from '@peer-plan/schema';
+import { YDOC_KEYS } from '@shipyard/schema';
 ```
 
 ## Keys Overview
@@ -23,7 +23,7 @@ import { YDOC_KEYS } from '@peer-plan/schema';
 
 ### Reading Metadata
 ```typescript
-import { YDOC_KEYS, getPlanMetadata } from '@peer-plan/schema';
+import { YDOC_KEYS, getPlanMetadata } from '@shipyard/schema';
 
 // Option 1: Use helper function (recommended)
 const metadata = getPlanMetadata(ydoc);
@@ -35,7 +35,7 @@ const status = metaMap.get('status');
 
 ### Updating Metadata
 ```typescript
-import { YDOC_KEYS } from '@peer-plan/schema';
+import { YDOC_KEYS } from '@shipyard/schema';
 
 ydoc.transact(() => {
   const metadata = ydoc.getMap(YDOC_KEYS.METADATA);
@@ -47,7 +47,7 @@ ydoc.transact(() => {
 
 ### Reading Content Array
 ```typescript
-import { YDOC_KEYS } from '@peer-plan/schema';
+import { YDOC_KEYS } from '@shipyard/schema';
 
 const contentArray = ydoc.getArray(YDOC_KEYS.CONTENT);
 const blocks = contentArray.toJSON();
@@ -55,7 +55,7 @@ const blocks = contentArray.toJSON();
 
 ### BlockNote Collaboration
 ```typescript
-import { YDOC_KEYS } from '@peer-plan/schema';
+import { YDOC_KEYS } from '@shipyard/schema';
 import { useCreateBlockNote } from '@blocknote/react';
 
 const editor = useCreateBlockNote({
@@ -70,7 +70,7 @@ const editor = useCreateBlockNote({
 
 ### Comment Threads
 ```typescript
-import { YDOC_KEYS } from '@peer-plan/schema';
+import { YDOC_KEYS } from '@shipyard/schema';
 import { YjsThreadStore } from '@blocknote/core/comments';
 
 // Initialize thread store
@@ -84,7 +84,7 @@ const threads = parseThreads(threadsData);
 
 ### Step Completions
 ```typescript
-import { YDOC_KEYS, toggleStepCompletion } from '@peer-plan/schema';
+import { YDOC_KEYS, toggleStepCompletion } from '@shipyard/schema';
 
 // Toggle a step
 toggleStepCompletion(ydoc, 'step-123');
@@ -96,7 +96,7 @@ const isCompleted = steps.get('step-123') || false;
 
 ### Plan Index
 ```typescript
-import { YDOC_KEYS, getPlanIndex } from '@peer-plan/schema';
+import { YDOC_KEYS, getPlanIndex } from '@shipyard/schema';
 
 // Get all plans (only in index doc!)
 const plans = getPlanIndex(indexDoc);
@@ -161,7 +161,7 @@ const editor = useCreateBlockNote({
 ## Validation
 
 ```typescript
-import { isValidYDocKey } from '@peer-plan/schema';
+import { isValidYDocKey } from '@shipyard/schema';
 
 const key = 'metadata';
 if (isValidYDocKey(key)) {
@@ -205,11 +205,11 @@ if (isValidYDocKey(key)) {
 ### ✅ DO
 ```typescript
 // Use constants
-import { YDOC_KEYS } from '@peer-plan/schema';
+import { YDOC_KEYS } from '@shipyard/schema';
 const metadata = ydoc.getMap(YDOC_KEYS.METADATA);
 
 // Use helper functions
-import { getPlanMetadata } from '@peer-plan/schema';
+import { getPlanMetadata } from '@shipyard/schema';
 const metadata = getPlanMetadata(ydoc);
 
 // Use transactions for multiple updates
@@ -243,7 +243,7 @@ If you're refactoring old code:
 - [ ] Replace `'stepCompletions'` with `YDOC_KEYS.STEP_COMPLETIONS`
 - [ ] Replace `'plans'` with `YDOC_KEYS.PLANS`
 - [ ] Verify BlockNote uses DOCUMENT_FRAGMENT, not CONTENT
-- [ ] Add import: `import { YDOC_KEYS } from '@peer-plan/schema';`
+- [ ] Add import: `import { YDOC_KEYS } from '@shipyard/schema';`
 
 ## See Also
 

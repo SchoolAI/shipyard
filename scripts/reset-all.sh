@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Nuclear reset script for peer-plan development
+# Nuclear reset script for shipyard development
 # Clears ALL storage: server LevelDB, browser IndexedDB, localStorage
 #
 # Usage: pnpm reset
@@ -12,23 +12,23 @@ set -euo pipefail
 #   This prevents Claude Code from auto-restarting the hub during reset.
 #
 # This script:
-# 1. Kills all peer-plan dev processes (MCP servers, registry, signaling)
-# 2. Clears server-side LevelDB storage (~/.peer-plan/plans/)
+# 1. Kills all shipyard dev processes (MCP servers, registry, signaling)
+# 2. Clears server-side LevelDB storage (~/.shipyard/plans/)
 # 3. Opens browser to trigger client-side reset (?reset=all)
 
-echo "🧨 Nuclear Reset: Clearing ALL peer-plan data..."
+echo "🧨 Nuclear Reset: Clearing ALL shipyard data..."
 echo ""
 echo "⚠️  If running via Claude Code, please run /mcp disable first!"
 echo "   (This prevents the hub from auto-restarting)"
 echo ""
 
 # --- Step 0: Preparation ---
-echo "⚠️  PREPARATION: Close all peer-plan browser tabs!"
+echo "⚠️  PREPARATION: Close all shipyard browser tabs!"
 echo ""
 echo "   This includes:"
 echo "   • Regular browser tabs on localhost:5173"
 echo "   • Incognito/private windows (separate storage)"
-echo "   • Any tabs showing peer-plan plans"
+echo "   • Any tabs showing shipyard plans"
 echo ""
 echo "   Open tabs will BLOCK IndexedDB deletion."
 echo ""
@@ -48,16 +48,16 @@ echo ""
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-# --- Step 1: Kill all peer-plan processes ---
-echo "🔪 Step 1: Killing all peer-plan processes..."
+# --- Step 1: Kill all shipyard processes ---
+echo "🔪 Step 1: Killing all shipyard processes..."
 
-# Get all PIDs for peer-plan directory (excludes worktrees and VS Code)
-# Matches: Working Directory/peer-plan/
-# Excludes: peer-plan-wt/, biome lsp-proxy, tmux sessions
-echo "  Finding peer-plan processes..."
+# Get all PIDs for shipyard directory (excludes worktrees and VS Code)
+# Matches: Working Directory/shipyard/
+# Excludes: shipyard-wt/, biome lsp-proxy, tmux sessions
+echo "  Finding shipyard processes..."
 pids=$(ps aux | \
-  grep "Working Directory/peer-plan/" | \
-  grep -v "peer-plan-wt" | \
+  grep "Working Directory/shipyard/" | \
+  grep -v "shipyard-wt" | \
   grep -v "biome lsp-proxy" | \
   grep -v "biome __run_server" | \
   grep -v "tmux" | \
@@ -88,26 +88,26 @@ fi
 echo ""
 echo "🗄️  Step 2: Clearing server-side storage..."
 
-PEER_PLAN_DIR="$HOME/.peer-plan"
+SHIPYARD_DIR="$HOME/.shipyard"
 
-if [ -d "$PEER_PLAN_DIR/plans" ]; then
+if [ -d "$SHIPYARD_DIR/plans" ]; then
   # Count what we're deleting
-  plan_count=$(find "$PEER_PLAN_DIR/plans" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l | tr -d ' ')
-  rm -rf "$PEER_PLAN_DIR/plans"
-  echo "  ✓ Cleared $plan_count session(s) from ~/.peer-plan/plans/"
+  plan_count=$(find "$SHIPYARD_DIR/plans" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l | tr -d ' ')
+  rm -rf "$SHIPYARD_DIR/plans"
+  echo "  ✓ Cleared $plan_count session(s) from ~/.shipyard/plans/"
 else
   echo "  ✓ No server storage to clear"
 fi
 
 # Clear hook state (Claude Code session metadata)
-HOOK_STATE_FILE="$PEER_PLAN_DIR/hook-state.json"
+HOOK_STATE_FILE="$SHIPYARD_DIR/hook-state.json"
 if [ -f "$HOOK_STATE_FILE" ]; then
   rm -f "$HOOK_STATE_FILE"
   echo "  ✓ Cleared hook state (session metadata)"
 fi
 
 # Clear hub.lock (contains stale PID from killed MCP server)
-HUB_LOCK_FILE="$PEER_PLAN_DIR/hub.lock"
+HUB_LOCK_FILE="$SHIPYARD_DIR/hub.lock"
 if [ -f "$HUB_LOCK_FILE" ]; then
   rm -f "$HUB_LOCK_FILE"
   echo "  ✓ Cleared hub.lock (stale process lock)"
@@ -278,7 +278,7 @@ else
 
   echo "  ✓ Vite stopped"
   echo ""
-  echo "🎉 Reset complete! Local peer-plan data has been cleared."
+  echo "🎉 Reset complete! Local shipyard data has been cleared."
   echo ""
   echo "📝 Note: To reset GitHub Pages (production), use DevTools:"
   echo "   Application → Storage → Clear site data"

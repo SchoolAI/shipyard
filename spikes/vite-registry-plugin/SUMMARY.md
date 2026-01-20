@@ -24,7 +24,7 @@ vite-registry-plugin/
 
 ### 1. WebSocket Server (ws-server.js)
 - Starts on random port (port 0)
-- Registers in `~/.peer-plan/servers.json` on startup
+- Registers in `~/.shipyard/servers.json` on startup
 - Unregisters on shutdown (SIGINT/SIGTERM)
 - Simple echo server for testing
 - Unique server ID per instance
@@ -51,11 +51,11 @@ vite-registry-plugin/
 node ws-server.js
 
 # Check registry
-cat ~/.peer-plan/servers.json
+cat ~/.shipyard/servers.json
 # Shows: { "servers": [ { "id": "...", "port": 58195, ... } ] }
 
 # Stop server (Ctrl+C)
-cat ~/.peer-plan/servers.json
+cat ~/.shipyard/servers.json
 # Shows: { "servers": [] }
 ```
 
@@ -107,7 +107,7 @@ These would be needed for production but are intentionally omitted from this spi
 - Multiple registry files (per project/session)
 - Race condition handling for concurrent writes
 
-## Integration with Peer-Plan
+## Integration with Shipyard
 
 This spike validates the discovery pattern for:
 - MCP server registering WebSocket port

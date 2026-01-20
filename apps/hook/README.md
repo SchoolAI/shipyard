@@ -1,12 +1,12 @@
 // TODO: Convert to a runbook
 
-# @peer-plan/hook
+# @shipyard/hook
 
-Claude Code integration hook for peer-plan. Automatically creates and syncs plans when agents enter plan mode.
+Claude Code integration hook for shipyard. Automatically creates and syncs plans when agents enter plan mode.
 
 ## How It Works
 
-This hook intercepts Claude Code events and bridges them to the peer-plan system:
+This hook intercepts Claude Code events and bridges them to the shipyard system:
 
 1. **EnterPlanMode** → Creates plan, opens browser, sets "Claude is here" presence
 2. **Write/Edit** (in plan mode) → Syncs content in real-time
@@ -17,26 +17,26 @@ This hook intercepts Claude Code events and bridges them to the peer-plan system
 ### Prerequisites
 
 - Node.js 22+ (LTS)
-- peer-plan MCP server running (`@peer-plan/server`)
+- shipyard MCP server running (`@shipyard/server`)
 
 ### Option 1: npm Global Install (Recommended for Users)
 
 ```bash
-npm install -g @peer-plan/hook
+npm install -g @shipyard/hook
 ```
 
 The postinstall script automatically configures Claude Code hooks in `~/.claude/settings.json`. Just restart Claude Code after installation.
 
 If the automatic setup didn't work, you can manually run:
 ```bash
-peer-plan-hook-install
+shipyard-hook-install
 ```
 
 ### Option 2: Plugin Directory (Testing/Development)
 
 ```bash
 # Build the hook first
-cd /path/to/peer-plan
+cd /path/to/shipyard
 pnpm build
 
 # Run Claude Code with explicit plugin directory
@@ -47,18 +47,18 @@ This loads the plugin without global installation - useful for testing.
 
 ### Option 3: Local Development
 
-For active development on peer-plan itself:
+For active development on shipyard itself:
 
 ```bash
-cd /path/to/peer-plan
+cd /path/to/shipyard
 
 # One-time: Create global symlink
-pnpm --filter @peer-plan/hook dev:link
+pnpm --filter @shipyard/hook dev:link
 
 # Run in watch mode (rebuilds on changes)
-pnpm --filter @peer-plan/hook dev
+pnpm --filter @shipyard/hook dev
 
-# The hooks.json expects "peer-plan-hook" in PATH
+# The hooks.json expects "shipyard-hook" in PATH
 # pnpm link --global creates this symlink automatically
 ```
 
@@ -72,18 +72,18 @@ If you prefer manual setup, add to `~/.claude/settings.json`:
     "PermissionRequest": [
       {
         "matcher": "ExitPlanMode",
-        "hooks": [{ "type": "command", "command": "peer-plan-hook", "timeout": 1800 }]
+        "hooks": [{ "type": "command", "command": "shipyard-hook", "timeout": 1800 }]
       }
     ],
     "PostToolUse": [
       {
         "matcher": "ExitPlanMode",
-        "hooks": [{ "type": "command", "command": "peer-plan-hook" }]
+        "hooks": [{ "type": "command", "command": "shipyard-hook" }]
       }
     ],
     "SessionStart": [
       {
-        "hooks": [{ "type": "command", "command": "peer-plan-hook --context" }]
+        "hooks": [{ "type": "command", "command": "shipyard-hook --context" }]
       }
     ]
   }
@@ -103,7 +103,7 @@ The install script adds this to `~/.claude/settings.json`:
         "hooks": [
           {
             "type": "command",
-            "command": "peer-plan-hook"
+            "command": "shipyard-hook"
           }
         ]
       }
@@ -114,7 +114,7 @@ The install script adds this to `~/.claude/settings.json`:
         "hooks": [
           {
             "type": "command",
-            "command": "peer-plan-hook",
+            "command": "shipyard-hook",
             "timeout": 1800
           }
         ]
@@ -128,10 +128,10 @@ The install script adds this to `~/.claude/settings.json`:
 
 ## Local Testing
 
-### 1. Start the peer-plan stack
+### 1. Start the shipyard stack
 
 ```bash
-cd /path/to/peer-plan
+cd /path/to/shipyard
 
 # Terminal 1: Start MCP server (includes registry + WebSocket)
 pnpm dev:server
@@ -143,7 +143,7 @@ pnpm dev:web
 ### 2. Build the hook
 
 ```bash
-pnpm --filter @peer-plan/hook build
+pnpm --filter @shipyard/hook build
 ```
 
 ### 3. Run the test harness
@@ -184,7 +184,7 @@ The hook logs to stderr, so you can see them in Claude Code's debug output.
 
 The hook maintains session state at:
 ```
-~/.peer-plan/hook-state.json
+~/.shipyard/hook-state.json
 ```
 
 This file maps session IDs to plan IDs. It's automatically cleaned up after 24 hours.
@@ -195,7 +195,7 @@ This file maps session IDs to plan IDs. It's automatically cleaned up after 24 h
 Claude Code → Hook CLI → HTTP API → Registry Server → Y.Doc
                 ↓
             State File
-        (~/.peer-plan/hook-state.json)
+        (~/.shipyard/hook-state.json)
 ```
 
 ### Adapter Pattern
@@ -239,8 +239,8 @@ pnpm lint:fix
 
 1. Check Claude Code settings are correct
 2. Restart Claude Code after changing settings
-3. Check hook binary exists: `which peer-plan-hook`
-4. Check hook binary is executable: `ls -l $(which peer-plan-hook)`
+3. Check hook binary exists: `which shipyard-hook`
+4. Check hook binary is executable: `ls -l $(which shipyard-hook)`
 
 ### Plan not appearing
 
@@ -252,7 +252,7 @@ pnpm lint:fix
 
 1. Check WebSocket connection in browser dev tools
 2. Verify plan ID matches between hook state and browser URL
-3. Check `~/.peer-plan/hook-state.json` for session mapping
+3. Check `~/.shipyard/hook-state.json` for session mapping
 
 ### Review not blocking exit
 
@@ -266,7 +266,7 @@ pnpm lint:fix
 |----------|---------|-------------|
 | `REGISTRY_PORT` | `32191,32192` | Registry server port |
 | `LOG_LEVEL` | `info` | Log level (debug, info, warn, error) |
-| `PEER_PLAN_STATE_DIR` | `~/.peer-plan` | State directory |
+| `SHIPYARD_STATE_DIR` | `~/.shipyard` | State directory |
 
 ## License
 

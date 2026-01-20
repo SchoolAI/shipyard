@@ -1,5 +1,5 @@
 import { Button } from '@heroui/react';
-import { getPlanOwnerId, type PlanMetadata } from '@peer-plan/schema';
+import { getPlanOwnerId, type PlanMetadata } from '@shipyard/schema';
 import { Clock, Loader2, LogIn, ShieldX, TicketX, User } from 'lucide-react';
 import type { ReactNode } from 'react';
 import type { WebrtcProvider } from 'y-webrtc';

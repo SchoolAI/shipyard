@@ -4,7 +4,7 @@
  */
 
 import { Button, Chip } from '@heroui/react';
-import type { PlanMetadata, PlanStatusType } from '@peer-plan/schema';
+import type { PlanMetadata, PlanStatusType } from '@shipyard/schema';
 import { AlertTriangle, Check, Clock } from 'lucide-react';
 import { assertNever } from '../utils/assert-never';
 import { PanelControlButtons } from './PanelControlButtons';
