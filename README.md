@@ -1,6 +1,10 @@
-# Shipyard
+<div align="center">
+  <img src="apps/web/public/icon.svg" alt="Shipyard Logo" width="200" height="200">
+  <h1>Shipyard</h1>
+  <p><strong>P2P collaborative review for AI-generated implementation plans</strong></p>
+</div>
 
-P2P collaborative review for AI-generated implementation plans.
+---
 
 The Penrose triangle logo represents the "impossible triangle" of AI development: quality, speed, and low effort. Traditionally you sacrifice one. Shipyard enables all three through collaborative verification loops.
 
