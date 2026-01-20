@@ -142,8 +142,8 @@ export function useMultiProviderSync(
   /** WebRTC provider for P2P sync (null if not connected) */
   rtcProvider: WebrtcProvider | null;
 } {
-  // Don't enable WebRTC for plan-index (only for individual plans)
-  const enableWebRTC = options.enableWebRTC ?? docName !== 'plan-index';
+  // Enable WebRTC for all documents including plan-index (needed for remote sync)
+  const enableWebRTC = options.enableWebRTC ?? true;
   const { identity: githubIdentity } = useGitHubAuth();
   // biome-ignore lint/correctness/useExhaustiveDependencies: docName triggers Y.Doc recreation intentionally
   const ydoc = useMemo(() => new Y.Doc(), [docName]);
