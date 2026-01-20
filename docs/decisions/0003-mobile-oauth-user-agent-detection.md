@@ -7,7 +7,7 @@ Accepted
 
 **Issue #83** reported that mobile browsers (iOS Safari, Android Chrome) could briefly open a desktop app during the GitHub OAuth flow instead of staying in the mobile browser, creating jarring UX.
 
-**Root cause:** When GitHub redirects back to the app domain (e.g., `https://schoolai.github.io/shipyard?code=xxx`), mobile operating systems check for Universal Links (iOS) or App Links (Android) configuration. If the domain is associated with an installed app, the OS may launch that app instead of staying in the browser.
+**Root cause:** When GitHub redirects back to the app domain (e.g., `https://schoolai.github.io/peer-plan?code=xxx`), mobile operating systems check for Universal Links (iOS) or App Links (Android) configuration. If the domain is associated with an installed app, the OS may launch that app instead of staying in the browser.
 
 This only occurs if `.well-known/apple-app-site-association` (iOS) or `.well-known/assetlinks.json` (Android) files exist on the domain and are configured to deep link the OAuth callback path.
 
@@ -102,7 +102,7 @@ interface TokenExchangeResponse {
 
 ### Manual Testing (Required for Production)
 1. **iOS Safari:**
-   - Open `https://schoolai.github.io/Shipyard` on iPhone
+   - Open `https://schoolai.github.io/peer-plan` on iPhone
    - Sign in with GitHub
    - Verify: OAuth flow completes successfully in mobile browser
    - Check console logs for `[OAuth] Mobile device detected` message
@@ -125,8 +125,8 @@ interface TokenExchangeResponse {
 If a Shipyard mobile app is developed and deep linking is configured:
 
 1. **Create separate OAuth paths:**
-   - Desktop: `https://schoolai.github.io/Shipyard/`
-   - Mobile: `https://schoolai.github.io/Shipyard/oauth-mobile`
+   - Desktop: `https://schoolai.github.io/peer-plan/`
+   - Mobile: `https://schoolai.github.io/peer-plan/oauth-mobile`
 
 2. **Update `.well-known` configuration:**
    ```json

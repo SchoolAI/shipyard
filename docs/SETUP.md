@@ -172,7 +172,7 @@ The `?reset=all` URL parameter only works in development mode. To reset producti
 
 1. Close all Shipyard browser tabs
 2. Kill any local MCP servers: `pkill -f "Shipyard"`
-3. Open GitHub Pages: https://schoolai.github.io/Shipyard/
+3. Open GitHub Pages: https://schoolai.github.io/peer-plan/
 4. Open DevTools → Application → Storage → **Clear site data**
 
 ### Manual Reset

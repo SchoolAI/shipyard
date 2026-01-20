@@ -44,9 +44,9 @@ function githubPagesSpa(): Plugin {
 }
 
 export default defineConfig(({ mode }) => ({
-  // Base path for GitHub Pages: https://schoolai.github.io/shipyard/
-  // Use '/' for development, '/shipyard/' for production
-  base: mode === 'production' ? '/shipyard/' : '/',
+  // Base path for GitHub Pages: https://schoolai.github.io/peer-plan/
+  // Use '/' for development, '/peer-plan/' for production
+  base: mode === 'production' ? '/peer-plan/' : '/',
   plugins: [tailwindcss(), react(), githubPagesSpa()],
   server: {
     port: 5173,
