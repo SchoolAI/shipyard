@@ -2,6 +2,7 @@ import { execSync } from 'node:child_process';
 import { ServerBlockNoteEditor } from '@blocknote/server-util';
 import {
   addSnapshot,
+  createLinkedPR,
   createPlanSnapshot,
   createPlanUrlWithHistory,
   GitHubPRResponseSchema,
@@ -302,15 +303,15 @@ async function tryAutoLinkPR(ydoc: Y.Doc, repo: string): Promise<LinkedPR | null
     // Validate GitHub API response
     const validatedPR = GitHubPRResponseSchema.parse(pr);
 
-    const linkedPR: LinkedPR = {
+    // Create LinkedPR object using factory for consistent validation
+    const linkedPR = createLinkedPR({
       prNumber: validatedPR.number,
       url: validatedPR.html_url,
-      linkedAt: Date.now(),
       // We query for state: 'open' only, so merged/closed are never returned
       status: validatedPR.draft ? 'draft' : 'open',
       branch,
       title: validatedPR.title,
-    };
+    });
 
     // Store in Y.Doc
     const actorName = await getGitHubUsername();
@@ -329,10 +330,7 @@ async function tryAutoLinkPR(ydoc: Y.Doc, repo: string): Promise<LinkedPR | null
       const fieldErrors = error.issues
         .map((issue) => `${issue.path.join('.')}: ${issue.message}`)
         .join(', ');
-      logger.error(
-        { fieldErrors, repo, branch },
-        'Invalid GitHub PR response during auto-link'
-      );
+      logger.error({ fieldErrors, repo, branch }, 'Invalid GitHub PR response during auto-link');
       return null;
     }
     logger.warn({ error, repo, branch }, 'Failed to lookup PR from GitHub');

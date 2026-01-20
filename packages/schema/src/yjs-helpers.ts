@@ -379,7 +379,13 @@ export function getArtifacts(ydoc: Y.Doc): Artifact[] {
 }
 
 export function addArtifact(ydoc: Y.Doc, artifact: Artifact, actor?: string): void {
-  // Validate discriminated union (storage: 'github' | 'local') before writing
+  // CRITICAL: Validate BEFORE transaction to prevent partial writes on validation failure
+  // Validates discriminated union (storage: 'github' | 'local')
+  //
+  // Why validation-first pattern matters:
+  // - If validation throws inside transaction, Y.Doc may contain partial/corrupted state
+  // - Pre-validation ensures atomic all-or-nothing behavior
+  // - Failed validation returns clear error without touching Y.Doc
   const validated = ArtifactSchema.parse(artifact);
 
   ydoc.transact(
@@ -417,10 +423,19 @@ export function getAgentPresences(ydoc: Y.Doc): Map<string, AgentPresence> {
 }
 
 export function setAgentPresence(ydoc: Y.Doc, presence: AgentPresence, actor?: string): void {
+  // CRITICAL: Validate BEFORE transaction to prevent partial writes on validation failure
+  // If validation throws mid-transaction, the transaction may have partial state
+  //
+  // Why validation-first pattern matters:
+  // - If validation throws inside transaction, Y.Doc may contain partial/corrupted state
+  // - Pre-validation ensures atomic all-or-nothing behavior
+  // - Failed validation returns clear error without touching Y.Doc
+  const validated = AgentPresenceSchema.parse(presence);
+
   ydoc.transact(
     () => {
       const map = ydoc.getMap<AgentPresence>(YDOC_KEYS.PRESENCE);
-      map.set(presence.sessionId, presence);
+      map.set(validated.sessionId, validated);
     },
     actor ? { actor } : undefined
   );
@@ -453,10 +468,13 @@ export function getDeliverables(ydoc: Y.Doc): Deliverable[] {
 }
 
 export function addDeliverable(ydoc: Y.Doc, deliverable: Deliverable, actor?: string): void {
+  // Validate before writing to catch programmer errors at the source
+  const validated = DeliverableSchema.parse(deliverable);
+
   ydoc.transact(
     () => {
       const array = ydoc.getArray<Deliverable>(YDOC_KEYS.DELIVERABLES);
-      array.push([deliverable]);
+      array.push([validated]);
     },
     actor ? { actor } : undefined
   );
@@ -653,7 +671,13 @@ export function getLinkedPRs(ydoc: Y.Doc): LinkedPR[] {
 }
 
 export function linkPR(ydoc: Y.Doc, pr: LinkedPR, actor?: string): void {
-  // Validate before writing to catch programmer errors at the source
+  // CRITICAL: Validate BEFORE transaction to prevent partial writes on validation failure
+  // If validation throws mid-transaction, the transaction may have partial state
+  //
+  // Why validation-first pattern matters:
+  // - If validation throws inside transaction, Y.Doc may contain partial/corrupted state
+  // - Pre-validation ensures atomic all-or-nothing behavior
+  // - Failed validation returns clear error without touching Y.Doc
   const validated = LinkedPRSchema.parse(pr);
 
   ydoc.transact(
@@ -725,10 +749,13 @@ export function getPRReviewCommentsForPR(ydoc: Y.Doc, prNumber: number): PRRevie
 }
 
 export function addPRReviewComment(ydoc: Y.Doc, comment: PRReviewComment, actor?: string): void {
+  // Validate before writing to catch programmer errors at the source
+  const validated = PRReviewCommentSchema.parse(comment);
+
   ydoc.transact(
     () => {
       const array = ydoc.getArray<PRReviewComment>(YDOC_KEYS.PR_REVIEW_COMMENTS);
-      array.push([comment]);
+      array.push([validated]);
     },
     actor ? { actor } : undefined
   );
@@ -970,10 +997,13 @@ export function getSnapshots(ydoc: Y.Doc): PlanSnapshot[] {
  * Snapshots are append-only for CRDT correctness.
  */
 export function addSnapshot(ydoc: Y.Doc, snapshot: PlanSnapshot, actor?: string): void {
+  // Validate before writing to catch programmer errors at the source
+  const validated = PlanSnapshotSchema.parse(snapshot);
+
   ydoc.transact(
     () => {
       const array = ydoc.getArray<PlanSnapshot>(YDOC_KEYS.SNAPSHOTS);
-      array.push([snapshot]);
+      array.push([validated]);
     },
     actor ? { actor } : undefined
   );

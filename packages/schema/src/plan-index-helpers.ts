@@ -44,7 +44,13 @@ export function getPlanIndexEntry(ydoc: Y.Doc, planId: string): PlanIndexEntry |
  * Adds or updates a plan in the index.
  */
 export function setPlanIndexEntry(ydoc: Y.Doc, entry: PlanIndexEntry): void {
-  // Validate discriminated union (deleted: true | false) before writing
+  // CRITICAL: Validate BEFORE accessing Y.Doc to prevent partial writes on validation failure
+  // Validates discriminated union (deleted: true | false)
+  //
+  // Why validation-first pattern matters:
+  // - If validation throws after Y.Doc access, Y.Doc may contain partial/corrupted state
+  // - Pre-validation ensures atomic all-or-nothing behavior
+  // - Failed validation returns clear error without touching Y.Doc
   const validated = PlanIndexEntrySchema.parse(entry);
 
   const plansMap = ydoc.getMap<Record<string, unknown>>('plans');

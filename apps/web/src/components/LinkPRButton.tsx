@@ -94,11 +94,10 @@ export function LinkPRButton({
 
       const pr = await response.json();
 
-      // Create LinkedPR object
-      const linkedPR: LinkedPR = {
+      // Create LinkedPR object using factory for consistent validation
+      const linkedPR = createLinkedPR({
         prNumber,
         url: pr.html_url,
-        linkedAt: Date.now(),
         status: pr.merged
           ? 'merged'
           : pr.state === 'closed'
@@ -108,7 +107,7 @@ export function LinkPRButton({
               : 'open',
         branch: pr.head.ref,
         title: pr.title,
-      };
+      });
 
       // Store in Y.Doc
       linkPR(ydoc, linkedPR);

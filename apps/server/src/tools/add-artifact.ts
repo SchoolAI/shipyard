@@ -6,6 +6,7 @@ import {
   type ArtifactType,
   addArtifact,
   addSnapshot,
+  createLinkedPR,
   createPlanSnapshot,
   createPlanUrlWithHistory,
   type GitHubArtifact,
@@ -630,14 +631,14 @@ async function tryAutoLinkPR(ydoc: Y.Doc, repo: string): Promise<LinkedPR | null
     const prState = validatedPR.state as 'open' | 'closed';
     switch (prState) {
       case 'open': {
-        const linkedPR: LinkedPR = {
+        // Create LinkedPR object using factory for consistent validation
+        const linkedPR = createLinkedPR({
           prNumber: validatedPR.number,
           url: validatedPR.html_url,
-          linkedAt: Date.now(),
           status: validatedPR.draft ? 'draft' : 'open',
           branch,
           title: validatedPR.title,
-        };
+        });
 
         // Store in Y.Doc
         const actorName = await getGitHubUsername();

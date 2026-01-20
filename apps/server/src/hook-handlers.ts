@@ -11,6 +11,7 @@ import {
   addDeliverable,
   type CreateHookSessionRequest,
   type CreateHookSessionResponse,
+  createInitialConversationVersion,
   createUserResolver,
   extractDeliverables,
   formatDeliverablesForLLM,
@@ -134,14 +135,16 @@ export async function createSessionHandler(
 
   if (origin && origin.platform === 'claude-code') {
     const metadata = ydoc.getMap('metadata');
-    const initialVersion = {
+    const creator =
+      typeof input.metadata?.ownerId === 'string' ? input.metadata.ownerId : 'unknown';
+    const initialVersion = createInitialConversationVersion({
       versionId: nanoid(),
-      creator: input.metadata?.ownerId || 'unknown',
+      creator,
       platform: origin.platform,
       sessionId: origin.sessionId,
       messageCount: 0,
       createdAt: now,
-    };
+    });
     metadata.set('conversationVersions', [initialVersion]);
     ctx.logger.info(
       { planId, versionId: initialVersion.versionId },

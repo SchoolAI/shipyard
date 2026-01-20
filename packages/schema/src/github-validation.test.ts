@@ -41,7 +41,7 @@ describe('GitHubPRResponseSchema', () => {
     expect(result.state).toBe('closed');
   });
 
-  it('should apply defaults for missing draft and merged fields', () => {
+  it('should reject response with missing draft and merged fields', () => {
     const minimalResponse = {
       number: 1,
       html_url: 'https://github.com/owner/repo/pull/1',
@@ -52,10 +52,8 @@ describe('GitHubPRResponseSchema', () => {
       },
     };
 
-    const result = GitHubPRResponseSchema.parse(minimalResponse);
-
-    expect(result.draft).toBe(false);
-    expect(result.merged).toBe(false);
+    // Missing draft and merged fields should cause validation to fail
+    expect(() => GitHubPRResponseSchema.parse(minimalResponse)).toThrow();
   });
 
   it('should reject response with missing required fields', () => {

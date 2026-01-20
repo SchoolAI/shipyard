@@ -1,7 +1,7 @@
 import {
+  createLinkedPR,
   GitHubPRResponseSchema,
   getPlanMetadata,
-  type LinkedPR,
   linkPR,
   logPlanEvent,
 } from '@peer-plan/schema';
@@ -142,11 +142,10 @@ link_pr({
       // Validate GitHub API response
       const validatedPR = GitHubPRResponseSchema.parse(pr);
 
-      // Create LinkedPR object
-      const linkedPR: LinkedPR = {
+      // Create LinkedPR object using factory for consistent validation
+      const linkedPR = createLinkedPR({
         prNumber: input.prNumber,
         url: validatedPR.html_url,
-        linkedAt: Date.now(),
         status: validatedPR.merged
           ? 'merged'
           : validatedPR.state === 'closed'
@@ -156,7 +155,7 @@ link_pr({
               : 'open',
         branch: input.branch || validatedPR.head.ref,
         title: validatedPR.title,
-      };
+      });
 
       // Get actor name for event logging
       const actorName = await getGitHubUsername();
