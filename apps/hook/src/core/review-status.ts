@@ -25,7 +25,6 @@ import { logger } from '../logger.js';
 import { generateSessionToken, hashSessionToken } from '../session-token.js';
 import { createPlan } from './plan-manager.js';
 
-// --- Review Decision Types ---
 
 interface ReviewDecision {
   approved: boolean;
@@ -33,7 +32,6 @@ interface ReviewDecision {
   deliverables?: Deliverable[];
 }
 
-// --- Server-Side Approval Observer ---
 
 /**
  * Wait for review decision via server-side observer.
@@ -44,10 +42,8 @@ async function waitForReviewDecision(
   planId: string,
   _wsUrl: string
 ): Promise<ReviewDecision & { reviewComment?: string; reviewedBy?: string; status?: string }> {
-  // Call server API which handles the Y.Doc observer and blocking logic
   logger.info({ planId }, 'Waiting for approval via server endpoint');
 
-  // Server will generate reviewRequestId and manage the observer
   const result = await waitForApproval(planId, planId);
 
   logger.info({ planId, approved: result.approved }, 'Received approval decision from server');
@@ -62,13 +58,6 @@ async function waitForReviewDecision(
   };
 }
 
-// --- Review Status Check ---
-
-/**
- * Handle review of updated plan content.
- * Called when plan content has changed since last approval.
- * Re-syncs content and blocks for new review decision.
- */
 async function handleUpdatedPlanReview(
   sessionId: string,
   planId: string,
@@ -80,7 +69,6 @@ async function handleUpdatedPlanReview(
     'Plan content changed, triggering re-review'
   );
 
-  // Sync updated content
   logger.info({ planId }, 'Syncing updated plan content');
   try {
     await updatePlanContent(planId, {
@@ -88,16 +76,12 @@ async function handleUpdatedPlanReview(
     });
   } catch (err) {
     const error = err as Error;
-    // If plan doesn't exist (404), create a new plan seamlessly
     if (error.message?.includes('404')) {
       logger.warn(
         { planId, sessionId },
         'Plan not found (404), creating new plan with updated content'
       );
-      // Server manages state cleanup
 
-      // Recursively call the new plan creation path
-      // This will create the plan, sync content, and block for approval
       return await checkReviewStatus(sessionId, planContent, _originMetadata);
     }
     throw err;
@@ -109,23 +93,19 @@ async function handleUpdatedPlanReview(
     'Content synced, browser already open. Waiting for server approval...'
   );
 
-  // Block until user approves/denies via server-side Y.Doc observer
   const decision = await waitForReviewDecision(planId, '');
   logger.info({ planId, approved: decision.approved }, 'Decision received via Y.Doc');
 
   if (decision.approved) {
-    // Generate NEW session token on re-approval
     const sessionToken = generateSessionToken();
     const sessionTokenHash = hashSessionToken(sessionToken);
 
     logger.info({ planId }, 'Generating new session token for re-approved plan');
 
     try {
-      // Set the token hash on the server
       const tokenResult = await setSessionToken(planId, sessionTokenHash);
       const url = tokenResult.url;
 
-      // Deliverables are stored by the server in waitForApprovalHandler
       const deliverableCount = (decision.deliverables ?? []).length;
 
       logger.info(
@@ -142,7 +122,6 @@ async function handleUpdatedPlanReview(
       };
     } catch (err) {
       logger.error({ err, planId }, 'Failed to set session token, but plan was approved');
-      // Still approve since human approved, just without token
       return {
         allow: true,
         message: 'Updated plan approved (session token unavailable)',
@@ -151,7 +130,6 @@ async function handleUpdatedPlanReview(
     }
   }
 
-  // Changes requested - server manages state cleanup
   logger.debug({ planId }, 'Changes requested - server will manage state cleanup');
 
   return {
@@ -161,44 +139,35 @@ async function handleUpdatedPlanReview(
   };
 }
 
-/**
- * Check review status for a session's plan.
- * Called when agent tries to exit plan mode.
- */
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Complex review flow requires conditional logic
 export async function checkReviewStatus(
   sessionId: string,
   planContent?: string,
   originMetadata?: Record<string, unknown>
 ): Promise<CoreResponse> {
-  // Query server for session state
   const state = await getSessionContext(sessionId);
   let planId: string;
 
-  // Blocking approach: Create plan from ExitPlanMode if we have content
   if (!state.found && planContent) {
     logger.info(
       { sessionId, contentLength: planContent.length, hasState: !!state },
       'Creating plan from ExitPlanMode (blocking mode)'
     );
 
-    // Create plan (this opens browser)
     const result = await createPlan({
       sessionId,
       agentType: DEFAULT_AGENT_TYPE,
       metadata: {
         source: 'ExitPlanMode',
-        ...originMetadata, // Spread origin fields (originSessionId, originTranscriptPath, originCwd)
+        ...originMetadata,
       },
     });
 
     planId = result.planId;
 
-    // Sync content immediately
     logger.info({ planId }, 'Syncing plan content');
     await updatePlanContent(planId, {
       content: planContent,
-      // filePath removed - server doesn't use it, was metadata only
     });
 
     logger.info(
@@ -206,23 +175,19 @@ export async function checkReviewStatus(
       'Plan created and synced, browser opened. Waiting for server approval...'
     );
 
-    // Block until user approves/denies via server-side Y.Doc observer
     const decision = await waitForReviewDecision(planId, '');
     logger.info({ planId, approved: decision.approved }, 'Decision received via Y.Doc');
 
     if (decision.approved) {
-      // Generate session token on approval so Claude can call add_artifact, etc.
       const sessionToken = generateSessionToken();
       const sessionTokenHash = hashSessionToken(sessionToken);
 
       logger.info({ planId }, 'Generating session token for approved plan');
 
       try {
-        // Set the token hash on the server
         const tokenResult = await setSessionToken(planId, sessionTokenHash);
         const url = tokenResult.url;
 
-        // Server stores deliverables and session data via waitForApprovalHandler
         const deliverableCount = (decision.deliverables ?? []).length;
 
         logger.info(
@@ -239,7 +204,6 @@ export async function checkReviewStatus(
         };
       } catch (err) {
         logger.error({ err, planId }, 'Failed to set session token, approving without it');
-        // Still approve, just without token
         return {
           allow: true,
           message:
@@ -249,7 +213,6 @@ export async function checkReviewStatus(
       }
     }
 
-    // Changes requested - server manages state cleanup
     logger.debug({ sessionId }, 'Changes requested - server will manage state cleanup');
 
     return {
@@ -260,12 +223,10 @@ export async function checkReviewStatus(
   }
 
   if (!state.found) {
-    // No state and no plan content - allow exit
     logger.info({ sessionId }, 'No session state or plan content, allowing exit');
     return { allow: true };
   }
 
-  // Unreachable: if we have content but no state, should have been handled above
   if ((!state || !state.planId) && planContent) {
     logger.error(
       { sessionId, hasPlanContent: !!planContent, hasState: !!state, statePlanId: state?.planId },
@@ -278,13 +239,11 @@ export async function checkReviewStatus(
     };
   }
 
-  // At this point, state.planId must exist (checked above)
   if (!state.planId) {
     throw new Error('Unreachable: state.planId should exist at this point');
   }
   planId = state.planId;
 
-  // If we have new plan content, trigger re-review
   if (planContent) {
     logger.info({ planId }, 'Plan content provided, triggering re-review');
     return await handleUpdatedPlanReview(sessionId, planId, planContent, originMetadata);
@@ -348,17 +307,11 @@ export async function checkReviewStatus(
       };
 
     default: {
-      // Exhaustive check for unknown status values
       assertNever(status);
     }
   }
 }
 
-// --- Feedback Formatting ---
-
-/**
- * Format review feedback into a human-readable message.
- */
 function formatFeedbackMessage(feedback?: ReviewFeedback[]): string {
   if (!feedback?.length) {
     return 'Changes requested. Check the plan for reviewer comments.';

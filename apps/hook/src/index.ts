@@ -17,18 +17,9 @@ import { checkReviewStatus } from './core/review-status.js';
 import { getDeliverableContext, getSessionContext } from './http-client.js';
 import { logger } from './logger.js';
 
-// --- Adapter Selection ---
-
-/**
- * Get the appropriate adapter based on environment or input detection.
- * For now, we default to Claude Code adapter.
- */
 function getAdapter(): AgentAdapter {
-  // Future: Could detect adapter type from input or environment
   return claudeCodeAdapter;
 }
-
-// --- Event Handlers ---
 
 /**
  * Handle plan_start event (agent entering plan mode).
@@ -50,9 +41,10 @@ async function handlePlanStart(
       url: result.url,
     };
   } catch (err) {
-    // Logs go to: stderr (visible in Claude Code) + ~/.peer-plan/hook-debug.log
-    // Fail open here because plan creation failure shouldn't block the agent's work.
-    // The agent can still proceed without peer-plan features.
+    /*
+     * Fail-open policy: plan creation failure shouldn't block agent work.
+     * The agent can still proceed without peer-plan features.
+     */
     logger.error({ err }, 'Failed to create plan');
     return { allow: true };
   }
@@ -94,14 +86,11 @@ async function handlePlanExit(
       'Failed to check review status'
     );
 
-    // Check error type using structured properties instead of string matching
-    // Prefer error.code over message string matching for better reliability
     const isConnectionError =
       error.code === 'ECONNREFUSED' ||
       error.code === 'ECONNRESET' ||
       error.code === 'ETIMEDOUT' ||
       error.code === 'ENOTFOUND' ||
-      // Fallback to message matching for errors without structured codes
       error.message?.includes('connect') ||
       error.message?.includes('timeout') ||
       error.message?.includes('WebSocket') ||
@@ -127,7 +116,6 @@ async function handlePostExit(
   event: Extract<AdapterEvent, { type: 'post_exit' }>
 ): Promise<CoreResponse> {
   try {
-    // Get session context from server registry (replaces local state.ts)
     const sessionContext = await getSessionContext(event.sessionId);
 
     if (!sessionContext.found) {
@@ -146,7 +134,6 @@ async function handlePostExit(
       'Injecting session context via PostToolUse'
     );
 
-    // Get pre-formatted context from server
     const result = await getDeliverableContext(planId, sessionToken);
 
     return {
@@ -159,7 +146,6 @@ async function handlePostExit(
     };
   } catch (err) {
     logger.error({ err, sessionId: event.sessionId }, 'Failed to get session context from server');
-    // Fail gracefully - still allow exit, but without formatted context
     return {
       allow: true,
       hookType: 'post_tool_use',
@@ -168,11 +154,6 @@ async function handlePostExit(
   }
 }
 
-// --- Main Entry Point ---
-
-/**
- * Process a hook event and return the response.
- */
 async function processEvent(_adapter: AgentAdapter, event: AdapterEvent): Promise<CoreResponse> {
   switch (event.type) {
     case 'plan_start':
@@ -188,11 +169,9 @@ async function processEvent(_adapter: AgentAdapter, event: AdapterEvent): Promis
       return handlePostExit(event);
 
     case 'disconnect':
-      // Could clear presence here if needed
       return { allow: true };
 
     case 'tool_deny':
-      // Tool call denial - return deny response
       return {
         allow: false,
         hookType: 'tool_deny',
@@ -203,18 +182,16 @@ async function processEvent(_adapter: AgentAdapter, event: AdapterEvent): Promis
       return { allow: true };
 
     default: {
-      // Exhaustive check
       const _exhaustive: never = event;
       logger.warn({ event: _exhaustive }, 'Unknown event type');
-      // Fail-open for unknown events - forward compatibility with future hook types
+      /*
+       * Forward compatibility: fail-open for unknown events
+       */
       return { allow: true };
     }
   }
 }
 
-/**
- * Read all data from stdin.
- */
 async function readStdin(): Promise<string> {
   const chunks: Buffer[] = [];
 
@@ -226,12 +203,9 @@ async function readStdin(): Promise<string> {
 }
 
 /**
- * Output SessionStart context for Claude to see.
- *
- * NOTE: This context is duplicated in the skill (peer-plan-skill/SKILL.md) but serves
- * a different purpose. The hook context is for Claude Code users who have the hook
- * installed and use native plan mode (Shift+Tab). The skill documentation is for
- * agents invoking the MCP tool directly without native plan mode. Both are needed.
+ * NOTE: Duplication with peer-plan-skill/SKILL.md is intentional.
+ * Hook: For Claude Code users with native plan mode (Shift+Tab)
+ * Skill: For agents using MCP tool directly without plan mode
  */
 function outputSessionStartContext(): void {
   const context = `[PEER-PLAN] Collaborative planning with human review & proof-of-work tracking.
@@ -271,7 +245,6 @@ You only need ONE tool: \`add_artifact\`
 
 When the last deliverable gets an artifact, the task auto-completes and returns a snapshot URL for your PR.`;
 
-  // Output in Claude Code hook JSON format
   const hookOutput = {
     hookSpecificOutput: {
       hookEventName: 'SessionStart',
@@ -288,16 +261,11 @@ When the last deliverable gets an artifact, the task auto-completes and returns 
  */
 async function main(): Promise<void> {
   try {
-    // Handle --context flag for SessionStart hooks
     if (process.argv.includes('--context')) {
       outputSessionStartContext();
-      // Don't call process.exit - let process end naturally to avoid pino flush errors
       return;
     }
 
-    // Session cleanup is now handled server-side (no local state)
-
-    // Read input from stdin
     const stdin = await readStdin();
 
     if (!stdin.trim()) {
@@ -307,16 +275,13 @@ async function main(): Promise<void> {
       return;
     }
 
-    // Get adapter and parse input
     const adapter = getAdapter();
     const event = adapter.parseInput(stdin);
 
     logger.debug({ event }, 'Parsed event');
 
-    // Process event
     const response = await processEvent(adapter, event);
 
-    // Format and output response
     const output = adapter.formatOutput(response);
     logger.debug({ output }, 'Sending hook response');
     // biome-ignore lint/suspicious/noConsole: Hook output MUST go to stdout
@@ -340,5 +305,4 @@ async function main(): Promise<void> {
   }
 }
 
-// Run main
 main();

@@ -5,7 +5,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
  * This is a minimal export wrapper to allow testing of the private retryWithBackoff function.
  */
 
-// Mock logger to avoid console noise during tests
 vi.mock('./logger.js', () => ({
   logger: {
     debug: vi.fn(),
@@ -91,17 +90,14 @@ describe('retryWithBackoff', () => {
           throw new Error('Fail');
         },
         3,
-        100 // 100ms base delay for faster test
+        100
       );
     } catch {
-      // Expected to fail
     }
 
-    // Verify we made 3 attempts
     expect(attempts).toBe(3);
 
-    // Note: We can't easily verify exact delays without mocking setTimeout,
-    // but we can verify the function completed (which means delays were applied)
+    // NOTE: Can't verify exact delays without mocking setTimeout
   });
 
   it('should respect custom maxAttempts', async () => {
@@ -113,11 +109,10 @@ describe('retryWithBackoff', () => {
           attempts++;
           throw new Error('Fail');
         },
-        5, // Custom max attempts
-        10 // Short delay for faster test
+        5,
+        10
       );
     } catch {
-      // Expected
     }
 
     expect(attempts).toBe(5);
@@ -132,14 +127,12 @@ describe('retryWithBackoff', () => {
           attempts++;
           throw new Error('Fail');
         },
-        2, // 2 attempts
-        50 // 50ms base delay
+        2,
+        50
       );
     } catch {
-      // Expected
     }
 
-    // Just verify attempts were made - timing checks are flaky due to setTimeout precision
     expect(attempts).toBe(2);
   });
 
@@ -162,7 +155,6 @@ describe('retryWithBackoff', () => {
 
     const result = await retryWithBackoff(async () => {
       attempts++;
-      // Simulate async work
       await new Promise((resolve) => setTimeout(resolve, 10));
 
       if (attempts < 2) {

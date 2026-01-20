@@ -26,7 +26,7 @@ interface RequestUserInputParams {
 interface AskUserQuestionParams {
   questions: Array<{
     question: string;
-    header: string; // Max 12 chars
+    header: string;
     multiSelect: boolean;
     options: Array<{
       label: string;
@@ -56,7 +56,6 @@ type HookResponse = TransformResponse | PassthroughResponse;
  * All types now use browser modal for consistent UX.
  */
 export function transformToAskUserQuestion(params: RequestUserInputParams): HookResponse {
-  // Always passthrough to browser modal - all types use consistent UI
   logger.debug({ type: params.type }, 'Passing through to browser modal (all types)');
   return { type: 'passthrough' };
 }

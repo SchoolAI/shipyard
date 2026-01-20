@@ -4,6 +4,7 @@
  */
 
 import type { AppRouter } from '@peer-plan/schema';
+import { DEFAULT_TRPC_TIMEOUT_MS } from '@peer-plan/shared';
 import { createTRPCClient, httpBatchLink } from '@trpc/client';
 
 let cachedClient: ReturnType<typeof createTRPCClient<AppRouter>> | null = null;
@@ -16,9 +17,12 @@ let cachedBaseUrl: string | null = null;
  * @param baseUrl - The base URL of the registry server
  * @param timeoutMs - Request timeout in milliseconds (default: 10000)
  */
-export function getTRPCClient(baseUrl: string, timeoutMs = 10000) {
-  // Don't cache clients with custom timeouts - they're used for specific long-polling operations
-  if (timeoutMs !== 10000) {
+export function getTRPCClient(baseUrl: string, timeoutMs = DEFAULT_TRPC_TIMEOUT_MS) {
+  /*
+   * Don't cache clients with custom timeouts - different timeout configs can't share a client instance.
+   * Long-polling operations need dedicated clients to avoid interfering with normal requests.
+   */
+  if (timeoutMs !== DEFAULT_TRPC_TIMEOUT_MS) {
     return createTRPCClient<AppRouter>({
       links: [
         httpBatchLink({
@@ -34,7 +38,6 @@ export function getTRPCClient(baseUrl: string, timeoutMs = 10000) {
     });
   }
 
-  // Use cached client for default timeout
   if (cachedClient && cachedBaseUrl === baseUrl) {
     return cachedClient;
   }

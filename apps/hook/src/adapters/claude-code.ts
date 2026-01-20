@@ -20,11 +20,6 @@ import type {
   ReviewFeedback,
 } from './types.js';
 
-// --- Claude Code Hook Input Schemas ---
-
-/**
- * Common fields present in all Claude Code hook inputs.
- */
 const ClaudeCodeHookBaseSchema = z.object({
   session_id: z.string(),
   transcript_path: z.string().optional(),
@@ -43,18 +38,9 @@ const ClaudeCodeHookBaseSchema = z.object({
 
 type ClaudeCodeHookInput = z.infer<typeof ClaudeCodeHookBaseSchema>;
 
-// --- Event Handlers ---
-
-/**
- * Handle PreToolUse events - intercept tool calls before execution.
- *
- * Currently blocks:
- * - AskUserQuestion → redirects to request_user_input MCP tool for consistent browser UX
- */
 function handlePreToolUse(input: ClaudeCodeHookInput): AdapterEvent {
   const toolName = input.tool_name;
 
-  // Block native AskUserQuestion - use browser modal via request_user_input instead
   if (toolName === CLAUDE_TOOL_NAMES.ASK_USER_QUESTION) {
     logger.info(
       { toolName },
@@ -71,9 +57,6 @@ function handlePreToolUse(input: ClaudeCodeHookInput): AdapterEvent {
   return { type: 'passthrough' };
 }
 
-/**
- * Schema for ExitPlanMode tool input - contains the full plan content
- */
 const ExitPlanModeToolInputSchema = z.object({
   plan: z.string(),
 });
@@ -82,9 +65,7 @@ function handlePermissionRequest(input: ClaudeCodeHookInput): AdapterEvent {
   const sessionId = input.session_id;
   const toolName = input.tool_name;
 
-  // ExitPlanMode triggers review - gets full plan content
   if (toolName === CLAUDE_TOOL_NAMES.EXIT_PLAN_MODE) {
-    // DEBUG: Log what Claude Code actually sends
     logger.info(
       {
         toolInput: input.tool_input,
@@ -95,16 +76,13 @@ function handlePermissionRequest(input: ClaudeCodeHookInput): AdapterEvent {
 
     const parsed = ExitPlanModeToolInputSchema.safeParse(input.tool_input);
     if (!parsed.success) {
-      // DEBUG: Log parse failure
       logger.warn(
         { parseError: parsed.error?.issues, toolInput: input.tool_input },
         'ExitPlanMode tool_input parse failed - no plan content'
       );
-      // No plan content - just do status check
       return { type: 'plan_exit', sessionId };
     }
 
-    // Return plan_exit with full plan content for review + origin metadata
     return {
       type: 'plan_exit',
       sessionId,
@@ -124,7 +102,6 @@ function handlePostToolUse(input: ClaudeCodeHookInput): AdapterEvent {
   const sessionId = input.session_id;
   const toolName = input.tool_name;
 
-  // After ExitPlanMode completes, inject session context
   if (toolName === CLAUDE_TOOL_NAMES.EXIT_PLAN_MODE) {
     return {
       type: 'post_exit',
@@ -135,8 +112,6 @@ function handlePostToolUse(input: ClaudeCodeHookInput): AdapterEvent {
 
   return { type: 'passthrough' };
 }
-
-// --- Adapter Implementation ---
 
 export const claudeCodeAdapter: AgentAdapter = {
   name: 'claude-code',
@@ -151,17 +126,14 @@ export const claudeCodeAdapter: AgentAdapter = {
       return { type: 'passthrough' };
     }
 
-    // Handle PreToolUse in all modes (for tool transformations like request_user_input)
     if (input.hook_event_name === CLAUDE_HOOK_EVENTS.PRE_TOOL_USE) {
       return handlePreToolUse(input);
     }
 
-    // Only handle plan mode events for other hook types
     if (input.permission_mode !== CLAUDE_PERMISSION_MODES.PLAN) {
       return { type: 'passthrough' };
     }
 
-    // Dispatch to appropriate handler
     if (input.hook_event_name === CLAUDE_HOOK_EVENTS.PERMISSION_REQUEST) {
       return handlePermissionRequest(input);
     }
@@ -174,7 +146,6 @@ export const claudeCodeAdapter: AgentAdapter = {
   },
 
   formatOutput(response: CoreResponse): string {
-    // Handle tool denial - PreToolUse with deny decision
     if (response.hookType === 'tool_deny') {
       return JSON.stringify({
         hookSpecificOutput: {
@@ -185,7 +156,6 @@ export const claudeCodeAdapter: AgentAdapter = {
       });
     }
 
-    // Handle PostToolUse responses - inject additionalContext
     if (response.hookType === 'post_tool_use') {
       return JSON.stringify({
         hookSpecificOutput: {
@@ -195,9 +165,7 @@ export const claudeCodeAdapter: AgentAdapter = {
       });
     }
 
-    // Handle PermissionRequest responses
     if (response.allow) {
-      // Allow the operation
       return JSON.stringify({
         hookSpecificOutput: {
           hookEventName: CLAUDE_HOOK_EVENTS.PERMISSION_REQUEST,
@@ -208,7 +176,6 @@ export const claudeCodeAdapter: AgentAdapter = {
       });
     }
 
-    // Deny the operation
     const message = response.feedback?.length
       ? formatFeedback(response.feedback)
       : response.message || 'Changes requested';
@@ -225,18 +192,15 @@ export const claudeCodeAdapter: AgentAdapter = {
   },
 };
 
-// --- Helpers ---
-
 function formatFeedback(feedback: ReviewFeedback[]): string {
   if (!feedback.length) {
     return 'Changes requested. Check the plan for reviewer comments.';
   }
 
-  // Convert ReviewFeedback[] to Thread[] format for shared formatter
   const threads = feedback.map((f) => ({
     id: f.threadId,
     comments: f.comments.map((c) => ({
-      id: c.author, // Use author as id for now
+      id: c.author,
       userId: c.author,
       body: c.content,
       createdAt: c.createdAt,

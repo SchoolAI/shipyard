@@ -10,6 +10,8 @@ export default [
       'apps/github-oauth-worker/**/*.tsx',
       'apps/signaling/**/*.ts',
       'apps/signaling/**/*.tsx',
+      'apps/hook/**/*.ts',
+      'apps/hook/**/*.tsx',
     ],
     languageOptions: {
       parser: tsParser,

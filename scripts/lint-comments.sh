@@ -5,6 +5,7 @@ PACKAGES=(
   "packages/shared"
   "apps/github-oauth-worker"
   "apps/signaling"
+  "apps/hook"
 )
 
 echo "🔍 Checking comment style (ESLint)..."

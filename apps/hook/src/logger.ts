@@ -22,14 +22,13 @@ import { serverConfig } from './config/env/server.js';
 
 const LOG_FILE = join(homedir(), '.peer-plan', 'hook-debug.log');
 
-// Create logger that writes to BOTH stderr and a file
 export const logger = pino(
   {
     level: serverConfig.LOG_LEVEL,
     timestamp: pino.stdTimeFunctions.isoTime,
   },
   pino.multistream([
-    { stream: pino.destination(2) }, // stderr
-    { stream: pino.destination(LOG_FILE) }, // file
+    { stream: pino.destination(2) },
+    { stream: pino.destination(LOG_FILE) },
   ])
 );

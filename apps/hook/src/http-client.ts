@@ -17,13 +17,6 @@ import { registryConfig } from './config/env/registry.js';
 import { logger } from './logger.js';
 import { getTRPCClient } from './trpc-client.js';
 
-/**
- * Retries an async operation with exponential backoff.
- * @param fn - Async function to retry
- * @param maxAttempts - Maximum retry attempts (default: 3)
- * @param baseDelay - Base delay in ms (default: 1000)
- * @returns Result of fn or throws last error
- */
 async function retryWithBackoff<T>(
   fn: () => Promise<T>,
   maxAttempts = 3,
@@ -50,10 +43,6 @@ async function retryWithBackoff<T>(
   throw lastError || new Error('Retry failed');
 }
 
-/**
- * Discovers the registry server URL by checking health endpoints with retry logic.
- * Returns null if no server found after all retries.
- */
 async function getRegistryUrl(): Promise<string | null> {
   const ports = registryConfig.REGISTRY_PORT;
 
@@ -61,18 +50,17 @@ async function getRegistryUrl(): Promise<string | null> {
     try {
       const url = `http://localhost:${port}`;
 
-      // Retry health check with exponential backoff
       await retryWithBackoff(
         async () => {
           const res = await fetch(`${url}/registry`, {
-            signal: AbortSignal.timeout(5000), // Increased from 3s to 5s
+            signal: AbortSignal.timeout(5000),
           });
           if (!res.ok) {
             throw new Error(`Registry responded with status ${res.status}`);
           }
         },
-        3, // 3 attempts total
-        1000 // Start with 1s delay
+        3,
+        1000
       );
 
       logger.debug({ port }, 'Found registry server (with retry)');
@@ -86,7 +74,6 @@ async function getRegistryUrl(): Promise<string | null> {
     }
   }
 
-  // Add diagnostic logging before returning null
   logger.error(
     {
       ports,
@@ -99,12 +86,6 @@ async function getRegistryUrl(): Promise<string | null> {
   return null;
 }
 
-// --- API Methods ---
-
-/**
- * Get WebSocket URL for Y.Doc sync.
- * Uses direct port scanning - the hub's WebSocket server runs on the same port as HTTP.
- */
 export async function getWebSocketUrl(): Promise<string | null> {
   const baseUrl = await getRegistryUrl();
   if (!baseUrl) {
@@ -112,16 +93,11 @@ export async function getWebSocketUrl(): Promise<string | null> {
     return null;
   }
 
-  // The hub's WebSocket server runs on the same port as HTTP
-  // Just convert http:// to ws://
   const wsUrl = baseUrl.replace('http://', 'ws://');
   logger.debug({ wsUrl }, 'Constructed WebSocket URL from hub');
   return wsUrl;
 }
 
-/**
- * Create a new plan session.
- */
 export async function createSession(
   request: CreateHookSessionRequest
 ): Promise<CreateHookSessionResponse> {
@@ -134,9 +110,6 @@ export async function createSession(
   return trpc.hook.createSession.mutate(request);
 }
 
-/**
- * Update plan content.
- */
 export async function updatePlanContent(
   planId: string,
   request: UpdatePlanContentRequest
@@ -150,9 +123,6 @@ export async function updatePlanContent(
   return trpc.hook.updateContent.mutate({ planId, ...request });
 }
 
-/**
- * Get review status for a plan.
- */
 export async function getReviewStatus(planId: string): Promise<GetReviewStatusResponse> {
   const baseUrl = await getRegistryUrl();
   if (!baseUrl) {
@@ -163,9 +133,6 @@ export async function getReviewStatus(planId: string): Promise<GetReviewStatusRe
   return trpc.hook.getReviewStatus.query({ planId });
 }
 
-/**
- * Update agent presence (heartbeat).
- */
 export async function updatePresence(
   planId: string,
   request: UpdatePresenceRequest
@@ -179,10 +146,6 @@ export async function updatePresence(
   return trpc.hook.updatePresence.mutate({ planId, ...request });
 }
 
-/**
- * Set session token hash on a plan (called on approval).
- * Returns the URL for the plan.
- */
 export async function setSessionToken(
   planId: string,
   sessionTokenHash: string
@@ -196,11 +159,6 @@ export async function setSessionToken(
   return trpc.hook.setSessionToken.mutate({ planId, sessionTokenHash });
 }
 
-/**
- * Wait for approval decision (blocking call to server).
- * Server observes Y.Doc and returns when status changes to approved or rejected.
- * Uses a 30-minute timeout to accommodate the 25-minute max wait time.
- */
 export async function waitForApproval(
   planId: string,
   reviewRequestId: string
@@ -217,17 +175,10 @@ export async function waitForApproval(
     throw new Error('Registry server not available');
   }
 
-  // Create tRPC client with 30-minute timeout for long-polling
-  // (server waits up to 25 minutes for approval)
-  const trpc = getTRPCClient(baseUrl, 30 * 60 * 1000);
+  const trpc = getTRPCClient(baseUrl, APPROVAL_LONG_POLL_TIMEOUT_MS);
   return trpc.hook.waitForApproval.mutate({ planId, reviewRequestId });
 }
 
-/**
- * Get session context for post-exit injection.
- * Returns session data from server registry and deletes it (one-time use).
- * This replaces the hook's local state.ts file.
- */
 export async function getSessionContext(sessionId: string): Promise<SessionContextResult> {
   const baseUrl = await getRegistryUrl();
   if (!baseUrl) {
@@ -238,10 +189,6 @@ export async function getSessionContext(sessionId: string): Promise<SessionConte
   return trpc.hook.getSessionContext.query({ sessionId });
 }
 
-/**
- * Get formatted deliverable context for post-exit injection.
- * Returns pre-formatted context string from server.
- */
 export async function getDeliverableContext(
   planId: string,
   sessionToken: string
