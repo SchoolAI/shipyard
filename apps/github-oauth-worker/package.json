@@ -4,9 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "wrangler dev",
+    "dev": "wrangler dev --env development",
     "deploy": "wrangler deploy",
-    "deploy:production": "wrangler deploy --env production",
     "tail": "wrangler tail",
     "secret:client-id": "wrangler secret put GITHUB_CLIENT_ID",
     "secret:client-secret": "wrangler secret put GITHUB_CLIENT_SECRET"
