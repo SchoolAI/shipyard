@@ -382,9 +382,69 @@ export function useMultiProviderSync(
       }, 100); // Check every 100ms until room is ready
     }
 
+    /**
+     * Check if any signaling connection is currently open.
+     */
+    function isSignalingConnOpen(signalingConns: Array<{ ws: WebSocket }> | undefined): boolean {
+      if (!signalingConns || signalingConns.length === 0) return false;
+
+      for (const conn of signalingConns) {
+        if (conn.ws && conn.ws.readyState === WebSocket.OPEN) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    /**
+     * Send identity and approval state if a signaling connection is ready.
+     * Returns true if successful, false otherwise.
+     */
+    function sendIdentityWhenReady(signalingConns: Array<{ ws: WebSocket }> | undefined): boolean {
+      if (!signalingConns) return false;
+
+      for (const conn of signalingConns) {
+        if (conn.ws && conn.ws.readyState === WebSocket.OPEN) {
+          sendUserIdentityToSignaling();
+          pushApprovalStateToSignaling();
+          return true;
+        }
+      }
+      return false;
+    }
+
+    /**
+     * Clear the signaling open watcher interval.
+     */
+    function clearSignalingWatcher() {
+      if (signalingOpenWatcher) {
+        clearInterval(signalingOpenWatcher);
+        signalingOpenWatcher = null;
+      }
+    }
+
+    /**
+     * Poll for signaling connection and send identity when ready.
+     */
+    function pollForSignalingConnection(
+      signalingConns: Array<{ ws: WebSocket }>,
+      attemptsRef: { current: number },
+      maxAttempts: number
+    ) {
+      attemptsRef.current++;
+
+      if (attemptsRef.current > maxAttempts) {
+        clearSignalingWatcher();
+        return;
+      }
+
+      if (sendIdentityWhenReady(signalingConns)) {
+        clearSignalingWatcher();
+      }
+    }
+
     // Watch for signaling WebSocket to open, then send identity
     // Fixes "unauthenticated" error when WebSocket wasn't ready during initial send
-    // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Polling with early returns
     function startWatchingForSignalingOpen() {
       if (!rtc || !githubIdentity) return;
 
@@ -394,39 +454,15 @@ export function useMultiProviderSync(
       if (!signalingConns || signalingConns.length === 0) return;
 
       // Check immediately if any connection is already open
-      for (const conn of signalingConns) {
-        if (conn.ws && conn.ws.readyState === WebSocket.OPEN) {
-          return; // Already connected, sendUserIdentityToSignaling already ran
-        }
+      if (isSignalingConnOpen(signalingConns)) {
+        return; // Already connected, sendUserIdentityToSignaling already ran
       }
 
       // Poll until at least one signaling WebSocket is open
-      let attempts = 0;
+      const attemptsRef = { current: 0 };
       const maxAttempts = 100; // 10 seconds max
-      // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Polling until WebSocket ready
       signalingOpenWatcher = setInterval(() => {
-        attempts++;
-
-        if (attempts > maxAttempts) {
-          if (signalingOpenWatcher) {
-            clearInterval(signalingOpenWatcher);
-            signalingOpenWatcher = null;
-          }
-          return;
-        }
-
-        for (const conn of signalingConns) {
-          if (conn.ws && conn.ws.readyState === WebSocket.OPEN) {
-            // WebSocket is now open - send identity and approval
-            sendUserIdentityToSignaling();
-            pushApprovalStateToSignaling();
-            if (signalingOpenWatcher) {
-              clearInterval(signalingOpenWatcher);
-              signalingOpenWatcher = null;
-            }
-            return;
-          }
-        }
+        pollForSignalingConnection(signalingConns, attemptsRef, maxAttempts);
       }, 100);
     }
 
