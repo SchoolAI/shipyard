@@ -104,19 +104,22 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
     }
   }, [remainingTime, isOpen, request, handleCancel]);
 
-  const handleAnswerError = useCallback((result: { success: false; error: string }, onCloseFn: () => void) => {
-    if (result.error === 'Request already answered') {
-      toast.error('This request was already answered by another user');
-    } else if (result.error === 'Request not found') {
-      toast.error('This request could not be found');
-      onCloseFn();
-    } else if (result.error === 'Request is not pending') {
-      toast.error('This request has expired or was cancelled');
-      onCloseFn();
-    } else {
-      toast.error('Failed to submit response');
-    }
-  }, []);
+  const handleAnswerError = useCallback(
+    (error: string, onCloseFn: () => void) => {
+      if (error === 'Request already answered') {
+        toast.error('This request was already answered by another user');
+      } else if (error === 'Request not found') {
+        toast.error('This request could not be found');
+        onCloseFn();
+      } else if (error === 'Request is not pending') {
+        toast.error('This request has expired or was cancelled');
+        onCloseFn();
+      } else {
+        toast.error('Failed to submit response');
+      }
+    },
+    []
+  );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -130,20 +133,7 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
       const result = answerInputRequest(ydoc, request.id, responseValue, identity.username);
 
       if (!result.success) {
-        // Show appropriate error message based on failure reason
-        if (result.error === 'Request already answered') {
-          toast.error('This request was already answered by another user');
-          // Keep modal open so user can see the message
-        } else if (result.error === 'Request not found') {
-          toast.error('This request could not be found');
-          onClose();
-        } else if (result.error === 'Request is not pending') {
-          toast.error('This request has expired or was cancelled');
-          onClose();
-        } else {
-          console.error('Failed to answer request:', result.error);
-          toast.error('Failed to submit response');
-        }
+        handleAnswerError(result.error || 'Unknown error', onClose);
         return;
       }
 
@@ -174,20 +164,7 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
         const result = answerInputRequest(ydoc, request.id, response, identity.username);
 
         if (!result.success) {
-          // Show appropriate error message based on failure reason
-          if (result.error === 'Request already answered') {
-            toast.error('This request was already answered by another user');
-            // Keep modal open so user can see the message
-          } else if (result.error === 'Request not found') {
-            toast.error('This request could not be found');
-            onClose();
-          } else if (result.error === 'Request is not pending') {
-            toast.error('This request has expired or was cancelled');
-            onClose();
-          } else {
-            console.error('Failed to answer request:', result.error);
-            toast.error('Failed to submit response');
-          }
+          handleAnswerError(result.error || 'Unknown error', onClose);
           return;
         }
 
@@ -199,7 +176,7 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
         setIsSubmitting(false);
       }
     },
-    [ydoc, request, identity, isSubmitting, onClose]
+    [ydoc, request, identity, isSubmitting, onClose, handleAnswerError]
   );
 
   // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Input type switching with form validation requires comprehensive handling
