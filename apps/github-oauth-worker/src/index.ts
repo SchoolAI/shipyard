@@ -34,6 +34,13 @@ interface GitHubTokenResponse {
   error_description?: string;
 }
 
+interface TokenExchangeResponse {
+  access_token?: string;
+  token_type?: string;
+  scope?: string;
+  is_mobile?: boolean;
+}
+
 // Allowed origins by environment - restrict CORS to prevent phishing attacks
 const ALLOWED_ORIGINS = {
   development: [
@@ -59,6 +66,14 @@ function getCorsHeaders(origin: string | null, env: Env): Record<string, string>
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
   };
+}
+
+/**
+ * Detects if the User-Agent header indicates a mobile device
+ * Used to prevent deep linking to desktop apps during OAuth on mobile
+ */
+function isMobileUserAgent(userAgent: string): boolean {
+  return /iPhone|iPad|iPod|Android/i.test(userAgent);
 }
 
 export default {
@@ -169,17 +184,21 @@ export default {
         );
       }
 
-      return new Response(
-        JSON.stringify({
-          access_token: data.access_token,
-          token_type: data.token_type,
-          scope: data.scope,
-        }),
-        {
-          status: 200,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
+      // Check if request is from mobile device for deep linking prevention
+      const userAgent = request.headers.get('User-Agent') || '';
+      const isMobile = isMobileUserAgent(userAgent);
+
+      const responseBody: TokenExchangeResponse = {
+        access_token: data.access_token,
+        token_type: data.token_type,
+        scope: data.scope,
+        ...(isMobile && { is_mobile: true }),
+      };
+
+      return new Response(JSON.stringify(responseBody), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     } catch (error) {
       logger.error({ error }, 'Token exchange failed');
       return new Response(JSON.stringify({ error: 'Token exchange failed' }), {

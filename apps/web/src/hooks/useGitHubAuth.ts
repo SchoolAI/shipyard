@@ -152,7 +152,12 @@ async function processOAuthCallback(
 
   try {
     const redirectUri = window.location.origin + (import.meta.env.BASE_URL || '/');
-    const { access_token, scope } = await handleCallback(code, state, redirectUri);
+    const { access_token, scope, is_mobile } = await handleCallback(code, state, redirectUri);
+
+    // Log mobile detection for debugging deep linking issues
+    if (is_mobile) {
+      console.log('[OAuth] Mobile device detected during authentication');
+    }
 
     const user = await getGitHubUser(access_token);
 

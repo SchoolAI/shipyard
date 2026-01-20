@@ -42,11 +42,17 @@ export function startWebFlow(
   window.location.href = `https://github.com/login/oauth/authorize?${params}`;
 }
 
+export interface TokenExchangeResponse {
+  access_token: string;
+  scope?: string;
+  is_mobile?: boolean;
+}
+
 export async function handleCallback(
   code: string,
   state: string,
   redirectUri: string
-): Promise<{ access_token: string; scope?: string }> {
+): Promise<TokenExchangeResponse> {
   const storedState = sessionStorage.getItem('github-oauth-state');
   if (state !== storedState) {
     throw new Error('Invalid state parameter - possible CSRF attack');
@@ -67,7 +73,7 @@ export async function handleCallback(
     throw new Error(error.error_description || error.error || 'Token exchange failed');
   }
 
-  return response.json() as Promise<{ access_token: string; scope?: string }>;
+  return response.json() as Promise<TokenExchangeResponse>;
 }
 
 export class TokenValidationError extends Error {

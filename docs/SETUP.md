@@ -85,6 +85,24 @@ gh auth login
 export GITHUB_TOKEN=ghp_your_token_here
 ```
 
+### Mobile OAuth Handling
+
+The GitHub OAuth flow automatically detects mobile browsers (iOS Safari, Android Chrome) to prevent potential deep linking issues with desktop apps.
+
+**How it works:**
+- OAuth worker detects mobile User-Agent during token exchange
+- Adds `is_mobile: true` flag to response for mobile devices
+- Web app logs mobile detection in console: `[OAuth] Mobile device detected`
+
+**Testing on mobile:**
+- iOS Safari: Open app, sign in with GitHub, verify OAuth completes in browser
+- Android Chrome: Same test, verify no unexpected app launches
+- Check browser console for mobile detection log
+
+**Note:** Deep linking to desktop apps during OAuth only occurs if Universal Links (iOS) or App Links (Android) are configured via `.well-known/` files on the domain. Currently, Peer Plan has no such configuration, so mobile OAuth works correctly without intervention.
+
+For more details, see [ADR-0003](./decisions/0003-mobile-oauth-user-agent-detection.md).
+
 ---
 
 ## Development Commands
