@@ -5,7 +5,6 @@
 
 import { Accordion, Button, Chip, ListBox, ListBoxItem, Switch, Tooltip } from '@heroui/react';
 import {
-  clearPlanIndexViewedBy,
   getPlanIndexEntry,
   type InputRequest,
   PLAN_INDEX_DOC_NAME,
@@ -254,8 +253,9 @@ export function InboxPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { identity: githubIdentity } = useGitHubAuth();
-  const { allInboxPlans, markPlanAsRead, refreshInboxUnreadState, isLoading, timedOut } =
-    usePlanIndex(githubIdentity?.username);
+  const { allInboxPlans, markPlanAsRead, markPlanAsUnread, isLoading, timedOut } = usePlanIndex(
+    githubIdentity?.username
+  );
   const { ydoc: indexDoc } = useMultiProviderSync(PLAN_INDEX_DOC_NAME);
   const [showRead, setShowRead] = useState(getInboxShowRead);
   const { actor } = useUserIdentity();
@@ -365,16 +365,10 @@ export function InboxPage() {
   // Mark as unread handler
   const handleMarkUnread = useCallback(
     async (planId: string) => {
-      if (!githubIdentity?.username) {
-        toast.error('Please sign in with GitHub first');
-        return;
-      }
-
-      clearPlanIndexViewedBy(indexDoc, planId, githubIdentity.username);
-      refreshInboxUnreadState();
+      await markPlanAsUnread(planId);
       toast.success('Marked as unread');
     },
-    [githubIdentity, indexDoc, refreshInboxUnreadState]
+    [markPlanAsUnread]
   );
 
   // Helper to find the next plan to select after dismissal
