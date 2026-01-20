@@ -139,13 +139,17 @@ async function flushQueuedMessages(
         platform.sendMessage(ws, msg);
       }
     } else {
-      // User is rejected or pending - discard queued messages
-      // Pending users shouldn't receive messages from approved users
-      platform.debug('[handleSubscribe] Discarding queued messages for non-approved user', {
+      // User is pending (e.g., has invite but hasn't redeemed yet)
+      // Re-queue messages instead of discarding - they may be approved soon
+      // This fixes invite flow where approval happens milliseconds after identify
+      platform.debug('[handleSubscribe] Re-queueing messages for pending user', {
         userId,
         planId,
         messageCount: messages.length,
       });
+      for (const msg of messages) {
+        platform.queueMessageForConnection(ws, topic, msg);
+      }
     }
   }
   } finally {
