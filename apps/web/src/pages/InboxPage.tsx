@@ -258,6 +258,14 @@ function EventInboxItem({ item, onView }: EventInboxItemProps) {
 
   const { icon, description, color } = getEventDisplay();
 
+  // Extract message for agent requests (type-safe)
+  let agentMessage: string | undefined;
+  if (event.type === 'agent_activity') {
+    if (event.data.activityType === 'help_request' || event.data.activityType === 'blocker') {
+      agentMessage = event.data.message;
+    }
+  }
+
   return (
     <div className="flex items-center justify-between gap-3 w-full py-2">
       <div className="flex flex-col gap-1 flex-1 min-w-0">
@@ -265,7 +273,9 @@ function EventInboxItem({ item, onView }: EventInboxItemProps) {
         <div className="flex items-center gap-2 flex-wrap">
           <Chip size="sm" variant="soft" color={color} className="gap-1">
             {icon}
-            {description}
+            {event.type === 'agent_activity'
+              ? event.data.activityType.replace('_', ' ')
+              : description}
           </Chip>
           <span className="text-xs text-muted-foreground">
             {formatRelativeTime(event.timestamp)}
@@ -282,6 +292,10 @@ function EventInboxItem({ item, onView }: EventInboxItemProps) {
             </div>
           )}
         </div>
+        {/* Show full message for agent requests */}
+        {agentMessage && (
+          <p className="text-sm text-muted-foreground mt-1 pl-1">"{agentMessage}"</p>
+        )}
       </div>
 
       <div className="flex items-center gap-1 shrink-0">

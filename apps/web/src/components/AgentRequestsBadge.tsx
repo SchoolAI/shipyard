@@ -2,6 +2,7 @@ import { Chip } from '@heroui/react';
 import { getPlanEvents, getPlanMetadata, YDOC_KEYS } from '@peer-plan/schema';
 import { AlertOctagon, HelpCircle } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import type * as Y from 'yjs';
 
 interface AgentRequestsBadgeProps {
@@ -10,10 +11,25 @@ interface AgentRequestsBadgeProps {
 }
 
 export function AgentRequestsBadge({ ydoc, isSnapshot = false }: AgentRequestsBadgeProps) {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [counts, setCounts] = useState<{
     help: number;
     blocker: number;
   }>({ help: 0, blocker: 0 });
+
+  const handleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+
+    // Get plan ID from metadata to construct URL
+    const metadata = getPlanMetadata(ydoc);
+    if (!metadata) return;
+
+    // Navigate to activity tab
+    const searchParams = new URLSearchParams(location.search);
+    searchParams.set('tab', 'activity');
+    navigate(`/plan/${metadata.id}?${searchParams.toString()}`);
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -79,7 +95,12 @@ export function AgentRequestsBadge({ ydoc, isSnapshot = false }: AgentRequestsBa
   // Blockers take priority (more critical)
   if (counts.blocker > 0) {
     return (
-      <Chip color="danger" variant="soft">
+      <Chip
+        color="danger"
+        variant="soft"
+        onClick={handleClick}
+        className="cursor-pointer hover:opacity-80 transition-opacity"
+      >
         <div className="flex items-center gap-1">
           <AlertOctagon className="w-3 h-3" />
           <span>Agent: Blocked{counts.blocker > 1 ? ` (${counts.blocker})` : ''}</span>
@@ -90,7 +111,12 @@ export function AgentRequestsBadge({ ydoc, isSnapshot = false }: AgentRequestsBa
 
   if (counts.help > 0) {
     return (
-      <Chip color="warning" variant="soft">
+      <Chip
+        color="warning"
+        variant="soft"
+        onClick={handleClick}
+        className="cursor-pointer hover:opacity-80 transition-opacity"
+      >
         <div className="flex items-center gap-1">
           <HelpCircle className="w-3 h-3" />
           <span>Agent: Needs Help{counts.help > 1 ? ` (${counts.help})` : ''}</span>
