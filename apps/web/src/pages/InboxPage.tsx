@@ -416,33 +416,24 @@ export function InboxPage() {
   );
 
   // Request changes handler
-  const handleRequestChanges = useCallback(
-    (planId: string) => {
-      setSelectedPlanId(planId);
-      toast.info('Open panel to add comments and request changes');
-    },
-    []
-  );
+  const handleRequestChanges = useCallback((planId: string) => {
+    setSelectedPlanId(planId);
+    toast.info('Open panel to add comments and request changes');
+  }, []);
 
   // List selection handler
-  const handleListSelection = useCallback(
-    (keys: Set<unknown> | 'all') => {
-      if (keys === 'all') return;
-      const key = Array.from(keys)[0];
-      if (key) {
-        setSelectedPlanId(String(key));
-      }
-    },
-    []
-  );
+  const handleListSelection = useCallback((keys: Set<unknown> | 'all') => {
+    if (keys === 'all') return;
+    const key = Array.from(keys)[0];
+    if (key) {
+      setSelectedPlanId(String(key));
+    }
+  }, []);
 
   // Event item view handler
-  const handleViewEvent = useCallback(
-    (planId: string) => {
-      setSelectedPlanId(planId);
-    },
-    []
-  );
+  const handleViewEvent = useCallback((planId: string) => {
+    setSelectedPlanId(planId);
+  }, []);
 
   // Panel approve handler
   const handlePanelApprove = useCallback(
