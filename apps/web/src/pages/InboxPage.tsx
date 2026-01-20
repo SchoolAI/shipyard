@@ -271,18 +271,18 @@ export function InboxPage() {
     setInboxShowRead(value);
   }, []);
 
-  // Filter inbox plans - inbox list is source of truth
+  // Filter inbox plans
   const sortedInboxPlans = useMemo(() => {
     const filtered = allInboxPlans.filter((plan) => {
       // Show all plans when toggle is ON
       if (showRead) return true;
 
-      // Only show unread plans (no special case for selected items)
-      return plan.isUnread;
+      // Show unread plans OR currently selected plan (so you can view it)
+      return plan.isUnread || plan.id === selectedPlanId;
     });
 
     return filtered.sort((a, b) => b.updatedAt - a.updatedAt);
-  }, [allInboxPlans, showRead]);
+  }, [allInboxPlans, showRead, selectedPlanId]);
 
   // Group inbox items by category
   const inboxGroups = useMemo(() => {
@@ -303,12 +303,16 @@ export function InboxPage() {
     };
   }, [sortedInboxPlans, eventBasedInbox]);
 
-  // Auto-deselect if selected plan is no longer in inbox (marked as read)
+  // Auto-deselect if selected plan is marked as read (and show read is OFF)
   useEffect(() => {
-    if (selectedPlanId && !sortedInboxPlans.find((p) => p.id === selectedPlanId)) {
+    if (!selectedPlanId || showRead) return;
+
+    const selectedPlan = allInboxPlans.find((p) => p.id === selectedPlanId);
+    // If plan is no longer unread, deselect it
+    if (selectedPlan && !selectedPlan.isUnread) {
       setSelectedPlanId(null);
     }
-  }, [selectedPlanId, sortedInboxPlans]);
+  }, [selectedPlanId, allInboxPlans, showRead]);
 
   // Update URL when panel state changes
   useEffect(() => {
@@ -414,11 +418,10 @@ export function InboxPage() {
   // Request changes handler
   const handleRequestChanges = useCallback(
     (planId: string) => {
-      markPlanAsRead(planId);
       setSelectedPlanId(planId);
       toast.info('Open panel to add comments and request changes');
     },
-    [markPlanAsRead]
+    []
   );
 
   // List selection handler
@@ -427,20 +430,18 @@ export function InboxPage() {
       if (keys === 'all') return;
       const key = Array.from(keys)[0];
       if (key) {
-        markPlanAsRead(String(key));
         setSelectedPlanId(String(key));
       }
     },
-    [markPlanAsRead]
+    []
   );
 
   // Event item view handler
   const handleViewEvent = useCallback(
     (planId: string) => {
-      markPlanAsRead(planId);
       setSelectedPlanId(planId);
     },
-    [markPlanAsRead]
+    []
   );
 
   // Panel approve handler
@@ -507,10 +508,9 @@ export function InboxPage() {
       const nextPlan = sortedInboxPlans[currentIndex + 1];
       if (nextPlan) {
         setSelectedPlanId(nextPlan.id);
-        markPlanAsRead(nextPlan.id);
       }
     }
-  }, [selectedPlanId, sortedInboxPlans, markPlanAsRead]);
+  }, [selectedPlanId, sortedInboxPlans]);
 
   const handlePrevItem = useCallback(() => {
     if (!selectedPlanId) return;
@@ -519,10 +519,9 @@ export function InboxPage() {
       const prevPlan = sortedInboxPlans[currentIndex - 1];
       if (prevPlan) {
         setSelectedPlanId(prevPlan.id);
-        markPlanAsRead(prevPlan.id);
       }
     }
-  }, [selectedPlanId, sortedInboxPlans, markPlanAsRead]);
+  }, [selectedPlanId, sortedInboxPlans]);
 
   const handleKeyboardDismiss = useCallback(async () => {
     if (!selectedPlanId) return;
