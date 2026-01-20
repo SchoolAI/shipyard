@@ -202,6 +202,7 @@ export {
   PlanIndexEntrySchema,
 } from './plan-index.js';
 export {
+  clearPlanIndexViewedBy,
   getAllViewedByFromIndex,
   getPlanIndex,
   getPlanIndexEntry,

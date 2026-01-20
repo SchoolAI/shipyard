@@ -121,6 +121,21 @@ export function updatePlanIndexViewedBy(ydoc: Y.Doc, planId: string, username: s
 }
 
 /**
+ * Clears viewedBy for a plan in the plan-index (marks as unread).
+ * Removes the user's timestamp, making the plan appear unread again.
+ */
+export function clearPlanIndexViewedBy(ydoc: Y.Doc, planId: string, username: string): void {
+  ydoc.transact(() => {
+    const viewedByRoot = ydoc.getMap<Y.Map<number>>(PLAN_INDEX_VIEWED_BY_KEY);
+    const planViewedBy = viewedByRoot.get(planId);
+
+    if (planViewedBy && planViewedBy instanceof Y.Map) {
+      planViewedBy.delete(username);
+    }
+  });
+}
+
+/**
  * Gets all viewedBy data from the plan-index for multiple plans.
  * Efficient batch read for inbox calculations.
  */

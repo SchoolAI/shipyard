@@ -288,18 +288,14 @@ export function usePlanIndex(currentUsername: string | undefined): PlanIndexStat
   );
 
   // Get all plans that match inbox criteria (status-based)
-  // Inbox shows only plans that need user action:
+  // Inbox shows only plans waiting for review/approval:
   // - pending_review: Plans waiting for your review/approval
-  // - changes_requested: Plans where you need to address feedback
+  // Note: changes_requested plans belong in "My Plans" (work continues there)
   // Draft plans belong in "My Plans" section, not inbox (they're not actionable yet)
   // in_progress plans also belong in "My Plans" (work continues there)
   const inboxCandidates = useMemo(
     () =>
-      allActivePlans.filter(
-        (p) =>
-          p.ownerId === currentUsername &&
-          (p.status === 'changes_requested' || p.status === 'pending_review')
-      ),
+      allActivePlans.filter((p) => p.ownerId === currentUsername && p.status === 'pending_review'),
     [allActivePlans, currentUsername]
   );
 

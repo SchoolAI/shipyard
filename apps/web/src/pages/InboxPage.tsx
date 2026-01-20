@@ -1,10 +1,11 @@
 /**
- * Inbox Page - Shows plans needing review (pending_review or changes_requested).
+ * Inbox Page - Shows plans needing review (pending_review status only).
  * Two-column layout with inbox list on left and detail panel on right.
  */
 
 import { Accordion, Button, Chip, ListBox, ListBoxItem, Switch, Tooltip } from '@heroui/react';
 import {
+  clearPlanIndexViewedBy,
   getPlanIndexEntry,
   type InputRequest,
   PLAN_INDEX_DOC_NAME,
@@ -19,9 +20,10 @@ import {
   CheckCircle,
   ChevronDown,
   Clock,
+  Eye,
+  EyeOff,
   MessageSquare,
   UserPlus,
-  X,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -82,17 +84,28 @@ function StatusBadge({ status }: StatusBadgeProps) {
 }
 
 interface InboxItemProps {
-  plan: PlanIndexEntry;
+  plan: PlanIndexEntry & { isUnread?: boolean };
   onApprove: (planId: string) => void;
   onRequestChanges: (planId: string) => void;
   onDismiss: (planId: string) => void;
+  onMarkUnread: (planId: string) => void;
 }
 
-function InboxItem({ plan, onApprove, onRequestChanges, onDismiss }: InboxItemProps) {
+function InboxItem({ plan, onApprove, onRequestChanges, onDismiss, onMarkUnread }: InboxItemProps) {
+  const isRead = plan.isUnread === false;
   return (
-    <div className="flex items-center justify-between gap-3 w-full py-2">
+    <div
+      className={`flex items-center justify-between gap-3 w-full py-2 ${isRead ? 'opacity-60' : ''}`}
+    >
       <div className="flex flex-col gap-1 flex-1 min-w-0">
-        <span className="font-medium text-foreground truncate">{plan.title}</span>
+        <div className="flex items-center gap-2">
+          {isRead && <EyeOff className="w-3 h-3 text-muted-foreground shrink-0" />}
+          <span
+            className={`font-medium truncate ${isRead ? 'text-muted-foreground' : 'text-foreground'}`}
+          >
+            {plan.title}
+          </span>
+        </div>
         <div className="flex items-center gap-2">
           <StatusBadge status={plan.status} />
           <span className="text-xs text-muted-foreground">
@@ -144,14 +157,14 @@ function InboxItem({ plan, onApprove, onRequestChanges, onDismiss }: InboxItemPr
               isIconOnly
               variant="ghost"
               size="sm"
-              aria-label="Dismiss plan"
-              onPress={() => onDismiss(plan.id)}
+              aria-label={isRead ? 'Mark as unread' : 'Mark as read'}
+              onPress={() => (isRead ? onMarkUnread(plan.id) : onDismiss(plan.id))}
               className="w-8 h-8"
             >
-              <X className="w-4 h-4" />
+              {isRead ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
             </Button>
           </Tooltip.Trigger>
-          <Tooltip.Content>Dismiss</Tooltip.Content>
+          <Tooltip.Content>{isRead ? 'Mark as unread' : 'Mark as read'}</Tooltip.Content>
         </Tooltip>
       </div>
     </div>
@@ -289,8 +302,7 @@ export function InboxPage() {
     const statusBasedInbox = sortedInboxPlans;
 
     return {
-      needsReview: statusBasedInbox.filter((p) => p.status === 'pending_review'),
-      needsAction: statusBasedInbox.filter((p) => p.status === 'changes_requested'),
+      needsReview: statusBasedInbox, // All inbox items are pending_review now
       approvalRequests: eventBasedInbox.filter(
         (e: InboxEventItem) => e.event.type === 'approval_requested'
       ),
@@ -342,13 +354,27 @@ export function InboxPage() {
     setSelectedPlanId(null);
   }, []);
 
-  // Dismiss handler
+  // Dismiss handler (mark as read)
   const handleDismiss = useCallback(
     async (planId: string) => {
       await markPlanAsRead(planId);
       toast.success('Marked as read');
     },
     [markPlanAsRead]
+  );
+
+  // Mark as unread handler
+  const handleMarkUnread = useCallback(
+    async (planId: string) => {
+      if (!githubIdentity?.username) {
+        toast.error('Please sign in with GitHub first');
+        return;
+      }
+
+      clearPlanIndexViewedBy(indexDoc, planId, githubIdentity.username);
+      toast.success('Marked as unread');
+    },
+    [githubIdentity, indexDoc]
   );
 
   // Helper to find the next plan to select after dismissal
@@ -665,51 +691,7 @@ export function InboxPage() {
                             onApprove={handleApprove}
                             onRequestChanges={handleRequestChanges}
                             onDismiss={handleDismiss}
-                          />
-                        </ListBoxItem>
-                      ))}
-                    </ListBox>
-                  </Accordion.Body>
-                </Accordion.Panel>
-              </Accordion.Item>
-            )}
-
-            {/* Needs Your Action */}
-            {inboxGroups.needsAction.length > 0 && (
-              <Accordion.Item id="needsAction">
-                <Accordion.Heading>
-                  <Accordion.Trigger>
-                    <AlertTriangle className="w-4 h-4 mr-2 shrink-0 text-danger" />
-                    <span className="flex-1 text-left">Needs Your Action</span>
-                    <Chip size="sm" variant="soft" color="danger" className="mr-2">
-                      {inboxGroups.needsAction.length}
-                    </Chip>
-                    <Accordion.Indicator>
-                      <ChevronDown />
-                    </Accordion.Indicator>
-                  </Accordion.Trigger>
-                </Accordion.Heading>
-                <Accordion.Panel>
-                  <Accordion.Body>
-                    <ListBox
-                      aria-label="Plans needing your action"
-                      selectionMode="single"
-                      selectedKeys={selectedPlanId ? new Set([selectedPlanId]) : new Set()}
-                      onSelectionChange={handleListSelection}
-                      className="divide-y divide-separator"
-                    >
-                      {inboxGroups.needsAction.map((plan) => (
-                        <ListBoxItem
-                          id={plan.id}
-                          key={plan.id}
-                          textValue={plan.title}
-                          className="px-3 rounded-lg hover:bg-surface"
-                        >
-                          <InboxItem
-                            plan={plan}
-                            onApprove={handleApprove}
-                            onRequestChanges={handleRequestChanges}
-                            onDismiss={handleDismiss}
+                            onMarkUnread={handleMarkUnread}
                           />
                         </ListBoxItem>
                       ))}
