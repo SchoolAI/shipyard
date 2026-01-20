@@ -50,7 +50,6 @@ export function TagEditor({ tags, onTagsChange, allPlans }: TagEditorProps) {
             placeholder="Add tags (e.g., ui, bug, project:mobile-app)"
             onKeyDown={handleKeyDown}
           />
-          <ComboBox.Trigger />
         </ComboBox.InputGroup>
         <ComboBox.Popover>
           <ListBox>
