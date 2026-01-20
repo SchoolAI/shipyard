@@ -379,13 +379,15 @@ export function getArtifacts(ydoc: Y.Doc): Artifact[] {
 }
 
 export function addArtifact(ydoc: Y.Doc, artifact: Artifact, actor?: string): void {
-  // CRITICAL: Validate BEFORE transaction to prevent partial writes on validation failure
-  // Validates discriminated union (storage: 'github' | 'local')
-  //
-  // Why validation-first pattern matters:
-  // - If validation throws inside transaction, Y.Doc may contain partial/corrupted state
-  // - Pre-validation ensures atomic all-or-nothing behavior
-  // - Failed validation returns clear error without touching Y.Doc
+  /*
+   * CRITICAL: Validate BEFORE transaction to prevent partial writes on validation failure.
+   * Validates discriminated union (storage: 'github' | 'local').
+   *
+   * Why validation-first pattern matters:
+   * - If validation throws inside transaction, Y.Doc may contain partial/corrupted state
+   * - Pre-validation ensures atomic all-or-nothing behavior
+   * - Failed validation returns clear error without touching Y.Doc
+   */
   const validated = ArtifactSchema.parse(artifact);
 
   ydoc.transact(
@@ -792,7 +794,7 @@ export function markPlanAsViewed(ydoc: Y.Doc, username: string): void {
   const map = ydoc.getMap(YDOC_KEYS.METADATA);
 
   ydoc.transact(() => {
-    // Must handle Y.Map properly (can't spread it!)
+    // NOTE: Must handle Y.Map properly (can't spread it!)
     const existingViewedBy = map.get('viewedBy');
     let viewedBy: Record<string, number> = {};
 
@@ -810,7 +812,7 @@ export function markPlanAsViewed(ydoc: Y.Doc, username: string): void {
 
     viewedBy[username] = Date.now();
 
-    // Use Y.Map for the viewedBy to enable CRDT merging
+    // NOTE: Use Y.Map for the viewedBy to enable CRDT merging
     const viewedByMap = new Y.Map<number>();
     for (const [user, timestamp] of Object.entries(viewedBy)) {
       viewedByMap.set(user, timestamp);

@@ -73,6 +73,8 @@ export {
   SubscriptionClientIdSchema,
 } from './schemas.js';
 
-// NOTE: middleware, publicProcedure, and router are NOT exported here
-// to prevent bundling @trpc/server in browser builds.
-// Server code should import these directly from './trpc.js' if needed.
+/*
+ * NOTE: middleware, publicProcedure, and router are NOT exported here
+ * to prevent bundling @trpc/server in browser builds.
+ * Server code should import these directly from './trpc.js' if needed.
+ */

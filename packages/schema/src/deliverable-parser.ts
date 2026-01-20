@@ -1,6 +1,12 @@
 import type { Deliverable } from './plan.js';
 
 /**
+ * Marker used to identify deliverables in BlockNote content.
+ * Example: "- [ ] Screenshot of login page {#deliverable}"
+ */
+export const DELIVERABLE_MARKER = '{#deliverable}';
+
+/**
  * BlockNote block structure (simplified).
  * We only care about checkListItem blocks with {#deliverable} marker.
  * This is a minimal interface that matches BlockNote's actual Block type.
@@ -30,11 +36,12 @@ export function extractDeliverables(blocks: Block[]): Deliverable[] {
     // Extract text from content array
     const text = extractTextFromBlock(block);
 
-    // Check if it has {#deliverable} marker
-    // Works with both checkListItem and bulletListItem (markdown "- [ ]" syntax)
-    if (text.includes('{#deliverable}')) {
-      // Remove the marker from display text
-      const cleanText = text.replace(/\s*\{#deliverable\}\s*/g, '').trim();
+    if (text.includes(DELIVERABLE_MARKER)) {
+      const markerRegex = new RegExp(
+        `\\s*${DELIVERABLE_MARKER.replace(/[{}#]/g, '\\$&')}\\s*`,
+        'g'
+      );
+      const cleanText = text.replace(markerRegex, '').trim();
 
       deliverables.push({
         id: block.id,

@@ -263,9 +263,10 @@ export type {
   SubscriptionClientIdInput,
   SubscriptionCreateParams,
 } from './trpc/index.js';
-// tRPC router and types - Issue #XX
-// Note: Only export runtime routers and schemas, NOT server primitives
-// Server code should import middleware/publicProcedure/router from './trpc/trpc.js'
+/*
+ * NOTE: Server primitives (middleware, publicProcedure, router) NOT exported to prevent
+ * bundling @trpc/server in browser builds. Server code should import from './trpc/trpc.js'
+ */
 export {
   appRouter,
   ChangeSchema,

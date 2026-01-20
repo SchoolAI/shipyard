@@ -118,7 +118,7 @@ export function decodePlan(encoded: string): UrlEncodedPlan | null {
     // Parse as unknown first to avoid type narrowing issues
     const parsed = JSON.parse(json) as { v?: number };
 
-    // Accept v1 and v2 (silently accept unknown versions for forward compatibility)
+    // NOTE: Accept v1 and v2 (silently accept unknown versions for forward compatibility)
     return parsed as UrlEncodedPlan;
   } catch (_error) {
     return null;

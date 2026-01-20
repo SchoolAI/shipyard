@@ -31,7 +31,7 @@ export const GitHubPRResponseSchema = z.object({
   html_url: z.string().url(),
   title: z.string(),
   state: z.enum(['open', 'closed']),
-  // GitHub API always returns these fields - no defaults to ensure we catch API changes
+  // NOTE: GitHub API always returns these fields - no defaults to ensure we catch API changes
   draft: z.boolean(),
   merged: z.boolean(),
   head: z.object({
