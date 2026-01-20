@@ -1,4 +1,4 @@
-# Fly.io configuration for peer-plan signaling server
+# Fly.io configuration for Shipyard signaling server
 # Optimized for minimum cost with auto-stop capability
 
 app = 'shipyard-signaling'

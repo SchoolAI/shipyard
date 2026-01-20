@@ -1,4 +1,4 @@
-# Dockerfile for peer-plan signaling server
+# Dockerfile for Shipyard signaling server
 # Optimized for small image size and fast startup
 
 FROM node:22-alpine

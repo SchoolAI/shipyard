@@ -1,5 +1,5 @@
 /**
- * Shared timeout constants for peer-plan services
+ * Shared timeout constants for Shipyard services
  */
 
 /**
