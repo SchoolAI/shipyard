@@ -45,8 +45,7 @@ function AppWithLayout() {
 
   // Check for reset param before any providers initialize
   // This prevents sync attempts that would re-populate storage
-  // ONLY available in development mode for safety
-  if (import.meta.env.DEV && hasResetParam()) {
+  if (hasResetParam()) {
     return <ResetPage />;
   }
 
