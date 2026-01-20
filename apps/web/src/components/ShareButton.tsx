@@ -124,8 +124,9 @@ export function ShareButton({
             delete window.__shareButtonTimeout;
           }
 
-          // Build the invite URL
-          const baseUrl = window.location.origin;
+          // Build the invite URL with the correct base path (for GitHub Pages subdirectory deployment)
+          const baseUrl =
+            window.location.origin + (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
           const inviteUrl = buildInviteUrl(baseUrl, planId, data.tokenId, data.tokenValue);
 
           // Copy to clipboard

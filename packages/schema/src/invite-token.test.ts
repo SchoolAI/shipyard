@@ -43,6 +43,21 @@ describe('buildInviteUrl', () => {
     expect(url).toBe('https://example.com/plan/plan123?invite=token456%3Asecret789');
   });
 
+  it('should handle baseUrl with subdirectory path', () => {
+    const url = buildInviteUrl('https://example.com/peer-plan', 'plan123', 'token456', 'secret789');
+    expect(url).toBe('https://example.com/peer-plan/plan/plan123?invite=token456%3Asecret789');
+  });
+
+  it('should handle baseUrl with subdirectory path and trailing slash', () => {
+    const url = buildInviteUrl(
+      'https://example.com/peer-plan/',
+      'plan123',
+      'token456',
+      'secret789'
+    );
+    expect(url).toBe('https://example.com/peer-plan/plan/plan123?invite=token456%3Asecret789');
+  });
+
   it('should round-trip with parseInviteFromUrl', () => {
     const baseUrl = 'https://example.com';
     const planId = 'my-plan-id';
