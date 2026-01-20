@@ -154,8 +154,21 @@ export const PlanEventTypes = [
   'input_request_created',
   'input_request_answered',
   'input_request_declined',
+  'agent_activity',
 ] as const;
 export type PlanEventType = (typeof PlanEventTypes)[number];
+
+/**
+ * Agent activity types for tracking agent work status and updates.
+ * Used in agent_activity events to communicate agent state to humans.
+ */
+export const AgentActivityTypes = [
+  'help_request', // non-blocking request for help
+  'help_request_resolved', // help request resolved
+  'blocker', // hit a blocker
+  'blocker_resolved', // blocker resolved
+] as const;
+export type AgentActivityType = (typeof AgentActivityTypes)[number];
 
 /** Base fields shared by all plan events */
 interface PlanEventBase {
@@ -296,6 +309,11 @@ export type PlanEvent =
       data: {
         requestId: string;
       };
+    })
+  // Agent activity
+  | (PlanEventBase & {
+      type: 'agent_activity';
+      data: AgentActivityData;
     });
 
 /** Base schema shared by all plan events */
@@ -306,6 +324,37 @@ const PlanEventBaseSchema = z.object({
   inboxWorthy: z.boolean().optional(),
   inboxFor: z.union([z.string(), z.array(z.string())]).optional(),
 });
+
+/** Zod schema for agent activity data discriminated union */
+export const AgentActivityDataSchema = z.discriminatedUnion('activityType', [
+  z.object({
+    activityType: z.literal('help_request'),
+    requestId: z.string(),
+    message: z.string(),
+  }),
+  z.object({
+    activityType: z.literal('help_request_resolved'),
+    requestId: z.string(),
+    resolution: z.string().optional(),
+  }),
+  z.object({
+    activityType: z.literal('blocker'),
+    message: z.string(),
+    requestId: z.string(),
+  }),
+  z.object({
+    activityType: z.literal('blocker_resolved'),
+    requestId: z.string(),
+    resolution: z.string().optional(),
+  }),
+]);
+
+/**
+ * Discriminated union for agent activity event data.
+ * Each activity type has specific required/optional fields.
+ * Derived from AgentActivityDataSchema to prevent drift.
+ */
+export type AgentActivityData = z.infer<typeof AgentActivityDataSchema>;
 
 /** Discriminated union schema for plan events */
 export const PlanEventSchema = z.discriminatedUnion('type', [
@@ -446,6 +495,11 @@ export const PlanEventSchema = z.discriminatedUnion('type', [
     data: z.object({
       requestId: z.string(),
     }),
+  }),
+  // Agent activity
+  PlanEventBaseSchema.extend({
+    type: z.literal('agent_activity'),
+    data: AgentActivityDataSchema,
   }),
 ]);
 

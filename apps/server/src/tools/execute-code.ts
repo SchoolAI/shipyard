@@ -247,6 +247,92 @@ if (result.success) {
 
 ---
 
+### postActivityUpdate(opts): Promise<{ success, eventId, requestId? }>
+Post an activity update to the agent activity feed.
+
+Parameters:
+- planId (string): The plan ID
+- activityType (string): 'status' | 'note' | 'help_request' | 'milestone' | 'blocker'
+- message (string): The activity message
+- status (string, optional): For 'status' type: 'working' | 'blocked' | 'idle' | 'waiting'
+- category (string, optional): For 'note' type: 'info' | 'progress' | 'decision' | 'question'
+
+Returns:
+- success: Boolean indicating if the update was logged
+- eventId: The ID of the created event
+- requestId: The request ID (only for 'help_request' and 'blocker' types)
+
+Examples:
+\`\`\`typescript
+// Status update
+await postActivityUpdate({
+  planId: "abc",
+  activityType: "status",
+  status: "working",
+  message: "Implementing authentication"
+});
+
+// Informational note
+await postActivityUpdate({
+  planId: "abc",
+  activityType: "note",
+  message: "Found a better approach using JWT",
+  category: "decision"
+});
+
+// Request for help (non-blocking)
+const result = await postActivityUpdate({
+  planId: "abc",
+  activityType: "help_request",
+  message: "Should we use PostgreSQL or SQLite?"
+});
+// Save result.requestId to resolve later
+
+// Milestone reached
+await postActivityUpdate({
+  planId: "abc",
+  activityType: "milestone",
+  message: "Authentication flow complete"
+});
+
+// Hit a blocker (needs resolution to proceed)
+const blockerResult = await postActivityUpdate({
+  planId: "abc",
+  activityType: "blocker",
+  message: "Missing API credentials"
+});
+// Save blockerResult.requestId to resolve later
+\`\`\`
+
+---
+
+### resolveActivityRequest(opts): Promise<{ success }>
+Resolve a previously posted help_request or blocker.
+
+Parameters:
+- planId (string): The plan ID
+- requestId (string): The request ID from postActivityUpdate
+- resolution (string, optional): How the request was resolved
+
+Example:
+\`\`\`typescript
+// First, create a help request
+const helpResult = await postActivityUpdate({
+  planId: "abc",
+  activityType: "help_request",
+  message: "Which database should we use?"
+});
+
+// Later, resolve it
+await resolveActivityRequest({
+  planId: "abc",
+  requestId: helpResult.requestId,
+  resolution: "Using PostgreSQL based on team feedback"
+});
+\`\`\`
+
+---
+
 ## Common Pattern
 
 \`\`\`typescript
@@ -569,6 +655,93 @@ async function requestUserInput(opts: {
   };
 }
 
+async function postActivityUpdate(opts: {
+  planId: string;
+  activityType: 'help_request' | 'blocker';
+  message: string;
+}): Promise<{ success: boolean; eventId: string; requestId?: string }> {
+  const { logPlanEvent } = await import('@peer-plan/schema');
+  const { getGitHubUsername } = await import('../server-identity.js');
+  const { nanoid } = await import('nanoid');
+
+  const doc = await getOrCreateDoc(opts.planId);
+  const actorName = await getGitHubUsername();
+
+  // Generate requestId and log event as inbox-worthy for plan owner
+  const requestId = nanoid();
+  const eventId = logPlanEvent(
+    doc,
+    'agent_activity',
+    actorName,
+    {
+      activityType: opts.activityType,
+      requestId,
+      message: opts.message,
+    },
+    {
+      inboxWorthy: true,
+      inboxFor: 'owner',
+    }
+  );
+
+  return { success: true, eventId, requestId };
+}
+
+async function resolveActivityRequest(opts: {
+  planId: string;
+  requestId: string;
+  resolution?: string;
+}): Promise<{ success: boolean }> {
+  const { logPlanEvent, getPlanEvents } = await import('@peer-plan/schema');
+  const { getGitHubUsername } = await import('../server-identity.js');
+
+  const doc = await getOrCreateDoc(opts.planId);
+  const actorName = await getGitHubUsername();
+  const events = getPlanEvents(doc);
+
+  // Find original unresolved request (help_request or blocker only)
+  const originalEvent = events.find(
+    (e) =>
+      e.type === 'agent_activity' &&
+      e.data &&
+      'requestId' in e.data &&
+      e.data.requestId === opts.requestId &&
+      (e.data.activityType === 'help_request' || e.data.activityType === 'blocker')
+  );
+
+  if (!originalEvent || originalEvent.type !== 'agent_activity') {
+    throw new Error(`Unresolved request ${opts.requestId} not found`);
+  }
+
+  // Check if already resolved
+  const existingResolution = events.find(
+    (e) =>
+      e.type === 'agent_activity' &&
+      e.data &&
+      'requestId' in e.data &&
+      e.data.requestId === opts.requestId &&
+      (e.data.activityType === 'help_request_resolved' ||
+        e.data.activityType === 'blocker_resolved')
+  );
+
+  if (existingResolution) {
+    throw new Error(`Request ${opts.requestId} has already been resolved`);
+  }
+
+  // Determine resolution type - TypeScript narrowing ensures data exists
+  const activityType = originalEvent.data.activityType;
+  const resolvedType =
+    activityType === 'help_request' ? 'help_request_resolved' : 'blocker_resolved';
+
+  logPlanEvent(doc, 'agent_activity', actorName, {
+    activityType: resolvedType,
+    requestId: opts.requestId,
+    resolution: opts.resolution,
+  });
+
+  return { success: true };
+}
+
 // --- Public Export ---
 
 export const executeCodeTool = {
@@ -605,6 +778,8 @@ export const executeCodeTool = {
         addPRReviewComment,
         setupReviewNotification,
         requestUserInput,
+        postActivityUpdate,
+        resolveActivityRequest,
         console: {
           log: (...logArgs: unknown[]) => logger.info({ output: logArgs }, 'console.log'),
           error: (...logArgs: unknown[]) => logger.error({ output: logArgs }, 'console.error'),

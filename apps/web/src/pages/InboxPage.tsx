@@ -13,6 +13,7 @@ import {
   setPlanIndexEntry,
 } from '@peer-plan/schema';
 import {
+  AlertOctagon,
   AlertTriangle,
   AtSign,
   Check,
@@ -21,6 +22,7 @@ import {
   Clock,
   Eye,
   EyeOff,
+  HelpCircle,
   MessageSquare,
   UserPlus,
 } from 'lucide-react';
@@ -225,6 +227,26 @@ function EventInboxItem({ item, onView }: EventInboxItemProps) {
           description: 'Deliverable linked',
           color: 'default' as const,
         };
+      case 'agent_activity':
+        if (event.data?.activityType === 'help_request') {
+          return {
+            icon: <HelpCircle className="w-4 h-4" />,
+            description: `needs help: ${event.data.message}`,
+            color: 'warning' as const,
+          };
+        }
+        if (event.data?.activityType === 'blocker') {
+          return {
+            icon: <AlertOctagon className="w-4 h-4" />,
+            description: `hit blocker: ${event.data.message}`,
+            color: 'danger' as const,
+          };
+        }
+        return {
+          icon: <MessageSquare className="w-4 h-4" />,
+          description: event.type,
+          color: 'default' as const,
+        };
       default:
         return {
           icon: <MessageSquare className="w-4 h-4" />,
@@ -236,6 +258,14 @@ function EventInboxItem({ item, onView }: EventInboxItemProps) {
 
   const { icon, description, color } = getEventDisplay();
 
+  // Extract message for agent requests (type-safe)
+  let agentMessage: string | undefined;
+  if (event.type === 'agent_activity') {
+    if (event.data.activityType === 'help_request' || event.data.activityType === 'blocker') {
+      agentMessage = event.data.message;
+    }
+  }
+
   return (
     <div className="flex items-center justify-between gap-3 w-full py-2">
       <div className="flex flex-col gap-1 flex-1 min-w-0">
@@ -243,7 +273,9 @@ function EventInboxItem({ item, onView }: EventInboxItemProps) {
         <div className="flex items-center gap-2 flex-wrap">
           <Chip size="sm" variant="soft" color={color} className="gap-1">
             {icon}
-            {description}
+            {event.type === 'agent_activity'
+              ? event.data.activityType.replace('_', ' ')
+              : description}
           </Chip>
           <span className="text-xs text-muted-foreground">
             {formatRelativeTime(event.timestamp)}
@@ -260,6 +292,10 @@ function EventInboxItem({ item, onView }: EventInboxItemProps) {
             </div>
           )}
         </div>
+        {/* Show full message for agent requests */}
+        {agentMessage && (
+          <p className="text-sm text-muted-foreground mt-1 pl-1">"{agentMessage}"</p>
+        )}
       </div>
 
       <div className="flex items-center gap-1 shrink-0">
@@ -301,6 +337,14 @@ function groupInboxEvents(
     ),
     readyToComplete: eventBasedInbox.filter(
       (e: InboxEventItem) => e.event.type === 'deliverable_linked' && e.event.data?.allFulfilled
+    ),
+    agentHelpRequests: eventBasedInbox.filter(
+      (e: InboxEventItem) =>
+        e.event.type === 'agent_activity' && e.event.data?.activityType === 'help_request'
+    ),
+    agentBlockers: eventBasedInbox.filter(
+      (e: InboxEventItem) =>
+        e.event.type === 'agent_activity' && e.event.data?.activityType === 'blocker'
     ),
   };
 }
@@ -459,6 +503,8 @@ function calculateTotalInboxItems(
     inboxGroups.mentions.length +
     inboxGroups.readyToComplete.length +
     inboxGroups.approvalRequests.length +
+    inboxGroups.agentHelpRequests.length +
+    inboxGroups.agentBlockers.length +
     pendingRequestsCount
   );
 }
@@ -856,6 +902,64 @@ export function InboxPage() {
                   <Accordion.Body>
                     <div className="divide-y divide-separator">
                       {inboxGroups.approvalRequests.map((item: InboxEventItem) => (
+                        <div key={`${item.plan.id}-${item.event.id}`} className="px-3">
+                          <EventInboxItem item={item} onView={handleViewEvent} />
+                        </div>
+                      ))}
+                    </div>
+                  </Accordion.Body>
+                </Accordion.Panel>
+              </Accordion.Item>
+            )}
+
+            {/* Agent Help Requests */}
+            {inboxGroups.agentHelpRequests.length > 0 && (
+              <Accordion.Item id="agentHelpRequests">
+                <Accordion.Heading>
+                  <Accordion.Trigger>
+                    <HelpCircle className="w-4 h-4 mr-2 shrink-0 text-warning" />
+                    <span className="flex-1 text-left">Agent Help Requests</span>
+                    <Chip size="sm" variant="soft" color="warning" className="mr-2">
+                      {inboxGroups.agentHelpRequests.length}
+                    </Chip>
+                    <Accordion.Indicator>
+                      <ChevronDown />
+                    </Accordion.Indicator>
+                  </Accordion.Trigger>
+                </Accordion.Heading>
+                <Accordion.Panel>
+                  <Accordion.Body>
+                    <div className="divide-y divide-separator">
+                      {inboxGroups.agentHelpRequests.map((item: InboxEventItem) => (
+                        <div key={`${item.plan.id}-${item.event.id}`} className="px-3">
+                          <EventInboxItem item={item} onView={handleViewEvent} />
+                        </div>
+                      ))}
+                    </div>
+                  </Accordion.Body>
+                </Accordion.Panel>
+              </Accordion.Item>
+            )}
+
+            {/* Agent Blockers */}
+            {inboxGroups.agentBlockers.length > 0 && (
+              <Accordion.Item id="agentBlockers">
+                <Accordion.Heading>
+                  <Accordion.Trigger>
+                    <AlertOctagon className="w-4 h-4 mr-2 shrink-0 text-danger" />
+                    <span className="flex-1 text-left">Agent Blockers</span>
+                    <Chip size="sm" variant="soft" color="danger" className="mr-2">
+                      {inboxGroups.agentBlockers.length}
+                    </Chip>
+                    <Accordion.Indicator>
+                      <ChevronDown />
+                    </Accordion.Indicator>
+                  </Accordion.Trigger>
+                </Accordion.Heading>
+                <Accordion.Panel>
+                  <Accordion.Body>
+                    <div className="divide-y divide-separator">
+                      {inboxGroups.agentBlockers.map((item: InboxEventItem) => (
                         <div key={`${item.plan.id}-${item.event.id}`} className="px-3">
                           <EventInboxItem item={item} onView={handleViewEvent} />
                         </div>

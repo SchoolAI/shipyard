@@ -1,10 +1,18 @@
-import { assertNever, type PlanEvent, type PlanEventType } from '@peer-plan/schema';
+import { Chip } from '@heroui/react';
 import {
+  type AgentActivityData,
+  assertNever,
+  type PlanEvent,
+  type PlanEventType,
+} from '@peer-plan/schema';
+import {
+  AlertOctagon,
   AlertTriangle,
   Archive,
   ArrowRightLeft,
   Check,
   CheckCircle,
+  Circle,
   Download,
   FileEdit,
   GitPullRequest,
@@ -21,6 +29,54 @@ import { formatRelativeTime } from '@/utils/formatters';
 
 interface ActivityEventProps {
   event: PlanEvent;
+  /** Whether this is an unresolved help_request or blocker that needs attention */
+  isUnresolved?: boolean;
+}
+
+/**
+ * Get icon for agent activity events based on activity type and sub-type.
+ * Each activity type has specific visual representation.
+ */
+function getAgentActivityIcon(data: AgentActivityData): ReactNode {
+  switch (data.activityType) {
+    case 'help_request':
+      return <HelpCircle className="w-4 h-4 text-warning" />;
+    case 'help_request_resolved':
+      return <CheckCircle className="w-4 h-4 text-success" />;
+    case 'blocker':
+      return <AlertOctagon className="w-4 h-4 text-danger" />;
+    case 'blocker_resolved':
+      return <CheckCircle className="w-4 h-4 text-success" />;
+    default: {
+      const _exhaustive: never = data;
+      void _exhaustive;
+      return <Circle className="w-4 h-4" />;
+    }
+  }
+}
+
+/**
+ * Get human-readable description for agent activity events.
+ * Formats messages based on activity type and available data.
+ */
+function getAgentActivityDescription(data: AgentActivityData): string {
+  switch (data.activityType) {
+    case 'help_request':
+      return `needs help: ${data.message}`;
+    case 'help_request_resolved':
+      return data.resolution
+        ? `resolved help request: ${data.resolution}`
+        : 'resolved help request';
+    case 'blocker':
+      return `hit blocker: ${data.message}`;
+    case 'blocker_resolved':
+      return data.resolution ? `resolved blocker: ${data.resolution}` : 'resolved blocker';
+    default: {
+      const _exhaustive: never = data;
+      void _exhaustive;
+      return 'agent activity';
+    }
+  }
 }
 
 function getEventIcon(type: PlanEventType): ReactNode {
@@ -69,6 +125,9 @@ function getEventIcon(type: PlanEventType): ReactNode {
       return <Check className="w-3.5 h-3.5 text-success" />;
     case 'input_request_declined':
       return <X className="w-3.5 h-3.5 text-muted-foreground" />;
+    case 'agent_activity':
+      // agent_activity uses special helper - will be called separately
+      return <Circle className="w-3.5 h-3.5" />;
     default:
       return assertNever(type);
   }
@@ -153,24 +212,53 @@ function getEventDescription(event: PlanEvent): string {
     }
     case 'input_request_declined':
       return 'declined input request';
+    case 'agent_activity':
+      // agent_activity uses special helper with sub-type logic
+      return getAgentActivityDescription(event.data);
     default:
       return assertNever(event);
   }
 }
 
-export function ActivityEvent({ event }: ActivityEventProps) {
-  const icon = getEventIcon(event.type);
+/**
+ * Determine the highlight color for unresolved events.
+ * Blockers use danger (red), help requests use warning (yellow).
+ */
+function getUnresolvedHighlightColor(event: PlanEvent): 'danger' | 'warning' {
+  if (event.type !== 'agent_activity') return 'warning';
+  return event.data.activityType === 'blocker' ? 'danger' : 'warning';
+}
+
+export function ActivityEvent({ event, isUnresolved = false }: ActivityEventProps) {
+  // Use special icon helper for agent_activity events
+  const icon =
+    event.type === 'agent_activity' ? getAgentActivityIcon(event.data) : getEventIcon(event.type);
   const description = getEventDescription(event);
 
+  // Determine styling based on unresolved status
+  const highlightColor = isUnresolved ? getUnresolvedHighlightColor(event) : null;
+  const borderClass = highlightColor
+    ? highlightColor === 'danger'
+      ? 'border-l-2 border-danger pl-3'
+      : 'border-l-2 border-warning pl-3'
+    : '';
+
   return (
-    <div className="flex gap-3 items-start">
+    <div className={`flex gap-3 items-start ${borderClass}`}>
       <div className="w-6 h-6 rounded-full bg-surface flex items-center justify-center shrink-0">
         {icon}
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm text-foreground">
-          <span className="font-medium">{event.actor}</span> {description}
-        </p>
+        <div className="flex items-center gap-2 flex-wrap">
+          <p className="text-sm text-foreground">
+            <span className="font-medium">{event.actor}</span> {description}
+          </p>
+          {isUnresolved && (
+            <Chip color={highlightColor ?? 'warning'} variant="soft" className="text-xs py-0">
+              Needs Resolution
+            </Chip>
+          )}
+        </div>
         <p className="text-xs text-muted-foreground mt-0.5">
           {formatRelativeTime(event.timestamp)}
         </p>
