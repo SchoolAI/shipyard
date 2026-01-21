@@ -36,12 +36,13 @@ function MobileBottomDrawer({
   onClose: () => void;
   children: ReactNode;
 }) {
-  // Snap points: 65% (default), 95% (expanded)
-  // Dragging below 65% will close the drawer
-  const snapPoints: (string | number)[] = [0.65, 0.95];
+  // Snap points configuration
+  const DEFAULT_SNAP = 0.65; // 65% - initial drawer height
+  const EXPANDED_SNAP = 0.95; // 95% - maximum drawer height
+  const snapPoints: (string | number)[] = [DEFAULT_SNAP, EXPANDED_SNAP];
 
   // Controlled state for snap point - required to make it "stick" after dragging
-  const [activeSnapPoint, setActiveSnapPoint] = useState<number | string | null>(0.65);
+  const [activeSnapPoint, setActiveSnapPoint] = useState<number | string | null>(DEFAULT_SNAP);
 
   return (
     <Drawer.Root
@@ -59,7 +60,7 @@ function MobileBottomDrawer({
         <Drawer.Overlay className="fixed inset-0 z-40 bg-black/40" />
         <Drawer.Content
           className="fixed bottom-0 left-0 right-0 z-50 flex flex-col rounded-t-2xl bg-background outline-none"
-          style={{ height: '95vh' }}
+          style={{ height: `${EXPANDED_SNAP * 100}vh` }}
           aria-label="Task details panel"
         >
           {/* Drag handle - only this area triggers drag gestures */}
