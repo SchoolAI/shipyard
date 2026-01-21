@@ -1,0 +1,1 @@
+{"version":3,"file":"registry-config.mjs","names":[],"sources":["../src/registry-config.ts"],"sourcesContent":["/**\n * Default registry ports for shipyard hub discovery.\n * Multiple ports support hub restarts - new instances use next available port.\n */\nexport const DEFAULT_REGISTRY_PORTS = [32191, 32192] as const;\n"],"mappings":";;;;;AAIA,MAAa,yBAAyB,CAAC,OAAO,MAAM"}

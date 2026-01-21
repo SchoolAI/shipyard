@@ -1,8 +1,8 @@
 {
   "mcpServers": {
     "shipyard": {
-      "command": "npx",
-      "args": ["-y", "@schoolai/shipyard-mcp", "mcp-server-shipyard"],
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/apps/server/dist/index.js"],
       "env": {
         "NODE_ENV": "production"
       }
