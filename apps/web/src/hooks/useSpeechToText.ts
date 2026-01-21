@@ -156,11 +156,7 @@ export function useSpeechToText(): UseSpeechToTextReturn {
     const recognition = new SpeechRecognitionClass();
     recognitionRef.current = recognition;
 
-    // Disable continuous on iOS Safari - it's buggy and causes never-ending recognition
-    // Let onend handler restart if needed
-    const isIOSSafari =
-      /iPad|iPhone|iPod/.test(navigator.userAgent) && !/CriOS|FxiOS/.test(navigator.userAgent);
-    recognition.continuous = !isIOSSafari;
+    recognition.continuous = true;
     recognition.interimResults = true;
     recognition.lang = 'en-US';
 
@@ -236,7 +232,7 @@ export function useSpeechToText(): UseSpeechToTextReturn {
     }
 
     // Use stop() to allow finalization of results (abort() discards transcription)
-    // The ding sound on iOS indicates recognition is properly stopping
+    // The ding sound indicates recognition is properly stopping
     if (recognitionRef.current) {
       recognitionRef.current.stop();
     }

@@ -103,7 +103,11 @@ export function VoiceInputButton({ onTranscript, className }: VoiceInputButtonPr
         <Tooltip.Trigger>{button}</Tooltip.Trigger>
         <Tooltip.Content>
           <div className="text-center max-w-xs">
-            {partialTranscript && <p className="mb-1 font-medium">"{partialTranscript}..."</p>}
+            {partialTranscript ? (
+              <p className="mb-1 font-medium">"{partialTranscript}..."</p>
+            ) : (
+              <p className="mb-1 text-foreground-400 italic">Listening...</p>
+            )}
             <p className="text-xs opacity-70">Tap mic to stop</p>
           </div>
         </Tooltip.Content>
