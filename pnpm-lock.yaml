@@ -87,6 +87,12 @@ importers:
         specifier: ^4.3.4
         version: 4.3.5
     devDependencies:
+      '@shipyard/schema':
+        specifier: workspace:*
+        version: link:../../packages/schema
+      '@shipyard/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       '@types/node':
         specifier: ^25.0.3
         version: 25.0.3
@@ -169,6 +175,12 @@ importers:
       '@floating-ui/dom':
         specifier: ^1.6.14
         version: 1.7.4
+      '@shipyard/schema':
+        specifier: workspace:*
+        version: link:../../packages/schema
+      '@shipyard/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       '@types/express':
         specifier: ^5.0.6
         version: 5.0.6
