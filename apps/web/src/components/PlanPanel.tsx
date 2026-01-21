@@ -4,7 +4,7 @@
  * On mobile, displays as a draggable bottom drawer using vaul.
  */
 
-import type { ReactNode } from 'react';
+import { type ReactNode, useState } from 'react';
 import { Drawer } from 'vaul';
 import { useIsMobile } from '@/hooks/useIsMobile';
 
@@ -36,16 +36,20 @@ function MobileBottomDrawer({
   onClose: () => void;
   children: ReactNode;
 }) {
-  // Snap points: 60% (default), 90% (expanded)
-  // Dragging below 60% will close the drawer
-  const snapPoints = [0.6, 0.9];
+  // Snap points: 65% (default), 95% (expanded)
+  // Dragging below 65% will close the drawer
+  const snapPoints: (string | number)[] = [0.65, 0.95];
+
+  // Controlled state for snap point - required to make it "stick" after dragging
+  const [activeSnapPoint, setActiveSnapPoint] = useState<number | string | null>(0.65);
 
   return (
     <Drawer.Root
       open={isOpen}
       onOpenChange={(open) => !open && onClose()}
       snapPoints={snapPoints}
-      activeSnapPoint={snapPoints[0]}
+      activeSnapPoint={activeSnapPoint}
+      setActiveSnapPoint={setActiveSnapPoint}
       // Start fading overlay when dragging below the first snap point
       fadeFromIndex={0}
       // Only drag from handle, allow content scrolling
@@ -55,7 +59,7 @@ function MobileBottomDrawer({
         <Drawer.Overlay className="fixed inset-0 z-40 bg-black/40" />
         <Drawer.Content
           className="fixed bottom-0 left-0 right-0 z-50 flex flex-col rounded-t-2xl bg-background outline-none"
-          style={{ height: '90vh' }}
+          style={{ height: '95vh' }}
           aria-label="Task details panel"
         >
           {/* Drag handle - only this area triggers drag gestures */}
