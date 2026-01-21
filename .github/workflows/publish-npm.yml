@@ -1,5 +1,14 @@
 name: Publish to npm
 
+run-name: >-
+  ${{ github.event_name == 'workflow_dispatch' && inputs.action == 'promote'
+      && format('Promote {0} → {1}', inputs.rc_version, inputs.stable_version)
+      || github.event_name == 'workflow_dispatch' && inputs.action == 'rc'
+      && 'Publish RC'
+      || startsWith(github.ref, 'refs/tags/v')
+      && format('Release {0}', github.ref_name)
+      || format('Auto RC ({0})', github.sha) }}
+
 on:
   push:
     branches:
