@@ -1,0 +1,48 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "AskUserQuestion",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node /Users/jacobpetterle/Working\\ Directory/shipyard/apps/hook/dist/index.js"
+          }
+        ]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "matcher": "ExitPlanMode",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node /Users/jacobpetterle/Working\\ Directory/shipyard/apps/hook/dist/index.js",
+            "timeout": 1800
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node /Users/jacobpetterle/Working\\ Directory/shipyard/apps/hook/dist/index.js --context"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "ExitPlanMode",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node /Users/jacobpetterle/Working\\ Directory/shipyard/apps/hook/dist/index.js"
+          }
+        ]
+      }
+    ]
+  }
+}

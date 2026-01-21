@@ -36,8 +36,8 @@ function MobileBottomDrawer({
   onClose: () => void;
   children: ReactNode;
 }) {
-  // Snap points: 60% (initial), 90% (expanded), close on drag below threshold
-  const snapPoints = [0.6, 0.9];
+  // Snap points: 85% (default, near header), 97% (full), close on drag below
+  const snapPoints = [0.85, 0.97];
 
   return (
     <Drawer.Root
@@ -46,17 +46,22 @@ function MobileBottomDrawer({
       snapPoints={snapPoints}
       activeSnapPoint={snapPoints[0]}
       fadeFromIndex={0}
+      // Only drag from handle, allow content scrolling
+      handleOnly
     >
       <Drawer.Portal>
         <Drawer.Overlay className="fixed inset-0 z-40 bg-black/40" />
         <Drawer.Content
           className="fixed bottom-0 left-0 right-0 z-50 flex flex-col rounded-t-2xl bg-background outline-none"
-          style={{ maxHeight: '90vh' }}
+          style={{ height: '97vh' }}
           aria-label="Task details panel"
         >
-          {/* Functional drag handle */}
+          {/* Drag handle - only this area triggers drag gestures */}
           <Drawer.Handle className="mx-auto mt-3 mb-2 h-1.5 w-12 shrink-0 rounded-full bg-muted-foreground/30" />
-          <div className="flex-1 overflow-hidden flex flex-col pb-safe">{children}</div>
+          {/* Scrollable content area */}
+          <div className="flex-1 overflow-y-auto overflow-x-hidden flex flex-col pb-safe overscroll-contain">
+            {children}
+          </div>
         </Drawer.Content>
       </Drawer.Portal>
     </Drawer.Root>
