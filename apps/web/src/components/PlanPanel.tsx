@@ -51,6 +51,8 @@ function MobileBottomDrawer({
       snapPoints={snapPoints}
       activeSnapPoint={activeSnapPoint}
       setActiveSnapPoint={setActiveSnapPoint}
+      // Prevent velocity-based snap point skipping - ensures drawer stays at dragged position
+      snapToSequentialPoint
       // Start fading overlay when dragging below the first snap point
       fadeFromIndex={0}
       // Only drag from handle, allow content scrolling

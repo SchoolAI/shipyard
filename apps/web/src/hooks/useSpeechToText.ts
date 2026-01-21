@@ -87,6 +87,9 @@ export function useSpeechToText(): UseSpeechToTextReturn {
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
   const isStoppingRef = useRef(false);
   const stateRef = useRef(state);
+  // Track partial transcript in a ref so we can reliably read it when stopping
+  // (avoids race conditions with nested setState calls)
+  const partialTranscriptRef = useRef('');
 
   const SpeechRecognitionClass = getSpeechRecognition();
   const isSupported = SpeechRecognitionClass !== null;
@@ -123,6 +126,7 @@ export function useSpeechToText(): UseSpeechToTextReturn {
     setError(null);
     setTranscript('');
     setPartialTranscript('');
+    partialTranscriptRef.current = '';
     isStoppingRef.current = false;
 
     try {
@@ -149,8 +153,10 @@ export function useSpeechToText(): UseSpeechToTextReturn {
       if (finalText) {
         setTranscript((prev) => (prev ? `${prev} ${finalText}` : finalText));
         setPartialTranscript('');
+        partialTranscriptRef.current = '';
       } else {
         setPartialTranscript(interimText);
+        partialTranscriptRef.current = interimText;
       }
     };
 
@@ -193,12 +199,13 @@ export function useSpeechToText(): UseSpeechToTextReturn {
 
     // On mobile Safari, isFinal may not be set until stop() is called
     // Capture any pending partial transcript as final text before stopping
-    setPartialTranscript((currentPartial) => {
-      if (currentPartial) {
-        setTranscript((prev) => (prev ? `${prev} ${currentPartial}` : currentPartial));
-      }
-      return '';
-    });
+    // Use ref to avoid race conditions with nested setState calls
+    const pendingPartial = partialTranscriptRef.current;
+    if (pendingPartial) {
+      setTranscript((prev) => (prev ? `${prev} ${pendingPartial}` : pendingPartial));
+      setPartialTranscript('');
+      partialTranscriptRef.current = '';
+    }
 
     if (recognitionRef.current) {
       recognitionRef.current.stop();
