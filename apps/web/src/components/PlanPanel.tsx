@@ -36,16 +36,13 @@ function MobileBottomDrawer({
   onClose: () => void;
   children: ReactNode;
 }) {
-  // Snap points: 95% (default, just below header), 97% (full), close on drag below
-  const snapPoints = [0.95, 0.97];
-
   return (
     <Drawer.Root
       open={isOpen}
       onOpenChange={(open) => !open && onClose()}
-      snapPoints={snapPoints}
-      activeSnapPoint={snapPoints[0]}
-      fadeFromIndex={0}
+      // No snap points = smooth dismiss on any significant downward drag
+      // closeThreshold controls how far down you need to drag to dismiss (0.25 = 25% of height)
+      closeThreshold={0.15}
       // Only drag from handle, allow content scrolling
       handleOnly
     >

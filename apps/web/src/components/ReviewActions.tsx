@@ -250,8 +250,9 @@ export function ReviewActions({
           Approve
         </Button>
 
-        {/* z-[60] ensures popover renders above mobile drawer (z-50) */}
-        <Popover.Content placement="top" className="w-80 z-[60]">
+        {/* z-[60] ensures popover renders above mobile drawer (z-50)
+            data-vaul-no-drag prevents vaul drawer from capturing touch events */}
+        <Popover.Content placement="top" className="w-80 z-[60]" data-vaul-no-drag>
           <Popover.Dialog>
             <Popover.Arrow />
             <Popover.Heading>Approve Task</Popover.Heading>
@@ -309,8 +310,9 @@ export function ReviewActions({
           {currentStatus === 'changes_requested' ? 'Changes' : 'Request Changes'}
         </Button>
 
-        {/* z-[60] ensures popover renders above mobile drawer (z-50) */}
-        <Popover.Content placement="top" className="w-80 z-[60]">
+        {/* z-[60] ensures popover renders above mobile drawer (z-50)
+            data-vaul-no-drag prevents vaul drawer from capturing touch events */}
+        <Popover.Content placement="top" className="w-80 z-[60]" data-vaul-no-drag>
           <Popover.Dialog>
             <Popover.Arrow />
             <Popover.Heading>Request Changes</Popover.Heading>
