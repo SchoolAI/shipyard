@@ -210,6 +210,55 @@ async function handleCreateInvite(
 }
 
 /**
+ * Flush queued messages for a newly-approved user.
+ * Called after invite redemption to deliver messages that were queued
+ * before the user was approved.
+ *
+ * @param platform - Platform adapter for storage/messaging
+ * @param ws - WebSocket connection to flush
+ * @param planId - Plan ID to flush messages for
+ */
+async function flushMessagesAfterApproval(
+  platform: PlatformAdapter,
+  ws: unknown,
+  planId: string
+): Promise<void> {
+  // Mark connection as flushing to prevent race conditions with handlePublish
+  platform.setFlushingMessages(ws, true);
+
+  try {
+    const queuedByTopic = platform.getAndClearQueuedMessages(ws);
+
+    if (queuedByTopic.size === 0) return;
+
+    const topic = `${PLAN_TOPIC_PREFIX}${planId}`;
+    const messages = queuedByTopic.get(topic);
+
+    if (messages && messages.length > 0) {
+      platform.debug('[flushMessagesAfterApproval] Delivering queued messages', {
+        planId,
+        messageCount: messages.length,
+      });
+
+      for (const msg of messages) {
+        platform.sendMessage(ws, msg);
+      }
+    }
+
+    // Re-queue messages for other topics (shouldn't happen, but be safe)
+    for (const [otherTopic, otherMessages] of queuedByTopic) {
+      if (otherTopic !== topic) {
+        for (const msg of otherMessages) {
+          platform.queueMessageForConnection(ws, otherTopic, msg);
+        }
+      }
+    }
+  } finally {
+    platform.setFlushingMessages(ws, false);
+  }
+}
+
+/**
  * Handle redeem_invite message from guest.
  * Validates token and auto-approves the user if valid.
  *
@@ -242,6 +291,8 @@ async function handleRedeemInvite(
 
   if (existingRedemption) {
     // Already redeemed - return success (idempotent)
+    // Also flush any queued messages in case they reconnected
+    await flushMessagesAfterApproval(platform, ws, planId);
     const response: InviteRedemptionResult = {
       type: 'invite_redemption_result',
       success: true,
@@ -268,6 +319,11 @@ async function handleRedeemInvite(
 
   // Auto-approve user
   await autoApproveUserFromInvite(platform, planId, userId, validToken);
+
+  // Flush queued messages now that user is approved
+  // This is critical: messages were queued during initial subscribe (before userId was set)
+  // and re-queued during first flush (before user was approved). Now we can deliver them.
+  await flushMessagesAfterApproval(platform, ws, planId);
 
   platform.info('[handleRedeemInvite] User redeemed invite token', { userId, tokenId, planId });
 
