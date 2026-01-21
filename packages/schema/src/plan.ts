@@ -638,46 +638,37 @@ export const PlanMetadataSchema = z.discriminatedUnion('status', [
 
 export type ArtifactType = 'screenshot' | 'video' | 'test_results' | 'diff';
 
-interface BaseArtifact {
-  id: string;
-  type: ArtifactType;
-  filename: string;
-  description?: string;
-  uploadedAt?: number;
-}
+const BaseArtifactSchema = z.object({
+  id: z.string(),
+  type: z.enum(['screenshot', 'video', 'test_results', 'diff']),
+  filename: z.string(),
+  description: z.string().optional(),
+  uploadedAt: z.number().optional(),
+});
 
-export interface GitHubArtifact extends BaseArtifact {
-  storage: 'github';
-  url: string;
-}
+const GitHubArtifactSchema = BaseArtifactSchema.extend({
+  storage: z.literal('github'),
+  url: z.string(),
+});
 
-export interface LocalArtifact extends BaseArtifact {
-  storage: 'local';
-  localArtifactId: string;
-}
-
-export type Artifact = GitHubArtifact | LocalArtifact;
+const LocalArtifactSchema = BaseArtifactSchema.extend({
+  storage: z.literal('local'),
+  localArtifactId: z.string(),
+});
 
 export const ArtifactSchema = z.discriminatedUnion('storage', [
-  z.object({
-    id: z.string(),
-    type: z.enum(['screenshot', 'video', 'test_results', 'diff']),
-    filename: z.string(),
-    storage: z.literal('github'),
-    url: z.string(),
-    description: z.string().optional(),
-    uploadedAt: z.number().optional(),
-  }),
-  z.object({
-    id: z.string(),
-    type: z.enum(['screenshot', 'video', 'test_results', 'diff']),
-    filename: z.string(),
-    storage: z.literal('local'),
-    localArtifactId: z.string(),
-    description: z.string().optional(),
-    uploadedAt: z.number().optional(),
-  }),
+  GitHubArtifactSchema,
+  LocalArtifactSchema,
 ]);
+
+/**
+ * Artifact types - proof-of-work attachments to plans.
+ * Can be stored in GitHub (for sharing) or locally (for privacy).
+ * Schema is source of truth - types derived via z.infer.
+ */
+export type Artifact = z.infer<typeof ArtifactSchema>;
+export type GitHubArtifact = z.infer<typeof GitHubArtifactSchema>;
+export type LocalArtifact = z.infer<typeof LocalArtifactSchema>;
 
 export function getArtifactUrl(repo: string, pr: number, planId: string, filename: string): string {
   return `https://raw.githubusercontent.com/${repo}/plan-artifacts/pr-${pr}/${planId}/${filename}`;
@@ -690,21 +681,6 @@ export interface StepCompletion {
   completedBy?: string;
 }
 
-/**
- * A deliverable extracted from plan content.
- * Checkboxes marked with {#deliverable} become deliverables.
- */
-export interface Deliverable {
-  /** Unique ID (typically the BlockNote block ID) */
-  id: string;
-  /** Checkbox text (e.g., "Screenshot of login page") */
-  text: string;
-  /** Artifact ID when linked */
-  linkedArtifactId?: string;
-  /** When the artifact was linked */
-  linkedAt?: number;
-}
-
 export const DeliverableSchema = z.object({
   id: z.string(),
   text: z.string(),
@@ -713,33 +689,11 @@ export const DeliverableSchema = z.object({
 });
 
 /**
- * A point-in-time snapshot of plan state.
- * Created at significant status transitions for version history.
- * Stored in Y.Array(YDOC_KEYS.SNAPSHOTS) for CRDT sync.
+ * A deliverable extracted from plan content.
+ * Checkboxes marked with {#deliverable} become deliverables.
+ * Schema is source of truth - type derived via z.infer.
  */
-export interface PlanSnapshot {
-  /** Unique snapshot ID */
-  id: string;
-  /** Status at time of snapshot */
-  status: PlanStatusType;
-  /** Who created this snapshot (agent or human name) */
-  createdBy: string;
-  /** Why this snapshot was created (e.g., "Approved by reviewer") */
-  reason: string;
-  /** Timestamp when snapshot was taken */
-  createdAt: number;
-  /** Plan content blocks at this point (BlockNote Block[]) */
-  content: unknown[];
-  /** Thread summary (lightweight, not full threads) */
-  threadSummary?: {
-    total: number;
-    unresolved: number;
-  };
-  /** Artifacts at this point */
-  artifacts?: Artifact[];
-  /** Deliverables with linkage state */
-  deliverables?: Deliverable[];
-}
+export type Deliverable = z.infer<typeof DeliverableSchema>;
 
 export const PlanSnapshotSchema = z.object({
   id: z.string(),
@@ -758,27 +712,16 @@ export const PlanSnapshotSchema = z.object({
   deliverables: z.array(DeliverableSchema).optional(),
 });
 
+/**
+ * A point-in-time snapshot of plan state.
+ * Created at significant status transitions for version history.
+ * Stored in Y.Array(YDOC_KEYS.SNAPSHOTS) for CRDT sync.
+ * Schema is source of truth - type derived via z.infer.
+ */
+export type PlanSnapshot = z.infer<typeof PlanSnapshotSchema>;
+
 export const LinkedPRStatusValues = ['draft', 'open', 'merged', 'closed'] as const;
 export type LinkedPRStatus = (typeof LinkedPRStatusValues)[number];
-
-/**
- * A GitHub PR linked to a plan.
- * Auto-detected from branch when complete_task runs.
- */
-export interface LinkedPR {
-  /** GitHub PR number */
-  prNumber: number;
-  /** Full PR URL (e.g., https://github.com/org/repo/pull/123) */
-  url: string;
-  /** When the PR was linked to this plan */
-  linkedAt: number;
-  /** Current PR status */
-  status: LinkedPRStatus;
-  /** Branch name the PR is from */
-  branch?: string;
-  /** PR title for display */
-  title?: string;
-}
 
 export const LinkedPRSchema = z.object({
   prNumber: z.number(),
@@ -790,27 +733,11 @@ export const LinkedPRSchema = z.object({
 });
 
 /**
- * A review comment on a PR diff.
- * Can be added by AI (via MCP tool) or human (via UI).
+ * A GitHub PR linked to a plan.
+ * Auto-detected from branch when complete_task runs.
+ * Schema is source of truth - type derived via z.infer.
  */
-export interface PRReviewComment {
-  /** Unique comment ID */
-  id: string;
-  /** PR number this comment belongs to */
-  prNumber: number;
-  /** File path in the diff */
-  path: string;
-  /** Line number in the diff (in modified file) */
-  line: number;
-  /** Comment content (markdown supported) */
-  body: string;
-  /** Author - GitHub username or "AI" */
-  author: string;
-  /** When the comment was created */
-  createdAt: number;
-  /** Whether the comment has been resolved */
-  resolved?: boolean;
-}
+export type LinkedPR = z.infer<typeof LinkedPRSchema>;
 
 export const PRReviewCommentSchema = z.object({
   id: z.string(),
@@ -822,6 +749,13 @@ export const PRReviewCommentSchema = z.object({
   createdAt: z.number(),
   resolved: z.boolean().optional(),
 });
+
+/**
+ * A review comment on a PR diff.
+ * Can be added by AI (via MCP tool) or human (via UI).
+ * Schema is source of truth - type derived via z.infer.
+ */
+export type PRReviewComment = z.infer<typeof PRReviewCommentSchema>;
 
 /**
  * Create a LinkedPR object with validation.
