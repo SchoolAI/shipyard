@@ -113,6 +113,8 @@ pnpm install
 pnpm dev:all
 ```
 
+**Important:** Do NOT install the `shipyard` plugin if you're developing this repo. The plugin is for end users only. Local hooks/skills/MCP are always used from the project directory.
+
 See **[SETUP.md](./docs/SETUP.md)** for full development setup.
 
 ## How It Works

@@ -14,6 +14,27 @@ Developer guide for running Shipyard locally and contributing to the codebase.
 
 ---
 
+## Important: Don't Install the Plugin for Local Dev
+
+**Do NOT install the `shipyard` plugin if you're developing this codebase.**
+
+The plugin is for end users only. When developing locally:
+- ✅ Use project hooks (`./hooks/hooks.json`)
+- ✅ Use project skills (`./skills/shipyard/`)
+- ✅ Use project MCP (`./.mcp.json`)
+
+**Why not both?**
+- Plugin hooks + project hooks run in parallel (duplicate triggers)
+- Can't disable local hooks (they always load from the project)
+- Causes confusion about which code is executing
+
+**If you already installed it:**
+```bash
+/plugin uninstall shipyard@schoolai-shipyard
+```
+
+---
+
 ## Installation
 
 ```bash
