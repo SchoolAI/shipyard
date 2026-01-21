@@ -18,6 +18,12 @@ Complete installation instructions for all AI platforms.
 
 > **Why two steps?** Claude Code uses a marketplace model (like app stores). You first register a marketplace (catalog of plugins), then install specific plugins from it. This is intentional design for security and control.
 
+**Troubleshooting:** If Step 1 fails with a cache error (known bug #14696 with case-sensitive org names), try:
+```bash
+/plugin marketplace add https://github.com/SchoolAI/shipyard.git
+```
+If that stalls, start a fresh Claude Code session and retry.
+
 **What you get:**
 - ✅ MCP server with all tools (`create_plan`, `read_plan`, `add_artifact`, etc.)
 - ✅ Automatic hooks (plan creation on `ExitPlanMode`, session tracking)

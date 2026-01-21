@@ -47,6 +47,18 @@ Install the complete Shipyard plugin (MCP server + hooks + skills):
 
 > **Note:** Claude Code requires adding a marketplace before installing plugins from it. This is intentional design (similar to app stores).
 
+<details>
+<summary>Troubleshooting: If Step 1 fails with a cache error</summary>
+
+There's a known Claude Code bug (#14696) with case-sensitive GitHub org names. Try the full git URL instead:
+
+```bash
+/plugin marketplace add https://github.com/SchoolAI/shipyard.git
+```
+
+If that stalls, start a fresh Claude Code session and try again.
+</details>
+
 This gives you:
 - ✅ MCP tools for creating and managing plans
 - ✅ Automatic hooks for plan creation workflow
