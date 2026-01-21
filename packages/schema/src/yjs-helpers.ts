@@ -94,6 +94,7 @@ export interface TransitionToInProgress {
   status: 'in_progress';
   reviewedAt?: number;
   reviewedBy?: string;
+  reviewComment?: string;
 }
 
 /**
@@ -241,6 +242,9 @@ export function transitionPlanStatus(
           }
           if (transition.reviewedBy !== undefined) {
             map.set('reviewedBy', transition.reviewedBy);
+          }
+          if (transition.reviewComment !== undefined) {
+            map.set('reviewComment', transition.reviewComment);
           }
           break;
 

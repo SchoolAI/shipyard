@@ -239,6 +239,9 @@ export type PlanEvent =
     })
   | (PlanEventBase & {
       type: 'approved' | 'changes_requested';
+      data?: {
+        comment?: string;
+      };
     })
   | (PlanEventBase & {
       type: 'completed';
@@ -406,6 +409,11 @@ export const PlanEventSchema = z.discriminatedUnion('type', [
   }),
   PlanEventBaseSchema.extend({
     type: z.enum(['approved', 'changes_requested']),
+    data: z
+      .object({
+        comment: z.string().optional(),
+      })
+      .optional(),
   }),
   PlanEventBaseSchema.extend({
     type: z.literal('completed'),
@@ -565,6 +573,8 @@ export type PlanMetadata =
       reviewedAt: number;
       /** Display name of the reviewer who approved */
       reviewedBy: string;
+      /** Optional feedback from reviewer on approval */
+      reviewComment?: string;
     })
   | (PlanMetadataBase & {
       status: 'completed';
@@ -616,6 +626,7 @@ export const PlanMetadataSchema = z.discriminatedUnion('status', [
     status: z.literal('in_progress'),
     reviewedAt: z.number(),
     reviewedBy: z.string(),
+    reviewComment: z.string().optional(),
   }),
   PlanMetadataBaseSchema.extend({
     status: z.literal('completed'),

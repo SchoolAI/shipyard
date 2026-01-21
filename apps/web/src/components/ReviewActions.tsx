@@ -149,7 +149,12 @@ export function ReviewActions({
     const result = transitionPlanStatus(
       ydoc,
       action === 'approve'
-        ? { status: 'in_progress', reviewedAt: now, reviewedBy: reviewerName }
+        ? {
+            status: 'in_progress',
+            reviewedAt: now,
+            reviewedBy: reviewerName,
+            reviewComment: trimmedComment || undefined,
+          }
         : {
             status: 'changes_requested',
             reviewedAt: now,
@@ -176,7 +181,13 @@ export function ReviewActions({
     const reviewerName = identity?.name ?? 'Unknown';
     const newStatus = updateReviewStatus(action, trimmedComment, timestamp);
 
-    logPlanEvent(ydoc, getEventType(action), reviewerName);
+    // Log event with comment if present
+    logPlanEvent(
+      ydoc,
+      getEventType(action),
+      reviewerName,
+      trimmedComment ? { comment: trimmedComment } : undefined
+    );
 
     const snapshot = createPlanSnapshot(
       ydoc,

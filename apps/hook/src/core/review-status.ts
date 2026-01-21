@@ -111,9 +111,10 @@ async function handleUpdatedPlanReview(
         'Session token set and stored by server with updated content hash'
       );
 
+      const reviewFeedback = decision.reviewComment ? `\n\nReviewer comment: ${decision.reviewComment}` : '';
       return {
         allow: true,
-        message: `Plan re-approved with updates! You have ${deliverableCount} deliverable${deliverableCount === 1 ? '' : 's'}. Use add_artifact(filePath, deliverableId) to upload proof-of-work.`,
+        message: `Plan re-approved with updates! You have ${deliverableCount} deliverable${deliverableCount === 1 ? '' : 's'}. Use add_artifact(filePath, deliverableId) to upload proof-of-work.${reviewFeedback}`,
         planId,
         sessionToken,
         url,
@@ -132,7 +133,7 @@ async function handleUpdatedPlanReview(
 
   return {
     allow: false,
-    message: decision.feedback || 'Changes requested',
+    message: decision.reviewComment || 'Changes requested',
     planId,
   };
 }
@@ -193,9 +194,10 @@ export async function checkReviewStatus(
           'Session token set and stored by server with deliverables'
         );
 
+        const reviewFeedback = decision.reviewComment ? `\n\nReviewer comment: ${decision.reviewComment}` : '';
         return {
           allow: true,
-          message: `Plan approved! You have ${deliverableCount} deliverable${deliverableCount === 1 ? '' : 's'}. Use add_artifact(filePath, deliverableId) to upload proof-of-work.`,
+          message: `Plan approved! You have ${deliverableCount} deliverable${deliverableCount === 1 ? '' : 's'}. Use add_artifact(filePath, deliverableId) to upload proof-of-work.${reviewFeedback}`,
           planId,
           sessionToken,
           url,
@@ -215,7 +217,7 @@ export async function checkReviewStatus(
 
     return {
       allow: false,
-      message: decision.feedback || 'Changes requested',
+      message: decision.reviewComment || 'Changes requested',
       planId,
     };
   }
