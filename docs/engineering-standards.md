@@ -271,10 +271,12 @@ This project uses a specialized stack for P2P collaborative editing. It follows 
 | Package Manager | pnpm | 10.9.0 | Shared workspace (aligns with repo standard) |
 | Node Version | Node.js LTS | 22.14.0 | Matches repo standard |
 | TypeScript | TypeScript | 5.6.0 | Strict mode enabled |
-| Build Tool | tsdown | 0.3.1 | 49% faster than tsup (aligns with repo standard) |
+| Build Tool | tsup | 8.5.1 | Workspace bundling works (tsdown broken for pnpm monorepos) |
 | Validation | zod | 3.23.8 | Type-safe runtime validation |
 | Linting | Biome | 1.9.4 | 20-50x faster than ESLint |
 | Testing | Vitest | 2.1.0 | Fast, parallel execution |
+
+**Note:** Previously used tsdown (49% faster), but switched to tsup due to [workspace bundling issues](https://github.com/rolldown/tsdown/issues/544). tsup reliably bundles workspace packages for npm distribution.
 
 ## P2P Collaboration Stack
 
