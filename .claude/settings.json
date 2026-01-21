@@ -16,7 +16,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node apps/hook/dist/index.mjs"
+            "command": "node apps/hook/dist/index.js"
           }
         ]
       }
@@ -27,7 +27,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node apps/hook/dist/index.mjs",
+            "command": "node apps/hook/dist/index.js",
             "timeout": 1800
           }
         ]
@@ -39,7 +39,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node apps/hook/dist/index.mjs"
+            "command": "node apps/hook/dist/index.js"
           }
         ]
       }
