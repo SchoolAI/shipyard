@@ -54,12 +54,27 @@ function applyThemeToDOM(theme: Theme): void {
   }
 }
 
+export type ResolvedTheme = 'light' | 'dark';
+
+function getResolvedTheme(theme: Theme): ResolvedTheme {
+  if (theme === 'system') {
+    return typeof window !== 'undefined' &&
+      window.matchMedia('(prefers-color-scheme: dark)').matches
+      ? 'dark'
+      : 'light';
+  }
+  return theme;
+}
+
 export function useTheme() {
   const theme = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
   const setTheme = useCallback((newTheme: Theme) => {
     setThemeValue(newTheme);
   }, []);
+
+  // Compute resolved theme (what's actually applied)
+  const resolvedTheme = getResolvedTheme(theme);
 
   // Apply theme to DOM when it changes
   useEffect(() => {
@@ -101,5 +116,5 @@ export function useTheme() {
     return () => window.removeEventListener('storage', handleStorage);
   }, []);
 
-  return { theme, setTheme };
+  return { theme, setTheme, resolvedTheme };
 }

@@ -31,7 +31,8 @@ import {
   MessageSquare,
   UserPlus,
 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import type React from 'react';
+import { type PropsWithChildren, useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { IndexeddbPersistence } from 'y-indexeddb';
@@ -41,6 +42,7 @@ import { InputRequestInboxItem } from '@/components/InputRequestInboxItem';
 import { InputRequestModal } from '@/components/InputRequestModal';
 import { BaseInboxCard } from '@/components/inbox/BaseInboxCard';
 import { OfflineBanner } from '@/components/OfflineBanner';
+import { type PanelWidth, PlanPanel } from '@/components/PlanPanel';
 import { TagChip } from '@/components/TagChip';
 import { TwoColumnSkeleton } from '@/components/ui/TwoColumnSkeleton';
 import { getPlanRoute } from '@/constants/routes';
@@ -49,6 +51,7 @@ import { useUserIdentity } from '@/contexts/UserIdentityContext';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
 import { type InboxEventItem, useInboxEvents } from '@/hooks/useInboxEvents';
 import { useInputRequests } from '@/hooks/useInputRequests';
+import { useIsMobile } from '@/hooks/useIsMobile';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { formatRelativeTime } from '@/utils/formatters';
 import { getInboxShowRead, setInboxShowRead, setSidebarCollapsed } from '@/utils/uiPreferences';
@@ -369,6 +372,53 @@ function EventInboxItem({ item, onView, onMarkRead, onMarkUnread }: EventInboxIt
   );
 }
 
+// --- Reusable Accordion Section Component ---
+
+type InboxAccordionSectionProps = PropsWithChildren<{
+  id: string;
+  icon: JSX.Element;
+  iconColorClass: string;
+  title: string;
+  count: number;
+  chipColor: 'warning' | 'danger' | 'success' | 'default' | 'accent';
+}>;
+
+/** Reusable accordion section for inbox groups - reduces JSX complexity in main component */
+function InboxAccordionSection({
+  id,
+  icon,
+  iconColorClass,
+  title,
+  count,
+  chipColor,
+  children,
+}: InboxAccordionSectionProps) {
+  return (
+    <Accordion.Item id={id}>
+      <Accordion.Heading>
+        <Accordion.Trigger>
+          <span
+            className={`w-4 h-4 mr-2 shrink-0 flex items-center justify-center ${iconColorClass}`}
+          >
+            {icon}
+          </span>
+          <span className="flex-1 text-left">{title}</span>
+          <Chip size="sm" variant="soft" color={chipColor} className="mr-2">
+            {count}
+          </Chip>
+          <Accordion.Indicator>
+            <ChevronDown />
+          </Accordion.Indicator>
+        </Accordion.Trigger>
+      </Accordion.Heading>
+      <Accordion.Panel>
+        {/* biome-ignore lint/suspicious/noExplicitAny: React 18/19 type compatibility */}
+        <Accordion.Body>{children as any}</Accordion.Body>
+      </Accordion.Panel>
+    </Accordion.Item>
+  );
+}
+
 // --- Helper functions extracted to reduce component complexity ---
 
 /** Filter and sort inbox plans based on show read preference */
@@ -609,10 +659,290 @@ function getInboxStatusMessage(totalItems: number, allPlansCount: number): strin
   return `${totalItems} ${totalItems === 1 ? 'item needs' : 'items need'} your attention`;
 }
 
+// --- Event List Component - Reduces JSX complexity in main component ---
+
+interface EventItemListProps {
+  items: InboxEventItem[];
+  onView: (planId: string, tab?: PlanViewTab) => void;
+  onMarkRead: (planId: string, eventId: string) => void;
+  onMarkUnread: (planId: string, eventId: string) => void;
+}
+
+/** Renders a list of event inbox items */
+function EventItemList({ items, onView, onMarkRead, onMarkUnread }: EventItemListProps) {
+  return (
+    <div className="divide-y divide-separator">
+      {items.map((item: InboxEventItem) => (
+        <div key={`${item.plan.id}-${item.event.id}`} className="px-3">
+          <EventInboxItem
+            item={item}
+            onView={onView}
+            onMarkRead={onMarkRead}
+            onMarkUnread={onMarkUnread}
+          />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// --- Inbox Accordion Content Component - Moves conditional rendering out of main component ---
+
+interface InboxAccordionContentProps {
+  pendingRequests: InputRequest[];
+  inboxGroups: ReturnType<typeof groupInboxEvents>;
+  selectedPlanId: string | null;
+  handleListSelection: (keys: Set<unknown> | 'all') => void;
+  handleApprove: (planId: string) => void;
+  handleRequestChanges: (planId: string) => void;
+  handleDismiss: (planId: string) => void;
+  handleMarkUnread: (planId: string) => void;
+  handleViewEvent: (planId: string, tab?: PlanViewTab) => void;
+  handleMarkEventRead: (planId: string, eventId: string) => void;
+  handleMarkEventUnread: (planId: string, eventId: string) => void;
+}
+
+/** Renders all inbox accordion sections - extracts conditional logic from main component */
+function InboxAccordionContent({
+  pendingRequests,
+  inboxGroups,
+  selectedPlanId,
+  handleListSelection,
+  handleApprove,
+  handleRequestChanges,
+  handleDismiss,
+  handleMarkUnread,
+  handleViewEvent,
+  handleMarkEventRead,
+  handleMarkEventUnread,
+}: InboxAccordionContentProps) {
+  return (
+    <Accordion
+      allowsMultipleExpanded
+      defaultExpandedKeys={['agentInputNeeded', 'needsReview', 'mentions']}
+    >
+      {/* Agent Input Needed */}
+      {pendingRequests.length > 0 && (
+        <InboxAccordionSection
+          id="agentInputNeeded"
+          icon={<MessageSquare className="w-4 h-4" />}
+          iconColorClass="text-accent"
+          title="Agent Input Needed"
+          count={pendingRequests.length}
+          chipColor="accent"
+        >
+          <div className="space-y-2 px-3">
+            {pendingRequests.map((request) => (
+              <InputRequestInboxItem
+                key={request.id}
+                request={request}
+                onClick={() => {
+                  document.dispatchEvent(
+                    new CustomEvent('open-input-request', {
+                      detail: request,
+                    })
+                  );
+                }}
+              />
+            ))}
+          </div>
+        </InboxAccordionSection>
+      )}
+
+      {/* Needs Review */}
+      {inboxGroups.needsReview.length > 0 && (
+        <InboxAccordionSection
+          id="needsReview"
+          icon={<Clock className="w-4 h-4" />}
+          iconColorClass="text-warning"
+          title="Needs Review"
+          count={inboxGroups.needsReview.length}
+          chipColor="warning"
+        >
+          <ListBox
+            aria-label="Tasks needing review"
+            selectionMode="single"
+            selectedKeys={selectedPlanId ? new Set([selectedPlanId]) : new Set()}
+            onSelectionChange={handleListSelection}
+            className="divide-y divide-separator"
+          >
+            {inboxGroups.needsReview.map((plan) => (
+              <ListBoxItem
+                id={plan.id}
+                key={plan.id}
+                textValue={plan.title}
+                className="px-3 rounded-lg hover:bg-surface"
+              >
+                <InboxItem
+                  plan={plan}
+                  onApprove={handleApprove}
+                  onRequestChanges={handleRequestChanges}
+                  onDismiss={handleDismiss}
+                  onMarkUnread={handleMarkUnread}
+                />
+              </ListBoxItem>
+            ))}
+          </ListBox>
+        </InboxAccordionSection>
+      )}
+
+      {/* Mentions */}
+      {inboxGroups.mentions.length > 0 && (
+        <InboxAccordionSection
+          id="mentions"
+          icon={<AtSign className="w-4 h-4" />}
+          iconColorClass="text-accent"
+          title="Mentions"
+          count={inboxGroups.mentions.length}
+          chipColor="accent"
+        >
+          <EventItemList
+            items={inboxGroups.mentions}
+            onView={handleViewEvent}
+            onMarkRead={handleMarkEventRead}
+            onMarkUnread={handleMarkEventUnread}
+          />
+        </InboxAccordionSection>
+      )}
+
+      {/* Ready to Complete */}
+      {inboxGroups.readyToComplete.length > 0 && (
+        <InboxAccordionSection
+          id="readyToComplete"
+          icon={<CheckCircle className="w-4 h-4" />}
+          iconColorClass="text-success"
+          title="Ready to Complete"
+          count={inboxGroups.readyToComplete.length}
+          chipColor="success"
+        >
+          <EventItemList
+            items={inboxGroups.readyToComplete}
+            onView={handleViewEvent}
+            onMarkRead={handleMarkEventRead}
+            onMarkUnread={handleMarkEventUnread}
+          />
+        </InboxAccordionSection>
+      )}
+
+      {/* Approval Requests */}
+      {inboxGroups.approvalRequests.length > 0 && (
+        <InboxAccordionSection
+          id="approvalRequests"
+          icon={<UserPlus className="w-4 h-4" />}
+          iconColorClass="text-warning"
+          title="Approval Requests"
+          count={inboxGroups.approvalRequests.length}
+          chipColor="warning"
+        >
+          <EventItemList
+            items={inboxGroups.approvalRequests}
+            onView={handleViewEvent}
+            onMarkRead={handleMarkEventRead}
+            onMarkUnread={handleMarkEventUnread}
+          />
+        </InboxAccordionSection>
+      )}
+
+      {/* Agent Help Requests */}
+      {inboxGroups.agentHelpRequests.length > 0 && (
+        <InboxAccordionSection
+          id="agentHelpRequests"
+          icon={<HelpCircle className="w-4 h-4" />}
+          iconColorClass="text-warning"
+          title="Agent Help Requests"
+          count={inboxGroups.agentHelpRequests.length}
+          chipColor="warning"
+        >
+          <EventItemList
+            items={inboxGroups.agentHelpRequests}
+            onView={handleViewEvent}
+            onMarkRead={handleMarkEventRead}
+            onMarkUnread={handleMarkEventUnread}
+          />
+        </InboxAccordionSection>
+      )}
+
+      {/* Agent Blockers */}
+      {inboxGroups.agentBlockers.length > 0 && (
+        <InboxAccordionSection
+          id="agentBlockers"
+          icon={<AlertOctagon className="w-4 h-4" />}
+          iconColorClass="text-danger"
+          title="Agent Blockers"
+          count={inboxGroups.agentBlockers.length}
+          chipColor="danger"
+        >
+          <EventItemList
+            items={inboxGroups.agentBlockers}
+            onView={handleViewEvent}
+            onMarkRead={handleMarkEventRead}
+            onMarkUnread={handleMarkEventUnread}
+          />
+        </InboxAccordionSection>
+      )}
+    </Accordion>
+  );
+}
+
+// --- Detail Panel Component - Moves conditional rendering out of main component ---
+
+interface InboxDetailPanelProps {
+  isMobile: boolean;
+  selectedPlanId: string | null;
+  selectedTab: PlanViewTab;
+  mobilePanelWidth: PanelWidth;
+  setMobilePanelWidth: React.Dispatch<React.SetStateAction<PanelWidth>>;
+  handleClosePanel: () => void;
+  handlePanelApprove: (context: PlanActionContext) => Promise<void>;
+  handlePanelRequestChanges: (context: PlanActionContext) => void;
+  handleStatusChange: (newStatus: 'in_progress' | 'changes_requested', updatedAt: number) => void;
+}
+
+/** Renders the detail panel - handles mobile vs desktop layout */
+function InboxDetailPanel({
+  isMobile,
+  selectedPlanId,
+  selectedTab,
+  mobilePanelWidth,
+  setMobilePanelWidth,
+  handleClosePanel,
+  handlePanelApprove,
+  handlePanelRequestChanges,
+  handleStatusChange,
+}: InboxDetailPanelProps) {
+  const detailContent = (
+    <InlinePlanDetail
+      planId={selectedPlanId}
+      initialTab={selectedTab}
+      onClose={handleClosePanel}
+      onApprove={handlePanelApprove}
+      onRequestChanges={handlePanelRequestChanges}
+      onStatusChange={handleStatusChange}
+      emptyMessage="Select a plan to view details"
+    />
+  );
+
+  if (isMobile) {
+    return (
+      <PlanPanel
+        planId={selectedPlanId}
+        width={mobilePanelWidth}
+        onClose={handleClosePanel}
+        onChangeWidth={setMobilePanelWidth}
+      >
+        {detailContent}
+      </PlanPanel>
+    );
+  }
+
+  return <div className="flex flex-col h-full overflow-hidden">{detailContent}</div>;
+}
+
 export function InboxPage() {
   // All hooks at top of component - called in same order every render
   const navigate = useNavigate();
   const location = useLocation();
+  const isMobile = useIsMobile();
   const { identity: githubIdentity } = useGitHubAuth();
   const {
     allInboxPlans,
@@ -625,6 +955,9 @@ export function InboxPage() {
   } = usePlanIndexContext();
   const [showRead, setShowRead] = useState(getInboxShowRead);
   const { actor } = useUserIdentity();
+
+  // Mobile panel state
+  const [mobilePanelWidth, setMobilePanelWidth] = useState<PanelWidth>('peek');
 
   // Load event-based inbox items from ALL owned plans (not just inbox candidates)
   // This ensures blockers/help requests show up regardless of plan status
@@ -876,9 +1209,13 @@ export function InboxPage() {
   }
 
   return (
-    <div className="h-full grid grid-cols-[minmax(300px,400px)_1fr]">
+    <div
+      className={`h-full ${isMobile ? 'flex flex-col' : 'grid grid-cols-[minmax(300px,400px)_1fr]'}`}
+    >
       {/* Inbox list */}
-      <div className="flex flex-col h-full overflow-hidden border-r border-separator">
+      <div
+        className={`flex flex-col h-full overflow-hidden ${isMobile ? '' : 'border-r border-separator'}`}
+      >
         {/* Offline banner */}
         {timedOut && <OfflineBanner />}
 
@@ -897,278 +1234,34 @@ export function InboxPage() {
 
         {/* Inbox results */}
         <div className="flex-1 overflow-y-auto p-2">
-          <Accordion
-            allowsMultipleExpanded
-            defaultExpandedKeys={['agentInputNeeded', 'needsReview', 'mentions']}
-          >
-            {/* Agent Input Needed */}
-            {pendingRequests.length > 0 && (
-              <Accordion.Item id="agentInputNeeded">
-                <Accordion.Heading>
-                  <Accordion.Trigger>
-                    <MessageSquare className="w-4 h-4 mr-2 shrink-0 text-accent" />
-                    <span className="flex-1 text-left">Agent Input Needed</span>
-                    <Chip size="sm" variant="soft" color="accent" className="mr-2">
-                      {pendingRequests.length}
-                    </Chip>
-                    <Accordion.Indicator>
-                      <ChevronDown />
-                    </Accordion.Indicator>
-                  </Accordion.Trigger>
-                </Accordion.Heading>
-                <Accordion.Panel>
-                  <Accordion.Body>
-                    <div className="space-y-2 px-3">
-                      {pendingRequests.map((request) => (
-                        <InputRequestInboxItem
-                          key={request.id}
-                          request={request}
-                          onClick={() => {
-                            document.dispatchEvent(
-                              new CustomEvent('open-input-request', {
-                                detail: request,
-                              })
-                            );
-                          }}
-                        />
-                      ))}
-                    </div>
-                  </Accordion.Body>
-                </Accordion.Panel>
-              </Accordion.Item>
-            )}
-
-            {/* Needs Review */}
-            {inboxGroups.needsReview.length > 0 && (
-              <Accordion.Item id="needsReview">
-                <Accordion.Heading>
-                  <Accordion.Trigger>
-                    <Clock className="w-4 h-4 mr-2 shrink-0 text-warning" />
-                    <span className="flex-1 text-left">Needs Review</span>
-                    <Chip size="sm" variant="soft" color="warning" className="mr-2">
-                      {inboxGroups.needsReview.length}
-                    </Chip>
-                    <Accordion.Indicator>
-                      <ChevronDown />
-                    </Accordion.Indicator>
-                  </Accordion.Trigger>
-                </Accordion.Heading>
-                <Accordion.Panel>
-                  <Accordion.Body>
-                    <ListBox
-                      aria-label="Tasks needing review"
-                      selectionMode="single"
-                      selectedKeys={selectedPlanId ? new Set([selectedPlanId]) : new Set()}
-                      onSelectionChange={handleListSelection}
-                      className="divide-y divide-separator"
-                    >
-                      {inboxGroups.needsReview.map((plan) => (
-                        <ListBoxItem
-                          id={plan.id}
-                          key={plan.id}
-                          textValue={plan.title}
-                          className="px-3 rounded-lg hover:bg-surface"
-                        >
-                          <InboxItem
-                            plan={plan}
-                            onApprove={handleApprove}
-                            onRequestChanges={handleRequestChanges}
-                            onDismiss={handleDismiss}
-                            onMarkUnread={handleMarkUnread}
-                          />
-                        </ListBoxItem>
-                      ))}
-                    </ListBox>
-                  </Accordion.Body>
-                </Accordion.Panel>
-              </Accordion.Item>
-            )}
-
-            {/* Mentions */}
-            {inboxGroups.mentions.length > 0 && (
-              <Accordion.Item id="mentions">
-                <Accordion.Heading>
-                  <Accordion.Trigger>
-                    <AtSign className="w-4 h-4 mr-2 shrink-0 text-accent" />
-                    <span className="flex-1 text-left">Mentions</span>
-                    <Chip size="sm" variant="soft" color="accent" className="mr-2">
-                      {inboxGroups.mentions.length}
-                    </Chip>
-                    <Accordion.Indicator>
-                      <ChevronDown />
-                    </Accordion.Indicator>
-                  </Accordion.Trigger>
-                </Accordion.Heading>
-                <Accordion.Panel>
-                  <Accordion.Body>
-                    <div className="divide-y divide-separator">
-                      {inboxGroups.mentions.map((item: InboxEventItem) => (
-                        <div key={`${item.plan.id}-${item.event.id}`} className="px-3">
-                          <EventInboxItem
-                            item={item}
-                            onView={handleViewEvent}
-                            onMarkRead={handleMarkEventRead}
-                            onMarkUnread={handleMarkEventUnread}
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  </Accordion.Body>
-                </Accordion.Panel>
-              </Accordion.Item>
-            )}
-
-            {/* Ready to Complete */}
-            {inboxGroups.readyToComplete.length > 0 && (
-              <Accordion.Item id="readyToComplete">
-                <Accordion.Heading>
-                  <Accordion.Trigger>
-                    <CheckCircle className="w-4 h-4 mr-2 shrink-0 text-success" />
-                    <span className="flex-1 text-left">Ready to Complete</span>
-                    <Chip size="sm" variant="soft" color="success" className="mr-2">
-                      {inboxGroups.readyToComplete.length}
-                    </Chip>
-                    <Accordion.Indicator>
-                      <ChevronDown />
-                    </Accordion.Indicator>
-                  </Accordion.Trigger>
-                </Accordion.Heading>
-                <Accordion.Panel>
-                  <Accordion.Body>
-                    <div className="divide-y divide-separator">
-                      {inboxGroups.readyToComplete.map((item: InboxEventItem) => (
-                        <div key={`${item.plan.id}-${item.event.id}`} className="px-3">
-                          <EventInboxItem
-                            item={item}
-                            onView={handleViewEvent}
-                            onMarkRead={handleMarkEventRead}
-                            onMarkUnread={handleMarkEventUnread}
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  </Accordion.Body>
-                </Accordion.Panel>
-              </Accordion.Item>
-            )}
-
-            {/* Approval Requests */}
-            {inboxGroups.approvalRequests.length > 0 && (
-              <Accordion.Item id="approvalRequests">
-                <Accordion.Heading>
-                  <Accordion.Trigger>
-                    <UserPlus className="w-4 h-4 mr-2 shrink-0 text-warning" />
-                    <span className="flex-1 text-left">Approval Requests</span>
-                    <Chip size="sm" variant="soft" color="warning" className="mr-2">
-                      {inboxGroups.approvalRequests.length}
-                    </Chip>
-                    <Accordion.Indicator>
-                      <ChevronDown />
-                    </Accordion.Indicator>
-                  </Accordion.Trigger>
-                </Accordion.Heading>
-                <Accordion.Panel>
-                  <Accordion.Body>
-                    <div className="divide-y divide-separator">
-                      {inboxGroups.approvalRequests.map((item: InboxEventItem) => (
-                        <div key={`${item.plan.id}-${item.event.id}`} className="px-3">
-                          <EventInboxItem
-                            item={item}
-                            onView={handleViewEvent}
-                            onMarkRead={handleMarkEventRead}
-                            onMarkUnread={handleMarkEventUnread}
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  </Accordion.Body>
-                </Accordion.Panel>
-              </Accordion.Item>
-            )}
-
-            {/* Agent Help Requests */}
-            {inboxGroups.agentHelpRequests.length > 0 && (
-              <Accordion.Item id="agentHelpRequests">
-                <Accordion.Heading>
-                  <Accordion.Trigger>
-                    <HelpCircle className="w-4 h-4 mr-2 shrink-0 text-warning" />
-                    <span className="flex-1 text-left">Agent Help Requests</span>
-                    <Chip size="sm" variant="soft" color="warning" className="mr-2">
-                      {inboxGroups.agentHelpRequests.length}
-                    </Chip>
-                    <Accordion.Indicator>
-                      <ChevronDown />
-                    </Accordion.Indicator>
-                  </Accordion.Trigger>
-                </Accordion.Heading>
-                <Accordion.Panel>
-                  <Accordion.Body>
-                    <div className="divide-y divide-separator">
-                      {inboxGroups.agentHelpRequests.map((item: InboxEventItem) => (
-                        <div key={`${item.plan.id}-${item.event.id}`} className="px-3">
-                          <EventInboxItem
-                            item={item}
-                            onView={handleViewEvent}
-                            onMarkRead={handleMarkEventRead}
-                            onMarkUnread={handleMarkEventUnread}
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  </Accordion.Body>
-                </Accordion.Panel>
-              </Accordion.Item>
-            )}
-
-            {/* Agent Blockers */}
-            {inboxGroups.agentBlockers.length > 0 && (
-              <Accordion.Item id="agentBlockers">
-                <Accordion.Heading>
-                  <Accordion.Trigger>
-                    <AlertOctagon className="w-4 h-4 mr-2 shrink-0 text-danger" />
-                    <span className="flex-1 text-left">Agent Blockers</span>
-                    <Chip size="sm" variant="soft" color="danger" className="mr-2">
-                      {inboxGroups.agentBlockers.length}
-                    </Chip>
-                    <Accordion.Indicator>
-                      <ChevronDown />
-                    </Accordion.Indicator>
-                  </Accordion.Trigger>
-                </Accordion.Heading>
-                <Accordion.Panel>
-                  <Accordion.Body>
-                    <div className="divide-y divide-separator">
-                      {inboxGroups.agentBlockers.map((item: InboxEventItem) => (
-                        <div key={`${item.plan.id}-${item.event.id}`} className="px-3">
-                          <EventInboxItem
-                            item={item}
-                            onView={handleViewEvent}
-                            onMarkRead={handleMarkEventRead}
-                            onMarkUnread={handleMarkEventUnread}
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  </Accordion.Body>
-                </Accordion.Panel>
-              </Accordion.Item>
-            )}
-          </Accordion>
+          <InboxAccordionContent
+            pendingRequests={pendingRequests}
+            inboxGroups={inboxGroups}
+            selectedPlanId={selectedPlanId}
+            handleListSelection={handleListSelection}
+            handleApprove={handleApprove}
+            handleRequestChanges={handleRequestChanges}
+            handleDismiss={handleDismiss}
+            handleMarkUnread={handleMarkUnread}
+            handleViewEvent={handleViewEvent}
+            handleMarkEventRead={handleMarkEventRead}
+            handleMarkEventUnread={handleMarkEventUnread}
+          />
         </div>
       </div>
 
-      {/* Right: Detail panel */}
-      <div className="flex flex-col h-full overflow-hidden">
-        <InlinePlanDetail
-          planId={selectedPlanId}
-          initialTab={selectedTab}
-          onClose={handleClosePanel}
-          onApprove={handlePanelApprove}
-          onRequestChanges={handlePanelRequestChanges}
-          onStatusChange={handleStatusChange}
-          emptyMessage="Select a plan to view details"
-        />
-      </div>
+      {/* Detail panel - handles mobile vs desktop layout */}
+      <InboxDetailPanel
+        isMobile={isMobile}
+        selectedPlanId={selectedPlanId}
+        selectedTab={selectedTab}
+        mobilePanelWidth={mobilePanelWidth}
+        setMobilePanelWidth={setMobilePanelWidth}
+        handleClosePanel={handleClosePanel}
+        handlePanelApprove={handlePanelApprove}
+        handlePanelRequestChanges={handlePanelRequestChanges}
+        handleStatusChange={handleStatusChange}
+      />
 
       {/* Input Request Modal */}
       <InputRequestModal
