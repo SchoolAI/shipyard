@@ -9,20 +9,15 @@
  * - unsubscribe: Client leaves room topics
  * - publish: Broadcast message to all subscribers of a topic
  * - ping/pong: Keepalive (handled automatically via hibernation API)
- * - approval_state: Owner pushes approval state for access control
  *
  * WebSocket Hibernation allows the DO to sleep while connections remain open,
  * dramatically reducing costs for idle connections.
  *
- * Access Control:
- * The signaling server enforces approval at the peer discovery layer.
- * When a user is not approved, they cannot discover or connect to other peers.
- * This prevents unapproved users from receiving CRDT data.
+ * Note: This is a simple pub/sub relay - no authentication or approval checking.
  */
 
 import { DurableObject } from 'cloudflare:workers';
 import {
-  handleApprovalState,
   handleCreateInvite,
   handleListInvites,
   handlePublish,
@@ -97,7 +92,7 @@ export class SignalingRoom extends DurableObject<Env> {
       // All handlers use the platform adapter for storage/messaging
       switch (data.type) {
         case 'subscribe':
-          await handleSubscribe(this.adapter, ws, data);
+          handleSubscribe(this.adapter, ws, data);
           break;
 
         case 'unsubscribe':
@@ -105,16 +100,12 @@ export class SignalingRoom extends DurableObject<Env> {
           break;
 
         case 'publish':
-          await handlePublish(this.adapter, ws, data);
+          handlePublish(this.adapter, ws, data);
           break;
 
         case 'ping':
           // Handled by setWebSocketAutoResponse, but just in case
           ws.send(JSON.stringify({ type: 'pong' }));
-          break;
-
-        case 'approval_state':
-          await handleApprovalState(this.adapter, ws, data);
           break;
 
         case 'create_invite':
@@ -155,7 +146,6 @@ export class SignalingRoom extends DurableObject<Env> {
   ): Promise<void> {
     // Adapter is initialized via blockConcurrencyWhile in constructor
     this.adapter.unsubscribeFromAllTopics(ws);
-    this.adapter.clearQueuedMessages(ws);
   }
 
   /**
@@ -165,6 +155,5 @@ export class SignalingRoom extends DurableObject<Env> {
     logger.error({ error }, 'WebSocket error');
     // Adapter is initialized via blockConcurrencyWhile in constructor
     this.adapter.unsubscribeFromAllTopics(ws);
-    this.adapter.clearQueuedMessages(ws);
   }
 }

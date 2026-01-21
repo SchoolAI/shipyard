@@ -11,18 +11,14 @@
  * - unsubscribe: Client leaves room topics
  * - publish: Broadcast message to all subscribers of a topic
  * - ping/pong: Keepalive
- * - approval_state: Owner pushes approval state for access control
  *
- * Also implements invite token handlers for secure room access:
- * - create_invite: Create time-limited invite token (owner only)
- * - redeem_invite: Redeem an invite token (guest)
- * - revoke_invite: Revoke an invite token (owner only)
- * - list_invites: List active invites (owner only)
+ * Also implements invite token handlers:
+ * - create_invite: Create time-limited invite token
+ * - redeem_invite: Redeem an invite token
+ * - revoke_invite: Revoke an invite token
+ * - list_invites: List active invites
  *
- * Access Control:
- * The signaling server enforces approval at the peer discovery layer.
- * When a user is not approved, they cannot discover or connect to other peers.
- * This prevents unapproved users from receiving CRDT data.
+ * Note: This is a simple pub/sub relay - no authentication or approval checking.
  */
 
 import type { IncomingMessage, ServerResponse } from 'node:http';
@@ -30,7 +26,6 @@ import http from 'node:http';
 import type { WebSocket } from 'ws';
 import { WebSocketServer } from 'ws';
 import {
-  handleApprovalState,
   handleCreateInvite,
   handleListInvites,
   handlePublish,
@@ -98,7 +93,6 @@ function onConnection(conn: WebSocket): void {
 
   conn.on('close', () => {
     adapter.unsubscribeFromAllTopics(conn);
-    adapter.clearQueuedMessages(conn);
     closed = true;
     clearInterval(pingInterval);
   });
@@ -118,7 +112,7 @@ function onConnection(conn: WebSocket): void {
 
       switch (message.type) {
         case 'subscribe':
-          await handleSubscribe(adapter, conn, message);
+          handleSubscribe(adapter, conn, message);
           break;
 
         case 'unsubscribe':
@@ -126,15 +120,11 @@ function onConnection(conn: WebSocket): void {
           break;
 
         case 'publish':
-          await handlePublish(adapter, conn, message);
+          handlePublish(adapter, conn, message);
           break;
 
         case 'ping':
           adapter.sendMessage(conn, { type: 'pong' });
-          break;
-
-        case 'approval_state':
-          await handleApprovalState(adapter, conn, message);
           break;
 
         case 'create_invite':

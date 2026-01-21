@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { WebrtcProvider } from 'y-webrtc';
-import type { PlanAwarenessState } from './useMultiProviderSync';
+import type { PlanAwarenessState } from '@/types/awareness';
 
 export interface PendingUser {
   /** GitHub username */

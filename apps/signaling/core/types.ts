@@ -42,12 +42,10 @@ export type {
 
 /**
  * Client subscribes to room topics (plan IDs).
- * Clients can optionally provide their userId for approval checking.
  */
 export interface SubscribeMessage {
   type: 'subscribe';
   topics: string[];
-  userId?: string; // GitHub username for approval checking
 }
 
 /**
@@ -85,35 +83,11 @@ export interface PongMessage {
 }
 
 /**
- * Approval state message from plan owner.
- * Used to broadcast approval state to the signaling server.
- */
-export interface ApprovalStateMessage {
-  type: 'approval_state';
-  planId: string;
-  ownerId: string;
-  approvedUsers: string[];
-  rejectedUsers: string[];
-}
-
-/**
  * Error message sent to clients when something goes wrong.
  */
 export interface ErrorMessage {
   type: 'error';
   error: string;
-}
-
-/**
- * Plan approval state stored by the signaling server.
- * Tracks which users are approved or rejected for a plan.
- */
-export interface PlanApprovalState {
-  planId: string;
-  ownerId: string;
-  approvedUsers: string[];
-  rejectedUsers: string[];
-  lastUpdated: number;
 }
 
 // --- Type Unions ---
@@ -127,7 +101,6 @@ export type SignalingMessage =
   | UnsubscribeMessage
   | PublishMessage
   | PingMessage
-  | ApprovalStateMessage
   | CreateInviteRequest
   | RedeemInviteRequest
   | RevokeInviteRequest

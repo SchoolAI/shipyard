@@ -4,14 +4,10 @@
  * This interface abstracts over the differences between Node.js and Cloudflare
  * environments, allowing core handlers to work with both platforms.
  *
- * Why async everywhere:
- * - Storage operations are async in Cloudflare Durable Objects
- * - Crypto operations use Web Crypto API (async) in Cloudflare
- * - Node.js can return resolved Promises for synchronous operations
+ * Simplified for basic pub/sub signaling - no approval or queueing.
  */
 
 import type { InviteRedemption, InviteToken } from '@shipyard/schema';
-import type { PlanApprovalState } from './types.js';
 
 /**
  * Platform-specific adapter that core handlers use to interact with
@@ -19,20 +15,7 @@ import type { PlanApprovalState } from './types.js';
  */
 export interface PlatformAdapter {
   // --- Storage Operations ---
-  // All storage operations are async to support both sync (Node.js Map)
-  // and async (Cloudflare Durable Objects) implementations.
-
-  /**
-   * Get approval state for a plan.
-   * Returns undefined if no approval state exists.
-   */
-  getApprovalState(planId: string): Promise<PlanApprovalState | undefined>;
-
-  /**
-   * Set approval state for a plan.
-   * Overwrites any existing state.
-   */
-  setApprovalState(planId: string, state: PlanApprovalState): Promise<void>;
+  // For invite tokens and redemptions only (approval state removed).
 
   /**
    * Get invite token by plan ID and token ID.
@@ -121,22 +104,6 @@ export interface PlatformAdapter {
    */
   sendMessage(ws: unknown, message: unknown): void;
 
-  /**
-   * Get the userId associated with a WebSocket connection.
-   * Returns undefined if no userId has been set.
-   *
-   * Why needed: Tracks which GitHub user is connected for approval checks.
-   */
-  getUserId(ws: unknown): string | undefined;
-
-  /**
-   * Set the userId for a WebSocket connection.
-   * Called when client subscribes with a userId.
-   *
-   * Why needed: Associates connection with GitHub user for approval checks.
-   */
-  setUserId(ws: unknown, userId: string | undefined): void;
-
   // --- Topic (Pub/Sub) Operations ---
   // Topics represent WebRTC rooms (plan IDs). Clients subscribe to topics
   // to receive signaling messages for that room.
@@ -164,58 +131,6 @@ export interface PlatformAdapter {
    * Called when connection closes.
    */
   unsubscribeFromAllTopics(ws: unknown): void;
-
-  // --- Message Queue Operations ---
-  // Messages may need to be queued when a connection doesn't have a userId yet.
-  // Once the userId is set, queued messages can be flushed after approval check.
-  // All queued messages have a TTL to prevent memory exhaustion from stale connections.
-
-  /**
-   * Queue a message for delivery to a connection.
-   * Used when we can't determine approval status (no userId).
-   * Messages are queued per-topic to allow selective flushing.
-   * Messages older than MESSAGE_QUEUE_TTL_MS (30 seconds) are automatically expired.
-   *
-   * @param ws - WebSocket connection to queue message for
-   * @param topic - Topic the message belongs to (for selective flushing)
-   * @param message - Message to queue
-   */
-  queueMessageForConnection(ws: unknown, topic: string, message: unknown): void;
-
-  /**
-   * Get all queued messages for a connection grouped by topic.
-   * Returns a map of topic -> messages (excluding expired messages).
-   * Clears the queue after returning.
-   *
-   * @param ws - WebSocket connection to get queued messages for
-   */
-  getAndClearQueuedMessages(ws: unknown): Map<string, unknown[]>;
-
-  /**
-   * Clear all queued messages for a connection.
-   * Called when connection closes or is explicitly rejected.
-   *
-   * @param ws - WebSocket connection to clear queue for
-   */
-  clearQueuedMessages(ws: unknown): void;
-
-  /**
-   * Check if a connection is currently flushing its message queue.
-   * Used to prevent race conditions during queue flush.
-   *
-   * @param ws - WebSocket connection to check
-   * @returns true if currently flushing, false otherwise
-   */
-  isFlushingMessages(ws: unknown): boolean;
-
-  /**
-   * Mark a connection as flushing (or not flushing) its message queue.
-   * Used to prevent concurrent message sends during flush.
-   *
-   * @param ws - WebSocket connection to mark
-   * @param flushing - true when starting flush, false when done
-   */
-  setFlushingMessages(ws: unknown, flushing: boolean): void;
 
   // --- Logging ---
   // Simple logging interface. Implementations can use console, Durable Object

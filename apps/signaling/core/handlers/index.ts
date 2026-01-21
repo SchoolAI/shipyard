@@ -9,7 +9,6 @@
  * over platform-specific storage, crypto, and WebSocket operations.
  */
 
-export { handleApprovalState } from './approval-state.js';
 export {
   handleCreateInvite,
   handleListInvites,

@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import type { WebrtcProvider } from 'y-webrtc';
-import type { PlanAwarenessState } from './useMultiProviderSync';
+import type { PlanAwarenessState } from '@/types/awareness';
 
 /**
  * Extracts a pending user from a plan status, if valid.

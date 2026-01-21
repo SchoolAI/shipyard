@@ -1,13 +1,13 @@
 import { Button } from '@heroui/react';
-import { getPlanOwnerId, type PlanMetadata } from '@shipyard/schema';
+import type { PlanMetadata } from '@shipyard/schema';
 import { Clock, Loader2, LogIn, ShieldX, TicketX, User } from 'lucide-react';
 import type { ReactNode } from 'react';
 import type { WebrtcProvider } from 'y-webrtc';
 import type * as Y from 'yjs';
-import { useApprovalStatus } from '@/hooks/useApprovalStatus';
 import type { GitHubIdentity } from '@/hooks/useGitHubAuth';
 import { useInviteToken } from '@/hooks/useInviteToken';
 import type { SyncState } from '@/hooks/useMultiProviderSync';
+import { useYDocApprovalStatus } from '@/hooks/useYDocApprovalStatus';
 
 interface WaitingRoomGateProps {
   ydoc: Y.Doc;
@@ -24,6 +24,16 @@ interface WaitingRoomGateProps {
  * Shows auth prompt for unauthenticated users, waiting room for pending users,
  * and access denied for rejected users.
  *
+ * Approval status is read directly from Y.Doc CRDT metadata:
+ * - approvedUsers: string[] - List of approved user IDs
+ * - rejectedUsers: string[] - List of rejected user IDs
+ * - ownerId: string - Plan owner (always approved)
+ *
+ * This approach is more reliable than signaling server state because:
+ * - Y.Doc is the single source of truth
+ * - Syncs automatically via WebRTC P2P
+ * - Works offline with IndexedDB persistence
+ *
  * Also handles invite token redemption - users with valid invite tokens
  * are auto-approved without manual owner approval.
  */
@@ -36,7 +46,12 @@ export function WaitingRoomGate({
   onStartAuth,
   children,
 }: WaitingRoomGateProps) {
-  const { isPending, isRejected } = useApprovalStatus(syncState);
+  // Read approval status directly from Y.Doc CRDT
+  const { isPending, isRejected, requiresApproval, ownerId } = useYDocApprovalStatus(
+    ydoc,
+    githubIdentity?.username ?? null
+  );
+
   const { redemptionState, hasInviteToken, clearInviteToken } = useInviteToken(
     metadata.id,
     rtcProvider,
@@ -52,11 +67,7 @@ export function WaitingRoomGate({
     return <>{children}</>;
   }
 
-  // Read ownerId directly from Y.Doc to determine if approval is required
-  // This works even if approvalStatus hasn't been computed yet
-  const ownerId = getPlanOwnerId(ydoc);
-  const requiresApproval = ownerId !== null;
-
+  // If approval is not required (no ownerId), allow access
   if (!requiresApproval) {
     return <>{children}</>;
   }

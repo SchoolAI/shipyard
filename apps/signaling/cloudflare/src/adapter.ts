@@ -5,38 +5,17 @@
  * Web Crypto API, hibernating WebSockets) into the platform-agnostic interface
  * that core handlers use.
  *
+ * Simplified for basic pub/sub signaling - no approval state or message queueing.
+ *
  * Storage: Uses ctx.storage for persistent storage that survives hibernation
  * Crypto: Uses Web Crypto API (all operations are async)
  * WebSocket: Uses Cloudflare's hibernation API with serializeAttachment/deserializeAttachment
  * Logging: Uses console wrapper (Cloudflare Workers don't support pino)
- *
- * Key Differences from Node.js Adapter:
- * - All storage persists to Durable Object storage (survives hibernation)
- * - Crypto operations are truly async (Web Crypto API)
- * - WebSocket state stored via ws.serializeAttachment() instead of WeakMap
- * - Must handle hibernation wake (restore topics from WebSocket attachments)
  */
 
 import type { InviteRedemption, InviteToken } from '@shipyard/schema';
 import type { PlatformAdapter } from '../../core/platform.js';
-import type { PlanApprovalState } from '../../core/types.js';
 import { logger } from './logger.js';
-
-/**
- * Queued message with timestamp for TTL expiration.
- */
-interface QueuedMessage {
-  message: unknown;
-  queuedAt: number;
-}
-
-/**
- * Serialized message queue entry for JSON storage.
- */
-interface SerializedQueueEntry {
-  topic: string;
-  messages: QueuedMessage[];
-}
 
 /**
  * Serialized connection state stored in WebSocket attachment.
@@ -45,33 +24,15 @@ interface SerializedQueueEntry {
 interface SerializedConnectionState {
   id: string;
   topics: string[];
-  userId?: string;
-  messageQueue?: SerializedQueueEntry[];
 }
 
 /**
  * In-memory connection state with proper Set for topics.
- * Note: isFlushing is not persisted because it's transient (only set during active flush).
  */
 interface ConnectionState {
   id: string;
   topics: Set<string>;
-  userId?: string;
-  messageQueue?: Map<string, QueuedMessage[]>;
-  isFlushing?: boolean;
 }
-
-/**
- * Maximum number of messages to queue per connection per topic.
- * Prevents memory exhaustion from slow clients.
- */
-const MAX_QUEUE_SIZE_PER_TOPIC = 100;
-
-/**
- * TTL for queued messages in milliseconds.
- * Messages older than this are expired and not delivered.
- */
-const MESSAGE_QUEUE_TTL_MS = 30_000; // 30 seconds
 
 /**
  * Cloudflare Durable Objects platform adapter implementation.
@@ -84,12 +45,6 @@ export class CloudflarePlatformAdapter implements PlatformAdapter {
    * Durable Object context for storage operations.
    */
   private ctx: DurableObjectState;
-
-  /**
-   * In-memory cache of plan approval states.
-   * Backed by persistent storage with 'approval:' prefix.
-   */
-  private planApprovals = new Map<string, PlanApprovalState>();
 
   /**
    * In-memory cache of invite tokens.
@@ -123,30 +78,10 @@ export class CloudflarePlatformAdapter implements PlatformAdapter {
    */
   async initialize(): Promise<void> {
     await Promise.all([
-      this.restoreApprovalStateFromStorage(),
       this.restoreInviteTokensFromStorage(),
       this.restoreRedemptionsFromStorage(),
     ]);
     this.restoreTopicsFromHibernation();
-  }
-
-  /**
-   * Restore approval states from Durable Object storage.
-   * Called on DO construction and hibernation wake.
-   */
-  private async restoreApprovalStateFromStorage(): Promise<void> {
-    try {
-      const stored = await this.ctx.storage.list<PlanApprovalState>({
-        prefix: 'approval:',
-      });
-      for (const [key, value] of stored) {
-        const planId = key.replace('approval:', '');
-        this.planApprovals.set(planId, value);
-      }
-      logger.info({ count: stored.size }, 'Restored approval states from storage');
-    } catch (error) {
-      logger.error({ error }, 'Failed to restore approval state');
-    }
   }
 
   /**
@@ -222,7 +157,6 @@ export class CloudflarePlatformAdapter implements PlatformAdapter {
         const state: ConnectionState = {
           id: attachment.id,
           topics: new Set(attachment.topics),
-          userId: attachment.userId,
         };
 
         // Rebuild topic -> WebSocket mapping
@@ -245,27 +179,6 @@ export class CloudflarePlatformAdapter implements PlatformAdapter {
   }
 
   // --- Storage Operations ---
-
-  async getApprovalState(planId: string): Promise<PlanApprovalState | undefined> {
-    // Check in-memory cache first
-    const cached = this.planApprovals.get(planId);
-    if (cached) return cached;
-
-    // Fall back to storage (handles case where cache was cleared)
-    const stored = await this.ctx.storage.get<PlanApprovalState>(`approval:${planId}`);
-    if (stored) {
-      this.planApprovals.set(planId, stored);
-    }
-    return stored;
-  }
-
-  async setApprovalState(planId: string, state: PlanApprovalState): Promise<void> {
-    // Update in-memory cache
-    this.planApprovals.set(planId, state);
-
-    // Persist to Durable Object storage
-    await this.ctx.storage.put(`approval:${planId}`, state);
-  }
 
   async getInviteToken(planId: string, tokenId: string): Promise<InviteToken | undefined> {
     const cacheKey = `${planId}:${tokenId}`;
@@ -450,31 +363,6 @@ export class CloudflarePlatformAdapter implements PlatformAdapter {
     }
   }
 
-  getUserId(ws: unknown): string | undefined {
-    const state = this.getConnectionState(ws as WebSocket);
-    return state?.userId;
-  }
-
-  setUserId(ws: unknown, userId: string | undefined): void {
-    const socket = ws as WebSocket;
-    let state = this.getConnectionState(socket);
-
-    if (!state) {
-      // Initialize connection state if not exists
-      state = {
-        id: crypto.randomUUID(),
-        topics: new Set(),
-        userId,
-      };
-      (socket as any).__state = state;
-    } else {
-      state.userId = userId;
-    }
-
-    // Persist to WebSocket attachment for hibernation survival
-    this.persistConnectionState(socket, state);
-  }
-
   // --- Topic (Pub/Sub) Operations ---
 
   getTopicSubscribers(topic: string): unknown[] {
@@ -547,147 +435,6 @@ export class CloudflarePlatformAdapter implements PlatformAdapter {
     state.topics.clear();
   }
 
-  // --- Message Queue Operations ---
-
-  queueMessageForConnection(ws: unknown, topic: string, message: unknown): void {
-    const socket = ws as WebSocket;
-    let state = this.getConnectionState(socket);
-
-    if (!state) {
-      // Initialize connection state if not exists
-      state = {
-        id: crypto.randomUUID(),
-        topics: new Set(),
-        messageQueue: new Map(),
-      };
-      (socket as any).__state = state;
-    }
-
-    if (!state.messageQueue) {
-      state.messageQueue = new Map();
-    }
-
-    let messages = state.messageQueue.get(topic);
-    if (!messages) {
-      messages = [];
-      state.messageQueue.set(topic, messages);
-    }
-
-    // Remove expired messages first to make room
-    const now = Date.now();
-    const validMessages = messages.filter(
-      (m) => now - m.queuedAt < MESSAGE_QUEUE_TTL_MS
-    );
-
-    // Enforce max queue size to prevent memory exhaustion
-    if (validMessages.length < MAX_QUEUE_SIZE_PER_TOPIC) {
-      validMessages.push({ message, queuedAt: now });
-      state.messageQueue.set(topic, validMessages);
-      this.debug('[queueMessageForConnection] Queued message', {
-        topic,
-        queueSize: validMessages.length,
-      });
-
-      // Persist for hibernation survival
-      this.persistConnectionState(socket, state);
-    } else {
-      this.warn('[queueMessageForConnection] Queue full, dropping message', {
-        topic,
-        maxSize: MAX_QUEUE_SIZE_PER_TOPIC,
-      });
-    }
-  }
-
-  getAndClearQueuedMessages(ws: unknown): Map<string, unknown[]> {
-    const socket = ws as WebSocket;
-    const state = this.getConnectionState(socket);
-
-    if (!state || !state.messageQueue || state.messageQueue.size === 0) {
-      return new Map();
-    }
-
-    const now = Date.now();
-    const result = new Map<string, unknown[]>();
-    let totalMessages = 0;
-    let expiredMessages = 0;
-
-    // Filter out expired messages and extract just the message payloads
-    for (const [topic, queuedMessages] of state.messageQueue) {
-      const validMessages: unknown[] = [];
-      for (const qm of queuedMessages) {
-        if (now - qm.queuedAt < MESSAGE_QUEUE_TTL_MS) {
-          validMessages.push(qm.message);
-        } else {
-          expiredMessages++;
-        }
-      }
-      if (validMessages.length > 0) {
-        result.set(topic, validMessages);
-        totalMessages += validMessages.length;
-      }
-    }
-
-    state.messageQueue.clear();
-
-    this.debug('[getAndClearQueuedMessages] Flushed queued messages', {
-      topicCount: result.size,
-      totalMessages,
-      expiredMessages,
-    });
-
-    // Persist cleared state
-    this.persistConnectionState(socket, state);
-
-    return result;
-  }
-
-  clearQueuedMessages(ws: unknown): void {
-    const socket = ws as WebSocket;
-    const state = this.getConnectionState(socket);
-
-    if (state && state.messageQueue && state.messageQueue.size > 0) {
-      const totalMessages = Array.from(state.messageQueue.values()).reduce(
-        (sum, msgs) => sum + msgs.length,
-        0
-      );
-      if (totalMessages > 0) {
-        this.debug('[clearQueuedMessages] Cleared queued messages', {
-          topicCount: state.messageQueue.size,
-          totalMessages,
-        });
-      }
-      state.messageQueue.clear();
-
-      // Persist cleared state
-      this.persistConnectionState(socket, state);
-    }
-  }
-
-  isFlushingMessages(ws: unknown): boolean {
-    const socket = ws as WebSocket;
-    const state = this.getConnectionState(socket);
-    return state?.isFlushing ?? false;
-  }
-
-  setFlushingMessages(ws: unknown, flushing: boolean): void {
-    const socket = ws as WebSocket;
-    let state = this.getConnectionState(socket);
-
-    if (!state) {
-      // Initialize state if needed (shouldn't normally happen)
-      state = {
-        id: crypto.randomUUID(),
-        topics: new Set(),
-        isFlushing: flushing,
-      };
-      (socket as any).__state = state;
-    } else {
-      state.isFlushing = flushing;
-    }
-
-    // No need to persist - isFlushing is transient
-  }
-
   // --- Logging ---
 
   info(message: string, ...args: unknown[]): void {
@@ -736,19 +483,9 @@ export class CloudflarePlatformAdapter implements PlatformAdapter {
     // Fall back to deserialized attachment (after hibernation wake)
     const attachment = ws.deserializeAttachment() as SerializedConnectionState | null;
     if (attachment) {
-      // Deserialize message queue from array back to Map
-      const messageQueue = new Map<string, QueuedMessage[]>();
-      if (attachment.messageQueue) {
-        for (const entry of attachment.messageQueue) {
-          messageQueue.set(entry.topic, entry.messages);
-        }
-      }
-
       const state: ConnectionState = {
         id: attachment.id,
         topics: new Set(attachment.topics),
-        userId: attachment.userId,
-        messageQueue,
       };
       (ws as any).__state = state;
       return state;
@@ -761,19 +498,9 @@ export class CloudflarePlatformAdapter implements PlatformAdapter {
    * Persist connection state to WebSocket attachment for hibernation survival.
    */
   private persistConnectionState(ws: WebSocket, state: ConnectionState): void {
-    // Serialize message queue from Map to array format
-    const messageQueue: SerializedQueueEntry[] = [];
-    if (state.messageQueue) {
-      for (const [topic, messages] of state.messageQueue) {
-        messageQueue.push({ topic, messages });
-      }
-    }
-
     ws.serializeAttachment({
       id: state.id,
       topics: Array.from(state.topics),
-      userId: state.userId,
-      messageQueue: messageQueue.length > 0 ? messageQueue : undefined,
     } satisfies SerializedConnectionState);
   }
 }
