@@ -111,7 +111,9 @@ async function handleUpdatedPlanReview(
         'Session token set and stored by server with updated content hash'
       );
 
-      const reviewFeedback = decision.reviewComment ? `\n\nReviewer comment: ${decision.reviewComment}` : '';
+      const reviewFeedback = decision.reviewComment
+        ? `\n\nReviewer comment: ${decision.reviewComment}`
+        : '';
       return {
         allow: true,
         message: `Plan re-approved with updates! You have ${deliverableCount} deliverable${deliverableCount === 1 ? '' : 's'}. Use add_artifact(filePath, deliverableId) to upload proof-of-work.${reviewFeedback}`,
@@ -194,7 +196,9 @@ export async function checkReviewStatus(
           'Session token set and stored by server with deliverables'
         );
 
-        const reviewFeedback = decision.reviewComment ? `\n\nReviewer comment: ${decision.reviewComment}` : '';
+        const reviewFeedback = decision.reviewComment
+          ? `\n\nReviewer comment: ${decision.reviewComment}`
+          : '';
         return {
           allow: true,
           message: `Plan approved! You have ${deliverableCount} deliverable${deliverableCount === 1 ? '' : 's'}. Use add_artifact(filePath, deliverableId) to upload proof-of-work.${reviewFeedback}`,

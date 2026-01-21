@@ -1,5 +1,4 @@
 import { Button, Chip, Tooltip } from '@heroui/react';
-import { PLAN_INDEX_DOC_NAME } from '@shipyard/schema';
 import { Archive, ChevronRight, Inbox, LayoutGrid, Search } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -9,7 +8,6 @@ import { CollapsiblePanel } from '@/components/ui/collapsible-panel';
 import { getPlanRoute } from '@/constants/routes';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
 import { useInputRequests } from '@/hooks/useInputRequests';
-import { useMultiProviderSync } from '@/hooks/useMultiProviderSync';
 import { usePlanIndex } from '@/hooks/usePlanIndex';
 import { getSidebarCollapsed, setSidebarCollapsed } from '@/utils/uiPreferences';
 
@@ -209,10 +207,14 @@ interface SidebarProps {
 
 export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
   const { identity: githubIdentity } = useGitHubAuth();
-  const { inboxPlans, archivedPlans, navigationTarget, clearNavigation, isLoading } = usePlanIndex(
-    githubIdentity?.username
-  );
-  const { ydoc: indexDoc } = useMultiProviderSync(PLAN_INDEX_DOC_NAME);
+  const {
+    inboxPlans,
+    archivedPlans,
+    navigationTarget,
+    clearNavigation,
+    isLoading,
+    ydoc: indexDoc,
+  } = usePlanIndex(githubIdentity?.username);
   const { pendingRequests } = useInputRequests({ ydoc: indexDoc });
   const [collapsed, setCollapsed] = useState(getSidebarCollapsed);
   const navigate = useNavigate();

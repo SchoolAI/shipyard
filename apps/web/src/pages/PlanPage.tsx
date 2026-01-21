@@ -9,7 +9,6 @@ import {
   getPlanMetadata,
   getPlanOwnerId,
   type InputRequest,
-  PLAN_INDEX_DOC_NAME,
   type PlanMetadata,
   setPlanIndexEntry,
   setPlanMetadata,
@@ -98,8 +97,12 @@ export function PlanPage() {
       }
     : null;
 
-  const { ydoc: indexDoc } = useMultiProviderSync(PLAN_INDEX_DOC_NAME);
-  const { myPlans, sharedPlans, inboxPlans } = usePlanIndex(githubIdentity?.username);
+  const {
+    myPlans,
+    sharedPlans,
+    inboxPlans,
+    ydoc: indexDoc,
+  } = usePlanIndex(githubIdentity?.username);
   const allPlans = useMemo(
     () => [...myPlans, ...sharedPlans, ...inboxPlans],
     [myPlans, sharedPlans, inboxPlans]
@@ -514,6 +517,7 @@ export function PlanPage() {
                 ydoc={ydoc}
                 rtcProvider={rtcProvider}
                 metadata={metadata}
+                indexDoc={indexDoc}
               />
             }
           />

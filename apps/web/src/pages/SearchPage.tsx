@@ -4,7 +4,7 @@
  */
 
 import { Button, Checkbox, ListBox, ListBoxItem, Popover, Spinner } from '@heroui/react';
-import { getAllTagsFromIndex, PLAN_INDEX_DOC_NAME, type PlanIndexEntry } from '@shipyard/schema';
+import { getAllTagsFromIndex, type PlanIndexEntry } from '@shipyard/schema';
 import { Filter, LayoutGrid, Search } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -16,7 +16,6 @@ import { SearchPlanInput } from '@/components/ui/SearchPlanInput';
 import { getPlanRoute } from '@/constants/routes';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
-import { useMultiProviderSync } from '@/hooks/useMultiProviderSync';
 import { usePlanIndex } from '@/hooks/usePlanIndex';
 import { STATUS_FILTER_OPTIONS, useViewFilters } from '@/hooks/useViewFilters';
 import { formatRelativeTime } from '@/utils/formatters';
@@ -193,10 +192,10 @@ type OwnershipFilter = 'all' | 'my-plans' | 'shared';
 
 export function SearchPage() {
   const { identity: githubIdentity } = useGitHubAuth();
+  // usePlanIndex already syncs plan-index via useMultiProviderSync internally
   const { myPlans, sharedPlans, inboxPlans, isLoading, timedOut } = usePlanIndex(
     githubIdentity?.username
   );
-  useMultiProviderSync(PLAN_INDEX_DOC_NAME); // Keep index synced
   const navigate = useNavigate();
   const location = useLocation();
 

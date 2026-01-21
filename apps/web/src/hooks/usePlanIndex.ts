@@ -149,6 +149,8 @@ export interface PlanIndexState {
   markPlanAsUnread: (planId: string) => Promise<void>;
   /** Force refresh of inbox unread states */
   refreshInboxUnreadState: () => void;
+  /** The plan-index Y.Doc for direct access (e.g., useInputRequests) */
+  ydoc: Y.Doc;
 }
 
 /**
@@ -525,5 +527,6 @@ export function usePlanIndex(currentUsername: string | undefined): PlanIndexStat
     markPlanAsRead,
     markPlanAsUnread,
     refreshInboxUnreadState,
+    ydoc,
   };
 }

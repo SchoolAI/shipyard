@@ -10,6 +10,7 @@ import {
 } from '@shipyard/schema';
 import { Package } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import type * as Y from 'yjs';
 import { assertNever } from '@/utils/assert-never';
 import { DeliverableCard } from './DeliverableCard';
@@ -174,7 +175,11 @@ export function DeliverablesView({
 
   const handleComplete = () => {
     if (!identity) {
-      onRequestIdentity?.();
+      if (onRequestIdentity) {
+        onRequestIdentity();
+      } else {
+        toast.info('Sign in to complete this task');
+      }
       return;
     }
 

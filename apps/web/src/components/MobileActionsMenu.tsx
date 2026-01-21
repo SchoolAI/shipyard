@@ -1,11 +1,6 @@
 import { Avatar, Button, Card, Dropdown, Label, Modal } from '@heroui/react';
 import type { A2AMessage, ConversationExportMeta, PlanMetadata } from '@shipyard/schema';
-import {
-  getPlanIndexEntry,
-  PLAN_INDEX_DOC_NAME,
-  setPlanIndexEntry,
-  YDOC_KEYS,
-} from '@shipyard/schema';
+import { getPlanIndexEntry, setPlanIndexEntry, YDOC_KEYS } from '@shipyard/schema';
 import {
   Archive,
   ArchiveRestore,
@@ -25,7 +20,6 @@ import { HandoffConversationDialog } from '@/components/HandoffConversationDialo
 import { LinkPRButton } from '@/components/LinkPRButton';
 import { useUserIdentity } from '@/contexts/UserIdentityContext';
 import { useConversationTransfer } from '@/hooks/useConversationTransfer';
-import { useMultiProviderSync } from '@/hooks/useMultiProviderSync';
 
 // ============================================================================
 // Helper Functions & Sub-Components
@@ -180,14 +174,21 @@ interface MobileActionsMenuProps {
   ydoc: Y.Doc;
   rtcProvider: WebrtcProvider | null;
   metadata: PlanMetadata;
+  /** Plan index Y.Doc for archive operations */
+  indexDoc: Y.Doc;
 }
 
 /**
  * Mobile dropdown menu with all plan actions (share, import, handoff, link PR, archive).
  * Designed for use in MobileHeader as a replacement for individual action buttons.
  */
-export function MobileActionsMenu({ planId, ydoc, rtcProvider, metadata }: MobileActionsMenuProps) {
-  const { ydoc: indexDoc } = useMultiProviderSync(PLAN_INDEX_DOC_NAME);
+export function MobileActionsMenu({
+  planId,
+  ydoc,
+  rtcProvider,
+  metadata,
+  indexDoc,
+}: MobileActionsMenuProps) {
   const isArchived = !!metadata.archivedAt;
   const { actor } = useUserIdentity();
 

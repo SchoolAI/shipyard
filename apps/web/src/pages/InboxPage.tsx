@@ -10,7 +10,6 @@ import {
   getPlanIndexEntry,
   type InputRequest,
   markEventAsViewed,
-  PLAN_INDEX_DOC_NAME,
   type PlanEvent,
   type PlanIndexEntry,
   type PlanStatusType,
@@ -50,7 +49,6 @@ import { useGitHubAuth } from '@/hooks/useGitHubAuth';
 import { type InboxEventItem, useInboxEvents } from '@/hooks/useInboxEvents';
 import { useInputRequests } from '@/hooks/useInputRequests';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
-import { useMultiProviderSync } from '@/hooks/useMultiProviderSync';
 import { usePlanIndex } from '@/hooks/usePlanIndex';
 import { formatRelativeTime } from '@/utils/formatters';
 import { getInboxShowRead, setInboxShowRead, setSidebarCollapsed } from '@/utils/uiPreferences';
@@ -616,9 +614,15 @@ export function InboxPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { identity: githubIdentity } = useGitHubAuth();
-  const { allInboxPlans, allOwnedPlans, markPlanAsRead, markPlanAsUnread, isLoading, timedOut } =
-    usePlanIndex(githubIdentity?.username);
-  const { ydoc: indexDoc } = useMultiProviderSync(PLAN_INDEX_DOC_NAME);
+  const {
+    allInboxPlans,
+    allOwnedPlans,
+    markPlanAsRead,
+    markPlanAsUnread,
+    isLoading,
+    timedOut,
+    ydoc: indexDoc,
+  } = usePlanIndex(githubIdentity?.username);
   const [showRead, setShowRead] = useState(getInboxShowRead);
   const { actor } = useUserIdentity();
 

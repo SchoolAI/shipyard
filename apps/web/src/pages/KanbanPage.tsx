@@ -22,7 +22,6 @@ import {
   getDeliverables,
   getPlanIndexEntry,
   getPlanMetadata,
-  PLAN_INDEX_DOC_NAME,
   type PlanIndexEntry,
   type PlanMetadata,
   type PlanStatusType,
@@ -184,10 +183,14 @@ async function updatePlanStatus(
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: page component orchestrates multiple state machines
 export function KanbanPage() {
   const { identity: githubIdentity, startAuth } = useGitHubAuth();
-  const { myPlans, sharedPlans, inboxPlans, isLoading, timedOut } = usePlanIndex(
-    githubIdentity?.username
-  );
-  const { ydoc: indexDoc } = useMultiProviderSync(PLAN_INDEX_DOC_NAME);
+  const {
+    myPlans,
+    sharedPlans,
+    inboxPlans,
+    isLoading,
+    timedOut,
+    ydoc: indexDoc,
+  } = usePlanIndex(githubIdentity?.username);
   const navigate = useNavigate();
   const location = useLocation();
 
