@@ -1,12 +1,8 @@
 /**
  * Inline detail panel for viewing plans in list views.
  * Used by InboxPage, ArchivePage, and SearchPage for consistent plan viewing.
- *
- * NOTE: This component disables WebRTC to prevent provider collisions when navigating to PlanPage.
- * WebRTC sync only happens in the full PlanPage view.
  */
 
-import type { BlockNoteEditor } from '@blocknote/core';
 import { Spinner } from '@heroui/react';
 import {
   getDeliverables,
@@ -18,11 +14,14 @@ import {
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type * as Y from 'yjs';
+import { AuthChoiceModal } from '@/components/AuthChoiceModal';
+import { GitHubAuthOverlay } from '@/components/GitHubAuthModal';
 import { PlanContent } from '@/components/PlanContent';
 import type { PanelWidth } from '@/components/PlanPanel';
 import { PlanPanelHeader } from '@/components/PlanPanelHeader';
-import { getPlanRoute } from '@/constants/routes';
+import { SignInModal } from '@/components/SignInModal';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
+import { useLocalIdentity } from '@/hooks/useLocalIdentity';
 import { useMultiProviderSync } from '@/hooks/useMultiProviderSync';
 import { colorFromString } from '@/utils/color';
 import { formatRelativeTime } from '@/utils/formatters';
@@ -62,32 +61,34 @@ export interface InlinePlanDetailProps {
  */
 export function InlinePlanDetail({
   planId,
-  initialTab,
+  initialTab: _initialTab,
   onClose,
   onApprove,
   onRequestChanges,
   onExpand,
   width = 'peek',
   emptyMessage = 'Select a task to view details',
-  onStatusChange,
+  onStatusChange: _onStatusChange,
 }: InlinePlanDetailProps) {
   const navigate = useNavigate();
-  const { identity: githubIdentity, startAuth } = useGitHubAuth();
+  const { identity: githubIdentity, startAuth, authState } = useGitHubAuth();
+  const { localIdentity, setLocalIdentity } = useLocalIdentity();
+  const [showAuthChoice, setShowAuthChoice] = useState(false);
+  const [showLocalSignIn, setShowLocalSignIn] = useState(false);
 
   // Plan data for panel
   const [panelMetadata, setPanelMetadata] = useState<PlanMetadata | null>(null);
   const [panelDeliverableStats, setPanelDeliverableStats] = useState({ completed: 0, total: 0 });
   const [panelLastActivity, setPanelLastActivity] = useState('');
   const [loadTimeout, setLoadTimeout] = useState(false);
-  const [editor, setEditor] = useState<BlockNoteEditor | null>(null);
 
-  // Sync providers for selected plan (WebRTC disabled to prevent collisions with PlanPage)
+  // Sync providers for selected plan
   const {
     ydoc: panelYdoc,
     syncState: panelSyncState,
     wsProvider: panelWsProvider,
     rtcProvider: panelRtcProvider,
-  } = useMultiProviderSync(planId || '', { enableWebRTC: false });
+  } = useMultiProviderSync(planId || '');
 
   // Timeout for loading state (detect invalid planIds)
   useEffect(() => {
@@ -133,29 +134,38 @@ export function InlinePlanDetail({
     return () => metaMap.unobserve(update);
   }, [planId, panelYdoc, panelSyncState.idbSynced]);
 
-  // Identity for comments
+  // Identity for comments - Priority: GitHub > Local > null
   const identity = githubIdentity
     ? {
         id: githubIdentity.username,
         name: githubIdentity.displayName,
         color: colorFromString(githubIdentity.username),
       }
-    : null;
+    : localIdentity
+      ? {
+          id: `local:${localIdentity.username}`,
+          name: localIdentity.username,
+          color: colorFromString(localIdentity.username),
+        }
+      : null;
 
   const handleRequestIdentity = useCallback(() => {
-    startAuth();
-  }, [startAuth]);
-
-  // Store editor instance when ready (for ReviewActions)
-  const handleEditorReady = useCallback((editorInstance: BlockNoteEditor) => {
-    setEditor(editorInstance);
+    setShowAuthChoice(true);
   }, []);
+
+  const handleLocalSignIn = useCallback(
+    (username: string) => {
+      setLocalIdentity(username);
+      setShowLocalSignIn(false);
+    },
+    [setLocalIdentity]
+  );
 
   // Navigate to full plan page
   const handleFullScreen = useCallback(() => {
     if (planId) {
       setSidebarCollapsed(true);
-      navigate(getPlanRoute(planId));
+      navigate(`/plan/${planId}`);
     }
   }, [planId, navigate]);
 
@@ -164,7 +174,7 @@ export function InlinePlanDetail({
     if (onApprove && planId && panelMetadata) {
       onApprove({ planId, ydoc: panelYdoc, metadata: panelMetadata });
     } else if (planId) {
-      navigate(getPlanRoute(planId));
+      navigate(`/plan/${planId}`);
     }
   }, [onApprove, planId, panelYdoc, panelMetadata, navigate]);
 
@@ -173,48 +183,61 @@ export function InlinePlanDetail({
     if (onRequestChanges && planId && panelMetadata) {
       onRequestChanges({ planId, ydoc: panelYdoc, metadata: panelMetadata });
     } else if (planId) {
-      navigate(getPlanRoute(planId));
+      navigate(`/plan/${planId}`);
     }
   }, [onRequestChanges, planId, panelYdoc, panelMetadata, navigate]);
 
   // Prefer WebSocket when connected, fall back to WebRTC
   const activeProvider = panelWsProvider ?? panelRtcProvider;
 
+  // Auth modals - always rendered
+  const authModals = (
+    <>
+      <GitHubAuthOverlay authState={authState} />
+      <AuthChoiceModal
+        isOpen={showAuthChoice}
+        onOpenChange={setShowAuthChoice}
+        onGitHubAuth={startAuth}
+        onLocalAuth={() => setShowLocalSignIn(true)}
+      />
+      <SignInModal
+        isOpen={showLocalSignIn}
+        onClose={() => setShowLocalSignIn(false)}
+        onSignIn={handleLocalSignIn}
+      />
+    </>
+  );
+
   // Plan selected and metadata loaded
   if (planId && panelMetadata) {
     return (
-      <div className="flex flex-col h-full">
-        <PlanPanelHeader
-          metadata={panelMetadata}
-          deliverableStats={panelDeliverableStats}
-          lastActivityText={panelLastActivity}
-          onApprove={handleApprove}
-          onRequestChanges={handleRequestChanges}
-          onClose={onClose}
-          onExpand={onExpand}
-          onFullScreen={handleFullScreen}
-          width={width}
-          // Props for ReviewActions (comment popover support)
-          ydoc={panelYdoc}
-          identity={identity}
-          onRequestIdentity={handleRequestIdentity}
-          editor={editor}
-          onStatusChange={onStatusChange}
-        />
-        <div className="flex-1 overflow-y-auto">
-          <PlanContent
-            mode="live"
-            ydoc={panelYdoc}
+      <>
+        <div className="flex flex-col h-full">
+          <PlanPanelHeader
             metadata={panelMetadata}
-            syncState={panelSyncState}
-            identity={identity}
-            onRequestIdentity={handleRequestIdentity}
-            provider={activeProvider}
-            initialTab={initialTab}
-            onEditorReady={handleEditorReady}
+            deliverableStats={panelDeliverableStats}
+            lastActivityText={panelLastActivity}
+            onApprove={handleApprove}
+            onRequestChanges={handleRequestChanges}
+            onClose={onClose}
+            onExpand={onExpand}
+            onFullScreen={handleFullScreen}
+            width={width}
           />
+          <div className="flex-1 overflow-y-auto">
+            <PlanContent
+              mode="live"
+              ydoc={panelYdoc}
+              metadata={panelMetadata}
+              syncState={panelSyncState}
+              identity={identity}
+              onRequestIdentity={handleRequestIdentity}
+              provider={activeProvider}
+            />
+          </div>
         </div>
-      </div>
+        {authModals}
+      </>
     );
   }
 
@@ -222,31 +245,40 @@ export function InlinePlanDetail({
   if (planId) {
     if (loadTimeout) {
       return (
-        <div className="flex items-center justify-center h-full">
-          <div className="text-center">
-            <p className="text-danger mb-2">Task not found</p>
-            <p className="text-sm text-muted-foreground">
-              This task may have been deleted or is invalid.
-            </p>
+        <>
+          <div className="flex items-center justify-center h-full">
+            <div className="text-center">
+              <p className="text-danger mb-2">Task not found</p>
+              <p className="text-sm text-muted-foreground">
+                This task may have been deleted or is invalid.
+              </p>
+            </div>
           </div>
-        </div>
+          {authModals}
+        </>
       );
     }
 
     return (
-      <div className="flex items-center justify-center h-full">
-        <div className="flex flex-col items-center gap-4">
-          <Spinner size="lg" />
-          <p className="text-muted-foreground">Loading task...</p>
+      <>
+        <div className="flex items-center justify-center h-full">
+          <div className="flex flex-col items-center gap-4">
+            <Spinner size="lg" />
+            <p className="text-muted-foreground">Loading task...</p>
+          </div>
         </div>
-      </div>
+        {authModals}
+      </>
     );
   }
 
   // No plan selected
   return (
-    <div className="flex items-center justify-center h-full text-muted-foreground">
-      <p>{emptyMessage}</p>
-    </div>
+    <>
+      <div className="flex items-center justify-center h-full text-muted-foreground">
+        <p>{emptyMessage}</p>
+      </div>
+      {authModals}
+    </>
   );
 }

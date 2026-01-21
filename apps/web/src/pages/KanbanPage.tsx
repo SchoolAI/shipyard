@@ -22,6 +22,7 @@ import {
   getDeliverables,
   getPlanIndexEntry,
   getPlanMetadata,
+  PLAN_INDEX_DOC_NAME,
   type PlanIndexEntry,
   type PlanMetadata,
   type PlanStatusType,
@@ -36,20 +37,23 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { IndexeddbPersistence } from 'y-indexeddb';
 import * as Y from 'yjs';
+import { AuthChoiceModal } from '@/components/AuthChoiceModal';
+import { GitHubAuthOverlay } from '@/components/GitHubAuthModal';
 import { OfflineBanner } from '@/components/OfflineBanner';
 import { PlanContent } from '@/components/PlanContent';
 import { type PanelWidth, PlanPanel } from '@/components/PlanPanel';
 import { PlanPanelHeader } from '@/components/PlanPanelHeader';
 import { PlanPeekModal } from '@/components/PlanPeekModal';
+import { SignInModal } from '@/components/SignInModal';
 import { KanbanSkeleton } from '@/components/ui/KanbanSkeleton';
 import { KanbanCard } from '@/components/views/KanbanCard';
 import { KanbanColumn } from '@/components/views/KanbanColumn';
-import { getPlanRoute } from '@/constants/routes';
-import { usePlanIndexContext } from '@/contexts/PlanIndexContext';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
 import { type ColumnId, columnIdToStatus, useKanbanColumns } from '@/hooks/useKanbanColumns';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
+import { useLocalIdentity } from '@/hooks/useLocalIdentity';
 import { useMultiProviderSync } from '@/hooks/useMultiProviderSync';
+import { usePlanIndex } from '@/hooks/usePlanIndex';
 import { colorFromString } from '@/utils/color';
 import { formatRelativeTime } from '@/utils/formatters';
 import {
@@ -182,15 +186,14 @@ async function updatePlanStatus(
 
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: page component orchestrates multiple state machines
 export function KanbanPage() {
-  const { identity: githubIdentity, startAuth } = useGitHubAuth();
-  const {
-    myPlans,
-    sharedPlans,
-    inboxPlans,
-    isLoading,
-    timedOut,
-    ydoc: indexDoc,
-  } = usePlanIndexContext();
+  const { identity: githubIdentity, startAuth, authState } = useGitHubAuth();
+  const { localIdentity, setLocalIdentity } = useLocalIdentity();
+  const [showAuthChoice, setShowAuthChoice] = useState(false);
+  const [showLocalSignIn, setShowLocalSignIn] = useState(false);
+  const { myPlans, sharedPlans, inboxPlans, isLoading, timedOut } = usePlanIndex(
+    githubIdentity?.username
+  );
+  const { ydoc: indexDoc } = useMultiProviderSync(PLAN_INDEX_DOC_NAME);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -376,7 +379,7 @@ export function KanbanPage() {
     onFullScreen: useCallback(() => {
       if (selectedPlanId) {
         setSidebarCollapsed(true);
-        navigate(getPlanRoute(selectedPlanId));
+        navigate(`/plan/${selectedPlanId}`);
       }
     }, [selectedPlanId, navigate]),
     onClose: handleClosePanel,
@@ -433,22 +436,36 @@ export function KanbanPage() {
   const handleRequestChanges = useCallback(() => {
     if (!selectedPlanId) return;
     // Navigate to full plan page for adding comments
-    navigate(getPlanRoute(selectedPlanId));
+    navigate(`/plan/${selectedPlanId}`);
     toast.info('Navigate to add comments and request changes');
   }, [selectedPlanId, navigate]);
 
-  // Identity for comments
+  // Identity for comments - Priority: GitHub > Local > null
   const identity = githubIdentity
     ? {
         id: githubIdentity.username,
         name: githubIdentity.displayName,
         color: colorFromString(githubIdentity.username),
       }
-    : null;
+    : localIdentity
+      ? {
+          id: `local:${localIdentity.username}`,
+          name: localIdentity.username,
+          color: colorFromString(localIdentity.username),
+        }
+      : null;
 
   const handleRequestIdentity = useCallback(() => {
-    startAuth();
-  }, [startAuth]);
+    setShowAuthChoice(true);
+  }, []);
+
+  const handleLocalSignIn = useCallback(
+    (username: string) => {
+      setLocalIdentity(username);
+      setShowLocalSignIn(false);
+    },
+    [setLocalIdentity]
+  );
 
   const sensors = useSensors(
     useSensor(MouseSensor, {
@@ -629,7 +646,7 @@ export function KanbanPage() {
               onFullScreen={() => {
                 if (selectedPlanId) {
                   setSidebarCollapsed(true);
-                  navigate(getPlanRoute(selectedPlanId));
+                  navigate(`/plan/${selectedPlanId}`);
                 }
               }}
               width={panelWidth}
@@ -653,6 +670,20 @@ export function KanbanPage() {
           </div>
         ) : null}
       </PlanPanel>
+
+      {/* Auth modals */}
+      <GitHubAuthOverlay authState={authState} />
+      <AuthChoiceModal
+        isOpen={showAuthChoice}
+        onOpenChange={setShowAuthChoice}
+        onGitHubAuth={startAuth}
+        onLocalAuth={() => setShowLocalSignIn(true)}
+      />
+      <SignInModal
+        isOpen={showLocalSignIn}
+        onClose={() => setShowLocalSignIn(false)}
+        onSignIn={handleLocalSignIn}
+      />
     </div>
   );
 }
