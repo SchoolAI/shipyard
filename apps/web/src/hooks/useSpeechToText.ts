@@ -178,7 +178,9 @@ export function useSpeechToText(): UseSpeechToTextReturn {
     };
 
     recognition.onend = () => {
-      if (!isStoppingRef.current && stateRef.current === 'recording') {
+      // Only auto-restart if we're still recording and not manually stopping
+      // Also check if recognitionRef still exists (abort() sets it to null)
+      if (!isStoppingRef.current && stateRef.current === 'recording' && recognitionRef.current) {
         recognition.start();
       } else {
         setState('ready');
@@ -207,8 +209,11 @@ export function useSpeechToText(): UseSpeechToTextReturn {
       partialTranscriptRef.current = '';
     }
 
+    // Use abort() for more immediate stop (doesn't wait for finalization)
+    // This is more reliable than stop() especially on mobile Safari
     if (recognitionRef.current) {
-      recognitionRef.current.stop();
+      recognitionRef.current.abort();
+      recognitionRef.current = null;
     }
     setState('ready');
   }, []);

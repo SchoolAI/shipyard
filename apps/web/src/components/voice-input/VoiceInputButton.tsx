@@ -52,12 +52,15 @@ export function VoiceInputButton({ onTranscript, className }: VoiceInputButtonPr
   const isLoading = state === 'loading';
   const hasError = isSpeechError(speechResult);
 
-  const getIcon = () => {
+  const getButtonContent = () => {
     if (isLoading) {
       return <Loader2 className="w-4 h-4 animate-spin" />;
     }
     if (hasError) {
       return <MicOff className="w-4 h-4" />;
+    }
+    if (isRecording) {
+      return <span className="text-xs font-semibold">Stop</span>;
     }
     return <Mic className="w-4 h-4" />;
   };
@@ -71,20 +74,20 @@ export function VoiceInputButton({ onTranscript, className }: VoiceInputButtonPr
 
   const button = (
     <Button
-      isIconOnly
+      isIconOnly={!isRecording}
       size="sm"
       variant={isRecording ? 'danger' : 'ghost'}
       onPress={handlePress}
       isDisabled={isLoading}
       aria-label={getAriaLabel()}
       className={`
-        w-9 h-9
-        ${isRecording ? 'voice-recording' : ''}
+        min-w-[44px] min-h-[44px]
+        ${isRecording ? 'voice-recording px-3' : 'w-11 h-11'}
         ${hasError ? 'text-danger' : ''}
         ${className || ''}
       `.trim()}
     >
-      {getIcon()}
+      {getButtonContent()}
     </Button>
   );
 
@@ -97,11 +100,16 @@ export function VoiceInputButton({ onTranscript, className }: VoiceInputButtonPr
     );
   }
 
-  if (isRecording && partialTranscript) {
+  if (isRecording) {
     return (
       <Tooltip>
         <Tooltip.Trigger>{button}</Tooltip.Trigger>
-        <Tooltip.Content>{`"${partialTranscript}..."`}</Tooltip.Content>
+        <Tooltip.Content>
+          <div className="text-center max-w-xs">
+            {partialTranscript && <p className="mb-1 font-medium">"{partialTranscript}..."</p>}
+            <p className="text-xs opacity-70">Tap Stop to finish</p>
+          </div>
+        </Tooltip.Content>
       </Tooltip>
     );
   }
