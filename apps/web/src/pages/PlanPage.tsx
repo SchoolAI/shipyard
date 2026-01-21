@@ -34,6 +34,7 @@ import { WaitingRoomGate } from '@/components/WaitingRoomGate';
 import { useActivePlanSync } from '@/contexts/ActivePlanSyncContext';
 import { usePlanIndexContext } from '@/contexts/PlanIndexContext';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
+import { useInputRequests } from '@/hooks/useInputRequests';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { useLocalIdentity } from '@/hooks/useLocalIdentity';
 import { useMultiProviderSync } from '@/hooks/useMultiProviderSync';
@@ -112,11 +113,17 @@ export function PlanPage() {
       : null;
 
   // Use shared plan index context to avoid duplicate WebRTC providers
-  const { ydoc: indexDoc, myPlans, sharedPlans, inboxPlans } = usePlanIndexContext();
+  const { ydoc: indexDoc, myPlans, sharedPlans, inboxPlans, isLoading } = usePlanIndexContext();
+  const { pendingRequests } = useInputRequests({ ydoc: indexDoc });
   const allPlans = useMemo(
     () => [...myPlans, ...sharedPlans, ...inboxPlans],
     [myPlans, sharedPlans, inboxPlans]
   );
+
+  // Calculate total inbox count (plans + input requests) - for mobile header badge
+  const totalInboxCount = useMemo(() => {
+    return inboxPlans.length + pendingRequests.length;
+  }, [inboxPlans, pendingRequests]);
 
   // Prefer WebSocket provider when connected, fall back to WebRTC for P2P-only mode.
   const activeProvider = isSnapshot ? null : (wsProvider ?? rtcProvider);
@@ -529,6 +536,8 @@ export function PlanPage() {
             peerCount={syncState?.peerCount}
             indexDoc={indexDoc}
             planId={planId}
+            inboxCount={totalInboxCount}
+            isLoadingInbox={isLoading}
             rightContent={
               <MobileActionsMenu
                 planId={planId}
