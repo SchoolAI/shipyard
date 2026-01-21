@@ -3,14 +3,6 @@
     {
       "name": "shipyard",
       "path": "."
-    },
-    {
-      "name": "\ud83c\udf33\u2705 88-types-in-hooks",
-      "path": "../shipyard-wt/88-types-in-hooks"
-    },
-    {
-      "name": "\ud83c\udf33\ud83c\udf13 95-system-dark-ligth-and-mobile-issue",
-      "path": "../shipyard-wt/95-system-dark-ligth-and-mobile-issue"
     }
   ]
 }
