@@ -146,12 +146,12 @@ export function PlanContent(props: PlanContentProps) {
       {/* Tab navigation */}
       <div className="border-b border-separator bg-surface px-2 md:px-6 py-1 md:py-2 shrink-0">
         <div className="flex items-center justify-between">
-          {/* Tabs on the left */}
-          <div className="flex gap-0 md:gap-4">
+          {/* Tabs on the left - scrollable on mobile */}
+          <div className="flex gap-0 md:gap-4 overflow-x-auto md:overflow-visible">
             <button
               type="button"
               onClick={() => setActiveView('plan')}
-              className={`flex items-center justify-center gap-2 pb-2 px-2 font-medium text-sm transition-colors flex-1 md:flex-initial ${
+              className={`flex items-center justify-center gap-2 pb-2 px-2 font-medium text-sm transition-colors shrink-0 ${
                 activeView === 'plan'
                   ? 'text-primary border-b-2 border-primary'
                   : 'text-muted-foreground hover:text-foreground border-b-2 border-transparent'
@@ -163,7 +163,7 @@ export function PlanContent(props: PlanContentProps) {
             <button
               type="button"
               onClick={() => setActiveView('activity')}
-              className={`flex items-center justify-center gap-2 pb-2 px-2 font-medium text-sm transition-colors flex-1 md:flex-initial ${
+              className={`flex items-center justify-center gap-2 pb-2 px-2 font-medium text-sm transition-colors shrink-0 ${
                 activeView === 'activity'
                   ? 'text-primary border-b-2 border-primary'
                   : 'text-muted-foreground hover:text-foreground border-b-2 border-transparent'
@@ -175,7 +175,7 @@ export function PlanContent(props: PlanContentProps) {
             <button
               type="button"
               onClick={() => setActiveView('deliverables')}
-              className={`flex items-center justify-center gap-2 pb-2 px-2 font-medium text-sm transition-colors flex-1 md:flex-initial ${
+              className={`flex items-center justify-center gap-2 pb-2 px-2 font-medium text-sm transition-colors shrink-0 ${
                 activeView === 'deliverables'
                   ? 'text-primary border-b-2 border-primary'
                   : 'text-muted-foreground hover:text-foreground border-b-2 border-transparent'
@@ -192,7 +192,7 @@ export function PlanContent(props: PlanContentProps) {
             <button
               type="button"
               onClick={() => setActiveView('changes')}
-              className={`flex items-center justify-center gap-2 pb-2 px-2 font-medium text-sm transition-colors flex-1 md:flex-initial ${
+              className={`flex items-center justify-center gap-2 pb-2 px-2 font-medium text-sm transition-colors shrink-0 ${
                 activeView === 'changes'
                   ? 'text-primary border-b-2 border-primary'
                   : 'text-muted-foreground hover:text-foreground border-b-2 border-transparent'

@@ -33,7 +33,7 @@ export function StatusChip({ status, className }: StatusChipProps) {
   return (
     <Chip color={config.color} variant={config.variant} className={className}>
       <Icon className="w-3 h-3" />
-      {config.label}
+      <span className="hidden sm:inline">{config.label}</span>
     </Chip>
   );
 }
