@@ -6,8 +6,8 @@ export default defineConfig({
 	dts: false, // Project references break tsup type gen with workspace packages
 	clean: true,
 	sourcemap: false, // Exclude source maps from production builds (reduces size 43%)
-	// Bundle ALL dependencies for plugin distribution (needs to run without node_modules)
-	noExternal: [/.*/],
+	// Bundle workspace packages only (for npm publishing)
+	noExternal: ['@shipyard/schema', '@shipyard/shared'],
 	target: 'node22.14',
 	shims: false,
 });
