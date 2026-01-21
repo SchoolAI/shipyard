@@ -250,7 +250,8 @@ export function ReviewActions({
           Approve
         </Button>
 
-        <Popover.Content placement="top" className="w-80">
+        {/* z-[60] ensures popover renders above mobile drawer (z-50) */}
+        <Popover.Content placement="top" className="w-80 z-[60]">
           <Popover.Dialog>
             <Popover.Arrow />
             <Popover.Heading>Approve Task</Popover.Heading>
@@ -308,7 +309,8 @@ export function ReviewActions({
           {currentStatus === 'changes_requested' ? 'Changes' : 'Request Changes'}
         </Button>
 
-        <Popover.Content placement="top" className="w-80">
+        {/* z-[60] ensures popover renders above mobile drawer (z-50) */}
+        <Popover.Content placement="top" className="w-80 z-[60]">
           <Popover.Dialog>
             <Popover.Arrow />
             <Popover.Heading>Request Changes</Popover.Heading>

@@ -1,6 +1,6 @@
 import { Button, Tooltip } from '@heroui/react';
 import { Loader2, Mic, MicOff } from 'lucide-react';
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { isSpeechError, useSpeechToText } from '@/hooks/useSpeechToText';
 
 interface VoiceInputButtonProps {
@@ -13,9 +13,26 @@ export function VoiceInputButton({ onTranscript, className }: VoiceInputButtonPr
   const { state, transcript, partialTranscript, startRecording, stopRecording, isSupported } =
     speechResult;
 
+  // Track the last transcript length we've already sent to avoid duplicates
+  // The transcript is cumulative (e.g., "hello" then "hello world"), so we only
+  // want to send the NEW portion ("world") to avoid duplication in the text field
+  const lastSentLengthRef = useRef(0);
+
+  // Reset tracking when recording starts fresh (transcript becomes empty)
   useEffect(() => {
-    if (transcript) {
-      onTranscript(transcript);
+    if (!transcript) {
+      lastSentLengthRef.current = 0;
+    }
+  }, [transcript]);
+
+  useEffect(() => {
+    if (transcript && transcript.length > lastSentLengthRef.current) {
+      // Only send the NEW portion of the transcript
+      const newText = transcript.slice(lastSentLengthRef.current).trim();
+      if (newText) {
+        onTranscript(newText);
+      }
+      lastSentLengthRef.current = transcript.length;
     }
   }, [transcript, onTranscript]);
 
