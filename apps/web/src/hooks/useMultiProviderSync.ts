@@ -563,18 +563,104 @@ export function useMultiProviderSync(
     };
   }, [docName, ydoc, enableWebRTC]);
 
-  // Separate effect for GitHub identity changes - updates awareness without destroying providers
-  // This prevents y-webrtc "room already exists" race condition
+  // Separate effect for GitHub identity changes - updates awareness and pushes approval state
+  // This handles the case where user authenticates AFTER WebRTC connects
+  // Without this, approval state is never pushed and messages stay queued
   useEffect(() => {
     if (!rtcProvider || !githubIdentity) return;
 
-    // These functions are defined in the main effect above
-    // We need to expose them or recreate the logic here
-    // For now, the main effect will handle initial setup
-    // This effect handles changes after initial mount
+    // Helper to check if signaling is connected
+    const isSignalingOpen = (): boolean => {
+      const signalingConns = (
+        rtcProvider as unknown as { signalingConns?: Array<{ ws: WebSocket | null }> }
+      ).signalingConns;
+      if (!signalingConns || signalingConns.length === 0) return false;
+      return signalingConns.some((conn) => conn.ws && conn.ws.readyState === WebSocket.OPEN);
+    };
 
-    // TODO: Refactor to extract these functions outside the main effect
-  }, [githubIdentity, rtcProvider]);
+    // Send identity and approval state now that we have GitHub identity
+    if (isSignalingOpen()) {
+      // Send userId to signaling server
+      const identifyMessage = JSON.stringify({
+        type: 'subscribe',
+        topics: [],
+        userId: githubIdentity.username,
+      });
+
+      const signalingConns = (
+        rtcProvider as unknown as { signalingConns: Array<{ ws: WebSocket }> }
+      ).signalingConns;
+
+      if (signalingConns) {
+        for (const conn of signalingConns) {
+          if (conn.ws && conn.ws.readyState === WebSocket.OPEN) {
+            conn.ws.send(identifyMessage);
+          }
+        }
+      }
+
+      // Push approval state if we're the owner
+      const ownerId = getPlanOwnerId(ydoc);
+      if (ownerId && ownerId === githubIdentity.username) {
+        const approvedUsers = getApprovedUsers(ydoc);
+        const rejectedUsers = getRejectedUsers(ydoc);
+
+        const approvalStateMessage = JSON.stringify({
+          type: 'approval_state',
+          planId: docName,
+          ownerId,
+          approvedUsers,
+          rejectedUsers,
+        });
+
+        if (signalingConns) {
+          for (const conn of signalingConns) {
+            if (conn.ws && conn.ws.readyState === WebSocket.OPEN) {
+              conn.ws.send(approvalStateMessage);
+            }
+          }
+        }
+      }
+
+      // Update awareness state
+      const status = isUserRejected(ydoc, githubIdentity.username)
+        ? 'rejected'
+        : isUserApproved(ydoc, githubIdentity.username)
+          ? 'approved'
+          : 'pending';
+
+      if (status !== undefined) {
+        const webrtcPeerId = (rtcProvider as unknown as { room?: { peerId?: string } }).room
+          ?.peerId;
+
+        const awarenessState: PlanAwarenessState =
+          status === 'pending'
+            ? {
+                user: {
+                  id: githubIdentity.username,
+                  name: githubIdentity.displayName,
+                  color: colorFromString(githubIdentity.username),
+                },
+                isOwner: ownerId === githubIdentity.username,
+                status: 'pending',
+                requestedAt: Date.now(),
+                webrtcPeerId,
+              }
+            : {
+                user: {
+                  id: githubIdentity.username,
+                  name: githubIdentity.displayName,
+                  color: colorFromString(githubIdentity.username),
+                },
+                isOwner: ownerId === githubIdentity.username,
+                status,
+                webrtcPeerId,
+              };
+
+        rtcProvider.awareness.setLocalStateField('planStatus', awarenessState);
+      }
+    }
+  }, [githubIdentity, rtcProvider, ydoc, docName]);
 
   return { ydoc, syncState, wsProvider, rtcProvider };
 }
