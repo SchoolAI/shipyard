@@ -123,6 +123,22 @@ export function useSpeechToText(): UseSpeechToTextReturn {
       return;
     }
 
+    // Prevent double-start
+    if (stateRef.current === 'recording') {
+      return;
+    }
+
+    // Clean up any existing recognition instance (iOS Safari silent failure fix)
+    // Safari can silently fail if you don't fully destroy between sessions
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.abort();
+      } catch {
+        // Ignore errors from aborting already-stopped recognition
+      }
+      recognitionRef.current = null;
+    }
+
     setError(null);
     setTranscript('');
     setPartialTranscript('');
@@ -140,7 +156,11 @@ export function useSpeechToText(): UseSpeechToTextReturn {
     const recognition = new SpeechRecognitionClass();
     recognitionRef.current = recognition;
 
-    recognition.continuous = true;
+    // Disable continuous on iOS Safari - it's buggy and causes never-ending recognition
+    // Let onend handler restart if needed
+    const isIOSSafari =
+      /iPad|iPhone|iPod/.test(navigator.userAgent) && !/CriOS|FxiOS/.test(navigator.userAgent);
+    recognition.continuous = !isIOSSafari;
     recognition.interimResults = true;
     recognition.lang = 'en-US';
 
