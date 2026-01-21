@@ -248,10 +248,18 @@ export class InputRequestManager {
 
         resolved = true;
         cleanup();
+
+        const minutes = Math.floor(effectiveTimeout / 60);
+        const seconds = effectiveTimeout % 60;
+        const timeStr =
+          minutes > 0
+            ? `${minutes} minute${minutes === 1 ? '' : 's'}${seconds > 0 ? ` ${seconds} second${seconds === 1 ? '' : 's'}` : ''}`
+            : `${seconds} second${seconds === 1 ? '' : 's'}`;
+
         resolve({
           success: false,
           status: 'cancelled',
-          reason: `Timeout after ${effectiveTimeout} seconds`,
+          reason: `Request timed out after ${timeStr}. The user likely didn't see the request in time. Please try again.`,
         });
       };
 

@@ -27,7 +27,7 @@ const RequestUserInputInput = z.object({
     .optional()
     .describe("For 'choice' type - allow selecting multiple options"),
   defaultValue: z.string().optional().describe('Pre-filled value for text/multiline inputs'),
-  timeout: z.number().optional().describe('Timeout in seconds (default: 300, min: 10, max: 600)'),
+  timeout: z.number().optional().describe('Timeout in seconds (default: 300, min: 10, max: 900)'),
   planId: z
     .string()
     .optional()
@@ -90,7 +90,7 @@ NOTE: This is also available as requestUserInput() inside execute_code for multi
         },
         timeout: {
           type: 'number',
-          description: 'Timeout in seconds (default: 300, min: 10, max: 600)',
+          description: 'Timeout in seconds (default: 300, min: 10, max: 900)',
         },
         planId: {
           type: 'string',

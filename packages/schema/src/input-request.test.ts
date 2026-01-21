@@ -64,19 +64,19 @@ describe('InputRequestSchema validation', () => {
       }
     });
 
-    it('should reject timeouts exceeding 600 seconds (10 minutes)', () => {
+    it('should reject timeouts exceeding 900 seconds (15 minutes)', () => {
       const result = InputRequestSchema.safeParse({
         id: 'test-id',
         createdAt: Date.now(),
         message: 'Test',
         type: 'text',
         status: 'pending',
-        timeout: 700,
+        timeout: 1000,
       });
 
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect(result.error.issues[0]?.message).toBe('Timeout cannot exceed 10 minutes');
+        expect(result.error.issues[0]?.message).toBe('Timeout cannot exceed 15 minutes');
       }
     });
 
@@ -142,7 +142,7 @@ describe('createInputRequest', () => {
 
   it('should throw error for timeout exceeding max', () => {
     expect(() => {
-      createInputRequest({ message: 'Test', type: 'text', timeout: 700 });
+      createInputRequest({ message: 'Test', type: 'text', timeout: 1000 });
     }).toThrow();
   });
 

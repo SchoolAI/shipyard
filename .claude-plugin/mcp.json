@@ -2,7 +2,7 @@
   "mcpServers": {
     "shipyard": {
       "command": "npx",
-      "args": ["-y", "@schoolai/shipyard-mcp@next", "mcp-server-shipyard"],
+      "args": ["-y", "@schoolai/shipyard-mcp@latest", "mcp-server-shipyard"],
       "env": {
         "NODE_ENV": "production"
       }
