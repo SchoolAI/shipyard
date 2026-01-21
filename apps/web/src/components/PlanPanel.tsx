@@ -58,21 +58,19 @@ function MobileBottomDrawer({
       // Only drag from handle, allow content scrolling
       handleOnly
     >
-      <Drawer.Portal>
-        <Drawer.Overlay className="fixed inset-0 z-40 bg-black/40" />
-        <Drawer.Content
-          className="fixed bottom-0 left-0 right-0 z-50 flex flex-col rounded-t-2xl bg-background outline-none"
-          style={{ height: `${EXPANDED_SNAP * 100}vh` }}
-          aria-label="Task details panel"
-        >
-          {/* Drag handle - only this area triggers drag gestures */}
-          <Drawer.Handle className="mx-auto mt-3 mb-2 h-1.5 w-12 shrink-0 rounded-full bg-muted-foreground/30" />
-          {/* Scrollable content area */}
-          <div className="flex-1 overflow-y-auto overflow-x-hidden flex flex-col pb-safe overscroll-contain">
-            {children}
-          </div>
-        </Drawer.Content>
-      </Drawer.Portal>
+      <Drawer.Overlay className="fixed inset-0 z-40 bg-black/40" />
+      <Drawer.Content
+        className="fixed bottom-0 left-0 right-0 z-50 flex flex-col rounded-t-2xl bg-background outline-none"
+        style={{ height: `${EXPANDED_SNAP * 100}vh` }}
+        aria-label="Task details panel"
+      >
+        {/* Drag handle - only this area triggers drag gestures */}
+        <Drawer.Handle className="mx-auto mt-3 mb-2 h-1.5 w-12 shrink-0 rounded-full bg-muted-foreground/30" />
+        {/* Scrollable content area */}
+        <div className="flex-1 overflow-y-auto overflow-x-hidden flex flex-col pb-safe overscroll-contain">
+          {children}
+        </div>
+      </Drawer.Content>
     </Drawer.Root>
   );
 }
