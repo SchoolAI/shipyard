@@ -34,16 +34,41 @@ pnpm dev:web
 
 Opens on `http://localhost:5173`
 
-### 2. Add MCP Server to Claude Code
+### 2. Add MCP Server for Local Development
+
+The plugin's `.mcp.json` uses `npx @schoolai/shipyard-mcp` for end users. For local development, you need to add `shipyard-dev` to your user config:
 
 ```bash
-claude mcp add --transport stdio Shipyard \
-  -- node "/Users/jacobpetterle/Working Directory/Shipyard/apps/server/dist/index.mjs"
+# Run the setup script (adds shipyard-dev to ~/.claude.json)
+./scripts/setup-dev-mcp.sh
 ```
+
+Or manually add to `~/.claude.json`:
+```json
+{
+  "mcpServers": {
+    "shipyard-dev": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["/path/to/shipyard/apps/server/dist/index.js"],
+      "env": {
+        "NODE_ENV": "development",
+        "LOG_LEVEL": "debug"
+      }
+    }
+  }
+}
+```
+
+**Why separate configs?**
+- Plugin users get `.mcp.json` with npx (no build required)
+- Developers get `shipyard-dev` in `~/.claude.json` (uses local build)
 
 Verify it was added:
 ```bash
-claude mcp list
+# Restart Claude Code, then:
+/mcp
+# Should see shipyard-dev listed
 ```
 
 ### 3. Test It
