@@ -522,21 +522,26 @@ export async function waitForApprovalHandler(
 
   const metadata = ydoc.getMap<PlanMetadata>(YDOC_KEYS.METADATA);
 
-  // Generate unique review request ID to prevent stale decisions
-  const reviewRequestId = nanoid();
-
-  // Set reviewRequestId and status on Y.Doc using type-safe transition
-  // CRITICAL: Only transition if status is not already 'pending_review'
-  // This prevents race condition where two hooks overwrite each other's reviewRequestId
+  // Get current plan metadata to check status
   const planMetadata = getPlanMetadata(ydoc);
   const ownerId = planMetadata?.ownerId ?? 'unknown';
 
-  if (planMetadata?.status === 'pending_review') {
-    ctx.logger.warn(
-      { planId, currentStatus: planMetadata.status },
-      'Status already pending_review, another hook may be waiting. Skipping reviewRequestId update.'
+  // Determine reviewRequestId: reuse existing if status is already pending_review,
+  // otherwise generate a new one. This fixes the race condition where a retry
+  // would create a new ID that doesn't match what's in Y.Doc.
+  let reviewRequestId: string;
+
+  if (planMetadata?.status === 'pending_review' && planMetadata.reviewRequestId) {
+    // Reuse the existing reviewRequestId from Y.Doc to match what's already there
+    reviewRequestId = planMetadata.reviewRequestId;
+    ctx.logger.info(
+      { planId, currentStatus: planMetadata.status, reviewRequestId },
+      'Status already pending_review, reusing existing reviewRequestId for observer'
     );
   } else {
+    // Generate new reviewRequestId and transition to pending_review
+    reviewRequestId = nanoid();
+
     const result = transitionPlanStatus(
       ydoc,
       {
@@ -931,21 +936,25 @@ function extractFeedbackFromYDoc(ydoc: Y.Doc, ctx: HookContext): string | undefi
     }
 
     // Get plan content from Y.Doc for context
+    // NOTE: XmlFragment.toJSON() returns XML structure, not BlockNote blocks array.
+    // We need to safely handle this - if it's not an array, skip plan text extraction.
     const contentFragment = ydoc.getXmlFragment(YDOC_KEYS.DOCUMENT_FRAGMENT);
-    const blocks = contentFragment.toJSON() as unknown as Array<{
-      content?: Array<{ text?: string }>;
-    }>;
+    const fragmentJson = contentFragment.toJSON();
 
-    // Simple text extraction from BlockNote blocks
-    const planText = blocks
-      .map((block) => {
-        if (!block.content || !Array.isArray(block.content)) return '';
-        return block.content
-          .map((item) => (typeof item === 'object' && item && 'text' in item ? item.text : ''))
-          .join('');
-      })
-      .filter(Boolean)
-      .join('\n');
+    // Simple text extraction from BlockNote blocks (if available)
+    let planText = '';
+    if (Array.isArray(fragmentJson)) {
+      const blocks = fragmentJson as Array<{ content?: Array<{ text?: string }> }>;
+      planText = blocks
+        .map((block) => {
+          if (!block.content || !Array.isArray(block.content)) return '';
+          return block.content
+            .map((item) => (typeof item === 'object' && item && 'text' in item ? item.text : ''))
+            .join('');
+        })
+        .filter(Boolean)
+        .join('\n');
+    }
 
     // Format threads using shared formatter with user name resolution
     const resolveUser = createUserResolver(ydoc);
