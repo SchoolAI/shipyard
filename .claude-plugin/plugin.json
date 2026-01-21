@@ -20,7 +20,7 @@
     "crdt",
     "p2p"
   ],
-  "skills": "../skills/",
-  "hooks": "../hooks/hooks.json",
-  "mcpServers": "../.mcp.json"
+  "skills": "./skills/",
+  "hooks": "./hooks/hooks.json",
+  "mcpServers": "./.mcp.json"
 }
