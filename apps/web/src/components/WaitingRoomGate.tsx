@@ -4,6 +4,7 @@ import { Clock, Loader2, LogIn, ShieldX, TicketX, User } from 'lucide-react';
 import type { ReactNode } from 'react';
 import type { WebrtcProvider } from 'y-webrtc';
 import type * as Y from 'yjs';
+import { useBroadcastApprovalStatus } from '@/hooks/useBroadcastApprovalStatus';
 import type { GitHubIdentity } from '@/hooks/useGitHubAuth';
 import { useInviteToken } from '@/hooks/useInviteToken';
 import type { SyncState } from '@/hooks/useMultiProviderSync';
@@ -37,6 +38,7 @@ interface WaitingRoomGateProps {
  * Also handles invite token redemption - users with valid invite tokens
  * are auto-approved without manual owner approval.
  */
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Component handles multiple auth/invite/approval states - can't simplify further
 export function WaitingRoomGate({
   ydoc,
   syncState,
@@ -47,10 +49,23 @@ export function WaitingRoomGate({
   children,
 }: WaitingRoomGateProps) {
   // Read approval status directly from Y.Doc CRDT
-  const { isPending, isRejected, requiresApproval, ownerId } = useYDocApprovalStatus(
-    ydoc,
-    githubIdentity?.username ?? null
-  );
+  const {
+    status: approvalStatus,
+    isPending,
+    isRejected,
+    requiresApproval,
+    ownerId,
+  } = useYDocApprovalStatus(ydoc, githubIdentity?.username ?? null);
+
+  // Broadcast approval status to WebRTC awareness so owners can see pending users
+  // This enables the ApprovalPanel to show the list of users waiting for access
+  const isOwner = !!(githubIdentity && ownerId && githubIdentity.username === ownerId);
+  useBroadcastApprovalStatus({
+    rtcProvider,
+    githubIdentity,
+    approvalStatus,
+    isOwner,
+  });
 
   const { redemptionState, hasInviteToken, clearInviteToken } = useInviteToken(
     metadata.id,
