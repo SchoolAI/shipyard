@@ -1,187 +1,450 @@
-# Shipyard Installation Guide
+# Installation Guide
 
-Complete installation instructions for all AI platforms.
+How to install Shipyard MCP server across different LLM clients and IDEs.
 
 ---
 
-## Claude Code (Recommended)
+## Quick Start
 
-**Method:** GitHub plugin (two-step install)
-
+**For Claude Code users (recommended):**
 ```bash
-# Step 1: Add the Shipyard marketplace
-/plugin marketplace add SchoolAI/shipyard
-
-# Step 2: Install the plugin from the marketplace
-/plugin install shipyard@schoolai-shipyard
+/plugin install SchoolAI/shipyard
 ```
 
-> **Why two steps?** Claude Code uses a marketplace model (like app stores). You first register a marketplace (catalog of plugins), then install specific plugins from it. This is intentional design for security and control.
+**For other clients:** See client-specific instructions below.
 
-**Troubleshooting:** If Step 1 fails with a cache error (known bug #14696 with case-sensitive org names), try:
+---
+
+## Table of Contents
+
+1. [Claude Code](#1-claude-code)
+2. [Claude Desktop](#2-claude-desktop-app)
+3. [Cursor](#3-cursor)
+4. [Windsurf](#4-windsurf)
+5. [Zed Editor](#5-zed-editor)
+6. [Visual Studio Code](#6-visual-studio-code)
+7. [JetBrains IDEs](#7-jetbrains-ides)
+
+---
+
+## 1. Claude Code
+
+Claude Code offers the most comprehensive Shipyard experience with plugin support for hooks and skills.
+
+### Method 1: Plugin Install (Recommended)
+
+Installs the full plugin including MCP server, hooks, and skills:
+
 ```bash
-/plugin marketplace add https://github.com/SchoolAI/shipyard.git
+/plugin install SchoolAI/shipyard
 ```
-If that stalls, start a fresh Claude Code session and retry.
-
-**Enable auto-updates:** After installing, run `/plugin` → Marketplaces tab → select `schoolai-shipyard` → "Enable auto-update" to receive updates automatically.
 
 **What you get:**
-- ✅ MCP server with all tools (`create_plan`, `read_plan`, `add_artifact`, etc.)
-- ✅ Automatic hooks (plan creation on `ExitPlanMode`, session tracking)
-- ✅ Skills for collaborative planning workflows
+- ✅ MCP server with plan creation and artifact tools
+- ✅ Hooks (auto-formatting, git workflows)
+- ✅ Skills (planning workflows)
+- ✅ Auto-updates when you pull new versions
+
+**To update:**
+```bash
+/plugin update shipyard
+```
 
 **Verification:**
+```bash
+/plugin list              # Should show "shipyard"
+/shipyard                 # Access Shipyard skills
+```
+
+### Method 2: Direct MCP Configuration
+
+Install just the MCP server without hooks/skills:
+
+**Option A: Command-line**
+```bash
+claude mcp add --transport stdio shipyard -- npx -y @schoolai/shipyard-mcp@latest mcp-server-shipyard
+```
+
+**Option B: JSON config (`.mcp.json` in your project root)**
+```json
+{
+  "mcpServers": {
+    "shipyard": {
+      "command": "npx",
+      "args": ["-y", "@schoolai/shipyard-mcp@latest", "mcp-server-shipyard"],
+      "env": {
+        "NODE_ENV": "production"
+      }
+    }
+  }
+}
+```
+
+**What you get:**
+- ✅ MCP server tools
+- ❌ No hooks
+- ❌ No skills
+
+**When to use:**
+- You only need the MCP tools
+- You want project-specific configuration
+- You're testing different versions
+
+---
+
+## 2. Claude Desktop App
+
+Claude Desktop supports MCP servers only (no plugin hooks/skills).
+
+### Method 1: One-Click Extensions (Easiest)
+
+1. Open Claude Desktop
+2. Go to **Settings** → **Extensions** → **Browse extensions**
+3. Search for "Shipyard" (when published to Anthropic marketplace)
+4. Click **"Install"**
+
+### Method 2: Manual Configuration
+
+**macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
+
+**Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
+
+**Linux:** `~/.config/claude/claude_desktop_config.json`
+
+Add to your config:
+
+```json
+{
+  "mcpServers": {
+    "shipyard": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@schoolai/shipyard-mcp@latest",
+        "mcp-server-shipyard"
+      ],
+      "env": {
+        "NODE_ENV": "production"
+      }
+    }
+  }
+}
+```
+
+**Restart Claude Desktop** to load changes.
+
+**What you get:**
+- ✅ MCP server tools (create plans, add artifacts)
+- ❌ No hooks or skills
+
+---
+
+## 3. Cursor
+
+Cursor supports MCP via CLI commands or JSON configuration.
+
+### Method 1: CLI (Recommended)
 
 ```bash
-# Check plugin installed
-/plugin list
-
-# Check skills available
-/shipyard
-
-# Create a test plan
-[Enter plan mode with Shift+Tab, write plan, exit]
-# Hook should trigger, browser should open
+agent mcp add shipyard npx -y @schoolai/shipyard-mcp@latest mcp-server-shipyard
 ```
 
----
+**Manage servers:**
+```bash
+agent mcp list              # List all servers
+agent mcp enable shipyard   # Enable server
+agent mcp disable shipyard  # Disable server
+```
 
-## Other Platforms (MCP Server Only)
+### Method 2: JSON Configuration
 
-For platforms that don't support hooks (Cursor, Windsurf, Replit, Copilot, etc.), install the MCP server via npm.
+**Global (recommended):** `~/.cursor/mcp.json`
 
-### Cursor
-
-**Configuration:** `~/.cursor/mcp.json`
+**Project:** `.cursor/mcp.json` (may not work reliably)
 
 ```json
 {
   "mcpServers": {
     "shipyard": {
       "command": "npx",
-      "args": ["-y", "-p", "@schoolai/shipyard-mcp", "mcp-server-shipyard"]
-    }
-  }
-}
-```
-
-**Verification:**
-
-1. Restart Cursor
-2. Open MCP panel
-3. Check "shipyard" server is connected
-4. Test tool availability (MCP tools should show `create_plan`, etc.)
-
-### Windsurf
-
-**Configuration:** `~/.windsurf/settings.json`
-
-```json
-{
-  "mcp.servers": {
-    "shipyard": {
-      "command": "npx @schoolai/shipyard-mcp mcp-server-shipyard"
-    }
-  }
-}
-```
-
-**Note:** Windsurf has a 100-tool limit - Shipyard uses ~10 tools.
-
-### Replit Agent
-
-**Configuration:** `.replit.mcp.json` in your project
-
-```json
-{
-  "mcpServers": {
-    "shipyard": {
-      "command": "npx",
-      "args": ["@schoolai/shipyard-mcp", "mcp-server-shipyard"]
-    }
-  }
-}
-```
-
-### GitHub Copilot
-
-**Configuration:** VS Code settings (`settings.json`)
-
-```json
-{
-  "github.copilot.chat.mcp.servers": {
-    "shipyard": {
-      "command": "npx",
-      "args": ["@schoolai/shipyard-mcp", "mcp-server-shipyard"]
-    }
-  }
-}
-```
-
-### Gemini Code Assist
-
-**Configuration:** Gemini settings
-
-```json
-{
-  "mcp": {
-    "servers": {
-      "shipyard": {
-        "command": "npx @schoolai/shipyard-mcp mcp-server-shipyard"
-      }
-    }
-  }
-}
-```
-
----
-
-## Environment Variables
-
-All platforms support environment variables in MCP configuration:
-
-```json
-{
-  "mcpServers": {
-    "shipyard": {
-      "command": "npx",
-      "args": ["@schoolai/shipyard-mcp", "mcp-server-shipyard"],
+      "args": ["-y", "@schoolai/shipyard-mcp@latest", "mcp-server-shipyard"],
       "env": {
-        "GITHUB_TOKEN": "your-github-pat",
-        "SHIPYARD_WEB_URL": "https://your-shipyard-instance.github.io",
-        "LOG_LEVEL": "info"
+        "NODE_ENV": "production"
       }
     }
   }
 }
 ```
 
-### Available Variables
+**Restart Cursor** after changes.
 
-| Variable | Required | Default | Purpose |
-|----------|----------|---------|---------|
-| `GITHUB_TOKEN` | Optional | - | For artifact uploads (public repos work without it) |
-| `SHIPYARD_WEB_URL` | Optional | `http://localhost:5173` | URL to open plans in browser |
-| `LOG_LEVEL` | Optional | `info` | Logging level (debug, info, warn, error) |
-| `REGISTRY_PORT` | Optional | `32191` | Multi-instance coordination port |
-| `SHIPYARD_STATE_DIR` | Optional | `~/.shipyard` | Persistent storage location |
+**What you get:**
+- ✅ MCP tools available in Composer
+- ❌ No hooks or skills
+
+---
+
+## 4. Windsurf
+
+Windsurf integrates MCP through its Cascade AI assistant with a user-friendly marketplace.
+
+### Method 1: MCP Marketplace (Easiest)
+
+1. Open Cascade panel
+2. Click **MCP icon** in top-right menu
+3. Search for "Shipyard" (when published)
+4. Click **"Install"**
+
+### Method 2: Manual Configuration
+
+**Config file:** `~/.codeium/windsurf/mcp_config.json`
+
+```json
+{
+  "mcpServers": {
+    "shipyard": {
+      "command": "npx",
+      "args": ["-y", "@schoolai/shipyard-mcp@latest", "mcp-server-shipyard"],
+      "env": {
+        "NODE_ENV": "production"
+      }
+    }
+  }
+}
+```
+
+**Environment variable syntax:**
+```json
+{
+  "env": {
+    "GITHUB_TOKEN": "${env:GITHUB_TOKEN}"
+  }
+}
+```
+
+**What you get:**
+- ✅ MCP tools in Cascade
+- ❌ No hooks or skills
+
+---
+
+## 5. Zed Editor
+
+Zed provides both GUI and JSON-based MCP configuration.
+
+### Method 1: GUI (Recommended)
+
+1. Open **Agent Panel**
+2. Click **Settings** → **"Add Custom Server"**
+3. Configure via modal:
+   - Name: `shipyard`
+   - Command: `npx`
+   - Args: `-y @schoolai/shipyard-mcp@latest mcp-server-shipyard`
+
+### Method 2: JSON Configuration
+
+**Config file:** `~/.config/zed/settings.json` (macOS/Linux) or `%APPDATA%\Zed\settings.json` (Windows)
+
+Add to your settings:
+
+```json
+{
+  "context_servers": {
+    "shipyard": {
+      "command": "npx",
+      "args": ["-y", "@schoolai/shipyard-mcp@latest", "mcp-server-shipyard"],
+      "env": {
+        "NODE_ENV": "production"
+      }
+    }
+  }
+}
+```
+
+**Verification:** Green dot next to "shipyard" in Agent Panel settings means it's running.
+
+**What you get:**
+- ✅ MCP tools in Agent Panel
+- ❌ No hooks or skills
+
+---
+
+## 6. Visual Studio Code
+
+VS Code supports MCP through workspace or user configuration.
+
+### Method 1: Extensions View (Easiest)
+
+1. Open **Extensions** sidebar
+2. Search `@mcp` or "Shipyard"
+3. Click **"Install"** (when published to VS Code marketplace)
+
+### Method 2: Command Palette
+
+1. Press **Ctrl+Shift+P** / **Cmd+Shift+P**
+2. Run **"MCP: Add Server"**
+3. Follow prompts
+
+### Method 3: JSON Configuration
+
+**Workspace:** `.vscode/mcp.json` (checked into git)
+
+```json
+{
+  "servers": {
+    "shipyard": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@schoolai/shipyard-mcp@latest", "mcp-server-shipyard"],
+      "env": {
+        "NODE_ENV": "production"
+      }
+    }
+  }
+}
+```
+
+**Reload VS Code** or run **"MCP: Restart Server"** from Command Palette.
+
+**What you get:**
+- ✅ MCP tools in Copilot/assistant
+- ❌ No hooks or skills
+
+---
+
+## 7. JetBrains IDEs
+
+JetBrains IDEs (IntelliJ IDEA, PyCharm, WebStorm, etc.) have built-in MCP support since version 2025.2.
+
+### Configuration
+
+1. Go to **Settings** → **Tools** → **AI Assistant** → **Model Context Protocol (MCP)**
+2. Click **"Add"** to add Shipyard MCP server
+3. Configure:
+   - **Command:** `npx`
+   - **Args:** `-y @schoolai/shipyard-mcp@latest mcp-server-shipyard`
+
+### Legacy Plugin (Pre-2025.2)
+
+For older IDE versions:
+1. **Settings** → **Plugins**
+2. Search **"MCP Server"**
+3. Install and restart
+4. Add JSON configuration
+
+**What you get:**
+- ✅ MCP tools in AI Assistant
+- ❌ No hooks or skills
+
+---
+
+## Feature Comparison
+
+| Client | MCP Server | Hooks | Skills | Auto-Update | Best For |
+|--------|------------|-------|--------|-------------|----------|
+| **Claude Code (plugin)** | ✅ | ✅ | ✅ | ✅ | Full Shipyard experience |
+| **Claude Code (MCP only)** | ✅ | ❌ | ❌ | ❌ | Testing specific versions |
+| **Claude Desktop** | ✅ | ❌ | ❌ | ❌ | Desktop chat with Shipyard |
+| **Cursor** | ✅ | ❌ | ❌ | ❌ | Composer integration |
+| **Windsurf** | ✅ | ❌ | ❌ | ❌ | Cascade AI integration |
+| **Zed** | ✅ | ❌ | ❌ | ❌ | Lightweight editor |
+| **VS Code** | ✅ | ❌ | ❌ | ❌ | Copilot integration |
+| **JetBrains** | ✅ | ❌ | ❌ | ❌ | IntelliJ/PyCharm/etc |
+
+**Recommendation:** Use Claude Code with plugin install for the full experience (hooks + skills + MCP).
+
+---
+
+## Configuration Options
+
+All clients support these environment variables in MCP config:
+
+```json
+{
+  "env": {
+    "NODE_ENV": "production",
+    "GITHUB_TOKEN": "${GITHUB_TOKEN}",
+    "LOG_LEVEL": "info"
+  }
+}
+```
+
+**Available environment variables:**
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `NODE_ENV` | `development` | Set to `production` for stable behavior |
+| `GITHUB_TOKEN` | (none) | GitHub PAT for artifact uploads |
+| `LOG_LEVEL` | `info` | Logging verbosity: `debug`, `info`, `warn`, `error` |
+| `SHIPYARD_WEB_URL` | `http://localhost:5173` | URL to open plans in browser |
+| `REGISTRY_PORT` | `32191` | Multi-instance coordination port |
+
+---
+
+## Version Management
+
+### Install Specific Version
+
+**Latest stable:**
+```json
+"args": ["-y", "@schoolai/shipyard-mcp@latest", "mcp-server-shipyard"]
+```
+
+**Next (RC):**
+```json
+"args": ["-y", "@schoolai/shipyard-mcp@next", "mcp-server-shipyard"]
+```
+
+**Specific version:**
+```json
+"args": ["-y", "@schoolai/shipyard-mcp@0.2.0", "mcp-server-shipyard"]
+```
+
+### Check Installed Version
+
+```bash
+npm view @schoolai/shipyard-mcp version        # Latest stable
+npm view @schoolai/shipyard-mcp@next version   # Latest RC
+```
 
 ---
 
 ## Troubleshooting
 
-### MCP Server Won't Start
+### "Command not found: npx"
 
-**Error:** `Cannot find module '@shipyard/schema'`
-- **Cause:** Workspace dependencies not bundled (should not happen with v0.1.0+)
-- **Fix:** Update to latest version: `npx @schoolai/shipyard-mcp@latest mcp-server-shipyard`
+Install Node.js from https://nodejs.org/ (LTS recommended, minimum v22)
 
-**Error:** `EADDRINUSE` (port already in use)
-- **Cause:** Another Shipyard instance running
-- **Fix:** Stop other instances or set different `REGISTRY_PORT` in env vars
+### "MCP server failed to start"
 
-### Browser Won't Open
+1. Check Node.js version: `node --version` (need v22+)
+2. Clear npm cache: `npx clear-npx-cache`
+3. Try explicit version: `@schoolai/shipyard-mcp@0.1.0`
+
+### "Permission denied"
+
+Ensure npm global installs work:
+```bash
+npm config set prefix ~/.npm-global
+export PATH=~/.npm-global/bin:$PATH
+```
+
+### Server not appearing
+
+1. Restart the client/IDE
+2. Check config file syntax (valid JSON)
+3. Verify config file location is correct for your platform
+
+### Claude Code plugin not found
+
+The plugin install command should be:
+```bash
+/plugin install SchoolAI/shipyard
+```
+
+Not from a marketplace - it installs directly from the GitHub repository.
+
+### Browser won't open
 
 **Issue:** Plan created but no browser launched
 
@@ -189,142 +452,50 @@ All platforms support environment variables in MCP configuration:
 - **Check:** Browser is installed and accessible
 - **Manual:** Copy the URL from MCP tool response and open manually
 
-### Artifacts Won't Upload
-
-**Error:** `GitHub API rate limit exceeded`
-- **Solution:** Add `GITHUB_TOKEN` to env vars (increases limit to 5000/hour)
+### Artifacts won't upload
 
 **Error:** `403 Forbidden` on artifact upload
 - **Cause:** No write permissions to repo
-- **Fix:** Ensure `GITHUB_TOKEN` has `repo` scope
+- **Fix:** Add `GITHUB_TOKEN` to env vars with `repo` scope
 
-### Sync Issues
+---
 
-**Issue:** Changes not syncing between peers
+## Uninstallation
 
-1. **Check registry server:** Should see "Connected to registry hub" in logs
-2. **Check WebRTC:** Browser should show "X P2P peers connected"
-3. **Check signaling:** Default is `ws://localhost:4444` - ensure signaling server is running
+### Claude Code (plugin)
 
-**Manual test:**
 ```bash
-# Start signaling server
-pnpm dev --filter @shipyard/signaling
-
-# Then start MCP server
-pnpm dev --filter @shipyard/server
+/plugin uninstall shipyard
 ```
 
----
+### Claude Code (MCP only)
 
-## Platform Compatibility Matrix
+```bash
+claude mcp remove shipyard
+```
 
-### Feature Support Overview
+### Other Clients
 
-| Platform | MCP Support | Plan Mode | Hooks/Events | Artifact Upload | Real-time Sync | P2P Collaboration | Status |
-|----------|------------|-----------|--------------|-----------------|----------------|-------------------|--------|
-| **Claude Code** | ✅ Full | ✅ Native | ✅ 8 events | ✅ Full | ✅ Full | ✅ Full | ✅ Production |
-| **OpenCode** | ✅ Full | ✅ Native (Tab) | ⚠️ Unknown | ✅ Via MCP | ✅ Full | ✅ Full | ⚠️ Testing needed |
-| **Cursor** | ✅ Full | ❌ No | ⚠️ Limited | ✅ Via MCP | ✅ Full | ✅ Full | ⚠️ Manual workflow |
-| **Windsurf** | ✅ Full | ❌ No | ⚠️ Limited | ✅ Via MCP | ✅ Full | ✅ Full | ⚠️ Testing needed |
-| **Devin** | ✅ Full | ❌ No | ❌ None | ✅ Via MCP | ✅ Full | ⚠️ API-only | ⚠️ Manual session |
-| **Replit Agent** | ✅ Full | ❌ No | ❌ None | ✅ Via MCP | ✅ Full | ✅ Full | ⚠️ Basic MCP only |
-| **GitHub Copilot** | ✅ Full | ❌ No | ❌ None | ✅ Via MCP | ✅ Full | ✅ Full | ⚠️ Basic MCP only |
-| **Gemini Code Assist** | ✅ Full | ❌ No | ❌ None | ✅ Via MCP | ✅ Full | ✅ Full | ⚠️ Basic MCP only |
-| **Codex (OpenAI)** | ❓ Unknown | ❓ Unknown | ❌ None | ❓ Unknown | ❓ Unknown | ❓ Unknown | ❓ Research needed |
-
-### Platform Details
-
-#### Claude Code (✅ Full Support)
-- **Installation:** GitHub plugin via `/plugin install SchoolAI/shipyard`
-- **Plan Mode:** Native integration with EnterPlanMode/ExitPlanMode hooks
-- **Hooks:** 8 event types (SessionStart, EnterPlanMode, Write, ExitPlanMode, etc.)
-- **Session Tracking:** Automatic with session_id + transcript_path
-- **Workflow:** Fully automatic - Shift+Tab creates plans, browser opens, approval flow
-- **Auto-update:** Built-in via plugin system
-
-#### OpenCode (⚠️ Testing Needed)
-- **Installation:** npm + config (`~/.config/opencode/opencode.json`)
-- **Plan Mode:** Native Tab-toggle plan mode
-- **Hooks:** Unknown - needs investigation if OpenCode exposes plan mode events
-- **Session Tracking:** TBD
-- **Workflow:** Manual - use MCP tools directly
-- **Status:** MCP server works, but plan mode integration needs testing (see issue #26)
-
-#### Cursor (⚠️ Manual Workflow)
-- **Installation:** npm + manual JSON config (`~/.cursor/mcp.json`)
-- **Hooks:** Limited - `beforeMCPExecution` hook available for session capture
-- **Session Tracking:** Manual - conversation_id + generation_id
-- **Workflow:** Manual - user must call `create_plan` MCP tool explicitly
-- **Limitation:** No automatic plan creation on approval workflow
-
-#### Windsurf (⚠️ Testing Needed)
-- **Installation:** npm + manual JSON config (`~/.windsurf/settings.json`)
-- **Hooks:** Limited - `pre_mcp_tool_use` hook (payload structure unknown)
-- **Session Tracking:** Not implemented
-- **Workflow:** Manual - use MCP tools directly
-- **Limitation:** 100-tool limit per config (Shipyard uses ~11 tools)
-
-#### Devin (⚠️ Manual Session)
-- **Installation:** npm only
-- **Hooks:** None
-- **Session Tracking:** Manual - user must provide session_id
-- **Workflow:** Manual - use MCP tools directly
-- **Limitation:** API-only instances cannot join P2P WebRTC mesh
-
-#### Replit Agent, GitHub Copilot, Gemini Code Assist (⚠️ Basic MCP Only)
-- **Installation:** npm + platform-specific config
-- **Hooks:** None
-- **Session Tracking:** None
-- **Workflow:** Manual - use MCP tools directly
-- **Status:** Basic functionality works, but no automatic workflows
-
-#### Codex / OpenAI (❓ Research Needed)
-- **Status:** Unknown - needs research and testing (see issue #104)
-- **Expected:** Likely similar to GitHub Copilot integration
-- **Priority:** P1 - feature completeness assessment in progress
-
-### Installation Methods Summary
-
-| Platform | Config File | Command | Auto-update |
-|----------|-------------|---------|-------------|
-| Claude Code | Plugin system | `/plugin install SchoolAI/shipyard` | ✅ Built-in |
-| OpenCode | `~/.config/opencode/opencode.json` | Manual JSON edit | ❌ Manual |
-| Cursor | `~/.cursor/mcp.json` | Manual JSON edit | ❌ Manual |
-| Windsurf | `~/.windsurf/settings.json` | Manual JSON edit | ❌ Manual |
-| Replit Agent | `.replit.mcp.json` | Per-project config | ❌ Manual |
-| GitHub Copilot | VS Code `settings.json` | Manual JSON edit | ❌ Manual |
-| Gemini Code Assist | Platform settings | Manual JSON edit | ❌ Manual |
-
-### Key Takeaways
-
-**✅ Full Experience (Claude Code only):**
-- Automatic plan creation via hooks
-- Approval workflow with blocking
-- Skills for specialized tasks
-- Built-in auto-update
-
-**⚠️ MCP Tools Only (Other Platforms):**
-- All MCP tools work (`create_plan`, `add_artifact`, etc.)
-- Manual workflow - user must explicitly invoke tools
-- No automatic plan creation or approval blocking
-- Real-time sync and P2P collaboration still work
-- Requires manual npm package updates
-
-**Recommended Platform:** Claude Code for best experience. Other platforms work but require manual MCP tool invocation.
+Remove the `shipyard` entry from your MCP config file and restart the client.
 
 ---
 
-## Next Steps
+## Platform-Specific Notes
 
-After installation:
+### macOS
+- Use `~` for home directory in all configs
+- Standard location: `~/Library/Application Support/`
+- Verify Node.js installed via Homebrew: `brew install node@22`
 
-1. **Try creating a plan** — Ask your AI assistant to create an implementation plan
-2. **Review in browser** — Plan should open automatically
-3. **Invite collaborators** — Share the URL for P2P review
-4. **Add artifacts** — Screenshot your work and attach to deliverables
+### Windows
+- Use `%APPDATA%` or full path: `C:\Users\Username\AppData\Roaming`
+- Backslashes require escaping in JSON: `"C:\\Users\\..."`
+- WSL: Follow Linux conventions
 
-For comprehensive usage docs, see [docs/milestones/](./milestones/) for detailed workflows.
+### Linux
+- Use `~/.config/` for user configs
+- System-wide: `/etc/` (requires sudo)
+- Verify npm global path: `npm config get prefix`
 
 ---
 
@@ -332,7 +503,7 @@ For comprehensive usage docs, see [docs/milestones/](./milestones/) for detailed
 
 - **Issues:** https://github.com/SchoolAI/shipyard/issues
 - **Discussions:** https://github.com/SchoolAI/shipyard/discussions
-- **Documentation:** [docs/](./docs/)
+- **Documentation:** [docs/](../README.md)
 
 ---
 
