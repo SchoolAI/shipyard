@@ -37,7 +37,26 @@ jobs:
           # Copy package-npm.json to package.json for publishing
           cp package-npm.json package.json
 
+          # Update version from git tag (strip 'v' prefix)
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          npm version "$TAG_VERSION" --no-git-tag-version --allow-same-version
+
+      - name: Determine npm tag
+        id: npm-tag
+        run: |
+          # Extract version from git tag
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+
+          # Check if it's a prerelease (contains -, like rc, alpha, beta)
+          if [[ "$TAG_VERSION" == *"-"* ]]; then
+            echo "tag=next" >> $GITHUB_OUTPUT
+            echo "Publishing as prerelease with 'next' tag"
+          else
+            echo "tag=latest" >> $GITHUB_OUTPUT
+            echo "Publishing as stable with 'latest' tag"
+          fi
+
       - name: Publish to npm
-        run: npm publish --access public --provenance
+        run: npm publish --access public --provenance --tag ${{ steps.npm-tag.outputs.tag }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

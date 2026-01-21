@@ -1,0 +1,91 @@
+name: Promote RC to Stable
+
+on:
+  workflow_dispatch:
+    inputs:
+      rc_version:
+        description: 'RC version to promote (e.g., 0.2.0-next.158)'
+        required: true
+        type: string
+      stable_version:
+        description: 'New stable version (e.g., 0.2.0)'
+        required: true
+        type: string
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Validate versions
+        run: |
+          RC_VERSION="${{ inputs.rc_version }}"
+          STABLE_VERSION="${{ inputs.stable_version }}"
+
+          # Extract base version from RC
+          BASE_VERSION=$(echo "$RC_VERSION" | sed 's/-next\..*//')
+
+          if [ "$BASE_VERSION" != "$STABLE_VERSION" ]; then
+            echo "Error: RC version base ($BASE_VERSION) doesn't match stable version ($STABLE_VERSION)"
+            exit 1
+          fi
+
+          echo "Promoting $RC_VERSION → $STABLE_VERSION"
+
+      - name: Promote to latest tag
+        run: |
+          npm dist-tag add @schoolai/shipyard-mcp@${{ inputs.rc_version }} latest
+          echo "✅ Promoted to latest tag"
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Update package-npm.json
+        run: |
+          # Update base version for future RCs
+          node -e "
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('./package-npm.json', 'utf8'));
+            pkg.version = '${{ inputs.stable_version }}';
+            fs.writeFileSync('package-npm.json', JSON.stringify(pkg, null, 2) + '\n');
+          "
+
+      - name: Create git tag and commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Commit version bump
+          git add package-npm.json
+          git commit -m "chore: release v${{ inputs.stable_version }}"
+
+          # Create tag
+          git tag "v${{ inputs.stable_version }}"
+
+          # Push
+          git push origin main
+          git push origin "v${{ inputs.stable_version }}"
+
+      - name: Create GitHub Release
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.repos.createRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag_name: 'v${{ inputs.stable_version }}',
+              name: 'v${{ inputs.stable_version }}',
+              body: 'Promoted from RC: `${{ inputs.rc_version }}`\n\nInstall with:\n```bash\nnpm install @schoolai/shipyard-mcp@latest\n# or\nnpx -y -p @schoolai/shipyard-mcp mcp-server-shipyard\n```',
+              draft: false,
+              prerelease: false
+            });
