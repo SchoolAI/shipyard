@@ -6,11 +6,17 @@ Complete installation instructions for all AI platforms.
 
 ## Claude Code (Recommended)
 
-**Method:** GitHub plugin (one-command install)
+**Method:** GitHub plugin (two-step install)
 
 ```bash
-/plugin install SchoolAI/shipyard
+# Step 1: Add the Shipyard marketplace
+/plugin marketplace add SchoolAI/shipyard
+
+# Step 2: Install the plugin from the marketplace
+/plugin install shipyard@schoolai-shipyard
 ```
+
+> **Why two steps?** Claude Code uses a marketplace model (like app stores). You first register a marketplace (catalog of plugins), then install specific plugins from it. This is intentional design for security and control.
 
 **What you get:**
 - ✅ MCP server with all tools (`create_plan`, `read_plan`, `add_artifact`, etc.)

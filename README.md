@@ -38,8 +38,14 @@ Shipyard solves this with P2P collaborative review and proof-of-work artifacts.
 Install the complete Shipyard plugin (MCP server + hooks + skills):
 
 ```bash
-/plugin install SchoolAI/shipyard
+# Step 1: Add the marketplace
+/plugin marketplace add SchoolAI/shipyard
+
+# Step 2: Install the plugin
+/plugin install shipyard@schoolai-shipyard
 ```
+
+> **Note:** Claude Code requires adding a marketplace before installing plugins from it. This is intentional design (similar to app stores).
 
 This gives you:
 - ✅ MCP tools for creating and managing plans
