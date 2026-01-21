@@ -1,15 +1,14 @@
 {
   "mcpServers": {
-    "shipyard": {
+    "shipyard-dev": {
       "type": "stdio",
-      "command": "npx",
+      "command": "node",
       "args": [
-        "-y",
-        "@schoolai/shipyard-mcp",
-        "mcp-server-shipyard"
+        "apps/server/dist/index.js"
       ],
       "env": {
-        "NODE_ENV": "production"
+        "NODE_ENV": "development",
+        "LOG_LEVEL": "debug"
       }
     },
     "heroui-react": {
@@ -22,20 +21,8 @@
     "playwright": {
       "command": "npx",
       "args": [
-        "@playwright/mcp@latest",
-        "--user-data-dir=/tmp/pw-79-distribute-shipyard"
+        "@playwright/mcp@latest"
       ]
-    },
-    "shipyard-dev": {
-      "type": "stdio",
-      "command": "node",
-      "args": [
-        "apps/server/dist/index.js"
-      ],
-      "env": {
-        "NODE_ENV": "development",
-        "LOG_LEVEL": "debug"
-      }
     }
   }
 }
