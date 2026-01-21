@@ -151,7 +151,10 @@ export function useSpeechToText(): UseSpeechToTextReturn {
     recognition.onresult = (event: SpeechRecognitionEvent) => {
       const { finalText, interimText } = processRecognitionResults(event);
       if (finalText) {
-        setTranscript((prev) => (prev ? `${prev} ${finalText}` : finalText));
+        setTranscript((prev) => {
+          const newTranscript = prev ? `${prev} ${finalText}` : finalText;
+          return newTranscript;
+        });
         setPartialTranscript('');
         partialTranscriptRef.current = '';
       } else {
@@ -204,16 +207,18 @@ export function useSpeechToText(): UseSpeechToTextReturn {
     // Use ref to avoid race conditions with nested setState calls
     const pendingPartial = partialTranscriptRef.current;
     if (pendingPartial) {
-      setTranscript((prev) => (prev ? `${prev} ${pendingPartial}` : pendingPartial));
+      setTranscript((prev) => {
+        const newTranscript = prev ? `${prev} ${pendingPartial}` : pendingPartial;
+        return newTranscript;
+      });
       setPartialTranscript('');
       partialTranscriptRef.current = '';
     }
 
-    // Use abort() for more immediate stop (doesn't wait for finalization)
-    // This is more reliable than stop() especially on mobile Safari
+    // Use stop() to allow finalization of results (abort() discards transcription)
+    // The ding sound on iOS indicates recognition is properly stopping
     if (recognitionRef.current) {
-      recognitionRef.current.abort();
-      recognitionRef.current = null;
+      recognitionRef.current.stop();
     }
     setState('ready');
   }, []);

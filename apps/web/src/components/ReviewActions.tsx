@@ -99,7 +99,10 @@ export function ReviewActions({
   };
 
   const handleTranscript = useCallback((text: string) => {
-    setComment((prev) => (prev ? `${prev} ${text}` : text));
+    setComment((prev) => {
+      const newComment = prev ? `${prev} ${text}` : text;
+      return newComment;
+    });
   }, []);
 
   // Validate state before review action
