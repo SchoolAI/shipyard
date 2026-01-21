@@ -127,6 +127,11 @@ export function useMultiProviderSync(
   const [wsProvider, setWsProvider] = useState<WebsocketProvider | null>(null);
 
   useEffect(() => {
+    // Skip all sync setup if docName is empty (e.g., for snapshots)
+    if (!docName) {
+      return;
+    }
+
     let mounted = true;
     let ws: WebsocketProvider | null = null;
     let rtc: WebrtcProvider | null = null;
@@ -298,7 +303,8 @@ export function useMultiProviderSync(
       // Cleanup WebRTC provider
       if (rtc) {
         // Clear awareness before destroying so other peers see us leave
-        rtc.awareness.setLocalState(null);
+        // Use optional chaining in case awareness failed to initialize
+        rtc.awareness?.setLocalState(null);
         rtc.disconnect();
         rtc.destroy();
         setRtcProvider(null);

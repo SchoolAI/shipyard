@@ -22,7 +22,6 @@ import {
   getDeliverables,
   getPlanIndexEntry,
   getPlanMetadata,
-  PLAN_INDEX_DOC_NAME,
   type PlanIndexEntry,
   type PlanMetadata,
   type PlanStatusType,
@@ -48,12 +47,13 @@ import { SignInModal } from '@/components/SignInModal';
 import { KanbanSkeleton } from '@/components/ui/KanbanSkeleton';
 import { KanbanCard } from '@/components/views/KanbanCard';
 import { KanbanColumn } from '@/components/views/KanbanColumn';
+import { getPlanRoute } from '@/constants/routes';
+import { usePlanIndexContext } from '@/contexts/PlanIndexContext';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
 import { type ColumnId, columnIdToStatus, useKanbanColumns } from '@/hooks/useKanbanColumns';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useLocalIdentity } from '@/hooks/useLocalIdentity';
 import { useMultiProviderSync } from '@/hooks/useMultiProviderSync';
-import { usePlanIndex } from '@/hooks/usePlanIndex';
 import { colorFromString } from '@/utils/color';
 import { formatRelativeTime } from '@/utils/formatters';
 import {
@@ -190,10 +190,15 @@ export function KanbanPage() {
   const { localIdentity, setLocalIdentity } = useLocalIdentity();
   const [showAuthChoice, setShowAuthChoice] = useState(false);
   const [showLocalSignIn, setShowLocalSignIn] = useState(false);
-  const { myPlans, sharedPlans, inboxPlans, isLoading, timedOut } = usePlanIndex(
-    githubIdentity?.username
-  );
-  const { ydoc: indexDoc } = useMultiProviderSync(PLAN_INDEX_DOC_NAME);
+  // Use shared plan index context to avoid duplicate WebRTC providers
+  const {
+    myPlans,
+    sharedPlans,
+    inboxPlans,
+    isLoading,
+    timedOut,
+    ydoc: indexDoc,
+  } = usePlanIndexContext();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -379,7 +384,7 @@ export function KanbanPage() {
     onFullScreen: useCallback(() => {
       if (selectedPlanId) {
         setSidebarCollapsed(true);
-        navigate(`/plan/${selectedPlanId}`);
+        navigate(getPlanRoute(selectedPlanId));
       }
     }, [selectedPlanId, navigate]),
     onClose: handleClosePanel,
@@ -436,7 +441,7 @@ export function KanbanPage() {
   const handleRequestChanges = useCallback(() => {
     if (!selectedPlanId) return;
     // Navigate to full plan page for adding comments
-    navigate(`/plan/${selectedPlanId}`);
+    navigate(getPlanRoute(selectedPlanId));
     toast.info('Navigate to add comments and request changes');
   }, [selectedPlanId, navigate]);
 
@@ -646,7 +651,7 @@ export function KanbanPage() {
               onFullScreen={() => {
                 if (selectedPlanId) {
                   setSidebarCollapsed(true);
-                  navigate(`/plan/${selectedPlanId}`);
+                  navigate(getPlanRoute(selectedPlanId));
                 }
               }}
               width={panelWidth}

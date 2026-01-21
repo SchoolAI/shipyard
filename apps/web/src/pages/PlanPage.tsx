@@ -9,7 +9,6 @@ import {
   getPlanMetadata,
   getPlanOwnerId,
   type InputRequest,
-  PLAN_INDEX_DOC_NAME,
   type PlanMetadata,
   setPlanIndexEntry,
   setPlanMetadata,
@@ -33,12 +32,12 @@ import { SignInModal } from '@/components/SignInModal';
 import { Drawer } from '@/components/ui/drawer';
 import { WaitingRoomGate } from '@/components/WaitingRoomGate';
 import { useActivePlanSync } from '@/contexts/ActivePlanSyncContext';
+import { usePlanIndexContext } from '@/contexts/PlanIndexContext';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { useLocalIdentity } from '@/hooks/useLocalIdentity';
 import { useMultiProviderSync } from '@/hooks/useMultiProviderSync';
 import { usePendingUserNotifications } from '@/hooks/usePendingUserNotifications';
-import { usePlanIndex } from '@/hooks/usePlanIndex';
 import { useVersionNavigation } from '@/hooks/useVersionNavigation';
 import { colorFromString } from '@/utils/color';
 
@@ -112,8 +111,8 @@ export function PlanPage() {
         }
       : null;
 
-  const { ydoc: indexDoc } = useMultiProviderSync(PLAN_INDEX_DOC_NAME);
-  const { myPlans, sharedPlans, inboxPlans } = usePlanIndex(githubIdentity?.username);
+  // Use shared plan index context to avoid duplicate WebRTC providers
+  const { ydoc: indexDoc, myPlans, sharedPlans, inboxPlans } = usePlanIndexContext();
   const allPlans = useMemo(
     () => [...myPlans, ...sharedPlans, ...inboxPlans],
     [myPlans, sharedPlans, inboxPlans]
