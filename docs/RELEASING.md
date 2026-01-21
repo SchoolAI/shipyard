@@ -192,12 +192,14 @@ git push origin main v0.2.1
 
 ## Claude Code Plugin Version
 
-The GitHub plugin (`.claude-plugin/`) is separate from npm:
+The GitHub plugin is separate from npm:
 
 | File | Purpose |
 |------|---------|
 | `.claude-plugin/plugin.json` | Plugin metadata and version |
-| `.claude-plugin/mcp.json` | MCP server config (points to npm package) |
+| `.mcp.json` | MCP server config (points to npm package) |
+| `hooks/hooks.json` | Hook configurations |
+| `skills/` | Skill definitions |
 
 **Recommendation:** Keep plugin version in sync with npm for clarity.
 

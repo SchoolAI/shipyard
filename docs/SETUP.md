@@ -57,12 +57,24 @@ Opens on `http://localhost:5173`
 
 ### 2. MCP Server Setup
 
-The `.mcp.json` in this repo automatically provides the `shipyard` MCP server when you're in this directory. No additional setup needed!
+**For local development**, create a `.claude/settings.local.json` file in the repo root:
 
-**How it works:**
-- `.mcp.json` points to `${CLAUDE_PLUGIN_ROOT}/apps/server/dist/index.js`
-- When in shipyard directory: uses local build
-- When installed as plugin: uses bundled dist from plugin cache
+```json
+{
+  "mcpServers": {
+    "shipyard": {
+      "command": "node",
+      "args": ["apps/server/dist/index.js"],
+      "env": {
+        "NODE_ENV": "development",
+        "LOG_LEVEL": "debug"
+      }
+    }
+  }
+}
+```
+
+**Note:** The root `.mcp.json` is for **plugin distribution** (uses `npx @schoolai/shipyard-mcp`). For local development, use the settings.local.json approach above.
 
 Verify it's available:
 ```bash
