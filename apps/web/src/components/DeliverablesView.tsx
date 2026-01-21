@@ -175,11 +175,8 @@ export function DeliverablesView({
 
   const handleComplete = () => {
     if (!identity) {
-      if (onRequestIdentity) {
-        onRequestIdentity();
-      } else {
-        toast.info('Sign in to complete this task');
-      }
+      toast.info('Sign in to complete this task');
+      onRequestIdentity?.();
       return;
     }
 
