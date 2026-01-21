@@ -4,196 +4,169 @@ How to publish new versions of Shipyard to npm.
 
 ---
 
-## Automated Release Candidates
+## Quick Reference
 
-**Every merge to main automatically publishes an RC:**
+| Action | How | Result |
+|--------|-----|--------|
+| **Auto RC** | Push/merge to `main` | `0.1.0-next.{commit#}` → `@next` |
+| **Manual RC** | GitHub Actions → Run workflow | Same as above |
+| **Stable release** | Push tag `v0.2.0` | `0.2.0` → `@latest` |
+| **Prerelease tag** | Push tag `v0.2.0-rc.1` | `0.2.0-rc.1` → `@next` |
 
-```
-Merge PR to main → Auto-publish: 0.2.0-next.156
-                                    ↓
-                            npm install @schoolai/shipyard-mcp@next
-```
-
-**Version scheme:** `{base}-next.{commit_count}`
-- `0.2.0-next.156` (commit count: 156)
-- `0.2.0-next.157` (commit count: 157)
-- Predictable, incrementing, easy to reference
-
-**No manual work required!**
+**All publishing uses OIDC trusted publishing** - no tokens to manage!
 
 ---
 
-## Promoting RC to Stable
+## Automated RC Releases (Default)
 
-When you've tested an RC and want to make it the default:
+**Every push to main automatically publishes an RC:**
 
-### Via GitHub Actions (Recommended)
+```
+Push to main → publish-npm.yml → 0.1.0-next.435 published to @next
+```
 
-1. Go to: https://github.com/SchoolAI/shipyard/actions/workflows/promote-stable.yml
-2. Click "Run workflow"
-3. Enter:
-   - **RC version:** `0.2.0-next.158` (the one you tested)
-   - **Stable version:** `0.2.0` (what users will get)
-4. Click "Run workflow"
+**Version scheme:** `{base}-next.{commit_count}`
+- Predictable, incrementing, easy to reference
+- No manual work required!
 
-**What happens:**
-- ✅ Same build promoted to `latest` tag (no rebuild)
-- ✅ Git tag `v0.2.0` created
-- ✅ GitHub Release created
-- ✅ `package-npm.json` updated to `0.2.0`
-- ✅ Commit pushed to main
+**Install RC:**
+```bash
+npx -y @schoolai/shipyard-mcp@next mcp-server-shipyard
+```
 
-### Via CLI (Manual)
+---
+
+## Publishing a Stable Release
+
+When you're ready to make a version the default for users:
+
+### Option 1: Create a Git Tag (Recommended)
 
 ```bash
-# Promote existing RC to latest
-npm dist-tag add @schoolai/shipyard-mcp@0.2.0-next.158 latest
-
-# Update package-npm.json
+# 1. Update version in package-npm.json
 vim package-npm.json  # Set "version": "0.2.0"
-git commit -am "chore: release v0.2.0"
+
+# 2. Commit the version bump
+git add package-npm.json
+git commit -m "chore: release v0.2.0"
+
+# 3. Create and push the tag
 git tag v0.2.0
 git push origin main v0.2.0
 ```
+
+**What happens:**
+- GitHub Actions detects the `v*` tag
+- Publishes `0.2.0` to `@latest` tag
+- Users now get `0.2.0` by default
+
+### Option 2: Promote Existing RC
+
+If you've tested an RC and want to promote it without rebuilding:
+
+```bash
+# Promote RC to latest (no rebuild)
+npm dist-tag add @schoolai/shipyard-mcp@0.1.0-next.435 latest
+```
+
+Then update `package-npm.json` to match:
+```bash
+vim package-npm.json  # Set "version": "0.2.0"
+git commit -am "chore: release v0.2.0"
+git push origin main
+```
+
+---
+
+## Manual Workflow Dispatch
+
+To manually trigger a publish without pushing code:
+
+1. Go to: https://github.com/SchoolAI/shipyard/actions/workflows/publish-npm.yml
+2. Click **"Run workflow"**
+3. Select branch: `main`
+4. Click **"Run workflow"**
+
+This publishes an RC version (`0.1.0-next.{commit#}`) to `@next`.
+
+---
+
+## Workflow Architecture
+
+**Single workflow handles everything:** `.github/workflows/publish-npm.yml`
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    publish-npm.yml                          │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  Triggers:                                                  │
+│  ├── push to main branch    → RC release (next tag)        │
+│  ├── push v* tag            → Stable release (latest tag)  │
+│  └── workflow_dispatch      → RC release (next tag)        │
+│                                                             │
+│  Authentication: OIDC Trusted Publishing (no tokens!)      │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Why one workflow?** npm's OIDC trusted publishing only allows one workflow per package. Consolidating ensures all publishes use secure OIDC auth.
 
 ---
 
 ## Version Management
 
-**package-npm.json:** Base version for RCs
+### package-npm.json
+
+This file controls the base version for RC releases:
 
 ```json
 {
-  "version": "0.2.0"  // Update only when promoting to stable
+  "version": "0.2.0"
 }
 ```
 
-**Auto-generated RC versions:**
-- Built from: `{package-npm.json version}-next.{commit_count}`
-- Example: If package shows `0.2.0`, RCs will be `0.2.0-next.156`, `0.2.0-next.157`, etc.
+**RC versions:** `{version}-next.{commit_count}`
+- If version is `0.2.0` → RCs are `0.2.0-next.435`, `0.2.0-next.436`, etc.
 
-**When to bump package-npm.json:**
-- Only when promoting RC to stable (via promote workflow)
-- Workflow auto-updates it for you
-- Or manually if you want to start a new version series
+**When to update:**
+- When releasing a new stable version
+- When starting a new version series (e.g., `0.2.0` → `0.3.0`)
 
----
+### npm Dist Tags
 
-## Release Workflow
-
-### Testing RCs
-
-Every merge to main is immediately available for testing:
-
-```bash
-# Get latest RC
-npm view @schoolai/shipyard-mcp@next version
-
-# Install it
-npx -y -p @schoolai/shipyard-mcp@next mcp-server-shipyard
-
-# Or add to Cursor config for testing
-{
-  "mcpServers": {
-    "shipyard-rc": {
-      "command": "npx",
-      "args": ["-y", "-p", "@schoolai/shipyard-mcp@next", "mcp-server-shipyard"]
-    }
-  }
-}
-```
+| Tag | What it means | Install command |
+|-----|---------------|-----------------|
+| `latest` | Stable release | `npm install @schoolai/shipyard-mcp` |
+| `next` | RC/prerelease | `npm install @schoolai/shipyard-mcp@next` |
 
 ---
 
-## Version Naming Convention
-
-### Stable Releases
-
-```
-0.1.0 → 0.2.0 → 1.0.0
-```
-
-Use when: Changes are tested and ready for production
-
-### Release Candidates
-
-```
-0.2.0-rc.1 → 0.2.0-rc.2 → 0.2.0
-```
-
-Use when: You want to test before stable release
-
-### Alpha/Beta (if needed)
-
-```
-0.2.0-alpha.1  # Early testing
-0.2.0-beta.1   # Feature complete, needs testing
-0.2.0-rc.1     # Final testing before stable
-0.2.0          # Stable
-```
-
----
-
-## npm Dist Tags
-
-When you publish, the version goes to an npm "tag":
-
-**`latest` tag** (default):
-```bash
-npm install @schoolai/shipyard-mcp  # Gets latest stable
-```
-
-**`next` tag** (for RCs):
-```bash
-npm install @schoolai/shipyard-mcp@next  # Gets latest RC
-```
-
-**Both can exist simultaneously:**
-- `latest` → 0.1.0 (stable)
-- `next` → 0.2.0-rc.1 (testing)
-
----
-
-## Example Release Cycle
-
-### Scenario: Multiple features ready for v0.2.0
+## Example: Full Release Cycle
 
 ```bash
-# Week 1-2: Merge feature PRs to main (no publish)
-# - PR #101: Add new tool
-# - PR #102: Fix bug
-# - PR #103: Update UI
+# Day 1-5: Develop features, merge PRs to main
+# Each merge auto-publishes: 0.2.0-next.430, 0.2.0-next.431, etc.
 
-# Week 3: Ready to test together
+# Day 6: Ready to release v0.2.0
 
-# 1. Bump version to RC
-vim package-npm.json  # Set "version": "0.2.0-rc.1"
-git commit -am "chore: bump version to 0.2.0-rc.1"
+# 1. Test the latest RC
+npm view @schoolai/shipyard-mcp@next version  # 0.2.0-next.435
+npx -y @schoolai/shipyard-mcp@next mcp-server-shipyard
+# ✅ Works great!
+
+# 2. Create stable release
+git tag v0.2.0
+git push origin v0.2.0
+
+# 3. Verify
+npm view @schoolai/shipyard-mcp version  # 0.2.0 ✅
+
+# 4. Update base version for next cycle
+vim package-npm.json  # Set "version": "0.3.0"
+git commit -am "chore: start v0.3.0 development"
 git push origin main
-
-# 2. Publish RC
-GitHub Actions → Manual npm Publish → npm_tag: next
-
-# 3. Test RC
-npx @schoolai/shipyard-mcp@next mcp-server-shipyard
-
-# Found issues? Fix and create rc.2
-vim package-npm.json  # Set "version": "0.2.0-rc.2"
-git commit -am "chore: bump version to 0.2.0-rc.2"
-# Publish again with 'next' tag
-
-# 4. RC testing complete, make it stable
-vim package-npm.json  # Set "version": "0.2.0"
-git commit -am "chore: release v0.2.0"
-git push origin main
-
-# 5. Publish stable
-GitHub Actions → Manual npm Publish → npm_tag: latest
-```
-
-Now users get v0.2.0 by default:
-```bash
-npx @schoolai/shipyard-mcp mcp-server-shipyard  # Gets 0.2.0
+# Now RCs will be 0.3.0-next.436, 0.3.0-next.437, etc.
 ```
 
 ---
@@ -203,36 +176,54 @@ npx @schoolai/shipyard-mcp mcp-server-shipyard  # Gets 0.2.0
 If a published version has issues:
 
 ```bash
-# Deprecate the bad version
-npm deprecate @schoolai/shipyard-mcp@0.2.0 "Broken build, use 0.2.1"
+# Deprecate the bad version (shows warning on install)
+npm deprecate @schoolai/shipyard-mcp@0.2.0 "Bug in auth, use 0.2.1"
 
 # Publish a fix
 vim package-npm.json  # Set "version": "0.2.1"
-git commit -am "chore: bump version to 0.2.1"
-# Trigger workflow
+git commit -am "chore: release v0.2.1"
+git tag v0.2.1
+git push origin main v0.2.1
 ```
 
-**Note:** Can only unpublish within 72 hours of publishing. After that, must deprecate and publish a fix.
+**Note:** npm only allows unpublishing within 72 hours. After that, deprecate and publish a fix.
 
 ---
 
-## GitHub Plugin Version
+## Claude Code Plugin Version
 
-**Important:** The GitHub plugin version is separate from npm!
+The GitHub plugin (`.claude-plugin/`) is separate from npm:
 
-**Plugin version:** Set in `.claude-plugin/plugin.json`
-```json
-{
-  "version": "1.0.0"
-}
-```
+| File | Purpose |
+|------|---------|
+| `.claude-plugin/plugin.json` | Plugin metadata and version |
+| `.claude-plugin/mcp.json` | MCP server config (points to npm package) |
 
-This should match your major version but doesn't need to match exact npm version (plugin includes MCP server + hooks + skills, npm is just server).
-
-**Recommendation:** Keep them in sync for clarity:
-- npm: `0.2.0` → plugin: `0.2.0`
-- Bump both in the same commit
+**Recommendation:** Keep plugin version in sync with npm for clarity.
 
 ---
 
-*Last updated: 2026-01-20*
+## Troubleshooting
+
+### "OIDC authentication failed"
+
+The workflow must be registered as a trusted publisher on npm:
+1. Go to: https://www.npmjs.com/package/@schoolai/shipyard-mcp/access
+2. Verify `publish-npm.yml` is listed under "Trusted Publishers"
+
+### "Version already exists"
+
+npm doesn't allow republishing the same version. Either:
+- Bump the version in `package-npm.json`
+- Or wait for next commit (RC version increments automatically)
+
+### Workflow not triggering
+
+Check the trigger conditions:
+- **Push to main:** Must be a direct push or merged PR
+- **Tag push:** Tag must match `v*` pattern (e.g., `v0.2.0`)
+- **Manual:** Use "Run workflow" button in GitHub Actions
+
+---
+
+*Last updated: 2026-01-21*

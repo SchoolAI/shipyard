@@ -2,18 +2,40 @@ name: Publish to npm
 
 on:
   push:
+    branches:
+      - main  # Auto RC on every push
     tags:
-      - 'v*'
+      - 'v*'  # Stable/prerelease on version tags
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'What to publish'
+        required: true
+        type: choice
+        options:
+          - rc            # Publish RC from current commit
+          - promote       # Promote existing RC to stable
+        default: rc
+      rc_version:
+        description: 'RC version to promote (only for promote action, e.g., 0.1.0-next.435)'
+        required: false
+        type: string
+      stable_version:
+        description: 'Stable version (only for promote action, e.g., 0.2.0)'
+        required: false
+        type: string
 
 jobs:
   publish:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
-      id-token: write # Required for npm provenance
+      contents: write   # For creating tags and commits
+      id-token: write   # For npm OIDC trusted publishing
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Need full history for commit count
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v2
@@ -24,8 +46,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-          # NOTE: Do NOT set registry-url here - it creates an .npmrc that expects NODE_AUTH_TOKEN
-          # which conflicts with OIDC trusted publishing
+          # NOTE: Do NOT set registry-url - conflicts with OIDC
 
       - name: Install npm 11.5+ for OIDC trusted publishing
         run: npm install -g npm@latest
@@ -36,30 +57,128 @@ jobs:
       - name: Build packages
         run: pnpm build --filter @shipyard/schema --filter @shipyard/shared --filter @shipyard/server --filter @shipyard/hook
 
-      - name: Prepare npm package
+      # ============================================
+      # PROMOTE ACTION: Move existing RC to stable
+      # ============================================
+      - name: Promote RC to stable
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.action == 'promote' }}
         run: |
-          # Copy package-npm.json to package.json for publishing
-          cp package-npm.json package.json
+          RC_VERSION="${{ inputs.rc_version }}"
+          STABLE_VERSION="${{ inputs.stable_version }}"
 
-          # Update version from git tag (strip 'v' prefix)
-          TAG_VERSION="${GITHUB_REF_NAME#v}"
-          npm version "$TAG_VERSION" --no-git-tag-version --allow-same-version
-
-      - name: Determine npm tag
-        id: npm-tag
-        run: |
-          # Extract version from git tag
-          TAG_VERSION="${GITHUB_REF_NAME#v}"
-
-          # Check if it's a prerelease (contains -, like rc, alpha, beta)
-          if [[ "$TAG_VERSION" == *"-"* ]]; then
-            echo "tag=next" >> $GITHUB_OUTPUT
-            echo "Publishing as prerelease with 'next' tag"
-          else
-            echo "tag=latest" >> $GITHUB_OUTPUT
-            echo "Publishing as stable with 'latest' tag"
+          if [ -z "$RC_VERSION" ] || [ -z "$STABLE_VERSION" ]; then
+            echo "::error::Both rc_version and stable_version are required for promote action"
+            exit 1
           fi
 
+          echo "Promoting $RC_VERSION → $STABLE_VERSION"
+
+          # Use npm dist-tag to move the RC to latest (OIDC handles auth)
+          npm dist-tag add @schoolai/shipyard-mcp@$RC_VERSION latest
+
+          echo "✅ Promoted $RC_VERSION to latest tag"
+
+      - name: Update version and create tag (promote)
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.action == 'promote' }}
+        run: |
+          STABLE_VERSION="${{ inputs.stable_version }}"
+
+          # Update package-npm.json
+          node -e "
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('./package-npm.json', 'utf8'));
+            pkg.version = '$STABLE_VERSION';
+            fs.writeFileSync('package-npm.json', JSON.stringify(pkg, null, 2) + '\n');
+          "
+
+          # Commit and tag
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add package-npm.json
+          git commit -m "chore: release v$STABLE_VERSION"
+          git tag "v$STABLE_VERSION"
+          git push origin main
+          git push origin "v$STABLE_VERSION"
+
+          echo "✅ Created tag v$STABLE_VERSION"
+
+      # ============================================
+      # PUBLISH ACTION: Build and publish new version
+      # ============================================
+      - name: Determine version and npm tag
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.action == 'promote') }}
+        id: version
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            # Tag-triggered: use tag version
+            VERSION="${GITHUB_REF_NAME#v}"
+            if [[ "$VERSION" == *"-"* ]]; then
+              NPM_TAG="next"
+              echo "Publishing tag release as prerelease: $VERSION → @next"
+            else
+              NPM_TAG="latest"
+              echo "Publishing tag release as stable: $VERSION → @latest"
+            fi
+          else
+            # Push to main or manual dispatch: generate RC version
+            BASE_VERSION=$(node -p "require('./package-npm.json').version")
+            COMMIT_COUNT=$(git rev-list --count HEAD)
+            VERSION="${BASE_VERSION}-next.${COMMIT_COUNT}"
+            NPM_TAG="next"
+            echo "Publishing RC version: $VERSION → @next"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "npm_tag=$NPM_TAG" >> $GITHUB_OUTPUT
+
+      - name: Prepare npm package
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.action == 'promote') }}
+        run: |
+          cp package-npm.json package.json
+          npm version "${{ steps.version.outputs.version }}" --no-git-tag-version --allow-same-version
+
       - name: Publish to npm
-        run: npm publish --access public --provenance --tag ${{ steps.npm-tag.outputs.tag }}
-    
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.action == 'promote') }}
+        run: npm publish --access public --provenance --tag ${{ steps.version.outputs.npm_tag }}
+
+      # ============================================
+      # POST-PUBLISH: Comments and summaries
+      # ============================================
+      - name: Comment on commit (RC releases)
+        if: ${{ github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/') }}
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.repos.createCommitComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              commit_sha: context.sha,
+              body: `📦 Published RC: \`${{ steps.version.outputs.version }}\`\n\nInstall with:\n\`\`\`bash\nnpx -y @schoolai/shipyard-mcp@next mcp-server-shipyard\n\`\`\``
+            });
+
+      - name: Create GitHub Release (stable tags)
+        if: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') && !contains(github.ref, '-') }}
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.repos.createRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag_name: '${{ github.ref_name }}',
+              name: '${{ github.ref_name }}',
+              body: 'Install with:\n```bash\nnpm install @schoolai/shipyard-mcp\n# or\nnpx -y @schoolai/shipyard-mcp mcp-server-shipyard\n```',
+              draft: false,
+              prerelease: false
+            });
+
+      - name: Summary
+        run: |
+          echo "## Publish Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ inputs.action }}" == "promote" ]]; then
+            echo "**Action:** Promoted RC to stable" >> $GITHUB_STEP_SUMMARY
+            echo "- RC Version: \`${{ inputs.rc_version }}\`" >> $GITHUB_STEP_SUMMARY
+            echo "- Stable Version: \`${{ inputs.stable_version }}\`" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "**Version:** \`${{ steps.version.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+            echo "**npm Tag:** \`${{ steps.version.outputs.npm_tag }}\`" >> $GITHUB_STEP_SUMMARY
+          fi
