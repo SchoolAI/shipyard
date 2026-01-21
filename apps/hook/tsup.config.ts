@@ -6,8 +6,15 @@ export default defineConfig({
 	dts: false, // Project references break tsup type gen with workspace packages
 	clean: true,
 	sourcemap: false, // Exclude source maps from production builds (reduces size 43%)
-	// Bundle workspace packages - they will be inlined
-	noExternal: ['@shipyard/schema', '@shipyard/shared'],
+	// Bundle ALL dependencies for npm publishing (npx needs standalone binary)
+	// But keep Node.js built-ins external
+	external: [
+		'node:*', // Node.js built-in modules with node: prefix
+		'fs', 'path', 'os', 'crypto', 'util', 'stream', 'events', 'http', 'https',
+		'net', 'tls', 'zlib', 'child_process', 'buffer', 'url', 'querystring',
+		'assert', 'constants', 'module', 'process', 'v8', 'vm', 'worker_threads',
+	],
+	noExternal: [/.*/], // Bundle everything else
 	target: 'node22.14',
 	shims: false,
 });

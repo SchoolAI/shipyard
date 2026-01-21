@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "shipyard": {
+      "command": "npx",
+      "args": ["-y", "-p", "@schoolai/shipyard-mcp@latest", "mcp-server-shipyard"],
+      "env": {
+        "NODE_ENV": "production"
+      }
+    }
+  }
+}
