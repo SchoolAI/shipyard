@@ -36,16 +36,16 @@ function MobileBottomDrawer({
   onClose: () => void;
   children: ReactNode;
 }) {
-  // Snap points: 85% (default, main view), 50% (half screen for quick peek)
-  // Dragging below 50% will close the drawer
-  const snapPoints = [0.5, 0.85];
+  // Snap points: 60% (default), 90% (expanded)
+  // Dragging below 60% will close the drawer
+  const snapPoints = [0.6, 0.9];
 
   return (
     <Drawer.Root
       open={isOpen}
       onOpenChange={(open) => !open && onClose()}
       snapPoints={snapPoints}
-      activeSnapPoint={snapPoints[1]}
+      activeSnapPoint={snapPoints[0]}
       // Start fading overlay when dragging below the first snap point
       fadeFromIndex={0}
       // Only drag from handle, allow content scrolling
@@ -55,7 +55,7 @@ function MobileBottomDrawer({
         <Drawer.Overlay className="fixed inset-0 z-40 bg-black/40" />
         <Drawer.Content
           className="fixed bottom-0 left-0 right-0 z-50 flex flex-col rounded-t-2xl bg-background outline-none"
-          style={{ height: '85vh' }}
+          style={{ height: '90vh' }}
           aria-label="Task details panel"
         >
           {/* Drag handle - only this area triggers drag gestures */}
