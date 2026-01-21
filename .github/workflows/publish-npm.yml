@@ -114,11 +114,11 @@ jobs:
             fs.writeFileSync('package-npm.json', JSON.stringify(pkg, null, 2) + '\n');
           "
 
-          # Commit and tag
+          # Commit and tag (skip hooks - already validated by CI)
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add package-npm.json
-          git commit -m "chore: release v$STABLE_VERSION"
+          git commit --no-verify -m "chore: release v$STABLE_VERSION"
           git tag "v$STABLE_VERSION"
           git push origin main
           git push origin "v$STABLE_VERSION"
