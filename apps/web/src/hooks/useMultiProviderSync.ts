@@ -8,6 +8,84 @@ import * as Y from 'yjs';
 const DEFAULT_SIGNALING_SERVER = 'wss://shipyard-signaling.jacob-191.workers.dev';
 
 /**
+ * Module-level cache for WebRTC providers to prevent duplicate room errors.
+ *
+ * y-webrtc maintains an internal room registry that throws if a room with the same name
+ * already exists. The issue is that y-webrtc's destroy() method is asynchronous -
+ * it waits for `this.key.then()` before removing the room from the registry.
+ *
+ * When React StrictMode re-runs effects, the cleanup from the first run and the
+ * setup from the second run can race. The new provider tries to create a room
+ * before the old one has finished cleaning up.
+ *
+ * This cache tracks active providers per room. If a provider already exists for a room,
+ * we reuse it and track reference counts. This prevents the duplicate room error
+ * while ensuring proper cleanup when all consumers unmount.
+ */
+interface CachedProvider {
+  provider: WebrtcProvider;
+  refCount: number;
+  ydoc: Y.Doc;
+}
+
+const webrtcProviderCache = new Map<string, CachedProvider>();
+
+/**
+ * Get or create a WebRTC provider for a room.
+ * Uses reference counting to manage lifecycle across multiple consumers.
+ */
+function getOrCreateWebrtcProvider(
+  roomName: string,
+  ydoc: Y.Doc,
+  signalingServer: string
+): WebrtcProvider {
+  const existing = webrtcProviderCache.get(roomName);
+
+  if (existing) {
+    // Reuse existing provider if it's for the same ydoc
+    if (existing.ydoc === ydoc) {
+      existing.refCount++;
+      return existing.provider;
+    }
+    // Different ydoc - this shouldn't happen in normal usage, but handle gracefully
+    // by destroying the old provider first
+    releaseWebrtcProvider(roomName);
+  }
+
+  // Create new provider
+  const provider = new WebrtcProvider(roomName, ydoc, {
+    signaling: [signalingServer],
+  });
+
+  webrtcProviderCache.set(roomName, {
+    provider,
+    refCount: 1,
+    ydoc,
+  });
+
+  return provider;
+}
+
+/**
+ * Release a reference to a WebRTC provider.
+ * Destroys the provider when the last reference is released.
+ */
+function releaseWebrtcProvider(roomName: string): void {
+  const cached = webrtcProviderCache.get(roomName);
+  if (!cached) return;
+
+  cached.refCount--;
+
+  if (cached.refCount <= 0) {
+    // Last reference - destroy the provider
+    cached.provider.awareness?.setLocalState(null);
+    cached.provider.disconnect();
+    cached.provider.destroy();
+    webrtcProviderCache.delete(roomName);
+  }
+}
+
+/**
  * Discover the hub URL by checking registry endpoints.
  * Tries ports 32191 and 32192 to handle hub restarts.
  */
@@ -219,10 +297,10 @@ export function useMultiProviderSync(
       const signalingServer =
         (import.meta.env.VITE_WEBRTC_SIGNALING as string) || DEFAULT_SIGNALING_SERVER;
 
-      // Simple WebRTC setup - public rooms, no authentication
-      rtc = new WebrtcProvider(`shipyard-${docName}`, ydoc, {
-        signaling: [signalingServer],
-      });
+      const roomName = `shipyard-${docName}`;
+
+      // Use cached provider to avoid duplicate room errors in StrictMode
+      rtc = getOrCreateWebrtcProvider(roomName, ydoc, signalingServer);
       setRtcProvider(rtc);
 
       // Set basic awareness for user presence (name and color only)
@@ -300,13 +378,10 @@ export function useMultiProviderSync(
       // Cleanup IndexedDB provider
       idbProvider.destroy();
 
-      // Cleanup WebRTC provider
-      if (rtc) {
-        // Clear awareness before destroying so other peers see us leave
-        // Use optional chaining in case awareness failed to initialize
-        rtc.awareness?.setLocalState(null);
-        rtc.disconnect();
-        rtc.destroy();
+      // Cleanup WebRTC provider using cached release
+      if (rtc && enableWebRTC) {
+        const roomName = `shipyard-${docName}`;
+        releaseWebrtcProvider(roomName);
         setRtcProvider(null);
       }
 
