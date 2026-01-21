@@ -22,5 +22,5 @@
   ],
   "skills": "./skills/",
   "mcpServers": "./.mcp-plugin.json",
-  "hooks": "./hooks/"
+  "hooks": "./hooks/hooks.json"
 }
