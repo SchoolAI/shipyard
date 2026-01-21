@@ -3,21 +3,26 @@
     "shipyard": {
       "type": "stdio",
       "command": "node",
-      "args": ["apps/server/dist/index.mjs"],
+      "args": [
+        "${CLAUDE_PLUGIN_ROOT}/apps/server/dist/index.js"
+      ],
       "env": {
-        "NODE_ENV": "development",
+        "NODE_ENV": "production",
         "SIGNALING_URL": "ws://localhost:4444"
       }
     },
     "heroui-react": {
       "command": "npx",
-      "args": ["-y", "@heroui/react-mcp@latest"]
+      "args": [
+        "-y",
+        "@heroui/react-mcp@latest"
+      ]
     },
     "playwright": {
       "command": "npx",
       "args": [
         "@playwright/mcp@latest",
-        "--user-data-dir=/tmp/pw-79-packaging"
+        "--user-data-dir=/tmp/pw-79-distribute-shipyard"
       ]
     }
   }

@@ -31,7 +31,57 @@ Shipyard solves this with P2P collaborative review and proof-of-work artifacts.
 - **BlockNote editor** — Notion-like editing with inline comments and threads
 - **Offline-first** — IndexedDB persistence, works without network
 
-## Quick Start
+## Installation
+
+### For Claude Code Users
+
+Install the complete Shipyard plugin (MCP server + hooks + skills):
+
+```bash
+/plugin install SchoolAI/shipyard
+```
+
+This gives you:
+- ✅ MCP tools for creating and managing plans
+- ✅ Automatic hooks for plan creation workflow
+- ✅ Skills for collaborative planning
+
+### For Other Platforms (Cursor, Windsurf, Replit, etc.)
+
+Install the MCP server via npm:
+
+```bash
+npx @schoolai/shipyard-mcp mcp-server-shipyard
+```
+
+Then configure in your platform's MCP settings:
+
+**Cursor** (`~/.cursor/mcp.json`):
+```json
+{
+  "mcpServers": {
+    "shipyard": {
+      "command": "npx",
+      "args": ["-y", "@schoolai/shipyard-mcp", "mcp-server-shipyard"]
+    }
+  }
+}
+```
+
+**Windsurf** (`~/.windsurf/settings.json`):
+```json
+{
+  "mcp.servers": {
+    "shipyard": {
+      "command": "npx @schoolai/shipyard-mcp mcp-server-shipyard"
+    }
+  }
+}
+```
+
+See **[docs/INSTALLATION.md](./docs/INSTALLATION.md)** for comprehensive platform-specific guides.
+
+### For Development
 
 ```bash
 # Clone and install
@@ -39,11 +89,11 @@ git clone https://github.com/SchoolAI/shipyard.git
 cd shipyard
 pnpm install
 
-# Start development (MCP server + web app)
+# Start all services
 pnpm dev:all
 ```
 
-Then configure Claude Code to use the MCP server. See **[SETUP.md](./docs/SETUP.md)** for full instructions.
+See **[SETUP.md](./docs/SETUP.md)** for full development setup.
 
 ## How It Works
 
@@ -99,13 +149,13 @@ The Penrose triangle logo represents the "impossible triangle" of AI development
 Use Shipyard with Claude Cowork via the included skill:
 
 ```
-shipyard-skill/
+skills/shipyard/
 ├── SKILL.md      # Instructions for Claude
 ├── README.md     # Setup guide
 └── examples/     # Usage examples
 ```
 
-See [shipyard-skill/README.md](./shipyard-skill/README.md) for setup.
+See [skills/shipyard/README.md](./skills/shipyard/README.md) for setup.
 
 ## Contributing
 

@@ -1,0 +1,26 @@
+{
+  "name": "shipyard",
+  "version": "1.0.0",
+  "description": "Collaborative planning workspace with proof-of-work tracking and human review",
+  "author": {
+    "name": "SchoolAI",
+    "email": "team@schoolai.com",
+    "url": "https://github.com/SchoolAI"
+  },
+  "homepage": "https://github.com/SchoolAI/shipyard",
+  "repository": "https://github.com/SchoolAI/shipyard",
+  "license": "MIT",
+  "keywords": [
+    "planning",
+    "collaboration",
+    "review",
+    "artifacts",
+    "mcp",
+    "hooks",
+    "crdt",
+    "p2p"
+  ],
+  "skills": "../skills/",
+  "hooks": "../hooks/hooks.json",
+  "mcpServers": "../.mcp.json"
+}
