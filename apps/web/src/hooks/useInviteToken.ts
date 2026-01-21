@@ -193,7 +193,7 @@ export function useInviteToken(
   }, [planId, githubIdentity, sendToSignaling]);
 
   // Auto-redeem when conditions are met
-  // Polls for signaling connection to be ready before redeeming
+  // Uses event-based approach instead of polling for signaling connection
   useEffect(() => {
     if (
       !hasInviteToken ||
@@ -205,10 +205,23 @@ export function useInviteToken(
       return;
     }
 
-    const signalingConns = (rtcProvider as unknown as { signalingConns: Array<{ ws: WebSocket }> })
+    /**
+     * Typed interface for SignalingConn from y-webrtc.
+     * Based on lib0/websocket.WebsocketClient which extends Observable.
+     */
+    interface SignalingConn {
+      ws: WebSocket | null;
+      connected: boolean;
+      on(event: 'connect', handler: () => void): void;
+      off(event: 'connect', handler: () => void): void;
+    }
+
+    const signalingConns = (rtcProvider as unknown as { signalingConns?: SignalingConn[] })
       .signalingConns;
 
-    const hasOpenConnection = signalingConns?.some(
+    if (!signalingConns || signalingConns.length === 0) return;
+
+    const hasOpenConnection = signalingConns.some(
       (conn) => conn.ws && conn.ws.readyState === WebSocket.OPEN
     );
 
@@ -217,33 +230,29 @@ export function useInviteToken(
       return;
     }
 
-    // WebSocket not ready yet - poll until it opens (max 10 seconds)
-    let attempts = 0;
-    const maxAttempts = 100;
-    const interval = setInterval(() => {
-      attempts++;
+    // Listen for 'connect' event instead of polling
+    const handlers: Array<{ conn: SignalingConn; handler: () => void }> = [];
 
-      if (attempts > maxAttempts) {
-        clearInterval(interval);
-        return;
-      }
-
-      if (hasAttemptedRef.current) {
-        clearInterval(interval);
-        return;
-      }
-
-      const hasOpen = signalingConns?.some(
-        (conn) => conn.ws && conn.ws.readyState === WebSocket.OPEN
-      );
-
-      if (hasOpen) {
-        clearInterval(interval);
+    const onConnect = () => {
+      if (!hasAttemptedRef.current) {
         redeemInvite();
       }
-    }, 100);
+      // Clean up all handlers after first connection
+      for (const { conn, handler } of handlers) {
+        conn.off('connect', handler);
+      }
+    };
 
-    return () => clearInterval(interval);
+    for (const conn of signalingConns) {
+      conn.on('connect', onConnect);
+      handlers.push({ conn, handler: onConnect });
+    }
+
+    return () => {
+      for (const { conn, handler } of handlers) {
+        conn.off('connect', handler);
+      }
+    };
   }, [hasInviteToken, githubIdentity, rtcProvider, redemptionState.status, redeemInvite]);
 
   return {

@@ -353,118 +353,76 @@ export function useMultiProviderSync(
       lastBroadcastPeerId = webrtcPeerId;
     }
 
-    // Watch for room.peerId to become available and update awareness
-    // This fixes P2P transfers failing with "Peer not found" because
-    // webrtcPeerId was undefined when awareness was first set
-    let roomPeerIdWatcher: ReturnType<typeof setInterval> | null = null;
-    let signalingOpenWatcher: ReturnType<typeof setInterval> | null = null;
-
-    function startWatchingForRoomPeerId() {
-      if (!rtc) return;
-
-      // Check immediately
-      const room = (rtc as unknown as { room?: { peerId?: string } }).room;
-      if (room?.peerId && room.peerId !== lastBroadcastPeerId) {
-        setLocalAwarenessState();
-        return; // peerId is already available
-      }
-
-      // Poll until room.peerId is available (y-webrtc doesn't emit an event for this)
-      roomPeerIdWatcher = setInterval(() => {
-        const room = (rtc as unknown as { room?: { peerId?: string } }).room;
-        if (room?.peerId && room.peerId !== lastBroadcastPeerId) {
-          setLocalAwarenessState();
-          // Stop watching once we've broadcast the real peerId
-          if (roomPeerIdWatcher) {
-            clearInterval(roomPeerIdWatcher);
-            roomPeerIdWatcher = null;
-          }
-        }
-      }, 100); // Check every 100ms until room is ready
+    /**
+     * Typed interface for SignalingConn from y-webrtc.
+     * Based on lib0/websocket.WebsocketClient which extends Observable.
+     */
+    interface SignalingConn {
+      ws: WebSocket | null;
+      connected: boolean;
+      on(event: 'connect', handler: () => void): void;
+      off(event: 'connect', handler: () => void): void;
     }
+
+    // Track signaling connect handlers for cleanup
+    const signalingConnectHandlers: Array<{ conn: SignalingConn; handler: () => void }> = [];
 
     /**
      * Check if any signaling connection is currently open.
      */
-    function isSignalingConnOpen(signalingConns: Array<{ ws: WebSocket }> | undefined): boolean {
+    function isSignalingConnOpen(): boolean {
+      if (!rtc) return false;
+      const signalingConns = (rtc as unknown as { signalingConns?: SignalingConn[] })
+        .signalingConns;
       if (!signalingConns || signalingConns.length === 0) return false;
 
-      for (const conn of signalingConns) {
-        if (conn.ws && conn.ws.readyState === WebSocket.OPEN) {
-          return true;
-        }
-      }
-      return false;
+      return signalingConns.some((conn) => conn.ws && conn.ws.readyState === WebSocket.OPEN);
     }
 
     /**
-     * Send identity and approval state if a signaling connection is ready.
-     * Returns true if successful, false otherwise.
+     * Called when signaling connection opens.
+     * Sends identity, approval state, and updates awareness with room peerId.
      */
-    function sendIdentityWhenReady(signalingConns: Array<{ ws: WebSocket }> | undefined): boolean {
-      if (!signalingConns) return false;
-
-      for (const conn of signalingConns) {
-        if (conn.ws && conn.ws.readyState === WebSocket.OPEN) {
-          sendUserIdentityToSignaling();
-          pushApprovalStateToSignaling();
-          return true;
-        }
-      }
-      return false;
-    }
-
-    /**
-     * Clear the signaling open watcher interval.
-     */
-    function clearSignalingWatcher() {
-      if (signalingOpenWatcher) {
-        clearInterval(signalingOpenWatcher);
-        signalingOpenWatcher = null;
-      }
-    }
-
-    /**
-     * Poll for signaling connection and send identity when ready.
-     */
-    function pollForSignalingConnection(
-      signalingConns: Array<{ ws: WebSocket }>,
-      attemptsRef: { current: number },
-      maxAttempts: number
-    ) {
-      attemptsRef.current++;
-
-      if (attemptsRef.current > maxAttempts) {
-        clearSignalingWatcher();
-        return;
-      }
-
-      if (sendIdentityWhenReady(signalingConns)) {
-        clearSignalingWatcher();
-      }
-    }
-
-    // Watch for signaling WebSocket to open, then send identity
-    // Fixes "unauthenticated" error when WebSocket wasn't ready during initial send
-    function startWatchingForSignalingOpen() {
+    function onSignalingConnected() {
       if (!rtc || !githubIdentity) return;
 
-      const signalingConns = (rtc as unknown as { signalingConns: Array<{ ws: WebSocket }> })
+      // Send identity and approval state
+      sendUserIdentityToSignaling();
+      pushApprovalStateToSignaling();
+
+      // Update awareness with room peerId now that room should be available
+      const room = (rtc as unknown as { room?: { peerId?: string } }).room;
+      if (room?.peerId && room.peerId !== lastBroadcastPeerId) {
+        setLocalAwarenessState();
+      }
+    }
+
+    /**
+     * Listen for signaling WebSocket 'connect' events instead of polling.
+     * Uses lib0's Observable 'connect' event emitted when WebSocket opens.
+     */
+    function listenForSignalingConnect() {
+      if (!rtc) return;
+
+      const signalingConns = (rtc as unknown as { signalingConns?: SignalingConn[] })
         .signalingConns;
 
       if (!signalingConns || signalingConns.length === 0) return;
 
-      // Check immediately if any connection is already open
-      if (isSignalingConnOpen(signalingConns)) {
-        return; // Already connected, sendUserIdentityToSignaling already ran
+      // Check if already connected
+      if (isSignalingConnOpen()) {
+        onSignalingConnected();
+        return;
       }
 
-      // Poll until at least one signaling WebSocket is open
-      const attemptsRef = { current: 0 };
-      const maxAttempts = 100; // 10 seconds max
-      signalingOpenWatcher = setInterval(() => {
-        pollForSignalingConnection(signalingConns, attemptsRef, maxAttempts);
-      }, 100);
+      // Listen for 'connect' event on each signaling connection
+      for (const conn of signalingConns) {
+        const handler = () => {
+          onSignalingConnected();
+        };
+        conn.on('connect', handler);
+        signalingConnectHandlers.push({ conn, handler });
+      }
     }
 
     function updateApprovalStatus() {
@@ -553,14 +511,9 @@ export function useMultiProviderSync(
     // Set initial awareness state when GitHub identity is available
     if (githubIdentity && rtc) {
       updateApprovalStatus();
-      // Send user identity and approval state immediately (or when WebSocket opens)
-      // No delay - we need this before any WebRTC messages are relayed
-      sendUserIdentityToSignaling();
-      pushApprovalStateToSignaling();
-      // Watch for room.peerId to become available (fixes P2P transfer "Peer not found")
-      startWatchingForRoomPeerId();
-      // Retry sending identity until WebSocket is open (fixes "unauthenticated" error)
-      startWatchingForSignalingOpen();
+      // Send identity/approval state when signaling connects (event-based, not polling)
+      // This also updates awareness with room.peerId once available
+      listenForSignalingConnect();
     }
 
     function updateSyncState() {
@@ -592,14 +545,11 @@ export function useMultiProviderSync(
       setWsProvider(null);
       metadataMap.unobserve(handleMetadataChange);
       idbProvider.destroy();
-      if (roomPeerIdWatcher) {
-        clearInterval(roomPeerIdWatcher);
-        roomPeerIdWatcher = null;
+      // Clean up signaling connect handlers
+      for (const { conn, handler } of signalingConnectHandlers) {
+        conn.off('connect', handler);
       }
-      if (signalingOpenWatcher) {
-        clearInterval(signalingOpenWatcher);
-        signalingOpenWatcher = null;
-      }
+      signalingConnectHandlers.length = 0;
       if (rtc) {
         // Clear awareness before destroying so other peers see us leave
         rtc.awareness.setLocalState(null);
