@@ -171,6 +171,7 @@ export const claudeCodeAdapter: AgentAdapter = {
           hookEventName: CLAUDE_HOOK_EVENTS.PERMISSION_REQUEST,
           decision: {
             behavior: 'allow',
+            message: response.message,
           },
         },
       });

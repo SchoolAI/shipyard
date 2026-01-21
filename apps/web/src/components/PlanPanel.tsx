@@ -1,11 +1,11 @@
 /**
  * Slide-out panel for viewing plans without losing board context.
  * Notion-style panel with three width modes: peek, expanded (center modal), full.
- * On mobile, displays as a bottom drawer for better touch UX.
+ * On mobile, displays as a draggable bottom drawer using vaul.
  */
 
-import { Modal } from '@heroui/react';
 import type { ReactNode } from 'react';
+import { Drawer } from 'vaul';
 import { useIsMobile } from '@/hooks/useIsMobile';
 
 export type PanelWidth = 'peek' | 'expanded' | 'full';
@@ -24,7 +24,8 @@ export interface PlanPanelProps {
 }
 
 /**
- * Mobile bottom drawer implementation using HeroUI Modal.
+ * Mobile bottom drawer implementation using vaul.
+ * Supports drag gestures, snap points, and spring animations.
  */
 function MobileBottomDrawer({
   isOpen,
@@ -35,28 +36,30 @@ function MobileBottomDrawer({
   onClose: () => void;
   children: ReactNode;
 }) {
+  // Snap points: 60% (initial), 90% (expanded), close on drag below threshold
+  const snapPoints = [0.6, 0.9];
+
   return (
-    <Modal.Backdrop
-      isOpen={isOpen}
+    <Drawer.Root
+      open={isOpen}
       onOpenChange={(open) => !open && onClose()}
-      isDismissable
-      className="data-[entering]:animate-in data-[entering]:fade-in-0 data-[entering]:duration-200 data-[exiting]:animate-out data-[exiting]:fade-out-0 data-[exiting]:duration-150"
+      snapPoints={snapPoints}
+      activeSnapPoint={snapPoints[0]}
+      fadeFromIndex={0}
     >
-      <Modal.Container className="flex items-end justify-center h-full w-full p-0">
-        <Modal.Dialog
-          className="w-full h-[85vh] max-h-[85vh] rounded-t-2xl shadow-xl bg-background flex flex-col p-0 data-[entering]:animate-in data-[entering]:slide-in-from-bottom data-[entering]:duration-300 data-[exiting]:animate-out data-[exiting]:slide-out-to-bottom data-[exiting]:duration-200"
-          role="dialog"
-          aria-modal="true"
+      <Drawer.Portal>
+        <Drawer.Overlay className="fixed inset-0 z-40 bg-black/40" />
+        <Drawer.Content
+          className="fixed bottom-0 left-0 right-0 z-50 flex flex-col rounded-t-2xl bg-background outline-none"
+          style={{ maxHeight: '90vh' }}
           aria-label="Task details panel"
         >
-          {/* Drag handle indicator */}
-          <div className="flex justify-center pt-3 pb-2 shrink-0">
-            <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
-          </div>
-          <div className="flex-1 overflow-hidden flex flex-col">{children}</div>
-        </Modal.Dialog>
-      </Modal.Container>
-    </Modal.Backdrop>
+          {/* Functional drag handle */}
+          <Drawer.Handle className="mx-auto mt-3 mb-2 h-1.5 w-12 shrink-0 rounded-full bg-muted-foreground/30" />
+          <div className="flex-1 overflow-hidden flex flex-col pb-safe">{children}</div>
+        </Drawer.Content>
+      </Drawer.Portal>
+    </Drawer.Root>
   );
 }
 

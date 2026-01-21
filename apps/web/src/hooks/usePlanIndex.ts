@@ -162,6 +162,7 @@ export interface PlanIndexState {
  */
 export function usePlanIndex(currentUsername: string | undefined): PlanIndexState {
   const { ydoc, syncState } = useMultiProviderSync(PLAN_INDEX_DOC_NAME);
+
   const [allPlansData, setAllPlansData] = useState<{
     active: PlanIndexEntry[];
     archived: PlanIndexEntry[];

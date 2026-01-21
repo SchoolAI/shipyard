@@ -23,6 +23,9 @@ function handleSubscribe(platform: PlatformAdapter, ws: unknown, message: Subscr
   for (const topic of message.topics ?? []) {
     if (typeof topic !== 'string') continue;
     platform.subscribeToTopic(ws, topic);
+    // Log subscription for debugging
+    const subscriberCount = platform.getTopicSubscribers(topic).length;
+    platform.debug(`[Subscribe] Client subscribed to topic: ${topic} (now ${subscriberCount} subscribers)`);
   }
 }
 

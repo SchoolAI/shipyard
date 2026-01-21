@@ -21,7 +21,15 @@ function handlePublish(platform: PlatformAdapter, ws: unknown, message: PublishM
   if (!message.topic) return;
 
   const subscribers = platform.getTopicSubscribers(message.topic);
-  if (subscribers.length === 0) return;
+
+  // Log publish attempt for debugging
+  const recipientCount = subscribers.filter(s => s !== ws).length;
+  platform.debug(`[Publish] Topic: ${message.topic}, subscribers: ${subscribers.length}, will relay to: ${recipientCount}`);
+
+  if (subscribers.length === 0) {
+    platform.debug(`[Publish] No subscribers for topic: ${message.topic}`);
+    return;
+  }
 
   // Add client count to message (y-webrtc uses this)
   const outMessage: PublishMessage = {

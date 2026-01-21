@@ -52,9 +52,36 @@ function getOrCreateWebrtcProvider(
     releaseWebrtcProvider(roomName);
   }
 
-  // Create new provider
+  // Create new provider with ICE server configuration for better NAT traversal
+  // STUN servers help establish direct peer connections
+  // TURN servers relay traffic when direct connection fails (common on mobile)
+
+  // Build ICE servers configuration
+  const iceServers: RTCIceServer[] = [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+  ];
+
+  // Add TURN server if configured via environment variables
+  const turnUrl = import.meta.env.VITE_TURN_URL as string | undefined;
+  const turnUsername = import.meta.env.VITE_TURN_USERNAME as string | undefined;
+  const turnCredential = import.meta.env.VITE_TURN_CREDENTIAL as string | undefined;
+
+  if (turnUrl && turnUsername && turnCredential) {
+    iceServers.push({
+      urls: turnUrl,
+      username: turnUsername,
+      credential: turnCredential,
+    });
+  }
+
   const provider = new WebrtcProvider(roomName, ydoc, {
     signaling: [signalingServer],
+    peerOpts: {
+      config: {
+        iceServers,
+      },
+    },
   });
 
   webrtcProviderCache.set(roomName, {
@@ -302,6 +329,11 @@ export function useMultiProviderSync(
       // Use cached provider to avoid duplicate room errors in StrictMode
       rtc = getOrCreateWebrtcProvider(roomName, ydoc, signalingServer);
       setRtcProvider(rtc);
+
+      // Expose provider on window for debugging (only for plan-index)
+      if (docName === 'plan-index') {
+        (window as unknown as { planIndexRtcProvider: WebrtcProvider }).planIndexRtcProvider = rtc;
+      }
 
       // Set basic awareness for user presence (name and color only)
       const awareness = rtc.awareness;

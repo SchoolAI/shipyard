@@ -376,7 +376,7 @@ function EventInboxItem({ item, onView, onMarkRead, onMarkUnread }: EventInboxIt
 
 type InboxAccordionSectionProps = PropsWithChildren<{
   id: string;
-  icon: JSX.Element;
+  icon: React.JSX.Element;
   iconColorClass: string;
   title: string;
   count: number;
