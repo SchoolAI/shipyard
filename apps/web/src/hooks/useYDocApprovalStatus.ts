@@ -5,7 +5,7 @@ import {
   isUserRejected,
   YDOC_KEYS,
 } from '@shipyard/schema';
-import { useCallback, useSyncExternalStore } from 'react';
+import { useCallback, useRef, useSyncExternalStore } from 'react';
 import type * as Y from 'yjs';
 
 export type ApprovalStatus = 'pending' | 'approved' | 'rejected';
@@ -44,6 +44,11 @@ export function useYDocApprovalStatus(
   ydoc: Y.Doc,
   userId: string | null
 ): YDocApprovalStatusResult {
+  // Cache the last snapshot to prevent infinite re-renders from useSyncExternalStore.
+  // useSyncExternalStore uses Object.is() to compare snapshots, so returning a new
+  // object every time (even with identical values) causes infinite update loops.
+  const cachedSnapshot = useRef<YDocApprovalStatusResult | null>(null);
+
   // Subscribe to Y.Doc metadata changes
   const subscribe = useCallback(
     (callback: () => void) => {
@@ -55,13 +60,17 @@ export function useYDocApprovalStatus(
   );
 
   // Get current approval status snapshot from Y.Doc
+  // IMPORTANT: Must return the same object reference if values haven't changed
+  // to avoid infinite update loops in useSyncExternalStore
   const getSnapshot = useCallback((): YDocApprovalStatusResult => {
     const ownerId = getPlanOwnerId(ydoc);
     const requiresApproval = isApprovalRequired(ydoc);
 
+    let newSnapshot: YDocApprovalStatusResult;
+
     // If approval is not required (no ownerId), everyone has access
     if (!requiresApproval) {
-      return {
+      newSnapshot = {
         status: undefined,
         isPending: false,
         isApproved: true, // No approval required = effectively approved
@@ -69,11 +78,39 @@ export function useYDocApprovalStatus(
         requiresApproval: false,
         ownerId,
       };
-    }
-
-    // User not authenticated - they are pending until they authenticate
-    if (!userId) {
-      return {
+    } else if (!userId) {
+      // User not authenticated - they are pending until they authenticate
+      newSnapshot = {
+        status: 'pending',
+        isPending: true,
+        isApproved: false,
+        isRejected: false,
+        requiresApproval: true,
+        ownerId,
+      };
+    } else if (isUserRejected(ydoc, userId)) {
+      // Check rejection first (rejected takes precedence)
+      newSnapshot = {
+        status: 'rejected',
+        isPending: false,
+        isApproved: false,
+        isRejected: true,
+        requiresApproval: true,
+        ownerId,
+      };
+    } else if (isUserApproved(ydoc, userId)) {
+      // Check if user is approved (owner is always approved)
+      newSnapshot = {
+        status: 'approved',
+        isPending: false,
+        isApproved: true,
+        isRejected: false,
+        requiresApproval: true,
+        ownerId,
+      };
+    } else {
+      // User is pending approval
+      newSnapshot = {
         status: 'pending',
         isPending: true,
         isApproved: false,
@@ -83,39 +120,23 @@ export function useYDocApprovalStatus(
       };
     }
 
-    // Check rejection first (rejected takes precedence)
-    if (isUserRejected(ydoc, userId)) {
-      return {
-        status: 'rejected',
-        isPending: false,
-        isApproved: false,
-        isRejected: true,
-        requiresApproval: true,
-        ownerId,
-      };
+    // Return cached snapshot if values haven't changed (prevents infinite loops)
+    const cached = cachedSnapshot.current;
+    if (
+      cached &&
+      cached.status === newSnapshot.status &&
+      cached.isPending === newSnapshot.isPending &&
+      cached.isApproved === newSnapshot.isApproved &&
+      cached.isRejected === newSnapshot.isRejected &&
+      cached.requiresApproval === newSnapshot.requiresApproval &&
+      cached.ownerId === newSnapshot.ownerId
+    ) {
+      return cached;
     }
 
-    // Check if user is approved (owner is always approved)
-    if (isUserApproved(ydoc, userId)) {
-      return {
-        status: 'approved',
-        isPending: false,
-        isApproved: true,
-        isRejected: false,
-        requiresApproval: true,
-        ownerId,
-      };
-    }
-
-    // User is pending approval
-    return {
-      status: 'pending',
-      isPending: true,
-      isApproved: false,
-      isRejected: false,
-      requiresApproval: true,
-      ownerId,
-    };
+    // Cache and return the new snapshot
+    cachedSnapshot.current = newSnapshot;
+    return newSnapshot;
   }, [ydoc, userId]);
 
   // Use useSyncExternalStore for safe concurrent rendering
