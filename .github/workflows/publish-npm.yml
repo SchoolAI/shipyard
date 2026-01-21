@@ -7,7 +7,7 @@ run-name: >-
       && 'Publish RC'
       || startsWith(github.ref, 'refs/tags/v')
       && format('Release {0}', github.ref_name)
-      || format('Auto RC ({0})', github.sha) }}
+      || github.event.head_commit.message }}
 
 on:
   push:
