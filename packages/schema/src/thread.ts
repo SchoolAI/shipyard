@@ -1,32 +1,16 @@
 import { z } from 'zod';
 
 /**
- * BlockNote comment content - can be a string or structured content.
+ * Zod schema for comment body - can be a string or structured content.
  * BlockNote stores comment bodies as arrays of block content.
  */
-export type CommentBody = string | unknown[];
+export const CommentBodySchema = z.union([z.string(), z.array(z.unknown())]);
 
 /**
- * A single comment within a thread.
+ * BlockNote comment content - can be a string or structured content.
+ * Schema is source of truth - type derived via z.infer.
  */
-export interface ThreadComment {
-  id: string;
-  userId: string;
-  /** Comment content - may be string or BlockNote block structure */
-  body: CommentBody;
-  createdAt: number;
-}
-
-/**
- * A comment thread attached to selected text.
- */
-export interface Thread {
-  id: string;
-  comments: ThreadComment[];
-  resolved?: boolean;
-  /** The text that was selected when the comment was created */
-  selectedText?: string;
-}
+export type CommentBody = z.infer<typeof CommentBodySchema>;
 
 /**
  * Zod schema for thread comment validation.
@@ -34,9 +18,15 @@ export interface Thread {
 export const ThreadCommentSchema = z.object({
   id: z.string(),
   userId: z.string(),
-  body: z.union([z.string(), z.array(z.unknown())]),
+  body: CommentBodySchema,
   createdAt: z.number(),
 });
+
+/**
+ * Individual comment within a thread.
+ * Schema is source of truth - type derived via z.infer.
+ */
+export type ThreadComment = z.infer<typeof ThreadCommentSchema>;
 
 /**
  * Zod schema for thread validation.
@@ -47,6 +37,12 @@ export const ThreadSchema = z.object({
   resolved: z.boolean().optional(),
   selectedText: z.string().optional(),
 });
+
+/**
+ * Comment thread on a plan block.
+ * Schema is source of truth - type derived via z.infer.
+ */
+export type Thread = z.infer<typeof ThreadSchema>;
 
 /**
  * Type guard for checking if a value is a valid Thread.

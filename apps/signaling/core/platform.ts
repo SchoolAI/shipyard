@@ -165,6 +165,58 @@ export interface PlatformAdapter {
    */
   unsubscribeFromAllTopics(ws: unknown): void;
 
+  // --- Message Queue Operations ---
+  // Messages may need to be queued when a connection doesn't have a userId yet.
+  // Once the userId is set, queued messages can be flushed after approval check.
+  // All queued messages have a TTL to prevent memory exhaustion from stale connections.
+
+  /**
+   * Queue a message for delivery to a connection.
+   * Used when we can't determine approval status (no userId).
+   * Messages are queued per-topic to allow selective flushing.
+   * Messages older than MESSAGE_QUEUE_TTL_MS (30 seconds) are automatically expired.
+   *
+   * @param ws - WebSocket connection to queue message for
+   * @param topic - Topic the message belongs to (for selective flushing)
+   * @param message - Message to queue
+   */
+  queueMessageForConnection(ws: unknown, topic: string, message: unknown): void;
+
+  /**
+   * Get all queued messages for a connection grouped by topic.
+   * Returns a map of topic -> messages (excluding expired messages).
+   * Clears the queue after returning.
+   *
+   * @param ws - WebSocket connection to get queued messages for
+   */
+  getAndClearQueuedMessages(ws: unknown): Map<string, unknown[]>;
+
+  /**
+   * Clear all queued messages for a connection.
+   * Called when connection closes or is explicitly rejected.
+   *
+   * @param ws - WebSocket connection to clear queue for
+   */
+  clearQueuedMessages(ws: unknown): void;
+
+  /**
+   * Check if a connection is currently flushing its message queue.
+   * Used to prevent race conditions during queue flush.
+   *
+   * @param ws - WebSocket connection to check
+   * @returns true if currently flushing, false otherwise
+   */
+  isFlushingMessages(ws: unknown): boolean;
+
+  /**
+   * Mark a connection as flushing (or not flushing) its message queue.
+   * Used to prevent concurrent message sends during flush.
+   *
+   * @param ws - WebSocket connection to mark
+   * @param flushing - true when starting flush, false when done
+   */
+  setFlushingMessages(ws: unknown, flushing: boolean): void;
+
   // --- Logging ---
   // Simple logging interface. Implementations can use console, Durable Object
   // ctx.waitUntil(), or other platform-specific mechanisms.

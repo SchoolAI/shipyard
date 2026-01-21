@@ -149,6 +149,8 @@ export interface PlanIndexState {
   markPlanAsUnread: (planId: string) => Promise<void>;
   /** Force refresh of inbox unread states */
   refreshInboxUnreadState: () => void;
+  /** The plan-index Y.Doc for direct access (e.g., useInputRequests) */
+  ydoc: Y.Doc;
 }
 
 /**
@@ -293,13 +295,22 @@ export function usePlanIndex(currentUsername: string | undefined): PlanIndexStat
       }, 100);
     };
 
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        discoverIndexedDBPlans();
+      }
+    };
+
     window.addEventListener('indexeddb-plan-synced', handlePlanSynced);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
     return () => {
       isActive = false;
       if (debounceTimer) {
         clearTimeout(debounceTimer);
       }
       window.removeEventListener('indexeddb-plan-synced', handlePlanSynced);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [allPlansData.active, currentUsername]);
 
@@ -516,5 +527,6 @@ export function usePlanIndex(currentUsername: string | undefined): PlanIndexStat
     markPlanAsRead,
     markPlanAsUnread,
     refreshInboxUnreadState,
+    ydoc,
   };
 }

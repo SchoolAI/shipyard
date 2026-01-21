@@ -1,15 +1,13 @@
 import { Button, Chip, Tooltip } from '@heroui/react';
-import { PLAN_INDEX_DOC_NAME } from '@shipyard/schema';
 import { Archive, ChevronRight, Inbox, LayoutGrid, Search } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { AccountSection } from '@/components/account';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { CollapsiblePanel } from '@/components/ui/collapsible-panel';
-import { useGitHubAuth } from '@/hooks/useGitHubAuth';
+import { getPlanRoute } from '@/constants/routes';
+import { usePlanIndexContext } from '@/contexts/PlanIndexContext';
 import { useInputRequests } from '@/hooks/useInputRequests';
-import { useMultiProviderSync } from '@/hooks/useMultiProviderSync';
-import { usePlanIndex } from '@/hooks/usePlanIndex';
 import { getSidebarCollapsed, setSidebarCollapsed } from '@/utils/uiPreferences';
 
 interface NavItemProps {
@@ -207,11 +205,14 @@ interface SidebarProps {
 }
 
 export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
-  const { identity: githubIdentity } = useGitHubAuth();
-  const { inboxPlans, archivedPlans, navigationTarget, clearNavigation, isLoading } = usePlanIndex(
-    githubIdentity?.username
-  );
-  const { ydoc: indexDoc } = useMultiProviderSync(PLAN_INDEX_DOC_NAME);
+  const {
+    inboxPlans,
+    archivedPlans,
+    navigationTarget,
+    clearNavigation,
+    isLoading,
+    ydoc: indexDoc,
+  } = usePlanIndexContext();
   const { pendingRequests } = useInputRequests({ ydoc: indexDoc });
   const [collapsed, setCollapsed] = useState(getSidebarCollapsed);
   const navigate = useNavigate();
@@ -224,7 +225,7 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
 
   useEffect(() => {
     if (!navigationTarget) return;
-    const targetPath = `/plan/${navigationTarget}`;
+    const targetPath = getPlanRoute(navigationTarget);
     if (location.pathname !== targetPath) {
       navigate(targetPath);
     }
@@ -251,7 +252,7 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
     <>
       <div className="px-3 py-3 border-b border-separator flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <img src="/icon.svg" alt="Shipyard" className="w-5 h-5" />
+          <img src={`${import.meta.env.BASE_URL}icon.svg`} alt="Shipyard" className="w-5 h-5" />
           <h2 className="font-semibold text-lg text-foreground">Shipyard</h2>
         </div>
         <div className="flex items-center gap-1">

@@ -12,7 +12,12 @@
 import type { CreateHookSessionResponse } from '@shipyard/schema';
 import { computeHash } from '@shipyard/shared';
 import { DEFAULT_AGENT_TYPE } from '../constants.js';
-import { createSession, updatePlanContent, updatePresence } from '../http-client.js';
+import {
+  createSession,
+  getSessionContext,
+  updatePlanContent,
+  updatePresence,
+} from '../http-client.js';
 import { logger } from '../logger.js';
 
 const sessionToPlan = new Map<
@@ -62,6 +67,23 @@ export async function updateContent(options: UpdateContentOptions): Promise<bool
   const { sessionId, filePath, content, agentType } = options;
 
   let session = sessionToPlan.get(sessionId);
+
+  /** If not in local cache, check server registry (handles CLI process restarts) */
+  if (!session) {
+    try {
+      const serverSession = await getSessionContext(sessionId);
+      if (serverSession.found && serverSession.planId) {
+        logger.info(
+          { sessionId, planId: serverSession.planId },
+          'Found existing session on server'
+        );
+        session = { planId: serverSession.planId };
+        sessionToPlan.set(sessionId, session);
+      }
+    } catch (err) {
+      logger.debug({ sessionId, err }, 'Could not fetch session from server');
+    }
+  }
 
   if (!session) {
     logger.info({ sessionId, filePath }, 'First write detected, creating plan');

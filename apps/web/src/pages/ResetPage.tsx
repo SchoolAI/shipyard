@@ -23,7 +23,9 @@ export function ResetPage() {
         const delay = hasErrors ? 8000 : 3000;
         setTimeout(() => {
           removeResetParam();
-          window.location.href = '/';
+          // Use base path for GitHub Pages subdirectory deployment
+          const basePath = import.meta.env.BASE_URL || '/';
+          window.location.href = basePath;
         }, delay);
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e));

@@ -94,6 +94,7 @@ export interface TransitionToInProgress {
   status: 'in_progress';
   reviewedAt?: number;
   reviewedBy?: string;
+  reviewComment?: string;
 }
 
 /**
@@ -186,6 +187,78 @@ export function setPlanMetadata(
 }
 
 /**
+ * Apply pending_review transition fields to metadata map.
+ */
+function applyPendingReviewTransition(
+  map: Y.Map<unknown>,
+  transition: TransitionToPendingReview
+): void {
+  map.set('reviewRequestId', transition.reviewRequestId);
+}
+
+/**
+ * Apply changes_requested transition fields to metadata map.
+ */
+function applyChangesRequestedTransition(
+  map: Y.Map<unknown>,
+  transition: TransitionToChangesRequested
+): void {
+  map.set('reviewedAt', transition.reviewedAt);
+  map.set('reviewedBy', transition.reviewedBy);
+  if (transition.reviewComment !== undefined) {
+    map.set('reviewComment', transition.reviewComment);
+  }
+}
+
+/**
+ * Apply in_progress transition fields to metadata map.
+ */
+function applyInProgressTransition(map: Y.Map<unknown>, transition: TransitionToInProgress): void {
+  if (transition.reviewedAt !== undefined) {
+    map.set('reviewedAt', transition.reviewedAt);
+  }
+  if (transition.reviewedBy !== undefined) {
+    map.set('reviewedBy', transition.reviewedBy);
+  }
+  if (transition.reviewComment !== undefined) {
+    map.set('reviewComment', transition.reviewComment);
+  }
+}
+
+/**
+ * Apply completed transition fields to metadata map.
+ */
+function applyCompletedTransition(map: Y.Map<unknown>, transition: TransitionToCompleted): void {
+  map.set('completedAt', transition.completedAt);
+  map.set('completedBy', transition.completedBy);
+  if (transition.snapshotUrl !== undefined) {
+    map.set('snapshotUrl', transition.snapshotUrl);
+  }
+}
+
+/**
+ * Apply status-specific transition fields to metadata map.
+ */
+function applyStatusTransitionFields(map: Y.Map<unknown>, transition: StatusTransition): void {
+  switch (transition.status) {
+    case 'pending_review':
+      applyPendingReviewTransition(map, transition);
+      break;
+    case 'changes_requested':
+      applyChangesRequestedTransition(map, transition);
+      break;
+    case 'in_progress':
+      applyInProgressTransition(map, transition);
+      break;
+    case 'completed':
+      applyCompletedTransition(map, transition);
+      break;
+    default:
+      assertNever(transition);
+  }
+}
+
+/**
  * Transition plan status with state machine validation.
  * Enforces valid status transitions and ensures required fields are provided.
  *
@@ -219,43 +292,8 @@ export function transitionPlanStatus(
   ydoc.transact(
     () => {
       const map = ydoc.getMap(YDOC_KEYS.METADATA);
-
       map.set('status', transition.status);
-
-      switch (transition.status) {
-        case 'pending_review':
-          map.set('reviewRequestId', transition.reviewRequestId);
-          break;
-
-        case 'changes_requested':
-          map.set('reviewedAt', transition.reviewedAt);
-          map.set('reviewedBy', transition.reviewedBy);
-          if (transition.reviewComment !== undefined) {
-            map.set('reviewComment', transition.reviewComment);
-          }
-          break;
-
-        case 'in_progress':
-          if (transition.reviewedAt !== undefined) {
-            map.set('reviewedAt', transition.reviewedAt);
-          }
-          if (transition.reviewedBy !== undefined) {
-            map.set('reviewedBy', transition.reviewedBy);
-          }
-          break;
-
-        case 'completed':
-          map.set('completedAt', transition.completedAt);
-          map.set('completedBy', transition.completedBy);
-          if (transition.snapshotUrl !== undefined) {
-            map.set('snapshotUrl', transition.snapshotUrl);
-          }
-          break;
-
-        default:
-          assertNever(transition);
-      }
-
+      applyStatusTransitionFields(map, transition);
       map.set('updatedAt', Date.now());
     },
     actor ? { actor } : undefined

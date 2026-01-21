@@ -193,27 +193,66 @@ export function useInviteToken(
   }, [planId, githubIdentity, sendToSignaling]);
 
   // Auto-redeem when conditions are met
+  // Uses event-based approach instead of polling for signaling connection
   useEffect(() => {
     if (
-      hasInviteToken &&
-      githubIdentity &&
-      rtcProvider &&
-      !hasAttemptedRef.current &&
-      (redemptionState.status === 'has_invite' || redemptionState.status === 'waiting_for_auth')
+      !hasInviteToken ||
+      !githubIdentity ||
+      !rtcProvider ||
+      hasAttemptedRef.current ||
+      (redemptionState.status !== 'has_invite' && redemptionState.status !== 'waiting_for_auth')
     ) {
-      // Check if signaling is connected before attempting
-      const signalingConns = (
-        rtcProvider as unknown as { signalingConns: Array<{ ws: WebSocket }> }
-      ).signalingConns;
+      return;
+    }
 
-      const hasOpenConnection = signalingConns?.some(
-        (conn) => conn.ws && conn.ws.readyState === WebSocket.OPEN
-      );
+    /**
+     * Typed interface for SignalingConn from y-webrtc.
+     * Based on lib0/websocket.WebsocketClient which extends Observable.
+     */
+    interface SignalingConn {
+      ws: WebSocket | null;
+      connected: boolean;
+      on(event: 'connect', handler: () => void): void;
+      off(event: 'connect', handler: () => void): void;
+    }
 
-      if (hasOpenConnection) {
+    const signalingConns = (rtcProvider as unknown as { signalingConns?: SignalingConn[] })
+      .signalingConns;
+
+    if (!signalingConns || signalingConns.length === 0) return;
+
+    const hasOpenConnection = signalingConns.some(
+      (conn) => conn.ws && conn.ws.readyState === WebSocket.OPEN
+    );
+
+    if (hasOpenConnection) {
+      redeemInvite();
+      return;
+    }
+
+    // Listen for 'connect' event instead of polling
+    const handlers: Array<{ conn: SignalingConn; handler: () => void }> = [];
+
+    const onConnect = () => {
+      if (!hasAttemptedRef.current) {
         redeemInvite();
       }
+      // Clean up all handlers after first connection
+      for (const { conn, handler } of handlers) {
+        conn.off('connect', handler);
+      }
+    };
+
+    for (const conn of signalingConns) {
+      conn.on('connect', onConnect);
+      handlers.push({ conn, handler: onConnect });
     }
+
+    return () => {
+      for (const { conn, handler } of handlers) {
+        conn.off('connect', handler);
+      }
+    };
   }, [hasInviteToken, githubIdentity, rtcProvider, redemptionState.status, redeemInvite]);
 
   return {

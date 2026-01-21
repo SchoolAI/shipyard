@@ -270,14 +270,22 @@ export function useGitHubAuth(): UseGitHubAuthReturn {
     }
   }, []);
 
-  const startAuth = useCallback((forceAccountPicker = false) => {
-    // Store current URL to return to after auth
-    const returnUrl = window.location.pathname + window.location.search + window.location.hash;
-    sessionStorage.setItem(RETURN_URL_KEY, returnUrl);
+  const startAuth = useCallback(
+    (forceAccountPicker = false) => {
+      // Prevent concurrent auth flows
+      if (authState.status === 'exchanging_token') {
+        return;
+      }
 
-    const redirectUri = window.location.origin + (import.meta.env.BASE_URL || '/');
-    startWebFlow(redirectUri, { forceAccountPicker });
-  }, []);
+      // Store current URL to return to after auth
+      const returnUrl = window.location.pathname + window.location.search + window.location.hash;
+      sessionStorage.setItem(RETURN_URL_KEY, returnUrl);
+
+      const redirectUri = window.location.origin + (import.meta.env.BASE_URL || '/');
+      startWebFlow(redirectUri, { forceAccountPicker });
+    },
+    [authState.status]
+  );
 
   const requestRepoAccess = useCallback(() => {
     // Store current URL to return to after auth

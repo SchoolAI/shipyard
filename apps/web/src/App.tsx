@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes, useSearchParams } from 'react-r
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { Layout } from './components/Layout';
 import { ActivePlanSyncProvider } from './contexts/ActivePlanSyncContext';
+import { PlanIndexProvider } from './contexts/PlanIndexContext';
 import { UserIdentityProvider } from './contexts/UserIdentityContext';
 import { useGitHubAuth } from './hooks/useGitHubAuth';
 import { useLocalIdentity } from './hooks/useLocalIdentity';
@@ -29,8 +30,8 @@ function AppRoutes() {
       <Route path="/search" element={<SearchPage />} />
       <Route path="/board" element={<KanbanPage />} />
       <Route path="/archive" element={<ArchivePage />} />
-      {/* PlanPage handles both normal plans (/plan/:id) and snapshots (/?d=...) */}
-      <Route path="/plan/:id" element={<PlanPage />} />
+      {/* PlanPage handles both /task/:id and snapshots (/?d=...) */}
+      <Route path="/task/:id" element={<PlanPage />} />
       <Route path="*" element={<Navigate to="/inbox" replace />} />
     </Routes>
   );
@@ -45,18 +46,19 @@ function AppWithLayout() {
 
   // Check for reset param before any providers initialize
   // This prevents sync attempts that would re-populate storage
-  // ONLY available in development mode for safety
-  if (import.meta.env.DEV && hasResetParam()) {
+  if (hasResetParam()) {
     return <ResetPage />;
   }
 
   return (
     <UserIdentityProvider githubIdentity={identity} localIdentity={localIdentity}>
-      <ActivePlanSyncProvider>
-        <Layout>
-          <AppRoutes />
-        </Layout>
-      </ActivePlanSyncProvider>
+      <PlanIndexProvider>
+        <ActivePlanSyncProvider>
+          <Layout>
+            <AppRoutes />
+          </Layout>
+        </ActivePlanSyncProvider>
+      </PlanIndexProvider>
     </UserIdentityProvider>
   );
 }

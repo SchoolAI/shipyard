@@ -9,12 +9,13 @@ port = 4445
 local_protocol = "http"
 
 # Environment variables (non-secret)
+# Default to production since that's what the deployed worker should be
 [vars]
-ENVIRONMENT = "development"
-
-# Production environment overrides
-[env.production.vars]
 ENVIRONMENT = "production"
+
+# Development environment overrides (use: wrangler dev --env development)
+[env.development.vars]
+ENVIRONMENT = "development"
 
 # Secrets (set via wrangler secret put):
 # - GITHUB_CLIENT_ID

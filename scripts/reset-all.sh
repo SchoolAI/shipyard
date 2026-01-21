@@ -51,12 +51,12 @@ PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 # --- Step 1: Kill all shipyard processes ---
 echo "🔪 Step 1: Killing all shipyard processes..."
 
-# Get all PIDs for shipyard/peer-plan directory (excludes worktrees and VS Code)
-# Matches: Working Directory/shipyard/ OR Working Directory/peer-plan/
+# Get all PIDs for shipyard directory (excludes worktrees and VS Code)
+# Matches: Working Directory/shipyard/
 # Excludes: shipyard-wt/, biome lsp-proxy, tmux sessions
 echo "  Finding shipyard processes..."
 pids=$(ps aux | \
-  grep -E "Working Directory/(shipyard|peer-plan)/" | \
+  grep -E "Working Directory/shipyard/" | \
   grep -v "shipyard-wt" | \
   grep -v "biome lsp-proxy" | \
   grep -v "biome __run_server" | \

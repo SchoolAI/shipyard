@@ -1,9 +1,9 @@
 ---
 name: shipyard
-description: Create verified work plans with proof-of-work tracking. Use when tasks need human review, artifact evidence, or collaboration.
+description: Create verified work tasks with proof-of-work tracking. Use when tasks need human review, artifact evidence, or collaboration.
 ---
 
-# Shipyard: Verified Work Plans
+# Shipyard: Verified Work Tasks
 
 Use this skill when doing work that needs:
 - Human review before completion
@@ -13,7 +13,7 @@ Use this skill when doing work that needs:
 
 ## Quick Start
 
-1. **Create a plan** with deliverables (provable outcomes)
+1. **Create a task** with deliverables (provable outcomes)
 2. **Do the work** and capture artifacts as you go
 3. **Upload artifacts** linked to deliverables
 4. **Auto-complete** when all deliverables are satisfied
@@ -37,7 +37,7 @@ Deliverables are outcomes you can PROVE with artifacts. Mark them with `{#delive
 Shipyard uses ONE tool called `execute_code` that runs TypeScript code.
 Write code that calls our APIs - NOT individual MCP tool calls.
 
-### Step 1: Create Plan
+### Step 1: Create Task
 
 Use `execute_code` with:
 
@@ -45,7 +45,7 @@ Use `execute_code` with:
 const plan = await createPlan({
   title: "Your Task Name",
   content: `
-# Implementation Plan
+# Implementation Task
 
 ## Deliverables
 - [ ] Screenshot of completed feature {#deliverable}
@@ -68,7 +68,7 @@ const { planId, sessionToken, deliverables } = plan;
 // ]
 ```
 
-The browser will open automatically showing your plan.
+The browser will open automatically showing your task.
 
 ### Step 2: Do the Work
 
@@ -123,10 +123,10 @@ Your platform may have built-in tools like:
 - Other agents: Various question/input mechanisms
 
 **Use Shipyard's version instead** because:
-- ✅ Shows in the browser UI (where users are already viewing plans)
+- ✅ Shows in the browser UI (where users are already viewing tasks)
 - ✅ Integrates with the activity log
 - ✅ Consistent UX across all agent platforms
-- ✅ Can be linked to specific plans (via `planId` parameter)
+- ✅ Can be linked to specific tasks (via `planId` parameter)
 
 **Standalone tool:**
 ```typescript
@@ -154,11 +154,11 @@ const result = await requestUserInput({
 | API | Purpose |
 |-----|---------|
 | `requestUserInput(opts)` | Ask user a question (use instead of built-in tools) |
-| `createPlan(opts)` | Start a new verified plan |
+| `createPlan(opts)` | Start a new verified task |
 | `addArtifact(opts)` | Upload proof (screenshot, video, test_results, diff) |
 | `readPlan(planId, token, opts)` | Check status and reviewer feedback |
 | `updatePlan(planId, token, updates)` | Manually change status (rarely needed) |
-| `linkPR(opts)` | Link a GitHub PR to the plan |
+| `linkPR(opts)` | Link a GitHub PR to the task |
 | `setupReviewNotification(planId)` | Get script to wait for approval |
 
 ## Complete Example
@@ -166,7 +166,7 @@ const result = await requestUserInput({
 Here's a full workflow for adding a dark mode feature:
 
 ```typescript
-// 1. Create the plan with deliverables
+// 1. Create the task with deliverables
 const plan = await createPlan({
   title: "Add dark mode toggle",
   content: `

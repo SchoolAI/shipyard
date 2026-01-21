@@ -16,10 +16,12 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { type NodeApi, type NodeRendererProps, Tree, type TreeApi } from 'react-arborist';
+import { toast } from 'sonner';
 import type * as Y from 'yjs';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
 import { useLinkedPRs } from '@/hooks/useLinkedPRs';
 import { usePRReviewComments } from '@/hooks/usePRReviewComments';
+import { assertNever } from '@/utils/assert-never';
 
 // --- Types ---
 
@@ -178,15 +180,24 @@ interface PRCardProps {
 }
 
 function PRCard({ pr, selected, onSelect }: PRCardProps) {
-  // Map PR status to HeroUI Chip color
-  const statusColor: 'default' | 'success' | 'accent' | 'danger' =
-    pr.status === 'draft'
-      ? 'default'
-      : pr.status === 'open'
-        ? 'success'
-        : pr.status === 'merged'
-          ? 'accent'
-          : 'danger';
+  // Map PR status to HeroUI Chip color using exhaustive switch
+  const getStatusColor = (
+    status: LinkedPR['status']
+  ): 'default' | 'success' | 'accent' | 'danger' => {
+    switch (status) {
+      case 'draft':
+        return 'default';
+      case 'open':
+        return 'success';
+      case 'merged':
+        return 'accent';
+      case 'closed':
+        return 'danger';
+      default:
+        assertNever(status);
+    }
+  };
+  const statusColor = getStatusColor(pr.status);
 
   return (
     <button
@@ -223,13 +234,14 @@ interface PRHeaderProps {
 function PRHeader({ pr, repo, ydoc }: PRHeaderProps) {
   const [isPublishing, setIsPublishing] = useState(false);
   const [publishError, setPublishError] = useState<string | null>(null);
-  const { identity } = useGitHubAuth();
+  const { identity, startAuth } = useGitHubAuth();
 
   const handlePublish = useCallback(async () => {
     if (!repo) return;
 
     if (!identity?.token) {
-      setPublishError('GitHub authentication required');
+      toast.info('Sign in with GitHub to publish this PR');
+      startAuth();
       return;
     }
 
@@ -262,7 +274,7 @@ function PRHeader({ pr, repo, ydoc }: PRHeaderProps) {
     } finally {
       setIsPublishing(false);
     }
-  }, [repo, pr.prNumber, ydoc, identity?.token]);
+  }, [repo, pr.prNumber, ydoc, identity?.token, startAuth]);
 
   const isDraft = pr.status === 'draft';
 

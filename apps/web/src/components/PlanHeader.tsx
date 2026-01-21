@@ -292,7 +292,7 @@ function DesktopActions({
         isIconOnly
         variant="ghost"
         size="sm"
-        aria-label={isArchived ? 'Unarchive plan' : 'Archive plan'}
+        aria-label={isArchived ? 'Unarchive task' : 'Archive task'}
         onPress={onArchiveToggle}
         className="touch-target"
       >

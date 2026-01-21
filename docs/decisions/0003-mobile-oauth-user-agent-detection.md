@@ -102,7 +102,7 @@ interface TokenExchangeResponse {
 
 ### Manual Testing (Required for Production)
 1. **iOS Safari:**
-   - Open `https://schoolai.github.io/Shipyard` on iPhone
+   - Open `https://schoolai.github.io/shipyard` on iPhone
    - Sign in with GitHub
    - Verify: OAuth flow completes successfully in mobile browser
    - Check console logs for `[OAuth] Mobile device detected` message
@@ -125,8 +125,8 @@ interface TokenExchangeResponse {
 If a Shipyard mobile app is developed and deep linking is configured:
 
 1. **Create separate OAuth paths:**
-   - Desktop: `https://schoolai.github.io/Shipyard/`
-   - Mobile: `https://schoolai.github.io/Shipyard/oauth-mobile`
+   - Desktop: `https://schoolai.github.io/shipyard/`
+   - Mobile: `https://schoolai.github.io/shipyard/oauth-mobile`
 
 2. **Update `.well-known` configuration:**
    ```json

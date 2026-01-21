@@ -3,13 +3,23 @@
  * Shows plan title, status, deliverables progress, and quick actions.
  */
 
+import type { BlockNoteEditor } from '@blocknote/core';
 import { Button, Chip } from '@heroui/react';
 import type { PlanMetadata, PlanStatusType } from '@shipyard/schema';
 import { AlertTriangle, Check, Clock } from 'lucide-react';
+import type * as Y from 'yjs';
 import { assertNever } from '../utils/assert-never';
 import { PanelControlButtons } from './PanelControlButtons';
 import type { PanelWidth } from './PlanPanel';
+import { ReviewActions } from './ReviewActions';
 import { TagChip } from './TagChip';
+
+/** Simple identity type for display purposes */
+interface UserIdentity {
+  id: string;
+  name: string;
+  color: string;
+}
 
 export interface PlanPanelHeaderProps {
   /** Plan metadata */
@@ -18,9 +28,9 @@ export interface PlanPanelHeaderProps {
   deliverableStats: { completed: number; total: number };
   /** Last activity description */
   lastActivityText: string;
-  /** Approve callback */
+  /** Approve callback (fallback when ReviewActions not available) */
   onApprove: () => void;
-  /** Request changes callback */
+  /** Request changes callback (fallback when ReviewActions not available) */
   onRequestChanges: () => void;
   /** Close panel */
   onClose: () => void;
@@ -30,6 +40,17 @@ export interface PlanPanelHeaderProps {
   onFullScreen: () => void;
   /** Current panel width */
   width: PanelWidth;
+  // Optional props for ReviewActions (when provided, shows popover with comment field)
+  /** Y.Doc for the plan - enables ReviewActions */
+  ydoc?: Y.Doc;
+  /** User identity for comments */
+  identity?: UserIdentity | null;
+  /** Called when user needs to authenticate */
+  onRequestIdentity?: () => void;
+  /** BlockNote editor instance */
+  editor?: BlockNoteEditor | null;
+  /** Called after status change (for updating plan index) */
+  onStatusChange?: (newStatus: 'in_progress' | 'changes_requested', updatedAt: number) => void;
 }
 
 /** Map status to display config */
@@ -90,9 +111,17 @@ export function PlanPanelHeader({
   onExpand,
   onFullScreen,
   width,
+  // Optional ReviewActions props
+  ydoc,
+  identity,
+  onRequestIdentity,
+  editor,
+  onStatusChange,
 }: PlanPanelHeaderProps) {
   const statusConfig = getStatusConfig(metadata.status);
   const showReviewActions = metadata.status === 'pending_review';
+  // Use ReviewActions with comment popover when ydoc and onRequestIdentity are provided
+  const canUseReviewActions = ydoc && onRequestIdentity;
 
   return (
     <div className="border-b border-separator bg-surface shrink-0">
@@ -160,23 +189,38 @@ export function PlanPanelHeader({
         {/* Quick action buttons for pending review */}
         {showReviewActions && (
           <div className="flex items-center gap-1.5 shrink-0">
-            <Button
-              size="sm"
-              className="bg-success hover:bg-success-dark text-white h-7 px-2 text-xs"
-              onPress={onApprove}
-            >
-              <Check className="w-3 h-3" />
-              Approve
-            </Button>
-            <Button
-              size="sm"
-              variant="danger"
-              className="h-7 px-2 text-xs"
-              onPress={onRequestChanges}
-            >
-              <AlertTriangle className="w-3 h-3" />
-              Request Changes
-            </Button>
+            {canUseReviewActions ? (
+              // Use ReviewActions with popover and comment field
+              <ReviewActions
+                ydoc={ydoc}
+                currentStatus={metadata.status}
+                identity={identity ?? null}
+                onRequestIdentity={onRequestIdentity}
+                editor={editor ?? null}
+                onStatusChange={onStatusChange}
+              />
+            ) : (
+              // Fallback to simple buttons
+              <>
+                <Button
+                  size="sm"
+                  className="bg-success hover:bg-success-dark text-white h-7 px-2 text-xs"
+                  onPress={onApprove}
+                >
+                  <Check className="w-3 h-3" />
+                  Approve
+                </Button>
+                <Button
+                  size="sm"
+                  variant="danger"
+                  className="h-7 px-2 text-xs"
+                  onPress={onRequestChanges}
+                >
+                  <AlertTriangle className="w-3 h-3" />
+                  Request Changes
+                </Button>
+              </>
+            )}
           </div>
         )}
       </div>

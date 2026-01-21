@@ -26,13 +26,22 @@
 
 See [docs/milestones/PROGRESS.md](./docs/milestones/PROGRESS.md) for full implementation details.
 
+## Distribution
+
+Shipyard is distributed in two ways:
+
+- **Claude Code:** GitHub plugin via `/plugin install SchoolAI/shipyard` (includes MCP + hooks + skills)
+- **Other platforms:** npm package `@schoolai/shipyard-mcp` (MCP server only)
+
+See [docs/INSTALLATION.md](./docs/INSTALLATION.md) for platform-specific setup instructions.
+
 ## Tech Stack (Quick Reference)
 
 - **CRDT:** Yjs (not Loro) — See [ADR-0001](./docs/decisions/0001-use-yjs-not-loro.md)
 - **Block Editor:** BlockNote (Notion-like)
 - **UI Components:** HeroUI v3 (React) — See [HeroUI v3 Guidelines](#heroui-v3-guidelines) below
 - **Sync:** y-websocket (MCP↔browser), y-webrtc (P2P)
-- **Build:** pnpm + tsdown + Biome
+- **Build:** pnpm + tsup + Biome (switched from tsdown due to workspace bundling issues)
 - **Testing:** Vitest with fan-in based coverage
 
 ## HeroUI v3 Guidelines

@@ -25,6 +25,7 @@ import { useNavigate } from 'react-router-dom';
 import { IndexeddbPersistence } from 'y-indexeddb';
 import * as Y from 'yjs';
 import { TagChip } from '@/components/TagChip';
+import { getPlanRoute } from '@/constants/routes';
 import { assertNever } from '@/utils/assert-never';
 import { formatRelativeTime } from '@/utils/formatters';
 
@@ -132,7 +133,7 @@ export function PlanPeekModal({ plan, isOpen, onClose }: PlanPeekModalProps) {
 
   const handleViewFull = () => {
     onClose();
-    navigate(`/plan/${plan.id}`);
+    navigate(getPlanRoute(plan.id));
   };
 
   const completedCount = peekData.deliverables.filter((d) => d.linkedArtifactId).length;

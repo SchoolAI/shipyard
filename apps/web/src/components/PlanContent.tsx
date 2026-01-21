@@ -5,7 +5,12 @@
 
 import type { Block, BlockNoteEditor } from '@blocknote/core';
 import type { Deliverable, PlanMetadata, PlanSnapshot } from '@shipyard/schema';
-import { extractDeliverables, getDeliverables, YDOC_KEYS } from '@shipyard/schema';
+import {
+  extractDeliverables,
+  getDeliverables,
+  type PlanViewTab,
+  YDOC_KEYS,
+} from '@shipyard/schema';
 import { Clock, FileText, GitPullRequest, Package } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { WebrtcProvider } from 'y-webrtc';
@@ -18,8 +23,6 @@ import { DeliverablesView } from '@/components/DeliverablesView';
 import { PlanViewer } from '@/components/PlanViewer';
 import { VersionSelector } from '@/components/VersionSelector';
 import type { SyncState } from '@/hooks/useMultiProviderSync';
-
-type ViewType = 'plan' | 'activity' | 'deliverables' | 'changes';
 
 /** Simple identity type for display purposes */
 interface UserIdentity {
@@ -59,6 +62,8 @@ interface LivePlanContentProps {
   onRequestIdentity: () => void;
   /** Provider for collaboration (WebSocket or WebRTC) */
   provider: CollaborationProvider | null;
+  /** Initial tab to show (defaults to 'plan') */
+  initialTab?: PlanViewTab;
   /** Snapshot to view (when viewing version history) - Issue #42 */
   currentSnapshot?: { content: unknown[] } | null;
   /** Callback to receive editor instance for snapshots - Issue #42 */
@@ -78,6 +83,8 @@ interface SnapshotPlanContentProps {
   syncState: SyncState;
   /** Initial content for snapshots */
   initialContent: unknown[];
+  /** Initial tab to show (defaults to 'plan') */
+  initialTab?: PlanViewTab;
 }
 
 export type PlanContentProps = LivePlanContentProps | SnapshotPlanContentProps;
@@ -88,13 +95,20 @@ export type PlanContentProps = LivePlanContentProps | SnapshotPlanContentProps;
  */
 export function PlanContent(props: PlanContentProps) {
   const { ydoc, metadata, syncState } = props;
-  const [activeView, setActiveView] = useState<ViewType>('plan');
+  const [activeView, setActiveView] = useState<PlanViewTab>(props.initialTab || 'plan');
   const [deliverableCount, setDeliverableCount] = useState({ completed: 0, total: 0 });
+
+  // Update activeView when initialTab changes
+  useEffect(() => {
+    if (props.initialTab) {
+      setActiveView(props.initialTab);
+    }
+  }, [props.initialTab]);
 
   // Listen for external tab switch requests (e.g., from AgentRequestsBadge)
   useEffect(() => {
     const handleSwitchTab = (event: Event) => {
-      const customEvent = event as CustomEvent<{ tab: ViewType }>;
+      const customEvent = event as CustomEvent<{ tab: PlanViewTab }>;
       if (customEvent.detail?.tab) {
         setActiveView(customEvent.detail.tab);
       }

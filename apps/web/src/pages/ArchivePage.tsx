@@ -5,12 +5,7 @@
 
 import { Button, ListBox, ListBoxItem } from '@heroui/react';
 import type { PlanIndexEntry } from '@shipyard/schema';
-import {
-  getPlanIndexEntry,
-  PLAN_INDEX_DOC_NAME,
-  setPlanIndexEntry,
-  unarchivePlan,
-} from '@shipyard/schema';
+import { getPlanIndexEntry, setPlanIndexEntry, unarchivePlan } from '@shipyard/schema';
 import { ArchiveRestore } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -21,10 +16,10 @@ import { InlinePlanDetail } from '@/components/InlinePlanDetail';
 import { OfflineBanner } from '@/components/OfflineBanner';
 import { TagChip } from '@/components/TagChip';
 import { TwoColumnSkeleton } from '@/components/ui/TwoColumnSkeleton';
+import { getPlanRoute } from '@/constants/routes';
+import { usePlanIndexContext } from '@/contexts/PlanIndexContext';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
-import { useMultiProviderSync } from '@/hooks/useMultiProviderSync';
-import { usePlanIndex } from '@/hooks/usePlanIndex';
 import { formatRelativeTime } from '@/utils/formatters';
 import { setSidebarCollapsed } from '@/utils/uiPreferences';
 
@@ -76,8 +71,7 @@ export function ArchivePage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { identity: githubIdentity } = useGitHubAuth();
-  const { archivedPlans, isLoading, timedOut } = usePlanIndex(githubIdentity?.username);
-  const { ydoc: indexDoc } = useMultiProviderSync(PLAN_INDEX_DOC_NAME);
+  const { archivedPlans, isLoading, timedOut, ydoc: indexDoc } = usePlanIndexContext();
 
   // Selected plan state - read from URL on mount
   const searchParams = new URLSearchParams(location.search);
@@ -109,7 +103,7 @@ export function ArchivePage() {
     onFullScreen: useCallback(() => {
       if (selectedPlanId) {
         setSidebarCollapsed(true);
-        navigate(`/plan/${selectedPlanId}`);
+        navigate(getPlanRoute(selectedPlanId));
       }
     }, [selectedPlanId, navigate]),
     onClose: handleClosePanel,

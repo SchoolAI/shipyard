@@ -60,6 +60,33 @@ export class NodePlatformAdapter implements PlatformAdapter {
    */
   private connectionTopics = new WeakMap<WebSocket, Set<string>>();
 
+  /**
+   * Queued message with timestamp for TTL expiration.
+   */
+  private static readonly MESSAGE_QUEUE_TTL_MS = 30_000; // 30 seconds
+
+  /**
+   * Map from connection to queued messages (by topic).
+   * Used to buffer messages for connections without userId.
+   * Structure: ws -> Map<topic, QueuedMessage[]>
+   */
+  private connectionMessageQueues = new WeakMap<
+    WebSocket,
+    Map<string, Array<{ message: unknown; queuedAt: number }>>
+  >();
+
+  /**
+   * Set of connections currently flushing their message queues.
+   * Prevents race conditions between flush and concurrent publish operations.
+   */
+  private flushingConnections = new WeakSet<WebSocket>();
+
+  /**
+   * Maximum number of messages to queue per connection per topic.
+   * Prevents memory exhaustion from slow clients.
+   */
+  private static readonly MAX_QUEUE_SIZE_PER_TOPIC = 100;
+
   // --- Storage Operations ---
 
   async getApprovalState(planId: string): Promise<PlanApprovalState | undefined> {
@@ -257,6 +284,118 @@ export class NodePlatformAdapter implements PlatformAdapter {
 
     // Clear socket's subscription set
     socketTopics.clear();
+  }
+
+  // --- Message Queue Operations ---
+
+  queueMessageForConnection(ws: unknown, topic: string, message: unknown): void {
+    const socket = ws as WebSocket;
+
+    let topicQueues = this.connectionMessageQueues.get(socket);
+    if (!topicQueues) {
+      topicQueues = new Map();
+      this.connectionMessageQueues.set(socket, topicQueues);
+    }
+
+    let messages = topicQueues.get(topic);
+    if (!messages) {
+      messages = [];
+      topicQueues.set(topic, messages);
+    }
+
+    // Remove expired messages first to make room
+    const now = Date.now();
+    const validMessages = messages.filter(
+      (m) => now - m.queuedAt < NodePlatformAdapter.MESSAGE_QUEUE_TTL_MS
+    );
+
+    // Enforce max queue size to prevent memory exhaustion
+    if (validMessages.length < NodePlatformAdapter.MAX_QUEUE_SIZE_PER_TOPIC) {
+      validMessages.push({ message, queuedAt: now });
+      topicQueues.set(topic, validMessages);
+      this.debug('[queueMessageForConnection] Queued message', {
+        topic,
+        queueSize: validMessages.length,
+      });
+    } else {
+      this.warn('[queueMessageForConnection] Queue full, dropping message', {
+        topic,
+        maxSize: NodePlatformAdapter.MAX_QUEUE_SIZE_PER_TOPIC,
+      });
+    }
+  }
+
+  getAndClearQueuedMessages(ws: unknown): Map<string, unknown[]> {
+    const socket = ws as WebSocket;
+    const topicQueues = this.connectionMessageQueues.get(socket);
+
+    if (!topicQueues) {
+      return new Map();
+    }
+
+    const now = Date.now();
+    const result = new Map<string, unknown[]>();
+    let totalMessages = 0;
+    let expiredMessages = 0;
+
+    // Filter out expired messages and extract just the message payloads
+    for (const [topic, queuedMessages] of topicQueues) {
+      const validMessages: unknown[] = [];
+      for (const qm of queuedMessages) {
+        if (now - qm.queuedAt < NodePlatformAdapter.MESSAGE_QUEUE_TTL_MS) {
+          validMessages.push(qm.message);
+        } else {
+          expiredMessages++;
+        }
+      }
+      if (validMessages.length > 0) {
+        result.set(topic, validMessages);
+        totalMessages += validMessages.length;
+      }
+    }
+
+    topicQueues.clear();
+
+    this.debug('[getAndClearQueuedMessages] Flushed queued messages', {
+      topicCount: result.size,
+      totalMessages,
+      expiredMessages,
+    });
+
+    return result;
+  }
+
+  clearQueuedMessages(ws: unknown): void {
+    const socket = ws as WebSocket;
+    const topicQueues = this.connectionMessageQueues.get(socket);
+
+    if (topicQueues) {
+      const totalMessages = Array.from(topicQueues.values()).reduce(
+        (sum, msgs) => sum + msgs.length,
+        0
+      );
+      if (totalMessages > 0) {
+        this.debug('[clearQueuedMessages] Cleared queued messages', {
+          topicCount: topicQueues.size,
+          totalMessages,
+        });
+      }
+      topicQueues.clear();
+    }
+  }
+
+  isFlushingMessages(ws: unknown): boolean {
+    const socket = ws as WebSocket;
+    return this.flushingConnections.has(socket);
+  }
+
+  setFlushingMessages(ws: unknown, flushing: boolean): void {
+    const socket = ws as WebSocket;
+    if (flushing) {
+      this.flushingConnections.add(socket);
+    } else {
+      this.flushingConnections.delete(socket);
+    }
   }
 
   // --- Logging ---

@@ -1,0 +1,20 @@
+{
+  "folders": [
+    {
+      "name": "shipyard",
+      "path": "."
+    },
+    {
+      "name": "\ud83c\udf33\u2705 88-types-in-hooks",
+      "path": "../shipyard-wt/88-types-in-hooks"
+    },
+    {
+      "name": "\ud83c\udf33\ud83d\udd10 87-login-unify",
+      "path": "../shipyard-wt/87-login-unify"
+    },
+    {
+      "name": "\ud83c\udf33\ud83d\udce6 79-distribute-shipyard",
+      "path": "../shipyard-wt/79-distribute-shipyard"
+    }
+  ]
+}

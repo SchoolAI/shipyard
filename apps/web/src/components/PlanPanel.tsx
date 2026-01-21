@@ -74,7 +74,7 @@ export function PlanPanel({ planId, width, onClose, children }: PlanPanelProps) 
         `}
         role="dialog"
         aria-modal={isCenterModal || isFullScreen}
-        aria-label="Plan details panel"
+        aria-label="Task details panel"
       >
         {children}
       </aside>

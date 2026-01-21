@@ -97,7 +97,7 @@ export class SignalingRoom extends DurableObject<Env> {
       // All handlers use the platform adapter for storage/messaging
       switch (data.type) {
         case 'subscribe':
-          handleSubscribe(this.adapter, ws, data);
+          await handleSubscribe(this.adapter, ws, data);
           break;
 
         case 'unsubscribe':
@@ -155,6 +155,7 @@ export class SignalingRoom extends DurableObject<Env> {
   ): Promise<void> {
     // Adapter is initialized via blockConcurrencyWhile in constructor
     this.adapter.unsubscribeFromAllTopics(ws);
+    this.adapter.clearQueuedMessages(ws);
   }
 
   /**
@@ -164,5 +165,6 @@ export class SignalingRoom extends DurableObject<Env> {
     logger.error({ error }, 'WebSocket error');
     // Adapter is initialized via blockConcurrencyWhile in constructor
     this.adapter.unsubscribeFromAllTopics(ws);
+    this.adapter.clearQueuedMessages(ws);
   }
 }

@@ -5,11 +5,15 @@
 
 import { Accordion, Button, Chip, ListBox, ListBoxItem, Switch, Tooltip } from '@heroui/react';
 import {
+  assertNever,
+  clearEventViewedBy,
   getPlanIndexEntry,
   type InputRequest,
-  PLAN_INDEX_DOC_NAME,
+  markEventAsViewed,
+  type PlanEvent,
   type PlanIndexEntry,
   type PlanStatusType,
+  type PlanViewTab,
   setPlanIndexEntry,
   transitionPlanStatus,
 } from '@shipyard/schema';
@@ -35,16 +39,17 @@ import * as Y from 'yjs';
 import { InlinePlanDetail, type PlanActionContext } from '@/components/InlinePlanDetail';
 import { InputRequestInboxItem } from '@/components/InputRequestInboxItem';
 import { InputRequestModal } from '@/components/InputRequestModal';
+import { BaseInboxCard } from '@/components/inbox/BaseInboxCard';
 import { OfflineBanner } from '@/components/OfflineBanner';
 import { TagChip } from '@/components/TagChip';
 import { TwoColumnSkeleton } from '@/components/ui/TwoColumnSkeleton';
+import { getPlanRoute } from '@/constants/routes';
+import { usePlanIndexContext } from '@/contexts/PlanIndexContext';
 import { useUserIdentity } from '@/contexts/UserIdentityContext';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
 import { type InboxEventItem, useInboxEvents } from '@/hooks/useInboxEvents';
 import { useInputRequests } from '@/hooks/useInputRequests';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
-import { useMultiProviderSync } from '@/hooks/useMultiProviderSync';
-import { usePlanIndex } from '@/hooks/usePlanIndex';
 import { formatRelativeTime } from '@/utils/formatters';
 import { getInboxShowRead, setInboxShowRead, setSidebarCollapsed } from '@/utils/uiPreferences';
 
@@ -187,11 +192,13 @@ function InboxItem({ plan, onApprove, onRequestChanges, onDismiss, onMarkUnread 
 
 interface EventInboxItemProps {
   item: InboxEventItem;
-  onView: (planId: string) => void;
+  onView: (planId: string, tab?: PlanViewTab) => void;
+  onMarkRead: (planId: string, eventId: string) => void;
+  onMarkUnread: (planId: string, eventId: string) => void;
 }
 
-function EventInboxItem({ item, onView }: EventInboxItemProps) {
-  const { plan, event } = item;
+function EventInboxItem({ item, onView, onMarkRead, onMarkUnread }: EventInboxItemProps) {
+  const { plan, event, isUnread } = item;
 
   // Determine icon and description based on event type
   const getEventDisplay = () => {
@@ -232,14 +239,14 @@ function EventInboxItem({ item, onView }: EventInboxItemProps) {
         if (event.data?.activityType === 'help_request') {
           return {
             icon: <HelpCircle className="w-4 h-4" />,
-            description: `needs help: ${event.data.message}`,
+            description: 'needs help',
             color: 'warning' as const,
           };
         }
         if (event.data?.activityType === 'blocker') {
           return {
             icon: <AlertOctagon className="w-4 h-4" />,
-            description: `hit blocker: ${event.data.message}`,
+            description: 'hit blocker',
             color: 'danger' as const,
           };
         }
@@ -259,29 +266,71 @@ function EventInboxItem({ item, onView }: EventInboxItemProps) {
 
   const { icon, description, color } = getEventDisplay();
 
-  // Extract message for agent requests (type-safe)
-  let agentMessage: string | undefined;
-  if (event.type === 'agent_activity') {
-    if (event.data.activityType === 'help_request' || event.data.activityType === 'blocker') {
-      agentMessage = event.data.message;
+  const getTargetTab = (evt: PlanEvent): PlanViewTab => {
+    switch (evt.type) {
+      case 'plan_created':
+      case 'comment_added':
+      case 'comment_resolved':
+      case 'content_edited':
+        return 'plan';
+      case 'deliverable_linked':
+      case 'step_completed':
+        return 'deliverables';
+      case 'pr_linked':
+      case 'conversation_imported':
+      case 'conversation_handed_off':
+      case 'conversation_exported':
+        return 'changes';
+      case 'status_changed':
+      case 'artifact_uploaded':
+      case 'approved':
+      case 'changes_requested':
+      case 'completed':
+      case 'plan_archived':
+      case 'plan_unarchived':
+      case 'plan_shared':
+      case 'approval_requested':
+      case 'input_request_created':
+      case 'input_request_answered':
+      case 'input_request_declined':
+      case 'agent_activity':
+        return 'activity';
+      default:
+        return assertNever(evt);
     }
-  }
+  };
+
+  const handleClick = () => {
+    onView(plan.id, getTargetTab(event));
+    if (isUnread) {
+      onMarkRead(plan.id, event.id);
+    }
+  };
+
+  const expandedMessage =
+    event.type === 'agent_activity' &&
+    (event.data.activityType === 'blocker' || event.data.activityType === 'help_request')
+      ? event.data.message
+      : undefined;
 
   return (
-    <div className="flex items-center justify-between gap-3 w-full py-2">
-      <div className="flex flex-col gap-1 flex-1 min-w-0">
-        <span className="font-medium text-foreground truncate">{plan.title}</span>
-        <div className="flex items-center gap-2 flex-wrap">
-          <Chip size="sm" variant="soft" color={color} className="gap-1">
-            {icon}
-            {event.type === 'agent_activity'
-              ? event.data.activityType.replace('_', ' ')
-              : description}
-          </Chip>
+    <BaseInboxCard
+      title={plan.title}
+      isUnread={isUnread}
+      onClick={handleClick}
+      badge={
+        <Chip size="sm" variant="soft" color={color} className="gap-1">
+          {icon}
+          {event.type === 'agent_activity'
+            ? event.data.activityType.replace('_', ' ')
+            : description}
+        </Chip>
+      }
+      metadata={
+        <>
           <span className="text-xs text-muted-foreground">
             {formatRelativeTime(event.timestamp)}
           </span>
-          {/* Show first 3 tags */}
           {plan.tags && plan.tags.length > 0 && (
             <div className="flex gap-1 items-center">
               {plan.tags.slice(0, 3).map((tag) => (
@@ -292,19 +341,31 @@ function EventInboxItem({ item, onView }: EventInboxItemProps) {
               )}
             </div>
           )}
-        </div>
-        {/* Show full message for agent requests */}
-        {agentMessage && (
-          <p className="text-sm text-muted-foreground mt-1 pl-1">"{agentMessage}"</p>
-        )}
-      </div>
-
-      <div className="flex items-center gap-1 shrink-0">
-        <Button variant="ghost" size="sm" onPress={() => onView(plan.id)}>
-          View
-        </Button>
-      </div>
-    </div>
+        </>
+      }
+      expandedContent={
+        expandedMessage && (
+          <p className="text-sm text-muted-foreground mt-1 pl-1">"{expandedMessage}"</p>
+        )
+      }
+      actions={
+        <Tooltip>
+          <Tooltip.Trigger>
+            <Button
+              variant="ghost"
+              size="sm"
+              isIconOnly
+              onPress={() => {
+                isUnread ? onMarkRead(plan.id, event.id) : onMarkUnread(plan.id, event.id);
+              }}
+            >
+              {isUnread ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </Button>
+          </Tooltip.Trigger>
+          <Tooltip.Content>{isUnread ? 'Mark as read' : 'Mark as unread'}</Tooltip.Content>
+        </Tooltip>
+      }
+    />
   );
 }
 
@@ -326,26 +387,41 @@ function filterAndSortInboxPlans(
 /** Group inbox events by category */
 function groupInboxEvents(
   sortedInboxPlans: (PlanIndexEntry & { isUnread?: boolean })[],
-  eventBasedInbox: InboxEventItem[]
+  eventBasedInbox: InboxEventItem[],
+  showRead: boolean,
+  selectedPlanId: string | null
 ) {
+  const filterByReadState = (items: InboxEventItem[]) => {
+    if (showRead) return items;
+    return items.filter((item) => item.isUnread || item.plan.id === selectedPlanId);
+  };
+
   return {
     needsReview: sortedInboxPlans,
-    approvalRequests: eventBasedInbox.filter(
-      (e: InboxEventItem) => e.event.type === 'approval_requested'
+    approvalRequests: filterByReadState(
+      eventBasedInbox.filter((e: InboxEventItem) => e.event.type === 'approval_requested')
     ),
-    mentions: eventBasedInbox.filter(
-      (e: InboxEventItem) => e.event.type === 'comment_added' && e.event.data?.mentions
+    mentions: filterByReadState(
+      eventBasedInbox.filter(
+        (e: InboxEventItem) => e.event.type === 'comment_added' && e.event.data?.mentions
+      )
     ),
-    readyToComplete: eventBasedInbox.filter(
-      (e: InboxEventItem) => e.event.type === 'deliverable_linked' && e.event.data?.allFulfilled
+    readyToComplete: filterByReadState(
+      eventBasedInbox.filter(
+        (e: InboxEventItem) => e.event.type === 'deliverable_linked' && e.event.data?.allFulfilled
+      )
     ),
-    agentHelpRequests: eventBasedInbox.filter(
-      (e: InboxEventItem) =>
-        e.event.type === 'agent_activity' && e.event.data?.activityType === 'help_request'
+    agentHelpRequests: filterByReadState(
+      eventBasedInbox.filter(
+        (e: InboxEventItem) =>
+          e.event.type === 'agent_activity' && e.event.data?.activityType === 'help_request'
+      )
     ),
-    agentBlockers: eventBasedInbox.filter(
-      (e: InboxEventItem) =>
-        e.event.type === 'agent_activity' && e.event.data?.activityType === 'blocker'
+    agentBlockers: filterByReadState(
+      eventBasedInbox.filter(
+        (e: InboxEventItem) =>
+          e.event.type === 'agent_activity' && e.event.data?.activityType === 'blocker'
+      )
     ),
   };
 }
@@ -449,6 +525,28 @@ function updateIndexToInProgress(indexDoc: Y.Doc, planId: string, now: number): 
   }
 }
 
+/** Update plan metadata to changes_requested status using type-safe transition helper */
+function updatePlanToChangesRequested(
+  ydoc: Y.Doc,
+  now: number,
+  actor: string,
+  reviewedBy: string
+): void {
+  transitionPlanStatus(ydoc, { status: 'changes_requested', reviewedAt: now, reviewedBy }, actor);
+}
+
+/** Update plan index entry to changes_requested */
+function updateIndexToChangesRequested(indexDoc: Y.Doc, planId: string, now: number): void {
+  const entry = getPlanIndexEntry(indexDoc, planId);
+  if (entry) {
+    setPlanIndexEntry(indexDoc, {
+      ...entry,
+      status: 'changes_requested',
+      updatedAt: now,
+    });
+  }
+}
+
 /** Approve a plan by updating local IDB and index */
 async function approvePlanInLocalDb(
   planId: string,
@@ -516,15 +614,21 @@ export function InboxPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { identity: githubIdentity } = useGitHubAuth();
-  const { allInboxPlans, allOwnedPlans, markPlanAsRead, markPlanAsUnread, isLoading, timedOut } =
-    usePlanIndex(githubIdentity?.username);
-  const { ydoc: indexDoc } = useMultiProviderSync(PLAN_INDEX_DOC_NAME);
+  const {
+    allInboxPlans,
+    allOwnedPlans,
+    markPlanAsRead,
+    markPlanAsUnread,
+    isLoading,
+    timedOut,
+    ydoc: indexDoc,
+  } = usePlanIndexContext();
   const [showRead, setShowRead] = useState(getInboxShowRead);
   const { actor } = useUserIdentity();
 
   // Load event-based inbox items from ALL owned plans (not just inbox candidates)
   // This ensures blockers/help requests show up regardless of plan status
-  const eventBasedInbox = useInboxEvents(allOwnedPlans, githubIdentity?.username ?? null);
+  const eventBasedInbox = useInboxEvents(allOwnedPlans, githubIdentity?.username ?? null, indexDoc);
 
   // Load input requests from the plan index doc
   const { pendingRequests } = useInputRequests({
@@ -539,6 +643,7 @@ export function InboxPage() {
   const searchParams = new URLSearchParams(location.search);
   const initialPanelId = searchParams.get('panel');
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(initialPanelId);
+  const [selectedTab, setSelectedTab] = useState<PlanViewTab>('plan');
 
   // Update show read preference
   const handleToggleShowRead = useCallback((value: boolean) => {
@@ -554,8 +659,8 @@ export function InboxPage() {
 
   // Group inbox items by category - extracted to helper
   const inboxGroups = useMemo(
-    () => groupInboxEvents(sortedInboxPlans, eventBasedInbox),
-    [sortedInboxPlans, eventBasedInbox]
+    () => groupInboxEvents(sortedInboxPlans, eventBasedInbox, showRead, selectedPlanId),
+    [sortedInboxPlans, eventBasedInbox, showRead, selectedPlanId]
   );
 
   // Effects extracted to custom hooks
@@ -566,6 +671,7 @@ export function InboxPage() {
   // Panel handlers
   const handleClosePanel = useCallback(() => {
     setSelectedPlanId(null);
+    setSelectedTab('plan');
   }, []);
 
   // Dismiss handler (mark as read)
@@ -584,6 +690,23 @@ export function InboxPage() {
       toast.success('Marked as unread');
     },
     [markPlanAsUnread]
+  );
+
+  // Event read/unread handlers
+  const handleMarkEventRead = useCallback(
+    (planId: string, eventId: string) => {
+      if (!githubIdentity) return;
+      markEventAsViewed(indexDoc, planId, eventId, githubIdentity.username);
+    },
+    [indexDoc, githubIdentity]
+  );
+
+  const handleMarkEventUnread = useCallback(
+    (planId: string, eventId: string) => {
+      if (!githubIdentity) return;
+      clearEventViewedBy(indexDoc, planId, eventId, githubIdentity.username);
+    },
+    [indexDoc, githubIdentity]
   );
 
   // Helper to find the next plan to select after dismissal - uses extracted helper
@@ -616,14 +739,24 @@ export function InboxPage() {
   }, []);
 
   // List selection handler - uses extracted helper
-  const handleListSelection = useCallback((keys: Set<unknown> | 'all') => {
-    const key = extractFirstSelectionKey(keys);
-    if (key) setSelectedPlanId(key);
-  }, []);
+  const handleListSelection = useCallback(
+    (keys: Set<unknown> | 'all') => {
+      const key = extractFirstSelectionKey(keys);
+      if (key) {
+        setSelectedPlanId(key);
+        const selectedPlan = sortedInboxPlans.find((p) => p.id === key);
+        if (selectedPlan?.isUnread) {
+          markPlanAsRead(key);
+        }
+      }
+    },
+    [sortedInboxPlans, markPlanAsRead]
+  );
 
   // Event item view handler
-  const handleViewEvent = useCallback((planId: string) => {
+  const handleViewEvent = useCallback((planId: string, tab?: PlanViewTab) => {
     setSelectedPlanId(planId);
+    setSelectedTab(tab || 'plan');
   }, []);
 
   // Panel approve handler - uses extracted helpers
@@ -645,22 +778,47 @@ export function InboxPage() {
     [githubIdentity, indexDoc, actor]
   );
 
-  // Panel request changes handler
+  // Panel request changes handler - works inline like approve
   const handlePanelRequestChanges = useCallback(
     (context: PlanActionContext) => {
-      const { planId } = context;
-      // Navigate to full plan page for adding comments
-      navigate(`/plan/${planId}`);
-      toast.info('Navigate to add comments and request changes');
+      if (!githubIdentity) {
+        toast.error('Please sign in with GitHub first');
+        return;
+      }
+
+      const { planId, ydoc } = context;
+      const now = Date.now();
+      const reviewedBy = githubIdentity.displayName || githubIdentity.username;
+
+      updatePlanToChangesRequested(ydoc, now, actor, reviewedBy);
+      updateIndexToChangesRequested(indexDoc, planId, now);
+      toast.success('Changes requested - add comments below');
     },
-    [navigate]
+    [githubIdentity, indexDoc, actor]
+  );
+
+  // Status change handler for ReviewActions (updates plan index)
+  const handleStatusChange = useCallback(
+    (newStatus: 'in_progress' | 'changes_requested', updatedAt: number) => {
+      if (!selectedPlanId) return;
+
+      const entry = getPlanIndexEntry(indexDoc, selectedPlanId);
+      if (entry) {
+        setPlanIndexEntry(indexDoc, {
+          ...entry,
+          status: newStatus,
+          updatedAt,
+        });
+      }
+    },
+    [indexDoc, selectedPlanId]
   );
 
   // Keyboard shortcut handlers - all extracted to top level
   const handleFullScreen = useCallback(() => {
     if (selectedPlanId) {
       setSidebarCollapsed(true);
-      navigate(`/plan/${selectedPlanId}`);
+      navigate(getPlanRoute(selectedPlanId));
     }
   }, [selectedPlanId, navigate]);
 
@@ -846,7 +1004,12 @@ export function InboxPage() {
                     <div className="divide-y divide-separator">
                       {inboxGroups.mentions.map((item: InboxEventItem) => (
                         <div key={`${item.plan.id}-${item.event.id}`} className="px-3">
-                          <EventInboxItem item={item} onView={handleViewEvent} />
+                          <EventInboxItem
+                            item={item}
+                            onView={handleViewEvent}
+                            onMarkRead={handleMarkEventRead}
+                            onMarkUnread={handleMarkEventUnread}
+                          />
                         </div>
                       ))}
                     </div>
@@ -875,7 +1038,12 @@ export function InboxPage() {
                     <div className="divide-y divide-separator">
                       {inboxGroups.readyToComplete.map((item: InboxEventItem) => (
                         <div key={`${item.plan.id}-${item.event.id}`} className="px-3">
-                          <EventInboxItem item={item} onView={handleViewEvent} />
+                          <EventInboxItem
+                            item={item}
+                            onView={handleViewEvent}
+                            onMarkRead={handleMarkEventRead}
+                            onMarkUnread={handleMarkEventUnread}
+                          />
                         </div>
                       ))}
                     </div>
@@ -904,7 +1072,12 @@ export function InboxPage() {
                     <div className="divide-y divide-separator">
                       {inboxGroups.approvalRequests.map((item: InboxEventItem) => (
                         <div key={`${item.plan.id}-${item.event.id}`} className="px-3">
-                          <EventInboxItem item={item} onView={handleViewEvent} />
+                          <EventInboxItem
+                            item={item}
+                            onView={handleViewEvent}
+                            onMarkRead={handleMarkEventRead}
+                            onMarkUnread={handleMarkEventUnread}
+                          />
                         </div>
                       ))}
                     </div>
@@ -933,7 +1106,12 @@ export function InboxPage() {
                     <div className="divide-y divide-separator">
                       {inboxGroups.agentHelpRequests.map((item: InboxEventItem) => (
                         <div key={`${item.plan.id}-${item.event.id}`} className="px-3">
-                          <EventInboxItem item={item} onView={handleViewEvent} />
+                          <EventInboxItem
+                            item={item}
+                            onView={handleViewEvent}
+                            onMarkRead={handleMarkEventRead}
+                            onMarkUnread={handleMarkEventUnread}
+                          />
                         </div>
                       ))}
                     </div>
@@ -962,7 +1140,12 @@ export function InboxPage() {
                     <div className="divide-y divide-separator">
                       {inboxGroups.agentBlockers.map((item: InboxEventItem) => (
                         <div key={`${item.plan.id}-${item.event.id}`} className="px-3">
-                          <EventInboxItem item={item} onView={handleViewEvent} />
+                          <EventInboxItem
+                            item={item}
+                            onView={handleViewEvent}
+                            onMarkRead={handleMarkEventRead}
+                            onMarkUnread={handleMarkEventUnread}
+                          />
                         </div>
                       ))}
                     </div>
@@ -978,9 +1161,11 @@ export function InboxPage() {
       <div className="flex flex-col h-full overflow-hidden">
         <InlinePlanDetail
           planId={selectedPlanId}
+          initialTab={selectedTab}
           onClose={handleClosePanel}
           onApprove={handlePanelApprove}
           onRequestChanges={handlePanelRequestChanges}
+          onStatusChange={handleStatusChange}
           emptyMessage="Select a plan to view details"
         />
       </div>

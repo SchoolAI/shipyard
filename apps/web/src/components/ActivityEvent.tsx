@@ -157,10 +157,14 @@ function getEventDescription(event: PlanEvent): string {
     }
     case 'content_edited':
       return 'edited the task content';
-    case 'approved':
-      return 'approved the task';
-    case 'changes_requested':
-      return 'requested changes';
+    case 'approved': {
+      const approveComment = event.data?.comment;
+      return approveComment ? `approved the task: ${approveComment}` : 'approved the task';
+    }
+    case 'changes_requested': {
+      const changesComment = event.data?.comment;
+      return changesComment ? `requested changes: ${changesComment}` : 'requested changes';
+    }
     case 'completed':
       return 'marked the task as completed';
     case 'conversation_imported': {

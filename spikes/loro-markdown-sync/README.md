@@ -121,17 +121,17 @@ File sync will always be "jumpier" because we're reconstructing operations from 
 
 | Solution | Eliminates Conflict? | Complexity | Production Ready? |
 |----------|---------------------|------------|-------------------|
-| **FileSystemProvider** (`peerplan://` URI) | ✅ Yes | Medium | Yes |
+| **FileSystemProvider** (`shipyard://` URI) | ✅ Yes | Medium | Yes |
 | **y-monaco webview** (embedded Monaco) | ✅ Yes | Medium | Yes |
 | Buffer applyEdit() | ❌ Race conditions | Low | No |
 | Wait for VSCode fix | ❓ Unknown (7+ year wait) | N/A | No |
 
 #### Recommended Approach: FileSystemProvider
 
-Create VSCode extension that registers `peerplan://` URI scheme:
+Create VSCode extension that registers `shipyard://` URI scheme:
 
 ```typescript
-class PeerPlanFS implements vscode.FileSystemProvider {
+class ShipyardFS implements vscode.FileSystemProvider {
   private yDocs: Map<string, Y.Doc> = new Map();
 
   readFile(uri: vscode.Uri): Uint8Array {
@@ -151,7 +151,7 @@ class PeerPlanFS implements vscode.FileSystemProvider {
 ```
 
 **How it works:**
-1. User opens `peerplan://plan-abc123/document.md` instead of real file
+1. User opens `shipyard://plan-abc123/document.md` instead of real file
 2. Extension provides virtual file backed by Yjs/Loro CRDT
 3. All edits go through CRDT (no disk = no conflict dialog)
 4. Syncs to peers via y-websocket/y-webrtc
@@ -252,7 +252,7 @@ To enable "bring your own editor" for shipyard:
 
 1. **Tier 1: Web app (BlockNote)** - Primary editing experience, no compromises
 2. **Tier 2: Obsidian** - Test with real Obsidian vault, handles external changes well
-3. **Tier 3: VSCode via extension** - Build `peerplan://` FileSystemProvider for conflict-free editing
+3. **Tier 3: VSCode via extension** - Build `shipyard://` FileSystemProvider for conflict-free editing
 4. **Tier 4: Other editors** - Export-only (view in any editor, edit in Tiers 1-3)
 
 ### Next Steps

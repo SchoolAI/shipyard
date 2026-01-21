@@ -30,6 +30,7 @@ import { webConfig } from './config/env/web.js';
 import { getOrCreateDoc } from './doc-store.js';
 import { logger } from './logger.js';
 import { getGitHubUsername, getRepositoryFullName } from './server-identity.js';
+import { getSessionState } from './session-registry.js';
 
 async function parseMarkdownToBlocks(markdown: string): Promise<Block[]> {
   const editor = ServerBlockNoteEditor.create();
@@ -62,6 +63,19 @@ function extractTitleFromBlocks(blocks: Block[]): string {
 export async function handleCreateSession(req: Request, res: Response): Promise<void> {
   try {
     const input = CreateHookSessionRequestSchema.parse(req.body);
+
+    // Check if session already exists (idempotent - handles CLI process restarts)
+    const existingSession = getSessionState(input.sessionId);
+    if (existingSession) {
+      const webUrl = webConfig.SHIPYARD_WEB_URL;
+      const url = `${webUrl}/plan/${existingSession.planId}`;
+      logger.info(
+        { planId: existingSession.planId, sessionId: input.sessionId },
+        'Returning existing session (idempotent)'
+      );
+      res.json({ planId: existingSession.planId, url } as CreateHookSessionResponse);
+      return;
+    }
 
     const planId = nanoid();
     const now = Date.now();

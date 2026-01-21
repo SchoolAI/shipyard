@@ -44,7 +44,7 @@ export function LinkPRButton({
   const [repo, setRepo] = useState('');
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { identity } = useGitHubAuth();
+  const { identity, startAuth } = useGitHubAuth();
   const { actor } = useUserIdentity();
 
   // Use controlled state if provided, otherwise use internal state
@@ -64,7 +64,8 @@ export function LinkPRButton({
     }
 
     if (!identity?.token) {
-      toast.error('Please sign in with GitHub to link PRs');
+      toast.info('Sign in with GitHub to link PRs');
+      startAuth();
       return;
     }
 

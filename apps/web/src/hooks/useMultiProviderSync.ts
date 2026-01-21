@@ -104,6 +104,7 @@ export type PlanAwarenessState =
 
 interface SyncStateBase {
   connected: boolean;
+  hubConnected: boolean;
   synced: boolean;
   peerCount: number;
   idbSynced: boolean;
@@ -140,13 +141,14 @@ export function useMultiProviderSync(
   /** WebRTC provider for P2P sync (null if not connected) */
   rtcProvider: WebrtcProvider | null;
 } {
-  // Don't enable WebRTC for plan-index (only for individual plans)
-  const enableWebRTC = options.enableWebRTC ?? docName !== 'plan-index';
+  // Enable WebRTC for all documents including plan-index (needed for remote sync)
+  const enableWebRTC = options.enableWebRTC ?? true;
   const { identity: githubIdentity } = useGitHubAuth();
   // biome-ignore lint/correctness/useExhaustiveDependencies: docName triggers Y.Doc recreation intentionally
   const ydoc = useMemo(() => new Y.Doc(), [docName]);
   const [syncState, setSyncState] = useState<SyncState>({
     connected: false,
+    hubConnected: false,
     synced: false,
     peerCount: 0,
     idbSynced: false,
@@ -164,6 +166,7 @@ export function useMultiProviderSync(
   const peerCountRef = useRef<number>(0);
   const wsProviderRef = useRef<WebsocketProvider | null>(null);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Intentionally excluding githubIdentity to prevent provider recreation race
   useEffect(() => {
     let mounted = true;
     let ws: WebsocketProvider | null = null;
@@ -349,33 +352,76 @@ export function useMultiProviderSync(
       lastBroadcastPeerId = webrtcPeerId;
     }
 
-    // Watch for room.peerId to become available and update awareness
-    // This fixes P2P transfers failing with "Peer not found" because
-    // webrtcPeerId was undefined when awareness was first set
-    let roomPeerIdWatcher: ReturnType<typeof setInterval> | null = null;
+    /**
+     * Typed interface for SignalingConn from y-webrtc.
+     * Based on lib0/websocket.WebsocketClient which extends Observable.
+     */
+    interface SignalingConn {
+      ws: WebSocket | null;
+      connected: boolean;
+      on(event: 'connect', handler: () => void): void;
+      off(event: 'connect', handler: () => void): void;
+    }
 
-    function startWatchingForRoomPeerId() {
-      if (!rtc) return;
+    // Track signaling connect handlers for cleanup
+    const signalingConnectHandlers: Array<{ conn: SignalingConn; handler: () => void }> = [];
 
-      // Check immediately
+    /**
+     * Check if any signaling connection is currently open.
+     */
+    function isSignalingConnOpen(): boolean {
+      if (!rtc) return false;
+      const signalingConns = (rtc as unknown as { signalingConns?: SignalingConn[] })
+        .signalingConns;
+      if (!signalingConns || signalingConns.length === 0) return false;
+
+      return signalingConns.some((conn) => conn.ws && conn.ws.readyState === WebSocket.OPEN);
+    }
+
+    /**
+     * Called when signaling connection opens.
+     * Sends identity, approval state, and updates awareness with room peerId.
+     */
+    function onSignalingConnected() {
+      if (!rtc || !githubIdentity) return;
+
+      // Send identity and approval state
+      sendUserIdentityToSignaling();
+      pushApprovalStateToSignaling();
+
+      // Update awareness with room peerId now that room should be available
       const room = (rtc as unknown as { room?: { peerId?: string } }).room;
       if (room?.peerId && room.peerId !== lastBroadcastPeerId) {
         setLocalAwarenessState();
-        return; // peerId is already available
+      }
+    }
+
+    /**
+     * Listen for signaling WebSocket 'connect' events instead of polling.
+     * Uses lib0's Observable 'connect' event emitted when WebSocket opens.
+     */
+    function listenForSignalingConnect() {
+      if (!rtc) return;
+
+      const signalingConns = (rtc as unknown as { signalingConns?: SignalingConn[] })
+        .signalingConns;
+
+      if (!signalingConns || signalingConns.length === 0) return;
+
+      // Check if already connected
+      if (isSignalingConnOpen()) {
+        onSignalingConnected();
+        return;
       }
 
-      // Poll until room.peerId is available (y-webrtc doesn't emit an event for this)
-      roomPeerIdWatcher = setInterval(() => {
-        const room = (rtc as unknown as { room?: { peerId?: string } }).room;
-        if (room?.peerId && room.peerId !== lastBroadcastPeerId) {
-          setLocalAwarenessState();
-          // Stop watching once we've broadcast the real peerId
-          if (roomPeerIdWatcher) {
-            clearInterval(roomPeerIdWatcher);
-            roomPeerIdWatcher = null;
-          }
-        }
-      }, 100); // Check every 100ms until room is ready
+      // Listen for 'connect' event on each signaling connection
+      for (const conn of signalingConns) {
+        const handler = () => {
+          onSignalingConnected();
+        };
+        conn.on('connect', handler);
+        signalingConnectHandlers.push({ conn, handler });
+      }
     }
 
     function updateApprovalStatus() {
@@ -464,12 +510,9 @@ export function useMultiProviderSync(
     // Set initial awareness state when GitHub identity is available
     if (githubIdentity && rtc) {
       updateApprovalStatus();
-      // Send user identity and approval state immediately
-      // No delay - we need this before any WebRTC messages are relayed
-      sendUserIdentityToSignaling();
-      pushApprovalStateToSignaling();
-      // Watch for room.peerId to become available (fixes P2P transfer "Peer not found")
-      startWatchingForRoomPeerId();
+      // Send identity/approval state when signaling connects (event-based, not polling)
+      // This also updates awareness with room.peerId once available
+      listenForSignalingConnect();
     }
 
     function updateSyncState() {
@@ -479,6 +522,7 @@ export function useMultiProviderSync(
 
       const baseState: SyncStateBase = {
         connected: anyConnected,
+        hubConnected: wsConnected,
         synced: wsSynced,
         peerCount: peerCountRef.current,
         idbSynced: idbSyncedRef.current,
@@ -504,10 +548,11 @@ export function useMultiProviderSync(
       setWsProvider(null);
       metadataMap.unobserve(handleMetadataChange);
       idbProvider.destroy();
-      if (roomPeerIdWatcher) {
-        clearInterval(roomPeerIdWatcher);
-        roomPeerIdWatcher = null;
+      // Clean up signaling connect handlers
+      for (const { conn, handler } of signalingConnectHandlers) {
+        conn.off('connect', handler);
       }
+      signalingConnectHandlers.length = 0;
       if (rtc) {
         // Clear awareness before destroying so other peers see us leave
         rtc.awareness.setLocalState(null);
@@ -519,7 +564,107 @@ export function useMultiProviderSync(
         window.removeEventListener('beforeunload', handleBeforeUnload);
       }
     };
-  }, [docName, ydoc, enableWebRTC, githubIdentity]);
+  }, [docName, ydoc, enableWebRTC]);
+
+  // Separate effect for GitHub identity changes - updates awareness and pushes approval state
+  // This handles the case where user authenticates AFTER WebRTC connects
+  // Without this, approval state is never pushed and messages stay queued
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Complex state management for auth+WebRTC coordination
+  useEffect(() => {
+    if (!rtcProvider || !githubIdentity) return;
+
+    // Helper to check if signaling is connected
+    const isSignalingOpen = (): boolean => {
+      const signalingConns = (
+        rtcProvider as unknown as { signalingConns?: Array<{ ws: WebSocket | null }> }
+      ).signalingConns;
+      if (!signalingConns || signalingConns.length === 0) return false;
+      return signalingConns.some((conn) => conn.ws && conn.ws.readyState === WebSocket.OPEN);
+    };
+
+    // Send identity and approval state now that we have GitHub identity
+    if (isSignalingOpen()) {
+      // Send userId to signaling server
+      const identifyMessage = JSON.stringify({
+        type: 'subscribe',
+        topics: [],
+        userId: githubIdentity.username,
+      });
+
+      const signalingConns = (
+        rtcProvider as unknown as { signalingConns: Array<{ ws: WebSocket }> }
+      ).signalingConns;
+
+      if (signalingConns) {
+        for (const conn of signalingConns) {
+          if (conn.ws && conn.ws.readyState === WebSocket.OPEN) {
+            conn.ws.send(identifyMessage);
+          }
+        }
+      }
+
+      // Push approval state if we're the owner
+      const ownerId = getPlanOwnerId(ydoc);
+      if (ownerId && ownerId === githubIdentity.username) {
+        const approvedUsers = getApprovedUsers(ydoc);
+        const rejectedUsers = getRejectedUsers(ydoc);
+
+        const approvalStateMessage = JSON.stringify({
+          type: 'approval_state',
+          planId: docName,
+          ownerId,
+          approvedUsers,
+          rejectedUsers,
+        });
+
+        if (signalingConns) {
+          for (const conn of signalingConns) {
+            if (conn.ws && conn.ws.readyState === WebSocket.OPEN) {
+              conn.ws.send(approvalStateMessage);
+            }
+          }
+        }
+      }
+
+      // Update awareness state
+      const status = isUserRejected(ydoc, githubIdentity.username)
+        ? 'rejected'
+        : isUserApproved(ydoc, githubIdentity.username)
+          ? 'approved'
+          : 'pending';
+
+      if (status !== undefined) {
+        const webrtcPeerId = (rtcProvider as unknown as { room?: { peerId?: string } }).room
+          ?.peerId;
+
+        const awarenessState: PlanAwarenessState =
+          status === 'pending'
+            ? {
+                user: {
+                  id: githubIdentity.username,
+                  name: githubIdentity.displayName,
+                  color: colorFromString(githubIdentity.username),
+                },
+                isOwner: ownerId === githubIdentity.username,
+                status: 'pending',
+                requestedAt: Date.now(),
+                webrtcPeerId,
+              }
+            : {
+                user: {
+                  id: githubIdentity.username,
+                  name: githubIdentity.displayName,
+                  color: colorFromString(githubIdentity.username),
+                },
+                isOwner: ownerId === githubIdentity.username,
+                status,
+                webrtcPeerId,
+              };
+
+        rtcProvider.awareness.setLocalStateField('planStatus', awarenessState);
+      }
+    }
+  }, [githubIdentity, rtcProvider, ydoc, docName]);
 
   return { ydoc, syncState, wsProvider, rtcProvider };
 }

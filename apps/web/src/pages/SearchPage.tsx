@@ -4,7 +4,7 @@
  */
 
 import { Button, Checkbox, ListBox, ListBoxItem, Popover, Spinner } from '@heroui/react';
-import { getAllTagsFromIndex, PLAN_INDEX_DOC_NAME, type PlanIndexEntry } from '@shipyard/schema';
+import { getAllTagsFromIndex, type PlanIndexEntry } from '@shipyard/schema';
 import { Filter, LayoutGrid, Search } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -13,10 +13,9 @@ import { OfflineBanner } from '@/components/OfflineBanner';
 import { StatusChip } from '@/components/StatusChip';
 import { TagChip } from '@/components/TagChip';
 import { SearchPlanInput } from '@/components/ui/SearchPlanInput';
-import { useGitHubAuth } from '@/hooks/useGitHubAuth';
+import { getPlanRoute } from '@/constants/routes';
+import { usePlanIndexContext } from '@/contexts/PlanIndexContext';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
-import { useMultiProviderSync } from '@/hooks/useMultiProviderSync';
-import { usePlanIndex } from '@/hooks/usePlanIndex';
 import { STATUS_FILTER_OPTIONS, useViewFilters } from '@/hooks/useViewFilters';
 import { formatRelativeTime } from '@/utils/formatters';
 import { setSidebarCollapsed } from '@/utils/uiPreferences';
@@ -191,11 +190,8 @@ function FilterBar({
 type OwnershipFilter = 'all' | 'my-plans' | 'shared';
 
 export function SearchPage() {
-  const { identity: githubIdentity } = useGitHubAuth();
-  const { myPlans, sharedPlans, inboxPlans, isLoading, timedOut } = usePlanIndex(
-    githubIdentity?.username
-  );
-  useMultiProviderSync(PLAN_INDEX_DOC_NAME); // Keep index synced
+  // usePlanIndexContext already syncs plan-index via useMultiProviderSync internally
+  const { myPlans, sharedPlans, inboxPlans, isLoading, timedOut } = usePlanIndexContext();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -294,7 +290,7 @@ export function SearchPage() {
     onFullScreen: useCallback(() => {
       if (selectedPlanId) {
         setSidebarCollapsed(true);
-        navigate(`/plan/${selectedPlanId}`);
+        navigate(getPlanRoute(selectedPlanId));
       }
     }, [selectedPlanId, navigate]),
     onClose: handleClosePanel,

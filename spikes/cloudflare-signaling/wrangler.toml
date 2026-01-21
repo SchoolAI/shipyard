@@ -26,10 +26,6 @@ new_sqlite_classes = ["SignalingRoom"]
 port = 4444
 local_protocol = "http"
 
-# Environment-specific configuration
+# Environment configuration
 [vars]
 ENVIRONMENT = "development"
-
-# Production environment overrides
-[env.production.vars]
-ENVIRONMENT = "production"

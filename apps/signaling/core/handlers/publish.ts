@@ -100,6 +100,21 @@ async function handlePublish(
   if (planId) {
     const approval = await platform.getApprovalState(planId);
 
+    // If no approval state exists, allow P2P sync (open collaboration)
+    // This fixes the case where owner's browser hasn't pushed approval state yet
+    if (!approval) {
+      const outMessage: PublishMessage = {
+        ...message,
+        clients: subscribers.length,
+      };
+      for (const subscriber of subscribers) {
+        if (subscriber === ws) continue;
+        if (platform.isFlushingMessages(subscriber)) continue;
+        platform.sendMessage(subscriber, outMessage);
+      }
+      return;
+    }
+
     // Block rejected senders completely
     if (isUserRejected(approval, senderUserId)) {
       return;
@@ -118,10 +133,24 @@ async function handlePublish(
       // Don't send back to sender
       if (subscriber === ws) continue;
 
+      // Skip subscribers currently flushing their queue to prevent race conditions
+      // Messages sent during flush could be duplicated (sent directly + from queue)
+      if (platform.isFlushingMessages(subscriber)) {
+        continue;
+      }
+
       const subscriberUserId = platform.getUserId(subscriber);
 
       // Block rejected recipients
       if (isUserRejected(approval, subscriberUserId)) {
+        continue;
+      }
+
+      // Handle unidentified subscribers (no userId yet)
+      // Queue messages for later delivery when they identify themselves
+      // This fixes the race condition where y-webrtc subscribes before userId is sent
+      if (!subscriberUserId) {
+        platform.queueMessageForConnection(subscriber, message.topic, outMessage);
         continue;
       }
 

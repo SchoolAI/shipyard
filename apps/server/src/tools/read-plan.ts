@@ -26,16 +26,16 @@ const ReadPlanInput = z.object({
 export const readPlanTool = {
   definition: {
     name: TOOL_NAMES.READ_PLAN,
-    description: `Read a specific plan by ID, returning its metadata and content in markdown format.
+    description: `Read a specific task by ID, returning its metadata and content in markdown format.
 
-NOTE FOR CLAUDE CODE USERS: If you just received plan approval via the hook, deliverable IDs were already provided in the approval message. You only need this tool if:
+NOTE FOR CLAUDE CODE USERS: If you just received task approval via the hook, deliverable IDs were already provided in the approval message. You only need this tool if:
 - You need to check human feedback (set includeAnnotations=true)
 - You need to refresh state after changes
 - You need to see linked PRs (set includeLinkedPRs=true)
 
 USE CASES:
 - Review feedback from human reviewers (set includeAnnotations=true)
-- Check plan status and completion state
+- Check task status and completion state
 - Get block IDs for update_block_content operations
 - View linked PRs and their status (set includeLinkedPRs=true)
 
@@ -48,7 +48,7 @@ OUTPUT INCLUDES:
     inputSchema: {
       type: 'object',
       properties: {
-        planId: { type: 'string', description: 'The plan ID to read' },
+        planId: { type: 'string', description: 'The task ID to read' },
         sessionToken: { type: 'string', description: 'Session token from create_plan' },
         includeAnnotations: {
           type: 'boolean',

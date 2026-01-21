@@ -1,0 +1,62 @@
+name: Publish to npm
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # Required for npm provenance
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build packages
+        run: pnpm build --filter @shipyard/schema --filter @shipyard/shared --filter @shipyard/server --filter @shipyard/hook
+
+      - name: Prepare npm package
+        run: |
+          # Copy package-npm.json to package.json for publishing
+          cp package-npm.json package.json
+
+          # Update version from git tag (strip 'v' prefix)
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          npm version "$TAG_VERSION" --no-git-tag-version --allow-same-version
+
+      - name: Determine npm tag
+        id: npm-tag
+        run: |
+          # Extract version from git tag
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+
+          # Check if it's a prerelease (contains -, like rc, alpha, beta)
+          if [[ "$TAG_VERSION" == *"-"* ]]; then
+            echo "tag=next" >> $GITHUB_OUTPUT
+            echo "Publishing as prerelease with 'next' tag"
+          else
+            echo "tag=latest" >> $GITHUB_OUTPUT
+            echo "Publishing as stable with 'latest' tag"
+          fi
+
+      - name: Publish to npm
+        run: npm publish --access public --provenance --tag ${{ steps.npm-tag.outputs.tag }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

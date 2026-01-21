@@ -19,6 +19,8 @@ import { LogIn } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import * as Y from 'yjs';
+import { AuthChoiceModal } from '@/components/AuthChoiceModal';
+import { GitHubAuthOverlay } from '@/components/GitHubAuthModal';
 import { ImportConversationHandler } from '@/components/ImportConversationHandler';
 import { InputRequestModal } from '@/components/InputRequestModal';
 import { MobileActionsMenu } from '@/components/MobileActionsMenu';
@@ -27,11 +29,13 @@ import { PlanContent } from '@/components/PlanContent';
 import { PlanHeader } from '@/components/PlanHeader';
 import { ReviewActions } from '@/components/ReviewActions';
 import { Sidebar } from '@/components/Sidebar';
+import { SignInModal } from '@/components/SignInModal';
 import { Drawer } from '@/components/ui/drawer';
 import { WaitingRoomGate } from '@/components/WaitingRoomGate';
 import { useActivePlanSync } from '@/contexts/ActivePlanSyncContext';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
 import { useIsMobile } from '@/hooks/useIsMobile';
+import { useLocalIdentity } from '@/hooks/useLocalIdentity';
 import { useMultiProviderSync } from '@/hooks/useMultiProviderSync';
 import { usePendingUserNotifications } from '@/hooks/usePendingUserNotifications';
 import { usePlanIndex } from '@/hooks/usePlanIndex';
@@ -83,20 +87,30 @@ export function PlanPage() {
 
   const ydoc = isSnapshot ? (snapshotYdoc ?? syncedYdoc) : syncedYdoc;
 
-  const { identity: githubIdentity, startAuth } = useGitHubAuth();
+  const { identity: githubIdentity, startAuth, authState } = useGitHubAuth();
+  const { localIdentity, setLocalIdentity } = useLocalIdentity();
   const isMobile = useIsMobile();
   const drawerState = useOverlayState();
   const { setActivePlanSync, clearActivePlanSync } = useActivePlanSync();
   const [metadata, setMetadata] = useState<PlanMetadata | null>(null);
+  const [showAuthChoice, setShowAuthChoice] = useState(false);
+  const [showLocalSignIn, setShowLocalSignIn] = useState(false);
 
-  // Convert GitHub identity to BlockNote-compatible format
+  // Convert GitHub or local identity to BlockNote-compatible format
+  // Priority: GitHub > Local > null
   const identity = githubIdentity
     ? {
         id: githubIdentity.username,
         name: githubIdentity.displayName,
         color: colorFromString(githubIdentity.username),
       }
-    : null;
+    : localIdentity
+      ? {
+          id: `local:${localIdentity.username}`,
+          name: localIdentity.username,
+          color: colorFromString(localIdentity.username),
+        }
+      : null;
 
   const { ydoc: indexDoc } = useMultiProviderSync(PLAN_INDEX_DOC_NAME);
   const { myPlans, sharedPlans, inboxPlans } = usePlanIndex(githubIdentity?.username);
@@ -114,6 +128,9 @@ export function PlanPage() {
   // P2P grace period: when opening a shared URL, IndexedDB syncs immediately (empty)
   // but we need to wait for WebRTC to deliver the plan data before showing "Not Found"
   const [p2pGracePeriodExpired, setP2pGracePeriodExpired] = useState(false);
+
+  // Timeout for when we have peers connected but still haven't received plan data
+  const [peerSyncTimedOut, setPeerSyncTimedOut] = useState(false);
 
   // Input request modal state
   const [inputRequestModalOpen, setInputRequestModalOpen] = useState(false);
@@ -163,7 +180,7 @@ export function PlanPage() {
 
   // Start timeout when in P2P-only mode without metadata
   useEffect(() => {
-    const inP2POnlyMode = syncState.idbSynced && !syncState.synced && !syncState.connected;
+    const inP2POnlyMode = syncState.idbSynced && !syncState.hubConnected;
     const needsP2PData = !metadata && inP2POnlyMode;
 
     if (needsP2PData) {
@@ -175,7 +192,21 @@ export function PlanPage() {
       setP2pGracePeriodExpired(false);
     }
     return undefined;
-  }, [metadata, syncState.idbSynced, syncState.synced, syncState.connected, syncState.peerCount]);
+  }, [metadata, syncState.idbSynced, syncState.hubConnected, syncState.peerCount]);
+
+  // Timeout when peers are connected but no data arrives after 30 seconds
+  useEffect(() => {
+    const hasPeersButNoData = syncState.peerCount > 0 && !metadata;
+
+    if (hasPeersButNoData) {
+      const timeout = setTimeout(() => setPeerSyncTimedOut(true), 30000);
+      return () => clearTimeout(timeout);
+    }
+
+    // Reset timeout state when metadata arrives or peers disconnect
+    setPeerSyncTimedOut(false);
+    return undefined;
+  }, [syncState.peerCount, metadata]);
 
   // Set metadata from URL for snapshots, or from Y.Doc for normal plans
   useEffect(() => {
@@ -210,10 +241,18 @@ export function PlanPage() {
     return () => clearActivePlanSync();
   }, [planId, syncState, setActivePlanSync, clearActivePlanSync]);
 
-  // When user tries to comment without identity, open GitHub auth
+  // When user tries to comment without identity, open auth choice modal
   const handleRequestIdentity = useCallback(() => {
-    startAuth();
-  }, [startAuth]);
+    setShowAuthChoice(true);
+  }, []);
+
+  const handleLocalSignIn = useCallback(
+    (username: string) => {
+      setLocalIdentity(username);
+      setShowLocalSignIn(false);
+    },
+    [setLocalIdentity]
+  );
 
   // Store editor instance when ready (Issue #42)
   const handleEditorReady = useCallback((editorInstance: BlockNoteEditor) => {
@@ -293,9 +332,33 @@ export function PlanPage() {
     }
 
     // Phase 2: P2P-only mode - waiting for peers to sync data
-    const inP2POnlyMode = syncState.idbSynced && !syncState.synced && !syncState.connected;
+    const inP2POnlyMode = syncState.idbSynced && !syncState.hubConnected;
     const waitingForP2P = inP2POnlyMode && !metadata && !p2pGracePeriodExpired;
     const hasPeersButNoData = syncState.peerCount > 0 && !metadata;
+
+    // Show timeout error when peers connected but no data after 30s
+    if (peerSyncTimedOut && !metadata) {
+      return (
+        <div className="flex items-center justify-center min-h-[50vh] p-4">
+          <div className="flex flex-col items-center gap-4 text-center max-w-md">
+            <div className="w-12 h-12 rounded-full bg-danger/10 flex items-center justify-center">
+              <span className="text-danger text-2xl">!</span>
+            </div>
+            <div>
+              <p className="text-foreground font-medium mb-2">Sync Failed</p>
+              <p className="text-sm text-muted-foreground mb-4">
+                Connected to {syncState.peerCount} peer{syncState.peerCount > 1 ? 's' : ''} but
+                couldn&apos;t load task data. The peer may not have the plan you&apos;re looking
+                for.
+              </p>
+            </div>
+            <Button variant="primary" onPress={() => window.location.reload()}>
+              Retry
+            </Button>
+          </div>
+        </div>
+      );
+    }
 
     if (!metadata && (waitingForP2P || hasPeersButNoData)) {
       return (
@@ -473,6 +536,7 @@ export function PlanPage() {
                 ydoc={ydoc}
                 rtcProvider={rtcProvider}
                 metadata={metadata}
+                indexDoc={indexDoc}
               />
             }
           />
@@ -490,6 +554,18 @@ export function PlanPage() {
             setCurrentInputRequest(null);
           }}
         />
+        <GitHubAuthOverlay authState={authState} />
+        <AuthChoiceModal
+          isOpen={showAuthChoice}
+          onOpenChange={setShowAuthChoice}
+          onGitHubAuth={startAuth}
+          onLocalAuth={() => setShowLocalSignIn(true)}
+        />
+        <SignInModal
+          isOpen={showLocalSignIn}
+          onClose={() => setShowLocalSignIn(false)}
+          onSignIn={handleLocalSignIn}
+        />
       </>
     );
   }
@@ -505,6 +581,18 @@ export function PlanPage() {
           setInputRequestModalOpen(false);
           setCurrentInputRequest(null);
         }}
+      />
+      <GitHubAuthOverlay authState={authState} />
+      <AuthChoiceModal
+        isOpen={showAuthChoice}
+        onOpenChange={setShowAuthChoice}
+        onGitHubAuth={startAuth}
+        onLocalAuth={() => setShowLocalSignIn(true)}
+      />
+      <SignInModal
+        isOpen={showLocalSignIn}
+        onClose={() => setShowLocalSignIn(false)}
+        onSignIn={handleLocalSignIn}
       />
     </>
   );
