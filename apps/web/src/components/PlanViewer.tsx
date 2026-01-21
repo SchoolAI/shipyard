@@ -27,7 +27,6 @@ import { useEffect, useRef } from 'react';
 import type { WebrtcProvider } from 'y-webrtc';
 import type { WebsocketProvider } from 'y-websocket';
 import type * as Y from 'yjs';
-import { useGitHubAuth } from '@/hooks/useGitHubAuth';
 import { useTheme } from '@/hooks/useTheme';
 import { RedoButton } from './editor/RedoButton';
 import { UndoButton } from './editor/UndoButton';
@@ -178,7 +177,6 @@ export function PlanViewer({
   // Comments are fully enabled only when identity is set
   const hasComments = identity !== null;
   const { theme } = useTheme();
-  const { startAuth } = useGitHubAuth();
 
   // When viewing a snapshot, use its content and make editor read-only
   const isViewingHistory = currentSnapshot !== null;
@@ -491,7 +489,7 @@ export function PlanViewer({
               Choose how you'd like to identify yourself to participate in discussions.
             </Alert.Description>
           </Alert.Content>
-          <Button size="sm" variant="secondary" onPress={onRequestIdentity ?? (() => startAuth())}>
+          <Button size="sm" variant="secondary" onPress={onRequestIdentity}>
             Sign in
           </Button>
         </Alert>

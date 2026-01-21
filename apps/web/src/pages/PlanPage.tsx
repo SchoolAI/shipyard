@@ -88,7 +88,7 @@ export function PlanPage() {
   const ydoc = isSnapshot ? (snapshotYdoc ?? syncedYdoc) : syncedYdoc;
 
   const { identity: githubIdentity, startAuth, authState } = useGitHubAuth();
-  const { setLocalIdentity } = useLocalIdentity();
+  const { localIdentity, setLocalIdentity } = useLocalIdentity();
   const isMobile = useIsMobile();
   const drawerState = useOverlayState();
   const { setActivePlanSync, clearActivePlanSync } = useActivePlanSync();
@@ -96,14 +96,21 @@ export function PlanPage() {
   const [showAuthChoice, setShowAuthChoice] = useState(false);
   const [showLocalSignIn, setShowLocalSignIn] = useState(false);
 
-  // Convert GitHub identity to BlockNote-compatible format
+  // Convert GitHub or local identity to BlockNote-compatible format
+  // Priority: GitHub > Local > null
   const identity = githubIdentity
     ? {
         id: githubIdentity.username,
         name: githubIdentity.displayName,
         color: colorFromString(githubIdentity.username),
       }
-    : null;
+    : localIdentity
+      ? {
+          id: `local:${localIdentity.username}`,
+          name: localIdentity.username,
+          color: colorFromString(localIdentity.username),
+        }
+      : null;
 
   const { ydoc: indexDoc } = useMultiProviderSync(PLAN_INDEX_DOC_NAME);
   const { myPlans, sharedPlans, inboxPlans } = usePlanIndex(githubIdentity?.username);
@@ -239,13 +246,10 @@ export function PlanPage() {
     setShowAuthChoice(true);
   }, []);
 
-  const handleLocalSignIn = useCallback(
-    (username: string) => {
-      setLocalIdentity(username);
-      setShowLocalSignIn(false);
-    },
-    [setLocalIdentity]
-  );
+  const handleLocalSignIn = useCallback((username: string) => {
+    setLocalIdentity(username);
+    setShowLocalSignIn(false);
+  }, [setLocalIdentity]);
 
   // Store editor instance when ready (Issue #42)
   const handleEditorReady = useCallback((editorInstance: BlockNoteEditor) => {
