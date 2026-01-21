@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'apps/signaling/cloudflare/**'
+      - 'apps/signaling/core/**'
       - '.github/workflows/deploy-signaling.yml'
   workflow_dispatch:
 
