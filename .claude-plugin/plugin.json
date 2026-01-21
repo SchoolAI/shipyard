@@ -21,6 +21,5 @@
     "p2p"
   ],
   "skills": "./skills/",
-  "hooks": "./hooks/hooks.json",
   "mcpServers": "./.mcp-plugin.json"
 }

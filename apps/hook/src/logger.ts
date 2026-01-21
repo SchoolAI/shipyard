@@ -15,17 +15,36 @@
  * - "Review timeout" - Normal during testing when no human reviews
  */
 
+import { existsSync, mkdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import pino from 'pino';
 import { serverConfig } from './config/env/server.js';
 
-const LOG_FILE = join(homedir(), '.shipyard', 'hook-debug.log');
+const LOG_DIR = join(homedir(), '.shipyard');
+const LOG_FILE = join(LOG_DIR, 'hook-debug.log');
+
+/**
+ * Skip file logging in test environment to avoid filesystem side effects.
+ * This prevents ENOENT errors in CI where ~/.shipyard doesn't exist.
+ */
+const isTest = process.env.NODE_ENV === 'test' || process.env.VITEST;
+if (!isTest && !existsSync(LOG_DIR)) {
+  try {
+    mkdirSync(LOG_DIR, { recursive: true });
+  } catch {
+    /* Directory creation failed - continue without file logging */
+  }
+}
+
+const streams = isTest
+  ? [{ stream: pino.destination(2) }]
+  : [{ stream: pino.destination(2) }, { stream: pino.destination(LOG_FILE) }];
 
 export const logger = pino(
   {
     level: serverConfig.LOG_LEVEL,
     timestamp: pino.stdTimeFunctions.isoTime,
   },
-  pino.multistream([{ stream: pino.destination(2) }, { stream: pino.destination(LOG_FILE) }])
+  pino.multistream(streams)
 );
