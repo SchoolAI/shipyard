@@ -1192,12 +1192,21 @@ export function unarchivePlan(ydoc: Y.Doc, actorId: string): ArchiveResult {
  * Answer a pending input request with validation.
  * Used by browser UI when user responds to input request modal.
  */
+/** Result type for input request answer operation */
+export type AnswerInputRequestResult =
+  | { success: true }
+  | { success: false; error: 'Request not found' }
+  | { success: false; error: 'Request already answered'; answeredBy?: string }
+  | { success: false; error: 'Request was declined' }
+  | { success: false; error: 'Request was cancelled' }
+  | { success: false; error: 'Request is not pending' };
+
 export function answerInputRequest(
   ydoc: Y.Doc,
   requestId: string,
   response: string,
   answeredBy: string
-): { success: boolean; error?: string } {
+): AnswerInputRequestResult {
   const requestsArray = ydoc.getArray<InputRequest>(YDOC_KEYS.INPUT_REQUESTS);
   const requests = requestsArray.toJSON() as InputRequest[];
   const index = requests.findIndex((r) => r.id === requestId);
@@ -1212,7 +1221,20 @@ export function answerInputRequest(
   }
 
   if (request.status !== 'pending') {
-    return { success: false, error: `Request is not pending` };
+    switch (request.status) {
+      case 'answered':
+        return {
+          success: false,
+          error: 'Request already answered',
+          answeredBy: request.answeredBy,
+        };
+      case 'declined':
+        return { success: false, error: 'Request was declined' };
+      case 'cancelled':
+        return { success: false, error: 'Request was cancelled' };
+      default:
+        return { success: false, error: `Request is not pending` };
+    }
   }
 
   const answeredRequest = {

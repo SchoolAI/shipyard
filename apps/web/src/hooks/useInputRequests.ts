@@ -49,6 +49,30 @@ function createRequestIdSet(requests: InputRequest[]): Set<string> {
 }
 
 /**
+ * Finds request IDs that were in the previous set but are no longer pending.
+ * Used to dismiss toasts for resolved requests.
+ */
+function findResolvedRequestIds(previousIds: Set<string>, currentIds: Set<string>): string[] {
+  return Array.from(previousIds).filter((id) => !currentIds.has(id));
+}
+
+/**
+ * Dismisses toasts for requests that are no longer pending.
+ * Also dismisses the grouped toast if no requests remain.
+ */
+function dismissResolvedToasts(resolvedIds: string[], remainingCount: number): void {
+  // Dismiss individual request toasts
+  for (const id of resolvedIds) {
+    toast.dismiss(`input-request-${id}`);
+  }
+
+  // If no pending requests remain, also dismiss the grouped toast
+  if (remainingCount === 0) {
+    toast.dismiss('input-requests-grouped');
+  }
+}
+
+/**
  * Shows a toast notification for new input request(s).
  * Groups multiple pending requests into a single toast.
  */
@@ -148,14 +172,25 @@ export function useInputRequests({
       const allRequests = requestsArray.toJSON() as InputRequest[];
       const pending = filterPendingRequests(allRequests);
 
+      // Create set of current pending IDs
+      const currentIds = createRequestIdSet(pending);
+
       // Find NEW requests (not in previous set)
       const newRequests = findNewRequests(pending, previousRequestIdsRef.current);
+
+      // Find RESOLVED requests (were pending before, not anymore)
+      // This happens when another device responds to the request
+      const resolvedIds = findResolvedRequestIds(previousRequestIdsRef.current, currentIds);
+
+      // Dismiss toasts for resolved requests
+      if (resolvedIds.length > 0) {
+        dismissResolvedToasts(resolvedIds, pending.length);
+      }
 
       // Update state
       setPendingRequests(pending);
 
       // Update tracking set
-      const currentIds = createRequestIdSet(pending);
       previousRequestIdsRef.current = currentIds;
 
       // Handle new requests

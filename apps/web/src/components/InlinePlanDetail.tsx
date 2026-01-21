@@ -3,6 +3,7 @@
  * Used by InboxPage, ArchivePage, and SearchPage for consistent plan viewing.
  */
 
+import type { BlockNoteEditor } from '@blocknote/core';
 import { Spinner } from '@heroui/react';
 import {
   getDeliverables,
@@ -69,7 +70,7 @@ export function InlinePlanDetail({
   onExpand,
   width = 'peek',
   emptyMessage = 'Select a task to view details',
-  onStatusChange: _onStatusChange,
+  onStatusChange,
 }: InlinePlanDetailProps) {
   const navigate = useNavigate();
   const { identity: githubIdentity, startAuth, authState } = useGitHubAuth();
@@ -82,6 +83,7 @@ export function InlinePlanDetail({
   const [panelDeliverableStats, setPanelDeliverableStats] = useState({ completed: 0, total: 0 });
   const [panelLastActivity, setPanelLastActivity] = useState('');
   const [loadTimeout, setLoadTimeout] = useState(false);
+  const [editor, setEditor] = useState<BlockNoteEditor | null>(null);
 
   // Sync providers for selected plan
   const {
@@ -154,6 +156,10 @@ export function InlinePlanDetail({
     setShowAuthChoice(true);
   }, []);
 
+  const handleEditorReady = useCallback((newEditor: BlockNoteEditor) => {
+    setEditor(newEditor);
+  }, []);
+
   const handleLocalSignIn = useCallback(
     (username: string) => {
       setLocalIdentity(username);
@@ -224,6 +230,11 @@ export function InlinePlanDetail({
             onExpand={onExpand}
             onFullScreen={handleFullScreen}
             width={width}
+            ydoc={panelYdoc}
+            identity={identity}
+            onRequestIdentity={handleRequestIdentity}
+            editor={editor}
+            onStatusChange={onStatusChange}
           />
           <div className="flex-1 overflow-y-auto">
             <PlanContent
@@ -234,6 +245,7 @@ export function InlinePlanDetail({
               identity={identity}
               onRequestIdentity={handleRequestIdentity}
               provider={activeProvider}
+              onEditorReady={handleEditorReady}
             />
           </div>
         </div>

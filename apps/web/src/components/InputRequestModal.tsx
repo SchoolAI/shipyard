@@ -19,8 +19,13 @@ import {
   TextArea,
   TextField,
 } from '@heroui/react';
-import type { InputRequest } from '@shipyard/schema';
-import { answerInputRequest, cancelInputRequest } from '@shipyard/schema';
+import {
+  type AnswerInputRequestResult,
+  answerInputRequest,
+  assertNever,
+  cancelInputRequest,
+  type InputRequest,
+} from '@shipyard/schema';
 import type React from 'react';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
@@ -104,19 +109,36 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
     }
   }, [remainingTime, isOpen, request, handleCancel]);
 
-  const handleAnswerError = useCallback((error: string, onCloseFn: () => void) => {
-    if (error === 'Request already answered') {
-      toast.error('This request was already answered by another user');
-    } else if (error === 'Request not found') {
-      toast.error('This request could not be found');
+  /** Handle answer errors with exhaustive checking. Always closes modal after error. */
+  const handleAnswerError = useCallback(
+    (result: Extract<AnswerInputRequestResult, { success: false }>, onCloseFn: () => void) => {
+      const { error } = result;
+      switch (error) {
+        case 'Request already answered': {
+          const answeredBy = 'answeredBy' in result ? result.answeredBy : undefined;
+          const byWhom = answeredBy ? ` by ${answeredBy}` : '';
+          toast.error(`This request was already answered${byWhom}`);
+          break;
+        }
+        case 'Request not found':
+          toast.error('This request could not be found');
+          break;
+        case 'Request was declined':
+          toast.error('This request was declined');
+          break;
+        case 'Request was cancelled':
+          toast.error('This request timed out or was cancelled');
+          break;
+        case 'Request is not pending':
+          toast.error('This request is no longer pending');
+          break;
+        default:
+          assertNever(error);
+      }
       onCloseFn();
-    } else if (error === 'Request is not pending') {
-      toast.error('This request has expired or was cancelled');
-      onCloseFn();
-    } else {
-      toast.error('Failed to submit response');
-    }
-  }, []);
+    },
+    []
+  );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -130,7 +152,7 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
       const result = answerInputRequest(ydoc, request.id, responseValue, identity.username);
 
       if (!result.success) {
-        handleAnswerError(result.error || 'Unknown error', onClose);
+        handleAnswerError(result, onClose);
         return;
       }
 
@@ -161,7 +183,7 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
         const result = answerInputRequest(ydoc, request.id, response, identity.username);
 
         if (!result.success) {
-          handleAnswerError(result.error || 'Unknown error', onClose);
+          handleAnswerError(result, onClose);
           return;
         }
 

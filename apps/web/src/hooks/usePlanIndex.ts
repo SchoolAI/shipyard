@@ -333,16 +333,24 @@ export function usePlanIndex(currentUsername: string | undefined): PlanIndexStat
   }, [allPlansData.active, discoveredPlans]);
 
   /**
-   * Inbox shows plans that need attention:
-   * - draft: New plans just created (need to be reviewed/worked on)
-   * - pending_review: Plans waiting for your review/approval
-   * NOTE: changes_requested and in_progress plans belong in "My Plans" (work continues there)
+   * Inbox shows all notifications (plans that the user might need to act on).
+   * Unlike a status-based view, inbox keeps items until they're marked as read.
+   * This includes:
+   * - draft: New plans just created
+   * - pending_review: Plans waiting for approval
+   * - in_progress: Recently approved plans (stay visible until read)
+   * - changes_requested: Plans needing revision (stay visible until read)
+   * NOTE: Only 'completed' plans are excluded from inbox (they go to archive view)
    */
   const inboxCandidates = useMemo(
     () =>
       allActivePlans.filter(
         (p) =>
-          p.ownerId === currentUsername && (p.status === 'pending_review' || p.status === 'draft')
+          p.ownerId === currentUsername &&
+          (p.status === 'pending_review' ||
+            p.status === 'draft' ||
+            p.status === 'in_progress' ||
+            p.status === 'changes_requested')
       ),
     [allActivePlans, currentUsername]
   );

@@ -307,6 +307,7 @@ export {
 export type { UserProfile } from './user-helpers.js';
 export { createUserResolver } from './user-helpers.js';
 export type {
+  AnswerInputRequestResult,
   ArchiveResult,
   GetPlanMetadataResult,
   InitPlanMetadataParams,
