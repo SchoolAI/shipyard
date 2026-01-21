@@ -24,6 +24,8 @@ Complete installation instructions for all AI platforms.
 ```
 If that stalls, start a fresh Claude Code session and retry.
 
+**Enable auto-updates:** After installing, run `/plugin` → Marketplaces tab → select `schoolai-shipyard` → "Enable auto-update" to receive updates automatically.
+
 **What you get:**
 - ✅ MCP server with all tools (`create_plan`, `read_plan`, `add_artifact`, etc.)
 - ✅ Automatic hooks (plan creation on `ExitPlanMode`, session tracking)

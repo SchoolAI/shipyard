@@ -47,6 +47,8 @@ Install the complete Shipyard plugin (MCP server + hooks + skills):
 
 > **Note:** Claude Code requires adding a marketplace before installing plugins from it. This is intentional design (similar to app stores).
 
+**Enable auto-updates:** After installing, run `/plugin` → Marketplaces tab → select `schoolai-shipyard` → "Enable auto-update" to receive updates automatically.
+
 <details>
 <summary>Troubleshooting: If Step 1 fails with a cache error</summary>
 
