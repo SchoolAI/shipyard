@@ -20,5 +20,6 @@
     "crdt",
     "p2p"
   ],
-  "skills": "./skills/"
+  "skills": "./skills/",
+  "mcpServers": "./.claude-plugin/mcp.json"
 }
