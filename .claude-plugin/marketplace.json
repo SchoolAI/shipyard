@@ -1,5 +1,7 @@
 {
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "schoolai-shipyard",
+  "version": "1.0.0",
   "owner": {
     "name": "SchoolAI",
     "email": "team@schoolai.com"
