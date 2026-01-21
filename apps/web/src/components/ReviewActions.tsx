@@ -251,8 +251,13 @@ export function ReviewActions({
         </Button>
 
         {/* z-[60] ensures popover renders above mobile drawer (z-50)
+            pointer-events-auto restores interactivity since vaul sets body to pointer-events:none
             data-vaul-no-drag prevents vaul drawer from capturing touch events */}
-        <Popover.Content placement="top" className="w-80 z-[60]" data-vaul-no-drag>
+        <Popover.Content
+          placement="top"
+          className="w-80 z-[60] pointer-events-auto"
+          data-vaul-no-drag
+        >
           <Popover.Dialog>
             <Popover.Arrow />
             <Popover.Heading>Approve Task</Popover.Heading>
@@ -311,8 +316,13 @@ export function ReviewActions({
         </Button>
 
         {/* z-[60] ensures popover renders above mobile drawer (z-50)
+            pointer-events-auto restores interactivity since vaul sets body to pointer-events:none
             data-vaul-no-drag prevents vaul drawer from capturing touch events */}
-        <Popover.Content placement="top" className="w-80 z-[60]" data-vaul-no-drag>
+        <Popover.Content
+          placement="top"
+          className="w-80 z-[60] pointer-events-auto"
+          data-vaul-no-drag
+        >
           <Popover.Dialog>
             <Popover.Arrow />
             <Popover.Heading>Request Changes</Popover.Heading>

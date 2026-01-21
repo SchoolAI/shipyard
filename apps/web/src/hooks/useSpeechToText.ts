@@ -190,6 +190,16 @@ export function useSpeechToText(): UseSpeechToTextReturn {
 
   const stopRecording = useCallback(() => {
     isStoppingRef.current = true;
+
+    // On mobile Safari, isFinal may not be set until stop() is called
+    // Capture any pending partial transcript as final text before stopping
+    setPartialTranscript((currentPartial) => {
+      if (currentPartial) {
+        setTranscript((prev) => (prev ? `${prev} ${currentPartial}` : currentPartial));
+      }
+      return '';
+    });
+
     if (recognitionRef.current) {
       recognitionRef.current.stop();
     }
