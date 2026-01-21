@@ -31,7 +31,7 @@ Push to main → publish-npm.yml → 0.1.0-next.435 published to @next
 
 **Install RC:**
 ```bash
-npx -y @schoolai/shipyard-mcp@next mcp-server-shipyard
+npx -y -p @schoolai/shipyard-mcp@next mcp-server-shipyard
 ```
 
 ---
@@ -152,7 +152,7 @@ This file controls the base version for RC releases:
 
 # 1. Test the latest RC
 npm view @schoolai/shipyard-mcp@next version  # 0.2.0-next.435
-npx -y @schoolai/shipyard-mcp@next mcp-server-shipyard
+npx -y -p @schoolai/shipyard-mcp@next mcp-server-shipyard
 # ✅ Works great!
 
 # 2. Create stable release

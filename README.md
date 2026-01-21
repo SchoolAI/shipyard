@@ -89,7 +89,7 @@ This gives you:
 Install the MCP server via npm:
 
 ```bash
-npx @schoolai/shipyard-mcp mcp-server-shipyard
+npx -y -p @schoolai/shipyard-mcp mcp-server-shipyard
 ```
 
 Then configure in your platform's MCP settings:
@@ -100,7 +100,7 @@ Then configure in your platform's MCP settings:
   "mcpServers": {
     "shipyard": {
       "command": "npx",
-      "args": ["-y", "@schoolai/shipyard-mcp", "mcp-server-shipyard"]
+      "args": ["-y", "-p", "@schoolai/shipyard-mcp", "mcp-server-shipyard"]
     }
   }
 }
@@ -111,7 +111,7 @@ Then configure in your platform's MCP settings:
 {
   "mcp.servers": {
     "shipyard": {
-      "command": "npx @schoolai/shipyard-mcp mcp-server-shipyard"
+      "command": "npx -y -p @schoolai/shipyard-mcp mcp-server-shipyard"
     }
   }
 }

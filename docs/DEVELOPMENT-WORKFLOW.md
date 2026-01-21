@@ -211,7 +211,7 @@ This publishes as the default stable version.
 
 **Users get it with:**
 ```bash
-npx @schoolai/shipyard-mcp mcp-server-shipyard  # Gets latest stable
+npx -y -p @schoolai/shipyard-mcp mcp-server-shipyard  # Gets latest stable
 ```
 
 ---

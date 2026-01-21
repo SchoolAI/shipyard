@@ -63,8 +63,9 @@ jobs:
       - name: Promote RC to stable
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.action == 'promote' }}
         run: |
-          RC_VERSION="${{ inputs.rc_version }}"
-          STABLE_VERSION="${{ inputs.stable_version }}"
+          # Trim whitespace from inputs
+          RC_VERSION=$(echo "${{ inputs.rc_version }}" | xargs)
+          STABLE_VERSION=$(echo "${{ inputs.stable_version }}" | xargs)
 
           if [ -z "$RC_VERSION" ] || [ -z "$STABLE_VERSION" ]; then
             echo "::error::Both rc_version and stable_version are required for promote action"
@@ -73,10 +74,23 @@ jobs:
 
           echo "Promoting $RC_VERSION → $STABLE_VERSION"
 
-          # Use npm dist-tag to move the RC to latest (OIDC handles auth)
-          npm dist-tag add @schoolai/shipyard-mcp@$RC_VERSION latest
+          # Download the RC tarball
+          npm pack @schoolai/shipyard-mcp@$RC_VERSION
+          TARBALL=$(ls schoolai-shipyard-mcp-*.tgz)
+          echo "Downloaded: $TARBALL"
 
-          echo "✅ Promoted $RC_VERSION to latest tag"
+          # Extract, update version, repack
+          tar -xzf $TARBALL
+          cd package
+          npm version $STABLE_VERSION --no-git-tag-version --allow-same-version
+          cd ..
+
+          # Re-publish as stable (OIDC works with publish --provenance)
+          cd package
+          npm publish --access public --provenance --tag latest
+          cd ..
+
+          echo "✅ Published $STABLE_VERSION as latest"
 
       - name: Update version and create tag (promote)
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.action == 'promote' }}
@@ -152,7 +166,7 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               commit_sha: context.sha,
-              body: `📦 Published RC: \`${{ steps.version.outputs.version }}\`\n\nInstall with:\n\`\`\`bash\nnpx -y @schoolai/shipyard-mcp@next mcp-server-shipyard\n\`\`\``
+              body: `📦 Published RC: \`${{ steps.version.outputs.version }}\`\n\nInstall with:\n\`\`\`bash\nnpx -y -p @schoolai/shipyard-mcp@next mcp-server-shipyard\n\`\`\``
             });
 
       - name: Create GitHub Release (stable tags)
@@ -165,7 +179,7 @@ jobs:
               repo: context.repo.repo,
               tag_name: '${{ github.ref_name }}',
               name: '${{ github.ref_name }}',
-              body: 'Install with:\n```bash\nnpm install @schoolai/shipyard-mcp\n# or\nnpx -y @schoolai/shipyard-mcp mcp-server-shipyard\n```',
+              body: 'Install with:\n```bash\nnpm install @schoolai/shipyard-mcp\n# or\nnpx -y -p @schoolai/shipyard-mcp mcp-server-shipyard\n```',
               draft: false,
               prerelease: false
             });

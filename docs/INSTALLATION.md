@@ -62,7 +62,7 @@ Install just the MCP server without hooks/skills:
 
 **Option A: Command-line**
 ```bash
-claude mcp add --transport stdio shipyard -- npx -y @schoolai/shipyard-mcp@latest mcp-server-shipyard
+claude mcp add --transport stdio shipyard -- npx -y -p @schoolai/shipyard-mcp@latest mcp-server-shipyard
 ```
 
 **Option B: JSON config (`.mcp.json` in your project root)**
@@ -71,7 +71,7 @@ claude mcp add --transport stdio shipyard -- npx -y @schoolai/shipyard-mcp@lates
   "mcpServers": {
     "shipyard": {
       "command": "npx",
-      "args": ["-y", "@schoolai/shipyard-mcp@latest", "mcp-server-shipyard"],
+      "args": ["-y", "-p", "@schoolai/shipyard-mcp@latest", "mcp-server-shipyard"],
       "env": {
         "NODE_ENV": "production"
       }
@@ -146,7 +146,7 @@ Cursor supports MCP via CLI commands or JSON configuration.
 ### Method 1: CLI (Recommended)
 
 ```bash
-agent mcp add shipyard npx -y @schoolai/shipyard-mcp@latest mcp-server-shipyard
+agent mcp add shipyard npx -y -p @schoolai/shipyard-mcp@latest mcp-server-shipyard
 ```
 
 **Manage servers:**
@@ -167,7 +167,7 @@ agent mcp disable shipyard  # Disable server
   "mcpServers": {
     "shipyard": {
       "command": "npx",
-      "args": ["-y", "@schoolai/shipyard-mcp@latest", "mcp-server-shipyard"],
+      "args": ["-y", "-p", "@schoolai/shipyard-mcp@latest", "mcp-server-shipyard"],
       "env": {
         "NODE_ENV": "production"
       }
@@ -204,7 +204,7 @@ Windsurf integrates MCP through its Cascade AI assistant with a user-friendly ma
   "mcpServers": {
     "shipyard": {
       "command": "npx",
-      "args": ["-y", "@schoolai/shipyard-mcp@latest", "mcp-server-shipyard"],
+      "args": ["-y", "-p", "@schoolai/shipyard-mcp@latest", "mcp-server-shipyard"],
       "env": {
         "NODE_ENV": "production"
       }
@@ -252,7 +252,7 @@ Add to your settings:
   "context_servers": {
     "shipyard": {
       "command": "npx",
-      "args": ["-y", "@schoolai/shipyard-mcp@latest", "mcp-server-shipyard"],
+      "args": ["-y", "-p", "@schoolai/shipyard-mcp@latest", "mcp-server-shipyard"],
       "env": {
         "NODE_ENV": "production"
       }
@@ -295,7 +295,7 @@ VS Code supports MCP through workspace or user configuration.
     "shipyard": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "@schoolai/shipyard-mcp@latest", "mcp-server-shipyard"],
+      "args": ["-y", "-p", "@schoolai/shipyard-mcp@latest", "mcp-server-shipyard"],
       "env": {
         "NODE_ENV": "production"
       }
@@ -387,17 +387,17 @@ All clients support these environment variables in MCP config:
 
 **Latest stable:**
 ```json
-"args": ["-y", "@schoolai/shipyard-mcp@latest", "mcp-server-shipyard"]
+"args": ["-y", "-p", "@schoolai/shipyard-mcp@latest", "mcp-server-shipyard"]
 ```
 
 **Next (RC):**
 ```json
-"args": ["-y", "@schoolai/shipyard-mcp@next", "mcp-server-shipyard"]
+"args": ["-y", "-p", "@schoolai/shipyard-mcp@next", "mcp-server-shipyard"]
 ```
 
 **Specific version:**
 ```json
-"args": ["-y", "@schoolai/shipyard-mcp@0.2.0", "mcp-server-shipyard"]
+"args": ["-y", "-p", "@schoolai/shipyard-mcp@0.2.0", "mcp-server-shipyard"]
 ```
 
 ### Check Installed Version
