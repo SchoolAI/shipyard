@@ -449,10 +449,16 @@ export function usePlanIndex(currentUsername: string | undefined): PlanIndexStat
     setNavigationTarget(null);
   };
 
-  // Loading until WebSocket has synced - ensures plans are fetched and filtered
-  // before showing content or empty state (prevents flicker)
-  // However, if connection has timed out and we have IndexedDB data, show cached data
-  const isLoading = !syncState.synced && !syncState.timedOut;
+  // Loading until we have usable data from ANY source:
+  // 1. WebSocket has synced (online with MCP server)
+  // 2. Connection has timed out (offline mode)
+  // 3. IndexedDB has synced (local cached data available - critical for mobile!)
+  //
+  // The IndexedDB check fixes infinite loading on mobile where:
+  // - No local MCP server means WebSocket never syncs
+  // - Timeout should fire but might be unreliable
+  // - IndexedDB syncs almost immediately with local data
+  const isLoading = !syncState.idbSynced && !syncState.synced && !syncState.timedOut;
 
   const markPlanAsRead = useCallback(
     (planId: string): Promise<void> => {
