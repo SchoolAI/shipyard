@@ -27,7 +27,6 @@ import { useEffect, useRef } from 'react';
 import type { WebrtcProvider } from 'y-webrtc';
 import type { WebsocketProvider } from 'y-websocket';
 import type * as Y from 'yjs';
-import { useUserIdentity } from '@/contexts/UserIdentityContext';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
 import { useTheme } from '@/hooks/useTheme';
 import { RedoButton } from './editor/RedoButton';

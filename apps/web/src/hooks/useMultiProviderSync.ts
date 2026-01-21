@@ -566,6 +566,7 @@ export function useMultiProviderSync(
   // Separate effect for GitHub identity changes - updates awareness and pushes approval state
   // This handles the case where user authenticates AFTER WebRTC connects
   // Without this, approval state is never pushed and messages stay queued
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Complex state management for auth+WebRTC coordination
   useEffect(() => {
     if (!rtcProvider || !githubIdentity) return;
 

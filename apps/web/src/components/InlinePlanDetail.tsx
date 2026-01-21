@@ -1,6 +1,9 @@
 /**
  * Inline detail panel for viewing plans in list views.
  * Used by InboxPage, ArchivePage, and SearchPage for consistent plan viewing.
+ *
+ * NOTE: This component disables WebRTC to prevent provider collisions when navigating to PlanPage.
+ * WebRTC sync only happens in the full PlanPage view.
  */
 
 import type { BlockNoteEditor } from '@blocknote/core';
@@ -78,13 +81,13 @@ export function InlinePlanDetail({
   const [loadTimeout, setLoadTimeout] = useState(false);
   const [editor, setEditor] = useState<BlockNoteEditor | null>(null);
 
-  // Sync providers for selected plan
+  // Sync providers for selected plan (WebRTC disabled to prevent collisions with PlanPage)
   const {
     ydoc: panelYdoc,
     syncState: panelSyncState,
     wsProvider: panelWsProvider,
     rtcProvider: panelRtcProvider,
-  } = useMultiProviderSync(planId || '');
+  } = useMultiProviderSync(planId || '', { enableWebRTC: false });
 
   // Timeout for loading state (detect invalid planIds)
   useEffect(() => {
