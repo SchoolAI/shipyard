@@ -27,6 +27,7 @@ import { useEffect, useRef } from 'react';
 import type { WebrtcProvider } from 'y-webrtc';
 import type { WebsocketProvider } from 'y-websocket';
 import type * as Y from 'yjs';
+import { useUserIdentity } from '@/contexts/UserIdentityContext';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
 import { useTheme } from '@/hooks/useTheme';
 import { RedoButton } from './editor/RedoButton';
@@ -488,11 +489,11 @@ export function PlanViewer({
           <Alert.Content className="flex-1">
             <Alert.Title>Sign in to add comments</Alert.Title>
             <Alert.Description>
-              Sign in with GitHub to participate in discussions.
+              Choose how you'd like to identify yourself to participate in discussions.
             </Alert.Description>
           </Alert.Content>
           <Button size="sm" variant="secondary" onPress={onRequestIdentity ?? (() => startAuth())}>
-            Sign in with GitHub
+            Sign in
           </Button>
         </Alert>
       )}
