@@ -36,8 +36,8 @@ function MobileBottomDrawer({
   onClose: () => void;
   children: ReactNode;
 }) {
-  // Snap points: 85% (default, near header), 97% (full), close on drag below
-  const snapPoints = [0.85, 0.97];
+  // Snap points: 95% (default, just below header), 97% (full), close on drag below
+  const snapPoints = [0.95, 0.97];
 
   return (
     <Drawer.Root

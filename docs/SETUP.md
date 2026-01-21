@@ -82,6 +82,101 @@ Claude will call the `create_plan` tool → browser opens with plan!
 
 ---
 
+## Local Hooks Setup
+
+**For testing hook changes locally (without installing the plugin).**
+
+Similar to MCP, hooks need different configuration for local dev vs distribution:
+- **Distribution**: `hooks/hooks.json` uses `${CLAUDE_PLUGIN_ROOT}` (plugin install)
+- **Local Dev**: `~/.claude/settings.json` points to your local build
+
+### Quick Setup
+
+```bash
+# Switch to local development hooks
+./scripts/setup-hooks-dev.sh
+
+# Make changes, rebuild
+vim apps/hook/src/adapters/claude-code.ts
+pnpm --filter @shipyard/hook build
+
+# Switch back to production
+./scripts/restore-hooks-prod.sh
+```
+
+### What Gets Configured
+
+The setup script updates your `~/.claude/settings.json` to use local builds:
+
+**Hooks configured:**
+- `PreToolUse` → `AskUserQuestion` - Blocks built-in prompt, redirects to MCP `request_user_input`
+- `PermissionRequest` → `ExitPlanMode` - Handles plan approval (30min timeout)
+- `PostToolUse` → `ExitPlanMode` - Injects session context after approval
+- `SessionStart` - Loads project context
+
+**Before (production):**
+```json
+{
+  "hooks": {
+    "PermissionRequest": [{
+      "hooks": [{"command": "shipyard-hook"}]
+    }]
+  }
+}
+```
+
+**After (local dev):**
+```json
+{
+  "hooks": {
+    "PermissionRequest": [{
+      "hooks": [{"command": "node /Users/.../shipyard/apps/hook/dist/index.js"}]
+    }]
+  }
+}
+```
+
+### Requirements
+
+- `jq` must be installed: `brew install jq`
+
+### Troubleshooting Hooks
+
+**Hooks not firing?**
+
+1. Check if hook is built:
+   ```bash
+   ls -la apps/hook/dist/index.js
+   ```
+
+2. Check settings file points to local build:
+   ```bash
+   grep "shipyard" ~/.claude/settings.json
+   ```
+
+3. Check hook logs:
+   ```bash
+   tail -f ~/.shipyard/hook-debug.log
+   ```
+
+4. Verify you ran the setup script:
+   ```bash
+   # If settings still show "shipyard-hook", run setup again
+   ./scripts/setup-hooks-dev.sh
+   ```
+
+**Restore from backup manually:**
+
+```bash
+# List backups (created automatically by setup script)
+ls -lt ~/.claude/settings.json.backup-*
+
+# Restore specific backup
+cp ~/.claude/settings.json.backup-1737445678 ~/.claude/settings.json
+```
+
+---
+
 ## Environment Variables
 
 Each app has configurable environment variables. See the `.env.example` file in each app directory:

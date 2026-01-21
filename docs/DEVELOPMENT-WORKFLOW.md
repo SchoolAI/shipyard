@@ -134,23 +134,20 @@ pnpm build --filter @shipyard/server
 ### 3. Testing Hook Changes
 
 ```bash
-# Disable global plugin temporarily
-/plugin disable shipyard
+# Use setup script to switch to local build
+./scripts/setup-hooks-dev.sh
 
 # Build local hook
 pnpm build --filter @shipyard/hook
 
-# Link it globally
-cd apps/hook
-pnpm link --global
-
 # Test - hooks now use local version
 # [Enter plan mode, hooks should trigger with local code]
 
-# When done, restore global
-pnpm unlink --global
-/plugin enable shipyard
+# When done, restore production hooks
+./scripts/restore-hooks-prod.sh
 ```
+
+**See [SETUP.md - Local Hooks Setup](./SETUP.md#local-hooks-setup) for detailed instructions.**
 
 ---
 
@@ -269,10 +266,10 @@ pnpm build --filter @shipyard/server
 
 ### Testing Hook Changes
 ```bash
-/plugin disable shipyard
-cd apps/hook && pnpm link --global
+./scripts/setup-hooks-dev.sh
+pnpm build --filter @shipyard/hook
 # Test hooks
-pnpm unlink --global && /plugin enable shipyard
+./scripts/restore-hooks-prod.sh
 ```
 
 ### Publishing Release Candidate
