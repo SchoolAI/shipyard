@@ -9,6 +9,7 @@ import {
   getPlanMetadata,
   getPlanOwnerId,
   type InputRequest,
+  PLAN_INDEX_DOC_NAME,
   type PlanMetadata,
   setPlanIndexEntry,
   setPlanMetadata,
@@ -18,6 +19,8 @@ import { LogIn } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import * as Y from 'yjs';
+import { AuthChoiceModal } from '@/components/AuthChoiceModal';
+import { GitHubAuthOverlay } from '@/components/GitHubAuthModal';
 import { ImportConversationHandler } from '@/components/ImportConversationHandler';
 import { InputRequestModal } from '@/components/InputRequestModal';
 import { MobileActionsMenu } from '@/components/MobileActionsMenu';
@@ -26,14 +29,16 @@ import { PlanContent } from '@/components/PlanContent';
 import { PlanHeader } from '@/components/PlanHeader';
 import { ReviewActions } from '@/components/ReviewActions';
 import { Sidebar } from '@/components/Sidebar';
+import { SignInModal } from '@/components/SignInModal';
 import { Drawer } from '@/components/ui/drawer';
 import { WaitingRoomGate } from '@/components/WaitingRoomGate';
 import { useActivePlanSync } from '@/contexts/ActivePlanSyncContext';
-import { usePlanIndexContext } from '@/contexts/PlanIndexContext';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
 import { useIsMobile } from '@/hooks/useIsMobile';
+import { useLocalIdentity } from '@/hooks/useLocalIdentity';
 import { useMultiProviderSync } from '@/hooks/useMultiProviderSync';
 import { usePendingUserNotifications } from '@/hooks/usePendingUserNotifications';
+import { usePlanIndex } from '@/hooks/usePlanIndex';
 import { useVersionNavigation } from '@/hooks/useVersionNavigation';
 import { colorFromString } from '@/utils/color';
 
@@ -82,11 +87,14 @@ export function PlanPage() {
 
   const ydoc = isSnapshot ? (snapshotYdoc ?? syncedYdoc) : syncedYdoc;
 
-  const { identity: githubIdentity, startAuth } = useGitHubAuth();
+  const { identity: githubIdentity, startAuth, authState } = useGitHubAuth();
+  const { setLocalIdentity } = useLocalIdentity();
   const isMobile = useIsMobile();
   const drawerState = useOverlayState();
   const { setActivePlanSync, clearActivePlanSync } = useActivePlanSync();
   const [metadata, setMetadata] = useState<PlanMetadata | null>(null);
+  const [showAuthChoice, setShowAuthChoice] = useState(false);
+  const [showLocalSignIn, setShowLocalSignIn] = useState(false);
 
   // Convert GitHub identity to BlockNote-compatible format
   const identity = githubIdentity
@@ -97,7 +105,8 @@ export function PlanPage() {
       }
     : null;
 
-  const { myPlans, sharedPlans, inboxPlans, ydoc: indexDoc } = usePlanIndexContext();
+  const { ydoc: indexDoc } = useMultiProviderSync(PLAN_INDEX_DOC_NAME);
+  const { myPlans, sharedPlans, inboxPlans } = usePlanIndex(githubIdentity?.username);
   const allPlans = useMemo(
     () => [...myPlans, ...sharedPlans, ...inboxPlans],
     [myPlans, sharedPlans, inboxPlans]
@@ -225,10 +234,18 @@ export function PlanPage() {
     return () => clearActivePlanSync();
   }, [planId, syncState, setActivePlanSync, clearActivePlanSync]);
 
-  // When user tries to comment without identity, open GitHub auth
+  // When user tries to comment without identity, open auth choice modal
   const handleRequestIdentity = useCallback(() => {
-    startAuth();
-  }, [startAuth]);
+    setShowAuthChoice(true);
+  }, []);
+
+  const handleLocalSignIn = useCallback(
+    (username: string) => {
+      setLocalIdentity(username);
+      setShowLocalSignIn(false);
+    },
+    [setLocalIdentity]
+  );
 
   // Store editor instance when ready (Issue #42)
   const handleEditorReady = useCallback((editorInstance: BlockNoteEditor) => {
@@ -530,6 +547,18 @@ export function PlanPage() {
             setCurrentInputRequest(null);
           }}
         />
+        <GitHubAuthOverlay authState={authState} />
+        <AuthChoiceModal
+          isOpen={showAuthChoice}
+          onOpenChange={setShowAuthChoice}
+          onGitHubAuth={startAuth}
+          onLocalAuth={() => setShowLocalSignIn(true)}
+        />
+        <SignInModal
+          isOpen={showLocalSignIn}
+          onClose={() => setShowLocalSignIn(false)}
+          onSignIn={handleLocalSignIn}
+        />
       </>
     );
   }
@@ -545,6 +574,18 @@ export function PlanPage() {
           setInputRequestModalOpen(false);
           setCurrentInputRequest(null);
         }}
+      />
+      <GitHubAuthOverlay authState={authState} />
+      <AuthChoiceModal
+        isOpen={showAuthChoice}
+        onOpenChange={setShowAuthChoice}
+        onGitHubAuth={startAuth}
+        onLocalAuth={() => setShowLocalSignIn(true)}
+      />
+      <SignInModal
+        isOpen={showLocalSignIn}
+        onClose={() => setShowLocalSignIn(false)}
+        onSignIn={handleLocalSignIn}
       />
     </>
   );
