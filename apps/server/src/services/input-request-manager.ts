@@ -18,6 +18,27 @@ import type * as Y from 'yjs';
 import { logger } from '../logger.js';
 
 /**
+ * Format a duration in seconds as a human-readable string.
+ * Examples: "5 minutes", "1 minute 30 seconds", "45 seconds"
+ */
+function formatDuration(totalSeconds: number): string {
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+
+  if (minutes === 0) {
+    return `${seconds} second${seconds === 1 ? '' : 's'}`;
+  }
+
+  const minutePart = `${minutes} minute${minutes === 1 ? '' : 's'}`;
+  if (seconds === 0) {
+    return minutePart;
+  }
+
+  const secondPart = `${seconds} second${seconds === 1 ? '' : 's'}`;
+  return `${minutePart} ${secondPart}`;
+}
+
+/**
  * Response from waiting for a user input request.
  * Uses discriminated union on 'success' to ensure type safety:
  * - success=true + status='answered': response, answeredBy, answeredAt are REQUIRED
@@ -249,13 +270,7 @@ export class InputRequestManager {
         resolved = true;
         cleanup();
 
-        const minutes = Math.floor(effectiveTimeout / 60);
-        const seconds = effectiveTimeout % 60;
-        const timeStr =
-          minutes > 0
-            ? `${minutes} minute${minutes === 1 ? '' : 's'}${seconds > 0 ? ` ${seconds} second${seconds === 1 ? '' : 's'}` : ''}`
-            : `${seconds} second${seconds === 1 ? '' : 's'}`;
-
+        const timeStr = formatDuration(effectiveTimeout);
         resolve({
           success: false,
           status: 'cancelled',
