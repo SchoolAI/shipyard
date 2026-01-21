@@ -46,7 +46,7 @@
     "claude-code"
   ],
   "scripts": {
-    "prepublishOnly": "pnpm build --filter @shipyard/server --filter @shipyard/hook"
+    "prepublishOnly": "echo 'Packages already built in CI workflow'"
   },
   "dependencies": {
     "@blocknote/core": "^0.45.0",

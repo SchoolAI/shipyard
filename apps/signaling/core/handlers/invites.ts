@@ -136,11 +136,11 @@ async function handleRedeemInvite(
     return;
   }
 
-  // Check if already redeemed by this user (idempotent)
-  const existingRedemption = await platform.getInviteRedemption(planId, userId);
+  // Check if this specific token was already redeemed by this user (idempotent)
+  const existingRedemption = await platform.getSpecificInviteRedemption(planId, tokenId, userId);
 
   if (existingRedemption) {
-    // Already redeemed - return success (idempotent)
+    // Already redeemed this token - return success (idempotent)
     const response: InviteRedemptionResult = {
       type: 'invite_redemption_result',
       success: true,

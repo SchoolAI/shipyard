@@ -97,10 +97,14 @@ export function WaitingRoomGate({
     return <AuthRequiredForInvite title={metadata.title} onStartAuth={onStartAuth} />;
   }
 
-  // If invite was successfully redeemed, show brief success then pass through
-  // The user will be approved server-side, so isPending should become false shortly
+  // If invite was successfully redeemed, wait for CRDT approval to propagate
+  // This prevents the race condition where we show content before isPending becomes false
   if (redemptionState.status === 'success') {
-    // Don't block - the approval should propagate via CRDT
+    // Wait for CRDT sync - if still pending, show loading state
+    if (isPending) {
+      return <RedeemingInvite title={metadata.title} />;
+    }
+    // Approval has propagated - allow access
     return <>{children}</>;
   }
 
@@ -277,40 +281,42 @@ interface InviteErrorProps {
   onStartAuth: () => void;
 }
 
-function InviteError({ title, error, onDismiss, onStartAuth }: InviteErrorProps) {
-  const defaultError = {
-    heading: 'Invalid Invite Link',
-    message: 'This invite link is invalid. Please check the URL and try again.',
+const INVITE_ERROR_DEFAULT = {
+  heading: 'Invalid Invite Link',
+  message: 'This invite link is invalid. Please check the URL and try again.',
+  icon: TicketX,
+} as const;
+
+const INVITE_ERROR_MESSAGES: Record<
+  string,
+  { heading: string; message: string; icon: typeof TicketX }
+> = {
+  expired: {
+    heading: 'Invite Link Expired',
+    message: 'This invite link has expired. Please ask the task owner for a new link.',
+    icon: Clock,
+  },
+  exhausted: {
+    heading: 'Invite Link Used',
+    message:
+      'This invite link has reached its maximum number of uses. Please ask the task owner for a new link.',
     icon: TicketX,
-  } as const;
+  },
+  revoked: {
+    heading: 'Invite Link Revoked',
+    message: 'This invite link has been revoked by the task owner.',
+    icon: ShieldX,
+  },
+  invalid: INVITE_ERROR_DEFAULT,
+  already_redeemed: {
+    heading: 'Already Joined',
+    message: "You've already used this invite link. Try refreshing the page.",
+    icon: TicketX,
+  },
+};
 
-  const errorMessages: Record<string, { heading: string; message: string; icon: typeof TicketX }> =
-    {
-      expired: {
-        heading: 'Invite Link Expired',
-        message: 'This invite link has expired. Please ask the task owner for a new link.',
-        icon: Clock,
-      },
-      exhausted: {
-        heading: 'Invite Link Used',
-        message:
-          'This invite link has reached its maximum number of uses. Please ask the task owner for a new link.',
-        icon: TicketX,
-      },
-      revoked: {
-        heading: 'Invite Link Revoked',
-        message: 'This invite link has been revoked by the task owner.',
-        icon: ShieldX,
-      },
-      invalid: defaultError,
-      already_redeemed: {
-        heading: 'Already Joined',
-        message: "You've already used this invite link. Try refreshing the page.",
-        icon: TicketX,
-      },
-    };
-
-  const errorInfo = errorMessages[error ?? 'invalid'] ?? defaultError;
+function InviteError({ title, error, onDismiss, onStartAuth }: InviteErrorProps) {
+  const errorInfo = INVITE_ERROR_MESSAGES[error ?? 'invalid'] ?? INVITE_ERROR_DEFAULT;
   const Icon = errorInfo.icon;
 
   return (

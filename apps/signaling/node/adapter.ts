@@ -102,6 +102,15 @@ export class NodePlatformAdapter implements PlatformAdapter {
     return undefined;
   }
 
+  async getSpecificInviteRedemption(
+    planId: string,
+    tokenId: string,
+    userId: string
+  ): Promise<InviteRedemption | undefined> {
+    const key = `${planId}:${tokenId}:${userId}`;
+    return this.redemptions.get(key);
+  }
+
   async setInviteRedemption(
     planId: string,
     tokenId: string,

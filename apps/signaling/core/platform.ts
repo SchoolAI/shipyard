@@ -44,11 +44,23 @@ export interface PlatformAdapter {
   listInviteTokens(planId: string): Promise<InviteToken[]>;
 
   /**
-   * Get invite redemption by key.
+   * Get invite redemption by user (checks if user redeemed ANY token for this plan).
    * Key format: 'redemption:{planId}:{userId}'
    * Returns undefined if no redemption exists.
+   * @deprecated Use getSpecificInviteRedemption for token-specific checks
    */
   getInviteRedemption(planId: string, userId: string): Promise<InviteRedemption | undefined>;
+
+  /**
+   * Get invite redemption for a specific token and user.
+   * Key format: 'redemption:{planId}:{tokenId}:{userId}'
+   * Returns undefined if this specific token hasn't been redeemed by this user.
+   */
+  getSpecificInviteRedemption(
+    planId: string,
+    tokenId: string,
+    userId: string
+  ): Promise<InviteRedemption | undefined>;
 
   /**
    * Set invite redemption.

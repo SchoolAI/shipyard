@@ -272,6 +272,31 @@ export class CloudflarePlatformAdapter implements PlatformAdapter {
     return undefined;
   }
 
+  async getSpecificInviteRedemption(
+    planId: string,
+    tokenId: string,
+    userId: string
+  ): Promise<InviteRedemption | undefined> {
+    const cacheKey = `${planId}:${tokenId}:${userId}`;
+
+    // Check in-memory cache first
+    const cached = this.redemptions.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    // Fall back to storage
+    const storageKey = `redemption:${cacheKey}`;
+    const redemption = await this.ctx.storage.get<InviteRedemption>(storageKey);
+
+    if (redemption) {
+      // Cache for future lookups
+      this.redemptions.set(cacheKey, redemption);
+    }
+
+    return redemption;
+  }
+
   async setInviteRedemption(
     planId: string,
     tokenId: string,
