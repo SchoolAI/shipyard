@@ -3,7 +3,9 @@
 
 set -e
 
-SHIPYARD_ROOT="/Users/jacobpetterle/Working Directory/shipyard"
+# Get the repo root (directory containing this script's parent)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SHIPYARD_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 SETTINGS_FILE="$HOME/.claude/settings.json"
 BACKUP_FILE="$HOME/.claude/settings.json.backup-$(date +%s)"
 
@@ -25,20 +27,19 @@ fi
 echo "✏️  Updating hooks to use local build..."
 
 # Update hooks to use absolute path to local build
-jq --arg hook_path "node $SHIPYARD_ROOT/apps/hook/dist/index.js" '
-  # Add AskUserQuestion PreToolUse hook if it doesn'\''t exist
+# NOTE: Path must be quoted to handle spaces in directory names
+HOOK_CMD=$(printf 'node "%s"' "$SHIPYARD_ROOT/apps/hook/dist/index.js")
+jq --arg hook_path "$HOOK_CMD" '
+  # Remove any existing AskUserQuestion hook, then add fresh one with correct path
   .hooks.PreToolUse = (
-    if (.hooks.PreToolUse | map(.matcher == "AskUserQuestion") | any) then
-      .hooks.PreToolUse
-    else
-      [{
-        "matcher": "AskUserQuestion",
-        "hooks": [{
-          "type": "command",
-          "command": $hook_path
-        }]
-      }] + .hooks.PreToolUse
-    end
+    [.hooks.PreToolUse[] | select(.matcher != "AskUserQuestion")] +
+    [{
+      "matcher": "AskUserQuestion",
+      "hooks": [{
+        "type": "command",
+        "command": $hook_path
+      }]
+    }]
   ) |
   # Update SessionStart hooks
   .hooks.SessionStart = [.hooks.SessionStart[] |
@@ -56,11 +57,11 @@ jq --arg hook_path "node $SHIPYARD_ROOT/apps/hook/dist/index.js" '
     end
   ] |
 
-  # Update existing PreToolUse hooks (but not the AskUserQuestion one we just added)
+  # Update existing PreToolUse hooks (peer-plan-hook or shipyard-hook → local path)
   .hooks.PreToolUse = [.hooks.PreToolUse[] |
     if .matcher == "AskUserQuestion" then
-      .
-    elif (.hooks[0].command == "shipyard-hook" or .hooks[0].command == "peer-plan-hook")
+      .  # Already set with correct path above
+    elif (.hooks[0].command | test("shipyard-hook|peer-plan-hook"))
     then .hooks[0].command = $hook_path
     else .
     end

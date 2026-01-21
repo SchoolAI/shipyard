@@ -93,16 +93,21 @@ Similar to MCP, hooks need different configuration for local dev vs distribution
 ### Quick Setup
 
 ```bash
-# Switch to local development hooks
+# 1. Switch to local development hooks
 ./scripts/setup-hooks-dev.sh
 
-# Make changes, rebuild
+# 2. RESTART Claude Code (required!)
+#    Close and reopen Claude Code to pick up settings changes
+
+# 3. Make changes, rebuild
 vim apps/hook/src/adapters/claude-code.ts
 pnpm --filter @shipyard/hook build
 
-# Switch back to production
+# 4. Switch back to production when done
 ./scripts/restore-hooks-prod.sh
 ```
+
+**⚠️ Important:** You MUST restart Claude Code after running `setup-hooks-dev.sh`. Claude Code reads `~/.claude/settings.json` on startup - changes aren't picked up while running.
 
 ### What Gets Configured
 
