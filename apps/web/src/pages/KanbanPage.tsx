@@ -45,11 +45,11 @@ import { KanbanSkeleton } from '@/components/ui/KanbanSkeleton';
 import { KanbanCard } from '@/components/views/KanbanCard';
 import { KanbanColumn } from '@/components/views/KanbanColumn';
 import { getPlanRoute } from '@/constants/routes';
+import { usePlanIndexContext } from '@/contexts/PlanIndexContext';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
 import { type ColumnId, columnIdToStatus, useKanbanColumns } from '@/hooks/useKanbanColumns';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useMultiProviderSync } from '@/hooks/useMultiProviderSync';
-import { usePlanIndex } from '@/hooks/usePlanIndex';
 import { colorFromString } from '@/utils/color';
 import { formatRelativeTime } from '@/utils/formatters';
 import {
@@ -190,7 +190,7 @@ export function KanbanPage() {
     isLoading,
     timedOut,
     ydoc: indexDoc,
-  } = usePlanIndex(githubIdentity?.username);
+  } = usePlanIndexContext();
   const navigate = useNavigate();
   const location = useLocation();
 

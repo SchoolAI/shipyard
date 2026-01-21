@@ -44,12 +44,12 @@ import { OfflineBanner } from '@/components/OfflineBanner';
 import { TagChip } from '@/components/TagChip';
 import { TwoColumnSkeleton } from '@/components/ui/TwoColumnSkeleton';
 import { getPlanRoute } from '@/constants/routes';
+import { usePlanIndexContext } from '@/contexts/PlanIndexContext';
 import { useUserIdentity } from '@/contexts/UserIdentityContext';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
 import { type InboxEventItem, useInboxEvents } from '@/hooks/useInboxEvents';
 import { useInputRequests } from '@/hooks/useInputRequests';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
-import { usePlanIndex } from '@/hooks/usePlanIndex';
 import { formatRelativeTime } from '@/utils/formatters';
 import { getInboxShowRead, setInboxShowRead, setSidebarCollapsed } from '@/utils/uiPreferences';
 
@@ -622,7 +622,7 @@ export function InboxPage() {
     isLoading,
     timedOut,
     ydoc: indexDoc,
-  } = usePlanIndex(githubIdentity?.username);
+  } = usePlanIndexContext();
   const [showRead, setShowRead] = useState(getInboxShowRead);
   const { actor } = useUserIdentity();
 

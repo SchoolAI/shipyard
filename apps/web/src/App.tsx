@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes, useSearchParams } from 'react-r
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { Layout } from './components/Layout';
 import { ActivePlanSyncProvider } from './contexts/ActivePlanSyncContext';
+import { PlanIndexProvider } from './contexts/PlanIndexContext';
 import { UserIdentityProvider } from './contexts/UserIdentityContext';
 import { useGitHubAuth } from './hooks/useGitHubAuth';
 import { useLocalIdentity } from './hooks/useLocalIdentity';
@@ -51,11 +52,13 @@ function AppWithLayout() {
 
   return (
     <UserIdentityProvider githubIdentity={identity} localIdentity={localIdentity}>
-      <ActivePlanSyncProvider>
-        <Layout>
-          <AppRoutes />
-        </Layout>
-      </ActivePlanSyncProvider>
+      <PlanIndexProvider>
+        <ActivePlanSyncProvider>
+          <Layout>
+            <AppRoutes />
+          </Layout>
+        </ActivePlanSyncProvider>
+      </PlanIndexProvider>
     </UserIdentityProvider>
   );
 }

@@ -29,11 +29,11 @@ import { Sidebar } from '@/components/Sidebar';
 import { Drawer } from '@/components/ui/drawer';
 import { WaitingRoomGate } from '@/components/WaitingRoomGate';
 import { useActivePlanSync } from '@/contexts/ActivePlanSyncContext';
+import { usePlanIndexContext } from '@/contexts/PlanIndexContext';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { useMultiProviderSync } from '@/hooks/useMultiProviderSync';
 import { usePendingUserNotifications } from '@/hooks/usePendingUserNotifications';
-import { usePlanIndex } from '@/hooks/usePlanIndex';
 import { useVersionNavigation } from '@/hooks/useVersionNavigation';
 import { colorFromString } from '@/utils/color';
 
@@ -97,12 +97,7 @@ export function PlanPage() {
       }
     : null;
 
-  const {
-    myPlans,
-    sharedPlans,
-    inboxPlans,
-    ydoc: indexDoc,
-  } = usePlanIndex(githubIdentity?.username);
+  const { myPlans, sharedPlans, inboxPlans, ydoc: indexDoc } = usePlanIndexContext();
   const allPlans = useMemo(
     () => [...myPlans, ...sharedPlans, ...inboxPlans],
     [myPlans, sharedPlans, inboxPlans]

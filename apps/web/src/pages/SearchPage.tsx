@@ -14,9 +14,8 @@ import { StatusChip } from '@/components/StatusChip';
 import { TagChip } from '@/components/TagChip';
 import { SearchPlanInput } from '@/components/ui/SearchPlanInput';
 import { getPlanRoute } from '@/constants/routes';
-import { useGitHubAuth } from '@/hooks/useGitHubAuth';
+import { usePlanIndexContext } from '@/contexts/PlanIndexContext';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
-import { usePlanIndex } from '@/hooks/usePlanIndex';
 import { STATUS_FILTER_OPTIONS, useViewFilters } from '@/hooks/useViewFilters';
 import { formatRelativeTime } from '@/utils/formatters';
 import { setSidebarCollapsed } from '@/utils/uiPreferences';
@@ -191,11 +190,8 @@ function FilterBar({
 type OwnershipFilter = 'all' | 'my-plans' | 'shared';
 
 export function SearchPage() {
-  const { identity: githubIdentity } = useGitHubAuth();
-  // usePlanIndex already syncs plan-index via useMultiProviderSync internally
-  const { myPlans, sharedPlans, inboxPlans, isLoading, timedOut } = usePlanIndex(
-    githubIdentity?.username
-  );
+  // usePlanIndexContext already syncs plan-index via useMultiProviderSync internally
+  const { myPlans, sharedPlans, inboxPlans, isLoading, timedOut } = usePlanIndexContext();
   const navigate = useNavigate();
   const location = useLocation();
 

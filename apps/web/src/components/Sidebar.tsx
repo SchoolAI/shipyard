@@ -6,9 +6,8 @@ import { AccountSection } from '@/components/account';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { CollapsiblePanel } from '@/components/ui/collapsible-panel';
 import { getPlanRoute } from '@/constants/routes';
-import { useGitHubAuth } from '@/hooks/useGitHubAuth';
+import { usePlanIndexContext } from '@/contexts/PlanIndexContext';
 import { useInputRequests } from '@/hooks/useInputRequests';
-import { usePlanIndex } from '@/hooks/usePlanIndex';
 import { getSidebarCollapsed, setSidebarCollapsed } from '@/utils/uiPreferences';
 
 interface NavItemProps {
@@ -206,7 +205,6 @@ interface SidebarProps {
 }
 
 export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
-  const { identity: githubIdentity } = useGitHubAuth();
   const {
     inboxPlans,
     archivedPlans,
@@ -214,7 +212,7 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
     clearNavigation,
     isLoading,
     ydoc: indexDoc,
-  } = usePlanIndex(githubIdentity?.username);
+  } = usePlanIndexContext();
   const { pendingRequests } = useInputRequests({ ydoc: indexDoc });
   const [collapsed, setCollapsed] = useState(getSidebarCollapsed);
   const navigate = useNavigate();

@@ -17,9 +17,9 @@ import { OfflineBanner } from '@/components/OfflineBanner';
 import { TagChip } from '@/components/TagChip';
 import { TwoColumnSkeleton } from '@/components/ui/TwoColumnSkeleton';
 import { getPlanRoute } from '@/constants/routes';
+import { usePlanIndexContext } from '@/contexts/PlanIndexContext';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
-import { usePlanIndex } from '@/hooks/usePlanIndex';
 import { formatRelativeTime } from '@/utils/formatters';
 import { setSidebarCollapsed } from '@/utils/uiPreferences';
 
@@ -71,12 +71,7 @@ export function ArchivePage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { identity: githubIdentity } = useGitHubAuth();
-  const {
-    archivedPlans,
-    isLoading,
-    timedOut,
-    ydoc: indexDoc,
-  } = usePlanIndex(githubIdentity?.username);
+  const { archivedPlans, isLoading, timedOut, ydoc: indexDoc } = usePlanIndexContext();
 
   // Selected plan state - read from URL on mount
   const searchParams = new URLSearchParams(location.search);
