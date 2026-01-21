@@ -217,18 +217,101 @@ pnpm dev --filter @shipyard/server
 
 ---
 
-## Platform Capabilities Comparison
+## Platform Compatibility Matrix
 
-| Platform | MCP | Hooks | Session Tracking | Distribution |
-|----------|-----|-------|------------------|--------------|
-| **Claude Code** | ✅ | ✅ (8 events) | ✅ session_id | GitHub plugin |
-| **Cursor** | ✅ | ⚠️ Limited | ⚠️ Manual | npm + manual hook (future) |
-| **Windsurf** | ✅ | ⚠️ Unknown | ❌ | npm only |
-| **Replit** | ✅ | ❌ | ❌ | npm only |
-| **Copilot** | ✅ | ❌ | ❌ | npm only |
-| **Gemini** | ✅ | ❌ | ❌ | npm only |
+### Feature Support Overview
 
-**Key:** Only Claude Code gets the full experience (hooks + skills + MCP). Other platforms can use MCP tools but lack automatic workflows.
+| Platform | MCP Support | Plan Mode | Hooks/Events | Artifact Upload | Real-time Sync | P2P Collaboration | Status |
+|----------|------------|-----------|--------------|-----------------|----------------|-------------------|--------|
+| **Claude Code** | ✅ Full | ✅ Native | ✅ 8 events | ✅ Full | ✅ Full | ✅ Full | ✅ Production |
+| **OpenCode** | ✅ Full | ✅ Native (Tab) | ⚠️ Unknown | ✅ Via MCP | ✅ Full | ✅ Full | ⚠️ Testing needed |
+| **Cursor** | ✅ Full | ❌ No | ⚠️ Limited | ✅ Via MCP | ✅ Full | ✅ Full | ⚠️ Manual workflow |
+| **Windsurf** | ✅ Full | ❌ No | ⚠️ Limited | ✅ Via MCP | ✅ Full | ✅ Full | ⚠️ Testing needed |
+| **Devin** | ✅ Full | ❌ No | ❌ None | ✅ Via MCP | ✅ Full | ⚠️ API-only | ⚠️ Manual session |
+| **Replit Agent** | ✅ Full | ❌ No | ❌ None | ✅ Via MCP | ✅ Full | ✅ Full | ⚠️ Basic MCP only |
+| **GitHub Copilot** | ✅ Full | ❌ No | ❌ None | ✅ Via MCP | ✅ Full | ✅ Full | ⚠️ Basic MCP only |
+| **Gemini Code Assist** | ✅ Full | ❌ No | ❌ None | ✅ Via MCP | ✅ Full | ✅ Full | ⚠️ Basic MCP only |
+| **Codex (OpenAI)** | ❓ Unknown | ❓ Unknown | ❌ None | ❓ Unknown | ❓ Unknown | ❓ Unknown | ❓ Research needed |
+
+### Platform Details
+
+#### Claude Code (✅ Full Support)
+- **Installation:** GitHub plugin via `/plugin install SchoolAI/shipyard`
+- **Plan Mode:** Native integration with EnterPlanMode/ExitPlanMode hooks
+- **Hooks:** 8 event types (SessionStart, EnterPlanMode, Write, ExitPlanMode, etc.)
+- **Session Tracking:** Automatic with session_id + transcript_path
+- **Workflow:** Fully automatic - Shift+Tab creates plans, browser opens, approval flow
+- **Auto-update:** Built-in via plugin system
+
+#### OpenCode (⚠️ Testing Needed)
+- **Installation:** npm + config (`~/.config/opencode/opencode.json`)
+- **Plan Mode:** Native Tab-toggle plan mode
+- **Hooks:** Unknown - needs investigation if OpenCode exposes plan mode events
+- **Session Tracking:** TBD
+- **Workflow:** Manual - use MCP tools directly
+- **Status:** MCP server works, but plan mode integration needs testing (see issue #26)
+
+#### Cursor (⚠️ Manual Workflow)
+- **Installation:** npm + manual JSON config (`~/.cursor/mcp.json`)
+- **Hooks:** Limited - `beforeMCPExecution` hook available for session capture
+- **Session Tracking:** Manual - conversation_id + generation_id
+- **Workflow:** Manual - user must call `create_plan` MCP tool explicitly
+- **Limitation:** No automatic plan creation on approval workflow
+
+#### Windsurf (⚠️ Testing Needed)
+- **Installation:** npm + manual JSON config (`~/.windsurf/settings.json`)
+- **Hooks:** Limited - `pre_mcp_tool_use` hook (payload structure unknown)
+- **Session Tracking:** Not implemented
+- **Workflow:** Manual - use MCP tools directly
+- **Limitation:** 100-tool limit per config (Shipyard uses ~11 tools)
+
+#### Devin (⚠️ Manual Session)
+- **Installation:** npm only
+- **Hooks:** None
+- **Session Tracking:** Manual - user must provide session_id
+- **Workflow:** Manual - use MCP tools directly
+- **Limitation:** API-only instances cannot join P2P WebRTC mesh
+
+#### Replit Agent, GitHub Copilot, Gemini Code Assist (⚠️ Basic MCP Only)
+- **Installation:** npm + platform-specific config
+- **Hooks:** None
+- **Session Tracking:** None
+- **Workflow:** Manual - use MCP tools directly
+- **Status:** Basic functionality works, but no automatic workflows
+
+#### Codex / OpenAI (❓ Research Needed)
+- **Status:** Unknown - needs research and testing (see issue #104)
+- **Expected:** Likely similar to GitHub Copilot integration
+- **Priority:** P1 - feature completeness assessment in progress
+
+### Installation Methods Summary
+
+| Platform | Config File | Command | Auto-update |
+|----------|-------------|---------|-------------|
+| Claude Code | Plugin system | `/plugin install SchoolAI/shipyard` | ✅ Built-in |
+| OpenCode | `~/.config/opencode/opencode.json` | Manual JSON edit | ❌ Manual |
+| Cursor | `~/.cursor/mcp.json` | Manual JSON edit | ❌ Manual |
+| Windsurf | `~/.windsurf/settings.json` | Manual JSON edit | ❌ Manual |
+| Replit Agent | `.replit.mcp.json` | Per-project config | ❌ Manual |
+| GitHub Copilot | VS Code `settings.json` | Manual JSON edit | ❌ Manual |
+| Gemini Code Assist | Platform settings | Manual JSON edit | ❌ Manual |
+
+### Key Takeaways
+
+**✅ Full Experience (Claude Code only):**
+- Automatic plan creation via hooks
+- Approval workflow with blocking
+- Skills for specialized tasks
+- Built-in auto-update
+
+**⚠️ MCP Tools Only (Other Platforms):**
+- All MCP tools work (`create_plan`, `add_artifact`, etc.)
+- Manual workflow - user must explicitly invoke tools
+- No automatic plan creation or approval blocking
+- Real-time sync and P2P collaboration still work
+- Requires manual npm package updates
+
+**Recommended Platform:** Claude Code for best experience. Other platforms work but require manual MCP tool invocation.
 
 ---
 
@@ -253,4 +336,4 @@ For comprehensive usage docs, see [docs/milestones/](./milestones/) for detailed
 
 ---
 
-*Last updated: 2026-01-20*
+*Last updated: 2026-01-21*

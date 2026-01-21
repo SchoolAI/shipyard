@@ -31,6 +31,24 @@ Shipyard solves this with P2P collaborative review and proof-of-work artifacts.
 - **BlockNote editor** — Notion-like editing with inline comments and threads
 - **Offline-first** — IndexedDB persistence, works without network
 
+## Platform Support
+
+| Platform | Status | Installation | Notes |
+|----------|--------|--------------|-------|
+| **Claude Code** | ✅ Full support | GitHub plugin | Complete integration with hooks + skills |
+| **OpenCode** | ⚠️ Experimental | npm + config | Native plan mode, testing in progress |
+| **Cursor** | ⚠️ MCP only | npm + config | Works via MCP tools, manual workflow |
+| **Windsurf** | ⚠️ MCP only | npm + config | Works via MCP tools, testing needed |
+| **Devin** | ⚠️ MCP only | npm + config | API-only mode has limitations |
+| **Replit Agent** | ⚠️ MCP only | npm + config | Basic functionality |
+| **GitHub Copilot** | ⚠️ MCP only | npm + config | Basic functionality |
+| **Gemini Code Assist** | ⚠️ MCP only | npm + config | Basic functionality |
+| **Codex (OpenAI)** | ❓ Research needed | TBD | Feature completeness assessment in progress |
+
+**Key:** Only Claude Code provides the full experience with automatic plan creation and approval workflows. Other platforms work via manual MCP tool invocation.
+
+See [Platform Compatibility Matrix](./docs/INSTALLATION.md#platform-compatibility-matrix) for detailed feature comparison.
+
 ## Installation
 
 ### For Claude Code Users
