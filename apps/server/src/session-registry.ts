@@ -32,6 +32,15 @@ export interface SessionStateSynced extends SessionStateBase {
   url: string;
 }
 
+export interface SessionStateApprovedAwaitingToken extends SessionStateBase {
+  lifecycle: 'approved_awaiting_token';
+  url: string;
+  approvedAt: number;
+  deliverables: Array<{ id: string; text: string }>;
+  reviewComment?: string;
+  reviewedBy?: string;
+}
+
 export interface SessionStateApproved extends SessionStateBase {
   lifecycle: 'approved';
   contentHash: string;
@@ -57,6 +66,7 @@ export interface SessionStateReviewed extends SessionStateBase {
 export type SessionState =
   | SessionStateCreated
   | SessionStateSynced
+  | SessionStateApprovedAwaitingToken
   | SessionStateApproved
   | SessionStateReviewed;
 
@@ -68,6 +78,12 @@ export function isSessionStateCreated(state: SessionState): state is SessionStat
 
 export function isSessionStateSynced(state: SessionState): state is SessionStateSynced {
   return state.lifecycle === 'synced';
+}
+
+export function isSessionStateApprovedAwaitingToken(
+  state: SessionState
+): state is SessionStateApprovedAwaitingToken {
+  return state.lifecycle === 'approved_awaiting_token';
 }
 
 export function isSessionStateApproved(state: SessionState): state is SessionStateApproved {

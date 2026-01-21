@@ -34,7 +34,7 @@ import { CheckSquare, GitPullRequest } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { TagChip } from '@/components/TagChip';
 import { getPlanRoute } from '@/constants/routes';
-import { usePlanMetadata } from '@/hooks/usePlanMetadata';
+import { isPlanMetadataLoaded, usePlanMetadata } from '@/hooks/usePlanMetadata';
 import { assertNever } from '@/utils/assert-never';
 import { formatRelativeTime } from '@/utils/formatters';
 
@@ -93,8 +93,9 @@ export function KanbanCard({ plan, onHover, onPanelOpen }: KanbanCardProps) {
     }
   };
 
-  const hasDeliverables = metadata.deliverableCount > 0;
-  const hasPR = metadata.linkedPRs.length > 0;
+  const metadataLoaded = isPlanMetadataLoaded(metadata);
+  const hasDeliverables = metadataLoaded && metadata.deliverableCount > 0;
+  const hasPR = metadataLoaded && metadata.linkedPRs.length > 0;
   const borderColorClass = getStatusBorderColor(plan.status);
 
   return (
@@ -163,16 +164,14 @@ export function KanbanCard({ plan, onHover, onPanelOpen }: KanbanCardProps) {
               </div>
             )}
 
-            {/* PR indicator */}
-            {hasPR && (
+            {metadataLoaded && hasPR && (
               <Chip size="sm" variant="soft" color="accent" className="gap-1">
                 <GitPullRequest className="w-3 h-3" />
                 <span>{metadata.linkedPRs.length > 1 ? metadata.linkedPRs.length : ''}</span>
               </Chip>
             )}
 
-            {/* Deliverables progress */}
-            {hasDeliverables && (
+            {metadataLoaded && hasDeliverables && (
               <Chip
                 size="sm"
                 variant="soft"

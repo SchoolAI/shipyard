@@ -1,17 +1,25 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-type SpeechState = 'idle' | 'loading' | 'ready' | 'recording' | 'error';
-
-export interface UseSpeechToTextReturn {
-  state: SpeechState;
+type UseSpeechToTextBase = {
   loadingProgress: number;
   transcript: string;
   partialTranscript: string;
-  error: string | null;
   startRecording: () => Promise<void>;
   stopRecording: () => void;
   isSupported: boolean;
+};
+
+export type UseSpeechToTextReturn =
+  | (UseSpeechToTextBase & { state: 'idle' | 'loading' | 'ready' | 'recording' })
+  | (UseSpeechToTextBase & { state: 'error'; error: string });
+
+export function isSpeechError(
+  result: UseSpeechToTextReturn
+): result is UseSpeechToTextBase & { state: 'error'; error: string } {
+  return result.state === 'error';
 }
+
+type SpeechState = 'idle' | 'loading' | 'ready' | 'recording' | 'error';
 
 interface SpeechRecognitionEvent extends Event {
   results: SpeechRecognitionResultList;
@@ -188,14 +196,18 @@ export function useSpeechToText(): UseSpeechToTextReturn {
     setState('ready');
   }, []);
 
-  return {
-    state,
+  const base = {
     loadingProgress: isSupported ? 100 : 0,
     transcript,
     partialTranscript,
-    error,
     startRecording,
     stopRecording,
     isSupported,
   };
+
+  if (state === 'error') {
+    return { ...base, state, error: error ?? 'Unknown error' };
+  }
+
+  return { ...base, state };
 }

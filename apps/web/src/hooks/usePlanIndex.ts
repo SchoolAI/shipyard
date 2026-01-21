@@ -15,7 +15,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { IndexeddbPersistence } from 'y-indexeddb';
 import * as Y from 'yjs';
-import { useMultiProviderSync } from './useMultiProviderSync';
+import { isSyncStateTimedOut, useMultiProviderSync } from './useMultiProviderSync';
 
 /** Type alias for viewedBy records: planId -> (username -> timestamp) */
 type ViewedByRecord = Record<string, Record<string, number>>;
@@ -520,7 +520,7 @@ export function usePlanIndex(currentUsername: string | undefined): PlanIndexStat
     synced: syncState.synced,
     peerCount: syncState.peerCount,
     timedOut: syncState.timedOut,
-    error: syncState.error,
+    error: isSyncStateTimedOut(syncState) ? syncState.error : undefined,
     navigationTarget,
     clearNavigation,
     isLoading,

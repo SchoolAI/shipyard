@@ -55,6 +55,7 @@ import {
   getSessionState,
   getSessionStateByPlanId,
   isSessionStateApproved,
+  isSessionStateApprovedAwaitingToken,
   isSessionStateReviewed,
   isSessionStateSynced,
   setSessionState,
@@ -283,11 +284,9 @@ export async function updateContentHandler(
     if (session) {
       const contentHash = computeHash(input.content);
 
-      // Preserve lifecycle state and add contentHash if applicable
       switch (session.lifecycle) {
         case 'created':
-          // Can't add contentHash to created state - it doesn't have that field yet
-          // Just update planFilePath if needed
+        case 'approved_awaiting_token':
           setSessionState(sessionId, {
             ...session,
             planFilePath: input.filePath,
@@ -295,25 +294,8 @@ export async function updateContentHandler(
           break;
 
         case 'synced':
-          // Update contentHash and planFilePath
-          setSessionState(sessionId, {
-            ...session,
-            contentHash,
-            planFilePath: input.filePath,
-          });
-          break;
-
         case 'approved':
-          // Update contentHash and planFilePath, preserve all approved fields
-          setSessionState(sessionId, {
-            ...session,
-            contentHash,
-            planFilePath: input.filePath,
-          });
-          break;
-
         case 'reviewed':
-          // Update contentHash and planFilePath, preserve all reviewed fields
           setSessionState(sessionId, {
             ...session,
             contentHash,
@@ -448,55 +430,54 @@ export async function setSessionTokenHandler(
   const webUrl = webConfig.SHIPYARD_WEB_URL;
   const url = `${webUrl}/plan/${planId}`;
 
-  // Update session registry with session token hash - transition to 'synced' if needed
   const session = getSessionStateByPlanId(planId);
   const sessionId = getSessionIdByPlanId(planId);
   if (session && sessionId) {
     switch (session.lifecycle) {
       case 'created':
-        // Transition from created to synced
-        // Note: contentHash may not be set yet (happens in updateContent after token)
         setSessionState(sessionId, {
           lifecycle: 'synced',
           planId: session.planId,
           planFilePath: session.planFilePath,
           createdAt: session.createdAt,
           lastSyncedAt: session.lastSyncedAt,
-          contentHash: '', // Will be updated by next updateContent call
+          contentHash: '',
           sessionToken: sessionTokenHash,
           url,
         });
         ctx.logger.info({ planId, sessionId }, 'Transitioned session to synced state');
         break;
 
+      case 'approved_awaiting_token':
+        setSessionState(sessionId, {
+          lifecycle: 'approved',
+          planId: session.planId,
+          planFilePath: session.planFilePath,
+          createdAt: session.createdAt,
+          lastSyncedAt: session.lastSyncedAt,
+          contentHash: '',
+          sessionToken: sessionTokenHash,
+          url,
+          approvedAt: session.approvedAt,
+          deliverables: session.deliverables,
+          reviewComment: session.reviewComment,
+          reviewedBy: session.reviewedBy,
+        });
+        ctx.logger.info(
+          { planId, sessionId },
+          'Transitioned session from approved_awaiting_token to approved'
+        );
+        break;
+
       case 'synced':
-        // Update sessionToken and url
-        setSessionState(sessionId, {
-          ...session,
-          sessionToken: sessionTokenHash,
-          url,
-        });
-        ctx.logger.info({ planId, sessionId }, 'Updated session token in synced state');
-        break;
-
       case 'approved':
-        // Update sessionToken and url, preserve all approved fields
-        setSessionState(sessionId, {
-          ...session,
-          sessionToken: sessionTokenHash,
-          url,
-        });
-        ctx.logger.info({ planId, sessionId }, 'Updated session token in approved state');
-        break;
-
       case 'reviewed':
-        // Update sessionToken and url, preserve all reviewed fields
         setSessionState(sessionId, {
           ...session,
           sessionToken: sessionTokenHash,
           url,
         });
-        ctx.logger.info({ planId, sessionId }, 'Updated session token in reviewed state');
+        ctx.logger.info({ planId, sessionId }, 'Updated session token');
         break;
 
       default:
@@ -678,8 +659,6 @@ export async function waitForApprovalHandler(
     lastSyncedAt: session.lastSyncedAt,
   });
 
-  // Helper: Build synced state fields
-  // For 'created' state, returns placeholders that will be filled by setSessionToken after approval
   const buildSyncedFields = (session: NonNullable<ReturnType<typeof getSessionStateByPlanId>>) => {
     if (
       isSessionStateSynced(session) ||
@@ -693,17 +672,9 @@ export async function waitForApprovalHandler(
       };
     }
 
-    // 'created' state - return placeholder values
-    // These will be properly set by setSessionToken() after approval is received by the hook
-    const webUrl = webConfig.SHIPYARD_WEB_URL;
-    return {
-      contentHash: '', // Will be set by updateContent or setSessionToken
-      sessionToken: '', // Will be set by setSessionToken after hook receives approval
-      url: `${webUrl}/plan/${session.planId}`,
-    };
+    return null;
   };
 
-  // Helper: Handle transition to approved state
   const handleApprovedTransition = (
     sessionId: string,
     baseState: ReturnType<typeof buildBaseState>,
@@ -719,18 +690,31 @@ export async function waitForApprovalHandler(
       );
     }
 
-    setSessionState(sessionId, {
-      lifecycle: 'approved',
-      ...baseState,
-      ...syncedFields,
-      approvedAt: extraData.approvedAt,
-      deliverables: extraData.deliverables,
-      reviewComment,
-      reviewedBy,
-    });
+    const webUrl = webConfig.SHIPYARD_WEB_URL;
+
+    if (syncedFields) {
+      setSessionState(sessionId, {
+        lifecycle: 'approved',
+        ...baseState,
+        ...syncedFields,
+        approvedAt: extraData.approvedAt,
+        deliverables: extraData.deliverables,
+        reviewComment,
+        reviewedBy,
+      });
+    } else {
+      setSessionState(sessionId, {
+        lifecycle: 'approved_awaiting_token',
+        ...baseState,
+        url: `${webUrl}/plan/${baseState.planId}`,
+        approvedAt: extraData.approvedAt,
+        deliverables: extraData.deliverables,
+        reviewComment,
+        reviewedBy,
+      });
+    }
   };
 
-  // Helper: Handle transition to reviewed state
   const handleReviewedTransition = (
     sessionId: string,
     baseState: ReturnType<typeof buildBaseState>,
@@ -744,9 +728,17 @@ export async function waitForApprovalHandler(
       throw new Error(`Invalid session state transition: missing reviewedBy for changes_requested`);
     }
 
+    if (!syncedFields) {
+      throw new Error(
+        `Invalid session state transition: changes_requested requires synced fields (contentHash, sessionToken)`
+      );
+    }
+
     const deliverables =
       extraData.deliverables ||
-      (isSessionStateApproved(session) || isSessionStateReviewed(session)
+      (isSessionStateApproved(session) ||
+      isSessionStateReviewed(session) ||
+      isSessionStateApprovedAwaitingToken(session)
         ? session.deliverables
         : []);
 

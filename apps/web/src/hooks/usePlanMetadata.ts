@@ -8,29 +8,48 @@ import { useEffect, useState } from 'react';
 import { IndexeddbPersistence } from 'y-indexeddb';
 import * as Y from 'yjs';
 
-export interface PlanMetadataInfo {
-  /** Total number of deliverables */
-  deliverableCount: number;
-  /** Number of completed deliverables (have linked artifacts) */
-  completedDeliverables: number;
-  /** Linked PRs for this plan */
-  linkedPRs: LinkedPR[];
-  /** Whether the data is still loading */
-  isLoading: boolean;
+/**
+ * Plan metadata - discriminated union on isLoading.
+ * When isLoading is true, no data fields are available.
+ * When isLoading is false, all data fields are guaranteed present.
+ */
+export type PlanMetadataInfo =
+  | { isLoading: true }
+  | {
+      isLoading: false;
+      /** Total number of deliverables */
+      deliverableCount: number;
+      /** Number of completed deliverables (have linked artifacts) */
+      completedDeliverables: number;
+      /** Linked PRs for this plan */
+      linkedPRs: LinkedPR[];
+    };
+
+/**
+ * Type guard for loaded plan metadata.
+ * Use this to narrow PlanMetadataInfo to the loaded variant.
+ */
+export function isPlanMetadataLoaded(
+  info: PlanMetadataInfo
+): info is Extract<PlanMetadataInfo, { isLoading: false }> {
+  return !info.isLoading;
 }
 
 // Cache to avoid reloading the same plan data
 const metadataCache = new Map<string, { data: PlanMetadataInfo; timestamp: number }>();
 const CACHE_TTL = 30_000; // 30 seconds
 
+/** Loaded metadata type (without isLoading) */
+type LoadedPlanMetadata = Extract<PlanMetadataInfo, { isLoading: false }>;
+
 /**
  * Load plan metadata from IndexedDB.
  * Results are cached for 30 seconds to avoid repeated loads.
  */
-async function loadPlanMetadata(planId: string): Promise<Omit<PlanMetadataInfo, 'isLoading'>> {
+async function loadPlanMetadata(planId: string): Promise<LoadedPlanMetadata> {
   // Check cache first
   const cached = metadataCache.get(planId);
-  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL && isPlanMetadataLoaded(cached.data)) {
     return cached.data;
   }
 
@@ -44,11 +63,11 @@ async function loadPlanMetadata(planId: string): Promise<Omit<PlanMetadataInfo, 
 
     idb.destroy();
 
-    const result: PlanMetadataInfo = {
+    const result: LoadedPlanMetadata = {
+      isLoading: false,
       deliverableCount: deliverables.length,
       completedDeliverables: deliverables.filter((d) => d.linkedArtifactId).length,
       linkedPRs,
-      isLoading: false,
     };
 
     // Cache the result
@@ -58,6 +77,7 @@ async function loadPlanMetadata(planId: string): Promise<Omit<PlanMetadataInfo, 
   } catch {
     // Return empty state on error
     return {
+      isLoading: false,
       deliverableCount: 0,
       completedDeliverables: 0,
       linkedPRs: [],
@@ -70,26 +90,24 @@ async function loadPlanMetadata(planId: string): Promise<Omit<PlanMetadataInfo, 
  * Returns deliverable counts and linked PRs.
  */
 export function usePlanMetadata(planId: string): PlanMetadataInfo {
-  const [metadata, setMetadata] = useState<PlanMetadataInfo>({
-    deliverableCount: 0,
-    completedDeliverables: 0,
-    linkedPRs: [],
-    isLoading: true,
-  });
+  const [metadata, setMetadata] = useState<PlanMetadataInfo>({ isLoading: true });
 
   useEffect(() => {
     let isActive = true;
 
     // Check cache synchronously for instant display
     const cached = metadataCache.get(planId);
-    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
-      setMetadata({ ...cached.data, isLoading: false });
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL && isPlanMetadataLoaded(cached.data)) {
+      setMetadata(cached.data);
       return;
     }
 
+    // Reset to loading state when planId changes
+    setMetadata({ isLoading: true });
+
     loadPlanMetadata(planId).then((data) => {
       if (isActive) {
-        setMetadata({ ...data, isLoading: false });
+        setMetadata(data);
       }
     });
 
