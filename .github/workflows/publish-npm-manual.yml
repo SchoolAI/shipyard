@@ -12,62 +12,70 @@ on:
           - next
         default: next
 
+# This workflow creates a git tag which triggers the publish-npm.yml workflow.
+# The actual npm publish happens in publish-npm.yml which has trusted publishing configured.
+
 jobs:
-  publish:
+  create-tag:
     runs-on: ubuntu-latest
     permissions:
       contents: write  # For creating git tags
-      id-token: write  # For npm provenance
+    outputs:
+      version: ${{ steps.package-version.outputs.version }}
+      git_tag: ${{ steps.package-version.outputs.git_tag }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: 10
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          registry-url: 'https://registry.npmjs.org'
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Build packages
-        run: pnpm build --filter @shipyard/schema --filter @shipyard/shared --filter @shipyard/server --filter @shipyard/hook
 
       - name: Read version from package-npm.json
         id: package-version
         run: |
           # Extract version from package-npm.json
           VERSION=$(node -p "require('./package-npm.json').version")
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Publishing version: $VERSION"
 
-      - name: Prepare npm package
-        run: |
-          # Copy package-npm.json to package.json
-          cp package-npm.json package.json
-          echo "Package prepared for version ${{ steps.package-version.outputs.version }}"
-
-      - name: Publish to npm
-        run: npm publish --access public --provenance --tag ${{ inputs.npm_tag }}
-
-      - name: Create git tag
-        run: |
-          VERSION="${{ steps.package-version.outputs.version }}"
-          GIT_TAG="v$VERSION"
-
-          # Check if tag already exists
-          if git rev-parse "$GIT_TAG" >/dev/null 2>&1; then
-            echo "Tag $GIT_TAG already exists, skipping"
-          else
-            echo "Creating tag $GIT_TAG"
-            git config user.name "github-actions[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
-            git tag "$GIT_TAG"
-            git push origin "$GIT_TAG"
+          # For 'next' tag, append -rc.{timestamp} if not already a prerelease
+          if [[ "${{ inputs.npm_tag }}" == "next" && "$VERSION" != *"-"* ]]; then
+            # Append RC suffix for next releases
+            TIMESTAMP=$(date +%Y%m%d%H%M%S)
+            VERSION="${VERSION}-rc.${TIMESTAMP}"
           fi
+
+          GIT_TAG="v$VERSION"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "git_tag=$GIT_TAG" >> $GITHUB_OUTPUT
+          echo "Will create tag: $GIT_TAG"
+
+      - name: Check if tag already exists
+        id: check-tag
+        run: |
+          GIT_TAG="${{ steps.package-version.outputs.git_tag }}"
+          if git ls-remote --tags origin | grep -q "refs/tags/$GIT_TAG$"; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "::error::Tag $GIT_TAG already exists on remote"
+            exit 1
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "Tag $GIT_TAG does not exist, proceeding"
+          fi
+
+      - name: Create and push git tag
+        run: |
+          GIT_TAG="${{ steps.package-version.outputs.git_tag }}"
+          echo "Creating tag $GIT_TAG"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag "$GIT_TAG"
+          git push origin "$GIT_TAG"
+          echo "Tag $GIT_TAG pushed. This will trigger the publish-npm.yml workflow."
+
+      - name: Summary
+        run: |
+          echo "## Manual Publish Triggered" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version:** ${{ steps.package-version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Git Tag:** ${{ steps.package-version.outputs.git_tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **npm Tag:** ${{ inputs.npm_tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "The tag push has triggered the [publish-npm.yml](${{ github.server_url }}/${{ github.repository }}/actions/workflows/publish-npm.yml) workflow." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Check the workflow runs for publish status." >> $GITHUB_STEP_SUMMARY
