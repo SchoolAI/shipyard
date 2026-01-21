@@ -1,139 +1,114 @@
 ---
 name: shipyard
-description: Create verified work tasks with proof-of-work tracking. Use when tasks need human review, artifact evidence, or collaboration.
+description: Companion skill for the Shipyard MCP server - creates verified work tasks with proof-of-work tracking. Use when tasks need human review, screenshot/video evidence, audit trails, or collaborative review. Invoke when the user says "create a task", "I need proof of this", "track my work", "make this reviewable", or needs accountability for implementation work.
 ---
 
 # Shipyard: Verified Work Tasks
 
-Use this skill when doing work that needs:
-- Human review before completion
-- Visual proof (screenshots, videos)
-- Collaboration with reviewers
-- Audit trail of what was done
+Shipyard turns invisible agent work into reviewable, verifiable tasks. Instead of trusting that code was written correctly, reviewers see screenshots, videos, and test results as proof.
+
+**Why use Shipyard?**
+- **Accountability** - Prove you did the work with artifacts
+- **Human-in-the-loop** - Reviewers can approve, request changes, or leave feedback
+- **Audit trail** - Every task has a permanent record with timestamps
+- **Collaboration** - Real-time sync between agent and reviewers via browser
+
+## MCP Integration
+
+This skill complements the Shipyard MCP server. The MCP provides tools; this skill teaches you how to use them effectively.
+
+**MCP tools available:**
+| Tool | Purpose |
+|------|---------|
+| `execute_code` | Run TypeScript that calls Shipyard APIs (recommended) |
+| `request_user_input` | Ask user questions via browser modal |
+| `create_plan` | Start a new verified task |
+| `add_artifact` | Upload proof (screenshot, video, test results) |
+| `read_plan` | Check status and reviewer feedback |
+| `link_pr` | Connect a GitHub PR to the task |
+
+**Preferred approach:** Use `execute_code` to chain multiple API calls in one step, reducing round-trips.
 
 ## Quick Start
 
-1. **Create a task** with deliverables (provable outcomes)
+1. **Create task** with deliverables (provable outcomes)
 2. **Do the work** and capture artifacts as you go
 3. **Upload artifacts** linked to deliverables
-4. **Auto-complete** when all deliverables are satisfied
+4. **Auto-complete** when all deliverables have proof
 
-## What Are Deliverables?
+## Deliverables: Provable Outcomes
 
-Deliverables are outcomes you can PROVE with artifacts. Mark them with `{#deliverable}`.
+Deliverables are outcomes you prove with artifacts. Mark them with `{#deliverable}`.
 
 **Good (provable):**
 - Screenshot of working login page
-- Video showing feature in action
-- Test results showing all tests pass
+- Video showing drag-and-drop feature
+- Test results showing 100% pass rate
 
-**Bad (implementation details - can't prove with artifacts):**
-- Implement getUserMedia API
-- Add error handling
-- Refactor code
+**Bad (not provable):**
+- Implement authentication (too vague)
+- Refactor code (no artifact)
+- Add error handling (internal)
 
-## How It Works: execute_code
-
-Shipyard uses ONE tool called `execute_code` that runs TypeScript code.
-Write code that calls our APIs - NOT individual MCP tool calls.
-
-### Step 1: Create Task
-
-Use `execute_code` with:
+## Workflow Example
 
 ```typescript
+// Step 1: Create task with deliverables
 const plan = await createPlan({
-  title: "Your Task Name",
+  title: "Add user profile page",
   content: `
-# Implementation Task
-
 ## Deliverables
-- [ ] Screenshot of completed feature {#deliverable}
-- [ ] Test results showing success {#deliverable}
+- [ ] Screenshot of profile page with avatar {#deliverable}
+- [ ] Screenshot of edit form validation {#deliverable}
 
-## Steps
-1. First implementation step
-2. Second implementation step
-3. Third implementation step
+## Implementation
+1. Create /profile route
+2. Add avatar upload component
+3. Build edit form with validation
 `
 });
 
-// IMPORTANT: Save these for all subsequent calls
 const { planId, sessionToken, deliverables } = plan;
+// deliverables = [{ id: "del_xxx", text: "Screenshot of profile page with avatar" }, ...]
 
-// deliverables contains:
-// [
-//   { id: "del_xxx", text: "Screenshot of completed feature" },
-//   { id: "del_yyy", text: "Test results showing success" }
-// ]
-```
+// Step 2: Implement the feature (your actual work happens here)
 
-The browser will open automatically showing your task.
+// Step 3: Upload proof
+await addArtifact({
+  planId,
+  sessionToken,
+  type: 'screenshot',
+  filename: 'profile-page.png',
+  source: 'file',
+  filePath: '/tmp/screenshots/profile.png',
+  deliverableId: deliverables[0].id
+});
 
-### Step 2: Do the Work
-
-Complete your actual task. As you work, capture proof:
-- **Screenshots**: UI changes, completed features
-- **Videos**: Complex flows, interactions
-- **Test results**: Command output, test reports
-
-### Step 3: Upload Artifacts
-
-Link artifacts to their deliverables:
-
-```typescript
 const result = await addArtifact({
   planId,
   sessionToken,
-  type: 'screenshot',  // or 'video', 'test_results', 'diff'
-  filename: 'feature-complete.png',
-  filePath: '/path/to/screenshot.png',
-  deliverableId: deliverables[0].id  // Links to first deliverable
+  type: 'screenshot',
+  filename: 'validation-errors.png',
+  source: 'file',
+  filePath: '/tmp/screenshots/validation.png',
+  deliverableId: deliverables[1].id
 });
 
-// Check for auto-completion
+// Step 4: Auto-complete triggers when all deliverables have artifacts
 if (result.allDeliverablesComplete) {
-  // All deliverables have artifacts - task complete!
-  return result.snapshotUrl;  // Share this URL as proof
-}
-```
-
-### Step 4: Check for Feedback (Optional)
-
-If reviewers leave comments:
-
-```typescript
-const status = await readPlan(planId, sessionToken, {
-  includeAnnotations: true  // Include reviewer comments
-});
-
-if (status.status === "changes_requested") {
-  // Reviewer left feedback - read annotations and address them
-  console.log(status.content);  // Contains inline comments
+  return { done: true, proof: result.snapshotUrl };
 }
 ```
 
 ## Asking Users Questions
 
-**IMPORTANT:** If you need to ask the user a question, use the `request_user_input` MCP tool (or `requestUserInput()` in execute_code) instead of your platform's built-in question mechanisms.
+Use `request_user_input` instead of your platform's built-in question tools. This shows questions in the browser where users view tasks.
 
-Your platform may have built-in tools like:
-- Claude Code: `AskUserQuestion`
-- Devin/Cursor: `prompt()` or similar
-- Other agents: Various question/input mechanisms
-
-**Use Shipyard's version instead** because:
-- ✅ Shows in the browser UI (where users are already viewing tasks)
-- ✅ Integrates with the activity log
-- ✅ Consistent UX across all agent platforms
-- ✅ Can be linked to specific tasks (via `planId` parameter)
-
-**Standalone tool:**
 ```typescript
-const result = await mcp.call_tool('request_user_input', {
+const result = await requestUserInput({
   message: "Which database should we use?",
   type: "choice",
-  options: ["PostgreSQL", "MongoDB"]
+  options: ["PostgreSQL", "SQLite", "MongoDB"]
 });
 
 if (result.success) {
@@ -141,127 +116,51 @@ if (result.success) {
 }
 ```
 
-**Via execute_code (multi-step workflows):**
-```typescript
-const result = await requestUserInput({
-  message: "Proceed with deployment?",
-  type: "confirm"
-});
-```
+**Input types:** `text`, `multiline`, `choice`, `confirm`
 
-## Available APIs
+## Handling Reviewer Feedback
 
-| API | Purpose |
-|-----|---------|
-| `requestUserInput(opts)` | Ask user a question (use instead of built-in tools) |
-| `createPlan(opts)` | Start a new verified task |
-| `addArtifact(opts)` | Upload proof (screenshot, video, test_results, diff) |
-| `readPlan(planId, token, opts)` | Check status and reviewer feedback |
-| `updatePlan(planId, token, updates)` | Manually change status (rarely needed) |
-| `linkPR(opts)` | Link a GitHub PR to the task |
-| `setupReviewNotification(planId)` | Get script to wait for approval |
-
-## Complete Example
-
-Here's a full workflow for adding a dark mode feature:
+Check for comments and change requests:
 
 ```typescript
-// 1. Create the task with deliverables
-const plan = await createPlan({
-  title: "Add dark mode toggle",
-  content: `
-# Dark Mode Implementation
-
-## Deliverables
-- [ ] Screenshot of dark mode active {#deliverable}
-- [ ] Screenshot of light mode active {#deliverable}
-- [ ] Test results for theme switching {#deliverable}
-
-## Implementation Steps
-1. Add theme context provider
-2. Create toggle component
-3. Apply CSS variables for themes
-4. Test theme persistence
-`
+const status = await readPlan(planId, sessionToken, {
+  includeAnnotations: true
 });
 
-const { planId, sessionToken, deliverables } = plan;
-
-// 2. (You implement the dark mode feature here)
-
-// 3. Upload screenshots as proof
-await addArtifact({
-  planId,
-  sessionToken,
-  type: 'screenshot',
-  filename: 'dark-mode.png',
-  filePath: './screenshots/dark.png',
-  deliverableId: deliverables[0].id
-});
-
-await addArtifact({
-  planId,
-  sessionToken,
-  type: 'screenshot',
-  filename: 'light-mode.png',
-  filePath: './screenshots/light.png',
-  deliverableId: deliverables[1].id
-});
-
-// 4. Upload test results
-const result = await addArtifact({
-  planId,
-  sessionToken,
-  type: 'test_results',
-  filename: 'theme-tests.json',
-  filePath: './test-output/results.json',
-  deliverableId: deliverables[2].id
-});
-
-// 5. Auto-complete triggers when all deliverables have artifacts
-if (result.allDeliverablesComplete) {
-  return {
-    message: "Dark mode implementation complete!",
-    snapshotUrl: result.snapshotUrl
-  };
+if (status.status === "changes_requested") {
+  // Read status.content for inline comments
+  // Make changes, upload new artifacts
 }
 ```
 
 ## Artifact Types
 
-| Type | Use For | File Types |
-|------|---------|------------|
-| `screenshot` | UI changes, visual proof | .png, .jpg, .gif |
-| `video` | Complex flows, demonstrations | .mp4, .webm |
-| `test_results` | Test output, coverage reports | .json, .txt, .xml |
-| `diff` | Code changes, before/after | .diff, .patch |
+| Type | Use For | Examples |
+|------|---------|----------|
+| `screenshot` | UI changes, visual proof | .png, .jpg |
+| `video` | Complex flows, interactions | .mp4, .webm |
+| `test_results` | Test output, coverage | .json, .txt |
+| `diff` | Code changes | .diff, .patch |
 
 ## Tips
 
-1. **Plan first**: Think about what deliverables will prove success before starting work
-2. **Capture as you go**: Take screenshots during implementation, not just at the end
-3. **Be specific**: "Screenshot of login page with error message" is better than "Screenshot"
-4. **Link artifacts**: Always include `deliverableId` to track completion
-5. **Check status**: Use `readPlan` periodically to see if reviewers left feedback
+1. **Plan deliverables first** - Decide what proves success before coding
+2. **Capture during work** - Take screenshots as you implement, not after
+3. **Be specific** - "Login page with error state" beats "Screenshot"
+4. **Link every artifact** - Always set `deliverableId` for auto-completion
+5. **Check feedback** - Poll `readPlan` when awaiting review
 
-## When NOT to Use This Skill
+## When NOT to Use
 
-- Quick questions that don't need verification
-- Simple tasks with obvious results
-- Internal helper functions with no visible output
-- Research or exploration (no artifacts to capture)
+- Quick answers or research (no artifacts to capture)
+- Internal refactoring with no visible output
+- Tasks where proof adds no value
+- Exploration or debugging sessions
 
 ## Troubleshooting
 
-**Plan doesn't open in browser:**
-- Ensure MCP server is running
-- Check Claude Desktop MCP configuration
+**Browser doesn't open:** Check MCP server is running and `SHIPYARD_WEB_URL` is set.
 
-**Artifact upload fails:**
-- Verify file path exists
-- Check file permissions
-- Ensure GitHub token is configured (for remote storage)
+**Upload fails:** Verify file path exists, check `GITHUB_TOKEN` has repo write access.
 
-**Auto-complete doesn't trigger:**
-- Verify all deliverables have `deliverableId` set on their artifacts
-- Check that all deliverables were created (use `readPlan` to verify)
+**No auto-complete:** Ensure every deliverable has an artifact with matching `deliverableId`.

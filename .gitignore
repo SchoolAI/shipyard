@@ -90,6 +90,8 @@ out
 # Nuxt.js build / generate output
 .nuxt
 dist
+# BUT include hook dist for plugin distribution (no postInstall support yet)
+!apps/hook/dist/
 
 # Gatsby files
 .cache/
