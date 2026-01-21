@@ -102,23 +102,23 @@ export type PlanAwarenessState =
       webrtcPeerId?: string;
     };
 
-export interface SyncState {
-  /** Connected to hub WebSocket or WebRTC peers */
+interface SyncStateBase {
   connected: boolean;
-  /** Hub WebSocket has completed initial sync */
   synced: boolean;
-  /** Number of peers connected via WebRTC P2P */
   peerCount: number;
-  /** Whether IndexedDB has synced (local data available) */
   idbSynced: boolean;
-  /** User's approval status for this plan (undefined if approval not required) */
   approvalStatus?: ApprovalStatus;
-  /** Registry server port (for local artifact URLs) */
   registryPort: number | null;
-  /** Error message if connection failed or timed out */
-  error?: string;
-  /** Whether connection timeout has been reached */
-  timedOut: boolean;
+}
+
+export type SyncState =
+  | (SyncStateBase & { timedOut: false })
+  | (SyncStateBase & { timedOut: true; error: string });
+
+export function isSyncStateTimedOut(
+  state: SyncState
+): state is SyncStateBase & { timedOut: true; error: string } {
+  return state.timedOut;
 }
 
 /**
@@ -152,7 +152,7 @@ export function useMultiProviderSync(
     idbSynced: false,
     registryPort: null,
     timedOut: false,
-  });
+  } satisfies SyncState);
   const idbSyncedRef = useRef(false);
   const approvalStatusRef = useRef<ApprovalStatus | undefined>(undefined);
   const registryPortRef = useRef<number | null>(null);
@@ -477,16 +477,20 @@ export function useMultiProviderSync(
       const wsSynced = wsProviderRef.current?.synced ?? false;
       const anyConnected = wsConnected || (rtc?.connected ?? false);
 
-      setSyncState({
+      const baseState: SyncStateBase = {
         connected: anyConnected,
         synced: wsSynced,
         peerCount: peerCountRef.current,
         idbSynced: idbSyncedRef.current,
         approvalStatus: approvalStatusRef.current,
         registryPort: registryPortRef.current,
-        timedOut: timedOutRef.current,
-        error: errorRef.current,
-      });
+      };
+
+      if (timedOutRef.current && errorRef.current) {
+        setSyncState({ ...baseState, timedOut: true, error: errorRef.current });
+      } else {
+        setSyncState({ ...baseState, timedOut: false });
+      }
     }
 
     return () => {

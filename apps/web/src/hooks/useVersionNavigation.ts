@@ -2,15 +2,14 @@ import { getSnapshots, type PlanSnapshot, YDOC_KEYS } from '@shipyard/schema';
 import { useEffect, useState } from 'react';
 import type * as Y from 'yjs';
 
-interface VersionNavigationState {
+/**
+ * Base fields shared by all version navigation states.
+ */
+interface VersionNavigationBase {
   /** All available snapshots (sorted oldest to newest) */
   snapshots: PlanSnapshot[];
-  /** Currently selected version index (0 = oldest, length-1 = newest/current) */
+  /** Currently selected version index (0 = oldest, length-1 = newest/current, -1 = live) */
   currentIndex: number;
-  /** Currently selected snapshot (null if viewing live version) */
-  currentSnapshot: PlanSnapshot | null;
-  /** Is viewing an old version (not the current/live state) */
-  isViewingHistory: boolean;
   /** Navigate to previous version */
   goToPrevious: () => void;
   /** Navigate to next version */
@@ -21,6 +20,24 @@ interface VersionNavigationState {
   canGoPrevious: boolean;
   /** Can navigate to next version */
   canGoNext: boolean;
+}
+
+/**
+ * Version navigation state - discriminated union on isViewingHistory.
+ * When viewing history, currentSnapshot is guaranteed to be a valid PlanSnapshot.
+ * When viewing live (not history), currentSnapshot is null.
+ */
+export type VersionNavigationState =
+  | (VersionNavigationBase & { isViewingHistory: false; currentSnapshot: null })
+  | (VersionNavigationBase & { isViewingHistory: true; currentSnapshot: PlanSnapshot });
+
+/**
+ * Type guard for checking if viewing historical version.
+ */
+export function isViewingHistorySnapshot(
+  state: VersionNavigationState
+): state is VersionNavigationBase & { isViewingHistory: true; currentSnapshot: PlanSnapshot } {
+  return state.isViewingHistory;
 }
 
 /**
@@ -59,9 +76,6 @@ export function useVersionNavigation(ydoc: Y.Doc | null): VersionNavigationState
     return () => snapshotsArray.unobserve(updateSnapshots);
   }, [ydoc]);
 
-  const isViewingHistory = currentIndex >= 0;
-  const currentSnapshot = isViewingHistory ? (snapshots[currentIndex] ?? null) : null;
-
   const goToPrevious = () => {
     setCurrentIndex((prev) => {
       // If viewing current, go to last snapshot
@@ -87,15 +101,29 @@ export function useVersionNavigation(ydoc: Y.Doc | null): VersionNavigationState
   const canGoPrevious = snapshots.length > 0 && (currentIndex > 0 || currentIndex === -1);
   const canGoNext = currentIndex >= 0; // Can always go to current from history
 
-  return {
+  const base: VersionNavigationBase = {
     snapshots,
     currentIndex,
-    currentSnapshot,
-    isViewingHistory,
     goToPrevious,
     goToNext,
     goToCurrent,
     canGoPrevious,
     canGoNext,
+  };
+
+  const snapshot = currentIndex >= 0 ? snapshots[currentIndex] : undefined;
+
+  if (currentIndex >= 0 && snapshot !== undefined) {
+    return {
+      ...base,
+      isViewingHistory: true,
+      currentSnapshot: snapshot,
+    };
+  }
+
+  return {
+    ...base,
+    isViewingHistory: false,
+    currentSnapshot: null,
   };
 }

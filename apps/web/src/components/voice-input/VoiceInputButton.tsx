@@ -1,7 +1,7 @@
 import { Button, Tooltip } from '@heroui/react';
 import { Loader2, Mic, MicOff } from 'lucide-react';
 import { useCallback, useEffect } from 'react';
-import { useSpeechToText } from '@/hooks/useSpeechToText';
+import { isSpeechError, useSpeechToText } from '@/hooks/useSpeechToText';
 
 interface VoiceInputButtonProps {
   onTranscript: (text: string) => void;
@@ -9,15 +9,9 @@ interface VoiceInputButtonProps {
 }
 
 export function VoiceInputButton({ onTranscript, className }: VoiceInputButtonProps) {
-  const {
-    state,
-    transcript,
-    partialTranscript,
-    error,
-    startRecording,
-    stopRecording,
-    isSupported,
-  } = useSpeechToText();
+  const speechResult = useSpeechToText();
+  const { state, transcript, partialTranscript, startRecording, stopRecording, isSupported } =
+    speechResult;
 
   useEffect(() => {
     if (transcript) {
@@ -39,7 +33,7 @@ export function VoiceInputButton({ onTranscript, className }: VoiceInputButtonPr
 
   const isRecording = state === 'recording';
   const isLoading = state === 'loading';
-  const hasError = state === 'error';
+  const hasError = isSpeechError(speechResult);
 
   const getIcon = () => {
     if (isLoading) {
@@ -53,7 +47,7 @@ export function VoiceInputButton({ onTranscript, className }: VoiceInputButtonPr
 
   const getAriaLabel = () => {
     if (isLoading) return 'Loading speech recognition...';
-    if (hasError) return error || 'Speech recognition error';
+    if (hasError) return speechResult.error;
     if (isRecording) return 'Stop recording';
     return 'Start voice input';
   };
@@ -77,11 +71,11 @@ export function VoiceInputButton({ onTranscript, className }: VoiceInputButtonPr
     </Button>
   );
 
-  if (hasError && error) {
+  if (hasError) {
     return (
       <Tooltip>
         <Tooltip.Trigger>{button}</Tooltip.Trigger>
-        <Tooltip.Content>{error}</Tooltip.Content>
+        <Tooltip.Content>{speechResult.error}</Tooltip.Content>
       </Tooltip>
     );
   }
