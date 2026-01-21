@@ -246,10 +246,13 @@ export function PlanPage() {
     setShowAuthChoice(true);
   }, []);
 
-  const handleLocalSignIn = useCallback((username: string) => {
-    setLocalIdentity(username);
-    setShowLocalSignIn(false);
-  }, [setLocalIdentity]);
+  const handleLocalSignIn = useCallback(
+    (username: string) => {
+      setLocalIdentity(username);
+      setShowLocalSignIn(false);
+    },
+    [setLocalIdentity]
+  );
 
   // Store editor instance when ready (Issue #42)
   const handleEditorReady = useCallback((editorInstance: BlockNoteEditor) => {
