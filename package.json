@@ -21,6 +21,8 @@
     "dev:hook": "turbo run dev --filter=@shipyard/hook",
     "cleanup": "bash scripts/cleanup.sh",
     "reset": "bash scripts/reset-all.sh",
+    "hooks:local": "bash scripts/hooks-local.sh",
+    "hooks:prod": "bash scripts/hooks-prod.sh",
     "prepare": "simple-git-hooks"
   },
   "devDependencies": {
