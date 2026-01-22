@@ -11,8 +11,8 @@
     "secret:client-secret": "wrangler secret put GITHUB_CLIENT_SECRET"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20260103.0",
+    "@cloudflare/workers-types": "^4.20260122.0",
     "typescript": "^5.9.3",
-    "wrangler": "^3.114.16"
+    "wrangler": "^4.59.3"
   }
 }

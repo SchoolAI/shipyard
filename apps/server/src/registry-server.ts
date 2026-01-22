@@ -29,6 +29,15 @@ import {
   startCleanupInterval,
 } from './subscriptions/index.js';
 
+/**
+ * Extract a single string value from Express route params.
+ * Handles Express 5.x type change where params can be string | string[].
+ */
+function getParam(value: string | string[] | undefined): string | undefined {
+  if (Array.isArray(value)) return value[0];
+  return value;
+}
+
 // Shared LevelDB for all plans (no session-pid isolation)
 const PERSISTENCE_DIR = join(homedir(), '.shipyard', 'plans');
 
@@ -493,7 +502,8 @@ async function handleHealthCheck(_req: Request, res: Response): Promise<void> {
 }
 
 async function handleGetPRDiff(req: Request, res: Response): Promise<void> {
-  const { id: planId, prNumber } = req.params;
+  const planId = getParam(req.params.id);
+  const prNumber = getParam(req.params.prNumber);
 
   if (!planId || !prNumber) {
     res.status(400).json({ error: 'Missing plan ID or PR number' });
@@ -537,7 +547,8 @@ async function handleGetPRDiff(req: Request, res: Response): Promise<void> {
 }
 
 async function handleGetPRFiles(req: Request, res: Response): Promise<void> {
-  const { id: planId, prNumber } = req.params;
+  const planId = getParam(req.params.id);
+  const prNumber = getParam(req.params.prNumber);
 
   if (!planId || !prNumber) {
     res.status(400).json({ error: 'Missing plan ID or PR number' });
@@ -587,7 +598,7 @@ async function handleGetPRFiles(req: Request, res: Response): Promise<void> {
 }
 
 async function handleGetTranscript(req: Request, res: Response): Promise<void> {
-  const planId = req.params.id;
+  const planId = getParam(req.params.id);
   if (!planId) {
     res.status(400).json({ error: 'Missing plan ID' });
     return;
@@ -728,8 +739,8 @@ function createApp(): { app: express.Express; httpServer: http.Server } {
 
   // Artifact serving endpoint with path traversal protection
   app.get('/artifacts/:planId/:filename', async (req: Request, res: Response): Promise<void> => {
-    const planId = req.params.planId;
-    const filename = req.params.filename;
+    const planId = getParam(req.params.planId);
+    const filename = getParam(req.params.filename);
 
     if (!planId || !filename) {
       res.status(400).json({ error: 'Missing planId or filename' });

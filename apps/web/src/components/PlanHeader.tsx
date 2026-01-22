@@ -195,11 +195,22 @@ function PresenceIndicators({ connectedPeers }: PresenceIndicatorsProps) {
         {agents.length > 0 && (
           <div className="flex flex-col gap-1">
             {agents.map((agent, idx) => (
-              <div key={`agent-${idx}`} className="flex items-center gap-2">
-                <Bot className="w-3.5 h-3.5 text-accent" />
-                <span className="font-medium">{formatPlatformName(agent.platform)}</span>
-                {agent.name && agent.name !== `Peer ${idx}` && (
-                  <span className="text-muted-foreground">({agent.name})</span>
+              <div key={`agent-${idx}`} className="flex flex-col gap-1">
+                <div className="flex items-center gap-2">
+                  <Bot className="w-3.5 h-3.5 text-accent" />
+                  <span className="font-medium">{formatPlatformName(agent.platform)}</span>
+                  {agent.name && agent.name !== `Peer ${idx}` && (
+                    <span className="text-muted-foreground">({agent.name})</span>
+                  )}
+                </div>
+
+                {/* Environment context */}
+                {agent.context && (
+                  <div className="flex flex-col gap-0.5 text-xs text-muted-foreground ml-5">
+                    {agent.context.projectName && <span>📁 {agent.context.projectName}</span>}
+                    {agent.context.branch && <span>🌿 {agent.context.branch}</span>}
+                    {agent.context.hostname && <span>🖥️ {agent.context.hostname}</span>}
+                  </div>
                 )}
               </div>
             ))}
