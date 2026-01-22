@@ -8,6 +8,7 @@
  * @see Issue #41 - Context Teleportation
  */
 
+import type { EnvironmentContext } from '@shipyard/schema';
 import { useCallback, useEffect, useState } from 'react';
 import type { WebrtcProvider } from 'y-webrtc';
 
@@ -31,6 +32,8 @@ export interface ConnectedPeer {
   isOwner: boolean;
   /** Connection timestamp */
   connectedAt: number;
+  /** Environment context (project, branch, hostname) for agent identification */
+  context?: EnvironmentContext;
 }
 
 /**
@@ -45,6 +48,7 @@ function extractPeerInfo(peerId: number, state: Record<string, unknown>): Connec
         isOwner?: boolean;
         webrtcPeerId?: string;
         platform?: string;
+        context?: EnvironmentContext;
       }
     | undefined;
 
@@ -57,6 +61,7 @@ function extractPeerInfo(peerId: number, state: Record<string, unknown>): Connec
       color: '#888888',
       isOwner: false,
       connectedAt: Date.now(),
+      context: planStatus?.context,
     };
   }
 
@@ -67,6 +72,7 @@ function extractPeerInfo(peerId: number, state: Record<string, unknown>): Connec
     color: planStatus.user.color,
     isOwner: planStatus.isOwner ?? false,
     connectedAt: Date.now(),
+    context: planStatus.context,
   };
 }
 

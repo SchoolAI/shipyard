@@ -436,6 +436,23 @@ export function removeArtifact(ydoc: Y.Doc, artifactId: string): boolean {
   return true;
 }
 
+/**
+ * Get all agent presence records from Y.Doc CRDT.
+ *
+ * IMPORTANT: This is for AUDIT TRAIL / HISTORICAL TRACKING only.
+ * NOT used for real-time presence display.
+ *
+ * Real-time presence uses WebRTC awareness protocol instead:
+ * @see apps/web/src/hooks/useP2PPeers.ts - For real-time connected peer tracking
+ *
+ * CRDT presence is:
+ * - Written by: Server via setAgentPresence()
+ * - Read by: Audit/historical analysis (no current consumers)
+ * - Browser: Does NOT read this - only uses WebRTC awareness for real-time updates
+ *
+ * @param ydoc - The Y.Doc containing presence data
+ * @returns Map of sessionId → AgentPresence records (may be stale/historical)
+ */
 export function getAgentPresences(ydoc: Y.Doc): Map<string, AgentPresence> {
   const map = ydoc.getMap<AgentPresence>(YDOC_KEYS.PRESENCE);
   const result = new Map<string, AgentPresence>();
@@ -450,6 +467,26 @@ export function getAgentPresences(ydoc: Y.Doc): Map<string, AgentPresence> {
   return result;
 }
 
+/**
+ * Write agent presence to Y.Doc CRDT.
+ *
+ * IMPORTANT: This is for AUDIT TRAIL / HISTORICAL TRACKING only.
+ * NOT used for real-time presence display.
+ *
+ * Real-time presence uses WebRTC awareness protocol instead:
+ * @see apps/web/src/hooks/useP2PPeers.ts - For real-time connected peer tracking
+ *
+ * CRDT presence is:
+ * - Written by: Server via apps/server/src/registry-server.ts hook API
+ * - Read by: Audit/historical analysis (no current consumers)
+ * - Browser: Does NOT read this - only uses WebRTC awareness for real-time updates
+ *
+ * Use case: Future audit trail / historical replay of agent connections
+ *
+ * @param ydoc - The Y.Doc to write to
+ * @param presence - AgentPresence record to store
+ * @param actor - Optional actor name for transaction metadata
+ */
 export function setAgentPresence(ydoc: Y.Doc, presence: AgentPresence, actor?: string): void {
   const validated = AgentPresenceSchema.parse(presence);
 
@@ -469,6 +506,24 @@ export function clearAgentPresence(ydoc: Y.Doc, sessionId: string): boolean {
   return true;
 }
 
+/**
+ * Get a single agent presence record from Y.Doc CRDT.
+ *
+ * IMPORTANT: This is for AUDIT TRAIL / HISTORICAL TRACKING only.
+ * NOT used for real-time presence display.
+ *
+ * Real-time presence uses WebRTC awareness protocol instead:
+ * @see apps/web/src/hooks/useP2PPeers.ts - For real-time connected peer tracking
+ *
+ * CRDT presence is:
+ * - Written by: Server via setAgentPresence()
+ * - Read by: Audit/historical analysis (no current consumers)
+ * - Browser: Does NOT read this - only uses WebRTC awareness for real-time updates
+ *
+ * @param ydoc - The Y.Doc to read from
+ * @param sessionId - The session ID to look up
+ * @returns AgentPresence record if found (may be stale/historical), null otherwise
+ */
 export function getAgentPresence(ydoc: Y.Doc, sessionId: string): AgentPresence | null {
   const map = ydoc.getMap<AgentPresence>(YDOC_KEYS.PRESENCE);
   const value = map.get(sessionId);

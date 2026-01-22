@@ -26,6 +26,7 @@ export {
 } from './conversation-export.js';
 export { formatDeliverablesForLLM } from './deliverable-formatter.js';
 export { extractDeliverables } from './deliverable-parser.js';
+export type { EnvironmentContext } from './environment.js';
 export type { GitHubPRResponse } from './github-validation.js';
 export { GitHubPRResponseSchema } from './github-validation.js';
 export type {

@@ -102,11 +102,20 @@ export const YDOC_KEYS = {
   /**
    * Agent presence (Y.Map<string, AgentPresence>)
    * Maps session ID → presence info (agentType, connectedAt, lastSeenAt)
-   * Used for real-time "Claude is here" indicator
+   *
+   * IMPORTANT: This is for AUDIT TRAIL / HISTORICAL TRACKING only.
+   * It is NOT used for real-time presence display.
+   *
+   * Real-time presence uses WebRTC awareness protocol instead:
+   * @see apps/web/src/hooks/useP2PPeers.ts - Tracks real-time connected peers via awareness
+   *
+   * CRDT presence write-only:
+   * - Written by: Server via hook API (apps/server/src/registry-server.ts)
+   * - Read by: No current consumers (kept for future audit trail features)
+   * - Browser: NEVER reads this - only reads WebRTC awareness for real-time presence
    *
    * Used by:
    * - Server: apps/server/src/registry-server.ts (write via hook API)
-   * - Web: apps/web/src/components/PresenceIndicator.tsx (read)
    * - Helpers: packages/schema/src/yjs-helpers.ts (read/write)
    */
   PRESENCE: 'presence' as const,

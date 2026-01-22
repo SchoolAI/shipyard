@@ -32,6 +32,15 @@ import { logger } from './logger.js';
 import { getGitHubUsername, getRepositoryFullName } from './server-identity.js';
 import { getSessionState } from './session-registry.js';
 
+/**
+ * Extract a single string value from Express route params.
+ * Handles Express 5.x type change where params can be string | string[].
+ */
+function getParam(value: string | string[] | undefined): string | undefined {
+  if (Array.isArray(value)) return value[0];
+  return value;
+}
+
 async function parseMarkdownToBlocks(markdown: string): Promise<Block[]> {
   const editor = ServerBlockNoteEditor.create();
   return await editor.tryParseMarkdownToBlocks(markdown);
@@ -166,7 +175,7 @@ export async function handleCreateSession(req: Request, res: Response): Promise<
 
 export async function handleUpdateContent(req: Request, res: Response): Promise<void> {
   try {
-    const planId = req.params.id;
+    const planId = getParam(req.params.id);
     if (!planId) {
       res.status(400).json({ error: 'Missing plan ID' });
       return;
@@ -240,7 +249,7 @@ export async function handleUpdateContent(req: Request, res: Response): Promise<
 
 export async function handleGetReview(req: Request, res: Response): Promise<void> {
   try {
-    const planId = req.params.id;
+    const planId = getParam(req.params.id);
     if (!planId) {
       res.status(400).json({ error: 'Missing plan ID' });
       return;
@@ -323,7 +332,7 @@ export async function handleGetReview(req: Request, res: Response): Promise<void
 
 export async function handleSetSessionToken(req: Request, res: Response): Promise<void> {
   try {
-    const planId = req.params.id;
+    const planId = getParam(req.params.id);
     if (!planId) {
       res.status(400).json({ error: 'Missing plan ID' });
       return;
@@ -363,7 +372,7 @@ export async function handleSetSessionToken(req: Request, res: Response): Promis
 
 export async function handleUpdatePresence(req: Request, res: Response): Promise<void> {
   try {
-    const planId = req.params.id;
+    const planId = getParam(req.params.id);
     if (!planId) {
       res.status(400).json({ error: 'Missing plan ID' });
       return;
@@ -390,7 +399,7 @@ export async function handleUpdatePresence(req: Request, res: Response): Promise
 
 export async function handleClearPresence(req: Request, res: Response): Promise<void> {
   try {
-    const planId = req.params.id;
+    const planId = getParam(req.params.id);
     if (!planId) {
       res.status(400).json({ error: 'Missing plan ID' });
       return;

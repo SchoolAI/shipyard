@@ -166,3 +166,4 @@ plannotator/
 
 # macOS system files
 .DS_Store
+tmp/
