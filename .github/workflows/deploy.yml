@@ -40,6 +40,7 @@ jobs:
         env:
           VITE_GITHUB_CLIENT_ID: ${{ vars.GH_OAUTH_CLIENT_ID }}
           VITE_GITHUB_OAUTH_WORKER: https://shipyard-github-oauth.jacob-191.workers.dev
+          VITE_WEBRTC_SIGNALING: wss://shipyard-signaling.jacob-191.workers.dev
 
       - name: Setup Pages
         uses: actions/configure-pages@v5

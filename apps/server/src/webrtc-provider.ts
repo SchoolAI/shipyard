@@ -22,7 +22,15 @@ interface McpAwarenessState {
   context?: EnvironmentContext;
 }
 
-const SIGNALING_SERVER = process.env.SIGNALING_URL || 'ws://localhost:4444';
+/**
+ * Production signaling when NODE_ENV=production, localhost for development.
+ * NODE_ENV is set in .mcp-plugin.json (production) or .mcp.json (development).
+ */
+const defaultSignaling =
+  process.env.NODE_ENV === 'production'
+    ? 'wss://shipyard-signaling.jacob-191.workers.dev'
+    : 'ws://localhost:4444';
+const SIGNALING_SERVER = process.env.SIGNALING_URL || defaultSignaling;
 
 /**
  * Create a WebRTC provider that connects MCP to the peer mesh.

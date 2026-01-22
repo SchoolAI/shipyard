@@ -28494,7 +28494,7 @@ init_cjs_shims();
 // ../../packages/schema/dist/index.mjs
 init_cjs_shims();
 
-// ../../packages/schema/dist/yjs-helpers-DeNoxvrN.mjs
+// ../../packages/schema/dist/yjs-helpers-B435ND5d.mjs
 init_cjs_shims();
 
 // ../../packages/schema/dist/plan.mjs
@@ -42665,7 +42665,7 @@ var PRReviewCommentSchema = external_exports.object({
   resolved: external_exports.boolean().optional()
 });
 
-// ../../packages/schema/dist/yjs-helpers-DeNoxvrN.mjs
+// ../../packages/schema/dist/yjs-helpers-B435ND5d.mjs
 function assertNever2(value) {
   throw new Error(`Unhandled discriminated union member: ${JSON.stringify(value)}`);
 }
@@ -45704,8 +45704,9 @@ init_cjs_shims();
 
 // src/config/env/web.ts
 init_cjs_shims();
+var defaultWebUrl = process.env.NODE_ENV === "production" ? "https://schoolai.github.io/shipyard" : "http://localhost:5173";
 var schema3 = external_exports.object({
-  SHIPYARD_WEB_URL: external_exports.string().url().default("http://localhost:5173")
+  SHIPYARD_WEB_URL: external_exports.string().url().default(defaultWebUrl)
 });
 var webConfig = loadEnv(schema3);
 

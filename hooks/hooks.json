@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/apps/hook/dist/index.js"
+            "command": "NODE_ENV=production node ${CLAUDE_PLUGIN_ROOT}/apps/hook/dist/index.js"
           }
         ]
       }
@@ -17,7 +17,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/apps/hook/dist/index.js",
+            "command": "NODE_ENV=production node ${CLAUDE_PLUGIN_ROOT}/apps/hook/dist/index.js",
             "timeout": 1800
           }
         ]
@@ -28,7 +28,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/apps/hook/dist/index.js --context"
+            "command": "NODE_ENV=production node ${CLAUDE_PLUGIN_ROOT}/apps/hook/dist/index.js --context"
           }
         ]
       }
@@ -39,7 +39,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/apps/hook/dist/index.js"
+            "command": "NODE_ENV=production node ${CLAUDE_PLUGIN_ROOT}/apps/hook/dist/index.js"
           }
         ]
       }

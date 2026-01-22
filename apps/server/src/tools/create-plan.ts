@@ -15,6 +15,7 @@ import { nanoid } from 'nanoid';
 import open from 'open';
 import type * as Y from 'yjs';
 import { z } from 'zod';
+import { webConfig } from '../config/env/web.js';
 import { getOrCreateDoc, hasActiveConnections } from '../doc-store.js';
 import { logger } from '../logger.js';
 import { getGitHubUsername, getRepositoryFullName } from '../server-identity.js';
@@ -267,7 +268,7 @@ Bad deliverables (not provable):
     });
     logger.info({ planId }, 'Plan index updated');
 
-    const url = `http://localhost:5173/plan/${planId}`;
+    const url = `${webConfig.SHIPYARD_WEB_URL}/plan/${planId}`;
     await openPlanInBrowser(planId, url);
 
     const repoInfo = repo
