@@ -1,4 +1,9 @@
+import * as child_process from 'node:child_process';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
 import * as vm from 'node:vm';
+import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
 import {
   getArtifacts,
   getDeliverables,
@@ -766,8 +771,50 @@ export const executeCodeTool = {
     logger.info({ codeLength: code.length }, 'Executing code');
 
     try {
-      // Create sandbox with API functions
+      // Helper: Encode frames to MP4 using bundled FFmpeg
+      async function encodeVideo(opts: {
+        framesDir: string;
+        fps?: number;
+        outputPath?: string;
+      }): Promise<string> {
+        const fps = opts.fps || 6;
+        const outputPath = opts.outputPath || path.join(os.tmpdir(), `video-${Date.now()}.mp4`);
+
+        const { spawnSync } = child_process;
+        const result = spawnSync(
+          ffmpegInstaller.path,
+          [
+            '-y',
+            '-framerate',
+            String(fps),
+            '-i',
+            path.join(opts.framesDir, 'frame-%06d.jpg'),
+            '-vf',
+            'scale=trunc(iw/2)*2:trunc(ih/2)*2',
+            '-c:v',
+            'libx264',
+            '-pix_fmt',
+            'yuv420p',
+            '-preset',
+            'fast',
+            outputPath,
+          ],
+          { encoding: 'utf-8', timeout: 60000 }
+        );
+
+        if (result.status !== 0) {
+          throw new Error(`FFmpeg encoding failed: ${result.stderr?.slice(-300)}`);
+        }
+
+        // Cleanup frames directory
+        fs.rmSync(opts.framesDir, { recursive: true, force: true });
+
+        return outputPath;
+      }
+
+      // Create sandbox with API functions and Node.js modules for video encoding
       const sandbox = {
+        // Shipyard API functions
         createPlan,
         readPlan,
         updatePlan,
@@ -780,6 +827,15 @@ export const executeCodeTool = {
         requestUserInput,
         postActivityUpdate,
         resolveActivityRequest,
+        // Video encoding helper (uses bundled FFmpeg)
+        encodeVideo,
+        // Node.js modules for advanced workflows (file ops, process spawning)
+        child_process,
+        fs,
+        path,
+        os,
+        // FFmpeg bundled with server - no installation required
+        ffmpegPath: ffmpegInstaller.path,
         console: {
           log: (...logArgs: unknown[]) => logger.info({ output: logArgs }, 'console.log'),
           error: (...logArgs: unknown[]) => logger.error({ output: logArgs }, 'console.error'),

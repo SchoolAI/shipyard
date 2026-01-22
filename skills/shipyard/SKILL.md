@@ -1,9 +1,16 @@
 ---
 name: shipyard
-description: Companion skill for the Shipyard MCP server - creates verified work tasks with proof-of-work tracking. Use when tasks need human review, screenshot/video evidence, audit trails, or collaborative review. Invoke when the user says "create a task", "I need proof of this", "track my work", "make this reviewable", or needs accountability for implementation work.
+description: |
+  Companion skill for the Shipyard MCP server - creates verified work tasks with proof-of-work tracking.
+
+  **IMPORTANT:** When Shipyard MCP tools are available (`mcp__shipyard__*` or `mcp__plugin_shipyard_shipyard__*`), ALWAYS load this skill first. The MCP provides tools; this skill teaches the workflow for using them effectively together.
+
+  Use when tasks need human review, screenshot/video evidence, audit trails, or collaborative review. Invoke when the user says "create a task", "I need proof of this", "track my work", "make this reviewable", or needs accountability for implementation work.
 ---
 
 # Shipyard: Verified Work Tasks
+
+> **MCP + Skill = Full Power:** If you see `mcp__shipyard__*` tools available, you have the Shipyard MCP. This skill teaches you how to use those tools effectively. Always use both together for the best workflow.
 
 Shipyard turns invisible agent work into reviewable, verifiable tasks. Instead of trusting that code was written correctly, reviewers see screenshots, videos, and test results as proof.
 
@@ -141,6 +148,28 @@ if (status.status === "changes_requested") {
 | `video` | Complex flows, interactions | .mp4, .webm |
 | `test_results` | Test output, coverage | .json, .txt |
 | `diff` | Code changes | .diff, .patch |
+
+## Video Recording
+
+Video recording uses the Playwriter MCP for browser capture and Shipyard for uploading proof-of-work artifacts. This is ideal for demonstrating complex user interactions, multi-step flows, or animated UI behavior.
+
+**Workflow (4 steps):**
+
+1. **Start recording** - Playwriter begins capturing browser frames via CDP
+2. **Perform interactions** - Execute the actions you want to demonstrate
+3. **Stop capture** - Playwriter stops CDP screencast, saves frames to disk
+4. **Encode and upload** - Shipyard's bundled FFmpeg encodes frames to MP4, then uploads via `addArtifact`
+
+**Configuration:**
+
+| Option | Range | Default | Description |
+|--------|-------|---------|-------------|
+| `fps` | 4-8 | 6 | Frames per second (lower = smaller file) |
+| `quality` | 60-90 | 80 | JPEG quality (higher = better quality, larger file) |
+
+**Note:** FFmpeg is bundled with Shipyard (via @ffmpeg-installer, auto-downloaded on `pnpm install`). No manual installation required.
+
+**See `examples/video-recording.md` for complete code examples.**
 
 ## Tips
 
