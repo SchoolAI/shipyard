@@ -5,7 +5,7 @@ import { WebrtcProvider } from 'y-webrtc';
 import { WebsocketProvider } from 'y-websocket';
 import * as Y from 'yjs';
 
-const DEFAULT_SIGNALING_SERVER = 'wss://shipyard-signaling.jacob-191.workers.dev';
+const DEFAULT_SIGNALING_SERVER = 'ws://localhost:4444';
 
 /**
  * Module-level cache for WebRTC providers to prevent duplicate room errors.
@@ -330,9 +330,12 @@ export function useMultiProviderSync(
       rtc = getOrCreateWebrtcProvider(roomName, ydoc, signalingServer);
       setRtcProvider(rtc);
 
-      // Expose provider on window for debugging (only for plan-index)
+      // Expose provider on window for debugging
       if (docName === 'plan-index') {
         (window as unknown as { planIndexRtcProvider: WebrtcProvider }).planIndexRtcProvider = rtc;
+      } else {
+        // Also expose plan-specific provider for debugging
+        (window as unknown as { planRtcProvider: WebrtcProvider }).planRtcProvider = rtc;
       }
 
       // Set awareness for user presence with planStatus field

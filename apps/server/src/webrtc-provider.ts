@@ -22,8 +22,7 @@ interface McpAwarenessState {
   context?: EnvironmentContext;
 }
 
-const SIGNALING_SERVER =
-  process.env.SIGNALING_URL || 'wss://shipyard-signaling.jacob-191.workers.dev';
+const SIGNALING_SERVER = process.env.SIGNALING_URL || 'ws://localhost:4444';
 
 /**
  * Create a WebRTC provider that connects MCP to the peer mesh.
@@ -95,7 +94,7 @@ export async function createWebRtcProvider(ydoc: Y.Doc, planId: string): Promise
   };
   provider.awareness.setLocalStateField('planStatus', awarenessState);
   logger.info(
-    { username: username ?? fallbackId, platform: 'claude-code', hasContext: true },
+    { planId, username: username ?? fallbackId, platform: 'claude-code', hasContext: true },
     'MCP awareness state set'
   );
 
