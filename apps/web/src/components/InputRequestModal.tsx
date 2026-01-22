@@ -24,6 +24,7 @@ import {
   answerInputRequest,
   assertNever,
   cancelInputRequest,
+  DEFAULT_INPUT_REQUEST_TIMEOUT_SECONDS,
   type InputRequest,
 } from '@shipyard/schema';
 import type React from 'react';
@@ -85,7 +86,7 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
   useEffect(() => {
     if (!request || !isOpen) return;
 
-    const timeout = request.timeout || 300; // default 5 min
+    const timeout = request.timeout || DEFAULT_INPUT_REQUEST_TIMEOUT_SECONDS;
     const elapsed = Math.floor((Date.now() - request.createdAt) / 1000);
     const remaining = Math.max(0, timeout - elapsed);
 

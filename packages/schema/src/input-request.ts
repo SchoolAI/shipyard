@@ -2,6 +2,18 @@ import { nanoid } from 'nanoid';
 import { z } from 'zod';
 
 /**
+ * Default timeout in seconds for input requests when not explicitly specified.
+ * Used as fallback in:
+ * - InputRequestModal.tsx (browser countdown)
+ * - InputRequestInboxItem.tsx (browser countdown display)
+ * - useInputRequests.ts (client-side expiration check)
+ *
+ * Server-side timeout in input-request-manager.ts uses the request's timeout
+ * or 0 (no timeout) if not specified, but clients use this default for UI display.
+ */
+export const DEFAULT_INPUT_REQUEST_TIMEOUT_SECONDS = 300;
+
+/**
  * Valid input request types.
  * - text: Single-line text input
  * - multiline: Multi-line text input

@@ -7,7 +7,11 @@
  * - useInboxEvents.ts (event monitoring)
  */
 
-import { type InputRequest, YDOC_KEYS } from '@shipyard/schema';
+import {
+  DEFAULT_INPUT_REQUEST_TIMEOUT_SECONDS,
+  type InputRequest,
+  YDOC_KEYS,
+} from '@shipyard/schema';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import type * as Y from 'yjs';
@@ -125,6 +129,23 @@ function dispatchOpenInputRequestEvent(request: InputRequest): void {
 }
 
 /**
+ * Check if a request has expired based on its createdAt and timeout.
+ */
+function isRequestExpired(request: InputRequest): boolean {
+  const timeoutMs = (request.timeout || DEFAULT_INPUT_REQUEST_TIMEOUT_SECONDS) * 1000;
+  const elapsed = Date.now() - request.createdAt;
+  return elapsed >= timeoutMs;
+}
+
+/**
+ * Filter out expired requests from the array.
+ * This provides client-side expiration detection even when Y.Doc sync is delayed.
+ */
+function filterOutExpiredRequests(requests: InputRequest[]): InputRequest[] {
+  return requests.filter((r) => !isRequestExpired(r));
+}
+
+/**
  * Hook that monitors the INPUT_REQUESTS array in Y.Doc and shows toast notifications
  * when new pending requests are detected.
  *
@@ -170,7 +191,11 @@ export function useInputRequests({
     const updateRequests = () => {
       // Get all requests and filter for pending
       const allRequests = requestsArray.toJSON() as InputRequest[];
-      const pending = filterPendingRequests(allRequests);
+      // Filter for pending status first, then filter out client-side expired requests
+      // Client-side expiration check ensures we detect timeouts even when Y.Doc sync is delayed
+      // (e.g., browser tab in background, network latency, etc.)
+      const pendingByStatus = filterPendingRequests(allRequests);
+      const pending = filterOutExpiredRequests(pendingByStatus);
 
       // Create set of current pending IDs
       const currentIds = createRequestIdSet(pending);
@@ -179,7 +204,7 @@ export function useInputRequests({
       const newRequests = findNewRequests(pending, previousRequestIdsRef.current);
 
       // Find RESOLVED requests (were pending before, not anymore)
-      // This happens when another device responds to the request
+      // This happens when another device responds to the request OR when client-side expiration fires
       const resolvedIds = findResolvedRequestIds(previousRequestIdsRef.current, currentIds);
 
       // Dismiss toasts for resolved requests
@@ -217,11 +242,29 @@ export function useInputRequests({
     // Set up observer for array changes
     requestsArray.observe(updateRequests);
 
+    // Set up periodic check for expired requests (every 5 seconds)
+    // This ensures we detect client-side timeouts even when:
+    // - Browser tab is in background (JavaScript throttled)
+    // - Y.Doc sync is delayed
+    // - Server timeout hasn't fired yet
+    const expirationCheckInterval = setInterval(updateRequests, 5000);
+
+    // Set up visibility change listener to immediately check when page becomes visible
+    // This ensures expired requests are cleaned up as soon as user returns to the tab
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        updateRequests();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
     // Cleanup: unobserve on unmount or ydoc change
     return () => {
       // Capture requestsArray in closure to ensure correct cleanup
       // even if ydoc changes during async state update
       requestsArray.unobserve(updateRequests);
+      clearInterval(expirationCheckInterval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
       previousRequestIdsRef.current.clear(); // Clear on ydoc change
     };
   }, [ydoc]);

@@ -263,12 +263,15 @@ export class InputRequestManager {
 
         logger.warn({ requestId, timeout: effectiveTimeout }, 'Input request timed out');
 
-        markRequestAsCancelled();
-
-        if (resolved) return;
-
+        // IMPORTANT: Set resolved = true BEFORE markRequestAsCancelled()
+        // markRequestAsCancelled() updates Y.Doc, which synchronously triggers the observer,
+        // which would call checkStatus() and see status='cancelled', resolving with a short
+        // "Request timed out" message instead of our detailed message with duration.
         resolved = true;
         cleanup();
+
+        // Now safe to update Y.Doc - observer won't double-resolve
+        markRequestAsCancelled();
 
         const timeStr = formatDuration(effectiveTimeout);
         resolve({
@@ -279,10 +282,10 @@ export class InputRequestManager {
       };
 
       // Helper: Mark request as cancelled in Y.Doc
+      // Note: No `resolved` check here - the caller is responsible for setting resolved
+      // BEFORE calling this to prevent the Y.Doc observer from double-resolving.
       const markRequestAsCancelled = () => {
         ydoc.transact(() => {
-          if (resolved) return;
-
           const currentRequest = findRequest();
           if (!currentRequest || currentRequest.status !== 'pending') {
             return;

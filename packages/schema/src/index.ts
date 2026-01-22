@@ -97,6 +97,7 @@ export type {
 } from './input-request.js';
 export {
   createInputRequest,
+  DEFAULT_INPUT_REQUEST_TIMEOUT_SECONDS,
   InputRequestSchema,
   InputRequestStatusValues,
   InputRequestTypeValues,

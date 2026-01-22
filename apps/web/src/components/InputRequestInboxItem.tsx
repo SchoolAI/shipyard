@@ -4,7 +4,7 @@
  */
 
 import { Card, Chip } from '@heroui/react';
-import type { InputRequest } from '@shipyard/schema';
+import { DEFAULT_INPUT_REQUEST_TIMEOUT_SECONDS, type InputRequest } from '@shipyard/schema';
 import { Clock } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
@@ -20,7 +20,7 @@ export function InputRequestInboxItem({ request, onClick }: InputRequestInboxIte
   useEffect(() => {
     const updateRemainingTime = () => {
       const now = Date.now();
-      const timeoutMs = (request.timeout || 120) * 1000;
+      const timeoutMs = (request.timeout || DEFAULT_INPUT_REQUEST_TIMEOUT_SECONDS) * 1000;
       const elapsed = now - request.createdAt;
       const remaining = Math.max(0, timeoutMs - elapsed);
       setRemainingTime(remaining);
