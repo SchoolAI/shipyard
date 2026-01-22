@@ -1256,8 +1256,8 @@ export function answerInputRequest(
 }
 
 /**
- * Cancel a pending input request.
- * Used when user closes modal without responding.
+ * Cancel a pending input request due to timeout or programmatic cancellation.
+ * Sets status to 'cancelled'. For user-initiated decline, use declineInputRequest().
  */
 export function cancelInputRequest(
   ydoc: Y.Doc,
@@ -1286,6 +1286,47 @@ export function cancelInputRequest(
   };
 
   const validated = InputRequestSchema.parse(cancelledRequest);
+
+  ydoc.transact(() => {
+    requestsArray.delete(index, 1);
+    requestsArray.insert(index, [validated]);
+  });
+
+  return { success: true };
+}
+
+/**
+ * Decline a pending input request.
+ * Used when user explicitly clicks "Decline" button in the UI.
+ * Sets status to 'declined' (distinct from 'cancelled' which is for timeouts).
+ */
+export function declineInputRequest(
+  ydoc: Y.Doc,
+  requestId: string
+): { success: boolean; error?: string } {
+  const requestsArray = ydoc.getArray<InputRequest>(YDOC_KEYS.INPUT_REQUESTS);
+  const requests = requestsArray.toJSON() as InputRequest[];
+  const index = requests.findIndex((r) => r.id === requestId);
+
+  if (index === -1) {
+    return { success: false, error: 'Request not found' };
+  }
+
+  const request = requests[index];
+  if (!request) {
+    return { success: false, error: 'Request not found' };
+  }
+
+  if (request.status !== 'pending') {
+    return { success: false, error: `Request is not pending` };
+  }
+
+  const declinedRequest = {
+    ...request,
+    status: 'declined' as const,
+  };
+
+  const validated = InputRequestSchema.parse(declinedRequest);
 
   ydoc.transact(() => {
     requestsArray.delete(index, 1);

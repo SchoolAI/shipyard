@@ -333,6 +333,7 @@ export {
   cancelInputRequest,
   clearAgentPresence,
   createPlanSnapshot,
+  declineInputRequest,
   getAgentPresence,
   getAgentPresences,
   getAllTagsFromIndex,

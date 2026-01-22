@@ -25,6 +25,7 @@ import {
   assertNever,
   cancelInputRequest,
   DEFAULT_INPUT_REQUEST_TIMEOUT_SECONDS,
+  declineInputRequest,
   type InputRequest,
 } from '@shipyard/schema';
 import type React from 'react';
@@ -63,10 +64,25 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
     setRemainingTime(-1);
   }, [request]);
 
+  // Used for auto-timeout - sets status to 'cancelled'
   const handleCancel = useCallback(() => {
     if (!ydoc || !request) return;
 
     const result = cancelInputRequest(ydoc, request.id);
+    if (!result.success) {
+      return;
+    }
+
+    // multiSelect only exists on 'choice' type requests
+    setValue(request.type === 'choice' && request.multiSelect ? [] : '');
+    onClose();
+  }, [ydoc, request, onClose]);
+
+  // Used when user explicitly clicks "Decline" - sets status to 'declined'
+  const handleDecline = useCallback(() => {
+    if (!ydoc || !request) return;
+
+    const result = declineInputRequest(ydoc, request.id);
     if (!result.success) {
       return;
     }
@@ -384,7 +400,7 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
                       {formatTime(remainingTime)}
                     </span>
                     <div className="flex gap-2">
-                      <Button variant="secondary" onPress={handleCancel} isDisabled={isSubmitting}>
+                      <Button variant="secondary" onPress={handleDecline} isDisabled={isSubmitting}>
                         Decline
                       </Button>
                       <Button onPress={() => startAuth()}>Sign in with GitHub</Button>
@@ -428,7 +444,7 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
                       {formatTime(remainingTime)}
                     </span>
                     <div className="flex gap-2">
-                      <Button variant="secondary" onPress={handleCancel} isDisabled={isSubmitting}>
+                      <Button variant="secondary" onPress={handleDecline} isDisabled={isSubmitting}>
                         Decline
                       </Button>
                       <Button
