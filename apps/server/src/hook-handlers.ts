@@ -733,12 +733,6 @@ export async function waitForApprovalHandler(
       throw new Error(`Invalid session state transition: missing reviewedBy for changes_requested`);
     }
 
-    if (!syncedFields) {
-      throw new Error(
-        `Invalid session state transition: changes_requested requires synced fields (contentHash, sessionToken)`
-      );
-    }
-
     const deliverables =
       extraData.deliverables ||
       (isSessionStateApproved(session) ||
@@ -747,10 +741,17 @@ export async function waitForApprovalHandler(
         ? session.deliverables
         : []);
 
+    // If we don't have synced fields yet (first rejection before any approval),
+    // transition to 'reviewed' with placeholder fields. The agent is being blocked
+    // anyway, so they don't need a real sessionToken - they just need the feedback.
+    const webUrl = webConfig.SHIPYARD_WEB_URL;
+
     setSessionState(sessionId, {
       lifecycle: 'reviewed',
       ...baseState,
-      ...syncedFields,
+      contentHash: syncedFields?.contentHash ?? '',
+      sessionToken: syncedFields?.sessionToken ?? '',
+      url: syncedFields?.url ?? `${webUrl}/plan/${baseState.planId}`,
       deliverables,
       reviewComment: reviewComment || '',
       reviewedBy,
