@@ -1,4 +1,7 @@
 import { execSync } from 'node:child_process';
+import os from 'node:os';
+import { basename } from 'node:path';
+import type { EnvironmentContext } from '@shipyard/schema';
 import { githubConfig } from './config/env/github.js';
 import { logger } from './logger.js';
 
@@ -156,4 +159,35 @@ function getUsernameFromGitConfig(): string | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * Gets the current git branch name.
+ * Returns undefined if not in a git repo or git is not available.
+ */
+function getGitBranch(): string | undefined {
+  try {
+    return (
+      execSync('git branch --show-current', {
+        encoding: 'utf-8',
+        timeout: 2000,
+        stdio: ['pipe', 'pipe', 'pipe'],
+      }).trim() || undefined
+    );
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Gets environment context for agent identification.
+ * Provides metadata about where the agent is running (project, branch, hostname, repo).
+ */
+export function getEnvironmentContext(): EnvironmentContext {
+  return {
+    projectName: basename(process.cwd()) || undefined,
+    branch: getGitBranch(),
+    hostname: os.hostname(),
+    repo: getRepositoryFullName() || undefined,
+  };
 }

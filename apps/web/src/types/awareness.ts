@@ -1,4 +1,4 @@
-import type { OriginPlatform } from '@shipyard/schema';
+import type { EnvironmentContext, OriginPlatform } from '@shipyard/schema';
 
 /**
  * Approval status for a user in the awareness protocol.
@@ -33,6 +33,11 @@ export type PlanAwarenessState =
        * The webrtcPeerId is used as the key in room.webrtcConns.
        */
       webrtcPeerId?: string;
+      /**
+       * Environment context for agent identification.
+       * Helps users distinguish agents working from different machines/branches.
+       */
+      context?: EnvironmentContext;
     }
   | {
       status: 'approved' | 'rejected';
@@ -53,4 +58,9 @@ export type PlanAwarenessState =
        * The webrtcPeerId is used as the key in room.webrtcConns.
        */
       webrtcPeerId?: string;
+      /**
+       * Environment context for agent identification.
+       * Helps users distinguish agents working from different machines/branches.
+       */
+      context?: EnvironmentContext;
     };

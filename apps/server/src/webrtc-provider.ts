@@ -1,9 +1,9 @@
 import wrtc from '@roamhq/wrtc';
-import type { OriginPlatform } from '@shipyard/schema';
+import type { EnvironmentContext, OriginPlatform } from '@shipyard/schema';
 import { WebrtcProvider } from 'y-webrtc';
 import type * as Y from 'yjs';
 import { logger } from './logger.js';
-import { getGitHubUsername } from './server-identity.js';
+import { getEnvironmentContext, getGitHubUsername } from './server-identity.js';
 
 /**
  * MCP awareness state broadcasted to peers.
@@ -19,6 +19,7 @@ interface McpAwarenessState {
   status: 'approved' | 'pending' | 'rejected';
   isOwner: boolean;
   webrtcPeerId: string;
+  context?: EnvironmentContext;
 }
 
 const SIGNALING_SERVER =
@@ -74,31 +75,33 @@ export async function createWebRtcProvider(ydoc: Y.Doc, planId: string): Promise
   });
 
   // Broadcast MCP identity via awareness protocol and push to signaling
-  let username: string | undefined;
-  try {
-    username = await getGitHubUsername();
-    const awarenessState: McpAwarenessState = {
-      user: {
-        id: `mcp-${username}`,
-        name: `Claude Code (${username})`,
-        color: '#0066cc',
-      },
-      platform: 'claude-code',
-      status: 'approved',
-      isOwner: true,
-      webrtcPeerId: crypto.randomUUID(),
-    };
-    provider.awareness.setLocalStateField('planStatus', awarenessState);
-    logger.info({ username, platform: 'claude-code' }, 'MCP awareness state set');
+  // Use .catch() to ensure awareness is always set, even if GitHub auth fails
+  const username = await getGitHubUsername().catch(() => undefined);
+  const fallbackId = `mcp-anon-${crypto.randomUUID().slice(0, 8)}`;
+  const userId = username ? `mcp-${username}` : fallbackId;
+  const displayName = username ? `Claude Code (${username})` : 'Claude Code';
 
-    // Push approval state to signaling server (required for access control)
-    sendApprovalStateToSignaling(provider, planId, username);
-  } catch (error) {
-    logger.warn(
-      { error },
-      'Could not set MCP awareness (GitHub not authenticated - run: gh auth login)'
-    );
-  }
+  const awarenessState: McpAwarenessState = {
+    user: {
+      id: userId,
+      name: displayName,
+      color: '#0066cc',
+    },
+    platform: 'claude-code',
+    status: 'approved',
+    isOwner: true,
+    webrtcPeerId: crypto.randomUUID(),
+    context: getEnvironmentContext(),
+  };
+  provider.awareness.setLocalStateField('planStatus', awarenessState);
+  logger.info(
+    { username: username ?? fallbackId, platform: 'claude-code', hasContext: true },
+    'MCP awareness state set'
+  );
+
+  // Push approval state to signaling server (required for access control)
+  // Use fallback ID if no username available
+  sendApprovalStateToSignaling(provider, planId, username ?? fallbackId);
 
   // Set up event listeners for monitoring
   setupProviderListeners(provider, planId);
