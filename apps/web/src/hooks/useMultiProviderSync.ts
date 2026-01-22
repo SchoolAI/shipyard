@@ -335,12 +335,19 @@ export function useMultiProviderSync(
         (window as unknown as { planIndexRtcProvider: WebrtcProvider }).planIndexRtcProvider = rtc;
       }
 
-      // Set basic awareness for user presence (name and color only)
+      // Set awareness for user presence with planStatus field
+      // This matches what useP2PPeers expects and what MCP servers broadcast
       const awareness = rtc.awareness;
-      awareness.setLocalStateField('user', {
-        name: userName,
-        color: colorFromString(userName),
-      } as UserPresence['user']);
+      awareness.setLocalStateField('planStatus', {
+        user: {
+          id: userName,
+          name: userName,
+          color: colorFromString(userName),
+        },
+        platform: 'browser',
+        isOwner: false, // Updated by useBroadcastApprovalStatus if user is owner
+        status: 'approved' as const, // Browsers are auto-approved
+      });
 
       // Count peers from awareness states (excluding self)
       const updatePeerCountFromAwareness = () => {
