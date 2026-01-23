@@ -63,6 +63,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Check npm package dependencies
+        run: node scripts/check-npm-deps.js
+
       - name: Build packages
         run: pnpm build --filter @shipyard/schema --filter @shipyard/shared --filter @shipyard/server --filter @shipyard/hook
 
