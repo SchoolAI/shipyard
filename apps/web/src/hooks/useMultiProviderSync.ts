@@ -5,7 +5,11 @@ import { WebrtcProvider } from 'y-webrtc';
 import { WebsocketProvider } from 'y-websocket';
 import * as Y from 'yjs';
 
-const DEFAULT_SIGNALING_SERVER = 'ws://localhost:4444';
+/**
+ * Production signaling server URL.
+ * For local development, set VITE_WEBRTC_SIGNALING=ws://localhost:4444
+ */
+const DEFAULT_SIGNALING_SERVER = 'wss://shipyard-signaling.jacob-191.workers.dev';
 
 /**
  * Module-level cache for WebRTC providers to prevent duplicate room errors.

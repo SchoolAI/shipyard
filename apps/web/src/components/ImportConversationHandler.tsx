@@ -7,6 +7,7 @@ import {
   logPlanEvent,
   type OriginPlatform,
 } from '@shipyard/schema';
+import { DEFAULT_REGISTRY_PORTS } from '@shipyard/shared/registry-config';
 import { Check, Download, MessageSquare, MessageSquareReply, Terminal } from 'lucide-react';
 import type React from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -234,7 +235,7 @@ export function ImportConversationButton({
   );
 }
 
-const REGISTRY_URL = 'http://localhost:32191';
+const REGISTRY_URL = `http://localhost:${DEFAULT_REGISTRY_PORTS[0]}`;
 
 // TODO(#9): Platform detection - Currently hard-coded to only detect Claude Code
 // Should detect available platforms (Cursor, Devin, Windsurf, etc.) and show

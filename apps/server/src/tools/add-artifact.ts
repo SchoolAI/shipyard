@@ -431,6 +431,9 @@ ARTIFACT TYPES:
         const blocks = editor.yXmlFragmentToBlocks(fragment);
         const artifacts = getArtifacts(doc);
 
+        // Check if any artifacts are stored locally (won't be visible to remote viewers)
+        const hasLocalArtifacts = artifacts.some((a) => a.storage === 'local');
+
         // Create completion snapshot (Issue #42)
         const completionSnapshot = createPlanSnapshot(
           doc,
@@ -525,7 +528,11 @@ ARTIFACT TYPES:
 🎉 ALL DELIVERABLES COMPLETE! Task auto-completed.${prText}
 
 Snapshot URL saved to: ${snapshotFile}
-(Note: Very long URL - recommend not reading directly. Use file path to attach to PR or access later.)`,
+(Note: Very long URL - recommend not reading directly. Use file path to attach to PR or access later.)${
+                hasLocalArtifacts
+                  ? '\n\n⚠️ WARNING: This plan contains local artifacts that will not be visible to remote viewers. For full remote access, configure GITHUB_TOKEN to upload artifacts to GitHub.'
+                  : ''
+              }`,
             },
           ],
           // Keep structured data for execute_code wrapper

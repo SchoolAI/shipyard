@@ -106,6 +106,9 @@ RETURNS:
 
     // Check artifacts exist
     const artifacts = getArtifacts(ydoc);
+    // Check if any artifacts are stored locally (won't be visible to remote viewers)
+    const hasLocalArtifacts = artifacts.some((a) => a.storage === 'local');
+
     if (artifacts.length === 0) {
       return {
         content: [
@@ -239,6 +242,12 @@ Generated with [Shipyard](https://github.com/SchoolAI/shipyard)"
 \`\`\`
 linkPR({ planId, sessionToken, prNumber: 42 })
 \`\`\``;
+    }
+
+    // Add warning if plan contains local artifacts
+    if (hasLocalArtifacts) {
+      responseText +=
+        '\n\n⚠️ WARNING: This plan contains local artifacts that will not be visible to remote viewers. For full remote access, configure GITHUB_TOKEN to upload artifacts to GitHub.';
     }
 
     return {

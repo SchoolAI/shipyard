@@ -1,5 +1,11 @@
 const CLIENT_ID = import.meta.env.VITE_GITHUB_CLIENT_ID;
-const WORKER_URL = import.meta.env.VITE_GITHUB_OAUTH_WORKER || 'http://localhost:4445';
+
+/**
+ * GitHub OAuth worker URL.
+ * For local development, set VITE_GITHUB_OAUTH_WORKER=http://localhost:4445
+ */
+const WORKER_URL =
+  import.meta.env.VITE_GITHUB_OAUTH_WORKER || 'https://shipyard-github-oauth.jacob-191.workers.dev';
 
 export interface GitHubUser {
   login: string;

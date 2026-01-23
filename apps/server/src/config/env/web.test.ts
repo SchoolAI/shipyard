@@ -14,22 +14,20 @@ describe('webConfig', () => {
   });
 
   describe('SHIPYARD_WEB_URL', () => {
-    it('should default to http://localhost:5173 when env var not set and NODE_ENV is not production', async () => {
+    it('should default to production URL when env var not set', async () => {
       delete process.env.SHIPYARD_WEB_URL;
-      delete process.env.NODE_ENV;
-
-      const { webConfig } = await import('./web.js');
-
-      expect(webConfig.SHIPYARD_WEB_URL).toBe('http://localhost:5173');
-    });
-
-    it('should default to production URL when NODE_ENV is production', async () => {
-      delete process.env.SHIPYARD_WEB_URL;
-      process.env.NODE_ENV = 'production';
 
       const { webConfig } = await import('./web.js');
 
       expect(webConfig.SHIPYARD_WEB_URL).toBe('https://schoolai.github.io/shipyard');
+    });
+
+    it('should allow overriding with localhost for local development', async () => {
+      process.env.SHIPYARD_WEB_URL = 'http://localhost:5173';
+
+      const { webConfig } = await import('./web.js');
+
+      expect(webConfig.SHIPYARD_WEB_URL).toBe('http://localhost:5173');
     });
 
     it('should use valid URL from env var', async () => {
