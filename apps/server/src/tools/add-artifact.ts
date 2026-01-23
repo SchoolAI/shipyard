@@ -509,13 +509,14 @@ ARTIFACT TYPES:
               type: 'text',
               text: `Artifact uploaded!\nID: ${artifact.id}\nType: ${type}\nFilename: ${filename}\nURL: ${artifactUrl}${linkedText}
 
-🎉 ALL DELIVERABLES COMPLETE! Task auto-completed.
+🎉 ALL DELIVERABLES COMPLETE! Task auto-completed.${prText}
 
-Snapshot URL: ${snapshotUrl}${prText}
-
-Embed this snapshot URL in your PR description as proof of completed work.`,
+Snapshot URL generated. Access via result.snapshotUrl to embed in PR.`,
             },
           ],
+          // Structured data for programmatic access (avoids token limit issues)
+          snapshotUrl: snapshotUrl,
+          allDeliverablesComplete: true,
         };
       }
 
