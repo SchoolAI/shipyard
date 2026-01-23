@@ -64,19 +64,19 @@ describe('InputRequestSchema validation', () => {
       }
     });
 
-    it('should reject timeouts exceeding 900 seconds (15 minutes)', () => {
+    it('should reject timeouts exceeding 14400 seconds (4 hours)', () => {
       const result = InputRequestSchema.safeParse({
         id: 'test-id',
         createdAt: Date.now(),
         message: 'Test',
         type: 'text',
         status: 'pending',
-        timeout: 1000,
+        timeout: 15000,
       });
 
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect(result.error.issues[0]?.message).toBe('Timeout cannot exceed 15 minutes');
+        expect(result.error.issues[0]?.message).toBe('Timeout cannot exceed 4 hours');
       }
     });
 
@@ -97,7 +97,7 @@ describe('InputRequestSchema validation', () => {
     });
 
     it('should accept valid timeout values', () => {
-      const validTimeouts = [10, 30, 60, 300, 600];
+      const validTimeouts = [10, 30, 60, 300, 1800, 14400];
 
       for (const timeout of validTimeouts) {
         const result = InputRequestSchema.safeParse({
@@ -142,7 +142,7 @@ describe('createInputRequest', () => {
 
   it('should throw error for timeout exceeding max', () => {
     expect(() => {
-      createInputRequest({ message: 'Test', type: 'text', timeout: 1000 });
+      createInputRequest({ message: 'Test', type: 'text', timeout: 15000 });
     }).toThrow();
   });
 
