@@ -87,8 +87,16 @@ export interface PongMessage {
  */
 export interface ErrorMessage {
   type: 'error';
+  /** Error code for programmatic handling */
   error: string;
+  /** Human-readable error message */
+  message?: string;
 }
+
+/**
+ * Authentication/authorization error types for invite operations.
+ */
+export type InviteAuthError = 'unauthenticated' | 'unauthorized' | 'plan_not_found';
 
 // --- Type Unions ---
 

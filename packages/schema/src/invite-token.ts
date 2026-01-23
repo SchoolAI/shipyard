@@ -64,6 +64,8 @@ export const InviteRedemptionSchema = z.object({
 export interface CreateInviteRequest {
   type: 'create_invite';
   planId: string;
+  /** GitHub OAuth token for authentication */
+  authToken: string;
   /** TTL in minutes (default: 30) */
   ttlMinutes?: number;
   /** Max uses (null = unlimited, default: null) */
