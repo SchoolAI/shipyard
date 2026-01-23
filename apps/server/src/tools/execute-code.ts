@@ -198,16 +198,35 @@ Parameters:
 - pollIntervalSeconds (number, optional): Polling interval (default: 30)
 
 Returns:
-- script: Bash script that polls registry server and exits when status becomes 'changes_requested' or 'in_progress'
+- script: Bash script that polls registry server and exits when status becomes 'in_progress' (approved) or 'changes_requested' (needs work)
 
-Use this for agents WITHOUT hook support (Cursor, Devin, etc). The script can be run in background.
+**IMPORTANT:** This is ONLY for agents WITHOUT hook support (Cursor, Devin, Windsurf, etc).
+Claude Code users have automatic blocking via the shipyard hook - you don't need this.
 
-Example:
+**Complete workflow for non-hook agents (example user code):**
 \`\`\`typescript
+// 1. Create plan and get the monitoring script in ONE code block
+const plan = await createPlan({
+  title: "My Feature Implementation",
+  content: "- [ ] Screenshot of working feature {#deliverable}"
+});
+
+// 2. Get the polling script (returns bash script as string)
 const { script } = await setupReviewNotification(plan.planId, 15);
-// Agent runs this script in background to wait for approval
-console.log(script);
+
+// 3. Return both so the agent can run the script
+return {
+  planId: plan.planId,
+  sessionToken: plan.sessionToken,
+  monitoringScript: script,
+  instructions: "Run the monitoring script in background: bash <script> &"
+};
 \`\`\`
+
+The agent then runs the returned bash script in the background. The script will:
+- Poll the registry server every N seconds
+- Print status changes to stdout
+- Exit with code 0 when the plan is approved/rejected
 
 ---
 
