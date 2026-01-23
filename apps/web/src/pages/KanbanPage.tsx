@@ -197,6 +197,8 @@ export function KanbanPage() {
     inboxPlans,
     isLoading,
     timedOut,
+    reconnect,
+    isReconnecting,
     ydoc: indexDoc,
   } = usePlanIndexContext();
   const navigate = useNavigate();
@@ -569,7 +571,7 @@ export function KanbanPage() {
   return (
     <div className="h-full flex flex-col">
       {/* Offline banner */}
-      {timedOut && <OfflineBanner />}
+      {timedOut && <OfflineBanner onRetry={reconnect} isReconnecting={isReconnecting} />}
 
       <header className="flex items-center justify-between px-4 py-3 border-b border-separator shrink-0">
         <div>

@@ -151,6 +151,10 @@ export interface PlanIndexState {
   refreshInboxUnreadState: () => void;
   /** The plan-index Y.Doc for direct access (e.g., useInputRequests) */
   ydoc: Y.Doc;
+  /** Manually trigger reconnection after circuit breaker trips */
+  reconnect: () => void;
+  /** True while reconnection is in progress (prevents button spam) */
+  isReconnecting: boolean;
 }
 
 /**
@@ -161,7 +165,7 @@ export interface PlanIndexState {
  * @param currentUsername - GitHub username of the current user (for ownership filtering)
  */
 export function usePlanIndex(currentUsername: string | undefined): PlanIndexState {
-  const { ydoc, syncState } = useMultiProviderSync(PLAN_INDEX_DOC_NAME);
+  const { ydoc, syncState, reconnect, isReconnecting } = useMultiProviderSync(PLAN_INDEX_DOC_NAME);
 
   const [allPlansData, setAllPlansData] = useState<{
     active: PlanIndexEntry[];
@@ -543,5 +547,7 @@ export function usePlanIndex(currentUsername: string | undefined): PlanIndexStat
     markPlanAsUnread,
     refreshInboxUnreadState,
     ydoc,
+    reconnect,
+    isReconnecting,
   };
 }

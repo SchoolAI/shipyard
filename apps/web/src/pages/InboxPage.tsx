@@ -951,6 +951,8 @@ export function InboxPage() {
     markPlanAsUnread,
     isLoading,
     timedOut,
+    reconnect,
+    isReconnecting,
     ydoc: indexDoc,
   } = usePlanIndexContext();
   const [showRead, setShowRead] = useState(getInboxShowRead);
@@ -1217,7 +1219,7 @@ export function InboxPage() {
         className={`flex flex-col h-full overflow-hidden ${isMobile ? '' : 'border-r border-separator'}`}
       >
         {/* Offline banner */}
-        {timedOut && <OfflineBanner />}
+        {timedOut && <OfflineBanner onRetry={reconnect} isReconnecting={isReconnecting} />}
 
         {/* Header with show read toggle */}
         <div className="border-b border-separator shrink-0 p-4">

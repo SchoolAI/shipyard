@@ -191,7 +191,8 @@ type OwnershipFilter = 'all' | 'my-plans' | 'shared';
 
 export function SearchPage() {
   // usePlanIndexContext already syncs plan-index via useMultiProviderSync internally
-  const { myPlans, sharedPlans, inboxPlans, isLoading, timedOut } = usePlanIndexContext();
+  const { myPlans, sharedPlans, inboxPlans, isLoading, timedOut, reconnect, isReconnecting } =
+    usePlanIndexContext();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -341,7 +342,7 @@ export function SearchPage() {
         className={`flex flex-col h-full overflow-hidden ${selectedPlanId ? 'border-r border-separator' : 'max-w-3xl mx-auto w-full p-4'}`}
       >
         {/* Offline banner */}
-        {timedOut && <OfflineBanner />}
+        {timedOut && <OfflineBanner onRetry={reconnect} isReconnecting={isReconnecting} />}
 
         {/* Header with search */}
         <div className={`border-b border-separator shrink-0 ${selectedPlanId ? 'p-4' : 'mb-4'}`}>
