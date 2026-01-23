@@ -144,6 +144,41 @@ export interface PlatformAdapter {
    */
   unsubscribeFromAllTopics(ws: unknown): void;
 
+  // --- Authentication Operations ---
+  // For validating user identity and plan ownership.
+
+  /**
+   * Validate a GitHub OAuth token and return the authenticated username.
+   * Calls GitHub API /user endpoint to verify the token.
+   *
+   * @param token - GitHub OAuth token to validate
+   * @returns Object with valid flag and username if successful, error message if not
+   */
+  validateGitHubToken(
+    token: string
+  ): Promise<{ valid: boolean; username?: string; error?: string }>;
+
+  /**
+   * Get the owner ID for a plan.
+   * Returns null if plan ownership is not recorded.
+   *
+   * Plan ownership is recorded on first invite creation (trust-on-first-use).
+   * This prevents attackers from claiming ownership of existing plans.
+   *
+   * @param planId - The plan ID to look up
+   * @returns The owner's GitHub username, or null if not recorded
+   */
+  getPlanOwnerId(planId: string): Promise<string | null>;
+
+  /**
+   * Set the owner ID for a plan.
+   * Used on first invite creation to record plan ownership.
+   *
+   * @param planId - The plan ID
+   * @param ownerId - The owner's GitHub username
+   */
+  setPlanOwnerId(planId: string, ownerId: string): Promise<void>;
+
   // --- Logging ---
   // Simple logging interface. Implementations can use console, Durable Object
   // ctx.waitUntil(), or other platform-specific mechanisms.

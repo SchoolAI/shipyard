@@ -606,10 +606,34 @@ export function PlanHeader({
     }
   };
 
+  /**
+   * Handle share from mobile dropdown menu.
+   * This is a simplified version that only copies the URL (no invite creation).
+   * For invite creation on mobile, users should use the ShareButton directly.
+   */
   const handleShare = async () => {
+    // Check authentication - mobile share requires sign-in
+    if (!githubIdentity) {
+      toast.error('Sign in required', {
+        description: 'You need to sign in with GitHub to share this plan.',
+      });
+      return;
+    }
+
+    // Check if user is owner
+    const isOwnerCheck = githubIdentity && ownerId && githubIdentity.username === ownerId;
+
     try {
       await navigator.clipboard.writeText(window.location.href);
-      toast.success('Link copied to clipboard');
+
+      // Show appropriate toast based on ownership
+      if (isOwnerCheck) {
+        toast.success('Link copied to clipboard');
+      } else {
+        toast.info('Link copied (view-only access)', {
+          description: 'Sign in as the plan owner to create invite links with full access.',
+        });
+      }
 
       // Log plan shared event
       logPlanEvent(ydoc, 'plan_shared', actor);
@@ -621,7 +645,15 @@ export function PlanHeader({
       textArea.select();
       document.execCommand('copy');
       document.body.removeChild(textArea);
-      toast.success('Link copied to clipboard');
+
+      // Show appropriate toast based on ownership
+      if (isOwnerCheck) {
+        toast.success('Link copied to clipboard');
+      } else {
+        toast.info('Link copied (view-only access)', {
+          description: 'Sign in as the plan owner to create invite links with full access.',
+        });
+      }
 
       // Log plan shared event
       logPlanEvent(ydoc, 'plan_shared', actor);

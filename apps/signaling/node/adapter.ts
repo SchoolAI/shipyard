@@ -40,6 +40,13 @@ export class NodePlatformAdapter implements PlatformAdapter {
   private redemptions = new Map<string, InviteRedemption>();
 
   /**
+   * Plan ownership storage (planId -> ownerId).
+   * Records which GitHub user owns each plan.
+   * Uses trust-on-first-use pattern - first invite creator becomes owner.
+   */
+  private planOwners = new Map<string, string>();
+
+  /**
    * Map from topic-name to set of subscribed clients.
    */
   private topics = new Map<string, Set<WebSocket>>();
@@ -119,6 +126,43 @@ export class NodePlatformAdapter implements PlatformAdapter {
   ): Promise<void> {
     const key = `${planId}:${tokenId}:${userId}`;
     this.redemptions.set(key, redemption);
+  }
+
+  // --- Authentication Operations ---
+
+  async validateGitHubToken(
+    token: string
+  ): Promise<{ valid: boolean; username?: string; error?: string }> {
+    try {
+      const response = await fetch('https://api.github.com/user', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/vnd.github.v3+json',
+          'User-Agent': 'Shipyard-Signaling-Server',
+        },
+      });
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          return { valid: false, error: 'Invalid or expired GitHub token' };
+        }
+        return { valid: false, error: `GitHub API error: ${response.status}` };
+      }
+
+      const user = (await response.json()) as { login: string };
+      return { valid: true, username: user.login };
+    } catch (error) {
+      this.error('[validateGitHubToken] Failed to validate token', { error });
+      return { valid: false, error: 'Failed to validate GitHub token' };
+    }
+  }
+
+  async getPlanOwnerId(planId: string): Promise<string | null> {
+    return this.planOwners.get(planId) ?? null;
+  }
+
+  async setPlanOwnerId(planId: string, ownerId: string): Promise<void> {
+    this.planOwners.set(planId, ownerId);
   }
 
   // --- Crypto Operations ---

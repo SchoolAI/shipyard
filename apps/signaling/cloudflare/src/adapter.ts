@@ -61,6 +61,13 @@ export class CloudflarePlatformAdapter implements PlatformAdapter {
   private redemptions = new Map<string, InviteRedemption>();
 
   /**
+   * In-memory cache of plan ownership.
+   * Backed by persistent storage with 'plan_owner:' prefix.
+   * Maps planId to GitHub username of owner.
+   */
+  private planOwners = new Map<string, string>();
+
+  /**
    * Map from topic name to set of subscribed WebSockets.
    * Rebuilt on hibernation wake from WebSocket attachments.
    */
@@ -80,6 +87,7 @@ export class CloudflarePlatformAdapter implements PlatformAdapter {
     await Promise.all([
       this.restoreInviteTokensFromStorage(),
       this.restoreRedemptionsFromStorage(),
+      this.restorePlanOwnersFromStorage(),
     ]);
     this.restoreTopicsFromHibernation();
   }
@@ -140,6 +148,27 @@ export class CloudflarePlatformAdapter implements PlatformAdapter {
       logger.info({ count: this.redemptions.size }, 'Restored redemptions from storage');
     } catch (error) {
       logger.error({ error }, 'Failed to restore redemptions');
+    }
+  }
+
+  /**
+   * Restore plan ownership from Durable Object storage into in-memory cache.
+   */
+  private async restorePlanOwnersFromStorage(): Promise<void> {
+    try {
+      const stored = await this.ctx.storage.list<string>({
+        prefix: 'plan_owner:',
+      });
+
+      for (const [key, ownerId] of stored) {
+        // Store by planId (strip 'plan_owner:' prefix)
+        const planId = key.replace('plan_owner:', '');
+        this.planOwners.set(planId, ownerId);
+      }
+
+      logger.info({ count: this.planOwners.size }, 'Restored plan owners from storage');
+    } catch (error) {
+      logger.error({ error }, 'Failed to restore plan owners');
     }
   }
 
@@ -311,6 +340,58 @@ export class CloudflarePlatformAdapter implements PlatformAdapter {
     // Persist to Durable Object storage
     const storageKey = `redemption:${cacheKey}`;
     await this.ctx.storage.put(storageKey, redemption);
+  }
+
+  // --- Authentication Operations ---
+
+  async validateGitHubToken(
+    token: string
+  ): Promise<{ valid: boolean; username?: string; error?: string }> {
+    try {
+      const response = await fetch('https://api.github.com/user', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/vnd.github.v3+json',
+          'User-Agent': 'Shipyard-Signaling-Server',
+        },
+      });
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          return { valid: false, error: 'Invalid or expired GitHub token' };
+        }
+        return { valid: false, error: `GitHub API error: ${response.status}` };
+      }
+
+      const user = (await response.json()) as { login: string };
+      return { valid: true, username: user.login };
+    } catch (error) {
+      logger.error({ error }, '[validateGitHubToken] Failed to validate token');
+      return { valid: false, error: 'Failed to validate GitHub token' };
+    }
+  }
+
+  async getPlanOwnerId(planId: string): Promise<string | null> {
+    // Check in-memory cache first
+    const cached = this.planOwners.get(planId);
+    if (cached) return cached;
+
+    // Fall back to storage
+    const storageKey = `plan_owner:${planId}`;
+    const stored = await this.ctx.storage.get<string>(storageKey);
+    if (stored) {
+      this.planOwners.set(planId, stored);
+    }
+    return stored ?? null;
+  }
+
+  async setPlanOwnerId(planId: string, ownerId: string): Promise<void> {
+    // Update in-memory cache
+    this.planOwners.set(planId, ownerId);
+
+    // Persist to Durable Object storage
+    const storageKey = `plan_owner:${planId}`;
+    await this.ctx.storage.put(storageKey, ownerId);
   }
 
   // --- Crypto Operations (Web Crypto API - all async) ---
