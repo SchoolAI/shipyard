@@ -5,15 +5,62 @@ import {
   getPlanMetadata,
   PLAN_INDEX_DOC_NAME,
   type PlanStatusType,
+  resetPlanToDraft,
+  type StatusTransition,
   setPlanIndexEntry,
   setPlanMetadata,
+  transitionPlanStatus,
 } from '@shipyard/schema';
+import { nanoid } from 'nanoid';
 import { z } from 'zod';
 import { getOrCreateDoc } from '../doc-store.js';
 import { logger } from '../logger.js';
 import { getGitHubUsername } from '../server-identity.js';
 import { verifySessionToken } from '../session-token.js';
 import { TOOL_NAMES } from './tool-names.js';
+
+/**
+ * Build a proper StatusTransition object with all required fields.
+ * This ensures the discriminated union is always valid.
+ */
+function buildStatusTransition(
+  targetStatus: PlanStatusType,
+  actorName: string
+): StatusTransition | null {
+  const now = Date.now();
+
+  switch (targetStatus) {
+    case 'pending_review':
+      return {
+        status: 'pending_review',
+        reviewRequestId: nanoid(),
+      };
+    case 'changes_requested':
+      return {
+        status: 'changes_requested',
+        reviewedAt: now,
+        reviewedBy: actorName,
+      };
+    case 'in_progress':
+      // in_progress requires reviewedAt/reviewedBy per the PlanMetadata schema
+      return {
+        status: 'in_progress',
+        reviewedAt: now,
+        reviewedBy: actorName,
+      };
+    case 'completed':
+      return {
+        status: 'completed',
+        completedAt: now,
+        completedBy: actorName,
+      };
+    case 'draft':
+      // Draft is handled separately via resetPlanToDraft()
+      return null;
+    default:
+      return null;
+  }
+}
 
 const UpdatePlanInput = z.object({
   planId: z.string().describe('The plan ID to update'),
@@ -70,6 +117,7 @@ STATUSES:
     },
   },
 
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: tool handler orchestrates validation, snapshots, and state transitions
   handler: async (args: unknown) => {
     const input = UpdatePlanInput.parse(args);
     const doc = await getOrCreateDoc(input.planId);
@@ -106,14 +154,9 @@ STATUSES:
       };
     }
 
-    const updates: { title?: string; status?: PlanStatusType; tags?: string[]; updatedAt: number } =
-      {
-        updatedAt: Date.now(),
-      };
-    if (input.title) updates.title = input.title;
-    if (input.status) updates.status = input.status;
-    if (input.tags !== undefined) updates.tags = input.tags;
-
+    // Handle status change separately from other metadata updates
+    // Status changes MUST go through transitionPlanStatus() or resetPlanToDraft()
+    // to ensure required fields are set and state machine is validated
     const statusChanged = input.status && input.status !== existingMetadata.status;
 
     if (statusChanged && input.status) {
@@ -125,9 +168,62 @@ STATUSES:
       const reason = `Status changed to ${input.status}`;
       const snapshot = createPlanSnapshot(doc, reason, actorName, input.status, blocks);
       addSnapshot(doc, snapshot);
+
+      // Handle status transition with proper validation
+      if (input.status === 'draft') {
+        // Reset to draft is a special operation (not a forward transition)
+        const resetResult = resetPlanToDraft(doc, actorName);
+        if (!resetResult.success) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `Failed to reset plan to draft: ${resetResult.error}`,
+              },
+            ],
+            isError: true,
+          };
+        }
+      } else {
+        // Forward transition - build proper transition object with required fields
+        const transition = buildStatusTransition(input.status, actorName);
+        if (!transition) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `Invalid status: ${input.status}`,
+              },
+            ],
+            isError: true,
+          };
+        }
+
+        const transitionResult = transitionPlanStatus(doc, transition, actorName);
+        if (!transitionResult.success) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `Failed to transition status: ${transitionResult.error}`,
+              },
+            ],
+            isError: true,
+          };
+        }
+      }
     }
 
-    setPlanMetadata(doc, updates, actorName);
+    // Update non-status fields (title, tags) via setPlanMetadata
+    // Note: setPlanMetadata should NOT be used for status changes
+    const updates: { title?: string; tags?: string[] } = {};
+    if (input.title) updates.title = input.title;
+    if (input.tags !== undefined) updates.tags = input.tags;
+
+    // Only call setPlanMetadata if there are non-status updates
+    if (Object.keys(updates).length > 0) {
+      setPlanMetadata(doc, updates, actorName);
+    }
 
     const indexDoc = await getOrCreateDoc(PLAN_INDEX_DOC_NAME);
     if (existingMetadata.ownerId) {
