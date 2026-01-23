@@ -11,7 +11,7 @@ import { z } from 'zod';
  * Server-side timeout in input-request-manager.ts uses the request's timeout
  * or 0 (no timeout) if not specified, but clients use this default for UI display.
  */
-export const DEFAULT_INPUT_REQUEST_TIMEOUT_SECONDS = 300;
+export const DEFAULT_INPUT_REQUEST_TIMEOUT_SECONDS = 1800;
 
 /**
  * Valid input request types.
@@ -49,7 +49,7 @@ const InputRequestBaseSchema = z.object({
     .number()
     .int()
     .min(10, 'Timeout must be at least 10 seconds')
-    .max(900, 'Timeout cannot exceed 15 minutes')
+    .max(14400, 'Timeout cannot exceed 4 hours')
     .optional(),
   /** Optional plan ID to associate request with a specific plan (null/undefined = global) */
   planId: z.string().optional(),
