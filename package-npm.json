@@ -49,26 +49,27 @@
     "prepublishOnly": "echo 'Packages already built in CI workflow'"
   },
   "dependencies": {
-    "@blocknote/core": "^0.45.0",
-    "@blocknote/server-util": "^0.45.0",
-    "@modelcontextprotocol/sdk": "^1.22.0",
-    "@octokit/rest": "^21.0.0",
+    "@blocknote/core": "^0.46.1",
+    "@blocknote/server-util": "^0.46.1",
+    "@ffmpeg-installer/ffmpeg": "^1.1.0",
+    "@modelcontextprotocol/sdk": "^1.25.3",
+    "@octokit/rest": "^22.0.1",
     "@roamhq/wrtc": "^0.9.1",
     "@trpc/client": "^11.8.1",
     "@trpc/server": "^11.8.1",
     "express": "^5.2.1",
     "lib0": "^0.2.117",
-    "nanoid": "^5.0.9",
+    "nanoid": "^5.1.6",
     "open": "^11.0.0",
-    "pino": "^10.1.0",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "ws": "^8.18.3",
+    "pino": "^10.2.1",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3",
+    "ws": "^8.19.0",
     "y-leveldb": "^0.2.0",
     "y-protocols": "^1.0.7",
     "y-webrtc": "^10.3.0",
     "y-websocket": "^3.0.0",
-    "yjs": "^13.6.28",
-    "zod": "^4.3.4"
+    "yjs": "^13.6.29",
+    "zod": "^4.3.5"
   }
 }
