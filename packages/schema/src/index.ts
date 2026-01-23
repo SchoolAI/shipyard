@@ -370,6 +370,7 @@ export {
   removeArtifact,
   removePlanTag,
   removePRReviewComment,
+  resetPlanToDraft,
   resolvePRReviewComment,
   revokeUser,
   setAgentPresence,

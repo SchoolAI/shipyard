@@ -259,15 +259,64 @@ function applyStatusTransitionFields(map: Y.Map<unknown>, transition: StatusTran
 }
 
 /**
+ * Reset a plan back to draft status.
+ * This is a special operation that bypasses the normal state machine because
+ * there's no forward transition TO draft - it's only reachable via reset.
+ *
+ * Clears status-specific fields to ensure valid discriminated union state:
+ * - reviewRequestId (from pending_review)
+ * - reviewedAt, reviewedBy, reviewComment (from changes_requested/in_progress)
+ * - completedAt, completedBy, snapshotUrl (from completed)
+ *
+ * @param ydoc - The Y.Doc containing the plan
+ * @param actor - Optional actor name for transaction metadata
+ * @returns TransitionResult indicating success or failure
+ */
+export function resetPlanToDraft(ydoc: Y.Doc, actor?: string): TransitionResult {
+  const metadataResult = getPlanMetadataWithValidation(ydoc);
+  if (!metadataResult.success) {
+    return { success: false, error: metadataResult.error };
+  }
+
+  const currentStatus = metadataResult.data.status;
+  if (currentStatus === 'draft') {
+    return { success: false, error: 'Plan is already in draft status' };
+  }
+
+  ydoc.transact(
+    () => {
+      const map = ydoc.getMap(YDOC_KEYS.METADATA);
+
+      map.set('status', 'draft');
+      map.delete('reviewRequestId');
+      map.delete('reviewedAt');
+      map.delete('reviewedBy');
+      map.delete('reviewComment');
+      map.delete('completedAt');
+      map.delete('completedBy');
+      map.delete('snapshotUrl');
+      map.set('updatedAt', Date.now());
+    },
+    actor ? { actor } : undefined
+  );
+
+  return { success: true };
+}
+
+/**
  * Transition plan status with state machine validation.
  * Enforces valid status transitions and ensures required fields are provided.
  *
  * Valid transitions:
  * - draft -> pending_review (requires reviewRequestId)
+ * - draft -> in_progress (requires reviewedAt, reviewedBy for schema validity)
  * - pending_review -> in_progress (requires reviewedAt, reviewedBy)
  * - pending_review -> changes_requested (requires reviewedAt, reviewedBy, optional reviewComment)
  * - changes_requested -> pending_review (requires reviewRequestId)
+ * - changes_requested -> in_progress (requires reviewedAt, reviewedBy)
  * - in_progress -> completed (requires completedAt, completedBy, optional snapshotUrl)
+ *
+ * Note: To reset to draft, use resetPlanToDraft() instead.
  */
 export function transitionPlanStatus(
   ydoc: Y.Doc,
