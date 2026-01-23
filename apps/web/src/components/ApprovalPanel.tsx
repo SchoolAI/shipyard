@@ -8,6 +8,9 @@ import type * as Y from 'yjs';
 import type { PendingUser } from '@/hooks/usePendingUsers';
 import { usePendingUsers } from '@/hooks/usePendingUsers';
 
+// Maximum number of pending users to display in the popover
+const MAX_DISPLAYED_PENDING_USERS = 20;
+
 // Note: Avatar compound components have type issues in HeroUI v3 beta
 // Using type assertions until types are fixed in stable release
 const AvatarRoot = Avatar as unknown as React.FC<{
@@ -28,6 +31,8 @@ interface ApprovalPanelProps {
   currentUsername: string | null;
   /** Plan owner's username */
   ownerId: string | null;
+  /** Current plan ID for filtering pending users */
+  planId: string;
 }
 
 /**
@@ -118,11 +123,22 @@ function PendingUserRow({ user, onApprove, onDeny }: PendingUserRowProps) {
  * Panel showing pending access requests for plan owners.
  * Displays as a popover triggered by a badge in the header.
  */
-export function ApprovalPanel({ ydoc, rtcProvider, currentUsername, ownerId }: ApprovalPanelProps) {
-  const pendingUsers = usePendingUsers(rtcProvider);
+export function ApprovalPanel({
+  ydoc,
+  rtcProvider,
+  currentUsername,
+  ownerId,
+  planId,
+}: ApprovalPanelProps) {
+  const pendingUsers = usePendingUsers(rtcProvider, planId);
 
   // Only show to plan owner
   const isOwner = currentUsername && ownerId && currentUsername === ownerId;
+
+  // Limit displayed users for performance with large lists
+  const displayedUsers = pendingUsers.slice(0, MAX_DISPLAYED_PENDING_USERS);
+  const hasMoreUsers = pendingUsers.length > MAX_DISPLAYED_PENDING_USERS;
+  const hiddenCount = pendingUsers.length - MAX_DISPLAYED_PENDING_USERS;
 
   const handleApprove = useCallback(
     (userId: string) => {
@@ -177,7 +193,7 @@ export function ApprovalPanel({ ydoc, rtcProvider, currentUsername, ownerId }: A
           </Popover.Heading>
 
           <div className="mt-3 divide-y divide-separator">
-            {pendingUsers.map((user) => (
+            {displayedUsers.map((user) => (
               <PendingUserRow
                 key={user.id}
                 user={user}
@@ -186,6 +202,12 @@ export function ApprovalPanel({ ydoc, rtcProvider, currentUsername, ownerId }: A
               />
             ))}
           </div>
+
+          {hasMoreUsers && (
+            <p className="mt-2 text-xs text-muted-foreground text-center">
+              and {hiddenCount} more user{hiddenCount > 1 ? 's' : ''} waiting...
+            </p>
+          )}
 
           <p className="mt-3 text-xs text-muted-foreground">
             Approved users will immediately gain access to this task.

@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import type { WebrtcProvider } from 'y-webrtc';
 import type { GitHubIdentity } from '@/hooks/useGitHubAuth';
 import type { ApprovalStatus } from '@/hooks/useYDocApprovalStatus';
@@ -22,6 +22,7 @@ interface UseBroadcastApprovalStatusOptions {
   githubIdentity: GitHubIdentity | null;
   approvalStatus: ApprovalStatus | undefined;
   isOwner: boolean;
+  planId: string;
 }
 
 /**
@@ -40,9 +41,18 @@ export function useBroadcastApprovalStatus({
   githubIdentity,
   approvalStatus,
   isOwner,
+  planId,
 }: UseBroadcastApprovalStatusOptions): void {
+  // Store requestedAt timestamp to prevent it from refreshing on re-render
+  const requestedAtRef = useRef<number | null>(null);
+
   useEffect(() => {
     if (!rtcProvider || !githubIdentity) {
+      return;
+    }
+
+    // Validate planId is non-empty
+    if (!planId || planId.trim() === '') {
       return;
     }
 
@@ -66,17 +76,30 @@ export function useBroadcastApprovalStatus({
     let planStatus: PlanAwarenessState;
 
     if (approvalStatus === 'pending') {
+      // Set requestedAt only once when entering pending state
+      if (requestedAtRef.current === null) {
+        requestedAtRef.current = Date.now();
+      }
+
       planStatus = {
         ...baseState,
         status: 'pending',
-        requestedAt: Date.now(),
+        requestedAt: requestedAtRef.current, // Use stored value
+        planId,
+        expiresAt: requestedAtRef.current + 24 * 60 * 60 * 1000, // Use stored value
       };
     } else if (approvalStatus === 'approved' || approvalStatus === 'rejected') {
+      // Clear requestedAt when leaving pending state
+      requestedAtRef.current = null;
+
       planStatus = {
         ...baseState,
         status: approvalStatus,
+        planId,
       };
     } else {
+      // Clear requestedAt for other states
+      requestedAtRef.current = null;
       // No approval required - don't broadcast planStatus
       return;
     }
@@ -86,10 +109,13 @@ export function useBroadcastApprovalStatus({
 
     // Cleanup: Clear planStatus when component unmounts
     return () => {
-      // Only clear if we actually set it
+      // Note: If browser closes ungracefully (force quit), awareness state
+      // persists until WebRTC timeout (~30 seconds). This is expected behavior.
+      // The beforeunload handler in useMultiProviderSync sets localState to null,
+      // which also clears planStatus. The 24-hour expiration provides secondary cleanup.
       if (awareness.getLocalState()?.planStatus) {
         awareness.setLocalStateField('planStatus', null);
       }
     };
-  }, [rtcProvider, githubIdentity, approvalStatus, isOwner]);
+  }, [rtcProvider, githubIdentity, approvalStatus, isOwner, planId]);
 }

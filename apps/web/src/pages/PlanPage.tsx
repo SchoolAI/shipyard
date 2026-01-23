@@ -454,6 +454,8 @@ export function PlanPage() {
       githubIdentity={githubIdentity}
       rtcProvider={rtcProvider}
       onStartAuth={startAuth}
+      planId={planId}
+      isSnapshot={isSnapshot}
     >
       {!isSnapshot && (
         <ImportConversationHandler planId={planId} ydoc={ydoc} rtcProvider={rtcProvider} />

@@ -18,9 +18,13 @@ export interface PendingUser {
  * Only returns users who are in 'pending' status and not the owner.
  *
  * @param rtcProvider - WebRTC provider with awareness state
+ * @param currentPlanId - Current plan ID to filter pending users
  * @returns Array of pending users
  */
-export function usePendingUsers(rtcProvider: WebrtcProvider | null): PendingUser[] {
+export function usePendingUsers(
+  rtcProvider: WebrtcProvider | null,
+  currentPlanId: string
+): PendingUser[] {
   const [pendingUsers, setPendingUsers] = useState<PendingUser[]>([]);
 
   useEffect(() => {
@@ -31,9 +35,11 @@ export function usePendingUsers(rtcProvider: WebrtcProvider | null): PendingUser
 
     const awareness = rtcProvider.awareness;
 
+    // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: filtering logic requires multiple conditions
     const updatePendingUsers = () => {
       const states = awareness.getStates();
       const pending: PendingUser[] = [];
+      const now = Date.now();
 
       for (const [, state] of states) {
         const planStatus = state.planStatus as PlanAwarenessState | undefined;
@@ -43,8 +49,42 @@ export function usePendingUsers(rtcProvider: WebrtcProvider | null): PendingUser
           continue;
         }
 
+        // Runtime validation for malicious/malformed data
+        // Check that user object and required fields exist
+        if (!planStatus.user || typeof planStatus.user !== 'object') {
+          continue;
+        }
+
+        if (!planStatus.user.id || typeof planStatus.user.id !== 'string') {
+          continue;
+        }
+
+        if (!planStatus.user.name || typeof planStatus.user.name !== 'string') {
+          continue;
+        }
+
+        // Validate requestedAt is a valid timestamp
+        if (typeof planStatus.requestedAt !== 'number' || Number.isNaN(planStatus.requestedAt)) {
+          continue;
+        }
+
         // Skip owners (they're always approved)
         if (planStatus.isOwner) {
+          continue;
+        }
+
+        // Filter by planId (reject empty planIds)
+        if (!planStatus.planId || planStatus.planId !== currentPlanId) {
+          continue;
+        }
+
+        // Filter expired requests
+        // Note: This check uses Date.now() which can be manipulated by changing
+        // system clock. However, this is acceptable because:
+        // 1. Awareness expiration is advisory only (cosmetic)
+        // 2. Actual approval is enforced by Y.Doc CRDT (immutable source of truth)
+        // 3. Malicious users can only affect their own visibility, not access
+        if (planStatus.expiresAt && planStatus.expiresAt < now) {
           continue;
         }
 
@@ -81,7 +121,7 @@ export function usePendingUsers(rtcProvider: WebrtcProvider | null): PendingUser
     return () => {
       awareness.off('change', updatePendingUsers);
     };
-  }, [rtcProvider]);
+  }, [rtcProvider, currentPlanId]);
 
   return pendingUsers;
 }
