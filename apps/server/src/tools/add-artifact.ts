@@ -1,5 +1,5 @@
 import { execSync } from 'node:child_process';
-import { readFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { ServerBlockNoteEditor } from '@blocknote/server-util';
 import {
   type Artifact,
@@ -492,6 +492,19 @@ ARTIFACT TYPES:
 
         logger.info({ planId, snapshotUrl }, 'Task auto-completed');
 
+        // Write snapshot URL to file (avoids token limit in response)
+        const { homedir } = await import('node:os');
+        const { join } = await import('node:path');
+        const { mkdir } = await import('node:fs/promises');
+
+        const snapshotsDir = join(homedir(), '.shipyard', 'snapshots');
+        await mkdir(snapshotsDir, { recursive: true });
+
+        const snapshotFile = join(snapshotsDir, `${planId}.txt`);
+        await writeFile(snapshotFile, snapshotUrl, 'utf-8');
+
+        logger.info({ planId, snapshotFile }, 'Snapshot URL written to file');
+
         // Build completion response
         let prText = '';
         if (linkedPR) {
@@ -511,10 +524,11 @@ ARTIFACT TYPES:
 
 🎉 ALL DELIVERABLES COMPLETE! Task auto-completed.${prText}
 
-Snapshot URL generated. Access via result.snapshotUrl to embed in PR.`,
+Snapshot URL saved to: ${snapshotFile}
+(Note: Very long URL - recommend not reading directly. Use file path to attach to PR or access later.)`,
             },
           ],
-          // Structured data for programmatic access (avoids token limit issues)
+          // Keep structured data for execute_code wrapper
           snapshotUrl: snapshotUrl,
           allDeliverablesComplete: true,
         };
