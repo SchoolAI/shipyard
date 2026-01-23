@@ -9,7 +9,10 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "lint": "biome check src",
-    "lint:fix": "biome check src --write"
+    "lint:fix": "biome check src --write",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@blocknote/core": "^0.46.1",
@@ -56,11 +59,15 @@
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.1.18",
+    "@testing-library/react": "^16.3.0",
     "@types/react": "^19.2.9",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.2",
+    "@vitest/coverage-v8": "^4.0.17",
+    "happy-dom": "^20.3.7",
     "tailwindcss": "^4.1.18",
     "typescript": "^5.9.3",
-    "vite": "^7.3.1"
+    "vite": "^7.3.1",
+    "vitest": "^4.0.18"
   }
 }

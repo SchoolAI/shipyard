@@ -71,7 +71,14 @@ export function ArchivePage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { identity: githubIdentity } = useGitHubAuth();
-  const { archivedPlans, isLoading, timedOut, ydoc: indexDoc } = usePlanIndexContext();
+  const {
+    archivedPlans,
+    isLoading,
+    timedOut,
+    reconnect,
+    isReconnecting,
+    ydoc: indexDoc,
+  } = usePlanIndexContext();
 
   // Selected plan state - read from URL on mount
   const searchParams = new URLSearchParams(location.search);
@@ -201,7 +208,7 @@ export function ArchivePage() {
       {/* Archive list */}
       <div className="flex flex-col h-full overflow-hidden border-r border-separator">
         {/* Offline banner */}
-        {timedOut && <OfflineBanner />}
+        {timedOut && <OfflineBanner onRetry={reconnect} isReconnecting={isReconnecting} />}
 
         {/* Header */}
         <div className="border-b border-separator shrink-0 p-4">
