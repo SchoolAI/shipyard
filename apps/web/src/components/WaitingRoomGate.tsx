@@ -1,7 +1,7 @@
 import { Button } from '@heroui/react';
 import type { PlanMetadata } from '@shipyard/schema';
 import { Clock, Loader2, LogIn, ShieldX, TicketX, User } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { type ReactNode, useMemo } from 'react';
 import type { WebrtcProvider } from 'y-webrtc';
 import type * as Y from 'yjs';
 import { useBroadcastApprovalStatus } from '@/hooks/useBroadcastApprovalStatus';
@@ -9,6 +9,7 @@ import type { GitHubIdentity } from '@/hooks/useGitHubAuth';
 import { useInviteToken } from '@/hooks/useInviteToken';
 import type { SyncState } from '@/hooks/useMultiProviderSync';
 import { useYDocApprovalStatus } from '@/hooks/useYDocApprovalStatus';
+import type { PlanAwarenessState } from '@/types/awareness';
 
 interface WaitingRoomGateProps {
   ydoc: Y.Doc;
@@ -18,6 +19,8 @@ interface WaitingRoomGateProps {
   rtcProvider: WebrtcProvider | null;
   onStartAuth: () => void;
   children: ReactNode;
+  planId: string;
+  isSnapshot: boolean;
 }
 
 /**
@@ -47,8 +50,11 @@ export function WaitingRoomGate({
   rtcProvider,
   onStartAuth,
   children,
+  planId,
+  isSnapshot,
 }: WaitingRoomGateProps) {
   // Read approval status directly from Y.Doc CRDT
+  // IMPORTANT: All hooks must be called before any early returns
   const {
     status: approvalStatus,
     isPending,
@@ -65,6 +71,7 @@ export function WaitingRoomGate({
     githubIdentity,
     approvalStatus,
     isOwner,
+    planId,
   });
 
   const { redemptionState, hasInviteToken, clearInviteToken } = useInviteToken(
@@ -72,6 +79,25 @@ export function WaitingRoomGate({
     rtcProvider,
     githubIdentity
   );
+
+  // Check if request has expired (only for pending users)
+  const isRequestExpired = useMemo(() => {
+    if (!isPending || !rtcProvider) return false;
+
+    const awareness = rtcProvider.awareness;
+    const localState = awareness.getLocalState();
+    const planStatus = localState?.planStatus as PlanAwarenessState | undefined;
+
+    if (!planStatus || planStatus.status !== 'pending') return false;
+
+    const requestAge = Date.now() - planStatus.requestedAt;
+    return requestAge > 24 * 60 * 60 * 1000; // 24 hours
+  }, [isPending, rtcProvider]);
+
+  // Snapshots are always viewable (self-contained, no approval needed)
+  if (isSnapshot) {
+    return <>{children}</>;
+  }
 
   // If connected to the hub WebSocket, skip auth entirely
   // This allows local development without authentication
@@ -128,6 +154,11 @@ export function WaitingRoomGate({
     return <AuthRequired title={metadata.title} onStartAuth={onStartAuth} />;
   }
 
+  // Check for expired request AFTER isPending check
+  if (isRequestExpired) {
+    return <RequestExpired title={metadata.title} onRetry={() => window.location.reload()} />;
+  }
+
   if (isPending) {
     return <WaitingRoom title={metadata.title} ownerId={ownerId} />;
   }
@@ -137,6 +168,37 @@ export function WaitingRoomGate({
   }
 
   return <>{children}</>;
+}
+
+interface RequestExpiredProps {
+  title: string;
+  onRetry: () => void;
+}
+
+function RequestExpired({ title, onRetry }: RequestExpiredProps) {
+  return (
+    <div className="flex items-center justify-center min-h-[60vh] p-4">
+      <div className="bg-surface border border-separator rounded-lg p-8 max-w-md w-full text-center">
+        <div className="flex justify-center mb-6">
+          <Clock className="w-12 h-12 text-warning" />
+        </div>
+
+        <h1 className="text-xl font-semibold text-foreground mb-2">Request Expired</h1>
+
+        <p className="text-muted-foreground mb-4">
+          Your access request for <span className="font-medium">{title}</span> has expired.
+        </p>
+
+        <p className="text-sm text-muted-foreground mb-6">
+          Access requests expire after 24 hours. Click below to request access again.
+        </p>
+
+        <Button onPress={onRetry} variant="primary" className="w-full">
+          Request Access Again
+        </Button>
+      </div>
+    </div>
+  );
 }
 
 interface WaitingRoomProps {

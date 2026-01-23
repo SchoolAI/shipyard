@@ -139,19 +139,6 @@ async function discoverHubUrl(): Promise<string> {
 }
 
 /**
- * Generate a deterministic color from a string (e.g., username).
- * Uses a simple hash to pick a hue for consistent colors per user.
- */
-function colorFromString(str: string): string {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    hash = str.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  const hue = Math.abs(hash) % 360;
-  return `hsl(${hue}, 70%, 50%)`;
-}
-
-/**
  * Basic awareness state for user presence.
  * Simplified from Milestone 8 - just presence info, no approval status.
  */
@@ -207,7 +194,6 @@ export function useMultiProviderSync(
 } {
   // Enable WebRTC for all documents including plan-index (needed for remote sync)
   const enableWebRTC = options.enableWebRTC ?? true;
-  const userName = options.userName ?? 'Anonymous';
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: docName triggers Y.Doc recreation intentionally
   const ydoc = useMemo(() => new Y.Doc(), [docName]);
@@ -324,6 +310,10 @@ export function useMultiProviderSync(
       const signalingServer =
         (import.meta.env.VITE_WEBRTC_SIGNALING as string) || DEFAULT_SIGNALING_SERVER;
 
+      // WebRTC room name is derived from docName (which is planId for plans),
+      // ensuring each plan has a unique signaling room. This prevents awareness
+      // state collisions between different plans, even when the same user has
+      // multiple tabs open.
       const roomName = `shipyard-${docName}`;
 
       // Use cached provider to avoid duplicate room errors in StrictMode
@@ -338,19 +328,10 @@ export function useMultiProviderSync(
         (window as unknown as { planRtcProvider: WebrtcProvider }).planRtcProvider = rtc;
       }
 
-      // Set awareness for user presence with planStatus field
-      // This matches what useP2PPeers expects and what MCP servers broadcast
+      // planStatus is managed by useBroadcastApprovalStatus hook to ensure
+      // planId and expiresAt are always included. Setting it here would create
+      // a race condition with incomplete state.
       const awareness = rtc.awareness;
-      awareness.setLocalStateField('planStatus', {
-        user: {
-          id: userName,
-          name: userName,
-          color: colorFromString(userName),
-        },
-        platform: 'browser',
-        isOwner: false, // Updated by useBroadcastApprovalStatus if user is owner
-        status: 'approved' as const, // Browsers are auto-approved
-      });
 
       // Count peers from awareness states (excluding self)
       const updatePeerCountFromAwareness = () => {
@@ -432,7 +413,7 @@ export function useMultiProviderSync(
         window.removeEventListener('beforeunload', handleBeforeUnload);
       }
     };
-  }, [docName, ydoc, enableWebRTC, userName]);
+  }, [docName, ydoc, enableWebRTC]);
 
   return { ydoc, syncState, wsProvider, rtcProvider };
 }

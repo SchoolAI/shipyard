@@ -775,6 +775,7 @@ export function PlanHeader({
             rtcProvider={rtcProvider}
             currentUsername={githubIdentity?.username ?? null}
             ownerId={ownerId}
+            planId={planId}
           />
 
           {/* Review actions - inline on desktop, floating on mobile */}

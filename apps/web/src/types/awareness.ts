@@ -23,6 +23,16 @@ export type PlanAwarenessState =
       isOwner: boolean;
       requestedAt: number;
       /**
+       * Which plan is being requested.
+       * Used to scope approval requests to specific plans.
+       */
+      planId: string;
+      /**
+       * When the request expires (Unix timestamp in milliseconds).
+       * Default: 24 hours from requestedAt.
+       */
+      expiresAt: number;
+      /**
        * Platform type for this peer (browser, MCP server, etc.)
        * Used to distinguish between different types of participants.
        */
@@ -47,6 +57,11 @@ export type PlanAwarenessState =
         color: string;
       };
       isOwner: boolean;
+      /**
+       * Which plan this approval/rejection applies to.
+       * Used to scope approval status to specific plans.
+       */
+      planId: string;
       /**
        * Platform type for this peer (browser, MCP server, etc.)
        * Used to distinguish between different types of participants.
