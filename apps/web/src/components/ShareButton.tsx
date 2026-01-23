@@ -1,4 +1,4 @@
-import { Button } from '@heroui/react';
+import { Button, Tooltip } from '@heroui/react';
 import { buildInviteUrl, logPlanEvent } from '@shipyard/schema';
 import { Check, Loader2, Share2 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
@@ -55,44 +55,60 @@ export function ShareButton({
     }
   }, []);
 
+  /**
+   * Simple share: copy the current URL (view-only access).
+   * Used when the user is not the owner or cannot create invite links.
+   */
   const handleSimpleShare = useCallback(async () => {
     await copyToClipboard(window.location.href);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+
+    // Show informative toast about view-only access
+    toast.info('Link copied (view-only access)', {
+      description: 'Sign in as the plan owner to create invite links with full access.',
+    });
   }, [copyToClipboard]);
 
   // Send invite creation message via WebSocket
-  const sendInviteMessage = useCallback((rtcProvider: WebrtcProvider, planId: string): boolean => {
-    const message = JSON.stringify({
-      type: 'create_invite',
-      planId,
-      ttlMinutes: 30, // Default: 30 minutes
-      maxUses: null, // Default: unlimited
-    });
+  const sendInviteMessage = useCallback(
+    (rtcProvider: WebrtcProvider, planId: string, authToken: string): boolean => {
+      const message = JSON.stringify({
+        type: 'create_invite',
+        planId,
+        authToken, // Include auth token for server-side validation
+        ttlMinutes: 30, // Default: 30 minutes
+        maxUses: null, // Default: unlimited
+      });
 
-    const signalingConns = (rtcProvider as unknown as { signalingConns: Array<{ ws: WebSocket }> })
-      .signalingConns;
+      const signalingConns = (
+        rtcProvider as unknown as { signalingConns: Array<{ ws: WebSocket }> }
+      ).signalingConns;
 
-    if (signalingConns) {
-      for (const conn of signalingConns) {
-        if (conn.ws && conn.ws.readyState === WebSocket.OPEN) {
-          conn.ws.send(message);
-          return true;
+      if (signalingConns) {
+        for (const conn of signalingConns) {
+          if (conn.ws && conn.ws.readyState === WebSocket.OPEN) {
+            conn.ws.send(message);
+            return true;
+          }
         }
       }
-    }
-    return false;
-  }, []);
+      return false;
+    },
+    []
+  );
 
   // Create invite via signaling server (defaults: 30min TTL, unlimited uses)
   const createInvite = useCallback(() => {
     if (!rtcProvider || !planId) {
+      // Fallback to simple share if WebRTC isn't available
       handleSimpleShare();
       return;
     }
 
-    // Check authentication before creating invite
-    if (!identity) {
+    // This check shouldn't be needed since we disable the button when not signed in,
+    // but keep it as a safety net
+    if (!identity || !identity.token) {
       toast.error('Sign in required', {
         description: 'You need to sign in with GitHub to create invite links.',
       });
@@ -113,7 +129,7 @@ export function ShareButton({
     // Store timeout ID to clear it if we get a response
     window.__shareButtonTimeout = timeout;
 
-    const sent = sendInviteMessage(rtcProvider, planId);
+    const sent = sendInviteMessage(rtcProvider, planId, identity.token);
 
     if (!sent) {
       clearTimeout(timeout);
@@ -167,6 +183,11 @@ export function ShareButton({
       setIsCreating(false);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+
+      // Show success toast for invite link creation
+      toast.success('Invite link copied!', {
+        description: 'Link expires in 30 minutes. Recipients can view and collaborate.',
+      });
     },
     [planId, copyToClipboard, ydoc, actor]
   );
@@ -216,17 +237,53 @@ export function ShareButton({
     };
   }, [rtcProvider, isOwner, planId, handleErrorResponse, handleInviteCreated]);
 
-  // Owner creates invite link, non-owner copies plain URL
-  const handleShare = isOwner && rtcProvider && planId ? createInvite : handleSimpleShare;
+  /**
+   * Handle share button press with explicit logic for different scenarios:
+   * - Not signed in: Button is disabled (handled by isDisabled prop)
+   * - Signed in but NOT owner: Copy plain URL with view-only toast
+   * - Signed in AND owner: Create invite token with success toast
+   */
+  const handleShare = useCallback(() => {
+    // Safety check - button should be disabled when not signed in
+    if (!identity) {
+      toast.error('Sign in required', {
+        description: 'You need to sign in with GitHub to share this plan.',
+      });
+      return;
+    }
 
-  return (
+    // Signed in but NOT owner: copy plain URL (view-only access)
+    if (!isOwner) {
+      handleSimpleShare();
+      return;
+    }
+
+    // Signed in AND owner: create invite link
+    if (rtcProvider && planId) {
+      createInvite();
+    } else {
+      // Fallback if WebRTC not available
+      handleSimpleShare();
+    }
+  }, [identity, isOwner, rtcProvider, planId, createInvite, handleSimpleShare]);
+
+  // Determine button state and tooltip content
+  const isDisabled = !identity;
+  const tooltipContent = !identity
+    ? 'Sign in with GitHub to share this plan'
+    : isOwner
+      ? 'Create invite link'
+      : 'Copy link to share with reviewers';
+
+  const button = (
     <Button
       isIconOnly
       variant="ghost"
       size="sm"
       onPress={handleShare}
+      isDisabled={isDisabled}
       className={`${className} touch-target`}
-      aria-label={isOwner ? 'Create invite link' : 'Copy link to share with reviewers'}
+      aria-label={tooltipContent}
     >
       {copied ? (
         <Check className="w-4 h-4 text-success" />
@@ -236,5 +293,13 @@ export function ShareButton({
         <Share2 className="w-4 h-4" />
       )}
     </Button>
+  );
+
+  // Always wrap in tooltip to show contextual information
+  return (
+    <Tooltip delay={0}>
+      <Tooltip.Trigger>{button}</Tooltip.Trigger>
+      <Tooltip.Content>{tooltipContent}</Tooltip.Content>
+    </Tooltip>
   );
 }

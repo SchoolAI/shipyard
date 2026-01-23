@@ -50,8 +50,26 @@ async function validateInviteToken(
 }
 
 /**
+ * Send an error response to the client.
+ */
+function sendErrorResponse(
+  platform: PlatformAdapter,
+  ws: unknown,
+  error: 'unauthenticated' | 'unauthorized' | 'plan_not_found',
+  message: string
+): void {
+  platform.sendMessage(ws, {
+    type: 'error',
+    error,
+    message,
+  });
+}
+
+/**
  * Handle create_invite message.
  * Creates a new time-limited invite token.
+ *
+ * Security: Requires valid GitHub auth token and plan ownership verification.
  *
  * @param platform - Platform adapter for storage/messaging
  * @param ws - WebSocket connection
@@ -66,7 +84,64 @@ async function handleCreateInvite(
     planId: message.planId,
   });
 
-  // Generate token components
+  // --- Authentication: Validate GitHub token ---
+  if (!message.authToken) {
+    platform.warn('[handleCreateInvite] Missing auth token');
+    sendErrorResponse(
+      platform,
+      ws,
+      'unauthenticated',
+      'Authentication required. Please sign in with GitHub.'
+    );
+    return;
+  }
+
+  const authResult = await platform.validateGitHubToken(message.authToken);
+  if (!authResult.valid || !authResult.username) {
+    platform.warn('[handleCreateInvite] Invalid auth token', {
+      error: authResult.error,
+    });
+    sendErrorResponse(
+      platform,
+      ws,
+      'unauthenticated',
+      authResult.error || 'Invalid GitHub token. Please sign in again.'
+    );
+    return;
+  }
+
+  const authenticatedUser = authResult.username;
+  platform.info('[handleCreateInvite] Authenticated user', { username: authenticatedUser });
+
+  // --- Authorization: Check plan ownership ---
+  const existingOwnerId = await platform.getPlanOwnerId(message.planId);
+
+  if (existingOwnerId) {
+    // Plan has an existing owner - verify the authenticated user is the owner
+    if (existingOwnerId !== authenticatedUser) {
+      platform.warn('[handleCreateInvite] User is not the plan owner', {
+        authenticatedUser,
+        planOwner: existingOwnerId,
+        planId: message.planId,
+      });
+      sendErrorResponse(
+        platform,
+        ws,
+        'unauthorized',
+        'Only the plan owner can create invite links.'
+      );
+      return;
+    }
+  } else {
+    // No existing owner - trust-on-first-use: record this user as owner
+    platform.info('[handleCreateInvite] Recording plan owner (first invite)', {
+      planId: message.planId,
+      ownerId: authenticatedUser,
+    });
+    await platform.setPlanOwnerId(message.planId, authenticatedUser);
+  }
+
+  // --- Create the invite token ---
   const tokenId = await platform.generateTokenId();
   const tokenValue = await platform.generateTokenValue();
   const tokenHash = await platform.hashTokenValue(tokenValue);
@@ -78,7 +153,7 @@ async function handleCreateInvite(
     id: tokenId,
     tokenHash,
     planId: message.planId,
-    createdBy: 'unknown', // No auth tracking - simplified signaling
+    createdBy: authenticatedUser,
     createdAt: now,
     expiresAt: now + ttlMs,
     maxUses: message.maxUses ?? null,
@@ -93,6 +168,7 @@ async function handleCreateInvite(
   platform.info('[handleCreateInvite] Created invite token', {
     tokenId,
     planId: message.planId,
+    createdBy: authenticatedUser,
     ttlMinutes: message.ttlMinutes ?? 30,
   });
 

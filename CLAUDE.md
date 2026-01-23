@@ -139,6 +139,41 @@ Follow the **3+ Rule** from engineering-standards.md:
 - Target 30% per-file function coverage (not 100%)
 - Tests should rarely change
 
+## Git Worktree Gotchas
+
+When working in a git worktree (created via the `/wt` skill), some files have the **skip-worktree** flag set to prevent accidental commits of local config changes.
+
+### Affected Files
+
+- `.env*` files (e.g., `.env.example`, `.env.development`)
+- `.mcp.json`
+- `.vscode/` directory
+
+### Symptoms
+
+If you try to stage these files, you may see:
+- `git add` silently does nothing
+- Errors about "sparse-checkout" (misleading - it's actually skip-worktree)
+- `git diff` shows no changes even though file content differs
+
+### How to Stage These Files
+
+```bash
+# Check if a file has skip-worktree set (S prefix = skip-worktree)
+git ls-files -v <file>
+# Output: "S apps/web/.env.example" means skip-worktree is ON
+
+# Remove the skip-worktree flag
+git update-index --no-skip-worktree <file>
+
+# Now you can stage normally
+git add <file>
+```
+
+### Why This Exists
+
+The worktree creation script sets skip-worktree on config files so developers can customize them locally without accidentally committing personal settings (API keys, local ports, etc.).
+
 ## When Stuck
 
 1. Check spikes/ for working examples
@@ -147,4 +182,4 @@ Follow the **3+ Rule** from engineering-standards.md:
 
 ---
 
-*Last updated: 2026-01-14*
+*Last updated: 2026-01-23*

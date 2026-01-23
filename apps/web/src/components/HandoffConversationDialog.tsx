@@ -1,5 +1,6 @@
 import { Avatar, Button, Card, Modal, Spinner } from '@heroui/react';
 import { getConversationVersions, logPlanEvent, markVersionHandedOff } from '@shipyard/schema';
+import { DEFAULT_REGISTRY_PORTS } from '@shipyard/shared/registry-config';
 import { Download, Send, Upload, Users, X } from 'lucide-react';
 import type React from 'react';
 import { useEffect, useRef, useState } from 'react';
@@ -197,7 +198,7 @@ export function HandoffConversationDialog({
       setIsLoadingTranscript(true);
       setTranscriptError(null);
 
-      fetch(`http://localhost:32191/api/plan/${planId}/transcript`)
+      fetch(`http://localhost:${DEFAULT_REGISTRY_PORTS[0]}/api/plan/${planId}/transcript`)
         .then((res) => {
           if (res.ok) return res.text();
           throw new Error('Failed to fetch transcript');
@@ -233,7 +234,7 @@ export function HandoffConversationDialog({
     setTranscriptError(null);
     setIsLoadingTranscript(true);
 
-    fetch(`http://localhost:32191/api/plan/${planId}/transcript`)
+    fetch(`http://localhost:${DEFAULT_REGISTRY_PORTS[0]}/api/plan/${planId}/transcript`)
       .then((res) => {
         if (res.ok) return res.text();
         throw new Error('Failed to fetch transcript');

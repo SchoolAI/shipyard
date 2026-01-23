@@ -11,6 +11,7 @@ import {
   PLAN_INDEX_DOC_NAME,
 } from '@shipyard/schema';
 import { z } from 'zod';
+import { registryConfig } from '../config/env/registry.js';
 import { getOrCreateDoc } from '../doc-store.js';
 import { logger } from '../logger.js';
 import { addArtifactTool } from './add-artifact.js';
@@ -510,7 +511,7 @@ async function addArtifact(opts: AddArtifactOpts) {
     artifactUrl =
       addedArtifact.storage === 'github'
         ? addedArtifact.url
-        : `http://localhost:${process.env.REGISTRY_PORT || 3000}/artifacts/${addedArtifact.localArtifactId}`;
+        : `http://localhost:${registryConfig.REGISTRY_PORT[0]}/artifacts/${addedArtifact.localArtifactId}`;
   }
 
   return {
