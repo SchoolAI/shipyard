@@ -1,20 +1,15 @@
 {
   "mcpServers": {
-    "shipyard-dev": {
-      "type": "stdio",
+    "shipyard": {
       "command": "node",
-      "args": ["/Users/jacobpetterle/Working Directory/shipyard-wt/105-local-changes/apps/server/dist/index.js"],
-      "cwd": "/Users/jacobpetterle/Working Directory/shipyard-wt/105-local-changes",
+      "args": ["apps/server/dist/index.js"],
       "env": {
-        "NODE_ENV": "development",
-        "LOG_LEVEL": "debug",
-        "SIGNALING_URL": "ws://localhost:4444",
-        "SHIPYARD_WEB_URL": "http://localhost:5173"
+        "NODE_ENV": "development"
       }
     },
-    "playwright": {
+    "heroui-react": {
       "command": "npx",
-      "args": ["@playwright/mcp@latest", "--user-data-dir=/tmp/pw-105-local-changes"]
+      "args": ["-y", "@heroui/react-mcp@latest"]
     }
   }
 }
