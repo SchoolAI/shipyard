@@ -151,40 +151,40 @@ export function PlanContent(props: PlanContentProps) {
             <button
               type="button"
               onClick={() => setActiveView('plan')}
-              className={`flex items-center justify-center gap-2 pb-2 px-2 font-medium text-sm transition-colors shrink-0 ${
+              className={`flex items-center justify-center gap-1.5 md:gap-2 pb-1.5 md:pb-2 px-1.5 md:px-2 font-medium text-xs md:text-sm transition-colors shrink-0 ${
                 activeView === 'plan'
                   ? 'text-primary border-b-2 border-primary'
                   : 'text-muted-foreground hover:text-foreground border-b-2 border-transparent'
               }`}
             >
-              <FileText className="w-4 h-4" />
+              <FileText className="w-3.5 h-3.5 md:w-4 md:h-4" />
               Plan
             </button>
             <button
               type="button"
               onClick={() => setActiveView('activity')}
-              className={`flex items-center justify-center gap-2 pb-2 px-2 font-medium text-sm transition-colors shrink-0 ${
+              className={`flex items-center justify-center gap-1.5 md:gap-2 pb-1.5 md:pb-2 px-1.5 md:px-2 font-medium text-xs md:text-sm transition-colors shrink-0 ${
                 activeView === 'activity'
                   ? 'text-primary border-b-2 border-primary'
                   : 'text-muted-foreground hover:text-foreground border-b-2 border-transparent'
               }`}
             >
-              <Clock className="w-4 h-4" />
+              <Clock className="w-3.5 h-3.5 md:w-4 md:h-4" />
               Activity
             </button>
             <button
               type="button"
               onClick={() => setActiveView('deliverables')}
-              className={`flex items-center justify-center gap-2 pb-2 px-2 font-medium text-sm transition-colors shrink-0 ${
+              className={`flex items-center justify-center gap-1.5 md:gap-2 pb-1.5 md:pb-2 px-1.5 md:px-2 font-medium text-xs md:text-sm transition-colors shrink-0 ${
                 activeView === 'deliverables'
                   ? 'text-primary border-b-2 border-primary'
                   : 'text-muted-foreground hover:text-foreground border-b-2 border-transparent'
               }`}
             >
-              <Package className="w-4 h-4" />
+              <Package className="w-3.5 h-3.5 md:w-4 md:h-4" />
               Deliverables
               {deliverableCount.total > 0 && (
-                <span className="text-xs opacity-70">
+                <span className="text-[10px] md:text-xs opacity-70">
                   ({deliverableCount.completed}/{deliverableCount.total})
                 </span>
               )}
@@ -192,13 +192,13 @@ export function PlanContent(props: PlanContentProps) {
             <button
               type="button"
               onClick={() => setActiveView('changes')}
-              className={`flex items-center justify-center gap-2 pb-2 px-2 font-medium text-sm transition-colors shrink-0 ${
+              className={`flex items-center justify-center gap-1.5 md:gap-2 pb-1.5 md:pb-2 px-1.5 md:px-2 font-medium text-xs md:text-sm transition-colors shrink-0 ${
                 activeView === 'changes'
                   ? 'text-primary border-b-2 border-primary'
                   : 'text-muted-foreground hover:text-foreground border-b-2 border-transparent'
               }`}
             >
-              <GitPullRequest className="w-4 h-4" />
+              <GitPullRequest className="w-3.5 h-3.5 md:w-4 md:h-4" />
               Changes
             </button>
           </div>
