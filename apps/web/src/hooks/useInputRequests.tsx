@@ -15,6 +15,7 @@ import {
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import type * as Y from 'yjs';
+import { MarkdownContent } from '@/components/ui/MarkdownContent';
 
 export interface UseInputRequestsOptions {
   /** The Y.Doc to monitor for input requests */
@@ -108,7 +109,9 @@ function showInputRequestToast(
       id: `input-request-${request.id}`,
       position: 'top-right',
       duration: 60000, // 60 seconds
-      description: request.message,
+      description: (
+        <MarkdownContent content={request.message} variant="toast" className="line-clamp-2" />
+      ),
       action: {
         label: 'Respond',
         onClick: onOpenModal,

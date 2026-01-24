@@ -30,7 +30,7 @@ const RequestUserInputInput = z.object({
   timeout: z
     .number()
     .optional()
-    .describe('Timeout in seconds (default: 1800, min: 10, max: 14400)'),
+    .describe('Timeout in seconds (default: 1800, min: 300, max: 1800)'),
   planId: z
     .string()
     .optional()
@@ -64,6 +64,12 @@ For 'choice' type:
 
 This tool is analogous to AskUserQuestion, prompt(), or other agent question mechanisms,
 but shows responses in the browser UI where users are already viewing plans.
+
+Timeout guidelines:
+- Simple yes/no or quick choices: 300-600 seconds (5-10 minutes)
+- Complex questions with code examples: 600-1200 seconds (10-20 minutes)
+- Default (1800 = 30 minutes) is suitable for most cases
+- Note: System-level timeouts may cause earlier cancellation regardless of this value
 
 NOTE: This is also available as requestUserInput() inside execute_code for multi-step workflows.`,
     inputSchema: {
