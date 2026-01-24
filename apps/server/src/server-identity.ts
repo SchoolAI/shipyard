@@ -162,6 +162,48 @@ function getUsernameFromGitConfig(): string | null {
 }
 
 /**
+ * Get verified GitHub username (authenticated sources only).
+ * Use this for security-critical operations like token regeneration.
+ *
+ * Returns null if no verified auth is available.
+ */
+export async function getVerifiedGitHubUsername(): Promise<string | null> {
+  // Try GITHUB_USERNAME env var (if set, assumed verified)
+  if (githubConfig.GITHUB_USERNAME) {
+    logger.info({ username: githubConfig.GITHUB_USERNAME }, 'Using GITHUB_USERNAME from env');
+    return githubConfig.GITHUB_USERNAME;
+  }
+
+  // Try GITHUB_TOKEN + API call (verified)
+  if (githubConfig.GITHUB_TOKEN) {
+    try {
+      const username = await getUsernameFromToken(githubConfig.GITHUB_TOKEN);
+      if (username) {
+        logger.info({ username }, 'Got verified username from GITHUB_TOKEN');
+        return username;
+      }
+    } catch (error) {
+      logger.warn({ error }, 'Failed to get username from GITHUB_TOKEN');
+    }
+  }
+
+  // Try gh CLI (verified)
+  try {
+    const username = getUsernameFromCLI();
+    if (username) {
+      logger.info({ username }, 'Got verified username from gh CLI');
+      return username;
+    }
+  } catch (error) {
+    logger.debug({ error }, 'Failed to get username from gh CLI');
+  }
+
+  // Do NOT fall back to git config or USER env var
+  logger.warn('No verified GitHub authentication available');
+  return null;
+}
+
+/**
  * Gets the current git branch name.
  * Returns undefined if not in a git repo or git is not available.
  */

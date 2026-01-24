@@ -1439,3 +1439,52 @@ export function declineInputRequest(
 
   return { success: true };
 }
+
+/**
+ * Result type for atomic token regeneration operation.
+ * Discriminated union for type-safe handling of success/failure cases.
+ */
+export type AtomicRegenerateTokenResult =
+  | { success: true }
+  | { success: false; actualOwner: string | undefined };
+
+/**
+ * Atomically regenerate session token if the current user is the owner.
+ *
+ * This function performs ownership verification and token update in a single
+ * Y.Doc transaction, preventing TOCTOU race conditions where ownership could
+ * change between the check and the update.
+ *
+ * @param ydoc - The Y.Doc containing the plan
+ * @param expectedOwnerId - The owner ID that must match for the operation to proceed
+ * @param newTokenHash - The new session token hash to set
+ * @param actor - Optional actor name for transaction metadata
+ * @returns Result indicating success or failure with actual owner if mismatched
+ */
+export function atomicRegenerateTokenIfOwner(
+  ydoc: Y.Doc,
+  expectedOwnerId: string,
+  newTokenHash: string,
+  actor?: string
+): AtomicRegenerateTokenResult {
+  let result: AtomicRegenerateTokenResult = { success: false, actualOwner: undefined };
+
+  ydoc.transact(
+    () => {
+      const map = ydoc.getMap(YDOC_KEYS.METADATA);
+      const currentOwner = map.get('ownerId') as string | undefined;
+
+      if (currentOwner !== expectedOwnerId) {
+        result = { success: false, actualOwner: currentOwner };
+        return;
+      }
+
+      map.set('sessionTokenHash', newTokenHash);
+      map.set('updatedAt', Date.now());
+      result = { success: true };
+    },
+    actor ? { actor } : undefined
+  );
+
+  return result;
+}
