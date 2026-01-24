@@ -2,6 +2,7 @@ import type { Block } from '@blocknote/core';
 import { ServerBlockNoteEditor } from '@blocknote/server-util';
 import {
   addDeliverable,
+  createPlanWebUrl,
   extractDeliverables,
   getPlanMetadata,
   initPlanMetadata,
@@ -268,7 +269,7 @@ Bad deliverables (not provable):
     });
     logger.info({ planId }, 'Plan index updated');
 
-    const url = `${webConfig.SHIPYARD_WEB_URL}/plan/${planId}`;
+    const url = createPlanWebUrl(webConfig.SHIPYARD_WEB_URL, planId);
     await openPlanInBrowser(planId, url);
 
     const repoInfo = repo

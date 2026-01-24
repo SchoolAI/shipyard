@@ -28494,7 +28494,7 @@ init_cjs_shims();
 // ../../packages/schema/dist/index.mjs
 init_cjs_shims();
 
-// ../../packages/schema/dist/yjs-helpers-B435ND5d.mjs
+// ../../packages/schema/dist/yjs-helpers-A0hIPiRs.mjs
 init_cjs_shims();
 
 // ../../packages/schema/dist/plan.mjs
@@ -42552,7 +42552,8 @@ var PlanEventSchema = external_exports.discriminatedUnion("type", [
   PlanEventBaseSchema.extend({
     type: external_exports.literal("agent_activity"),
     data: AgentActivityDataSchema
-  })
+  }),
+  PlanEventBaseSchema.extend({ type: external_exports.literal("session_token_regenerated") })
 ]);
 var PlanMetadataBaseSchema = external_exports.object({
   id: external_exports.string(),
@@ -42665,7 +42666,7 @@ var PRReviewCommentSchema = external_exports.object({
   resolved: external_exports.boolean().optional()
 });
 
-// ../../packages/schema/dist/yjs-helpers-B435ND5d.mjs
+// ../../packages/schema/dist/yjs-helpers-A0hIPiRs.mjs
 function assertNever2(value) {
   throw new Error(`Unhandled discriminated union member: ${JSON.stringify(value)}`);
 }
@@ -42770,7 +42771,7 @@ var InputRequestBaseSchema = external_exports.object({
   message: external_exports.string().min(1, "Message cannot be empty"),
   status: external_exports.enum(InputRequestStatusValues),
   defaultValue: external_exports.string().optional(),
-  timeout: external_exports.number().int().min(10, "Timeout must be at least 10 seconds").max(900, "Timeout cannot exceed 15 minutes").optional(),
+  timeout: external_exports.number().int().min(10, "Timeout must be at least 10 seconds").max(14400, "Timeout cannot exceed 4 hours").optional(),
   planId: external_exports.string().optional(),
   response: external_exports.unknown().optional(),
   answeredAt: external_exports.number().optional(),
@@ -43851,6 +43852,29 @@ var PlanIndexEntrySchema = external_exports.discriminatedUnion("deleted", [exter
   deletedAt: external_exports.number(),
   deletedBy: external_exports.string()
 })]);
+var ROUTES = {
+  REGISTRY_LIST: "/registry",
+  REGISTRY_REGISTER: "/register",
+  REGISTRY_UNREGISTER: "/unregister",
+  PLAN_STATUS: (planId) => `/api/plan/${planId}/status`,
+  PLAN_HAS_CONNECTIONS: (planId) => `/api/plan/${planId}/has-connections`,
+  PLAN_TRANSCRIPT: (planId) => `/api/plan/${planId}/transcript`,
+  PLAN_SUBSCRIBE: (planId) => `/api/plan/${planId}/subscribe`,
+  PLAN_CHANGES: (planId) => `/api/plan/${planId}/changes`,
+  PLAN_UNSUBSCRIBE: (planId) => `/api/plan/${planId}/unsubscribe`,
+  PLAN_PR_DIFF: (planId, prNumber) => `/api/plans/${planId}/pr-diff/${prNumber}`,
+  PLAN_PR_FILES: (planId, prNumber) => `/api/plans/${planId}/pr-files/${prNumber}`,
+  HOOK_SESSION: "/api/hook/session",
+  HOOK_CONTENT: (planId) => `/api/hook/plan/${planId}/content`,
+  HOOK_REVIEW: (planId) => `/api/hook/plan/${planId}/review`,
+  HOOK_SESSION_TOKEN: (planId) => `/api/hook/plan/${planId}/session-token`,
+  HOOK_PRESENCE: (planId) => `/api/hook/plan/${planId}/presence`,
+  CONVERSATION_IMPORT: "/api/conversation/import",
+  WEB_TASK: (planId) => `/task/${planId}`
+};
+function createPlanWebUrl(baseUrl, planId) {
+  return `${baseUrl.replace(/\/$/, "")}${ROUTES.WEB_TASK(planId)}`;
+}
 function formatThreadsForLLM(threads, options = {}) {
   const { includeResolved = false, selectedTextMaxLength = 100, resolveUser } = options;
   const unresolvedThreads = threads.filter((t$1) => !t$1.resolved);
@@ -45704,9 +45728,8 @@ init_cjs_shims();
 
 // src/config/env/web.ts
 init_cjs_shims();
-var defaultWebUrl = process.env.NODE_ENV === "production" ? "https://schoolai.github.io/shipyard" : "http://localhost:5173";
 var schema3 = external_exports.object({
-  SHIPYARD_WEB_URL: external_exports.string().url().default(defaultWebUrl)
+  SHIPYARD_WEB_URL: external_exports.string().url().default("https://schoolai.github.io/shipyard")
 });
 var webConfig = loadEnv(schema3);
 
@@ -45750,7 +45773,7 @@ async function handleUpdatedPlanReview(sessionId, planId, planContent, _originMe
   }
   const baseUrl = webConfig.SHIPYARD_WEB_URL;
   logger.info(
-    { planId, url: `${baseUrl}/plan/${planId}` },
+    { planId, url: createPlanWebUrl(baseUrl, planId) },
     "Content synced, browser already open. Waiting for server approval..."
   );
   const decision = await waitForReviewDecision(planId, "");
@@ -45907,7 +45930,7 @@ Reviewer comment: ${decision.reviewComment}` : "";
         allow: false,
         message: `Plan is pending review.
 
-Open: ${baseUrl}/plan/${planId}`,
+Open: ${createPlanWebUrl(baseUrl, planId)}`,
         planId
       };
     case "draft":
@@ -45915,7 +45938,7 @@ Open: ${baseUrl}/plan/${planId}`,
         allow: false,
         message: `Plan is still in draft.
 
-Submit for review at: ${baseUrl}/plan/${planId}`,
+Submit for review at: ${createPlanWebUrl(baseUrl, planId)}`,
         planId
       };
     case "in_progress":

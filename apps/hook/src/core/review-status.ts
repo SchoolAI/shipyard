@@ -7,6 +7,7 @@
  */
 import {
   assertNever,
+  createPlanWebUrl,
   type Deliverable,
   type GetReviewStatusResponse,
   type ReviewFeedback,
@@ -87,7 +88,7 @@ async function handleUpdatedPlanReview(
 
   const baseUrl = webConfig.SHIPYARD_WEB_URL;
   logger.info(
-    { planId, url: `${baseUrl}/plan/${planId}` },
+    { planId, url: createPlanWebUrl(baseUrl, planId) },
     'Content synced, browser already open. Waiting for server approval...'
   );
 
@@ -284,14 +285,14 @@ export async function checkReviewStatus(
     case 'pending_review':
       return {
         allow: false,
-        message: `Plan is pending review.\n\nOpen: ${baseUrl}/plan/${planId}`,
+        message: `Plan is pending review.\n\nOpen: ${createPlanWebUrl(baseUrl, planId)}`,
         planId,
       };
 
     case 'draft':
       return {
         allow: false,
-        message: `Plan is still in draft.\n\nSubmit for review at: ${baseUrl}/plan/${planId}`,
+        message: `Plan is still in draft.\n\nSubmit for review at: ${createPlanWebUrl(baseUrl, planId)}`,
         planId,
       };
 

@@ -13,6 +13,7 @@ import {
   type CreateHookSessionRequest,
   type CreateHookSessionResponse,
   createInitialConversationVersion,
+  createPlanWebUrl,
   createUserResolver,
   extractDeliverables,
   formatDeliverablesForLLM,
@@ -100,8 +101,7 @@ export async function createSessionHandler(
   // Check if session already exists (idempotent - handles CLI process restarts)
   const existingSession = getSessionState(input.sessionId);
   if (existingSession) {
-    const webUrl = webConfig.SHIPYARD_WEB_URL;
-    const url = `${webUrl}/plan/${existingSession.planId}`;
+    const url = createPlanWebUrl(webConfig.SHIPYARD_WEB_URL, existingSession.planId);
     ctx.logger.info(
       { planId: existingSession.planId, sessionId: input.sessionId },
       'Returning existing session (idempotent)'
@@ -179,8 +179,7 @@ export async function createSessionHandler(
     deleted: false,
   });
 
-  const webUrl = webConfig.SHIPYARD_WEB_URL;
-  const url = `${webUrl}/plan/${planId}`;
+  const url = createPlanWebUrl(webConfig.SHIPYARD_WEB_URL, planId);
 
   ctx.logger.info({ url }, 'Plan URL generated');
 
@@ -427,8 +426,7 @@ export async function setSessionTokenHandler(
     sessionTokenHash,
   });
 
-  const webUrl = webConfig.SHIPYARD_WEB_URL;
-  const url = `${webUrl}/plan/${planId}`;
+  const url = createPlanWebUrl(webConfig.SHIPYARD_WEB_URL, planId);
 
   const session = getSessionStateByPlanId(planId);
   const sessionId = getSessionIdByPlanId(planId);
@@ -711,7 +709,7 @@ export async function waitForApprovalHandler(
       setSessionState(sessionId, {
         lifecycle: 'approved_awaiting_token',
         ...baseState,
-        url: `${webUrl}/plan/${baseState.planId}`,
+        url: createPlanWebUrl(webUrl, baseState.planId),
         approvedAt: extraData.approvedAt,
         deliverables: extraData.deliverables,
         reviewComment,
@@ -751,7 +749,7 @@ export async function waitForApprovalHandler(
       ...baseState,
       contentHash: syncedFields?.contentHash ?? '',
       sessionToken: syncedFields?.sessionToken ?? '',
-      url: syncedFields?.url ?? `${webUrl}/plan/${baseState.planId}`,
+      url: syncedFields?.url ?? createPlanWebUrl(webUrl, baseState.planId),
       deliverables,
       reviewComment: reviewComment || '',
       reviewedBy,
@@ -1025,8 +1023,7 @@ export async function getDeliverableContextHandler(
   }
 
   const deliverables = getDeliverables(ydoc);
-  const webUrl = webConfig.SHIPYARD_WEB_URL;
-  const url = `${webUrl}/plan/${planId}`;
+  const url = createPlanWebUrl(webConfig.SHIPYARD_WEB_URL, planId);
 
   // Format deliverables section
   let deliverablesSection = '';

@@ -8,6 +8,7 @@ import {
   type CreateHookSessionResponse,
   clearAgentPresence,
   createInitialConversationVersion,
+  createPlanWebUrl,
   extractDeliverables,
   type GetReviewStatusResponse,
   getPlanMetadata,
@@ -76,8 +77,7 @@ export async function handleCreateSession(req: Request, res: Response): Promise<
     // Check if session already exists (idempotent - handles CLI process restarts)
     const existingSession = getSessionState(input.sessionId);
     if (existingSession) {
-      const webUrl = webConfig.SHIPYARD_WEB_URL;
-      const url = `${webUrl}/plan/${existingSession.planId}`;
+      const url = createPlanWebUrl(webConfig.SHIPYARD_WEB_URL, existingSession.planId);
       logger.info(
         { planId: existingSession.planId, sessionId: input.sessionId },
         'Returning existing session (idempotent)'
@@ -156,8 +156,7 @@ export async function handleCreateSession(req: Request, res: Response): Promise<
       deleted: false,
     });
 
-    const webUrl = webConfig.SHIPYARD_WEB_URL;
-    const url = `${webUrl}/plan/${planId}`;
+    const url = createPlanWebUrl(webConfig.SHIPYARD_WEB_URL, planId);
 
     logger.info({ url }, 'Plan URL generated');
 
@@ -358,8 +357,7 @@ export async function handleSetSessionToken(req: Request, res: Response): Promis
       sessionTokenHash,
     });
 
-    const webUrl = webConfig.SHIPYARD_WEB_URL;
-    const url = `${webUrl}/plan/${planId}`;
+    const url = createPlanWebUrl(webConfig.SHIPYARD_WEB_URL, planId);
 
     logger.info({ planId }, 'Session token set successfully');
 

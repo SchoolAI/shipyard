@@ -25,6 +25,19 @@ export const ROUTES = {
   HOOK_PRESENCE: (planId: string) => `/api/hook/plan/${planId}/presence`,
 
   CONVERSATION_IMPORT: '/api/conversation/import',
+
+  WEB_TASK: (planId: string) => `/task/${planId}`,
 } as const;
 
 export type RoutePath = (typeof ROUTES)[keyof typeof ROUTES];
+
+/**
+ * Creates a full URL to a plan in the web UI.
+ * @param baseUrl - Base URL (e.g., "https://schoolai.github.io/shipyard" or "http://localhost:5173")
+ * @param planId - Plan ID
+ * @returns Full URL to the plan
+ */
+export function createPlanWebUrl(baseUrl: string, planId: string): string {
+  const cleanBaseUrl = baseUrl.replace(/\/$/, '');
+  return `${cleanBaseUrl}${ROUTES.WEB_TASK(planId)}`;
+}
