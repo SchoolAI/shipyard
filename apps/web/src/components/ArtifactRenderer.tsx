@@ -43,7 +43,20 @@ export function ArtifactRenderer({ artifact, registryPort }: ArtifactRendererPro
   const url = artifact.url;
 
   switch (artifact.type) {
-    case 'screenshot':
+    case 'html':
+      return (
+        <HtmlViewer
+          url={url}
+          filename={artifact.filename}
+          token={token}
+          isSignedIn={isSignedIn}
+          hasRepoScope={hasRepoScope}
+          onSignIn={startAuth}
+          onRequestRepoAccess={requestRepoAccess}
+        />
+      );
+
+    case 'image':
       return (
         <BinaryArtifactViewer
           url={url}
@@ -78,38 +91,6 @@ export function ArtifactRenderer({ artifact, registryPort }: ArtifactRendererPro
               <track kind="captions" />
               Your browser does not support video playback.
             </video>
-          )}
-        />
-      );
-
-    case 'test_results':
-      return (
-        <TextArtifactViewer
-          url={url}
-          filename={artifact.filename}
-          token={token}
-          isSignedIn={isSignedIn}
-          hasRepoScope={hasRepoScope}
-          onSignIn={startAuth}
-          onRequestRepoAccess={requestRepoAccess}
-          renderContent={(content) => (
-            <JsonContent content={content} filename={artifact.filename} />
-          )}
-        />
-      );
-
-    case 'diff':
-      return (
-        <TextArtifactViewer
-          url={url}
-          filename={artifact.filename}
-          token={token}
-          isSignedIn={isSignedIn}
-          hasRepoScope={hasRepoScope}
-          onSignIn={startAuth}
-          onRequestRepoAccess={requestRepoAccess}
-          renderContent={(content) => (
-            <DiffContent content={content} filename={artifact.filename} />
           )}
         />
       );
@@ -236,13 +217,20 @@ function BinaryArtifactViewer({
 // Text Artifact Viewer (JSON, Diffs)
 // ============================================================================
 
-interface TextArtifactViewerProps extends ArtifactViewerAuthProps {
+// ============================================================================
+// HTML Artifact Viewer
+// ============================================================================
+
+interface HtmlViewerProps extends ArtifactViewerAuthProps {
   url: string;
   filename: string;
-  renderContent: (content: string) => React.ReactNode;
 }
 
-function TextArtifactViewer({
+/**
+ * Renders HTML artifacts in a sandboxed iframe.
+ * SECURITY: Uses strict sandbox without allow-same-origin to prevent XSS.
+ */
+function HtmlViewer({
   url,
   filename,
   token,
@@ -250,8 +238,7 @@ function TextArtifactViewer({
   hasRepoScope,
   onSignIn,
   onRequestRepoAccess,
-  renderContent,
-}: TextArtifactViewerProps) {
+}: HtmlViewerProps) {
   const [status, setStatus] = useState<FetchArtifactStatus | 'loading'>('loading');
   const [content, setContent] = useState<string | null>(null);
 
@@ -306,7 +293,14 @@ function TextArtifactViewer({
     return <ArtifactPlaceholder filename={filename} message="Failed to load" />;
   }
 
-  return <>{renderContent(content)}</>;
+  return (
+    <iframe
+      sandbox="allow-scripts"
+      srcDoc={content}
+      title={filename}
+      className="w-full min-h-96 border rounded-lg bg-white"
+    />
+  );
 }
 
 // ============================================================================
@@ -391,7 +385,19 @@ function LocalArtifactViewer({
 
   // Artifact is available - render based on type using exhaustive switch
   switch (artifact.type) {
-    case 'screenshot':
+    case 'html':
+      return (
+        <HtmlViewer
+          url={url}
+          filename={artifact.filename}
+          token={token}
+          isSignedIn={isSignedIn}
+          hasRepoScope={hasRepoScope}
+          onSignIn={onSignIn}
+          onRequestRepoAccess={onRequestRepoAccess}
+        />
+      );
+    case 'image':
       return (
         <BinaryArtifactViewer
           url={url}
@@ -428,36 +434,6 @@ function LocalArtifactViewer({
           )}
         />
       );
-    case 'test_results':
-      return (
-        <TextArtifactViewer
-          url={url}
-          filename={artifact.filename}
-          token={token}
-          isSignedIn={isSignedIn}
-          hasRepoScope={hasRepoScope}
-          onSignIn={onSignIn}
-          onRequestRepoAccess={onRequestRepoAccess}
-          renderContent={(content) => (
-            <JsonContent content={content} filename={artifact.filename} />
-          )}
-        />
-      );
-    case 'diff':
-      return (
-        <TextArtifactViewer
-          url={url}
-          filename={artifact.filename}
-          token={token}
-          isSignedIn={isSignedIn}
-          hasRepoScope={hasRepoScope}
-          onSignIn={onSignIn}
-          onRequestRepoAccess={onRequestRepoAccess}
-          renderContent={(content) => (
-            <DiffContent content={content} filename={artifact.filename} />
-          )}
-        />
-      );
     default: {
       const _exhaustive: never = artifact.type;
       return (
@@ -468,52 +444,6 @@ function LocalArtifactViewer({
       );
     }
   }
-}
-
-// ============================================================================
-// Content Renderers
-// ============================================================================
-
-function JsonContent({ content, filename }: { content: string; filename: string }) {
-  let displayContent = content;
-  try {
-    const parsed = JSON.parse(content);
-    displayContent = JSON.stringify(parsed, null, 2);
-  } catch {
-    // Not valid JSON, show as-is
-  }
-
-  return (
-    <div className="bg-muted rounded-lg p-4 overflow-x-auto max-h-96">
-      <div className="text-muted-foreground text-xs mb-2">{filename}</div>
-      <pre className="text-success text-sm font-mono whitespace-pre-wrap">{displayContent}</pre>
-    </div>
-  );
-}
-
-function DiffContent({ content, filename }: { content: string; filename: string }) {
-  const lines = content.split('\n');
-
-  return (
-    <div className="bg-muted rounded-lg p-4 overflow-x-auto max-h-96">
-      <div className="text-muted-foreground text-xs mb-2">{filename}</div>
-      <pre className="text-sm font-mono">
-        {lines.map((line, i) => {
-          let className = 'text-foreground';
-          if (line.startsWith('+') && !line.startsWith('+++')) className = 'text-success';
-          else if (line.startsWith('-') && !line.startsWith('---')) className = 'text-danger';
-          else if (line.startsWith('@@')) className = 'text-accent';
-          else if (line.startsWith('diff') || line.startsWith('index')) className = 'text-muted';
-
-          return (
-            <div key={`${i}-${line.slice(0, 20)}`} className={className}>
-              {line}
-            </div>
-          );
-        })}
-      </pre>
-    </div>
-  );
 }
 
 // ============================================================================

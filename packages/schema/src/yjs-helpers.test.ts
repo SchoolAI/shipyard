@@ -47,7 +47,7 @@ describe('Artifact helpers', () => {
   it('addArtifact adds artifact and getArtifacts retrieves it', () => {
     const artifact = {
       id: 'art-1',
-      type: 'screenshot' as const,
+      type: 'image' as const,
       filename: 'test.png',
       storage: 'github' as const,
       url: 'https://example.com/test.png',
@@ -60,7 +60,7 @@ describe('Artifact helpers', () => {
   it('addArtifact can add multiple artifacts', () => {
     const artifact1 = {
       id: 'art-1',
-      type: 'screenshot' as const,
+      type: 'image' as const,
       filename: 'test.png',
       storage: 'github' as const,
       url: 'https://example.com/test.png',
@@ -85,7 +85,7 @@ describe('Artifact helpers', () => {
   it('removeArtifact removes by ID', () => {
     addArtifact(ydoc, {
       id: 'art-1',
-      type: 'screenshot',
+      type: 'image',
       filename: 'a.png',
       storage: 'github',
       url: 'https://example.com/a.png',
@@ -120,7 +120,7 @@ describe('Artifact helpers', () => {
     array.push([
       {
         id: 'art-1',
-        type: 'screenshot',
+        type: 'image',
         filename: 'valid.png',
         storage: 'github',
         url: 'https://example.com/valid.png',
@@ -128,7 +128,7 @@ describe('Artifact helpers', () => {
     ]);
 
     array.push([{ id: 'art-2', filename: 'no-type.png' }]);
-    array.push([{ type: 'screenshot' }]);
+    array.push([{ type: 'image' }]);
     array.push([null]);
 
     const artifacts = getArtifacts(ydoc);
@@ -138,13 +138,12 @@ describe('Artifact helpers', () => {
 
   it('handles all artifact types', () => {
     const types: Array<{
-      type: 'screenshot' | 'video' | 'test_results' | 'diff';
+      type: 'html' | 'image' | 'video';
       filename: string;
     }> = [
-      { type: 'screenshot', filename: 'screen.png' },
+      { type: 'html', filename: 'report.html' },
+      { type: 'image', filename: 'screen.png' },
       { type: 'video', filename: 'demo.mp4' },
-      { type: 'test_results', filename: 'results.json' },
-      { type: 'diff', filename: 'changes.diff' },
     ];
 
     for (const item of types) {
@@ -157,15 +156,15 @@ describe('Artifact helpers', () => {
     }
 
     const artifacts = getArtifacts(ydoc);
-    expect(artifacts).toHaveLength(4);
-    expect(artifacts.map((a) => a.type)).toEqual(['screenshot', 'video', 'test_results', 'diff']);
+    expect(artifacts).toHaveLength(3);
+    expect(artifacts.map((a) => a.type)).toEqual(['html', 'image', 'video']);
   });
 
   describe('addArtifact validation', () => {
     it('rejects invalid artifact (missing required fields)', () => {
       const invalidArtifact = {
         id: 'art-1',
-        type: 'screenshot',
+        type: 'image',
       } as any;
 
       expect(() => addArtifact(ydoc, invalidArtifact)).toThrow();
@@ -174,7 +173,7 @@ describe('Artifact helpers', () => {
     it('rejects artifact with invalid storage type', () => {
       const invalidArtifact = {
         id: 'art-1',
-        type: 'screenshot',
+        type: 'image',
         filename: 'test.png',
         storage: 'invalid-storage',
         url: 'https://example.com/test.png',
@@ -186,7 +185,7 @@ describe('Artifact helpers', () => {
     it('rejects github artifact without url', () => {
       const invalidArtifact = {
         id: 'art-1',
-        type: 'screenshot',
+        type: 'image',
         filename: 'test.png',
         storage: 'github',
       } as any;
@@ -197,7 +196,7 @@ describe('Artifact helpers', () => {
     it('rejects local artifact without localArtifactId', () => {
       const invalidArtifact = {
         id: 'art-1',
-        type: 'screenshot',
+        type: 'image',
         filename: 'test.png',
         storage: 'local',
       } as any;
@@ -208,7 +207,7 @@ describe('Artifact helpers', () => {
     it('accepts valid github artifact', () => {
       const validArtifact = {
         id: 'art-1',
-        type: 'screenshot' as const,
+        type: 'image' as const,
         filename: 'test.png',
         storage: 'github' as const,
         url: 'https://example.com/test.png',
@@ -221,7 +220,7 @@ describe('Artifact helpers', () => {
     it('accepts valid local artifact', () => {
       const validArtifact = {
         id: 'art-1',
-        type: 'screenshot' as const,
+        type: 'image' as const,
         filename: 'test.png',
         storage: 'local' as const,
         localArtifactId: 'local-123',

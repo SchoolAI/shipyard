@@ -43,6 +43,200 @@ This skill complements the Shipyard MCP server. The MCP provides tools; this ski
 3. **Upload artifacts** linked to deliverables
 4. **Auto-complete** when all deliverables have proof
 
+## Deliverable Format Guidelines
+
+**HTML is the primary format for artifacts.** Use HTML for 90% of deliverables - it's self-contained, richly formatted, searchable, and works everywhere.
+
+### 3-Tier Format Hierarchy
+
+| Tier | Format | Use For | Examples |
+|------|--------|---------|----------|
+| **1** | **HTML** (primary) | Test results, reviews, terminal output, reports | Unit tests, code reviews, build logs, lint output |
+| **2** | **Image** | Actual UI screenshots only | App interface, visual bugs, design mockups |
+| **3** | **Video** | Complex flows requiring browser automation | Multi-step user journeys, animations, interactions |
+
+### When to Use Each Format
+
+**Use HTML when:**
+- ✅ Terminal output (test results, build logs, linting)
+- ✅ Code reviews or security audits
+- ✅ Structured reports or analysis
+- ✅ Any text-based output you'd normally copy-paste
+- ✅ Screenshots with annotations or context
+- ✅ Coverage reports, profiling data, metrics
+
+**Use Images when:**
+- 📸 Showing actual application UI (buttons, forms, layouts)
+- 📸 Visual bugs or design issues
+- 📸 Before/after comparisons
+- 📸 Design mockups or prototypes
+
+**Use Video when:**
+- 🎥 Demonstrating multi-step user flows
+- 🎥 Showing animations or transitions
+- 🎥 Browser automation proof (Playwright/Puppeteer)
+- 🎥 Complex interactions that images can't capture
+
+### Decision Tree
+
+```
+Is this terminal/CLI output? ──► YES ──► HTML (dark terminal theme)
+  │
+  NO
+  │
+Is this a code review/audit? ──► YES ──► HTML (light professional theme)
+  │
+  NO
+  │
+Is this test/coverage data? ──► YES ──► HTML (syntax-highlighted)
+  │
+  NO
+  │
+Does it require browser automation? ──► YES ──► Video
+  │
+  NO
+  │
+Is it showing actual UI? ──► YES ──► Screenshot (Image)
+```
+
+### HTML Examples
+
+**Test Results:**
+```typescript
+const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body {
+      font-family: 'SF Mono', Monaco, monospace;
+      background: #1e1e1e;
+      color: #d4d4d4;
+      padding: 20px;
+    }
+    .pass { color: #22c55e; }
+    .pass::before { content: "✔ "; }
+  </style>
+</head>
+<body>
+  <h1>Test Results - PASS</h1>
+  <div class="test-case">
+    <span class="pass">validates email addresses</span>
+  </div>
+</body>
+</html>`;
+
+await addArtifact({
+  planId,
+  sessionToken,
+  type: 'test_results',
+  filename: 'test-results.html',
+  source: 'base64',
+  content: Buffer.from(html).toString('base64'),
+  deliverableId: deliverables[0].id
+});
+```
+
+**Code Review:**
+```typescript
+const review = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body {
+      font-family: -apple-system, sans-serif;
+      max-width: 1000px;
+      margin: 0 auto;
+      padding: 40px;
+      background: #ffffff;
+    }
+    .verdict.pass {
+      background: #d1fae5;
+      border: 2px solid #10b981;
+      padding: 20px;
+    }
+    .issue.critical {
+      border-left: 4px solid #dc2626;
+      background: #fef2f2;
+      padding: 16px;
+      margin: 16px 0;
+    }
+  </style>
+</head>
+<body>
+  <h1>Code Review: Authentication Module</h1>
+  <div class="verdict pass">✓ APPROVED</div>
+  <!-- Risk tables, findings, recommendations -->
+</body>
+</html>`;
+```
+
+**See `examples/html-artifacts.md` for complete working templates.**
+
+### Base64 Image Embedding
+
+Embed screenshots directly in HTML for self-contained artifacts:
+
+```typescript
+import { readFileSync } from 'node:fs';
+
+const imageBuffer = readFileSync('/tmp/screenshot.png');
+const base64Image = imageBuffer.toString('base64');
+
+const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    .screenshot {
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .screenshot img { width: 100%; display: block; }
+  </style>
+</head>
+<body>
+  <h1>Login Page Implementation</h1>
+  <div class="screenshot">
+    <img src="data:image/png;base64,${base64Image}"
+         alt="Login page with validation">
+  </div>
+</body>
+</html>`;
+
+await addArtifact({
+  planId,
+  sessionToken,
+  type: 'screenshot',
+  filename: 'login-demo.html',
+  source: 'base64',
+  content: Buffer.from(html).toString('base64'),
+  deliverableId: deliverables[0].id
+});
+```
+
+### Why HTML is Primary
+
+1. **Self-contained** - Inline CSS, no external dependencies
+2. **Rich formatting** - Colors, structure, syntax highlighting
+3. **Searchable** - Text content is indexable
+4. **Universal** - Works in any browser
+5. **Version control friendly** - Text diffs work
+6. **Portable** - Single file, no special viewers needed
+
+### HTML Best Practices
+
+- ✅ Inline all CSS in `<style>` tags
+- ✅ Embed images as base64 data URIs
+- ✅ Use semantic HTML (h1, h2, table, etc.)
+- ✅ Include proper `<meta charset="UTF-8">`
+- ✅ Keep files under 5MB for fast loading
+- ❌ Never link external stylesheets or scripts
+- ❌ Don't use CDNs or remote resources
+- ❌ Avoid JavaScript (static HTML only)
+
 ## Deliverables: Provable Outcomes
 
 Deliverables are outcomes you prove with artifacts. Mark them with `{#deliverable}`.

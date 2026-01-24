@@ -643,11 +643,11 @@ export const PlanMetadataSchema = z.discriminatedUnion('status', [
   }),
 ]);
 
-export type ArtifactType = 'screenshot' | 'video' | 'test_results' | 'diff';
+export type ArtifactType = 'html' | 'image' | 'video';
 
 const BaseArtifactSchema = z.object({
   id: z.string(),
-  type: z.enum(['screenshot', 'video', 'test_results', 'diff']),
+  type: z.enum(['html', 'image', 'video']),
   filename: z.string(),
   description: z.string().optional(),
   uploadedAt: z.number().optional(),

@@ -130,7 +130,7 @@ describe('Factory Functions', () => {
   describe('createGitHubArtifact', () => {
     it('creates valid GitHubArtifact with storage: github', () => {
       const artifact = createGitHubArtifact({
-        type: 'screenshot',
+        type: 'image',
         filename: 'screenshot.png',
         url: 'https://example.com/screenshot.png',
         description: 'Login page',
@@ -157,7 +157,7 @@ describe('Factory Functions', () => {
     it('defaults uploadedAt to current time if not provided', () => {
       const before = Date.now();
       const artifact = createGitHubArtifact({
-        type: 'test_results',
+        type: 'html',
         filename: 'results.json',
         url: 'https://example.com/results.json',
       });
@@ -171,7 +171,7 @@ describe('Factory Functions', () => {
   describe('createLocalArtifact', () => {
     it('creates valid LocalArtifact with storage: local', () => {
       const artifact = createLocalArtifact({
-        type: 'screenshot',
+        type: 'image',
         filename: 'screenshot.png',
         localArtifactId: 'local-123',
         description: 'Dashboard',
@@ -186,7 +186,7 @@ describe('Factory Functions', () => {
     it('uses provided uploadedAt if given', () => {
       const uploadedAt = 1234567890;
       const artifact = createLocalArtifact({
-        type: 'diff',
+        type: 'html',
         filename: 'changes.diff',
         localArtifactId: 'local-456',
         uploadedAt,

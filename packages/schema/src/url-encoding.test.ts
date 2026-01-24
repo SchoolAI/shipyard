@@ -26,7 +26,7 @@ describe('URL Encoding', () => {
     artifacts: [
       {
         id: 'art-1',
-        type: 'screenshot',
+        type: 'image',
         filename: 'login-ui.png',
         storage: 'github',
         url: 'https://example.com/login-ui.png',

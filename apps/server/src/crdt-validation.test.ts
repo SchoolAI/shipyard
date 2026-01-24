@@ -69,7 +69,7 @@ describe('CRDT Validation', () => {
     it('should detect invalid artifact in array', () => {
       const artifacts = doc.getArray(YDOC_KEYS.ARTIFACTS);
       // Push invalid artifact (missing required fields)
-      artifacts.push([{ id: '123', type: 'screenshot' }]); // Missing storage, filename
+      artifacts.push([{ id: '123', type: 'image' }]); // Missing storage, filename
 
       const report = validateYDoc(doc, planId);
 
@@ -85,7 +85,7 @@ describe('CRDT Validation', () => {
       artifacts.push([
         {
           id: 'art-123',
-          type: 'screenshot',
+          type: 'image',
           filename: 'test.png',
           storage: 'github',
           url: 'https://example.com/test.png',
@@ -171,12 +171,12 @@ describe('CRDT Validation', () => {
       artifacts.push([
         {
           id: 'art-1',
-          type: 'screenshot',
+          type: 'image',
           filename: 'valid.png',
           storage: 'github',
           url: 'https://example.com/valid.png',
         },
-        { id: 'art-2', type: 'screenshot' }, // Invalid - missing fields
+        { id: 'art-2', type: 'image' }, // Invalid - missing fields
       ]);
 
       const report = validateYDoc(doc, planId);
@@ -199,7 +199,7 @@ describe('CRDT Validation', () => {
 
       // Add invalid artifact
       const artifacts = doc.getArray(YDOC_KEYS.ARTIFACTS);
-      artifacts.push([{ id: 'bad', type: 'screenshot' }]); // Invalid
+      artifacts.push([{ id: 'bad', type: 'image' }]); // Invalid
 
       // Now corrupted
       expect(isPlanCorrupted(planId)).toBe(true);
@@ -211,7 +211,7 @@ describe('CRDT Validation', () => {
 
       // Add invalid artifact
       const artifacts = doc.getArray(YDOC_KEYS.ARTIFACTS);
-      artifacts.push([{ id: 'bad', type: 'screenshot' }]);
+      artifacts.push([{ id: 'bad', type: 'image' }]);
 
       expect(isPlanCorrupted(planId)).toBe(true);
 
@@ -220,7 +220,7 @@ describe('CRDT Validation', () => {
       artifacts.push([
         {
           id: 'good',
-          type: 'screenshot',
+          type: 'image',
           filename: 'test.png',
           storage: 'github',
           url: 'https://example.com/test.png',

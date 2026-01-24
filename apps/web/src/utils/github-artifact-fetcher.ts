@@ -229,6 +229,8 @@ async function fetchViaGitHubApi(
 function getMimeType(path: string): string {
   const ext = path.split('.').pop()?.toLowerCase();
   const mimeTypes: Record<string, string> = {
+    html: 'text/html',
+    htm: 'text/html',
     png: 'image/png',
     jpg: 'image/jpeg',
     jpeg: 'image/jpeg',

@@ -50,7 +50,7 @@ import { TOOL_NAMES } from './tool-names.js';
 const AddArtifactInputBase = z.object({
   planId: z.string().describe('The plan ID to add artifact to'),
   sessionToken: z.string().describe('Session token from create_plan'),
-  type: z.enum(['screenshot', 'video', 'test_results', 'diff']).describe('Artifact type'),
+  type: z.enum(['html', 'image', 'video']).describe('Artifact type'),
   filename: z.string().describe('Filename for the artifact'),
   description: z.string().optional().describe('What this artifact proves (deliverable name)'),
   deliverableId: z.string().optional().describe('ID of the deliverable this artifact fulfills'),
@@ -70,6 +70,40 @@ const AddArtifactInput = z.discriminatedUnion('source', [
     content: z.string().describe('Base64 encoded file content'),
   }),
 ]);
+
+// --- Validation Functions ---
+
+/**
+ * Validates that the artifact type matches the file extension.
+ * Throws a helpful error with suggestions if the extension is invalid.
+ */
+function validateArtifactType(type: ArtifactType, filename: string): void {
+  const ext = filename.split('.').pop()?.toLowerCase();
+
+  const validExtensions: Record<ArtifactType, string[]> = {
+    html: ['html', 'htm'],
+    image: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'],
+    video: ['mp4', 'webm', 'mov', 'avi'],
+  };
+
+  const valid = validExtensions[type];
+  if (!valid || !ext || !valid.includes(ext)) {
+    const suggestions: Record<ArtifactType, string> = {
+      html: 'HTML is the primary format for test results, terminal output, code reviews, and structured data. Use self-contained HTML with inline CSS and base64 images.',
+      image:
+        'Images are for actual UI screenshots only. For terminal output or test results, use type: "html" instead.',
+      video:
+        'Videos are for browser automation flows and complex interactions. For static content, use type: "image" or "html".',
+    };
+
+    throw new Error(
+      `Invalid file extension for artifact type '${type}'.\n\n` +
+        `Expected: ${valid?.join(', ') || 'unknown'}\n` +
+        `Got: ${ext || 'no extension'}\n\n` +
+        `Tip: ${suggestions[type]}`
+    );
+  }
+}
 
 // --- Public Export ---
 
@@ -116,7 +150,7 @@ ARTIFACT TYPES:
         sessionToken: { type: 'string', description: 'Session token from create_plan' },
         type: {
           type: 'string',
-          enum: ['screenshot', 'video', 'test_results', 'diff'],
+          enum: ['html', 'image', 'video'],
           description: 'Artifact type for rendering',
         },
         filename: {
@@ -159,6 +193,9 @@ ARTIFACT TYPES:
   handler: async (args: unknown) => {
     const input = AddArtifactInput.parse(args);
     const { planId, sessionToken, type, filename } = input;
+
+    // Validate artifact type matches file extension (before any file operations)
+    validateArtifactType(type as ArtifactType, filename);
 
     // Get actor name for event logging
     const actorName = await getGitHubUsername();
