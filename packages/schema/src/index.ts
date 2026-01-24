@@ -126,6 +126,22 @@ export {
   parseInviteFromUrl,
 } from './invite-token.js';
 export type {
+  GitFileStatus,
+  LocalChangesResponse,
+  LocalChangesResult,
+  LocalChangesUnavailable,
+  LocalChangesUnavailableReason,
+  LocalFileChange,
+} from './local-changes.js';
+export {
+  GitFileStatusSchema,
+  LocalChangesResponseSchema,
+  LocalChangesResultSchema,
+  LocalChangesUnavailableReasonSchema,
+  LocalChangesUnavailableSchema,
+  LocalFileChangeSchema,
+} from './local-changes.js';
+export type {
   ChunkMessage,
   ConversationExportEnd,
   ConversationExportStartMeta,

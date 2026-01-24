@@ -17,6 +17,7 @@ import * as Y from 'yjs';
 import { registryConfig } from './config/env/registry.js';
 import { createConversationHandlers } from './conversation-handlers.js';
 import { attachCRDTValidation } from './crdt-validation.js';
+import { getLocalChanges } from './git-local-changes.js';
 import { getOctokit, parseRepoString } from './github-artifacts.js';
 import { createHookHandlers } from './hook-handlers.js';
 import { logger } from './logger.js';
@@ -673,6 +674,7 @@ function createContext(): Context & {
     logger,
     hookHandlers: createHookHandlers(),
     conversationHandlers: createConversationHandlers(),
+    getLocalChanges,
   };
 }
 

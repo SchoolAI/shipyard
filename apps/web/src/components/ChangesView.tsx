@@ -8,6 +8,7 @@ import {
   ExternalLink,
   FileText,
   Folder,
+  FolderGit2,
   GitBranch,
   GitPullRequest,
   MessageSquare,
@@ -20,8 +21,10 @@ import { toast } from 'sonner';
 import type * as Y from 'yjs';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
 import { useLinkedPRs } from '@/hooks/useLinkedPRs';
+import { useLocalChanges } from '@/hooks/useLocalChanges';
 import { usePRReviewComments } from '@/hooks/usePRReviewComments';
 import { assertNever } from '@/utils/assert-never';
+import { LocalChangesViewer } from './LocalChangesViewer';
 
 // --- Types ---
 
@@ -51,12 +54,34 @@ function setDiffViewModePreference(mode: DiffViewMode): void {
 interface ChangesViewProps {
   ydoc: Y.Doc;
   metadata: PlanMetadata;
+  /** Whether this tab is currently active (triggers refetch) */
+  isActive?: boolean;
 }
 
-export function ChangesView({ ydoc, metadata }: ChangesViewProps) {
+type ChangeSource = 'local' | 'pr';
+
+export function ChangesView({ ydoc, metadata, isActive = true }: ChangesViewProps) {
   const linkedPRs = useLinkedPRs(ydoc);
   const [selectedPR, setSelectedPR] = useState<number | null>(null);
   const { identity } = useGitHubAuth();
+
+  // Determine default source: local if available, otherwise PR
+  const [source, setSource] = useState<ChangeSource>('local');
+
+  // Local changes hook - enabled when source is 'local' and tab is active
+  const {
+    data: localChanges,
+    isLoading: localLoading,
+    isFetching: localFetching,
+    refetch: refetchLocal,
+  } = useLocalChanges(metadata.id, { enabled: source === 'local' && isActive });
+
+  // Refetch local changes when tab becomes active
+  useEffect(() => {
+    if (isActive && source === 'local') {
+      refetchLocal();
+    }
+  }, [isActive, source, refetchLocal]);
 
   // Auto-select first PR when available
   useEffect(() => {
@@ -118,54 +143,66 @@ export function ChangesView({ ydoc, metadata }: ChangesViewProps) {
     refreshPRStatus();
   }, [linkedPRs, metadata.repo, identity?.token, ydoc]);
 
-  // Empty state
-  if (linkedPRs.length === 0) {
-    return (
-      <div className="max-w-4xl mx-auto p-4 md:p-6">
-        <Card>
-          <Card.Content className="p-6 text-center">
-            <GitPullRequest className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-            <h3 className="text-lg font-semibold text-foreground mb-2">No PRs Linked</h3>
-            <p className="text-foreground/80 mb-4">
-              PRs are auto-linked when you run{' '}
-              <code className="text-xs bg-muted px-1 py-0.5 rounded">complete_task</code>.
-            </p>
-            <p className="text-sm text-muted-foreground">
-              Create a PR first, then complete the task to see changes here.
-            </p>
-          </Card.Content>
-        </Card>
-      </div>
-    );
-  }
-
   const selected = linkedPRs.find((pr) => pr.prNumber === selectedPR) ?? linkedPRs[0] ?? null;
+  const hasPRs = linkedPRs.length > 0;
 
   return (
-    <div className="max-w-full mx-auto p-2 md:p-4 space-y-2">
-      {/* PR List (when multiple PRs) */}
-      {linkedPRs.length > 1 && (
-        <div className="space-y-1.5">
-          {linkedPRs.map((pr) => (
-            <PRCard
-              key={pr.prNumber}
-              pr={pr}
-              selected={pr.prNumber === selectedPR}
-              onSelect={() => setSelectedPR(pr.prNumber)}
-            />
-          ))}
-        </div>
+    <div className="max-w-full mx-auto p-2 md:p-4 space-y-3">
+      {/* Source Selector - only show if we have PRs to switch between */}
+      {hasPRs && (
+        <ButtonGroup size="sm">
+          <Button
+            variant={source === 'local' ? 'primary' : 'secondary'}
+            onPress={() => setSource('local')}
+          >
+            <FolderGit2 className="w-4 h-4" />
+            Local Changes
+          </Button>
+          <Button
+            variant={source === 'pr' ? 'primary' : 'secondary'}
+            onPress={() => setSource('pr')}
+          >
+            <GitPullRequest className="w-4 h-4" />
+            PR #{selected?.prNumber ?? '...'}
+          </Button>
+        </ButtonGroup>
       )}
 
-      {/* Selected PR diff viewer */}
-      {selected && (
-        <div className="space-y-2">
-          {/* PR Header (compact) */}
-          <PRHeader pr={selected} repo={metadata.repo} ydoc={ydoc} />
+      {/* Content based on source */}
+      {source === 'local' ? (
+        <LocalChangesViewer
+          data={localChanges}
+          isLoading={localLoading}
+          isFetching={localFetching}
+          onRefresh={refetchLocal}
+        />
+      ) : (
+        <>
+          {/* PR List (when multiple PRs) */}
+          {linkedPRs.length > 1 && (
+            <div className="space-y-1.5">
+              {linkedPRs.map((pr) => (
+                <PRCard
+                  key={pr.prNumber}
+                  pr={pr}
+                  selected={pr.prNumber === selectedPR}
+                  onSelect={() => setSelectedPR(pr.prNumber)}
+                />
+              ))}
+            </div>
+          )}
 
-          {/* Diff Viewer with Comments */}
-          <DiffViewer pr={selected} repo={metadata.repo || ''} ydoc={ydoc} />
-        </div>
+          {/* Selected PR diff viewer */}
+          {selected && (
+            <div className="space-y-2">
+              {/* PR Header (compact) */}
+              <PRHeader pr={selected} repo={metadata.repo} ydoc={ydoc} />
+
+              {/* Diff Viewer with Comments */}
+              <DiffViewer pr={selected} repo={metadata.repo || ''} ydoc={ydoc} />
+            </div>
+          )}
+        </>
       )}
     </div>
   );

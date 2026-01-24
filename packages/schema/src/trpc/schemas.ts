@@ -18,6 +18,7 @@ export {
   UpdatePresenceRequestSchema,
   UpdatePresenceResponseSchema,
 } from '../hook-api.js';
+export { LocalChangesResultSchema } from '../local-changes.js';
 export { getPlanMetadata } from '../yjs-helpers.js';
 
 export const PlanIdSchema = z.object({
