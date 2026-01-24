@@ -144,7 +144,7 @@ export function PlanContent(props: PlanContentProps) {
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Tab navigation */}
-      <div className="border-b border-separator bg-surface px-2 md:px-6 py-1 md:py-2 shrink-0">
+      <div className="border-b border-separator bg-surface px-2 md:px-6 pt-1 md:pt-2 shrink-0">
         <div className="flex items-center justify-between">
           {/* Tabs on the left - scrollable on mobile */}
           <div className="flex gap-0 md:gap-4 overflow-x-auto md:overflow-visible">

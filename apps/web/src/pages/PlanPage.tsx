@@ -464,7 +464,7 @@ export function PlanPage() {
       <div className="flex flex-col h-full overflow-hidden">
         {/* Header bar with plan metadata - hidden on mobile */}
         {!isMobile && (
-          <div className="border-b border-separator bg-surface px-2 md:px-6 py-1 md:py-3 shrink-0">
+          <div className="border-b border-separator bg-surface px-2 md:px-6 py-1 md:py-2 shrink-0">
             <PlanHeader
               ydoc={ydoc}
               indexDoc={indexDoc}
