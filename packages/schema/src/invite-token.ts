@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ROUTES } from './routes.js';
 
 /**
  * Invite token for time-limited P2P room access.
@@ -212,7 +213,7 @@ export function buildInviteUrl(
   tokenValue: string
 ): string {
   const normalizedBase = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
-  const url = new URL(`${normalizedBase}/task/${planId}`);
+  const url = new URL(`${normalizedBase}${ROUTES.WEB_TASK(planId)}`);
   url.searchParams.set('invite', `${tokenId}:${tokenValue}`);
   return url.toString();
 }

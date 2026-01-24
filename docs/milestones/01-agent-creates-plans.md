@@ -98,7 +98,7 @@ User: "Create an implementation plan for adding user authentication"
 Claude: [calls create_plan tool]
 
 Result:
-- Browser opens with URL like `http://localhost:5173/plan?d=...`
+- Browser opens with URL like `http://localhost:5173/?d=...`
 - Page shows the plan structure (even if just JSON)
 ```
 

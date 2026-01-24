@@ -95,7 +95,7 @@ Based on research of production systems (itty.bitty, Excalidraw, textarea.my):
 ### URL Structure
 
 ```
-https://{host}/plan?d={compressed-data}
+https://{host}/?d={compressed-data}
 
 Where compressed-data = lz-string.compressToEncodedURIComponent(JSON.stringify({
   v: 1,                    // Version for forward compatibility

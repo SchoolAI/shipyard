@@ -346,7 +346,7 @@ Should see: "MCP server started" in logs (stderr)
 
 Check URL has `?d=` parameter with encoded data:
 ```
-http://localhost:5173/plan?d=N4IgdghgtgpiBcIQBoQBc...
+http://localhost:5173/?d=N4IgdghgtgpiBcIQBoQBc...
 ```
 
 ### TypeScript Errors in IDE

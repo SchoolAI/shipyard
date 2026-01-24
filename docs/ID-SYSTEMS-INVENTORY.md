@@ -42,7 +42,7 @@ const planId = nanoid();
 ```
 
 **Where used:**
-- URL path: `/plan/{planId}`
+- URL path: `/task/{planId}`
 - Y.Doc document name
 - IndexedDB persistence key
 - WebRTC room name (prefixed with `shipyard-`)
@@ -51,7 +51,7 @@ const planId = nanoid();
 1. Claude Code hook calls `POST /api/hook/session`
 2. Server generates `planId = nanoid()`
 3. Server creates Y.Doc with this ID
-4. URL returned to hook: `{webUrl}/plan/{planId}`
+4. URL returned to hook: `{webUrl}/task/{planId}`
 
 ---
 

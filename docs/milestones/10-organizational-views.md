@@ -335,7 +335,7 @@ apps/web/src/hooks/useInboxPlans.ts        -- New: Filter for inbox items
 - [ ] **2b: Main layout refactor**
   - Move from plan-only content to view-aware layout
   - Route: `/views/:viewType` or use query param `?view=kanban`
-  - Preserve `/plan/:id` route for direct plan access
+  - Preserve `/task/:id` route for direct plan access
 
 - [ ] **2c: Kanban board component**
   - 6 columns matching `PlanStatusValues`: draft, pending_review, approved, changes_requested, in_progress, completed

@@ -3,19 +3,19 @@ import { buildInviteUrl, getTokenTimeRemaining, parseInviteFromUrl } from './inv
 
 describe('parseInviteFromUrl', () => {
   it('should parse valid invite URL', () => {
-    const url = 'https://example.com/plan/abc123?invite=token123:secretvalue';
+    const url = 'https://example.com/task/abc123?invite=token123:secretvalue';
     const result = parseInviteFromUrl(url);
     expect(result).toEqual({ tokenId: 'token123', tokenValue: 'secretvalue' });
   });
 
   it('should return null for URL without invite param', () => {
-    const url = 'https://example.com/plan/abc123';
+    const url = 'https://example.com/task/abc123';
     const result = parseInviteFromUrl(url);
     expect(result).toBeNull();
   });
 
   it('should return null for malformed invite param', () => {
-    const url = 'https://example.com/plan/abc123?invite=onlyonepart';
+    const url = 'https://example.com/task/abc123?invite=onlyonepart';
     const result = parseInviteFromUrl(url);
     expect(result).toBeNull();
   });
@@ -26,7 +26,7 @@ describe('parseInviteFromUrl', () => {
   });
 
   it('should handle invite param with colons in token value', () => {
-    const url = 'https://example.com/plan/abc123?invite=token123:secret:with:colons';
+    const url = 'https://example.com/task/abc123?invite=token123:secret:with:colons';
     const result = parseInviteFromUrl(url);
     expect(result).toEqual({ tokenId: 'token123', tokenValue: 'secret' });
   });

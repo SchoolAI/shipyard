@@ -82,7 +82,7 @@ Claude: "Create a plan for adding dark mode"
 - ✅ Dynamic WebSocket port allocation (port 0)
 - ✅ Browser multi-provider sync (connects to all MCP instances)
 - ✅ Sidebar with plan list (Notion-like UI)
-- ✅ Routing: `/`, `/plan/:id`, `/?d=` for snapshots
+- ✅ Routing: `/`, `/task/:id`, `/?d=` for snapshots
 - ✅ New MCP tools: `read_plan`, `update_plan`
 - ✅ Plan index syncs via CRDT across all peers
 
