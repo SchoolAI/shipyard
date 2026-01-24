@@ -5,7 +5,7 @@
   "type": "module",
   "bin": {
     "mcp-server-shipyard": "./apps/server/dist/index.js",
-    "shipyard-hook": "./apps/hook/dist/index.js"
+    "shipyard-hook": "./apps/hook/dist/index.cjs"
   },
   "files": [
     "apps/server/dist",
@@ -19,7 +19,7 @@
       "import": "./apps/server/dist/index.js"
     },
     "./hook": {
-      "import": "./apps/hook/dist/index.js"
+      "require": "./apps/hook/dist/index.cjs"
     }
   },
   "engines": {

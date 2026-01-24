@@ -28488,6 +28488,342 @@ var require_undici = __commonJS({
 // src/index.ts
 init_cjs_shims();
 
+// ../../packages/shared/dist/instructions/index.mjs
+init_cjs_shims();
+var CRITICAL_USAGE_SECTION = `## CRITICAL: When to Use Shipyard
+
+\u26A0\uFE0F **MANDATORY USAGE RULE:**
+
+If Shipyard is available, you MUST use it for:
+- Creating implementation plans
+- Tracking work that needs human review
+- Documenting proof of work (screenshots, videos, test results)
+- ANY user request involving "plan", "track", "verify", or "prove"
+
+**DO NOT:**
+- Create plans manually in chat or as markdown files
+- Write implementation docs yourself when Shipyard is available
+- Suggest alternatives to Shipyard for trackable work
+- Overthink whether to use it - WHEN IN DOUBT, USE SHIPYARD
+
+**Decision Tree:**
+\`\`\`
+Need to create/track/verify work?
+        \u2502
+        \u25BC
+  Shipyard available?
+     \u2502           \u2502
+    YES          NO
+     \u2502           \u2502
+     \u25BC           \u25BC
+  USE IT     Manual approach
+  NOW        (tell user why)
+\`\`\``;
+var DELIVERABLES_SECTION = `## What are Deliverables?
+
+Deliverables are measurable outcomes you can **prove** with artifacts (screenshots, videos, test results).
+
+**Good deliverables (provable):**
+\`\`\`
+- [ ] Screenshot of working login page {#deliverable}
+- [ ] Video showing drag-and-drop feature {#deliverable}
+- [ ] Test results showing all tests pass {#deliverable}
+\`\`\`
+
+**Bad deliverables (not provable - these are tasks, not deliverables):**
+\`\`\`
+- [ ] Implement getUserMedia API  \u2190 Implementation detail, not provable
+- [ ] Add error handling          \u2190 Can't capture this with an artifact
+- [ ] Refactor authentication     \u2190 Too vague, no visual proof
+\`\`\`
+
+**Rule:** If you can't screenshot/record/export it, it's not a deliverable.`;
+var ARTIFACT_TYPES_SECTION = `## Artifact Types
+
+| Type | Use For | File Formats |
+|------|---------|--------------|
+| \`screenshot\` | UI changes, visual proof, error states | .png, .jpg, .webp |
+| \`video\` | Complex flows, interactions, animations | .mp4, .webm |
+| \`test_results\` | Test output, coverage reports | .json, .txt, .xml |
+| \`diff\` | Code changes, before/after comparisons | .diff, .patch |`;
+var TIPS_SECTION = `## Tips for Effective Use
+
+1. **Plan deliverables first** - Decide what proves success before coding
+2. **Capture during work** - Take screenshots as you implement, not after
+3. **Be specific** - "Login page with error state" beats "Screenshot"
+4. **Link every artifact** - Always set \`deliverableId\` for auto-completion
+5. **Check feedback** - Read reviewer comments and iterate`;
+var WHEN_NOT_TO_USE_SECTION = `## When NOT to Use Shipyard
+
+Skip Shipyard for:
+- Quick answers or research questions (no artifacts to capture)
+- Internal refactoring with no visible output
+- Tasks where proof adds no value (trivial fixes)
+- Exploration or debugging sessions
+- Pure documentation without implementation`;
+var TROUBLESHOOTING_SECTION = `## Troubleshooting
+
+**Browser doesn't open:** Check MCP server is running and accessible.
+
+**Upload fails:** Verify file path exists. For GitHub uploads, check \`GITHUB_TOKEN\` has repo write access.
+
+**No auto-complete:** Ensure every deliverable has an artifact with matching \`deliverableId\`.
+
+**Plan not syncing:** Check WebSocket connection to registry server.`;
+var COMMON_INSTRUCTIONS = [
+  CRITICAL_USAGE_SECTION,
+  DELIVERABLES_SECTION,
+  ARTIFACT_TYPES_SECTION,
+  TIPS_SECTION,
+  WHEN_NOT_TO_USE_SECTION,
+  TROUBLESHOOTING_SECTION
+].join("\n\n");
+var CLAUDE_CODE_HEADER = `[SHIPYARD] Collaborative planning with human review & proof-of-work tracking.`;
+var PLAN_MODE_WORKFLOW = `## How to Use (Claude Code with Hooks)
+
+You have the **full Shipyard experience** with automatic hooks. Use native plan mode:
+
+### Workflow
+
+1. **Enter plan mode** (Shift+Tab) \u2192 Browser opens with live plan automatically
+2. **Write your plan** with \`{#deliverable}\` markers for provable outcomes
+3. **Exit plan mode** \u2192 Hook **BLOCKS** until human approves or requests changes
+4. **On approval** \u2192 You automatically receive: planId, sessionToken, deliverable IDs
+5. **Do the work** \u2192 Take screenshots/videos as you implement
+6. **Upload artifacts** \u2192 \`add_artifact(filePath, deliverableId)\` for each deliverable
+7. **Auto-complete** \u2192 When all deliverables have artifacts, task completes with snapshot URL
+
+### After Approval
+
+You only need ONE tool: \`add_artifact\`
+
+The hook automatically injects everything you need (planId, sessionToken, deliverables).
+Just call \`add_artifact\` with the file path and deliverable ID.
+
+\`\`\`typescript
+// Example: After approval, you'll have these in context
+// planId: "abc123"
+// sessionToken: "xyz..."
+// deliverables: [{ id: "del_xxx", text: "Screenshot of login" }]
+
+await addArtifact({
+  planId,
+  sessionToken,
+  type: 'screenshot',
+  filename: 'login-page.png',
+  source: 'file',
+  filePath: '/tmp/screenshot.png',
+  deliverableId: deliverables[0].id
+});
+\`\`\`
+
+When the last deliverable gets an artifact, the task auto-completes and returns a snapshot URL.`;
+var IMPORTANT_NOTES = `## Important Notes for Claude Code
+
+- **DO NOT call \`createPlan()\` directly** - The hook handles plan creation when you enter plan mode
+- **DO NOT use the Shipyard skill** - The hook provides everything you need
+- **DO NOT poll for approval** - The hook blocks automatically until human decides
+- **DO use plan mode** for ANY work that needs tracking, verification, or human review`;
+var CLAUDE_CODE_INSTRUCTIONS = [
+  CLAUDE_CODE_HEADER,
+  "",
+  CRITICAL_USAGE_SECTION,
+  "",
+  PLAN_MODE_WORKFLOW,
+  "",
+  DELIVERABLES_SECTION,
+  "",
+  ARTIFACT_TYPES_SECTION,
+  "",
+  IMPORTANT_NOTES,
+  "",
+  TIPS_SECTION,
+  "",
+  WHEN_NOT_TO_USE_SECTION,
+  "",
+  TROUBLESHOOTING_SECTION
+].join("\n");
+var MCP_DIRECT_HEADER = `# Shipyard: Verified Work Tasks
+
+> **MCP Integration:** Use \`execute_code\` to call Shipyard APIs. This skill teaches the workflow.
+
+Shipyard turns invisible agent work into reviewable, verifiable tasks. Instead of trusting that code was written correctly, reviewers see screenshots, videos, and test results as proof.`;
+var MCP_TOOLS_OVERVIEW = `## Available MCP Tools
+
+| Tool | Purpose |
+|------|---------|
+| \`execute_code\` | Run TypeScript that calls Shipyard APIs (recommended) |
+| \`request_user_input\` | Ask user questions via browser modal |
+
+**Preferred approach:** Use \`execute_code\` to chain multiple API calls in one step.`;
+var MCP_WORKFLOW = `## Workflow (MCP Direct)
+
+### Step 1: Create Plan
+
+\`\`\`typescript
+const plan = await createPlan({
+  title: "Add user authentication",
+  content: \`
+## Deliverables
+- [ ] Screenshot of login page {#deliverable}
+- [ ] Screenshot of error handling {#deliverable}
+
+## Implementation
+1. Create login form component
+2. Add validation
+3. Connect to auth API
+\`
+});
+
+const { planId, sessionToken, deliverables, monitoringScript } = plan;
+// deliverables = [{ id: "del_xxx", text: "Screenshot of login page" }, ...]
+\`\`\`
+
+### Step 2: Wait for Approval
+
+For platforms without hooks, run the monitoring script in the background:
+
+\`\`\`bash
+# The monitoringScript polls for approval status
+# Run it in background while you wait
+bash <(echo "$monitoringScript") &
+\`\`\`
+
+Or poll manually:
+
+\`\`\`typescript
+const status = await readPlan(planId, sessionToken);
+if (status.status === "in_progress") {
+  // Approved! Proceed with work
+}
+if (status.status === "changes_requested") {
+  // Read feedback, make changes
+}
+\`\`\`
+
+### Step 3: Do the Work
+
+Implement the feature, taking screenshots/recordings as you go.
+
+### Step 4: Upload Artifacts
+
+\`\`\`typescript
+await addArtifact({
+  planId,
+  sessionToken,
+  type: 'screenshot',
+  filename: 'login-page.png',
+  source: 'file',
+  filePath: '/path/to/screenshot.png',
+  deliverableId: deliverables[0].id  // Links to specific deliverable
+});
+
+const result = await addArtifact({
+  planId,
+  sessionToken,
+  type: 'screenshot',
+  filename: 'error-handling.png',
+  source: 'file',
+  filePath: '/path/to/error.png',
+  deliverableId: deliverables[1].id
+});
+
+// Auto-complete triggers when ALL deliverables have artifacts
+if (result.allDeliverablesComplete) {
+  console.log('Done!', result.snapshotUrl);
+}
+\`\`\``;
+var API_REFERENCE = `## API Reference
+
+### createPlan(options)
+
+Creates a new plan and opens it in the browser.
+
+**Parameters:**
+- \`title\` (string) - Plan title
+- \`content\` (string) - Markdown content with \`{#deliverable}\` markers
+- \`repo\` (string, optional) - GitHub repo for artifact storage
+- \`prNumber\` (number, optional) - PR number to link
+
+**Returns:** \`{ planId, sessionToken, url, deliverables, monitoringScript }\`
+
+### readPlan(planId, sessionToken, options?)
+
+Reads current plan state.
+
+**Parameters:**
+- \`planId\` (string) - Plan ID
+- \`sessionToken\` (string) - Session token from createPlan
+- \`options.includeAnnotations\` (boolean) - Include reviewer comments
+
+**Returns:** \`{ content, status, title, deliverables }\`
+
+### addArtifact(options)
+
+Uploads proof-of-work artifact.
+
+**Parameters:**
+- \`planId\` (string) - Plan ID
+- \`sessionToken\` (string) - Session token
+- \`type\` ('screenshot' | 'video' | 'test_results' | 'diff')
+- \`filename\` (string) - File name
+- \`source\` ('file' | 'url' | 'base64')
+- \`filePath\` (string) - Local file path (when source='file')
+- \`deliverableId\` (string, optional) - Links artifact to deliverable
+
+**Returns:** \`{ artifactId, url, allDeliverablesComplete, snapshotUrl? }\`
+
+### requestUserInput(options)
+
+Asks user a question via browser modal.
+
+**Parameters:**
+- \`message\` (string) - Question to ask
+- \`type\` ('text' | 'choice' | 'confirm' | 'multiline')
+- \`options\` (string[], for 'choice') - Available choices
+- \`timeout\` (number, optional) - Timeout in seconds
+
+**Returns:** \`{ success, response?, status }\``;
+var HANDLING_FEEDBACK = `## Handling Reviewer Feedback
+
+\`\`\`typescript
+const status = await readPlan(planId, sessionToken, {
+  includeAnnotations: true
+});
+
+if (status.status === "changes_requested") {
+  // Read the content for inline comments
+  console.log(status.content);
+
+  // Make changes based on feedback
+  // Upload new artifacts
+  // Plan will transition back to pending_review
+}
+\`\`\``;
+var MCP_DIRECT_INSTRUCTIONS = [
+  MCP_DIRECT_HEADER,
+  "",
+  CRITICAL_USAGE_SECTION,
+  "",
+  MCP_TOOLS_OVERVIEW,
+  "",
+  MCP_WORKFLOW,
+  "",
+  DELIVERABLES_SECTION,
+  "",
+  ARTIFACT_TYPES_SECTION,
+  "",
+  API_REFERENCE,
+  "",
+  HANDLING_FEEDBACK,
+  "",
+  TIPS_SECTION,
+  "",
+  WHEN_NOT_TO_USE_SECTION,
+  "",
+  TROUBLESHOOTING_SECTION
+].join("\n");
+
 // src/adapters/claude-code.ts
 init_cjs_shims();
 
@@ -42603,10 +42939,9 @@ var PlanMetadataSchema = external_exports.discriminatedUnion("status", [
 var BaseArtifactSchema = external_exports.object({
   id: external_exports.string(),
   type: external_exports.enum([
-    "screenshot",
-    "video",
-    "test_results",
-    "diff"
+    "html",
+    "image",
+    "video"
   ]),
   filename: external_exports.string(),
   description: external_exports.string().optional(),
@@ -43793,6 +44128,29 @@ var GitHubPRResponseSchema = external_exports.object({
   merged: external_exports.boolean(),
   head: external_exports.object({ ref: external_exports.string() })
 });
+var ROUTES = {
+  REGISTRY_LIST: "/registry",
+  REGISTRY_REGISTER: "/register",
+  REGISTRY_UNREGISTER: "/unregister",
+  PLAN_STATUS: (planId) => `/api/plan/${planId}/status`,
+  PLAN_HAS_CONNECTIONS: (planId) => `/api/plan/${planId}/has-connections`,
+  PLAN_TRANSCRIPT: (planId) => `/api/plan/${planId}/transcript`,
+  PLAN_SUBSCRIBE: (planId) => `/api/plan/${planId}/subscribe`,
+  PLAN_CHANGES: (planId) => `/api/plan/${planId}/changes`,
+  PLAN_UNSUBSCRIBE: (planId) => `/api/plan/${planId}/unsubscribe`,
+  PLAN_PR_DIFF: (planId, prNumber) => `/api/plans/${planId}/pr-diff/${prNumber}`,
+  PLAN_PR_FILES: (planId, prNumber) => `/api/plans/${planId}/pr-files/${prNumber}`,
+  HOOK_SESSION: "/api/hook/session",
+  HOOK_CONTENT: (planId) => `/api/hook/plan/${planId}/content`,
+  HOOK_REVIEW: (planId) => `/api/hook/plan/${planId}/review`,
+  HOOK_SESSION_TOKEN: (planId) => `/api/hook/plan/${planId}/session-token`,
+  HOOK_PRESENCE: (planId) => `/api/hook/plan/${planId}/presence`,
+  CONVERSATION_IMPORT: "/api/conversation/import",
+  WEB_TASK: (planId) => `/task/${planId}`
+};
+function createPlanWebUrl(baseUrl, planId) {
+  return `${baseUrl.replace(/\/$/, "")}${ROUTES.WEB_TASK(planId)}`;
+}
 var InviteTokenSchema = external_exports.object({
   id: external_exports.string(),
   tokenHash: external_exports.string(),
@@ -43810,6 +44168,42 @@ var InviteRedemptionSchema = external_exports.object({
   redeemedAt: external_exports.number(),
   tokenId: external_exports.string()
 });
+var GitFileStatusSchema = external_exports.enum([
+  "added",
+  "modified",
+  "deleted",
+  "renamed",
+  "copied",
+  "untracked"
+]);
+var LocalFileChangeSchema = external_exports.object({
+  path: external_exports.string(),
+  status: GitFileStatusSchema,
+  additions: external_exports.number(),
+  deletions: external_exports.number(),
+  patch: external_exports.string().optional()
+});
+var LocalChangesResponseSchema = external_exports.object({
+  available: external_exports.literal(true),
+  branch: external_exports.string(),
+  baseBranch: external_exports.string(),
+  staged: external_exports.array(LocalFileChangeSchema),
+  unstaged: external_exports.array(LocalFileChangeSchema),
+  untracked: external_exports.array(external_exports.string()),
+  files: external_exports.array(LocalFileChangeSchema)
+});
+var LocalChangesUnavailableReasonSchema = external_exports.enum([
+  "no_cwd",
+  "not_git_repo",
+  "mcp_not_connected",
+  "git_error"
+]);
+var LocalChangesUnavailableSchema = external_exports.object({
+  available: external_exports.literal(false),
+  reason: LocalChangesUnavailableReasonSchema,
+  message: external_exports.string()
+});
+var LocalChangesResultSchema = external_exports.discriminatedUnion("available", [LocalChangesResponseSchema, LocalChangesUnavailableSchema]);
 var ConversationExportStartMetaSchema = external_exports.object({
   exportId: external_exports.string(),
   totalChunks: external_exports.number().int().positive(),
@@ -43852,29 +44246,6 @@ var PlanIndexEntrySchema = external_exports.discriminatedUnion("deleted", [exter
   deletedAt: external_exports.number(),
   deletedBy: external_exports.string()
 })]);
-var ROUTES = {
-  REGISTRY_LIST: "/registry",
-  REGISTRY_REGISTER: "/register",
-  REGISTRY_UNREGISTER: "/unregister",
-  PLAN_STATUS: (planId) => `/api/plan/${planId}/status`,
-  PLAN_HAS_CONNECTIONS: (planId) => `/api/plan/${planId}/has-connections`,
-  PLAN_TRANSCRIPT: (planId) => `/api/plan/${planId}/transcript`,
-  PLAN_SUBSCRIBE: (planId) => `/api/plan/${planId}/subscribe`,
-  PLAN_CHANGES: (planId) => `/api/plan/${planId}/changes`,
-  PLAN_UNSUBSCRIBE: (planId) => `/api/plan/${planId}/unsubscribe`,
-  PLAN_PR_DIFF: (planId, prNumber) => `/api/plans/${planId}/pr-diff/${prNumber}`,
-  PLAN_PR_FILES: (planId, prNumber) => `/api/plans/${planId}/pr-files/${prNumber}`,
-  HOOK_SESSION: "/api/hook/session",
-  HOOK_CONTENT: (planId) => `/api/hook/plan/${planId}/content`,
-  HOOK_REVIEW: (planId) => `/api/hook/plan/${planId}/review`,
-  HOOK_SESSION_TOKEN: (planId) => `/api/hook/plan/${planId}/session-token`,
-  HOOK_PRESENCE: (planId) => `/api/hook/plan/${planId}/presence`,
-  CONVERSATION_IMPORT: "/api/conversation/import",
-  WEB_TASK: (planId) => `/task/${planId}`
-};
-function createPlanWebUrl(baseUrl, planId) {
-  return `${baseUrl.replace(/\/$/, "")}${ROUTES.WEB_TASK(planId)}`;
-}
 function formatThreadsForLLM(threads, options = {}) {
   const { includeResolved = false, selectedTextMaxLength = 100, resolveUser } = options;
   const unresolvedThreads = threads.filter((t$1) => !t$1.resolved);
@@ -44028,6 +44399,21 @@ var planRouter = router({
   }),
   hasConnections: publicProcedure.input(PlanIdSchema).output(HasConnectionsResponseSchema).query(async ({ input, ctx }) => {
     return { hasConnections: await ctx.getPlanStore().hasActiveConnections(input.planId) };
+  }),
+  getLocalChanges: publicProcedure.input(PlanIdSchema).output(LocalChangesResultSchema).query(async ({ input, ctx }) => {
+    const metadata = getPlanMetadata(await ctx.getOrCreateDoc(input.planId));
+    if (!metadata) throw new TRPCError({
+      code: "NOT_FOUND",
+      message: "Plan not found"
+    });
+    const origin = metadata.origin;
+    const cwd = origin?.platform === "claude-code" ? origin.cwd : void 0;
+    if (!cwd) return {
+      available: false,
+      reason: "no_cwd",
+      message: "Plan has no associated working directory. Only Claude Code plans support local changes."
+    };
+    return ctx.getLocalChanges(cwd);
   })
 });
 var subscriptionRouter = router({
@@ -46095,46 +46481,10 @@ async function readStdin() {
   return Buffer.concat(chunks).toString("utf-8");
 }
 function outputSessionStartContext() {
-  const context = `[SHIPYARD] Collaborative planning with human review & proof-of-work tracking.
-
-IMPORTANT: Use native plan mode (Shift+Tab) to create plans. The hook handles everything automatically.
-
-## What are Deliverables?
-
-Deliverables are measurable outcomes you can prove with artifacts (screenshots, videos, test results).
-
-Good deliverables (provable):
-\`\`\`
-- [ ] Screenshot of working login page {#deliverable}
-- [ ] Video showing feature in action {#deliverable}
-- [ ] Test results showing all tests pass {#deliverable}
-\`\`\`
-
-Bad deliverables (implementation details, not provable):
-\`\`\`
-- [ ] Implement getUserMedia API  \u2190 This is a task, not a deliverable
-- [ ] Add error handling          \u2190 Can't prove this with an artifact
-\`\`\`
-
-## Workflow
-
-1. Enter plan mode (Shift+Tab) \u2192 Browser opens with live plan
-2. Write plan with {#deliverable} markers for provable outcomes
-3. Exit plan mode \u2192 Hook BLOCKS until human approves
-4. On approval \u2192 You receive planId, sessionToken, and deliverable IDs
-5. Do work \u2192 Take screenshots/videos as you go
-6. \`add_artifact(filePath, deliverableId)\` for each deliverable
-7. When all deliverables fulfilled \u2192 Auto-completes with snapshot URL
-
-## After Approval
-
-You only need ONE tool: \`add_artifact\`
-
-When the last deliverable gets an artifact, the task auto-completes and returns a snapshot URL for your PR.`;
   const hookOutput = {
     hookSpecificOutput: {
       hookEventName: "SessionStart",
-      additionalContext: context
+      additionalContext: CLAUDE_CODE_INSTRUCTIONS
     }
   };
   console.log(JSON.stringify(hookOutput));

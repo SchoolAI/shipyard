@@ -3,7 +3,7 @@ import { defineConfig } from 'tsup';
 export default defineConfig({
 	entry: ['src/index.ts'],
 	format: ['cjs'], // CJS for pino compatibility (uses dynamic require internally)
-	outExtension: () => ({ js: '.js' }), // Force .js extension (hooks.json references index.js)
+	outExtension: () => ({ js: '.cjs' }), // .cjs extension ensures Node treats it as CommonJS even in ESM packages
 	dts: false, // Project references break tsup type gen with workspace packages
 	clean: true,
 	sourcemap: false, // Exclude source maps from production builds (reduces size 43%)

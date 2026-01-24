@@ -9,6 +9,7 @@
  *   echo '{"session_id": "...", ...}' | shipyard-hook
  */
 
+import { CLAUDE_CODE_INSTRUCTIONS } from '@shipyard/shared/instructions';
 import { claudeCodeAdapter } from './adapters/claude-code.js';
 import type { AdapterEvent, AgentAdapter, CoreResponse } from './adapters/types.js';
 import { DEFAULT_AGENT_TYPE } from './constants.js';
@@ -203,53 +204,18 @@ async function readStdin(): Promise<string> {
 /**
  * Output SessionStart context for Claude to see.
  *
- * NOTE: This context is duplicated in the skill (shipyard-skill/SKILL.md) but serves
- * a different purpose. The hook context is for Claude Code users who have the hook
- * installed and use native plan mode (Shift+Tab). The skill documentation is for
- * agents invoking the MCP tool directly without native plan mode. Both are needed.
+ * Uses shared instructions from @shipyard/shared/instructions to keep
+ * Claude Code and MCP-direct platforms in sync. The CLAUDE_CODE_INSTRUCTIONS
+ * is specifically tailored for users with hooks (plan mode workflow).
+ *
+ * For MCP-direct platforms (Cursor, Windsurf, etc.), see skills/shipyard/SKILL.md
+ * which uses MCP_DIRECT_INSTRUCTIONS from the same shared module.
  */
 function outputSessionStartContext(): void {
-  const context = `[SHIPYARD] Collaborative planning with human review & proof-of-work tracking.
-
-IMPORTANT: Use native plan mode (Shift+Tab) to create plans. The hook handles everything automatically.
-
-## What are Deliverables?
-
-Deliverables are measurable outcomes you can prove with artifacts (screenshots, videos, test results).
-
-Good deliverables (provable):
-\`\`\`
-- [ ] Screenshot of working login page {#deliverable}
-- [ ] Video showing feature in action {#deliverable}
-- [ ] Test results showing all tests pass {#deliverable}
-\`\`\`
-
-Bad deliverables (implementation details, not provable):
-\`\`\`
-- [ ] Implement getUserMedia API  ← This is a task, not a deliverable
-- [ ] Add error handling          ← Can't prove this with an artifact
-\`\`\`
-
-## Workflow
-
-1. Enter plan mode (Shift+Tab) → Browser opens with live plan
-2. Write plan with {#deliverable} markers for provable outcomes
-3. Exit plan mode → Hook BLOCKS until human approves
-4. On approval → You receive planId, sessionToken, and deliverable IDs
-5. Do work → Take screenshots/videos as you go
-6. \`add_artifact(filePath, deliverableId)\` for each deliverable
-7. When all deliverables fulfilled → Auto-completes with snapshot URL
-
-## After Approval
-
-You only need ONE tool: \`add_artifact\`
-
-When the last deliverable gets an artifact, the task auto-completes and returns a snapshot URL for your PR.`;
-
   const hookOutput = {
     hookSpecificOutput: {
       hookEventName: 'SessionStart',
-      additionalContext: context,
+      additionalContext: CLAUDE_CODE_INSTRUCTIONS,
     },
   };
 

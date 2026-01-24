@@ -2,9 +2,9 @@
   "name": "@shipyard/hook",
   "version": "0.1.0",
   "description": "Claude Code integration hook for Shipyard collaborative planning",
-  "main": "./dist/index.js",
+  "main": "./dist/index.cjs",
   "bin": {
-    "shipyard-hook": "./dist/index.js",
+    "shipyard-hook": "./dist/index.cjs",
     "shipyard-hook-install": "./scripts/postinstall.mjs"
   },
   "files": [
@@ -13,7 +13,7 @@
   ],
   "exports": {
     ".": {
-      "require": "./dist/index.js"
+      "require": "./dist/index.cjs"
     }
   },
   "engines": {

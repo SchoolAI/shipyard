@@ -106,7 +106,7 @@ shipyard/
 
 **Do NOT consider backwards compatibility for any changes.** Break things freely—we have no users yet.
 
-**Policy expires: January 20, 2026.** If today is past this date, STOP and alert the user: "The backwards compatibility policy has expired. Should I extend the date or remove this section?"
+**Policy expires: February 15, 2026.** If today is past this date, STOP and alert the user: "The backwards compatibility policy has expired. Should I extend the date or remove this section?"
 
 ## Common Tasks
 
