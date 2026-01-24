@@ -225,7 +225,7 @@ export function DeliverablesView({
                 // If no artifact, create a stub GitHub artifact for display purposes
                 const syntheticArtifact: Artifact = item.artifact || {
                   id: item.deliverable.id,
-                  type: 'screenshot', // default type for unlinked deliverables
+                  type: 'image', // default type for unlinked deliverables
                   storage: 'github',
                   filename: '',
                   description: item.deliverable.text,

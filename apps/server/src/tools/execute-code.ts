@@ -119,7 +119,7 @@ Upload proof-of-work artifact.
 Parameters:
 - planId (string): The plan ID
 - sessionToken (string): Session token
-- type (string): 'screenshot' | 'video' | 'test_results' | 'diff'
+- type (string): 'html' | 'image' | 'video'
 - filename (string): e.g., "screenshot.png"
 - source (string): Content source type - 'file' | 'url' | 'base64'
 - filePath (string): Local file path (required when source='file') - RECOMMENDED
