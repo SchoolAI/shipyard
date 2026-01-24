@@ -54,6 +54,7 @@ import { ShareButton } from '@/components/ShareButton';
 import { StatusChip } from '@/components/StatusChip';
 import { TagChip } from '@/components/TagChip';
 import { TagEditor } from '@/components/TagEditor';
+import { TruncatedText } from '@/components/ui/TruncatedText';
 import { useActivePlanSync } from '@/contexts/ActivePlanSyncContext';
 import { useUserIdentity } from '@/contexts/UserIdentityContext';
 import { useConversationTransfer } from '@/hooks/useConversationTransfer';
@@ -719,7 +720,12 @@ export function PlanHeader({
   return (
     <div className="flex flex-wrap items-center gap-2 w-full">
       {/* Title and status */}
-      <h1 className="text-lg md:text-xl font-semibold text-foreground truncate">{display.title}</h1>
+      <TruncatedText
+        text={display.title}
+        maxLength={50}
+        className="text-lg md:text-xl font-semibold text-foreground truncate"
+        as="h1"
+      />
       <StatusChip status={display.status} className="shrink-0" />
       <AgentRequestsBadge ydoc={ydoc} isSnapshot={isSnapshot} />
       {isSnapshot && (
