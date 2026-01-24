@@ -75,8 +75,13 @@ const plan = await createPlan({
 `
 });
 
-const { planId, sessionToken, deliverables } = plan;
+const { planId, sessionToken, deliverables, monitoringScript } = plan;
 // deliverables = [{ id: "del_xxx", text: "Screenshot of profile page with avatar" }, ...]
+// monitoringScript = bash script to poll for approval (for non-hook agents)
+
+// For non-hook agents (Cursor, Devin, etc.): Run the monitoring script in background
+// to wait for human approval before proceeding:
+// bash <(echo "$monitoringScript") &
 
 // Step 2: Implement the feature (your actual work happens here)
 

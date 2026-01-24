@@ -33,7 +33,7 @@ const BUNDLED_DOCS = `Execute TypeScript code that calls Shipyard APIs. Use this
 
 ## Available APIs
 
-### createPlan(opts): Promise<{ planId, sessionToken, url, deliverables }>
+### createPlan(opts): Promise<{ planId, sessionToken, url, deliverables, monitoringScript }>
 Create a new plan and open it in browser.
 
 Parameters:
@@ -47,6 +47,7 @@ Returns:
 - sessionToken: Required for subsequent API calls
 - url: Browser URL for the plan
 - deliverables: Array of { id, text } for linking artifacts
+- monitoringScript: Bash script to poll for approval (for non-hook agents)
 
 Example:
 \`\`\`typescript
@@ -54,7 +55,10 @@ const plan = await createPlan({
   title: "Add auth",
   content: "- [ ] Screenshot of login {#deliverable}"
 });
-// Returns: { planId: "abc", sessionToken: "xyz", url: "...", deliverables: [{ id: "del_xxx", text: "Screenshot of login" }] }
+// Returns: { planId: "abc", sessionToken: "xyz", url: "...", deliverables: [...], monitoringScript: "#!/bin/bash..." }
+
+// For non-hook agents: Run the monitoring script in background to wait for approval
+// bash <(echo "$monitoringScript") &
 \`\`\`
 
 ---
@@ -92,7 +96,7 @@ data.deliverables.forEach(d => console.log(d.id, d.completed));
 
 ---
 
-### updatePlan(planId, sessionToken, updates): Promise<void>
+### updatePlan(planId, sessionToken, updates): Promise<{ success, monitoringScript }>
 Update plan metadata.
 
 Parameters:
@@ -100,6 +104,10 @@ Parameters:
 - sessionToken (string): Session token
 - updates.title (string, optional): New title
 - updates.status (string, optional): 'draft' | 'pending_review' | 'changes_requested' | 'in_progress'
+
+Returns:
+- success: Boolean indicating update succeeded
+- monitoringScript: Bash script to poll for approval (for non-hook agents)
 
 Note: Most status transitions are automatic. Rarely needed.
 
@@ -188,46 +196,6 @@ Add review comment to PR diff.
 
 Parameters:
 - planId, sessionToken, prNumber, path, line, body
-
----
-
-### setupReviewNotification(planId, pollIntervalSeconds?): Promise<{ script }>
-Get a bash script to poll for plan approval status changes.
-
-Parameters:
-- planId (string): Plan ID to monitor
-- pollIntervalSeconds (number, optional): Polling interval (default: 30)
-
-Returns:
-- script: Bash script that polls registry server and exits when status becomes 'in_progress' (approved) or 'changes_requested' (needs work)
-
-**IMPORTANT:** This is ONLY for agents WITHOUT hook support (Cursor, Devin, Windsurf, etc).
-Claude Code users have automatic blocking via the shipyard hook - you don't need this.
-
-**Complete workflow for non-hook agents (example user code):**
-\`\`\`typescript
-// 1. Create plan and get the monitoring script in ONE code block
-const plan = await createPlan({
-  title: "My Feature Implementation",
-  content: "- [ ] Screenshot of working feature {#deliverable}"
-});
-
-// 2. Get the polling script (returns bash script as string)
-const { script } = await setupReviewNotification(plan.planId, 15);
-
-// 3. Return both so the agent can run the script
-return {
-  planId: plan.planId,
-  sessionToken: plan.sessionToken,
-  monitoringScript: script,
-  instructions: "Run the monitoring script in background: bash <script> &"
-};
-\`\`\`
-
-The agent then runs the returned bash script in the background. The script will:
-- Poll the registry server every N seconds
-- Print status changes to stdout
-- Exit with code 0 when the plan is approved/rejected
 
 ---
 
@@ -366,7 +334,9 @@ const plan = await createPlan({
   content: "- [ ] Screenshot {#deliverable}\\n- [ ] Video {#deliverable}"
 });
 
-// plan.deliverables = [{ id: "del_xxx", text: "Screenshot" }, { id: "del_yyy", text: "Video" }]
+// plan includes: planId, sessionToken, url, deliverables, monitoringScript
+// For non-hook agents: Run monitoringScript in background to wait for approval
+// The script polls and exits when human approves/rejects
 
 // Do work, take screenshots...
 
@@ -420,11 +390,15 @@ async function createPlan(opts: {
     deliverables = allDeliverables.map((d) => ({ id: d.id, text: d.text }));
   }
 
+  // Always include monitoring script for non-hook agents
+  const { script: monitoringScript } = await setupReviewNotification(planId, 30);
+
   return {
     planId,
     sessionToken: text.match(/Session Token: (\S+)/)?.[1] || '',
     url: text.match(/URL: (\S+)/)?.[1] || '',
     deliverables,
+    monitoringScript,
   };
 }
 
@@ -467,6 +441,14 @@ async function updatePlan(
   updates: { title?: string; status?: string }
 ) {
   await updatePlanTool.handler({ planId, sessionToken, ...updates });
+
+  // Always include monitoring script for non-hook agents
+  const { script: monitoringScript } = await setupReviewNotification(planId, 30);
+
+  return {
+    success: true,
+    monitoringScript,
+  };
 }
 
 type AddArtifactOpts = {

@@ -24,7 +24,12 @@ const plan = await createPlan({
 });
 
 // Save for the agentic loop
-const { planId, sessionToken, deliverables } = plan;
+const { planId, sessionToken, deliverables, monitoringScript } = plan;
+
+// For non-hook agents (Cursor, Devin, Windsurf):
+// The monitoringScript is a bash script that polls for approval.
+// Run it in background: bash <(echo "$monitoringScript") &
+// It exits when human approves or requests changes.
 ```
 
 ## Agentic Loop
