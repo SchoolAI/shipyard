@@ -209,7 +209,11 @@ Parameters:
 - options (string[], optional): For 'choice' type - available options (required for choice)
 - multiSelect (boolean, optional): For 'choice' type - allow selecting multiple options (uses checkboxes instead of radio buttons)
 - defaultValue (string, optional): Pre-filled value for text/multiline inputs
-- timeout (number, optional): Timeout in seconds (default: 1800, min: 10, max: 14400)
+- timeout (number, optional): Timeout in seconds (default: 1800, min: 300, max: 1800)
+  - Simple yes/no or quick choices: 300-600 seconds (5-10 minutes)
+  - Complex questions with code examples: 600-1200 seconds (10-20 minutes)
+  - Default (1800 = 30 minutes) is suitable for most cases
+  - Note: System-level timeouts may cause earlier cancellation
 - planId (string, optional): Optional metadata to link request to plan (for activity log filtering)
 
 Returns:
@@ -229,7 +233,7 @@ const result = await requestUserInput({
   message: "Which database should we use?",
   type: "choice",
   options: ["PostgreSQL", "SQLite", "MongoDB"],
-  timeout: 120  // 2 minutes
+  timeout: 600  // 10 minutes
 });
 
 if (result.success) {

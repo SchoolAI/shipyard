@@ -26,6 +26,7 @@ import {
   X,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { MarkdownContent } from '@/components/ui/MarkdownContent';
 import { formatRelativeTime } from '@/utils/formatters';
 
 interface ActivityEventProps {
@@ -59,19 +60,42 @@ function getAgentActivityIcon(data: AgentActivityData): ReactNode {
 /**
  * Get human-readable description for agent activity events.
  * Formats messages based on activity type and available data.
+ * Returns ReactNode to support markdown rendering in messages.
  */
-function getAgentActivityDescription(data: AgentActivityData): string {
+function getAgentActivityDescription(data: AgentActivityData): ReactNode {
   switch (data.activityType) {
     case 'help_request':
-      return `needs help: ${data.message}`;
+      return (
+        <>
+          needs help:{' '}
+          <MarkdownContent content={data.message} variant="compact" className="inline" />
+        </>
+      );
     case 'help_request_resolved':
-      return data.resolution
-        ? `resolved help request: ${data.resolution}`
-        : 'resolved help request';
+      return data.resolution ? (
+        <>
+          resolved help request:{' '}
+          <MarkdownContent content={data.resolution} variant="compact" className="inline" />
+        </>
+      ) : (
+        'resolved help request'
+      );
     case 'blocker':
-      return `hit blocker: ${data.message}`;
+      return (
+        <>
+          hit blocker:{' '}
+          <MarkdownContent content={data.message} variant="compact" className="inline" />
+        </>
+      );
     case 'blocker_resolved':
-      return data.resolution ? `resolved blocker: ${data.resolution}` : 'resolved blocker';
+      return data.resolution ? (
+        <>
+          resolved blocker:{' '}
+          <MarkdownContent content={data.resolution} variant="compact" className="inline" />
+        </>
+      ) : (
+        'resolved blocker'
+      );
     default: {
       const _exhaustive: never = data;
       void _exhaustive;
@@ -137,7 +161,7 @@ function getEventIcon(type: PlanEventType): ReactNode {
 }
 
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Event descriptions require comprehensive switch handling
-function getEventDescription(event: PlanEvent): string {
+function getEventDescription(event: PlanEvent): ReactNode {
   switch (event.type) {
     case 'plan_created':
       return 'created the task';
@@ -162,11 +186,25 @@ function getEventDescription(event: PlanEvent): string {
       return 'edited the task content';
     case 'approved': {
       const approveComment = event.data?.comment;
-      return approveComment ? `approved the task: ${approveComment}` : 'approved the task';
+      return approveComment ? (
+        <>
+          approved the task:{' '}
+          <MarkdownContent content={approveComment} variant="compact" className="inline" />
+        </>
+      ) : (
+        'approved the task'
+      );
     }
     case 'changes_requested': {
       const changesComment = event.data?.comment;
-      return changesComment ? `requested changes: ${changesComment}` : 'requested changes';
+      return changesComment ? (
+        <>
+          requested changes:{' '}
+          <MarkdownContent content={changesComment} variant="compact" className="inline" />
+        </>
+      ) : (
+        'requested changes'
+      );
     }
     case 'completed':
       return 'marked the task as completed';
@@ -202,7 +240,12 @@ function getEventDescription(event: PlanEvent): string {
       const requestMessage = event.data?.requestMessage;
       const requestType = event.data?.requestType;
       if (requestMessage) {
-        return `requested input: "${requestMessage}"`;
+        return (
+          <>
+            requested input:{' '}
+            <MarkdownContent content={requestMessage} variant="compact" className="inline" />
+          </>
+        );
       }
       return requestType ? `requested ${requestType} input` : 'requested input';
     }

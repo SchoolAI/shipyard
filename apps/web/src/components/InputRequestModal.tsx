@@ -12,7 +12,6 @@ import {
   CheckboxGroup,
   Form,
   Input,
-  Label,
   Modal,
   Radio,
   RadioGroup,
@@ -29,9 +28,10 @@ import {
   type InputRequest,
 } from '@shipyard/schema';
 import type React from 'react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import type * as Y from 'yjs';
+import { MarkdownContent } from '@/components/ui/MarkdownContent';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
 
 interface InputRequestModalProps {
@@ -41,6 +41,29 @@ interface InputRequestModalProps {
   onClose: () => void;
 }
 
+/**
+ * Determines modal size and scroll behavior based on message content complexity.
+ * Complex content (code blocks, tables, long text) gets a larger modal with scrolling.
+ */
+function getModalConfig(message: string): { isLarge: boolean; maxHeight: string | undefined } {
+  const hasCodeBlock = /```[\s\S]*?```/.test(message);
+  const hasTable = /\|.*\|.*\|/.test(message);
+  const lineCount = message.split('\n').length;
+  const charCount = message.length;
+
+  // Complex content gets larger modal with scroll
+  if (hasCodeBlock || hasTable || lineCount > 15 || charCount > 800) {
+    return { isLarge: true, maxHeight: '400px' };
+  }
+  // Medium content gets scroll if needed
+  if (lineCount > 8 || charCount > 400) {
+    return { isLarge: false, maxHeight: '300px' };
+  }
+  // Simple content - no special handling
+  return { isLarge: false, maxHeight: undefined };
+}
+
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Modal with multiple input types and auth states naturally has branching logic
 export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputRequestModalProps) {
   const [value, setValue] = useState<string | string[]>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -48,6 +71,9 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
   // This prevents race condition where auto-cancel fires before countdown is set
   const [remainingTime, setRemainingTime] = useState(-1);
   const { identity, startAuth } = useGitHubAuth();
+
+  // Calculate modal config based on message complexity
+  const modalConfig = useMemo(() => getModalConfig(request?.message || ''), [request?.message]);
 
   // Reset state when request changes
   useEffect(() => {
@@ -223,8 +249,8 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
       case 'text':
         return (
           <div className="space-y-3">
+            <MarkdownContent content={request.message} maxHeight={modalConfig.maxHeight} />
             <TextField isRequired isDisabled={isSubmitting}>
-              <Label className="text-sm font-medium text-foreground">{request.message}</Label>
               <Input
                 value={value}
                 onChange={(e) => setValue(e.target.value)}
@@ -238,8 +264,8 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
       case 'multiline':
         return (
           <div className="space-y-3">
+            <MarkdownContent content={request.message} maxHeight={modalConfig.maxHeight} />
             <TextField isRequired isDisabled={isSubmitting}>
-              <Label className="text-sm font-medium text-foreground">{request.message}</Label>
               <TextArea
                 value={value}
                 onChange={(e) => setValue(e.target.value)}
@@ -272,21 +298,21 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
         if (request.multiSelect) {
           return (
             <div className="space-y-3">
+              <MarkdownContent content={request.message} maxHeight={modalConfig.maxHeight} />
+              <p className="text-xs text-muted-foreground">(Select one or more options)</p>
               <CheckboxGroup
                 isRequired
                 value={Array.isArray(value) ? value : []}
                 onChange={setValue}
                 isDisabled={isSubmitting}
               >
-                <Label className="text-sm font-medium text-foreground">{request.message}</Label>
-                <p className="text-xs text-muted-foreground mt-1">(Select one or more options)</p>
                 {options.map((opt) => (
                   <Checkbox key={opt} value={opt}>
                     <Checkbox.Control>
                       <Checkbox.Indicator />
                     </Checkbox.Control>
                     <Checkbox.Content>
-                      <Label>{opt}</Label>
+                      <MarkdownContent content={opt} variant="minimal" />
                     </Checkbox.Content>
                   </Checkbox>
                 ))}
@@ -295,23 +321,23 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
           );
         }
 
-        // Single-select mode with radio buttons (existing code)
+        // Single-select mode with radio buttons
         return (
           <div className="space-y-3">
+            <MarkdownContent content={request.message} maxHeight={modalConfig.maxHeight} />
             <RadioGroup
               isRequired
               value={typeof value === 'string' ? value : ''}
               onChange={setValue}
               isDisabled={isSubmitting}
             >
-              <Label className="text-sm font-medium text-foreground">{request.message}</Label>
               {options.map((opt) => (
                 <Radio key={opt} value={opt}>
                   <Radio.Control>
                     <Radio.Indicator />
                   </Radio.Control>
                   <Radio.Content>
-                    <Label>{opt}</Label>
+                    <MarkdownContent content={opt} variant="minimal" />
                   </Radio.Content>
                 </Radio>
               ))}
@@ -323,7 +349,7 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
       case 'confirm':
         return (
           <div className="space-y-4">
-            <p className="text-sm text-foreground">{request.message}</p>
+            <MarkdownContent content={request.message} maxHeight={modalConfig.maxHeight} />
             <div className="flex justify-between items-center pt-2">
               <span
                 className={`text-sm ${remainingTime >= 0 && remainingTime < 30 ? 'text-warning' : 'text-muted-foreground'}`}
@@ -367,7 +393,7 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
         isKeyboardDismissDisabled={true}
       >
         <Modal.Container placement="center" size="md">
-          <Modal.Dialog>
+          <Modal.Dialog className={modalConfig.isLarge ? 'sm:max-w-[650px]' : undefined}>
             <Modal.CloseTrigger />
 
             <Card>
@@ -379,7 +405,7 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
                 <div className="space-y-4">
                   <div className="space-y-2">
                     <p className="text-sm font-medium text-foreground">Agent is asking:</p>
-                    <p className="text-sm text-foreground">{request.message}</p>
+                    <MarkdownContent content={request.message} maxHeight={modalConfig.maxHeight} />
                   </div>
                   <Alert status="warning">
                     <Alert.Indicator />
@@ -423,7 +449,7 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
       isKeyboardDismissDisabled={true}
     >
       <Modal.Container placement="center" size="md">
-        <Modal.Dialog>
+        <Modal.Dialog className={modalConfig.isLarge ? 'sm:max-w-[650px]' : undefined}>
           <Modal.CloseTrigger />
 
           <Card>

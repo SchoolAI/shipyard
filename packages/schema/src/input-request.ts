@@ -48,8 +48,8 @@ const InputRequestBaseSchema = z.object({
   timeout: z
     .number()
     .int()
-    .min(10, 'Timeout must be at least 10 seconds')
-    .max(14400, 'Timeout cannot exceed 4 hours')
+    .min(300, 'Timeout must be at least 5 minutes (300 seconds)')
+    .max(1800, 'Timeout cannot exceed 30 minutes (1800 seconds)')
     .optional(),
   /** Optional plan ID to associate request with a specific plan (null/undefined = global) */
   planId: z.string().optional(),
