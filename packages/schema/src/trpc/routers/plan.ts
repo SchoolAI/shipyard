@@ -6,6 +6,7 @@ import { TRPCError } from '@trpc/server';
 import {
   getPlanMetadata,
   HasConnectionsResponseSchema,
+  LocalChangesResultSchema,
   PlanIdSchema,
   PlanStatusResponseSchema,
 } from '../schemas.js';
@@ -48,6 +49,44 @@ export const planRouter = router({
       const planStore = ctx.getPlanStore();
       const hasConnections = await planStore.hasActiveConnections(input.planId);
       return { hasConnections };
+    }),
+
+  /**
+   * Get local git changes for a plan's working directory.
+   * Only works for plans created via Claude Code (which stores origin.cwd).
+   * GET /api/plan/:id/local-changes
+   */
+  getLocalChanges: publicProcedure
+    .input(PlanIdSchema)
+    .output(LocalChangesResultSchema)
+    .query(async ({ input, ctx }) => {
+      const doc = await ctx.getOrCreateDoc(input.planId);
+      const metadata = getPlanMetadata(doc);
+
+      if (!metadata) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Plan not found',
+        });
+      }
+
+      /**
+       * Extract working directory from origin metadata.
+       * Only Claude Code platform stores cwd - other platforms return undefined.
+       */
+      const origin = metadata.origin;
+      const cwd = origin?.platform === 'claude-code' ? origin.cwd : undefined;
+
+      if (!cwd) {
+        return {
+          available: false as const,
+          reason: 'no_cwd' as const,
+          message:
+            'Plan has no associated working directory. Only Claude Code plans support local changes.',
+        };
+      }
+
+      return ctx.getLocalChanges(cwd);
     }),
 });
 
