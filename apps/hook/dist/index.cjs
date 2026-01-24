@@ -44411,9 +44411,29 @@ var planRouter = router({
     if (!cwd) return {
       available: false,
       reason: "no_cwd",
-      message: "Plan has no associated working directory. Only Claude Code plans support local changes."
+      message: "Plan has no associated working directory. Local changes are only available for plans created with working directory metadata."
     };
     return ctx.getLocalChanges(cwd);
+  }),
+  getFileContent: publicProcedure.input(external_exports.object({
+    planId: PlanIdSchema.shape.planId,
+    filePath: external_exports.string()
+  })).output(external_exports.object({
+    content: external_exports.string().nullable(),
+    error: external_exports.string().optional()
+  })).query(async ({ input, ctx }) => {
+    const metadata = getPlanMetadata(await ctx.getOrCreateDoc(input.planId));
+    if (!metadata) throw new TRPCError({
+      code: "NOT_FOUND",
+      message: "Plan not found"
+    });
+    const origin = metadata.origin;
+    const cwd = origin?.platform === "claude-code" ? origin.cwd : void 0;
+    if (!cwd) return {
+      content: null,
+      error: "No working directory available"
+    };
+    return ctx.getFileContent(cwd, input.filePath);
   })
 });
 var subscriptionRouter = router({

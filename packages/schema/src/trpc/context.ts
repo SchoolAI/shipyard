@@ -51,6 +51,8 @@ export interface Context {
   conversationHandlers: ConversationHandlers;
   /** Get local git changes for a working directory */
   getLocalChanges: (cwd: string) => LocalChangesResult;
+  /** Get content of a file from a working directory */
+  getFileContent: (cwd: string, filePath: string) => { content: string | null; error?: string };
 }
 
 /**

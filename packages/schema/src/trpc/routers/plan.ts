@@ -3,6 +3,7 @@
  */
 
 import { TRPCError } from '@trpc/server';
+import { z } from 'zod';
 import {
   getPlanMetadata,
   HasConnectionsResponseSchema,
@@ -82,11 +83,49 @@ export const planRouter = router({
           available: false as const,
           reason: 'no_cwd' as const,
           message:
-            'Plan has no associated working directory. Only Claude Code plans support local changes.',
+            'Plan has no associated working directory. Local changes are only available for plans created with working directory metadata.',
         };
       }
 
       return ctx.getLocalChanges(cwd);
+    }),
+
+  /**
+   * Get content of a file from a plan's working directory.
+   * Used for viewing untracked files which don't have diff patches.
+   */
+  getFileContent: publicProcedure
+    .input(
+      z.object({
+        planId: PlanIdSchema.shape.planId,
+        filePath: z.string(),
+      })
+    )
+    .output(
+      z.object({
+        content: z.string().nullable(),
+        error: z.string().optional(),
+      })
+    )
+    .query(async ({ input, ctx }) => {
+      const doc = await ctx.getOrCreateDoc(input.planId);
+      const metadata = getPlanMetadata(doc);
+
+      if (!metadata) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Plan not found',
+        });
+      }
+
+      const origin = metadata.origin;
+      const cwd = origin?.platform === 'claude-code' ? origin.cwd : undefined;
+
+      if (!cwd) {
+        return { content: null, error: 'No working directory available' };
+      }
+
+      return ctx.getFileContent(cwd, input.filePath);
     }),
 });
 

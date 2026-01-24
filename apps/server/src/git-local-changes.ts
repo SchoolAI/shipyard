@@ -2,6 +2,8 @@
  * Git local changes helper - runs git commands to get working tree diff.
  */
 import { execSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import { isAbsolute, join, normalize } from 'node:path';
 import type { GitFileStatus, LocalChangesResult, LocalFileChange } from '@shipyard/schema';
 import { logger } from './logger.js';
 
@@ -9,9 +11,10 @@ import { logger } from './logger.js';
  * Get local git changes from a working directory.
  * Runs git status and git diff commands to build a structured response.
  */
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Git parsing with auto-init, branch detection, diff parsing requires branching
 export function getLocalChanges(cwd: string): LocalChangesResult {
   try {
-    // Verify it's a git repository
+    // Verify it's a git repository, auto-initialize if not
     try {
       execSync('git rev-parse --is-inside-work-tree', {
         cwd,
@@ -20,11 +23,26 @@ export function getLocalChanges(cwd: string): LocalChangesResult {
         stdio: ['pipe', 'pipe', 'pipe'],
       });
     } catch {
-      return {
-        available: false,
-        reason: 'not_git_repo',
-        message: `Directory is not a git repository: ${cwd}`,
-      };
+      // Not a git repo - auto-initialize
+      logger.info({ cwd }, 'Not a git repo, initializing with git init');
+      try {
+        execSync('git init', {
+          cwd,
+          encoding: 'utf-8',
+          timeout: 5000,
+          stdio: ['pipe', 'pipe', 'pipe'],
+        });
+        logger.info({ cwd }, 'Git repository initialized');
+        // Continue with normal flow - the repo is now initialized
+      } catch (initError) {
+        const message = initError instanceof Error ? initError.message : 'Unknown error';
+        logger.error({ error: initError, cwd }, 'Failed to initialize git repository');
+        return {
+          available: false,
+          reason: 'git_error',
+          message: `Failed to initialize git repository: ${message}`,
+        };
+      }
     }
 
     // Get current branch (or commit SHA if detached HEAD)
@@ -323,4 +341,46 @@ function detectStatus(fileDiff: string): GitFileStatus {
     return 'copied';
   }
   return 'modified';
+}
+
+/**
+ * Get content of a file from a working directory.
+ * Validates the path is within the working directory (no directory traversal).
+ */
+export function getFileContent(
+  cwd: string,
+  filePath: string
+): { content: string | null; error?: string } {
+  try {
+    // Prevent directory traversal attacks
+    const normalizedPath = normalize(filePath);
+    if (isAbsolute(normalizedPath) || normalizedPath.startsWith('..')) {
+      return { content: null, error: 'Invalid file path' };
+    }
+
+    const fullPath = join(cwd, normalizedPath);
+
+    // Double-check the resolved path is within cwd
+    if (!fullPath.startsWith(cwd)) {
+      return { content: null, error: 'Invalid file path' };
+    }
+
+    const content = readFileSync(fullPath, { encoding: 'utf-8' });
+
+    // Limit content size to prevent memory issues (10MB)
+    if (content.length > 10 * 1024 * 1024) {
+      return { content: null, error: 'File too large to display' };
+    }
+
+    return { content };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    if (message.includes('ENOENT')) {
+      return { content: null, error: 'File not found' };
+    }
+    if (message.includes('EISDIR')) {
+      return { content: null, error: 'Path is a directory' };
+    }
+    return { content: null, error: `Failed to read file: ${message}` };
+  }
 }
