@@ -33,7 +33,9 @@ export function ThemeToggle() {
           selectionMode="single"
           selectedKeys={new Set([theme])}
           onSelectionChange={(keys) => {
-            const selected = Array.from(keys)[0] as string;
+            if (keys === 'all') return;
+            const selected = Array.from(keys)[0];
+            if (typeof selected !== 'string') return;
             if (selected === 'light' || selected === 'dark' || selected === 'system') {
               setTheme(selected);
             }

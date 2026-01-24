@@ -20,7 +20,6 @@ import {
   setAgentPresence,
   setPlanIndexEntry,
   setPlanMetadata,
-  type Thread,
   UpdatePlanContentRequestSchema,
   UpdatePresenceRequestSchema,
   YDOC_KEYS,
@@ -282,8 +281,8 @@ export async function handleGetReview(req: Request, res: Response): Promise<void
         break;
 
       case 'changes_requested': {
-        const threadsMap = ydoc.getMap<Record<string, Thread>>(YDOC_KEYS.THREADS);
-        const threadsData = threadsMap.toJSON() as Record<string, unknown>;
+        const threadsMap = ydoc.getMap(YDOC_KEYS.THREADS);
+        const threadsData = threadsMap.toJSON();
         const threads = parseThreads(threadsData);
         const feedback: ReviewFeedback[] = threads.map((thread) => ({
           threadId: thread.id,

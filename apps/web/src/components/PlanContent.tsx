@@ -25,6 +25,17 @@ import { PlanViewer } from '@/components/PlanViewer';
 import { VersionSelector } from '@/components/VersionSelector';
 import type { SyncState } from '@/hooks/useMultiProviderSync';
 
+/**
+ * Type guard to check if an array is a Block[] from BlockNote.
+ * Validates that each item has the required 'type' and 'id' properties.
+ */
+function isBlockArray(arr: unknown): arr is Block[] {
+  return (
+    Array.isArray(arr) &&
+    arr.every((item) => typeof item === 'object' && item !== null && 'type' in item && 'id' in item)
+  );
+}
+
 /** Simple identity type for display purposes */
 interface UserIdentity {
   id: string;
@@ -126,8 +137,8 @@ export function PlanContent(props: PlanContentProps) {
   }, []);
 
   useEffect(() => {
-    if (props.mode === 'snapshot') {
-      const deliverables = extractDeliverables(props.initialContent as Block[]);
+    if (props.mode === 'snapshot' && isBlockArray(props.initialContent)) {
+      const deliverables = extractDeliverables(props.initialContent);
       const deliverablesArray = ydoc.getArray<Deliverable>(YDOC_KEYS.DELIVERABLES);
       deliverablesArray.delete(0, deliverablesArray.length);
       deliverablesArray.push(deliverables);

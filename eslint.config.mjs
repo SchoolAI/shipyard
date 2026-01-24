@@ -1,3 +1,4 @@
+import tseslint from '@typescript-eslint/eslint-plugin';
 import tsParser from '@typescript-eslint/parser';
 
 /**
@@ -62,20 +63,36 @@ const localRules = {
   },
 };
 
+/**
+ * ESLint Configuration (Blacklist Approach)
+ *
+ * Rules apply to ALL TypeScript/TSX files by default.
+ * Use ignores to exclude files that shouldn't be checked.
+ *
+ * This ensures new files are automatically covered.
+ */
 export default [
+  // Global ignores (apply to all rules)
   {
-    files: [
-      'packages/shared/**/*.ts',
-      'packages/shared/**/*.tsx',
-      'packages/schema/**/*.ts',
-      'packages/schema/**/*.tsx',
-      'apps/github-oauth-worker/**/*.ts',
-      'apps/github-oauth-worker/**/*.tsx',
-      'apps/signaling/**/*.ts',
-      'apps/signaling/**/*.tsx',
-      'apps/hook/**/*.ts',
-      'apps/hook/**/*.tsx',
+    ignores: [
+      'node_modules/**',
+      'dist/**',
+      'build/**',
+      '**/*.config.js',
+      '**/*.config.ts',
+      '**/*.config.mjs',
+      '**/tsdown.config.ts',
+      '**/vite.config.ts',
+      // Test files excluded from type assertion rules (they need `as any` for Y.Doc)
+      '**/*.test.ts',
+      '**/*.test.tsx',
+      '**/__tests__/**',
     ],
+  },
+
+  // TypeScript rules (apply to ALL .ts/.tsx files)
+  {
+    files: ['**/*.ts', '**/*.tsx'],
     languageOptions: {
       parser: tsParser,
       parserOptions: {
@@ -87,31 +104,30 @@ export default [
       },
     },
     plugins: {
+      '@typescript-eslint': tseslint,
       local: localRules,
     },
     rules: {
-      'multiline-comment-style': ['warn', 'starred-block'],
+      // Comment quality rules - STRICT MODE
+      'multiline-comment-style': ['error', 'starred-block'],
       'spaced-comment': [
-        'warn',
+        'error',
         'always',
         {
           exceptions: ['-', '+', '*'],
           markers: ['/'],
         },
       ],
-      'local/no-noisy-single-line-comments': 'warn',
+      'local/no-noisy-single-line-comments': 'error',
+
+      // Type assertion rules - STRICT MODE
+      '@typescript-eslint/consistent-type-assertions': [
+        'error',
+        {
+          assertionStyle: 'never',
+        },
+      ],
+      '@typescript-eslint/no-explicit-any': 'error',
     },
-  },
-  {
-    ignores: [
-      'node_modules',
-      'dist',
-      'build',
-      '**/*.config.js',
-      '**/*.config.ts',
-      '**/*.config.mjs',
-      '**/tsdown.config.ts',
-      '**/vite.config.ts',
-    ],
   },
 ];

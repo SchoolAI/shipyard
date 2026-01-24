@@ -34,7 +34,6 @@ import {
   setAgentPresence,
   setPlanIndexEntry,
   setPlanMetadata,
-  type Thread,
   transitionPlanStatus,
   type UpdatePlanContentRequest,
   type UpdatePlanContentResponse,
@@ -349,8 +348,8 @@ export async function getReviewStatusHandler(
 
     case 'changes_requested': {
       // Extract feedback from threads
-      const threadsMap = ydoc.getMap<Record<string, Thread>>(YDOC_KEYS.THREADS);
-      const threadsData = threadsMap.toJSON() as Record<string, unknown>;
+      const threadsMap = ydoc.getMap(YDOC_KEYS.THREADS);
+      const threadsData = threadsMap.toJSON();
       const threads = parseThreads(threadsData);
       const feedback: ReviewFeedback[] = threads.map((thread) => ({
         threadId: thread.id,
@@ -564,11 +563,20 @@ export async function waitForApprovalHandler(
     '[SERVER OBSERVER] Set reviewRequestId and status, starting observation'
   );
 
-  // Extract common review data from Y.Doc metadata
-  const getReviewData = () => ({
-    reviewComment: metadata.get('reviewComment') as string | undefined,
-    reviewedBy: metadata.get('reviewedBy') as string | undefined,
-  });
+  // Extract common review data from Y.Doc metadata using type-safe helper
+  const getReviewData = () => {
+    const meta = getPlanMetadata(ydoc);
+    if (meta?.status === 'changes_requested' || meta?.status === 'in_progress') {
+      return {
+        reviewComment: meta.reviewComment,
+        reviewedBy: meta.reviewedBy,
+      };
+    }
+    return {
+      reviewComment: undefined,
+      reviewedBy: undefined,
+    };
+  };
 
   /**
    * Update session registry with review decision data.
@@ -825,12 +833,17 @@ export async function waitForApprovalHandler(
     let checkStatus: (() => void) | null = null;
 
     // Helper: Check if status change should be processed (matching review ID + terminal state)
-    const shouldProcessStatusChange = (
-      currentReviewId: string | undefined,
-      status: string | undefined
-    ): boolean => {
+    const shouldProcessStatusChange = (): boolean => {
+      const currentMeta = getPlanMetadata(ydoc);
+      if (!currentMeta) return false;
+
+      // For pending_review, extract reviewRequestId
+      const currentReviewId =
+        currentMeta.status === 'pending_review' ? currentMeta.reviewRequestId : undefined;
+      const status = currentMeta.status;
+
       // Ignore stale decisions from previous review requests
-      if (currentReviewId !== reviewRequestId) {
+      if (currentReviewId !== reviewRequestId && currentMeta.status === 'pending_review') {
         ctx.logger.warn(
           { planId, expected: reviewRequestId, actual: currentReviewId, status },
           '[SERVER OBSERVER] Review ID mismatch, ignoring status change'
@@ -865,15 +878,17 @@ export async function waitForApprovalHandler(
       }, APPROVAL_TIMEOUT_MS);
 
       checkStatus = () => {
-        const currentReviewId = metadata.get('reviewRequestId') as string | undefined;
-        const status = metadata.get('status') as string | undefined;
+        const currentMeta = getPlanMetadata(ydoc);
+        const status = currentMeta?.status;
+        const currentReviewId =
+          currentMeta?.status === 'pending_review' ? currentMeta.reviewRequestId : undefined;
 
         ctx.logger.debug(
           { planId, status, currentReviewId, expectedReviewId: reviewRequestId },
           '[SERVER OBSERVER] Metadata changed, checking status'
         );
 
-        if (!shouldProcessStatusChange(currentReviewId, status)) return;
+        if (!shouldProcessStatusChange()) return;
 
         cleanupObserver();
         resolve(status === 'in_progress' ? handleApproved() : handleChangesRequested());
@@ -925,12 +940,19 @@ export async function waitForApprovalHandler(
  */
 function extractFeedbackFromYDoc(ydoc: Y.Doc, ctx: HookContext): string | undefined {
   try {
-    const metadataMap = ydoc.getMap<PlanMetadata>(YDOC_KEYS.METADATA);
-    const reviewComment = metadataMap.get('reviewComment') as string | undefined;
-    const reviewedBy = metadataMap.get('reviewedBy') as string | undefined;
+    // Use type-safe helper to get metadata
+    const planMeta = getPlanMetadata(ydoc);
+    const reviewComment =
+      planMeta?.status === 'changes_requested' || planMeta?.status === 'in_progress'
+        ? planMeta.reviewComment
+        : undefined;
+    const reviewedBy =
+      planMeta?.status === 'changes_requested' || planMeta?.status === 'in_progress'
+        ? planMeta.reviewedBy
+        : undefined;
 
-    const threadsMap = ydoc.getMap<Record<string, Thread>>(YDOC_KEYS.THREADS);
-    const threadsData = threadsMap.toJSON() as Record<string, unknown>;
+    const threadsMap = ydoc.getMap(YDOC_KEYS.THREADS);
+    const threadsData = threadsMap.toJSON();
     const threads = parseThreads(threadsData);
 
     // If no reviewComment and no threads, return generic message

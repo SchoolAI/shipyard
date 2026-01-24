@@ -249,15 +249,18 @@ function initPersistence(): void {
     logger.info({ dir: PERSISTENCE_DIR }, 'LevelDB persistence initialized');
     return;
   } catch (err) {
-    const error = err as Error;
-
-    if (!isLevelDbLockError(error)) {
-      logger.error({ err: error }, 'Failed to initialize LevelDB persistence');
-      throw error;
+    if (!(err instanceof Error)) {
+      logger.error({ err }, 'Failed to initialize LevelDB persistence with unknown error');
+      throw new Error(String(err));
     }
 
-    logger.warn({ err: error }, 'LevelDB locked, checking for stale lock');
-    tryRecoverStaleLock(error);
+    if (!isLevelDbLockError(err)) {
+      logger.error({ err }, 'Failed to initialize LevelDB persistence');
+      throw err;
+    }
+
+    logger.warn({ err }, 'LevelDB locked, checking for stale lock');
+    tryRecoverStaleLock(err);
 
     // Lock removed, retry initialization
     ldb = new LeveldbPersistence(PERSISTENCE_DIR);

@@ -64,6 +64,24 @@ import {
 } from '@/utils/uiPreferences';
 import { assertNever } from '../utils/assert-never';
 
+/** Type guard to validate PanelWidth values */
+function isPanelWidth(value: string | null): value is PanelWidth {
+  return value === 'peek' || value === 'expanded' || value === 'full';
+}
+
+/**
+ * Type guard to safely extract PlanIndexEntry from drag data.
+ */
+function getDragPlan(
+  data: { current?: { plan?: unknown } } | undefined
+): PlanIndexEntry | undefined {
+  const plan = data?.current?.plan;
+  if (plan && typeof plan === 'object' && 'id' in plan && 'title' in plan) {
+    return plan as PlanIndexEntry;
+  }
+  return undefined;
+}
+
 /**
  * Determine the target column ID from a drag-drop event.
  */
@@ -73,7 +91,7 @@ function getTargetColumnId(event: DragEndEvent, allPlans: PlanIndexEntry[]): Col
 
   // Dropped directly on a column
   if (over.data.current?.type === 'column') {
-    const columnId = over.id as string;
+    const columnId = String(over.id);
     // Validate that it's a valid ColumnId
     if (
       columnId === 'draft' ||
@@ -230,10 +248,7 @@ export function KanbanPage() {
   const searchParams = new URLSearchParams(location.search);
   const initialPanelId = searchParams.get('panel');
   const rawWidth = searchParams.get('width');
-  const validWidths: PanelWidth[] = ['peek', 'expanded', 'full'];
-  const initialWidth: PanelWidth = validWidths.includes(rawWidth as PanelWidth)
-    ? (rawWidth as PanelWidth)
-    : 'peek';
+  const initialWidth: PanelWidth = isPanelWidth(rawWidth) ? rawWidth : 'peek';
 
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(initialPanelId);
   const [panelWidth, setPanelWidth] = useState<PanelWidth>(initialWidth);
@@ -356,9 +371,15 @@ export function KanbanPage() {
       const widths: PanelWidth[] = ['peek', 'expanded', 'full'];
       const currentIndex = widths.indexOf(panelWidth);
       if (direction === 'expand' && currentIndex < widths.length - 1) {
-        setPanelWidth(widths[currentIndex + 1] as PanelWidth);
+        const nextWidth = widths[currentIndex + 1];
+        if (nextWidth !== undefined) {
+          setPanelWidth(nextWidth);
+        }
       } else if (direction === 'collapse' && currentIndex > 0) {
-        setPanelWidth(widths[currentIndex - 1] as PanelWidth);
+        const prevWidth = widths[currentIndex - 1];
+        if (prevWidth !== undefined) {
+          setPanelWidth(prevWidth);
+        }
       }
     },
     [panelWidth]
@@ -502,35 +523,36 @@ export function KanbanPage() {
 
   const announcements: Announcements = {
     onDragStart({ active }) {
-      const plan = active.data.current?.plan as PlanIndexEntry | undefined;
+      const plan = getDragPlan(active.data);
       return `Picked up task: ${plan?.title || 'unknown'}`;
     },
     onDragOver({ active, over }) {
-      const plan = active.data.current?.plan as PlanIndexEntry | undefined;
+      const plan = getDragPlan(active.data);
       if (over) {
         const columnData = over.data.current;
-        const status = (columnData?.status || columnData?.column?.id || 'unknown') as string;
+        const status = String(columnData?.status || columnData?.column?.id || 'unknown');
         return `Task ${plan?.title || 'unknown'} is over ${status.replace('_', ' ')} column`;
       }
       return `Task ${plan?.title || 'unknown'} is no longer over a droppable area`;
     },
     onDragEnd({ active, over }) {
-      const plan = active.data.current?.plan as PlanIndexEntry | undefined;
+      const plan = getDragPlan(active.data);
       if (over) {
         const columnData = over.data.current;
-        const status = (columnData?.status || columnData?.column?.id || 'unknown') as string;
+        const status = String(columnData?.status || columnData?.column?.id || 'unknown');
         return `Task ${plan?.title || 'unknown'} was moved to ${status.replace('_', ' ')} column`;
       }
       return `Drag cancelled for task: ${plan?.title || 'unknown'}`;
     },
     onDragCancel({ active }) {
-      const plan = active.data.current?.plan as PlanIndexEntry | undefined;
+      const plan = getDragPlan(active.data);
       return `Dragging was cancelled. Task ${plan?.title || 'unknown'} was not moved.`;
     },
   };
 
   const handleDragStart = (event: DragStartEvent) => {
-    const plan = allPlans.find((p) => p.id === event.active.id);
+    const planId = String(event.active.id);
+    const plan = allPlans.find((p) => p.id === planId);
     if (plan) {
       setActivePlan(plan);
     }
@@ -539,7 +561,7 @@ export function KanbanPage() {
   const handleDragEnd = async (event: DragEndEvent) => {
     setActivePlan(null);
 
-    const planId = event.active.id as string;
+    const planId = String(event.active.id);
     const plan = allPlans.find((p) => p.id === planId);
     if (!plan) return;
 

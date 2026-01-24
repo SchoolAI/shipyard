@@ -4,18 +4,8 @@
  * Linear-style feature for rapid plan review without navigation.
  */
 
-import { Avatar, Button, Chip, Modal } from '@heroui/react';
-
-const AvatarRoot = Avatar as React.FC<{
-  children: React.ReactNode;
-  size?: 'sm' | 'md' | 'lg';
-  className?: string;
-}>;
-const AvatarImage = Avatar.Image as React.FC<{ src?: string; alt: string }>;
-const AvatarFallback = Avatar.Fallback as React.FC<{
-  children: React.ReactNode;
-  className?: string;
-}>;
+import { Button, Chip, Modal } from '@heroui/react';
+import { Avatar } from '@/components/ui/avatar';
 
 import type { Deliverable, LinkedPR, PlanIndexEntry, PlanStatusType } from '@shipyard/schema';
 import { getDeliverables, getLinkedPRs } from '@shipyard/schema';
@@ -182,15 +172,15 @@ export function PlanPeekModal({ plan, isOpen, onClose }: PlanPeekModalProps) {
             {/* Owner */}
             {plan.ownerId && (
               <div className="flex items-center gap-2 mb-4">
-                <AvatarRoot size="sm" className="w-6 h-6">
-                  <AvatarImage
+                <Avatar size="sm" className="w-6 h-6">
+                  <Avatar.Image
                     src={`https://github.com/${plan.ownerId}.png?size=48`}
                     alt={plan.ownerId}
                   />
-                  <AvatarFallback className="text-xs">
+                  <Avatar.Fallback className="text-xs">
                     {plan.ownerId.slice(0, 2).toUpperCase()}
-                  </AvatarFallback>
-                </AvatarRoot>
+                  </Avatar.Fallback>
+                </Avatar>
                 <span className="text-sm text-foreground">{plan.ownerId}</span>
               </div>
             )}

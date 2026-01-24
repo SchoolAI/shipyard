@@ -29,7 +29,7 @@ async function retryWithBackoff<T>(
     try {
       return await fn();
     } catch (err) {
-      lastError = err as Error;
+      lastError = err instanceof Error ? err : new Error(String(err));
       if (attempt < maxAttempts - 1) {
         const delay = attempt === 0 ? 0 : baseDelay * 2 ** (attempt - 1);
         logger.debug(
@@ -67,9 +67,9 @@ async function getRegistryUrl(): Promise<string | null> {
       logger.debug({ port }, 'Found registry server (with retry)');
       return url;
     } catch (err) {
-      const error = err as Error;
+      const errorMessage = err instanceof Error ? err.message : String(err);
       logger.debug(
-        { port, error: error.message },
+        { port, error: errorMessage },
         'Failed to connect to registry port after retries'
       );
     }

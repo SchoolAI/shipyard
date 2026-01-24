@@ -46203,7 +46203,7 @@ async function retryWithBackoff(fn, maxAttempts = 3, baseDelay = 1e3) {
     try {
       return await fn();
     } catch (err) {
-      lastError = err;
+      lastError = err instanceof Error ? err : new Error(String(err));
       if (attempt < maxAttempts - 1) {
         const delay = attempt === 0 ? 0 : baseDelay * 2 ** (attempt - 1);
         logger.debug(
@@ -46236,9 +46236,9 @@ async function getRegistryUrl() {
       logger.debug({ port }, "Found registry server (with retry)");
       return url2;
     } catch (err) {
-      const error48 = err;
+      const errorMessage = err instanceof Error ? err.message : String(err);
       logger.debug(
-        { port, error: error48.message },
+        { port, error: errorMessage },
         "Failed to connect to registry port after retries"
       );
     }
@@ -46431,8 +46431,8 @@ async function handleUpdatedPlanReview(sessionId, planId, planContent, _originMe
       content: planContent
     });
   } catch (err) {
-    const error48 = err;
-    if (error48.message?.includes("404")) {
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    if (errorMessage?.includes("404")) {
       logger.warn(
         { planId, sessionId },
         "Plan not found (404), creating new plan with updated content"
@@ -46683,13 +46683,14 @@ async function handlePlanExit(event) {
   try {
     return await checkReviewStatus(event.sessionId, event.planContent, event.metadata);
   } catch (err) {
-    const error48 = err;
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    const errorCode = err instanceof Error && "code" in err && typeof err.code === "string" ? err.code : void 0;
     logger.error(
-      { err: error48, message: error48.message, code: error48.code },
+      { err, message: errorMessage, code: errorCode },
       "Failed to check review status"
     );
-    const isConnectionError = error48.code === "ECONNREFUSED" || error48.code === "ECONNRESET" || error48.code === "ETIMEDOUT" || error48.code === "ENOTFOUND" || error48.message?.includes("connect") || error48.message?.includes("timeout") || error48.message?.includes("WebSocket") || error48.message?.includes("not available");
-    const message = isConnectionError ? "Cannot connect to Shipyard server. Ensure the Shipyard MCP server is running. Check ~/.shipyard/hook-debug.log for details." : `Review system error: ${error48.message}. Check ~/.shipyard/hook-debug.log for details.`;
+    const isConnectionError = errorCode === "ECONNREFUSED" || errorCode === "ECONNRESET" || errorCode === "ETIMEDOUT" || errorCode === "ENOTFOUND" || errorMessage?.includes("connect") || errorMessage?.includes("timeout") || errorMessage?.includes("WebSocket") || errorMessage?.includes("not available");
+    const message = isConnectionError ? "Cannot connect to Shipyard server. Ensure the Shipyard MCP server is running. Check ~/.shipyard/hook-debug.log for details." : `Review system error: ${errorMessage}. Check ~/.shipyard/hook-debug.log for details.`;
     return {
       allow: false,
       message
@@ -46795,13 +46796,14 @@ async function main() {
     process.exit(0);
   } catch (err) {
     logger.error({ err }, "Hook error, failing closed");
+    const errorMessage = err instanceof Error ? err.message : String(err);
     console.log(
       JSON.stringify({
         hookSpecificOutput: {
           hookEventName: "PermissionRequest",
           decision: {
             behavior: "deny",
-            message: `Hook error: ${err.message}. Check ~/.shipyard/hook-debug.log for details.`
+            message: `Hook error: ${errorMessage}. Check ~/.shipyard/hook-debug.log for details.`
           }
         }
       })

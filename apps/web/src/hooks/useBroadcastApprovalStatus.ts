@@ -3,6 +3,7 @@ import type { WebrtcProvider } from 'y-webrtc';
 import type { GitHubIdentity } from '@/hooks/useGitHubAuth';
 import type { ApprovalStatus } from '@/hooks/useYDocApprovalStatus';
 import type { PlanAwarenessState } from '@/types/awareness';
+import { getWebrtcPeerId } from '@/types/y-webrtc-internals';
 
 /**
  * Generate a deterministic color from a string (e.g., username).
@@ -59,7 +60,7 @@ export function useBroadcastApprovalStatus({
     const awareness = rtcProvider.awareness;
 
     // Get WebRTC peerId from the room
-    const webrtcPeerId = (rtcProvider as unknown as { room?: { peerId?: string } }).room?.peerId;
+    const webrtcPeerId = getWebrtcPeerId(rtcProvider);
 
     // Build the awareness state based on approval status
     // Note: 'platform' is omitted for browser users - it's only set by MCP servers

@@ -1,4 +1,4 @@
-import { Avatar, Button, Card, Modal, Spinner } from '@heroui/react';
+import { Button, Card, Modal, Spinner } from '@heroui/react';
 import { getConversationVersions, logPlanEvent, markVersionHandedOff } from '@shipyard/schema';
 import { DEFAULT_REGISTRY_PORTS } from '@shipyard/shared/registry-config';
 import { Download, Send, Upload, Users, X } from 'lucide-react';
@@ -7,20 +7,10 @@ import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import type { WebrtcProvider } from 'y-webrtc';
 import type * as Y from 'yjs';
+import { Avatar } from '@/components/ui/avatar';
 import { useUserIdentity } from '@/contexts/UserIdentityContext';
 import { useConversationTransfer } from '@/hooks/useConversationTransfer';
 import { type ConnectedPeer, useP2PPeers } from '@/hooks/useP2PPeers';
-
-// Avatar compound components have type issues in HeroUI v3 beta
-const AvatarRoot = Avatar as unknown as React.FC<{
-  children: React.ReactNode;
-  size?: 'sm' | 'md' | 'lg';
-  className?: string;
-}>;
-const AvatarFallback = Avatar.Fallback as React.FC<{
-  children: React.ReactNode;
-  style?: React.CSSProperties;
-}>;
 
 interface HandoffConversationDialogProps {
   /** Plan ID for handoff metadata */
@@ -74,11 +64,11 @@ function PeerCard({
         disabled={isDisabled}
         onClick={onSelect}
       >
-        <AvatarRoot size="sm">
-          <AvatarFallback style={{ backgroundColor: peer.color }}>
+        <Avatar size="sm">
+          <Avatar.Fallback style={{ backgroundColor: peer.color }}>
             {peer.name.slice(0, 2).toUpperCase()}
-          </AvatarFallback>
-        </AvatarRoot>
+          </Avatar.Fallback>
+        </Avatar>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium text-foreground truncate">{peer.name}</p>
           <p className="text-xs text-muted-foreground">{peer.platform}</p>

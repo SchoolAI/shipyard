@@ -4,11 +4,16 @@ import {
   addSnapshot,
   createPlanSnapshot,
   logPlanEvent,
-  type PlanMetadata,
   type PlanStatusType,
+  PlanStatusValues,
   transitionPlanStatus,
   YDOC_KEYS,
 } from '@shipyard/schema';
+
+/** Type guard for valid PlanStatusType values */
+function isValidPlanStatus(value: unknown): value is PlanStatusType {
+  return typeof value === 'string' && PlanStatusValues.includes(value as PlanStatusType);
+}
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import type * as Y from 'yjs';
@@ -124,8 +129,10 @@ export function ReviewActions({
       return { valid: false };
     }
 
-    const metadata = ydoc.getMap<PlanMetadata>(YDOC_KEYS.METADATA) as Y.Map<unknown>;
-    const currentStatus = metadata.get('status') as PlanStatusType;
+    const metadata = ydoc.getMap(YDOC_KEYS.METADATA);
+    const rawStatus = metadata.get('status');
+    const currentStatus =
+      typeof rawStatus === 'string' && isValidPlanStatus(rawStatus) ? rawStatus : undefined;
 
     if (
       (action === 'approve' && currentStatus === 'in_progress') ||

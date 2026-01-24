@@ -16,7 +16,7 @@
  * because y-websocket confirms sync before returning from operations.
  */
 
-import { ROUTES } from '@shipyard/schema';
+import { HasConnectionsResponseSchema, ROUTES } from '@shipyard/schema';
 import { WebsocketProvider } from 'y-websocket';
 import * as Y from 'yjs';
 import { logger } from './logger.js';
@@ -134,7 +134,7 @@ export async function hasActiveConnections(planId: string): Promise<boolean> {
 
     if (!res.ok) return false;
 
-    const data = (await res.json()) as { hasConnections: boolean };
+    const data = HasConnectionsResponseSchema.parse(await res.json());
     return data.hasConnections;
   } catch {
     // Fail open - allow browser to open on error

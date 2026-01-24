@@ -1,28 +1,16 @@
-import { Avatar, Button, Popover } from '@heroui/react';
+import { Button, Popover } from '@heroui/react';
 import { approveUser, rejectUser } from '@shipyard/schema';
 import { Check, Clock, UserPlus, Users, X } from 'lucide-react';
 import { useCallback } from 'react';
 import { toast } from 'sonner';
 import type { WebrtcProvider } from 'y-webrtc';
 import type * as Y from 'yjs';
+import { Avatar } from '@/components/ui/avatar';
 import type { PendingUser } from '@/hooks/usePendingUsers';
 import { usePendingUsers } from '@/hooks/usePendingUsers';
 
 // Maximum number of pending users to display in the popover
 const MAX_DISPLAYED_PENDING_USERS = 20;
-
-// Note: Avatar compound components have type issues in HeroUI v3 beta
-// Using type assertions until types are fixed in stable release
-const AvatarRoot = Avatar as unknown as React.FC<{
-  children: React.ReactNode;
-  size?: 'sm' | 'md' | 'lg';
-  className?: string;
-}>;
-const AvatarImage = Avatar.Image as React.FC<{ src?: string; alt: string }>;
-const AvatarFallback = Avatar.Fallback as React.FC<{
-  children: React.ReactNode;
-  style?: React.CSSProperties;
-}>;
 
 interface ApprovalPanelProps {
   ydoc: Y.Doc;
@@ -78,12 +66,12 @@ interface PendingUserRowProps {
 function PendingUserRow({ user, onApprove, onDeny }: PendingUserRowProps) {
   return (
     <div className="flex items-center gap-3 py-2">
-      <AvatarRoot size="sm">
-        <AvatarImage alt={user.name} src={`https://github.com/${user.id}.png?size=64`} />
-        <AvatarFallback style={{ backgroundColor: user.color }}>
+      <Avatar size="sm">
+        <Avatar.Image alt={user.name} src={`https://github.com/${user.id}.png?size=64`} />
+        <Avatar.Fallback style={{ backgroundColor: user.color }}>
           {getInitials(user.name)}
-        </AvatarFallback>
-      </AvatarRoot>
+        </Avatar.Fallback>
+      </Avatar>
 
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium text-foreground truncate">{user.name}</p>

@@ -2,8 +2,14 @@ import { execSync } from 'node:child_process';
 import os from 'node:os';
 import { basename } from 'node:path';
 import type { EnvironmentContext } from '@shipyard/schema';
+import { z } from 'zod';
 import { githubConfig } from './config/env/github.js';
 import { logger } from './logger.js';
+
+// Schema for GitHub API /user response (minimal fields we use)
+const GitHubUserResponseSchema = z.object({
+  login: z.string().optional(),
+});
 
 let cachedUsername: string | null = null;
 let usernameResolved = false;
@@ -127,8 +133,8 @@ async function getUsernameFromToken(token: string): Promise<string | null> {
 
     if (!response.ok) return null;
 
-    const user = (await response.json()) as { login?: string };
-    return user.login || null;
+    const user = GitHubUserResponseSchema.parse(await response.json());
+    return user.login ?? null;
   } catch (error) {
     logger.debug({ error }, 'GitHub API failed');
     return null;

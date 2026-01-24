@@ -7,6 +7,7 @@ import type { WebrtcProvider } from 'y-webrtc';
 import type * as Y from 'yjs';
 import { useUserIdentity } from '@/contexts/UserIdentityContext';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
+import { getSignalingConnections } from '@/types/y-webrtc-internals';
 
 // Extend Window interface for temporary timeout storage
 declare global {
@@ -81,16 +82,12 @@ export function ShareButton({
         maxUses: null, // Default: unlimited
       });
 
-      const signalingConns = (
-        rtcProvider as unknown as { signalingConns: Array<{ ws: WebSocket }> }
-      ).signalingConns;
+      const signalingConns = getSignalingConnections(rtcProvider);
 
-      if (signalingConns) {
-        for (const conn of signalingConns) {
-          if (conn.ws && conn.ws.readyState === WebSocket.OPEN) {
-            conn.ws.send(message);
-            return true;
-          }
+      for (const conn of signalingConns) {
+        if (conn.ws && conn.ws.readyState === WebSocket.OPEN) {
+          conn.ws.send(message);
+          return true;
         }
       }
       return false;
@@ -215,23 +212,18 @@ export function ShareButton({
     };
 
     // Access signaling connections
-    const signalingConns = (rtcProvider as unknown as { signalingConns: Array<{ ws: WebSocket }> })
-      .signalingConns;
+    const signalingConns = getSignalingConnections(rtcProvider);
 
-    if (signalingConns) {
-      for (const conn of signalingConns) {
-        if (conn.ws) {
-          conn.ws.addEventListener('message', handleMessage);
-        }
+    for (const conn of signalingConns) {
+      if (conn.ws) {
+        conn.ws.addEventListener('message', handleMessage);
       }
     }
 
     return () => {
-      if (signalingConns) {
-        for (const conn of signalingConns) {
-          if (conn.ws) {
-            conn.ws.removeEventListener('message', handleMessage);
-          }
+      for (const conn of signalingConns) {
+        if (conn.ws) {
+          conn.ws.removeEventListener('message', handleMessage);
         }
       }
     };

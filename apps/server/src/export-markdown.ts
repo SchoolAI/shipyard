@@ -2,7 +2,7 @@ import { ServerBlockNoteEditor } from '@blocknote/server-util';
 import {
   createUserResolver,
   extractTextFromCommentBody,
-  type PlanMetadata,
+  getPlanMetadata,
   parseThreads,
   type Thread,
   YDOC_KEYS,
@@ -69,8 +69,8 @@ export async function exportPlanToMarkdown(
   const contentMarkdown = markdownParts.join('\n');
 
   // Get threads and extract selected text from document marks
-  const threadsMap = ydoc.getMap<Record<string, Thread>>(YDOC_KEYS.THREADS);
-  const threadsData = threadsMap.toJSON() as Record<string, unknown>;
+  const threadsMap = ydoc.getMap(YDOC_KEYS.THREADS);
+  const threadsData = threadsMap.toJSON();
   const allThreads = parseThreads(threadsData);
 
   // Extract selected text for each thread from document marks
@@ -90,10 +90,16 @@ export async function exportPlanToMarkdown(
     resolveUser
   );
 
-  // Get reviewer comment from metadata
-  const metadataMap = ydoc.getMap<PlanMetadata>(YDOC_KEYS.METADATA);
-  const reviewComment = metadataMap.get('reviewComment') as string | undefined;
-  const reviewedBy = metadataMap.get('reviewedBy') as string | undefined;
+  // Get reviewer comment from metadata using type-safe helper
+  const metadata = getPlanMetadata(ydoc);
+  const reviewComment =
+    metadata?.status === 'changes_requested' || metadata?.status === 'in_progress'
+      ? metadata.reviewComment
+      : undefined;
+  const reviewedBy =
+    metadata?.status === 'changes_requested' || metadata?.status === 'in_progress'
+      ? metadata.reviewedBy
+      : undefined;
 
   // Build output with optional sections
   const sections: string[] = [contentMarkdown];

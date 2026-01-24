@@ -2,6 +2,10 @@ import { type InviteRedemptionResult, parseInviteFromUrl } from '@shipyard/schem
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import type { WebrtcProvider } from 'y-webrtc';
+import {
+  type SignalingConnection,
+  getSignalingConnections,
+} from '@/types/y-webrtc-internals';
 import type { GitHubIdentity } from './useGitHubAuth';
 
 export type RedemptionState =
@@ -120,23 +124,18 @@ export function useInviteToken(
     };
 
     // Access signaling connections from WebRTC provider
-    const signalingConns = (rtcProvider as unknown as { signalingConns: Array<{ ws: WebSocket }> })
-      .signalingConns;
+    const signalingConns = getSignalingConnections(rtcProvider);
 
-    if (signalingConns) {
-      for (const conn of signalingConns) {
-        if (conn.ws) {
-          conn.ws.addEventListener('message', handleMessage);
-        }
+    for (const conn of signalingConns) {
+      if (conn.ws) {
+        conn.ws.addEventListener('message', handleMessage);
       }
     }
 
     return () => {
-      if (signalingConns) {
-        for (const conn of signalingConns) {
-          if (conn.ws) {
-            conn.ws.removeEventListener('message', handleMessage);
-          }
+      for (const conn of signalingConns) {
+        if (conn.ws) {
+          conn.ws.removeEventListener('message', handleMessage);
         }
       }
     };
@@ -147,11 +146,7 @@ export function useInviteToken(
     (message: string): boolean => {
       if (!rtcProvider) return false;
 
-      const signalingConns = (
-        rtcProvider as unknown as { signalingConns: Array<{ ws: WebSocket }> }
-      ).signalingConns;
-
-      if (!signalingConns) return false;
+      const signalingConns = getSignalingConnections(rtcProvider);
 
       for (const conn of signalingConns) {
         if (conn.ws && conn.ws.readyState === WebSocket.OPEN) {
@@ -205,21 +200,9 @@ export function useInviteToken(
       return;
     }
 
-    /**
-     * Typed interface for SignalingConn from y-webrtc.
-     * Based on lib0/websocket.WebsocketClient which extends Observable.
-     */
-    interface SignalingConn {
-      ws: WebSocket | null;
-      connected: boolean;
-      on(event: 'connect', handler: () => void): void;
-      off(event: 'connect', handler: () => void): void;
-    }
+    const signalingConns = getSignalingConnections(rtcProvider);
 
-    const signalingConns = (rtcProvider as unknown as { signalingConns?: SignalingConn[] })
-      .signalingConns;
-
-    if (!signalingConns || signalingConns.length === 0) return;
+    if (signalingConns.length === 0) return;
 
     const hasOpenConnection = signalingConns.some(
       (conn) => conn.ws && conn.ws.readyState === WebSocket.OPEN
@@ -231,7 +214,7 @@ export function useInviteToken(
     }
 
     // Listen for 'connect' event instead of polling
-    const handlers: Array<{ conn: SignalingConn; handler: () => void }> = [];
+    const handlers: Array<{ conn: SignalingConnection; handler: () => void }> = [];
 
     const onConnect = () => {
       if (!hasAttemptedRef.current) {
@@ -239,18 +222,18 @@ export function useInviteToken(
       }
       // Clean up all handlers after first connection
       for (const { conn, handler } of handlers) {
-        conn.off('connect', handler);
+        conn.off?.('connect', handler);
       }
     };
 
     for (const conn of signalingConns) {
-      conn.on('connect', onConnect);
+      conn.on?.('connect', onConnect);
       handlers.push({ conn, handler: onConnect });
     }
 
     return () => {
       for (const { conn, handler } of handlers) {
-        conn.off('connect', handler);
+        conn.off?.('connect', handler);
       }
     };
   }, [hasInviteToken, githubIdentity, rtcProvider, redemptionState.status, redeemInvite]);

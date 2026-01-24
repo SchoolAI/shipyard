@@ -262,9 +262,9 @@ export function usePlanIndex(currentUsername: string | undefined): PlanIndexStat
         const dbNames = databases.map((db) => db.name).filter((name): name is string => !!name);
         const planIndexIds = new Set(allPlansData.active.map((p) => p.id));
 
+        const nonPlanDbNamesSet = new Set<string>(NON_PLAN_DB_NAMES);
         const planDocIds = dbNames.filter(
-          (name) =>
-            !(NON_PLAN_DB_NAMES as readonly string[]).includes(name) && !planIndexIds.has(name)
+          (name) => !nonPlanDbNamesSet.has(name) && !planIndexIds.has(name)
         );
 
         const plans = await Promise.all(

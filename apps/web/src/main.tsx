@@ -33,8 +33,7 @@ import { trpc } from './utils/trpc';
 // Expose reset function in development for console access
 // Usage: window.__resetShipyard() or just __resetShipyard()
 if (import.meta.env.DEV) {
-  (window as unknown as { __resetShipyard: typeof resetAllBrowserStorage }).__resetShipyard =
-    resetAllBrowserStorage;
+  window.__resetShipyard = resetAllBrowserStorage;
   // biome-ignore lint/suspicious/noConsole: Dev-only helpful message
   console.log(
     '%c[Shipyard Dev] %cReset available: window.__resetShipyard() or navigate to ?reset=all',
@@ -57,9 +56,8 @@ const queryClient = new QueryClient({
 function getRegistryUrl() {
   // Use env var if provided, otherwise use first default port
   // The actual connection will handle discovery/fallback as needed
-  const port = import.meta.env.VITE_REGISTRY_PORT
-    ? Number.parseInt(import.meta.env.VITE_REGISTRY_PORT as string, 10)
-    : DEFAULT_REGISTRY_PORTS[0];
+  const envPort = import.meta.env.VITE_REGISTRY_PORT;
+  const port = envPort ? Number.parseInt(envPort, 10) : DEFAULT_REGISTRY_PORTS[0];
   return `http://localhost:${port}`;
 }
 

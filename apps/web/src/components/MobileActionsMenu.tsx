@@ -1,4 +1,4 @@
-import { Avatar, Button, Card, Dropdown, Label, Modal } from '@heroui/react';
+import { Button, Card, Dropdown, Label, Modal } from '@heroui/react';
 import type { A2AMessage, ConversationExportMeta, PlanMetadata } from '@shipyard/schema';
 import { getPlanIndexEntry, setPlanIndexEntry, YDOC_KEYS } from '@shipyard/schema';
 import {
@@ -18,6 +18,7 @@ import type { WebrtcProvider } from 'y-webrtc';
 import type * as Y from 'yjs';
 import { HandoffConversationDialog } from '@/components/HandoffConversationDialog';
 import { LinkPRButton } from '@/components/LinkPRButton';
+import { Avatar } from '@/components/ui/avatar';
 import { useUserIdentity } from '@/contexts/UserIdentityContext';
 import { useConversationTransfer } from '@/hooks/useConversationTransfer';
 
@@ -32,16 +33,6 @@ function getMessageTextPreview(msg: A2AMessage, maxLength = 150): string {
   return text.length > maxLength ? `${text.slice(0, maxLength)}...` : text;
 }
 
-// Note: Avatar compound components have type issues in HeroUI v3 beta
-// Using type assertions until types are fixed in stable release
-const AvatarRoot = Avatar as unknown as React.FC<{
-  children: React.ReactNode;
-  size?: 'sm' | 'md' | 'lg';
-  color?: 'default' | 'accent';
-  className?: string;
-}>;
-const AvatarFallback = Avatar.Fallback as React.FC<{ children: React.ReactNode }>;
-
 /** Props for the message preview item */
 interface MessagePreviewItemProps {
   msg: A2AMessage;
@@ -55,9 +46,9 @@ function MessagePreviewItem({ msg, idx }: MessagePreviewItemProps) {
 
   return (
     <div key={msg.messageId || idx} className={`flex gap-2 ${isUser ? '' : 'flex-row-reverse'}`}>
-      <AvatarRoot size="sm" color={isUser ? 'default' : 'accent'}>
-        <AvatarFallback>{isUser ? 'U' : 'A'}</AvatarFallback>
-      </AvatarRoot>
+      <Avatar size="sm" color={isUser ? 'default' : 'accent'}>
+        <Avatar.Fallback>{isUser ? 'U' : 'A'}</Avatar.Fallback>
+      </Avatar>
       <div
         className={`flex-1 p-2 rounded-lg text-sm ${
           isUser ? 'bg-surface-secondary' : 'bg-accent/10'

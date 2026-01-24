@@ -1,4 +1,5 @@
-import { Avatar, Chip } from '@heroui/react';
+import { Chip } from '@heroui/react';
+import { Avatar } from '@/components/ui/avatar';
 import type { GitHubIdentity } from '@/hooks/useGitHubAuth';
 
 interface UserInfoHeaderProps {
@@ -15,27 +16,17 @@ function getInitials(name: string): string {
     .slice(0, 2);
 }
 
-// Note: Avatar compound components have type issues in HeroUI v3 beta
-// Using type assertions until types are fixed in stable release
-const AvatarRoot = Avatar as unknown as React.FC<{
-  children: React.ReactNode;
-  size?: 'sm' | 'md' | 'lg';
-  className?: string;
-}>;
-const AvatarImage = Avatar.Image as React.FC<{ src?: string; alt: string }>;
-const AvatarFallback = Avatar.Fallback as React.FC<{ children: React.ReactNode }>;
-
 export function UserInfoHeader({ identity, isGitHubAuth }: UserInfoHeaderProps) {
   return (
     <div className="px-3 pt-3 pb-2">
       <div className="flex items-center gap-3">
         <div className="relative">
-          <AvatarRoot size="md">
-            <AvatarImage src={identity.avatarUrl} alt={identity.username} />
-            <AvatarFallback>
+          <Avatar size="md">
+            <Avatar.Image src={identity.avatarUrl} alt={identity.username} />
+            <Avatar.Fallback>
               {getInitials(identity.displayName || identity.username)}
-            </AvatarFallback>
-          </AvatarRoot>
+            </Avatar.Fallback>
+          </Avatar>
           {!isGitHubAuth && (
             <Chip
               size="sm"

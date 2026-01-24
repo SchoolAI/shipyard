@@ -74,8 +74,8 @@ async function handleUpdatedPlanReview(
       content: planContent,
     });
   } catch (err) {
-    const error = err as Error;
-    if (error.message?.includes('404')) {
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    if (errorMessage?.includes('404')) {
       logger.warn(
         { planId, sessionId },
         'Plan not found (404), creating new plan with updated content'

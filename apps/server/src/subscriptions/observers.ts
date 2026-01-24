@@ -47,8 +47,8 @@ const CONTENT_EDIT_DEBOUNCE_MS = 5000;
 
 export function attachObservers(planId: string, doc: Y.Doc): void {
   const metadata = getPlanMetadata(doc);
-  const threadsMap = doc.getMap<Record<string, Thread>>(YDOC_KEYS.THREADS);
-  const threads = parseThreads(threadsMap.toJSON() as Record<string, unknown>);
+  const threadsMap = doc.getMap(YDOC_KEYS.THREADS);
+  const threads = parseThreads(threadsMap.toJSON());
   const deliverables = getDeliverables(doc);
   const allFulfilled = deliverables.length > 0 && deliverables.every((d) => d.linkedArtifactId);
 
@@ -105,13 +105,13 @@ export function attachObservers(planId: string, doc: Y.Doc): void {
     }
   });
 
-  doc.getMap<Record<string, Thread>>(YDOC_KEYS.THREADS).observeDeep((_events, transaction) => {
+  doc.getMap(YDOC_KEYS.THREADS).observeDeep((_events, transaction) => {
     const prev = previousState.get(planId);
     if (!prev) return;
 
     const actor = transaction.origin?.actor || 'System';
-    const threadsMap = doc.getMap<Record<string, Thread>>(YDOC_KEYS.THREADS);
-    const threads = parseThreads(threadsMap.toJSON() as Record<string, unknown>);
+    const threadsMap = doc.getMap(YDOC_KEYS.THREADS);
+    const threads = parseThreads(threadsMap.toJSON());
 
     handleNewComments(doc, planId, threads, prev, actor);
     handleResolvedComments(doc, planId, threads, prev, actor);

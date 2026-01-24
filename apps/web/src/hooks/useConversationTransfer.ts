@@ -16,17 +16,16 @@ import {
   type A2AMessage,
   type ConversationExportMeta,
   claudeCodeToA2A,
-  type OriginMetadata,
-  type PlanMetadata,
+  getPlanMetadata,
   parseClaudeCodeTranscriptString,
   summarizeA2AConversation,
   validateA2AMessages,
-  YDOC_KEYS,
 } from '@shipyard/schema';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { WebrtcProvider } from 'y-webrtc';
 import type * as Y from 'yjs';
 import { z } from 'zod';
+import { getWebrtcRoom } from '@/types/y-webrtc-internals';
 import {
   ConversationTransferManager,
   type PeerConnection,
@@ -36,22 +35,6 @@ import {
 // =============================================================================
 // Types
 // =============================================================================
-
-/**
- * Internal types for accessing y-webrtc internals.
- * These are not exported by y-webrtc, so we define minimal interfaces.
- */
-interface WebrtcConn {
-  peer: PeerConnection;
-}
-
-interface WebrtcRoom {
-  webrtcConns: Map<string, WebrtcConn>;
-}
-
-interface WebrtcProviderInternal {
-  room: WebrtcRoom | null;
-}
 
 /**
  * Progress callback for transfer operations.
@@ -171,8 +154,7 @@ function extractPeersFromProvider(provider: WebrtcProvider | null): Map<string, 
   if (!provider) return peers;
 
   // Access internal room structure (undocumented API)
-  const internal = provider as unknown as WebrtcProviderInternal;
-  const room = internal.room;
+  const room = getWebrtcRoom<PeerConnection>(provider);
 
   if (!room || !room.webrtcConns) return peers;
 
@@ -216,13 +198,12 @@ export function useConversationTransfer(
 
   /**
    * Get plan metadata for export.
-   * Type-safe extraction of origin metadata using discriminated union.
+   * Type-safe extraction of origin metadata using schema helper.
    */
-  const getPlanMetadata = useCallback(() => {
-    const metadataMap = ydoc.getMap<PlanMetadata>(YDOC_KEYS.METADATA);
-    const origin = metadataMap.get('origin') as OriginMetadata | undefined;
+  const getPlanMetadataCallback = useCallback(() => {
+    const metadata = getPlanMetadata(ydoc);
     return {
-      origin,
+      origin: metadata?.origin,
     };
   }, [ydoc]);
 
@@ -333,7 +314,7 @@ export function useConversationTransfer(
         const a2aMessages = claudeCodeToA2A(parseResult.messages, planId);
 
         // 3. Build export package
-        const metadata = getPlanMetadata();
+        const metadata = getPlanMetadataCallback();
         const sourcePlatform = metadata.origin?.platform ?? 'claude-code';
         const sourceSessionId =
           (metadata.origin?.platform === 'claude-code' && metadata.origin.sessionId) ||
@@ -390,7 +371,7 @@ export function useConversationTransfer(
         setTimeout(() => setProgress(null), 1000);
       }
     },
-    [planId, getPlanMetadata]
+    [planId, getPlanMetadataCallback]
   );
 
   /**
@@ -486,7 +467,7 @@ export function useConversationTransfer(
         }
       }
 
-      const metadata = getPlanMetadata();
+      const metadata = getPlanMetadataCallback();
       const exportId = crypto.randomUUID();
 
       setIsProcessing(true);
@@ -551,7 +532,7 @@ export function useConversationTransfer(
         return false;
       }
     },
-    [getPlanMetadata, planId, rtcProvider]
+    [getPlanMetadataCallback, planId, rtcProvider]
   );
 
   /**

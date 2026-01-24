@@ -1,6 +1,5 @@
 import type { BlockNoteEditor } from '@blocknote/core';
 import {
-  Avatar,
   Button,
   Card,
   Chip,
@@ -54,7 +53,10 @@ import { ShareButton } from '@/components/ShareButton';
 import { StatusChip } from '@/components/StatusChip';
 import { TagChip } from '@/components/TagChip';
 import { TagEditor } from '@/components/TagEditor';
+
 import { TruncatedText } from '@/components/ui/TruncatedText';
+
+import { Avatar } from '@/components/ui/avatar';
 import { useActivePlanSync } from '@/contexts/ActivePlanSyncContext';
 import { useUserIdentity } from '@/contexts/UserIdentityContext';
 import { useConversationTransfer } from '@/hooks/useConversationTransfer';
@@ -62,9 +64,9 @@ import { useGitHubAuth } from '@/hooks/useGitHubAuth';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { type ConnectedPeer, useP2PPeers } from '@/hooks/useP2PPeers';
 
-// ============================================================================
+// =====================================================================
 // Helper Functions & Sub-Components
-// ============================================================================
+// =====================================================================
 
 /** Extract text preview from a message */
 function getMessageTextPreview(msg: A2AMessage, maxLength = 150): string {
@@ -72,16 +74,6 @@ function getMessageTextPreview(msg: A2AMessage, maxLength = 150): string {
   const text = firstTextPart && 'text' in firstTextPart ? firstTextPart.text : '[Non-text content]';
   return text.length > maxLength ? `${text.slice(0, maxLength)}...` : text;
 }
-
-// Note: Avatar compound components have type issues in HeroUI v3 beta
-// Using type assertions until types are fixed in stable release
-const AvatarRoot = Avatar as unknown as React.FC<{
-  children: React.ReactNode;
-  size?: 'sm' | 'md' | 'lg';
-  color?: 'default' | 'accent';
-  className?: string;
-}>;
-const AvatarFallback = Avatar.Fallback as React.FC<{ children: React.ReactNode }>;
 
 /** Props for the message preview item */
 interface MessagePreviewItemProps {
@@ -96,9 +88,9 @@ function MessagePreviewItem({ msg, idx }: MessagePreviewItemProps) {
 
   return (
     <div key={msg.messageId || idx} className={`flex gap-2 ${isUser ? '' : 'flex-row-reverse'}`}>
-      <AvatarRoot size="sm" color={isUser ? 'default' : 'accent'}>
-        <AvatarFallback>{isUser ? 'U' : 'A'}</AvatarFallback>
-      </AvatarRoot>
+      <Avatar size="sm" color={isUser ? 'default' : 'accent'}>
+        <Avatar.Fallback>{isUser ? 'U' : 'A'}</Avatar.Fallback>
+      </Avatar>
       <div
         className={`flex-1 p-2 rounded-lg text-sm ${
           isUser ? 'bg-surface-secondary' : 'bg-accent/10'
@@ -474,9 +466,9 @@ function ImportReviewModal({
   );
 }
 
-// ============================================================================
+// =====================================================================
 // Main Component
-// ============================================================================
+// =====================================================================
 
 /** Simple identity type for display purposes */
 interface UserIdentity {

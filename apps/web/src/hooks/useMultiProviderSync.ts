@@ -67,9 +67,9 @@ function getOrCreateWebrtcProvider(
   ];
 
   // Add TURN server if configured via environment variables
-  const turnUrl = import.meta.env.VITE_TURN_URL as string | undefined;
-  const turnUsername = import.meta.env.VITE_TURN_USERNAME as string | undefined;
-  const turnCredential = import.meta.env.VITE_TURN_CREDENTIAL as string | undefined;
+  const turnUrl = import.meta.env.VITE_TURN_URL;
+  const turnUsername = import.meta.env.VITE_TURN_USERNAME;
+  const turnCredential = import.meta.env.VITE_TURN_CREDENTIAL;
 
   if (turnUrl && turnUsername && turnCredential) {
     iceServers.push({
@@ -121,9 +121,8 @@ function releaseWebrtcProvider(roomName: string): void {
  * Tries ports 32191 and 32192 to handle hub restarts.
  */
 async function discoverHubUrl(): Promise<string> {
-  const ports = import.meta.env.VITE_REGISTRY_PORT
-    ? [Number.parseInt(import.meta.env.VITE_REGISTRY_PORT as string, 10)]
-    : DEFAULT_REGISTRY_PORTS;
+  const envPort = import.meta.env.VITE_REGISTRY_PORT;
+  const ports = envPort ? [Number.parseInt(envPort, 10)] : DEFAULT_REGISTRY_PORTS;
 
   for (const port of ports) {
     try {
@@ -375,9 +374,8 @@ export function useMultiProviderSync(
 
     // Connect to single Registry Hub with port discovery
     (async () => {
-      const hubUrl = import.meta.env.VITE_HUB_URL
-        ? (import.meta.env.VITE_HUB_URL as string)
-        : await discoverHubUrl();
+      const envHubUrl = import.meta.env.VITE_HUB_URL;
+      const hubUrl = envHubUrl ? envHubUrl : await discoverHubUrl();
 
       // Critical: Check mounted AFTER async hub discovery completes
       // Component could have unmounted during the await
@@ -430,8 +428,8 @@ export function useMultiProviderSync(
 
     // WebRTC P2P sync - simple setup without authentication
     if (enableWebRTC) {
-      const signalingServer =
-        (import.meta.env.VITE_WEBRTC_SIGNALING as string) || DEFAULT_SIGNALING_SERVER;
+      const envSignaling = import.meta.env.VITE_WEBRTC_SIGNALING;
+      const signalingServer = envSignaling || DEFAULT_SIGNALING_SERVER;
 
       const roomName = `shipyard-${docName}`;
 
@@ -442,10 +440,10 @@ export function useMultiProviderSync(
 
       // Expose provider on window for debugging
       if (docName === 'plan-index') {
-        (window as unknown as { planIndexRtcProvider: WebrtcProvider }).planIndexRtcProvider = rtc;
+        window.planIndexRtcProvider = rtc;
       } else {
         // Also expose plan-specific provider for debugging
-        (window as unknown as { planRtcProvider: WebrtcProvider }).planRtcProvider = rtc;
+        window.planRtcProvider = rtc;
       }
 
       // Set awareness for user presence with planStatus field
@@ -543,10 +541,9 @@ export function useMultiProviderSync(
 
         // Clean up window debug references
         if (docName === 'plan-index') {
-          delete (window as unknown as { planIndexRtcProvider?: WebrtcProvider })
-            .planIndexRtcProvider;
+          delete window.planIndexRtcProvider;
         } else {
-          delete (window as unknown as { planRtcProvider?: WebrtcProvider }).planRtcProvider;
+          delete window.planRtcProvider;
         }
       }
 
