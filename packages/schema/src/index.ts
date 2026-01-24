@@ -84,24 +84,38 @@ export {
 } from './ids.js';
 export type {
   ChoiceInputRequest,
+  ChoiceOption,
   ConfirmInputRequest,
   CreateChoiceInputParams,
   CreateConfirmInputParams,
+  CreateDateInputParams,
+  CreateDropdownInputParams,
+  CreateEmailInputParams,
   CreateInputRequestParams,
   CreateMultilineInputParams,
+  CreateNumberInputParams,
+  CreateRatingInputParams,
   CreateTextInputParams,
+  DateInputRequest,
+  DropdownInputRequest,
+  EmailInputRequest,
   InputRequest,
   InputRequestStatus,
   InputRequestType,
   MultilineInputRequest,
+  NormalizedChoiceOption,
+  NumberInputRequest,
+  RatingInputRequest,
   TextInputRequest,
 } from './input-request.js';
 export {
+  ChoiceOptionSchema,
   createInputRequest,
   DEFAULT_INPUT_REQUEST_TIMEOUT_SECONDS,
   InputRequestSchema,
   InputRequestStatusValues,
   InputRequestTypeValues,
+  normalizeChoiceOptions,
 } from './input-request.js';
 export type {
   CreateInviteRequest,

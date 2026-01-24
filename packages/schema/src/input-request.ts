@@ -19,8 +19,23 @@ export const DEFAULT_INPUT_REQUEST_TIMEOUT_SECONDS = 1800;
  * - multiline: Multi-line text input
  * - choice: Select from predefined options
  * - confirm: Boolean yes/no question
+ * - number: Numeric value with optional bounds
+ * - email: Email address with optional domain restriction
+ * - date: Date selection with optional range
+ * - dropdown: Searchable select from options (for long lists)
+ * - rating: Scale rating (1-5, 1-10, etc.)
  */
-export const InputRequestTypeValues = ['text', 'multiline', 'choice', 'confirm'] as const;
+export const InputRequestTypeValues = [
+  'text',
+  'multiline',
+  'choice',
+  'confirm',
+  'number',
+  'email',
+  'date',
+  'dropdown',
+  'rating',
+] as const;
 export type InputRequestType = (typeof InputRequestTypeValues)[number];
 
 /**
@@ -71,11 +86,25 @@ const MultilineInputSchema = InputRequestBaseSchema.extend({
   type: z.literal('multiline'),
 });
 
+/** Choice option can be simple string or rich object (backward compatible) */
+export const ChoiceOptionSchema = z.union([
+  z.string(),
+  z.object({
+    value: z.string(),
+    label: z.string().optional(),
+    description: z.string().optional(),
+    icon: z.string().optional(),
+    disabled: z.boolean().optional(),
+  }),
+]);
+
+export type ChoiceOption = z.infer<typeof ChoiceOptionSchema>;
+
 /** Choice input request - select from predefined options */
 const ChoiceInputSchema = InputRequestBaseSchema.extend({
   type: z.literal('choice'),
-  /** Available options - REQUIRED for choice type */
-  options: z.array(z.string()).min(1, 'Choice requests must have at least one option'),
+  /** Available options - supports both string[] (old) and object[] (new) formats */
+  options: z.array(ChoiceOptionSchema).min(1, 'Choice requests must have at least one option'),
   /** Enable multi-select for 'choice' type (uses checkboxes instead of radio buttons) */
   multiSelect: z.boolean().optional(),
 });
@@ -83,6 +112,82 @@ const ChoiceInputSchema = InputRequestBaseSchema.extend({
 /** Confirm input request - boolean yes/no question */
 const ConfirmInputSchema = InputRequestBaseSchema.extend({
   type: z.literal('confirm'),
+});
+
+/** Number input request - numeric value with optional bounds */
+const NumberInputSchema = InputRequestBaseSchema.extend({
+  type: z.literal('number'),
+  /** Minimum allowed value */
+  min: z.number().optional(),
+  /** Maximum allowed value */
+  max: z.number().optional(),
+  /** Step increment for stepper controls */
+  step: z.number().positive().optional(),
+  /** Display format hint */
+  format: z.enum(['integer', 'decimal', 'currency', 'percentage']).optional(),
+  /** Unit label (e.g., "seconds", "items", "$") */
+  unit: z.string().optional(),
+}).refine((data) => data.min === undefined || data.max === undefined || data.min <= data.max, {
+  message: 'min must be <= max',
+});
+
+/** Email input request - email address with optional domain restriction */
+const EmailInputSchema = InputRequestBaseSchema.extend({
+  type: z.literal('email'),
+  /** Allow multiple comma-separated emails */
+  allowMultiple: z.boolean().optional(),
+  /** Restrict to specific domain (e.g., "company.com") */
+  domain: z.string().optional(),
+});
+
+/** Date input request - date selection with optional range */
+const DateInputSchema = InputRequestBaseSchema.extend({
+  type: z.literal('date'),
+  /** Minimum date in ISO format (YYYY-MM-DD) */
+  min: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in YYYY-MM-DD format')
+    .optional(),
+  /** Maximum date in ISO format (YYYY-MM-DD) */
+  max: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in YYYY-MM-DD format')
+    .optional(),
+}).refine(
+  (data) =>
+    data.min === undefined || data.max === undefined || new Date(data.min) <= new Date(data.max),
+  { message: 'min date must be before or equal to max date' }
+);
+
+/** Dropdown input request - searchable select for long option lists */
+const DropdownInputSchema = InputRequestBaseSchema.extend({
+  type: z.literal('dropdown'),
+  /** Available options (supports both string[] and object[] formats) */
+  options: z.array(ChoiceOptionSchema).min(1, 'Dropdown requests must have at least one option'),
+  /** Enable search filtering */
+  searchable: z.boolean().optional(),
+  /** Placeholder text */
+  placeholder: z.string().optional(),
+});
+
+/** Rating input request - scale rating */
+const RatingInputSchema = InputRequestBaseSchema.extend({
+  type: z.literal('rating'),
+  /** Minimum rating value */
+  min: z.number().int().default(1),
+  /** Maximum rating value */
+  max: z.number().int().default(5),
+  /** Display style */
+  style: z.enum(['stars', 'numbers', 'emoji']).optional(),
+  /** Labels for scale endpoints */
+  labels: z
+    .object({
+      low: z.string().optional(),
+      high: z.string().optional(),
+    })
+    .optional(),
+}).refine((data) => data.min <= data.max && data.max - data.min <= 20, {
+  message: 'Rating scale must have min <= max and at most 20 items',
 });
 
 /**
@@ -98,6 +203,11 @@ export const InputRequestSchema = z.discriminatedUnion('type', [
   MultilineInputSchema,
   ChoiceInputSchema,
   ConfirmInputSchema,
+  NumberInputSchema,
+  EmailInputSchema,
+  DateInputSchema,
+  DropdownInputSchema,
+  RatingInputSchema,
 ]);
 
 export type InputRequest = z.infer<typeof InputRequestSchema>;
@@ -106,6 +216,11 @@ export type TextInputRequest = z.infer<typeof TextInputSchema>;
 export type MultilineInputRequest = z.infer<typeof MultilineInputSchema>;
 export type ChoiceInputRequest = z.infer<typeof ChoiceInputSchema>;
 export type ConfirmInputRequest = z.infer<typeof ConfirmInputSchema>;
+export type NumberInputRequest = z.infer<typeof NumberInputSchema>;
+export type EmailInputRequest = z.infer<typeof EmailInputSchema>;
+export type DateInputRequest = z.infer<typeof DateInputSchema>;
+export type DropdownInputRequest = z.infer<typeof DropdownInputSchema>;
+export type RatingInputRequest = z.infer<typeof RatingInputSchema>;
 
 /** Base params for creating any input request */
 interface CreateInputRequestBaseParams {
@@ -128,8 +243,8 @@ export interface CreateMultilineInputParams extends CreateInputRequestBaseParams
 /** Params for creating a choice input request */
 export interface CreateChoiceInputParams extends CreateInputRequestBaseParams {
   type: 'choice';
-  /** Required: available options for selection */
-  options: string[];
+  /** Required: available options for selection (supports both string[] and object[] formats) */
+  options: ChoiceOption[];
   /** Enable multi-select (uses checkboxes instead of radio buttons) */
   multiSelect?: boolean;
 }
@@ -139,15 +254,63 @@ export interface CreateConfirmInputParams extends CreateInputRequestBaseParams {
   type: 'confirm';
 }
 
+/** Params for creating a number input request */
+export interface CreateNumberInputParams extends CreateInputRequestBaseParams {
+  type: 'number';
+  min?: number;
+  max?: number;
+  step?: number;
+  format?: 'integer' | 'decimal' | 'currency' | 'percentage';
+  unit?: string;
+}
+
+/** Params for creating an email input request */
+export interface CreateEmailInputParams extends CreateInputRequestBaseParams {
+  type: 'email';
+  allowMultiple?: boolean;
+  domain?: string;
+}
+
+/** Params for creating a date input request */
+export interface CreateDateInputParams extends CreateInputRequestBaseParams {
+  type: 'date';
+  /** Minimum date in ISO format (YYYY-MM-DD) */
+  min?: string;
+  /** Maximum date in ISO format (YYYY-MM-DD) */
+  max?: string;
+}
+
+/** Params for creating a dropdown input request */
+export interface CreateDropdownInputParams extends CreateInputRequestBaseParams {
+  type: 'dropdown';
+  options: ChoiceOption[];
+  searchable?: boolean;
+  placeholder?: string;
+}
+
+/** Params for creating a rating input request */
+export interface CreateRatingInputParams extends CreateInputRequestBaseParams {
+  type: 'rating';
+  min?: number;
+  max?: number;
+  style?: 'stars' | 'numbers' | 'emoji';
+  labels?: { low?: string; high?: string };
+}
+
 /**
  * Parameters for creating a new input request.
- * Discriminated union ensures 'choice' type requires options.
+ * Discriminated union ensures type-specific fields are required.
  */
 export type CreateInputRequestParams =
   | CreateTextInputParams
   | CreateMultilineInputParams
   | CreateChoiceInputParams
-  | CreateConfirmInputParams;
+  | CreateConfirmInputParams
+  | CreateNumberInputParams
+  | CreateEmailInputParams
+  | CreateDateInputParams
+  | CreateDropdownInputParams
+  | CreateRatingInputParams;
 
 /**
  * Create a new input request with auto-generated fields.
@@ -187,6 +350,52 @@ export function createInputRequest(params: CreateInputRequestParams): InputReque
     case 'confirm':
       request = { ...baseFields, type: 'confirm' as const };
       break;
+    case 'number':
+      request = {
+        ...baseFields,
+        type: 'number' as const,
+        min: params.min,
+        max: params.max,
+        step: params.step,
+        format: params.format,
+        unit: params.unit,
+      };
+      break;
+    case 'email':
+      request = {
+        ...baseFields,
+        type: 'email' as const,
+        allowMultiple: params.allowMultiple,
+        domain: params.domain,
+      };
+      break;
+    case 'date':
+      request = {
+        ...baseFields,
+        type: 'date' as const,
+        min: params.min,
+        max: params.max,
+      };
+      break;
+    case 'dropdown':
+      request = {
+        ...baseFields,
+        type: 'dropdown' as const,
+        options: params.options,
+        searchable: params.searchable,
+        placeholder: params.placeholder,
+      };
+      break;
+    case 'rating':
+      request = {
+        ...baseFields,
+        type: 'rating' as const,
+        min: params.min,
+        max: params.max,
+        style: params.style,
+        labels: params.labels,
+      };
+      break;
   }
 
   const parseResult = InputRequestSchema.safeParse(request);
@@ -195,4 +404,28 @@ export function createInputRequest(params: CreateInputRequestParams): InputReque
   }
 
   return parseResult.data;
+}
+
+/** Normalized choice option with guaranteed value and label */
+export interface NormalizedChoiceOption {
+  value: string;
+  label: string;
+  description?: string;
+  icon?: string;
+  disabled?: boolean;
+}
+
+/**
+ * Normalize choice options to objects for consistent rendering.
+ * Handles both string[] (old format) and object[] (new format) for backward compatibility.
+ *
+ * @param options - Array of string or object options
+ * @returns Array of normalized option objects with guaranteed value and label
+ */
+export function normalizeChoiceOptions(options: ChoiceOption[]): NormalizedChoiceOption[] {
+  return options.map((opt) =>
+    typeof opt === 'string'
+      ? { value: opt, label: opt }
+      : { ...opt, value: opt.value, label: opt.label || opt.value }
+  );
 }

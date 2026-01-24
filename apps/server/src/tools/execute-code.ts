@@ -205,39 +205,76 @@ Request input from the user via browser modal.
 
 Parameters:
 - message (string, required): The question to ask the user
-- type (string, required): 'text' | 'choice' | 'confirm' | 'multiline'
+- type (string, required): CURRENTLY SUPPORTED: 'text' | 'choice' | 'confirm' | 'multiline'
+  (Future types planned: 'number' | 'email' | 'date' | 'dropdown' | 'rating')
 - options (string[], optional): For 'choice' type - available options (required for choice)
-- multiSelect (boolean, optional): For 'choice' type - allow selecting multiple options (uses checkboxes instead of radio buttons)
+- multiSelect (boolean, optional): For 'choice' type - allow selecting multiple options (checkboxes)
 - defaultValue (string, optional): Pre-filled value for text/multiline inputs
 - timeout (number, optional): Timeout in seconds (default: 1800, min: 10, max: 14400)
 - planId (string, optional): Optional metadata to link request to plan (for activity log filtering)
 
 Returns:
 - success: Boolean indicating if user responded
-- response: User's answer (if success=true)
-- status: 'answered' | 'cancelled'
+- response: User's answer (string - see format details below)
+- status: 'answered' | 'declined' | 'cancelled'
 - reason: Reason for failure (if success=false): 'cancelled' | timeout message
 
+Response format (all responses are strings):
+- text/multiline: Raw string (multiline preserves newlines as \n)
+- choice (single): Selected option string (e.g., "PostgreSQL")
+- choice (multi): Comma-space separated (e.g., "PostgreSQL, SQLite")
+- confirm: "yes" or "no" (lowercase)
+- See docs/INPUT-RESPONSE-FORMATS.md for complete format specification
+
 The request appears as a modal in the browser. The function blocks until:
-- User responds (success=true)
-- User cancels (success=false)
-- Timeout occurs (success=false)
+- User responds (success=true, status='answered')
+- User declines (success=true, status='declined')
+- Timeout occurs (success=false, status='cancelled')
 
-Example:
+Currently supported input types:
+
+1. text - Single-line text input
 \`\`\`typescript
-const result = await requestUserInput({
-  message: "Which database should we use?",
-  type: "choice",
-  options: ["PostgreSQL", "SQLite", "MongoDB"],
-  timeout: 120  // 2 minutes
-});
-
-if (result.success) {
-  console.log("User chose:", result.response);
-} else {
-  console.log("Request failed:", result.reason);
-}
+await requestUserInput({ message: "Enter filename:", type: "text" })
 \`\`\`
+
+2. multiline - Multi-line text area
+\`\`\`typescript
+await requestUserInput({ message: "Describe the issue:", type: "multiline" })
+\`\`\`
+
+3. choice - Select from options (radio or checkbox)
+\`\`\`typescript
+// Single-select
+await requestUserInput({
+  message: "Which database?",
+  type: "choice",
+  options: ["PostgreSQL", "SQLite", "MongoDB"]
+})
+
+// Multi-select
+await requestUserInput({
+  message: "Which features?",
+  type: "choice",
+  options: ["Dark mode", "Offline support", "Analytics"],
+  multiSelect: true
+})
+// Response: "Dark mode, Offline support"
+\`\`\`
+
+4. confirm - Yes/No confirmation
+\`\`\`typescript
+await requestUserInput({ message: "Delete file?", type: "confirm" })
+// Response: "yes" or "no"
+\`\`\`
+
+Future types (not yet implemented):
+
+5. number - Numeric input with validation
+6. email - Email address with validation
+7. date - Date selection
+8. dropdown - Select from searchable list (for 10+ options)
+9. rating - Scale rating (1-5, 1-10, etc.)
 
 ---
 
@@ -645,12 +682,36 @@ async function setupReviewNotification(planId: string, pollIntervalSeconds?: num
 
 async function requestUserInput(opts: {
   message: string;
-  type: 'text' | 'choice' | 'confirm' | 'multiline';
+  type:
+    | 'text'
+    | 'choice'
+    | 'confirm'
+    | 'multiline'
+    | 'number'
+    | 'email'
+    | 'date'
+    | 'dropdown'
+    | 'rating';
   options?: string[];
   multiSelect?: boolean;
   defaultValue?: string;
   timeout?: number;
   planId?: string;
+  // Number/rating type parameters
+  min?: number;
+  max?: number;
+  step?: number;
+  format?: 'integer' | 'decimal' | 'currency' | 'percentage';
+  unit?: string;
+  // Date type parameters (separate from min/max since they're strings)
+  minDate?: string; // YYYY-MM-DD format
+  maxDate?: string; // YYYY-MM-DD format
+  // Email type parameters
+  allowMultiple?: boolean;
+  domain?: string;
+  // Rating type parameters
+  style?: 'stars' | 'numbers' | 'emoji';
+  labels?: { low?: string; high?: string };
 }) {
   const { InputRequestManager } = await import('../services/input-request-manager.js');
 
@@ -661,27 +722,77 @@ async function requestUserInput(opts: {
   // Create manager and make request
   const manager = new InputRequestManager();
 
-  // Build params based on type - choice requires options
-  const params =
-    opts.type === 'choice'
-      ? {
-          message: opts.message,
-          type: 'choice' as const,
-          options: opts.options ?? [],
-          multiSelect: opts.multiSelect,
-          defaultValue: opts.defaultValue,
-          timeout: opts.timeout,
-          planId: opts.planId,
-        }
-      : {
-          message: opts.message,
-          type: opts.type,
-          defaultValue: opts.defaultValue,
-          timeout: opts.timeout,
-          planId: opts.planId,
-        };
+  // Build params based on type - include type-specific parameters
+  const baseParams = {
+    message: opts.message,
+    defaultValue: opts.defaultValue,
+    timeout: opts.timeout,
+    planId: opts.planId,
+  };
 
-  const requestId = manager.createRequest(ydoc, params);
+  let params: Record<string, unknown>;
+
+  switch (opts.type) {
+    case 'choice':
+    case 'dropdown':
+      params = {
+        ...baseParams,
+        type: opts.type,
+        options: opts.options ?? [],
+        multiSelect: opts.multiSelect,
+      };
+      break;
+    case 'number':
+      params = {
+        ...baseParams,
+        type: opts.type,
+        min: opts.min,
+        max: opts.max,
+        step: opts.step,
+        format: opts.format,
+        unit: opts.unit,
+      };
+      break;
+    case 'email':
+      params = {
+        ...baseParams,
+        type: opts.type,
+        allowMultiple: opts.allowMultiple,
+        domain: opts.domain,
+      };
+      break;
+    case 'date':
+      params = {
+        ...baseParams,
+        type: opts.type,
+        min: opts.minDate,
+        max: opts.maxDate,
+      };
+      break;
+    case 'rating':
+      params = {
+        ...baseParams,
+        type: opts.type,
+        min: opts.min,
+        max: opts.max,
+        style: opts.style,
+        labels: opts.labels,
+      };
+      break;
+    default:
+      // text, multiline, confirm
+      params = {
+        ...baseParams,
+        type: opts.type,
+      };
+  }
+
+  // Cast through unknown since new types (number, email, date, dropdown, rating)
+  // may not yet be in the schema. The InputRequestManager will pass through to Y.Doc.
+  const requestId = manager.createRequest(
+    ydoc,
+    params as unknown as Parameters<typeof manager.createRequest>[1]
+  );
 
   // Wait for response
   const result = await manager.waitForResponse(ydoc, requestId, opts.timeout);

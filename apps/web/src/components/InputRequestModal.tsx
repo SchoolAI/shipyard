@@ -4,21 +4,7 @@
  * Updates Y.Doc with user response or cancellation.
  */
 
-import {
-  Alert,
-  Button,
-  Card,
-  Checkbox,
-  CheckboxGroup,
-  Form,
-  Input,
-  Label,
-  Modal,
-  Radio,
-  RadioGroup,
-  TextArea,
-  TextField,
-} from '@heroui/react';
+import { Alert, Button, Card, Form, Modal } from '@heroui/react';
 import {
   type AnswerInputRequestResult,
   answerInputRequest,
@@ -33,6 +19,19 @@ import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import type * as Y from 'yjs';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
+import {
+  ChoiceInput,
+  ConfirmInput,
+  DateInput,
+  DropdownInput,
+  EmailInput,
+  formatTime,
+  MultilineInput,
+  NumberInput,
+  OTHER_OPTION_VALUE,
+  RatingInput,
+  TextInput,
+} from './inputs';
 
 interface InputRequestModalProps {
   isOpen: boolean;
@@ -41,13 +40,74 @@ interface InputRequestModalProps {
   onClose: () => void;
 }
 
+/** Basic email validation regex */
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/**
+ * Validate input value based on request type.
+ * Returns true if input is valid, false otherwise.
+ * Used to disable submit button when validation fails.
+ */
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Validation logic for multiple input types needs conditional checks
+function isInputValid(request: InputRequest | null, value: string | string[]): boolean {
+  if (!request) return true;
+
+  switch (request.type) {
+    case 'number': {
+      const numStr = typeof value === 'string' ? value : '';
+      if (!numStr) return true; // Empty is handled by required check
+      const num = Number.parseFloat(numStr);
+      if (Number.isNaN(num)) return false;
+      if (request.min !== undefined && num < request.min) return false;
+      if (request.max !== undefined && num > request.max) return false;
+      return true;
+    }
+    case 'email': {
+      const email = typeof value === 'string' ? value : '';
+      if (!email.trim()) return true; // Empty is handled by required check
+      if (!EMAIL_REGEX.test(email)) return false;
+      if (request.domain && !email.toLowerCase().endsWith(`@${request.domain.toLowerCase()}`)) {
+        return false;
+      }
+      return true;
+    }
+    case 'date': {
+      const dateStr = typeof value === 'string' ? value : '';
+      if (!dateStr) return true; // Empty is handled by required check
+      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+      if (!dateRegex.test(dateStr)) return false;
+      const date = new Date(dateStr);
+      if (Number.isNaN(date.getTime())) return false;
+      if (request.min) {
+        const minDate = new Date(request.min);
+        if (date < minDate) return false;
+      }
+      if (request.max) {
+        const maxDate = new Date(request.max);
+        if (date > maxDate) return false;
+      }
+      return true;
+    }
+    default:
+      return true;
+  }
+}
+
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Modal handles multiple input types with complex state management
 export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputRequestModalProps) {
   const [value, setValue] = useState<string | string[]>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   // Use -1 as sentinel value to indicate "not yet initialized"
   // This prevents race condition where auto-cancel fires before countdown is set
   const [remainingTime, setRemainingTime] = useState(-1);
+  // Custom input for "Other" option in choice-type questions
+  const [customInput, setCustomInput] = useState('');
   const { identity, startAuth } = useGitHubAuth();
+
+  // Derive whether "Other" is selected for choice-type questions
+  const isOtherSelected =
+    request?.type === 'choice' &&
+    (Array.isArray(value) ? value.includes(OTHER_OPTION_VALUE) : value === OTHER_OPTION_VALUE);
 
   // Reset state when request changes
   useEffect(() => {
@@ -58,6 +118,8 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
       } else {
         setValue(request.defaultValue || '');
       }
+      // Reset custom input when request changes
+      setCustomInput('');
     }
     // Reset countdown to sentinel value when request changes
     // This prevents stale timeout values from previous requests
@@ -157,6 +219,7 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
     []
   );
 
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Submit handler has conditional logic for "Other" option and multi-select
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!ydoc || !request || !identity || isSubmitting) return;
@@ -164,8 +227,23 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
     setIsSubmitting(true);
 
     try {
-      // Convert array values (from multiSelect choice) to comma-separated string
-      const responseValue = Array.isArray(value) ? value.join(', ') : value;
+      let responseValue: string;
+
+      // Handle "Other" option for choice-type questions
+      if (request.type === 'choice' && isOtherSelected) {
+        if (Array.isArray(value)) {
+          // Multi-select: combine selected options (excluding __other__) with custom input
+          const selectedOptions = value.filter((v) => v !== OTHER_OPTION_VALUE);
+          responseValue = [...selectedOptions, customInput.trim()].join(', ');
+        } else {
+          // Single-select: use custom input as the response
+          responseValue = customInput.trim();
+        }
+      } else {
+        // Standard handling: convert array values to comma-separated string
+        responseValue = Array.isArray(value) ? value.join(', ') : value;
+      }
+
       const result = answerInputRequest(ydoc, request.id, responseValue, identity.username);
 
       if (!result.success) {
@@ -173,21 +251,14 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
         return;
       }
 
-      // Success - close modal and clear value
+      // Success - close modal and clear state
       // multiSelect only exists on 'choice' type requests
       setValue(request.type === 'choice' && request.multiSelect ? [] : '');
+      setCustomInput('');
       onClose();
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  const formatTime = (seconds: number) => {
-    // Handle sentinel value (-1 = not yet initialized)
-    if (seconds < 0) return '--:--';
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
   const handleConfirmResponse = useCallback(
@@ -215,142 +286,58 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
     [ydoc, request, identity, isSubmitting, onClose, handleAnswerError]
   );
 
-  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Input type switching with form validation requires comprehensive handling
   const renderInput = () => {
     if (!request) return null;
 
+    const baseProps = { request, value, setValue, isSubmitting };
+
     switch (request.type) {
       case 'text':
-        return (
-          <div className="space-y-3">
-            <TextField isRequired isDisabled={isSubmitting}>
-              <Label className="text-sm font-medium text-foreground">{request.message}</Label>
-              <Input
-                value={value}
-                onChange={(e) => setValue(e.target.value)}
-                placeholder={request.defaultValue}
-                autoFocus
-              />
-            </TextField>
-          </div>
-        );
-
+        return <TextInput {...baseProps} request={request} />;
       case 'multiline':
+        return <MultilineInput {...baseProps} request={request} />;
+      case 'choice':
         return (
-          <div className="space-y-3">
-            <TextField isRequired isDisabled={isSubmitting}>
-              <Label className="text-sm font-medium text-foreground">{request.message}</Label>
-              <TextArea
-                value={value}
-                onChange={(e) => setValue(e.target.value)}
-                placeholder={request.defaultValue}
-                rows={4}
-                autoFocus
-              />
-            </TextField>
-            <p className="text-xs text-muted-foreground">{value.length} characters</p>
-          </div>
+          <ChoiceInput
+            {...baseProps}
+            request={request}
+            customInput={customInput}
+            setCustomInput={setCustomInput}
+            isOtherSelected={isOtherSelected}
+          />
         );
-
-      case 'choice': {
-        const options = request.options || [];
-        if (options.length === 0) {
-          return (
-            <Alert status="danger">
-              <Alert.Indicator />
-              <Alert.Content>
-                <Alert.Title>Invalid Request</Alert.Title>
-                <Alert.Description>
-                  This choice request has no options available. Please cancel and contact the agent.
-                </Alert.Description>
-              </Alert.Content>
-            </Alert>
-          );
-        }
-
-        // Multi-select mode with checkboxes
-        if (request.multiSelect) {
-          return (
-            <div className="space-y-3">
-              <CheckboxGroup
-                isRequired
-                value={Array.isArray(value) ? value : []}
-                onChange={setValue}
-                isDisabled={isSubmitting}
-              >
-                <Label className="text-sm font-medium text-foreground">{request.message}</Label>
-                <p className="text-xs text-muted-foreground mt-1">(Select one or more options)</p>
-                {options.map((opt) => (
-                  <Checkbox key={opt} value={opt}>
-                    <Checkbox.Control>
-                      <Checkbox.Indicator />
-                    </Checkbox.Control>
-                    <Checkbox.Content>
-                      <Label>{opt}</Label>
-                    </Checkbox.Content>
-                  </Checkbox>
-                ))}
-              </CheckboxGroup>
-            </div>
-          );
-        }
-
-        // Single-select mode with radio buttons (existing code)
-        return (
-          <div className="space-y-3">
-            <RadioGroup
-              isRequired
-              value={typeof value === 'string' ? value : ''}
-              onChange={setValue}
-              isDisabled={isSubmitting}
-            >
-              <Label className="text-sm font-medium text-foreground">{request.message}</Label>
-              {options.map((opt) => (
-                <Radio key={opt} value={opt}>
-                  <Radio.Control>
-                    <Radio.Indicator />
-                  </Radio.Control>
-                  <Radio.Content>
-                    <Label>{opt}</Label>
-                  </Radio.Content>
-                </Radio>
-              ))}
-            </RadioGroup>
-          </div>
-        );
-      }
-
       case 'confirm':
         return (
-          <div className="space-y-4">
-            <p className="text-sm text-foreground">{request.message}</p>
-            <div className="flex justify-between items-center pt-2">
-              <span
-                className={`text-sm ${remainingTime >= 0 && remainingTime < 30 ? 'text-warning' : 'text-muted-foreground'}`}
-              >
-                {remainingTime >= 0 && remainingTime < 30 && '⚠️ '}Timeout:{' '}
-                {formatTime(remainingTime)}
-              </span>
-              <div className="flex gap-2">
-                <Button
-                  onPress={() => handleConfirmResponse('no')}
-                  variant="secondary"
-                  isDisabled={isSubmitting}
-                >
-                  No
-                </Button>
-                <Button onPress={() => handleConfirmResponse('yes')} isDisabled={isSubmitting}>
-                  Yes
-                </Button>
-              </div>
-            </div>
-          </div>
+          <ConfirmInput
+            {...baseProps}
+            request={request}
+            remainingTime={remainingTime}
+            onConfirmResponse={handleConfirmResponse}
+          />
         );
-
+      case 'number':
+        return <NumberInput {...baseProps} request={request} />;
+      case 'email':
+        return <EmailInput {...baseProps} request={request} />;
+      case 'date':
+        return <DateInput {...baseProps} request={request} />;
+      case 'dropdown':
+        return <DropdownInput {...baseProps} request={request} />;
+      case 'rating':
+        return <RatingInput {...baseProps} request={request} />;
       default: {
         // Exhaustive check - TypeScript will error if new type added without case
         const _exhaustiveCheck: never = request;
-        return _exhaustiveCheck;
+        return (
+          <Alert status="warning">
+            <Alert.Content>
+              <Alert.Title>Unsupported Input Type</Alert.Title>
+              <Alert.Description>
+                Type "{(_exhaustiveCheck as { type: string }).type}" is not supported.
+              </Alert.Description>
+            </Alert.Content>
+          </Alert>
+        );
       }
     }
   };
@@ -396,7 +383,7 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
                     <span
                       className={`text-sm ${remainingTime >= 0 && remainingTime < 30 ? 'text-warning' : 'text-muted-foreground'}`}
                     >
-                      {remainingTime >= 0 && remainingTime < 30 && '⚠️ '}Timeout:{' '}
+                      {remainingTime >= 0 && remainingTime < 30 && '! '}Timeout:{' '}
                       {formatTime(remainingTime)}
                     </span>
                     <div className="flex gap-2">
@@ -440,7 +427,7 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
                     <span
                       className={`text-sm ${remainingTime >= 0 && remainingTime < 30 ? 'text-warning' : 'text-muted-foreground'}`}
                     >
-                      {remainingTime >= 0 && remainingTime < 30 && '⚠️ '}Timeout:{' '}
+                      {remainingTime >= 0 && remainingTime < 30 && '! '}Timeout:{' '}
                       {formatTime(remainingTime)}
                     </span>
                     <div className="flex gap-2">
@@ -451,8 +438,13 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
                         type="submit"
                         isDisabled={
                           isSubmitting ||
-                          (Array.isArray(value) ? value.length === 0 : !value) ||
-                          (request.type === 'choice' && !request.options?.length)
+                          // Validation must pass for number/email/date types
+                          !isInputValid(request, value) ||
+                          (request.type === 'choice' && !request.options?.length) ||
+                          // When "Other" is selected, require custom input text
+                          (isOtherSelected && !customInput.trim()) ||
+                          // For regular selections, require at least one option selected
+                          (!isOtherSelected && (Array.isArray(value) ? value.length === 0 : !value))
                         }
                         isPending={isSubmitting}
                       >

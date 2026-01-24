@@ -156,7 +156,13 @@ Asks user a question via browser modal.
 - \`options\` (string[], for 'choice') - Available choices
 - \`timeout\` (number, optional) - Timeout in seconds
 
-**Returns:** \`{ success, response?, status }\``;
+**Returns:** \`{ success, response?, status }\`
+
+**Response format:**
+- All responses are strings
+- Multi-select: \`"option1, option2"\` (comma-space separated)
+- Confirm: \`"yes"\` or \`"no"\` (lowercase)
+- See docs/INPUT-RESPONSE-FORMATS.md for details`;
 
 export const HANDLING_FEEDBACK = `## Handling Reviewer Feedback
 
