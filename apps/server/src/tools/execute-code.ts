@@ -372,6 +372,10 @@ const ExecuteCodeInput = z.object({
 
 // --- API Wrapper Functions ---
 
+// Track monitoring script for auto-append to tool result
+// String array to work around TypeScript control flow issues
+const scriptTracker: string[] = [];
+
 async function createPlan(opts: {
   title: string;
   content: string;
@@ -392,6 +396,9 @@ async function createPlan(opts: {
 
   // Always include monitoring script for non-hook agents
   const { script: monitoringScript } = await setupReviewNotification(planId, 30);
+
+  // Track for auto-append to tool result (use array.push to track in handler)
+  scriptTracker.push(`Plan "${planId}" created.\n\n${monitoringScript}`);
 
   return {
     planId,
@@ -444,6 +451,9 @@ async function updatePlan(
 
   // Always include monitoring script for non-hook agents
   const { script: monitoringScript } = await setupReviewNotification(planId, 30);
+
+  // Track for auto-append to tool result
+  scriptTracker.push(`Plan "${planId}" updated.\n\n${monitoringScript}`);
 
   return {
     success: true,
@@ -772,6 +782,9 @@ export const executeCodeTool = {
 
     logger.info({ codeLength: code.length }, 'Executing code');
 
+    // Reset tracking for this execution
+    scriptTracker.length = 0;
+
     try {
       // Helper: Encode frames to MP4 using bundled FFmpeg
       async function encodeVideo(opts: {
@@ -854,17 +867,39 @@ export const executeCodeTool = {
 
       logger.info({ result }, 'Code execution complete');
 
-      return {
-        content: [
-          {
-            type: 'text',
-            text:
-              typeof result === 'object'
-                ? JSON.stringify(result, null, 2)
-                : String(result ?? 'Done'),
-          },
-        ],
-      };
+      // Build result content
+      const content: Array<{ type: string; text: string }> = [
+        {
+          type: 'text',
+          text:
+            typeof result === 'object' ? JSON.stringify(result, null, 2) : String(result ?? 'Done'),
+        },
+      ];
+
+      // Auto-append monitoring script reminder if createPlan or updatePlan was called
+      // This ensures non-hook agents always see how to wait for approval
+      const latestScript = scriptTracker[scriptTracker.length - 1];
+      if (latestScript) {
+        const [planAction, ...scriptParts] = latestScript.split('\n\n');
+        content.push({
+          type: 'text',
+          text: `
+
+---
+**⚠️ IMPORTANT FOR NON-HOOK AGENTS (Cursor, Devin, Windsurf, etc.):**
+
+${planAction} To wait for human approval before proceeding, run this monitoring script in background:
+
+\`\`\`bash
+${scriptParts.join('\n\n')}
+\`\`\`
+
+Save the script to a file and run: \`bash script.sh &\`
+The script will exit when the human approves or requests changes.`,
+        });
+      }
+
+      return { content };
     } catch (error) {
       logger.error({ error, code }, 'Code execution failed');
       const message = error instanceof Error ? error.message : 'Unknown error';
