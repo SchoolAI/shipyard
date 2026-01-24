@@ -17,6 +17,7 @@ import {
   FileEdit,
   GitPullRequest,
   HelpCircle,
+  Key,
   Link as LinkIcon,
   MessageSquare,
   RefreshCw,
@@ -128,6 +129,8 @@ function getEventIcon(type: PlanEventType): ReactNode {
     case 'agent_activity':
       // agent_activity uses special helper - will be called separately
       return <Circle className="w-3.5 h-3.5" />;
+    case 'session_token_regenerated':
+      return <Key className="w-3.5 h-3.5 text-warning" />;
     default:
       return assertNever(type);
   }
@@ -219,6 +222,8 @@ function getEventDescription(event: PlanEvent): string {
     case 'agent_activity':
       // agent_activity uses special helper with sub-type logic
       return getAgentActivityDescription(event.data);
+    case 'session_token_regenerated':
+      return 'regenerated the session token';
     default:
       return assertNever(event);
   }

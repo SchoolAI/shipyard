@@ -311,6 +311,7 @@ export { createUserResolver } from './user-helpers.js';
 export type {
   AnswerInputRequestResult,
   ArchiveResult,
+  AtomicRegenerateTokenResult,
   GetPlanMetadataResult,
   InitPlanMetadataParams,
   PlanMetadataBaseUpdate,
@@ -331,6 +332,7 @@ export {
   answerInputRequest,
   approveUser,
   archivePlan,
+  atomicRegenerateTokenIfOwner,
   cancelInputRequest,
   clearAgentPresence,
   createPlanSnapshot,

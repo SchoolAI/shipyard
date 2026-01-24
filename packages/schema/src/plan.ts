@@ -160,6 +160,7 @@ export const PlanEventTypes = [
   'input_request_answered',
   'input_request_declined',
   'agent_activity',
+  'session_token_regenerated',
 ] as const;
 export type PlanEventType = (typeof PlanEventTypes)[number];
 
@@ -305,6 +306,9 @@ export type PlanEvent =
   | (PlanEventBase & {
       type: 'agent_activity';
       data: AgentActivityData;
+    })
+  | (PlanEventBase & {
+      type: 'session_token_regenerated';
     });
 
 /** Base schema shared by all plan events */
@@ -479,6 +483,9 @@ export const PlanEventSchema = z.discriminatedUnion('type', [
   PlanEventBaseSchema.extend({
     type: z.literal('agent_activity'),
     data: AgentActivityDataSchema,
+  }),
+  PlanEventBaseSchema.extend({
+    type: z.literal('session_token_regenerated'),
   }),
 ]);
 

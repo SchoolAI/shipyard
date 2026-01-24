@@ -297,6 +297,7 @@ function EventInboxItem({ item, onView, onMarkRead, onMarkUnread }: EventInboxIt
       case 'input_request_answered':
       case 'input_request_declined':
       case 'agent_activity':
+      case 'session_token_regenerated':
         return 'activity';
       default:
         return assertNever(evt);

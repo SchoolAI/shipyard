@@ -20,6 +20,7 @@ import { completeTaskTool } from './complete-task.js';
 import { createPlanTool } from './create-plan.js';
 import { linkPRTool } from './link-pr.js';
 import { readPlanTool } from './read-plan.js';
+import { regenerateSessionTokenTool } from './regenerate-session-token.js';
 import { setupReviewNotificationTool } from './setup-review-notification.js';
 import { TOOL_NAMES } from './tool-names.js';
 import { updateBlockContentTool } from './update-block-content.js';
@@ -321,6 +322,46 @@ await resolveActivityRequest({
   planId: "abc",
   requestId: helpResult.requestId,
   resolution: "Using PostgreSQL based on team feedback"
+});
+\`\`\`
+
+---
+
+### regenerateSessionToken(planId): Promise<{ sessionToken, planId }>
+Regenerate the session token for a plan you own.
+
+USE WHEN:
+- Your Claude Code session ended and you lost the original token
+- You need to resume work on a plan from a previous session
+- The old token may have been compromised
+
+REQUIREMENTS:
+- You must be the plan owner (verified via GitHub identity)
+- The plan must exist and have an ownerId set
+
+Returns:
+- sessionToken: New token for API calls
+- planId: The plan ID
+
+SECURITY:
+- Only the plan owner can regenerate tokens
+- Old token is immediately invalidated
+- GitHub identity verification happens on MCP server (via gh auth login)
+
+Example:
+\`\`\`typescript
+// Lost your session token? Regenerate it:
+const { sessionToken, planId } = await regenerateSessionToken("abc123");
+
+// Now use the new token for operations
+await addArtifact({
+  planId,
+  sessionToken,
+  type: 'screenshot',
+  filename: 'screenshot.png',
+  source: 'file',
+  filePath: '/tmp/screenshot.png',
+  deliverableId: 'del_xxx'
 });
 \`\`\`
 
@@ -759,6 +800,22 @@ async function resolveActivityRequest(opts: {
   return { success: true };
 }
 
+async function regenerateSessionToken(planId: string) {
+  const result = await regenerateSessionTokenTool.handler({ planId });
+  const text = (result.content[0] as { text: string })?.text || '';
+
+  if (result.isError) {
+    throw new Error(text);
+  }
+
+  // Extract session token from response text
+  const tokenMatch = text.match(/New Session Token: (\S+)/);
+  return {
+    sessionToken: tokenMatch?.[1] || '',
+    planId,
+  };
+}
+
 // --- Public Export ---
 
 export const executeCodeTool = {
@@ -842,6 +899,7 @@ export const executeCodeTool = {
         requestUserInput,
         postActivityUpdate,
         resolveActivityRequest,
+        regenerateSessionToken,
         // Video encoding helper (uses bundled FFmpeg)
         encodeVideo,
         // Node.js modules for advanced workflows (file ops, process spawning)
