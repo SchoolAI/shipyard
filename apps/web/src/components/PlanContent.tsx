@@ -4,7 +4,7 @@
  */
 
 import type { Block, BlockNoteEditor } from '@blocknote/core';
-import type { Deliverable, PlanMetadata, PlanSnapshot } from '@shipyard/schema';
+import type { Deliverable, LocalChangesResult, PlanMetadata, PlanSnapshot } from '@shipyard/schema';
 import {
   extractDeliverables,
   getDeliverables,
@@ -20,6 +20,7 @@ import { ActivityTimeline } from '@/components/ActivityTimeline';
 import { Attachments } from '@/components/Attachments';
 import { ChangesView } from '@/components/ChangesView';
 import { DeliverablesView } from '@/components/DeliverablesView';
+import { LocalChangesHeader } from '@/components/LocalChangesHeader';
 import { PlanViewer } from '@/components/PlanViewer';
 import { VersionSelector } from '@/components/VersionSelector';
 import type { SyncState } from '@/hooks/useMultiProviderSync';
@@ -93,10 +94,16 @@ export type PlanContentProps = LivePlanContentProps | SnapshotPlanContentProps;
  * Tabbed plan content viewer.
  * Shows Plan, Deliverables, and Changes tabs with their respective content.
  */
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Multiple tabs, conditional rendering, effects for deliverable tracking
 export function PlanContent(props: PlanContentProps) {
   const { ydoc, metadata, syncState } = props;
   const [activeView, setActiveView] = useState<PlanViewTab>(props.initialTab || 'plan');
   const [deliverableCount, setDeliverableCount] = useState({ completed: 0, total: 0 });
+  const [localChangesState, setLocalChangesState] = useState<{
+    data: LocalChangesResult | undefined;
+    isFetching: boolean;
+    refetch: () => void;
+  } | null>(null);
 
   // Update activeView when initialTab changes
   useEffect(() => {
@@ -219,6 +226,15 @@ export function PlanContent(props: PlanContentProps) {
                 onCurrent={props.versionNav.goToCurrent}
               />
             )}
+
+          {/* Local changes header - only show on Changes tab when data available */}
+          {activeView === 'changes' && localChangesState && (
+            <LocalChangesHeader
+              data={localChangesState.data}
+              isFetching={localChangesState.isFetching}
+              onRefresh={localChangesState.refetch}
+            />
+          )}
         </div>
       </div>
 
@@ -272,7 +288,12 @@ export function PlanContent(props: PlanContentProps) {
 
       {activeView === 'changes' && (
         <div className="flex-1 overflow-y-auto bg-background">
-          <ChangesView ydoc={ydoc} metadata={metadata} />
+          <ChangesView
+            ydoc={ydoc}
+            metadata={metadata}
+            isActive={activeView === 'changes'}
+            onLocalChangesState={setLocalChangesState}
+          />
         </div>
       )}
     </div>

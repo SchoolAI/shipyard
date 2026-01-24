@@ -1,7 +1,12 @@
 import { DiffModeEnum, DiffView } from '@git-diff-view/react';
 import '@git-diff-view/react/styles/diff-view.css';
 import { Alert, Button, ButtonGroup, Card, Chip, Link as HeroLink } from '@heroui/react';
-import { type LinkedPR, type PlanMetadata, updateLinkedPRStatus } from '@shipyard/schema';
+import {
+  type LinkedPR,
+  type LocalChangesResult,
+  type PlanMetadata,
+  updateLinkedPRStatus,
+} from '@shipyard/schema';
 import {
   ChevronRight,
   Columns2,
@@ -56,11 +61,22 @@ interface ChangesViewProps {
   metadata: PlanMetadata;
   /** Whether this tab is currently active (triggers refetch) */
   isActive?: boolean;
+  /** Callback to provide local changes state to parent (for rendering header in tab bar) */
+  onLocalChangesState?: (state: {
+    data: LocalChangesResult | undefined;
+    isFetching: boolean;
+    refetch: () => void;
+  }) => void;
 }
 
 type ChangeSource = 'local' | 'pr';
 
-export function ChangesView({ ydoc, metadata, isActive = true }: ChangesViewProps) {
+export function ChangesView({
+  ydoc,
+  metadata,
+  isActive = true,
+  onLocalChangesState,
+}: ChangesViewProps) {
   const linkedPRs = useLinkedPRs(ydoc);
   const [selectedPR, setSelectedPR] = useState<number | null>(null);
   const { identity } = useGitHubAuth();
@@ -82,6 +98,17 @@ export function ChangesView({ ydoc, metadata, isActive = true }: ChangesViewProp
       refetchLocal();
     }
   }, [isActive, source, refetchLocal]);
+
+  // Expose local changes state to parent for header rendering
+  useEffect(() => {
+    if (onLocalChangesState && source === 'local') {
+      onLocalChangesState({
+        data: localChanges,
+        isFetching: localFetching,
+        refetch: refetchLocal,
+      });
+    }
+  }, [onLocalChangesState, source, localChanges, localFetching, refetchLocal]);
 
   // Auto-select first PR when available
   useEffect(() => {
@@ -147,7 +174,7 @@ export function ChangesView({ ydoc, metadata, isActive = true }: ChangesViewProp
   const hasPRs = linkedPRs.length > 0;
 
   return (
-    <div className="max-w-full mx-auto p-2 md:p-4 space-y-3">
+    <div className="max-w-full mx-auto p-2 md:p-4 h-full flex flex-col">
       {/* Source Selector - only show if we have PRs to switch between */}
       {hasPRs && (
         <ButtonGroup size="sm">
@@ -170,12 +197,9 @@ export function ChangesView({ ydoc, metadata, isActive = true }: ChangesViewProp
 
       {/* Content based on source */}
       {source === 'local' ? (
-        <LocalChangesViewer
-          data={localChanges}
-          isLoading={localLoading}
-          isFetching={localFetching}
-          onRefresh={refetchLocal}
-        />
+        <div className="flex-1 min-h-0">
+          <LocalChangesViewer data={localChanges} isLoading={localLoading} planId={metadata.id} />
+        </div>
       ) : (
         <>
           {/* PR List (when multiple PRs) */}

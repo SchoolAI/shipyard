@@ -3,7 +3,8 @@
     "shipyard-dev": {
       "type": "stdio",
       "command": "node",
-      "args": ["apps/server/dist/index.js"],
+      "args": ["/Users/jacobpetterle/Working Directory/shipyard-wt/105-local-changes/apps/server/dist/index.js"],
+      "cwd": "/Users/jacobpetterle/Working Directory/shipyard-wt/105-local-changes",
       "env": {
         "NODE_ENV": "development",
         "LOG_LEVEL": "debug",
