@@ -23,7 +23,6 @@ import {
   ChoiceInput,
   ConfirmInput,
   DateInput,
-  DropdownInput,
   EmailInput,
   formatTime,
   MultilineInput,
@@ -43,57 +42,130 @@ interface InputRequestModalProps {
 /** Basic email validation regex */
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+/** Validate number input against min/max bounds */
+function validateNumberInput(
+  value: string | string[],
+  min: number | undefined,
+  max: number | undefined
+): boolean {
+  const numStr = typeof value === 'string' ? value : '';
+  if (!numStr) return true; // Empty is handled by required check
+  const num = Number.parseFloat(numStr);
+  if (Number.isNaN(num)) return false;
+  if (min !== undefined && num < min) return false;
+  if (max !== undefined && num > max) return false;
+  return true;
+}
+
+/** Validate email input against format and optional domain restriction */
+function validateEmailInput(value: string | string[], domain: string | undefined): boolean {
+  const email = typeof value === 'string' ? value : '';
+  if (!email.trim()) return true; // Empty is handled by required check
+  if (!EMAIL_REGEX.test(email)) return false;
+  if (domain && !email.toLowerCase().endsWith(`@${domain.toLowerCase()}`)) {
+    return false;
+  }
+  return true;
+}
+
+/** Validate date input against format and optional min/max bounds */
+function validateDateInput(
+  value: string | string[],
+  min: string | undefined,
+  max: string | undefined
+): boolean {
+  const dateStr = typeof value === 'string' ? value : '';
+  if (!dateStr) return true; // Empty is handled by required check
+  const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+  if (!dateRegex.test(dateStr)) return false;
+  const date = new Date(dateStr);
+  if (Number.isNaN(date.getTime())) return false;
+  if (min && date < new Date(min)) return false;
+  if (max && date > new Date(max)) return false;
+  return true;
+}
+
 /**
  * Validate input value based on request type.
  * Returns true if input is valid, false otherwise.
  * Used to disable submit button when validation fails.
  */
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Validation logic for multiple input types needs conditional checks
 function isInputValid(request: InputRequest | null, value: string | string[]): boolean {
   if (!request) return true;
 
   switch (request.type) {
-    case 'number': {
-      const numStr = typeof value === 'string' ? value : '';
-      if (!numStr) return true; // Empty is handled by required check
-      const num = Number.parseFloat(numStr);
-      if (Number.isNaN(num)) return false;
-      if (request.min !== undefined && num < request.min) return false;
-      if (request.max !== undefined && num > request.max) return false;
-      return true;
-    }
-    case 'email': {
-      const email = typeof value === 'string' ? value : '';
-      if (!email.trim()) return true; // Empty is handled by required check
-      if (!EMAIL_REGEX.test(email)) return false;
-      if (request.domain && !email.toLowerCase().endsWith(`@${request.domain.toLowerCase()}`)) {
-        return false;
-      }
-      return true;
-    }
-    case 'date': {
-      const dateStr = typeof value === 'string' ? value : '';
-      if (!dateStr) return true; // Empty is handled by required check
-      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-      if (!dateRegex.test(dateStr)) return false;
-      const date = new Date(dateStr);
-      if (Number.isNaN(date.getTime())) return false;
-      if (request.min) {
-        const minDate = new Date(request.min);
-        if (date < minDate) return false;
-      }
-      if (request.max) {
-        const maxDate = new Date(request.max);
-        if (date > maxDate) return false;
-      }
-      return true;
-    }
+    case 'number':
+      return validateNumberInput(value, request.min, request.max);
+    case 'email':
+      return validateEmailInput(value, request.domain);
+    case 'date':
+      return validateDateInput(value, request.min, request.max);
     default:
       return true;
   }
 }
 
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Modal handles multiple input types with complex state management
+/**
+ * Format the response value for submission.
+ * Handles "Other" option for choice-type questions and multi-select arrays.
+ */
+function formatResponseValue(
+  request: InputRequest,
+  value: string | string[],
+  customInput: string,
+  isOtherSelected: boolean
+): string {
+  // Handle "Other" option for choice-type questions
+  if (request.type === 'choice' && isOtherSelected) {
+    if (Array.isArray(value)) {
+      // Multi-select: combine selected options (excluding __other__) with custom input
+      const selectedOptions = value.filter((v) => v !== OTHER_OPTION_VALUE);
+      return [...selectedOptions, customInput.trim()].join(', ');
+    }
+    // Single-select: use custom input as the response
+    return customInput.trim();
+  }
+  // Standard handling: convert array values to comma-separated string
+  return Array.isArray(value) ? value.join(', ') : value;
+}
+
+/**
+ * Determine if the submit button should be disabled.
+ */
+function isSubmitDisabled(
+  isSubmitting: boolean,
+  request: InputRequest,
+  value: string | string[],
+  isOtherSelected: boolean,
+  customInput: string
+): boolean {
+  if (isSubmitting) return true;
+  if (!isInputValid(request, value)) return true;
+  if (request.type === 'choice' && !request.options?.length) return true;
+  // When "Other" is selected, require custom input text
+  if (isOtherSelected && !customInput.trim()) return true;
+  // For regular selections, require at least one option selected
+  if (!isOtherSelected && (Array.isArray(value) ? value.length === 0 : !value)) return true;
+  return false;
+}
+
+/**
+ * Get the default value state for a given request.
+ */
+function getDefaultValueState(request: InputRequest): string | string[] {
+  if (request.type === 'choice' && request.multiSelect) {
+    return request.defaultValue ? [request.defaultValue] : [];
+  }
+  return request.defaultValue || '';
+}
+
+/**
+ * Get the reset value state for a given request.
+ */
+function getResetValueState(request: InputRequest): string | string[] {
+  return request.type === 'choice' && request.multiSelect ? [] : '';
+}
+
 export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputRequestModalProps) {
   const [value, setValue] = useState<string | string[]>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -112,12 +184,7 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
   // Reset state when request changes
   useEffect(() => {
     if (request) {
-      // multiSelect only exists on 'choice' type requests
-      if (request.type === 'choice' && request.multiSelect) {
-        setValue(request.defaultValue ? [request.defaultValue] : []);
-      } else {
-        setValue(request.defaultValue || '');
-      }
+      setValue(getDefaultValueState(request));
       // Reset custom input when request changes
       setCustomInput('');
     }
@@ -135,8 +202,7 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
       return;
     }
 
-    // multiSelect only exists on 'choice' type requests
-    setValue(request.type === 'choice' && request.multiSelect ? [] : '');
+    setValue(getResetValueState(request));
     onClose();
   }, [ydoc, request, onClose]);
 
@@ -149,8 +215,7 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
       return;
     }
 
-    // multiSelect only exists on 'choice' type requests
-    setValue(request.type === 'choice' && request.multiSelect ? [] : '');
+    setValue(getResetValueState(request));
     onClose();
   }, [ydoc, request, onClose]);
 
@@ -219,7 +284,6 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
     []
   );
 
-  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Submit handler has conditional logic for "Other" option and multi-select
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!ydoc || !request || !identity || isSubmitting) return;
@@ -227,23 +291,7 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
     setIsSubmitting(true);
 
     try {
-      let responseValue: string;
-
-      // Handle "Other" option for choice-type questions
-      if (request.type === 'choice' && isOtherSelected) {
-        if (Array.isArray(value)) {
-          // Multi-select: combine selected options (excluding __other__) with custom input
-          const selectedOptions = value.filter((v) => v !== OTHER_OPTION_VALUE);
-          responseValue = [...selectedOptions, customInput.trim()].join(', ');
-        } else {
-          // Single-select: use custom input as the response
-          responseValue = customInput.trim();
-        }
-      } else {
-        // Standard handling: convert array values to comma-separated string
-        responseValue = Array.isArray(value) ? value.join(', ') : value;
-      }
-
+      const responseValue = formatResponseValue(request, value, customInput, isOtherSelected);
       const result = answerInputRequest(ydoc, request.id, responseValue, identity.username);
 
       if (!result.success) {
@@ -252,8 +300,7 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
       }
 
       // Success - close modal and clear state
-      // multiSelect only exists on 'choice' type requests
-      setValue(request.type === 'choice' && request.multiSelect ? [] : '');
+      setValue(getResetValueState(request));
       setCustomInput('');
       onClose();
     } finally {
@@ -276,8 +323,7 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
         }
 
         // Success - close modal and clear value
-        // multiSelect only exists on 'choice' type requests
-        setValue(request.type === 'choice' && request.multiSelect ? [] : '');
+        setValue(getResetValueState(request));
         onClose();
       } finally {
         setIsSubmitting(false);
@@ -321,8 +367,6 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
         return <EmailInput {...baseProps} request={request} />;
       case 'date':
         return <DateInput {...baseProps} request={request} />;
-      case 'dropdown':
-        return <DropdownInput {...baseProps} request={request} />;
       case 'rating':
         return <RatingInput {...baseProps} request={request} />;
       default: {
@@ -436,16 +480,13 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
                       </Button>
                       <Button
                         type="submit"
-                        isDisabled={
-                          isSubmitting ||
-                          // Validation must pass for number/email/date types
-                          !isInputValid(request, value) ||
-                          (request.type === 'choice' && !request.options?.length) ||
-                          // When "Other" is selected, require custom input text
-                          (isOtherSelected && !customInput.trim()) ||
-                          // For regular selections, require at least one option selected
-                          (!isOtherSelected && (Array.isArray(value) ? value.length === 0 : !value))
-                        }
+                        isDisabled={isSubmitDisabled(
+                          isSubmitting,
+                          request,
+                          value,
+                          isOtherSelected,
+                          customInput
+                        )}
                         isPending={isSubmitting}
                       >
                         Submit

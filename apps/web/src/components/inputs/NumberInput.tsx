@@ -1,6 +1,6 @@
 /**
  * Number input component for input requests.
- * Supports min/max bounds, step increments, and unit labels.
+ * Supports min/max bounds with step derived from format.
  */
 
 import { Input, Label, TextField } from '@heroui/react';
@@ -14,6 +14,9 @@ export function NumberInput({
   isSubmitting,
 }: BaseInputProps<NumberInputRequest>) {
   const numValue = typeof value === 'string' ? value : '';
+
+  // Derive step from format (integer=1, decimal/currency/percentage=0.01)
+  const step = request.format === 'integer' ? 1 : 0.01;
 
   // Parse current value for validation
   const parsedNum = numValue ? Number.parseFloat(numValue) : Number.NaN;
@@ -45,27 +48,19 @@ export function NumberInput({
     <div className="space-y-3">
       <TextField isRequired isDisabled={isSubmitting} isInvalid={hasValue && !isValid}>
         <Label className="text-sm font-medium text-foreground">{request.message}</Label>
-        <div className="flex gap-2 items-center">
-          <Input
-            type="number"
-            inputMode={
-              request.format === 'decimal' || request.format === 'currency' ? 'decimal' : 'numeric'
-            }
-            value={numValue}
-            onChange={(e) => setValue(e.target.value)}
-            min={request.min}
-            max={request.max}
-            step={request.step ?? (request.format === 'integer' ? 1 : 0.01)}
-            autoFocus
-            aria-describedby={request.unit ? 'number-unit' : undefined}
-            aria-invalid={hasValue && !isValid}
-          />
-          {request.unit && (
-            <span id="number-unit" className="text-sm text-muted-foreground whitespace-nowrap">
-              {request.unit}
-            </span>
-          )}
-        </div>
+        <Input
+          type="number"
+          inputMode={
+            request.format === 'decimal' || request.format === 'currency' ? 'decimal' : 'numeric'
+          }
+          value={numValue}
+          onChange={(e) => setValue(e.target.value)}
+          min={request.min}
+          max={request.max}
+          step={step}
+          autoFocus
+          aria-invalid={hasValue && !isValid}
+        />
         {errorMessage && (
           <p className="text-xs text-danger mt-1" role="alert">
             {errorMessage}

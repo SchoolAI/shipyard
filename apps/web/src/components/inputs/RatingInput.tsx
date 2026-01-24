@@ -9,13 +9,18 @@ import type { BaseInputProps } from './types';
 
 /**
  * Get the display icon/label for a rating value based on style.
+ * For emoji style, falls back to numbers if the scale is too large (> 5 items).
  */
-function getRatingDisplay(rating: number, style: string, minVal: number): string {
+function getRatingDisplay(rating: number, style: string, minVal: number, maxVal: number): string {
   if (style === 'stars') return '\u2605'; // Filled star
   if (style === 'emoji') {
+    // Disable emoji for large scales (e.g., NPS 0-10)
+    if (maxVal - minVal > 4) {
+      return String(rating); // Fallback to numbers
+    }
     const emojis = ['\ud83d\ude1e', '\ud83d\ude15', '\ud83d\ude10', '\ud83d\ude42', '\ud83d\ude04']; // Sad to happy
-    const index = Math.min(rating - minVal, emojis.length - 1);
-    return emojis[Math.max(0, index)] ?? '\ud83d\ude10';
+    const index = rating - minVal;
+    return emojis[Math.max(0, Math.min(index, emojis.length - 1))] ?? '\ud83d\ude10';
   }
   return String(rating);
 }
@@ -48,7 +53,7 @@ export function RatingInput({
         <div className="flex items-center gap-1 pt-2">
           {ratingValues.map((rating) => {
             const isSelected = selectedValue === String(rating);
-            const displayValue = getRatingDisplay(rating, style, minVal);
+            const displayValue = getRatingDisplay(rating, style, minVal, maxVal);
 
             return (
               <Radio key={rating} value={String(rating)}>

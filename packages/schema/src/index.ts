@@ -109,6 +109,7 @@ export type {
   TextInputRequest,
 } from './input-request.js';
 export {
+  CHOICE_DROPDOWN_THRESHOLD,
   ChoiceOptionSchema,
   createInputRequest,
   DEFAULT_INPUT_REQUEST_TIMEOUT_SECONDS,

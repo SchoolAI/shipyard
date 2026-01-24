@@ -700,9 +700,7 @@ async function requestUserInput(opts: {
   // Number/rating type parameters
   min?: number;
   max?: number;
-  step?: number;
   format?: 'integer' | 'decimal' | 'currency' | 'percentage';
-  unit?: string;
   // Date type parameters (separate from min/max since they're strings)
   minDate?: string; // YYYY-MM-DD format
   maxDate?: string; // YYYY-MM-DD format
@@ -748,9 +746,7 @@ async function requestUserInput(opts: {
         type: opts.type,
         min: opts.min,
         max: opts.max,
-        step: opts.step,
         format: opts.format,
-        unit: opts.unit,
       };
       break;
     case 'email':

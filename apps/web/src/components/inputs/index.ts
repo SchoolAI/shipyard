@@ -4,19 +4,19 @@
  * Architecture: Each input type has its own focused component:
  * - TextInput: Single-line text entry
  * - MultilineInput: Multi-line text area
- * - ChoiceInput: Radio buttons or checkboxes with "Other" option
+ * - ChoiceInput: Radio/checkbox or searchable dropdown (auto-switches based on option count)
  * - ConfirmInput: Yes/No buttons
  * - NumberInput: Numeric value with bounds validation
  * - EmailInput: Email address with domain restriction
  * - DateInput: Date selection with range validation
- * - DropdownInput: Searchable select for long option lists
  * - RatingInput: Scale rating with stars/numbers/emoji
+ *
+ * Note: DropdownInput was merged into ChoiceInput - UI auto-switches for 9+ options.
  */
 
 export { ChoiceInput } from './ChoiceInput';
 export { ConfirmInput } from './ConfirmInput';
 export { DateInput } from './DateInput';
-export { DropdownInput } from './DropdownInput';
 export { EmailInput } from './EmailInput';
 export { MultilineInput } from './MultilineInput';
 export { NumberInput } from './NumberInput';

@@ -28836,7 +28836,7 @@ init_cjs_shims();
 // ../../packages/schema/dist/index.mjs
 init_cjs_shims();
 
-// ../../packages/schema/dist/yjs-helpers-CD5Asqsb.mjs
+// ../../packages/schema/dist/yjs-helpers-M5P6jw5y.mjs
 init_cjs_shims();
 
 // ../../packages/schema/dist/plan.mjs
@@ -43012,7 +43012,7 @@ var PRReviewCommentSchema = external_exports.object({
   resolved: external_exports.boolean().optional()
 });
 
-// ../../packages/schema/dist/yjs-helpers-CD5Asqsb.mjs
+// ../../packages/schema/dist/yjs-helpers-M5P6jw5y.mjs
 function assertNever2(value) {
   throw new Error(`Unhandled discriminated union member: ${JSON.stringify(value)}`);
 }
@@ -43135,21 +43135,25 @@ var ChoiceOptionSchema = external_exports.union([external_exports.string(), exte
 var ChoiceInputSchema = InputRequestBaseSchema.extend({
   type: external_exports.literal("choice"),
   options: external_exports.array(ChoiceOptionSchema).min(1, "Choice requests must have at least one option"),
-  multiSelect: external_exports.boolean().optional()
+  multiSelect: external_exports.boolean().optional(),
+  displayAs: external_exports.enum([
+    "radio",
+    "checkbox",
+    "dropdown"
+  ]).optional(),
+  placeholder: external_exports.string().optional()
 });
 var ConfirmInputSchema = InputRequestBaseSchema.extend({ type: external_exports.literal("confirm") });
 var NumberInputSchema = InputRequestBaseSchema.extend({
   type: external_exports.literal("number"),
   min: external_exports.number().optional(),
   max: external_exports.number().optional(),
-  step: external_exports.number().positive().optional(),
   format: external_exports.enum([
     "integer",
     "decimal",
     "currency",
     "percentage"
-  ]).optional(),
-  unit: external_exports.string().optional()
+  ]).optional()
 }).refine((data) => data.min === void 0 || data.max === void 0 || data.min <= data.max, { message: "min must be <= max" });
 var EmailInputSchema = InputRequestBaseSchema.extend({
   type: external_exports.literal("email"),
@@ -43161,16 +43165,10 @@ var DateInputSchema = InputRequestBaseSchema.extend({
   min: external_exports.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be in YYYY-MM-DD format").optional(),
   max: external_exports.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be in YYYY-MM-DD format").optional()
 }).refine((data) => data.min === void 0 || data.max === void 0 || new Date(data.min) <= new Date(data.max), { message: "min date must be before or equal to max date" });
-var DropdownInputSchema = InputRequestBaseSchema.extend({
-  type: external_exports.literal("dropdown"),
-  options: external_exports.array(ChoiceOptionSchema).min(1, "Dropdown requests must have at least one option"),
-  searchable: external_exports.boolean().optional(),
-  placeholder: external_exports.string().optional()
-});
 var RatingInputSchema = InputRequestBaseSchema.extend({
   type: external_exports.literal("rating"),
-  min: external_exports.number().int().default(1),
-  max: external_exports.number().int().default(5),
+  min: external_exports.number().int().optional(),
+  max: external_exports.number().int().optional(),
   style: external_exports.enum([
     "stars",
     "numbers",
@@ -43180,7 +43178,10 @@ var RatingInputSchema = InputRequestBaseSchema.extend({
     low: external_exports.string().optional(),
     high: external_exports.string().optional()
   }).optional()
-}).refine((data) => data.min <= data.max && data.max - data.min <= 20, { message: "Rating scale must have min <= max and at most 20 items" });
+}).refine((data) => {
+  if (data.min === void 0 || data.max === void 0) return true;
+  return data.min <= data.max && data.max - data.min <= 20;
+}, { message: "Rating scale must have min <= max and at most 20 items" });
 var InputRequestSchema = external_exports.discriminatedUnion("type", [
   TextInputSchema,
   MultilineInputSchema,
@@ -43189,7 +43190,6 @@ var InputRequestSchema = external_exports.discriminatedUnion("type", [
   NumberInputSchema,
   EmailInputSchema,
   DateInputSchema,
-  DropdownInputSchema,
   RatingInputSchema
 ]);
 var YDOC_KEYS = {

@@ -304,6 +304,90 @@ describe('normalizeChoiceOptions', () => {
   });
 });
 
+describe('MultilineInputRequest validation', () => {
+  it('should accept valid multiline request', () => {
+    const result = InputRequestSchema.safeParse({
+      id: nanoid(),
+      createdAt: Date.now(),
+      message: 'Describe the issue',
+      type: 'multiline',
+      status: 'pending',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('should accept multiline request with defaultValue', () => {
+    const result = InputRequestSchema.safeParse({
+      id: nanoid(),
+      createdAt: Date.now(),
+      message: 'Enter description',
+      type: 'multiline',
+      status: 'pending',
+      defaultValue: 'Default text here',
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.defaultValue).toBe('Default text here');
+    }
+  });
+
+  it('should reject multiline request with empty message', () => {
+    const result = InputRequestSchema.safeParse({
+      id: nanoid(),
+      createdAt: Date.now(),
+      message: '',
+      type: 'multiline',
+      status: 'pending',
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0]?.message).toBe('Message cannot be empty');
+    }
+  });
+});
+
+describe('ConfirmInputRequest validation', () => {
+  it('should accept valid confirm request', () => {
+    const result = InputRequestSchema.safeParse({
+      id: nanoid(),
+      createdAt: Date.now(),
+      message: 'Delete file?',
+      type: 'confirm',
+      status: 'pending',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('should accept confirm request with timeout', () => {
+    const result = InputRequestSchema.safeParse({
+      id: nanoid(),
+      createdAt: Date.now(),
+      message: 'Proceed with operation?',
+      type: 'confirm',
+      status: 'pending',
+      timeout: 60,
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.timeout).toBe(60);
+    }
+  });
+
+  it('should reject confirm request with empty message', () => {
+    const result = InputRequestSchema.safeParse({
+      id: nanoid(),
+      createdAt: Date.now(),
+      message: '',
+      type: 'confirm',
+      status: 'pending',
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0]?.message).toBe('Message cannot be empty');
+    }
+  });
+});
+
 describe('NumberInputRequest validation', () => {
   it('should accept valid number request with bounds', () => {
     const result = InputRequestSchema.safeParse({
@@ -314,7 +398,6 @@ describe('NumberInputRequest validation', () => {
       status: 'pending',
       min: 0,
       max: 10,
-      step: 1,
     });
     expect(result.success).toBe(true);
   });
@@ -346,7 +429,7 @@ describe('NumberInputRequest validation', () => {
     }
   });
 
-  it('should accept number request with format and unit', () => {
+  it('should accept number request with format', () => {
     const result = InputRequestSchema.safeParse({
       id: nanoid(),
       createdAt: Date.now(),
@@ -354,7 +437,6 @@ describe('NumberInputRequest validation', () => {
       type: 'number',
       status: 'pending',
       format: 'integer',
-      unit: 'seconds',
     });
     expect(result.success).toBe(true);
   });
@@ -439,15 +521,16 @@ describe('DateInputRequest validation', () => {
   });
 });
 
-describe('DropdownInputRequest validation', () => {
+describe('Choice with displayAs=dropdown validation', () => {
   it('should accept valid dropdown request with string options', () => {
     const result = InputRequestSchema.safeParse({
       id: nanoid(),
       createdAt: Date.now(),
       message: 'Select country',
-      type: 'dropdown',
+      type: 'choice',
       status: 'pending',
       options: ['United States', 'Canada', 'Mexico'],
+      displayAs: 'dropdown',
     });
     expect(result.success).toBe(true);
   });
@@ -457,30 +540,30 @@ describe('DropdownInputRequest validation', () => {
       id: nanoid(),
       createdAt: Date.now(),
       message: 'Select timezone',
-      type: 'dropdown',
+      type: 'choice',
       status: 'pending',
       options: [
         { value: 'pst', label: 'Pacific Time', description: 'UTC-8' },
         { value: 'est', label: 'Eastern Time', description: 'UTC-5' },
       ],
+      displayAs: 'dropdown',
     });
     expect(result.success).toBe(true);
   });
 
-  it('should reject dropdown request without options', () => {
+  it('should reject choice request without options', () => {
     const result = InputRequestSchema.safeParse({
       id: nanoid(),
       createdAt: Date.now(),
       message: 'Select something',
-      type: 'dropdown',
+      type: 'choice',
       status: 'pending',
       options: [],
+      displayAs: 'dropdown',
     });
     expect(result.success).toBe(false);
     if (!result.success) {
-      expect(result.error.issues[0]?.message).toBe(
-        'Dropdown requests must have at least one option'
-      );
+      expect(result.error.issues[0]?.message).toBe('Choice requests must have at least one option');
     }
   });
 });
@@ -588,16 +671,18 @@ describe('createInputRequest with new types', () => {
     }
   });
 
-  it('should create dropdown input request', () => {
+  it('should create choice input with displayAs=dropdown', () => {
     const request = createInputRequest({
       message: 'Select country',
-      type: 'dropdown',
+      type: 'choice',
       options: ['USA', 'Canada'],
+      displayAs: 'dropdown',
       placeholder: 'Choose...',
     });
-    expect(request.type).toBe('dropdown');
-    if (request.type === 'dropdown') {
+    expect(request.type).toBe('choice');
+    if (request.type === 'choice') {
       expect(request.options).toEqual(['USA', 'Canada']);
+      expect(request.displayAs).toBe('dropdown');
       expect(request.placeholder).toBe('Choose...');
     }
   });

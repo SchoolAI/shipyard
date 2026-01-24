@@ -18,26 +18,21 @@ import { TOOL_NAMES } from './tool-names.js';
 const RequestUserInputInput = z.object({
   message: z.string().describe('The question to ask the user'),
   type: z
-    .enum([
-      'text',
-      'choice',
-      'confirm',
-      'multiline',
-      'number',
-      'email',
-      'date',
-      'dropdown',
-      'rating',
-    ])
+    .enum(['text', 'choice', 'confirm', 'multiline', 'number', 'email', 'date', 'rating'])
     .describe('Type of input to request'),
   options: z
     .array(z.string())
     .optional()
-    .describe("For 'choice'/'dropdown' type - available options (required)"),
+    .describe("For 'choice' type - available options (required)"),
   multiSelect: z
     .boolean()
     .optional()
     .describe("For 'choice' type - allow selecting multiple options"),
+  displayAs: z
+    .enum(['radio', 'checkbox', 'dropdown'])
+    .optional()
+    .describe("For 'choice' type - override automatic UI selection"),
+  placeholder: z.string().optional().describe("For 'choice' type with dropdown - placeholder text"),
   defaultValue: z.string().optional().describe('Pre-filled value for text/multiline inputs'),
   timeout: z
     .number()
@@ -61,18 +56,13 @@ const RequestUserInputInput = z.object({
     .regex(/^\d{4}-\d{2}-\d{2}$/)
     .optional()
     .describe("For 'date' - maximum date in YYYY-MM-DD format"),
-  step: z.number().optional().describe("For 'number' - step increment"),
   format: z
     .enum(['integer', 'decimal', 'currency', 'percentage'])
     .optional()
-    .describe("For 'number' - display format hint"),
-  unit: z.string().optional().describe("For 'number' - unit label (e.g., 'seconds')"),
+    .describe("For 'number' - display format hint (step is derived: integer=1, others=0.01)"),
   // Email type parameters
   allowMultiple: z.boolean().optional().describe("For 'email' - allow multiple emails"),
   domain: z.string().optional().describe("For 'email' - restrict to domain"),
-  // Dropdown type parameters
-  searchable: z.boolean().optional().describe("For 'dropdown' - enable search filtering"),
-  placeholder: z.string().optional().describe("For 'dropdown' - placeholder text"),
   // Rating type parameters
   style: z.enum(['stars', 'numbers', 'emoji']).optional().describe("For 'rating' - display style"),
   labels: z
@@ -83,6 +73,94 @@ const RequestUserInputInput = z.object({
     .optional()
     .describe("For 'rating' - endpoint labels"),
 });
+
+// --- Helper Functions ---
+
+type RequestUserInputInput = z.infer<typeof RequestUserInputInput>;
+
+/** Build request params for choice type */
+function buildChoiceParams(input: RequestUserInputInput, baseParams: Record<string, unknown>) {
+  return {
+    ...baseParams,
+    type: 'choice' as const,
+    options: input.options ?? [],
+    multiSelect: input.multiSelect,
+    displayAs: input.displayAs,
+    placeholder: input.placeholder,
+  };
+}
+
+/** Build request params for number type */
+function buildNumberParams(input: RequestUserInputInput, baseParams: Record<string, unknown>) {
+  return {
+    ...baseParams,
+    type: 'number' as const,
+    min: input.min,
+    max: input.max,
+    format: input.format,
+  };
+}
+
+/** Build request params for email type */
+function buildEmailParams(input: RequestUserInputInput, baseParams: Record<string, unknown>) {
+  return {
+    ...baseParams,
+    type: 'email' as const,
+    allowMultiple: input.allowMultiple,
+    domain: input.domain,
+  };
+}
+
+/** Build request params for date type */
+function buildDateParams(input: RequestUserInputInput, baseParams: Record<string, unknown>) {
+  return {
+    ...baseParams,
+    type: 'date' as const,
+    min: input.minDate,
+    max: input.maxDate,
+  };
+}
+
+/** Build request params for rating type */
+function buildRatingParams(input: RequestUserInputInput, baseParams: Record<string, unknown>) {
+  return {
+    ...baseParams,
+    type: 'rating' as const,
+    min: input.min,
+    max: input.max,
+    style: input.style,
+    labels: input.labels,
+  };
+}
+
+/** Build request params based on input type */
+function buildRequestParams(input: RequestUserInputInput): Record<string, unknown> {
+  const baseParams = {
+    message: input.message,
+    defaultValue: input.defaultValue,
+    timeout: input.timeout,
+    planId: input.planId,
+  };
+
+  switch (input.type) {
+    case 'choice':
+      return buildChoiceParams(input, baseParams);
+    case 'number':
+      return buildNumberParams(input, baseParams);
+    case 'email':
+      return buildEmailParams(input, baseParams);
+    case 'date':
+      return buildDateParams(input, baseParams);
+    case 'rating':
+      return buildRatingParams(input, baseParams);
+    default:
+      // text, multiline, confirm
+      return {
+        ...baseParams,
+        type: input.type,
+      };
+  }
+}
 
 // --- Public Export ---
 
@@ -102,23 +180,24 @@ The request appears as a modal in the browser UI. The function blocks until:
 Input types:
 - text: Single-line text input
 - multiline: Multi-line text area
-- choice: Select from options (requires 'options' parameter)
+- choice: Select from options (requires 'options' parameter). UI auto-switches:
+  - 1-8 options: Radio buttons (single) or checkboxes (multi)
+  - 9+ options: Searchable dropdown
+  - Override with displayAs: 'dropdown' to force dropdown for any count
 - confirm: Yes/No confirmation
 - number: Numeric input with min/max bounds
 - email: Email address with optional domain restriction
 - date: Date selection with optional minDate/maxDate range (YYYY-MM-DD)
-- dropdown: Searchable select for long option lists
 - rating: Scale rating (1-5 stars, numbers, or emoji)
 
 For 'choice' type:
 - Set multiSelect=true to allow multiple selections (checkboxes)
 - Set multiSelect=false or omit for single selection (radio buttons)
+- Set displayAs='dropdown' to force dropdown UI for any number of options
 
 For 'number' type:
 - min/max: Value bounds
-- step: Increment value
-- format: 'integer' | 'decimal' | 'currency' | 'percentage'
-- unit: Label like "seconds" or "items"
+- format: 'integer' | 'decimal' | 'currency' | 'percentage' (step is derived from format)
 
 For 'rating' type:
 - min/max: Rating scale (default 1-5)
@@ -144,27 +223,27 @@ NOTE: This is also available as requestUserInput() inside execute_code for multi
         },
         type: {
           type: 'string',
-          enum: [
-            'text',
-            'choice',
-            'confirm',
-            'multiline',
-            'number',
-            'email',
-            'date',
-            'dropdown',
-            'rating',
-          ],
+          enum: ['text', 'choice', 'confirm', 'multiline', 'number', 'email', 'date', 'rating'],
           description: 'Type of input to request',
         },
         options: {
           type: 'array',
           items: { type: 'string' },
-          description: "For 'choice'/'dropdown' type - available options (required)",
+          description: "For 'choice' type - available options (required)",
         },
         multiSelect: {
           type: 'boolean',
           description: "For 'choice' type - allow selecting multiple options",
+        },
+        displayAs: {
+          type: 'string',
+          enum: ['radio', 'checkbox', 'dropdown'],
+          description:
+            "For 'choice' type - override automatic UI selection. Default: auto-selects based on option count (1-8: radio/checkbox, 9+: dropdown)",
+        },
+        placeholder: {
+          type: 'string',
+          description: "For 'choice' type with dropdown UI - placeholder text",
         },
         defaultValue: {
           type: 'string',
@@ -198,18 +277,11 @@ NOTE: This is also available as requestUserInput() inside execute_code for multi
           pattern: '^\\d{4}-\\d{2}-\\d{2}$',
           description: "For 'date' type - maximum date in YYYY-MM-DD format",
         },
-        step: {
-          type: 'number',
-          description: "For 'number' - step increment",
-        },
         format: {
           type: 'string',
           enum: ['integer', 'decimal', 'currency', 'percentage'],
-          description: "For 'number' - display format hint",
-        },
-        unit: {
-          type: 'string',
-          description: "For 'number' - unit label (e.g., 'seconds')",
+          description:
+            "For 'number' - display format hint (step is derived: integer=1, others=0.01)",
         },
         // Email type parameters
         allowMultiple: {
@@ -219,15 +291,6 @@ NOTE: This is also available as requestUserInput() inside execute_code for multi
         domain: {
           type: 'string',
           description: "For 'email' - restrict to specific domain",
-        },
-        // Dropdown type parameters
-        searchable: {
-          type: 'boolean',
-          description: "For 'dropdown' - enable search filtering (default true)",
-        },
-        placeholder: {
-          type: 'string',
-          description: "For 'dropdown' - placeholder text",
         },
         // Rating type parameters
         style: {
@@ -248,7 +311,6 @@ NOTE: This is also available as requestUserInput() inside execute_code for multi
     },
   },
 
-  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Handler needs to validate and route 9 different input types
   handler: async (args: unknown) => {
     const input = RequestUserInputInput.parse(args);
 
@@ -257,11 +319,8 @@ NOTE: This is also available as requestUserInput() inside execute_code for multi
       'Processing request_user_input'
     );
 
-    // Validate choice/dropdown types have options
-    if (
-      (input.type === 'choice' || input.type === 'dropdown') &&
-      (!input.options || input.options.length === 0)
-    ) {
+    // Validate choice type has options
+    if (input.type === 'choice' && (!input.options || input.options.length === 0)) {
       return {
         content: [
           {
@@ -269,7 +328,7 @@ NOTE: This is also available as requestUserInput() inside execute_code for multi
             text: JSON.stringify({
               success: false,
               status: 'cancelled',
-              reason: `'${input.type}' type requires 'options' array with at least one option`,
+              reason: "'choice' type requires 'options' array with at least one option",
             }),
           },
         ],
@@ -284,79 +343,7 @@ NOTE: This is also available as requestUserInput() inside execute_code for multi
 
       // Create manager and make request
       const manager = new InputRequestManager();
-
-      // Build params based on type - include type-specific parameters
-      const baseParams = {
-        message: input.message,
-        defaultValue: input.defaultValue,
-        timeout: input.timeout,
-        planId: input.planId,
-      };
-
-      let params: Record<string, unknown>;
-
-      switch (input.type) {
-        case 'choice':
-          params = {
-            ...baseParams,
-            type: 'choice' as const,
-            options: input.options ?? [],
-            multiSelect: input.multiSelect,
-          };
-          break;
-        case 'dropdown':
-          params = {
-            ...baseParams,
-            type: 'dropdown' as const,
-            options: input.options ?? [],
-            searchable: input.searchable,
-            placeholder: input.placeholder,
-          };
-          break;
-        case 'number':
-          params = {
-            ...baseParams,
-            type: 'number' as const,
-            min: input.min,
-            max: input.max,
-            step: input.step,
-            format: input.format,
-            unit: input.unit,
-          };
-          break;
-        case 'email':
-          params = {
-            ...baseParams,
-            type: 'email' as const,
-            allowMultiple: input.allowMultiple,
-            domain: input.domain,
-          };
-          break;
-        case 'date':
-          params = {
-            ...baseParams,
-            type: 'date' as const,
-            min: input.minDate,
-            max: input.maxDate,
-          };
-          break;
-        case 'rating':
-          params = {
-            ...baseParams,
-            type: 'rating' as const,
-            min: input.min,
-            max: input.max,
-            style: input.style,
-            labels: input.labels,
-          };
-          break;
-        default:
-          // text, multiline, confirm
-          params = {
-            ...baseParams,
-            type: input.type,
-          };
-      }
+      const params = buildRequestParams(input);
 
       // Cast through unknown since new types may not yet be in the schema
       const requestId = manager.createRequest(

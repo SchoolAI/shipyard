@@ -17,13 +17,14 @@ export const DEFAULT_INPUT_REQUEST_TIMEOUT_SECONDS = 1800;
  * Valid input request types.
  * - text: Single-line text input
  * - multiline: Multi-line text input
- * - choice: Select from predefined options
+ * - choice: Select from predefined options (auto-switches UI based on option count)
  * - confirm: Boolean yes/no question
  * - number: Numeric value with optional bounds
  * - email: Email address with optional domain restriction
  * - date: Date selection with optional range
- * - dropdown: Searchable select from options (for long lists)
  * - rating: Scale rating (1-5, 1-10, etc.)
+ *
+ * Note: 'dropdown' was merged into 'choice' - UI auto-switches to dropdown for 9+ options.
  */
 export const InputRequestTypeValues = [
   'text',
@@ -33,7 +34,6 @@ export const InputRequestTypeValues = [
   'number',
   'email',
   'date',
-  'dropdown',
   'rating',
 ] as const;
 export type InputRequestType = (typeof InputRequestTypeValues)[number];
@@ -100,13 +100,23 @@ export const ChoiceOptionSchema = z.union([
 
 export type ChoiceOption = z.infer<typeof ChoiceOptionSchema>;
 
-/** Choice input request - select from predefined options */
+/**
+ * Choice input request - select from predefined options.
+ * UI auto-switches based on option count:
+ * - 1-8 options: Radio buttons (single) or checkboxes (multi)
+ * - 9+ options: Searchable dropdown
+ * Use displayAs to override auto-selection.
+ */
 const ChoiceInputSchema = InputRequestBaseSchema.extend({
   type: z.literal('choice'),
   /** Available options - supports both string[] (old) and object[] (new) formats */
   options: z.array(ChoiceOptionSchema).min(1, 'Choice requests must have at least one option'),
   /** Enable multi-select for 'choice' type (uses checkboxes instead of radio buttons) */
   multiSelect: z.boolean().optional(),
+  /** Override automatic UI selection (radio/checkbox vs dropdown) */
+  displayAs: z.enum(['radio', 'checkbox', 'dropdown']).optional(),
+  /** Placeholder text (used when displayAs='dropdown' or auto-switched to dropdown) */
+  placeholder: z.string().optional(),
 });
 
 /** Confirm input request - boolean yes/no question */
@@ -121,12 +131,8 @@ const NumberInputSchema = InputRequestBaseSchema.extend({
   min: z.number().optional(),
   /** Maximum allowed value */
   max: z.number().optional(),
-  /** Step increment for stepper controls */
-  step: z.number().positive().optional(),
-  /** Display format hint */
+  /** Display format hint (step is derived: integer=1, decimal/currency/percentage=0.01) */
   format: z.enum(['integer', 'decimal', 'currency', 'percentage']).optional(),
-  /** Unit label (e.g., "seconds", "items", "$") */
-  unit: z.string().optional(),
 }).refine((data) => data.min === undefined || data.max === undefined || data.min <= data.max, {
   message: 'min must be <= max',
 });
@@ -159,24 +165,13 @@ const DateInputSchema = InputRequestBaseSchema.extend({
   { message: 'min date must be before or equal to max date' }
 );
 
-/** Dropdown input request - searchable select for long option lists */
-const DropdownInputSchema = InputRequestBaseSchema.extend({
-  type: z.literal('dropdown'),
-  /** Available options (supports both string[] and object[] formats) */
-  options: z.array(ChoiceOptionSchema).min(1, 'Dropdown requests must have at least one option'),
-  /** Enable search filtering */
-  searchable: z.boolean().optional(),
-  /** Placeholder text */
-  placeholder: z.string().optional(),
-});
-
 /** Rating input request - scale rating */
 const RatingInputSchema = InputRequestBaseSchema.extend({
   type: z.literal('rating'),
-  /** Minimum rating value */
-  min: z.number().int().default(1),
-  /** Maximum rating value */
-  max: z.number().int().default(5),
+  /** Minimum rating value (UI defaults to 1 if not provided) */
+  min: z.number().int().optional(),
+  /** Maximum rating value (UI defaults to 5 if not provided) */
+  max: z.number().int().optional(),
   /** Display style */
   style: z.enum(['stars', 'numbers', 'emoji']).optional(),
   /** Labels for scale endpoints */
@@ -186,9 +181,14 @@ const RatingInputSchema = InputRequestBaseSchema.extend({
       high: z.string().optional(),
     })
     .optional(),
-}).refine((data) => data.min <= data.max && data.max - data.min <= 20, {
-  message: 'Rating scale must have min <= max and at most 20 items',
-});
+}).refine(
+  (data) => {
+    /** Only validate if both min and max are provided (they're optional) */
+    if (data.min === undefined || data.max === undefined) return true;
+    return data.min <= data.max && data.max - data.min <= 20;
+  },
+  { message: 'Rating scale must have min <= max and at most 20 items' }
+);
 
 /**
  * Schema for an input request stored in Y.Doc.
@@ -206,7 +206,6 @@ export const InputRequestSchema = z.discriminatedUnion('type', [
   NumberInputSchema,
   EmailInputSchema,
   DateInputSchema,
-  DropdownInputSchema,
   RatingInputSchema,
 ]);
 
@@ -219,8 +218,13 @@ export type ConfirmInputRequest = z.infer<typeof ConfirmInputSchema>;
 export type NumberInputRequest = z.infer<typeof NumberInputSchema>;
 export type EmailInputRequest = z.infer<typeof EmailInputSchema>;
 export type DateInputRequest = z.infer<typeof DateInputSchema>;
-export type DropdownInputRequest = z.infer<typeof DropdownInputSchema>;
 export type RatingInputRequest = z.infer<typeof RatingInputSchema>;
+
+/**
+ * @deprecated Use ChoiceInputRequest with displayAs='dropdown' instead.
+ * Kept for backward compatibility - old dropdown requests are migrated to choice.
+ */
+export type DropdownInputRequest = ChoiceInputRequest;
 
 /** Base params for creating any input request */
 interface CreateInputRequestBaseParams {
@@ -247,6 +251,10 @@ export interface CreateChoiceInputParams extends CreateInputRequestBaseParams {
   options: ChoiceOption[];
   /** Enable multi-select (uses checkboxes instead of radio buttons) */
   multiSelect?: boolean;
+  /** Override automatic UI selection (radio/checkbox vs dropdown) */
+  displayAs?: 'radio' | 'checkbox' | 'dropdown';
+  /** Placeholder text (used when displayAs='dropdown' or auto-switched to dropdown) */
+  placeholder?: string;
 }
 
 /** Params for creating a confirm input request */
@@ -259,9 +267,8 @@ export interface CreateNumberInputParams extends CreateInputRequestBaseParams {
   type: 'number';
   min?: number;
   max?: number;
-  step?: number;
+  /** Display format hint (step is derived: integer=1, decimal/currency/percentage=0.01) */
   format?: 'integer' | 'decimal' | 'currency' | 'percentage';
-  unit?: string;
 }
 
 /** Params for creating an email input request */
@@ -278,14 +285,6 @@ export interface CreateDateInputParams extends CreateInputRequestBaseParams {
   min?: string;
   /** Maximum date in ISO format (YYYY-MM-DD) */
   max?: string;
-}
-
-/** Params for creating a dropdown input request */
-export interface CreateDropdownInputParams extends CreateInputRequestBaseParams {
-  type: 'dropdown';
-  options: ChoiceOption[];
-  searchable?: boolean;
-  placeholder?: string;
 }
 
 /** Params for creating a rating input request */
@@ -309,8 +308,17 @@ export type CreateInputRequestParams =
   | CreateNumberInputParams
   | CreateEmailInputParams
   | CreateDateInputParams
-  | CreateDropdownInputParams
   | CreateRatingInputParams;
+
+/**
+ * @deprecated Use CreateChoiceInputParams with displayAs='dropdown' instead.
+ */
+export interface CreateDropdownInputParams extends CreateInputRequestBaseParams {
+  type: 'choice';
+  options: ChoiceOption[];
+  displayAs: 'dropdown';
+  placeholder?: string;
+}
 
 /**
  * Create a new input request with auto-generated fields.
@@ -345,6 +353,8 @@ export function createInputRequest(params: CreateInputRequestParams): InputReque
         type: 'choice' as const,
         options: params.options,
         multiSelect: params.multiSelect,
+        displayAs: params.displayAs,
+        placeholder: params.placeholder,
       };
       break;
     case 'confirm':
@@ -356,9 +366,7 @@ export function createInputRequest(params: CreateInputRequestParams): InputReque
         type: 'number' as const,
         min: params.min,
         max: params.max,
-        step: params.step,
         format: params.format,
-        unit: params.unit,
       };
       break;
     case 'email':
@@ -375,15 +383,6 @@ export function createInputRequest(params: CreateInputRequestParams): InputReque
         type: 'date' as const,
         min: params.min,
         max: params.max,
-      };
-      break;
-    case 'dropdown':
-      request = {
-        ...baseFields,
-        type: 'dropdown' as const,
-        options: params.options,
-        searchable: params.searchable,
-        placeholder: params.placeholder,
       };
       break;
     case 'rating':
@@ -429,3 +428,6 @@ export function normalizeChoiceOptions(options: ChoiceOption[]): NormalizedChoic
       : { ...opt, value: opt.value, label: opt.label || opt.value }
   );
 }
+
+/** Threshold for auto-switching from radio/checkbox to dropdown UI */
+export const CHOICE_DROPDOWN_THRESHOLD = 9;

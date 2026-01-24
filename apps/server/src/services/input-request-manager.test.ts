@@ -470,4 +470,363 @@ describe('InputRequestManager', () => {
       }
     });
   });
+
+  describe('integration: number input lifecycle', () => {
+    it('creates number request, waits, receives answer', async () => {
+      const requestId = manager.createRequest(ydoc, {
+        message: 'How many retries?',
+        type: 'number',
+        min: 0,
+        max: 10,
+      });
+
+      expect(requestId).toBeDefined();
+      const request = manager.getRequest(ydoc, requestId);
+      expect(request?.type).toBe('number');
+      if (request?.type === 'number') {
+        expect(request.min).toBe(0);
+        expect(request.max).toBe(10);
+      }
+
+      // Start waiting for response
+      const responsePromise = manager.waitForResponse(ydoc, requestId, 10);
+
+      // Simulate user answering
+      setTimeout(() => {
+        ydoc.transact(() => {
+          const requestsArray = ydoc.getArray(YDOC_KEYS.INPUT_REQUESTS);
+          const req = requestsArray.get(0) as any;
+          requestsArray.delete(0, 1);
+          requestsArray.insert(0, [
+            {
+              ...req,
+              status: 'answered',
+              response: '5',
+              answeredAt: Date.now(),
+              answeredBy: 'test-user',
+            },
+          ]);
+        });
+      }, 10);
+
+      const result = await responsePromise;
+      expect(result.success).toBe(true);
+      expect(result.status).toBe('answered');
+      if (result.status === 'answered') {
+        expect(result.response).toBe('5');
+      }
+    });
+  });
+
+  describe('integration: email input lifecycle', () => {
+    it('creates email request, waits, receives answer', async () => {
+      const requestId = manager.createRequest(ydoc, {
+        message: 'Enter your email',
+        type: 'email',
+        domain: 'company.com',
+      });
+
+      expect(requestId).toBeDefined();
+      const request = manager.getRequest(ydoc, requestId);
+      expect(request?.type).toBe('email');
+      if (request?.type === 'email') {
+        expect(request.domain).toBe('company.com');
+      }
+
+      // Start waiting for response
+      const responsePromise = manager.waitForResponse(ydoc, requestId, 10);
+
+      // Simulate user answering
+      setTimeout(() => {
+        ydoc.transact(() => {
+          const requestsArray = ydoc.getArray(YDOC_KEYS.INPUT_REQUESTS);
+          const req = requestsArray.get(0) as any;
+          requestsArray.delete(0, 1);
+          requestsArray.insert(0, [
+            {
+              ...req,
+              status: 'answered',
+              response: 'user@company.com',
+              answeredAt: Date.now(),
+              answeredBy: 'test-user',
+            },
+          ]);
+        });
+      }, 10);
+
+      const result = await responsePromise;
+      expect(result.success).toBe(true);
+      expect(result.status).toBe('answered');
+      if (result.status === 'answered') {
+        expect(result.response).toBe('user@company.com');
+      }
+    });
+  });
+
+  describe('integration: date input lifecycle', () => {
+    it('creates date request, waits, receives answer', async () => {
+      const requestId = manager.createRequest(ydoc, {
+        message: 'Select a deadline',
+        type: 'date',
+        min: '2026-01-01',
+        max: '2026-12-31',
+      });
+
+      expect(requestId).toBeDefined();
+      const request = manager.getRequest(ydoc, requestId);
+      expect(request?.type).toBe('date');
+      if (request?.type === 'date') {
+        expect(request.min).toBe('2026-01-01');
+        expect(request.max).toBe('2026-12-31');
+      }
+
+      // Start waiting for response
+      const responsePromise = manager.waitForResponse(ydoc, requestId, 10);
+
+      // Simulate user answering
+      setTimeout(() => {
+        ydoc.transact(() => {
+          const requestsArray = ydoc.getArray(YDOC_KEYS.INPUT_REQUESTS);
+          const req = requestsArray.get(0) as any;
+          requestsArray.delete(0, 1);
+          requestsArray.insert(0, [
+            {
+              ...req,
+              status: 'answered',
+              response: '2026-06-15',
+              answeredAt: Date.now(),
+              answeredBy: 'test-user',
+            },
+          ]);
+        });
+      }, 10);
+
+      const result = await responsePromise;
+      expect(result.success).toBe(true);
+      expect(result.status).toBe('answered');
+      if (result.status === 'answered') {
+        expect(result.response).toBe('2026-06-15');
+      }
+    });
+  });
+
+  describe('integration: choice with displayAs=dropdown lifecycle', () => {
+    it('creates choice request with dropdown display, waits, receives answer', async () => {
+      const requestId = manager.createRequest(ydoc, {
+        message: 'Select a country',
+        type: 'choice',
+        options: ['United States', 'Canada', 'Mexico'],
+        displayAs: 'dropdown',
+        placeholder: 'Choose a country...',
+      });
+
+      expect(requestId).toBeDefined();
+      const request = manager.getRequest(ydoc, requestId);
+      expect(request?.type).toBe('choice');
+      if (request?.type === 'choice') {
+        expect(request.options).toEqual(['United States', 'Canada', 'Mexico']);
+        expect(request.displayAs).toBe('dropdown');
+        expect(request.placeholder).toBe('Choose a country...');
+      }
+
+      // Start waiting for response
+      const responsePromise = manager.waitForResponse(ydoc, requestId, 10);
+
+      // Simulate user answering
+      setTimeout(() => {
+        ydoc.transact(() => {
+          const requestsArray = ydoc.getArray(YDOC_KEYS.INPUT_REQUESTS);
+          const req = requestsArray.get(0) as any;
+          requestsArray.delete(0, 1);
+          requestsArray.insert(0, [
+            {
+              ...req,
+              status: 'answered',
+              response: 'Canada',
+              answeredAt: Date.now(),
+              answeredBy: 'test-user',
+            },
+          ]);
+        });
+      }, 10);
+
+      const result = await responsePromise;
+      expect(result.success).toBe(true);
+      expect(result.status).toBe('answered');
+      if (result.status === 'answered') {
+        expect(result.response).toBe('Canada');
+      }
+    });
+  });
+
+  describe('integration: rating input lifecycle', () => {
+    it('creates rating request, waits, receives answer', async () => {
+      const requestId = manager.createRequest(ydoc, {
+        message: 'Rate this feature',
+        type: 'rating',
+        min: 1,
+        max: 5,
+        style: 'stars',
+        labels: { low: 'Poor', high: 'Excellent' },
+      });
+
+      expect(requestId).toBeDefined();
+      const request = manager.getRequest(ydoc, requestId);
+      expect(request?.type).toBe('rating');
+      if (request?.type === 'rating') {
+        expect(request.min).toBe(1);
+        expect(request.max).toBe(5);
+        expect(request.style).toBe('stars');
+        expect(request.labels).toEqual({ low: 'Poor', high: 'Excellent' });
+      }
+
+      // Start waiting for response
+      const responsePromise = manager.waitForResponse(ydoc, requestId, 10);
+
+      // Simulate user answering
+      setTimeout(() => {
+        ydoc.transact(() => {
+          const requestsArray = ydoc.getArray(YDOC_KEYS.INPUT_REQUESTS);
+          const req = requestsArray.get(0) as any;
+          requestsArray.delete(0, 1);
+          requestsArray.insert(0, [
+            {
+              ...req,
+              status: 'answered',
+              response: '4',
+              answeredAt: Date.now(),
+              answeredBy: 'test-user',
+            },
+          ]);
+        });
+      }, 10);
+
+      const result = await responsePromise;
+      expect(result.success).toBe(true);
+      expect(result.status).toBe('answered');
+      if (result.status === 'answered') {
+        expect(result.response).toBe('4');
+      }
+    });
+  });
+
+  describe('integration: multiline input lifecycle', () => {
+    it('creates multiline request, waits, receives answer', async () => {
+      const requestId = manager.createRequest(ydoc, {
+        message: 'Describe the issue in detail',
+        type: 'multiline',
+        defaultValue: 'Default description',
+      });
+
+      expect(requestId).toBeDefined();
+      const request = manager.getRequest(ydoc, requestId);
+      expect(request?.type).toBe('multiline');
+      expect(request?.defaultValue).toBe('Default description');
+
+      // Start waiting for response
+      const responsePromise = manager.waitForResponse(ydoc, requestId, 10);
+
+      // Simulate user answering
+      setTimeout(() => {
+        ydoc.transact(() => {
+          const requestsArray = ydoc.getArray(YDOC_KEYS.INPUT_REQUESTS);
+          const req = requestsArray.get(0) as any;
+          requestsArray.delete(0, 1);
+          requestsArray.insert(0, [
+            {
+              ...req,
+              status: 'answered',
+              response: 'This is a detailed\nmultiline\nresponse',
+              answeredAt: Date.now(),
+              answeredBy: 'test-user',
+            },
+          ]);
+        });
+      }, 10);
+
+      const result = await responsePromise;
+      expect(result.success).toBe(true);
+      expect(result.status).toBe('answered');
+      if (result.status === 'answered') {
+        expect(result.response).toBe('This is a detailed\nmultiline\nresponse');
+      }
+    });
+  });
+
+  describe('integration: confirm input lifecycle', () => {
+    it('creates confirm request, waits, receives answer', async () => {
+      const requestId = manager.createRequest(ydoc, {
+        message: 'Are you sure you want to proceed?',
+        type: 'confirm',
+      });
+
+      expect(requestId).toBeDefined();
+      const request = manager.getRequest(ydoc, requestId);
+      expect(request?.type).toBe('confirm');
+
+      // Start waiting for response
+      const responsePromise = manager.waitForResponse(ydoc, requestId, 10);
+
+      // Simulate user answering 'yes'
+      setTimeout(() => {
+        ydoc.transact(() => {
+          const requestsArray = ydoc.getArray(YDOC_KEYS.INPUT_REQUESTS);
+          const req = requestsArray.get(0) as any;
+          requestsArray.delete(0, 1);
+          requestsArray.insert(0, [
+            {
+              ...req,
+              status: 'answered',
+              response: 'yes',
+              answeredAt: Date.now(),
+              answeredBy: 'test-user',
+            },
+          ]);
+        });
+      }, 10);
+
+      const result = await responsePromise;
+      expect(result.success).toBe(true);
+      expect(result.status).toBe('answered');
+      if (result.status === 'answered') {
+        expect(result.response).toBe('yes');
+      }
+    });
+
+    it('handles confirm request declined', async () => {
+      const requestId = manager.createRequest(ydoc, {
+        message: 'Delete all files?',
+        type: 'confirm',
+      });
+
+      // Start waiting for response
+      const responsePromise = manager.waitForResponse(ydoc, requestId, 10);
+
+      // Simulate user declining
+      setTimeout(() => {
+        ydoc.transact(() => {
+          const requestsArray = ydoc.getArray(YDOC_KEYS.INPUT_REQUESTS);
+          const req = requestsArray.get(0) as any;
+          requestsArray.delete(0, 1);
+          requestsArray.insert(0, [
+            {
+              ...req,
+              status: 'declined',
+              answeredAt: Date.now(),
+              answeredBy: 'test-user',
+            },
+          ]);
+        });
+      }, 10);
+
+      const result = await responsePromise;
+      // Note: 'declined' is success=true because the user explicitly chose to decline
+      // This is different from 'cancelled' (success=false) which is a timeout/error
+      expect(result.success).toBe(true);
+      expect(result.status).toBe('declined');
+      if (result.status === 'declined') {
+        expect(result.reason).toBe('User declined to answer');
+      }
+    });
+  });
 });
