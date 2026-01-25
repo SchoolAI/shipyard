@@ -98,22 +98,21 @@ export function useInviteToken(
   useEffect(() => {
     if (!rtcProvider) return;
 
-    // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Message handling with multiple response types requires comprehensive validation
     const handleMessage = (event: MessageEvent) => {
       try {
         const data = JSON.parse(event.data);
-        if (data.type === 'invite_redemption_result') {
-          if (data.success === true && typeof data.planId === 'string') {
-            // Success variant
-            setRedemptionState({ status: 'success' });
-            // Clean up URL after short delay to show success state
-            setTimeout(() => {
-              clearInviteToken();
-            }, 500);
-          } else if (data.success === false && isValidInviteError(data.error)) {
-            // Failure variant
-            setRedemptionState({ status: 'error', error: data.error });
-          }
+        if (data.type !== 'invite_redemption_result') return;
+
+        if (data.success === true && typeof data.planId === 'string') {
+          // Success variant
+          setRedemptionState({ status: 'success' });
+          // Clean up URL after short delay to show success state
+          setTimeout(() => {
+            clearInviteToken();
+          }, 500);
+        } else if (data.success === false && isValidInviteError(data.error)) {
+          // Failure variant
+          setRedemptionState({ status: 'error', error: data.error });
         }
       } catch {
         // Not JSON or not our message

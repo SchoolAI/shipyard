@@ -445,50 +445,63 @@ export function useConversationTransfer(
   }, []);
 
   /**
+   * Sync peers from provider to manager to catch race conditions.
+   */
+  const syncPeersFromProvider = useCallback(() => {
+    const manager = managerRef.current;
+    if (!rtcProvider || !manager) return;
+
+    const currentPeers = extractPeersFromProvider(rtcProvider);
+    for (const [pid, peer] of currentPeers) {
+      if (!trackedPeersRef.current.has(pid)) {
+        manager.addPeer(pid, peer);
+        trackedPeersRef.current.set(pid, peer);
+      }
+    }
+  }, [rtcProvider]);
+
+  /**
+   * Extract source session ID from metadata origin.
+   */
+  const getSourceSessionId = useCallback(
+    (origin: ReturnType<typeof getPlanMetadataCallback>['origin']): string => {
+      if (origin?.platform === 'claude-code' && origin.sessionId) {
+        return origin.sessionId;
+      }
+      if (origin?.platform === 'devin' && origin.sessionId) {
+        return origin.sessionId;
+      }
+      return planId;
+    },
+    [planId]
+  );
+
+  /**
    * Send conversation to P2P peer via WebRTC.
    */
   const sendToPeer = useCallback(
-    // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Complex but straightforward P2P transfer logic
     async (peerId: string, messages: A2AMessage[], options: SendOptions = {}): Promise<boolean> => {
       const manager = managerRef.current;
       if (!manager) {
         return false;
       }
 
-      // Last-minute sync: extract fresh peers from provider to catch any race conditions
-      // where awareness is ahead of the manager's peer tracking
-      if (rtcProvider) {
-        const currentPeers = extractPeersFromProvider(rtcProvider);
-        for (const [pid, peer] of currentPeers) {
-          if (!trackedPeersRef.current.has(pid)) {
-            manager.addPeer(pid, peer);
-            trackedPeersRef.current.set(pid, peer);
-          }
-        }
-      }
+      // Last-minute sync to catch race conditions where awareness is ahead of tracking
+      syncPeersFromProvider();
 
       const metadata = getPlanMetadataCallback();
       const exportId = crypto.randomUUID();
 
       setIsProcessing(true);
-      setProgress({
-        stage: 'preparing',
-        current: 0,
-        total: 1,
-      });
+      setProgress({ stage: 'preparing', current: 0, total: 1 });
 
       try {
-        const sourcePlatform = metadata.origin?.platform ?? 'claude-code';
-        const sourceSessionId =
-          (metadata.origin?.platform === 'claude-code' && metadata.origin.sessionId) ||
-          (metadata.origin?.platform === 'devin' && metadata.origin.sessionId) ||
-          planId;
         await manager.sendConversation(
           peerId,
           messages,
           {
-            sourcePlatform,
-            sourceSessionId,
+            sourcePlatform: metadata.origin?.platform ?? 'claude-code',
+            sourceSessionId: getSourceSessionId(metadata.origin),
             planId,
             exportedAt: Date.now(),
           },
@@ -505,10 +518,7 @@ export function useConversationTransfer(
               options.onProgress?.(sent, total);
             },
             onComplete: () => {
-              setProgress({
-                stage: 'done',
-                exportId,
-              });
+              setProgress({ stage: 'done', exportId });
               setTimeout(() => {
                 setProgress(null);
                 setIsProcessing(false);
@@ -532,7 +542,7 @@ export function useConversationTransfer(
         return false;
       }
     },
-    [getPlanMetadataCallback, planId, rtcProvider]
+    [getPlanMetadataCallback, planId, syncPeersFromProvider, getSourceSessionId]
   );
 
   /**

@@ -459,7 +459,6 @@ export function InputRequestModal({
           />
         );
       default: {
-        // Exhaustive check - TypeScript will error if new type added without case
         const _exhaustiveCheck: never = request;
         return (
           <Alert status="warning">

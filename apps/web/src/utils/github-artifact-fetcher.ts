@@ -170,7 +170,34 @@ async function fetchDirect(url: string, isBinary: boolean): Promise<FetchArtifac
   }
 }
 
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: GitHub API error handling requires multiple branches
+/**
+ * Map HTTP status codes to FetchArtifactResult for error responses.
+ */
+function mapGitHubErrorStatus(status: number, hasRepoScope: boolean): FetchArtifactResult {
+  if (status === 401 || status === 403) {
+    return { status: 'needs_auth' };
+  }
+  if (status === 404) {
+    // 404 could mean "not found" OR "insufficient permissions"
+    // If user doesn't have repo scope, treat as needs_auth
+    return hasRepoScope ? { status: 'not_found' } : { status: 'needs_auth' };
+  }
+  return { status: 'error', error: `GitHub API: ${status}` };
+}
+
+/**
+ * Decode base64 content and convert to blob URL for binary files.
+ */
+function decodeAsBlobUrl(base64Content: string, path: string): string {
+  const decodedContent = atob(base64Content.replace(/\n/g, ''));
+  const bytes = new Uint8Array(decodedContent.length);
+  for (let i = 0; i < decodedContent.length; i++) {
+    bytes[i] = decodedContent.charCodeAt(i);
+  }
+  const blob = new Blob([bytes], { type: getMimeType(path) });
+  return URL.createObjectURL(blob);
+}
+
 async function fetchViaGitHubApi(
   parsed: ParsedArtifactUrl,
   token: string,
@@ -188,18 +215,7 @@ async function fetchViaGitHubApi(
     });
 
     if (!response.ok) {
-      if (response.status === 401 || response.status === 403) {
-        return { status: 'needs_auth' };
-      }
-      if (response.status === 404) {
-        // 404 could mean "not found" OR "insufficient permissions"
-        // If user doesn't have repo scope, treat as needs_auth
-        if (!hasRepoScope) {
-          return { status: 'needs_auth' };
-        }
-        return { status: 'not_found' };
-      }
-      return { status: 'error', error: `GitHub API: ${response.status}` };
+      return mapGitHubErrorStatus(response.status, hasRepoScope);
     }
 
     const json: unknown = await response.json();
@@ -214,19 +230,12 @@ async function fetchViaGitHubApi(
       return { status: 'error', error: 'Unexpected API response format' };
     }
 
-    const decodedContent = atob(data.content.replace(/\n/g, ''));
-
     if (isBinary) {
-      // Convert decoded string to blob
-      const bytes = new Uint8Array(decodedContent.length);
-      for (let i = 0; i < decodedContent.length; i++) {
-        bytes[i] = decodedContent.charCodeAt(i);
-      }
-      const blob = new Blob([bytes], { type: getMimeType(parsed.path) });
-      const blobUrl = URL.createObjectURL(blob);
+      const blobUrl = decodeAsBlobUrl(data.content, parsed.path);
       return { status: 'success', blobUrl };
     }
 
+    const decodedContent = atob(data.content.replace(/\n/g, ''));
     return { status: 'success', textContent: decodedContent };
   } catch (err) {
     return {

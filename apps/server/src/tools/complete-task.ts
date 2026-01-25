@@ -1,31 +1,26 @@
-import { execSync } from 'node:child_process';
 import { ServerBlockNoteEditor } from '@blocknote/server-util';
 import {
   addSnapshot,
-  createLinkedPR,
   createPlanSnapshot,
   createPlanUrlWithHistory,
-  GitHubPRResponseSchema,
   getArtifacts,
   getDeliverables,
   getLinkedPRs,
   getPlanMetadata,
   getSnapshots,
   type LinkedPR,
-  linkPR,
   logPlanEvent,
   PLAN_INDEX_DOC_NAME,
   setPlanIndexEntry,
   transitionPlanStatus,
 } from '@shipyard/schema';
-import type * as Y from 'yjs';
 import { z } from 'zod';
 import { webConfig } from '../config/env/web.js';
 import { getOrCreateDoc } from '../doc-store.js';
-import { getOctokit, parseRepoString } from '../github-artifacts.js';
 import { logger } from '../logger.js';
 import { getGitHubUsername } from '../server-identity.js';
 import { verifySessionToken } from '../session-token.js';
+import { tryAutoLinkPR } from './pr-helpers.js';
 import { TOOL_NAMES } from './tool-names.js';
 
 const CompleteTaskInput = z.object({
@@ -255,94 +250,3 @@ linkPR({ planId, sessionToken, prNumber: 42 })
     };
   },
 };
-
-// --- Helper Functions ---
-
-/**
- * Tries to auto-link a PR from the current git branch.
- * Returns the linked PR if found, null otherwise.
- */
-async function tryAutoLinkPR(ydoc: Y.Doc, repo: string): Promise<LinkedPR | null> {
-  // Get current branch
-  let branch: string;
-  try {
-    branch = execSync('git branch --show-current', {
-      encoding: 'utf-8',
-      timeout: 5000,
-      stdio: ['pipe', 'pipe', 'pipe'],
-    }).trim();
-  } catch (error) {
-    logger.debug({ error }, 'Could not detect current git branch');
-    return null;
-  }
-
-  if (!branch) {
-    logger.debug('Not on a branch (possibly detached HEAD)');
-    return null;
-  }
-
-  // Get Octokit instance
-  const octokit = getOctokit();
-  if (!octokit) {
-    logger.debug('No GitHub token available for PR lookup');
-    return null;
-  }
-
-  // Parse repo
-  const { owner, repoName } = parseRepoString(repo);
-
-  try {
-    // Look for open PRs from this branch
-    const { data: prs } = await octokit.pulls.list({
-      owner,
-      repo: repoName,
-      head: `${owner}:${branch}`,
-      state: 'open',
-    });
-
-    if (prs.length === 0) {
-      logger.debug({ branch, repo }, 'No open PR found on branch');
-      return null;
-    }
-
-    // Use the first (most recent) PR
-    const pr = prs[0];
-    if (!pr) return null;
-
-    // Validate GitHub API response
-    const validatedPR = GitHubPRResponseSchema.parse(pr);
-
-    // Create LinkedPR object using factory for consistent validation
-    const linkedPR = createLinkedPR({
-      prNumber: validatedPR.number,
-      url: validatedPR.html_url,
-      // We query for state: 'open' only, so merged/closed are never returned
-      status: validatedPR.draft ? 'draft' : 'open',
-      branch,
-      title: validatedPR.title,
-    });
-
-    // Store in Y.Doc
-    const actorName = await getGitHubUsername();
-    linkPR(ydoc, linkedPR, actorName);
-
-    // Log PR linked event (semantic action)
-    logPlanEvent(ydoc, 'pr_linked', actorName, {
-      prNumber: linkedPR.prNumber,
-      url: linkedPR.url,
-    });
-
-    return linkedPR;
-  } catch (error) {
-    // Validation errors indicate malformed GitHub API response
-    if (error instanceof z.ZodError) {
-      const fieldErrors = error.issues
-        .map((issue) => `${issue.path.join('.')}: ${issue.message}`)
-        .join(', ');
-      logger.error({ fieldErrors, repo, branch }, 'Invalid GitHub PR response during auto-link');
-      return null;
-    }
-    logger.warn({ error, repo, branch }, 'Failed to lookup PR from GitHub');
-    return null;
-  }
-}

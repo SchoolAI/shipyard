@@ -6,7 +6,7 @@ import type { WebrtcProvider } from 'y-webrtc';
 import type * as Y from 'yjs';
 import { useBroadcastApprovalStatus } from '@/hooks/useBroadcastApprovalStatus';
 import type { GitHubIdentity } from '@/hooks/useGitHubAuth';
-import { useInviteToken } from '@/hooks/useInviteToken';
+import { type RedemptionState, useInviteToken } from '@/hooks/useInviteToken';
 import type { SyncState } from '@/hooks/useMultiProviderSync';
 import { useYDocApprovalStatus } from '@/hooks/useYDocApprovalStatus';
 import { isPlanAwarenessState } from '@/types/awareness';
@@ -21,6 +21,103 @@ interface WaitingRoomGateProps {
   children: ReactNode;
   planId: string;
   isSnapshot: boolean;
+}
+
+/**
+ * Check if a pending request has expired (over 24 hours old).
+ */
+function checkRequestExpired(isPending: boolean, rtcProvider: WebrtcProvider | null): boolean {
+  if (!isPending || !rtcProvider) return false;
+
+  const awareness = rtcProvider.awareness;
+  const localState = awareness.getLocalState();
+  const localStateRecord =
+    localState && typeof localState === 'object'
+      ? Object.fromEntries(Object.entries(localState))
+      : {};
+  const planStatusRaw = localStateRecord.planStatus;
+  const planStatus = isPlanAwarenessState(planStatusRaw) ? planStatusRaw : undefined;
+
+  if (!planStatus || planStatus.status !== 'pending') return false;
+
+  const requestAge = Date.now() - planStatus.requestedAt;
+  return requestAge > 24 * 60 * 60 * 1000; // 24 hours
+}
+
+/**
+ * Determine what gate UI to show based on current state.
+ * Returns null if access should be granted.
+ */
+type GateDecision =
+  | { type: 'allow' }
+  | { type: 'redeeming' }
+  | { type: 'invite_error'; error: InviteErrorProps['error'] }
+  | { type: 'auth_for_invite' }
+  | { type: 'auth_required' }
+  | { type: 'request_expired' }
+  | { type: 'waiting_room' }
+  | { type: 'access_denied' };
+
+function determineGateDecision(params: {
+  isSnapshot: boolean;
+  isLocalViewing: boolean;
+  requiresApproval: boolean;
+  hasInviteToken: boolean;
+  redemptionState: RedemptionState;
+  githubIdentity: GitHubIdentity | null;
+  isPending: boolean;
+  isRejected: boolean;
+  isRequestExpired: boolean;
+}): GateDecision {
+  const {
+    isSnapshot,
+    isLocalViewing,
+    requiresApproval,
+    hasInviteToken,
+    redemptionState,
+    githubIdentity,
+    isPending,
+    isRejected,
+    isRequestExpired,
+  } = params;
+
+  // Snapshots are always viewable
+  if (isSnapshot) return { type: 'allow' };
+
+  // Local viewing (connected to hub) bypasses auth
+  if (isLocalViewing) return { type: 'allow' };
+
+  // No approval required
+  if (!requiresApproval) return { type: 'allow' };
+
+  // Handle invite token states FIRST
+  if (hasInviteToken && redemptionState.status === 'redeeming') {
+    return { type: 'redeeming' };
+  }
+
+  if (redemptionState.status === 'error') {
+    return { type: 'invite_error', error: redemptionState.error };
+  }
+
+  if (hasInviteToken && !githubIdentity) {
+    return { type: 'auth_for_invite' };
+  }
+
+  // Invite successfully redeemed - wait for CRDT sync
+  if (redemptionState.status === 'success') {
+    return isPending ? { type: 'redeeming' } : { type: 'allow' };
+  }
+
+  // Standard auth check
+  if (!githubIdentity) return { type: 'auth_required' };
+
+  // Check for expired request
+  if (isRequestExpired) return { type: 'request_expired' };
+
+  if (isPending) return { type: 'waiting_room' };
+  if (isRejected) return { type: 'access_denied' };
+
+  return { type: 'allow' };
 }
 
 /**
@@ -41,7 +138,6 @@ interface WaitingRoomGateProps {
  * Also handles invite token redemption - users with valid invite tokens
  * are auto-approved without manual owner approval.
  */
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Component handles multiple auth/invite/approval states - can't simplify further
 export function WaitingRoomGate({
   ydoc,
   syncState,
@@ -64,7 +160,6 @@ export function WaitingRoomGate({
   } = useYDocApprovalStatus(ydoc, githubIdentity?.username ?? null);
 
   // Broadcast approval status to WebRTC awareness so owners can see pending users
-  // This enables the ApprovalPanel to show the list of users waiting for access
   const isOwner = !!(githubIdentity && ownerId && githubIdentity.username === ownerId);
   useBroadcastApprovalStatus({
     rtcProvider,
@@ -80,99 +175,50 @@ export function WaitingRoomGate({
     githubIdentity
   );
 
-  // Check if request has expired (only for pending users)
-  const isRequestExpired = useMemo(() => {
-    if (!isPending || !rtcProvider) return false;
+  const isRequestExpired = useMemo(
+    () => checkRequestExpired(isPending, rtcProvider),
+    [isPending, rtcProvider]
+  );
 
-    const awareness = rtcProvider.awareness;
-    const localState = awareness.getLocalState();
-    const localStateRecord =
-      localState && typeof localState === 'object'
-        ? Object.fromEntries(Object.entries(localState))
-        : {};
-    const planStatusRaw = localStateRecord.planStatus;
-    const planStatus = isPlanAwarenessState(planStatusRaw) ? planStatusRaw : undefined;
-
-    if (!planStatus || planStatus.status !== 'pending') return false;
-
-    const requestAge = Date.now() - planStatus.requestedAt;
-    return requestAge > 24 * 60 * 60 * 1000; // 24 hours
-  }, [isPending, rtcProvider]);
-
-  // Snapshots are always viewable (self-contained, no approval needed)
-  if (isSnapshot) {
-    return <>{children}</>;
-  }
-
-  // If connected to the hub WebSocket, skip auth entirely
-  // This allows local development without authentication
-  // Shared links (P2P only) will still require auth since hubConnected === false
   const isLocalViewing = syncState.hubConnected && syncState.synced;
 
-  if (isLocalViewing) {
-    return <>{children}</>;
-  }
+  const decision = determineGateDecision({
+    isSnapshot,
+    isLocalViewing,
+    requiresApproval,
+    hasInviteToken,
+    redemptionState,
+    githubIdentity,
+    isPending,
+    isRejected,
+    isRequestExpired,
+  });
 
-  // If approval is not required (no ownerId), allow access
-  if (!requiresApproval) {
-    return <>{children}</>;
-  }
-
-  // Handle invite token states FIRST (before auth check)
-  // This allows showing invite-specific UI
-
-  // If invite redemption is in progress, show redemption UI
-  if (hasInviteToken && redemptionState.status === 'redeeming') {
-    return <RedeemingInvite title={metadata.title} />;
-  }
-
-  // If invite redemption failed, show error
-  if (redemptionState.status === 'error') {
-    return (
-      <InviteError
-        title={metadata.title}
-        error={redemptionState.error}
-        onDismiss={clearInviteToken}
-        onStartAuth={onStartAuth}
-      />
-    );
-  }
-
-  // If user has invite but needs to authenticate first
-  if (hasInviteToken && !githubIdentity) {
-    return <AuthRequiredForInvite title={metadata.title} onStartAuth={onStartAuth} />;
-  }
-
-  // If invite was successfully redeemed, wait for CRDT approval to propagate
-  // This prevents the race condition where we show content before isPending becomes false
-  if (redemptionState.status === 'success') {
-    // Wait for CRDT sync - if still pending, show loading state
-    if (isPending) {
+  switch (decision.type) {
+    case 'allow':
+      return <>{children}</>;
+    case 'redeeming':
       return <RedeemingInvite title={metadata.title} />;
-    }
-    // Approval has propagated - allow access
-    return <>{children}</>;
+    case 'invite_error':
+      return (
+        <InviteError
+          title={metadata.title}
+          error={decision.error}
+          onDismiss={clearInviteToken}
+          onStartAuth={onStartAuth}
+        />
+      );
+    case 'auth_for_invite':
+      return <AuthRequiredForInvite title={metadata.title} onStartAuth={onStartAuth} />;
+    case 'auth_required':
+      return <AuthRequired title={metadata.title} onStartAuth={onStartAuth} />;
+    case 'request_expired':
+      return <RequestExpired title={metadata.title} onRetry={() => window.location.reload()} />;
+    case 'waiting_room':
+      return <WaitingRoom title={metadata.title} ownerId={ownerId} />;
+    case 'access_denied':
+      return <AccessDenied title={metadata.title} />;
   }
-
-  // Standard auth check (no invite token)
-  if (!githubIdentity) {
-    return <AuthRequired title={metadata.title} onStartAuth={onStartAuth} />;
-  }
-
-  // Check for expired request AFTER isPending check
-  if (isRequestExpired) {
-    return <RequestExpired title={metadata.title} onRetry={() => window.location.reload()} />;
-  }
-
-  if (isPending) {
-    return <WaitingRoom title={metadata.title} ownerId={ownerId} />;
-  }
-
-  if (isRejected) {
-    return <AccessDenied title={metadata.title} />;
-  }
-
-  return <>{children}</>;
 }
 
 interface RequestExpiredProps {

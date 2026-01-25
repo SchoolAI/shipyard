@@ -166,6 +166,24 @@ function createResolveUsers(ydoc: Y.Doc, currentIdentity: UserIdentity | null) {
   };
 }
 
+/**
+ * Check if Cmd/Ctrl+Z was pressed (platform-aware).
+ */
+function isCmdOrCtrlZ(e: KeyboardEvent): boolean {
+  if (e.key !== 'z') return false;
+  const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+  return isMac ? e.metaKey : e.ctrlKey;
+}
+
+/**
+ * Check if target is in an input context where native shortcuts should work.
+ */
+function isInNativeInputContext(target: HTMLElement): boolean {
+  const isInput =
+    target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
+  return isInput || target.closest('.bn-editor') !== null;
+}
+
 export function PlanViewer({
   ydoc,
   identity,
@@ -345,18 +363,21 @@ export function PlanViewer({
       }
     };
 
+    /**
+     * Check if an added node is or contains a thread composer.
+     */
+    const isThreadNode = (node: Node): boolean => {
+      if (!(node instanceof HTMLElement)) return false;
+      return node.classList.contains('bn-thread') || node.querySelector('.bn-thread') !== null;
+    };
+
     // Observe for the floating composer appearing
-    // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: MutationObserver callback is inherently nested
     const observer = new MutationObserver((mutations) => {
-      for (const mutation of mutations) {
-        for (const node of mutation.addedNodes) {
-          if (node instanceof HTMLElement) {
-            // Check if this is or contains the thread/composer
-            if (node.classList.contains('bn-thread') || node.querySelector('.bn-thread')) {
-              focusCommentInput();
-            }
-          }
-        }
+      const hasNewThread = mutations.some((mutation) =>
+        Array.from(mutation.addedNodes).some(isThreadNode)
+      );
+      if (hasNewThread) {
+        focusCommentInput();
       }
     });
 
@@ -379,95 +400,76 @@ export function PlanViewer({
   useEffect(() => {
     if (!editor) return;
 
-    // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Keyboard handler needs multiple condition checks for platform detection, focus state, and modifier keys
     const handleUndoRedoKeyDown = (e: KeyboardEvent) => {
-      // Detect platform
-      const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
-      const cmdOrCtrl = isMac ? e.metaKey : e.ctrlKey;
+      if (!isCmdOrCtrlZ(e)) return;
 
-      // Check if we're in an input/textarea (don't intercept their undo/redo)
       const target = e.target;
       if (!(target instanceof HTMLElement)) return;
-      const isInInput =
-        target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
+      if (isInNativeInputContext(target)) return;
 
-      // Check if we're in BlockNote editor
-      const isInBlockNote = target.closest('.bn-editor') !== null;
+      e.preventDefault();
+      editor.focus();
 
-      if (cmdOrCtrl && e.key === 'z') {
-        // Allow BlockNote's built-in shortcuts to work when focused
-        if (isInBlockNote) return;
+      const yUndo = getYUndoExtension(editor);
+      if (!yUndo) return;
 
-        // For all other cases, handle globally
-        if (!isInInput) {
-          e.preventDefault();
-          editor.focus();
-
-          // Get the yUndo extension (used when collaboration is enabled)
-          const yUndo = getYUndoExtension(editor);
-          if (yUndo) {
-            const { state, view } = editor._tiptapEditor;
-            if (e.shiftKey) {
-              // Cmd+Shift+Z or Ctrl+Shift+Z: Redo
-              if (yUndo.redoCommand) {
-                yUndo.redoCommand(state, view.dispatch, view);
-              }
-            } else {
-              // Cmd+Z or Ctrl+Z: Undo
-              if (yUndo.undoCommand) {
-                yUndo.undoCommand(state, view.dispatch, view);
-              }
-            }
-          }
-        }
-      }
+      const { state, view } = editor._tiptapEditor;
+      const command = e.shiftKey ? yUndo.redoCommand : yUndo.undoCommand;
+      command?.(state, view.dispatch, view);
     };
 
     window.addEventListener('keydown', handleUndoRedoKeyDown);
     return () => window.removeEventListener('keydown', handleUndoRedoKeyDown);
   }, [editor]);
 
-  // Handle Enter to submit comments (Shift+Enter or Ctrl+Enter for newline)
-  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Keyboard handling requires multiple condition checks
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    // Check if we're in a comment input (BlockNote thread component)
-    const target = e.target;
-    if (!(target instanceof HTMLElement)) return;
-    const isInThread =
+  /**
+   * Check if an element is inside a BlockNote thread/composer.
+   */
+  const isInCommentThread = (target: HTMLElement): boolean => {
+    return !!(
       target.closest('.bn-thread') ||
       target.closest('.bn-floating-composer') ||
-      target.closest('[data-floating-composer]');
+      target.closest('[data-floating-composer]')
+    );
+  };
 
-    if (!isInThread) return;
+  /**
+   * Find and click the submit button in the comment thread.
+   */
+  const clickCommentSubmitButton = (): void => {
+    const buttonSelectors = [
+      '.bn-thread .bn-action-toolbar .bn-button',
+      '.bn-thread button[type="submit"]',
+      '.bn-thread .bn-button',
+      '.bn-floating-composer .bn-button',
+    ];
 
-    if (e.key === 'Enter') {
-      // Shift+Enter or Ctrl+Enter: Insert newline
-      if (e.shiftKey || e.ctrlKey || e.metaKey) {
-        // For contenteditable (ProseMirror), let the default behavior handle it
-        // ProseMirror already handles Shift+Enter as soft break
+    for (const selector of buttonSelectors) {
+      const submitButton = containerRef.current?.querySelector(selector);
+      if (submitButton instanceof HTMLButtonElement) {
+        submitButton.click();
         return;
       }
-
-      // Enter without modifier: Submit the comment
-      e.preventDefault();
-      e.stopPropagation();
-
-      // BlockNote uses .bn-button inside .bn-action-toolbar for the save button
-      const buttonSelectors = [
-        '.bn-thread .bn-action-toolbar .bn-button',
-        '.bn-thread button[type="submit"]',
-        '.bn-thread .bn-button',
-        '.bn-floating-composer .bn-button',
-      ];
-
-      for (const selector of buttonSelectors) {
-        const submitButton = containerRef.current?.querySelector(selector);
-        if (submitButton instanceof HTMLButtonElement) {
-          submitButton.click();
-          return;
-        }
-      }
     }
+  };
+
+  // Handle Enter to submit comments (Shift+Enter or Ctrl+Enter for newline)
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    const target = e.target;
+    if (!(target instanceof HTMLElement)) return;
+
+    // Only handle in comment threads
+    if (!isInCommentThread(target)) return;
+
+    if (e.key !== 'Enter') return;
+
+    // Shift+Enter, Ctrl+Enter, or Cmd+Enter: Insert newline (default behavior)
+    if (e.shiftKey || e.ctrlKey || e.metaKey) return;
+
+    // Enter without modifier: Submit the comment
+    e.preventDefault();
+    e.stopPropagation();
+    clickCommentSubmitButton();
   };
 
   return (
