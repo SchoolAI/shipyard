@@ -254,7 +254,6 @@ export async function updateContentHandler(
     }
     editor.blocksToYXmlFragment(blocks, fragment);
 
-    // Clear existing deliverables first to prevent duplicates on content updates
     const deliverablesArray = ydoc.getArray(YDOC_KEYS.DELIVERABLES);
     deliverablesArray.delete(0, deliverablesArray.length);
 

@@ -164,8 +164,6 @@ describe('URL Encoding', () => {
 
   describe('version handling', () => {
     it('rejects unknown versions for security (URL data is untrusted)', () => {
-      // With proper validation, unknown versions should be rejected
-      // URLs are untrusted user input - we only accept known versions
       const futureVersionPlan = { ...samplePlan, v: 99 as 1 };
       const encoded = encodePlan(futureVersionPlan);
       const decoded = decodePlan(encoded);

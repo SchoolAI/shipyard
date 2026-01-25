@@ -23,7 +23,6 @@ export { NumberInput } from './NumberInput';
 export { RatingInput } from './RatingInput';
 export { TextInput } from './TextInput';
 
-// Re-export types for consumers
 export type {
   BaseInputProps,
   ChoiceInputProps,
@@ -31,7 +30,6 @@ export type {
   RatingInputProps,
 } from './types';
 
-// Re-export utils for consumers
 export {
   formatTime,
   NA_OPTION_LABEL,

@@ -56,10 +56,8 @@ const RequestUserInputInput = z
       .string()
       .optional()
       .describe('Optional metadata to link request to plan (for activity log filtering)'),
-    // Number/rating type parameters
     min: z.number().optional().describe("For 'number'/'rating' - minimum value"),
     max: z.number().optional().describe("For 'number'/'rating' - maximum value"),
-    // Date type parameters (separate from min/max since they're strings)
     minDate: z
       .string()
       .regex(/^\d{4}-\d{2}-\d{2}$/)
@@ -74,9 +72,7 @@ const RequestUserInputInput = z
       .enum(['integer', 'decimal', 'currency', 'percentage'])
       .optional()
       .describe("For 'number' - display format hint (step is derived: integer=1, others=0.01)"),
-    // Email type parameters
     domain: z.string().optional().describe("For 'email' - restrict to domain"),
-    // Rating type parameters
     style: z
       .enum(['stars', 'numbers', 'emoji'])
       .optional()
@@ -88,7 +84,6 @@ const RequestUserInputInput = z
       })
       .optional()
       .describe("For 'rating' - endpoint labels"),
-    // Multi-question support
     questions: z
       .array(QuestionSchema)
       .min(1)
@@ -99,8 +94,6 @@ const RequestUserInputInput = z
   .refine((data) => (data.message && data.type) || data.questions, {
     message: 'Either provide message+type OR questions array',
   });
-
-// --- Helper Functions ---
 
 type RequestUserInputInput = z.infer<typeof RequestUserInputInput>;
 
@@ -342,7 +335,6 @@ NOTE: This is also available as requestUserInput() inside execute_code for multi
           type: 'string',
           description: 'Optional metadata to link request to plan (for activity log filtering)',
         },
-        // Number/rating type parameters
         min: {
           type: 'number',
           description: "For 'number'/'rating' type - minimum allowed value",
@@ -351,7 +343,6 @@ NOTE: This is also available as requestUserInput() inside execute_code for multi
           type: 'number',
           description: "For 'number'/'rating' type - maximum allowed value",
         },
-        // Date type parameters (separate from min/max since they're strings)
         minDate: {
           type: 'string',
           pattern: '^\\d{4}-\\d{2}-\\d{2}$',
@@ -368,12 +359,10 @@ NOTE: This is also available as requestUserInput() inside execute_code for multi
           description:
             "For 'number' - display format hint (step is derived: integer=1, others=0.01)",
         },
-        // Email type parameters
         domain: {
           type: 'string',
           description: "For 'email' - restrict to specific domain",
         },
-        // Rating type parameters
         style: {
           type: 'string',
           enum: ['stars', 'numbers', 'emoji'],
@@ -468,7 +457,6 @@ NOTE: This is also available as requestUserInput() inside execute_code for multi
       'Processing request_user_input'
     );
 
-    // Validate choice type has options (only for single-question mode)
     if (input.type === 'choice' && (!input.options || input.options.length === 0)) {
       return {
         content: [
@@ -497,7 +485,6 @@ NOTE: This is also available as requestUserInput() inside execute_code for multi
       let requestId: string;
 
       if (input.questions) {
-        // Multi-question request
         const params = {
           questions: input.questions,
           timeout: input.timeout,
@@ -505,7 +492,6 @@ NOTE: This is also available as requestUserInput() inside execute_code for multi
         };
         requestId = manager.createMultiQuestionRequest(ydoc, params);
       } else {
-        // Single-question request (existing logic)
         const params = buildRequestParams(input);
         requestId = manager.createRequest(ydoc, params);
       }

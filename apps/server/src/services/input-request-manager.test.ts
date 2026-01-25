@@ -10,7 +10,6 @@ describe('InputRequestManager', () => {
   beforeEach(() => {
     ydoc = new Y.Doc();
     manager = new InputRequestManager();
-    // Clear any timers from previous tests
     vi.clearAllTimers();
   });
 
@@ -43,7 +42,6 @@ describe('InputRequestManager', () => {
       });
 
       const request = manager.getRequest(ydoc, requestId);
-      // Narrow the type to ChoiceInputRequest to access options
       expect(request?.type).toBe('choice');
       if (request?.type === 'choice') {
         expect(request.options).toEqual(['red', 'blue', 'green']);
@@ -141,7 +139,6 @@ describe('InputRequestManager', () => {
         type: 'text',
       });
 
-      // Manually mark as answered
       ydoc.transact(() => {
         const requestsArray = ydoc.getArray(YDOC_KEYS.INPUT_REQUESTS);
         const request = requestsArray.get(0) as any;
@@ -161,7 +158,6 @@ describe('InputRequestManager', () => {
         type: 'text',
       });
 
-      // Answer the request immediately
       ydoc.transact(() => {
         const requestsArray = ydoc.getArray(YDOC_KEYS.INPUT_REQUESTS);
         const request = requestsArray.get(0) as any;
@@ -181,7 +177,6 @@ describe('InputRequestManager', () => {
 
       expect(response.success).toBe(true);
       expect(response.status).toBe('answered');
-      // Narrow the discriminated union before accessing status-specific fields
       if (response.status === 'answered') {
         expect(response.response).toBe('My answer');
         expect(response.answeredBy).toBe('user123');
@@ -194,7 +189,6 @@ describe('InputRequestManager', () => {
         type: 'text',
       });
 
-      // Simulate user answering after 100ms
       setTimeout(() => {
         ydoc.transact(() => {
           const requestsArray = ydoc.getArray(YDOC_KEYS.INPUT_REQUESTS);
@@ -215,7 +209,6 @@ describe('InputRequestManager', () => {
       const response = await manager.waitForResponse(ydoc, requestId, 5);
 
       expect(response.success).toBe(true);
-      // Narrow the discriminated union before accessing status-specific fields
       if (response.status === 'answered') {
         expect(response.response).toBe('Delayed answer');
       }
@@ -227,7 +220,6 @@ describe('InputRequestManager', () => {
         type: 'text',
       });
 
-      // Cancel after 50ms
       setTimeout(() => {
         manager.cancelRequest(ydoc, requestId);
       }, 50);
@@ -248,20 +240,16 @@ describe('InputRequestManager', () => {
 
       const responsePromise = manager.waitForResponse(ydoc, requestId, 2);
 
-      // Fast-forward time by 2 seconds
       await vi.advanceTimersByTimeAsync(2000);
 
       const response = await responsePromise;
 
-      // Should be cancelled due to timeout
       expect(response.success).toBe(false);
       expect(response.status).toBe('cancelled');
-      // Narrow the discriminated union before accessing failure-specific fields
       if (!response.success) {
         expect(response.reason).toBeDefined();
       }
 
-      // Verify the request was marked as cancelled in Y.Doc
       const request = manager.getRequest(ydoc, requestId);
       expect(request?.status).toBe('cancelled');
 
@@ -273,7 +261,6 @@ describe('InputRequestManager', () => {
 
       expect(response.success).toBe(false);
       expect(response.status).toBe('cancelled');
-      // Narrow the discriminated union before accessing failure-specific fields
       if (!response.success) {
         expect(response.reason).toContain('not found');
       }
@@ -285,25 +272,21 @@ describe('InputRequestManager', () => {
       const requestId = manager.createRequest(ydoc, {
         message: 'Test',
         type: 'text',
-        timeout: 300, // Request has 300 second timeout (minimum allowed)
+        timeout: 300,
       });
 
-      const responsePromise = manager.waitForResponse(ydoc, requestId); // No timeout param
+      const responsePromise = manager.waitForResponse(ydoc, requestId);
 
-      // Fast-forward by 300 seconds
       await vi.advanceTimersByTimeAsync(300000);
 
       const response = await responsePromise;
 
-      // Should be cancelled due to timeout
       expect(response.success).toBe(false);
       expect(response.status).toBe('cancelled');
-      // Narrow the discriminated union before accessing failure-specific fields
       if (!response.success) {
         expect(response.reason).toBeDefined();
       }
 
-      // Verify the request was marked as cancelled in Y.Doc
       const request = manager.getRequest(ydoc, requestId);
       expect(request?.status).toBe('cancelled');
 
@@ -322,7 +305,6 @@ describe('InputRequestManager', () => {
       const id2 = manager.createRequest(ydoc, { message: 'Q2', type: 'text' });
       const id3 = manager.createRequest(ydoc, { message: 'Q3', type: 'text' });
 
-      // Cancel one
       manager.cancelRequest(ydoc, id2);
 
       const pending = manager.getPendingRequests(ydoc);
@@ -333,7 +315,6 @@ describe('InputRequestManager', () => {
     it('excludes answered requests', () => {
       manager.createRequest(ydoc, { message: 'Q1', type: 'text' });
 
-      // Answer it
       ydoc.transact(() => {
         const requestsArray = ydoc.getArray(YDOC_KEYS.INPUT_REQUESTS);
         const request = requestsArray.get(0) as any;
@@ -354,9 +335,8 @@ describe('InputRequestManager', () => {
 
   describe('cleanupOldRequests', () => {
     it('removes answered requests older than max age', () => {
-      const oldTimestamp = Date.now() - 2 * 24 * 60 * 60 * 1000; // 2 days ago
+      const oldTimestamp = Date.now() - 2 * 24 * 60 * 60 * 1000;
 
-      // Create request with old timestamp
       ydoc.transact(() => {
         const requestsArray = ydoc.getArray(YDOC_KEYS.INPUT_REQUESTS);
         requestsArray.push([
@@ -372,7 +352,6 @@ describe('InputRequestManager', () => {
         ]);
       });
 
-      // Should remove requests older than 1 day
       const removed = manager.cleanupOldRequests(ydoc, 24 * 60 * 60 * 1000);
 
       expect(removed).toBe(1);
@@ -382,7 +361,7 @@ describe('InputRequestManager', () => {
     });
 
     it('keeps pending requests regardless of age', () => {
-      const oldTimestamp = Date.now() - 2 * 24 * 60 * 60 * 1000; // 2 days ago
+      const oldTimestamp = Date.now() - 2 * 24 * 60 * 60 * 1000;
 
       ydoc.transact(() => {
         const requestsArray = ydoc.getArray(YDOC_KEYS.INPUT_REQUESTS);
@@ -406,7 +385,7 @@ describe('InputRequestManager', () => {
     });
 
     it('keeps recent completed requests', () => {
-      const recentTimestamp = Date.now() - 1000; // 1 second ago
+      const recentTimestamp = Date.now() - 1000;
 
       ydoc.transact(() => {
         const requestsArray = ydoc.getArray(YDOC_KEYS.INPUT_REQUESTS);
@@ -434,16 +413,13 @@ describe('InputRequestManager', () => {
 
   describe('integration: full request lifecycle', () => {
     it('creates request, waits, and receives answer', async () => {
-      // Create request
       const requestId = manager.createRequest(ydoc, {
         message: 'What is your favorite color?',
         type: 'text',
       });
 
-      // Start waiting for response
       const responsePromise = manager.waitForResponse(ydoc, requestId, 10);
 
-      // Simulate user answering immediately (sync)
       ydoc.transact(() => {
         const requestsArray = ydoc.getArray(YDOC_KEYS.INPUT_REQUESTS);
         const request = requestsArray.get(0) as any;
@@ -459,11 +435,9 @@ describe('InputRequestManager', () => {
         ]);
       });
 
-      // Wait for response
       const response = await responsePromise;
 
       expect(response.success).toBe(true);
-      // Narrow the discriminated union before accessing status-specific fields
       if (response.status === 'answered') {
         expect(response.response).toBe('blue');
         expect(response.answeredBy).toBe('user123');
@@ -488,10 +462,8 @@ describe('InputRequestManager', () => {
         expect(request.max).toBe(10);
       }
 
-      // Start waiting for response
       const responsePromise = manager.waitForResponse(ydoc, requestId, 10);
 
-      // Simulate user answering
       setTimeout(() => {
         ydoc.transact(() => {
           const requestsArray = ydoc.getArray(YDOC_KEYS.INPUT_REQUESTS);
@@ -533,10 +505,8 @@ describe('InputRequestManager', () => {
         expect(request.domain).toBe('company.com');
       }
 
-      // Start waiting for response
       const responsePromise = manager.waitForResponse(ydoc, requestId, 10);
 
-      // Simulate user answering
       setTimeout(() => {
         ydoc.transact(() => {
           const requestsArray = ydoc.getArray(YDOC_KEYS.INPUT_REQUESTS);
@@ -580,10 +550,8 @@ describe('InputRequestManager', () => {
         expect(request.max).toBe('2026-12-31');
       }
 
-      // Start waiting for response
       const responsePromise = manager.waitForResponse(ydoc, requestId, 10);
 
-      // Simulate user answering
       setTimeout(() => {
         ydoc.transact(() => {
           const requestsArray = ydoc.getArray(YDOC_KEYS.INPUT_REQUESTS);
@@ -629,10 +597,8 @@ describe('InputRequestManager', () => {
         expect(request.placeholder).toBe('Choose a country...');
       }
 
-      // Start waiting for response
       const responsePromise = manager.waitForResponse(ydoc, requestId, 10);
 
-      // Simulate user answering
       setTimeout(() => {
         ydoc.transact(() => {
           const requestsArray = ydoc.getArray(YDOC_KEYS.INPUT_REQUESTS);
@@ -680,10 +646,8 @@ describe('InputRequestManager', () => {
         expect(request.labels).toEqual({ low: 'Poor', high: 'Excellent' });
       }
 
-      // Start waiting for response
       const responsePromise = manager.waitForResponse(ydoc, requestId, 10);
 
-      // Simulate user answering
       setTimeout(() => {
         ydoc.transact(() => {
           const requestsArray = ydoc.getArray(YDOC_KEYS.INPUT_REQUESTS);
@@ -723,10 +687,8 @@ describe('InputRequestManager', () => {
       expect(request?.type).toBe('multiline');
       expect(request?.defaultValue).toBe('Default description');
 
-      // Start waiting for response
       const responsePromise = manager.waitForResponse(ydoc, requestId, 10);
 
-      // Simulate user answering
       setTimeout(() => {
         ydoc.transact(() => {
           const requestsArray = ydoc.getArray(YDOC_KEYS.INPUT_REQUESTS);
@@ -764,10 +726,8 @@ describe('InputRequestManager', () => {
       const request = manager.getRequest(ydoc, requestId);
       expect(request?.type).toBe('confirm');
 
-      // Start waiting for response
       const responsePromise = manager.waitForResponse(ydoc, requestId, 10);
 
-      // Simulate user answering 'yes'
       setTimeout(() => {
         ydoc.transact(() => {
           const requestsArray = ydoc.getArray(YDOC_KEYS.INPUT_REQUESTS);
@@ -799,10 +759,8 @@ describe('InputRequestManager', () => {
         type: 'confirm',
       });
 
-      // Start waiting for response
       const responsePromise = manager.waitForResponse(ydoc, requestId, 10);
 
-      // Simulate user declining
       setTimeout(() => {
         ydoc.transact(() => {
           const requestsArray = ydoc.getArray(YDOC_KEYS.INPUT_REQUESTS);
@@ -820,8 +778,6 @@ describe('InputRequestManager', () => {
       }, 10);
 
       const result = await responsePromise;
-      // Note: 'declined' is success=true because the user explicitly chose to decline
-      // This is different from 'cancelled' (success=false) which is a timeout/error
       expect(result.success).toBe(true);
       expect(result.status).toBe('declined');
       if (result.status === 'declined') {

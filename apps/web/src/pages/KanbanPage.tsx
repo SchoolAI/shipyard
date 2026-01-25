@@ -88,10 +88,8 @@ function getTargetColumnId(event: DragEndEvent, allPlans: PlanIndexEntry[]): Col
   const { over } = event;
   if (!over) return null;
 
-  // Dropped directly on a column
   if (over.data.current?.type === 'column') {
     const columnId = String(over.id);
-    // Validate that it's a valid ColumnId
     if (
       columnId === 'draft' ||
       columnId === 'in_review' ||
@@ -103,12 +101,10 @@ function getTargetColumnId(event: DragEndEvent, allPlans: PlanIndexEntry[]): Col
     return null;
   }
 
-  // Dropped on a card - get the card's current status and map to column ID
   if (over.data.current?.type === 'plan') {
     const targetPlan = allPlans.find((p) => p.id === over.id);
     if (!targetPlan) return null;
 
-    // Map status to column ID
     const status = targetPlan.status;
     switch (status) {
       case 'draft':
@@ -165,7 +161,6 @@ async function updatePlanStatus(
 ): Promise<void> {
   const now = Date.now();
 
-  // Update in plan-index CRDT (always succeeds for UI consistency)
   const entry = getPlanIndexEntry(indexDoc, planId);
   if (entry) {
     setPlanIndexEntry(indexDoc, {
@@ -175,23 +170,17 @@ async function updatePlanStatus(
     });
   }
 
-  // Build the appropriate transition for the target status
   const transition = buildDragDropTransition(newStatus, reviewedBy, now);
 
-  // Also update the plan's own metadata using type-safe transition
   try {
     const planDoc = new Y.Doc();
     const idb = new IndexeddbPersistence(planId, planDoc);
     await idb.whenSynced;
 
-    // Transition may fail if plan is in an unexpected state - that's OK for drag-drop UI
-    // The index update is the UI source of truth
     transitionPlanStatus(planDoc, transition);
 
     idb.destroy();
-  } catch {
-    // Plan doc may not exist locally - index update is sufficient
-  }
+  } catch {}
 }
 
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: page component orchestrates multiple state machines
@@ -200,7 +189,6 @@ export function KanbanPage() {
   const { localIdentity, setLocalIdentity } = useLocalIdentity();
   const [showAuthChoice, setShowAuthChoice] = useState(false);
   const [showLocalSignIn, setShowLocalSignIn] = useState(false);
-  // Use shared plan index context to avoid duplicate WebRTC providers
   const {
     myPlans,
     sharedPlans,
@@ -214,7 +202,6 @@ export function KanbanPage() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Combine all plans for the board (memoized to stabilize identity for useCallback deps)
   const allPlans = useMemo(
     () => [...myPlans, ...sharedPlans, ...inboxPlans],
     [myPlans, sharedPlans, inboxPlans]
@@ -238,12 +225,10 @@ export function KanbanPage() {
 
   const [activePlan, setActivePlan] = useState<PlanIndexEntry | null>(null);
 
-  // Space bar peek preview state
   const [hoveredCardId, setHoveredCardId] = useState<string | null>(null);
   const [isPeeking, setIsPeeking] = useState(false);
   const [peekPlanId, setPeekPlanId] = useState<string | null>(null);
 
-  // Slide-out panel state - read from URL on mount
   const searchParams = new URLSearchParams(location.search);
   const initialPanelId = searchParams.get('panel');
   const rawWidth = searchParams.get('width');
@@ -252,12 +237,10 @@ export function KanbanPage() {
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(initialPanelId);
   const [panelWidth, setPanelWidth] = useState<PanelWidth>(initialWidth);
 
-  // Plan data for panel
   const [panelMetadata, setPanelMetadata] = useState<PlanMetadata | null>(null);
   const [panelDeliverableStats, setPanelDeliverableStats] = useState({ completed: 0, total: 0 });
   const [panelLastActivity, setPanelLastActivity] = useState('');
 
-  // Sync providers for selected plan
   const {
     ydoc: panelYdoc,
     syncState: panelSyncState,
@@ -265,7 +248,6 @@ export function KanbanPage() {
     rtcProvider: panelRtcProvider,
   } = useMultiProviderSync(selectedPlanId || '');
 
-  // Update URL when panel state changes
   useEffect(() => {
     if (selectedPlanId) {
       navigate(`?panel=${selectedPlanId}&width=${panelWidth}`, { replace: true });
@@ -274,7 +256,6 @@ export function KanbanPage() {
     }
   }, [selectedPlanId, panelWidth, navigate]);
 
-  // Load panel metadata when plan is selected
   useEffect(() => {
     if (!selectedPlanId || !panelSyncState.idbSynced) {
       setPanelMetadata(null);
@@ -286,12 +267,10 @@ export function KanbanPage() {
       const metadata = getPlanMetadata(panelYdoc);
       setPanelMetadata(metadata);
 
-      // Update deliverable stats
       const deliverables = getDeliverables(panelYdoc);
       const completed = deliverables.filter((d) => d.linkedArtifactId).length;
       setPanelDeliverableStats({ completed, total: deliverables.length });
 
-      // Format last activity
       if (metadata?.updatedAt) {
         setPanelLastActivity(`Updated ${formatRelativeTime(metadata.updatedAt)}`);
       }
@@ -303,12 +282,9 @@ export function KanbanPage() {
 
   const peekPlan = peekPlanId ? allPlans.find((p) => p.id === peekPlanId) : null;
 
-  // Space bar peek handlers
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Only trigger if Space and hovering over a card, not during drag
       if (e.code === 'Space' && hoveredCardId && !activePlan) {
-        // Don't trigger if typing in an input
         if (
           document.activeElement?.tagName === 'INPUT' ||
           document.activeElement?.tagName === 'TEXTAREA'
@@ -350,7 +326,6 @@ export function KanbanPage() {
     setIsPeeking(false);
   }, []);
 
-  // Panel handlers
   const handleCardClick = useCallback((planId: string) => {
     setSelectedPlanId(planId);
     setPanelWidth('peek');
@@ -364,7 +339,6 @@ export function KanbanPage() {
     setPanelWidth(width);
   }, []);
 
-  // Panel width cycling
   const cycleWidth = useCallback(
     (direction: 'expand' | 'collapse') => {
       const widths: PanelWidth[] = ['peek', 'expanded', 'full'];
@@ -384,7 +358,6 @@ export function KanbanPage() {
     [panelWidth]
   );
 
-  // Keyboard shortcuts for panel
   useKeyboardShortcuts({
     onTogglePanel: useCallback(() => {
       if (selectedPlanId) {
@@ -425,22 +398,18 @@ export function KanbanPage() {
     }, [selectedPlanId, allPlans]),
   });
 
-  // Review action handlers
   const handleApprove = useCallback(async () => {
     if (!selectedPlanId || !panelMetadata) return;
 
     const now = Date.now();
     const reviewedBy = githubIdentity?.displayName || githubIdentity?.username || 'Unknown';
 
-    // Use type-safe transition helper for plan doc
-    // Transition may fail if plan is in an unexpected state - that's OK for UI
     transitionPlanStatus(
       panelYdoc,
       { status: 'in_progress', reviewedAt: now, reviewedBy },
       reviewedBy
     );
 
-    // Also update index with the same timestamp
     const entry = getPlanIndexEntry(indexDoc, selectedPlanId);
     if (entry) {
       setPlanIndexEntry(indexDoc, {
@@ -455,12 +424,10 @@ export function KanbanPage() {
 
   const handleRequestChanges = useCallback(() => {
     if (!selectedPlanId) return;
-    // Navigate to full plan page for adding comments
     navigate(getPlanRoute(selectedPlanId));
     toast.info('Navigate to add comments and request changes');
   }, [selectedPlanId, navigate]);
 
-  // Identity for comments - Priority: GitHub > Local > null
   const identity = githubIdentity
     ? {
         id: githubIdentity.username,
@@ -579,7 +546,6 @@ export function KanbanPage() {
     setActivePlan(null);
   };
 
-  // Prefer WebSocket when connected, fall back to WebRTC
   const activeProvider = panelWsProvider ?? panelRtcProvider;
 
   return (

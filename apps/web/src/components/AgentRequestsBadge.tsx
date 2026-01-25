@@ -31,7 +31,6 @@ export function AgentRequestsBadge({ ydoc, isSnapshot = false }: AgentRequestsBa
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
 
-    // Dispatch custom event to switch tab - PlanContent listens for this
     const event = new CustomEvent<SwitchTabEventDetail>('switch-plan-tab', {
       detail: { tab: 'activity' },
       bubbles: true,
@@ -47,20 +46,17 @@ export function AgentRequestsBadge({ ydoc, isSnapshot = false }: AgentRequestsBa
 
       const metadata = getPlanMetadata(ydoc);
 
-      // Don't show badge for completed, archived, or snapshot plans
       if (!metadata || metadata.status === 'completed' || metadata.archivedAt || isSnapshot) {
         setCounts({ input: 0, blocker: 0 });
         return;
       }
 
-      // Count pending input requests (from plan-index, filtered by this planId)
       const requestsArray = ydoc.getArray<AnyInputRequest>(YDOC_KEYS.INPUT_REQUESTS);
-      const allRequests = requestsArray.toJSON() as AnyInputRequest[];
+      const allRequests = requestsArray.toJSON();
       const pendingRequests = allRequests.filter(
         (r) => r.status === 'pending' && r.planId === metadata.id
       );
 
-      // Separate blockers from normal input requests
       const blockerCount = pendingRequests.filter((r) => r.isBlocker).length;
       const normalCount = pendingRequests.filter((r) => !r.isBlocker).length;
 
@@ -81,7 +77,6 @@ export function AgentRequestsBadge({ ydoc, isSnapshot = false }: AgentRequestsBa
     };
   }, [ydoc, isSnapshot]);
 
-  // Blockers take priority (more critical)
   if (counts.blocker > 0) {
     return (
       <button

@@ -45,7 +45,6 @@ describe('registryConfig', () => {
 
       const { registryConfig } = await import('./registry.js');
 
-      // Empty string becomes undefined in transform, returns default
       expect(registryConfig.REGISTRY_PORT).toEqual([32191, 32192]);
     });
 
@@ -88,7 +87,6 @@ describe('registryConfig', () => {
 
       const { registryConfig } = await import('./registry.js');
 
-      // Zod's .default() only triggers on undefined, not empty string
       expect(registryConfig.SHIPYARD_STATE_DIR).toBe('');
     });
 

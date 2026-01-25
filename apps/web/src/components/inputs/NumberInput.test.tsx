@@ -15,7 +15,6 @@ import { describe, expect, it, vi } from 'vitest';
 import { NumberInput } from './NumberInput';
 import type { NumberInputRequest } from './types';
 
-// Factory for creating test requests
 function createNumberRequest(overrides: Partial<NumberInputRequest> = {}): NumberInputRequest {
   return {
     id: 'test-id',
@@ -69,7 +68,6 @@ describe('NumberInput', () => {
     const input = screen.getByRole('spinbutton');
     await user.type(input, '42');
 
-    // Called for each character (controlled component)
     expect(setValue).toHaveBeenCalledTimes(2);
     expect(setValue).toHaveBeenNthCalledWith(1, '4');
     expect(setValue).toHaveBeenNthCalledWith(2, '2');
@@ -105,11 +103,9 @@ describe('NumberInput', () => {
   });
 
   it('should show combined error for both bounds violated', () => {
-    // This tests the edge case where parsing error makes both conditions true
     const request = createNumberRequest({ min: 10, max: 100 });
     render(<NumberInput request={request} value="5" setValue={vi.fn()} isSubmitting={false} />);
 
-    // Value 5 is below min, so we show the min error
     expect(screen.getByRole('alert')).toHaveTextContent('Must be at least 10');
   });
 

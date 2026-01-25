@@ -289,24 +289,19 @@ await requestUserInput({ message: "Describe the bug:", type: "multiline" })
 
 3. **choice** - Select from options (auto-adds "Other" escape hatch)
 \`\`\`typescript
-// Single-select (radio buttons or dropdown for 9+ options)
 await requestUserInput({
   message: "Which database?",
   type: "choice",
   options: ["PostgreSQL", "SQLite", "MongoDB"]
 })
-// Response: "PostgreSQL" or custom text like "Redis" if "Other" selected
 
-// Multi-select (checkboxes)
 await requestUserInput({
   message: "Which features?",
   type: "choice",
   options: ["Dark mode", "Offline support", "Analytics"],
   multiSelect: true
 })
-// Response: "Dark mode, Offline support"
 
-// Force dropdown UI
 await requestUserInput({
   message: "Select country:",
   type: "choice",
@@ -318,7 +313,6 @@ await requestUserInput({
 4. **confirm** - Yes/No confirmation
 \`\`\`typescript
 await requestUserInput({ message: "Deploy to production?", type: "confirm" })
-// Response: "yes" or "no"
 \`\`\`
 
 5. **number** - Numeric input with validation
@@ -330,14 +324,12 @@ await requestUserInput({
   max: 65535,
   format: "integer"
 })
-// Response: "3000"
 
 await requestUserInput({
   message: "Budget amount?",
   type: "number",
   format: "currency"
 })
-// Response: "1234.56"
 \`\`\`
 
 6. **email** - Email address with validation
@@ -345,9 +337,8 @@ await requestUserInput({
 await requestUserInput({
   message: "Contact email?",
   type: "email",
-  domain: "company.com"  // Optional domain restriction
+  domain: "company.com"
 })
-// Response: "user@company.com"
 \`\`\`
 
 7. **date** - Date selection with range
@@ -358,7 +349,6 @@ await requestUserInput({
   minDate: "2026-01-24",
   maxDate: "2026-12-31"
 })
-// Response: "2026-06-15"
 \`\`\`
 
 8. **rating** - Scale rating (auto-selects stars for <=5, numbers for >5)
@@ -370,9 +360,7 @@ await requestUserInput({
   max: 5,
   labels: { low: "Poor", high: "Excellent" }
 })
-// Response: "4"
 
-// Custom style override
 await requestUserInput({
   message: "NPS Score (0-10):",
   type: "rating",
@@ -380,7 +368,6 @@ await requestUserInput({
   max: 10,
   style: "numbers"
 })
-// Response: "8"
 \`\`\`
 
 ---
@@ -534,7 +521,7 @@ await addArtifact({
   source: 'file',
   filename: 'screenshot.png',
   filePath: './screenshot.png',
-  deliverableId: plan.deliverables[0].id  // Use actual deliverable ID
+  deliverableId: plan.deliverables[0].id
 });
 
 const result = await addArtifact({
@@ -544,7 +531,7 @@ const result = await addArtifact({
   source: 'file',
   filename: 'demo.mp4',
   filePath: './demo.mp4',
-  deliverableId: plan.deliverables[1].id  // Use actual deliverable ID
+  deliverableId: plan.deliverables[1].id
 });
 
 return { planId: plan.planId, snapshotUrl: result.snapshotUrl };
@@ -799,16 +786,12 @@ async function requestUserInput(opts: {
   defaultValue?: string;
   timeout?: number;
   planId?: string;
-  // Number/rating type parameters
   min?: number;
   max?: number;
   format?: 'integer' | 'decimal' | 'currency' | 'percentage';
-  // Date type parameters (separate from min/max since they're strings)
-  minDate?: string; // YYYY-MM-DD format
-  maxDate?: string; // YYYY-MM-DD format
-  // Email type parameters
+  minDate?: string;
+  maxDate?: string;
   domain?: string;
-  // Rating type parameters
   style?: 'stars' | 'numbers' | 'emoji';
   labels?: { low?: string; high?: string };
 }) {
@@ -884,7 +867,6 @@ async function requestUserInput(opts: {
       } satisfies CreateRatingInputParams;
       break;
     default:
-      // text, multiline, confirm
       params = {
         message: opts.message,
         defaultValue: opts.defaultValue,

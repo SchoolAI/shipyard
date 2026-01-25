@@ -50,7 +50,6 @@ export function PlanPage() {
   const urlPlan = searchParams.has('d') ? getPlanFromUrl() : null;
   const isSnapshot = urlPlan !== null;
 
-  // For snapshots, use planId from URL; for normal plans, use route param
   const planId = isSnapshot ? (urlPlan?.id ?? '') : (id ?? '');
 
   const {
@@ -60,24 +59,20 @@ export function PlanPage() {
     rtcProvider,
   } = useMultiProviderSync(isSnapshot ? '' : planId);
 
-  // For snapshots, create local Y.Doc hydrated with URL data
   const snapshotYdoc = useMemo(() => {
     if (!isSnapshot || !urlPlan) return null;
 
     const doc = new Y.Doc();
-    // Add artifacts if present
     if (urlPlan.artifacts) {
       for (const artifact of urlPlan.artifacts) {
         addArtifact(doc, artifact);
       }
     }
 
-    // Populate deliverables from URL if present
     if (urlPlan.deliverables) {
       const deliverablesArray = doc.getArray<Deliverable>(YDOC_KEYS.DELIVERABLES);
       deliverablesArray.push(urlPlan.deliverables);
     } else if (urlPlan.content) {
-      // Extract from content as fallback
       const deliverables = extractDeliverables(urlPlan.content);
       const deliverablesArray = doc.getArray<Deliverable>(YDOC_KEYS.DELIVERABLES);
       deliverablesArray.push(deliverables);
@@ -97,8 +92,6 @@ export function PlanPage() {
   const [showAuthChoice, setShowAuthChoice] = useState(false);
   const [showLocalSignIn, setShowLocalSignIn] = useState(false);
 
-  // Convert GitHub or local identity to BlockNote-compatible format
-  // Priority: GitHub > Local > null
   const identity = githubIdentity
     ? {
         id: githubIdentity.username,
@@ -113,7 +106,6 @@ export function PlanPage() {
         }
       : null;
 
-  // Use shared plan index context to avoid duplicate WebRTC providers
   const { ydoc: indexDoc, myPlans, sharedPlans, inboxPlans, isLoading } = usePlanIndexContext();
   const { pendingRequests } = useInputRequests({ ydoc: indexDoc });
   const allPlans = useMemo(
@@ -121,44 +113,32 @@ export function PlanPage() {
     [myPlans, sharedPlans, inboxPlans]
   );
 
-  // Calculate total inbox count (plans + input requests) - for mobile header badge
   const totalInboxCount = useMemo(() => {
     return inboxPlans.length + pendingRequests.length;
   }, [inboxPlans, pendingRequests]);
 
-  // Prefer WebSocket provider when connected, fall back to WebRTC for P2P-only mode.
   const activeProvider = isSnapshot ? null : (wsProvider ?? rtcProvider);
 
-  // Store editor instance for snapshots (Issue #42)
   const [editor, setEditor] = useState<BlockNoteEditor | null>(null);
 
-  // P2P grace period: when opening a shared URL, IndexedDB syncs immediately (empty)
-  // but we need to wait for WebRTC to deliver the plan data before showing "Not Found"
   const [p2pGracePeriodExpired, setP2pGracePeriodExpired] = useState(false);
 
-  // Timeout for when we have peers connected but still haven't received plan data
   const [peerSyncTimedOut, setPeerSyncTimedOut] = useState(false);
 
-  // Input request modal state
   const [inputRequestModalOpen, setInputRequestModalOpen] = useState(false);
   const [currentInputRequest, setCurrentInputRequest] = useState<AnyInputRequest | null>(null);
 
-  // Check if current user is the plan owner (for notifications)
   const ownerId = getPlanOwnerId(ydoc);
   const isOwner = !!(githubIdentity && ownerId && githubIdentity.username === ownerId);
 
-  // Show toast notifications when new users request access (only for owners)
   usePendingUserNotifications(rtcProvider, isOwner);
 
-  // Version navigation for viewing plan history (Issue #42)
   const versionNav = useVersionNavigation(isSnapshot ? null : ydoc);
 
-  // Listen for 'open-input-request' custom events
   useEffect(() => {
     let isMounted = true;
 
     const handleOpenInputRequest = (event: Event) => {
-      // Prevent state updates after component unmounts
       if (!isMounted) {
         return;
       }
@@ -167,10 +147,6 @@ export function PlanPage() {
       const result = AnyInputRequestSchema.safeParse(event.detail);
       if (!result.success) return;
 
-      // Prevent duplicate opens - if modal is already open with this request, ignore
-      // Note: This only prevents duplicates within a single tab. Multi-tab coordination
-      // would require BroadcastChannel or localStorage, but current UX is acceptable
-      // (user sees "already answered" error if they try to answer in second tab)
       if (inputRequestModalOpen && currentInputRequest?.id === result.data.id) {
         return;
       }
@@ -187,7 +163,6 @@ export function PlanPage() {
     };
   }, [inputRequestModalOpen, currentInputRequest]);
 
-  // Start timeout when in P2P-only mode without metadata
   useEffect(() => {
     const inP2POnlyMode = syncState.idbSynced && !syncState.hubConnected;
     const needsP2PData = !metadata && inP2POnlyMode;
@@ -203,7 +178,6 @@ export function PlanPage() {
     return undefined;
   }, [metadata, syncState.idbSynced, syncState.hubConnected, syncState.peerCount]);
 
-  // Timeout when peers are connected but no data arrives after 30 seconds
   useEffect(() => {
     const hasPeersButNoData = syncState.peerCount > 0 && !metadata;
 
@@ -212,16 +186,12 @@ export function PlanPage() {
       return () => clearTimeout(timeout);
     }
 
-    // Reset timeout state when metadata arrives or peers disconnect
     setPeerSyncTimedOut(false);
     return undefined;
   }, [syncState.peerCount, metadata]);
 
-  // Set metadata from URL for snapshots, or from Y.Doc for normal plans
   useEffect(() => {
     if (isSnapshot && urlPlan) {
-      // For snapshots from URL, we only have minimal metadata
-      // Treat as draft since we don't have full status-specific fields
       setMetadata({
         id: urlPlan.id,
         title: urlPlan.title,
@@ -244,13 +214,11 @@ export function PlanPage() {
     return () => metaMap.unobserve(update);
   }, [ydoc, isSnapshot, urlPlan]);
 
-  // Update context with active plan sync state
   useEffect(() => {
     setActivePlanSync(planId, syncState);
     return () => clearActivePlanSync();
   }, [planId, syncState, setActivePlanSync, clearActivePlanSync]);
 
-  // When user tries to comment without identity, open auth choice modal
   const handleRequestIdentity = useCallback(() => {
     setShowAuthChoice(true);
   }, []);
@@ -263,7 +231,6 @@ export function PlanPage() {
     [setLocalIdentity]
   );
 
-  // Store editor instance when ready (Issue #42)
   const handleEditorReady = useCallback((editorInstance: BlockNoteEditor) => {
     setEditor(editorInstance);
   }, []);
@@ -272,11 +239,9 @@ export function PlanPage() {
     (newStatus: 'in_progress' | 'changes_requested', updatedAt: number) => {
       if (!metadata) return;
 
-      // Only update plan-index if the plan is already there (owned by this user's MCP server)
       const existingEntry = getPlanIndexEntry(indexDoc, planId);
       if (!existingEntry) return;
 
-      // Use the same timestamp that was used to update the plan doc
       setPlanIndexEntry(indexDoc, {
         ...existingEntry,
         status: newStatus,
@@ -290,10 +255,8 @@ export function PlanPage() {
     (newTags: string[]) => {
       if (!metadata || isSnapshot) return;
 
-      // Update plan metadata
       setPlanMetadata(ydoc, { tags: newTags }, githubIdentity?.username);
 
-      // Update plan index entry
       const existingEntry = getPlanIndexEntry(indexDoc, planId);
       if (existingEntry) {
         setPlanIndexEntry(indexDoc, {
@@ -306,7 +269,6 @@ export function PlanPage() {
     [ydoc, indexDoc, planId, metadata, githubIdentity?.username, isSnapshot]
   );
 
-  // Mark plan as deleted in index if metadata is missing after sync.
   useEffect(() => {
     if (syncState.synced && syncState.connected && !metadata) {
       const existingEntry = getPlanIndexEntry(indexDoc, planId);
@@ -326,9 +288,7 @@ export function PlanPage() {
     }
   }, [syncState.synced, syncState.connected, metadata, indexDoc, planId]);
 
-  // Early returns AFTER all hooks
   if (!isSnapshot) {
-    // Phase 1: Initial loading
     if (!syncState.idbSynced) {
       return (
         <div className="flex items-center justify-center min-h-[50vh] p-4">
@@ -340,12 +300,10 @@ export function PlanPage() {
       );
     }
 
-    // Phase 2: P2P-only mode - waiting for peers to sync data
     const inP2POnlyMode = syncState.idbSynced && !syncState.hubConnected;
     const waitingForP2P = inP2POnlyMode && !metadata && !p2pGracePeriodExpired;
     const hasPeersButNoData = syncState.peerCount > 0 && !metadata;
 
-    // Show timeout error when peers connected but no data after 30s
     if (peerSyncTimedOut && !metadata) {
       return (
         <div className="flex items-center justify-center min-h-[50vh] p-4">
@@ -430,7 +388,6 @@ export function PlanPage() {
     }
   }
 
-  // For snapshots, handle invalid URL
   if (isSnapshot && !urlPlan) {
     return (
       <div className="p-8 text-center">
@@ -440,7 +397,6 @@ export function PlanPage() {
     );
   }
 
-  // Metadata should be set at this point
   if (!metadata) {
     return (
       <div className="p-8">
@@ -528,7 +484,6 @@ export function PlanPage() {
     </WaitingRoomGate>
   );
 
-  // Mobile: Custom header overlays Layout's default header
   if (isMobile && metadata) {
     return (
       <>

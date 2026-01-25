@@ -14,7 +14,6 @@ import { describe, expect, it, vi } from 'vitest';
 import { MultilineInput } from './MultilineInput';
 import type { MultilineInputRequest } from './types';
 
-// Factory for creating test requests
 function createMultilineRequest(
   overrides: Partial<MultilineInputRequest> = {}
 ): MultilineInputRequest {
@@ -53,7 +52,6 @@ describe('MultilineInput', () => {
     const textarea = screen.getByRole('textbox');
     await user.type(textarea, 'Hi');
 
-    // Called for each character (controlled component)
     expect(setValue).toHaveBeenCalledTimes(2);
     expect(setValue).toHaveBeenNthCalledWith(1, 'H');
     expect(setValue).toHaveBeenNthCalledWith(2, 'i');
@@ -70,7 +68,6 @@ describe('MultilineInput', () => {
       />
     );
 
-    // "Hello World" has 11 characters
     expect(screen.getByText('11 characters')).toBeInTheDocument();
   });
 
@@ -124,7 +121,6 @@ describe('MultilineInput', () => {
       />
     );
 
-    // Should render empty and show 0 characters
     const textarea = screen.getByRole('textbox');
     expect(textarea).toHaveValue('');
     expect(screen.getByText('0 characters')).toBeInTheDocument();

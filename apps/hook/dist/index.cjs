@@ -28491,7 +28491,7 @@ init_cjs_shims();
 // ../../packages/schema/dist/index.mjs
 init_cjs_shims();
 
-// ../../packages/schema/dist/yjs-helpers-CYz7cIUV.mjs
+// ../../packages/schema/dist/yjs-helpers-3DNyE4lF.mjs
 init_cjs_shims();
 
 // ../../packages/schema/dist/plan.mjs
@@ -42529,9 +42529,17 @@ var PlanEventSchema = external_exports.discriminatedUnion("type", [
         "text",
         "multiline",
         "choice",
-        "confirm"
+        "confirm",
+        "number",
+        "email",
+        "date",
+        "dropdown",
+        "rating",
+        "multi"
       ]),
-      requestMessage: external_exports.string()
+      requestMessage: external_exports.string().optional(),
+      questionCount: external_exports.number().optional(),
+      isBlocker: external_exports.boolean().optional()
     })
   }),
   PlanEventBaseSchema.extend({
@@ -42688,7 +42696,7 @@ var LocalArtifactParseSchema = external_exports.object({
   localArtifactId: external_exports.string()
 });
 
-// ../../packages/schema/dist/yjs-helpers-CYz7cIUV.mjs
+// ../../packages/schema/dist/yjs-helpers-3DNyE4lF.mjs
 function assertNever2(value) {
   throw new Error(`Unhandled discriminated union member: ${JSON.stringify(value)}`);
 }
@@ -42804,22 +42812,157 @@ var InputRequestBaseSchema = external_exports.object({
   planId: external_exports.string().optional(),
   response: external_exports.unknown().optional(),
   answeredAt: external_exports.number().optional(),
-  answeredBy: external_exports.string().optional()
+  answeredBy: external_exports.string().optional(),
+  isBlocker: external_exports.boolean().optional()
 });
 var TextInputSchema = InputRequestBaseSchema.extend({ type: external_exports.literal("text") });
 var MultilineInputSchema = InputRequestBaseSchema.extend({ type: external_exports.literal("multiline") });
+var ChoiceOptionSchema = external_exports.union([external_exports.string(), external_exports.object({
+  value: external_exports.string(),
+  label: external_exports.string().optional(),
+  description: external_exports.string().optional(),
+  icon: external_exports.string().optional(),
+  disabled: external_exports.boolean().optional()
+})]);
 var ChoiceInputSchema = InputRequestBaseSchema.extend({
   type: external_exports.literal("choice"),
-  options: external_exports.array(external_exports.string()).min(1, "Choice requests must have at least one option"),
-  multiSelect: external_exports.boolean().optional()
+  options: external_exports.array(ChoiceOptionSchema).min(1, "Choice requests must have at least one option"),
+  multiSelect: external_exports.boolean().optional(),
+  displayAs: external_exports.enum([
+    "radio",
+    "checkbox",
+    "dropdown"
+  ]).optional(),
+  placeholder: external_exports.string().optional()
 });
 var ConfirmInputSchema = InputRequestBaseSchema.extend({ type: external_exports.literal("confirm") });
+var NumberInputSchema = InputRequestBaseSchema.extend({
+  type: external_exports.literal("number"),
+  min: external_exports.number().optional(),
+  max: external_exports.number().optional(),
+  format: external_exports.enum([
+    "integer",
+    "decimal",
+    "currency",
+    "percentage"
+  ]).optional()
+}).refine((data) => data.min === void 0 || data.max === void 0 || data.min <= data.max, { message: "min must be <= max" });
+var EmailInputSchema = InputRequestBaseSchema.extend({
+  type: external_exports.literal("email"),
+  domain: external_exports.string().optional()
+});
+var DateInputSchema = InputRequestBaseSchema.extend({
+  type: external_exports.literal("date"),
+  min: external_exports.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be in YYYY-MM-DD format").optional(),
+  max: external_exports.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be in YYYY-MM-DD format").optional()
+}).refine((data) => data.min === void 0 || data.max === void 0 || new Date(data.min) <= new Date(data.max), { message: "min date must be before or equal to max date" });
+var RatingInputSchema = InputRequestBaseSchema.extend({
+  type: external_exports.literal("rating"),
+  min: external_exports.number().int().optional(),
+  max: external_exports.number().int().optional(),
+  style: external_exports.enum([
+    "stars",
+    "numbers",
+    "emoji"
+  ]).optional(),
+  labels: external_exports.object({
+    low: external_exports.string().optional(),
+    high: external_exports.string().optional()
+  }).optional()
+}).refine((data) => {
+  if (data.min === void 0 || data.max === void 0) return true;
+  return data.min <= data.max && data.max - data.min <= 20;
+}, { message: "Rating scale must have min <= max and at most 20 items" });
 var InputRequestSchema = external_exports.discriminatedUnion("type", [
   TextInputSchema,
   MultilineInputSchema,
   ChoiceInputSchema,
-  ConfirmInputSchema
+  ConfirmInputSchema,
+  NumberInputSchema,
+  EmailInputSchema,
+  DateInputSchema,
+  RatingInputSchema
 ]);
+var MAX_QUESTIONS_PER_REQUEST = 10;
+var QuestionBaseSchema = external_exports.object({
+  message: external_exports.string().min(1, "Message cannot be empty"),
+  defaultValue: external_exports.string().optional()
+});
+var TextQuestionSchema = QuestionBaseSchema.extend({ type: external_exports.literal("text") });
+var MultilineQuestionSchema = QuestionBaseSchema.extend({ type: external_exports.literal("multiline") });
+var ChoiceQuestionSchema = QuestionBaseSchema.extend({
+  type: external_exports.literal("choice"),
+  options: external_exports.array(ChoiceOptionSchema).min(1, "Choice questions must have at least one option"),
+  multiSelect: external_exports.boolean().optional(),
+  displayAs: external_exports.enum([
+    "radio",
+    "checkbox",
+    "dropdown"
+  ]).optional(),
+  placeholder: external_exports.string().optional()
+});
+var ConfirmQuestionSchema = QuestionBaseSchema.extend({ type: external_exports.literal("confirm") });
+var NumberQuestionSchema = QuestionBaseSchema.extend({
+  type: external_exports.literal("number"),
+  min: external_exports.number().optional(),
+  max: external_exports.number().optional(),
+  format: external_exports.enum([
+    "integer",
+    "decimal",
+    "currency",
+    "percentage"
+  ]).optional()
+}).refine((data) => data.min === void 0 || data.max === void 0 || data.min <= data.max, { message: "min must be <= max" });
+var EmailQuestionSchema = QuestionBaseSchema.extend({
+  type: external_exports.literal("email"),
+  domain: external_exports.string().optional()
+});
+var DateQuestionSchema = QuestionBaseSchema.extend({
+  type: external_exports.literal("date"),
+  min: external_exports.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be in YYYY-MM-DD format").optional(),
+  max: external_exports.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be in YYYY-MM-DD format").optional()
+}).refine((data) => data.min === void 0 || data.max === void 0 || new Date(data.min) <= new Date(data.max), { message: "min date must be before or equal to max date" });
+var RatingQuestionSchema = QuestionBaseSchema.extend({
+  type: external_exports.literal("rating"),
+  min: external_exports.number().int().optional(),
+  max: external_exports.number().int().optional(),
+  style: external_exports.enum([
+    "stars",
+    "numbers",
+    "emoji"
+  ]).optional(),
+  labels: external_exports.object({
+    low: external_exports.string().optional(),
+    high: external_exports.string().optional()
+  }).optional()
+}).refine((data) => {
+  if (data.min === void 0 || data.max === void 0) return true;
+  return data.min <= data.max && data.max - data.min <= 20;
+}, { message: "Rating scale must have min <= max and at most 20 items" });
+var QuestionSchema = external_exports.discriminatedUnion("type", [
+  TextQuestionSchema,
+  MultilineQuestionSchema,
+  ChoiceQuestionSchema,
+  ConfirmQuestionSchema,
+  NumberQuestionSchema,
+  EmailQuestionSchema,
+  DateQuestionSchema,
+  RatingQuestionSchema
+]);
+var MultiQuestionInputRequestSchema = external_exports.object({
+  id: external_exports.string(),
+  createdAt: external_exports.number(),
+  type: external_exports.literal("multi"),
+  questions: external_exports.array(QuestionSchema).min(1, "At least one question is required").max(MAX_QUESTIONS_PER_REQUEST, `Maximum ${MAX_QUESTIONS_PER_REQUEST} questions allowed (8 recommended for optimal UX)`),
+  status: external_exports.enum(InputRequestStatusValues),
+  timeout: external_exports.number().int().min(10, "Timeout must be at least 10 seconds").max(14400, "Timeout cannot exceed 4 hours").optional(),
+  planId: external_exports.string().optional(),
+  responses: external_exports.record(external_exports.string(), external_exports.unknown()).optional(),
+  answeredAt: external_exports.number().optional(),
+  answeredBy: external_exports.string().optional(),
+  isBlocker: external_exports.boolean().optional()
+});
+var AnyInputRequestSchema = external_exports.union([InputRequestSchema, MultiQuestionInputRequestSchema]);
 var YDOC_KEYS = {
   METADATA: "metadata",
   DOCUMENT_FRAGMENT: "document",
@@ -44083,6 +44226,20 @@ function truncate(text, maxLength) {
   if (cleaned.length <= maxLength) return cleaned;
   return `${cleaned.slice(0, maxLength)}...`;
 }
+var TOOL_NAMES = {
+  ADD_ARTIFACT: "add_artifact",
+  ADD_PR_REVIEW_COMMENT: "add_pr_review_comment",
+  COMPLETE_TASK: "complete_task",
+  CREATE_PLAN: "create_plan",
+  EXECUTE_CODE: "execute_code",
+  LINK_PR: "link_pr",
+  READ_PLAN: "read_plan",
+  REGENERATE_SESSION_TOKEN: "regenerate_session_token",
+  REQUEST_USER_INPUT: "request_user_input",
+  SETUP_REVIEW_NOTIFICATION: "setup_review_notification",
+  UPDATE_BLOCK_CONTENT: "update_block_content",
+  UPDATE_PLAN: "update_plan"
+};
 var PlanIdSchema = external_exports.object({ planId: external_exports.string().min(1) });
 var PlanStatusResponseSchema = external_exports.object({ status: external_exports.string() });
 var HasConnectionsResponseSchema = external_exports.object({ hasConnections: external_exports.boolean() });
@@ -44272,6 +44429,20 @@ function isBuffer(value) {
 
 // ../../packages/shared/dist/instructions/index.mjs
 init_cjs_shims();
+var TOOL_NAMES2 = {
+  ADD_ARTIFACT: "add_artifact",
+  ADD_PR_REVIEW_COMMENT: "add_pr_review_comment",
+  COMPLETE_TASK: "complete_task",
+  CREATE_PLAN: "create_plan",
+  EXECUTE_CODE: "execute_code",
+  LINK_PR: "link_pr",
+  READ_PLAN: "read_plan",
+  REGENERATE_SESSION_TOKEN: "regenerate_session_token",
+  REQUEST_USER_INPUT: "request_user_input",
+  SETUP_REVIEW_NOTIFICATION: "setup_review_notification",
+  UPDATE_BLOCK_CONTENT: "update_block_content",
+  UPDATE_PLAN: "update_plan"
+};
 var CRITICAL_USAGE_SECTION = `## CRITICAL: When to Use Shipyard
 
 \u26A0\uFE0F **MANDATORY USAGE RULE:**
@@ -44343,6 +44514,55 @@ Skip Shipyard for:
 - Tasks where proof adds no value (trivial fixes)
 - Exploration or debugging sessions
 - Pure documentation without implementation`;
+var USER_INPUT_SECTION = `## Human-Agent Communication
+
+**\`${TOOL_NAMES2.REQUEST_USER_INPUT}\` is THE primary way to communicate with humans during active work.**
+
+Shipyard is the central hub where humans manage AI agents. When you need to ask a question, get clarification, or request a decision - use \`${TOOL_NAMES2.REQUEST_USER_INPUT}\`. The human is already in the browser viewing your plan. That's where conversations should happen.
+
+### Why Use ${TOOL_NAMES2.REQUEST_USER_INPUT}
+
+- **Context:** The human sees your question alongside the plan, artifacts, and comments
+- **History:** All exchanges are logged in the plan's activity feed
+- **Continuity:** The conversation stays attached to the work, not scattered across chat windows
+- **Flexibility:** 8 input types, multi-question forms, "Other" escape hatch for custom answers
+
+### Replace Platform Tools
+
+**ALWAYS prefer \`${TOOL_NAMES2.REQUEST_USER_INPUT}\` over platform-specific tools:**
+
+| Platform | DON'T Use | Use Instead |
+|----------|-----------|-------------|
+| Claude Code | \`AskUserQuestion\` | \`${TOOL_NAMES2.REQUEST_USER_INPUT}\` |
+| Cursor | Built-in prompts | \`${TOOL_NAMES2.REQUEST_USER_INPUT}\` |
+| Windsurf | Native dialogs | \`${TOOL_NAMES2.REQUEST_USER_INPUT}\` |
+| Claude Desktop | Chat questions | \`${TOOL_NAMES2.REQUEST_USER_INPUT}\` |
+
+### When to Ask
+
+Use \`${TOOL_NAMES2.REQUEST_USER_INPUT}\` when you need:
+- Clarification on requirements ("Which auth provider?")
+- Decisions that affect implementation ("PostgreSQL or SQLite?")
+- Confirmation before destructive actions ("Delete this file?")
+- User preferences ("Rate this approach 1-5")
+- Any information you can't infer from context
+
+### Example
+
+\`\`\`typescript
+const result = await requestUserInput({
+  message: "Which database should we use?",
+  type: "choice",
+  options: ["PostgreSQL", "SQLite", "MongoDB"],
+  timeout: 600  // 10 minutes
+});
+
+if (result.success) {
+  console.log("User chose:", result.response);
+}
+\`\`\`
+
+**Note:** The MCP tool is named \`${TOOL_NAMES2.REQUEST_USER_INPUT}\` (snake_case). Inside \`${TOOL_NAMES2.EXECUTE_CODE}\`, it's available as \`requestUserInput()\` (camelCase).`;
 var TROUBLESHOOTING_SECTION = `## Troubleshooting
 
 **Browser doesn't open:** Check MCP server is running and accessible.
@@ -44351,9 +44571,16 @@ var TROUBLESHOOTING_SECTION = `## Troubleshooting
 
 **No auto-complete:** Ensure every deliverable has an artifact with matching \`deliverableId\`.
 
-**Plan not syncing:** Check WebSocket connection to registry server.`;
+**Plan not syncing:** Check WebSocket connection to registry server.
+
+**Input request times out:** User may not have seen it or needs more time. Default timeout is 30 minutes. Try again with a longer timeout or rephrase the question.
+
+**Input request declined:** User clicked "Decline." Rephrase your question, proceed with a reasonable default, or use a different approach.
+
+**No response to input:** Check if browser is connected to the plan. User may have closed the browser window.`;
 var COMMON_INSTRUCTIONS = [
   CRITICAL_USAGE_SECTION,
+  USER_INPUT_SECTION,
   DELIVERABLES_SECTION,
   ARTIFACT_TYPES_SECTION,
   TIPS_SECTION,
@@ -44372,15 +44599,15 @@ You have the **full Shipyard experience** with automatic hooks. Use native plan 
 3. **Exit plan mode** \u2192 Hook **BLOCKS** until human approves or requests changes
 4. **On approval** \u2192 You automatically receive: planId, sessionToken, deliverable IDs
 5. **Do the work** \u2192 Take screenshots/videos as you implement
-6. **Upload artifacts** \u2192 \`add_artifact(filePath, deliverableId)\` for each deliverable
+6. **Upload artifacts** \u2192 \`${TOOL_NAMES2.ADD_ARTIFACT}(filePath, deliverableId)\` for each deliverable
 7. **Auto-complete** \u2192 When all deliverables have artifacts, task completes with snapshot URL
 
 ### After Approval
 
-You only need ONE tool: \`add_artifact\`
+You only need ONE tool: \`${TOOL_NAMES2.ADD_ARTIFACT}\`
 
 The hook automatically injects everything you need (planId, sessionToken, deliverables).
-Just call \`add_artifact\` with the file path and deliverable ID.
+Just call \`${TOOL_NAMES2.ADD_ARTIFACT}\` with the file path and deliverable ID.
 
 \`\`\`typescript
 /**
@@ -44407,11 +44634,14 @@ var IMPORTANT_NOTES = `## Important Notes for Claude Code
 - **DO NOT call \`createPlan()\` directly** - The hook handles plan creation when you enter plan mode
 - **DO NOT use the Shipyard skill** - The hook provides everything you need
 - **DO NOT poll for approval** - The hook blocks automatically until human decides
-- **DO use plan mode** for ANY work that needs tracking, verification, or human review`;
+- **DO use plan mode** for ANY work that needs tracking, verification, or human review
+- **DO use \`${TOOL_NAMES2.REQUEST_USER_INPUT}\`** instead of \`AskUserQuestion\` - The human is in the browser viewing your plan, questions should appear there`;
 var CLAUDE_CODE_INSTRUCTIONS = [
   CLAUDE_CODE_HEADER,
   "",
   CRITICAL_USAGE_SECTION,
+  "",
+  USER_INPUT_SECTION,
   "",
   PLAN_MODE_WORKFLOW,
   "",
@@ -44427,19 +44657,25 @@ var CLAUDE_CODE_INSTRUCTIONS = [
   "",
   TROUBLESHOOTING_SECTION
 ].join("\n");
-var MCP_DIRECT_HEADER = `# Shipyard: Verified Work Tasks
+var MCP_DIRECT_HEADER = `# Shipyard: Your Agent Management Hub
 
-> **MCP Integration:** Use \`execute_code\` to call Shipyard APIs. This skill teaches the workflow.
+> **Shipyard is the central interface where humans manage AI agents.** Plans, artifacts, feedback, and communication all happen here.
 
-Shipyard turns invisible agent work into reviewable, verifiable tasks. Instead of trusting that code was written correctly, reviewers see screenshots, videos, and test results as proof.`;
+Shipyard turns invisible agent work into reviewable, verifiable tasks. Instead of trusting that code was written correctly, reviewers see screenshots, videos, and test results as proof.
+
+**Key principle:** When you're working in Shipyard, ALL human-agent communication should happen through Shipyard's \`${TOOL_NAMES2.REQUEST_USER_INPUT}\` tool. The human is already in the browser viewing your plan - that's where they expect to interact with you.`;
 var MCP_TOOLS_OVERVIEW = `## Available MCP Tools
 
 | Tool | Purpose |
 |------|---------|
-| \`execute_code\` | Run TypeScript that calls Shipyard APIs (recommended) |
-| \`request_user_input\` | Ask user questions via browser modal |
+| \`${TOOL_NAMES2.REQUEST_USER_INPUT}\` | **THE primary human-agent communication channel** - Ask questions, get decisions, request clarification |
+| \`${TOOL_NAMES2.EXECUTE_CODE}\` | Run TypeScript that calls Shipyard APIs (recommended for multi-step operations) |
 
-**Preferred approach:** Use \`execute_code\` to chain multiple API calls in one step.`;
+### ${TOOL_NAMES2.REQUEST_USER_INPUT}: Your Direct Line to the Human
+
+This is how you talk to humans during active work. Don't use your platform's built-in question tools (AskUserQuestion, etc.) - use this instead. The human is in the browser viewing your plan, and that's where they expect to see your questions.
+
+**Preferred approach:** Use \`${TOOL_NAMES2.EXECUTE_CODE}\` to chain multiple API calls in one step.`;
 var MCP_WORKFLOW = `## Workflow (MCP Direct)
 
 ### Step 1: Create Plan
@@ -44563,11 +44799,40 @@ Asks user a question via browser modal.
 
 **Parameters:**
 - \`message\` (string) - Question to ask
-- \`type\` ('text' | 'choice' | 'confirm' | 'multiline')
+- \`type\` (string) - Input type (see below)
 - \`options\` (string[], for 'choice') - Available choices
 - \`timeout\` (number, optional) - Timeout in seconds
+- Type-specific parameters (min, max, format, etc.)
 
-**Returns:** \`{ success, response?, status }\``;
+**Returns:** \`{ success, response?, status }\`
+
+**Supported types (8 total):**
+1. \`text\` - Single-line text
+2. \`multiline\` - Multi-line text area
+3. \`choice\` - Radio/checkbox/dropdown (auto-adds "Other" option)
+   - Auto-switches: 1-8 options = radio/checkbox, 9+ = dropdown
+   - \`multiSelect: true\` for checkboxes
+   - \`displayAs: 'dropdown'\` to force dropdown UI
+4. \`confirm\` - Yes/No buttons
+5. \`number\` - Numeric input with validation
+   - \`min\`, \`max\`, \`format\` ('integer' | 'decimal' | 'currency' | 'percentage')
+6. \`email\` - Email validation
+   - \`domain\` for restriction
+7. \`date\` - Date picker with range
+   - \`minDate\`, \`maxDate\` (YYYY-MM-DD format)
+8. \`rating\` - Scale rating (auto-selects stars/numbers)
+   - \`min\`, \`max\`, \`style\` ('stars' | 'numbers' | 'emoji'), \`labels\`
+
+**Response format:**
+- All responses are strings
+- choice (single): \`"PostgreSQL"\` or custom text from "Other"
+- choice (multi): \`"option1, option2"\` (comma-space separated)
+- confirm: \`"yes"\` or \`"no"\` (lowercase)
+- number: \`"42"\` or \`"3.14"\`
+- email: \`"user@example.com"\`
+- date: \`"2026-01-24"\` (ISO 8601)
+- rating: \`"4"\` (integer as string)
+- See docs/INPUT-RESPONSE-FORMATS.md for complete specification`;
 var HANDLING_FEEDBACK = `## Handling Reviewer Feedback
 
 \`\`\`typescript
@@ -44590,6 +44855,8 @@ var MCP_DIRECT_INSTRUCTIONS = [
   MCP_DIRECT_HEADER,
   "",
   CRITICAL_USAGE_SECTION,
+  "",
+  USER_INPUT_SECTION,
   "",
   MCP_TOOLS_OVERVIEW,
   "",
@@ -44620,9 +44887,6 @@ var CLAUDE_TOOL_NAMES = {
   EDIT: "Edit",
   EXIT_PLAN_MODE: "ExitPlanMode",
   ASK_USER_QUESTION: "AskUserQuestion"
-};
-var MCP_TOOL_NAMES = {
-  REQUEST_USER_INPUT: "request_user_input"
 };
 var CLAUDE_PERMISSION_MODES = {
   PLAN: "plan",
@@ -44720,7 +44984,7 @@ function handlePreToolUse(input) {
     );
     return {
       type: "tool_deny",
-      reason: `BLOCKED: Use the ${MCP_TOOL_NAMES.REQUEST_USER_INPUT} MCP tool instead for consistent browser UI. See the tool description for available parameters.`
+      reason: `BLOCKED: Use the ${TOOL_NAMES.REQUEST_USER_INPUT} MCP tool instead. The human is in the browser viewing your plan - that's where they expect to interact with you. See the tool description for input types and parameters.`
     };
   }
   return { type: "passthrough" };

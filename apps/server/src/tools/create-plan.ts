@@ -24,8 +24,6 @@ import { getGitHubUsername, getRepositoryFullName } from '../server-identity.js'
 import { generateSessionToken, hashSessionToken } from '../session-token.js';
 import { TOOL_NAMES } from './tool-names.js';
 
-// --- Input Schema ---
-
 /**
  * Origin platforms for conversation export.
  * Claude Code uses hook, so only other platforms are listed here.
@@ -38,7 +36,6 @@ const CreatePlanInput = z.object({
   repo: z.string().optional().describe('GitHub repo (org/repo)'),
   prNumber: z.number().optional().describe('PR number'),
 
-  // Origin tracking for conversation export (Issue #41)
   originPlatform: OriginPlatformEnum.optional().describe(
     'Platform where this plan originated (for conversation export)'
   ),
@@ -48,14 +45,11 @@ const CreatePlanInput = z.object({
     .optional()
     .describe('Platform-specific metadata for conversation export'),
 
-  // Tags for organization (Issue #37)
   tags: z
     .array(z.string())
     .optional()
     .describe('Tags for categorization (e.g., ["ui", "bug", "project:mobile-app"])'),
 });
-
-// --- Helper Functions ---
 
 /** Construct origin metadata from input platform and session info */
 function buildOriginMetadata(
@@ -94,19 +88,15 @@ function initializePlanContent(ydoc: Y.Doc, blocks: Block[], ownerId: string | n
 
   ydoc.transact(
     () => {
-      // Store in document fragment for BlockNote collaboration (source of truth)
       const fragment = ydoc.getXmlFragment('document');
-      // Clear existing content first to avoid duplicates or conflicts
       while (fragment.length > 0) {
         fragment.delete(0, 1);
       }
       editor.blocksToYXmlFragment(blocks, fragment);
 
-      // Clear existing deliverables first to prevent duplicates on content updates
       const deliverablesArray = ydoc.getArray(YDOC_KEYS.DELIVERABLES);
       deliverablesArray.delete(0, deliverablesArray.length);
 
-      // Extract and store deliverables
       const deliverables = extractDeliverables(blocks);
       for (const deliverable of deliverables) {
         addDeliverable(ydoc, deliverable);
@@ -117,8 +107,6 @@ function initializePlanContent(ydoc: Y.Doc, blocks: Block[], ownerId: string | n
       }
 
       logPlanEvent(ydoc, 'plan_created', ownerId ?? 'unknown');
-      // Note: Initial snapshot is NOT created here - snapshots are only created
-      // when content is updated via update_block_content (Issue #42)
     },
     { actor: ownerId ?? 'unknown' }
   );
@@ -136,8 +124,6 @@ async function openPlanInBrowser(planId: string, url: string): Promise<void> {
     logger.info({ url }, 'Browser launched');
   }
 }
-
-// --- Public Export ---
 
 export const createPlanTool = {
   definition: {
@@ -173,7 +159,6 @@ Bad deliverables (not provable):
             'GitHub repo (org/repo). Auto-detected from current directory if not provided. Required for artifact uploads.',
         },
         prNumber: { type: 'number', description: 'PR number. Required for artifact uploads.' },
-        // Origin tracking for conversation export (Issue #41)
         originPlatform: {
           type: 'string',
           enum: ['devin', 'cursor', 'windsurf', 'aider', 'unknown'],
@@ -206,7 +191,6 @@ Bad deliverables (not provable):
     const sessionTokenHash = hashSessionToken(sessionToken);
     const now = Date.now();
 
-    // Auto-detect repo from current directory if not provided
     const repo = input.repo || getRepositoryFullName() || undefined;
     if (repo && !input.repo) {
       logger.info({ repo }, 'Auto-detected repository from current directory');
@@ -218,7 +202,6 @@ Bad deliverables (not provable):
     const ownerId = await getGitHubUsername();
     logger.info({ ownerId }, 'GitHub username for plan ownership');
 
-    // Construct origin metadata - extracted to helper
     const origin = buildOriginMetadata(
       input.originPlatform,
       input.originSessionId,
@@ -236,7 +219,6 @@ Bad deliverables (not provable):
       tags: input.tags,
     });
 
-    // Transition from draft to pending_review so plan appears in inbox
     const transitionResult = transitionPlanStatus(
       ydoc,
       { status: 'pending_review', reviewRequestId: nanoid() },
@@ -250,14 +232,12 @@ Bad deliverables (not provable):
       );
     }
 
-    // Parse and store content - extracted to helper
     logger.info({ contentLength: input.content.length }, 'About to parse markdown');
     const blocks = await parseMarkdownToBlocks(input.content);
     logger.info({ blockCount: blocks.length }, 'Parsed blocks, storing in Y.Doc');
     initializePlanContent(ydoc, blocks, ownerId);
     logger.info('Content stored in Y.Doc document fragment');
 
-    // Get the final metadata after status transition to ensure consistent timestamps
     const finalMetadata = getPlanMetadata(ydoc);
     if (!finalMetadata) {
       throw new Error('Failed to get plan metadata after initialization');
@@ -304,8 +284,6 @@ Next steps:
     };
   },
 };
-
-// --- Private Helpers ---
 
 async function parseMarkdownToBlocks(markdown: string): Promise<Block[]> {
   logger.info({ markdown: markdown.substring(0, 100) }, 'Parsing markdown to blocks');

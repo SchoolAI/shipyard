@@ -18,7 +18,6 @@ import { RatingInput } from './RatingInput';
 import type { RatingInputRequest } from './types';
 import { NA_OPTION_VALUE, OTHER_OPTION_VALUE } from './utils';
 
-// Factory for creating test requests
 function createRatingRequest(overrides: Partial<RatingInputRequest> = {}): RatingInputRequest {
   return {
     id: 'test-id',
@@ -30,7 +29,6 @@ function createRatingRequest(overrides: Partial<RatingInputRequest> = {}): Ratin
   };
 }
 
-// Default props for escape hatch functionality
 const defaultEscapeHatchProps = {
   customInput: '',
   setCustomInput: vi.fn(),
@@ -81,7 +79,6 @@ describe('RatingInput', () => {
       />
     );
 
-    // Check for 5 options with aria-labels indicating rating values
     expect(screen.getByLabelText('1 out of 5')).toBeInTheDocument();
     expect(screen.getByLabelText('2 out of 5')).toBeInTheDocument();
     expect(screen.getByLabelText('3 out of 5')).toBeInTheDocument();
@@ -101,7 +98,6 @@ describe('RatingInput', () => {
       />
     );
 
-    // Check first and last options
     expect(screen.getByLabelText('1 out of 10')).toBeInTheDocument();
     expect(screen.getByLabelText('10 out of 10')).toBeInTheDocument();
   });
@@ -121,7 +117,6 @@ describe('RatingInput', () => {
       />
     );
 
-    // Click on rating 4
     await user.click(screen.getByLabelText('4 out of 5'));
 
     expect(setValue).toHaveBeenCalledWith('4');
@@ -139,8 +134,7 @@ describe('RatingInput', () => {
       />
     );
 
-    // All stars should be empty when nothing is selected
-    const emptyStars = screen.getAllByText('\u2606'); // Unicode empty star (☆)
+    const emptyStars = screen.getAllByText('\u2606');
     expect(emptyStars.length).toBe(5);
   });
 
@@ -156,9 +150,8 @@ describe('RatingInput', () => {
       />
     );
 
-    // Stars 1-3 should be filled, stars 4-5 should be empty
-    const filledStars = screen.getAllByText('\u2605'); // Unicode filled star (★)
-    const emptyStars = screen.getAllByText('\u2606'); // Unicode empty star (☆)
+    const filledStars = screen.getAllByText('\u2605');
+    const emptyStars = screen.getAllByText('\u2606');
     expect(filledStars.length).toBe(3);
     expect(emptyStars.length).toBe(2);
   });
@@ -175,7 +168,6 @@ describe('RatingInput', () => {
       />
     );
 
-    // Numbers should be displayed
     expect(screen.getByText('1')).toBeInTheDocument();
     expect(screen.getByText('2')).toBeInTheDocument();
     expect(screen.getByText('3')).toBeInTheDocument();
@@ -195,9 +187,8 @@ describe('RatingInput', () => {
       />
     );
 
-    // Emojis range from sad to happy
-    expect(screen.getByText('\ud83d\ude1e')).toBeInTheDocument(); // Sad
-    expect(screen.getByText('\ud83d\ude04')).toBeInTheDocument(); // Happy
+    expect(screen.getByText('\ud83d\ude1e')).toBeInTheDocument();
+    expect(screen.getByText('\ud83d\ude04')).toBeInTheDocument();
   });
 
   it('should display scale labels when provided', () => {
@@ -233,13 +224,12 @@ describe('RatingInput', () => {
       />
     );
 
-    // Ratings 1-3 should have full opacity (cumulative fill)
     const ratingElements = screen.getAllByRole('img');
-    expect(ratingElements[0]).toHaveClass('opacity-100'); // Rating 1
-    expect(ratingElements[1]).toHaveClass('opacity-100'); // Rating 2
-    expect(ratingElements[2]).toHaveClass('opacity-100'); // Rating 3
-    expect(ratingElements[3]).toHaveClass('opacity-50'); // Rating 4
-    expect(ratingElements[4]).toHaveClass('opacity-50'); // Rating 5
+    expect(ratingElements[0]).toHaveClass('opacity-100');
+    expect(ratingElements[1]).toHaveClass('opacity-100');
+    expect(ratingElements[2]).toHaveClass('opacity-100');
+    expect(ratingElements[3]).toHaveClass('opacity-50');
+    expect(ratingElements[4]).toHaveClass('opacity-50');
   });
 
   it('should show bold for filled numbers in numbers style', () => {
@@ -255,11 +245,9 @@ describe('RatingInput', () => {
     );
 
     const ratingElements = screen.getAllByRole('img');
-    // Numbers 1-3 should be bold (filled)
     expect(ratingElements[0]).toHaveClass('font-bold');
     expect(ratingElements[1]).toHaveClass('font-bold');
     expect(ratingElements[2]).toHaveClass('font-bold');
-    // Numbers 4-5 should not be bold
     expect(ratingElements[3]).not.toHaveClass('font-bold');
     expect(ratingElements[4]).not.toHaveClass('font-bold');
   });
@@ -293,11 +281,9 @@ describe('RatingInput', () => {
       />
     );
 
-    // Should render without crashing
     expect(screen.getByRole('radiogroup')).toBeInTheDocument();
   });
 
-  // Keyboard accessibility tests
   describe('keyboard accessibility', () => {
     it('should show hover preview on focus for keyboard users', async () => {
       const user = userEvent.setup();
@@ -312,16 +298,13 @@ describe('RatingInput', () => {
         />
       );
 
-      // Tab to the radio group to focus it
       await user.tab();
 
-      // The radio group and its elements should be focusable
       const radiogroup = screen.getByRole('radiogroup');
       expect(radiogroup).toBeInTheDocument();
     });
   });
 
-  // Escape hatch tests
   describe('escape hatches', () => {
     it('should render N/A and Other options', () => {
       const request = createRatingRequest();
@@ -437,7 +420,6 @@ describe('RatingInput', () => {
       const input = screen.getByPlaceholderText('Explain...');
       await user.type(input, 'I need more context');
 
-      // setCustomInput is called for each character typed
       expect(setCustomInput).toHaveBeenCalled();
     });
 
@@ -456,7 +438,6 @@ describe('RatingInput', () => {
         />
       );
 
-      // The N/A option should be rendered and have the selected style
       const naOption = screen.getByText('N/A');
       expect(naOption).toBeInTheDocument();
       expect(naOption).toHaveClass('bg-primary');
@@ -477,7 +458,6 @@ describe('RatingInput', () => {
         />
       );
 
-      // The Other option should be rendered and have the selected style
       const otherOption = screen.getByText('Other...');
       expect(otherOption).toBeInTheDocument();
       expect(otherOption).toHaveClass('bg-primary');
@@ -498,8 +478,7 @@ describe('RatingInput', () => {
         />
       );
 
-      // All stars should be empty when N/A is selected
-      const emptyStars = screen.getAllByText('\u2606'); // Unicode empty star (☆)
+      const emptyStars = screen.getAllByText('\u2606');
       expect(emptyStars.length).toBe(5);
     });
 
@@ -518,8 +497,7 @@ describe('RatingInput', () => {
         />
       );
 
-      // All stars should be empty when Other is selected
-      const emptyStars = screen.getAllByText('\u2606'); // Unicode empty star (☆)
+      const emptyStars = screen.getAllByText('\u2606');
       expect(emptyStars.length).toBe(5);
     });
 
@@ -538,7 +516,6 @@ describe('RatingInput', () => {
       const naOption = screen.getByText('N/A');
       const otherOption = screen.getByText('Other...');
 
-      // The options should have disabled styling applied via className
       expect(naOption).toHaveClass('cursor-not-allowed');
       expect(otherOption).toHaveClass('cursor-not-allowed');
     });

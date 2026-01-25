@@ -1417,7 +1417,6 @@ export function answerInputRequest(
   answeredBy: string
 ): AnswerInputRequestResult {
   const requestsArray = ydoc.getArray<AnyInputRequest>(YDOC_KEYS.INPUT_REQUESTS);
-  // CRDT boundary: validate input requests from CRDT
   const data = toUnknownArray(requestsArray);
   const requests = data
     .map((item) => AnyInputRequestSchema.safeParse(item))
@@ -1491,7 +1490,6 @@ export function answerMultiQuestionInputRequest(
   answeredBy: string
 ): AnswerInputRequestResult {
   const requestsArray = ydoc.getArray<AnyInputRequest>(YDOC_KEYS.INPUT_REQUESTS);
-  // CRDT boundary: validate input requests from CRDT
   const data = toUnknownArray(requestsArray);
   const requests = data
     .map((item) => AnyInputRequestSchema.safeParse(item))
@@ -1562,7 +1560,6 @@ export function cancelInputRequest(
   requestId: string
 ): { success: boolean; error?: string } {
   const requestsArray = ydoc.getArray<AnyInputRequest>(YDOC_KEYS.INPUT_REQUESTS);
-  // CRDT boundary: validate input requests from CRDT
   const data = toUnknownArray(requestsArray);
   const requests = data
     .map((item) => AnyInputRequestSchema.safeParse(item))
@@ -1612,7 +1609,6 @@ export function declineInputRequest(
   requestId: string
 ): { success: boolean; error?: string } {
   const requestsArray = ydoc.getArray<AnyInputRequest>(YDOC_KEYS.INPUT_REQUESTS);
-  // CRDT boundary: validate input requests from CRDT
   const data = toUnknownArray(requestsArray);
   const requests = data
     .map((item) => AnyInputRequestSchema.safeParse(item))

@@ -140,7 +140,6 @@ function getEventIcon(event: PlanEvent): ReactNode {
     case 'approval_requested':
       return <AlertTriangle className="w-3.5 h-3.5 text-warning" />;
     case 'input_request_created': {
-      // Check if request is marked as blocker - show urgent red icon
       const isBlocker = event.data?.isBlocker;
       return isBlocker ? (
         <AlertOctagon className="w-3.5 h-3.5 text-danger" />
@@ -244,7 +243,6 @@ function getEventDescription(event: PlanEvent): ReactNode {
       const requestMessage = event.data?.requestMessage;
       const requestType = event.data?.requestType;
       const isBlocker = event.data?.isBlocker;
-      // Use "blocked - needs" prefix for blockers, "requested" for normal requests
       const prefix = isBlocker ? 'blocked - needs' : 'requested';
       if (requestMessage) {
         return (

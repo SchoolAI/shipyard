@@ -17,7 +17,6 @@ export function DateInput({
   const dateValue = typeof value === 'string' ? value : '';
   const hasValue = dateValue !== '';
 
-  // Validate date is within range
   const isDateValid = (): boolean => {
     if (!hasValue) return true;
     const date = new Date(dateValue);
@@ -36,7 +35,6 @@ export function DateInput({
 
   const isValid = isDateValid();
 
-  // Build error message
   const getErrorMessage = (): string | null => {
     if (!hasValue || isValid) return null;
     if (request.min && request.max) {

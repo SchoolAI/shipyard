@@ -16,15 +16,12 @@ import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import type * as Y from 'yjs';
 
-// Mock timer functions for controlling timeouts
 vi.useFakeTimers();
 
-// Track mock instances for verification
 let mockWebsocketProviders: MockWebsocketProvider[] = [];
 let mockWebrtcProviders: MockWebrtcProvider[] = [];
 let mockIndexeddbProviders: MockIndexeddbPersistence[] = [];
 
-// Event handler storage for mocks
 type EventHandler = (...args: unknown[]) => void;
 
 /**
@@ -67,9 +64,7 @@ class MockWebsocketProvider {
     }
   }
 
-  connect(): void {
-    // Simulate connection
-  }
+  connect(): void {}
 
   disconnect(): void {
     this.wsconnected = false;
@@ -79,7 +74,6 @@ class MockWebsocketProvider {
     this.eventHandlers.clear();
   }
 
-  // Test helpers
   simulateConnect(): void {
     this.wsconnected = true;
     this.emit('status', { status: 'connected' });
@@ -109,7 +103,6 @@ class MockAwareness {
   private localClientId = 1;
 
   constructor() {
-    // Initialize with self
     this.states.set(this.localClientId, {});
   }
 
@@ -153,7 +146,6 @@ class MockAwareness {
     }
   }
 
-  // Test helpers
   addPeer(clientId: number, state: unknown): void {
     this.states.set(clientId, state);
     this.emit('change', { added: [clientId], updated: [], removed: [] });
@@ -220,7 +212,6 @@ class MockWebrtcProvider {
     this.eventHandlers.clear();
   }
 
-  // Test helpers
   simulatePeerConnect(): void {
     this.connected = true;
     this.awareness.addPeer(2, { planStatus: { user: { name: 'Peer' } } });
@@ -257,17 +248,13 @@ class MockIndexeddbPersistence {
     });
   }
 
-  destroy(): void {
-    // Cleanup
-  }
+  destroy(): void {}
 
-  // Test helper
   simulateSynced(): void {
     this.resolveWhenSynced();
   }
 }
 
-// Module mocks
 vi.mock('y-websocket', () => ({
   WebsocketProvider: MockWebsocketProvider,
 }));
@@ -280,38 +267,30 @@ vi.mock('y-indexeddb', () => ({
   IndexeddbPersistence: MockIndexeddbPersistence,
 }));
 
-// Mock fetch for hub discovery
 const mockFetch = vi.fn();
 (globalThis as unknown as { fetch: typeof fetch }).fetch = mockFetch;
 
-// Mock window events
 const mockAddEventListener = vi.spyOn(window, 'addEventListener');
 const mockRemoveEventListener = vi.spyOn(window, 'removeEventListener');
 const mockDispatchEvent = vi.spyOn(window, 'dispatchEvent');
 
 describe('useMultiProviderSync', () => {
-  // Import the hook after mocks are set up
   let useMultiProviderSync: typeof import('../useMultiProviderSync').useMultiProviderSync;
 
   beforeEach(async () => {
-    // Reset mock arrays
     mockWebsocketProviders = [];
     mockWebrtcProviders = [];
     mockIndexeddbProviders = [];
 
-    // Reset fetch mock
     mockFetch.mockReset();
     mockFetch.mockResolvedValue({ ok: true });
 
-    // Reset event listener spies
     mockAddEventListener.mockClear();
     mockRemoveEventListener.mockClear();
     mockDispatchEvent.mockClear();
 
-    // Clear module cache to reset module-level state (webrtcProviderCache)
     vi.resetModules();
 
-    // Re-import the hook to get fresh module state
     const module = await import('../useMultiProviderSync');
     useMultiProviderSync = module.useMultiProviderSync;
   });
@@ -343,7 +322,6 @@ describe('useMultiProviderSync', () => {
     it('should skip provider setup when docName is empty', async () => {
       renderHook(() => useMultiProviderSync(''));
 
-      // Allow async effects to run
       await act(async () => {
         await vi.advanceTimersByTimeAsync(100);
       });
@@ -360,15 +338,12 @@ describe('useMultiProviderSync', () => {
     it('should timeout after 10 seconds if no connection is established', async () => {
       const { result } = renderHook(() => useMultiProviderSync('test-doc'));
 
-      // Allow async effects to run
       await act(async () => {
         await vi.advanceTimersByTimeAsync(100);
       });
 
-      // Initial state should not be timed out
       expect(result.current.syncState.timedOut).toBe(false);
 
-      // Advance timer past the timeout
       await act(async () => {
         await vi.advanceTimersByTimeAsync(CONNECTION_TIMEOUT);
       });
@@ -382,7 +357,6 @@ describe('useMultiProviderSync', () => {
     it('should disconnect providers after timeout to prevent infinite reconnection', async () => {
       renderHook(() => useMultiProviderSync('test-doc'));
 
-      // Allow async effects to run
       await act(async () => {
         await vi.advanceTimersByTimeAsync(100);
       });
@@ -390,11 +364,9 @@ describe('useMultiProviderSync', () => {
       const wsProvider = mockWebsocketProviders[0]!;
       const rtcProvider = mockWebrtcProviders[0]!;
 
-      // Spy on disconnect methods
       const wsDisconnectSpy = vi.spyOn(wsProvider, 'disconnect');
       const rtcDisconnectSpy = vi.spyOn(rtcProvider, 'disconnect');
 
-      // Advance past timeout
       await act(async () => {
         await vi.advanceTimersByTimeAsync(CONNECTION_TIMEOUT);
       });
@@ -406,20 +378,17 @@ describe('useMultiProviderSync', () => {
     it('should NOT timeout if WebSocket connects before timeout', async () => {
       const { result } = renderHook(() => useMultiProviderSync('test-doc'));
 
-      // Allow async effects to run
       await act(async () => {
         await vi.advanceTimersByTimeAsync(100);
       });
 
       const wsProvider = mockWebsocketProviders[0]!;
 
-      // Connect WebSocket before timeout
       await act(async () => {
-        await vi.advanceTimersByTimeAsync(5000); // Half the timeout
+        await vi.advanceTimersByTimeAsync(5000);
         wsProvider.simulateConnect();
       });
 
-      // Advance past the original timeout
       await act(async () => {
         await vi.advanceTimersByTimeAsync(CONNECTION_TIMEOUT);
       });
@@ -431,20 +400,17 @@ describe('useMultiProviderSync', () => {
     it('should NOT timeout if P2P peers connect before timeout', async () => {
       const { result } = renderHook(() => useMultiProviderSync('test-doc'));
 
-      // Allow async effects to run
       await act(async () => {
         await vi.advanceTimersByTimeAsync(100);
       });
 
       const rtcProvider = mockWebrtcProviders[0]!;
 
-      // Connect P2P peer before timeout
       await act(async () => {
         await vi.advanceTimersByTimeAsync(5000);
         rtcProvider.simulatePeerConnect();
       });
 
-      // Advance past the original timeout
       await act(async () => {
         await vi.advanceTimersByTimeAsync(CONNECTION_TIMEOUT);
       });
@@ -456,7 +422,6 @@ describe('useMultiProviderSync', () => {
     it('should allow manual reconnection after timeout via reconnect()', async () => {
       const { result } = renderHook(() => useMultiProviderSync('test-doc'));
 
-      // Allow async effects and timeout
       await act(async () => {
         await vi.advanceTimersByTimeAsync(100);
       });
@@ -467,27 +432,22 @@ describe('useMultiProviderSync', () => {
 
       expect(result.current.syncState.timedOut).toBe(true);
 
-      // Call reconnect
       await act(async () => {
         result.current.reconnect();
       });
 
-      // Allow effects to re-run
       await act(async () => {
         await vi.advanceTimersByTimeAsync(100);
       });
 
-      // State should be reset
       expect(result.current.syncState.timedOut).toBe(false);
 
-      // New providers should be created
       expect(mockWebsocketProviders.length).toBeGreaterThan(1);
     });
 
     it('should clear timeout state when connection succeeds after previous timeout', async () => {
       const { result } = renderHook(() => useMultiProviderSync('test-doc'));
 
-      // Allow timeout
       await act(async () => {
         await vi.advanceTimersByTimeAsync(100);
       });
@@ -498,7 +458,6 @@ describe('useMultiProviderSync', () => {
 
       expect(result.current.syncState.timedOut).toBe(true);
 
-      // Reconnect and connect successfully
       await act(async () => {
         result.current.reconnect();
       });
@@ -522,7 +481,6 @@ describe('useMultiProviderSync', () => {
     it('should remove all event listeners when unmounting', async () => {
       const { unmount } = renderHook(() => useMultiProviderSync('test-doc'));
 
-      // Allow async effects to run
       await act(async () => {
         await vi.advanceTimersByTimeAsync(100);
       });
@@ -530,15 +488,12 @@ describe('useMultiProviderSync', () => {
       const wsProvider = mockWebsocketProviders[0]!;
       const rtcProvider = mockWebrtcProviders[0]!;
 
-      // Verify listeners were added
       expect(wsProvider.getEventHandlerCount('status')).toBeGreaterThan(0);
       expect(wsProvider.getEventHandlerCount('sync')).toBeGreaterThan(0);
       expect(rtcProvider.awareness.getEventHandlerCount('change')).toBeGreaterThan(0);
 
-      // Unmount
       unmount();
 
-      // Verify listeners were removed
       expect(wsProvider.getEventHandlerCount('status')).toBe(0);
       expect(wsProvider.getEventHandlerCount('sync')).toBe(0);
       expect(rtcProvider.awareness.getEventHandlerCount('change')).toBe(0);
@@ -547,43 +502,32 @@ describe('useMultiProviderSync', () => {
     it('should clean up beforeunload listener on unmount', async () => {
       const { unmount } = renderHook(() => useMultiProviderSync('test-doc'));
 
-      // Allow async effects to run
       await act(async () => {
         await vi.advanceTimersByTimeAsync(100);
       });
 
-      // Verify beforeunload listener was added
       expect(mockAddEventListener).toHaveBeenCalledWith('beforeunload', expect.any(Function));
 
-      // Unmount
       unmount();
 
-      // Verify beforeunload listener was removed
       expect(mockRemoveEventListener).toHaveBeenCalledWith('beforeunload', expect.any(Function));
     });
 
     it('should handle React StrictMode double-mount without duplicate providers', async () => {
-      // Simulate StrictMode by mounting, unmounting, and remounting
       const { unmount } = renderHook(() => useMultiProviderSync('test-doc'));
 
-      // Allow async effects to run
       await act(async () => {
         await vi.advanceTimersByTimeAsync(100);
       });
 
-      // Unmount (first StrictMode cleanup)
       unmount();
 
-      // Remount with new hook instance
       const { result } = renderHook(() => useMultiProviderSync('test-doc'));
 
-      // Allow async effects to run
       await act(async () => {
         await vi.advanceTimersByTimeAsync(100);
       });
 
-      // Due to WebRTC provider caching, we should reuse the same provider
-      // WebSocket providers are recreated each time
       expect(result.current.ydoc).toBeDefined();
       expect(result.current.syncState.connected).toBe(false);
     });
@@ -591,12 +535,10 @@ describe('useMultiProviderSync', () => {
     it('should not create orphaned providers after rapid reconnect spam', async () => {
       const { result } = renderHook(() => useMultiProviderSync('test-doc'));
 
-      // Allow initial setup
       await act(async () => {
         await vi.advanceTimersByTimeAsync(100);
       });
 
-      // Spam reconnect
       for (let i = 0; i < 5; i++) {
         await act(async () => {
           result.current.reconnect();
@@ -604,38 +546,29 @@ describe('useMultiProviderSync', () => {
         });
       }
 
-      // Allow final setup
       await act(async () => {
         await vi.advanceTimersByTimeAsync(100);
       });
 
-      // Verify providers are being properly cleaned up
-      // The last WebSocket provider should be the active one
       const lastWsProvider = mockWebsocketProviders[mockWebsocketProviders.length - 1]!;
       expect(lastWsProvider.getEventHandlerCount('status')).toBeGreaterThan(0);
 
-      // Previous providers should have been cleaned up (destroy called)
-      // The hook should still be functional
       expect(result.current.syncState.connected).toBe(false);
     });
 
     it('should clear timeout when component unmounts', async () => {
       const { unmount } = renderHook(() => useMultiProviderSync('test-doc'));
 
-      // Allow async effects to run
       await act(async () => {
         await vi.advanceTimersByTimeAsync(100);
       });
 
-      // Unmount before timeout
       unmount();
 
-      // Advance past what would have been the timeout
       await act(async () => {
         await vi.advanceTimersByTimeAsync(15000);
       });
 
-      // No errors should occur and providers should be cleaned up
       expect(mockWebsocketProviders[0]!.getEventHandlerCount('status')).toBe(0);
     });
   });
@@ -700,21 +633,18 @@ describe('useMultiProviderSync', () => {
 
       expect(result.current.syncState.peerCount).toBe(0);
 
-      // Add a peer
       await act(async () => {
         mockWebrtcProviders[0]!.awareness.addPeer(2, {});
       });
 
       expect(result.current.syncState.peerCount).toBe(1);
 
-      // Add another peer
       await act(async () => {
         mockWebrtcProviders[0]!.awareness.addPeer(3, {});
       });
 
       expect(result.current.syncState.peerCount).toBe(2);
 
-      // Remove a peer
       await act(async () => {
         mockWebrtcProviders[0]!.awareness.removePeer(2);
       });
@@ -733,7 +663,6 @@ describe('useMultiProviderSync', () => {
 
       await act(async () => {
         mockIndexeddbProviders[0]!.simulateSynced();
-        // Allow promise to resolve
         await vi.advanceTimersByTimeAsync(0);
       });
 
@@ -762,9 +691,7 @@ describe('useMultiProviderSync', () => {
         await vi.advanceTimersByTimeAsync(100);
       });
 
-      // WebRTC provider should not be created
       expect(result.current.rtcProvider).toBeNull();
-      // WebSocket should still be created
       expect(mockWebsocketProviders.length).toBeGreaterThan(0);
     });
 
@@ -809,14 +736,12 @@ describe('useMultiProviderSync', () => {
 
       const firstDocGuid = result.current.ydoc.guid;
 
-      // Change docName
       rerender({ docName: 'doc-2' });
 
       await act(async () => {
         await vi.advanceTimersByTimeAsync(100);
       });
 
-      // Should be a different Y.Doc
       expect(result.current.ydoc.guid).not.toBe(firstDocGuid);
     });
   });
@@ -831,7 +756,6 @@ describe('useMultiProviderSync', () => {
         await vi.advanceTimersByTimeAsync(100);
       });
 
-      // The hook should attempt to extract port from the hub URL
       expect(result.current.syncState.registryPort).toBeDefined();
     });
 
@@ -844,7 +768,6 @@ describe('useMultiProviderSync', () => {
         await vi.advanceTimersByTimeAsync(100);
       });
 
-      // Should still create providers with fallback URL
       expect(mockWebsocketProviders.length).toBeGreaterThan(0);
     });
   });
@@ -884,7 +807,6 @@ describe('useMultiProviderSync', () => {
         await vi.advanceTimersByTimeAsync(0);
       });
 
-      // Should not have dispatched the plan-synced event
       const planSyncedCalls = (mockDispatchEvent as Mock).mock.calls.filter(
         (call) => (call[0] as CustomEvent)?.type === 'indexeddb-plan-synced'
       );

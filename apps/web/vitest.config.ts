@@ -15,7 +15,6 @@ export default defineConfig({
       include: ['src/**/*.{ts,tsx}'],
       exclude: ['src/**/*.test.{ts,tsx}', 'src/vite-env.d.ts'],
     },
-    // Ensure mock imports are resolved correctly
     alias: {
       '@': path.resolve(__dirname, './src'),
     },

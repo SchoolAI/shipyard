@@ -54,13 +54,11 @@ describe('setupReviewNotification', () => {
 
       const text = (result.content[0] as { text: string }).text;
 
-      // Should POST to subscription.create with raw JSON (no {"json": ...} wrapper)
       expect(text).toContain('POST "$TRPC_URL/subscription.create"');
       expect(text).toContain('"subscribe":["status","comments"]');
       expect(text).toContain('"windowMs":5000');
       expect(text).toContain('"threshold":1');
 
-      // Should NOT have {"json": ...} wrapper
       expect(text).not.toContain('{"json":{"planId"');
     });
 
@@ -71,12 +69,10 @@ describe('setupReviewNotification', () => {
 
       const text = (result.content[0] as { text: string }).text;
 
-      // Should GET with url-encoded input
       expect(text).toContain('curl -sf "$TRPC_URL/subscription.getChanges?input=$ENCODED_INPUT"');
       expect(text).toContain('jq -sRr @uri');
       expect(text).toContain('INPUT=');
 
-      // Should NOT use POST for query
       expect(text).not.toContain('POST "$TRPC_URL/subscription.getChanges"');
     });
   });
@@ -89,7 +85,6 @@ describe('setupReviewNotification', () => {
 
       const text = (result.content[0] as { text: string }).text;
 
-      // Should check for "Status: in_progress" in changes string
       expect(text).toContain('grep -qE "Status:.*(in_progress|changes_requested)"');
     });
 
@@ -109,11 +104,9 @@ describe('setupReviewNotification', () => {
 
       const text = (result.content[0] as { text: string }).text;
 
-      // Should check for actual enum values, not hardcoded strings
       expect(text).toContain('in_progress');
       expect(text).toContain('changes_requested');
 
-      // Grep pattern should only check for these two statuses
       expect(text).toMatch(/grep -qE "Status:\.\*\(in_progress\|changes_requested\)"/);
     });
   });
@@ -126,7 +119,6 @@ describe('setupReviewNotification', () => {
 
       const text = (result.content[0] as { text: string }).text;
 
-      // Should extract from: {"result":{"data":{"clientId":"..."}}}
       expect(text).toContain('sed -n \'s/.*"clientId":"\\([^"]*\\)".*/\\1/p\'');
     });
 
@@ -137,7 +129,6 @@ describe('setupReviewNotification', () => {
 
       const text = (result.content[0] as { text: string }).text;
 
-      // Should check for: {"result":{"data":{"ready":true,"changes":"..."}}}
       expect(text).toContain('grep -q \'"ready":true\'');
       expect(text).toContain('sed -n \'s/.*"changes":"\\([^"]*\\)".*/\\1/p\'');
     });
