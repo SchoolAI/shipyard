@@ -197,8 +197,17 @@ const ClaudeCodeToolResultBlockSchema = z.object({
 type ClaudeCodeToolResultBlock = z.infer<typeof ClaudeCodeToolResultBlockSchema>;
 
 /**
+ * Union type for Claude Code content blocks
+ */
+type ClaudeCodeContentBlock =
+  | ClaudeCodeTextBlock
+  | ClaudeCodeToolUseBlock
+  | ClaudeCodeToolResultBlock;
+
+/**
  * Claude Code content block schema
- * Uses a custom approach to avoid Zod v4 issues with union arrays
+ * Uses a custom approach to avoid Zod v4 issues with union arrays.
+ * The transform at the end ensures the output type is properly narrowed.
  */
 const ClaudeCodeContentBlockSchema = z
   .object({
@@ -241,11 +250,9 @@ const ClaudeCodeContentBlockSchema = z
         });
       }
     }
-  });
-type ClaudeCodeContentBlock =
-  | ClaudeCodeTextBlock
-  | ClaudeCodeToolUseBlock
-  | ClaudeCodeToolResultBlock;
+  })
+  // Transform to properly type the validated output
+  .transform((val) => val as ClaudeCodeContentBlock);
 
 /**
  * Claude Code token usage
@@ -402,7 +409,7 @@ function convertMessage(msg: ClaudeCodeMessage, contextId: string): A2AMessage {
   const role = msg.message.role === 'user' ? 'user' : 'agent';
 
   const parts: A2APart[] = msg.message.content.flatMap((block) =>
-    convertContentBlock(block as ClaudeCodeContentBlock)
+    convertContentBlock(block)
   );
 
   return {

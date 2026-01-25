@@ -1,11 +1,6 @@
 import { useBlockNoteEditor, useComponentsContext } from '@blocknote/react';
 import { Redo } from 'lucide-react';
-
-/** Type for yUndo extension with undo/redo commands */
-interface YUndoExtension {
-  undoCommand?: (state: unknown, dispatch: unknown, view: unknown) => void;
-  redoCommand?: (state: unknown, dispatch: unknown, view: unknown) => void;
-}
+import { getYUndoExtension } from '../../types/blocknote-extensions';
 
 /**
  * Redo button for BlockNote FormattingToolbar.
@@ -26,7 +21,7 @@ export function RedoButton() {
         editor.focus();
 
         // Get the yUndo extension (used when collaboration is enabled)
-        const yUndo = editor.getExtension('yUndo') as YUndoExtension | undefined;
+        const yUndo = getYUndoExtension(editor);
         if (yUndo?.redoCommand) {
           const { state, view } = editor._tiptapEditor;
           yUndo.redoCommand(state, view.dispatch, view);

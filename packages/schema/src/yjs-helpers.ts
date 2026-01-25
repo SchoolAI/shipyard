@@ -4,6 +4,7 @@ import { assertNever } from './assert-never.js';
 import { type AgentPresence, AgentPresenceSchema } from './hook-api.js';
 import {
   type AnyInputRequest,
+  AnyInputRequestSchema,
   InputRequestSchema,
   type MultiQuestionInputRequest,
   MultiQuestionInputRequestSchema,
@@ -1341,7 +1342,12 @@ export function answerInputRequest(
   answeredBy: string
 ): AnswerInputRequestResult {
   const requestsArray = ydoc.getArray<AnyInputRequest>(YDOC_KEYS.INPUT_REQUESTS);
-  const requests = requestsArray.toJSON() as AnyInputRequest[];
+  // CRDT boundary: validate input requests from CRDT
+  const data = requestsArray.toJSON() as unknown[];
+  const requests = data
+    .map((item) => AnyInputRequestSchema.safeParse(item))
+    .filter((r) => r.success)
+    .map((r) => r.data);
   const index = requests.findIndex((r) => r.id === requestId);
 
   if (index === -1) {
@@ -1410,7 +1416,12 @@ export function answerMultiQuestionInputRequest(
   answeredBy: string
 ): AnswerInputRequestResult {
   const requestsArray = ydoc.getArray<AnyInputRequest>(YDOC_KEYS.INPUT_REQUESTS);
-  const requests = requestsArray.toJSON() as AnyInputRequest[];
+  // CRDT boundary: validate input requests from CRDT
+  const data = requestsArray.toJSON() as unknown[];
+  const requests = data
+    .map((item) => AnyInputRequestSchema.safeParse(item))
+    .filter((r) => r.success)
+    .map((r) => r.data);
   const index = requests.findIndex((r) => r.id === requestId);
 
   if (index === -1) {
@@ -1476,7 +1487,12 @@ export function cancelInputRequest(
   requestId: string
 ): { success: boolean; error?: string } {
   const requestsArray = ydoc.getArray<AnyInputRequest>(YDOC_KEYS.INPUT_REQUESTS);
-  const requests = requestsArray.toJSON() as AnyInputRequest[];
+  // CRDT boundary: validate input requests from CRDT
+  const data = requestsArray.toJSON() as unknown[];
+  const requests = data
+    .map((item) => AnyInputRequestSchema.safeParse(item))
+    .filter((r) => r.success)
+    .map((r) => r.data);
   const index = requests.findIndex((r) => r.id === requestId);
 
   if (index === -1) {
@@ -1521,7 +1537,12 @@ export function declineInputRequest(
   requestId: string
 ): { success: boolean; error?: string } {
   const requestsArray = ydoc.getArray<AnyInputRequest>(YDOC_KEYS.INPUT_REQUESTS);
-  const requests = requestsArray.toJSON() as AnyInputRequest[];
+  // CRDT boundary: validate input requests from CRDT
+  const data = requestsArray.toJSON() as unknown[];
+  const requests = data
+    .map((item) => AnyInputRequestSchema.safeParse(item))
+    .filter((r) => r.success)
+    .map((r) => r.data);
   const index = requests.findIndex((r) => r.id === requestId);
 
   if (index === -1) {

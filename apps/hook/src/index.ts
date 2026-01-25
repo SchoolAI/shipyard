@@ -9,6 +9,7 @@
  *   echo '{"session_id": "...", ...}' | shipyard-hook
  */
 
+import { isBuffer } from '@shipyard/schema';
 import { CLAUDE_CODE_INSTRUCTIONS } from '@shipyard/shared/instructions';
 import { claudeCodeAdapter } from './adapters/claude-code.js';
 import type { AdapterEvent, AgentAdapter, CoreResponse } from './adapters/types.js';
@@ -200,7 +201,10 @@ async function readStdin(): Promise<string> {
   const chunks: Buffer[] = [];
 
   for await (const chunk of process.stdin) {
-    chunks.push(chunk as Buffer);
+    // NOTE: process.stdin yields Buffer chunks in Node.js, but TypeScript types it as `any`
+    if (isBuffer(chunk)) {
+      chunks.push(chunk);
+    }
   }
 
   return Buffer.concat(chunks).toString('utf-8');

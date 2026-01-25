@@ -1,5 +1,9 @@
 import wrtc from '@roamhq/wrtc';
-import type { EnvironmentContext, OriginPlatform } from '@shipyard/schema';
+import {
+  type EnvironmentContext,
+  getSignalingConnections,
+  type OriginPlatform,
+} from '@shipyard/schema';
 import { WebrtcProvider } from 'y-webrtc';
 import type * as Y from 'yjs';
 import { logger } from './logger.js';
@@ -138,11 +142,10 @@ function sendApprovalStateToSignaling(
   planId: string,
   username: string
 ): void {
-  // Access signaling connections (internal y-webrtc API)
-  const signalingConns = (provider as unknown as { signalingConns?: Array<{ ws?: unknown }> })
-    .signalingConns;
+  // Access signaling connections (internal y-webrtc API via shared type guard)
+  const signalingConns = getSignalingConnections(provider);
 
-  if (!signalingConns || signalingConns.length === 0) {
+  if (signalingConns.length === 0) {
     // Schedule approval state push after signaling connects
     setTimeout(() => sendApprovalStateToSignaling(provider, planId, username), 1000);
     return;
@@ -165,12 +168,11 @@ function sendApprovalStateToSignaling(
   });
 
   for (const conn of signalingConns) {
-    // Type assertion for internal y-webrtc WebSocket connection
-    const ws = conn.ws as { readyState?: number; send?: (data: string) => void } | undefined;
-    if (ws?.readyState === 1) {
-      // WebSocket.OPEN = 1
-      ws.send?.(identifyMessage);
-      ws.send?.(approvalStateMessage);
+    // NOTE: SignalingConnection.ws is typed but may be null
+    const ws = conn.ws;
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(identifyMessage);
+      ws.send(approvalStateMessage);
       logger.info({ planId, username }, 'Pushed identity and approval state to signaling server');
     }
   }

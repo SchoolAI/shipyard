@@ -71,8 +71,10 @@ export interface PeerConnection {
   on(event: 'close', callback: () => void): void;
   /** Listen for error events */
   on(event: 'error', callback: (error: Error) => void): void;
-  /** Remove event listeners */
-  removeListener(event: string, callback: (...args: unknown[]) => void): void;
+  /** Remove event listeners - overloads match on() signature for type safety */
+  removeListener(event: 'data', callback: (data: Uint8Array) => void): void;
+  removeListener(event: 'close', callback: () => void): void;
+  removeListener(event: 'error', callback: (error: Error) => void): void;
 }
 
 /**
@@ -588,8 +590,8 @@ export class ConversationTransferManager {
     const listeners = this.peerListeners.get(peerId);
 
     if (peer && listeners) {
-      peer.removeListener('data', listeners.data as (...args: unknown[]) => void);
-      peer.removeListener('close', listeners.close as (...args: unknown[]) => void);
+      peer.removeListener('data', listeners.data);
+      peer.removeListener('close', listeners.close);
     }
 
     this.peers.delete(peerId);
@@ -617,8 +619,8 @@ export class ConversationTransferManager {
     for (const [peerId, peer] of this.peers) {
       const listeners = this.peerListeners.get(peerId);
       if (listeners) {
-        peer.removeListener('data', listeners.data as (...args: unknown[]) => void);
-        peer.removeListener('close', listeners.close as (...args: unknown[]) => void);
+        peer.removeListener('data', listeners.data);
+        peer.removeListener('close', listeners.close);
       }
     }
 

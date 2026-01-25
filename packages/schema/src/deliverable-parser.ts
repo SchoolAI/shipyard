@@ -22,18 +22,27 @@ interface Block {
  * Extracts deliverables from BlockNote blocks.
  * Looks for checkListItem blocks with {#deliverable} marker in the text.
  *
+ * Accepts unknown[] because content often comes from untrusted sources (URLs, CRDT).
+ * Validates structure before processing.
+ *
  * Example:
  * - [ ] Screenshot of login page {#deliverable}
  * - [ ] Regular task (not a deliverable)
  *
- * @param blocks - BlockNote blocks array
+ * @param blocks - BlockNote blocks array (from external sources, needs validation)
  * @returns Array of deliverables extracted from marked checkboxes
  */
-export function extractDeliverables(blocks: Block[]): Deliverable[] {
+export function extractDeliverables(blocks: unknown[]): Deliverable[] {
   const deliverables: Deliverable[] = [];
 
-  function processBlock(block: Block): void {
-    const text = extractTextFromBlock(block);
+  function processBlock(block: unknown): void {
+    // Validate block structure
+    if (!block || typeof block !== 'object') return;
+    if (!('id' in block) || typeof block.id !== 'string') return;
+    if (!('type' in block) || typeof block.type !== 'string') return;
+
+    const validBlock = block as Block;
+    const text = extractTextFromBlock(validBlock);
 
     if (text.includes(DELIVERABLE_MARKER)) {
       const markerRegex = new RegExp(
@@ -43,14 +52,14 @@ export function extractDeliverables(blocks: Block[]): Deliverable[] {
       const cleanText = text.replace(markerRegex, '').trim();
 
       deliverables.push({
-        id: block.id,
+        id: validBlock.id,
         text: cleanText,
       });
     }
 
-    if (block.children && Array.isArray(block.children)) {
-      for (const child of block.children) {
-        processBlock(child as Block);
+    if (validBlock.children && Array.isArray(validBlock.children)) {
+      for (const child of validBlock.children) {
+        processBlock(child);
       }
     }
   }

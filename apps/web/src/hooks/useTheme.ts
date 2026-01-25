@@ -1,9 +1,24 @@
 import { useCallback, useEffect, useSyncExternalStore } from 'react';
+import { z } from 'zod';
 
-type Theme = 'light' | 'dark' | 'system';
+/**
+ * Schema for theme validation.
+ * localStorage is user-controllable storage - validate to prevent injection.
+ */
+const ThemeSchema = z.enum(['light', 'dark', 'system']);
+type Theme = z.infer<typeof ThemeSchema>;
 
 // Custom event for cross-component synchronization (storage events only fire across tabs)
 const THEME_CHANGE_EVENT = 'theme-change';
+
+/**
+ * Safely parse theme from localStorage with validation.
+ * @returns Validated theme or 'system' as default
+ */
+function parseThemeFromStorage(value: string | null): Theme {
+  const result = ThemeSchema.safeParse(value);
+  return result.success ? result.data : 'system';
+}
 
 // Shared state for theme across all hook instances
 let currentTheme: Theme = 'system';
@@ -11,7 +26,7 @@ const listeners = new Set<() => void>();
 
 // Initialize from localStorage (only once)
 if (typeof window !== 'undefined') {
-  currentTheme = (localStorage.getItem('theme') as Theme) || 'system';
+  currentTheme = parseThemeFromStorage(localStorage.getItem('theme'));
 }
 
 function subscribe(callback: () => void): () => void {
@@ -102,7 +117,8 @@ export function useTheme() {
   useEffect(() => {
     const handleStorage = (e: StorageEvent) => {
       if (e.key === 'theme' && e.newValue) {
-        const newTheme = e.newValue as Theme;
+        // Validate storage event value - could come from another tab/window
+        const newTheme = parseThemeFromStorage(e.newValue);
         if (newTheme !== currentTheme) {
           currentTheme = newTheme;
           for (const listener of listeners) {

@@ -1,6 +1,15 @@
 import type { Block } from '@blocknote/core';
 import lzstring from 'lz-string';
-import type { Artifact, Deliverable, PlanMetadata, PlanSnapshot } from './plan.js';
+import { z } from 'zod';
+import {
+  type Artifact,
+  ArtifactSchema,
+  type Deliverable,
+  DeliverableSchema,
+  type PlanMetadata,
+  type PlanSnapshot,
+  PlanStatusValues,
+} from './plan.js';
 
 /**
  * Lightweight snapshot reference for URL encoding.
@@ -22,7 +31,8 @@ export interface UrlSnapshotRef {
  */
 export interface UrlKeyVersion {
   id: string;
-  content: Block[];
+  /** Content from URL is unknown[] and needs validation before use as Block[] */
+  content: unknown[];
 }
 
 /**
@@ -37,7 +47,8 @@ export interface UrlEncodedPlanV1 {
   status: PlanMetadata['status'];
   repo?: string;
   pr?: number;
-  content: Block[];
+  /** Content from URL is unknown[] and needs validation before use as Block[] */
+  content: unknown[];
   artifacts?: Artifact[];
   /** Deliverables with linkage info (which artifact fulfills each deliverable) */
   deliverables?: Deliverable[];
@@ -56,8 +67,8 @@ export interface UrlEncodedPlanV2 {
   status: PlanMetadata['status'];
   repo?: string;
   pr?: number;
-  /** Current content (the latest version) */
-  content: Block[];
+  /** Current content (the latest version) - unknown[] from URL, needs validation */
+  content: unknown[];
   artifacts?: Artifact[];
   /** Deliverables with linkage info */
   deliverables?: Deliverable[];
@@ -78,6 +89,76 @@ export interface UrlEncodedPlanV2 {
  * Use type guards to distinguish between versions.
  */
 export type UrlEncodedPlan = UrlEncodedPlanV1 | UrlEncodedPlanV2;
+
+/**
+ * Zod schema for UrlSnapshotRef - lightweight snapshot reference for URL encoding.
+ */
+const UrlSnapshotRefSchema = z.object({
+  id: z.string(),
+  status: z.enum(PlanStatusValues),
+  createdBy: z.string(),
+  reason: z.string(),
+  createdAt: z.number(),
+  threads: z
+    .object({
+      total: z.number(),
+      unresolved: z.number(),
+    })
+    .optional(),
+});
+
+/**
+ * Zod schema for UrlKeyVersion - full content snapshot for key versions.
+ */
+const UrlKeyVersionSchema = z.object({
+  id: z.string(),
+  content: z.array(z.unknown()),
+});
+
+/**
+ * Zod schema for URL-encoded plan v1.
+ * IMPORTANT: URL data is UNTRUSTED - this schema validates external input.
+ */
+const UrlEncodedPlanV1Schema = z.object({
+  v: z.literal(1),
+  id: z.string(),
+  title: z.string(),
+  status: z.enum(PlanStatusValues),
+  repo: z.string().optional(),
+  pr: z.number().optional(),
+  content: z.array(z.unknown()),
+  artifacts: z.array(ArtifactSchema).optional(),
+  deliverables: z.array(DeliverableSchema).optional(),
+  comments: z.array(z.unknown()).optional(),
+});
+
+/**
+ * Zod schema for URL-encoded plan v2 with version history.
+ * IMPORTANT: URL data is UNTRUSTED - this schema validates external input.
+ */
+const UrlEncodedPlanV2Schema = z.object({
+  v: z.literal(2),
+  id: z.string(),
+  title: z.string(),
+  status: z.enum(PlanStatusValues),
+  repo: z.string().optional(),
+  pr: z.number().optional(),
+  content: z.array(z.unknown()),
+  artifacts: z.array(ArtifactSchema).optional(),
+  deliverables: z.array(DeliverableSchema).optional(),
+  comments: z.array(z.unknown()).optional(),
+  versionRefs: z.array(UrlSnapshotRefSchema).optional(),
+  keyVersions: z.array(UrlKeyVersionSchema).optional(),
+});
+
+/**
+ * Zod schema for URL-encoded plan (discriminated union on version).
+ * IMPORTANT: URL data is UNTRUSTED user input - always validate!
+ */
+const UrlEncodedPlanSchema = z.discriminatedUnion('v', [
+  UrlEncodedPlanV1Schema,
+  UrlEncodedPlanV2Schema,
+]);
 
 /**
  * Type guard for v1 plans.
@@ -108,16 +189,24 @@ export function encodePlan(plan: UrlEncodedPlan): string {
  * Decodes a URL-encoded plan string.
  * Supports both v1 and v2 plan formats.
  *
- * Returns null if decoding fails or data is corrupted.
+ * SECURITY: URL data is UNTRUSTED user input - validated with Zod schema.
+ * Returns null if decoding fails, data is corrupted, or validation fails.
  */
 export function decodePlan(encoded: string): UrlEncodedPlan | null {
   try {
     const json = lzstring.decompressFromEncodedURIComponent(encoded);
     if (!json) return null;
 
-    const parsed = JSON.parse(json) as { v?: number };
+    const parsed: unknown = JSON.parse(json);
 
-    return parsed as UrlEncodedPlan;
+    // Validate untrusted URL data with Zod schema
+    const result = UrlEncodedPlanSchema.safeParse(parsed);
+    if (!result.success) {
+      // Invalid URL data - could be corrupted or malicious
+      return null;
+    }
+
+    return result.data;
   } catch (_error) {
     return null;
   }

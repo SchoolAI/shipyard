@@ -16,7 +16,6 @@ import type {
   AdapterEvent,
   AgentAdapter,
   CoreResponse,
-  PostExitEvent,
   ReviewFeedback,
 } from './types.js';
 
@@ -104,11 +103,12 @@ function handlePostToolUse(input: ClaudeCodeHookInput): AdapterEvent {
   const toolName = input.tool_name;
 
   if (toolName === CLAUDE_TOOL_NAMES.EXIT_PLAN_MODE) {
+    // toolName is narrowed to the string literal by the equality check above
     return {
       type: 'post_exit',
       sessionId,
       toolName,
-    } as PostExitEvent;
+    };
   }
 
   return { type: 'passthrough' };

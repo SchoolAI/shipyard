@@ -4,7 +4,13 @@ import http from 'node:http';
 import { homedir } from 'node:os';
 import { join, resolve, sep } from 'node:path';
 
-import { appRouter, type Context, getPlanMetadata, type PlanStore } from '@shipyard/schema';
+import {
+  appRouter,
+  type Context,
+  getPlanMetadata,
+  hasErrorCode,
+  type PlanStore,
+} from '@shipyard/schema';
 import { createExpressMiddleware } from '@trpc/server/adapters/express';
 import express, { type Request, type Response } from 'express';
 import * as decoding from 'lib0/decoding';
@@ -155,8 +161,7 @@ export async function tryAcquireHubLock(retryCount = 0): Promise<boolean> {
     logger.info({ pid: process.pid }, 'Acquired hub lock');
     return true;
   } catch (err) {
-    const isLockExists = (err as NodeJS.ErrnoException).code === 'EEXIST';
-    if (isLockExists) {
+    if (hasErrorCode(err, 'EEXIST')) {
       return handleExistingLock(retryCount);
     }
     logger.error({ err }, 'Failed to acquire hub lock');
@@ -632,7 +637,7 @@ async function handleGetTranscript(req: Request, res: Response): Promise<void> {
     res.type('text/plain').send(content);
     logger.debug({ planId, transcriptPath, size: content.length }, 'Served transcript for handoff');
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+    if (hasErrorCode(error, 'ENOENT')) {
       res.status(404).json({ error: 'Transcript file not found' });
     } else {
       logger.error({ error, planId }, 'Failed to read transcript');

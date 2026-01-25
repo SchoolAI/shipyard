@@ -177,10 +177,17 @@ export const UnregisterServerResponseSchema = z.object({
 export type UnregisterServerResponse = z.infer<typeof UnregisterServerResponseSchema>;
 
 /**
+ * Valid change types for subscription notifications
+ */
+export const ChangeTypeSchema = z.enum(['status', 'comments', 'resolved', 'content', 'artifacts']);
+
+export type ChangeType = z.infer<typeof ChangeTypeSchema>;
+
+/**
  * POST /api/plan/:id/subscribe - Create a subscription
  */
 export const CreateSubscriptionRequestSchema = z.object({
-  subscribe: z.array(z.string()).optional(),
+  subscribe: z.array(ChangeTypeSchema).optional(),
   windowMs: z.number().positive().optional(),
   maxWindowMs: z.number().positive().optional(),
   threshold: z.number().positive().optional(),

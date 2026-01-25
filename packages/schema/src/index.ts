@@ -26,7 +26,7 @@ export {
 } from './conversation-export.js';
 export { formatDeliverablesForLLM } from './deliverable-formatter.js';
 export { extractDeliverables } from './deliverable-parser.js';
-export type { EnvironmentContext } from './environment.js';
+export { EnvironmentContextSchema, type EnvironmentContext } from './environment.js';
 export type { GitHubPRResponse } from './github-validation.js';
 export { GitHubPRResponseSchema } from './github-validation.js';
 export type {
@@ -438,3 +438,15 @@ export {
 } from './yjs-helpers.js';
 export type { YDocKey } from './yjs-keys.js';
 export { isValidYDocKey, YDOC_KEYS } from './yjs-keys.js';
+export { hasErrorCode, isBuffer, isErrnoException } from './type-guards.js';
+export type {
+  SignalingConnection,
+  WebrtcConn,
+  WebrtcProviderInternals,
+  WebrtcRoom,
+} from './y-webrtc-internals.js';
+export {
+  getSignalingConnections,
+  getWebrtcPeerId,
+  getWebrtcRoom,
+} from './y-webrtc-internals.js';

@@ -44,7 +44,7 @@ function getVariantClasses(variant: MarkdownContentProps['variant']): string {
  */
 const markdownComponents: Components = {
   // Links open in new tab with security attributes
-  a: ({ href, children }) => (
+  a: ({ href, children }: { href?: string; children?: React.ReactNode }) => (
     <a
       href={href}
       target="_blank"
@@ -56,64 +56,65 @@ const markdownComponents: Components = {
   ),
 
   // Code blocks with monospace styling
-  code: ({ className, children, ...props }) => {
+  code: (props: { className?: string; children?: React.ReactNode; node?: unknown }) => {
+    const { className, children, ...rest } = props;
     const isInline = !className;
     if (isInline) {
       return (
-        <code className="bg-surface px-1.5 py-0.5 rounded text-[0.9em] font-mono" {...props}>
+        <code className="bg-surface px-1.5 py-0.5 rounded text-[0.9em] font-mono" {...rest}>
           {children}
         </code>
       );
     }
     // Block code - className contains language info like "language-typescript"
     return (
-      <code className={`${className} font-mono`} {...props}>
+      <code className={`${className} font-mono`} {...rest}>
         {children}
       </code>
     );
   },
 
   // Pre blocks for code
-  pre: ({ children }) => (
+  pre: ({ children }: { children?: React.ReactNode }) => (
     <pre className="bg-surface border border-border rounded-md p-3 overflow-x-auto text-[0.9em]">
       {children}
     </pre>
   ),
 
   // Unordered lists
-  ul: ({ children }) => <ul className="list-disc list-inside space-y-1 ml-1">{children}</ul>,
+  ul: ({ children }: { children?: React.ReactNode }) => <ul className="list-disc list-inside space-y-1 ml-1">{children}</ul>,
 
   // Ordered lists
-  ol: ({ children }) => <ol className="list-decimal list-inside space-y-1 ml-1">{children}</ol>,
+  ol: ({ children }: { children?: React.ReactNode }) => <ol className="list-decimal list-inside space-y-1 ml-1">{children}</ol>,
 
   // List items
-  li: ({ children }) => <li className="text-foreground">{children}</li>,
+  li: ({ children }: { children?: React.ReactNode }) => <li className="text-foreground">{children}</li>,
 
   // Paragraphs
-  p: ({ children }) => <p className="text-foreground leading-relaxed">{children}</p>,
+  p: ({ children }: { children?: React.ReactNode }) => <p className="text-foreground leading-relaxed">{children}</p>,
 
   // Headers
-  h1: ({ children }) => (
+  h1: ({ children }: { children?: React.ReactNode }) => (
     <h1 className="font-semibold text-foreground mb-2 mt-3 first:mt-0">{children}</h1>
   ),
-  h2: ({ children }) => (
+  h2: ({ children }: { children?: React.ReactNode }) => (
     <h2 className="font-semibold text-foreground mb-2 mt-3 first:mt-0">{children}</h2>
   ),
-  h3: ({ children }) => (
+  h3: ({ children }: { children?: React.ReactNode }) => (
     <h3 className="font-medium text-foreground mb-1.5 mt-2 first:mt-0">{children}</h3>
   ),
-  h4: ({ children }) => (
+  h4: ({ children }: { children?: React.ReactNode }) => (
     <h4 className="font-medium text-foreground mb-1 mt-2 first:mt-0">{children}</h4>
   ),
-  h5: ({ children }) => (
+  h5: ({ children }: { children?: React.ReactNode }) => (
     <h5 className="font-medium text-foreground mb-1 mt-1 first:mt-0">{children}</h5>
   ),
-  h6: ({ children }) => (
+  h6: ({ children }: { children?: React.ReactNode }) => (
     <h6 className="font-medium text-muted-foreground mb-1 mt-1 first:mt-0">{children}</h6>
   ),
 
   // Blockquotes
-  blockquote: ({ children }) => (
+  blockquote: ({ children }: { children?: React.ReactNode }) => (
     <blockquote className="border-l-2 border-accent pl-3 italic text-muted-foreground my-2">
       {children}
     </blockquote>
@@ -123,27 +124,27 @@ const markdownComponents: Components = {
   hr: () => <hr className="border-border my-4" />,
 
   // Tables (GFM)
-  table: ({ children }) => (
+  table: ({ children }: { children?: React.ReactNode }) => (
     <div className="overflow-x-auto my-2">
       <table className="min-w-full border-collapse text-sm">{children}</table>
     </div>
   ),
-  thead: ({ children }) => <thead className="bg-surface">{children}</thead>,
-  tbody: ({ children }) => <tbody>{children}</tbody>,
-  tr: ({ children }) => <tr className="border-b border-border">{children}</tr>,
-  th: ({ children }) => (
+  thead: ({ children }: { children?: React.ReactNode }) => <thead className="bg-surface">{children}</thead>,
+  tbody: ({ children }: { children?: React.ReactNode }) => <tbody>{children}</tbody>,
+  tr: ({ children }: { children?: React.ReactNode }) => <tr className="border-b border-border">{children}</tr>,
+  th: ({ children }: { children?: React.ReactNode }) => (
     <th className="px-3 py-2 text-left font-medium text-foreground">{children}</th>
   ),
-  td: ({ children }) => <td className="px-3 py-2 text-foreground">{children}</td>,
+  td: ({ children }: { children?: React.ReactNode }) => <td className="px-3 py-2 text-foreground">{children}</td>,
 
   // Strong/Bold
-  strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+  strong: ({ children }: { children?: React.ReactNode }) => <strong className="font-semibold">{children}</strong>,
 
   // Emphasis/Italic
-  em: ({ children }) => <em className="italic">{children}</em>,
+  em: ({ children }: { children?: React.ReactNode }) => <em className="italic">{children}</em>,
 
   // Strikethrough (GFM)
-  del: ({ children }) => <del className="line-through text-muted-foreground">{children}</del>,
+  del: ({ children }: { children?: React.ReactNode }) => <del className="line-through text-muted-foreground">{children}</del>,
 };
 
 /**

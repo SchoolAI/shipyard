@@ -1,3 +1,5 @@
+import { z } from 'zod';
+
 const CLIENT_ID = import.meta.env.VITE_GITHUB_CLIENT_ID;
 
 /**
@@ -7,11 +9,36 @@ const CLIENT_ID = import.meta.env.VITE_GITHUB_CLIENT_ID;
 const WORKER_URL =
   import.meta.env.VITE_GITHUB_OAUTH_WORKER || 'https://shipyard-github-oauth.jacob-191.workers.dev';
 
-export interface GitHubUser {
-  login: string;
-  name: string | null;
-  avatar_url: string;
-}
+/**
+ * Schema for GitHub OAuth token exchange error response.
+ * SECURITY: GitHub API responses are external data - validate structure.
+ */
+const OAuthErrorResponseSchema = z.object({
+  error: z.string().optional(),
+  error_description: z.string().optional(),
+});
+
+/**
+ * Schema for GitHub OAuth token exchange success response.
+ * SECURITY: External API response - validate before use.
+ */
+const TokenExchangeResponseSchema = z.object({
+  access_token: z.string(),
+  scope: z.string().optional(),
+  is_mobile: z.boolean().optional(),
+});
+
+/**
+ * Schema for GitHub user API response.
+ * SECURITY: External API response - validate before use.
+ */
+const GitHubUserSchema = z.object({
+  login: z.string(),
+  name: z.string().nullable(),
+  avatar_url: z.string(),
+});
+
+export type GitHubUser = z.infer<typeof GitHubUserSchema>;
 
 /**
  * Start GitHub OAuth web flow.
@@ -48,11 +75,7 @@ export function startWebFlow(
   window.location.href = `https://github.com/login/oauth/authorize?${params}`;
 }
 
-export interface TokenExchangeResponse {
-  access_token: string;
-  scope?: string;
-  is_mobile?: boolean;
-}
+export type TokenExchangeResponse = z.infer<typeof TokenExchangeResponseSchema>;
 
 export async function handleCallback(
   code: string,
@@ -72,14 +95,20 @@ export async function handleCallback(
   });
 
   if (!response.ok) {
-    const error = (await response.json()) as {
-      error?: string;
-      error_description?: string;
-    };
+    // Validate error response structure from external API
+    const rawError: unknown = await response.json();
+    const errorResult = OAuthErrorResponseSchema.safeParse(rawError);
+    const error = errorResult.success ? errorResult.data : { error: 'Unknown error' };
     throw new Error(error.error_description || error.error || 'Token exchange failed');
   }
 
-  return response.json() as Promise<TokenExchangeResponse>;
+  // Validate success response from external API
+  const rawData: unknown = await response.json();
+  const result = TokenExchangeResponseSchema.safeParse(rawData);
+  if (!result.success) {
+    throw new Error('Invalid token exchange response from OAuth server');
+  }
+  return result.data;
 }
 
 export class TokenValidationError extends Error {
@@ -108,7 +137,13 @@ export async function getGitHubUser(token: string): Promise<GitHubUser> {
     throw new TokenValidationError(`Failed to fetch user info: ${response.status}`, false);
   }
 
-  return response.json();
+  // Validate GitHub API response
+  const rawData: unknown = await response.json();
+  const result = GitHubUserSchema.safeParse(rawData);
+  if (!result.success) {
+    throw new TokenValidationError('Invalid user data from GitHub API', false);
+  }
+  return result.data;
 }
 
 export type TokenValidationResult =

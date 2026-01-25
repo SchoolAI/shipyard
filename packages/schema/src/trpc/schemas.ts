@@ -5,9 +5,9 @@
 
 import { z } from 'zod';
 import { A2AMessageSchema } from '../conversation-export.js';
-
-export { A2AMessageSchema, ConversationExportMetaSchema } from '../conversation-export.js';
-export {
+import {
+  ChangeTypeSchema,
+  type ChangeType,
   CreateHookSessionRequestSchema,
   CreateHookSessionResponseSchema,
   CreateSubscriptionRequestSchema,
@@ -18,6 +18,21 @@ export {
   UpdatePresenceRequestSchema,
   UpdatePresenceResponseSchema,
 } from '../hook-api.js';
+
+export { A2AMessageSchema, ConversationExportMetaSchema } from '../conversation-export.js';
+export {
+  ChangeTypeSchema,
+  CreateHookSessionRequestSchema,
+  CreateHookSessionResponseSchema,
+  CreateSubscriptionRequestSchema,
+  CreateSubscriptionResponseSchema,
+  GetReviewStatusResponseSchema,
+  UpdatePlanContentRequestSchema,
+  UpdatePlanContentResponseSchema,
+  UpdatePresenceRequestSchema,
+  UpdatePresenceResponseSchema,
+};
+export type { ChangeType };
 export { LocalChangesResultSchema } from '../local-changes.js';
 export { getPlanMetadata } from '../yjs-helpers.js';
 
@@ -45,10 +60,6 @@ export const SubscriptionClientIdSchema = z.object({
 });
 
 export type SubscriptionClientIdInput = z.infer<typeof SubscriptionClientIdSchema>;
-
-export const ChangeTypeSchema = z.enum(['status', 'comments', 'resolved', 'content', 'artifacts']);
-
-export type ChangeType = z.infer<typeof ChangeTypeSchema>;
 
 export const ChangeSchema = z.object({
   type: ChangeTypeSchema,

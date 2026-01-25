@@ -406,7 +406,8 @@ export async function handleClearPresence(req: Request, res: Response): Promise<
       return;
     }
 
-    const sessionId = req.query.sessionId as string | undefined;
+    // Validate query param - HTTP query params are untrusted external input
+    const sessionId = typeof req.query.sessionId === 'string' ? req.query.sessionId : undefined;
 
     if (!sessionId) {
       res.status(400).json({ error: 'Missing sessionId' });

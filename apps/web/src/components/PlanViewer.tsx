@@ -30,6 +30,7 @@ import type * as Y from 'yjs';
 import { useTheme } from '@/hooks/useTheme';
 import { RedoButton } from './editor/RedoButton';
 import { UndoButton } from './editor/UndoButton';
+import { getYUndoExtension } from '@/types/blocknote-extensions';
 
 /** Simple identity type for display purposes */
 interface UserIdentity {
@@ -397,14 +398,8 @@ export function PlanViewer({
           e.preventDefault();
           editor.focus();
 
-          // Type for yUndo extension
-          interface YUndoExtension {
-            undoCommand?: (state: unknown, dispatch: unknown, view: unknown) => void;
-            redoCommand?: (state: unknown, dispatch: unknown, view: unknown) => void;
-          }
-
           // Get the yUndo extension (used when collaboration is enabled)
-          const yUndo = editor.getExtension('yUndo') as YUndoExtension | undefined;
+          const yUndo = getYUndoExtension(editor);
           if (yUndo) {
             const { state, view } = editor._tiptapEditor;
             if (e.shiftKey) {

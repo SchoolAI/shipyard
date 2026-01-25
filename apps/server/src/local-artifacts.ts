@@ -1,6 +1,7 @@
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join, resolve, sep } from 'node:path';
+import { hasErrorCode } from '@shipyard/schema';
 import { logger } from './logger.js';
 
 // ============ PUBLIC API (Exports) ============
@@ -41,7 +42,7 @@ export async function getLocalArtifact(artifactId: string): Promise<Buffer | nul
     return await readFile(filepath);
   } catch (error) {
     // File not found is expected when artifact doesn't exist
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+    if (hasErrorCode(error, 'ENOENT')) {
       return null;
     }
     // Re-throw unexpected errors (permission denied, disk full, etc.)
@@ -68,7 +69,7 @@ export async function deleteLocalArtifact(artifactId: string): Promise<boolean> 
     logger.info({ artifactId }, 'Deleted orphaned local artifact');
     return true;
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+    if (hasErrorCode(error, 'ENOENT')) {
       return false;
     }
     // Log but don't throw - cleanup is best effort
