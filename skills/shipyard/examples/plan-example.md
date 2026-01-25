@@ -45,7 +45,7 @@ The agent iterates through work, capturing proof at each milestone:
 await addArtifact({
   planId,
   sessionToken,
-  type: 'screenshot',
+  type: 'image',
   filename: 'profile-display.png',
   filePath: './screenshots/profile.png',
   deliverableId: deliverables[0].id
@@ -61,7 +61,7 @@ await addArtifact({
 await addArtifact({
   planId,
   sessionToken,
-  type: 'screenshot',
+  type: 'image',
   filename: 'edit-mode.png',
   filePath: './screenshots/edit-form.png',
   deliverableId: deliverables[1].id
@@ -77,7 +77,7 @@ await addArtifact({
 const result = await addArtifact({
   planId,
   sessionToken,
-  type: 'test_results',
+  type: 'html',
   filename: 'api-tests.json',
   filePath: './test-output/results.json',
   deliverableId: deliverables[2].id
@@ -111,9 +111,11 @@ if (status.status === "changes_requested") {
 
 | Good | Bad |
 |------|-----|
-| Screenshot of profile page | Create ProfilePage component |
-| Video of edit flow | Implement form validation |
-| Test results JSON file | Write unit tests |
-| Diff showing API changes | Refactor API handler |
+| Screenshot of profile page (image) | Create ProfilePage component |
+| Video of edit flow (video) | Implement form validation |
+| Test results HTML report (html) | Write unit tests |
+| Code review HTML document (html) | Refactor API handler |
 
 **Rule**: If you can't attach a file proving it's done, it's not a deliverable.
+
+**Artifact Types**: `html` (reports, reviews, terminal output), `image` (screenshots), `video` (recordings)

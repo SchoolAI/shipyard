@@ -53,23 +53,23 @@ The actual source of truth is the distributed CRDT state stored in browser Index
 │                                    │    │                        │
 │  ┌──────────────────────────────┐  │    │  ┌──────────────────┐  │
 │  │ AI Agent (Claude)            │  │    │  │ Browser          │  │
-│  └──────────┬───────────────────┘  │    │  │ (loro WebRTC)    │  │
+│  └──────────┬───────────────────┘  │    │  │ (y-webrtc)       │  │
 │             │ MCP                  │    │  └──────────┬───────┘  │
 │             ▼                      │    └─────────────┼──────────┘
 │  ┌──────────────────────────────┐  │                  │
 │  │ MCP Server (Node.js)         │  │                  │
-│  │ • @loro-extended/repo        │  │                  │ WebRTC P2P
-│  │ • adapter-websocket/server   │  │                  │
+│  │ • yjs                        │  │                  │ WebRTC P2P
+│  │ • y-websocket (server)       │  │                  │
 │  └──────────┬───────────────────┘  │                  │
 │             │ WebSocket            │                  │
 │             │ (localhost)          │                  │
 │             ▼                      │                  │
 │  ┌──────────────────────────────┐  │                  │
 │  │ Author's Browser             │◄─┼──────────────────┘
-│  │ • @loro-extended/react       │  │
-│  │ • adapter-websocket/client   │  │
-│  │ • adapter-webrtc (for peers) │  │
-│  │ • IndexedDB (persistence)    │  │
+│  │ • yjs                        │  │
+│  │ • y-websocket (client)       │  │
+│  │ • y-webrtc (for peers)       │  │
+│  │ • y-indexeddb (persistence)  │  │
 │  └──────────────────────────────┘  │
 └────────────────────────────────────┘
 ```

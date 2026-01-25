@@ -1073,13 +1073,13 @@ ydoc.getMap('metadata').observe(() => {
 **Pitfall 4: Storing too much data in Y.Doc**
 
 ```typescript
-// ❌ BAD: Large binary blob in Y.Map
-map.set('screenshot', base64Image); // Bloats Y.Doc and sync traffic
+// Bad: Large binary blob in Y.Map
+map.set('image', base64Image); // Bloats Y.Doc and sync traffic
 
-// ✅ GOOD: Store reference, not data
+// Good: Store reference, not data
 const artifact = {
   id: 'art-123',
-  type: 'screenshot',
+  type: 'image',  // Valid types: 'html' | 'image' | 'video'
   filename: 'login-ui.png',
   url: getArtifactUrl(repo, pr, planId, 'login-ui.png'),
 };

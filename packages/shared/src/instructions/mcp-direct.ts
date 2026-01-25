@@ -90,7 +90,7 @@ Implement the feature, taking screenshots/recordings as you go.
 await addArtifact({
   planId,
   sessionToken,
-  type: 'screenshot',
+  type: 'image',
   filename: 'login-page.png',
   source: 'file',
   filePath: '/path/to/screenshot.png',
@@ -100,7 +100,7 @@ await addArtifact({
 const result = await addArtifact({
   planId,
   sessionToken,
-  type: 'screenshot',
+  type: 'image',
   filename: 'error-handling.png',
   source: 'file',
   filePath: '/path/to/error.png',
@@ -145,7 +145,7 @@ Uploads proof-of-work artifact.
 **Parameters:**
 - \`planId\` (string) - Plan ID
 - \`sessionToken\` (string) - Session token
-- \`type\` ('screenshot' | 'video' | 'test_results' | 'diff')
+- \`type\` ('html' | 'image' | 'video')
 - \`filename\` (string) - File name
 - \`source\` ('file' | 'url' | 'base64')
 - \`filePath\` (string) - Local file path (when source='file')

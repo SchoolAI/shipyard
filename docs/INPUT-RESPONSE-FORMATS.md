@@ -279,5 +279,5 @@ String-based storage ensures:
 
 - **Input Request Schema:** `/packages/schema/src/input-request.ts`
 - **Browser UI Implementation:** `/apps/web/src/components/InputRequestModal.tsx`
-- **MCP Tool Definition:** `/apps/server/src/tools/request-user-input.ts`
+- **MCP Tool Definition:** `/apps/server/src/tools/execute-code.ts` (requestUserInput is implemented inline)
 - **Agent Instructions:** `/packages/shared/src/instructions/mcp-direct.ts`

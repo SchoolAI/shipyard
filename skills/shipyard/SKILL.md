@@ -182,7 +182,7 @@ const html = `<!DOCTYPE html>
 await addArtifact({
   planId,
   sessionToken,
-  type: 'test_results',
+  type: 'html',
   filename: 'test-results.html',
   source: 'base64',
   content: Buffer.from(html).toString('base64'),
@@ -262,7 +262,7 @@ const html = `<!DOCTYPE html>
 await addArtifact({
   planId,
   sessionToken,
-  type: 'screenshot',
+  type: 'html',
   filename: 'login-demo.html',
   source: 'base64',
   content: Buffer.from(html).toString('base64'),
@@ -336,7 +336,7 @@ const { planId, sessionToken, deliverables, monitoringScript } = plan;
 await addArtifact({
   planId,
   sessionToken,
-  type: 'screenshot',
+  type: 'image',
   filename: 'profile-page.png',
   source: 'file',
   filePath: '/tmp/screenshots/profile.png',
@@ -346,7 +346,7 @@ await addArtifact({
 const result = await addArtifact({
   planId,
   sessionToken,
-  type: 'screenshot',
+  type: 'image',
   filename: 'validation-errors.png',
   source: 'file',
   filePath: '/tmp/screenshots/validation.png',
@@ -473,10 +473,11 @@ if (status.status === "changes_requested") {
 
 | Type | Use For | Examples |
 |------|---------|----------|
-| `screenshot` | UI changes, visual proof | .png, .jpg |
-| `video` | Complex flows, interactions | .mp4, .webm |
-| `test_results` | Test output, coverage | .json, .txt |
-| `diff` | Code changes | .diff, .patch |
+| `html` | Test results, code reviews, reports, terminal output | .html |
+| `image` | UI screenshots, visual proof, error states | .png, .jpg, .webp |
+| `video` | Complex flows, interactions, animations | .mp4, .webm |
+
+**Note:** HTML is the primary format for most artifacts. Use it for test results, coverage reports, code reviews, and any text-based output. Only use `image` for actual UI screenshots and `video` for multi-step flows.
 
 ## Video Recording
 

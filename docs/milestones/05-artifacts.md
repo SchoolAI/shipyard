@@ -45,7 +45,7 @@ server.tool(
   {
     planId: z.string(),
     stepId: z.string().optional(),
-    type: z.enum(['screenshot', 'video', 'test_results', 'diff']),
+    type: z.enum(['html', 'image', 'video']),
     filename: z.string(),
     content: z.string().describe("Base64 encoded file content"),
   },

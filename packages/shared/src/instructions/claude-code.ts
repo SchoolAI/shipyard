@@ -49,7 +49,7 @@ Just call \`${TOOL_NAMES.ADD_ARTIFACT}\` with the file path and deliverable ID.
 await addArtifact({
   planId,
   sessionToken,
-  type: 'screenshot',
+  type: 'image',
   filename: 'login-page.png',
   source: 'file',
   filePath: '/tmp/screenshot.png',

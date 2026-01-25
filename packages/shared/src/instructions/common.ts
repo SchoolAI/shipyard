@@ -59,10 +59,11 @@ export const ARTIFACT_TYPES_SECTION = `## Artifact Types
 
 | Type | Use For | File Formats |
 |------|---------|--------------|
-| \`screenshot\` | UI changes, visual proof, error states | .png, .jpg, .webp |
+| \`html\` | Test results, code reviews, reports, terminal output | .html |
+| \`image\` | UI screenshots, visual proof, error states | .png, .jpg, .webp |
 | \`video\` | Complex flows, interactions, animations | .mp4, .webm |
-| \`test_results\` | Test output, coverage reports | .json, .txt, .xml |
-| \`diff\` | Code changes, before/after comparisons | .diff, .patch |`;
+
+**Note:** HTML is the primary format for most artifacts. Use it for test results, coverage reports, code reviews, and any text-based output. Only use \`image\` for actual UI screenshots and \`video\` for multi-step flows.`;
 
 export const TIPS_SECTION = `## Tips for Effective Use
 

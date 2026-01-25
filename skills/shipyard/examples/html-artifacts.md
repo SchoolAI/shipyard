@@ -199,7 +199,7 @@ const html = `<!DOCTYPE html>...`; // Your template with dynamic content
 await addArtifact({
   planId,
   sessionToken,
-  type: 'test_results',
+  type: 'html',
   filename: 'test-results.html',
   source: 'base64',
   content: Buffer.from(html).toString('base64'),
@@ -778,7 +778,7 @@ const html = `
 await addArtifact({
   planId,
   sessionToken,
-  type: 'screenshot',
+  type: 'html',
   filename: 'login-page-demo.html',
   source: 'base64',
   content: Buffer.from(html).toString('base64'),
@@ -858,7 +858,7 @@ const html = `<!DOCTYPE html>
 await addArtifact({
   planId,
   sessionToken,
-  type: 'test_results',
+  type: 'html',
   filename: 'test-results.html',
   source: 'base64',
   content: Buffer.from(html).toString('base64'),
@@ -869,9 +869,8 @@ await addArtifact({
 ## When NOT to Use HTML
 
 HTML is not suitable for:
-- **Large binary data** - Use direct file upload for videos, databases, archives
-- **Interactive demos** - HTML is static; use actual screenshots or videos
-- **Source code files** - Use `diff` type for code changes
-- **Structured data** - Use JSON for API responses or data exports
+- **Large binary data** - Use `video` type for recordings, or upload archives separately
+- **Interactive demos** - HTML is static; use `image` for screenshots or `video` for recordings
+- **Raw screenshots without context** - Use `image` type directly for PNG/JPG files
 
-For these cases, upload the native file format directly.
+For code diffs and changes, you CAN use HTML with syntax highlighting (like a styled diff viewer). The three valid artifact types are: `html`, `image`, and `video`.
