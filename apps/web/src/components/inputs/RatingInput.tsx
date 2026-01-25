@@ -95,7 +95,7 @@ export function RatingInput({
       <MarkdownContent content={request.message} variant="default" />
       <RadioGroup
         value={selectedValue}
-        onChange={(val) => setValue(val as string)}
+        onChange={setValue}
         isDisabled={isSubmitting}
         orientation="horizontal"
       >

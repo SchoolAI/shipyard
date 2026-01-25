@@ -1492,7 +1492,7 @@ export function answerMultiQuestionInputRequest(
 ): AnswerInputRequestResult {
   const requestsArray = ydoc.getArray<AnyInputRequest>(YDOC_KEYS.INPUT_REQUESTS);
   // CRDT boundary: validate input requests from CRDT
-  const data = requestsArray.toJSON() as unknown[];
+  const data = toUnknownArray(requestsArray);
   const requests = data
     .map((item) => AnyInputRequestSchema.safeParse(item))
     .filter((r) => r.success)

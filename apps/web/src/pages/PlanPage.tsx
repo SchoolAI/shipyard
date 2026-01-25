@@ -2,6 +2,7 @@ import type { BlockNoteEditor } from '@blocknote/core';
 import { Button, Spinner, useOverlayState } from '@heroui/react';
 import {
   type AnyInputRequest,
+  AnyInputRequestSchema,
   addArtifact,
   type Deliverable,
   extractDeliverables,
@@ -9,7 +10,6 @@ import {
   getPlanIndexEntry,
   getPlanMetadata,
   getPlanOwnerId,
-  AnyInputRequestSchema,
   type PlanMetadata,
   setPlanIndexEntry,
   setPlanMetadata,
@@ -163,7 +163,7 @@ export function PlanPage() {
         return;
       }
 
-if (!(event instanceof CustomEvent)) return;
+      if (!(event instanceof CustomEvent)) return;
       const result = AnyInputRequestSchema.safeParse(event.detail);
       if (!result.success) return;
 

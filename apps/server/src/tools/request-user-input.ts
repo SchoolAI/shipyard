@@ -6,7 +6,16 @@
  * without needing to execute arbitrary code.
  */
 
-import { PLAN_INDEX_DOC_NAME, QuestionSchema } from '@shipyard/schema';
+import {
+  type CreateChoiceInputParams,
+  type CreateDateInputParams,
+  type CreateEmailInputParams,
+  type CreateInputRequestParams,
+  type CreateNumberInputParams,
+  type CreateRatingInputParams,
+  PLAN_INDEX_DOC_NAME,
+  QuestionSchema,
+} from '@shipyard/schema';
 import { z } from 'zod';
 import { getOrCreateDoc } from '../doc-store.js';
 import { logger } from '../logger.js';
@@ -95,86 +104,89 @@ const RequestUserInputInput = z
 
 type RequestUserInputInput = z.infer<typeof RequestUserInputInput>;
 
-/** Build request params for choice type */
-function buildChoiceParams(input: RequestUserInputInput, baseParams: Record<string, unknown>) {
-  return {
-    ...baseParams,
-    type: 'choice' as const,
-    options: input.options ?? [],
-    multiSelect: input.multiSelect,
-    displayAs: input.displayAs,
-    placeholder: input.placeholder,
-  };
-}
-
-/** Build request params for number type */
-function buildNumberParams(input: RequestUserInputInput, baseParams: Record<string, unknown>) {
-  return {
-    ...baseParams,
-    type: 'number' as const,
-    min: input.min,
-    max: input.max,
-    format: input.format,
-  };
-}
-
-/** Build request params for email type */
-function buildEmailParams(input: RequestUserInputInput, baseParams: Record<string, unknown>) {
-  return {
-    ...baseParams,
-    type: 'email' as const,
-    domain: input.domain,
-  };
-}
-
-/** Build request params for date type */
-function buildDateParams(input: RequestUserInputInput, baseParams: Record<string, unknown>) {
-  return {
-    ...baseParams,
-    type: 'date' as const,
-    min: input.minDate,
-    max: input.maxDate,
-  };
-}
-
-/** Build request params for rating type */
-function buildRatingParams(input: RequestUserInputInput, baseParams: Record<string, unknown>) {
-  return {
-    ...baseParams,
-    type: 'rating' as const,
-    min: input.min,
-    max: input.max,
-    style: input.style,
-    labels: input.labels,
-  };
-}
-
 /** Build request params based on input type */
-function buildRequestParams(input: RequestUserInputInput): Record<string, unknown> {
-  const baseParams = {
-    message: input.message,
-    defaultValue: input.defaultValue,
-    timeout: input.timeout,
-    planId: input.planId,
-  };
-
+function buildRequestParams(input: RequestUserInputInput): CreateInputRequestParams {
   switch (input.type) {
     case 'choice':
-      return buildChoiceParams(input, baseParams);
-    case 'number':
-      return buildNumberParams(input, baseParams);
-    case 'email':
-      return buildEmailParams(input, baseParams);
-    case 'date':
-      return buildDateParams(input, baseParams);
-    case 'rating':
-      return buildRatingParams(input, baseParams);
-    default:
-      // text, multiline, confirm
       return {
-        ...baseParams,
-        type: input.type,
+        message: input.message ?? '',
+        defaultValue: input.defaultValue,
+        timeout: input.timeout,
+        planId: input.planId,
+        type: 'choice' as const,
+        options: input.options ?? [],
+        multiSelect: input.multiSelect,
+        displayAs: input.displayAs,
+        placeholder: input.placeholder,
+      } satisfies CreateChoiceInputParams;
+    case 'number':
+      return {
+        message: input.message ?? '',
+        defaultValue: input.defaultValue,
+        timeout: input.timeout,
+        planId: input.planId,
+        type: 'number' as const,
+        min: input.min,
+        max: input.max,
+        format: input.format,
+      } satisfies CreateNumberInputParams;
+    case 'email':
+      return {
+        message: input.message ?? '',
+        defaultValue: input.defaultValue,
+        timeout: input.timeout,
+        planId: input.planId,
+        type: 'email' as const,
+        domain: input.domain,
+      } satisfies CreateEmailInputParams;
+    case 'date':
+      return {
+        message: input.message ?? '',
+        defaultValue: input.defaultValue,
+        timeout: input.timeout,
+        planId: input.planId,
+        type: 'date' as const,
+        min: input.minDate,
+        max: input.maxDate,
+      } satisfies CreateDateInputParams;
+    case 'rating':
+      return {
+        message: input.message ?? '',
+        defaultValue: input.defaultValue,
+        timeout: input.timeout,
+        planId: input.planId,
+        type: 'rating' as const,
+        min: input.min,
+        max: input.max,
+        style: input.style,
+        labels: input.labels,
+      } satisfies CreateRatingInputParams;
+    case 'text':
+      return {
+        message: input.message ?? '',
+        defaultValue: input.defaultValue,
+        timeout: input.timeout,
+        planId: input.planId,
+        type: 'text' as const,
       };
+    case 'multiline':
+      return {
+        message: input.message ?? '',
+        defaultValue: input.defaultValue,
+        timeout: input.timeout,
+        planId: input.planId,
+        type: 'multiline' as const,
+      };
+    case 'confirm':
+      return {
+        message: input.message ?? '',
+        defaultValue: input.defaultValue,
+        timeout: input.timeout,
+        planId: input.planId,
+        type: 'confirm' as const,
+      };
+    default:
+      throw new Error(`Unsupported input type: ${String(input.type)}`);
   }
 }
 
@@ -495,11 +507,7 @@ NOTE: This is also available as requestUserInput() inside execute_code for multi
       } else {
         // Single-question request (existing logic)
         const params = buildRequestParams(input);
-        // Cast through unknown since new types may not yet be in the schema
-        requestId = manager.createRequest(
-          ydoc,
-          params as unknown as Parameters<typeof manager.createRequest>[1]
-        );
+        requestId = manager.createRequest(ydoc, params);
       }
 
       /** Wait for response */

@@ -5,6 +5,15 @@ import * as path from 'node:path';
 import * as vm from 'node:vm';
 import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
 import {
+  type CreateChoiceInputParams,
+  type CreateConfirmInputParams,
+  type CreateDateInputParams,
+  type CreateEmailInputParams,
+  type CreateInputRequestParams,
+  type CreateMultilineInputParams,
+  type CreateNumberInputParams,
+  type CreateRatingInputParams,
+  type CreateTextInputParams,
   getArtifacts,
   getDeliverables,
   getPlanMetadata,
@@ -814,73 +823,78 @@ async function requestUserInput(opts: {
   /** Create manager and make request */
   const manager = new InputRequestManager();
 
-  // Build params based on type - include type-specific parameters
-  const baseParams = {
-    message: opts.message,
-    defaultValue: opts.defaultValue,
-    timeout: opts.timeout,
-    planId: opts.planId,
-  };
-
-  let params: Record<string, unknown>;
+  let params: CreateInputRequestParams;
 
   switch (opts.type) {
     case 'choice':
       params = {
-        ...baseParams,
+        message: opts.message,
+        defaultValue: opts.defaultValue,
+        timeout: opts.timeout,
+        planId: opts.planId,
         type: opts.type,
         options: opts.options ?? [],
         multiSelect: opts.multiSelect,
-      };
+      } satisfies CreateChoiceInputParams;
       break;
     case 'number':
       params = {
-        ...baseParams,
+        message: opts.message,
+        defaultValue: opts.defaultValue,
+        timeout: opts.timeout,
+        planId: opts.planId,
         type: opts.type,
         min: opts.min,
         max: opts.max,
         format: opts.format,
-      };
+      } satisfies CreateNumberInputParams;
       break;
     case 'email':
       params = {
-        ...baseParams,
+        message: opts.message,
+        defaultValue: opts.defaultValue,
+        timeout: opts.timeout,
+        planId: opts.planId,
         type: opts.type,
         domain: opts.domain,
-      };
+      } satisfies CreateEmailInputParams;
       break;
     case 'date':
       params = {
-        ...baseParams,
+        message: opts.message,
+        defaultValue: opts.defaultValue,
+        timeout: opts.timeout,
+        planId: opts.planId,
         type: opts.type,
         min: opts.minDate,
         max: opts.maxDate,
-      };
+      } satisfies CreateDateInputParams;
       break;
     case 'rating':
       params = {
-        ...baseParams,
+        message: opts.message,
+        defaultValue: opts.defaultValue,
+        timeout: opts.timeout,
+        planId: opts.planId,
         type: opts.type,
         min: opts.min,
         max: opts.max,
         style: opts.style,
         labels: opts.labels,
-      };
+      } satisfies CreateRatingInputParams;
       break;
     default:
       // text, multiline, confirm
       params = {
-        ...baseParams,
+        message: opts.message,
+        defaultValue: opts.defaultValue,
+        timeout: opts.timeout,
+        planId: opts.planId,
         type: opts.type,
-      };
+      } satisfies CreateTextInputParams | CreateMultilineInputParams | CreateConfirmInputParams;
   }
 
-  // Cast through unknown since new types (number, email, date, rating)
-  // may not yet be in the schema. The InputRequestManager will pass through to Y.Doc.
-  const requestId = manager.createRequest(
-    ydoc,
-    params as unknown as Parameters<typeof manager.createRequest>[1]
-  );
+  const requestId = manager.createRequest(ydoc, params);
 
   /** Wait for response */
   const result = await manager.waitForResponse(ydoc, requestId, opts.timeout);

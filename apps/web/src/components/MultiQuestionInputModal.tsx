@@ -694,6 +694,7 @@ export function MultiQuestionInputModal({
             <Alert.Content>
               <Alert.Title>Unsupported Question Type</Alert.Title>
               <Alert.Description>
+                {/* eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- SAFE-ASSERTION: Exhaustive switch - narrowing never to access discriminant for error message */}
                 Type "{(_exhaustiveCheck as { type: string }).type}" is not supported.
               </Alert.Description>
             </Alert.Content>
