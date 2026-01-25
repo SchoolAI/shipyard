@@ -53,39 +53,45 @@ describe('InputRequestSchema validation', () => {
 
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect(result.error.issues[0]?.message).toBe('Timeout must be at least 10 seconds');
+        expect(result.error.issues[0]?.message).toBe(
+          'Timeout must be at least 5 minutes (300 seconds)'
+        );
       }
     });
 
-    it('should reject timeouts less than 10 seconds', () => {
+    it('should reject timeouts less than 300 seconds (5 minutes)', () => {
       const result = InputRequestSchema.safeParse({
         id: 'test-id',
         createdAt: Date.now(),
         message: 'Test',
         type: 'text',
         status: 'pending',
-        timeout: 5,
+        timeout: 60,
       });
 
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect(result.error.issues[0]?.message).toBe('Timeout must be at least 10 seconds');
+        expect(result.error.issues[0]?.message).toBe(
+          'Timeout must be at least 5 minutes (300 seconds)'
+        );
       }
     });
 
-    it('should reject timeouts exceeding 14400 seconds (4 hours)', () => {
+    it('should reject timeouts exceeding 1800 seconds (30 minutes)', () => {
       const result = InputRequestSchema.safeParse({
         id: 'test-id',
         createdAt: Date.now(),
         message: 'Test',
         type: 'text',
         status: 'pending',
-        timeout: 15000,
+        timeout: 2000,
       });
 
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect(result.error.issues[0]?.message).toBe('Timeout cannot exceed 4 hours');
+        expect(result.error.issues[0]?.message).toBe(
+          'Timeout cannot exceed 30 minutes (1800 seconds)'
+        );
       }
     });
 
@@ -106,7 +112,7 @@ describe('InputRequestSchema validation', () => {
     });
 
     it('should accept valid timeout values', () => {
-      const validTimeouts = [10, 30, 60, 300, 1800, 14400];
+      const validTimeouts = [300, 600, 900, 1200, 1800];
 
       for (const timeout of validTimeouts) {
         const result = InputRequestSchema.safeParse({
@@ -151,7 +157,7 @@ describe('createInputRequest', () => {
 
   it('should throw error for timeout exceeding max', () => {
     expect(() => {
-      createInputRequest({ message: 'Test', type: 'text', timeout: 15000 });
+      createInputRequest({ message: 'Test', type: 'text', timeout: 2000 });
     }).toThrow();
   });
 
@@ -159,12 +165,12 @@ describe('createInputRequest', () => {
     const request = createInputRequest({
       message: 'Test message',
       type: 'text',
-      timeout: 60,
+      timeout: 600,
     });
 
     expect(request.message).toBe('Test message');
     expect(request.type).toBe('text');
-    expect(request.timeout).toBe(60);
+    expect(request.timeout).toBe(600);
     expect(request.status).toBe('pending');
     expect(request.id).toBeDefined();
     expect(request.createdAt).toBeDefined();
@@ -368,11 +374,11 @@ describe('ConfirmInputRequest validation', () => {
       message: 'Proceed with operation?',
       type: 'confirm',
       status: 'pending',
-      timeout: 60,
+      timeout: 300,
     });
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.timeout).toBe(60);
+      expect(result.data.timeout).toBe(300);
     }
   });
 
@@ -784,7 +790,7 @@ describe('MultiQuestionInputRequest validation', () => {
     expect(result.success).toBe(false);
     if (!result.success) {
       expect(result.error.issues[0]?.message).toBe(
-        'Maximum 10 questions allowed (4 recommended for UX)'
+        'Maximum 10 questions allowed (8 recommended for optimal UX)'
       );
     }
   });
@@ -906,7 +912,7 @@ describe('createMultiQuestionInputRequest', () => {
           { type: 'text', message: 'Q11' },
         ],
       });
-    }).toThrow('Maximum 10 questions allowed (4 recommended for UX)');
+    }).toThrow('Maximum 10 questions allowed (8 recommended for optimal UX)');
   });
 });
 

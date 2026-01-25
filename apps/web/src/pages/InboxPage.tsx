@@ -44,6 +44,7 @@ import { BaseInboxCard } from '@/components/inbox/BaseInboxCard';
 import { OfflineBanner } from '@/components/OfflineBanner';
 import { type PanelWidth, PlanPanel } from '@/components/PlanPanel';
 import { TagChip } from '@/components/TagChip';
+import { TruncatedText } from '@/components/ui/TruncatedText';
 import { TwoColumnSkeleton } from '@/components/ui/TwoColumnSkeleton';
 import { getPlanRoute } from '@/constants/routes';
 import { usePlanIndexContext } from '@/contexts/PlanIndexContext';
@@ -111,11 +112,11 @@ function InboxItem({ plan, onApprove, onRequestChanges, onDismiss, onMarkUnread 
       <div className="flex flex-col gap-1 flex-1 min-w-0">
         <div className="flex items-center gap-2">
           {isRead && <EyeOff className="w-3 h-3 text-muted-foreground shrink-0" />}
-          <span
+          <TruncatedText
+            text={plan.title}
+            maxLength={50}
             className={`font-medium truncate ${isRead ? 'text-muted-foreground' : 'text-foreground'}`}
-          >
-            {plan.title}
-          </span>
+          />
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <StatusBadge status={plan.status} />

@@ -56,6 +56,6 @@ export function useLocalChanges(
     isLoading: query.isLoading,
     isFetching: query.isFetching,
     error: query.error,
-    refetch: () => query.refetch(),
+    refetch: query.refetch,
   };
 }

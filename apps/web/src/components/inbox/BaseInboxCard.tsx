@@ -4,6 +4,7 @@
  */
 
 import type React from 'react';
+import { TruncatedText } from '@/components/ui/TruncatedText';
 
 export interface BaseInboxCardProps {
   /** Plan title */
@@ -44,7 +45,11 @@ export function BaseInboxCard({
         }`}
         onClick={onClick}
       >
-        <span className="font-medium text-foreground truncate">{title}</span>
+        <TruncatedText
+          text={title}
+          maxLength={50}
+          className="font-medium text-foreground truncate"
+        />
         <div className="flex items-center gap-2 flex-wrap">
           {badge}
           {metadata}

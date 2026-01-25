@@ -7,6 +7,7 @@ import { Card, Chip } from '@heroui/react';
 import { type AnyInputRequest, DEFAULT_INPUT_REQUEST_TIMEOUT_SECONDS } from '@shipyard/schema';
 import { Clock } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { MarkdownContent } from '@/components/ui/MarkdownContent';
 
 interface InputRequestInboxItemProps {
   request: AnyInputRequest;
@@ -71,9 +72,9 @@ export function InputRequestInboxItem({ request, onClick }: InputRequestInboxIte
               </Chip>
             </div>
 
-            <p className="text-sm font-medium text-foreground mb-1 line-clamp-2">
-              {getDisplayMessage(request)}
-            </p>
+            <div className="text-sm font-medium text-foreground mb-1 line-clamp-2">
+              <MarkdownContent content={getDisplayMessage(request)} variant="toast" />
+            </div>
           </div>
 
           <div className="flex items-center gap-1 text-xs text-muted-foreground shrink-0">

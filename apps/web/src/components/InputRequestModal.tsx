@@ -15,9 +15,10 @@ import {
   type InputRequest,
 } from '@shipyard/schema';
 import type React from 'react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import type * as Y from 'yjs';
+import { MarkdownContent } from '@/components/ui/MarkdownContent';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
 import {
   ChoiceInput,
@@ -180,6 +181,29 @@ function getResetValueState(request: InputRequest): string | string[] {
   return request.type === 'choice' && request.multiSelect ? [] : '';
 }
 
+/**
+ * Determines modal size and scroll behavior based on message content complexity.
+ * Complex content (code blocks, tables, long text) gets a larger modal with scrolling.
+ */
+function getModalConfig(message: string): { isLarge: boolean; maxHeight: string | undefined } {
+  const hasCodeBlock = /```[\s\S]*?```/.test(message);
+  const hasTable = /\|.*\|.*\|/.test(message);
+  const lineCount = message.split('\n').length;
+  const charCount = message.length;
+
+  // Complex content gets larger modal with scroll
+  if (hasCodeBlock || hasTable || lineCount > 15 || charCount > 800) {
+    return { isLarge: true, maxHeight: '400px' };
+  }
+  // Medium content gets scroll if needed
+  if (lineCount > 8 || charCount > 400) {
+    return { isLarge: false, maxHeight: '300px' };
+  }
+  // Simple content - no special handling
+  return { isLarge: false, maxHeight: undefined };
+}
+
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Modal with multiple input types and auth states naturally has branching logic
 export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputRequestModalProps) {
   const [value, setValue] = useState<string | string[]>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -201,6 +225,9 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
   // Derive whether "N/A" is selected for rating-type questions
   const isNaSelected =
     request?.type === 'rating' && typeof value === 'string' && value === NA_OPTION_VALUE;
+
+  // Calculate modal config based on message complexity
+  const modalConfig = useMemo(() => getModalConfig(request?.message || ''), [request?.message]);
 
   // Reset state when request changes
   useEffect(() => {
@@ -434,7 +461,7 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
         isKeyboardDismissDisabled={true}
       >
         <Modal.Container placement="center" size="md">
-          <Modal.Dialog>
+          <Modal.Dialog className={modalConfig.isLarge ? 'sm:max-w-[650px]' : undefined}>
             <Modal.CloseTrigger />
 
             <Card>
@@ -446,7 +473,7 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
                 <div className="space-y-4">
                   <div className="space-y-2">
                     <p className="text-sm font-medium text-foreground">Agent is asking:</p>
-                    <p className="text-sm text-foreground">{request.message}</p>
+                    <MarkdownContent content={request.message} maxHeight={modalConfig.maxHeight} />
                   </div>
                   <Alert status="warning">
                     <Alert.Indicator />
@@ -490,7 +517,7 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
       isKeyboardDismissDisabled={true}
     >
       <Modal.Container placement="center" size="md">
-        <Modal.Dialog>
+        <Modal.Dialog className={modalConfig.isLarge ? 'sm:max-w-[650px]' : undefined}>
           <Modal.CloseTrigger />
 
           <Card>

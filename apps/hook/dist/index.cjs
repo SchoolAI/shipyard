@@ -28859,7 +28859,7 @@ init_cjs_shims();
 // ../../packages/schema/dist/index.mjs
 init_cjs_shims();
 
-// ../../packages/schema/dist/yjs-helpers-DOFk5YTr.mjs
+// ../../packages/schema/dist/yjs-helpers-Dg3vErAn.mjs
 init_cjs_shims();
 
 // ../../packages/schema/dist/plan.mjs
@@ -43037,7 +43037,7 @@ var PRReviewCommentSchema = external_exports.object({
   resolved: external_exports.boolean().optional()
 });
 
-// ../../packages/schema/dist/yjs-helpers-DOFk5YTr.mjs
+// ../../packages/schema/dist/yjs-helpers-Dg3vErAn.mjs
 function assertNever2(value) {
   throw new Error(`Unhandled discriminated union member: ${JSON.stringify(value)}`);
 }
@@ -43142,7 +43142,7 @@ var InputRequestBaseSchema = external_exports.object({
   message: external_exports.string().min(1, "Message cannot be empty"),
   status: external_exports.enum(InputRequestStatusValues),
   defaultValue: external_exports.string().optional(),
-  timeout: external_exports.number().int().min(10, "Timeout must be at least 10 seconds").max(14400, "Timeout cannot exceed 4 hours").optional(),
+  timeout: external_exports.number().int().min(300, "Timeout must be at least 5 minutes (300 seconds)").max(1800, "Timeout cannot exceed 30 minutes (1800 seconds)").optional(),
   planId: external_exports.string().optional(),
   response: external_exports.unknown().optional(),
   answeredAt: external_exports.number().optional(),
@@ -44580,9 +44580,29 @@ var planRouter = router({
     if (!cwd) return {
       available: false,
       reason: "no_cwd",
-      message: "Plan has no associated working directory. Only Claude Code plans support local changes."
+      message: "Plan has no associated working directory. Local changes are only available for plans created with working directory metadata."
     };
     return ctx.getLocalChanges(cwd);
+  }),
+  getFileContent: publicProcedure.input(external_exports.object({
+    planId: PlanIdSchema.shape.planId,
+    filePath: external_exports.string()
+  })).output(external_exports.object({
+    content: external_exports.string().nullable(),
+    error: external_exports.string().optional()
+  })).query(async ({ input, ctx }) => {
+    const metadata = getPlanMetadata(await ctx.getOrCreateDoc(input.planId));
+    if (!metadata) throw new TRPCError({
+      code: "NOT_FOUND",
+      message: "Plan not found"
+    });
+    const origin = metadata.origin;
+    const cwd = origin?.platform === "claude-code" ? origin.cwd : void 0;
+    if (!cwd) return {
+      content: null,
+      error: "No working directory available"
+    };
+    return ctx.getFileContent(cwd, input.filePath);
   })
 });
 var subscriptionRouter = router({

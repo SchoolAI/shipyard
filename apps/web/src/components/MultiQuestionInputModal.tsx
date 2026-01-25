@@ -194,7 +194,9 @@ function formatQuestionResponse(question: Question, state: QuestionState): strin
     case 'date':
       return formatDefaultResponse(value);
     default: {
+      // biome-ignore lint/correctness/noUnusedVariables: Exhaustive check for type safety
       const _exhaustive: never = question;
+      void _exhaustive;
       return formatDefaultResponse(value);
     }
   }
@@ -273,7 +275,9 @@ function isQuestionSubmittable(question: Question, state: QuestionState): boolea
     case 'date':
       return isDefaultSubmittable(value);
     default: {
+      // biome-ignore lint/correctness/noUnusedVariables: Exhaustive check for type safety
       const _exhaustive: never = question;
+      void _exhaustive;
       return isDefaultSubmittable(value);
     }
   }

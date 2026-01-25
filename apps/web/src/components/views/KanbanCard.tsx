@@ -16,7 +16,7 @@
 
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Avatar, Card, Chip } from '@heroui/react';
+import { Avatar, Card, Chip, Tooltip } from '@heroui/react';
 
 const AvatarRoot = Avatar as React.FC<{
   children: React.ReactNode;
@@ -128,19 +128,39 @@ export function KanbanCard({ plan, onHover, onPanelOpen }: KanbanCardProps) {
         `}
       >
         <Card.Header className="p-4">
-          {/* Title with proper truncation */}
-          <Card.Title
-            className="text-base font-semibold leading-snug"
-            style={{
-              display: '-webkit-box',
-              WebkitLineClamp: 2,
-              WebkitBoxOrient: 'vertical',
-              overflow: 'hidden',
-              wordBreak: 'break-word',
-            }}
-          >
-            {plan.title}
-          </Card.Title>
+          {/* Title with proper truncation and tooltip */}
+          {plan.title.length > 50 ? (
+            <Tooltip delay={0}>
+              <Tooltip.Trigger>
+                <Card.Title
+                  className="text-base font-semibold leading-snug cursor-default"
+                  style={{
+                    display: '-webkit-box',
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: 'vertical',
+                    overflow: 'hidden',
+                    wordBreak: 'break-word',
+                  }}
+                >
+                  {plan.title}
+                </Card.Title>
+              </Tooltip.Trigger>
+              <Tooltip.Content className="max-w-md">{plan.title}</Tooltip.Content>
+            </Tooltip>
+          ) : (
+            <Card.Title
+              className="text-base font-semibold leading-snug"
+              style={{
+                display: '-webkit-box',
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: 'vertical',
+                overflow: 'hidden',
+                wordBreak: 'break-word',
+              }}
+            >
+              {plan.title}
+            </Card.Title>
+          )}
         </Card.Header>
 
         {/* Metadata footer */}
