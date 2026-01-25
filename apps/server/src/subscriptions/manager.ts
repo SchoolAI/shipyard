@@ -8,12 +8,12 @@ import { logger } from '../logger.js';
 import { startPeriodicCleanup as startSessionCleanup } from '../session-registry.js';
 import type { Change, ChangesResponse, Subscription, SubscriptionConfig } from './types.js';
 
-// --- State ---
+/** --- State --- */
 
 const subscriptions = new Map<string, Map<string, Subscription>>();
 const SUBSCRIPTION_TTL_MS = 5 * 60 * 1000;
 
-// --- Public API ---
+/** --- Public API --- */
 
 export function createSubscription(config: SubscriptionConfig): string {
   const id = nanoid();
@@ -120,10 +120,10 @@ export function getChanges(planId: string, subscriptionId: string): ChangesRespo
 }
 
 export function startCleanupInterval(): void {
-  // Start session registry cleanup (runs every 15 minutes)
+  /** Start session registry cleanup (runs every 15 minutes) */
   startSessionCleanup();
 
-  // Start subscription cleanup (runs every 60 seconds)
+  /** Start subscription cleanup (runs every 60 seconds) */
   setInterval(() => {
     const now = Date.now();
     let cleanedCount = 0;
@@ -154,7 +154,7 @@ export function getSubscriptionsForPlan(planId: string): Map<string, Subscriptio
   return subscriptions.get(planId);
 }
 
-// --- Private Helpers ---
+/** --- Private Helpers --- */
 
 function checkFlushConditions(sub: Subscription): void {
   const now = Date.now();
@@ -188,19 +188,19 @@ function summarizeChanges(changes: Change[]): string {
 
   const commentChanges = changes.filter((c) => c.type === 'comments');
   if (commentChanges.length > 0) {
-    const totalAdded = commentChanges.reduce(
-      (acc, c) => acc + ((c.details?.added as number) || 1),
-      0
-    );
+    const totalAdded = commentChanges.reduce((acc, c) => {
+      const added = c.details?.added;
+      return acc + (typeof added === 'number' ? added : 1);
+    }, 0);
     parts.push(`${totalAdded} new comment(s)`);
   }
 
   const resolvedChanges = changes.filter((c) => c.type === 'resolved');
   if (resolvedChanges.length > 0) {
-    const totalResolved = resolvedChanges.reduce(
-      (acc, c) => acc + ((c.details?.resolved as number) || 1),
-      0
-    );
+    const totalResolved = resolvedChanges.reduce((acc, c) => {
+      const resolved = c.details?.resolved;
+      return acc + (typeof resolved === 'number' ? resolved : 1);
+    }, 0);
     parts.push(`${totalResolved} resolved`);
   }
 
@@ -211,10 +211,10 @@ function summarizeChanges(changes: Change[]): string {
 
   const artifactChanges = changes.filter((c) => c.type === 'artifacts');
   if (artifactChanges.length > 0) {
-    const totalAdded = artifactChanges.reduce(
-      (acc, c) => acc + ((c.details?.added as number) || 1),
-      0
-    );
+    const totalAdded = artifactChanges.reduce((acc, c) => {
+      const added = c.details?.added;
+      return acc + (typeof added === 'number' ? added : 1);
+    }, 0);
     parts.push(`${totalAdded} artifact(s) added`);
   }
 

@@ -1,3 +1,4 @@
+import tseslint from '@typescript-eslint/eslint-plugin';
 import tsParser from '@typescript-eslint/parser';
 
 /**
@@ -45,6 +46,7 @@ const localRules = {
                 /^HACK/,
                 /^XXX/,
                 /^biome-ignore/,
+                /^\//, // Triple-slash directives (/// <reference ...)
               ];
 
               const isDirective = allowedPatterns.some((pattern) => pattern.test(text));
@@ -62,20 +64,37 @@ const localRules = {
   },
 };
 
+/**
+ * ESLint Configuration (Blacklist Approach)
+ *
+ * Rules apply to ALL TypeScript/TSX files by default.
+ * Use ignores to exclude files that shouldn't be checked.
+ *
+ * This ensures new files are automatically covered.
+ */
 export default [
+  // Global ignores (apply to all rules)
   {
-    files: [
-      'packages/shared/**/*.ts',
-      'packages/shared/**/*.tsx',
-      'packages/schema/**/*.ts',
-      'packages/schema/**/*.tsx',
-      'apps/github-oauth-worker/**/*.ts',
-      'apps/github-oauth-worker/**/*.tsx',
-      'apps/signaling/**/*.ts',
-      'apps/signaling/**/*.tsx',
-      'apps/hook/**/*.ts',
-      'apps/hook/**/*.tsx',
+    ignores: [
+      'node_modules/**',
+      'dist/**',
+      'build/**',
+      '**/*.config.js',
+      '**/*.config.ts',
+      '**/*.config.mjs',
+      '**/tsdown.config.ts',
+      '**/vite.config.ts',
+      // Test files excluded from type assertion rules (they need `as any` for Y.Doc)
+      '**/*.test.ts',
+      '**/*.test.tsx',
+      '**/__tests__/**',
     ],
+  },
+
+  // TypeScript rules (apply to ALL .ts/.tsx files)
+  {
+    files: ['**/*.ts', '**/*.tsx'],
+    ignores: ['**/*.test.ts', '**/*.test.tsx', '**/__tests__/**'],
     languageOptions: {
       parser: tsParser,
       parserOptions: {
@@ -87,31 +106,31 @@ export default [
       },
     },
     plugins: {
+      '@typescript-eslint': tseslint,
       local: localRules,
     },
     rules: {
-      'multiline-comment-style': ['warn', 'starred-block'],
+      // Comment quality rules - STRICT MODE
+      'multiline-comment-style': ['error', 'starred-block'],
       'spaced-comment': [
-        'warn',
+        'error',
         'always',
         {
           exceptions: ['-', '+', '*'],
           markers: ['/'],
         },
       ],
-      'local/no-noisy-single-line-comments': 'warn',
+      'local/no-noisy-single-line-comments': 'error',
+
+      // Type assertion rules - STRICT MODE
+      // Note: Biome handles noExplicitAny and noNonNullAssertion
+      // ESLint only needed for consistent-type-assertions (Biome doesn't have this)
+      '@typescript-eslint/consistent-type-assertions': [
+        'error',
+        {
+          assertionStyle: 'never',
+        },
+      ],
     },
-  },
-  {
-    ignores: [
-      'node_modules',
-      'dist',
-      'build',
-      '**/*.config.js',
-      '**/*.config.ts',
-      '**/*.config.mjs',
-      '**/tsdown.config.ts',
-      '**/vite.config.ts',
-    ],
   },
 ];

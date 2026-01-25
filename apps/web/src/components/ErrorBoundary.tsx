@@ -35,7 +35,7 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
   }
 
   static getDerivedStateFromError(error: Error): Partial<ErrorBoundaryState> {
-    // Update state so the next render will show the fallback UI
+    /** Update state so the next render will show the fallback UI */
     return {
       hasError: true,
       error,
@@ -43,18 +43,20 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
   }
 
   override componentDidCatch(error: Error, errorInfo: React.ErrorInfo): void {
-    // Log error details to console for debugging
-    // biome-ignore lint/suspicious/noConsole: Error boundaries require console logging for debugging
+    /*
+     * Log error details to console for debugging
+     * biome-ignore lint/suspicious/noConsole: Error boundaries require console logging for debugging
+     */
     console.error('ErrorBoundary caught an error:', error, errorInfo);
 
-    // Update state with error info for display
+    /** Update state with error info for display */
     this.setState({
       errorInfo,
     });
   }
 
   handleReset = (): void => {
-    // Reset error state and reload the page
+    /** Reset error state and reload the page */
     this.setState({
       hasError: false,
       error: null,
@@ -64,7 +66,7 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
   };
 
   handleTryAgain = (): void => {
-    // Reset error state without reloading (useful for transient errors)
+    /** Reset error state without reloading (useful for transient errors) */
     this.setState({
       hasError: false,
       error: null,
@@ -74,12 +76,12 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
 
   override render() {
     if (this.state.hasError) {
-      // Custom fallback UI provided via props
+      /** Custom fallback UI provided via props */
       if (this.props.fallback) {
         return this.props.fallback;
       }
 
-      // Default fallback UI using HeroUI Alert component
+      /** Default fallback UI using HeroUI Alert component */
       return (
         <div className="flex min-h-screen items-center justify-center p-4 bg-background">
           <div className="w-full max-w-2xl">

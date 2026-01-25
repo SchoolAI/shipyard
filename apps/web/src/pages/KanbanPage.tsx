@@ -23,6 +23,7 @@ import {
   getPlanIndexEntry,
   getPlanMetadata,
   type PlanIndexEntry,
+  PlanIndexEntrySchema,
   type PlanMetadata,
   type PlanStatusType,
   type StatusTransition,
@@ -64,6 +65,22 @@ import {
 } from '@/utils/uiPreferences';
 import { assertNever } from '../utils/assert-never';
 
+/** Type guard to validate PanelWidth values */
+function isPanelWidth(value: string | null): value is PanelWidth {
+  return value === 'peek' || value === 'expanded' || value === 'full';
+}
+
+/**
+ * Type guard to safely extract PlanIndexEntry from drag data.
+ */
+function getDragPlan(
+  data: { current?: { plan?: unknown } } | undefined
+): PlanIndexEntry | undefined {
+  const plan = data?.current?.plan;
+  const result = PlanIndexEntrySchema.safeParse(plan);
+  return result.success ? result.data : undefined;
+}
+
 /**
  * Determine the target column ID from a drag-drop event.
  */
@@ -71,10 +88,8 @@ function getTargetColumnId(event: DragEndEvent, allPlans: PlanIndexEntry[]): Col
   const { over } = event;
   if (!over) return null;
 
-  // Dropped directly on a column
   if (over.data.current?.type === 'column') {
-    const columnId = over.id as string;
-    // Validate that it's a valid ColumnId
+    const columnId = String(over.id);
     if (
       columnId === 'draft' ||
       columnId === 'in_review' ||
@@ -86,12 +101,10 @@ function getTargetColumnId(event: DragEndEvent, allPlans: PlanIndexEntry[]): Col
     return null;
   }
 
-  // Dropped on a card - get the card's current status and map to column ID
   if (over.data.current?.type === 'plan') {
     const targetPlan = allPlans.find((p) => p.id === over.id);
     if (!targetPlan) return null;
 
-    // Map status to column ID
     const status = targetPlan.status;
     switch (status) {
       case 'draft':
@@ -148,7 +161,6 @@ async function updatePlanStatus(
 ): Promise<void> {
   const now = Date.now();
 
-  // Update in plan-index CRDT (always succeeds for UI consistency)
   const entry = getPlanIndexEntry(indexDoc, planId);
   if (entry) {
     setPlanIndexEntry(indexDoc, {
@@ -158,23 +170,17 @@ async function updatePlanStatus(
     });
   }
 
-  // Build the appropriate transition for the target status
   const transition = buildDragDropTransition(newStatus, reviewedBy, now);
 
-  // Also update the plan's own metadata using type-safe transition
   try {
     const planDoc = new Y.Doc();
     const idb = new IndexeddbPersistence(planId, planDoc);
     await idb.whenSynced;
 
-    // Transition may fail if plan is in an unexpected state - that's OK for drag-drop UI
-    // The index update is the UI source of truth
     transitionPlanStatus(planDoc, transition);
 
     idb.destroy();
-  } catch {
-    // Plan doc may not exist locally - index update is sufficient
-  }
+  } catch {}
 }
 
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: page component orchestrates multiple state machines
@@ -183,7 +189,6 @@ export function KanbanPage() {
   const { localIdentity, setLocalIdentity } = useLocalIdentity();
   const [showAuthChoice, setShowAuthChoice] = useState(false);
   const [showLocalSignIn, setShowLocalSignIn] = useState(false);
-  // Use shared plan index context to avoid duplicate WebRTC providers
   const {
     myPlans,
     sharedPlans,
@@ -197,7 +202,6 @@ export function KanbanPage() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Combine all plans for the board (memoized to stabilize identity for useCallback deps)
   const allPlans = useMemo(
     () => [...myPlans, ...sharedPlans, ...inboxPlans],
     [myPlans, sharedPlans, inboxPlans]
@@ -221,29 +225,22 @@ export function KanbanPage() {
 
   const [activePlan, setActivePlan] = useState<PlanIndexEntry | null>(null);
 
-  // Space bar peek preview state
   const [hoveredCardId, setHoveredCardId] = useState<string | null>(null);
   const [isPeeking, setIsPeeking] = useState(false);
   const [peekPlanId, setPeekPlanId] = useState<string | null>(null);
 
-  // Slide-out panel state - read from URL on mount
   const searchParams = new URLSearchParams(location.search);
   const initialPanelId = searchParams.get('panel');
   const rawWidth = searchParams.get('width');
-  const validWidths: PanelWidth[] = ['peek', 'expanded', 'full'];
-  const initialWidth: PanelWidth = validWidths.includes(rawWidth as PanelWidth)
-    ? (rawWidth as PanelWidth)
-    : 'peek';
+  const initialWidth: PanelWidth = isPanelWidth(rawWidth) ? rawWidth : 'peek';
 
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(initialPanelId);
   const [panelWidth, setPanelWidth] = useState<PanelWidth>(initialWidth);
 
-  // Plan data for panel
   const [panelMetadata, setPanelMetadata] = useState<PlanMetadata | null>(null);
   const [panelDeliverableStats, setPanelDeliverableStats] = useState({ completed: 0, total: 0 });
   const [panelLastActivity, setPanelLastActivity] = useState('');
 
-  // Sync providers for selected plan
   const {
     ydoc: panelYdoc,
     syncState: panelSyncState,
@@ -251,7 +248,6 @@ export function KanbanPage() {
     rtcProvider: panelRtcProvider,
   } = useMultiProviderSync(selectedPlanId || '');
 
-  // Update URL when panel state changes
   useEffect(() => {
     if (selectedPlanId) {
       navigate(`?panel=${selectedPlanId}&width=${panelWidth}`, { replace: true });
@@ -260,7 +256,6 @@ export function KanbanPage() {
     }
   }, [selectedPlanId, panelWidth, navigate]);
 
-  // Load panel metadata when plan is selected
   useEffect(() => {
     if (!selectedPlanId || !panelSyncState.idbSynced) {
       setPanelMetadata(null);
@@ -272,12 +267,10 @@ export function KanbanPage() {
       const metadata = getPlanMetadata(panelYdoc);
       setPanelMetadata(metadata);
 
-      // Update deliverable stats
       const deliverables = getDeliverables(panelYdoc);
       const completed = deliverables.filter((d) => d.linkedArtifactId).length;
       setPanelDeliverableStats({ completed, total: deliverables.length });
 
-      // Format last activity
       if (metadata?.updatedAt) {
         setPanelLastActivity(`Updated ${formatRelativeTime(metadata.updatedAt)}`);
       }
@@ -289,19 +282,16 @@ export function KanbanPage() {
 
   const peekPlan = peekPlanId ? allPlans.find((p) => p.id === peekPlanId) : null;
 
-  // Space bar peek handlers
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Only trigger if Space and hovering over a card, not during drag
       if (e.code === 'Space' && hoveredCardId && !activePlan) {
-        // Don't trigger if typing in an input
         if (
           document.activeElement?.tagName === 'INPUT' ||
           document.activeElement?.tagName === 'TEXTAREA'
         ) {
           return;
         }
-        e.preventDefault(); // Prevent page scroll
+        e.preventDefault();
         setIsPeeking(true);
         setPeekPlanId(hoveredCardId);
       }
@@ -336,7 +326,6 @@ export function KanbanPage() {
     setIsPeeking(false);
   }, []);
 
-  // Panel handlers
   const handleCardClick = useCallback((planId: string) => {
     setSelectedPlanId(planId);
     setPanelWidth('peek');
@@ -350,21 +339,25 @@ export function KanbanPage() {
     setPanelWidth(width);
   }, []);
 
-  // Panel width cycling
   const cycleWidth = useCallback(
     (direction: 'expand' | 'collapse') => {
       const widths: PanelWidth[] = ['peek', 'expanded', 'full'];
       const currentIndex = widths.indexOf(panelWidth);
       if (direction === 'expand' && currentIndex < widths.length - 1) {
-        setPanelWidth(widths[currentIndex + 1] as PanelWidth);
+        const nextWidth = widths[currentIndex + 1];
+        if (nextWidth !== undefined) {
+          setPanelWidth(nextWidth);
+        }
       } else if (direction === 'collapse' && currentIndex > 0) {
-        setPanelWidth(widths[currentIndex - 1] as PanelWidth);
+        const prevWidth = widths[currentIndex - 1];
+        if (prevWidth !== undefined) {
+          setPanelWidth(prevWidth);
+        }
       }
     },
     [panelWidth]
   );
 
-  // Keyboard shortcuts for panel
   useKeyboardShortcuts({
     onTogglePanel: useCallback(() => {
       if (selectedPlanId) {
@@ -405,22 +398,18 @@ export function KanbanPage() {
     }, [selectedPlanId, allPlans]),
   });
 
-  // Review action handlers
   const handleApprove = useCallback(async () => {
     if (!selectedPlanId || !panelMetadata) return;
 
     const now = Date.now();
     const reviewedBy = githubIdentity?.displayName || githubIdentity?.username || 'Unknown';
 
-    // Use type-safe transition helper for plan doc
-    // Transition may fail if plan is in an unexpected state - that's OK for UI
     transitionPlanStatus(
       panelYdoc,
       { status: 'in_progress', reviewedAt: now, reviewedBy },
       reviewedBy
     );
 
-    // Also update index with the same timestamp
     const entry = getPlanIndexEntry(indexDoc, selectedPlanId);
     if (entry) {
       setPlanIndexEntry(indexDoc, {
@@ -435,12 +424,10 @@ export function KanbanPage() {
 
   const handleRequestChanges = useCallback(() => {
     if (!selectedPlanId) return;
-    // Navigate to full plan page for adding comments
     navigate(getPlanRoute(selectedPlanId));
     toast.info('Navigate to add comments and request changes');
   }, [selectedPlanId, navigate]);
 
-  // Identity for comments - Priority: GitHub > Local > null
   const identity = githubIdentity
     ? {
         id: githubIdentity.username,
@@ -470,12 +457,12 @@ export function KanbanPage() {
   const sensors = useSensors(
     useSensor(MouseSensor, {
       activationConstraint: {
-        distance: 8, // Require 8px movement before drag starts
+        distance: 8,
       },
     }),
     useSensor(TouchSensor, {
       activationConstraint: {
-        delay: 200, // Long press to start drag on touch
+        delay: 200,
         tolerance: 5,
       },
     }),
@@ -502,35 +489,36 @@ export function KanbanPage() {
 
   const announcements: Announcements = {
     onDragStart({ active }) {
-      const plan = active.data.current?.plan as PlanIndexEntry | undefined;
+      const plan = getDragPlan(active.data);
       return `Picked up task: ${plan?.title || 'unknown'}`;
     },
     onDragOver({ active, over }) {
-      const plan = active.data.current?.plan as PlanIndexEntry | undefined;
+      const plan = getDragPlan(active.data);
       if (over) {
         const columnData = over.data.current;
-        const status = (columnData?.status || columnData?.column?.id || 'unknown') as string;
+        const status = String(columnData?.status || columnData?.column?.id || 'unknown');
         return `Task ${plan?.title || 'unknown'} is over ${status.replace('_', ' ')} column`;
       }
       return `Task ${plan?.title || 'unknown'} is no longer over a droppable area`;
     },
     onDragEnd({ active, over }) {
-      const plan = active.data.current?.plan as PlanIndexEntry | undefined;
+      const plan = getDragPlan(active.data);
       if (over) {
         const columnData = over.data.current;
-        const status = (columnData?.status || columnData?.column?.id || 'unknown') as string;
+        const status = String(columnData?.status || columnData?.column?.id || 'unknown');
         return `Task ${plan?.title || 'unknown'} was moved to ${status.replace('_', ' ')} column`;
       }
       return `Drag cancelled for task: ${plan?.title || 'unknown'}`;
     },
     onDragCancel({ active }) {
-      const plan = active.data.current?.plan as PlanIndexEntry | undefined;
+      const plan = getDragPlan(active.data);
       return `Dragging was cancelled. Task ${plan?.title || 'unknown'} was not moved.`;
     },
   };
 
   const handleDragStart = (event: DragStartEvent) => {
-    const plan = allPlans.find((p) => p.id === event.active.id);
+    const planId = String(event.active.id);
+    const plan = allPlans.find((p) => p.id === planId);
     if (plan) {
       setActivePlan(plan);
     }
@@ -539,7 +527,7 @@ export function KanbanPage() {
   const handleDragEnd = async (event: DragEndEvent) => {
     setActivePlan(null);
 
-    const planId = event.active.id as string;
+    const planId = String(event.active.id);
     const plan = allPlans.find((p) => p.id === planId);
     if (!plan) return;
 
@@ -558,7 +546,6 @@ export function KanbanPage() {
     setActivePlan(null);
   };
 
-  // Prefer WebSocket when connected, fall back to WebRTC
   const activeProvider = panelWsProvider ?? panelRtcProvider;
 
   return (

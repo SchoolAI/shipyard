@@ -46,7 +46,6 @@ async function handleApproveUser(
 
   platform.info('[handleApproveUser] Processing approve request', { planId, userId });
 
-  // --- Authentication: Validate GitHub token ---
   if (!authToken) {
     platform.warn('[handleApproveUser] Missing auth token');
     sendErrorResponse(platform, ws, 'unauthenticated', 'Authentication required.');
@@ -60,7 +59,6 @@ async function handleApproveUser(
     return;
   }
 
-  // --- Authorization: Verify requester is plan owner ---
   const ownerId = await platform.getPlanOwnerId(planId);
   if (!ownerId) {
     platform.warn('[handleApproveUser] Plan not found', { planId });
@@ -77,7 +75,6 @@ async function handleApproveUser(
     return;
   }
 
-  // --- Update approval state ---
   const topic = `shipyard-${planId}`;
   let approvalState = await platform.getPlanApprovalState(planId);
 
@@ -91,7 +88,6 @@ async function handleApproveUser(
     };
   }
 
-  // Check if user is already approved
   if (approvalState.approvedUsers.includes(userId)) {
     platform.debug('[handleApproveUser] User already approved', { userId });
     platform.sendMessage(ws, {
@@ -102,17 +98,15 @@ async function handleApproveUser(
     return;
   }
 
-  // Move user from pending to approved
   const newState: PlanApprovalState = {
     ...approvalState,
     approvedUsers: [...new Set([...approvalState.approvedUsers, userId])],
     pendingUsers: approvalState.pendingUsers.filter((p) => p.userId !== userId),
-    rejectedUsers: approvalState.rejectedUsers.filter((id) => id !== userId), // Remove from rejected if was there
+    rejectedUsers: approvalState.rejectedUsers.filter((id) => id !== userId),
   };
 
   await platform.setPlanApprovalState(planId, newState);
 
-  // --- Notify the approved user ---
   platform.broadcastToTopic(
     topic,
     {
@@ -124,7 +118,6 @@ async function handleApproveUser(
     (sub) => platform.getConnectionUserId(sub) === userId
   );
 
-  // --- Confirm to owner ---
   platform.sendMessage(ws, {
     type: 'user_approved',
     planId,
@@ -153,7 +146,6 @@ async function handleRejectUser(
 
   platform.info('[handleRejectUser] Processing reject request', { planId, userId });
 
-  // --- Authentication: Validate GitHub token ---
   if (!authToken) {
     platform.warn('[handleRejectUser] Missing auth token');
     sendErrorResponse(platform, ws, 'unauthenticated', 'Authentication required.');
@@ -167,7 +159,6 @@ async function handleRejectUser(
     return;
   }
 
-  // --- Authorization: Verify requester is plan owner ---
   const ownerId = await platform.getPlanOwnerId(planId);
   if (!ownerId) {
     platform.warn('[handleRejectUser] Plan not found', { planId });
@@ -184,7 +175,6 @@ async function handleRejectUser(
     return;
   }
 
-  // --- Update approval state ---
   const topic = `shipyard-${planId}`;
   let approvalState = await platform.getPlanApprovalState(planId);
 
@@ -198,17 +188,15 @@ async function handleRejectUser(
     };
   }
 
-  // Move user to rejected list
   const newState: PlanApprovalState = {
     ...approvalState,
     rejectedUsers: [...new Set([...approvalState.rejectedUsers, userId])],
     pendingUsers: approvalState.pendingUsers.filter((p) => p.userId !== userId),
-    approvedUsers: approvalState.approvedUsers.filter((id) => id !== userId), // Remove from approved if was there
+    approvedUsers: approvalState.approvedUsers.filter((id) => id !== userId),
   };
 
   await platform.setPlanApprovalState(planId, newState);
 
-  // --- Notify the rejected user ---
   platform.broadcastToTopic(
     topic,
     {
@@ -220,7 +208,6 @@ async function handleRejectUser(
     (sub) => platform.getConnectionUserId(sub) === userId
   );
 
-  // --- Confirm to owner ---
   platform.sendMessage(ws, {
     type: 'user_rejected',
     planId,

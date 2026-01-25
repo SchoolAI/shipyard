@@ -6,6 +6,7 @@
 import { Accordion, Button, Chip, ListBox, ListBoxItem, Switch, Tooltip } from '@heroui/react';
 import {
   type AnyInputRequest,
+  AnyInputRequestSchema,
   assertNever,
   clearEventViewedBy,
   getPlanIndexEntry,
@@ -204,7 +205,7 @@ interface EventInboxItemProps {
 function EventInboxItem({ item, onView, onMarkRead, onMarkUnread }: EventInboxItemProps) {
   const { plan, event, isUnread } = item;
 
-  // Determine icon and description based on event type
+  /** Determine icon and description based on event type */
   const getEventDisplay = () => {
     switch (event.type) {
       case 'comment_added':
@@ -374,7 +375,7 @@ function EventInboxItem({ item, onView, onMarkRead, onMarkUnread }: EventInboxIt
   );
 }
 
-// --- Reusable Accordion Section Component ---
+/** --- Reusable Accordion Section Component --- */
 
 type InboxAccordionSectionProps = PropsWithChildren<{
   id: string;
@@ -414,14 +415,13 @@ function InboxAccordionSection({
         </Accordion.Trigger>
       </Accordion.Heading>
       <Accordion.Panel>
-        {/* biome-ignore lint/suspicious/noExplicitAny: React 18/19 type compatibility */}
-        <Accordion.Body>{children as any}</Accordion.Body>
+        <Accordion.Body>{children}</Accordion.Body>
       </Accordion.Panel>
     </Accordion.Item>
   );
 }
 
-// --- Helper functions extracted to reduce component complexity ---
+/** --- Helper functions extracted to reduce component complexity --- */
 
 /** Filter and sort inbox plans based on show read preference */
 function filterAndSortInboxPlans(
@@ -481,9 +481,12 @@ function useInputRequestEventListener(
 ) {
   useEffect(() => {
     const handleOpenInputRequest = (event: Event) => {
-      const customEvent = event as CustomEvent<AnyInputRequest>;
-      setCurrentInputRequest(customEvent.detail);
-      setInputRequestModalOpen(true);
+      if (!(event instanceof CustomEvent)) return;
+      const result = AnyInputRequestSchema.safeParse(event.detail);
+      if (result.success) {
+        setCurrentInputRequest(result.data);
+        setInputRequestModalOpen(true);
+      }
     };
 
     document.addEventListener('open-input-request', handleOpenInputRequest);
@@ -548,8 +551,10 @@ function navigateToAdjacentItem(
 
 /** Update plan metadata to in_progress status using type-safe transition helper */
 function updatePlanToInProgress(ydoc: Y.Doc, now: number, actor: string, reviewedBy: string): void {
-  // Transition may fail if plan is in an unexpected state - that's OK for drag-drop UI
-  // The index update is the primary source of truth
+  /*
+   * Transition may fail if plan is in an unexpected state - that's OK for drag-drop UI
+   * The index update is the primary source of truth
+   */
   transitionPlanStatus(ydoc, { status: 'in_progress', reviewedAt: now, reviewedBy }, actor);
 }
 
@@ -601,7 +606,7 @@ async function approvePlanInLocalDb(
     updatePlanToInProgress(planDoc, now, actor, reviewedBy);
     idb.destroy();
   } catch {
-    // Plan doc may not exist locally
+    /** Plan doc may not exist locally */
   }
 }
 
@@ -647,7 +652,7 @@ function getInboxStatusMessage(totalItems: number, allPlansCount: number): strin
   return `${totalItems} ${totalItems === 1 ? 'item needs' : 'items need'} your attention`;
 }
 
-// --- Event List Component - Reduces JSX complexity in main component ---
+/** --- Event List Component - Reduces JSX complexity in main component --- */
 
 interface EventItemListProps {
   items: InboxEventItem[];
@@ -674,7 +679,7 @@ function EventItemList({ items, onView, onMarkRead, onMarkUnread }: EventItemLis
   );
 }
 
-// --- Inbox Accordion Content Component - Moves conditional rendering out of main component ---
+/** --- Inbox Accordion Content Component - Moves conditional rendering out of main component --- */
 
 interface InboxAccordionContentProps {
   pendingRequests: AnyInputRequest[];
@@ -834,7 +839,7 @@ function InboxAccordionContent({
   );
 }
 
-// --- Detail Panel Component - Moves conditional rendering out of main component ---
+/** --- Detail Panel Component - Moves conditional rendering out of main component --- */
 
 interface InboxDetailPanelProps {
   isMobile: boolean;
@@ -889,7 +894,7 @@ function InboxDetailPanel({
 }
 
 export function InboxPage() {
-  // All hooks at top of component - called in same order every render
+  /** All hooks at top of component - called in same order every render */
   const navigate = useNavigate();
   const location = useLocation();
   const isMobile = useIsMobile();
@@ -908,58 +913,60 @@ export function InboxPage() {
   const [showRead, setShowRead] = useState(getInboxShowRead);
   const { actor } = useUserIdentity();
 
-  // Mobile panel state
+  /** Mobile panel state */
   const [mobilePanelWidth, setMobilePanelWidth] = useState<PanelWidth>('peek');
 
-  // Load event-based inbox items from ALL owned plans (not just inbox candidates)
-  // This ensures blockers/help requests show up regardless of plan status
+  /*
+   * Load event-based inbox items from ALL owned plans (not just inbox candidates)
+   * This ensures blockers/help requests show up regardless of plan status
+   */
   const eventBasedInbox = useInboxEvents(allOwnedPlans, githubIdentity?.username ?? null, indexDoc);
 
-  // Load input requests from the plan index doc
+  /** Load input requests from the plan index doc */
   const { pendingRequests } = useInputRequests({
     ydoc: indexDoc,
   });
 
-  // Input request modal state
+  /** Input request modal state */
   const [inputRequestModalOpen, setInputRequestModalOpen] = useState(false);
   const [currentInputRequest, setCurrentInputRequest] = useState<AnyInputRequest | null>(null);
 
-  // Selected plan state - read from URL on mount
+  /** Selected plan state - read from URL on mount */
   const searchParams = new URLSearchParams(location.search);
   const initialPanelId = searchParams.get('panel');
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(initialPanelId);
   const [selectedTab, setSelectedTab] = useState<PlanViewTab>('plan');
 
-  // Update show read preference
+  /** Update show read preference */
   const handleToggleShowRead = useCallback((value: boolean) => {
     setShowRead(value);
     setInboxShowRead(value);
   }, []);
 
-  // Filter inbox plans - extracted to helper
+  /** Filter inbox plans - extracted to helper */
   const sortedInboxPlans = useMemo(
     () => filterAndSortInboxPlans(allInboxPlans, showRead, selectedPlanId),
     [allInboxPlans, showRead, selectedPlanId]
   );
 
-  // Group inbox items by category - extracted to helper
+  /** Group inbox items by category - extracted to helper */
   const inboxGroups = useMemo(
     () => groupInboxEvents(sortedInboxPlans, eventBasedInbox, showRead, selectedPlanId),
     [sortedInboxPlans, eventBasedInbox, showRead, selectedPlanId]
   );
 
-  // Effects extracted to custom hooks
+  /** Effects extracted to custom hooks */
   useAutoDeselectReadPlan(selectedPlanId, allInboxPlans, showRead, setSelectedPlanId);
   usePanelUrlSync(selectedPlanId, navigate);
   useInputRequestEventListener(setCurrentInputRequest, setInputRequestModalOpen);
 
-  // Panel handlers
+  /** Panel handlers */
   const handleClosePanel = useCallback(() => {
     setSelectedPlanId(null);
     setSelectedTab('plan');
   }, []);
 
-  // Dismiss handler (mark as read)
+  /** Dismiss handler (mark as read) */
   const handleDismiss = useCallback(
     async (planId: string) => {
       await markPlanAsRead(planId);
@@ -968,7 +975,7 @@ export function InboxPage() {
     [markPlanAsRead]
   );
 
-  // Mark as unread handler
+  /** Mark as unread handler */
   const handleMarkUnread = useCallback(
     async (planId: string) => {
       await markPlanAsUnread(planId);
@@ -977,7 +984,7 @@ export function InboxPage() {
     [markPlanAsUnread]
   );
 
-  // Event read/unread handlers
+  /** Event read/unread handlers */
   const handleMarkEventRead = useCallback(
     (planId: string, eventId: string) => {
       if (!githubIdentity) return;
@@ -994,13 +1001,13 @@ export function InboxPage() {
     [indexDoc, githubIdentity]
   );
 
-  // Helper to find the next plan to select after dismissal - uses extracted helper
+  /** Helper to find the next plan to select after dismissal - uses extracted helper */
   const getNextSelectedId = useCallback(
     (currentIndex: number): string | null => getNextOrPrevId(sortedInboxPlans, currentIndex),
     [sortedInboxPlans]
   );
 
-  // Approve handler - uses extracted helpers to reduce complexity
+  /** Approve handler - uses extracted helpers to reduce complexity */
   const handleApprove = useCallback(
     async (planId: string) => {
       if (!githubIdentity) {
@@ -1017,13 +1024,13 @@ export function InboxPage() {
     [githubIdentity, indexDoc, actor]
   );
 
-  // Request changes handler
+  /** Request changes handler */
   const handleRequestChanges = useCallback((planId: string) => {
     setSelectedPlanId(planId);
     toast.info('Open panel to add comments and request changes');
   }, []);
 
-  // List selection handler - uses extracted helper
+  /** List selection handler - uses extracted helper */
   const handleListSelection = useCallback(
     (keys: Set<unknown> | 'all') => {
       const key = extractFirstSelectionKey(keys);
@@ -1038,13 +1045,13 @@ export function InboxPage() {
     [sortedInboxPlans, markPlanAsRead]
   );
 
-  // Event item view handler
+  /** Event item view handler */
   const handleViewEvent = useCallback((planId: string, tab?: PlanViewTab) => {
     setSelectedPlanId(planId);
     setSelectedTab(tab || 'plan');
   }, []);
 
-  // Panel approve handler - uses extracted helpers
+  /** Panel approve handler - uses extracted helpers */
   const handlePanelApprove = useCallback(
     async (context: PlanActionContext) => {
       if (!githubIdentity) {
@@ -1063,7 +1070,7 @@ export function InboxPage() {
     [githubIdentity, indexDoc, actor]
   );
 
-  // Panel request changes handler - works inline like approve
+  /** Panel request changes handler - works inline like approve */
   const handlePanelRequestChanges = useCallback(
     (context: PlanActionContext) => {
       if (!githubIdentity) {
@@ -1082,7 +1089,7 @@ export function InboxPage() {
     [githubIdentity, indexDoc, actor]
   );
 
-  // Status change handler for ReviewActions (updates plan index)
+  /** Status change handler for ReviewActions (updates plan index) */
   const handleStatusChange = useCallback(
     (newStatus: 'in_progress' | 'changes_requested', updatedAt: number) => {
       if (!selectedPlanId) return;
@@ -1099,7 +1106,7 @@ export function InboxPage() {
     [indexDoc, selectedPlanId]
   );
 
-  // Keyboard shortcut handlers - all extracted to top level
+  /** Keyboard shortcut handlers - all extracted to top level */
   const handleFullScreen = useCallback(() => {
     if (selectedPlanId) {
       setSidebarCollapsed(true);
@@ -1107,7 +1114,7 @@ export function InboxPage() {
     }
   }, [selectedPlanId, navigate]);
 
-  // Navigation handlers use extracted helper to reduce complexity
+  /** Navigation handlers use extracted helper to reduce complexity */
   const handleNextItem = useCallback(() => {
     navigateToAdjacentItem(selectedPlanId, sortedInboxPlans, 'next', setSelectedPlanId);
   }, [selectedPlanId, sortedInboxPlans]);
@@ -1124,7 +1131,7 @@ export function InboxPage() {
     setSelectedPlanId(getNextSelectedId(current.index));
   }, [selectedPlanId, sortedInboxPlans, handleDismiss, getNextSelectedId]);
 
-  // Keyboard shortcuts for panel
+  /** Keyboard shortcuts for panel */
   useKeyboardShortcuts({
     onFullScreen: handleFullScreen,
     onClose: handleClosePanel,
@@ -1137,7 +1144,7 @@ export function InboxPage() {
     return <TwoColumnSkeleton itemCount={3} showActions={true} titleWidth="w-20" />;
   }
 
-  // Calculate total inbox items - extracted to helper
+  /** Calculate total inbox items - extracted to helper */
   const totalInboxItems = calculateTotalInboxItems(
     sortedInboxPlans,
     inboxGroups,
@@ -1145,7 +1152,7 @@ export function InboxPage() {
   );
   const statusMessage = getInboxStatusMessage(totalInboxItems, allInboxPlans.length);
 
-  // Show zero state only if there are no items at all (including read items)
+  /** Show zero state only if there are no items at all (including read items) */
   if (totalInboxItems === 0 && allInboxPlans.length === 0) {
     return (
       <div className="h-full flex items-center justify-center p-4">

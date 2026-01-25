@@ -85,7 +85,7 @@ export function ActivityTimeline({ ydoc }: ActivityTimelineProps) {
     return () => eventsArray.unobserve(update);
   }, [ydoc]);
 
-  // Compute resolved request IDs once per render
+  /** Compute resolved request IDs once per render */
   const resolvedRequestIds = useMemo(() => getResolvedRequestIds(events), [events]);
 
   const grouped = groupEventsByDay(events);

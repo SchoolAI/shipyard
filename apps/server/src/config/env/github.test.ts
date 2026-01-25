@@ -1,7 +1,6 @@
 import { execSync } from 'node:child_process';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-// Mock execSync before importing the module
 vi.mock('node:child_process', () => ({
   execSync: vi.fn(),
 }));

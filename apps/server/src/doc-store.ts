@@ -27,7 +27,7 @@ type Mode = 'hub' | 'client' | 'uninitialized';
 
 let currentMode: Mode = 'uninitialized';
 
-// WebRTC providers for P2P sync (shared across both hub and client modes)
+/** WebRTC providers for P2P sync (shared across both hub and client modes) */
 const webrtcProviders = new Map<string, WebrtcProvider>();
 
 /**
@@ -41,7 +41,7 @@ export function initAsHub(): void {
     return;
   }
 
-  // No need to start anything - registry-server already has WebSocket support
+  /** No need to start anything - registry-server already has WebSocket support */
   currentMode = 'hub';
   logger.info('Doc store initialized as hub (registry server mode)');
 }
@@ -67,7 +67,7 @@ export async function initAsClient(registryPort: number): Promise<void> {
  * Also initializes WebRTC P2P provider for remote browser sync.
  */
 export async function getOrCreateDoc(docName: string): Promise<Y.Doc> {
-  // Get doc from hub or client
+  /** Get doc from hub or client */
   let doc: Y.Doc;
   switch (currentMode) {
     case 'hub':
@@ -77,20 +77,22 @@ export async function getOrCreateDoc(docName: string): Promise<Y.Doc> {
       doc = await hubGetOrCreateDoc(docName);
       break;
     case 'uninitialized':
-      // Fallback: if doc-store wasn't explicitly initialized, check if hub-client
-      // was initialized directly (for backwards compatibility during transition)
+      /*
+       * Fallback: if doc-store wasn't explicitly initialized, check if hub-client
+       * was initialized directly (for backwards compatibility during transition)
+       */
       if (isHubClientInitialized()) {
         currentMode = 'client';
         doc = await hubGetOrCreateDoc(docName);
       } else {
-        // Default to registry-server behavior for backwards compatibility
+        /** Default to registry-server behavior for backwards compatibility */
         logger.warn('Doc store not initialized, defaulting to registry server mode');
         currentMode = 'hub';
         doc = await registryGetOrCreateDoc(docName);
       }
   }
 
-  // Add WebRTC provider for P2P sync (enabled by default)
+  /** Add WebRTC provider for P2P sync (enabled by default) */
   if (!webrtcProviders.has(docName)) {
     try {
       const provider = await createWebRtcProvider(doc, docName);
@@ -98,7 +100,7 @@ export async function getOrCreateDoc(docName: string): Promise<Y.Doc> {
       logger.info({ docName }, 'WebRTC P2P sync enabled for plan');
     } catch (error) {
       logger.error({ error, docName }, 'Failed to create WebRTC provider - P2P sync unavailable');
-      // Continue without WebRTC - local sync still works
+      /** Continue without WebRTC - local sync still works */
     }
   }
 
@@ -113,13 +115,13 @@ export async function getOrCreateDoc(docName: string): Promise<Y.Doc> {
 export async function hasActiveConnections(planId: string): Promise<boolean> {
   switch (currentMode) {
     case 'hub':
-      // Sync function in hub mode
+      /** Sync function in hub mode */
       return registryHasActiveConnections(planId);
     case 'client':
-      // Async function in client mode
+      /** Async function in client mode */
       return await hubHasActiveConnections(planId);
     case 'uninitialized':
-      // In uninitialized state, assume no connections
+      /** In uninitialized state, assume no connections */
       return false;
   }
 }
@@ -136,13 +138,13 @@ export function getMode(): Mode {
  * Destroys WebRTC providers and client connections.
  */
 export async function destroy(): Promise<void> {
-  // Clean up all WebRTC providers
+  /** Clean up all WebRTC providers */
   for (const [docName, provider] of webrtcProviders.entries()) {
     destroyWebRtcProvider(provider, docName);
   }
   webrtcProviders.clear();
 
-  // Clean up hub client if in client mode
+  /** Clean up hub client if in client mode */
   if (currentMode === 'client') {
     await destroyHubClient();
   }

@@ -37,14 +37,12 @@ export function ChoiceInput({
   const customInputRef = useRef<HTMLInputElement>(null);
   const rawOptions = request.options || [];
 
-  // Auto-focus custom input when "Other" is selected
   useEffect(() => {
     if (isOtherSelected && customInputRef.current) {
       customInputRef.current.focus();
     }
   }, [isOtherSelected]);
 
-  // Show error if no options available
   if (rawOptions.length === 0) {
     return (
       <Alert status="danger">
@@ -59,16 +57,12 @@ export function ChoiceInput({
     );
   }
 
-  // Normalize options to handle both string[] (old) and object[] (new) formats
   const options = normalizeChoiceOptions(rawOptions);
 
-  // Auto-select UI based on option count or displayAs override
-  // displayAs takes precedence, otherwise auto-switch at threshold
   const shouldUseDropdown =
     request.displayAs === 'dropdown' ||
     (!request.displayAs && !request.multiSelect && options.length >= CHOICE_DROPDOWN_THRESHOLD);
 
-  // Render the "Other" text input field (shared between single and multi-select)
   const otherInputField = isOtherSelected && (
     <TextField className="mt-3 ml-6">
       <Label className="text-sm text-muted-foreground">Please specify:</Label>
@@ -82,7 +76,6 @@ export function ChoiceInput({
     </TextField>
   );
 
-  // Dropdown UI for long option lists (single-select only)
   if (shouldUseDropdown) {
     const selectedValue = typeof value === 'string' ? value : '';
     return (
@@ -142,7 +135,6 @@ export function ChoiceInput({
     );
   }
 
-  // Multi-select mode with checkboxes
   if (request.multiSelect) {
     return (
       <div className="space-y-3">
@@ -182,7 +174,6 @@ export function ChoiceInput({
     );
   }
 
-  // Single-select mode with radio buttons
   return (
     <div className="space-y-3">
       <MarkdownContent content={request.message} variant="default" />

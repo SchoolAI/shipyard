@@ -29,7 +29,7 @@ async function retryWithBackoff<T>(
     try {
       return await fn();
     } catch (err) {
-      lastError = err as Error;
+      lastError = err instanceof Error ? err : new Error(String(err));
       if (attempt < maxAttempts - 1) {
         const delay = attempt === 0 ? 0 : baseDelay * 2 ** (attempt - 1);
         await new Promise((resolve) => setTimeout(resolve, delay));
@@ -143,7 +143,7 @@ describe('retryWithBackoff', () => {
       expect.fail('Should have thrown');
     } catch (err) {
       expect(err).toBe(originalError);
-      expect((err as Error).message).toBe('Specific error message');
+      expect(err instanceof Error ? err.message : String(err)).toBe('Specific error message');
     }
   });
 

@@ -16,12 +16,12 @@
  * because y-websocket confirms sync before returning from operations.
  */
 
-import { ROUTES } from '@shipyard/schema';
+import { HasConnectionsResponseSchema, ROUTES } from '@shipyard/schema';
 import { WebsocketProvider } from 'y-websocket';
 import * as Y from 'yjs';
 import { logger } from './logger.js';
 
-// Track providers and docs for this client instance
+/** Track providers and docs for this client instance */
 const providers = new Map<string, WebsocketProvider>();
 const docs = new Map<string, Y.Doc>();
 
@@ -55,7 +55,7 @@ export function isHubClientInitialized(): boolean {
  * This replaces the local WebSocket server pattern.
  */
 export async function getOrCreateDoc(docName: string): Promise<Y.Doc> {
-  // Return cached doc if exists
+  /** Return cached doc if exists */
   const existing = docs.get(docName);
   if (existing) {
     return existing;
@@ -65,11 +65,11 @@ export async function getOrCreateDoc(docName: string): Promise<Y.Doc> {
     throw new Error('Hub client not initialized. Call initHubClient() first.');
   }
 
-  // Create new Y.Doc
+  /** Create new Y.Doc */
   const doc = new Y.Doc();
   docs.set(docName, doc);
 
-  // Connect to hub via WebSocket
+  /** Connect to hub via WebSocket */
   const hubUrl = `ws://localhost:${hubPort}`;
   const provider = new WebsocketProvider(hubUrl, docName, doc, {
     connect: true,
@@ -78,18 +78,20 @@ export async function getOrCreateDoc(docName: string): Promise<Y.Doc> {
 
   providers.set(docName, provider);
 
-  // Wait for initial sync before returning - REQUIRED for data integrity
+  /** Wait for initial sync before returning - REQUIRED for data integrity */
   await new Promise<void>((resolve, reject) => {
-    // Check if already synced (can happen if WebSocket connects immediately)
+    /** Check if already synced (can happen if WebSocket connects immediately) */
     if (provider.synced) {
       logger.debug({ docName }, 'Provider already synced');
       resolve();
       return;
     }
 
-    // Use 'sync' event with isSynced parameter (more reliable than 'once')
-    // The 'sync' event fires when the document is synchronized with the server.
-    // For empty documents, this happens immediately after WebSocket connection.
+    /*
+     * Use 'sync' event with isSynced parameter (more reliable than 'once')
+     * The 'sync' event fires when the document is synchronized with the server.
+     * For empty documents, this happens immediately after WebSocket connection.
+     */
     const onSync = (isSynced: boolean) => {
       if (isSynced) {
         logger.debug({ docName }, 'Provider synced via sync event');
@@ -101,8 +103,10 @@ export async function getOrCreateDoc(docName: string): Promise<Y.Doc> {
 
     provider.on('sync', onSync);
 
-    // Timeout after 10 seconds - FAIL instead of proceeding with empty doc
-    // Client MCPs MUST sync with hub to avoid data divergence
+    /*
+     * Timeout after 10 seconds - FAIL instead of proceeding with empty doc
+     * Client MCPs MUST sync with hub to avoid data divergence
+     */
     const timeoutId = setTimeout(() => {
       if (!provider.synced) {
         provider.off('sync', onSync);
@@ -112,9 +116,11 @@ export async function getOrCreateDoc(docName: string): Promise<Y.Doc> {
     }, 10000);
   });
 
-  // NOTE: Do NOT attach observers here - hub handles all observer notifications
-  // Client MCPs just receive updates via y-websocket sync
-  // Attaching observers on client would cause duplicate notifications
+  /*
+   * NOTE: Do NOT attach observers here - hub handles all observer notifications
+   * Client MCPs just receive updates via y-websocket sync
+   * Attaching observers on client would cause duplicate notifications
+   */
 
   logger.info({ docName, hubUrl }, 'Connected to hub for document sync');
   return doc;
@@ -134,10 +140,10 @@ export async function hasActiveConnections(planId: string): Promise<boolean> {
 
     if (!res.ok) return false;
 
-    const data = (await res.json()) as { hasConnections: boolean };
+    const data = HasConnectionsResponseSchema.parse(await res.json());
     return data.hasConnections;
   } catch {
-    // Fail open - allow browser to open on error
+    /** Fail open - allow browser to open on error */
     return false;
   }
 }

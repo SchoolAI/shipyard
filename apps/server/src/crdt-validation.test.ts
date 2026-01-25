@@ -14,7 +14,6 @@ import {
   validateYDoc,
 } from './crdt-validation.js';
 
-// Mock the logger to capture error logs
 vi.mock('./logger.js', () => ({
   logger: {
     debug: vi.fn(),
@@ -30,7 +29,6 @@ describe('CRDT Validation', () => {
 
   beforeEach(() => {
     doc = new Y.Doc();
-    // Initialize with valid metadata
     const metadata = doc.getMap(YDOC_KEYS.METADATA);
     metadata.set('id', planId);
     metadata.set('title', 'Test Plan');
@@ -50,7 +48,7 @@ describe('CRDT Validation', () => {
 
       expect(report.isCorrupted).toBe(false);
       expect(report.planId).toBe(planId);
-      expect(report.results).toHaveLength(8); // metadata + 7 arrays
+      expect(report.results).toHaveLength(8);
       expect(report.results.every((r) => r.valid)).toBe(true);
     });
 
@@ -68,8 +66,7 @@ describe('CRDT Validation', () => {
 
     it('should detect invalid artifact in array', () => {
       const artifacts = doc.getArray(YDOC_KEYS.ARTIFACTS);
-      // Push invalid artifact (missing required fields)
-      artifacts.push([{ id: '123', type: 'image' }]); // Missing storage, filename
+      artifacts.push([{ id: '123', type: 'image' }]);
 
       const report = validateYDoc(doc, planId);
 
@@ -103,8 +100,7 @@ describe('CRDT Validation', () => {
 
     it('should detect invalid linked PR', () => {
       const linkedPRs = doc.getArray(YDOC_KEYS.LINKED_PRS);
-      // Push invalid PR (missing required fields)
-      linkedPRs.push([{ prNumber: 42 }]); // Missing url, linkedAt, status
+      linkedPRs.push([{ prNumber: 42 }]);
 
       const report = validateYDoc(doc, planId);
 
@@ -115,8 +111,7 @@ describe('CRDT Validation', () => {
 
     it('should detect invalid deliverable', () => {
       const deliverables = doc.getArray(YDOC_KEYS.DELIVERABLES);
-      // Push invalid deliverable (missing required text field)
-      deliverables.push([{ id: 'del-1' }]); // Missing text
+      deliverables.push([{ id: 'del-1' }]);
 
       const report = validateYDoc(doc, planId);
 
@@ -127,7 +122,6 @@ describe('CRDT Validation', () => {
 
     it('should detect invalid plan event', () => {
       const events = doc.getArray(YDOC_KEYS.EVENTS);
-      // Push invalid event (invalid type)
       events.push([
         {
           id: 'evt-1',
@@ -146,7 +140,6 @@ describe('CRDT Validation', () => {
 
     it('should detect invalid input request', () => {
       const inputRequests = doc.getArray(YDOC_KEYS.INPUT_REQUESTS);
-      // Push invalid input request (choice type without options)
       inputRequests.push([
         {
           id: 'req-1',
@@ -154,7 +147,6 @@ describe('CRDT Validation', () => {
           message: 'Choose one',
           status: 'pending',
           createdAt: Date.now(),
-          // Missing required 'options' for choice type
         },
       ]);
 
@@ -167,7 +159,6 @@ describe('CRDT Validation', () => {
 
     it('should detect mixed valid and invalid items', () => {
       const artifacts = doc.getArray(YDOC_KEYS.ARTIFACTS);
-      // Push one valid and one invalid
       artifacts.push([
         {
           id: 'art-1',
@@ -176,7 +167,7 @@ describe('CRDT Validation', () => {
           storage: 'github',
           url: 'https://example.com/valid.png',
         },
-        { id: 'art-2', type: 'image' }, // Invalid - missing fields
+        { id: 'art-2', type: 'image' },
       ]);
 
       const report = validateYDoc(doc, planId);
@@ -193,15 +184,12 @@ describe('CRDT Validation', () => {
     it('should track corruption state when invalid data is added', () => {
       attachCRDTValidation(planId, doc);
 
-      // Initially not corrupted
       expect(isPlanCorrupted(planId)).toBe(false);
       expect(getCorruptedKeys(planId)).toEqual([]);
 
-      // Add invalid artifact
       const artifacts = doc.getArray(YDOC_KEYS.ARTIFACTS);
-      artifacts.push([{ id: 'bad', type: 'image' }]); // Invalid
+      artifacts.push([{ id: 'bad', type: 'image' }]);
 
-      // Now corrupted
       expect(isPlanCorrupted(planId)).toBe(true);
       expect(getCorruptedKeys(planId)).toContain(YDOC_KEYS.ARTIFACTS);
     });
@@ -209,13 +197,11 @@ describe('CRDT Validation', () => {
     it('should clear corruption state when data becomes valid', () => {
       attachCRDTValidation(planId, doc);
 
-      // Add invalid artifact
       const artifacts = doc.getArray(YDOC_KEYS.ARTIFACTS);
       artifacts.push([{ id: 'bad', type: 'image' }]);
 
       expect(isPlanCorrupted(planId)).toBe(true);
 
-      // Remove invalid and add valid
       artifacts.delete(0, 1);
       artifacts.push([
         {
@@ -227,7 +213,6 @@ describe('CRDT Validation', () => {
         },
       ]);
 
-      // Should be cleared
       expect(isPlanCorrupted(planId)).toBe(false);
     });
 
@@ -236,7 +221,6 @@ describe('CRDT Validation', () => {
 
       expect(isPlanCorrupted(planId)).toBe(false);
 
-      // Corrupt metadata with invalid status
       const metadata = doc.getMap(YDOC_KEYS.METADATA);
       metadata.set('status', 'hacked-status');
 
@@ -247,15 +231,12 @@ describe('CRDT Validation', () => {
     it('should validate multiple arrays independently', () => {
       attachCRDTValidation(planId, doc);
 
-      // Corrupt artifacts
       const artifacts = doc.getArray(YDOC_KEYS.ARTIFACTS);
       artifacts.push([{ id: 'bad' }]);
 
-      // Corrupt deliverables
       const deliverables = doc.getArray(YDOC_KEYS.DELIVERABLES);
       deliverables.push([{ id: 'bad' }]);
 
-      // Both should be flagged
       const corruptedKeys = getCorruptedKeys(planId);
       expect(corruptedKeys).toContain(YDOC_KEYS.ARTIFACTS);
       expect(corruptedKeys).toContain(YDOC_KEYS.DELIVERABLES);
@@ -266,16 +247,13 @@ describe('CRDT Validation', () => {
     it('should clear all corruption state', () => {
       attachCRDTValidation(planId, doc);
 
-      // Add some corruption
       const artifacts = doc.getArray(YDOC_KEYS.ARTIFACTS);
       artifacts.push([{ id: 'bad' }]);
 
       expect(isPlanCorrupted(planId)).toBe(true);
 
-      // Detach
       detachCRDTValidation(planId);
 
-      // State should be cleared
       expect(isPlanCorrupted(planId)).toBe(false);
       expect(getCorruptedKeys(planId)).toEqual([]);
     });
@@ -296,7 +274,6 @@ describe('CRDT Validation', () => {
 
     it('should handle null items in arrays gracefully', () => {
       const artifacts = doc.getArray(YDOC_KEYS.ARTIFACTS);
-      // Push null (this shouldn't happen in practice, but testing resilience)
       artifacts.push([null as unknown as object]);
 
       const report = validateYDoc(doc, planId);
@@ -309,7 +286,6 @@ describe('CRDT Validation', () => {
     it('should validate pending_review status requires reviewRequestId', () => {
       const metadata = doc.getMap(YDOC_KEYS.METADATA);
       metadata.set('status', 'pending_review');
-      // Missing reviewRequestId
 
       const report = validateYDoc(doc, planId);
 
@@ -331,7 +307,6 @@ describe('CRDT Validation', () => {
     it('should validate in_progress status requires review fields', () => {
       const metadata = doc.getMap(YDOC_KEYS.METADATA);
       metadata.set('status', 'in_progress');
-      // Missing reviewedAt and reviewedBy
 
       const report = validateYDoc(doc, planId);
 

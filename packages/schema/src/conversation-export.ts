@@ -49,14 +49,31 @@ export type A2AFilePart = z.infer<typeof A2AFilePartSchema>;
  * A2A Part schema - validates any of the three part types
  * Uses a custom approach to avoid Zod v4 issues with union arrays
  */
+/**
+ * Type guard helper to check for property existence and type.
+ * Avoids unsafe type assertions in validation logic.
+ */
+function hasStringProperty(obj: Record<string, unknown>, prop: string): boolean {
+  return prop in obj && typeof obj[prop] === 'string';
+}
+
+/**
+ * Convert passthrough object to Record for safe property access.
+ * Uses Object.fromEntries/entries to avoid type assertions.
+ */
+function toRecord(obj: object): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(obj));
+}
+
 export const A2APartSchema = z
   .object({
     type: z.enum(['text', 'data', 'file']),
   })
   .passthrough()
   .superRefine((val, ctx) => {
+    const record = toRecord(val);
     if (val.type === 'text') {
-      if (typeof (val as { text?: unknown }).text !== 'string') {
+      if (!hasStringProperty(record, 'text')) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           message: 'text part must have a string text field',
@@ -70,7 +87,7 @@ export const A2APartSchema = z
         });
       }
     } else if (val.type === 'file') {
-      if (typeof (val as { uri?: unknown }).uri !== 'string') {
+      if (!hasStringProperty(record, 'uri')) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           message: 'file part must have a string uri field',
@@ -93,7 +110,7 @@ export type A2APart = A2ATextPart | A2ADataPart | A2AFilePart;
  */
 function isValidA2APart(part: unknown): boolean {
   if (!part || typeof part !== 'object') return false;
-  const p = part as Record<string, unknown>;
+  const p = toRecord(part);
   const t = p.type;
   if (t === 'text') {
     return typeof p.text === 'string';
@@ -123,22 +140,41 @@ export const A2AMessageSchema = z
     referenceTaskIds: z.array(z.string()).optional(),
     metadata: z.record(z.string(), z.unknown()).optional(),
     extensions: z.array(z.string()).optional(),
+    parts: z.array(z.unknown()),
   })
   .passthrough()
   .refine(
     (val) => {
-      const parts = (val as Record<string, unknown>).parts;
-      return isValidA2AParts(parts);
+      return isValidA2AParts(val.parts);
     },
     {
       message: 'Invalid parts array - each part must have valid type and required fields',
       path: ['parts'],
     }
   )
-  .transform((val) => ({
-    ...val,
-    parts: (val as unknown as { parts: A2APart[] }).parts,
-  }));
+  .transform((val) => {
+    /** After refine validates, parts is guaranteed to be A2APart[] */
+    const parts: A2APart[] = val.parts.map((p) => {
+      if (!p || typeof p !== 'object') {
+        throw new Error('Invalid part: not an object');
+      }
+      const record = toRecord(p);
+      const partType = record.type;
+      if (partType === 'text') {
+        return { type: 'text' as const, text: String(record.text) };
+      } else if (partType === 'data') {
+        return { type: 'data' as const, data: record.data };
+      } else {
+        return {
+          type: 'file' as const,
+          uri: String(record.uri),
+          mediaType: typeof record.mediaType === 'string' ? record.mediaType : undefined,
+          name: typeof record.name === 'string' ? record.name : undefined,
+        };
+      }
+    });
+    return { ...val, parts };
+  });
 export type A2AMessage = {
   messageId: string;
   role: 'user' | 'agent';
@@ -197,8 +233,17 @@ const ClaudeCodeToolResultBlockSchema = z.object({
 type ClaudeCodeToolResultBlock = z.infer<typeof ClaudeCodeToolResultBlockSchema>;
 
 /**
+ * Union type for Claude Code content blocks
+ */
+type ClaudeCodeContentBlock =
+  | ClaudeCodeTextBlock
+  | ClaudeCodeToolUseBlock
+  | ClaudeCodeToolResultBlock;
+
+/**
  * Claude Code content block schema
- * Uses a custom approach to avoid Zod v4 issues with union arrays
+ * Uses a custom approach to avoid Zod v4 issues with union arrays.
+ * The transform at the end ensures the output type is properly narrowed.
  */
 const ClaudeCodeContentBlockSchema = z
   .object({
@@ -206,7 +251,7 @@ const ClaudeCodeContentBlockSchema = z
   })
   .passthrough()
   .superRefine((val, ctx) => {
-    const typedVal = val as Record<string, unknown>;
+    const typedVal = toRecord(val);
     if (val.type === 'text') {
       if (typeof typedVal.text !== 'string') {
         ctx.addIssue({
@@ -241,11 +286,33 @@ const ClaudeCodeContentBlockSchema = z
         });
       }
     }
+  })
+  .transform((val): ClaudeCodeContentBlock => {
+    const record = toRecord(val);
+    switch (val.type) {
+      case 'text':
+        return { type: 'text', text: String(record.text) };
+      case 'tool_use': {
+        const inputVal = record.input;
+        if (!inputVal || typeof inputVal !== 'object') {
+          throw new Error('Invalid tool_use: input is not an object');
+        }
+        return {
+          type: 'tool_use',
+          id: String(record.id),
+          name: String(record.name),
+          input: toRecord(inputVal),
+        };
+      }
+      case 'tool_result':
+        return {
+          type: 'tool_result',
+          tool_use_id: String(record.tool_use_id),
+          content: record.content,
+          is_error: typeof record.is_error === 'boolean' ? record.is_error : undefined,
+        };
+    }
   });
-type ClaudeCodeContentBlock =
-  | ClaudeCodeTextBlock
-  | ClaudeCodeToolUseBlock
-  | ClaudeCodeToolResultBlock;
 
 /**
  * Claude Code token usage
@@ -401,9 +468,7 @@ function convertContentBlock(block: ClaudeCodeContentBlock): A2APart[] {
 function convertMessage(msg: ClaudeCodeMessage, contextId: string): A2AMessage {
   const role = msg.message.role === 'user' ? 'user' : 'agent';
 
-  const parts: A2APart[] = msg.message.content.flatMap((block) =>
-    convertContentBlock(block as ClaudeCodeContentBlock)
-  );
+  const parts: A2APart[] = msg.message.content.flatMap((block) => convertContentBlock(block));
 
   return {
     messageId: msg.uuid,
@@ -539,7 +604,9 @@ export function summarizeA2AConversation(
   const title = extractTitleFromMessage(firstUserMessage);
 
   const messagesToSummarize = messages.slice(0, maxMessages);
-  const summaryLines = messagesToSummarize.map(summarizeMessage).filter(Boolean) as string[];
+  const summaryLines = messagesToSummarize
+    .map(summarizeMessage)
+    .filter((line): line is string => typeof line === 'string');
 
   if (messages.length > maxMessages) {
     summaryLines.push(`... and ${messages.length - maxMessages} more messages`);
@@ -575,9 +642,9 @@ interface ToolResultData {
 
 function isToolUseData(data: unknown): data is ToolUseData {
   if (!data || typeof data !== 'object') return false;
-  const d = data as Record<string, unknown>;
+  const d = toRecord(data);
   if (!d.toolUse || typeof d.toolUse !== 'object') return false;
-  const toolUse = d.toolUse as Record<string, unknown>;
+  const toolUse = toRecord(d.toolUse);
   return (
     typeof toolUse.name === 'string' &&
     typeof toolUse.id === 'string' &&
@@ -587,9 +654,9 @@ function isToolUseData(data: unknown): data is ToolUseData {
 
 function isToolResultData(data: unknown): data is ToolResultData {
   if (!data || typeof data !== 'object') return false;
-  const d = data as Record<string, unknown>;
+  const d = toRecord(data);
   if (!d.toolResult || typeof d.toolResult !== 'object') return false;
-  const toolResult = d.toolResult as Record<string, unknown>;
+  const toolResult = toRecord(d.toolResult);
   return typeof toolResult.toolUseId === 'string';
 }
 
@@ -618,7 +685,7 @@ function convertA2APartToContentBlock(part: A2APart): ClaudeCodeContentBlock[] {
             type: 'tool_use',
             id: data.toolUse.id,
             name: data.toolUse.name,
-            input: data.toolUse.input as Record<string, unknown>,
+            input: data.toolUse.input,
           },
         ];
       }
@@ -650,9 +717,31 @@ function convertA2APartToContentBlock(part: A2APart): ClaudeCodeContentBlock[] {
         },
       ];
 
-    default:
-      return assertNever(part as never);
+    default: {
+      const _exhaustiveCheck: never = part;
+      throw new Error(`Unhandled part type: ${JSON.stringify(_exhaustiveCheck)}`);
+    }
   }
+}
+
+/**
+ * Zod schema for Claude Code usage metadata
+ */
+const UsageMetadataSchema = z.object({
+  input_tokens: z.number(),
+  output_tokens: z.number(),
+  cache_creation_input_tokens: z.number().optional(),
+  cache_read_input_tokens: z.number().optional(),
+});
+
+type UsageMetadata = z.infer<typeof UsageMetadataSchema>;
+
+/**
+ * Parse and validate usage metadata from A2A message metadata.
+ */
+function parseUsageMetadata(usage: unknown): UsageMetadata | undefined {
+  const result = UsageMetadataSchema.safeParse(usage);
+  return result.success ? result.data : undefined;
 }
 
 /**
@@ -677,14 +766,7 @@ function convertA2AToClaudeCodeMessage(
   const timestamp =
     typeof metadata.timestamp === 'string' ? metadata.timestamp : new Date().toISOString();
   const model = typeof metadata.model === 'string' ? metadata.model : undefined;
-  const usage = metadata.usage as
-    | {
-        input_tokens: number;
-        output_tokens: number;
-        cache_creation_input_tokens?: number;
-        cache_read_input_tokens?: number;
-      }
-    | undefined;
+  const usage = parseUsageMetadata(metadata.usage);
   const costUSD = typeof metadata.costUSD === 'number' ? metadata.costUSD : undefined;
   const durationMs = typeof metadata.durationMs === 'number' ? metadata.durationMs : undefined;
 

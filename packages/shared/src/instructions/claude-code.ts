@@ -39,10 +39,12 @@ The hook automatically injects everything you need (planId, sessionToken, delive
 Just call \`${TOOL_NAMES.ADD_ARTIFACT}\` with the file path and deliverable ID.
 
 \`\`\`typescript
-// Example: After approval, you'll have these in context
-// planId: "abc123"
-// sessionToken: "xyz..."
-// deliverables: [{ id: "del_xxx", text: "Screenshot of login" }]
+/**
+ * Example: After approval, you'll have these in context
+ * planId: "abc123"
+ * sessionToken: "xyz..."
+ * deliverables: [{ id: "del_xxx", text: "Screenshot of login" }]
+ */
 
 await addArtifact({
   planId,

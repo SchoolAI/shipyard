@@ -3,6 +3,8 @@
  * These endpoints are called by the Claude Code hook to manage plan sessions.
  */
 
+import type { Deliverable } from '@schema/plan.js';
+import { DeliverableSchema } from '@schema/plan.js';
 import type * as Y from 'yjs';
 import { z } from 'zod';
 import type { Logger } from '../context.js';
@@ -32,7 +34,7 @@ import { publicProcedure, router } from '../trpc.js';
 export type ApprovalResult =
   | {
       approved: true;
-      deliverables: unknown[];
+      deliverables: Deliverable[];
       reviewComment?: string;
       reviewedBy: string;
       status: 'in_progress';
@@ -133,7 +135,7 @@ export const hookRouter = router({
       z.object({
         approved: z.boolean(),
         feedback: z.string().optional(),
-        deliverables: z.array(z.any()).optional(),
+        deliverables: z.array(DeliverableSchema).optional(),
         reviewComment: z.string().optional(),
         reviewedBy: z.string().optional(),
         status: z.string().optional(),

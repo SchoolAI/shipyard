@@ -6,7 +6,6 @@
 import { TRPCError } from '@trpc/server';
 import {
   ChangesResponseSchema,
-  type ChangeType,
   CreateSubscriptionRequestSchema,
   CreateSubscriptionResponseSchema,
   DeleteSubscriptionResponseSchema,
@@ -32,7 +31,7 @@ export const subscriptionRouter = router({
 
       const clientId = planStore.createSubscription({
         planId,
-        subscribe: (subscribe || ['status']) as ChangeType[],
+        subscribe: subscribe ?? ['status'],
         windowMs: windowMs ?? 5000,
         maxWindowMs: maxWindowMs ?? 30000,
         threshold: threshold ?? 1,

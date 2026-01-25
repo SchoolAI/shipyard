@@ -20,7 +20,6 @@ import {
   setAgentPresence,
   setPlanIndexEntry,
   setPlanMetadata,
-  type Thread,
   UpdatePlanContentRequestSchema,
   UpdatePresenceRequestSchema,
   YDOC_KEYS,
@@ -62,8 +61,12 @@ function extractTitleFromBlocks(blocks: Block[]): string {
     return UNTITLED;
   }
 
-  const text = (firstContent as { text: string }).text;
-  // For headings, use full text; for paragraphs, truncate
+  const record = Object.fromEntries(Object.entries(firstContent));
+  const text = record.text;
+  if (typeof text !== 'string') {
+    return UNTITLED;
+  }
+  /** For headings, use full text; for paragraphs, truncate */
   if (firstBlock.type === 'heading') {
     return text;
   }
@@ -74,7 +77,7 @@ export async function handleCreateSession(req: Request, res: Response): Promise<
   try {
     const input = CreateHookSessionRequestSchema.parse(req.body);
 
-    // Check if session already exists (idempotent - handles CLI process restarts)
+    /** Check if session already exists (idempotent - handles CLI process restarts) */
     const existingSession = getSessionState(input.sessionId);
     if (existingSession) {
       const url = createPlanWebUrl(webConfig.SHIPYARD_WEB_URL, existingSession.planId);
@@ -82,7 +85,8 @@ export async function handleCreateSession(req: Request, res: Response): Promise<
         { planId: existingSession.planId, sessionId: input.sessionId },
         'Returning existing session (idempotent)'
       );
-      res.json({ planId: existingSession.planId, url } as CreateHookSessionResponse);
+      const response: CreateHookSessionResponse = { planId: existingSession.planId, url };
+      res.json(response);
       return;
     }
 
@@ -205,7 +209,6 @@ export async function handleUpdateContent(req: Request, res: Response): Promise<
         }
         editor.blocksToYXmlFragment(blocks, fragment);
 
-        // Clear existing deliverables first to prevent duplicates on content updates
         const deliverablesArray = ydoc.getArray(YDOC_KEYS.DELIVERABLES);
         deliverablesArray.delete(0, deliverablesArray.length);
 
@@ -266,7 +269,7 @@ export async function handleGetReview(req: Request, res: Response): Promise<void
       return;
     }
 
-    // Build discriminated union response based on status
+    /** Build discriminated union response based on status */
     let response: GetReviewStatusResponse;
 
     switch (metadata.status) {
@@ -282,8 +285,8 @@ export async function handleGetReview(req: Request, res: Response): Promise<void
         break;
 
       case 'changes_requested': {
-        const threadsMap = ydoc.getMap<Record<string, Thread>>(YDOC_KEYS.THREADS);
-        const threadsData = threadsMap.toJSON() as Record<string, unknown>;
+        const threadsMap = ydoc.getMap(YDOC_KEYS.THREADS);
+        const threadsData = threadsMap.toJSON();
         const threads = parseThreads(threadsData);
         const feedback: ReviewFeedback[] = threads.map((thread) => ({
           threadId: thread.id,
@@ -341,7 +344,13 @@ export async function handleSetSessionToken(req: Request, res: Response): Promis
       return;
     }
 
-    const { sessionTokenHash } = req.body as { sessionTokenHash?: string };
+    const body: unknown = req.body;
+    if (!body || typeof body !== 'object') {
+      res.status(400).json({ error: 'Invalid request body' });
+      return;
+    }
+    const bodyRecord = Object.fromEntries(Object.entries(body));
+    const sessionTokenHash = bodyRecord.sessionTokenHash;
     if (!sessionTokenHash || typeof sessionTokenHash !== 'string') {
       res.status(400).json({ error: 'Missing or invalid sessionTokenHash' });
       return;
@@ -388,7 +397,7 @@ export async function handleUpdatePresence(req: Request, res: Response): Promise
     setAgentPresence(ydoc, {
       agentType: input.agentType,
       sessionId: input.sessionId,
-      connectedAt: now, // Will be overwritten if already exists
+      connectedAt: now,
       lastSeenAt: now,
     });
 
@@ -407,7 +416,8 @@ export async function handleClearPresence(req: Request, res: Response): Promise<
       return;
     }
 
-    const sessionId = req.query.sessionId as string | undefined;
+    /** Validate query param - HTTP query params are untrusted external input */
+    const sessionId = typeof req.query.sessionId === 'string' ? req.query.sessionId : undefined;
 
     if (!sessionId) {
       res.status(400).json({ error: 'Missing sessionId' });

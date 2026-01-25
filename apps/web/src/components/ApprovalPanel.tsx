@@ -1,28 +1,16 @@
-import { Avatar, Button, Popover } from '@heroui/react';
+import { Button, Popover } from '@heroui/react';
 import { approveUser, rejectUser } from '@shipyard/schema';
 import { Check, Clock, UserPlus, Users, X } from 'lucide-react';
 import { useCallback } from 'react';
 import { toast } from 'sonner';
 import type { WebrtcProvider } from 'y-webrtc';
 import type * as Y from 'yjs';
+import { Avatar } from '@/components/ui/avatar';
 import type { PendingUser } from '@/hooks/usePendingUsers';
 import { usePendingUsers } from '@/hooks/usePendingUsers';
 
-// Maximum number of pending users to display in the popover
+/** Maximum number of pending users to display in the popover */
 const MAX_DISPLAYED_PENDING_USERS = 20;
-
-// Note: Avatar compound components have type issues in HeroUI v3 beta
-// Using type assertions until types are fixed in stable release
-const AvatarRoot = Avatar as unknown as React.FC<{
-  children: React.ReactNode;
-  size?: 'sm' | 'md' | 'lg';
-  className?: string;
-}>;
-const AvatarImage = Avatar.Image as React.FC<{ src?: string; alt: string }>;
-const AvatarFallback = Avatar.Fallback as React.FC<{
-  children: React.ReactNode;
-  style?: React.CSSProperties;
-}>;
 
 interface ApprovalPanelProps {
   ydoc: Y.Doc;
@@ -78,12 +66,12 @@ interface PendingUserRowProps {
 function PendingUserRow({ user, onApprove, onDeny }: PendingUserRowProps) {
   return (
     <div className="flex items-center gap-3 py-2">
-      <AvatarRoot size="sm">
-        <AvatarImage alt={user.name} src={`https://github.com/${user.id}.png?size=64`} />
-        <AvatarFallback style={{ backgroundColor: user.color }}>
+      <Avatar size="sm">
+        <Avatar.Image alt={user.name} src={`https://github.com/${user.id}.png?size=64`} />
+        <Avatar.Fallback style={{ backgroundColor: user.color }}>
           {getInitials(user.name)}
-        </AvatarFallback>
-      </AvatarRoot>
+        </Avatar.Fallback>
+      </Avatar>
 
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium text-foreground truncate">{user.name}</p>
@@ -132,10 +120,10 @@ export function ApprovalPanel({
 }: ApprovalPanelProps) {
   const pendingUsers = usePendingUsers(rtcProvider, planId);
 
-  // Only show to plan owner
+  /** Only show to plan owner */
   const isOwner = currentUsername && ownerId && currentUsername === ownerId;
 
-  // Limit displayed users for performance with large lists
+  /** Limit displayed users for performance with large lists */
   const displayedUsers = pendingUsers.slice(0, MAX_DISPLAYED_PENDING_USERS);
   const hasMoreUsers = pendingUsers.length > MAX_DISPLAYED_PENDING_USERS;
   const hiddenCount = pendingUsers.length - MAX_DISPLAYED_PENDING_USERS;
@@ -153,7 +141,7 @@ export function ApprovalPanel({
 
   const handleDeny = useCallback(
     (userId: string) => {
-      // Reject the user - this adds them to rejectedUsers list
+      /** Reject the user - this adds them to rejectedUsers list */
       rejectUser(ydoc, userId);
       const user = pendingUsers.find((u) => u.id === userId);
       toast.info(`${user?.name ?? userId} denied`, {
@@ -163,7 +151,7 @@ export function ApprovalPanel({
     [ydoc, pendingUsers]
   );
 
-  // Don't render if not owner or no pending users
+  /** Don't render if not owner or no pending users */
   if (!isOwner || pendingUsers.length === 0) {
     return null;
   }

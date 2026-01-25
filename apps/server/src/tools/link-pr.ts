@@ -13,7 +13,7 @@ import { getGitHubUsername } from '../server-identity.js';
 import { verifySessionToken } from '../session-token.js';
 import { TOOL_NAMES } from './tool-names.js';
 
-// --- Input Schema ---
+/** --- Input Schema --- */
 
 const LinkPRInput = z.object({
   planId: z.string().describe('Plan ID'),
@@ -26,7 +26,7 @@ const LinkPRInput = z.object({
     .describe('Repository override (org/repo). Uses plan repo if omitted.'),
 });
 
-// --- Public Export ---
+/** --- Public Export --- */
 
 export const linkPRTool = {
   definition: {
@@ -89,7 +89,7 @@ link_pr({
       };
     }
 
-    // Verify session token
+    /** Verify session token */
     if (
       !metadata.sessionTokenHash ||
       !verifySessionToken(input.sessionToken, metadata.sessionTokenHash)
@@ -100,7 +100,7 @@ link_pr({
       };
     }
 
-    // Determine repo
+    /** Determine repo */
     const repo = input.repo || metadata.repo;
     if (!repo) {
       return {
@@ -114,7 +114,7 @@ link_pr({
       };
     }
 
-    // Get Octokit instance
+    /** Get Octokit instance */
     const octokit = getOctokit();
     if (!octokit) {
       return {
@@ -128,21 +128,21 @@ link_pr({
       };
     }
 
-    // Parse repo
+    /** Parse repo */
     const { owner, repoName } = parseRepoString(repo);
 
     try {
-      // Fetch PR details from GitHub
+      /** Fetch PR details from GitHub */
       const { data: pr } = await octokit.pulls.get({
         owner,
         repo: repoName,
         pull_number: input.prNumber,
       });
 
-      // Validate GitHub API response
+      /** Validate GitHub API response */
       const validatedPR = GitHubPRResponseSchema.parse(pr);
 
-      // Create LinkedPR object using factory for consistent validation
+      /** Create LinkedPR object using factory for consistent validation */
       const linkedPR = createLinkedPR({
         prNumber: input.prNumber,
         url: validatedPR.html_url,
@@ -157,13 +157,13 @@ link_pr({
         title: validatedPR.title,
       });
 
-      // Get actor name for event logging
+      /** Get actor name for event logging */
       const actorName = await getGitHubUsername();
 
-      // Store in Y.Doc
+      /** Store in Y.Doc */
       linkPR(ydoc, linkedPR, actorName);
 
-      // Log PR linked event (semantic action)
+      /** Log PR linked event (semantic action) */
       logPlanEvent(ydoc, 'pr_linked', actorName, {
         prNumber: linkedPR.prNumber,
         url: linkedPR.url,
@@ -192,9 +192,9 @@ The PR is now visible in the "Changes" tab of your plan.`,
     } catch (error) {
       logger.error({ error, planId: input.planId, prNumber: input.prNumber }, 'Failed to link PR');
 
-      // Check if this is a validation error
+      /** Check if this is a validation error */
       if (error instanceof z.ZodError) {
-        // Include field-level errors for better debugging
+        /** Include field-level errors for better debugging */
         const fieldErrors = error.issues
           .map((issue) => `${issue.path.join('.')}: ${issue.message}`)
           .join(', ');

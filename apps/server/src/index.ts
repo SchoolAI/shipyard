@@ -19,25 +19,25 @@ import { executeCodeTool } from './tools/execute-code.js';
 import { requestUserInputTool } from './tools/request-user-input.js';
 import { TOOL_NAMES } from './tools/tool-names.js';
 
-// Determine if we're the Registry Hub or a client
+/** Determine if we're the Registry Hub or a client */
 const registryPort = await isRegistryRunning();
 if (!registryPort) {
-  // No hub running - try to acquire lock and become hub
+  /** No hub running - try to acquire lock and become hub */
   const acquired = await tryAcquireHubLock();
   if (acquired) {
-    // We got the lock - become the hub
+    /** We got the lock - become the hub */
     logger.info('Acquired hub lock, starting registry hub');
     const hubPort = await startRegistryServer();
     if (!hubPort) {
-      await releaseHubLock(); // Release on failure
+      await releaseHubLock();
       logger.error('Failed to start registry hub - all ports in use');
       process.exit(1);
     }
-    // Hub mode: run our own WebSocket server for Y.Doc sync
+    /** Hub mode: run our own WebSocket server for Y.Doc sync */
     initAsHub();
     logger.info({ hubPort }, 'Registry hub started successfully');
   } else {
-    // Another process holds the lock - wait and become client
+    /** Another process holds the lock - wait and become client */
     logger.info('Hub lock held by another process, waiting to become client');
     await new Promise((resolve) => setTimeout(resolve, 2000));
 
@@ -51,7 +51,7 @@ if (!registryPort) {
     }
   }
 } else {
-  // Hub already running - connect as client
+  /** Hub already running - connect as client */
   logger.info({ registryPort }, 'Connecting to registry hub as client');
   await initAsClient(registryPort);
 }
@@ -67,12 +67,11 @@ const server = new Server(
     capabilities: {
       tools: {},
     },
-    // Instructions shown to clients during initialization
     instructions: `IMPORTANT: When working with Shipyard, use ${TOOL_NAMES.REQUEST_USER_INPUT} for ALL human interaction instead of platform-specific question tools (AskUserQuestion, etc.). The human is in the browser viewing your plan - that's where they expect to interact with you.`,
   }
 );
 
-// Expose execute_code (bundled APIs) and request_user_input (standalone)
+/** Expose execute_code (bundled APIs) and request_user_input (standalone) */
 server.setRequestHandler(ListToolsRequestSchema, async () => ({
   tools: [executeCodeTool.definition, requestUserInputTool.definition],
 }));

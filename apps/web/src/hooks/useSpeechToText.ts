@@ -87,8 +87,10 @@ export function useSpeechToText(): UseSpeechToTextReturn {
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
   const isStoppingRef = useRef(false);
   const stateRef = useRef(state);
-  // Track partial transcript in a ref so we can reliably read it when stopping
-  // (avoids race conditions with nested setState calls)
+  /*
+   * Track partial transcript in a ref so we can reliably read it when stopping
+   * (avoids race conditions with nested setState calls)
+   */
   const partialTranscriptRef = useRef('');
 
   const SpeechRecognitionClass = getSpeechRecognition();
@@ -123,18 +125,20 @@ export function useSpeechToText(): UseSpeechToTextReturn {
       return;
     }
 
-    // Prevent double-start
+    /** Prevent double-start */
     if (stateRef.current === 'recording') {
       return;
     }
 
-    // Clean up any existing recognition instance (iOS Safari silent failure fix)
-    // Safari can silently fail if you don't fully destroy between sessions
+    /*
+     * Clean up any existing recognition instance (iOS Safari silent failure fix)
+     * Safari can silently fail if you don't fully destroy between sessions
+     */
     if (recognitionRef.current) {
       try {
         recognitionRef.current.abort();
       } catch {
-        // Ignore errors from aborting already-stopped recognition
+        /** Ignore errors from aborting already-stopped recognition */
       }
       recognitionRef.current = null;
     }
@@ -197,8 +201,10 @@ export function useSpeechToText(): UseSpeechToTextReturn {
     };
 
     recognition.onend = () => {
-      // Only auto-restart if we're still recording and not manually stopping
-      // Also check if recognitionRef still exists (abort() sets it to null)
+      /*
+       * Only auto-restart if we're still recording and not manually stopping
+       * Also check if recognitionRef still exists (abort() sets it to null)
+       */
       if (!isStoppingRef.current && stateRef.current === 'recording' && recognitionRef.current) {
         recognition.start();
       } else {
@@ -218,9 +224,11 @@ export function useSpeechToText(): UseSpeechToTextReturn {
   const stopRecording = useCallback(() => {
     isStoppingRef.current = true;
 
-    // On mobile Safari, isFinal may not be set until stop() is called
-    // Capture any pending partial transcript as final text before stopping
-    // Use ref to avoid race conditions with nested setState calls
+    /*
+     * On mobile Safari, isFinal may not be set until stop() is called
+     * Capture any pending partial transcript as final text before stopping
+     * Use ref to avoid race conditions with nested setState calls
+     */
     const pendingPartial = partialTranscriptRef.current;
     if (pendingPartial) {
       setTranscript((prev) => {
@@ -231,8 +239,10 @@ export function useSpeechToText(): UseSpeechToTextReturn {
       partialTranscriptRef.current = '';
     }
 
-    // Use stop() to allow finalization of results (abort() discards transcription)
-    // The ding sound indicates recognition is properly stopping
+    /*
+     * Use stop() to allow finalization of results (abort() discards transcription)
+     * The ding sound indicates recognition is properly stopping
+     */
     if (recognitionRef.current) {
       recognitionRef.current.stop();
     }

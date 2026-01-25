@@ -17,7 +17,6 @@ import { describe, expect, it, vi } from 'vitest';
 import { ConfirmInput } from './ConfirmInput';
 import type { ConfirmInputRequest } from './types';
 
-// Factory for creating test requests
 function createConfirmRequest(overrides: Partial<ConfirmInputRequest> = {}): ConfirmInputRequest {
   return {
     id: 'test-id',
@@ -116,7 +115,7 @@ describe('ConfirmInput', () => {
         value=""
         setValue={vi.fn()}
         isSubmitting={false}
-        remainingTime={125} // 2:05
+        remainingTime={125}
         onConfirmResponse={vi.fn()}
       />
     );
@@ -137,7 +136,6 @@ describe('ConfirmInput', () => {
       />
     );
 
-    // When < 30s, an exclamation mark is prepended
     expect(screen.getByText(/! Timeout:/)).toBeInTheDocument();
   });
 
@@ -154,7 +152,6 @@ describe('ConfirmInput', () => {
       />
     );
 
-    // No exclamation mark when >= 30s
     expect(screen.queryByText(/! Timeout:/)).not.toBeInTheDocument();
   });
 
@@ -166,7 +163,7 @@ describe('ConfirmInput', () => {
         value=""
         setValue={vi.fn()}
         isSubmitting={false}
-        remainingTime={-1} // Sentinel for uninitialized
+        remainingTime={-1}
         onConfirmResponse={vi.fn()}
       />
     );
@@ -437,7 +434,6 @@ describe('ConfirmInput', () => {
       await user.click(screen.getByRole('button', { name: 'Explain...' }));
       await user.type(screen.getByPlaceholderText('Type your answer...'), 'Some text');
 
-      // Rerender with isSubmitting=true
       rerender(
         <ConfirmInput
           request={request}

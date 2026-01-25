@@ -36,10 +36,20 @@ export function resolveGitHubToken(): string | null {
 }
 
 /**
+ * Extract status code from an error if it has one.
+ */
+function getErrorStatus(error: unknown): number | undefined {
+  if (!error || typeof error !== 'object') return undefined;
+  const record = Object.fromEntries(Object.entries(error));
+  const status = record.status;
+  return typeof status === 'number' ? status : undefined;
+}
+
+/**
  * Check if an error is an authentication error (401/403).
  */
 export function isAuthError(error: unknown): boolean {
-  const status = (error as { status?: number }).status;
+  const status = getErrorStatus(error);
   return status === 401 || status === 403;
 }
 
@@ -65,7 +75,7 @@ async function withTokenRetry<T>(operation: () => Promise<T>): Promise<T> {
     if (isAuthError(error)) {
       logger.info('GitHub auth error, checking token and retrying...');
 
-      // Check if we have a token (token is loaded once at startup)
+      /** Check if we have a token (token is loaded once at startup) */
       const newToken = resolveGitHubToken();
       if (!newToken) {
         throw new GitHubAuthError(
@@ -76,7 +86,7 @@ async function withTokenRetry<T>(operation: () => Promise<T>): Promise<T> {
         );
       }
 
-      // Retry once with fresh token
+      /** Retry once with fresh token */
       try {
         return await operation();
       } catch (retryError: unknown) {
@@ -128,7 +138,7 @@ export async function ensureArtifactsBranch(repo: string): Promise<void> {
 
     const { owner, repoName } = parseRepoString(repo);
 
-    // Check if branch exists
+    /** Check if branch exists */
     try {
       await octokit.repos.getBranch({
         owner,
@@ -138,16 +148,16 @@ export async function ensureArtifactsBranch(repo: string): Promise<void> {
       logger.debug({ repo }, 'Artifacts branch exists');
       return;
     } catch (error: unknown) {
-      if ((error as { status?: number }).status !== 404) {
+      if (getErrorStatus(error) !== 404) {
         throw error;
       }
-      // Branch doesn't exist, need to create it
+      /** Branch doesn't exist, need to create it */
     }
 
     logger.info({ repo }, 'Creating artifacts branch');
 
     try {
-      // Get the default branch SHA
+      /** Get the default branch SHA */
       const { data: repoData } = await octokit.repos.get({ owner, repo: repoName });
       const defaultBranch = repoData.default_branch;
 
@@ -157,7 +167,7 @@ export async function ensureArtifactsBranch(repo: string): Promise<void> {
         ref: `heads/${defaultBranch}`,
       });
 
-      // Create the artifacts branch from default branch
+      /** Create the artifacts branch from default branch */
       await octokit.git.createRef({
         owner,
         repo: repoName,
@@ -185,7 +195,7 @@ export interface UploadArtifactParams {
   repo: string;
   planId: string;
   filename: string;
-  content: string; // base64 encoded
+  content: string;
 }
 
 /**
@@ -204,10 +214,10 @@ export async function uploadArtifact(params: UploadArtifactParams): Promise<stri
     const { owner, repoName } = parseRepoString(repo);
     const path = `plans/${planId}/${filename}`;
 
-    // Ensure branch exists
+    /** Ensure branch exists */
     await ensureArtifactsBranch(repo);
 
-    // Check if file already exists (need SHA for update)
+    /** Check if file already exists (need SHA for update) */
     let existingSha: string | undefined;
     try {
       const { data } = await octokit.repos.getContent({
@@ -220,13 +230,13 @@ export async function uploadArtifact(params: UploadArtifactParams): Promise<stri
         existingSha = data.sha;
       }
     } catch (error: unknown) {
-      if ((error as { status?: number }).status !== 404) {
+      if (getErrorStatus(error) !== 404) {
         throw error;
       }
-      // File doesn't exist, that's fine
+      /** File doesn't exist, that's fine */
     }
 
-    // Upload/update file
+    /** Upload/update file */
     await octokit.repos.createOrUpdateFileContents({
       owner,
       repo: repoName,

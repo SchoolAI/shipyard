@@ -163,13 +163,12 @@ describe('URL Encoding', () => {
   });
 
   describe('version handling', () => {
-    it('handles unknown versions gracefully', () => {
+    it('rejects unknown versions for security (URL data is untrusted)', () => {
       const futureVersionPlan = { ...samplePlan, v: 99 as 1 };
       const encoded = encodePlan(futureVersionPlan);
       const decoded = decodePlan(encoded);
 
-      expect(decoded).toBeTruthy();
-      expect(decoded?.id).toBe(samplePlan.id);
+      expect(decoded).toBeNull();
     });
   });
 });

@@ -12,7 +12,7 @@
 
 import { logger } from './logger.js';
 
-// --- Session State Types ---
+/** --- Session State Types --- */
 
 interface SessionStateBase {
   planId: string;
@@ -70,7 +70,7 @@ export type SessionState =
   | SessionStateApproved
   | SessionStateReviewed;
 
-// --- Type Guards ---
+/** --- Type Guards --- */
 
 export function isSessionStateCreated(state: SessionState): state is SessionStateCreated {
   return state.lifecycle === 'created';
@@ -94,13 +94,13 @@ export function isSessionStateReviewed(state: SessionState): state is SessionSta
   return state.lifecycle === 'reviewed';
 }
 
-// --- Helper for Exhaustive Checks ---
+/** --- Helper for Exhaustive Checks --- */
 
 export function assertNever(value: never): never {
   throw new Error(`Unhandled discriminated union member: ${JSON.stringify(value)}`);
 }
 
-// --- Registry State ---
+/** --- Registry State --- */
 
 /**
  * In-memory session registry.
@@ -125,7 +125,7 @@ const planToSession = new Map<string, string>();
  */
 const DEFAULT_TTL_MS = 60 * 60 * 1000;
 
-// --- Public API ---
+/** --- Public API --- */
 
 /**
  * Get session state by sessionId (pure read, no side effects).
@@ -155,7 +155,7 @@ export function setSessionState(sessionId: string, state: SessionState): void {
 
   sessions.set(sessionId, updatedState);
 
-  // Maintain reverse index
+  /** Maintain reverse index */
   planToSession.set(updatedState.planId, sessionId);
 }
 
@@ -165,7 +165,7 @@ export function setSessionState(sessionId: string, state: SessionState): void {
 export function deleteSessionState(sessionId: string): void {
   const session = sessions.get(sessionId);
   if (session) {
-    // Clean up reverse index
+    /** Clean up reverse index */
     planToSession.delete(session.planId);
   }
   sessions.delete(sessionId);
@@ -197,8 +197,10 @@ export function cleanStaleSessions(ttlMs: number = DEFAULT_TTL_MS): number {
 
   for (const [sessionId, session] of sessions.entries()) {
     if (now - session.lastSyncedAt > ttlMs) {
-      // Clean up reverse index only if it still points to this stale session
-      // This prevents orphaning planToSession entries when a new session reuses the same planId
+      /*
+       * Clean up reverse index only if it still points to this stale session
+       * This prevents orphaning planToSession entries when a new session reuses the same planId
+       */
       const currentSessionId = planToSession.get(session.planId);
       if (currentSessionId === sessionId) {
         planToSession.delete(session.planId);
@@ -229,7 +231,7 @@ export function getSessionCount(): number {
   return sessions.size;
 }
 
-// --- Background Cleanup ---
+/** --- Background Cleanup --- */
 
 /**
  * Start periodic cleanup of stale sessions.

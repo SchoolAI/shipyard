@@ -15,7 +15,6 @@ import { describe, expect, it, vi } from 'vitest';
 import { EmailInput } from './EmailInput';
 import type { EmailInputRequest } from './types';
 
-// Factory for creating test requests
 function createEmailRequest(overrides: Partial<EmailInputRequest> = {}): EmailInputRequest {
   return {
     id: 'test-id',
@@ -55,7 +54,6 @@ describe('EmailInput', () => {
     const input = screen.getByRole('textbox');
     await user.type(input, 'ab');
 
-    // Called for each character (controlled component)
     expect(setValue).toHaveBeenCalledTimes(2);
     expect(setValue).toHaveBeenNthCalledWith(1, 'a');
     expect(setValue).toHaveBeenNthCalledWith(2, 'b');

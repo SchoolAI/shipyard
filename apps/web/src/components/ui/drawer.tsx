@@ -1,5 +1,5 @@
 import { Modal } from '@heroui/react';
-import type { ComponentProps, ReactNode } from 'react';
+import type { ReactNode } from 'react';
 
 interface DrawerProps {
   /** Whether the drawer is open */
@@ -27,7 +27,7 @@ export function Drawer({
 }: DrawerProps) {
   const isLeft = side === 'left';
 
-  // Animation classes for slide-in effect
+  /** Animation classes for slide-in effect */
   const enterAnimation = isLeft
     ? 'data-[entering]:animate-in data-[entering]:slide-in-from-left data-[entering]:duration-300 data-[entering]:ease-out'
     : 'data-[entering]:animate-in data-[entering]:slide-in-from-right data-[entering]:duration-300 data-[entering]:ease-out';
@@ -36,7 +36,7 @@ export function Drawer({
     ? 'data-[exiting]:animate-out data-[exiting]:slide-out-to-left data-[exiting]:duration-200 data-[exiting]:ease-in'
     : 'data-[exiting]:animate-out data-[exiting]:slide-out-to-right data-[exiting]:duration-200 data-[exiting]:ease-in';
 
-  // Position the drawer container on the correct side
+  /** Position the drawer container on the correct side */
   const positionClass = isLeft ? 'justify-start' : 'justify-end';
 
   return (
@@ -55,7 +55,7 @@ export function Drawer({
           aria-modal="true"
           aria-label="Navigation drawer"
         >
-          {children as ComponentProps<typeof Modal.Dialog>['children']}
+          {children}
         </Modal.Dialog>
       </Modal.Container>
     </Modal.Backdrop>

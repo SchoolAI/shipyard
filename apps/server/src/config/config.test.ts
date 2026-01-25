@@ -79,8 +79,6 @@ describe('loadEnv', () => {
     });
 
     expect(() => loadEnv(schema)).toThrow('Environment variable validation failed');
-    // Note: The specific field names may not always be in the error message
-    // depending on how Zod reports errors, but the main validation failure message is always present
   });
 
   it('should apply transformations', () => {

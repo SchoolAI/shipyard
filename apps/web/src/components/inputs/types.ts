@@ -65,7 +65,6 @@ export interface RatingInputProps extends BaseInputProps<RatingInputRequest> {
   isNaSelected: boolean;
 }
 
-// Re-export specific request types for component convenience
 export type {
   ChoiceInputRequest,
   ConfirmInputRequest,

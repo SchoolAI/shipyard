@@ -51,10 +51,10 @@ function mergeViewedByState(prevState: ViewedByRecord, newData: ViewedByRecord):
 
   for (const [planId, existingViewedBy] of Object.entries(prevState)) {
     if (!merged[planId]) {
-      // Plan not in new data, preserve existing
+      /** Plan not in new data, preserve existing */
       merged[planId] = existingViewedBy;
     } else {
-      // Merge timestamps for this plan, keeping newer values
+      /** Merge timestamps for this plan, keeping newer values */
       merged[planId] = mergeViewedByTimestamps(existingViewedBy, merged[planId]);
     }
   }
@@ -175,12 +175,14 @@ export function usePlanIndex(currentUsername: string | undefined): PlanIndexStat
   const [discoveredPlans, setDiscoveredPlans] = useState<PlanIndexEntry[]>([]);
   const [navigationTarget, setNavigationTarget] = useState<string | null>(null);
 
-  // Per-plan viewedBy data for inbox unread filtering
+  /** Per-plan viewedBy data for inbox unread filtering */
   const [planViewedBy, setPlanViewedBy] = useState<Record<string, Record<string, number>>>({});
   const [inboxRefreshTrigger, setInboxRefreshTrigger] = useState(0);
 
-  // Track last update to avoid redundant state changes
-  // Include updatedAt values so sorting works when timestamps change
+  /*
+   * Track last update to avoid redundant state changes
+   * Include updatedAt values so sorting works when timestamps change
+   */
   const lastPlanKeysRef = useRef<{ active: string; archived: string }>({
     active: '',
     archived: '',
@@ -200,7 +202,7 @@ export function usePlanIndex(currentUsername: string | undefined): PlanIndexStat
       const allPlans = getPlanIndex(ydoc, true);
       const archived = allPlans.filter((p) => p.deleted);
 
-      // Build key strings for comparison - include updatedAt so sorting triggers when timestamps change
+      /** Build key strings for comparison - include updatedAt so sorting triggers when timestamps change */
       const activeKeys = activePlans
         .map((p) => `${p.id}:${p.updatedAt}:${p.status}`)
         .sort()
@@ -210,7 +212,7 @@ export function usePlanIndex(currentUsername: string | undefined): PlanIndexStat
         .sort()
         .join(',');
 
-      // Skip update if nothing changed (using ref to avoid closure issues)
+      /** Skip update if nothing changed (using ref to avoid closure issues) */
       if (
         activeKeys === lastPlanKeysRef.current.active &&
         archivedKeys === lastPlanKeysRef.current.archived
@@ -218,7 +220,7 @@ export function usePlanIndex(currentUsername: string | undefined): PlanIndexStat
         return;
       }
 
-      // Update ref before state to prevent race conditions
+      /** Update ref before state to prevent race conditions */
       lastPlanKeysRef.current = { active: activeKeys, archived: archivedKeys };
       setAllPlansData({ active: activePlans, archived });
     };
@@ -227,15 +229,17 @@ export function usePlanIndex(currentUsername: string | undefined): PlanIndexStat
       if (debounceTimer) {
         clearTimeout(debounceTimer);
       }
-      // Reduced debounce from 100ms to 16ms (one frame) for snappier updates
+      /** Reduced debounce from 100ms to 16ms (one frame) for snappier updates */
       debounceTimer = setTimeout(updatePlans, 16);
     };
 
-    // Initial update - run immediately without debounce
+    /** Initial update - run immediately without debounce */
     updatePlans();
 
-    // Use observeDeep to detect nested field changes (e.g., updatedAt timestamp changes)
-    // so that "Recently Updated" sorting works correctly when plans are modified.
+    /*
+     * Use observeDeep to detect nested field changes (e.g., updatedAt timestamp changes)
+     * so that "Recently Updated" sorting works correctly when plans are modified.
+     */
     plansMap.observeDeep(debouncedUpdatePlans);
 
     return () => {
@@ -252,7 +256,7 @@ export function usePlanIndex(currentUsername: string | undefined): PlanIndexStat
     let isActive = true;
 
     async function discoverIndexedDBPlans() {
-      // Wrap isActive in an object so it can be passed by reference to async helpers
+      /** Wrap isActive in an object so it can be passed by reference to async helpers */
       const activeRef = { current: isActive };
 
       try {
@@ -262,9 +266,9 @@ export function usePlanIndex(currentUsername: string | undefined): PlanIndexStat
         const dbNames = databases.map((db) => db.name).filter((name): name is string => !!name);
         const planIndexIds = new Set(allPlansData.active.map((p) => p.id));
 
+        const nonPlanDbNamesSet = new Set<string>(NON_PLAN_DB_NAMES);
         const planDocIds = dbNames.filter(
-          (name) =>
-            !(NON_PLAN_DB_NAMES as readonly string[]).includes(name) && !planIndexIds.has(name)
+          (name) => !nonPlanDbNamesSet.has(name) && !planIndexIds.has(name)
         );
 
         const plans = await Promise.all(
@@ -359,18 +363,20 @@ export function usePlanIndex(currentUsername: string | undefined): PlanIndexStat
     [allActivePlans, currentUsername]
   );
 
-  // Load viewedBy from plan-index (syncs across devices via WebSocket + WebRTC)
-  // biome-ignore lint/correctness/useExhaustiveDependencies: inboxRefreshTrigger forces refresh
+  /*
+   * Load viewedBy from plan-index (syncs across devices via WebSocket + WebRTC)
+   * biome-ignore lint/correctness/useExhaustiveDependencies: inboxRefreshTrigger forces refresh
+   */
   useEffect(() => {
     let isActive = true;
 
     function loadViewedByFromPlanIndex() {
       if (!currentUsername) {
-        return; // Don't clear state - just skip loading
+        return;
       }
 
       if (inboxCandidates.length === 0) {
-        return; // Don't clear state for empty candidates
+        return;
       }
 
       const planIds = inboxCandidates.map((p) => p.id);
@@ -397,7 +403,7 @@ export function usePlanIndex(currentUsername: string | undefined): PlanIndexStat
     };
   }, [ydoc, inboxCandidates, currentUsername, inboxRefreshTrigger]);
 
-  // All inbox plans with read state (unfiltered)
+  /** All inbox plans with read state (unfiltered) */
   const allInboxPlans: PlanIndexEntryWithReadState[] = useMemo(() => {
     if (!currentUsername) {
       return [];
@@ -410,7 +416,7 @@ export function usePlanIndex(currentUsername: string | undefined): PlanIndexStat
     });
   }, [inboxCandidates, currentUsername, planViewedBy]);
 
-  // Filter inbox to only unread plans
+  /** Filter inbox to only unread plans */
   const inboxPlans: PlanIndexEntryWithReadState[] = useMemo(() => {
     return allInboxPlans.filter((plan) => plan.isUnread);
   }, [allInboxPlans]);
@@ -431,7 +437,7 @@ export function usePlanIndex(currentUsername: string | undefined): PlanIndexStat
     [allActivePlans, currentUsername]
   );
 
-  // All plans owned by current user (for event-based inbox - includes all statuses)
+  /** All plans owned by current user (for event-based inbox - includes all statuses) */
   const allOwnedPlans = useMemo(
     () => allActivePlans.filter((p) => p.ownerId === currentUsername),
     [allActivePlans, currentUsername]
@@ -462,15 +468,17 @@ export function usePlanIndex(currentUsername: string | undefined): PlanIndexStat
     setNavigationTarget(null);
   };
 
-  // Loading until we have usable data from ANY source:
-  // 1. WebSocket has synced (online with MCP server)
-  // 2. Connection has timed out (offline mode)
-  // 3. IndexedDB has synced (local cached data available - critical for mobile!)
-  //
-  // The IndexedDB check fixes infinite loading on mobile where:
-  // - No local MCP server means WebSocket never syncs
-  // - Timeout should fire but might be unreliable
-  // - IndexedDB syncs almost immediately with local data
+  /*
+   * Loading until we have usable data from ANY source:
+   * 1. WebSocket has synced (online with MCP server)
+   * 2. Connection has timed out (offline mode)
+   * 3. IndexedDB has synced (local cached data available - critical for mobile!)
+   *
+   * The IndexedDB check fixes infinite loading on mobile where:
+   * - No local MCP server means WebSocket never syncs
+   * - Timeout should fire but might be unreliable
+   * - IndexedDB syncs almost immediately with local data
+   */
   const isLoading = !syncState.idbSynced && !syncState.synced && !syncState.timedOut;
 
   const markPlanAsRead = useCallback(
@@ -503,7 +511,7 @@ export function usePlanIndex(currentUsername: string | undefined): PlanIndexStat
 
       clearPlanIndexViewedBy(ydoc, planId, currentUsername);
 
-      // Optimistically update state - remove user's timestamp
+      /** Optimistically update state - remove user's timestamp */
       setPlanViewedBy((prev) => {
         const updated = { ...prev };
         if (updated[planId]) {

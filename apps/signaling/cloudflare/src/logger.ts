@@ -17,11 +17,11 @@ function formatLog(level: LogLevel, context: LogContext | string, message?: stri
   const timestamp = new Date().toISOString();
 
   if (typeof context === 'string') {
-    // Simple message without context
+    /** Simple message without context */
     return `[${timestamp}] ${level.toUpperCase()}: ${context}`;
   }
 
-  // Structured logging with context
+  /** Structured logging with context */
   const contextStr = Object.keys(context).length > 0 ? ` ${JSON.stringify(context)}` : '';
   return `[${timestamp}] ${level.toUpperCase()}:${contextStr} ${message || ''}`;
 }

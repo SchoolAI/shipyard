@@ -1,4 +1,4 @@
-import { Avatar, Button, Card, Modal, Spinner } from '@heroui/react';
+import { Button, Card, Modal, Spinner } from '@heroui/react';
 import {
   type A2AMessage,
   addConversationVersion,
@@ -6,7 +6,17 @@ import {
   type ConversationVersion,
   logPlanEvent,
   type OriginPlatform,
+  OriginPlatformValues,
 } from '@shipyard/schema';
+
+/** Set of valid OriginPlatform values for efficient lookup */
+const ORIGIN_PLATFORM_SET = new Set<string>(OriginPlatformValues);
+
+/** Type guard to validate OriginPlatform values */
+function isOriginPlatform(value: string | undefined): value is OriginPlatform {
+  return typeof value === 'string' && ORIGIN_PLATFORM_SET.has(value);
+}
+
 import { DEFAULT_REGISTRY_PORTS } from '@shipyard/shared/registry-config';
 import { Check, Download, MessageSquare, MessageSquareReply, Terminal } from 'lucide-react';
 import type React from 'react';
@@ -14,6 +24,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import type { WebrtcProvider } from 'y-webrtc';
 import type * as Y from 'yjs';
+import { Avatar } from '@/components/ui/avatar';
 import { useUserIdentity } from '@/contexts/UserIdentityContext';
 import {
   type ImportResult,
@@ -23,14 +34,6 @@ import {
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
 import { useImportConversationToast } from '@/hooks/useImportConversationToast';
 import { createVanillaTRPCClient } from '@/utils/trpc-client';
-
-// Avatar compound components have type issues in HeroUI v3 beta
-const AvatarRoot = Avatar as unknown as React.FC<{
-  children: React.ReactNode;
-  size?: 'sm' | 'md' | 'lg';
-  color?: 'default' | 'accent';
-}>;
-const AvatarFallback = Avatar.Fallback as React.FC<{ children: React.ReactNode }>;
 
 interface ImportConversationHandlerProps {
   /** Plan ID */
@@ -53,9 +56,9 @@ function MessagePreview({ message }: { message: A2AMessage }) {
 
   return (
     <div className={`flex gap-2 ${isUser ? '' : 'flex-row-reverse'}`}>
-      <AvatarRoot size="sm" color={isUser ? 'default' : 'accent'}>
-        <AvatarFallback>{isUser ? 'U' : 'A'}</AvatarFallback>
-      </AvatarRoot>
+      <Avatar size="sm" color={isUser ? 'default' : 'accent'}>
+        <Avatar.Fallback>{isUser ? 'U' : 'A'}</Avatar.Fallback>
+      </Avatar>
       <div
         className={`flex-1 p-2 rounded-lg text-sm ${
           isUser ? 'bg-surface-secondary' : 'bg-accent/10'
@@ -237,9 +240,11 @@ export function ImportConversationButton({
 
 const REGISTRY_URL = `http://localhost:${DEFAULT_REGISTRY_PORTS[0]}`;
 
-// TODO(#9): Platform detection - Currently hard-coded to only detect Claude Code
-// Should detect available platforms (Cursor, Devin, Windsurf, etc.) and show
-// appropriate import buttons. See: https://github.com/jacobpetterle/shipyard/issues/9
+/*
+ * TODO(#9): Platform detection - Currently hard-coded to only detect Claude Code
+ * Should detect available platforms (Cursor, Devin, Windsurf, etc.) and show
+ * appropriate import buttons. See: https://github.com/jacobpetterle/shipyard/issues/9
+ */
 function useRegistryAvailable(): boolean {
   const [available, setAvailable] = useState(false);
 
@@ -436,18 +441,22 @@ export function ImportConversationHandler({
     setIsImporting(true);
 
     try {
-      // Use vanilla tRPC client for imperative code
+      /** Use vanilla tRPC client for imperative code */
       const trpcClient = createVanillaTRPCClient(REGISTRY_URL);
       const result = await trpcClient.conversation.import.mutate({
         a2aMessages: selectedReceived.messages,
         meta: selectedReceived.meta,
       });
 
-      // Track conversation import in CRDT
+      /** Track conversation import in CRDT */
+      const sourcePlatform = selectedReceived.meta.sourcePlatform;
+      const platform: OriginPlatform = isOriginPlatform(sourcePlatform)
+        ? sourcePlatform
+        : 'unknown';
       const newVersion: ConversationVersion = {
         versionId: crypto.randomUUID(),
         creator: identity?.username || 'anonymous',
-        platform: (selectedReceived.meta.sourcePlatform || 'unknown') as OriginPlatform,
+        platform,
         sessionId: selectedReceived.meta.sourceSessionId,
         messageCount: selectedReceived.meta.messageCount,
         createdAt: Date.now(),
@@ -455,7 +464,7 @@ export function ImportConversationHandler({
       };
       addConversationVersion(ydoc, newVersion);
 
-      // Log activity event
+      /** Log activity event */
       logPlanEvent(ydoc, 'conversation_imported', actor, {
         sourcePlatform: selectedReceived.meta.sourcePlatform,
         messageCount: selectedReceived.meta.messageCount,
@@ -472,7 +481,7 @@ export function ImportConversationHandler({
       setIsReviewOpen(false);
       setSelectedReceived(null);
     } catch (error) {
-      // tRPC throws on errors - handle gracefully
+      /** tRPC throws on errors - handle gracefully */
       const message =
         error instanceof Error
           ? error.message

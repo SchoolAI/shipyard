@@ -84,13 +84,16 @@ export function extractTextFromCommentBody(body: CommentBody): string {
       if (typeof block === 'string') return block;
       if (typeof block !== 'object' || block === null) return '';
 
-      const blockObj = block as { content?: unknown };
-      if (Array.isArray(blockObj.content)) {
-        return blockObj.content
+      const blockObj = Object.fromEntries(Object.entries(block));
+      const content = blockObj.content;
+      if (Array.isArray(content)) {
+        return content
           .map((item: unknown) => {
             if (typeof item === 'string') return item;
             if (typeof item === 'object' && item !== null && 'text' in item) {
-              return (item as { text: string }).text;
+              const textItem = Object.fromEntries(Object.entries(item));
+              const text = textItem.text;
+              return typeof text === 'string' ? text : '';
             }
             return '';
           })
@@ -112,15 +115,9 @@ export function extractTextFromCommentBody(body: CommentBody): string {
 export function extractMentions(body: CommentBody): string[] {
   const text = extractTextFromCommentBody(body);
   const mentionRegex = /@([a-zA-Z0-9_-]+)/g;
-  const mentions: string[] = [];
-  let match: RegExpExecArray | null;
-
-  // biome-ignore lint/suspicious/noAssignInExpressions: Standard regex exec loop pattern
-  while ((match = mentionRegex.exec(text)) !== null) {
-    if (match[1]) {
-      mentions.push(match[1]);
-    }
-  }
+  const mentions = [...text.matchAll(mentionRegex)]
+    .map((match) => match[1])
+    .filter((username): username is string => username !== undefined);
 
   return [...new Set(mentions)];
 }

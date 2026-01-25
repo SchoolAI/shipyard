@@ -64,7 +64,7 @@ function validateNumberInput(
   question: { min?: number; max?: number }
 ): boolean {
   const numStr = typeof value === 'string' ? value : '';
-  if (!numStr) return true; // Empty is handled by required check
+  if (!numStr) return true;
   const num = Number.parseFloat(numStr);
   if (Number.isNaN(num)) return false;
   if (question.min !== undefined && num < question.min) return false;
@@ -75,7 +75,7 @@ function validateNumberInput(
 /** Validate email input against format and optional domain restriction */
 function validateEmailInput(value: string | string[], question: { domain?: string }): boolean {
   const email = typeof value === 'string' ? value : '';
-  if (!email.trim()) return true; // Empty is handled by required check
+  if (!email.trim()) return true;
   if (!EMAIL_REGEX.test(email)) return false;
   if (question.domain && !email.toLowerCase().endsWith(`@${question.domain.toLowerCase()}`)) {
     return false;
@@ -89,7 +89,7 @@ function validateDateInput(
   question: { min?: string; max?: string }
 ): boolean {
   const dateStr = typeof value === 'string' ? value : '';
-  if (!dateStr) return true; // Empty is handled by required check
+  if (!dateStr) return true;
   const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
   if (!dateRegex.test(dateStr)) return false;
   const date = new Date(dateStr);
@@ -241,11 +241,8 @@ function isChoiceSubmittable(
 /** Validate rating-type question submission */
 function isRatingSubmittable(value: string | string[], customInput: string): boolean {
   const strValue = typeof value === 'string' ? value : '';
-  // N/A is always valid
   if (strValue === NA_OPTION_VALUE) return true;
-  // Other requires custom input
   if (strValue === OTHER_OPTION_VALUE) return !!customInput.trim();
-  // Normal rating (number as string)
   return !!strValue && strValue !== '';
 }
 
@@ -374,7 +371,6 @@ export function MultiQuestionInputModal({
   const [remainingTime, setRemainingTime] = useState(-1);
   const { identity, startAuth } = useGitHubAuth();
 
-  // Reset state when request changes
   useEffect(() => {
     if (request) {
       setQuestionStates(request.questions.map(getDefaultQuestionState));
@@ -382,7 +378,6 @@ export function MultiQuestionInputModal({
     setRemainingTime(-1);
   }, [request]);
 
-  // Used for auto-timeout
   const handleCancel = useCallback(() => {
     if (!ydoc || !request) return;
 
@@ -395,7 +390,6 @@ export function MultiQuestionInputModal({
     onClose();
   }, [ydoc, request, onClose]);
 
-  // Used when user explicitly clicks "Decline"
   const handleDecline = useCallback(() => {
     if (!ydoc || !request) return;
 
@@ -443,7 +437,6 @@ export function MultiQuestionInputModal({
     []
   );
 
-  // Countdown timer
   useEffect(() => {
     if (!request || !isOpen) return;
 
@@ -462,7 +455,6 @@ export function MultiQuestionInputModal({
     return () => clearInterval(interval);
   }, [request, isOpen]);
 
-  // Auto-cancel on timeout
   useEffect(() => {
     if (remainingTime === 0 && isOpen && request) {
       handleCancel();
@@ -476,7 +468,6 @@ export function MultiQuestionInputModal({
     setIsSubmitting(true);
 
     try {
-      // Build responses record
       const responses: Record<string, string> = {};
       for (let i = 0; i < request.questions.length; i++) {
         const question = request.questions[i];
@@ -498,7 +489,6 @@ export function MultiQuestionInputModal({
         return;
       }
 
-      // Also log to plan's Y.Doc for activity timeline if this is a plan-scoped request
       if (planYdoc && request.planId) {
         logPlanEvent(planYdoc, 'input_request_answered', identity.username, {
           requestId: request.id,
@@ -694,6 +684,7 @@ export function MultiQuestionInputModal({
             <Alert.Content>
               <Alert.Title>Unsupported Question Type</Alert.Title>
               <Alert.Description>
+                {/* eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- SAFE-ASSERTION: Exhaustive switch - narrowing never to access discriminant for error message */}
                 Type "{(_exhaustiveCheck as { type: string }).type}" is not supported.
               </Alert.Description>
             </Alert.Content>
@@ -703,7 +694,6 @@ export function MultiQuestionInputModal({
     }
   };
 
-  // Check if all questions are submittable
   const isFormSubmittable = (): boolean => {
     if (!request || questionStates.length !== request.questions.length) return false;
     return request.questions.every((question, index) => {
@@ -714,7 +704,6 @@ export function MultiQuestionInputModal({
 
   if (!request) return null;
 
-  // Show sign-in prompt if no identity
   if (!identity) {
     return (
       <SignInPrompt

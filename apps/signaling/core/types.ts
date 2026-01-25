@@ -9,7 +9,7 @@
  * and avoid duplication.
  */
 
-// Import and re-export types from @shipyard/schema that are used in signaling
+/** Import and re-export types from @shipyard/schema that are used in signaling */
 import type {
   CreateInviteRequest,
   InviteCreatedResponse,
@@ -23,6 +23,7 @@ import type {
   RedeemInviteRequest,
   RevokeInviteRequest,
 } from '@shipyard/schema';
+import { z } from 'zod';
 
 export type {
   CreateInviteRequest,
@@ -38,7 +39,7 @@ export type {
   RevokeInviteRequest,
 };
 
-// --- Core Signaling Protocol Messages (y-webrtc) ---
+/** --- Core Signaling Protocol Messages (y-webrtc) --- */
 
 /**
  * Client subscribes to room topics (plan IDs).
@@ -63,9 +64,9 @@ export interface UnsubscribeMessage {
 export interface PublishMessage {
   type: 'publish';
   topic: string;
-  from?: string; // y-webrtc client ID (not user ID)
-  clients?: number; // Number of clients in the room (added by server)
-  [key: string]: unknown; // y-webrtc adds various fields (to, signal, etc.)
+  from?: string /** y-webrtc client ID (not user ID) */;
+  clients?: number /** Number of clients in the room (added by server) */;
+  [key: string]: unknown /** y-webrtc adds various fields (to, signal, etc.) */;
 }
 
 /**
@@ -98,7 +99,7 @@ export interface ErrorMessage {
  */
 export type InviteAuthError = 'unauthenticated' | 'unauthorized' | 'plan_not_found';
 
-// --- Type Unions ---
+/** --- Type Unions --- */
 
 /**
  * Discriminated union of all incoming signaling message types.
@@ -132,3 +133,71 @@ export type OutgoingMessage =
  * Token validation error types.
  */
 export type TokenValidationError = 'invalid' | 'revoked' | 'expired' | 'exhausted';
+
+/** --- Zod Schemas for runtime validation --- */
+
+const SubscribeMessageSchema = z.object({
+  type: z.literal('subscribe'),
+  topics: z.array(z.string()),
+});
+
+const UnsubscribeMessageSchema = z.object({
+  type: z.literal('unsubscribe'),
+  topics: z.array(z.string()),
+});
+
+const PublishMessageSchema = z
+  .object({
+    type: z.literal('publish'),
+    topic: z.string(),
+    from: z.string().optional(),
+    clients: z.number().optional(),
+  })
+  .passthrough();
+
+const PingMessageSchema = z.object({
+  type: z.literal('ping'),
+});
+
+const CreateInviteRequestSchema = z.object({
+  type: z.literal('create_invite'),
+  planId: z.string(),
+  authToken: z.string(),
+  ttlMinutes: z.number().optional(),
+  maxUses: z.number().nullable().optional(),
+  label: z.string().optional(),
+});
+
+const RedeemInviteRequestSchema = z.object({
+  type: z.literal('redeem_invite'),
+  planId: z.string(),
+  tokenId: z.string(),
+  tokenValue: z.string(),
+  userId: z.string(),
+});
+
+const RevokeInviteRequestSchema = z.object({
+  type: z.literal('revoke_invite'),
+  planId: z.string(),
+  tokenId: z.string(),
+});
+
+const ListInvitesRequestSchema = z.object({
+  type: z.literal('list_invites'),
+  planId: z.string(),
+});
+
+/**
+ * Zod schema for validating incoming signaling messages.
+ * Use this to safely parse external JSON data.
+ */
+export const SignalingMessageSchema = z.discriminatedUnion('type', [
+  SubscribeMessageSchema,
+  UnsubscribeMessageSchema,
+  PublishMessageSchema,
+  PingMessageSchema,
+  CreateInviteRequestSchema,
+  RedeemInviteRequestSchema,
+  RevokeInviteRequestSchema,
+  ListInvitesRequestSchema,
+]);

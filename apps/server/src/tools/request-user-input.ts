@@ -6,14 +6,23 @@
  * without needing to execute arbitrary code.
  */
 
-import { PLAN_INDEX_DOC_NAME, QuestionSchema } from '@shipyard/schema';
+import {
+  type CreateChoiceInputParams,
+  type CreateDateInputParams,
+  type CreateEmailInputParams,
+  type CreateInputRequestParams,
+  type CreateNumberInputParams,
+  type CreateRatingInputParams,
+  PLAN_INDEX_DOC_NAME,
+  QuestionSchema,
+} from '@shipyard/schema';
 import { z } from 'zod';
 import { getOrCreateDoc } from '../doc-store.js';
 import { logger } from '../logger.js';
 import { InputRequestManager } from '../services/input-request-manager.js';
 import { TOOL_NAMES } from './tool-names.js';
 
-// --- Input Schema ---
+/** --- Input Schema --- */
 
 const RequestUserInputInput = z
   .object({
@@ -47,10 +56,8 @@ const RequestUserInputInput = z
       .string()
       .optional()
       .describe('Optional metadata to link request to plan (for activity log filtering)'),
-    // Number/rating type parameters
     min: z.number().optional().describe("For 'number'/'rating' - minimum value"),
     max: z.number().optional().describe("For 'number'/'rating' - maximum value"),
-    // Date type parameters (separate from min/max since they're strings)
     minDate: z
       .string()
       .regex(/^\d{4}-\d{2}-\d{2}$/)
@@ -65,9 +72,7 @@ const RequestUserInputInput = z
       .enum(['integer', 'decimal', 'currency', 'percentage'])
       .optional()
       .describe("For 'number' - display format hint (step is derived: integer=1, others=0.01)"),
-    // Email type parameters
     domain: z.string().optional().describe("For 'email' - restrict to domain"),
-    // Rating type parameters
     style: z
       .enum(['stars', 'numbers', 'emoji'])
       .optional()
@@ -79,7 +84,6 @@ const RequestUserInputInput = z
       })
       .optional()
       .describe("For 'rating' - endpoint labels"),
-    // Multi-question support
     questions: z
       .array(QuestionSchema)
       .min(1)
@@ -91,145 +95,95 @@ const RequestUserInputInput = z
     message: 'Either provide message+type OR questions array',
   });
 
-// --- Helper Functions ---
-
 type RequestUserInputInput = z.infer<typeof RequestUserInputInput>;
 
-/** Build request params for choice type */
-function buildChoiceParams(input: RequestUserInputInput, baseParams: Record<string, unknown>) {
-  return {
-    ...baseParams,
-    type: 'choice' as const,
-    options: input.options ?? [],
-    multiSelect: input.multiSelect,
-    displayAs: input.displayAs,
-    placeholder: input.placeholder,
-  };
-}
-
-/** Build request params for number type */
-function buildNumberParams(input: RequestUserInputInput, baseParams: Record<string, unknown>) {
-  return {
-    ...baseParams,
-    type: 'number' as const,
-    min: input.min,
-    max: input.max,
-    format: input.format,
-  };
-}
-
-/** Build request params for email type */
-function buildEmailParams(input: RequestUserInputInput, baseParams: Record<string, unknown>) {
-  return {
-    ...baseParams,
-    type: 'email' as const,
-    domain: input.domain,
-  };
-}
-
-/** Build request params for date type */
-function buildDateParams(input: RequestUserInputInput, baseParams: Record<string, unknown>) {
-  return {
-    ...baseParams,
-    type: 'date' as const,
-    min: input.minDate,
-    max: input.maxDate,
-  };
-}
-
-/** Build request params for rating type */
-function buildRatingParams(input: RequestUserInputInput, baseParams: Record<string, unknown>) {
-  return {
-    ...baseParams,
-    type: 'rating' as const,
-    min: input.min,
-    max: input.max,
-    style: input.style,
-    labels: input.labels,
-  };
-}
-
 /** Build request params based on input type */
-function buildRequestParams(input: RequestUserInputInput): Record<string, unknown> {
-  const baseParams = {
-    message: input.message,
-    defaultValue: input.defaultValue,
-    timeout: input.timeout,
-    planId: input.planId,
-  };
-
+function buildRequestParams(input: RequestUserInputInput): CreateInputRequestParams {
   switch (input.type) {
     case 'choice':
-      return buildChoiceParams(input, baseParams);
-    case 'number':
-      return buildNumberParams(input, baseParams);
-    case 'email':
-      return buildEmailParams(input, baseParams);
-    case 'date':
-      return buildDateParams(input, baseParams);
-    case 'rating':
-      return buildRatingParams(input, baseParams);
-    default:
-      // text, multiline, confirm
       return {
-        ...baseParams,
-        type: input.type,
+        message: input.message ?? '',
+        defaultValue: input.defaultValue,
+        timeout: input.timeout,
+        planId: input.planId,
+        type: 'choice' as const,
+        options: input.options ?? [],
+        multiSelect: input.multiSelect,
+        displayAs: input.displayAs,
+        placeholder: input.placeholder,
+      } satisfies CreateChoiceInputParams;
+    case 'number':
+      return {
+        message: input.message ?? '',
+        defaultValue: input.defaultValue,
+        timeout: input.timeout,
+        planId: input.planId,
+        type: 'number' as const,
+        min: input.min,
+        max: input.max,
+        format: input.format,
+      } satisfies CreateNumberInputParams;
+    case 'email':
+      return {
+        message: input.message ?? '',
+        defaultValue: input.defaultValue,
+        timeout: input.timeout,
+        planId: input.planId,
+        type: 'email' as const,
+        domain: input.domain,
+      } satisfies CreateEmailInputParams;
+    case 'date':
+      return {
+        message: input.message ?? '',
+        defaultValue: input.defaultValue,
+        timeout: input.timeout,
+        planId: input.planId,
+        type: 'date' as const,
+        min: input.minDate,
+        max: input.maxDate,
+      } satisfies CreateDateInputParams;
+    case 'rating':
+      return {
+        message: input.message ?? '',
+        defaultValue: input.defaultValue,
+        timeout: input.timeout,
+        planId: input.planId,
+        type: 'rating' as const,
+        min: input.min,
+        max: input.max,
+        style: input.style,
+        labels: input.labels,
+      } satisfies CreateRatingInputParams;
+    case 'text':
+      return {
+        message: input.message ?? '',
+        defaultValue: input.defaultValue,
+        timeout: input.timeout,
+        planId: input.planId,
+        type: 'text' as const,
       };
+    case 'multiline':
+      return {
+        message: input.message ?? '',
+        defaultValue: input.defaultValue,
+        timeout: input.timeout,
+        planId: input.planId,
+        type: 'multiline' as const,
+      };
+    case 'confirm':
+      return {
+        message: input.message ?? '',
+        defaultValue: input.defaultValue,
+        timeout: input.timeout,
+        planId: input.planId,
+        type: 'confirm' as const,
+      };
+    default:
+      throw new Error(`Unsupported input type: ${String(input.type)}`);
   }
 }
 
-/** Create the input request in ydoc and optionally log event */
-async function initializeInputRequest(
-  input: RequestUserInputInput,
-  ydoc: Awaited<ReturnType<typeof getOrCreateDoc>>
-): Promise<string> {
-  const manager = new InputRequestManager();
-  let requestId: string;
-
-  if (input.questions) {
-    // Multi-question request
-    const params = {
-      questions: input.questions,
-      timeout: input.timeout,
-      planId: input.planId,
-    };
-    requestId = manager.createMultiQuestionRequest(ydoc, params);
-  } else {
-    // Single-question request (existing logic)
-    const params = buildRequestParams(input);
-    // Cast through unknown since new types may not yet be in the schema
-    requestId = manager.createRequest(
-      ydoc,
-      params as unknown as Parameters<typeof manager.createRequest>[1]
-    );
-  }
-
-  // If request is plan-scoped, also log created event to plan doc for activity timeline
-  if (input.planId) {
-    const planDoc = await getOrCreateDoc(input.planId);
-    const { logPlanEvent } = await import('@shipyard/schema');
-    const requestType = input.questions ? 'multi' : (input.type ?? 'text');
-    logPlanEvent(
-      planDoc,
-      'input_request_created',
-      'Agent',
-      {
-        requestId,
-        requestType,
-        requestMessage:
-          input.message || (input.questions ? `${input.questions.length} questions` : ''),
-      },
-      {
-        inboxWorthy: true,
-        inboxFor: 'owner',
-      }
-    );
-  }
-
-  return requestId;
-}
-
-// --- Public Export ---
+/** --- Public Export --- */
 
 export const requestUserInputTool = {
   definition: {
@@ -381,7 +335,6 @@ NOTE: This is also available as requestUserInput() inside execute_code for multi
           type: 'string',
           description: 'Optional metadata to link request to plan (for activity log filtering)',
         },
-        // Number/rating type parameters
         min: {
           type: 'number',
           description: "For 'number'/'rating' type - minimum allowed value",
@@ -390,7 +343,6 @@ NOTE: This is also available as requestUserInput() inside execute_code for multi
           type: 'number',
           description: "For 'number'/'rating' type - maximum allowed value",
         },
-        // Date type parameters (separate from min/max since they're strings)
         minDate: {
           type: 'string',
           pattern: '^\\d{4}-\\d{2}-\\d{2}$',
@@ -407,12 +359,10 @@ NOTE: This is also available as requestUserInput() inside execute_code for multi
           description:
             "For 'number' - display format hint (step is derived: integer=1, others=0.01)",
         },
-        // Email type parameters
         domain: {
           type: 'string',
           description: "For 'email' - restrict to specific domain",
         },
-        // Rating type parameters
         style: {
           type: 'string',
           enum: ['stars', 'numbers', 'emoji'],
@@ -507,7 +457,6 @@ NOTE: This is also available as requestUserInput() inside execute_code for multi
       'Processing request_user_input'
     );
 
-    // Validate choice type has options (only for single-question mode)
     if (input.type === 'choice' && (!input.options || input.options.length === 0)) {
       return {
         content: [
@@ -525,18 +474,32 @@ NOTE: This is also available as requestUserInput() inside execute_code for multi
     }
 
     try {
-      // Always use plan-index doc so browser can see requests from all agents
-      // Browser is already connected to plan-index for plan discovery
+      /*
+       * Always use plan-index doc so browser can see requests from all agents
+       * Browser is already connected to plan-index for plan discovery
+       */
       const ydoc = await getOrCreateDoc(PLAN_INDEX_DOC_NAME);
 
-      // Create request and log event
-      const requestId = await initializeInputRequest(input, ydoc);
-
-      // Wait for response
+      /** Create manager and make request */
       const manager = new InputRequestManager();
+      let requestId: string;
+
+      if (input.questions) {
+        const params = {
+          questions: input.questions,
+          timeout: input.timeout,
+          planId: input.planId,
+        };
+        requestId = manager.createMultiQuestionRequest(ydoc, params);
+      } else {
+        const params = buildRequestParams(input);
+        requestId = manager.createRequest(ydoc, params);
+      }
+
+      /** Wait for response */
       const result = await manager.waitForResponse(ydoc, requestId, input.timeout);
 
-      // Format response based on status
+      /** Format response based on status */
       if (result.status === 'answered') {
         logger.info({ requestId, answeredBy: result.answeredBy }, 'User input received');
         return {
@@ -569,7 +532,7 @@ NOTE: This is also available as requestUserInput() inside execute_code for multi
         };
       }
 
-      // Cancelled status
+      /** Cancelled status */
       logger.info({ requestId, reason: result.reason }, 'Input request cancelled');
       return {
         content: [

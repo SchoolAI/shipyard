@@ -26,16 +26,16 @@ export interface InboxEventItem {
   isUnread: boolean;
 }
 
-// Cache to avoid reloading the same plan events
+/** Cache to avoid reloading the same plan events */
 const eventsCache = new Map<string, { events: PlanEvent[]; timestamp: number }>();
-const CACHE_TTL = 30_000; // 30 seconds
+const CACHE_TTL = 30_000;
 
 /**
  * Load events from a single plan's Y.Doc via IndexedDB.
  * Results are cached for 30 seconds to avoid repeated loads.
  */
 async function loadPlanEvents(planId: string): Promise<PlanEvent[]> {
-  // Check cache first
+  /** Check cache first */
   const cached = eventsCache.get(planId);
   if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
     return cached.events;
@@ -50,12 +50,12 @@ async function loadPlanEvents(planId: string): Promise<PlanEvent[]> {
 
     idb.destroy();
 
-    // Cache the result
+    /** Cache the result */
     eventsCache.set(planId, { events, timestamp: Date.now() });
 
     return events;
   } catch {
-    // Return empty array on error
+    /** Return empty array on error */
     return [];
   }
 }
@@ -103,20 +103,24 @@ export function useInboxEvents(
     async function loadAllEvents() {
       const allEvents: InboxEventItem[] = [];
 
-      // Load events from each plan in parallel
+      /** Load events from each plan in parallel */
       const eventPromises = plans.map(async (plan) => {
         const events = await loadPlanEvents(plan.id);
 
-        // Filter for inbox-worthy events for this user
-        // currentUsername is guaranteed non-null by the outer condition
-        // Pass plan.ownerId to resolve 'owner' in inboxFor field
+        /*
+         * Filter for inbox-worthy events for this user
+         * currentUsername is guaranteed non-null by the outer condition
+         * Pass plan.ownerId to resolve 'owner' in inboxFor field
+         */
         const inboxWorthyEvents = events.filter((event) => {
           if (!currentUsername) return false;
           return isInboxWorthy(event, currentUsername, plan.ownerId);
         });
 
-        // Map to InboxEventItem with isUnread
-        // currentUsername is guaranteed non-null by outer guard
+        /*
+         * Map to InboxEventItem with isUnread
+         * currentUsername is guaranteed non-null by outer guard
+         */
         return inboxWorthyEvents.map((event) => ({
           plan,
           event,
@@ -129,7 +133,7 @@ export function useInboxEvents(
 
       const results = await Promise.all(eventPromises);
 
-      // Flatten and sort by timestamp descending
+      /** Flatten and sort by timestamp descending */
       for (const items of results) {
         allEvents.push(...items);
       }

@@ -34,7 +34,7 @@ import {
   handleSubscribe,
   handleUnsubscribe,
 } from '../core/handlers/index.js';
-import type { SignalingMessage } from '../core/types.js';
+import { SignalingMessageSchema } from '../core/types.js';
 import { NodePlatformAdapter } from '../node/adapter.js';
 import { serverConfig } from './config/env/server.js';
 import { logger } from './logger.js';
@@ -106,9 +106,9 @@ function onConnection(conn: WebSocket): void {
             ? Buffer.concat(rawMessage).toString()
             : new TextDecoder().decode(rawMessage);
 
-      const message = JSON.parse(messageStr) as SignalingMessage;
-
-      if (!message || !message.type || closed) return;
+      const parsed = SignalingMessageSchema.safeParse(JSON.parse(messageStr));
+      if (!parsed.success || closed) return;
+      const message = parsed.data;
 
       switch (message.type) {
         case 'subscribe':

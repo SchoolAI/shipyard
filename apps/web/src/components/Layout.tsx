@@ -17,12 +17,12 @@ export function Layout({ children }: LayoutProps) {
   const { inboxPlans, isLoading, ydoc: indexDoc } = usePlanIndexContext();
   const { pendingRequests } = useInputRequests({ ydoc: indexDoc });
 
-  // Calculate total inbox count (plans + input requests) - same as Sidebar
+  /** Calculate total inbox count (plans + input requests) - same as Sidebar */
   const totalInboxCount = useMemo(() => {
     return inboxPlans.length + pendingRequests.length;
   }, [inboxPlans, pendingRequests]);
 
-  // Mobile layout: default header + drawer (pages can override by rendering their own)
+  /** Mobile layout: default header + drawer (pages can override by rendering their own) */
   if (isMobile) {
     return (
       <div className="flex flex-col h-screen-safe bg-background">
@@ -39,7 +39,7 @@ export function Layout({ children }: LayoutProps) {
     );
   }
 
-  // Desktop layout: sidebar + main (unchanged)
+  /** Desktop layout: sidebar + main (unchanged) */
   return (
     <div className="flex h-screen bg-background">
       <Sidebar />

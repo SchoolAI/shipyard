@@ -14,7 +14,6 @@ import { describe, expect, it, vi } from 'vitest';
 import { TextInput } from './TextInput';
 import type { TextInputRequest } from './types';
 
-// Factory for creating test requests
 function createTextRequest(overrides: Partial<TextInputRequest> = {}): TextInputRequest {
   return {
     id: 'test-id',
@@ -51,9 +50,7 @@ describe('TextInput', () => {
     const input = screen.getByRole('textbox');
     await user.type(input, 'John');
 
-    // Called once per character typed (controlled component receives individual chars)
     expect(setValue).toHaveBeenCalledTimes(4);
-    // Each call receives just the character since value prop doesn't update
     expect(setValue).toHaveBeenNthCalledWith(1, 'J');
     expect(setValue).toHaveBeenNthCalledWith(2, 'o');
     expect(setValue).toHaveBeenNthCalledWith(3, 'h');
@@ -98,7 +95,6 @@ describe('TextInput', () => {
       />
     );
 
-    // Should render empty string for non-string values
     const input = screen.getByRole('textbox');
     expect(input).toHaveValue('');
   });

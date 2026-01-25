@@ -23,12 +23,12 @@ export function AccountSection({ collapsed = false }: AccountSectionProps) {
   const [showAuthChoice, setShowAuthChoice] = useState(false);
   const [showLocalSignIn, setShowLocalSignIn] = useState(false);
 
-  // Convert local identity to GitHubIdentity format for UI consistency
+  /** Convert local identity to GitHubIdentity format for UI consistency */
   const unifiedIdentity = useMemo((): GitHubIdentity | null => {
     if (githubIdentity) return githubIdentity;
     if (localIdentity) {
       return {
-        token: '', // Local identity doesn't have a token
+        token: '',
         username: localIdentity.username,
         displayName: localIdentity.username,
         createdAt: localIdentity.createdAt,
@@ -39,7 +39,7 @@ export function AccountSection({ collapsed = false }: AccountSectionProps) {
   }, [githubIdentity, localIdentity]);
 
   const handleSwitchAccount = () => {
-    // Clear both auth types and show choice modal (don't force GitHub)
+    /** Clear both auth types and show choice modal (don't force GitHub) */
     clearAuth();
     clearLocalIdentity();
     setShowAuthChoice(true);

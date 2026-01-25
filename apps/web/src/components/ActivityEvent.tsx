@@ -140,7 +140,6 @@ function getEventIcon(event: PlanEvent): ReactNode {
     case 'approval_requested':
       return <AlertTriangle className="w-3.5 h-3.5 text-warning" />;
     case 'input_request_created': {
-      // Check if request is marked as blocker - show urgent red icon
       const isBlocker = event.data?.isBlocker;
       return isBlocker ? (
         <AlertOctagon className="w-3.5 h-3.5 text-danger" />
@@ -153,7 +152,7 @@ function getEventIcon(event: PlanEvent): ReactNode {
     case 'input_request_declined':
       return <X className="w-3.5 h-3.5 text-muted-foreground" />;
     case 'agent_activity':
-      // agent_activity uses special helper - will be called separately
+      /** agent_activity uses special helper - will be called separately */
       return <Circle className="w-3.5 h-3.5" />;
     case 'session_token_regenerated':
       return <Key className="w-3.5 h-3.5 text-warning" />;
@@ -244,7 +243,6 @@ function getEventDescription(event: PlanEvent): ReactNode {
       const requestMessage = event.data?.requestMessage;
       const requestType = event.data?.requestType;
       const isBlocker = event.data?.isBlocker;
-      // Use "blocked - needs" prefix for blockers, "requested" for normal requests
       const prefix = isBlocker ? 'blocked - needs' : 'requested';
       if (requestMessage) {
         return (
@@ -260,7 +258,7 @@ function getEventDescription(event: PlanEvent): ReactNode {
       const answeredBy = event.data?.answeredBy;
       const response = event.data?.response;
       if (answeredBy && response !== undefined) {
-        // Format response for display
+        /** Format response for display */
         const responseStr = typeof response === 'string' ? response : JSON.stringify(response);
         const truncated = responseStr.length > 50 ? `${responseStr.slice(0, 50)}...` : responseStr;
         return `${answeredBy} responded: "${truncated}"`;
@@ -270,7 +268,7 @@ function getEventDescription(event: PlanEvent): ReactNode {
     case 'input_request_declined':
       return 'declined input request';
     case 'agent_activity':
-      // agent_activity uses special helper with sub-type logic
+      /** agent_activity uses special helper with sub-type logic */
       return getAgentActivityDescription(event.data);
     case 'session_token_regenerated':
       return 'regenerated the session token';
@@ -289,12 +287,12 @@ function getUnresolvedHighlightColor(event: PlanEvent): 'danger' | 'warning' {
 }
 
 export function ActivityEvent({ event, isUnresolved = false }: ActivityEventProps) {
-  // Use special icon helper for agent_activity events
+  /** Use special icon helper for agent_activity events */
   const icon =
     event.type === 'agent_activity' ? getAgentActivityIcon(event.data) : getEventIcon(event);
   const description = getEventDescription(event);
 
-  // Determine styling based on unresolved status
+  /** Determine styling based on unresolved status */
   const highlightColor = isUnresolved ? getUnresolvedHighlightColor(event) : null;
   const borderClass = highlightColor
     ? highlightColor === 'danger'

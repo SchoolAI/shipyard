@@ -1,5 +1,5 @@
 import { Alert, Button, Card } from '@heroui/react';
-import type { Artifact, ArtifactType } from '@shipyard/schema';
+import type { Artifact } from '@shipyard/schema';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useGitHubAuth } from '../hooks/useGitHubAuth';
 import {
@@ -23,8 +23,10 @@ export function ArtifactRenderer({ artifact, registryPort }: ArtifactRendererPro
   const token = identity?.token ?? null;
   const isSignedIn = identity !== null;
 
-  // For local artifacts, check availability before rendering
-  // Local artifacts may not be available if viewing on a different machine
+  /*
+   * For local artifacts, check availability before rendering
+   * Local artifacts may not be available if viewing on a different machine
+   */
   if (artifact.storage === 'local') {
     return (
       <LocalArtifactViewer
@@ -39,7 +41,7 @@ export function ArtifactRenderer({ artifact, registryPort }: ArtifactRendererPro
     );
   }
 
-  // GitHub artifacts - use existing viewer logic
+  /** GitHub artifacts - use existing viewer logic */
   const url = artifact.url;
 
   switch (artifact.type) {
@@ -100,16 +102,18 @@ export function ArtifactRenderer({ artifact, registryPort }: ArtifactRendererPro
       return (
         <ArtifactPlaceholder
           filename={artifact.filename}
-          message={`Unknown type: ${_exhaustive as ArtifactType}`}
+          message={`Unknown type: ${String(_exhaustive)}`}
         />
       );
     }
   }
 }
 
-// ============================================================================
-// Binary Artifact Viewer (Images, Videos)
-// ============================================================================
+/*
+ * ============================================================================
+ * Binary Artifact Viewer (Images, Videos)
+ * ============================================================================
+ */
 
 interface ArtifactViewerAuthProps {
   token: string | null;
@@ -138,18 +142,18 @@ function BinaryArtifactViewer({
   const [status, setStatus] = useState<FetchArtifactStatus | 'loading'>('loading');
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
 
-  // Track blob URL in ref to avoid infinite loop in useCallback dependencies
+  /** Track blob URL in ref to avoid infinite loop in useCallback dependencies */
   const blobUrlRef = useRef<string | null>(null);
-  // Only show loading state on initial load, not re-fetches
+  /** Only show loading state on initial load, not re-fetches */
   const isInitialLoad = useRef(true);
 
   const loadArtifact = useCallback(async () => {
-    // Only show loading on initial load to prevent flash on re-fetch
+    /** Only show loading on initial load to prevent flash on re-fetch */
     if (isInitialLoad.current) {
       setStatus('loading');
     }
 
-    // Revoke previous blob URL to prevent memory leak
+    /** Revoke previous blob URL to prevent memory leak */
     if (blobUrlRef.current) {
       URL.revokeObjectURL(blobUrlRef.current);
       blobUrlRef.current = null;
@@ -166,14 +170,14 @@ function BinaryArtifactViewer({
     }
 
     isInitialLoad.current = false;
-  }, [url, token, hasRepoScope]); // Remove blobUrl from dependencies
+  }, [url, token, hasRepoScope]);
 
-  // Load artifact on mount and when URL/token changes
+  /** Load artifact on mount and when URL/token changes */
   useEffect(() => {
     loadArtifact();
   }, [loadArtifact]);
 
-  // Cleanup blob URL on unmount
+  /** Cleanup blob URL on unmount */
   useEffect(() => {
     return () => {
       if (blobUrlRef.current) {
@@ -213,13 +217,17 @@ function BinaryArtifactViewer({
   return <>{renderContent(blobUrl)}</>;
 }
 
-// ============================================================================
-// Text Artifact Viewer (JSON, Diffs)
-// ============================================================================
+/*
+ * ============================================================================
+ * Text Artifact Viewer (JSON, Diffs)
+ * ============================================================================
+ */
 
-// ============================================================================
-// HTML Artifact Viewer
-// ============================================================================
+/*
+ * ============================================================================
+ * HTML Artifact Viewer
+ * ============================================================================
+ */
 
 interface HtmlViewerProps extends ArtifactViewerAuthProps {
   url: string;
@@ -242,11 +250,11 @@ function HtmlViewer({
   const [status, setStatus] = useState<FetchArtifactStatus | 'loading'>('loading');
   const [content, setContent] = useState<string | null>(null);
 
-  // Only show loading state on initial load, not re-fetches
+  /** Only show loading state on initial load, not re-fetches */
   const isInitialLoad = useRef(true);
 
   const loadArtifact = useCallback(async () => {
-    // Only show loading on initial load to prevent flash on re-fetch
+    /** Only show loading on initial load to prevent flash on re-fetch */
     if (isInitialLoad.current) {
       setStatus('loading');
     }
@@ -303,9 +311,11 @@ function HtmlViewer({
   );
 }
 
-// ============================================================================
-// Local Artifact Viewer (With Availability Check)
-// ============================================================================
+/*
+ * ============================================================================
+ * Local Artifact Viewer (With Availability Check)
+ * ============================================================================
+ */
 
 interface LocalArtifactViewerProps extends ArtifactViewerAuthProps {
   artifact: Artifact & { storage: 'local' };
@@ -329,7 +339,7 @@ function LocalArtifactViewer({
   const [isAvailable, setIsAvailable] = useState<boolean | null>(null);
   const url = getArtifactUrl(artifact, registryPort);
 
-  // Check if artifact is available on this machine
+  /** Check if artifact is available on this machine */
   useEffect(() => {
     let mounted = true;
     const controller = new AbortController();
@@ -344,7 +354,7 @@ function LocalArtifactViewer({
           setIsAvailable(response.ok);
         }
       } catch (error) {
-        if ((error as Error).name !== 'AbortError' && mounted) {
+        if (!(error instanceof Error && error.name === 'AbortError') && mounted) {
           setIsAvailable(false);
         }
       }
@@ -358,7 +368,7 @@ function LocalArtifactViewer({
     };
   }, [url]);
 
-  // Show loading while checking availability
+  /** Show loading while checking availability */
   if (isAvailable === null) {
     return (
       <div className="relative min-h-[100px]">
@@ -367,7 +377,7 @@ function LocalArtifactViewer({
     );
   }
 
-  // Show warning if artifact is not available
+  /** Show warning if artifact is not available */
   if (!isAvailable) {
     return (
       <Alert status="warning">
@@ -383,7 +393,7 @@ function LocalArtifactViewer({
     );
   }
 
-  // Artifact is available - render based on type using exhaustive switch
+  /** Artifact is available - render based on type using exhaustive switch */
   switch (artifact.type) {
     case 'html':
       return (
@@ -439,16 +449,18 @@ function LocalArtifactViewer({
       return (
         <ArtifactPlaceholder
           filename={artifact.filename}
-          message={`Unknown type: ${_exhaustive as ArtifactType}`}
+          message={`Unknown type: ${String(_exhaustive)}`}
         />
       );
     }
   }
 }
 
-// ============================================================================
-// Shared UI Components
-// ============================================================================
+/*
+ * ============================================================================
+ * Shared UI Components
+ * ============================================================================
+ */
 
 function ArtifactPlaceholder({ filename, message }: { filename: string; message: string }) {
   return (
@@ -482,7 +494,7 @@ function NeedsAuthPrompt({
   onSignIn,
   onRequestRepoAccess,
 }: NeedsAuthPromptProps) {
-  // Determine what action to show based on auth state
+  /** Determine what action to show based on auth state */
   const needsRepoUpgrade = isSignedIn && !hasRepoScope;
 
   return (

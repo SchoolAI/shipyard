@@ -16,14 +16,11 @@ export function NumberInput({
 }: BaseInputProps<NumberInputRequest>) {
   const numValue = typeof value === 'string' ? value : '';
 
-  // Derive step from format (integer=1, decimal/currency/percentage=0.01)
   const step = request.format === 'integer' ? 1 : 0.01;
 
-  // Parse current value for validation
   const parsedNum = numValue ? Number.parseFloat(numValue) : Number.NaN;
   const hasValue = numValue !== '';
 
-  // Validate bounds
   const isBelowMin =
     hasValue && !Number.isNaN(parsedNum) && request.min !== undefined && parsedNum < request.min;
   const isAboveMax =
@@ -31,7 +28,6 @@ export function NumberInput({
   const isInvalidNumber = hasValue && Number.isNaN(parsedNum);
   const isValid = !isInvalidNumber && !isBelowMin && !isAboveMax;
 
-  // Build error message
   const getErrorMessage = (): string | null => {
     if (!hasValue) return null;
     if (isInvalidNumber) return 'Please enter a valid number';

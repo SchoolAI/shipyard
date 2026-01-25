@@ -62,73 +62,103 @@ provider.on('sync', (isSynced) => {
   }
 });
 
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Utility script, complexity is acceptable
+/**
+ * Format a timestamp as ISO string or 'N/A'.
+ */
+function formatTimestamp(ts) {
+  return ts ? new Date(ts).toISOString() : 'N/A';
+}
+
+/**
+ * Print basic plan metadata section.
+ */
+function printBasicMetadata(metadata) {
+  console.log('📋 Plan Metadata:');
+  console.log('─'.repeat(50));
+  console.log(`Title: ${metadata.title}`);
+  console.log(`Status: ${metadata.status}`);
+  console.log(`Owner ID: ${metadata.ownerId || 'N/A'}`);
+  console.log(`Repo: ${metadata.repo || 'N/A'}`);
+  console.log(`PR: ${metadata.pr || 'N/A'}`);
+  console.log(`Created: ${formatTimestamp(metadata.createdAt)}`);
+  console.log(`Updated: ${formatTimestamp(metadata.updatedAt)}`);
+}
+
+/**
+ * Print origin metadata for a specific platform.
+ */
+function printOriginDetails(origin) {
+  console.log(`Platform: ${origin.platform}`);
+
+  switch (origin.platform) {
+    case 'claude-code': {
+      console.log(`Session ID: ${origin.sessionId}`);
+      console.log(`Transcript Path: ${origin.transcriptPath}`);
+      console.log(`CWD: ${origin.cwd || 'N/A'}`);
+      const hasTranscript = Boolean(origin.transcriptPath);
+      console.log(`\n✨ Handoff button should ${hasTranscript ? '✅ APPEAR' : '❌ NOT APPEAR'}`);
+      if (!hasTranscript) {
+        console.log('⚠️  Missing transcript path!');
+      }
+      break;
+    }
+    case 'devin':
+      console.log(`Session ID: ${origin.sessionId}`);
+      break;
+    case 'cursor':
+      console.log(`Conversation ID: ${origin.conversationId}`);
+      console.log(`Generation ID: ${origin.generationId || 'N/A'}`);
+      break;
+    default:
+      console.log('Unknown platform - no additional data');
+  }
+}
+
+/**
+ * Print origin metadata section.
+ */
+function printOriginMetadata(origin) {
+  console.log('\n🔗 Origin Metadata:');
+  console.log('─'.repeat(50));
+
+  if (origin) {
+    printOriginDetails(origin);
+  } else {
+    console.log('❌ No origin metadata found');
+    console.log('\n⚠️  This plan was likely created before origin metadata was implemented.');
+    console.log('    The handoff button will NOT appear.');
+  }
+}
+
+/**
+ * Print raw metadata and Y.Doc keys for debugging.
+ */
+function printDebugInfo(ydoc) {
+  console.log('\n🔧 Raw Metadata (for debugging):');
+  console.log('─'.repeat(50));
+  const metaMap = ydoc.getMap(YDOC_KEYS.METADATA);
+  console.log(JSON.stringify(metaMap.toJSON(), null, 2));
+
+  console.log('\n📦 Y.Doc Keys Present:');
+  console.log('─'.repeat(50));
+  const keys = [
+    ['metadata', ydoc.getMap('metadata').size > 0],
+    ['document', ydoc.getXmlFragment('document').toString().length > 0],
+    ['content', ydoc.getArray('content').length > 0],
+    ['threads', ydoc.getMap('threads').size > 0],
+    ['artifacts', ydoc.getArray('artifacts').length > 0],
+  ];
+  for (const [key, present] of keys) {
+    console.log(`${key}: ${present ? '✅' : '❌'}`);
+  }
+}
+
 function inspectMetadata() {
   try {
-    // Get metadata using helper
     const metadata = getPlanMetadata(ydoc);
-
-    console.log('📋 Plan Metadata:');
-    console.log('─'.repeat(50));
-    console.log(`Title: ${metadata.title}`);
-    console.log(`Status: ${metadata.status}`);
-    console.log(`Owner ID: ${metadata.ownerId || 'N/A'}`);
-    console.log(`Repo: ${metadata.repo || 'N/A'}`);
-    console.log(`PR: ${metadata.pr || 'N/A'}`);
-    console.log(
-      `Created: ${metadata.createdAt ? new Date(metadata.createdAt).toISOString() : 'N/A'}`
-    );
-    console.log(
-      `Updated: ${metadata.updatedAt ? new Date(metadata.updatedAt).toISOString() : 'N/A'}`
-    );
-
-    console.log('\n🔗 Origin Metadata:');
-    console.log('─'.repeat(50));
-
-    if (metadata.origin) {
-      console.log(`Platform: ${metadata.origin.platform}`);
-
-      if (metadata.origin.platform === 'claude-code') {
-        console.log(`Session ID: ${metadata.origin.sessionId}`);
-        console.log(`Transcript Path: ${metadata.origin.transcriptPath}`);
-        console.log(`CWD: ${metadata.origin.cwd || 'N/A'}`);
-
-        // Check if handoff button should appear
-        const hasTranscript = Boolean(metadata.origin.transcriptPath);
-        console.log(`\n✨ Handoff button should ${hasTranscript ? '✅ APPEAR' : '❌ NOT APPEAR'}`);
-
-        if (!hasTranscript) {
-          console.log('⚠️  Missing transcript path!');
-        }
-      } else if (metadata.origin.platform === 'devin') {
-        console.log(`Session ID: ${metadata.origin.sessionId}`);
-      } else if (metadata.origin.platform === 'cursor') {
-        console.log(`Conversation ID: ${metadata.origin.conversationId}`);
-        console.log(`Generation ID: ${metadata.origin.generationId || 'N/A'}`);
-      } else {
-        console.log('Unknown platform - no additional data');
-      }
-    } else {
-      console.log('❌ No origin metadata found');
-      console.log('\n⚠️  This plan was likely created before origin metadata was implemented.');
-      console.log('    The handoff button will NOT appear.');
-    }
-
-    // Raw metadata inspection
-    console.log('\n🔧 Raw Metadata (for debugging):');
-    console.log('─'.repeat(50));
-    const metaMap = ydoc.getMap(YDOC_KEYS.METADATA);
-    const rawData = metaMap.toJSON();
-    console.log(JSON.stringify(rawData, null, 2));
-
-    // Check all Y.Doc keys
-    console.log('\n📦 Y.Doc Keys Present:');
-    console.log('─'.repeat(50));
-    console.log(`metadata: ${ydoc.getMap('metadata').size > 0 ? '✅' : '❌'}`);
-    console.log(`document: ${ydoc.getXmlFragment('document').toString().length > 0 ? '✅' : '❌'}`);
-    console.log(`content: ${ydoc.getArray('content').length > 0 ? '✅' : '❌'}`);
-    console.log(`threads: ${ydoc.getMap('threads').size > 0 ? '✅' : '❌'}`);
-    console.log(`artifacts: ${ydoc.getArray('artifacts').length > 0 ? '✅' : '❌'}`);
+    printBasicMetadata(metadata);
+    printOriginMetadata(metadata.origin);
+    printDebugInfo(ydoc);
   } catch (error) {
     console.error('❌ Error inspecting metadata:', error);
   } finally {

@@ -11,13 +11,13 @@ function getTokenFromGhCli(): string | null {
     const token = execSync('gh auth token', {
       encoding: 'utf-8',
       timeout: 5000,
-      stdio: ['pipe', 'pipe', 'pipe'], // Suppress stderr
+      stdio: ['pipe', 'pipe', 'pipe'],
     }).trim();
     if (token) {
       return token;
     }
   } catch {
-    // gh CLI not available or not authenticated
+    /** gh CLI not available or not authenticated */
   }
   return null;
 }
@@ -32,7 +32,7 @@ const schema = z.object({
     .string()
     .optional()
     .transform((val) => {
-      if (!val) return true; // Default enabled
+      if (!val) return true;
       const setting = val.toLowerCase();
       return setting !== 'disabled' && setting !== 'false' && setting !== '0';
     }),

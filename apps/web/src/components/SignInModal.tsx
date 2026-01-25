@@ -27,7 +27,7 @@ export function SignInModal({ isOpen, onClose, onSignIn }: SignInModalProps) {
       setUsername('');
       onClose();
     } catch (error) {
-      // Show validation errors from useLocalIdentity hook
+      /** Show validation errors from useLocalIdentity hook */
       if (error instanceof Error) {
         toast.error(error.message);
       } else {

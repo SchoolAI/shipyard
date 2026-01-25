@@ -52,12 +52,12 @@ export function VersionSelector({
   onNext,
   onCurrent,
 }: VersionSelectorProps) {
-  // Don't show if no snapshots exist
+  /** Don't show if no snapshots exist */
   if (totalSnapshots === 0) return null;
 
   const isViewingHistory = currentSnapshot !== null;
-  const versionNumber = isViewingHistory ? currentIndex + 1 : totalSnapshots + 1; // +1 for current
-  const totalVersions = totalSnapshots + 1; // Include current version
+  const versionNumber = isViewingHistory ? currentIndex + 1 : totalSnapshots + 1;
+  const totalVersions = totalSnapshots + 1;
 
   return (
     <div className="flex items-center gap-2 text-sm">

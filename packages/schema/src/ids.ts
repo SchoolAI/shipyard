@@ -62,31 +62,44 @@ export type ExportId = string & { readonly __brand: 'ExportId' };
 /**
  * Creates a PlanId from a string.
  * Use this when you know the string is a valid plan ID.
+ *
+ * NOTE: Branded type casts are intentional - they're the only way to create branded types.
+ * The eslint-disable is necessary because TypeScript's branded types pattern requires casts.
  */
 export function asPlanId(id: string): PlanId {
+  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- Branded type cast is intentional
   return id as PlanId;
 }
 
 /**
  * Creates an AwarenessClientId from a number.
  * Use this when you know the number is from awareness.clientID.
+ *
+ * NOTE: Branded type casts are intentional - they're the only way to create branded types.
  */
 export function asAwarenessClientId(id: number): AwarenessClientId {
+  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- Branded type cast is intentional
   return id as AwarenessClientId;
 }
 
 /**
  * Creates a WebRTCPeerId from a string.
  * Use this when you know the string is from room.peerId.
+ *
+ * NOTE: Branded type casts are intentional - they're the only way to create branded types.
  */
 export function asWebRTCPeerId(id: string): WebRTCPeerId {
+  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- Branded type cast is intentional
   return id as WebRTCPeerId;
 }
 
 /**
  * Creates a GitHubUsername from a string.
  * Use this when you know the string is a GitHub username.
+ *
+ * NOTE: Branded type casts are intentional - they're the only way to create branded types.
  */
 export function asGitHubUsername(username: string): GitHubUsername {
+  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- Branded type cast is intentional
   return username as GitHubUsername;
 }

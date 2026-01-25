@@ -19,24 +19,24 @@ export function NotificationsButton({ ydoc, planId }: NotificationsButtonProps) 
   const { pendingRequests } = useInputRequests({
     ydoc,
     onRequestReceived: () => {
-      // Toast notification is handled by the hook
+      /** Toast notification is handled by the hook */
     },
   });
 
-  // Filter requests by planId if provided
+  /** Filter requests by planId if provided */
   const filteredRequests = useMemo(() => {
     if (!planId) {
-      // No filter - show all (used in inbox or sidebar)
+      /** No filter - show all (used in inbox or sidebar) */
       return pendingRequests;
     }
 
-    // On a plan page - show ONLY this plan's requests (exclude global)
+    /** On a plan page - show ONLY this plan's requests (exclude global) */
     return pendingRequests.filter((request) => request.planId === planId);
   }, [pendingRequests, planId]);
 
   const handlePress = () => {
     if (filteredRequests.length > 0) {
-      // Dispatch custom event to open modal with first request
+      /** Dispatch custom event to open modal with first request */
       document.dispatchEvent(
         new CustomEvent('open-input-request', {
           detail: filteredRequests[0],

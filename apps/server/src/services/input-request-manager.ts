@@ -94,12 +94,10 @@ export class InputRequestManager {
   createRequest(ydoc: Y.Doc, params: CreateInputRequestParams): string {
     const request = createInputRequest(params);
 
-    // Add request to Y.Doc in a transaction
     ydoc.transact(() => {
       const requestsArray = ydoc.getArray<InputRequest>(YDOC_KEYS.INPUT_REQUESTS);
       requestsArray.push([request]);
 
-      // Log activity event - mark as inbox-worthy so plan owner sees it
       logPlanEvent(
         ydoc,
         'input_request_created',
@@ -136,12 +134,10 @@ export class InputRequestManager {
   createMultiQuestionRequest(ydoc: Y.Doc, params: CreateMultiQuestionInputParams): string {
     const request = createMultiQuestionInputRequest(params);
 
-    // Add request to Y.Doc in a transaction
     ydoc.transact(() => {
       const requestsArray = ydoc.getArray<AnyInputRequest>(YDOC_KEYS.INPUT_REQUESTS);
       requestsArray.push([request]);
 
-      // Log activity event - mark as inbox-worthy so plan owner sees it
       logPlanEvent(
         ydoc,
         'input_request_created',
@@ -192,26 +188,20 @@ export class InputRequestManager {
       let timeoutHandle: NodeJS.Timeout | undefined;
       let observerFn: (() => void) | undefined;
 
-      // Find the request in the array
       const findRequest = (): AnyInputRequest | undefined => {
         const requests = requestsArray.toJSON();
         return requests.find((r) => r.id === requestId);
       };
 
       const cleanup = () => {
-        // Clean up observer to prevent memory leaks
-        // Must unobserve in all code paths (success, timeout, cancellation)
         if (observerFn) {
           requestsArray.unobserve(observerFn);
           observerFn = undefined;
         }
-        // Clean up timeout timer if still active
         if (timeoutHandle) {
           clearTimeout(timeoutHandle);
           timeoutHandle = undefined;
         }
-        // Set resolved flag to prevent multiple cleanup calls
-        // (can be triggered by observer, timeout, or cancellation)
         if (!resolved) {
           resolved = true;
         }
@@ -237,7 +227,6 @@ export class InputRequestManager {
         }
       };
 
-      // Helper: Handle request not found
       const handleRequestNotFound = () => {
         logger.warn({ requestId }, 'Request not found, treating as cancelled');
         resolved = true;
@@ -249,15 +238,12 @@ export class InputRequestManager {
         });
       };
 
-      // Helper: Handle answered status
       const handleAnsweredStatus = (request: AnyInputRequest) => {
         logger.info({ requestId, answeredBy: request.answeredBy }, 'Input request answered');
         resolved = true;
         cleanup();
 
-        // Return responses for multi-question, response for single-question
-        const responseValue =
-          request.type === 'multi' ? request.responses : (request as InputRequest).response;
+        const responseValue = request.type === 'multi' ? request.responses : request.response;
 
         resolve({
           success: true,
@@ -268,7 +254,6 @@ export class InputRequestManager {
         });
       };
 
-      // Helper: Handle declined status
       const handleDeclinedStatus = () => {
         logger.info({ requestId }, 'Input request declined by user');
         resolved = true;
@@ -280,7 +265,6 @@ export class InputRequestManager {
         });
       };
 
-      // Helper: Handle cancelled status
       const handleCancelledStatus = () => {
         logger.info({ requestId }, 'Input request cancelled (timeout)');
         resolved = true;
@@ -292,23 +276,18 @@ export class InputRequestManager {
         });
       };
 
-      // Observe changes to the requests array
       observerFn = () => {
         checkStatus();
       };
 
-      // Check status immediately in case request was already answered
       checkStatus();
 
-      // If already resolved after immediate check, don't set up observer
       if (resolved) {
         return;
       }
 
-      // Set up observer for future changes
       requestsArray.observe(observerFn);
 
-      // Determine timeout value
       const request = findRequest();
       const effectiveTimeout =
         timeoutSeconds !== undefined
@@ -317,20 +296,14 @@ export class InputRequestManager {
             ? request.timeout
             : 0;
 
-      // Helper: Handle timeout by marking request as cancelled
       const handleTimeout = () => {
         if (resolved) return;
 
         logger.warn({ requestId, timeout: effectiveTimeout }, 'Input request timed out');
 
-        // IMPORTANT: Set resolved = true BEFORE markRequestAsCancelled()
-        // markRequestAsCancelled() updates Y.Doc, which synchronously triggers the observer,
-        // which would call checkStatus() and see status='cancelled', resolving with a short
-        // "Request timed out" message instead of our detailed message with duration.
         resolved = true;
         cleanup();
 
-        // Now safe to update Y.Doc - observer won't double-resolve
         markRequestAsCancelled();
 
         const timeStr = formatDuration(effectiveTimeout);
@@ -341,9 +314,6 @@ export class InputRequestManager {
         });
       };
 
-      // Helper: Mark request as cancelled in Y.Doc
-      // Note: No `resolved` check here - the caller is responsible for setting resolved
-      // BEFORE calling this to prevent the Y.Doc observer from double-resolving.
       const markRequestAsCancelled = () => {
         ydoc.transact(() => {
           const currentRequest = findRequest();
@@ -360,7 +330,6 @@ export class InputRequestManager {
         });
       };
 
-      // Set up timeout if specified (0 = no timeout)
       if (effectiveTimeout > 0) {
         timeoutHandle = setTimeout(handleTimeout, effectiveTimeout * 1000);
       }
@@ -415,7 +384,6 @@ export class InputRequestManager {
     const request = requests.find((r) => r.id === requestId);
 
     if (request) {
-      // Validate with Zod schema before returning
       const parseResult = InputRequestSchema.safeParse(request);
       if (parseResult.success) {
         return parseResult.data;
@@ -455,7 +423,6 @@ export class InputRequestManager {
       const requestsArray = ydoc.getArray<InputRequest>(YDOC_KEYS.INPUT_REQUESTS);
       const requests = requestsArray.toJSON();
 
-      // Remove in reverse order to maintain indices
       for (let i = requests.length - 1; i >= 0; i--) {
         const request = requests[i];
         if (request.status !== 'pending' && (request.answeredAt ?? request.createdAt) < cutoff) {

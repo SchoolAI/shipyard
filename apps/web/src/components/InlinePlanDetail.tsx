@@ -78,14 +78,14 @@ export function InlinePlanDetail({
   const [showAuthChoice, setShowAuthChoice] = useState(false);
   const [showLocalSignIn, setShowLocalSignIn] = useState(false);
 
-  // Plan data for panel
+  /** Plan data for panel */
   const [panelMetadata, setPanelMetadata] = useState<PlanMetadata | null>(null);
   const [panelDeliverableStats, setPanelDeliverableStats] = useState({ completed: 0, total: 0 });
   const [panelLastActivity, setPanelLastActivity] = useState('');
   const [loadTimeout, setLoadTimeout] = useState(false);
   const [editor, setEditor] = useState<BlockNoteEditor | null>(null);
 
-  // Sync providers for selected plan
+  /** Sync providers for selected plan */
   const {
     ydoc: panelYdoc,
     syncState: panelSyncState,
@@ -93,7 +93,7 @@ export function InlinePlanDetail({
     rtcProvider: panelRtcProvider,
   } = useMultiProviderSync(planId || '');
 
-  // Timeout for loading state (detect invalid planIds)
+  /** Timeout for loading state (detect invalid planIds) */
   useEffect(() => {
     if (!planId) {
       setLoadTimeout(false);
@@ -104,12 +104,12 @@ export function InlinePlanDetail({
       if (!panelMetadata) {
         setLoadTimeout(true);
       }
-    }, 10000); // 10 second timeout
+    }, 10000);
 
     return () => clearTimeout(timer);
   }, [planId, panelMetadata]);
 
-  // Load panel metadata when plan is selected
+  /** Load panel metadata when plan is selected */
   useEffect(() => {
     if (!planId || !panelSyncState.idbSynced) {
       setPanelMetadata(null);
@@ -122,12 +122,12 @@ export function InlinePlanDetail({
       const metadata = getPlanMetadata(panelYdoc);
       setPanelMetadata(metadata);
 
-      // Update deliverable stats
+      /** Update deliverable stats */
       const deliverables = getDeliverables(panelYdoc);
       const completed = deliverables.filter((d) => d.linkedArtifactId).length;
       setPanelDeliverableStats({ completed, total: deliverables.length });
 
-      // Format last activity
+      /** Format last activity */
       if (metadata?.updatedAt) {
         setPanelLastActivity(`Updated ${formatRelativeTime(metadata.updatedAt)}`);
       }
@@ -137,7 +137,7 @@ export function InlinePlanDetail({
     return () => metaMap.unobserve(update);
   }, [planId, panelYdoc, panelSyncState.idbSynced]);
 
-  // Identity for comments - Priority: GitHub > Local > null
+  /** Identity for comments - Priority: GitHub > Local > null */
   const identity = githubIdentity
     ? {
         id: githubIdentity.username,
@@ -168,7 +168,7 @@ export function InlinePlanDetail({
     [setLocalIdentity]
   );
 
-  // Navigate to full plan page
+  /** Navigate to full plan page */
   const handleFullScreen = useCallback(() => {
     if (planId) {
       setSidebarCollapsed(true);
@@ -176,7 +176,7 @@ export function InlinePlanDetail({
     }
   }, [planId, navigate]);
 
-  // Default approve handler - navigate to plan page
+  /** Default approve handler - navigate to plan page */
   const handleApprove = useCallback(() => {
     if (onApprove && planId && panelMetadata) {
       onApprove({ planId, ydoc: panelYdoc, metadata: panelMetadata });
@@ -185,7 +185,7 @@ export function InlinePlanDetail({
     }
   }, [onApprove, planId, panelYdoc, panelMetadata, navigate]);
 
-  // Default request changes handler - navigate to plan page
+  /** Default request changes handler - navigate to plan page */
   const handleRequestChanges = useCallback(() => {
     if (onRequestChanges && planId && panelMetadata) {
       onRequestChanges({ planId, ydoc: panelYdoc, metadata: panelMetadata });
@@ -194,10 +194,10 @@ export function InlinePlanDetail({
     }
   }, [onRequestChanges, planId, panelYdoc, panelMetadata, navigate]);
 
-  // Prefer WebSocket when connected, fall back to WebRTC
+  /** Prefer WebSocket when connected, fall back to WebRTC */
   const activeProvider = panelWsProvider ?? panelRtcProvider;
 
-  // Auth modals - always rendered
+  /** Auth modals - always rendered */
   const authModals = (
     <>
       <GitHubAuthOverlay authState={authState} />
@@ -215,7 +215,7 @@ export function InlinePlanDetail({
     </>
   );
 
-  // Plan selected and metadata loaded
+  /** Plan selected and metadata loaded */
   if (planId && panelMetadata) {
     return (
       <>
@@ -254,7 +254,7 @@ export function InlinePlanDetail({
     );
   }
 
-  // Plan selected but still loading
+  /** Plan selected but still loading */
   if (planId) {
     if (loadTimeout) {
       return (
@@ -285,7 +285,7 @@ export function InlinePlanDetail({
     );
   }
 
-  // No plan selected
+  /** No plan selected */
   return (
     <>
       <div className="flex items-center justify-center h-full text-muted-foreground">

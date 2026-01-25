@@ -38,7 +38,7 @@ export function CollapsiblePanel({
 }: CollapsiblePanelProps) {
   const ChevronClosed = side === 'left' ? ChevronRight : ChevronLeft;
 
-  // If no collapsedContent provided, show floating button (right panel behavior)
+  /** If no collapsedContent provided, show floating button (right panel behavior) */
   if (!isOpen && !collapsedContent) {
     return (
       <Button
