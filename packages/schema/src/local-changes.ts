@@ -44,6 +44,8 @@ export const LocalChangesResponseSchema = z.object({
   branch: z.string(),
   /** Base for comparison (usually 'HEAD') */
   baseBranch: z.string(),
+  /** Current HEAD commit SHA (for staleness detection in comments) */
+  headSha: z.string().optional(),
   /** Files with staged changes */
   staged: z.array(LocalFileChangeSchema),
   /** Files with unstaged changes */

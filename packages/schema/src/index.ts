@@ -26,6 +26,15 @@ export {
 } from './conversation-export.js';
 export { formatDeliverablesForLLM } from './deliverable-formatter.js';
 export { extractDeliverables } from './deliverable-parser.js';
+export type {
+  FormatDiffCommentsOptions,
+  FormatPRCommentsOptions,
+} from './diff-comment-formatter.js';
+export {
+  formatDiffCommentsForLLM,
+  formatPRCommentsForLLM,
+  getPRCommentsSummary,
+} from './diff-comment-formatter.js';
 export { type EnvironmentContext, EnvironmentContextSchema } from './environment.js';
 export type { GitHubPRResponse } from './github-validation.js';
 export { GitHubPRResponseSchema } from './github-validation.js';
@@ -157,6 +166,7 @@ export {
   InviteTokenSchema,
   parseInviteFromUrl,
 } from './invite-token.js';
+export { hashLineContent } from './line-content-hash.js';
 export type {
   GitFileStatus,
   LocalChangesResponse,
@@ -208,10 +218,12 @@ export type {
   CursorOriginMetadata,
   Deliverable,
   DevinOriginMetadata,
+  DiffComment,
   GitHubArtifact,
   LinkedPR,
   LinkedPRStatus,
   LocalArtifact,
+  LocalDiffComment,
   OriginMetadata,
   OriginPlatform,
   PlanEvent,
@@ -241,6 +253,7 @@ export {
   isInboxWorthy,
   LinkedPRSchema,
   LinkedPRStatusValues,
+  LocalDiffCommentSchema,
   OriginMetadataSchema,
   OriginPlatformValues,
   PlanEventSchema,
@@ -278,6 +291,19 @@ export {
 } from './plan-index-helpers.js';
 export type { RoutePath } from './routes.js';
 export { createPlanWebUrl, ROUTES } from './routes.js';
+export type {
+  LocalDiffCommentWithStaleness,
+  StalenessInfo,
+  StalenessType,
+} from './staleness-detection.js';
+export {
+  buildLineContentMap,
+  computeCommentStaleness,
+  formatStalenessMarker,
+  isLineContentStale,
+  withStalenessInfo,
+  withStalenessInfoBatch,
+} from './staleness-detection.js';
 export type { CommentBody, Thread, ThreadComment } from './thread.js';
 export {
   extractMentions,
@@ -388,7 +414,9 @@ export {
   addArtifact,
   addConversationVersion,
   addDeliverable,
+  addLocalDiffComment,
   addPlanTag,
+  addPRReviewComment,
   addSnapshot,
   answerInputRequest,
   answerMultiQuestionInputRequest,
@@ -409,6 +437,8 @@ export {
   getLatestSnapshot,
   getLinkedPR,
   getLinkedPRs,
+  getLocalDiffComments,
+  getLocalDiffCommentsForFile,
   getPlanEvents,
   getPlanMetadata,
   getPlanMetadataWithValidation,
@@ -432,9 +462,11 @@ export {
   markVersionHandedOff,
   rejectUser,
   removeArtifact,
+  removeLocalDiffComment,
   removePlanTag,
   removePRReviewComment,
   resetPlanToDraft,
+  resolveLocalDiffComment,
   resolvePRReviewComment,
   revokeUser,
   setAgentPresence,

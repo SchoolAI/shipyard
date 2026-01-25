@@ -18,6 +18,8 @@ import {
   DeliverableSchema,
   type LinkedPR,
   LinkedPRSchema,
+  type LocalDiffComment,
+  LocalDiffCommentSchema,
   type OriginMetadata,
   type PlanEvent,
   PlanEventSchema,
@@ -989,6 +991,90 @@ export function removePRReviewComment(ydoc: Y.Doc, commentId: string): boolean {
   const data = toUnknownArray(array);
   const existing = data
     .map((item) => PRReviewCommentSchema.safeParse(item))
+    .filter((r) => r.success)
+    .map((r) => r.data);
+  const index = existing.findIndex((c) => c.id === commentId);
+
+  if (index === -1) return false;
+
+  array.delete(index, 1);
+  return true;
+}
+
+/**
+ * Get all local diff comments from the Y.Doc.
+ * Local diff comments are review comments on uncommitted changes.
+ */
+export function getLocalDiffComments(ydoc: Y.Doc): LocalDiffComment[] {
+  const array = ydoc.getArray<LocalDiffComment>(YDOC_KEYS.LOCAL_DIFF_COMMENTS);
+  const data = toUnknownArray(array);
+
+  return data
+    .map((item) => LocalDiffCommentSchema.safeParse(item))
+    .filter((result) => result.success)
+    .map((result) => result.data);
+}
+
+/**
+ * Get local diff comments for a specific file path.
+ */
+export function getLocalDiffCommentsForFile(ydoc: Y.Doc, path: string): LocalDiffComment[] {
+  return getLocalDiffComments(ydoc).filter((c) => c.path === path);
+}
+
+/**
+ * Add a local diff comment to the Y.Doc.
+ * Validates the comment before adding to prevent partial/corrupted state.
+ */
+export function addLocalDiffComment(ydoc: Y.Doc, comment: LocalDiffComment, actor?: string): void {
+  const validated = LocalDiffCommentSchema.parse(comment);
+
+  ydoc.transact(
+    () => {
+      const array = ydoc.getArray<LocalDiffComment>(YDOC_KEYS.LOCAL_DIFF_COMMENTS);
+      array.push([validated]);
+    },
+    actor ? { actor } : undefined
+  );
+}
+
+/**
+ * Resolve or unresolve a local diff comment.
+ * @returns true if the comment was found and updated, false otherwise.
+ */
+export function resolveLocalDiffComment(
+  ydoc: Y.Doc,
+  commentId: string,
+  resolved: boolean
+): boolean {
+  const array = ydoc.getArray<LocalDiffComment>(YDOC_KEYS.LOCAL_DIFF_COMMENTS);
+  const data = toUnknownArray(array);
+  const existing = data
+    .map((item) => LocalDiffCommentSchema.safeParse(item))
+    .filter((r) => r.success)
+    .map((r) => r.data);
+  const index = existing.findIndex((c) => c.id === commentId);
+
+  if (index === -1) return false;
+
+  const comment = existing[index];
+  if (!comment) return false;
+
+  array.delete(index, 1);
+  array.insert(index, [{ ...comment, resolved }]);
+
+  return true;
+}
+
+/**
+ * Remove a local diff comment from the Y.Doc.
+ * @returns true if the comment was found and removed, false otherwise.
+ */
+export function removeLocalDiffComment(ydoc: Y.Doc, commentId: string): boolean {
+  const array = ydoc.getArray<LocalDiffComment>(YDOC_KEYS.LOCAL_DIFF_COMMENTS);
+  const data = toUnknownArray(array);
+  const existing = data
+    .map((item) => LocalDiffCommentSchema.safeParse(item))
     .filter((r) => r.success)
     .map((r) => r.data);
   const index = existing.findIndex((c) => c.id === commentId);

@@ -64,6 +64,7 @@ export const CursorOriginMetadataSchema = z.object({
 
 export const UnknownOriginMetadataSchema = z.object({
   platform: z.literal('unknown'),
+  cwd: z.string(),
 });
 
 export const OriginMetadataSchema = z.discriminatedUnion('platform', [
@@ -816,6 +817,35 @@ export const PRReviewCommentSchema = z.object({
  * Schema is source of truth - type derived via z.infer.
  */
 export type PRReviewComment = z.infer<typeof PRReviewCommentSchema>;
+
+export const LocalDiffCommentSchema = z.object({
+  id: z.string(),
+  type: z.literal('local'),
+  path: z.string(),
+  line: z.number(),
+  body: z.string(),
+  author: z.string(),
+  createdAt: z.number(),
+  baseRef: z.string(),
+  resolved: z.boolean().optional(),
+  /** Hash of the line content when comment was created, for staleness detection */
+  lineContentHash: z.string().optional(),
+});
+
+/**
+ * A comment on a local (uncommitted) diff.
+ * Similar to PR review comments but for uncommitted changes.
+ * baseRef tracks the HEAD SHA when the comment was created,
+ * allowing detection of stale comments after commits.
+ * Schema is source of truth - type derived via z.infer.
+ */
+export type LocalDiffComment = z.infer<typeof LocalDiffCommentSchema>;
+
+/**
+ * Union type for all diff comments.
+ * Enables handling both PR review comments and local diff comments polymorphically.
+ */
+export type DiffComment = LocalDiffComment | PRReviewComment;
 
 /**
  * Create a LinkedPR object with validation.

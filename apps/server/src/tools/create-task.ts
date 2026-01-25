@@ -73,11 +73,11 @@ function buildOriginMetadata(
     case 'windsurf':
     case 'aider':
     case 'unknown':
-      return { platform: 'unknown' as const };
+      return { platform: 'unknown' as const, cwd: process.cwd() };
     default: {
       const _exhaustive: never = platform;
       void _exhaustive;
-      return { platform: 'unknown' as const };
+      return { platform: 'unknown' as const, cwd: process.cwd() };
     }
   }
 }

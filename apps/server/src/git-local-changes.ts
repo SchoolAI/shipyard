@@ -142,6 +142,15 @@ export function getLocalChanges(cwd: string): LocalChangesResult {
     /** Get current branch */
     const branch = getCurrentBranchName(cwd);
 
+    /** Get HEAD SHA for staleness detection in comments */
+    let headSha: string | undefined;
+    try {
+      headSha = execGit('git rev-parse HEAD', { cwd }) ?? undefined;
+    } catch {
+      /** No commits yet */
+      headSha = undefined;
+    }
+
     /** Get status (staged, unstaged, untracked) */
     const statusOutput = execGit('git status --porcelain', { cwd, timeout: 10000 }) ?? '';
     const { staged, unstaged, untracked } = parseGitStatus(statusOutput);
@@ -157,6 +166,7 @@ export function getLocalChanges(cwd: string): LocalChangesResult {
       {
         cwd,
         branch,
+        headSha,
         stagedCount: staged.length,
         unstagedCount: unstaged.length,
         untrackedCount: untracked.length,
@@ -169,6 +179,7 @@ export function getLocalChanges(cwd: string): LocalChangesResult {
       available: true,
       branch,
       baseBranch: 'HEAD',
+      headSha,
       staged,
       unstaged,
       untracked,
