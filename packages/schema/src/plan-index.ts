@@ -2,8 +2,33 @@ import { z } from 'zod';
 import { type PlanStatusType, PlanStatusValues } from './plan.js';
 
 /**
- * The document name for the plan index Y.Doc.
- * This is a special Y.Doc that tracks all plan metadata for the sidebar.
+ * Prefix for plan index document names.
+ * Each user has their own index: plan-index-{username}
+ */
+export const PLAN_INDEX_DOC_NAME_PREFIX = 'plan-index';
+
+/**
+ * Generate the plan-index document name for a specific user.
+ * Each user has their own plan-index that syncs across their devices.
+ *
+ * This ensures privacy - you only see your own plans, not other users' plans.
+ *
+ * @param username - GitHub username
+ * @returns Document name like 'plan-index-alice'
+ */
+export function getPlanIndexDocName(username: string): string {
+  if (!username) {
+    throw new Error('getPlanIndexDocName requires a username');
+  }
+  return `${PLAN_INDEX_DOC_NAME_PREFIX}-${username}`;
+}
+
+/**
+ * Legacy global plan-index document name.
+ * @deprecated Use getPlanIndexDocName(username) instead for per-user indexes.
+ *
+ * Kept for backwards compatibility during migration period.
+ * Will be removed once all code uses per-user indexes.
  */
 export const PLAN_INDEX_DOC_NAME = 'plan-index';
 
@@ -17,8 +42,19 @@ export const PLAN_INDEX_VIEWED_BY_KEY = 'viewedBy';
 /**
  * Known IndexedDB database names that are NOT plan documents.
  * Used to filter when querying for shared plans.
+ *
+ * Note: Per-user index names follow pattern 'plan-index-{username}',
+ * so we need to check with startsWith() for filtering.
  */
 export const NON_PLAN_DB_NAMES = ['plan-index', 'idb-keyval'] as const;
+
+/**
+ * Check if a database name is a plan index (not a plan document).
+ * Matches both legacy global index and per-user indexes.
+ */
+export function isPlanIndexDbName(dbName: string): boolean {
+  return dbName === 'plan-index' || dbName.startsWith('plan-index-') || dbName === 'idb-keyval';
+}
 
 export type { PlanStatusType };
 

@@ -14,7 +14,7 @@
  */
 
 import type { InviteRedemption, InviteToken } from '@shipyard/schema';
-import type { PlatformAdapter } from '../../core/platform.js';
+import type { PlanApprovalState, PlatformAdapter } from '../../core/platform.js';
 import { logger } from './logger.js';
 
 /**
@@ -24,6 +24,8 @@ import { logger } from './logger.js';
 interface SerializedConnectionState {
   id: string;
   topics: string[];
+  /** GitHub username of the connected user */
+  userId?: string;
 }
 
 /**
@@ -32,6 +34,8 @@ interface SerializedConnectionState {
 interface ConnectionState {
   id: string;
   topics: Set<string>;
+  /** GitHub username of the connected user */
+  userId?: string;
 }
 
 /**
@@ -68,6 +72,13 @@ export class CloudflarePlatformAdapter implements PlatformAdapter {
   private planOwners = new Map<string, string>();
 
   /**
+   * In-memory cache of plan approval states.
+   * Backed by persistent storage with 'approval:' prefix.
+   * Maps planId to approval state (approved/rejected/pending users).
+   */
+  private planApprovals = new Map<string, PlanApprovalState>();
+
+  /**
    * Map from topic name to set of subscribed WebSockets.
    * Rebuilt on hibernation wake from WebSocket attachments.
    */
@@ -88,6 +99,7 @@ export class CloudflarePlatformAdapter implements PlatformAdapter {
       this.restoreInviteTokensFromStorage(),
       this.restoreRedemptionsFromStorage(),
       this.restorePlanOwnersFromStorage(),
+      this.restoreApprovalStatesFromStorage(),
     ]);
     this.restoreTopicsFromHibernation();
   }
@@ -173,6 +185,27 @@ export class CloudflarePlatformAdapter implements PlatformAdapter {
   }
 
   /**
+   * Restore approval states from Durable Object storage into in-memory cache.
+   */
+  private async restoreApprovalStatesFromStorage(): Promise<void> {
+    try {
+      const stored = await this.ctx.storage.list<PlanApprovalState>({
+        prefix: 'approval:',
+      });
+
+      for (const [key, state] of stored) {
+        // Store by planId (strip 'approval:' prefix)
+        const planId = key.replace('approval:', '');
+        this.planApprovals.set(planId, state);
+      }
+
+      logger.info({ count: this.planApprovals.size }, 'Restored approval states from storage');
+    } catch (error) {
+      logger.error({ error }, 'Failed to restore approval states');
+    }
+  }
+
+  /**
    * Restore topic subscriptions from hibernated WebSocket attachments.
    * Called on hibernation wake to rebuild the topics map.
    */
@@ -183,9 +216,11 @@ export class CloudflarePlatformAdapter implements PlatformAdapter {
       const attachment = ws.deserializeAttachment() as SerializedConnectionState | null;
       if (attachment) {
         // Restore topics Set from serialized array
+        // Also restore userId
         const state: ConnectionState = {
           id: attachment.id,
           topics: new Set(attachment.topics),
+          userId: attachment.userId,
         };
 
         // Rebuild topic -> WebSocket mapping
@@ -394,6 +429,81 @@ export class CloudflarePlatformAdapter implements PlatformAdapter {
     await this.ctx.storage.put(storageKey, ownerId);
   }
 
+  // --- Approval State Operations ---
+
+  async getPlanApprovalState(planId: string): Promise<PlanApprovalState | undefined> {
+    // Check in-memory cache first
+    const cached = this.planApprovals.get(planId);
+    if (cached) return cached;
+
+    // Fall back to storage
+    const storageKey = `approval:${planId}`;
+    const stored = await this.ctx.storage.get<PlanApprovalState>(storageKey);
+    if (stored) {
+      this.planApprovals.set(planId, stored);
+    }
+    return stored;
+  }
+
+  async setPlanApprovalState(planId: string, state: PlanApprovalState): Promise<void> {
+    // Update in-memory cache
+    this.planApprovals.set(planId, state);
+
+    // Persist to Durable Object storage
+    const storageKey = `approval:${planId}`;
+    await this.ctx.storage.put(storageKey, state);
+  }
+
+  // --- Connection State Operations ---
+
+  setConnectionUserId(ws: unknown, userId: string): void {
+    const socket = ws as WebSocket;
+    let state = this.getConnectionState(socket);
+    if (!state) {
+      state = {
+        id: crypto.randomUUID(),
+        topics: new Set(),
+      };
+      (socket as any).__state = state;
+    }
+    state.userId = userId;
+    this.persistConnectionState(socket, state);
+  }
+
+  getConnectionUserId(ws: unknown): string | undefined {
+    const socket = ws as WebSocket;
+    const state = this.getConnectionState(socket);
+    return state?.userId;
+  }
+
+  // --- Notification Operations ---
+
+  broadcastToTopic(topic: string, message: unknown, filter?: (ws: unknown) => boolean): void {
+    const subscribers = this.topics.get(topic);
+    if (!subscribers) return;
+
+    for (const ws of subscribers) {
+      if (filter && !filter(ws)) continue;
+      this.sendMessage(ws, message);
+    }
+  }
+
+  async notifyPlanOwner(planId: string, message: unknown): Promise<void> {
+    const ownerId = await this.getPlanOwnerId(planId);
+    if (!ownerId) return;
+
+    const topic = `shipyard-${planId}`;
+    const subscribers = this.topics.get(topic);
+    if (!subscribers) return;
+
+    for (const ws of subscribers) {
+      const userId = this.getConnectionUserId(ws);
+      if (userId === ownerId) {
+        this.sendMessage(ws, message);
+      }
+    }
+  }
+
   // --- Crypto Operations (Web Crypto API - all async) ---
 
   async generateTokenId(): Promise<string> {
@@ -592,6 +702,7 @@ export class CloudflarePlatformAdapter implements PlatformAdapter {
       const state: ConnectionState = {
         id: attachment.id,
         topics: new Set(attachment.topics),
+        userId: attachment.userId,
       };
       (ws as any).__state = state;
       return state;
@@ -607,6 +718,7 @@ export class CloudflarePlatformAdapter implements PlatformAdapter {
     ws.serializeAttachment({
       id: state.id,
       topics: Array.from(state.topics),
+      userId: state.userId,
     } satisfies SerializedConnectionState);
   }
 }

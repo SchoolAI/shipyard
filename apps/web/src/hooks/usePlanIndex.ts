@@ -2,11 +2,11 @@ import {
   clearPlanIndexViewedBy,
   getAllViewedByFromIndex,
   getPlanIndex,
+  getPlanIndexDocName,
   getPlanMetadata,
   getPlanOwnerId,
+  isPlanIndexDbName,
   isPlanUnread,
-  NON_PLAN_DB_NAMES,
-  PLAN_INDEX_DOC_NAME,
   PLAN_INDEX_VIEWED_BY_KEY,
   type PlanIndexEntry,
   updatePlanIndexViewedBy,
@@ -158,14 +158,44 @@ export interface PlanIndexState {
 }
 
 /**
+ * Empty plan index state returned when user is not authenticated.
+ */
+const EMPTY_PLAN_INDEX_STATE: PlanIndexState = {
+  myPlans: [],
+  sharedPlans: [],
+  inboxPlans: [],
+  allInboxPlans: [],
+  allOwnedPlans: [],
+  archivedPlans: [],
+  connected: false,
+  synced: false,
+  peerCount: 0,
+  timedOut: false,
+  navigationTarget: null,
+  clearNavigation: () => {},
+  isLoading: false,
+  markPlanAsRead: () => Promise.resolve(),
+  markPlanAsUnread: () => Promise.resolve(),
+  refreshInboxUnreadState: () => {},
+  ydoc: new Y.Doc(),
+  reconnect: () => {},
+  isReconnecting: false,
+};
+
+/**
  * Hook for syncing with the plan index Y.Doc.
  * Connects to all discovered MCP servers and merges their updates.
  * Returns plans categorized by ownership and connection status.
  *
+ * Each user has their own plan-index-{username} doc that syncs across their devices.
+ * This ensures privacy - you only see your own plans, not other users' plans.
+ *
  * @param currentUsername - GitHub username of the current user (for ownership filtering)
  */
 export function usePlanIndex(currentUsername: string | undefined): PlanIndexState {
-  const { ydoc, syncState, reconnect, isReconnecting } = useMultiProviderSync(PLAN_INDEX_DOC_NAME);
+  // Don't sync until authenticated - no index without username
+  const docName = currentUsername ? getPlanIndexDocName(currentUsername) : '';
+  const { ydoc, syncState, reconnect, isReconnecting } = useMultiProviderSync(docName);
 
   const [allPlansData, setAllPlansData] = useState<{
     active: PlanIndexEntry[];
@@ -263,8 +293,7 @@ export function usePlanIndex(currentUsername: string | undefined): PlanIndexStat
         const planIndexIds = new Set(allPlansData.active.map((p) => p.id));
 
         const planDocIds = dbNames.filter(
-          (name) =>
-            !(NON_PLAN_DB_NAMES as readonly string[]).includes(name) && !planIndexIds.has(name)
+          (name) => !isPlanIndexDbName(name) && !planIndexIds.has(name)
         );
 
         const plans = await Promise.all(
@@ -527,6 +556,12 @@ export function usePlanIndex(currentUsername: string | undefined): PlanIndexStat
   const refreshInboxUnreadState = useCallback(() => {
     setInboxRefreshTrigger((prev) => prev + 1);
   }, []);
+
+  // Return empty state if not authenticated
+  // Must be after all hooks to comply with React rules
+  if (!currentUsername || !docName) {
+    return EMPTY_PLAN_INDEX_STATE;
+  }
 
   return {
     myPlans,

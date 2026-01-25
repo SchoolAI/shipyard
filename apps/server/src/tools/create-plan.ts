@@ -4,11 +4,11 @@ import {
   addDeliverable,
   createPlanWebUrl,
   extractDeliverables,
+  getPlanIndexDocName,
   getPlanMetadata,
   initPlanMetadata,
   logPlanEvent,
   type OriginMetadata,
-  PLAN_INDEX_DOC_NAME,
   setPlanIndexEntry,
   transitionPlanStatus,
 } from '@shipyard/schema';
@@ -118,10 +118,11 @@ function initializePlanContent(ydoc: Y.Doc, blocks: Block[], ownerId: string | n
 }
 
 /** Open or navigate to plan URL */
-async function openPlanInBrowser(planId: string, url: string): Promise<void> {
-  const indexDoc = await getOrCreateDoc(PLAN_INDEX_DOC_NAME);
+async function openPlanInBrowser(planId: string, url: string, ownerId: string): Promise<void> {
+  const indexDocName = getPlanIndexDocName(ownerId);
+  const indexDoc = await getOrCreateDoc(indexDocName);
 
-  if (await hasActiveConnections(PLAN_INDEX_DOC_NAME)) {
+  if (await hasActiveConnections(indexDocName)) {
     indexDoc.getMap<string>('navigation').set('target', planId);
     logger.info({ url, planId }, 'Browser already connected, navigating via CRDT');
   } else {
@@ -256,7 +257,7 @@ Bad deliverables (not provable):
       throw new Error('Failed to get plan metadata after initialization');
     }
 
-    const indexDoc = await getOrCreateDoc(PLAN_INDEX_DOC_NAME);
+    const indexDoc = await getOrCreateDoc(getPlanIndexDocName(ownerId));
     setPlanIndexEntry(indexDoc, {
       id: planId,
       title: input.title,
@@ -270,7 +271,7 @@ Bad deliverables (not provable):
     logger.info({ planId }, 'Plan index updated');
 
     const url = createPlanWebUrl(webConfig.SHIPYARD_WEB_URL, planId);
-    await openPlanInBrowser(planId, url);
+    await openPlanInBrowser(planId, url, ownerId);
 
     const repoInfo = repo
       ? `Repo: ${repo}${!input.repo ? ' (auto-detected)' : ''}`

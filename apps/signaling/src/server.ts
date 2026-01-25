@@ -26,10 +26,12 @@ import http from 'node:http';
 import type { WebSocket } from 'ws';
 import { WebSocketServer } from 'ws';
 import {
+  handleApproveUser,
   handleCreateInvite,
   handleListInvites,
   handlePublish,
   handleRedeemInvite,
+  handleRejectUser,
   handleRevokeInvite,
   handleSubscribe,
   handleUnsubscribe,
@@ -112,7 +114,7 @@ function onConnection(conn: WebSocket): void {
 
       switch (message.type) {
         case 'subscribe':
-          handleSubscribe(adapter, conn, message);
+          await handleSubscribe(adapter, conn, message);
           break;
 
         case 'unsubscribe':
@@ -141,6 +143,14 @@ function onConnection(conn: WebSocket): void {
 
         case 'list_invites':
           await handleListInvites(adapter, conn, message);
+          break;
+
+        case 'approve_user':
+          await handleApproveUser(adapter, conn, message);
+          break;
+
+        case 'reject_user':
+          await handleRejectUser(adapter, conn, message);
           break;
 
         default:

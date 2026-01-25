@@ -7,8 +7,8 @@ import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
 import {
   getArtifacts,
   getDeliverables,
+  getPlanIndexDocName,
   getPlanMetadata,
-  PLAN_INDEX_DOC_NAME,
 } from '@shipyard/schema';
 import { z } from 'zod';
 import { registryConfig } from '../config/env/registry.js';
@@ -657,10 +657,12 @@ async function requestUserInput(opts: {
   planId?: string;
 }) {
   const { InputRequestManager } = await import('../services/input-request-manager.js');
+  const { getGitHubUsername } = await import('../server-identity.js');
 
-  // Always use plan-index doc so browser can see requests from all agents
-  // Browser is already connected to plan-index for plan discovery
-  const ydoc = await getOrCreateDoc(PLAN_INDEX_DOC_NAME);
+  // Use per-user plan-index so browser can see requests from this user's agents
+  // Browser is already connected to plan-index-{username} for plan discovery
+  const ownerId = await getGitHubUsername();
+  const ydoc = await getOrCreateDoc(getPlanIndexDocName(ownerId));
 
   // Create manager and make request
   const manager = new InputRequestManager();
