@@ -157,7 +157,7 @@ Example:
 \`\`\`typescript
 const result = await addArtifact({
   taskId, sessionToken,
-  type: 'screenshot',
+  type: 'image',
   filename: 'login.png',
   source: 'file',
   filePath: '/tmp/screenshot.png',
@@ -471,7 +471,7 @@ const { sessionToken, taskId } = await regenerateSessionToken("abc123");
 await addArtifact({
   taskId,
   sessionToken,
-  type: 'screenshot',
+  type: 'image',
   filename: 'screenshot.png',
   source: 'file',
   filePath: '/tmp/screenshot.png',
@@ -500,7 +500,7 @@ const task = await createTask({
 await addArtifact({
   taskId: task.taskId,
   sessionToken: task.sessionToken,
-  type: 'screenshot',
+  type: 'image',
   source: 'file',
   filename: 'screenshot.png',
   filePath: './screenshot.png',
@@ -748,9 +748,10 @@ async function requestUserInput(
         type: 'text' | 'choice' | 'confirm' | 'multiline' | 'number' | 'email' | 'date' | 'rating';
         options?: string[];
         multiSelect?: boolean;
+        displayAs?: 'radio' | 'checkbox' | 'dropdown';
         defaultValue?: string;
         timeout?: number;
-        planId?: string;
+        taskId?: string;
         /** If true, this request is blocking the agent from proceeding. Shows as red/urgent. */
         isBlocker?: boolean;
         min?: number;
@@ -767,7 +768,7 @@ async function requestUserInput(
         /** Multi-question mode */
         questions: Question[];
         timeout?: number;
-        planId?: string;
+        taskId?: string;
         /** If true, this request is blocking the agent from proceeding. Shows as red/urgent. */
         isBlocker?: boolean;
         message?: never;
@@ -795,7 +796,7 @@ async function requestUserInput(
     const requestId = await manager.createMultiQuestionRequest(ydoc, {
       questions: validQuestions,
       timeout: opts.timeout,
-      planId: opts.planId,
+      planId: opts.taskId,
       isBlocker: opts.isBlocker,
     });
 
@@ -835,11 +836,12 @@ async function requestUserInput(
         message: opts.message,
         defaultValue: opts.defaultValue,
         timeout: opts.timeout,
-        planId: opts.planId,
+        planId: opts.taskId,
         isBlocker: opts.isBlocker,
         type: opts.type,
         options: opts.options ?? [],
         multiSelect: opts.multiSelect,
+        displayAs: opts.displayAs,
       } satisfies CreateChoiceInputParams;
       break;
     case 'number':
@@ -847,7 +849,7 @@ async function requestUserInput(
         message: opts.message,
         defaultValue: opts.defaultValue,
         timeout: opts.timeout,
-        planId: opts.planId,
+        planId: opts.taskId,
         isBlocker: opts.isBlocker,
         type: opts.type,
         min: opts.min,
@@ -860,7 +862,7 @@ async function requestUserInput(
         message: opts.message,
         defaultValue: opts.defaultValue,
         timeout: opts.timeout,
-        planId: opts.planId,
+        planId: opts.taskId,
         isBlocker: opts.isBlocker,
         type: opts.type,
         domain: opts.domain,
@@ -871,7 +873,7 @@ async function requestUserInput(
         message: opts.message,
         defaultValue: opts.defaultValue,
         timeout: opts.timeout,
-        planId: opts.planId,
+        planId: opts.taskId,
         isBlocker: opts.isBlocker,
         type: opts.type,
         min: opts.minDate,
@@ -883,7 +885,7 @@ async function requestUserInput(
         message: opts.message,
         defaultValue: opts.defaultValue,
         timeout: opts.timeout,
-        planId: opts.planId,
+        planId: opts.taskId,
         isBlocker: opts.isBlocker,
         type: opts.type,
         min: opts.min,
@@ -897,7 +899,7 @@ async function requestUserInput(
         message: opts.message,
         defaultValue: opts.defaultValue,
         timeout: opts.timeout,
-        planId: opts.planId,
+        planId: opts.taskId,
         isBlocker: opts.isBlocker,
         type: opts.type,
       } satisfies CreateTextInputParams | CreateMultilineInputParams | CreateConfirmInputParams;

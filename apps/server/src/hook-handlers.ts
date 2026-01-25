@@ -1115,7 +1115,7 @@ For each deliverable above, call:
 add_artifact(
   planId="${planId}",
   sessionToken="${sessionToken}",
-  type="screenshot",
+  type="image",
   filePath="/path/to/file.png",
   deliverableId="<id from above>"
 )
