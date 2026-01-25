@@ -228,7 +228,40 @@ Parameters:
 ### requestUserInput(opts): Promise<{ success, response?, status, reason? }>
 Request input from the user via browser modal.
 
-Supports both single-question and multi-question modes (1-10 questions, 8 recommended for optimal UX).
+**THE primary human-agent communication channel in Shipyard.** ALWAYS use this instead of platform-specific question tools (AskUserQuestion, Cursor prompts, etc.). The human is in the browser viewing your plan - that's where they expect to interact with you.
+
+Supports two modes - choose based on whether questions depend on each other:
+
+**Multi-step mode (dependencies):** Chain multiple calls when later questions depend on earlier answers
+\`\`\`typescript
+// First ask about database...
+const dbResult = await requestUserInput({
+  message: "Which database?",
+  type: "choice",
+  options: ["PostgreSQL", "SQLite", "MongoDB"]
+});
+
+// ...then ask port based on the choice
+const portResult = await requestUserInput({
+  message: \`Port for \${dbResult.response}?\`,
+  type: "number",
+  min: 1000,
+  max: 65535
+});
+\`\`\`
+
+**Multi-form mode (independent):** Single call with questions array for unrelated info
+\`\`\`typescript
+const config = await requestUserInput({
+  questions: [
+    { message: "Project name?", type: "text" },
+    { message: "Use TypeScript?", type: "confirm" },
+    { message: "License?", type: "choice", options: ["MIT", "Apache-2.0", "GPL-3.0"] }
+  ],
+  timeout: 600
+});
+// Returns: { response: { "0": "my-app", "1": "yes", "2": "MIT" }, ... }
+\`\`\`
 
 Parameters:
 - message (string, required): The question to ask the user
@@ -831,16 +864,14 @@ async function requestUserInput(
   /** Handle multi-question mode */
   if ('questions' in opts && opts.questions) {
     /** Filter out any null/undefined elements from questions array (defensive) */
-    const validQuestions = opts.questions.filter(
-      (q): q is NonNullable<typeof q> => q != null
-    );
+    const validQuestions = opts.questions.filter((q): q is NonNullable<typeof q> => q != null);
     if (validQuestions.length === 0) {
       throw new Error(
         'questions array is empty after filtering. Each question must be an object with "message" and "type" fields.'
       );
     }
 
-    const requestId = manager.createMultiQuestionRequest(ydoc, {
+    const requestId = await manager.createMultiQuestionRequest(ydoc, {
       questions: validQuestions,
       timeout: opts.timeout,
       planId: opts.planId,
@@ -954,7 +985,7 @@ async function requestUserInput(
       } satisfies CreateTextInputParams | CreateMultilineInputParams | CreateConfirmInputParams;
   }
 
-  const requestId = manager.createRequest(ydoc, params);
+  const requestId = await manager.createRequest(ydoc, params);
 
   /** Wait for response */
   const result = await manager.waitForResponse(ydoc, requestId, opts.timeout);

@@ -38,14 +38,14 @@ function handlePreToolUse(input: ClaudeCodeHookInput): AdapterEvent {
   if (toolName === CLAUDE_TOOL_NAMES.ASK_USER_QUESTION) {
     logger.info(
       { toolName },
-      'Blocking AskUserQuestion - redirecting to request_user_input MCP tool'
+      'Blocking AskUserQuestion - redirecting to requestUserInput() in execute_code'
     );
     return {
       type: 'tool_deny',
       reason:
-        `BLOCKED: Use the ${TOOL_NAMES.REQUEST_USER_INPUT} MCP tool instead. ` +
+        `BLOCKED: Use requestUserInput() inside ${TOOL_NAMES.EXECUTE_CODE} instead. ` +
         "The human is in the browser viewing your plan - that's where they expect to interact with you. " +
-        'See the tool description for input types and parameters.',
+        'See the execute_code tool description for input types and parameters.',
     };
   }
 

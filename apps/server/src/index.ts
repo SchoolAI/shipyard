@@ -16,7 +16,6 @@ import {
   tryAcquireHubLock,
 } from './registry-server.js';
 import { executeCodeTool } from './tools/execute-code.js';
-import { requestUserInputTool } from './tools/request-user-input.js';
 import { TOOL_NAMES } from './tools/tool-names.js';
 
 /** Determine if we're the Registry Hub or a client */
@@ -67,13 +66,13 @@ const server = new Server(
     capabilities: {
       tools: {},
     },
-    instructions: `IMPORTANT: When working with Shipyard, use ${TOOL_NAMES.REQUEST_USER_INPUT} for ALL human interaction instead of platform-specific question tools (AskUserQuestion, etc.). The human is in the browser viewing your plan - that's where they expect to interact with you.`,
+    instructions: `IMPORTANT: When working with Shipyard, use requestUserInput() inside ${TOOL_NAMES.EXECUTE_CODE} for ALL human interaction instead of platform-specific question tools (AskUserQuestion, etc.). The human is in the browser viewing your plan - that's where they expect to interact with you.`,
   }
 );
 
-/** Expose execute_code (bundled APIs) and request_user_input (standalone) */
+/** Expose execute_code - all APIs including requestUserInput() are available inside */
 server.setRequestHandler(ListToolsRequestSchema, async () => ({
-  tools: [executeCodeTool.definition, requestUserInputTool.definition],
+  tools: [executeCodeTool.definition],
 }));
 
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
@@ -81,10 +80,6 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
   if (name === TOOL_NAMES.EXECUTE_CODE) {
     return await executeCodeTool.handler(args ?? {});
-  }
-
-  if (name === TOOL_NAMES.REQUEST_USER_INPUT) {
-    return await requestUserInputTool.handler(args ?? {});
   }
 
   throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${name}`);

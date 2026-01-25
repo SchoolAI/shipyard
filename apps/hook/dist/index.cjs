@@ -28491,7 +28491,7 @@ init_cjs_shims();
 // ../../packages/schema/dist/index.mjs
 init_cjs_shims();
 
-// ../../packages/schema/dist/yjs-helpers-3DNyE4lF.mjs
+// ../../packages/schema/dist/yjs-helpers-7mHCBw75.mjs
 init_cjs_shims();
 
 // ../../packages/schema/dist/plan.mjs
@@ -42547,7 +42547,19 @@ var PlanEventSchema = external_exports.discriminatedUnion("type", [
     data: external_exports.object({
       requestId: external_exports.string(),
       response: external_exports.unknown(),
-      answeredBy: external_exports.string()
+      answeredBy: external_exports.string(),
+      requestMessage: external_exports.string().optional(),
+      requestType: external_exports.enum([
+        "text",
+        "multiline",
+        "choice",
+        "confirm",
+        "number",
+        "email",
+        "date",
+        "rating",
+        "multi"
+      ]).optional()
     })
   }),
   PlanEventBaseSchema.extend({
@@ -42696,7 +42708,7 @@ var LocalArtifactParseSchema = external_exports.object({
   localArtifactId: external_exports.string()
 });
 
-// ../../packages/schema/dist/yjs-helpers-3DNyE4lF.mjs
+// ../../packages/schema/dist/yjs-helpers-7mHCBw75.mjs
 function assertNever2(value) {
   throw new Error(`Unhandled discriminated union member: ${JSON.stringify(value)}`);
 }
@@ -42902,7 +42914,7 @@ var ChoiceQuestionSchema = QuestionBaseSchema.extend({
   placeholder: external_exports.string().optional()
 });
 var ConfirmQuestionSchema = QuestionBaseSchema.extend({ type: external_exports.literal("confirm") });
-var NumberQuestionSchema = QuestionBaseSchema.extend({
+var NumberQuestionBaseSchema = QuestionBaseSchema.extend({
   type: external_exports.literal("number"),
   min: external_exports.number().optional(),
   max: external_exports.number().optional(),
@@ -42912,17 +42924,17 @@ var NumberQuestionSchema = QuestionBaseSchema.extend({
     "currency",
     "percentage"
   ]).optional()
-}).refine((data) => data.min === void 0 || data.max === void 0 || data.min <= data.max, { message: "min must be <= max" });
+});
 var EmailQuestionSchema = QuestionBaseSchema.extend({
   type: external_exports.literal("email"),
   domain: external_exports.string().optional()
 });
-var DateQuestionSchema = QuestionBaseSchema.extend({
+var DateQuestionBaseSchema = QuestionBaseSchema.extend({
   type: external_exports.literal("date"),
   min: external_exports.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be in YYYY-MM-DD format").optional(),
   max: external_exports.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be in YYYY-MM-DD format").optional()
-}).refine((data) => data.min === void 0 || data.max === void 0 || new Date(data.min) <= new Date(data.max), { message: "min date must be before or equal to max date" });
-var RatingQuestionSchema = QuestionBaseSchema.extend({
+});
+var RatingQuestionBaseSchema = QuestionBaseSchema.extend({
   type: external_exports.literal("rating"),
   min: external_exports.number().int().optional(),
   max: external_exports.number().int().optional(),
@@ -42935,20 +42947,58 @@ var RatingQuestionSchema = QuestionBaseSchema.extend({
     low: external_exports.string().optional(),
     high: external_exports.string().optional()
   }).optional()
-}).refine((data) => {
-  if (data.min === void 0 || data.max === void 0) return true;
-  return data.min <= data.max && data.max - data.min <= 20;
-}, { message: "Rating scale must have min <= max and at most 20 items" });
+});
 var QuestionSchema = external_exports.discriminatedUnion("type", [
   TextQuestionSchema,
   MultilineQuestionSchema,
   ChoiceQuestionSchema,
   ConfirmQuestionSchema,
-  NumberQuestionSchema,
+  NumberQuestionBaseSchema,
   EmailQuestionSchema,
-  DateQuestionSchema,
-  RatingQuestionSchema
+  DateQuestionBaseSchema,
+  RatingQuestionBaseSchema
 ]);
+function validateNumberQuestion(q, index, ctx) {
+  if (q.min !== void 0 && q.max !== void 0 && q.min > q.max) ctx.addIssue({
+    code: external_exports.ZodIssueCode.custom,
+    message: "min must be <= max",
+    path: ["questions", index]
+  });
+}
+function validateDateQuestion(q, index, ctx) {
+  if (q.min !== void 0 && q.max !== void 0 && new Date(q.min) > new Date(q.max)) ctx.addIssue({
+    code: external_exports.ZodIssueCode.custom,
+    message: "min date must be before or equal to max date",
+    path: ["questions", index]
+  });
+}
+function validateRatingQuestion(q, index, ctx) {
+  if (q.min === void 0 || q.max === void 0) return;
+  if (q.min > q.max || q.max - q.min > 20) ctx.addIssue({
+    code: external_exports.ZodIssueCode.custom,
+    message: "Rating scale must have min <= max and at most 20 items",
+    path: ["questions", index]
+  });
+}
+function validateQuestionConstraints(questions, ctx) {
+  for (let i = 0; i < questions.length; i++) {
+    const q = questions[i];
+    if (!q) continue;
+    switch (q.type) {
+      case "number":
+        validateNumberQuestion(q, i, ctx);
+        break;
+      case "date":
+        validateDateQuestion(q, i, ctx);
+        break;
+      case "rating":
+        validateRatingQuestion(q, i, ctx);
+        break;
+      default:
+        break;
+    }
+  }
+}
 var MultiQuestionInputRequestSchema = external_exports.object({
   id: external_exports.string(),
   createdAt: external_exports.number(),
@@ -42961,6 +43011,8 @@ var MultiQuestionInputRequestSchema = external_exports.object({
   answeredAt: external_exports.number().optional(),
   answeredBy: external_exports.string().optional(),
   isBlocker: external_exports.boolean().optional()
+}).superRefine((data, ctx) => {
+  validateQuestionConstraints(data.questions, ctx);
 });
 var AnyInputRequestSchema = external_exports.union([InputRequestSchema, MultiQuestionInputRequestSchema]);
 var YDOC_KEYS = {
@@ -44516,11 +44568,11 @@ Skip Shipyard for:
 - Pure documentation without implementation`;
 var USER_INPUT_SECTION = `## Human-Agent Communication
 
-**\`${TOOL_NAMES2.REQUEST_USER_INPUT}\` is THE primary way to communicate with humans during active work.**
+**\`requestUserInput()\` inside \`${TOOL_NAMES2.EXECUTE_CODE}\` is THE primary way to communicate with humans during active work.**
 
-Shipyard is the central hub where humans manage AI agents. When you need to ask a question, get clarification, or request a decision - use \`${TOOL_NAMES2.REQUEST_USER_INPUT}\`. The human is already in the browser viewing your plan. That's where conversations should happen.
+Shipyard is the central hub where humans manage AI agents. When you need to ask a question, get clarification, or request a decision - use \`requestUserInput()\`. The human is already in the browser viewing your plan. That's where conversations should happen.
 
-### Why Use ${TOOL_NAMES2.REQUEST_USER_INPUT}
+### Why Use requestUserInput()
 
 - **Context:** The human sees your question alongside the plan, artifacts, and comments
 - **History:** All exchanges are logged in the plan's activity feed
@@ -44529,40 +44581,57 @@ Shipyard is the central hub where humans manage AI agents. When you need to ask 
 
 ### Replace Platform Tools
 
-**ALWAYS prefer \`${TOOL_NAMES2.REQUEST_USER_INPUT}\` over platform-specific tools:**
+**ALWAYS prefer \`requestUserInput()\` over platform-specific tools:**
 
 | Platform | DON'T Use | Use Instead |
 |----------|-----------|-------------|
-| Claude Code | \`AskUserQuestion\` | \`${TOOL_NAMES2.REQUEST_USER_INPUT}\` |
-| Cursor | Built-in prompts | \`${TOOL_NAMES2.REQUEST_USER_INPUT}\` |
-| Windsurf | Native dialogs | \`${TOOL_NAMES2.REQUEST_USER_INPUT}\` |
-| Claude Desktop | Chat questions | \`${TOOL_NAMES2.REQUEST_USER_INPUT}\` |
+| Claude Code | \`AskUserQuestion\` | \`requestUserInput()\` |
+| Cursor | Built-in prompts | \`requestUserInput()\` |
+| Windsurf | Native dialogs | \`requestUserInput()\` |
+| Claude Desktop | Chat questions | \`requestUserInput()\` |
+
+### Two Modes: Multi-step vs Multi-form
+
+Choose based on whether questions depend on each other:
+
+**Multi-step (dependencies):** Chain calls when later questions depend on earlier answers
+\`\`\`typescript
+// First ask about database...
+const dbResult = await requestUserInput({
+  message: "Which database?",
+  type: "choice",
+  options: ["PostgreSQL", "SQLite", "MongoDB"]
+});
+
+// ...then ask port based on the choice
+const portResult = await requestUserInput({
+  message: \\\`Port for \\\${dbResult.response}?\\\`,
+  type: "number",
+  min: 1000,
+  max: 65535
+});
+\`\`\`
+
+**Multi-form (independent):** Single call for unrelated questions
+\`\`\`typescript
+const config = await requestUserInput({
+  questions: [
+    { message: "Project name?", type: "text" },
+    { message: "Use TypeScript?", type: "confirm" },
+    { message: "License?", type: "choice", options: ["MIT", "Apache-2.0"] }
+  ],
+  timeout: 600
+});
+\`\`\`
 
 ### When to Ask
 
-Use \`${TOOL_NAMES2.REQUEST_USER_INPUT}\` when you need:
+Use \`requestUserInput()\` when you need:
 - Clarification on requirements ("Which auth provider?")
 - Decisions that affect implementation ("PostgreSQL or SQLite?")
 - Confirmation before destructive actions ("Delete this file?")
 - User preferences ("Rate this approach 1-5")
-- Any information you can't infer from context
-
-### Example
-
-\`\`\`typescript
-const result = await requestUserInput({
-  message: "Which database should we use?",
-  type: "choice",
-  options: ["PostgreSQL", "SQLite", "MongoDB"],
-  timeout: 600  // 10 minutes
-});
-
-if (result.success) {
-  console.log("User chose:", result.response);
-}
-\`\`\`
-
-**Note:** The MCP tool is named \`${TOOL_NAMES2.REQUEST_USER_INPUT}\` (snake_case). Inside \`${TOOL_NAMES2.EXECUTE_CODE}\`, it's available as \`requestUserInput()\` (camelCase).`;
+- Any information you can't infer from context`;
 var TROUBLESHOOTING_SECTION = `## Troubleshooting
 
 **Browser doesn't open:** Check MCP server is running and accessible.
@@ -44635,7 +44704,7 @@ var IMPORTANT_NOTES = `## Important Notes for Claude Code
 - **DO NOT use the Shipyard skill** - The hook provides everything you need
 - **DO NOT poll for approval** - The hook blocks automatically until human decides
 - **DO use plan mode** for ANY work that needs tracking, verification, or human review
-- **DO use \`${TOOL_NAMES2.REQUEST_USER_INPUT}\`** instead of \`AskUserQuestion\` - The human is in the browser viewing your plan, questions should appear there`;
+- **DO use \`requestUserInput()\`** inside \`${TOOL_NAMES2.EXECUTE_CODE}\` instead of \`AskUserQuestion\` - The human is in the browser viewing your plan, questions should appear there`;
 var CLAUDE_CODE_INSTRUCTIONS = [
   CLAUDE_CODE_HEADER,
   "",
@@ -44663,19 +44732,18 @@ var MCP_DIRECT_HEADER = `# Shipyard: Your Agent Management Hub
 
 Shipyard turns invisible agent work into reviewable, verifiable tasks. Instead of trusting that code was written correctly, reviewers see screenshots, videos, and test results as proof.
 
-**Key principle:** When you're working in Shipyard, ALL human-agent communication should happen through Shipyard's \`${TOOL_NAMES2.REQUEST_USER_INPUT}\` tool. The human is already in the browser viewing your plan - that's where they expect to interact with you.`;
+**Key principle:** When you're working in Shipyard, ALL human-agent communication should happen through \`requestUserInput()\` inside \`${TOOL_NAMES2.EXECUTE_CODE}\`. The human is already in the browser viewing your plan - that's where they expect to interact with you.`;
 var MCP_TOOLS_OVERVIEW = `## Available MCP Tools
 
 | Tool | Purpose |
 |------|---------|
-| \`${TOOL_NAMES2.REQUEST_USER_INPUT}\` | **THE primary human-agent communication channel** - Ask questions, get decisions, request clarification |
-| \`${TOOL_NAMES2.EXECUTE_CODE}\` | Run TypeScript that calls Shipyard APIs (recommended for multi-step operations) |
+| \`${TOOL_NAMES2.EXECUTE_CODE}\` | Run TypeScript that calls ALL Shipyard APIs including \`requestUserInput()\` |
 
-### ${TOOL_NAMES2.REQUEST_USER_INPUT}: Your Direct Line to the Human
+### requestUserInput(): Your Direct Line to the Human
 
-This is how you talk to humans during active work. Don't use your platform's built-in question tools (AskUserQuestion, etc.) - use this instead. The human is in the browser viewing your plan, and that's where they expect to see your questions.
+This is how you talk to humans during active work. Don't use your platform's built-in question tools (AskUserQuestion, etc.) - use \`requestUserInput()\` inside \`${TOOL_NAMES2.EXECUTE_CODE}\` instead. The human is in the browser viewing your plan, and that's where they expect to see your questions.
 
-**Preferred approach:** Use \`${TOOL_NAMES2.EXECUTE_CODE}\` to chain multiple API calls in one step.`;
+All Shipyard operations (createPlan, addArtifact, requestUserInput, etc.) are available inside \`${TOOL_NAMES2.EXECUTE_CODE}\`.`;
 var MCP_WORKFLOW = `## Workflow (MCP Direct)
 
 ### Step 1: Create Plan
@@ -44753,7 +44821,7 @@ if (result.allDeliverablesComplete) {
   console.log('Done!', result.snapshotUrl);
 }
 \`\`\``;
-var API_REFERENCE = `## API Reference
+var API_REFERENCE = `## API Reference (inside execute_code)
 
 ### createPlan(options)
 
@@ -44795,14 +44863,36 @@ Uploads proof-of-work artifact.
 
 ### requestUserInput(options)
 
-Asks user a question via browser modal.
+**THE primary human-agent communication channel.** Asks user a question via browser modal.
 
-**Parameters:**
+**Two modes - choose based on dependencies:**
+
+**Multi-step (dependencies):** Chain calls when later questions depend on earlier answers
+\`\`\`typescript
+const db = await requestUserInput({ message: "Database?", type: "choice", options: ["PostgreSQL", "SQLite"] });
+const port = await requestUserInput({ message: \\\`Port for \\\${db.response}?\\\`, type: "number" });
+\`\`\`
+
+**Multi-form (independent):** Single call for unrelated questions
+\`\`\`typescript
+const config = await requestUserInput({
+  questions: [
+    { message: "Project name?", type: "text" },
+    { message: "Use TypeScript?", type: "confirm" }
+  ]
+});
+\`\`\`
+
+**Parameters (single-question mode):**
 - \`message\` (string) - Question to ask
 - \`type\` (string) - Input type (see below)
 - \`options\` (string[], for 'choice') - Available choices
 - \`timeout\` (number, optional) - Timeout in seconds
 - Type-specific parameters (min, max, format, etc.)
+
+**Parameters (multi-question mode):**
+- \`questions\` (array) - Array of 1-10 questions (8 recommended)
+- \`timeout\` (number, optional) - Timeout in seconds
 
 **Returns:** \`{ success, response?, status }\`
 
@@ -44810,29 +44900,11 @@ Asks user a question via browser modal.
 1. \`text\` - Single-line text
 2. \`multiline\` - Multi-line text area
 3. \`choice\` - Radio/checkbox/dropdown (auto-adds "Other" option)
-   - Auto-switches: 1-8 options = radio/checkbox, 9+ = dropdown
-   - \`multiSelect: true\` for checkboxes
-   - \`displayAs: 'dropdown'\` to force dropdown UI
 4. \`confirm\` - Yes/No buttons
 5. \`number\` - Numeric input with validation
-   - \`min\`, \`max\`, \`format\` ('integer' | 'decimal' | 'currency' | 'percentage')
 6. \`email\` - Email validation
-   - \`domain\` for restriction
 7. \`date\` - Date picker with range
-   - \`minDate\`, \`maxDate\` (YYYY-MM-DD format)
-8. \`rating\` - Scale rating (auto-selects stars/numbers)
-   - \`min\`, \`max\`, \`style\` ('stars' | 'numbers' | 'emoji'), \`labels\`
-
-**Response format:**
-- All responses are strings
-- choice (single): \`"PostgreSQL"\` or custom text from "Other"
-- choice (multi): \`"option1, option2"\` (comma-space separated)
-- confirm: \`"yes"\` or \`"no"\` (lowercase)
-- number: \`"42"\` or \`"3.14"\`
-- email: \`"user@example.com"\`
-- date: \`"2026-01-24"\` (ISO 8601)
-- rating: \`"4"\` (integer as string)
-- See docs/INPUT-RESPONSE-FORMATS.md for complete specification`;
+8. \`rating\` - Scale rating`;
 var HANDLING_FEEDBACK = `## Handling Reviewer Feedback
 
 \`\`\`typescript
@@ -44980,11 +45052,11 @@ function handlePreToolUse(input) {
   if (toolName === CLAUDE_TOOL_NAMES.ASK_USER_QUESTION) {
     logger.info(
       { toolName },
-      "Blocking AskUserQuestion - redirecting to request_user_input MCP tool"
+      "Blocking AskUserQuestion - redirecting to requestUserInput() in execute_code"
     );
     return {
       type: "tool_deny",
-      reason: `BLOCKED: Use the ${TOOL_NAMES.REQUEST_USER_INPUT} MCP tool instead. The human is in the browser viewing your plan - that's where they expect to interact with you. See the tool description for input types and parameters.`
+      reason: `BLOCKED: Use requestUserInput() inside ${TOOL_NAMES.EXECUTE_CODE} instead. The human is in the browser viewing your plan - that's where they expect to interact with you. See the execute_code tool description for input types and parameters.`
     };
   }
   return { type: "passthrough" };

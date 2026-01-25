@@ -18,8 +18,8 @@ describe('InputRequestManager', () => {
   });
 
   describe('createRequest', () => {
-    it('creates a text input request', () => {
-      const requestId = manager.createRequest(ydoc, {
+    it('creates a text input request', async () => {
+      const requestId = await manager.createRequest(ydoc, {
         message: 'What is your name?',
         type: 'text',
       });
@@ -34,8 +34,8 @@ describe('InputRequestManager', () => {
       expect(request?.status).toBe('pending');
     });
 
-    it('creates a choice input request with options', () => {
-      const requestId = manager.createRequest(ydoc, {
+    it('creates a choice input request with options', async () => {
+      const requestId = await manager.createRequest(ydoc, {
         message: 'Select a color',
         type: 'choice',
         options: ['red', 'blue', 'green'],
@@ -48,8 +48,8 @@ describe('InputRequestManager', () => {
       }
     });
 
-    it('creates a confirm input request', () => {
-      const requestId = manager.createRequest(ydoc, {
+    it('creates a confirm input request', async () => {
+      const requestId = await manager.createRequest(ydoc, {
         message: 'Are you sure?',
         type: 'confirm',
       });
@@ -58,8 +58,8 @@ describe('InputRequestManager', () => {
       expect(request?.type).toBe('confirm');
     });
 
-    it('creates a multiline input request', () => {
-      const requestId = manager.createRequest(ydoc, {
+    it('creates a multiline input request', async () => {
+      const requestId = await manager.createRequest(ydoc, {
         message: 'Enter a description',
         type: 'multiline',
         defaultValue: 'Default text',
@@ -70,8 +70,8 @@ describe('InputRequestManager', () => {
       expect(request?.defaultValue).toBe('Default text');
     });
 
-    it('sets timeout when provided', () => {
-      const requestId = manager.createRequest(ydoc, {
+    it('sets timeout when provided', async () => {
+      const requestId = await manager.createRequest(ydoc, {
         message: 'Quick question?',
         type: 'text',
         timeout: 600,
@@ -81,8 +81,8 @@ describe('InputRequestManager', () => {
       expect(request?.timeout).toBe(600);
     });
 
-    it('stores request in Y.Doc INPUT_REQUESTS array', () => {
-      const requestId = manager.createRequest(ydoc, {
+    it('stores request in Y.Doc INPUT_REQUESTS array', async () => {
+      const requestId = await manager.createRequest(ydoc, {
         message: 'Test',
         type: 'text',
       });
@@ -101,8 +101,8 @@ describe('InputRequestManager', () => {
       expect(request).toBeUndefined();
     });
 
-    it('returns request by ID', () => {
-      const requestId = manager.createRequest(ydoc, {
+    it('returns request by ID', async () => {
+      const requestId = await manager.createRequest(ydoc, {
         message: 'Test message',
         type: 'text',
       });
@@ -115,8 +115,8 @@ describe('InputRequestManager', () => {
   });
 
   describe('cancelRequest', () => {
-    it('cancels a pending request', () => {
-      const requestId = manager.createRequest(ydoc, {
+    it('cancels a pending request', async () => {
+      const requestId = await manager.createRequest(ydoc, {
         message: 'Test',
         type: 'text',
       });
@@ -133,8 +133,8 @@ describe('InputRequestManager', () => {
       expect(cancelled).toBe(false);
     });
 
-    it('returns false when trying to cancel already answered request', () => {
-      const requestId = manager.createRequest(ydoc, {
+    it('returns false when trying to cancel already answered request', async () => {
+      const requestId = await manager.createRequest(ydoc, {
         message: 'Test',
         type: 'text',
       });
@@ -153,7 +153,7 @@ describe('InputRequestManager', () => {
 
   describe('waitForResponse', () => {
     it('resolves immediately if request already answered', async () => {
-      const requestId = manager.createRequest(ydoc, {
+      const requestId = await manager.createRequest(ydoc, {
         message: 'Test',
         type: 'text',
       });
@@ -184,7 +184,7 @@ describe('InputRequestManager', () => {
     });
 
     it('resolves when request is answered after waiting', async () => {
-      const requestId = manager.createRequest(ydoc, {
+      const requestId = await manager.createRequest(ydoc, {
         message: 'Test',
         type: 'text',
       });
@@ -215,7 +215,7 @@ describe('InputRequestManager', () => {
     });
 
     it('handles cancellation status', async () => {
-      const requestId = manager.createRequest(ydoc, {
+      const requestId = await manager.createRequest(ydoc, {
         message: 'Test',
         type: 'text',
       });
@@ -233,7 +233,7 @@ describe('InputRequestManager', () => {
     it('times out if no response within timeout period', async () => {
       vi.useFakeTimers();
 
-      const requestId = manager.createRequest(ydoc, {
+      const requestId = await manager.createRequest(ydoc, {
         message: 'Test',
         type: 'text',
       });
@@ -269,7 +269,7 @@ describe('InputRequestManager', () => {
     it('uses request timeout if no timeout specified', async () => {
       vi.useFakeTimers();
 
-      const requestId = manager.createRequest(ydoc, {
+      const requestId = await manager.createRequest(ydoc, {
         message: 'Test',
         type: 'text',
         timeout: 300,
@@ -300,10 +300,10 @@ describe('InputRequestManager', () => {
       expect(pending).toEqual([]);
     });
 
-    it('returns only pending requests', () => {
-      const id1 = manager.createRequest(ydoc, { message: 'Q1', type: 'text' });
-      const id2 = manager.createRequest(ydoc, { message: 'Q2', type: 'text' });
-      const id3 = manager.createRequest(ydoc, { message: 'Q3', type: 'text' });
+    it('returns only pending requests', async () => {
+      const id1 = await manager.createRequest(ydoc, { message: 'Q1', type: 'text' });
+      const id2 = await manager.createRequest(ydoc, { message: 'Q2', type: 'text' });
+      const id3 = await manager.createRequest(ydoc, { message: 'Q3', type: 'text' });
 
       manager.cancelRequest(ydoc, id2);
 
@@ -312,8 +312,8 @@ describe('InputRequestManager', () => {
       expect(pending.map((r) => r.id)).toEqual([id1, id3]);
     });
 
-    it('excludes answered requests', () => {
-      manager.createRequest(ydoc, { message: 'Q1', type: 'text' });
+    it('excludes answered requests', async () => {
+      await manager.createRequest(ydoc, { message: 'Q1', type: 'text' });
 
       ydoc.transact(() => {
         const requestsArray = ydoc.getArray(YDOC_KEYS.INPUT_REQUESTS);
@@ -413,7 +413,7 @@ describe('InputRequestManager', () => {
 
   describe('integration: full request lifecycle', () => {
     it('creates request, waits, and receives answer', async () => {
-      const requestId = manager.createRequest(ydoc, {
+      const requestId = await manager.createRequest(ydoc, {
         message: 'What is your favorite color?',
         type: 'text',
       });
@@ -447,7 +447,7 @@ describe('InputRequestManager', () => {
 
   describe('integration: number input lifecycle', () => {
     it('creates number request, waits, receives answer', async () => {
-      const requestId = manager.createRequest(ydoc, {
+      const requestId = await manager.createRequest(ydoc, {
         message: 'How many retries?',
         type: 'number',
         min: 0,
@@ -492,7 +492,7 @@ describe('InputRequestManager', () => {
 
   describe('integration: email input lifecycle', () => {
     it('creates email request, waits, receives answer', async () => {
-      const requestId = manager.createRequest(ydoc, {
+      const requestId = await manager.createRequest(ydoc, {
         message: 'Enter your email',
         type: 'email',
         domain: 'company.com',
@@ -535,7 +535,7 @@ describe('InputRequestManager', () => {
 
   describe('integration: date input lifecycle', () => {
     it('creates date request, waits, receives answer', async () => {
-      const requestId = manager.createRequest(ydoc, {
+      const requestId = await manager.createRequest(ydoc, {
         message: 'Select a deadline',
         type: 'date',
         min: '2026-01-01',
@@ -580,7 +580,7 @@ describe('InputRequestManager', () => {
 
   describe('integration: choice with displayAs=dropdown lifecycle', () => {
     it('creates choice request with dropdown display, waits, receives answer', async () => {
-      const requestId = manager.createRequest(ydoc, {
+      const requestId = await manager.createRequest(ydoc, {
         message: 'Select a country',
         type: 'choice',
         options: ['United States', 'Canada', 'Mexico'],
@@ -627,7 +627,7 @@ describe('InputRequestManager', () => {
 
   describe('integration: rating input lifecycle', () => {
     it('creates rating request, waits, receives answer', async () => {
-      const requestId = manager.createRequest(ydoc, {
+      const requestId = await manager.createRequest(ydoc, {
         message: 'Rate this feature',
         type: 'rating',
         min: 1,
@@ -676,7 +676,7 @@ describe('InputRequestManager', () => {
 
   describe('integration: multiline input lifecycle', () => {
     it('creates multiline request, waits, receives answer', async () => {
-      const requestId = manager.createRequest(ydoc, {
+      const requestId = await manager.createRequest(ydoc, {
         message: 'Describe the issue in detail',
         type: 'multiline',
         defaultValue: 'Default description',
@@ -717,7 +717,7 @@ describe('InputRequestManager', () => {
 
   describe('integration: confirm input lifecycle', () => {
     it('creates confirm request, waits, receives answer', async () => {
-      const requestId = manager.createRequest(ydoc, {
+      const requestId = await manager.createRequest(ydoc, {
         message: 'Are you sure you want to proceed?',
         type: 'confirm',
       });
@@ -754,7 +754,7 @@ describe('InputRequestManager', () => {
     });
 
     it('handles confirm request declined', async () => {
-      const requestId = manager.createRequest(ydoc, {
+      const requestId = await manager.createRequest(ydoc, {
         message: 'Delete all files?',
         type: 'confirm',
       });

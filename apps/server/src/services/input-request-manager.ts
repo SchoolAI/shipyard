@@ -4,6 +4,10 @@
  *
  * Pattern based on apps/hook/src/core/review-status.ts:waitForReviewDecision()
  * Uses Y.Doc observer to detect when user responds to a request.
+ *
+ * IMPORTANT: Input requests are stored in the plan-index doc so they're accessible
+ * from anywhere, but the input_request_created events are logged to the specific
+ * plan's doc so they appear in that plan's activity timeline.
  */
 
 import {
@@ -18,6 +22,7 @@ import {
   YDOC_KEYS,
 } from '@shipyard/schema';
 import type * as Y from 'yjs';
+import { getOrCreateDoc } from '../doc-store.js';
 import { logger } from '../logger.js';
 
 /**
@@ -87,36 +92,68 @@ export class InputRequestManager {
    * Create a new input request in the Y.Doc.
    * Request is added to the INPUT_REQUESTS array and becomes visible in browser UI.
    *
-   * @param ydoc - The Y.Doc to add the request to
+   * IMPORTANT: The request is stored in ydoc (plan-index), but the event is logged
+   * to the plan-specific doc so it appears in that plan's activity timeline.
+   *
+   * @param ydoc - The Y.Doc to add the request to (typically plan-index)
    * @param params - Request parameters (message, type, options, etc.)
    * @returns The generated request ID
    */
-  createRequest(ydoc: Y.Doc, params: CreateInputRequestParams): string {
+  async createRequest(ydoc: Y.Doc, params: CreateInputRequestParams): Promise<string> {
     const request = createInputRequest(params);
 
+    /** Add request to plan-index INPUT_REQUESTS array */
     ydoc.transact(() => {
       const requestsArray = ydoc.getArray<InputRequest>(YDOC_KEYS.INPUT_REQUESTS);
       requestsArray.push([request]);
-
-      logPlanEvent(
-        ydoc,
-        'input_request_created',
-        'Agent',
-        {
-          requestId: request.id,
-          requestType: request.type,
-          requestMessage: request.message,
-          isBlocker: request.isBlocker,
-        },
-        {
-          inboxWorthy: true,
-          inboxFor: 'owner',
-        }
-      );
     });
 
+    /**
+     * Log event to the plan-specific doc so it appears in that plan's activity timeline.
+     * If no planId provided, the event won't appear in any timeline (acceptable for global requests).
+     */
+    if (params.planId) {
+      try {
+        const planDoc = await getOrCreateDoc(params.planId);
+        logPlanEvent(
+          planDoc,
+          'input_request_created',
+          'Agent',
+          {
+            requestId: request.id,
+            requestType: request.type,
+            requestMessage: request.message,
+            isBlocker: request.isBlocker,
+          },
+          {
+            inboxWorthy: true,
+            inboxFor: 'owner',
+          }
+        );
+        logger.debug(
+          { requestId: request.id, planId: params.planId },
+          'Logged input_request_created event to plan doc'
+        );
+      } catch (error) {
+        logger.error(
+          { error, planId: params.planId },
+          'Failed to log input_request_created event to plan doc'
+        );
+      }
+    } else {
+      logger.debug(
+        { requestId: request.id },
+        'No planId provided - skipping event log to plan doc'
+      );
+    }
+
     logger.info(
-      { requestId: request.id, type: request.type, timeout: request.timeout },
+      {
+        requestId: request.id,
+        type: request.type,
+        timeout: request.timeout,
+        planId: params.planId,
+      },
       'Created input request in Y.Doc'
     );
 
@@ -127,36 +164,71 @@ export class InputRequestManager {
    * Create a new multi-question input request in the Y.Doc.
    * Request is added to the INPUT_REQUESTS array and becomes visible in browser UI.
    *
-   * @param ydoc - The Y.Doc to add the request to
+   * IMPORTANT: The request is stored in ydoc (plan-index), but the event is logged
+   * to the plan-specific doc so it appears in that plan's activity timeline.
+   *
+   * @param ydoc - The Y.Doc to add the request to (typically plan-index)
    * @param params - Request parameters (questions array, timeout, planId)
    * @returns The generated request ID
    */
-  createMultiQuestionRequest(ydoc: Y.Doc, params: CreateMultiQuestionInputParams): string {
+  async createMultiQuestionRequest(
+    ydoc: Y.Doc,
+    params: CreateMultiQuestionInputParams
+  ): Promise<string> {
     const request = createMultiQuestionInputRequest(params);
 
+    /** Add request to plan-index INPUT_REQUESTS array */
     ydoc.transact(() => {
       const requestsArray = ydoc.getArray<AnyInputRequest>(YDOC_KEYS.INPUT_REQUESTS);
       requestsArray.push([request]);
-
-      logPlanEvent(
-        ydoc,
-        'input_request_created',
-        'Agent',
-        {
-          requestId: request.id,
-          requestType: 'multi',
-          questionCount: request.questions.length,
-          isBlocker: request.isBlocker,
-        },
-        {
-          inboxWorthy: true,
-          inboxFor: 'owner',
-        }
-      );
     });
 
+    /**
+     * Log event to the plan-specific doc so it appears in that plan's activity timeline.
+     * If no planId provided, the event won't appear in any timeline (acceptable for global requests).
+     */
+    if (params.planId) {
+      try {
+        const planDoc = await getOrCreateDoc(params.planId);
+        logPlanEvent(
+          planDoc,
+          'input_request_created',
+          'Agent',
+          {
+            requestId: request.id,
+            requestType: 'multi',
+            questionCount: request.questions.length,
+            isBlocker: request.isBlocker,
+          },
+          {
+            inboxWorthy: true,
+            inboxFor: 'owner',
+          }
+        );
+        logger.debug(
+          { requestId: request.id, planId: params.planId },
+          'Logged input_request_created event to plan doc'
+        );
+      } catch (error) {
+        logger.error(
+          { error, planId: params.planId },
+          'Failed to log input_request_created event to plan doc'
+        );
+      }
+    } else {
+      logger.debug(
+        { requestId: request.id },
+        'No planId provided - skipping event log to plan doc'
+      );
+    }
+
     logger.info(
-      { requestId: request.id, questionCount: request.questions.length, timeout: request.timeout },
+      {
+        requestId: request.id,
+        questionCount: request.questions.length,
+        timeout: request.timeout,
+        planId: params.planId,
+      },
       'Created multi-question input request in Y.Doc'
     );
 
