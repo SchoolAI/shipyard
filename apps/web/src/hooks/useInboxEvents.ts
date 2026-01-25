@@ -28,7 +28,7 @@ export interface InboxEventItem {
 
 // Cache to avoid reloading the same plan events
 const eventsCache = new Map<string, { events: PlanEvent[]; timestamp: number }>();
-const CACHE_TTL = 30_000; // 30 seconds
+const CACHE_TTL = 30_000;
 
 /**
  * Load events from a single plan's Y.Doc via IndexedDB.

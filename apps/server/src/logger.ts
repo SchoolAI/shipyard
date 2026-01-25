@@ -26,8 +26,8 @@ try {
 // Create logger that writes to BOTH stderr and a file
 // In development, use pino-pretty for stderr only (file gets raw JSON)
 const streams: pino.StreamEntry[] = [
-  { stream: pino.destination(2) }, // stderr - CRITICAL: MCP uses stdout for protocol
-  { stream: pino.destination(LOG_FILE) }, // file for debugging
+  { stream: pino.destination(2) },
+  { stream: pino.destination(LOG_FILE) },
 ];
 
 export const logger = pino(

@@ -166,7 +166,7 @@ function BinaryArtifactViewer({
     }
 
     isInitialLoad.current = false;
-  }, [url, token, hasRepoScope]); // Remove blobUrl from dependencies
+  }, [url, token, hasRepoScope]);
 
   // Load artifact on mount and when URL/token changes
   useEffect(() => {

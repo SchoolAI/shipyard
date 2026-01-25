@@ -37,8 +37,8 @@ function MobileBottomDrawer({
   children: ReactNode;
 }) {
   // Snap points configuration
-  const DEFAULT_SNAP = 0.65; // 65% - initial drawer height
-  const EXPANDED_SNAP = 0.95; // 95% - maximum drawer height
+  const DEFAULT_SNAP = 0.65;
+  const EXPANDED_SNAP = 0.95;
   const snapPoints: (string | number)[] = [DEFAULT_SNAP, EXPANDED_SNAP];
 
   // Controlled state for snap point - required to make it "stick" after dragging
@@ -125,9 +125,9 @@ function DesktopPanel({
           flex flex-col overflow-hidden
           ${
             isCenterModal
-              ? // Center modal (expanded mode)
+              ?
                 'top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[1100px] max-w-[90vw] h-[95vh] rounded-lg border border-separator animate-in zoom-in-95 fade-in duration-200'
-              : // Side panel (peek/full modes)
+              :
                 'top-0 right-0 h-full border-l border-separator animate-in slide-in-from-right duration-300 ease-out'
           }
           ${isPeek ? 'w-1/2 max-w-[90vw]' : ''}

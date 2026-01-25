@@ -86,7 +86,7 @@ export function useKanbanColumns(plans: PlanIndexEntry[]): ColumnWithPlans[] {
 
     return STATUS_COLUMNS.map((column) => ({
       ...column,
-      plans: activePlans.filter(column.filter).sort((a, b) => b.updatedAt - a.updatedAt), // Most recent first
+      plans: activePlans.filter(column.filter).sort((a, b) => b.updatedAt - a.updatedAt),
     }));
   }, [plans]);
 }

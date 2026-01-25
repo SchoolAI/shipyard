@@ -148,8 +148,8 @@ export async function getGitHubUser(token: string): Promise<GitHubUser> {
 
 export type TokenValidationResult =
   | { status: 'valid' }
-  | { status: 'invalid' } // Token is genuinely invalid (401) - should logout
-  | { status: 'error'; message: string }; // Network/server error - should NOT logout
+  | { status: 'invalid' }
+  | { status: 'error'; message: string };
 
 export async function validateToken(token: string): Promise<TokenValidationResult> {
   try {

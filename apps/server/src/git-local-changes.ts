@@ -39,7 +39,7 @@ function execGit(command: string, opts: GitExecOptions): string | null {
  */
 function ensureGitRepo(cwd: string): LocalChangesResult | null {
   const isRepo = execGit('git rev-parse --is-inside-work-tree', { cwd });
-  if (isRepo !== null) return null; // Already a repo
+  if (isRepo !== null) return null;
 
   // Not a git repo - auto-initialize
   logger.info({ cwd }, 'Not a git repo, initializing with git init');
@@ -207,8 +207,8 @@ function parseGitStatus(output: string): {
   for (const line of output.split('\n')) {
     if (!line || line.length < 3) continue;
 
-    const x = line[0]; // Staged status
-    const y = line[1]; // Unstaged status
+    const x = line[0];
+    const y = line[1];
     let path = line.slice(3);
 
     // Handle renamed files: "R  old -> new"
@@ -232,7 +232,7 @@ function parseGitStatus(output: string): {
       staged.push({
         path,
         status: parseStatusChar(x),
-        additions: 0, // We get this from diff output
+        additions: 0,
         deletions: 0,
       });
     }
@@ -267,7 +267,7 @@ function parseStatusChar(char: string): GitFileStatus {
     case 'C':
       return 'copied';
     case 'U':
-      return 'modified'; // Unmerged, treat as modified
+      return 'modified';
     default:
       return 'modified';
   }

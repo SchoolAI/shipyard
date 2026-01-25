@@ -29,7 +29,7 @@ if (!registryPort) {
     logger.info('Acquired hub lock, starting registry hub');
     const hubPort = await startRegistryServer();
     if (!hubPort) {
-      await releaseHubLock(); // Release on failure
+      await releaseHubLock();
       logger.error('Failed to start registry hub - all ports in use');
       process.exit(1);
     }

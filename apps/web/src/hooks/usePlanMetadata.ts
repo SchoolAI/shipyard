@@ -37,7 +37,7 @@ export function isPlanMetadataLoaded(
 
 // Cache to avoid reloading the same plan data
 const metadataCache = new Map<string, { data: PlanMetadataInfo; timestamp: number }>();
-const CACHE_TTL = 30_000; // 30 seconds
+const CACHE_TTL = 30_000;
 
 /** Loaded metadata type (without isLoading) */
 type LoadedPlanMetadata = Extract<PlanMetadataInfo, { isLoading: false }>;

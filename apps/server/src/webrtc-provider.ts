@@ -77,7 +77,7 @@ export async function createWebRtcProvider(ydoc: Y.Doc, planId: string): Promise
     signaling: [SIGNALING_SERVER],
     peerOpts: {
       // @ts-expect-error - wrtc type definitions don't match runtime structure
-      wrtc: wrtc.default || wrtc, // Pass wrtc polyfill to simple-peer
+      wrtc: wrtc.default || wrtc,
       config: {
         iceServers,
       },
@@ -154,7 +154,7 @@ function sendApprovalStateToSignaling(
   // Send user identity first (so signaling knows which user this connection belongs to)
   const identifyMessage = JSON.stringify({
     type: 'subscribe',
-    topics: [], // Empty topics - just identifying the user
+    topics: [],
     userId: username,
   });
 
@@ -163,7 +163,7 @@ function sendApprovalStateToSignaling(
     type: 'approval_state',
     planId,
     ownerId: username,
-    approvedUsers: [username], // Owner is always approved
+    approvedUsers: [username],
     rejectedUsers: [],
   });
 

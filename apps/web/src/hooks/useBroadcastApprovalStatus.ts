@@ -85,9 +85,9 @@ export function useBroadcastApprovalStatus({
       planStatus = {
         ...baseState,
         status: 'pending',
-        requestedAt: requestedAtRef.current, // Use stored value
+        requestedAt: requestedAtRef.current,
         planId,
-        expiresAt: requestedAtRef.current + 24 * 60 * 60 * 1000, // Use stored value
+        expiresAt: requestedAtRef.current + 24 * 60 * 60 * 1000,
       };
     } else if (approvalStatus === 'approved' || approvalStatus === 'rejected') {
       // Clear requestedAt when leaving pending state

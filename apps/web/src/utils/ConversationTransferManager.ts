@@ -182,21 +182,21 @@ function decompressFromUint8Array(data: Uint8Array): string | null {
  * ```typescript
  * const manager = new ConversationTransferManager(peers);
  *
- * // Send a conversation
+ *
  * await manager.sendConversation('peer-123', messages, {
  *   exportId: '...',
  *   planId: 'plan-abc',
- *   // ... other metadata
+ *
  * }, {
  *   onProgress: (sent, total) => console.log(`${sent}/${total}`),
  * });
  *
- * // Receive conversations
+ *
  * const cleanup = manager.onReceiveConversation((messages, meta) => {
  *   console.log('Received conversation:', meta.planId);
  * });
  *
- * // Later: cleanup
+ *
  * cleanup();
  * ```
  */
@@ -418,7 +418,7 @@ export class ConversationTransferManager {
   private scheduleTimeoutCheck(exportId: string): void {
     setTimeout(() => {
       const transfer = this.incomingTransfers.get(exportId);
-      if (!transfer) return; // Already completed
+      if (!transfer) return;
 
       const timeSinceProgress = Date.now() - transfer.lastProgressAt;
       if (timeSinceProgress > TRANSFER_TIMEOUT) {

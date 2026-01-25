@@ -398,7 +398,7 @@ export async function handleUpdatePresence(req: Request, res: Response): Promise
     setAgentPresence(ydoc, {
       agentType: input.agentType,
       sessionId: input.sessionId,
-      connectedAt: now, // Will be overwritten if already exists
+      connectedAt: now,
       lastSeenAt: now,
     });
 

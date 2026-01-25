@@ -195,7 +195,7 @@ export interface UploadArtifactParams {
   repo: string;
   planId: string;
   filename: string;
-  content: string; // base64 encoded
+  content: string;
 }
 
 /**

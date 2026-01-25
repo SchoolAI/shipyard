@@ -24,7 +24,7 @@
  *   await writeFile(path, data, { flag: 'wx' });
  * } catch (err) {
  *   if (isErrnoException(err) && err.code === 'EEXIST') {
- *     // Handle file already exists
+ *
  *   }
  * }
  * ```
@@ -44,7 +44,7 @@ export function isErrnoException(err: unknown): err is NodeJS.ErrnoException {
  * @example
  * ```typescript
  * if (hasErrorCode(err, 'ENOENT')) {
- *   return null; // File not found
+ *   return null;
  * }
  * ```
  */

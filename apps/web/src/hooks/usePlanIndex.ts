@@ -366,11 +366,11 @@ export function usePlanIndex(currentUsername: string | undefined): PlanIndexStat
 
     function loadViewedByFromPlanIndex() {
       if (!currentUsername) {
-        return; // Don't clear state - just skip loading
+        return;
       }
 
       if (inboxCandidates.length === 0) {
-        return; // Don't clear state for empty candidates
+        return;
       }
 
       const planIds = inboxCandidates.map((p) => p.id);

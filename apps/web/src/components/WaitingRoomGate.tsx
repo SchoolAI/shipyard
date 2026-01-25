@@ -41,7 +41,7 @@ function checkRequestExpired(isPending: boolean, rtcProvider: WebrtcProvider | n
   if (!planStatus || planStatus.status !== 'pending') return false;
 
   const requestAge = Date.now() - planStatus.requestedAt;
-  return requestAge > 24 * 60 * 60 * 1000; // 24 hours
+  return requestAge > 24 * 60 * 60 * 1000;
 }
 
 /**

@@ -58,7 +58,7 @@ export function PlanPage() {
     syncState,
     wsProvider,
     rtcProvider,
-  } = useMultiProviderSync(isSnapshot ? '' : planId); // Don't sync snapshots
+  } = useMultiProviderSync(isSnapshot ? '' : planId);
 
   // For snapshots, create local Y.Doc hydrated with URL data
   const snapshotYdoc = useMemo(() => {

@@ -7,10 +7,10 @@
  * - className: string - Additional CSS classes
  *
  * @example
- * // Horizontal separator
+ *
  * <Separator className="my-4" />
  *
- * // Vertical separator
+ *
  * <Separator orientation="vertical" />
  */
 export { Separator } from '@heroui/react';

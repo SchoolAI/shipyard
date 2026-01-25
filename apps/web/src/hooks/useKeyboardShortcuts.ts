@@ -44,8 +44,8 @@ function hasNoModifiers(e: KeyboardEvent): boolean {
 /** Shortcut definition with matching criteria and handler key */
 interface ShortcutDef {
   key: string;
-  needsModifier?: boolean; // true = requires Cmd/Ctrl, false/undefined = requires NO modifiers
-  allowInInput?: boolean; // true = works even when in text inputs
+  needsModifier?: boolean;
+  allowInInput?: boolean;
   handler: keyof ShortcutHandlers;
 }
 

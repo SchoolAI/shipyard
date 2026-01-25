@@ -315,7 +315,7 @@ export function KanbanPage() {
         ) {
           return;
         }
-        e.preventDefault(); // Prevent page scroll
+        e.preventDefault();
         setIsPeeking(true);
         setPeekPlanId(hoveredCardId);
       }
@@ -490,12 +490,12 @@ export function KanbanPage() {
   const sensors = useSensors(
     useSensor(MouseSensor, {
       activationConstraint: {
-        distance: 8, // Require 8px movement before drag starts
+        distance: 8,
       },
     }),
     useSensor(TouchSensor, {
       activationConstraint: {
-        delay: 200, // Long press to start drag on touch
+        delay: 200,
         tolerance: 5,
       },
     }),

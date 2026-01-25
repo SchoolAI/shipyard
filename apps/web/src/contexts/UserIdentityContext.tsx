@@ -5,9 +5,9 @@ import type { LocalIdentity } from '@/hooks/useLocalIdentity';
 interface UserIdentityContextValue {
   identity: GitHubIdentity | null;
   localIdentity: LocalIdentity | null;
-  actor: string; // Computed: GitHub username > Local username (prefixed) > 'Anonymous'
-  hasIdentity: boolean; // True if either GitHub or local identity exists
-  canAccessPrivateRepos: boolean; // True only if GitHub identity with repo scope
+  actor: string;
+  hasIdentity: boolean;
+  canAccessPrivateRepos: boolean;
 }
 
 const UserIdentityContext = createContext<UserIdentityContextValue | null>(null);

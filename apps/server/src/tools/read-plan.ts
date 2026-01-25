@@ -106,7 +106,7 @@ OUTPUT INCLUDES:
 
     // Export plan to markdown (with annotations if requested)
     const markdown = await exportPlanToMarkdown(doc, {
-      includeResolved: includeAnnotations, // Include resolved comments if showing annotations
+      includeResolved: includeAnnotations,
     });
 
     // Build metadata header

@@ -77,9 +77,9 @@ export function ShareButton({
       const message = JSON.stringify({
         type: 'create_invite',
         planId,
-        authToken, // Include auth token for server-side validation
-        ttlMinutes: 30, // Default: 30 minutes
-        maxUses: null, // Default: unlimited
+        authToken,
+        ttlMinutes: 30,
+        maxUses: null,
       });
 
       const signalingConns = getSignalingConnections(rtcProvider);
@@ -173,7 +173,7 @@ export function ShareButton({
       // Log plan_shared event
       if (ydoc) {
         logPlanEvent(ydoc, 'plan_shared', actor, undefined, {
-          inboxWorthy: false, // Sharing action doesn't need owner action
+          inboxWorthy: false,
         });
       }
 

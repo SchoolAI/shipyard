@@ -95,7 +95,7 @@ await addArtifact({
   filename: 'login-page.png',
   source: 'file',
   filePath: '/path/to/screenshot.png',
-  deliverableId: deliverables[0].id  // Links to specific deliverable
+  deliverableId: deliverables[0].id
 });
 
 const result = await addArtifact({

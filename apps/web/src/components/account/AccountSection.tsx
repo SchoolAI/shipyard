@@ -28,7 +28,7 @@ export function AccountSection({ collapsed = false }: AccountSectionProps) {
     if (githubIdentity) return githubIdentity;
     if (localIdentity) {
       return {
-        token: '', // Local identity doesn't have a token
+        token: '',
         username: localIdentity.username,
         displayName: localIdentity.username,
         createdAt: localIdentity.createdAt,

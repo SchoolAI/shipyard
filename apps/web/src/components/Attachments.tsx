@@ -30,7 +30,7 @@ export function Attachments({ ydoc, registryPort }: AttachmentsProps) {
   }, [ydoc]);
 
   if (artifacts.length === 0) {
-    return null; // Don't show section if no artifacts
+    return null;
   }
 
   return (

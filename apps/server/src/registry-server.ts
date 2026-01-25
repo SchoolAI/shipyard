@@ -94,7 +94,7 @@ async function readLockHolderPid(): Promise<number | null> {
  */
 function isLockHolderAlive(pid: number): boolean {
   try {
-    process.kill(pid, 0); // Signal 0 doesn't kill, just checks
+    process.kill(pid, 0);
     return true;
   } catch {
     return false;
@@ -206,7 +206,7 @@ function isLevelDbLockError(error: Error): boolean {
  */
 function isProcessAlive(pid: number): boolean {
   try {
-    process.kill(pid, 0); // Signal 0 doesn't kill, just checks
+    process.kill(pid, 0);
     return true;
   } catch {
     return false;
@@ -477,7 +477,7 @@ function handleWebSocketConnection(ws: WebSocket, req: http.IncomingMessage): vo
         for (const msg of pendingMessages) {
           processMessage(msg, doc, awareness, planId, ws);
         }
-        pendingMessages.length = 0; // Clear buffer
+        pendingMessages.length = 0;
       }
 
       // Send initial sync state (SyncStep1) to start handshake

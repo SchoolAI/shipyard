@@ -104,7 +104,7 @@ export function InlinePlanDetail({
       if (!panelMetadata) {
         setLoadTimeout(true);
       }
-    }, 10000); // 10 second timeout
+    }, 10000);
 
     return () => clearTimeout(timer);
   }, [planId, panelMetadata]);

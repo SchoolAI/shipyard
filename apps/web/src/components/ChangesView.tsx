@@ -641,7 +641,7 @@ interface FileTreeData {
   id: string;
   name: string;
   children?: FileTreeData[];
-  file?: PRFile; // Only for file nodes
+  file?: PRFile;
 }
 
 /**

@@ -36,7 +36,7 @@ export function getSidebarCollapsed(): boolean {
   try {
     return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === 'true';
   } catch {
-    return false; // default: expanded
+    return false;
   }
 }
 
@@ -54,7 +54,7 @@ export function getShowArchived(): boolean {
   try {
     return localStorage.getItem(SHOW_ARCHIVED_KEY) === 'true';
   } catch {
-    return false; // default: hide archived
+    return false;
   }
 }
 
@@ -127,7 +127,7 @@ export function getHideEmptyColumns(): boolean {
   try {
     return localStorage.getItem(KANBAN_HIDE_EMPTY_COLUMNS_KEY) === 'true';
   } catch {
-    return false; // default: show all columns
+    return false;
   }
 }
 
@@ -147,7 +147,7 @@ export function getInboxShowRead(): boolean {
   try {
     return localStorage.getItem(INBOX_SHOW_READ_KEY) === 'true';
   } catch {
-    return false; // default: show unread only
+    return false;
   }
 }
 

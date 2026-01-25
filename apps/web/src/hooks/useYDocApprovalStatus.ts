@@ -73,7 +73,7 @@ export function useYDocApprovalStatus(
       newSnapshot = {
         status: undefined,
         isPending: false,
-        isApproved: true, // No approval required = effectively approved
+        isApproved: true,
         isRejected: false,
         requiresApproval: false,
         ownerId,

@@ -69,7 +69,7 @@ const trpcClient = trpc.createClient({
       fetch: (url, options) => {
         return fetch(url, {
           ...options,
-          signal: AbortSignal.timeout(10000), // 10 seconds
+          signal: AbortSignal.timeout(10000),
         });
       },
     }),

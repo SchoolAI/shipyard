@@ -68,7 +68,7 @@ export function getArtifactUrl(artifact: Artifact, registryPort: number | null):
  *
  * @example
  * parseArtifactUrl('https://raw.githubusercontent.com/owner/repo/plan-artifacts/plans/abc/file.png')
- * // => { owner: 'owner', repo: 'repo', ref: 'plan-artifacts', path: 'plans/abc/file.png' }
+ *
  */
 export function parseArtifactUrl(url: string): ParsedArtifactUrl | null {
   try {

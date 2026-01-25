@@ -49,7 +49,7 @@ export function isViewingHistorySnapshot(
  */
 export function useVersionNavigation(ydoc: Y.Doc | null): VersionNavigationState {
   const [snapshots, setSnapshots] = useState<PlanSnapshot[]>([]);
-  const [currentIndex, setCurrentIndex] = useState<number>(-1); // -1 = current/live version
+  const [currentIndex, setCurrentIndex] = useState<number>(-1);
 
   // Subscribe to snapshots Y.Array
   useEffect(() => {
@@ -61,8 +61,8 @@ export function useVersionNavigation(ydoc: Y.Doc | null): VersionNavigationState
 
       // If viewing history and snapshots changed, stay on same relative position
       setCurrentIndex((prevIndex) => {
-        if (prevIndex === -1) return -1; // Still viewing current
-        return Math.min(prevIndex, allSnapshots.length - 1); // Clamp to valid range
+        if (prevIndex === -1) return -1;
+        return Math.min(prevIndex, allSnapshots.length - 1);
       });
     };
 
@@ -99,7 +99,7 @@ export function useVersionNavigation(ydoc: Y.Doc | null): VersionNavigationState
   };
 
   const canGoPrevious = snapshots.length > 0 && (currentIndex > 0 || currentIndex === -1);
-  const canGoNext = currentIndex >= 0; // Can always go to current from history
+  const canGoNext = currentIndex >= 0;
 
   const base: VersionNavigationBase = {
     snapshots,

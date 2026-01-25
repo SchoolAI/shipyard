@@ -18,7 +18,7 @@ export function TagChip({ tag, removable = false, onRemove, size = 'sm' }: TagCh
       size={size}
       variant="soft"
       style={{
-        backgroundColor: `${color}20`, // 20% opacity
+        backgroundColor: `${color}20`,
         color: color,
         borderColor: color,
       }}

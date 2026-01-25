@@ -212,7 +212,7 @@ function logCorruption(planId: string, result: ValidationResult, origin?: unknow
       key: result.key,
       totalItems: result.totalItems,
       invalidItems: result.invalidItems,
-      errors: result.errors?.slice(0, 5), // Limit to first 5 errors
+      errors: result.errors?.slice(0, 5),
       origin: typeof origin === 'string' ? origin : undefined,
     },
     'CRDT corruption detected from peer sync'

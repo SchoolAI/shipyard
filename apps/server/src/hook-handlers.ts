@@ -807,7 +807,7 @@ export async function waitForApprovalHandler(
       approved: true,
       deliverables,
       reviewComment,
-      reviewedBy: reviewedBy || 'unknown', // Required by schema
+      reviewedBy: reviewedBy || 'unknown',
       status: 'in_progress' as const,
     };
   };
@@ -824,7 +824,7 @@ export async function waitForApprovalHandler(
     );
     return {
       approved: false,
-      feedback: feedback || 'Changes requested', // Required by schema
+      feedback: feedback || 'Changes requested',
       status: 'changes_requested' as const,
       reviewComment,
       reviewedBy,
@@ -832,7 +832,7 @@ export async function waitForApprovalHandler(
   };
 
   return new Promise((resolve, reject) => {
-    const APPROVAL_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes (matches client timeout)
+    const APPROVAL_TIMEOUT_MS = 30 * 60 * 1000;
     let timeout: NodeJS.Timeout | null = null;
     let checkStatus: (() => void) | null = null;
 
@@ -1100,7 +1100,7 @@ For each deliverable above, call:
 add_artifact(
   planId="${planId}",
   sessionToken="${sessionToken}",
-  type="screenshot",  // or "video", "test_results", "diff"
+  type="screenshot",
   filePath="/path/to/file.png",
   deliverableId="<id from above>"
 )

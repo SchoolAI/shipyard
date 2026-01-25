@@ -105,7 +105,7 @@ function showInputRequestToast(
     toast.info(`Agent needs input (${totalPending} pending)`, {
       id: 'input-requests-grouped',
       position: 'top-right',
-      duration: 60000, // 60 seconds
+      duration: 60000,
       description: 'Multiple requests waiting for response',
       action: {
         label: 'Respond',
@@ -120,7 +120,7 @@ function showInputRequestToast(
     toast.info('Agent needs your input', {
       id: `input-request-${request.id}`,
       position: 'top-right',
-      duration: 60000, // 60 seconds
+      duration: 60000,
       description: (
         <MarkdownContent
           content={getRequestDisplayMessage(request)}
@@ -288,7 +288,7 @@ export function useInputRequests({
       requestsArray.unobserve(updateRequests);
       clearInterval(expirationCheckInterval);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
-      previousRequestIdsRef.current.clear(); // Clear on ydoc change
+      previousRequestIdsRef.current.clear();
     };
   }, [ydoc]);
 

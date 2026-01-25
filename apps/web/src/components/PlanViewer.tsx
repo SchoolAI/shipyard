@@ -251,7 +251,7 @@ export function PlanViewer({
                   }
                 : {
                     name: 'Anonymous',
-                    color: 'hsl(0, 0%, 55%)', // Neutral gray works in light and dark modes
+                    color: 'hsl(0, 0%, 55%)',
                   },
             }
           : undefined,

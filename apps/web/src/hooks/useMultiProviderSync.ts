@@ -456,8 +456,8 @@ export function useMultiProviderSync(
           color: colorFromString(userName),
         },
         platform: 'browser',
-        isOwner: false, // Updated by useBroadcastApprovalStatus if user is owner
-        status: 'approved' as const, // Browsers are auto-approved
+        isOwner: false,
+        status: 'approved' as const,
       });
 
       // Count peers from awareness states (excluding self)
