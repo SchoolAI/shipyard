@@ -121,14 +121,14 @@ export default [
       'local/no-noisy-single-line-comments': 'error',
 
       // Type assertion rules - STRICT MODE
+      // Note: Biome handles noExplicitAny and noNonNullAssertion
+      // ESLint only needed for consistent-type-assertions (Biome doesn't have this)
       '@typescript-eslint/consistent-type-assertions': [
         'error',
         {
           assertionStyle: 'never',
         },
       ],
-      '@typescript-eslint/no-explicit-any': 'error',
-      '@typescript-eslint/no-non-null-assertion': 'error', // Ban value! syntax
     },
   },
 ];
