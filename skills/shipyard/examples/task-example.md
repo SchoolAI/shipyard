@@ -2,10 +2,10 @@
 
 This shows the full agentic loop with Shipyard.
 
-## Plan Creation
+## Task Creation
 
 ```typescript
-const plan = await createPlan({
+const task = await createTask({
   title: "Add user profile page",
   content: `
 # User Profile Page Implementation
@@ -24,7 +24,7 @@ const plan = await createPlan({
 });
 
 // Save for the agentic loop
-const { planId, sessionToken, deliverables, monitoringScript } = plan;
+const { taskId, sessionToken, deliverables, monitoringScript } = task;
 
 // For non-hook agents (Cursor, Devin, Windsurf):
 // The monitoringScript is a bash script that polls for approval.
@@ -43,7 +43,7 @@ The agent iterates through work, capturing proof at each milestone:
 
 // Capture proof
 await addArtifact({
-  planId,
+  taskId,
   sessionToken,
   type: 'image',
   filename: 'profile-display.png',
@@ -59,7 +59,7 @@ await addArtifact({
 
 // Capture proof
 await addArtifact({
-  planId,
+  taskId,
   sessionToken,
   type: 'image',
   filename: 'edit-mode.png',
@@ -75,7 +75,7 @@ await addArtifact({
 
 // Capture proof - triggers auto-complete
 const result = await addArtifact({
-  planId,
+  taskId,
   sessionToken,
   type: 'html',
   filename: 'api-tests.json',
@@ -97,7 +97,7 @@ if (result.allDeliverablesComplete) {
 If reviewer requests changes:
 
 ```typescript
-const status = await readPlan(planId, sessionToken, {
+const status = await readTask(taskId, sessionToken, {
   includeAnnotations: true
 });
 

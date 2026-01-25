@@ -11,9 +11,9 @@ import { verifySessionToken } from '../session-token.js';
 import { formatLinkedPRsSection, formatPlanHeader } from './response-formatters.js';
 import { TOOL_NAMES } from './tool-names.js';
 
-const ReadPlanInput = z.object({
-  planId: z.string().describe('The plan ID to read'),
-  sessionToken: z.string().describe('Session token from create_plan'),
+const ReadTaskInput = z.object({
+  taskId: z.string().describe('The task ID to read'),
+  sessionToken: z.string().describe('Session token from create_task'),
   includeAnnotations: z
     .boolean()
     .optional()
@@ -24,9 +24,9 @@ const ReadPlanInput = z.object({
     .describe('Include linked PRs section in the response (default: false)'),
 });
 
-export const readPlanTool = {
+export const readTaskTool = {
   definition: {
-    name: TOOL_NAMES.READ_PLAN,
+    name: TOOL_NAMES.READ_TASK,
     description: `Read a specific task by ID, returning its metadata and content in markdown format.
 
 NOTE FOR CLAUDE CODE USERS: If you just received task approval via the hook, deliverable IDs were already provided in the approval message. You only need this tool if:
@@ -52,8 +52,8 @@ OUTPUT INCLUDES:
     inputSchema: {
       type: 'object',
       properties: {
-        planId: { type: 'string', description: 'The task ID to read' },
-        sessionToken: { type: 'string', description: 'Session token from create_plan' },
+        taskId: { type: 'string', description: 'The task ID to read' },
+        sessionToken: { type: 'string', description: 'Session token from create_task' },
         includeAnnotations: {
           type: 'boolean',
           description:
@@ -65,18 +65,18 @@ OUTPUT INCLUDES:
             'Include linked PRs section in the response (default: false). Set true to see linked PRs.',
         },
       },
-      required: ['planId', 'sessionToken'],
+      required: ['taskId', 'sessionToken'],
     },
   },
 
   handler: async (args: unknown) => {
     const {
-      planId,
+      taskId,
       sessionToken,
       includeAnnotations = false,
       includeLinkedPRs = false,
-    } = ReadPlanInput.parse(args);
-    const doc = await getOrCreateDoc(planId);
+    } = ReadTaskInput.parse(args);
+    const doc = await getOrCreateDoc(taskId);
     const metadata = getPlanMetadata(doc);
 
     if (!metadata) {
@@ -84,7 +84,7 @@ OUTPUT INCLUDES:
         content: [
           {
             type: 'text',
-            text: `Plan "${planId}" not found or has no metadata.`,
+            text: `Task "${taskId}" not found or has no metadata.`,
           },
         ],
         isError: true,
@@ -99,7 +99,7 @@ OUTPUT INCLUDES:
         content: [
           {
             type: 'text',
-            text: `Invalid session token for plan "${planId}".`,
+            text: `Invalid session token for task "${taskId}".`,
           },
         ],
         isError: true,

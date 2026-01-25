@@ -30,9 +30,9 @@ import { TOOL_NAMES } from './tool-names.js';
  */
 const OriginPlatformEnum = z.enum(['devin', 'cursor', 'windsurf', 'aider', 'unknown']);
 
-const CreatePlanInput = z.object({
-  title: z.string().describe('Plan title'),
-  content: z.string().describe('Plan content (markdown)'),
+const CreateTaskInput = z.object({
+  title: z.string().describe('Task title'),
+  content: z.string().describe('Task content (markdown)'),
   repo: z.string().optional().describe('GitHub repo (org/repo)'),
   prNumber: z.number().optional().describe('PR number'),
 
@@ -82,8 +82,8 @@ function buildOriginMetadata(
   }
 }
 
-/** Initialize plan document content with blocks and deliverables */
-function initializePlanContent(ydoc: Y.Doc, blocks: Block[], ownerId: string | null): void {
+/** Initialize task document content with blocks and deliverables */
+function initializeTaskContent(ydoc: Y.Doc, blocks: Block[], ownerId: string | null): void {
   const editor = ServerBlockNoteEditor.create();
 
   ydoc.transact(
@@ -112,22 +112,22 @@ function initializePlanContent(ydoc: Y.Doc, blocks: Block[], ownerId: string | n
   );
 }
 
-/** Open or navigate to plan URL */
-async function openPlanInBrowser(planId: string, url: string): Promise<void> {
+/** Open or navigate to task URL */
+async function openTaskInBrowser(taskId: string, url: string): Promise<void> {
   const indexDoc = await getOrCreateDoc(PLAN_INDEX_DOC_NAME);
 
   if (await hasActiveConnections(PLAN_INDEX_DOC_NAME)) {
-    indexDoc.getMap<string>('navigation').set('target', planId);
-    logger.info({ url, planId }, 'Browser already connected, navigating via CRDT');
+    indexDoc.getMap<string>('navigation').set('target', taskId);
+    logger.info({ url, taskId }, 'Browser already connected, navigating via CRDT');
   } else {
     await open(url);
     logger.info({ url }, 'Browser launched');
   }
 }
 
-export const createPlanTool = {
+export const createTaskTool = {
   definition: {
-    name: TOOL_NAMES.CREATE_PLAN,
+    name: TOOL_NAMES.CREATE_TASK,
     description: `Create a new implementation task and open it in browser.
 
 NOTE FOR CLAUDE CODE USERS: If you have the shipyard hook installed, use native plan mode (Shift+Tab) instead of this tool. The hook handles task creation automatically and provides a better experience.
@@ -185,8 +185,8 @@ Bad deliverables (not provable):
   },
 
   handler: async (args: unknown) => {
-    const input = CreatePlanInput.parse(args);
-    const planId = nanoid();
+    const input = CreateTaskInput.parse(args);
+    const taskId = nanoid();
     const sessionToken = generateSessionToken();
     const sessionTokenHash = hashSessionToken(sessionToken);
     const now = Date.now();
@@ -196,11 +196,11 @@ Bad deliverables (not provable):
       logger.info({ repo }, 'Auto-detected repository from current directory');
     }
 
-    logger.info({ planId, title: input.title, repo }, 'Creating plan');
+    logger.info({ taskId, title: input.title, repo }, 'Creating task');
 
-    const ydoc = await getOrCreateDoc(planId);
+    const ydoc = await getOrCreateDoc(taskId);
     const ownerId = await getGitHubUsername();
-    logger.info({ ownerId }, 'GitHub username for plan ownership');
+    logger.info({ ownerId }, 'GitHub username for task ownership');
 
     const origin = buildOriginMetadata(
       input.originPlatform,
@@ -209,7 +209,7 @@ Bad deliverables (not provable):
     );
 
     initPlanMetadata(ydoc, {
-      id: planId,
+      id: taskId,
       title: input.title,
       repo,
       pr: input.prNumber,
@@ -228,24 +228,24 @@ Bad deliverables (not provable):
     if (!transitionResult.success) {
       logger.error(
         { error: transitionResult.error },
-        'Failed to transition plan to pending_review'
+        'Failed to transition task to pending_review'
       );
     }
 
     logger.info({ contentLength: input.content.length }, 'About to parse markdown');
     const blocks = await parseMarkdownToBlocks(input.content);
     logger.info({ blockCount: blocks.length }, 'Parsed blocks, storing in Y.Doc');
-    initializePlanContent(ydoc, blocks, ownerId);
+    initializeTaskContent(ydoc, blocks, ownerId);
     logger.info('Content stored in Y.Doc document fragment');
 
     const finalMetadata = getPlanMetadata(ydoc);
     if (!finalMetadata) {
-      throw new Error('Failed to get plan metadata after initialization');
+      throw new Error('Failed to get task metadata after initialization');
     }
 
     const indexDoc = await getOrCreateDoc(PLAN_INDEX_DOC_NAME);
     setPlanIndexEntry(indexDoc, {
-      id: planId,
+      id: taskId,
       title: input.title,
       status: 'pending_review',
       createdAt: now,
@@ -254,10 +254,10 @@ Bad deliverables (not provable):
       tags: input.tags,
       deleted: false,
     });
-    logger.info({ planId }, 'Plan index updated');
+    logger.info({ taskId }, 'Task index updated');
 
-    const url = createPlanWebUrl(webConfig.SHIPYARD_WEB_URL, planId);
-    await openPlanInBrowser(planId, url);
+    const url = createPlanWebUrl(webConfig.SHIPYARD_WEB_URL, taskId);
+    await openTaskInBrowser(taskId, url);
 
     const repoInfo = repo
       ? `Repo: ${repo}${!input.repo ? ' (auto-detected)' : ''}`
@@ -267,8 +267,8 @@ Bad deliverables (not provable):
       content: [
         {
           type: 'text',
-          text: `Plan created!
-ID: ${planId}
+          text: `Task created!
+ID: ${taskId}
 Session Token: ${sessionToken}
 ${repoInfo}
 URL: ${url}
@@ -276,7 +276,7 @@ URL: ${url}
 IMPORTANT: Save the session token - it's required for add_artifact calls.
 
 Next steps:
-1. Wait for human to review and approve the plan in the browser
+1. Wait for human to review and approve the task in the browser
 2. Once approved, use add_artifact to upload proof for each deliverable
 3. When all deliverables have artifacts, the task auto-completes with a snapshot URL`,
         },

@@ -62,9 +62,9 @@ function buildStatusTransition(
   }
 }
 
-const UpdatePlanInput = z.object({
-  planId: z.string().describe('The plan ID to update'),
-  sessionToken: z.string().describe('Session token from create_plan'),
+const UpdateTaskInput = z.object({
+  taskId: z.string().describe('The task ID to update'),
+  sessionToken: z.string().describe('Session token from create_task'),
   title: z.string().optional().describe('New title'),
   status: z
     .enum(['draft', 'pending_review', 'changes_requested', 'in_progress', 'completed'])
@@ -73,10 +73,10 @@ const UpdatePlanInput = z.object({
   tags: z.array(z.string()).optional().describe('Updated tags (replaces existing tags)'),
 });
 
-export const updatePlanTool = {
+export const updateTaskTool = {
   definition: {
-    name: TOOL_NAMES.UPDATE_PLAN,
-    description: `Update an existing plan's metadata (title, status). Does not modify content—use update_block_content for that.
+    name: TOOL_NAMES.UPDATE_TASK,
+    description: `Update an existing task's metadata (title, status). Does not modify content—use update_block_content for that.
 
 NOTE: Most status transitions are automatic. You rarely need to call this tool.
 
@@ -85,7 +85,7 @@ AUTOMATIC TRANSITIONS:
 - in_progress → completed: Auto-set when all deliverables have artifacts
 
 MANUAL USE CASES (rare):
-- Resetting a plan to draft status
+- Resetting a task to draft status
 - Changing title after creation
 - Edge cases where automatic transitions don't apply
 
@@ -98,8 +98,8 @@ STATUSES:
     inputSchema: {
       type: 'object',
       properties: {
-        planId: { type: 'string', description: 'The plan ID to update' },
-        sessionToken: { type: 'string', description: 'Session token from create_plan' },
+        taskId: { type: 'string', description: 'The task ID to update' },
+        sessionToken: { type: 'string', description: 'Session token from create_task' },
         title: { type: 'string', description: 'New title (optional)' },
         status: {
           type: 'string',
@@ -113,14 +113,14 @@ STATUSES:
           description: 'Updated tags (optional, replaces existing tags)',
         },
       },
-      required: ['planId', 'sessionToken'],
+      required: ['taskId', 'sessionToken'],
     },
   },
 
   // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: tool handler orchestrates validation, snapshots, and state transitions
   handler: async (args: unknown) => {
-    const input = UpdatePlanInput.parse(args);
-    const doc = await getOrCreateDoc(input.planId);
+    const input = UpdateTaskInput.parse(args);
+    const doc = await getOrCreateDoc(input.taskId);
     const existingMetadata = getPlanMetadata(doc);
 
     /** Get actor name for event logging */
@@ -131,7 +131,7 @@ STATUSES:
         content: [
           {
             type: 'text',
-            text: `Plan "${input.planId}" not found.`,
+            text: `Task "${input.taskId}" not found.`,
           },
         ],
         isError: true,
@@ -147,7 +147,7 @@ STATUSES:
         content: [
           {
             type: 'text',
-            text: `Invalid session token for plan "${input.planId}".`,
+            text: `Invalid session token for task "${input.taskId}".`,
           },
         ],
         isError: true,
@@ -180,7 +180,7 @@ STATUSES:
             content: [
               {
                 type: 'text',
-                text: `Failed to reset plan to draft: ${resetResult.error}`,
+                text: `Failed to reset task to draft: ${resetResult.error}`,
               },
             ],
             isError: true,
@@ -242,16 +242,16 @@ STATUSES:
         deleted: false,
       });
     } else {
-      logger.warn({ planId: input.planId }, 'Cannot update plan index: missing ownerId');
+      logger.warn({ taskId: input.taskId }, 'Cannot update task index: missing ownerId');
     }
 
-    logger.info({ planId: input.planId, updates }, 'Plan updated');
+    logger.info({ taskId: input.taskId, updates }, 'Task updated');
 
     return {
       content: [
         {
           type: 'text',
-          text: `Plan "${input.planId}" updated successfully.`,
+          text: `Task "${input.taskId}" updated successfully.`,
         },
       ],
     };

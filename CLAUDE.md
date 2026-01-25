@@ -98,7 +98,7 @@ shipyard/
 ## Key Architectural Principles
 
 1. **URLs are snapshots, not source of truth** — Y.Doc (distributed) is truth, URLs are recovery/sharing
-2. **GitHub only for binary blobs** — Plan data lives in CRDT, not GitHub
+2. **GitHub only for binary blobs** — Task data lives in CRDT, not GitHub
 3. **BlockNote handles comments** — Don't build custom annotation system
 4. **Single WebSocket** — All sync (content, metadata, comments) on one connection
 

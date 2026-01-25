@@ -11,12 +11,12 @@
 export const TOOL_NAMES = {
   ADD_ARTIFACT: 'add_artifact',
   COMPLETE_TASK: 'complete_task',
-  CREATE_PLAN: 'create_plan',
+  CREATE_TASK: 'create_task',
   EXECUTE_CODE: 'execute_code',
   LINK_PR: 'link_pr',
-  READ_PLAN: 'read_plan',
+  READ_TASK: 'read_task',
   REGENERATE_SESSION_TOKEN: 'regenerate_session_token',
   REQUEST_USER_INPUT: 'request_user_input',
   UPDATE_BLOCK_CONTENT: 'update_block_content',
-  UPDATE_PLAN: 'update_plan',
+  UPDATE_TASK: 'update_task',
 } as const;

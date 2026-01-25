@@ -21,25 +21,25 @@ Quick reference for current implementation status.
 
 ---
 
-## Milestone 1: Agent Creates Plans ✅ COMPLETE
+## Milestone 1: Agent Creates Tasks ✅ COMPLETE
 
 **Completed:**
-- ✅ MCP server with `create_plan` tool
-- ✅ Basic web UI (decodes URL, displays plan)
+- ✅ MCP server with `create_task` tool
+- ✅ Basic web UI (decodes URL, displays task)
 - ✅ Pino logging (stderr-safe for MCP)
 - ✅ End-to-end flow validated
 
 **Demo:**
 ```
-Claude: "Create a plan for adding dark mode"
-→ MCP tool creates plan
+Claude: "Create a task for adding dark mode"
+→ MCP tool creates task
 → Browser opens with URL
-→ Plan displays (JSON rendering)
+→ Task displays (JSON rendering)
 ```
 
 ---
 
-## Milestone 2: View Plans ✅ COMPLETE
+## Milestone 2: View Tasks ✅ COMPLETE
 
 **Goal:** Professional UI with BlockNote editor + Tailwind/shadcn
 
@@ -47,8 +47,8 @@ Claude: "Create a plan for adding dark mode"
 - ✅ Tailwind CSS v4 + shadcn/ui setup
 - ✅ BlockNote read-only editor for content
 - ✅ Mantine + Tailwind hybrid (CSS layer ordering)
-- ✅ PlanHeader component (shadcn Card + Badge)
-- ✅ PlanViewer component (BlockNote read-only)
+- ✅ TaskHeader component (shadcn Card + Badge)
+- ✅ TaskViewer component (BlockNote read-only)
 - ✅ Full layout with Tailwind utilities
 
 **Tech stack:**
@@ -72,19 +72,19 @@ Claude: "Create a plan for adding dark mode"
 
 ---
 
-## Milestone 4: Plan Discovery & Multi-Peer ✅ COMPLETE
+## Milestone 4: Task Discovery & Multi-Peer ✅ COMPLETE
 
 **Goal:** Multiple MCP instances (Claude Code, Cursor, VSCode) without conflicts
 
 **Completed:**
 - ✅ Registry server on ports 32191/32192 (in-memory)
-- ✅ Per-instance LevelDB (`~/.shipyard/plans/session-{pid}/`)
+- ✅ Per-instance LevelDB (`~/.shipyard/tasks/session-{pid}/`)
 - ✅ Dynamic WebSocket port allocation (port 0)
 - ✅ Browser multi-provider sync (connects to all MCP instances)
-- ✅ Sidebar with plan list (Notion-like UI)
+- ✅ Sidebar with task list (Notion-like UI)
 - ✅ Routing: `/`, `/task/:id`, `/?d=` for snapshots
-- ✅ New MCP tools: `read_plan`, `update_plan`
-- ✅ Plan index syncs via CRDT across all peers
+- ✅ New MCP tools: `read_task`, `update_task`
+- ✅ Task index syncs via CRDT across all peers
 
 **Architecture:**
 ```
@@ -108,7 +108,7 @@ Browser discovers all → Multi-provider Yjs merge
 - ✅ CommentsPanel sidebar with real-time thread sync
 - ✅ User identity system (ProfileSetup modal, localStorage)
 - ✅ Review status UI (Approve/Request Changes with confirmation)
-- ✅ Agent feedback via `read_plan` tool with `includeAnnotations: true`
+- ✅ Agent feedback via `read_task` tool with `includeAnnotations: true`
 - ✅ Thread parsing and export to structured markdown
 - ✅ FormattingToolbar with AddCommentButton
 
@@ -116,14 +116,14 @@ Browser discovers all → Multi-provider Yjs merge
 - `apps/web/src/components/CommentsPanel.tsx` - Thread list sidebar
 - `apps/web/src/components/ReviewActions.tsx` - Approve/Request Changes
 - `apps/web/src/utils/identity.ts` - User identity helpers
-- `apps/server/src/tools/read-plan.ts` - MCP tool includes annotations
+- `apps/server/src/tools/read-plan.ts` - MCP tool includes annotations (reads tasks)
 - `packages/schema/src/thread.ts` - Thread parsing utilities
 
 ---
 
 ## Milestone 6: P2P ✅ COMPLETE
 
-**Goal:** WebRTC remote collaboration - multiple reviewers sync without central server
+**Goal:** WebRTC remote collaboration - multiple reviewers sync without central server on shared tasks
 
 **Completed:**
 - ✅ y-webrtc provider added to browser
@@ -172,15 +172,15 @@ Browser discovers all → Multi-provider Yjs merge
 
 ## Milestone 8: Waiting Room & Access Control (IN PROGRESS)
 
-**Goal:** Zoom-like approval flow for shared plans
+**Goal:** Zoom-like approval flow for shared tasks
 
 **Completed:**
-- ✅ Schema updates: `ownerId`, `approvalRequired`, `approvedUsers` in PlanMetadata
+- ✅ Schema updates: `ownerId`, `approvalRequired`, `approvedUsers` in TaskMetadata (PlanMetadata)
 - ✅ Awareness protocol extension for pending/approved status
 - ✅ Waiting Room UI component (blocks content until approved)
 - ⏳ Owner Approval Panel (approve/deny pending users) - Blocked on M9
 - ⏳ Signaling server enforcement - Deferred
-- ✅ MCP integration: `create_plan` sets `ownerId`
+- ✅ MCP integration: `create_task` sets `ownerId`
 
 **Blocked by:** Milestone 9 (GitHub Identity) - needed for verified ownership
 
@@ -224,7 +224,7 @@ See [08-waiting-room.md](./08-waiting-room.md) for full details.
 ### Completed:
 - ✅ **Phase 1a: Sidebar Navigation** - NavItem component with routes to `/inbox`, `/archive`, `/board`
 - ✅ **Phase 1c: Inbox Page** - Dedicated `/inbox` route with quick actions
-- ✅ **Inbox Bug Fix** (#57 partial) - markPlanAsRead() called on click, badge count works
+- ✅ **Inbox Bug Fix** (#57 partial) - markTaskAsRead() called on click, badge count works
 - ✅ **Filters in Sidebar** - Search, sort (with direction toggle), status filter chips
 - ✅ **Read/Unread Infrastructure** - `viewedBy` field, helpers, React hooks ordering fixed
 - ✅ **Phase 2: Kanban Board** - `/board` route with drag-drop status changes (@dnd-kit)
@@ -236,12 +236,12 @@ See [08-waiting-room.md](./08-waiting-room.md) for full details.
 - ✅ **Hide Empty Columns** - Toggle to show/hide empty columns (persists to localStorage)
 - ✅ **Natural Drag UX** - Entire card draggable (no visible handle), cursor-grab styling
 - ✅ **Enhanced Animations** - Lift on hover, spring physics, smooth transitions
-- ✅ **usePlanMetadata Hook** - Cached async loading of deliverables/PRs (30s cache)
+- ✅ **useTaskMetadata Hook** - Cached async loading of deliverables/PRs (30s cache)
 
-### Diverged from Plan:
-- ⚠️ **Phase 1b: /plans route** - NOT DONE. Filters in sidebar instead
+### Diverged from Original Plan:
+- ⚠️ **Phase 1b: /tasks route** - NOT DONE. Filters in sidebar instead
 - ⚠️ **Inbox Groupings** - No "Needs Your Review" / "Needs Your Action" sections
-- ⚠️ **Active Route** - Using "My Plans" / "Shared With Me" sections instead
+- ⚠️ **Active Route** - Using "My Tasks" / "Shared With Me" sections instead
 
 ### Known Issues:
 - ⚠️ **#61 - Kanban column consolidation** - Current 6-column layout works, but issue proposes consolidating review states
@@ -270,10 +270,10 @@ See [10-organizational-views.md](./10-organizational-views.md) for full implemen
 - ✅ Created `shipyard-skill/` directory with Skill structure
 - ✅ `SKILL.md` with execute_code pattern (not individual MCP tools)
 - ✅ `README.md` for human setup instructions
-- ✅ `examples/plan-example.md` showing agentic loop workflow
+- ✅ `examples/task-example.md` showing agentic loop workflow
 - ✅ Updated project README with Cowork section
 
-**Key insight:** Cowork doesn't have plan mode hooks like Claude Code. Uses Skills to learn workflows. The skill teaches Cowork to use `execute_code` with TypeScript code blocks.
+**Key insight:** Cowork doesn't have task mode hooks like Claude Code. Uses Skills to learn workflows. The skill teaches Cowork to use `execute_code` with TypeScript code blocks.
 
 **Key files:**
 - `shipyard-skill/SKILL.md` - Main Cowork instructions
@@ -289,10 +289,10 @@ See [10-organizational-views.md](./10-organizational-views.md) for full implemen
 | # | Milestone | Status |
 |---|-----------|--------|
 | 0 | Foundation | ✅ Complete |
-| 1 | Agent Creates Plans | ✅ Complete |
-| 2 | View Plans | ✅ Complete |
+| 1 | Agent Creates Tasks | ✅ Complete |
+| 2 | View Tasks | ✅ Complete |
 | 3 | Live Sync | ✅ Complete |
-| 4 | Plan Discovery | ✅ Complete |
+| 4 | Task Discovery | ✅ Complete |
 | 5 | Review Flow | ✅ Complete |
 | 6 | P2P | ✅ Complete |
 | 7 | Artifacts | ✅ Complete |

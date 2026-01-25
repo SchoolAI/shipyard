@@ -1,7 +1,7 @@
 /**
  * MCP-direct instructions for platforms without hook support.
  * These are for Cursor, Windsurf, Claude Desktop, and other MCP-only clients.
- * Users must call MCP tools directly (createPlan, addArtifact, etc.).
+ * Users must call MCP tools directly (createTask, addArtifact, etc.).
  */
 
 import {
@@ -17,11 +17,11 @@ import { TOOL_NAMES } from './tool-names.js';
 
 export const MCP_DIRECT_HEADER = `# Shipyard: Your Agent Management Hub
 
-> **Shipyard is the central interface where humans manage AI agents.** Plans, artifacts, feedback, and communication all happen here.
+> **Shipyard is the central interface where humans manage AI agents.** Tasks, artifacts, feedback, and communication all happen here.
 
 Shipyard turns invisible agent work into reviewable, verifiable tasks. Instead of trusting that code was written correctly, reviewers see screenshots, videos, and test results as proof.
 
-**Key principle:** When you're working in Shipyard, ALL human-agent communication should happen through \`requestUserInput()\` inside \`${TOOL_NAMES.EXECUTE_CODE}\`. The human is already in the browser viewing your plan - that's where they expect to interact with you.`;
+**Key principle:** When you're working in Shipyard, ALL human-agent communication should happen through \`requestUserInput()\` inside \`${TOOL_NAMES.EXECUTE_CODE}\`. The human is already in the browser viewing your task - that's where they expect to interact with you.`;
 
 export const MCP_TOOLS_OVERVIEW = `## Available MCP Tools
 
@@ -31,16 +31,16 @@ export const MCP_TOOLS_OVERVIEW = `## Available MCP Tools
 
 ### requestUserInput(): Your Direct Line to the Human
 
-This is how you talk to humans during active work. Don't use your platform's built-in question tools (AskUserQuestion, etc.) - use \`requestUserInput()\` inside \`${TOOL_NAMES.EXECUTE_CODE}\` instead. The human is in the browser viewing your plan, and that's where they expect to see your questions.
+This is how you talk to humans during active work. Don't use your platform's built-in question tools (AskUserQuestion, etc.) - use \`requestUserInput()\` inside \`${TOOL_NAMES.EXECUTE_CODE}\` instead. The human is in the browser viewing your task, and that's where they expect to see your questions.
 
-All Shipyard operations (createPlan, addArtifact, requestUserInput, etc.) are available inside \`${TOOL_NAMES.EXECUTE_CODE}\`.`;
+All Shipyard operations (createTask, addArtifact, requestUserInput, etc.) are available inside \`${TOOL_NAMES.EXECUTE_CODE}\`.`;
 
 export const MCP_WORKFLOW = `## Workflow (MCP Direct)
 
-### Step 1: Create Plan
+### Step 1: Create Task
 
 \`\`\`typescript
-const plan = await createPlan({
+const task = await createTask({
   title: "Add user authentication",
   content: \`
 ## Deliverables
@@ -54,7 +54,7 @@ const plan = await createPlan({
 \`
 });
 
-const { planId, sessionToken, deliverables, monitoringScript } = plan;
+const { taskId, sessionToken, deliverables, monitoringScript } = task;
 /** deliverables = [{ id: "del_xxx", text: "Screenshot of login page" }, ...] */
 \`\`\`
 
@@ -71,7 +71,7 @@ bash <(echo "$monitoringScript") &
 Or poll manually:
 
 \`\`\`typescript
-const status = await readPlan(planId, sessionToken);
+const status = await readTask(taskId, sessionToken);
 if (status.status === "in_progress") {
   /** Approved! Proceed with work */
 }
@@ -88,7 +88,7 @@ Implement the feature, taking screenshots/recordings as you go.
 
 \`\`\`typescript
 await addArtifact({
-  planId,
+  taskId,
   sessionToken,
   type: 'image',
   filename: 'login-page.png',
@@ -98,7 +98,7 @@ await addArtifact({
 });
 
 const result = await addArtifact({
-  planId,
+  taskId,
   sessionToken,
   type: 'image',
   filename: 'error-handling.png',
@@ -115,25 +115,25 @@ if (result.allDeliverablesComplete) {
 
 export const API_REFERENCE = `## API Reference (inside execute_code)
 
-### createPlan(options)
+### createTask(options)
 
-Creates a new plan and opens it in the browser.
+Creates a new task and opens it in the browser.
 
 **Parameters:**
-- \`title\` (string) - Plan title
+- \`title\` (string) - Task title
 - \`content\` (string) - Markdown content with \`{#deliverable}\` markers
 - \`repo\` (string, optional) - GitHub repo for artifact storage
 - \`prNumber\` (number, optional) - PR number to link
 
-**Returns:** \`{ planId, sessionToken, url, deliverables, monitoringScript }\`
+**Returns:** \`{ taskId, sessionToken, url, deliverables, monitoringScript }\`
 
-### readPlan(planId, sessionToken, options?)
+### readTask(taskId, sessionToken, options?)
 
-Reads current plan state.
+Reads current task state.
 
 **Parameters:**
-- \`planId\` (string) - Plan ID
-- \`sessionToken\` (string) - Session token from createPlan
+- \`taskId\` (string) - Task ID
+- \`sessionToken\` (string) - Session token from createTask
 - \`options.includeAnnotations\` (boolean) - Include reviewer comments
 
 **Returns:** \`{ content, status, title, deliverables }\`
@@ -143,7 +143,7 @@ Reads current plan state.
 Uploads proof-of-work artifact.
 
 **Parameters:**
-- \`planId\` (string) - Plan ID
+- \`taskId\` (string) - Task ID
 - \`sessionToken\` (string) - Session token
 - \`type\` ('html' | 'image' | 'video')
 - \`filename\` (string) - File name
@@ -218,7 +218,7 @@ return { config: config.response };
 export const HANDLING_FEEDBACK = `## Handling Reviewer Feedback
 
 \`\`\`typescript
-const status = await readPlan(planId, sessionToken, {
+const status = await readTask(taskId, sessionToken, {
   includeAnnotations: true
 });
 
@@ -229,7 +229,7 @@ if (status.status === "changes_requested") {
   /**
    * Make changes based on feedback
    * Upload new artifacts
-   * Plan will transition back to pending_review
+   * Task will transition back to pending_review
    */
 }
 \`\`\``;

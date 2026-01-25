@@ -11,7 +11,7 @@ This document explains how shipyard uses Yjs for collaborative editing, real-tim
 1. [Context & Background](#context--background)
 2. [Y.Doc Structure Overview](#ydoc-structure-overview)
 3. [Part 1: BlockNote Content](#part-1-blocknote-content)
-4. [Part 2: Plan Metadata](#part-2-plan-metadata)
+4. [Part 2: Task Metadata](#part-2-task-metadata)
 5. [Part 3: Comments & Threads](#part-3-comments--threads)
 6. [Sync Strategy](#sync-strategy)
 7. [URL Snapshots vs Y.Doc State](#url-snapshots-vs-ydoc-state)
@@ -36,7 +36,7 @@ See [ADR-0001](./decisions/0001-use-yjs-not-loro.md) for the decision rationale.
 
 ### What is a Y.Doc?
 
-A `Y.Doc` is a Yjs document that contains all shared state for a plan. It's:
+A `Y.Doc` is a Yjs document that contains all shared state for a task. It's:
 - **Distributed**: Exists across multiple peers simultaneously
 - **Eventually consistent**: All peers converge to the same state
 - **Conflict-free**: Concurrent edits merge automatically without conflicts
@@ -45,7 +45,7 @@ A `Y.Doc` is a Yjs document that contains all shared state for a plan. It's:
 
 ## Y.Doc Structure Overview
 
-Every plan is represented by a single `Y.Doc` with three main compartments:
+Every task is represented by a single `Y.Doc` with three main compartments:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -59,7 +59,7 @@ Every plan is represented by a single `Y.Doc` with three main compartments:
 │     │   (for JSON serialization/URLs)                       │
 │     └── Managed by: BlockNote + our helpers                 │
 │                                                             │
-│  2. Plan Metadata                                           │
+│  2. Task Metadata                                           │
 │     ├── ydoc.getMap('metadata')                             │
 │     └── Managed by: Us (via yjs-helpers.ts)                 │
 │                                                             │
@@ -72,7 +72,7 @@ Every plan is represented by a single `Y.Doc` with three main compartments:
 
 **Note**: Content is stored in TWO places:
 - `'document'` Y.XmlFragment: For BlockNote real-time collaboration
-- `'content'` Y.Array: For JSON export (URL snapshots, read_plan tool)
+- `'content'` Y.Array: For JSON export (URL snapshots, read_task tool)
 
 ### Visual Diagram
 
@@ -202,11 +202,11 @@ Example:
 
 ---
 
-## Part 2: Plan Metadata
+## Part 2: Task Metadata
 
 ### What is it?
 
-Plan metadata stores information about the plan itself: ID, title, status, timestamps, GitHub references.
+Task metadata stores information about the task itself: ID, title, status, timestamps, GitHub references.
 
 ### Storage Location
 
@@ -224,8 +224,8 @@ Defined in `packages/schema/src/plan.ts`:
 
 ```typescript
 interface PlanMetadata {
-  id: string;                    // Plan ID (stable identifier)
-  title: string;                 // Plan title
+  id: string;                    // Task ID (stable identifier)
+  title: string;                 // Task title
   status: 'draft' | 'pending_review' | 'approved' | 'changes_requested';
   createdAt: number;             // Unix timestamp (ms)
   updatedAt: number;             // Unix timestamp (ms)
@@ -244,7 +244,7 @@ import { PlanMetadataSchema } from '@shipyard/schema';
 // Validates at runtime
 const result = PlanMetadataSchema.safeParse(data);
 if (result.success) {
-  const metadata = result.data; // Typed as PlanMetadata
+  const metadata = result.data; // Typed as PlanMetadata (task metadata)
 }
 ```
 
@@ -362,7 +362,7 @@ import { WebsocketProvider } from 'y-websocket';
 
 const wsProvider = new WebsocketProvider(
   'ws://localhost:3000',  // MCP server WebSocket URL
-  'plan-abc123',          // Plan ID (room name)
+  'task-abc123',          // Task ID (room name)
   ydoc                    // Y.Doc instance
 );
 
@@ -386,7 +386,7 @@ AI Agent → MCP Server → WebSocket → Browser
 import { IndexeddbPersistence } from 'y-indexeddb';
 
 const indexeddbProvider = new IndexeddbPersistence(
-  'plan-abc123',  // Plan ID (database name)
+  'task-abc123',  // Task ID (database name)
   ydoc            // Y.Doc instance
 );
 
@@ -410,7 +410,7 @@ On page load: IndexedDB → Y.Doc (automatic)
 import { WebrtcProvider } from 'y-webrtc';
 
 const webrtcProvider = new WebrtcProvider(
-  'plan-abc123',                          // Plan ID (room name)
+  'task-abc123',                          // Task ID (room name)
   ydoc,                                   // Y.Doc instance
   {
     signaling: ['wss://signaling.yjs.dev'], // Public signaling server
@@ -436,14 +436,14 @@ All providers should be cleaned up when no longer needed:
 ```typescript
 useEffect(() => {
   const ydoc = new Y.Doc();
-  const wsProvider = new WebsocketProvider('ws://localhost:3000', planId, ydoc);
-  const indexeddbProvider = new IndexeddbPersistence(planId, ydoc);
+  const wsProvider = new WebsocketProvider('ws://localhost:3000', taskId, ydoc);
+  const indexeddbProvider = new IndexeddbPersistence(taskId, ydoc);
 
   return () => {
     wsProvider.destroy();
     indexeddbProvider.destroy();
   };
-}, [planId]);
+}, [taskId]);
 ```
 
 ### Sync Behavior
@@ -480,7 +480,7 @@ useEffect(() => {
 
 ### What are URL Snapshots?
 
-URL snapshots are **compressed JSON representations** of a plan's state at a point in time. They're:
+URL snapshots are **compressed JSON representations** of a task's state at a point in time. They're:
 - **Portable**: Can be shared via Slack, bookmarks, GitHub comments
 - **Self-contained**: Include all data needed to bootstrap a new peer
 - **Immutable**: Once created, they don't change
@@ -493,8 +493,8 @@ https://org.github.io/shipyard?d={compressed-data}
 
 Where compressed-data = lz-string.compressToEncodedURIComponent(JSON.stringify({
   v: 1,                              // Schema version
-  id: 'plan-abc123',                 // Plan ID
-  title: 'Add Authentication',       // Plan title
+  id: 'task-abc123',                 // Task ID
+  title: 'Add Authentication',       // Task title
   status: 'draft',                   // Current status
   repo: 'org/repo',                  // GitHub repo
   pr: 42,                            // PR number
@@ -509,7 +509,7 @@ Example:
 ```
 https://shipyard.app/?d=NobwRAhg9gxgLgS2A...
                        ^^^^^^^^^^^^^^^^^^^^^^^^
-                       Compressed plan data
+                       Compressed task data
 ```
 
 ### Hydration Flow
@@ -546,8 +546,8 @@ See [Code Examples](#code-examples) section for full implementation.
 ### When to Generate URL Snapshots
 
 Generate a new URL snapshot when:
-- User clicks "Share Plan" button
-- Plan reaches a milestone (e.g., approved)
+- User clicks "Share Task" button
+- Task reaches a milestone (e.g., approved)
 - User wants to bookmark current state
 - Creating a recovery point before major changes
 
@@ -557,7 +557,7 @@ Generate a new URL snapshot when:
 
 ## Code Examples
 
-### Example 1: Initialize a New Plan
+### Example 1: Initialize a New Task
 
 ```typescript
 import * as Y from 'yjs';
@@ -568,7 +568,7 @@ const ydoc = new Y.Doc();
 
 // Initialize metadata
 initPlanMetadata(ydoc, {
-  id: 'plan-abc123',
+  id: 'task-abc123',
   title: 'Add User Authentication',
   status: 'draft',
   repo: 'myorg/myrepo',
@@ -580,7 +580,7 @@ initPlanMetadata(ydoc, {
 // Comments will be added via YjsThreadStore
 ```
 
-### Example 2: Read Plan Metadata
+### Example 2: Read Task Metadata
 
 ```typescript
 import { getPlanMetadata } from '@shipyard/schema/yjs';
@@ -588,7 +588,7 @@ import { getPlanMetadata } from '@shipyard/schema/yjs';
 const metadata = getPlanMetadata(ydoc);
 
 if (metadata) {
-  console.log('Plan ID:', metadata.id);
+  console.log('Task ID:', metadata.id);
   console.log('Title:', metadata.title);
   console.log('Status:', metadata.status);
   console.log('Created:', new Date(metadata.createdAt));
@@ -597,7 +597,7 @@ if (metadata) {
 }
 ```
 
-### Example 3: Update Plan Metadata
+### Example 3: Update Task Metadata
 
 ```typescript
 import { setPlanMetadata } from '@shipyard/schema/yjs';
@@ -652,16 +652,16 @@ function usePlanWithHydration() {
 
   useEffect(() => {
     // 1. Get URL snapshot
-    const urlPlan = getPlanFromUrl();
-    if (!urlPlan) {
-      console.error('No plan in URL');
+    const urlTask = getPlanFromUrl();
+    if (!urlTask) {
+      console.error('No task in URL');
       return;
     }
 
-    const planId = urlPlan.id;
+    const taskId = urlTask.id;
 
     // 2. Set up IndexedDB persistence (loads existing state if any)
-    const indexeddbProvider = new IndexeddbPersistence(planId, ydoc);
+    const indexeddbProvider = new IndexeddbPersistence(taskId, ydoc);
 
     indexeddbProvider.once('synced', () => {
       // 3. Check if Y.Doc is empty (first load)
@@ -672,15 +672,15 @@ function usePlanWithHydration() {
         console.log('First load - hydrating from URL');
 
         initPlanMetadata(ydoc, {
-          id: urlPlan.id,
-          title: urlPlan.title,
-          status: urlPlan.status as any,
-          repo: urlPlan.repo,
-          pr: urlPlan.pr,
+          id: urlTask.id,
+          title: urlTask.title,
+          status: urlTask.status as any,
+          repo: urlTask.repo,
+          pr: urlTask.pr,
         });
 
         // BlockNote content will be initialized separately
-        // (pass urlPlan.content to BlockNote editor)
+        // (pass urlTask.content to BlockNote editor)
       } else {
         console.log('Existing state loaded from IndexedDB');
       }
@@ -691,7 +691,7 @@ function usePlanWithHydration() {
     // 5. Connect to WebSocket server
     const wsProvider = new WebsocketProvider(
       'ws://localhost:3000',
-      planId,
+      taskId,
       ydoc
     );
 
@@ -717,7 +717,7 @@ import { YjsThreadStore } from '@blocknote/react';
 
 function PlanEditor() {
   const { ydoc, isHydrated } = usePlanWithHydration();
-  const urlPlan = getPlanFromUrl();
+  const urlTask = getPlanFromUrl();
 
   const editor = useCreateBlockNote({
     collaboration: {
@@ -729,13 +729,13 @@ function PlanEditor() {
       },
     },
     // Initialize with URL content if first load
-    initialContent: isHydrated ? undefined : urlPlan?.content,
+    initialContent: isHydrated ? undefined : urlTask?.content,
   });
 
   const threadStore = YjsThreadStore.create(ydoc);
 
   if (!isHydrated) {
-    return <div>Loading plan...</div>;
+    return <div>Loading task...</div>;
   }
 
   return (
@@ -791,7 +791,7 @@ console.log('Copied to clipboard:', shareableUrl);
 ### Example 8: Monitor Sync Status
 
 ```typescript
-function useSyncStatus(ydoc: Y.Doc, planId: string) {
+function useSyncStatus(ydoc: Y.Doc, taskId: string) {
   const [status, setStatus] = useState({
     indexeddb: false,
     websocket: false,
@@ -799,9 +799,9 @@ function useSyncStatus(ydoc: Y.Doc, planId: string) {
   });
 
   useEffect(() => {
-    const indexeddbProvider = new IndexeddbPersistence(planId, ydoc);
-    const wsProvider = new WebsocketProvider('ws://localhost:3000', planId, ydoc);
-    const webrtcProvider = new WebrtcProvider(planId, ydoc);
+    const indexeddbProvider = new IndexeddbPersistence(taskId, ydoc);
+    const wsProvider = new WebsocketProvider('ws://localhost:3000', taskId, ydoc);
+    const webrtcProvider = new WebrtcProvider(taskId, ydoc);
 
     indexeddbProvider.on('synced', () => {
       setStatus(prev => ({ ...prev, indexeddb: true }));
@@ -820,7 +820,7 @@ function useSyncStatus(ydoc: Y.Doc, planId: string) {
       wsProvider.destroy();
       webrtcProvider.destroy();
     };
-  }, [ydoc, planId]);
+  }, [ydoc, taskId]);
 
   return status;
 }
@@ -828,8 +828,8 @@ function useSyncStatus(ydoc: Y.Doc, planId: string) {
 // Usage in UI
 function SyncIndicator() {
   const { ydoc } = usePlan();
-  const planId = getPlanMetadata(ydoc)?.id ?? 'unknown';
-  const status = useSyncStatus(ydoc, planId);
+  const taskId = getPlanMetadata(ydoc)?.id ?? 'unknown';
+  const status = useSyncStatus(ydoc, taskId);
 
   return (
     <div>
@@ -854,22 +854,22 @@ Shipyard uses explicit versioning for both URL snapshots and Y.Doc metadata.
 ```typescript
 interface UrlEncodedPlan {
   v: 1;  // Version field
-  // ... rest of plan data
+  // ... rest of task data
 }
 
 function decodePlan(encoded: string): UrlEncodedPlan | null {
-  const plan = JSON.parse(decompressed);
+  const task = JSON.parse(decompressed);
 
   // Handle different versions
-  if (plan.v === 1) {
-    return plan;
-  } else if (plan.v === 2) {
+  if (task.v === 1) {
+    return task;
+  } else if (task.v === 2) {
     // Transform v2 → v1 format for backwards compat
-    return migrateV2ToV1(plan);
+    return migrateV2ToV1(task);
   } else {
-    console.warn('Unknown plan version:', plan.v);
+    console.warn('Unknown task version:', task.v);
     // Try to handle gracefully
-    return plan;
+    return task;
   }
 }
 ```
@@ -1032,15 +1032,15 @@ When changing the schema:
 ```typescript
 // ❌ BAD: Providers leak
 useEffect(() => {
-  const wsProvider = new WebsocketProvider('ws://localhost:3000', planId, ydoc);
+  const wsProvider = new WebsocketProvider('ws://localhost:3000', taskId, ydoc);
   // Missing cleanup!
 }, []);
 
 // ✅ GOOD: Cleanup on unmount
 useEffect(() => {
-  const wsProvider = new WebsocketProvider('ws://localhost:3000', planId, ydoc);
+  const wsProvider = new WebsocketProvider('ws://localhost:3000', taskId, ydoc);
   return () => wsProvider.destroy();
-}, [planId, ydoc]);
+}, [taskId, ydoc]);
 ```
 
 **Pitfall 2: Directly mutating Y.Map**
@@ -1081,7 +1081,7 @@ const artifact = {
   id: 'art-123',
   type: 'image',  // Valid types: 'html' | 'image' | 'video'
   filename: 'login-ui.png',
-  url: getArtifactUrl(repo, pr, planId, 'login-ui.png'),
+  url: getArtifactUrl(repo, pr, taskId, 'login-ui.png'),
 };
 // Actual image is stored in GitHub
 ```
@@ -1122,7 +1122,7 @@ const artifact = {
 
 Shipyard's Yjs data model provides:
 
-- **Three-part structure**: BlockNote content, Plan metadata, Comments/Threads
+- **Three-part structure**: BlockNote content, Task metadata, Comments/Threads
 - **Clear ownership**: BlockNote manages content/comments, we manage metadata
 - **Type safety**: Zod validation + TypeScript wrappers around Y.Map
 - **Multi-provider sync**: WebSocket (server), IndexedDB (persistence), WebRTC (P2P)
@@ -1132,11 +1132,11 @@ Shipyard's Yjs data model provides:
 ### Key Files
 
 - [`packages/schema/src/yjs-helpers.ts`](../packages/schema/src/yjs-helpers.ts) - Type-safe Y.Map helpers
-- [`packages/schema/src/plan.ts`](../packages/schema/src/plan.ts) - PlanMetadata schema
+- [`packages/schema/src/plan.ts`](../packages/schema/src/plan.ts) - PlanMetadata schema (task metadata)
 - [`packages/schema/src/url-encoding.ts`](../packages/schema/src/url-encoding.ts) - URL snapshot utilities
 - [`docs/decisions/0001-use-yjs-not-loro.md`](./decisions/0001-use-yjs-not-loro.md) - Why Yjs?
 - [`docs/architecture.md`](./architecture.md) - Overall architecture
-- [`docs/milestones/03-live-sync.md`](./milestones/03-live-sync.md) - Sync implementation plan
+- [`docs/milestones/03-live-sync.md`](./milestones/03-live-sync.md) - Sync implementation task
 
 ### Next Steps
 

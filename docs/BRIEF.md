@@ -8,9 +8,9 @@
 
 ## The Problem
 
-When AI agents generate implementation plans, there's no good way to:
+When AI agents generate implementation tasks, there's no good way to:
 1. **Verify** the agent actually did what it claimed (screenshots, test results, etc.)
-2. **Review** the plan collaboratively with humans in real-time
+2. **Review** the task collaboratively with humans in real-time
 3. **Provide feedback** that the agent can act on
 
 We're building a P2P collaborative review system that solves this.
@@ -20,9 +20,9 @@ We're building a P2P collaborative review system that solves this.
 ## How It Works (30-second version)
 
 ```
-Agent creates plan → URL generated → Browser opens
+Agent creates task → URL generated → Browser opens
                                           ↓
-                            Reviewer sees plan + artifacts
+                            Reviewer sees task + artifacts
                                           ↓
                             Reviewer adds annotations
                                           ↓
@@ -39,7 +39,7 @@ Agent creates plan → URL generated → Browser opens
 
 | Location | What | Persistence |
 |----------|------|-------------|
-| **URL** | Plan snapshot (title, steps, artifacts refs, annotations) | Shareable, regenerable anytime |
+| **URL** | Task snapshot (title, steps, artifacts refs, annotations) | Shareable, regenerable anytime |
 | **CRDT** | Live state (annotations, status, step completion) | Browser IndexedDB + peer sync |
 | **GitHub** | Binary blobs only (screenshots, videos) | Orphan branch in same repo |
 
@@ -110,11 +110,11 @@ shipyard/
 | # | Milestone | Status | What It Delivers |
 |---|-----------|--------|------------------|
 | 0 | Foundation | ✅ Complete | Scaffold, schemas, URL encoding |
-| 1 | Agent Creates Plans | ✅ Complete | MCP tools, browser launch |
-| 2 | View Plans | ✅ Complete | Static React UI with BlockNote |
+| 1 | Agent Creates Tasks | ✅ Complete | MCP tools, browser launch |
+| 2 | View Tasks | ✅ Complete | Static React UI with BlockNote |
 | 3 | Live Sync | ✅ Complete | WebSocket CRDT sync |
-| 4 | Plan Discovery | ✅ Complete | Multi-peer architecture, sidebar |
-| 5 | Review Flow | ✅ Complete | Comments, approval, feedback via read_plan |
+| 4 | Task Discovery | ✅ Complete | Multi-peer architecture, sidebar |
+| 5 | Review Flow | ✅ Complete | Comments, approval, feedback via read_task |
 | 6 | P2P | ✅ Complete | WebRTC remote collab |
 | 7 | Artifacts | ✅ Complete | GitHub blob storage |
 
@@ -136,8 +136,8 @@ shipyard/
 ## Important Constraints
 
 1. **No paid infrastructure** — Everything runs on GitHub Pages + local MCP
-2. **URL is recovery mechanism** — If all else fails, URL has the plan
-3. **GitHub only for blobs** — Don't store plan data in GitHub, only artifacts
+2. **URL is recovery mechanism** — If all else fails, URL has the task
+3. **GitHub only for blobs** — Don't store task data in GitHub, only artifacts
 4. **Two-way doors** — Most schema/structure decisions are reversible
 
 ---

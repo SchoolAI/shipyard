@@ -25,7 +25,7 @@ Shipyard uses a layered data model where different types of data live in differe
 │  SNAPSHOTS: URLs                                                │
 │  ├── Can be generated anytime from current state                │
 │  ├── Shareable "save points"                                    │
-│  ├── Include: plan structure + annotations + status             │
+│  ├── Include: task structure + annotations + status             │
 │  └── Multiple snapshots can exist (version history)             │
 │                                                                 │
 │  BLOBS: GitHub                                                  │
@@ -41,7 +41,7 @@ URLs are **materialized views** of the current state that can be regenerated at 
 - Save points / bookmarks
 - Recovery mechanism if local state is lost
 
-The actual source of truth is the distributed CRDT state stored in browser IndexedDB and synced across peers.
+The actual source of truth is the distributed CRDT state stored in browser IndexedDB and synced across peers. Task data lives in the CRDT, not in GitHub.
 
 ---
 
@@ -99,10 +99,10 @@ https://{host}/?d={compressed-data}
 
 Where compressed-data = lz-string.compressToEncodedURIComponent(JSON.stringify({
   v: 1,                    // Version for forward compatibility
-  id: "plan-abc123",       // Plan ID (hash of initial content)
+  id: "task-abc123",       // Task ID (hash of initial content)
   repo: "org/repo",        // GitHub repo for artifacts
   pr: 42,                  // PR number
-  title: "...",            // Plan title
+  title: "...",            // Task title
   steps: [...],            // Step definitions
   artifacts: [...],        // Artifact references (filenames only)
   annotations: [...],      // Current annotations (snapshot)
@@ -127,7 +127,7 @@ The `v` field allows schema evolution:
 |----------|-----------|----------|
 | Browser storage cleared | Local CRDT state | Sync from peers, or load URL snapshot |
 | All peers offline | Nothing | Load from local IndexedDB |
-| GitHub artifacts deleted | Binary blobs | Plan + annotations intact, just missing visuals |
+| GitHub artifacts deleted | Binary blobs | Task + annotations intact, just missing visuals |
 | User loses URL | Nothing | Generate new URL from current state |
 | **Catastrophic**: All storage + no peers + no URLs | Everything | Would need to recreate |
 
@@ -170,11 +170,11 @@ These decisions can be revised as we build:
 
 | Decision | Current Thinking | Revisable? |
 |----------|------------------|------------|
-| Plan ID format | Hash of initial content | Yes |
+| Task ID format | Hash of initial content | Yes |
 | Title mutability | Probably immutable | Yes |
 | Steps mutability | Probably mutable (via CRDT) | Yes |
 | URL max size handling | Start with inline, add hash fallback if needed | Yes |
-| Artifact URL pattern | `raw.githubusercontent.com/{repo}/plan-artifacts/pr-{pr}/{plan-id}/{file}` | Yes |
+| Artifact URL pattern | `raw.githubusercontent.com/{repo}/task-artifacts/pr-{pr}/{task-id}/{file}` | Yes |
 
 ---
 

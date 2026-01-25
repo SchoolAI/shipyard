@@ -39,44 +39,44 @@ function getToolResultText(result: { content: unknown[] }): string {
 }
 
 import { completeTaskTool } from './complete-task.js';
-import { createPlanTool } from './create-plan.js';
+import { createTaskTool } from './create-task.js';
 import { linkPRTool } from './link-pr.js';
-import { readPlanTool } from './read-plan.js';
+import { readTaskTool } from './read-task.js';
 import { regenerateSessionTokenTool } from './regenerate-session-token.js';
 import { setupReviewNotificationTool } from './setup-review-notification.js';
 import { TOOL_NAMES } from './tool-names.js';
 import { updateBlockContentTool } from './update-block-content.js';
-import { updatePlanTool } from './update-plan.js';
+import { updateTaskTool } from './update-task.js';
 
 const BUNDLED_DOCS = `Execute TypeScript code that calls Shipyard APIs. Use this for multi-step workflows to reduce round-trips.
 
-⚠️ IMPORTANT LIMITATION: Dynamic imports (\`await import()\`) are NOT supported in the VM execution context. Use only the pre-provided functions in the execution environment (createPlan, readPlan, updatePlan, addArtifact, completeTask, updateBlockContent, linkPR, requestUserInput, regenerateSessionToken). All necessary APIs are already available in the sandbox.
+⚠️ IMPORTANT LIMITATION: Dynamic imports (\`await import()\`) are NOT supported in the VM execution context. Use only the pre-provided functions in the execution environment (createTask, readTask, updateTask, addArtifact, completeTask, updateBlockContent, linkPR, requestUserInput, regenerateSessionToken). All necessary APIs are already available in the sandbox.
 
 ## Available APIs
 
-### createPlan(opts): Promise<{ planId, sessionToken, url, deliverables, monitoringScript }>
-Create a new plan and open it in browser.
+### createTask(opts): Promise<{ taskId, sessionToken, url, deliverables, monitoringScript }>
+Create a new task and open it in browser.
 
 Parameters:
-- title (string, required): Plan title
+- title (string, required): Task title
 - content (string, required): Markdown content. Use \`{#deliverable}\` on checkbox items.
 - repo (string, optional): GitHub repo (org/repo). Auto-detected if not provided.
 - prNumber (number, optional): PR number for artifact uploads.
 
 Returns:
-- planId: The plan ID
+- taskId: The task ID
 - sessionToken: Required for subsequent API calls
-- url: Browser URL for the plan
+- url: Browser URL for the task
 - deliverables: Array of { id, text } for linking artifacts
 - monitoringScript: Bash script to poll for approval (for non-hook agents)
 
 Example:
 \`\`\`typescript
-const plan = await createPlan({
+const task = await createTask({
   title: "Add auth",
   content: "- [ ] Screenshot of login {#deliverable}"
 });
-/** Returns: { planId: "abc", sessionToken: "xyz", url: "...", deliverables: [...], monitoringScript: "#!/bin/bash..." } */
+/** Returns: { taskId: "abc", sessionToken: "xyz", url: "...", deliverables: [...], monitoringScript: "#!/bin/bash..." } */
 
 /**
  * For non-hook agents: Run the monitoring script in background to wait for approval
@@ -86,19 +86,19 @@ const plan = await createPlan({
 
 ---
 
-### readPlan(planId, sessionToken, opts?): Promise<ReadPlanResult>
-Read plan content, metadata, and deliverables.
+### readTask(taskId, sessionToken, opts?): Promise<ReadTaskResult>
+Read task content, metadata, and deliverables.
 
 Parameters:
-- planId (string): The plan ID
-- sessionToken (string): Session token from createPlan
+- taskId (string): The task ID
+- sessionToken (string): Session token from createTask
 - opts.includeAnnotations (boolean, optional): Include comment threads
 - opts.includeLinkedPRs (boolean, optional): Include linked PRs section
 
 Returns:
 - content: Full markdown (with block IDs, annotations, and linked PRs if requested)
-- status: Plan status (e.g., "draft", "pending_review", "changes_requested")
-- title: Plan title
+- status: Task status (e.g., "draft", "pending_review", "changes_requested")
+- title: Task title
 - repo: GitHub repo (if set)
 - pr: PR number (if set)
 - deliverables: Array of { id, text, completed }
@@ -106,7 +106,7 @@ Returns:
 
 Example:
 \`\`\`typescript
-const data = await readPlan(planId, token, {
+const data = await readTask(taskId, token, {
   includeAnnotations: true,
   includeLinkedPRs: true
 });
@@ -119,11 +119,11 @@ data.deliverables.forEach(d => console.log(d.id, d.completed));
 
 ---
 
-### updatePlan(planId, sessionToken, updates): Promise<{ success, monitoringScript }>
-Update plan metadata.
+### updateTask(taskId, sessionToken, updates): Promise<{ success, monitoringScript }>
+Update task metadata.
 
 Parameters:
-- planId (string): The plan ID
+- taskId (string): The task ID
 - sessionToken (string): Session token
 - updates.title (string, optional): New title
 - updates.status (string, optional): 'draft' | 'pending_review' | 'changes_requested' | 'in_progress'
@@ -140,7 +140,7 @@ Note: Most status transitions are automatic. Rarely needed.
 Upload proof-of-work artifact.
 
 Parameters:
-- planId (string): The plan ID
+- taskId (string): The task ID
 - sessionToken (string): Session token
 - type (string): 'html' | 'image' | 'video'
 - filename (string): e.g., "screenshot.png"
@@ -156,7 +156,7 @@ Auto-complete: When ALL deliverables have artifacts, returns snapshotUrl.
 Example:
 \`\`\`typescript
 const result = await addArtifact({
-  planId, sessionToken,
+  taskId, sessionToken,
   type: 'screenshot',
   filename: 'login.png',
   source: 'file',
@@ -170,13 +170,13 @@ if (result.allDeliverablesComplete) {
 
 ---
 
-### completeTask(planId, sessionToken, summary?): Promise<{ snapshotUrl }>
+### completeTask(taskId, sessionToken, summary?): Promise<{ snapshotUrl }>
 Force-complete task. Usually NOT needed - addArtifact auto-completes.
 
 ---
 
-### updateBlockContent(planId, sessionToken, operations): Promise<void>
-Modify plan content blocks.
+### updateBlockContent(taskId, sessionToken, operations): Promise<void>
+Modify task content blocks.
 
 Operations array items:
 - { type: 'update', blockId: string, content: string }
@@ -187,14 +187,14 @@ Operations array items:
 ---
 
 ### linkPR(opts): Promise<{ prNumber, url, status, branch, title }>
-Link a GitHub PR to a plan.
+Link a GitHub PR to a task.
 
 Parameters:
-- planId (string): The plan ID
+- taskId (string): The task ID
 - sessionToken (string): Session token
 - prNumber (number): PR number to link
 - branch (string, optional): Branch name (will be fetched if omitted)
-- repo (string, optional): Repository override (org/repo). Uses plan repo if omitted.
+- repo (string, optional): Repository override (org/repo). Uses task repo if omitted.
 
 Returns:
 - prNumber: The PR number
@@ -206,7 +206,7 @@ Returns:
 Example:
 \`\`\`typescript
 const pr = await linkPR({
-  planId, sessionToken,
+  taskId, sessionToken,
   prNumber: 42
 });
 console.log('Linked:', pr.title, pr.status);
@@ -217,7 +217,7 @@ console.log('Linked:', pr.title, pr.status);
 ### requestUserInput(opts): Promise<{ success, response?, status, reason? }>
 Request input from the user via browser modal.
 
-**THE primary human-agent communication channel in Shipyard.** ALWAYS use this instead of platform-specific question tools (AskUserQuestion, Cursor prompts, etc.). The human is in the browser viewing your plan - that's where they expect to interact with you.
+**THE primary human-agent communication channel in Shipyard.** ALWAYS use this instead of platform-specific question tools (AskUserQuestion, Cursor prompts, etc.). The human is in the browser viewing your task - that's where they expect to interact with you.
 
 **IMPORTANT: Always RETURN the response value in your execute_code return object.**
 
@@ -286,7 +286,7 @@ Parameters:
   - Default (1800 = 30 minutes) is suitable for most cases
   - Max (14400 = 4 hours) for extended user sessions
   - Note: System-level timeouts may cause earlier cancellation
-- planId (string, optional): Optional metadata to link request to plan (for activity log filtering)
+- taskId (string, optional): Optional metadata to link request to task (for activity log filtering)
 - min (number, optional): For 'number'/'rating' - minimum value
 - max (number, optional): For 'number'/'rating' - maximum value
 - format (string, optional): For 'number' - 'integer' | 'decimal' | 'currency' | 'percentage'
@@ -441,35 +441,35 @@ return { npsScore: parseInt(nps.response, 10) };  // e.g., 8
 
 ---
 
-### regenerateSessionToken(planId): Promise<{ sessionToken, planId }>
-Regenerate the session token for a plan you own.
+### regenerateSessionToken(taskId): Promise<{ sessionToken, taskId }>
+Regenerate the session token for a task you own.
 
 USE WHEN:
 - Your Claude Code session ended and you lost the original token
-- You need to resume work on a plan from a previous session
+- You need to resume work on a task from a previous session
 - The old token may have been compromised
 
 REQUIREMENTS:
-- You must be the plan owner (verified via GitHub identity)
-- The plan must exist and have an ownerId set
+- You must be the task owner (verified via GitHub identity)
+- The task must exist and have an ownerId set
 
 Returns:
 - sessionToken: New token for API calls
-- planId: The plan ID
+- taskId: The task ID
 
 SECURITY:
-- Only the plan owner can regenerate tokens
+- Only the task owner can regenerate tokens
 - Old token is immediately invalidated
 - GitHub identity verification happens on MCP server (via gh auth login)
 
 Example:
 \`\`\`typescript
 /** Lost your session token? Regenerate it: */
-const { sessionToken, planId } = await regenerateSessionToken("abc123");
+const { sessionToken, taskId } = await regenerateSessionToken("abc123");
 
 /** Now use the new token for operations */
 await addArtifact({
-  planId,
+  taskId,
   sessionToken,
   type: 'screenshot',
   filename: 'screenshot.png',
@@ -484,13 +484,13 @@ await addArtifact({
 ## Common Pattern
 
 \`\`\`typescript
-const plan = await createPlan({
+const task = await createTask({
   title: "Feature X",
   content: "- [ ] Screenshot {#deliverable}\\n- [ ] Video {#deliverable}"
 });
 
 /**
- * plan includes: planId, sessionToken, url, deliverables, monitoringScript
+ * task includes: taskId, sessionToken, url, deliverables, monitoringScript
  * For non-hook agents: Run monitoringScript in background to wait for approval
  * The script polls and exits when human approves/rejects
  */
@@ -498,26 +498,26 @@ const plan = await createPlan({
 /** Do work, take screenshots... */
 
 await addArtifact({
-  planId: plan.planId,
-  sessionToken: plan.sessionToken,
+  taskId: task.taskId,
+  sessionToken: task.sessionToken,
   type: 'screenshot',
   source: 'file',
   filename: 'screenshot.png',
   filePath: './screenshot.png',
-  deliverableId: plan.deliverables[0].id
+  deliverableId: task.deliverables[0].id
 });
 
 const result = await addArtifact({
-  planId: plan.planId,
-  sessionToken: plan.sessionToken,
+  taskId: task.taskId,
+  sessionToken: task.sessionToken,
   type: 'video',
   source: 'file',
   filename: 'demo.mp4',
   filePath: './demo.mp4',
-  deliverableId: plan.deliverables[1].id
+  deliverableId: task.deliverables[1].id
 });
 
-return { planId: plan.planId, snapshotUrl: result.snapshotUrl };
+return { taskId: task.taskId, snapshotUrl: result.snapshotUrl };
 \`\`\`
 `;
 
@@ -531,29 +531,29 @@ const ExecuteCodeInput = z.object({
  */
 const scriptTracker: string[] = [];
 
-async function createPlan(opts: {
+async function createTask(opts: {
   title: string;
   content: string;
   repo?: string;
   prNumber?: number;
 }) {
-  const result = await createPlanTool.handler(opts);
+  const result = await createTaskTool.handler(opts);
   const text = getToolResultText(result);
-  const planId = text.match(/ID: (\S+)/)?.[1] || '';
+  const taskId = text.match(/ID: (\S+)/)?.[1] || '';
 
   let deliverables: Array<{ id: string; text: string }> = [];
-  if (planId) {
-    const ydoc = await getOrCreateDoc(planId);
+  if (taskId) {
+    const ydoc = await getOrCreateDoc(taskId);
     const allDeliverables = getDeliverables(ydoc);
     deliverables = allDeliverables.map((d) => ({ id: d.id, text: d.text }));
   }
 
-  const { script: monitoringScript } = await setupReviewNotification(planId, 30);
+  const { script: monitoringScript } = await setupReviewNotification(taskId, 30);
 
-  scriptTracker.push(`Plan "${planId}" created.\n\n${monitoringScript}`);
+  scriptTracker.push(`Task "${taskId}" created.\n\n${monitoringScript}`);
 
   return {
-    planId,
+    taskId,
     sessionToken: text.match(/Session Token: (\S+)/)?.[1] || '',
     url: text.match(/URL: (\S+)/)?.[1] || '',
     deliverables,
@@ -561,20 +561,20 @@ async function createPlan(opts: {
   };
 }
 
-async function readPlan(
-  planId: string,
+async function readTask(
+  taskId: string,
   sessionToken: string,
   opts?: { includeAnnotations?: boolean; includeLinkedPRs?: boolean }
 ) {
-  const result = await readPlanTool.handler({
-    planId,
+  const result = await readTaskTool.handler({
+    taskId,
     sessionToken,
     includeAnnotations: opts?.includeAnnotations,
     includeLinkedPRs: opts?.includeLinkedPRs,
   });
   const text = getToolResultText(result);
 
-  const ydoc = await getOrCreateDoc(planId);
+  const ydoc = await getOrCreateDoc(taskId);
   const metadata = getPlanMetadata(ydoc);
   const deliverables = getDeliverables(ydoc).map((d) => ({
     id: d.id,
@@ -593,16 +593,16 @@ async function readPlan(
   };
 }
 
-async function updatePlan(
-  planId: string,
+async function updateTask(
+  taskId: string,
   sessionToken: string,
   updates: { title?: string; status?: string }
 ) {
-  await updatePlanTool.handler({ planId, sessionToken, ...updates });
+  await updateTaskTool.handler({ taskId, sessionToken, ...updates });
 
-  const { script: monitoringScript } = await setupReviewNotification(planId, 30);
+  const { script: monitoringScript } = await setupReviewNotification(taskId, 30);
 
-  scriptTracker.push(`Plan "${planId}" updated.\n\n${monitoringScript}`);
+  scriptTracker.push(`Task "${taskId}" updated.\n\n${monitoringScript}`);
 
   return {
     success: true,
@@ -611,7 +611,7 @@ async function updatePlan(
 }
 
 type AddArtifactOpts = {
-  planId: string;
+  taskId: string;
   sessionToken: string;
   type: string;
   filename: string;
@@ -624,14 +624,15 @@ type AddArtifactOpts = {
 );
 
 async function addArtifact(opts: AddArtifactOpts) {
-  const result = await addArtifactTool.handler(opts);
+  /** Map taskId to planId for backwards compatibility with add-artifact tool */
+  const result = await addArtifactTool.handler({ ...opts, planId: opts.taskId });
   const text = getToolResultText(result);
 
   if (result.isError) {
     return { isError: true, error: text };
   }
 
-  const ydoc = await getOrCreateDoc(opts.planId);
+  const ydoc = await getOrCreateDoc(opts.taskId);
   const artifacts = getArtifacts(ydoc);
   const deliverables = getDeliverables(ydoc);
 
@@ -659,15 +660,16 @@ async function addArtifact(opts: AddArtifactOpts) {
   };
 }
 
-async function completeTask(planId: string, sessionToken: string, summary?: string) {
-  const result = await completeTaskTool.handler({ planId, sessionToken, summary });
+async function completeTask(taskId: string, sessionToken: string, summary?: string) {
+  /** Map taskId to planId for backwards compatibility with complete-task tool */
+  const result = await completeTaskTool.handler({ planId: taskId, sessionToken, summary });
   const text = getToolResultText(result);
 
   if (result.isError) {
     return { isError: true, error: text };
   }
 
-  const ydoc = await getOrCreateDoc(planId);
+  const ydoc = await getOrCreateDoc(taskId);
   const metadata = getPlanMetadata(ydoc);
 
   return {
@@ -678,7 +680,7 @@ async function completeTask(planId: string, sessionToken: string, summary?: stri
 }
 
 async function updateBlockContent(
-  planId: string,
+  taskId: string,
   sessionToken: string,
   operations: Array<{
     type: 'update' | 'insert' | 'delete' | 'replace_all';
@@ -687,17 +689,19 @@ async function updateBlockContent(
     content?: string;
   }>
 ) {
-  await updateBlockContentTool.handler({ planId, sessionToken, operations });
+  /** Map taskId to planId for backwards compatibility with update-block-content tool */
+  await updateBlockContentTool.handler({ planId: taskId, sessionToken, operations });
 }
 
 async function linkPR(opts: {
-  planId: string;
+  taskId: string;
   sessionToken: string;
   prNumber: number;
   branch?: string;
   repo?: string;
 }) {
-  const result = await linkPRTool.handler(opts);
+  /** Map taskId to planId for backwards compatibility with link-pr tool */
+  const result = await linkPRTool.handler({ ...opts, planId: opts.taskId });
   const text = getToolResultText(result);
 
   if (result.isError) {
@@ -719,9 +723,9 @@ async function linkPR(opts: {
   };
 }
 
-async function setupReviewNotification(planId: string, pollIntervalSeconds?: number) {
+async function setupReviewNotification(taskId: string, pollIntervalSeconds?: number) {
   const result = await setupReviewNotificationTool.handler({
-    planId,
+    planId: taskId,
     pollIntervalSeconds: pollIntervalSeconds ?? 30,
   });
   const text = getToolResultText(result);
@@ -929,8 +933,8 @@ async function requestUserInput(
   };
 }
 
-async function regenerateSessionToken(planId: string) {
-  const result = await regenerateSessionTokenTool.handler({ planId });
+async function regenerateSessionToken(taskId: string) {
+  const result = await regenerateSessionTokenTool.handler({ planId: taskId });
   const text = getToolResultText(result);
 
   if (result.isError) {
@@ -940,7 +944,7 @@ async function regenerateSessionToken(planId: string) {
   const tokenMatch = text.match(/New Session Token: (\S+)/);
   return {
     sessionToken: tokenMatch?.[1] || '',
-    planId,
+    taskId,
   };
 }
 
@@ -1008,9 +1012,9 @@ export const executeCodeTool = {
       }
 
       const sandbox = {
-        createPlan,
-        readPlan,
-        updatePlan,
+        createTask,
+        readTask,
+        updateTask,
         addArtifact,
         completeTask,
         updateBlockContent,
@@ -1046,12 +1050,12 @@ export const executeCodeTool = {
       ];
 
       /*
-       * Auto-append monitoring script reminder if createPlan or updatePlan was called
+       * Auto-append monitoring script reminder if createTask or updateTask was called
        * This ensures non-hook agents always see how to wait for approval
        */
       const latestScript = scriptTracker[scriptTracker.length - 1];
       if (latestScript) {
-        const [planAction, ...scriptParts] = latestScript.split('\n\n');
+        const [taskAction, ...scriptParts] = latestScript.split('\n\n');
         content.push({
           type: 'text',
           text: `
@@ -1059,7 +1063,7 @@ export const executeCodeTool = {
 ---
 **⚠️ IMPORTANT FOR NON-HOOK AGENTS (Cursor, Devin, Windsurf, etc.):**
 
-${planAction} To wait for human approval before proceeding, run this monitoring script in background:
+${taskAction} To wait for human approval before proceeding, run this monitoring script in background:
 
 \`\`\`bash
 ${scriptParts.join('\n\n')}

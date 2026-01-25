@@ -36,7 +36,7 @@ Shipyard solves this with P2P collaborative review and proof-of-work artifacts.
 | Platform | Status | Installation | Notes |
 |----------|--------|--------------|-------|
 | **Claude Code** | ✅ Full support | GitHub plugin | Complete integration with hooks + skills |
-| **OpenCode** | ⚠️ Experimental | npm + config | Native plan mode, testing in progress |
+| **OpenCode** | ⚠️ Experimental | npm + config | Native task mode, testing in progress |
 | **Cursor** | ⚠️ MCP only | npm + config | Works via MCP tools, manual workflow |
 | **Windsurf** | ⚠️ MCP only | npm + config | Works via MCP tools, testing needed |
 | **Devin** | ⚠️ MCP only | npm + config | API-only mode has limitations |
@@ -45,7 +45,7 @@ Shipyard solves this with P2P collaborative review and proof-of-work artifacts.
 | **Gemini Code Assist** | ⚠️ MCP only | npm + config | Basic functionality |
 | **Codex (OpenAI)** | ❓ Research needed | TBD | Feature completeness assessment in progress |
 
-**Key:** Only Claude Code provides the full experience with automatic plan creation and approval workflows. Other platforms work via manual MCP tool invocation.
+**Key:** Only Claude Code provides the full experience with automatic task creation and approval workflows. Other platforms work via manual MCP tool invocation.
 
 See [Platform Compatibility Matrix](./docs/INSTALLATION.md#platform-compatibility-matrix) for detailed feature comparison.
 
@@ -80,9 +80,9 @@ If that stalls, start a fresh Claude Code session and try again.
 </details>
 
 This gives you:
-- ✅ MCP tools for creating and managing plans
-- ✅ Automatic hooks for plan creation workflow
-- ✅ Skills for collaborative planning
+- ✅ MCP tools for creating and managing tasks
+- ✅ Automatic hooks for task creation workflow
+- ✅ Skills for collaborative task management
 
 ### For Other Platforms (Cursor, Windsurf, Replit, etc.)
 
@@ -159,7 +159,7 @@ See **[SETUP.md](./docs/SETUP.md)** for full development setup.
 
 | Package | Description |
 |---------|-------------|
-| [`@shipyard/server`](./apps/server) | MCP server with task tools |
+| [`@shipyard/server`](./apps/server) | MCP server with Shipyard task tools |
 | [`@shipyard/web`](./apps/web) | React app with BlockNote editor |
 | [`@shipyard/schema`](./packages/schema) | Shared types, Yjs helpers, URL encoding |
 | [`@shipyard/signaling`](./apps/signaling) | WebRTC signaling server (Cloudflare Worker) |

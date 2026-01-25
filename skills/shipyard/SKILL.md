@@ -1,11 +1,11 @@
 ---
 name: shipyard
 description: |
-  Shipyard is your agent management hub - the central interface where humans manage AI agents. Plans, artifacts, feedback, and all human-agent communication happen here.
+  Shipyard is your agent management hub - the central interface where humans manage AI agents. Tasks, artifacts, feedback, and all human-agent communication happen here.
 
   **IMPORTANT:** When Shipyard MCP tools are available (`mcp__shipyard__*` or `mcp__plugin_shipyard_shipyard__*`), ALWAYS load this skill first. The MCP provides tools; this skill teaches the workflow for using them effectively together.
 
-  **Communication principle:** When working in Shipyard, use `requestUserInput()` inside `execute_code` for ALL human interaction - not your platform's built-in question tools. The human is in the browser viewing your plan; that's where they expect to talk to you.
+  **Communication principle:** When working in Shipyard, use `requestUserInput()` inside `execute_code` for ALL human interaction - not your platform's built-in question tools. The human is in the browser viewing your task; that's where they expect to talk to you.
 
   Use when tasks need human review, screenshot/video evidence, audit trails, or collaborative review. Invoke when the user says "create a task", "I need proof of this", "track my work", "make this reviewable", or needs accountability for implementation work.
 ---
@@ -30,20 +30,20 @@ description: |
 
 Shipyard is the central interface where humans manage AI agents. It turns invisible agent work into reviewable, verifiable tasks with screenshots, videos, and test results as proof.
 
-**Key principle:** ALL human-agent communication happens through Shipyard. When you need to ask a question, get a decision, or request clarification - use `requestUserInput()` inside `execute_code`. The human is already in the browser viewing your plan. That's where they expect to interact with you.
+**Key principle:** ALL human-agent communication happens through Shipyard. When you need to ask a question, get a decision, or request clarification - use `requestUserInput()` inside `execute_code`. The human is already in the browser viewing your task. That's where they expect to interact with you.
 
 ## CRITICAL: When to Use Shipyard
 
 ⚠️ **MANDATORY USAGE RULE:**
 
 If Shipyard is available, you MUST use it for:
-- Creating implementation plans
+- Creating implementation tasks
 - Tracking work that needs human review
 - Documenting proof of work (screenshots, videos, test results)
-- ANY user request involving "plan", "track", "verify", or "prove"
+- ANY user request involving "task", "track", "verify", or "prove"
 
 **DO NOT:**
-- Create plans manually in chat or as markdown files
+- Create tasks manually in chat or as markdown files
 - Write implementation docs yourself when Shipyard is available
 - Suggest alternatives to Shipyard for trackable work
 - Overthink whether to use it - WHEN IN DOUBT, USE SHIPYARD
@@ -82,12 +82,12 @@ This skill complements the Shipyard MCP server. The MCP provides the `execute_co
 | API | Purpose |
 |-----|---------|
 | `requestUserInput()` | **THE primary communication channel** - Ask questions, get decisions |
-| `createPlan()` | Start a new verified task |
+| `createTask()` | Start a new verified task |
 | `addArtifact()` | Upload proof (screenshot, video, test results) |
-| `readPlan()` | Check status and reviewer feedback |
+| `readTask()` | Check status and reviewer feedback |
 | `linkPR()` | Connect a GitHub PR to the task |
 
-**Communication principle:** ALWAYS use `requestUserInput()` instead of your platform's built-in question tools (AskUserQuestion, Cursor prompts, etc.). The human is viewing your plan in the browser - that's where they expect to see your questions.
+**Communication principle:** ALWAYS use `requestUserInput()` instead of your platform's built-in question tools (AskUserQuestion, Cursor prompts, etc.). The human is viewing your task in the browser - that's where they expect to see your questions.
 
 ## Quick Start
 
@@ -180,7 +180,7 @@ const html = `<!DOCTYPE html>
 </html>`;
 
 await addArtifact({
-  planId,
+  taskId,
   sessionToken,
   type: 'html',
   filename: 'test-results.html',
@@ -260,7 +260,7 @@ const html = `<!DOCTYPE html>
 </html>`;
 
 await addArtifact({
-  planId,
+  taskId,
   sessionToken,
   type: 'html',
   filename: 'login-demo.html',
@@ -308,7 +308,7 @@ Deliverables are outcomes you prove with artifacts. Mark them with `{#deliverabl
 
 ```typescript
 // Step 1: Create task with deliverables
-const plan = await createPlan({
+const task = await createTask({
   title: "Add user profile page",
   content: `
 ## Deliverables
@@ -322,7 +322,7 @@ const plan = await createPlan({
 `
 });
 
-const { planId, sessionToken, deliverables, monitoringScript } = plan;
+const { taskId, sessionToken, deliverables, monitoringScript } = task;
 // deliverables = [{ id: "del_xxx", text: "Screenshot of profile page with avatar" }, ...]
 // monitoringScript = bash script to poll for approval (for non-hook agents)
 
@@ -334,7 +334,7 @@ const { planId, sessionToken, deliverables, monitoringScript } = plan;
 
 // Step 3: Upload proof
 await addArtifact({
-  planId,
+  taskId,
   sessionToken,
   type: 'image',
   filename: 'profile-page.png',
@@ -344,7 +344,7 @@ await addArtifact({
 });
 
 const result = await addArtifact({
-  planId,
+  taskId,
   sessionToken,
   type: 'image',
   filename: 'validation-errors.png',
@@ -363,7 +363,7 @@ if (result.allDeliverablesComplete) {
 
 **`requestUserInput()` inside `execute_code` is THE primary way to talk to humans during active work.**
 
-The human is already in the browser viewing your plan. When you need to ask a question, get a decision, or request clarification - that's where they expect to see it. Don't scatter conversations across different interfaces.
+The human is already in the browser viewing your task. When you need to ask a question, get a decision, or request clarification - that's where they expect to see it. Don't scatter conversations across different interfaces.
 
 ### Best Practice: Return the Response Value
 
@@ -387,8 +387,8 @@ Avoid using `console.log()` for response values - it clutters the output and isn
 
 ### Why Use requestUserInput()
 
-- **Context:** The human sees your question alongside the plan, artifacts, and comments
-- **History:** All exchanges are logged in the plan's activity feed
+- **Context:** The human sees your question alongside the task, artifacts, and comments
+- **History:** All exchanges are logged in the task's activity feed
 - **Continuity:** The conversation stays attached to the work
 - **Flexibility:** 8 input types, multi-question forms, "Other" escape hatch
 
@@ -459,7 +459,7 @@ return { config: config.response };
 Check for comments and change requests:
 
 ```typescript
-const status = await readPlan(planId, sessionToken, {
+const status = await readTask(taskId, sessionToken, {
   includeAnnotations: true
 });
 
@@ -503,11 +503,11 @@ Video recording uses the Playwriter MCP for browser capture and Shipyard for upl
 
 ## Tips
 
-1. **Plan deliverables first** - Decide what proves success before coding
+1. **Define deliverables first** - Decide what proves success before coding
 2. **Capture during work** - Take screenshots as you implement, not after
 3. **Be specific** - "Login page with error state" beats "Screenshot"
 4. **Link every artifact** - Always set `deliverableId` for auto-completion
-5. **Check feedback** - Poll `readPlan` when awaiting review
+5. **Check feedback** - Poll `readTask` when awaiting review
 
 ## When NOT to Use
 

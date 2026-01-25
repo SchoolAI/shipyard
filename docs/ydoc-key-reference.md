@@ -12,12 +12,12 @@ import { YDOC_KEYS } from '@shipyard/schema';
 
 | Constant | String Value | Type | Purpose |
 |----------|--------------|------|---------|
-| `YDOC_KEYS.METADATA` | `'metadata'` | Y.Map | Plan metadata (id, title, status, etc.) |
+| `YDOC_KEYS.METADATA` | `'metadata'` | Y.Map | Task metadata (id, title, status, etc.) |
 | `YDOC_KEYS.CONTENT` | `'content'` | Y.Array | BlockNote blocks as JSON (for snapshots) |
 | `YDOC_KEYS.DOCUMENT_FRAGMENT` | `'document'` | Y.XmlFragment | BlockNote editor structure (for collaboration) |
 | `YDOC_KEYS.THREADS` | `'threads'` | Y.Map | Comment threads (managed by BlockNote) |
 | `YDOC_KEYS.STEP_COMPLETIONS` | `'stepCompletions'` | Y.Map | Checklist completion status |
-| `YDOC_KEYS.PLANS` | `'plans'` | Y.Map | Plan index (only in index doc) |
+| `YDOC_KEYS.PLANS` | `'plans'` | Y.Map | Task index (only in index doc) |
 
 ## Usage Examples
 
@@ -94,16 +94,16 @@ const steps = ydoc.getMap(YDOC_KEYS.STEP_COMPLETIONS);
 const isCompleted = steps.get('step-123') || false;
 ```
 
-### Plan Index
+### Task Index
 ```typescript
 import { YDOC_KEYS, getPlanIndex } from '@shipyard/schema';
 
-// Get all plans (only in index doc!)
-const plans = getPlanIndex(indexDoc);
+// Get all tasks (only in index doc!)
+const tasks = getPlanIndex(indexDoc);
 
 // Direct access
-const plansMap = indexDoc.getMap(YDOC_KEYS.PLANS);
-const planEntry = plansMap.get(planId);
+const tasksMap = indexDoc.getMap(YDOC_KEYS.PLANS);
+const taskEntry = tasksMap.get(taskId);
 ```
 
 ## Critical: Content vs Document Fragment
@@ -117,7 +117,7 @@ const planEntry = plansMap.get(planId);
 - **Format:** JSON array of BlockNote blocks
 - **Purpose:**
   - Serialization for URL snapshots
-  - MCP tool access (read_plan)
+  - MCP tool access (read_task)
   - Easy to convert to/from JSON
 - **Not used for:** Real-time editing
 
@@ -133,7 +133,7 @@ const planEntry = plansMap.get(planId);
 ### Sync Strategy
 
 ```typescript
-// SERVER: Create both on plan creation
+// SERVER: Create both on task creation
 ydoc.transact(() => {
   // 1. JSON array for snapshots
   const contentArray = ydoc.getArray(YDOC_KEYS.CONTENT);
@@ -173,25 +173,25 @@ if (isValidYDocKey(key)) {
 ## Where Keys Are Used
 
 ### Server Side
-- `/apps/server/src/tools/create-plan.ts`
+- `/apps/server/src/tools/create-plan.ts` (creates tasks)
   - Writes: METADATA, CONTENT, DOCUMENT_FRAGMENT
-- `/apps/server/src/tools/read-plan.ts`
+- `/apps/server/src/tools/read-plan.ts` (reads tasks)
   - Reads: METADATA, CONTENT
 - `/apps/server/src/tools/get-feedback.ts`
   - Reads: METADATA, THREADS
 
 ### Browser Side
-- `/apps/web/src/components/PlanViewer.tsx`
+- `/apps/web/src/components/PlanViewer.tsx` (renders task content)
   - Reads: DOCUMENT_FRAGMENT (BlockNote), THREADS
 - `/apps/web/src/components/CommentsPanel.tsx`
   - Reads: THREADS
 - `/apps/web/src/components/ReviewActions.tsx`
   - Writes: METADATA (status, reviewedAt, reviewedBy)
-- `/apps/web/src/pages/PlanPage.tsx`
+- `/apps/web/src/pages/PlanPage.tsx` (task detail page)
   - Reads: METADATA, CONTENT (fallback)
 - `/apps/web/src/hooks/useHydration.ts`
   - Writes: METADATA, CONTENT
-- `/apps/web/src/hooks/usePlanIndex.ts`
+- `/apps/web/src/hooks/usePlanIndex.ts` (task list)
   - Reads: PLANS
 
 ### Schema Helpers

@@ -197,7 +197,7 @@ Use this for unit tests, integration tests, coverage reports - anything with pas
 const html = `<!DOCTYPE html>...`; // Your template with dynamic content
 
 await addArtifact({
-  planId,
+  taskId,
   sessionToken,
   type: 'html',
   filename: 'test-results.html',
@@ -776,7 +776,7 @@ const html = `
 
 // Upload as artifact
 await addArtifact({
-  planId,
+  taskId,
   sessionToken,
   type: 'html',
   filename: 'login-page-demo.html',
@@ -856,7 +856,7 @@ const html = `<!DOCTYPE html>
 </html>`;
 
 await addArtifact({
-  planId,
+  taskId,
   sessionToken,
   type: 'html',
   filename: 'test-results.html',

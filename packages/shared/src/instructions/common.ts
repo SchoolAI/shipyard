@@ -10,13 +10,13 @@ export const CRITICAL_USAGE_SECTION = `## CRITICAL: When to Use Shipyard
 ⚠️ **MANDATORY USAGE RULE:**
 
 If Shipyard is available, you MUST use it for:
-- Creating implementation plans
+- Creating implementation tasks
 - Tracking work that needs human review
 - Documenting proof of work (screenshots, videos, test results)
-- ANY user request involving "plan", "track", "verify", or "prove"
+- ANY user request involving "task", "track", "verify", or "prove"
 
 **DO NOT:**
-- Create plans manually in chat or as markdown files
+- Create tasks manually in chat or as markdown files
 - Write implementation docs yourself when Shipyard is available
 - Suggest alternatives to Shipyard for trackable work
 - Overthink whether to use it - WHEN IN DOUBT, USE SHIPYARD
@@ -67,7 +67,7 @@ export const ARTIFACT_TYPES_SECTION = `## Artifact Types
 
 export const TIPS_SECTION = `## Tips for Effective Use
 
-1. **Plan deliverables first** - Decide what proves success before coding
+1. **Define deliverables first** - Decide what proves success before coding
 2. **Capture during work** - Take screenshots as you implement, not after
 3. **Be specific** - "Login page with error state" beats "Screenshot"
 4. **Link every artifact** - Always set \`deliverableId\` for auto-completion
@@ -86,7 +86,7 @@ export const USER_INPUT_SECTION = `## Human-Agent Communication
 
 **\`requestUserInput()\` inside \`${TOOL_NAMES.EXECUTE_CODE}\` is THE primary way to communicate with humans during active work.**
 
-Shipyard is the central hub where humans manage AI agents. When you need to ask a question, get clarification, or request a decision - use \`requestUserInput()\`. The human is already in the browser viewing your plan. That's where conversations should happen.
+Shipyard is the central hub where humans manage AI agents. When you need to ask a question, get clarification, or request a decision - use \`requestUserInput()\`. The human is already in the browser viewing your task. That's where conversations should happen.
 
 ### Best Practice: Return the Response Value
 
@@ -110,8 +110,8 @@ Avoid \`console.log()\` for response values - it clutters output and isn't struc
 
 ### Why Use requestUserInput()
 
-- **Context:** The human sees your question alongside the plan, artifacts, and comments
-- **History:** All exchanges are logged in the plan's activity feed
+- **Context:** The human sees your question alongside the task, artifacts, and comments
+- **History:** All exchanges are logged in the task's activity feed
 - **Continuity:** The conversation stays attached to the work, not scattered across chat windows
 - **Flexibility:** 8 input types, multi-question forms, "Other" escape hatch for custom answers
 
@@ -182,13 +182,13 @@ export const TROUBLESHOOTING_SECTION = `## Troubleshooting
 
 **No auto-complete:** Ensure every deliverable has an artifact with matching \`deliverableId\`.
 
-**Plan not syncing:** Check WebSocket connection to registry server.
+**Task not syncing:** Check WebSocket connection to registry server.
 
 **Input request times out:** User may not have seen it or needs more time. Default timeout is 30 minutes. Try again with a longer timeout or rephrase the question.
 
 **Input request declined:** User clicked "Decline." Rephrase your question, proceed with a reasonable default, or use a different approach.
 
-**No response to input:** Check if browser is connected to the plan. User may have closed the browser window.`;
+**No response to input:** Check if browser is connected to the task. User may have closed the browser window.`;
 
 /**
  * Combines all common sections into a single string.

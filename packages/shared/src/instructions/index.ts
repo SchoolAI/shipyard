@@ -8,12 +8,12 @@
  * Common content is shared to prevent divergence.
  */
 
-/** Claude Code specific exports (plan mode workflow via hooks) */
+/** Claude Code specific exports (task mode workflow via hooks) */
 export {
   CLAUDE_CODE_HEADER,
   CLAUDE_CODE_INSTRUCTIONS,
   IMPORTANT_NOTES,
-  PLAN_MODE_WORKFLOW,
+  TASK_MODE_WORKFLOW,
 } from './claude-code.js';
 
 /** Common sections used by both platforms */

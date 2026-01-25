@@ -44280,17 +44280,15 @@ function truncate(text, maxLength) {
 }
 var TOOL_NAMES = {
   ADD_ARTIFACT: "add_artifact",
-  ADD_PR_REVIEW_COMMENT: "add_pr_review_comment",
   COMPLETE_TASK: "complete_task",
-  CREATE_PLAN: "create_plan",
+  CREATE_TASK: "create_task",
   EXECUTE_CODE: "execute_code",
   LINK_PR: "link_pr",
-  READ_PLAN: "read_plan",
+  READ_TASK: "read_task",
   REGENERATE_SESSION_TOKEN: "regenerate_session_token",
   REQUEST_USER_INPUT: "request_user_input",
-  SETUP_REVIEW_NOTIFICATION: "setup_review_notification",
   UPDATE_BLOCK_CONTENT: "update_block_content",
-  UPDATE_PLAN: "update_plan"
+  UPDATE_TASK: "update_task"
 };
 var PlanIdSchema = external_exports.object({ planId: external_exports.string().min(1) });
 var PlanStatusResponseSchema = external_exports.object({ status: external_exports.string() });
@@ -44483,30 +44481,28 @@ function isBuffer(value) {
 init_cjs_shims();
 var TOOL_NAMES2 = {
   ADD_ARTIFACT: "add_artifact",
-  ADD_PR_REVIEW_COMMENT: "add_pr_review_comment",
   COMPLETE_TASK: "complete_task",
-  CREATE_PLAN: "create_plan",
+  CREATE_TASK: "create_task",
   EXECUTE_CODE: "execute_code",
   LINK_PR: "link_pr",
-  READ_PLAN: "read_plan",
+  READ_TASK: "read_task",
   REGENERATE_SESSION_TOKEN: "regenerate_session_token",
   REQUEST_USER_INPUT: "request_user_input",
-  SETUP_REVIEW_NOTIFICATION: "setup_review_notification",
   UPDATE_BLOCK_CONTENT: "update_block_content",
-  UPDATE_PLAN: "update_plan"
+  UPDATE_TASK: "update_task"
 };
 var CRITICAL_USAGE_SECTION = `## CRITICAL: When to Use Shipyard
 
 \u26A0\uFE0F **MANDATORY USAGE RULE:**
 
 If Shipyard is available, you MUST use it for:
-- Creating implementation plans
+- Creating implementation tasks
 - Tracking work that needs human review
 - Documenting proof of work (screenshots, videos, test results)
-- ANY user request involving "plan", "track", "verify", or "prove"
+- ANY user request involving "task", "track", "verify", or "prove"
 
 **DO NOT:**
-- Create plans manually in chat or as markdown files
+- Create tasks manually in chat or as markdown files
 - Write implementation docs yourself when Shipyard is available
 - Suggest alternatives to Shipyard for trackable work
 - Overthink whether to use it - WHEN IN DOUBT, USE SHIPYARD
@@ -44547,13 +44543,14 @@ var ARTIFACT_TYPES_SECTION = `## Artifact Types
 
 | Type | Use For | File Formats |
 |------|---------|--------------|
-| \`screenshot\` | UI changes, visual proof, error states | .png, .jpg, .webp |
+| \`html\` | Test results, code reviews, reports, terminal output | .html |
+| \`image\` | UI screenshots, visual proof, error states | .png, .jpg, .webp |
 | \`video\` | Complex flows, interactions, animations | .mp4, .webm |
-| \`test_results\` | Test output, coverage reports | .json, .txt, .xml |
-| \`diff\` | Code changes, before/after comparisons | .diff, .patch |`;
+
+**Note:** HTML is the primary format for most artifacts. Use it for test results, coverage reports, code reviews, and any text-based output. Only use \`image\` for actual UI screenshots and \`video\` for multi-step flows.`;
 var TIPS_SECTION = `## Tips for Effective Use
 
-1. **Plan deliverables first** - Decide what proves success before coding
+1. **Define deliverables first** - Decide what proves success before coding
 2. **Capture during work** - Take screenshots as you implement, not after
 3. **Be specific** - "Login page with error state" beats "Screenshot"
 4. **Link every artifact** - Always set \`deliverableId\` for auto-completion
@@ -44570,7 +44567,7 @@ var USER_INPUT_SECTION = `## Human-Agent Communication
 
 **\`requestUserInput()\` inside \`${TOOL_NAMES2.EXECUTE_CODE}\` is THE primary way to communicate with humans during active work.**
 
-Shipyard is the central hub where humans manage AI agents. When you need to ask a question, get clarification, or request a decision - use \`requestUserInput()\`. The human is already in the browser viewing your plan. That's where conversations should happen.
+Shipyard is the central hub where humans manage AI agents. When you need to ask a question, get clarification, or request a decision - use \`requestUserInput()\`. The human is already in the browser viewing your task. That's where conversations should happen.
 
 ### Best Practice: Return the Response Value
 
@@ -44594,8 +44591,8 @@ Avoid \`console.log()\` for response values - it clutters output and isn't struc
 
 ### Why Use requestUserInput()
 
-- **Context:** The human sees your question alongside the plan, artifacts, and comments
-- **History:** All exchanges are logged in the plan's activity feed
+- **Context:** The human sees your question alongside the task, artifacts, and comments
+- **History:** All exchanges are logged in the task's activity feed
 - **Continuity:** The conversation stays attached to the work, not scattered across chat windows
 - **Flexibility:** 8 input types, multi-question forms, "Other" escape hatch for custom answers
 
@@ -44665,13 +44662,13 @@ var TROUBLESHOOTING_SECTION = `## Troubleshooting
 
 **No auto-complete:** Ensure every deliverable has an artifact with matching \`deliverableId\`.
 
-**Plan not syncing:** Check WebSocket connection to registry server.
+**Task not syncing:** Check WebSocket connection to registry server.
 
 **Input request times out:** User may not have seen it or needs more time. Default timeout is 30 minutes. Try again with a longer timeout or rephrase the question.
 
 **Input request declined:** User clicked "Decline." Rephrase your question, proceed with a reasonable default, or use a different approach.
 
-**No response to input:** Check if browser is connected to the plan. User may have closed the browser window.`;
+**No response to input:** Check if browser is connected to the task. User may have closed the browser window.`;
 var COMMON_INSTRUCTIONS = [
   CRITICAL_USAGE_SECTION,
   USER_INPUT_SECTION,
@@ -44681,17 +44678,17 @@ var COMMON_INSTRUCTIONS = [
   WHEN_NOT_TO_USE_SECTION,
   TROUBLESHOOTING_SECTION
 ].join("\n\n");
-var CLAUDE_CODE_HEADER = `[SHIPYARD] Collaborative planning with human review & proof-of-work tracking.`;
-var PLAN_MODE_WORKFLOW = `## How to Use (Claude Code with Hooks)
+var CLAUDE_CODE_HEADER = `[SHIPYARD] Collaborative task management with human review & proof-of-work tracking.`;
+var TASK_MODE_WORKFLOW = `## How to Use (Claude Code with Hooks)
 
-You have the **full Shipyard experience** with automatic hooks. Use native plan mode:
+You have the **full Shipyard experience** with automatic hooks. Use native task mode:
 
 ### Workflow
 
-1. **Enter plan mode** (Shift+Tab) \u2192 Browser opens with live plan automatically
-2. **Write your plan** with \`{#deliverable}\` markers for provable outcomes
-3. **Exit plan mode** \u2192 Hook **BLOCKS** until human approves or requests changes
-4. **On approval** \u2192 You automatically receive: planId, sessionToken, deliverable IDs
+1. **Enter task mode** (Shift+Tab) \u2192 Browser opens with live task automatically
+2. **Write your task** with \`{#deliverable}\` markers for provable outcomes
+3. **Exit task mode** \u2192 Hook **BLOCKS** until human approves or requests changes
+4. **On approval** \u2192 You automatically receive: taskId, sessionToken, deliverable IDs
 5. **Do the work** \u2192 Take screenshots/videos as you implement
 6. **Upload artifacts** \u2192 \`${TOOL_NAMES2.ADD_ARTIFACT}(filePath, deliverableId)\` for each deliverable
 7. **Auto-complete** \u2192 When all deliverables have artifacts, task completes with snapshot URL
@@ -44700,21 +44697,21 @@ You have the **full Shipyard experience** with automatic hooks. Use native plan 
 
 You only need ONE tool: \`${TOOL_NAMES2.ADD_ARTIFACT}\`
 
-The hook automatically injects everything you need (planId, sessionToken, deliverables).
+The hook automatically injects everything you need (taskId, sessionToken, deliverables).
 Just call \`${TOOL_NAMES2.ADD_ARTIFACT}\` with the file path and deliverable ID.
 
 \`\`\`typescript
 /**
  * Example: After approval, you'll have these in context
- * planId: "abc123"
+ * taskId: "abc123"
  * sessionToken: "xyz..."
  * deliverables: [{ id: "del_xxx", text: "Screenshot of login" }]
  */
 
 await addArtifact({
-  planId,
+  taskId,
   sessionToken,
-  type: 'screenshot',
+  type: 'image',
   filename: 'login-page.png',
   source: 'file',
   filePath: '/tmp/screenshot.png',
@@ -44725,11 +44722,11 @@ await addArtifact({
 When the last deliverable gets an artifact, the task auto-completes and returns a snapshot URL.`;
 var IMPORTANT_NOTES = `## Important Notes for Claude Code
 
-- **DO NOT call \`createPlan()\` directly** - The hook handles plan creation when you enter plan mode
+- **DO NOT call \`createTask()\` directly** - The hook handles task creation when you enter task mode
 - **DO NOT use the Shipyard skill** - The hook provides everything you need
 - **DO NOT poll for approval** - The hook blocks automatically until human decides
-- **DO use plan mode** for ANY work that needs tracking, verification, or human review
-- **DO use \`requestUserInput()\`** inside \`${TOOL_NAMES2.EXECUTE_CODE}\` instead of \`AskUserQuestion\` - The human is in the browser viewing your plan, questions should appear there`;
+- **DO use task mode** for ANY work that needs tracking, verification, or human review
+- **DO use \`requestUserInput()\`** inside \`${TOOL_NAMES2.EXECUTE_CODE}\` instead of \`AskUserQuestion\` - The human is in the browser viewing your task, questions should appear there`;
 var CLAUDE_CODE_INSTRUCTIONS = [
   CLAUDE_CODE_HEADER,
   "",
@@ -44737,7 +44734,7 @@ var CLAUDE_CODE_INSTRUCTIONS = [
   "",
   USER_INPUT_SECTION,
   "",
-  PLAN_MODE_WORKFLOW,
+  TASK_MODE_WORKFLOW,
   "",
   DELIVERABLES_SECTION,
   "",
@@ -44753,11 +44750,11 @@ var CLAUDE_CODE_INSTRUCTIONS = [
 ].join("\n");
 var MCP_DIRECT_HEADER = `# Shipyard: Your Agent Management Hub
 
-> **Shipyard is the central interface where humans manage AI agents.** Plans, artifacts, feedback, and communication all happen here.
+> **Shipyard is the central interface where humans manage AI agents.** Tasks, artifacts, feedback, and communication all happen here.
 
 Shipyard turns invisible agent work into reviewable, verifiable tasks. Instead of trusting that code was written correctly, reviewers see screenshots, videos, and test results as proof.
 
-**Key principle:** When you're working in Shipyard, ALL human-agent communication should happen through \`requestUserInput()\` inside \`${TOOL_NAMES2.EXECUTE_CODE}\`. The human is already in the browser viewing your plan - that's where they expect to interact with you.`;
+**Key principle:** When you're working in Shipyard, ALL human-agent communication should happen through \`requestUserInput()\` inside \`${TOOL_NAMES2.EXECUTE_CODE}\`. The human is already in the browser viewing your task - that's where they expect to interact with you.`;
 var MCP_TOOLS_OVERVIEW = `## Available MCP Tools
 
 | Tool | Purpose |
@@ -44766,15 +44763,15 @@ var MCP_TOOLS_OVERVIEW = `## Available MCP Tools
 
 ### requestUserInput(): Your Direct Line to the Human
 
-This is how you talk to humans during active work. Don't use your platform's built-in question tools (AskUserQuestion, etc.) - use \`requestUserInput()\` inside \`${TOOL_NAMES2.EXECUTE_CODE}\` instead. The human is in the browser viewing your plan, and that's where they expect to see your questions.
+This is how you talk to humans during active work. Don't use your platform's built-in question tools (AskUserQuestion, etc.) - use \`requestUserInput()\` inside \`${TOOL_NAMES2.EXECUTE_CODE}\` instead. The human is in the browser viewing your task, and that's where they expect to see your questions.
 
-All Shipyard operations (createPlan, addArtifact, requestUserInput, etc.) are available inside \`${TOOL_NAMES2.EXECUTE_CODE}\`.`;
+All Shipyard operations (createTask, addArtifact, requestUserInput, etc.) are available inside \`${TOOL_NAMES2.EXECUTE_CODE}\`.`;
 var MCP_WORKFLOW = `## Workflow (MCP Direct)
 
-### Step 1: Create Plan
+### Step 1: Create Task
 
 \`\`\`typescript
-const plan = await createPlan({
+const task = await createTask({
   title: "Add user authentication",
   content: \`
 ## Deliverables
@@ -44788,7 +44785,7 @@ const plan = await createPlan({
 \`
 });
 
-const { planId, sessionToken, deliverables, monitoringScript } = plan;
+const { taskId, sessionToken, deliverables, monitoringScript } = task;
 /** deliverables = [{ id: "del_xxx", text: "Screenshot of login page" }, ...] */
 \`\`\`
 
@@ -44805,7 +44802,7 @@ bash <(echo "$monitoringScript") &
 Or poll manually:
 
 \`\`\`typescript
-const status = await readPlan(planId, sessionToken);
+const status = await readTask(taskId, sessionToken);
 if (status.status === "in_progress") {
   /** Approved! Proceed with work */
 }
@@ -44822,9 +44819,9 @@ Implement the feature, taking screenshots/recordings as you go.
 
 \`\`\`typescript
 await addArtifact({
-  planId,
+  taskId,
   sessionToken,
-  type: 'screenshot',
+  type: 'image',
   filename: 'login-page.png',
   source: 'file',
   filePath: '/path/to/screenshot.png',
@@ -44832,9 +44829,9 @@ await addArtifact({
 });
 
 const result = await addArtifact({
-  planId,
+  taskId,
   sessionToken,
-  type: 'screenshot',
+  type: 'image',
   filename: 'error-handling.png',
   source: 'file',
   filePath: '/path/to/error.png',
@@ -44848,25 +44845,25 @@ if (result.allDeliverablesComplete) {
 \`\`\``;
 var API_REFERENCE = `## API Reference (inside execute_code)
 
-### createPlan(options)
+### createTask(options)
 
-Creates a new plan and opens it in the browser.
+Creates a new task and opens it in the browser.
 
 **Parameters:**
-- \`title\` (string) - Plan title
+- \`title\` (string) - Task title
 - \`content\` (string) - Markdown content with \`{#deliverable}\` markers
 - \`repo\` (string, optional) - GitHub repo for artifact storage
 - \`prNumber\` (number, optional) - PR number to link
 
-**Returns:** \`{ planId, sessionToken, url, deliverables, monitoringScript }\`
+**Returns:** \`{ taskId, sessionToken, url, deliverables, monitoringScript }\`
 
-### readPlan(planId, sessionToken, options?)
+### readTask(taskId, sessionToken, options?)
 
-Reads current plan state.
+Reads current task state.
 
 **Parameters:**
-- \`planId\` (string) - Plan ID
-- \`sessionToken\` (string) - Session token from createPlan
+- \`taskId\` (string) - Task ID
+- \`sessionToken\` (string) - Session token from createTask
 - \`options.includeAnnotations\` (boolean) - Include reviewer comments
 
 **Returns:** \`{ content, status, title, deliverables }\`
@@ -44876,9 +44873,9 @@ Reads current plan state.
 Uploads proof-of-work artifact.
 
 **Parameters:**
-- \`planId\` (string) - Plan ID
+- \`taskId\` (string) - Task ID
 - \`sessionToken\` (string) - Session token
-- \`type\` ('screenshot' | 'video' | 'test_results' | 'diff')
+- \`type\` ('html' | 'image' | 'video')
 - \`filename\` (string) - File name
 - \`source\` ('file' | 'url' | 'base64')
 - \`filePath\` (string) - Local file path (when source='file')
@@ -44950,7 +44947,7 @@ return { config: config.response };
 var HANDLING_FEEDBACK = `## Handling Reviewer Feedback
 
 \`\`\`typescript
-const status = await readPlan(planId, sessionToken, {
+const status = await readTask(taskId, sessionToken, {
   includeAnnotations: true
 });
 
@@ -44961,7 +44958,7 @@ if (status.status === "changes_requested") {
   /**
    * Make changes based on feedback
    * Upload new artifacts
-   * Plan will transition back to pending_review
+   * Task will transition back to pending_review
    */
 }
 \`\`\``;

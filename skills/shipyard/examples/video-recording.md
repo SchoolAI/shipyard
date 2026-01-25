@@ -18,7 +18,7 @@ Video recording requires FFmpeg for encoding. Shipyard bundles FFmpeg via `@ffmp
 ## Prerequisites
 
 - Playwriter MCP connected to active Chrome tab
-- Shipyard plan with video deliverable created
+- Shipyard task with video deliverable created
 
 ## Complete Example
 
@@ -130,7 +130,7 @@ Shipyard's execute_code sandbox has bundled FFmpeg - encode and upload in one ca
 
 ```typescript
 // Encode + upload (call via mcp__shipyard__execute_code or within execute_code)
-// Assume framesDir, planId, sessionToken, deliverableId are available
+// Assume framesDir, taskId, sessionToken, deliverableId are available
 
 const { spawnSync } = child_process;
 const outputPath = path.join(os.tmpdir(), `shipyard-video-${Date.now()}.mp4`);
@@ -156,7 +156,7 @@ try {
 
   // Upload to Shipyard
   const uploadResult = await addArtifact({
-    planId,
+    taskId,
     sessionToken,
     type: 'video',
     filename: 'interaction-demo.mp4',
@@ -192,13 +192,13 @@ try {
 ## Full Workflow Example
 
 ```typescript
-// 1. Create plan with video deliverable
-const plan = await createPlan({
+// 1. Create task with video deliverable
+const task = await createTask({
   title: "Demo search feature",
   content: `# Search Feature Demo\n\n## Deliverables\n- [ ] Video showing search flow {#deliverable}`
 });
 
-const { planId, sessionToken, deliverables } = plan;
+const { taskId, sessionToken, deliverables } = task;
 const deliverableId = deliverables[0].id;
 
 // 2. Start recording (Playwriter)
@@ -227,7 +227,7 @@ await execute_code(`
     if (result.status !== 0) throw new Error('Encoding failed');
 
     await addArtifact({
-      planId: '${planId}',
+      taskId: '${taskId}',
       sessionToken: '${sessionToken}',
       type: 'video',
       source: 'file',

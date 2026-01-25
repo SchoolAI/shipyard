@@ -40,7 +40,7 @@ Installs the full plugin including MCP server, hooks, and skills:
 ```
 
 **What you get:**
-- ✅ MCP server with plan creation and artifact tools
+- ✅ MCP server with task creation and artifact tools
 - ✅ Hooks (auto-formatting, git workflows)
 - ✅ Skills (planning workflows)
 - ✅ Auto-updates when you pull new versions
@@ -446,7 +446,7 @@ Not from a marketplace - it installs directly from the GitHub repository.
 
 ### Browser won't open
 
-**Issue:** Plan created but no browser launched
+**Issue:** Task created but no browser launched
 
 - **Check:** `SHIPYARD_WEB_URL` env var is set correctly
 - **Check:** Browser is installed and accessible

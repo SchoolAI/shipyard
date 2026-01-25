@@ -1,4 +1,4 @@
-# Milestone 2: View Plans
+# Milestone 2: View Tasks
 
 **Status**: In Progress
 **Goal**: Upgrade web UI to use BlockNote editor and shadcn/ui components
@@ -33,10 +33,10 @@ No live sync yet. Pure static rendering from URL data with professional UI.
 - [ ] Handle invalid/missing data gracefully
 - [ ] Show error state for corrupt URLs
 
-### 2c: Plan Renderer with BlockNote
+### 2c: Task Renderer with BlockNote
 
 - [ ] Replace JSON rendering with BlockNote editor (read-only mode)
-- [ ] Plan header using shadcn Card (title, status Badge, PR link)
+- [ ] Task header using shadcn Card (title, status Badge, PR link)
 - [ ] BlockNote editor for content display
 - [ ] Artifact references using shadcn components
 - [ ] Professional layout and spacing
@@ -51,12 +51,12 @@ No live sync yet. Pure static rendering from URL data with professional UI.
 
 ## Demo Checkpoint
 
-**Scenario**: Anyone with a plan URL can view it
+**Scenario**: Anyone with a task URL can view it
 
 ```
 1. Get URL from Milestone 1 demo
 2. Open in browser (or share with someone)
-3. See nicely rendered plan:
+3. See nicely rendered task:
    - Title: "Add User Authentication"
    - Status: pending_review
    - Steps:
@@ -94,11 +94,11 @@ function usePlanFromUrl(): UrlEncodedPlan | null {
 
 ```
 <App>
-  <PlanView plan={plan}>
-    <PlanHeader title={plan.title} status={plan.status} />
-    <StepsList steps={plan.steps} />
-    <ArtifactsList artifacts={plan.artifacts} />
-  </PlanView>
+  <TaskView task={task}>
+    <TaskHeader title={task.title} status={task.status} />
+    <StepsList steps={task.steps} />
+    <ArtifactsList artifacts={task.artifacts} />
+  </TaskView>
 </App>
 ```
 
