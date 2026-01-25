@@ -56,6 +56,12 @@ const RequestUserInputInput = z
       .string()
       .optional()
       .describe('Optional metadata to link request to plan (for activity log filtering)'),
+    isBlocker: z
+      .boolean()
+      .optional()
+      .describe(
+        'If true, this request is blocking the agent from proceeding. Shows as red/urgent in the UI.'
+      ),
     min: z.number().optional().describe("For 'number'/'rating' - minimum value"),
     max: z.number().optional().describe("For 'number'/'rating' - maximum value"),
     minDate: z
@@ -111,6 +117,7 @@ function buildRequestParams(input: RequestUserInputInput): CreateInputRequestPar
         defaultValue: input.defaultValue,
         timeout: input.timeout,
         planId: input.planId,
+        isBlocker: input.isBlocker,
         type: 'choice' as const,
         options: input.options ?? [],
         multiSelect: input.multiSelect,
@@ -123,6 +130,7 @@ function buildRequestParams(input: RequestUserInputInput): CreateInputRequestPar
         defaultValue: input.defaultValue,
         timeout: input.timeout,
         planId: input.planId,
+        isBlocker: input.isBlocker,
         type: 'number' as const,
         min: input.min,
         max: input.max,
@@ -134,6 +142,7 @@ function buildRequestParams(input: RequestUserInputInput): CreateInputRequestPar
         defaultValue: input.defaultValue,
         timeout: input.timeout,
         planId: input.planId,
+        isBlocker: input.isBlocker,
         type: 'email' as const,
         domain: input.domain,
       } satisfies CreateEmailInputParams;
@@ -143,6 +152,7 @@ function buildRequestParams(input: RequestUserInputInput): CreateInputRequestPar
         defaultValue: input.defaultValue,
         timeout: input.timeout,
         planId: input.planId,
+        isBlocker: input.isBlocker,
         type: 'date' as const,
         min: input.minDate,
         max: input.maxDate,
@@ -153,6 +163,7 @@ function buildRequestParams(input: RequestUserInputInput): CreateInputRequestPar
         defaultValue: input.defaultValue,
         timeout: input.timeout,
         planId: input.planId,
+        isBlocker: input.isBlocker,
         type: 'rating' as const,
         min: input.min,
         max: input.max,
@@ -165,6 +176,7 @@ function buildRequestParams(input: RequestUserInputInput): CreateInputRequestPar
         defaultValue: input.defaultValue,
         timeout: input.timeout,
         planId: input.planId,
+        isBlocker: input.isBlocker,
         type: 'text' as const,
       };
     case 'multiline':
@@ -173,6 +185,7 @@ function buildRequestParams(input: RequestUserInputInput): CreateInputRequestPar
         defaultValue: input.defaultValue,
         timeout: input.timeout,
         planId: input.planId,
+        isBlocker: input.isBlocker,
         type: 'multiline' as const,
       };
     case 'confirm':
@@ -181,6 +194,7 @@ function buildRequestParams(input: RequestUserInputInput): CreateInputRequestPar
         defaultValue: input.defaultValue,
         timeout: input.timeout,
         planId: input.planId,
+        isBlocker: input.isBlocker,
         type: 'confirm' as const,
       };
     default:
@@ -339,6 +353,11 @@ NOTE: This is also available as requestUserInput() inside execute_code for multi
         planId: {
           type: 'string',
           description: 'Optional metadata to link request to plan (for activity log filtering)',
+        },
+        isBlocker: {
+          type: 'boolean',
+          description:
+            'If true, this request is blocking the agent from proceeding. Shows as red/urgent in the UI.',
         },
         min: {
           type: 'number',
@@ -533,6 +552,7 @@ NOTE: This is also available as requestUserInput() inside execute_code for multi
           questions: input.questions,
           timeout: input.timeout,
           planId: input.planId,
+          isBlocker: input.isBlocker,
         };
         requestId = manager.createMultiQuestionRequest(ydoc, params);
       } else {

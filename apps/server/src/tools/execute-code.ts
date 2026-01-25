@@ -794,6 +794,8 @@ async function requestUserInput(
         defaultValue?: string;
         timeout?: number;
         planId?: string;
+        /** If true, this request is blocking the agent from proceeding. Shows as red/urgent. */
+        isBlocker?: boolean;
         min?: number;
         max?: number;
         format?: 'integer' | 'decimal' | 'currency' | 'percentage';
@@ -809,6 +811,8 @@ async function requestUserInput(
         questions: Question[];
         timeout?: number;
         planId?: string;
+        /** If true, this request is blocking the agent from proceeding. Shows as red/urgent. */
+        isBlocker?: boolean;
         message?: never;
         type?: never;
       }
@@ -840,6 +844,7 @@ async function requestUserInput(
       questions: validQuestions,
       timeout: opts.timeout,
       planId: opts.planId,
+      isBlocker: opts.isBlocker,
     });
 
     /** Wait for response */
@@ -882,6 +887,7 @@ async function requestUserInput(
         defaultValue: opts.defaultValue,
         timeout: opts.timeout,
         planId: opts.planId,
+        isBlocker: opts.isBlocker,
         type: opts.type,
         options: opts.options ?? [],
         multiSelect: opts.multiSelect,
@@ -893,6 +899,7 @@ async function requestUserInput(
         defaultValue: opts.defaultValue,
         timeout: opts.timeout,
         planId: opts.planId,
+        isBlocker: opts.isBlocker,
         type: opts.type,
         min: opts.min,
         max: opts.max,
@@ -905,6 +912,7 @@ async function requestUserInput(
         defaultValue: opts.defaultValue,
         timeout: opts.timeout,
         planId: opts.planId,
+        isBlocker: opts.isBlocker,
         type: opts.type,
         domain: opts.domain,
       } satisfies CreateEmailInputParams;
@@ -915,6 +923,7 @@ async function requestUserInput(
         defaultValue: opts.defaultValue,
         timeout: opts.timeout,
         planId: opts.planId,
+        isBlocker: opts.isBlocker,
         type: opts.type,
         min: opts.minDate,
         max: opts.maxDate,
@@ -926,6 +935,7 @@ async function requestUserInput(
         defaultValue: opts.defaultValue,
         timeout: opts.timeout,
         planId: opts.planId,
+        isBlocker: opts.isBlocker,
         type: opts.type,
         min: opts.min,
         max: opts.max,
@@ -939,6 +949,7 @@ async function requestUserInput(
         defaultValue: opts.defaultValue,
         timeout: opts.timeout,
         planId: opts.planId,
+        isBlocker: opts.isBlocker,
         type: opts.type,
       } satisfies CreateTextInputParams | CreateMultilineInputParams | CreateConfirmInputParams;
   }
