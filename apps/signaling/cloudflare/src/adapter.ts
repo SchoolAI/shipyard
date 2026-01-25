@@ -14,8 +14,25 @@
  */
 
 import type { InviteRedemption, InviteToken } from '@shipyard/schema';
-import type { PlatformAdapter } from '../../core/platform.js';
+import type { PlatformAdapter } from '@signaling/platform.js';
+import { z } from 'zod';
 import { logger } from './logger.js';
+
+/**
+ * Zod schema for GitHub user API response.
+ * Only validates the fields we actually use.
+ */
+const GitHubUserResponseSchema = z.object({
+  login: z.string(),
+});
+
+/**
+ * Type guard for checking if a value is a non-null object.
+ * Used for safely narrowing unknown types before logging.
+ */
+function isNonNullObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
 
 /**
  * Serialized connection state stored in WebSocket attachment.
@@ -32,6 +49,38 @@ interface SerializedConnectionState {
 interface ConnectionState {
   id: string;
   topics: Set<string>;
+}
+
+/**
+ * Zod schema for validating deserialized WebSocket attachment data.
+ */
+const SerializedConnectionStateSchema = z.object({
+  id: z.string(),
+  topics: z.array(z.string()),
+});
+
+/**
+ * Type guard for checking if a value is a valid SerializedConnectionState.
+ */
+function isSerializedConnectionState(value: unknown): value is SerializedConnectionState {
+  const result = SerializedConnectionStateSchema.safeParse(value);
+  return result.success;
+}
+
+/**
+ * Type guard for Cloudflare WebSocket using duck typing.
+ * Cloudflare Workers have no WebSocket constructor to check with instanceof.
+ */
+function isCloudflareWebSocket(value: unknown): value is WebSocket {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+  if (!('send' in value) || !('close' in value)) {
+    return false;
+  }
+  const sendProp = value.send;
+  const closeProp = value.close;
+  return typeof sendProp === 'function' && typeof closeProp === 'function';
 }
 
 /**
@@ -73,11 +122,17 @@ export class CloudflarePlatformAdapter implements PlatformAdapter {
    */
   private topics = new Map<string, Set<WebSocket>>();
 
+  /**
+   * In-memory cache of connection state per WebSocket.
+   * Uses WeakMap for automatic cleanup when WebSocket is garbage collected.
+   */
+  private connectionStates = new WeakMap<WebSocket, ConnectionState>();
+
   constructor(ctx: DurableObjectState) {
     this.ctx = ctx;
   }
 
-  // --- Initialization Methods ---
+  /** --- Initialization Methods --- */
 
   /**
    * Initialize the adapter by restoring state from storage.
@@ -106,14 +161,16 @@ export class CloudflarePlatformAdapter implements PlatformAdapter {
       let expiredCount = 0;
 
       for (const [key, token] of stored) {
-        // Skip and delete expired tokens
+        /** Skip and delete expired tokens */
         if (token.expiresAt < now) {
           await this.ctx.storage.delete(key);
           expiredCount++;
           continue;
         }
-        // Store by planId:tokenId (strip 'invite:' prefix)
-        // Key format: 'invite:{planId}:{tokenId}' -> '{planId}:{tokenId}'
+        /*
+         * Store by planId:tokenId (strip 'invite:' prefix)
+         * Key format: 'invite:{planId}:{tokenId}' -> '{planId}:{tokenId}'
+         */
         const cacheKey = key.replace('invite:', '');
         this.inviteTokens.set(cacheKey, token);
       }
@@ -140,7 +197,7 @@ export class CloudflarePlatformAdapter implements PlatformAdapter {
       });
 
       for (const [key, redemption] of stored) {
-        // Store by planId:tokenId:userId (strip 'redemption:' prefix)
+        /** Store by planId:tokenId:userId (strip 'redemption:' prefix) */
         const cacheKey = key.replace('redemption:', '');
         this.redemptions.set(cacheKey, redemption);
       }
@@ -161,7 +218,7 @@ export class CloudflarePlatformAdapter implements PlatformAdapter {
       });
 
       for (const [key, ownerId] of stored) {
-        // Store by planId (strip 'plan_owner:' prefix)
+        /** Store by planId (strip 'plan_owner:' prefix) */
         const planId = key.replace('plan_owner:', '');
         this.planOwners.set(planId, ownerId);
       }
@@ -180,15 +237,13 @@ export class CloudflarePlatformAdapter implements PlatformAdapter {
     const websockets = this.ctx.getWebSockets();
 
     for (const ws of websockets) {
-      const attachment = ws.deserializeAttachment() as SerializedConnectionState | null;
-      if (attachment) {
-        // Restore topics Set from serialized array
+      const attachment = ws.deserializeAttachment();
+      if (isSerializedConnectionState(attachment)) {
         const state: ConnectionState = {
           id: attachment.id,
           topics: new Set(attachment.topics),
         };
 
-        // Rebuild topic -> WebSocket mapping
         for (const topic of state.topics) {
           if (!this.topics.has(topic)) {
             this.topics.set(topic, new Set());
@@ -196,8 +251,7 @@ export class CloudflarePlatformAdapter implements PlatformAdapter {
           this.topics.get(topic)?.add(ws);
         }
 
-        // Store in-memory state on WebSocket
-        (ws as any).__state = state;
+        this.connectionStates.set(ws, state);
       }
     }
 
@@ -207,16 +261,16 @@ export class CloudflarePlatformAdapter implements PlatformAdapter {
     );
   }
 
-  // --- Storage Operations ---
+  /** --- Storage Operations --- */
 
   async getInviteToken(planId: string, tokenId: string): Promise<InviteToken | undefined> {
     const cacheKey = `${planId}:${tokenId}`;
 
-    // Check in-memory cache first
+    /** Check in-memory cache first */
     const cached = this.inviteTokens.get(cacheKey);
     if (cached) return cached;
 
-    // Fall back to storage
+    /** Fall back to storage */
     const storageKey = `invite:${cacheKey}`;
     const stored = await this.ctx.storage.get<InviteToken>(storageKey);
     if (stored) {
@@ -228,20 +282,20 @@ export class CloudflarePlatformAdapter implements PlatformAdapter {
   async setInviteToken(planId: string, tokenId: string, token: InviteToken): Promise<void> {
     const cacheKey = `${planId}:${tokenId}`;
 
-    // Update in-memory cache
+    /** Update in-memory cache */
     this.inviteTokens.set(cacheKey, token);
 
-    // Persist to Durable Object storage
+    /** Persist to Durable Object storage */
     await this.ctx.storage.put(`invite:${cacheKey}`, token);
   }
 
   async deleteInviteToken(planId: string, tokenId: string): Promise<void> {
     const cacheKey = `${planId}:${tokenId}`;
 
-    // Remove from in-memory cache
+    /** Remove from in-memory cache */
     this.inviteTokens.delete(cacheKey);
 
-    // Remove from Durable Object storage
+    /** Remove from Durable Object storage */
     await this.ctx.storage.delete(`invite:${cacheKey}`);
   }
 
@@ -250,18 +304,18 @@ export class CloudflarePlatformAdapter implements PlatformAdapter {
     const now = Date.now();
     const prefix = `${planId}:`;
 
-    // Iterate through in-memory cache
+    /** Iterate through in-memory cache */
     for (const [key, token] of this.inviteTokens.entries()) {
-      // Only include tokens for this plan
+      /** Only include tokens for this plan */
       if (!key.startsWith(prefix)) continue;
 
-      // Filter out expired tokens
+      /** Filter out expired tokens */
       if (token.expiresAt < now) continue;
 
-      // Filter out revoked tokens
+      /** Filter out revoked tokens */
       if (token.revoked) continue;
 
-      // Filter out exhausted tokens (all uses consumed)
+      /** Filter out exhausted tokens (all uses consumed) */
       if (token.maxUses !== null && token.useCount >= token.maxUses) continue;
 
       tokens.push(token);
@@ -271,25 +325,29 @@ export class CloudflarePlatformAdapter implements PlatformAdapter {
   }
 
   async getInviteRedemption(planId: string, userId: string): Promise<InviteRedemption | undefined> {
-    // Search for ANY redemption by this user for this plan
-    // Key format: planId:tokenId:userId
+    /*
+     * Search for ANY redemption by this user for this plan
+     * Key format: planId:tokenId:userId
+     */
     const prefix = `${planId}:`;
 
-    // First check in-memory cache
+    /** First check in-memory cache */
     for (const [key, redemption] of this.redemptions.entries()) {
       if (key.startsWith(prefix) && redemption.redeemedBy === userId) {
         return redemption;
       }
     }
 
-    // Fall back to storage if not in cache
-    // This handles edge cases where cache might be incomplete
+    /*
+     * Fall back to storage if not in cache
+     * This handles edge cases where cache might be incomplete
+     */
     const stored = await this.ctx.storage.list<InviteRedemption>({
       prefix: `redemption:${planId}:`,
     });
 
     for (const [key, redemption] of stored) {
-      // Add to cache for future lookups
+      /** Add to cache for future lookups */
       const cacheKey = key.replace('redemption:', '');
       this.redemptions.set(cacheKey, redemption);
 
@@ -308,18 +366,18 @@ export class CloudflarePlatformAdapter implements PlatformAdapter {
   ): Promise<InviteRedemption | undefined> {
     const cacheKey = `${planId}:${tokenId}:${userId}`;
 
-    // Check in-memory cache first
+    /** Check in-memory cache first */
     const cached = this.redemptions.get(cacheKey);
     if (cached) {
       return cached;
     }
 
-    // Fall back to storage
+    /** Fall back to storage */
     const storageKey = `redemption:${cacheKey}`;
     const redemption = await this.ctx.storage.get<InviteRedemption>(storageKey);
 
     if (redemption) {
-      // Cache for future lookups
+      /** Cache for future lookups */
       this.redemptions.set(cacheKey, redemption);
     }
 
@@ -334,15 +392,15 @@ export class CloudflarePlatformAdapter implements PlatformAdapter {
   ): Promise<void> {
     const cacheKey = `${planId}:${tokenId}:${userId}`;
 
-    // Update in-memory cache
+    /** Update in-memory cache */
     this.redemptions.set(cacheKey, redemption);
 
-    // Persist to Durable Object storage
+    /** Persist to Durable Object storage */
     const storageKey = `redemption:${cacheKey}`;
     await this.ctx.storage.put(storageKey, redemption);
   }
 
-  // --- Authentication Operations ---
+  /** --- Authentication Operations --- */
 
   async validateGitHubToken(
     token: string
@@ -363,8 +421,12 @@ export class CloudflarePlatformAdapter implements PlatformAdapter {
         return { valid: false, error: `GitHub API error: ${response.status}` };
       }
 
-      const user = (await response.json()) as { login: string };
-      return { valid: true, username: user.login };
+      const json: unknown = await response.json();
+      const parseResult = GitHubUserResponseSchema.safeParse(json);
+      if (!parseResult.success) {
+        return { valid: false, error: 'Invalid response from GitHub API' };
+      }
+      return { valid: true, username: parseResult.data.login };
     } catch (error) {
       logger.error({ error }, '[validateGitHubToken] Failed to validate token');
       return { valid: false, error: 'Failed to validate GitHub token' };
@@ -372,11 +434,11 @@ export class CloudflarePlatformAdapter implements PlatformAdapter {
   }
 
   async getPlanOwnerId(planId: string): Promise<string | null> {
-    // Check in-memory cache first
+    /** Check in-memory cache first */
     const cached = this.planOwners.get(planId);
     if (cached) return cached;
 
-    // Fall back to storage
+    /** Fall back to storage */
     const storageKey = `plan_owner:${planId}`;
     const stored = await this.ctx.storage.get<string>(storageKey);
     if (stored) {
@@ -386,27 +448,27 @@ export class CloudflarePlatformAdapter implements PlatformAdapter {
   }
 
   async setPlanOwnerId(planId: string, ownerId: string): Promise<void> {
-    // Update in-memory cache
+    /** Update in-memory cache */
     this.planOwners.set(planId, ownerId);
 
-    // Persist to Durable Object storage
+    /** Persist to Durable Object storage */
     const storageKey = `plan_owner:${planId}`;
     await this.ctx.storage.put(storageKey, ownerId);
   }
 
-  // --- Crypto Operations (Web Crypto API - all async) ---
+  /** --- Crypto Operations (Web Crypto API - all async) --- */
 
   async generateTokenId(): Promise<string> {
-    // Short ID for URL (8 chars from UUID)
+    /** Short ID for URL (8 chars from UUID) */
     return crypto.randomUUID().slice(0, 8);
   }
 
   async generateTokenValue(): Promise<string> {
-    // 32 bytes of random data
+    /** 32 bytes of random data */
     const bytes = new Uint8Array(32);
     crypto.getRandomValues(bytes);
 
-    // Convert to base64url
+    /** Convert to base64url */
     return btoa(String.fromCharCode(...bytes))
       .replace(/\+/g, '-')
       .replace(/\//g, '_')
@@ -418,7 +480,7 @@ export class CloudflarePlatformAdapter implements PlatformAdapter {
     const data = encoder.encode(value);
     const hashBuffer = await crypto.subtle.digest('SHA-256', data);
 
-    // Convert to hex string
+    /** Convert to hex string */
     return Array.from(new Uint8Array(hashBuffer))
       .map((b) => b.toString(16).padStart(2, '0'))
       .join('');
@@ -427,8 +489,10 @@ export class CloudflarePlatformAdapter implements PlatformAdapter {
   async verifyTokenHash(value: string, hash: string): Promise<boolean> {
     const computedHash = await this.hashTokenValue(value);
 
-    // Implement timing-safe comparison to prevent timing attacks
-    // Web Crypto API doesn't provide timingSafeEqual, so we implement it manually
+    /*
+     * Implement timing-safe comparison to prevent timing attacks
+     * Web Crypto API doesn't provide timingSafeEqual, so we implement it manually
+     */
     return this.timingSafeCompare(computedHash, hash);
   }
 
@@ -437,19 +501,23 @@ export class CloudflarePlatformAdapter implements PlatformAdapter {
    * Compares strings in constant time regardless of where they differ.
    */
   private timingSafeCompare(a: string, b: string): boolean {
-    // If lengths differ, still do full comparison to avoid timing leak
-    // We'll use XOR to compare byte by byte
+    /*
+     * If lengths differ, still do full comparison to avoid timing leak
+     * We'll use XOR to compare byte by byte
+     */
     const aBytes = new TextEncoder().encode(a);
     const bBytes = new TextEncoder().encode(b);
 
-    // If lengths don't match, comparison should still take constant time
-    // Use the longer length and pad the shorter one
+    /*
+     * If lengths don't match, comparison should still take constant time
+     * Use the longer length and pad the shorter one
+     */
     const maxLen = Math.max(aBytes.length, bBytes.length);
 
     let result = aBytes.length === bBytes.length ? 0 : 1;
 
     for (let i = 0; i < maxLen; i++) {
-      // Use 0 for out-of-bounds to avoid timing leaks
+      /** Use 0 for out-of-bounds to avoid timing leaks */
       const aByte = i < aBytes.length ? aBytes[i] : 0;
       const bByte = i < bBytes.length ? bBytes[i] : 0;
       result |= aByte ^ bByte;
@@ -458,18 +526,21 @@ export class CloudflarePlatformAdapter implements PlatformAdapter {
     return result === 0;
   }
 
-  // --- WebSocket Operations ---
+  /** --- WebSocket Operations --- */
 
   sendMessage(ws: unknown, message: unknown): void {
-    const socket = ws as WebSocket;
+    if (!isCloudflareWebSocket(ws)) {
+      logger.error({}, '[sendMessage] Invalid WebSocket');
+      return;
+    }
     try {
-      socket.send(JSON.stringify(message));
+      ws.send(JSON.stringify(message));
     } catch (error) {
       logger.error({ error }, '[sendMessage] Failed to send message');
     }
   }
 
-  // --- Topic (Pub/Sub) Operations ---
+  /** --- Topic (Pub/Sub) Operations --- */
 
   getTopicSubscribers(topic: string): unknown[] {
     const subscribers = this.topics.get(topic);
@@ -477,123 +548,129 @@ export class CloudflarePlatformAdapter implements PlatformAdapter {
   }
 
   subscribeToTopic(ws: unknown, topic: string): void {
-    const socket = ws as WebSocket;
+    if (!isCloudflareWebSocket(ws)) {
+      logger.error({}, '[subscribeToTopic] Invalid WebSocket');
+      return;
+    }
 
-    // Add socket to topic's subscriber set
     if (!this.topics.has(topic)) {
       this.topics.set(topic, new Set());
     }
-    this.topics.get(topic)?.add(socket);
+    this.topics.get(topic)?.add(ws);
 
-    // Update connection state
-    let state = this.getConnectionState(socket);
+    let state = this.getConnectionState(ws);
     if (!state) {
       state = {
         id: crypto.randomUUID(),
         topics: new Set(),
       };
-      (socket as any).__state = state;
+      this.connectionStates.set(ws, state);
     }
     state.topics.add(topic);
 
-    // Persist for hibernation survival
-    this.persistConnectionState(socket, state);
+    this.persistConnectionState(ws, state);
   }
 
   unsubscribeFromTopic(ws: unknown, topic: string): void {
-    const socket = ws as WebSocket;
+    if (!isCloudflareWebSocket(ws)) {
+      logger.error({}, '[unsubscribeFromTopic] Invalid WebSocket');
+      return;
+    }
 
-    // Remove socket from topic's subscriber set
     const subscribers = this.topics.get(topic);
     if (subscribers) {
-      subscribers.delete(socket);
+      subscribers.delete(ws);
       if (subscribers.size === 0) {
         this.topics.delete(topic);
       }
     }
 
-    // Update connection state
-    const state = this.getConnectionState(socket);
+    const state = this.getConnectionState(ws);
     if (state) {
       state.topics.delete(topic);
-      this.persistConnectionState(socket, state);
+      this.persistConnectionState(ws, state);
     }
   }
 
   unsubscribeFromAllTopics(ws: unknown): void {
-    const socket = ws as WebSocket;
-    const state = this.getConnectionState(socket);
+    if (!isCloudflareWebSocket(ws)) {
+      logger.error({}, '[unsubscribeFromAllTopics] Invalid WebSocket');
+      return;
+    }
+    const state = this.getConnectionState(ws);
 
     if (!state) return;
 
-    // Remove socket from all topics
     for (const topic of state.topics) {
       const subscribers = this.topics.get(topic);
       if (subscribers) {
-        subscribers.delete(socket);
+        subscribers.delete(ws);
         if (subscribers.size === 0) {
           this.topics.delete(topic);
         }
       }
     }
 
-    // Clear connection's topic set (no need to persist since connection is closing)
     state.topics.clear();
   }
 
-  // --- Logging ---
+  /** --- Logging --- */
 
   info(message: string, ...args: unknown[]): void {
-    if (args.length > 0 && typeof args[0] === 'object' && args[0] !== null) {
-      logger.info(args[0] as Record<string, unknown>, message);
+    const firstArg = args[0];
+    if (args.length > 0 && isNonNullObject(firstArg)) {
+      logger.info(firstArg, message);
     } else {
       logger.info(message);
     }
   }
 
   warn(message: string, ...args: unknown[]): void {
-    if (args.length > 0 && typeof args[0] === 'object' && args[0] !== null) {
-      logger.warn(args[0] as Record<string, unknown>, message);
+    const firstArg = args[0];
+    if (args.length > 0 && isNonNullObject(firstArg)) {
+      logger.warn(firstArg, message);
     } else {
       logger.warn(message);
     }
   }
 
   error(message: string, ...args: unknown[]): void {
-    if (args.length > 0 && typeof args[0] === 'object' && args[0] !== null) {
-      logger.error(args[0] as Record<string, unknown>, message);
+    const firstArg = args[0];
+    if (args.length > 0 && isNonNullObject(firstArg)) {
+      logger.error(firstArg, message);
     } else {
       logger.error(message);
     }
   }
 
   debug(message: string, ...args: unknown[]): void {
-    if (args.length > 0 && typeof args[0] === 'object' && args[0] !== null) {
-      logger.debug(args[0] as Record<string, unknown>, message);
+    const firstArg = args[0];
+    if (args.length > 0 && isNonNullObject(firstArg)) {
+      logger.debug(firstArg, message);
     } else {
       logger.debug(message);
     }
   }
 
-  // --- Private Helper Methods ---
+  /** --- Private Helper Methods --- */
 
   /**
    * Get connection state from WebSocket.
-   * First checks in-memory state, then falls back to deserialized attachment.
+   * First checks WeakMap, then falls back to deserialized attachment.
    */
   private getConnectionState(ws: WebSocket): ConnectionState | null {
-    // Check in-memory state first
-    const inMemory = (ws as any).__state as ConnectionState | undefined;
-    if (inMemory) return inMemory;
+    /** Check WeakMap first */
+    const cached = this.connectionStates.get(ws);
+    if (cached) return cached;
 
-    // Fall back to deserialized attachment (after hibernation wake)
-    const attachment = ws.deserializeAttachment() as SerializedConnectionState | null;
-    if (attachment) {
+    /** Fall back to deserialized attachment (after hibernation wake) */
+    const attachment = ws.deserializeAttachment();
+    if (isSerializedConnectionState(attachment)) {
       const state: ConnectionState = {
         id: attachment.id,
         topics: new Set(attachment.topics),
       };
-      (ws as any).__state = state;
+      this.connectionStates.set(ws, state);
       return state;
     }
 

@@ -309,6 +309,19 @@ export type PlanEvent =
         requestId: string;
         response: unknown;
         answeredBy: string;
+        /** Original question message for display in activity timeline */
+        requestMessage?: string;
+        /** Original request type for context */
+        requestType?:
+          | 'text'
+          | 'multiline'
+          | 'choice'
+          | 'confirm'
+          | 'number'
+          | 'email'
+          | 'date'
+          | 'rating'
+          | 'multi';
       };
     })
   | (PlanEventBase & {
@@ -499,6 +512,20 @@ export const PlanEventSchema = z.discriminatedUnion('type', [
       requestId: z.string(),
       response: z.unknown(),
       answeredBy: z.string(),
+      requestMessage: z.string().optional(),
+      requestType: z
+        .enum([
+          'text',
+          'multiline',
+          'choice',
+          'confirm',
+          'number',
+          'email',
+          'date',
+          'rating',
+          'multi',
+        ])
+        .optional(),
     }),
   }),
   PlanEventBaseSchema.extend({
@@ -844,6 +871,19 @@ export function createLinkedPR(params: {
  * Create a GitHub artifact with validation.
  * Ensures storage discriminator is set correctly.
  */
+/**
+ * Zod schema specifically for GitHub artifacts (extracted from discriminated union).
+ */
+const GitHubArtifactParseSchema = z.object({
+  id: z.string(),
+  type: z.enum(['html', 'image', 'video']),
+  filename: z.string(),
+  description: z.string().optional(),
+  uploadedAt: z.number().optional(),
+  storage: z.literal('github'),
+  url: z.string(),
+});
+
 export function createGitHubArtifact(params: {
   type: ArtifactType;
   filename: string;
@@ -858,8 +898,21 @@ export function createGitHubArtifact(params: {
     uploadedAt: params.uploadedAt ?? Date.now(),
   } satisfies GitHubArtifact;
 
-  return ArtifactSchema.parse(artifact) as GitHubArtifact;
+  return GitHubArtifactParseSchema.parse(artifact);
 }
+
+/**
+ * Zod schema specifically for local artifacts (extracted from discriminated union).
+ */
+const LocalArtifactParseSchema = z.object({
+  id: z.string(),
+  type: z.enum(['html', 'image', 'video']),
+  filename: z.string(),
+  description: z.string().optional(),
+  uploadedAt: z.number().optional(),
+  storage: z.literal('local'),
+  localArtifactId: z.string(),
+});
 
 /**
  * Create a local artifact with validation.
@@ -879,7 +932,7 @@ export function createLocalArtifact(params: {
     uploadedAt: params.uploadedAt ?? Date.now(),
   } satisfies LocalArtifact;
 
-  return ArtifactSchema.parse(artifact) as LocalArtifact;
+  return LocalArtifactParseSchema.parse(artifact);
 }
 
 /**

@@ -10,6 +10,7 @@ import { z } from 'zod';
 import { getOrCreateDoc } from '../doc-store.js';
 import { exportPlanToMarkdown } from '../export-markdown.js';
 import { verifySessionToken } from '../session-token.js';
+import { formatLinkedPRsSection, formatPlanHeader } from './response-formatters.js';
 import { TOOL_NAMES } from './tool-names.js';
 
 const ReadPlanInput = z.object({
@@ -41,6 +42,7 @@ NOTE FOR CLAUDE CODE USERS: If you just received task approval via the hook, del
 - You need to refresh state after changes
 - You need to see linked PRs (set includeLinkedPRs=true)
 - You need to see inline diff comments (set includePRComments=true)
+- You need to see user responses to input requests (set includeAnnotations=true)
 
 USE CASES:
 - Review feedback from human reviewers (set includeAnnotations=true)
@@ -48,12 +50,14 @@ USE CASES:
 - Get block IDs for update_block_content operations
 - View linked PRs and their status (set includeLinkedPRs=true)
 - View inline PR diff comments (set includePRComments=true)
+- See user responses to requestUserInput() calls (set includeAnnotations=true)
 
 OUTPUT INCLUDES:
 - Metadata: title, status, repo, PR, timestamps
 - Content: Full markdown with block IDs
 - Deliverables section: Shows deliverable IDs and completion status
 - Annotations: Comment threads if includeAnnotations=true
+- Activity: Input requests and user responses if includeAnnotations=true
 - Linked PRs: PR list with status, URL, branch if includeLinkedPRs=true
 - PR Comments: Inline diff comments by file and line if includePRComments=true`,
     inputSchema: {
@@ -81,7 +85,6 @@ OUTPUT INCLUDES:
     },
   },
 
-  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Tool handler requires session validation, markdown export with deliverables/annotations/linked PRs/PR comments sections
   handler: async (args: unknown) => {
     const {
       planId,
@@ -105,7 +108,6 @@ OUTPUT INCLUDES:
       };
     }
 
-    // Verify session token
     if (
       !metadata.sessionTokenHash ||
       !verifySessionToken(sessionToken, metadata.sessionTokenHash)
@@ -121,31 +123,14 @@ OUTPUT INCLUDES:
       };
     }
 
-    // Export plan to markdown (with annotations if requested)
     const markdown = await exportPlanToMarkdown(doc, {
-      includeResolved: includeAnnotations, // Include resolved comments if showing annotations
+      includeResolved: includeAnnotations,
+      includeActivity: includeAnnotations,
     });
 
-    // Build metadata header
-    let output = `# ${metadata.title}\n\n`;
-    output += `**Status:** ${metadata.status.replace('_', ' ')}\n`;
-    if (metadata.repo) {
-      output += `**Repo:** ${metadata.repo}\n`;
-    }
-    if (metadata.pr) {
-      output += `**PR:** #${metadata.pr}\n`;
-    }
-    output += `**Created:** ${new Date(metadata.createdAt).toISOString()}\n`;
-    output += `**Updated:** ${new Date(metadata.updatedAt).toISOString()}\n`;
-    if (metadata.status === 'changes_requested' && metadata.reviewComment) {
-      output += `\n**Reviewer Comment:** ${metadata.reviewComment}\n`;
-    }
-    output += '\n---\n\n';
-
-    // Append markdown content
+    let output = formatPlanHeader(metadata);
     output += markdown;
 
-    // Append deliverables section if any exist (uses shared formatter)
     const deliverables = getDeliverables(doc);
     const deliverablesText = formatDeliverablesForLLM(deliverables);
     if (deliverablesText) {
@@ -153,33 +138,16 @@ OUTPUT INCLUDES:
       output += deliverablesText;
     }
 
-    // Append linked PRs section if requested
     if (includeLinkedPRs) {
       const linkedPRs = getLinkedPRs(doc);
-      if (linkedPRs.length > 0) {
-        output += '\n\n---\n\n';
-        output += '## Linked PRs\n\n';
-        for (const pr of linkedPRs) {
-          output += `- **#${pr.prNumber}** (${pr.status})`;
-          if (pr.title) {
-            output += ` - ${pr.title}`;
-          }
-          output += '\n';
-          output += `  - URL: ${pr.url}\n`;
-          if (pr.branch) {
-            output += `  - Branch: ${pr.branch}\n`;
-          }
-          output += `  - Linked: ${new Date(pr.linkedAt).toISOString()}\n`;
-        }
-      }
+      output += formatLinkedPRsSection(linkedPRs);
     }
 
-    // Append PR review comments section if requested
     if (includePRComments) {
       const prComments = getPRReviewComments(doc);
       if (prComments.length > 0) {
         const prCommentsText = formatDiffCommentsForLLM(prComments, {
-          includeResolved: false, // Only show unresolved by default
+          includeResolved: false,
         });
         if (prCommentsText) {
           output += '\n\n---\n\n';

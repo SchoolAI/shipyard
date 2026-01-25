@@ -14,7 +14,6 @@ import { describe, expect, it, vi } from 'vitest';
 import { DateInput } from './DateInput';
 import type { DateInputRequest } from './types';
 
-// Factory for creating test requests
 function createDateRequest(overrides: Partial<DateInputRequest> = {}): DateInputRequest {
   return {
     id: 'test-id',
@@ -38,7 +37,6 @@ describe('DateInput', () => {
     const request = createDateRequest();
     render(<DateInput request={request} value="" setValue={vi.fn()} isSubmitting={false} />);
 
-    // Date inputs have no role in happy-dom, but we can check the type
     const input = document.querySelector('input[type="date"]');
     expect(input).toBeInTheDocument();
   });
@@ -51,7 +49,6 @@ describe('DateInput', () => {
     render(<DateInput request={request} value="" setValue={setValue} isSubmitting={false} />);
 
     const input = document.querySelector('input[type="date"]') as HTMLInputElement;
-    // Clear and type a new date
     await user.clear(input);
     await user.type(input, '2024-06-15');
 

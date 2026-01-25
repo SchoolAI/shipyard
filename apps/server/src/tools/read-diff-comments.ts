@@ -121,12 +121,11 @@ OUTPUT FORMAT:
 
     const doc = await getOrCreateDoc(planId);
 
-    // Verify session token (reuse pattern from read-plan)
+    /** Verify session token */
     const metadata = doc.getMap('metadata').toJSON();
-    if (
-      !metadata.sessionTokenHash ||
-      !verifySessionToken(sessionToken, metadata.sessionTokenHash as string)
-    ) {
+    const tokenHash =
+      typeof metadata.sessionTokenHash === 'string' ? metadata.sessionTokenHash : '';
+    if (!tokenHash || !verifySessionToken(sessionToken, tokenHash)) {
       return {
         content: [
           {
@@ -138,7 +137,7 @@ OUTPUT FORMAT:
       };
     }
 
-    // Gather comments based on filters
+    /** Gather comments based on filters */
     const allComments = [];
 
     if (includeLocal) {
@@ -151,7 +150,7 @@ OUTPUT FORMAT:
       allComments.push(...prComments);
     }
 
-    // Format for LLM
+    /** Format for LLM output */
     if (allComments.length === 0) {
       return {
         content: [
@@ -163,7 +162,7 @@ OUTPUT FORMAT:
       };
     }
 
-    // Get staleness context for local comments (HEAD SHA and current file diffs)
+    /** Get staleness context for local comments (HEAD SHA and current file diffs) */
     const stalenessContext = includeLocal ? getStalenessContext(doc) : {};
 
     const formatted = formatDiffCommentsForLLM(allComments, {

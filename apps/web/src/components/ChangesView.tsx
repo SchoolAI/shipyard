@@ -24,7 +24,7 @@ import { assertNever } from '@/utils/assert-never';
 import { type DiffViewMode, FileDiffView } from './diff';
 import { LocalChangesViewer } from './LocalChangesViewer';
 
-// --- LocalStorage Helpers ---
+/** --- LocalStorage Helpers --- */
 
 const DIFF_VIEW_MODE_KEY = 'shipyard:diff-view-mode';
 
@@ -41,7 +41,7 @@ function setDiffViewModePreference(mode: DiffViewMode): void {
   try {
     localStorage.setItem(DIFF_VIEW_MODE_KEY, mode);
   } catch {
-    // Ignore localStorage errors
+    /** Ignore localStorage errors */
   }
 }
 
@@ -84,14 +84,14 @@ export function ChangesView({
   const [selectedPR, setSelectedPR] = useState<number | null>(null);
   const { identity } = useGitHubAuth();
 
-  // Determine default source: local if available, otherwise PR
+  /** Determine default source: local if available, otherwise PR */
   const [source, setSource] = useState<ChangeSource>('local');
 
-  // Track PR fetching state and provide refetch trigger
+  /** Track PR fetching state and provide refetch trigger */
   const [prFetching, setPRFetching] = useState(false);
   const [prRefetchTrigger, setPRRefetchTrigger] = useState(0);
 
-  // Local changes hook - enabled when source is 'local' and tab is active
+  /** Local changes hook - enabled when source is 'local' and tab is active */
   const {
     data: localChanges,
     isLoading: localLoading,
@@ -99,18 +99,18 @@ export function ChangesView({
     refetch: refetchLocal,
   } = useLocalChanges(metadata.id, { enabled: source === 'local' && isActive });
 
-  // Refetch local changes when tab becomes active
+  /** Refetch local changes when tab becomes active */
   useEffect(() => {
     if (isActive && source === 'local') {
       refetchLocal();
     }
   }, [isActive, source, refetchLocal]);
 
-  // Derive selected PR and hasPRs early so they can be used in effects
+  /** Derive selected PR and hasPRs early so they can be used in effects */
   const selected = linkedPRs.find((pr) => pr.prNumber === selectedPR) ?? linkedPRs[0] ?? null;
   const hasPRs = linkedPRs.length > 0;
 
-  // Expose full changes view state to parent for header rendering
+  /** Expose full changes view state to parent for header rendering */
   useEffect(() => {
     if (onChangesViewState) {
       onChangesViewState({
@@ -140,7 +140,7 @@ export function ChangesView({
     prFetching,
   ]);
 
-  // Auto-select first PR when available
+  /** Auto-select first PR when available */
   useEffect(() => {
     if (linkedPRs.length > 0 && selectedPR === null) {
       const firstPR = linkedPRs[0];
@@ -150,7 +150,7 @@ export function ChangesView({
     }
   }, [linkedPRs, selectedPR]);
 
-  // PR status refresh - check GitHub for updated statuses
+  /** PR status refresh - check GitHub for updated statuses */
   useEffect(() => {
     if (linkedPRs.length === 0 || !metadata.repo || !identity?.token) {
       return;
@@ -171,7 +171,7 @@ export function ChangesView({
           );
 
           if (!response.ok) {
-            // 404 = PR deleted or moved, just skip
+            /** 404 = PR deleted or moved, just skip */
             if (response.status === 404) {
               continue;
             }
@@ -187,12 +187,12 @@ export function ChangesView({
                 ? 'draft'
                 : 'open';
 
-          // Only update if status changed
+          /** Only update if status changed */
           if (newStatus !== pr.status) {
             updateLinkedPRStatus(ydoc, pr.prNumber, newStatus);
           }
         } catch (_error) {
-          // Continue with other PRs even if one fails
+          /** Continue with other PRs even if one fails */
         }
       }
     };
@@ -244,7 +244,7 @@ export function ChangesView({
   );
 }
 
-// --- Subcomponents ---
+/** --- Subcomponents --- */
 
 interface PRCardProps {
   pr: LinkedPR;
@@ -253,7 +253,7 @@ interface PRCardProps {
 }
 
 function PRCard({ pr, selected, onSelect }: PRCardProps) {
-  // Map PR status to HeroUI Chip color using exhaustive switch
+  /** Map PR status to HeroUI Chip color using exhaustive switch */
   const getStatusColor = (
     status: LinkedPR['status']
   ): 'default' | 'success' | 'accent' | 'danger' => {
@@ -314,10 +314,10 @@ function DiffViewer({ pr, repo, ydoc, refetchTrigger = 0, onFetchingChange }: Di
   const [viewMode, setViewMode] = useState<DiffViewMode>(getDiffViewModePreference);
   const { identity } = useGitHubAuth();
 
-  // Get all comments for this PR
+  /** Get all comments for this PR */
   const comments = usePRReviewComments(ydoc, pr.prNumber);
 
-  // Memoize commentSupport to prevent unnecessary re-renders of FileDiffView
+  /** Memoize commentSupport to prevent unnecessary re-renders of FileDiffView */
   const commentSupport = useMemo(
     () => ({
       type: 'pr' as const,
@@ -329,13 +329,13 @@ function DiffViewer({ pr, repo, ydoc, refetchTrigger = 0, onFetchingChange }: Di
     [pr.prNumber, comments, ydoc, identity?.username]
   );
 
-  // Handle view mode change with localStorage persistence
+  /** Handle view mode change with localStorage persistence */
   const handleViewModeChange = useCallback((mode: DiffViewMode) => {
     setViewMode(mode);
     setDiffViewModePreference(mode);
   }, []);
 
-  // Count comments per file
+  /** Count comments per file */
   const commentCountByFile = useMemo(() => {
     const counts = new Map<string, number>();
     for (const comment of comments) {
@@ -345,30 +345,30 @@ function DiffViewer({ pr, repo, ydoc, refetchTrigger = 0, onFetchingChange }: Di
     return counts;
   }, [comments]);
 
-  // Build file tree (must be before conditional returns!)
+  /** Build file tree (must be before conditional returns!) */
   const fileTree = useMemo(() => buildFileTreeData(files), [files]);
   const treeRef = useRef<TreeApi<FileTreeData>>(null);
 
-  // Handle file selection from tree (MUST be before conditional returns!)
+  /** Handle file selection from tree (MUST be before conditional returns!) */
   const handleFileSelect = useCallback((nodes: NodeApi<FileTreeData>[]) => {
-    // react-arborist passes NodeApi objects
+    /** react-arborist passes NodeApi objects */
     const node = nodes[0];
     if (!node) return;
 
-    // Get the file from the node's data
+    /** Get the file from the node's data */
     const fileData = node.data;
     if (fileData.file) {
       setSelectedFile(fileData.file.filename);
     }
   }, []);
 
-  // Create node renderer with comment counts (MUST be before conditional returns!)
+  /** Create node renderer with comment counts (MUST be before conditional returns!) */
   const NodeRenderer = useMemo(
     () => createFileTreeNode(commentCountByFile, setSelectedFile),
     [commentCountByFile]
   );
 
-  // Fetch file list directly from GitHub API
+  /** Fetch file list directly from GitHub API */
   // biome-ignore lint/correctness/useExhaustiveDependencies: refetchTrigger intentionally triggers re-fetch when incremented
   useEffect(() => {
     if (!repo) return;
@@ -377,7 +377,7 @@ function DiffViewer({ pr, repo, ydoc, refetchTrigger = 0, onFetchingChange }: Di
     setError(null);
     onFetchingChange?.(true);
 
-    // Build headers with optional auth for private repos
+    /** Build headers with optional auth for private repos */
     const headers: HeadersInit = {
       Accept: 'application/vnd.github+json',
     };
@@ -385,7 +385,7 @@ function DiffViewer({ pr, repo, ydoc, refetchTrigger = 0, onFetchingChange }: Di
       headers.Authorization = `Bearer ${identity.token}`;
     }
 
-    // Fetch directly from GitHub API
+    /** Fetch directly from GitHub API */
     fetch(`https://api.github.com/repos/${repo}/pulls/${pr.prNumber}/files`, { headers })
       .then((res) => {
         if (!res.ok) throw new Error(`GitHub API returned ${res.status}`);
@@ -423,7 +423,7 @@ function DiffViewer({ pr, repo, ydoc, refetchTrigger = 0, onFetchingChange }: Di
       });
   }, [pr.prNumber, repo, identity?.token, refetchTrigger, onFetchingChange]);
 
-  // Auto-select first file when files load
+  /** Auto-select first file when files load */
   useEffect(() => {
     if (files.length > 0 && selectedFile === null) {
       const firstFile = files[0];
@@ -515,7 +515,7 @@ function DiffViewer({ pr, repo, ydoc, refetchTrigger = 0, onFetchingChange }: Di
   );
 }
 
-// --- Helper Components ---
+/** --- Helper Components --- */
 
 interface PRFile {
   filename: string;
@@ -526,13 +526,13 @@ interface PRFile {
   patch?: string;
 }
 
-// --- File Tree Types and Helpers (react-arborist) ---
+/** --- File Tree Types and Helpers (react-arborist) --- */
 
 interface FileTreeData {
   id: string;
   name: string;
   children?: FileTreeData[];
-  file?: PRFile; // Only for file nodes
+  file?: PRFile;
 }
 
 /**
@@ -557,7 +557,7 @@ function buildFileTreeData(files: PRFile[]): FileTreeData[] {
       const isFile = i === parts.length - 1;
       const path = parts.slice(0, i + 1).join('/');
 
-      // Find existing child or create new one
+      /** Find existing child or create new one */
       let childNode = currentNode.children?.find((c) => c.name === part);
 
       if (!childNode) {
@@ -570,24 +570,24 @@ function buildFileTreeData(files: PRFile[]): FileTreeData[] {
         currentNode.children?.push(childNode);
       }
 
-      // Move to next level if folder
+      /** Move to next level if folder */
       if (!isFile) {
         currentNode = childNode;
       }
     }
   }
 
-  // Sort recursively
+  /** Sort recursively */
   const sortNodes = (nodes: FileTreeData[]): FileTreeData[] => {
     return nodes
       .sort((a, b) => {
-        // Folders before files
+        /** Folders before files */
         const aIsFolder = a.children !== undefined;
         const bIsFolder = b.children !== undefined;
         if (aIsFolder !== bIsFolder) {
           return aIsFolder ? -1 : 1;
         }
-        // Alphabetical
+        /** Alphabetical */
         return a.name.localeCompare(b.name);
       })
       .map((node) => ({
@@ -632,7 +632,7 @@ function createFileTreeNode(
       );
     }
 
-    // File node
+    /** File node */
     return (
       <button
         type="button"

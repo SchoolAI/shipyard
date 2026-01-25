@@ -7,7 +7,6 @@
  * Returns '--:--' for uninitialized state (negative values).
  */
 export function formatTime(seconds: number): string {
-  // Handle sentinel value (-1 = not yet initialized)
   if (seconds < 0) return '--:--';
   const mins = Math.floor(seconds / 60);
   const secs = seconds % 60;

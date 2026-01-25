@@ -154,16 +154,16 @@ export function DeliverablesView({
   const deliverables = useDeliverables(ydoc);
   const artifacts = useArtifacts(ydoc);
 
-  // Create map of artifactId → artifact for fast lookup
+  /** Create map of artifactId → artifact for fast lookup */
   const artifactMap = new Map(artifacts.map((a) => [a.id, a]));
 
-  // Enrich deliverables with artifact data
+  /** Enrich deliverables with artifact data */
   const enrichedDeliverables: EnrichedDeliverable[] = deliverables.map((d) => ({
     deliverable: d,
     artifact: d.linkedArtifactId ? artifactMap.get(d.linkedArtifactId) : undefined,
   }));
 
-  // Determine what to show: deliverables or fall back to artifacts
+  /** Determine what to show: deliverables or fall back to artifacts */
   const useDeliverablesView = deliverables.length > 0;
   const itemsToShow = useDeliverablesView ? enrichedDeliverables : artifacts;
   const completedCount = useDeliverablesView
@@ -180,7 +180,7 @@ export function DeliverablesView({
       return;
     }
 
-    // Use type-safe status transition helper
+    /** Use type-safe status transition helper */
     const result = transitionPlanStatus(
       ydoc,
       {
@@ -192,11 +192,11 @@ export function DeliverablesView({
     );
 
     if (!result.success) {
-      // Failed to transition - index update still happens via observer
+      /** Failed to transition - index update still happens via observer */
     }
   };
 
-  // Determine chip color based on completion status
+  /** Determine chip color based on completion status */
   const getChipColor = () => {
     if (totalCount === 0) return 'default';
     if (completedCount === totalCount) return 'success';
@@ -221,15 +221,17 @@ export function DeliverablesView({
         <div className="flex flex-col gap-3">
           {useDeliverablesView
             ? enrichedDeliverables.map((item) => {
-                // Create a synthetic artifact for the DeliverableCard
-                // If no artifact, create a stub GitHub artifact for display purposes
+                /*
+                 * Create a synthetic artifact for the DeliverableCard
+                 * If no artifact, create a stub GitHub artifact for display purposes
+                 */
                 const syntheticArtifact: Artifact = item.artifact || {
                   id: item.deliverable.id,
-                  type: 'image', // default type for unlinked deliverables
+                  type: 'image',
                   storage: 'github',
                   filename: '',
                   description: item.deliverable.text,
-                  url: '', // Empty URL for unlinked deliverables
+                  url: '',
                   uploadedAt: item.deliverable.linkedAt,
                 };
 

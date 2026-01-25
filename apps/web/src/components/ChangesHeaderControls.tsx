@@ -42,12 +42,12 @@ import type { ChangesViewState } from './ChangesView';
  * so we need to infer the cause based on auth state.
  */
 type PublishErrorType =
-  | 'needs_repo_scope' // Token doesn't have repo scope for private repos
-  | 'needs_write_access' // User doesn't have write access to the repository
-  | 'pr_not_found' // PR genuinely doesn't exist
-  | 'rate_limited' // GitHub API rate limit exceeded
-  | 'network_error' // Network connectivity issue
-  | 'unknown'; // Unknown error
+  | 'needs_repo_scope'
+  | 'needs_write_access'
+  | 'pr_not_found'
+  | 'rate_limited'
+  | 'network_error'
+  | 'unknown';
 
 interface PublishError {
   type: PublishErrorType;
@@ -79,7 +79,6 @@ export function ChangesHeaderControls({ state, repo, ydoc }: ChangesHeaderContro
       status: number,
       responseBody: { message?: string; documentation_url?: string }
     ): PublishError => {
-      // Rate limiting
       if (status === 403 && responseBody.message?.toLowerCase().includes('rate limit')) {
         return {
           type: 'rate_limited',
@@ -87,7 +86,6 @@ export function ChangesHeaderControls({ state, repo, ydoc }: ChangesHeaderContro
         };
       }
 
-      // 403 Forbidden - permission denied (explicit)
       if (status === 403) {
         return {
           type: 'needs_write_access',
@@ -96,7 +94,6 @@ export function ChangesHeaderControls({ state, repo, ydoc }: ChangesHeaderContro
         };
       }
 
-      // 401 Unauthorized - token invalid
       if (status === 401) {
         return {
           type: 'needs_repo_scope',
@@ -104,10 +101,11 @@ export function ChangesHeaderControls({ state, repo, ydoc }: ChangesHeaderContro
         };
       }
 
-      // 404 Not Found - ambiguous: could be permission or genuinely not found
-      // GitHub returns 404 for private resources you can't access (privacy protection)
+      /**
+       * 404 is ambiguous: GitHub returns it for both "not found" and "no permission"
+       * to protect privacy of private resources.
+       */
       if (status === 404) {
-        // If user doesn't have repo scope, they can't access private PRs
         if (!hasRepoScope) {
           return {
             type: 'needs_repo_scope',
@@ -116,8 +114,6 @@ export function ChangesHeaderControls({ state, repo, ydoc }: ChangesHeaderContro
           };
         }
 
-        // Has repo scope but still 404 - either genuinely not found or no write access
-        // Since the PR was linked, it likely exists, so it's probably a permission issue
         return {
           type: 'needs_write_access',
           message:
@@ -125,7 +121,6 @@ export function ChangesHeaderControls({ state, repo, ydoc }: ChangesHeaderContro
         };
       }
 
-      // Other errors
       return {
         type: 'unknown',
         message: responseBody.message || `GitHub API error (HTTP ${status})`,
@@ -137,7 +132,6 @@ export function ChangesHeaderControls({ state, repo, ydoc }: ChangesHeaderContro
   const handlePublish = useCallback(async () => {
     if (!selectedPR || !repo) return;
 
-    // Clear any previous error
     setPublishError(null);
 
     if (!identity?.token) {
@@ -167,7 +161,6 @@ export function ChangesHeaderControls({ state, repo, ydoc }: ChangesHeaderContro
         const classifiedError = classifyPublishError(response.status, errorData);
         setPublishError(classifiedError);
 
-        // Show toast for transient errors, not for permission issues (those show inline)
         if (classifiedError.type === 'rate_limited' || classifiedError.type === 'unknown') {
           toast.error(classifiedError.message);
         }
@@ -177,7 +170,6 @@ export function ChangesHeaderControls({ state, repo, ydoc }: ChangesHeaderContro
       updateLinkedPRStatus(ydoc, selectedPR.prNumber, 'open');
       toast.success('PR published successfully');
     } catch (_err) {
-      // Network error - couldn't reach GitHub
       setPublishError({
         type: 'network_error',
         message: 'Could not connect to GitHub. Check your internet connection.',
@@ -188,7 +180,6 @@ export function ChangesHeaderControls({ state, repo, ydoc }: ChangesHeaderContro
     }
   }, [selectedPR, repo, ydoc, identity?.token, startAuth, classifyPublishError]);
 
-  // Clear error when user starts a new auth flow
   const handleRequestRepoAccess = useCallback(() => {
     setPublishError(null);
     requestRepoAccess();
@@ -199,7 +190,6 @@ export function ChangesHeaderControls({ state, repo, ydoc }: ChangesHeaderContro
     startAuth();
   }, [startAuth]);
 
-  // Handle dropdown menu actions
   const handleAction = useCallback(
     (key: React.Key) => {
       if (key === 'publish') {
@@ -217,7 +207,6 @@ export function ChangesHeaderControls({ state, repo, ydoc }: ChangesHeaderContro
 
   return (
     <div className="flex items-center gap-2 pb-1.5 md:pb-2">
-      {/* Source Toggle - Only show if PRs exist */}
       {hasPRs && selectedPR && (
         <ButtonGroup size="sm" variant="ghost" hideSeparator>
           <Button
@@ -239,7 +228,6 @@ export function ChangesHeaderControls({ state, repo, ydoc }: ChangesHeaderContro
         </ButtonGroup>
       )}
 
-      {/* Info Dropdown - Contextual info only */}
       <Dropdown>
         <Button size="sm" variant="secondary" className="gap-1">
           {source === 'local' ? (
@@ -274,7 +262,6 @@ export function ChangesHeaderControls({ state, repo, ydoc }: ChangesHeaderContro
         </Dropdown.Popover>
       </Dropdown>
 
-      {/* Refresh Button - For both local and PR views */}
       <Button
         size="sm"
         variant="secondary"
@@ -299,8 +286,6 @@ export function ChangesHeaderControls({ state, repo, ydoc }: ChangesHeaderContro
     </div>
   );
 }
-
-// --- Subcomponents ---
 
 interface LocalInfoDropdownProps {
   localChanges: ChangesViewState['localChanges'];
@@ -490,8 +475,6 @@ function PRInfoDropdown({ selectedPR, repo, isPublishing, publishError }: PRInfo
     </>
   );
 }
-
-// --- Helper Components ---
 
 function PRStatusChip({ status }: { status: LinkedPR['status'] }) {
   const color =

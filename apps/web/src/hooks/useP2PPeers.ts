@@ -8,9 +8,10 @@
  * @see Issue #41 - Context Teleportation
  */
 
-import type { EnvironmentContext } from '@shipyard/schema';
+import { type EnvironmentContext, EnvironmentContextSchema } from '@shipyard/schema';
 import { useCallback, useEffect, useState } from 'react';
 import type { WebrtcProvider } from 'y-webrtc';
+import { z } from 'zod';
 
 /**
  * Represents a connected P2P peer with identity information.
@@ -37,23 +38,52 @@ export interface ConnectedPeer {
 }
 
 /**
+ * Schema for validating awareness state from P2P peers.
+ * SECURITY: Awareness data from peers is UNTRUSTED external input.
+ */
+const AwarenessUserSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  color: z.string(),
+});
+
+const AwarenessPlanStatusSchema = z.object({
+  user: AwarenessUserSchema.optional(),
+  isOwner: z.boolean().optional(),
+  webrtcPeerId: z.string().optional(),
+  platform: z.string().optional(),
+  context: EnvironmentContextSchema.optional(),
+});
+
+const AwarenessStateSchema = z.object({
+  planStatus: AwarenessPlanStatusSchema.optional(),
+});
+
+/**
  * Extracts user info from awareness state.
  * Handles the planStatus field set by useMultiProviderSync.
+ * SECURITY: Validates untrusted peer data with Zod schema.
  */
 function extractPeerInfo(peerId: number, state: Record<string, unknown>): ConnectedPeer | null {
-  // The awareness state contains planStatus from useMultiProviderSync
-  const planStatus = state.planStatus as
-    | {
-        user?: { id: string; name: string; color: string };
-        isOwner?: boolean;
-        webrtcPeerId?: string;
-        platform?: string;
-        context?: EnvironmentContext;
-      }
-    | undefined;
+  /** Validate awareness state from untrusted peer */
+  const validated = AwarenessStateSchema.safeParse(state);
+  if (!validated.success) {
+    /** Invalid peer data - return minimal info */
+    return {
+      webrtcPeerId: undefined,
+      platform: 'browser',
+      name: `Peer ${peerId}`,
+      color: '#888888',
+      isOwner: false,
+      connectedAt: Date.now(),
+      context: undefined,
+    };
+  }
+
+  const planStatus = validated.data.planStatus;
 
   if (!planStatus?.user) {
-    // Unknown peer without identity - still track them
+    /** Unknown peer without identity - still track them */
     return {
       webrtcPeerId: planStatus?.webrtcPeerId,
       platform: planStatus?.platform ?? 'browser',
@@ -109,10 +139,12 @@ export function useP2PPeers(rtcProvider: WebrtcProvider | null): UseP2PPeersResu
     const peers: ConnectedPeer[] = [];
 
     states.forEach((state, clientId) => {
-      // Skip ourselves
+      /** Skip ourselves */
       if (clientId === myClientId) return;
 
-      const peerInfo = extractPeerInfo(clientId, state as Record<string, unknown>);
+      const stateRecord =
+        state && typeof state === 'object' ? Object.fromEntries(Object.entries(state)) : {};
+      const peerInfo = extractPeerInfo(clientId, stateRecord);
       if (peerInfo) {
         peers.push(peerInfo);
       }
@@ -129,10 +161,10 @@ export function useP2PPeers(rtcProvider: WebrtcProvider | null): UseP2PPeersResu
 
     const awareness = rtcProvider.awareness;
 
-    // Initial load
+    /** Initial load */
     refresh();
 
-    // Subscribe to awareness changes
+    /** Subscribe to awareness changes */
     const handleChange = () => {
       refresh();
     };

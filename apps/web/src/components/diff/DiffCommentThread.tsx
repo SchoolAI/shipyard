@@ -35,7 +35,6 @@ export function DiffCommentThread({
 }: DiffCommentThreadProps) {
   const handleResolve = useCallback(
     (commentId: string, resolved: boolean) => {
-      // Find the comment to determine its type
       const comment = comments.find((c) => c.id === commentId);
       if (!comment) return;
 
@@ -50,7 +49,6 @@ export function DiffCommentThread({
 
   const handleDelete = useCallback(
     (commentId: string) => {
-      // Find the comment to determine its type
       const comment = comments.find((c) => c.id === commentId);
       if (!comment) return;
 

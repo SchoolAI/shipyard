@@ -9,6 +9,7 @@
  *   echo '{"session_id": "...", ...}' | shipyard-hook
  */
 
+import { isBuffer } from '@shipyard/schema';
 import { CLAUDE_CODE_INSTRUCTIONS } from '@shipyard/shared/instructions';
 import { claudeCodeAdapter } from './adapters/claude-code.js';
 import type { AdapterEvent, AgentAdapter, CoreResponse } from './adapters/types.js';
@@ -81,25 +82,25 @@ async function handlePlanExit(
   try {
     return await checkReviewStatus(event.sessionId, event.planContent, event.metadata);
   } catch (err) {
-    const error = err as Error & { code?: string; cause?: Error };
-    logger.error(
-      { err: error, message: error.message, code: error.code },
-      'Failed to check review status'
-    );
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    const errorCode =
+      err instanceof Error && 'code' in err && typeof err.code === 'string' ? err.code : undefined;
+
+    logger.error({ err, message: errorMessage, code: errorCode }, 'Failed to check review status');
 
     const isConnectionError =
-      error.code === 'ECONNREFUSED' ||
-      error.code === 'ECONNRESET' ||
-      error.code === 'ETIMEDOUT' ||
-      error.code === 'ENOTFOUND' ||
-      error.message?.includes('connect') ||
-      error.message?.includes('timeout') ||
-      error.message?.includes('WebSocket') ||
-      error.message?.includes('not available');
+      errorCode === 'ECONNREFUSED' ||
+      errorCode === 'ECONNRESET' ||
+      errorCode === 'ETIMEDOUT' ||
+      errorCode === 'ENOTFOUND' ||
+      errorMessage?.includes('connect') ||
+      errorMessage?.includes('timeout') ||
+      errorMessage?.includes('WebSocket') ||
+      errorMessage?.includes('not available');
 
     const message = isConnectionError
       ? 'Cannot connect to Shipyard server. Ensure the Shipyard MCP server is running. Check ~/.shipyard/hook-debug.log for details.'
-      : `Review system error: ${error.message}. Check ~/.shipyard/hook-debug.log for details.`;
+      : `Review system error: ${errorMessage}. Check ~/.shipyard/hook-debug.log for details.`;
 
     return {
       allow: false,
@@ -195,7 +196,10 @@ async function readStdin(): Promise<string> {
   const chunks: Buffer[] = [];
 
   for await (const chunk of process.stdin) {
-    chunks.push(chunk as Buffer);
+    // NOTE: process.stdin yields Buffer chunks in Node.js, but TypeScript types it as `any`
+    if (isBuffer(chunk)) {
+      chunks.push(chunk);
+    }
   }
 
   return Buffer.concat(chunks).toString('utf-8');
@@ -256,6 +260,7 @@ async function main(): Promise<void> {
     process.exit(0);
   } catch (err) {
     logger.error({ err }, 'Hook error, failing closed');
+    const errorMessage = err instanceof Error ? err.message : String(err);
     // biome-ignore lint/suspicious/noConsole: Hook output MUST go to stdout
     console.log(
       JSON.stringify({
@@ -263,7 +268,7 @@ async function main(): Promise<void> {
           hookEventName: 'PermissionRequest',
           decision: {
             behavior: 'deny',
-            message: `Hook error: ${(err as Error).message}. Check ~/.shipyard/hook-debug.log for details.`,
+            message: `Hook error: ${errorMessage}. Check ~/.shipyard/hook-debug.log for details.`,
           },
         },
       })

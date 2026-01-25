@@ -22,7 +22,7 @@ function handlePublish(platform: PlatformAdapter, ws: unknown, message: PublishM
 
   const subscribers = platform.getTopicSubscribers(message.topic);
 
-  // Log publish attempt for debugging
+  /** Log publish attempt for debugging */
   const recipientCount = subscribers.filter((s) => s !== ws).length;
   platform.debug(
     `[Publish] Topic: ${message.topic}, subscribers: ${subscribers.length}, will relay to: ${recipientCount}`
@@ -33,13 +33,13 @@ function handlePublish(platform: PlatformAdapter, ws: unknown, message: PublishM
     return;
   }
 
-  // Add client count to message (y-webrtc uses this)
+  /** Add client count to message (y-webrtc uses this) */
   const outMessage: PublishMessage = {
     ...message,
     clients: subscribers.length,
   };
 
-  // Broadcast to all subscribers except sender
+  /** Broadcast to all subscribers except sender */
   for (const subscriber of subscribers) {
     if (subscriber === ws) continue;
     platform.sendMessage(subscriber, outMessage);

@@ -14,8 +14,10 @@ import type { InviteRedemption, InviteToken } from '@shipyard/schema';
  * storage, crypto, WebSocket connections, pub/sub topics, and logging.
  */
 export interface PlatformAdapter {
-  // --- Storage Operations ---
-  // For invite tokens and redemptions only (approval state removed).
+  /*
+   * --- Storage Operations ---
+   * For invite tokens and redemptions only (approval state removed).
+   */
 
   /**
    * Get invite token by plan ID and token ID.
@@ -74,9 +76,11 @@ export interface PlatformAdapter {
     redemption: InviteRedemption
   ): Promise<void>;
 
-  // --- Crypto Operations ---
-  // All crypto operations are async to support Web Crypto API (Cloudflare).
-  // Node.js can use sync crypto functions but wrap in Promise.resolve().
+  /*
+   * --- Crypto Operations ---
+   * All crypto operations are async to support Web Crypto API (Cloudflare).
+   * Node.js can use sync crypto functions but wrap in Promise.resolve().
+   */
 
   /**
    * Generate a random token ID (8 characters).
@@ -105,10 +109,12 @@ export interface PlatformAdapter {
    */
   verifyTokenHash(value: string, hash: string): Promise<boolean>;
 
-  // --- WebSocket Operations ---
-  // WebSocket type is unknown because each platform uses different types:
-  // - Node.js: import('ws').WebSocket
-  // - Cloudflare: WebSocket (global)
+  /*
+   * --- WebSocket Operations ---
+   * WebSocket type is unknown because each platform uses different types:
+   * - Node.js: import('ws').WebSocket
+   * - Cloudflare: WebSocket (global)
+   */
 
   /**
    * Send a JSON message to a WebSocket connection.
@@ -116,9 +122,11 @@ export interface PlatformAdapter {
    */
   sendMessage(ws: unknown, message: unknown): void;
 
-  // --- Topic (Pub/Sub) Operations ---
-  // Topics represent WebRTC rooms (plan IDs). Clients subscribe to topics
-  // to receive signaling messages for that room.
+  /*
+   * --- Topic (Pub/Sub) Operations ---
+   * Topics represent WebRTC rooms (plan IDs). Clients subscribe to topics
+   * to receive signaling messages for that room.
+   */
 
   /**
    * Get all WebSocket connections subscribed to a topic.
@@ -144,8 +152,10 @@ export interface PlatformAdapter {
    */
   unsubscribeFromAllTopics(ws: unknown): void;
 
-  // --- Authentication Operations ---
-  // For validating user identity and plan ownership.
+  /*
+   * --- Authentication Operations ---
+   * For validating user identity and plan ownership.
+   */
 
   /**
    * Validate a GitHub OAuth token and return the authenticated username.
@@ -179,9 +189,11 @@ export interface PlatformAdapter {
    */
   setPlanOwnerId(planId: string, ownerId: string): Promise<void>;
 
-  // --- Logging ---
-  // Simple logging interface. Implementations can use console, Durable Object
-  // ctx.waitUntil(), or other platform-specific mechanisms.
+  /*
+   * --- Logging ---
+   * Simple logging interface. Implementations can use console, Durable Object
+   * ctx.waitUntil(), or other platform-specific mechanisms.
+   */
 
   /**
    * Log informational message.

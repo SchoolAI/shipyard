@@ -32,7 +32,6 @@ export function EmailInput({
   const hasValue = emailValue.trim() !== '';
   const isValid = !hasValue || isValidEmail(emailValue, request.domain);
 
-  // Build error message
   const getErrorMessage = (): string | null => {
     if (!hasValue || isValid) return null;
     if (request.domain) {

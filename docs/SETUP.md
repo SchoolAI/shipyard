@@ -126,7 +126,7 @@ pnpm --filter @shipyard/hook build
 The setup script updates your `~/.claude/settings.json` to use local builds:
 
 **Hooks configured:**
-- `PreToolUse` → `AskUserQuestion` - Blocks built-in prompt, redirects to MCP `request_user_input`
+- `PreToolUse` → `AskUserQuestion` - Blocks built-in prompt, redirects to `requestUserInput()` in `execute_code`
 - `PermissionRequest` → `ExitPlanMode` - Handles plan approval (30min timeout)
 - `PostToolUse` → `ExitPlanMode` - Injects session context after approval
 - `SessionStart` - Loads project context

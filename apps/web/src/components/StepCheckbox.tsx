@@ -18,7 +18,7 @@ export function StepCheckbox({ ydoc, stepId, label }: StepCheckboxProps) {
     const steps = ydoc.getMap<boolean>('stepCompletions');
 
     const update = () => setChecked(steps.get(stepId) || false);
-    update(); // Initial read
+    update();
 
     steps.observe(update);
     return () => steps.unobserve(update);
@@ -28,7 +28,7 @@ export function StepCheckbox({ ydoc, stepId, label }: StepCheckboxProps) {
     const newValue = !checked;
     toggleStepCompletion(ydoc, stepId, actor);
 
-    // Log step completion event
+    /** Log step completion event */
     logPlanEvent(ydoc, 'step_completed', actor, {
       stepId,
       completed: newValue,

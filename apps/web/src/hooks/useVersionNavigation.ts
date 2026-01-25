@@ -49,9 +49,9 @@ export function isViewingHistorySnapshot(
  */
 export function useVersionNavigation(ydoc: Y.Doc | null): VersionNavigationState {
   const [snapshots, setSnapshots] = useState<PlanSnapshot[]>([]);
-  const [currentIndex, setCurrentIndex] = useState<number>(-1); // -1 = current/live version
+  const [currentIndex, setCurrentIndex] = useState<number>(-1);
 
-  // Subscribe to snapshots Y.Array
+  /** Subscribe to snapshots Y.Array */
   useEffect(() => {
     if (!ydoc) return;
 
@@ -59,17 +59,17 @@ export function useVersionNavigation(ydoc: Y.Doc | null): VersionNavigationState
       const allSnapshots = getSnapshots(ydoc);
       setSnapshots(allSnapshots);
 
-      // If viewing history and snapshots changed, stay on same relative position
+      /** If viewing history and snapshots changed, stay on same relative position */
       setCurrentIndex((prevIndex) => {
-        if (prevIndex === -1) return -1; // Still viewing current
-        return Math.min(prevIndex, allSnapshots.length - 1); // Clamp to valid range
+        if (prevIndex === -1) return -1;
+        return Math.min(prevIndex, allSnapshots.length - 1);
       });
     };
 
-    // Initial load
+    /** Initial load */
     updateSnapshots();
 
-    // Subscribe to changes
+    /** Subscribe to changes */
     const snapshotsArray = ydoc.getArray<PlanSnapshot>(YDOC_KEYS.SNAPSHOTS);
     snapshotsArray.observe(updateSnapshots);
 
@@ -78,18 +78,18 @@ export function useVersionNavigation(ydoc: Y.Doc | null): VersionNavigationState
 
   const goToPrevious = () => {
     setCurrentIndex((prev) => {
-      // If viewing current, go to last snapshot
+      /** If viewing current, go to last snapshot */
       if (prev === -1) return snapshots.length - 1;
-      // Otherwise go back one
+      /** Otherwise go back one */
       return Math.max(0, prev - 1);
     });
   };
 
   const goToNext = () => {
     setCurrentIndex((prev) => {
-      // If at last snapshot, go to current
+      /** If at last snapshot, go to current */
       if (prev === snapshots.length - 1) return -1;
-      // Otherwise go forward one
+      /** Otherwise go forward one */
       return prev + 1;
     });
   };
@@ -99,7 +99,7 @@ export function useVersionNavigation(ydoc: Y.Doc | null): VersionNavigationState
   };
 
   const canGoPrevious = snapshots.length > 0 && (currentIndex > 0 || currentIndex === -1);
-  const canGoNext = currentIndex >= 0; // Can always go to current from history
+  const canGoNext = currentIndex >= 0;
 
   const base: VersionNavigationBase = {
     snapshots,

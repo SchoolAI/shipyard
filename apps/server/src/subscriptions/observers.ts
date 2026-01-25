@@ -10,7 +10,6 @@ import {
   logPlanEvent,
   type PlanMetadata,
   type PlanStatusType,
-  PlanStatusValues,
   parseThreads,
   type Thread,
   type ThreadComment,
@@ -39,20 +38,20 @@ interface PlanState {
 
 const previousState = new Map<string, PlanState>();
 
-// Debounce state for content edits to prevent event spam
+/** Debounce state for content edits to prevent event spam */
 const lastContentEdit = new Map<string, number>();
 const CONTENT_EDIT_DEBOUNCE_MS = 5000;
 
-// --- Public API ---
+/** --- Public API --- */
 
 export function attachObservers(planId: string, doc: Y.Doc): void {
   const metadata = getPlanMetadata(doc);
-  const threadsMap = doc.getMap<Record<string, Thread>>(YDOC_KEYS.THREADS);
-  const threads = parseThreads(threadsMap.toJSON() as Record<string, unknown>);
+  const threadsMap = doc.getMap(YDOC_KEYS.THREADS);
+  const threads = parseThreads(threadsMap.toJSON());
   const deliverables = getDeliverables(doc);
   const allFulfilled = deliverables.length > 0 && deliverables.every((d) => d.linkedArtifactId);
 
-  // Build initial set of comment IDs
+  /** Build initial set of comment IDs */
   const initialCommentIds = new Set<string>();
   for (const thread of threads) {
     for (const comment of thread.comments) {
@@ -74,23 +73,30 @@ export function attachObservers(planId: string, doc: Y.Doc): void {
   doc.getMap<PlanMetadata>(YDOC_KEYS.METADATA).observe((event, transaction) => {
     if (event.keysChanged.has('status')) {
       const prev = previousState.get(planId);
-      // Runtime validation: ensure status value is a valid PlanStatusType
+      /** Runtime validation: ensure status value is a valid PlanStatusType */
       const rawStatus = doc.getMap<PlanMetadata>(YDOC_KEYS.METADATA).get('status');
-      const newStatus =
-        typeof rawStatus === 'string' && PlanStatusValues.includes(rawStatus as PlanStatusType)
-          ? (rawStatus as PlanStatusType)
-          : undefined;
+      function isValidStatus(s: unknown): s is PlanStatusType {
+        return (
+          typeof s === 'string' &&
+          (s === 'draft' ||
+            s === 'pending_review' ||
+            s === 'changes_requested' ||
+            s === 'in_progress' ||
+            s === 'completed')
+        );
+      }
+      const newStatus = isValidStatus(rawStatus) ? rawStatus : undefined;
 
       if (prev?.status && prev.status !== newStatus && newStatus) {
         const actor = transaction.origin?.actor || 'System';
 
-        // Log event
+        /** Log event */
         logPlanEvent(doc, 'status_changed', actor, {
           fromStatus: prev.status,
           toStatus: newStatus,
         });
 
-        // Notify subscriptions
+        /** Notify subscriptions */
         const change: Change = {
           type: 'status',
           timestamp: Date.now(),
@@ -105,31 +111,31 @@ export function attachObservers(planId: string, doc: Y.Doc): void {
     }
   });
 
-  doc.getMap<Record<string, Thread>>(YDOC_KEYS.THREADS).observeDeep((_events, transaction) => {
+  doc.getMap(YDOC_KEYS.THREADS).observeDeep((_events, transaction) => {
     const prev = previousState.get(planId);
     if (!prev) return;
 
     const actor = transaction.origin?.actor || 'System';
-    const threadsMap = doc.getMap<Record<string, Thread>>(YDOC_KEYS.THREADS);
-    const threads = parseThreads(threadsMap.toJSON() as Record<string, unknown>);
+    const threadsMap = doc.getMap(YDOC_KEYS.THREADS);
+    const threads = parseThreads(threadsMap.toJSON());
 
     handleNewComments(doc, planId, threads, prev, actor);
     handleResolvedComments(doc, planId, threads, prev, actor);
   });
 
-  // Watch the document fragment (source of truth) for content changes
+  /** Watch the document fragment (source of truth) for content changes */
   doc.getXmlFragment('document').observeDeep((_events, transaction) => {
     const now = Date.now();
     const lastEdit = lastContentEdit.get(planId) || 0;
 
-    // Only log if 5 seconds have passed since last edit (prevent event spam)
+    /** Only log if 5 seconds have passed since last edit (prevent event spam) */
     if (now - lastEdit > CONTENT_EDIT_DEBOUNCE_MS) {
       const actor = transaction.origin?.actor || 'System';
       logPlanEvent(doc, 'content_edited', actor);
       lastContentEdit.set(planId, now);
     }
 
-    // Always notify subscriptions (don't debounce notifications)
+    /** Always notify subscriptions (don't debounce notifications) */
     notifyChange(planId, {
       type: 'content',
       timestamp: Date.now(),
@@ -149,14 +155,18 @@ export function attachObservers(planId: string, doc: Y.Doc): void {
     if (newCount > prev.artifactCount) {
       const diff = newCount - prev.artifactCount;
       const artifacts = doc.getArray<Artifact>(YDOC_KEYS.ARTIFACTS).toArray();
-      const newArtifact = artifacts[artifacts.length - 1] as { id: string };
+      const lastArtifact = artifacts[artifacts.length - 1];
+      const artifactId =
+        lastArtifact && typeof lastArtifact === 'object' && 'id' in lastArtifact
+          ? String(lastArtifact.id)
+          : 'unknown';
 
-      // Log event
+      /** Log event */
       logPlanEvent(doc, 'artifact_uploaded', actor, {
-        artifactId: newArtifact.id,
+        artifactId,
       });
 
-      // Notify subscriptions
+      /** Notify subscriptions */
       notifyChange(planId, {
         type: 'artifacts',
         timestamp: Date.now(),
@@ -169,7 +179,7 @@ export function attachObservers(planId: string, doc: Y.Doc): void {
     }
   });
 
-  // Watch deliverables array for fulfillment (inbox-worthy event)
+  /** Watch deliverables array for fulfillment (inbox-worthy event) */
   doc.getArray(YDOC_KEYS.DELIVERABLES).observeDeep((_events, transaction) => {
     const prev = previousState.get(planId);
     if (!prev) return;
@@ -177,11 +187,11 @@ export function attachObservers(planId: string, doc: Y.Doc): void {
     const deliverables = getDeliverables(doc);
     const allFulfilled = deliverables.length > 0 && deliverables.every((d) => d.linkedArtifactId);
 
-    // Detect transition to all fulfilled
+    /** Detect transition to all fulfilled */
     if (allFulfilled && !prev.deliverablesFulfilled) {
       const actor = transaction.origin?.actor || 'System';
 
-      // Log inbox-worthy event (owner should mark plan as complete)
+      /** Log inbox-worthy event (owner should mark plan as complete) */
       logPlanEvent(
         doc,
         'deliverable_linked',
@@ -218,7 +228,7 @@ export function hasObservers(planId: string): boolean {
   return previousState.has(planId);
 }
 
-// --- Helper Functions (private) ---
+/** --- Helper Functions (private) --- */
 
 /**
  * Find comments that don't exist in the previous state's ID set.
@@ -282,7 +292,7 @@ function handleNewComments(
   const diff = newCommentCount - prev.commentCount;
   const newComments = detectNewComments(threads, prev.commentIds);
 
-  // Update tracking state for each new comment
+  /** Update tracking state for each new comment */
   for (const comment of newComments) {
     prev.commentIds.add(comment.id);
     logCommentWithMentions(doc, planId, comment, actor);

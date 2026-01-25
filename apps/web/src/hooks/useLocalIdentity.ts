@@ -7,28 +7,30 @@ export interface LocalIdentity {
   createdAt: number;
 }
 
-// Pure function: Parse stored identity
+/** Pure function: Parse stored identity */
 function parseStoredIdentity(stored: string | null): LocalIdentity | null {
   if (!stored) return null;
 
   try {
-    const parsed = JSON.parse(stored) as LocalIdentity;
-    // Validate structure
-    if (typeof parsed.username !== 'string' || typeof parsed.createdAt !== 'number') {
+    const parsed: unknown = JSON.parse(stored);
+    /** Validate structure */
+    if (!parsed || typeof parsed !== 'object') return null;
+    const record = Object.fromEntries(Object.entries(parsed));
+    if (typeof record.username !== 'string' || typeof record.createdAt !== 'number') {
       return null;
     }
-    return parsed;
+    return { username: record.username, createdAt: record.createdAt };
   } catch {
     return null;
   }
 }
 
-// Pure function: Serialize identity for storage
+/** Pure function: Serialize identity for storage */
 function serializeIdentity(identity: LocalIdentity): string {
   return JSON.stringify(identity);
 }
 
-// External store: Cross-tab sync with localStorage
+/** External store: Cross-tab sync with localStorage */
 let changeCounter = 0;
 const listeners = new Set<() => void>();
 
@@ -37,7 +39,7 @@ interface SnapshotCache {
   value: LocalIdentity | null;
 }
 
-// Initialize cache eagerly at module load to prevent race conditions
+/** Initialize cache eagerly at module load to prevent race conditions */
 let snapshotCache: SnapshotCache | null = null;
 
 function initializeSnapshotCache(): void {
@@ -52,7 +54,7 @@ function initializeSnapshotCache(): void {
   }
 }
 
-// Run initialization immediately when module is loaded
+/** Run initialization immediately when module is loaded */
 initializeSnapshotCache();
 
 function notifyListeners(): void {
@@ -106,7 +108,7 @@ function getSnapshot(): LocalIdentity | null {
   return value;
 }
 
-// SSR-safe: Return null on server, read from localStorage on hydration
+/** SSR-safe: Return null on server, read from localStorage on hydration */
 function getServerSnapshot(): LocalIdentity | null {
   if (typeof localStorage === 'undefined') {
     return null;
@@ -133,12 +135,12 @@ export function useLocalIdentity(): UseLocalIdentityReturn {
   const localIdentity = useSyncExternalStore(subscribeAll, getSnapshot, getServerSnapshot);
 
   const setLocalIdentity = useCallback((username: string) => {
-    // Issue 1: Reject reserved prefixes to prevent double-prefix vulnerability
+    /** Issue 1: Reject reserved prefixes to prevent double-prefix vulnerability */
     if (username.startsWith('local:') || username.startsWith('github:')) {
       throw new Error('Username cannot start with reserved prefixes (local:, github:)');
     }
 
-    // Issue 2: Server-side validation (HTML5 pattern validation is client-side only)
+    /** Issue 2: Server-side validation (HTML5 pattern validation is client-side only) */
     if (!/^[a-zA-Z0-9-]{2,39}$/.test(username)) {
       throw new Error('Username must be 2-39 characters: letters, numbers, and hyphens only');
     }

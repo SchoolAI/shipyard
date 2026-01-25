@@ -25,6 +25,17 @@ import { PlanViewer } from '@/components/PlanViewer';
 import { VersionSelector } from '@/components/VersionSelector';
 import type { SyncState } from '@/hooks/useMultiProviderSync';
 
+/**
+ * Type guard to check if an array is a Block[] from BlockNote.
+ * Validates that each item has the required 'type' and 'id' properties.
+ */
+function isBlockArray(arr: unknown): arr is Block[] {
+  return (
+    Array.isArray(arr) &&
+    arr.every((item) => typeof item === 'object' && item !== null && 'type' in item && 'id' in item)
+  );
+}
+
 /** Simple identity type for display purposes */
 interface UserIdentity {
   id: string;
@@ -95,17 +106,108 @@ interface SnapshotPlanContentProps {
 export type PlanContentProps = LivePlanContentProps | SnapshotPlanContentProps;
 
 /**
+ * Check if a value is a valid PlanViewTab.
+ */
+function isValidTab(value: string): value is PlanViewTab {
+  return (
+    value === 'plan' || value === 'activity' || value === 'deliverables' || value === 'changes'
+  );
+}
+
+/**
+ * Extract tab from a custom event detail, with validation.
+ */
+function extractTabFromEvent(event: Event): PlanViewTab | null {
+  if (!(event instanceof CustomEvent) || !event.detail || typeof event.detail !== 'object') {
+    return null;
+  }
+  const detailRecord = Object.fromEntries(Object.entries(event.detail));
+  const tab = detailRecord.tab;
+  if (typeof tab === 'string' && isValidTab(tab)) {
+    return tab;
+  }
+  return null;
+}
+
+/**
+ * Hook to track deliverable counts from Y.Doc.
+ */
+function useDeliverableCount(
+  ydoc: Y.Doc,
+  mode: 'live' | 'snapshot',
+  initialContent?: unknown[]
+): { completed: number; total: number } {
+  const [count, setCount] = useState({ completed: 0, total: 0 });
+
+  useEffect(() => {
+    if (mode === 'snapshot' && initialContent && isBlockArray(initialContent)) {
+      const deliverables = extractDeliverables(initialContent);
+      const deliverablesArray = ydoc.getArray<Deliverable>(YDOC_KEYS.DELIVERABLES);
+      deliverablesArray.delete(0, deliverablesArray.length);
+      deliverablesArray.push(deliverables);
+
+      const completed = deliverables.filter((d) => d.linkedArtifactId).length;
+      setCount({ completed, total: deliverables.length });
+      return;
+    }
+
+    const deliverablesArray = ydoc.getArray<Deliverable>(YDOC_KEYS.DELIVERABLES);
+    const updateCount = () => {
+      const deliverables = getDeliverables(ydoc);
+      const completed = deliverables.filter((d) => d.linkedArtifactId).length;
+      setCount({ completed, total: deliverables.length });
+    };
+    updateCount();
+    deliverablesArray.observe(updateCount);
+    return () => deliverablesArray.unobserve(updateCount);
+  }, [ydoc, mode, initialContent]);
+
+  return count;
+}
+
+/** Props for a single tab button */
+interface TabButtonProps {
+  tab: PlanViewTab;
+  activeView: PlanViewTab;
+  onClick: (tab: PlanViewTab) => void;
+  icon: React.ReactNode;
+  label: string;
+  badge?: React.ReactNode;
+}
+
+/** Reusable tab button component */
+function TabButton({ tab, activeView, onClick, icon, label, badge }: TabButtonProps) {
+  const isActive = activeView === tab;
+  return (
+    <button
+      type="button"
+      onClick={() => onClick(tab)}
+      className={`flex items-center justify-center gap-1.5 md:gap-2 pb-1.5 md:pb-2 px-1.5 md:px-2 font-medium text-xs md:text-sm transition-colors shrink-0 ${
+        isActive
+          ? 'text-primary border-b-2 border-primary'
+          : 'text-muted-foreground hover:text-foreground border-b-2 border-transparent'
+      }`}
+    >
+      {icon}
+      {label}
+      {badge}
+    </button>
+  );
+}
+
+/**
  * Tabbed plan content viewer.
  * Shows Plan, Deliverables, and Changes tabs with their respective content.
  */
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Multiple tabs, conditional rendering, effects for deliverable tracking
 export function PlanContent(props: PlanContentProps) {
   const { ydoc, metadata, syncState } = props;
   const [activeView, setActiveView] = useState<PlanViewTab>(props.initialTab || 'plan');
-  const [deliverableCount, setDeliverableCount] = useState({ completed: 0, total: 0 });
   const [changesViewState, setChangesViewState] = useState<ChangesViewState | null>(null);
 
-  // Handle tab change - updates state and notifies parent
+  const initialContent = props.mode === 'snapshot' ? props.initialContent : undefined;
+  const deliverableCount = useDeliverableCount(ydoc, props.mode, initialContent);
+
+  /** Handle tab change - updates state and notifies parent */
   const handleTabChange = useCallback(
     (tab: PlanViewTab) => {
       setActiveView(tab);
@@ -114,48 +216,25 @@ export function PlanContent(props: PlanContentProps) {
     [props.onTabChange]
   );
 
-  // Update activeView when initialTab changes (e.g., from URL navigation)
+  /** Update activeView when initialTab changes */
   useEffect(() => {
     if (props.initialTab) {
       setActiveView(props.initialTab);
     }
   }, [props.initialTab]);
 
-  // Listen for external tab switch requests (e.g., from AgentRequestsBadge)
+  /** Listen for external tab switch requests (e.g., from AgentRequestsBadge) */
   useEffect(() => {
     const handleSwitchTab = (event: Event) => {
-      const customEvent = event as CustomEvent<{ tab: PlanViewTab }>;
-      if (customEvent.detail?.tab) {
-        handleTabChange(customEvent.detail.tab);
+      const tab = extractTabFromEvent(event);
+      if (tab) {
+        handleTabChange(tab);
       }
     };
 
     document.addEventListener('switch-plan-tab', handleSwitchTab);
     return () => document.removeEventListener('switch-plan-tab', handleSwitchTab);
   }, [handleTabChange]);
-
-  useEffect(() => {
-    if (props.mode === 'snapshot') {
-      const deliverables = extractDeliverables(props.initialContent as Block[]);
-      const deliverablesArray = ydoc.getArray<Deliverable>(YDOC_KEYS.DELIVERABLES);
-      deliverablesArray.delete(0, deliverablesArray.length);
-      deliverablesArray.push(deliverables);
-
-      const completed = deliverables.filter((d) => d.linkedArtifactId).length;
-      setDeliverableCount({ completed, total: deliverables.length });
-      return;
-    }
-
-    const deliverablesArray = ydoc.getArray<Deliverable>(YDOC_KEYS.DELIVERABLES);
-    const updateCount = () => {
-      const deliverables = getDeliverables(ydoc);
-      const completed = deliverables.filter((d) => d.linkedArtifactId).length;
-      setDeliverableCount({ completed, total: deliverables.length });
-    };
-    updateCount();
-    deliverablesArray.observe(updateCount);
-    return () => deliverablesArray.unobserve(updateCount);
-  }, [ydoc, props]);
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -164,59 +243,41 @@ export function PlanContent(props: PlanContentProps) {
         <div className="flex items-center justify-between pt-1 md:pt-2">
           {/* Tabs on the left - scrollable on mobile */}
           <div className="flex gap-0 md:gap-4 overflow-x-auto md:overflow-visible">
-            <button
-              type="button"
-              onClick={() => handleTabChange('plan')}
-              className={`flex items-center justify-center gap-1.5 md:gap-2 pb-1.5 md:pb-2 px-1.5 md:px-2 font-medium text-xs md:text-sm transition-colors shrink-0 ${
-                activeView === 'plan'
-                  ? 'text-primary border-b-2 border-primary'
-                  : 'text-muted-foreground hover:text-foreground border-b-2 border-transparent'
-              }`}
-            >
-              <FileText className="w-3.5 h-3.5 md:w-4 md:h-4" />
-              Plan
-            </button>
-            <button
-              type="button"
-              onClick={() => handleTabChange('activity')}
-              className={`flex items-center justify-center gap-1.5 md:gap-2 pb-1.5 md:pb-2 px-1.5 md:px-2 font-medium text-xs md:text-sm transition-colors shrink-0 ${
-                activeView === 'activity'
-                  ? 'text-primary border-b-2 border-primary'
-                  : 'text-muted-foreground hover:text-foreground border-b-2 border-transparent'
-              }`}
-            >
-              <Clock className="w-3.5 h-3.5 md:w-4 md:h-4" />
-              Activity
-            </button>
-            <button
-              type="button"
-              onClick={() => handleTabChange('deliverables')}
-              className={`flex items-center justify-center gap-1.5 md:gap-2 pb-1.5 md:pb-2 px-1.5 md:px-2 font-medium text-xs md:text-sm transition-colors shrink-0 ${
-                activeView === 'deliverables'
-                  ? 'text-primary border-b-2 border-primary'
-                  : 'text-muted-foreground hover:text-foreground border-b-2 border-transparent'
-              }`}
-            >
-              <Package className="w-3.5 h-3.5 md:w-4 md:h-4" />
-              Deliverables
-              {deliverableCount.total > 0 && (
-                <span className="text-[10px] md:text-xs opacity-70">
-                  ({deliverableCount.completed}/{deliverableCount.total})
-                </span>
-              )}
-            </button>
-            <button
-              type="button"
-              onClick={() => handleTabChange('changes')}
-              className={`flex items-center justify-center gap-1.5 md:gap-2 pb-1.5 md:pb-2 px-1.5 md:px-2 font-medium text-xs md:text-sm transition-colors shrink-0 ${
-                activeView === 'changes'
-                  ? 'text-primary border-b-2 border-primary'
-                  : 'text-muted-foreground hover:text-foreground border-b-2 border-transparent'
-              }`}
-            >
-              <GitPullRequest className="w-3.5 h-3.5 md:w-4 md:h-4" />
-              Changes
-            </button>
+            <TabButton
+              tab="plan"
+              activeView={activeView}
+              onClick={handleTabChange}
+              icon={<FileText className="w-3.5 h-3.5 md:w-4 md:h-4" />}
+              label="Plan"
+            />
+            <TabButton
+              tab="activity"
+              activeView={activeView}
+              onClick={handleTabChange}
+              icon={<Clock className="w-3.5 h-3.5 md:w-4 md:h-4" />}
+              label="Activity"
+            />
+            <TabButton
+              tab="deliverables"
+              activeView={activeView}
+              onClick={handleTabChange}
+              icon={<Package className="w-3.5 h-3.5 md:w-4 md:h-4" />}
+              label="Deliverables"
+              badge={
+                deliverableCount.total > 0 ? (
+                  <span className="text-[10px] md:text-xs opacity-70">
+                    ({deliverableCount.completed}/{deliverableCount.total})
+                  </span>
+                ) : undefined
+              }
+            />
+            <TabButton
+              tab="changes"
+              activeView={activeView}
+              onClick={handleTabChange}
+              icon={<GitPullRequest className="w-3.5 h-3.5 md:w-4 md:h-4" />}
+              label="Changes"
+            />
           </div>
 
           {/* Version selector on the right - only show on Plan tab when versions exist */}

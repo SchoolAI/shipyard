@@ -30,6 +30,76 @@ interface ReviewDecision {
   approved: boolean;
   feedback?: string;
   deliverables?: Deliverable[];
+  reviewComment?: string;
+  reviewedBy?: string;
+  status?: string;
+}
+
+/** --- Approval Handling Helpers --- */
+
+/**
+ * Build the approval message with deliverable count and optional reviewer comment.
+ */
+function buildApprovalMessage(
+  prefix: string,
+  deliverableCount: number,
+  reviewComment?: string
+): string {
+  const countText = `${deliverableCount} deliverable${deliverableCount === 1 ? '' : 's'}`;
+  const feedbackText = reviewComment ? `\n\nReviewer comment: ${reviewComment}` : '';
+  return `${prefix} You have ${countText}. Use add_artifact(filePath, deliverableId) to upload proof-of-work.${feedbackText}`;
+}
+
+/**
+ * Generate session token and store it on the server.
+ * Returns a CoreResponse for either success or failure.
+ */
+async function handleApproval(
+  planId: string,
+  decision: ReviewDecision,
+  messagePrefix: string
+): Promise<CoreResponse> {
+  const sessionToken = generateSessionToken();
+  const sessionTokenHash = hashSessionToken(sessionToken);
+  const deliverableCount = (decision.deliverables ?? []).length;
+
+  logger.info({ planId }, 'Generating session token for approved plan');
+
+  try {
+    const tokenResult = await setSessionToken(planId, sessionTokenHash);
+    const url = tokenResult.url;
+
+    logger.info(
+      { planId, url, deliverableCount },
+      'Session token set and stored by server with deliverables'
+    );
+
+    return {
+      allow: true,
+      message: buildApprovalMessage(messagePrefix, deliverableCount, decision.reviewComment),
+      planId,
+      sessionToken,
+      url,
+    };
+  } catch (err) {
+    logger.error({ err, planId }, 'Failed to set session token, approving without it');
+    return {
+      allow: true,
+      message: `${messagePrefix.replace('!', '')} (session token unavailable)`,
+      planId,
+    };
+  }
+}
+
+/**
+ * Handle rejection/changes requested response.
+ */
+function handleRejection(planId: string, decision: ReviewDecision): CoreResponse {
+  return {
+    allow: false,
+    message: decision.reviewComment || 'Changes requested',
+    planId,
+  };
 }
 
 /**
@@ -37,10 +107,7 @@ interface ReviewDecision {
  * Server watches Y.Doc and returns when status changes to approved or rejected.
  * Uses a unique reviewRequestId to prevent stale decisions from previous cycles.
  */
-async function waitForReviewDecision(
-  planId: string,
-  _wsUrl: string
-): Promise<ReviewDecision & { reviewComment?: string; reviewedBy?: string; status?: string }> {
+async function waitForReviewDecision(planId: string): Promise<ReviewDecision> {
   logger.info({ planId }, 'Waiting for approval via server endpoint');
 
   const result = await waitForApproval(planId, planId);
@@ -50,7 +117,7 @@ async function waitForReviewDecision(
   return {
     approved: result.approved,
     feedback: result.feedback,
-    deliverables: result.deliverables as Deliverable[] | undefined,
+    deliverables: result.deliverables,
     reviewComment: result.reviewComment,
     reviewedBy: result.reviewedBy,
     status: result.status,
@@ -70,17 +137,14 @@ async function handleUpdatedPlanReview(
 
   logger.info({ planId }, 'Syncing updated plan content');
   try {
-    await updatePlanContent(planId, {
-      content: planContent,
-    });
+    await updatePlanContent(planId, { content: planContent });
   } catch (err) {
-    const error = err as Error;
-    if (error.message?.includes('404')) {
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    if (errorMessage?.includes('404')) {
       logger.warn(
         { planId, sessionId },
         'Plan not found (404), creating new plan with updated content'
       );
-
       return await checkReviewStatus(sessionId, planContent, _originMetadata);
     }
     throw err;
@@ -92,187 +156,68 @@ async function handleUpdatedPlanReview(
     'Content synced, browser already open. Waiting for server approval...'
   );
 
-  const decision = await waitForReviewDecision(planId, '');
+  const decision = await waitForReviewDecision(planId);
   logger.info({ planId, approved: decision.approved }, 'Decision received via Y.Doc');
 
   if (decision.approved) {
-    const sessionToken = generateSessionToken();
-    const sessionTokenHash = hashSessionToken(sessionToken);
-
-    logger.info({ planId }, 'Generating new session token for re-approved plan');
-
-    try {
-      const tokenResult = await setSessionToken(planId, sessionTokenHash);
-      const url = tokenResult.url;
-
-      const deliverableCount = (decision.deliverables ?? []).length;
-
-      logger.info(
-        { planId, url, deliverableCount },
-        'Session token set and stored by server with updated content hash'
-      );
-
-      const reviewFeedback = decision.reviewComment
-        ? `\n\nReviewer comment: ${decision.reviewComment}`
-        : '';
-      return {
-        allow: true,
-        message: `Plan re-approved with updates! You have ${deliverableCount} deliverable${deliverableCount === 1 ? '' : 's'}. Use add_artifact(filePath, deliverableId) to upload proof-of-work.${reviewFeedback}`,
-        planId,
-        sessionToken,
-        url,
-      };
-    } catch (err) {
-      logger.error({ err, planId }, 'Failed to set session token, but plan was approved');
-      return {
-        allow: true,
-        message: 'Updated plan approved (session token unavailable)',
-        planId,
-      };
-    }
+    return handleApproval(planId, decision, 'Plan re-approved with updates!');
   }
 
   logger.debug({ planId }, 'Changes requested - server will manage state cleanup');
-
-  return {
-    allow: false,
-    message: decision.reviewComment || 'Changes requested',
-    planId,
-  };
+  return handleRejection(planId, decision);
 }
 
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Complex review flow requires conditional logic
-export async function checkReviewStatus(
+/**
+ * Handle the flow when creating a new plan and waiting for approval.
+ */
+async function handleNewPlanCreation(
   sessionId: string,
-  planContent?: string,
+  planContent: string,
   originMetadata?: Record<string, unknown>
 ): Promise<CoreResponse> {
-  const state = await getSessionContext(sessionId);
-  let planId: string;
+  logger.info(
+    { sessionId, contentLength: planContent.length },
+    'Creating plan from ExitPlanMode (blocking mode)'
+  );
 
-  if (!state.found && planContent) {
-    logger.info(
-      { sessionId, contentLength: planContent.length, hasState: !!state },
-      'Creating plan from ExitPlanMode (blocking mode)'
-    );
+  const result = await createPlan({
+    sessionId,
+    agentType: DEFAULT_AGENT_TYPE,
+    metadata: {
+      source: 'ExitPlanMode',
+      ...originMetadata,
+    },
+  });
 
-    const result = await createPlan({
-      sessionId,
-      agentType: DEFAULT_AGENT_TYPE,
-      metadata: {
-        source: 'ExitPlanMode',
-        ...originMetadata,
-      },
-    });
+  const planId = result.planId;
 
-    planId = result.planId;
+  logger.info({ planId }, 'Syncing plan content');
+  await updatePlanContent(planId, { content: planContent });
 
-    logger.info({ planId }, 'Syncing plan content');
-    await updatePlanContent(planId, {
-      content: planContent,
-    });
+  logger.info(
+    { planId, url: result.url },
+    'Plan created and synced, browser opened. Waiting for server approval...'
+  );
 
-    logger.info(
-      { planId, url: result.url },
-      'Plan created and synced, browser opened. Waiting for server approval...'
-    );
+  const decision = await waitForReviewDecision(planId);
+  logger.info({ planId, approved: decision.approved }, 'Decision received via Y.Doc');
 
-    const decision = await waitForReviewDecision(planId, '');
-    logger.info({ planId, approved: decision.approved }, 'Decision received via Y.Doc');
-
-    if (decision.approved) {
-      const sessionToken = generateSessionToken();
-      const sessionTokenHash = hashSessionToken(sessionToken);
-
-      logger.info({ planId }, 'Generating session token for approved plan');
-
-      try {
-        const tokenResult = await setSessionToken(planId, sessionTokenHash);
-        const url = tokenResult.url;
-
-        const deliverableCount = (decision.deliverables ?? []).length;
-
-        logger.info(
-          { planId, url, deliverableCount },
-          'Session token set and stored by server with deliverables'
-        );
-
-        const reviewFeedback = decision.reviewComment
-          ? `\n\nReviewer comment: ${decision.reviewComment}`
-          : '';
-        return {
-          allow: true,
-          message: `Plan approved! You have ${deliverableCount} deliverable${deliverableCount === 1 ? '' : 's'}. Use add_artifact(filePath, deliverableId) to upload proof-of-work.${reviewFeedback}`,
-          planId,
-          sessionToken,
-          url,
-        };
-      } catch (err) {
-        logger.error({ err, planId }, 'Failed to set session token, approving without it');
-        return {
-          allow: true,
-          message:
-            'Plan approved, but session token unavailable. You may need to refresh the plan in the browser. Check ~/.shipyard/server-debug.log for details.',
-          planId,
-        };
-      }
-    }
-
-    logger.debug({ sessionId }, 'Changes requested - server will manage state cleanup');
-
-    return {
-      allow: false,
-      message: decision.reviewComment || 'Changes requested',
-      planId,
-    };
+  if (decision.approved) {
+    return handleApproval(planId, decision, 'Plan approved!');
   }
 
-  if (!state.found) {
-    logger.info({ sessionId }, 'No session state or plan content, allowing exit');
-    return { allow: true };
-  }
+  logger.debug({ sessionId }, 'Changes requested - server will manage state cleanup');
+  return handleRejection(planId, decision);
+}
 
-  if ((!state || !state.planId) && planContent) {
-    logger.error(
-      { sessionId, hasPlanContent: !!planContent, hasState: !!state, statePlanId: state?.planId },
-      'Unreachable state: plan content exists but no session state'
-    );
-    return {
-      allow: false,
-      message:
-        'Internal error: Plan content found but session state missing. Check ~/.shipyard/hook-debug.log and report this issue.',
-    };
-  }
-
-  if (!state.planId) {
-    throw new Error('Unreachable: state.planId should exist at this point');
-  }
-  planId = state.planId;
-
-  if (planContent) {
-    logger.info({ planId }, 'Plan content provided, triggering re-review');
-    return await handleUpdatedPlanReview(sessionId, planId, planContent, originMetadata);
-  }
-
-  logger.info({ sessionId, planId }, 'Checking review status');
-
-  let status: GetReviewStatusResponse;
-  try {
-    status = await getReviewStatus(planId);
-  } catch (err) {
-    logger.warn({ err, planId }, 'Failed to get review status, blocking exit');
-    return {
-      allow: false,
-      message:
-        'Cannot verify plan approval status. Ensure the Shipyard MCP server is running. Check ~/.shipyard/server-debug.log for details.',
-      planId,
-    };
-  }
-
-  logger.info({ sessionId, planId, status: status.status }, 'Review status retrieved');
-
-  const baseUrl = webConfig.SHIPYARD_WEB_URL;
-
+/**
+ * Build response for each review status.
+ */
+function buildStatusResponse(
+  status: GetReviewStatusResponse,
+  planId: string,
+  baseUrl: string
+): CoreResponse {
   switch (status.status) {
     case 'changes_requested':
       return {
@@ -311,10 +256,74 @@ export async function checkReviewStatus(
         planId,
       };
 
-    default: {
+    default:
       assertNever(status);
-    }
   }
+}
+
+export async function checkReviewStatus(
+  sessionId: string,
+  planContent?: string,
+  originMetadata?: Record<string, unknown>
+): Promise<CoreResponse> {
+  const state = await getSessionContext(sessionId);
+
+  /** Case 1: New plan creation (no state, but have content) */
+  if (!state.found && planContent) {
+    return handleNewPlanCreation(sessionId, planContent, originMetadata);
+  }
+
+  /** Case 2: No state and no content - allow exit */
+  if (!state.found) {
+    logger.info({ sessionId }, 'No session state or plan content, allowing exit');
+    return { allow: true };
+  }
+
+  /** Case 3: State exists but planId missing (should not happen) */
+  if (!state.planId && planContent) {
+    logger.error(
+      { sessionId, hasPlanContent: !!planContent, hasState: !!state, statePlanId: state?.planId },
+      'Unreachable state: plan content exists but no session state'
+    );
+    return {
+      allow: false,
+      message:
+        'Internal error: Plan content found but session state missing. Check ~/.shipyard/hook-debug.log and report this issue.',
+    };
+  }
+
+  if (!state.planId) {
+    throw new Error('Unreachable: state.planId should exist at this point');
+  }
+
+  const planId = state.planId;
+
+  /** Case 4: Plan update (have planId and new content) */
+  if (planContent) {
+    logger.info({ planId }, 'Plan content provided, triggering re-review');
+    return await handleUpdatedPlanReview(sessionId, planId, planContent, originMetadata);
+  }
+
+  /** Case 5: Just checking status (no new content) */
+  logger.info({ sessionId, planId }, 'Checking review status');
+
+  let status: GetReviewStatusResponse;
+  try {
+    status = await getReviewStatus(planId);
+  } catch (err) {
+    logger.warn({ err, planId }, 'Failed to get review status, blocking exit');
+    return {
+      allow: false,
+      message:
+        'Cannot verify plan approval status. Ensure the Shipyard MCP server is running. Check ~/.shipyard/server-debug.log for details.',
+      planId,
+    };
+  }
+
+  logger.info({ sessionId, planId, status: status.status }, 'Review status retrieved');
+
+  const baseUrl = webConfig.SHIPYARD_WEB_URL;
+  return buildStatusResponse(status, planId, baseUrl);
 }
 
 function formatFeedbackMessage(feedback?: ReviewFeedback[]): string {

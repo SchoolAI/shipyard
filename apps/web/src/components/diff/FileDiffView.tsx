@@ -12,11 +12,7 @@ import type * as Y from 'yjs';
 import { AddDiffCommentForm } from './AddDiffCommentForm';
 import { DiffCommentThread } from './DiffCommentThread';
 
-// --- Types ---
-
 export type DiffViewMode = 'unified' | 'split';
-
-// --- Helper Functions ---
 
 /**
  * Parse a unified diff patch to extract line content at each line number.
@@ -92,42 +88,32 @@ export interface FileDiffViewProps {
  */
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Prop comparison requires many conditional checks
 function arePropsEqual(prev: FileDiffViewProps, next: FileDiffViewProps): boolean {
-  // Quick reference check
   if (prev === next) return true;
 
-  // Compare primitive props
   if (prev.filename !== next.filename) return false;
   if (prev.patch !== next.patch) return false;
   if (prev.viewMode !== next.viewMode) return false;
   if (prev.sidebarCollapsed !== next.sidebarCollapsed) return false;
 
-  // Function props - compare by reference (they should be memoized by parent)
   if (prev.onViewModeChange !== next.onViewModeChange) return false;
   if (prev.onExpandSidebar !== next.onExpandSidebar) return false;
 
-  // Deep compare commentSupport
   const prevCS = prev.commentSupport;
   const nextCS = next.commentSupport;
 
-  // Both undefined
   if (!prevCS && !nextCS) return true;
-  // One undefined
   if (!prevCS || !nextCS) return false;
 
-  // Compare commentSupport properties
   if (prevCS.type !== nextCS.type) return false;
   if (prevCS.prNumber !== nextCS.prNumber) return false;
   if (prevCS.ydoc !== nextCS.ydoc) return false;
   if (prevCS.currentUser !== nextCS.currentUser) return false;
   if (prevCS.currentHeadSha !== nextCS.currentHeadSha) return false;
 
-  // For comments array, compare length and IDs (not full deep equality)
-  // This allows re-render only when comments are actually added/removed
   const prevComments = prevCS.comments;
   const nextComments = nextCS.comments;
   if (prevComments.length !== nextComments.length) return false;
 
-  // Compare comment IDs to detect actual changes
   for (let i = 0; i < prevComments.length; i++) {
     if (prevComments[i]?.id !== nextComments[i]?.id) return false;
   }
@@ -155,7 +141,6 @@ export const FileDiffView = memo(function FileDiffView({
 }: FileDiffViewProps) {
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
 
-  // Detect theme from document
   useEffect(() => {
     const checkTheme = () => {
       const isDark = document.documentElement.classList.contains('dark');
@@ -168,7 +153,6 @@ export const FileDiffView = memo(function FileDiffView({
     return () => observer.disconnect();
   }, []);
 
-  // Extract stable references from commentSupport to minimize re-renders
   const comments = commentSupport?.comments;
   const ydoc = commentSupport?.ydoc;
   const commentType = commentSupport?.type;
@@ -176,14 +160,14 @@ export const FileDiffView = memo(function FileDiffView({
   const currentUser = commentSupport?.currentUser;
   const currentHeadSha = commentSupport?.currentHeadSha;
 
-  // Parse patch to build a map of line number -> line content for staleness detection
   const lineContentMap = useMemo(() => {
     if (!patch) return new Map<number, string>();
     return parsePatchToLineContentMap(patch);
   }, [patch]);
 
-  // Store callback dependencies in refs so callbacks can access latest values
-  // without changing their reference (which would cause DiffView to close widgets)
+  /**
+   * Refs keep callback dependencies stable so DiffView doesn't close widgets on re-render.
+   */
   const callbackDepsRef = useRef({
     ydoc,
     commentType,
@@ -193,7 +177,6 @@ export const FileDiffView = memo(function FileDiffView({
     filename,
     lineContentMap,
   });
-  // Update ref on every render (this doesn't cause re-renders)
   callbackDepsRef.current = {
     ydoc,
     commentType,
@@ -204,7 +187,6 @@ export const FileDiffView = memo(function FileDiffView({
     lineContentMap,
   };
 
-  // Build extendData from comments grouped by line number (only when commentSupport provided)
   const extendData = useMemo(() => {
     if (!comments) return undefined;
 
@@ -221,7 +203,6 @@ export const FileDiffView = memo(function FileDiffView({
       }
     }
 
-    // Sort comments within each line by creation time
     for (const entry of Object.values(newFile)) {
       entry.data.sort((a, b) => a.createdAt - b.createdAt);
     }
@@ -229,9 +210,7 @@ export const FileDiffView = memo(function FileDiffView({
     return { newFile };
   }, [comments, filename]);
 
-  // CRITICAL: Use a stable callback that reads from ref to prevent DiffView re-renders
-  // This callback reference NEVER changes, so DiffView won't close the widget
-  const renderExtendLine = useCallback(({ data }: { data: unknown }) => {
+  const renderExtendLine = useCallback(({ data }: { data: DiffComment[] }) => {
     const {
       ydoc: doc,
       currentUser: user,
@@ -241,17 +220,15 @@ export const FileDiffView = memo(function FileDiffView({
     if (!doc) return null;
     return (
       <DiffCommentThread
-        comments={data as DiffComment[]}
+        comments={data}
         ydoc={doc}
         currentUser={user}
         currentHeadSha={sha}
         lineContentMap={contentMap}
       />
     );
-  }, []); // Empty deps - callback is stable forever, reads from ref
+  }, []);
 
-  // CRITICAL: Use a stable callback that reads from ref to prevent DiffView re-renders
-  // This callback reference NEVER changes, so DiffView won't close the widget
   const renderWidgetLine = useCallback(
     ({ lineNumber, onClose }: { lineNumber: number; onClose: () => void }) => {
       const {
@@ -277,7 +254,7 @@ export const FileDiffView = memo(function FileDiffView({
       );
     },
     []
-  ); // Empty deps - callback is stable forever, reads from ref
+  );
 
   if (!patch) {
     return (
@@ -292,11 +269,11 @@ export const FileDiffView = memo(function FileDiffView({
     );
   }
 
-  // Detect file language from extension for syntax highlighting
   const fileLang = filename.split('.').pop() || 'text';
 
-  // Construct a proper unified diff string from GitHub's patch
-  // GitHub API returns just the hunk content, but the library needs full diff format
+  /**
+   * GitHub API returns just the hunk content, but the library needs full unified diff format.
+   */
   const fullDiff = `diff --git a/${filename} b/${filename}
 --- a/${filename}
 +++ b/${filename}
@@ -348,9 +325,6 @@ ${patch}`;
           diffViewTheme={theme}
           diffViewHighlight={true}
           diffViewWrap={true}
-          // Comment support props - using memoized callbacks to prevent widget from closing
-          // CRITICAL: renderWidgetLine and renderExtendLine must be stable references
-          // or the DiffView library will close the widget on every parent re-render
           diffViewAddWidget={!!commentSupport}
           extendData={extendData}
           renderExtendLine={commentSupport ? renderExtendLine : undefined}

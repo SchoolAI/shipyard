@@ -87,7 +87,6 @@ describe('webConfig', () => {
     });
 
     it('should accept localhost with port (no protocol)', async () => {
-      // Zod's .url() validation accepts this as a valid URL
       process.env.SHIPYARD_WEB_URL = 'localhost:5173';
 
       const { webConfig } = await import('./web.js');

@@ -23,7 +23,6 @@ export function AnyInputRequestModal({
   planYdoc,
   onClose,
 }: AnyInputRequestModalProps) {
-  // Route to appropriate modal based on request type
   if (request?.type === 'multi') {
     return (
       <MultiQuestionInputModal
@@ -36,7 +35,6 @@ export function AnyInputRequestModal({
     );
   }
 
-  // For all other types, use the standard InputRequestModal
   return (
     <InputRequestModal
       isOpen={isOpen}

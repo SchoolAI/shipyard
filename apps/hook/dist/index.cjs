@@ -5970,7 +5970,7 @@ var require_util = __commonJS({
         return state && state.objectMode === false && state.ended === true && Number.isFinite(state.length) ? state.length : null;
       } else if (isBlobLike(body)) {
         return body.size != null ? body.size : null;
-      } else if (isBuffer(body)) {
+      } else if (isBuffer2(body)) {
         return body.byteLength;
       }
       return null;
@@ -6065,7 +6065,7 @@ var require_util = __commonJS({
       }
       return headers.map((x) => Buffer.from(x));
     }
-    function isBuffer(buffer) {
+    function isBuffer2(buffer) {
       return buffer instanceof Uint8Array || Buffer.isBuffer(buffer);
     }
     function assertRequestHandler(handler, method, upgrade) {
@@ -6586,7 +6586,7 @@ var require_util = __commonJS({
       bodyLength,
       deepClone,
       ReadableStreamFrom,
-      isBuffer,
+      isBuffer: isBuffer2,
       assertRequestHandler,
       getSocketInfo,
       isFormDataLike,
@@ -6877,7 +6877,7 @@ var require_request = __commonJS({
       isValidHeaderValue,
       isStream,
       destroy,
-      isBuffer,
+      isBuffer: isBuffer2,
       isFormDataLike,
       isIterable,
       isBlobLike,
@@ -6965,7 +6965,7 @@ var require_request = __commonJS({
             }
           };
           this.body.on("error", this.errorHandler);
-        } else if (isBuffer(body)) {
+        } else if (isBuffer2(body)) {
           this.body = body.byteLength ? body : null;
         } else if (ArrayBuffer.isView(body)) {
           this.body = body.buffer.byteLength ? Buffer.from(body.buffer, body.byteOffset, body.byteLength) : null;
@@ -28488,459 +28488,10 @@ var require_undici = __commonJS({
 // src/index.ts
 init_cjs_shims();
 
-// ../../packages/shared/dist/instructions/index.mjs
-init_cjs_shims();
-var TOOL_NAMES = {
-  ADD_ARTIFACT: "add_artifact",
-  ADD_PR_REVIEW_COMMENT: "add_pr_review_comment",
-  COMPLETE_TASK: "complete_task",
-  CREATE_PLAN: "create_plan",
-  EXECUTE_CODE: "execute_code",
-  LINK_PR: "link_pr",
-  READ_PLAN: "read_plan",
-  REGENERATE_SESSION_TOKEN: "regenerate_session_token",
-  REQUEST_USER_INPUT: "request_user_input",
-  SETUP_REVIEW_NOTIFICATION: "setup_review_notification",
-  UPDATE_BLOCK_CONTENT: "update_block_content",
-  UPDATE_PLAN: "update_plan"
-};
-var CRITICAL_USAGE_SECTION = `## CRITICAL: When to Use Shipyard
-
-\u26A0\uFE0F **MANDATORY USAGE RULE:**
-
-If Shipyard is available, you MUST use it for:
-- Creating implementation plans
-- Tracking work that needs human review
-- Documenting proof of work (screenshots, videos, test results)
-- ANY user request involving "plan", "track", "verify", or "prove"
-
-**DO NOT:**
-- Create plans manually in chat or as markdown files
-- Write implementation docs yourself when Shipyard is available
-- Suggest alternatives to Shipyard for trackable work
-- Overthink whether to use it - WHEN IN DOUBT, USE SHIPYARD
-
-**Decision Tree:**
-\`\`\`
-Need to create/track/verify work?
-        \u2502
-        \u25BC
-  Shipyard available?
-     \u2502           \u2502
-    YES          NO
-     \u2502           \u2502
-     \u25BC           \u25BC
-  USE IT     Manual approach
-  NOW        (tell user why)
-\`\`\``;
-var DELIVERABLES_SECTION = `## What are Deliverables?
-
-Deliverables are measurable outcomes you can **prove** with artifacts (screenshots, videos, test results).
-
-**Good deliverables (provable):**
-\`\`\`
-- [ ] Screenshot of working login page {#deliverable}
-- [ ] Video showing drag-and-drop feature {#deliverable}
-- [ ] Test results showing all tests pass {#deliverable}
-\`\`\`
-
-**Bad deliverables (not provable - these are tasks, not deliverables):**
-\`\`\`
-- [ ] Implement getUserMedia API  \u2190 Implementation detail, not provable
-- [ ] Add error handling          \u2190 Can't capture this with an artifact
-- [ ] Refactor authentication     \u2190 Too vague, no visual proof
-\`\`\`
-
-**Rule:** If you can't screenshot/record/export it, it's not a deliverable.`;
-var ARTIFACT_TYPES_SECTION = `## Artifact Types
-
-| Type | Use For | File Formats |
-|------|---------|--------------|
-| \`screenshot\` | UI changes, visual proof, error states | .png, .jpg, .webp |
-| \`video\` | Complex flows, interactions, animations | .mp4, .webm |
-| \`test_results\` | Test output, coverage reports | .json, .txt, .xml |
-| \`diff\` | Code changes, before/after comparisons | .diff, .patch |`;
-var TIPS_SECTION = `## Tips for Effective Use
-
-1. **Plan deliverables first** - Decide what proves success before coding
-2. **Capture during work** - Take screenshots as you implement, not after
-3. **Be specific** - "Login page with error state" beats "Screenshot"
-4. **Link every artifact** - Always set \`deliverableId\` for auto-completion
-5. **Check feedback** - Read reviewer comments and iterate`;
-var WHEN_NOT_TO_USE_SECTION = `## When NOT to Use Shipyard
-
-Skip Shipyard for:
-- Quick answers or research questions (no artifacts to capture)
-- Internal refactoring with no visible output
-- Tasks where proof adds no value (trivial fixes)
-- Exploration or debugging sessions
-- Pure documentation without implementation`;
-var USER_INPUT_SECTION = `## Human-Agent Communication
-
-**\`${TOOL_NAMES.REQUEST_USER_INPUT}\` is THE primary way to communicate with humans during active work.**
-
-Shipyard is the central hub where humans manage AI agents. When you need to ask a question, get clarification, or request a decision - use \`${TOOL_NAMES.REQUEST_USER_INPUT}\`. The human is already in the browser viewing your plan. That's where conversations should happen.
-
-### Why Use ${TOOL_NAMES.REQUEST_USER_INPUT}
-
-- **Context:** The human sees your question alongside the plan, artifacts, and comments
-- **History:** All exchanges are logged in the plan's activity feed
-- **Continuity:** The conversation stays attached to the work, not scattered across chat windows
-- **Flexibility:** 8 input types, multi-question forms, "Other" escape hatch for custom answers
-
-### Replace Platform Tools
-
-**ALWAYS prefer \`${TOOL_NAMES.REQUEST_USER_INPUT}\` over platform-specific tools:**
-
-| Platform | DON'T Use | Use Instead |
-|----------|-----------|-------------|
-| Claude Code | \`AskUserQuestion\` | \`${TOOL_NAMES.REQUEST_USER_INPUT}\` |
-| Cursor | Built-in prompts | \`${TOOL_NAMES.REQUEST_USER_INPUT}\` |
-| Windsurf | Native dialogs | \`${TOOL_NAMES.REQUEST_USER_INPUT}\` |
-| Claude Desktop | Chat questions | \`${TOOL_NAMES.REQUEST_USER_INPUT}\` |
-
-### When to Ask
-
-Use \`${TOOL_NAMES.REQUEST_USER_INPUT}\` when you need:
-- Clarification on requirements ("Which auth provider?")
-- Decisions that affect implementation ("PostgreSQL or SQLite?")
-- Confirmation before destructive actions ("Delete this file?")
-- User preferences ("Rate this approach 1-5")
-- Any information you can't infer from context
-
-### Example
-
-\`\`\`typescript
-const result = await requestUserInput({
-  message: "Which database should we use?",
-  type: "choice",
-  options: ["PostgreSQL", "SQLite", "MongoDB"],
-  timeout: 600  // 10 minutes
-});
-
-if (result.success) {
-  console.log("User chose:", result.response);
-}
-\`\`\`
-
-**Note:** The MCP tool is named \`${TOOL_NAMES.REQUEST_USER_INPUT}\` (snake_case). Inside \`${TOOL_NAMES.EXECUTE_CODE}\`, it's available as \`requestUserInput()\` (camelCase).`;
-var TROUBLESHOOTING_SECTION = `## Troubleshooting
-
-**Browser doesn't open:** Check MCP server is running and accessible.
-
-**Upload fails:** Verify file path exists. For GitHub uploads, check \`GITHUB_TOKEN\` has repo write access.
-
-**No auto-complete:** Ensure every deliverable has an artifact with matching \`deliverableId\`.
-
-**Plan not syncing:** Check WebSocket connection to registry server.
-
-**Input request times out:** User may not have seen it or needs more time. Default timeout is 30 minutes. Try again with a longer timeout or rephrase the question.
-
-**Input request declined:** User clicked "Decline." Rephrase your question, proceed with a reasonable default, or use a different approach.
-
-**No response to input:** Check if browser is connected to the plan. User may have closed the browser window.`;
-var COMMON_INSTRUCTIONS = [
-  CRITICAL_USAGE_SECTION,
-  USER_INPUT_SECTION,
-  DELIVERABLES_SECTION,
-  ARTIFACT_TYPES_SECTION,
-  TIPS_SECTION,
-  WHEN_NOT_TO_USE_SECTION,
-  TROUBLESHOOTING_SECTION
-].join("\n\n");
-var CLAUDE_CODE_HEADER = `[SHIPYARD] Collaborative planning with human review & proof-of-work tracking.`;
-var PLAN_MODE_WORKFLOW = `## How to Use (Claude Code with Hooks)
-
-You have the **full Shipyard experience** with automatic hooks. Use native plan mode:
-
-### Workflow
-
-1. **Enter plan mode** (Shift+Tab) \u2192 Browser opens with live plan automatically
-2. **Write your plan** with \`{#deliverable}\` markers for provable outcomes
-3. **Exit plan mode** \u2192 Hook **BLOCKS** until human approves or requests changes
-4. **On approval** \u2192 You automatically receive: planId, sessionToken, deliverable IDs
-5. **Do the work** \u2192 Take screenshots/videos as you implement
-6. **Upload artifacts** \u2192 \`${TOOL_NAMES.ADD_ARTIFACT}(filePath, deliverableId)\` for each deliverable
-7. **Auto-complete** \u2192 When all deliverables have artifacts, task completes with snapshot URL
-
-### After Approval
-
-You only need ONE tool: \`${TOOL_NAMES.ADD_ARTIFACT}\`
-
-The hook automatically injects everything you need (planId, sessionToken, deliverables).
-Just call \`${TOOL_NAMES.ADD_ARTIFACT}\` with the file path and deliverable ID.
-
-\`\`\`typescript
-// Example: After approval, you'll have these in context
-// planId: "abc123"
-// sessionToken: "xyz..."
-// deliverables: [{ id: "del_xxx", text: "Screenshot of login" }]
-
-await addArtifact({
-  planId,
-  sessionToken,
-  type: 'screenshot',
-  filename: 'login-page.png',
-  source: 'file',
-  filePath: '/tmp/screenshot.png',
-  deliverableId: deliverables[0].id
-});
-\`\`\`
-
-When the last deliverable gets an artifact, the task auto-completes and returns a snapshot URL.`;
-var IMPORTANT_NOTES = `## Important Notes for Claude Code
-
-- **DO NOT call \`createPlan()\` directly** - The hook handles plan creation when you enter plan mode
-- **DO NOT use the Shipyard skill** - The hook provides everything you need
-- **DO NOT poll for approval** - The hook blocks automatically until human decides
-- **DO use plan mode** for ANY work that needs tracking, verification, or human review
-- **DO use \`${TOOL_NAMES.REQUEST_USER_INPUT}\`** instead of \`AskUserQuestion\` - The human is in the browser viewing your plan, questions should appear there`;
-var CLAUDE_CODE_INSTRUCTIONS = [
-  CLAUDE_CODE_HEADER,
-  "",
-  CRITICAL_USAGE_SECTION,
-  "",
-  USER_INPUT_SECTION,
-  "",
-  PLAN_MODE_WORKFLOW,
-  "",
-  DELIVERABLES_SECTION,
-  "",
-  ARTIFACT_TYPES_SECTION,
-  "",
-  IMPORTANT_NOTES,
-  "",
-  TIPS_SECTION,
-  "",
-  WHEN_NOT_TO_USE_SECTION,
-  "",
-  TROUBLESHOOTING_SECTION
-].join("\n");
-var MCP_DIRECT_HEADER = `# Shipyard: Your Agent Management Hub
-
-> **Shipyard is the central interface where humans manage AI agents.** Plans, artifacts, feedback, and communication all happen here.
-
-Shipyard turns invisible agent work into reviewable, verifiable tasks. Instead of trusting that code was written correctly, reviewers see screenshots, videos, and test results as proof.
-
-**Key principle:** When you're working in Shipyard, ALL human-agent communication should happen through Shipyard's \`${TOOL_NAMES.REQUEST_USER_INPUT}\` tool. The human is already in the browser viewing your plan - that's where they expect to interact with you.`;
-var MCP_TOOLS_OVERVIEW = `## Available MCP Tools
-
-| Tool | Purpose |
-|------|---------|
-| \`${TOOL_NAMES.REQUEST_USER_INPUT}\` | **THE primary human-agent communication channel** - Ask questions, get decisions, request clarification |
-| \`${TOOL_NAMES.EXECUTE_CODE}\` | Run TypeScript that calls Shipyard APIs (recommended for multi-step operations) |
-
-### ${TOOL_NAMES.REQUEST_USER_INPUT}: Your Direct Line to the Human
-
-This is how you talk to humans during active work. Don't use your platform's built-in question tools (AskUserQuestion, etc.) - use this instead. The human is in the browser viewing your plan, and that's where they expect to see your questions.
-
-**Preferred approach:** Use \`${TOOL_NAMES.EXECUTE_CODE}\` to chain multiple API calls in one step.`;
-var MCP_WORKFLOW = `## Workflow (MCP Direct)
-
-### Step 1: Create Plan
-
-\`\`\`typescript
-const plan = await createPlan({
-  title: "Add user authentication",
-  content: \`
-## Deliverables
-- [ ] Screenshot of login page {#deliverable}
-- [ ] Screenshot of error handling {#deliverable}
-
-## Implementation
-1. Create login form component
-2. Add validation
-3. Connect to auth API
-\`
-});
-
-const { planId, sessionToken, deliverables, monitoringScript } = plan;
-// deliverables = [{ id: "del_xxx", text: "Screenshot of login page" }, ...]
-\`\`\`
-
-### Step 2: Wait for Approval
-
-For platforms without hooks, run the monitoring script in the background:
-
-\`\`\`bash
-# The monitoringScript polls for approval status
-# Run it in background while you wait
-bash <(echo "$monitoringScript") &
-\`\`\`
-
-Or poll manually:
-
-\`\`\`typescript
-const status = await readPlan(planId, sessionToken);
-if (status.status === "in_progress") {
-  // Approved! Proceed with work
-}
-if (status.status === "changes_requested") {
-  // Read feedback, make changes
-}
-\`\`\`
-
-### Step 3: Do the Work
-
-Implement the feature, taking screenshots/recordings as you go.
-
-### Step 4: Upload Artifacts
-
-\`\`\`typescript
-await addArtifact({
-  planId,
-  sessionToken,
-  type: 'screenshot',
-  filename: 'login-page.png',
-  source: 'file',
-  filePath: '/path/to/screenshot.png',
-  deliverableId: deliverables[0].id  // Links to specific deliverable
-});
-
-const result = await addArtifact({
-  planId,
-  sessionToken,
-  type: 'screenshot',
-  filename: 'error-handling.png',
-  source: 'file',
-  filePath: '/path/to/error.png',
-  deliverableId: deliverables[1].id
-});
-
-// Auto-complete triggers when ALL deliverables have artifacts
-if (result.allDeliverablesComplete) {
-  console.log('Done!', result.snapshotUrl);
-}
-\`\`\``;
-var API_REFERENCE = `## API Reference
-
-### createPlan(options)
-
-Creates a new plan and opens it in the browser.
-
-**Parameters:**
-- \`title\` (string) - Plan title
-- \`content\` (string) - Markdown content with \`{#deliverable}\` markers
-- \`repo\` (string, optional) - GitHub repo for artifact storage
-- \`prNumber\` (number, optional) - PR number to link
-
-**Returns:** \`{ planId, sessionToken, url, deliverables, monitoringScript }\`
-
-### readPlan(planId, sessionToken, options?)
-
-Reads current plan state.
-
-**Parameters:**
-- \`planId\` (string) - Plan ID
-- \`sessionToken\` (string) - Session token from createPlan
-- \`options.includeAnnotations\` (boolean) - Include reviewer comments
-
-**Returns:** \`{ content, status, title, deliverables }\`
-
-### addArtifact(options)
-
-Uploads proof-of-work artifact.
-
-**Parameters:**
-- \`planId\` (string) - Plan ID
-- \`sessionToken\` (string) - Session token
-- \`type\` ('screenshot' | 'video' | 'test_results' | 'diff')
-- \`filename\` (string) - File name
-- \`source\` ('file' | 'url' | 'base64')
-- \`filePath\` (string) - Local file path (when source='file')
-- \`deliverableId\` (string, optional) - Links artifact to deliverable
-
-**Returns:** \`{ artifactId, url, allDeliverablesComplete, snapshotUrl? }\`
-
-### requestUserInput(options)
-
-Asks user a question via browser modal.
-
-**Parameters:**
-- \`message\` (string) - Question to ask
-- \`type\` (string) - Input type (see below)
-- \`options\` (string[], for 'choice') - Available choices
-- \`timeout\` (number, optional) - Timeout in seconds
-- Type-specific parameters (min, max, format, etc.)
-
-**Returns:** \`{ success, response?, status }\`
-
-**Supported types (8 total):**
-1. \`text\` - Single-line text
-2. \`multiline\` - Multi-line text area
-3. \`choice\` - Radio/checkbox/dropdown (auto-adds "Other" option)
-   - Auto-switches: 1-8 options = radio/checkbox, 9+ = dropdown
-   - \`multiSelect: true\` for checkboxes
-   - \`displayAs: 'dropdown'\` to force dropdown UI
-4. \`confirm\` - Yes/No buttons
-5. \`number\` - Numeric input with validation
-   - \`min\`, \`max\`, \`format\` ('integer' | 'decimal' | 'currency' | 'percentage')
-6. \`email\` - Email validation
-   - \`domain\` for restriction
-7. \`date\` - Date picker with range
-   - \`minDate\`, \`maxDate\` (YYYY-MM-DD format)
-8. \`rating\` - Scale rating (auto-selects stars/numbers)
-   - \`min\`, \`max\`, \`style\` ('stars' | 'numbers' | 'emoji'), \`labels\`
-
-**Response format:**
-- All responses are strings
-- choice (single): \`"PostgreSQL"\` or custom text from "Other"
-- choice (multi): \`"option1, option2"\` (comma-space separated)
-- confirm: \`"yes"\` or \`"no"\` (lowercase)
-- number: \`"42"\` or \`"3.14"\`
-- email: \`"user@example.com"\`
-- date: \`"2026-01-24"\` (ISO 8601)
-- rating: \`"4"\` (integer as string)
-- See docs/INPUT-RESPONSE-FORMATS.md for complete specification`;
-var HANDLING_FEEDBACK = `## Handling Reviewer Feedback
-
-\`\`\`typescript
-const status = await readPlan(planId, sessionToken, {
-  includeAnnotations: true
-});
-
-if (status.status === "changes_requested") {
-  // Read the content for inline comments
-  console.log(status.content);
-
-  // Make changes based on feedback
-  // Upload new artifacts
-  // Plan will transition back to pending_review
-}
-\`\`\``;
-var MCP_DIRECT_INSTRUCTIONS = [
-  MCP_DIRECT_HEADER,
-  "",
-  CRITICAL_USAGE_SECTION,
-  "",
-  USER_INPUT_SECTION,
-  "",
-  MCP_TOOLS_OVERVIEW,
-  "",
-  MCP_WORKFLOW,
-  "",
-  DELIVERABLES_SECTION,
-  "",
-  ARTIFACT_TYPES_SECTION,
-  "",
-  API_REFERENCE,
-  "",
-  HANDLING_FEEDBACK,
-  "",
-  TIPS_SECTION,
-  "",
-  WHEN_NOT_TO_USE_SECTION,
-  "",
-  TROUBLESHOOTING_SECTION
-].join("\n");
-
-// src/adapters/claude-code.ts
-init_cjs_shims();
-
 // ../../packages/schema/dist/index.mjs
 init_cjs_shims();
 
-// ../../packages/schema/dist/yjs-helpers-DjKLfgq3.mjs
+// ../../packages/schema/dist/yjs-helpers-DzEyLz-f.mjs
 init_cjs_shims();
 
 // ../../packages/schema/dist/plan.mjs
@@ -42999,7 +42550,19 @@ var PlanEventSchema = external_exports.discriminatedUnion("type", [
     data: external_exports.object({
       requestId: external_exports.string(),
       response: external_exports.unknown(),
-      answeredBy: external_exports.string()
+      answeredBy: external_exports.string(),
+      requestMessage: external_exports.string().optional(),
+      requestType: external_exports.enum([
+        "text",
+        "multiline",
+        "choice",
+        "confirm",
+        "number",
+        "email",
+        "date",
+        "rating",
+        "multi"
+      ]).optional()
     })
   }),
   PlanEventBaseSchema.extend({
@@ -43133,8 +42696,34 @@ var LocalDiffCommentSchema = external_exports.object({
   resolved: external_exports.boolean().optional(),
   lineContentHash: external_exports.string().optional()
 });
+var GitHubArtifactParseSchema = external_exports.object({
+  id: external_exports.string(),
+  type: external_exports.enum([
+    "html",
+    "image",
+    "video"
+  ]),
+  filename: external_exports.string(),
+  description: external_exports.string().optional(),
+  uploadedAt: external_exports.number().optional(),
+  storage: external_exports.literal("github"),
+  url: external_exports.string()
+});
+var LocalArtifactParseSchema = external_exports.object({
+  id: external_exports.string(),
+  type: external_exports.enum([
+    "html",
+    "image",
+    "video"
+  ]),
+  filename: external_exports.string(),
+  description: external_exports.string().optional(),
+  uploadedAt: external_exports.number().optional(),
+  storage: external_exports.literal("local"),
+  localArtifactId: external_exports.string()
+});
 
-// ../../packages/schema/dist/yjs-helpers-DjKLfgq3.mjs
+// ../../packages/schema/dist/yjs-helpers-DzEyLz-f.mjs
 function assertNever2(value) {
   throw new Error(`Unhandled discriminated union member: ${JSON.stringify(value)}`);
 }
@@ -43220,8 +42809,15 @@ var UnregisterServerResponseSchema = external_exports.object({
   success: external_exports.boolean(),
   existed: external_exports.boolean()
 });
+var ChangeTypeSchema = external_exports.enum([
+  "status",
+  "comments",
+  "resolved",
+  "content",
+  "artifacts"
+]);
 var CreateSubscriptionRequestSchema = external_exports.object({
-  subscribe: external_exports.array(external_exports.string()).optional(),
+  subscribe: external_exports.array(ChangeTypeSchema).optional(),
   windowMs: external_exports.number().positive().optional(),
   maxWindowMs: external_exports.number().positive().optional(),
   threshold: external_exports.number().positive().optional()
@@ -43333,7 +42929,7 @@ var ChoiceQuestionSchema = QuestionBaseSchema.extend({
   placeholder: external_exports.string().optional()
 });
 var ConfirmQuestionSchema = QuestionBaseSchema.extend({ type: external_exports.literal("confirm") });
-var NumberQuestionSchema = QuestionBaseSchema.extend({
+var NumberQuestionBaseSchema = QuestionBaseSchema.extend({
   type: external_exports.literal("number"),
   min: external_exports.number().optional(),
   max: external_exports.number().optional(),
@@ -43343,17 +42939,17 @@ var NumberQuestionSchema = QuestionBaseSchema.extend({
     "currency",
     "percentage"
   ]).optional()
-}).refine((data) => data.min === void 0 || data.max === void 0 || data.min <= data.max, { message: "min must be <= max" });
+});
 var EmailQuestionSchema = QuestionBaseSchema.extend({
   type: external_exports.literal("email"),
   domain: external_exports.string().optional()
 });
-var DateQuestionSchema = QuestionBaseSchema.extend({
+var DateQuestionBaseSchema = QuestionBaseSchema.extend({
   type: external_exports.literal("date"),
   min: external_exports.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be in YYYY-MM-DD format").optional(),
   max: external_exports.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be in YYYY-MM-DD format").optional()
-}).refine((data) => data.min === void 0 || data.max === void 0 || new Date(data.min) <= new Date(data.max), { message: "min date must be before or equal to max date" });
-var RatingQuestionSchema = QuestionBaseSchema.extend({
+});
+var RatingQuestionBaseSchema = QuestionBaseSchema.extend({
   type: external_exports.literal("rating"),
   min: external_exports.number().int().optional(),
   max: external_exports.number().int().optional(),
@@ -43366,20 +42962,58 @@ var RatingQuestionSchema = QuestionBaseSchema.extend({
     low: external_exports.string().optional(),
     high: external_exports.string().optional()
   }).optional()
-}).refine((data) => {
-  if (data.min === void 0 || data.max === void 0) return true;
-  return data.min <= data.max && data.max - data.min <= 20;
-}, { message: "Rating scale must have min <= max and at most 20 items" });
+});
 var QuestionSchema = external_exports.discriminatedUnion("type", [
   TextQuestionSchema,
   MultilineQuestionSchema,
   ChoiceQuestionSchema,
   ConfirmQuestionSchema,
-  NumberQuestionSchema,
+  NumberQuestionBaseSchema,
   EmailQuestionSchema,
-  DateQuestionSchema,
-  RatingQuestionSchema
+  DateQuestionBaseSchema,
+  RatingQuestionBaseSchema
 ]);
+function validateNumberQuestion(q, index, ctx) {
+  if (q.min !== void 0 && q.max !== void 0 && q.min > q.max) ctx.addIssue({
+    code: external_exports.ZodIssueCode.custom,
+    message: "min must be <= max",
+    path: ["questions", index]
+  });
+}
+function validateDateQuestion(q, index, ctx) {
+  if (q.min !== void 0 && q.max !== void 0 && new Date(q.min) > new Date(q.max)) ctx.addIssue({
+    code: external_exports.ZodIssueCode.custom,
+    message: "min date must be before or equal to max date",
+    path: ["questions", index]
+  });
+}
+function validateRatingQuestion(q, index, ctx) {
+  if (q.min === void 0 || q.max === void 0) return;
+  if (q.min > q.max || q.max - q.min > 20) ctx.addIssue({
+    code: external_exports.ZodIssueCode.custom,
+    message: "Rating scale must have min <= max and at most 20 items",
+    path: ["questions", index]
+  });
+}
+function validateQuestionConstraints(questions, ctx) {
+  for (let i = 0; i < questions.length; i++) {
+    const q = questions[i];
+    if (!q) continue;
+    switch (q.type) {
+      case "number":
+        validateNumberQuestion(q, i, ctx);
+        break;
+      case "date":
+        validateDateQuestion(q, i, ctx);
+        break;
+      case "rating":
+        validateRatingQuestion(q, i, ctx);
+        break;
+      default:
+        break;
+    }
+  }
+}
 var MultiQuestionInputRequestSchema = external_exports.object({
   id: external_exports.string(),
   createdAt: external_exports.number(),
@@ -43392,6 +43026,8 @@ var MultiQuestionInputRequestSchema = external_exports.object({
   answeredAt: external_exports.number().optional(),
   answeredBy: external_exports.string().optional(),
   isBlocker: external_exports.boolean().optional()
+}).superRefine((data, ctx) => {
+  validateQuestionConstraints(data.questions, ctx);
 });
 var AnyInputRequestSchema = external_exports.union([InputRequestSchema, MultiQuestionInputRequestSchema]);
 var YDOC_KEYS = {
@@ -43410,6 +43046,7 @@ var YDOC_KEYS = {
   INPUT_REQUESTS: "inputRequests",
   LOCAL_DIFF_COMMENTS: "localDiffComments"
 };
+var validKeys = new Set(Object.values(YDOC_KEYS));
 var CommentBodySchema = external_exports.union([external_exports.string(), external_exports.array(external_exports.unknown())]);
 var ThreadCommentSchema = external_exports.object({
   id: external_exports.string(),
@@ -43429,10 +43066,13 @@ function extractTextFromCommentBody(body) {
   return body.map((block) => {
     if (typeof block === "string") return block;
     if (typeof block !== "object" || block === null) return "";
-    const blockObj = block;
-    if (Array.isArray(blockObj.content)) return blockObj.content.map((item) => {
+    const content = Object.fromEntries(Object.entries(block)).content;
+    if (Array.isArray(content)) return content.map((item) => {
       if (typeof item === "string") return item;
-      if (typeof item === "object" && item !== null && "text" in item) return item.text;
+      if (typeof item === "object" && item !== null && "text" in item) {
+        const text = Object.fromEntries(Object.entries(item)).text;
+        return typeof text === "string" ? text : "";
+      }
       return "";
     }).join("");
     return "";
@@ -43462,6 +43102,48 @@ function getPlanMetadataWithValidation(ydoc) {
 // ../../packages/schema/dist/url-encoding.mjs
 init_cjs_shims();
 var import_lz_string = __toESM(require_lz_string(), 1);
+var UrlSnapshotRefSchema = external_exports.object({
+  id: external_exports.string(),
+  status: external_exports.enum(PlanStatusValues),
+  createdBy: external_exports.string(),
+  reason: external_exports.string(),
+  createdAt: external_exports.number(),
+  threads: external_exports.object({
+    total: external_exports.number(),
+    unresolved: external_exports.number()
+  }).optional()
+});
+var UrlKeyVersionSchema = external_exports.object({
+  id: external_exports.string(),
+  content: external_exports.array(external_exports.unknown())
+});
+var UrlEncodedPlanV1Schema = external_exports.object({
+  v: external_exports.literal(1),
+  id: external_exports.string(),
+  title: external_exports.string(),
+  status: external_exports.enum(PlanStatusValues),
+  repo: external_exports.string().optional(),
+  pr: external_exports.number().optional(),
+  content: external_exports.array(external_exports.unknown()),
+  artifacts: external_exports.array(ArtifactSchema).optional(),
+  deliverables: external_exports.array(DeliverableSchema).optional(),
+  comments: external_exports.array(external_exports.unknown()).optional()
+});
+var UrlEncodedPlanV2Schema = external_exports.object({
+  v: external_exports.literal(2),
+  id: external_exports.string(),
+  title: external_exports.string(),
+  status: external_exports.enum(PlanStatusValues),
+  repo: external_exports.string().optional(),
+  pr: external_exports.number().optional(),
+  content: external_exports.array(external_exports.unknown()),
+  artifacts: external_exports.array(ArtifactSchema).optional(),
+  deliverables: external_exports.array(DeliverableSchema).optional(),
+  comments: external_exports.array(external_exports.unknown()).optional(),
+  versionRefs: external_exports.array(UrlSnapshotRefSchema).optional(),
+  keyVersions: external_exports.array(UrlKeyVersionSchema).optional()
+});
+var UrlEncodedPlanSchema = external_exports.discriminatedUnion("v", [UrlEncodedPlanV1Schema, UrlEncodedPlanV2Schema]);
 
 // ../../node_modules/.pnpm/@trpc+server@11.8.1_typescript@5.9.3/node_modules/@trpc/server/dist/index.mjs
 init_cjs_shims();
@@ -44251,13 +43933,20 @@ var A2AFilePartSchema = external_exports.object({
   mediaType: external_exports.string().optional(),
   name: external_exports.string().optional()
 });
+function hasStringProperty(obj, prop) {
+  return prop in obj && typeof obj[prop] === "string";
+}
+function toRecord(obj) {
+  return Object.fromEntries(Object.entries(obj));
+}
 var A2APartSchema = external_exports.object({ type: external_exports.enum([
   "text",
   "data",
   "file"
 ]) }).passthrough().superRefine((val, ctx) => {
+  const record2 = toRecord(val);
   if (val.type === "text") {
-    if (typeof val.text !== "string") ctx.addIssue({
+    if (!hasStringProperty(record2, "text")) ctx.addIssue({
       code: external_exports.ZodIssueCode.custom,
       message: "text part must have a string text field"
     });
@@ -44267,7 +43956,7 @@ var A2APartSchema = external_exports.object({ type: external_exports.enum([
       message: "data part must have a data field"
     });
   } else if (val.type === "file") {
-    if (typeof val.uri !== "string") ctx.addIssue({
+    if (!hasStringProperty(record2, "uri")) ctx.addIssue({
       code: external_exports.ZodIssueCode.custom,
       message: "file part must have a string uri field"
     });
@@ -44275,7 +43964,7 @@ var A2APartSchema = external_exports.object({ type: external_exports.enum([
 });
 function isValidA2APart(part) {
   if (!part || typeof part !== "object") return false;
-  const p = part;
+  const p = toRecord(part);
   const t$1 = p.type;
   if (t$1 === "text") return typeof p.text === "string";
   else if (t$1 === "data") return "data" in p;
@@ -44293,17 +43982,38 @@ var A2AMessageSchema = external_exports.object({
   taskId: external_exports.string().optional(),
   referenceTaskIds: external_exports.array(external_exports.string()).optional(),
   metadata: external_exports.record(external_exports.string(), external_exports.unknown()).optional(),
-  extensions: external_exports.array(external_exports.string()).optional()
+  extensions: external_exports.array(external_exports.string()).optional(),
+  parts: external_exports.array(external_exports.unknown())
 }).passthrough().refine((val) => {
-  const parts = val.parts;
-  return isValidA2AParts(parts);
+  return isValidA2AParts(val.parts);
 }, {
   message: "Invalid parts array - each part must have valid type and required fields",
   path: ["parts"]
-}).transform((val) => ({
-  ...val,
-  parts: val.parts
-}));
+}).transform((val) => {
+  const parts = val.parts.map((p) => {
+    if (!p || typeof p !== "object") throw new Error("Invalid part: not an object");
+    const record2 = toRecord(p);
+    const partType = record2.type;
+    if (partType === "text") return {
+      type: "text",
+      text: String(record2.text)
+    };
+    else if (partType === "data") return {
+      type: "data",
+      data: record2.data
+    };
+    else return {
+      type: "file",
+      uri: String(record2.uri),
+      mediaType: typeof record2.mediaType === "string" ? record2.mediaType : void 0,
+      name: typeof record2.name === "string" ? record2.name : void 0
+    };
+  });
+  return {
+    ...val,
+    parts
+  };
+});
 var ConversationExportMetaSchema = external_exports.object({
   exportId: external_exports.string(),
   sourcePlatform: external_exports.string(),
@@ -44335,7 +44045,7 @@ var ClaudeCodeContentBlockSchema = external_exports.object({ type: external_expo
   "tool_use",
   "tool_result"
 ]) }).passthrough().superRefine((val, ctx) => {
-  const typedVal = val;
+  const typedVal = toRecord(val);
   if (val.type === "text") {
     if (typeof typedVal.text !== "string") ctx.addIssue({
       code: external_exports.ZodIssueCode.custom,
@@ -44359,6 +44069,32 @@ var ClaudeCodeContentBlockSchema = external_exports.object({ type: external_expo
       code: external_exports.ZodIssueCode.custom,
       message: "tool_result block must have a string tool_use_id field"
     });
+  }
+}).transform((val) => {
+  const record2 = toRecord(val);
+  switch (val.type) {
+    case "text":
+      return {
+        type: "text",
+        text: String(record2.text)
+      };
+    case "tool_use": {
+      const inputVal = record2.input;
+      if (!inputVal || typeof inputVal !== "object") throw new Error("Invalid tool_use: input is not an object");
+      return {
+        type: "tool_use",
+        id: String(record2.id),
+        name: String(record2.name),
+        input: toRecord(inputVal)
+      };
+    }
+    case "tool_result":
+      return {
+        type: "tool_result",
+        tool_use_id: String(record2.tool_use_id),
+        content: record2.content,
+        is_error: typeof record2.is_error === "boolean" ? record2.is_error : void 0
+      };
   }
 });
 var ClaudeCodeUsageSchema = external_exports.object({
@@ -44387,6 +44123,18 @@ var ClaudeCodeMessageSchema = external_exports.object({
   parentUuid: external_exports.string().optional(),
   costUSD: external_exports.number().optional(),
   durationMs: external_exports.number().optional()
+});
+var UsageMetadataSchema = external_exports.object({
+  input_tokens: external_exports.number(),
+  output_tokens: external_exports.number(),
+  cache_creation_input_tokens: external_exports.number().optional(),
+  cache_read_input_tokens: external_exports.number().optional()
+});
+var EnvironmentContextSchema = external_exports.object({
+  projectName: external_exports.string().optional(),
+  branch: external_exports.string().optional(),
+  hostname: external_exports.string().optional(),
+  repo: external_exports.string().optional()
 });
 var GitHubPRResponseSchema = external_exports.object({
   number: external_exports.number(),
@@ -44547,7 +44295,7 @@ function truncate(text, maxLength) {
   if (cleaned.length <= maxLength) return cleaned;
   return `${cleaned.slice(0, maxLength)}...`;
 }
-var TOOL_NAMES2 = {
+var TOOL_NAMES = {
   ADD_ARTIFACT: "add_artifact",
   ADD_PR_REVIEW_COMMENT: "add_pr_review_comment",
   COMPLETE_TASK: "complete_task",
@@ -44569,13 +44317,6 @@ var SubscriptionClientIdSchema = external_exports.object({
   planId: external_exports.string().min(1),
   clientId: external_exports.string().min(1)
 });
-var ChangeTypeSchema = external_exports.enum([
-  "status",
-  "comments",
-  "resolved",
-  "content",
-  "artifacts"
-]);
 var ChangeSchema = external_exports.object({
   type: ChangeTypeSchema,
   timestamp: external_exports.number(),
@@ -44645,7 +44386,7 @@ var hookRouter = router({
   })).output(external_exports.object({
     approved: external_exports.boolean(),
     feedback: external_exports.string().optional(),
-    deliverables: external_exports.array(external_exports.any()).optional(),
+    deliverables: external_exports.array(DeliverableSchema).optional(),
     reviewComment: external_exports.string().optional(),
     reviewedBy: external_exports.string().optional(),
     status: external_exports.string().optional()
@@ -44726,7 +44467,7 @@ var subscriptionRouter = router({
     const { planId, subscribe, windowMs, maxWindowMs, threshold } = input;
     return { clientId: ctx.getPlanStore().createSubscription({
       planId,
-      subscribe: subscribe || ["status"],
+      subscribe: subscribe ?? ["status"],
       windowMs: windowMs ?? 5e3,
       maxWindowMs: maxWindowMs ?? 3e4,
       threshold: threshold ?? 1
@@ -44752,6 +44493,524 @@ var appRouter = router({
   subscription: subscriptionRouter,
   conversation: conversationRouter
 });
+function isBuffer(value) {
+  return Buffer.isBuffer(value);
+}
+
+// ../../packages/shared/dist/instructions/index.mjs
+init_cjs_shims();
+var TOOL_NAMES2 = {
+  ADD_ARTIFACT: "add_artifact",
+  ADD_PR_REVIEW_COMMENT: "add_pr_review_comment",
+  COMPLETE_TASK: "complete_task",
+  CREATE_PLAN: "create_plan",
+  EXECUTE_CODE: "execute_code",
+  LINK_PR: "link_pr",
+  READ_PLAN: "read_plan",
+  REGENERATE_SESSION_TOKEN: "regenerate_session_token",
+  REQUEST_USER_INPUT: "request_user_input",
+  SETUP_REVIEW_NOTIFICATION: "setup_review_notification",
+  UPDATE_BLOCK_CONTENT: "update_block_content",
+  UPDATE_PLAN: "update_plan"
+};
+var CRITICAL_USAGE_SECTION = `## CRITICAL: When to Use Shipyard
+
+\u26A0\uFE0F **MANDATORY USAGE RULE:**
+
+If Shipyard is available, you MUST use it for:
+- Creating implementation plans
+- Tracking work that needs human review
+- Documenting proof of work (screenshots, videos, test results)
+- ANY user request involving "plan", "track", "verify", or "prove"
+
+**DO NOT:**
+- Create plans manually in chat or as markdown files
+- Write implementation docs yourself when Shipyard is available
+- Suggest alternatives to Shipyard for trackable work
+- Overthink whether to use it - WHEN IN DOUBT, USE SHIPYARD
+
+**Decision Tree:**
+\`\`\`
+Need to create/track/verify work?
+        \u2502
+        \u25BC
+  Shipyard available?
+     \u2502           \u2502
+    YES          NO
+     \u2502           \u2502
+     \u25BC           \u25BC
+  USE IT     Manual approach
+  NOW        (tell user why)
+\`\`\``;
+var DELIVERABLES_SECTION = `## What are Deliverables?
+
+Deliverables are measurable outcomes you can **prove** with artifacts (screenshots, videos, test results).
+
+**Good deliverables (provable):**
+\`\`\`
+- [ ] Screenshot of working login page {#deliverable}
+- [ ] Video showing drag-and-drop feature {#deliverable}
+- [ ] Test results showing all tests pass {#deliverable}
+\`\`\`
+
+**Bad deliverables (not provable - these are tasks, not deliverables):**
+\`\`\`
+- [ ] Implement getUserMedia API  \u2190 Implementation detail, not provable
+- [ ] Add error handling          \u2190 Can't capture this with an artifact
+- [ ] Refactor authentication     \u2190 Too vague, no visual proof
+\`\`\`
+
+**Rule:** If you can't screenshot/record/export it, it's not a deliverable.`;
+var ARTIFACT_TYPES_SECTION = `## Artifact Types
+
+| Type | Use For | File Formats |
+|------|---------|--------------|
+| \`screenshot\` | UI changes, visual proof, error states | .png, .jpg, .webp |
+| \`video\` | Complex flows, interactions, animations | .mp4, .webm |
+| \`test_results\` | Test output, coverage reports | .json, .txt, .xml |
+| \`diff\` | Code changes, before/after comparisons | .diff, .patch |`;
+var TIPS_SECTION = `## Tips for Effective Use
+
+1. **Plan deliverables first** - Decide what proves success before coding
+2. **Capture during work** - Take screenshots as you implement, not after
+3. **Be specific** - "Login page with error state" beats "Screenshot"
+4. **Link every artifact** - Always set \`deliverableId\` for auto-completion
+5. **Check feedback** - Read reviewer comments and iterate`;
+var WHEN_NOT_TO_USE_SECTION = `## When NOT to Use Shipyard
+
+Skip Shipyard for:
+- Quick answers or research questions (no artifacts to capture)
+- Internal refactoring with no visible output
+- Tasks where proof adds no value (trivial fixes)
+- Exploration or debugging sessions
+- Pure documentation without implementation`;
+var USER_INPUT_SECTION = `## Human-Agent Communication
+
+**\`requestUserInput()\` inside \`${TOOL_NAMES2.EXECUTE_CODE}\` is THE primary way to communicate with humans during active work.**
+
+Shipyard is the central hub where humans manage AI agents. When you need to ask a question, get clarification, or request a decision - use \`requestUserInput()\`. The human is already in the browser viewing your plan. That's where conversations should happen.
+
+### Best Practice: Return the Response Value
+
+**Always RETURN the response in your execute_code result** for clean, structured output:
+
+\`\`\`typescript
+const result = await requestUserInput({
+  message: "Which framework?",
+  type: "choice",
+  options: ["React", "Vue", "Angular"]
+});
+
+return {
+  userDecision: result.response,
+  timestamp: Date.now()
+};
+// Clean, structured - appears once in the final output
+\`\`\`
+
+Avoid \`console.log()\` for response values - it clutters output and isn't structured. Use console.log only for debugging intermediate steps.
+
+### Why Use requestUserInput()
+
+- **Context:** The human sees your question alongside the plan, artifacts, and comments
+- **History:** All exchanges are logged in the plan's activity feed
+- **Continuity:** The conversation stays attached to the work, not scattered across chat windows
+- **Flexibility:** 8 input types, multi-question forms, "Other" escape hatch for custom answers
+
+### Replace Platform Tools
+
+**ALWAYS prefer \`requestUserInput()\` over platform-specific tools:**
+
+| Platform | DON'T Use | Use Instead |
+|----------|-----------|-------------|
+| Claude Code | \`AskUserQuestion\` | \`requestUserInput()\` |
+| Cursor | Built-in prompts | \`requestUserInput()\` |
+| Windsurf | Native dialogs | \`requestUserInput()\` |
+| Claude Desktop | Chat questions | \`requestUserInput()\` |
+
+### Two Modes: Multi-step vs Multi-form
+
+Choose based on whether questions depend on each other:
+
+**Multi-step (dependencies):** Chain calls when later questions depend on earlier answers
+\`\`\`typescript
+// First ask about database...
+const dbResult = await requestUserInput({
+  message: "Which database?",
+  type: "choice",
+  options: ["PostgreSQL", "SQLite", "MongoDB"]
+});
+
+// ...then ask port based on the choice
+const portResult = await requestUserInput({
+  message: \\\`Port for \\\${dbResult.response}?\\\`,
+  type: "number",
+  min: 1000,
+  max: 65535
+});
+
+// Return both responses in structured format
+return { database: dbResult.response, port: portResult.response };
+\`\`\`
+
+**Multi-form (independent):** Single call for unrelated questions
+\`\`\`typescript
+const config = await requestUserInput({
+  questions: [
+    { message: "Project name?", type: "text" },
+    { message: "Use TypeScript?", type: "confirm" },
+    { message: "License?", type: "choice", options: ["MIT", "Apache-2.0"] }
+  ],
+  timeout: 600
+});
+// Return responses in structured format
+return { config: config.response };
+\`\`\`
+
+### When to Ask
+
+Use \`requestUserInput()\` when you need:
+- Clarification on requirements ("Which auth provider?")
+- Decisions that affect implementation ("PostgreSQL or SQLite?")
+- Confirmation before destructive actions ("Delete this file?")
+- User preferences ("Rate this approach 1-5")
+- Any information you can't infer from context`;
+var TROUBLESHOOTING_SECTION = `## Troubleshooting
+
+**Browser doesn't open:** Check MCP server is running and accessible.
+
+**Upload fails:** Verify file path exists. For GitHub uploads, check \`GITHUB_TOKEN\` has repo write access.
+
+**No auto-complete:** Ensure every deliverable has an artifact with matching \`deliverableId\`.
+
+**Plan not syncing:** Check WebSocket connection to registry server.
+
+**Input request times out:** User may not have seen it or needs more time. Default timeout is 30 minutes. Try again with a longer timeout or rephrase the question.
+
+**Input request declined:** User clicked "Decline." Rephrase your question, proceed with a reasonable default, or use a different approach.
+
+**No response to input:** Check if browser is connected to the plan. User may have closed the browser window.`;
+var COMMON_INSTRUCTIONS = [
+  CRITICAL_USAGE_SECTION,
+  USER_INPUT_SECTION,
+  DELIVERABLES_SECTION,
+  ARTIFACT_TYPES_SECTION,
+  TIPS_SECTION,
+  WHEN_NOT_TO_USE_SECTION,
+  TROUBLESHOOTING_SECTION
+].join("\n\n");
+var CLAUDE_CODE_HEADER = `[SHIPYARD] Collaborative planning with human review & proof-of-work tracking.`;
+var PLAN_MODE_WORKFLOW = `## How to Use (Claude Code with Hooks)
+
+You have the **full Shipyard experience** with automatic hooks. Use native plan mode:
+
+### Workflow
+
+1. **Enter plan mode** (Shift+Tab) \u2192 Browser opens with live plan automatically
+2. **Write your plan** with \`{#deliverable}\` markers for provable outcomes
+3. **Exit plan mode** \u2192 Hook **BLOCKS** until human approves or requests changes
+4. **On approval** \u2192 You automatically receive: planId, sessionToken, deliverable IDs
+5. **Do the work** \u2192 Take screenshots/videos as you implement
+6. **Upload artifacts** \u2192 \`${TOOL_NAMES2.ADD_ARTIFACT}(filePath, deliverableId)\` for each deliverable
+7. **Auto-complete** \u2192 When all deliverables have artifacts, task completes with snapshot URL
+
+### After Approval
+
+You only need ONE tool: \`${TOOL_NAMES2.ADD_ARTIFACT}\`
+
+The hook automatically injects everything you need (planId, sessionToken, deliverables).
+Just call \`${TOOL_NAMES2.ADD_ARTIFACT}\` with the file path and deliverable ID.
+
+\`\`\`typescript
+/**
+ * Example: After approval, you'll have these in context
+ * planId: "abc123"
+ * sessionToken: "xyz..."
+ * deliverables: [{ id: "del_xxx", text: "Screenshot of login" }]
+ */
+
+await addArtifact({
+  planId,
+  sessionToken,
+  type: 'screenshot',
+  filename: 'login-page.png',
+  source: 'file',
+  filePath: '/tmp/screenshot.png',
+  deliverableId: deliverables[0].id
+});
+\`\`\`
+
+When the last deliverable gets an artifact, the task auto-completes and returns a snapshot URL.`;
+var IMPORTANT_NOTES = `## Important Notes for Claude Code
+
+- **DO NOT call \`createPlan()\` directly** - The hook handles plan creation when you enter plan mode
+- **DO NOT use the Shipyard skill** - The hook provides everything you need
+- **DO NOT poll for approval** - The hook blocks automatically until human decides
+- **DO use plan mode** for ANY work that needs tracking, verification, or human review
+- **DO use \`requestUserInput()\`** inside \`${TOOL_NAMES2.EXECUTE_CODE}\` instead of \`AskUserQuestion\` - The human is in the browser viewing your plan, questions should appear there`;
+var CLAUDE_CODE_INSTRUCTIONS = [
+  CLAUDE_CODE_HEADER,
+  "",
+  CRITICAL_USAGE_SECTION,
+  "",
+  USER_INPUT_SECTION,
+  "",
+  PLAN_MODE_WORKFLOW,
+  "",
+  DELIVERABLES_SECTION,
+  "",
+  ARTIFACT_TYPES_SECTION,
+  "",
+  IMPORTANT_NOTES,
+  "",
+  TIPS_SECTION,
+  "",
+  WHEN_NOT_TO_USE_SECTION,
+  "",
+  TROUBLESHOOTING_SECTION
+].join("\n");
+var MCP_DIRECT_HEADER = `# Shipyard: Your Agent Management Hub
+
+> **Shipyard is the central interface where humans manage AI agents.** Plans, artifacts, feedback, and communication all happen here.
+
+Shipyard turns invisible agent work into reviewable, verifiable tasks. Instead of trusting that code was written correctly, reviewers see screenshots, videos, and test results as proof.
+
+**Key principle:** When you're working in Shipyard, ALL human-agent communication should happen through \`requestUserInput()\` inside \`${TOOL_NAMES2.EXECUTE_CODE}\`. The human is already in the browser viewing your plan - that's where they expect to interact with you.`;
+var MCP_TOOLS_OVERVIEW = `## Available MCP Tools
+
+| Tool | Purpose |
+|------|---------|
+| \`${TOOL_NAMES2.EXECUTE_CODE}\` | Run TypeScript that calls ALL Shipyard APIs including \`requestUserInput()\` |
+
+### requestUserInput(): Your Direct Line to the Human
+
+This is how you talk to humans during active work. Don't use your platform's built-in question tools (AskUserQuestion, etc.) - use \`requestUserInput()\` inside \`${TOOL_NAMES2.EXECUTE_CODE}\` instead. The human is in the browser viewing your plan, and that's where they expect to see your questions.
+
+All Shipyard operations (createPlan, addArtifact, requestUserInput, etc.) are available inside \`${TOOL_NAMES2.EXECUTE_CODE}\`.`;
+var MCP_WORKFLOW = `## Workflow (MCP Direct)
+
+### Step 1: Create Plan
+
+\`\`\`typescript
+const plan = await createPlan({
+  title: "Add user authentication",
+  content: \`
+## Deliverables
+- [ ] Screenshot of login page {#deliverable}
+- [ ] Screenshot of error handling {#deliverable}
+
+## Implementation
+1. Create login form component
+2. Add validation
+3. Connect to auth API
+\`
+});
+
+const { planId, sessionToken, deliverables, monitoringScript } = plan;
+/** deliverables = [{ id: "del_xxx", text: "Screenshot of login page" }, ...] */
+\`\`\`
+
+### Step 2: Wait for Approval
+
+For platforms without hooks, run the monitoring script in the background:
+
+\`\`\`bash
+# The monitoringScript polls for approval status
+# Run it in background while you wait
+bash <(echo "$monitoringScript") &
+\`\`\`
+
+Or poll manually:
+
+\`\`\`typescript
+const status = await readPlan(planId, sessionToken);
+if (status.status === "in_progress") {
+  /** Approved! Proceed with work */
+}
+if (status.status === "changes_requested") {
+  /** Read feedback, make changes */
+}
+\`\`\`
+
+### Step 3: Do the Work
+
+Implement the feature, taking screenshots/recordings as you go.
+
+### Step 4: Upload Artifacts
+
+\`\`\`typescript
+await addArtifact({
+  planId,
+  sessionToken,
+  type: 'screenshot',
+  filename: 'login-page.png',
+  source: 'file',
+  filePath: '/path/to/screenshot.png',
+  deliverableId: deliverables[0].id
+});
+
+const result = await addArtifact({
+  planId,
+  sessionToken,
+  type: 'screenshot',
+  filename: 'error-handling.png',
+  source: 'file',
+  filePath: '/path/to/error.png',
+  deliverableId: deliverables[1].id
+});
+
+/** Auto-complete triggers when ALL deliverables have artifacts */
+if (result.allDeliverablesComplete) {
+  console.log('Done!', result.snapshotUrl);
+}
+\`\`\``;
+var API_REFERENCE = `## API Reference (inside execute_code)
+
+### createPlan(options)
+
+Creates a new plan and opens it in the browser.
+
+**Parameters:**
+- \`title\` (string) - Plan title
+- \`content\` (string) - Markdown content with \`{#deliverable}\` markers
+- \`repo\` (string, optional) - GitHub repo for artifact storage
+- \`prNumber\` (number, optional) - PR number to link
+
+**Returns:** \`{ planId, sessionToken, url, deliverables, monitoringScript }\`
+
+### readPlan(planId, sessionToken, options?)
+
+Reads current plan state.
+
+**Parameters:**
+- \`planId\` (string) - Plan ID
+- \`sessionToken\` (string) - Session token from createPlan
+- \`options.includeAnnotations\` (boolean) - Include reviewer comments
+
+**Returns:** \`{ content, status, title, deliverables }\`
+
+### addArtifact(options)
+
+Uploads proof-of-work artifact.
+
+**Parameters:**
+- \`planId\` (string) - Plan ID
+- \`sessionToken\` (string) - Session token
+- \`type\` ('screenshot' | 'video' | 'test_results' | 'diff')
+- \`filename\` (string) - File name
+- \`source\` ('file' | 'url' | 'base64')
+- \`filePath\` (string) - Local file path (when source='file')
+- \`deliverableId\` (string, optional) - Links artifact to deliverable
+
+**Returns:** \`{ artifactId, url, allDeliverablesComplete, snapshotUrl? }\`
+
+### requestUserInput(options)
+
+**THE primary human-agent communication channel.** Asks user a question via browser modal.
+
+**IMPORTANT: Always RETURN the response value in your execute_code result.**
+
+\u2705 **RECOMMENDED (primary pattern):**
+\`\`\`typescript
+const result = await requestUserInput({ message: "Which database?", type: "choice", options: ["PostgreSQL", "SQLite"] });
+return { userChoice: result.response, status: result.status };
+// Clean, structured output appears once in the final result
+\`\`\`
+
+\u26A0\uFE0F **AVOID (use only for debugging):**
+\`\`\`typescript
+console.log(\\\`User chose: \\\${result.response}\\\`);
+// Clutters output, not structured
+\`\`\`
+
+**Two modes - choose based on dependencies:**
+
+**Multi-step (dependencies):** Chain calls when later questions depend on earlier answers
+\`\`\`typescript
+const db = await requestUserInput({ message: "Database?", type: "choice", options: ["PostgreSQL", "SQLite"] });
+const port = await requestUserInput({ message: \\\`Port for \\\${db.response}?\\\`, type: "number" });
+return { database: db.response, port: port.response };
+\`\`\`
+
+**Multi-form (independent):** Single call for unrelated questions
+\`\`\`typescript
+const config = await requestUserInput({
+  questions: [
+    { message: "Project name?", type: "text" },
+    { message: "Use TypeScript?", type: "confirm" }
+  ]
+});
+return { config: config.response };
+\`\`\`
+
+**Parameters (single-question mode):**
+- \`message\` (string) - Question to ask
+- \`type\` (string) - Input type (see below)
+- \`options\` (string[], for 'choice') - Available choices
+- \`timeout\` (number, optional) - Timeout in seconds
+- Type-specific parameters (min, max, format, etc.)
+
+**Parameters (multi-question mode):**
+- \`questions\` (array) - Array of 1-10 questions (8 recommended)
+- \`timeout\` (number, optional) - Timeout in seconds
+
+**Returns:** \`{ success, response?, status }\`
+
+**Supported types (8 total):**
+1. \`text\` - Single-line text
+2. \`multiline\` - Multi-line text area
+3. \`choice\` - Radio/checkbox/dropdown (auto-adds "Other" option)
+4. \`confirm\` - Yes/No buttons
+5. \`number\` - Numeric input with validation
+6. \`email\` - Email validation
+7. \`date\` - Date picker with range
+8. \`rating\` - Scale rating`;
+var HANDLING_FEEDBACK = `## Handling Reviewer Feedback
+
+\`\`\`typescript
+const status = await readPlan(planId, sessionToken, {
+  includeAnnotations: true
+});
+
+if (status.status === "changes_requested") {
+  /** Read the content for inline comments */
+  console.log(status.content);
+
+  /**
+   * Make changes based on feedback
+   * Upload new artifacts
+   * Plan will transition back to pending_review
+   */
+}
+\`\`\``;
+var MCP_DIRECT_INSTRUCTIONS = [
+  MCP_DIRECT_HEADER,
+  "",
+  CRITICAL_USAGE_SECTION,
+  "",
+  USER_INPUT_SECTION,
+  "",
+  MCP_TOOLS_OVERVIEW,
+  "",
+  MCP_WORKFLOW,
+  "",
+  DELIVERABLES_SECTION,
+  "",
+  ARTIFACT_TYPES_SECTION,
+  "",
+  API_REFERENCE,
+  "",
+  HANDLING_FEEDBACK,
+  "",
+  TIPS_SECTION,
+  "",
+  WHEN_NOT_TO_USE_SECTION,
+  "",
+  TROUBLESHOOTING_SECTION
+].join("\n");
+
+// src/adapters/claude-code.ts
+init_cjs_shims();
 
 // src/constants.ts
 init_cjs_shims();
@@ -44853,11 +45112,11 @@ function handlePreToolUse(input) {
   if (toolName === CLAUDE_TOOL_NAMES.ASK_USER_QUESTION) {
     logger.info(
       { toolName },
-      "Blocking AskUserQuestion - redirecting to request_user_input MCP tool"
+      "Blocking AskUserQuestion - redirecting to requestUserInput() in execute_code"
     );
     return {
       type: "tool_deny",
-      reason: `BLOCKED: Use the ${TOOL_NAMES2.REQUEST_USER_INPUT} MCP tool instead. The human is in the browser viewing your plan - that's where they expect to interact with you. See the tool description for input types and parameters.`
+      reason: `BLOCKED: Use requestUserInput() inside ${TOOL_NAMES.EXECUTE_CODE} instead. The human is in the browser viewing your plan - that's where they expect to interact with you. See the execute_code tool description for input types and parameters.`
     };
   }
   return { type: "passthrough" };
@@ -46221,7 +46480,7 @@ async function retryWithBackoff(fn, maxAttempts = 3, baseDelay = 1e3) {
     try {
       return await fn();
     } catch (err) {
-      lastError = err;
+      lastError = err instanceof Error ? err : new Error(String(err));
       if (attempt < maxAttempts - 1) {
         const delay = attempt === 0 ? 0 : baseDelay * 2 ** (attempt - 1);
         logger.debug(
@@ -46254,9 +46513,9 @@ async function getRegistryUrl() {
       logger.debug({ port }, "Found registry server (with retry)");
       return url2;
     } catch (err) {
-      const error48 = err;
+      const errorMessage = err instanceof Error ? err.message : String(err);
       logger.debug(
-        { port, error: error48.message },
+        { port, error: errorMessage },
         "Failed to connect to registry port after retries"
       );
     }
@@ -46425,7 +46684,49 @@ var webConfig = loadEnv(schema3);
 init_cjs_shims();
 
 // src/core/review-status.ts
-async function waitForReviewDecision(planId, _wsUrl) {
+function buildApprovalMessage(prefix, deliverableCount, reviewComment) {
+  const countText = `${deliverableCount} deliverable${deliverableCount === 1 ? "" : "s"}`;
+  const feedbackText = reviewComment ? `
+
+Reviewer comment: ${reviewComment}` : "";
+  return `${prefix} You have ${countText}. Use add_artifact(filePath, deliverableId) to upload proof-of-work.${feedbackText}`;
+}
+async function handleApproval(planId, decision, messagePrefix) {
+  const sessionToken = generateSessionToken();
+  const sessionTokenHash = hashSessionToken(sessionToken);
+  const deliverableCount = (decision.deliverables ?? []).length;
+  logger.info({ planId }, "Generating session token for approved plan");
+  try {
+    const tokenResult = await setSessionToken(planId, sessionTokenHash);
+    const url2 = tokenResult.url;
+    logger.info(
+      { planId, url: url2, deliverableCount },
+      "Session token set and stored by server with deliverables"
+    );
+    return {
+      allow: true,
+      message: buildApprovalMessage(messagePrefix, deliverableCount, decision.reviewComment),
+      planId,
+      sessionToken,
+      url: url2
+    };
+  } catch (err) {
+    logger.error({ err, planId }, "Failed to set session token, approving without it");
+    return {
+      allow: true,
+      message: `${messagePrefix.replace("!", "")} (session token unavailable)`,
+      planId
+    };
+  }
+}
+function handleRejection(planId, decision) {
+  return {
+    allow: false,
+    message: decision.reviewComment || "Changes requested",
+    planId
+  };
+}
+async function waitForReviewDecision(planId) {
   logger.info({ planId }, "Waiting for approval via server endpoint");
   const result = await waitForApproval(planId, planId);
   logger.info({ planId, approved: result.approved }, "Received approval decision from server");
@@ -46445,12 +46746,10 @@ async function handleUpdatedPlanReview(sessionId, planId, planContent, _originMe
   );
   logger.info({ planId }, "Syncing updated plan content");
   try {
-    await updatePlanContent(planId, {
-      content: planContent
-    });
+    await updatePlanContent(planId, { content: planContent });
   } catch (err) {
-    const error48 = err;
-    if (error48.message?.includes("404")) {
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    if (errorMessage?.includes("404")) {
       logger.warn(
         { planId, sessionId },
         "Plan not found (404), creating new plan with updated content"
@@ -46464,147 +46763,43 @@ async function handleUpdatedPlanReview(sessionId, planId, planContent, _originMe
     { planId, url: createPlanWebUrl(baseUrl, planId) },
     "Content synced, browser already open. Waiting for server approval..."
   );
-  const decision = await waitForReviewDecision(planId, "");
+  const decision = await waitForReviewDecision(planId);
   logger.info({ planId, approved: decision.approved }, "Decision received via Y.Doc");
   if (decision.approved) {
-    const sessionToken = generateSessionToken();
-    const sessionTokenHash = hashSessionToken(sessionToken);
-    logger.info({ planId }, "Generating new session token for re-approved plan");
-    try {
-      const tokenResult = await setSessionToken(planId, sessionTokenHash);
-      const url2 = tokenResult.url;
-      const deliverableCount = (decision.deliverables ?? []).length;
-      logger.info(
-        { planId, url: url2, deliverableCount },
-        "Session token set and stored by server with updated content hash"
-      );
-      const reviewFeedback = decision.reviewComment ? `
-
-Reviewer comment: ${decision.reviewComment}` : "";
-      return {
-        allow: true,
-        message: `Plan re-approved with updates! You have ${deliverableCount} deliverable${deliverableCount === 1 ? "" : "s"}. Use add_artifact(filePath, deliverableId) to upload proof-of-work.${reviewFeedback}`,
-        planId,
-        sessionToken,
-        url: url2
-      };
-    } catch (err) {
-      logger.error({ err, planId }, "Failed to set session token, but plan was approved");
-      return {
-        allow: true,
-        message: "Updated plan approved (session token unavailable)",
-        planId
-      };
-    }
+    return handleApproval(planId, decision, "Plan re-approved with updates!");
   }
   logger.debug({ planId }, "Changes requested - server will manage state cleanup");
-  return {
-    allow: false,
-    message: decision.reviewComment || "Changes requested",
-    planId
-  };
+  return handleRejection(planId, decision);
 }
-async function checkReviewStatus(sessionId, planContent, originMetadata) {
-  const state = await getSessionContext(sessionId);
-  let planId;
-  if (!state.found && planContent) {
-    logger.info(
-      { sessionId, contentLength: planContent.length, hasState: !!state },
-      "Creating plan from ExitPlanMode (blocking mode)"
-    );
-    const result = await createPlan({
-      sessionId,
-      agentType: DEFAULT_AGENT_TYPE,
-      metadata: {
-        source: "ExitPlanMode",
-        ...originMetadata
-      }
-    });
-    planId = result.planId;
-    logger.info({ planId }, "Syncing plan content");
-    await updatePlanContent(planId, {
-      content: planContent
-    });
-    logger.info(
-      { planId, url: result.url },
-      "Plan created and synced, browser opened. Waiting for server approval..."
-    );
-    const decision = await waitForReviewDecision(planId, "");
-    logger.info({ planId, approved: decision.approved }, "Decision received via Y.Doc");
-    if (decision.approved) {
-      const sessionToken = generateSessionToken();
-      const sessionTokenHash = hashSessionToken(sessionToken);
-      logger.info({ planId }, "Generating session token for approved plan");
-      try {
-        const tokenResult = await setSessionToken(planId, sessionTokenHash);
-        const url2 = tokenResult.url;
-        const deliverableCount = (decision.deliverables ?? []).length;
-        logger.info(
-          { planId, url: url2, deliverableCount },
-          "Session token set and stored by server with deliverables"
-        );
-        const reviewFeedback = decision.reviewComment ? `
-
-Reviewer comment: ${decision.reviewComment}` : "";
-        return {
-          allow: true,
-          message: `Plan approved! You have ${deliverableCount} deliverable${deliverableCount === 1 ? "" : "s"}. Use add_artifact(filePath, deliverableId) to upload proof-of-work.${reviewFeedback}`,
-          planId,
-          sessionToken,
-          url: url2
-        };
-      } catch (err) {
-        logger.error({ err, planId }, "Failed to set session token, approving without it");
-        return {
-          allow: true,
-          message: "Plan approved, but session token unavailable. You may need to refresh the plan in the browser. Check ~/.shipyard/server-debug.log for details.",
-          planId
-        };
-      }
+async function handleNewPlanCreation(sessionId, planContent, originMetadata) {
+  logger.info(
+    { sessionId, contentLength: planContent.length },
+    "Creating plan from ExitPlanMode (blocking mode)"
+  );
+  const result = await createPlan({
+    sessionId,
+    agentType: DEFAULT_AGENT_TYPE,
+    metadata: {
+      source: "ExitPlanMode",
+      ...originMetadata
     }
-    logger.debug({ sessionId }, "Changes requested - server will manage state cleanup");
-    return {
-      allow: false,
-      message: decision.reviewComment || "Changes requested",
-      planId
-    };
+  });
+  const planId = result.planId;
+  logger.info({ planId }, "Syncing plan content");
+  await updatePlanContent(planId, { content: planContent });
+  logger.info(
+    { planId, url: result.url },
+    "Plan created and synced, browser opened. Waiting for server approval..."
+  );
+  const decision = await waitForReviewDecision(planId);
+  logger.info({ planId, approved: decision.approved }, "Decision received via Y.Doc");
+  if (decision.approved) {
+    return handleApproval(planId, decision, "Plan approved!");
   }
-  if (!state.found) {
-    logger.info({ sessionId }, "No session state or plan content, allowing exit");
-    return { allow: true };
-  }
-  if ((!state || !state.planId) && planContent) {
-    logger.error(
-      { sessionId, hasPlanContent: !!planContent, hasState: !!state, statePlanId: state?.planId },
-      "Unreachable state: plan content exists but no session state"
-    );
-    return {
-      allow: false,
-      message: "Internal error: Plan content found but session state missing. Check ~/.shipyard/hook-debug.log and report this issue."
-    };
-  }
-  if (!state.planId) {
-    throw new Error("Unreachable: state.planId should exist at this point");
-  }
-  planId = state.planId;
-  if (planContent) {
-    logger.info({ planId }, "Plan content provided, triggering re-review");
-    return await handleUpdatedPlanReview(sessionId, planId, planContent, originMetadata);
-  }
-  logger.info({ sessionId, planId }, "Checking review status");
-  let status;
-  try {
-    status = await getReviewStatus(planId);
-  } catch (err) {
-    logger.warn({ err, planId }, "Failed to get review status, blocking exit");
-    return {
-      allow: false,
-      message: "Cannot verify plan approval status. Ensure the Shipyard MCP server is running. Check ~/.shipyard/server-debug.log for details.",
-      planId
-    };
-  }
-  logger.info({ sessionId, planId, status: status.status }, "Review status retrieved");
-  const baseUrl = webConfig.SHIPYARD_WEB_URL;
+  logger.debug({ sessionId }, "Changes requested - server will manage state cleanup");
+  return handleRejection(planId, decision);
+}
+function buildStatusResponse(status, planId, baseUrl) {
   switch (status.status) {
     case "changes_requested":
       return {
@@ -46641,10 +46836,52 @@ Submit for review at: ${createPlanWebUrl(baseUrl, planId)}`,
         message: `Task completed by ${status.completedBy}`,
         planId
       };
-    default: {
+    default:
       assertNever2(status);
-    }
   }
+}
+async function checkReviewStatus(sessionId, planContent, originMetadata) {
+  const state = await getSessionContext(sessionId);
+  if (!state.found && planContent) {
+    return handleNewPlanCreation(sessionId, planContent, originMetadata);
+  }
+  if (!state.found) {
+    logger.info({ sessionId }, "No session state or plan content, allowing exit");
+    return { allow: true };
+  }
+  if (!state.planId && planContent) {
+    logger.error(
+      { sessionId, hasPlanContent: !!planContent, hasState: !!state, statePlanId: state?.planId },
+      "Unreachable state: plan content exists but no session state"
+    );
+    return {
+      allow: false,
+      message: "Internal error: Plan content found but session state missing. Check ~/.shipyard/hook-debug.log and report this issue."
+    };
+  }
+  if (!state.planId) {
+    throw new Error("Unreachable: state.planId should exist at this point");
+  }
+  const planId = state.planId;
+  if (planContent) {
+    logger.info({ planId }, "Plan content provided, triggering re-review");
+    return await handleUpdatedPlanReview(sessionId, planId, planContent, originMetadata);
+  }
+  logger.info({ sessionId, planId }, "Checking review status");
+  let status;
+  try {
+    status = await getReviewStatus(planId);
+  } catch (err) {
+    logger.warn({ err, planId }, "Failed to get review status, blocking exit");
+    return {
+      allow: false,
+      message: "Cannot verify plan approval status. Ensure the Shipyard MCP server is running. Check ~/.shipyard/server-debug.log for details.",
+      planId
+    };
+  }
+  logger.info({ sessionId, planId, status: status.status }, "Review status retrieved");
+  const baseUrl = webConfig.SHIPYARD_WEB_URL;
+  return buildStatusResponse(status, planId, baseUrl);
 }
 function formatFeedbackMessage(feedback) {
   if (!feedback?.length) {
@@ -46701,13 +46938,11 @@ async function handlePlanExit(event) {
   try {
     return await checkReviewStatus(event.sessionId, event.planContent, event.metadata);
   } catch (err) {
-    const error48 = err;
-    logger.error(
-      { err: error48, message: error48.message, code: error48.code },
-      "Failed to check review status"
-    );
-    const isConnectionError = error48.code === "ECONNREFUSED" || error48.code === "ECONNRESET" || error48.code === "ETIMEDOUT" || error48.code === "ENOTFOUND" || error48.message?.includes("connect") || error48.message?.includes("timeout") || error48.message?.includes("WebSocket") || error48.message?.includes("not available");
-    const message = isConnectionError ? "Cannot connect to Shipyard server. Ensure the Shipyard MCP server is running. Check ~/.shipyard/hook-debug.log for details." : `Review system error: ${error48.message}. Check ~/.shipyard/hook-debug.log for details.`;
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    const errorCode = err instanceof Error && "code" in err && typeof err.code === "string" ? err.code : void 0;
+    logger.error({ err, message: errorMessage, code: errorCode }, "Failed to check review status");
+    const isConnectionError = errorCode === "ECONNREFUSED" || errorCode === "ECONNRESET" || errorCode === "ETIMEDOUT" || errorCode === "ENOTFOUND" || errorMessage?.includes("connect") || errorMessage?.includes("timeout") || errorMessage?.includes("WebSocket") || errorMessage?.includes("not available");
+    const message = isConnectionError ? "Cannot connect to Shipyard server. Ensure the Shipyard MCP server is running. Check ~/.shipyard/hook-debug.log for details." : `Review system error: ${errorMessage}. Check ~/.shipyard/hook-debug.log for details.`;
     return {
       allow: false,
       message
@@ -46778,7 +47013,9 @@ async function processEvent(_adapter, event) {
 async function readStdin() {
   const chunks = [];
   for await (const chunk of process.stdin) {
-    chunks.push(chunk);
+    if (isBuffer(chunk)) {
+      chunks.push(chunk);
+    }
   }
   return Buffer.concat(chunks).toString("utf-8");
 }
@@ -46813,13 +47050,14 @@ async function main() {
     process.exit(0);
   } catch (err) {
     logger.error({ err }, "Hook error, failing closed");
+    const errorMessage = err instanceof Error ? err.message : String(err);
     console.log(
       JSON.stringify({
         hookSpecificOutput: {
           hookEventName: "PermissionRequest",
           decision: {
             behavior: "deny",
-            message: `Hook error: ${err.message}. Check ~/.shipyard/hook-debug.log for details.`
+            message: `Hook error: ${errorMessage}. Check ~/.shipyard/hook-debug.log for details.`
           }
         }
       })

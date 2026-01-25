@@ -31,13 +31,13 @@ const SESSION_STORAGE_KEYS = [
 function isShipyardDatabase(name: string): boolean {
   if (name === 'plan-index') return true;
 
-  // UUID pattern: 8-4-4-4-12 hex chars
+  /** UUID pattern: 8-4-4-4-12 hex chars */
   const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   if (uuidPattern.test(name)) return true;
 
   if (name.startsWith('plan-')) return true;
 
-  // Empty database name (sometimes created by y-indexeddb)
+  /** Empty database name (sometimes created by y-indexeddb) */
   if (name === '') return true;
 
   return false;
@@ -65,7 +65,7 @@ function deleteDatabase(name: string, timeoutMs = 10000): Promise<DeleteResult> 
     const request = indexedDB.deleteDatabase(name);
 
     const timeout = setTimeout(() => {
-      // If still waiting after timeout, report as blocked
+      /** If still waiting after timeout, report as blocked */
       resolve({
         success: false,
         blocked: wasBlocked,
@@ -83,11 +83,13 @@ function deleteDatabase(name: string, timeoutMs = 10000): Promise<DeleteResult> 
       resolve({ success: false, error: request.error?.message ?? 'Unknown error' });
     };
 
-    // onblocked means there are open connections, but deletion will proceed
-    // once they close. We just note it and keep waiting for onsuccess.
+    /*
+     * onblocked means there are open connections, but deletion will proceed
+     * once they close. We just note it and keep waiting for onsuccess.
+     */
     request.onblocked = () => {
       wasBlocked = true;
-      // Don't resolve here - wait for onsuccess or timeout
+      /** Don't resolve here - wait for onsuccess or timeout */
     };
   });
 }
@@ -130,7 +132,7 @@ async function clearIndexedDBFallback(): Promise<{ cleared: string[]; errors: st
  * Clear all IndexedDB databases created by shipyard
  */
 async function clearIndexedDB(): Promise<{ cleared: string[]; errors: string[] }> {
-  // Fallback for browsers without indexedDB.databases()
+  /** Fallback for browsers without indexedDB.databases() */
   if (!('databases' in indexedDB)) {
     return clearIndexedDBFallback();
   }

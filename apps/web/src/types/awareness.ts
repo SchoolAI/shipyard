@@ -79,3 +79,40 @@ export type PlanAwarenessState =
        */
       context?: EnvironmentContext;
     };
+
+/** Helper to check if user object has required string fields */
+function isValidUser(user: unknown): boolean {
+  if (!user || typeof user !== 'object') return false;
+  const u = Object.fromEntries(Object.entries(user));
+  return typeof u.id === 'string' && typeof u.name === 'string' && typeof u.color === 'string';
+}
+
+/** Helper to validate common base fields */
+function hasValidBaseFields(obj: Record<string, unknown>): boolean {
+  return (
+    typeof obj.status === 'string' &&
+    typeof obj.isOwner === 'boolean' &&
+    typeof obj.planId === 'string' &&
+    isValidUser(obj.user)
+  );
+}
+
+/** Helper to validate pending status fields */
+function isValidPendingStatus(obj: Record<string, unknown>): boolean {
+  return typeof obj.requestedAt === 'number' && typeof obj.expiresAt === 'number';
+}
+
+/**
+ * Type guard to validate a PlanAwarenessState object.
+ * Used for safely parsing awareness state from WebRTC.
+ */
+export function isPlanAwarenessState(value: unknown): value is PlanAwarenessState {
+  if (!value || typeof value !== 'object') return false;
+  const obj = Object.fromEntries(Object.entries(value));
+
+  if (!hasValidBaseFields(obj)) return false;
+
+  const status = obj.status;
+  if (status === 'pending') return isValidPendingStatus(obj);
+  return status === 'approved' || status === 'rejected';
+}

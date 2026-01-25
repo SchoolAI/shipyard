@@ -28,12 +28,15 @@ import {
   encodeExportEndMessage,
   encodeExportStartMessage,
   isP2PConversationMessage,
+  validateA2AMessages,
 } from '@shipyard/schema';
 import lzstring from 'lz-string';
 
-// =============================================================================
-// Constants
-// =============================================================================
+/*
+ * =============================================================================
+ * Constants
+ * =============================================================================
+ */
 
 /** Chunk size in bytes - 16 KiB for maximum cross-browser compatibility */
 const CHUNK_SIZE = 16 * 1024;
@@ -50,9 +53,11 @@ const TRANSFER_TIMEOUT = 5 * 60 * 1000;
 /** Progress check interval for timeout detection */
 const PROGRESS_CHECK_INTERVAL = 30 * 1000;
 
-// =============================================================================
-// Types
-// =============================================================================
+/*
+ * =============================================================================
+ * Types
+ * =============================================================================
+ */
 
 /**
  * Minimal interface for peer connections.
@@ -71,8 +76,10 @@ export interface PeerConnection {
   on(event: 'close', callback: () => void): void;
   /** Listen for error events */
   on(event: 'error', callback: (error: Error) => void): void;
-  /** Remove event listeners */
-  removeListener(event: string, callback: (...args: unknown[]) => void): void;
+  /** Remove event listeners - overloads match on() signature for type safety */
+  removeListener(event: 'data', callback: (data: Uint8Array) => void): void;
+  removeListener(event: 'close', callback: () => void): void;
+  removeListener(event: 'error', callback: (error: Error) => void): void;
 }
 
 /**
@@ -114,9 +121,11 @@ interface OutgoingTransfer {
   cancelled: boolean;
 }
 
-// =============================================================================
-// Utility Functions
-// =============================================================================
+/*
+ * =============================================================================
+ * Utility Functions
+ * =============================================================================
+ */
 
 /**
  * Generates a UUID for transfer identification.
@@ -129,7 +138,17 @@ function generateExportId(): string {
  * Computes SHA-256 hash of data and returns hex string.
  */
 async function computeChecksum(data: Uint8Array): Promise<string> {
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data as BufferSource);
+  /**
+   * Web Crypto API expects BufferSource (ArrayBuffer | ArrayBufferView).
+   * Uint8Array<ArrayBufferLike> includes SharedArrayBuffer which isn't accepted.
+   * Using the underlying ArrayBuffer directly works around this TypeScript limitation.
+   */
+  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- Uint8Array.buffer is ArrayBuffer but TypeScript readonly/mutable incompatibility
+  const buffer = data.buffer as ArrayBuffer;
+  const hashBuffer = await crypto.subtle.digest(
+    'SHA-256',
+    new Uint8Array(buffer, data.byteOffset, data.byteLength)
+  );
   const hashArray = new Uint8Array(hashBuffer);
   return Array.from(hashArray)
     .map((b) => b.toString(16).padStart(2, '0'))
@@ -158,9 +177,11 @@ function decompressFromUint8Array(data: Uint8Array): string | null {
   return lzstring.decompressFromUint8Array(data);
 }
 
-// =============================================================================
-// ConversationTransferManager Class
-// =============================================================================
+/*
+ * =============================================================================
+ * ConversationTransferManager Class
+ * =============================================================================
+ */
 
 /**
  * Manages P2P transfer of A2A conversation exports.
@@ -169,21 +190,21 @@ function decompressFromUint8Array(data: Uint8Array): string | null {
  * ```typescript
  * const manager = new ConversationTransferManager(peers);
  *
- * // Send a conversation
+ *
  * await manager.sendConversation('peer-123', messages, {
  *   exportId: '...',
  *   planId: 'plan-abc',
- *   // ... other metadata
+ *
  * }, {
  *   onProgress: (sent, total) => console.log(`${sent}/${total}`),
  * });
  *
- * // Receive conversations
+ *
  * const cleanup = manager.onReceiveConversation((messages, meta) => {
  *   console.log('Received conversation:', meta.planId);
  * });
  *
- * // Later: cleanup
+ *
  * cleanup();
  * ```
  */
@@ -226,7 +247,7 @@ export class ConversationTransferManager {
       if (isP2PConversationMessage(data)) {
         this.handleIncomingMessage(peerId, data);
       }
-      // Non-P2P messages are ignored (let Yjs handle them)
+      /** Non-P2P messages are ignored (let Yjs handle them) */
     };
 
     const closeHandler = (): void => {
@@ -270,7 +291,7 @@ export class ConversationTransferManager {
    * Handles export start message.
    */
   private handleExportStart(_peerId: string, meta: ConversationExportStartMeta): void {
-    // Start tracking this transfer
+    /** Start tracking this transfer */
     this.incomingTransfers.set(meta.exportId, {
       meta,
       chunks: new Map(),
@@ -278,7 +299,7 @@ export class ConversationTransferManager {
       lastProgressAt: Date.now(),
     });
 
-    // Set up timeout checker
+    /** Set up timeout checker */
     this.scheduleTimeoutCheck(meta.exportId);
   }
 
@@ -291,7 +312,7 @@ export class ConversationTransferManager {
       return;
     }
 
-    // Store chunk
+    /** Store chunk */
     transfer.chunks.set(chunk.chunkIndex, chunk.data);
     transfer.receivedChunks = transfer.chunks.size;
     transfer.lastProgressAt = Date.now();
@@ -306,13 +327,13 @@ export class ConversationTransferManager {
       return;
     }
 
-    // Check we have all chunks
+    /** Check we have all chunks */
     if (transfer.chunks.size !== transfer.meta.totalChunks) {
       this.incomingTransfers.delete(end.exportId);
       return;
     }
 
-    // Reassemble chunks in order
+    /** Reassemble chunks in order */
     const assembledSize = transfer.meta.compressedBytes;
     const assembled = new Uint8Array(assembledSize);
     let offset = 0;
@@ -327,33 +348,43 @@ export class ConversationTransferManager {
       offset += chunk.length;
     }
 
-    // Verify checksum
+    /** Verify checksum */
     const actualChecksum = await computeChecksum(assembled);
     if (actualChecksum !== end.checksum) {
       this.incomingTransfers.delete(end.exportId);
       return;
     }
 
-    // Decompress
+    /** Decompress */
     const json = decompressFromUint8Array(assembled);
     if (!json) {
       this.incomingTransfers.delete(end.exportId);
       return;
     }
 
-    // Parse messages
+    /** Parse and validate messages */
     let messages: A2AMessage[];
     try {
-      messages = JSON.parse(json) as A2AMessage[];
+      const parsed: unknown = JSON.parse(json);
+      if (!Array.isArray(parsed)) {
+        this.incomingTransfers.delete(end.exportId);
+        return;
+      }
+      const { valid, errors } = validateA2AMessages(parsed);
+      if (errors.length > 0) {
+        this.incomingTransfers.delete(end.exportId);
+        return;
+      }
+      messages = valid;
     } catch (_err) {
       this.incomingTransfers.delete(end.exportId);
       return;
     }
 
-    // Clean up
+    /** Clean up */
     this.incomingTransfers.delete(end.exportId);
 
-    // Convert start meta to export meta format
+    /** Convert start meta to export meta format */
     const exportMeta: ConversationExportMeta = {
       exportId: transfer.meta.exportId,
       sourcePlatform: transfer.meta.sourcePlatform,
@@ -365,7 +396,7 @@ export class ConversationTransferManager {
       uncompressedBytes: transfer.meta.totalBytes,
     };
 
-    // Notify callbacks
+    /** Notify callbacks */
     for (const callback of this.receiveCallbacks) {
       try {
         callback(messages, exportMeta);
@@ -377,7 +408,7 @@ export class ConversationTransferManager {
    * Handles peer disconnect.
    */
   private handlePeerClose(peerId: string): void {
-    // Cancel any outgoing transfers to this peer
+    /** Cancel any outgoing transfers to this peer */
     for (const [exportId, transfer] of this.outgoingTransfers) {
       if (transfer.peerId === peerId) {
         transfer.cancelled = true;
@@ -385,7 +416,7 @@ export class ConversationTransferManager {
       }
     }
 
-    // Remove listener
+    /** Remove listener */
     this.peerListeners.delete(peerId);
   }
 
@@ -395,13 +426,13 @@ export class ConversationTransferManager {
   private scheduleTimeoutCheck(exportId: string): void {
     setTimeout(() => {
       const transfer = this.incomingTransfers.get(exportId);
-      if (!transfer) return; // Already completed
+      if (!transfer) return;
 
       const timeSinceProgress = Date.now() - transfer.lastProgressAt;
       if (timeSinceProgress > TRANSFER_TIMEOUT) {
         this.incomingTransfers.delete(exportId);
       } else {
-        // Schedule another check
+        /** Schedule another check */
         this.scheduleTimeoutCheck(exportId);
       }
     }, PROGRESS_CHECK_INTERVAL);
@@ -439,7 +470,7 @@ export class ConversationTransferManager {
 
     const exportId = generateExportId();
 
-    // Track outgoing transfer
+    /** Track outgoing transfer */
     const transferState: OutgoingTransfer = {
       exportId,
       peerId,
@@ -448,14 +479,14 @@ export class ConversationTransferManager {
     this.outgoingTransfers.set(exportId, transferState);
 
     try {
-      // Serialize and compress
+      /** Serialize and compress */
       const json = JSON.stringify(messages);
       const compressed = compressToUint8Array(json);
 
-      // Calculate chunks
+      /** Calculate chunks */
       const totalChunks = Math.ceil(compressed.length / CHUNK_SIZE);
 
-      // Build start metadata
+      /** Build start metadata */
       const startMeta: ConversationExportStartMeta = {
         exportId,
         totalChunks,
@@ -467,11 +498,11 @@ export class ConversationTransferManager {
         exportedAt: metadata.exportedAt,
       };
 
-      // Send start message
+      /** Send start message */
       const startMsg = encodeExportStartMessage(startMeta);
       await this.sendWithBackpressure(peer, startMsg, transferState);
 
-      // Send chunks
+      /** Send chunks */
       for (let i = 0; i < totalChunks; i++) {
         if (transferState.cancelled) {
           throw new Error('Transfer cancelled');
@@ -490,14 +521,14 @@ export class ConversationTransferManager {
         const chunkMsg = encodeChunkMessage(chunk);
         await this.sendWithBackpressure(peer, chunkMsg, transferState);
 
-        // Progress callback
+        /** Progress callback */
         options.onProgress?.(i + 1, totalChunks);
       }
 
-      // Compute checksum
+      /** Compute checksum */
       const checksum = await computeChecksum(compressed);
 
-      // Send end message
+      /** Send end message */
       const endPayload: ConversationExportEnd = {
         exportId,
         checksum,
@@ -505,7 +536,7 @@ export class ConversationTransferManager {
       const endMsg = encodeExportEndMessage(endPayload);
       await this.sendWithBackpressure(peer, endMsg, transferState);
 
-      // Clean up and notify
+      /** Clean up and notify */
       this.outgoingTransfers.delete(exportId);
       options.onComplete?.();
     } catch (err) {
@@ -524,7 +555,7 @@ export class ConversationTransferManager {
     data: Uint8Array,
     transfer: OutgoingTransfer
   ): Promise<void> {
-    // Wait for buffer to drain if needed
+    /** Wait for buffer to drain if needed */
     while (peer.bufferedAmount > BACKPRESSURE_THRESHOLD) {
       if (transfer.cancelled) {
         throw new Error('Transfer cancelled');
@@ -565,7 +596,7 @@ export class ConversationTransferManager {
     if (transfer) {
       transfer.cancelled = true;
     }
-    // Also clean up incoming transfers if cancelled
+    /** Also clean up incoming transfers if cancelled */
     this.incomingTransfers.delete(exportId);
   }
 
@@ -588,8 +619,8 @@ export class ConversationTransferManager {
     const listeners = this.peerListeners.get(peerId);
 
     if (peer && listeners) {
-      peer.removeListener('data', listeners.data as (...args: unknown[]) => void);
-      peer.removeListener('close', listeners.close as (...args: unknown[]) => void);
+      peer.removeListener('data', listeners.data);
+      peer.removeListener('close', listeners.close);
     }
 
     this.peers.delete(peerId);
@@ -613,12 +644,12 @@ export class ConversationTransferManager {
   dispose(): void {
     this.disposed = true;
 
-    // Remove all listeners
+    /** Remove all listeners */
     for (const [peerId, peer] of this.peers) {
       const listeners = this.peerListeners.get(peerId);
       if (listeners) {
-        peer.removeListener('data', listeners.data as (...args: unknown[]) => void);
-        peer.removeListener('close', listeners.close as (...args: unknown[]) => void);
+        peer.removeListener('data', listeners.data);
+        peer.removeListener('close', listeners.close);
       }
     }
 
@@ -629,9 +660,11 @@ export class ConversationTransferManager {
   }
 }
 
-// =============================================================================
-// Exports for Testing
-// =============================================================================
+/*
+ * =============================================================================
+ * Exports for Testing
+ * =============================================================================
+ */
 
 export const _testing = {
   CHUNK_SIZE,

@@ -54,7 +54,6 @@ export function AddDiffCommentForm({
     setIsSubmitting(true);
 
     if (commentType === 'pr') {
-      // PR review comment
       if (!prNumber) {
         setIsSubmitting(false);
         return;
@@ -73,7 +72,6 @@ export function AddDiffCommentForm({
         resolved: false,
       });
     } else {
-      // Local diff comment
       const id = `localcomment-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
       addLocalDiffComment(ydoc, {
@@ -109,12 +107,10 @@ export function AddDiffCommentForm({
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-      // Submit on Cmd/Ctrl+Enter
       if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
         handleSubmit();
       }
-      // Close on Escape
       if (e.key === 'Escape') {
         e.preventDefault();
         onClose();
@@ -126,7 +122,6 @@ export function AddDiffCommentForm({
   return (
     <div className="px-4 py-3 bg-background border-t border-separator">
       <div className="max-w-2xl space-y-3">
-        {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <MessageSquare className="w-4 h-4" />
@@ -139,7 +134,6 @@ export function AddDiffCommentForm({
           </Button>
         </div>
 
-        {/* Auth prompt if not signed in */}
         {!identity?.username && (
           <div className="p-3 rounded-lg bg-warning/10 border border-warning/20 text-sm">
             <p className="text-foreground">
@@ -151,7 +145,6 @@ export function AddDiffCommentForm({
           </div>
         )}
 
-        {/* Comment textarea */}
         <TextArea
           aria-label="Comment"
           placeholder="Add your comment... (Cmd/Ctrl+Enter to submit)"
@@ -164,7 +157,6 @@ export function AddDiffCommentForm({
           className="w-full"
         />
 
-        {/* Actions */}
         <div className="flex justify-end gap-2">
           <Button variant="tertiary" size="sm" onPress={onClose} isDisabled={isSubmitting}>
             Cancel

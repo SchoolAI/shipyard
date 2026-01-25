@@ -19,8 +19,8 @@ import { z } from 'zod';
  * });
  *
  * export const config = loadEnv(schema);
- * // config.PORT is typed as `number`
- * // config.NODE_ENV is typed as 'development' | 'production'
+ *
+ *
  * ```
  */
 export function loadEnv<T extends z.ZodSchema>(schema: T): z.infer<T> {

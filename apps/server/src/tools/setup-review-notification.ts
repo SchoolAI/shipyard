@@ -46,7 +46,7 @@ REQUIREMENTS: The script requires 'jq' for URL encoding. Install with: brew inst
     const registryPort = registryConfig.REGISTRY_PORT[0];
     const trpcUrl = `http://localhost:${registryPort}/trpc`;
 
-    // Use actual status enum values to ensure script stays in sync with schema
+    /** Use actual status enum values to ensure script stays in sync with schema */
     const statusInProgress = PlanStatusValues.find((s) => s === 'in_progress');
     const statusChangesRequested = PlanStatusValues.find((s) => s === 'changes_requested');
 
@@ -54,7 +54,7 @@ REQUIREMENTS: The script requires 'jq' for URL encoding. Install with: brew inst
       throw new Error('Required status values not found in PlanStatusValues');
     }
 
-    // Standard tRPC v10+ HTTP format (no superjson transformer)
+    /** Standard tRPC v10+ HTTP format (no superjson transformer) */
     const script = `#!/bin/bash
 # Monitor plan "${planId}" for approval status changes
 # Polls the Shipyard registry server and exits when approved/rejected

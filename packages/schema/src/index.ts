@@ -35,7 +35,7 @@ export {
   formatPRCommentsForLLM,
   getPRCommentsSummary,
 } from './diff-comment-formatter.js';
-export type { EnvironmentContext } from './environment.js';
+export { type EnvironmentContext, EnvironmentContextSchema } from './environment.js';
 export type { GitHubPRResponse } from './github-validation.js';
 export { GitHubPRResponseSchema } from './github-validation.js';
 export type {
@@ -366,6 +366,7 @@ export {
   SubscriptionClientIdSchema,
   subscriptionRouter,
 } from './trpc/index.js';
+export { hasErrorCode, isBuffer, isErrnoException } from './type-guards.js';
 export type {
   UrlEncodedPlan,
   UrlEncodedPlanV1,
@@ -384,6 +385,17 @@ export {
 } from './url-encoding.js';
 export type { UserProfile } from './user-helpers.js';
 export { createUserResolver } from './user-helpers.js';
+export type {
+  SignalingConnection,
+  WebrtcConn,
+  WebrtcProviderInternals,
+  WebrtcRoom,
+} from './y-webrtc-internals.js';
+export {
+  getSignalingConnections,
+  getWebrtcPeerId,
+  getWebrtcRoom,
+} from './y-webrtc-internals.js';
 export type {
   AnswerInputRequestResult,
   ArchiveResult,

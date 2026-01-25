@@ -9,7 +9,7 @@ const MOBILE_BREAKPOINT = 768;
  */
 export function useIsMobile(): boolean {
   const [isMobile, setIsMobile] = useState(() => {
-    // SSR-safe: default to false, will update on mount
+    /** SSR-safe: default to false, will update on mount */
     if (typeof window === 'undefined') return false;
     return window.innerWidth < MOBILE_BREAKPOINT;
   });
@@ -17,10 +17,10 @@ export function useIsMobile(): boolean {
   useEffect(() => {
     const mediaQuery = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT - 1}px)`);
 
-    // Set initial value
+    /** Set initial value */
     setIsMobile(mediaQuery.matches);
 
-    // Listen for changes
+    /** Listen for changes */
     const handler = (event: MediaQueryListEvent) => {
       setIsMobile(event.matches);
     };

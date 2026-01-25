@@ -27,14 +27,13 @@ function getRatingDisplay(
   isFilled: boolean
 ): string {
   if (style === 'stars') {
-    return isFilled ? '\u2605' : '\u2606'; // Filled star or empty star
+    return isFilled ? '\u2605' : '\u2606';
   }
   if (style === 'emoji') {
-    // Disable emoji for large scales (e.g., NPS 0-10)
     if (maxVal - minVal > 4) {
-      return String(rating); // Fallback to numbers
+      return String(rating);
     }
-    const emojis = ['\ud83d\ude1e', '\ud83d\ude15', '\ud83d\ude10', '\ud83d\ude42', '\ud83d\ude04']; // Sad to happy
+    const emojis = ['\ud83d\ude1e', '\ud83d\ude15', '\ud83d\ude10', '\ud83d\ude42', '\ud83d\ude04'];
     const index = rating - minVal;
     return emojis[Math.max(0, Math.min(index, emojis.length - 1))] ?? '\ud83d\ude10';
   }
@@ -59,24 +58,18 @@ export function RatingInput({
   const style = request.style ?? 'stars';
   const selectedValue = typeof value === 'string' ? value : '';
 
-  // Auto-focus custom input when "Other" is selected
   useEffect(() => {
     if (isOtherSelected && customInputRef.current) {
       customInputRef.current.focus();
     }
   }, [isOtherSelected]);
 
-  // Parse selected value for cumulative fill calculation
-  // If escape hatch is selected, nothing should be filled
   const selectedNumber =
     selectedValue && !isOtherSelected && !isNaSelected ? Number.parseInt(selectedValue, 10) : 0;
-  // Display value is hover preview or selected value (0 means nothing filled)
   const displayValue = hoveredRating ?? selectedNumber;
 
-  // Generate rating values array
   const ratingValues = Array.from({ length: maxVal - minVal + 1 }, (_, i) => minVal + i);
 
-  // Custom text input for "Other" option (shared pattern from ChoiceInput)
   const otherInputField = isOtherSelected && (
     <TextField className="mt-3">
       <Label className="text-sm text-muted-foreground">Why can't you rate this?</Label>
@@ -95,14 +88,13 @@ export function RatingInput({
       <MarkdownContent content={request.message} variant="default" />
       <RadioGroup
         value={selectedValue}
-        onChange={(val) => setValue(val as string)}
+        onChange={setValue}
         isDisabled={isSubmitting}
         orientation="horizontal"
       >
         {/* Rating values displayed horizontally */}
         <div className="flex items-center gap-1 justify-center">
           {ratingValues.map((rating) => {
-            // Cumulative fill: all ratings <= displayValue are filled
             const isFilled = rating <= displayValue;
             const displayChar = getRatingDisplay(rating, style, minVal, maxVal, isFilled);
 

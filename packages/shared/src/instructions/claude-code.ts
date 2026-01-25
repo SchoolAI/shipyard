@@ -39,10 +39,12 @@ The hook automatically injects everything you need (planId, sessionToken, delive
 Just call \`${TOOL_NAMES.ADD_ARTIFACT}\` with the file path and deliverable ID.
 
 \`\`\`typescript
-// Example: After approval, you'll have these in context
-// planId: "abc123"
-// sessionToken: "xyz..."
-// deliverables: [{ id: "del_xxx", text: "Screenshot of login" }]
+/**
+ * Example: After approval, you'll have these in context
+ * planId: "abc123"
+ * sessionToken: "xyz..."
+ * deliverables: [{ id: "del_xxx", text: "Screenshot of login" }]
+ */
 
 await addArtifact({
   planId,
@@ -63,7 +65,7 @@ export const IMPORTANT_NOTES = `## Important Notes for Claude Code
 - **DO NOT use the Shipyard skill** - The hook provides everything you need
 - **DO NOT poll for approval** - The hook blocks automatically until human decides
 - **DO use plan mode** for ANY work that needs tracking, verification, or human review
-- **DO use \`${TOOL_NAMES.REQUEST_USER_INPUT}\`** instead of \`AskUserQuestion\` - The human is in the browser viewing your plan, questions should appear there`;
+- **DO use \`requestUserInput()\`** inside \`${TOOL_NAMES.EXECUTE_CODE}\` instead of \`AskUserQuestion\` - The human is in the browser viewing your plan, questions should appear there`;
 
 /**
  * Complete Claude Code instructions for SessionStart hook injection.

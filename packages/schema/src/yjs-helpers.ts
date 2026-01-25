@@ -4,6 +4,7 @@ import { assertNever } from './assert-never.js';
 import { type AgentPresence, AgentPresenceSchema } from './hook-api.js';
 import {
   type AnyInputRequest,
+  AnyInputRequestSchema,
   InputRequestSchema,
   type MultiQuestionInputRequest,
   MultiQuestionInputRequestSchema,
@@ -33,6 +34,50 @@ import {
 } from './plan.js';
 import { parseThreads } from './thread.js';
 import { YDOC_KEYS } from './yjs-keys.js';
+
+/**
+ * Safely converts Y.Array.toJSON() to unknown[] for validation.
+ *
+ * Yjs's toJSON() returns `any`, which bypasses type checking.
+ * This wrapper converts `any` to `unknown`, forcing callers to validate
+ * before use (typically with Zod schemas).
+ *
+ * @param array - Yjs array to convert
+ * @returns Array of unknown items that must be validated before use
+ */
+function toUnknownArray<T = unknown>(array: Y.Array<T>): unknown[] {
+  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- Converting Yjs any to unknown for type safety
+  return array.toJSON() as unknown[];
+}
+
+/**
+ * Find an input request by ID in the raw CRDT data.
+ *
+ * This function is needed because:
+ * 1. We need the ACTUAL index in the Y.Array for delete/insert operations
+ * 2. Schema validation might filter out requests with legacy/invalid data
+ * 3. We want to find the request first, then validate it specifically
+ *
+ * @param data - Raw array data from Y.Array.toJSON()
+ * @param requestId - The ID of the request to find
+ * @returns Object with rawIndex and validated request, or null if not found
+ */
+function findInputRequestById(
+  data: unknown[],
+  requestId: string
+): { rawIndex: number; request: AnyInputRequest } | null {
+  for (let i = 0; i < data.length; i++) {
+    const item = data[i];
+    if (item && typeof item === 'object' && 'id' in item && item.id === requestId) {
+      const parsed = AnyInputRequestSchema.safeParse(item);
+      if (parsed.success) {
+        return { rawIndex: i, request: parsed.data };
+      }
+      return null;
+    }
+  }
+  return null;
+}
 
 /**
  * Fields that can be safely updated without changing status.
@@ -100,13 +145,13 @@ export interface TransitionToChangesRequested {
 
 /**
  * Type for transitioning to in_progress status.
- * When coming from pending_review, requires review fields.
- * When coming from draft (no approval required), review fields are optional.
+ * Requires reviewedAt and reviewedBy to satisfy PlanMetadata schema invariants.
+ * Without these fields, the discriminated union validation will fail.
  */
 export interface TransitionToInProgress {
   status: 'in_progress';
-  reviewedAt?: number;
-  reviewedBy?: string;
+  reviewedAt: number;
+  reviewedBy: string;
   reviewComment?: string;
 }
 
@@ -240,14 +285,11 @@ function applyChangesRequestedTransition(
 
 /**
  * Apply in_progress transition fields to metadata map.
+ * Always sets reviewedAt and reviewedBy to satisfy schema invariants.
  */
 function applyInProgressTransition(map: Y.Map<unknown>, transition: TransitionToInProgress): void {
-  if (transition.reviewedAt !== undefined) {
-    map.set('reviewedAt', transition.reviewedAt);
-  }
-  if (transition.reviewedBy !== undefined) {
-    map.set('reviewedBy', transition.reviewedBy);
-  }
+  map.set('reviewedAt', transition.reviewedAt);
+  map.set('reviewedBy', transition.reviewedBy);
   if (transition.reviewComment !== undefined) {
     map.set('reviewComment', transition.reviewComment);
   }
@@ -462,14 +504,14 @@ export function isStepCompleted(ydoc: Y.Doc, stepId: string): boolean {
 
 export function getArtifacts(ydoc: Y.Doc): Artifact[] {
   const array = ydoc.getArray<Artifact>(YDOC_KEYS.ARTIFACTS);
-  const data = array.toJSON() as unknown[];
+  const data = toUnknownArray(array);
 
   return data
     .map((item: unknown) => {
       if (!item || typeof item !== 'object') {
         return null;
       }
-      const artifact = item as Record<string, unknown>;
+      const artifact = Object.fromEntries(Object.entries(item));
       if (artifact.url && !artifact.storage) {
         return { ...artifact, storage: 'github' };
       }
@@ -507,7 +549,12 @@ export function addArtifact(ydoc: Y.Doc, artifact: Artifact, actor?: string): vo
 
 export function removeArtifact(ydoc: Y.Doc, artifactId: string): boolean {
   const array = ydoc.getArray<Artifact>(YDOC_KEYS.ARTIFACTS);
-  const artifacts = array.toJSON() as Artifact[];
+  const data = toUnknownArray(array);
+  const artifacts = data
+    .map((item) => ArtifactSchema.safeParse(item))
+    .filter((r) => r.success)
+    .map((r) => r.data);
+
   const index = artifacts.findIndex((a) => a.id === artifactId);
 
   if (index === -1) return false;
@@ -615,7 +662,7 @@ export function getAgentPresence(ydoc: Y.Doc, sessionId: string): AgentPresence 
 
 export function getDeliverables(ydoc: Y.Doc): Deliverable[] {
   const array = ydoc.getArray<Deliverable>(YDOC_KEYS.DELIVERABLES);
-  const data = array.toJSON() as unknown[];
+  const data = toUnknownArray(array);
 
   return data
     .map((item) => DeliverableSchema.safeParse(item))
@@ -642,7 +689,11 @@ export function linkArtifactToDeliverable(
   actor?: string
 ): boolean {
   const array = ydoc.getArray<Deliverable>(YDOC_KEYS.DELIVERABLES);
-  const deliverables = array.toJSON() as Deliverable[];
+  const data = toUnknownArray(array);
+  const deliverables = data
+    .map((item) => DeliverableSchema.safeParse(item))
+    .filter((r) => r.success)
+    .map((r) => r.data);
   const index = deliverables.findIndex((d) => d.id === deliverableId);
 
   if (index === -1) return false;
@@ -813,7 +864,7 @@ export function unrejectUser(ydoc: Y.Doc, userId: string, actor?: string): boole
 
 export function getLinkedPRs(ydoc: Y.Doc): LinkedPR[] {
   const array = ydoc.getArray<LinkedPR>(YDOC_KEYS.LINKED_PRS);
-  const data = array.toJSON() as unknown[];
+  const data = toUnknownArray(array);
 
   return data
     .map((item) => LinkedPRSchema.safeParse(item))
@@ -827,7 +878,11 @@ export function linkPR(ydoc: Y.Doc, pr: LinkedPR, actor?: string): void {
   ydoc.transact(
     () => {
       const array = ydoc.getArray<LinkedPR>(YDOC_KEYS.LINKED_PRS);
-      const existing = array.toJSON() as LinkedPR[];
+      const data = toUnknownArray(array);
+      const existing = data
+        .map((item) => LinkedPRSchema.safeParse(item))
+        .filter((r) => r.success)
+        .map((r) => r.data);
       const index = existing.findIndex((p) => p.prNumber === validated.prNumber);
 
       if (index !== -1) {
@@ -842,7 +897,11 @@ export function linkPR(ydoc: Y.Doc, pr: LinkedPR, actor?: string): void {
 
 export function unlinkPR(ydoc: Y.Doc, prNumber: number): boolean {
   const array = ydoc.getArray<LinkedPR>(YDOC_KEYS.LINKED_PRS);
-  const existing = array.toJSON() as LinkedPR[];
+  const data = toUnknownArray(array);
+  const existing = data
+    .map((item) => LinkedPRSchema.safeParse(item))
+    .filter((r) => r.success)
+    .map((r) => r.data);
   const index = existing.findIndex((p) => p.prNumber === prNumber);
 
   if (index === -1) return false;
@@ -863,7 +922,11 @@ export function updateLinkedPRStatus(
   status: LinkedPR['status']
 ): boolean {
   const array = ydoc.getArray<LinkedPR>(YDOC_KEYS.LINKED_PRS);
-  const existing = array.toJSON() as LinkedPR[];
+  const data = toUnknownArray(array);
+  const existing = data
+    .map((item) => LinkedPRSchema.safeParse(item))
+    .filter((r) => r.success)
+    .map((r) => r.data);
   const index = existing.findIndex((p) => p.prNumber === prNumber);
 
   if (index === -1) return false;
@@ -879,7 +942,7 @@ export function updateLinkedPRStatus(
 
 export function getPRReviewComments(ydoc: Y.Doc): PRReviewComment[] {
   const array = ydoc.getArray<PRReviewComment>(YDOC_KEYS.PR_REVIEW_COMMENTS);
-  const data = array.toJSON() as unknown[];
+  const data = toUnknownArray(array);
 
   return data
     .map((item) => PRReviewCommentSchema.safeParse(item))
@@ -905,7 +968,11 @@ export function addPRReviewComment(ydoc: Y.Doc, comment: PRReviewComment, actor?
 
 export function resolvePRReviewComment(ydoc: Y.Doc, commentId: string, resolved: boolean): boolean {
   const array = ydoc.getArray<PRReviewComment>(YDOC_KEYS.PR_REVIEW_COMMENTS);
-  const existing = array.toJSON() as PRReviewComment[];
+  const data = toUnknownArray(array);
+  const existing = data
+    .map((item) => PRReviewCommentSchema.safeParse(item))
+    .filter((r) => r.success)
+    .map((r) => r.data);
   const index = existing.findIndex((c) => c.id === commentId);
 
   if (index === -1) return false;
@@ -921,7 +988,11 @@ export function resolvePRReviewComment(ydoc: Y.Doc, commentId: string, resolved:
 
 export function removePRReviewComment(ydoc: Y.Doc, commentId: string): boolean {
   const array = ydoc.getArray<PRReviewComment>(YDOC_KEYS.PR_REVIEW_COMMENTS);
-  const existing = array.toJSON() as PRReviewComment[];
+  const data = toUnknownArray(array);
+  const existing = data
+    .map((item) => PRReviewCommentSchema.safeParse(item))
+    .filter((r) => r.success)
+    .map((r) => r.data);
   const index = existing.findIndex((c) => c.id === commentId);
 
   if (index === -1) return false;
@@ -936,7 +1007,7 @@ export function removePRReviewComment(ydoc: Y.Doc, commentId: string): boolean {
  */
 export function getLocalDiffComments(ydoc: Y.Doc): LocalDiffComment[] {
   const array = ydoc.getArray<LocalDiffComment>(YDOC_KEYS.LOCAL_DIFF_COMMENTS);
-  const data = array.toJSON() as unknown[];
+  const data = toUnknownArray(array);
 
   return data
     .map((item) => LocalDiffCommentSchema.safeParse(item))
@@ -977,7 +1048,11 @@ export function resolveLocalDiffComment(
   resolved: boolean
 ): boolean {
   const array = ydoc.getArray<LocalDiffComment>(YDOC_KEYS.LOCAL_DIFF_COMMENTS);
-  const existing = array.toJSON() as LocalDiffComment[];
+  const data = toUnknownArray(array);
+  const existing = data
+    .map((item) => LocalDiffCommentSchema.safeParse(item))
+    .filter((r) => r.success)
+    .map((r) => r.data);
   const index = existing.findIndex((c) => c.id === commentId);
 
   if (index === -1) return false;
@@ -997,7 +1072,11 @@ export function resolveLocalDiffComment(
  */
 export function removeLocalDiffComment(ydoc: Y.Doc, commentId: string): boolean {
   const array = ydoc.getArray<LocalDiffComment>(YDOC_KEYS.LOCAL_DIFF_COMMENTS);
-  const existing = array.toJSON() as LocalDiffComment[];
+  const data = toUnknownArray(array);
+  const existing = data
+    .map((item) => LocalDiffCommentSchema.safeParse(item))
+    .filter((r) => r.success)
+    .map((r) => r.data);
   const index = existing.findIndex((c) => c.id === commentId);
 
   if (index === -1) return false;
@@ -1006,22 +1085,36 @@ export function removeLocalDiffComment(ydoc: Y.Doc, commentId: string): boolean 
   return true;
 }
 
+function extractViewedByFromCrdt(existingViewedBy: unknown): Record<string, number> {
+  const viewedBy: Record<string, number> = {};
+
+  if (existingViewedBy instanceof Y.Map) {
+    for (const [key, value] of existingViewedBy.entries()) {
+      if (typeof key === 'string' && typeof value === 'number') {
+        viewedBy[key] = value;
+      }
+    }
+  } else if (
+    existingViewedBy &&
+    typeof existingViewedBy === 'object' &&
+    !Array.isArray(existingViewedBy)
+  ) {
+    for (const [key, value] of Object.entries(existingViewedBy)) {
+      if (typeof value === 'number') {
+        viewedBy[key] = value;
+      }
+    }
+  }
+
+  return viewedBy;
+}
+
 export function markPlanAsViewed(ydoc: Y.Doc, username: string): void {
   const map = ydoc.getMap(YDOC_KEYS.METADATA);
 
   ydoc.transact(() => {
     const existingViewedBy = map.get('viewedBy');
-    let viewedBy: Record<string, number> = {};
-
-    if (existingViewedBy instanceof Y.Map) {
-      for (const [key, value] of existingViewedBy.entries()) {
-        if (typeof value === 'number') {
-          viewedBy[key] = value;
-        }
-      }
-    } else if (existingViewedBy && typeof existingViewedBy === 'object') {
-      viewedBy = { ...(existingViewedBy as Record<string, number>) };
-    }
+    const viewedBy: Record<string, number> = extractViewedByFromCrdt(existingViewedBy);
 
     viewedBy[username] = Date.now();
 
@@ -1036,24 +1129,7 @@ export function markPlanAsViewed(ydoc: Y.Doc, username: string): void {
 export function getViewedBy(ydoc: Y.Doc): Record<string, number> {
   const map = ydoc.getMap(YDOC_KEYS.METADATA);
   const viewedBy = map.get('viewedBy');
-
-  if (!viewedBy) return {};
-
-  if (viewedBy instanceof Y.Map) {
-    const result: Record<string, number> = {};
-    for (const [key, value] of viewedBy.entries()) {
-      if (typeof value === 'number') {
-        result[key] = value;
-      }
-    }
-    return result;
-  }
-
-  if (typeof viewedBy === 'object') {
-    return viewedBy as Record<string, number>;
-  }
-
-  return {};
+  return extractViewedByFromCrdt(viewedBy);
 }
 
 export function isPlanUnread(
@@ -1084,7 +1160,14 @@ export function addConversationVersion(
   ydoc.transact(
     () => {
       const metadata = ydoc.getMap(YDOC_KEYS.METADATA);
-      const versions = (metadata.get('conversationVersions') as ConversationVersion[]) || [];
+      const rawVersions = metadata.get('conversationVersions');
+      let versions: ConversationVersion[] = [];
+      if (Array.isArray(rawVersions)) {
+        versions = rawVersions
+          .map((v) => ConversationVersionSchema.safeParse(v))
+          .filter((r) => r.success)
+          .map((r) => r.data);
+      }
       metadata.set('conversationVersions', [...versions, validated]);
     },
     actor ? { actor } : undefined
@@ -1188,7 +1271,7 @@ export function logPlanEvent<T extends PlanEventType>(
 
 export function getPlanEvents(ydoc: Y.Doc): PlanEvent[] {
   const array = ydoc.getArray<PlanEvent>(YDOC_KEYS.EVENTS);
-  const data = array.toJSON() as unknown[];
+  const data = toUnknownArray(array);
 
   return data
     .map((item) => PlanEventSchema.safeParse(item))
@@ -1202,7 +1285,7 @@ export function getPlanEvents(ydoc: Y.Doc): PlanEvent[] {
  */
 export function getSnapshots(ydoc: Y.Doc): PlanSnapshot[] {
   const array = ydoc.getArray<PlanSnapshot>(YDOC_KEYS.SNAPSHOTS);
-  const data = array.toJSON() as unknown[];
+  const data = toUnknownArray(array);
 
   return data
     .map((item) => PlanSnapshotSchema.safeParse(item))
@@ -1246,7 +1329,11 @@ export function createPlanSnapshot(
   blocks: unknown[]
 ): PlanSnapshot {
   const threadsMap = ydoc.getMap<Record<string, unknown>>(YDOC_KEYS.THREADS);
-  const threadsData = threadsMap.toJSON() as Record<string, unknown>;
+  const rawThreadsData = threadsMap.toJSON();
+  const threadsData: Record<string, unknown> =
+    rawThreadsData && typeof rawThreadsData === 'object'
+      ? Object.fromEntries(Object.entries(rawThreadsData))
+      : {};
   const threads = parseThreads(threadsData);
   const unresolved = threads.filter((t) => !t.resolved).length;
 
@@ -1282,6 +1369,11 @@ export function getLatestSnapshot(ydoc: Y.Doc): PlanSnapshot | null {
   return snapshots[snapshots.length - 1] ?? null;
 }
 
+function getValidatedTags(rawTags: unknown): string[] {
+  if (!Array.isArray(rawTags)) return [];
+  return rawTags.filter((t): t is string => typeof t === 'string');
+}
+
 /**
  * Add a tag to a plan (automatically normalizes and deduplicates).
  * Tags are normalized to lowercase and trimmed to prevent duplicates.
@@ -1290,7 +1382,7 @@ export function addPlanTag(ydoc: Y.Doc, tag: string, actor?: string): void {
   ydoc.transact(
     () => {
       const map = ydoc.getMap(YDOC_KEYS.METADATA);
-      const currentTags = (map.get('tags') as string[]) || [];
+      const currentTags = getValidatedTags(map.get('tags'));
 
       const normalizedTag = tag.toLowerCase().trim();
       if (!normalizedTag || currentTags.includes(normalizedTag)) return;
@@ -1309,7 +1401,7 @@ export function removePlanTag(ydoc: Y.Doc, tag: string, actor?: string): void {
   ydoc.transact(
     () => {
       const map = ydoc.getMap(YDOC_KEYS.METADATA);
-      const currentTags = (map.get('tags') as string[]) || [];
+      const currentTags = getValidatedTags(map.get('tags'));
       const normalizedTag = tag.toLowerCase().trim();
 
       map.set(
@@ -1419,17 +1511,14 @@ export function answerInputRequest(
   answeredBy: string
 ): AnswerInputRequestResult {
   const requestsArray = ydoc.getArray<AnyInputRequest>(YDOC_KEYS.INPUT_REQUESTS);
-  const requests = requestsArray.toJSON() as AnyInputRequest[];
-  const index = requests.findIndex((r) => r.id === requestId);
+  const data = toUnknownArray(requestsArray);
 
-  if (index === -1) {
+  const found = findInputRequestById(data, requestId);
+  if (!found) {
     return { success: false, error: 'Request not found' };
   }
 
-  const request = requests[index];
-  if (!request) {
-    return { success: false, error: 'Request not found' };
-  }
+  const { rawIndex: index, request } = found;
 
   if (request.status !== 'pending') {
     switch (request.status) {
@@ -1462,10 +1551,18 @@ export function answerInputRequest(
     requestsArray.delete(index, 1);
     requestsArray.insert(index, [validated]);
 
+    /**
+     * Include original request context for activity visibility.
+     * Single-question requests have 'message' field, multi-question requests don't.
+     */
+    const requestMessage = 'message' in request ? request.message : undefined;
+
     logPlanEvent(ydoc, 'input_request_answered', answeredBy, {
       requestId,
       response,
       answeredBy,
+      requestMessage,
+      requestType: request.type,
     });
   });
 
@@ -1488,17 +1585,14 @@ export function answerMultiQuestionInputRequest(
   answeredBy: string
 ): AnswerInputRequestResult {
   const requestsArray = ydoc.getArray<AnyInputRequest>(YDOC_KEYS.INPUT_REQUESTS);
-  const requests = requestsArray.toJSON() as AnyInputRequest[];
-  const index = requests.findIndex((r) => r.id === requestId);
+  const data = toUnknownArray(requestsArray);
 
-  if (index === -1) {
+  const found = findInputRequestById(data, requestId);
+  if (!found) {
     return { success: false, error: 'Request not found' };
   }
 
-  const request = requests[index];
-  if (!request) {
-    return { success: false, error: 'Request not found' };
-  }
+  const { rawIndex: index, request } = found;
 
   if (request.type !== 'multi') {
     return { success: false, error: 'Request is not pending' };
@@ -1539,6 +1633,7 @@ export function answerMultiQuestionInputRequest(
       requestId,
       response: responses,
       answeredBy,
+      requestType: 'multi',
     });
   });
 
@@ -1554,17 +1649,14 @@ export function cancelInputRequest(
   requestId: string
 ): { success: boolean; error?: string } {
   const requestsArray = ydoc.getArray<AnyInputRequest>(YDOC_KEYS.INPUT_REQUESTS);
-  const requests = requestsArray.toJSON() as AnyInputRequest[];
-  const index = requests.findIndex((r) => r.id === requestId);
+  const data = toUnknownArray(requestsArray);
 
-  if (index === -1) {
+  const found = findInputRequestById(data, requestId);
+  if (!found) {
     return { success: false, error: 'Request not found' };
   }
 
-  const request = requests[index];
-  if (!request) {
-    return { success: false, error: 'Request not found' };
-  }
+  const { rawIndex: index, request } = found;
 
   if (request.status !== 'pending') {
     return { success: false, error: `Request is not pending` };
@@ -1575,7 +1667,6 @@ export function cancelInputRequest(
     status: 'cancelled' as const,
   };
 
-  /** Use appropriate schema based on request type */
   const validated =
     request.type === 'multi'
       ? MultiQuestionInputRequestSchema.parse(cancelledRequest)
@@ -1599,17 +1690,14 @@ export function declineInputRequest(
   requestId: string
 ): { success: boolean; error?: string } {
   const requestsArray = ydoc.getArray<AnyInputRequest>(YDOC_KEYS.INPUT_REQUESTS);
-  const requests = requestsArray.toJSON() as AnyInputRequest[];
-  const index = requests.findIndex((r) => r.id === requestId);
+  const data = toUnknownArray(requestsArray);
 
-  if (index === -1) {
+  const found = findInputRequestById(data, requestId);
+  if (!found) {
     return { success: false, error: 'Request not found' };
   }
 
-  const request = requests[index];
-  if (!request) {
-    return { success: false, error: 'Request not found' };
-  }
+  const { rawIndex: index, request } = found;
 
   if (request.status !== 'pending') {
     return { success: false, error: `Request is not pending` };
@@ -1620,7 +1708,6 @@ export function declineInputRequest(
     status: 'declined' as const,
   };
 
-  /** Use appropriate schema based on request type */
   const validated =
     request.type === 'multi'
       ? MultiQuestionInputRequestSchema.parse(declinedRequest)
@@ -1670,7 +1757,8 @@ export function atomicRegenerateTokenIfOwner(
   ydoc.transact(
     () => {
       const map = ydoc.getMap(YDOC_KEYS.METADATA);
-      const currentOwner = map.get('ownerId') as string | undefined;
+      const rawOwnerId = map.get('ownerId');
+      const currentOwner = typeof rawOwnerId === 'string' ? rawOwnerId : undefined;
 
       if (currentOwner !== expectedOwnerId) {
         result = { success: false, actualOwner: currentOwner };

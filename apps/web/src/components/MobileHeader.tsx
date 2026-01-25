@@ -47,7 +47,7 @@ export function MobileHeader({
   inboxCount = 0,
   isLoadingInbox = false,
 }: MobileHeaderProps) {
-  // Hide badge during loading to prevent flash from 0→actual
+  /** Hide badge during loading to prevent flash from 0→actual */
   const showBadge = !isLoadingInbox && inboxCount > 0;
 
   return (

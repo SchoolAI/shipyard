@@ -1,9 +1,10 @@
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join, resolve, sep } from 'node:path';
+import { hasErrorCode } from '@shipyard/schema';
 import { logger } from './logger.js';
 
-// ============ PUBLIC API (Exports) ============
+/** ============ PUBLIC API (Exports) ============ */
 
 /**
  * Store artifact bytes to local file system.
@@ -30,7 +31,7 @@ export async function storeLocalArtifact(
  */
 export async function getLocalArtifact(artifactId: string): Promise<Buffer | null> {
   try {
-    // Path traversal protection: resolve full path and verify it's within artifacts directory
+    /** Path traversal protection: resolve full path and verify it's within artifacts directory */
     const filepath = resolve(ARTIFACTS_DIR, artifactId);
 
     if (!filepath.startsWith(ARTIFACTS_DIR + sep)) {
@@ -40,11 +41,11 @@ export async function getLocalArtifact(artifactId: string): Promise<Buffer | nul
 
     return await readFile(filepath);
   } catch (error) {
-    // File not found is expected when artifact doesn't exist
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+    /** File not found is expected when artifact doesn't exist */
+    if (hasErrorCode(error, 'ENOENT')) {
       return null;
     }
-    // Re-throw unexpected errors (permission denied, disk full, etc.)
+    /** Re-throw unexpected errors (permission denied, disk full, etc.) */
     throw error;
   }
 }
@@ -58,7 +59,7 @@ export async function deleteLocalArtifact(artifactId: string): Promise<boolean> 
   try {
     const filepath = resolve(ARTIFACTS_DIR, artifactId);
 
-    // Path traversal protection
+    /** Path traversal protection */
     if (!filepath.startsWith(ARTIFACTS_DIR + sep)) {
       logger.warn({ artifactId, filepath }, 'Path traversal attempt in delete');
       return false;
@@ -68,10 +69,10 @@ export async function deleteLocalArtifact(artifactId: string): Promise<boolean> 
     logger.info({ artifactId }, 'Deleted orphaned local artifact');
     return true;
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+    if (hasErrorCode(error, 'ENOENT')) {
       return false;
     }
-    // Log but don't throw - cleanup is best effort
+    /** Log but don't throw - cleanup is best effort */
     logger.warn({ error, artifactId }, 'Failed to delete local artifact');
     return false;
   }
@@ -87,6 +88,6 @@ export async function deleteArtifactsForPlan(planId: string): Promise<void> {
   logger.info({ planId }, 'Deleted all artifacts for plan');
 }
 
-// ============ PRIVATE IMPLEMENTATION ============
+/** ============ PRIVATE IMPLEMENTATION ============ */
 
 const ARTIFACTS_DIR = join(homedir(), '.shipyard', 'artifacts');

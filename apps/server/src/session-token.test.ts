@@ -10,7 +10,6 @@ describe('Session Token Functions', () => {
 
     it('returns exactly 43 chars (base64url encoding of 32 bytes)', () => {
       const token = generateSessionToken();
-      // 32 bytes = 256 bits. Base64url encoding: ceil(32 * 8 / 6) = 43 chars (no padding)
       expect(token.length).toBe(43);
     });
 
@@ -25,7 +24,6 @@ describe('Session Token Functions', () => {
     });
 
     it('generates base64url-safe characters only', () => {
-      // Base64url uses: A-Z, a-z, 0-9, -, _
       const token = generateSessionToken();
       expect(token).toMatch(/^[A-Za-z0-9_-]+$/);
     });
@@ -51,7 +49,6 @@ describe('Session Token Functions', () => {
       const token = 'any-token';
       const hash = hashSessionToken(token);
 
-      // SHA256 produces 256 bits = 32 bytes = 64 hex characters
       expect(hash.length).toBe(64);
     });
 
@@ -77,7 +74,6 @@ describe('Session Token Functions', () => {
     });
 
     it('produces deterministic hash (known test vector)', () => {
-      // Known SHA256 hash for "test"
       const hash = hashSessionToken('test');
       expect(hash).toBe('9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08');
     });
@@ -113,26 +109,18 @@ describe('Session Token Functions', () => {
     });
 
     it('returns false for both empty strings', () => {
-      // Note: empty token hashes to SHA256('') which doesn't match empty storedHash
       expect(verifySessionToken('', '')).toBe(false);
     });
 
     it('uses constant-time comparison (timing attack protection)', () => {
-      // This test verifies the implementation uses timingSafeEqual
-      // We can't directly test timing, but we can verify the function handles
-      // invalid hex gracefully (which proves it's using Buffer conversion)
-
       const validToken = generateSessionToken();
       const validHash = hashSessionToken(validToken);
 
-      // Invalid hex should be rejected without throwing
       expect(verifySessionToken(validToken, 'not-valid-hex')).toBe(false);
       expect(verifySessionToken(validToken, 'ZZ')).toBe(false);
 
-      // Different length hashes should be rejected
       expect(verifySessionToken(validToken, 'abc')).toBe(false);
 
-      // Valid comparison should still work
       expect(verifySessionToken(validToken, validHash)).toBe(true);
     });
 
@@ -140,7 +128,6 @@ describe('Session Token Functions', () => {
       const token = generateSessionToken();
       const hash = hashSessionToken(token);
 
-      // Modify the last character
       const modifiedToken = `${token.slice(0, -1)}X`;
 
       expect(verifySessionToken(modifiedToken, hash)).toBe(false);
@@ -165,24 +152,19 @@ describe('Session Token Functions', () => {
 
   describe('integration: full token lifecycle', () => {
     it('generates, hashes, and verifies token successfully', () => {
-      // Simulate creating a new session
       const token = generateSessionToken();
 
-      // Store the hash (this is what goes in the database)
       const storedHash = hashSessionToken(token);
 
-      // Later, verify the token (user provides the original token)
       const isValid = verifySessionToken(token, storedHash);
 
       expect(isValid).toBe(true);
     });
 
     it('rejects invalid tokens in full lifecycle', () => {
-      // Simulate creating a new session
       const token = generateSessionToken();
       const storedHash = hashSessionToken(token);
 
-      // Attacker provides a different token
       const attackerToken = generateSessionToken();
       const isValid = verifySessionToken(attackerToken, storedHash);
 

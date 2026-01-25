@@ -14,7 +14,7 @@
  *     case 'draft': return 'gray';
  *     case 'approved': return 'green';
  *     case 'rejected': return 'red';
- *     default: return assertNever(status); // Compile error if new status added
+ *     default: return assertNever(status);
  *   }
  * }
  * ```

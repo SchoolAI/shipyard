@@ -17,7 +17,6 @@ import { ChoiceInput } from './ChoiceInput';
 import type { ChoiceInputRequest } from './types';
 import { OTHER_OPTION_VALUE } from './utils';
 
-// Factory for creating test requests
 function createChoiceRequest(overrides: Partial<ChoiceInputRequest> = {}): ChoiceInputRequest {
   return {
     id: 'test-id',
@@ -90,7 +89,6 @@ describe('ChoiceInput', () => {
         />
       );
 
-      // Click on the Banana label/radio
       await user.click(screen.getByText('Banana'));
 
       expect(setValue).toHaveBeenCalledWith('Banana');
@@ -167,7 +165,6 @@ describe('ChoiceInput', () => {
         />
       );
 
-      // RadioGroup should be disabled
       const radiogroup = screen.getByRole('radiogroup');
       expect(radiogroup).toHaveAttribute('aria-disabled', 'true');
     });
@@ -191,7 +188,6 @@ describe('ChoiceInput', () => {
         />
       );
 
-      // Should have checkboxgroup not radiogroup
       expect(screen.getByRole('group')).toBeInTheDocument();
       expect(screen.getByText('(Select one or more options)')).toBeInTheDocument();
     });
@@ -238,10 +234,8 @@ describe('ChoiceInput', () => {
         />
       );
 
-      // Click on Y
       await user.click(screen.getByText('Y'));
 
-      // Should be called with both X and Y
       expect(setValue).toHaveBeenCalled();
     });
   });
@@ -332,7 +326,6 @@ describe('ChoiceInput', () => {
         />
       );
 
-      // Should render as radiogroup, not combobox
       expect(screen.getByRole('radiogroup')).toBeInTheDocument();
     });
 
@@ -352,7 +345,6 @@ describe('ChoiceInput', () => {
         />
       );
 
-      // Should render as combobox
       expect(screen.getByRole('combobox')).toBeInTheDocument();
     });
 
@@ -373,7 +365,6 @@ describe('ChoiceInput', () => {
         />
       );
 
-      // Should render as combobox even with few options
       expect(screen.getByRole('combobox')).toBeInTheDocument();
     });
 
@@ -415,7 +406,6 @@ describe('ChoiceInput', () => {
         />
       );
 
-      // Should render as checkboxgroup, not combobox
       expect(screen.getByRole('group')).toBeInTheDocument();
     });
   });

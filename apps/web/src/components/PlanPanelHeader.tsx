@@ -40,7 +40,7 @@ export interface PlanPanelHeaderProps {
   onFullScreen: () => void;
   /** Current panel width */
   width: PanelWidth;
-  // Optional props for ReviewActions (when provided, shows popover with comment field)
+  /** Optional props for ReviewActions (when provided, shows popover with comment field) */
   /** Y.Doc for the plan - enables ReviewActions */
   ydoc?: Y.Doc;
   /** User identity for comments */
@@ -111,7 +111,7 @@ export function PlanPanelHeader({
   onExpand,
   onFullScreen,
   width,
-  // Optional ReviewActions props
+  /** Optional ReviewActions props */
   ydoc,
   identity,
   onRequestIdentity,
@@ -120,7 +120,7 @@ export function PlanPanelHeader({
 }: PlanPanelHeaderProps) {
   const statusConfig = getStatusConfig(metadata.status);
   const showReviewActions = metadata.status === 'pending_review';
-  // Use ReviewActions with comment popover when ydoc and onRequestIdentity are provided
+  /** Use ReviewActions with comment popover when ydoc and onRequestIdentity are provided */
   const canUseReviewActions = ydoc && onRequestIdentity;
 
   return (
@@ -190,7 +190,7 @@ export function PlanPanelHeader({
         {showReviewActions && (
           <div className="flex items-center gap-1.5 shrink-0">
             {canUseReviewActions ? (
-              // Use ReviewActions with popover and comment field
+              /** Use ReviewActions with popover and comment field */
               <ReviewActions
                 ydoc={ydoc}
                 currentStatus={metadata.status}
@@ -200,7 +200,7 @@ export function PlanPanelHeader({
                 onStatusChange={onStatusChange}
               />
             ) : (
-              // Fallback to simple buttons
+              /** Fallback to simple buttons */
               <>
                 <Button
                   size="sm"

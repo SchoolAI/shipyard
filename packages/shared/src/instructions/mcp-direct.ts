@@ -21,20 +21,19 @@ export const MCP_DIRECT_HEADER = `# Shipyard: Your Agent Management Hub
 
 Shipyard turns invisible agent work into reviewable, verifiable tasks. Instead of trusting that code was written correctly, reviewers see screenshots, videos, and test results as proof.
 
-**Key principle:** When you're working in Shipyard, ALL human-agent communication should happen through Shipyard's \`${TOOL_NAMES.REQUEST_USER_INPUT}\` tool. The human is already in the browser viewing your plan - that's where they expect to interact with you.`;
+**Key principle:** When you're working in Shipyard, ALL human-agent communication should happen through \`requestUserInput()\` inside \`${TOOL_NAMES.EXECUTE_CODE}\`. The human is already in the browser viewing your plan - that's where they expect to interact with you.`;
 
 export const MCP_TOOLS_OVERVIEW = `## Available MCP Tools
 
 | Tool | Purpose |
 |------|---------|
-| \`${TOOL_NAMES.REQUEST_USER_INPUT}\` | **THE primary human-agent communication channel** - Ask questions, get decisions, request clarification |
-| \`${TOOL_NAMES.EXECUTE_CODE}\` | Run TypeScript that calls Shipyard APIs (recommended for multi-step operations) |
+| \`${TOOL_NAMES.EXECUTE_CODE}\` | Run TypeScript that calls ALL Shipyard APIs including \`requestUserInput()\` |
 
-### ${TOOL_NAMES.REQUEST_USER_INPUT}: Your Direct Line to the Human
+### requestUserInput(): Your Direct Line to the Human
 
-This is how you talk to humans during active work. Don't use your platform's built-in question tools (AskUserQuestion, etc.) - use this instead. The human is in the browser viewing your plan, and that's where they expect to see your questions.
+This is how you talk to humans during active work. Don't use your platform's built-in question tools (AskUserQuestion, etc.) - use \`requestUserInput()\` inside \`${TOOL_NAMES.EXECUTE_CODE}\` instead. The human is in the browser viewing your plan, and that's where they expect to see your questions.
 
-**Preferred approach:** Use \`${TOOL_NAMES.EXECUTE_CODE}\` to chain multiple API calls in one step.`;
+All Shipyard operations (createPlan, addArtifact, requestUserInput, etc.) are available inside \`${TOOL_NAMES.EXECUTE_CODE}\`.`;
 
 export const MCP_WORKFLOW = `## Workflow (MCP Direct)
 
@@ -56,7 +55,7 @@ const plan = await createPlan({
 });
 
 const { planId, sessionToken, deliverables, monitoringScript } = plan;
-// deliverables = [{ id: "del_xxx", text: "Screenshot of login page" }, ...]
+/** deliverables = [{ id: "del_xxx", text: "Screenshot of login page" }, ...] */
 \`\`\`
 
 ### Step 2: Wait for Approval
@@ -74,10 +73,10 @@ Or poll manually:
 \`\`\`typescript
 const status = await readPlan(planId, sessionToken);
 if (status.status === "in_progress") {
-  // Approved! Proceed with work
+  /** Approved! Proceed with work */
 }
 if (status.status === "changes_requested") {
-  // Read feedback, make changes
+  /** Read feedback, make changes */
 }
 \`\`\`
 
@@ -95,7 +94,7 @@ await addArtifact({
   filename: 'login-page.png',
   source: 'file',
   filePath: '/path/to/screenshot.png',
-  deliverableId: deliverables[0].id  // Links to specific deliverable
+  deliverableId: deliverables[0].id
 });
 
 const result = await addArtifact({
@@ -108,13 +107,13 @@ const result = await addArtifact({
   deliverableId: deliverables[1].id
 });
 
-// Auto-complete triggers when ALL deliverables have artifacts
+/** Auto-complete triggers when ALL deliverables have artifacts */
 if (result.allDeliverablesComplete) {
   console.log('Done!', result.snapshotUrl);
 }
 \`\`\``;
 
-export const API_REFERENCE = `## API Reference
+export const API_REFERENCE = `## API Reference (inside execute_code)
 
 ### createPlan(options)
 
@@ -156,14 +155,53 @@ Uploads proof-of-work artifact.
 
 ### requestUserInput(options)
 
-Asks user a question via browser modal.
+**THE primary human-agent communication channel.** Asks user a question via browser modal.
 
-**Parameters:**
+**IMPORTANT: Always RETURN the response value in your execute_code result.**
+
+✅ **RECOMMENDED (primary pattern):**
+\`\`\`typescript
+const result = await requestUserInput({ message: "Which database?", type: "choice", options: ["PostgreSQL", "SQLite"] });
+return { userChoice: result.response, status: result.status };
+// Clean, structured output appears once in the final result
+\`\`\`
+
+⚠️ **AVOID (use only for debugging):**
+\`\`\`typescript
+console.log(\\\`User chose: \\\${result.response}\\\`);
+// Clutters output, not structured
+\`\`\`
+
+**Two modes - choose based on dependencies:**
+
+**Multi-step (dependencies):** Chain calls when later questions depend on earlier answers
+\`\`\`typescript
+const db = await requestUserInput({ message: "Database?", type: "choice", options: ["PostgreSQL", "SQLite"] });
+const port = await requestUserInput({ message: \\\`Port for \\\${db.response}?\\\`, type: "number" });
+return { database: db.response, port: port.response };
+\`\`\`
+
+**Multi-form (independent):** Single call for unrelated questions
+\`\`\`typescript
+const config = await requestUserInput({
+  questions: [
+    { message: "Project name?", type: "text" },
+    { message: "Use TypeScript?", type: "confirm" }
+  ]
+});
+return { config: config.response };
+\`\`\`
+
+**Parameters (single-question mode):**
 - \`message\` (string) - Question to ask
 - \`type\` (string) - Input type (see below)
 - \`options\` (string[], for 'choice') - Available choices
 - \`timeout\` (number, optional) - Timeout in seconds
 - Type-specific parameters (min, max, format, etc.)
+
+**Parameters (multi-question mode):**
+- \`questions\` (array) - Array of 1-10 questions (8 recommended)
+- \`timeout\` (number, optional) - Timeout in seconds
 
 **Returns:** \`{ success, response?, status }\`
 
@@ -171,29 +209,11 @@ Asks user a question via browser modal.
 1. \`text\` - Single-line text
 2. \`multiline\` - Multi-line text area
 3. \`choice\` - Radio/checkbox/dropdown (auto-adds "Other" option)
-   - Auto-switches: 1-8 options = radio/checkbox, 9+ = dropdown
-   - \`multiSelect: true\` for checkboxes
-   - \`displayAs: 'dropdown'\` to force dropdown UI
 4. \`confirm\` - Yes/No buttons
 5. \`number\` - Numeric input with validation
-   - \`min\`, \`max\`, \`format\` ('integer' | 'decimal' | 'currency' | 'percentage')
 6. \`email\` - Email validation
-   - \`domain\` for restriction
 7. \`date\` - Date picker with range
-   - \`minDate\`, \`maxDate\` (YYYY-MM-DD format)
-8. \`rating\` - Scale rating (auto-selects stars/numbers)
-   - \`min\`, \`max\`, \`style\` ('stars' | 'numbers' | 'emoji'), \`labels\`
-
-**Response format:**
-- All responses are strings
-- choice (single): \`"PostgreSQL"\` or custom text from "Other"
-- choice (multi): \`"option1, option2"\` (comma-space separated)
-- confirm: \`"yes"\` or \`"no"\` (lowercase)
-- number: \`"42"\` or \`"3.14"\`
-- email: \`"user@example.com"\`
-- date: \`"2026-01-24"\` (ISO 8601)
-- rating: \`"4"\` (integer as string)
-- See docs/INPUT-RESPONSE-FORMATS.md for complete specification`;
+8. \`rating\` - Scale rating`;
 
 export const HANDLING_FEEDBACK = `## Handling Reviewer Feedback
 
@@ -203,12 +223,14 @@ const status = await readPlan(planId, sessionToken, {
 });
 
 if (status.status === "changes_requested") {
-  // Read the content for inline comments
+  /** Read the content for inline comments */
   console.log(status.content);
 
-  // Make changes based on feedback
-  // Upload new artifacts
-  // Plan will transition back to pending_review
+  /**
+   * Make changes based on feedback
+   * Upload new artifacts
+   * Plan will transition back to pending_review
+   */
 }
 \`\`\``;
 

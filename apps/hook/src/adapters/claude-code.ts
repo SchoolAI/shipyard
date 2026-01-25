@@ -12,13 +12,7 @@ import {
   TOOL_NAMES,
 } from '../constants.js';
 import { logger } from '../logger.js';
-import type {
-  AdapterEvent,
-  AgentAdapter,
-  CoreResponse,
-  PostExitEvent,
-  ReviewFeedback,
-} from './types.js';
+import type { AdapterEvent, AgentAdapter, CoreResponse, ReviewFeedback } from './types.js';
 
 const ClaudeCodeHookBaseSchema = z.object({
   session_id: z.string(),
@@ -44,14 +38,14 @@ function handlePreToolUse(input: ClaudeCodeHookInput): AdapterEvent {
   if (toolName === CLAUDE_TOOL_NAMES.ASK_USER_QUESTION) {
     logger.info(
       { toolName },
-      'Blocking AskUserQuestion - redirecting to request_user_input MCP tool'
+      'Blocking AskUserQuestion - redirecting to requestUserInput() in execute_code'
     );
     return {
       type: 'tool_deny',
       reason:
-        `BLOCKED: Use the ${TOOL_NAMES.REQUEST_USER_INPUT} MCP tool instead. ` +
+        `BLOCKED: Use requestUserInput() inside ${TOOL_NAMES.EXECUTE_CODE} instead. ` +
         "The human is in the browser viewing your plan - that's where they expect to interact with you. " +
-        'See the tool description for input types and parameters.',
+        'See the execute_code tool description for input types and parameters.',
     };
   }
 
@@ -104,11 +98,12 @@ function handlePostToolUse(input: ClaudeCodeHookInput): AdapterEvent {
   const toolName = input.tool_name;
 
   if (toolName === CLAUDE_TOOL_NAMES.EXIT_PLAN_MODE) {
+    /** toolName is narrowed to the string literal by the equality check above */
     return {
       type: 'post_exit',
       sessionId,
       toolName,
-    } as PostExitEvent;
+    };
   }
 
   return { type: 'passthrough' };

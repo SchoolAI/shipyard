@@ -4,7 +4,7 @@
  * Updates Y.Doc with user response or cancellation.
  */
 
-import { Alert, Button, Card, Form, Modal } from '@heroui/react';
+import { Alert, Button, Card, Chip, Form, Modal } from '@heroui/react';
 import {
   type AnswerInputRequestResult,
   answerInputRequest,
@@ -15,6 +15,7 @@ import {
   type InputRequest,
   logPlanEvent,
 } from '@shipyard/schema';
+import { AlertOctagon } from 'lucide-react';
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -53,7 +54,7 @@ function validateNumberInput(
   max: number | undefined
 ): boolean {
   const numStr = typeof value === 'string' ? value : '';
-  if (!numStr) return true; // Empty is handled by required check
+  if (!numStr) return true;
   const num = Number.parseFloat(numStr);
   if (Number.isNaN(num)) return false;
   if (min !== undefined && num < min) return false;
@@ -64,7 +65,7 @@ function validateNumberInput(
 /** Validate email input against format and optional domain restriction */
 function validateEmailInput(value: string | string[], domain: string | undefined): boolean {
   const email = typeof value === 'string' ? value : '';
-  if (!email.trim()) return true; // Empty is handled by required check
+  if (!email.trim()) return true;
   if (!EMAIL_REGEX.test(email)) return false;
   if (domain && !email.toLowerCase().endsWith(`@${domain.toLowerCase()}`)) {
     return false;
@@ -79,7 +80,7 @@ function validateDateInput(
   max: string | undefined
 ): boolean {
   const dateStr = typeof value === 'string' ? value : '';
-  if (!dateStr) return true; // Empty is handled by required check
+  if (!dateStr) return true;
   const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
   if (!dateRegex.test(dateStr)) return false;
   const date = new Date(dateStr);
@@ -120,17 +121,13 @@ function formatResponseValue(
   isOtherSelected: boolean,
   isNaSelected: boolean
 ): string {
-  // Handle "Other" option for choice-type questions
   if (request.type === 'choice' && isOtherSelected) {
     if (Array.isArray(value)) {
-      // Multi-select: combine selected options (excluding __other__) with custom input
       const selectedOptions = value.filter((v) => v !== OTHER_OPTION_VALUE);
       return [...selectedOptions, customInput.trim()].join(', ');
     }
-    // Single-select: use custom input as the response
     return customInput.trim();
   }
-  // Handle rating escape hatches
   if (request.type === 'rating') {
     if (isNaSelected) {
       return NA_OPTION_VALUE;
@@ -139,7 +136,6 @@ function formatResponseValue(
       return customInput.trim();
     }
   }
-  // Standard handling: convert array values to comma-separated string
   return Array.isArray(value) ? value.join(', ') : value;
 }
 
@@ -157,11 +153,8 @@ function isSubmitDisabled(
   if (isSubmitting) return true;
   if (!isInputValid(request, value)) return true;
   if (request.type === 'choice' && !request.options?.length) return true;
-  // Rating with N/A selected is valid
   if (request.type === 'rating' && isNaSelected) return false;
-  // When "Other" is selected, require custom input text
   if (isOtherSelected && !customInput.trim()) return true;
-  // For regular selections, require at least one option selected
   if (!isOtherSelected && (Array.isArray(value) ? value.length === 0 : !value)) return true;
   return false;
 }
@@ -193,15 +186,12 @@ function getModalConfig(message: string): { isLarge: boolean; maxHeight: string 
   const lineCount = message.split('\n').length;
   const charCount = message.length;
 
-  // Complex content gets larger modal with scroll
   if (hasCodeBlock || hasTable || lineCount > 15 || charCount > 800) {
     return { isLarge: true, maxHeight: '400px' };
   }
-  // Medium content gets scroll if needed
   if (lineCount > 8 || charCount > 400) {
     return { isLarge: false, maxHeight: '300px' };
   }
-  // Simple content - no special handling
   return { isLarge: false, maxHeight: undefined };
 }
 
@@ -215,14 +205,10 @@ export function InputRequestModal({
 }: InputRequestModalProps) {
   const [value, setValue] = useState<string | string[]>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  // Use -1 as sentinel value to indicate "not yet initialized"
-  // This prevents race condition where auto-cancel fires before countdown is set
   const [remainingTime, setRemainingTime] = useState(-1);
-  // Custom input for "Other" option in choice-type questions
   const [customInput, setCustomInput] = useState('');
   const { identity, startAuth } = useGitHubAuth();
 
-  // Derive whether "Other" is selected for choice-type and rating-type questions
   const isChoiceOtherSelected =
     request?.type === 'choice' &&
     (Array.isArray(value) ? value.includes(OTHER_OPTION_VALUE) : value === OTHER_OPTION_VALUE);
@@ -230,26 +216,19 @@ export function InputRequestModal({
     request?.type === 'rating' && typeof value === 'string' && value === OTHER_OPTION_VALUE;
   const isOtherSelected = isChoiceOtherSelected || isRatingOtherSelected;
 
-  // Derive whether "N/A" is selected for rating-type questions
   const isNaSelected =
     request?.type === 'rating' && typeof value === 'string' && value === NA_OPTION_VALUE;
 
-  // Calculate modal config based on message complexity
   const modalConfig = useMemo(() => getModalConfig(request?.message || ''), [request?.message]);
 
-  // Reset state when request changes
   useEffect(() => {
     if (request) {
       setValue(getDefaultValueState(request));
-      // Reset custom input when request changes
       setCustomInput('');
     }
-    // Reset countdown to sentinel value when request changes
-    // This prevents stale timeout values from previous requests
     setRemainingTime(-1);
   }, [request]);
 
-  // Used for auto-timeout - sets status to 'cancelled'
   const handleCancel = useCallback(() => {
     if (!ydoc || !request) return;
 
@@ -262,12 +241,12 @@ export function InputRequestModal({
     onClose();
   }, [ydoc, request, onClose]);
 
-  // Used when user explicitly clicks "Decline" - sets status to 'declined'
   const handleDecline = useCallback(() => {
     if (!ydoc || !request) return;
 
     const result = declineInputRequest(ydoc, request.id);
     if (!result.success) {
+      toast.error(result.error || 'Failed to decline request');
       return;
     }
 
@@ -276,12 +255,9 @@ export function InputRequestModal({
   }, [ydoc, request, onClose]);
 
   const handleModalClose = useCallback(() => {
-    // Only close modal, don't cancel request
-    // User must explicitly click Cancel button or let timeout expire
     onClose();
   }, [onClose]);
 
-  // Countdown timer - calculate from createdAt
   useEffect(() => {
     if (!request || !isOpen) return;
 
@@ -300,9 +276,6 @@ export function InputRequestModal({
     return () => clearInterval(interval);
   }, [request, isOpen]);
 
-  // Auto-cancel on timeout
-  // Note: Uses remainingTime === 0 (not < 0) to skip initial state (-1)
-  // This prevents race condition where auto-cancel fires before countdown timer sets actual value
   useEffect(() => {
     if (remainingTime === 0 && isOpen && request) {
       handleCancel();
@@ -361,16 +334,16 @@ export function InputRequestModal({
         return;
       }
 
-      // Also log to plan's Y.Doc for activity timeline if this is a plan-scoped request
       if (planYdoc && request.planId) {
         logPlanEvent(planYdoc, 'input_request_answered', identity.username, {
           requestId: request.id,
           response: responseValue,
           answeredBy: identity.username,
+          requestMessage: request.message,
+          requestType: request.type,
         });
       }
 
-      // Success - close modal and clear state
       setValue(getResetValueState(request));
       setCustomInput('');
       onClose();
@@ -393,16 +366,16 @@ export function InputRequestModal({
           return;
         }
 
-        // Also log to plan's Y.Doc for activity timeline if this is a plan-scoped request
         if (planYdoc && request.planId) {
           logPlanEvent(planYdoc, 'input_request_answered', identity.username, {
             requestId: request.id,
             response,
             answeredBy: identity.username,
+            requestMessage: request.message,
+            requestType: request.type,
           });
         }
 
-        // Success - close modal and clear value
         setValue(getResetValueState(request));
         onClose();
       } finally {
@@ -459,13 +432,13 @@ export function InputRequestModal({
           />
         );
       default: {
-        // Exhaustive check - TypeScript will error if new type added without case
         const _exhaustiveCheck: never = request;
         return (
           <Alert status="warning">
             <Alert.Content>
               <Alert.Title>Unsupported Input Type</Alert.Title>
               <Alert.Description>
+                {/* eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- SAFE-ASSERTION: Exhaustive switch - narrowing never to access discriminant for error message */}
                 Type "{(_exhaustiveCheck as { type: string }).type}" is not supported.
               </Alert.Description>
             </Alert.Content>
@@ -477,7 +450,6 @@ export function InputRequestModal({
 
   if (!request) return null;
 
-  // Show sign-in prompt if no identity
   if (!identity) {
     return (
       <Modal.Backdrop
@@ -490,9 +462,23 @@ export function InputRequestModal({
           <Modal.Dialog className={modalConfig.isLarge ? 'sm:max-w-[650px]' : undefined}>
             <Modal.CloseTrigger />
 
-            <Card>
+            <Card
+              className={request.isBlocker ? 'border-2 border-danger ring-2 ring-danger/20' : ''}
+            >
               <Card.Header>
-                <h2 className="text-xl font-semibold">Agent is requesting input</h2>
+                <div className="flex items-center gap-2">
+                  {request.isBlocker && <AlertOctagon className="w-5 h-5 text-danger shrink-0" />}
+                  <h2 className="text-xl font-semibold">
+                    {request.isBlocker
+                      ? 'BLOCKER: Agent needs your input'
+                      : 'Agent is requesting input'}
+                  </h2>
+                  {request.isBlocker && (
+                    <Chip color="danger" variant="primary" size="sm">
+                      BLOCKER
+                    </Chip>
+                  )}
+                </div>
               </Card.Header>
 
               <Card.Content>
@@ -501,13 +487,15 @@ export function InputRequestModal({
                     <p className="text-sm font-medium text-foreground">Agent is asking:</p>
                     <MarkdownContent content={request.message} maxHeight={modalConfig.maxHeight} />
                   </div>
-                  <Alert status="warning">
+                  <Alert status={request.isBlocker ? 'danger' : 'warning'}>
                     <Alert.Indicator />
                     <Alert.Content>
                       <Alert.Title>Sign in required</Alert.Title>
                       <Alert.Description>
                         You need to sign in with GitHub to respond to this request. Your identity
                         will be recorded with your response.
+                        {request.isBlocker &&
+                          ' This is a BLOCKER - the agent cannot proceed without your response.'}
                       </Alert.Description>
                     </Alert.Content>
                   </Alert>
@@ -546,9 +534,21 @@ export function InputRequestModal({
         <Modal.Dialog className={modalConfig.isLarge ? 'sm:max-w-[650px]' : undefined}>
           <Modal.CloseTrigger />
 
-          <Card>
+          <Card className={request.isBlocker ? 'border-2 border-danger ring-2 ring-danger/20' : ''}>
             <Card.Header>
-              <h2 className="text-xl font-semibold">Agent is requesting input</h2>
+              <div className="flex items-center gap-2">
+                {request.isBlocker && <AlertOctagon className="w-5 h-5 text-danger shrink-0" />}
+                <h2 className="text-xl font-semibold">
+                  {request.isBlocker
+                    ? 'BLOCKER: Agent needs your input'
+                    : 'Agent is requesting input'}
+                </h2>
+                {request.isBlocker && (
+                  <Chip color="danger" variant="primary" size="sm">
+                    BLOCKER
+                  </Chip>
+                )}
+              </div>
             </Card.Header>
 
             <Card.Content>

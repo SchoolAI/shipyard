@@ -488,14 +488,15 @@ const ConfirmQuestionSchema = QuestionBaseSchema.extend({
   type: z.literal('confirm'),
 });
 
-/** Number question - numeric value with optional bounds */
-const NumberQuestionSchema = QuestionBaseSchema.extend({
+/**
+ * Number question - numeric value with optional bounds.
+ * Note: Refine() is applied after discriminatedUnion to preserve type discrimination.
+ */
+const NumberQuestionBaseSchema = QuestionBaseSchema.extend({
   type: z.literal('number'),
   min: z.number().optional(),
   max: z.number().optional(),
   format: z.enum(['integer', 'decimal', 'currency', 'percentage']).optional(),
-}).refine((data) => data.min === undefined || data.max === undefined || data.min <= data.max, {
-  message: 'min must be <= max',
 });
 
 /** Email question - email address with optional domain restriction */
@@ -504,8 +505,11 @@ const EmailQuestionSchema = QuestionBaseSchema.extend({
   domain: z.string().optional(),
 });
 
-/** Date question - date selection with optional range */
-const DateQuestionSchema = QuestionBaseSchema.extend({
+/**
+ * Date question - date selection with optional range.
+ * Note: Refine() is applied after discriminatedUnion to preserve type discrimination.
+ */
+const DateQuestionBaseSchema = QuestionBaseSchema.extend({
   type: z.literal('date'),
   min: z
     .string()
@@ -515,14 +519,13 @@ const DateQuestionSchema = QuestionBaseSchema.extend({
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in YYYY-MM-DD format')
     .optional(),
-}).refine(
-  (data) =>
-    data.min === undefined || data.max === undefined || new Date(data.min) <= new Date(data.max),
-  { message: 'min date must be before or equal to max date' }
-);
+});
 
-/** Rating question - scale rating */
-const RatingQuestionSchema = QuestionBaseSchema.extend({
+/**
+ * Rating question - scale rating.
+ * Note: Refine() is applied after discriminatedUnion to preserve type discrimination.
+ */
+const RatingQuestionBaseSchema = QuestionBaseSchema.extend({
   type: z.literal('rating'),
   min: z.number().int().optional(),
   max: z.number().int().optional(),
@@ -533,27 +536,25 @@ const RatingQuestionSchema = QuestionBaseSchema.extend({
       high: z.string().optional(),
     })
     .optional(),
-}).refine(
-  (data) => {
-    if (data.min === undefined || data.max === undefined) return true;
-    return data.min <= data.max && data.max - data.min <= 20;
-  },
-  { message: 'Rating scale must have min <= max and at most 20 items' }
-);
+});
 
 /**
  * Schema for an individual question in a multi-question request.
  * Uses discriminated union on 'type' field.
+ *
+ * IMPORTANT: The base schemas are used here (without refine) because Zod's discriminatedUnion
+ * doesn't work with refined schemas - it loses the type discriminator information.
+ * Validation refinements are applied at the form level in the UI components.
  */
 export const QuestionSchema = z.discriminatedUnion('type', [
   TextQuestionSchema,
   MultilineQuestionSchema,
   ChoiceQuestionSchema,
   ConfirmQuestionSchema,
-  NumberQuestionSchema,
+  NumberQuestionBaseSchema,
   EmailQuestionSchema,
-  DateQuestionSchema,
-  RatingQuestionSchema,
+  DateQuestionBaseSchema,
+  RatingQuestionBaseSchema,
 ]);
 
 export type Question = z.infer<typeof QuestionSchema>;
@@ -561,54 +562,118 @@ export type TextQuestion = z.infer<typeof TextQuestionSchema>;
 export type MultilineQuestion = z.infer<typeof MultilineQuestionSchema>;
 export type ChoiceQuestion = z.infer<typeof ChoiceQuestionSchema>;
 export type ConfirmQuestion = z.infer<typeof ConfirmQuestionSchema>;
-export type NumberQuestion = z.infer<typeof NumberQuestionSchema>;
+export type NumberQuestion = z.infer<typeof NumberQuestionBaseSchema>;
 export type EmailQuestion = z.infer<typeof EmailQuestionSchema>;
-export type DateQuestion = z.infer<typeof DateQuestionSchema>;
-export type RatingQuestion = z.infer<typeof RatingQuestionSchema>;
+export type DateQuestion = z.infer<typeof DateQuestionBaseSchema>;
+export type RatingQuestion = z.infer<typeof RatingQuestionBaseSchema>;
+
+/** Validates number question min/max constraints */
+function validateNumberQuestion(q: NumberQuestion, index: number, ctx: z.RefinementCtx): void {
+  if (q.min !== undefined && q.max !== undefined && q.min > q.max) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'min must be <= max',
+      path: ['questions', index],
+    });
+  }
+}
+
+/** Validates date question min/max constraints */
+function validateDateQuestion(q: DateQuestion, index: number, ctx: z.RefinementCtx): void {
+  if (q.min !== undefined && q.max !== undefined && new Date(q.min) > new Date(q.max)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'min date must be before or equal to max date',
+      path: ['questions', index],
+    });
+  }
+}
+
+/** Validates rating question min/max constraints */
+function validateRatingQuestion(q: RatingQuestion, index: number, ctx: z.RefinementCtx): void {
+  if (q.min === undefined || q.max === undefined) return;
+  if (q.min > q.max || q.max - q.min > 20) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Rating scale must have min <= max and at most 20 items',
+      path: ['questions', index],
+    });
+  }
+}
+
+/**
+ * Validates question-specific constraints that can't be expressed in the base schema.
+ * Called via superRefine on MultiQuestionInputRequestSchema.
+ */
+function validateQuestionConstraints(questions: Question[], ctx: z.RefinementCtx): void {
+  for (let i = 0; i < questions.length; i++) {
+    const q = questions[i];
+    if (!q) continue;
+
+    switch (q.type) {
+      case 'number':
+        validateNumberQuestion(q, i, ctx);
+        break;
+      case 'date':
+        validateDateQuestion(q, i, ctx);
+        break;
+      case 'rating':
+        validateRatingQuestion(q, i, ctx);
+        break;
+      default:
+        /** Other question types don't need extra validation */
+        break;
+    }
+  }
+}
 
 /**
  * Multi-question input request schema.
  * Allows asking 1-10 questions in a single form submission (8 recommended for optimal UX).
  * Responses are stored as a record mapping question index to response value.
  */
-export const MultiQuestionInputRequestSchema = z.object({
-  /** Unique request ID */
-  id: z.string(),
-  /** When the request was created (Unix timestamp in ms) */
-  createdAt: z.number(),
-  /** Type discriminator for multi-question requests */
-  type: z.literal('multi'),
-  /** Array of questions (1-10, 8 recommended for UX) */
-  questions: z
-    .array(QuestionSchema)
-    .min(1, 'At least one question is required')
-    .max(
-      MAX_QUESTIONS_PER_REQUEST,
-      `Maximum ${MAX_QUESTIONS_PER_REQUEST} questions allowed (8 recommended for optimal UX)`
-    ),
-  /** Current status of the request */
-  status: z.enum(InputRequestStatusValues),
-  /** Timeout in seconds (0 = no timeout) */
-  timeout: z
-    .number()
-    .int()
-    .min(10, 'Timeout must be at least 10 seconds')
-    .max(14400, 'Timeout cannot exceed 4 hours')
-    .optional(),
-  /** Optional plan ID to associate request with a specific plan */
-  planId: z.string().optional(),
-  /** User's responses keyed by question index ("0", "1", etc.) */
-  responses: z.record(z.string(), z.unknown()).optional(),
-  /** When the user answered (Unix timestamp in ms) */
-  answeredAt: z.number().optional(),
-  /** Who answered (username or "agent") */
-  answeredBy: z.string().optional(),
-  /**
-   * If true, this request is blocking the agent from proceeding.
-   * Shows as red/urgent in the activity timeline.
-   */
-  isBlocker: z.boolean().optional(),
-});
+export const MultiQuestionInputRequestSchema = z
+  .object({
+    /** Unique request ID */
+    id: z.string(),
+    /** When the request was created (Unix timestamp in ms) */
+    createdAt: z.number(),
+    /** Type discriminator for multi-question requests */
+    type: z.literal('multi'),
+    /** Array of questions (1-10, 8 recommended for UX) */
+    questions: z
+      .array(QuestionSchema)
+      .min(1, 'At least one question is required')
+      .max(
+        MAX_QUESTIONS_PER_REQUEST,
+        `Maximum ${MAX_QUESTIONS_PER_REQUEST} questions allowed (8 recommended for optimal UX)`
+      ),
+    /** Current status of the request */
+    status: z.enum(InputRequestStatusValues),
+    /** Timeout in seconds (0 = no timeout) */
+    timeout: z
+      .number()
+      .int()
+      .min(10, 'Timeout must be at least 10 seconds')
+      .max(14400, 'Timeout cannot exceed 4 hours')
+      .optional(),
+    /** Optional plan ID to associate request with a specific plan */
+    planId: z.string().optional(),
+    /** User's responses keyed by question index ("0", "1", etc.) */
+    responses: z.record(z.string(), z.unknown()).optional(),
+    /** When the user answered (Unix timestamp in ms) */
+    answeredAt: z.number().optional(),
+    /** Who answered (username or "agent") */
+    answeredBy: z.string().optional(),
+    /**
+     * If true, this request is blocking the agent from proceeding.
+     * Shows as red/urgent in the activity timeline.
+     */
+    isBlocker: z.boolean().optional(),
+  })
+  .superRefine((data, ctx) => {
+    validateQuestionConstraints(data.questions, ctx);
+  });
 
 export type MultiQuestionInputRequest = z.infer<typeof MultiQuestionInputRequestSchema>;
 

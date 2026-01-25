@@ -42,7 +42,7 @@ function buildStatusTransition(
         reviewedBy: actorName,
       };
     case 'in_progress':
-      // in_progress requires reviewedAt/reviewedBy per the PlanMetadata schema
+      /** in_progress requires reviewedAt/reviewedBy per the PlanMetadata schema */
       return {
         status: 'in_progress',
         reviewedAt: now,
@@ -55,7 +55,7 @@ function buildStatusTransition(
         completedBy: actorName,
       };
     case 'draft':
-      // Draft is handled separately via resetPlanToDraft()
+      /** Draft is handled separately via resetPlanToDraft() */
       return null;
     default:
       return null;
@@ -123,7 +123,7 @@ STATUSES:
     const doc = await getOrCreateDoc(input.planId);
     const existingMetadata = getPlanMetadata(doc);
 
-    // Get actor name for event logging
+    /** Get actor name for event logging */
     const actorName = await getGitHubUsername();
 
     if (!existingMetadata) {
@@ -138,7 +138,7 @@ STATUSES:
       };
     }
 
-    // Verify session token
+    /** Verify session token */
     if (
       !existingMetadata.sessionTokenHash ||
       !verifySessionToken(input.sessionToken, existingMetadata.sessionTokenHash)
@@ -154,13 +154,15 @@ STATUSES:
       };
     }
 
-    // Handle status change separately from other metadata updates
-    // Status changes MUST go through transitionPlanStatus() or resetPlanToDraft()
-    // to ensure required fields are set and state machine is validated
+    /*
+     * Handle status change separately from other metadata updates
+     * Status changes MUST go through transitionPlanStatus() or resetPlanToDraft()
+     * to ensure required fields are set and state machine is validated
+     */
     const statusChanged = input.status && input.status !== existingMetadata.status;
 
     if (statusChanged && input.status) {
-      // Create snapshot on status change (Issue #42)
+      /** Create snapshot on status change (Issue #42) */
       const editor = ServerBlockNoteEditor.create();
       const fragment = doc.getXmlFragment('document');
       const blocks = editor.yXmlFragmentToBlocks(fragment);
@@ -169,9 +171,9 @@ STATUSES:
       const snapshot = createPlanSnapshot(doc, reason, actorName, input.status, blocks);
       addSnapshot(doc, snapshot);
 
-      // Handle status transition with proper validation
+      /** Handle status transition with proper validation */
       if (input.status === 'draft') {
-        // Reset to draft is a special operation (not a forward transition)
+        /** Reset to draft is a special operation (not a forward transition) */
         const resetResult = resetPlanToDraft(doc, actorName);
         if (!resetResult.success) {
           return {
@@ -185,7 +187,7 @@ STATUSES:
           };
         }
       } else {
-        // Forward transition - build proper transition object with required fields
+        /** Forward transition - build proper transition object with required fields */
         const transition = buildStatusTransition(input.status, actorName);
         if (!transition) {
           return {
@@ -214,13 +216,15 @@ STATUSES:
       }
     }
 
-    // Update non-status fields (title, tags) via setPlanMetadata
-    // Note: setPlanMetadata should NOT be used for status changes
+    /*
+     * Update non-status fields (title, tags) via setPlanMetadata
+     * Note: setPlanMetadata should NOT be used for status changes
+     */
     const updates: { title?: string; tags?: string[] } = {};
     if (input.title) updates.title = input.title;
     if (input.tags !== undefined) updates.tags = input.tags;
 
-    // Only call setPlanMetadata if there are non-status updates
+    /** Only call setPlanMetadata if there are non-status updates */
     if (Object.keys(updates).length > 0) {
       setPlanMetadata(doc, updates, actorName);
     }

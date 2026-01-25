@@ -15,7 +15,7 @@ import { getGitHubUsername } from '../server-identity.js';
 import { verifySessionToken } from '../session-token.js';
 import { TOOL_NAMES } from './tool-names.js';
 
-// --- Input Schema ---
+/** --- Input Schema --- */
 
 const BlockOperationSchema = z.discriminatedUnion('type', [
   z.object({
@@ -52,7 +52,7 @@ const UpdateBlockContentInput = z.object({
 
 type BlockOperation = z.infer<typeof BlockOperationSchema>;
 
-// --- Public Export ---
+/** --- Public Export --- */
 
 export const updateBlockContentTool = {
   definition: {
@@ -116,7 +116,7 @@ Example with deliverables:
 
     const ydoc = await getOrCreateDoc(planId);
 
-    // Verify session token first
+    /** Verify session token first */
     const metadata = getPlanMetadata(ydoc);
     if (!metadata) {
       return {
@@ -137,7 +137,7 @@ Example with deliverables:
 
     const editor = ServerBlockNoteEditor.create();
 
-    // Get current blocks from document fragment
+    /** Get current blocks from document fragment */
     const fragment = ydoc.getXmlFragment('document');
     let blocks: Block[] = editor.yXmlFragmentToBlocks(fragment);
 
@@ -153,7 +153,7 @@ Example with deliverables:
       };
     }
 
-    // Apply each operation
+    /** Apply each operation */
     const results: string[] = [];
     for (const operation of operations) {
       const result = await applyOperation(blocks, operation, editor);
@@ -167,27 +167,29 @@ Example with deliverables:
       results.push(result.message);
     }
 
-    // Get actor name for snapshot
+    /** Get actor name for snapshot */
     const actorName = await getGitHubUsername();
 
-    // Write updated blocks back to document fragment
+    /** Write updated blocks back to document fragment */
     ydoc.transact(
       () => {
-        // Clear existing content
+        /** Clear existing content */
         while (fragment.length > 0) {
           fragment.delete(0, 1);
         }
-        // Write new blocks
+        /** Write new blocks */
         editor.blocksToYXmlFragment(blocks, fragment);
 
-        // Update metadata timestamp (setPlanMetadata automatically updates updatedAt)
+        /** Update metadata timestamp (setPlanMetadata automatically updates updatedAt) */
         setPlanMetadata(ydoc, {});
       },
       { actor: actorName }
     );
 
-    // Create a snapshot for this content update (Issue #42)
-    // Each call to update_block_content creates one version (batches all operations)
+    /*
+     * Create a snapshot for this content update (Issue #42)
+     * Each call to update_block_content creates one version (batches all operations)
+     */
     const operationSummary =
       operations.length === 1
         ? (results[0] ?? 'Content updated')
@@ -196,7 +198,7 @@ Example with deliverables:
     addSnapshot(ydoc, snapshot);
     logger.info({ planId, snapshotId: snapshot.id }, 'Content snapshot created');
 
-    // Update plan index
+    /** Update plan index */
     const indexDoc = await getOrCreateDoc(PLAN_INDEX_DOC_NAME);
     touchPlanIndexEntry(indexDoc, planId);
 
@@ -213,7 +215,7 @@ Example with deliverables:
   },
 };
 
-// --- Private Helpers ---
+/** --- Private Helpers --- */
 
 interface OperationResult {
   blocks: Block[];

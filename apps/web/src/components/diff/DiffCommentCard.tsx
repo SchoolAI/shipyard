@@ -44,24 +44,18 @@ export function DiffCommentCard({
     [comment.id, onResolve]
   );
 
-  // Format relative time
   const timeAgo = formatRelativeTime(comment.createdAt);
 
-  // Check if current user can delete this comment
   const canDelete = currentUser && currentUser === comment.author;
 
-  // Compute staleness info for local comments using shared utility
   const stalenessInfo = useMemo((): StalenessInfo => {
-    // Only check staleness for local diff comments
     if (!('type' in comment) || comment.type !== 'local') {
       return { isStale: false, type: 'none' };
     }
 
-    // Use shared staleness computation from @shipyard/schema
     return computeCommentStaleness(comment, currentHeadSha, currentLineContent);
   }, [comment, currentHeadSha, currentLineContent]);
 
-  // Generate initials for fallback
   const initials = comment.author
     .split(/[-_]/)
     .map((part) => part[0]?.toUpperCase() ?? '')
@@ -78,7 +72,6 @@ export function DiffCommentCard({
             : 'bg-surface border-separator hover:border-primary/30'
       }`}
     >
-      {/* Avatar */}
       <Avatar size="sm" className="shrink-0">
         <Avatar.Image
           src={`https://github.com/${comment.author}.png?size=40`}
@@ -87,9 +80,7 @@ export function DiffCommentCard({
         <Avatar.Fallback>{initials}</Avatar.Fallback>
       </Avatar>
 
-      {/* Content */}
       <div className="flex-1 min-w-0">
-        {/* Header */}
         <div className="flex items-center gap-2 mb-1 flex-wrap">
           <span className="font-medium text-sm text-foreground">{comment.author}</span>
           <span className="text-xs text-muted-foreground">{timeAgo}</span>
@@ -116,10 +107,8 @@ export function DiffCommentCard({
           )}
         </div>
 
-        {/* Body */}
         <p className="text-sm text-foreground/90 whitespace-pre-wrap break-words">{comment.body}</p>
 
-        {/* Actions */}
         <div className="flex items-center justify-between mt-2 pt-2 border-t border-separator/50">
           <Checkbox
             id={`resolve-${comment.id}`}
@@ -179,6 +168,5 @@ function formatRelativeTime(timestamp: number): string {
     return `${diffDays}d ago`;
   }
 
-  // Fall back to date
   return new Date(timestamp).toLocaleDateString();
 }

@@ -10,7 +10,6 @@ import {
 import { useEffect, useState } from 'react';
 import type * as Y from 'yjs';
 
-// Re-export types from schema for backwards compatibility
 export type { LocalDiffCommentWithStaleness, StalenessType };
 
 /**
@@ -46,8 +45,6 @@ export function useLocalDiffComments(
     const update = () => {
       const rawComments = getLocalDiffComments(ydoc);
       const withStale = rawComments.map((comment) => {
-        // Compute HEAD-level staleness using shared utility
-        // Content-level staleness is computed in the component layer
         const staleness = computeCommentStaleness(comment, currentHeadSha);
         return {
           ...comment,
@@ -99,18 +96,17 @@ export function computeFullStaleness(
   lineContentMap: Map<number, string>
 ): LocalDiffCommentWithStaleness[] {
   return comments.map((comment) => {
-    // If already stale due to HEAD change, keep that status
     if (comment.stalenessType === 'head_changed') {
       return comment;
     }
 
-    // Check for content-level staleness using shared utility
     const currentLineContent = lineContentMap.get(comment.line);
     if (isLineContentStale(comment, currentLineContent)) {
+      const stalenessType: StalenessType = 'content_changed';
       return {
         ...comment,
         isStale: true,
-        stalenessType: 'content_changed' as StalenessType,
+        stalenessType,
       };
     }
 

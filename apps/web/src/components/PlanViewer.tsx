@@ -28,6 +28,7 @@ import type { WebrtcProvider } from 'y-webrtc';
 import type { WebsocketProvider } from 'y-websocket';
 import type * as Y from 'yjs';
 import { useTheme } from '@/hooks/useTheme';
+import { getYUndoExtension } from '@/types/blocknote-extensions';
 import { RedoButton } from './editor/RedoButton';
 import { UndoButton } from './editor/UndoButton';
 
@@ -98,12 +99,12 @@ function hslToRgb(h: number, s: number, l: number): [number, number, number] {
 function normalizeColor(color: string): string {
   if (!color) return '';
 
-  // Already hex
+  /** Already hex */
   if (color.startsWith('#')) {
     return color.toLowerCase();
   }
 
-  // HSL/HSLA format: hsl(180, 70%, 50%) or hsla(180, 70%, 50%, 1)
+  /** HSL/HSLA format: hsl(180, 70%, 50%) or hsla(180, 70%, 50%, 1) */
   const hslMatch = color.match(/hsla?\s*\(\s*(\d+)\s*,\s*(\d+)%?\s*,\s*(\d+)%?/i);
   if (hslMatch?.[1] && hslMatch[2] && hslMatch[3]) {
     const h = Number.parseInt(hslMatch[1], 10);
@@ -113,7 +114,7 @@ function normalizeColor(color: string): string {
     return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
   }
 
-  // RGB/RGBA format
+  /** RGB/RGBA format */
   const rgbMatch = color.match(/rgba?\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
   if (rgbMatch?.[1] && rgbMatch[2] && rgbMatch[3]) {
     const r = Number.parseInt(rgbMatch[1], 10).toString(16).padStart(2, '0');
@@ -136,7 +137,7 @@ function createResolveUsers(ydoc: Y.Doc, currentIdentity: UserIdentity | null) {
     const usersMap = ydoc.getMap<{ displayName: string; color: string }>('users');
 
     return userIds.map((id) => {
-      // Check if this is the current user
+      /** Check if this is the current user */
       if (currentIdentity && id === currentIdentity.id) {
         return {
           id,
@@ -145,7 +146,7 @@ function createResolveUsers(ydoc: Y.Doc, currentIdentity: UserIdentity | null) {
         };
       }
 
-      // Look up from ydoc users map
+      /** Look up from ydoc users map */
       const userData = usersMap.get(id);
       if (userData) {
         return {
@@ -155,7 +156,7 @@ function createResolveUsers(ydoc: Y.Doc, currentIdentity: UserIdentity | null) {
         };
       }
 
-      // Fallback to ID slice
+      /** Fallback to ID slice */
       return {
         id,
         username: id.slice(0, 8),
@@ -163,6 +164,24 @@ function createResolveUsers(ydoc: Y.Doc, currentIdentity: UserIdentity | null) {
       };
     });
   };
+}
+
+/**
+ * Check if Cmd/Ctrl+Z was pressed (platform-aware).
+ */
+function isCmdOrCtrlZ(e: KeyboardEvent): boolean {
+  if (e.key !== 'z') return false;
+  const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+  return isMac ? e.metaKey : e.ctrlKey;
+}
+
+/**
+ * Check if target is in an input context where native shortcuts should work.
+ */
+function isInNativeInputContext(target: HTMLElement): boolean {
+  const isInput =
+    target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
+  return isInput || target.closest('.bn-editor') !== null;
 }
 
 export function PlanViewer({
@@ -174,15 +193,15 @@ export function PlanViewer({
   currentSnapshot = null,
   onEditorReady,
 }: PlanViewerProps) {
-  // Comments are fully enabled only when identity is set
+  /** Comments are fully enabled only when identity is set */
   const hasComments = identity !== null;
   const { theme } = useTheme();
 
-  // When viewing a snapshot, use its content and make editor read-only
+  /** When viewing a snapshot, use its content and make editor read-only */
   const isViewingHistory = currentSnapshot !== null;
   const effectiveInitialContent = isViewingHistory ? currentSnapshot.content : _initialContent;
 
-  // Determine effective theme for BlockNote
+  /** Determine effective theme for BlockNote */
   const effectiveTheme: 'light' | 'dark' = (() => {
     if (theme === 'system') {
       return typeof window !== 'undefined' &&
@@ -193,7 +212,7 @@ export function PlanViewer({
     return theme;
   })();
 
-  // Store current user info in ydoc so other peers can resolve their name
+  /** Store current user info in ydoc so other peers can resolve their name */
   useEffect(() => {
     if (!identity) return;
     const usersMap = ydoc.getMap<{ displayName: string; color: string }>('users');
@@ -203,24 +222,29 @@ export function PlanViewer({
     });
   }, [ydoc, identity]);
 
-  // Create editor with all configuration in one place to avoid timing issues.
-  // When identity is null, we don't enable comments at all.
-  // When identity is set, we create the threadStore and extension inline.
+  /*
+   * Create editor with all configuration in one place to avoid timing issues.
+   * When identity is null, we don't enable comments at all.
+   * When identity is set, we create the threadStore and extension inline.
+   */
   const editor = useCreateBlockNote(
     {
-      // When viewing history, use snapshot content in read-only mode
-      // When collaboration is enabled, content comes from the Yjs fragment.
-      // For snapshots (no provider) OR viewing version history, use initialContent.
+      /**
+       * For snapshots (no provider) OR viewing version history, use initialContent.
+       * BlockNote expects PartialBlock[] but our snapshots store unknown[].
+       * BlockNote handles invalid content gracefully so the cast is safe.
+       */
       initialContent:
         (!provider || isViewingHistory) && effectiveInitialContent
-          ? (effectiveInitialContent as never)
+          ? // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- BlockNote initialContent requires PartialBlock[], casting unknown[] snapshot data
+            (effectiveInitialContent as never)
           : undefined,
-      // Disable collaboration when viewing history (read-only snapshot mode)
+      /** Disable collaboration when viewing history (read-only snapshot mode) */
       collaboration:
         provider && !isViewingHistory
           ? {
               provider,
-              // Use 'document' key - this is the DOCUMENT_FRAGMENT (source of truth)
+              /** Use 'document' key - this is the DOCUMENT_FRAGMENT (source of truth) */
               fragment: ydoc.getXmlFragment('document'),
               user: identity
                 ? {
@@ -229,16 +253,18 @@ export function PlanViewer({
                   }
                 : {
                     name: 'Anonymous',
-                    color: 'hsl(0, 0%, 55%)', // Neutral gray works in light and dark modes
+                    color: 'hsl(0, 0%, 55%)',
                   },
             }
           : undefined,
-      // Make editor read-only when viewing history
+      /** Make editor read-only when viewing history */
       editable: !isViewingHistory,
-      // ALWAYS load CommentsExtension to properly render comment marks in the document.
-      // Without this, documents with comment marks will render incorrectly when
-      // identity is null (e.g., after clearing browser data).
-      // When identity is null, we use 'anonymous' as userId with 'comment' role (read-only).
+      /*
+       * ALWAYS load CommentsExtension to properly render comment marks in the document.
+       * Without this, documents with comment marks will render incorrectly when
+       * identity is null (e.g., after clearing browser data).
+       * When identity is null, we use 'anonymous' as userId with 'comment' role (read-only).
+       */
       extensions: [
         CommentsExtension({
           threadStore: new YjsThreadStore(
@@ -253,48 +279,55 @@ export function PlanViewer({
         }),
       ],
     },
-    // Dependencies: recreate editor when ydoc, identity, theme, or viewing version changes.
-    // This ensures the extension is properly registered when identity becomes available,
-    // and the editor re-renders with the correct theme when toggling dark mode.
-    // Adding currentSnapshot ensures editor recreates when viewing different versions.
+    /*
+     * Dependencies: recreate editor when ydoc, identity, theme, or viewing version changes.
+     * This ensures the extension is properly registered when identity becomes available,
+     * and the editor re-renders with the correct theme when toggling dark mode.
+     * Adding currentSnapshot ensures editor recreates when viewing different versions.
+     */
     [ydoc, identity?.id, effectiveTheme, currentSnapshot?.content]
   );
 
-  // Force BlockNoteView remount when switching plans, theme, or versions.
-  // Identity changes are handled by the parent's key prop on PlanViewer.
-  // Adding theme to key ensures BlockNote updates immediately without refresh.
-  // Adding snapshot state ensures proper remount when toggling versions.
+  /*
+   * Force BlockNoteView remount when switching plans, theme, or versions.
+   * Identity changes are handled by the parent's key prop on PlanViewer.
+   * Adding theme to key ensures BlockNote updates immediately without refresh.
+   * Adding snapshot state ensures proper remount when toggling versions.
+   */
   const editorKey = `${ydoc.guid}-${effectiveTheme}-${isViewingHistory ? 'history' : 'live'}`;
 
-  // Ref for the container to observe cursor elements
+  /** Ref for the container to observe cursor elements */
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Mark own collaboration cursors so CSS can hide them
-  // This uses MutationObserver to detect cursor elements and marks ones matching our color
+  /*
+   * Mark own collaboration cursors so CSS can hide them
+   * This uses MutationObserver to detect cursor elements and marks ones matching our color
+   */
   useEffect(() => {
     if (!identity || !containerRef.current) return;
 
-    // Normalize our color to hex for consistent comparison
+    /** Normalize our color to hex for consistent comparison */
     const ownColorNormalized = normalizeColor(identity.color);
 
     const markOwnCursors = () => {
       const cursors = containerRef.current?.querySelectorAll('.bn-collaboration-cursor__caret');
       cursors?.forEach((cursor) => {
-        const cursorColor = (cursor as HTMLElement).style.backgroundColor;
+        if (!(cursor instanceof HTMLElement)) return;
+        const cursorColor = cursor.style.backgroundColor;
         const cursorColorNormalized = normalizeColor(cursorColor);
         const parent = cursor.closest('.bn-collaboration-cursor__base');
-        if (parent) {
-          // Check if this cursor's color matches our color (both normalized to hex)
+        if (parent instanceof HTMLElement) {
+          /** Check if this cursor's color matches our color (both normalized to hex) */
           const isOwn = cursorColorNormalized === ownColorNormalized;
-          (parent as HTMLElement).setAttribute('data-is-own-cursor', isOwn ? 'true' : 'false');
+          parent.setAttribute('data-is-own-cursor', isOwn ? 'true' : 'false');
         }
       });
     };
 
-    // Initial mark
+    /** Initial mark */
     markOwnCursors();
 
-    // Observe for new cursor elements
+    /** Observe for new cursor elements */
     const observer = new MutationObserver(markOwnCursors);
     observer.observe(containerRef.current, {
       childList: true,
@@ -306,29 +339,31 @@ export function PlanViewer({
     return () => observer.disconnect();
   }, [identity]);
 
-  // Auto-focus comment input when FloatingComposer appears
+  /** Auto-focus comment input when FloatingComposer appears */
   useEffect(() => {
     if (!hasComments || !containerRef.current) return;
 
     const focusCommentInput = () => {
-      // BlockNote's FloatingComposer uses a mini BlockNote editor (CommentEditor)
-      // which renders as a ProseMirror contenteditable div
+      /*
+       * BlockNote's FloatingComposer uses a mini BlockNote editor (CommentEditor)
+       * which renders as a ProseMirror contenteditable div
+       */
       const selectors = [
-        // ProseMirror editor inside floating composer
+        /** ProseMirror editor inside floating composer */
         '.bn-thread .ProseMirror[contenteditable="true"]',
-        // Fallback: any contenteditable in the thread
+        /** Fallback: any contenteditable in the thread */
         '.bn-thread [contenteditable="true"]',
-        // Generic BlockNote editor in thread
+        /** Generic BlockNote editor in thread */
         '.bn-thread .bn-editor',
       ];
 
       for (const selector of selectors) {
         const input = containerRef.current?.querySelector(selector);
         if (input instanceof HTMLElement) {
-          // Small delay to ensure the composer is fully rendered and ready
+          /** Small delay to ensure the composer is fully rendered and ready */
           setTimeout(() => {
             input.focus();
-            // For ProseMirror, we may need to trigger a selection
+            /** For ProseMirror, we may need to trigger a selection */
             const selection = window.getSelection();
             if (selection && input.firstChild) {
               selection.selectAllChildren(input);
@@ -340,18 +375,21 @@ export function PlanViewer({
       }
     };
 
-    // Observe for the floating composer appearing
-    // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: MutationObserver callback is inherently nested
+    /**
+     * Check if an added node is or contains a thread composer.
+     */
+    const isThreadNode = (node: Node): boolean => {
+      if (!(node instanceof HTMLElement)) return false;
+      return node.classList.contains('bn-thread') || node.querySelector('.bn-thread') !== null;
+    };
+
+    /** Observe for the floating composer appearing */
     const observer = new MutationObserver((mutations) => {
-      for (const mutation of mutations) {
-        for (const node of mutation.addedNodes) {
-          if (node instanceof HTMLElement) {
-            // Check if this is or contains the thread/composer
-            if (node.classList.contains('bn-thread') || node.querySelector('.bn-thread')) {
-              focusCommentInput();
-            }
-          }
-        }
+      const hasNewThread = mutations.some((mutation) =>
+        Array.from(mutation.addedNodes).some(isThreadNode)
+      );
+      if (hasNewThread) {
+        focusCommentInput();
       }
     });
 
@@ -363,110 +401,87 @@ export function PlanViewer({
     return () => observer.disconnect();
   }, [hasComments]);
 
-  // Notify parent when editor is ready (for snapshots - Issue #42)
+  /** Notify parent when editor is ready (for snapshots - Issue #42) */
   useEffect(() => {
     if (editor && onEditorReady) {
       onEditorReady(editor);
     }
   }, [editor, onEditorReady]);
 
-  // Global keyboard shortcuts for undo/redo (works even when editor not focused)
+  /** Global keyboard shortcuts for undo/redo (works even when editor not focused) */
   useEffect(() => {
     if (!editor) return;
 
-    // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Keyboard handler needs multiple condition checks for platform detection, focus state, and modifier keys
     const handleUndoRedoKeyDown = (e: KeyboardEvent) => {
-      // Detect platform
-      const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
-      const cmdOrCtrl = isMac ? e.metaKey : e.ctrlKey;
+      if (!isCmdOrCtrlZ(e)) return;
 
-      // Check if we're in an input/textarea (don't intercept their undo/redo)
-      const target = e.target as HTMLElement;
-      const isInInput =
-        target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
+      const target = e.target;
+      if (!(target instanceof HTMLElement)) return;
+      if (isInNativeInputContext(target)) return;
 
-      // Check if we're in BlockNote editor
-      const isInBlockNote = target.closest('.bn-editor') !== null;
+      e.preventDefault();
+      editor.focus();
 
-      if (cmdOrCtrl && e.key === 'z') {
-        // Allow BlockNote's built-in shortcuts to work when focused
-        if (isInBlockNote) return;
+      const yUndo = getYUndoExtension(editor);
+      if (!yUndo) return;
 
-        // For all other cases, handle globally
-        if (!isInInput) {
-          e.preventDefault();
-          editor.focus();
-
-          // Type for yUndo extension
-          interface YUndoExtension {
-            undoCommand?: (state: unknown, dispatch: unknown, view: unknown) => void;
-            redoCommand?: (state: unknown, dispatch: unknown, view: unknown) => void;
-          }
-
-          // Get the yUndo extension (used when collaboration is enabled)
-          const yUndo = editor.getExtension('yUndo') as YUndoExtension | undefined;
-          if (yUndo) {
-            const { state, view } = editor._tiptapEditor;
-            if (e.shiftKey) {
-              // Cmd+Shift+Z or Ctrl+Shift+Z: Redo
-              if (yUndo.redoCommand) {
-                yUndo.redoCommand(state, view.dispatch, view);
-              }
-            } else {
-              // Cmd+Z or Ctrl+Z: Undo
-              if (yUndo.undoCommand) {
-                yUndo.undoCommand(state, view.dispatch, view);
-              }
-            }
-          }
-        }
-      }
+      const { state, view } = editor._tiptapEditor;
+      const command = e.shiftKey ? yUndo.redoCommand : yUndo.undoCommand;
+      command?.(state, view.dispatch, view);
     };
 
     window.addEventListener('keydown', handleUndoRedoKeyDown);
     return () => window.removeEventListener('keydown', handleUndoRedoKeyDown);
   }, [editor]);
 
-  // Handle Enter to submit comments (Shift+Enter or Ctrl+Enter for newline)
-  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Keyboard handling requires multiple condition checks
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    // Check if we're in a comment input (BlockNote thread component)
-    const target = e.target as HTMLElement;
-    const isInThread =
+  /**
+   * Check if an element is inside a BlockNote thread/composer.
+   */
+  const isInCommentThread = (target: HTMLElement): boolean => {
+    return !!(
       target.closest('.bn-thread') ||
       target.closest('.bn-floating-composer') ||
-      target.closest('[data-floating-composer]');
+      target.closest('[data-floating-composer]')
+    );
+  };
 
-    if (!isInThread) return;
+  /**
+   * Find and click the submit button in the comment thread.
+   */
+  const clickCommentSubmitButton = (): void => {
+    const buttonSelectors = [
+      '.bn-thread .bn-action-toolbar .bn-button',
+      '.bn-thread button[type="submit"]',
+      '.bn-thread .bn-button',
+      '.bn-floating-composer .bn-button',
+    ];
 
-    if (e.key === 'Enter') {
-      // Shift+Enter or Ctrl+Enter: Insert newline
-      if (e.shiftKey || e.ctrlKey || e.metaKey) {
-        // For contenteditable (ProseMirror), let the default behavior handle it
-        // ProseMirror already handles Shift+Enter as soft break
+    for (const selector of buttonSelectors) {
+      const submitButton = containerRef.current?.querySelector(selector);
+      if (submitButton instanceof HTMLButtonElement) {
+        submitButton.click();
         return;
       }
-
-      // Enter without modifier: Submit the comment
-      e.preventDefault();
-      e.stopPropagation();
-
-      // BlockNote uses .bn-button inside .bn-action-toolbar for the save button
-      const buttonSelectors = [
-        '.bn-thread .bn-action-toolbar .bn-button',
-        '.bn-thread button[type="submit"]',
-        '.bn-thread .bn-button',
-        '.bn-floating-composer .bn-button',
-      ];
-
-      for (const selector of buttonSelectors) {
-        const submitButton = containerRef.current?.querySelector(selector);
-        if (submitButton instanceof HTMLButtonElement) {
-          submitButton.click();
-          return;
-        }
-      }
     }
+  };
+
+  /** Handle Enter to submit comments (Shift+Enter or Ctrl+Enter for newline) */
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    const target = e.target;
+    if (!(target instanceof HTMLElement)) return;
+
+    /** Only handle in comment threads */
+    if (!isInCommentThread(target)) return;
+
+    if (e.key !== 'Enter') return;
+
+    /** Shift+Enter, Ctrl+Enter, or Cmd+Enter: Insert newline (default behavior) */
+    if (e.shiftKey || e.ctrlKey || e.metaKey) return;
+
+    /** Enter without modifier: Submit the comment */
+    e.preventDefault();
+    e.stopPropagation();
+    clickCommentSubmitButton();
   };
 
   return (
@@ -499,9 +514,9 @@ export function PlanViewer({
         editor={editor}
         theme={effectiveTheme}
         editable={!isViewingHistory}
-        // Use custom formatting toolbar with comments integration
+        /** Use custom formatting toolbar with comments integration */
         formattingToolbar={false}
-        // Disable default comments UI - we use ThreadsSidebar instead
+        /** Disable default comments UI - we use ThreadsSidebar instead */
         comments={false}
       >
         {/* Custom formatting toolbar - appears when text is selected */}
@@ -530,10 +545,10 @@ export function PlanViewer({
               <CreateLinkButton />
 
               {hasComments ? (
-                // User has identity - show real comment button
+                /** User has identity - show real comment button */
                 <AddCommentButton />
               ) : (
-                // No identity - show button that prompts for profile setup
+                /** No identity - show button that prompts for profile setup */
                 <button
                   type="button"
                   onClick={onRequestIdentity}

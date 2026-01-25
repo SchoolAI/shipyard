@@ -2,6 +2,7 @@ import { type InviteRedemptionResult, parseInviteFromUrl } from '@shipyard/schem
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import type { WebrtcProvider } from 'y-webrtc';
+import { getSignalingConnections, type SignalingConnection } from '@/types/y-webrtc-internals';
 import type { GitHubIdentity } from './useGitHubAuth';
 
 export type RedemptionState =
@@ -52,16 +53,16 @@ export function useInviteToken(
   const [searchParams, setSearchParams] = useSearchParams();
   const [redemptionState, setRedemptionState] = useState<RedemptionState>({ status: 'idle' });
 
-  // Track if we've already attempted redemption to prevent double-redeem
+  /** Track if we've already attempted redemption to prevent double-redeem */
   const hasAttemptedRef = useRef(false);
-  // Store parsed invite to avoid re-parsing
+  /** Store parsed invite to avoid re-parsing */
   const inviteRef = useRef<{ tokenId: string; tokenValue: string } | null>(null);
 
-  // Parse invite from URL on mount or when URL changes
+  /** Parse invite from URL on mount or when URL changes */
   const inviteParam = searchParams.get('invite');
   const hasInviteToken = inviteParam !== null;
 
-  // Parse and cache invite token
+  /** Parse and cache invite token */
   useEffect(() => {
     if (inviteParam) {
       const invite = parseInviteFromUrl(window.location.href);
@@ -76,14 +77,14 @@ export function useInviteToken(
       }
     } else {
       inviteRef.current = null;
-      // Don't reset state if we already succeeded
+      /** Don't reset state if we already succeeded */
       if (redemptionState.status !== 'success') {
         setRedemptionState({ status: 'idle' });
       }
     }
   }, [inviteParam, githubIdentity, redemptionState.status]);
 
-  // Clear invite token from URL
+  /** Clear invite token from URL */
   const clearInviteToken = useCallback(() => {
     if (searchParams.has('invite')) {
       searchParams.delete('invite');
@@ -93,65 +94,55 @@ export function useInviteToken(
     hasAttemptedRef.current = false;
   }, [searchParams, setSearchParams]);
 
-  // Listen for redemption result from signaling server
+  /** Listen for redemption result from signaling server */
   useEffect(() => {
     if (!rtcProvider) return;
 
-    // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Message handling with multiple response types requires comprehensive validation
     const handleMessage = (event: MessageEvent) => {
       try {
         const data = JSON.parse(event.data);
-        if (data.type === 'invite_redemption_result') {
-          if (data.success === true && typeof data.planId === 'string') {
-            // Success variant
-            setRedemptionState({ status: 'success' });
-            // Clean up URL after short delay to show success state
-            setTimeout(() => {
-              clearInviteToken();
-            }, 500);
-          } else if (data.success === false && isValidInviteError(data.error)) {
-            // Failure variant
-            setRedemptionState({ status: 'error', error: data.error });
-          }
+        if (data.type !== 'invite_redemption_result') return;
+
+        if (data.success === true && typeof data.planId === 'string') {
+          /** Success variant */
+          setRedemptionState({ status: 'success' });
+          /** Clean up URL after short delay to show success state */
+          setTimeout(() => {
+            clearInviteToken();
+          }, 500);
+        } else if (data.success === false && isValidInviteError(data.error)) {
+          /** Failure variant */
+          setRedemptionState({ status: 'error', error: data.error });
         }
       } catch {
-        // Not JSON or not our message
+        /** Not JSON or not our message */
       }
     };
 
-    // Access signaling connections from WebRTC provider
-    const signalingConns = (rtcProvider as unknown as { signalingConns: Array<{ ws: WebSocket }> })
-      .signalingConns;
+    /** Access signaling connections from WebRTC provider */
+    const signalingConns = getSignalingConnections(rtcProvider);
 
-    if (signalingConns) {
-      for (const conn of signalingConns) {
-        if (conn.ws) {
-          conn.ws.addEventListener('message', handleMessage);
-        }
+    for (const conn of signalingConns) {
+      if (conn.ws) {
+        conn.ws.addEventListener('message', handleMessage);
       }
     }
 
     return () => {
-      if (signalingConns) {
-        for (const conn of signalingConns) {
-          if (conn.ws) {
-            conn.ws.removeEventListener('message', handleMessage);
-          }
+      for (const conn of signalingConns) {
+        if (conn.ws) {
+          conn.ws.removeEventListener('message', handleMessage);
         }
       }
     };
   }, [rtcProvider, clearInviteToken]);
 
-  // Helper to send message to signaling server
+  /** Helper to send message to signaling server */
   const sendToSignaling = useCallback(
     (message: string): boolean => {
       if (!rtcProvider) return false;
 
-      const signalingConns = (
-        rtcProvider as unknown as { signalingConns: Array<{ ws: WebSocket }> }
-      ).signalingConns;
-
-      if (!signalingConns) return false;
+      const signalingConns = getSignalingConnections(rtcProvider);
 
       for (const conn of signalingConns) {
         if (conn.ws && conn.ws.readyState === WebSocket.OPEN) {
@@ -164,18 +155,18 @@ export function useInviteToken(
     [rtcProvider]
   );
 
-  // Redeem invite token
+  /** Redeem invite token */
   const redeemInvite = useCallback(() => {
     const invite = inviteRef.current;
 
-    // Early returns for validation
+    /** Early returns for validation */
     if (!invite || !githubIdentity) return;
     if (hasAttemptedRef.current) return;
 
     setRedemptionState({ status: 'redeeming' });
     hasAttemptedRef.current = true;
 
-    // Build and send redeem message
+    /** Build and send redeem message */
     const redeemMessage = JSON.stringify({
       type: 'redeem_invite',
       planId,
@@ -192,8 +183,10 @@ export function useInviteToken(
     }
   }, [planId, githubIdentity, sendToSignaling]);
 
-  // Auto-redeem when conditions are met
-  // Uses event-based approach instead of polling for signaling connection
+  /*
+   * Auto-redeem when conditions are met
+   * Uses event-based approach instead of polling for signaling connection
+   */
   useEffect(() => {
     if (
       !hasInviteToken ||
@@ -205,21 +198,9 @@ export function useInviteToken(
       return;
     }
 
-    /**
-     * Typed interface for SignalingConn from y-webrtc.
-     * Based on lib0/websocket.WebsocketClient which extends Observable.
-     */
-    interface SignalingConn {
-      ws: WebSocket | null;
-      connected: boolean;
-      on(event: 'connect', handler: () => void): void;
-      off(event: 'connect', handler: () => void): void;
-    }
+    const signalingConns = getSignalingConnections(rtcProvider);
 
-    const signalingConns = (rtcProvider as unknown as { signalingConns?: SignalingConn[] })
-      .signalingConns;
-
-    if (!signalingConns || signalingConns.length === 0) return;
+    if (signalingConns.length === 0) return;
 
     const hasOpenConnection = signalingConns.some(
       (conn) => conn.ws && conn.ws.readyState === WebSocket.OPEN
@@ -230,27 +211,27 @@ export function useInviteToken(
       return;
     }
 
-    // Listen for 'connect' event instead of polling
-    const handlers: Array<{ conn: SignalingConn; handler: () => void }> = [];
+    /** Listen for 'connect' event instead of polling */
+    const handlers: Array<{ conn: SignalingConnection; handler: () => void }> = [];
 
     const onConnect = () => {
       if (!hasAttemptedRef.current) {
         redeemInvite();
       }
-      // Clean up all handlers after first connection
+      /** Clean up all handlers after first connection */
       for (const { conn, handler } of handlers) {
-        conn.off('connect', handler);
+        conn.off?.('connect', handler);
       }
     };
 
     for (const conn of signalingConns) {
-      conn.on('connect', onConnect);
+      conn.on?.('connect', onConnect);
       handlers.push({ conn, handler: onConnect });
     }
 
     return () => {
       for (const { conn, handler } of handlers) {
-        conn.off('connect', handler);
+        conn.off?.('connect', handler);
       }
     };
   }, [hasInviteToken, githubIdentity, rtcProvider, redemptionState.status, redeemInvite]);

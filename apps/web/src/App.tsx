@@ -18,7 +18,7 @@ function AppRoutes() {
   const [searchParams] = useSearchParams();
   const hasSnapshot = searchParams.has('d');
 
-  // If we have ?d= param (snapshot mode), show PlanPage regardless of path
+  /** If we have ?d= param (snapshot mode), show PlanPage regardless of path */
   if (hasSnapshot) {
     return <PlanPage />;
   }
@@ -37,15 +37,17 @@ function AppRoutes() {
   );
 }
 
-// Base path from Vite config for GitHub Pages deployment
+/** Base path from Vite config for GitHub Pages deployment */
 const basename = import.meta.env.BASE_URL;
 
 function AppWithLayout() {
   const { identity } = useGitHubAuth();
   const { localIdentity } = useLocalIdentity();
 
-  // Check for reset param before any providers initialize
-  // This prevents sync attempts that would re-populate storage
+  /*
+   * Check for reset param before any providers initialize
+   * This prevents sync attempts that would re-populate storage
+   */
   if (hasResetParam()) {
     return <ResetPage />;
   }

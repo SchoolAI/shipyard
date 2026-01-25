@@ -83,11 +83,31 @@ Skip Shipyard for:
 
 export const USER_INPUT_SECTION = `## Human-Agent Communication
 
-**\`${TOOL_NAMES.REQUEST_USER_INPUT}\` is THE primary way to communicate with humans during active work.**
+**\`requestUserInput()\` inside \`${TOOL_NAMES.EXECUTE_CODE}\` is THE primary way to communicate with humans during active work.**
 
-Shipyard is the central hub where humans manage AI agents. When you need to ask a question, get clarification, or request a decision - use \`${TOOL_NAMES.REQUEST_USER_INPUT}\`. The human is already in the browser viewing your plan. That's where conversations should happen.
+Shipyard is the central hub where humans manage AI agents. When you need to ask a question, get clarification, or request a decision - use \`requestUserInput()\`. The human is already in the browser viewing your plan. That's where conversations should happen.
 
-### Why Use ${TOOL_NAMES.REQUEST_USER_INPUT}
+### Best Practice: Return the Response Value
+
+**Always RETURN the response in your execute_code result** for clean, structured output:
+
+\`\`\`typescript
+const result = await requestUserInput({
+  message: "Which framework?",
+  type: "choice",
+  options: ["React", "Vue", "Angular"]
+});
+
+return {
+  userDecision: result.response,
+  timestamp: Date.now()
+};
+// Clean, structured - appears once in the final output
+\`\`\`
+
+Avoid \`console.log()\` for response values - it clutters output and isn't structured. Use console.log only for debugging intermediate steps.
+
+### Why Use requestUserInput()
 
 - **Context:** The human sees your question alongside the plan, artifacts, and comments
 - **History:** All exchanges are logged in the plan's activity feed
@@ -96,40 +116,62 @@ Shipyard is the central hub where humans manage AI agents. When you need to ask 
 
 ### Replace Platform Tools
 
-**ALWAYS prefer \`${TOOL_NAMES.REQUEST_USER_INPUT}\` over platform-specific tools:**
+**ALWAYS prefer \`requestUserInput()\` over platform-specific tools:**
 
 | Platform | DON'T Use | Use Instead |
 |----------|-----------|-------------|
-| Claude Code | \`AskUserQuestion\` | \`${TOOL_NAMES.REQUEST_USER_INPUT}\` |
-| Cursor | Built-in prompts | \`${TOOL_NAMES.REQUEST_USER_INPUT}\` |
-| Windsurf | Native dialogs | \`${TOOL_NAMES.REQUEST_USER_INPUT}\` |
-| Claude Desktop | Chat questions | \`${TOOL_NAMES.REQUEST_USER_INPUT}\` |
+| Claude Code | \`AskUserQuestion\` | \`requestUserInput()\` |
+| Cursor | Built-in prompts | \`requestUserInput()\` |
+| Windsurf | Native dialogs | \`requestUserInput()\` |
+| Claude Desktop | Chat questions | \`requestUserInput()\` |
+
+### Two Modes: Multi-step vs Multi-form
+
+Choose based on whether questions depend on each other:
+
+**Multi-step (dependencies):** Chain calls when later questions depend on earlier answers
+\`\`\`typescript
+// First ask about database...
+const dbResult = await requestUserInput({
+  message: "Which database?",
+  type: "choice",
+  options: ["PostgreSQL", "SQLite", "MongoDB"]
+});
+
+// ...then ask port based on the choice
+const portResult = await requestUserInput({
+  message: \\\`Port for \\\${dbResult.response}?\\\`,
+  type: "number",
+  min: 1000,
+  max: 65535
+});
+
+// Return both responses in structured format
+return { database: dbResult.response, port: portResult.response };
+\`\`\`
+
+**Multi-form (independent):** Single call for unrelated questions
+\`\`\`typescript
+const config = await requestUserInput({
+  questions: [
+    { message: "Project name?", type: "text" },
+    { message: "Use TypeScript?", type: "confirm" },
+    { message: "License?", type: "choice", options: ["MIT", "Apache-2.0"] }
+  ],
+  timeout: 600
+});
+// Return responses in structured format
+return { config: config.response };
+\`\`\`
 
 ### When to Ask
 
-Use \`${TOOL_NAMES.REQUEST_USER_INPUT}\` when you need:
+Use \`requestUserInput()\` when you need:
 - Clarification on requirements ("Which auth provider?")
 - Decisions that affect implementation ("PostgreSQL or SQLite?")
 - Confirmation before destructive actions ("Delete this file?")
 - User preferences ("Rate this approach 1-5")
-- Any information you can't infer from context
-
-### Example
-
-\`\`\`typescript
-const result = await requestUserInput({
-  message: "Which database should we use?",
-  type: "choice",
-  options: ["PostgreSQL", "SQLite", "MongoDB"],
-  timeout: 600  // 10 minutes
-});
-
-if (result.success) {
-  console.log("User chose:", result.response);
-}
-\`\`\`
-
-**Note:** The MCP tool is named \`${TOOL_NAMES.REQUEST_USER_INPUT}\` (snake_case). Inside \`${TOOL_NAMES.EXECUTE_CODE}\`, it's available as \`requestUserInput()\` (camelCase).`;
+- Any information you can't infer from context`;
 
 export const TROUBLESHOOTING_SECTION = `## Troubleshooting
 

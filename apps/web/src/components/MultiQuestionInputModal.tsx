@@ -8,6 +8,7 @@ import {
   Alert,
   Button,
   Card,
+  Chip,
   Form,
   Label,
   Modal,
@@ -28,6 +29,7 @@ import {
   normalizeChoiceOptions,
   type Question,
 } from '@shipyard/schema';
+import { AlertOctagon } from 'lucide-react';
 import type React from 'react';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
@@ -64,7 +66,7 @@ function validateNumberInput(
   question: { min?: number; max?: number }
 ): boolean {
   const numStr = typeof value === 'string' ? value : '';
-  if (!numStr) return true; // Empty is handled by required check
+  if (!numStr) return true;
   const num = Number.parseFloat(numStr);
   if (Number.isNaN(num)) return false;
   if (question.min !== undefined && num < question.min) return false;
@@ -75,7 +77,7 @@ function validateNumberInput(
 /** Validate email input against format and optional domain restriction */
 function validateEmailInput(value: string | string[], question: { domain?: string }): boolean {
   const email = typeof value === 'string' ? value : '';
-  if (!email.trim()) return true; // Empty is handled by required check
+  if (!email.trim()) return true;
   if (!EMAIL_REGEX.test(email)) return false;
   if (question.domain && !email.toLowerCase().endsWith(`@${question.domain.toLowerCase()}`)) {
     return false;
@@ -89,7 +91,7 @@ function validateDateInput(
   question: { min?: string; max?: string }
 ): boolean {
   const dateStr = typeof value === 'string' ? value : '';
-  if (!dateStr) return true; // Empty is handled by required check
+  if (!dateStr) return true;
   const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
   if (!dateRegex.test(dateStr)) return false;
   const date = new Date(dateStr);
@@ -241,11 +243,8 @@ function isChoiceSubmittable(
 /** Validate rating-type question submission */
 function isRatingSubmittable(value: string | string[], customInput: string): boolean {
   const strValue = typeof value === 'string' ? value : '';
-  // N/A is always valid
   if (strValue === NA_OPTION_VALUE) return true;
-  // Other requires custom input
   if (strValue === OTHER_OPTION_VALUE) return !!customInput.trim();
-  // Normal rating (number as string)
   return !!strValue && strValue !== '';
 }
 
@@ -300,6 +299,7 @@ function SignInPrompt({
   onSignIn: () => void;
   onClose: () => void;
 }) {
+  const isBlocker = request.isBlocker;
   return (
     <Modal.Backdrop
       isOpen={true}
@@ -310,9 +310,19 @@ function SignInPrompt({
       <Modal.Container placement="center" size="lg">
         <Modal.Dialog>
           <Modal.CloseTrigger />
-          <Card>
+          <Card className={isBlocker ? 'border-2 border-danger ring-2 ring-danger/20' : ''}>
             <Card.Header>
-              <h2 className="text-xl font-semibold">Agent is requesting input</h2>
+              <div className="flex items-center gap-2">
+                {isBlocker && <AlertOctagon className="w-5 h-5 text-danger shrink-0" />}
+                <h2 className="text-xl font-semibold">
+                  {isBlocker ? 'BLOCKER: Agent needs your input' : 'Agent is requesting input'}
+                </h2>
+                {isBlocker && (
+                  <Chip color="danger" variant="primary" size="sm">
+                    BLOCKER
+                  </Chip>
+                )}
+              </div>
             </Card.Header>
             <Card.Content>
               <div className="space-y-4">
@@ -329,13 +339,15 @@ function SignInPrompt({
                     ))}
                   </ul>
                 </div>
-                <Alert status="warning">
+                <Alert status={isBlocker ? 'danger' : 'warning'}>
                   <Alert.Indicator />
                   <Alert.Content>
                     <Alert.Title>Sign in required</Alert.Title>
                     <Alert.Description>
                       You need to sign in with GitHub to respond to this request. Your identity will
                       be recorded with your response.
+                      {isBlocker &&
+                        ' This is a BLOCKER - the agent cannot proceed without your response.'}
                     </Alert.Description>
                   </Alert.Content>
                 </Alert>
@@ -374,7 +386,6 @@ export function MultiQuestionInputModal({
   const [remainingTime, setRemainingTime] = useState(-1);
   const { identity, startAuth } = useGitHubAuth();
 
-  // Reset state when request changes
   useEffect(() => {
     if (request) {
       setQuestionStates(request.questions.map(getDefaultQuestionState));
@@ -382,7 +393,6 @@ export function MultiQuestionInputModal({
     setRemainingTime(-1);
   }, [request]);
 
-  // Used for auto-timeout
   const handleCancel = useCallback(() => {
     if (!ydoc || !request) return;
 
@@ -395,12 +405,12 @@ export function MultiQuestionInputModal({
     onClose();
   }, [ydoc, request, onClose]);
 
-  // Used when user explicitly clicks "Decline"
   const handleDecline = useCallback(() => {
     if (!ydoc || !request) return;
 
     const result = declineInputRequest(ydoc, request.id);
     if (!result.success) {
+      toast.error(result.error || 'Failed to decline request');
       return;
     }
 
@@ -443,7 +453,6 @@ export function MultiQuestionInputModal({
     []
   );
 
-  // Countdown timer
   useEffect(() => {
     if (!request || !isOpen) return;
 
@@ -462,13 +471,13 @@ export function MultiQuestionInputModal({
     return () => clearInterval(interval);
   }, [request, isOpen]);
 
-  // Auto-cancel on timeout
   useEffect(() => {
     if (remainingTime === 0 && isOpen && request) {
       handleCancel();
     }
   }, [remainingTime, isOpen, request, handleCancel]);
 
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Form submission with validation and error handling naturally has branching logic
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!ydoc || !request || !identity || isSubmitting) return;
@@ -476,7 +485,6 @@ export function MultiQuestionInputModal({
     setIsSubmitting(true);
 
     try {
-      // Build responses record
       const responses: Record<string, string> = {};
       for (let i = 0; i < request.questions.length; i++) {
         const question = request.questions[i];
@@ -498,12 +506,15 @@ export function MultiQuestionInputModal({
         return;
       }
 
-      // Also log to plan's Y.Doc for activity timeline if this is a plan-scoped request
       if (planYdoc && request.planId) {
+        /** Build a summary message for multi-question requests */
+        const summaryMessage = `${request.questions.length} question${request.questions.length > 1 ? 's' : ''} answered`;
         logPlanEvent(planYdoc, 'input_request_answered', identity.username, {
           requestId: request.id,
           response: responses,
           answeredBy: identity.username,
+          requestMessage: summaryMessage,
+          requestType: 'multi',
         });
       }
 
@@ -694,6 +705,7 @@ export function MultiQuestionInputModal({
             <Alert.Content>
               <Alert.Title>Unsupported Question Type</Alert.Title>
               <Alert.Description>
+                {/* eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- SAFE-ASSERTION: Exhaustive switch - narrowing never to access discriminant for error message */}
                 Type "{(_exhaustiveCheck as { type: string }).type}" is not supported.
               </Alert.Description>
             </Alert.Content>
@@ -703,7 +715,6 @@ export function MultiQuestionInputModal({
     }
   };
 
-  // Check if all questions are submittable
   const isFormSubmittable = (): boolean => {
     if (!request || questionStates.length !== request.questions.length) return false;
     return request.questions.every((question, index) => {
@@ -714,7 +725,6 @@ export function MultiQuestionInputModal({
 
   if (!request) return null;
 
-  // Show sign-in prompt if no identity
   if (!identity) {
     return (
       <SignInPrompt
@@ -728,6 +738,8 @@ export function MultiQuestionInputModal({
     );
   }
 
+  const isBlocker = request.isBlocker;
+
   return (
     <Modal.Backdrop
       isOpen={isOpen}
@@ -739,12 +751,20 @@ export function MultiQuestionInputModal({
         <Modal.Dialog>
           <Modal.CloseTrigger />
 
-          <Card>
+          <Card className={isBlocker ? 'border-2 border-danger ring-2 ring-danger/20' : ''}>
             <Card.Header className="flex justify-between items-center">
-              <h2 className="text-xl font-semibold">
-                Agent is requesting input ({request.questions.length} question
-                {request.questions.length > 1 ? 's' : ''})
-              </h2>
+              <div className="flex items-center gap-2">
+                {isBlocker && <AlertOctagon className="w-5 h-5 text-danger shrink-0" />}
+                <h2 className="text-xl font-semibold">
+                  {isBlocker ? 'BLOCKER: ' : ''}Agent is requesting input (
+                  {request.questions.length} question{request.questions.length > 1 ? 's' : ''})
+                </h2>
+                {isBlocker && (
+                  <Chip color="danger" variant="primary" size="sm">
+                    BLOCKER
+                  </Chip>
+                )}
+              </div>
               <span
                 className={`text-sm ${remainingTime >= 0 && remainingTime < 30 ? 'text-warning' : 'text-muted-foreground'}`}
               >

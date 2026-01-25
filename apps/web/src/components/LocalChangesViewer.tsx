@@ -14,7 +14,7 @@ import { useLocalDiffComments } from '@/hooks/useLocalDiffComments';
 import { trpc } from '@/utils/trpc';
 import { type CommentSupport, type DiffViewMode, FileDiffView } from './diff';
 
-// --- LocalStorage Helpers ---
+/** --- LocalStorage Helpers --- */
 
 const DIFF_VIEW_MODE_KEY = 'shipyard:diff-view-mode';
 
@@ -31,11 +31,11 @@ function setDiffViewModePreference(mode: DiffViewMode): void {
   try {
     localStorage.setItem(DIFF_VIEW_MODE_KEY, mode);
   } catch {
-    // Ignore localStorage errors
+    /** Ignore localStorage errors */
   }
 }
 
-// --- Component Props ---
+/** --- Component Props --- */
 
 interface LocalChangesViewerProps {
   data: LocalChangesResult | undefined;
@@ -50,13 +50,13 @@ export function LocalChangesViewer({ data, isLoading, planId, ydoc }: LocalChang
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<DiffViewMode>(getDiffViewModePreference);
 
-  // Handle view mode change with localStorage persistence
+  /** Handle view mode change with localStorage persistence */
   const handleViewModeChange = useCallback((mode: DiffViewMode) => {
     setViewMode(mode);
     setDiffViewModePreference(mode);
   }, []);
 
-  // Loading state
+  /** Loading state */
   if (isLoading) {
     return (
       <Card>
@@ -68,7 +68,7 @@ export function LocalChangesViewer({ data, isLoading, planId, ydoc }: LocalChang
     );
   }
 
-  // Unavailable state
+  /** Unavailable state */
   if (!data || !data.available) {
     const reason = data && !data.available ? data.reason : 'unknown';
     const message = data && !data.available ? data.message : 'Local changes unavailable';
@@ -91,7 +91,7 @@ export function LocalChangesViewer({ data, isLoading, planId, ydoc }: LocalChang
     );
   }
 
-  // Available state - show files and diff
+  /** Available state - show files and diff */
   return (
     <LocalChangesContent
       data={data}
@@ -105,7 +105,7 @@ export function LocalChangesViewer({ data, isLoading, planId, ydoc }: LocalChang
   );
 }
 
-// --- Content Component (when data is available) ---
+/** --- Content Component (when data is available) --- */
 
 interface LocalChangesContentProps {
   data: LocalChangesResponse;
@@ -144,31 +144,32 @@ function LocalChangesContent({
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const { identity } = useGitHubAuth();
 
-  // Memoize sidebar expand callback to prevent FileDiffView re-renders
+  /** Memoize sidebar expand callback to prevent FileDiffView re-renders */
   const handleExpandSidebar = useCallback(() => setSidebarCollapsed(false), []);
 
-  // Get HEAD SHA for staleness detection
+  /** Get HEAD SHA for staleness detection */
   const currentHeadSha = data.headSha;
 
-  // Get local diff comments from CRDT (only if ydoc is provided)
-  const localComments = useLocalDiffComments(
-    ydoc ?? ({} as Y.Doc), // Empty object fallback when no ydoc
-    currentHeadSha
-  );
+  /**
+   * Get local diff comments from CRDT (only if ydoc is provided).
+   * Uses empty Y.Doc as fallback when no ydoc is provided.
+   */
+  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- Empty object fallback when ydoc is not provided, hook handles undefined gracefully
+  const localComments = useLocalDiffComments(ydoc ?? ({} as Y.Doc), currentHeadSha);
 
-  // Build stats map from files array (has accurate additions/deletions from diff parsing)
+  /** Build stats map from files array (has accurate additions/deletions from diff parsing) */
   const fileStatsMap = useMemo(() => buildFileStatsMap(data.files), [data.files]);
 
-  // Build grouped file tree with sections for staged/unstaged/untracked
+  /** Build grouped file tree with sections for staged/unstaged/untracked */
   const fileTree = useMemo(() => buildGroupedFileTree(data, fileStatsMap), [data, fileStatsMap]);
 
-  // Helper to check if file is untracked
+  /** Helper to check if file is untracked */
   const isUntrackedFile = useCallback(
     (path: string) => data.untracked.includes(path),
     [data.untracked]
   );
 
-  // Auto-select first file when data loads
+  /** Auto-select first file when data loads */
   useEffect(() => {
     if (data.files.length > 0 && selectedFile === null) {
       const firstFile = data.files[0];
@@ -178,7 +179,7 @@ function LocalChangesContent({
     }
   }, [data.files, selectedFile, setSelectedFile]);
 
-  // Handle file selection from tree
+  /** Handle file selection from tree */
   const handleFileSelect = useCallback(
     (nodes: NodeApi<FileTreeData>[]) => {
       const node = nodes[0];
@@ -191,13 +192,13 @@ function LocalChangesContent({
     [setSelectedFile]
   );
 
-  // Create node renderer
+  /** Create node renderer */
   const NodeRenderer = useMemo(() => createFileTreeNode(setSelectedFile), [setSelectedFile]);
 
-  // Find selected file data
+  /** Find selected file data */
   const selectedFileData = data.files.find((f) => f.path === selectedFile);
 
-  // Build comment support for FileDiffView (only when ydoc is available)
+  /** Build comment support for FileDiffView (only when ydoc is available) */
   const commentSupport = useMemo(() => {
     if (!ydoc) return undefined;
 
@@ -210,7 +211,7 @@ function LocalChangesContent({
     };
   }, [ydoc, localComments, identity?.username, currentHeadSha]);
 
-  // No changes state
+  /** No changes state */
   if (data.files.length === 0 && data.untracked.length === 0) {
     return (
       <Card>
@@ -317,7 +318,7 @@ function LocalChangesContent({
   );
 }
 
-// --- File Tree Types and Helpers ---
+/** --- File Tree Types and Helpers --- */
 
 type StagingStatus = 'staged' | 'unstaged' | 'untracked';
 
@@ -327,7 +328,7 @@ interface FileTreeData {
   children?: FileTreeData[];
   file?: LocalFileChange;
   stagingStatus?: StagingStatus;
-  // For section headers
+  /** For section headers */
   isSection?: boolean;
   category?: StagingStatus;
 }
@@ -342,14 +343,14 @@ function buildGroupedFileTree(
 ): FileTreeData[] {
   const sections: FileTreeData[] = [];
 
-  // Helper to enrich files with stats from the map
+  /** Helper to enrich files with stats from the map */
   const enrichWithStats = (files: LocalFileChange[]): LocalFileChange[] =>
     files.map((f) => {
       const stats = fileStatsMap.get(f.path);
       return stats ? { ...f, additions: stats.additions, deletions: stats.deletions } : f;
     });
 
-  // Staged section
+  /** Staged section */
   if (data.staged.length > 0) {
     sections.push({
       id: '__staged__',
@@ -360,7 +361,7 @@ function buildGroupedFileTree(
     });
   }
 
-  // Unstaged section
+  /** Unstaged section */
   if (data.unstaged.length > 0) {
     sections.push({
       id: '__unstaged__',
@@ -371,7 +372,7 @@ function buildGroupedFileTree(
     });
   }
 
-  // Untracked section
+  /** Untracked section */
   if (data.untracked.length > 0) {
     const untrackedFiles: LocalFileChange[] = data.untracked.map((path) => ({
       path,
@@ -416,7 +417,7 @@ function buildFileTreeData(
     children: [],
   };
 
-  // Prefix ensures unique IDs when same paths appear in multiple sections
+  /** Prefix ensures unique IDs when same paths appear in multiple sections */
   const idPrefix = stagingStatus ? `${stagingStatus}:` : '';
 
   for (const file of files) {
@@ -429,10 +430,10 @@ function buildFileTreeData(
 
       const isFile = i === parts.length - 1;
       const path = parts.slice(0, i + 1).join('/');
-      // Use prefixed ID to avoid collisions across sections
+      /** Use prefixed ID to avoid collisions across sections */
       const nodeId = `${idPrefix}${path}`;
 
-      // Find existing child or create new one
+      /** Find existing child or create new one */
       let childNode = currentNode.children?.find((c) => c.id === nodeId);
 
       if (!childNode) {
@@ -446,24 +447,24 @@ function buildFileTreeData(
         currentNode.children?.push(childNode);
       }
 
-      // Move to next level if folder
+      /** Move to next level if folder */
       if (!isFile) {
         currentNode = childNode;
       }
     }
   }
 
-  // Sort recursively
+  /** Sort recursively */
   const sortNodes = (nodes: FileTreeData[]): FileTreeData[] => {
     return nodes
       .sort((a, b) => {
-        // Folders before files
+        /** Folders before files */
         const aIsFolder = a.children !== undefined;
         const bIsFolder = b.children !== undefined;
         if (aIsFolder !== bIsFolder) {
           return aIsFolder ? -1 : 1;
         }
-        // Alphabetical
+        /** Alphabetical */
         return a.name.localeCompare(b.name);
       })
       .map((node) => ({
@@ -479,9 +480,9 @@ function buildFileTreeData(
  * Custom node renderer for react-arborist with staging status indicators
  */
 function createFileTreeNode(onFileClick: (path: string) => void) {
-  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Renders 3 node types (sections, folders, files) with conditional styling
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Renders 3 node types (sections, folders, files) with different styling and behaviors - inherent to tree UI
   return function FileTreeNode({ node, style }: NodeRendererProps<FileTreeData>) {
-    // Section header (Staged/Unstaged/Untracked)
+    /** Section header (Staged/Unstaged/Untracked) */
     if (node.data.isSection) {
       const category = node.data.category;
       const sectionIcons = {
@@ -513,7 +514,7 @@ function createFileTreeNode(onFileClick: (path: string) => void) {
       );
     }
 
-    // Folder node
+    /** Folder node */
     const isFolder = node.data.children !== undefined && !node.data.isSection;
     if (isFolder) {
       return (
@@ -534,7 +535,7 @@ function createFileTreeNode(onFileClick: (path: string) => void) {
       );
     }
 
-    // File node with staging status indicator
+    /** File node with staging status indicator */
     const file = node.data.file;
     const stagingStatus = node.data.stagingStatus;
 
@@ -597,7 +598,7 @@ function createFileTreeNode(onFileClick: (path: string) => void) {
   };
 }
 
-// --- Diff View Components ---
+/** --- Diff View Components --- */
 
 /**
  * Props for UntrackedFileView component.
@@ -625,13 +626,13 @@ function UntrackedFileView({
   onExpandSidebar,
   commentSupport,
 }: UntrackedFileViewProps) {
-  // Fetch file content via tRPC
+  /** Fetch file content via tRPC */
   const { data, isLoading, error } = trpc.plan.getFileContent.useQuery(
     { planId, filePath: filename },
     { retry: false, staleTime: 30000 }
   );
 
-  // Loading state
+  /** Loading state */
   if (isLoading) {
     return (
       <Card>
@@ -652,7 +653,7 @@ function UntrackedFileView({
     );
   }
 
-  // Error or no content
+  /** Error or no content */
   if (error || !data?.content) {
     return (
       <Card>
@@ -680,7 +681,7 @@ function UntrackedFileView({
     );
   }
 
-  // Generate patch for new file - all lines as additions with proper hunk header
+  /** Generate patch for new file - all lines as additions with proper hunk header */
   const lines = data.content.split('\n');
   const patch = `@@ -0,0 +1,${lines.length} @@\n${lines.map((line) => `+${line}`).join('\n')}`;
 

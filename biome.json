@@ -129,7 +129,7 @@
       }
     },
     {
-      "includes": ["apps/github-oauth-worker/src/logger.ts"],
+      "includes": ["apps/github-oauth-worker/src/logger.ts", "apps/signaling/**/logger.ts"],
       "linter": {
         "rules": {
           "suspicious": {
@@ -139,20 +139,9 @@
       }
     },
     {
-      "includes": ["**/signaling/**/*.ts"],
+      "includes": ["apps/signaling/cloudflare/worker-configuration.d.ts"],
       "linter": {
-        "rules": {
-          "suspicious": {
-            "noConsole": "off",
-            "noExplicitAny": "off"
-          },
-          "complexity": {
-            "noExcessiveCognitiveComplexity": "off"
-          },
-          "correctness": {
-            "noUnusedFunctionParameters": "off"
-          }
-        }
+        "enabled": false
       }
     }
   ]
