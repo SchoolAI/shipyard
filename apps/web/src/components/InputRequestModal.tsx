@@ -4,20 +4,7 @@
  * Updates Y.Doc with user response or cancellation.
  */
 
-import {
-  Alert,
-  Button,
-  Card,
-  Checkbox,
-  CheckboxGroup,
-  Form,
-  Input,
-  Modal,
-  Radio,
-  RadioGroup,
-  TextArea,
-  TextField,
-} from '@heroui/react';
+import { Alert, Button, Card, Form, Modal } from '@heroui/react';
 import {
   type AnswerInputRequestResult,
   answerInputRequest,
@@ -33,12 +20,165 @@ import { toast } from 'sonner';
 import type * as Y from 'yjs';
 import { MarkdownContent } from '@/components/ui/MarkdownContent';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
+import {
+  ChoiceInput,
+  ConfirmInput,
+  DateInput,
+  EmailInput,
+  formatTime,
+  MultilineInput,
+  NA_OPTION_VALUE,
+  NumberInput,
+  OTHER_OPTION_VALUE,
+  RatingInput,
+  TextInput,
+} from './inputs';
 
 interface InputRequestModalProps {
   isOpen: boolean;
   request: InputRequest | null;
   ydoc: Y.Doc | null;
   onClose: () => void;
+}
+
+/** Basic email validation regex */
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** Validate number input against min/max bounds */
+function validateNumberInput(
+  value: string | string[],
+  min: number | undefined,
+  max: number | undefined
+): boolean {
+  const numStr = typeof value === 'string' ? value : '';
+  if (!numStr) return true; // Empty is handled by required check
+  const num = Number.parseFloat(numStr);
+  if (Number.isNaN(num)) return false;
+  if (min !== undefined && num < min) return false;
+  if (max !== undefined && num > max) return false;
+  return true;
+}
+
+/** Validate email input against format and optional domain restriction */
+function validateEmailInput(value: string | string[], domain: string | undefined): boolean {
+  const email = typeof value === 'string' ? value : '';
+  if (!email.trim()) return true; // Empty is handled by required check
+  if (!EMAIL_REGEX.test(email)) return false;
+  if (domain && !email.toLowerCase().endsWith(`@${domain.toLowerCase()}`)) {
+    return false;
+  }
+  return true;
+}
+
+/** Validate date input against format and optional min/max bounds */
+function validateDateInput(
+  value: string | string[],
+  min: string | undefined,
+  max: string | undefined
+): boolean {
+  const dateStr = typeof value === 'string' ? value : '';
+  if (!dateStr) return true; // Empty is handled by required check
+  const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+  if (!dateRegex.test(dateStr)) return false;
+  const date = new Date(dateStr);
+  if (Number.isNaN(date.getTime())) return false;
+  if (min && date < new Date(min)) return false;
+  if (max && date > new Date(max)) return false;
+  return true;
+}
+
+/**
+ * Validate input value based on request type.
+ * Returns true if input is valid, false otherwise.
+ * Used to disable submit button when validation fails.
+ */
+function isInputValid(request: InputRequest | null, value: string | string[]): boolean {
+  if (!request) return true;
+
+  switch (request.type) {
+    case 'number':
+      return validateNumberInput(value, request.min, request.max);
+    case 'email':
+      return validateEmailInput(value, request.domain);
+    case 'date':
+      return validateDateInput(value, request.min, request.max);
+    default:
+      return true;
+  }
+}
+
+/**
+ * Format the response value for submission.
+ * Handles "Other" option for choice-type and rating-type questions and multi-select arrays.
+ */
+function formatResponseValue(
+  request: InputRequest,
+  value: string | string[],
+  customInput: string,
+  isOtherSelected: boolean,
+  isNaSelected: boolean
+): string {
+  // Handle "Other" option for choice-type questions
+  if (request.type === 'choice' && isOtherSelected) {
+    if (Array.isArray(value)) {
+      // Multi-select: combine selected options (excluding __other__) with custom input
+      const selectedOptions = value.filter((v) => v !== OTHER_OPTION_VALUE);
+      return [...selectedOptions, customInput.trim()].join(', ');
+    }
+    // Single-select: use custom input as the response
+    return customInput.trim();
+  }
+  // Handle rating escape hatches
+  if (request.type === 'rating') {
+    if (isNaSelected) {
+      return NA_OPTION_VALUE;
+    }
+    if (isOtherSelected) {
+      return customInput.trim();
+    }
+  }
+  // Standard handling: convert array values to comma-separated string
+  return Array.isArray(value) ? value.join(', ') : value;
+}
+
+/**
+ * Determine if the submit button should be disabled.
+ */
+function isSubmitDisabled(
+  isSubmitting: boolean,
+  request: InputRequest,
+  value: string | string[],
+  isOtherSelected: boolean,
+  customInput: string,
+  isNaSelected: boolean
+): boolean {
+  if (isSubmitting) return true;
+  if (!isInputValid(request, value)) return true;
+  if (request.type === 'choice' && !request.options?.length) return true;
+  // Rating with N/A selected is valid
+  if (request.type === 'rating' && isNaSelected) return false;
+  // When "Other" is selected, require custom input text
+  if (isOtherSelected && !customInput.trim()) return true;
+  // For regular selections, require at least one option selected
+  if (!isOtherSelected && (Array.isArray(value) ? value.length === 0 : !value)) return true;
+  return false;
+}
+
+/**
+ * Get the default value state for a given request.
+ */
+function getDefaultValueState(request: InputRequest): string | string[] {
+  if (request.type === 'choice' && request.multiSelect) {
+    return request.defaultValue ? [request.defaultValue] : [];
+  }
+  return request.defaultValue || '';
+}
+
+/**
+ * Get the reset value state for a given request.
+ */
+function getResetValueState(request: InputRequest): string | string[] {
+  return request.type === 'choice' && request.multiSelect ? [] : '';
 }
 
 /**
@@ -70,7 +210,21 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
   // Use -1 as sentinel value to indicate "not yet initialized"
   // This prevents race condition where auto-cancel fires before countdown is set
   const [remainingTime, setRemainingTime] = useState(-1);
+  // Custom input for "Other" option in choice-type questions
+  const [customInput, setCustomInput] = useState('');
   const { identity, startAuth } = useGitHubAuth();
+
+  // Derive whether "Other" is selected for choice-type and rating-type questions
+  const isChoiceOtherSelected =
+    request?.type === 'choice' &&
+    (Array.isArray(value) ? value.includes(OTHER_OPTION_VALUE) : value === OTHER_OPTION_VALUE);
+  const isRatingOtherSelected =
+    request?.type === 'rating' && typeof value === 'string' && value === OTHER_OPTION_VALUE;
+  const isOtherSelected = isChoiceOtherSelected || isRatingOtherSelected;
+
+  // Derive whether "N/A" is selected for rating-type questions
+  const isNaSelected =
+    request?.type === 'rating' && typeof value === 'string' && value === NA_OPTION_VALUE;
 
   // Calculate modal config based on message complexity
   const modalConfig = useMemo(() => getModalConfig(request?.message || ''), [request?.message]);
@@ -78,12 +232,9 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
   // Reset state when request changes
   useEffect(() => {
     if (request) {
-      // multiSelect only exists on 'choice' type requests
-      if (request.type === 'choice' && request.multiSelect) {
-        setValue(request.defaultValue ? [request.defaultValue] : []);
-      } else {
-        setValue(request.defaultValue || '');
-      }
+      setValue(getDefaultValueState(request));
+      // Reset custom input when request changes
+      setCustomInput('');
     }
     // Reset countdown to sentinel value when request changes
     // This prevents stale timeout values from previous requests
@@ -99,8 +250,7 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
       return;
     }
 
-    // multiSelect only exists on 'choice' type requests
-    setValue(request.type === 'choice' && request.multiSelect ? [] : '');
+    setValue(getResetValueState(request));
     onClose();
   }, [ydoc, request, onClose]);
 
@@ -113,8 +263,7 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
       return;
     }
 
-    // multiSelect only exists on 'choice' type requests
-    setValue(request.type === 'choice' && request.multiSelect ? [] : '');
+    setValue(getResetValueState(request));
     onClose();
   }, [ydoc, request, onClose]);
 
@@ -190,8 +339,13 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
     setIsSubmitting(true);
 
     try {
-      // Convert array values (from multiSelect choice) to comma-separated string
-      const responseValue = Array.isArray(value) ? value.join(', ') : value;
+      const responseValue = formatResponseValue(
+        request,
+        value,
+        customInput,
+        isOtherSelected,
+        isNaSelected
+      );
       const result = answerInputRequest(ydoc, request.id, responseValue, identity.username);
 
       if (!result.success) {
@@ -199,25 +353,17 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
         return;
       }
 
-      // Success - close modal and clear value
-      // multiSelect only exists on 'choice' type requests
-      setValue(request.type === 'choice' && request.multiSelect ? [] : '');
+      // Success - close modal and clear state
+      setValue(getResetValueState(request));
+      setCustomInput('');
       onClose();
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const formatTime = (seconds: number) => {
-    // Handle sentinel value (-1 = not yet initialized)
-    if (seconds < 0) return '--:--';
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
-
   const handleConfirmResponse = useCallback(
-    (response: 'yes' | 'no') => {
+    (response: string) => {
       if (!ydoc || !request || !identity || isSubmitting) return;
 
       setIsSubmitting(true);
@@ -231,8 +377,7 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
         }
 
         // Success - close modal and clear value
-        // multiSelect only exists on 'choice' type requests
-        setValue(request.type === 'choice' && request.multiSelect ? [] : '');
+        setValue(getResetValueState(request));
         onClose();
       } finally {
         setIsSubmitting(false);
@@ -241,142 +386,65 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
     [ydoc, request, identity, isSubmitting, onClose, handleAnswerError]
   );
 
-  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Input type switching with form validation requires comprehensive handling
   const renderInput = () => {
     if (!request) return null;
 
+    const baseProps = { request, value, setValue, isSubmitting };
+
     switch (request.type) {
       case 'text':
-        return (
-          <div className="space-y-3">
-            <MarkdownContent content={request.message} maxHeight={modalConfig.maxHeight} />
-            <TextField isRequired isDisabled={isSubmitting}>
-              <Input
-                value={value}
-                onChange={(e) => setValue(e.target.value)}
-                placeholder={request.defaultValue}
-                autoFocus
-              />
-            </TextField>
-          </div>
-        );
-
+        return <TextInput {...baseProps} request={request} />;
       case 'multiline':
+        return <MultilineInput {...baseProps} request={request} />;
+      case 'choice':
         return (
-          <div className="space-y-3">
-            <MarkdownContent content={request.message} maxHeight={modalConfig.maxHeight} />
-            <TextField isRequired isDisabled={isSubmitting}>
-              <TextArea
-                value={value}
-                onChange={(e) => setValue(e.target.value)}
-                placeholder={request.defaultValue}
-                rows={4}
-                autoFocus
-              />
-            </TextField>
-            <p className="text-xs text-muted-foreground">{value.length} characters</p>
-          </div>
+          <ChoiceInput
+            {...baseProps}
+            request={request}
+            customInput={customInput}
+            setCustomInput={setCustomInput}
+            isOtherSelected={isOtherSelected}
+          />
         );
-
-      case 'choice': {
-        const options = request.options || [];
-        if (options.length === 0) {
-          return (
-            <Alert status="danger">
-              <Alert.Indicator />
-              <Alert.Content>
-                <Alert.Title>Invalid Request</Alert.Title>
-                <Alert.Description>
-                  This choice request has no options available. Please cancel and contact the agent.
-                </Alert.Description>
-              </Alert.Content>
-            </Alert>
-          );
-        }
-
-        // Multi-select mode with checkboxes
-        if (request.multiSelect) {
-          return (
-            <div className="space-y-3">
-              <MarkdownContent content={request.message} maxHeight={modalConfig.maxHeight} />
-              <p className="text-xs text-muted-foreground">(Select one or more options)</p>
-              <CheckboxGroup
-                isRequired
-                value={Array.isArray(value) ? value : []}
-                onChange={setValue}
-                isDisabled={isSubmitting}
-              >
-                {options.map((opt) => (
-                  <Checkbox key={opt} value={opt}>
-                    <Checkbox.Control>
-                      <Checkbox.Indicator />
-                    </Checkbox.Control>
-                    <Checkbox.Content>
-                      <MarkdownContent content={opt} variant="minimal" />
-                    </Checkbox.Content>
-                  </Checkbox>
-                ))}
-              </CheckboxGroup>
-            </div>
-          );
-        }
-
-        // Single-select mode with radio buttons
-        return (
-          <div className="space-y-3">
-            <MarkdownContent content={request.message} maxHeight={modalConfig.maxHeight} />
-            <RadioGroup
-              isRequired
-              value={typeof value === 'string' ? value : ''}
-              onChange={setValue}
-              isDisabled={isSubmitting}
-            >
-              {options.map((opt) => (
-                <Radio key={opt} value={opt}>
-                  <Radio.Control>
-                    <Radio.Indicator />
-                  </Radio.Control>
-                  <Radio.Content>
-                    <MarkdownContent content={opt} variant="minimal" />
-                  </Radio.Content>
-                </Radio>
-              ))}
-            </RadioGroup>
-          </div>
-        );
-      }
-
       case 'confirm':
         return (
-          <div className="space-y-4">
-            <MarkdownContent content={request.message} maxHeight={modalConfig.maxHeight} />
-            <div className="flex justify-between items-center pt-2">
-              <span
-                className={`text-sm ${remainingTime >= 0 && remainingTime < 30 ? 'text-warning' : 'text-muted-foreground'}`}
-              >
-                {remainingTime >= 0 && remainingTime < 30 && '⚠️ '}Timeout:{' '}
-                {formatTime(remainingTime)}
-              </span>
-              <div className="flex gap-2">
-                <Button
-                  onPress={() => handleConfirmResponse('no')}
-                  variant="secondary"
-                  isDisabled={isSubmitting}
-                >
-                  No
-                </Button>
-                <Button onPress={() => handleConfirmResponse('yes')} isDisabled={isSubmitting}>
-                  Yes
-                </Button>
-              </div>
-            </div>
-          </div>
+          <ConfirmInput
+            {...baseProps}
+            request={request}
+            remainingTime={remainingTime}
+            onConfirmResponse={handleConfirmResponse}
+          />
         );
-
+      case 'number':
+        return <NumberInput {...baseProps} request={request} />;
+      case 'email':
+        return <EmailInput {...baseProps} request={request} />;
+      case 'date':
+        return <DateInput {...baseProps} request={request} />;
+      case 'rating':
+        return (
+          <RatingInput
+            {...baseProps}
+            request={request}
+            customInput={customInput}
+            setCustomInput={setCustomInput}
+            isOtherSelected={isRatingOtherSelected}
+            isNaSelected={isNaSelected}
+          />
+        );
       default: {
         // Exhaustive check - TypeScript will error if new type added without case
         const _exhaustiveCheck: never = request;
-        return _exhaustiveCheck;
+        return (
+          <Alert status="warning">
+            <Alert.Content>
+              <Alert.Title>Unsupported Input Type</Alert.Title>
+              <Alert.Description>
+                Type "{(_exhaustiveCheck as { type: string }).type}" is not supported.
+              </Alert.Description>
+            </Alert.Content>
+          </Alert>
+        );
       }
     }
   };
@@ -422,7 +490,7 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
                     <span
                       className={`text-sm ${remainingTime >= 0 && remainingTime < 30 ? 'text-warning' : 'text-muted-foreground'}`}
                     >
-                      {remainingTime >= 0 && remainingTime < 30 && '⚠️ '}Timeout:{' '}
+                      {remainingTime >= 0 && remainingTime < 30 && '! '}Timeout:{' '}
                       {formatTime(remainingTime)}
                     </span>
                     <div className="flex gap-2">
@@ -466,7 +534,7 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
                     <span
                       className={`text-sm ${remainingTime >= 0 && remainingTime < 30 ? 'text-warning' : 'text-muted-foreground'}`}
                     >
-                      {remainingTime >= 0 && remainingTime < 30 && '⚠️ '}Timeout:{' '}
+                      {remainingTime >= 0 && remainingTime < 30 && '! '}Timeout:{' '}
                       {formatTime(remainingTime)}
                     </span>
                     <div className="flex gap-2">
@@ -475,11 +543,14 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
                       </Button>
                       <Button
                         type="submit"
-                        isDisabled={
-                          isSubmitting ||
-                          (Array.isArray(value) ? value.length === 0 : !value) ||
-                          (request.type === 'choice' && !request.options?.length)
-                        }
+                        isDisabled={isSubmitDisabled(
+                          isSubmitting,
+                          request,
+                          value,
+                          isOtherSelected,
+                          customInput,
+                          isNaSelected
+                        )}
                         isPending={isSubmitting}
                       >
                         Submit

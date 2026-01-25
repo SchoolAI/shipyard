@@ -8,8 +8,8 @@
  */
 
 import {
+  type AnyInputRequest,
   DEFAULT_INPUT_REQUEST_TIMEOUT_SECONDS,
-  type InputRequest,
   YDOC_KEYS,
 } from '@shipyard/schema';
 import { useEffect, useRef, useState } from 'react';
@@ -21,18 +21,18 @@ export interface UseInputRequestsOptions {
   /** The Y.Doc to monitor for input requests */
   ydoc: Y.Doc | null;
   /** Callback fired when a new request is received */
-  onRequestReceived?: (request: InputRequest) => void;
+  onRequestReceived?: (request: AnyInputRequest) => void;
 }
 
 export interface UseInputRequestsReturn {
   /** Array of currently pending requests */
-  pendingRequests: InputRequest[];
+  pendingRequests: AnyInputRequest[];
 }
 
 /**
  * Filters array of input requests to only include pending ones.
  */
-function filterPendingRequests(requests: InputRequest[]): InputRequest[] {
+function filterPendingRequests(requests: AnyInputRequest[]): AnyInputRequest[] {
   return requests.filter((r) => r.status === 'pending');
 }
 
@@ -40,16 +40,16 @@ function filterPendingRequests(requests: InputRequest[]): InputRequest[] {
  * Identifies which requests are new (not in the previous set).
  */
 function findNewRequests(
-  pendingRequests: InputRequest[],
+  pendingRequests: AnyInputRequest[],
   previousRequestIds: Set<string>
-): InputRequest[] {
+): AnyInputRequest[] {
   return pendingRequests.filter((req) => !previousRequestIds.has(req.id));
 }
 
 /**
  * Creates a set of request IDs from an array of requests.
  */
-function createRequestIdSet(requests: InputRequest[]): Set<string> {
+function createRequestIdSet(requests: AnyInputRequest[]): Set<string> {
   return new Set(requests.map((r) => r.id));
 }
 
@@ -78,11 +78,22 @@ function dismissResolvedToasts(resolvedIds: string[], remainingCount: number): v
 }
 
 /**
+ * Get the display message for a request (handles multi-question).
+ */
+function getRequestDisplayMessage(request: AnyInputRequest): string {
+  if (request.type === 'multi') {
+    const count = request.questions.length;
+    return `${count} question${count > 1 ? 's' : ''} from agent`;
+  }
+  return request.message;
+}
+
+/**
  * Shows a toast notification for new input request(s).
  * Groups multiple pending requests into a single toast.
  */
 function showInputRequestToast(
-  newRequests: InputRequest[],
+  newRequests: AnyInputRequest[],
   totalPending: number,
   onOpenModal: () => void
 ): void {
@@ -110,7 +121,11 @@ function showInputRequestToast(
       position: 'top-right',
       duration: 60000, // 60 seconds
       description: (
-        <MarkdownContent content={request.message} variant="toast" className="line-clamp-2" />
+        <MarkdownContent
+          content={getRequestDisplayMessage(request)}
+          variant="toast"
+          className="line-clamp-2"
+        />
       ),
       action: {
         label: 'Respond',
@@ -123,7 +138,7 @@ function showInputRequestToast(
 /**
  * Dispatches a custom event to open the input request modal.
  */
-function dispatchOpenInputRequestEvent(request: InputRequest): void {
+function dispatchOpenInputRequestEvent(request: AnyInputRequest): void {
   document.dispatchEvent(
     new CustomEvent('open-input-request', {
       detail: request,
@@ -134,7 +149,7 @@ function dispatchOpenInputRequestEvent(request: InputRequest): void {
 /**
  * Check if a request has expired based on its createdAt and timeout.
  */
-function isRequestExpired(request: InputRequest): boolean {
+function isRequestExpired(request: AnyInputRequest): boolean {
   const timeoutMs = (request.timeout || DEFAULT_INPUT_REQUEST_TIMEOUT_SECONDS) * 1000;
   const elapsed = Date.now() - request.createdAt;
   return elapsed >= timeoutMs;
@@ -144,7 +159,7 @@ function isRequestExpired(request: InputRequest): boolean {
  * Filter out expired requests from the array.
  * This provides client-side expiration detection even when Y.Doc sync is delayed.
  */
-function filterOutExpiredRequests(requests: InputRequest[]): InputRequest[] {
+function filterOutExpiredRequests(requests: AnyInputRequest[]): AnyInputRequest[] {
   return requests.filter((r) => !isRequestExpired(r));
 }
 
@@ -168,7 +183,7 @@ export function useInputRequests({
   ydoc,
   onRequestReceived,
 }: UseInputRequestsOptions): UseInputRequestsReturn {
-  const [pendingRequests, setPendingRequests] = useState<InputRequest[]>([]);
+  const [pendingRequests, setPendingRequests] = useState<AnyInputRequest[]>([]);
 
   // Track previously seen requests to detect new ones
   const previousRequestIdsRef = useRef<Set<string>>(new Set());
@@ -189,11 +204,11 @@ export function useInputRequests({
       return;
     }
 
-    const requestsArray = ydoc.getArray<InputRequest>(YDOC_KEYS.INPUT_REQUESTS);
+    const requestsArray = ydoc.getArray<AnyInputRequest>(YDOC_KEYS.INPUT_REQUESTS);
 
     const updateRequests = () => {
       // Get all requests and filter for pending
-      const allRequests = requestsArray.toJSON() as InputRequest[];
+      const allRequests = requestsArray.toJSON() as AnyInputRequest[];
       // Filter for pending status first, then filter out client-side expired requests
       // Client-side expiration check ensures we detect timeouts even when Y.Doc sync is delayed
       // (e.g., browser tab in background, network latency, etc.)

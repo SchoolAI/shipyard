@@ -2,7 +2,12 @@ import { nanoid } from 'nanoid';
 import * as Y from 'yjs';
 import { assertNever } from './assert-never.js';
 import { type AgentPresence, AgentPresenceSchema } from './hook-api.js';
-import { type InputRequest, InputRequestSchema } from './input-request.js';
+import {
+  type AnyInputRequest,
+  InputRequestSchema,
+  type MultiQuestionInputRequest,
+  MultiQuestionInputRequestSchema,
+} from './input-request.js';
 import {
   type Artifact,
   ArtifactSchema,
@@ -1311,8 +1316,8 @@ export function answerInputRequest(
   response: string,
   answeredBy: string
 ): AnswerInputRequestResult {
-  const requestsArray = ydoc.getArray<InputRequest>(YDOC_KEYS.INPUT_REQUESTS);
-  const requests = requestsArray.toJSON() as InputRequest[];
+  const requestsArray = ydoc.getArray<AnyInputRequest>(YDOC_KEYS.INPUT_REQUESTS);
+  const requests = requestsArray.toJSON() as AnyInputRequest[];
   const index = requests.findIndex((r) => r.id === requestId);
 
   if (index === -1) {
@@ -1360,6 +1365,73 @@ export function answerInputRequest(
 }
 
 /**
+ * Answer a pending multi-question input request with validation.
+ * Used by browser UI when user responds to multi-question form modal.
+ *
+ * @param ydoc - Y.Doc containing the request
+ * @param requestId - ID of the request to answer
+ * @param responses - Record mapping question index ("0", "1", etc.) to response value
+ * @param answeredBy - Username or identifier of the responder
+ */
+export function answerMultiQuestionInputRequest(
+  ydoc: Y.Doc,
+  requestId: string,
+  responses: Record<string, unknown>,
+  answeredBy: string
+): AnswerInputRequestResult {
+  const requestsArray = ydoc.getArray<AnyInputRequest>(YDOC_KEYS.INPUT_REQUESTS);
+  const requests = requestsArray.toJSON() as AnyInputRequest[];
+  const index = requests.findIndex((r) => r.id === requestId);
+
+  if (index === -1) {
+    return { success: false, error: 'Request not found' };
+  }
+
+  const request = requests[index];
+  if (!request) {
+    return { success: false, error: 'Request not found' };
+  }
+
+  if (request.type !== 'multi') {
+    return { success: false, error: 'Request is not pending' };
+  }
+
+  if (request.status !== 'pending') {
+    switch (request.status) {
+      case 'answered':
+        return {
+          success: false,
+          error: 'Request already answered',
+          answeredBy: request.answeredBy,
+        };
+      case 'declined':
+        return { success: false, error: 'Request was declined' };
+      case 'cancelled':
+        return { success: false, error: 'Request was cancelled' };
+      default:
+        return { success: false, error: `Request is not pending` };
+    }
+  }
+
+  const answeredRequest: MultiQuestionInputRequest = {
+    ...request,
+    status: 'answered' as const,
+    responses,
+    answeredAt: Date.now(),
+    answeredBy,
+  };
+
+  const validated = MultiQuestionInputRequestSchema.parse(answeredRequest);
+
+  ydoc.transact(() => {
+    requestsArray.delete(index, 1);
+    requestsArray.insert(index, [validated]);
+  });
+
+  return { success: true };
+}
+
+/**
  * Cancel a pending input request due to timeout or programmatic cancellation.
  * Sets status to 'cancelled'. For user-initiated decline, use declineInputRequest().
  */
@@ -1367,8 +1439,8 @@ export function cancelInputRequest(
   ydoc: Y.Doc,
   requestId: string
 ): { success: boolean; error?: string } {
-  const requestsArray = ydoc.getArray<InputRequest>(YDOC_KEYS.INPUT_REQUESTS);
-  const requests = requestsArray.toJSON() as InputRequest[];
+  const requestsArray = ydoc.getArray<AnyInputRequest>(YDOC_KEYS.INPUT_REQUESTS);
+  const requests = requestsArray.toJSON() as AnyInputRequest[];
   const index = requests.findIndex((r) => r.id === requestId);
 
   if (index === -1) {
@@ -1389,7 +1461,11 @@ export function cancelInputRequest(
     status: 'cancelled' as const,
   };
 
-  const validated = InputRequestSchema.parse(cancelledRequest);
+  /** Use appropriate schema based on request type */
+  const validated =
+    request.type === 'multi'
+      ? MultiQuestionInputRequestSchema.parse(cancelledRequest)
+      : InputRequestSchema.parse(cancelledRequest);
 
   ydoc.transact(() => {
     requestsArray.delete(index, 1);
@@ -1408,8 +1484,8 @@ export function declineInputRequest(
   ydoc: Y.Doc,
   requestId: string
 ): { success: boolean; error?: string } {
-  const requestsArray = ydoc.getArray<InputRequest>(YDOC_KEYS.INPUT_REQUESTS);
-  const requests = requestsArray.toJSON() as InputRequest[];
+  const requestsArray = ydoc.getArray<AnyInputRequest>(YDOC_KEYS.INPUT_REQUESTS);
+  const requests = requestsArray.toJSON() as AnyInputRequest[];
   const index = requests.findIndex((r) => r.id === requestId);
 
   if (index === -1) {
@@ -1430,7 +1506,11 @@ export function declineInputRequest(
     status: 'declined' as const,
   };
 
-  const validated = InputRequestSchema.parse(declinedRequest);
+  /** Use appropriate schema based on request type */
+  const validated =
+    request.type === 'multi'
+      ? MultiQuestionInputRequestSchema.parse(declinedRequest)
+      : InputRequestSchema.parse(declinedRequest);
 
   ydoc.transact(() => {
     requestsArray.delete(index, 1);

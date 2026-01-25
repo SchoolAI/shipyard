@@ -62,6 +62,7 @@ provider.on('sync', (isSynced) => {
   }
 });
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Utility script, complexity is acceptable
 function inspectMetadata() {
   try {
     // Get metadata using helper

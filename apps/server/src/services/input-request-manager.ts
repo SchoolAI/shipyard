@@ -7,8 +7,11 @@
  */
 
 import {
+  type AnyInputRequest,
   type CreateInputRequestParams,
+  type CreateMultiQuestionInputParams,
   createInputRequest,
+  createMultiQuestionInputRequest,
   type InputRequest,
   InputRequestSchema,
   logPlanEvent,
@@ -113,6 +116,38 @@ export class InputRequestManager {
   }
 
   /**
+   * Create a new multi-question input request in the Y.Doc.
+   * Request is added to the INPUT_REQUESTS array and becomes visible in browser UI.
+   *
+   * @param ydoc - The Y.Doc to add the request to
+   * @param params - Request parameters (questions array, timeout, planId)
+   * @returns The generated request ID
+   */
+  createMultiQuestionRequest(ydoc: Y.Doc, params: CreateMultiQuestionInputParams): string {
+    const request = createMultiQuestionInputRequest(params);
+
+    // Add request to Y.Doc in a transaction
+    ydoc.transact(() => {
+      const requestsArray = ydoc.getArray<AnyInputRequest>(YDOC_KEYS.INPUT_REQUESTS);
+      requestsArray.push([request]);
+
+      // Log activity event
+      logPlanEvent(ydoc, 'input_request_created', 'Agent', {
+        requestId: request.id,
+        requestType: 'multi',
+        questionCount: request.questions.length,
+      });
+    });
+
+    logger.info(
+      { requestId: request.id, questionCount: request.questions.length, timeout: request.timeout },
+      'Created multi-question input request in Y.Doc'
+    );
+
+    return request.id;
+  }
+
+  /**
    * Wait for a user to respond to an input request.
    * Blocks until the request is answered, cancelled, or times out.
    *
@@ -132,13 +167,13 @@ export class InputRequestManager {
     timeoutSeconds?: number
   ): Promise<InputRequestResponse> {
     return new Promise((resolve) => {
-      const requestsArray = ydoc.getArray<InputRequest>(YDOC_KEYS.INPUT_REQUESTS);
+      const requestsArray = ydoc.getArray<AnyInputRequest>(YDOC_KEYS.INPUT_REQUESTS);
       let resolved = false;
       let timeoutHandle: NodeJS.Timeout | undefined;
       let observerFn: (() => void) | undefined;
 
       // Find the request in the array
-      const findRequest = (): InputRequest | undefined => {
+      const findRequest = (): AnyInputRequest | undefined => {
         const requests = requestsArray.toJSON();
         return requests.find((r) => r.id === requestId);
       };
@@ -195,13 +230,18 @@ export class InputRequestManager {
       };
 
       // Helper: Handle answered status
-      const handleAnsweredStatus = (request: InputRequest) => {
+      const handleAnsweredStatus = (request: AnyInputRequest) => {
         logger.info({ requestId, answeredBy: request.answeredBy }, 'Input request answered');
         resolved = true;
         cleanup();
+
+        // Return responses for multi-question, response for single-question
+        const responseValue =
+          request.type === 'multi' ? request.responses : (request as InputRequest).response;
+
         resolve({
           success: true,
-          response: request.response,
+          response: responseValue,
           status: 'answered',
           answeredBy: request.answeredBy ?? 'unknown',
           answeredAt: request.answeredAt ?? Date.now(),

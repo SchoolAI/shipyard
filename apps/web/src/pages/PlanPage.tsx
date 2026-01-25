@@ -1,6 +1,7 @@
 import type { BlockNoteEditor } from '@blocknote/core';
 import { Button, Spinner, useOverlayState } from '@heroui/react';
 import {
+  type AnyInputRequest,
   addArtifact,
   type Deliverable,
   extractDeliverables,
@@ -8,7 +9,6 @@ import {
   getPlanIndexEntry,
   getPlanMetadata,
   getPlanOwnerId,
-  type InputRequest,
   type PlanMetadata,
   setPlanIndexEntry,
   setPlanMetadata,
@@ -18,10 +18,10 @@ import { LogIn } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import * as Y from 'yjs';
+import { AnyInputRequestModal } from '@/components/AnyInputRequestModal';
 import { AuthChoiceModal } from '@/components/AuthChoiceModal';
 import { GitHubAuthOverlay } from '@/components/GitHubAuthModal';
 import { ImportConversationHandler } from '@/components/ImportConversationHandler';
-import { InputRequestModal } from '@/components/InputRequestModal';
 import { MobileActionsMenu } from '@/components/MobileActionsMenu';
 import { MobileHeader } from '@/components/MobileHeader';
 import { PlanContent } from '@/components/PlanContent';
@@ -140,7 +140,7 @@ export function PlanPage() {
 
   // Input request modal state
   const [inputRequestModalOpen, setInputRequestModalOpen] = useState(false);
-  const [currentInputRequest, setCurrentInputRequest] = useState<InputRequest | null>(null);
+  const [currentInputRequest, setCurrentInputRequest] = useState<AnyInputRequest | null>(null);
 
   // Check if current user is the plan owner (for notifications)
   const ownerId = getPlanOwnerId(ydoc);
@@ -162,7 +162,7 @@ export function PlanPage() {
         return;
       }
 
-      const customEvent = event as CustomEvent<InputRequest>;
+      const customEvent = event as CustomEvent<AnyInputRequest>;
 
       // Prevent duplicate opens - if modal is already open with this request, ignore
       // Note: This only prevents duplicates within a single tab. Multi-tab coordination
@@ -555,7 +555,7 @@ export function PlanPage() {
           <Sidebar inDrawer onNavigate={drawerState.close} />
         </Drawer>
         {pageContent}
-        <InputRequestModal
+        <AnyInputRequestModal
           isOpen={inputRequestModalOpen}
           request={currentInputRequest}
           ydoc={indexDoc}
@@ -583,7 +583,7 @@ export function PlanPage() {
   return (
     <>
       {pageContent}
-      <InputRequestModal
+      <AnyInputRequestModal
         isOpen={inputRequestModalOpen}
         request={currentInputRequest}
         ydoc={indexDoc}

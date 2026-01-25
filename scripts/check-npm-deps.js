@@ -7,18 +7,14 @@
  */
 
 import { readFileSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const rootDir = join(__dirname, '..');
 
-const serverPkg = JSON.parse(
-  readFileSync(join(rootDir, 'apps/server/package.json'), 'utf8')
-);
-const npmPkg = JSON.parse(
-  readFileSync(join(rootDir, 'package-npm.json'), 'utf8')
-);
+const serverPkg = JSON.parse(readFileSync(join(rootDir, 'apps/server/package.json'), 'utf8'));
+const npmPkg = JSON.parse(readFileSync(join(rootDir, 'package-npm.json'), 'utf8'));
 
 const serverDeps = serverPkg.dependencies || {};
 const npmDeps = npmPkg.dependencies || {};

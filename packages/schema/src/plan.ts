@@ -285,8 +285,19 @@ export type PlanEvent =
       type: 'input_request_created';
       data: {
         requestId: string;
-        requestType: 'text' | 'multiline' | 'choice' | 'confirm';
-        requestMessage: string;
+        requestType:
+          | 'text'
+          | 'multiline'
+          | 'choice'
+          | 'confirm'
+          | 'number'
+          | 'email'
+          | 'date'
+          | 'dropdown'
+          | 'rating'
+          | 'multi';
+        requestMessage?: string;
+        questionCount?: number;
       };
     })
   | (PlanEventBase & {
@@ -462,8 +473,20 @@ export const PlanEventSchema = z.discriminatedUnion('type', [
     type: z.literal('input_request_created'),
     data: z.object({
       requestId: z.string(),
-      requestType: z.enum(['text', 'multiline', 'choice', 'confirm']),
-      requestMessage: z.string(),
+      requestType: z.enum([
+        'text',
+        'multiline',
+        'choice',
+        'confirm',
+        'number',
+        'email',
+        'date',
+        'dropdown',
+        'rating',
+        'multi',
+      ]),
+      requestMessage: z.string().optional(),
+      questionCount: z.number().optional(),
     }),
   }),
   PlanEventBaseSchema.extend({

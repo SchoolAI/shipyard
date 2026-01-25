@@ -71,6 +71,10 @@ const { servers } = await res.json();
 
 **Note:** Browser COULD call these, but they're designed for hook integration
 
+### Input Request Response Formats
+
+For details on how user responses are serialized for each input type (text, multiline, choice, confirm), see **[docs/INPUT-RESPONSE-FORMATS.md](./INPUT-RESPONSE-FORMATS.md)**
+
 ---
 
 ## 2. WebSocket Server (Y.Doc Sync)
