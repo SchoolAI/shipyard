@@ -3,7 +3,7 @@
  * Shows file tree and diff viewer, similar to PRDiffViewer.
  */
 import { DiffModeEnum, DiffView } from '@git-diff-view/react';
-import '@git-diff-view/react/styles/diff-view.css';
+import '@git-diff-view/react/styles/diff-view-pure.css';
 import { Alert, Button, ButtonGroup, Card, Chip } from '@heroui/react';
 import type { LocalChangesResponse, LocalChangesResult, LocalFileChange } from '@shipyard/schema';
 import {

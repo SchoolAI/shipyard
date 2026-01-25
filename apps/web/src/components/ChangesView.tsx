@@ -1,5 +1,5 @@
 import { DiffModeEnum, DiffView, type SplitSide } from '@git-diff-view/react';
-import '@git-diff-view/react/styles/diff-view.css';
+import '@git-diff-view/react/styles/diff-view-pure.css';
 import { Alert, Button, ButtonGroup, Card, Chip, Link as HeroLink } from '@heroui/react';
 import {
   type LinkedPR,
@@ -585,39 +585,16 @@ function DiffViewer({ pr, repo, ydoc }: DiffViewerProps) {
       {/* Diff View for Selected File */}
       <div>
         {selectedFile ? (
-          <div className="space-y-2">
-            {/* Diff controls */}
-            <div className="flex items-center justify-between px-2">
-              <span className="text-sm text-muted-foreground font-mono">{selectedFile}</span>
-              <ButtonGroup size="sm" variant="tertiary">
-                <Button
-                  isIconOnly
-                  aria-label="Unified view"
-                  onPress={() => handleViewModeChange('unified')}
-                  className={viewMode === 'unified' ? 'bg-primary/10 text-primary' : ''}
-                >
-                  <Rows3 className="w-4 h-4" />
-                </Button>
-                <Button
-                  isIconOnly
-                  aria-label="Split view"
-                  onPress={() => handleViewModeChange('split')}
-                  className={viewMode === 'split' ? 'bg-primary/10 text-primary' : ''}
-                >
-                  <Columns2 className="w-4 h-4" />
-                </Button>
-              </ButtonGroup>
-            </div>
-            <FileDiffView
-              filename={selectedFile}
-              patch={files.find((f) => f.filename === selectedFile)?.patch}
-              viewMode={viewMode}
-              prNumber={pr.prNumber}
-              comments={comments}
-              ydoc={ydoc}
-              currentUser={identity?.username}
-            />
-          </div>
+          <FileDiffView
+            filename={selectedFile}
+            patch={files.find((f) => f.filename === selectedFile)?.patch}
+            viewMode={viewMode}
+            onViewModeChange={handleViewModeChange}
+            prNumber={pr.prNumber}
+            comments={comments}
+            ydoc={ydoc}
+            currentUser={identity?.username}
+          />
         ) : (
           <Card>
             <Card.Content className="p-8 text-center">
@@ -796,6 +773,7 @@ interface FileDiffViewProps {
   filename: string;
   patch?: string;
   viewMode: DiffViewMode;
+  onViewModeChange: (mode: DiffViewMode) => void;
   prNumber: number;
   comments: PRReviewComment[];
   ydoc: Y.Doc;
@@ -806,6 +784,7 @@ function FileDiffView({
   filename,
   patch,
   viewMode,
+  onViewModeChange,
   prNumber,
   comments,
   ydoc,
@@ -888,8 +867,26 @@ ${patch}`;
 
   return (
     <Card>
-      <Card.Header>
+      <Card.Header className="flex flex-row items-center justify-between">
         <Card.Title className="font-mono text-sm">{filename}</Card.Title>
+        <ButtonGroup size="sm" variant="tertiary">
+          <Button
+            isIconOnly
+            aria-label="Unified view"
+            onPress={() => onViewModeChange('unified')}
+            className={viewMode === 'unified' ? 'bg-primary/10 text-primary' : ''}
+          >
+            <Rows3 className="w-4 h-4" />
+          </Button>
+          <Button
+            isIconOnly
+            aria-label="Split view"
+            onPress={() => onViewModeChange('split')}
+            className={viewMode === 'split' ? 'bg-primary/10 text-primary' : ''}
+          >
+            <Columns2 className="w-4 h-4" />
+          </Button>
+        </ButtonGroup>
       </Card.Header>
       <Card.Content className="p-0">
         <DiffView
