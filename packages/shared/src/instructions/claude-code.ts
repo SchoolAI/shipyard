@@ -4,7 +4,6 @@
  * They use native plan mode (Shift+Tab) rather than MCP tools directly.
  */
 
-import { TOOL_NAMES } from '@shipyard/schema';
 import {
   ARTIFACT_TYPES_SECTION,
   CRITICAL_USAGE_SECTION,
@@ -14,6 +13,7 @@ import {
   USER_INPUT_SECTION,
   WHEN_NOT_TO_USE_SECTION,
 } from './common.js';
+import { TOOL_NAMES } from './tool-names.js';
 
 export const CLAUDE_CODE_HEADER = `[SHIPYARD] Collaborative planning with human review & proof-of-work tracking.`;
 

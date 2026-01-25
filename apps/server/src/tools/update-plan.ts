@@ -2,8 +2,8 @@ import { ServerBlockNoteEditor } from '@blocknote/server-util';
 import {
   addSnapshot,
   createPlanSnapshot,
-  getPlanIndexDocName,
   getPlanMetadata,
+  PLAN_INDEX_DOC_NAME,
   type PlanStatusType,
   resetPlanToDraft,
   type StatusTransition,
@@ -225,8 +225,8 @@ STATUSES:
       setPlanMetadata(doc, updates, actorName);
     }
 
+    const indexDoc = await getOrCreateDoc(PLAN_INDEX_DOC_NAME);
     if (existingMetadata.ownerId) {
-      const indexDoc = await getOrCreateDoc(getPlanIndexDocName(existingMetadata.ownerId));
       setPlanIndexEntry(indexDoc, {
         id: existingMetadata.id,
         title: input.title ?? existingMetadata.title,

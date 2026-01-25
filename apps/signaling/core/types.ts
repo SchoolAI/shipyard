@@ -42,21 +42,10 @@ export type {
 
 /**
  * Client subscribes to room topics (plan IDs).
- *
- * For plan rooms, authentication is required:
- * - inviteToken: Required for non-owners to join plan rooms
- * - userId: GitHub username of the connecting user
  */
 export interface SubscribeMessage {
   type: 'subscribe';
   topics: string[];
-  /** Invite token for authenticated room access */
-  inviteToken?: {
-    tokenId: string;
-    tokenValue: string;
-  };
-  /** GitHub username of the connecting user */
-  userId?: string;
 }
 
 /**
@@ -109,85 +98,6 @@ export interface ErrorMessage {
  */
 export type InviteAuthError = 'unauthenticated' | 'unauthorized' | 'plan_not_found';
 
-// --- Approval Flow Messages ---
-
-/**
- * Approval status for a user in a plan room.
- * - pending: User has valid token but awaiting owner approval
- * - approved: User can receive full CRDT content
- * - rejected: User is denied access
- */
-export type ApprovalStatus = 'pending' | 'approved' | 'rejected';
-
-/**
- * Owner approves a pending user for full access.
- */
-export interface ApproveUserRequest {
-  type: 'approve_user';
-  planId: string;
-  userId: string;
-  /** Owner's GitHub OAuth token for authentication */
-  authToken: string;
-}
-
-/**
- * Owner rejects a pending user, denying access.
- */
-export interface RejectUserRequest {
-  type: 'reject_user';
-  planId: string;
-  userId: string;
-  /** Owner's GitHub OAuth token for authentication */
-  authToken: string;
-}
-
-/**
- * Server notifies a user of their approval status change.
- */
-export interface ApprovalStatusNotification {
-  type: 'approval_status';
-  planId: string;
-  userId: string;
-  status: ApprovalStatus;
-}
-
-/**
- * Server notifies owner of users waiting for approval.
- */
-export interface PendingUsersNotification {
-  type: 'pending_users';
-  planId: string;
-  users: Array<{ userId: string; requestedAt: number }>;
-}
-
-/**
- * Server notifies owner when a new user requests access.
- */
-export interface PendingUserNotification {
-  type: 'pending_user';
-  planId: string;
-  userId: string;
-  requestedAt: number;
-}
-
-/**
- * Server confirms user was approved.
- */
-export interface UserApprovedResponse {
-  type: 'user_approved';
-  planId: string;
-  userId: string;
-}
-
-/**
- * Server confirms user was rejected.
- */
-export interface UserRejectedResponse {
-  type: 'user_rejected';
-  planId: string;
-  userId: string;
-}
-
 // --- Type Unions ---
 
 /**
@@ -202,9 +112,7 @@ export type SignalingMessage =
   | CreateInviteRequest
   | RedeemInviteRequest
   | RevokeInviteRequest
-  | ListInvitesRequest
-  | ApproveUserRequest
-  | RejectUserRequest;
+  | ListInvitesRequest;
 
 /**
  * All possible outgoing message types.
@@ -218,12 +126,7 @@ export type OutgoingMessage =
   | InviteRedemptionResult
   | InviteRevokedResponse
   | InvitesListResponse
-  | InviteRedeemedNotification
-  | ApprovalStatusNotification
-  | PendingUsersNotification
-  | PendingUserNotification
-  | UserApprovedResponse
-  | UserRejectedResponse;
+  | InviteRedeemedNotification;
 
 /**
  * Token validation error types.

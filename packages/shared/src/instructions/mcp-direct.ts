@@ -4,7 +4,6 @@
  * Users must call MCP tools directly (createPlan, addArtifact, etc.).
  */
 
-import { TOOL_NAMES } from '@shipyard/schema';
 import {
   ARTIFACT_TYPES_SECTION,
   CRITICAL_USAGE_SECTION,
@@ -14,6 +13,7 @@ import {
   USER_INPUT_SECTION,
   WHEN_NOT_TO_USE_SECTION,
 } from './common.js';
+import { TOOL_NAMES } from './tool-names.js';
 
 export const MCP_DIRECT_HEADER = `# Shipyard: Your Agent Management Hub
 

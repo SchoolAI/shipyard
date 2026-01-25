@@ -18,12 +18,10 @@
 
 import { DurableObject } from 'cloudflare:workers';
 import {
-  handleApproveUser,
   handleCreateInvite,
   handleListInvites,
   handlePublish,
   handleRedeemInvite,
-  handleRejectUser,
   handleRevokeInvite,
   handleSubscribe,
   handleUnsubscribe,
@@ -94,7 +92,7 @@ export class SignalingRoom extends DurableObject<Env> {
       // All handlers use the platform adapter for storage/messaging
       switch (data.type) {
         case 'subscribe':
-          await handleSubscribe(this.adapter, ws, data);
+          handleSubscribe(this.adapter, ws, data);
           break;
 
         case 'unsubscribe':
@@ -124,14 +122,6 @@ export class SignalingRoom extends DurableObject<Env> {
 
         case 'list_invites':
           await handleListInvites(this.adapter, ws, data);
-          break;
-
-        case 'approve_user':
-          await handleApproveUser(this.adapter, ws, data);
-          break;
-
-        case 'reject_user':
-          await handleRejectUser(this.adapter, ws, data);
           break;
 
         default: {

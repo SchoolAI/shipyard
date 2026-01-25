@@ -3,8 +3,8 @@ import { ServerBlockNoteEditor } from '@blocknote/server-util';
 import {
   addSnapshot,
   createPlanSnapshot,
-  getPlanIndexDocName,
   getPlanMetadata,
+  PLAN_INDEX_DOC_NAME,
   setPlanMetadata,
   touchPlanIndexEntry,
 } from '@shipyard/schema';
@@ -197,10 +197,8 @@ Example with deliverables:
     logger.info({ planId, snapshotId: snapshot.id }, 'Content snapshot created');
 
     // Update plan index
-    if (metadata.ownerId) {
-      const indexDoc = await getOrCreateDoc(getPlanIndexDocName(metadata.ownerId));
-      touchPlanIndexEntry(indexDoc, planId);
-    }
+    const indexDoc = await getOrCreateDoc(PLAN_INDEX_DOC_NAME);
+    touchPlanIndexEntry(indexDoc, planId);
 
     logger.info({ planId, results }, 'Block content updated successfully');
 

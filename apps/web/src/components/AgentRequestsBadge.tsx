@@ -1,12 +1,11 @@
 import { Chip } from '@heroui/react';
 import {
-  getPlanEvents,
+  type AnyInputRequest,
   getPlanMetadata,
-  type PlanEvent,
   type PlanMetadata,
   YDOC_KEYS,
 } from '@shipyard/schema';
-import { AlertOctagon, HelpCircle } from 'lucide-react';
+import { AlertOctagon, MessageSquare } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type * as Y from 'yjs';
 
@@ -25,9 +24,9 @@ export type SwitchTabEventDetail = {
 
 export function AgentRequestsBadge({ ydoc, isSnapshot = false }: AgentRequestsBadgeProps) {
   const [counts, setCounts] = useState<{
-    help: number;
+    input: number;
     blocker: number;
-  }>({ help: 0, blocker: 0 });
+  }>({ input: 0, blocker: 0 });
 
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -46,57 +45,38 @@ export function AgentRequestsBadge({ ydoc, isSnapshot = false }: AgentRequestsBa
     const update = () => {
       if (!mounted) return;
 
-      const events = getPlanEvents(ydoc);
       const metadata = getPlanMetadata(ydoc);
 
       // Don't show badge for completed, archived, or snapshot plans
       if (!metadata || metadata.status === 'completed' || metadata.archivedAt || isSnapshot) {
-        setCounts({ help: 0, blocker: 0 });
+        setCounts({ input: 0, blocker: 0 });
         return;
       }
 
-      // Find all help_request and blocker events
-      const agentActivityEvents = events.filter((e) => e.type === 'agent_activity');
-
-      const helpRequests = agentActivityEvents.filter(
-        (e) => e.data.activityType === 'help_request'
+      // Count pending input requests (from plan-index, filtered by this planId)
+      const requestsArray = ydoc.getArray<AnyInputRequest>(YDOC_KEYS.INPUT_REQUESTS);
+      const allRequests = requestsArray.toJSON() as AnyInputRequest[];
+      const pendingRequests = allRequests.filter(
+        (r) => r.status === 'pending' && r.planId === metadata.id
       );
 
-      const blockers = agentActivityEvents.filter((e) => e.data.activityType === 'blocker');
+      // Separate blockers from normal input requests
+      const blockerCount = pendingRequests.filter((r) => r.isBlocker).length;
+      const normalCount = pendingRequests.filter((r) => !r.isBlocker).length;
 
-      // Get resolved requestIds
-      const resolvedRequestIds = new Set(
-        agentActivityEvents
-          .filter(
-            (e) =>
-              e.data.activityType === 'help_request_resolved' ||
-              e.data.activityType === 'blocker_resolved'
-          )
-          .map((e) => e.data.requestId)
-      );
-
-      // Count unresolved requests
-      const unresolvedHelp = helpRequests.filter(
-        (e) => !resolvedRequestIds.has(e.data.requestId)
-      ).length;
-
-      const unresolvedBlockers = blockers.filter(
-        (e) => !resolvedRequestIds.has(e.data.requestId)
-      ).length;
-
-      setCounts({ help: unresolvedHelp, blocker: unresolvedBlockers });
+      setCounts({ input: normalCount, blocker: blockerCount });
     };
 
-    const eventsArray = ydoc.getArray<PlanEvent>(YDOC_KEYS.EVENTS);
+    const requestsArray = ydoc.getArray(YDOC_KEYS.INPUT_REQUESTS);
     const metadataMap = ydoc.getMap<PlanMetadata>(YDOC_KEYS.METADATA);
 
     update();
-    eventsArray.observe(update);
+    requestsArray.observe(update);
     metadataMap.observe(update);
 
     return () => {
       mounted = false;
-      eventsArray.unobserve(update);
+      requestsArray.unobserve(update);
       metadataMap.unobserve(update);
     };
   }, [ydoc, isSnapshot]);
@@ -119,17 +99,17 @@ export function AgentRequestsBadge({ ydoc, isSnapshot = false }: AgentRequestsBa
     );
   }
 
-  if (counts.help > 0) {
+  if (counts.input > 0) {
     return (
       <button
         type="button"
         onClick={handleClick}
-        className="cursor-pointer hover:opacity-80 transition-opacity focus:outline-none focus:ring-2 focus:ring-warning rounded-full"
+        className="cursor-pointer hover:opacity-80 transition-opacity focus:outline-none focus:ring-2 focus:ring-accent rounded-full"
       >
-        <Chip color="warning" variant="soft">
+        <Chip color="accent" variant="soft">
           <div className="flex items-center gap-1">
-            <HelpCircle className="w-3 h-3" />
-            <span>Agent: Needs Help{counts.help > 1 ? ` (${counts.help})` : ''}</span>
+            <MessageSquare className="w-3 h-3" />
+            <span>Agent: Needs Input{counts.input > 1 ? ` (${counts.input})` : ''}</span>
           </div>
         </Chip>
       </button>

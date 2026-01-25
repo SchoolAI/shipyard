@@ -916,6 +916,84 @@ describe('createMultiQuestionInputRequest', () => {
   });
 });
 
+describe('isBlocker flag validation', () => {
+  it('should accept request with isBlocker: true', () => {
+    const result = InputRequestSchema.safeParse({
+      id: nanoid(),
+      createdAt: Date.now(),
+      message: 'Critical question',
+      type: 'confirm',
+      status: 'pending',
+      isBlocker: true,
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.isBlocker).toBe(true);
+    }
+  });
+
+  it('should accept request with isBlocker: false', () => {
+    const result = InputRequestSchema.safeParse({
+      id: nanoid(),
+      createdAt: Date.now(),
+      message: 'Non-blocking question',
+      type: 'text',
+      status: 'pending',
+      isBlocker: false,
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.isBlocker).toBe(false);
+    }
+  });
+
+  it('should accept request without isBlocker (optional)', () => {
+    const result = InputRequestSchema.safeParse({
+      id: nanoid(),
+      createdAt: Date.now(),
+      message: 'Regular question',
+      type: 'text',
+      status: 'pending',
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.isBlocker).toBeUndefined();
+    }
+  });
+
+  it('should create input request with isBlocker flag', () => {
+    const request = createInputRequest({
+      message: 'Blocking question',
+      type: 'confirm',
+      isBlocker: true,
+    });
+    expect(request.isBlocker).toBe(true);
+  });
+
+  it('should accept multi-question request with isBlocker', () => {
+    const result = MultiQuestionInputRequestSchema.safeParse({
+      id: nanoid(),
+      createdAt: Date.now(),
+      type: 'multi',
+      questions: [{ type: 'text', message: 'Name?' }],
+      status: 'pending',
+      isBlocker: true,
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.isBlocker).toBe(true);
+    }
+  });
+
+  it('should create multi-question request with isBlocker flag', () => {
+    const request = createMultiQuestionInputRequest({
+      questions: [{ type: 'text', message: 'What is your name?' }],
+      isBlocker: true,
+    });
+    expect(request.isBlocker).toBe(true);
+  });
+});
+
 describe('AnyInputRequestSchema', () => {
   it('should accept single-question input request', () => {
     const result = AnyInputRequestSchema.safeParse({

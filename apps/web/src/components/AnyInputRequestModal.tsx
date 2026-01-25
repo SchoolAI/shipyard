@@ -12,6 +12,7 @@ interface AnyInputRequestModalProps {
   isOpen: boolean;
   request: AnyInputRequest | null;
   ydoc: Y.Doc | null;
+  planYdoc?: Y.Doc | null;
   onClose: () => void;
 }
 
@@ -19,15 +20,30 @@ export function AnyInputRequestModal({
   isOpen,
   request,
   ydoc,
+  planYdoc,
   onClose,
 }: AnyInputRequestModalProps) {
   // Route to appropriate modal based on request type
   if (request?.type === 'multi') {
     return (
-      <MultiQuestionInputModal isOpen={isOpen} request={request} ydoc={ydoc} onClose={onClose} />
+      <MultiQuestionInputModal
+        isOpen={isOpen}
+        request={request}
+        ydoc={ydoc}
+        planYdoc={planYdoc}
+        onClose={onClose}
+      />
     );
   }
 
   // For all other types, use the standard InputRequestModal
-  return <InputRequestModal isOpen={isOpen} request={request} ydoc={ydoc} onClose={onClose} />;
+  return (
+    <InputRequestModal
+      isOpen={isOpen}
+      request={request}
+      ydoc={ydoc}
+      planYdoc={planYdoc}
+      onClose={onClose}
+    />
+  );
 }

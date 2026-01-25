@@ -21,6 +21,7 @@ import {
 import { CHOICE_DROPDOWN_THRESHOLD, normalizeChoiceOptions } from '@shipyard/schema';
 import { ChevronDown } from 'lucide-react';
 import { useEffect, useRef } from 'react';
+import { MarkdownContent } from '@/components/ui/MarkdownContent';
 import type { ChoiceInputProps } from './types';
 import { OTHER_OPTION_LABEL, OTHER_OPTION_VALUE } from './utils';
 
@@ -86,13 +87,13 @@ export function ChoiceInput({
     const selectedValue = typeof value === 'string' ? value : '';
     return (
       <div className="space-y-3">
+        <MarkdownContent content={request.message} variant="default" />
         <ComboBox
           selectedKey={selectedValue || null}
           onSelectionChange={(key) => setValue(key ? String(key) : '')}
           isDisabled={isSubmitting}
           isRequired
         >
-          <Label className="text-sm font-medium text-foreground">{request.message}</Label>
           <ComboBox.InputGroup className="relative">
             <Input
               placeholder={request.placeholder || 'Select an option...'}
@@ -145,13 +146,13 @@ export function ChoiceInput({
   if (request.multiSelect) {
     return (
       <div className="space-y-3">
+        <MarkdownContent content={request.message} variant="default" />
         <CheckboxGroup
           isRequired
           value={Array.isArray(value) ? value : []}
           onChange={setValue}
           isDisabled={isSubmitting}
         >
-          <Label className="text-sm font-medium text-foreground">{request.message}</Label>
           <p className="text-xs text-muted-foreground mt-1">(Select one or more options)</p>
           {options.map((opt) => (
             <Checkbox key={opt.value} value={opt.value} isDisabled={opt.disabled}>
@@ -184,13 +185,13 @@ export function ChoiceInput({
   // Single-select mode with radio buttons
   return (
     <div className="space-y-3">
+      <MarkdownContent content={request.message} variant="default" />
       <RadioGroup
         isRequired
         value={typeof value === 'string' ? value : ''}
         onChange={setValue}
         isDisabled={isSubmitting}
       >
-        <Label className="text-sm font-medium text-foreground">{request.message}</Label>
         {options.map((opt) => (
           <Radio key={opt.value} value={opt.value} isDisabled={opt.disabled}>
             <Radio.Control>

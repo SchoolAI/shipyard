@@ -99,12 +99,22 @@ export class InputRequestManager {
       const requestsArray = ydoc.getArray<InputRequest>(YDOC_KEYS.INPUT_REQUESTS);
       requestsArray.push([request]);
 
-      // Log activity event
-      logPlanEvent(ydoc, 'input_request_created', 'Agent', {
-        requestId: request.id,
-        requestType: request.type,
-        requestMessage: request.message,
-      });
+      // Log activity event - mark as inbox-worthy so plan owner sees it
+      logPlanEvent(
+        ydoc,
+        'input_request_created',
+        'Agent',
+        {
+          requestId: request.id,
+          requestType: request.type,
+          requestMessage: request.message,
+          isBlocker: request.isBlocker,
+        },
+        {
+          inboxWorthy: true,
+          inboxFor: 'owner',
+        }
+      );
     });
 
     logger.info(
@@ -131,12 +141,22 @@ export class InputRequestManager {
       const requestsArray = ydoc.getArray<AnyInputRequest>(YDOC_KEYS.INPUT_REQUESTS);
       requestsArray.push([request]);
 
-      // Log activity event
-      logPlanEvent(ydoc, 'input_request_created', 'Agent', {
-        requestId: request.id,
-        requestType: 'multi',
-        questionCount: request.questions.length,
-      });
+      // Log activity event - mark as inbox-worthy so plan owner sees it
+      logPlanEvent(
+        ydoc,
+        'input_request_created',
+        'Agent',
+        {
+          requestId: request.id,
+          requestType: 'multi',
+          questionCount: request.questions.length,
+          isBlocker: request.isBlocker,
+        },
+        {
+          inboxWorthy: true,
+          inboxFor: 'owner',
+        }
+      );
     });
 
     logger.info(

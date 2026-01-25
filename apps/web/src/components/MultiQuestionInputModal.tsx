@@ -23,6 +23,7 @@ import {
   cancelInputRequest,
   DEFAULT_INPUT_REQUEST_TIMEOUT_SECONDS,
   declineInputRequest,
+  logPlanEvent,
   type MultiQuestionInputRequest,
   normalizeChoiceOptions,
   type Question,
@@ -31,6 +32,7 @@ import type React from 'react';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import type * as Y from 'yjs';
+import { MarkdownContent } from '@/components/ui/MarkdownContent';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
 import {
   ChoiceInput,
@@ -49,6 +51,7 @@ interface MultiQuestionInputModalProps {
   isOpen: boolean;
   request: MultiQuestionInputRequest | null;
   ydoc: Y.Doc | null;
+  planYdoc?: Y.Doc | null;
   onClose: () => void;
 }
 
@@ -194,7 +197,6 @@ function formatQuestionResponse(question: Question, state: QuestionState): strin
     case 'date':
       return formatDefaultResponse(value);
     default: {
-      // biome-ignore lint/correctness/noUnusedVariables: Exhaustive check for type safety
       const _exhaustive: never = question;
       void _exhaustive;
       return formatDefaultResponse(value);
@@ -275,7 +277,6 @@ function isQuestionSubmittable(question: Question, state: QuestionState): boolea
     case 'date':
       return isDefaultSubmittable(value);
     default: {
-      // biome-ignore lint/correctness/noUnusedVariables: Exhaustive check for type safety
       const _exhaustive: never = question;
       void _exhaustive;
       return isDefaultSubmittable(value);
@@ -323,7 +324,7 @@ function SignInPrompt({
                   <ul className="text-sm text-muted-foreground list-disc list-inside">
                     {request.questions.map((q, i) => (
                       <li key={i} className="truncate">
-                        {q.message}
+                        <MarkdownContent content={q.message} variant="compact" className="inline" />
                       </li>
                     ))}
                   </ul>
@@ -365,6 +366,7 @@ export function MultiQuestionInputModal({
   isOpen,
   request,
   ydoc,
+  planYdoc,
   onClose,
 }: MultiQuestionInputModalProps) {
   const [questionStates, setQuestionStates] = useState<QuestionState[]>([]);
@@ -496,6 +498,15 @@ export function MultiQuestionInputModal({
         return;
       }
 
+      // Also log to plan's Y.Doc for activity timeline if this is a plan-scoped request
+      if (planYdoc && request.planId) {
+        logPlanEvent(planYdoc, 'input_request_answered', identity.username, {
+          requestId: request.id,
+          response: responses,
+          answeredBy: identity.username,
+        });
+      }
+
       setQuestionStates([]);
       onClose();
     } finally {
@@ -524,7 +535,7 @@ export function MultiQuestionInputModal({
     const showExplainInput = typeof value === 'string' && value === '__explain__';
     return (
       <div className="space-y-3">
-        <p className="text-sm text-foreground">{question.message}</p>
+        <MarkdownContent content={question.message} variant="default" />
         {showExplainInput ? (
           <div className="space-y-3">
             <TextField isDisabled={isSubmitting}>

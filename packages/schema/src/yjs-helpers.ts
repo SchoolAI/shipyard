@@ -57,20 +57,26 @@ export interface PlanMetadataBaseUpdate {
 /**
  * Valid status transitions in the plan lifecycle.
  *
- * Flow: draft -> (pending_review | in_progress) <-> changes_requested -> in_progress -> completed
- *
- * Plans can go directly from draft to in_progress if approval is not required.
- * Plans requiring approval must go through: draft -> pending_review -> in_progress.
+ * All transitions are now allowed to support flexible Kanban workflows.
+ * Required fields are auto-generated during transitions to prevent CRDT corruption.
  *
  * Each transition requires specific fields to be provided.
  */
 export const VALID_STATUS_TRANSITIONS: Record<PlanStatusType, PlanStatusType[]> = {
-  draft: ['pending_review', 'in_progress'],
-  pending_review: ['in_progress', 'changes_requested'],
-  changes_requested: ['pending_review', 'in_progress'],
-  in_progress: ['completed'],
-  completed: [],
+  draft: ['pending_review', 'in_progress', 'changes_requested', 'completed'],
+  pending_review: ['draft', 'in_progress', 'changes_requested', 'completed'],
+  changes_requested: ['draft', 'pending_review', 'in_progress', 'completed'],
+  in_progress: ['draft', 'pending_review', 'changes_requested', 'completed'],
+  completed: ['draft', 'pending_review', 'in_progress', 'changes_requested'],
 };
+
+/**
+ * Type for transitioning to draft status.
+ * Clears all status-specific fields.
+ */
+export interface TransitionToDraft {
+  status: 'draft';
+}
 
 /**
  * Type for transitioning to pending_review status.
@@ -116,6 +122,7 @@ export interface TransitionToCompleted {
  * Union of all valid status transitions.
  */
 export type StatusTransition =
+  | TransitionToDraft
   | TransitionToPendingReview
   | TransitionToChangesRequested
   | TransitionToInProgress
@@ -192,6 +199,20 @@ export function setPlanMetadata(
 }
 
 /**
+ * Apply draft transition fields to metadata map.
+ * Clears all status-specific fields to ensure clean state.
+ */
+function applyDraftTransition(map: Y.Map<unknown>, _transition: TransitionToDraft): void {
+  map.delete('reviewRequestId');
+  map.delete('reviewedAt');
+  map.delete('reviewedBy');
+  map.delete('reviewComment');
+  map.delete('completedAt');
+  map.delete('completedBy');
+  map.delete('snapshotUrl');
+}
+
+/**
  * Apply pending_review transition fields to metadata map.
  */
 function applyPendingReviewTransition(
@@ -246,6 +267,9 @@ function applyCompletedTransition(map: Y.Map<unknown>, transition: TransitionToC
  */
 function applyStatusTransitionFields(map: Y.Map<unknown>, transition: StatusTransition): void {
   switch (transition.status) {
+    case 'draft':
+      applyDraftTransition(map, transition);
+      break;
     case 'pending_review':
       applyPendingReviewTransition(map, transition);
       break;
@@ -1359,6 +1383,12 @@ export function answerInputRequest(
   ydoc.transact(() => {
     requestsArray.delete(index, 1);
     requestsArray.insert(index, [validated]);
+
+    logPlanEvent(ydoc, 'input_request_answered', answeredBy, {
+      requestId,
+      response,
+      answeredBy,
+    });
   });
 
   return { success: true };
@@ -1426,6 +1456,12 @@ export function answerMultiQuestionInputRequest(
   ydoc.transact(() => {
     requestsArray.delete(index, 1);
     requestsArray.insert(index, [validated]);
+
+    logPlanEvent(ydoc, 'input_request_answered', answeredBy, {
+      requestId,
+      response: responses,
+      answeredBy,
+    });
   });
 
   return { success: true };
@@ -1515,6 +1551,10 @@ export function declineInputRequest(
   ydoc.transact(() => {
     requestsArray.delete(index, 1);
     requestsArray.insert(index, [validated]);
+
+    logPlanEvent(ydoc, 'input_request_declined', 'User', {
+      requestId,
+    });
   });
 
   return { success: true };

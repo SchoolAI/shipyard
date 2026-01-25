@@ -8,26 +8,6 @@
  */
 
 import type { InviteRedemption, InviteToken } from '@shipyard/schema';
-import type { ApprovalStatus } from './types.js';
-
-/**
- * Per-plan approval state tracking who can access plan content.
- *
- * Stored in Durable Objects with key: 'approval:{planId}'
- */
-export interface PlanApprovalState {
-  planId: string;
-  ownerId: string;
-  /** Users who have been granted full access */
-  approvedUsers: string[];
-  /** Users who have been denied access */
-  rejectedUsers: string[];
-  /** Users waiting for owner approval */
-  pendingUsers: Array<{
-    userId: string;
-    requestedAt: number;
-  }>;
-}
 
 /**
  * Platform-specific adapter that core handlers use to interact with
@@ -198,67 +178,6 @@ export interface PlatformAdapter {
    * @param ownerId - The owner's GitHub username
    */
   setPlanOwnerId(planId: string, ownerId: string): Promise<void>;
-
-  // --- Approval State Operations ---
-  // For tracking user approval status in plan rooms.
-
-  /**
-   * Get the approval state for a plan.
-   * Returns undefined if no approval state exists (plan uses legacy access).
-   *
-   * @param planId - The plan ID
-   */
-  getPlanApprovalState(planId: string): Promise<PlanApprovalState | undefined>;
-
-  /**
-   * Set the approval state for a plan.
-   * Creates or updates the state with approved/rejected/pending users.
-   *
-   * @param planId - The plan ID
-   * @param state - The approval state to set
-   */
-  setPlanApprovalState(planId: string, state: PlanApprovalState): Promise<void>;
-
-  // --- Connection State Operations ---
-  // For tracking per-connection user identity and approval status.
-
-  /**
-   * Associate a user ID with a WebSocket connection.
-   * Called during subscription with authenticated userId.
-   *
-   * @param ws - The WebSocket connection
-   * @param userId - GitHub username
-   */
-  setConnectionUserId(ws: unknown, userId: string): void;
-
-  /**
-   * Get the user ID associated with a WebSocket connection.
-   *
-   * @param ws - The WebSocket connection
-   * @returns GitHub username or undefined if not set
-   */
-  getConnectionUserId(ws: unknown): string | undefined;
-
-  // --- Notification Operations ---
-  // For sending targeted messages to specific users or groups.
-
-  /**
-   * Broadcast a message to all subscribers of a topic, with optional filter.
-   *
-   * @param topic - The topic to broadcast to
-   * @param message - The message to send
-   * @param filter - Optional filter function to select which subscribers receive the message
-   */
-  broadcastToTopic(topic: string, message: unknown, filter?: (ws: unknown) => boolean): void;
-
-  /**
-   * Send a notification to the plan owner only.
-   * Used to notify owner of pending user requests.
-   *
-   * @param planId - The plan ID (topic will be derived as `shipyard-{planId}`)
-   * @param message - The message to send
-   */
-  notifyPlanOwner(planId: string, message: unknown): Promise<void>;
 
   // --- Logging ---
   // Simple logging interface. Implementations can use console, Durable Object

@@ -31,6 +31,7 @@ import {
   YDOC_KEYS,
 } from '@shipyard/schema';
 import { Eye, EyeOff } from 'lucide-react';
+import { nanoid } from 'nanoid';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -112,32 +113,26 @@ function getTargetColumnId(event: DragEndEvent, allPlans: PlanIndexEntry[]): Col
 
 /**
  * Build the appropriate status transition for drag-drop operations.
- * Returns null if the transition is not valid or requires user input.
+ * Auto-generates required fields to prevent CRDT corruption.
  */
 function buildDragDropTransition(
   newStatus: PlanStatusType,
   reviewedBy: string,
   now: number
-): StatusTransition | null {
+): StatusTransition {
   switch (newStatus) {
-    case 'in_progress':
-      // Approval transition (from pending_review or changes_requested)
-      return { status: 'in_progress', reviewedAt: now, reviewedBy };
-    case 'changes_requested':
-      // Request changes transition
-      return { status: 'changes_requested', reviewedAt: now, reviewedBy };
-    case 'completed':
-      // Completion transition
-      return { status: 'completed', completedAt: now, completedBy: reviewedBy };
-    case 'pending_review':
-      // Note: This transition requires a reviewRequestId which we don't have in drag-drop
-      // The index update will still work, but the plan doc won't be updated
-      return null;
     case 'draft':
-      // Cannot transition back to draft via state machine
-      return null;
+      return { status: 'draft' };
+    case 'pending_review':
+      return { status: 'pending_review', reviewRequestId: nanoid() };
+    case 'changes_requested':
+      return { status: 'changes_requested', reviewedAt: now, reviewedBy };
+    case 'in_progress':
+      return { status: 'in_progress', reviewedAt: now, reviewedBy };
+    case 'completed':
+      return { status: 'completed', completedAt: now, completedBy: reviewedBy };
     default:
-      return null;
+      return assertNever(newStatus);
   }
 }
 
@@ -174,9 +169,7 @@ async function updatePlanStatus(
 
     // Transition may fail if plan is in an unexpected state - that's OK for drag-drop UI
     // The index update is the UI source of truth
-    if (transition) {
-      transitionPlanStatus(planDoc, transition);
-    }
+    transitionPlanStatus(planDoc, transition);
 
     idb.destroy();
   } catch {

@@ -323,7 +323,7 @@ describe('RatingInput', () => {
 
   // Escape hatch tests
   describe('escape hatches', () => {
-    it('should render N/A and Other buttons', () => {
+    it('should render N/A and Other options', () => {
       const request = createRatingRequest();
       render(
         <RatingInput
@@ -335,11 +335,11 @@ describe('RatingInput', () => {
         />
       );
 
-      expect(screen.getByRole('button', { name: 'N/A' })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Other...' })).toBeInTheDocument();
+      expect(screen.getByText('N/A')).toBeInTheDocument();
+      expect(screen.getByText('Other...')).toBeInTheDocument();
     });
 
-    it('should call setValue with N/A value when N/A button is clicked', async () => {
+    it('should call setValue with N/A value when N/A option is clicked', async () => {
       const user = userEvent.setup();
       const setValue = vi.fn();
       const request = createRatingRequest();
@@ -354,12 +354,12 @@ describe('RatingInput', () => {
         />
       );
 
-      await user.click(screen.getByRole('button', { name: 'N/A' }));
+      await user.click(screen.getByText('N/A'));
 
       expect(setValue).toHaveBeenCalledWith(NA_OPTION_VALUE);
     });
 
-    it('should call setValue with Other value when Other button is clicked', async () => {
+    it('should call setValue with Other value when Other option is clicked', async () => {
       const user = userEvent.setup();
       const setValue = vi.fn();
       const request = createRatingRequest();
@@ -374,7 +374,7 @@ describe('RatingInput', () => {
         />
       );
 
-      await user.click(screen.getByRole('button', { name: 'Other...' }));
+      await user.click(screen.getByText('Other...'));
 
       expect(setValue).toHaveBeenCalledWith(OTHER_OPTION_VALUE);
     });
@@ -441,7 +441,7 @@ describe('RatingInput', () => {
       expect(setCustomInput).toHaveBeenCalled();
     });
 
-    it('should select N/A button when N/A is selected (visual state managed via props)', () => {
+    it('should select N/A option when N/A is selected (visual state managed via props)', () => {
       const request = createRatingRequest();
       render(
         <RatingInput
@@ -456,12 +456,13 @@ describe('RatingInput', () => {
         />
       );
 
-      // The N/A button should be rendered and accessible
-      const naButton = screen.getByRole('button', { name: 'N/A' });
-      expect(naButton).toBeInTheDocument();
+      // The N/A option should be rendered and have the selected style
+      const naOption = screen.getByText('N/A');
+      expect(naOption).toBeInTheDocument();
+      expect(naOption).toHaveClass('bg-primary');
     });
 
-    it('should select Other button when Other is selected (visual state managed via props)', () => {
+    it('should select Other option when Other is selected (visual state managed via props)', () => {
       const request = createRatingRequest();
       render(
         <RatingInput
@@ -476,9 +477,10 @@ describe('RatingInput', () => {
         />
       );
 
-      // The Other button should be rendered and accessible
-      const otherButton = screen.getByRole('button', { name: 'Other...' });
-      expect(otherButton).toBeInTheDocument();
+      // The Other option should be rendered and have the selected style
+      const otherOption = screen.getByText('Other...');
+      expect(otherOption).toBeInTheDocument();
+      expect(otherOption).toHaveClass('bg-primary');
     });
 
     it('should clear star fill when N/A is selected', () => {
@@ -521,7 +523,7 @@ describe('RatingInput', () => {
       expect(emptyStars.length).toBe(5);
     });
 
-    it('should disable escape hatch buttons when isSubmitting is true', () => {
+    it('should show disabled styling on escape hatch options when isSubmitting is true', () => {
       const request = createRatingRequest();
       render(
         <RatingInput
@@ -533,11 +535,12 @@ describe('RatingInput', () => {
         />
       );
 
-      const naButton = screen.getByRole('button', { name: 'N/A' });
-      const otherButton = screen.getByRole('button', { name: 'Other...' });
+      const naOption = screen.getByText('N/A');
+      const otherOption = screen.getByText('Other...');
 
-      expect(naButton).toBeDisabled();
-      expect(otherButton).toBeDisabled();
+      // The options should have disabled styling applied via className
+      expect(naOption).toHaveClass('cursor-not-allowed');
+      expect(otherOption).toHaveClass('cursor-not-allowed');
     });
   });
 });

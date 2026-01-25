@@ -6,11 +6,10 @@
  * without needing to execute arbitrary code.
  */
 
-import { getPlanIndexDocName, QuestionSchema } from '@shipyard/schema';
+import { PLAN_INDEX_DOC_NAME, QuestionSchema } from '@shipyard/schema';
 import { z } from 'zod';
 import { getOrCreateDoc } from '../doc-store.js';
 import { logger } from '../logger.js';
-import { getGitHubUsername } from '../server-identity.js';
 import { InputRequestManager } from '../services/input-request-manager.js';
 import { TOOL_NAMES } from './tool-names.js';
 
@@ -177,6 +176,57 @@ function buildRequestParams(input: RequestUserInputInput): Record<string, unknow
         type: input.type,
       };
   }
+}
+
+/** Create the input request in ydoc and optionally log event */
+async function initializeInputRequest(
+  input: RequestUserInputInput,
+  ydoc: Awaited<ReturnType<typeof getOrCreateDoc>>
+): Promise<string> {
+  const manager = new InputRequestManager();
+  let requestId: string;
+
+  if (input.questions) {
+    // Multi-question request
+    const params = {
+      questions: input.questions,
+      timeout: input.timeout,
+      planId: input.planId,
+    };
+    requestId = manager.createMultiQuestionRequest(ydoc, params);
+  } else {
+    // Single-question request (existing logic)
+    const params = buildRequestParams(input);
+    // Cast through unknown since new types may not yet be in the schema
+    requestId = manager.createRequest(
+      ydoc,
+      params as unknown as Parameters<typeof manager.createRequest>[1]
+    );
+  }
+
+  // If request is plan-scoped, also log created event to plan doc for activity timeline
+  if (input.planId) {
+    const planDoc = await getOrCreateDoc(input.planId);
+    const { logPlanEvent } = await import('@shipyard/schema');
+    const requestType = input.questions ? 'multi' : (input.type ?? 'text');
+    logPlanEvent(
+      planDoc,
+      'input_request_created',
+      'Agent',
+      {
+        requestId,
+        requestType,
+        requestMessage:
+          input.message || (input.questions ? `${input.questions.length} questions` : ''),
+      },
+      {
+        inboxWorthy: true,
+        inboxFor: 'owner',
+      }
+    );
+  }
+
+  return requestId;
 }
 
 // --- Public Export ---
@@ -475,34 +525,15 @@ NOTE: This is also available as requestUserInput() inside execute_code for multi
     }
 
     try {
-      // Use per-user plan-index so browser can see requests from this user's agents
-      // Browser is already connected to plan-index-{username} for plan discovery
-      const ownerId = await getGitHubUsername();
-      const ydoc = await getOrCreateDoc(getPlanIndexDocName(ownerId));
+      // Always use plan-index doc so browser can see requests from all agents
+      // Browser is already connected to plan-index for plan discovery
+      const ydoc = await getOrCreateDoc(PLAN_INDEX_DOC_NAME);
 
-      // Create manager and make request
-      const manager = new InputRequestManager();
-      let requestId: string;
-
-      if (input.questions) {
-        // Multi-question request
-        const params = {
-          questions: input.questions,
-          timeout: input.timeout,
-          planId: input.planId,
-        };
-        requestId = manager.createMultiQuestionRequest(ydoc, params);
-      } else {
-        // Single-question request (existing logic)
-        const params = buildRequestParams(input);
-        // Cast through unknown since new types may not yet be in the schema
-        requestId = manager.createRequest(
-          ydoc,
-          params as unknown as Parameters<typeof manager.createRequest>[1]
-        );
-      }
+      // Create request and log event
+      const requestId = await initializeInputRequest(input, ydoc);
 
       // Wait for response
+      const manager = new InputRequestManager();
       const result = await manager.waitForResponse(ydoc, requestId, input.timeout);
 
       // Format response based on status

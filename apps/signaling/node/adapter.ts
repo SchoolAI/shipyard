@@ -16,7 +16,7 @@ import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import type { InviteRedemption, InviteToken } from '@shipyard/schema';
 import { nanoid } from 'nanoid';
 import type { WebSocket } from 'ws';
-import type { PlanApprovalState, PlatformAdapter } from '../core/platform.js';
+import type { PlatformAdapter } from '../core/platform.js';
 import { logger } from '../src/logger.js';
 
 /**
@@ -56,17 +56,6 @@ export class NodePlatformAdapter implements PlatformAdapter {
    * Used for efficient cleanup when connection closes.
    */
   private connectionTopics = new WeakMap<WebSocket, Set<string>>();
-
-  /**
-   * Plan approval states (planId -> state).
-   * Tracks approved/rejected/pending users for each plan.
-   */
-  private planApprovals = new Map<string, PlanApprovalState>();
-
-  /**
-   * Map from connection to user ID (GitHub username).
-   */
-  private connectionUserIds = new WeakMap<WebSocket, string>();
 
   // --- Storage Operations ---
 
@@ -174,56 +163,6 @@ export class NodePlatformAdapter implements PlatformAdapter {
 
   async setPlanOwnerId(planId: string, ownerId: string): Promise<void> {
     this.planOwners.set(planId, ownerId);
-  }
-
-  // --- Approval State Operations ---
-
-  async getPlanApprovalState(planId: string): Promise<PlanApprovalState | undefined> {
-    return this.planApprovals.get(planId);
-  }
-
-  async setPlanApprovalState(planId: string, state: PlanApprovalState): Promise<void> {
-    this.planApprovals.set(planId, state);
-  }
-
-  // --- Connection State Operations ---
-
-  setConnectionUserId(ws: unknown, userId: string): void {
-    const socket = ws as WebSocket;
-    this.connectionUserIds.set(socket, userId);
-  }
-
-  getConnectionUserId(ws: unknown): string | undefined {
-    const socket = ws as WebSocket;
-    return this.connectionUserIds.get(socket);
-  }
-
-  // --- Notification Operations ---
-
-  broadcastToTopic(topic: string, message: unknown, filter?: (ws: unknown) => boolean): void {
-    const subscribers = this.topics.get(topic);
-    if (!subscribers) return;
-
-    for (const ws of subscribers) {
-      if (filter && !filter(ws)) continue;
-      this.sendMessage(ws, message);
-    }
-  }
-
-  async notifyPlanOwner(planId: string, message: unknown): Promise<void> {
-    const ownerId = await this.getPlanOwnerId(planId);
-    if (!ownerId) return;
-
-    const topic = `shipyard-${planId}`;
-    const subscribers = this.topics.get(topic);
-    if (!subscribers) return;
-
-    for (const ws of subscribers) {
-      const userId = this.getConnectionUserId(ws);
-      if (userId === ownerId) {
-        this.sendMessage(ws, message);
-      }
-    }
   }
 
   // --- Crypto Operations ---

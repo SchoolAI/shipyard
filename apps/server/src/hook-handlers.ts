@@ -20,11 +20,11 @@ import {
   formatThreadsForLLM,
   type GetReviewStatusResponse,
   getDeliverables,
-  getPlanIndexDocName,
   getPlanMetadata,
   type HookContext,
   type HookHandlers,
   initPlanMetadata,
+  PLAN_INDEX_DOC_NAME,
   type PlanMetadata,
   parseClaudeCodeOrigin,
   parseThreads,
@@ -168,7 +168,7 @@ export async function createSessionHandler(
     );
   }
 
-  const indexDoc = await ctx.getOrCreateDoc(getPlanIndexDocName(ownerId));
+  const indexDoc = await ctx.getOrCreateDoc(PLAN_INDEX_DOC_NAME);
   setPlanIndexEntry(indexDoc, {
     id: planId,
     title: PLAN_IN_PROGRESS,
@@ -198,8 +198,7 @@ export async function createSessionHandler(
   // 1. The window is very small (milliseconds)
   // 2. If it happens, the browser simply won't navigate (user can do it manually)
   // 3. Adding synchronization would add complexity without significant benefit
-  const indexDocName = getPlanIndexDocName(ownerId);
-  if (await hasActiveConnections(indexDocName)) {
+  if (await hasActiveConnections(PLAN_INDEX_DOC_NAME)) {
     // Browser already connected - navigate it via CRDT
     // NOTE: navigation.target is never cleared by the server (acceptable race condition).
     // The browser clears it after reading. If multiple plans are created rapidly,
@@ -248,6 +247,10 @@ export async function updateContentHandler(
     }
     editor.blocksToYXmlFragment(blocks, fragment);
 
+    // Clear existing deliverables first to prevent duplicates on content updates
+    const deliverablesArray = ydoc.getArray(YDOC_KEYS.DELIVERABLES);
+    deliverablesArray.delete(0, deliverablesArray.length);
+
     const deliverables = extractDeliverables(blocks);
     for (const deliverable of deliverables) {
       addDeliverable(ydoc, deliverable);
@@ -262,8 +265,8 @@ export async function updateContentHandler(
     title,
   });
 
+  const indexDoc = await ctx.getOrCreateDoc(PLAN_INDEX_DOC_NAME);
   if (metadata.ownerId) {
-    const indexDoc = await ctx.getOrCreateDoc(getPlanIndexDocName(metadata.ownerId));
     setPlanIndexEntry(indexDoc, {
       id: planId,
       title,

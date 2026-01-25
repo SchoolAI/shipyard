@@ -298,6 +298,8 @@ export type PlanEvent =
           | 'multi';
         requestMessage?: string;
         questionCount?: number;
+        /** If true, this request is blocking the agent from proceeding */
+        isBlocker?: boolean;
       };
     })
   | (PlanEventBase & {
@@ -487,6 +489,7 @@ export const PlanEventSchema = z.discriminatedUnion('type', [
       ]),
       requestMessage: z.string().optional(),
       questionCount: z.number().optional(),
+      isBlocker: z.boolean().optional(),
     }),
   }),
   PlanEventBaseSchema.extend({

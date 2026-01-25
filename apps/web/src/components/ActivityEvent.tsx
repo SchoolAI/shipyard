@@ -1,10 +1,5 @@
 import { Chip } from '@heroui/react';
-import {
-  type AgentActivityData,
-  assertNever,
-  type PlanEvent,
-  type PlanEventType,
-} from '@shipyard/schema';
+import { type AgentActivityData, assertNever, type PlanEvent } from '@shipyard/schema';
 import {
   AlertOctagon,
   AlertTriangle,
@@ -104,8 +99,8 @@ function getAgentActivityDescription(data: AgentActivityData): ReactNode {
   }
 }
 
-function getEventIcon(type: PlanEventType): ReactNode {
-  switch (type) {
+function getEventIcon(event: PlanEvent): ReactNode {
+  switch (event.type) {
     case 'plan_created':
       return <FileEdit className="w-3.5 h-3.5" />;
     case 'status_changed':
@@ -144,8 +139,15 @@ function getEventIcon(type: PlanEventType): ReactNode {
       return <Share2 className="w-3.5 h-3.5" />;
     case 'approval_requested':
       return <AlertTriangle className="w-3.5 h-3.5 text-warning" />;
-    case 'input_request_created':
-      return <HelpCircle className="w-3.5 h-3.5 text-accent" />;
+    case 'input_request_created': {
+      // Check if request is marked as blocker - show urgent red icon
+      const isBlocker = event.data?.isBlocker;
+      return isBlocker ? (
+        <AlertOctagon className="w-3.5 h-3.5 text-danger" />
+      ) : (
+        <HelpCircle className="w-3.5 h-3.5 text-accent" />
+      );
+    }
     case 'input_request_answered':
       return <Check className="w-3.5 h-3.5 text-success" />;
     case 'input_request_declined':
@@ -155,8 +157,10 @@ function getEventIcon(type: PlanEventType): ReactNode {
       return <Circle className="w-3.5 h-3.5" />;
     case 'session_token_regenerated':
       return <Key className="w-3.5 h-3.5 text-warning" />;
-    default:
-      return assertNever(type);
+    default: {
+      const _exhaustive: never = event;
+      return assertNever(_exhaustive);
+    }
   }
 }
 
@@ -239,15 +243,18 @@ function getEventDescription(event: PlanEvent): ReactNode {
     case 'input_request_created': {
       const requestMessage = event.data?.requestMessage;
       const requestType = event.data?.requestType;
+      const isBlocker = event.data?.isBlocker;
+      // Use "blocked - needs" prefix for blockers, "requested" for normal requests
+      const prefix = isBlocker ? 'blocked - needs' : 'requested';
       if (requestMessage) {
         return (
           <>
-            requested input:{' '}
+            {prefix} input:{' '}
             <MarkdownContent content={requestMessage} variant="compact" className="inline" />
           </>
         );
       }
-      return requestType ? `requested ${requestType} input` : 'requested input';
+      return requestType ? `${prefix} ${requestType} input` : `${prefix} input`;
     }
     case 'input_request_answered': {
       const answeredBy = event.data?.answeredBy;
@@ -284,7 +291,7 @@ function getUnresolvedHighlightColor(event: PlanEvent): 'danger' | 'warning' {
 export function ActivityEvent({ event, isUnresolved = false }: ActivityEventProps) {
   // Use special icon helper for agent_activity events
   const icon =
-    event.type === 'agent_activity' ? getAgentActivityIcon(event.data) : getEventIcon(event.type);
+    event.type === 'agent_activity' ? getAgentActivityIcon(event.data) : getEventIcon(event);
   const description = getEventDescription(event);
 
   // Determine styling based on unresolved status

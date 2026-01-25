@@ -1290,61 +1290,161 @@ describe('transitionPlanStatus', () => {
     });
   });
 
-  describe('invalid transitions', () => {
-    it('should reject transition from draft to completed', () => {
+  describe('flexible transitions (all allowed)', () => {
+    it('should allow transition from draft to completed', () => {
+      const now = Date.now();
       const result = transitionPlanStatus(
         ydoc,
-        { status: 'completed', completedAt: Date.now(), completedBy: 'actor' },
+        { status: 'completed', completedAt: now, completedBy: 'actor' },
         'test-actor'
       );
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toContain('Invalid transition');
+      expect(result.success).toBe(true);
+
+      const metadata = getPlanMetadata(ydoc);
+      expect(metadata?.status).toBe('completed');
+      if (metadata?.status === 'completed') {
+        expect(metadata.completedAt).toBe(now);
+        expect(metadata.completedBy).toBe('actor');
       }
-
-      const metadata = getPlanMetadata(ydoc);
-      expect(metadata?.status).toBe('draft');
     });
 
-    it('should reject transition from draft to changes_requested', () => {
+    it('should allow transition from draft to changes_requested', () => {
+      const now = Date.now();
       const result = transitionPlanStatus(
         ydoc,
-        { status: 'changes_requested', reviewedAt: Date.now(), reviewedBy: 'actor' },
+        { status: 'changes_requested', reviewedAt: now, reviewedBy: 'actor' },
         'test-actor'
       );
 
-      expect(result.success).toBe(false);
+      expect(result.success).toBe(true);
       const metadata = getPlanMetadata(ydoc);
-      expect(metadata?.status).toBe('draft');
+      expect(metadata?.status).toBe('changes_requested');
     });
 
-    it('should reject transition from completed to any status', () => {
-      transitionPlanStatus(
-        ydoc,
-        { status: 'pending_review', reviewRequestId: 'req-123' },
-        'actor1'
-      );
-      transitionPlanStatus(
-        ydoc,
-        { status: 'in_progress', reviewedAt: Date.now(), reviewedBy: 'reviewer1' },
-        'actor1'
-      );
+    it('should allow transition from completed to in_progress', () => {
       transitionPlanStatus(
         ydoc,
         { status: 'completed', completedAt: Date.now(), completedBy: 'actor1' },
         'actor1'
       );
 
+      const now = Date.now();
       const result = transitionPlanStatus(
         ydoc,
-        { status: 'in_progress', reviewedAt: Date.now(), reviewedBy: 'actor1' },
+        { status: 'in_progress', reviewedAt: now, reviewedBy: 'actor1' },
         'actor1'
       );
 
-      expect(result.success).toBe(false);
+      expect(result.success).toBe(true);
       const metadata = getPlanMetadata(ydoc);
+      expect(metadata?.status).toBe('in_progress');
+    });
+
+    it('should allow transition from completed to draft', () => {
+      transitionPlanStatus(
+        ydoc,
+        { status: 'completed', completedAt: Date.now(), completedBy: 'actor1' },
+        'actor1'
+      );
+
+      const result = transitionPlanStatus(ydoc, { status: 'draft' }, 'actor1');
+
+      expect(result.success).toBe(true);
+      const metadata = getPlanMetadata(ydoc);
+      expect(metadata?.status).toBe('draft');
+    });
+
+    it('should allow transition from in_progress to draft', () => {
+      transitionPlanStatus(
+        ydoc,
+        { status: 'in_progress', reviewedAt: Date.now(), reviewedBy: 'reviewer1' },
+        'actor1'
+      );
+
+      const result = transitionPlanStatus(ydoc, { status: 'draft' }, 'actor1');
+
+      expect(result.success).toBe(true);
+      const metadata = getPlanMetadata(ydoc);
+      expect(metadata?.status).toBe('draft');
+    });
+
+    it('should allow transition from pending_review to draft', () => {
+      transitionPlanStatus(
+        ydoc,
+        { status: 'pending_review', reviewRequestId: 'req-123' },
+        'actor1'
+      );
+
+      const result = transitionPlanStatus(ydoc, { status: 'draft' }, 'actor1');
+
+      expect(result.success).toBe(true);
+      const metadata = getPlanMetadata(ydoc);
+      expect(metadata?.status).toBe('draft');
+    });
+  });
+
+  describe('draft transition clears status-specific fields', () => {
+    it('should clear completed fields when transitioning to draft', () => {
+      transitionPlanStatus(
+        ydoc,
+        {
+          status: 'completed',
+          completedAt: Date.now(),
+          completedBy: 'completer1',
+          snapshotUrl: 'https://example.com/snapshot',
+        },
+        'actor1'
+      );
+
+      let metadata = getPlanMetadata(ydoc);
       expect(metadata?.status).toBe('completed');
+      if (metadata?.status === 'completed') {
+        expect(metadata.completedAt).toBeDefined();
+        expect(metadata.completedBy).toBe('completer1');
+      }
+
+      transitionPlanStatus(ydoc, { status: 'draft' }, 'actor1');
+
+      metadata = getPlanMetadata(ydoc);
+      expect(metadata?.status).toBe('draft');
+      const map = ydoc.getMap('metadata');
+      expect(map.get('completedAt')).toBeUndefined();
+      expect(map.get('completedBy')).toBeUndefined();
+      expect(map.get('snapshotUrl')).toBeUndefined();
+    });
+
+    it('should clear review fields when transitioning to draft', () => {
+      transitionPlanStatus(
+        ydoc,
+        {
+          status: 'changes_requested',
+          reviewedAt: Date.now(),
+          reviewedBy: 'reviewer1',
+          reviewComment: 'Needs work',
+        },
+        'actor1'
+      );
+
+      transitionPlanStatus(ydoc, { status: 'draft' }, 'actor1');
+
+      const map = ydoc.getMap('metadata');
+      expect(map.get('reviewedAt')).toBeUndefined();
+      expect(map.get('reviewedBy')).toBeUndefined();
+      expect(map.get('reviewComment')).toBeUndefined();
+    });
+
+    it('should clear reviewRequestId when transitioning to draft from pending_review', () => {
+      transitionPlanStatus(
+        ydoc,
+        { status: 'pending_review', reviewRequestId: 'req-123' },
+        'actor1'
+      );
+
+      transitionPlanStatus(ydoc, { status: 'draft' }, 'actor1');
+
+      const map = ydoc.getMap('metadata');
+      expect(map.get('reviewRequestId')).toBeUndefined();
     });
   });
 

@@ -463,18 +463,6 @@ function groupInboxEvents(
         (e: InboxEventItem) => e.event.type === 'deliverable_linked' && e.event.data?.allFulfilled
       )
     ),
-    agentHelpRequests: filterByReadState(
-      eventBasedInbox.filter(
-        (e: InboxEventItem) =>
-          e.event.type === 'agent_activity' && e.event.data?.activityType === 'help_request'
-      )
-    ),
-    agentBlockers: filterByReadState(
-      eventBasedInbox.filter(
-        (e: InboxEventItem) =>
-          e.event.type === 'agent_activity' && e.event.data?.activityType === 'blocker'
-      )
-    ),
   };
 }
 
@@ -647,8 +635,6 @@ function calculateTotalInboxItems(
     inboxGroups.mentions.length +
     inboxGroups.readyToComplete.length +
     inboxGroups.approvalRequests.length +
-    inboxGroups.agentHelpRequests.length +
-    inboxGroups.agentBlockers.length +
     pendingRequestsCount
   );
 }
@@ -838,44 +824,6 @@ function InboxAccordionContent({
         >
           <EventItemList
             items={inboxGroups.approvalRequests}
-            onView={handleViewEvent}
-            onMarkRead={handleMarkEventRead}
-            onMarkUnread={handleMarkEventUnread}
-          />
-        </InboxAccordionSection>
-      )}
-
-      {/* Agent Help Requests */}
-      {inboxGroups.agentHelpRequests.length > 0 && (
-        <InboxAccordionSection
-          id="agentHelpRequests"
-          icon={<HelpCircle className="w-4 h-4" />}
-          iconColorClass="text-warning"
-          title="Agent Help Requests"
-          count={inboxGroups.agentHelpRequests.length}
-          chipColor="warning"
-        >
-          <EventItemList
-            items={inboxGroups.agentHelpRequests}
-            onView={handleViewEvent}
-            onMarkRead={handleMarkEventRead}
-            onMarkUnread={handleMarkEventUnread}
-          />
-        </InboxAccordionSection>
-      )}
-
-      {/* Agent Blockers */}
-      {inboxGroups.agentBlockers.length > 0 && (
-        <InboxAccordionSection
-          id="agentBlockers"
-          icon={<AlertOctagon className="w-4 h-4" />}
-          iconColorClass="text-danger"
-          title="Agent Blockers"
-          count={inboxGroups.agentBlockers.length}
-          chipColor="danger"
-        >
-          <EventItemList
-            items={inboxGroups.agentBlockers}
             onView={handleViewEvent}
             onMarkRead={handleMarkEventRead}
             onMarkUnread={handleMarkEventUnread}

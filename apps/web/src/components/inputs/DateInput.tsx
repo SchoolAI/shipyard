@@ -3,8 +3,9 @@
  * Uses native HTML5 date picker with optional min/max range validation.
  */
 
-import { Input, Label, TextField } from '@heroui/react';
+import { Input, TextField } from '@heroui/react';
 import type { DateInputRequest } from '@shipyard/schema';
+import { MarkdownContent } from '@/components/ui/MarkdownContent';
 import type { BaseInputProps } from './types';
 
 export function DateInput({
@@ -54,25 +55,27 @@ export function DateInput({
 
   return (
     <div className="space-y-3">
-      <TextField isRequired isDisabled={isSubmitting} isInvalid={hasValue && !isValid}>
-        <Label className="text-sm font-medium text-foreground">{request.message}</Label>
-        <Input
-          type="date"
-          value={dateValue}
-          onChange={(e) => setValue(e.target.value)}
-          min={request.min}
-          max={request.max}
-          autoComplete="off"
-          autoFocus
-          aria-invalid={hasValue && !isValid}
-          aria-describedby={errorMessage ? 'date-error' : undefined}
-        />
-        {errorMessage && (
-          <p id="date-error" className="text-xs text-danger mt-1" role="alert">
-            {errorMessage}
-          </p>
-        )}
-      </TextField>
+      <div className="space-y-1">
+        <MarkdownContent content={request.message} variant="default" />
+        <TextField isRequired isDisabled={isSubmitting} isInvalid={hasValue && !isValid}>
+          <Input
+            type="date"
+            value={dateValue}
+            onChange={(e) => setValue(e.target.value)}
+            min={request.min}
+            max={request.max}
+            autoComplete="off"
+            autoFocus
+            aria-invalid={hasValue && !isValid}
+            aria-describedby={errorMessage ? 'date-error' : undefined}
+          />
+          {errorMessage && (
+            <p id="date-error" className="text-xs text-danger mt-1" role="alert">
+              {errorMessage}
+            </p>
+          )}
+        </TextField>
+      </div>
     </div>
   );
 }

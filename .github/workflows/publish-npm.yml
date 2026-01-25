@@ -5,16 +5,12 @@ run-name: >-
       && format('Promote {0} → {1}', inputs.rc_version, inputs.stable_version)
       || github.event_name == 'workflow_dispatch' && inputs.action == 'rc'
       && 'Publish RC'
-      || startsWith(github.ref, 'refs/tags/v')
-      && format('Release {0}', github.ref_name)
       || github.event.head_commit.message }}
 
 on:
   push:
     branches:
       - main  # Auto RC on every push
-    tags:
-      - 'v*'  # Stable/prerelease on version tags
   workflow_dispatch:
     inputs:
       action:
@@ -128,6 +124,21 @@ jobs:
 
           echo "✅ Created tag v$STABLE_VERSION"
 
+      - name: Create GitHub Release (promote)
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.action == 'promote' }}
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.repos.createRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag_name: 'v${{ inputs.stable_version }}',
+              name: 'v${{ inputs.stable_version }}',
+              body: 'Promoted from RC: `${{ inputs.rc_version }}`\n\nInstall with:\n```bash\nnpm install @schoolai/shipyard-mcp\n# or\nnpx -y -p @schoolai/shipyard-mcp mcp-server-shipyard\n```',
+              draft: false,
+              prerelease: false
+            });
+
       # ============================================
       # PUBLISH ACTION: Build and publish new version
       # ============================================
@@ -135,24 +146,12 @@ jobs:
         if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.action == 'promote') }}
         id: version
         run: |
-          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
-            # Tag-triggered: use tag version
-            VERSION="${GITHUB_REF_NAME#v}"
-            if [[ "$VERSION" == *"-"* ]]; then
-              NPM_TAG="next"
-              echo "Publishing tag release as prerelease: $VERSION → @next"
-            else
-              NPM_TAG="latest"
-              echo "Publishing tag release as stable: $VERSION → @latest"
-            fi
-          else
-            # Push to main or manual dispatch: generate RC version
-            BASE_VERSION=$(node -p "require('./package-npm.json').version")
-            COMMIT_COUNT=$(git rev-list --count HEAD)
-            VERSION="${BASE_VERSION}-next.${COMMIT_COUNT}"
-            NPM_TAG="next"
-            echo "Publishing RC version: $VERSION → @next"
-          fi
+          # Push to main or manual dispatch: generate RC version
+          BASE_VERSION=$(node -p "require('./package-npm.json').version")
+          COMMIT_COUNT=$(git rev-list --count HEAD)
+          VERSION="${BASE_VERSION}-next.${COMMIT_COUNT}"
+          NPM_TAG="next"
+          echo "Publishing RC version: $VERSION → @next"
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "npm_tag=$NPM_TAG" >> $GITHUB_OUTPUT
 
@@ -170,7 +169,7 @@ jobs:
       # POST-PUBLISH: Comments and summaries
       # ============================================
       - name: Comment on commit (RC releases)
-        if: ${{ github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/') }}
+        if: ${{ github.event_name == 'push' }}
         uses: actions/github-script@v7
         with:
           script: |
@@ -179,21 +178,6 @@ jobs:
               repo: context.repo.repo,
               commit_sha: context.sha,
               body: `📦 Published RC: \`${{ steps.version.outputs.version }}\`\n\nInstall with:\n\`\`\`bash\nnpx -y -p @schoolai/shipyard-mcp@next mcp-server-shipyard\n\`\`\``
-            });
-
-      - name: Create GitHub Release (stable tags)
-        if: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') && !contains(github.ref, '-') }}
-        uses: actions/github-script@v7
-        with:
-          script: |
-            await github.rest.repos.createRelease({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              tag_name: '${{ github.ref_name }}',
-              name: '${{ github.ref_name }}',
-              body: 'Install with:\n```bash\nnpm install @schoolai/shipyard-mcp\n# or\nnpx -y -p @schoolai/shipyard-mcp mcp-server-shipyard\n```',
-              draft: false,
-              prerelease: false
             });
 
       - name: Summary

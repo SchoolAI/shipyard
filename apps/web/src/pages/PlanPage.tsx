@@ -559,6 +559,7 @@ export function PlanPage() {
           isOpen={inputRequestModalOpen}
           request={currentInputRequest}
           ydoc={indexDoc}
+          planYdoc={ydoc}
           onClose={() => {
             setInputRequestModalOpen(false);
             setCurrentInputRequest(null);
@@ -587,6 +588,7 @@ export function PlanPage() {
         isOpen={inputRequestModalOpen}
         request={currentInputRequest}
         ydoc={indexDoc}
+        planYdoc={ydoc}
         onClose={() => {
           setInputRequestModalOpen(false);
           setCurrentInputRequest(null);

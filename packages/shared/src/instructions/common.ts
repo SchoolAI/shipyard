@@ -3,7 +3,7 @@
  * These are the platform-agnostic concepts that apply everywhere.
  */
 
-import { TOOL_NAMES } from '@shipyard/schema';
+import { TOOL_NAMES } from './tool-names.js';
 
 export const CRITICAL_USAGE_SECTION = `## CRITICAL: When to Use Shipyard
 

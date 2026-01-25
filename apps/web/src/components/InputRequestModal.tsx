@@ -13,6 +13,7 @@ import {
   DEFAULT_INPUT_REQUEST_TIMEOUT_SECONDS,
   declineInputRequest,
   type InputRequest,
+  logPlanEvent,
 } from '@shipyard/schema';
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -38,6 +39,7 @@ interface InputRequestModalProps {
   isOpen: boolean;
   request: InputRequest | null;
   ydoc: Y.Doc | null;
+  planYdoc?: Y.Doc | null;
   onClose: () => void;
 }
 
@@ -204,7 +206,13 @@ function getModalConfig(message: string): { isLarge: boolean; maxHeight: string 
 }
 
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Modal with multiple input types and auth states naturally has branching logic
-export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputRequestModalProps) {
+export function InputRequestModal({
+  isOpen,
+  request,
+  ydoc,
+  planYdoc,
+  onClose,
+}: InputRequestModalProps) {
   const [value, setValue] = useState<string | string[]>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   // Use -1 as sentinel value to indicate "not yet initialized"
@@ -353,6 +361,15 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
         return;
       }
 
+      // Also log to plan's Y.Doc for activity timeline if this is a plan-scoped request
+      if (planYdoc && request.planId) {
+        logPlanEvent(planYdoc, 'input_request_answered', identity.username, {
+          requestId: request.id,
+          response: responseValue,
+          answeredBy: identity.username,
+        });
+      }
+
       // Success - close modal and clear state
       setValue(getResetValueState(request));
       setCustomInput('');
@@ -376,6 +393,15 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
           return;
         }
 
+        // Also log to plan's Y.Doc for activity timeline if this is a plan-scoped request
+        if (planYdoc && request.planId) {
+          logPlanEvent(planYdoc, 'input_request_answered', identity.username, {
+            requestId: request.id,
+            response,
+            answeredBy: identity.username,
+          });
+        }
+
         // Success - close modal and clear value
         setValue(getResetValueState(request));
         onClose();
@@ -383,7 +409,7 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
         setIsSubmitting(false);
       }
     },
-    [ydoc, request, identity, isSubmitting, onClose, handleAnswerError]
+    [ydoc, planYdoc, request, identity, isSubmitting, onClose, handleAnswerError]
   );
 
   const renderInput = () => {

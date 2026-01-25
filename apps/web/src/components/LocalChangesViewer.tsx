@@ -446,7 +446,6 @@ function buildFileTreeData(
 /**
  * Custom node renderer for react-arborist with staging status indicators
  */
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Handles sections, folders, and files with staging status
 function createFileTreeNode(onFileClick: (path: string) => void) {
   // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Renders 3 node types (sections, folders, files) with conditional styling
   return function FileTreeNode({ node, style }: NodeRendererProps<FileTreeData>) {

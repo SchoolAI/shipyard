@@ -11,9 +11,9 @@ import {
   createPlanWebUrl,
   extractDeliverables,
   type GetReviewStatusResponse,
-  getPlanIndexDocName,
   getPlanMetadata,
   initPlanMetadata,
+  PLAN_INDEX_DOC_NAME,
   parseClaudeCodeOrigin,
   parseThreads,
   type ReviewFeedback,
@@ -145,7 +145,7 @@ export async function handleCreateSession(req: Request, res: Response): Promise<
       );
     }
 
-    const indexDoc = await getOrCreateDoc(getPlanIndexDocName(ownerId));
+    const indexDoc = await getOrCreateDoc(PLAN_INDEX_DOC_NAME);
     setPlanIndexEntry(indexDoc, {
       id: planId,
       title: PLAN_IN_PROGRESS,
@@ -205,6 +205,10 @@ export async function handleUpdateContent(req: Request, res: Response): Promise<
         }
         editor.blocksToYXmlFragment(blocks, fragment);
 
+        // Clear existing deliverables first to prevent duplicates on content updates
+        const deliverablesArray = ydoc.getArray(YDOC_KEYS.DELIVERABLES);
+        deliverablesArray.delete(0, deliverablesArray.length);
+
         const deliverables = extractDeliverables(blocks);
         for (const deliverable of deliverables) {
           addDeliverable(ydoc, deliverable);
@@ -222,8 +226,8 @@ export async function handleUpdateContent(req: Request, res: Response): Promise<
       title,
     });
 
+    const indexDoc = await getOrCreateDoc(PLAN_INDEX_DOC_NAME);
     if (metadata.ownerId) {
-      const indexDoc = await getOrCreateDoc(getPlanIndexDocName(metadata.ownerId));
       setPlanIndexEntry(indexDoc, {
         id: planId,
         title,

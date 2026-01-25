@@ -74,6 +74,12 @@ const InputRequestBaseSchema = z.object({
   answeredAt: z.number().optional(),
   /** Who answered (username or "agent") */
   answeredBy: z.string().optional(),
+  /**
+   * If true, this request is blocking the agent from proceeding.
+   * Shows as red/urgent in the activity timeline. Use for critical questions
+   * that must be answered before work can continue.
+   */
+  isBlocker: z.boolean().optional(),
 });
 
 /** Text input request - single line text entry */
@@ -230,6 +236,11 @@ interface CreateInputRequestBaseParams {
   defaultValue?: string;
   timeout?: number;
   planId?: string;
+  /**
+   * If true, this request is blocking the agent from proceeding.
+   * Shows as red/urgent in the activity timeline.
+   */
+  isBlocker?: boolean;
 }
 
 /** Params for creating a text input request */
@@ -333,6 +344,7 @@ export function createInputRequest(params: CreateInputRequestParams): InputReque
     status: 'pending' as const,
     timeout: params.timeout,
     planId: params.planId,
+    isBlocker: params.isBlocker,
   };
 
   let request: unknown;
@@ -591,6 +603,11 @@ export const MultiQuestionInputRequestSchema = z.object({
   answeredAt: z.number().optional(),
   /** Who answered (username or "agent") */
   answeredBy: z.string().optional(),
+  /**
+   * If true, this request is blocking the agent from proceeding.
+   * Shows as red/urgent in the activity timeline.
+   */
+  isBlocker: z.boolean().optional(),
 });
 
 export type MultiQuestionInputRequest = z.infer<typeof MultiQuestionInputRequestSchema>;
@@ -608,6 +625,11 @@ export interface CreateMultiQuestionInputParams {
   questions: Question[];
   timeout?: number;
   planId?: string;
+  /**
+   * If true, this request is blocking the agent from proceeding.
+   * Shows as red/urgent in the activity timeline.
+   */
+  isBlocker?: boolean;
 }
 
 /**
@@ -624,6 +646,7 @@ export function createMultiQuestionInputRequest(
     status: 'pending' as const,
     timeout: params.timeout,
     planId: params.planId,
+    isBlocker: params.isBlocker,
   };
 
   const parseResult = MultiQuestionInputRequestSchema.safeParse(request);

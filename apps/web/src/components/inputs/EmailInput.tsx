@@ -3,8 +3,9 @@
  * Supports domain restriction and email format validation.
  */
 
-import { Input, Label, TextField } from '@heroui/react';
+import { Input, TextField } from '@heroui/react';
 import type { EmailInputRequest } from '@shipyard/schema';
+import { MarkdownContent } from '@/components/ui/MarkdownContent';
 import type { BaseInputProps } from './types';
 
 /** Basic email validation regex */
@@ -45,25 +46,27 @@ export function EmailInput({
 
   return (
     <div className="space-y-3">
-      <TextField isRequired isDisabled={isSubmitting} isInvalid={hasValue && !isValid}>
-        <Label className="text-sm font-medium text-foreground">{request.message}</Label>
-        <Input
-          type="email"
-          inputMode="email"
-          autoComplete="email"
-          value={emailValue}
-          onChange={(e) => setValue(e.target.value)}
-          placeholder={placeholder}
-          autoFocus
-          aria-invalid={hasValue && !isValid}
-          aria-describedby={errorMessage ? 'email-error' : undefined}
-        />
-        {errorMessage && (
-          <p id="email-error" className="text-xs text-danger mt-1" role="alert">
-            {errorMessage}
-          </p>
-        )}
-      </TextField>
+      <div className="space-y-1">
+        <MarkdownContent content={request.message} variant="default" />
+        <TextField isRequired isDisabled={isSubmitting} isInvalid={hasValue && !isValid}>
+          <Input
+            type="email"
+            inputMode="email"
+            autoComplete="email"
+            value={emailValue}
+            onChange={(e) => setValue(e.target.value)}
+            placeholder={placeholder}
+            autoFocus
+            aria-invalid={hasValue && !isValid}
+            aria-describedby={errorMessage ? 'email-error' : undefined}
+          />
+          {errorMessage && (
+            <p id="email-error" className="text-xs text-danger mt-1" role="alert">
+              {errorMessage}
+            </p>
+          )}
+        </TextField>
+      </div>
     </div>
   );
 }

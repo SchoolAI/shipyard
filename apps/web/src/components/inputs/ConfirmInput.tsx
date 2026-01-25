@@ -6,6 +6,7 @@
 
 import { Button, Label, TextArea, TextField } from '@heroui/react';
 import { useState } from 'react';
+import { MarkdownContent } from '@/components/ui/MarkdownContent';
 import type { ConfirmInputProps } from './types';
 import { formatTime } from './utils';
 
@@ -25,7 +26,7 @@ export function ConfirmInput({
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-foreground">{request.message}</p>
+      <MarkdownContent content={request.message} variant="default" />
 
       {showExplain ? (
         <div className="space-y-3">

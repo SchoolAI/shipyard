@@ -1,19 +1,23 @@
 /**
  * Rating input component for input requests.
- * Uses RadioGroup pattern for accessibility compliance.
+ * Uses HeroUI RadioGroup pattern for accessibility compliance.
  * Features cumulative left-to-right fill with hover preview.
  * Includes N/A and "Other" escape hatch options.
  */
 
-import { Button, Input, Label, Radio, RadioGroup, TextField } from '@heroui/react';
+import { Input, Label, Radio, RadioGroup, TextField } from '@heroui/react';
 import { useEffect, useRef, useState } from 'react';
+import { MarkdownContent } from '@/components/ui/MarkdownContent';
 import type { RatingInputProps } from './types';
 import { NA_OPTION_LABEL, NA_OPTION_VALUE, OTHER_OPTION_VALUE } from './utils';
+
+/** Rating-specific label for "Other" option (shorter than ChoiceInput's version) */
+const RATING_OTHER_LABEL = 'Other...';
 
 /**
  * Get the display icon/label for a rating value based on style.
  * For emoji style, falls back to numbers if the scale is too large (> 5 items).
- * For stars, uses filled (★) or empty (☆) based on whether it's filled.
+ * For stars, uses filled (star) or empty (star outline) based on whether it's filled.
  */
 function getRatingDisplay(
   rating: number,
@@ -23,7 +27,7 @@ function getRatingDisplay(
   isFilled: boolean
 ): string {
   if (style === 'stars') {
-    return isFilled ? '\u2605' : '\u2606'; // Filled star (★) or empty star (☆)
+    return isFilled ? '\u2605' : '\u2606'; // Filled star or empty star
   }
   if (style === 'emoji') {
     // Disable emoji for large scales (e.g., NPS 0-10)
@@ -72,104 +76,113 @@ export function RatingInput({
   // Generate rating values array
   const ratingValues = Array.from({ length: maxVal - minVal + 1 }, (_, i) => minVal + i);
 
-  // Handle escape hatch button clicks
-  const handleNaClick = () => {
-    setValue(NA_OPTION_VALUE);
-  };
-
-  const handleOtherClick = () => {
-    setValue(OTHER_OPTION_VALUE);
-  };
+  // Custom text input for "Other" option (shared pattern from ChoiceInput)
+  const otherInputField = isOtherSelected && (
+    <TextField className="mt-3">
+      <Label className="text-sm text-muted-foreground">Why can't you rate this?</Label>
+      <Input
+        ref={customInputRef}
+        value={customInput}
+        onChange={(e) => setCustomInput(e.target.value)}
+        placeholder="Explain..."
+        disabled={isSubmitting}
+      />
+    </TextField>
+  );
 
   return (
     <div className="space-y-3">
+      <MarkdownContent content={request.message} variant="default" />
       <RadioGroup
         value={selectedValue}
         onChange={(val) => setValue(val as string)}
         isDisabled={isSubmitting}
-        isRequired
         orientation="horizontal"
       >
-        <Label className="text-sm font-medium text-foreground">{request.message}</Label>
+        {/* Rating values displayed horizontally */}
+        <div className="flex items-center gap-1 justify-center">
+          {ratingValues.map((rating) => {
+            // Cumulative fill: all ratings <= displayValue are filled
+            const isFilled = rating <= displayValue;
+            const displayChar = getRatingDisplay(rating, style, minVal, maxVal, isFilled);
 
-        {/* Stars and buttons on same line */}
-        <div className="flex items-center gap-4 justify-center flex-wrap">
-          <div className="flex gap-1">
-            {ratingValues.map((rating) => {
-              // Cumulative fill: all ratings <= displayValue are filled
-              const isFilled = rating <= displayValue;
-              const displayChar = getRatingDisplay(rating, style, minVal, maxVal, isFilled);
-
-              return (
-                <Radio key={rating} value={String(rating)}>
-                  <Radio.Control className="sr-only" />
-                  <Radio.Content>
-                    {/* biome-ignore lint/a11y/noNoninteractiveElementInteractions: Mouse events for hover preview; Radio handles the actual interaction */}
-                    <span
-                      className={`
-                        text-2xl cursor-pointer transition-all
-                        hover:scale-110
-                        ${isFilled ? 'opacity-100' : 'opacity-50'}
-                        ${style === 'stars' ? (isFilled ? 'text-yellow-500' : 'text-gray-300') : ''}
-                        ${style === 'numbers' && isFilled ? 'font-bold' : ''}
-                      `}
-                      role="img"
-                      aria-label={`${rating} out of ${maxVal}`}
-                      onMouseEnter={() => setHoveredRating(rating)}
-                      onMouseLeave={() => setHoveredRating(null)}
-                      onFocus={() => setHoveredRating(rating)}
-                      onBlur={() => setHoveredRating(null)}
-                    >
-                      {displayChar}
-                    </span>
-                  </Radio.Content>
-                </Radio>
-              );
-            })}
-          </div>
-
-          {/* Escape hatch buttons */}
-          <div className="flex gap-2">
-            <Button
-              size="sm"
-              variant={isNaSelected ? 'primary' : 'secondary'}
-              onPress={handleNaClick}
-              isDisabled={isSubmitting}
-            >
-              {NA_OPTION_LABEL}
-            </Button>
-            <Button
-              size="sm"
-              variant={isOtherSelected ? 'primary' : 'secondary'}
-              onPress={handleOtherClick}
-              isDisabled={isSubmitting}
-            >
-              Other...
-            </Button>
-          </div>
+            return (
+              <Radio
+                key={rating}
+                value={String(rating)}
+                className="cursor-pointer"
+                onHoverStart={() => setHoveredRating(rating)}
+                onHoverEnd={() => setHoveredRating(null)}
+              >
+                <Radio.Control className="sr-only">
+                  <Radio.Indicator />
+                </Radio.Control>
+                <Radio.Content>
+                  <span
+                    className={`
+                      text-2xl cursor-pointer transition-all select-none
+                      hover:scale-110
+                      ${isFilled ? 'opacity-100' : 'opacity-50'}
+                      ${style === 'stars' ? (isFilled ? 'text-yellow-500' : 'text-gray-300') : ''}
+                      ${style === 'numbers' && isFilled ? 'font-bold' : ''}
+                    `}
+                    role="img"
+                    aria-label={`${rating} out of ${maxVal}`}
+                  >
+                    {displayChar}
+                  </span>
+                </Radio.Content>
+              </Radio>
+            );
+          })}
         </div>
 
+        {/* Labels for rating scale endpoints */}
         {request.labels && (
           <div className="flex justify-between text-xs text-muted-foreground pt-1 w-full">
             <span>{request.labels.low || ''}</span>
             <span>{request.labels.high || ''}</span>
           </div>
         )}
+
+        {/* Escape hatch options - N/A and Other with custom button-like styling */}
+        <div className="flex gap-2 justify-center mt-2">
+          <Radio value={NA_OPTION_VALUE}>
+            <Radio.Control className="sr-only">
+              <Radio.Indicator />
+            </Radio.Control>
+            <Radio.Content>
+              <span
+                className={`px-3 py-1 rounded text-sm cursor-pointer transition-colors ${
+                  isNaSelected
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+                } ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
+              >
+                {NA_OPTION_LABEL}
+              </span>
+            </Radio.Content>
+          </Radio>
+          <Radio value={OTHER_OPTION_VALUE}>
+            <Radio.Control className="sr-only">
+              <Radio.Indicator />
+            </Radio.Control>
+            <Radio.Content>
+              <span
+                className={`px-3 py-1 rounded text-sm cursor-pointer transition-colors ${
+                  isOtherSelected
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+                } ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
+              >
+                {RATING_OTHER_LABEL}
+              </span>
+            </Radio.Content>
+          </Radio>
+        </div>
       </RadioGroup>
 
-      {/* Custom text input for "Other" option */}
-      {isOtherSelected && (
-        <TextField>
-          <Label className="text-sm text-muted-foreground">Why can't you rate this?</Label>
-          <Input
-            ref={customInputRef}
-            value={customInput}
-            onChange={(e) => setCustomInput(e.target.value)}
-            placeholder="Explain..."
-            disabled={isSubmitting}
-          />
-        </TextField>
-      )}
+      {otherInputField}
     </div>
   );
 }
