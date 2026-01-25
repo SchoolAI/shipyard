@@ -33,18 +33,21 @@ NOTE FOR CLAUDE CODE USERS: If you just received task approval via the hook, del
 - You need to check human feedback (set includeAnnotations=true)
 - You need to refresh state after changes
 - You need to see linked PRs (set includeLinkedPRs=true)
+- You need to see user responses to input requests (set includeAnnotations=true)
 
 USE CASES:
 - Review feedback from human reviewers (set includeAnnotations=true)
 - Check task status and completion state
 - Get block IDs for update_block_content operations
 - View linked PRs and their status (set includeLinkedPRs=true)
+- See user responses to requestUserInput() calls (set includeAnnotations=true)
 
 OUTPUT INCLUDES:
 - Metadata: title, status, repo, PR, timestamps
 - Content: Full markdown with block IDs
 - Deliverables section: Shows deliverable IDs and completion status
 - Annotations: Comment threads if includeAnnotations=true
+- Activity: Input requests and user responses if includeAnnotations=true
 - Linked PRs: PR list with status, URL, branch if includeLinkedPRs=true`,
     inputSchema: {
       type: 'object',
@@ -88,7 +91,6 @@ OUTPUT INCLUDES:
       };
     }
 
-    /** Verify session token */
     if (
       !metadata.sessionTokenHash ||
       !verifySessionToken(sessionToken, metadata.sessionTokenHash)
@@ -104,16 +106,14 @@ OUTPUT INCLUDES:
       };
     }
 
-    /** Export plan to markdown (with annotations if requested) */
     const markdown = await exportPlanToMarkdown(doc, {
       includeResolved: includeAnnotations,
+      includeActivity: includeAnnotations,
     });
 
-    /** Build output with extracted formatters */
     let output = formatPlanHeader(metadata);
     output += markdown;
 
-    /** Append deliverables section if any exist (uses shared formatter) */
     const deliverables = getDeliverables(doc);
     const deliverablesText = formatDeliverablesForLLM(deliverables);
     if (deliverablesText) {
@@ -121,7 +121,6 @@ OUTPUT INCLUDES:
       output += deliverablesText;
     }
 
-    /** Append linked PRs section if requested */
     if (includeLinkedPRs) {
       const linkedPRs = getLinkedPRs(doc);
       output += formatLinkedPRsSection(linkedPRs);

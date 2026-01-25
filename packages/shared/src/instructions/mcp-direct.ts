@@ -157,12 +157,28 @@ Uploads proof-of-work artifact.
 
 **THE primary human-agent communication channel.** Asks user a question via browser modal.
 
+**IMPORTANT: Always RETURN the response value in your execute_code result.**
+
+✅ **RECOMMENDED (primary pattern):**
+\`\`\`typescript
+const result = await requestUserInput({ message: "Which database?", type: "choice", options: ["PostgreSQL", "SQLite"] });
+return { userChoice: result.response, status: result.status };
+// Clean, structured output appears once in the final result
+\`\`\`
+
+⚠️ **AVOID (use only for debugging):**
+\`\`\`typescript
+console.log(\\\`User chose: \\\${result.response}\\\`);
+// Clutters output, not structured
+\`\`\`
+
 **Two modes - choose based on dependencies:**
 
 **Multi-step (dependencies):** Chain calls when later questions depend on earlier answers
 \`\`\`typescript
 const db = await requestUserInput({ message: "Database?", type: "choice", options: ["PostgreSQL", "SQLite"] });
 const port = await requestUserInput({ message: \\\`Port for \\\${db.response}?\\\`, type: "number" });
+return { database: db.response, port: port.response };
 \`\`\`
 
 **Multi-form (independent):** Single call for unrelated questions
@@ -173,6 +189,7 @@ const config = await requestUserInput({
     { message: "Use TypeScript?", type: "confirm" }
   ]
 });
+return { config: config.response };
 \`\`\`
 
 **Parameters (single-question mode):**

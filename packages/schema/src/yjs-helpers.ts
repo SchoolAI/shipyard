@@ -66,13 +66,11 @@ function findInputRequestById(
 ): { rawIndex: number; request: AnyInputRequest } | null {
   for (let i = 0; i < data.length; i++) {
     const item = data[i];
-    /** Quick check for id field before full validation */
     if (item && typeof item === 'object' && 'id' in item && item.id === requestId) {
       const parsed = AnyInputRequestSchema.safeParse(item);
       if (parsed.success) {
         return { rawIndex: i, request: parsed.data };
       }
-      /** Request found but invalid - return null to indicate error */
       return null;
     }
   }
@@ -549,7 +547,6 @@ export function addArtifact(ydoc: Y.Doc, artifact: Artifact, actor?: string): vo
 
 export function removeArtifact(ydoc: Y.Doc, artifactId: string): boolean {
   const array = ydoc.getArray<Artifact>(YDOC_KEYS.ARTIFACTS);
-  /** CRDT boundary: validate data structure */
   const data = toUnknownArray(array);
   const artifacts = data
     .map((item) => ArtifactSchema.safeParse(item))
@@ -690,7 +687,6 @@ export function linkArtifactToDeliverable(
   actor?: string
 ): boolean {
   const array = ydoc.getArray<Deliverable>(YDOC_KEYS.DELIVERABLES);
-  /** CRDT boundary: validate deliverables from CRDT */
   const data = toUnknownArray(array);
   const deliverables = data
     .map((item) => DeliverableSchema.safeParse(item))
@@ -880,7 +876,6 @@ export function linkPR(ydoc: Y.Doc, pr: LinkedPR, actor?: string): void {
   ydoc.transact(
     () => {
       const array = ydoc.getArray<LinkedPR>(YDOC_KEYS.LINKED_PRS);
-      /** CRDT boundary: validate existing data */
       const data = toUnknownArray(array);
       const existing = data
         .map((item) => LinkedPRSchema.safeParse(item))
@@ -900,7 +895,6 @@ export function linkPR(ydoc: Y.Doc, pr: LinkedPR, actor?: string): void {
 
 export function unlinkPR(ydoc: Y.Doc, prNumber: number): boolean {
   const array = ydoc.getArray<LinkedPR>(YDOC_KEYS.LINKED_PRS);
-  /** CRDT boundary: validate existing data */
   const data = toUnknownArray(array);
   const existing = data
     .map((item) => LinkedPRSchema.safeParse(item))
@@ -926,7 +920,6 @@ export function updateLinkedPRStatus(
   status: LinkedPR['status']
 ): boolean {
   const array = ydoc.getArray<LinkedPR>(YDOC_KEYS.LINKED_PRS);
-  /** CRDT boundary: validate existing data */
   const data = toUnknownArray(array);
   const existing = data
     .map((item) => LinkedPRSchema.safeParse(item))
@@ -973,7 +966,6 @@ export function addPRReviewComment(ydoc: Y.Doc, comment: PRReviewComment, actor?
 
 export function resolvePRReviewComment(ydoc: Y.Doc, commentId: string, resolved: boolean): boolean {
   const array = ydoc.getArray<PRReviewComment>(YDOC_KEYS.PR_REVIEW_COMMENTS);
-  /** CRDT boundary: validate existing data */
   const data = toUnknownArray(array);
   const existing = data
     .map((item) => PRReviewCommentSchema.safeParse(item))
@@ -994,7 +986,6 @@ export function resolvePRReviewComment(ydoc: Y.Doc, commentId: string, resolved:
 
 export function removePRReviewComment(ydoc: Y.Doc, commentId: string): boolean {
   const array = ydoc.getArray<PRReviewComment>(YDOC_KEYS.PR_REVIEW_COMMENTS);
-  /** CRDT boundary: validate existing data */
   const data = toUnknownArray(array);
   const existing = data
     .map((item) => PRReviewCommentSchema.safeParse(item))
@@ -1008,10 +999,6 @@ export function removePRReviewComment(ydoc: Y.Doc, commentId: string): boolean {
   return true;
 }
 
-/**
- * CRDT boundary: Extract and validate viewedBy data from CRDT.
- * Handles both Y.Map and plain object formats.
- */
 function extractViewedByFromCrdt(existingViewedBy: unknown): Record<string, number> {
   const viewedBy: Record<string, number> = {};
 
@@ -1026,7 +1013,6 @@ function extractViewedByFromCrdt(existingViewedBy: unknown): Record<string, numb
     typeof existingViewedBy === 'object' &&
     !Array.isArray(existingViewedBy)
   ) {
-    /** Validate each entry in plain object */
     for (const [key, value] of Object.entries(existingViewedBy)) {
       if (typeof value === 'number') {
         viewedBy[key] = value;
@@ -1089,7 +1075,6 @@ export function addConversationVersion(
     () => {
       const metadata = ydoc.getMap(YDOC_KEYS.METADATA);
       const rawVersions = metadata.get('conversationVersions');
-      /** CRDT boundary: validate existing conversation versions */
       let versions: ConversationVersion[] = [];
       if (Array.isArray(rawVersions)) {
         versions = rawVersions
@@ -1298,9 +1283,6 @@ export function getLatestSnapshot(ydoc: Y.Doc): PlanSnapshot | null {
   return snapshots[snapshots.length - 1] ?? null;
 }
 
-/**
- * CRDT boundary: validates that tags are string arrays.
- */
 function getValidatedTags(rawTags: unknown): string[] {
   if (!Array.isArray(rawTags)) return [];
   return rawTags.filter((t): t is string => typeof t === 'string');
@@ -1314,7 +1296,6 @@ export function addPlanTag(ydoc: Y.Doc, tag: string, actor?: string): void {
   ydoc.transact(
     () => {
       const map = ydoc.getMap(YDOC_KEYS.METADATA);
-      /** CRDT boundary: validate tags array */
       const currentTags = getValidatedTags(map.get('tags'));
 
       const normalizedTag = tag.toLowerCase().trim();
@@ -1334,7 +1315,6 @@ export function removePlanTag(ydoc: Y.Doc, tag: string, actor?: string): void {
   ydoc.transact(
     () => {
       const map = ydoc.getMap(YDOC_KEYS.METADATA);
-      /** CRDT boundary: validate tags array */
       const currentTags = getValidatedTags(map.get('tags'));
       const normalizedTag = tag.toLowerCase().trim();
 
@@ -1447,7 +1427,6 @@ export function answerInputRequest(
   const requestsArray = ydoc.getArray<AnyInputRequest>(YDOC_KEYS.INPUT_REQUESTS);
   const data = toUnknownArray(requestsArray);
 
-  /** Find request by ID in raw data to get correct array index */
   const found = findInputRequestById(data, requestId);
   if (!found) {
     return { success: false, error: 'Request not found' };
@@ -1486,10 +1465,18 @@ export function answerInputRequest(
     requestsArray.delete(index, 1);
     requestsArray.insert(index, [validated]);
 
+    /**
+     * Include original request context for activity visibility.
+     * Single-question requests have 'message' field, multi-question requests don't.
+     */
+    const requestMessage = 'message' in request ? request.message : undefined;
+
     logPlanEvent(ydoc, 'input_request_answered', answeredBy, {
       requestId,
       response,
       answeredBy,
+      requestMessage,
+      requestType: request.type,
     });
   });
 
@@ -1514,7 +1501,6 @@ export function answerMultiQuestionInputRequest(
   const requestsArray = ydoc.getArray<AnyInputRequest>(YDOC_KEYS.INPUT_REQUESTS);
   const data = toUnknownArray(requestsArray);
 
-  /** Find request by ID in raw data to get correct array index */
   const found = findInputRequestById(data, requestId);
   if (!found) {
     return { success: false, error: 'Request not found' };
@@ -1561,6 +1547,7 @@ export function answerMultiQuestionInputRequest(
       requestId,
       response: responses,
       answeredBy,
+      requestType: 'multi',
     });
   });
 
@@ -1578,7 +1565,6 @@ export function cancelInputRequest(
   const requestsArray = ydoc.getArray<AnyInputRequest>(YDOC_KEYS.INPUT_REQUESTS);
   const data = toUnknownArray(requestsArray);
 
-  /** Find request by ID in raw data to get correct array index */
   const found = findInputRequestById(data, requestId);
   if (!found) {
     return { success: false, error: 'Request not found' };
@@ -1595,7 +1581,6 @@ export function cancelInputRequest(
     status: 'cancelled' as const,
   };
 
-  /** Use appropriate schema based on request type */
   const validated =
     request.type === 'multi'
       ? MultiQuestionInputRequestSchema.parse(cancelledRequest)
@@ -1621,7 +1606,6 @@ export function declineInputRequest(
   const requestsArray = ydoc.getArray<AnyInputRequest>(YDOC_KEYS.INPUT_REQUESTS);
   const data = toUnknownArray(requestsArray);
 
-  /** Find request by ID in raw data to get correct array index */
   const found = findInputRequestById(data, requestId);
   if (!found) {
     return { success: false, error: 'Request not found' };
@@ -1638,7 +1622,6 @@ export function declineInputRequest(
     status: 'declined' as const,
   };
 
-  /** Use appropriate schema based on request type */
   const validated =
     request.type === 'multi'
       ? MultiQuestionInputRequestSchema.parse(declinedRequest)
@@ -1688,7 +1671,6 @@ export function atomicRegenerateTokenIfOwner(
   ydoc.transact(
     () => {
       const map = ydoc.getMap(YDOC_KEYS.METADATA);
-      /** CRDT boundary: validate ownerId type */
       const rawOwnerId = map.get('ownerId');
       const currentOwner = typeof rawOwnerId === 'string' ? rawOwnerId : undefined;
 

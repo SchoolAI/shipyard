@@ -28491,7 +28491,7 @@ init_cjs_shims();
 // ../../packages/schema/dist/index.mjs
 init_cjs_shims();
 
-// ../../packages/schema/dist/yjs-helpers-7mHCBw75.mjs
+// ../../packages/schema/dist/yjs-helpers-CNlw-U7T.mjs
 init_cjs_shims();
 
 // ../../packages/schema/dist/plan.mjs
@@ -42708,7 +42708,7 @@ var LocalArtifactParseSchema = external_exports.object({
   localArtifactId: external_exports.string()
 });
 
-// ../../packages/schema/dist/yjs-helpers-7mHCBw75.mjs
+// ../../packages/schema/dist/yjs-helpers-CNlw-U7T.mjs
 function assertNever2(value) {
   throw new Error(`Unhandled discriminated union member: ${JSON.stringify(value)}`);
 }
@@ -44572,6 +44572,26 @@ var USER_INPUT_SECTION = `## Human-Agent Communication
 
 Shipyard is the central hub where humans manage AI agents. When you need to ask a question, get clarification, or request a decision - use \`requestUserInput()\`. The human is already in the browser viewing your plan. That's where conversations should happen.
 
+### Best Practice: Return the Response Value
+
+**Always RETURN the response in your execute_code result** for clean, structured output:
+
+\`\`\`typescript
+const result = await requestUserInput({
+  message: "Which framework?",
+  type: "choice",
+  options: ["React", "Vue", "Angular"]
+});
+
+return {
+  userDecision: result.response,
+  timestamp: Date.now()
+};
+// Clean, structured - appears once in the final output
+\`\`\`
+
+Avoid \`console.log()\` for response values - it clutters output and isn't structured. Use console.log only for debugging intermediate steps.
+
 ### Why Use requestUserInput()
 
 - **Context:** The human sees your question alongside the plan, artifacts, and comments
@@ -44610,6 +44630,9 @@ const portResult = await requestUserInput({
   min: 1000,
   max: 65535
 });
+
+// Return both responses in structured format
+return { database: dbResult.response, port: portResult.response };
 \`\`\`
 
 **Multi-form (independent):** Single call for unrelated questions
@@ -44622,6 +44645,8 @@ const config = await requestUserInput({
   ],
   timeout: 600
 });
+// Return responses in structured format
+return { config: config.response };
 \`\`\`
 
 ### When to Ask
@@ -44865,12 +44890,28 @@ Uploads proof-of-work artifact.
 
 **THE primary human-agent communication channel.** Asks user a question via browser modal.
 
+**IMPORTANT: Always RETURN the response value in your execute_code result.**
+
+\u2705 **RECOMMENDED (primary pattern):**
+\`\`\`typescript
+const result = await requestUserInput({ message: "Which database?", type: "choice", options: ["PostgreSQL", "SQLite"] });
+return { userChoice: result.response, status: result.status };
+// Clean, structured output appears once in the final result
+\`\`\`
+
+\u26A0\uFE0F **AVOID (use only for debugging):**
+\`\`\`typescript
+console.log(\\\`User chose: \\\${result.response}\\\`);
+// Clutters output, not structured
+\`\`\`
+
 **Two modes - choose based on dependencies:**
 
 **Multi-step (dependencies):** Chain calls when later questions depend on earlier answers
 \`\`\`typescript
 const db = await requestUserInput({ message: "Database?", type: "choice", options: ["PostgreSQL", "SQLite"] });
 const port = await requestUserInput({ message: \\\`Port for \\\${db.response}?\\\`, type: "number" });
+return { database: db.response, port: port.response };
 \`\`\`
 
 **Multi-form (independent):** Single call for unrelated questions
@@ -44881,6 +44922,7 @@ const config = await requestUserInput({
     { message: "Use TypeScript?", type: "confirm" }
   ]
 });
+return { config: config.response };
 \`\`\`
 
 **Parameters (single-question mode):**

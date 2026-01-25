@@ -49,8 +49,6 @@ import { TOOL_NAMES } from './tool-names.js';
 import { updateBlockContentTool } from './update-block-content.js';
 import { updatePlanTool } from './update-plan.js';
 
-/** --- Bundled API Documentation --- */
-
 const BUNDLED_DOCS = `Execute TypeScript code that calls Shipyard APIs. Use this for multi-step workflows to reduce round-trips.
 
 ⚠️ IMPORTANT LIMITATION: Dynamic imports (\`await import()\`) are NOT supported in the VM execution context. Use only the pre-provided functions in the execution environment (createPlan, readPlan, updatePlan, addArtifact, completeTask, updateBlockContent, linkPR, addPRReviewComment, setupReviewNotification). All necessary APIs are already available in the sandbox.
@@ -230,6 +228,22 @@ Request input from the user via browser modal.
 
 **THE primary human-agent communication channel in Shipyard.** ALWAYS use this instead of platform-specific question tools (AskUserQuestion, Cursor prompts, etc.). The human is in the browser viewing your plan - that's where they expect to interact with you.
 
+**IMPORTANT: Always RETURN the response value in your execute_code return object.**
+
+✅ **RECOMMENDED (primary pattern):**
+\`\`\`typescript
+const result = await requestUserInput({ message: "Which database?", type: "choice", options: ["PostgreSQL", "SQLite"] });
+return { userChoice: result.response, status: result.status };
+// Clean, structured output appears once in the final result
+\`\`\`
+
+⚠️ **AVOID (noisy, use only for debugging):**
+\`\`\`typescript
+const result = await requestUserInput({ message: "Which database?", type: "choice", options: ["PostgreSQL", "SQLite"] });
+console.log(\`User chose: \${result.response}\`);
+// Clutters output, not structured, harder to parse
+\`\`\`
+
 Supports two modes - choose based on whether questions depend on each other:
 
 **Multi-step mode (dependencies):** Chain multiple calls when later questions depend on earlier answers
@@ -248,6 +262,9 @@ const portResult = await requestUserInput({
   min: 1000,
   max: 65535
 });
+
+// Return both responses in structured format
+return { database: dbResult.response, port: portResult.response };
 \`\`\`
 
 **Multi-form mode (independent):** Single call with questions array for unrelated info
@@ -260,7 +277,9 @@ const config = await requestUserInput({
   ],
   timeout: 600
 });
-// Returns: { response: { "0": "my-app", "1": "yes", "2": "MIT" }, ... }
+// Return responses in structured format
+// config.response = { "0": "my-app", "1": "yes", "2": "MIT" }
+return { config: config.response };
 \`\`\`
 
 Parameters:
@@ -292,6 +311,14 @@ Returns:
 - status: 'answered' | 'declined' | 'cancelled'
 - reason: Reason for failure (if success=false): 'cancelled' | timeout message
 
+**Best Practice: Return the response in your execute_code result:**
+\`\`\`typescript
+if (result.success) {
+  return { userAnswer: result.response, status: result.status };  // ✅ Structured output
+}
+// Avoid: console.log(\`Status: \${result.status}\`);  // ❌ Noisy, not structured
+\`\`\`
+
 Response format (all responses are strings):
 - text/multiline: Raw string (multiline preserves newlines as \n)
 - choice (single): Selected option string (e.g., "PostgreSQL")
@@ -311,97 +338,114 @@ The request appears as a modal in the browser. The function blocks until:
 
 ## Supported Input Types (8 total)
 
+All examples below show the recommended pattern of returning responses:
+
 1. **text** - Single-line text input
 \`\`\`typescript
-await requestUserInput({ message: "API endpoint URL?", type: "text" })
+const url = await requestUserInput({ message: "API endpoint URL?", type: "text" });
+return { apiUrl: url.response };  // e.g., "https://api.example.com"
 \`\`\`
 
 2. **multiline** - Multi-line text area
 \`\`\`typescript
-await requestUserInput({ message: "Describe the bug:", type: "multiline" })
+const desc = await requestUserInput({ message: "Describe the bug:", type: "multiline" });
+return { bugDescription: desc.response };
 \`\`\`
 
 3. **choice** - Select from options (auto-adds "Other" escape hatch)
 \`\`\`typescript
-await requestUserInput({
+const db = await requestUserInput({
   message: "Which database?",
   type: "choice",
   options: ["PostgreSQL", "SQLite", "MongoDB"]
-})
+});
+return { database: db.response };  // e.g., "PostgreSQL"
 
-await requestUserInput({
+// Multi-select example:
+const features = await requestUserInput({
   message: "Which features?",
   type: "choice",
   options: ["Dark mode", "Offline support", "Analytics"],
   multiSelect: true
-})
+});
+return { features: features.response };  // e.g., "Dark mode, Analytics"
 
-await requestUserInput({
+// Dropdown example:
+const country = await requestUserInput({
   message: "Select country:",
   type: "choice",
   options: ["USA", "Canada", "Mexico"],
   displayAs: "dropdown"
-})
+});
+return { country: country.response };
 \`\`\`
 
 4. **confirm** - Yes/No confirmation
 \`\`\`typescript
-await requestUserInput({ message: "Deploy to production?", type: "confirm" })
+const deploy = await requestUserInput({ message: "Deploy to production?", type: "confirm" });
+return { shouldDeploy: deploy.response === "yes" };  // response is "yes" or "no"
 \`\`\`
 
 5. **number** - Numeric input with validation
 \`\`\`typescript
-await requestUserInput({
+const port = await requestUserInput({
   message: "Port number?",
   type: "number",
   min: 1,
   max: 65535,
   format: "integer"
-})
+});
+return { port: parseInt(port.response, 10) };  // e.g., 8080
 
-await requestUserInput({
+const budget = await requestUserInput({
   message: "Budget amount?",
   type: "number",
   format: "currency"
-})
+});
+return { budget: parseFloat(budget.response) };  // e.g., 1500.00
 \`\`\`
 
 6. **email** - Email address with validation
 \`\`\`typescript
-await requestUserInput({
+const contact = await requestUserInput({
   message: "Contact email?",
   type: "email",
   domain: "company.com"
-})
+});
+return { contactEmail: contact.response };  // e.g., "user@company.com"
 \`\`\`
 
 7. **date** - Date selection with range
 \`\`\`typescript
-await requestUserInput({
+const deadline = await requestUserInput({
   message: "Project deadline?",
   type: "date",
   minDate: "2026-01-24",
   maxDate: "2026-12-31"
-})
+});
+return { deadline: deadline.response };  // e.g., "2026-03-15"
 \`\`\`
 
 8. **rating** - Scale rating (auto-selects stars for <=5, numbers for >5)
 \`\`\`typescript
-await requestUserInput({
+const rating = await requestUserInput({
   message: "Rate this approach:",
   type: "rating",
   min: 1,
   max: 5,
   labels: { low: "Poor", high: "Excellent" }
-})
+});
+return { rating: parseInt(rating.response, 10) };  // e.g., 4
 
-await requestUserInput({
+// NPS scale example:
+const nps = await requestUserInput({
   message: "NPS Score (0-10):",
   type: "rating",
   min: 0,
   max: 10,
   style: "numbers"
-})
+});
+return { npsScore: parseInt(nps.response, 10) };  // e.g., 8
 \`\`\`
 
 ---
@@ -572,17 +616,13 @@ return { planId: plan.planId, snapshotUrl: result.snapshotUrl };
 \`\`\`
 `;
 
-/** --- Input Schema --- */
-
 const ExecuteCodeInput = z.object({
   code: z.string().describe('TypeScript code to execute'),
 });
 
-/** --- API Wrapper Functions --- */
-
-/*
- * Track monitoring script for auto-append to tool result
- * String array to work around TypeScript control flow issues
+/**
+ * NOTE: String array (not let) to work around TypeScript control flow issues
+ * where reassignment in async handlers isn't detected.
  */
 const scriptTracker: string[] = [];
 
@@ -596,7 +636,6 @@ async function createPlan(opts: {
   const text = getToolResultText(result);
   const planId = text.match(/ID: (\S+)/)?.[1] || '';
 
-  /** Fetch deliverables from the Y.Doc */
   let deliverables: Array<{ id: string; text: string }> = [];
   if (planId) {
     const ydoc = await getOrCreateDoc(planId);
@@ -604,10 +643,8 @@ async function createPlan(opts: {
     deliverables = allDeliverables.map((d) => ({ id: d.id, text: d.text }));
   }
 
-  /** Always include monitoring script for non-hook agents */
   const { script: monitoringScript } = await setupReviewNotification(planId, 30);
 
-  /** Track for auto-append to tool result (use array.push to track in handler) */
   scriptTracker.push(`Plan "${planId}" created.\n\n${monitoringScript}`);
 
   return {
@@ -632,7 +669,6 @@ async function readPlan(
   });
   const text = getToolResultText(result);
 
-  /** Get structured data directly from Y.Doc instead of parsing strings */
   const ydoc = await getOrCreateDoc(planId);
   const metadata = getPlanMetadata(ydoc);
   const deliverables = getDeliverables(ydoc).map((d) => ({
@@ -659,10 +695,8 @@ async function updatePlan(
 ) {
   await updatePlanTool.handler({ planId, sessionToken, ...updates });
 
-  /** Always include monitoring script for non-hook agents */
   const { script: monitoringScript } = await setupReviewNotification(planId, 30);
 
-  /** Track for auto-append to tool result */
   scriptTracker.push(`Plan "${planId}" updated.\n\n${monitoringScript}`);
 
   return {
@@ -692,22 +726,17 @@ async function addArtifact(opts: AddArtifactOpts) {
     return { isError: true, error: text };
   }
 
-  /** Get structured data from Y.Doc instead of parsing strings */
   const ydoc = await getOrCreateDoc(opts.planId);
   const artifacts = getArtifacts(ydoc);
   const deliverables = getDeliverables(ydoc);
 
-  /** Find the artifact we just added (most recent by filename) */
   const addedArtifact = artifacts.find((a) => a.filename === opts.filename);
 
-  /** Check if all deliverables are complete */
   const allDeliverablesComplete =
     deliverables.length > 0 && deliverables.every((d) => d.linkedArtifactId);
 
-  /** Get snapshot URL from metadata if task was completed */
   const metadata = getPlanMetadata(ydoc);
 
-  /** Get URL from discriminated union */
   let artifactUrl = '';
   if (addedArtifact) {
     artifactUrl =
@@ -733,7 +762,6 @@ async function completeTask(planId: string, sessionToken: string, summary?: stri
     return { isError: true, error: text };
   }
 
-  /** Get structured data from Y.Doc */
   const ydoc = await getOrCreateDoc(planId);
   const metadata = getPlanMetadata(ydoc);
 
@@ -771,7 +799,6 @@ async function linkPR(opts: {
     throw new Error(text);
   }
 
-  /** Parse PR details from response text */
   const prNumber = opts.prNumber;
   const urlMatch = text.match(/URL: (https:\/\/[^\s]+)/);
   const statusMatch = text.match(/Status: (\w+)/);
@@ -805,7 +832,6 @@ async function setupReviewNotification(planId: string, pollIntervalSeconds?: num
   });
   const text = getToolResultText(result);
 
-  /** Extract script from markdown code block */
   const scriptMatch = text.match(/```bash\n([\s\S]*?)\n```/);
   const script = scriptMatch?.[1] || '';
 
@@ -858,12 +884,9 @@ async function requestUserInput(
    */
   const ydoc = await getOrCreateDoc(PLAN_INDEX_DOC_NAME);
 
-  /** Create manager and make request */
   const manager = new InputRequestManager();
 
-  /** Handle multi-question mode */
   if ('questions' in opts && opts.questions) {
-    /** Filter out any null/undefined elements from questions array (defensive) */
     const validQuestions = opts.questions.filter((q): q is NonNullable<typeof q> => q != null);
     if (validQuestions.length === 0) {
       throw new Error(
@@ -878,10 +901,8 @@ async function requestUserInput(
       isBlocker: opts.isBlocker,
     });
 
-    /** Wait for response */
     const result = await manager.waitForResponse(ydoc, requestId, opts.timeout);
 
-    /** Narrow the discriminated union to access appropriate fields */
     if (result.status === 'answered') {
       return {
         success: true as const,
@@ -908,7 +929,6 @@ async function requestUserInput(
     };
   }
 
-  /** Single-question mode */
   let params: CreateInputRequestParams;
 
   switch (opts.type) {
@@ -987,10 +1007,8 @@ async function requestUserInput(
 
   const requestId = await manager.createRequest(ydoc, params);
 
-  /** Wait for response */
   const result = await manager.waitForResponse(ydoc, requestId, opts.timeout);
 
-  /** Narrow the discriminated union to access appropriate fields */
   if (result.status === 'answered') {
     return {
       success: true as const,
@@ -1029,7 +1047,6 @@ async function postActivityUpdate(opts: {
   const doc = await getOrCreateDoc(opts.planId);
   const actorName = await getGitHubUsername();
 
-  /** Generate requestId and log event as inbox-worthy for plan owner */
   const requestId = nanoid();
   const eventId = logPlanEvent(
     doc,
@@ -1061,7 +1078,6 @@ async function resolveActivityRequest(opts: {
   const actorName = await getGitHubUsername();
   const events = getPlanEvents(doc);
 
-  /** Find original unresolved request (help_request or blocker only) */
   const originalEvent = events.find(
     (e) =>
       e.type === 'agent_activity' &&
@@ -1075,7 +1091,6 @@ async function resolveActivityRequest(opts: {
     throw new Error(`Unresolved request ${opts.requestId} not found`);
   }
 
-  /** Check if already resolved */
   const existingResolution = events.find(
     (e) =>
       e.type === 'agent_activity' &&
@@ -1090,7 +1105,6 @@ async function resolveActivityRequest(opts: {
     throw new Error(`Request ${opts.requestId} has already been resolved`);
   }
 
-  /** Determine resolution type - TypeScript narrowing ensures data exists */
   const activityType = originalEvent.data.activityType;
   const resolvedType =
     activityType === 'help_request' ? 'help_request_resolved' : 'blocker_resolved';
@@ -1112,15 +1126,12 @@ async function regenerateSessionToken(planId: string) {
     throw new Error(text);
   }
 
-  /** Extract session token from response text */
   const tokenMatch = text.match(/New Session Token: (\S+)/);
   return {
     sessionToken: tokenMatch?.[1] || '',
     planId,
   };
 }
-
-/** --- Public Export --- */
 
 export const executeCodeTool = {
   definition: {
@@ -1143,11 +1154,9 @@ export const executeCodeTool = {
 
     logger.info({ codeLength: code.length }, 'Executing code');
 
-    /** Reset tracking for this execution */
     scriptTracker.length = 0;
 
     try {
-      /** Helper: Encode frames to MP4 using bundled FFmpeg */
       async function encodeVideo(opts: {
         framesDir: string;
         fps?: number;
@@ -1182,15 +1191,12 @@ export const executeCodeTool = {
           throw new Error(`FFmpeg encoding failed: ${result.stderr?.slice(-300)}`);
         }
 
-        /** Cleanup frames directory */
         fs.rmSync(opts.framesDir, { recursive: true, force: true });
 
         return outputPath;
       }
 
-      /** Create sandbox with API functions and Node.js modules for video encoding */
       const sandbox = {
-        /** Shipyard API functions */
         createPlan,
         readPlan,
         updatePlan,
@@ -1204,14 +1210,11 @@ export const executeCodeTool = {
         postActivityUpdate,
         resolveActivityRequest,
         regenerateSessionToken,
-        /** Video encoding helper (uses bundled FFmpeg) */
         encodeVideo,
-        /** Node.js modules for advanced workflows (file ops, process spawning) */
         child_process,
         fs,
         path,
         os,
-        /** FFmpeg bundled with server - no installation required */
         ffmpegPath: ffmpegInstaller.path,
         console: {
           log: (...logArgs: unknown[]) => logger.info({ output: logArgs }, 'console.log'),
@@ -1219,17 +1222,14 @@ export const executeCodeTool = {
         },
       };
 
-      /** Wrap in async IIFE */
       const wrappedCode = `(async () => { ${code} })()`;
 
-      /** Execute in sandboxed context */
       const context = vm.createContext(sandbox);
       const script = new vm.Script(wrappedCode);
       const result = await script.runInContext(context, { timeout: 120000 });
 
       logger.info({ result }, 'Code execution complete');
 
-      /** Build result content */
       const content: Array<{ type: string; text: string }> = [
         {
           type: 'text',

@@ -365,6 +365,26 @@ if (result.allDeliverablesComplete) {
 
 The human is already in the browser viewing your plan. When you need to ask a question, get a decision, or request clarification - that's where they expect to see it. Don't scatter conversations across different interfaces.
 
+### Best Practice: Return the Response Value
+
+**Always return the response in your execute_code result** for clean, structured output:
+
+```typescript
+const result = await requestUserInput({
+  message: "Which framework?",
+  type: "choice",
+  options: ["React", "Vue", "Angular"]
+});
+
+return {
+  userDecision: result.response,
+  timestamp: Date.now()
+};
+// This is cleaner than console.log and appears once in the final output
+```
+
+Avoid using `console.log()` for response values - it clutters the output and isn't structured. Use console.log only for debugging intermediate steps.
+
 ### Why Use requestUserInput()
 
 - **Context:** The human sees your question alongside the plan, artifacts, and comments
@@ -401,6 +421,9 @@ const portResult = await requestUserInput({
   min: 1000,
   max: 65535
 });
+
+// Return both responses in structured format
+return { database: dbResult.response, port: portResult.response };
 ```
 
 **Multi-form (independent):** Single call for unrelated questions
@@ -413,6 +436,9 @@ const config = await requestUserInput({
   ],
   timeout: 600
 });
+// Return responses in structured format
+// config.response = { "0": "my-app", "1": "React", "2": "yes" }
+return { config: config.response };
 ```
 
 ### Input Types (8 total)
