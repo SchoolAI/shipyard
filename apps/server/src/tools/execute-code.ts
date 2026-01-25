@@ -212,10 +212,11 @@ Parameters:
 - multiSelect (boolean, optional): For 'choice' type - allow selecting multiple options (checkboxes)
 - displayAs (string, optional): For 'choice' type - override automatic UI ('radio' | 'checkbox' | 'dropdown')
 - defaultValue (string, optional): Pre-filled value for text/multiline inputs
-- timeout (number, optional): Timeout in seconds (default: 1800, min: 300, max: 1800)
+- timeout (number, optional): Timeout in seconds (default: 1800, min: 10, max: 14400)
   - Simple yes/no or quick choices: 300-600 seconds (5-10 minutes)
   - Complex questions with code examples: 600-1200 seconds (10-20 minutes)
   - Default (1800 = 30 minutes) is suitable for most cases
+  - Max (14400 = 4 hours) for extended user sessions
   - Note: System-level timeouts may cause earlier cancellation
 - planId (string, optional): Optional metadata to link request to plan (for activity log filtering)
 - min (number, optional): For 'number'/'rating' - minimum value
@@ -764,16 +765,7 @@ async function setupReviewNotification(planId: string, pollIntervalSeconds?: num
 
 async function requestUserInput(opts: {
   message: string;
-  type:
-    | 'text'
-    | 'choice'
-    | 'confirm'
-    | 'multiline'
-    | 'number'
-    | 'email'
-    | 'date'
-    | 'dropdown'
-    | 'rating';
+  type: 'text' | 'choice' | 'confirm' | 'multiline' | 'number' | 'email' | 'date' | 'rating';
   options?: string[];
   multiSelect?: boolean;
   defaultValue?: string;
@@ -813,7 +805,6 @@ async function requestUserInput(opts: {
 
   switch (opts.type) {
     case 'choice':
-    case 'dropdown':
       params = {
         ...baseParams,
         type: opts.type,
@@ -863,7 +854,7 @@ async function requestUserInput(opts: {
       };
   }
 
-  // Cast through unknown since new types (number, email, date, dropdown, rating)
+  // Cast through unknown since new types (number, email, date, rating)
   // may not yet be in the schema. The InputRequestManager will pass through to Y.Doc.
   const requestId = manager.createRequest(
     ydoc,

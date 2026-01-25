@@ -3,6 +3,8 @@
  * These are the platform-agnostic concepts that apply everywhere.
  */
 
+import { TOOL_NAMES } from '@shipyard/schema';
+
 export const CRITICAL_USAGE_SECTION = `## CRITICAL: When to Use Shipyard
 
 ⚠️ **MANDATORY USAGE RULE:**
@@ -79,6 +81,56 @@ Skip Shipyard for:
 - Exploration or debugging sessions
 - Pure documentation without implementation`;
 
+export const USER_INPUT_SECTION = `## Human-Agent Communication
+
+**\`${TOOL_NAMES.REQUEST_USER_INPUT}\` is THE primary way to communicate with humans during active work.**
+
+Shipyard is the central hub where humans manage AI agents. When you need to ask a question, get clarification, or request a decision - use \`${TOOL_NAMES.REQUEST_USER_INPUT}\`. The human is already in the browser viewing your plan. That's where conversations should happen.
+
+### Why Use ${TOOL_NAMES.REQUEST_USER_INPUT}
+
+- **Context:** The human sees your question alongside the plan, artifacts, and comments
+- **History:** All exchanges are logged in the plan's activity feed
+- **Continuity:** The conversation stays attached to the work, not scattered across chat windows
+- **Flexibility:** 8 input types, multi-question forms, "Other" escape hatch for custom answers
+
+### Replace Platform Tools
+
+**ALWAYS prefer \`${TOOL_NAMES.REQUEST_USER_INPUT}\` over platform-specific tools:**
+
+| Platform | DON'T Use | Use Instead |
+|----------|-----------|-------------|
+| Claude Code | \`AskUserQuestion\` | \`${TOOL_NAMES.REQUEST_USER_INPUT}\` |
+| Cursor | Built-in prompts | \`${TOOL_NAMES.REQUEST_USER_INPUT}\` |
+| Windsurf | Native dialogs | \`${TOOL_NAMES.REQUEST_USER_INPUT}\` |
+| Claude Desktop | Chat questions | \`${TOOL_NAMES.REQUEST_USER_INPUT}\` |
+
+### When to Ask
+
+Use \`${TOOL_NAMES.REQUEST_USER_INPUT}\` when you need:
+- Clarification on requirements ("Which auth provider?")
+- Decisions that affect implementation ("PostgreSQL or SQLite?")
+- Confirmation before destructive actions ("Delete this file?")
+- User preferences ("Rate this approach 1-5")
+- Any information you can't infer from context
+
+### Example
+
+\`\`\`typescript
+const result = await requestUserInput({
+  message: "Which database should we use?",
+  type: "choice",
+  options: ["PostgreSQL", "SQLite", "MongoDB"],
+  timeout: 600  // 10 minutes
+});
+
+if (result.success) {
+  console.log("User chose:", result.response);
+}
+\`\`\`
+
+**Note:** The MCP tool is named \`${TOOL_NAMES.REQUEST_USER_INPUT}\` (snake_case). Inside \`${TOOL_NAMES.EXECUTE_CODE}\`, it's available as \`requestUserInput()\` (camelCase).`;
+
 export const TROUBLESHOOTING_SECTION = `## Troubleshooting
 
 **Browser doesn't open:** Check MCP server is running and accessible.
@@ -87,7 +139,13 @@ export const TROUBLESHOOTING_SECTION = `## Troubleshooting
 
 **No auto-complete:** Ensure every deliverable has an artifact with matching \`deliverableId\`.
 
-**Plan not syncing:** Check WebSocket connection to registry server.`;
+**Plan not syncing:** Check WebSocket connection to registry server.
+
+**Input request times out:** User may not have seen it or needs more time. Default timeout is 30 minutes. Try again with a longer timeout or rephrase the question.
+
+**Input request declined:** User clicked "Decline." Rephrase your question, proceed with a reasonable default, or use a different approach.
+
+**No response to input:** Check if browser is connected to the plan. User may have closed the browser window.`;
 
 /**
  * Combines all common sections into a single string.
@@ -95,6 +153,7 @@ export const TROUBLESHOOTING_SECTION = `## Troubleshooting
  */
 export const COMMON_INSTRUCTIONS = [
   CRITICAL_USAGE_SECTION,
+  USER_INPUT_SECTION,
   DELIVERABLES_SECTION,
   ARTIFACT_TYPES_SECTION,
   TIPS_SECTION,

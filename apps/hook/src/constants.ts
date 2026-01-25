@@ -1,3 +1,5 @@
+import { TOOL_NAMES } from '@shipyard/schema';
+
 export const CLAUDE_TOOL_NAMES = {
   WRITE: 'Write',
   EDIT: 'Edit',
@@ -6,11 +8,10 @@ export const CLAUDE_TOOL_NAMES = {
 } as const;
 
 /**
- * MCP tool names (shipyard specific)
+ * Re-export TOOL_NAMES from @shipyard/schema for convenient access.
+ * This is the single source of truth for MCP tool names.
  */
-export const MCP_TOOL_NAMES = {
-  REQUEST_USER_INPUT: 'request_user_input',
-} as const;
+export { TOOL_NAMES };
 
 export const CLAUDE_PERMISSION_MODES = {
   PLAN: 'plan',

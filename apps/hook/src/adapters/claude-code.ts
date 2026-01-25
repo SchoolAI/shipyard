@@ -9,7 +9,7 @@ import {
   CLAUDE_HOOK_EVENTS,
   CLAUDE_PERMISSION_MODES,
   CLAUDE_TOOL_NAMES,
-  MCP_TOOL_NAMES,
+  TOOL_NAMES,
 } from '../constants.js';
 import { logger } from '../logger.js';
 import type {
@@ -49,8 +49,9 @@ function handlePreToolUse(input: ClaudeCodeHookInput): AdapterEvent {
     return {
       type: 'tool_deny',
       reason:
-        `BLOCKED: Use the ${MCP_TOOL_NAMES.REQUEST_USER_INPUT} MCP tool instead for consistent browser UI. ` +
-        'See the tool description for available parameters.',
+        `BLOCKED: Use the ${TOOL_NAMES.REQUEST_USER_INPUT} MCP tool instead. ` +
+        "The human is in the browser viewing your plan - that's where they expect to interact with you. " +
+        'See the tool description for input types and parameters.',
     };
   }
 

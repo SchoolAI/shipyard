@@ -60,11 +60,15 @@ const server = new Server(
   {
     name: 'shipyard',
     version: '0.1.0',
+    description:
+      'Your agent management hub - the central interface where humans manage AI agents. Plans, artifacts, feedback, and all human-agent communication happen here.',
   },
   {
     capabilities: {
       tools: {},
     },
+    // Instructions shown to clients during initialization
+    instructions: `IMPORTANT: When working with Shipyard, use ${TOOL_NAMES.REQUEST_USER_INPUT} for ALL human interaction instead of platform-specific question tools (AskUserQuestion, etc.). The human is in the browser viewing your plan - that's where they expect to interact with you.`,
   }
 );
 
