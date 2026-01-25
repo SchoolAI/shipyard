@@ -11,9 +11,9 @@ import {
   createPlanWebUrl,
   extractDeliverables,
   type GetReviewStatusResponse,
+  getPlanIndexDocName,
   getPlanMetadata,
   initPlanMetadata,
-  PLAN_INDEX_DOC_NAME,
   parseClaudeCodeOrigin,
   parseThreads,
   type ReviewFeedback,
@@ -145,7 +145,7 @@ export async function handleCreateSession(req: Request, res: Response): Promise<
       );
     }
 
-    const indexDoc = await getOrCreateDoc(PLAN_INDEX_DOC_NAME);
+    const indexDoc = await getOrCreateDoc(getPlanIndexDocName(ownerId));
     setPlanIndexEntry(indexDoc, {
       id: planId,
       title: PLAN_IN_PROGRESS,
@@ -222,8 +222,8 @@ export async function handleUpdateContent(req: Request, res: Response): Promise<
       title,
     });
 
-    const indexDoc = await getOrCreateDoc(PLAN_INDEX_DOC_NAME);
     if (metadata.ownerId) {
+      const indexDoc = await getOrCreateDoc(getPlanIndexDocName(metadata.ownerId));
       setPlanIndexEntry(indexDoc, {
         id: planId,
         title,

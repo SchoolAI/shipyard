@@ -6,10 +6,11 @@
  * without needing to execute arbitrary code.
  */
 
-import { PLAN_INDEX_DOC_NAME, QuestionSchema } from '@shipyard/schema';
+import { getPlanIndexDocName, QuestionSchema } from '@shipyard/schema';
 import { z } from 'zod';
 import { getOrCreateDoc } from '../doc-store.js';
 import { logger } from '../logger.js';
+import { getGitHubUsername } from '../server-identity.js';
 import { InputRequestManager } from '../services/input-request-manager.js';
 import { TOOL_NAMES } from './tool-names.js';
 
@@ -474,9 +475,10 @@ NOTE: This is also available as requestUserInput() inside execute_code for multi
     }
 
     try {
-      // Always use plan-index doc so browser can see requests from all agents
-      // Browser is already connected to plan-index for plan discovery
-      const ydoc = await getOrCreateDoc(PLAN_INDEX_DOC_NAME);
+      // Use per-user plan-index so browser can see requests from this user's agents
+      // Browser is already connected to plan-index-{username} for plan discovery
+      const ownerId = await getGitHubUsername();
+      const ydoc = await getOrCreateDoc(getPlanIndexDocName(ownerId));
 
       // Create manager and make request
       const manager = new InputRequestManager();

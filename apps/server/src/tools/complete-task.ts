@@ -9,12 +9,12 @@ import {
   getArtifacts,
   getDeliverables,
   getLinkedPRs,
+  getPlanIndexDocName,
   getPlanMetadata,
   getSnapshots,
   type LinkedPR,
   linkPR,
   logPlanEvent,
-  PLAN_INDEX_DOC_NAME,
   setPlanIndexEntry,
   transitionPlanStatus,
 } from '@shipyard/schema';
@@ -193,8 +193,8 @@ RETURNS:
     logPlanEvent(ydoc, 'completed', actorName);
 
     // Update plan index
-    const indexDoc = await getOrCreateDoc(PLAN_INDEX_DOC_NAME);
     if (metadata.ownerId) {
+      const indexDoc = await getOrCreateDoc(getPlanIndexDocName(metadata.ownerId));
       setPlanIndexEntry(indexDoc, {
         id: metadata.id,
         title: metadata.title,

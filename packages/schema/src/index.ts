@@ -254,8 +254,11 @@ export {
 } from './plan.js';
 export type { PlanIndexEntry } from './plan-index.js';
 export {
+  getPlanIndexDocName,
+  isPlanIndexDbName,
   NON_PLAN_DB_NAMES,
   PLAN_INDEX_DOC_NAME,
+  PLAN_INDEX_DOC_NAME_PREFIX,
   PLAN_INDEX_VIEWED_BY_KEY,
   PlanIndexEntrySchema,
 } from './plan-index.js';

@@ -20,11 +20,11 @@ import {
   formatThreadsForLLM,
   type GetReviewStatusResponse,
   getDeliverables,
+  getPlanIndexDocName,
   getPlanMetadata,
   type HookContext,
   type HookHandlers,
   initPlanMetadata,
-  PLAN_INDEX_DOC_NAME,
   type PlanMetadata,
   parseClaudeCodeOrigin,
   parseThreads,
@@ -168,7 +168,7 @@ export async function createSessionHandler(
     );
   }
 
-  const indexDoc = await ctx.getOrCreateDoc(PLAN_INDEX_DOC_NAME);
+  const indexDoc = await ctx.getOrCreateDoc(getPlanIndexDocName(ownerId));
   setPlanIndexEntry(indexDoc, {
     id: planId,
     title: PLAN_IN_PROGRESS,
@@ -198,7 +198,8 @@ export async function createSessionHandler(
   // 1. The window is very small (milliseconds)
   // 2. If it happens, the browser simply won't navigate (user can do it manually)
   // 3. Adding synchronization would add complexity without significant benefit
-  if (await hasActiveConnections(PLAN_INDEX_DOC_NAME)) {
+  const indexDocName = getPlanIndexDocName(ownerId);
+  if (await hasActiveConnections(indexDocName)) {
     // Browser already connected - navigate it via CRDT
     // NOTE: navigation.target is never cleared by the server (acceptable race condition).
     // The browser clears it after reading. If multiple plans are created rapidly,
@@ -261,8 +262,8 @@ export async function updateContentHandler(
     title,
   });
 
-  const indexDoc = await ctx.getOrCreateDoc(PLAN_INDEX_DOC_NAME);
   if (metadata.ownerId) {
+    const indexDoc = await ctx.getOrCreateDoc(getPlanIndexDocName(metadata.ownerId));
     setPlanIndexEntry(indexDoc, {
       id: planId,
       title,

@@ -2,7 +2,9 @@
  * Publish handler for signaling server.
  *
  * Handles broadcasting messages to topic subscribers.
- * Simple relay - no authentication or approval filtering.
+ *
+ * Simple relay - all subscribed clients receive all messages.
+ * Access control happens at subscription time (subscribe.ts validates tokens).
  */
 
 export { handlePublish };
@@ -12,6 +14,9 @@ import type { PublishMessage } from '../types.js';
 
 /**
  * Handle publish message - relay to all topic subscribers.
+ *
+ * All subscribers of a topic receive the message (except the sender).
+ * Access control is enforced at subscription time via token validation.
  *
  * @param platform - Platform adapter for storage/messaging
  * @param ws - WebSocket connection of the sender
