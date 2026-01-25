@@ -58,14 +58,12 @@ interface SnapshotCache {
   value: GitHubIdentity | null;
 }
 
-// Initialize cache eagerly at module load to prevent race conditions.
-// This ensures the first call to getSnapshot() returns the stored value
-// without needing to wait for any async operations.
+/**
+ * Eagerly initialized to prevent race conditions where React calls
+ * getSnapshot() before the cache is populated during concurrent rendering.
+ */
 let snapshotCache: SnapshotCache | null = null;
 
-// Eagerly initialize the snapshot cache at module load time.
-// This prevents race conditions where React might call getSnapshot()
-// before the cache is populated.
 function initializeSnapshotCache(): void {
   if (typeof localStorage !== 'undefined' && snapshotCache === null) {
     try {
@@ -86,7 +84,6 @@ function initializeSnapshotCache(): void {
   }
 }
 
-// Run initialization immediately when module is loaded
 initializeSnapshotCache();
 
 function notifyListeners() {
@@ -118,11 +115,13 @@ function getStoredIdentity(): GitHubIdentity | null {
     if (!stored) return null;
     const parsed: unknown = JSON.parse(stored);
     const validated = GitHubIdentitySchema.safeParse(parsed);
-    return validated.success ? validated.data : null;
-  } catch (err) {
-    // Log parse errors to help debug localStorage corruption
-    // biome-ignore lint/suspicious/noConsole: Intentional debugging log for localStorage corruption
-    console.error('[useGitHubAuth] Failed to parse stored identity:', err);
+    if (!validated.success) {
+      localStorage.removeItem(STORAGE_KEY);
+      return null;
+    }
+    return validated.data;
+  } catch {
+    localStorage.removeItem(STORAGE_KEY);
     return null;
   }
 }
@@ -146,12 +145,11 @@ function getSnapshot(): GitHubIdentity | null {
   return value;
 }
 
+/**
+ * React concurrent mode may call this during hydration. Reading localStorage
+ * here prevents identity flickering on first render.
+ */
 function getServerSnapshot(): GitHubIdentity | null {
-  // In a pure client-side app, this shouldn't be called, but React's concurrent
-  // features and StrictMode can sometimes use this during initial render.
-  // To avoid race conditions where identity appears as null/undefined on first
-  // render, we also read from localStorage here.
-  // Note: This is safe because localStorage is synchronous and available in browsers.
   if (typeof localStorage === 'undefined') {
     return null;
   }
@@ -167,11 +165,7 @@ async function processOAuthCallback(
 
   try {
     const redirectUri = window.location.origin + (import.meta.env.BASE_URL || '/');
-    const { access_token, scope, is_mobile } = await handleCallback(code, state, redirectUri);
-
-    // Log mobile detection for debugging deep linking issues
-    if (is_mobile) {
-    }
+    const { access_token, scope } = await handleCallback(code, state, redirectUri);
 
     const user = await getGitHubUser(access_token);
 
@@ -187,20 +181,16 @@ async function processOAuthCallback(
     setStoredIdentity(newIdentity);
     setAuthState({ status: 'success' });
 
-    // Check for stored return URL and navigate there
     const returnUrl = sessionStorage.getItem(RETURN_URL_KEY);
     sessionStorage.removeItem(RETURN_URL_KEY);
 
-    // Reset to idle after success, then navigate if needed
     setTimeout(() => {
       setAuthState({ status: 'idle' });
-      // Navigate to return URL if it differs from current path
       if (returnUrl && returnUrl !== window.location.pathname) {
         window.location.href = returnUrl;
       }
     }, 1500);
   } catch (err) {
-    // Clean up return URL on error too
     sessionStorage.removeItem(RETURN_URL_KEY);
     setAuthState({
       status: 'error',
@@ -223,11 +213,12 @@ export function useGitHubAuth(): UseGitHubAuthReturn {
   const [isValidating, setIsValidating] = useState(false);
   const [authState, setAuthState] = useState<AuthState>({ status: 'idle' });
 
-  // Check if current token has repo scope
   const hasRepoScope = identity?.scope?.includes('repo') ?? false;
 
-  // Validate existing token on mount
-  // Only clears auth on confirmed 401 (invalid token), NOT on network/server errors
+  /**
+   * Validates token on mount. Only clears auth on confirmed 401 (invalid token).
+   * Network errors or rate limits preserve the session to avoid unnecessary logouts.
+   */
   useEffect(() => {
     if (!identity) return;
 
@@ -240,11 +231,8 @@ export function useGitHubAuth(): UseGitHubAuthReturn {
       if (cancelled) return;
 
       if (result.status === 'invalid') {
-        // Token is genuinely invalid (401 from GitHub) - clear auth
         clearStoredIdentity();
       }
-      // For 'valid' or 'error' status, keep the session
-      // Network errors, rate limits, server errors shouldn't log users out
       setIsValidating(false);
     }
 
@@ -255,7 +243,6 @@ export function useGitHubAuth(): UseGitHubAuthReturn {
     };
   }, [identity]);
 
-  // Handle OAuth callback on mount
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const code = params.get('code');
@@ -263,13 +250,11 @@ export function useGitHubAuth(): UseGitHubAuthReturn {
     const error = params.get('error');
     const errorDescription = params.get('error_description');
 
-    // Clean URL immediately if we have OAuth params
     if (code || error) {
       const cleanUrl = window.location.pathname + window.location.hash;
       window.history.replaceState({}, '', cleanUrl);
     }
 
-    // Handle error from GitHub (e.g., user denied access)
     if (error) {
       sessionStorage.removeItem(RETURN_URL_KEY);
       setAuthState({
@@ -279,7 +264,6 @@ export function useGitHubAuth(): UseGitHubAuthReturn {
       return;
     }
 
-    // Handle successful callback with code
     if (code && state) {
       processOAuthCallback(code, state, setAuthState);
     }
@@ -287,12 +271,10 @@ export function useGitHubAuth(): UseGitHubAuthReturn {
 
   const startAuth = useCallback(
     (forceAccountPicker = false) => {
-      // Prevent concurrent auth flows
       if (authState.status === 'exchanging_token') {
         return;
       }
 
-      // Store current URL to return to after auth
       const returnUrl = window.location.pathname + window.location.search + window.location.hash;
       sessionStorage.setItem(RETURN_URL_KEY, returnUrl);
 
@@ -303,13 +285,10 @@ export function useGitHubAuth(): UseGitHubAuthReturn {
   );
 
   const requestRepoAccess = useCallback(() => {
-    // Store current URL to return to after auth
     const returnUrl = window.location.pathname + window.location.search + window.location.hash;
     sessionStorage.setItem(RETURN_URL_KEY, returnUrl);
 
     const redirectUri = window.location.origin + (import.meta.env.BASE_URL || '/');
-    // Request repo scope - this will replace the existing token
-    // Don't clear identity here - causes UI flicker. OAuth callback will replace it.
     startWebFlow(redirectUri, { scope: 'repo', forceConsent: true });
   }, []);
 

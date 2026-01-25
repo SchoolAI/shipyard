@@ -11,7 +11,11 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "esModuleInterop": true,
-    "forceConsistentCasingInFileNames": true
+    "forceConsistentCasingInFileNames": true,
+    "baseUrl": ".",
+    "paths": {
+      "@signaling/*": ["../core/*", "../src/*"]
+    }
   },
   "include": ["src/**/*.ts", "worker-configuration.d.ts"],
   "exclude": ["node_modules"]

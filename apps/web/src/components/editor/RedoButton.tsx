@@ -1,6 +1,6 @@
 import { useBlockNoteEditor, useComponentsContext } from '@blocknote/react';
 import { Redo } from 'lucide-react';
-import { getYUndoExtension } from '../../types/blocknote-extensions';
+import { getYUndoExtension } from '@/types/blocknote-extensions';
 
 /**
  * Redo button for BlockNote FormattingToolbar.

@@ -27,9 +27,6 @@ import type * as Y from 'yjs';
 import { VoiceInputButton } from '@/components/voice-input';
 import { useUserIdentity } from '@/contexts/UserIdentityContext';
 
-// Helper functions to reduce complexity in the main component
-// These are pure functions that map action types to display values
-
 type ReviewAction = 'approve' | 'request_changes';
 
 /** Maps action to event type for logging */
@@ -47,6 +44,20 @@ const getSuccessMessage = (action: ReviewAction): string =>
 /** Maps action to user-facing error action label */
 const getErrorActionLabel = (action: ReviewAction): string =>
   action === 'approve' ? 'approve' : 'request changes';
+
+/** Checks if the action would be redundant given the current status */
+function isRedundantAction(
+  action: ReviewAction,
+  currentStatus: PlanStatusType | undefined
+): string | null {
+  if (action === 'approve' && currentStatus === 'in_progress') {
+    return 'already in progress';
+  }
+  if (action === 'request_changes' && currentStatus === 'changes_requested') {
+    return 'already has changes requested';
+  }
+  return null;
+}
 
 /** Simple identity type for display purposes */
 interface UserIdentity {
@@ -89,10 +100,10 @@ export function ReviewActions({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { actor } = useUserIdentity();
 
-  // Auto-focus textarea when Request Changes popover opens
+  /** Auto-focus textarea when Request Changes popover opens */
   useEffect(() => {
     if (openPopover === 'changes' && textareaRef.current) {
-      // Small delay to ensure popover is rendered
+      /** Delay ensures popover is rendered before focusing */
       setTimeout(() => textareaRef.current?.focus(), 50);
     }
   }, [openPopover]);
@@ -117,20 +128,17 @@ export function ReviewActions({
     });
   }, []);
 
-  // Validate state before review action
   const validateReviewAction = (
-    action: 'approve' | 'request_changes'
+    action: ReviewAction
   ): { valid: boolean; currentStatus?: PlanStatusType } => {
     if (!identity) {
       toast.error('No identity set - please set up your profile first');
       return { valid: false };
     }
-
     if (!ydoc) {
       toast.error('Document not loaded - please refresh the page');
       return { valid: false };
     }
-
     if (!editor) {
       toast.error('Editor not ready - please try again in a moment');
       return { valid: false };
@@ -141,20 +149,15 @@ export function ReviewActions({
     const currentStatus =
       typeof rawStatus === 'string' && isValidPlanStatus(rawStatus) ? rawStatus : undefined;
 
-    if (
-      (action === 'approve' && currentStatus === 'in_progress') ||
-      (action === 'request_changes' && currentStatus === 'changes_requested')
-    ) {
-      const statusLabel =
-        currentStatus === 'in_progress' ? 'already in progress' : 'already has changes requested';
-      toast.info(`Task ${statusLabel}`);
+    const redundantReason = isRedundantAction(action, currentStatus);
+    if (redundantReason) {
+      toast.info(`Task ${redundantReason}`);
       return { valid: false };
     }
 
     return { valid: true, currentStatus };
   };
 
-  // Update Y.Doc with new review status using type-safe transition helper
   const updateReviewStatus = (
     action: 'approve' | 'request_changes',
     trimmedComment: string,
@@ -188,7 +191,6 @@ export function ReviewActions({
     return newStatus;
   };
 
-  // Execute the review action - updates doc, logs event, creates snapshot
   const executeReviewAction = (
     action: ReviewAction,
     validEditor: BlockNoteEditor,
@@ -198,7 +200,6 @@ export function ReviewActions({
     const reviewerName = identity?.name ?? 'Unknown';
     const newStatus = updateReviewStatus(action, trimmedComment, timestamp);
 
-    // Log event with comment if present
     logPlanEvent(
       ydoc,
       getEventType(action),

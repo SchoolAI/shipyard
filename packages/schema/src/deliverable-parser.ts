@@ -19,6 +19,32 @@ interface Block {
 }
 
 /**
+ * Validates and converts an unknown object to a Block structure.
+ * Returns null if the object doesn't have required id and type string fields.
+ */
+function validateBlock(block: unknown): Block | null {
+  if (!block || typeof block !== 'object') return null;
+  if (!('id' in block) || typeof block.id !== 'string') return null;
+  if (!('type' in block) || typeof block.type !== 'string') return null;
+
+  const blockRecord = Object.fromEntries(Object.entries(block));
+  return {
+    id: String(blockRecord.id),
+    type: String(blockRecord.type),
+    content: blockRecord.content,
+    children: blockRecord.children,
+  };
+}
+
+/**
+ * Removes the deliverable marker from text and returns clean deliverable text.
+ */
+function cleanDeliverableText(text: string): string {
+  const markerRegex = new RegExp(`\\s*${DELIVERABLE_MARKER.replace(/[{}#]/g, '\\$&')}\\s*`, 'g');
+  return text.replace(markerRegex, '').trim();
+}
+
+/**
  * Extracts deliverables from BlockNote blocks.
  * Looks for checkListItem blocks with {#deliverable} marker in the text.
  *
@@ -36,31 +62,14 @@ export function extractDeliverables(blocks: unknown[]): Deliverable[] {
   const deliverables: Deliverable[] = [];
 
   function processBlock(block: unknown): void {
-    // Validate block structure
-    if (!block || typeof block !== 'object') return;
-    if (!('id' in block) || typeof block.id !== 'string') return;
-    if (!('type' in block) || typeof block.type !== 'string') return;
+    const validBlock = validateBlock(block);
+    if (!validBlock) return;
 
-    // After validation, we know block has id and type - construct validated block
-    const blockRecord = Object.fromEntries(Object.entries(block));
-    const validBlock: Block = {
-      id: String(blockRecord.id),
-      type: String(blockRecord.type),
-      content: blockRecord.content,
-      children: blockRecord.children,
-    };
     const text = extractTextFromBlock(validBlock);
-
     if (text.includes(DELIVERABLE_MARKER)) {
-      const markerRegex = new RegExp(
-        `\\s*${DELIVERABLE_MARKER.replace(/[{}#]/g, '\\$&')}\\s*`,
-        'g'
-      );
-      const cleanText = text.replace(markerRegex, '').trim();
-
       deliverables.push({
         id: validBlock.id,
-        text: cleanText,
+        text: cleanDeliverableText(text),
       });
     }
 

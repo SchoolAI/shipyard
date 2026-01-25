@@ -1,6 +1,6 @@
 import { useBlockNoteEditor, useComponentsContext } from '@blocknote/react';
 import { Undo } from 'lucide-react';
-import { getYUndoExtension } from '../../types/blocknote-extensions';
+import { getYUndoExtension } from '@/types/blocknote-extensions';
 
 /**
  * Undo button for BlockNote FormattingToolbar.

@@ -25,8 +25,8 @@ import {
   handleRevokeInvite,
   handleSubscribe,
   handleUnsubscribe,
-} from '../../core/handlers/index.js';
-import type { SignalingMessage } from '../../core/types.js';
+} from '@signaling/handlers/index.js';
+import type { SignalingMessage } from '@signaling/types.js';
 import { CloudflarePlatformAdapter } from './adapter.js';
 import { logger } from './logger.js';
 

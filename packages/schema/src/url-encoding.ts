@@ -309,12 +309,12 @@ function getLocationSearch(): string | null {
   if (!('location' in globalThis)) return null;
 
   const globalRecord = Object.fromEntries(Object.entries(globalThis));
-  const location = globalRecord['location'];
+  const location = globalRecord.location;
   if (typeof location !== 'object' || location === null) return null;
   if (!('search' in location)) return null;
 
   const locationRecord = Object.fromEntries(Object.entries(location));
-  const search = locationRecord['search'];
+  const search = locationRecord.search;
   return typeof search === 'string' ? search : null;
 }
 

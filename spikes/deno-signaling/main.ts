@@ -57,86 +57,118 @@ function cleanupConnection(conn: WebSocket): void {
 }
 
 /**
+ * Parse a signaling message from raw JSON string.
+ * Returns null if the message is invalid.
+ */
+function parseMessage(data: string): Record<string, unknown> | null {
+  try {
+    const message = JSON.parse(data);
+    if (!message || typeof message.type !== 'string') {
+      return null;
+    }
+    return message;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Extract string topic names from a message's topics array.
+ */
+function extractTopicNames(message: Record<string, unknown>): string[] {
+  const messageTopics = message.topics;
+  if (!Array.isArray(messageTopics)) {
+    return [];
+  }
+  return messageTopics.filter((t): t is string => typeof t === 'string');
+}
+
+/**
+ * Handle subscribe message - add connection to requested topics.
+ */
+function handleSubscribe(
+  conn: WebSocket,
+  message: Record<string, unknown>,
+  subscribedTopics: Set<string>
+): void {
+  for (const topicName of extractTopicNames(message)) {
+    if (!topics.has(topicName)) {
+      topics.set(topicName, new Set());
+    }
+    topics.get(topicName)?.add(conn);
+    subscribedTopics.add(topicName);
+  }
+}
+
+/**
+ * Handle unsubscribe message - remove connection from topics.
+ */
+function handleUnsubscribe(
+  conn: WebSocket,
+  message: Record<string, unknown>,
+  subscribedTopics: Set<string>
+): void {
+  for (const topicName of extractTopicNames(message)) {
+    const subs = topics.get(topicName);
+    if (subs) {
+      subs.delete(conn);
+      if (subs.size === 0) {
+        topics.delete(topicName);
+      }
+    }
+    subscribedTopics.delete(topicName);
+  }
+}
+
+/**
+ * Handle publish message - broadcast to all topic subscribers.
+ */
+function handlePublish(message: Record<string, unknown>): void {
+  const topic = message.topic;
+  if (typeof topic !== 'string') {
+    return;
+  }
+  const receivers = topics.get(topic);
+  if (!receivers) {
+    return;
+  }
+  const outMessage = { ...message, clients: receivers.size };
+  for (const receiver of receivers) {
+    send(receiver, outMessage);
+  }
+}
+
+/**
  * Handle incoming WebSocket messages.
  * Protocol matches y-webrtc signaling expectations.
  */
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Spike code, complexity is acceptable for POC
 function handleMessage(conn: WebSocket, data: string): void {
-  let message: Record<string, unknown>;
-  try {
-    message = JSON.parse(data);
-  } catch {
-    return; // Invalid JSON, ignore
-  }
-
-  if (!message || typeof message.type !== 'string') {
+  const message = parseMessage(data);
+  if (!message) {
     return;
   }
 
-  // Ensure connection has a topic set
-  if (!connectionTopics.has(conn)) {
-    connectionTopics.set(conn, new Set());
+  // Ensure connection has a topic set and get it
+  let subscribedTopics = connectionTopics.get(conn);
+  if (!subscribedTopics) {
+    subscribedTopics = new Set();
+    connectionTopics.set(conn, subscribedTopics);
   }
-  // biome-ignore lint/style/noNonNullAssertion: Safe assertion after has() check
-  const subscribedTopics = connectionTopics.get(conn)!;
 
   switch (message.type) {
-    case 'subscribe': {
-      const messageTopics = message.topics;
-      if (Array.isArray(messageTopics)) {
-        for (const topicName of messageTopics) {
-          if (typeof topicName === 'string') {
-            // Add conn to topic
-            if (!topics.has(topicName)) {
-              topics.set(topicName, new Set());
-            }
-            topics.get(topicName)?.add(conn);
-            // Track topic for cleanup
-            subscribedTopics.add(topicName);
-          }
-        }
-      }
+    case 'subscribe':
+      handleSubscribe(conn, message, subscribedTopics);
       break;
-    }
-
-    case 'unsubscribe': {
-      const messageTopics = message.topics;
-      if (Array.isArray(messageTopics)) {
-        for (const topicName of messageTopics) {
-          if (typeof topicName === 'string') {
-            const subs = topics.get(topicName);
-            if (subs) {
-              subs.delete(conn);
-              if (subs.size === 0) {
-                topics.delete(topicName);
-              }
-            }
-            subscribedTopics.delete(topicName);
-          }
-        }
-      }
+    case 'unsubscribe':
+      handleUnsubscribe(conn, message, subscribedTopics);
       break;
-    }
-
-    case 'publish': {
-      const topic = message.topic;
-      if (typeof topic === 'string') {
-        const receivers = topics.get(topic);
-        if (receivers) {
-          // Add client count to message (y-webrtc uses this)
-          const outMessage = { ...message, clients: receivers.size };
-          for (const receiver of receivers) {
-            send(receiver, outMessage);
-          }
-        }
-      }
+    case 'publish':
+      handlePublish(message);
       break;
-    }
-
-    case 'ping': {
+    case 'ping':
       send(conn, { type: 'pong' });
       break;
-    }
   }
 }
 

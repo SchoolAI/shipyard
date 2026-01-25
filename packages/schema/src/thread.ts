@@ -115,15 +115,9 @@ export function extractTextFromCommentBody(body: CommentBody): string {
 export function extractMentions(body: CommentBody): string[] {
   const text = extractTextFromCommentBody(body);
   const mentionRegex = /@([a-zA-Z0-9_-]+)/g;
-  const mentions: string[] = [];
-  let match: RegExpExecArray | null;
-
-  // biome-ignore lint/suspicious/noAssignInExpressions: Standard regex exec loop pattern
-  while ((match = mentionRegex.exec(text)) !== null) {
-    if (match[1]) {
-      mentions.push(match[1]);
-    }
-  }
+  const mentions = [...text.matchAll(mentionRegex)]
+    .map((match) => match[1])
+    .filter((username): username is string => username !== undefined);
 
   return [...new Set(mentions)];
 }

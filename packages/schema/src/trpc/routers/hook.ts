@@ -3,9 +3,10 @@
  * These endpoints are called by the Claude Code hook to manage plan sessions.
  */
 
+import type { Deliverable } from '@schema/plan.js';
+import { DeliverableSchema } from '@schema/plan.js';
 import type * as Y from 'yjs';
 import { z } from 'zod';
-import { type Deliverable, DeliverableSchema } from '../../plan.js';
 import type { Logger } from '../context.js';
 import {
   CreateHookSessionRequestSchema,

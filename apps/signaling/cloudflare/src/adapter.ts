@@ -14,8 +14,8 @@
  */
 
 import type { InviteRedemption, InviteToken } from '@shipyard/schema';
+import type { PlatformAdapter } from '@signaling/platform.js';
 import { z } from 'zod';
-import type { PlatformAdapter } from '../../core/platform.js';
 import { logger } from './logger.js';
 
 /**

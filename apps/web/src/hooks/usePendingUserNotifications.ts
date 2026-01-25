@@ -4,6 +4,17 @@ import type { WebrtcProvider } from 'y-webrtc';
 import { isPlanAwarenessState, type PlanAwarenessState } from '@/types/awareness';
 
 /**
+ * Extracts the plan status from a raw awareness state entry.
+ * Handles type validation and conversion from unknown state.
+ */
+function extractPlanStatus(state: unknown): PlanAwarenessState | undefined {
+  if (!state || typeof state !== 'object') return undefined;
+  const stateRecord = Object.fromEntries(Object.entries(state));
+  const planStatusRaw = stateRecord.planStatus;
+  return isPlanAwarenessState(planStatusRaw) ? planStatusRaw : undefined;
+}
+
+/**
  * Extracts a pending user from a plan status, if valid.
  * Returns null if the status is not a valid pending user.
  */
@@ -11,11 +22,9 @@ function extractPendingUser(planStatus: PlanAwarenessState | undefined): {
   userId: string;
   userName: string;
 } | null {
-  // Skip if no plan status or not pending
   if (!planStatus || planStatus.status !== 'pending') {
     return null;
   }
-  // Skip owners (they're always approved)
   if (planStatus.isOwner) {
     return null;
   }
@@ -28,7 +37,7 @@ function extractPendingUser(planStatus: PlanAwarenessState | undefined): {
 function showPendingUserToast(userName: string, onOpenApprovalPanel?: () => void): void {
   toast.info(`${userName} requests access`, {
     description: 'Tap to review access requests',
-    duration: 10000, // 10 seconds - longer since it requires action
+    duration: 10000,
     action: onOpenApprovalPanel
       ? {
           label: 'View',
@@ -51,12 +60,10 @@ export function usePendingUserNotifications(
   isOwner: boolean,
   onOpenApprovalPanel?: () => void
 ): void {
-  // Track previously seen pending users to detect new ones
   const seenPendingUsersRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     if (!rtcProvider || !isOwner) {
-      // Reset tracking when not applicable
       seenPendingUsersRef.current.clear();
       return;
     }
@@ -68,32 +75,22 @@ export function usePendingUserNotifications(
       const currentPendingUsers = new Set<string>();
 
       for (const [, state] of states) {
-        const stateRecord =
-          state && typeof state === 'object' ? Object.fromEntries(Object.entries(state)) : {};
-        const planStatusRaw = stateRecord.planStatus;
-        const planStatus: PlanAwarenessState | undefined = isPlanAwarenessState(planStatusRaw)
-          ? planStatusRaw
-          : undefined;
+        const planStatus = extractPlanStatus(state);
         const pendingUser = extractPendingUser(planStatus);
         if (!pendingUser) continue;
 
         const { userId, userName } = pendingUser;
         currentPendingUsers.add(userId);
 
-        // Check if this is a new pending user and show toast
         if (!seenPendingUsersRef.current.has(userId)) {
           showPendingUserToast(userName, onOpenApprovalPanel);
         }
       }
 
-      // Update tracked users
       seenPendingUsersRef.current = currentPendingUsers;
     };
 
-    // Initial check
     checkForNewPendingUsers();
-
-    // Listen for awareness changes
     awareness.on('change', checkForNewPendingUsers);
 
     return () => {
