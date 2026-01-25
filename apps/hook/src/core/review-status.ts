@@ -50,7 +50,7 @@ async function waitForReviewDecision(
   return {
     approved: result.approved,
     feedback: result.feedback,
-    deliverables: result.deliverables as Deliverable[] | undefined,
+    deliverables: result.deliverables,
     reviewComment: result.reviewComment,
     reviewedBy: result.reviewedBy,
     status: result.status,

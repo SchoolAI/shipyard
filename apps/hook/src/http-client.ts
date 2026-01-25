@@ -6,6 +6,7 @@
 import type {
   CreateHookSessionRequest,
   CreateHookSessionResponse,
+  Deliverable,
   GetReviewStatusResponse,
   SessionContextResult,
   UpdatePlanContentRequest,
@@ -166,7 +167,7 @@ export async function waitForApproval(
 ): Promise<{
   approved: boolean;
   feedback?: string;
-  deliverables?: unknown[];
+  deliverables?: Deliverable[];
   reviewComment?: string;
   reviewedBy?: string;
   status?: string;
