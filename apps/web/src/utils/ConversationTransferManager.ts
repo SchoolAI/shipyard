@@ -139,7 +139,10 @@ async function computeChecksum(data: Uint8Array): Promise<string> {
    */
   // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- Uint8Array.buffer is ArrayBuffer but TypeScript readonly/mutable incompatibility
   const buffer = data.buffer as ArrayBuffer;
-  const hashBuffer = await crypto.subtle.digest('SHA-256', new Uint8Array(buffer, data.byteOffset, data.byteLength));
+  const hashBuffer = await crypto.subtle.digest(
+    'SHA-256',
+    new Uint8Array(buffer, data.byteOffset, data.byteLength)
+  );
   const hashArray = new Uint8Array(hashBuffer);
   return Array.from(hashArray)
     .map((b) => b.toString(16).padStart(2, '0'))

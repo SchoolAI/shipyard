@@ -9,8 +9,6 @@
  * and avoid duplication.
  */
 
-import { z } from 'zod';
-
 // Import and re-export types from @shipyard/schema that are used in signaling
 import type {
   CreateInviteRequest,
@@ -25,6 +23,7 @@ import type {
   RedeemInviteRequest,
   RevokeInviteRequest,
 } from '@shipyard/schema';
+import { z } from 'zod';
 
 export type {
   CreateInviteRequest,

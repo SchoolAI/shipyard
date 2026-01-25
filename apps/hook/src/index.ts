@@ -84,14 +84,9 @@ async function handlePlanExit(
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : String(err);
     const errorCode =
-      err instanceof Error && 'code' in err && typeof err.code === 'string'
-        ? err.code
-        : undefined;
+      err instanceof Error && 'code' in err && typeof err.code === 'string' ? err.code : undefined;
 
-    logger.error(
-      { err, message: errorMessage, code: errorCode },
-      'Failed to check review status'
-    );
+    logger.error({ err, message: errorMessage, code: errorCode }, 'Failed to check review status');
 
     const isConnectionError =
       errorCode === 'ECONNREFUSED' ||

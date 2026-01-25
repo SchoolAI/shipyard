@@ -12,12 +12,7 @@ import {
   TOOL_NAMES,
 } from '../constants.js';
 import { logger } from '../logger.js';
-import type {
-  AdapterEvent,
-  AgentAdapter,
-  CoreResponse,
-  ReviewFeedback,
-} from './types.js';
+import type { AdapterEvent, AgentAdapter, CoreResponse, ReviewFeedback } from './types.js';
 
 const ClaudeCodeHookBaseSchema = z.object({
   session_id: z.string(),
