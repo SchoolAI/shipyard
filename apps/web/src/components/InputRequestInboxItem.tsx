@@ -4,13 +4,31 @@
  */
 
 import { Card, Chip } from '@heroui/react';
-import { DEFAULT_INPUT_REQUEST_TIMEOUT_SECONDS, type InputRequest } from '@shipyard/schema';
+import { type AnyInputRequest, DEFAULT_INPUT_REQUEST_TIMEOUT_SECONDS } from '@shipyard/schema';
 import { Clock } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 interface InputRequestInboxItemProps {
-  request: InputRequest;
+  request: AnyInputRequest;
   onClick: () => void;
+}
+
+/** Get display message for any input request type */
+function getDisplayMessage(request: AnyInputRequest): string {
+  if (request.type === 'multi') {
+    const count = request.questions.length;
+    const firstQuestion = request.questions[0]?.message || 'Multiple questions';
+    return count > 1 ? `${firstQuestion} (+${count - 1} more)` : firstQuestion;
+  }
+  return request.message;
+}
+
+/** Get display type label for any input request */
+function getDisplayType(request: AnyInputRequest): string {
+  if (request.type === 'multi') {
+    return `multi (${request.questions.length})`;
+  }
+  return request.type;
 }
 
 export function InputRequestInboxItem({ request, onClick }: InputRequestInboxItemProps) {
@@ -49,12 +67,12 @@ export function InputRequestInboxItem({ request, onClick }: InputRequestInboxIte
                 Agent Input
               </Chip>
               <Chip variant="soft" color="default" size="sm">
-                {request.type}
+                {getDisplayType(request)}
               </Chip>
             </div>
 
             <p className="text-sm font-medium text-foreground mb-1 line-clamp-2">
-              {request.message}
+              {getDisplayMessage(request)}
             </p>
           </div>
 

@@ -20,3 +20,10 @@ export function formatTime(seconds: number): string {
  */
 export const OTHER_OPTION_VALUE = '__other__';
 export const OTHER_OPTION_LABEL = 'Other (please specify)';
+
+/**
+ * "N/A" escape hatch constants for rating-type questions.
+ * Allows users to indicate the question is not applicable to their situation.
+ */
+export const NA_OPTION_VALUE = 'n/a';
+export const NA_OPTION_LABEL = 'N/A';

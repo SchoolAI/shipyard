@@ -238,9 +238,9 @@ Claude Code's built-in `AskUserQuestion` tool was added in v2.0.21 (October 2025
   "properties": {
     "questions": {
       "type": "array",
-      "description": "Questions to ask the user (1-4 questions)",
+      "description": "Questions to ask the user (1-10 questions, 4 recommended for UX)",
       "minItems": 1,
-      "maxItems": 4,
+      "maxItems": 10,
       "items": {
         "type": "object",
         "required": ["question", "header", "options", "multiSelect"],

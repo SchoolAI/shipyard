@@ -58,6 +58,7 @@ export function NumberInput({
           min={request.min}
           max={request.max}
           step={step}
+          autoComplete="off"
           autoFocus
           aria-invalid={hasValue && !isValid}
         />

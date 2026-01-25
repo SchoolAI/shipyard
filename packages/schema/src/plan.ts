@@ -294,8 +294,10 @@ export type PlanEvent =
           | 'email'
           | 'date'
           | 'dropdown'
-          | 'rating';
-        requestMessage: string;
+          | 'rating'
+          | 'multi';
+        requestMessage?: string;
+        questionCount?: number;
       };
     })
   | (PlanEventBase & {
@@ -481,8 +483,10 @@ export const PlanEventSchema = z.discriminatedUnion('type', [
         'date',
         'dropdown',
         'rating',
+        'multi',
       ]),
-      requestMessage: z.string(),
+      requestMessage: z.string().optional(),
+      questionCount: z.number().optional(),
     }),
   }),
   PlanEventBaseSchema.extend({

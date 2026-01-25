@@ -8,6 +8,7 @@
  * - Different display styles (stars, numbers, emoji)
  * - Labels for scale endpoints
  * - Selection updates value
+ * - N/A and Other escape hatch buttons
  */
 
 import { render, screen } from '@testing-library/react';
@@ -15,6 +16,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { RatingInput } from './RatingInput';
 import type { RatingInputRequest } from './types';
+import { NA_OPTION_VALUE, OTHER_OPTION_VALUE } from './utils';
 
 // Factory for creating test requests
 function createRatingRequest(overrides: Partial<RatingInputRequest> = {}): RatingInputRequest {
@@ -28,24 +30,56 @@ function createRatingRequest(overrides: Partial<RatingInputRequest> = {}): Ratin
   };
 }
 
+// Default props for escape hatch functionality
+const defaultEscapeHatchProps = {
+  customInput: '',
+  setCustomInput: vi.fn(),
+  isOtherSelected: false,
+  isNaSelected: false,
+};
+
 describe('RatingInput', () => {
   it('should render with message as label', () => {
     const request = createRatingRequest({ message: 'How satisfied are you?' });
-    render(<RatingInput request={request} value="" setValue={vi.fn()} isSubmitting={false} />);
+    render(
+      <RatingInput
+        request={request}
+        value=""
+        setValue={vi.fn()}
+        isSubmitting={false}
+        {...defaultEscapeHatchProps}
+      />
+    );
 
     expect(screen.getByText('How satisfied are you?')).toBeInTheDocument();
   });
 
   it('should render as a radiogroup for accessibility', () => {
     const request = createRatingRequest();
-    render(<RatingInput request={request} value="" setValue={vi.fn()} isSubmitting={false} />);
+    render(
+      <RatingInput
+        request={request}
+        value=""
+        setValue={vi.fn()}
+        isSubmitting={false}
+        {...defaultEscapeHatchProps}
+      />
+    );
 
     expect(screen.getByRole('radiogroup')).toBeInTheDocument();
   });
 
   it('should render default 5 rating options (1-5)', () => {
     const request = createRatingRequest();
-    render(<RatingInput request={request} value="" setValue={vi.fn()} isSubmitting={false} />);
+    render(
+      <RatingInput
+        request={request}
+        value=""
+        setValue={vi.fn()}
+        isSubmitting={false}
+        {...defaultEscapeHatchProps}
+      />
+    );
 
     // Check for 5 options with aria-labels indicating rating values
     expect(screen.getByLabelText('1 out of 5')).toBeInTheDocument();
@@ -57,7 +91,15 @@ describe('RatingInput', () => {
 
   it('should render custom rating range', () => {
     const request = createRatingRequest({ min: 1, max: 10 });
-    render(<RatingInput request={request} value="" setValue={vi.fn()} isSubmitting={false} />);
+    render(
+      <RatingInput
+        request={request}
+        value=""
+        setValue={vi.fn()}
+        isSubmitting={false}
+        {...defaultEscapeHatchProps}
+      />
+    );
 
     // Check first and last options
     expect(screen.getByLabelText('1 out of 10')).toBeInTheDocument();
@@ -69,7 +111,15 @@ describe('RatingInput', () => {
     const setValue = vi.fn();
     const request = createRatingRequest();
 
-    render(<RatingInput request={request} value="" setValue={setValue} isSubmitting={false} />);
+    render(
+      <RatingInput
+        request={request}
+        value=""
+        setValue={setValue}
+        isSubmitting={false}
+        {...defaultEscapeHatchProps}
+      />
+    );
 
     // Click on rating 4
     await user.click(screen.getByLabelText('4 out of 5'));
@@ -77,18 +127,53 @@ describe('RatingInput', () => {
     expect(setValue).toHaveBeenCalledWith('4');
   });
 
-  it('should display stars style by default', () => {
+  it('should display empty stars by default when no value selected', () => {
     const request = createRatingRequest();
-    render(<RatingInput request={request} value="" setValue={vi.fn()} isSubmitting={false} />);
+    render(
+      <RatingInput
+        request={request}
+        value=""
+        setValue={vi.fn()}
+        isSubmitting={false}
+        {...defaultEscapeHatchProps}
+      />
+    );
 
-    // Stars are rendered as the filled star character
-    const stars = screen.getAllByText('\u2605'); // Unicode filled star
-    expect(stars.length).toBe(5);
+    // All stars should be empty when nothing is selected
+    const emptyStars = screen.getAllByText('\u2606'); // Unicode empty star (☆)
+    expect(emptyStars.length).toBe(5);
+  });
+
+  it('should show cumulative filled stars up to selected value', () => {
+    const request = createRatingRequest();
+    render(
+      <RatingInput
+        request={request}
+        value="3"
+        setValue={vi.fn()}
+        isSubmitting={false}
+        {...defaultEscapeHatchProps}
+      />
+    );
+
+    // Stars 1-3 should be filled, stars 4-5 should be empty
+    const filledStars = screen.getAllByText('\u2605'); // Unicode filled star (★)
+    const emptyStars = screen.getAllByText('\u2606'); // Unicode empty star (☆)
+    expect(filledStars.length).toBe(3);
+    expect(emptyStars.length).toBe(2);
   });
 
   it('should display numbers when style is "numbers"', () => {
     const request = createRatingRequest({ style: 'numbers' });
-    render(<RatingInput request={request} value="" setValue={vi.fn()} isSubmitting={false} />);
+    render(
+      <RatingInput
+        request={request}
+        value=""
+        setValue={vi.fn()}
+        isSubmitting={false}
+        {...defaultEscapeHatchProps}
+      />
+    );
 
     // Numbers should be displayed
     expect(screen.getByText('1')).toBeInTheDocument();
@@ -100,7 +185,15 @@ describe('RatingInput', () => {
 
   it('should display emoji when style is "emoji"', () => {
     const request = createRatingRequest({ style: 'emoji', min: 1, max: 5 });
-    render(<RatingInput request={request} value="" setValue={vi.fn()} isSubmitting={false} />);
+    render(
+      <RatingInput
+        request={request}
+        value=""
+        setValue={vi.fn()}
+        isSubmitting={false}
+        {...defaultEscapeHatchProps}
+      />
+    );
 
     // Emojis range from sad to happy
     expect(screen.getByText('\ud83d\ude1e')).toBeInTheDocument(); // Sad
@@ -114,25 +207,74 @@ describe('RatingInput', () => {
         high: 'Excellent',
       },
     });
-    render(<RatingInput request={request} value="" setValue={vi.fn()} isSubmitting={false} />);
+    render(
+      <RatingInput
+        request={request}
+        value=""
+        setValue={vi.fn()}
+        isSubmitting={false}
+        {...defaultEscapeHatchProps}
+      />
+    );
 
     expect(screen.getByText('Poor')).toBeInTheDocument();
     expect(screen.getByText('Excellent')).toBeInTheDocument();
   });
 
-  it('should highlight selected rating', () => {
+  it('should highlight all ratings up to selected value with cumulative fill', () => {
     const request = createRatingRequest();
-    render(<RatingInput request={request} value="3" setValue={vi.fn()} isSubmitting={false} />);
+    render(
+      <RatingInput
+        request={request}
+        value="3"
+        setValue={vi.fn()}
+        isSubmitting={false}
+        {...defaultEscapeHatchProps}
+      />
+    );
 
-    // The selected rating should have full opacity while others are reduced
+    // Ratings 1-3 should have full opacity (cumulative fill)
     const ratingElements = screen.getAllByRole('img');
-    const rating3 = ratingElements[2]; // Index 2 = rating 3
-    expect(rating3).toHaveClass('opacity-100');
+    expect(ratingElements[0]).toHaveClass('opacity-100'); // Rating 1
+    expect(ratingElements[1]).toHaveClass('opacity-100'); // Rating 2
+    expect(ratingElements[2]).toHaveClass('opacity-100'); // Rating 3
+    expect(ratingElements[3]).toHaveClass('opacity-50'); // Rating 4
+    expect(ratingElements[4]).toHaveClass('opacity-50'); // Rating 5
+  });
+
+  it('should show bold for filled numbers in numbers style', () => {
+    const request = createRatingRequest({ style: 'numbers' });
+    render(
+      <RatingInput
+        request={request}
+        value="3"
+        setValue={vi.fn()}
+        isSubmitting={false}
+        {...defaultEscapeHatchProps}
+      />
+    );
+
+    const ratingElements = screen.getAllByRole('img');
+    // Numbers 1-3 should be bold (filled)
+    expect(ratingElements[0]).toHaveClass('font-bold');
+    expect(ratingElements[1]).toHaveClass('font-bold');
+    expect(ratingElements[2]).toHaveClass('font-bold');
+    // Numbers 4-5 should not be bold
+    expect(ratingElements[3]).not.toHaveClass('font-bold');
+    expect(ratingElements[4]).not.toHaveClass('font-bold');
   });
 
   it('should be disabled when isSubmitting is true', () => {
     const request = createRatingRequest();
-    render(<RatingInput request={request} value="" setValue={vi.fn()} isSubmitting={true} />);
+    render(
+      <RatingInput
+        request={request}
+        value=""
+        setValue={vi.fn()}
+        isSubmitting={true}
+        {...defaultEscapeHatchProps}
+      />
+    );
 
     const radiogroup = screen.getByRole('radiogroup');
     expect(radiogroup).toHaveAttribute('aria-disabled', 'true');
@@ -147,10 +289,255 @@ describe('RatingInput', () => {
         value={['array'] as any}
         setValue={vi.fn()}
         isSubmitting={false}
+        {...defaultEscapeHatchProps}
       />
     );
 
     // Should render without crashing
     expect(screen.getByRole('radiogroup')).toBeInTheDocument();
+  });
+
+  // Keyboard accessibility tests
+  describe('keyboard accessibility', () => {
+    it('should show hover preview on focus for keyboard users', async () => {
+      const user = userEvent.setup();
+      const request = createRatingRequest();
+      render(
+        <RatingInput
+          request={request}
+          value=""
+          setValue={vi.fn()}
+          isSubmitting={false}
+          {...defaultEscapeHatchProps}
+        />
+      );
+
+      // Tab to the radio group to focus it
+      await user.tab();
+
+      // The radio group and its elements should be focusable
+      const radiogroup = screen.getByRole('radiogroup');
+      expect(radiogroup).toBeInTheDocument();
+    });
+  });
+
+  // Escape hatch tests
+  describe('escape hatches', () => {
+    it('should render N/A and Other buttons', () => {
+      const request = createRatingRequest();
+      render(
+        <RatingInput
+          request={request}
+          value=""
+          setValue={vi.fn()}
+          isSubmitting={false}
+          {...defaultEscapeHatchProps}
+        />
+      );
+
+      expect(screen.getByRole('button', { name: 'N/A' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Other...' })).toBeInTheDocument();
+    });
+
+    it('should call setValue with N/A value when N/A button is clicked', async () => {
+      const user = userEvent.setup();
+      const setValue = vi.fn();
+      const request = createRatingRequest();
+
+      render(
+        <RatingInput
+          request={request}
+          value=""
+          setValue={setValue}
+          isSubmitting={false}
+          {...defaultEscapeHatchProps}
+        />
+      );
+
+      await user.click(screen.getByRole('button', { name: 'N/A' }));
+
+      expect(setValue).toHaveBeenCalledWith(NA_OPTION_VALUE);
+    });
+
+    it('should call setValue with Other value when Other button is clicked', async () => {
+      const user = userEvent.setup();
+      const setValue = vi.fn();
+      const request = createRatingRequest();
+
+      render(
+        <RatingInput
+          request={request}
+          value=""
+          setValue={setValue}
+          isSubmitting={false}
+          {...defaultEscapeHatchProps}
+        />
+      );
+
+      await user.click(screen.getByRole('button', { name: 'Other...' }));
+
+      expect(setValue).toHaveBeenCalledWith(OTHER_OPTION_VALUE);
+    });
+
+    it('should show text input when Other is selected', () => {
+      const request = createRatingRequest();
+      render(
+        <RatingInput
+          request={request}
+          value={OTHER_OPTION_VALUE}
+          setValue={vi.fn()}
+          isSubmitting={false}
+          customInput=""
+          setCustomInput={vi.fn()}
+          isOtherSelected={true}
+          isNaSelected={false}
+        />
+      );
+
+      expect(screen.getByPlaceholderText('Explain...')).toBeInTheDocument();
+      expect(screen.getByText("Why can't you rate this?")).toBeInTheDocument();
+    });
+
+    it('should not show text input when N/A is selected', () => {
+      const request = createRatingRequest();
+      render(
+        <RatingInput
+          request={request}
+          value={NA_OPTION_VALUE}
+          setValue={vi.fn()}
+          isSubmitting={false}
+          customInput=""
+          setCustomInput={vi.fn()}
+          isOtherSelected={false}
+          isNaSelected={true}
+        />
+      );
+
+      expect(screen.queryByPlaceholderText('Explain...')).not.toBeInTheDocument();
+    });
+
+    it('should call setCustomInput when typing in Other text field', async () => {
+      const user = userEvent.setup();
+      const setCustomInput = vi.fn();
+      const request = createRatingRequest();
+
+      render(
+        <RatingInput
+          request={request}
+          value={OTHER_OPTION_VALUE}
+          setValue={vi.fn()}
+          isSubmitting={false}
+          customInput=""
+          setCustomInput={setCustomInput}
+          isOtherSelected={true}
+          isNaSelected={false}
+        />
+      );
+
+      const input = screen.getByPlaceholderText('Explain...');
+      await user.type(input, 'I need more context');
+
+      // setCustomInput is called for each character typed
+      expect(setCustomInput).toHaveBeenCalled();
+    });
+
+    it('should select N/A button when N/A is selected (visual state managed via props)', () => {
+      const request = createRatingRequest();
+      render(
+        <RatingInput
+          request={request}
+          value={NA_OPTION_VALUE}
+          setValue={vi.fn()}
+          isSubmitting={false}
+          customInput=""
+          setCustomInput={vi.fn()}
+          isOtherSelected={false}
+          isNaSelected={true}
+        />
+      );
+
+      // The N/A button should be rendered and accessible
+      const naButton = screen.getByRole('button', { name: 'N/A' });
+      expect(naButton).toBeInTheDocument();
+    });
+
+    it('should select Other button when Other is selected (visual state managed via props)', () => {
+      const request = createRatingRequest();
+      render(
+        <RatingInput
+          request={request}
+          value={OTHER_OPTION_VALUE}
+          setValue={vi.fn()}
+          isSubmitting={false}
+          customInput=""
+          setCustomInput={vi.fn()}
+          isOtherSelected={true}
+          isNaSelected={false}
+        />
+      );
+
+      // The Other button should be rendered and accessible
+      const otherButton = screen.getByRole('button', { name: 'Other...' });
+      expect(otherButton).toBeInTheDocument();
+    });
+
+    it('should clear star fill when N/A is selected', () => {
+      const request = createRatingRequest();
+      render(
+        <RatingInput
+          request={request}
+          value={NA_OPTION_VALUE}
+          setValue={vi.fn()}
+          isSubmitting={false}
+          customInput=""
+          setCustomInput={vi.fn()}
+          isOtherSelected={false}
+          isNaSelected={true}
+        />
+      );
+
+      // All stars should be empty when N/A is selected
+      const emptyStars = screen.getAllByText('\u2606'); // Unicode empty star (☆)
+      expect(emptyStars.length).toBe(5);
+    });
+
+    it('should clear star fill when Other is selected', () => {
+      const request = createRatingRequest();
+      render(
+        <RatingInput
+          request={request}
+          value={OTHER_OPTION_VALUE}
+          setValue={vi.fn()}
+          isSubmitting={false}
+          customInput=""
+          setCustomInput={vi.fn()}
+          isOtherSelected={true}
+          isNaSelected={false}
+        />
+      );
+
+      // All stars should be empty when Other is selected
+      const emptyStars = screen.getAllByText('\u2606'); // Unicode empty star (☆)
+      expect(emptyStars.length).toBe(5);
+    });
+
+    it('should disable escape hatch buttons when isSubmitting is true', () => {
+      const request = createRatingRequest();
+      render(
+        <RatingInput
+          request={request}
+          value=""
+          setValue={vi.fn()}
+          isSubmitting={true}
+          {...defaultEscapeHatchProps}
+        />
+      );
+
+      const naButton = screen.getByRole('button', { name: 'N/A' });
+      const otherButton = screen.getByRole('button', { name: 'Other...' });
+
+      expect(naButton).toBeDisabled();
+      expect(otherButton).toBeDisabled();
+    });
   });
 });

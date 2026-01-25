@@ -24,7 +24,18 @@ export { RatingInput } from './RatingInput';
 export { TextInput } from './TextInput';
 
 // Re-export types for consumers
-export type { BaseInputProps, ChoiceInputProps, ConfirmInputProps } from './types';
+export type {
+  BaseInputProps,
+  ChoiceInputProps,
+  ConfirmInputProps,
+  RatingInputProps,
+} from './types';
 
 // Re-export utils for consumers
-export { formatTime, OTHER_OPTION_LABEL, OTHER_OPTION_VALUE } from './utils';
+export {
+  formatTime,
+  NA_OPTION_LABEL,
+  NA_OPTION_VALUE,
+  OTHER_OPTION_LABEL,
+  OTHER_OPTION_VALUE,
+} from './utils';

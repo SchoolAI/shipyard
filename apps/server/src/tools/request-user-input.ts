@@ -6,7 +6,7 @@
  * without needing to execute arbitrary code.
  */
 
-import { PLAN_INDEX_DOC_NAME } from '@shipyard/schema';
+import { PLAN_INDEX_DOC_NAME, QuestionSchema } from '@shipyard/schema';
 import { z } from 'zod';
 import { getOrCreateDoc } from '../doc-store.js';
 import { logger } from '../logger.js';
@@ -15,64 +15,81 @@ import { TOOL_NAMES } from './tool-names.js';
 
 // --- Input Schema ---
 
-const RequestUserInputInput = z.object({
-  message: z.string().describe('The question to ask the user'),
-  type: z
-    .enum(['text', 'choice', 'confirm', 'multiline', 'number', 'email', 'date', 'rating'])
-    .describe('Type of input to request'),
-  options: z
-    .array(z.string())
-    .optional()
-    .describe("For 'choice' type - available options (required)"),
-  multiSelect: z
-    .boolean()
-    .optional()
-    .describe("For 'choice' type - allow selecting multiple options"),
-  displayAs: z
-    .enum(['radio', 'checkbox', 'dropdown'])
-    .optional()
-    .describe("For 'choice' type - override automatic UI selection"),
-  placeholder: z.string().optional().describe("For 'choice' type with dropdown - placeholder text"),
-  defaultValue: z.string().optional().describe('Pre-filled value for text/multiline inputs'),
-  timeout: z
-    .number()
-    .optional()
-    .describe('Timeout in seconds (default: 1800, min: 10, max: 14400)'),
-  planId: z
-    .string()
-    .optional()
-    .describe('Optional metadata to link request to plan (for activity log filtering)'),
-  // Number/rating type parameters
-  min: z.number().optional().describe("For 'number'/'rating' - minimum value"),
-  max: z.number().optional().describe("For 'number'/'rating' - maximum value"),
-  // Date type parameters (separate from min/max since they're strings)
-  minDate: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/)
-    .optional()
-    .describe("For 'date' - minimum date in YYYY-MM-DD format"),
-  maxDate: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/)
-    .optional()
-    .describe("For 'date' - maximum date in YYYY-MM-DD format"),
-  format: z
-    .enum(['integer', 'decimal', 'currency', 'percentage'])
-    .optional()
-    .describe("For 'number' - display format hint (step is derived: integer=1, others=0.01)"),
-  // Email type parameters
-  allowMultiple: z.boolean().optional().describe("For 'email' - allow multiple emails"),
-  domain: z.string().optional().describe("For 'email' - restrict to domain"),
-  // Rating type parameters
-  style: z.enum(['stars', 'numbers', 'emoji']).optional().describe("For 'rating' - display style"),
-  labels: z
-    .object({
-      low: z.string().optional(),
-      high: z.string().optional(),
-    })
-    .optional()
-    .describe("For 'rating' - endpoint labels"),
-});
+const RequestUserInputInput = z
+  .object({
+    message: z.string().optional().describe('The question to ask the user'),
+    type: z
+      .enum(['text', 'choice', 'confirm', 'multiline', 'number', 'email', 'date', 'rating'])
+      .optional()
+      .describe('Type of input to request'),
+    options: z
+      .array(z.string())
+      .optional()
+      .describe("For 'choice' type - available options (required)"),
+    multiSelect: z
+      .boolean()
+      .optional()
+      .describe("For 'choice' type - allow selecting multiple options"),
+    displayAs: z
+      .enum(['radio', 'checkbox', 'dropdown'])
+      .optional()
+      .describe("For 'choice' type - override automatic UI selection"),
+    placeholder: z
+      .string()
+      .optional()
+      .describe("For 'choice' type with dropdown - placeholder text"),
+    defaultValue: z.string().optional().describe('Pre-filled value for text/multiline inputs'),
+    timeout: z
+      .number()
+      .optional()
+      .describe('Timeout in seconds (default: 1800, min: 10, max: 14400)'),
+    planId: z
+      .string()
+      .optional()
+      .describe('Optional metadata to link request to plan (for activity log filtering)'),
+    // Number/rating type parameters
+    min: z.number().optional().describe("For 'number'/'rating' - minimum value"),
+    max: z.number().optional().describe("For 'number'/'rating' - maximum value"),
+    // Date type parameters (separate from min/max since they're strings)
+    minDate: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/)
+      .optional()
+      .describe("For 'date' - minimum date in YYYY-MM-DD format"),
+    maxDate: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/)
+      .optional()
+      .describe("For 'date' - maximum date in YYYY-MM-DD format"),
+    format: z
+      .enum(['integer', 'decimal', 'currency', 'percentage'])
+      .optional()
+      .describe("For 'number' - display format hint (step is derived: integer=1, others=0.01)"),
+    // Email type parameters
+    domain: z.string().optional().describe("For 'email' - restrict to domain"),
+    // Rating type parameters
+    style: z
+      .enum(['stars', 'numbers', 'emoji'])
+      .optional()
+      .describe("For 'rating' - display style"),
+    labels: z
+      .object({
+        low: z.string().optional(),
+        high: z.string().optional(),
+      })
+      .optional()
+      .describe("For 'rating' - endpoint labels"),
+    // Multi-question support
+    questions: z
+      .array(QuestionSchema)
+      .min(1)
+      .max(10)
+      .optional()
+      .describe('Array of 1-10 questions for multi-question form (8 recommended for optimal UX)'),
+  })
+  .refine((data) => (data.message && data.type) || data.questions, {
+    message: 'Either provide message+type OR questions array',
+  });
 
 // --- Helper Functions ---
 
@@ -106,7 +123,6 @@ function buildEmailParams(input: RequestUserInputInput, baseParams: Record<strin
   return {
     ...baseParams,
     type: 'email' as const,
-    allowMultiple: input.allowMultiple,
     domain: input.domain,
   };
 }
@@ -177,38 +193,88 @@ The request appears as a modal in the browser UI. The function blocks until:
 - User declines (success=true, status='declined')
 - Timeout occurs (success=false, status='cancelled')
 
-Input types:
-- text: Single-line text input
-- multiline: Multi-line text area
-- choice: Select from options (requires 'options' parameter). UI auto-switches:
-  - 1-8 options: Radio buttons (single) or checkboxes (multi)
-  - 9+ options: Searchable dropdown
-  - Override with displayAs: 'dropdown' to force dropdown for any count
-- confirm: Yes/No confirmation
-- number: Numeric input with min/max bounds
-- email: Email address with optional domain restriction
-- date: Date selection with optional minDate/maxDate range (YYYY-MM-DD)
-- rating: Scale rating (1-5 stars, numbers, or emoji)
+## Usage Modes
 
-For 'choice' type:
-- Set multiSelect=true to allow multiple selections (checkboxes)
-- Set multiSelect=false or omit for single selection (radio buttons)
-- Set displayAs='dropdown' to force dropdown UI for any number of options
+### Single-Question Mode
+Provide \`message\` and \`type\` parameters to ask one question.
 
-For 'number' type:
-- min/max: Value bounds
-- format: 'integer' | 'decimal' | 'currency' | 'percentage' (step is derived from format)
+### Multi-Question Mode
+Provide \`questions\` array (1-10 questions, 8 recommended for optimal UX) to ask multiple questions in a single form.
+Example:
+\`\`\`
+{
+  questions: [
+    { message: "Project name?", type: "text" },
+    { message: "Which framework?", type: "choice", options: ["React", "Vue", "Angular"] }
+  ],
+  timeout: 300,
+  planId: "plan_abc"
+}
+\`\`\`
 
-For 'rating' type:
-- min/max: Rating scale (default 1-5)
-- style: 'stars' | 'numbers' | 'emoji'
-- labels: { low?: string, high?: string }
+## Input Types (8 total)
 
-Response format:
-- All responses are returned as strings
-- Multi-select choices: comma-space separated (e.g., "option1, option2")
-- Confirm: "yes" or "no" (lowercase)
-- See docs/INPUT-RESPONSE-FORMATS.md for complete format specification
+### 1. text - Single-line text input
+Example: { message: "API endpoint URL?", type: "text", defaultValue: "https://api.example.com" }
+
+### 2. multiline - Multi-line text area
+Example: { message: "Describe the bug:", type: "multiline" }
+
+### 3. choice - Select from options
+Example: { message: "Which database?", type: "choice", options: ["PostgreSQL", "MySQL", "SQLite"] }
+Notes:
+- Automatically adds "Other (please specify)" option as escape hatch
+- UI auto-switches: 1-8 options = radio/checkbox, 9+ = dropdown
+- Set multiSelect=true for checkboxes (multiple selections)
+- Set displayAs='dropdown' to force dropdown for any count
+
+### 4. confirm - Yes/No decision
+Example: { message: "Deploy to production?", type: "confirm" }
+Response: "yes" or "no" (lowercase)
+
+### 5. number - Numeric input with validation
+Example: { message: "Port number?", type: "number", min: 1, max: 65535 }
+Notes:
+- format parameter: 'integer' | 'decimal' | 'currency' | 'percentage' (affects step size)
+- Mobile shows numeric keypad
+
+### 6. email - Email address with validation
+Example: { message: "Contact email?", type: "email", domain: "company.com" }
+Notes:
+- Format validation enforced
+- Optional domain restriction
+- Mobile shows email keyboard
+
+### 7. date - Date selection with range
+Example: { message: "Project deadline?", type: "date", minDate: "2026-01-24", maxDate: "2026-12-31" }
+Notes:
+- ISO 8601 format (YYYY-MM-DD)
+- Native date picker on mobile
+- Response format: "2026-01-24"
+
+### 8. rating - Scale rating
+Example: { message: "Rate this approach (1-5):", type: "rating", min: 1, max: 5, labels: { low: "Poor", high: "Excellent" } }
+Notes:
+- Auto-selects style: stars for <=5, numbers for >5
+- style parameter: 'stars' | 'numbers' | 'emoji' (optional override)
+- Response format: integer as string (e.g., "4")
+
+## Response Format
+
+All responses are returned as strings:
+- text/multiline: Raw string (multiline preserves newlines as \\n)
+- choice (single): Selected option (e.g., "PostgreSQL")
+- choice (multi): Comma-space separated (e.g., "PostgreSQL, SQLite")
+- choice (other): Custom text entered by user (e.g., "Redis")
+- confirm: "yes" or "no" (lowercase)
+- number: Decimal representation (e.g., "42" or "3.14")
+- email: Email address string (e.g., "user@example.com")
+- date: ISO 8601 date (e.g., "2026-01-24")
+- rating: Integer as string (e.g., "5")
+
+See docs/INPUT-RESPONSE-FORMATS.md for complete specification.
+
+## Usage Notes
 
 This tool is analogous to AskUserQuestion, prompt(), or other agent question mechanisms,
 but shows responses in the browser UI where users are already viewing plans.
@@ -219,12 +285,12 @@ NOTE: This is also available as requestUserInput() inside execute_code for multi
       properties: {
         message: {
           type: 'string',
-          description: 'The question to ask the user',
+          description: 'The question to ask the user (required for single-question mode)',
         },
         type: {
           type: 'string',
           enum: ['text', 'choice', 'confirm', 'multiline', 'number', 'email', 'date', 'rating'],
-          description: 'Type of input to request',
+          description: 'Type of input to request (required for single-question mode)',
         },
         options: {
           type: 'array',
@@ -284,10 +350,6 @@ NOTE: This is also available as requestUserInput() inside execute_code for multi
             "For 'number' - display format hint (step is derived: integer=1, others=0.01)",
         },
         // Email type parameters
-        allowMultiple: {
-          type: 'boolean',
-          description: "For 'email' - allow multiple comma-separated emails",
-        },
         domain: {
           type: 'string',
           description: "For 'email' - restrict to specific domain",
@@ -306,8 +368,71 @@ NOTE: This is also available as requestUserInput() inside execute_code for multi
           },
           description: "For 'rating' - endpoint labels",
         },
+        questions: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              message: { type: 'string', description: 'Question prompt' },
+              type: {
+                type: 'string',
+                enum: [
+                  'text',
+                  'choice',
+                  'confirm',
+                  'multiline',
+                  'number',
+                  'email',
+                  'date',
+                  'rating',
+                ],
+                description: 'Question type',
+              },
+              defaultValue: { type: 'string', description: 'Pre-filled value' },
+              options: {
+                type: 'array',
+                items: { type: 'string' },
+                description: 'For choice type',
+              },
+              multiSelect: { type: 'boolean', description: 'For choice type' },
+              displayAs: {
+                type: 'string',
+                enum: ['radio', 'checkbox', 'dropdown'],
+                description: 'For choice type',
+              },
+              placeholder: { type: 'string', description: 'For choice type' },
+              min: { type: 'number', description: 'For number/rating type' },
+              max: { type: 'number', description: 'For number/rating type' },
+              format: {
+                type: 'string',
+                enum: ['integer', 'decimal', 'currency', 'percentage'],
+                description: 'For number type',
+              },
+              domain: { type: 'string', description: 'For email type' },
+              style: {
+                type: 'string',
+                enum: ['stars', 'numbers', 'emoji'],
+                description: 'For rating type',
+              },
+              labels: {
+                type: 'object',
+                properties: {
+                  low: { type: 'string' },
+                  high: { type: 'string' },
+                },
+                description: 'For rating type',
+              },
+            },
+            required: ['message', 'type'],
+          },
+          minItems: 1,
+          maxItems: 10,
+          description:
+            'Array of 1-10 questions for multi-question mode (8 recommended for optimal UX). Mutually exclusive with message+type.',
+        },
       },
-      required: ['message', 'type'],
+      description:
+        'Either provide message+type for single-question mode OR questions array for multi-question mode',
     },
   },
 
@@ -315,11 +440,16 @@ NOTE: This is also available as requestUserInput() inside execute_code for multi
     const input = RequestUserInputInput.parse(args);
 
     logger.info(
-      { type: input.type, timeout: input.timeout, planId: input.planId },
+      {
+        type: input.type,
+        timeout: input.timeout,
+        planId: input.planId,
+        isMultiQuestion: !!input.questions,
+      },
       'Processing request_user_input'
     );
 
-    // Validate choice type has options
+    // Validate choice type has options (only for single-question mode)
     if (input.type === 'choice' && (!input.options || input.options.length === 0)) {
       return {
         content: [
@@ -343,13 +473,25 @@ NOTE: This is also available as requestUserInput() inside execute_code for multi
 
       // Create manager and make request
       const manager = new InputRequestManager();
-      const params = buildRequestParams(input);
+      let requestId: string;
 
-      // Cast through unknown since new types may not yet be in the schema
-      const requestId = manager.createRequest(
-        ydoc,
-        params as unknown as Parameters<typeof manager.createRequest>[1]
-      );
+      if (input.questions) {
+        // Multi-question request
+        const params = {
+          questions: input.questions,
+          timeout: input.timeout,
+          planId: input.planId,
+        };
+        requestId = manager.createMultiQuestionRequest(ydoc, params);
+      } else {
+        // Single-question request (existing logic)
+        const params = buildRequestParams(input);
+        // Cast through unknown since new types may not yet be in the schema
+        requestId = manager.createRequest(
+          ydoc,
+          params as unknown as Parameters<typeof manager.createRequest>[1]
+        );
+      }
 
       // Wait for response
       const result = await manager.waitForResponse(ydoc, requestId, input.timeout);

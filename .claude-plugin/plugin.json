@@ -10,16 +10,7 @@
   "homepage": "https://github.com/SchoolAI/shipyard",
   "repository": "https://github.com/SchoolAI/shipyard",
   "license": "MIT",
-  "keywords": [
-    "planning",
-    "collaboration",
-    "review",
-    "artifacts",
-    "mcp",
-    "hooks",
-    "crdt",
-    "p2p"
-  ],
+  "keywords": ["planning", "collaboration", "review", "artifacts", "mcp", "hooks", "crdt", "p2p"],
   "hooks": "./hooks/hooks.json",
   "mcpServers": "./.mcp-plugin.json"
 }

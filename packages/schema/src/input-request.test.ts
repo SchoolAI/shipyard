@@ -1,9 +1,12 @@
 import { nanoid } from 'nanoid';
 import { describe, expect, it } from 'vitest';
 import {
+  AnyInputRequestSchema,
   type ChoiceOption,
   createInputRequest,
+  createMultiQuestionInputRequest,
   InputRequestSchema,
+  MultiQuestionInputRequestSchema,
   normalizeChoiceOptions,
 } from './input-request.js';
 
@@ -701,5 +704,242 @@ describe('createInputRequest with new types', () => {
       expect(request.style).toBe('stars');
       expect(request.labels).toEqual({ low: 'Bad', high: 'Great' });
     }
+  });
+});
+
+/**
+ * ============================================================================
+ * MULTI-QUESTION SUPPORT TESTS
+ * ============================================================================
+ */
+
+describe('MultiQuestionInputRequest validation', () => {
+  it('should accept valid multi-question request with single question', () => {
+    const result = MultiQuestionInputRequestSchema.safeParse({
+      id: nanoid(),
+      createdAt: Date.now(),
+      type: 'multi',
+      questions: [{ type: 'text', message: 'What is your name?' }],
+      status: 'pending',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('should accept valid multi-question request with 10 questions', () => {
+    const result = MultiQuestionInputRequestSchema.safeParse({
+      id: nanoid(),
+      createdAt: Date.now(),
+      type: 'multi',
+      questions: [
+        { type: 'text', message: 'What is your name?' },
+        { type: 'number', message: 'How old are you?', min: 0, max: 150 },
+        { type: 'choice', message: 'Favorite color?', options: ['Red', 'Green', 'Blue'] },
+        { type: 'confirm', message: 'Agree to terms?' },
+        { type: 'email', message: 'Email address?' },
+        { type: 'date', message: 'Birth date?' },
+        { type: 'rating', message: 'Rate us?', min: 1, max: 5 },
+        { type: 'multiline', message: 'Comments?' },
+        { type: 'text', message: 'City?' },
+        { type: 'text', message: 'Country?' },
+      ],
+      status: 'pending',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('should reject multi-question request with 0 questions', () => {
+    const result = MultiQuestionInputRequestSchema.safeParse({
+      id: nanoid(),
+      createdAt: Date.now(),
+      type: 'multi',
+      questions: [],
+      status: 'pending',
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0]?.message).toBe('At least one question is required');
+    }
+  });
+
+  it('should reject multi-question request with more than 10 questions', () => {
+    const result = MultiQuestionInputRequestSchema.safeParse({
+      id: nanoid(),
+      createdAt: Date.now(),
+      type: 'multi',
+      questions: [
+        { type: 'text', message: 'Q1' },
+        { type: 'text', message: 'Q2' },
+        { type: 'text', message: 'Q3' },
+        { type: 'text', message: 'Q4' },
+        { type: 'text', message: 'Q5' },
+        { type: 'text', message: 'Q6' },
+        { type: 'text', message: 'Q7' },
+        { type: 'text', message: 'Q8' },
+        { type: 'text', message: 'Q9' },
+        { type: 'text', message: 'Q10' },
+        { type: 'text', message: 'Q11' },
+      ],
+      status: 'pending',
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0]?.message).toBe(
+        'Maximum 10 questions allowed (4 recommended for UX)'
+      );
+    }
+  });
+
+  it('should accept multi-question request with timeout', () => {
+    const result = MultiQuestionInputRequestSchema.safeParse({
+      id: nanoid(),
+      createdAt: Date.now(),
+      type: 'multi',
+      questions: [{ type: 'text', message: 'Name?' }],
+      status: 'pending',
+      timeout: 300,
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.timeout).toBe(300);
+    }
+  });
+
+  it('should accept multi-question request with responses (answered state)', () => {
+    const result = MultiQuestionInputRequestSchema.safeParse({
+      id: nanoid(),
+      createdAt: Date.now(),
+      type: 'multi',
+      questions: [
+        { type: 'text', message: 'Name?' },
+        { type: 'number', message: 'Age?' },
+      ],
+      status: 'answered',
+      responses: { '0': 'Alice', '1': '30' },
+      answeredAt: Date.now(),
+      answeredBy: 'testuser',
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.responses).toEqual({ '0': 'Alice', '1': '30' });
+    }
+  });
+
+  it('should validate individual question types within multi-question', () => {
+    const result = MultiQuestionInputRequestSchema.safeParse({
+      id: nanoid(),
+      createdAt: Date.now(),
+      type: 'multi',
+      questions: [{ type: 'invalid', message: 'Test' }],
+      status: 'pending',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('should validate choice question requires options', () => {
+    const result = MultiQuestionInputRequestSchema.safeParse({
+      id: nanoid(),
+      createdAt: Date.now(),
+      type: 'multi',
+      questions: [{ type: 'choice', message: 'Pick one', options: [] }],
+      status: 'pending',
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0]?.message).toBe(
+        'Choice questions must have at least one option'
+      );
+    }
+  });
+
+  it('should validate number question min <= max', () => {
+    const result = MultiQuestionInputRequestSchema.safeParse({
+      id: nanoid(),
+      createdAt: Date.now(),
+      type: 'multi',
+      questions: [{ type: 'number', message: 'Value?', min: 10, max: 5 }],
+      status: 'pending',
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('createMultiQuestionInputRequest', () => {
+  it('should create valid multi-question request', () => {
+    const request = createMultiQuestionInputRequest({
+      questions: [
+        { type: 'text', message: 'What is your name?' },
+        { type: 'choice', message: 'Favorite color?', options: ['Red', 'Blue', 'Green'] },
+      ],
+      timeout: 600,
+    });
+
+    expect(request.type).toBe('multi');
+    expect(request.questions).toHaveLength(2);
+    expect(request.status).toBe('pending');
+    expect(request.timeout).toBe(600);
+    expect(request.id).toBeDefined();
+    expect(request.createdAt).toBeDefined();
+  });
+
+  it('should throw for empty questions array', () => {
+    expect(() => {
+      createMultiQuestionInputRequest({
+        questions: [],
+      });
+    }).toThrow('At least one question is required');
+  });
+
+  it('should throw for too many questions', () => {
+    expect(() => {
+      createMultiQuestionInputRequest({
+        questions: [
+          { type: 'text', message: 'Q1' },
+          { type: 'text', message: 'Q2' },
+          { type: 'text', message: 'Q3' },
+          { type: 'text', message: 'Q4' },
+          { type: 'text', message: 'Q5' },
+          { type: 'text', message: 'Q6' },
+          { type: 'text', message: 'Q7' },
+          { type: 'text', message: 'Q8' },
+          { type: 'text', message: 'Q9' },
+          { type: 'text', message: 'Q10' },
+          { type: 'text', message: 'Q11' },
+        ],
+      });
+    }).toThrow('Maximum 10 questions allowed (4 recommended for UX)');
+  });
+});
+
+describe('AnyInputRequestSchema', () => {
+  it('should accept single-question input request', () => {
+    const result = AnyInputRequestSchema.safeParse({
+      id: nanoid(),
+      createdAt: Date.now(),
+      message: 'What is your name?',
+      type: 'text',
+      status: 'pending',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('should accept multi-question input request', () => {
+    const result = AnyInputRequestSchema.safeParse({
+      id: nanoid(),
+      createdAt: Date.now(),
+      type: 'multi',
+      questions: [{ type: 'text', message: 'Name?' }],
+      status: 'pending',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('should reject invalid request', () => {
+    const result = AnyInputRequestSchema.safeParse({
+      id: nanoid(),
+      createdAt: Date.now(),
+      type: 'invalid',
+      status: 'pending',
+    });
+    expect(result.success).toBe(false);
   });
 });

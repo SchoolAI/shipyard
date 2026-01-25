@@ -203,15 +203,25 @@ Parameters:
 ### requestUserInput(opts): Promise<{ success, response?, status, reason? }>
 Request input from the user via browser modal.
 
+Supports both single-question and multi-question modes (1-10 questions, 8 recommended for optimal UX).
+
 Parameters:
 - message (string, required): The question to ask the user
-- type (string, required): CURRENTLY SUPPORTED: 'text' | 'choice' | 'confirm' | 'multiline'
-  (Future types planned: 'number' | 'email' | 'date' | 'dropdown' | 'rating')
+- type (string, required): 'text' | 'multiline' | 'choice' | 'confirm' | 'number' | 'email' | 'date' | 'rating'
 - options (string[], optional): For 'choice' type - available options (required for choice)
 - multiSelect (boolean, optional): For 'choice' type - allow selecting multiple options (checkboxes)
+- displayAs (string, optional): For 'choice' type - override automatic UI ('radio' | 'checkbox' | 'dropdown')
 - defaultValue (string, optional): Pre-filled value for text/multiline inputs
 - timeout (number, optional): Timeout in seconds (default: 1800, min: 10, max: 14400)
 - planId (string, optional): Optional metadata to link request to plan (for activity log filtering)
+- min (number, optional): For 'number'/'rating' - minimum value
+- max (number, optional): For 'number'/'rating' - maximum value
+- format (string, optional): For 'number' - 'integer' | 'decimal' | 'currency' | 'percentage'
+- minDate (string, optional): For 'date' - minimum date (YYYY-MM-DD)
+- maxDate (string, optional): For 'date' - maximum date (YYYY-MM-DD)
+- domain (string, optional): For 'email' - restrict to specific domain
+- style (string, optional): For 'rating' - 'stars' | 'numbers' | 'emoji'
+- labels (object, optional): For 'rating' - { low?: string, high?: string }
 
 Returns:
 - success: Boolean indicating if user responded
@@ -223,7 +233,12 @@ Response format (all responses are strings):
 - text/multiline: Raw string (multiline preserves newlines as \n)
 - choice (single): Selected option string (e.g., "PostgreSQL")
 - choice (multi): Comma-space separated (e.g., "PostgreSQL, SQLite")
+- choice (other): Custom text entered by user (e.g., "Redis")
 - confirm: "yes" or "no" (lowercase)
+- number: Decimal representation (e.g., "42" or "3.14")
+- email: Email address (e.g., "user@example.com")
+- date: ISO 8601 date (e.g., "2026-01-24")
+- rating: Integer as string (e.g., "4")
 - See docs/INPUT-RESPONSE-FORMATS.md for complete format specification
 
 The request appears as a modal in the browser. The function blocks until:
@@ -231,28 +246,29 @@ The request appears as a modal in the browser. The function blocks until:
 - User declines (success=true, status='declined')
 - Timeout occurs (success=false, status='cancelled')
 
-Currently supported input types:
+## Supported Input Types (8 total)
 
-1. text - Single-line text input
+1. **text** - Single-line text input
 \`\`\`typescript
-await requestUserInput({ message: "Enter filename:", type: "text" })
+await requestUserInput({ message: "API endpoint URL?", type: "text" })
 \`\`\`
 
-2. multiline - Multi-line text area
+2. **multiline** - Multi-line text area
 \`\`\`typescript
-await requestUserInput({ message: "Describe the issue:", type: "multiline" })
+await requestUserInput({ message: "Describe the bug:", type: "multiline" })
 \`\`\`
 
-3. choice - Select from options (radio or checkbox)
+3. **choice** - Select from options (auto-adds "Other" escape hatch)
 \`\`\`typescript
-// Single-select
+// Single-select (radio buttons or dropdown for 9+ options)
 await requestUserInput({
   message: "Which database?",
   type: "choice",
   options: ["PostgreSQL", "SQLite", "MongoDB"]
 })
+// Response: "PostgreSQL" or custom text like "Redis" if "Other" selected
 
-// Multi-select
+// Multi-select (checkboxes)
 await requestUserInput({
   message: "Which features?",
   type: "choice",
@@ -260,21 +276,83 @@ await requestUserInput({
   multiSelect: true
 })
 // Response: "Dark mode, Offline support"
+
+// Force dropdown UI
+await requestUserInput({
+  message: "Select country:",
+  type: "choice",
+  options: ["USA", "Canada", "Mexico"],
+  displayAs: "dropdown"
+})
 \`\`\`
 
-4. confirm - Yes/No confirmation
+4. **confirm** - Yes/No confirmation
 \`\`\`typescript
-await requestUserInput({ message: "Delete file?", type: "confirm" })
+await requestUserInput({ message: "Deploy to production?", type: "confirm" })
 // Response: "yes" or "no"
 \`\`\`
 
-Future types (not yet implemented):
+5. **number** - Numeric input with validation
+\`\`\`typescript
+await requestUserInput({
+  message: "Port number?",
+  type: "number",
+  min: 1,
+  max: 65535,
+  format: "integer"
+})
+// Response: "3000"
 
-5. number - Numeric input with validation
-6. email - Email address with validation
-7. date - Date selection
-8. dropdown - Select from searchable list (for 10+ options)
-9. rating - Scale rating (1-5, 1-10, etc.)
+await requestUserInput({
+  message: "Budget amount?",
+  type: "number",
+  format: "currency"
+})
+// Response: "1234.56"
+\`\`\`
+
+6. **email** - Email address with validation
+\`\`\`typescript
+await requestUserInput({
+  message: "Contact email?",
+  type: "email",
+  domain: "company.com"  // Optional domain restriction
+})
+// Response: "user@company.com"
+\`\`\`
+
+7. **date** - Date selection with range
+\`\`\`typescript
+await requestUserInput({
+  message: "Project deadline?",
+  type: "date",
+  minDate: "2026-01-24",
+  maxDate: "2026-12-31"
+})
+// Response: "2026-06-15"
+\`\`\`
+
+8. **rating** - Scale rating (auto-selects stars for <=5, numbers for >5)
+\`\`\`typescript
+await requestUserInput({
+  message: "Rate this approach:",
+  type: "rating",
+  min: 1,
+  max: 5,
+  labels: { low: "Poor", high: "Excellent" }
+})
+// Response: "4"
+
+// Custom style override
+await requestUserInput({
+  message: "NPS Score (0-10):",
+  type: "rating",
+  min: 0,
+  max: 10,
+  style: "numbers"
+})
+// Response: "8"
+\`\`\`
 
 ---
 
@@ -705,7 +783,6 @@ async function requestUserInput(opts: {
   minDate?: string; // YYYY-MM-DD format
   maxDate?: string; // YYYY-MM-DD format
   // Email type parameters
-  allowMultiple?: boolean;
   domain?: string;
   // Rating type parameters
   style?: 'stars' | 'numbers' | 'emoji';
@@ -753,7 +830,6 @@ async function requestUserInput(opts: {
       params = {
         ...baseParams,
         type: opts.type,
-        allowMultiple: opts.allowMultiple,
         domain: opts.domain,
       };
       break;

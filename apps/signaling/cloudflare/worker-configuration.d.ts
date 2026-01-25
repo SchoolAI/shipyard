@@ -11159,6 +11159,7 @@ declare namespace Cloudflare {
   //     }
   //
   // You can use `wrangler types` to generate `GlobalProps` automatically.
+  // biome-ignore lint/complexity/noBannedTypes: Generated type from Cloudflare Workers
   type GlobalProps = {};
   // Evaluates to the type of a property in GlobalProps, defaulting to `Default` if it is not
   // present.
@@ -11167,6 +11168,7 @@ declare namespace Cloudflare {
     : Default;
   // The type of the program's main module exports, if known. Requires `GlobalProps` to declare the
   // `mainModule` property.
+  // biome-ignore lint/complexity/noBannedTypes: Generated type from Cloudflare Workers
   type MainModule = GlobalProp<'mainModule', {}>;
   // The type of ctx.exports, which contains loopback bindings for all top-level exports.
   type Exports = {
@@ -11181,7 +11183,8 @@ declare namespace Cloudflare {
             ? DurableObjectNamespace<DoInstance>
             : DurableObjectNamespace<undefined>
           : DurableObjectNamespace<undefined>
-        : {});
+        : // biome-ignore lint/complexity/noBannedTypes: Generated type from Cloudflare Workers
+          {});
   };
 }
 declare namespace CloudflareWorkersModule {
@@ -11193,6 +11196,7 @@ declare namespace CloudflareWorkersModule {
     [Rpc.__RPC_TARGET_BRAND]: never;
   }
   // `protected` fields don't appear in `keyof`s, so can't be accessed over RPC
+  // biome-ignore lint/complexity/noBannedTypes: Generated type from Cloudflare Workers
   export abstract class WorkerEntrypoint<Env = Cloudflare.Env, Props = {}>
     implements Rpc.WorkerEntrypointBranded
   {
@@ -11211,6 +11215,7 @@ declare namespace CloudflareWorkersModule {
     test?(controller: TestController): void | Promise<void>;
     trace?(traces: TraceItem[]): void | Promise<void>;
   }
+  // biome-ignore lint/complexity/noBannedTypes: Generated type from Cloudflare Workers
   export abstract class DurableObject<Env = Cloudflare.Env, Props = {}>
     implements Rpc.DurableObjectBranded
   {

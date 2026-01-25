@@ -5,10 +5,10 @@
 
 import { Accordion, Button, Chip, ListBox, ListBoxItem, Switch, Tooltip } from '@heroui/react';
 import {
+  type AnyInputRequest,
   assertNever,
   clearEventViewedBy,
   getPlanIndexEntry,
-  type InputRequest,
   markEventAsViewed,
   type PlanEvent,
   type PlanIndexEntry,
@@ -37,9 +37,9 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { IndexeddbPersistence } from 'y-indexeddb';
 import * as Y from 'yjs';
+import { AnyInputRequestModal } from '@/components/AnyInputRequestModal';
 import { InlinePlanDetail, type PlanActionContext } from '@/components/InlinePlanDetail';
 import { InputRequestInboxItem } from '@/components/InputRequestInboxItem';
-import { InputRequestModal } from '@/components/InputRequestModal';
 import { BaseInboxCard } from '@/components/inbox/BaseInboxCard';
 import { OfflineBanner } from '@/components/OfflineBanner';
 import { type PanelWidth, PlanPanel } from '@/components/PlanPanel';
@@ -487,12 +487,12 @@ function usePanelUrlSync(selectedPlanId: string | null, navigate: ReturnType<typ
 
 /** Hook for listening to input request events */
 function useInputRequestEventListener(
-  setCurrentInputRequest: React.Dispatch<React.SetStateAction<InputRequest | null>>,
+  setCurrentInputRequest: React.Dispatch<React.SetStateAction<AnyInputRequest | null>>,
   setInputRequestModalOpen: React.Dispatch<React.SetStateAction<boolean>>
 ) {
   useEffect(() => {
     const handleOpenInputRequest = (event: Event) => {
-      const customEvent = event as CustomEvent<InputRequest>;
+      const customEvent = event as CustomEvent<AnyInputRequest>;
       setCurrentInputRequest(customEvent.detail);
       setInputRequestModalOpen(true);
     };
@@ -690,7 +690,7 @@ function EventItemList({ items, onView, onMarkRead, onMarkUnread }: EventItemLis
 // --- Inbox Accordion Content Component - Moves conditional rendering out of main component ---
 
 interface InboxAccordionContentProps {
-  pendingRequests: InputRequest[];
+  pendingRequests: AnyInputRequest[];
   inboxGroups: ReturnType<typeof groupInboxEvents>;
   selectedPlanId: string | null;
   handleListSelection: (keys: Set<unknown> | 'all') => void;
@@ -973,7 +973,7 @@ export function InboxPage() {
 
   // Input request modal state
   const [inputRequestModalOpen, setInputRequestModalOpen] = useState(false);
-  const [currentInputRequest, setCurrentInputRequest] = useState<InputRequest | null>(null);
+  const [currentInputRequest, setCurrentInputRequest] = useState<AnyInputRequest | null>(null);
 
   // Selected plan state - read from URL on mount
   const searchParams = new URLSearchParams(location.search);
@@ -1267,7 +1267,7 @@ export function InboxPage() {
       />
 
       {/* Input Request Modal */}
-      <InputRequestModal
+      <AnyInputRequestModal
         isOpen={inputRequestModalOpen}
         request={currentInputRequest}
         ydoc={indexDoc}

@@ -28779,17 +28779,40 @@ Asks user a question via browser modal.
 
 **Parameters:**
 - \`message\` (string) - Question to ask
-- \`type\` ('text' | 'choice' | 'confirm' | 'multiline')
+- \`type\` (string) - Input type (see below)
 - \`options\` (string[], for 'choice') - Available choices
 - \`timeout\` (number, optional) - Timeout in seconds
+- Type-specific parameters (min, max, format, etc.)
 
 **Returns:** \`{ success, response?, status }\`
 
+**Supported types (8 total):**
+1. \`text\` - Single-line text
+2. \`multiline\` - Multi-line text area
+3. \`choice\` - Radio/checkbox/dropdown (auto-adds "Other" option)
+   - Auto-switches: 1-8 options = radio/checkbox, 9+ = dropdown
+   - \`multiSelect: true\` for checkboxes
+   - \`displayAs: 'dropdown'\` to force dropdown UI
+4. \`confirm\` - Yes/No buttons
+5. \`number\` - Numeric input with validation
+   - \`min\`, \`max\`, \`format\` ('integer' | 'decimal' | 'currency' | 'percentage')
+6. \`email\` - Email validation
+   - \`domain\` for restriction
+7. \`date\` - Date picker with range
+   - \`minDate\`, \`maxDate\` (YYYY-MM-DD format)
+8. \`rating\` - Scale rating (auto-selects stars/numbers)
+   - \`min\`, \`max\`, \`style\` ('stars' | 'numbers' | 'emoji'), \`labels\`
+
 **Response format:**
 - All responses are strings
-- Multi-select: \`"option1, option2"\` (comma-space separated)
-- Confirm: \`"yes"\` or \`"no"\` (lowercase)
-- See docs/INPUT-RESPONSE-FORMATS.md for details`;
+- choice (single): \`"PostgreSQL"\` or custom text from "Other"
+- choice (multi): \`"option1, option2"\` (comma-space separated)
+- confirm: \`"yes"\` or \`"no"\` (lowercase)
+- number: \`"42"\` or \`"3.14"\`
+- email: \`"user@example.com"\`
+- date: \`"2026-01-24"\` (ISO 8601)
+- rating: \`"4"\` (integer as string)
+- See docs/INPUT-RESPONSE-FORMATS.md for complete specification`;
 var HANDLING_FEEDBACK = `## Handling Reviewer Feedback
 
 \`\`\`typescript
@@ -28836,7 +28859,7 @@ init_cjs_shims();
 // ../../packages/schema/dist/index.mjs
 init_cjs_shims();
 
-// ../../packages/schema/dist/yjs-helpers-M5P6jw5y.mjs
+// ../../packages/schema/dist/yjs-helpers-DOFk5YTr.mjs
 init_cjs_shims();
 
 // ../../packages/schema/dist/plan.mjs
@@ -42879,9 +42902,11 @@ var PlanEventSchema = external_exports.discriminatedUnion("type", [
         "email",
         "date",
         "dropdown",
-        "rating"
+        "rating",
+        "multi"
       ]),
-      requestMessage: external_exports.string()
+      requestMessage: external_exports.string().optional(),
+      questionCount: external_exports.number().optional()
     })
   }),
   PlanEventBaseSchema.extend({
@@ -43012,7 +43037,7 @@ var PRReviewCommentSchema = external_exports.object({
   resolved: external_exports.boolean().optional()
 });
 
-// ../../packages/schema/dist/yjs-helpers-M5P6jw5y.mjs
+// ../../packages/schema/dist/yjs-helpers-DOFk5YTr.mjs
 function assertNever2(value) {
   throw new Error(`Unhandled discriminated union member: ${JSON.stringify(value)}`);
 }
@@ -43157,7 +43182,6 @@ var NumberInputSchema = InputRequestBaseSchema.extend({
 }).refine((data) => data.min === void 0 || data.max === void 0 || data.min <= data.max, { message: "min must be <= max" });
 var EmailInputSchema = InputRequestBaseSchema.extend({
   type: external_exports.literal("email"),
-  allowMultiple: external_exports.boolean().optional(),
   domain: external_exports.string().optional()
 });
 var DateInputSchema = InputRequestBaseSchema.extend({
@@ -43192,6 +43216,85 @@ var InputRequestSchema = external_exports.discriminatedUnion("type", [
   DateInputSchema,
   RatingInputSchema
 ]);
+var MAX_QUESTIONS_PER_REQUEST = 10;
+var QuestionBaseSchema = external_exports.object({
+  message: external_exports.string().min(1, "Message cannot be empty"),
+  defaultValue: external_exports.string().optional()
+});
+var TextQuestionSchema = QuestionBaseSchema.extend({ type: external_exports.literal("text") });
+var MultilineQuestionSchema = QuestionBaseSchema.extend({ type: external_exports.literal("multiline") });
+var ChoiceQuestionSchema = QuestionBaseSchema.extend({
+  type: external_exports.literal("choice"),
+  options: external_exports.array(ChoiceOptionSchema).min(1, "Choice questions must have at least one option"),
+  multiSelect: external_exports.boolean().optional(),
+  displayAs: external_exports.enum([
+    "radio",
+    "checkbox",
+    "dropdown"
+  ]).optional(),
+  placeholder: external_exports.string().optional()
+});
+var ConfirmQuestionSchema = QuestionBaseSchema.extend({ type: external_exports.literal("confirm") });
+var NumberQuestionSchema = QuestionBaseSchema.extend({
+  type: external_exports.literal("number"),
+  min: external_exports.number().optional(),
+  max: external_exports.number().optional(),
+  format: external_exports.enum([
+    "integer",
+    "decimal",
+    "currency",
+    "percentage"
+  ]).optional()
+}).refine((data) => data.min === void 0 || data.max === void 0 || data.min <= data.max, { message: "min must be <= max" });
+var EmailQuestionSchema = QuestionBaseSchema.extend({
+  type: external_exports.literal("email"),
+  domain: external_exports.string().optional()
+});
+var DateQuestionSchema = QuestionBaseSchema.extend({
+  type: external_exports.literal("date"),
+  min: external_exports.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be in YYYY-MM-DD format").optional(),
+  max: external_exports.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be in YYYY-MM-DD format").optional()
+}).refine((data) => data.min === void 0 || data.max === void 0 || new Date(data.min) <= new Date(data.max), { message: "min date must be before or equal to max date" });
+var RatingQuestionSchema = QuestionBaseSchema.extend({
+  type: external_exports.literal("rating"),
+  min: external_exports.number().int().optional(),
+  max: external_exports.number().int().optional(),
+  style: external_exports.enum([
+    "stars",
+    "numbers",
+    "emoji"
+  ]).optional(),
+  labels: external_exports.object({
+    low: external_exports.string().optional(),
+    high: external_exports.string().optional()
+  }).optional()
+}).refine((data) => {
+  if (data.min === void 0 || data.max === void 0) return true;
+  return data.min <= data.max && data.max - data.min <= 20;
+}, { message: "Rating scale must have min <= max and at most 20 items" });
+var QuestionSchema = external_exports.discriminatedUnion("type", [
+  TextQuestionSchema,
+  MultilineQuestionSchema,
+  ChoiceQuestionSchema,
+  ConfirmQuestionSchema,
+  NumberQuestionSchema,
+  EmailQuestionSchema,
+  DateQuestionSchema,
+  RatingQuestionSchema
+]);
+var MultiQuestionInputRequestSchema = external_exports.object({
+  id: external_exports.string(),
+  createdAt: external_exports.number(),
+  type: external_exports.literal("multi"),
+  questions: external_exports.array(QuestionSchema).min(1, "At least one question is required").max(MAX_QUESTIONS_PER_REQUEST, `Maximum ${MAX_QUESTIONS_PER_REQUEST} questions allowed (8 recommended for optimal UX)`),
+  status: external_exports.enum(InputRequestStatusValues),
+  timeout: external_exports.number().int().min(10, "Timeout must be at least 10 seconds").max(14400, "Timeout cannot exceed 4 hours").optional(),
+  planId: external_exports.string().optional(),
+  responses: external_exports.record(external_exports.string(), external_exports.unknown()).optional(),
+  answeredAt: external_exports.number().optional(),
+  answeredBy: external_exports.string().optional()
+});
+var AnyInputRequestSchema = external_exports.union([InputRequestSchema, MultiQuestionInputRequestSchema]);
 var YDOC_KEYS = {
   METADATA: "metadata",
   DOCUMENT_FRAGMENT: "document",

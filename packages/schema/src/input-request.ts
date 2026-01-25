@@ -140,8 +140,6 @@ const NumberInputSchema = InputRequestBaseSchema.extend({
 /** Email input request - email address with optional domain restriction */
 const EmailInputSchema = InputRequestBaseSchema.extend({
   type: z.literal('email'),
-  /** Allow multiple comma-separated emails */
-  allowMultiple: z.boolean().optional(),
   /** Restrict to specific domain (e.g., "company.com") */
   domain: z.string().optional(),
 });
@@ -274,7 +272,6 @@ export interface CreateNumberInputParams extends CreateInputRequestBaseParams {
 /** Params for creating an email input request */
 export interface CreateEmailInputParams extends CreateInputRequestBaseParams {
   type: 'email';
-  allowMultiple?: boolean;
   domain?: string;
 }
 
@@ -373,7 +370,6 @@ export function createInputRequest(params: CreateInputRequestParams): InputReque
       request = {
         ...baseFields,
         type: 'email' as const,
-        allowMultiple: params.allowMultiple,
         domain: params.domain,
       };
       break;
@@ -431,3 +427,211 @@ export function normalizeChoiceOptions(options: ChoiceOption[]): NormalizedChoic
 
 /** Threshold for auto-switching from radio/checkbox to dropdown UI */
 export const CHOICE_DROPDOWN_THRESHOLD = 9;
+
+/**
+ * ============================================================================
+ * MULTI-QUESTION SUPPORT
+ * ============================================================================
+ */
+
+/**
+ * Maximum number of questions allowed in a multi-question request.
+ * Technical limit is 10, but 8 is recommended for optimal UX.
+ * All 8 input types can fit in one form without overwhelming users.
+ */
+export const MAX_QUESTIONS_PER_REQUEST = 10;
+
+/**
+ * Base schema for individual questions within a multi-question request.
+ * Each question has its own message and type-specific configuration.
+ */
+const QuestionBaseSchema = z.object({
+  /** Prompt message shown to the user for this question */
+  message: z.string().min(1, 'Message cannot be empty'),
+  /** Default value to pre-populate the input */
+  defaultValue: z.string().optional(),
+});
+
+/** Text question - single line text entry */
+const TextQuestionSchema = QuestionBaseSchema.extend({
+  type: z.literal('text'),
+});
+
+/** Multiline question - multi-line text entry */
+const MultilineQuestionSchema = QuestionBaseSchema.extend({
+  type: z.literal('multiline'),
+});
+
+/** Choice question - select from predefined options */
+const ChoiceQuestionSchema = QuestionBaseSchema.extend({
+  type: z.literal('choice'),
+  options: z.array(ChoiceOptionSchema).min(1, 'Choice questions must have at least one option'),
+  multiSelect: z.boolean().optional(),
+  displayAs: z.enum(['radio', 'checkbox', 'dropdown']).optional(),
+  placeholder: z.string().optional(),
+});
+
+/** Confirm question - boolean yes/no */
+const ConfirmQuestionSchema = QuestionBaseSchema.extend({
+  type: z.literal('confirm'),
+});
+
+/** Number question - numeric value with optional bounds */
+const NumberQuestionSchema = QuestionBaseSchema.extend({
+  type: z.literal('number'),
+  min: z.number().optional(),
+  max: z.number().optional(),
+  format: z.enum(['integer', 'decimal', 'currency', 'percentage']).optional(),
+}).refine((data) => data.min === undefined || data.max === undefined || data.min <= data.max, {
+  message: 'min must be <= max',
+});
+
+/** Email question - email address with optional domain restriction */
+const EmailQuestionSchema = QuestionBaseSchema.extend({
+  type: z.literal('email'),
+  domain: z.string().optional(),
+});
+
+/** Date question - date selection with optional range */
+const DateQuestionSchema = QuestionBaseSchema.extend({
+  type: z.literal('date'),
+  min: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in YYYY-MM-DD format')
+    .optional(),
+  max: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in YYYY-MM-DD format')
+    .optional(),
+}).refine(
+  (data) =>
+    data.min === undefined || data.max === undefined || new Date(data.min) <= new Date(data.max),
+  { message: 'min date must be before or equal to max date' }
+);
+
+/** Rating question - scale rating */
+const RatingQuestionSchema = QuestionBaseSchema.extend({
+  type: z.literal('rating'),
+  min: z.number().int().optional(),
+  max: z.number().int().optional(),
+  style: z.enum(['stars', 'numbers', 'emoji']).optional(),
+  labels: z
+    .object({
+      low: z.string().optional(),
+      high: z.string().optional(),
+    })
+    .optional(),
+}).refine(
+  (data) => {
+    if (data.min === undefined || data.max === undefined) return true;
+    return data.min <= data.max && data.max - data.min <= 20;
+  },
+  { message: 'Rating scale must have min <= max and at most 20 items' }
+);
+
+/**
+ * Schema for an individual question in a multi-question request.
+ * Uses discriminated union on 'type' field.
+ */
+export const QuestionSchema = z.discriminatedUnion('type', [
+  TextQuestionSchema,
+  MultilineQuestionSchema,
+  ChoiceQuestionSchema,
+  ConfirmQuestionSchema,
+  NumberQuestionSchema,
+  EmailQuestionSchema,
+  DateQuestionSchema,
+  RatingQuestionSchema,
+]);
+
+export type Question = z.infer<typeof QuestionSchema>;
+export type TextQuestion = z.infer<typeof TextQuestionSchema>;
+export type MultilineQuestion = z.infer<typeof MultilineQuestionSchema>;
+export type ChoiceQuestion = z.infer<typeof ChoiceQuestionSchema>;
+export type ConfirmQuestion = z.infer<typeof ConfirmQuestionSchema>;
+export type NumberQuestion = z.infer<typeof NumberQuestionSchema>;
+export type EmailQuestion = z.infer<typeof EmailQuestionSchema>;
+export type DateQuestion = z.infer<typeof DateQuestionSchema>;
+export type RatingQuestion = z.infer<typeof RatingQuestionSchema>;
+
+/**
+ * Multi-question input request schema.
+ * Allows asking 1-10 questions in a single form submission (8 recommended for optimal UX).
+ * Responses are stored as a record mapping question index to response value.
+ */
+export const MultiQuestionInputRequestSchema = z.object({
+  /** Unique request ID */
+  id: z.string(),
+  /** When the request was created (Unix timestamp in ms) */
+  createdAt: z.number(),
+  /** Type discriminator for multi-question requests */
+  type: z.literal('multi'),
+  /** Array of questions (1-10, 8 recommended for UX) */
+  questions: z
+    .array(QuestionSchema)
+    .min(1, 'At least one question is required')
+    .max(
+      MAX_QUESTIONS_PER_REQUEST,
+      `Maximum ${MAX_QUESTIONS_PER_REQUEST} questions allowed (8 recommended for optimal UX)`
+    ),
+  /** Current status of the request */
+  status: z.enum(InputRequestStatusValues),
+  /** Timeout in seconds (0 = no timeout) */
+  timeout: z
+    .number()
+    .int()
+    .min(10, 'Timeout must be at least 10 seconds')
+    .max(14400, 'Timeout cannot exceed 4 hours')
+    .optional(),
+  /** Optional plan ID to associate request with a specific plan */
+  planId: z.string().optional(),
+  /** User's responses keyed by question index ("0", "1", etc.) */
+  responses: z.record(z.string(), z.unknown()).optional(),
+  /** When the user answered (Unix timestamp in ms) */
+  answeredAt: z.number().optional(),
+  /** Who answered (username or "agent") */
+  answeredBy: z.string().optional(),
+});
+
+export type MultiQuestionInputRequest = z.infer<typeof MultiQuestionInputRequestSchema>;
+
+/**
+ * Combined schema for any input request (single-question or multi-question).
+ * Use this when you need to handle both types.
+ */
+export const AnyInputRequestSchema = z.union([InputRequestSchema, MultiQuestionInputRequestSchema]);
+
+export type AnyInputRequest = z.infer<typeof AnyInputRequestSchema>;
+
+/** Parameters for creating a multi-question input request */
+export interface CreateMultiQuestionInputParams {
+  questions: Question[];
+  timeout?: number;
+  planId?: string;
+}
+
+/**
+ * Create a new multi-question input request with auto-generated fields.
+ */
+export function createMultiQuestionInputRequest(
+  params: CreateMultiQuestionInputParams
+): MultiQuestionInputRequest {
+  const request = {
+    id: nanoid(),
+    createdAt: Date.now(),
+    type: 'multi' as const,
+    questions: params.questions,
+    status: 'pending' as const,
+    timeout: params.timeout,
+    planId: params.planId,
+  };
+
+  const parseResult = MultiQuestionInputRequestSchema.safeParse(request);
+  if (!parseResult.success) {
+    throw new Error(
+      `Invalid multi-question input request: ${parseResult.error.issues[0]?.message}`
+    );
+  }
+
+  return parseResult.data;
+}

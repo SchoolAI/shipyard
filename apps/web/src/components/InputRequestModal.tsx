@@ -26,6 +26,7 @@ import {
   EmailInput,
   formatTime,
   MultilineInput,
+  NA_OPTION_VALUE,
   NumberInput,
   OTHER_OPTION_VALUE,
   RatingInput,
@@ -107,13 +108,14 @@ function isInputValid(request: InputRequest | null, value: string | string[]): b
 
 /**
  * Format the response value for submission.
- * Handles "Other" option for choice-type questions and multi-select arrays.
+ * Handles "Other" option for choice-type and rating-type questions and multi-select arrays.
  */
 function formatResponseValue(
   request: InputRequest,
   value: string | string[],
   customInput: string,
-  isOtherSelected: boolean
+  isOtherSelected: boolean,
+  isNaSelected: boolean
 ): string {
   // Handle "Other" option for choice-type questions
   if (request.type === 'choice' && isOtherSelected) {
@@ -124,6 +126,15 @@ function formatResponseValue(
     }
     // Single-select: use custom input as the response
     return customInput.trim();
+  }
+  // Handle rating escape hatches
+  if (request.type === 'rating') {
+    if (isNaSelected) {
+      return NA_OPTION_VALUE;
+    }
+    if (isOtherSelected) {
+      return customInput.trim();
+    }
   }
   // Standard handling: convert array values to comma-separated string
   return Array.isArray(value) ? value.join(', ') : value;
@@ -137,11 +148,14 @@ function isSubmitDisabled(
   request: InputRequest,
   value: string | string[],
   isOtherSelected: boolean,
-  customInput: string
+  customInput: string,
+  isNaSelected: boolean
 ): boolean {
   if (isSubmitting) return true;
   if (!isInputValid(request, value)) return true;
   if (request.type === 'choice' && !request.options?.length) return true;
+  // Rating with N/A selected is valid
+  if (request.type === 'rating' && isNaSelected) return false;
   // When "Other" is selected, require custom input text
   if (isOtherSelected && !customInput.trim()) return true;
   // For regular selections, require at least one option selected
@@ -176,10 +190,17 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
   const [customInput, setCustomInput] = useState('');
   const { identity, startAuth } = useGitHubAuth();
 
-  // Derive whether "Other" is selected for choice-type questions
-  const isOtherSelected =
+  // Derive whether "Other" is selected for choice-type and rating-type questions
+  const isChoiceOtherSelected =
     request?.type === 'choice' &&
     (Array.isArray(value) ? value.includes(OTHER_OPTION_VALUE) : value === OTHER_OPTION_VALUE);
+  const isRatingOtherSelected =
+    request?.type === 'rating' && typeof value === 'string' && value === OTHER_OPTION_VALUE;
+  const isOtherSelected = isChoiceOtherSelected || isRatingOtherSelected;
+
+  // Derive whether "N/A" is selected for rating-type questions
+  const isNaSelected =
+    request?.type === 'rating' && typeof value === 'string' && value === NA_OPTION_VALUE;
 
   // Reset state when request changes
   useEffect(() => {
@@ -291,7 +312,13 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
     setIsSubmitting(true);
 
     try {
-      const responseValue = formatResponseValue(request, value, customInput, isOtherSelected);
+      const responseValue = formatResponseValue(
+        request,
+        value,
+        customInput,
+        isOtherSelected,
+        isNaSelected
+      );
       const result = answerInputRequest(ydoc, request.id, responseValue, identity.username);
 
       if (!result.success) {
@@ -309,7 +336,7 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
   };
 
   const handleConfirmResponse = useCallback(
-    (response: 'yes' | 'no') => {
+    (response: string) => {
       if (!ydoc || !request || !identity || isSubmitting) return;
 
       setIsSubmitting(true);
@@ -368,7 +395,16 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
       case 'date':
         return <DateInput {...baseProps} request={request} />;
       case 'rating':
-        return <RatingInput {...baseProps} request={request} />;
+        return (
+          <RatingInput
+            {...baseProps}
+            request={request}
+            customInput={customInput}
+            setCustomInput={setCustomInput}
+            isOtherSelected={isRatingOtherSelected}
+            isNaSelected={isNaSelected}
+          />
+        );
       default: {
         // Exhaustive check - TypeScript will error if new type added without case
         const _exhaustiveCheck: never = request;
@@ -485,7 +521,8 @@ export function InputRequestModal({ isOpen, request, ydoc, onClose }: InputReque
                           request,
                           value,
                           isOtherSelected,
-                          customInput
+                          customInput,
+                          isNaSelected
                         )}
                         isPending={isSubmitting}
                       >

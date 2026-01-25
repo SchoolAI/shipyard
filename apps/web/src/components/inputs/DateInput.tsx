@@ -62,6 +62,7 @@ export function DateInput({
           onChange={(e) => setValue(e.target.value)}
           min={request.min}
           max={request.max}
+          autoComplete="off"
           autoFocus
           aria-invalid={hasValue && !isValid}
           aria-describedby={errorMessage ? 'date-error' : undefined}

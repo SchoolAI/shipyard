@@ -152,17 +152,40 @@ Asks user a question via browser modal.
 
 **Parameters:**
 - \`message\` (string) - Question to ask
-- \`type\` ('text' | 'choice' | 'confirm' | 'multiline')
+- \`type\` (string) - Input type (see below)
 - \`options\` (string[], for 'choice') - Available choices
 - \`timeout\` (number, optional) - Timeout in seconds
+- Type-specific parameters (min, max, format, etc.)
 
 **Returns:** \`{ success, response?, status }\`
 
+**Supported types (8 total):**
+1. \`text\` - Single-line text
+2. \`multiline\` - Multi-line text area
+3. \`choice\` - Radio/checkbox/dropdown (auto-adds "Other" option)
+   - Auto-switches: 1-8 options = radio/checkbox, 9+ = dropdown
+   - \`multiSelect: true\` for checkboxes
+   - \`displayAs: 'dropdown'\` to force dropdown UI
+4. \`confirm\` - Yes/No buttons
+5. \`number\` - Numeric input with validation
+   - \`min\`, \`max\`, \`format\` ('integer' | 'decimal' | 'currency' | 'percentage')
+6. \`email\` - Email validation
+   - \`domain\` for restriction
+7. \`date\` - Date picker with range
+   - \`minDate\`, \`maxDate\` (YYYY-MM-DD format)
+8. \`rating\` - Scale rating (auto-selects stars/numbers)
+   - \`min\`, \`max\`, \`style\` ('stars' | 'numbers' | 'emoji'), \`labels\`
+
 **Response format:**
 - All responses are strings
-- Multi-select: \`"option1, option2"\` (comma-space separated)
-- Confirm: \`"yes"\` or \`"no"\` (lowercase)
-- See docs/INPUT-RESPONSE-FORMATS.md for details`;
+- choice (single): \`"PostgreSQL"\` or custom text from "Other"
+- choice (multi): \`"option1, option2"\` (comma-space separated)
+- confirm: \`"yes"\` or \`"no"\` (lowercase)
+- number: \`"42"\` or \`"3.14"\`
+- email: \`"user@example.com"\`
+- date: \`"2026-01-24"\` (ISO 8601)
+- rating: \`"4"\` (integer as string)
+- See docs/INPUT-RESPONSE-FORMATS.md for complete specification`;
 
 export const HANDLING_FEEDBACK = `## Handling Reviewer Feedback
 

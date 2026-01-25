@@ -47,8 +47,22 @@ export interface ChoiceInputProps extends BaseInputProps<ChoiceInputRequest> {
 export interface ConfirmInputProps extends BaseInputProps<ConfirmInputRequest> {
   /** Remaining time in seconds (-1 = not initialized) */
   remainingTime: number;
-  /** Callback to handle yes/no response */
-  onConfirmResponse: (response: 'yes' | 'no') => void;
+  /** Callback to handle response (yes, no, or custom explanation) */
+  onConfirmResponse: (response: string) => void;
+}
+
+/**
+ * Extended props for rating inputs that need N/A and "Other" escape hatch handling.
+ */
+export interface RatingInputProps extends BaseInputProps<RatingInputRequest> {
+  /** Current value for the custom "Other" text input */
+  customInput: string;
+  /** Callback to update the custom input value */
+  setCustomInput: (val: string) => void;
+  /** Whether the "Other" option is currently selected */
+  isOtherSelected: boolean;
+  /** Whether the "N/A" option is currently selected */
+  isNaSelected: boolean;
 }
 
 // Re-export specific request types for component convenience

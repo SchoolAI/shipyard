@@ -7,6 +7,7 @@
 
 import {
   Alert,
+  Button,
   Checkbox,
   CheckboxGroup,
   ComboBox,
@@ -18,6 +19,7 @@ import {
   TextField,
 } from '@heroui/react';
 import { CHOICE_DROPDOWN_THRESHOLD, normalizeChoiceOptions } from '@shipyard/schema';
+import { ChevronDown } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import type { ChoiceInputProps } from './types';
 import { OTHER_OPTION_LABEL, OTHER_OPTION_VALUE } from './utils';
@@ -91,8 +93,24 @@ export function ChoiceInput({
           isRequired
         >
           <Label className="text-sm font-medium text-foreground">{request.message}</Label>
-          <ComboBox.InputGroup>
-            <Input placeholder={request.placeholder || 'Select an option...'} autoFocus />
+          <ComboBox.InputGroup className="relative">
+            <Input
+              placeholder={request.placeholder || 'Select an option...'}
+              autoComplete="off"
+              data-1p-ignore
+              data-lpignore="true"
+              data-form-type="other"
+              autoFocus
+              className="pr-10"
+            />
+            <Button
+              variant="ghost"
+              size="sm"
+              className="absolute right-1 top-1/2 -translate-y-1/2 w-8 h-8 min-w-0 p-0"
+              isIconOnly
+            >
+              <ChevronDown className="w-4 h-4" aria-hidden="true" />
+            </Button>
           </ComboBox.InputGroup>
           <ComboBox.Popover>
             <ListBox>
