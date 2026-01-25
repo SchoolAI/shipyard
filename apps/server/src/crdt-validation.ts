@@ -142,7 +142,7 @@ function validateArray<T>(
   schema: { safeParse: (data: unknown) => { success: boolean; error?: { message: string } } }
 ): ValidationResult {
   const array = doc.getArray<T>(key);
-  const items = array.toJSON() as unknown[];
+  const items = array.toJSON();
 
   if (items.length === 0) {
     return { key, valid: true, totalItems: 0, invalidItems: 0 };

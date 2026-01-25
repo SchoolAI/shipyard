@@ -212,7 +212,7 @@ export function useInputRequests({
       const allRequests = requestsArray.toJSON() as AnyInputRequest[];
 =======
       // Get all requests and validate them with schema
-      const rawRequests = requestsArray.toJSON() as unknown[];
+      const rawRequests = requestsArray.toJSON();
       const allRequests = rawRequests
         .map((item) => InputRequestSchema.safeParse(item))
         .filter((result) => result.success)
