@@ -13,7 +13,7 @@ import { logger } from '../logger.js';
 import { InputRequestManager } from '../services/input-request-manager.js';
 import { TOOL_NAMES } from './tool-names.js';
 
-// --- Input Schema ---
+/** --- Input Schema --- */
 
 const RequestUserInputInput = z
   .object({
@@ -178,58 +178,7 @@ function buildRequestParams(input: RequestUserInputInput): Record<string, unknow
   }
 }
 
-/** Create the input request in ydoc and optionally log event */
-async function initializeInputRequest(
-  input: RequestUserInputInput,
-  ydoc: Awaited<ReturnType<typeof getOrCreateDoc>>
-): Promise<string> {
-  const manager = new InputRequestManager();
-  let requestId: string;
-
-  if (input.questions) {
-    // Multi-question request
-    const params = {
-      questions: input.questions,
-      timeout: input.timeout,
-      planId: input.planId,
-    };
-    requestId = manager.createMultiQuestionRequest(ydoc, params);
-  } else {
-    // Single-question request (existing logic)
-    const params = buildRequestParams(input);
-    // Cast through unknown since new types may not yet be in the schema
-    requestId = manager.createRequest(
-      ydoc,
-      params as unknown as Parameters<typeof manager.createRequest>[1]
-    );
-  }
-
-  // If request is plan-scoped, also log created event to plan doc for activity timeline
-  if (input.planId) {
-    const planDoc = await getOrCreateDoc(input.planId);
-    const { logPlanEvent } = await import('@shipyard/schema');
-    const requestType = input.questions ? 'multi' : (input.type ?? 'text');
-    logPlanEvent(
-      planDoc,
-      'input_request_created',
-      'Agent',
-      {
-        requestId,
-        requestType,
-        requestMessage:
-          input.message || (input.questions ? `${input.questions.length} questions` : ''),
-      },
-      {
-        inboxWorthy: true,
-        inboxFor: 'owner',
-      }
-    );
-  }
-
-  return requestId;
-}
-
-// --- Public Export ---
+/** --- Public Export --- */
 
 export const requestUserInputTool = {
   definition: {
@@ -525,18 +474,38 @@ NOTE: This is also available as requestUserInput() inside execute_code for multi
     }
 
     try {
-      // Always use plan-index doc so browser can see requests from all agents
-      // Browser is already connected to plan-index for plan discovery
+      /*
+       * Always use plan-index doc so browser can see requests from all agents
+       * Browser is already connected to plan-index for plan discovery
+       */
       const ydoc = await getOrCreateDoc(PLAN_INDEX_DOC_NAME);
 
-      // Create request and log event
-      const requestId = await initializeInputRequest(input, ydoc);
-
-      // Wait for response
+      /** Create manager and make request */
       const manager = new InputRequestManager();
+      let requestId: string;
+
+      if (input.questions) {
+        // Multi-question request
+        const params = {
+          questions: input.questions,
+          timeout: input.timeout,
+          planId: input.planId,
+        };
+        requestId = manager.createMultiQuestionRequest(ydoc, params);
+      } else {
+        // Single-question request (existing logic)
+        const params = buildRequestParams(input);
+        // Cast through unknown since new types may not yet be in the schema
+        requestId = manager.createRequest(
+          ydoc,
+          params as unknown as Parameters<typeof manager.createRequest>[1]
+        );
+      }
+
+      /** Wait for response */
       const result = await manager.waitForResponse(ydoc, requestId, input.timeout);
 
-      // Format response based on status
+      /** Format response based on status */
       if (result.status === 'answered') {
         logger.info({ requestId, answeredBy: result.answeredBy }, 'User input received');
         return {
@@ -569,7 +538,7 @@ NOTE: This is also available as requestUserInput() inside execute_code for multi
         };
       }
 
-      // Cancelled status
+      /** Cancelled status */
       logger.info({ requestId, reason: result.reason }, 'Input request cancelled');
       return {
         content: [

@@ -66,7 +66,7 @@ function extractTitleFromBlocks(blocks: Block[]): string {
   if (typeof text !== 'string') {
     return UNTITLED;
   }
-  // For headings, use full text; for paragraphs, truncate
+  /** For headings, use full text; for paragraphs, truncate */
   if (firstBlock.type === 'heading') {
     return text;
   }
@@ -77,7 +77,7 @@ export async function handleCreateSession(req: Request, res: Response): Promise<
   try {
     const input = CreateHookSessionRequestSchema.parse(req.body);
 
-    // Check if session already exists (idempotent - handles CLI process restarts)
+    /** Check if session already exists (idempotent - handles CLI process restarts) */
     const existingSession = getSessionState(input.sessionId);
     if (existingSession) {
       const url = createPlanWebUrl(webConfig.SHIPYARD_WEB_URL, existingSession.planId);
@@ -270,7 +270,7 @@ export async function handleGetReview(req: Request, res: Response): Promise<void
       return;
     }
 
-    // Build discriminated union response based on status
+    /** Build discriminated union response based on status */
     let response: GetReviewStatusResponse;
 
     switch (metadata.status) {
@@ -417,7 +417,7 @@ export async function handleClearPresence(req: Request, res: Response): Promise<
       return;
     }
 
-    // Validate query param - HTTP query params are untrusted external input
+    /** Validate query param - HTTP query params are untrusted external input */
     const sessionId = typeof req.query.sessionId === 'string' ? req.query.sessionId : undefined;
 
     if (!sessionId) {

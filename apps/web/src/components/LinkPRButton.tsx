@@ -47,7 +47,7 @@ export function LinkPRButton({
   const { identity, startAuth } = useGitHubAuth();
   const { actor } = useUserIdentity();
 
-  // Use controlled state if provided, otherwise use internal state
+  /** Use controlled state if provided, otherwise use internal state */
   const isOpen = controlledIsOpen ?? internalIsOpen;
   const setIsOpen = onOpenChange ?? setInternalIsOpen;
 
@@ -78,7 +78,7 @@ export function LinkPRButton({
     setIsSubmitting(true);
 
     try {
-      // Fetch PR details from GitHub API
+      /** Fetch PR details from GitHub API */
       const response = await fetch(`https://api.github.com/repos/${targetRepo}/pulls/${prNumber}`, {
         headers: {
           Authorization: `Bearer ${identity.token}`,
@@ -95,7 +95,7 @@ export function LinkPRButton({
 
       const pr = await response.json();
 
-      // Create LinkedPR object using factory for consistent validation
+      /** Create LinkedPR object using factory for consistent validation */
       const linkedPR = createLinkedPR({
         prNumber,
         url: pr.html_url,
@@ -110,10 +110,10 @@ export function LinkPRButton({
         title: pr.title,
       });
 
-      // Store in Y.Doc
+      /** Store in Y.Doc */
       linkPR(ydoc, linkedPR);
 
-      // Log PR linked event
+      /** Log PR linked event */
       logPlanEvent(ydoc, 'pr_linked', actor, {
         prNumber,
         url: linkedPR.url,

@@ -19,11 +19,11 @@ import type { SubscribeMessage, UnsubscribeMessage } from '../types.js';
  * @param message - Subscribe message with topics
  */
 function handleSubscribe(platform: PlatformAdapter, ws: unknown, message: SubscribeMessage): void {
-  // Subscribe to each topic
+  /** Subscribe to each topic */
   for (const topic of message.topics ?? []) {
     if (typeof topic !== 'string') continue;
     platform.subscribeToTopic(ws, topic);
-    // Log subscription for debugging
+    /** Log subscription for debugging */
     const subscriberCount = platform.getTopicSubscribers(topic).length;
     platform.debug(
       `[Subscribe] Client subscribed to topic: ${topic} (now ${subscriberCount} subscribers)`

@@ -8,7 +8,7 @@ import { z } from 'zod';
 const ThemeSchema = z.enum(['light', 'dark', 'system']);
 type Theme = z.infer<typeof ThemeSchema>;
 
-// Custom event for cross-component synchronization (storage events only fire across tabs)
+/** Custom event for cross-component synchronization (storage events only fire across tabs) */
 const THEME_CHANGE_EVENT = 'theme-change';
 
 /**
@@ -20,11 +20,11 @@ function parseThemeFromStorage(value: string | null): Theme {
   return result.success ? result.data : 'system';
 }
 
-// Shared state for theme across all hook instances
+/** Shared state for theme across all hook instances */
 let currentTheme: Theme = 'system';
 const listeners = new Set<() => void>();
 
-// Initialize from localStorage (only once)
+/** Initialize from localStorage (only once) */
 if (typeof window !== 'undefined') {
   currentTheme = parseThemeFromStorage(localStorage.getItem('theme'));
 }
@@ -47,12 +47,12 @@ function setThemeValue(newTheme: Theme): void {
   currentTheme = newTheme;
   localStorage.setItem('theme', newTheme);
 
-  // Notify all listeners
+  /** Notify all listeners */
   for (const listener of listeners) {
     listener();
   }
 
-  // Dispatch custom event for any edge cases
+  /** Dispatch custom event for any edge cases */
   window.dispatchEvent(new CustomEvent(THEME_CHANGE_EVENT, { detail: newTheme }));
 }
 
@@ -88,22 +88,22 @@ export function useTheme() {
     setThemeValue(newTheme);
   }, []);
 
-  // Compute resolved theme (what's actually applied)
+  /** Compute resolved theme (what's actually applied) */
   const resolvedTheme = getResolvedTheme(theme);
 
-  // Apply theme to DOM when it changes
+  /** Apply theme to DOM when it changes */
   useEffect(() => {
     applyThemeToDOM(theme);
   }, [theme]);
 
-  // Listen for system preference changes when theme is 'system'
+  /** Listen for system preference changes when theme is 'system' */
   useEffect(() => {
     if (theme !== 'system') return;
 
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     const handler = () => {
       applyThemeToDOM(theme);
-      // Force all listeners to re-render to pick up new effective theme
+      /** Force all listeners to re-render to pick up new effective theme */
       for (const listener of listeners) {
         listener();
       }
@@ -113,11 +113,11 @@ export function useTheme() {
     return () => mediaQuery.removeEventListener('change', handler);
   }, [theme]);
 
-  // Listen for storage events (cross-tab sync)
+  /** Listen for storage events (cross-tab sync) */
   useEffect(() => {
     const handleStorage = (e: StorageEvent) => {
       if (e.key === 'theme' && e.newValue) {
-        // Validate storage event value - could come from another tab/window
+        /** Validate storage event value - could come from another tab/window */
         const newTheme = parseThemeFromStorage(e.newValue);
         if (newTheme !== currentTheme) {
           currentTheme = newTheme;

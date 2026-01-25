@@ -10,20 +10,8 @@ import {
   Separator,
   Tooltip,
 } from '@heroui/react';
-import type {
-  A2AMessage,
-  ConversationExportMeta,
-  PlanIndexEntry,
-  PlanMetadata,
-} from '@shipyard/schema';
-import {
-  archivePlan,
-  getPlanIndexEntry,
-  getPlanOwnerId,
-  logPlanEvent,
-  setPlanIndexEntry,
-  unarchivePlan,
-} from '@shipyard/schema';
+import type { A2AMessage, PlanIndexEntry, PlanMetadata } from '@shipyard/schema';
+import { getPlanOwnerId } from '@shipyard/schema';
 import {
   Archive,
   ArchiveRestore,
@@ -38,8 +26,6 @@ import {
   Share2,
   Tag,
 } from 'lucide-react';
-import { useRef, useState } from 'react';
-import { toast } from 'sonner';
 import type { WebrtcProvider } from 'y-webrtc';
 import type * as Y from 'yjs';
 import { AgentRequestsBadge } from '@/components/AgentRequestsBadge';
@@ -56,15 +42,16 @@ import { TagEditor } from '@/components/TagEditor';
 import { Avatar } from '@/components/ui/avatar';
 import { TruncatedText } from '@/components/ui/TruncatedText';
 import { useActivePlanSync } from '@/contexts/ActivePlanSyncContext';
-import { useUserIdentity } from '@/contexts/UserIdentityContext';
-import { useConversationTransfer } from '@/hooks/useConversationTransfer';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
+import { type MobileImportData, useHeaderActions } from '@/hooks/useHeaderActions';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { type ConnectedPeer, useP2PPeers } from '@/hooks/useP2PPeers';
 
-// =====================================================================
-// Helper Functions & Sub-Components
-// =====================================================================
+/*
+ * =====================================================================
+ * Helper Functions & Sub-Components
+ * =====================================================================
+ */
 
 /** Extract text preview from a message */
 function getMessageTextPreview(msg: A2AMessage, maxLength = 150): string {
@@ -106,18 +93,13 @@ interface PresenceIndicatorsProps {
   connectedPeers: ConnectedPeer[];
 }
 
-/**
- * Check if a platform represents an AI agent (not a browser).
- * Known agent platforms: claude-code, devin, cursor, aider, etc.
- */
+/** Check if a platform represents an AI agent (not a browser). */
 function isAgentPlatform(platform: string): boolean {
   const agentPlatforms = ['claude-code', 'devin', 'cursor', 'aider', 'copilot', 'cody'];
   return agentPlatforms.includes(platform.toLowerCase());
 }
 
-/**
- * Format platform name for display (e.g., 'claude-code' -> 'Claude Code')
- */
+/** Format platform name for display (e.g., 'claude-code' -> 'Claude Code') */
 function formatPlatformName(platform: string): string {
   const platformNames: Record<string, string> = {
     'claude-code': 'Claude Code',
@@ -133,7 +115,6 @@ function formatPlatformName(platform: string): string {
 
 /** Renders hub connection and peer presence indicators */
 function PresenceIndicators({ connectedPeers }: PresenceIndicatorsProps) {
-  // Group peers by type (agent vs browser)
   const agents = connectedPeers.filter((p) => isAgentPlatform(p.platform));
   const browsers = connectedPeers.filter((p) => !isAgentPlatform(p.platform));
 
@@ -141,12 +122,10 @@ function PresenceIndicators({ connectedPeers }: PresenceIndicatorsProps) {
   const browserCount = browsers.length;
   const totalPeers = connectedPeers.length;
 
-  // Generate display text based on peer composition
   const getPeerDisplayText = () => {
     if (totalPeers === 0) return null;
 
     if (browserCount === 0 && agentCount > 0) {
-      // Only agents
       return (
         <span className="flex items-center gap-1.5">
           <Bot className="w-3 h-3" />
@@ -156,7 +135,6 @@ function PresenceIndicators({ connectedPeers }: PresenceIndicatorsProps) {
     }
 
     if (agentCount === 0 && browserCount > 0) {
-      // Only browsers
       return (
         <span className="flex items-center gap-1.5">
           <Monitor className="w-3 h-3" />
@@ -165,7 +143,6 @@ function PresenceIndicators({ connectedPeers }: PresenceIndicatorsProps) {
       );
     }
 
-    // Mixed: browsers and agents
     return (
       <span className="flex items-center gap-1.5">
         <Monitor className="w-3 h-3" />
@@ -177,7 +154,6 @@ function PresenceIndicators({ connectedPeers }: PresenceIndicatorsProps) {
     );
   };
 
-  // Generate tooltip content with peer details
   const getTooltipContent = () => {
     if (totalPeers === 0) return null;
 
@@ -195,12 +171,11 @@ function PresenceIndicators({ connectedPeers }: PresenceIndicatorsProps) {
                   )}
                 </div>
 
-                {/* Environment context */}
                 {agent.context && (
                   <div className="flex flex-col gap-0.5 text-xs text-muted-foreground ml-5">
-                    {agent.context.projectName && <span>📁 {agent.context.projectName}</span>}
-                    {agent.context.branch && <span>🌿 {agent.context.branch}</span>}
-                    {agent.context.hostname && <span>🖥️ {agent.context.hostname}</span>}
+                    {agent.context.projectName && <span> {agent.context.projectName}</span>}
+                    {agent.context.branch && <span> {agent.context.branch}</span>}
+                    {agent.context.hostname && <span> {agent.context.hostname}</span>}
                   </div>
                 )}
               </div>
@@ -266,13 +241,11 @@ function DesktopActions({
     <>
       <ShareButton planId={planId} rtcProvider={rtcProvider} isOwner={isOwner} ydoc={ydoc} />
 
-      {/* Resume conversation button */}
       <Tooltip delay={0}>
         <ImportConversationButton planId={planId} ydoc={ydoc} rtcProvider={rtcProvider} />
         <Tooltip.Content>Resume a handed-off conversation</Tooltip.Content>
       </Tooltip>
 
-      {/* Handoff conversation button - only shown if plan has origin transcript */}
       {hasOriginTranscript && (
         <Tooltip delay={0}>
           <Button
@@ -289,7 +262,6 @@ function DesktopActions({
         </Tooltip>
       )}
 
-      {/* Archive icon button */}
       <Button
         isIconOnly
         variant="ghost"
@@ -369,13 +341,6 @@ function MobileDropdownMenu({
   );
 }
 
-/** Data structure for mobile import review */
-interface MobileImportData {
-  messages: A2AMessage[];
-  meta: ConversationExportMeta;
-  summary: { title: string; text: string };
-}
-
 /** Props for import review modal */
 interface ImportReviewModalProps {
   importData: MobileImportData;
@@ -407,7 +372,6 @@ function ImportReviewModal({
           </Modal.Header>
 
           <Modal.Body className="p-4">
-            {/* Metadata summary */}
             <Card variant="secondary" className="mb-4">
               <Card.Content className="p-3">
                 <div className="grid grid-cols-2 gap-2 text-sm">
@@ -435,7 +399,6 @@ function ImportReviewModal({
               </Card.Content>
             </Card>
 
-            {/* Message preview */}
             <p className="text-sm text-muted-foreground mb-3">Conversation preview:</p>
             <div className="space-y-3 max-h-[300px] overflow-y-auto">
               {importData.messages.slice(0, 5).map((msg, idx) => (
@@ -464,9 +427,11 @@ function ImportReviewModal({
   );
 }
 
-// =====================================================================
-// Main Component
-// =====================================================================
+/*
+ * =====================================================================
+ * Main Component
+ * =====================================================================
+ */
 
 /** Simple identity type for display purposes */
 interface UserIdentity {
@@ -477,31 +442,20 @@ interface UserIdentity {
 
 interface PlanHeaderProps {
   ydoc: Y.Doc;
-  /** Index doc for input requests (separate from plan doc). Null if not synced yet. */
   indexDoc: Y.Doc | null;
-  /** Plan ID for archive actions */
   planId: string;
-  /** Current metadata from parent component */
   metadata: PlanMetadata;
-  /** User identity for review actions */
   identity: UserIdentity | null;
-  /** Called when user needs to set up identity */
   onRequestIdentity: () => void;
-  /** Called after status is successfully updated in the plan doc, with the timestamp used */
   onStatusChange?: (newStatus: 'in_progress' | 'changes_requested', updatedAt: number) => void;
-  /** When true, shows snapshot indicator and hides interactive elements */
   isSnapshot?: boolean;
-  /** WebRTC provider for P2P sync and awareness (needed for approval panel) */
   rtcProvider?: WebrtcProvider | null;
-  /** BlockNote editor instance for snapshots - Issue #42 */
   editor?: BlockNoteEditor | null;
-  /** Called when tags are changed */
   onTagsChange?: (tags: string[]) => void;
-  /** All plans for tag autocomplete */
   allPlans?: PlanIndexEntry[];
 }
 
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: component handles complex header state with tag editing
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: PlanHeader orchestrates many UI elements - complexity is inherent to the component's role as the main header
 export function PlanHeader({
   ydoc,
   indexDoc,
@@ -516,196 +470,38 @@ export function PlanHeader({
   onTagsChange,
   allPlans = [],
 }: PlanHeaderProps) {
-  // No local state or observer - metadata comes from parent to avoid duplicate observers
   const display = metadata;
   const { syncState } = useActivePlanSync();
   const isMobile = useIsMobile();
   const isArchived = !!display.archivedAt;
   const { identity: githubIdentity } = useGitHubAuth();
-  const { actor } = useUserIdentity();
-  // indexDoc is now passed as a prop (fixed Y.Doc mismatch bug)
   const ownerId = getPlanOwnerId(ydoc);
   const { connectedPeers } = useP2PPeers(rtcProvider);
 
-  // Handoff conversation dialog state
-  const [isHandoffDialogOpen, setIsHandoffDialogOpen] = useState(false);
+  /** Use extracted hook for header actions */
+  const headerActions = useHeaderActions(ydoc, indexDoc, planId, isArchived, rtcProvider);
+  const {
+    isHandoffDialogOpen,
+    setIsHandoffDialogOpen,
+    isLinkPROpen,
+    setIsLinkPROpen,
+    isTagEditorOpen,
+    setIsTagEditorOpen,
+    mobileImportInputRef,
+    mobileImportData,
+    isMobileReviewOpen,
+    setIsMobileReviewOpen,
+    handleArchiveToggle,
+    handleMobileFileSelect,
+    handleMobileImportConfirm,
+    handleMobileImportCancel,
+    handleDropdownAction,
+  } = headerActions;
 
-  // Link PR popover state - managed here for mobile dropdown
-  const [isLinkPROpen, setIsLinkPROpen] = useState(false);
-
-  // Tag editor popover state
-  const [isTagEditorOpen, setIsTagEditorOpen] = useState(false);
-
-  // File input ref for mobile import
-  const mobileImportInputRef = useRef<HTMLInputElement>(null);
-
-  // Conversation transfer hook for mobile import
-  const { importFromFile } = useConversationTransfer(planId, ydoc, rtcProvider);
-
-  // State for mobile import review modal
-  const [mobileImportData, setMobileImportData] = useState<MobileImportData | null>(null);
-  const [isMobileReviewOpen, setIsMobileReviewOpen] = useState(false);
-
-  // Check if this plan has an origin transcript (can be handed off)
-  // Type-safe check: only Claude Code origin with transcript path can be handed off
+  /** Check if this plan has an origin transcript (can be handed off) */
   const hasOriginTranscript = Boolean(
     display.origin?.platform === 'claude-code' && display.origin.transcriptPath
   );
-
-  const handleArchiveToggle = () => {
-    if (isArchived) {
-      unarchivePlan(ydoc, actor);
-    } else {
-      archivePlan(ydoc, actor);
-    }
-
-    // Log archive/unarchive event
-    logPlanEvent(ydoc, isArchived ? 'plan_unarchived' : 'plan_archived', actor);
-
-    // Update index entry if indexDoc is synced
-    if (indexDoc) {
-      const entry = getPlanIndexEntry(indexDoc, planId);
-      if (entry) {
-        if (isArchived) {
-          // Unarchiving: create a non-deleted entry
-          setPlanIndexEntry(indexDoc, {
-            id: entry.id,
-            title: entry.title,
-            status: entry.status,
-            createdAt: entry.createdAt,
-            updatedAt: Date.now(),
-            ownerId: entry.ownerId,
-            deleted: false,
-          });
-          toast.success('Task unarchived');
-        } else {
-          // Archiving: create a deleted entry
-          setPlanIndexEntry(indexDoc, {
-            id: entry.id,
-            title: entry.title,
-            status: entry.status,
-            createdAt: entry.createdAt,
-            updatedAt: Date.now(),
-            ownerId: entry.ownerId,
-            deleted: true,
-            deletedAt: Date.now(),
-            deletedBy: actor,
-          });
-          toast.success('Task archived');
-        }
-      }
-    }
-  };
-
-  /**
-   * Handle share from mobile dropdown menu.
-   * This is a simplified version that only copies the URL (no invite creation).
-   * For invite creation on mobile, users should use the ShareButton directly.
-   */
-  const handleShare = async () => {
-    // Check authentication - mobile share requires sign-in
-    if (!githubIdentity) {
-      toast.error('Sign in required', {
-        description: 'You need to sign in with GitHub to share this plan.',
-      });
-      return;
-    }
-
-    // Check if user is owner
-    const isOwnerCheck = githubIdentity && ownerId && githubIdentity.username === ownerId;
-
-    try {
-      await navigator.clipboard.writeText(window.location.href);
-
-      // Show appropriate toast based on ownership
-      if (isOwnerCheck) {
-        toast.success('Link copied to clipboard');
-      } else {
-        toast.info('Link copied (view-only access)', {
-          description: 'Sign in as the plan owner to create invite links with full access.',
-        });
-      }
-
-      // Log plan shared event
-      logPlanEvent(ydoc, 'plan_shared', actor);
-    } catch {
-      // Fallback for older browsers
-      const textArea = document.createElement('textarea');
-      textArea.value = window.location.href;
-      document.body.appendChild(textArea);
-      textArea.select();
-      document.execCommand('copy');
-      document.body.removeChild(textArea);
-
-      // Show appropriate toast based on ownership
-      if (isOwnerCheck) {
-        toast.success('Link copied to clipboard');
-      } else {
-        toast.info('Link copied (view-only access)', {
-          description: 'Sign in as the plan owner to create invite links with full access.',
-        });
-      }
-
-      // Log plan shared event
-      logPlanEvent(ydoc, 'plan_shared', actor);
-    }
-  };
-
-  const handleDropdownAction = (key: React.Key) => {
-    switch (key) {
-      case 'share':
-        handleShare();
-        break;
-      case 'import':
-        mobileImportInputRef.current?.click();
-        break;
-      case 'handoff':
-        setIsHandoffDialogOpen(true);
-        break;
-      case 'link-pr':
-        setIsLinkPROpen(true);
-        break;
-      case 'archive':
-      case 'unarchive':
-        handleArchiveToggle();
-        break;
-    }
-  };
-
-  /**
-   * Handle mobile file import selection.
-   */
-  async function handleMobileFileSelect(event: React.ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    // Reset input so same file can be selected again
-    event.target.value = '';
-
-    const result = await importFromFile(file);
-
-    if (result.success) {
-      setMobileImportData({
-        messages: result.messages,
-        meta: result.meta,
-        summary: result.summary,
-      });
-      setIsMobileReviewOpen(true);
-    } else {
-      toast.error(result.error);
-    }
-  }
-
-  /**
-   * Confirm mobile import.
-   */
-  function handleMobileImportConfirm() {
-    if (mobileImportData) {
-      toast.success(`Imported ${mobileImportData.meta.messageCount} messages`);
-    }
-    setIsMobileReviewOpen(false);
-    setMobileImportData(null);
-  }
 
   return (
     <div className="flex flex-wrap items-center gap-2 w-full">
@@ -879,10 +675,7 @@ export function PlanHeader({
           isOpen={isMobileReviewOpen}
           onOpenChange={(open) => !open && setIsMobileReviewOpen(false)}
           onConfirm={handleMobileImportConfirm}
-          onCancel={() => {
-            setIsMobileReviewOpen(false);
-            setMobileImportData(null);
-          }}
+          onCancel={handleMobileImportCancel}
         />
       )}
     </div>

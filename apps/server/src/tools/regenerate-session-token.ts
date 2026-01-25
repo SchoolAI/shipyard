@@ -6,12 +6,12 @@ import { getVerifiedGitHubUsername } from '../server-identity.js';
 import { generateSessionToken, hashSessionToken } from '../session-token.js';
 import { TOOL_NAMES } from './tool-names.js';
 
-// --- Input Schema ---
+/** --- Input Schema --- */
 const RegenerateSessionTokenInput = z.object({
   planId: z.string().describe('The plan ID to regenerate token for'),
 });
 
-// --- Public Export ---
+/** --- Public Export --- */
 export const regenerateSessionTokenTool = {
   definition: {
     name: TOOL_NAMES.REGENERATE_SESSION_TOKEN,
@@ -47,7 +47,7 @@ SECURITY:
 
     logger.info({ planId }, 'Attempting to regenerate session token');
 
-    // 1. Get current user's verified GitHub identity
+    /** 1. Get current user's verified GitHub identity */
     const currentUser = await getVerifiedGitHubUsername();
 
     if (!currentUser) {
@@ -69,7 +69,7 @@ Note: git config user.name is NOT accepted for security-critical operations.`,
       };
     }
 
-    // 2. Get the plan
+    /** 2. Get the plan */
     const doc = await getOrCreateDoc(planId);
     const metadata = getPlanMetadata(doc);
 
@@ -80,7 +80,7 @@ Note: git config user.name is NOT accepted for security-critical operations.`,
       };
     }
 
-    // 3. Verify ownership
+    /** 3. Verify ownership */
     if (!metadata.ownerId) {
       return {
         content: [
@@ -93,9 +93,11 @@ Note: git config user.name is NOT accepted for security-critical operations.`,
       };
     }
 
-    // 4. Generate new token and atomically update if still owner
-    // This prevents TOCTOU race conditions where ownership could change
-    // between the check above and the token update
+    /*
+     * 4. Generate new token and atomically update if still owner
+     * This prevents TOCTOU race conditions where ownership could change
+     * between the check above and the token update
+     */
     const newToken = generateSessionToken();
     const newTokenHash = hashSessionToken(newToken);
 
@@ -107,7 +109,7 @@ Note: git config user.name is NOT accepted for security-critical operations.`,
     );
 
     if (!updateResult.success) {
-      // Ownership changed during operation or initial check failed
+      /** Ownership changed during operation or initial check failed */
       const actualOwner = updateResult.actualOwner;
       if (actualOwner !== currentUser) {
         logger.warn(
@@ -124,7 +126,7 @@ Note: git config user.name is NOT accepted for security-critical operations.`,
           isError: true,
         };
       }
-      // If actualOwner === currentUser but still failed, something unexpected happened
+      /** If actualOwner === currentUser but still failed, something unexpected happened */
       logger.error(
         { planId, expectedOwner: metadata.ownerId, actualOwner, currentUser },
         'Unexpected failure in atomic token regeneration'
@@ -140,7 +142,7 @@ Note: git config user.name is NOT accepted for security-critical operations.`,
       };
     }
 
-    // 6. Log the event for audit trail
+    /** 6. Log the event for audit trail */
     logPlanEvent(doc, 'session_token_regenerated', currentUser);
 
     logger.info({ planId, ownerId: metadata.ownerId }, 'Session token regenerated successfully');

@@ -36,12 +36,12 @@ function MobileBottomDrawer({
   onClose: () => void;
   children: ReactNode;
 }) {
-  // Snap points configuration
+  /** Snap points configuration */
   const DEFAULT_SNAP = 0.65;
   const EXPANDED_SNAP = 0.95;
   const snapPoints: (string | number)[] = [DEFAULT_SNAP, EXPANDED_SNAP];
 
-  // Controlled state for snap point - required to make it "stick" after dragging
+  /** Controlled state for snap point - required to make it "stick" after dragging */
   const [activeSnapPoint, setActiveSnapPoint] = useState<number | string | null>(DEFAULT_SNAP);
 
   return (
@@ -51,11 +51,11 @@ function MobileBottomDrawer({
       snapPoints={snapPoints}
       activeSnapPoint={activeSnapPoint}
       setActiveSnapPoint={setActiveSnapPoint}
-      // Prevent velocity-based snap point skipping - ensures drawer stays at dragged position
+      /** Prevent velocity-based snap point skipping - ensures drawer stays at dragged position */
       snapToSequentialPoint
-      // Start fading overlay when dragging below the first snap point
+      /** Start fading overlay when dragging below the first snap point */
       fadeFromIndex={0}
-      // Only drag from handle, allow content scrolling
+      /** Only drag from handle, allow content scrolling */
       handleOnly
     >
       <Drawer.Overlay className="fixed inset-0 z-40 bg-black/40" />
@@ -125,10 +125,8 @@ function DesktopPanel({
           flex flex-col overflow-hidden
           ${
             isCenterModal
-              ?
-                'top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[1100px] max-w-[90vw] h-[95vh] rounded-lg border border-separator animate-in zoom-in-95 fade-in duration-200'
-              :
-                'top-0 right-0 h-full border-l border-separator animate-in slide-in-from-right duration-300 ease-out'
+              ? 'top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[1100px] max-w-[90vw] h-[95vh] rounded-lg border border-separator animate-in zoom-in-95 fade-in duration-200'
+              : 'top-0 right-0 h-full border-l border-separator animate-in slide-in-from-right duration-300 ease-out'
           }
           ${isPeek ? 'w-1/2 max-w-[90vw]' : ''}
           ${isFullScreen ? 'w-full' : ''}
@@ -156,7 +154,7 @@ export function PlanPanel({ planId, width, onClose, children }: PlanPanelProps) 
 
   if (!planId) return null;
 
-  // Mobile: always use bottom drawer
+  /** Mobile: always use bottom drawer */
   if (isMobile) {
     return (
       <MobileBottomDrawer isOpen={!!planId} onClose={onClose}>
@@ -165,7 +163,7 @@ export function PlanPanel({ planId, width, onClose, children }: PlanPanelProps) 
     );
   }
 
-  // Desktop: use existing side panel / center modal behavior
+  /** Desktop: use existing side panel / center modal behavior */
   return (
     <DesktopPanel width={width} onClose={onClose}>
       {children}

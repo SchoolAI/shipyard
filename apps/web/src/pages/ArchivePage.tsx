@@ -80,7 +80,7 @@ export function ArchivePage() {
     ydoc: indexDoc,
   } = usePlanIndexContext();
 
-  // Selected plan state - read from URL on mount
+  /** Selected plan state - read from URL on mount */
   const searchParams = new URLSearchParams(location.search);
   const initialPanelId = searchParams.get('panel');
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(initialPanelId);
@@ -91,7 +91,7 @@ export function ArchivePage() {
     );
   }, [archivedPlans]);
 
-  // Update URL when panel state changes
+  /** Update URL when panel state changes */
   useEffect(() => {
     if (selectedPlanId) {
       navigate(`?panel=${selectedPlanId}`, { replace: true });
@@ -100,12 +100,12 @@ export function ArchivePage() {
     }
   }, [selectedPlanId, navigate]);
 
-  // Panel handlers
+  /** Panel handlers */
   const handleClosePanel = useCallback(() => {
     setSelectedPlanId(null);
   }, []);
 
-  // Keyboard shortcuts for panel
+  /** Keyboard shortcuts for panel */
   useKeyboardShortcuts({
     onFullScreen: useCallback(() => {
       if (selectedPlanId) {
@@ -157,7 +157,7 @@ export function ArchivePage() {
 
       idb.destroy();
     } catch {
-      // Plan doc may not exist locally
+      /** Plan doc may not exist locally */
     }
 
     const entry = getPlanIndexEntry(indexDoc, planId);
@@ -173,7 +173,7 @@ export function ArchivePage() {
       });
     }
 
-    // Close panel if unarchiving selected plan
+    /** Close panel if unarchiving selected plan */
     if (selectedPlanId === planId) {
       setSelectedPlanId(null);
     }

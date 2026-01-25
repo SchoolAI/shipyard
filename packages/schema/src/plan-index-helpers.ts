@@ -175,24 +175,24 @@ export function markEventAsViewed(
   const viewedByRoot = ydoc.getMap(PLAN_INDEX_EVENT_VIEWED_BY_KEY);
   const rawPlanEvents = viewedByRoot.get(planId);
 
-  // Validate CRDT data structure - could be corrupted
+  /** Validate CRDT data structure - could be corrupted */
   let planEvents: Y.Map<unknown>;
   if (rawPlanEvents instanceof Y.Map) {
     planEvents = rawPlanEvents;
   } else {
-    // Corrupted or missing - recreate the map
+    /** Corrupted or missing - recreate the map */
     planEvents = new Y.Map();
     viewedByRoot.set(planId, planEvents);
   }
 
   const rawEventViews = planEvents.get(eventId);
 
-  // Validate nested CRDT data structure
+  /** Validate nested CRDT data structure */
   let eventViews: Y.Map<unknown>;
   if (rawEventViews instanceof Y.Map) {
     eventViews = rawEventViews;
   } else {
-    // Corrupted or missing - recreate the map
+    /** Corrupted or missing - recreate the map */
     eventViews = new Y.Map();
     planEvents.set(eventId, eventViews);
   }
@@ -213,12 +213,12 @@ export function clearEventViewedBy(
   const viewedByRoot = ydoc.getMap(PLAN_INDEX_EVENT_VIEWED_BY_KEY);
   const planEvents = viewedByRoot.get(planId);
 
-  // Validate CRDT data structure
+  /** Validate CRDT data structure */
   if (!planEvents || !(planEvents instanceof Y.Map)) return;
 
   const eventViews = planEvents.get(eventId);
 
-  // Validate nested CRDT data structure
+  /** Validate nested CRDT data structure */
   if (!eventViews || !(eventViews instanceof Y.Map)) return;
 
   eventViews.delete(username);
@@ -237,12 +237,12 @@ export function isEventUnread(
   const viewedByRoot = ydoc.getMap(PLAN_INDEX_EVENT_VIEWED_BY_KEY);
   const planEvents = viewedByRoot.get(planId);
 
-  // Validate CRDT data structure
+  /** Validate CRDT data structure */
   if (!planEvents || !(planEvents instanceof Y.Map)) return true;
 
   const eventViews = planEvents.get(eventId);
 
-  // Validate nested CRDT data structure
+  /** Validate nested CRDT data structure */
   if (!eventViews || !(eventViews instanceof Y.Map)) return true;
 
   return !eventViews.has(username);
@@ -260,18 +260,18 @@ export function getAllEventViewedByForPlan(
   const viewedByRoot = ydoc.getMap(PLAN_INDEX_EVENT_VIEWED_BY_KEY);
   const planEvents = viewedByRoot.get(planId);
 
-  // Validate CRDT data structure
+  /** Validate CRDT data structure */
   if (!planEvents || !(planEvents instanceof Y.Map)) return {};
 
   const result: Record<string, Record<string, number>> = {};
 
   for (const [eventId, eventViews] of planEvents.entries()) {
-    // Validate nested CRDT data structure
+    /** Validate nested CRDT data structure */
     if (!(eventViews instanceof Y.Map)) continue;
 
     const views: Record<string, number> = {};
     for (const [username, timestamp] of eventViews.entries()) {
-      // Validate timestamp is a number
+      /** Validate timestamp is a number */
       if (typeof timestamp === 'number') {
         views[username] = timestamp;
       }

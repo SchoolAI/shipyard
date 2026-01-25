@@ -13,12 +13,14 @@ export function VoiceInputButton({ onTranscript, className }: VoiceInputButtonPr
   const { state, transcript, partialTranscript, startRecording, stopRecording, isSupported } =
     speechResult;
 
-  // Track the last transcript length we've already sent to avoid duplicates
-  // The transcript is cumulative (e.g., "hello" then "hello world"), so we only
-  // want to send the NEW portion ("world") to avoid duplication in the text field
+  /*
+   * Track the last transcript length we've already sent to avoid duplicates
+   * The transcript is cumulative (e.g., "hello" then "hello world"), so we only
+   * want to send the NEW portion ("world") to avoid duplication in the text field
+   */
   const lastSentLengthRef = useRef(0);
 
-  // Reset tracking when recording starts fresh (transcript becomes empty)
+  /** Reset tracking when recording starts fresh (transcript becomes empty) */
   useEffect(() => {
     if (!transcript) {
       lastSentLengthRef.current = 0;
@@ -27,7 +29,7 @@ export function VoiceInputButton({ onTranscript, className }: VoiceInputButtonPr
 
   useEffect(() => {
     if (transcript && transcript.length > lastSentLengthRef.current) {
-      // Only send the NEW portion of the transcript
+      /** Only send the NEW portion of the transcript */
       const newText = transcript.slice(lastSentLengthRef.current).trim();
       if (newText) {
         onTranscript(newText);

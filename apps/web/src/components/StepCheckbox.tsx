@@ -28,7 +28,7 @@ export function StepCheckbox({ ydoc, stepId, label }: StepCheckboxProps) {
     const newValue = !checked;
     toggleStepCompletion(ydoc, stepId, actor);
 
-    // Log step completion event
+    /** Log step completion event */
     logPlanEvent(ydoc, 'step_completed', actor, {
       stepId,
       completed: newValue,

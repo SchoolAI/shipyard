@@ -99,10 +99,10 @@ export function PlanPeekModal({ plan, isOpen, onClose }: PlanPeekModalProps) {
     isLoading: true,
   });
 
-  // Load plan data when modal opens
+  /** Load plan data when modal opens */
   useEffect(() => {
     if (!isOpen) {
-      // Reset state when closed
+      /** Reset state when closed */
       setPeekData({ deliverables: [], linkedPRs: [], isLoading: true });
       return;
     }

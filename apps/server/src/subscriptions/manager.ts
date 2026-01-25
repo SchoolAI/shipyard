@@ -8,12 +8,12 @@ import { logger } from '../logger.js';
 import { startPeriodicCleanup as startSessionCleanup } from '../session-registry.js';
 import type { Change, ChangesResponse, Subscription, SubscriptionConfig } from './types.js';
 
-// --- State ---
+/** --- State --- */
 
 const subscriptions = new Map<string, Map<string, Subscription>>();
 const SUBSCRIPTION_TTL_MS = 5 * 60 * 1000;
 
-// --- Public API ---
+/** --- Public API --- */
 
 export function createSubscription(config: SubscriptionConfig): string {
   const id = nanoid();
@@ -120,10 +120,10 @@ export function getChanges(planId: string, subscriptionId: string): ChangesRespo
 }
 
 export function startCleanupInterval(): void {
-  // Start session registry cleanup (runs every 15 minutes)
+  /** Start session registry cleanup (runs every 15 minutes) */
   startSessionCleanup();
 
-  // Start subscription cleanup (runs every 60 seconds)
+  /** Start subscription cleanup (runs every 60 seconds) */
   setInterval(() => {
     const now = Date.now();
     let cleanedCount = 0;
@@ -154,7 +154,7 @@ export function getSubscriptionsForPlan(planId: string): Map<string, Subscriptio
   return subscriptions.get(planId);
 }
 
-// --- Private Helpers ---
+/** --- Private Helpers --- */
 
 function checkFlushConditions(sub: Subscription): void {
   const now = Date.now();

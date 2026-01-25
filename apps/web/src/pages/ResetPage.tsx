@@ -17,13 +17,15 @@ export function ResetPage() {
         setResult(resetResult);
         setState('complete');
 
-        // Wait a moment then redirect to clean URL
-        // Wait longer if there were IndexedDB errors so user can see them
+        /*
+         * Wait a moment then redirect to clean URL
+         * Wait longer if there were IndexedDB errors so user can see them
+         */
         const hasErrors = resetResult.indexedDB.errors.length > 0;
         const delay = hasErrors ? 8000 : 3000;
         setTimeout(() => {
           removeResetParam();
-          // Use base path for GitHub Pages subdirectory deployment
+          /** Use base path for GitHub Pages subdirectory deployment */
           const basePath = import.meta.env.BASE_URL || '/';
           window.location.href = basePath;
         }, delay);

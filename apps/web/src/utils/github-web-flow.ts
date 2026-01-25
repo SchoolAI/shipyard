@@ -67,7 +67,7 @@ export function startWebFlow(
     params.append('prompt', 'select_account');
   }
 
-  // Force consent screen when upgrading scopes (otherwise GitHub returns existing token)
+  /** Force consent screen when upgrading scopes (otherwise GitHub returns existing token) */
   if (forceConsent && scope) {
     params.append('prompt', 'consent');
   }
@@ -95,14 +95,14 @@ export async function handleCallback(
   });
 
   if (!response.ok) {
-    // Validate error response structure from external API
+    /** Validate error response structure from external API */
     const rawError: unknown = await response.json();
     const errorResult = OAuthErrorResponseSchema.safeParse(rawError);
     const error = errorResult.success ? errorResult.data : { error: 'Unknown error' };
     throw new Error(error.error_description || error.error || 'Token exchange failed');
   }
 
-  // Validate success response from external API
+  /** Validate success response from external API */
   const rawData: unknown = await response.json();
   const result = TokenExchangeResponseSchema.safeParse(rawData);
   if (!result.success) {
@@ -133,11 +133,11 @@ export async function getGitHubUser(token: string): Promise<GitHubUser> {
     if (response.status === 401) {
       throw new TokenValidationError('Token is invalid or has been revoked', true);
     }
-    // 403 (rate limit), 5xx (server errors) - token might still be valid
+    /** 403 (rate limit), 5xx (server errors) - token might still be valid */
     throw new TokenValidationError(`Failed to fetch user info: ${response.status}`, false);
   }
 
-  // Validate GitHub API response
+  /** Validate GitHub API response */
   const rawData: unknown = await response.json();
   const result = GitHubUserSchema.safeParse(rawData);
   if (!result.success) {
@@ -160,10 +160,10 @@ export async function validateToken(token: string): Promise<TokenValidationResul
       if (err.isInvalidToken) {
         return { status: 'invalid' };
       }
-      // Server error, rate limit, etc. - don't invalidate the token
+      /** Server error, rate limit, etc. - don't invalidate the token */
       return { status: 'error', message: err.message };
     }
-    // Network error (fetch failed) - don't invalidate the token
+    /** Network error (fetch failed) - don't invalidate the token */
     return {
       status: 'error',
       message: err instanceof Error ? err.message : 'Network error',

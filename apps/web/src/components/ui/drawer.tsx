@@ -27,7 +27,7 @@ export function Drawer({
 }: DrawerProps) {
   const isLeft = side === 'left';
 
-  // Animation classes for slide-in effect
+  /** Animation classes for slide-in effect */
   const enterAnimation = isLeft
     ? 'data-[entering]:animate-in data-[entering]:slide-in-from-left data-[entering]:duration-300 data-[entering]:ease-out'
     : 'data-[entering]:animate-in data-[entering]:slide-in-from-right data-[entering]:duration-300 data-[entering]:ease-out';
@@ -36,7 +36,7 @@ export function Drawer({
     ? 'data-[exiting]:animate-out data-[exiting]:slide-out-to-left data-[exiting]:duration-200 data-[exiting]:ease-in'
     : 'data-[exiting]:animate-out data-[exiting]:slide-out-to-right data-[exiting]:duration-200 data-[exiting]:ease-in';
 
-  // Position the drawer container on the correct side
+  /** Position the drawer container on the correct side */
   const positionClass = isLeft ? 'justify-start' : 'justify-end';
 
   return (

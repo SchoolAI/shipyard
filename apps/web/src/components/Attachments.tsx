@@ -115,7 +115,7 @@ function ArtifactTypeIcon({ type }: { type: Artifact['type'] }) {
         </svg>
       );
     default: {
-      // Exhaustive check - this should never happen
+      /** Exhaustive check - this should never happen */
       const _exhaustive: never = type;
       throw new Error(`Unknown artifact type: ${_exhaustive}`);
     }

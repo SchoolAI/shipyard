@@ -32,9 +32,11 @@ import {
   type SendOptions,
 } from '../utils/ConversationTransferManager';
 
-// =============================================================================
-// Types
-// =============================================================================
+/*
+ * =============================================================================
+ * Types
+ * =============================================================================
+ */
 
 /**
  * Progress callback for transfer operations.
@@ -140,9 +142,11 @@ interface UseConversationTransferResult {
   isP2PAvailable: boolean;
 }
 
-// =============================================================================
-// Helper Functions
-// =============================================================================
+/*
+ * =============================================================================
+ * Helper Functions
+ * =============================================================================
+ */
 
 /**
  * Extracts peer connections from a WebRTC provider.
@@ -153,12 +157,12 @@ function extractPeersFromProvider(provider: WebrtcProvider | null): Map<string, 
 
   if (!provider) return peers;
 
-  // Access internal room structure (undocumented API)
+  /** Access internal room structure (undocumented API) */
   const room = getWebrtcRoom<PeerConnection>(provider);
 
   if (!room || !room.webrtcConns) return peers;
 
-  // Extract peer connections
+  /** Extract peer connections */
   for (const [peerId, conn] of room.webrtcConns) {
     if (conn.peer) {
       peers.set(peerId, conn.peer);
@@ -168,9 +172,11 @@ function extractPeersFromProvider(provider: WebrtcProvider | null): Map<string, 
   return peers;
 }
 
-// =============================================================================
-// Hook Implementation
-// =============================================================================
+/*
+ * =============================================================================
+ * Hook Implementation
+ * =============================================================================
+ */
 
 /**
  * Hook for managing conversation export/import and P2P transfer.
@@ -189,11 +195,11 @@ export function useConversationTransfer(
   const [receivedConversations, setReceivedConversations] = useState<ReceivedConversation[]>([]);
   const [connectedPeerIds, setConnectedPeerIds] = useState<string[]>([]);
 
-  // Manager ref for P2P transfers
+  /** Manager ref for P2P transfers */
   const managerRef = useRef<ConversationTransferManager | null>(null);
-  // Track peers we've added to the manager
+  /** Track peers we've added to the manager */
   const trackedPeersRef = useRef<Map<string, PeerConnection>>(new Map());
-  // Track last peer count to detect changes
+  /** Track last peer count to detect changes */
   const lastPeerCountRef = useRef(0);
 
   /**
@@ -207,22 +213,22 @@ export function useConversationTransfer(
     };
   }, [ydoc]);
 
-  // Initialize and manage P2P transfer manager
+  /** Initialize and manage P2P transfer manager */
   useEffect(() => {
     if (!rtcProvider) {
       setConnectedPeerIds([]);
       return;
     }
 
-    // Extract peers from provider
+    /** Extract peers from provider */
     const peers = extractPeersFromProvider(rtcProvider);
     trackedPeersRef.current = peers;
 
-    // Create manager
+    /** Create manager */
     const manager = new ConversationTransferManager(peers);
     managerRef.current = manager;
 
-    // Set up receive callback
+    /** Set up receive callback */
     const cleanupReceive = manager.onReceiveConversation((messages, meta) => {
       const summary = summarizeA2AConversation(messages);
       setReceivedConversations((prev) => [
@@ -231,7 +237,7 @@ export function useConversationTransfer(
       ]);
     });
 
-    // Update connected peers list
+    /** Update connected peers list */
     const updatePeerList = (): void => {
       const currentPeers = extractPeersFromProvider(rtcProvider);
       const ids = Array.from(currentPeers.entries())
@@ -239,7 +245,7 @@ export function useConversationTransfer(
         .map(([id]) => id);
       setConnectedPeerIds(ids);
 
-      // Add new peers to manager
+      /** Add new peers to manager */
       for (const [peerId, peer] of currentPeers) {
         if (!trackedPeersRef.current.has(peerId)) {
           manager.addPeer(peerId, peer);
@@ -247,7 +253,7 @@ export function useConversationTransfer(
         }
       }
 
-      // Remove disconnected peers
+      /** Remove disconnected peers */
       for (const peerId of trackedPeersRef.current.keys()) {
         if (!currentPeers.has(peerId)) {
           manager.removePeer(peerId);
@@ -256,24 +262,26 @@ export function useConversationTransfer(
       }
     };
 
-    // Initial update
+    /** Initial update */
     updatePeerList();
 
-    // Listen for peer changes via the provider's 'peers' event
+    /** Listen for peer changes via the provider's 'peers' event */
     const handlePeersChange = (): void => {
       updatePeerList();
     };
 
     rtcProvider.on('peers', handlePeersChange);
 
-    // Also update on 'synced' event - connections may be established after sync
+    /** Also update on 'synced' event - connections may be established after sync */
     const handleSynced = (): void => {
       updatePeerList();
     };
     rtcProvider.on('synced', handleSynced);
 
-    // Poll for changes more frequently (500ms instead of 2s)
-    // This catches race conditions where awareness is ahead of actual connections
+    /*
+     * Poll for changes more frequently (500ms instead of 2s)
+     * This catches race conditions where awareness is ahead of actual connections
+     */
     const pollInterval = setInterval(() => {
       const currentPeers = extractPeersFromProvider(rtcProvider);
       if (currentPeers.size !== lastPeerCountRef.current) {
@@ -302,7 +310,7 @@ export function useConversationTransfer(
       setProgress({ current: 0, total: 3, stage: 'preparing' });
 
       try {
-        // 1. Parse transcript
+        /** 1. Parse transcript */
         const parseResult = parseClaudeCodeTranscriptString(transcript);
         if (parseResult.messages.length === 0) {
           return { success: false, error: 'No messages found in transcript' };
@@ -310,10 +318,10 @@ export function useConversationTransfer(
 
         setProgress({ current: 1, total: 3, stage: 'compressing' });
 
-        // 2. Convert to A2A format
+        /** 2. Convert to A2A format */
         const a2aMessages = claudeCodeToA2A(parseResult.messages, planId);
 
-        // 3. Build export package
+        /** 3. Build export package */
         const metadata = getPlanMetadataCallback();
         const sourcePlatform = metadata.origin?.platform ?? 'claude-code';
         const sourceSessionId =
@@ -341,7 +349,7 @@ export function useConversationTransfer(
 
         setProgress({ current: 2, total: 3, stage: 'compressing' });
 
-        // 4. Download as file
+        /** 4. Download as file */
         const blob = new Blob([jsonString], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const filename = `conversation-${planId.slice(0, 8)}-${Date.now()}.a2a.json`;
@@ -367,7 +375,7 @@ export function useConversationTransfer(
         return { success: false, error: errorMessage };
       } finally {
         setIsProcessing(false);
-        // Clear progress after a short delay
+        /** Clear progress after a short delay */
         setTimeout(() => setProgress(null), 1000);
       }
     },
@@ -382,11 +390,11 @@ export function useConversationTransfer(
     setProgress({ current: 0, total: 3, stage: 'preparing' });
 
     try {
-      // 1. Read file
+      /** 1. Read file */
       const content = await file.text();
       setProgress({ current: 1, total: 3, stage: 'compressing' });
 
-      // 2. Parse and validate
+      /** 2. Parse and validate */
       const parsed: unknown = JSON.parse(content);
       const validated = ImportedConversationSchema.safeParse(parsed);
 
@@ -399,7 +407,7 @@ export function useConversationTransfer(
 
       setProgress({ current: 2, total: 3, stage: 'compressing' });
 
-      // 3. Validate messages
+      /** 3. Validate messages */
       const { valid, errors } = validateA2AMessages(validated.data.messages);
 
       if (errors.length > 0 && valid.length === 0) {
@@ -409,7 +417,7 @@ export function useConversationTransfer(
         };
       }
 
-      // 4. Generate summary
+      /** 4. Generate summary */
       const summary = summarizeA2AConversation(valid);
 
       const exportId = validated.data.meta.exportId;
@@ -486,7 +494,7 @@ export function useConversationTransfer(
         return false;
       }
 
-      // Last-minute sync to catch race conditions where awareness is ahead of tracking
+      /** Last-minute sync to catch race conditions where awareness is ahead of tracking */
       syncPeersFromProvider();
 
       const metadata = getPlanMetadataCallback();

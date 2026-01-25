@@ -81,16 +81,16 @@ function determineGateDecision(params: {
     isRequestExpired,
   } = params;
 
-  // Snapshots are always viewable
+  /** Snapshots are always viewable */
   if (isSnapshot) return { type: 'allow' };
 
-  // Local viewing (connected to hub) bypasses auth
+  /** Local viewing (connected to hub) bypasses auth */
   if (isLocalViewing) return { type: 'allow' };
 
-  // No approval required
+  /** No approval required */
   if (!requiresApproval) return { type: 'allow' };
 
-  // Handle invite token states FIRST
+  /** Handle invite token states FIRST */
   if (hasInviteToken && redemptionState.status === 'redeeming') {
     return { type: 'redeeming' };
   }
@@ -103,15 +103,15 @@ function determineGateDecision(params: {
     return { type: 'auth_for_invite' };
   }
 
-  // Invite successfully redeemed - wait for CRDT sync
+  /** Invite successfully redeemed - wait for CRDT sync */
   if (redemptionState.status === 'success') {
     return isPending ? { type: 'redeeming' } : { type: 'allow' };
   }
 
-  // Standard auth check
+  /** Standard auth check */
   if (!githubIdentity) return { type: 'auth_required' };
 
-  // Check for expired request
+  /** Check for expired request */
   if (isRequestExpired) return { type: 'request_expired' };
 
   if (isPending) return { type: 'waiting_room' };
@@ -149,8 +149,10 @@ export function WaitingRoomGate({
   planId,
   isSnapshot,
 }: WaitingRoomGateProps) {
-  // Read approval status directly from Y.Doc CRDT
-  // IMPORTANT: All hooks must be called before any early returns
+  /*
+   * Read approval status directly from Y.Doc CRDT
+   * IMPORTANT: All hooks must be called before any early returns
+   */
   const {
     status: approvalStatus,
     isPending,
@@ -159,7 +161,7 @@ export function WaitingRoomGate({
     ownerId,
   } = useYDocApprovalStatus(ydoc, githubIdentity?.username ?? null);
 
-  // Broadcast approval status to WebRTC awareness so owners can see pending users
+  /** Broadcast approval status to WebRTC awareness so owners can see pending users */
   const isOwner = !!(githubIdentity && ownerId && githubIdentity.username === ownerId);
   useBroadcastApprovalStatus({
     rtcProvider,
@@ -344,7 +346,7 @@ function AuthRequired({ title, onStartAuth }: AuthRequiredProps) {
   );
 }
 
-// --- Invite Token UI Components ---
+/** --- Invite Token UI Components --- */
 
 interface RedeemingInviteProps {
   title: string;

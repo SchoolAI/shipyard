@@ -61,7 +61,7 @@ import {
   setSessionState,
 } from './session-registry.js';
 
-// --- Internal Helpers ---
+/** --- Internal Helpers --- */
 
 async function parseMarkdownToBlocks(markdown: string): Promise<Block[]> {
   const editor = ServerBlockNoteEditor.create();
@@ -88,20 +88,20 @@ function extractTitleFromBlocks(blocks: Block[]): string {
   if (typeof text !== 'string') {
     return UNTITLED;
   }
-  // For headings, use full text; for paragraphs, truncate
+  /** For headings, use full text; for paragraphs, truncate */
   if (firstBlock.type === 'heading') {
     return text;
   }
   return text.slice(0, 50);
 }
 
-// --- Handler Implementations ---
+/** --- Handler Implementations --- */
 
 export async function createSessionHandler(
   input: CreateHookSessionRequest,
   ctx: HookContext
 ): Promise<CreateHookSessionResponse> {
-  // Check if session already exists (idempotent - handles CLI process restarts)
+  /** Check if session already exists (idempotent - handles CLI process restarts) */
   const existingSession = getSessionState(input.sessionId);
   if (existingSession) {
     const url = createPlanWebUrl(webConfig.SHIPYARD_WEB_URL, existingSession.planId);
@@ -186,7 +186,7 @@ export async function createSessionHandler(
 
   ctx.logger.info({ url }, 'Plan URL generated');
 
-  // Register session in registry
+  /** Register session in registry */
   setSessionState(input.sessionId, {
     lifecycle: 'created',
     planId,
@@ -195,22 +195,26 @@ export async function createSessionHandler(
   });
   ctx.logger.info({ sessionId: input.sessionId, planId }, 'Session registered in registry');
 
-  // Open browser or navigate existing browser
-  // NOTE: TOCTOU race condition - browser could close between hasActiveConnections check
-  // and navigation.set(). This is acceptable because:
-  // 1. The window is very small (milliseconds)
-  // 2. If it happens, the browser simply won't navigate (user can do it manually)
-  // 3. Adding synchronization would add complexity without significant benefit
+  /*
+   * Open browser or navigate existing browser
+   * NOTE: TOCTOU race condition - browser could close between hasActiveConnections check
+   * and navigation.set(). This is acceptable because:
+   * 1. The window is very small (milliseconds)
+   * 2. If it happens, the browser simply won't navigate (user can do it manually)
+   * 3. Adding synchronization would add complexity without significant benefit
+   */
   if (await hasActiveConnections(PLAN_INDEX_DOC_NAME)) {
-    // Browser already connected - navigate it via CRDT
-    // NOTE: navigation.target is never cleared by the server (acceptable race condition).
-    // The browser clears it after reading. If multiple plans are created rapidly,
-    // the browser may miss some navigations, but this is acceptable since the user
-    // can always navigate manually via the plan list.
+    /*
+     * Browser already connected - navigate it via CRDT
+     * NOTE: navigation.target is never cleared by the server (acceptable race condition).
+     * The browser clears it after reading. If multiple plans are created rapidly,
+     * the browser may miss some navigations, but this is acceptable since the user
+     * can always navigate manually via the plan list.
+     */
     indexDoc.getMap<string>('navigation').set('target', planId);
     ctx.logger.info({ url, planId }, 'Browser already connected, navigating via CRDT');
   } else {
-    // No browser connected - open new one
+    /** No browser connected - open new one */
     await open(url);
     ctx.logger.info({ url }, 'Browser launched by server');
   }
@@ -283,7 +287,7 @@ export async function updateContentHandler(
     ctx.logger.warn({ planId }, 'Cannot update plan index: missing ownerId');
   }
 
-  // Update session registry with new content hash
+  /** Update session registry with new content hash */
   const sessionId = getSessionIdByPlanId(planId);
   if (sessionId) {
     const session = getSessionStateByPlanId(planId);
@@ -339,7 +343,7 @@ export async function getReviewStatusHandler(
     });
   }
 
-  // Return discriminated union based on status
+  /** Return discriminated union based on status */
   switch (metadata.status) {
     case 'draft':
       return { status: 'draft' };
@@ -351,7 +355,7 @@ export async function getReviewStatusHandler(
       };
 
     case 'changes_requested': {
-      // Extract feedback from threads
+      /** Extract feedback from threads */
       const threadsMap = ydoc.getMap(YDOC_KEYS.THREADS);
       const threadsData = threadsMap.toJSON();
       const threads = parseThreads(threadsData);
@@ -527,24 +531,26 @@ export async function waitForApprovalHandler(
 
   const metadata = ydoc.getMap<PlanMetadata>(YDOC_KEYS.METADATA);
 
-  // Get current plan metadata to check status
+  /** Get current plan metadata to check status */
   const planMetadata = getPlanMetadata(ydoc);
   const ownerId = planMetadata?.ownerId ?? 'unknown';
 
-  // Determine reviewRequestId: reuse existing if status is already pending_review,
-  // otherwise generate a new one. This fixes the race condition where a retry
-  // would create a new ID that doesn't match what's in Y.Doc.
+  /*
+   * Determine reviewRequestId: reuse existing if status is already pending_review,
+   * otherwise generate a new one. This fixes the race condition where a retry
+   * would create a new ID that doesn't match what's in Y.Doc.
+   */
   let reviewRequestId: string;
 
   if (planMetadata?.status === 'pending_review' && planMetadata.reviewRequestId) {
-    // Reuse the existing reviewRequestId from Y.Doc to match what's already there
+    /** Reuse the existing reviewRequestId from Y.Doc to match what's already there */
     reviewRequestId = planMetadata.reviewRequestId;
     ctx.logger.info(
       { planId, currentStatus: planMetadata.status, reviewRequestId },
       'Status already pending_review, reusing existing reviewRequestId for observer'
     );
   } else {
-    // Generate new reviewRequestId and transition to pending_review
+    /** Generate new reviewRequestId and transition to pending_review */
     reviewRequestId = nanoid();
 
     const result = transitionPlanStatus(
@@ -558,7 +564,7 @@ export async function waitForApprovalHandler(
 
     if (!result.success) {
       ctx.logger.error({ planId, error: result.error }, 'Failed to transition to pending_review');
-      // Continue anyway - observer setup is best-effort
+      /** Continue anyway - observer setup is best-effort */
     }
   }
 
@@ -567,7 +573,7 @@ export async function waitForApprovalHandler(
     '[SERVER OBSERVER] Set reviewRequestId and status, starting observation'
   );
 
-  // Extract common review data from Y.Doc metadata using type-safe helper
+  /** Extract common review data from Y.Doc metadata using type-safe helper */
   const getReviewData = () => {
     const meta = getPlanMetadata(ydoc);
     if (meta?.status === 'changes_requested' || meta?.status === 'in_progress') {
@@ -639,7 +645,7 @@ export async function waitForApprovalHandler(
     logRegistryUpdate(status, extraData);
   };
 
-  // Helper: Get session data or log warning if not found
+  /** Helper: Get session data or log warning if not found */
   const getSessionData = () => {
     const session = getSessionStateByPlanId(planId);
     const sessionId = getSessionIdByPlanId(planId);
@@ -655,22 +661,26 @@ export async function waitForApprovalHandler(
     return { session, sessionId };
   };
 
-  // Helper: Validate session can transition
-  // NOTE: We allow transitions from 'created' state because the approval can happen
-  // before setSessionToken() is called (which transitions to 'synced').
-  // The flow is: createSession → waitForApproval → (user clicks approve) → setSessionToken
-  // The approval observer fires when user clicks, which may be before setSessionToken.
+  /*
+   * Helper: Validate session can transition
+   * NOTE: We allow transitions from 'created' state because the approval can happen
+   * before setSessionToken() is called (which transitions to 'synced').
+   * The flow is: createSession → waitForApproval → (user clicks approve) → setSessionToken
+   * The approval observer fires when user clicks, which may be before setSessionToken.
+   */
   const validateSessionStateForTransition = (
     _session: ReturnType<typeof getSessionStateByPlanId>
   ) => {
-    // All states can transition to approved/reviewed:
-    // - 'created': Initial state, approval can come before token is set
-    // - 'synced': Token was set before approval (normal flow)
-    // - 'approved'/'reviewed': Re-approval after changes
-    // No validation needed - any state can transition
+    /*
+     * All states can transition to approved/reviewed:
+     * - 'created': Initial state, approval can come before token is set
+     * - 'synced': Token was set before approval (normal flow)
+     * - 'approved'/'reviewed': Re-approval after changes
+     * No validation needed - any state can transition
+     */
   };
 
-  // Helper: Build base state fields
+  /** Helper: Build base state fields */
   const buildBaseState = (session: NonNullable<ReturnType<typeof getSessionStateByPlanId>>) => ({
     planId: session.planId,
     planFilePath: session.planFilePath,
@@ -755,9 +765,11 @@ export async function waitForApprovalHandler(
         ? session.deliverables
         : []);
 
-    // If we don't have synced fields yet (first rejection before any approval),
-    // transition to 'reviewed' with placeholder fields. The agent is being blocked
-    // anyway, so they don't need a real sessionToken - they just need the feedback.
+    /*
+     * If we don't have synced fields yet (first rejection before any approval),
+     * transition to 'reviewed' with placeholder fields. The agent is being blocked
+     * anyway, so they don't need a real sessionToken - they just need the feedback.
+     */
     const webUrl = webConfig.SHIPYARD_WEB_URL;
 
     setSessionState(sessionId, {
@@ -773,7 +785,7 @@ export async function waitForApprovalHandler(
     });
   };
 
-  // Helper: Log registry update
+  /** Helper: Log registry update */
   const logRegistryUpdate = (
     status: string,
     extraData: { deliverables?: Array<{ id: string; text: string }> }
@@ -789,7 +801,7 @@ export async function waitForApprovalHandler(
     );
   };
 
-  // Handle approved status - plan is ready for implementation
+  /** Handle approved status - plan is ready for implementation */
   const handleApproved = (): ApprovalResult => {
     const deliverables = getDeliverables(ydoc);
     const deliverableInfos = deliverables.map((d) => ({ id: d.id, text: d.text }));
@@ -812,7 +824,7 @@ export async function waitForApprovalHandler(
     };
   };
 
-  // Handle changes_requested status - reviewer wants modifications
+  /** Handle changes_requested status - reviewer wants modifications */
   const handleChangesRequested = (): ApprovalResult => {
     updateSessionRegistry('changes_requested');
     const feedback = extractFeedbackFromYDoc(ydoc, ctx);
@@ -836,17 +848,17 @@ export async function waitForApprovalHandler(
     let timeout: NodeJS.Timeout | null = null;
     let checkStatus: (() => void) | null = null;
 
-    // Helper: Check if status change should be processed (matching review ID + terminal state)
+    /** Helper: Check if status change should be processed (matching review ID + terminal state) */
     const shouldProcessStatusChange = (): boolean => {
       const currentMeta = getPlanMetadata(ydoc);
       if (!currentMeta) return false;
 
-      // For pending_review, extract reviewRequestId
+      /** For pending_review, extract reviewRequestId */
       const currentReviewId =
         currentMeta.status === 'pending_review' ? currentMeta.reviewRequestId : undefined;
       const status = currentMeta.status;
 
-      // Ignore stale decisions from previous review requests
+      /** Ignore stale decisions from previous review requests */
       if (currentReviewId !== reviewRequestId && currentMeta.status === 'pending_review') {
         ctx.logger.warn(
           { planId, expected: reviewRequestId, actual: currentReviewId, status },
@@ -854,22 +866,24 @@ export async function waitForApprovalHandler(
         );
         return false;
       }
-      // Only handle terminal states (approved or changes requested)
+      /** Only handle terminal states (approved or changes requested) */
       const isTerminalState = status === 'in_progress' || status === 'changes_requested';
       return isTerminalState;
     };
 
-    // Helper: Clean up observer and timeout
+    /** Helper: Clean up observer and timeout */
     const cleanupObserver = () => {
       if (timeout) clearTimeout(timeout);
       if (checkStatus) metadata.unobserve(checkStatus);
     };
 
     try {
-      // NOTE: Timeout resolves (not rejects) with approved: false.
-      // This is intentional behavior - timeouts are treated as "no approval"
-      // rather than errors. The hook can handle this gracefully by blocking
-      // the agent with a timeout message instead of crashing.
+      /*
+       * NOTE: Timeout resolves (not rejects) with approved: false.
+       * This is intentional behavior - timeouts are treated as "no approval"
+       * rather than errors. The hook can handle this gracefully by blocking
+       * the agent with a timeout message instead of crashing.
+       */
       timeout = setTimeout(() => {
         if (checkStatus) {
           metadata.unobserve(checkStatus);
@@ -898,13 +912,13 @@ export async function waitForApprovalHandler(
         resolve(status === 'in_progress' ? handleApproved() : handleChangesRequested());
       };
 
-      // Observe changes to metadata
+      /** Observe changes to metadata */
       ctx.logger.info(
         { planId, reviewRequestId },
         '[SERVER OBSERVER] Registering metadata observer'
       );
 
-      // DEBUG: Add a test observer that logs ALL changes
+      /** DEBUG: Add a test observer that logs ALL changes */
       metadata.observe((event) => {
         ctx.logger.info(
           {
@@ -919,10 +933,10 @@ export async function waitForApprovalHandler(
 
       metadata.observe(checkStatus);
 
-      // Check status immediately in case it's already set (shouldn't happen since we just set it to pending_review)
+      /** Check status immediately in case it's already set (shouldn't happen since we just set it to pending_review) */
       checkStatus();
     } catch (err) {
-      // Cleanup observer and timeout if setup fails
+      /** Cleanup observer and timeout if setup fails */
       if (timeout) clearTimeout(timeout);
       if (checkStatus) {
         try {
@@ -944,7 +958,7 @@ export async function waitForApprovalHandler(
  */
 function extractFeedbackFromYDoc(ydoc: Y.Doc, ctx: HookContext): string | undefined {
   try {
-    // Use type-safe helper to get metadata
+    /** Use type-safe helper to get metadata */
     const planMeta = getPlanMetadata(ydoc);
     const reviewComment =
       planMeta?.status === 'changes_requested' || planMeta?.status === 'in_progress'
@@ -959,18 +973,20 @@ function extractFeedbackFromYDoc(ydoc: Y.Doc, ctx: HookContext): string | undefi
     const threadsData = threadsMap.toJSON();
     const threads = parseThreads(threadsData);
 
-    // If no reviewComment and no threads, return generic message
+    /** If no reviewComment and no threads, return generic message */
     if (!reviewComment && threads.length === 0) {
       return 'Changes requested. Check the plan for reviewer comments.';
     }
 
-    // Get plan content from Y.Doc for context
-    // NOTE: XmlFragment.toJSON() returns XML structure, not BlockNote blocks array.
-    // We need to safely handle this - if it's not an array, skip plan text extraction.
+    /*
+     * Get plan content from Y.Doc for context
+     * NOTE: XmlFragment.toJSON() returns XML structure, not BlockNote blocks array.
+     * We need to safely handle this - if it's not an array, skip plan text extraction.
+     */
     const contentFragment = ydoc.getXmlFragment(YDOC_KEYS.DOCUMENT_FRAGMENT);
     const fragmentJson = contentFragment.toJSON();
 
-    // Simple text extraction from BlockNote blocks (if available)
+    /** Simple text extraction from BlockNote blocks (if available) */
     let planText = '';
     if (Array.isArray(fragmentJson)) {
       planText = fragmentJson
@@ -992,7 +1008,7 @@ function extractFeedbackFromYDoc(ydoc: Y.Doc, ctx: HookContext): string | undefi
         .join('\n');
     }
 
-    // Format threads using shared formatter with user name resolution
+    /** Format threads using shared formatter with user name resolution */
     const resolveUser = createUserResolver(ydoc);
     const feedbackText = formatThreadsForLLM(threads, {
       includeResolved: false,
@@ -1000,7 +1016,7 @@ function extractFeedbackFromYDoc(ydoc: Y.Doc, ctx: HookContext): string | undefi
       resolveUser,
     });
 
-    // Combine: plan content + reviewer comment + thread feedback
+    /** Combine: plan content + reviewer comment + thread feedback */
     let output = 'Changes requested:\n\n';
 
     if (planText) {
@@ -1009,20 +1025,20 @@ function extractFeedbackFromYDoc(ydoc: Y.Doc, ctx: HookContext): string | undefi
       output += '\n\n---\n\n';
     }
 
-    // Add reviewer comment if present
+    /** Add reviewer comment if present */
     if (reviewComment) {
       output += '## Reviewer Comment\n\n';
       output += `> **${reviewedBy ?? 'Reviewer'}:** ${reviewComment}\n`;
       output += '\n---\n\n';
     }
 
-    // Add inline thread feedback if any
+    /** Add inline thread feedback if any */
     if (feedbackText) {
       output += '## Inline Feedback\n\n';
       output += feedbackText;
     }
 
-    // Add deliverables section if any exist
+    /** Add deliverables section if any exist */
     const deliverables = getDeliverables(ydoc);
     const deliverablesText = formatDeliverablesForLLM(deliverables);
     if (deliverablesText) {
@@ -1062,7 +1078,7 @@ export async function getDeliverableContextHandler(
   const deliverables = getDeliverables(ydoc);
   const url = createPlanWebUrl(webConfig.SHIPYARD_WEB_URL, planId);
 
-  // Format deliverables section
+  /** Format deliverables section */
   let deliverablesSection = '';
   if (deliverables.length > 0) {
     deliverablesSection = `\n## Deliverables\n\nAttach proof to each deliverable using add_artifact:\n\n`;
@@ -1073,13 +1089,13 @@ export async function getDeliverableContextHandler(
     deliverablesSection = `\n## Deliverables\n\nNo deliverables marked in this plan. You can still upload artifacts without linking them.`;
   }
 
-  // Build feedback section if reviewer provided a comment
+  /** Build feedback section if reviewer provided a comment */
   let feedbackSection = '';
   if (metadata.status === 'changes_requested' && metadata.reviewComment?.trim()) {
     feedbackSection = `\n## Reviewer Feedback\n\n${metadata.reviewedBy ? `**From:** ${metadata.reviewedBy}\n\n` : ''}${metadata.reviewComment}\n\n`;
   }
 
-  // Build approval message based on status
+  /** Build approval message based on status */
   const approvalMessage =
     metadata.status === 'changes_requested'
       ? '[SHIPYARD] Changes requested on your plan ⚠️'
@@ -1123,7 +1139,7 @@ export async function getSessionContextHandler(
 ): Promise<SessionContextResult> {
   ctx.logger.info({ sessionId }, 'Getting session context for post-exit injection');
 
-  // Get session from registry (idempotent read)
+  /** Get session from registry (idempotent read) */
   const sessionState = getSessionState(sessionId);
 
   if (!sessionState) {
@@ -1131,7 +1147,7 @@ export async function getSessionContextHandler(
     return { found: false };
   }
 
-  // Only approved or reviewed sessions have the required fields for post-exit injection
+  /** Only approved or reviewed sessions have the required fields for post-exit injection */
   if (isSessionStateApproved(sessionState)) {
     ctx.logger.info(
       { sessionId, planId: sessionState.planId },
@@ -1167,7 +1183,7 @@ export async function getSessionContextHandler(
     };
   }
 
-  // Session exists but not in a terminal state yet
+  /** Session exists but not in a terminal state yet */
   ctx.logger.warn(
     { sessionId, lifecycle: sessionState.lifecycle },
     'Session not ready for post-exit injection'

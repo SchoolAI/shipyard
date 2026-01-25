@@ -198,10 +198,10 @@ export function decodePlan(encoded: string): UrlEncodedPlan | null {
 
     const parsed: unknown = JSON.parse(json);
 
-    // Validate untrusted URL data with Zod schema
+    /** Validate untrusted URL data with Zod schema */
     const result = UrlEncodedPlanSchema.safeParse(parsed);
     if (!result.success) {
-      // Invalid URL data - could be corrupted or malicious
+      /** Invalid URL data - could be corrupted or malicious */
       return null;
     }
 

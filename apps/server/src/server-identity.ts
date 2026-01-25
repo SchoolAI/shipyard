@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { githubConfig } from './config/env/github.js';
 import { logger } from './logger.js';
 
-// Schema for GitHub API /user response (minimal fields we use)
+/** Schema for GitHub API /user response (minimal fields we use) */
 const GitHubUserResponseSchema = z.object({
   login: z.string().optional(),
 });
@@ -40,22 +40,24 @@ export function getRepositoryFullName(): string | null {
     cachedRepoName = repoName;
     return cachedRepoName;
   } catch {
-    // Not in a git repo, or gh CLI not available - that's okay, repo is optional
+    /** Not in a git repo, or gh CLI not available - that's okay, repo is optional */
     cachedRepoName = '';
     return null;
   }
 }
 
 export async function getGitHubUsername(): Promise<string> {
-  // No cache expiration needed: The MCP server runs as an ephemeral child process of
-  // Claude Code. Each Claude session spawns a fresh server process with empty cache.
-  // The username is fetched once per session and cached for the process lifetime,
-  // which is inherently bounded by the session duration.
+  /*
+   * No cache expiration needed: The MCP server runs as an ephemeral child process of
+   * Claude Code. Each Claude session spawns a fresh server process with empty cache.
+   * The username is fetched once per session and cached for the process lifetime,
+   * which is inherently bounded by the session duration.
+   */
   if (usernameResolved && cachedUsername) {
     return cachedUsername;
   }
 
-  // 1. Try GITHUB_USERNAME env var (explicit)
+  /** 1. Try GITHUB_USERNAME env var (explicit) */
   if (githubConfig.GITHUB_USERNAME) {
     cachedUsername = githubConfig.GITHUB_USERNAME;
     usernameResolved = true;
@@ -63,7 +65,7 @@ export async function getGitHubUsername(): Promise<string> {
     return cachedUsername;
   }
 
-  // 2. Try GITHUB_TOKEN + API
+  /** 2. Try GITHUB_TOKEN + API */
   if (githubConfig.GITHUB_TOKEN) {
     const username = await getUsernameFromToken(githubConfig.GITHUB_TOKEN);
     if (username) {
@@ -74,7 +76,7 @@ export async function getGitHubUsername(): Promise<string> {
     }
   }
 
-  // 3. Try gh CLI
+  /** 3. Try gh CLI */
   const cliUsername = getUsernameFromCLI();
   if (cliUsername) {
     cachedUsername = cliUsername;
@@ -83,7 +85,7 @@ export async function getGitHubUsername(): Promise<string> {
     return cachedUsername;
   }
 
-  // 4. Try git config (unverified)
+  /** 4. Try git config (unverified) */
   const gitUsername = getUsernameFromGitConfig();
   if (gitUsername) {
     cachedUsername = gitUsername;
@@ -92,11 +94,13 @@ export async function getGitHubUsername(): Promise<string> {
     return cachedUsername;
   }
 
-  // 5. Try OS username (unverified)
+  /** 5. Try OS username (unverified) */
   const osUsername = process.env.USER || process.env.USERNAME;
   if (osUsername) {
-    // Issue 3: Sanitize OS username - Windows usernames can contain spaces/special characters
-    // Replace invalid characters with underscores to match GitHub username format
+    /*
+     * Issue 3: Sanitize OS username - Windows usernames can contain spaces/special characters
+     * Replace invalid characters with underscores to match GitHub username format
+     */
     cachedUsername = osUsername.replace(/[^a-zA-Z0-9_-]/g, '_');
     usernameResolved = true;
     logger.warn(
@@ -106,7 +110,7 @@ export async function getGitHubUsername(): Promise<string> {
     return cachedUsername;
   }
 
-  // 6. All failed
+  /** 6. All failed */
   usernameResolved = true;
   throw new Error(
     'GitHub username required but could not be determined.\n\n' +
@@ -174,13 +178,13 @@ function getUsernameFromGitConfig(): string | null {
  * Returns null if no verified auth is available.
  */
 export async function getVerifiedGitHubUsername(): Promise<string | null> {
-  // Try GITHUB_USERNAME env var (if set, assumed verified)
+  /** Try GITHUB_USERNAME env var (if set, assumed verified) */
   if (githubConfig.GITHUB_USERNAME) {
     logger.info({ username: githubConfig.GITHUB_USERNAME }, 'Using GITHUB_USERNAME from env');
     return githubConfig.GITHUB_USERNAME;
   }
 
-  // Try GITHUB_TOKEN + API call (verified)
+  /** Try GITHUB_TOKEN + API call (verified) */
   if (githubConfig.GITHUB_TOKEN) {
     try {
       const username = await getUsernameFromToken(githubConfig.GITHUB_TOKEN);
@@ -193,7 +197,7 @@ export async function getVerifiedGitHubUsername(): Promise<string | null> {
     }
   }
 
-  // Try gh CLI (verified)
+  /** Try gh CLI (verified) */
   try {
     const username = getUsernameFromCLI();
     if (username) {
@@ -204,7 +208,7 @@ export async function getVerifiedGitHubUsername(): Promise<string | null> {
     logger.debug({ error }, 'Failed to get username from gh CLI');
   }
 
-  // Do NOT fall back to git config or USER env var
+  /** Do NOT fall back to git config or USER env var */
   logger.warn('No verified GitHub authentication available');
   return null;
 }

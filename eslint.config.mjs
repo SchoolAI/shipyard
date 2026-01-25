@@ -46,6 +46,7 @@ const localRules = {
                 /^HACK/,
                 /^XXX/,
                 /^biome-ignore/,
+                /^\//, // Triple-slash directives (/// <reference ...)
               ];
 
               const isDirective = allowedPatterns.some((pattern) => pattern.test(text));

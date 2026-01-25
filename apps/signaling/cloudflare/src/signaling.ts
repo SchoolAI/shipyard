@@ -45,10 +45,12 @@ export class SignalingRoom extends DurableObject<Env> {
     super(ctx, env);
     this.adapter = new CloudflarePlatformAdapter(ctx);
 
-    // Initialize adapter with blockConcurrencyWhile to ensure
-    // all state is restored before handling any messages.
-    // This prevents race conditions where a message arrives
-    // before initialization completes.
+    /*
+     * Initialize adapter with blockConcurrencyWhile to ensure
+     * all state is restored before handling any messages.
+     * This prevents race conditions where a message arrives
+     * before initialization completes.
+     */
     ctx.blockConcurrencyWhile(async () => {
       await this.adapter.initialize();
     });
@@ -57,18 +59,20 @@ export class SignalingRoom extends DurableObject<Env> {
   /**
    * Handle incoming HTTP requests (WebSocket upgrades)
    */
-  async fetch(request: Request): Promise<Response> {
-    // Adapter is already initialized via blockConcurrencyWhile in constructor
+  async fetch(_request: Request): Promise<Response> {
+    /** Adapter is already initialized via blockConcurrencyWhile in constructor */
 
-    // Create the WebSocket pair
+    /** Create the WebSocket pair */
     const pair = new WebSocketPair();
     const [client, server] = Object.values(pair);
 
-    // Accept the WebSocket with hibernation support
-    // This tells the runtime this connection can hibernate
+    /*
+     * Accept the WebSocket with hibernation support
+     * This tells the runtime this connection can hibernate
+     */
     this.ctx.acceptWebSocket(server);
 
-    // Return the client side of the WebSocket
+    /** Return the client side of the WebSocket */
     return new Response(null, {
       status: 101,
       webSocket: client,
@@ -80,16 +84,20 @@ export class SignalingRoom extends DurableObject<Env> {
    * Called when a message arrives (may wake DO from hibernation)
    */
   async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
-    // Adapter is initialized via blockConcurrencyWhile in constructor
-    // which also runs on hibernation wake
+    /*
+     * Adapter is initialized via blockConcurrencyWhile in constructor
+     * which also runs on hibernation wake
+     */
 
     try {
       const data: SignalingMessage = JSON.parse(
         typeof message === 'string' ? message : new TextDecoder().decode(message)
       );
 
-      // Handle each message type with exhaustive switch
-      // All handlers use the platform adapter for storage/messaging
+      /*
+       * Handle each message type with exhaustive switch
+       * All handlers use the platform adapter for storage/messaging
+       */
       switch (data.type) {
         case 'subscribe':
           handleSubscribe(this.adapter, ws, data);
@@ -104,7 +112,7 @@ export class SignalingRoom extends DurableObject<Env> {
           break;
 
         case 'ping':
-          // Handled by setWebSocketAutoResponse, but just in case
+          /** Handled by setWebSocketAutoResponse, but just in case */
           ws.send(JSON.stringify({ type: 'pong' }));
           break;
 
@@ -125,7 +133,7 @@ export class SignalingRoom extends DurableObject<Env> {
           break;
 
         default: {
-          // Exhaustive check - TypeScript will error if we miss a case
+          /** Exhaustive check - TypeScript will error if we miss a case */
           const _exhaustive: never = data;
           logger.error({ message: _exhaustive }, 'Unhandled message type');
         }
@@ -144,7 +152,7 @@ export class SignalingRoom extends DurableObject<Env> {
     _reason: string,
     _wasClean: boolean
   ): Promise<void> {
-    // Adapter is initialized via blockConcurrencyWhile in constructor
+    /** Adapter is initialized via blockConcurrencyWhile in constructor */
     this.adapter.unsubscribeFromAllTopics(ws);
   }
 
@@ -153,7 +161,7 @@ export class SignalingRoom extends DurableObject<Env> {
    */
   async webSocketError(ws: WebSocket, error: unknown): Promise<void> {
     logger.error({ error }, 'WebSocket error');
-    // Adapter is initialized via blockConcurrencyWhile in constructor
+    /** Adapter is initialized via blockConcurrencyWhile in constructor */
     this.adapter.unsubscribeFromAllTopics(ws);
   }
 }

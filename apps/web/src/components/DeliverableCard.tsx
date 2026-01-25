@@ -79,7 +79,7 @@ function ArtifactTypeIcon({ type }: { type: Artifact['type'] }) {
  * Uses HeroUI v3 compound components.
  */
 export function DeliverableCard({ artifact, registryPort }: DeliverableCardProps) {
-  // Check if artifact is attached based on storage type
+  /** Check if artifact is attached based on storage type */
   const isAttached = artifact.storage === 'github' ? !!artifact.url : !!artifact.localArtifactId;
   const displayName = artifact.description || artifact.filename;
   const [isExpanded, setIsExpanded] = useState(false);

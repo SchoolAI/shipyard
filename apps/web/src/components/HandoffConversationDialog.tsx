@@ -178,7 +178,7 @@ export function HandoffConversationDialog({
 
   useEffect(() => {
     if (!isOpen) {
-      // Reset state when dialog closes
+      /** Reset state when dialog closes */
       setTranscriptContent(null);
       setTranscriptError(null);
       return;
@@ -252,7 +252,7 @@ export function HandoffConversationDialog({
     const result = await exportToFile(transcriptContent);
 
     if (result.success) {
-      // Log conversation export event
+      /** Log conversation export event */
       logPlanEvent(ydoc, 'conversation_exported', actor, {
         messageCount: result.messageCount,
       });

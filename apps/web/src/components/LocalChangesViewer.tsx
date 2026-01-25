@@ -21,11 +21,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { type NodeApi, type NodeRendererProps, Tree, type TreeApi } from 'react-arborist';
 import { trpc } from '@/utils/trpc';
 
-// --- Types ---
+/** --- Types --- */
 
 type DiffViewMode = 'unified' | 'split';
 
-// --- LocalStorage Helpers ---
+/** --- LocalStorage Helpers --- */
 
 const DIFF_VIEW_MODE_KEY = 'shipyard:diff-view-mode';
 
@@ -42,11 +42,11 @@ function setDiffViewModePreference(mode: DiffViewMode): void {
   try {
     localStorage.setItem(DIFF_VIEW_MODE_KEY, mode);
   } catch {
-    // Ignore localStorage errors
+    /** Ignore localStorage errors */
   }
 }
 
-// --- Component Props ---
+/** --- Component Props --- */
 
 interface LocalChangesViewerProps {
   data: LocalChangesResult | undefined;
@@ -59,13 +59,13 @@ export function LocalChangesViewer({ data, isLoading, planId }: LocalChangesView
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<DiffViewMode>(getDiffViewModePreference);
 
-  // Handle view mode change with localStorage persistence
+  /** Handle view mode change with localStorage persistence */
   const handleViewModeChange = useCallback((mode: DiffViewMode) => {
     setViewMode(mode);
     setDiffViewModePreference(mode);
   }, []);
 
-  // Loading state
+  /** Loading state */
   if (isLoading) {
     return (
       <Card>
@@ -77,7 +77,7 @@ export function LocalChangesViewer({ data, isLoading, planId }: LocalChangesView
     );
   }
 
-  // Unavailable state
+  /** Unavailable state */
   if (!data || !data.available) {
     const reason = data && !data.available ? data.reason : 'unknown';
     const message = data && !data.available ? data.message : 'Local changes unavailable';
@@ -100,7 +100,7 @@ export function LocalChangesViewer({ data, isLoading, planId }: LocalChangesView
     );
   }
 
-  // Available state - show files and diff
+  /** Available state - show files and diff */
   return (
     <LocalChangesContent
       data={data}
@@ -113,7 +113,7 @@ export function LocalChangesViewer({ data, isLoading, planId }: LocalChangesView
   );
 }
 
-// --- Content Component (when data is available) ---
+/** --- Content Component (when data is available) --- */
 
 interface LocalChangesContentProps {
   data: LocalChangesResponse;
@@ -136,16 +136,16 @@ function LocalChangesContent({
   const treeRef = useRef<TreeApi<FileTreeData>>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
-  // Build grouped file tree with sections for staged/unstaged/untracked
+  /** Build grouped file tree with sections for staged/unstaged/untracked */
   const fileTree = useMemo(() => buildGroupedFileTree(data), [data]);
 
-  // Helper to check if file is untracked
+  /** Helper to check if file is untracked */
   const isUntrackedFile = useCallback(
     (path: string) => data.untracked.includes(path),
     [data.untracked]
   );
 
-  // Auto-select first file when data loads
+  /** Auto-select first file when data loads */
   useEffect(() => {
     if (data.files.length > 0 && selectedFile === null) {
       const firstFile = data.files[0];
@@ -155,7 +155,7 @@ function LocalChangesContent({
     }
   }, [data.files, selectedFile, setSelectedFile]);
 
-  // Handle file selection from tree
+  /** Handle file selection from tree */
   const handleFileSelect = useCallback(
     (nodes: NodeApi<FileTreeData>[]) => {
       const node = nodes[0];
@@ -168,13 +168,13 @@ function LocalChangesContent({
     [setSelectedFile]
   );
 
-  // Create node renderer
+  /** Create node renderer */
   const NodeRenderer = useMemo(() => createFileTreeNode(setSelectedFile), [setSelectedFile]);
 
-  // Find selected file data
+  /** Find selected file data */
   const selectedFileData = data.files.find((f) => f.path === selectedFile);
 
-  // No changes state
+  /** No changes state */
   if (data.files.length === 0 && data.untracked.length === 0) {
     return (
       <Card>
@@ -305,7 +305,7 @@ function LocalChangesContent({
   );
 }
 
-// --- File Tree Types and Helpers ---
+/** --- File Tree Types and Helpers --- */
 
 type StagingStatus = 'staged' | 'unstaged' | 'untracked';
 
@@ -315,7 +315,7 @@ interface FileTreeData {
   children?: FileTreeData[];
   file?: LocalFileChange;
   stagingStatus?: StagingStatus;
-  // For section headers
+  /** For section headers */
   isSection?: boolean;
   category?: StagingStatus;
 }
@@ -326,7 +326,7 @@ interface FileTreeData {
 function buildGroupedFileTree(data: LocalChangesResponse): FileTreeData[] {
   const sections: FileTreeData[] = [];
 
-  // Staged section
+  /** Staged section */
   if (data.staged.length > 0) {
     sections.push({
       id: '__staged__',
@@ -337,7 +337,7 @@ function buildGroupedFileTree(data: LocalChangesResponse): FileTreeData[] {
     });
   }
 
-  // Unstaged section
+  /** Unstaged section */
   if (data.unstaged.length > 0) {
     sections.push({
       id: '__unstaged__',
@@ -348,7 +348,7 @@ function buildGroupedFileTree(data: LocalChangesResponse): FileTreeData[] {
     });
   }
 
-  // Untracked section
+  /** Untracked section */
   if (data.untracked.length > 0) {
     const untrackedFiles: LocalFileChange[] = data.untracked.map((path) => ({
       path,
@@ -400,7 +400,7 @@ function buildFileTreeData(
       const isFile = i === parts.length - 1;
       const path = parts.slice(0, i + 1).join('/');
 
-      // Find existing child or create new one
+      /** Find existing child or create new one */
       let childNode = currentNode.children?.find((c) => c.name === part);
 
       if (!childNode) {
@@ -414,24 +414,24 @@ function buildFileTreeData(
         currentNode.children?.push(childNode);
       }
 
-      // Move to next level if folder
+      /** Move to next level if folder */
       if (!isFile) {
         currentNode = childNode;
       }
     }
   }
 
-  // Sort recursively
+  /** Sort recursively */
   const sortNodes = (nodes: FileTreeData[]): FileTreeData[] => {
     return nodes
       .sort((a, b) => {
-        // Folders before files
+        /** Folders before files */
         const aIsFolder = a.children !== undefined;
         const bIsFolder = b.children !== undefined;
         if (aIsFolder !== bIsFolder) {
           return aIsFolder ? -1 : 1;
         }
-        // Alphabetical
+        /** Alphabetical */
         return a.name.localeCompare(b.name);
       })
       .map((node) => ({
@@ -449,7 +449,7 @@ function buildFileTreeData(
 function createFileTreeNode(onFileClick: (path: string) => void) {
   // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Renders 3 node types (sections, folders, files) with different styling and behaviors - inherent to tree UI
   return function FileTreeNode({ node, style }: NodeRendererProps<FileTreeData>) {
-    // Section header (Staged/Unstaged/Untracked)
+    /** Section header (Staged/Unstaged/Untracked) */
     if (node.data.isSection) {
       const category = node.data.category;
       const sectionIcons = {
@@ -481,7 +481,7 @@ function createFileTreeNode(onFileClick: (path: string) => void) {
       );
     }
 
-    // Folder node
+    /** Folder node */
     const isFolder = node.data.children !== undefined && !node.data.isSection;
     if (isFolder) {
       return (
@@ -502,7 +502,7 @@ function createFileTreeNode(onFileClick: (path: string) => void) {
       );
     }
 
-    // File node with staging status indicator
+    /** File node with staging status indicator */
     const file = node.data.file;
     const stagingStatus = node.data.stagingStatus;
 
@@ -565,7 +565,7 @@ function createFileTreeNode(onFileClick: (path: string) => void) {
   };
 }
 
-// --- Diff View Components ---
+/** --- Diff View Components --- */
 
 /**
  * View for untracked files - fetches and displays full file content
@@ -581,13 +581,13 @@ function UntrackedFileView({
 }) {
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
 
-  // Fetch file content via tRPC
+  /** Fetch file content via tRPC */
   const { data, isLoading, error } = trpc.plan.getFileContent.useQuery(
     { planId, filePath: filename },
     { retry: false, staleTime: 30000 }
   );
 
-  // Detect theme from document
+  /** Detect theme from document */
   useEffect(() => {
     const checkTheme = () => {
       const isDark = document.documentElement.classList.contains('dark');
@@ -599,7 +599,7 @@ function UntrackedFileView({
     return () => observer.disconnect();
   }, []);
 
-  // Loading state
+  /** Loading state */
   if (isLoading) {
     return (
       <Card>
@@ -620,7 +620,7 @@ function UntrackedFileView({
     );
   }
 
-  // Error or no content
+  /** Error or no content */
   if (error || !data?.content) {
     return (
       <Card>
@@ -648,12 +648,12 @@ function UntrackedFileView({
     );
   }
 
-  // Generate fake diff - all lines as additions
+  /** Generate fake diff - all lines as additions */
   const lines = data.content.split('\n');
   const patch = lines.map((line) => `+${line}`).join('\n');
   const fileLang = filename.split('.').pop() || 'text';
 
-  // Construct unified diff format for new file
+  /** Construct unified diff format for new file */
   const fullDiff = `diff --git a/${filename} b/${filename}
 new file mode 100644
 --- /dev/null
@@ -699,7 +699,7 @@ interface FileDiffViewProps {
 function FileDiffView({ filename, patch, viewMode }: FileDiffViewProps) {
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
 
-  // Detect theme from document
+  /** Detect theme from document */
   useEffect(() => {
     const checkTheme = () => {
       const isDark = document.documentElement.classList.contains('dark');
@@ -725,11 +725,13 @@ function FileDiffView({ filename, patch, viewMode }: FileDiffViewProps) {
     );
   }
 
-  // Detect file language from extension for syntax highlighting
+  /** Detect file language from extension for syntax highlighting */
   const fileLang = filename.split('.').pop() || 'text';
 
-  // Construct a proper unified diff string
-  // The patch from git-local-changes already includes the @@ hunks
+  /*
+   * Construct a proper unified diff string
+   * The patch from git-local-changes already includes the @@ hunks
+   */
   const fullDiff = `diff --git a/${filename} b/${filename}
 --- a/${filename}
 +++ b/${filename}

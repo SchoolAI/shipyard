@@ -6,17 +6,17 @@
  * that occur when Tailwind v4's vite plugin processes CSS files.
  */
 
-// 1. BlockNote fonts
+/** 1. BlockNote fonts */
 import '@blocknote/core/fonts/inter.css';
-// 2. BlockNote core styles (includes thread mark highlighting for comments)
+/** 2. BlockNote core styles (includes thread mark highlighting for comments) */
 import '@blocknote/core/style.css';
-// 3. Mantine core styles (layer version for proper cascade)
+/** 3. Mantine core styles (layer version for proper cascade) */
 import '@mantine/core/styles.layer.css';
-// 4. BlockNote Mantine theme styles
+/** 4. BlockNote Mantine theme styles */
 import '@blocknote/mantine/style.css';
-// 5. HeroUI styles
+/** 5. HeroUI styles */
 import '@heroui/styles';
-// 6. Tailwind + app styles (must be last for proper cascade)
+/** 6. Tailwind + app styles (must be last for proper cascade) */
 import './index.css';
 
 import { MantineProvider } from '@mantine/core';
@@ -30,8 +30,10 @@ import { App } from './App';
 import { resetAllBrowserStorage } from './utils/resetStorage';
 import { trpc } from './utils/trpc';
 
-// Expose reset function in development for console access
-// Usage: window.__resetShipyard() or just __resetShipyard()
+/*
+ * Expose reset function in development for console access
+ * Usage: window.__resetShipyard() or just __resetShipyard()
+ */
 if (import.meta.env.DEV) {
   window.__resetShipyard = resetAllBrowserStorage;
   // biome-ignore lint/suspicious/noConsole: Dev-only helpful message
@@ -42,7 +44,7 @@ if (import.meta.env.DEV) {
   );
 }
 
-// React Query client with sensible defaults
+/** React Query client with sensible defaults */
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -52,16 +54,18 @@ const queryClient = new QueryClient({
   },
 });
 
-// Dynamically determine the registry URL
+/** Dynamically determine the registry URL */
 function getRegistryUrl() {
-  // Use env var if provided, otherwise use first default port
-  // The actual connection will handle discovery/fallback as needed
+  /*
+   * Use env var if provided, otherwise use first default port
+   * The actual connection will handle discovery/fallback as needed
+   */
   const envPort = import.meta.env.VITE_REGISTRY_PORT;
   const port = envPort ? Number.parseInt(envPort, 10) : DEFAULT_REGISTRY_PORTS[0];
   return `http://localhost:${port}`;
 }
 
-// tRPC client with HTTP batch link
+/** tRPC client with HTTP batch link */
 const trpcClient = trpc.createClient({
   links: [
     httpBatchLink({
@@ -91,4 +95,4 @@ ReactDOM.createRoot(root).render(
     </trpc.Provider>
   </React.StrictMode>
 );
-// Cache bust 1768971752
+/** Cache bust 1768971752 */

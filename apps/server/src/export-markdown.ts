@@ -9,7 +9,7 @@ import {
 } from '@shipyard/schema';
 import * as Y from 'yjs';
 
-// --- Constants ---
+/** --- Constants --- */
 
 /**
  * BlockNote's thread mark attribute names. Multiple formats checked
@@ -21,7 +21,7 @@ const THREAD_MARK_ATTRS = {
   COMMENT_THREAD: 'commentThread',
 } as const;
 
-// --- Public API ---
+/** --- Public API --- */
 
 export interface ExportOptions {
   /** Include resolved threads (default: false) */
@@ -52,45 +52,45 @@ export async function exportPlanToMarkdown(
 ): Promise<string> {
   const { includeResolved = false, selectedTextMaxLength = 100 } = options;
 
-  // Convert document content to markdown with block IDs
+  /** Convert document content to markdown with block IDs */
   const editor = ServerBlockNoteEditor.create();
   const fragment = ydoc.getXmlFragment('document');
   const blocks = editor.yXmlFragmentToBlocks(fragment);
 
-  // Build markdown with block ID comments for AI targeting
+  /** Build markdown with block ID comments for AI targeting */
   const markdownParts: string[] = [];
   for (const block of blocks) {
-    // Add block ID as HTML comment (invisible to humans, parseable by AI)
+    /** Add block ID as HTML comment (invisible to humans, parseable by AI) */
     markdownParts.push(`<!-- block:${block.id} -->`);
-    // Convert single block to markdown
+    /** Convert single block to markdown */
     const blockMarkdown = await editor.blocksToMarkdownLossy([block]);
     markdownParts.push(blockMarkdown);
   }
   const contentMarkdown = markdownParts.join('\n');
 
-  // Get threads and extract selected text from document marks
+  /** Get threads and extract selected text from document marks */
   const threadsMap = ydoc.getMap(YDOC_KEYS.THREADS);
   const threadsData = threadsMap.toJSON();
   const allThreads = parseThreads(threadsData);
 
-  // Extract selected text for each thread from document marks
+  /** Extract selected text for each thread from document marks */
   const threadTextMap = extractThreadTextFromFragment(fragment);
   const threadsWithText: ThreadWithText[] = allThreads.map((thread) => ({
     ...thread,
     selectedText: thread.selectedText || threadTextMap.get(thread.id),
   }));
 
-  // Create user resolver for author names
+  /** Create user resolver for author names */
   const resolveUser = createUserResolver(ydoc);
 
-  // Format feedback section
+  /** Format feedback section */
   const feedbackMarkdown = formatFeedbackSection(
     threadsWithText,
     { includeResolved, selectedTextMaxLength },
     resolveUser
   );
 
-  // Get reviewer comment from metadata using type-safe helper
+  /** Get reviewer comment from metadata using type-safe helper */
   const metadata = getPlanMetadata(ydoc);
   const reviewComment =
     metadata?.status === 'changes_requested' || metadata?.status === 'in_progress'
@@ -101,17 +101,17 @@ export async function exportPlanToMarkdown(
       ? metadata.reviewedBy
       : undefined;
 
-  // Build output with optional sections
+  /** Build output with optional sections */
   const sections: string[] = [contentMarkdown];
 
-  // Add reviewer comment if present
+  /** Add reviewer comment if present */
   if (reviewComment) {
     let reviewerSection = '## Reviewer Comment\n\n';
     reviewerSection += `> **${reviewedBy ?? 'Reviewer'}:** ${reviewComment}\n`;
     sections.push(reviewerSection);
   }
 
-  // Add thread feedback if present
+  /** Add thread feedback if present */
   if (feedbackMarkdown) {
     sections.push(feedbackMarkdown);
   }
@@ -209,7 +209,7 @@ export function formatFeedbackSection(
     output += '\n';
   });
 
-  // Add resolved summary if we're not showing them
+  /** Add resolved summary if we're not showing them */
   if (!includeResolved && resolvedCount > 0) {
     output += `---\n*${resolvedCount} resolved comment(s) not shown*\n`;
   }
@@ -217,7 +217,7 @@ export function formatFeedbackSection(
   return output;
 }
 
-// --- Private Helpers ---
+/** --- Private Helpers --- */
 
 function formatThread(
   thread: Thread,
@@ -227,7 +227,7 @@ function formatThread(
 ): string {
   let output = `### ${number}. `;
 
-  // Header with selected text or "General"
+  /** Header with selected text or "General" */
   if (thread.selectedText) {
     const preview = truncate(thread.selectedText, selectedTextMaxLength);
     output += `On: "${preview}"\n`;
@@ -235,21 +235,21 @@ function formatThread(
     output += 'General\n';
   }
 
-  // Resolved marker
+  /** Resolved marker */
   if (thread.resolved) {
     output += '*[Resolved]*\n';
   }
 
-  // Comments
+  /** Comments */
   thread.comments.forEach((comment, idx) => {
     const bodyText = extractTextFromCommentBody(comment.body);
     const authorName = resolveUser ? resolveUser(comment.userId) : comment.userId.slice(0, 8);
 
     if (idx === 0) {
-      // First comment is the main feedback
+      /** First comment is the main feedback */
       output += `> **${authorName}:** ${bodyText}\n`;
     } else {
-      // Subsequent comments are replies
+      /** Subsequent comments are replies */
       output += `>\n> **${authorName} (Reply):** ${bodyText}\n`;
     }
   });

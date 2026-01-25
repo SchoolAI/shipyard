@@ -207,14 +207,14 @@ export function PlanContent(props: PlanContentProps) {
   const initialContent = props.mode === 'snapshot' ? props.initialContent : undefined;
   const deliverableCount = useDeliverableCount(ydoc, props.mode, initialContent);
 
-  // Update activeView when initialTab changes
+  /** Update activeView when initialTab changes */
   useEffect(() => {
     if (props.initialTab) {
       setActiveView(props.initialTab);
     }
   }, [props.initialTab]);
 
-  // Listen for external tab switch requests (e.g., from AgentRequestsBadge)
+  /** Listen for external tab switch requests (e.g., from AgentRequestsBadge) */
   useEffect(() => {
     const handleSwitchTab = (event: Event) => {
       const tab = extractTabFromEvent(event);

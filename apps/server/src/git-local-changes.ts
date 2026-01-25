@@ -7,7 +7,7 @@ import { isAbsolute, join, normalize } from 'node:path';
 import type { GitFileStatus, LocalChangesResult, LocalFileChange } from '@shipyard/schema';
 import { logger } from './logger.js';
 
-// --- Git Command Helpers ---
+/** --- Git Command Helpers --- */
 
 interface GitExecOptions {
   cwd: string;
@@ -41,7 +41,7 @@ function ensureGitRepo(cwd: string): LocalChangesResult | null {
   const isRepo = execGit('git rev-parse --is-inside-work-tree', { cwd });
   if (isRepo !== null) return null;
 
-  // Not a git repo - auto-initialize
+  /** Not a git repo - auto-initialize */
   logger.info({ cwd }, 'Not a git repo, initializing with git init');
   const initResult = execGit('git init', { cwd });
 
@@ -69,7 +69,7 @@ function getCurrentBranchName(cwd: string): string {
     return 'unknown';
   }
 
-  // If detached HEAD, get short commit SHA
+  /** If detached HEAD, get short commit SHA */
   if (branch === 'HEAD') {
     return execGit('git rev-parse --short HEAD', { cwd }) ?? 'unknown';
   }
@@ -84,7 +84,7 @@ function getGitDiff(cwd: string): string {
   const headDiff = execGit('git diff HEAD', { cwd, timeout: 30000, maxBuffer: 10 * 1024 * 1024 });
   if (headDiff !== null) return headDiff;
 
-  // diff HEAD fails if no commits yet, try diff --cached instead
+  /** diff HEAD fails if no commits yet, try diff --cached instead */
   logger.debug({ cwd }, 'git diff HEAD failed, trying --cached');
   return execGit('git diff --cached', { cwd, timeout: 30000, maxBuffer: 10 * 1024 * 1024 }) ?? '';
 }
@@ -112,7 +112,7 @@ function mergeFilesWithStatus(
     if (diffFile) {
       mergedFiles.push(diffFile);
     } else {
-      // File has status but no diff (binary, or other edge case)
+      /** File has status but no diff (binary, or other edge case) */
       const status = stagedFile?.status ?? unstagedFile?.status ?? 'modified';
       mergedFiles.push({
         path,
@@ -127,7 +127,7 @@ function mergeFilesWithStatus(
   return mergedFiles.sort((a, b) => a.path.localeCompare(b.path));
 }
 
-// --- Main Function ---
+/** --- Main Function --- */
 
 /**
  * Get local git changes from a working directory.
@@ -135,22 +135,22 @@ function mergeFilesWithStatus(
  */
 export function getLocalChanges(cwd: string): LocalChangesResult {
   try {
-    // Ensure git repo exists (auto-init if needed)
+    /** Ensure git repo exists (auto-init if needed) */
     const repoError = ensureGitRepo(cwd);
     if (repoError) return repoError;
 
-    // Get current branch
+    /** Get current branch */
     const branch = getCurrentBranchName(cwd);
 
-    // Get status (staged, unstaged, untracked)
+    /** Get status (staged, unstaged, untracked) */
     const statusOutput = execGit('git status --porcelain', { cwd, timeout: 10000 }) ?? '';
     const { staged, unstaged, untracked } = parseGitStatus(statusOutput);
 
-    // Get diff and parse into file changes
+    /** Get diff and parse into file changes */
     const diffOutput = getGitDiff(cwd);
     const diffFiles = parseDiffOutput(diffOutput);
 
-    // Merge status info into files
+    /** Merge status info into files */
     const mergedFiles = mergeFilesWithStatus(staged, unstaged, diffFiles);
 
     logger.debug(
@@ -211,23 +211,23 @@ function parseGitStatus(output: string): {
     const y = line[1];
     let path = line.slice(3);
 
-    // Handle renamed files: "R  old -> new"
+    /** Handle renamed files: "R  old -> new" */
     if (path.includes(' -> ')) {
       path = path.split(' -> ')[1] ?? path;
     }
 
-    // Untracked files
+    /** Untracked files */
     if (x === '?' && y === '?') {
       untracked.push(path);
       continue;
     }
 
-    // Ignored files - skip
+    /** Ignored files - skip */
     if (x === '!' && y === '!') {
       continue;
     }
 
-    // Staged changes
+    /** Staged changes */
     if (x && x !== ' ' && x !== '?') {
       staged.push({
         path,
@@ -237,7 +237,7 @@ function parseGitStatus(output: string): {
       });
     }
 
-    // Unstaged changes
+    /** Unstaged changes */
     if (y && y !== ' ' && y !== '?') {
       unstaged.push({
         path,
@@ -284,20 +284,20 @@ function parseDiffOutput(diff: string): LocalFileChange[] {
     return files;
   }
 
-  // Split by file boundary: "diff --git a/... b/..."
+  /** Split by file boundary: "diff --git a/... b/..." */
   const fileDiffs = diff.split(/(?=diff --git )/);
 
   for (const fileDiff of fileDiffs) {
     if (!fileDiff.trim()) continue;
 
-    // Extract filename from "diff --git a/path b/path"
+    /** Extract filename from "diff --git a/path b/path" */
     const headerMatch = fileDiff.match(/^diff --git a\/(.+?) b\/(.+)/m);
     if (!headerMatch) continue;
 
     const path = headerMatch[2] ?? headerMatch[1];
     if (!path) continue;
 
-    // Check if binary file
+    /** Check if binary file */
     if (fileDiff.includes('Binary files')) {
       files.push({
         path,
@@ -309,7 +309,7 @@ function parseDiffOutput(diff: string): LocalFileChange[] {
       continue;
     }
 
-    // Count additions and deletions
+    /** Count additions and deletions */
     let additions = 0;
     let deletions = 0;
 
@@ -321,7 +321,7 @@ function parseDiffOutput(diff: string): LocalFileChange[] {
       }
     }
 
-    // Extract the patch (everything after the header)
+    /** Extract the patch (everything after the header) */
     const patchStart = fileDiff.indexOf('@@');
     const patch = patchStart >= 0 ? fileDiff.slice(patchStart) : undefined;
 
@@ -365,7 +365,7 @@ export function getFileContent(
   filePath: string
 ): { content: string | null; error?: string } {
   try {
-    // Prevent directory traversal attacks
+    /** Prevent directory traversal attacks */
     const normalizedPath = normalize(filePath);
     if (isAbsolute(normalizedPath) || normalizedPath.startsWith('..')) {
       return { content: null, error: 'Invalid file path' };
@@ -373,14 +373,14 @@ export function getFileContent(
 
     const fullPath = join(cwd, normalizedPath);
 
-    // Double-check the resolved path is within cwd
+    /** Double-check the resolved path is within cwd */
     if (!fullPath.startsWith(cwd)) {
       return { content: null, error: 'Invalid file path' };
     }
 
     const content = readFileSync(fullPath, { encoding: 'utf-8' });
 
-    // Limit content size to prevent memory issues (10MB)
+    /** Limit content size to prevent memory issues (10MB) */
     if (content.length > 10 * 1024 * 1024) {
       return { content: null, error: 'File too large to display' };
     }

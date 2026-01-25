@@ -17,7 +17,7 @@ function getTokenFromGhCli(): string | null {
       return token;
     }
   } catch {
-    // gh CLI not available or not authenticated
+    /** gh CLI not available or not authenticated */
   }
   return null;
 }

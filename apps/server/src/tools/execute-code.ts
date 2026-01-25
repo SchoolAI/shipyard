@@ -39,7 +39,7 @@ import { TOOL_NAMES } from './tool-names.js';
 import { updateBlockContentTool } from './update-block-content.js';
 import { updatePlanTool } from './update-plan.js';
 
-// --- Bundled API Documentation ---
+/** --- Bundled API Documentation --- */
 
 const BUNDLED_DOCS = `Execute TypeScript code that calls Shipyard APIs. Use this for multi-step workflows to reduce round-trips.
 
@@ -69,10 +69,12 @@ const plan = await createPlan({
   title: "Add auth",
   content: "- [ ] Screenshot of login {#deliverable}"
 });
-// Returns: { planId: "abc", sessionToken: "xyz", url: "...", deliverables: [...], monitoringScript: "#!/bin/bash..." }
+/** Returns: { planId: "abc", sessionToken: "xyz", url: "...", deliverables: [...], monitoringScript: "#!/bin/bash..." } */
 
-// For non-hook agents: Run the monitoring script in background to wait for approval
-// bash <(echo "$monitoringScript") &
+/**
+ * For non-hook agents: Run the monitoring script in background to wait for approval
+ * bash <(echo "$monitoringScript") &
+ */
 \`\`\`
 
 ---
@@ -102,9 +104,9 @@ const data = await readPlan(planId, token, {
   includeLinkedPRs: true
 });
 if (data.status === "changes_requested") {
-  // Respond to feedback
+  /** Respond to feedback */
 }
-// Access deliverables directly
+/** Access deliverables directly */
 data.deliverables.forEach(d => console.log(d.id, d.completed));
 \`\`\`
 
@@ -232,7 +234,6 @@ Parameters:
   - Max (14400 = 4 hours) for extended user sessions
   - Note: System-level timeouts may cause earlier cancellation
 - planId (string, optional): Optional metadata to link request to plan (for activity log filtering)
-- isBlocker (boolean, optional): If true, shows as red/urgent in timeline. Use for critical questions that block work.
 - min (number, optional): For 'number'/'rating' - minimum value
 - max (number, optional): For 'number'/'rating' - maximum value
 - format (string, optional): For 'number' - 'integer' | 'decimal' | 'currency' | 'percentage'
@@ -375,6 +376,92 @@ await requestUserInput({
 
 ---
 
+### postActivityUpdate(opts): Promise<{ success, eventId, requestId? }>
+Post an activity update to the agent activity feed.
+
+Parameters:
+- planId (string): The plan ID
+- activityType (string): 'status' | 'note' | 'help_request' | 'milestone' | 'blocker'
+- message (string): The activity message
+- status (string, optional): For 'status' type: 'working' | 'blocked' | 'idle' | 'waiting'
+- category (string, optional): For 'note' type: 'info' | 'progress' | 'decision' | 'question'
+
+Returns:
+- success: Boolean indicating if the update was logged
+- eventId: The ID of the created event
+- requestId: The request ID (only for 'help_request' and 'blocker' types)
+
+Examples:
+\`\`\`typescript
+/** Status update */
+await postActivityUpdate({
+  planId: "abc",
+  activityType: "status",
+  status: "working",
+  message: "Implementing authentication"
+});
+
+/** Informational note */
+await postActivityUpdate({
+  planId: "abc",
+  activityType: "note",
+  message: "Found a better approach using JWT",
+  category: "decision"
+});
+
+/** Request for help (non-blocking) */
+const result = await postActivityUpdate({
+  planId: "abc",
+  activityType: "help_request",
+  message: "Should we use PostgreSQL or SQLite?"
+});
+/** Save result.requestId to resolve later */
+
+/** Milestone reached */
+await postActivityUpdate({
+  planId: "abc",
+  activityType: "milestone",
+  message: "Authentication flow complete"
+});
+
+/** Hit a blocker (needs resolution to proceed) */
+const blockerResult = await postActivityUpdate({
+  planId: "abc",
+  activityType: "blocker",
+  message: "Missing API credentials"
+});
+/** Save blockerResult.requestId to resolve later */
+\`\`\`
+
+---
+
+### resolveActivityRequest(opts): Promise<{ success }>
+Resolve a previously posted help_request or blocker.
+
+Parameters:
+- planId (string): The plan ID
+- requestId (string): The request ID from postActivityUpdate
+- resolution (string, optional): How the request was resolved
+
+Example:
+\`\`\`typescript
+/** First, create a help request */
+const helpResult = await postActivityUpdate({
+  planId: "abc",
+  activityType: "help_request",
+  message: "Which database should we use?"
+});
+
+/** Later, resolve it */
+await resolveActivityRequest({
+  planId: "abc",
+  requestId: helpResult.requestId,
+  resolution: "Using PostgreSQL based on team feedback"
+});
+\`\`\`
+
+---
+
 ### regenerateSessionToken(planId): Promise<{ sessionToken, planId }>
 Regenerate the session token for a plan you own.
 
@@ -398,10 +485,10 @@ SECURITY:
 
 Example:
 \`\`\`typescript
-// Lost your session token? Regenerate it:
+/** Lost your session token? Regenerate it: */
 const { sessionToken, planId } = await regenerateSessionToken("abc123");
 
-// Now use the new token for operations
+/** Now use the new token for operations */
 await addArtifact({
   planId,
   sessionToken,
@@ -423,11 +510,13 @@ const plan = await createPlan({
   content: "- [ ] Screenshot {#deliverable}\\n- [ ] Video {#deliverable}"
 });
 
-// plan includes: planId, sessionToken, url, deliverables, monitoringScript
-// For non-hook agents: Run monitoringScript in background to wait for approval
-// The script polls and exits when human approves/rejects
+/**
+ * plan includes: planId, sessionToken, url, deliverables, monitoringScript
+ * For non-hook agents: Run monitoringScript in background to wait for approval
+ * The script polls and exits when human approves/rejects
+ */
 
-// Do work, take screenshots...
+/** Do work, take screenshots... */
 
 await addArtifact({
   planId: plan.planId,
@@ -453,16 +542,18 @@ return { planId: plan.planId, snapshotUrl: result.snapshotUrl };
 \`\`\`
 `;
 
-// --- Input Schema ---
+/** --- Input Schema --- */
 
 const ExecuteCodeInput = z.object({
   code: z.string().describe('TypeScript code to execute'),
 });
 
-// --- API Wrapper Functions ---
+/** --- API Wrapper Functions --- */
 
-// Track monitoring script for auto-append to tool result
-// String array to work around TypeScript control flow issues
+/*
+ * Track monitoring script for auto-append to tool result
+ * String array to work around TypeScript control flow issues
+ */
 const scriptTracker: string[] = [];
 
 async function createPlan(opts: {
@@ -475,7 +566,7 @@ async function createPlan(opts: {
   const text = getToolResultText(result);
   const planId = text.match(/ID: (\S+)/)?.[1] || '';
 
-  // Fetch deliverables from the Y.Doc
+  /** Fetch deliverables from the Y.Doc */
   let deliverables: Array<{ id: string; text: string }> = [];
   if (planId) {
     const ydoc = await getOrCreateDoc(planId);
@@ -483,10 +574,10 @@ async function createPlan(opts: {
     deliverables = allDeliverables.map((d) => ({ id: d.id, text: d.text }));
   }
 
-  // Always include monitoring script for non-hook agents
+  /** Always include monitoring script for non-hook agents */
   const { script: monitoringScript } = await setupReviewNotification(planId, 30);
 
-  // Track for auto-append to tool result (use array.push to track in handler)
+  /** Track for auto-append to tool result (use array.push to track in handler) */
   scriptTracker.push(`Plan "${planId}" created.\n\n${monitoringScript}`);
 
   return {
@@ -511,7 +602,7 @@ async function readPlan(
   });
   const text = getToolResultText(result);
 
-  // Get structured data directly from Y.Doc instead of parsing strings
+  /** Get structured data directly from Y.Doc instead of parsing strings */
   const ydoc = await getOrCreateDoc(planId);
   const metadata = getPlanMetadata(ydoc);
   const deliverables = getDeliverables(ydoc).map((d) => ({
@@ -538,10 +629,10 @@ async function updatePlan(
 ) {
   await updatePlanTool.handler({ planId, sessionToken, ...updates });
 
-  // Always include monitoring script for non-hook agents
+  /** Always include monitoring script for non-hook agents */
   const { script: monitoringScript } = await setupReviewNotification(planId, 30);
 
-  // Track for auto-append to tool result
+  /** Track for auto-append to tool result */
   scriptTracker.push(`Plan "${planId}" updated.\n\n${monitoringScript}`);
 
   return {
@@ -571,22 +662,22 @@ async function addArtifact(opts: AddArtifactOpts) {
     return { isError: true, error: text };
   }
 
-  // Get structured data from Y.Doc instead of parsing strings
+  /** Get structured data from Y.Doc instead of parsing strings */
   const ydoc = await getOrCreateDoc(opts.planId);
   const artifacts = getArtifacts(ydoc);
   const deliverables = getDeliverables(ydoc);
 
-  // Find the artifact we just added (most recent by filename)
+  /** Find the artifact we just added (most recent by filename) */
   const addedArtifact = artifacts.find((a) => a.filename === opts.filename);
 
-  // Check if all deliverables are complete
+  /** Check if all deliverables are complete */
   const allDeliverablesComplete =
     deliverables.length > 0 && deliverables.every((d) => d.linkedArtifactId);
 
-  // Get snapshot URL from metadata if task was completed
+  /** Get snapshot URL from metadata if task was completed */
   const metadata = getPlanMetadata(ydoc);
 
-  // Get URL from discriminated union
+  /** Get URL from discriminated union */
   let artifactUrl = '';
   if (addedArtifact) {
     artifactUrl =
@@ -612,7 +703,7 @@ async function completeTask(planId: string, sessionToken: string, summary?: stri
     return { isError: true, error: text };
   }
 
-  // Get structured data from Y.Doc
+  /** Get structured data from Y.Doc */
   const ydoc = await getOrCreateDoc(planId);
   const metadata = getPlanMetadata(ydoc);
 
@@ -650,7 +741,7 @@ async function linkPR(opts: {
     throw new Error(text);
   }
 
-  // Parse PR details from response text
+  /** Parse PR details from response text */
   const prNumber = opts.prNumber;
   const urlMatch = text.match(/URL: (https:\/\/[^\s]+)/);
   const statusMatch = text.match(/Status: (\w+)/);
@@ -684,7 +775,7 @@ async function setupReviewNotification(planId: string, pollIntervalSeconds?: num
   });
   const text = getToolResultText(result);
 
-  // Extract script from markdown code block
+  /** Extract script from markdown code block */
   const scriptMatch = text.match(/```bash\n([\s\S]*?)\n```/);
   const script = scriptMatch?.[1] || '';
 
@@ -699,8 +790,6 @@ async function requestUserInput(opts: {
   defaultValue?: string;
   timeout?: number;
   planId?: string;
-  /** If true, shows as red/urgent in timeline - use for critical blocking questions */
-  isBlocker?: boolean;
   // Number/rating type parameters
   min?: number;
   max?: number;
@@ -716,11 +805,13 @@ async function requestUserInput(opts: {
 }) {
   const { InputRequestManager } = await import('../services/input-request-manager.js');
 
-  // Always use plan-index doc so browser can see requests from all agents
-  // Browser is already connected to plan-index for plan discovery
+  /*
+   * Always use plan-index doc so browser can see requests from all agents
+   * Browser is already connected to plan-index for plan discovery
+   */
   const ydoc = await getOrCreateDoc(PLAN_INDEX_DOC_NAME);
 
-  // Create manager and make request
+  /** Create manager and make request */
   const manager = new InputRequestManager();
 
   // Build params based on type - include type-specific parameters
@@ -729,7 +820,6 @@ async function requestUserInput(opts: {
     defaultValue: opts.defaultValue,
     timeout: opts.timeout,
     planId: opts.planId,
-    isBlocker: opts.isBlocker,
   };
 
   let params: Record<string, unknown>;
@@ -792,10 +882,10 @@ async function requestUserInput(opts: {
     params as unknown as Parameters<typeof manager.createRequest>[1]
   );
 
-  // Wait for response
+  /** Wait for response */
   const result = await manager.waitForResponse(ydoc, requestId, opts.timeout);
 
-  // Narrow the discriminated union to access appropriate fields
+  /** Narrow the discriminated union to access appropriate fields */
   if (result.status === 'answered') {
     return {
       success: true as const,
@@ -822,11 +912,92 @@ async function requestUserInput(opts: {
   };
 }
 
-// NOTE: postActivityUpdate and resolveActivityRequest were removed in favor of
-// using requestUserInput with the isBlocker flag. This simplifies the activity
-// system - agents now use requestUserInput for all questions, and the isBlocker
-// flag indicates urgent/blocking questions that show in red in the timeline.
-// The timeline automatically logs when requests are answered/declined.
+async function postActivityUpdate(opts: {
+  planId: string;
+  activityType: 'help_request' | 'blocker';
+  message: string;
+}): Promise<{ success: boolean; eventId: string; requestId?: string }> {
+  const { logPlanEvent } = await import('@shipyard/schema');
+  const { getGitHubUsername } = await import('../server-identity.js');
+  const { nanoid } = await import('nanoid');
+
+  const doc = await getOrCreateDoc(opts.planId);
+  const actorName = await getGitHubUsername();
+
+  /** Generate requestId and log event as inbox-worthy for plan owner */
+  const requestId = nanoid();
+  const eventId = logPlanEvent(
+    doc,
+    'agent_activity',
+    actorName,
+    {
+      activityType: opts.activityType,
+      requestId,
+      message: opts.message,
+    },
+    {
+      inboxWorthy: true,
+      inboxFor: 'owner',
+    }
+  );
+
+  return { success: true, eventId, requestId };
+}
+
+async function resolveActivityRequest(opts: {
+  planId: string;
+  requestId: string;
+  resolution?: string;
+}): Promise<{ success: boolean }> {
+  const { logPlanEvent, getPlanEvents } = await import('@shipyard/schema');
+  const { getGitHubUsername } = await import('../server-identity.js');
+
+  const doc = await getOrCreateDoc(opts.planId);
+  const actorName = await getGitHubUsername();
+  const events = getPlanEvents(doc);
+
+  /** Find original unresolved request (help_request or blocker only) */
+  const originalEvent = events.find(
+    (e) =>
+      e.type === 'agent_activity' &&
+      e.data &&
+      'requestId' in e.data &&
+      e.data.requestId === opts.requestId &&
+      (e.data.activityType === 'help_request' || e.data.activityType === 'blocker')
+  );
+
+  if (!originalEvent || originalEvent.type !== 'agent_activity') {
+    throw new Error(`Unresolved request ${opts.requestId} not found`);
+  }
+
+  /** Check if already resolved */
+  const existingResolution = events.find(
+    (e) =>
+      e.type === 'agent_activity' &&
+      e.data &&
+      'requestId' in e.data &&
+      e.data.requestId === opts.requestId &&
+      (e.data.activityType === 'help_request_resolved' ||
+        e.data.activityType === 'blocker_resolved')
+  );
+
+  if (existingResolution) {
+    throw new Error(`Request ${opts.requestId} has already been resolved`);
+  }
+
+  /** Determine resolution type - TypeScript narrowing ensures data exists */
+  const activityType = originalEvent.data.activityType;
+  const resolvedType =
+    activityType === 'help_request' ? 'help_request_resolved' : 'blocker_resolved';
+
+  logPlanEvent(doc, 'agent_activity', actorName, {
+    activityType: resolvedType,
+    requestId: opts.requestId,
+    resolution: opts.resolution,
+  });
+
+  return { success: true };
+}
 
 async function regenerateSessionToken(planId: string) {
   const result = await regenerateSessionTokenTool.handler({ planId });
@@ -836,7 +1007,7 @@ async function regenerateSessionToken(planId: string) {
     throw new Error(text);
   }
 
-  // Extract session token from response text
+  /** Extract session token from response text */
   const tokenMatch = text.match(/New Session Token: (\S+)/);
   return {
     sessionToken: tokenMatch?.[1] || '',
@@ -844,7 +1015,7 @@ async function regenerateSessionToken(planId: string) {
   };
 }
 
-// --- Public Export ---
+/** --- Public Export --- */
 
 export const executeCodeTool = {
   definition: {
@@ -867,11 +1038,11 @@ export const executeCodeTool = {
 
     logger.info({ codeLength: code.length }, 'Executing code');
 
-    // Reset tracking for this execution
+    /** Reset tracking for this execution */
     scriptTracker.length = 0;
 
     try {
-      // Helper: Encode frames to MP4 using bundled FFmpeg
+      /** Helper: Encode frames to MP4 using bundled FFmpeg */
       async function encodeVideo(opts: {
         framesDir: string;
         fps?: number;
@@ -906,15 +1077,15 @@ export const executeCodeTool = {
           throw new Error(`FFmpeg encoding failed: ${result.stderr?.slice(-300)}`);
         }
 
-        // Cleanup frames directory
+        /** Cleanup frames directory */
         fs.rmSync(opts.framesDir, { recursive: true, force: true });
 
         return outputPath;
       }
 
-      // Create sandbox with API functions and Node.js modules for video encoding
+      /** Create sandbox with API functions and Node.js modules for video encoding */
       const sandbox = {
-        // Shipyard API functions
+        /** Shipyard API functions */
         createPlan,
         readPlan,
         updatePlan,
@@ -925,16 +1096,17 @@ export const executeCodeTool = {
         addPRReviewComment,
         setupReviewNotification,
         requestUserInput,
-        // NOTE: postActivityUpdate and resolveActivityRequest removed - use requestUserInput with isBlocker flag instead
+        postActivityUpdate,
+        resolveActivityRequest,
         regenerateSessionToken,
-        // Video encoding helper (uses bundled FFmpeg)
+        /** Video encoding helper (uses bundled FFmpeg) */
         encodeVideo,
-        // Node.js modules for advanced workflows (file ops, process spawning)
+        /** Node.js modules for advanced workflows (file ops, process spawning) */
         child_process,
         fs,
         path,
         os,
-        // FFmpeg bundled with server - no installation required
+        /** FFmpeg bundled with server - no installation required */
         ffmpegPath: ffmpegInstaller.path,
         console: {
           log: (...logArgs: unknown[]) => logger.info({ output: logArgs }, 'console.log'),
@@ -942,17 +1114,17 @@ export const executeCodeTool = {
         },
       };
 
-      // Wrap in async IIFE
+      /** Wrap in async IIFE */
       const wrappedCode = `(async () => { ${code} })()`;
 
-      // Execute in sandboxed context
+      /** Execute in sandboxed context */
       const context = vm.createContext(sandbox);
       const script = new vm.Script(wrappedCode);
       const result = await script.runInContext(context, { timeout: 120000 });
 
       logger.info({ result }, 'Code execution complete');
 
-      // Build result content
+      /** Build result content */
       const content: Array<{ type: string; text: string }> = [
         {
           type: 'text',
@@ -961,8 +1133,10 @@ export const executeCodeTool = {
         },
       ];
 
-      // Auto-append monitoring script reminder if createPlan or updatePlan was called
-      // This ensures non-hook agents always see how to wait for approval
+      /*
+       * Auto-append monitoring script reminder if createPlan or updatePlan was called
+       * This ensures non-hook agents always see how to wait for approval
+       */
       const latestScript = scriptTracker[scriptTracker.length - 1];
       if (latestScript) {
         const [planAction, ...scriptParts] = latestScript.split('\n\n');
@@ -987,12 +1161,7 @@ The script will exit when the human approves or requests changes.`,
       return { content };
     } catch (error) {
       logger.error({ error, code }, 'Code execution failed');
-      const message =
-        error instanceof Error
-          ? error.message
-          : typeof error === 'string'
-            ? error
-            : JSON.stringify(error) || 'Unknown error';
+      const message = error instanceof Error ? error.message : 'Unknown error';
       return {
         content: [{ type: 'text', text: `Execution error: ${message}` }],
         isError: true,

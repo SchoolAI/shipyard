@@ -42,7 +42,7 @@ async function validateInviteToken(
   if (Date.now() > token.expiresAt) return 'expired';
   if (token.maxUses !== null && token.useCount >= token.maxUses) return 'exhausted';
 
-  // Verify token hash
+  /** Verify token hash */
   const isValid = await platform.verifyTokenHash(tokenValue, token.tokenHash);
   if (!isValid) return 'invalid';
 
@@ -84,7 +84,7 @@ async function handleCreateInvite(
     planId: message.planId,
   });
 
-  // --- Authentication: Validate GitHub token ---
+  /** --- Authentication: Validate GitHub token --- */
   if (!message.authToken) {
     platform.warn('[handleCreateInvite] Missing auth token');
     sendErrorResponse(
@@ -113,11 +113,11 @@ async function handleCreateInvite(
   const authenticatedUser = authResult.username;
   platform.info('[handleCreateInvite] Authenticated user', { username: authenticatedUser });
 
-  // --- Authorization: Check plan ownership ---
+  /** --- Authorization: Check plan ownership --- */
   const existingOwnerId = await platform.getPlanOwnerId(message.planId);
 
   if (existingOwnerId) {
-    // Plan has an existing owner - verify the authenticated user is the owner
+    /** Plan has an existing owner - verify the authenticated user is the owner */
     if (existingOwnerId !== authenticatedUser) {
       platform.warn('[handleCreateInvite] User is not the plan owner', {
         authenticatedUser,
@@ -133,7 +133,7 @@ async function handleCreateInvite(
       return;
     }
   } else {
-    // No existing owner - trust-on-first-use: record this user as owner
+    /** No existing owner - trust-on-first-use: record this user as owner */
     platform.info('[handleCreateInvite] Recording plan owner (first invite)', {
       planId: message.planId,
       ownerId: authenticatedUser,
@@ -141,7 +141,7 @@ async function handleCreateInvite(
     await platform.setPlanOwnerId(message.planId, authenticatedUser);
   }
 
-  // --- Create the invite token ---
+  /** --- Create the invite token --- */
   const tokenId = await platform.generateTokenId();
   const tokenValue = await platform.generateTokenValue();
   const tokenHash = await platform.hashTokenValue(tokenValue);
@@ -162,7 +162,7 @@ async function handleCreateInvite(
     label: message.label,
   };
 
-  // Store the token using planId and tokenId
+  /** Store the token using planId and tokenId */
   await platform.setInviteToken(message.planId, tokenId, token);
 
   platform.info('[handleCreateInvite] Created invite token', {
@@ -172,11 +172,11 @@ async function handleCreateInvite(
     ttlMinutes: message.ttlMinutes ?? 30,
   });
 
-  // Send response with token value (only time it's sent!)
+  /** Send response with token value (only time it's sent!) */
   const response: InviteCreatedResponse = {
     type: 'invite_created',
     tokenId,
-    tokenValue, // Only sent once!
+    tokenValue /** Only sent once! */,
     expiresAt: token.expiresAt,
     maxUses: token.maxUses,
     label: token.label,
@@ -242,7 +242,7 @@ async function handleRedeemInvite(
   token.useCount++;
   await platform.setInviteToken(planId, tokenId, token);
 
-  // Record redemption (key includes tokenId to allow multiple token redemptions per user)
+  /** Record redemption (key includes tokenId to allow multiple token redemptions per user) */
   const redemption: InviteRedemption = {
     redeemedBy: userId,
     redeemedAt: Date.now(),
@@ -252,7 +252,7 @@ async function handleRedeemInvite(
 
   platform.info('[handleRedeemInvite] User redeemed invite token', { userId, tokenId, planId });
 
-  // Send success to guest
+  /** Send success to guest */
   const response: InviteRedemptionResult = {
     type: 'invite_redemption_result',
     success: true,
@@ -286,7 +286,7 @@ async function handleRevokeInvite(
     return;
   }
 
-  // Mark as revoked
+  /** Mark as revoked */
   token.revoked = true;
   await platform.setInviteToken(message.planId, message.tokenId, token);
 
@@ -319,7 +319,7 @@ async function handleListInvites(
   const now = Date.now();
   const allTokens = await platform.listInviteTokens(message.planId);
 
-  // Filter to active invites only
+  /** Filter to active invites only */
   const invites: InvitesListResponse['invites'] = [];
   for (const token of allTokens) {
     if (token.revoked) continue;

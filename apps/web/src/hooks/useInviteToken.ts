@@ -53,16 +53,16 @@ export function useInviteToken(
   const [searchParams, setSearchParams] = useSearchParams();
   const [redemptionState, setRedemptionState] = useState<RedemptionState>({ status: 'idle' });
 
-  // Track if we've already attempted redemption to prevent double-redeem
+  /** Track if we've already attempted redemption to prevent double-redeem */
   const hasAttemptedRef = useRef(false);
-  // Store parsed invite to avoid re-parsing
+  /** Store parsed invite to avoid re-parsing */
   const inviteRef = useRef<{ tokenId: string; tokenValue: string } | null>(null);
 
-  // Parse invite from URL on mount or when URL changes
+  /** Parse invite from URL on mount or when URL changes */
   const inviteParam = searchParams.get('invite');
   const hasInviteToken = inviteParam !== null;
 
-  // Parse and cache invite token
+  /** Parse and cache invite token */
   useEffect(() => {
     if (inviteParam) {
       const invite = parseInviteFromUrl(window.location.href);
@@ -77,14 +77,14 @@ export function useInviteToken(
       }
     } else {
       inviteRef.current = null;
-      // Don't reset state if we already succeeded
+      /** Don't reset state if we already succeeded */
       if (redemptionState.status !== 'success') {
         setRedemptionState({ status: 'idle' });
       }
     }
   }, [inviteParam, githubIdentity, redemptionState.status]);
 
-  // Clear invite token from URL
+  /** Clear invite token from URL */
   const clearInviteToken = useCallback(() => {
     if (searchParams.has('invite')) {
       searchParams.delete('invite');
@@ -94,7 +94,7 @@ export function useInviteToken(
     hasAttemptedRef.current = false;
   }, [searchParams, setSearchParams]);
 
-  // Listen for redemption result from signaling server
+  /** Listen for redemption result from signaling server */
   useEffect(() => {
     if (!rtcProvider) return;
 
@@ -104,22 +104,22 @@ export function useInviteToken(
         if (data.type !== 'invite_redemption_result') return;
 
         if (data.success === true && typeof data.planId === 'string') {
-          // Success variant
+          /** Success variant */
           setRedemptionState({ status: 'success' });
-          // Clean up URL after short delay to show success state
+          /** Clean up URL after short delay to show success state */
           setTimeout(() => {
             clearInviteToken();
           }, 500);
         } else if (data.success === false && isValidInviteError(data.error)) {
-          // Failure variant
+          /** Failure variant */
           setRedemptionState({ status: 'error', error: data.error });
         }
       } catch {
-        // Not JSON or not our message
+        /** Not JSON or not our message */
       }
     };
 
-    // Access signaling connections from WebRTC provider
+    /** Access signaling connections from WebRTC provider */
     const signalingConns = getSignalingConnections(rtcProvider);
 
     for (const conn of signalingConns) {
@@ -137,7 +137,7 @@ export function useInviteToken(
     };
   }, [rtcProvider, clearInviteToken]);
 
-  // Helper to send message to signaling server
+  /** Helper to send message to signaling server */
   const sendToSignaling = useCallback(
     (message: string): boolean => {
       if (!rtcProvider) return false;
@@ -155,18 +155,18 @@ export function useInviteToken(
     [rtcProvider]
   );
 
-  // Redeem invite token
+  /** Redeem invite token */
   const redeemInvite = useCallback(() => {
     const invite = inviteRef.current;
 
-    // Early returns for validation
+    /** Early returns for validation */
     if (!invite || !githubIdentity) return;
     if (hasAttemptedRef.current) return;
 
     setRedemptionState({ status: 'redeeming' });
     hasAttemptedRef.current = true;
 
-    // Build and send redeem message
+    /** Build and send redeem message */
     const redeemMessage = JSON.stringify({
       type: 'redeem_invite',
       planId,
@@ -183,8 +183,10 @@ export function useInviteToken(
     }
   }, [planId, githubIdentity, sendToSignaling]);
 
-  // Auto-redeem when conditions are met
-  // Uses event-based approach instead of polling for signaling connection
+  /*
+   * Auto-redeem when conditions are met
+   * Uses event-based approach instead of polling for signaling connection
+   */
   useEffect(() => {
     if (
       !hasInviteToken ||
@@ -209,14 +211,14 @@ export function useInviteToken(
       return;
     }
 
-    // Listen for 'connect' event instead of polling
+    /** Listen for 'connect' event instead of polling */
     const handlers: Array<{ conn: SignalingConnection; handler: () => void }> = [];
 
     const onConnect = () => {
       if (!hasAttemptedRef.current) {
         redeemInvite();
       }
-      // Clean up all handlers after first connection
+      /** Clean up all handlers after first connection */
       for (const { conn, handler } of handlers) {
         conn.off?.('connect', handler);
       }

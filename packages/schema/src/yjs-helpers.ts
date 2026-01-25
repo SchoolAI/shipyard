@@ -521,7 +521,7 @@ export function addArtifact(ydoc: Y.Doc, artifact: Artifact, actor?: string): vo
 
 export function removeArtifact(ydoc: Y.Doc, artifactId: string): boolean {
   const array = ydoc.getArray<Artifact>(YDOC_KEYS.ARTIFACTS);
-  // CRDT boundary: validate data structure
+  /** CRDT boundary: validate data structure */
   const data = toUnknownArray(array);
   const artifacts = data
     .map((item) => ArtifactSchema.safeParse(item))
@@ -662,7 +662,7 @@ export function linkArtifactToDeliverable(
   actor?: string
 ): boolean {
   const array = ydoc.getArray<Deliverable>(YDOC_KEYS.DELIVERABLES);
-  // CRDT boundary: validate deliverables from CRDT
+  /** CRDT boundary: validate deliverables from CRDT */
   const data = toUnknownArray(array);
   const deliverables = data
     .map((item) => DeliverableSchema.safeParse(item))
@@ -852,7 +852,7 @@ export function linkPR(ydoc: Y.Doc, pr: LinkedPR, actor?: string): void {
   ydoc.transact(
     () => {
       const array = ydoc.getArray<LinkedPR>(YDOC_KEYS.LINKED_PRS);
-      // CRDT boundary: validate existing data
+      /** CRDT boundary: validate existing data */
       const data = toUnknownArray(array);
       const existing = data
         .map((item) => LinkedPRSchema.safeParse(item))
@@ -872,7 +872,7 @@ export function linkPR(ydoc: Y.Doc, pr: LinkedPR, actor?: string): void {
 
 export function unlinkPR(ydoc: Y.Doc, prNumber: number): boolean {
   const array = ydoc.getArray<LinkedPR>(YDOC_KEYS.LINKED_PRS);
-  // CRDT boundary: validate existing data
+  /** CRDT boundary: validate existing data */
   const data = toUnknownArray(array);
   const existing = data
     .map((item) => LinkedPRSchema.safeParse(item))
@@ -898,7 +898,7 @@ export function updateLinkedPRStatus(
   status: LinkedPR['status']
 ): boolean {
   const array = ydoc.getArray<LinkedPR>(YDOC_KEYS.LINKED_PRS);
-  // CRDT boundary: validate existing data
+  /** CRDT boundary: validate existing data */
   const data = toUnknownArray(array);
   const existing = data
     .map((item) => LinkedPRSchema.safeParse(item))
@@ -945,7 +945,7 @@ export function addPRReviewComment(ydoc: Y.Doc, comment: PRReviewComment, actor?
 
 export function resolvePRReviewComment(ydoc: Y.Doc, commentId: string, resolved: boolean): boolean {
   const array = ydoc.getArray<PRReviewComment>(YDOC_KEYS.PR_REVIEW_COMMENTS);
-  // CRDT boundary: validate existing data
+  /** CRDT boundary: validate existing data */
   const data = toUnknownArray(array);
   const existing = data
     .map((item) => PRReviewCommentSchema.safeParse(item))
@@ -966,7 +966,7 @@ export function resolvePRReviewComment(ydoc: Y.Doc, commentId: string, resolved:
 
 export function removePRReviewComment(ydoc: Y.Doc, commentId: string): boolean {
   const array = ydoc.getArray<PRReviewComment>(YDOC_KEYS.PR_REVIEW_COMMENTS);
-  // CRDT boundary: validate existing data
+  /** CRDT boundary: validate existing data */
   const data = toUnknownArray(array);
   const existing = data
     .map((item) => PRReviewCommentSchema.safeParse(item))
@@ -980,22 +980,41 @@ export function removePRReviewComment(ydoc: Y.Doc, commentId: string): boolean {
   return true;
 }
 
+/**
+ * CRDT boundary: Extract and validate viewedBy data from CRDT.
+ * Handles both Y.Map and plain object formats.
+ */
+function extractViewedByFromCrdt(existingViewedBy: unknown): Record<string, number> {
+  const viewedBy: Record<string, number> = {};
+
+  if (existingViewedBy instanceof Y.Map) {
+    for (const [key, value] of existingViewedBy.entries()) {
+      if (typeof key === 'string' && typeof value === 'number') {
+        viewedBy[key] = value;
+      }
+    }
+  } else if (
+    existingViewedBy &&
+    typeof existingViewedBy === 'object' &&
+    !Array.isArray(existingViewedBy)
+  ) {
+    /** Validate each entry in plain object */
+    for (const [key, value] of Object.entries(existingViewedBy)) {
+      if (typeof value === 'number') {
+        viewedBy[key] = value;
+      }
+    }
+  }
+
+  return viewedBy;
+}
+
 export function markPlanAsViewed(ydoc: Y.Doc, username: string): void {
   const map = ydoc.getMap(YDOC_KEYS.METADATA);
 
   ydoc.transact(() => {
     const existingViewedBy = map.get('viewedBy');
-    let viewedBy: Record<string, number> = {};
-
-    if (existingViewedBy instanceof Y.Map) {
-      for (const [key, value] of existingViewedBy.entries()) {
-        if (typeof value === 'number') {
-          viewedBy[key] = value;
-        }
-      }
-    } else if (existingViewedBy && typeof existingViewedBy === 'object') {
-      viewedBy = { ...(existingViewedBy as Record<string, number>) };
-    }
+    const viewedBy: Record<string, number> = extractViewedByFromCrdt(existingViewedBy);
 
     viewedBy[username] = Date.now();
 
@@ -1010,24 +1029,7 @@ export function markPlanAsViewed(ydoc: Y.Doc, username: string): void {
 export function getViewedBy(ydoc: Y.Doc): Record<string, number> {
   const map = ydoc.getMap(YDOC_KEYS.METADATA);
   const viewedBy = map.get('viewedBy');
-
-  if (!viewedBy) return {};
-
-  if (viewedBy instanceof Y.Map) {
-    const result: Record<string, number> = {};
-    for (const [key, value] of viewedBy.entries()) {
-      if (typeof value === 'number') {
-        result[key] = value;
-      }
-    }
-    return result;
-  }
-
-  if (typeof viewedBy === 'object') {
-    return viewedBy as Record<string, number>;
-  }
-
-  return {};
+  return extractViewedByFromCrdt(viewedBy);
 }
 
 export function isPlanUnread(
@@ -1058,7 +1060,15 @@ export function addConversationVersion(
   ydoc.transact(
     () => {
       const metadata = ydoc.getMap(YDOC_KEYS.METADATA);
-      const versions = (metadata.get('conversationVersions') as ConversationVersion[]) || [];
+      const rawVersions = metadata.get('conversationVersions');
+      /** CRDT boundary: validate existing conversation versions */
+      let versions: ConversationVersion[] = [];
+      if (Array.isArray(rawVersions)) {
+        versions = rawVersions
+          .map((v) => ConversationVersionSchema.safeParse(v))
+          .filter((r) => r.success)
+          .map((r) => r.data);
+      }
       metadata.set('conversationVersions', [...versions, validated]);
     },
     actor ? { actor } : undefined
@@ -1261,6 +1271,14 @@ export function getLatestSnapshot(ydoc: Y.Doc): PlanSnapshot | null {
 }
 
 /**
+ * CRDT boundary: validates that tags are string arrays.
+ */
+function getValidatedTags(rawTags: unknown): string[] {
+  if (!Array.isArray(rawTags)) return [];
+  return rawTags.filter((t): t is string => typeof t === 'string');
+}
+
+/**
  * Add a tag to a plan (automatically normalizes and deduplicates).
  * Tags are normalized to lowercase and trimmed to prevent duplicates.
  */
@@ -1268,7 +1286,8 @@ export function addPlanTag(ydoc: Y.Doc, tag: string, actor?: string): void {
   ydoc.transact(
     () => {
       const map = ydoc.getMap(YDOC_KEYS.METADATA);
-      const currentTags = (map.get('tags') as string[]) || [];
+      /** CRDT boundary: validate tags array */
+      const currentTags = getValidatedTags(map.get('tags'));
 
       const normalizedTag = tag.toLowerCase().trim();
       if (!normalizedTag || currentTags.includes(normalizedTag)) return;
@@ -1287,7 +1306,8 @@ export function removePlanTag(ydoc: Y.Doc, tag: string, actor?: string): void {
   ydoc.transact(
     () => {
       const map = ydoc.getMap(YDOC_KEYS.METADATA);
-      const currentTags = (map.get('tags') as string[]) || [];
+      /** CRDT boundary: validate tags array */
+      const currentTags = getValidatedTags(map.get('tags'));
       const normalizedTag = tag.toLowerCase().trim();
 
       map.set(
@@ -1668,7 +1688,9 @@ export function atomicRegenerateTokenIfOwner(
   ydoc.transact(
     () => {
       const map = ydoc.getMap(YDOC_KEYS.METADATA);
-      const currentOwner = map.get('ownerId') as string | undefined;
+      /** CRDT boundary: validate ownerId type */
+      const rawOwnerId = map.get('ownerId');
+      const currentOwner = typeof rawOwnerId === 'string' ? rawOwnerId : undefined;
 
       if (currentOwner !== expectedOwnerId) {
         result = { success: false, actualOwner: currentOwner };

@@ -32,7 +32,7 @@ export function loadEnv<T extends z.ZodSchema>(schema: T): z.infer<T> {
       if (testResult.success) {
         return testResult.data;
       }
-      // Format validation errors with helpful messages
+      /** Format validation errors with helpful messages */
       if (!error.issues || !Array.isArray(error.issues)) {
         throw new Error('Environment variable validation failed (no error details available)');
       }

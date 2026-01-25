@@ -66,7 +66,7 @@ const corruptionState = new Map<
   }
 >();
 
-// Minimum interval between reporting the same corruption (5 minutes)
+/** Minimum interval between reporting the same corruption (5 minutes) */
 const CORRUPTION_REPORT_INTERVAL_MS = 5 * 60 * 1000;
 
 /**
@@ -85,14 +85,14 @@ function shouldReportCorruption(planId: string, key: string): boolean {
     return true;
   }
 
-  // New key that wasn't previously corrupted
+  /** New key that wasn't previously corrupted */
   if (!state.corruptedKeys.has(key)) {
     state.corruptedKeys.add(key);
     state.lastReported = now;
     return true;
   }
 
-  // Same key, check if enough time has passed
+  /** Same key, check if enough time has passed */
   if (now - state.lastReported > CORRUPTION_REPORT_INTERVAL_MS) {
     state.lastReported = now;
     return true;
@@ -175,10 +175,10 @@ function validateArray<T>(
 export function validateYDoc(doc: Y.Doc, planId: string): ValidationReport {
   const results: ValidationResult[] = [];
 
-  // Validate metadata
+  /** Validate metadata */
   results.push(validateMetadata(doc, planId));
 
-  // Validate arrays with their respective schemas
+  /** Validate arrays with their respective schemas */
   results.push(validateArray(doc, YDOC_KEYS.ARTIFACTS, ArtifactSchema));
   results.push(validateArray(doc, YDOC_KEYS.DELIVERABLES, DeliverableSchema));
   results.push(validateArray(doc, YDOC_KEYS.LINKED_PRS, LinkedPRSchema));
@@ -253,7 +253,7 @@ function createArrayObserver<T>(
  * @param doc - Y.Doc to attach validators to
  */
 export function attachCRDTValidation(planId: string, doc: Y.Doc): void {
-  // Validate metadata on every change
+  /** Validate metadata on every change */
   doc.getMap<PlanMetadata>(YDOC_KEYS.METADATA).observe((_event, transaction) => {
     const result = validateMetadata(doc, planId);
 
@@ -264,32 +264,32 @@ export function attachCRDTValidation(planId: string, doc: Y.Doc): void {
     }
   });
 
-  // Validate artifacts array
+  /** Validate artifacts array */
   doc
     .getArray<Artifact>(YDOC_KEYS.ARTIFACTS)
     .observe(createArrayObserver<Artifact>(planId, YDOC_KEYS.ARTIFACTS, ArtifactSchema));
 
-  // Validate deliverables array
+  /** Validate deliverables array */
   doc
     .getArray<Deliverable>(YDOC_KEYS.DELIVERABLES)
     .observe(createArrayObserver<Deliverable>(planId, YDOC_KEYS.DELIVERABLES, DeliverableSchema));
 
-  // Validate linked PRs array
+  /** Validate linked PRs array */
   doc
     .getArray<LinkedPR>(YDOC_KEYS.LINKED_PRS)
     .observe(createArrayObserver<LinkedPR>(planId, YDOC_KEYS.LINKED_PRS, LinkedPRSchema));
 
-  // Validate events array
+  /** Validate events array */
   doc
     .getArray<PlanEvent>(YDOC_KEYS.EVENTS)
     .observe(createArrayObserver<PlanEvent>(planId, YDOC_KEYS.EVENTS, PlanEventSchema));
 
-  // Validate snapshots array
+  /** Validate snapshots array */
   doc
     .getArray<PlanSnapshot>(YDOC_KEYS.SNAPSHOTS)
     .observe(createArrayObserver<PlanSnapshot>(planId, YDOC_KEYS.SNAPSHOTS, PlanSnapshotSchema));
 
-  // Validate PR review comments array
+  /** Validate PR review comments array */
   doc
     .getArray<PRReviewComment>(YDOC_KEYS.PR_REVIEW_COMMENTS)
     .observe(
@@ -300,7 +300,7 @@ export function attachCRDTValidation(planId: string, doc: Y.Doc): void {
       )
     );
 
-  // Validate input requests array
+  /** Validate input requests array */
   doc
     .getArray<InputRequest>(YDOC_KEYS.INPUT_REQUESTS)
     .observe(

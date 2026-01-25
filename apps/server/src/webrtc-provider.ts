@@ -43,25 +43,26 @@ const SIGNALING_SERVER =
  * @param planId - The plan ID (used as room name)
  * @returns WebrtcProvider instance
  */
-// Polyfill global WebRTC objects for simple-peer (done once at module load)
-// @ts-expect-error - Checking for browser WebRTC API availability
-if (typeof globalThis.RTCPeerConnection === 'undefined') {
-  // @ts-expect-error - Polyfilling browser WebRTC APIs for Node.js
-  globalThis.RTCPeerConnection = wrtc.RTCPeerConnection;
-  // @ts-expect-error - Polyfilling browser WebRTC APIs for Node.js
-  globalThis.RTCSessionDescription = wrtc.RTCSessionDescription;
-  // @ts-expect-error - Polyfilling browser WebRTC APIs for Node.js
-  globalThis.RTCIceCandidate = wrtc.RTCIceCandidate;
+/**
+ * Polyfill global WebRTC objects for simple-peer (done once at module load).
+ * TypeScript's globalThis has strict index signature that doesn't allow arbitrary property assignment.
+ */
+// eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- Node.js polyfill for WebRTC globals required by simple-peer
+const globalAny = globalThis as Record<string, unknown>;
+if (typeof globalAny.RTCPeerConnection === 'undefined') {
+  globalAny.RTCPeerConnection = wrtc.RTCPeerConnection;
+  globalAny.RTCSessionDescription = wrtc.RTCSessionDescription;
+  globalAny.RTCIceCandidate = wrtc.RTCIceCandidate;
 }
 
 export async function createWebRtcProvider(ydoc: Y.Doc, planId: string): Promise<WebrtcProvider> {
-  // Build ICE servers configuration
+  /** Build ICE servers configuration */
   const iceServers: Array<{ urls: string; username?: string; credential?: string }> = [
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
   ];
 
-  // Add TURN server if configured
+  /** Add TURN server if configured */
   if (process.env.TURN_URL && process.env.TURN_USERNAME && process.env.TURN_CREDENTIAL) {
     iceServers.push({
       urls: process.env.TURN_URL,
@@ -71,7 +72,7 @@ export async function createWebRtcProvider(ydoc: Y.Doc, planId: string): Promise
     logger.info({ turnUrl: process.env.TURN_URL }, 'TURN server configured');
   }
 
-  // Create provider with room name based on plan ID
+  /** Create provider with room name based on plan ID */
   const roomName = `shipyard-${planId}`;
   const provider = new WebrtcProvider(roomName, ydoc, {
     signaling: [SIGNALING_SERVER],
@@ -84,8 +85,10 @@ export async function createWebRtcProvider(ydoc: Y.Doc, planId: string): Promise
     },
   });
 
-  // Broadcast MCP identity via awareness protocol and push to signaling
-  // Use .catch() to ensure awareness is always set, even if GitHub auth fails
+  /*
+   * Broadcast MCP identity via awareness protocol and push to signaling
+   * Use .catch() to ensure awareness is always set, even if GitHub auth fails
+   */
   const username = await getGitHubUsername().catch(() => undefined);
   const fallbackId = `mcp-anon-${crypto.randomUUID().slice(0, 8)}`;
   const userId = username ? `mcp-${username}` : fallbackId;
@@ -109,11 +112,13 @@ export async function createWebRtcProvider(ydoc: Y.Doc, planId: string): Promise
     'MCP awareness state set'
   );
 
-  // Push approval state to signaling server (required for access control)
-  // Use fallback ID if no username available
+  /*
+   * Push approval state to signaling server (required for access control)
+   * Use fallback ID if no username available
+   */
   sendApprovalStateToSignaling(provider, planId, username ?? fallbackId);
 
-  // Set up event listeners for monitoring
+  /** Set up event listeners for monitoring */
   setupProviderListeners(provider, planId);
 
   logger.info(
@@ -142,23 +147,23 @@ function sendApprovalStateToSignaling(
   planId: string,
   username: string
 ): void {
-  // Access signaling connections (internal y-webrtc API via shared type guard)
+  /** Access signaling connections (internal y-webrtc API via shared type guard) */
   const signalingConns = getSignalingConnections(provider);
 
   if (signalingConns.length === 0) {
-    // Schedule approval state push after signaling connects
+    /** Schedule approval state push after signaling connects */
     setTimeout(() => sendApprovalStateToSignaling(provider, planId, username), 1000);
     return;
   }
 
-  // Send user identity first (so signaling knows which user this connection belongs to)
+  /** Send user identity first (so signaling knows which user this connection belongs to) */
   const identifyMessage = JSON.stringify({
     type: 'subscribe',
     topics: [],
     userId: username,
   });
 
-  // Then send approval state (MCP is owner, so approve itself)
+  /** Then send approval state (MCP is owner, so approve itself) */
   const approvalStateMessage = JSON.stringify({
     type: 'approval_state',
     planId,
@@ -185,7 +190,7 @@ function sendApprovalStateToSignaling(
  * @param planId - The plan ID for logging context
  */
 function setupProviderListeners(provider: WebrtcProvider, planId: string): void {
-  // Track peer connections
+  /** Track peer connections */
   provider.on('peers', (event: { added: string[]; removed: string[]; webrtcPeers: string[] }) => {
     const peerCount = event.webrtcPeers.length;
 
@@ -212,7 +217,7 @@ function setupProviderListeners(provider: WebrtcProvider, planId: string): void 
     }
   });
 
-  // Track sync status
+  /** Track sync status */
   provider.on('synced', (event: { synced: boolean }) => {
     logger.info(
       {
@@ -223,7 +228,7 @@ function setupProviderListeners(provider: WebrtcProvider, planId: string): void 
     );
   });
 
-  // Track signaling connection status
+  /** Track signaling connection status */
   provider.on('status', (event: { connected: boolean }) => {
     logger.info(
       {

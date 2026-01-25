@@ -12,7 +12,7 @@ import { getGitHubUsername } from '../server-identity.js';
 import { verifySessionToken } from '../session-token.js';
 import { TOOL_NAMES } from './tool-names.js';
 
-// --- Input Schema ---
+/** --- Input Schema --- */
 
 const AddPRReviewCommentInput = z.object({
   planId: z.string().describe('Plan ID'),
@@ -23,7 +23,7 @@ const AddPRReviewCommentInput = z.object({
   body: z.string().describe('Comment content (markdown supported)'),
 });
 
-// --- Public Export ---
+/** --- Public Export --- */
 
 export const addPRReviewCommentTool = {
   definition: {
@@ -80,7 +80,7 @@ add_pr_review_comment({
       };
     }
 
-    // Verify session token
+    /** Verify session token */
     if (
       !metadata.sessionTokenHash ||
       !verifySessionToken(input.sessionToken, metadata.sessionTokenHash)
@@ -91,7 +91,7 @@ add_pr_review_comment({
       };
     }
 
-    // Get actor name for event logging
+    /** Get actor name for event logging */
     const actorName = await getGitHubUsername();
 
     const comment: PRReviewComment = {
@@ -107,7 +107,7 @@ add_pr_review_comment({
 
     addPRReviewComment(ydoc, comment, actorName);
 
-    // Log comment added event (semantic action)
+    /** Log comment added event (semantic action) */
     logPlanEvent(ydoc, 'comment_added', actorName, {
       commentId: comment.id,
       prNumber: input.prNumber,

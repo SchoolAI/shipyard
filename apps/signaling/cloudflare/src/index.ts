@@ -16,14 +16,14 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
 
-    // Health check endpoint
+    /** Health check endpoint */
     if (url.pathname === '/health') {
       return new Response('OK', {
         headers: { 'Content-Type': 'text/plain' },
       });
     }
 
-    // CORS preflight for browser connections
+    /** CORS preflight for browser connections */
     if (request.method === 'OPTIONS') {
       return new Response(null, {
         headers: {
@@ -34,7 +34,7 @@ export default {
       });
     }
 
-    // Require WebSocket upgrade
+    /** Require WebSocket upgrade */
     const upgradeHeader = request.headers.get('Upgrade');
     if (upgradeHeader !== 'websocket') {
       return new Response(
@@ -50,14 +50,16 @@ export default {
       );
     }
 
-    // Route to a global signaling room
-    // Each connected client subscribes to topics (plan rooms) dynamically
-    // We use a single DO for all connections to keep things simple
-    // Alternative: create per-topic DOs (more isolation, more complexity)
+    /*
+     * Route to a global signaling room
+     * Each connected client subscribes to topics (plan rooms) dynamically
+     * We use a single DO for all connections to keep things simple
+     * Alternative: create per-topic DOs (more isolation, more complexity)
+     */
     const roomId = env.SIGNALING_ROOM.idFromName('global-signaling');
     const room = env.SIGNALING_ROOM.get(roomId);
 
-    // Forward the WebSocket upgrade request to the Durable Object
+    /** Forward the WebSocket upgrade request to the Durable Object */
     return room.fetch(request);
   },
 };

@@ -46,27 +46,31 @@ function getOrCreateWebrtcProvider(
   const existing = webrtcProviderCache.get(roomName);
 
   if (existing) {
-    // Reuse existing provider if it's for the same ydoc
+    /** Reuse existing provider if it's for the same ydoc */
     if (existing.ydoc === ydoc) {
       existing.refCount++;
       return existing.provider;
     }
-    // Different ydoc - this shouldn't happen in normal usage, but handle gracefully
-    // by destroying the old provider first
+    /*
+     * Different ydoc - this shouldn't happen in normal usage, but handle gracefully
+     * by destroying the old provider first
+     */
     releaseWebrtcProvider(roomName);
   }
 
-  // Create new provider with ICE server configuration for better NAT traversal
-  // STUN servers help establish direct peer connections
-  // TURN servers relay traffic when direct connection fails (common on mobile)
+  /*
+   * Create new provider with ICE server configuration for better NAT traversal
+   * STUN servers help establish direct peer connections
+   * TURN servers relay traffic when direct connection fails (common on mobile)
+   */
 
-  // Build ICE servers configuration
+  /** Build ICE servers configuration */
   const iceServers: RTCIceServer[] = [
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
   ];
 
-  // Add TURN server if configured via environment variables
+  /** Add TURN server if configured via environment variables */
   const turnUrl = import.meta.env.VITE_TURN_URL;
   const turnUsername = import.meta.env.VITE_TURN_USERNAME;
   const turnCredential = import.meta.env.VITE_TURN_CREDENTIAL;
@@ -108,7 +112,7 @@ function releaseWebrtcProvider(roomName: string): void {
   cached.refCount--;
 
   if (cached.refCount <= 0) {
-    // Last reference - destroy the provider
+    /** Last reference - destroy the provider */
     cached.provider.awareness?.setLocalState(null);
     cached.provider.disconnect();
     cached.provider.destroy();
@@ -133,11 +137,11 @@ async function discoverHubUrl(): Promise<string> {
         return `ws://localhost:${port}`;
       }
     } catch {
-      // Continue to next port
+      /** Continue to next port */
     }
   }
 
-  // Fallback to default if discovery fails
+  /** Fallback to default if discovery fails */
   return `ws://localhost:${DEFAULT_REGISTRY_PORTS[0]}`;
 }
 
@@ -212,7 +216,7 @@ export function useMultiProviderSync(
   /** True while reconnection is in progress (prevents button spam) */
   isReconnecting: boolean;
 } {
-  // Enable WebRTC for all documents including plan-index (needed for remote sync)
+  /** Enable WebRTC for all documents including plan-index (needed for remote sync) */
   const enableWebRTC = options.enableWebRTC ?? true;
   const userName = options.userName ?? 'Anonymous';
 
@@ -239,34 +243,36 @@ export function useMultiProviderSync(
   const [rtcProvider, setRtcProvider] = useState<WebrtcProvider | null>(null);
   const [wsProvider, setWsProvider] = useState<WebsocketProvider | null>(null);
 
-  // Manual reconnect trigger - incrementing this re-runs the effect
+  /** Manual reconnect trigger - incrementing this re-runs the effect */
   const [reconnectTrigger, setReconnectTrigger] = useState(0);
 
-  // Track whether reconnection is in progress (prevents button spam)
+  /** Track whether reconnection is in progress (prevents button spam) */
   const [isReconnecting, setIsReconnecting] = useState(false);
 
-  // Reconnect function exposed to consumers
+  /** Reconnect function exposed to consumers */
   const reconnect = useCallback(() => {
-    // Prevent rapid repeated clicks - button spam can cause orphaned WebSocket providers
+    /** Prevent rapid repeated clicks - button spam can cause orphaned WebSocket providers */
     if (isReconnecting) return;
 
-    // Reset timeout/error state
+    /** Reset timeout/error state */
     timedOutRef.current = false;
     errorRef.current = undefined;
     idbSyncedRef.current = false;
 
-    // Mark reconnecting and disable button for 2 seconds
-    // This gives hub discovery (1s timeout per port) time to complete
+    /*
+     * Mark reconnecting and disable button for 2 seconds
+     * This gives hub discovery (1s timeout per port) time to complete
+     */
     setIsReconnecting(true);
     setTimeout(() => {
       setIsReconnecting(false);
     }, 2000);
 
-    // Trigger effect re-run
+    /** Trigger effect re-run */
     setReconnectTrigger((prev) => prev + 1);
   }, [isReconnecting]);
 
-  // Helper: Handle connection timeout with circuit breaker
+  /** Helper: Handle connection timeout with circuit breaker */
   const handleConnectionTimeout = useCallback(
     (mounted: { current: boolean }, updateSyncState: () => void) => {
       if (!mounted.current) return;
@@ -274,13 +280,15 @@ export function useMultiProviderSync(
       const wsConnected = wsProviderRef.current?.wsconnected ?? false;
       const hasP2PPeers = peerCountRef.current > 0;
 
-      // Only timeout if we have no connection at all (no hub, no peers)
+      /** Only timeout if we have no connection at all (no hub, no peers) */
       if (!wsConnected && !hasP2PPeers) {
         timedOutRef.current = true;
         errorRef.current = 'Connection timeout - check network or start MCP server';
 
-        // CIRCUIT BREAKER: Stop providers to prevent infinite reconnection loop
-        // Without this, y-websocket and y-webrtc retry forever with exponential backoff
+        /*
+         * CIRCUIT BREAKER: Stop providers to prevent infinite reconnection loop
+         * Without this, y-websocket and y-webrtc retry forever with exponential backoff
+         */
         if (wsProviderRef.current) {
           wsProviderRef.current.disconnect();
         }
@@ -294,7 +302,7 @@ export function useMultiProviderSync(
     []
   );
 
-  // Helper: Cleanup WebSocket provider and listeners
+  /** Helper: Cleanup WebSocket provider and listeners */
   const cleanupWebSocketProvider = useCallback(
     (
       ws: WebsocketProvider | null,
@@ -311,7 +319,7 @@ export function useMultiProviderSync(
     []
   );
 
-  // Helper: Cleanup WebRTC provider and listeners
+  /** Helper: Cleanup WebRTC provider and listeners */
   const cleanupWebRTCProvider = useCallback(
     (
       rtc: WebrtcProvider | null,
@@ -332,38 +340,42 @@ export function useMultiProviderSync(
     []
   );
 
-  // reconnectTrigger is intentionally included to re-run the effect when reconnect() is called.
-  // This is the mechanism for manual reconnection after circuit breaker trips.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: reconnectTrigger is intentionally unused but triggers effect re-run
+  /*
+   * reconnectTrigger is intentionally included to re-run the effect when reconnect() is called.
+   * This is the mechanism for manual reconnection after circuit breaker trips.
+   * biome-ignore lint/correctness/useExhaustiveDependencies: reconnectTrigger is intentionally unused but triggers effect re-run
+   */
   useEffect(() => {
-    // Skip all sync setup if docName is empty (e.g., for snapshots)
+    /** Skip all sync setup if docName is empty (e.g., for snapshots) */
     if (!docName) {
       return;
     }
 
-    // Use ref object for mounted state so timeout callback always sees current value
+    /** Use ref object for mounted state so timeout callback always sees current value */
     const mountedRef = { current: true };
     let ws: WebsocketProvider | null = null;
     let rtc: WebrtcProvider | null = null;
     let handleBeforeUnload: (() => void) | null = null;
 
-    // Store listener references for proper cleanup (prevents memory leak)
+    /** Store listener references for proper cleanup (prevents memory leak) */
     let wsStatusListener: (() => void) | null = null;
     let wsSyncListener: (() => void) | null = null;
     let awarenessChangeListener: (() => void) | null = null;
     let rtcSyncedListener: (() => void) | null = null;
 
-    // IndexedDB persistence
+    /** IndexedDB persistence */
     const idbProvider = new IndexeddbPersistence(docName, ydoc);
 
-    // Track when IndexedDB has synced - this means local data is available
+    /** Track when IndexedDB has synced - this means local data is available */
     idbProvider.whenSynced.then(() => {
       if (mountedRef.current) {
         idbSyncedRef.current = true;
         updateSyncState();
 
-        // Fire event so useSharedPlans can discover newly synced plans
-        // Only fire for plan documents (not plan-index)
+        /*
+         * Fire event so useSharedPlans can discover newly synced plans
+         * Only fire for plan documents (not plan-index)
+         */
         if (docName !== 'plan-index') {
           window.dispatchEvent(
             new CustomEvent('indexeddb-plan-synced', { detail: { planId: docName } })
@@ -372,16 +384,18 @@ export function useMultiProviderSync(
       }
     });
 
-    // Connect to single Registry Hub with port discovery
+    /** Connect to single Registry Hub with port discovery */
     (async () => {
       const envHubUrl = import.meta.env.VITE_HUB_URL;
       const hubUrl = envHubUrl ? envHubUrl : await discoverHubUrl();
 
-      // Critical: Check mounted AFTER async hub discovery completes
-      // Component could have unmounted during the await
+      /*
+       * Critical: Check mounted AFTER async hub discovery completes
+       * Component could have unmounted during the await
+       */
       if (!mountedRef.current) return;
 
-      // Extract port from hub URL for local artifact URLs
+      /** Extract port from hub URL for local artifact URLs */
       try {
         const url = new URL(hubUrl);
         const port = Number.parseInt(url.port || '32191', 10);
@@ -398,10 +412,10 @@ export function useMultiProviderSync(
       wsProviderRef.current = ws;
       setWsProvider(ws);
 
-      // Store listener references for cleanup
+      /** Store listener references for cleanup */
       wsStatusListener = () => {
         if (mountedRef.current) {
-          // Clear timeout when connection succeeds
+          /** Clear timeout when connection succeeds */
           const wsConnected = ws?.wsconnected ?? false;
           if (wsConnected && timedOutRef.current) {
             timedOutRef.current = false;
@@ -418,36 +432,40 @@ export function useMultiProviderSync(
       ws.on('sync', wsSyncListener);
     })();
 
-    // Connection timeout: If not connected within 10 seconds, show offline state
-    // CIRCUIT BREAKER: Also disconnect providers to stop infinite reconnection loop
+    /*
+     * Connection timeout: If not connected within 10 seconds, show offline state
+     * CIRCUIT BREAKER: Also disconnect providers to stop infinite reconnection loop
+     */
     const CONNECTION_TIMEOUT = 10000;
     const timeoutId = setTimeout(
       () => handleConnectionTimeout(mountedRef, updateSyncState),
       CONNECTION_TIMEOUT
     );
 
-    // WebRTC P2P sync - simple setup without authentication
+    /** WebRTC P2P sync - simple setup without authentication */
     if (enableWebRTC) {
       const envSignaling = import.meta.env.VITE_WEBRTC_SIGNALING;
       const signalingServer = envSignaling || DEFAULT_SIGNALING_SERVER;
 
       const roomName = `shipyard-${docName}`;
 
-      // Use cached provider to avoid duplicate room errors in StrictMode
+      /** Use cached provider to avoid duplicate room errors in StrictMode */
       rtc = getOrCreateWebrtcProvider(roomName, ydoc, signalingServer);
       rtcProviderRef.current = rtc;
       setRtcProvider(rtc);
 
-      // Expose provider on window for debugging
+      /** Expose provider on window for debugging */
       if (docName === 'plan-index') {
         window.planIndexRtcProvider = rtc;
       } else {
-        // Also expose plan-specific provider for debugging
+        /** Also expose plan-specific provider for debugging */
         window.planRtcProvider = rtc;
       }
 
-      // Set awareness for user presence with planStatus field
-      // This matches what useP2PPeers expects and what MCP servers broadcast
+      /*
+       * Set awareness for user presence with planStatus field
+       * This matches what useP2PPeers expects and what MCP servers broadcast
+       */
       const awareness = rtc.awareness;
       awareness.setLocalStateField('planStatus', {
         user: {
@@ -460,11 +478,13 @@ export function useMultiProviderSync(
         status: 'approved' as const,
       });
 
-      // Count peers from awareness states (excluding self)
-      // Store as listener reference for cleanup
+      /*
+       * Count peers from awareness states (excluding self)
+       * Store as listener reference for cleanup
+       */
       awarenessChangeListener = () => {
         const states = awareness.getStates();
-        // Count peers excluding ourselves
+        /** Count peers excluding ourselves */
         const peerCount = states.size - 1;
         peerCountRef.current = Math.max(0, peerCount);
         if (mountedRef.current) {
@@ -472,13 +492,13 @@ export function useMultiProviderSync(
         }
       };
 
-      // Listen for awareness changes (peers joining/leaving)
+      /** Listen for awareness changes (peers joining/leaving) */
       awareness.on('change', awarenessChangeListener);
 
-      // Initial count
+      /** Initial count */
       awarenessChangeListener();
 
-      // Track sync state - store listener reference for cleanup
+      /** Track sync state - store listener reference for cleanup */
       rtcSyncedListener = () => {
         if (mountedRef.current) {
           updateSyncState();
@@ -486,8 +506,10 @@ export function useMultiProviderSync(
       };
       rtc.on('synced', rtcSyncedListener);
 
-      // Clear awareness on page unload so other peers see us leave immediately
-      // instead of waiting for the 30-second awareness timeout
+      /*
+       * Clear awareness on page unload so other peers see us leave immediately
+       * instead of waiting for the 30-second awareness timeout
+       */
       handleBeforeUnload = () => {
         awareness.setLocalState(null);
       };
@@ -519,27 +541,29 @@ export function useMultiProviderSync(
       mountedRef.current = false;
       clearTimeout(timeoutId);
 
-      // IMPORTANT: Remove event listeners BEFORE destroying providers
-      // This prevents memory leaks from accumulated listeners in React StrictMode
+      /*
+       * IMPORTANT: Remove event listeners BEFORE destroying providers
+       * This prevents memory leaks from accumulated listeners in React StrictMode
+       */
       cleanupWebSocketProvider(ws, wsStatusListener, wsSyncListener);
       wsProviderRef.current = null;
       setWsProvider(null);
 
-      // Cleanup IndexedDB provider
+      /** Cleanup IndexedDB provider */
       try {
         idbProvider.destroy();
       } catch {
-        // Ignore errors during cleanup
+        /** Ignore errors during cleanup */
       }
 
-      // Cleanup WebRTC provider - remove listeners first
+      /** Cleanup WebRTC provider - remove listeners first */
       if (enableWebRTC) {
         const roomName = `shipyard-${docName}`;
         cleanupWebRTCProvider(rtc, awarenessChangeListener, rtcSyncedListener, roomName);
         setRtcProvider(null);
         rtcProviderRef.current = null;
 
-        // Clean up window debug references
+        /** Clean up window debug references */
         if (docName === 'plan-index') {
           delete window.planIndexRtcProvider;
         } else {
@@ -547,7 +571,7 @@ export function useMultiProviderSync(
         }
       }
 
-      // Remove beforeunload listener
+      /** Remove beforeunload listener */
       if (handleBeforeUnload) {
         window.removeEventListener('beforeunload', handleBeforeUnload);
       }

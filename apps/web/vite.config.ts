@@ -26,17 +26,17 @@ function githubPagesSpa(): Plugin {
         const notFoundPath = path.join(distDir, '404.html');
         const nojekyllPath = path.join(distDir, '.nojekyll');
 
-        // Ensure dist directory exists
+        /** Ensure dist directory exists */
         if (!fs.existsSync(distDir)) {
           fs.mkdirSync(distDir, { recursive: true });
         }
 
-        // Copy index.html to 404.html for SPA routing
+        /** Copy index.html to 404.html for SPA routing */
         if (fs.existsSync(indexPath)) {
           fs.copyFileSync(indexPath, notFoundPath);
         }
 
-        // Create .nojekyll to prevent GitHub Pages from ignoring _-prefixed files
+        /** Create .nojekyll to prevent GitHub Pages from ignoring _-prefixed files */
         fs.writeFileSync(nojekyllPath, '');
       },
     },
@@ -44,14 +44,16 @@ function githubPagesSpa(): Plugin {
 }
 
 export default defineConfig(({ mode }) => ({
-  // Base path for GitHub Pages: https://schoolai.github.io/shipyard/
-  // Use '/' for development, '/shipyard/' for production
+  /**
+   * Base path for GitHub Pages: https://schoolai.github.io/shipyard/
+   * Use '/' for development, '/shipyard/' for production
+   */
   base: mode === 'production' ? '/shipyard/' : '/',
   plugins: [tailwindcss(), react(), githubPagesSpa()],
   server: {
     port: 5173,
     open: true,
-    // Watch workspace packages for changes
+    /** Watch workspace packages for changes */
     watch: {
       ignored: ['!**/node_modules/@shipyard/**'],
     },
@@ -61,7 +63,7 @@ export default defineConfig(({ mode }) => ({
       '@': path.resolve(__dirname, './src'),
     },
   },
-  // Don't pre-bundle workspace packages - use them directly from dist
+  /** Don't pre-bundle workspace packages - use them directly from dist */
   optimizeDeps: {
     exclude: ['@shipyard/schema'],
   },

@@ -35,7 +35,7 @@ interface ReviewDecision {
   status?: string;
 }
 
-// --- Approval Handling Helpers ---
+/** --- Approval Handling Helpers --- */
 
 /**
  * Build the approval message with deliverable count and optional reviewer comment.
@@ -268,18 +268,18 @@ export async function checkReviewStatus(
 ): Promise<CoreResponse> {
   const state = await getSessionContext(sessionId);
 
-  // Case 1: New plan creation (no state, but have content)
+  /** Case 1: New plan creation (no state, but have content) */
   if (!state.found && planContent) {
     return handleNewPlanCreation(sessionId, planContent, originMetadata);
   }
 
-  // Case 2: No state and no content - allow exit
+  /** Case 2: No state and no content - allow exit */
   if (!state.found) {
     logger.info({ sessionId }, 'No session state or plan content, allowing exit');
     return { allow: true };
   }
 
-  // Case 3: State exists but planId missing (should not happen)
+  /** Case 3: State exists but planId missing (should not happen) */
   if (!state.planId && planContent) {
     logger.error(
       { sessionId, hasPlanContent: !!planContent, hasState: !!state, statePlanId: state?.planId },
@@ -298,13 +298,13 @@ export async function checkReviewStatus(
 
   const planId = state.planId;
 
-  // Case 4: Plan update (have planId and new content)
+  /** Case 4: Plan update (have planId and new content) */
   if (planContent) {
     logger.info({ planId }, 'Plan content provided, triggering re-review');
     return await handleUpdatedPlanReview(sessionId, planId, planContent, originMetadata);
   }
 
-  // Case 5: Just checking status (no new content)
+  /** Case 5: Just checking status (no new content) */
   logger.info({ sessionId, planId }, 'Checking review status');
 
   let status: GetReviewStatusResponse;

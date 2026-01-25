@@ -35,7 +35,7 @@ export function isPlanMetadataLoaded(
   return !info.isLoading;
 }
 
-// Cache to avoid reloading the same plan data
+/** Cache to avoid reloading the same plan data */
 const metadataCache = new Map<string, { data: PlanMetadataInfo; timestamp: number }>();
 const CACHE_TTL = 30_000;
 
@@ -47,7 +47,7 @@ type LoadedPlanMetadata = Extract<PlanMetadataInfo, { isLoading: false }>;
  * Results are cached for 30 seconds to avoid repeated loads.
  */
 async function loadPlanMetadata(planId: string): Promise<LoadedPlanMetadata> {
-  // Check cache first
+  /** Check cache first */
   const cached = metadataCache.get(planId);
   if (cached && Date.now() - cached.timestamp < CACHE_TTL && isPlanMetadataLoaded(cached.data)) {
     return cached.data;
@@ -70,12 +70,12 @@ async function loadPlanMetadata(planId: string): Promise<LoadedPlanMetadata> {
       linkedPRs,
     };
 
-    // Cache the result
+    /** Cache the result */
     metadataCache.set(planId, { data: result, timestamp: Date.now() });
 
     return result;
   } catch {
-    // Return empty state on error
+    /** Return empty state on error */
     return {
       isLoading: false,
       deliverableCount: 0,
@@ -95,14 +95,14 @@ export function usePlanMetadata(planId: string): PlanMetadataInfo {
   useEffect(() => {
     let isActive = true;
 
-    // Check cache synchronously for instant display
+    /** Check cache synchronously for instant display */
     const cached = metadataCache.get(planId);
     if (cached && Date.now() - cached.timestamp < CACHE_TTL && isPlanMetadataLoaded(cached.data)) {
       setMetadata(cached.data);
       return;
     }
 
-    // Reset to loading state when planId changes
+    /** Reset to loading state when planId changes */
     setMetadata({ isLoading: true });
 
     loadPlanMetadata(planId).then((data) => {

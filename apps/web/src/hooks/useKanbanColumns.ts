@@ -81,7 +81,7 @@ export function columnIdToStatus(columnId: ColumnId): PlanStatusType {
  */
 export function useKanbanColumns(plans: PlanIndexEntry[]): ColumnWithPlans[] {
   return useMemo(() => {
-    // Filter out archived plans
+    /** Filter out archived plans */
     const activePlans = plans.filter((p) => !p.deleted);
 
     return STATUS_COLUMNS.map((column) => ({
@@ -116,7 +116,7 @@ export function useTagColumns(
   return useMemo(() => {
     const activePlans = plans.filter((p) => !p.deleted);
 
-    // Collect all unique tags from active plans
+    /** Collect all unique tags from active plans */
     const allTags = new Set<string>();
     for (const plan of activePlans) {
       if (plan.tags) {
@@ -126,13 +126,13 @@ export function useTagColumns(
       }
     }
 
-    // Filter to selected tags if provided
+    /** Filter to selected tags if provided */
     const tagsToShow =
       selectedTags && selectedTags.length > 0
         ? selectedTags.filter((t) => allTags.has(t))
         : Array.from(allTags).sort();
 
-    // Create column for each tag
+    /** Create column for each tag */
     const tagColumns: TagColumnDefinition[] = tagsToShow.map((tag) => ({
       id: `tag-${tag}`,
       label: tag,
@@ -143,7 +143,7 @@ export function useTagColumns(
         .sort((a, b) => b.updatedAt - a.updatedAt),
     }));
 
-    // Add "Untagged" column at the end
+    /** Add "Untagged" column at the end */
     const untaggedPlans = activePlans.filter((p) => !p.tags || p.tags.length === 0);
     if (untaggedPlans.length > 0) {
       tagColumns.push({

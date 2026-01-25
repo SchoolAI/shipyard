@@ -9,7 +9,7 @@ import { useUserIdentity } from '@/contexts/UserIdentityContext';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
 import { getSignalingConnections } from '@/types/y-webrtc-internals';
 
-// Extend Window interface for temporary timeout storage
+/** Extend Window interface for temporary timeout storage */
 declare global {
   interface Window {
     __shareButtonTimeout?: ReturnType<typeof setTimeout>;
@@ -46,7 +46,7 @@ export function ShareButton({
     try {
       await navigator.clipboard.writeText(text);
     } catch {
-      // Fallback for older browsers
+      /** Fallback for older browsers */
       const textArea = document.createElement('textarea');
       textArea.value = text;
       document.body.appendChild(textArea);
@@ -65,13 +65,13 @@ export function ShareButton({
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
 
-    // Show informative toast about view-only access
+    /** Show informative toast about view-only access */
     toast.info('Link copied (view-only access)', {
       description: 'Sign in as the plan owner to create invite links with full access.',
     });
   }, [copyToClipboard]);
 
-  // Send invite creation message via WebSocket
+  /** Send invite creation message via WebSocket */
   const sendInviteMessage = useCallback(
     (rtcProvider: WebrtcProvider, planId: string, authToken: string): boolean => {
       const message = JSON.stringify({
@@ -95,16 +95,18 @@ export function ShareButton({
     []
   );
 
-  // Create invite via signaling server (defaults: 30min TTL, unlimited uses)
+  /** Create invite via signaling server (defaults: 30min TTL, unlimited uses) */
   const createInvite = useCallback(() => {
     if (!rtcProvider || !planId) {
-      // Fallback to simple share if WebRTC isn't available
+      /** Fallback to simple share if WebRTC isn't available */
       handleSimpleShare();
       return;
     }
 
-    // This check shouldn't be needed since we disable the button when not signed in,
-    // but keep it as a safety net
+    /*
+     * This check shouldn't be needed since we disable the button when not signed in,
+     * but keep it as a safety net
+     */
     if (!identity || !identity.token) {
       toast.error('Sign in required', {
         description: 'You need to sign in with GitHub to create invite links.',
@@ -114,7 +116,7 @@ export function ShareButton({
 
     setIsCreating(true);
 
-    // Set timeout (10 seconds) - if no response, show error
+    /** Set timeout (10 seconds) - if no response, show error */
     const timeout = setTimeout(() => {
       setIsCreating(false);
       toast.error('Failed to create invite link', {
@@ -123,7 +125,7 @@ export function ShareButton({
       });
     }, 10000);
 
-    // Store timeout ID to clear it if we get a response
+    /** Store timeout ID to clear it if we get a response */
     window.__shareButtonTimeout = timeout;
 
     const sent = sendInviteMessage(rtcProvider, planId, identity.token);
@@ -131,12 +133,12 @@ export function ShareButton({
     if (!sent) {
       clearTimeout(timeout);
       setIsCreating(false);
-      // Fall back to copying current URL
+      /** Fall back to copying current URL */
       handleSimpleShare();
     }
   }, [rtcProvider, planId, identity, sendInviteMessage, handleSimpleShare]);
 
-  // Handle error responses from signaling server
+  /** Handle error responses from signaling server */
   const handleErrorResponse = useCallback((data: { error?: string }) => {
     const timeout = window.__shareButtonTimeout;
     if (timeout) {
@@ -153,24 +155,24 @@ export function ShareButton({
     });
   }, []);
 
-  // Handle successful invite creation from signaling server
+  /** Handle successful invite creation from signaling server */
   const handleInviteCreated = useCallback(
     async (data: { tokenId: string; tokenValue: string }) => {
-      // Clear the timeout fallback
+      /** Clear the timeout fallback */
       const timeout = window.__shareButtonTimeout;
       if (timeout) {
         clearTimeout(timeout);
         delete window.__shareButtonTimeout;
       }
 
-      // Build the invite URL with the correct base path (for GitHub Pages subdirectory deployment)
+      /** Build the invite URL with the correct base path (for GitHub Pages subdirectory deployment) */
       const baseUrl = window.location.origin + (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
       const inviteUrl = buildInviteUrl(baseUrl, planId || '', data.tokenId, data.tokenValue);
 
-      // Copy to clipboard
+      /** Copy to clipboard */
       await copyToClipboard(inviteUrl);
 
-      // Log plan_shared event
+      /** Log plan_shared event */
       if (ydoc) {
         logPlanEvent(ydoc, 'plan_shared', actor, undefined, {
           inboxWorthy: false,
@@ -181,7 +183,7 @@ export function ShareButton({
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
 
-      // Show success toast for invite link creation
+      /** Show success toast for invite link creation */
       toast.success('Invite link copied!', {
         description: 'Link expires in 30 minutes. Recipients can view and collaborate.',
       });
@@ -189,7 +191,7 @@ export function ShareButton({
     [planId, copyToClipboard, ydoc, actor]
   );
 
-  // Listen for invite_created response from signaling server
+  /** Listen for invite_created response from signaling server */
   useEffect(() => {
     if (!rtcProvider || !isOwner || !planId) return;
 
@@ -197,7 +199,7 @@ export function ShareButton({
       try {
         const data = JSON.parse(event.data);
 
-        // Dispatch to appropriate handler based on message type
+        /** Dispatch to appropriate handler based on message type */
         if (data.type === 'error') {
           handleErrorResponse(data);
           return;
@@ -207,11 +209,11 @@ export function ShareButton({
           await handleInviteCreated(data);
         }
       } catch {
-        // Not JSON or not our message
+        /** Not JSON or not our message */
       }
     };
 
-    // Access signaling connections
+    /** Access signaling connections */
     const signalingConns = getSignalingConnections(rtcProvider);
 
     for (const conn of signalingConns) {
@@ -236,7 +238,7 @@ export function ShareButton({
    * - Signed in AND owner: Create invite token with success toast
    */
   const handleShare = useCallback(() => {
-    // Safety check - button should be disabled when not signed in
+    /** Safety check - button should be disabled when not signed in */
     if (!identity) {
       toast.error('Sign in required', {
         description: 'You need to sign in with GitHub to share this plan.',
@@ -244,22 +246,22 @@ export function ShareButton({
       return;
     }
 
-    // Signed in but NOT owner: copy plain URL (view-only access)
+    /** Signed in but NOT owner: copy plain URL (view-only access) */
     if (!isOwner) {
       handleSimpleShare();
       return;
     }
 
-    // Signed in AND owner: create invite link
+    /** Signed in AND owner: create invite link */
     if (rtcProvider && planId) {
       createInvite();
     } else {
-      // Fallback if WebRTC not available
+      /** Fallback if WebRTC not available */
       handleSimpleShare();
     }
   }, [identity, isOwner, rtcProvider, planId, createInvite, handleSimpleShare]);
 
-  // Determine button state and tooltip content
+  /** Determine button state and tooltip content */
   const isDisabled = !identity;
   const tooltipContent = !identity
     ? 'Sign in with GitHub to share this plan'
@@ -287,7 +289,7 @@ export function ShareButton({
     </Button>
   );
 
-  // Always wrap in tooltip to show contextual information
+  /** Always wrap in tooltip to show contextual information */
   return (
     <Tooltip delay={0}>
       <Tooltip.Trigger>{button}</Tooltip.Trigger>

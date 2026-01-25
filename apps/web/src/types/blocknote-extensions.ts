@@ -8,9 +8,11 @@
  * @see Issue #80 - Type assertion cleanup
  */
 
-// =============================================================================
-// YUndo Extension (y-prosemirror collaboration undo/redo)
-// =============================================================================
+/*
+ * =============================================================================
+ * YUndo Extension (y-prosemirror collaboration undo/redo)
+ * =============================================================================
+ */
 
 /**
  * Type for yUndo extension from y-prosemirror.
@@ -43,7 +45,7 @@ export function isYUndoExtension(ext: unknown): ext is YUndoExtension {
   if (typeof ext !== 'object') {
     return false;
   }
-  // Check that it has at least one of the expected commands (or could be empty object before init)
+  /** Check that it has at least one of the expected commands (or could be empty object before init) */
   const obj = Object.fromEntries(Object.entries(ext));
   const hasUndo = !('undoCommand' in obj) || typeof obj.undoCommand === 'function';
   const hasRedo = !('redoCommand' in obj) || typeof obj.redoCommand === 'function';

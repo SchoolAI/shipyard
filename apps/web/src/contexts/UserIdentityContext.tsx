@@ -29,7 +29,7 @@ export function UserIdentityProvider({
   githubIdentity: GitHubIdentity | null;
   localIdentity: LocalIdentity | null;
 }) {
-  // Priority: GitHub > Local (prefixed) > Anonymous
+  /** Priority: GitHub > Local (prefixed) > Anonymous */
   const actor = githubIdentity?.username
     ? githubIdentity.username
     : localIdentity?.username

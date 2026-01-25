@@ -22,9 +22,11 @@ import { Avatar } from '@/components/ui/avatar';
 import { useUserIdentity } from '@/contexts/UserIdentityContext';
 import { useConversationTransfer } from '@/hooks/useConversationTransfer';
 
-// ============================================================================
-// Helper Functions & Sub-Components
-// ============================================================================
+/*
+ * ============================================================================
+ * Helper Functions & Sub-Components
+ * ============================================================================
+ */
 
 /** Extract text preview from a message */
 function getMessageTextPreview(msg: A2AMessage, maxLength = 150): string {
@@ -156,9 +158,11 @@ function ImportReviewModal({
   );
 }
 
-// ============================================================================
-// Main Component
-// ============================================================================
+/*
+ * ============================================================================
+ * Main Component
+ * ============================================================================
+ */
 
 interface MobileActionsMenuProps {
   planId: string;
@@ -183,23 +187,23 @@ export function MobileActionsMenu({
   const isArchived = !!metadata.archivedAt;
   const { actor } = useUserIdentity();
 
-  // Handoff conversation dialog state
+  /** Handoff conversation dialog state */
   const [isHandoffDialogOpen, setIsHandoffDialogOpen] = useState(false);
 
-  // Link PR popover state
+  /** Link PR popover state */
   const [isLinkPROpen, setIsLinkPROpen] = useState(false);
 
-  // File input ref for import
+  /** File input ref for import */
   const importInputRef = useRef<HTMLInputElement>(null);
 
-  // Conversation transfer hook for import
+  /** Conversation transfer hook for import */
   const { importFromFile } = useConversationTransfer(planId, ydoc, rtcProvider);
 
-  // State for import review modal
+  /** State for import review modal */
   const [importData, setImportData] = useState<MobileImportData | null>(null);
   const [isReviewOpen, setIsReviewOpen] = useState(false);
 
-  // Check if this plan has an origin transcript (can be handed off)
+  /** Check if this plan has an origin transcript (can be handed off) */
   const hasOriginTranscript = Boolean(
     metadata.origin?.platform === 'claude-code' && metadata.origin.transcriptPath
   );
@@ -257,7 +261,7 @@ export function MobileActionsMenu({
       await navigator.clipboard.writeText(window.location.href);
       toast.success('Link copied to clipboard');
     } catch {
-      // Fallback for older browsers
+      /** Fallback for older browsers */
       const textArea = document.createElement('textarea');
       textArea.value = window.location.href;
       document.body.appendChild(textArea);
@@ -296,7 +300,7 @@ export function MobileActionsMenu({
     const file = event.target.files?.[0];
     if (!file) return;
 
-    // Reset input so same file can be selected again
+    /** Reset input so same file can be selected again */
     event.target.value = '';
 
     const result = await importFromFile(file);

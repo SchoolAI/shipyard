@@ -20,7 +20,7 @@ export function RedoButton() {
       onClick={() => {
         editor.focus();
 
-        // Get the yUndo extension (used when collaboration is enabled)
+        /** Get the yUndo extension (used when collaboration is enabled) */
         const yUndo = getYUndoExtension(editor);
         if (yUndo?.redoCommand) {
           const { state, view } = editor._tiptapEditor;

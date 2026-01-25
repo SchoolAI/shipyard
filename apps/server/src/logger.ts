@@ -16,15 +16,17 @@ import { serverConfig } from './config/env/server.js';
 
 const LOG_FILE = join(homedir(), '.shipyard', 'server-debug.log');
 
-// Ensure log directory exists
+/** Ensure log directory exists */
 try {
   mkdirSync(dirname(LOG_FILE), { recursive: true });
 } catch {
-  // Directory already exists or can't be created - continue anyway
+  /** Directory already exists or can't be created - continue anyway */
 }
 
-// Create logger that writes to BOTH stderr and a file
-// In development, use pino-pretty for stderr only (file gets raw JSON)
+/*
+ * Create logger that writes to BOTH stderr and a file
+ * In development, use pino-pretty for stderr only (file gets raw JSON)
+ */
 const streams: pino.StreamEntry[] = [
   { stream: pino.destination(2) },
   { stream: pino.destination(LOG_FILE) },

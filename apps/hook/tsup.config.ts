@@ -2,15 +2,19 @@ import { defineConfig } from 'tsup';
 
 export default defineConfig({
   entry: ['src/index.ts'],
-  format: ['cjs'], // CJS for pino compatibility (uses dynamic require internally)
-  outExtension: () => ({ js: '.cjs' }), // .cjs extension ensures Node treats it as CommonJS even in ESM packages
-  dts: false, // Project references break tsup type gen with workspace packages
+  format: ['cjs'] /** CJS for pino compatibility (uses dynamic require internally) */,
+  outExtension: () => ({
+    js: '.cjs',
+  }) /** .cjs extension ensures Node treats it as CommonJS even in ESM packages */,
+  dts: false /** Project references break tsup type gen with workspace packages */,
   clean: true,
-  sourcemap: false, // Exclude source maps from production builds (reduces size 43%)
-  // Bundle ALL dependencies for npm publishing (npx needs standalone binary)
-  // But keep Node.js built-ins external
+  sourcemap: false /** Exclude source maps from production builds (reduces size 43%) */,
+  /**
+   * Bundle ALL dependencies for npm publishing (npx needs standalone binary)
+   * But keep Node.js built-ins external
+   */
   external: [
-    'node:*', // Node.js built-in modules with node: prefix
+    'node:*' /** Node.js built-in modules with node: prefix */,
     'fs',
     'path',
     'os',
@@ -35,7 +39,7 @@ export default defineConfig({
     'vm',
     'worker_threads',
   ],
-  noExternal: [/.*/], // Bundle everything else
+  noExternal: [/.*/] /** Bundle everything else */,
   target: 'node22.14',
-  shims: true, // Enable CJS/ESM shims for dynamic require in pino
+  shims: true /** Enable CJS/ESM shims for dynamic require in pino */,
 });

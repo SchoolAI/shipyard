@@ -74,7 +74,7 @@ export function KanbanCard({ plan, onHover, onPanelOpen }: KanbanCardProps) {
   };
 
   const handleClick = () => {
-    // If panel callback provided, open panel instead of navigating
+    /** If panel callback provided, open panel instead of navigating */
     if (onPanelOpen) {
       onPanelOpen(plan.id);
     } else {

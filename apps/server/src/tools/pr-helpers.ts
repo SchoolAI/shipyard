@@ -3,15 +3,29 @@
  * Extracted to reduce duplication between add-artifact.ts and complete-task.ts.
  */
 import { execSync } from 'node:child_process';
+import { ServerBlockNoteEditor } from '@blocknote/server-util';
 import {
+  addSnapshot,
   createLinkedPR,
+  createPlanSnapshot,
+  createPlanUrlWithHistory,
+  type Deliverable,
   GitHubPRResponseSchema,
+  getArtifacts,
+  getLinkedPRs,
+  getSnapshots,
   type LinkedPR,
   linkPR,
   logPlanEvent,
+  PLAN_INDEX_DOC_NAME,
+  type PlanMetadata,
+  setPlanIndexEntry,
+  transitionPlanStatus,
 } from '@shipyard/schema';
 import type * as Y from 'yjs';
 import { z } from 'zod';
+import { webConfig } from '../config/env/web.js';
+import { getOrCreateDoc } from '../doc-store.js';
 import { getOctokit, parseRepoString } from '../github-artifacts.js';
 import { logger } from '../logger.js';
 import { getGitHubUsername } from '../server-identity.js';
@@ -83,7 +97,7 @@ export async function tryAutoLinkPR(ydoc: Y.Doc, repo: string): Promise<LinkedPR
   const { owner, repoName } = parseRepoString(repo);
 
   try {
-    // Look for open PRs from this branch
+    /** Look for open PRs from this branch */
     const { data: prs } = await octokit.pulls.list({
       owner,
       repo: repoName,
@@ -96,23 +110,23 @@ export async function tryAutoLinkPR(ydoc: Y.Doc, repo: string): Promise<LinkedPR
       return null;
     }
 
-    // Use the first (most recent) PR
+    /** Use the first (most recent) PR */
     const pr = prs[0];
     if (!pr) return null;
 
-    // Validate GitHub API response
+    /** Validate GitHub API response */
     const validatedPR = GitHubPRResponseSchema.parse(pr);
 
-    // Handle all PR states exhaustively
+    /** Handle all PR states exhaustively */
     const prState = determinePRStatus(validatedPR);
 
-    // For auto-link, we only want open/draft PRs (query already filtered to open)
+    /** For auto-link, we only want open/draft PRs (query already filtered to open) */
     if (prState === 'closed' || prState === 'merged') {
       logger.warn({ prNumber: validatedPR.number, state: prState }, 'PR is not open, not linking');
       return null;
     }
 
-    // Create LinkedPR object using factory for consistent validation
+    /** Create LinkedPR object using factory for consistent validation */
     const linkedPR = createLinkedPR({
       prNumber: validatedPR.number,
       url: validatedPR.html_url,
@@ -121,13 +135,13 @@ export async function tryAutoLinkPR(ydoc: Y.Doc, repo: string): Promise<LinkedPR
       title: validatedPR.title,
     });
 
-    // Store in Y.Doc
+    /** Store in Y.Doc */
     const actorName = await getGitHubUsername();
     await storePRInDoc(ydoc, linkedPR, actorName);
 
     return linkedPR;
   } catch (error) {
-    // Validation errors indicate malformed GitHub API response
+    /** Validation errors indicate malformed GitHub API response */
     if (error instanceof z.ZodError) {
       const fieldErrors = error.issues
         .map((issue) => `${issue.path.join('.')}: ${issue.message}`)
@@ -138,4 +152,120 @@ export async function tryAutoLinkPR(ydoc: Y.Doc, repo: string): Promise<LinkedPR
     logger.warn({ error, repo, branch }, 'Failed to lookup PR from GitHub');
     return null;
   }
+}
+
+/** --- Auto-Completion Types --- */
+
+export interface AutoCompleteParams {
+  ydoc: Y.Doc;
+  metadata: PlanMetadata;
+  deliverables: Deliverable[];
+  actorName: string;
+  snapshotMessage: string;
+}
+
+export interface AutoCompleteResult {
+  snapshotUrl: string;
+  linkedPR: LinkedPR | null;
+  existingLinkedPRs: LinkedPR[];
+  hasLocalArtifacts: boolean;
+}
+
+/**
+ * Performs auto-completion logic shared between add-artifact and complete-task.
+ * Creates snapshot, generates URL, updates status and index.
+ */
+export async function performAutoComplete(params: AutoCompleteParams): Promise<AutoCompleteResult> {
+  const { ydoc, metadata, deliverables, actorName, snapshotMessage } = params;
+
+  /** Auto-link PR from current branch */
+  let linkedPR: LinkedPR | null = null;
+  const existingLinkedPRs = getLinkedPRs(ydoc);
+
+  if (metadata.repo && existingLinkedPRs.length === 0) {
+    linkedPR = await tryAutoLinkPR(ydoc, metadata.repo);
+    if (linkedPR) {
+      logger.info(
+        { planId: metadata.id, prNumber: linkedPR.prNumber, branch: linkedPR.branch },
+        'Auto-linked PR from current branch'
+      );
+    }
+  }
+
+  /** Generate snapshot URL with version history */
+  const editor = ServerBlockNoteEditor.create();
+  const fragment = ydoc.getXmlFragment('document');
+  const blocks = editor.yXmlFragmentToBlocks(fragment);
+  const artifacts = getArtifacts(ydoc);
+
+  /** Check if any artifacts are stored locally (won't be visible to remote viewers) */
+  const hasLocalArtifacts = artifacts.some((a) => a.storage === 'local');
+
+  /** Create completion snapshot */
+  const completionSnapshot = createPlanSnapshot(
+    ydoc,
+    snapshotMessage,
+    actorName,
+    'completed',
+    blocks
+  );
+  addSnapshot(ydoc, completionSnapshot);
+
+  /** Get all snapshots for URL encoding */
+  const allSnapshots = getSnapshots(ydoc);
+
+  const baseUrl = webConfig.SHIPYARD_WEB_URL;
+  const snapshotUrl = createPlanUrlWithHistory(
+    baseUrl,
+    {
+      id: metadata.id,
+      title: metadata.title,
+      status: 'completed',
+      repo: metadata.repo,
+      pr: metadata.pr,
+      content: blocks,
+      artifacts,
+      deliverables,
+    },
+    allSnapshots
+  );
+
+  /** Update metadata */
+  const completedAt = Date.now();
+  transitionPlanStatus(
+    ydoc,
+    {
+      status: 'completed',
+      completedAt,
+      completedBy: actorName,
+      snapshotUrl,
+    },
+    actorName
+  );
+  logPlanEvent(ydoc, 'completed', actorName);
+
+  /** Update plan index */
+  const indexDoc = await getOrCreateDoc(PLAN_INDEX_DOC_NAME);
+  if (metadata.ownerId) {
+    setPlanIndexEntry(indexDoc, {
+      id: metadata.id,
+      title: metadata.title,
+      status: 'completed',
+      createdAt: metadata.createdAt ?? Date.now(),
+      updatedAt: Date.now(),
+      ownerId: metadata.ownerId,
+      deleted: false,
+    });
+  } else {
+    logger.warn({ planId: metadata.id }, 'Cannot update plan index: missing ownerId');
+  }
+
+  logger.info({ planId: metadata.id, snapshotUrl }, 'Task completed');
+
+  return {
+    snapshotUrl,
+    linkedPR,
+    existingLinkedPRs,
+    hasLocalArtifacts,
+  };
 }

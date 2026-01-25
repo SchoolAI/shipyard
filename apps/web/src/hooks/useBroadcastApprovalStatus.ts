@@ -44,7 +44,7 @@ export function useBroadcastApprovalStatus({
   isOwner,
   planId,
 }: UseBroadcastApprovalStatusOptions): void {
-  // Store requestedAt timestamp to prevent it from refreshing on re-render
+  /** Store requestedAt timestamp to prevent it from refreshing on re-render */
   const requestedAtRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -52,18 +52,20 @@ export function useBroadcastApprovalStatus({
       return;
     }
 
-    // Validate planId is non-empty
+    /** Validate planId is non-empty */
     if (!planId || planId.trim() === '') {
       return;
     }
 
     const awareness = rtcProvider.awareness;
 
-    // Get WebRTC peerId from the room
+    /** Get WebRTC peerId from the room */
     const webrtcPeerId = getWebrtcPeerId(rtcProvider);
 
-    // Build the awareness state based on approval status
-    // Note: 'platform' is omitted for browser users - it's only set by MCP servers
+    /*
+     * Build the awareness state based on approval status
+     * Note: 'platform' is omitted for browser users - it's only set by MCP servers
+     */
     const baseState = {
       user: {
         id: githubIdentity.username,
@@ -77,7 +79,7 @@ export function useBroadcastApprovalStatus({
     let planStatus: PlanAwarenessState;
 
     if (approvalStatus === 'pending') {
-      // Set requestedAt only once when entering pending state
+      /** Set requestedAt only once when entering pending state */
       if (requestedAtRef.current === null) {
         requestedAtRef.current = Date.now();
       }
@@ -90,7 +92,7 @@ export function useBroadcastApprovalStatus({
         expiresAt: requestedAtRef.current + 24 * 60 * 60 * 1000,
       };
     } else if (approvalStatus === 'approved' || approvalStatus === 'rejected') {
-      // Clear requestedAt when leaving pending state
+      /** Clear requestedAt when leaving pending state */
       requestedAtRef.current = null;
 
       planStatus = {
@@ -99,21 +101,23 @@ export function useBroadcastApprovalStatus({
         planId,
       };
     } else {
-      // Clear requestedAt for other states
+      /** Clear requestedAt for other states */
       requestedAtRef.current = null;
-      // No approval required - don't broadcast planStatus
+      /** No approval required - don't broadcast planStatus */
       return;
     }
 
-    // Broadcast to awareness
+    /** Broadcast to awareness */
     awareness.setLocalStateField('planStatus', planStatus);
 
-    // Cleanup: Clear planStatus when component unmounts
+    /** Cleanup: Clear planStatus when component unmounts */
     return () => {
-      // Note: If browser closes ungracefully (force quit), awareness state
-      // persists until WebRTC timeout (~30 seconds). This is expected behavior.
-      // The beforeunload handler in useMultiProviderSync sets localState to null,
-      // which also clears planStatus. The 24-hour expiration provides secondary cleanup.
+      /*
+       * Note: If browser closes ungracefully (force quit), awareness state
+       * persists until WebRTC timeout (~30 seconds). This is expected behavior.
+       * The beforeunload handler in useMultiProviderSync sets localState to null,
+       * which also clears planStatus. The 24-hour expiration provides secondary cleanup.
+       */
       if (awareness.getLocalState()?.planStatus) {
         awareness.setLocalStateField('planStatus', null);
       }

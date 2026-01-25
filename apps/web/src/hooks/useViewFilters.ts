@@ -13,7 +13,7 @@ import {
   type ViewPreferences,
 } from '@/utils/uiPreferences';
 
-// --- Public Types ---
+/** --- Public Types --- */
 
 export interface ViewFiltersState {
   searchQuery: string;
@@ -34,7 +34,7 @@ export interface FilteredPlansResult {
   hasActiveFilters: boolean;
 }
 
-// --- Public API ---
+/** --- Public API --- */
 
 /**
  * Hook for managing view filter state with localStorage persistence.
@@ -44,7 +44,7 @@ export function useViewFilters(): ViewFiltersState {
   const [preferences, setPreferencesState] = useState<ViewPreferences>(getViewPreferences);
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState(preferences.searchQuery);
 
-  // Debounce search query updates
+  /** Debounce search query updates */
   useEffect(() => {
     const timer = setTimeout(() => {
       setPreferencesState((prev) => {
@@ -143,23 +143,23 @@ export function filterAndSortPlans(
 ): FilteredPlansResult {
   let filtered = plans;
 
-  // Apply search filter (case-insensitive includes)
+  /** Apply search filter (case-insensitive includes) */
   if (searchQuery.trim()) {
     const query = searchQuery.toLowerCase().trim();
     filtered = filtered.filter((plan) => plan.title.toLowerCase().includes(query));
   }
 
-  // Apply status filter (OR logic - show plans matching any selected status)
+  /** Apply status filter (OR logic - show plans matching any selected status) */
   if (statusFilters.length > 0) {
     filtered = filtered.filter((plan) => statusFilters.includes(plan.status));
   }
 
-  // Apply tag filter (OR logic - show plans matching any selected tag)
+  /** Apply tag filter (OR logic - show plans matching any selected tag) */
   if (tagFilters.length > 0) {
     filtered = filtered.filter((plan) => plan.tags?.some((tag) => tagFilters.includes(tag)));
   }
 
-  // Sort plans
+  /** Sort plans */
   const sorted = sortPlans(filtered, sortBy, sortDirection);
 
   return {
@@ -199,7 +199,7 @@ export function useFilteredPlans(plans: PlanIndexEntry[]): FilteredPlansResult &
   return { ...result, ...filters };
 }
 
-// --- Sort Options (for UI) ---
+/** --- Sort Options (for UI) --- */
 
 export const SORT_OPTIONS: { value: SortOption; label: string }[] = [
   { value: 'name', label: 'Name (A-Z)' },
@@ -216,7 +216,7 @@ export const STATUS_FILTER_OPTIONS: { value: PlanStatusType; label: string; colo
   { value: 'completed', label: 'Completed', color: 'success' },
 ];
 
-// --- Private Helpers ---
+/** --- Private Helpers --- */
 
 function sortPlans(
   plans: PlanIndexEntry[],
@@ -237,7 +237,7 @@ function sortPlans(
       return sorted.sort((a, b) => multiplier * (b.updatedAt - a.updatedAt));
 
     case 'status':
-      // Sort by status workflow order
+      /** Sort by status workflow order */
       return sorted.sort((a, b) => {
         const aIndex = PlanStatusValues.indexOf(a.status);
         const bIndex = PlanStatusValues.indexOf(b.status);
@@ -245,7 +245,7 @@ function sortPlans(
       });
 
     default: {
-      // Exhaustive check
+      /** Exhaustive check */
       const _exhaustive: never = sortBy;
       throw new Error(`Unhandled sort option: ${_exhaustive}`);
     }

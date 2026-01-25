@@ -55,19 +55,19 @@ function getErrorStatus(error: unknown): number {
   return typeof status === 'number' ? status : 500;
 }
 
-// Shared LevelDB for all plans (no session-pid isolation)
+/** Shared LevelDB for all plans (no session-pid isolation) */
 const PERSISTENCE_DIR = join(homedir(), '.shipyard', 'plans');
 
-// Lock file to prevent multiple processes from starting the hub simultaneously
+/** Lock file to prevent multiple processes from starting the hub simultaneously */
 const HUB_LOCK_FILE = join(homedir(), '.shipyard', 'hub.lock');
 const SHIPYARD_DIR = join(homedir(), '.shipyard');
 const MAX_LOCK_RETRIES = 3;
 
-// Message types matching y-websocket protocol
+/** Message types matching y-websocket protocol */
 const messageSync = 0;
 const messageAwareness = 1;
 
-// Y.Doc management
+/** Y.Doc management */
 const docs = new Map<string, Y.Doc>();
 const awarenessMap = new Map<string, awarenessProtocol.Awareness>();
 const conns = new Map<string, Set<WebSocket>>();
@@ -124,7 +124,7 @@ function registerLockCleanupHandler(): void {
     try {
       unlinkSync(HUB_LOCK_FILE);
     } catch {
-      // Lock may already be cleaned up
+      /** Lock may already be cleaned up */
     }
   });
 }
@@ -143,7 +143,7 @@ async function handleExistingLock(retryCount: number): Promise<boolean> {
     return false;
   }
 
-  // Process dead - check retry limit before attempting removal
+  /** Process dead - check retry limit before attempting removal */
   if (retryCount >= MAX_LOCK_RETRIES) {
     logger.error(
       { stalePid: pid, retryCount },
@@ -152,7 +152,7 @@ async function handleExistingLock(retryCount: number): Promise<boolean> {
     return false;
   }
 
-  // Attempt to remove stale lock and retry
+  /** Attempt to remove stale lock and retry */
   await tryRemoveStaleLock(pid, retryCount);
   return tryAcquireHubLock(retryCount + 1);
 }
@@ -188,7 +188,7 @@ export async function releaseHubLock(): Promise<void> {
     await unlink(HUB_LOCK_FILE);
     logger.info('Released hub lock');
   } catch (err) {
-    // Lock file may already be cleaned up by exit handler
+    /** Lock file may already be cleaned up by exit handler */
     logger.debug({ err }, 'Hub lock already released');
   }
 }
@@ -221,8 +221,10 @@ function isProcessAlive(pid: number): boolean {
 function tryRecoverStaleLock(originalError: Error): boolean {
   const lockFile = join(PERSISTENCE_DIR, 'LOCK');
 
-  // Try to read hub.lock to check if holder is alive
-  // LevelDB doesn't store PID, so we use our hub.lock
+  /*
+   * Try to read hub.lock to check if holder is alive
+   * LevelDB doesn't store PID, so we use our hub.lock
+   */
   try {
     const hubLockContent = readFileSync(HUB_LOCK_FILE, 'utf-8');
     const pidStr = hubLockContent.split('\n')[0] ?? '';
@@ -233,16 +235,16 @@ function tryRecoverStaleLock(originalError: Error): boolean {
       throw originalError;
     }
 
-    // Process dead, safe to remove lock
+    /** Process dead, safe to remove lock */
     logger.warn('Hub process dead, removing stale LevelDB lock');
     unlinkSync(lockFile);
     return true;
   } catch (hubLockErr) {
-    // Re-throw if it's the original error (lock is valid)
+    /** Re-throw if it's the original error (lock is valid) */
     if (hubLockErr === originalError) {
       throw hubLockErr;
     }
-    // No hub.lock file - assume lock is stale (no process running)
+    /** No hub.lock file - assume lock is stale (no process running) */
     logger.warn('No hub.lock found, assuming LevelDB lock is stale');
     unlinkSync(lockFile);
     return true;
@@ -277,7 +279,7 @@ function initPersistence(): void {
     logger.warn({ err }, 'LevelDB locked, checking for stale lock');
     tryRecoverStaleLock(err);
 
-    // Lock removed, retry initialization
+    /** Lock removed, retry initialization */
     ldb = new LeveldbPersistence(PERSISTENCE_DIR);
     logger.info('Recovered from stale LevelDB lock');
   }
@@ -307,10 +309,10 @@ async function getDoc(docName: string): Promise<Y.Doc> {
     const awareness = new awarenessProtocol.Awareness(doc);
     awarenessMap.set(docName, awareness);
 
-    // Attach observers for subscription notifications
+    /** Attach observers for subscription notifications */
     attachObservers(docName, doc);
 
-    // Attach CRDT validation observers (security: validates peer sync data)
+    /** Attach CRDT validation observers (security: validates peer sync data) */
     attachCRDTValidation(docName, doc);
   }
   return doc;
@@ -401,16 +403,20 @@ function handleWebSocketConnection(ws: WebSocket, req: http.IncomingMessage): vo
   const planId = req.url?.slice(1) || 'default';
   logger.info({ planId }, 'WebSocket client connected to registry');
 
-  // CRITICAL: Buffer for messages that arrive before doc is ready.
-  // The client may send SyncStep1 immediately upon connection, but getDoc() is async.
-  // Without buffering, those early messages are lost and sync fails with timeout.
+  /*
+   * CRITICAL: Buffer for messages that arrive before doc is ready.
+   * The client may send SyncStep1 immediately upon connection, but getDoc() is async.
+   * Without buffering, those early messages are lost and sync fails with timeout.
+   */
   const pendingMessages: Buffer[] = [];
   let docReady = false;
   let doc: Y.Doc;
   let awareness: awarenessProtocol.Awareness;
 
-  // Attach message handler IMMEDIATELY (synchronously) to avoid missing any messages.
-  // Messages received before doc initialization are buffered and processed later.
+  /*
+   * Attach message handler IMMEDIATELY (synchronously) to avoid missing any messages.
+   * Messages received before doc initialization are buffered and processed later.
+   */
   ws.on('message', (message: Buffer) => {
     if (!docReady) {
       pendingMessages.push(message);
@@ -423,12 +429,12 @@ function handleWebSocketConnection(ws: WebSocket, req: http.IncomingMessage): vo
     processMessage(message, doc, awareness, planId, ws);
   });
 
-  // Error handler also attached synchronously
+  /** Error handler also attached synchronously */
   ws.on('error', (err: Error) => {
     logger.error({ err, planId }, 'WebSocket error');
   });
 
-  // Async initialization
+  /** Async initialization */
   (async () => {
     try {
       doc = await getDoc(planId);
@@ -468,10 +474,10 @@ function handleWebSocketConnection(ws: WebSocket, req: http.IncomingMessage): vo
       };
       awareness.on('update', awarenessHandler);
 
-      // Mark doc as ready BEFORE processing buffered messages
+      /** Mark doc as ready BEFORE processing buffered messages */
       docReady = true;
 
-      // Process any messages that arrived during initialization
+      /** Process any messages that arrived during initialization */
       if (pendingMessages.length > 0) {
         logger.debug({ planId, count: pendingMessages.length }, 'Processing buffered messages');
         for (const msg of pendingMessages) {
@@ -480,13 +486,13 @@ function handleWebSocketConnection(ws: WebSocket, req: http.IncomingMessage): vo
         pendingMessages.length = 0;
       }
 
-      // Send initial sync state (SyncStep1) to start handshake
+      /** Send initial sync state (SyncStep1) to start handshake */
       const encoder = encoding.createEncoder();
       encoding.writeVarUint(encoder, messageSync);
       syncProtocol.writeSyncStep1(encoder, doc);
       send(ws, encoding.toUint8Array(encoder));
 
-      // Send current awareness states
+      /** Send current awareness states */
       const awarenessStates = awareness.getStates();
       if (awarenessStates.size > 0) {
         const awarenessEncoder = encoding.createEncoder();
@@ -657,7 +663,7 @@ async function handleGetTranscript(req: Request, res: Response): Promise<void> {
   }
 }
 
-// --- tRPC Context Factory ---
+/** --- tRPC Context Factory --- */
 
 /**
  * Creates the plan store adapter for tRPC context.
@@ -723,8 +729,10 @@ function createApp(): { app: express.Express; httpServer: http.Server } {
   const app = express();
   const httpServer = http.createServer(app);
 
-  // CORS headers FIRST - apply to ALL responses including errors
-  // This MUST come before body-parser so error responses (like 413) get CORS headers
+  /*
+   * CORS headers FIRST - apply to ALL responses including errors
+   * This MUST come before body-parser so error responses (like 413) get CORS headers
+   */
   app.use((_req, res, next) => {
     res.header('Access-Control-Allow-Origin', '*');
     res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
@@ -732,16 +740,18 @@ function createApp(): { app: express.Express; httpServer: http.Server } {
     next();
   });
 
-  // Handle OPTIONS preflight requests
-  // Note: Express 5 uses path-to-regexp v8 which requires named wildcards
+  /*
+   * Handle OPTIONS preflight requests
+   * Note: Express 5 uses path-to-regexp v8 which requires named wildcards
+   */
   app.options('{*splat}', (_req, res) => {
     res.sendStatus(204);
   });
 
-  // Body parser AFTER CORS - 10mb limit for large conversation imports
+  /** Body parser AFTER CORS - 10mb limit for large conversation imports */
   app.use(express.json({ limit: '10mb' }));
 
-  // tRPC middleware - handles all migrated routes
+  /** tRPC middleware - handles all migrated routes */
   app.use(
     '/trpc',
     createExpressMiddleware({
@@ -750,10 +760,10 @@ function createApp(): { app: express.Express; httpServer: http.Server } {
     })
   );
 
-  // Health check endpoint - used by browser and hook to discover if server is running
+  /** Health check endpoint - used by browser and hook to discover if server is running */
   app.get('/registry', handleHealthCheck);
 
-  // Connection status endpoint - used by hub-client to check for active browser connections
+  /** Connection status endpoint - used by hub-client to check for active browser connections */
   app.get('/api/plan/:planId/has-connections', (req, res) => {
     const planId = req.params.planId;
     if (!planId) {
@@ -764,12 +774,12 @@ function createApp(): { app: express.Express; httpServer: http.Server } {
     res.json({ hasConnections });
   });
 
-  // Remaining Express routes (non-JSON responses or special handling)
+  /** Remaining Express routes (non-JSON responses or special handling) */
   app.get('/api/plan/:id/transcript', handleGetTranscript);
   app.get('/api/plans/:id/pr-diff/:prNumber', handleGetPRDiff);
   app.get('/api/plans/:id/pr-files/:prNumber', handleGetPRFiles);
 
-  // Artifact serving endpoint with path traversal protection
+  /** Artifact serving endpoint with path traversal protection */
   app.get('/artifacts/:planId/:filename', async (req: Request, res: Response): Promise<void> => {
     const planId = getParam(req.params.planId);
     const filename = getParam(req.params.filename);
@@ -779,7 +789,7 @@ function createApp(): { app: express.Express; httpServer: http.Server } {
       return;
     }
 
-    // Path traversal protection: resolve full path and verify it's within artifacts directory
+    /** Path traversal protection: resolve full path and verify it's within artifacts directory */
     const ARTIFACTS_DIR = join(homedir(), '.shipyard', 'artifacts');
     const fullPath = resolve(ARTIFACTS_DIR, planId, filename);
 
@@ -788,7 +798,7 @@ function createApp(): { app: express.Express; httpServer: http.Server } {
       return;
     }
 
-    // Read file directly using resolved path
+    /** Read file directly using resolved path */
     const buffer = await readFile(fullPath).catch(() => null);
 
     if (!buffer) {
@@ -796,7 +806,7 @@ function createApp(): { app: express.Express; httpServer: http.Server } {
       return;
     }
 
-    // Content-Type affects browser rendering (inline vs download)
+    /** Content-Type affects browser rendering (inline vs download) */
     const ext = filename.split('.').pop()?.toLowerCase();
     const mimeTypes: Record<string, string> = {
       png: 'image/png',
@@ -823,20 +833,20 @@ export async function startRegistryServer(): Promise<number | null> {
 
   const { httpServer } = createApp();
 
-  // Create WebSocket server with noServer mode for upgrade handling
+  /** Create WebSocket server with noServer mode for upgrade handling */
   const wss = new WebSocketServer({ noServer: true });
 
-  // Handle HTTP upgrade requests for WebSocket connections
+  /** Handle HTTP upgrade requests for WebSocket connections */
   httpServer.on('upgrade', (request, socket, head) => {
     wss.handleUpgrade(request, socket, head, (ws) => {
       wss.emit('connection', ws, request);
     });
   });
 
-  // Handle WebSocket connections
+  /** Handle WebSocket connections */
   wss.on('connection', handleWebSocketConnection);
 
-  // Register signal handlers for graceful shutdown with lock cleanup
+  /** Register signal handlers for graceful shutdown with lock cleanup */
   process.once('SIGINT', async () => {
     logger.info('SIGINT received, shutting down gracefully');
     const { stopPeriodicCleanup } = await import('./session-registry.js');

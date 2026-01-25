@@ -43,7 +43,7 @@ function isWebSocket(value: unknown): value is WebSocket {
  * In production, consider using Redis or another persistent store.
  */
 export class NodePlatformAdapter implements PlatformAdapter {
-  // --- Storage Maps ---
+  /** --- Storage Maps --- */
 
   /**
    * Invite tokens storage (planId:tokenId -> token).
@@ -74,7 +74,7 @@ export class NodePlatformAdapter implements PlatformAdapter {
    */
   private connectionTopics = new WeakMap<WebSocket, Set<string>>();
 
-  // --- Storage Operations ---
+  /** --- Storage Operations --- */
 
   async getInviteToken(planId: string, tokenId: string): Promise<InviteToken | undefined> {
     const key = `${planId}:${tokenId}`;
@@ -97,16 +97,16 @@ export class NodePlatformAdapter implements PlatformAdapter {
     const prefix = `${planId}:`;
 
     for (const [key, token] of this.inviteTokens.entries()) {
-      // Only include tokens for this plan
+      /** Only include tokens for this plan */
       if (!key.startsWith(prefix)) continue;
 
-      // Filter out expired tokens
+      /** Filter out expired tokens */
       if (token.expiresAt < now) continue;
 
-      // Filter out revoked tokens
+      /** Filter out revoked tokens */
       if (token.revoked) continue;
 
-      // Filter out exhausted tokens (all uses consumed)
+      /** Filter out exhausted tokens (all uses consumed) */
       if (token.maxUses !== null && token.useCount >= token.maxUses) continue;
 
       tokens.push(token);
@@ -115,9 +115,11 @@ export class NodePlatformAdapter implements PlatformAdapter {
   }
 
   async getInviteRedemption(planId: string, userId: string): Promise<InviteRedemption | undefined> {
-    // Note: This searches for ANY redemption by this user for this plan
-    // The original implementation stored by "planId:tokenId:userId"
-    // This matches the interface which doesn't include tokenId in the key
+    /*
+     * Note: This searches for ANY redemption by this user for this plan
+     * The original implementation stored by "planId:tokenId:userId"
+     * This matches the interface which doesn't include tokenId in the key
+     */
     for (const [key, redemption] of this.redemptions.entries()) {
       if (key.startsWith(`${planId}:`) && redemption.redeemedBy === userId) {
         return redemption;
@@ -145,7 +147,7 @@ export class NodePlatformAdapter implements PlatformAdapter {
     this.redemptions.set(key, redemption);
   }
 
-  // --- Authentication Operations ---
+  /** --- Authentication Operations --- */
 
   async validateGitHubToken(
     token: string
@@ -186,7 +188,7 @@ export class NodePlatformAdapter implements PlatformAdapter {
     this.planOwners.set(planId, ownerId);
   }
 
-  // --- Crypto Operations ---
+  /** --- Crypto Operations --- */
 
   async generateTokenId(): Promise<string> {
     return nanoid(8);
@@ -203,24 +205,24 @@ export class NodePlatformAdapter implements PlatformAdapter {
   async verifyTokenHash(value: string, hash: string): Promise<boolean> {
     const computedHash = createHash('sha256').update(value).digest('hex');
 
-    // Use constant-time comparison to prevent timing attacks
+    /** Use constant-time comparison to prevent timing attacks */
     try {
       const computedHashBuffer = Buffer.from(computedHash, 'hex');
       const hashBuffer = Buffer.from(hash, 'hex');
 
-      // timingSafeEqual throws if lengths don't match
+      /** timingSafeEqual throws if lengths don't match */
       if (computedHashBuffer.length !== hashBuffer.length) {
         return false;
       }
 
       return timingSafeEqual(computedHashBuffer, hashBuffer);
     } catch {
-      // Invalid hex or other error - reject the token
+      /** Invalid hex or other error - reject the token */
       return false;
     }
   }
 
-  // --- WebSocket Operations ---
+  /** --- WebSocket Operations --- */
 
   sendMessage(ws: unknown, message: unknown): void {
     if (!isWebSocket(ws)) {
@@ -236,7 +238,7 @@ export class NodePlatformAdapter implements PlatformAdapter {
     }
   }
 
-  // --- Topic (Pub/Sub) Operations ---
+  /** --- Topic (Pub/Sub) Operations --- */
 
   getTopicSubscribers(topic: string): unknown[] {
     const subscribers = this.topics.get(topic);
@@ -306,9 +308,11 @@ export class NodePlatformAdapter implements PlatformAdapter {
     socketTopics.clear();
   }
 
-  // --- Logging ---
-  // Pino logger supports both object and string arguments
-  // We adapt to the simple string + args interface
+  /*
+   * --- Logging ---
+   * Pino logger supports both object and string arguments
+   * We adapt to the simple string + args interface
+   */
 
   info(message: string, ...args: unknown[]): void {
     if (args.length > 0 && typeof args[0] === 'object') {
@@ -342,8 +346,10 @@ export class NodePlatformAdapter implements PlatformAdapter {
     }
   }
 
-  // --- Cleanup Methods ---
-  // These should be called periodically by the server to prevent memory leaks.
+  /*
+   * --- Cleanup Methods ---
+   * These should be called periodically by the server to prevent memory leaks.
+   */
 
   /**
    * Remove expired invite tokens from storage.

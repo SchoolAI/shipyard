@@ -190,26 +190,26 @@ function FilterBar({
 type OwnershipFilter = 'all' | 'my-plans' | 'shared';
 
 export function SearchPage() {
-  // usePlanIndexContext already syncs plan-index via useMultiProviderSync internally
+  /** usePlanIndexContext already syncs plan-index via useMultiProviderSync internally */
   const { myPlans, sharedPlans, inboxPlans, isLoading, timedOut, reconnect, isReconnecting } =
     usePlanIndexContext();
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Filters
+  /** Filters */
   const [searchQuery, setSearchQuery] = useState('');
   const [ownershipFilter, setOwnershipFilter] = useState<OwnershipFilter>('all');
   const { statusFilters, toggleStatusFilter, tagFilters, toggleTagFilter } = useViewFilters();
 
-  // Selected plan state - read from URL on mount
+  /** Selected plan state - read from URL on mount */
   const searchParams = new URLSearchParams(location.search);
   const initialPanelId = searchParams.get('panel');
 
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(initialPanelId);
 
-  // Combine all plans for search (exclude archived by default)
+  /** Combine all plans for search (exclude archived by default) */
   const allPlans = useMemo(() => {
-    // Remove duplicates by using a Map keyed by plan id
+    /** Remove duplicates by using a Map keyed by plan id */
     const planMap = new Map<string, PlanIndexEntry>();
     for (const plan of [...inboxPlans, ...myPlans, ...sharedPlans]) {
       planMap.set(plan.id, plan);
@@ -217,7 +217,7 @@ export function SearchPage() {
     return Array.from(planMap.values());
   }, [inboxPlans, myPlans, sharedPlans]);
 
-  // Apply ownership filter
+  /** Apply ownership filter */
   const ownershipFilteredPlans = useMemo(() => {
     switch (ownershipFilter) {
       case 'my-plans':
@@ -229,22 +229,22 @@ export function SearchPage() {
     }
   }, [ownershipFilter, myPlans, sharedPlans, allPlans]);
 
-  // Filter by search query and status
+  /** Filter by search query and status */
   const filteredPlans = useMemo(() => {
     let plans = ownershipFilteredPlans;
 
-    // Search query filter
+    /** Search query filter */
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       plans = plans.filter((plan) => plan.title.toLowerCase().includes(query));
     }
 
-    // Status filter
+    /** Status filter */
     if (statusFilters.length > 0) {
       plans = plans.filter((plan) => statusFilters.includes(plan.status));
     }
 
-    // Tag filter (OR logic - match ANY selected tag)
+    /** Tag filter (OR logic - match ANY selected tag) */
     if (tagFilters.length > 0) {
       plans = plans.filter((plan) => plan.tags?.some((tag) => tagFilters.includes(tag)));
     }
@@ -252,19 +252,19 @@ export function SearchPage() {
     return plans;
   }, [ownershipFilteredPlans, searchQuery, statusFilters, tagFilters]);
 
-  // Sort by updated time
+  /** Sort by updated time */
   const sortedPlans = useMemo(() => {
     return [...filteredPlans].sort((a, b) => b.updatedAt - a.updatedAt);
   }, [filteredPlans]);
 
-  // Clear selected plan if it's filtered out
+  /** Clear selected plan if it's filtered out */
   useEffect(() => {
     if (selectedPlanId && !sortedPlans.find((p) => p.id === selectedPlanId)) {
       setSelectedPlanId(null);
     }
   }, [selectedPlanId, sortedPlans]);
 
-  // Update URL when panel state changes
+  /** Update URL when panel state changes */
   useEffect(() => {
     let mounted = true;
 
@@ -281,12 +281,12 @@ export function SearchPage() {
     };
   }, [selectedPlanId, navigate]);
 
-  // Panel handlers
+  /** Panel handlers */
   const handleClosePanel = useCallback(() => {
     setSelectedPlanId(null);
   }, []);
 
-  // Keyboard shortcuts for panel
+  /** Keyboard shortcuts for panel */
   useKeyboardShortcuts({
     onFullScreen: useCallback(() => {
       if (selectedPlanId) {

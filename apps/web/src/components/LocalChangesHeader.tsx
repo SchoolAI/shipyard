@@ -16,7 +16,7 @@ interface LocalChangesHeaderProps {
 export function LocalChangesHeader({ data, isFetching, onRefresh }: LocalChangesHeaderProps) {
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
 
-  // Don't render if data unavailable or no branch info
+  /** Don't render if data unavailable or no branch info */
   if (!data || !data.available) return null;
 
   const { branch, staged, unstaged, untracked, files } = data;

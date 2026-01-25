@@ -65,10 +65,10 @@ const AwarenessStateSchema = z.object({
  * SECURITY: Validates untrusted peer data with Zod schema.
  */
 function extractPeerInfo(peerId: number, state: Record<string, unknown>): ConnectedPeer | null {
-  // Validate awareness state from untrusted peer
+  /** Validate awareness state from untrusted peer */
   const validated = AwarenessStateSchema.safeParse(state);
   if (!validated.success) {
-    // Invalid peer data - return minimal info
+    /** Invalid peer data - return minimal info */
     return {
       webrtcPeerId: undefined,
       platform: 'browser',
@@ -83,7 +83,7 @@ function extractPeerInfo(peerId: number, state: Record<string, unknown>): Connec
   const planStatus = validated.data.planStatus;
 
   if (!planStatus?.user) {
-    // Unknown peer without identity - still track them
+    /** Unknown peer without identity - still track them */
     return {
       webrtcPeerId: planStatus?.webrtcPeerId,
       platform: planStatus?.platform ?? 'browser',
@@ -139,7 +139,7 @@ export function useP2PPeers(rtcProvider: WebrtcProvider | null): UseP2PPeersResu
     const peers: ConnectedPeer[] = [];
 
     states.forEach((state, clientId) => {
-      // Skip ourselves
+      /** Skip ourselves */
       if (clientId === myClientId) return;
 
       const stateRecord =
@@ -161,10 +161,10 @@ export function useP2PPeers(rtcProvider: WebrtcProvider | null): UseP2PPeersResu
 
     const awareness = rtcProvider.awareness;
 
-    // Initial load
+    /** Initial load */
     refresh();
 
-    // Subscribe to awareness changes
+    /** Subscribe to awareness changes */
     const handleChange = () => {
       refresh();
     };

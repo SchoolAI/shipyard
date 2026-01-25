@@ -23,7 +23,7 @@ type PendingAwarenessState = Extract<PlanAwarenessState, { status: 'pending' }>;
  * Returns false for malicious/malformed data.
  */
 function hasValidUserData(planStatus: PendingAwarenessState): boolean {
-  // Check that user object and required fields exist
+  /** Check that user object and required fields exist */
   if (!planStatus.user || typeof planStatus.user !== 'object') {
     return false;
   }
@@ -36,7 +36,7 @@ function hasValidUserData(planStatus: PendingAwarenessState): boolean {
     return false;
   }
 
-  // Validate requestedAt is a valid timestamp
+  /** Validate requestedAt is a valid timestamp */
   if (typeof planStatus.requestedAt !== 'number' || Number.isNaN(planStatus.requestedAt)) {
     return false;
   }
@@ -52,22 +52,24 @@ function isPendingForPlan(
   currentPlanId: string,
   now: number
 ): boolean {
-  // Skip owners (they're always approved)
+  /** Skip owners (they're always approved) */
   if (planStatus.isOwner) {
     return false;
   }
 
-  // Filter by planId (reject empty planIds)
+  /** Filter by planId (reject empty planIds) */
   if (!planStatus.planId || planStatus.planId !== currentPlanId) {
     return false;
   }
 
-  // Filter expired requests
-  // Note: This check uses Date.now() which can be manipulated by changing
-  // system clock. However, this is acceptable because:
-  // 1. Awareness expiration is advisory only (cosmetic)
-  // 2. Actual approval is enforced by Y.Doc CRDT (immutable source of truth)
-  // 3. Malicious users can only affect their own visibility, not access
+  /*
+   * Filter expired requests
+   * Note: This check uses Date.now() which can be manipulated by changing
+   * system clock. However, this is acceptable because:
+   * 1. Awareness expiration is advisory only (cosmetic)
+   * 2. Actual approval is enforced by Y.Doc CRDT (immutable source of truth)
+   * 3. Malicious users can only affect their own visibility, not access
+   */
   if (planStatus.expiresAt && planStatus.expiresAt < now) {
     return false;
   }
@@ -129,7 +131,7 @@ function extractPendingUsersFromStates(
     const planStatus = extractPendingStatus(state);
     if (!planStatus) continue;
 
-    // Validate and filter
+    /** Validate and filter */
     if (!hasValidUserData(planStatus)) continue;
     if (!isPendingForPlan(planStatus, currentPlanId, now)) continue;
 
@@ -166,15 +168,15 @@ export function usePendingUsers(
       const now = Date.now();
       const pending = extractPendingUsersFromStates(states, currentPlanId, now);
 
-      // Sort by request time (oldest first) and deduplicate
+      /** Sort by request time (oldest first) and deduplicate */
       pending.sort((a, b) => a.requestedAt - b.requestedAt);
       setPendingUsers(deduplicateUsers(pending));
     };
 
-    // Initial update
+    /** Initial update */
     updatePendingUsers();
 
-    // Listen for awareness changes
+    /** Listen for awareness changes */
     awareness.on('change', updatePendingUsers);
 
     return () => {

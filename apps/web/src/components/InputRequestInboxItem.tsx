@@ -35,7 +35,7 @@ function getDisplayType(request: AnyInputRequest): string {
 export function InputRequestInboxItem({ request, onClick }: InputRequestInboxItemProps) {
   const [remainingTime, setRemainingTime] = useState(0);
 
-  // Calculate remaining time from createdAt
+  /** Calculate remaining time from createdAt */
   useEffect(() => {
     const updateRemainingTime = () => {
       const now = Date.now();

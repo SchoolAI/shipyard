@@ -9,7 +9,7 @@
  * and avoid duplication.
  */
 
-// Import and re-export types from @shipyard/schema that are used in signaling
+/** Import and re-export types from @shipyard/schema that are used in signaling */
 import type {
   CreateInviteRequest,
   InviteCreatedResponse,
@@ -39,7 +39,7 @@ export type {
   RevokeInviteRequest,
 };
 
-// --- Core Signaling Protocol Messages (y-webrtc) ---
+/** --- Core Signaling Protocol Messages (y-webrtc) --- */
 
 /**
  * Client subscribes to room topics (plan IDs).
@@ -64,9 +64,9 @@ export interface UnsubscribeMessage {
 export interface PublishMessage {
   type: 'publish';
   topic: string;
-  from?: string; // y-webrtc client ID (not user ID)
-  clients?: number; // Number of clients in the room (added by server)
-  [key: string]: unknown; // y-webrtc adds various fields (to, signal, etc.)
+  from?: string /** y-webrtc client ID (not user ID) */;
+  clients?: number /** Number of clients in the room (added by server) */;
+  [key: string]: unknown /** y-webrtc adds various fields (to, signal, etc.) */;
 }
 
 /**
@@ -99,7 +99,7 @@ export interface ErrorMessage {
  */
 export type InviteAuthError = 'unauthenticated' | 'unauthorized' | 'plan_not_found';
 
-// --- Type Unions ---
+/** --- Type Unions --- */
 
 /**
  * Discriminated union of all incoming signaling message types.
@@ -134,7 +134,7 @@ export type OutgoingMessage =
  */
 export type TokenValidationError = 'invalid' | 'revoked' | 'expired' | 'exhausted';
 
-// --- Zod Schemas for runtime validation ---
+/** --- Zod Schemas for runtime validation --- */
 
 const SubscribeMessageSchema = z.object({
   type: z.literal('subscribe'),

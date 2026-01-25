@@ -66,12 +66,12 @@ const SHORTCUTS: ShortcutDef[] = [
 function matchesShortcut(e: KeyboardEvent, def: ShortcutDef, isInputFocused: boolean): boolean {
   if (e.key !== def.key) return false;
 
-  // Check modifier requirements
+  /** Check modifier requirements */
   const hasCmdOrCtrl = e.metaKey || e.ctrlKey;
   if (def.needsModifier && !hasCmdOrCtrl) return false;
   if (!def.needsModifier && !hasNoModifiers(e)) return false;
 
-  // Check if input focus blocks this shortcut
+  /** Check if input focus blocks this shortcut */
   if (isInputFocused && !def.allowInInput) return false;
 
   return true;

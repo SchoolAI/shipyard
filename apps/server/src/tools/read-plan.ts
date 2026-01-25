@@ -8,6 +8,7 @@ import { z } from 'zod';
 import { getOrCreateDoc } from '../doc-store.js';
 import { exportPlanToMarkdown } from '../export-markdown.js';
 import { verifySessionToken } from '../session-token.js';
+import { formatLinkedPRsSection, formatPlanHeader } from './response-formatters.js';
 import { TOOL_NAMES } from './tool-names.js';
 
 const ReadPlanInput = z.object({
@@ -65,7 +66,6 @@ OUTPUT INCLUDES:
     },
   },
 
-  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Tool handler requires session validation, markdown export with deliverables/annotations/linked PRs sections
   handler: async (args: unknown) => {
     const {
       planId,
@@ -88,7 +88,7 @@ OUTPUT INCLUDES:
       };
     }
 
-    // Verify session token
+    /** Verify session token */
     if (
       !metadata.sessionTokenHash ||
       !verifySessionToken(sessionToken, metadata.sessionTokenHash)
@@ -104,31 +104,16 @@ OUTPUT INCLUDES:
       };
     }
 
-    // Export plan to markdown (with annotations if requested)
+    /** Export plan to markdown (with annotations if requested) */
     const markdown = await exportPlanToMarkdown(doc, {
       includeResolved: includeAnnotations,
     });
 
-    // Build metadata header
-    let output = `# ${metadata.title}\n\n`;
-    output += `**Status:** ${metadata.status.replace('_', ' ')}\n`;
-    if (metadata.repo) {
-      output += `**Repo:** ${metadata.repo}\n`;
-    }
-    if (metadata.pr) {
-      output += `**PR:** #${metadata.pr}\n`;
-    }
-    output += `**Created:** ${new Date(metadata.createdAt).toISOString()}\n`;
-    output += `**Updated:** ${new Date(metadata.updatedAt).toISOString()}\n`;
-    if (metadata.status === 'changes_requested' && metadata.reviewComment) {
-      output += `\n**Reviewer Comment:** ${metadata.reviewComment}\n`;
-    }
-    output += '\n---\n\n';
-
-    // Append markdown content
+    /** Build output with extracted formatters */
+    let output = formatPlanHeader(metadata);
     output += markdown;
 
-    // Append deliverables section if any exist (uses shared formatter)
+    /** Append deliverables section if any exist (uses shared formatter) */
     const deliverables = getDeliverables(doc);
     const deliverablesText = formatDeliverablesForLLM(deliverables);
     if (deliverablesText) {
@@ -136,25 +121,10 @@ OUTPUT INCLUDES:
       output += deliverablesText;
     }
 
-    // Append linked PRs section if requested
+    /** Append linked PRs section if requested */
     if (includeLinkedPRs) {
       const linkedPRs = getLinkedPRs(doc);
-      if (linkedPRs.length > 0) {
-        output += '\n\n---\n\n';
-        output += '## Linked PRs\n\n';
-        for (const pr of linkedPRs) {
-          output += `- **#${pr.prNumber}** (${pr.status})`;
-          if (pr.title) {
-            output += ` - ${pr.title}`;
-          }
-          output += '\n';
-          output += `  - URL: ${pr.url}\n`;
-          if (pr.branch) {
-            output += `  - Branch: ${pr.branch}\n`;
-          }
-          output += `  - Linked: ${new Date(pr.linkedAt).toISOString()}\n`;
-        }
-      }
+      output += formatLinkedPRsSection(linkedPRs);
     }
 
     return {

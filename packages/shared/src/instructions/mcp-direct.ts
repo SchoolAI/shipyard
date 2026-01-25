@@ -56,7 +56,7 @@ const plan = await createPlan({
 });
 
 const { planId, sessionToken, deliverables, monitoringScript } = plan;
-// deliverables = [{ id: "del_xxx", text: "Screenshot of login page" }, ...]
+/** deliverables = [{ id: "del_xxx", text: "Screenshot of login page" }, ...] */
 \`\`\`
 
 ### Step 2: Wait for Approval
@@ -74,10 +74,10 @@ Or poll manually:
 \`\`\`typescript
 const status = await readPlan(planId, sessionToken);
 if (status.status === "in_progress") {
-  // Approved! Proceed with work
+  /** Approved! Proceed with work */
 }
 if (status.status === "changes_requested") {
-  // Read feedback, make changes
+  /** Read feedback, make changes */
 }
 \`\`\`
 
@@ -108,7 +108,7 @@ const result = await addArtifact({
   deliverableId: deliverables[1].id
 });
 
-// Auto-complete triggers when ALL deliverables have artifacts
+/** Auto-complete triggers when ALL deliverables have artifacts */
 if (result.allDeliverablesComplete) {
   console.log('Done!', result.snapshotUrl);
 }
@@ -203,12 +203,14 @@ const status = await readPlan(planId, sessionToken, {
 });
 
 if (status.status === "changes_requested") {
-  // Read the content for inline comments
+  /** Read the content for inline comments */
   console.log(status.content);
 
-  // Make changes based on feedback
-  // Upload new artifacts
-  // Plan will transition back to pending_review
+  /**
+   * Make changes based on feedback
+   * Upload new artifacts
+   * Plan will transition back to pending_review
+   */
 }
 \`\`\``;
 

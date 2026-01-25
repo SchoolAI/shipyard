@@ -1,26 +1,11 @@
-import { ServerBlockNoteEditor } from '@blocknote/server-util';
-import {
-  addSnapshot,
-  createPlanSnapshot,
-  createPlanUrlWithHistory,
-  getArtifacts,
-  getDeliverables,
-  getLinkedPRs,
-  getPlanMetadata,
-  getSnapshots,
-  type LinkedPR,
-  logPlanEvent,
-  PLAN_INDEX_DOC_NAME,
-  setPlanIndexEntry,
-  transitionPlanStatus,
-} from '@shipyard/schema';
+import { getArtifacts, getDeliverables, getPlanMetadata } from '@shipyard/schema';
 import { z } from 'zod';
-import { webConfig } from '../config/env/web.js';
 import { getOrCreateDoc } from '../doc-store.js';
 import { logger } from '../logger.js';
 import { getGitHubUsername } from '../server-identity.js';
 import { verifySessionToken } from '../session-token.js';
-import { tryAutoLinkPR } from './pr-helpers.js';
+import { performAutoComplete } from './pr-helpers.js';
+import { buildCompletionResponse } from './response-formatters.js';
 import { TOOL_NAMES } from './tool-names.js';
 
 const CompleteTaskInput = z.object({
@@ -62,7 +47,6 @@ RETURNS:
     },
   },
 
-  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Tool handler requires validation, auto-linking, and response formatting
   handler: async (args: unknown) => {
     const input = CompleteTaskInput.parse(args);
     const ydoc = await getOrCreateDoc(input.planId);
@@ -75,7 +59,7 @@ RETURNS:
       };
     }
 
-    // Verify session token
+    /** Verify session token */
     if (
       !metadata.sessionTokenHash ||
       !verifySessionToken(input.sessionToken, metadata.sessionTokenHash)
@@ -86,7 +70,7 @@ RETURNS:
       };
     }
 
-    // Validate status (must be in_progress)
+    /** Validate status (must be in_progress) */
     if (metadata.status !== 'in_progress') {
       return {
         content: [
@@ -99,11 +83,8 @@ RETURNS:
       };
     }
 
-    // Check artifacts exist
+    /** Check artifacts exist */
     const artifacts = getArtifacts(ydoc);
-    // Check if any artifacts are stored locally (won't be visible to remote viewers)
-    const hasLocalArtifacts = artifacts.some((a) => a.storage === 'local');
-
     if (artifacts.length === 0) {
       return {
         content: [
@@ -116,134 +97,30 @@ RETURNS:
       };
     }
 
-    // Get deliverables with linkage info
+    /** Get deliverables and actor name */
     const deliverables = getDeliverables(ydoc);
-
-    // Auto-link PR from current branch
-    let linkedPR: LinkedPR | null = null;
-    const existingLinkedPRs = getLinkedPRs(ydoc);
-
-    if (metadata.repo && existingLinkedPRs.length === 0) {
-      linkedPR = await tryAutoLinkPR(ydoc, metadata.repo);
-      if (linkedPR) {
-        logger.info(
-          { planId: input.planId, prNumber: linkedPR.prNumber, branch: linkedPR.branch },
-          'Auto-linked PR from current branch'
-        );
-      }
-    }
-
-    // Get content blocks from Y.Doc
-    const editor = ServerBlockNoteEditor.create();
-    const fragment = ydoc.getXmlFragment('document');
-    const blocks = editor.yXmlFragmentToBlocks(fragment);
-
-    // Get GitHub username for actor
     const actorName = await getGitHubUsername();
 
-    // Create completion snapshot (Issue #42)
-    const completionSnapshot = createPlanSnapshot(
+    /** Perform auto-completion (shared with add-artifact) */
+    const result = await performAutoComplete({
       ydoc,
-      'Task marked complete',
+      metadata,
+      deliverables,
       actorName,
-      'completed',
-      blocks
-    );
-    addSnapshot(ydoc, completionSnapshot);
-
-    // Get all snapshots for URL encoding
-    const allSnapshots = getSnapshots(ydoc);
-
-    // Generate snapshot URL with version history
-    const baseUrl = webConfig.SHIPYARD_WEB_URL;
-    const snapshotUrl = createPlanUrlWithHistory(
-      baseUrl,
-      {
-        id: input.planId,
-        title: metadata.title,
-        status: 'completed',
-        repo: metadata.repo,
-        pr: metadata.pr,
-        content: blocks,
-        artifacts,
-        deliverables,
-      },
-      allSnapshots
-    );
-
-    // Update metadata
-    const completedAt = Date.now();
-    transitionPlanStatus(
-      ydoc,
-      {
-        status: 'completed',
-        completedAt,
-        completedBy: actorName,
-        snapshotUrl,
-      },
-      actorName
-    );
-
-    // Log completion event (Issue #42 - was missing!)
-    logPlanEvent(ydoc, 'completed', actorName);
-
-    // Update plan index
-    const indexDoc = await getOrCreateDoc(PLAN_INDEX_DOC_NAME);
-    if (metadata.ownerId) {
-      setPlanIndexEntry(indexDoc, {
-        id: metadata.id,
-        title: metadata.title,
-        status: 'completed',
-        createdAt: metadata.createdAt ?? Date.now(),
-        updatedAt: Date.now(),
-        ownerId: metadata.ownerId,
-        deleted: false,
-      });
-    } else {
-      logger.warn({ planId: input.planId }, 'Cannot update plan index: missing ownerId');
-    }
+      snapshotMessage: 'Task marked complete',
+    });
 
     logger.info({ planId: input.planId }, 'Task marked complete');
 
-    // Build response message
-    let responseText = `Task completed!\n\nSnapshot URL: ${snapshotUrl}`;
-
-    if (linkedPR) {
-      responseText += `\n\nLinked PR: #${linkedPR.prNumber} (${linkedPR.status})
-Branch: ${linkedPR.branch}
-URL: ${linkedPR.url}
-
-The PR is now visible in the "Changes" tab of your plan.`;
-    } else if (!metadata.repo) {
-      responseText += `\n\nNote: No PR auto-linked (plan has no repo set).`;
-    } else if (existingLinkedPRs.length > 0) {
-      responseText += `\n\nExisting linked PR: #${existingLinkedPRs[0]?.prNumber}`;
-    } else {
-      responseText += `\n\nNo open PR found on current branch. You can:
-
-1. Create a new PR:
-\`\`\`
-gh pr create --title "${metadata.title}" --body "## Summary
-${input.summary || 'Task completed.'}
-
-## Deliverables
-[View Plan + Artifacts](${snapshotUrl})
-
----
-Generated with [Shipyard](https://github.com/SchoolAI/shipyard)"
-\`\`\`
-
-2. Or link an existing PR manually:
-\`\`\`
-linkPR({ planId, sessionToken, prNumber: 42 })
-\`\`\``;
-    }
-
-    // Add warning if plan contains local artifacts
-    if (hasLocalArtifacts) {
-      responseText +=
-        '\n\n⚠️ WARNING: This plan contains local artifacts that will not be visible to remote viewers. For full remote access, configure GITHUB_TOKEN to upload artifacts to GitHub.';
-    }
+    /** Build response using extracted formatter */
+    const responseText = buildCompletionResponse({
+      metadata,
+      snapshotUrl: result.snapshotUrl,
+      linkedPR: result.linkedPR,
+      existingLinkedPRs: result.existingLinkedPRs,
+      hasLocalArtifacts: result.hasLocalArtifacts,
+      summary: input.summary,
+    });
 
     return {
       content: [{ type: 'text', text: responseText }],

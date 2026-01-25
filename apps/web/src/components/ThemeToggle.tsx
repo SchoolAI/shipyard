@@ -5,7 +5,7 @@ import { useTheme } from '@/hooks/useTheme';
 export function ThemeToggle() {
   const { theme, setTheme } = useTheme();
 
-  // Dynamic icon based on current theme
+  /** Dynamic icon based on current theme */
   const getCurrentIcon = () => {
     switch (theme) {
       case 'light':

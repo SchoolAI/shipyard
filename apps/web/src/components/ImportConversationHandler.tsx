@@ -240,9 +240,11 @@ export function ImportConversationButton({
 
 const REGISTRY_URL = `http://localhost:${DEFAULT_REGISTRY_PORTS[0]}`;
 
-// TODO(#9): Platform detection - Currently hard-coded to only detect Claude Code
-// Should detect available platforms (Cursor, Devin, Windsurf, etc.) and show
-// appropriate import buttons. See: https://github.com/jacobpetterle/shipyard/issues/9
+/*
+ * TODO(#9): Platform detection - Currently hard-coded to only detect Claude Code
+ * Should detect available platforms (Cursor, Devin, Windsurf, etc.) and show
+ * appropriate import buttons. See: https://github.com/jacobpetterle/shipyard/issues/9
+ */
 function useRegistryAvailable(): boolean {
   const [available, setAvailable] = useState(false);
 
@@ -439,14 +441,14 @@ export function ImportConversationHandler({
     setIsImporting(true);
 
     try {
-      // Use vanilla tRPC client for imperative code
+      /** Use vanilla tRPC client for imperative code */
       const trpcClient = createVanillaTRPCClient(REGISTRY_URL);
       const result = await trpcClient.conversation.import.mutate({
         a2aMessages: selectedReceived.messages,
         meta: selectedReceived.meta,
       });
 
-      // Track conversation import in CRDT
+      /** Track conversation import in CRDT */
       const sourcePlatform = selectedReceived.meta.sourcePlatform;
       const platform: OriginPlatform = isOriginPlatform(sourcePlatform)
         ? sourcePlatform
@@ -462,7 +464,7 @@ export function ImportConversationHandler({
       };
       addConversationVersion(ydoc, newVersion);
 
-      // Log activity event
+      /** Log activity event */
       logPlanEvent(ydoc, 'conversation_imported', actor, {
         sourcePlatform: selectedReceived.meta.sourcePlatform,
         messageCount: selectedReceived.meta.messageCount,
@@ -479,7 +481,7 @@ export function ImportConversationHandler({
       setIsReviewOpen(false);
       setSelectedReceived(null);
     } catch (error) {
-      // tRPC throws on errors - handle gracefully
+      /** tRPC throws on errors - handle gracefully */
       const message =
         error instanceof Error
           ? error.message

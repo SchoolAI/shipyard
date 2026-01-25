@@ -9,7 +9,7 @@ import { Avatar } from '@/components/ui/avatar';
 import type { PendingUser } from '@/hooks/usePendingUsers';
 import { usePendingUsers } from '@/hooks/usePendingUsers';
 
-// Maximum number of pending users to display in the popover
+/** Maximum number of pending users to display in the popover */
 const MAX_DISPLAYED_PENDING_USERS = 20;
 
 interface ApprovalPanelProps {
@@ -120,10 +120,10 @@ export function ApprovalPanel({
 }: ApprovalPanelProps) {
   const pendingUsers = usePendingUsers(rtcProvider, planId);
 
-  // Only show to plan owner
+  /** Only show to plan owner */
   const isOwner = currentUsername && ownerId && currentUsername === ownerId;
 
-  // Limit displayed users for performance with large lists
+  /** Limit displayed users for performance with large lists */
   const displayedUsers = pendingUsers.slice(0, MAX_DISPLAYED_PENDING_USERS);
   const hasMoreUsers = pendingUsers.length > MAX_DISPLAYED_PENDING_USERS;
   const hiddenCount = pendingUsers.length - MAX_DISPLAYED_PENDING_USERS;
@@ -141,7 +141,7 @@ export function ApprovalPanel({
 
   const handleDeny = useCallback(
     (userId: string) => {
-      // Reject the user - this adds them to rejectedUsers list
+      /** Reject the user - this adds them to rejectedUsers list */
       rejectUser(ydoc, userId);
       const user = pendingUsers.find((u) => u.id === userId);
       toast.info(`${user?.name ?? userId} denied`, {
@@ -151,7 +151,7 @@ export function ApprovalPanel({
     [ydoc, pendingUsers]
   );
 
-  // Don't render if not owner or no pending users
+  /** Don't render if not owner or no pending users */
   if (!isOwner || pendingUsers.length === 0) {
     return null;
   }

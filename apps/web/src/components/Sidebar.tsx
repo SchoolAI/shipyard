@@ -79,7 +79,7 @@ function CollapsedSidebar({
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Hide counts during loading to prevent flash from 0→actual
+  /** Hide counts during loading to prevent flash from 0→actual */
   const displayInboxCount = isLoading ? 0 : inboxCount;
 
   return (
@@ -218,7 +218,7 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Calculate total inbox count (plans + input requests)
+  /** Calculate total inbox count (plans + input requests) */
   const totalInboxCount = useMemo(() => {
     return inboxPlans.length + pendingRequests.length;
   }, [inboxPlans, pendingRequests]);

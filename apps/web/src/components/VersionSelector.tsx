@@ -52,7 +52,7 @@ export function VersionSelector({
   onNext,
   onCurrent,
 }: VersionSelectorProps) {
-  // Don't show if no snapshots exist
+  /** Don't show if no snapshots exist */
   if (totalSnapshots === 0) return null;
 
   const isViewingHistory = currentSnapshot !== null;
