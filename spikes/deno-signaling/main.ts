@@ -60,6 +60,7 @@ function cleanupConnection(conn: WebSocket): void {
  * Handle incoming WebSocket messages.
  * Protocol matches y-webrtc signaling expectations.
  */
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Spike code, complexity is acceptable for POC
 function handleMessage(conn: WebSocket, data: string): void {
   let message: Record<string, unknown>;
   try {
@@ -76,6 +77,7 @@ function handleMessage(conn: WebSocket, data: string): void {
   if (!connectionTopics.has(conn)) {
     connectionTopics.set(conn, new Set());
   }
+  // biome-ignore lint/style/noNonNullAssertion: Safe assertion after has() check
   const subscribedTopics = connectionTopics.get(conn)!;
 
   switch (message.type) {

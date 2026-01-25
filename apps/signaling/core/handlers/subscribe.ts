@@ -288,7 +288,9 @@ async function handleSubscribe(
 
     // Log subscription for debugging
     const subscriberCount = platform.getTopicSubscribers(topic).length;
-    platform.debug(`[Subscribe] Client subscribed to topic: ${topic} (now ${subscriberCount} subscribers)`);
+    platform.debug(
+      `[Subscribe] Client subscribed to topic: ${topic} (now ${subscriberCount} subscribers)`
+    );
   }
 }
 

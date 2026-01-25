@@ -1,20 +1,5 @@
 /**
- * Centralized tool name constants for type safety.
- * Use these when referencing tool names in responses or other tools.
+ * Re-export tool names from @shipyard/schema.
+ * This file exists for backwards compatibility with existing imports.
  */
-export const TOOL_NAMES = {
-  ADD_ARTIFACT: 'add_artifact',
-  ADD_PR_REVIEW_COMMENT: 'add_pr_review_comment',
-  COMPLETE_TASK: 'complete_task',
-  CREATE_PLAN: 'create_plan',
-  EXECUTE_CODE: 'execute_code',
-  LINK_PR: 'link_pr',
-  READ_PLAN: 'read_plan',
-  REGENERATE_SESSION_TOKEN: 'regenerate_session_token',
-  REQUEST_USER_INPUT: 'request_user_input',
-  SETUP_REVIEW_NOTIFICATION: 'setup_review_notification',
-  UPDATE_BLOCK_CONTENT: 'update_block_content',
-  UPDATE_PLAN: 'update_plan',
-} as const;
-
-export type ToolName = (typeof TOOL_NAMES)[keyof typeof TOOL_NAMES];
+export { TOOL_NAMES, type ToolName } from '@shipyard/schema';

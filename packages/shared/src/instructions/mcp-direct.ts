@@ -4,29 +4,37 @@
  * Users must call MCP tools directly (createPlan, addArtifact, etc.).
  */
 
+import { TOOL_NAMES } from '@shipyard/schema';
 import {
   ARTIFACT_TYPES_SECTION,
   CRITICAL_USAGE_SECTION,
   DELIVERABLES_SECTION,
   TIPS_SECTION,
   TROUBLESHOOTING_SECTION,
+  USER_INPUT_SECTION,
   WHEN_NOT_TO_USE_SECTION,
 } from './common.js';
 
-export const MCP_DIRECT_HEADER = `# Shipyard: Verified Work Tasks
+export const MCP_DIRECT_HEADER = `# Shipyard: Your Agent Management Hub
 
-> **MCP Integration:** Use \`execute_code\` to call Shipyard APIs. This skill teaches the workflow.
+> **Shipyard is the central interface where humans manage AI agents.** Plans, artifacts, feedback, and communication all happen here.
 
-Shipyard turns invisible agent work into reviewable, verifiable tasks. Instead of trusting that code was written correctly, reviewers see screenshots, videos, and test results as proof.`;
+Shipyard turns invisible agent work into reviewable, verifiable tasks. Instead of trusting that code was written correctly, reviewers see screenshots, videos, and test results as proof.
+
+**Key principle:** When you're working in Shipyard, ALL human-agent communication should happen through Shipyard's \`${TOOL_NAMES.REQUEST_USER_INPUT}\` tool. The human is already in the browser viewing your plan - that's where they expect to interact with you.`;
 
 export const MCP_TOOLS_OVERVIEW = `## Available MCP Tools
 
 | Tool | Purpose |
 |------|---------|
-| \`execute_code\` | Run TypeScript that calls Shipyard APIs (recommended) |
-| \`request_user_input\` | Ask user questions via browser modal |
+| \`${TOOL_NAMES.REQUEST_USER_INPUT}\` | **THE primary human-agent communication channel** - Ask questions, get decisions, request clarification |
+| \`${TOOL_NAMES.EXECUTE_CODE}\` | Run TypeScript that calls Shipyard APIs (recommended for multi-step operations) |
 
-**Preferred approach:** Use \`execute_code\` to chain multiple API calls in one step.`;
+### ${TOOL_NAMES.REQUEST_USER_INPUT}: Your Direct Line to the Human
+
+This is how you talk to humans during active work. Don't use your platform's built-in question tools (AskUserQuestion, etc.) - use this instead. The human is in the browser viewing your plan, and that's where they expect to see your questions.
+
+**Preferred approach:** Use \`${TOOL_NAMES.EXECUTE_CODE}\` to chain multiple API calls in one step.`;
 
 export const MCP_WORKFLOW = `## Workflow (MCP Direct)
 
@@ -152,11 +160,40 @@ Asks user a question via browser modal.
 
 **Parameters:**
 - \`message\` (string) - Question to ask
-- \`type\` ('text' | 'choice' | 'confirm' | 'multiline')
+- \`type\` (string) - Input type (see below)
 - \`options\` (string[], for 'choice') - Available choices
 - \`timeout\` (number, optional) - Timeout in seconds
+- Type-specific parameters (min, max, format, etc.)
 
-**Returns:** \`{ success, response?, status }\``;
+**Returns:** \`{ success, response?, status }\`
+
+**Supported types (8 total):**
+1. \`text\` - Single-line text
+2. \`multiline\` - Multi-line text area
+3. \`choice\` - Radio/checkbox/dropdown (auto-adds "Other" option)
+   - Auto-switches: 1-8 options = radio/checkbox, 9+ = dropdown
+   - \`multiSelect: true\` for checkboxes
+   - \`displayAs: 'dropdown'\` to force dropdown UI
+4. \`confirm\` - Yes/No buttons
+5. \`number\` - Numeric input with validation
+   - \`min\`, \`max\`, \`format\` ('integer' | 'decimal' | 'currency' | 'percentage')
+6. \`email\` - Email validation
+   - \`domain\` for restriction
+7. \`date\` - Date picker with range
+   - \`minDate\`, \`maxDate\` (YYYY-MM-DD format)
+8. \`rating\` - Scale rating (auto-selects stars/numbers)
+   - \`min\`, \`max\`, \`style\` ('stars' | 'numbers' | 'emoji'), \`labels\`
+
+**Response format:**
+- All responses are strings
+- choice (single): \`"PostgreSQL"\` or custom text from "Other"
+- choice (multi): \`"option1, option2"\` (comma-space separated)
+- confirm: \`"yes"\` or \`"no"\` (lowercase)
+- number: \`"42"\` or \`"3.14"\`
+- email: \`"user@example.com"\`
+- date: \`"2026-01-24"\` (ISO 8601)
+- rating: \`"4"\` (integer as string)
+- See docs/INPUT-RESPONSE-FORMATS.md for complete specification`;
 
 export const HANDLING_FEEDBACK = `## Handling Reviewer Feedback
 
@@ -182,6 +219,8 @@ export const MCP_DIRECT_INSTRUCTIONS = [
   MCP_DIRECT_HEADER,
   '',
   CRITICAL_USAGE_SECTION,
+  '',
+  USER_INPUT_SECTION,
   '',
   MCP_TOOLS_OVERVIEW,
   '',

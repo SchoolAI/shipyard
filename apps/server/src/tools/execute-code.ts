@@ -203,44 +203,160 @@ Parameters:
 ### requestUserInput(opts): Promise<{ success, response?, status, reason? }>
 Request input from the user via browser modal.
 
+Supports both single-question and multi-question modes (1-10 questions, 8 recommended for optimal UX).
+
 Parameters:
 - message (string, required): The question to ask the user
-- type (string, required): 'text' | 'choice' | 'confirm' | 'multiline'
+- type (string, required): 'text' | 'multiline' | 'choice' | 'confirm' | 'number' | 'email' | 'date' | 'rating'
 - options (string[], optional): For 'choice' type - available options (required for choice)
-- multiSelect (boolean, optional): For 'choice' type - allow selecting multiple options (uses checkboxes instead of radio buttons)
+- multiSelect (boolean, optional): For 'choice' type - allow selecting multiple options (checkboxes)
+- displayAs (string, optional): For 'choice' type - override automatic UI ('radio' | 'checkbox' | 'dropdown')
 - defaultValue (string, optional): Pre-filled value for text/multiline inputs
-- timeout (number, optional): Timeout in seconds (default: 1800, min: 300, max: 1800)
+- timeout (number, optional): Timeout in seconds (default: 1800, min: 10, max: 14400)
   - Simple yes/no or quick choices: 300-600 seconds (5-10 minutes)
   - Complex questions with code examples: 600-1200 seconds (10-20 minutes)
   - Default (1800 = 30 minutes) is suitable for most cases
+  - Max (14400 = 4 hours) for extended user sessions
   - Note: System-level timeouts may cause earlier cancellation
 - planId (string, optional): Optional metadata to link request to plan (for activity log filtering)
+- min (number, optional): For 'number'/'rating' - minimum value
+- max (number, optional): For 'number'/'rating' - maximum value
+- format (string, optional): For 'number' - 'integer' | 'decimal' | 'currency' | 'percentage'
+- minDate (string, optional): For 'date' - minimum date (YYYY-MM-DD)
+- maxDate (string, optional): For 'date' - maximum date (YYYY-MM-DD)
+- domain (string, optional): For 'email' - restrict to specific domain
+- style (string, optional): For 'rating' - 'stars' | 'numbers' | 'emoji'
+- labels (object, optional): For 'rating' - { low?: string, high?: string }
 
 Returns:
 - success: Boolean indicating if user responded
-- response: User's answer (if success=true)
-- status: 'answered' | 'cancelled'
+- response: User's answer (string - see format details below)
+- status: 'answered' | 'declined' | 'cancelled'
 - reason: Reason for failure (if success=false): 'cancelled' | timeout message
 
+Response format (all responses are strings):
+- text/multiline: Raw string (multiline preserves newlines as \n)
+- choice (single): Selected option string (e.g., "PostgreSQL")
+- choice (multi): Comma-space separated (e.g., "PostgreSQL, SQLite")
+- choice (other): Custom text entered by user (e.g., "Redis")
+- confirm: "yes" or "no" (lowercase)
+- number: Decimal representation (e.g., "42" or "3.14")
+- email: Email address (e.g., "user@example.com")
+- date: ISO 8601 date (e.g., "2026-01-24")
+- rating: Integer as string (e.g., "4")
+- See docs/INPUT-RESPONSE-FORMATS.md for complete format specification
+
 The request appears as a modal in the browser. The function blocks until:
-- User responds (success=true)
-- User cancels (success=false)
-- Timeout occurs (success=false)
+- User responds (success=true, status='answered')
+- User declines (success=true, status='declined')
+- Timeout occurs (success=false, status='cancelled')
 
-Example:
+## Supported Input Types (8 total)
+
+1. **text** - Single-line text input
 \`\`\`typescript
-const result = await requestUserInput({
-  message: "Which database should we use?",
-  type: "choice",
-  options: ["PostgreSQL", "SQLite", "MongoDB"],
-  timeout: 600  // 10 minutes
-});
+await requestUserInput({ message: "API endpoint URL?", type: "text" })
+\`\`\`
 
-if (result.success) {
-  console.log("User chose:", result.response);
-} else {
-  console.log("Request failed:", result.reason);
-}
+2. **multiline** - Multi-line text area
+\`\`\`typescript
+await requestUserInput({ message: "Describe the bug:", type: "multiline" })
+\`\`\`
+
+3. **choice** - Select from options (auto-adds "Other" escape hatch)
+\`\`\`typescript
+// Single-select (radio buttons or dropdown for 9+ options)
+await requestUserInput({
+  message: "Which database?",
+  type: "choice",
+  options: ["PostgreSQL", "SQLite", "MongoDB"]
+})
+// Response: "PostgreSQL" or custom text like "Redis" if "Other" selected
+
+// Multi-select (checkboxes)
+await requestUserInput({
+  message: "Which features?",
+  type: "choice",
+  options: ["Dark mode", "Offline support", "Analytics"],
+  multiSelect: true
+})
+// Response: "Dark mode, Offline support"
+
+// Force dropdown UI
+await requestUserInput({
+  message: "Select country:",
+  type: "choice",
+  options: ["USA", "Canada", "Mexico"],
+  displayAs: "dropdown"
+})
+\`\`\`
+
+4. **confirm** - Yes/No confirmation
+\`\`\`typescript
+await requestUserInput({ message: "Deploy to production?", type: "confirm" })
+// Response: "yes" or "no"
+\`\`\`
+
+5. **number** - Numeric input with validation
+\`\`\`typescript
+await requestUserInput({
+  message: "Port number?",
+  type: "number",
+  min: 1,
+  max: 65535,
+  format: "integer"
+})
+// Response: "3000"
+
+await requestUserInput({
+  message: "Budget amount?",
+  type: "number",
+  format: "currency"
+})
+// Response: "1234.56"
+\`\`\`
+
+6. **email** - Email address with validation
+\`\`\`typescript
+await requestUserInput({
+  message: "Contact email?",
+  type: "email",
+  domain: "company.com"  // Optional domain restriction
+})
+// Response: "user@company.com"
+\`\`\`
+
+7. **date** - Date selection with range
+\`\`\`typescript
+await requestUserInput({
+  message: "Project deadline?",
+  type: "date",
+  minDate: "2026-01-24",
+  maxDate: "2026-12-31"
+})
+// Response: "2026-06-15"
+\`\`\`
+
+8. **rating** - Scale rating (auto-selects stars for <=5, numbers for >5)
+\`\`\`typescript
+await requestUserInput({
+  message: "Rate this approach:",
+  type: "rating",
+  min: 1,
+  max: 5,
+  labels: { low: "Poor", high: "Excellent" }
+})
+// Response: "4"
+
+// Custom style override
+await requestUserInput({
+  message: "NPS Score (0-10):",
+  type: "rating",
+  min: 0,
+  max: 10,
+  style: "numbers"
+})
+// Response: "8"
 \`\`\`
 
 ---
@@ -649,12 +765,24 @@ async function setupReviewNotification(planId: string, pollIntervalSeconds?: num
 
 async function requestUserInput(opts: {
   message: string;
-  type: 'text' | 'choice' | 'confirm' | 'multiline';
+  type: 'text' | 'choice' | 'confirm' | 'multiline' | 'number' | 'email' | 'date' | 'rating';
   options?: string[];
   multiSelect?: boolean;
   defaultValue?: string;
   timeout?: number;
   planId?: string;
+  // Number/rating type parameters
+  min?: number;
+  max?: number;
+  format?: 'integer' | 'decimal' | 'currency' | 'percentage';
+  // Date type parameters (separate from min/max since they're strings)
+  minDate?: string; // YYYY-MM-DD format
+  maxDate?: string; // YYYY-MM-DD format
+  // Email type parameters
+  domain?: string;
+  // Rating type parameters
+  style?: 'stars' | 'numbers' | 'emoji';
+  labels?: { low?: string; high?: string };
 }) {
   const { InputRequestManager } = await import('../services/input-request-manager.js');
   const { getGitHubUsername } = await import('../server-identity.js');
@@ -667,27 +795,73 @@ async function requestUserInput(opts: {
   // Create manager and make request
   const manager = new InputRequestManager();
 
-  // Build params based on type - choice requires options
-  const params =
-    opts.type === 'choice'
-      ? {
-          message: opts.message,
-          type: 'choice' as const,
-          options: opts.options ?? [],
-          multiSelect: opts.multiSelect,
-          defaultValue: opts.defaultValue,
-          timeout: opts.timeout,
-          planId: opts.planId,
-        }
-      : {
-          message: opts.message,
-          type: opts.type,
-          defaultValue: opts.defaultValue,
-          timeout: opts.timeout,
-          planId: opts.planId,
-        };
+  // Build params based on type - include type-specific parameters
+  const baseParams = {
+    message: opts.message,
+    defaultValue: opts.defaultValue,
+    timeout: opts.timeout,
+    planId: opts.planId,
+  };
 
-  const requestId = manager.createRequest(ydoc, params);
+  let params: Record<string, unknown>;
+
+  switch (opts.type) {
+    case 'choice':
+      params = {
+        ...baseParams,
+        type: opts.type,
+        options: opts.options ?? [],
+        multiSelect: opts.multiSelect,
+      };
+      break;
+    case 'number':
+      params = {
+        ...baseParams,
+        type: opts.type,
+        min: opts.min,
+        max: opts.max,
+        format: opts.format,
+      };
+      break;
+    case 'email':
+      params = {
+        ...baseParams,
+        type: opts.type,
+        domain: opts.domain,
+      };
+      break;
+    case 'date':
+      params = {
+        ...baseParams,
+        type: opts.type,
+        min: opts.minDate,
+        max: opts.maxDate,
+      };
+      break;
+    case 'rating':
+      params = {
+        ...baseParams,
+        type: opts.type,
+        min: opts.min,
+        max: opts.max,
+        style: opts.style,
+        labels: opts.labels,
+      };
+      break;
+    default:
+      // text, multiline, confirm
+      params = {
+        ...baseParams,
+        type: opts.type,
+      };
+  }
+
+  // Cast through unknown since new types (number, email, date, rating)
+  // may not yet be in the schema. The InputRequestManager will pass through to Y.Doc.
+  const requestId = manager.createRequest(
+    ydoc,
+    params as unknown as Parameters<typeof manager.createRequest>[1]
+  );
 
   // Wait for response
   const result = await manager.waitForResponse(ydoc, requestId, opts.timeout);

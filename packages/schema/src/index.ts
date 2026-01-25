@@ -83,25 +83,57 @@ export {
   asWebRTCPeerId,
 } from './ids.js';
 export type {
+  AnyInputRequest,
   ChoiceInputRequest,
+  ChoiceOption,
+  ChoiceQuestion,
   ConfirmInputRequest,
+  ConfirmQuestion,
   CreateChoiceInputParams,
   CreateConfirmInputParams,
+  CreateDateInputParams,
+  CreateDropdownInputParams,
+  CreateEmailInputParams,
   CreateInputRequestParams,
   CreateMultilineInputParams,
+  CreateMultiQuestionInputParams,
+  CreateNumberInputParams,
+  CreateRatingInputParams,
   CreateTextInputParams,
+  DateInputRequest,
+  DateQuestion,
+  DropdownInputRequest,
+  EmailInputRequest,
+  EmailQuestion,
   InputRequest,
   InputRequestStatus,
   InputRequestType,
   MultilineInputRequest,
+  MultilineQuestion,
+  MultiQuestionInputRequest,
+  NormalizedChoiceOption,
+  NumberInputRequest,
+  NumberQuestion,
+  Question,
+  RatingInputRequest,
+  RatingQuestion,
   TextInputRequest,
+  TextQuestion,
 } from './input-request.js';
 export {
+  AnyInputRequestSchema,
+  CHOICE_DROPDOWN_THRESHOLD,
+  ChoiceOptionSchema,
   createInputRequest,
+  createMultiQuestionInputRequest,
   DEFAULT_INPUT_REQUEST_TIMEOUT_SECONDS,
   InputRequestSchema,
   InputRequestStatusValues,
   InputRequestTypeValues,
+  MAX_QUESTIONS_PER_REQUEST,
+  MultiQuestionInputRequestSchema,
+  normalizeChoiceOptions,
+  QuestionSchema,
 } from './input-request.js';
 export type {
   CreateInviteRequest,
@@ -260,6 +292,8 @@ export {
 } from './thread.js';
 export type { FormatThreadsOptions } from './thread-formatter.js';
 export { formatThreadsForLLM } from './thread-formatter.js';
+export type { ToolName } from './tool-names.js';
+export { TOOL_NAMES } from './tool-names.js';
 export type {
   AppRouter,
   ApprovalResult,
@@ -349,6 +383,7 @@ export {
   addPRReviewComment,
   addSnapshot,
   answerInputRequest,
+  answerMultiQuestionInputRequest,
   approveUser,
   archivePlan,
   atomicRegenerateTokenIfOwner,
