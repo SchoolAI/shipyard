@@ -142,7 +142,9 @@ export function useP2PPeers(rtcProvider: WebrtcProvider | null): UseP2PPeersResu
       // Skip ourselves
       if (clientId === myClientId) return;
 
-      const peerInfo = extractPeerInfo(clientId, state as Record<string, unknown>);
+      const stateRecord =
+        state && typeof state === 'object' ? Object.fromEntries(Object.entries(state)) : {};
+      const peerInfo = extractPeerInfo(clientId, stateRecord);
       if (peerInfo) {
         peers.push(peerInfo);
       }

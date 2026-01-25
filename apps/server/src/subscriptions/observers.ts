@@ -10,7 +10,6 @@ import {
   logPlanEvent,
   type PlanMetadata,
   type PlanStatusType,
-  PlanStatusValues,
   parseThreads,
   type Thread,
   type ThreadComment,
@@ -76,10 +75,17 @@ export function attachObservers(planId: string, doc: Y.Doc): void {
       const prev = previousState.get(planId);
       // Runtime validation: ensure status value is a valid PlanStatusType
       const rawStatus = doc.getMap<PlanMetadata>(YDOC_KEYS.METADATA).get('status');
-      const newStatus =
-        typeof rawStatus === 'string' && PlanStatusValues.includes(rawStatus as PlanStatusType)
-          ? (rawStatus as PlanStatusType)
-          : undefined;
+      function isValidStatus(s: unknown): s is PlanStatusType {
+        return (
+          typeof s === 'string' &&
+          (s === 'draft' ||
+            s === 'pending_review' ||
+            s === 'changes_requested' ||
+            s === 'in_progress' ||
+            s === 'completed')
+        );
+      }
+      const newStatus = isValidStatus(rawStatus) ? rawStatus : undefined;
 
       if (prev?.status && prev.status !== newStatus && newStatus) {
         const actor = transaction.origin?.actor || 'System';
@@ -149,11 +155,15 @@ export function attachObservers(planId: string, doc: Y.Doc): void {
     if (newCount > prev.artifactCount) {
       const diff = newCount - prev.artifactCount;
       const artifacts = doc.getArray<Artifact>(YDOC_KEYS.ARTIFACTS).toArray();
-      const newArtifact = artifacts[artifacts.length - 1] as { id: string };
+      const lastArtifact = artifacts[artifacts.length - 1];
+      const artifactId =
+        lastArtifact && typeof lastArtifact === 'object' && 'id' in lastArtifact
+          ? String(lastArtifact.id)
+          : 'unknown';
 
       // Log event
       logPlanEvent(doc, 'artifact_uploaded', actor, {
-        artifactId: newArtifact.id,
+        artifactId,
       });
 
       // Notify subscriptions

@@ -16,6 +16,7 @@ const ORIGIN_PLATFORM_SET = new Set<string>(OriginPlatformValues);
 function isOriginPlatform(value: string | undefined): value is OriginPlatform {
   return typeof value === 'string' && ORIGIN_PLATFORM_SET.has(value);
 }
+
 import { DEFAULT_REGISTRY_PORTS } from '@shipyard/shared/registry-config';
 import { Check, Download, MessageSquare, MessageSquareReply, Terminal } from 'lucide-react';
 import type React from 'react';
@@ -447,7 +448,9 @@ export function ImportConversationHandler({
 
       // Track conversation import in CRDT
       const sourcePlatform = selectedReceived.meta.sourcePlatform;
-      const platform: OriginPlatform = isOriginPlatform(sourcePlatform) ? sourcePlatform : 'unknown';
+      const platform: OriginPlatform = isOriginPlatform(sourcePlatform)
+        ? sourcePlatform
+        : 'unknown';
       const newVersion: ConversationVersion = {
         versionId: crypto.randomUUID(),
         creator: identity?.username || 'anonymous',

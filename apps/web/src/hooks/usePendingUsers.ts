@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { WebrtcProvider } from 'y-webrtc';
-import type { PlanAwarenessState } from '@/types/awareness';
+import { isPlanAwarenessState, type PlanAwarenessState } from '@/types/awareness';
 
 export interface PendingUser {
   /** GitHub username */
@@ -42,7 +42,12 @@ export function usePendingUsers(
       const now = Date.now();
 
       for (const [, state] of states) {
-        const planStatus = state.planStatus as PlanAwarenessState | undefined;
+        const stateRecord =
+          state && typeof state === 'object' ? Object.fromEntries(Object.entries(state)) : {};
+        const planStatusRaw = stateRecord.planStatus;
+        const planStatus: PlanAwarenessState | undefined = isPlanAwarenessState(planStatusRaw)
+          ? planStatusRaw
+          : undefined;
 
         // Skip if no plan status or not pending
         if (!planStatus || planStatus.status !== 'pending') {

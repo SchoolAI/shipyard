@@ -7,6 +7,13 @@
  */
 
 import type { Artifact } from '@shipyard/schema';
+import { z } from 'zod';
+
+/** Schema for GitHub Contents API response */
+const GitHubContentsResponseSchema = z.object({
+  content: z.string().optional(),
+  encoding: z.string().optional(),
+});
 
 // ============================================================================
 // Public Types
@@ -79,9 +86,10 @@ export function parseArtifactUrl(url: string): ParsedArtifactUrl | null {
     }
 
     // Length check above guarantees at least 4 elements
-    const owner = parts[0] as string;
-    const repo = parts[1] as string;
-    const ref = parts[2] as string;
+    const owner = parts[0];
+    const repo = parts[1];
+    const ref = parts[2];
+    if (!owner || !repo || !ref) return null;
     const path = parts.slice(3).join('/');
 
     return { owner, repo, ref, path };
@@ -194,10 +202,12 @@ async function fetchViaGitHubApi(
       return { status: 'error', error: `GitHub API: ${response.status}` };
     }
 
-    const data = (await response.json()) as {
-      content?: string;
-      encoding?: string;
-    };
+    const json: unknown = await response.json();
+    const parseResult = GitHubContentsResponseSchema.safeParse(json);
+    if (!parseResult.success) {
+      return { status: 'error', error: 'Unexpected API response format' };
+    }
+    const data = parseResult.data;
 
     // GitHub Contents API returns base64-encoded content
     if (!data.content || data.encoding !== 'base64') {

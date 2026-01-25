@@ -5,15 +5,22 @@ import {
   createPlanSnapshot,
   logPlanEvent,
   type PlanStatusType,
-  PlanStatusValues,
   transitionPlanStatus,
   YDOC_KEYS,
 } from '@shipyard/schema';
 
 /** Type guard for valid PlanStatusType values */
 function isValidPlanStatus(value: unknown): value is PlanStatusType {
-  return typeof value === 'string' && PlanStatusValues.includes(value as PlanStatusType);
+  return (
+    typeof value === 'string' &&
+    (value === 'draft' ||
+      value === 'pending_review' ||
+      value === 'changes_requested' ||
+      value === 'in_progress' ||
+      value === 'completed')
+  );
 }
+
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import type * as Y from 'yjs';

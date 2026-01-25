@@ -15,6 +15,19 @@ import { registryConfig } from '../config/env/registry.js';
 import { getOrCreateDoc } from '../doc-store.js';
 import { logger } from '../logger.js';
 import { addArtifactTool } from './add-artifact.js';
+
+/**
+ * Extract text from MCP tool result content.
+ * MCP tools return { content: [{ type: 'text', text: string }] }.
+ */
+function getToolResultText(result: { content: unknown[] }): string {
+  const first = result.content[0];
+  if (!first || typeof first !== 'object') return '';
+  const record = Object.fromEntries(Object.entries(first));
+  const text = record.text;
+  return typeof text === 'string' ? text : '';
+}
+
 import { addPRReviewCommentTool } from './add-pr-review-comment.js';
 import { completeTaskTool } from './complete-task.js';
 import { createPlanTool } from './create-plan.js';
@@ -459,7 +472,7 @@ async function createPlan(opts: {
   prNumber?: number;
 }) {
   const result = await createPlanTool.handler(opts);
-  const text = (result.content[0] as { text: string })?.text || '';
+  const text = getToolResultText(result);
   const planId = text.match(/ID: (\S+)/)?.[1] || '';
 
   // Fetch deliverables from the Y.Doc
@@ -496,7 +509,7 @@ async function readPlan(
     includeAnnotations: opts?.includeAnnotations,
     includeLinkedPRs: opts?.includeLinkedPRs,
   });
-  const text = (result.content[0] as { text: string })?.text || '';
+  const text = getToolResultText(result);
 
   // Get structured data directly from Y.Doc instead of parsing strings
   const ydoc = await getOrCreateDoc(planId);
@@ -552,7 +565,7 @@ type AddArtifactOpts = {
 
 async function addArtifact(opts: AddArtifactOpts) {
   const result = await addArtifactTool.handler(opts);
-  const text = (result.content[0] as { text: string })?.text || '';
+  const text = getToolResultText(result);
 
   if (result.isError) {
     return { isError: true, error: text };
@@ -593,7 +606,7 @@ async function addArtifact(opts: AddArtifactOpts) {
 
 async function completeTask(planId: string, sessionToken: string, summary?: string) {
   const result = await completeTaskTool.handler({ planId, sessionToken, summary });
-  const text = (result.content[0] as { text: string })?.text || '';
+  const text = getToolResultText(result);
 
   if (result.isError) {
     return { isError: true, error: text };
@@ -631,7 +644,7 @@ async function linkPR(opts: {
   repo?: string;
 }) {
   const result = await linkPRTool.handler(opts);
-  const text = (result.content[0] as { text: string })?.text || '';
+  const text = getToolResultText(result);
 
   if (result.isError) {
     throw new Error(text);
@@ -669,7 +682,7 @@ async function setupReviewNotification(planId: string, pollIntervalSeconds?: num
     planId,
     pollIntervalSeconds: pollIntervalSeconds ?? 30,
   });
-  const text = (result.content[0] as { text: string })?.text || '';
+  const text = getToolResultText(result);
 
   // Extract script from markdown code block
   const scriptMatch = text.match(/```bash\n([\s\S]*?)\n```/);
@@ -817,7 +830,7 @@ async function requestUserInput(opts: {
 
 async function regenerateSessionToken(planId: string) {
   const result = await regenerateSessionTokenTool.handler({ planId });
-  const text = (result.content[0] as { text: string })?.text || '';
+  const text = getToolResultText(result);
 
   if (result.isError) {
     throw new Error(text);

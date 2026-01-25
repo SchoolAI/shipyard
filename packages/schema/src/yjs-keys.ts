@@ -189,9 +189,14 @@ export const YDOC_KEYS = {
 export type YDocKey = (typeof YDOC_KEYS)[keyof typeof YDOC_KEYS];
 
 /**
+ * Set of valid Y.Doc keys for O(1) lookup.
+ */
+const validKeys: Set<string> = new Set(Object.values(YDOC_KEYS));
+
+/**
  * Helper to validate a key is one of the known Y.Doc keys.
  * Useful for runtime validation when keys come from external sources.
  */
 export function isValidYDocKey(key: string): key is YDocKey {
-  return Object.values(YDOC_KEYS).includes(key as YDocKey);
+  return validKeys.has(key);
 }

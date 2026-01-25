@@ -8,5 +8,3 @@ declare global {
     planRtcProvider?: WebrtcProvider;
   }
 }
-
-export {};

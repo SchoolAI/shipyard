@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import type { WebrtcProvider } from 'y-webrtc';
-import type { PlanAwarenessState } from '@/types/awareness';
+import { isPlanAwarenessState, type PlanAwarenessState } from '@/types/awareness';
 
 /**
  * Extracts a pending user from a plan status, if valid.
@@ -68,7 +68,13 @@ export function usePendingUserNotifications(
       const currentPendingUsers = new Set<string>();
 
       for (const [, state] of states) {
-        const pendingUser = extractPendingUser(state.planStatus as PlanAwarenessState | undefined);
+        const stateRecord =
+          state && typeof state === 'object' ? Object.fromEntries(Object.entries(state)) : {};
+        const planStatusRaw = stateRecord.planStatus;
+        const planStatus: PlanAwarenessState | undefined = isPlanAwarenessState(planStatusRaw)
+          ? planStatusRaw
+          : undefined;
+        const pendingUser = extractPendingUser(planStatus);
         if (!pendingUser) continue;
 
         const { userId, userName } = pendingUser;

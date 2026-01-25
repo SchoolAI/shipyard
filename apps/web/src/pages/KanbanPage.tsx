@@ -23,6 +23,7 @@ import {
   getPlanIndexEntry,
   getPlanMetadata,
   type PlanIndexEntry,
+  PlanIndexEntrySchema,
   type PlanMetadata,
   type PlanStatusType,
   type StatusTransition,
@@ -76,10 +77,8 @@ function getDragPlan(
   data: { current?: { plan?: unknown } } | undefined
 ): PlanIndexEntry | undefined {
   const plan = data?.current?.plan;
-  if (plan && typeof plan === 'object' && 'id' in plan && 'title' in plan) {
-    return plan as PlanIndexEntry;
-  }
-  return undefined;
+  const result = PlanIndexEntrySchema.safeParse(plan);
+  return result.success ? result.data : undefined;
 }
 
 /**

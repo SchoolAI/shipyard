@@ -9,6 +9,7 @@
 
 import {
   type AnyInputRequest,
+  AnyInputRequestSchema,
   DEFAULT_INPUT_REQUEST_TIMEOUT_SECONDS,
   YDOC_KEYS,
 } from '@shipyard/schema';
@@ -207,17 +208,12 @@ export function useInputRequests({
     const requestsArray = ydoc.getArray<AnyInputRequest>(YDOC_KEYS.INPUT_REQUESTS);
 
     const updateRequests = () => {
-<<<<<<< HEAD
-      // Get all requests and filter for pending
-      const allRequests = requestsArray.toJSON() as AnyInputRequest[];
-=======
       // Get all requests and validate them with schema
       const rawRequests = requestsArray.toJSON();
       const allRequests = rawRequests
-        .map((item) => InputRequestSchema.safeParse(item))
+        .map((item) => AnyInputRequestSchema.safeParse(item))
         .filter((result) => result.success)
         .map((result) => result.data);
->>>>>>> 34727b5 (fix: wave 2 type assertion cleanup - error handling, Y.Doc, API responses)
       // Filter for pending status first, then filter out client-side expired requests
       // Client-side expiration check ensures we detect timeouts even when Y.Doc sync is delayed
       // (e.g., browser tab in background, network latency, etc.)

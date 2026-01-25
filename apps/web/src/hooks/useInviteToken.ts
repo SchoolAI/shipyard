@@ -2,10 +2,7 @@ import { type InviteRedemptionResult, parseInviteFromUrl } from '@shipyard/schem
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import type { WebrtcProvider } from 'y-webrtc';
-import {
-  type SignalingConnection,
-  getSignalingConnections,
-} from '@/types/y-webrtc-internals';
+import { getSignalingConnections, type SignalingConnection } from '@/types/y-webrtc-internals';
 import type { GitHubIdentity } from './useGitHubAuth';
 
 export type RedemptionState =

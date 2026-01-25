@@ -83,7 +83,11 @@ function extractTitleFromBlocks(blocks: Block[]): string {
     return UNTITLED;
   }
 
-  const text = (firstContent as { text: string }).text;
+  const record = Object.fromEntries(Object.entries(firstContent));
+  const text = record.text;
+  if (typeof text !== 'string') {
+    return UNTITLED;
+  }
   // For headings, use full text; for paragraphs, truncate
   if (firstBlock.type === 'heading') {
     return text;
@@ -969,12 +973,19 @@ function extractFeedbackFromYDoc(ydoc: Y.Doc, ctx: HookContext): string | undefi
     // Simple text extraction from BlockNote blocks (if available)
     let planText = '';
     if (Array.isArray(fragmentJson)) {
-      const blocks = fragmentJson as Array<{ content?: Array<{ text?: string }> }>;
-      planText = blocks
-        .map((block) => {
-          if (!block.content || !Array.isArray(block.content)) return '';
-          return block.content
-            .map((item) => (typeof item === 'object' && item && 'text' in item ? item.text : ''))
+      planText = fragmentJson
+        .map((block: unknown) => {
+          if (!block || typeof block !== 'object') return '';
+          const blockRecord = Object.fromEntries(Object.entries(block));
+          const content = blockRecord.content;
+          if (!Array.isArray(content)) return '';
+          return content
+            .map((item: unknown) => {
+              if (!item || typeof item !== 'object') return '';
+              const itemRecord = Object.fromEntries(Object.entries(item));
+              const text = itemRecord.text;
+              return typeof text === 'string' ? text : '';
+            })
             .join('');
         })
         .filter(Boolean)

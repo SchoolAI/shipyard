@@ -195,7 +195,9 @@ ARTIFACT TYPES:
     const { planId, sessionToken, type, filename } = input;
 
     // Validate artifact type matches file extension (before any file operations)
-    validateArtifactType(type as ArtifactType, filename);
+    const validatedType: ArtifactType =
+      type === 'html' || type === 'image' || type === 'video' ? type : 'html';
+    validateArtifactType(validatedType, filename);
 
     // Get actor name for event logging
     const actorName = await getGitHubUsername();
@@ -299,8 +301,11 @@ ARTIFACT TYPES:
       if (githubConfigured && hasRepo) {
         try {
           // Try GitHub upload (repo is guaranteed by hasRepo check above)
+          if (!metadata.repo) {
+            throw new Error('Repo not set');
+          }
           const url = await uploadArtifact({
-            repo: metadata.repo as string,
+            repo: metadata.repo,
             planId,
             filename,
             content,
@@ -309,7 +314,7 @@ ARTIFACT TYPES:
           // Type-safe: GitHubArtifact MUST have url
           artifact = {
             id: nanoid(),
-            type: type as ArtifactType,
+            type: validatedType,
             filename,
             storage: 'github',
             url,
@@ -328,7 +333,7 @@ ARTIFACT TYPES:
 
           artifact = {
             id: nanoid(),
-            type: type as ArtifactType,
+            type: validatedType,
             filename,
             storage: 'local',
             localArtifactId,
@@ -353,7 +358,7 @@ ARTIFACT TYPES:
 
         artifact = {
           id: nanoid(),
-          type: type as ArtifactType,
+          type: validatedType,
           filename,
           storage: 'local',
           localArtifactId,
@@ -687,7 +692,8 @@ async function tryAutoLinkPR(ydoc: Y.Doc, repo: string): Promise<LinkedPR | null
     const validatedPR = GitHubPRResponseSchema.parse(pr);
 
     // Handle all PR states exhaustively
-    const prState = validatedPR.state as 'open' | 'closed';
+    const prState =
+      validatedPR.state === 'open' || validatedPR.state === 'closed' ? validatedPR.state : 'open';
     switch (prState) {
       case 'open': {
         // Create LinkedPR object using factory for consistent validation

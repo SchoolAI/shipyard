@@ -1,4 +1,3 @@
-import type { Block } from '@blocknote/core';
 import lzstring from 'lz-string';
 import { z } from 'zod';
 import {
@@ -284,7 +283,7 @@ export function createPlanUrlWithHistory(
     .filter((s) => keyVersionIds.includes(s.id))
     .map((s) => ({
       id: s.id,
-      content: s.content as Block[],
+      content: s.content,
     }));
 
   const urlPlan: UrlEncodedPlanV2 = {
@@ -302,15 +301,30 @@ export function createPlanUrlWithHistory(
  *
  * @returns Decoded plan or null if not found/invalid
  */
+/**
+ * Safely extracts the location.search value from globalThis if available.
+ */
+function getLocationSearch(): string | null {
+  if (typeof globalThis === 'undefined') return null;
+  if (!('location' in globalThis)) return null;
+
+  const globalRecord = Object.fromEntries(Object.entries(globalThis));
+  const location = globalRecord['location'];
+  if (typeof location !== 'object' || location === null) return null;
+  if (!('search' in location)) return null;
+
+  const locationRecord = Object.fromEntries(Object.entries(location));
+  const search = locationRecord['search'];
+  return typeof search === 'string' ? search : null;
+}
+
 export function getPlanFromUrl(): UrlEncodedPlan | null {
-  if (typeof globalThis !== 'undefined' && 'location' in globalThis) {
-    const location = (globalThis as typeof globalThis & { location: { search: string } }).location;
-    const params = new URLSearchParams(location.search);
-    const encoded = params.get('d');
-    if (!encoded) return null;
+  const search = getLocationSearch();
+  if (!search) return null;
 
-    return decodePlan(encoded);
-  }
+  const params = new URLSearchParams(search);
+  const encoded = params.get('d');
+  if (!encoded) return null;
 
-  return null;
+  return decodePlan(encoded);
 }

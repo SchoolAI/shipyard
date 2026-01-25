@@ -28,6 +28,7 @@ import {
   encodeExportEndMessage,
   encodeExportStartMessage,
   isP2PConversationMessage,
+  validateA2AMessages,
 } from '@shipyard/schema';
 import lzstring from 'lz-string';
 
@@ -131,7 +132,14 @@ function generateExportId(): string {
  * Computes SHA-256 hash of data and returns hex string.
  */
 async function computeChecksum(data: Uint8Array): Promise<string> {
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data as BufferSource);
+  /**
+   * Web Crypto API expects BufferSource (ArrayBuffer | ArrayBufferView).
+   * Uint8Array<ArrayBufferLike> includes SharedArrayBuffer which isn't accepted.
+   * Using the underlying ArrayBuffer directly works around this TypeScript limitation.
+   */
+  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- Uint8Array.buffer is ArrayBuffer but TypeScript readonly/mutable incompatibility
+  const buffer = data.buffer as ArrayBuffer;
+  const hashBuffer = await crypto.subtle.digest('SHA-256', new Uint8Array(buffer, data.byteOffset, data.byteLength));
   const hashArray = new Uint8Array(hashBuffer);
   return Array.from(hashArray)
     .map((b) => b.toString(16).padStart(2, '0'))
@@ -343,10 +351,20 @@ export class ConversationTransferManager {
       return;
     }
 
-    // Parse messages
+    // Parse and validate messages
     let messages: A2AMessage[];
     try {
-      messages = JSON.parse(json) as A2AMessage[];
+      const parsed: unknown = JSON.parse(json);
+      if (!Array.isArray(parsed)) {
+        this.incomingTransfers.delete(end.exportId);
+        return;
+      }
+      const { valid, errors } = validateA2AMessages(parsed);
+      if (errors.length > 0) {
+        this.incomingTransfers.delete(end.exportId);
+        return;
+      }
+      messages = valid;
     } catch (_err) {
       this.incomingTransfers.delete(end.exportId);
       return;

@@ -12,12 +12,14 @@ function parseStoredIdentity(stored: string | null): LocalIdentity | null {
   if (!stored) return null;
 
   try {
-    const parsed = JSON.parse(stored) as LocalIdentity;
+    const parsed: unknown = JSON.parse(stored);
     // Validate structure
-    if (typeof parsed.username !== 'string' || typeof parsed.createdAt !== 'number') {
+    if (!parsed || typeof parsed !== 'object') return null;
+    const record = Object.fromEntries(Object.entries(parsed));
+    if (typeof record.username !== 'string' || typeof record.createdAt !== 'number') {
       return null;
     }
-    return parsed;
+    return { username: record.username, createdAt: record.createdAt };
   } catch {
     return null;
   }

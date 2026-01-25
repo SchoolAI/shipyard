@@ -5,7 +5,7 @@
 
 import type * as Y from 'yjs';
 import { z } from 'zod';
-import { DeliverableSchema, type Deliverable } from '../../plan.js';
+import { type Deliverable, DeliverableSchema } from '../../plan.js';
 import type { Logger } from '../context.js';
 import {
   CreateHookSessionRequestSchema,

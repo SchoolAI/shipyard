@@ -9,6 +9,7 @@ import {
   getPlanIndexEntry,
   getPlanMetadata,
   getPlanOwnerId,
+  AnyInputRequestSchema,
   type PlanMetadata,
   setPlanIndexEntry,
   setPlanMetadata,
@@ -162,17 +163,19 @@ export function PlanPage() {
         return;
       }
 
-      const customEvent = event as CustomEvent<AnyInputRequest>;
+if (!(event instanceof CustomEvent)) return;
+      const result = AnyInputRequestSchema.safeParse(event.detail);
+      if (!result.success) return;
 
       // Prevent duplicate opens - if modal is already open with this request, ignore
       // Note: This only prevents duplicates within a single tab. Multi-tab coordination
       // would require BroadcastChannel or localStorage, but current UX is acceptable
       // (user sees "already answered" error if they try to answer in second tab)
-      if (inputRequestModalOpen && currentInputRequest?.id === customEvent.detail.id) {
+      if (inputRequestModalOpen && currentInputRequest?.id === result.data.id) {
         return;
       }
 
-      setCurrentInputRequest(customEvent.detail);
+      setCurrentInputRequest(result.data);
       setInputRequestModalOpen(true);
     };
 

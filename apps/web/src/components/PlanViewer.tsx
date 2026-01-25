@@ -28,9 +28,9 @@ import type { WebrtcProvider } from 'y-webrtc';
 import type { WebsocketProvider } from 'y-websocket';
 import type * as Y from 'yjs';
 import { useTheme } from '@/hooks/useTheme';
+import { getYUndoExtension } from '@/types/blocknote-extensions';
 import { RedoButton } from './editor/RedoButton';
 import { UndoButton } from './editor/UndoButton';
-import { getYUndoExtension } from '@/types/blocknote-extensions';
 
 /** Simple identity type for display purposes */
 interface UserIdentity {
@@ -209,12 +209,15 @@ export function PlanViewer({
   // When identity is set, we create the threadStore and extension inline.
   const editor = useCreateBlockNote(
     {
-      // When viewing history, use snapshot content in read-only mode
-      // When collaboration is enabled, content comes from the Yjs fragment.
-      // For snapshots (no provider) OR viewing version history, use initialContent.
+      /**
+       * For snapshots (no provider) OR viewing version history, use initialContent.
+       * BlockNote expects PartialBlock[] but our snapshots store unknown[].
+       * BlockNote handles invalid content gracefully so the cast is safe.
+       */
       initialContent:
         (!provider || isViewingHistory) && effectiveInitialContent
-          ? (effectiveInitialContent as never)
+          ? // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- BlockNote initialContent requires PartialBlock[], casting unknown[] snapshot data
+            (effectiveInitialContent as never)
           : undefined,
       // Disable collaboration when viewing history (read-only snapshot mode)
       collaboration:
@@ -281,13 +284,14 @@ export function PlanViewer({
     const markOwnCursors = () => {
       const cursors = containerRef.current?.querySelectorAll('.bn-collaboration-cursor__caret');
       cursors?.forEach((cursor) => {
-        const cursorColor = (cursor as HTMLElement).style.backgroundColor;
+        if (!(cursor instanceof HTMLElement)) return;
+        const cursorColor = cursor.style.backgroundColor;
         const cursorColorNormalized = normalizeColor(cursorColor);
         const parent = cursor.closest('.bn-collaboration-cursor__base');
-        if (parent) {
+        if (parent instanceof HTMLElement) {
           // Check if this cursor's color matches our color (both normalized to hex)
           const isOwn = cursorColorNormalized === ownColorNormalized;
-          (parent as HTMLElement).setAttribute('data-is-own-cursor', isOwn ? 'true' : 'false');
+          parent.setAttribute('data-is-own-cursor', isOwn ? 'true' : 'false');
         }
       });
     };
@@ -382,7 +386,8 @@ export function PlanViewer({
       const cmdOrCtrl = isMac ? e.metaKey : e.ctrlKey;
 
       // Check if we're in an input/textarea (don't intercept their undo/redo)
-      const target = e.target as HTMLElement;
+      const target = e.target;
+      if (!(target instanceof HTMLElement)) return;
       const isInInput =
         target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
 
@@ -426,7 +431,8 @@ export function PlanViewer({
   // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Keyboard handling requires multiple condition checks
   const handleKeyDown = (e: React.KeyboardEvent) => {
     // Check if we're in a comment input (BlockNote thread component)
-    const target = e.target as HTMLElement;
+    const target = e.target;
+    if (!(target instanceof HTMLElement)) return;
     const isInThread =
       target.closest('.bn-thread') ||
       target.closest('.bn-floating-composer') ||

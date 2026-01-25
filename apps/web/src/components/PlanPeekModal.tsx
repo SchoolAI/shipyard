@@ -5,8 +5,6 @@
  */
 
 import { Button, Chip, Modal } from '@heroui/react';
-import { Avatar } from '@/components/ui/avatar';
-
 import type { Deliverable, LinkedPR, PlanIndexEntry, PlanStatusType } from '@shipyard/schema';
 import { getDeliverables, getLinkedPRs } from '@shipyard/schema';
 import { CheckSquare, ExternalLink, GitPullRequest, Square, X } from 'lucide-react';
@@ -15,6 +13,7 @@ import { useNavigate } from 'react-router-dom';
 import { IndexeddbPersistence } from 'y-indexeddb';
 import * as Y from 'yjs';
 import { TagChip } from '@/components/TagChip';
+import { Avatar } from '@/components/ui/avatar';
 import { getPlanRoute } from '@/constants/routes';
 import { assertNever } from '@/utils/assert-never';
 import { formatRelativeTime } from '@/utils/formatters';

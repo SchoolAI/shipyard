@@ -30,7 +30,8 @@ export function useKeyboardShortcuts(handlers: ShortcutHandlers): void {
   useEffect(() => {
     // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: keyboard handler must check multiple key combinations
     const handleKeyDown = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement;
+      const target = e.target;
+      if (!(target instanceof HTMLElement)) return;
 
       // Ignore shortcuts when typing in inputs/textareas or contenteditable
       const isInputFocused =

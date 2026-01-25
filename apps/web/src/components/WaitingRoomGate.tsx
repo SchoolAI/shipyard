@@ -9,7 +9,7 @@ import type { GitHubIdentity } from '@/hooks/useGitHubAuth';
 import { useInviteToken } from '@/hooks/useInviteToken';
 import type { SyncState } from '@/hooks/useMultiProviderSync';
 import { useYDocApprovalStatus } from '@/hooks/useYDocApprovalStatus';
-import type { PlanAwarenessState } from '@/types/awareness';
+import { isPlanAwarenessState } from '@/types/awareness';
 
 interface WaitingRoomGateProps {
   ydoc: Y.Doc;
@@ -86,7 +86,12 @@ export function WaitingRoomGate({
 
     const awareness = rtcProvider.awareness;
     const localState = awareness.getLocalState();
-    const planStatus = localState?.planStatus as PlanAwarenessState | undefined;
+    const localStateRecord =
+      localState && typeof localState === 'object'
+        ? Object.fromEntries(Object.entries(localState))
+        : {};
+    const planStatusRaw = localStateRecord.planStatus;
+    const planStatus = isPlanAwarenessState(planStatusRaw) ? planStatusRaw : undefined;
 
     if (!planStatus || planStatus.status !== 'pending') return false;
 

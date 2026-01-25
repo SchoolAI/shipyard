@@ -30,12 +30,11 @@
  * ```
  */
 export function isErrnoException(err: unknown): err is NodeJS.ErrnoException {
-  return (
-    err instanceof Error &&
-    'code' in err &&
-    (typeof (err as NodeJS.ErrnoException).code === 'string' ||
-      (err as NodeJS.ErrnoException).code === undefined)
-  );
+  if (!(err instanceof Error)) return false;
+  if (!('code' in err)) return false;
+  const errRecord = Object.fromEntries(Object.entries(err));
+  const code = errRecord.code;
+  return typeof code === 'string' || code === undefined;
 }
 
 /**

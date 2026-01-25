@@ -483,7 +483,7 @@ export function getArtifacts(ydoc: Y.Doc): Artifact[] {
       if (!item || typeof item !== 'object') {
         return null;
       }
-      const artifact = item as Record<string, unknown>;
+      const artifact = Object.fromEntries(Object.entries(item));
       if (artifact.url && !artifact.storage) {
         return { ...artifact, storage: 'github' };
       }
@@ -1220,7 +1220,11 @@ export function createPlanSnapshot(
   blocks: unknown[]
 ): PlanSnapshot {
   const threadsMap = ydoc.getMap<Record<string, unknown>>(YDOC_KEYS.THREADS);
-  const threadsData = threadsMap.toJSON() as Record<string, unknown>;
+  const rawThreadsData = threadsMap.toJSON();
+  const threadsData: Record<string, unknown> =
+    rawThreadsData && typeof rawThreadsData === 'object'
+      ? Object.fromEntries(Object.entries(rawThreadsData))
+      : {};
   const threads = parseThreads(threadsData);
   const unresolved = threads.filter((t) => !t.resolved).length;
 

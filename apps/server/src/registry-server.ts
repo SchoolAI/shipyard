@@ -45,6 +45,16 @@ function getParam(value: string | string[] | undefined): string | undefined {
   return value;
 }
 
+/**
+ * Extract HTTP status code from an error object if available.
+ */
+function getErrorStatus(error: unknown): number {
+  if (!error || typeof error !== 'object') return 500;
+  const record = Object.fromEntries(Object.entries(error));
+  const status = record.status;
+  return typeof status === 'number' ? status : 500;
+}
+
 // Shared LevelDB for all plans (no session-pid isolation)
 const PERSISTENCE_DIR = join(homedir(), '.shipyard', 'plans');
 
@@ -550,7 +560,7 @@ async function handleGetPRDiff(req: Request, res: Response): Promise<void> {
     logger.debug({ planId, prNumber: prNum, repo: metadata.repo }, 'Served PR diff');
   } catch (error) {
     logger.error({ error, planId, prNumber }, 'Failed to fetch PR diff');
-    const status = (error as { status?: number }).status || 500;
+    const status = getErrorStatus(error);
     res.status(status).json({ error: 'Failed to fetch PR diff' });
   }
 }
@@ -601,7 +611,7 @@ async function handleGetPRFiles(req: Request, res: Response): Promise<void> {
     logger.debug({ planId, prNumber: prNum, fileCount: fileList.length }, 'Served PR files');
   } catch (error) {
     logger.error({ error, planId, prNumber }, 'Failed to fetch PR files');
-    const status = (error as { status?: number }).status || 500;
+    const status = getErrorStatus(error);
     res.status(status).json({ error: 'Failed to fetch PR files' });
   }
 }
@@ -627,8 +637,9 @@ async function handleGetTranscript(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    const transcriptPath = (metadata.origin as { transcriptPath?: string }).transcriptPath;
-    if (!transcriptPath) {
+    const originRecord = Object.fromEntries(Object.entries(metadata.origin));
+    const transcriptPath = originRecord.transcriptPath;
+    if (typeof transcriptPath !== 'string' || !transcriptPath) {
       res.status(404).json({ error: 'No transcript path in origin metadata' });
       return;
     }
@@ -654,14 +665,24 @@ async function handleGetTranscript(req: Request, res: Response): Promise<void> {
  */
 function createPlanStore(): PlanStore {
   return {
-    createSubscription: (params) =>
-      createSubscription({
+    createSubscription: (params) => {
+      /** Validate subscription topics match ChangeType values */
+      const subscribe: ChangeType[] = params.subscribe.filter(
+        (s): s is ChangeType =>
+          s === 'status' ||
+          s === 'comments' ||
+          s === 'resolved' ||
+          s === 'content' ||
+          s === 'artifacts'
+      );
+      return createSubscription({
         planId: params.planId,
-        subscribe: params.subscribe as ChangeType[],
+        subscribe,
         windowMs: params.windowMs,
         maxWindowMs: params.maxWindowMs,
         threshold: params.threshold,
-      }),
+      });
+    },
     getChanges: (planId, clientId) => getChanges(planId, clientId),
     deleteSubscription: (planId, clientId) => deleteSubscription(planId, clientId),
     hasActiveConnections: async (planId) => hasActiveConnections(planId),

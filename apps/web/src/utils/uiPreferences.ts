@@ -3,7 +3,8 @@
  * Follows pattern from identity.ts for localStorage management.
  */
 
-import type { PlanStatusType } from '@shipyard/schema';
+import { type PlanStatusType, PlanStatusValues } from '@shipyard/schema';
+import { z } from 'zod';
 
 // --- Types ---
 
@@ -76,13 +77,26 @@ const DEFAULT_VIEW_PREFERENCES: ViewPreferences = {
   tagFilters: [],
 };
 
+/** Zod schema for validating stored view preferences */
+const ViewPreferencesSchema = z.object({
+  searchQuery: z.string().optional(),
+  sortBy: z.enum(['name', 'newest', 'updated', 'status']).optional(),
+  sortDirection: z.enum(['asc', 'desc']).optional(),
+  statusFilters: z.array(z.enum(PlanStatusValues)).optional(),
+  tagFilters: z.array(z.string()).optional(),
+});
+
 /** Get view preferences from localStorage */
 export function getViewPreferences(): ViewPreferences {
   try {
     const stored = localStorage.getItem(VIEW_PREFERENCES_KEY);
     if (!stored) return DEFAULT_VIEW_PREFERENCES;
 
-    const parsed = JSON.parse(stored) as Partial<ViewPreferences>;
+    const json: unknown = JSON.parse(stored);
+    const result = ViewPreferencesSchema.safeParse(json);
+    if (!result.success) return DEFAULT_VIEW_PREFERENCES;
+    const parsed = result.data;
+
     return {
       searchQuery: parsed.searchQuery ?? DEFAULT_VIEW_PREFERENCES.searchQuery,
       sortBy: parsed.sortBy ?? DEFAULT_VIEW_PREFERENCES.sortBy,

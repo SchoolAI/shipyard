@@ -59,12 +59,10 @@ export interface WebrtcProviderInternals<TPeer = unknown> {
  * Runtime check before accessing internal y-webrtc properties.
  */
 function hasSignalingConns(obj: unknown): obj is { signalingConns: unknown[] } {
-  return (
-    obj !== null &&
-    typeof obj === 'object' &&
-    'signalingConns' in obj &&
-    Array.isArray((obj as { signalingConns: unknown }).signalingConns)
-  );
+  if (obj === null || typeof obj !== 'object') return false;
+  if (!('signalingConns' in obj)) return false;
+  const record = Object.fromEntries(Object.entries(obj));
+  return Array.isArray(record.signalingConns);
 }
 
 /**

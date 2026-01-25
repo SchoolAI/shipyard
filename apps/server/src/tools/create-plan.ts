@@ -68,12 +68,14 @@ function buildOriginMetadata(
   switch (platform) {
     case 'devin':
       return { platform: 'devin' as const, sessionId };
-    case 'cursor':
+    case 'cursor': {
+      const generationId = metadata?.generationId;
       return {
         platform: 'cursor' as const,
         conversationId: sessionId,
-        generationId: metadata?.generationId as string | undefined,
+        generationId: typeof generationId === 'string' ? generationId : undefined,
       };
+    }
     case 'windsurf':
     case 'aider':
     case 'unknown':

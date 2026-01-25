@@ -188,19 +188,19 @@ function summarizeChanges(changes: Change[]): string {
 
   const commentChanges = changes.filter((c) => c.type === 'comments');
   if (commentChanges.length > 0) {
-    const totalAdded = commentChanges.reduce(
-      (acc, c) => acc + ((c.details?.added as number) || 1),
-      0
-    );
+    const totalAdded = commentChanges.reduce((acc, c) => {
+      const added = c.details?.added;
+      return acc + (typeof added === 'number' ? added : 1);
+    }, 0);
     parts.push(`${totalAdded} new comment(s)`);
   }
 
   const resolvedChanges = changes.filter((c) => c.type === 'resolved');
   if (resolvedChanges.length > 0) {
-    const totalResolved = resolvedChanges.reduce(
-      (acc, c) => acc + ((c.details?.resolved as number) || 1),
-      0
-    );
+    const totalResolved = resolvedChanges.reduce((acc, c) => {
+      const resolved = c.details?.resolved;
+      return acc + (typeof resolved === 'number' ? resolved : 1);
+    }, 0);
     parts.push(`${totalResolved} resolved`);
   }
 
@@ -211,10 +211,10 @@ function summarizeChanges(changes: Change[]): string {
 
   const artifactChanges = changes.filter((c) => c.type === 'artifacts');
   if (artifactChanges.length > 0) {
-    const totalAdded = artifactChanges.reduce(
-      (acc, c) => acc + ((c.details?.added as number) || 1),
-      0
-    );
+    const totalAdded = artifactChanges.reduce((acc, c) => {
+      const added = c.details?.added;
+      return acc + (typeof added === 'number' ? added : 1);
+    }, 0);
     parts.push(`${totalAdded} artifact(s) added`);
   }
 

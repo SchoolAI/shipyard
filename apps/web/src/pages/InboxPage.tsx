@@ -6,6 +6,7 @@
 import { Accordion, Button, Chip, ListBox, ListBoxItem, Switch, Tooltip } from '@heroui/react';
 import {
   type AnyInputRequest,
+  AnyInputRequestSchema,
   assertNever,
   clearEventViewedBy,
   getPlanIndexEntry,
@@ -414,8 +415,7 @@ function InboxAccordionSection({
         </Accordion.Trigger>
       </Accordion.Heading>
       <Accordion.Panel>
-        {/* biome-ignore lint/suspicious/noExplicitAny: React 18/19 type compatibility */}
-        <Accordion.Body>{children as any}</Accordion.Body>
+        <Accordion.Body>{children}</Accordion.Body>
       </Accordion.Panel>
     </Accordion.Item>
   );
@@ -481,9 +481,12 @@ function useInputRequestEventListener(
 ) {
   useEffect(() => {
     const handleOpenInputRequest = (event: Event) => {
-      const customEvent = event as CustomEvent<AnyInputRequest>;
-      setCurrentInputRequest(customEvent.detail);
-      setInputRequestModalOpen(true);
+      if (!(event instanceof CustomEvent)) return;
+      const result = AnyInputRequestSchema.safeParse(event.detail);
+      if (result.success) {
+        setCurrentInputRequest(result.data);
+        setInputRequestModalOpen(true);
+      }
     };
 
     document.addEventListener('open-input-request', handleOpenInputRequest);

@@ -209,7 +209,7 @@ export function MobileActionsMenu({
 
     ydoc.transact(
       () => {
-        const metadataMap = ydoc.getMap<PlanMetadata>(YDOC_KEYS.METADATA) as Y.Map<unknown>;
+        const metadataMap = ydoc.getMap(YDOC_KEYS.METADATA);
         if (isArchived) {
           metadataMap.delete('archivedAt');
           metadataMap.delete('archivedBy');

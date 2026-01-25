@@ -61,7 +61,11 @@ function extractTitleFromBlocks(blocks: Block[]): string {
     return UNTITLED;
   }
 
-  const text = (firstContent as { text: string }).text;
+  const record = Object.fromEntries(Object.entries(firstContent));
+  const text = record.text;
+  if (typeof text !== 'string') {
+    return UNTITLED;
+  }
   // For headings, use full text; for paragraphs, truncate
   if (firstBlock.type === 'heading') {
     return text;
@@ -81,7 +85,8 @@ export async function handleCreateSession(req: Request, res: Response): Promise<
         { planId: existingSession.planId, sessionId: input.sessionId },
         'Returning existing session (idempotent)'
       );
-      res.json({ planId: existingSession.planId, url } as CreateHookSessionResponse);
+      const response: CreateHookSessionResponse = { planId: existingSession.planId, url };
+      res.json(response);
       return;
     }
 
@@ -340,7 +345,13 @@ export async function handleSetSessionToken(req: Request, res: Response): Promis
       return;
     }
 
-    const { sessionTokenHash } = req.body as { sessionTokenHash?: string };
+    const body: unknown = req.body;
+    if (!body || typeof body !== 'object') {
+      res.status(400).json({ error: 'Invalid request body' });
+      return;
+    }
+    const bodyRecord = Object.fromEntries(Object.entries(body));
+    const sessionTokenHash = bodyRecord.sessionTokenHash;
     if (!sessionTokenHash || typeof sessionTokenHash !== 'string') {
       res.status(400).json({ error: 'Missing or invalid sessionTokenHash' });
       return;

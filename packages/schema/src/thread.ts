@@ -84,13 +84,16 @@ export function extractTextFromCommentBody(body: CommentBody): string {
       if (typeof block === 'string') return block;
       if (typeof block !== 'object' || block === null) return '';
 
-      const blockObj = block as { content?: unknown };
-      if (Array.isArray(blockObj.content)) {
-        return blockObj.content
+      const blockObj = Object.fromEntries(Object.entries(block));
+      const content = blockObj.content;
+      if (Array.isArray(content)) {
+        return content
           .map((item: unknown) => {
             if (typeof item === 'string') return item;
             if (typeof item === 'object' && item !== null && 'text' in item) {
-              return (item as { text: string }).text;
+              const textItem = Object.fromEntries(Object.entries(item));
+              const text = textItem.text;
+              return typeof text === 'string' ? text : '';
             }
             return '';
           })

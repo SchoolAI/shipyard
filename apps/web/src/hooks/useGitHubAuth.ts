@@ -1,5 +1,6 @@
 import type React from 'react';
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
+import { z } from 'zod';
 import {
   getGitHubUser,
   handleCallback,
@@ -9,6 +10,16 @@ import {
 
 const STORAGE_KEY = 'shipyard-github-identity';
 const RETURN_URL_KEY = 'github-oauth-return-url';
+
+/** Zod schema for validating stored GitHubIdentity */
+const GitHubIdentitySchema = z.object({
+  token: z.string(),
+  username: z.string(),
+  displayName: z.string(),
+  avatarUrl: z.string().optional(),
+  createdAt: z.number(),
+  scope: z.string(),
+});
 
 export interface GitHubIdentity {
   token: string;
@@ -60,8 +71,12 @@ function initializeSnapshotCache(): void {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
-        const parsed = JSON.parse(stored) as GitHubIdentity;
-        snapshotCache = { counter: changeCounter, value: parsed };
+        const parsed: unknown = JSON.parse(stored);
+        const validated = GitHubIdentitySchema.safeParse(parsed);
+        snapshotCache = {
+          counter: changeCounter,
+          value: validated.success ? validated.data : null,
+        };
       } else {
         snapshotCache = { counter: changeCounter, value: null };
       }
@@ -101,9 +116,9 @@ function getStoredIdentity(): GitHubIdentity | null {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (!stored) return null;
-    const parsed = JSON.parse(stored) as GitHubIdentity;
-
-    return parsed;
+    const parsed: unknown = JSON.parse(stored);
+    const validated = GitHubIdentitySchema.safeParse(parsed);
+    return validated.success ? validated.data : null;
   } catch (err) {
     // Log parse errors to help debug localStorage corruption
     // biome-ignore lint/suspicious/noConsole: Intentional debugging log for localStorage corruption

@@ -126,9 +126,15 @@ export function PlanContent(props: PlanContentProps) {
   // Listen for external tab switch requests (e.g., from AgentRequestsBadge)
   useEffect(() => {
     const handleSwitchTab = (event: Event) => {
-      const customEvent = event as CustomEvent<{ tab: PlanViewTab }>;
-      if (customEvent.detail?.tab) {
-        setActiveView(customEvent.detail.tab);
+      if (event instanceof CustomEvent && event.detail && typeof event.detail === 'object') {
+        const detailRecord = Object.fromEntries(Object.entries(event.detail));
+        const tab = detailRecord.tab;
+        if (
+          typeof tab === 'string' &&
+          (tab === 'plan' || tab === 'activity' || tab === 'deliverables' || tab === 'changes')
+        ) {
+          setActiveView(tab);
+        }
       }
     };
 

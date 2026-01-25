@@ -6,8 +6,8 @@
 import { z } from 'zod';
 import { A2AMessageSchema } from '../conversation-export.js';
 import {
-  ChangeTypeSchema,
   type ChangeType,
+  ChangeTypeSchema,
   CreateHookSessionRequestSchema,
   CreateHookSessionResponseSchema,
   CreateSubscriptionRequestSchema,

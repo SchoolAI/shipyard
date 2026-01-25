@@ -1,5 +1,5 @@
 import { Alert, Button, Card } from '@heroui/react';
-import type { Artifact, ArtifactType } from '@shipyard/schema';
+import type { Artifact } from '@shipyard/schema';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useGitHubAuth } from '../hooks/useGitHubAuth';
 import {
@@ -100,7 +100,7 @@ export function ArtifactRenderer({ artifact, registryPort }: ArtifactRendererPro
       return (
         <ArtifactPlaceholder
           filename={artifact.filename}
-          message={`Unknown type: ${_exhaustive as ArtifactType}`}
+          message={`Unknown type: ${String(_exhaustive)}`}
         />
       );
     }
@@ -344,7 +344,7 @@ function LocalArtifactViewer({
           setIsAvailable(response.ok);
         }
       } catch (error) {
-        if ((error as Error).name !== 'AbortError' && mounted) {
+        if (!(error instanceof Error && error.name === 'AbortError') && mounted) {
           setIsAvailable(false);
         }
       }
@@ -439,7 +439,7 @@ function LocalArtifactViewer({
       return (
         <ArtifactPlaceholder
           filename={artifact.filename}
-          message={`Unknown type: ${_exhaustive as ArtifactType}`}
+          message={`Unknown type: ${String(_exhaustive)}`}
         />
       );
     }

@@ -7,12 +7,12 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import {
-  type A2AMessage,
   a2aToClaudeCode,
   type ConversationContext,
   type ConversationHandlers,
   formatAsClaudeCodeJSONL,
   type ImportConversationResponse,
+  validateA2AMessages,
 } from '@shipyard/schema';
 import { nanoid } from 'nanoid';
 
@@ -46,8 +46,17 @@ export async function importConversationHandler(
   }
 
   try {
+    // Validate the A2A messages before conversion
+    const { valid, errors } = validateA2AMessages(a2aMessages);
+    if (errors.length > 0) {
+      return {
+        success: false,
+        error: `Invalid A2A messages: ${errors.map((e) => e.error).join(', ')}`,
+      };
+    }
+
     const sessionId = nanoid();
-    const claudeMessages = a2aToClaudeCode(a2aMessages as A2AMessage[], sessionId);
+    const claudeMessages = a2aToClaudeCode(valid, sessionId);
     const jsonl = formatAsClaudeCodeJSONL(claudeMessages);
 
     const projectName = meta?.planId

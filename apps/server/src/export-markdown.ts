@@ -7,7 +7,7 @@ import {
   type Thread,
   YDOC_KEYS,
 } from '@shipyard/schema';
-import type * as Y from 'yjs';
+import * as Y from 'yjs';
 
 // --- Constants ---
 
@@ -128,13 +128,12 @@ function extractThreadTextFromFragment(fragment: Y.XmlFragment): Map<string, str
   const threadTextMap = new Map<string, string>();
 
   for (const node of fragment.createTreeWalker(() => true)) {
-    if (node.constructor.name === 'YXmlText') {
-      const textNode = node as Y.XmlText;
-      const attrs = textNode.getAttributes();
+    if (node instanceof Y.XmlText) {
+      const attrs = node.getAttributes();
       const threadId = extractThreadIdFromAttrs(attrs);
 
       if (threadId) {
-        const text = textNode.toString();
+        const text = node.toString();
         if (text) {
           const existing = threadTextMap.get(threadId) || '';
           threadTextMap.set(threadId, existing + text);
@@ -156,7 +155,8 @@ function extractThreadIdFromAttrs(attrs: Record<string, unknown>): string | null
     return primaryAttr;
   }
   if (typeof primaryAttr === 'object' && primaryAttr && 'id' in primaryAttr) {
-    const id = (primaryAttr as { id?: unknown }).id;
+    const attrRecord = Object.fromEntries(Object.entries(primaryAttr));
+    const id = attrRecord.id;
     if (typeof id === 'string') {
       return id;
     }

@@ -53,10 +53,8 @@ import { ShareButton } from '@/components/ShareButton';
 import { StatusChip } from '@/components/StatusChip';
 import { TagChip } from '@/components/TagChip';
 import { TagEditor } from '@/components/TagEditor';
-
-import { TruncatedText } from '@/components/ui/TruncatedText';
-
 import { Avatar } from '@/components/ui/avatar';
+import { TruncatedText } from '@/components/ui/TruncatedText';
 import { useActivePlanSync } from '@/contexts/ActivePlanSyncContext';
 import { useUserIdentity } from '@/contexts/UserIdentityContext';
 import { useConversationTransfer } from '@/hooks/useConversationTransfer';

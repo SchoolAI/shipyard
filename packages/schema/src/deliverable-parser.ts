@@ -41,7 +41,14 @@ export function extractDeliverables(blocks: unknown[]): Deliverable[] {
     if (!('id' in block) || typeof block.id !== 'string') return;
     if (!('type' in block) || typeof block.type !== 'string') return;
 
-    const validBlock = block as Block;
+    // After validation, we know block has id and type - construct validated block
+    const blockRecord = Object.fromEntries(Object.entries(block));
+    const validBlock: Block = {
+      id: String(blockRecord.id),
+      type: String(blockRecord.type),
+      content: blockRecord.content,
+      children: blockRecord.children,
+    };
     const text = extractTextFromBlock(validBlock);
 
     if (text.includes(DELIVERABLE_MARKER)) {

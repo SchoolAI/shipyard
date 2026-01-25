@@ -82,16 +82,24 @@ const markdownComponents: Components = {
   ),
 
   // Unordered lists
-  ul: ({ children }: { children?: React.ReactNode }) => <ul className="list-disc list-inside space-y-1 ml-1">{children}</ul>,
+  ul: ({ children }: { children?: React.ReactNode }) => (
+    <ul className="list-disc list-inside space-y-1 ml-1">{children}</ul>
+  ),
 
   // Ordered lists
-  ol: ({ children }: { children?: React.ReactNode }) => <ol className="list-decimal list-inside space-y-1 ml-1">{children}</ol>,
+  ol: ({ children }: { children?: React.ReactNode }) => (
+    <ol className="list-decimal list-inside space-y-1 ml-1">{children}</ol>
+  ),
 
   // List items
-  li: ({ children }: { children?: React.ReactNode }) => <li className="text-foreground">{children}</li>,
+  li: ({ children }: { children?: React.ReactNode }) => (
+    <li className="text-foreground">{children}</li>
+  ),
 
   // Paragraphs
-  p: ({ children }: { children?: React.ReactNode }) => <p className="text-foreground leading-relaxed">{children}</p>,
+  p: ({ children }: { children?: React.ReactNode }) => (
+    <p className="text-foreground leading-relaxed">{children}</p>
+  ),
 
   // Headers
   h1: ({ children }: { children?: React.ReactNode }) => (
@@ -129,22 +137,32 @@ const markdownComponents: Components = {
       <table className="min-w-full border-collapse text-sm">{children}</table>
     </div>
   ),
-  thead: ({ children }: { children?: React.ReactNode }) => <thead className="bg-surface">{children}</thead>,
+  thead: ({ children }: { children?: React.ReactNode }) => (
+    <thead className="bg-surface">{children}</thead>
+  ),
   tbody: ({ children }: { children?: React.ReactNode }) => <tbody>{children}</tbody>,
-  tr: ({ children }: { children?: React.ReactNode }) => <tr className="border-b border-border">{children}</tr>,
+  tr: ({ children }: { children?: React.ReactNode }) => (
+    <tr className="border-b border-border">{children}</tr>
+  ),
   th: ({ children }: { children?: React.ReactNode }) => (
     <th className="px-3 py-2 text-left font-medium text-foreground">{children}</th>
   ),
-  td: ({ children }: { children?: React.ReactNode }) => <td className="px-3 py-2 text-foreground">{children}</td>,
+  td: ({ children }: { children?: React.ReactNode }) => (
+    <td className="px-3 py-2 text-foreground">{children}</td>
+  ),
 
   // Strong/Bold
-  strong: ({ children }: { children?: React.ReactNode }) => <strong className="font-semibold">{children}</strong>,
+  strong: ({ children }: { children?: React.ReactNode }) => (
+    <strong className="font-semibold">{children}</strong>
+  ),
 
   // Emphasis/Italic
   em: ({ children }: { children?: React.ReactNode }) => <em className="italic">{children}</em>,
 
   // Strikethrough (GFM)
-  del: ({ children }: { children?: React.ReactNode }) => <del className="line-through text-muted-foreground">{children}</del>,
+  del: ({ children }: { children?: React.ReactNode }) => (
+    <del className="line-through text-muted-foreground">{children}</del>
+  ),
 };
 
 /**

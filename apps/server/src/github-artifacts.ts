@@ -36,10 +36,20 @@ export function resolveGitHubToken(): string | null {
 }
 
 /**
+ * Extract status code from an error if it has one.
+ */
+function getErrorStatus(error: unknown): number | undefined {
+  if (!error || typeof error !== 'object') return undefined;
+  const record = Object.fromEntries(Object.entries(error));
+  const status = record.status;
+  return typeof status === 'number' ? status : undefined;
+}
+
+/**
  * Check if an error is an authentication error (401/403).
  */
 export function isAuthError(error: unknown): boolean {
-  const status = (error as { status?: number }).status;
+  const status = getErrorStatus(error);
   return status === 401 || status === 403;
 }
 
@@ -138,7 +148,7 @@ export async function ensureArtifactsBranch(repo: string): Promise<void> {
       logger.debug({ repo }, 'Artifacts branch exists');
       return;
     } catch (error: unknown) {
-      if ((error as { status?: number }).status !== 404) {
+      if (getErrorStatus(error) !== 404) {
         throw error;
       }
       // Branch doesn't exist, need to create it
@@ -220,7 +230,7 @@ export async function uploadArtifact(params: UploadArtifactParams): Promise<stri
         existingSha = data.sha;
       }
     } catch (error: unknown) {
-      if ((error as { status?: number }).status !== 404) {
+      if (getErrorStatus(error) !== 404) {
         throw error;
       }
       // File doesn't exist, that's fine

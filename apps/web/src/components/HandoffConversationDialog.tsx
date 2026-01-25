@@ -211,8 +211,11 @@ export function HandoffConversationDialog({
 
     const reader = new FileReader();
     reader.onload = () => {
-      setTranscriptContent(reader.result as string);
-      setTranscriptError(null);
+      const result = reader.result;
+      if (typeof result === 'string') {
+        setTranscriptContent(result);
+        setTranscriptError(null);
+      }
     };
     reader.onerror = () => {
       setTranscriptError('Failed to read file');
