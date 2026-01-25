@@ -93,6 +93,11 @@ export default [
   // TypeScript rules (apply to ALL .ts/.tsx files)
   {
     files: ['**/*.ts', '**/*.tsx'],
+    ignores: [
+      '**/*.test.ts',
+      '**/*.test.tsx',
+      '**/__tests__/**',
+    ],
     languageOptions: {
       parser: tsParser,
       parserOptions: {

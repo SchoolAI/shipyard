@@ -15,9 +15,26 @@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import type { InviteRedemption, InviteToken } from '@shipyard/schema';
 import { nanoid } from 'nanoid';
-import type { WebSocket } from 'ws';
+import { WebSocket } from 'ws';
+import { z } from 'zod';
 import type { PlatformAdapter } from '../core/platform.js';
 import { logger } from '../src/logger.js';
+
+/**
+ * Zod schema for GitHub user API response.
+ * Only validates the fields we actually use.
+ */
+const GitHubUserResponseSchema = z.object({
+  login: z.string(),
+});
+
+/**
+ * Type guard for checking if a value is a ws WebSocket.
+ * Uses instanceof check since we import the class directly.
+ */
+function isWebSocket(value: unknown): value is WebSocket {
+  return value instanceof WebSocket;
+}
 
 /**
  * Node.js platform adapter implementation.
@@ -149,8 +166,12 @@ export class NodePlatformAdapter implements PlatformAdapter {
         return { valid: false, error: `GitHub API error: ${response.status}` };
       }
 
-      const user = (await response.json()) as { login: string };
-      return { valid: true, username: user.login };
+      const json: unknown = await response.json();
+      const parseResult = GitHubUserResponseSchema.safeParse(json);
+      if (!parseResult.success) {
+        return { valid: false, error: 'Invalid response from GitHub API' };
+      }
+      return { valid: true, username: parseResult.data.login };
     } catch (error) {
       this.error('[validateGitHubToken] Failed to validate token', { error });
       return { valid: false, error: 'Failed to validate GitHub token' };
@@ -202,11 +223,13 @@ export class NodePlatformAdapter implements PlatformAdapter {
   // --- WebSocket Operations ---
 
   sendMessage(ws: unknown, message: unknown): void {
-    const socket = ws as WebSocket;
-    if (socket.readyState === 1) {
-      // 1 = OPEN
+    if (!isWebSocket(ws)) {
+      this.error('[sendMessage] Invalid WebSocket');
+      return;
+    }
+    if (ws.readyState === WebSocket.OPEN) {
       try {
-        socket.send(JSON.stringify(message));
+        ws.send(JSON.stringify(message));
       } catch (error) {
         this.error('[sendMessage] Failed to send message', { error });
       }
@@ -221,62 +244,65 @@ export class NodePlatformAdapter implements PlatformAdapter {
   }
 
   subscribeToTopic(ws: unknown, topic: string): void {
-    const socket = ws as WebSocket;
+    if (!isWebSocket(ws)) {
+      this.error('[subscribeToTopic] Invalid WebSocket');
+      return;
+    }
 
-    // Add socket to topic's subscriber set
     let topicSubscribers = this.topics.get(topic);
     if (!topicSubscribers) {
       topicSubscribers = new Set<WebSocket>();
       this.topics.set(topic, topicSubscribers);
     }
-    topicSubscribers.add(socket);
+    topicSubscribers.add(ws);
 
-    // Add topic to socket's subscription set
-    let socketTopics = this.connectionTopics.get(socket);
+    let socketTopics = this.connectionTopics.get(ws);
     if (!socketTopics) {
       socketTopics = new Set<string>();
-      this.connectionTopics.set(socket, socketTopics);
+      this.connectionTopics.set(ws, socketTopics);
     }
     socketTopics.add(topic);
   }
 
   unsubscribeFromTopic(ws: unknown, topic: string): void {
-    const socket = ws as WebSocket;
+    if (!isWebSocket(ws)) {
+      this.error('[unsubscribeFromTopic] Invalid WebSocket');
+      return;
+    }
 
-    // Remove socket from topic's subscriber set
     const topicSubscribers = this.topics.get(topic);
     if (topicSubscribers) {
-      topicSubscribers.delete(socket);
+      topicSubscribers.delete(ws);
       if (topicSubscribers.size === 0) {
         this.topics.delete(topic);
       }
     }
 
-    // Remove topic from socket's subscription set
-    const socketTopics = this.connectionTopics.get(socket);
+    const socketTopics = this.connectionTopics.get(ws);
     if (socketTopics) {
       socketTopics.delete(topic);
     }
   }
 
   unsubscribeFromAllTopics(ws: unknown): void {
-    const socket = ws as WebSocket;
-    const socketTopics = this.connectionTopics.get(socket);
+    if (!isWebSocket(ws)) {
+      this.error('[unsubscribeFromAllTopics] Invalid WebSocket');
+      return;
+    }
+    const socketTopics = this.connectionTopics.get(ws);
 
     if (!socketTopics) return;
 
-    // Remove socket from all topics
     for (const topic of socketTopics) {
       const topicSubscribers = this.topics.get(topic);
       if (topicSubscribers) {
-        topicSubscribers.delete(socket);
+        topicSubscribers.delete(ws);
         if (topicSubscribers.size === 0) {
           this.topics.delete(topic);
         }
       }
     }
 
-    // Clear socket's subscription set
     socketTopics.clear();
   }
 

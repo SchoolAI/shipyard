@@ -14,8 +14,25 @@
  */
 
 import type { InviteRedemption, InviteToken } from '@shipyard/schema';
+import { z } from 'zod';
 import type { PlatformAdapter } from '../../core/platform.js';
 import { logger } from './logger.js';
+
+/**
+ * Zod schema for GitHub user API response.
+ * Only validates the fields we actually use.
+ */
+const GitHubUserResponseSchema = z.object({
+  login: z.string(),
+});
+
+/**
+ * Type guard for checking if a value is a non-null object.
+ * Used for safely narrowing unknown types before logging.
+ */
+function isNonNullObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
 
 /**
  * Serialized connection state stored in WebSocket attachment.
@@ -32,6 +49,38 @@ interface SerializedConnectionState {
 interface ConnectionState {
   id: string;
   topics: Set<string>;
+}
+
+/**
+ * Zod schema for validating deserialized WebSocket attachment data.
+ */
+const SerializedConnectionStateSchema = z.object({
+  id: z.string(),
+  topics: z.array(z.string()),
+});
+
+/**
+ * Type guard for checking if a value is a valid SerializedConnectionState.
+ */
+function isSerializedConnectionState(value: unknown): value is SerializedConnectionState {
+  const result = SerializedConnectionStateSchema.safeParse(value);
+  return result.success;
+}
+
+/**
+ * Type guard for Cloudflare WebSocket using duck typing.
+ * Cloudflare Workers have no WebSocket constructor to check with instanceof.
+ */
+function isCloudflareWebSocket(value: unknown): value is WebSocket {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+  if (!('send' in value) || !('close' in value)) {
+    return false;
+  }
+  const sendProp = value.send;
+  const closeProp = value.close;
+  return typeof sendProp === 'function' && typeof closeProp === 'function';
 }
 
 /**
@@ -72,6 +121,12 @@ export class CloudflarePlatformAdapter implements PlatformAdapter {
    * Rebuilt on hibernation wake from WebSocket attachments.
    */
   private topics = new Map<string, Set<WebSocket>>();
+
+  /**
+   * In-memory cache of connection state per WebSocket.
+   * Uses WeakMap for automatic cleanup when WebSocket is garbage collected.
+   */
+  private connectionStates = new WeakMap<WebSocket, ConnectionState>();
 
   constructor(ctx: DurableObjectState) {
     this.ctx = ctx;
@@ -180,15 +235,13 @@ export class CloudflarePlatformAdapter implements PlatformAdapter {
     const websockets = this.ctx.getWebSockets();
 
     for (const ws of websockets) {
-      const attachment = ws.deserializeAttachment() as SerializedConnectionState | null;
-      if (attachment) {
-        // Restore topics Set from serialized array
+      const attachment = ws.deserializeAttachment();
+      if (isSerializedConnectionState(attachment)) {
         const state: ConnectionState = {
           id: attachment.id,
           topics: new Set(attachment.topics),
         };
 
-        // Rebuild topic -> WebSocket mapping
         for (const topic of state.topics) {
           if (!this.topics.has(topic)) {
             this.topics.set(topic, new Set());
@@ -196,8 +249,7 @@ export class CloudflarePlatformAdapter implements PlatformAdapter {
           this.topics.get(topic)?.add(ws);
         }
 
-        // Store in-memory state on WebSocket
-        (ws as any).__state = state;
+        this.connectionStates.set(ws, state);
       }
     }
 
@@ -363,8 +415,12 @@ export class CloudflarePlatformAdapter implements PlatformAdapter {
         return { valid: false, error: `GitHub API error: ${response.status}` };
       }
 
-      const user = (await response.json()) as { login: string };
-      return { valid: true, username: user.login };
+      const json: unknown = await response.json();
+      const parseResult = GitHubUserResponseSchema.safeParse(json);
+      if (!parseResult.success) {
+        return { valid: false, error: 'Invalid response from GitHub API' };
+      }
+      return { valid: true, username: parseResult.data.login };
     } catch (error) {
       logger.error({ error }, '[validateGitHubToken] Failed to validate token');
       return { valid: false, error: 'Failed to validate GitHub token' };
@@ -461,9 +517,12 @@ export class CloudflarePlatformAdapter implements PlatformAdapter {
   // --- WebSocket Operations ---
 
   sendMessage(ws: unknown, message: unknown): void {
-    const socket = ws as WebSocket;
+    if (!isCloudflareWebSocket(ws)) {
+      logger.error({}, '[sendMessage] Invalid WebSocket');
+      return;
+    }
     try {
-      socket.send(JSON.stringify(message));
+      ws.send(JSON.stringify(message));
     } catch (error) {
       logger.error({ error }, '[sendMessage] Failed to send message');
     }
@@ -477,99 +536,105 @@ export class CloudflarePlatformAdapter implements PlatformAdapter {
   }
 
   subscribeToTopic(ws: unknown, topic: string): void {
-    const socket = ws as WebSocket;
+    if (!isCloudflareWebSocket(ws)) {
+      logger.error({}, '[subscribeToTopic] Invalid WebSocket');
+      return;
+    }
 
-    // Add socket to topic's subscriber set
     if (!this.topics.has(topic)) {
       this.topics.set(topic, new Set());
     }
-    this.topics.get(topic)?.add(socket);
+    this.topics.get(topic)?.add(ws);
 
-    // Update connection state
-    let state = this.getConnectionState(socket);
+    let state = this.getConnectionState(ws);
     if (!state) {
       state = {
         id: crypto.randomUUID(),
         topics: new Set(),
       };
-      (socket as any).__state = state;
+      this.connectionStates.set(ws, state);
     }
     state.topics.add(topic);
 
-    // Persist for hibernation survival
-    this.persistConnectionState(socket, state);
+    this.persistConnectionState(ws, state);
   }
 
   unsubscribeFromTopic(ws: unknown, topic: string): void {
-    const socket = ws as WebSocket;
+    if (!isCloudflareWebSocket(ws)) {
+      logger.error({}, '[unsubscribeFromTopic] Invalid WebSocket');
+      return;
+    }
 
-    // Remove socket from topic's subscriber set
     const subscribers = this.topics.get(topic);
     if (subscribers) {
-      subscribers.delete(socket);
+      subscribers.delete(ws);
       if (subscribers.size === 0) {
         this.topics.delete(topic);
       }
     }
 
-    // Update connection state
-    const state = this.getConnectionState(socket);
+    const state = this.getConnectionState(ws);
     if (state) {
       state.topics.delete(topic);
-      this.persistConnectionState(socket, state);
+      this.persistConnectionState(ws, state);
     }
   }
 
   unsubscribeFromAllTopics(ws: unknown): void {
-    const socket = ws as WebSocket;
-    const state = this.getConnectionState(socket);
+    if (!isCloudflareWebSocket(ws)) {
+      logger.error({}, '[unsubscribeFromAllTopics] Invalid WebSocket');
+      return;
+    }
+    const state = this.getConnectionState(ws);
 
     if (!state) return;
 
-    // Remove socket from all topics
     for (const topic of state.topics) {
       const subscribers = this.topics.get(topic);
       if (subscribers) {
-        subscribers.delete(socket);
+        subscribers.delete(ws);
         if (subscribers.size === 0) {
           this.topics.delete(topic);
         }
       }
     }
 
-    // Clear connection's topic set (no need to persist since connection is closing)
     state.topics.clear();
   }
 
   // --- Logging ---
 
   info(message: string, ...args: unknown[]): void {
-    if (args.length > 0 && typeof args[0] === 'object' && args[0] !== null) {
-      logger.info(args[0] as Record<string, unknown>, message);
+    const firstArg = args[0];
+    if (args.length > 0 && isNonNullObject(firstArg)) {
+      logger.info(firstArg, message);
     } else {
       logger.info(message);
     }
   }
 
   warn(message: string, ...args: unknown[]): void {
-    if (args.length > 0 && typeof args[0] === 'object' && args[0] !== null) {
-      logger.warn(args[0] as Record<string, unknown>, message);
+    const firstArg = args[0];
+    if (args.length > 0 && isNonNullObject(firstArg)) {
+      logger.warn(firstArg, message);
     } else {
       logger.warn(message);
     }
   }
 
   error(message: string, ...args: unknown[]): void {
-    if (args.length > 0 && typeof args[0] === 'object' && args[0] !== null) {
-      logger.error(args[0] as Record<string, unknown>, message);
+    const firstArg = args[0];
+    if (args.length > 0 && isNonNullObject(firstArg)) {
+      logger.error(firstArg, message);
     } else {
       logger.error(message);
     }
   }
 
   debug(message: string, ...args: unknown[]): void {
-    if (args.length > 0 && typeof args[0] === 'object' && args[0] !== null) {
-      logger.debug(args[0] as Record<string, unknown>, message);
+    const firstArg = args[0];
+    if (args.length > 0 && isNonNullObject(firstArg)) {
+      logger.debug(firstArg, message);
     } else {
       logger.debug(message);
     }
@@ -579,21 +644,21 @@ export class CloudflarePlatformAdapter implements PlatformAdapter {
 
   /**
    * Get connection state from WebSocket.
-   * First checks in-memory state, then falls back to deserialized attachment.
+   * First checks WeakMap, then falls back to deserialized attachment.
    */
   private getConnectionState(ws: WebSocket): ConnectionState | null {
-    // Check in-memory state first
-    const inMemory = (ws as any).__state as ConnectionState | undefined;
-    if (inMemory) return inMemory;
+    /** Check WeakMap first */
+    const cached = this.connectionStates.get(ws);
+    if (cached) return cached;
 
-    // Fall back to deserialized attachment (after hibernation wake)
-    const attachment = ws.deserializeAttachment() as SerializedConnectionState | null;
-    if (attachment) {
+    /** Fall back to deserialized attachment (after hibernation wake) */
+    const attachment = ws.deserializeAttachment();
+    if (isSerializedConnectionState(attachment)) {
       const state: ConnectionState = {
         id: attachment.id,
         topics: new Set(attachment.topics),
       };
-      (ws as any).__state = state;
+      this.connectionStates.set(ws, state);
       return state;
     }
 

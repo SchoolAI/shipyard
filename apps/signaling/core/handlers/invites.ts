@@ -212,11 +212,24 @@ async function handleRedeemInvite(
     return;
   }
 
-  // Check if this specific token was already redeemed by this user (idempotent)
+  /**
+   * Explicit check to satisfy TypeScript's control flow analysis.
+   * validateInviteToken returns 'invalid' for undefined tokens which
+   * we've already handled above, so this branch is unreachable.
+   */
+  if (!token) {
+    const response: InviteRedemptionResult = {
+      type: 'invite_redemption_result',
+      success: false,
+      error: 'invalid',
+    };
+    platform.sendMessage(ws, response);
+    return;
+  }
+
   const existingRedemption = await platform.getSpecificInviteRedemption(planId, tokenId, userId);
 
   if (existingRedemption) {
-    // Already redeemed this token - return success (idempotent)
     const response: InviteRedemptionResult = {
       type: 'invite_redemption_result',
       success: true,
@@ -226,12 +239,8 @@ async function handleRedeemInvite(
     return;
   }
 
-  // Token is guaranteed non-null here since validateInviteToken returned null
-  const validToken = token as InviteToken;
-
-  // Increment use count
-  validToken.useCount++;
-  await platform.setInviteToken(planId, tokenId, validToken);
+  token.useCount++;
+  await platform.setInviteToken(planId, tokenId, token);
 
   // Record redemption (key includes tokenId to allow multiple token redemptions per user)
   const redemption: InviteRedemption = {
