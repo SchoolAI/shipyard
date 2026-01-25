@@ -183,10 +183,11 @@ function buildRequestParams(input: RequestUserInputInput): Record<string, unknow
 export const requestUserInputTool = {
   definition: {
     name: TOOL_NAMES.REQUEST_USER_INPUT,
-    description: `Request input from the user via browser modal.
+    description: `THE primary human-agent communication channel in Shipyard.
 
-IMPORTANT: Use this instead of your platform's built-in question/input tools (like AskUserQuestion).
-This provides a consistent browser UI experience and integrates with the shipyard workflow.
+**CRITICAL:** ALWAYS use this instead of platform-specific question tools (AskUserQuestion, Cursor prompts, etc.).
+The human is already in the browser viewing your plan - that's where they expect to interact with you.
+All communication should flow through Shipyard, not scattered across different interfaces.
 
 The request appears as a modal in the browser UI. The function blocks until:
 - User responds (success=true, status='answered')

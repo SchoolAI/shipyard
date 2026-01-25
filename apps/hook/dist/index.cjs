@@ -28490,371 +28490,6 @@ init_cjs_shims();
 
 // ../../packages/shared/dist/instructions/index.mjs
 init_cjs_shims();
-var CRITICAL_USAGE_SECTION = `## CRITICAL: When to Use Shipyard
-
-\u26A0\uFE0F **MANDATORY USAGE RULE:**
-
-If Shipyard is available, you MUST use it for:
-- Creating implementation plans
-- Tracking work that needs human review
-- Documenting proof of work (screenshots, videos, test results)
-- ANY user request involving "plan", "track", "verify", or "prove"
-
-**DO NOT:**
-- Create plans manually in chat or as markdown files
-- Write implementation docs yourself when Shipyard is available
-- Suggest alternatives to Shipyard for trackable work
-- Overthink whether to use it - WHEN IN DOUBT, USE SHIPYARD
-
-**Decision Tree:**
-\`\`\`
-Need to create/track/verify work?
-        \u2502
-        \u25BC
-  Shipyard available?
-     \u2502           \u2502
-    YES          NO
-     \u2502           \u2502
-     \u25BC           \u25BC
-  USE IT     Manual approach
-  NOW        (tell user why)
-\`\`\``;
-var DELIVERABLES_SECTION = `## What are Deliverables?
-
-Deliverables are measurable outcomes you can **prove** with artifacts (screenshots, videos, test results).
-
-**Good deliverables (provable):**
-\`\`\`
-- [ ] Screenshot of working login page {#deliverable}
-- [ ] Video showing drag-and-drop feature {#deliverable}
-- [ ] Test results showing all tests pass {#deliverable}
-\`\`\`
-
-**Bad deliverables (not provable - these are tasks, not deliverables):**
-\`\`\`
-- [ ] Implement getUserMedia API  \u2190 Implementation detail, not provable
-- [ ] Add error handling          \u2190 Can't capture this with an artifact
-- [ ] Refactor authentication     \u2190 Too vague, no visual proof
-\`\`\`
-
-**Rule:** If you can't screenshot/record/export it, it's not a deliverable.`;
-var ARTIFACT_TYPES_SECTION = `## Artifact Types
-
-| Type | Use For | File Formats |
-|------|---------|--------------|
-| \`screenshot\` | UI changes, visual proof, error states | .png, .jpg, .webp |
-| \`video\` | Complex flows, interactions, animations | .mp4, .webm |
-| \`test_results\` | Test output, coverage reports | .json, .txt, .xml |
-| \`diff\` | Code changes, before/after comparisons | .diff, .patch |`;
-var TIPS_SECTION = `## Tips for Effective Use
-
-1. **Plan deliverables first** - Decide what proves success before coding
-2. **Capture during work** - Take screenshots as you implement, not after
-3. **Be specific** - "Login page with error state" beats "Screenshot"
-4. **Link every artifact** - Always set \`deliverableId\` for auto-completion
-5. **Check feedback** - Read reviewer comments and iterate`;
-var WHEN_NOT_TO_USE_SECTION = `## When NOT to Use Shipyard
-
-Skip Shipyard for:
-- Quick answers or research questions (no artifacts to capture)
-- Internal refactoring with no visible output
-- Tasks where proof adds no value (trivial fixes)
-- Exploration or debugging sessions
-- Pure documentation without implementation`;
-var TROUBLESHOOTING_SECTION = `## Troubleshooting
-
-**Browser doesn't open:** Check MCP server is running and accessible.
-
-**Upload fails:** Verify file path exists. For GitHub uploads, check \`GITHUB_TOKEN\` has repo write access.
-
-**No auto-complete:** Ensure every deliverable has an artifact with matching \`deliverableId\`.
-
-**Plan not syncing:** Check WebSocket connection to registry server.`;
-var COMMON_INSTRUCTIONS = [
-  CRITICAL_USAGE_SECTION,
-  DELIVERABLES_SECTION,
-  ARTIFACT_TYPES_SECTION,
-  TIPS_SECTION,
-  WHEN_NOT_TO_USE_SECTION,
-  TROUBLESHOOTING_SECTION
-].join("\n\n");
-var CLAUDE_CODE_HEADER = `[SHIPYARD] Collaborative planning with human review & proof-of-work tracking.`;
-var PLAN_MODE_WORKFLOW = `## How to Use (Claude Code with Hooks)
-
-You have the **full Shipyard experience** with automatic hooks. Use native plan mode:
-
-### Workflow
-
-1. **Enter plan mode** (Shift+Tab) \u2192 Browser opens with live plan automatically
-2. **Write your plan** with \`{#deliverable}\` markers for provable outcomes
-3. **Exit plan mode** \u2192 Hook **BLOCKS** until human approves or requests changes
-4. **On approval** \u2192 You automatically receive: planId, sessionToken, deliverable IDs
-5. **Do the work** \u2192 Take screenshots/videos as you implement
-6. **Upload artifacts** \u2192 \`add_artifact(filePath, deliverableId)\` for each deliverable
-7. **Auto-complete** \u2192 When all deliverables have artifacts, task completes with snapshot URL
-
-### After Approval
-
-You only need ONE tool: \`add_artifact\`
-
-The hook automatically injects everything you need (planId, sessionToken, deliverables).
-Just call \`add_artifact\` with the file path and deliverable ID.
-
-\`\`\`typescript
-// Example: After approval, you'll have these in context
-// planId: "abc123"
-// sessionToken: "xyz..."
-// deliverables: [{ id: "del_xxx", text: "Screenshot of login" }]
-
-await addArtifact({
-  planId,
-  sessionToken,
-  type: 'screenshot',
-  filename: 'login-page.png',
-  source: 'file',
-  filePath: '/tmp/screenshot.png',
-  deliverableId: deliverables[0].id
-});
-\`\`\`
-
-When the last deliverable gets an artifact, the task auto-completes and returns a snapshot URL.`;
-var IMPORTANT_NOTES = `## Important Notes for Claude Code
-
-- **DO NOT call \`createPlan()\` directly** - The hook handles plan creation when you enter plan mode
-- **DO NOT use the Shipyard skill** - The hook provides everything you need
-- **DO NOT poll for approval** - The hook blocks automatically until human decides
-- **DO use plan mode** for ANY work that needs tracking, verification, or human review`;
-var CLAUDE_CODE_INSTRUCTIONS = [
-  CLAUDE_CODE_HEADER,
-  "",
-  CRITICAL_USAGE_SECTION,
-  "",
-  PLAN_MODE_WORKFLOW,
-  "",
-  DELIVERABLES_SECTION,
-  "",
-  ARTIFACT_TYPES_SECTION,
-  "",
-  IMPORTANT_NOTES,
-  "",
-  TIPS_SECTION,
-  "",
-  WHEN_NOT_TO_USE_SECTION,
-  "",
-  TROUBLESHOOTING_SECTION
-].join("\n");
-var MCP_DIRECT_HEADER = `# Shipyard: Verified Work Tasks
-
-> **MCP Integration:** Use \`execute_code\` to call Shipyard APIs. This skill teaches the workflow.
-
-Shipyard turns invisible agent work into reviewable, verifiable tasks. Instead of trusting that code was written correctly, reviewers see screenshots, videos, and test results as proof.`;
-var MCP_TOOLS_OVERVIEW = `## Available MCP Tools
-
-| Tool | Purpose |
-|------|---------|
-| \`execute_code\` | Run TypeScript that calls Shipyard APIs (recommended) |
-| \`request_user_input\` | Ask user questions via browser modal |
-
-**Preferred approach:** Use \`execute_code\` to chain multiple API calls in one step.`;
-var MCP_WORKFLOW = `## Workflow (MCP Direct)
-
-### Step 1: Create Plan
-
-\`\`\`typescript
-const plan = await createPlan({
-  title: "Add user authentication",
-  content: \`
-## Deliverables
-- [ ] Screenshot of login page {#deliverable}
-- [ ] Screenshot of error handling {#deliverable}
-
-## Implementation
-1. Create login form component
-2. Add validation
-3. Connect to auth API
-\`
-});
-
-const { planId, sessionToken, deliverables, monitoringScript } = plan;
-// deliverables = [{ id: "del_xxx", text: "Screenshot of login page" }, ...]
-\`\`\`
-
-### Step 2: Wait for Approval
-
-For platforms without hooks, run the monitoring script in the background:
-
-\`\`\`bash
-# The monitoringScript polls for approval status
-# Run it in background while you wait
-bash <(echo "$monitoringScript") &
-\`\`\`
-
-Or poll manually:
-
-\`\`\`typescript
-const status = await readPlan(planId, sessionToken);
-if (status.status === "in_progress") {
-  // Approved! Proceed with work
-}
-if (status.status === "changes_requested") {
-  // Read feedback, make changes
-}
-\`\`\`
-
-### Step 3: Do the Work
-
-Implement the feature, taking screenshots/recordings as you go.
-
-### Step 4: Upload Artifacts
-
-\`\`\`typescript
-await addArtifact({
-  planId,
-  sessionToken,
-  type: 'screenshot',
-  filename: 'login-page.png',
-  source: 'file',
-  filePath: '/path/to/screenshot.png',
-  deliverableId: deliverables[0].id  // Links to specific deliverable
-});
-
-const result = await addArtifact({
-  planId,
-  sessionToken,
-  type: 'screenshot',
-  filename: 'error-handling.png',
-  source: 'file',
-  filePath: '/path/to/error.png',
-  deliverableId: deliverables[1].id
-});
-
-// Auto-complete triggers when ALL deliverables have artifacts
-if (result.allDeliverablesComplete) {
-  console.log('Done!', result.snapshotUrl);
-}
-\`\`\``;
-var API_REFERENCE = `## API Reference
-
-### createPlan(options)
-
-Creates a new plan and opens it in the browser.
-
-**Parameters:**
-- \`title\` (string) - Plan title
-- \`content\` (string) - Markdown content with \`{#deliverable}\` markers
-- \`repo\` (string, optional) - GitHub repo for artifact storage
-- \`prNumber\` (number, optional) - PR number to link
-
-**Returns:** \`{ planId, sessionToken, url, deliverables, monitoringScript }\`
-
-### readPlan(planId, sessionToken, options?)
-
-Reads current plan state.
-
-**Parameters:**
-- \`planId\` (string) - Plan ID
-- \`sessionToken\` (string) - Session token from createPlan
-- \`options.includeAnnotations\` (boolean) - Include reviewer comments
-
-**Returns:** \`{ content, status, title, deliverables }\`
-
-### addArtifact(options)
-
-Uploads proof-of-work artifact.
-
-**Parameters:**
-- \`planId\` (string) - Plan ID
-- \`sessionToken\` (string) - Session token
-- \`type\` ('screenshot' | 'video' | 'test_results' | 'diff')
-- \`filename\` (string) - File name
-- \`source\` ('file' | 'url' | 'base64')
-- \`filePath\` (string) - Local file path (when source='file')
-- \`deliverableId\` (string, optional) - Links artifact to deliverable
-
-**Returns:** \`{ artifactId, url, allDeliverablesComplete, snapshotUrl? }\`
-
-### requestUserInput(options)
-
-Asks user a question via browser modal.
-
-**Parameters:**
-- \`message\` (string) - Question to ask
-- \`type\` (string) - Input type (see below)
-- \`options\` (string[], for 'choice') - Available choices
-- \`timeout\` (number, optional) - Timeout in seconds
-- Type-specific parameters (min, max, format, etc.)
-
-**Returns:** \`{ success, response?, status }\`
-
-**Supported types (8 total):**
-1. \`text\` - Single-line text
-2. \`multiline\` - Multi-line text area
-3. \`choice\` - Radio/checkbox/dropdown (auto-adds "Other" option)
-   - Auto-switches: 1-8 options = radio/checkbox, 9+ = dropdown
-   - \`multiSelect: true\` for checkboxes
-   - \`displayAs: 'dropdown'\` to force dropdown UI
-4. \`confirm\` - Yes/No buttons
-5. \`number\` - Numeric input with validation
-   - \`min\`, \`max\`, \`format\` ('integer' | 'decimal' | 'currency' | 'percentage')
-6. \`email\` - Email validation
-   - \`domain\` for restriction
-7. \`date\` - Date picker with range
-   - \`minDate\`, \`maxDate\` (YYYY-MM-DD format)
-8. \`rating\` - Scale rating (auto-selects stars/numbers)
-   - \`min\`, \`max\`, \`style\` ('stars' | 'numbers' | 'emoji'), \`labels\`
-
-**Response format:**
-- All responses are strings
-- choice (single): \`"PostgreSQL"\` or custom text from "Other"
-- choice (multi): \`"option1, option2"\` (comma-space separated)
-- confirm: \`"yes"\` or \`"no"\` (lowercase)
-- number: \`"42"\` or \`"3.14"\`
-- email: \`"user@example.com"\`
-- date: \`"2026-01-24"\` (ISO 8601)
-- rating: \`"4"\` (integer as string)
-- See docs/INPUT-RESPONSE-FORMATS.md for complete specification`;
-var HANDLING_FEEDBACK = `## Handling Reviewer Feedback
-
-\`\`\`typescript
-const status = await readPlan(planId, sessionToken, {
-  includeAnnotations: true
-});
-
-if (status.status === "changes_requested") {
-  // Read the content for inline comments
-  console.log(status.content);
-
-  // Make changes based on feedback
-  // Upload new artifacts
-  // Plan will transition back to pending_review
-}
-\`\`\``;
-var MCP_DIRECT_INSTRUCTIONS = [
-  MCP_DIRECT_HEADER,
-  "",
-  CRITICAL_USAGE_SECTION,
-  "",
-  MCP_TOOLS_OVERVIEW,
-  "",
-  MCP_WORKFLOW,
-  "",
-  DELIVERABLES_SECTION,
-  "",
-  ARTIFACT_TYPES_SECTION,
-  "",
-  API_REFERENCE,
-  "",
-  HANDLING_FEEDBACK,
-  "",
-  TIPS_SECTION,
-  "",
-  WHEN_NOT_TO_USE_SECTION,
-  "",
-  TROUBLESHOOTING_SECTION
-].join("\n");
-
-// src/adapters/claude-code.ts
-init_cjs_shims();
 
 // ../../packages/schema/dist/index.mjs
 init_cjs_shims();
@@ -44446,6 +44081,20 @@ function truncate(text, maxLength) {
   if (cleaned.length <= maxLength) return cleaned;
   return `${cleaned.slice(0, maxLength)}...`;
 }
+var TOOL_NAMES = {
+  ADD_ARTIFACT: "add_artifact",
+  ADD_PR_REVIEW_COMMENT: "add_pr_review_comment",
+  COMPLETE_TASK: "complete_task",
+  CREATE_PLAN: "create_plan",
+  EXECUTE_CODE: "execute_code",
+  LINK_PR: "link_pr",
+  READ_PLAN: "read_plan",
+  REGENERATE_SESSION_TOKEN: "regenerate_session_token",
+  REQUEST_USER_INPUT: "request_user_input",
+  SETUP_REVIEW_NOTIFICATION: "setup_review_notification",
+  UPDATE_BLOCK_CONTENT: "update_block_content",
+  UPDATE_PLAN: "update_plan"
+};
 var PlanIdSchema = external_exports.object({ planId: external_exports.string().min(1) });
 var PlanStatusResponseSchema = external_exports.object({ status: external_exports.string() });
 var HasConnectionsResponseSchema = external_exports.object({ hasConnections: external_exports.boolean() });
@@ -44637,6 +44286,440 @@ var appRouter = router({
   conversation: conversationRouter
 });
 
+// ../../packages/shared/dist/instructions/index.mjs
+var CRITICAL_USAGE_SECTION = `## CRITICAL: When to Use Shipyard
+
+\u26A0\uFE0F **MANDATORY USAGE RULE:**
+
+If Shipyard is available, you MUST use it for:
+- Creating implementation plans
+- Tracking work that needs human review
+- Documenting proof of work (screenshots, videos, test results)
+- ANY user request involving "plan", "track", "verify", or "prove"
+
+**DO NOT:**
+- Create plans manually in chat or as markdown files
+- Write implementation docs yourself when Shipyard is available
+- Suggest alternatives to Shipyard for trackable work
+- Overthink whether to use it - WHEN IN DOUBT, USE SHIPYARD
+
+**Decision Tree:**
+\`\`\`
+Need to create/track/verify work?
+        \u2502
+        \u25BC
+  Shipyard available?
+     \u2502           \u2502
+    YES          NO
+     \u2502           \u2502
+     \u25BC           \u25BC
+  USE IT     Manual approach
+  NOW        (tell user why)
+\`\`\``;
+var DELIVERABLES_SECTION = `## What are Deliverables?
+
+Deliverables are measurable outcomes you can **prove** with artifacts (screenshots, videos, test results).
+
+**Good deliverables (provable):**
+\`\`\`
+- [ ] Screenshot of working login page {#deliverable}
+- [ ] Video showing drag-and-drop feature {#deliverable}
+- [ ] Test results showing all tests pass {#deliverable}
+\`\`\`
+
+**Bad deliverables (not provable - these are tasks, not deliverables):**
+\`\`\`
+- [ ] Implement getUserMedia API  \u2190 Implementation detail, not provable
+- [ ] Add error handling          \u2190 Can't capture this with an artifact
+- [ ] Refactor authentication     \u2190 Too vague, no visual proof
+\`\`\`
+
+**Rule:** If you can't screenshot/record/export it, it's not a deliverable.`;
+var ARTIFACT_TYPES_SECTION = `## Artifact Types
+
+| Type | Use For | File Formats |
+|------|---------|--------------|
+| \`screenshot\` | UI changes, visual proof, error states | .png, .jpg, .webp |
+| \`video\` | Complex flows, interactions, animations | .mp4, .webm |
+| \`test_results\` | Test output, coverage reports | .json, .txt, .xml |
+| \`diff\` | Code changes, before/after comparisons | .diff, .patch |`;
+var TIPS_SECTION = `## Tips for Effective Use
+
+1. **Plan deliverables first** - Decide what proves success before coding
+2. **Capture during work** - Take screenshots as you implement, not after
+3. **Be specific** - "Login page with error state" beats "Screenshot"
+4. **Link every artifact** - Always set \`deliverableId\` for auto-completion
+5. **Check feedback** - Read reviewer comments and iterate`;
+var WHEN_NOT_TO_USE_SECTION = `## When NOT to Use Shipyard
+
+Skip Shipyard for:
+- Quick answers or research questions (no artifacts to capture)
+- Internal refactoring with no visible output
+- Tasks where proof adds no value (trivial fixes)
+- Exploration or debugging sessions
+- Pure documentation without implementation`;
+var USER_INPUT_SECTION = `## Human-Agent Communication
+
+**\`${TOOL_NAMES.REQUEST_USER_INPUT}\` is THE primary way to communicate with humans during active work.**
+
+Shipyard is the central hub where humans manage AI agents. When you need to ask a question, get clarification, or request a decision - use \`${TOOL_NAMES.REQUEST_USER_INPUT}\`. The human is already in the browser viewing your plan. That's where conversations should happen.
+
+### Why Use ${TOOL_NAMES.REQUEST_USER_INPUT}
+
+- **Context:** The human sees your question alongside the plan, artifacts, and comments
+- **History:** All exchanges are logged in the plan's activity feed
+- **Continuity:** The conversation stays attached to the work, not scattered across chat windows
+- **Flexibility:** 8 input types, multi-question forms, "Other" escape hatch for custom answers
+
+### Replace Platform Tools
+
+**ALWAYS prefer \`${TOOL_NAMES.REQUEST_USER_INPUT}\` over platform-specific tools:**
+
+| Platform | DON'T Use | Use Instead |
+|----------|-----------|-------------|
+| Claude Code | \`AskUserQuestion\` | \`${TOOL_NAMES.REQUEST_USER_INPUT}\` |
+| Cursor | Built-in prompts | \`${TOOL_NAMES.REQUEST_USER_INPUT}\` |
+| Windsurf | Native dialogs | \`${TOOL_NAMES.REQUEST_USER_INPUT}\` |
+| Claude Desktop | Chat questions | \`${TOOL_NAMES.REQUEST_USER_INPUT}\` |
+
+### When to Ask
+
+Use \`${TOOL_NAMES.REQUEST_USER_INPUT}\` when you need:
+- Clarification on requirements ("Which auth provider?")
+- Decisions that affect implementation ("PostgreSQL or SQLite?")
+- Confirmation before destructive actions ("Delete this file?")
+- User preferences ("Rate this approach 1-5")
+- Any information you can't infer from context
+
+### Example
+
+\`\`\`typescript
+const result = await requestUserInput({
+  message: "Which database should we use?",
+  type: "choice",
+  options: ["PostgreSQL", "SQLite", "MongoDB"],
+  timeout: 600  // 10 minutes
+});
+
+if (result.success) {
+  console.log("User chose:", result.response);
+}
+\`\`\`
+
+**Note:** The MCP tool is named \`${TOOL_NAMES.REQUEST_USER_INPUT}\` (snake_case). Inside \`${TOOL_NAMES.EXECUTE_CODE}\`, it's available as \`requestUserInput()\` (camelCase).`;
+var TROUBLESHOOTING_SECTION = `## Troubleshooting
+
+**Browser doesn't open:** Check MCP server is running and accessible.
+
+**Upload fails:** Verify file path exists. For GitHub uploads, check \`GITHUB_TOKEN\` has repo write access.
+
+**No auto-complete:** Ensure every deliverable has an artifact with matching \`deliverableId\`.
+
+**Plan not syncing:** Check WebSocket connection to registry server.
+
+**Input request times out:** User may not have seen it or needs more time. Default timeout is 30 minutes. Try again with a longer timeout or rephrase the question.
+
+**Input request declined:** User clicked "Decline." Rephrase your question, proceed with a reasonable default, or use a different approach.
+
+**No response to input:** Check if browser is connected to the plan. User may have closed the browser window.`;
+var COMMON_INSTRUCTIONS = [
+  CRITICAL_USAGE_SECTION,
+  USER_INPUT_SECTION,
+  DELIVERABLES_SECTION,
+  ARTIFACT_TYPES_SECTION,
+  TIPS_SECTION,
+  WHEN_NOT_TO_USE_SECTION,
+  TROUBLESHOOTING_SECTION
+].join("\n\n");
+var CLAUDE_CODE_HEADER = `[SHIPYARD] Collaborative planning with human review & proof-of-work tracking.`;
+var PLAN_MODE_WORKFLOW = `## How to Use (Claude Code with Hooks)
+
+You have the **full Shipyard experience** with automatic hooks. Use native plan mode:
+
+### Workflow
+
+1. **Enter plan mode** (Shift+Tab) \u2192 Browser opens with live plan automatically
+2. **Write your plan** with \`{#deliverable}\` markers for provable outcomes
+3. **Exit plan mode** \u2192 Hook **BLOCKS** until human approves or requests changes
+4. **On approval** \u2192 You automatically receive: planId, sessionToken, deliverable IDs
+5. **Do the work** \u2192 Take screenshots/videos as you implement
+6. **Upload artifacts** \u2192 \`${TOOL_NAMES.ADD_ARTIFACT}(filePath, deliverableId)\` for each deliverable
+7. **Auto-complete** \u2192 When all deliverables have artifacts, task completes with snapshot URL
+
+### After Approval
+
+You only need ONE tool: \`${TOOL_NAMES.ADD_ARTIFACT}\`
+
+The hook automatically injects everything you need (planId, sessionToken, deliverables).
+Just call \`${TOOL_NAMES.ADD_ARTIFACT}\` with the file path and deliverable ID.
+
+\`\`\`typescript
+// Example: After approval, you'll have these in context
+// planId: "abc123"
+// sessionToken: "xyz..."
+// deliverables: [{ id: "del_xxx", text: "Screenshot of login" }]
+
+await addArtifact({
+  planId,
+  sessionToken,
+  type: 'screenshot',
+  filename: 'login-page.png',
+  source: 'file',
+  filePath: '/tmp/screenshot.png',
+  deliverableId: deliverables[0].id
+});
+\`\`\`
+
+When the last deliverable gets an artifact, the task auto-completes and returns a snapshot URL.`;
+var IMPORTANT_NOTES = `## Important Notes for Claude Code
+
+- **DO NOT call \`createPlan()\` directly** - The hook handles plan creation when you enter plan mode
+- **DO NOT use the Shipyard skill** - The hook provides everything you need
+- **DO NOT poll for approval** - The hook blocks automatically until human decides
+- **DO use plan mode** for ANY work that needs tracking, verification, or human review
+- **DO use \`${TOOL_NAMES.REQUEST_USER_INPUT}\`** instead of \`AskUserQuestion\` - The human is in the browser viewing your plan, questions should appear there`;
+var CLAUDE_CODE_INSTRUCTIONS = [
+  CLAUDE_CODE_HEADER,
+  "",
+  CRITICAL_USAGE_SECTION,
+  "",
+  USER_INPUT_SECTION,
+  "",
+  PLAN_MODE_WORKFLOW,
+  "",
+  DELIVERABLES_SECTION,
+  "",
+  ARTIFACT_TYPES_SECTION,
+  "",
+  IMPORTANT_NOTES,
+  "",
+  TIPS_SECTION,
+  "",
+  WHEN_NOT_TO_USE_SECTION,
+  "",
+  TROUBLESHOOTING_SECTION
+].join("\n");
+var MCP_DIRECT_HEADER = `# Shipyard: Your Agent Management Hub
+
+> **Shipyard is the central interface where humans manage AI agents.** Plans, artifacts, feedback, and communication all happen here.
+
+Shipyard turns invisible agent work into reviewable, verifiable tasks. Instead of trusting that code was written correctly, reviewers see screenshots, videos, and test results as proof.
+
+**Key principle:** When you're working in Shipyard, ALL human-agent communication should happen through Shipyard's \`${TOOL_NAMES.REQUEST_USER_INPUT}\` tool. The human is already in the browser viewing your plan - that's where they expect to interact with you.`;
+var MCP_TOOLS_OVERVIEW = `## Available MCP Tools
+
+| Tool | Purpose |
+|------|---------|
+| \`${TOOL_NAMES.REQUEST_USER_INPUT}\` | **THE primary human-agent communication channel** - Ask questions, get decisions, request clarification |
+| \`${TOOL_NAMES.EXECUTE_CODE}\` | Run TypeScript that calls Shipyard APIs (recommended for multi-step operations) |
+
+### ${TOOL_NAMES.REQUEST_USER_INPUT}: Your Direct Line to the Human
+
+This is how you talk to humans during active work. Don't use your platform's built-in question tools (AskUserQuestion, etc.) - use this instead. The human is in the browser viewing your plan, and that's where they expect to see your questions.
+
+**Preferred approach:** Use \`${TOOL_NAMES.EXECUTE_CODE}\` to chain multiple API calls in one step.`;
+var MCP_WORKFLOW = `## Workflow (MCP Direct)
+
+### Step 1: Create Plan
+
+\`\`\`typescript
+const plan = await createPlan({
+  title: "Add user authentication",
+  content: \`
+## Deliverables
+- [ ] Screenshot of login page {#deliverable}
+- [ ] Screenshot of error handling {#deliverable}
+
+## Implementation
+1. Create login form component
+2. Add validation
+3. Connect to auth API
+\`
+});
+
+const { planId, sessionToken, deliverables, monitoringScript } = plan;
+// deliverables = [{ id: "del_xxx", text: "Screenshot of login page" }, ...]
+\`\`\`
+
+### Step 2: Wait for Approval
+
+For platforms without hooks, run the monitoring script in the background:
+
+\`\`\`bash
+# The monitoringScript polls for approval status
+# Run it in background while you wait
+bash <(echo "$monitoringScript") &
+\`\`\`
+
+Or poll manually:
+
+\`\`\`typescript
+const status = await readPlan(planId, sessionToken);
+if (status.status === "in_progress") {
+  // Approved! Proceed with work
+}
+if (status.status === "changes_requested") {
+  // Read feedback, make changes
+}
+\`\`\`
+
+### Step 3: Do the Work
+
+Implement the feature, taking screenshots/recordings as you go.
+
+### Step 4: Upload Artifacts
+
+\`\`\`typescript
+await addArtifact({
+  planId,
+  sessionToken,
+  type: 'screenshot',
+  filename: 'login-page.png',
+  source: 'file',
+  filePath: '/path/to/screenshot.png',
+  deliverableId: deliverables[0].id  // Links to specific deliverable
+});
+
+const result = await addArtifact({
+  planId,
+  sessionToken,
+  type: 'screenshot',
+  filename: 'error-handling.png',
+  source: 'file',
+  filePath: '/path/to/error.png',
+  deliverableId: deliverables[1].id
+});
+
+// Auto-complete triggers when ALL deliverables have artifacts
+if (result.allDeliverablesComplete) {
+  console.log('Done!', result.snapshotUrl);
+}
+\`\`\``;
+var API_REFERENCE = `## API Reference
+
+### createPlan(options)
+
+Creates a new plan and opens it in the browser.
+
+**Parameters:**
+- \`title\` (string) - Plan title
+- \`content\` (string) - Markdown content with \`{#deliverable}\` markers
+- \`repo\` (string, optional) - GitHub repo for artifact storage
+- \`prNumber\` (number, optional) - PR number to link
+
+**Returns:** \`{ planId, sessionToken, url, deliverables, monitoringScript }\`
+
+### readPlan(planId, sessionToken, options?)
+
+Reads current plan state.
+
+**Parameters:**
+- \`planId\` (string) - Plan ID
+- \`sessionToken\` (string) - Session token from createPlan
+- \`options.includeAnnotations\` (boolean) - Include reviewer comments
+
+**Returns:** \`{ content, status, title, deliverables }\`
+
+### addArtifact(options)
+
+Uploads proof-of-work artifact.
+
+**Parameters:**
+- \`planId\` (string) - Plan ID
+- \`sessionToken\` (string) - Session token
+- \`type\` ('screenshot' | 'video' | 'test_results' | 'diff')
+- \`filename\` (string) - File name
+- \`source\` ('file' | 'url' | 'base64')
+- \`filePath\` (string) - Local file path (when source='file')
+- \`deliverableId\` (string, optional) - Links artifact to deliverable
+
+**Returns:** \`{ artifactId, url, allDeliverablesComplete, snapshotUrl? }\`
+
+### requestUserInput(options)
+
+Asks user a question via browser modal.
+
+**Parameters:**
+- \`message\` (string) - Question to ask
+- \`type\` (string) - Input type (see below)
+- \`options\` (string[], for 'choice') - Available choices
+- \`timeout\` (number, optional) - Timeout in seconds
+- Type-specific parameters (min, max, format, etc.)
+
+**Returns:** \`{ success, response?, status }\`
+
+**Supported types (8 total):**
+1. \`text\` - Single-line text
+2. \`multiline\` - Multi-line text area
+3. \`choice\` - Radio/checkbox/dropdown (auto-adds "Other" option)
+   - Auto-switches: 1-8 options = radio/checkbox, 9+ = dropdown
+   - \`multiSelect: true\` for checkboxes
+   - \`displayAs: 'dropdown'\` to force dropdown UI
+4. \`confirm\` - Yes/No buttons
+5. \`number\` - Numeric input with validation
+   - \`min\`, \`max\`, \`format\` ('integer' | 'decimal' | 'currency' | 'percentage')
+6. \`email\` - Email validation
+   - \`domain\` for restriction
+7. \`date\` - Date picker with range
+   - \`minDate\`, \`maxDate\` (YYYY-MM-DD format)
+8. \`rating\` - Scale rating (auto-selects stars/numbers)
+   - \`min\`, \`max\`, \`style\` ('stars' | 'numbers' | 'emoji'), \`labels\`
+
+**Response format:**
+- All responses are strings
+- choice (single): \`"PostgreSQL"\` or custom text from "Other"
+- choice (multi): \`"option1, option2"\` (comma-space separated)
+- confirm: \`"yes"\` or \`"no"\` (lowercase)
+- number: \`"42"\` or \`"3.14"\`
+- email: \`"user@example.com"\`
+- date: \`"2026-01-24"\` (ISO 8601)
+- rating: \`"4"\` (integer as string)
+- See docs/INPUT-RESPONSE-FORMATS.md for complete specification`;
+var HANDLING_FEEDBACK = `## Handling Reviewer Feedback
+
+\`\`\`typescript
+const status = await readPlan(planId, sessionToken, {
+  includeAnnotations: true
+});
+
+if (status.status === "changes_requested") {
+  // Read the content for inline comments
+  console.log(status.content);
+
+  // Make changes based on feedback
+  // Upload new artifacts
+  // Plan will transition back to pending_review
+}
+\`\`\``;
+var MCP_DIRECT_INSTRUCTIONS = [
+  MCP_DIRECT_HEADER,
+  "",
+  CRITICAL_USAGE_SECTION,
+  "",
+  USER_INPUT_SECTION,
+  "",
+  MCP_TOOLS_OVERVIEW,
+  "",
+  MCP_WORKFLOW,
+  "",
+  DELIVERABLES_SECTION,
+  "",
+  ARTIFACT_TYPES_SECTION,
+  "",
+  API_REFERENCE,
+  "",
+  HANDLING_FEEDBACK,
+  "",
+  TIPS_SECTION,
+  "",
+  WHEN_NOT_TO_USE_SECTION,
+  "",
+  TROUBLESHOOTING_SECTION
+].join("\n");
+
+// src/adapters/claude-code.ts
+init_cjs_shims();
+
 // src/constants.ts
 init_cjs_shims();
 var CLAUDE_TOOL_NAMES = {
@@ -44644,9 +44727,6 @@ var CLAUDE_TOOL_NAMES = {
   EDIT: "Edit",
   EXIT_PLAN_MODE: "ExitPlanMode",
   ASK_USER_QUESTION: "AskUserQuestion"
-};
-var MCP_TOOL_NAMES = {
-  REQUEST_USER_INPUT: "request_user_input"
 };
 var CLAUDE_PERMISSION_MODES = {
   PLAN: "plan",
@@ -44744,7 +44824,7 @@ function handlePreToolUse(input) {
     );
     return {
       type: "tool_deny",
-      reason: `BLOCKED: Use the ${MCP_TOOL_NAMES.REQUEST_USER_INPUT} MCP tool instead for consistent browser UI. See the tool description for available parameters.`
+      reason: `BLOCKED: Use the ${TOOL_NAMES.REQUEST_USER_INPUT} MCP tool instead. The human is in the browser viewing your plan - that's where they expect to interact with you. See the tool description for input types and parameters.`
     };
   }
   return { type: "passthrough" };

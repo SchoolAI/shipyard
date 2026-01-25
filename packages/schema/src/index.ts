@@ -289,6 +289,8 @@ export {
 } from './thread.js';
 export type { FormatThreadsOptions } from './thread-formatter.js';
 export { formatThreadsForLLM } from './thread-formatter.js';
+export type { ToolName } from './tool-names.js';
+export { TOOL_NAMES } from './tool-names.js';
 export type {
   AppRouter,
   ApprovalResult,

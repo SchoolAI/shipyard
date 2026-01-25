@@ -1,9 +1,11 @@
 ---
 name: shipyard
 description: |
-  Companion skill for the Shipyard MCP server - creates verified work tasks with proof-of-work tracking.
+  Shipyard is your agent management hub - the central interface where humans manage AI agents. Plans, artifacts, feedback, and all human-agent communication happen here.
 
   **IMPORTANT:** When Shipyard MCP tools are available (`mcp__shipyard__*` or `mcp__plugin_shipyard_shipyard__*`), ALWAYS load this skill first. The MCP provides tools; this skill teaches the workflow for using them effectively together.
+
+  **Communication principle:** When working in Shipyard, use `request_user_input` for ALL human interaction - not your platform's built-in question tools. The human is in the browser viewing your plan; that's where they expect to talk to you.
 
   Use when tasks need human review, screenshot/video evidence, audit trails, or collaborative review. Invoke when the user says "create a task", "I need proof of this", "track my work", "make this reviewable", or needs accountability for implementation work.
 ---
@@ -22,11 +24,13 @@ description: |
   instructions (see apps/hook/src/index.ts using CLAUDE_CODE_INSTRUCTIONS).
 -->
 
-# Shipyard: Verified Work Tasks
+# Shipyard: Your Agent Management Hub
 
 > **MCP + Skill = Full Power:** If you see `mcp__shipyard__*` tools available, you have the Shipyard MCP. This skill teaches you how to use those tools effectively. Always use both together for the best workflow.
 
-Shipyard turns invisible agent work into reviewable, verifiable tasks. Instead of trusting that code was written correctly, reviewers see screenshots, videos, and test results as proof.
+Shipyard is the central interface where humans manage AI agents. It turns invisible agent work into reviewable, verifiable tasks with screenshots, videos, and test results as proof.
+
+**Key principle:** ALL human-agent communication happens through Shipyard. When you need to ask a question, get a decision, or request clarification - use `request_user_input`. The human is already in the browser viewing your plan. That's where they expect to interact with you.
 
 ## CRITICAL: When to Use Shipyard
 
@@ -72,12 +76,14 @@ This skill complements the Shipyard MCP server. The MCP provides tools; this ski
 **MCP tools available:**
 | Tool | Purpose |
 |------|---------|
-| `execute_code` | Run TypeScript that calls Shipyard APIs (recommended) |
-| `request_user_input` | Ask user questions via browser modal |
+| `request_user_input` | **THE primary communication channel** - Ask questions, get decisions, request clarification |
+| `execute_code` | Run TypeScript that calls Shipyard APIs (recommended for multi-step operations) |
 | `create_plan` | Start a new verified task |
 | `add_artifact` | Upload proof (screenshot, video, test results) |
 | `read_plan` | Check status and reviewer feedback |
 | `link_pr` | Connect a GitHub PR to the task |
+
+**Communication principle:** ALWAYS use `request_user_input` instead of your platform's built-in question tools (AskUserQuestion, Cursor prompts, etc.). The human is viewing your plan in the browser - that's where they expect to see your questions.
 
 **Preferred approach:** Use `execute_code` to chain multiple API calls in one step, reducing round-trips.
 
@@ -351,15 +357,36 @@ if (result.allDeliverablesComplete) {
 }
 ```
 
-## Asking Users Questions
+## Human-Agent Communication
 
-Use `request_user_input` instead of your platform's built-in question tools. This shows questions in the browser where users view tasks.
+**`request_user_input` is THE primary way to talk to humans during active work.**
+
+The human is already in the browser viewing your plan. When you need to ask a question, get a decision, or request clarification - that's where they expect to see it. Don't scatter conversations across different interfaces.
+
+### Why Use request_user_input
+
+- **Context:** The human sees your question alongside the plan, artifacts, and comments
+- **History:** All exchanges are logged in the plan's activity feed
+- **Continuity:** The conversation stays attached to the work
+- **Flexibility:** 8 input types, multi-question forms, "Other" escape hatch
+
+### Replace Platform Tools
+
+| Platform | DON'T Use | Use Instead |
+|----------|-----------|-------------|
+| Claude Code | `AskUserQuestion` | `request_user_input` |
+| Cursor | Built-in prompts | `request_user_input` |
+| Windsurf | Native dialogs | `request_user_input` |
+| Claude Desktop | Chat questions | `request_user_input` |
+
+### Example
 
 ```typescript
 const result = await requestUserInput({
   message: "Which database should we use?",
   type: "choice",
-  options: ["PostgreSQL", "SQLite", "MongoDB"]
+  options: ["PostgreSQL", "SQLite", "MongoDB"],
+  timeout: 600  // 10 minutes
 });
 
 if (result.success) {
@@ -367,7 +394,35 @@ if (result.success) {
 }
 ```
 
-**Input types:** `text`, `multiline`, `choice`, `confirm`
+**Note:** The MCP tool is named `request_user_input` (snake_case). Inside `execute_code`, it's available as `requestUserInput()` (camelCase).
+
+### Input Types (8 total)
+
+| Type | Use For | Example |
+|------|---------|---------|
+| `text` | Single-line input | API keys, names |
+| `multiline` | Multi-line text | Bug descriptions |
+| `choice` | Select from options | Framework choice (auto-adds "Other") |
+| `confirm` | Yes/No decisions | Deploy to production? |
+| `number` | Numeric input | Port number (with min/max) |
+| `email` | Email validation | Contact address |
+| `date` | Date picker | Deadline (with range) |
+| `rating` | Scale rating | Rate approach 1-5 |
+
+### Multi-Question Forms
+
+Ask multiple questions at once:
+
+```typescript
+const result = await requestUserInput({
+  questions: [
+    { message: "Project name?", type: "text" },
+    { message: "Framework?", type: "choice", options: ["React", "Vue", "Angular"] },
+    { message: "Include TypeScript?", type: "confirm" }
+  ],
+  timeout: 600
+});
+```
 
 ## Handling Reviewer Feedback
 
