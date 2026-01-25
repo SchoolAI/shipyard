@@ -180,6 +180,18 @@ export const YDOC_KEYS = {
    * - Web: apps/web/src/components/InputRequestDialog.tsx (read/write responses)
    */
   INPUT_REQUESTS: 'inputRequests' as const,
+
+  /**
+   * Local Diff Comments (Y.Array<LocalDiffComment>)
+   * Contains review comments on uncommitted local changes.
+   * Similar to PR review comments but for local/uncommitted diffs.
+   * baseRef tracks HEAD SHA when created to detect stale comments.
+   *
+   * Used by:
+   * - Web: apps/web/src/components/MonacoDiffViewer.tsx (read/write)
+   * - Helpers: packages/schema/src/yjs-helpers.ts (read/write)
+   */
+  LOCAL_DIFF_COMMENTS: 'localDiffComments' as const,
 } as const;
 
 /**

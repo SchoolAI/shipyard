@@ -1,6 +1,6 @@
 import {
   formatDeliverablesForLLM,
-  formatPRCommentsForLLM,
+  formatDiffCommentsForLLM,
   getDeliverables,
   getLinkedPRs,
   getPlanMetadata,
@@ -178,7 +178,7 @@ OUTPUT INCLUDES:
     if (includePRComments) {
       const prComments = getPRReviewComments(doc);
       if (prComments.length > 0) {
-        const prCommentsText = formatPRCommentsForLLM(prComments, {
+        const prCommentsText = formatDiffCommentsForLLM(prComments, {
           includeResolved: false, // Only show unresolved by default
         });
         if (prCommentsText) {

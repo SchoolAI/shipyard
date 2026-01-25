@@ -1,41 +1,28 @@
-import { DiffModeEnum, DiffView, type SplitSide } from '@git-diff-view/react';
-import '@git-diff-view/react/styles/diff-view-pure.css';
-import { Alert, Button, ButtonGroup, Card, Chip, Link as HeroLink } from '@heroui/react';
+import { Alert, Card, Chip } from '@heroui/react';
 import {
   type LinkedPR,
   type LocalChangesResult,
   type PlanMetadata,
-  type PRReviewComment,
   updateLinkedPRStatus,
 } from '@shipyard/schema';
 import {
   ChevronRight,
-  Columns2,
-  ExternalLink,
   FileText,
   Folder,
-  FolderGit2,
   GitBranch,
   GitPullRequest,
   MessageSquare,
-  Rocket,
-  Rows3,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { type NodeApi, type NodeRendererProps, Tree, type TreeApi } from 'react-arborist';
-import { toast } from 'sonner';
 import type * as Y from 'yjs';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
 import { useLinkedPRs } from '@/hooks/useLinkedPRs';
 import { useLocalChanges } from '@/hooks/useLocalChanges';
 import { usePRReviewComments } from '@/hooks/usePRReviewComments';
 import { assertNever } from '@/utils/assert-never';
-import { AddPRCommentForm, PRCommentThread } from './diff';
+import { type DiffViewMode, FileDiffView } from './diff';
 import { LocalChangesViewer } from './LocalChangesViewer';
-
-// --- Types ---
-
-type DiffViewMode = 'unified' | 'split';
 
 // --- LocalStorage Helpers ---
 
@@ -58,26 +45,40 @@ function setDiffViewModePreference(mode: DiffViewMode): void {
   }
 }
 
+/** Source of changes to display */
+export type ChangeSource = 'local' | 'pr';
+
+/** State exported to parent for rendering header controls */
+export interface ChangesViewState {
+  source: ChangeSource;
+  setSource: (source: ChangeSource) => void;
+  selectedPR: LinkedPR | null;
+  hasPRs: boolean;
+  localChanges: {
+    data: LocalChangesResult | undefined;
+    isFetching: boolean;
+    refetch: () => void;
+  };
+  prChanges: {
+    isFetching: boolean;
+    refetch: () => void;
+  };
+}
+
 interface ChangesViewProps {
   ydoc: Y.Doc;
   metadata: PlanMetadata;
   /** Whether this tab is currently active (triggers refetch) */
   isActive?: boolean;
-  /** Callback to provide local changes state to parent (for rendering header in tab bar) */
-  onLocalChangesState?: (state: {
-    data: LocalChangesResult | undefined;
-    isFetching: boolean;
-    refetch: () => void;
-  }) => void;
+  /** Callback to provide changes view state to parent (for rendering header controls) */
+  onChangesViewState?: (state: ChangesViewState) => void;
 }
-
-type ChangeSource = 'local' | 'pr';
 
 export function ChangesView({
   ydoc,
   metadata,
   isActive = true,
-  onLocalChangesState,
+  onChangesViewState,
 }: ChangesViewProps) {
   const linkedPRs = useLinkedPRs(ydoc);
   const [selectedPR, setSelectedPR] = useState<number | null>(null);
@@ -85,6 +86,10 @@ export function ChangesView({
 
   // Determine default source: local if available, otherwise PR
   const [source, setSource] = useState<ChangeSource>('local');
+
+  // Track PR fetching state and provide refetch trigger
+  const [prFetching, setPRFetching] = useState(false);
+  const [prRefetchTrigger, setPRRefetchTrigger] = useState(0);
 
   // Local changes hook - enabled when source is 'local' and tab is active
   const {
@@ -101,16 +106,39 @@ export function ChangesView({
     }
   }, [isActive, source, refetchLocal]);
 
-  // Expose local changes state to parent for header rendering
+  // Derive selected PR and hasPRs early so they can be used in effects
+  const selected = linkedPRs.find((pr) => pr.prNumber === selectedPR) ?? linkedPRs[0] ?? null;
+  const hasPRs = linkedPRs.length > 0;
+
+  // Expose full changes view state to parent for header rendering
   useEffect(() => {
-    if (onLocalChangesState && source === 'local') {
-      onLocalChangesState({
-        data: localChanges,
-        isFetching: localFetching,
-        refetch: refetchLocal,
+    if (onChangesViewState) {
+      onChangesViewState({
+        source,
+        setSource,
+        selectedPR: selected,
+        hasPRs,
+        localChanges: {
+          data: localChanges,
+          isFetching: localFetching,
+          refetch: refetchLocal,
+        },
+        prChanges: {
+          isFetching: prFetching,
+          refetch: () => setPRRefetchTrigger((prev) => prev + 1),
+        },
       });
     }
-  }, [onLocalChangesState, source, localChanges, localFetching, refetchLocal]);
+  }, [
+    onChangesViewState,
+    source,
+    selected,
+    hasPRs,
+    localChanges,
+    localFetching,
+    refetchLocal,
+    prFetching,
+  ]);
 
   // Auto-select first PR when available
   useEffect(() => {
@@ -172,41 +200,23 @@ export function ChangesView({
     refreshPRStatus();
   }, [linkedPRs, metadata.repo, identity?.token, ydoc]);
 
-  const selected = linkedPRs.find((pr) => pr.prNumber === selectedPR) ?? linkedPRs[0] ?? null;
-  const hasPRs = linkedPRs.length > 0;
-
   return (
     <div className="max-w-full mx-auto p-2 md:p-4 h-full flex flex-col">
-      {/* Source Selector - only show if we have PRs to switch between */}
-      {hasPRs && (
-        <ButtonGroup size="sm">
-          <Button
-            variant={source === 'local' ? 'primary' : 'secondary'}
-            onPress={() => setSource('local')}
-          >
-            <FolderGit2 className="w-4 h-4" />
-            Local Changes
-          </Button>
-          <Button
-            variant={source === 'pr' ? 'primary' : 'secondary'}
-            onPress={() => setSource('pr')}
-          >
-            <GitPullRequest className="w-4 h-4" />
-            PR #{selected?.prNumber ?? '...'}
-          </Button>
-        </ButtonGroup>
-      )}
-
-      {/* Content based on source */}
+      {/* Content based on source - controls moved to header */}
       {source === 'local' ? (
         <div className="flex-1 min-h-0">
-          <LocalChangesViewer data={localChanges} isLoading={localLoading} planId={metadata.id} />
+          <LocalChangesViewer
+            data={localChanges}
+            isLoading={localLoading}
+            planId={metadata.id}
+            ydoc={ydoc}
+          />
         </div>
       ) : (
         <>
           {/* PR List (when multiple PRs) */}
           {linkedPRs.length > 1 && (
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 mb-2">
               {linkedPRs.map((pr) => (
                 <PRCard
                   key={pr.prNumber}
@@ -218,15 +228,15 @@ export function ChangesView({
             </div>
           )}
 
-          {/* Selected PR diff viewer */}
+          {/* Selected PR diff viewer - no header bar, controls in top header */}
           {selected && (
-            <div className="space-y-2">
-              {/* PR Header (compact) */}
-              <PRHeader pr={selected} repo={metadata.repo} ydoc={ydoc} />
-
-              {/* Diff Viewer with Comments */}
-              <DiffViewer pr={selected} repo={metadata.repo || ''} ydoc={ydoc} />
-            </div>
+            <DiffViewer
+              pr={selected}
+              repo={metadata.repo || ''}
+              ydoc={ydoc}
+              refetchTrigger={prRefetchTrigger}
+              onFetchingChange={setPRFetching}
+            />
           )}
         </>
       )}
@@ -288,130 +298,15 @@ function PRCard({ pr, selected, onSelect }: PRCardProps) {
   );
 }
 
-interface PRHeaderProps {
-  pr: LinkedPR;
-  repo?: string;
-  ydoc: Y.Doc;
-}
-
-function PRHeader({ pr, repo, ydoc }: PRHeaderProps) {
-  const [isPublishing, setIsPublishing] = useState(false);
-  const [publishError, setPublishError] = useState<string | null>(null);
-  const { identity, startAuth } = useGitHubAuth();
-
-  const handlePublish = useCallback(async () => {
-    if (!repo) return;
-
-    if (!identity?.token) {
-      toast.info('Sign in with GitHub to publish this PR');
-      startAuth();
-      return;
-    }
-
-    setIsPublishing(true);
-    setPublishError(null);
-
-    try {
-      // Call GitHub API directly to mark PR as ready for review
-      const response = await fetch(`https://api.github.com/repos/${repo}/pulls/${pr.prNumber}`, {
-        method: 'PATCH',
-        headers: {
-          Authorization: `Bearer ${identity.token}`,
-          Accept: 'application/vnd.github.v3+json',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          draft: false,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: `HTTP ${response.status}` }));
-        throw new Error(errorData.message || errorData.error || `HTTP ${response.status}`);
-      }
-
-      // Update status in Y.Doc
-      updateLinkedPRStatus(ydoc, pr.prNumber, 'open');
-    } catch (err) {
-      setPublishError(err instanceof Error ? err.message : 'Failed to publish PR');
-    } finally {
-      setIsPublishing(false);
-    }
-  }, [repo, pr.prNumber, ydoc, identity?.token, startAuth]);
-
-  const isDraft = pr.status === 'draft';
-
-  return (
-    <div className="flex items-center justify-between gap-3 px-2 py-1.5 bg-surface rounded-lg border border-separator">
-      {/* Left: PR info (compact) */}
-      <div className="flex items-center gap-2 min-w-0 flex-1">
-        <GitPullRequest className="w-4 h-4 text-primary shrink-0" />
-        <span className="font-medium text-sm">#{pr.prNumber}</span>
-        <Chip
-          size="sm"
-          color={
-            pr.status === 'draft'
-              ? 'default'
-              : pr.status === 'merged'
-                ? 'accent'
-                : pr.status === 'open'
-                  ? 'success'
-                  : 'danger'
-          }
-        >
-          {pr.status}
-        </Chip>
-        {pr.title && (
-          <span className="text-sm text-foreground/80 truncate hidden sm:inline">{pr.title}</span>
-        )}
-        {pr.branch && (
-          <code className="text-xs text-muted-foreground hidden md:inline">
-            <GitBranch className="w-3 h-3 inline mr-0.5" />
-            {pr.branch}
-          </code>
-        )}
-      </div>
-
-      {/* Right: Actions */}
-      <div className="flex items-center gap-2 shrink-0">
-        {publishError && (
-          <span className="text-xs text-danger hidden sm:inline">{publishError}</span>
-        )}
-        {isDraft && repo && (
-          <Button
-            size="sm"
-            variant="primary"
-            onPress={handlePublish}
-            isDisabled={isPublishing}
-            isPending={isPublishing}
-          >
-            <Rocket className="w-3.5 h-3.5" />
-            Publish
-          </Button>
-        )}
-        {repo && (
-          <HeroLink
-            href={pr.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 text-sm text-primary hover:text-primary/80 transition-colors"
-          >
-            <ExternalLink className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">GitHub</span>
-          </HeroLink>
-        )}
-      </div>
-    </div>
-  );
-}
-
 interface DiffViewerProps {
   pr: LinkedPR;
   repo: string;
   ydoc: Y.Doc;
+  refetchTrigger?: number;
+  onFetchingChange?: (isFetching: boolean) => void;
 }
 
-function DiffViewer({ pr, repo, ydoc }: DiffViewerProps) {
+function DiffViewer({ pr, repo, ydoc, refetchTrigger = 0, onFetchingChange }: DiffViewerProps) {
   const [files, setFiles] = useState<PRFile[]>([]);
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -421,6 +316,18 @@ function DiffViewer({ pr, repo, ydoc }: DiffViewerProps) {
 
   // Get all comments for this PR
   const comments = usePRReviewComments(ydoc, pr.prNumber);
+
+  // Memoize commentSupport to prevent unnecessary re-renders of FileDiffView
+  const commentSupport = useMemo(
+    () => ({
+      type: 'pr' as const,
+      prNumber: pr.prNumber,
+      comments,
+      ydoc,
+      currentUser: identity?.username,
+    }),
+    [pr.prNumber, comments, ydoc, identity?.username]
+  );
 
   // Handle view mode change with localStorage persistence
   const handleViewModeChange = useCallback((mode: DiffViewMode) => {
@@ -462,11 +369,13 @@ function DiffViewer({ pr, repo, ydoc }: DiffViewerProps) {
   );
 
   // Fetch file list directly from GitHub API
+  // biome-ignore lint/correctness/useExhaustiveDependencies: refetchTrigger intentionally triggers re-fetch when incremented
   useEffect(() => {
     if (!repo) return;
 
     setLoading(true);
     setError(null);
+    onFetchingChange?.(true);
 
     // Build headers with optional auth for private repos
     const headers: HeadersInit = {
@@ -504,13 +413,15 @@ function DiffViewer({ pr, repo, ydoc }: DiffViewerProps) {
             }))
           );
           setLoading(false);
+          onFetchingChange?.(false);
         }
       )
       .catch((err) => {
         setError(err.message);
         setLoading(false);
+        onFetchingChange?.(false);
       });
-  }, [pr.prNumber, repo, identity?.token]);
+  }, [pr.prNumber, repo, identity?.token, refetchTrigger, onFetchingChange]);
 
   // Auto-select first file when files load
   useEffect(() => {
@@ -590,10 +501,7 @@ function DiffViewer({ pr, repo, ydoc }: DiffViewerProps) {
             patch={files.find((f) => f.filename === selectedFile)?.patch}
             viewMode={viewMode}
             onViewModeChange={handleViewModeChange}
-            prNumber={pr.prNumber}
-            comments={comments}
-            ydoc={ydoc}
-            currentUser={identity?.username}
+            commentSupport={commentSupport}
           />
         ) : (
           <Card>
@@ -767,164 +675,4 @@ function createFileTreeNode(
       </button>
     );
   };
-}
-
-interface FileDiffViewProps {
-  filename: string;
-  patch?: string;
-  viewMode: DiffViewMode;
-  onViewModeChange: (mode: DiffViewMode) => void;
-  prNumber: number;
-  comments: PRReviewComment[];
-  ydoc: Y.Doc;
-  currentUser?: string;
-}
-
-function FileDiffView({
-  filename,
-  patch,
-  viewMode,
-  onViewModeChange,
-  prNumber,
-  comments,
-  ydoc,
-  currentUser,
-}: FileDiffViewProps) {
-  const [theme, setTheme] = useState<'light' | 'dark'>('light');
-  const [widgetLine, setWidgetLine] = useState<{ lineNumber: number; side: SplitSide } | null>(
-    null
-  );
-
-  // Detect theme from document
-  useEffect(() => {
-    const checkTheme = () => {
-      const isDark = document.documentElement.classList.contains('dark');
-      setTheme(isDark ? 'dark' : 'light');
-    };
-    checkTheme();
-
-    const observer = new MutationObserver(checkTheme);
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-    return () => observer.disconnect();
-  }, []);
-
-  // Build extendData from comments grouped by line number
-  // extendData structure: { oldFile?: Record<string, { data: T }>; newFile?: Record<string, { data: T }> }
-  const extendData = useMemo(() => {
-    const fileComments = comments.filter((c) => c.path === filename);
-    const newFile: Record<string, { data: PRReviewComment[] }> = {};
-
-    for (const comment of fileComments) {
-      const key = String(comment.line);
-      const existing = newFile[key];
-      if (existing) {
-        existing.data.push(comment);
-      } else {
-        newFile[key] = { data: [comment] };
-      }
-    }
-
-    // Sort comments within each line by creation time
-    for (const entry of Object.values(newFile)) {
-      entry.data.sort((a, b) => a.createdAt - b.createdAt);
-    }
-
-    return { newFile };
-  }, [comments, filename]);
-
-  // Handle widget button click
-  const handleAddWidgetClick = useCallback((lineNumber: number, side: SplitSide) => {
-    setWidgetLine({ lineNumber, side });
-  }, []);
-
-  // Close widget
-  const handleWidgetClose = useCallback(() => {
-    setWidgetLine(null);
-  }, []);
-
-  if (!patch) {
-    return (
-      <Alert status="warning">
-        <Alert.Content>
-          <Alert.Title>No Diff Available</Alert.Title>
-          <Alert.Description>
-            The patch for <code>{filename}</code> is not available.
-          </Alert.Description>
-        </Alert.Content>
-      </Alert>
-    );
-  }
-
-  // Detect file language from extension for syntax highlighting
-  const fileLang = filename.split('.').pop() || 'text';
-
-  // Construct a proper unified diff string from GitHub's patch
-  // GitHub API returns just the hunk content, but the library needs full diff format
-  const fullDiff = `diff --git a/${filename} b/${filename}
---- a/${filename}
-+++ b/${filename}
-${patch}`;
-
-  return (
-    <Card>
-      <Card.Header className="flex flex-row items-center justify-between">
-        <Card.Title className="font-mono text-sm">{filename}</Card.Title>
-        <ButtonGroup size="sm" variant="tertiary">
-          <Button
-            isIconOnly
-            aria-label="Unified view"
-            onPress={() => onViewModeChange('unified')}
-            className={viewMode === 'unified' ? 'bg-primary/10 text-primary' : ''}
-          >
-            <Rows3 className="w-4 h-4" />
-          </Button>
-          <Button
-            isIconOnly
-            aria-label="Split view"
-            onPress={() => onViewModeChange('split')}
-            className={viewMode === 'split' ? 'bg-primary/10 text-primary' : ''}
-          >
-            <Columns2 className="w-4 h-4" />
-          </Button>
-        </ButtonGroup>
-      </Card.Header>
-      <Card.Content className="p-0">
-        <DiffView
-          data={{
-            oldFile: { fileName: filename, fileLang },
-            newFile: { fileName: filename, fileLang },
-            hunks: [fullDiff],
-          }}
-          diffViewMode={viewMode === 'split' ? DiffModeEnum.Split : DiffModeEnum.Unified}
-          diffViewTheme={theme}
-          diffViewHighlight={true}
-          diffViewWrap={true}
-          diffViewAddWidget={true}
-          onAddWidgetClick={handleAddWidgetClick}
-          extendData={extendData}
-          renderExtendLine={({ data }) => (
-            <PRCommentThread
-              comments={data as PRReviewComment[]}
-              ydoc={ydoc}
-              currentUser={currentUser}
-            />
-          )}
-          renderWidgetLine={({ lineNumber, onClose }) =>
-            widgetLine && widgetLine.lineNumber === lineNumber ? (
-              <AddPRCommentForm
-                prNumber={prNumber}
-                path={filename}
-                line={lineNumber}
-                ydoc={ydoc}
-                onClose={() => {
-                  onClose();
-                  handleWidgetClose();
-                }}
-              />
-            ) : null
-          }
-        />
-      </Card.Content>
-    </Card>
-  );
 }

@@ -10,6 +10,8 @@ import {
   getPlanMetadata,
   getPlanOwnerId,
   type PlanMetadata,
+  type PlanViewTab,
+  PlanViewTabValues,
   setPlanIndexEntry,
   setPlanMetadata,
   YDOC_KEYS,
@@ -42,12 +44,43 @@ import { usePendingUserNotifications } from '@/hooks/usePendingUserNotifications
 import { useVersionNavigation } from '@/hooks/useVersionNavigation';
 import { colorFromString } from '@/utils/color';
 
+/**
+ * Check if a string is a valid PlanViewTab.
+ */
+function isValidTab(tab: string | null): tab is PlanViewTab {
+  return tab !== null && (PlanViewTabValues as readonly string[]).includes(tab);
+}
+
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: page component handles complex sync state machine
 export function PlanPage() {
   const { id } = useParams<{ id: string }>();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const urlPlan = searchParams.has('d') ? getPlanFromUrl() : null;
   const isSnapshot = urlPlan !== null;
+
+  // Read tab from URL, default to 'plan' if invalid or missing
+  const tabFromUrl = searchParams.get('tab');
+  const initialTab: PlanViewTab = isValidTab(tabFromUrl) ? tabFromUrl : 'plan';
+
+  // Update URL when tab changes (without triggering navigation)
+  const handleTabChange = useCallback(
+    (tab: PlanViewTab) => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          if (tab === 'plan') {
+            // Remove tab param for default tab to keep URLs clean
+            next.delete('tab');
+          } else {
+            next.set('tab', tab);
+          }
+          return next;
+        },
+        { replace: true }
+      );
+    },
+    [setSearchParams]
+  );
 
   // For snapshots, use planId from URL; for normal plans, use route param
   const planId = isSnapshot ? (urlPlan?.id ?? '') : (id ?? '');
@@ -490,6 +523,8 @@ export function PlanPage() {
             metadata={metadata}
             syncState={syncState}
             initialContent={urlPlan.content}
+            initialTab={initialTab}
+            onTabChange={handleTabChange}
           />
         ) : (
           <PlanContent
@@ -503,6 +538,8 @@ export function PlanPage() {
             currentSnapshot={versionNav.currentSnapshot}
             onEditorReady={handleEditorReady}
             versionNav={versionNav}
+            initialTab={initialTab}
+            onTabChange={handleTabChange}
           />
         )}
 

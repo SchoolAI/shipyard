@@ -17,6 +17,7 @@ describe('YDOC_KEYS', () => {
       EVENTS: 'events',
       SNAPSHOTS: 'snapshots',
       INPUT_REQUESTS: 'inputRequests',
+      LOCAL_DIFF_COMMENTS: 'localDiffComments',
     });
   });
 
@@ -45,6 +46,7 @@ describe('isValidYDocKey', () => {
     expect(isValidYDocKey('linkedPRs')).toBe(true);
     expect(isValidYDocKey('prReviewComments')).toBe(true);
     expect(isValidYDocKey('snapshots')).toBe(true);
+    expect(isValidYDocKey('localDiffComments')).toBe(true);
   });
 
   it('should return false for unknown keys', () => {

@@ -1,3 +1,4 @@
-export { AddPRCommentForm } from './AddPRCommentForm';
-export { PRCommentCard } from './PRCommentCard';
-export { PRCommentThread } from './PRCommentThread';
+export { AddDiffCommentForm } from './AddDiffCommentForm';
+export { DiffCommentCard } from './DiffCommentCard';
+export { DiffCommentThread } from './DiffCommentThread';
+export { type CommentSupport, type DiffViewMode, FileDiffView } from './FileDiffView';

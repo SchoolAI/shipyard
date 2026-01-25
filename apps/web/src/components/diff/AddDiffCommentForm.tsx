@@ -1,23 +1,44 @@
 import { Button, TextArea } from '@heroui/react';
-import { addPRReviewComment } from '@shipyard/schema';
+import { addLocalDiffComment, addPRReviewComment, hashLineContent } from '@shipyard/schema';
 import { MessageSquare, X } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import type * as Y from 'yjs';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
 
-interface AddPRCommentFormProps {
-  prNumber: number;
+interface AddDiffCommentFormProps {
+  /** Type of comment: 'pr' for PR review, 'local' for uncommitted changes */
+  commentType: 'pr' | 'local';
+  /** PR number (required for PR comments) */
+  prNumber?: number;
+  /** Current HEAD SHA (required for local comments, for staleness detection) */
+  currentHeadSha?: string;
+  /** File path */
   path: string;
+  /** Line number */
   line: number;
+  /** Line content at time of comment creation (for local comment staleness detection) */
+  lineContent?: string;
+  /** Y.Doc for CRDT storage */
   ydoc: Y.Doc;
+  /** Callback when form is closed */
   onClose: () => void;
 }
 
 /**
  * Form for adding a new comment on a specific line in the diff.
+ * Supports both PR review comments and local diff comments.
  * Appears when clicking the "+" widget button on a diff line.
  */
-export function AddPRCommentForm({ prNumber, path, line, ydoc, onClose }: AddPRCommentFormProps) {
+export function AddDiffCommentForm({
+  commentType,
+  prNumber,
+  currentHeadSha,
+  path,
+  line,
+  lineContent,
+  ydoc,
+  onClose,
+}: AddDiffCommentFormProps) {
   const { identity, startAuth } = useGitHubAuth();
   const [body, setBody] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -32,24 +53,59 @@ export function AddPRCommentForm({ prNumber, path, line, ydoc, onClose }: AddPRC
 
     setIsSubmitting(true);
 
-    // Generate unique ID
-    const id = `prcomment-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+    if (commentType === 'pr') {
+      // PR review comment
+      if (!prNumber) {
+        setIsSubmitting(false);
+        return;
+      }
 
-    addPRReviewComment(ydoc, {
-      id,
-      prNumber,
-      path,
-      line,
-      body: body.trim(),
-      author: identity.username,
-      createdAt: Date.now(),
-      resolved: false,
-    });
+      const id = `prcomment-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+
+      addPRReviewComment(ydoc, {
+        id,
+        prNumber,
+        path,
+        line,
+        body: body.trim(),
+        author: identity.username,
+        createdAt: Date.now(),
+        resolved: false,
+      });
+    } else {
+      // Local diff comment
+      const id = `localcomment-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+
+      addLocalDiffComment(ydoc, {
+        id,
+        type: 'local',
+        path,
+        line,
+        body: body.trim(),
+        author: identity.username,
+        createdAt: Date.now(),
+        baseRef: currentHeadSha || 'unknown',
+        resolved: false,
+        lineContentHash: lineContent ? hashLineContent(lineContent) : undefined,
+      });
+    }
 
     setBody('');
     setIsSubmitting(false);
     onClose();
-  }, [body, identity, prNumber, path, line, ydoc, onClose, startAuth]);
+  }, [
+    body,
+    identity,
+    commentType,
+    prNumber,
+    currentHeadSha,
+    path,
+    line,
+    lineContent,
+    ydoc,
+    onClose,
+    startAuth,
+  ]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {

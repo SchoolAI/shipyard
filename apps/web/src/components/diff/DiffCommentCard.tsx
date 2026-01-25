@@ -1,21 +1,35 @@
-import { Avatar, Button, Checkbox, Label } from '@heroui/react';
-import type { PRReviewComment } from '@shipyard/schema';
-import { Check, Trash2 } from 'lucide-react';
-import { useCallback, useState } from 'react';
+import { Avatar, Button, Checkbox, Chip, Label } from '@heroui/react';
+import { computeCommentStaleness, type DiffComment, type StalenessInfo } from '@shipyard/schema';
+import { AlertTriangle, Check, GitCommit, Trash2 } from 'lucide-react';
+import { useCallback, useMemo, useState } from 'react';
 
-interface PRCommentCardProps {
-  comment: PRReviewComment;
+interface DiffCommentCardProps {
+  /** The comment to display (PR review or local diff comment) */
+  comment: DiffComment;
+  /** Current HEAD SHA (for staleness detection on local comments) */
+  currentHeadSha?: string;
+  /** Current content of the line (for content hash staleness detection) */
+  currentLineContent?: string;
+  /** Callback when resolve status changes */
   onResolve: (commentId: string, resolved: boolean) => void;
+  /** Callback when comment is deleted */
   onDelete: (commentId: string) => void;
   /** Current user's username - show delete button only for own comments */
   currentUser?: string;
 }
 
 /**
- * Renders a single PR review comment with author, timestamp, and body.
- * Supports resolve/unresolve toggle and delete action.
+ * Renders a single diff comment (PR review or local) with author, timestamp, and body.
+ * Supports resolve/unresolve toggle, delete action, and staleness indicator for local comments.
  */
-export function PRCommentCard({ comment, onResolve, onDelete, currentUser }: PRCommentCardProps) {
+export function DiffCommentCard({
+  comment,
+  currentHeadSha,
+  currentLineContent,
+  onResolve,
+  onDelete,
+  currentUser,
+}: DiffCommentCardProps) {
   const [isDeleting, setIsDeleting] = useState(false);
 
   const handleDelete = useCallback(() => {
@@ -36,6 +50,17 @@ export function PRCommentCard({ comment, onResolve, onDelete, currentUser }: PRC
   // Check if current user can delete this comment
   const canDelete = currentUser && currentUser === comment.author;
 
+  // Compute staleness info for local comments using shared utility
+  const stalenessInfo = useMemo((): StalenessInfo => {
+    // Only check staleness for local diff comments
+    if (!('type' in comment) || comment.type !== 'local') {
+      return { isStale: false, type: 'none' };
+    }
+
+    // Use shared staleness computation from @shipyard/schema
+    return computeCommentStaleness(comment, currentHeadSha, currentLineContent);
+  }, [comment, currentHeadSha, currentLineContent]);
+
   // Generate initials for fallback
   const initials = comment.author
     .split(/[-_]/)
@@ -48,7 +73,9 @@ export function PRCommentCard({ comment, onResolve, onDelete, currentUser }: PRC
       className={`flex gap-3 p-3 rounded-lg border transition-colors ${
         comment.resolved
           ? 'bg-success/5 border-success/20'
-          : 'bg-surface border-separator hover:border-primary/30'
+          : stalenessInfo.isStale
+            ? 'bg-warning/5 border-warning/20'
+            : 'bg-surface border-separator hover:border-primary/30'
       }`}
     >
       {/* Avatar */}
@@ -63,7 +90,7 @@ export function PRCommentCard({ comment, onResolve, onDelete, currentUser }: PRC
       {/* Content */}
       <div className="flex-1 min-w-0">
         {/* Header */}
-        <div className="flex items-center gap-2 mb-1">
+        <div className="flex items-center gap-2 mb-1 flex-wrap">
           <span className="font-medium text-sm text-foreground">{comment.author}</span>
           <span className="text-xs text-muted-foreground">{timeAgo}</span>
           {comment.resolved && (
@@ -71,6 +98,21 @@ export function PRCommentCard({ comment, onResolve, onDelete, currentUser }: PRC
               <Check className="w-3 h-3" />
               Resolved
             </span>
+          )}
+          {stalenessInfo.isStale && (
+            <Chip size="sm" color="warning" variant="soft" className="h-5">
+              {stalenessInfo.type === 'head_changed' ? (
+                <>
+                  <GitCommit className="w-3 h-3 mr-1" />
+                  HEAD changed
+                </>
+              ) : (
+                <>
+                  <AlertTriangle className="w-3 h-3 mr-1" />
+                  Line content changed
+                </>
+              )}
+            </Chip>
           )}
         </div>
 

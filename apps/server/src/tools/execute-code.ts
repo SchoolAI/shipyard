@@ -19,6 +19,7 @@ import { addPRReviewCommentTool } from './add-pr-review-comment.js';
 import { completeTaskTool } from './complete-task.js';
 import { createPlanTool } from './create-plan.js';
 import { linkPRTool } from './link-pr.js';
+import { readDiffCommentsTool } from './read-diff-comments.js';
 import { readPlanTool } from './read-plan.js';
 import { regenerateSessionTokenTool } from './regenerate-session-token.js';
 import { setupReviewNotificationTool } from './setup-review-notification.js';
@@ -30,7 +31,7 @@ import { updatePlanTool } from './update-plan.js';
 
 const BUNDLED_DOCS = `Execute TypeScript code that calls Shipyard APIs. Use this for multi-step workflows to reduce round-trips.
 
-⚠️ IMPORTANT LIMITATION: Dynamic imports (\`await import()\`) are NOT supported in the VM execution context. Use only the pre-provided functions in the execution environment (createPlan, readPlan, updatePlan, addArtifact, completeTask, updateBlockContent, linkPR, addPRReviewComment, setupReviewNotification). All necessary APIs are already available in the sandbox.
+⚠️ IMPORTANT LIMITATION: Dynamic imports (\`await import()\`) are NOT supported in the VM execution context. Use only the pre-provided functions in the execution environment (createPlan, readPlan, readDiffComments, updatePlan, addArtifact, completeTask, updateBlockContent, linkPR, addPRReviewComment, setupReviewNotification). All necessary APIs are already available in the sandbox.
 
 ## Available APIs
 
@@ -93,6 +94,31 @@ if (data.status === "changes_requested") {
 }
 // Access deliverables directly
 data.deliverables.forEach(d => console.log(d.id, d.completed));
+\`\`\`
+
+---
+
+### readDiffComments(planId, sessionToken, opts?): Promise<string>
+Read inline diff comments on local changes and PR diffs.
+
+Parameters:
+- planId (string): The plan ID
+- sessionToken (string): Session token from createPlan
+- opts.includeLocal (boolean, optional): Include local diff comments (default: true)
+- opts.includePR (boolean, optional): Include PR review comments (default: true)
+- opts.includeResolved (boolean, optional): Include resolved comments (default: false)
+
+Returns:
+- Formatted markdown string with comments grouped by type (local/PR) and file
+
+Example:
+\`\`\`typescript
+const comments = await readDiffComments(planId, token, {
+  includeLocal: true,
+  includePR: true,
+  includeResolved: false
+});
+console.log(comments); // Markdown with grouped comments
 \`\`\`
 
 ---
@@ -458,7 +484,11 @@ async function createPlan(opts: {
   repo?: string;
   prNumber?: number;
 }) {
-  const result = await createPlanTool.handler(opts);
+  const result = await createPlanTool.handler({
+    ...opts,
+    originPlatform: 'unknown' as const,
+    originSessionId: 'execute-code',
+  });
   const text = (result.content[0] as { text: string })?.text || '';
   const planId = text.match(/ID: (\S+)/)?.[1] || '';
 
@@ -516,6 +546,22 @@ async function readPlan(
     deliverables,
     isError: result.isError,
   };
+}
+
+async function readDiffComments(
+  planId: string,
+  sessionToken: string,
+  opts?: { includeLocal?: boolean; includePR?: boolean; includeResolved?: boolean }
+) {
+  const result = await readDiffCommentsTool.handler({
+    planId,
+    sessionToken,
+    includeLocal: opts?.includeLocal,
+    includePR: opts?.includePR,
+    includeResolved: opts?.includeResolved,
+  });
+  const text = (result.content[0] as { text: string })?.text || '';
+  return text;
 }
 
 async function updatePlan(
@@ -904,6 +950,7 @@ export const executeCodeTool = {
         // Shipyard API functions
         createPlan,
         readPlan,
+        readDiffComments,
         updatePlan,
         addArtifact,
         completeTask,

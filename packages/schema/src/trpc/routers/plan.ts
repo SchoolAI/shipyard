@@ -54,7 +54,7 @@ export const planRouter = router({
 
   /**
    * Get local git changes for a plan's working directory.
-   * Only works for plans created via Claude Code (which stores origin.cwd).
+   * Works for plans created via Claude Code or execute_code API (which store origin.cwd).
    * GET /api/plan/:id/local-changes
    */
   getLocalChanges: publicProcedure
@@ -73,10 +73,13 @@ export const planRouter = router({
 
       /**
        * Extract working directory from origin metadata.
-       * Only Claude Code platform stores cwd - other platforms return undefined.
+       * Claude Code and 'unknown' platforms store cwd - other platforms return undefined.
        */
       const origin = metadata.origin;
-      const cwd = origin?.platform === 'claude-code' ? origin.cwd : undefined;
+      const cwd =
+        origin?.platform === 'claude-code' || origin?.platform === 'unknown'
+          ? origin.cwd
+          : undefined;
 
       if (!cwd) {
         return {
@@ -119,7 +122,10 @@ export const planRouter = router({
       }
 
       const origin = metadata.origin;
-      const cwd = origin?.platform === 'claude-code' ? origin.cwd : undefined;
+      const cwd =
+        origin?.platform === 'claude-code' || origin?.platform === 'unknown'
+          ? origin.cwd
+          : undefined;
 
       if (!cwd) {
         return { content: null, error: 'No working directory available' };

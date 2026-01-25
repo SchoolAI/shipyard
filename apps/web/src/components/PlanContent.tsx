@@ -4,7 +4,7 @@
  */
 
 import type { Block, BlockNoteEditor } from '@blocknote/core';
-import type { Deliverable, LocalChangesResult, PlanMetadata, PlanSnapshot } from '@shipyard/schema';
+import type { Deliverable, PlanMetadata, PlanSnapshot } from '@shipyard/schema';
 import {
   extractDeliverables,
   getDeliverables,
@@ -12,15 +12,15 @@ import {
   YDOC_KEYS,
 } from '@shipyard/schema';
 import { Clock, FileText, GitPullRequest, Package } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { WebrtcProvider } from 'y-webrtc';
 import type { WebsocketProvider } from 'y-websocket';
 import type * as Y from 'yjs';
 import { ActivityTimeline } from '@/components/ActivityTimeline';
 import { Attachments } from '@/components/Attachments';
-import { ChangesView } from '@/components/ChangesView';
+import { ChangesHeaderControls } from '@/components/ChangesHeaderControls';
+import { ChangesView, type ChangesViewState } from '@/components/ChangesView';
 import { DeliverablesView } from '@/components/DeliverablesView';
-import { LocalChangesHeader } from '@/components/LocalChangesHeader';
 import { PlanViewer } from '@/components/PlanViewer';
 import { VersionSelector } from '@/components/VersionSelector';
 import type { SyncState } from '@/hooks/useMultiProviderSync';
@@ -65,6 +65,8 @@ interface LivePlanContentProps {
   provider: CollaborationProvider | null;
   /** Initial tab to show (defaults to 'plan') */
   initialTab?: PlanViewTab;
+  /** Called when the active tab changes */
+  onTabChange?: (tab: PlanViewTab) => void;
   /** Snapshot to view (when viewing version history) - Issue #42 */
   currentSnapshot?: { content: unknown[] } | null;
   /** Callback to receive editor instance for snapshots - Issue #42 */
@@ -86,6 +88,8 @@ interface SnapshotPlanContentProps {
   initialContent: unknown[];
   /** Initial tab to show (defaults to 'plan') */
   initialTab?: PlanViewTab;
+  /** Called when the active tab changes */
+  onTabChange?: (tab: PlanViewTab) => void;
 }
 
 export type PlanContentProps = LivePlanContentProps | SnapshotPlanContentProps;
@@ -99,13 +103,18 @@ export function PlanContent(props: PlanContentProps) {
   const { ydoc, metadata, syncState } = props;
   const [activeView, setActiveView] = useState<PlanViewTab>(props.initialTab || 'plan');
   const [deliverableCount, setDeliverableCount] = useState({ completed: 0, total: 0 });
-  const [localChangesState, setLocalChangesState] = useState<{
-    data: LocalChangesResult | undefined;
-    isFetching: boolean;
-    refetch: () => void;
-  } | null>(null);
+  const [changesViewState, setChangesViewState] = useState<ChangesViewState | null>(null);
 
-  // Update activeView when initialTab changes
+  // Handle tab change - updates state and notifies parent
+  const handleTabChange = useCallback(
+    (tab: PlanViewTab) => {
+      setActiveView(tab);
+      props.onTabChange?.(tab);
+    },
+    [props.onTabChange]
+  );
+
+  // Update activeView when initialTab changes (e.g., from URL navigation)
   useEffect(() => {
     if (props.initialTab) {
       setActiveView(props.initialTab);
@@ -117,13 +126,13 @@ export function PlanContent(props: PlanContentProps) {
     const handleSwitchTab = (event: Event) => {
       const customEvent = event as CustomEvent<{ tab: PlanViewTab }>;
       if (customEvent.detail?.tab) {
-        setActiveView(customEvent.detail.tab);
+        handleTabChange(customEvent.detail.tab);
       }
     };
 
     document.addEventListener('switch-plan-tab', handleSwitchTab);
     return () => document.removeEventListener('switch-plan-tab', handleSwitchTab);
-  }, []);
+  }, [handleTabChange]);
 
   useEffect(() => {
     if (props.mode === 'snapshot') {
@@ -151,13 +160,13 @@ export function PlanContent(props: PlanContentProps) {
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Tab navigation */}
-      <div className="border-b border-separator bg-surface px-2 md:px-6 pt-1 md:pt-2 shrink-0">
-        <div className="flex items-center justify-between">
+      <div className="border-b border-separator bg-surface px-2 md:px-6 shrink-0">
+        <div className="flex items-center justify-between pt-1 md:pt-2">
           {/* Tabs on the left - scrollable on mobile */}
           <div className="flex gap-0 md:gap-4 overflow-x-auto md:overflow-visible">
             <button
               type="button"
-              onClick={() => setActiveView('plan')}
+              onClick={() => handleTabChange('plan')}
               className={`flex items-center justify-center gap-1.5 md:gap-2 pb-1.5 md:pb-2 px-1.5 md:px-2 font-medium text-xs md:text-sm transition-colors shrink-0 ${
                 activeView === 'plan'
                   ? 'text-primary border-b-2 border-primary'
@@ -169,7 +178,7 @@ export function PlanContent(props: PlanContentProps) {
             </button>
             <button
               type="button"
-              onClick={() => setActiveView('activity')}
+              onClick={() => handleTabChange('activity')}
               className={`flex items-center justify-center gap-1.5 md:gap-2 pb-1.5 md:pb-2 px-1.5 md:px-2 font-medium text-xs md:text-sm transition-colors shrink-0 ${
                 activeView === 'activity'
                   ? 'text-primary border-b-2 border-primary'
@@ -181,7 +190,7 @@ export function PlanContent(props: PlanContentProps) {
             </button>
             <button
               type="button"
-              onClick={() => setActiveView('deliverables')}
+              onClick={() => handleTabChange('deliverables')}
               className={`flex items-center justify-center gap-1.5 md:gap-2 pb-1.5 md:pb-2 px-1.5 md:px-2 font-medium text-xs md:text-sm transition-colors shrink-0 ${
                 activeView === 'deliverables'
                   ? 'text-primary border-b-2 border-primary'
@@ -198,7 +207,7 @@ export function PlanContent(props: PlanContentProps) {
             </button>
             <button
               type="button"
-              onClick={() => setActiveView('changes')}
+              onClick={() => handleTabChange('changes')}
               className={`flex items-center justify-center gap-1.5 md:gap-2 pb-1.5 md:pb-2 px-1.5 md:px-2 font-medium text-xs md:text-sm transition-colors shrink-0 ${
                 activeView === 'changes'
                   ? 'text-primary border-b-2 border-primary'
@@ -227,13 +236,9 @@ export function PlanContent(props: PlanContentProps) {
               />
             )}
 
-          {/* Local changes header - only show on Changes tab when data available */}
-          {activeView === 'changes' && localChangesState && (
-            <LocalChangesHeader
-              data={localChangesState.data}
-              isFetching={localChangesState.isFetching}
-              onRefresh={localChangesState.refetch}
-            />
+          {/* Changes header controls - source selector, publish button, GitHub link */}
+          {activeView === 'changes' && changesViewState && (
+            <ChangesHeaderControls state={changesViewState} repo={metadata.repo} ydoc={ydoc} />
           )}
         </div>
       </div>
@@ -292,7 +297,7 @@ export function PlanContent(props: PlanContentProps) {
             ydoc={ydoc}
             metadata={metadata}
             isActive={activeView === 'changes'}
-            onLocalChangesState={setLocalChangesState}
+            onChangesViewState={setChangesViewState}
           />
         </div>
       )}

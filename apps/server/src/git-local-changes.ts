@@ -47,6 +47,7 @@ export function getLocalChanges(cwd: string): LocalChangesResult {
 
     // Get current branch (or commit SHA if detached HEAD)
     let branch: string;
+    let headSha: string | undefined;
     try {
       branch = execSync('git rev-parse --abbrev-ref HEAD', {
         cwd,
@@ -54,6 +55,19 @@ export function getLocalChanges(cwd: string): LocalChangesResult {
         timeout: 5000,
         stdio: ['pipe', 'pipe', 'pipe'],
       }).trim();
+
+      // Get HEAD SHA for staleness detection in comments
+      try {
+        headSha = execSync('git rev-parse HEAD', {
+          cwd,
+          encoding: 'utf-8',
+          timeout: 5000,
+          stdio: ['pipe', 'pipe', 'pipe'],
+        }).trim();
+      } catch {
+        // No commits yet
+        headSha = undefined;
+      }
 
       // If detached HEAD, get short commit SHA
       if (branch === 'HEAD') {
@@ -144,6 +158,7 @@ export function getLocalChanges(cwd: string): LocalChangesResult {
       {
         cwd,
         branch,
+        headSha,
         stagedCount: staged.length,
         unstagedCount: unstaged.length,
         untrackedCount: untracked.length,
@@ -156,6 +171,7 @@ export function getLocalChanges(cwd: string): LocalChangesResult {
       available: true,
       branch,
       baseBranch: 'HEAD',
+      headSha,
       staged,
       unstaged,
       untracked,
