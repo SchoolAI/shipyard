@@ -1,10 +1,11 @@
-import { DiffModeEnum, DiffView } from '@git-diff-view/react';
+import { DiffModeEnum, DiffView, type SplitSide } from '@git-diff-view/react';
 import '@git-diff-view/react/styles/diff-view.css';
 import { Alert, Button, ButtonGroup, Card, Chip, Link as HeroLink } from '@heroui/react';
 import {
   type LinkedPR,
   type LocalChangesResult,
   type PlanMetadata,
+  type PRReviewComment,
   updateLinkedPRStatus,
 } from '@shipyard/schema';
 import {
@@ -29,6 +30,7 @@ import { useLinkedPRs } from '@/hooks/useLinkedPRs';
 import { useLocalChanges } from '@/hooks/useLocalChanges';
 import { usePRReviewComments } from '@/hooks/usePRReviewComments';
 import { assertNever } from '@/utils/assert-never';
+import { AddPRCommentForm, PRCommentThread } from './diff';
 import { LocalChangesViewer } from './LocalChangesViewer';
 
 // --- Types ---
@@ -610,6 +612,10 @@ function DiffViewer({ pr, repo, ydoc }: DiffViewerProps) {
               filename={selectedFile}
               patch={files.find((f) => f.filename === selectedFile)?.patch}
               viewMode={viewMode}
+              prNumber={pr.prNumber}
+              comments={comments}
+              ydoc={ydoc}
+              currentUser={identity?.username}
             />
           </div>
         ) : (
@@ -790,10 +796,25 @@ interface FileDiffViewProps {
   filename: string;
   patch?: string;
   viewMode: DiffViewMode;
+  prNumber: number;
+  comments: PRReviewComment[];
+  ydoc: Y.Doc;
+  currentUser?: string;
 }
 
-function FileDiffView({ filename, patch, viewMode }: FileDiffViewProps) {
+function FileDiffView({
+  filename,
+  patch,
+  viewMode,
+  prNumber,
+  comments,
+  ydoc,
+  currentUser,
+}: FileDiffViewProps) {
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  const [widgetLine, setWidgetLine] = useState<{ lineNumber: number; side: SplitSide } | null>(
+    null
+  );
 
   // Detect theme from document
   useEffect(() => {
@@ -806,6 +827,40 @@ function FileDiffView({ filename, patch, viewMode }: FileDiffViewProps) {
     const observer = new MutationObserver(checkTheme);
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
     return () => observer.disconnect();
+  }, []);
+
+  // Build extendData from comments grouped by line number
+  // extendData structure: { oldFile?: Record<string, { data: T }>; newFile?: Record<string, { data: T }> }
+  const extendData = useMemo(() => {
+    const fileComments = comments.filter((c) => c.path === filename);
+    const newFile: Record<string, { data: PRReviewComment[] }> = {};
+
+    for (const comment of fileComments) {
+      const key = String(comment.line);
+      const existing = newFile[key];
+      if (existing) {
+        existing.data.push(comment);
+      } else {
+        newFile[key] = { data: [comment] };
+      }
+    }
+
+    // Sort comments within each line by creation time
+    for (const entry of Object.values(newFile)) {
+      entry.data.sort((a, b) => a.createdAt - b.createdAt);
+    }
+
+    return { newFile };
+  }, [comments, filename]);
+
+  // Handle widget button click
+  const handleAddWidgetClick = useCallback((lineNumber: number, side: SplitSide) => {
+    setWidgetLine({ lineNumber, side });
+  }, []);
+
+  // Close widget
+  const handleWidgetClose = useCallback(() => {
+    setWidgetLine(null);
   }, []);
 
   if (!patch) {
@@ -847,6 +902,30 @@ ${patch}`;
           diffViewTheme={theme}
           diffViewHighlight={true}
           diffViewWrap={true}
+          diffViewAddWidget={true}
+          onAddWidgetClick={handleAddWidgetClick}
+          extendData={extendData}
+          renderExtendLine={({ data }) => (
+            <PRCommentThread
+              comments={data as PRReviewComment[]}
+              ydoc={ydoc}
+              currentUser={currentUser}
+            />
+          )}
+          renderWidgetLine={({ lineNumber, onClose }) =>
+            widgetLine && widgetLine.lineNumber === lineNumber ? (
+              <AddPRCommentForm
+                prNumber={prNumber}
+                path={filename}
+                line={lineNumber}
+                ydoc={ydoc}
+                onClose={() => {
+                  onClose();
+                  handleWidgetClose();
+                }}
+              />
+            ) : null
+          }
         />
       </Card.Content>
     </Card>

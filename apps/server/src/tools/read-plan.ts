@@ -1,8 +1,10 @@
 import {
   formatDeliverablesForLLM,
+  formatPRCommentsForLLM,
   getDeliverables,
   getLinkedPRs,
   getPlanMetadata,
+  getPRReviewComments,
 } from '@shipyard/schema';
 import { z } from 'zod';
 import { getOrCreateDoc } from '../doc-store.js';
@@ -21,6 +23,12 @@ const ReadPlanInput = z.object({
     .boolean()
     .optional()
     .describe('Include linked PRs section in the response (default: false)'),
+  includePRComments: z
+    .boolean()
+    .optional()
+    .describe(
+      'Include inline PR review comments (diff line comments) in the response (default: false)'
+    ),
 });
 
 export const readPlanTool = {
@@ -32,19 +40,22 @@ NOTE FOR CLAUDE CODE USERS: If you just received task approval via the hook, del
 - You need to check human feedback (set includeAnnotations=true)
 - You need to refresh state after changes
 - You need to see linked PRs (set includeLinkedPRs=true)
+- You need to see inline diff comments (set includePRComments=true)
 
 USE CASES:
 - Review feedback from human reviewers (set includeAnnotations=true)
 - Check task status and completion state
 - Get block IDs for update_block_content operations
 - View linked PRs and their status (set includeLinkedPRs=true)
+- View inline PR diff comments (set includePRComments=true)
 
 OUTPUT INCLUDES:
 - Metadata: title, status, repo, PR, timestamps
 - Content: Full markdown with block IDs
 - Deliverables section: Shows deliverable IDs and completion status
 - Annotations: Comment threads if includeAnnotations=true
-- Linked PRs: PR list with status, URL, branch if includeLinkedPRs=true`,
+- Linked PRs: PR list with status, URL, branch if includeLinkedPRs=true
+- PR Comments: Inline diff comments by file and line if includePRComments=true`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -60,18 +71,24 @@ OUTPUT INCLUDES:
           description:
             'Include linked PRs section in the response (default: false). Set true to see linked PRs.',
         },
+        includePRComments: {
+          type: 'boolean',
+          description:
+            'Include inline PR review comments (diff line comments) in the response (default: false). Set true to see inline diff feedback.',
+        },
       },
       required: ['planId', 'sessionToken'],
     },
   },
 
-  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Tool handler requires session validation, markdown export with deliverables/annotations/linked PRs sections
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Tool handler requires session validation, markdown export with deliverables/annotations/linked PRs/PR comments sections
   handler: async (args: unknown) => {
     const {
       planId,
       sessionToken,
       includeAnnotations = false,
       includeLinkedPRs = false,
+      includePRComments = false,
     } = ReadPlanInput.parse(args);
     const doc = await getOrCreateDoc(planId);
     const metadata = getPlanMetadata(doc);
@@ -153,6 +170,20 @@ OUTPUT INCLUDES:
             output += `  - Branch: ${pr.branch}\n`;
           }
           output += `  - Linked: ${new Date(pr.linkedAt).toISOString()}\n`;
+        }
+      }
+    }
+
+    // Append PR review comments section if requested
+    if (includePRComments) {
+      const prComments = getPRReviewComments(doc);
+      if (prComments.length > 0) {
+        const prCommentsText = formatPRCommentsForLLM(prComments, {
+          includeResolved: false, // Only show unresolved by default
+        });
+        if (prCommentsText) {
+          output += '\n\n---\n\n';
+          output += prCommentsText;
         }
       }
     }
