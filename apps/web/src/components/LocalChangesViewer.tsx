@@ -1,29 +1,18 @@
 /**
  * Viewer component for local git changes.
  * Shows file tree and diff viewer, similar to PRDiffViewer.
+ * Supports commenting on local diffs with staleness detection.
  */
-import { DiffModeEnum, DiffView } from '@git-diff-view/react';
-import '@git-diff-view/react/styles/diff-view.css';
-import { Alert, Button, ButtonGroup, Card, Chip } from '@heroui/react';
+import { Alert, Button, Card, Chip } from '@heroui/react';
 import type { LocalChangesResponse, LocalChangesResult, LocalFileChange } from '@shipyard/schema';
-import {
-  Check,
-  ChevronRight,
-  CircleDot,
-  Columns2,
-  FileText,
-  Folder,
-  GitBranch,
-  Plus,
-  Rows3,
-} from 'lucide-react';
+import { Check, ChevronRight, CircleDot, FileText, Folder, GitBranch, Plus } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { type NodeApi, type NodeRendererProps, Tree, type TreeApi } from 'react-arborist';
+import type * as Y from 'yjs';
+import { useGitHubAuth } from '@/hooks/useGitHubAuth';
+import { useLocalDiffComments } from '@/hooks/useLocalDiffComments';
 import { trpc } from '@/utils/trpc';
-
-/** --- Types --- */
-
-type DiffViewMode = 'unified' | 'split';
+import { type CommentSupport, type DiffViewMode, FileDiffView } from './diff';
 
 /** --- LocalStorage Helpers --- */
 
@@ -52,10 +41,12 @@ interface LocalChangesViewerProps {
   data: LocalChangesResult | undefined;
   isLoading: boolean;
   planId: string;
+  /** Y.Doc for comment storage (required for commenting support) */
+  ydoc?: Y.Doc;
 }
 
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Multiple conditional states (loading, unavailable, empty, available) require branching
-export function LocalChangesViewer({ data, isLoading, planId }: LocalChangesViewerProps) {
+export function LocalChangesViewer({ data, isLoading, planId, ydoc }: LocalChangesViewerProps) {
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<DiffViewMode>(getDiffViewModePreference);
 
@@ -109,6 +100,7 @@ export function LocalChangesViewer({ data, isLoading, planId }: LocalChangesView
       viewMode={viewMode}
       onViewModeChange={handleViewModeChange}
       planId={planId}
+      ydoc={ydoc}
     />
   );
 }
@@ -122,9 +114,23 @@ interface LocalChangesContentProps {
   viewMode: DiffViewMode;
   onViewModeChange: (mode: DiffViewMode) => void;
   planId: string;
+  ydoc?: Y.Doc;
 }
 
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Handles file tree, diff viewer, collapse state, file selection with multiple conditionals
+/**
+ * Build a map of file path -> additions/deletions from the files array.
+ * This is used to show +/- counts for staged/unstaged files in the tree.
+ */
+function buildFileStatsMap(
+  files: LocalFileChange[]
+): Map<string, { additions: number; deletions: number }> {
+  const map = new Map<string, { additions: number; deletions: number }>();
+  for (const file of files) {
+    map.set(file.path, { additions: file.additions, deletions: file.deletions });
+  }
+  return map;
+}
+
 function LocalChangesContent({
   data,
   selectedFile,
@@ -132,12 +138,30 @@ function LocalChangesContent({
   viewMode,
   onViewModeChange,
   planId,
+  ydoc,
 }: LocalChangesContentProps) {
   const treeRef = useRef<TreeApi<FileTreeData>>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const { identity } = useGitHubAuth();
+
+  /** Memoize sidebar expand callback to prevent FileDiffView re-renders */
+  const handleExpandSidebar = useCallback(() => setSidebarCollapsed(false), []);
+
+  /** Get HEAD SHA for staleness detection */
+  const currentHeadSha = data.headSha;
+
+  /**
+   * Get local diff comments from CRDT (only if ydoc is provided).
+   * Uses empty Y.Doc as fallback when no ydoc is provided.
+   */
+  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- Empty object fallback when ydoc is not provided, hook handles undefined gracefully
+  const localComments = useLocalDiffComments(ydoc ?? ({} as Y.Doc), currentHeadSha);
+
+  /** Build stats map from files array (has accurate additions/deletions from diff parsing) */
+  const fileStatsMap = useMemo(() => buildFileStatsMap(data.files), [data.files]);
 
   /** Build grouped file tree with sections for staged/unstaged/untracked */
-  const fileTree = useMemo(() => buildGroupedFileTree(data), [data]);
+  const fileTree = useMemo(() => buildGroupedFileTree(data, fileStatsMap), [data, fileStatsMap]);
 
   /** Helper to check if file is untracked */
   const isUntrackedFile = useCallback(
@@ -173,6 +197,19 @@ function LocalChangesContent({
 
   /** Find selected file data */
   const selectedFileData = data.files.find((f) => f.path === selectedFile);
+
+  /** Build comment support for FileDiffView (only when ydoc is available) */
+  const commentSupport = useMemo(() => {
+    if (!ydoc) return undefined;
+
+    return {
+      type: 'local' as const,
+      comments: localComments,
+      ydoc,
+      currentUser: identity?.username,
+      currentHeadSha,
+    };
+  }, [ydoc, localComments, identity?.username, currentHeadSha]);
 
   /** No changes state */
   if (data.files.length === 0 && data.untracked.length === 0) {
@@ -231,52 +268,28 @@ function LocalChangesContent({
         {/* Diff viewer */}
         <div className="flex flex-col h-full min-h-0 overflow-y-auto">
           {selectedFile && (selectedFileData || isUntrackedFile(selectedFile)) ? (
-            <div className="flex flex-col h-full min-h-0">
-              {/* Diff controls */}
-              <div className="flex items-center justify-between px-2 shrink-0 py-2">
-                <div className="flex items-center gap-2">
-                  {sidebarCollapsed && (
-                    <button
-                      type="button"
-                      onClick={() => setSidebarCollapsed(false)}
-                      className="p-1 hover:bg-surface-hover rounded transition-colors"
-                      aria-label="Expand sidebar"
-                    >
-                      <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                    </button>
-                  )}
-                  <span className="text-sm text-muted-foreground font-mono">{selectedFile}</span>
-                </div>
-                <ButtonGroup size="sm" variant="tertiary">
-                  <Button
-                    isIconOnly
-                    aria-label="Unified view"
-                    onPress={() => onViewModeChange('unified')}
-                    className={viewMode === 'unified' ? 'bg-primary/10 text-primary' : ''}
-                  >
-                    <Rows3 className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    isIconOnly
-                    aria-label="Split view"
-                    onPress={() => onViewModeChange('split')}
-                    className={viewMode === 'split' ? 'bg-primary/10 text-primary' : ''}
-                  >
-                    <Columns2 className="w-4 h-4" />
-                  </Button>
-                </ButtonGroup>
-              </div>
-              <div className="flex-1 min-h-0 overflow-y-auto">
-                {selectedFileData ? (
-                  <FileDiffView
-                    filename={selectedFile}
-                    patch={selectedFileData.patch}
-                    viewMode={viewMode}
-                  />
-                ) : (
-                  <UntrackedFileView filename={selectedFile} planId={planId} viewMode={viewMode} />
-                )}
-              </div>
+            <div className="flex-1 min-h-0 overflow-y-auto">
+              {selectedFileData ? (
+                <FileDiffView
+                  filename={selectedFile}
+                  patch={selectedFileData.patch}
+                  viewMode={viewMode}
+                  onViewModeChange={onViewModeChange}
+                  sidebarCollapsed={sidebarCollapsed}
+                  onExpandSidebar={handleExpandSidebar}
+                  commentSupport={commentSupport}
+                />
+              ) : (
+                <UntrackedFileView
+                  filename={selectedFile}
+                  planId={planId}
+                  viewMode={viewMode}
+                  onViewModeChange={onViewModeChange}
+                  sidebarCollapsed={sidebarCollapsed}
+                  onExpandSidebar={handleExpandSidebar}
+                  commentSupport={commentSupport}
+                />
+              )}
             </div>
           ) : (
             <Card>
@@ -321,10 +334,21 @@ interface FileTreeData {
 }
 
 /**
- * Build grouped file tree with sections for staged/unstaged/untracked files
+ * Build grouped file tree with sections for staged/unstaged/untracked files.
+ * Uses fileStatsMap to get accurate additions/deletions from the diff parsing.
  */
-function buildGroupedFileTree(data: LocalChangesResponse): FileTreeData[] {
+function buildGroupedFileTree(
+  data: LocalChangesResponse,
+  fileStatsMap: Map<string, { additions: number; deletions: number }>
+): FileTreeData[] {
   const sections: FileTreeData[] = [];
+
+  /** Helper to enrich files with stats from the map */
+  const enrichWithStats = (files: LocalFileChange[]): LocalFileChange[] =>
+    files.map((f) => {
+      const stats = fileStatsMap.get(f.path);
+      return stats ? { ...f, additions: stats.additions, deletions: stats.deletions } : f;
+    });
 
   /** Staged section */
   if (data.staged.length > 0) {
@@ -333,7 +357,7 @@ function buildGroupedFileTree(data: LocalChangesResponse): FileTreeData[] {
       name: `Staged Changes (${data.staged.length})`,
       isSection: true,
       category: 'staged',
-      children: buildFileTreeForStatus(data.staged, 'staged'),
+      children: buildFileTreeForStatus(enrichWithStats(data.staged), 'staged'),
     });
   }
 
@@ -344,7 +368,7 @@ function buildGroupedFileTree(data: LocalChangesResponse): FileTreeData[] {
       name: `Unstaged Changes (${data.unstaged.length})`,
       isSection: true,
       category: 'unstaged',
-      children: buildFileTreeForStatus(data.unstaged, 'unstaged'),
+      children: buildFileTreeForStatus(enrichWithStats(data.unstaged), 'unstaged'),
     });
   }
 
@@ -376,7 +400,11 @@ function buildFileTreeForStatus(files: LocalFileChange[], status: StagingStatus)
 }
 
 /**
- * Build tree data structure for react-arborist from flat file list
+ * Build tree data structure for react-arborist from flat file list.
+ *
+ * IMPORTANT: Node IDs must be unique across the entire tree. Since the same
+ * directory path can appear in multiple sections (staged, unstaged, untracked),
+ * we prefix all IDs with the staging status to ensure uniqueness.
  */
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Tree building requires nested loops and recursive sorting
 function buildFileTreeData(
@@ -389,6 +417,9 @@ function buildFileTreeData(
     children: [],
   };
 
+  /** Prefix ensures unique IDs when same paths appear in multiple sections */
+  const idPrefix = stagingStatus ? `${stagingStatus}:` : '';
+
   for (const file of files) {
     const parts = file.path.split('/').filter(Boolean);
     let currentNode = root;
@@ -399,13 +430,15 @@ function buildFileTreeData(
 
       const isFile = i === parts.length - 1;
       const path = parts.slice(0, i + 1).join('/');
+      /** Use prefixed ID to avoid collisions across sections */
+      const nodeId = `${idPrefix}${path}`;
 
       /** Find existing child or create new one */
-      let childNode = currentNode.children?.find((c) => c.name === part);
+      let childNode = currentNode.children?.find((c) => c.id === nodeId);
 
       if (!childNode) {
         childNode = {
-          id: path,
+          id: nodeId,
           name: part,
           children: isFile ? undefined : [],
           file: isFile ? file : undefined,
@@ -568,36 +601,36 @@ function createFileTreeNode(onFileClick: (path: string) => void) {
 /** --- Diff View Components --- */
 
 /**
- * View for untracked files - fetches and displays full file content
+ * Props for UntrackedFileView component.
+ */
+interface UntrackedFileViewProps {
+  filename: string;
+  planId: string;
+  viewMode: DiffViewMode;
+  onViewModeChange: (mode: DiffViewMode) => void;
+  sidebarCollapsed?: boolean;
+  onExpandSidebar?: () => void;
+  commentSupport?: CommentSupport;
+}
+
+/**
+ * View for untracked files - fetches full file content and displays as a diff.
+ * Uses FileDiffView to enable commenting support.
  */
 function UntrackedFileView({
   filename,
   planId,
   viewMode,
-}: {
-  filename: string;
-  planId: string;
-  viewMode: DiffViewMode;
-}) {
-  const [theme, setTheme] = useState<'light' | 'dark'>('light');
-
+  onViewModeChange,
+  sidebarCollapsed,
+  onExpandSidebar,
+  commentSupport,
+}: UntrackedFileViewProps) {
   /** Fetch file content via tRPC */
   const { data, isLoading, error } = trpc.plan.getFileContent.useQuery(
     { planId, filePath: filename },
     { retry: false, staleTime: 30000 }
   );
-
-  /** Detect theme from document */
-  useEffect(() => {
-    const checkTheme = () => {
-      const isDark = document.documentElement.classList.contains('dark');
-      setTheme(isDark ? 'dark' : 'light');
-    };
-    checkTheme();
-    const observer = new MutationObserver(checkTheme);
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-    return () => observer.disconnect();
-  }, []);
 
   /** Loading state */
   if (isLoading) {
@@ -648,113 +681,19 @@ function UntrackedFileView({
     );
   }
 
-  /** Generate fake diff - all lines as additions */
+  /** Generate patch for new file - all lines as additions with proper hunk header */
   const lines = data.content.split('\n');
-  const patch = lines.map((line) => `+${line}`).join('\n');
-  const fileLang = filename.split('.').pop() || 'text';
-
-  /** Construct unified diff format for new file */
-  const fullDiff = `diff --git a/${filename} b/${filename}
-new file mode 100644
---- /dev/null
-+++ b/${filename}
-@@ -0,0 +1,${lines.length} @@
-${patch}`;
+  const patch = `@@ -0,0 +1,${lines.length} @@\n${lines.map((line) => `+${line}`).join('\n')}`;
 
   return (
-    <Card>
-      <Card.Header>
-        <Card.Title className="font-mono text-sm flex items-center gap-2">
-          <Plus className="w-4 h-4 text-success" />
-          {filename}
-          <Chip size="sm" color="success">
-            New File
-          </Chip>
-          <span className="text-xs text-success ml-auto">+{lines.length}</span>
-        </Card.Title>
-      </Card.Header>
-      <Card.Content className="p-0">
-        <DiffView
-          data={{
-            oldFile: { fileName: filename, fileLang },
-            newFile: { fileName: filename, fileLang },
-            hunks: [fullDiff],
-          }}
-          diffViewMode={viewMode === 'split' ? DiffModeEnum.Split : DiffModeEnum.Unified}
-          diffViewTheme={theme}
-          diffViewHighlight={true}
-          diffViewWrap={true}
-        />
-      </Card.Content>
-    </Card>
-  );
-}
-
-interface FileDiffViewProps {
-  filename: string;
-  patch?: string;
-  viewMode: DiffViewMode;
-}
-
-function FileDiffView({ filename, patch, viewMode }: FileDiffViewProps) {
-  const [theme, setTheme] = useState<'light' | 'dark'>('light');
-
-  /** Detect theme from document */
-  useEffect(() => {
-    const checkTheme = () => {
-      const isDark = document.documentElement.classList.contains('dark');
-      setTheme(isDark ? 'dark' : 'light');
-    };
-    checkTheme();
-
-    const observer = new MutationObserver(checkTheme);
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-    return () => observer.disconnect();
-  }, []);
-
-  if (!patch) {
-    return (
-      <Alert status="warning">
-        <Alert.Content>
-          <Alert.Title>No Diff Available</Alert.Title>
-          <Alert.Description>
-            The diff for <code>{filename}</code> is not available (may be a binary file).
-          </Alert.Description>
-        </Alert.Content>
-      </Alert>
-    );
-  }
-
-  /** Detect file language from extension for syntax highlighting */
-  const fileLang = filename.split('.').pop() || 'text';
-
-  /*
-   * Construct a proper unified diff string
-   * The patch from git-local-changes already includes the @@ hunks
-   */
-  const fullDiff = `diff --git a/${filename} b/${filename}
---- a/${filename}
-+++ b/${filename}
-${patch}`;
-
-  return (
-    <Card>
-      <Card.Header>
-        <Card.Title className="font-mono text-sm">{filename}</Card.Title>
-      </Card.Header>
-      <Card.Content className="p-0">
-        <DiffView
-          data={{
-            oldFile: { fileName: filename, fileLang },
-            newFile: { fileName: filename, fileLang },
-            hunks: [fullDiff],
-          }}
-          diffViewMode={viewMode === 'split' ? DiffModeEnum.Split : DiffModeEnum.Unified}
-          diffViewTheme={theme}
-          diffViewHighlight={true}
-          diffViewWrap={true}
-        />
-      </Card.Content>
-    </Card>
+    <FileDiffView
+      filename={filename}
+      patch={patch}
+      viewMode={viewMode}
+      onViewModeChange={onViewModeChange}
+      sidebarCollapsed={sidebarCollapsed}
+      onExpandSidebar={onExpandSidebar}
+      commentSupport={commentSupport}
+    />
   );
 }

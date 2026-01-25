@@ -28491,7 +28491,7 @@ init_cjs_shims();
 // ../../packages/schema/dist/index.mjs
 init_cjs_shims();
 
-// ../../packages/schema/dist/yjs-helpers-CNlw-U7T.mjs
+// ../../packages/schema/dist/yjs-helpers-DzEyLz-f.mjs
 init_cjs_shims();
 
 // ../../packages/schema/dist/plan.mjs
@@ -42388,7 +42388,10 @@ var CursorOriginMetadataSchema = external_exports.object({
   conversationId: external_exports.string(),
   generationId: external_exports.string().optional()
 });
-var UnknownOriginMetadataSchema = external_exports.object({ platform: external_exports.literal("unknown") });
+var UnknownOriginMetadataSchema = external_exports.object({
+  platform: external_exports.literal("unknown"),
+  cwd: external_exports.string()
+});
 var OriginMetadataSchema = external_exports.discriminatedUnion("platform", [
   ClaudeCodeOriginMetadataSchema,
   DevinOriginMetadataSchema,
@@ -42681,6 +42684,18 @@ var PRReviewCommentSchema = external_exports.object({
   createdAt: external_exports.number(),
   resolved: external_exports.boolean().optional()
 });
+var LocalDiffCommentSchema = external_exports.object({
+  id: external_exports.string(),
+  type: external_exports.literal("local"),
+  path: external_exports.string(),
+  line: external_exports.number(),
+  body: external_exports.string(),
+  author: external_exports.string(),
+  createdAt: external_exports.number(),
+  baseRef: external_exports.string(),
+  resolved: external_exports.boolean().optional(),
+  lineContentHash: external_exports.string().optional()
+});
 var GitHubArtifactParseSchema = external_exports.object({
   id: external_exports.string(),
   type: external_exports.enum([
@@ -42708,7 +42723,7 @@ var LocalArtifactParseSchema = external_exports.object({
   localArtifactId: external_exports.string()
 });
 
-// ../../packages/schema/dist/yjs-helpers-CNlw-U7T.mjs
+// ../../packages/schema/dist/yjs-helpers-DzEyLz-f.mjs
 function assertNever2(value) {
   throw new Error(`Unhandled discriminated union member: ${JSON.stringify(value)}`);
 }
@@ -43028,7 +43043,8 @@ var YDOC_KEYS = {
   PR_REVIEW_COMMENTS: "prReviewComments",
   EVENTS: "events",
   SNAPSHOTS: "snapshots",
-  INPUT_REQUESTS: "inputRequests"
+  INPUT_REQUESTS: "inputRequests",
+  LOCAL_DIFF_COMMENTS: "localDiffComments"
 };
 var validKeys = new Set(Object.values(YDOC_KEYS));
 var CommentBodySchema = external_exports.union([external_exports.string(), external_exports.array(external_exports.unknown())]);
@@ -44188,6 +44204,7 @@ var LocalChangesResponseSchema = external_exports.object({
   available: external_exports.literal(true),
   branch: external_exports.string(),
   baseBranch: external_exports.string(),
+  headSha: external_exports.string().optional(),
   staged: external_exports.array(LocalFileChangeSchema),
   unstaged: external_exports.array(LocalFileChangeSchema),
   untracked: external_exports.array(external_exports.string()),
@@ -44285,6 +44302,7 @@ var TOOL_NAMES = {
   CREATE_PLAN: "create_plan",
   EXECUTE_CODE: "execute_code",
   LINK_PR: "link_pr",
+  READ_DIFF_COMMENTS: "read_diff_comments",
   READ_PLAN: "read_plan",
   REGENERATE_SESSION_TOKEN: "regenerate_session_token",
   REQUEST_USER_INPUT: "request_user_input",
@@ -44415,7 +44433,7 @@ var planRouter = router({
       message: "Plan not found"
     });
     const origin = metadata.origin;
-    const cwd = origin?.platform === "claude-code" ? origin.cwd : void 0;
+    const cwd = origin?.platform === "claude-code" || origin?.platform === "unknown" ? origin.cwd : void 0;
     if (!cwd) return {
       available: false,
       reason: "no_cwd",
@@ -44436,7 +44454,7 @@ var planRouter = router({
       message: "Plan not found"
     });
     const origin = metadata.origin;
-    const cwd = origin?.platform === "claude-code" ? origin.cwd : void 0;
+    const cwd = origin?.platform === "claude-code" || origin?.platform === "unknown" ? origin.cwd : void 0;
     if (!cwd) return {
       content: null,
       error: "No working directory available"

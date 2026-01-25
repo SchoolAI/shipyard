@@ -16,6 +16,7 @@ import {
   tryAcquireHubLock,
 } from './registry-server.js';
 import { executeCodeTool } from './tools/execute-code.js';
+import { readDiffCommentsTool } from './tools/read-diff-comments.js';
 import { TOOL_NAMES } from './tools/tool-names.js';
 
 /** Determine if we're the Registry Hub or a client */
@@ -70,9 +71,9 @@ const server = new Server(
   }
 );
 
-/** Expose execute_code - all APIs including requestUserInput() are available inside */
+/** Expose execute_code (bundled APIs) and read_diff_comments */
 server.setRequestHandler(ListToolsRequestSchema, async () => ({
-  tools: [executeCodeTool.definition],
+  tools: [executeCodeTool.definition, readDiffCommentsTool.definition],
 }));
 
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
@@ -80,6 +81,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
   if (name === TOOL_NAMES.EXECUTE_CODE) {
     return await executeCodeTool.handler(args ?? {});
+  }
+
+  if (name === TOOL_NAMES.READ_DIFF_COMMENTS) {
+    return await readDiffCommentsTool.handler(args ?? {});
   }
 
   throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${name}`);

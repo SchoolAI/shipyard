@@ -11,6 +11,7 @@ export const TOOL_NAMES = {
   CREATE_PLAN: 'create_plan',
   EXECUTE_CODE: 'execute_code',
   LINK_PR: 'link_pr',
+  READ_DIFF_COMMENTS: 'read_diff_comments',
   READ_PLAN: 'read_plan',
   REGENERATE_SESSION_TOKEN: 'regenerate_session_token',
   REQUEST_USER_INPUT: 'request_user_input',
