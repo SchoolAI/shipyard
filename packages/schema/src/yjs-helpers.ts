@@ -49,6 +49,37 @@ function toUnknownArray<T = unknown>(array: Y.Array<T>): unknown[] {
 }
 
 /**
+ * Find an input request by ID in the raw CRDT data.
+ *
+ * This function is needed because:
+ * 1. We need the ACTUAL index in the Y.Array for delete/insert operations
+ * 2. Schema validation might filter out requests with legacy/invalid data
+ * 3. We want to find the request first, then validate it specifically
+ *
+ * @param data - Raw array data from Y.Array.toJSON()
+ * @param requestId - The ID of the request to find
+ * @returns Object with rawIndex and validated request, or null if not found
+ */
+function findInputRequestById(
+  data: unknown[],
+  requestId: string
+): { rawIndex: number; request: AnyInputRequest } | null {
+  for (let i = 0; i < data.length; i++) {
+    const item = data[i];
+    /** Quick check for id field before full validation */
+    if (item && typeof item === 'object' && 'id' in item && item.id === requestId) {
+      const parsed = AnyInputRequestSchema.safeParse(item);
+      if (parsed.success) {
+        return { rawIndex: i, request: parsed.data };
+      }
+      /** Request found but invalid - return null to indicate error */
+      return null;
+    }
+  }
+  return null;
+}
+
+/**
  * Fields that can be safely updated without changing status.
  * These are the common base fields that don't have invariants with status.
  */
@@ -114,13 +145,13 @@ export interface TransitionToChangesRequested {
 
 /**
  * Type for transitioning to in_progress status.
- * When coming from pending_review, requires review fields.
- * When coming from draft (no approval required), review fields are optional.
+ * Requires reviewedAt and reviewedBy to satisfy PlanMetadata schema invariants.
+ * Without these fields, the discriminated union validation will fail.
  */
 export interface TransitionToInProgress {
   status: 'in_progress';
-  reviewedAt?: number;
-  reviewedBy?: string;
+  reviewedAt: number;
+  reviewedBy: string;
   reviewComment?: string;
 }
 
@@ -254,14 +285,11 @@ function applyChangesRequestedTransition(
 
 /**
  * Apply in_progress transition fields to metadata map.
+ * Always sets reviewedAt and reviewedBy to satisfy schema invariants.
  */
 function applyInProgressTransition(map: Y.Map<unknown>, transition: TransitionToInProgress): void {
-  if (transition.reviewedAt !== undefined) {
-    map.set('reviewedAt', transition.reviewedAt);
-  }
-  if (transition.reviewedBy !== undefined) {
-    map.set('reviewedBy', transition.reviewedBy);
-  }
+  map.set('reviewedAt', transition.reviewedAt);
+  map.set('reviewedBy', transition.reviewedBy);
   if (transition.reviewComment !== undefined) {
     map.set('reviewComment', transition.reviewComment);
   }
@@ -1418,20 +1446,14 @@ export function answerInputRequest(
 ): AnswerInputRequestResult {
   const requestsArray = ydoc.getArray<AnyInputRequest>(YDOC_KEYS.INPUT_REQUESTS);
   const data = toUnknownArray(requestsArray);
-  const requests = data
-    .map((item) => AnyInputRequestSchema.safeParse(item))
-    .filter((r) => r.success)
-    .map((r) => r.data);
-  const index = requests.findIndex((r) => r.id === requestId);
 
-  if (index === -1) {
+  /** Find request by ID in raw data to get correct array index */
+  const found = findInputRequestById(data, requestId);
+  if (!found) {
     return { success: false, error: 'Request not found' };
   }
 
-  const request = requests[index];
-  if (!request) {
-    return { success: false, error: 'Request not found' };
-  }
+  const { rawIndex: index, request } = found;
 
   if (request.status !== 'pending') {
     switch (request.status) {
@@ -1491,20 +1513,14 @@ export function answerMultiQuestionInputRequest(
 ): AnswerInputRequestResult {
   const requestsArray = ydoc.getArray<AnyInputRequest>(YDOC_KEYS.INPUT_REQUESTS);
   const data = toUnknownArray(requestsArray);
-  const requests = data
-    .map((item) => AnyInputRequestSchema.safeParse(item))
-    .filter((r) => r.success)
-    .map((r) => r.data);
-  const index = requests.findIndex((r) => r.id === requestId);
 
-  if (index === -1) {
+  /** Find request by ID in raw data to get correct array index */
+  const found = findInputRequestById(data, requestId);
+  if (!found) {
     return { success: false, error: 'Request not found' };
   }
 
-  const request = requests[index];
-  if (!request) {
-    return { success: false, error: 'Request not found' };
-  }
+  const { rawIndex: index, request } = found;
 
   if (request.type !== 'multi') {
     return { success: false, error: 'Request is not pending' };
@@ -1561,20 +1577,14 @@ export function cancelInputRequest(
 ): { success: boolean; error?: string } {
   const requestsArray = ydoc.getArray<AnyInputRequest>(YDOC_KEYS.INPUT_REQUESTS);
   const data = toUnknownArray(requestsArray);
-  const requests = data
-    .map((item) => AnyInputRequestSchema.safeParse(item))
-    .filter((r) => r.success)
-    .map((r) => r.data);
-  const index = requests.findIndex((r) => r.id === requestId);
 
-  if (index === -1) {
+  /** Find request by ID in raw data to get correct array index */
+  const found = findInputRequestById(data, requestId);
+  if (!found) {
     return { success: false, error: 'Request not found' };
   }
 
-  const request = requests[index];
-  if (!request) {
-    return { success: false, error: 'Request not found' };
-  }
+  const { rawIndex: index, request } = found;
 
   if (request.status !== 'pending') {
     return { success: false, error: `Request is not pending` };
@@ -1610,20 +1620,14 @@ export function declineInputRequest(
 ): { success: boolean; error?: string } {
   const requestsArray = ydoc.getArray<AnyInputRequest>(YDOC_KEYS.INPUT_REQUESTS);
   const data = toUnknownArray(requestsArray);
-  const requests = data
-    .map((item) => AnyInputRequestSchema.safeParse(item))
-    .filter((r) => r.success)
-    .map((r) => r.data);
-  const index = requests.findIndex((r) => r.id === requestId);
 
-  if (index === -1) {
+  /** Find request by ID in raw data to get correct array index */
+  const found = findInputRequestById(data, requestId);
+  if (!found) {
     return { success: false, error: 'Request not found' };
   }
 
-  const request = requests[index];
-  if (!request) {
-    return { success: false, error: 'Request not found' };
-  }
+  const { rawIndex: index, request } = found;
 
   if (request.status !== 'pending') {
     return { success: false, error: `Request is not pending` };

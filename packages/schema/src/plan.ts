@@ -308,6 +308,19 @@ export type PlanEvent =
         requestId: string;
         response: unknown;
         answeredBy: string;
+        /** Original question message for display in activity timeline */
+        requestMessage?: string;
+        /** Original request type for context */
+        requestType?:
+          | 'text'
+          | 'multiline'
+          | 'choice'
+          | 'confirm'
+          | 'number'
+          | 'email'
+          | 'date'
+          | 'rating'
+          | 'multi';
       };
     })
   | (PlanEventBase & {
@@ -498,6 +511,20 @@ export const PlanEventSchema = z.discriminatedUnion('type', [
       requestId: z.string(),
       response: z.unknown(),
       answeredBy: z.string(),
+      requestMessage: z.string().optional(),
+      requestType: z
+        .enum([
+          'text',
+          'multiline',
+          'choice',
+          'confirm',
+          'number',
+          'email',
+          'date',
+          'rating',
+          'multi',
+        ])
+        .optional(),
     }),
   }),
   PlanEventBaseSchema.extend({

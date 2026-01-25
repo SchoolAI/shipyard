@@ -85,9 +85,14 @@ const RequestUserInputInput = z
       .optional()
       .describe("For 'rating' - endpoint labels"),
     questions: z
-      .array(QuestionSchema)
-      .min(1)
-      .max(10)
+      .preprocess(
+        /** Filter out null/undefined elements that may come from sparse arrays or JSON parsing issues */
+        (val) => {
+          if (!Array.isArray(val)) return val;
+          return val.filter((item): item is NonNullable<typeof item> => item != null);
+        },
+        z.array(QuestionSchema).min(1).max(10)
+      )
       .optional()
       .describe('Array of 1-10 questions for multi-question form (8 recommended for optimal UX)'),
   })
@@ -445,7 +450,46 @@ NOTE: This is also available as requestUserInput() inside execute_code for multi
   },
 
   handler: async (args: unknown) => {
-    const input = RequestUserInputInput.parse(args);
+    /** Validate input with helpful error messages */
+    let input: z.infer<typeof RequestUserInputInput>;
+    try {
+      input = RequestUserInputInput.parse(args);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        const issue = error.issues[0];
+        let message = issue?.message ?? 'Invalid input';
+
+        /** Provide helpful hints for common errors */
+        if (issue?.path.includes('questions')) {
+          if (issue.code === 'invalid_type' && issue.expected === 'object') {
+            const questionIndex = issue.path[issue.path.indexOf('questions') + 1];
+            message =
+              'Each question in the questions array must be an object with "message" and "type" fields. ' +
+              `Found invalid value at index ${String(questionIndex)}.`;
+          } else if (issue.code === 'invalid_union') {
+            message =
+              'Invalid question format. Each question must have a valid "type" field ' +
+              '(text, choice, confirm, multiline, number, email, date, or rating).';
+          }
+        }
+
+        logger.warn({ error: error.issues, args }, 'Invalid request_user_input arguments');
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: false,
+                status: 'cancelled',
+                reason: message,
+              }),
+            },
+          ],
+          isError: true,
+        };
+      }
+      throw error;
+    }
 
     logger.info(
       {

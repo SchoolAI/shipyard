@@ -18,6 +18,7 @@ import {
   getDeliverables,
   getPlanMetadata,
   PLAN_INDEX_DOC_NAME,
+  type Question,
 } from '@shipyard/schema';
 import { z } from 'zod';
 import { registryConfig } from '../config/env/registry.js';
@@ -778,23 +779,40 @@ async function setupReviewNotification(planId: string, pollIntervalSeconds?: num
   return { script, fullResponse: text };
 }
 
-async function requestUserInput(opts: {
-  message: string;
-  type: 'text' | 'choice' | 'confirm' | 'multiline' | 'number' | 'email' | 'date' | 'rating';
-  options?: string[];
-  multiSelect?: boolean;
-  defaultValue?: string;
-  timeout?: number;
-  planId?: string;
-  min?: number;
-  max?: number;
-  format?: 'integer' | 'decimal' | 'currency' | 'percentage';
-  minDate?: string;
-  maxDate?: string;
-  domain?: string;
-  style?: 'stars' | 'numbers' | 'emoji';
-  labels?: { low?: string; high?: string };
-}) {
+/**
+ * Request user input via browser modal.
+ * Supports both single-question mode (message + type) and multi-question mode (questions array).
+ */
+async function requestUserInput(
+  opts:
+    | {
+        /** Single-question mode */
+        message: string;
+        type: 'text' | 'choice' | 'confirm' | 'multiline' | 'number' | 'email' | 'date' | 'rating';
+        options?: string[];
+        multiSelect?: boolean;
+        defaultValue?: string;
+        timeout?: number;
+        planId?: string;
+        min?: number;
+        max?: number;
+        format?: 'integer' | 'decimal' | 'currency' | 'percentage';
+        minDate?: string;
+        maxDate?: string;
+        domain?: string;
+        style?: 'stars' | 'numbers' | 'emoji';
+        labels?: { low?: string; high?: string };
+        questions?: never;
+      }
+    | {
+        /** Multi-question mode */
+        questions: Question[];
+        timeout?: number;
+        planId?: string;
+        message?: never;
+        type?: never;
+      }
+) {
   const { InputRequestManager } = await import('../services/input-request-manager.js');
 
   /*
@@ -806,6 +824,55 @@ async function requestUserInput(opts: {
   /** Create manager and make request */
   const manager = new InputRequestManager();
 
+  /** Handle multi-question mode */
+  if ('questions' in opts && opts.questions) {
+    /** Filter out any null/undefined elements from questions array (defensive) */
+    const validQuestions = opts.questions.filter(
+      (q): q is NonNullable<typeof q> => q != null
+    );
+    if (validQuestions.length === 0) {
+      throw new Error(
+        'questions array is empty after filtering. Each question must be an object with "message" and "type" fields.'
+      );
+    }
+
+    const requestId = manager.createMultiQuestionRequest(ydoc, {
+      questions: validQuestions,
+      timeout: opts.timeout,
+      planId: opts.planId,
+    });
+
+    /** Wait for response */
+    const result = await manager.waitForResponse(ydoc, requestId, opts.timeout);
+
+    /** Narrow the discriminated union to access appropriate fields */
+    if (result.status === 'answered') {
+      return {
+        success: true as const,
+        response: result.response,
+        status: result.status,
+        reason: undefined,
+      };
+    }
+
+    if (result.status === 'declined') {
+      return {
+        success: false as const,
+        response: undefined,
+        status: result.status,
+        reason: result.reason,
+      };
+    }
+
+    return {
+      success: false as const,
+      response: undefined,
+      status: result.status,
+      reason: result.reason,
+    };
+  }
+
+  /** Single-question mode */
   let params: CreateInputRequestParams;
 
   switch (opts.type) {

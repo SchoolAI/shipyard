@@ -4,7 +4,7 @@
  * Updates Y.Doc with user response or cancellation.
  */
 
-import { Alert, Button, Card, Form, Modal } from '@heroui/react';
+import { Alert, Button, Card, Chip, Form, Modal } from '@heroui/react';
 import {
   type AnswerInputRequestResult,
   answerInputRequest,
@@ -15,6 +15,7 @@ import {
   type InputRequest,
   logPlanEvent,
 } from '@shipyard/schema';
+import { AlertOctagon } from 'lucide-react';
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -245,6 +246,7 @@ export function InputRequestModal({
 
     const result = declineInputRequest(ydoc, request.id);
     if (!result.success) {
+      toast.error(result.error || 'Failed to decline request');
       return;
     }
 
@@ -337,6 +339,8 @@ export function InputRequestModal({
           requestId: request.id,
           response: responseValue,
           answeredBy: identity.username,
+          requestMessage: request.message,
+          requestType: request.type,
         });
       }
 
@@ -367,6 +371,8 @@ export function InputRequestModal({
             requestId: request.id,
             response,
             answeredBy: identity.username,
+            requestMessage: request.message,
+            requestType: request.type,
           });
         }
 
@@ -456,9 +462,23 @@ export function InputRequestModal({
           <Modal.Dialog className={modalConfig.isLarge ? 'sm:max-w-[650px]' : undefined}>
             <Modal.CloseTrigger />
 
-            <Card>
+            <Card
+              className={request.isBlocker ? 'border-2 border-danger ring-2 ring-danger/20' : ''}
+            >
               <Card.Header>
-                <h2 className="text-xl font-semibold">Agent is requesting input</h2>
+                <div className="flex items-center gap-2">
+                  {request.isBlocker && <AlertOctagon className="w-5 h-5 text-danger shrink-0" />}
+                  <h2 className="text-xl font-semibold">
+                    {request.isBlocker
+                      ? 'BLOCKER: Agent needs your input'
+                      : 'Agent is requesting input'}
+                  </h2>
+                  {request.isBlocker && (
+                    <Chip color="danger" variant="primary" size="sm">
+                      BLOCKER
+                    </Chip>
+                  )}
+                </div>
               </Card.Header>
 
               <Card.Content>
@@ -467,13 +487,15 @@ export function InputRequestModal({
                     <p className="text-sm font-medium text-foreground">Agent is asking:</p>
                     <MarkdownContent content={request.message} maxHeight={modalConfig.maxHeight} />
                   </div>
-                  <Alert status="warning">
+                  <Alert status={request.isBlocker ? 'danger' : 'warning'}>
                     <Alert.Indicator />
                     <Alert.Content>
                       <Alert.Title>Sign in required</Alert.Title>
                       <Alert.Description>
                         You need to sign in with GitHub to respond to this request. Your identity
                         will be recorded with your response.
+                        {request.isBlocker &&
+                          ' This is a BLOCKER - the agent cannot proceed without your response.'}
                       </Alert.Description>
                     </Alert.Content>
                   </Alert>
@@ -512,9 +534,21 @@ export function InputRequestModal({
         <Modal.Dialog className={modalConfig.isLarge ? 'sm:max-w-[650px]' : undefined}>
           <Modal.CloseTrigger />
 
-          <Card>
+          <Card className={request.isBlocker ? 'border-2 border-danger ring-2 ring-danger/20' : ''}>
             <Card.Header>
-              <h2 className="text-xl font-semibold">Agent is requesting input</h2>
+              <div className="flex items-center gap-2">
+                {request.isBlocker && <AlertOctagon className="w-5 h-5 text-danger shrink-0" />}
+                <h2 className="text-xl font-semibold">
+                  {request.isBlocker
+                    ? 'BLOCKER: Agent needs your input'
+                    : 'Agent is requesting input'}
+                </h2>
+                {request.isBlocker && (
+                  <Chip color="danger" variant="primary" size="sm">
+                    BLOCKER
+                  </Chip>
+                )}
+              </div>
             </Card.Header>
 
             <Card.Content>

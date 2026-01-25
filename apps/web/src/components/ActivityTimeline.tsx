@@ -40,17 +40,23 @@ function groupEventsByDay(events: PlanEvent[]): Record<DayGroup, PlanEvent[]> {
 }
 
 /**
- * Build a set of resolved request IDs from agent_activity events.
- * Used to determine which help_request/blocker events are still unresolved.
+ * Build a set of resolved request IDs from agent_activity and input_request events.
+ * Used to determine which help_request/blocker/input_request events are still unresolved.
  */
 function getResolvedRequestIds(events: PlanEvent[]): Set<string> {
   const resolvedIds = new Set<string>();
 
   for (const event of events) {
-    if (event.type !== 'agent_activity') continue;
+    /** Check agent_activity resolution events */
+    if (event.type === 'agent_activity') {
+      const { activityType } = event.data;
+      if (activityType === 'help_request_resolved' || activityType === 'blocker_resolved') {
+        resolvedIds.add(event.data.requestId);
+      }
+    }
 
-    const { activityType } = event.data;
-    if (activityType === 'help_request_resolved' || activityType === 'blocker_resolved') {
+    /** Check input_request resolution events */
+    if (event.type === 'input_request_answered' || event.type === 'input_request_declined') {
       resolvedIds.add(event.data.requestId);
     }
   }
@@ -59,15 +65,22 @@ function getResolvedRequestIds(events: PlanEvent[]): Set<string> {
 }
 
 /**
- * Check if an event is an unresolved help_request or blocker.
+ * Check if an event is an unresolved help_request, blocker, or input_request.
  */
 function isUnresolvedRequest(event: PlanEvent, resolvedIds: Set<string>): boolean {
-  if (event.type !== 'agent_activity') return false;
+  /** Check agent_activity events (help_request, blocker) */
+  if (event.type === 'agent_activity') {
+    const { activityType } = event.data;
+    if (activityType !== 'help_request' && activityType !== 'blocker') return false;
+    return !resolvedIds.has(event.data.requestId);
+  }
 
-  const { activityType } = event.data;
-  if (activityType !== 'help_request' && activityType !== 'blocker') return false;
+  /** Check input_request_created events */
+  if (event.type === 'input_request_created') {
+    return !resolvedIds.has(event.data.requestId);
+  }
 
-  return !resolvedIds.has(event.data.requestId);
+  return false;
 }
 
 export function ActivityTimeline({ ydoc }: ActivityTimelineProps) {

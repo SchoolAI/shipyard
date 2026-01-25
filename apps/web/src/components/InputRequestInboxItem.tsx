@@ -5,7 +5,7 @@
 
 import { Card, Chip } from '@heroui/react';
 import { type AnyInputRequest, DEFAULT_INPUT_REQUEST_TIMEOUT_SECONDS } from '@shipyard/schema';
-import { Clock } from 'lucide-react';
+import { AlertOctagon, Clock } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { MarkdownContent } from '@/components/ui/MarkdownContent';
 
@@ -58,13 +58,24 @@ export function InputRequestInboxItem({ request, onClick }: InputRequestInboxIte
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   };
 
+  const isBlocker = request.isBlocker;
+
   return (
     <button onClick={onClick} className="cursor-pointer w-full text-left" type="button">
-      <Card variant="secondary" className="p-4 hover:bg-muted/50 transition-colors">
+      <Card
+        variant="secondary"
+        className={`p-4 hover:bg-muted/50 transition-colors ${isBlocker ? 'border-2 border-danger ring-1 ring-danger/20' : ''}`}
+      >
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1">
-              <Chip variant="soft" color="accent" size="sm">
+            <div className="flex items-center gap-2 mb-1 flex-wrap">
+              {isBlocker && (
+                <Chip variant="primary" color="danger" size="sm">
+                  <AlertOctagon className="w-3 h-3" />
+                  BLOCKER
+                </Chip>
+              )}
+              <Chip variant="soft" color={isBlocker ? 'danger' : 'accent'} size="sm">
                 Agent Input
               </Chip>
               <Chip variant="soft" color="default" size="sm">

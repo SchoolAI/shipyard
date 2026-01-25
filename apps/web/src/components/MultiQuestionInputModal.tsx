@@ -8,6 +8,7 @@ import {
   Alert,
   Button,
   Card,
+  Chip,
   Form,
   Label,
   Modal,
@@ -28,6 +29,7 @@ import {
   normalizeChoiceOptions,
   type Question,
 } from '@shipyard/schema';
+import { AlertOctagon } from 'lucide-react';
 import type React from 'react';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
@@ -297,6 +299,7 @@ function SignInPrompt({
   onSignIn: () => void;
   onClose: () => void;
 }) {
+  const isBlocker = request.isBlocker;
   return (
     <Modal.Backdrop
       isOpen={true}
@@ -307,9 +310,19 @@ function SignInPrompt({
       <Modal.Container placement="center" size="lg">
         <Modal.Dialog>
           <Modal.CloseTrigger />
-          <Card>
+          <Card className={isBlocker ? 'border-2 border-danger ring-2 ring-danger/20' : ''}>
             <Card.Header>
-              <h2 className="text-xl font-semibold">Agent is requesting input</h2>
+              <div className="flex items-center gap-2">
+                {isBlocker && <AlertOctagon className="w-5 h-5 text-danger shrink-0" />}
+                <h2 className="text-xl font-semibold">
+                  {isBlocker ? 'BLOCKER: Agent needs your input' : 'Agent is requesting input'}
+                </h2>
+                {isBlocker && (
+                  <Chip color="danger" variant="primary" size="sm">
+                    BLOCKER
+                  </Chip>
+                )}
+              </div>
             </Card.Header>
             <Card.Content>
               <div className="space-y-4">
@@ -326,13 +339,15 @@ function SignInPrompt({
                     ))}
                   </ul>
                 </div>
-                <Alert status="warning">
+                <Alert status={isBlocker ? 'danger' : 'warning'}>
                   <Alert.Indicator />
                   <Alert.Content>
                     <Alert.Title>Sign in required</Alert.Title>
                     <Alert.Description>
                       You need to sign in with GitHub to respond to this request. Your identity will
                       be recorded with your response.
+                      {isBlocker &&
+                        ' This is a BLOCKER - the agent cannot proceed without your response.'}
                     </Alert.Description>
                   </Alert.Content>
                 </Alert>
@@ -395,6 +410,7 @@ export function MultiQuestionInputModal({
 
     const result = declineInputRequest(ydoc, request.id);
     if (!result.success) {
+      toast.error(result.error || 'Failed to decline request');
       return;
     }
 
@@ -461,6 +477,7 @@ export function MultiQuestionInputModal({
     }
   }, [remainingTime, isOpen, request, handleCancel]);
 
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Form submission with validation and error handling naturally has branching logic
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!ydoc || !request || !identity || isSubmitting) return;
@@ -490,10 +507,14 @@ export function MultiQuestionInputModal({
       }
 
       if (planYdoc && request.planId) {
+        /** Build a summary message for multi-question requests */
+        const summaryMessage = `${request.questions.length} question${request.questions.length > 1 ? 's' : ''} answered`;
         logPlanEvent(planYdoc, 'input_request_answered', identity.username, {
           requestId: request.id,
           response: responses,
           answeredBy: identity.username,
+          requestMessage: summaryMessage,
+          requestType: 'multi',
         });
       }
 
@@ -717,6 +738,8 @@ export function MultiQuestionInputModal({
     );
   }
 
+  const isBlocker = request.isBlocker;
+
   return (
     <Modal.Backdrop
       isOpen={isOpen}
@@ -728,12 +751,20 @@ export function MultiQuestionInputModal({
         <Modal.Dialog>
           <Modal.CloseTrigger />
 
-          <Card>
+          <Card className={isBlocker ? 'border-2 border-danger ring-2 ring-danger/20' : ''}>
             <Card.Header className="flex justify-between items-center">
-              <h2 className="text-xl font-semibold">
-                Agent is requesting input ({request.questions.length} question
-                {request.questions.length > 1 ? 's' : ''})
-              </h2>
+              <div className="flex items-center gap-2">
+                {isBlocker && <AlertOctagon className="w-5 h-5 text-danger shrink-0" />}
+                <h2 className="text-xl font-semibold">
+                  {isBlocker ? 'BLOCKER: ' : ''}Agent is requesting input (
+                  {request.questions.length} question{request.questions.length > 1 ? 's' : ''})
+                </h2>
+                {isBlocker && (
+                  <Chip color="danger" variant="primary" size="sm">
+                    BLOCKER
+                  </Chip>
+                )}
+              </div>
               <span
                 className={`text-sm ${remainingTime >= 0 && remainingTime < 30 ? 'text-warning' : 'text-muted-foreground'}`}
               >

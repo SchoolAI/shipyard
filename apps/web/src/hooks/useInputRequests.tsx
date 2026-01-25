@@ -13,6 +13,7 @@ import {
   DEFAULT_INPUT_REQUEST_TIMEOUT_SECONDS,
   YDOC_KEYS,
 } from '@shipyard/schema';
+import { AlertOctagon } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import type * as Y from 'yjs';
@@ -64,18 +65,34 @@ function findResolvedRequestIds(previousIds: Set<string>, currentIds: Set<string
 
 /**
  * Dismisses toasts for requests that are no longer pending.
- * Also dismisses the grouped toast if no requests remain.
+ * Handles both individual toasts and grouped toasts.
+ *
+ * Toast strategy:
+ * - 0 requests: No toasts shown
+ * - 1 request: Individual toast with ID `input-request-${id}`
+ * - 2+ requests: Grouped toast with ID `input-requests-grouped`
+ *
+ * When requests are resolved, we need to:
+ * 1. Dismiss the grouped toast (in case we went from N to M requests)
+ * 2. Dismiss individual toasts for resolved requests
  */
-function dismissResolvedToasts(resolvedIds: string[], remainingCount: number): void {
+function dismissResolvedToasts(resolvedIds: string[]): void {
   /** Dismiss individual request toasts */
   for (const id of resolvedIds) {
     toast.dismiss(`input-request-${id}`);
   }
 
-  /** If no pending requests remain, also dismiss the grouped toast */
-  if (remainingCount === 0) {
-    toast.dismiss('input-requests-grouped');
-  }
+  /**
+   * Always dismiss the grouped toast when requests change.
+   * This handles transitions like:
+   * - 3 -> 2 requests (grouped toast needs refresh with new count)
+   * - 2 -> 1 request (grouped toast should be replaced by individual)
+   * - N -> 0 requests (grouped toast should be dismissed)
+   *
+   * The grouped toast will be re-shown with the correct count if needed
+   * by showInputRequestToast when new requests come in.
+   */
+  toast.dismiss('input-requests-grouped');
 }
 
 /**
@@ -89,50 +106,76 @@ function getRequestDisplayMessage(request: AnyInputRequest): string {
   return request.message;
 }
 
+/** Blocker icon element used in toast notifications */
+const blockerIcon = <AlertOctagon className="w-5 h-5 text-danger" />;
+
+/**
+ * Show a grouped toast for multiple pending requests.
+ */
+function showGroupedToast(count: number, hasBlocker: boolean, onClick: () => void): void {
+  const toastFn = hasBlocker ? toast.error : toast.info;
+  const title = hasBlocker
+    ? `BLOCKER: Agent needs input (${count} pending)`
+    : `Agent needs input (${count} pending)`;
+  const description = hasBlocker
+    ? 'Agent is blocked - multiple requests waiting for response'
+    : 'Multiple requests waiting for response';
+
+  toastFn(title, {
+    id: 'input-requests-grouped',
+    position: 'top-right',
+    duration: 60000,
+    description,
+    icon: hasBlocker ? blockerIcon : undefined,
+    action: { label: 'Respond', onClick },
+  });
+}
+
+/**
+ * Show a toast for a single input request.
+ */
+function showSingleRequestToast(request: AnyInputRequest, onClick: () => void): void {
+  const isBlocker = request.isBlocker;
+  const toastFn = isBlocker ? toast.error : toast.info;
+  const title = isBlocker ? 'BLOCKER: Agent needs your input' : 'Agent needs your input';
+
+  toastFn(title, {
+    id: `input-request-${request.id}`,
+    position: 'top-right',
+    duration: 60000,
+    description: (
+      <MarkdownContent
+        content={getRequestDisplayMessage(request)}
+        variant="toast"
+        className="line-clamp-2"
+      />
+    ),
+    icon: isBlocker ? blockerIcon : undefined,
+    action: { label: 'Respond', onClick },
+  });
+}
+
 /**
  * Shows a toast notification for new input request(s).
  * Groups multiple pending requests into a single toast.
+ * Blockers get urgent red styling with AlertOctagon icon.
  */
 function showInputRequestToast(
   newRequests: AnyInputRequest[],
   totalPending: number,
-  onOpenModal: () => void
+  onOpenModal: () => void,
+  onOpenSpecificRequest: (request: AnyInputRequest) => void
 ): void {
   if (newRequests.length === 0) return;
 
-  /** If multiple requests pending, show grouped toast */
   if (totalPending > 1) {
-    toast.info(`Agent needs input (${totalPending} pending)`, {
-      id: 'input-requests-grouped',
-      position: 'top-right',
-      duration: 60000,
-      description: 'Multiple requests waiting for response',
-      action: {
-        label: 'Respond',
-        onClick: onOpenModal,
-      },
-    });
+    const hasBlocker = newRequests.some((r) => r.isBlocker);
+    showGroupedToast(totalPending, hasBlocker, onOpenModal);
   } else {
-    /** Show single request toast with message */
     const request = newRequests[0];
-    if (!request) return;
-
-    toast.info('Agent needs your input', {
-      id: `input-request-${request.id}`,
-      position: 'top-right',
-      duration: 60000,
-      description: (
-        <MarkdownContent
-          content={getRequestDisplayMessage(request)}
-          variant="toast"
-          className="line-clamp-2"
-        />
-      ),
-      action: {
-        label: 'Respond',
-        onClick: onOpenModal,
-      },
-    });
+    if (request) {
+      showSingleRequestToast(request, () => onOpenSpecificRequest(request));
+    }
   }
 }
 
@@ -162,6 +205,82 @@ function isRequestExpired(request: AnyInputRequest): boolean {
  */
 function filterOutExpiredRequests(requests: AnyInputRequest[]): AnyInputRequest[] {
   return requests.filter((r) => !isRequestExpired(r));
+}
+
+/**
+ * Shows or updates the toast for remaining pending requests after some have been resolved.
+ * - Multiple pending: Shows grouped toast with updated count
+ * - Single pending: Shows individual toast for that request
+ * - None pending: All toasts already dismissed, nothing to show
+ * Blockers get urgent red styling with AlertOctagon icon.
+ */
+function showRemainingRequestsToast(pending: AnyInputRequest[]): void {
+  if (pending.length > 1) {
+    const firstRequest = pending[0];
+    const hasBlocker = pending.some((r) => r.isBlocker);
+    showGroupedToast(pending.length, hasBlocker, () => {
+      if (firstRequest) dispatchOpenInputRequestEvent(firstRequest);
+    });
+  } else if (pending.length === 1) {
+    const request = pending[0];
+    if (request) {
+      showSingleRequestToast(request, () => dispatchOpenInputRequestEvent(request));
+    }
+  }
+}
+
+/**
+ * Parse raw requests from Y.Array and filter to only valid, pending, non-expired requests.
+ */
+function parseAndFilterRequests(rawRequests: unknown[]): AnyInputRequest[] {
+  const allRequests = rawRequests
+    .map((item) => AnyInputRequestSchema.safeParse(item))
+    .filter((result) => result.success)
+    .map((result) => result.data);
+
+  const pendingByStatus = filterPendingRequests(allRequests);
+  return filterOutExpiredRequests(pendingByStatus);
+}
+
+/**
+ * Handle resolved requests by dismissing their toasts and updating the remaining toast.
+ */
+function handleResolvedRequests(resolvedIds: string[], pending: AnyInputRequest[]): void {
+  if (resolvedIds.length === 0) return;
+
+  dismissResolvedToasts(resolvedIds);
+  showRemainingRequestsToast(pending);
+}
+
+/**
+ * Handle new requests by showing toast notifications and notifying callbacks.
+ */
+function handleNewRequests(
+  newRequests: AnyInputRequest[],
+  pending: AnyInputRequest[],
+  onRequestReceived: ((request: AnyInputRequest) => void) | undefined
+): void {
+  if (newRequests.length === 0) return;
+
+  const firstRequest = pending[0];
+
+  showInputRequestToast(
+    newRequests,
+    pending.length,
+    () => {
+      if (firstRequest) {
+        dispatchOpenInputRequestEvent(firstRequest);
+      }
+    },
+    (request) => {
+      dispatchOpenInputRequestEvent(request);
+    }
+  );
+
+  /** Notify parent via callback */
+  for (const request of newRequests) {
+    onRequestReceived?.(request);
+  }
 }
 
 /**
@@ -208,19 +327,9 @@ export function useInputRequests({
     const requestsArray = ydoc.getArray<AnyInputRequest>(YDOC_KEYS.INPUT_REQUESTS);
 
     const updateRequests = () => {
-      /** Get all requests and validate them with schema */
+      /** Get and filter requests to only valid, pending, non-expired ones */
       const rawRequests = requestsArray.toJSON();
-      const allRequests = rawRequests
-        .map((item) => AnyInputRequestSchema.safeParse(item))
-        .filter((result) => result.success)
-        .map((result) => result.data);
-      /*
-       * Filter for pending status first, then filter out client-side expired requests
-       * Client-side expiration check ensures we detect timeouts even when Y.Doc sync is delayed
-       * (e.g., browser tab in background, network latency, etc.)
-       */
-      const pendingByStatus = filterPendingRequests(allRequests);
-      const pending = filterOutExpiredRequests(pendingByStatus);
+      const pending = parseAndFilterRequests(rawRequests);
 
       /** Create set of current pending IDs */
       const currentIds = createRequestIdSet(pending);
@@ -228,16 +337,11 @@ export function useInputRequests({
       /** Find NEW requests (not in previous set) */
       const newRequests = findNewRequests(pending, previousRequestIdsRef.current);
 
-      /*
-       * Find RESOLVED requests (were pending before, not anymore)
-       * This happens when another device responds to the request OR when client-side expiration fires
-       */
+      /** Find RESOLVED requests (were pending before, not anymore) */
       const resolvedIds = findResolvedRequestIds(previousRequestIdsRef.current, currentIds);
 
-      /** Dismiss toasts for resolved requests */
-      if (resolvedIds.length > 0) {
-        dismissResolvedToasts(resolvedIds, pending.length);
-      }
+      /** Handle resolved requests (dismiss toasts, show remaining) */
+      handleResolvedRequests(resolvedIds, pending);
 
       /** Update state */
       setPendingRequests(pending);
@@ -245,22 +349,8 @@ export function useInputRequests({
       /** Update tracking set */
       previousRequestIdsRef.current = currentIds;
 
-      /** Handle new requests */
-      if (newRequests.length > 0) {
-        const firstRequest = pending[0];
-
-        /** Show toast notification (clicking toast will dispatch event to open modal) */
-        showInputRequestToast(newRequests, pending.length, () => {
-          if (firstRequest) {
-            dispatchOpenInputRequestEvent(firstRequest);
-          }
-        });
-
-        /** Notify parent via callback using stable ref */
-        for (const request of newRequests) {
-          onRequestReceivedRef.current?.(request);
-        }
-      }
+      /** Handle new requests (show toasts, notify callbacks) */
+      handleNewRequests(newRequests, pending, onRequestReceivedRef.current);
     };
 
     /** Initial check for requests */

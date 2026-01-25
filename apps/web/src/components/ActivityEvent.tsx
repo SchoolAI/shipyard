@@ -243,25 +243,66 @@ function getEventDescription(event: PlanEvent): ReactNode {
       const requestMessage = event.data?.requestMessage;
       const requestType = event.data?.requestType;
       const isBlocker = event.data?.isBlocker;
-      const prefix = isBlocker ? 'blocked - needs' : 'requested';
+      const prefix = isBlocker ? 'BLOCKED - needs' : 'requested';
+      const blockerBadge = isBlocker ? (
+        <Chip color="danger" variant="primary" size="sm" className="ml-1">
+          BLOCKER
+        </Chip>
+      ) : null;
       if (requestMessage) {
         return (
           <>
             {prefix} input:{' '}
             <MarkdownContent content={requestMessage} variant="compact" className="inline" />
+            {blockerBadge}
           </>
         );
       }
-      return requestType ? `${prefix} ${requestType} input` : `${prefix} input`;
+      return (
+        <>
+          {requestType ? `${prefix} ${requestType} input` : `${prefix} input`}
+          {blockerBadge}
+        </>
+      );
     }
     case 'input_request_answered': {
       const answeredBy = event.data?.answeredBy;
       const response = event.data?.response;
+      const requestMessage = event.data?.requestMessage;
+      const requestType = event.data?.requestType;
+
+      /** Format response for display */
+      const formatResponse = (resp: unknown): string => {
+        if (typeof resp === 'string') return resp;
+        if (typeof resp === 'object' && resp !== null) {
+          /** For multi-question responses, show count */
+          const entries = Object.entries(resp);
+          if (entries.length > 1) {
+            return `${entries.length} answers`;
+          }
+        }
+        return JSON.stringify(resp);
+      };
+
       if (answeredBy && response !== undefined) {
-        /** Format response for display */
-        const responseStr = typeof response === 'string' ? response : JSON.stringify(response);
-        const truncated = responseStr.length > 50 ? `${responseStr.slice(0, 50)}...` : responseStr;
-        return `${answeredBy} responded: "${truncated}"`;
+        const responseStr = formatResponse(response);
+        const truncatedResponse =
+          responseStr.length > 40 ? `${responseStr.slice(0, 40)}...` : responseStr;
+
+        if (requestMessage) {
+          /** Show both question and answer */
+          const truncatedQuestion =
+            requestMessage.length > 40 ? `${requestMessage.slice(0, 40)}...` : requestMessage;
+          return (
+            <>
+              answered {requestType === 'multi' ? 'form' : 'question'}: "
+              <MarkdownContent content={truncatedQuestion} variant="compact" className="inline" />"
+              with "{truncatedResponse}"
+            </>
+          );
+        }
+
+        return `${answeredBy} responded: "${truncatedResponse}"`;
       }
       return answeredBy ? `${answeredBy} answered input request` : 'answered input request';
     }
@@ -279,11 +320,31 @@ function getEventDescription(event: PlanEvent): ReactNode {
 
 /**
  * Determine the highlight color for unresolved events.
- * Blockers use danger (red), help requests use warning (yellow).
+ * Blockers use danger (red), help requests and input requests use warning (yellow).
  */
 function getUnresolvedHighlightColor(event: PlanEvent): 'danger' | 'warning' {
-  if (event.type !== 'agent_activity') return 'warning';
-  return event.data.activityType === 'blocker' ? 'danger' : 'warning';
+  /** Input request blockers use danger */
+  if (event.type === 'input_request_created') {
+    return event.data?.isBlocker ? 'danger' : 'warning';
+  }
+
+  /** Agent activity blockers use danger */
+  if (event.type === 'agent_activity') {
+    return event.data.activityType === 'blocker' ? 'danger' : 'warning';
+  }
+
+  return 'warning';
+}
+
+/**
+ * Get the appropriate label for unresolved events.
+ * Input requests show "Waiting for Response", others show "Needs Resolution".
+ */
+function getUnresolvedLabel(event: PlanEvent): string {
+  if (event.type === 'input_request_created') {
+    return 'Waiting for Response';
+  }
+  return 'Needs Resolution';
 }
 
 export function ActivityEvent({ event, isUnresolved = false }: ActivityEventProps) {
@@ -312,7 +373,7 @@ export function ActivityEvent({ event, isUnresolved = false }: ActivityEventProp
           </p>
           {isUnresolved && (
             <Chip color={highlightColor ?? 'warning'} variant="soft" className="text-xs py-0">
-              Needs Resolution
+              {getUnresolvedLabel(event)}
             </Chip>
           )}
         </div>
