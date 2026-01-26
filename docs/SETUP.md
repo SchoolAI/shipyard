@@ -244,6 +244,54 @@ For more details, see [ADR-0003](./decisions/0003-mobile-oauth-user-agent-detect
 
 ---
 
+## OG Proxy Worker (Optional)
+
+Cloudflare Worker that injects dynamic Open Graph meta tags for social media crawlers.
+
+**When to run:** Only needed if testing social preview functionality (not required for normal development).
+
+### Why It Exists
+
+Static sites (GitHub Pages) serve the same HTML for all URLs. Social crawlers (Slackbot, Discord, etc.) don't execute JavaScript, so they can't see the plan title encoded in the `?d=` parameter. The worker decodes the URL and returns HTML with dynamic OG tags.
+
+### How It Works
+
+- **Crawlers** get HTML with dynamic OG tags (title, description, status)
+- **Regular users** get proxied to GitHub Pages (prod) or localhost:5173 (dev)
+
+### Running Locally
+
+```bash
+# Start the worker (port 4446)
+pnpm dev:og-proxy
+
+# In another terminal, test with a crawler User-Agent
+curl -H "User-Agent: Slackbot" "http://localhost:4446/?d=YOUR_ENCODED_PLAN"
+
+# Health check
+curl http://localhost:4446/health
+```
+
+### Testing
+
+Use the included test script:
+
+```bash
+# Test local (requires worker running)
+./apps/og-proxy-worker/test-worker.sh development
+
+# Test production
+./apps/og-proxy-worker/test-worker.sh production
+```
+
+### Production URL
+
+`https://shipyard-og-proxy.jacob-191.workers.dev`
+
+For architecture details, see `apps/og-proxy-worker/README.md`.
+
+---
+
 ## Development Commands
 
 ```bash

@@ -1,0 +1,22 @@
+{
+  "name": "@shipyard/og-proxy-worker",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --env development",
+    "deploy": "wrangler deploy",
+    "tail": "wrangler tail",
+    "typecheck": "tsc --noEmit",
+    "lint": "echo 'Lint handled by root biome config'",
+    "test": "echo 'No tests yet for og-proxy-worker'"
+  },
+  "dependencies": {
+    "lz-string": "^1.5.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260122.0",
+    "typescript": "^5.9.3",
+    "wrangler": "^4.59.3"
+  }
+}

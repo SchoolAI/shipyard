@@ -1,0 +1,23 @@
+name = "shipyard-og-proxy"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+account_id = "191909c2c1a28f6cb73d12e3362b874c"  # Jacob@schoolai.com's Account
+
+# Development settings
+[dev]
+port = 4446
+local_protocol = "http"
+
+# Production environment variables
+# NOTE: CANONICAL_BASE_URL should be the worker URL since that's what users share
+# Users share worker URL → crawler gets OG tags → regular users get proxied to GitHub Pages
+[vars]
+ENVIRONMENT = "production"
+UPSTREAM_URL = "https://schoolai.github.io/shipyard"
+CANONICAL_BASE_URL = "https://shipyard-og-proxy.jacob-191.workers.dev"
+
+# Development environment overrides (use: wrangler dev --env development)
+[env.development.vars]
+ENVIRONMENT = "development"
+UPSTREAM_URL = "http://localhost:5173"
+CANONICAL_BASE_URL = "http://localhost:4446"
