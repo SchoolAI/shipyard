@@ -5,16 +5,20 @@
       "path": "."
     },
     {
-      "name": "\ud83c\udf33\ud83d\udcac 153-diff-commenting",
-      "path": "../shipyard-wt/153-diff-commenting"
-    },
-    {
       "name": "\ud83c\udf33\ud83d\udcf8 22-url-embed-snapshot",
       "path": "../shipyard-wt/22-url-embed-snapshot"
     },
     {
       "name": "\ud83c\udf33\ud83d\udee1\ufe0f 103-exit-plan-permissions",
       "path": "../shipyard-wt/103-exit-plan-permissions"
+    },
+    {
+      "name": "\ud83c\udf33\ud83d\udcac 132-comment-reply-api",
+      "path": "../shipyard-wt/132-comment-reply-api"
+    },
+    {
+      "name": "\ud83c\udf33\ud83d\udc41\ufe0f 162-agent-activity",
+      "path": "../shipyard-wt/162-agent-activity"
     }
   ]
 }

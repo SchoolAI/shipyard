@@ -28491,7 +28491,7 @@ init_cjs_shims();
 // ../../packages/schema/dist/index.mjs
 init_cjs_shims();
 
-// ../../packages/schema/dist/yjs-helpers-DzEyLz-f.mjs
+// ../../packages/schema/dist/yjs-helpers-Dr9oWyS2.mjs
 init_cjs_shims();
 
 // ../../packages/schema/dist/plan.mjs
@@ -42694,7 +42694,8 @@ var LocalDiffCommentSchema = external_exports.object({
   createdAt: external_exports.number(),
   baseRef: external_exports.string(),
   resolved: external_exports.boolean().optional(),
-  lineContentHash: external_exports.string().optional()
+  lineContentHash: external_exports.string().optional(),
+  machineId: external_exports.string().optional()
 });
 var GitHubArtifactParseSchema = external_exports.object({
   id: external_exports.string(),
@@ -42723,10 +42724,33 @@ var LocalArtifactParseSchema = external_exports.object({
   localArtifactId: external_exports.string()
 });
 
-// ../../packages/schema/dist/yjs-helpers-DzEyLz-f.mjs
+// ../../packages/schema/dist/yjs-helpers-Dr9oWyS2.mjs
 function assertNever2(value) {
   throw new Error(`Unhandled discriminated union member: ${JSON.stringify(value)}`);
 }
+var SyncedFileChangeSchema = external_exports.object({
+  path: external_exports.string(),
+  status: external_exports.enum([
+    "added",
+    "modified",
+    "deleted",
+    "renamed"
+  ]),
+  patch: external_exports.string(),
+  staged: external_exports.boolean()
+});
+var ChangeSnapshotSchema = external_exports.object({
+  machineId: external_exports.string(),
+  machineName: external_exports.string(),
+  ownerId: external_exports.string(),
+  headSha: external_exports.string(),
+  branch: external_exports.string(),
+  isLive: external_exports.boolean(),
+  updatedAt: external_exports.number(),
+  files: external_exports.array(SyncedFileChangeSchema),
+  totalAdditions: external_exports.number(),
+  totalDeletions: external_exports.number()
+});
 var AgentPresenceSchema = external_exports.object({
   agentType: external_exports.string(),
   sessionId: external_exports.string(),
@@ -43044,7 +43068,8 @@ var YDOC_KEYS = {
   EVENTS: "events",
   SNAPSHOTS: "snapshots",
   INPUT_REQUESTS: "inputRequests",
-  LOCAL_DIFF_COMMENTS: "localDiffComments"
+  LOCAL_DIFF_COMMENTS: "localDiffComments",
+  CHANGE_SNAPSHOTS: "changeSnapshots"
 };
 var validKeys = new Set(Object.values(YDOC_KEYS));
 var CommentBodySchema = external_exports.union([external_exports.string(), external_exports.array(external_exports.unknown())]);
@@ -44353,6 +44378,11 @@ var ImportConversationResponseSchema = external_exports.discriminatedUnion("succ
   success: external_exports.literal(false),
   error: external_exports.string()
 })]);
+var MachineInfoResponseSchema = external_exports.object({
+  machineId: external_exports.string(),
+  machineName: external_exports.string(),
+  ownerId: external_exports.string()
+});
 var t = initTRPC.context().create({ allowOutsideOfServer: true });
 var router = t.router;
 var publicProcedure = t.procedure;
@@ -44459,6 +44489,9 @@ var planRouter = router({
       error: "No working directory available"
     };
     return ctx.getFileContent(cwd, input.filePath);
+  }),
+  getMachineInfo: publicProcedure.input(PlanIdSchema).output(MachineInfoResponseSchema).query(async ({ ctx }) => {
+    return ctx.getMachineInfo();
   })
 });
 var subscriptionRouter = router({
