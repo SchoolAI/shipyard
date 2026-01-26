@@ -29,8 +29,10 @@ import { addArtifactTool } from './add-artifact.js';
 /**
  * Extract text from MCP tool result content.
  * MCP tools return { content: [{ type: 'text', text: string }] }.
+ * Defensive against malformed results.
  */
-function getToolResultText(result: { content: unknown[] }): string {
+function getToolResultText(result: { content?: unknown[] } | undefined | null): string {
+  if (!result || !Array.isArray(result.content)) return '';
   const first = result.content[0];
   if (!first || typeof first !== 'object') return '';
   const record = Object.fromEntries(Object.entries(first));
@@ -38,9 +40,63 @@ function getToolResultText(result: { content: unknown[] }): string {
   return typeof text === 'string' ? text : '';
 }
 
+/**
+ * Serialize an error for logging and user display.
+ * Handles: Error, ZodError, plain objects, and error.cause chain.
+ * Returns { details, message, stack } for structured logging.
+ */
+async function serializeError(error: unknown): Promise<{
+  details: Record<string, unknown>;
+  message: string;
+  stack?: string;
+}> {
+  const { z } = await import('zod');
+
+  if (error instanceof z.ZodError) {
+    const formattedIssues = error.issues
+      .map((issue) => `  - ${issue.path.join('.')}: ${issue.message}`)
+      .join('\n');
+    const message = `Validation error:\n${formattedIssues}`;
+    return {
+      details: { name: 'ZodError', message, issues: error.issues, stack: error.stack },
+      message,
+      stack: error.stack,
+    };
+  }
+
+  if (error instanceof Error) {
+    return {
+      details: {
+        name: error.name,
+        message: error.message,
+        stack: error.stack,
+        cause: error.cause instanceof Error ? error.cause.message : error.cause,
+      },
+      message: error.message,
+      stack: error.stack,
+    };
+  }
+
+  if (error && typeof error === 'object') {
+    /** Use 'in' check to safely access message property without type assertion */
+    const message =
+      'message' in error && typeof error.message === 'string'
+        ? error.message
+        : JSON.stringify(error).slice(0, 500) || 'Unknown error';
+    return {
+      details: { raw: JSON.stringify(error).slice(0, 1000) },
+      message,
+    };
+  }
+
+  const message = String(error) || 'Unknown error';
+  return { details: { raw: message }, message };
+}
+
 import { completeTaskTool } from './complete-task.js';
 import { createTaskTool } from './create-task.js';
 import { linkPRTool } from './link-pr.js';
+import { postUpdateTool } from './post-update.js';
 import { readDiffCommentsTool } from './read-diff-comments.js';
 import { readTaskTool } from './read-task.js';
 import { regenerateSessionTokenTool } from './regenerate-session-token.js';
@@ -51,7 +107,7 @@ import { updateTaskTool } from './update-task.js';
 
 const BUNDLED_DOCS = `Execute TypeScript code that calls Shipyard APIs. Use this for multi-step workflows to reduce round-trips.
 
-⚠️ IMPORTANT LIMITATION: Dynamic imports (\`await import()\`) are NOT supported in the VM execution context. Use only the pre-provided functions in the execution environment (createTask, readTask, readDiffComments, updateTask, addArtifact, completeTask, updateBlockContent, linkPR, requestUserInput, regenerateSessionToken). All necessary APIs are already available in the sandbox.
+⚠️ IMPORTANT LIMITATION: Dynamic imports (\`await import()\`) are NOT supported in the VM execution context. Use only the pre-provided functions in the execution environment (createTask, readTask, readDiffComments, updateTask, addArtifact, completeTask, updateBlockContent, linkPR, requestUserInput, regenerateSessionToken, postUpdate). All necessary APIs are already available in the sandbox.
 
 ## Available APIs
 
@@ -503,6 +559,40 @@ await addArtifact({
   filePath: '/tmp/screenshot.png',
   deliverableId: 'del_xxx'
 });
+\`\`\`
+
+---
+
+### postUpdate(opts): Promise<{ success, isError?, error? }>
+Post a progress update to the task timeline.
+
+Use this to communicate status updates to humans watching your work:
+- "Starting work on authentication module"
+- "Milestone: API integration complete"
+- "Found edge case with rate limiting, investigating"
+
+Updates appear in the Activity tab and keep reviewers informed.
+
+Parameters:
+- taskId (string): The task ID
+- sessionToken (string): Session token from createTask
+- message (string): Update content (markdown supported)
+
+Returns:
+- success: Boolean indicating update was posted (true on success, false on error)
+- isError: Boolean indicating if an error occurred
+- error: Error message (only present when isError is true)
+
+Example:
+\`\`\`typescript
+const result = await postUpdate({
+  taskId,
+  sessionToken,
+  message: "Starting work on authentication module"
+});
+if (result.isError) {
+  console.log('Failed:', result.error);
+}
 \`\`\`
 
 ---
@@ -989,6 +1079,17 @@ async function regenerateSessionToken(taskId: string) {
   };
 }
 
+async function postUpdate(opts: { taskId: string; sessionToken: string; message: string }) {
+  const result = await postUpdateTool.handler(opts);
+  const text = getToolResultText(result);
+
+  if (result.isError) {
+    return { isError: true as const, error: text, success: false as const };
+  }
+
+  return { isError: false as const, success: true as const };
+}
+
 export const executeCodeTool = {
   definition: {
     name: TOOL_NAMES.EXECUTE_CODE,
@@ -1063,6 +1164,7 @@ export const executeCodeTool = {
         linkPR,
         requestUserInput,
         regenerateSessionToken,
+        postUpdate,
         encodeVideo,
         child_process,
         fs,
@@ -1118,10 +1220,15 @@ The script will exit when the human approves or requests changes.`,
 
       return { content };
     } catch (error) {
-      logger.error({ error, code }, 'Code execution failed');
-      const message = error instanceof Error ? error.message : 'Unknown error';
+      const { details, message, stack } = await serializeError(error);
+      logger.error({ error: details, code }, 'Code execution failed');
+
+      const errorText = stack
+        ? `Execution error: ${message}\n\nStack trace:\n${stack}`
+        : `Execution error: ${message}`;
+
       return {
-        content: [{ type: 'text', text: `Execution error: ${message}` }],
+        content: [{ type: 'text', text: errorText }],
         isError: true,
       };
     }
