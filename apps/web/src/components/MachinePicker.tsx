@@ -1,5 +1,5 @@
 import type { ChangeSnapshot } from '@shipyard/schema';
-import { MachineCard } from './MachineCard';
+import { MachineCard } from './machineCard';
 
 export interface MachinePickerProps {
   snapshots: Map<string, ChangeSnapshot>;
