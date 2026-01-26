@@ -26,7 +26,7 @@ import { assertNever } from '@/utils/assert-never';
 import { trpc } from '@/utils/trpc';
 import { type DiffViewMode, FileDiffView } from './diff';
 import { LocalChangesViewer } from './LocalChangesViewer';
-import { MachinePicker } from './MachinePicker';
+import { MachinePicker } from './machinePicker';
 
 /** --- LocalStorage Helpers --- */
 

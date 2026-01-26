@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import * as Y from 'yjs';
+import type { ChangeSnapshot } from './change-snapshot.js';
 import type { Deliverable, LinkedPR } from './plan.js';
 import {
   addArtifact,
@@ -7,6 +8,8 @@ import {
   approveUser,
   getApprovedUsers,
   getArtifacts,
+  getChangeSnapshot,
+  getChangeSnapshots,
   getDeliverables,
   getLinkedPR,
   getLinkedPRs,
@@ -22,10 +25,13 @@ import {
   isUserRejected,
   linkArtifactToDeliverable,
   linkPR,
+  markMachineDisconnected,
   markPlanAsViewed,
   rejectUser,
   removeArtifact,
+  removeChangeSnapshot,
   revokeUser,
+  setChangeSnapshot,
   setPlanMetadata,
   transitionPlanStatus,
   unlinkPR,
@@ -1523,5 +1529,139 @@ describe('transitionPlanStatus', () => {
         expect(metadata.completedBy).toBe('completer1');
       }
     });
+  });
+});
+
+describe('Change Snapshot helpers', () => {
+  let ydoc: Y.Doc;
+
+  const createSnapshot = (
+    machineId: string,
+    overrides?: Partial<ChangeSnapshot>
+  ): ChangeSnapshot => ({
+    machineId,
+    machineName: `Machine ${machineId}`,
+    ownerId: 'test-user',
+    headSha: 'abc123',
+    branch: 'main',
+    isLive: true,
+    updatedAt: Date.now(),
+    files: [],
+    totalAdditions: 0,
+    totalDeletions: 0,
+    ...overrides,
+  });
+
+  beforeEach(() => {
+    ydoc = new Y.Doc();
+  });
+
+  it('getChangeSnapshots returns empty Map for new doc', () => {
+    const snapshots = getChangeSnapshots(ydoc);
+    expect(snapshots.size).toBe(0);
+  });
+
+  it('setChangeSnapshot adds snapshot', () => {
+    const snapshot = createSnapshot('machine-1');
+
+    setChangeSnapshot(ydoc, snapshot);
+
+    const snapshots = getChangeSnapshots(ydoc);
+    expect(snapshots.size).toBe(1);
+    expect(snapshots.get('machine-1')).toMatchObject({
+      machineId: 'machine-1',
+      machineName: 'Machine machine-1',
+      ownerId: 'test-user',
+    });
+  });
+
+  it('getChangeSnapshot retrieves specific snapshot', () => {
+    const snapshot1 = createSnapshot('machine-1', { machineName: 'First' });
+    const snapshot2 = createSnapshot('machine-2', { machineName: 'Second' });
+
+    setChangeSnapshot(ydoc, snapshot1);
+    setChangeSnapshot(ydoc, snapshot2);
+
+    const retrieved = getChangeSnapshot(ydoc, 'machine-2');
+    expect(retrieved).not.toBe(null);
+    expect(retrieved?.machineName).toBe('Second');
+  });
+
+  it('getChangeSnapshot returns null for non-existent machineId', () => {
+    const result = getChangeSnapshot(ydoc, 'nonexistent');
+    expect(result).toBe(null);
+  });
+
+  it('markMachineDisconnected sets isLive to false', () => {
+    const snapshot = createSnapshot('machine-1', { isLive: true });
+    setChangeSnapshot(ydoc, snapshot);
+
+    const result = markMachineDisconnected(ydoc, 'machine-1');
+
+    expect(result).toBe(true);
+    const updated = getChangeSnapshot(ydoc, 'machine-1');
+    expect(updated?.isLive).toBe(false);
+  });
+
+  it('markMachineDisconnected returns false for non-existent machine', () => {
+    const result = markMachineDisconnected(ydoc, 'nonexistent');
+    expect(result).toBe(false);
+  });
+
+  it('markMachineDisconnected preserves other snapshot fields', () => {
+    const snapshot = createSnapshot('machine-1', {
+      branch: 'feature/test',
+      files: [{ path: 'file.ts', status: 'modified', patch: '', staged: false }],
+      totalAdditions: 10,
+      totalDeletions: 5,
+    });
+    setChangeSnapshot(ydoc, snapshot);
+
+    markMachineDisconnected(ydoc, 'machine-1');
+
+    const updated = getChangeSnapshot(ydoc, 'machine-1');
+    expect(updated?.branch).toBe('feature/test');
+    expect(updated?.files).toHaveLength(1);
+    expect(updated?.totalAdditions).toBe(10);
+    expect(updated?.totalDeletions).toBe(5);
+  });
+
+  it('removeChangeSnapshot deletes entry', () => {
+    const snapshot = createSnapshot('machine-1');
+    setChangeSnapshot(ydoc, snapshot);
+
+    const result = removeChangeSnapshot(ydoc, 'machine-1');
+
+    expect(result).toBe(true);
+    expect(getChangeSnapshots(ydoc).size).toBe(0);
+  });
+
+  it('removeChangeSnapshot returns false for non-existent entry', () => {
+    const result = removeChangeSnapshot(ydoc, 'nonexistent');
+    expect(result).toBe(false);
+  });
+
+  it('setChangeSnapshot overwrites existing snapshot for same machineId', () => {
+    const snapshot1 = createSnapshot('machine-1', { branch: 'main' });
+    const snapshot2 = createSnapshot('machine-1', { branch: 'develop' });
+
+    setChangeSnapshot(ydoc, snapshot1);
+    setChangeSnapshot(ydoc, snapshot2);
+
+    const snapshots = getChangeSnapshots(ydoc);
+    expect(snapshots.size).toBe(1);
+    expect(snapshots.get('machine-1')?.branch).toBe('develop');
+  });
+
+  it('can store multiple snapshots from different machines', () => {
+    setChangeSnapshot(ydoc, createSnapshot('machine-1'));
+    setChangeSnapshot(ydoc, createSnapshot('machine-2'));
+    setChangeSnapshot(ydoc, createSnapshot('machine-3'));
+
+    const snapshots = getChangeSnapshots(ydoc);
+    expect(snapshots.size).toBe(3);
+    expect(snapshots.has('machine-1')).toBe(true);
+    expect(snapshots.has('machine-2')).toBe(true);
+    expect(snapshots.has('machine-3')).toBe(true);
   });
 });
