@@ -42418,28 +42418,10 @@ var PlanEventBaseSchema = external_exports.object({
   inboxWorthy: external_exports.boolean().optional(),
   inboxFor: external_exports.union([external_exports.string(), external_exports.array(external_exports.string())]).optional()
 });
-var AgentActivityDataSchema = external_exports.discriminatedUnion("activityType", [
-  external_exports.object({
-    activityType: external_exports.literal("help_request"),
-    requestId: external_exports.string(),
-    message: external_exports.string()
-  }),
-  external_exports.object({
-    activityType: external_exports.literal("help_request_resolved"),
-    requestId: external_exports.string(),
-    resolution: external_exports.string().optional()
-  }),
-  external_exports.object({
-    activityType: external_exports.literal("blocker"),
-    message: external_exports.string(),
-    requestId: external_exports.string()
-  }),
-  external_exports.object({
-    activityType: external_exports.literal("blocker_resolved"),
-    requestId: external_exports.string(),
-    resolution: external_exports.string().optional()
-  })
-]);
+var AgentActivityDataSchema = external_exports.object({
+  activityType: external_exports.literal("update"),
+  message: external_exports.string()
+});
 var PlanEventSchema = external_exports.discriminatedUnion("type", [
   PlanEventBaseSchema.extend({ type: external_exports.enum([
     "plan_created",
@@ -44326,6 +44308,7 @@ var TOOL_NAMES = {
   CREATE_TASK: "create_task",
   EXECUTE_CODE: "execute_code",
   LINK_PR: "link_pr",
+  POST_UPDATE: "post_update",
   READ_DIFF_COMMENTS: "read_diff_comments",
   READ_TASK: "read_task",
   REGENERATE_SESSION_TOKEN: "regenerate_session_token",
@@ -44537,6 +44520,7 @@ var TOOL_NAMES2 = {
   CREATE_TASK: "create_task",
   EXECUTE_CODE: "execute_code",
   LINK_PR: "link_pr",
+  POST_UPDATE: "post_update",
   READ_DIFF_COMMENTS: "read_diff_comments",
   READ_TASK: "read_task",
   REGENERATE_SESSION_TOKEN: "regenerate_session_token",
@@ -44774,6 +44758,25 @@ await addArtifact({
 \`\`\`
 
 When the last deliverable gets an artifact, the task auto-completes and returns a snapshot URL.`;
+var POSTING_UPDATES_SECTION = `## Posting Progress Updates
+
+For long-running tasks, keep reviewers informed with periodic updates:
+
+\`\`\`typescript
+await postUpdate({
+  taskId,
+  sessionToken,
+  message: "Starting work on authentication module"
+});
+\`\`\`
+
+**When to post updates:**
+- After completing a significant milestone
+- When switching focus to a different part of the task
+- If you've been working for a while without visible output
+- When you encounter something interesting or unexpected
+
+Think about what a human watching your work would want to know.`;
 var IMPORTANT_NOTES = `## Important Notes for Claude Code
 
 - **DO NOT call \`createTask()\` directly** - The hook handles task creation when you enter task mode
@@ -44789,6 +44792,8 @@ var CLAUDE_CODE_INSTRUCTIONS = [
   USER_INPUT_SECTION,
   "",
   TASK_MODE_WORKFLOW,
+  "",
+  POSTING_UPDATES_SECTION,
   "",
   DELIVERABLES_SECTION,
   "",

@@ -169,12 +169,7 @@ export type PlanEventType = (typeof PlanEventTypes)[number];
  * Agent activity types for tracking agent work status and updates.
  * Used in agent_activity events to communicate agent state to humans.
  */
-export const AgentActivityTypes = [
-  'help_request',
-  'help_request_resolved',
-  'blocker',
-  'blocker_resolved',
-] as const;
+export const AgentActivityTypes = ['update'] as const;
 export type AgentActivityType = (typeof AgentActivityTypes)[number];
 
 /** Base fields shared by all plan events */
@@ -347,29 +342,11 @@ const PlanEventBaseSchema = z.object({
   inboxFor: z.union([z.string(), z.array(z.string())]).optional(),
 });
 
-/** Zod schema for agent activity data discriminated union */
-export const AgentActivityDataSchema = z.discriminatedUnion('activityType', [
-  z.object({
-    activityType: z.literal('help_request'),
-    requestId: z.string(),
-    message: z.string(),
-  }),
-  z.object({
-    activityType: z.literal('help_request_resolved'),
-    requestId: z.string(),
-    resolution: z.string().optional(),
-  }),
-  z.object({
-    activityType: z.literal('blocker'),
-    message: z.string(),
-    requestId: z.string(),
-  }),
-  z.object({
-    activityType: z.literal('blocker_resolved'),
-    requestId: z.string(),
-    resolution: z.string().optional(),
-  }),
-]);
+/** Zod schema for agent activity data - simple update type */
+export const AgentActivityDataSchema = z.object({
+  activityType: z.literal('update'),
+  message: z.string(),
+});
 
 /**
  * Discriminated union for agent activity event data.
