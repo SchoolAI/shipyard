@@ -28491,7 +28491,7 @@ init_cjs_shims();
 // ../../packages/schema/dist/index.mjs
 init_cjs_shims();
 
-// ../../packages/schema/dist/yjs-helpers-Dr9oWyS2.mjs
+// ../../packages/schema/dist/yjs-helpers-CmikQBE7.mjs
 init_cjs_shims();
 
 // ../../packages/schema/dist/plan.mjs
@@ -42706,7 +42706,7 @@ var LocalArtifactParseSchema = external_exports.object({
   localArtifactId: external_exports.string()
 });
 
-// ../../packages/schema/dist/yjs-helpers-Dr9oWyS2.mjs
+// ../../packages/schema/dist/yjs-helpers-CmikQBE7.mjs
 function assertNever2(value) {
   throw new Error(`Unhandled discriminated union member: ${JSON.stringify(value)}`);
 }
@@ -42727,6 +42727,7 @@ var ChangeSnapshotSchema = external_exports.object({
   ownerId: external_exports.string(),
   headSha: external_exports.string(),
   branch: external_exports.string(),
+  cwd: external_exports.string(),
   isLive: external_exports.boolean(),
   updatedAt: external_exports.number(),
   files: external_exports.array(SyncedFileChangeSchema),
@@ -44364,7 +44365,8 @@ var ImportConversationResponseSchema = external_exports.discriminatedUnion("succ
 var MachineInfoResponseSchema = external_exports.object({
   machineId: external_exports.string(),
   machineName: external_exports.string(),
-  ownerId: external_exports.string()
+  ownerId: external_exports.string(),
+  cwd: external_exports.string()
 });
 var t = initTRPC.context().create({ allowOutsideOfServer: true });
 var router = t.router;

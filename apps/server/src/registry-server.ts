@@ -716,6 +716,7 @@ function createContext(): Context & {
       machineId: getMachineId(),
       machineName: getMachineName(),
       ownerId: await getGitHubUsername(),
+      cwd: process.cwd(),
     }),
   };
 }

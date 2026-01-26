@@ -38,7 +38,7 @@ function convertToSyncedFiles(localChanges: LocalChangesResult): SyncedFileChang
  */
 function buildSnapshot(
   localChanges: LocalChangesResult,
-  machineInfo: { machineId: string; machineName: string; ownerId: string }
+  machineInfo: { machineId: string; machineName: string; ownerId: string; cwd: string }
 ): ChangeSnapshot {
   const files = convertToSyncedFiles(localChanges);
   let totalAdditions = 0;
@@ -57,6 +57,7 @@ function buildSnapshot(
     ownerId: machineInfo.ownerId,
     headSha: localChanges.available ? (localChanges.headSha ?? '') : '',
     branch: localChanges.available ? localChanges.branch : '',
+    cwd: machineInfo.cwd,
     isLive: true,
     updatedAt: Date.now(),
     files,

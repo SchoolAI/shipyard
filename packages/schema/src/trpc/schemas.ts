@@ -155,6 +155,7 @@ export const MachineInfoResponseSchema = z.object({
   machineId: z.string(),
   machineName: z.string(),
   ownerId: z.string(),
+  cwd: z.string(),
 });
 
 export type MachineInfoResponse = z.infer<typeof MachineInfoResponseSchema>;
