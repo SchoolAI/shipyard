@@ -16,13 +16,17 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { type NodeApi, type NodeRendererProps, Tree, type TreeApi } from 'react-arborist';
 import type * as Y from 'yjs';
+import { useChangeSnapshots } from '@/hooks/useChangeSnapshots';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
 import { useLinkedPRs } from '@/hooks/useLinkedPRs';
 import { useLocalChanges } from '@/hooks/useLocalChanges';
 import { usePRReviewComments } from '@/hooks/usePRReviewComments';
+import { useSyncChangeSnapshot } from '@/hooks/useSyncChangeSnapshot';
 import { assertNever } from '@/utils/assert-never';
+import { trpc } from '@/utils/trpc';
 import { type DiffViewMode, FileDiffView } from './diff';
 import { LocalChangesViewer } from './LocalChangesViewer';
+import { MachinePicker } from './MachinePicker';
 
 /** --- LocalStorage Helpers --- */
 
@@ -74,6 +78,7 @@ interface ChangesViewProps {
   onChangesViewState?: (state: ChangesViewState) => void;
 }
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Main view component with multiple conditional states (local/PR source, machine selection, fallback handling)
 export function ChangesView({
   ydoc,
   metadata,
@@ -87,6 +92,16 @@ export function ChangesView({
   /** Determine default source: local if available, otherwise PR */
   const [source, setSource] = useState<ChangeSource>('local');
 
+  /** Machine selection for viewing remote snapshots */
+  const [selectedMachine, setSelectedMachine] = useState<string | null>(null);
+  const changeSnapshots = useChangeSnapshots(ydoc);
+
+  /** Get machine info for determining local machine ID */
+  const { data: machineInfo } = trpc.plan.getMachineInfo.useQuery(
+    { planId: metadata.id },
+    { enabled: source === 'local' }
+  );
+
   /** Track PR fetching state and provide refetch trigger */
   const [prFetching, setPRFetching] = useState(false);
   const [prRefetchTrigger, setPRRefetchTrigger] = useState(0);
@@ -99,12 +114,29 @@ export function ChangesView({
     refetch: refetchLocal,
   } = useLocalChanges(metadata.id, { enabled: source === 'local' && isActive });
 
+  /** Sync local changes to CRDT for other machines to see */
+  useSyncChangeSnapshot(ydoc, localChanges, metadata.id, {
+    enabled: source === 'local' && !!localChanges?.available,
+  });
+
   /** Refetch local changes when tab becomes active */
   useEffect(() => {
     if (isActive && source === 'local') {
       refetchLocal();
     }
   }, [isActive, source, refetchLocal]);
+
+  /** Auto-poll PR diffs every 15 seconds when PR tab is active */
+  useEffect(() => {
+    if (source !== 'pr' || !isActive) return;
+
+    const POLL_INTERVAL_MS = 15000;
+    const interval = setInterval(() => {
+      setPRRefetchTrigger((prev) => prev + 1);
+    }, POLL_INTERVAL_MS);
+
+    return () => clearInterval(interval);
+  }, [source, isActive]);
 
   /** Derive selected PR and hasPRs early so they can be used in effects */
   const selected = linkedPRs.find((pr) => pr.prNumber === selectedPR) ?? linkedPRs[0] ?? null;
@@ -200,17 +232,55 @@ export function ChangesView({
     refreshPRStatus();
   }, [linkedPRs, metadata.repo, identity?.token, ydoc]);
 
+  const localMachineId = machineInfo?.machineId ?? null;
+  const isViewingRemote = selectedMachine !== null && selectedMachine !== localMachineId;
+  const selectedSnapshot = selectedMachine ? changeSnapshots.get(selectedMachine) : undefined;
+
+  const hasNoLocalRepo = localChanges?.available === false && localChanges.reason === 'no_cwd';
+  const hasRemoteSnapshots = changeSnapshots.size > 0;
+  const shouldShowMachinePicker =
+    changeSnapshots.size > 1 || (hasNoLocalRepo && hasRemoteSnapshots);
+
   return (
     <div className="max-w-full mx-auto p-2 md:p-4 h-full flex flex-col">
       {/* Content based on source - controls moved to header */}
       {source === 'local' ? (
-        <div className="flex-1 min-h-0">
-          <LocalChangesViewer
-            data={localChanges}
-            isLoading={localLoading}
-            planId={metadata.id}
-            ydoc={ydoc}
-          />
+        <div className="flex-1 min-h-0 flex flex-col">
+          {/* Machine picker when multiple machines have snapshots or fallback for no local repo */}
+          {shouldShowMachinePicker && (
+            <MachinePicker
+              snapshots={changeSnapshots}
+              localMachineId={localMachineId}
+              selectedMachineId={selectedMachine}
+              onSelectMachine={setSelectedMachine}
+            />
+          )}
+
+          {/* Show remote snapshot when viewing another machine */}
+          {isViewingRemote && selectedSnapshot ? (
+            <LocalChangesViewer
+              data={undefined}
+              isLoading={false}
+              planId={metadata.id}
+              ydoc={ydoc}
+              remoteSnapshot={selectedSnapshot}
+              isRemote={true}
+            />
+          ) : hasNoLocalRepo && hasRemoteSnapshots && !selectedMachine ? (
+            <Alert status="default">
+              <Alert.Content>
+                <Alert.Title>No Local Working Directory</Alert.Title>
+                <Alert.Description>Select a machine above to view their changes.</Alert.Description>
+              </Alert.Content>
+            </Alert>
+          ) : (
+            <LocalChangesViewer
+              data={localChanges}
+              isLoading={localLoading}
+              planId={metadata.id}
+              ydoc={ydoc}
+            />
+          )}
         </div>
       ) : (
         <>

@@ -4,7 +4,12 @@
  * Supports commenting on local diffs with staleness detection.
  */
 import { Alert, Button, Card, Chip } from '@heroui/react';
-import type { LocalChangesResponse, LocalChangesResult, LocalFileChange } from '@shipyard/schema';
+import type {
+  ChangeSnapshot,
+  LocalChangesResponse,
+  LocalChangesResult,
+  LocalFileChange,
+} from '@shipyard/schema';
 import { Check, ChevronRight, CircleDot, FileText, Folder, GitBranch, Plus } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { type NodeApi, type NodeRendererProps, Tree, type TreeApi } from 'react-arborist';
@@ -43,12 +48,62 @@ interface LocalChangesViewerProps {
   planId: string;
   /** Y.Doc for comment storage (required for commenting support) */
   ydoc?: Y.Doc;
+  /** Remote snapshot to display instead of local data */
+  remoteSnapshot?: ChangeSnapshot;
+  /** Whether viewing remote machine's changes (disables commenting) */
+  isRemote?: boolean;
+}
+
+function convertSnapshotToLocalChanges(snapshot: ChangeSnapshot): LocalChangesResponse {
+  const stagedFiles: LocalFileChange[] = [];
+  const unstagedFiles: LocalFileChange[] = [];
+
+  for (const file of snapshot.files) {
+    const localFile: LocalFileChange = {
+      path: file.path,
+      status: file.status,
+      additions: file.patch.split('\n').filter((l) => l.startsWith('+')).length,
+      deletions: file.patch.split('\n').filter((l) => l.startsWith('-')).length,
+      patch: file.patch,
+    };
+
+    if (file.staged) {
+      stagedFiles.push(localFile);
+    } else {
+      unstagedFiles.push(localFile);
+    }
+  }
+
+  return {
+    available: true,
+    branch: snapshot.branch,
+    baseBranch: 'HEAD',
+    headSha: snapshot.headSha,
+    staged: stagedFiles,
+    unstaged: unstagedFiles,
+    untracked: [],
+    files: [...stagedFiles, ...unstagedFiles],
+  };
 }
 
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Multiple conditional states (loading, unavailable, empty, available) require branching
-export function LocalChangesViewer({ data, isLoading, planId, ydoc }: LocalChangesViewerProps) {
+export function LocalChangesViewer({
+  data,
+  isLoading,
+  planId,
+  ydoc,
+  remoteSnapshot,
+  isRemote = false,
+}: LocalChangesViewerProps) {
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<DiffViewMode>(getDiffViewModePreference);
+
+  const effectiveData = useMemo(() => {
+    if (remoteSnapshot) {
+      return convertSnapshotToLocalChanges(remoteSnapshot);
+    }
+    return data;
+  }, [remoteSnapshot, data]);
 
   /** Handle view mode change with localStorage persistence */
   const handleViewModeChange = useCallback((mode: DiffViewMode) => {
@@ -57,7 +112,7 @@ export function LocalChangesViewer({ data, isLoading, planId, ydoc }: LocalChang
   }, []);
 
   /** Loading state */
-  if (isLoading) {
+  if (isLoading && !remoteSnapshot) {
     return (
       <Card>
         <Card.Content className="p-8 text-center">
@@ -69,9 +124,12 @@ export function LocalChangesViewer({ data, isLoading, planId, ydoc }: LocalChang
   }
 
   /** Unavailable state */
-  if (!data || !data.available) {
-    const reason = data && !data.available ? data.reason : 'unknown';
-    const message = data && !data.available ? data.message : 'Local changes unavailable';
+  if (!effectiveData || !effectiveData.available) {
+    const reason = effectiveData && !effectiveData.available ? effectiveData.reason : 'unknown';
+    const message =
+      effectiveData && !effectiveData.available
+        ? effectiveData.message
+        : 'Local changes unavailable';
 
     return (
       <Alert status={reason === 'no_cwd' ? 'default' : 'warning'}>
@@ -94,13 +152,13 @@ export function LocalChangesViewer({ data, isLoading, planId, ydoc }: LocalChang
   /** Available state - show files and diff */
   return (
     <LocalChangesContent
-      data={data}
+      data={effectiveData}
       selectedFile={selectedFile}
       setSelectedFile={setSelectedFile}
       viewMode={viewMode}
       onViewModeChange={handleViewModeChange}
       planId={planId}
-      ydoc={ydoc}
+      ydoc={isRemote ? undefined : ydoc}
     />
   );
 }
