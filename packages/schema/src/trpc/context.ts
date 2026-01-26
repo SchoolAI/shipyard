@@ -35,6 +35,15 @@ export interface PlanStore {
 }
 
 /**
+ * Machine identity information for sync tracking.
+ */
+export interface MachineInfo {
+  machineId: string;
+  machineName: string;
+  ownerId: string;
+}
+
+/**
  * tRPC context provided to all procedures.
  * Dependencies are injected by the server's context factory.
  */
@@ -53,6 +62,8 @@ export interface Context {
   getLocalChanges: (cwd: string) => LocalChangesResult;
   /** Get content of a file from a working directory */
   getFileContent: (cwd: string, filePath: string) => { content: string | null; error?: string };
+  /** Get machine identity information */
+  getMachineInfo: () => Promise<MachineInfo>;
 }
 
 /**

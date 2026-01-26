@@ -8,6 +8,7 @@ import {
   getPlanMetadata,
   HasConnectionsResponseSchema,
   LocalChangesResultSchema,
+  MachineInfoResponseSchema,
   PlanIdSchema,
   PlanStatusResponseSchema,
 } from '../schemas.js';
@@ -132,6 +133,13 @@ export const planRouter = router({
       }
 
       return ctx.getFileContent(cwd, input.filePath);
+    }),
+
+  getMachineInfo: publicProcedure
+    .input(PlanIdSchema)
+    .output(MachineInfoResponseSchema)
+    .query(async ({ ctx }) => {
+      return ctx.getMachineInfo();
     }),
 });
 

@@ -27,6 +27,7 @@ import { getFileContent, getLocalChanges } from './git-local-changes.js';
 import { getOctokit, parseRepoString } from './github-artifacts.js';
 import { createHookHandlers } from './hook-handlers.js';
 import { logger } from './logger.js';
+import { getGitHubUsername, getMachineId, getMachineName } from './server-identity.js';
 import {
   attachObservers,
   type ChangeType,
@@ -711,6 +712,11 @@ function createContext(): Context & {
     conversationHandlers: createConversationHandlers(),
     getLocalChanges,
     getFileContent,
+    getMachineInfo: async () => ({
+      machineId: getMachineId(),
+      machineName: getMachineName(),
+      ownerId: await getGitHubUsername(),
+    }),
   };
 }
 

@@ -1,4 +1,5 @@
 import { execSync } from 'node:child_process';
+import crypto from 'node:crypto';
 import os from 'node:os';
 import { basename } from 'node:path';
 import type { EnvironmentContext } from '@shipyard/schema';
@@ -242,4 +243,49 @@ export function getEnvironmentContext(): EnvironmentContext {
     hostname: os.hostname(),
     repo: getRepositoryFullName() || undefined,
   };
+}
+
+let cachedMachineId: string | null = null;
+
+export function getMachineId(): string {
+  if (cachedMachineId) {
+    return cachedMachineId;
+  }
+
+  const hostname = os.hostname();
+  const user = process.env.USER || process.env.USERNAME;
+  const cwd = process.cwd();
+
+  if (!hostname) {
+    throw new Error('Could not determine hostname for machine ID');
+  }
+  if (!user) {
+    throw new Error('Could not determine username for machine ID (set USER or USERNAME env var)');
+  }
+
+  const hash = crypto.createHash('sha256');
+  hash.update(`${hostname}:${user}:${cwd}`);
+  cachedMachineId = hash.digest('hex').slice(0, 16);
+
+  logger.info({ machineId: cachedMachineId, hostname, user, cwd }, 'Generated machine ID');
+  return cachedMachineId;
+}
+
+export function getMachineName(): string {
+  const hostname = os.hostname();
+
+  if (hostname.endsWith('.local')) {
+    return hostname.slice(0, -6);
+  }
+
+  if (hostname.includes('-')) {
+    const parts = hostname.split('-');
+    if (parts.length >= 2) {
+      const possessivePart = parts[0];
+      const typePart = parts.slice(1).join(' ');
+      return `${possessivePart}'s ${typePart}`;
+    }
+  }
+
+  return hostname;
 }

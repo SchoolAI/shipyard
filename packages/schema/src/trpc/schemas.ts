@@ -150,3 +150,11 @@ export const ImportConversationResponseSchema = z.discriminatedUnion('success', 
 ]);
 
 export type ImportConversationResponse = z.infer<typeof ImportConversationResponseSchema>;
+
+export const MachineInfoResponseSchema = z.object({
+  machineId: z.string(),
+  machineName: z.string(),
+  ownerId: z.string(),
+});
+
+export type MachineInfoResponse = z.infer<typeof MachineInfoResponseSchema>;
