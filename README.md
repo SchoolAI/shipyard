@@ -47,14 +47,12 @@ Shipyard is just an MCP server. One command or a simple JSON config—works with
 Full experience with hooks, skills, and auto-task creation:
 
 ```bash
-/plugin install SchoolAI/shipyard
-```
+# Step 1: Add the marketplace
+/plugin marketplace add https://github.com/SchoolAI/shipyard.git
 
-> **Troubleshooting:** If install fails with a cache error, try the two-step process with the full git URL:
-> ```bash
-> /plugin marketplace add https://github.com/SchoolAI/shipyard.git
-> /plugin install shipyard@schoolai-shipyard
-> ```
+# Step 2: Install the plugin
+/plugin install shipyard@schoolai-shipyard
+```
 
 ### Cursor
 
