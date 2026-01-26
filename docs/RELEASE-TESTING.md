@@ -25,7 +25,7 @@ pnpm test  # Should see: 695 tests pass (389 schema + 155 server + 151 web)
 
 ### How RCs Work
 
-Every push to `main` automatically publishes a release candidate:
+With nightly builds (not per-push), RCs are created on a schedule:
 
 ```
 Version format: {base-version}-next.{commit-count}
@@ -52,6 +52,54 @@ This:
 - Downloads RC tarball from npm
 - Re-publishes as stable with `@latest` tag
 - Creates git tag and GitHub release
+
+---
+
+## Finding the Delta Between Releases
+
+With nightly builds, understanding what changed since the last release is critical for focused testing.
+
+### Identify Changes
+
+```bash
+# Find commits between last release tag and current RC
+git log --oneline v0.2.3..HEAD
+
+# Or between two commits
+git log --oneline <old-commit>..<new-commit>
+
+# Check what's new to test (last 2 weeks)
+git log --oneline --since="2 weeks ago" | head -20
+```
+
+### Key Patterns to Look For
+
+| Commit Prefix | What It Means | Testing Priority |
+|---------------|---------------|------------------|
+| `feat:` | New features | High - needs full testing |
+| `fix:` | Bug fixes | Medium - verify the fix works |
+| `refactor:` | Code restructuring | Medium - check for regressions |
+| `docs:` | Documentation only | Low - no functional testing |
+| `test:` | Test changes only | Low - run test suite |
+
+### High-Priority File Changes
+
+Watch for changes in these directories:
+
+- **`apps/server/src/tools/`** - New or modified MCP tools
+- **`apps/web/src/components/`** - UI changes needing visual verification
+- **`apps/hook/`** - Plan mode behavior changes
+- **`packages/schema/`** - Data model changes (may affect everything)
+
+### Quick Delta Check
+
+```bash
+# See files changed since last tag
+git diff --stat v0.2.3..HEAD
+
+# See just the apps/server/src/tools/ changes
+git log --oneline v0.2.3..HEAD -- apps/server/src/tools/
+```
 
 ---
 
@@ -163,11 +211,66 @@ await requestUserInput({
 - [ ] Plan mode hooks fire correctly
 - [ ] Session tokens work for authentication
 
+### 7. New Feature Testing
+
+Features added since the last release (check commit logs with `git log --oneline <last-tag>..HEAD`):
+
+| Feature Area | What to Test |
+|--------------|--------------|
+| Local changes / diff sync | Comments on uncommitted changes sync between machines |
+| PR linking | `linkPR` tool works, PR appears in task UI |
+| PR creation | Agent can create PRs via gh CLI, link shows in task |
+| New MCP tools | Check `apps/server/src/tools/` for new tools to test |
+| Activity timeline | `post_update` tool logs messages to timeline |
+
+**How to identify new features:**
+
+```bash
+# Find new/modified MCP tools
+git log --oneline v0.2.3..HEAD -- apps/server/src/tools/
+
+# Find UI changes
+git log --oneline v0.2.3..HEAD -- apps/web/src/
+
+# Find all feat: commits
+git log --oneline v0.2.3..HEAD | grep "feat:"
+```
+
 ---
 
 ## Bug Fix Workflow
 
 When bugs are found during RC testing:
+
+### Efficient Bug Filing with Sub-agents
+
+For bugs or documentation issues that don't need immediate fixing, spawn a background sub-agent to file the issue while you continue testing:
+
+**Pattern:**
+```
+Task: File an issue for [bug description].
+First run `gh issue list --limit 10` to understand the repo's issue conventions.
+Include:
+- Clear reproduction steps
+- Expected vs actual behavior
+- Priority level (P1=critical, P2=important, P3=nice-to-have)
+- Relevant file paths
+```
+
+**Why this works:**
+- Synchronous testing continues uninterrupted
+- Sub-agent learns repo conventions from existing issues
+- Issues get proper priority labels
+- No context lost - bug is documented immediately
+
+**Example sub-agent prompt:**
+```
+File a P2 issue for: "Rating input N/A option doesn't submit correctly"
+- Check existing issues first with `gh issue list`
+- Follow the repo's issue format
+- Add label: bug
+- Include file: apps/web/src/components/inputs/RatingInput.tsx
+```
 
 ### 1. Document the Bug
 
