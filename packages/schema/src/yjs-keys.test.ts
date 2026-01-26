@@ -18,6 +18,7 @@ describe('YDOC_KEYS', () => {
       SNAPSHOTS: 'snapshots',
       INPUT_REQUESTS: 'inputRequests',
       LOCAL_DIFF_COMMENTS: 'localDiffComments',
+      CHANGE_SNAPSHOTS: 'changeSnapshots',
     });
   });
 
@@ -47,6 +48,7 @@ describe('isValidYDocKey', () => {
     expect(isValidYDocKey('prReviewComments')).toBe(true);
     expect(isValidYDocKey('snapshots')).toBe(true);
     expect(isValidYDocKey('localDiffComments')).toBe(true);
+    expect(isValidYDocKey('changeSnapshots')).toBe(true);
   });
 
   it('should return false for unknown keys', () => {

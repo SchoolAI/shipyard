@@ -1,6 +1,7 @@
 import { nanoid } from 'nanoid';
 import * as Y from 'yjs';
 import { assertNever } from './assert-never.js';
+import { type ChangeSnapshot, ChangeSnapshotSchema } from './change-snapshot.js';
 import { type AgentPresence, AgentPresenceSchema } from './hook-api.js';
 import {
   type AnyInputRequest,
@@ -1773,4 +1774,64 @@ export function atomicRegenerateTokenIfOwner(
   );
 
   return result;
+}
+
+export function getChangeSnapshots(ydoc: Y.Doc): Map<string, ChangeSnapshot> {
+  const map = ydoc.getMap<ChangeSnapshot>(YDOC_KEYS.CHANGE_SNAPSHOTS);
+  const result = new Map<string, ChangeSnapshot>();
+
+  for (const [machineId, value] of map.entries()) {
+    const parsed = ChangeSnapshotSchema.safeParse(value);
+    if (parsed.success) {
+      result.set(machineId, parsed.data);
+    }
+  }
+
+  return result;
+}
+
+export function getChangeSnapshot(ydoc: Y.Doc, machineId: string): ChangeSnapshot | null {
+  const map = ydoc.getMap<ChangeSnapshot>(YDOC_KEYS.CHANGE_SNAPSHOTS);
+  const value = map.get(machineId);
+  if (!value) return null;
+
+  const parsed = ChangeSnapshotSchema.safeParse(value);
+  return parsed.success ? parsed.data : null;
+}
+
+export function setChangeSnapshot(ydoc: Y.Doc, snapshot: ChangeSnapshot, actor?: string): void {
+  const validated = ChangeSnapshotSchema.parse(snapshot);
+
+  ydoc.transact(
+    () => {
+      const map = ydoc.getMap<ChangeSnapshot>(YDOC_KEYS.CHANGE_SNAPSHOTS);
+      map.set(validated.machineId, validated);
+    },
+    actor ? { actor } : undefined
+  );
+}
+
+export function markMachineDisconnected(ydoc: Y.Doc, machineId: string): boolean {
+  const map = ydoc.getMap<ChangeSnapshot>(YDOC_KEYS.CHANGE_SNAPSHOTS);
+  const value = map.get(machineId);
+  if (!value) return false;
+
+  const parsed = ChangeSnapshotSchema.safeParse(value);
+  if (!parsed.success) return false;
+
+  const updated: ChangeSnapshot = {
+    ...parsed.data,
+    isLive: false,
+    updatedAt: Date.now(),
+  };
+
+  map.set(machineId, updated);
+  return true;
+}
+
+export function removeChangeSnapshot(ydoc: Y.Doc, machineId: string): boolean {
+  const map = ydoc.getMap<ChangeSnapshot>(YDOC_KEYS.CHANGE_SNAPSHOTS);
+  if (!map.has(machineId)) return false;
+  map.delete(machineId);
+  return true;
 }

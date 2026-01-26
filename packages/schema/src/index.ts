@@ -1,4 +1,6 @@
 export { assertNever } from './assert-never.js';
+export type { ChangeSnapshot, SyncedFileChange } from './change-snapshot.js';
+export { ChangeSnapshotSchema, SyncedFileChangeSchema } from './change-snapshot.js';
 export type {
   A2ADataPart,
   A2AFilePart,
@@ -432,6 +434,8 @@ export {
   getAllTagsFromIndex,
   getApprovedUsers,
   getArtifacts,
+  getChangeSnapshot,
+  getChangeSnapshots,
   getConversationVersions,
   getDeliverables,
   getLatestSnapshot,
@@ -458,10 +462,12 @@ export {
   linkArtifactToDeliverable,
   linkPR,
   logPlanEvent,
+  markMachineDisconnected,
   markPlanAsViewed,
   markVersionHandedOff,
   rejectUser,
   removeArtifact,
+  removeChangeSnapshot,
   removeLocalDiffComment,
   removePlanTag,
   removePRReviewComment,
@@ -470,6 +476,7 @@ export {
   resolvePRReviewComment,
   revokeUser,
   setAgentPresence,
+  setChangeSnapshot,
   setPlanMetadata,
   toggleStepCompletion,
   transitionPlanStatus,

@@ -192,6 +192,20 @@ export const YDOC_KEYS = {
    * - Helpers: packages/schema/src/yjs-helpers.ts (read/write)
    */
   LOCAL_DIFF_COMMENTS: 'localDiffComments' as const,
+
+  /**
+   * Change Snapshots (Y.Map<machineId, ChangeSnapshot>)
+   * Contains synced snapshots of local git changes from each connected machine.
+   * One entry per machine, overwrites on update (not append-only).
+   * Enables remote collaborators to view local changes without direct git access.
+   *
+   * Used by:
+   * - Web: apps/web/src/hooks/useChangeSnapshots.ts (read)
+   * - Web: apps/web/src/hooks/useSyncChangeSnapshot.ts (write)
+   * - Web: apps/web/src/components/ChangesView.tsx (read for machine picker)
+   * - Helpers: packages/schema/src/yjs-helpers.ts (read/write)
+   */
+  CHANGE_SNAPSHOTS: 'changeSnapshots' as const,
 } as const;
 
 /**
