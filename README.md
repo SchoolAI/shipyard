@@ -65,6 +65,22 @@ Add to `~/.cursor/mcp.json`:
 }
 ```
 
+### Codex (OpenAI)
+
+Add via CLI:
+
+```bash
+codex mcp add shipyard -- npx -y @schoolai/shipyard-mcp@latest
+```
+
+Or add to `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.shipyard]
+command = "npx"
+args = ["-y", "@schoolai/shipyard-mcp@latest"]
+```
+
 ### VS Code / GitHub Copilot
 
 ```bash
@@ -150,7 +166,7 @@ mcpServers:
 | Platform | Experience |
 |----------|-----------|
 | **Claude Code** | Full integration — hooks, skills, MCP tools, auto-task creation |
-| **VS Code, Cursor, Windsurf** | MCP tools — manual workflow, full functionality |
+| **Codex, VS Code, Cursor, Windsurf** | MCP tools — manual workflow, full functionality |
 | **Other MCP clients** | Basic — depends on platform capabilities |
 
 **[See detailed compatibility matrix →](./docs/INSTALLATION.md#feature-comparison)**
