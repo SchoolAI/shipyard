@@ -64,13 +64,16 @@ kill_by_pattern "tsx.*apps/server/src/server.ts" "MCP server (tsx)"
 kill_by_pattern "node.*apps/server/dist/index.mjs" "MCP server (built)"
 kill_by_pattern "tsx.*apps/signaling/src/server.ts" "Signaling server"
 kill_by_pattern "vite.*apps/web" "Vite dev server"
-kill_by_pattern "wrangler.*apps/github-oauth-worker.*dev" "Wrangler OAuth worker"
-kill_by_pattern "tsdown.*--watch" "tsdown watch processes"
+kill_by_pattern "wrangler.*github-oauth-worker.*dev" "Wrangler OAuth worker"
+kill_by_pattern "wrangler.*og-proxy-worker.*dev" "Wrangler OG proxy worker"
+kill_by_pattern "tsdown.*--watch" "tsdown watch (schema)"
+kill_by_pattern "tsup.*--watch" "tsup watch (hook)"
 
 # 3. Kill by specific dev ports as backup
-kill_by_port "5173" "Vite"
-kill_by_port "4444" "Signaling"
-kill_by_port "8787" "Wrangler"
+kill_by_port "5173" "Vite (web)"
+kill_by_port "4444" "Signaling server"
+kill_by_port "8787" "Wrangler (OAuth)"
+kill_by_port "8788" "Wrangler (OG proxy)"
 
 echo "🗑️  Removing build artifacts..."
 
