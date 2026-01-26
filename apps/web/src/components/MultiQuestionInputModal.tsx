@@ -307,14 +307,19 @@ function SignInPrompt({
       isDismissable={false}
       isKeyboardDismissDisabled={true}
     >
-      <Modal.Container placement="center" size="lg">
-        <Modal.Dialog>
+      {/* Mobile: top placement to avoid keyboard overlap; Desktop: center */}
+      <Modal.Container
+        placement="center"
+        size="lg"
+        className="md:items-center items-start pt-4 md:pt-0"
+      >
+        <Modal.Dialog className="max-h-[85vh] overflow-y-auto">
           <Modal.CloseTrigger />
           <Card className={isBlocker ? 'border-2 border-danger ring-2 ring-danger/20' : ''}>
             <Card.Header>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 {isBlocker && <AlertOctagon className="w-5 h-5 text-danger shrink-0" />}
-                <h2 className="text-xl font-semibold">
+                <h2 className="text-lg md:text-xl font-semibold">
                   {isBlocker ? 'BLOCKER: Agent needs your input' : 'Agent is requesting input'}
                 </h2>
                 {isBlocker && (
@@ -351,14 +356,14 @@ function SignInPrompt({
                     </Alert.Description>
                   </Alert.Content>
                 </Alert>
-                <div className="flex justify-between items-center pt-2">
+                <div className="flex flex-col-reverse sm:flex-row justify-between items-stretch sm:items-center gap-2 pt-2">
                   <span
-                    className={`text-sm ${remainingTime >= 0 && remainingTime < 30 ? 'text-warning' : 'text-muted-foreground'}`}
+                    className={`text-sm text-center sm:text-left ${remainingTime >= 0 && remainingTime < 30 ? 'text-warning' : 'text-muted-foreground'}`}
                   >
                     {remainingTime >= 0 && remainingTime < 30 && '! '}Timeout:{' '}
                     {formatTime(remainingTime)}
                   </span>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 justify-end">
                     <Button variant="secondary" onPress={onDecline} isDisabled={isSubmitting}>
                       Decline
                     </Button>
@@ -747,15 +752,20 @@ export function MultiQuestionInputModal({
       isDismissable={false}
       isKeyboardDismissDisabled={true}
     >
-      <Modal.Container placement="center" size="lg">
-        <Modal.Dialog>
+      {/* Mobile: top placement to avoid keyboard overlap; Desktop: center */}
+      <Modal.Container
+        placement="center"
+        size="lg"
+        className="md:items-center items-start pt-4 md:pt-0"
+      >
+        <Modal.Dialog className="max-h-[85vh] overflow-y-auto">
           <Modal.CloseTrigger />
 
           <Card className={isBlocker ? 'border-2 border-danger ring-2 ring-danger/20' : ''}>
-            <Card.Header className="flex justify-between items-center">
-              <div className="flex items-center gap-2">
+            <Card.Header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 {isBlocker && <AlertOctagon className="w-5 h-5 text-danger shrink-0" />}
-                <h2 className="text-xl font-semibold">
+                <h2 className="text-lg md:text-xl font-semibold">
                   {isBlocker ? 'BLOCKER: ' : ''}Agent is requesting input (
                   {request.questions.length} question{request.questions.length > 1 ? 's' : ''})
                 </h2>
@@ -766,7 +776,7 @@ export function MultiQuestionInputModal({
                 )}
               </div>
               <span
-                className={`text-sm ${remainingTime >= 0 && remainingTime < 30 ? 'text-warning' : 'text-muted-foreground'}`}
+                className={`text-sm shrink-0 ${remainingTime >= 0 && remainingTime < 30 ? 'text-warning' : 'text-muted-foreground'}`}
               >
                 {remainingTime >= 0 && remainingTime < 30 && '! '}Timeout:{' '}
                 {formatTime(remainingTime)}
@@ -774,7 +784,7 @@ export function MultiQuestionInputModal({
             </Card.Header>
 
             <Form onSubmit={handleSubmit}>
-              <Card.Content className="max-h-[60vh] min-h-[20vh] overflow-y-auto px-6 py-4">
+              <Card.Content className="max-h-[50vh] min-h-[20vh] overflow-y-auto px-4 md:px-6 py-4">
                 <div className="space-y-6">
                   {request.questions.map((question, index) => (
                     <div key={index} className="space-y-2">

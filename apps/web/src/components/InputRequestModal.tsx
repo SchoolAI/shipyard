@@ -458,17 +458,24 @@ export function InputRequestModal({
         isDismissable={false}
         isKeyboardDismissDisabled={true}
       >
-        <Modal.Container placement="center" size="md">
-          <Modal.Dialog className={modalConfig.isLarge ? 'sm:max-w-[650px]' : undefined}>
+        {/* Mobile: top placement to avoid keyboard overlap; Desktop: center */}
+        <Modal.Container
+          placement="center"
+          size="md"
+          className="md:items-center items-start pt-4 md:pt-0"
+        >
+          <Modal.Dialog
+            className={`max-h-[85vh] overflow-y-auto ${modalConfig.isLarge ? 'sm:max-w-[650px]' : ''}`}
+          >
             <Modal.CloseTrigger />
 
             <Card
               className={request.isBlocker ? 'border-2 border-danger ring-2 ring-danger/20' : ''}
             >
               <Card.Header>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   {request.isBlocker && <AlertOctagon className="w-5 h-5 text-danger shrink-0" />}
-                  <h2 className="text-xl font-semibold">
+                  <h2 className="text-lg md:text-xl font-semibold">
                     {request.isBlocker
                       ? 'BLOCKER: Agent needs your input'
                       : 'Agent is requesting input'}
@@ -500,14 +507,14 @@ export function InputRequestModal({
                     </Alert.Content>
                   </Alert>
 
-                  <div className="flex justify-between items-center pt-2">
+                  <div className="flex flex-col-reverse sm:flex-row justify-between items-stretch sm:items-center gap-2 pt-2">
                     <span
-                      className={`text-sm ${remainingTime >= 0 && remainingTime < 30 ? 'text-warning' : 'text-muted-foreground'}`}
+                      className={`text-sm text-center sm:text-left ${remainingTime >= 0 && remainingTime < 30 ? 'text-warning' : 'text-muted-foreground'}`}
                     >
                       {remainingTime >= 0 && remainingTime < 30 && '! '}Timeout:{' '}
                       {formatTime(remainingTime)}
                     </span>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 justify-end">
                       <Button variant="secondary" onPress={handleDecline} isDisabled={isSubmitting}>
                         Decline
                       </Button>
@@ -530,15 +537,22 @@ export function InputRequestModal({
       isDismissable={false}
       isKeyboardDismissDisabled={true}
     >
-      <Modal.Container placement="center" size="md">
-        <Modal.Dialog className={modalConfig.isLarge ? 'sm:max-w-[650px]' : undefined}>
+      {/* Mobile: top placement to avoid keyboard overlap; Desktop: center */}
+      <Modal.Container
+        placement="center"
+        size="md"
+        className="md:items-center items-start pt-4 md:pt-0"
+      >
+        <Modal.Dialog
+          className={`max-h-[85vh] overflow-y-auto ${modalConfig.isLarge ? 'sm:max-w-[650px]' : ''}`}
+        >
           <Modal.CloseTrigger />
 
           <Card className={request.isBlocker ? 'border-2 border-danger ring-2 ring-danger/20' : ''}>
             <Card.Header>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 {request.isBlocker && <AlertOctagon className="w-5 h-5 text-danger shrink-0" />}
-                <h2 className="text-xl font-semibold">
+                <h2 className="text-lg md:text-xl font-semibold">
                   {request.isBlocker
                     ? 'BLOCKER: Agent needs your input'
                     : 'Agent is requesting input'}
@@ -556,14 +570,14 @@ export function InputRequestModal({
                 <div>{renderInput()}</div>
 
                 {request.type !== 'confirm' && (
-                  <div className="flex justify-between items-center pt-2">
+                  <div className="flex flex-col-reverse sm:flex-row justify-between items-stretch sm:items-center gap-2 pt-2">
                     <span
-                      className={`text-sm ${remainingTime >= 0 && remainingTime < 30 ? 'text-warning' : 'text-muted-foreground'}`}
+                      className={`text-sm text-center sm:text-left ${remainingTime >= 0 && remainingTime < 30 ? 'text-warning' : 'text-muted-foreground'}`}
                     >
                       {remainingTime >= 0 && remainingTime < 30 && '! '}Timeout:{' '}
                       {formatTime(remainingTime)}
                     </span>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 justify-end">
                       <Button variant="secondary" onPress={handleDecline} isDisabled={isSubmitting}>
                         Decline
                       </Button>
