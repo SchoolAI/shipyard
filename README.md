@@ -50,6 +50,12 @@ Full experience with hooks, skills, and auto-task creation:
 /plugin install SchoolAI/shipyard
 ```
 
+> **Troubleshooting:** If install fails with a cache error, try the two-step process with the full git URL:
+> ```bash
+> /plugin marketplace add https://github.com/SchoolAI/shipyard.git
+> /plugin install shipyard@schoolai-shipyard
+> ```
+
 ### Cursor
 
 Add to `~/.cursor/mcp.json`:
