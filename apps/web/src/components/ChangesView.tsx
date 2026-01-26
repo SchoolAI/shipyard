@@ -262,8 +262,28 @@ export function ChangesView({
     refreshPRStatus();
   }, [linkedPRs, metadata.repo, identity?.token, ydoc]);
 
+  /** Extract working directory for display */
+  const workingDirectory =
+    source === 'local'
+      ? isViewingRemote && selectedSnapshot
+        ? selectedSnapshot.cwd
+        : metadata.origin?.platform === 'claude-code' || metadata.origin?.platform === 'unknown'
+          ? metadata.origin.cwd
+          : undefined
+      : undefined;
+
   return (
     <div className="max-w-full mx-auto p-2 md:p-4 h-full flex flex-col">
+      {/* Working directory display */}
+      {workingDirectory && (
+        <div className="mb-2 px-3 py-2 bg-surface/50 border border-separator rounded-lg">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <FileText className="w-3.5 h-3.5 shrink-0" />
+            <code className="font-mono truncate">{workingDirectory}</code>
+          </div>
+        </div>
+      )}
+
       {/* Content based on source - controls moved to header */}
       {source === 'local' ? (
         <div className="flex-1 min-h-0 flex flex-col">

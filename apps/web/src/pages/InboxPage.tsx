@@ -19,7 +19,6 @@ import {
   transitionPlanStatus,
 } from '@shipyard/schema';
 import {
-  AlertOctagon,
   AlertTriangle,
   AtSign,
   Check,
@@ -28,7 +27,7 @@ import {
   Clock,
   Eye,
   EyeOff,
-  HelpCircle,
+  FileText,
   MessageSquare,
   UserPlus,
 } from 'lucide-react';
@@ -241,18 +240,11 @@ function EventInboxItem({ item, onView, onMarkRead, onMarkUnread }: EventInboxIt
           color: 'default' as const,
         };
       case 'agent_activity':
-        if (event.data?.activityType === 'help_request') {
+        if (event.data?.activityType === 'update') {
           return {
-            icon: <HelpCircle className="w-4 h-4" />,
-            description: 'needs help',
-            color: 'warning' as const,
-          };
-        }
-        if (event.data?.activityType === 'blocker') {
-          return {
-            icon: <AlertOctagon className="w-4 h-4" />,
-            description: 'hit blocker',
-            color: 'danger' as const,
+            icon: <FileText className="w-4 h-4" />,
+            description: 'posted an update',
+            color: 'default' as const,
           };
         }
         return {
@@ -314,8 +306,7 @@ function EventInboxItem({ item, onView, onMarkRead, onMarkUnread }: EventInboxIt
   };
 
   const expandedMessage =
-    event.type === 'agent_activity' &&
-    (event.data.activityType === 'blocker' || event.data.activityType === 'help_request')
+    event.type === 'agent_activity' && event.data.activityType === 'update'
       ? event.data.message
       : undefined;
 

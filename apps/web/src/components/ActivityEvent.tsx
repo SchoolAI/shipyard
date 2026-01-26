@@ -10,6 +10,7 @@ import {
   Circle,
   Download,
   FileEdit,
+  FileText,
   GitPullRequest,
   HelpCircle,
   Key,
@@ -26,26 +27,20 @@ import { formatRelativeTime } from '@/utils/formatters';
 
 interface ActivityEventProps {
   event: PlanEvent;
-  /** Whether this is an unresolved help_request or blocker that needs attention */
+  /** Whether this is an unresolved input_request that needs attention */
   isUnresolved?: boolean;
 }
 
 /**
- * Get icon for agent activity events based on activity type and sub-type.
- * Each activity type has specific visual representation.
+ * Get icon for agent activity events based on activity type.
+ * Currently only supports the 'update' type.
  */
 function getAgentActivityIcon(data: AgentActivityData): ReactNode {
   switch (data.activityType) {
-    case 'help_request':
-      return <HelpCircle className="w-4 h-4 text-warning" />;
-    case 'help_request_resolved':
-      return <CheckCircle className="w-4 h-4 text-success" />;
-    case 'blocker':
-      return <AlertOctagon className="w-4 h-4 text-danger" />;
-    case 'blocker_resolved':
-      return <CheckCircle className="w-4 h-4 text-success" />;
+    case 'update':
+      return <FileText className="w-4 h-4 text-accent" />;
     default: {
-      const _exhaustive: never = data;
+      const _exhaustive: never = data.activityType;
       void _exhaustive;
       return <Circle className="w-4 h-4" />;
     }
@@ -54,45 +49,14 @@ function getAgentActivityIcon(data: AgentActivityData): ReactNode {
 
 /**
  * Get human-readable description for agent activity events.
- * Formats messages based on activity type and available data.
  * Returns ReactNode to support markdown rendering in messages.
  */
 function getAgentActivityDescription(data: AgentActivityData): ReactNode {
   switch (data.activityType) {
-    case 'help_request':
-      return (
-        <>
-          needs help:{' '}
-          <MarkdownContent content={data.message} variant="compact" className="inline" />
-        </>
-      );
-    case 'help_request_resolved':
-      return data.resolution ? (
-        <>
-          resolved help request:{' '}
-          <MarkdownContent content={data.resolution} variant="compact" className="inline" />
-        </>
-      ) : (
-        'resolved help request'
-      );
-    case 'blocker':
-      return (
-        <>
-          hit blocker:{' '}
-          <MarkdownContent content={data.message} variant="compact" className="inline" />
-        </>
-      );
-    case 'blocker_resolved':
-      return data.resolution ? (
-        <>
-          resolved blocker:{' '}
-          <MarkdownContent content={data.resolution} variant="compact" className="inline" />
-        </>
-      ) : (
-        'resolved blocker'
-      );
+    case 'update':
+      return <MarkdownContent content={data.message} variant="compact" className="inline" />;
     default: {
-      const _exhaustive: never = data;
+      const _exhaustive: never = data.activityType;
       void _exhaustive;
       return 'agent activity';
     }
@@ -320,17 +284,12 @@ function getEventDescription(event: PlanEvent): ReactNode {
 
 /**
  * Determine the highlight color for unresolved events.
- * Blockers use danger (red), help requests and input requests use warning (yellow).
+ * Input request blockers use danger (red), others use warning (yellow).
  */
 function getUnresolvedHighlightColor(event: PlanEvent): 'danger' | 'warning' {
   /** Input request blockers use danger */
   if (event.type === 'input_request_created') {
     return event.data?.isBlocker ? 'danger' : 'warning';
-  }
-
-  /** Agent activity blockers use danger */
-  if (event.type === 'agent_activity') {
-    return event.data.activityType === 'blocker' ? 'danger' : 'warning';
   }
 
   return 'warning';

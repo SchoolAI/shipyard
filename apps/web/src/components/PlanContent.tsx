@@ -240,8 +240,9 @@ export function PlanContent(props: PlanContentProps) {
     <div className="flex flex-col h-full overflow-hidden">
       {/* Tab navigation */}
       <div className="border-b border-separator bg-surface px-2 md:px-6 shrink-0">
+        {/* Tabs row - always visible */}
         <div className="flex items-center justify-between pt-1 md:pt-2">
-          {/* Tabs on the left - scrollable on mobile */}
+          {/* Tabs - scrollable on mobile */}
           <div className="flex gap-0 md:gap-4 overflow-x-auto md:overflow-visible">
             <TabButton
               tab="plan"
@@ -280,28 +281,44 @@ export function PlanContent(props: PlanContentProps) {
             />
           </div>
 
-          {/* Version selector on the right - only show on Plan tab when versions exist */}
+          {/* Version selector on the right - only show on Plan tab when versions exist (desktop only) */}
           {activeView === 'plan' &&
             props.mode === 'live' &&
             props.versionNav &&
             props.versionNav.snapshots.length > 0 && (
-              <VersionSelector
-                currentSnapshot={props.versionNav.currentSnapshot}
-                totalSnapshots={props.versionNav.snapshots.length}
-                currentIndex={props.versionNav.currentIndex}
-                canGoPrevious={props.versionNav.canGoPrevious}
-                canGoNext={props.versionNav.canGoNext}
-                onPrevious={props.versionNav.goToPrevious}
-                onNext={props.versionNav.goToNext}
-                onCurrent={props.versionNav.goToCurrent}
-              />
+              <div className="hidden md:block">
+                <VersionSelector
+                  currentSnapshot={props.versionNav.currentSnapshot}
+                  totalSnapshots={props.versionNav.snapshots.length}
+                  currentIndex={props.versionNav.currentIndex}
+                  canGoPrevious={props.versionNav.canGoPrevious}
+                  canGoNext={props.versionNav.canGoNext}
+                  onPrevious={props.versionNav.goToPrevious}
+                  onNext={props.versionNav.goToNext}
+                  onCurrent={props.versionNav.goToCurrent}
+                />
+              </div>
             )}
 
-          {/* Changes header controls - source selector, publish button, GitHub link */}
+          {/* Changes header controls - desktop only (hidden on mobile) */}
           {activeView === 'changes' && changesViewState && (
-            <ChangesHeaderControls state={changesViewState} repo={metadata.repo} ydoc={ydoc} />
+            <div className="hidden md:block">
+              <ChangesHeaderControls state={changesViewState} repo={metadata.repo} ydoc={ydoc} />
+            </div>
           )}
         </div>
+
+        {/* Mobile-only row for Changes header controls - separate row for breathing room */}
+        {activeView === 'changes' && changesViewState && (
+          <div className="md:hidden py-2 border-t border-separator/50 mt-1">
+            <ChangesHeaderControls
+              state={changesViewState}
+              repo={metadata.repo}
+              ydoc={ydoc}
+              isMobile
+            />
+          </div>
+        )}
       </div>
 
       {/* Tab content */}

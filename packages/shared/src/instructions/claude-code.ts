@@ -59,6 +59,26 @@ await addArtifact({
 
 When the last deliverable gets an artifact, the task auto-completes and returns a snapshot URL.`;
 
+export const POSTING_UPDATES_SECTION = `## Posting Progress Updates
+
+For long-running tasks, keep reviewers informed with periodic updates:
+
+\`\`\`typescript
+await postUpdate({
+  taskId,
+  sessionToken,
+  message: "Starting work on authentication module"
+});
+\`\`\`
+
+**When to post updates:**
+- After completing a significant milestone
+- When switching focus to a different part of the task
+- If you've been working for a while without visible output
+- When you encounter something interesting or unexpected
+
+Think about what a human watching your work would want to know.`;
+
 export const IMPORTANT_NOTES = `## Important Notes for Claude Code
 
 - **DO NOT call \`createTask()\` directly** - The hook handles task creation when you enter task mode
@@ -79,6 +99,8 @@ export const CLAUDE_CODE_INSTRUCTIONS = [
   USER_INPUT_SECTION,
   '',
   TASK_MODE_WORKFLOW,
+  '',
+  POSTING_UPDATES_SECTION,
   '',
   DELIVERABLES_SECTION,
   '',

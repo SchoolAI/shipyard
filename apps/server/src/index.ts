@@ -16,6 +16,7 @@ import {
   tryAcquireHubLock,
 } from './registry-server.js';
 import { executeCodeTool } from './tools/execute-code.js';
+import { postUpdateTool } from './tools/post-update.js';
 import { readDiffCommentsTool } from './tools/read-diff-comments.js';
 import { TOOL_NAMES } from './tools/tool-names.js';
 
@@ -71,9 +72,9 @@ const server = new Server(
   }
 );
 
-/** Expose execute_code (bundled APIs) and read_diff_comments */
+/** Expose execute_code (bundled APIs), post_update, and read_diff_comments */
 server.setRequestHandler(ListToolsRequestSchema, async () => ({
-  tools: [executeCodeTool.definition, readDiffCommentsTool.definition],
+  tools: [executeCodeTool.definition, postUpdateTool.definition, readDiffCommentsTool.definition],
 }));
 
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
@@ -81,6 +82,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
   if (name === TOOL_NAMES.EXECUTE_CODE) {
     return await executeCodeTool.handler(args ?? {});
+  }
+
+  if (name === TOOL_NAMES.POST_UPDATE) {
+    return await postUpdateTool.handler(args ?? {});
   }
 
   if (name === TOOL_NAMES.READ_DIFF_COMMENTS) {

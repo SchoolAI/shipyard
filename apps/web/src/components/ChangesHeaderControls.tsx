@@ -62,6 +62,8 @@ interface ChangesHeaderControlsProps {
   state: ChangesViewState;
   repo?: string;
   ydoc: Y.Doc;
+  /** Render mobile-optimized layout */
+  isMobile?: boolean;
 }
 
 /**
@@ -119,7 +121,13 @@ function getEffectiveLocalData(state: ChangesViewState): {
  * Header controls for the Changes tab.
  * Returns controls: Source Toggle, Machine Dropdown (local only), Info Dropdown, and Refresh Button.
  */
-export function ChangesHeaderControls({ state, repo, ydoc }: ChangesHeaderControlsProps) {
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Component has separate mobile and desktop layouts, complexity is inherent
+export function ChangesHeaderControls({
+  state,
+  repo,
+  ydoc,
+  isMobile = false,
+}: ChangesHeaderControlsProps) {
   const { source, setSource, selectedPR, hasPRs, localChanges, prChanges, machinePicker } = state;
   const { identity, hasRepoScope, startAuth, requestRepoAccess } = useGitHubAuth();
   const [isPublishing, setIsPublishing] = useState(false);
@@ -263,6 +271,99 @@ export function ChangesHeaderControls({ state, repo, ydoc }: ChangesHeaderContro
   /** Get effective data based on selected machine (local or remote snapshot) */
   const effectiveData = useMemo(() => getEffectiveLocalData(state), [state]);
 
+  /** Mobile layout: wrap controls and use full width */
+  if (isMobile) {
+    return (
+      <div className="flex flex-wrap items-center gap-2">
+        {/* Source toggle (Local/PR) */}
+        {hasPRs && selectedPR && (
+          <ButtonGroup size="sm" variant="ghost" hideSeparator>
+            <Button
+              onPress={() => setSource('local')}
+              variant={source === 'local' ? 'secondary' : 'ghost'}
+              className={source === 'local' ? 'font-medium' : 'text-muted opacity-70'}
+            >
+              <FolderGit2 className="w-3.5 h-3.5" />
+              Local
+            </Button>
+            <Button
+              onPress={() => setSource('pr')}
+              variant={source === 'pr' ? 'secondary' : 'ghost'}
+              className={source === 'pr' ? 'font-medium' : 'text-muted opacity-70'}
+            >
+              <GitPullRequest className="w-3.5 h-3.5" />
+              PR
+            </Button>
+          </ButtonGroup>
+        )}
+
+        {/* Machine dropdown - simplified for mobile */}
+        {source === 'local' && machinePicker.shouldShow && (
+          <MachineDropdown machinePicker={machinePicker} isMobile />
+        )}
+
+        {/* Branch/PR info dropdown */}
+        <Dropdown>
+          <Button size="sm" variant="secondary" className="gap-1">
+            {source === 'local' ? (
+              <span className="flex items-center gap-1.5">
+                <GitBranch className="w-3.5 h-3.5" />
+                <span className="font-mono text-xs max-w-[80px] truncate">
+                  {effectiveData.branch}
+                </span>
+              </span>
+            ) : (
+              <span className="flex items-center gap-1.5">
+                <GitPullRequest className="w-3.5 h-3.5" />
+                <span className="max-w-[80px] truncate">#{selectedPR?.prNumber}</span>
+              </span>
+            )}
+            <ChevronDown className="w-3 h-3" />
+          </Button>
+
+          <Dropdown.Popover className="min-w-[280px]">
+            <Dropdown.Menu onAction={handleAction}>
+              {source === 'local' ? (
+                <LocalInfoDropdown effectiveData={effectiveData} />
+              ) : (
+                <PRInfoDropdown
+                  selectedPR={selectedPR}
+                  repo={repo}
+                  isPublishing={isPublishing}
+                  publishError={publishError}
+                />
+              )}
+            </Dropdown.Menu>
+          </Dropdown.Popover>
+        </Dropdown>
+
+        {/* Refresh button */}
+        <Button
+          size="sm"
+          variant="secondary"
+          isIconOnly
+          onPress={() => {
+            if (source === 'local') {
+              localChanges.refetch();
+            } else {
+              prChanges.refetch();
+            }
+          }}
+          aria-label={source === 'local' ? 'Refresh local changes' : 'Refresh PR files'}
+        >
+          <RefreshCw
+            className={`w-3.5 h-3.5 ${
+              (source === 'local' ? localChanges.isFetching : prChanges.isFetching)
+                ? 'animate-spin'
+                : ''
+            }`}
+          />
+        </Button>
+      </div>
+    );
+  }
+
+  /** Desktop layout: horizontal row */
   return (
     <div className="flex items-center gap-2 pb-1.5 md:pb-2">
       {hasPRs && selectedPR && (
@@ -568,13 +669,15 @@ function PRStatusChip({ status }: { status: LinkedPR['status'] }) {
 
 interface MachineDropdownProps {
   machinePicker: MachinePickerState;
+  /** Render compact mobile version */
+  isMobile?: boolean;
 }
 
 /**
  * Dropdown to select which machine's changes to view.
  * Shows machine name, live/snapshot status, file count, and +/- stats.
  */
-function MachineDropdown({ machinePicker }: MachineDropdownProps) {
+function MachineDropdown({ machinePicker, isMobile = false }: MachineDropdownProps) {
   const { snapshots, localMachineId, selectedMachineId, onSelectMachine } = machinePicker;
 
   /** Sort snapshots: local first, then live, then by update time */
@@ -610,6 +713,45 @@ function MachineDropdown({ machinePicker }: MachineDropdownProps) {
     [localMachineId, onSelectMachine]
   );
 
+  /** Mobile: compact button with just icon and count */
+  if (isMobile) {
+    return (
+      <Dropdown>
+        <Button size="sm" variant="secondary" className="gap-1">
+          <Monitor className="w-3.5 h-3.5" />
+          <span className="max-w-[60px] truncate text-xs">{displayName}</span>
+          {isLocal && (
+            <Chip size="sm" color="accent" variant="soft" className="h-4 text-[10px] px-1">
+              You
+            </Chip>
+          )}
+          <ChevronDown className="w-3 h-3" />
+        </Button>
+
+        <Dropdown.Popover className="min-w-[280px]">
+          <Dropdown.Menu onAction={handleAction}>
+            <Dropdown.Section>
+              <Header>Machines</Header>
+              {sortedSnapshots.map(([machineId, snapshot]) => (
+                <MachineDropdownItem
+                  key={machineId}
+                  machineId={machineId}
+                  snapshot={snapshot}
+                  isLocalMachine={machineId === localMachineId}
+                  isSelected={
+                    machineId === selectedMachineId ||
+                    (!selectedMachineId && machineId === localMachineId)
+                  }
+                />
+              ))}
+            </Dropdown.Section>
+          </Dropdown.Menu>
+        </Dropdown.Popover>
+      </Dropdown>
+    );
+  }
+
+  /** Desktop: full button with name and chips */
   return (
     <Dropdown>
       <Button size="sm" variant="secondary" className="gap-1">

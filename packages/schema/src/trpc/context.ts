@@ -41,6 +41,7 @@ export interface MachineInfo {
   machineId: string;
   machineName: string;
   ownerId: string;
+  cwd: string;
 }
 
 /**

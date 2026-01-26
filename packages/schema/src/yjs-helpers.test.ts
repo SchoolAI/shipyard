@@ -1544,6 +1544,7 @@ describe('Change Snapshot helpers', () => {
     ownerId: 'test-user',
     headSha: 'abc123',
     branch: 'main',
+    cwd: '/test/working/directory',
     isLive: true,
     updatedAt: Date.now(),
     files: [],

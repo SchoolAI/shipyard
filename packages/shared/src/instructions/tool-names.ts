@@ -14,6 +14,7 @@ export const TOOL_NAMES = {
   CREATE_TASK: 'create_task',
   EXECUTE_CODE: 'execute_code',
   LINK_PR: 'link_pr',
+  POST_UPDATE: 'post_update',
   READ_DIFF_COMMENTS: 'read_diff_comments',
   READ_TASK: 'read_task',
   REGENERATE_SESSION_TOKEN: 'regenerate_session_token',

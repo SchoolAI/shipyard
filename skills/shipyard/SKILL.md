@@ -84,6 +84,7 @@ This skill complements the Shipyard MCP server. The MCP provides the `execute_co
 | `requestUserInput()` | **THE primary communication channel** - Ask questions, get decisions |
 | `createTask()` | Start a new verified task |
 | `addArtifact()` | Upload proof (screenshot, video, test results) |
+| `postUpdate()` | Post progress updates to the task timeline |
 | `readTask()` | Check status and reviewer feedback |
 | `linkPR()` | Connect a GitHub PR to the task |
 
@@ -440,6 +441,39 @@ const config = await requestUserInput({
 // config.response = { "0": "my-app", "1": "React", "2": "yes" }
 return { config: config.response };
 ```
+
+## Posting Progress Updates
+
+For long-running tasks, keep reviewers informed with `postUpdate()`:
+
+### postUpdate
+
+Post a progress update to the task timeline.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| taskId | string | Yes | The task ID |
+| sessionToken | string | Yes | Session token from plan approval |
+| message | string | Yes | Update content (markdown) |
+
+**Returns:** `{ eventId: string }`
+
+**Example:**
+```typescript
+await postUpdate({
+  taskId,
+  sessionToken,
+  message: "Milestone: API integration complete"
+});
+```
+
+**When to post updates:**
+- After completing a significant milestone
+- When switching focus to a different part of the task
+- If you've been working for a while without visible output
+- When you encounter something interesting or unexpected
+
+Updates appear in the Activity tab, helping humans understand what you're doing without interrupting your work.
 
 ### Input Types (8 total)
 
