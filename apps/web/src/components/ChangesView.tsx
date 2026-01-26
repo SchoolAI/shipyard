@@ -264,7 +264,6 @@ export function ChangesView({
               planId={metadata.id}
               ydoc={ydoc}
               remoteSnapshot={selectedSnapshot}
-              isRemote={true}
             />
           ) : hasNoLocalRepo && hasRemoteSnapshots && !selectedMachine ? (
             <Alert status="default">

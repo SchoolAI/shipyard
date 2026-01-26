@@ -50,8 +50,6 @@ interface LocalChangesViewerProps {
   ydoc?: Y.Doc;
   /** Remote snapshot to display instead of local data */
   remoteSnapshot?: ChangeSnapshot;
-  /** Whether viewing remote machine's changes (disables commenting) */
-  isRemote?: boolean;
 }
 
 function convertSnapshotToLocalChanges(snapshot: ChangeSnapshot): LocalChangesResponse {
@@ -93,7 +91,6 @@ export function LocalChangesViewer({
   planId,
   ydoc,
   remoteSnapshot,
-  isRemote = false,
 }: LocalChangesViewerProps) {
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<DiffViewMode>(getDiffViewModePreference);
@@ -158,7 +155,8 @@ export function LocalChangesViewer({
       viewMode={viewMode}
       onViewModeChange={handleViewModeChange}
       planId={planId}
-      ydoc={isRemote ? undefined : ydoc}
+      ydoc={ydoc}
+      machineId={remoteSnapshot?.machineId}
     />
   );
 }
@@ -173,6 +171,8 @@ interface LocalChangesContentProps {
   onViewModeChange: (mode: DiffViewMode) => void;
   planId: string;
   ydoc?: Y.Doc;
+  /** Machine ID when viewing remote snapshot (for comment attribution) */
+  machineId?: string;
 }
 
 /**
@@ -197,6 +197,7 @@ function LocalChangesContent({
   onViewModeChange,
   planId,
   ydoc,
+  machineId,
 }: LocalChangesContentProps) {
   const treeRef = useRef<TreeApi<FileTreeData>>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -266,8 +267,9 @@ function LocalChangesContent({
       ydoc,
       currentUser: identity?.username,
       currentHeadSha,
+      machineId,
     };
-  }, [ydoc, localComments, identity?.username, currentHeadSha]);
+  }, [ydoc, localComments, identity?.username, currentHeadSha, machineId]);
 
   /** No changes state */
   if (data.files.length === 0 && data.untracked.length === 0) {

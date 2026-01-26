@@ -830,6 +830,8 @@ export const LocalDiffCommentSchema = z.object({
   resolved: z.boolean().optional(),
   /** Hash of the line content when comment was created, for staleness detection */
   lineContentHash: z.string().optional(),
+  /** Machine ID identifying which machine's snapshot this comment was created on */
+  machineId: z.string().optional(),
 });
 
 /**

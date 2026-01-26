@@ -66,6 +66,8 @@ export interface CommentSupport {
   currentHeadSha?: string;
   /** Map of line number to line content (for content hash staleness detection) */
   lineContentMap?: Map<number, string>;
+  /** Machine ID for remote snapshot commenting (identifies which machine's snapshot) */
+  machineId?: string;
 }
 
 export interface FileDiffViewProps {
@@ -109,6 +111,7 @@ function arePropsEqual(prev: FileDiffViewProps, next: FileDiffViewProps): boolea
   if (prevCS.ydoc !== nextCS.ydoc) return false;
   if (prevCS.currentUser !== nextCS.currentUser) return false;
   if (prevCS.currentHeadSha !== nextCS.currentHeadSha) return false;
+  if (prevCS.machineId !== nextCS.machineId) return false;
 
   const prevComments = prevCS.comments;
   const nextComments = nextCS.comments;
@@ -159,6 +162,7 @@ export const FileDiffView = memo(function FileDiffView({
   const prNumber = commentSupport?.prNumber;
   const currentUser = commentSupport?.currentUser;
   const currentHeadSha = commentSupport?.currentHeadSha;
+  const machineId = commentSupport?.machineId;
 
   const lineContentMap = useMemo(() => {
     if (!patch) return new Map<number, string>();
@@ -176,6 +180,7 @@ export const FileDiffView = memo(function FileDiffView({
     currentUser,
     filename,
     lineContentMap,
+    machineId,
   });
   callbackDepsRef.current = {
     ydoc,
@@ -185,6 +190,7 @@ export const FileDiffView = memo(function FileDiffView({
     currentUser,
     filename,
     lineContentMap,
+    machineId,
   };
 
   const extendData = useMemo(() => {
@@ -238,6 +244,7 @@ export const FileDiffView = memo(function FileDiffView({
         currentHeadSha: sha,
         filename: path,
         lineContentMap: contentMap,
+        machineId: machine,
       } = callbackDepsRef.current;
       if (!doc || !type) return null;
       return (
@@ -250,6 +257,7 @@ export const FileDiffView = memo(function FileDiffView({
           lineContent={contentMap.get(lineNumber)}
           ydoc={doc}
           onClose={onClose}
+          machineId={machine}
         />
       );
     },

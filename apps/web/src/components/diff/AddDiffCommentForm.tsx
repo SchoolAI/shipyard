@@ -22,6 +22,8 @@ interface AddDiffCommentFormProps {
   ydoc: Y.Doc;
   /** Callback when form is closed */
   onClose: () => void;
+  /** Machine ID for remote snapshot commenting (identifies which machine's snapshot) */
+  machineId?: string;
 }
 
 /**
@@ -38,6 +40,7 @@ export function AddDiffCommentForm({
   lineContent,
   ydoc,
   onClose,
+  machineId,
 }: AddDiffCommentFormProps) {
   const { identity, startAuth } = useGitHubAuth();
   const [body, setBody] = useState('');
@@ -85,6 +88,7 @@ export function AddDiffCommentForm({
         baseRef: currentHeadSha || 'unknown',
         resolved: false,
         lineContentHash: lineContent ? hashLineContent(lineContent) : undefined,
+        machineId,
       });
     }
 
@@ -103,6 +107,7 @@ export function AddDiffCommentForm({
     ydoc,
     onClose,
     startAuth,
+    machineId,
   ]);
 
   const handleKeyDown = useCallback(
