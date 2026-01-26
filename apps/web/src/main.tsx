@@ -89,7 +89,7 @@ ReactDOM.createRoot(root).render(
       <QueryClientProvider client={queryClient}>
         <MantineProvider>
           <App />
-          <Toaster position="bottom-right" richColors closeButton />
+          <Toaster position="bottom-right" richColors closeButton theme="system" />
         </MantineProvider>
       </QueryClientProvider>
     </trpc.Provider>

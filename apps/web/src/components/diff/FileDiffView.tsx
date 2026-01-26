@@ -118,7 +118,11 @@ function arePropsEqual(prev: FileDiffViewProps, next: FileDiffViewProps): boolea
   if (prevComments.length !== nextComments.length) return false;
 
   for (let i = 0; i < prevComments.length; i++) {
-    if (prevComments[i]?.id !== nextComments[i]?.id) return false;
+    const prevComment = prevComments[i];
+    const nextComment = nextComments[i];
+    if (prevComment?.id !== nextComment?.id) return false;
+    /** Also check resolved status to trigger re-render when comments are resolved/unresolved */
+    if (prevComment?.resolved !== nextComment?.resolved) return false;
   }
 
   return true;
