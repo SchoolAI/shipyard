@@ -65,6 +65,57 @@ interface ChangesHeaderControlsProps {
 }
 
 /**
+ * Derive effective branch and file stats based on selected machine.
+ * When viewing a remote machine's snapshot, use that data instead of local.
+ */
+function getEffectiveLocalData(state: ChangesViewState): {
+  branch: string;
+  fileCount: number;
+  staged: number;
+  unstaged: number;
+  untracked: number;
+} {
+  const { machinePicker, localChanges } = state;
+  const { selectedMachineId, localMachineId, snapshots } = machinePicker;
+
+  /** If viewing a remote machine, use snapshot data */
+  const isViewingRemote = selectedMachineId !== null && selectedMachineId !== localMachineId;
+  if (isViewingRemote) {
+    const snapshot = snapshots.get(selectedMachineId);
+    if (snapshot) {
+      const stagedCount = snapshot.files.filter((f) => f.staged).length;
+      return {
+        branch: snapshot.branch,
+        fileCount: snapshot.files.length,
+        staged: stagedCount,
+        unstaged: snapshot.files.length - stagedCount,
+        untracked: 0,
+      };
+    }
+  }
+
+  /** Default to local data */
+  const data = localChanges.data;
+  if (data?.available) {
+    return {
+      branch: data.branch,
+      fileCount: data.files.length,
+      staged: data.staged.length,
+      unstaged: data.unstaged.length,
+      untracked: data.untracked.length,
+    };
+  }
+
+  return {
+    branch: 'No branch',
+    fileCount: 0,
+    staged: 0,
+    unstaged: 0,
+    untracked: 0,
+  };
+}
+
+/**
  * Header controls for the Changes tab.
  * Returns controls: Source Toggle, Machine Dropdown (local only), Info Dropdown, and Refresh Button.
  */
@@ -209,6 +260,9 @@ export function ChangesHeaderControls({ state, repo, ydoc }: ChangesHeaderContro
     [handlePublish, selectedPR?.url, handleRequestRepoAccess, handleSignIn]
   );
 
+  /** Get effective data based on selected machine (local or remote snapshot) */
+  const effectiveData = useMemo(() => getEffectiveLocalData(state), [state]);
+
   return (
     <div className="flex items-center gap-2 pb-1.5 md:pb-2">
       {hasPRs && selectedPR && (
@@ -243,7 +297,7 @@ export function ChangesHeaderControls({ state, repo, ydoc }: ChangesHeaderContro
             <span className="flex items-center gap-1.5">
               <GitBranch className="w-3.5 h-3.5" />
               <span className="font-mono text-xs max-w-[120px] truncate">
-                {localChanges.data?.available ? localChanges.data.branch : 'No branch'}
+                {effectiveData.branch}
               </span>
             </span>
           ) : (
@@ -258,7 +312,7 @@ export function ChangesHeaderControls({ state, repo, ydoc }: ChangesHeaderContro
         <Dropdown.Popover className="min-w-[280px]">
           <Dropdown.Menu onAction={handleAction}>
             {source === 'local' ? (
-              <LocalInfoDropdown localChanges={localChanges} />
+              <LocalInfoDropdown effectiveData={effectiveData} />
             ) : (
               <PRInfoDropdown
                 selectedPR={selectedPR}
@@ -296,16 +350,26 @@ export function ChangesHeaderControls({ state, repo, ydoc }: ChangesHeaderContro
   );
 }
 
+/** Effective data derived from selected machine (local or remote snapshot) */
+interface EffectiveLocalData {
+  branch: string;
+  fileCount: number;
+  staged: number;
+  unstaged: number;
+  untracked: number;
+}
+
 interface LocalInfoDropdownProps {
-  localChanges: ChangesViewState['localChanges'];
+  effectiveData: EffectiveLocalData;
 }
 
 /**
  * Info-only dropdown content for local changes view.
  * Shows branch name and file change stats.
+ * Displays data from selected machine (local or remote snapshot).
  */
-function LocalInfoDropdown({ localChanges }: LocalInfoDropdownProps) {
-  const { data } = localChanges;
+function LocalInfoDropdown({ effectiveData }: LocalInfoDropdownProps) {
+  const { branch, fileCount, staged, unstaged, untracked } = effectiveData;
 
   return (
     <Dropdown.Section>
@@ -314,35 +378,33 @@ function LocalInfoDropdown({ localChanges }: LocalInfoDropdownProps) {
       {/* Branch name */}
       <Dropdown.Item id="branch-info" textValue="Branch info" className="pointer-events-none">
         <GitBranch className="w-4 h-4 shrink-0 text-muted-foreground" />
-        <Label className="font-mono text-sm text-foreground">
-          {data?.available ? data.branch : 'No branch'}
-        </Label>
+        <Label className="font-mono text-sm text-foreground">{branch}</Label>
       </Dropdown.Item>
 
       {/* File change stats */}
-      {data?.available && (
+      {fileCount > 0 && (
         <Dropdown.Item id="file-stats" textValue="File stats" className="pointer-events-none">
           <div className="flex flex-col gap-1.5 py-1">
             <span className="text-sm font-medium text-foreground">
-              {data.files.length} file{data.files.length !== 1 ? 's' : ''} changed
+              {fileCount} file{fileCount !== 1 ? 's' : ''} changed
             </span>
             <div className="flex flex-wrap items-center gap-1.5">
-              {data.staged.length > 0 && (
+              {staged > 0 && (
                 <Chip size="sm" color="success" className="flex items-center gap-0.5">
                   <Check className="w-3 h-3" />
-                  {data.staged.length} staged
+                  {staged} staged
                 </Chip>
               )}
-              {data.unstaged.length > 0 && (
+              {unstaged > 0 && (
                 <Chip size="sm" color="warning" className="flex items-center gap-0.5">
                   <CircleDot className="w-3 h-3" />
-                  {data.unstaged.length} unstaged
+                  {unstaged} unstaged
                 </Chip>
               )}
-              {data.untracked.length > 0 && (
+              {untracked > 0 && (
                 <Chip size="sm" color="default" className="flex items-center gap-0.5">
                   <Plus className="w-3 h-3" />
-                  {data.untracked.length} untracked
+                  {untracked} untracked
                 </Chip>
               )}
             </div>
