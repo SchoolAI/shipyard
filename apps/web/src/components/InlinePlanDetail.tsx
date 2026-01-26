@@ -22,6 +22,7 @@ import type { PanelWidth } from '@/components/PlanPanel';
 import { PlanPanelHeader } from '@/components/PlanPanelHeader';
 import { SignInModal } from '@/components/SignInModal';
 import { getPlanRoute } from '@/constants/routes';
+import { usePlanIndexContext } from '@/contexts/PlanIndexContext';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
 import { useLocalIdentity } from '@/hooks/useLocalIdentity';
 import { useMultiProviderSync } from '@/hooks/useMultiProviderSync';
@@ -75,6 +76,7 @@ export function InlinePlanDetail({
   const navigate = useNavigate();
   const { identity: githubIdentity, startAuth, authState } = useGitHubAuth();
   const { localIdentity, setLocalIdentity } = useLocalIdentity();
+  const { markPlanAsRead, allInboxPlans } = usePlanIndexContext();
   const [showAuthChoice, setShowAuthChoice] = useState(false);
   const [showLocalSignIn, setShowLocalSignIn] = useState(false);
 
@@ -136,6 +138,22 @@ export function InlinePlanDetail({
     metaMap.observe(update);
     return () => metaMap.unobserve(update);
   }, [planId, panelYdoc, panelSyncState.idbSynced]);
+
+  /**
+   * Mark plan as read when it finishes loading.
+   * This is done here (on plan load) instead of in the inbox onClick handler
+   * to avoid a race condition where markAsRead triggers a re-render before
+   * navigation completes. See issue #172.
+   */
+  useEffect(() => {
+    if (!planId || !panelMetadata) return;
+
+    /** Check if this plan is in inbox and unread */
+    const inboxPlan = allInboxPlans.find((p) => p.id === planId);
+    if (inboxPlan?.isUnread) {
+      markPlanAsRead(planId);
+    }
+  }, [planId, panelMetadata, allInboxPlans, markPlanAsRead]);
 
   /** Identity for comments - Priority: GitHub > Local > null */
   const identity = githubIdentity

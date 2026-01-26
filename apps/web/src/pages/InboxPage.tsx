@@ -1022,19 +1022,14 @@ export function InboxPage() {
   }, []);
 
   /** List selection handler - uses extracted helper */
-  const handleListSelection = useCallback(
-    (keys: Set<unknown> | 'all') => {
-      const key = extractFirstSelectionKey(keys);
-      if (key) {
-        setSelectedPlanId(key);
-        const selectedPlan = sortedInboxPlans.find((p) => p.id === key);
-        if (selectedPlan?.isUnread) {
-          markPlanAsRead(key);
-        }
-      }
-    },
-    [sortedInboxPlans, markPlanAsRead]
-  );
+  const handleListSelection = useCallback((keys: Set<unknown> | 'all') => {
+    const key = extractFirstSelectionKey(keys);
+    if (key) {
+      setSelectedPlanId(key);
+      // Note: markPlanAsRead is NOT called here to avoid race condition with navigation
+      // The plan page (PlanPage.tsx or InlinePlanDetail) will mark the task as read when loaded
+    }
+  }, []);
 
   /** Event item view handler */
   const handleViewEvent = useCallback((planId: string, tab?: PlanViewTab) => {

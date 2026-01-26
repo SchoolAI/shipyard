@@ -141,7 +141,15 @@ export function PlanPage() {
         }
       : null;
 
-  const { ydoc: indexDoc, myPlans, sharedPlans, inboxPlans, isLoading } = usePlanIndexContext();
+  const {
+    ydoc: indexDoc,
+    myPlans,
+    sharedPlans,
+    inboxPlans,
+    allInboxPlans,
+    isLoading,
+    markPlanAsRead,
+  } = usePlanIndexContext();
   const { pendingRequests } = useInputRequests({ ydoc: indexDoc });
   const allPlans = useMemo(
     () => [...myPlans, ...sharedPlans, ...inboxPlans],
@@ -253,6 +261,22 @@ export function PlanPage() {
     setActivePlanSync(planId, syncState);
     return () => clearActivePlanSync();
   }, [planId, syncState, setActivePlanSync, clearActivePlanSync]);
+
+  /**
+   * Mark plan as read when it finishes loading.
+   * This is done here (on plan load) instead of in inbox onClick handlers
+   * to avoid a race condition where markAsRead triggers a re-render before
+   * navigation completes. See issue #172.
+   */
+  useEffect(() => {
+    if (isSnapshot || !planId || !metadata) return;
+
+    /** Check if this plan is in inbox and unread */
+    const inboxPlan = allInboxPlans.find((p) => p.id === planId);
+    if (inboxPlan?.isUnread) {
+      markPlanAsRead(planId);
+    }
+  }, [isSnapshot, planId, metadata, allInboxPlans, markPlanAsRead]);
 
   const handleRequestIdentity = useCallback(() => {
     setShowAuthChoice(true);
