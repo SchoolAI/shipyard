@@ -335,6 +335,7 @@ ${patch}`;
           diffViewWrap={true}
           diffViewAddWidget={!!commentSupport}
           extendData={extendData}
+          onAddWidgetClick={(_side, _line) => {}}
           renderExtendLine={commentSupport ? renderExtendLine : undefined}
           renderWidgetLine={commentSupport ? renderWidgetLine : undefined}
         />

@@ -1,5 +1,6 @@
 import { Alert, Card, Chip } from '@heroui/react';
 import {
+  type ChangeSnapshot,
   type LinkedPR,
   type LocalChangesResult,
   type PlanMetadata,
@@ -26,7 +27,6 @@ import { assertNever } from '@/utils/assert-never';
 import { trpc } from '@/utils/trpc';
 import { type DiffViewMode, FileDiffView } from './diff';
 import { LocalChangesViewer } from './LocalChangesViewer';
-import { MachinePicker } from './machinePicker';
 
 /** --- LocalStorage Helpers --- */
 
@@ -52,6 +52,15 @@ function setDiffViewModePreference(mode: DiffViewMode): void {
 /** Source of changes to display */
 export type ChangeSource = 'local' | 'pr';
 
+/** Machine picker state for header controls */
+export interface MachinePickerState {
+  snapshots: Map<string, ChangeSnapshot>;
+  localMachineId: string | null;
+  selectedMachineId: string | null;
+  onSelectMachine: (machineId: string | null) => void;
+  shouldShow: boolean;
+}
+
 /** State exported to parent for rendering header controls */
 export interface ChangesViewState {
   source: ChangeSource;
@@ -67,6 +76,7 @@ export interface ChangesViewState {
     isFetching: boolean;
     refetch: () => void;
   };
+  machinePicker: MachinePickerState;
 }
 
 interface ChangesViewProps {
@@ -142,6 +152,15 @@ export function ChangesView({
   const selected = linkedPRs.find((pr) => pr.prNumber === selectedPR) ?? linkedPRs[0] ?? null;
   const hasPRs = linkedPRs.length > 0;
 
+  /** Derive machine picker state early so it can be used in effects */
+  const localMachineId = machineInfo?.machineId ?? null;
+  const isViewingRemote = selectedMachine !== null && selectedMachine !== localMachineId;
+  const selectedSnapshot = selectedMachine ? changeSnapshots.get(selectedMachine) : undefined;
+  const hasNoLocalRepo = localChanges?.available === false && localChanges.reason === 'no_cwd';
+  const hasRemoteSnapshots = changeSnapshots.size > 0;
+  const shouldShowMachinePicker =
+    changeSnapshots.size > 1 || (hasNoLocalRepo && hasRemoteSnapshots);
+
   /** Expose full changes view state to parent for header rendering */
   useEffect(() => {
     if (onChangesViewState) {
@@ -159,6 +178,13 @@ export function ChangesView({
           isFetching: prFetching,
           refetch: () => setPRRefetchTrigger((prev) => prev + 1),
         },
+        machinePicker: {
+          snapshots: changeSnapshots,
+          localMachineId,
+          selectedMachineId: selectedMachine,
+          onSelectMachine: setSelectedMachine,
+          shouldShow: shouldShowMachinePicker,
+        },
       });
     }
   }, [
@@ -170,6 +196,10 @@ export function ChangesView({
     localFetching,
     refetchLocal,
     prFetching,
+    changeSnapshots,
+    localMachineId,
+    selectedMachine,
+    shouldShowMachinePicker,
   ]);
 
   /** Auto-select first PR when available */
@@ -232,30 +262,11 @@ export function ChangesView({
     refreshPRStatus();
   }, [linkedPRs, metadata.repo, identity?.token, ydoc]);
 
-  const localMachineId = machineInfo?.machineId ?? null;
-  const isViewingRemote = selectedMachine !== null && selectedMachine !== localMachineId;
-  const selectedSnapshot = selectedMachine ? changeSnapshots.get(selectedMachine) : undefined;
-
-  const hasNoLocalRepo = localChanges?.available === false && localChanges.reason === 'no_cwd';
-  const hasRemoteSnapshots = changeSnapshots.size > 0;
-  const shouldShowMachinePicker =
-    changeSnapshots.size > 1 || (hasNoLocalRepo && hasRemoteSnapshots);
-
   return (
     <div className="max-w-full mx-auto p-2 md:p-4 h-full flex flex-col">
       {/* Content based on source - controls moved to header */}
       {source === 'local' ? (
         <div className="flex-1 min-h-0 flex flex-col">
-          {/* Machine picker when multiple machines have snapshots or fallback for no local repo */}
-          {shouldShowMachinePicker && (
-            <MachinePicker
-              snapshots={changeSnapshots}
-              localMachineId={localMachineId}
-              selectedMachineId={selectedMachine}
-              onSelectMachine={setSelectedMachine}
-            />
-          )}
-
           {/* Show remote snapshot when viewing another machine */}
           {isViewingRemote && selectedSnapshot ? (
             <LocalChangesViewer
@@ -269,7 +280,9 @@ export function ChangesView({
             <Alert status="default">
               <Alert.Content>
                 <Alert.Title>No Local Working Directory</Alert.Title>
-                <Alert.Description>Select a machine above to view their changes.</Alert.Description>
+                <Alert.Description>
+                  Select a machine from the dropdown above to view their changes.
+                </Alert.Description>
               </Alert.Content>
             </Alert>
           ) : (

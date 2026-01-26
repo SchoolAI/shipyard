@@ -1,9 +1,10 @@
 /**
  * Header controls for the Changes tab.
- * Renders three separate elements in the tab bar header area:
+ * Renders separate elements in the tab bar header area:
  * 1. Source Toggle - Pill buttons for "Local Changes" vs "PR #X"
- * 2. Info Dropdown - Contextual info only (branch details OR PR details)
- * 3. Refresh Button - Standalone button for both local and PR views
+ * 2. Machine Dropdown - Select which machine's changes to view (when in local mode)
+ * 3. Info Dropdown - Contextual info only (branch details OR PR details)
+ * 4. Refresh Button - Standalone button for both local and PR views
  */
 import {
   Button,
@@ -15,26 +16,29 @@ import {
   Label,
   Separator,
 } from '@heroui/react';
-import { type LinkedPR, updateLinkedPRStatus } from '@shipyard/schema';
+import { type ChangeSnapshot, type LinkedPR, updateLinkedPRStatus } from '@shipyard/schema';
 import {
   AlertCircle,
   Check,
   ChevronDown,
   CircleDot,
+  Clock,
   ExternalLink,
   FolderGit2,
   GitBranch,
   GitPullRequest,
   KeyRound,
+  Monitor,
   Plus,
   RefreshCw,
   Rocket,
 } from 'lucide-react';
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import type * as Y from 'yjs';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
-import type { ChangesViewState } from './ChangesView';
+import { formatRelativeTime } from '@/utils/formatters';
+import type { ChangesViewState, MachinePickerState } from './ChangesView';
 
 /**
  * Publish error types for better error handling.
@@ -62,10 +66,10 @@ interface ChangesHeaderControlsProps {
 
 /**
  * Header controls for the Changes tab.
- * Returns three separate controls: Source Toggle, Info Dropdown, and Refresh Button.
+ * Returns controls: Source Toggle, Machine Dropdown (local only), Info Dropdown, and Refresh Button.
  */
 export function ChangesHeaderControls({ state, repo, ydoc }: ChangesHeaderControlsProps) {
-  const { source, setSource, selectedPR, hasPRs, localChanges, prChanges } = state;
+  const { source, setSource, selectedPR, hasPRs, localChanges, prChanges, machinePicker } = state;
   const { identity, hasRepoScope, startAuth, requestRepoAccess } = useGitHubAuth();
   const [isPublishing, setIsPublishing] = useState(false);
   const [publishError, setPublishError] = useState<PublishError | null>(null);
@@ -226,6 +230,11 @@ export function ChangesHeaderControls({ state, repo, ydoc }: ChangesHeaderContro
             PR #{selectedPR.prNumber}
           </Button>
         </ButtonGroup>
+      )}
+
+      {/* Machine dropdown - only show when viewing local changes and multiple machines available */}
+      {source === 'local' && machinePicker.shouldShow && (
+        <MachineDropdown machinePicker={machinePicker} />
       )}
 
       <Dropdown>
@@ -490,5 +499,153 @@ function PRStatusChip({ status }: { status: LinkedPR['status'] }) {
     <Chip size="sm" color={color}>
       {status}
     </Chip>
+  );
+}
+
+/** --- Machine Dropdown --- */
+
+interface MachineDropdownProps {
+  machinePicker: MachinePickerState;
+}
+
+/**
+ * Dropdown to select which machine's changes to view.
+ * Shows machine name, live/snapshot status, file count, and +/- stats.
+ */
+function MachineDropdown({ machinePicker }: MachineDropdownProps) {
+  const { snapshots, localMachineId, selectedMachineId, onSelectMachine } = machinePicker;
+
+  /** Sort snapshots: local first, then live, then by update time */
+  const sortedSnapshots = useMemo(() => {
+    return Array.from(snapshots.entries()).sort(([idA, a], [idB, b]) => {
+      if (idA === localMachineId) return -1;
+      if (idB === localMachineId) return 1;
+      if (a.isLive !== b.isLive) return a.isLive ? -1 : 1;
+      return b.updatedAt - a.updatedAt;
+    });
+  }, [snapshots, localMachineId]);
+
+  /** Get the currently selected snapshot for display in trigger */
+  const selectedSnapshot = selectedMachineId
+    ? snapshots.get(selectedMachineId)
+    : sortedSnapshots[0]?.[1];
+
+  const displayName = selectedSnapshot?.machineName ?? 'Select machine';
+  const isLocal =
+    selectedMachineId === localMachineId ||
+    (!selectedMachineId && sortedSnapshots[0]?.[0] === localMachineId);
+
+  const handleAction = useCallback(
+    (key: React.Key) => {
+      const machineId = String(key);
+      /** If selecting the local machine, clear selection to use default local behavior */
+      if (machineId === localMachineId) {
+        onSelectMachine(null);
+      } else {
+        onSelectMachine(machineId);
+      }
+    },
+    [localMachineId, onSelectMachine]
+  );
+
+  return (
+    <Dropdown>
+      <Button size="sm" variant="secondary" className="gap-1">
+        <span className="flex items-center gap-1.5">
+          <Monitor className="w-3.5 h-3.5" />
+          <span className="max-w-[140px] truncate">{displayName}</span>
+          {isLocal && (
+            <Chip size="sm" color="accent" variant="soft" className="h-4 text-[10px]">
+              You
+            </Chip>
+          )}
+        </span>
+        <ChevronDown className="w-3 h-3" />
+      </Button>
+
+      <Dropdown.Popover className="min-w-[320px]">
+        <Dropdown.Menu onAction={handleAction}>
+          <Dropdown.Section>
+            <Header>Machines</Header>
+            {sortedSnapshots.map(([machineId, snapshot]) => (
+              <MachineDropdownItem
+                key={machineId}
+                machineId={machineId}
+                snapshot={snapshot}
+                isLocalMachine={machineId === localMachineId}
+                isSelected={
+                  machineId === selectedMachineId ||
+                  (!selectedMachineId && machineId === localMachineId)
+                }
+              />
+            ))}
+          </Dropdown.Section>
+        </Dropdown.Menu>
+      </Dropdown.Popover>
+    </Dropdown>
+  );
+}
+
+interface MachineDropdownItemProps {
+  machineId: string;
+  snapshot: ChangeSnapshot;
+  isLocalMachine: boolean;
+  isSelected: boolean;
+}
+
+/**
+ * Individual machine item in the dropdown.
+ * Shows machine name, status chip, file count, +/- stats, and relative time.
+ */
+function MachineDropdownItem({
+  machineId,
+  snapshot,
+  isLocalMachine,
+  isSelected,
+}: MachineDropdownItemProps) {
+  return (
+    <Dropdown.Item
+      id={machineId}
+      textValue={snapshot.machineName}
+      className={isSelected ? 'bg-primary/10' : ''}
+    >
+      <div className="flex flex-col gap-1.5 py-1 w-full">
+        {/* Row 1: Machine name + status chips */}
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <Monitor className="w-4 h-4 shrink-0 text-muted-foreground" />
+            <span className="font-medium truncate">{snapshot.machineName}</span>
+            {isLocalMachine && (
+              <Chip size="sm" color="accent" variant="soft" className="h-4 text-[10px]">
+                You
+              </Chip>
+            )}
+          </div>
+          <Chip
+            size="sm"
+            color={snapshot.isLive ? 'success' : 'default'}
+            variant="soft"
+            className="h-4 text-[10px] shrink-0"
+          >
+            {snapshot.isLive ? 'Live' : 'Snapshot'}
+          </Chip>
+        </div>
+
+        {/* Row 2: Stats */}
+        <div className="flex items-center justify-between text-xs text-muted-foreground">
+          <div className="flex items-center gap-2">
+            <span>
+              {snapshot.files.length} file{snapshot.files.length !== 1 ? 's' : ''}
+            </span>
+            <span className="text-success">+{snapshot.totalAdditions}</span>
+            <span className="text-danger">-{snapshot.totalDeletions}</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <Clock className="w-3 h-3" />
+            {formatRelativeTime(snapshot.updatedAt)}
+          </div>
+        </div>
+      </div>
+    </Dropdown.Item>
   );
 }

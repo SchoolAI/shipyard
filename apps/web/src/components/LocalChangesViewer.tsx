@@ -259,7 +259,9 @@ function LocalChangesContent({
 
   /** Build comment support for FileDiffView (only when ydoc is available) */
   const commentSupport = useMemo(() => {
-    if (!ydoc) return undefined;
+    if (!ydoc) {
+      return undefined;
+    }
 
     return {
       type: 'local' as const,

@@ -52,6 +52,7 @@ export default defineConfig(({ mode }) => ({
   plugins: [tailwindcss(), react(), githubPagesSpa()],
   server: {
     port: 5173,
+    host: true,
     open: true,
     /** Watch workspace packages for changes */
     watch: {
