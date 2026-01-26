@@ -276,13 +276,13 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
                 isIconOnly
                 variant="ghost"
                 size="sm"
-                aria-label="Collapse sidebar"
-                onPress={handleToggle}
+                aria-label={inDrawer ? 'Close menu' : 'Collapse sidebar'}
+                onPress={inDrawer ? onNavigate : handleToggle}
               >
                 <ChevronRight className="w-4 h-4 text-foreground rotate-180" />
               </Button>
             </Tooltip.Trigger>
-            <Tooltip.Content>Collapse sidebar</Tooltip.Content>
+            <Tooltip.Content>{inDrawer ? 'Close menu' : 'Collapse sidebar'}</Tooltip.Content>
           </Tooltip>
         </div>
       </div>
