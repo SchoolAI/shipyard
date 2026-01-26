@@ -22,7 +22,7 @@ export const appRouter = router({
 
 export type AppRouter = typeof appRouter;
 
-export type { Context, CreateContextFn, Logger, PlanStore } from './context.js';
+export type { Context, CreateContextFn, Logger, MachineInfo, PlanStore } from './context.js';
 export type { ConversationContext, ConversationHandlers } from './routers/conversation.js';
 export { conversationRouter } from './routers/conversation.js';
 export type {
@@ -42,6 +42,7 @@ export type {
   HasConnectionsResponse,
   ImportConversationRequest,
   ImportConversationResponse,
+  MachineInfoResponse,
   PlanIdInput,
   PlanStatusResponse,
   SetSessionTokenRequest,
@@ -58,6 +59,7 @@ export {
   HasConnectionsResponseSchema,
   ImportConversationRequestSchema,
   ImportConversationResponseSchema,
+  MachineInfoResponseSchema,
   PlanIdSchema,
   PlanStatusResponseSchema,
   SetSessionTokenRequestSchema,

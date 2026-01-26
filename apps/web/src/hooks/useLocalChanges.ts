@@ -40,16 +40,10 @@ export function useLocalChanges(
     { planId },
     {
       enabled,
-      /** Always refetch when the query becomes enabled (e.g., tab switch) */
       staleTime: 0,
-      /** Refetch when window gains focus */
+      refetchInterval: 5000,
       refetchOnWindowFocus: true,
-      /** Don't retry on failure (usually means MCP not connected) */
       retry: false,
-      /*
-       * Short timeout since this is a local operation
-       * Note: This is set in the tRPC client config, not here
-       */
     }
   );
 
