@@ -13,6 +13,11 @@ interface UseSyncChangeSnapshotOptions {
   enabled: boolean;
 }
 
+/**
+ * Debounce local changes to prevent CRDT churn.
+ * 5 seconds chosen to balance responsiveness for remote viewers
+ * with avoiding excessive Y.Doc updates during active development.
+ */
 const DEBOUNCE_MS = 5000;
 
 function convertToSyncedFiles(localChanges: LocalChangesResult): SyncedFileChange[] {
@@ -103,6 +108,11 @@ export function useSyncChangeSnapshot(
 
   useEffect(() => {
     return () => {
+      /**
+       * Preserve snapshot on unmount instead of removing.
+       * This allows remote collaborators to view last known state
+       * even after the agent/browser session ends.
+       */
       if (machineIdRef.current) {
         markMachineDisconnected(ydoc, machineIdRef.current);
       }
@@ -110,13 +120,44 @@ export function useSyncChangeSnapshot(
   }, [ydoc]);
 
   useEffect(() => {
+    let visibilityTimer: ReturnType<typeof setTimeout> | null = null;
+
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'hidden' && machineIdRef.current) {
-        markMachineDisconnected(ydoc, machineIdRef.current);
+        /**
+         * Cancel pending sync to prevent race: debounce timer could fire
+         * after disconnect and set isLive: true, overwriting the disconnected state.
+         */
+        if (debounceTimerRef.current) {
+          clearTimeout(debounceTimerRef.current);
+          debounceTimerRef.current = null;
+        }
+
+        /**
+         * 10-second grace period prevents marking disconnected on brief tab switches
+         * (Cmd+Tab, checking another app). Without this, even 0.1s visibility changes
+         * would immediately mark the machine disconnected, causing UI flicker.
+         */
+        visibilityTimer = setTimeout(() => {
+          if (machineIdRef.current) {
+            markMachineDisconnected(ydoc, machineIdRef.current);
+          }
+        }, 10000);
+      } else if (document.visibilityState === 'visible') {
+        /** Cancel pending disconnect since user returned to tab */
+        if (visibilityTimer) {
+          clearTimeout(visibilityTimer);
+          visibilityTimer = null;
+        }
       }
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      if (visibilityTimer) {
+        clearTimeout(visibilityTimer);
+      }
+    };
   }, [ydoc]);
 }
