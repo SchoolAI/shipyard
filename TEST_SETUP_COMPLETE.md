@@ -63,7 +63,7 @@ Untracked files:
 
 ### 1. Create Test Plan via MCP
 
-Use the `create_plan` MCP tool with this specification:
+Use the `create_task` MCP tool with this specification:
 
 ```
 Title: Validate Local Changes Feature

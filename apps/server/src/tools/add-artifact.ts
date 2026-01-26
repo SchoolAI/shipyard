@@ -29,8 +29,8 @@ import { TOOL_NAMES } from './tool-names.js';
 /** --- Input Schema --- */
 
 const AddArtifactInputBase = z.object({
-  planId: z.string().describe('The plan ID to add artifact to'),
-  sessionToken: z.string().describe('Session token from create_plan'),
+  taskId: z.string().describe('The task ID to add artifact to'),
+  sessionToken: z.string().describe('Session token from create_task'),
   type: z.enum(['html', 'image', 'video']).describe('Artifact type'),
   filename: z.string().describe('Filename for the artifact'),
   description: z.string().optional().describe('What this artifact proves (deliverable name)'),
@@ -120,7 +120,7 @@ function getContentSource(input: z.infer<typeof AddArtifactInput>): ContentSourc
  * Validates session and returns metadata or error response.
  */
 async function validateSessionAndGetMetadata(
-  planId: string,
+  taskId: string,
   sessionToken: string
 ): Promise<
   | {
@@ -130,17 +130,17 @@ async function validateSessionAndGetMetadata(
     }
   | { success: false; response: ToolResponse }
 > {
-  const doc = await getOrCreateDoc(planId);
+  const doc = await getOrCreateDoc(taskId);
   const metadata = getPlanMetadata(doc);
 
   if (!metadata) {
-    return { success: false, response: errorResponse(`Plan "${planId}" not found.`) };
+    return { success: false, response: errorResponse(`Task "${taskId}" not found.`) };
   }
 
   if (!metadata.sessionTokenHash || !verifySessionToken(sessionToken, metadata.sessionTokenHash)) {
     return {
       success: false,
-      response: errorResponse(`Invalid session token for plan "${planId}".`),
+      response: errorResponse(`Invalid session token for task "${taskId}".`),
     };
   }
 
@@ -190,8 +190,8 @@ CONTENT SOURCE (specify via 'source' field):
 
 DELIVERABLE LINKING:
 - Pass deliverableId to link artifact to a deliverable
-- If using Claude Code hooks, deliverable IDs are provided after plan approval
-- Otherwise, call read_plan to get deliverable IDs
+- If using Claude Code hooks, deliverable IDs are provided after task approval
+- Otherwise, call read_task to get deliverable IDs
 
 ARTIFACT TYPES:
 - screenshot: PNG, JPG images of UI, terminal output
@@ -201,8 +201,8 @@ ARTIFACT TYPES:
     inputSchema: {
       type: 'object',
       properties: {
-        planId: { type: 'string', description: 'The plan ID to add artifact to' },
-        sessionToken: { type: 'string', description: 'Session token from create_plan' },
+        taskId: { type: 'string', description: 'The task ID to add artifact to' },
+        sessionToken: { type: 'string', description: 'Session token from create_task' },
         type: {
           type: 'string',
           enum: ['html', 'image', 'video'],
@@ -237,16 +237,16 @@ ARTIFACT TYPES:
         deliverableId: {
           type: 'string',
           description:
-            'ID of the deliverable this fulfills (from read_plan output). Automatically marks deliverable as completed.',
+            'ID of the deliverable this fulfills (from read_task output). Automatically marks deliverable as completed.',
         },
       },
-      required: ['planId', 'sessionToken', 'type', 'filename', 'source'],
+      required: ['taskId', 'sessionToken', 'type', 'filename', 'source'],
     },
   },
 
   handler: async (args: unknown) => {
     const input = AddArtifactInput.parse(args);
-    const { planId, sessionToken, type, filename } = input;
+    const { taskId, sessionToken, type, filename } = input;
 
     /** Validate artifact type matches file extension */
     const validatedType: ArtifactType =
@@ -255,7 +255,7 @@ ARTIFACT TYPES:
 
     /** Get actor name and resolve content */
     const actorName = await getGitHubUsername();
-    logger.info({ planId, type, filename }, 'Adding artifact');
+    logger.info({ taskId, type, filename }, 'Adding artifact');
 
     const contentResult = await resolveArtifactContent(getContentSource(input));
     if (!contentResult.success) {
@@ -269,8 +269,8 @@ ARTIFACT TYPES:
       );
     }
 
-    /** Validate session and get plan metadata */
-    const validation = await validateSessionAndGetMetadata(planId, sessionToken);
+    /** Validate session and get task metadata */
+    const validation = await validateSessionAndGetMetadata(taskId, sessionToken);
     if (!validation.success) {
       return validation.response;
     }
@@ -281,7 +281,7 @@ ARTIFACT TYPES:
       metadata: validation.metadata,
       input,
       actorName,
-      planId,
+      taskId,
       type,
       filename,
       validatedType,
@@ -298,19 +298,19 @@ async function processArtifactUpload(params: {
   metadata: NonNullable<ReturnType<typeof getPlanMetadata>>;
   input: z.infer<typeof AddArtifactInput>;
   actorName: string;
-  planId: string;
+  taskId: string;
   type: string;
   filename: string;
   validatedType: ArtifactType;
   content: string;
 }): Promise<ToolResponse> {
-  const { doc, metadata, input, actorName, planId, type, filename, validatedType, content } =
+  const { doc, metadata, input, actorName, taskId, type, filename, validatedType, content } =
     params;
   let cleanupOnFailure: (() => Promise<void>) | null = null;
 
   try {
     const uploadResult = await uploadArtifactWithFallback({
-      planId,
+      planId: taskId,
       filename,
       content,
       validatedType,
@@ -331,13 +331,13 @@ async function processArtifactUpload(params: {
           artifact.id,
           actorName,
           metadata.status,
-          planId
+          taskId
         )
       : false;
 
     /** Compute artifact URL */
     const artifactUrl = getArtifactUrl(artifact);
-    logger.info({ planId, artifactId: artifact.id, url: artifactUrl }, 'Artifact added');
+    logger.info({ taskId, artifactId: artifact.id, url: artifactUrl }, 'Artifact added');
 
     const linkedText = input.deliverableId ? `\nLinked to deliverable: ${input.deliverableId}` : '';
 
@@ -351,7 +351,7 @@ async function processArtifactUpload(params: {
         metadata,
         deliverables,
         actorName,
-        planId,
+        taskId,
         artifact,
         type,
         filename,
@@ -376,7 +376,7 @@ async function processArtifactUpload(params: {
       deliverables
     );
   } catch (error) {
-    return handleUploadError(error, cleanupOnFailure, planId, filename);
+    return handleUploadError(error, cleanupOnFailure, taskId, filename);
   }
 }
 
@@ -406,10 +406,10 @@ function buildPartialCompletionResponse(
 async function handleUploadError(
   error: unknown,
   cleanupOnFailure: (() => Promise<void>) | null,
-  planId: string,
+  taskId: string,
   filename: string
 ): Promise<ToolResponse> {
-  logger.error({ error, planId, filename }, 'Failed to add artifact to Y.Doc');
+  logger.error({ error, taskId, filename }, 'Failed to add artifact to Y.Doc');
 
   if (cleanupOnFailure) {
     await cleanupOnFailure();
@@ -433,16 +433,16 @@ function handleDeliverableLinking(
   artifactId: string,
   actorName: string,
   currentStatus: string,
-  planId: string
+  taskId: string
 ): boolean {
   const linked = linkArtifactToDeliverable(doc, deliverableId, artifactId, actorName);
   if (!linked) {
-    logger.warn({ planId, deliverableId }, 'Failed to link artifact: deliverable not found');
+    logger.warn({ taskId, deliverableId }, 'Failed to link artifact: deliverable not found');
     return false;
   }
 
   logPlanEvent(doc, 'deliverable_linked', actorName, { deliverableId, artifactId });
-  logger.info({ planId, artifactId, deliverableId }, 'Artifact linked to deliverable');
+  logger.info({ taskId, artifactId, deliverableId }, 'Artifact linked to deliverable');
 
   /** Auto-progress status to in_progress when a deliverable is fulfilled */
   if (currentStatus !== 'draft') {
@@ -455,7 +455,7 @@ function handleDeliverableLinking(
     actorName
   );
   if (!transitionResult.success) {
-    logger.warn({ planId, error: transitionResult.error }, 'Failed to auto-progress status');
+    logger.warn({ taskId, error: transitionResult.error }, 'Failed to auto-progress status');
     return false;
   }
 
@@ -472,7 +472,7 @@ function handleDeliverableLinking(
   );
   addSnapshot(doc, snapshot);
 
-  logger.info({ planId }, 'Plan status auto-changed to in_progress');
+  logger.info({ taskId }, 'Task status auto-changed to in_progress');
   return true;
 }
 
@@ -484,7 +484,7 @@ async function handleAutoComplete(
   metadata: NonNullable<ReturnType<typeof getPlanMetadata>>,
   deliverables: ReturnType<typeof getDeliverables>,
   actorName: string,
-  planId: string,
+  taskId: string,
   artifact: { id: string },
   type: string,
   filename: string,
@@ -492,7 +492,7 @@ async function handleAutoComplete(
   linkedText: string,
   markCleanupDone: () => void
 ) {
-  logger.info({ planId }, 'All deliverables fulfilled, auto-completing task');
+  logger.info({ taskId }, 'All deliverables fulfilled, auto-completing task');
 
   /** Use shared auto-completion logic */
   const result = await performAutoComplete({
@@ -511,10 +511,10 @@ async function handleAutoComplete(
   const snapshotsDir = join(homedir(), '.shipyard', 'snapshots');
   await mkdir(snapshotsDir, { recursive: true });
 
-  const snapshotFile = join(snapshotsDir, `${planId}.txt`);
+  const snapshotFile = join(snapshotsDir, `${taskId}.txt`);
   await writeFile(snapshotFile, result.snapshotUrl, 'utf-8');
 
-  logger.info({ planId, snapshotFile }, 'Snapshot URL written to file');
+  logger.info({ taskId, snapshotFile }, 'Snapshot URL written to file');
 
   /** Build completion response */
   let prText = '';
@@ -538,7 +538,7 @@ ALL DELIVERABLES COMPLETE! Task auto-completed.${prText}
 Snapshot URL saved to: ${snapshotFile}
 (Note: Very long URL - recommend not reading directly. Use file path to attach to PR or access later.)${
           result.hasLocalArtifacts
-            ? '\n\nWARNING: This plan contains local artifacts that will not be visible to remote viewers. For full remote access, configure GITHUB_TOKEN to upload artifacts to GitHub.'
+            ? '\n\nWARNING: This task contains local artifacts that will not be visible to remote viewers. For full remote access, configure GITHUB_TOKEN to upload artifacts to GitHub.'
             : ''
         }`,
       },

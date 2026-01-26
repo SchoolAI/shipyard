@@ -18,7 +18,7 @@ export const YDOC_KEYS = {
    * Contains: id, title, status, createdAt, updatedAt, reviewedAt, reviewedBy, repo, pr
    *
    * Used by:
-   * - Server: packages/server/src/tools/create-plan.ts (write)
+   * - Server: apps/server/src/tools/create-task.ts (write)
    * - Web: packages/web/src/pages/PlanPage.tsx (read)
    * - Web: packages/web/src/hooks/useHydration.ts (write)
    * - Web: packages/web/src/components/ReviewActions.tsx (write)
@@ -34,7 +34,7 @@ export const YDOC_KEYS = {
    * This is the authoritative source for all plan content.
    *
    * Used by:
-   * - Server: apps/server/src/tools/create-plan.ts (write via blocksToYXmlFragment)
+   * - Server: apps/server/src/tools/create-task.ts (write via blocksToYXmlFragment)
    * - Server: apps/server/src/export-markdown.ts (read via yXmlFragmentToBlocks)
    * - Web: apps/web/src/components/PlanViewer.tsx (BlockNote collaboration)
    * - Web: apps/web/src/hooks/useHydration.ts (write from URL snapshot)
@@ -92,7 +92,7 @@ export const YDOC_KEYS = {
    * Linked to artifacts when agent uploads proof
    *
    * Used by:
-   * - Server: apps/server/src/tools/create-plan.ts (write)
+   * - Server: apps/server/src/tools/create-task.ts (write)
    * - Server: apps/server/src/tools/add-artifact.ts (update on link)
    * - Web: apps/web/src/components/DeliverablesView.tsx (read)
    * - Helpers: packages/schema/src/yjs-helpers.ts (read/write)

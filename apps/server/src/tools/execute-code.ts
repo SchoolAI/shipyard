@@ -625,7 +625,7 @@ async function readDiffComments(
   opts?: { includeLocal?: boolean; includePR?: boolean; includeResolved?: boolean }
 ) {
   const result = await readDiffCommentsTool.handler({
-    planId: taskId,
+    taskId,
     sessionToken,
     includeLocal: opts?.includeLocal,
     includePR: opts?.includePR,
@@ -667,8 +667,7 @@ type AddArtifactOpts = {
 );
 
 async function addArtifact(opts: AddArtifactOpts) {
-  /** Map taskId to planId for backwards compatibility with add-artifact tool */
-  const result = await addArtifactTool.handler({ ...opts, planId: opts.taskId });
+  const result = await addArtifactTool.handler(opts);
   const text = getToolResultText(result);
 
   if (result.isError) {
@@ -704,8 +703,7 @@ async function addArtifact(opts: AddArtifactOpts) {
 }
 
 async function completeTask(taskId: string, sessionToken: string, summary?: string) {
-  /** Map taskId to planId for backwards compatibility with complete-task tool */
-  const result = await completeTaskTool.handler({ planId: taskId, sessionToken, summary });
+  const result = await completeTaskTool.handler({ taskId, sessionToken, summary });
   const text = getToolResultText(result);
 
   if (result.isError) {
@@ -732,8 +730,7 @@ async function updateBlockContent(
     content?: string;
   }>
 ) {
-  /** Map taskId to planId for backwards compatibility with update-block-content tool */
-  await updateBlockContentTool.handler({ planId: taskId, sessionToken, operations });
+  await updateBlockContentTool.handler({ taskId, sessionToken, operations });
 }
 
 async function linkPR(opts: {
@@ -743,8 +740,7 @@ async function linkPR(opts: {
   branch?: string;
   repo?: string;
 }) {
-  /** Map taskId to planId for backwards compatibility with link-pr tool */
-  const result = await linkPRTool.handler({ ...opts, planId: opts.taskId });
+  const result = await linkPRTool.handler(opts);
   const text = getToolResultText(result);
 
   if (result.isError) {
@@ -768,7 +764,7 @@ async function linkPR(opts: {
 
 async function setupReviewNotification(taskId: string, pollIntervalSeconds?: number) {
   const result = await setupReviewNotificationTool.handler({
-    planId: taskId,
+    taskId,
     pollIntervalSeconds: pollIntervalSeconds ?? 30,
   });
   const text = getToolResultText(result);
@@ -979,7 +975,7 @@ async function requestUserInput(
 }
 
 async function regenerateSessionToken(taskId: string) {
-  const result = await regenerateSessionTokenTool.handler({ planId: taskId });
+  const result = await regenerateSessionTokenTool.handler({ taskId });
   const text = getToolResultText(result);
 
   if (result.isError) {

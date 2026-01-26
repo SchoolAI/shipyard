@@ -16,8 +16,8 @@ import { TOOL_NAMES } from './tool-names.js';
 /** --- Input Schema --- */
 
 const LinkPRInput = z.object({
-  planId: z.string().describe('Plan ID'),
-  sessionToken: z.string().describe('Session token from create_plan'),
+  taskId: z.string().describe('Task ID'),
+  sessionToken: z.string().describe('Session token from create_task'),
   prNumber: z.number().describe('PR number to link'),
   branch: z.string().optional().describe('Branch name (optional, will be fetched if omitted)'),
   repo: z
@@ -31,31 +31,31 @@ const LinkPRInput = z.object({
 export const linkPRTool = {
   definition: {
     name: TOOL_NAMES.LINK_PR,
-    description: `Link a GitHub PR to a plan.
+    description: `Link a GitHub PR to a task.
 
-Manually associate a PR with a plan. Useful when:
-- PR was created after plan completion
-- Multiple PRs implement parts of the same plan
+Manually associate a PR with a task. Useful when:
+- PR was created after task completion
+- Multiple PRs implement parts of the same task
 - You want to link a PR in a different repo
 
 USAGE:
 - prNumber: The GitHub PR number
-- repo (optional): Defaults to plan's repo. Use "owner/repo" format for cross-repo linking.
+- repo (optional): Defaults to task's repo. Use "owner/repo" format for cross-repo linking.
 - branch (optional): Will be fetched from GitHub if not provided
 
-The linked PR will appear in the plan's Changes tab with status, diff, and review comments.
+The linked PR will appear in the task's Changes tab with status, diff, and review comments.
 
 EXAMPLE:
 link_pr({
-  planId: "abc123",
+  taskId: "abc123",
   sessionToken: "token",
   prNumber: 42
 })`,
     inputSchema: {
       type: 'object',
       properties: {
-        planId: { type: 'string', description: 'Plan ID' },
-        sessionToken: { type: 'string', description: 'Session token from create_plan' },
+        taskId: { type: 'string', description: 'Task ID' },
+        sessionToken: { type: 'string', description: 'Session token from create_task' },
         prNumber: { type: 'number', description: 'PR number to link' },
         branch: {
           type: 'string',
@@ -63,10 +63,10 @@ link_pr({
         },
         repo: {
           type: 'string',
-          description: 'Repository override (org/repo). Uses plan repo if omitted.',
+          description: 'Repository override (org/repo). Uses task repo if omitted.',
         },
       },
-      required: ['planId', 'sessionToken', 'prNumber'],
+      required: ['taskId', 'sessionToken', 'prNumber'],
     },
   },
 
@@ -75,16 +75,16 @@ link_pr({
     const input = LinkPRInput.parse(args);
 
     logger.info(
-      { planId: input.planId, prNumber: input.prNumber, repo: input.repo },
-      'Linking PR to plan'
+      { taskId: input.taskId, prNumber: input.prNumber, repo: input.repo },
+      'Linking PR to task'
     );
 
-    const ydoc = await getOrCreateDoc(input.planId);
+    const ydoc = await getOrCreateDoc(input.taskId);
     const metadata = getPlanMetadata(ydoc);
 
     if (!metadata) {
       return {
-        content: [{ type: 'text', text: `Plan "${input.planId}" not found.` }],
+        content: [{ type: 'text', text: `Task "${input.taskId}" not found.` }],
         isError: true,
       };
     }
@@ -95,7 +95,7 @@ link_pr({
       !verifySessionToken(input.sessionToken, metadata.sessionTokenHash)
     ) {
       return {
-        content: [{ type: 'text', text: `Invalid session token for plan "${input.planId}".` }],
+        content: [{ type: 'text', text: `Invalid session token for task "${input.taskId}".` }],
         isError: true,
       };
     }
@@ -107,7 +107,7 @@ link_pr({
         content: [
           {
             type: 'text',
-            text: 'No repository specified. Provide repo parameter or set plan repo.',
+            text: 'No repository specified. Provide repo parameter or set task repo.',
           },
         ],
         isError: true,
@@ -170,7 +170,7 @@ link_pr({
       });
 
       logger.info(
-        { planId: input.planId, prNumber: input.prNumber, status: linkedPR.status },
+        { taskId: input.taskId, prNumber: input.prNumber, status: linkedPR.status },
         'PR linked successfully'
       );
 
@@ -185,12 +185,12 @@ Status: ${linkedPR.status}
 Branch: ${linkedPR.branch}
 URL: ${linkedPR.url}
 
-The PR is now visible in the "Changes" tab of your plan.`,
+The PR is now visible in the "Changes" tab of your task.`,
           },
         ],
       };
     } catch (error) {
-      logger.error({ error, planId: input.planId, prNumber: input.prNumber }, 'Failed to link PR');
+      logger.error({ error, taskId: input.taskId, prNumber: input.prNumber }, 'Failed to link PR');
 
       /** Check if this is a validation error */
       if (error instanceof z.ZodError) {

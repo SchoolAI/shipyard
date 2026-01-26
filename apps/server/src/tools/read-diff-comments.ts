@@ -58,8 +58,8 @@ function extractCwdFromMetadata(metadata: PlanMetadata | null): string | undefin
 }
 
 const ReadDiffCommentsInput = z.object({
-  planId: z.string().describe('The plan ID to read diff comments from'),
-  sessionToken: z.string().describe('Session token from create_plan'),
+  taskId: z.string().describe('The task ID to read diff comments from'),
+  sessionToken: z.string().describe('Session token from create_task'),
   includeLocal: z
     .boolean()
     .optional()
@@ -91,8 +91,8 @@ OUTPUT FORMAT:
     inputSchema: {
       type: 'object',
       properties: {
-        planId: { type: 'string', description: 'The plan ID to read diff comments from' },
-        sessionToken: { type: 'string', description: 'Session token from create_plan' },
+        taskId: { type: 'string', description: 'The task ID to read diff comments from' },
+        sessionToken: { type: 'string', description: 'Session token from create_task' },
         includeLocal: {
           type: 'boolean',
           description: 'Include local (uncommitted) diff comments (default: true)',
@@ -106,20 +106,20 @@ OUTPUT FORMAT:
           description: 'Include resolved comments (default: false)',
         },
       },
-      required: ['planId', 'sessionToken'],
+      required: ['taskId', 'sessionToken'],
     },
   },
 
   handler: async (args: unknown) => {
     const {
-      planId,
+      taskId,
       sessionToken,
       includeLocal = true,
       includePR = true,
       includeResolved = false,
     } = ReadDiffCommentsInput.parse(args);
 
-    const doc = await getOrCreateDoc(planId);
+    const doc = await getOrCreateDoc(taskId);
 
     /** Verify session token */
     const metadata = doc.getMap('metadata').toJSON();
@@ -130,7 +130,7 @@ OUTPUT FORMAT:
         content: [
           {
             type: 'text',
-            text: `Invalid session token for plan "${planId}".`,
+            text: `Invalid session token for task "${taskId}".`,
           },
         ],
         isError: true,

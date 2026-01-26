@@ -14,9 +14,11 @@ export const TOOL_NAMES = {
   CREATE_TASK: 'create_task',
   EXECUTE_CODE: 'execute_code',
   LINK_PR: 'link_pr',
+  READ_DIFF_COMMENTS: 'read_diff_comments',
   READ_TASK: 'read_task',
   REGENERATE_SESSION_TOKEN: 'regenerate_session_token',
   REQUEST_USER_INPUT: 'request_user_input',
+  SETUP_REVIEW_NOTIFICATION: 'setup_review_notification',
   UPDATE_BLOCK_CONTENT: 'update_block_content',
   UPDATE_TASK: 'update_task',
 } as const;

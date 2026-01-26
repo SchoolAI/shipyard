@@ -4,7 +4,7 @@ import { registryConfig } from '../config/env/registry.js';
 import { TOOL_NAMES } from './tool-names.js';
 
 const SetupReviewNotificationInput = z.object({
-  planId: z.string().describe('Plan ID to monitor'),
+  taskId: z.string().describe('Task ID to monitor'),
   pollIntervalSeconds: z
     .number()
     .optional()
@@ -15,7 +15,7 @@ const SetupReviewNotificationInput = z.object({
 export const setupReviewNotificationTool = {
   definition: {
     name: TOOL_NAMES.SETUP_REVIEW_NOTIFICATION,
-    description: `Returns a bash script to monitor plan review status.
+    description: `Returns a bash script to monitor task review status.
 
 NOTE FOR CLAUDE CODE USERS: If you have the shipyard hook installed, you DON'T need this tool. The hook automatically blocks until the human approves or requests changes. This tool is only for agents WITHOUT hook support.
 
@@ -29,19 +29,19 @@ REQUIREMENTS: The script requires 'jq' for URL encoding. Install with: brew inst
     inputSchema: {
       type: 'object',
       properties: {
-        planId: { type: 'string', description: 'Plan ID to monitor' },
+        taskId: { type: 'string', description: 'Task ID to monitor' },
         pollIntervalSeconds: {
           type: 'number',
           description: 'Polling interval in seconds (default: 30)',
         },
       },
-      required: ['planId'],
+      required: ['taskId'],
     },
   },
 
   handler: async (args: unknown) => {
     const input = SetupReviewNotificationInput.parse(args);
-    const { planId, pollIntervalSeconds = 30 } = input;
+    const { taskId, pollIntervalSeconds = 30 } = input;
 
     const registryPort = registryConfig.REGISTRY_PORT[0];
     const trpcUrl = `http://localhost:${registryPort}/trpc`;
@@ -56,7 +56,7 @@ REQUIREMENTS: The script requires 'jq' for URL encoding. Install with: brew inst
 
     /** Standard tRPC v10+ HTTP format (no superjson transformer) */
     const script = `#!/bin/bash
-# Monitor plan "${planId}" for approval status changes
+# Monitor task "${taskId}" for approval status changes
 # Polls the Shipyard registry server and exits when approved/rejected
 
 # Check for required dependency
@@ -67,14 +67,14 @@ if ! command -v jq &> /dev/null; then
 fi
 
 TRPC_URL="${trpcUrl}"
-PLAN_ID="${planId}"
+TASK_ID="${taskId}"
 POLL_INTERVAL=${pollIntervalSeconds}
 
 # Subscribe to status changes via tRPC mutation
-echo "Subscribing to plan changes..."
+echo "Subscribing to task changes..."
 RESPONSE=$(curl -sf -X POST "$TRPC_URL/subscription.create" \\
   -H "Content-Type: application/json" \\
-  -d '{"planId":"'"$PLAN_ID"'","subscribe":["status","comments"],"windowMs":5000,"threshold":1}')
+  -d '{"planId":"'"$TASK_ID"'","subscribe":["status","comments"],"windowMs":5000,"threshold":1}')
 
 # Extract clientId from response: {"result":{"data":{"clientId":"..."}}}
 CLIENT_ID=$(echo "$RESPONSE" | sed -n 's/.*"clientId":"\\([^"]*\\)".*/\\1/p')
@@ -93,7 +93,7 @@ while true; do
   sleep $POLL_INTERVAL
 
   # URL-encode the input JSON for GET request
-  INPUT='{"planId":"'"$PLAN_ID"'","clientId":"'"$CLIENT_ID"'"}'
+  INPUT='{"planId":"'"$TASK_ID"'","clientId":"'"$CLIENT_ID"'"}'
   ENCODED_INPUT=$(printf '%s' "$INPUT" | jq -sRr @uri)
 
   RESULT=$(curl -sf "$TRPC_URL/subscription.getChanges?input=$ENCODED_INPUT" 2>/dev/null)
@@ -105,7 +105,7 @@ while true; do
 
     # Exit on status change to in_progress (approved) or changes_requested (needs work)
     if echo "$CHANGES" | grep -qE "Status:.*(${statusInProgress}|${statusChangesRequested})"; then
-      echo "Plan status changed. Exiting."
+      echo "Task status changed. Exiting."
       exit 0
     fi
   fi
@@ -115,7 +115,7 @@ done`;
       content: [
         {
           type: 'text',
-          text: `Notification script for plan "${planId}":
+          text: `Notification script for task "${taskId}":
 
 \`\`\`bash
 ${script}

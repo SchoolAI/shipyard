@@ -42,8 +42,8 @@ const BlockOperationSchema = z.discriminatedUnion('type', [
 ]);
 
 const UpdateBlockContentInput = z.object({
-  planId: z.string().describe('The plan ID to modify'),
-  sessionToken: z.string().describe('Session token from create_plan'),
+  taskId: z.string().describe('The task ID to modify'),
+  sessionToken: z.string().describe('Session token from create_task'),
   operations: z
     .array(BlockOperationSchema)
     .min(1)
@@ -57,7 +57,7 @@ type BlockOperation = z.infer<typeof BlockOperationSchema>;
 export const updateBlockContentTool = {
   definition: {
     name: TOOL_NAMES.UPDATE_BLOCK_CONTENT,
-    description: `Modify task content by updating, inserting, or deleting specific blocks. Use read_plan first to get block IDs.
+    description: `Modify task content by updating, inserting, or deleting specific blocks. Use read_task first to get block IDs.
 
 DELIVERABLES: When inserting/updating content, you can mark checkbox items as deliverables using {#deliverable} marker. These can later be linked to artifacts via add_artifact tool.
 
@@ -72,8 +72,8 @@ Example with deliverables:
     inputSchema: {
       type: 'object',
       properties: {
-        planId: { type: 'string', description: 'The task ID to modify' },
-        sessionToken: { type: 'string', description: 'Session token from create_plan' },
+        taskId: { type: 'string', description: 'The task ID to modify' },
+        sessionToken: { type: 'string', description: 'Session token from create_task' },
         operations: {
           type: 'array',
           description: 'Array of operations to perform atomically',
@@ -87,7 +87,7 @@ Example with deliverables:
               },
               blockId: {
                 type: 'string',
-                description: 'Block ID for update/delete operations (from read_plan output)',
+                description: 'Block ID for update/delete operations (from read_task output)',
               },
               afterBlockId: {
                 type: 'string',
@@ -104,23 +104,23 @@ Example with deliverables:
           },
         },
       },
-      required: ['planId', 'sessionToken', 'operations'],
+      required: ['taskId', 'sessionToken', 'operations'],
     },
   },
 
   handler: async (args: unknown) => {
     const input = UpdateBlockContentInput.parse(args);
-    const { planId, sessionToken, operations } = input;
+    const { taskId, sessionToken, operations } = input;
 
-    logger.info({ planId, operationCount: operations.length }, 'Updating block content');
+    logger.info({ taskId, operationCount: operations.length }, 'Updating block content');
 
-    const ydoc = await getOrCreateDoc(planId);
+    const ydoc = await getOrCreateDoc(taskId);
 
     /** Verify session token first */
     const metadata = getPlanMetadata(ydoc);
     if (!metadata) {
       return {
-        content: [{ type: 'text', text: `Plan "${planId}" not found.` }],
+        content: [{ type: 'text', text: `Task "${taskId}" not found.` }],
         isError: true,
       };
     }
@@ -130,7 +130,7 @@ Example with deliverables:
       !verifySessionToken(sessionToken, metadata.sessionTokenHash)
     ) {
       return {
-        content: [{ type: 'text', text: `Invalid session token for plan "${planId}".` }],
+        content: [{ type: 'text', text: `Invalid session token for task "${taskId}".` }],
         isError: true,
       };
     }
@@ -146,7 +146,7 @@ Example with deliverables:
         content: [
           {
             type: 'text',
-            text: `Plan "${planId}" has no content. Use replace_all to add content or create a new plan.`,
+            text: `Task "${taskId}" has no content. Use replace_all to add content or create a new task.`,
           },
         ],
         isError: true,
@@ -196,19 +196,19 @@ Example with deliverables:
         : `${operations.length} operations: ${results.join(', ')}`;
     const snapshot = createPlanSnapshot(ydoc, operationSummary, actorName, metadata.status, blocks);
     addSnapshot(ydoc, snapshot);
-    logger.info({ planId, snapshotId: snapshot.id }, 'Content snapshot created');
+    logger.info({ taskId, snapshotId: snapshot.id }, 'Content snapshot created');
 
-    /** Update plan index */
+    /** Update task index */
     const indexDoc = await getOrCreateDoc(PLAN_INDEX_DOC_NAME);
-    touchPlanIndexEntry(indexDoc, planId);
+    touchPlanIndexEntry(indexDoc, taskId);
 
-    logger.info({ planId, results }, 'Block content updated successfully');
+    logger.info({ taskId, results }, 'Block content updated successfully');
 
     return {
       content: [
         {
           type: 'text',
-          text: `Updated plan "${planId}":\n${results.map((r) => `- ${r}`).join('\n')}`,
+          text: `Updated task "${taskId}":\n${results.map((r) => `- ${r}`).join('\n')}`,
         },
       ],
     };

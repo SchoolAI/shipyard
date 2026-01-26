@@ -90,7 +90,7 @@ Start a new Claude Code session and ask:
 "Create an implementation plan for adding user authentication"
 ```
 
-Claude will call the `create_plan` tool → browser opens with plan!
+Claude will call the `create_task` tool → browser opens with task!
 
 ---
 

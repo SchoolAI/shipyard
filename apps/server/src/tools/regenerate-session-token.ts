@@ -8,44 +8,44 @@ import { TOOL_NAMES } from './tool-names.js';
 
 /** --- Input Schema --- */
 const RegenerateSessionTokenInput = z.object({
-  planId: z.string().describe('The plan ID to regenerate token for'),
+  taskId: z.string().describe('The task ID to regenerate token for'),
 });
 
 /** --- Public Export --- */
 export const regenerateSessionTokenTool = {
   definition: {
     name: TOOL_NAMES.REGENERATE_SESSION_TOKEN,
-    description: `Regenerate the session token for a plan.
+    description: `Regenerate the session token for a task.
 
 USE WHEN:
 - Your Claude Code session ended and you lost the original token
-- You need to resume work on a plan you own
+- You need to resume work on a task you own
 - The old token may have been compromised
 
 REQUIREMENTS:
-- You must be the plan owner (verified via GitHub identity)
-- The plan must exist and have an ownerId set
+- You must be the task owner (verified via GitHub identity)
+- The task must exist and have an ownerId set
 
 RETURNS:
-- New session token that can be used for add_artifact, read_plan, etc.
+- New session token that can be used for add_artifact, read_task, etc.
 
 SECURITY:
-- Only the plan owner can regenerate tokens
+- Only the task owner can regenerate tokens
 - Old token is immediately invalidated
 - New token is returned only once - store it securely`,
     inputSchema: {
       type: 'object',
       properties: {
-        planId: { type: 'string', description: 'The plan ID to regenerate token for' },
+        taskId: { type: 'string', description: 'The task ID to regenerate token for' },
       },
-      required: ['planId'],
+      required: ['taskId'],
     },
   },
 
   handler: async (args: unknown) => {
-    const { planId } = RegenerateSessionTokenInput.parse(args);
+    const { taskId } = RegenerateSessionTokenInput.parse(args);
 
-    logger.info({ planId }, 'Attempting to regenerate session token');
+    logger.info({ taskId }, 'Attempting to regenerate session token');
 
     /** 1. Get current user's verified GitHub identity */
     const currentUser = await getVerifiedGitHubUsername();
@@ -69,13 +69,13 @@ Note: git config user.name is NOT accepted for security-critical operations.`,
       };
     }
 
-    /** 2. Get the plan */
-    const doc = await getOrCreateDoc(planId);
+    /** 2. Get the task */
+    const doc = await getOrCreateDoc(taskId);
     const metadata = getPlanMetadata(doc);
 
     if (!metadata) {
       return {
-        content: [{ type: 'text', text: `Plan "${planId}" not found.` }],
+        content: [{ type: 'text', text: `Task "${taskId}" not found.` }],
         isError: true,
       };
     }
@@ -86,7 +86,7 @@ Note: git config user.name is NOT accepted for security-critical operations.`,
         content: [
           {
             type: 'text',
-            text: `Plan "${planId}" has no owner set. Cannot regenerate token for ownerless plans.`,
+            text: `Task "${taskId}" has no owner set. Cannot regenerate token for ownerless tasks.`,
           },
         ],
         isError: true,
@@ -113,14 +113,14 @@ Note: git config user.name is NOT accepted for security-critical operations.`,
       const actualOwner = updateResult.actualOwner;
       if (actualOwner !== currentUser) {
         logger.warn(
-          { planId, expectedOwner: metadata.ownerId, actualOwner, currentUser },
+          { taskId, expectedOwner: metadata.ownerId, actualOwner, currentUser },
           'Token regeneration denied - ownership changed during operation'
         );
         return {
           content: [
             {
               type: 'text',
-              text: `Access denied. You do not have permission to regenerate the session token for plan "${planId}".`,
+              text: `Access denied. You do not have permission to regenerate the session token for task "${taskId}".`,
             },
           ],
           isError: true,
@@ -128,7 +128,7 @@ Note: git config user.name is NOT accepted for security-critical operations.`,
       }
       /** If actualOwner === currentUser but still failed, something unexpected happened */
       logger.error(
-        { planId, expectedOwner: metadata.ownerId, actualOwner, currentUser },
+        { taskId, expectedOwner: metadata.ownerId, actualOwner, currentUser },
         'Unexpected failure in atomic token regeneration'
       );
       return {
@@ -145,7 +145,7 @@ Note: git config user.name is NOT accepted for security-critical operations.`,
     /** 6. Log the event for audit trail */
     logPlanEvent(doc, 'session_token_regenerated', currentUser);
 
-    logger.info({ planId, ownerId: metadata.ownerId }, 'Session token regenerated successfully');
+    logger.info({ taskId, ownerId: metadata.ownerId }, 'Session token regenerated successfully');
 
     return {
       content: [
@@ -153,13 +153,13 @@ Note: git config user.name is NOT accepted for security-critical operations.`,
           type: 'text',
           text: `Session token regenerated successfully!
 
-Plan: ${metadata.title}
-Plan ID: ${planId}
+Task: ${metadata.title}
+Task ID: ${taskId}
 
 New Session Token: ${newToken}
 
 IMPORTANT: Store this token securely. The old token has been invalidated.
-Use this token for add_artifact, read_plan, link_pr, and other plan operations.`,
+Use this token for add_artifact, read_task, link_pr, and other task operations.`,
         },
       ],
     };

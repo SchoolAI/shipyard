@@ -9,8 +9,8 @@ import { buildCompletionResponse } from './response-formatters.js';
 import { TOOL_NAMES } from './tool-names.js';
 
 const CompleteTaskInput = z.object({
-  planId: z.string().describe('ID of the plan to complete'),
-  sessionToken: z.string().describe('Session token from create_plan'),
+  taskId: z.string().describe('ID of the task to complete'),
+  sessionToken: z.string().describe('Session token from create_task'),
   summary: z.string().optional().describe('Optional completion summary'),
 });
 
@@ -36,25 +36,25 @@ RETURNS:
     inputSchema: {
       type: 'object',
       properties: {
-        planId: { type: 'string', description: 'ID of the plan to complete' },
-        sessionToken: { type: 'string', description: 'Session token from create_plan' },
+        taskId: { type: 'string', description: 'ID of the task to complete' },
+        sessionToken: { type: 'string', description: 'Session token from create_task' },
         summary: {
           type: 'string',
           description: 'Optional completion summary for PR description',
         },
       },
-      required: ['planId', 'sessionToken'],
+      required: ['taskId', 'sessionToken'],
     },
   },
 
   handler: async (args: unknown) => {
     const input = CompleteTaskInput.parse(args);
-    const ydoc = await getOrCreateDoc(input.planId);
+    const ydoc = await getOrCreateDoc(input.taskId);
     const metadata = getPlanMetadata(ydoc);
 
     if (!metadata) {
       return {
-        content: [{ type: 'text', text: 'Plan not found' }],
+        content: [{ type: 'text', text: 'Task not found' }],
         isError: true,
       };
     }
@@ -65,7 +65,7 @@ RETURNS:
       !verifySessionToken(input.sessionToken, metadata.sessionTokenHash)
     ) {
       return {
-        content: [{ type: 'text', text: `Invalid session token for plan "${input.planId}".` }],
+        content: [{ type: 'text', text: `Invalid session token for task "${input.taskId}".` }],
         isError: true,
       };
     }
@@ -76,7 +76,7 @@ RETURNS:
         content: [
           {
             type: 'text',
-            text: `Cannot complete: plan status is '${metadata.status}', must be 'in_progress'`,
+            text: `Cannot complete: task status is '${metadata.status}', must be 'in_progress'`,
           },
         ],
         isError: true,
@@ -110,7 +110,7 @@ RETURNS:
       snapshotMessage: 'Task marked complete',
     });
 
-    logger.info({ planId: input.planId }, 'Task marked complete');
+    logger.info({ taskId: input.taskId }, 'Task marked complete');
 
     /** Build response using extracted formatter */
     const responseText = buildCompletionResponse({

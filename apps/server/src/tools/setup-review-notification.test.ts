@@ -5,19 +5,19 @@ describe('setupReviewNotification', () => {
   describe('script generation', () => {
     it('should generate script with correct registry port', async () => {
       const result = await setupReviewNotificationTool.handler({
-        planId: 'test-plan-123',
+        taskId: 'test-task-123',
         pollIntervalSeconds: 15,
       });
 
       const text = (result.content[0] as { text: string }).text;
       expect(text).toContain('TRPC_URL="http://localhost:32191/trpc"');
-      expect(text).toContain('PLAN_ID="test-plan-123"');
+      expect(text).toContain('TASK_ID="test-task-123"');
       expect(text).toContain('POLL_INTERVAL=15');
     });
 
     it('should use default poll interval of 30 seconds', async () => {
       const result = await setupReviewNotificationTool.handler({
-        planId: 'test-plan-abc',
+        taskId: 'test-task-abc',
       });
 
       const text = (result.content[0] as { text: string }).text;
@@ -26,7 +26,7 @@ describe('setupReviewNotification', () => {
 
     it('should include jq dependency check', async () => {
       const result = await setupReviewNotificationTool.handler({
-        planId: 'test-plan-123',
+        taskId: 'test-task-123',
       });
 
       const text = (result.content[0] as { text: string }).text;
@@ -37,7 +37,7 @@ describe('setupReviewNotification', () => {
 
     it('should check for empty CLIENT_ID', async () => {
       const result = await setupReviewNotificationTool.handler({
-        planId: 'test-plan-123',
+        taskId: 'test-task-123',
       });
 
       const text = (result.content[0] as { text: string }).text;
@@ -49,7 +49,7 @@ describe('setupReviewNotification', () => {
   describe('tRPC format', () => {
     it('should use correct mutation format (no json wrapper)', async () => {
       const result = await setupReviewNotificationTool.handler({
-        planId: 'test-123',
+        taskId: 'test-123',
       });
 
       const text = (result.content[0] as { text: string }).text;
@@ -59,12 +59,12 @@ describe('setupReviewNotification', () => {
       expect(text).toContain('"windowMs":5000');
       expect(text).toContain('"threshold":1');
 
-      expect(text).not.toContain('{"json":{"planId"');
+      expect(text).not.toContain('{"json":{"taskId"');
     });
 
     it('should use correct query format (GET with url-encoded input)', async () => {
       const result = await setupReviewNotificationTool.handler({
-        planId: 'test-123',
+        taskId: 'test-123',
       });
 
       const text = (result.content[0] as { text: string }).text;
@@ -80,7 +80,7 @@ describe('setupReviewNotification', () => {
   describe('status detection', () => {
     it('should exit on in_progress status (approved)', async () => {
       const result = await setupReviewNotificationTool.handler({
-        planId: 'test-123',
+        taskId: 'test-123',
       });
 
       const text = (result.content[0] as { text: string }).text;
@@ -90,7 +90,7 @@ describe('setupReviewNotification', () => {
 
     it('should exit on changes_requested status', async () => {
       const result = await setupReviewNotificationTool.handler({
-        planId: 'test-123',
+        taskId: 'test-123',
       });
 
       const text = (result.content[0] as { text: string }).text;
@@ -99,7 +99,7 @@ describe('setupReviewNotification', () => {
 
     it('should use enum values from PlanStatusValues', async () => {
       const result = await setupReviewNotificationTool.handler({
-        planId: 'test-123',
+        taskId: 'test-123',
       });
 
       const text = (result.content[0] as { text: string }).text;
@@ -114,7 +114,7 @@ describe('setupReviewNotification', () => {
   describe('response parsing', () => {
     it('should extract clientId from tRPC response format', async () => {
       const result = await setupReviewNotificationTool.handler({
-        planId: 'test-123',
+        taskId: 'test-123',
       });
 
       const text = (result.content[0] as { text: string }).text;
@@ -124,7 +124,7 @@ describe('setupReviewNotification', () => {
 
     it('should extract changes from tRPC response format', async () => {
       const result = await setupReviewNotificationTool.handler({
-        planId: 'test-123',
+        taskId: 'test-123',
       });
 
       const text = (result.content[0] as { text: string }).text;
@@ -137,7 +137,7 @@ describe('setupReviewNotification', () => {
   describe('documentation', () => {
     it('should mention jq requirement', async () => {
       const result = await setupReviewNotificationTool.handler({
-        planId: 'test-123',
+        taskId: 'test-123',
       });
 
       const text = (result.content[0] as { text: string }).text;
@@ -147,7 +147,7 @@ describe('setupReviewNotification', () => {
 
     it('should explain usage', async () => {
       const result = await setupReviewNotificationTool.handler({
-        planId: 'test-123',
+        taskId: 'test-123',
       });
 
       const text = (result.content[0] as { text: string }).text;
