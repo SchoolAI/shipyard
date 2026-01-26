@@ -57,24 +57,13 @@ Opens on `http://localhost:5173`
 
 ### 2. MCP Server Setup
 
-**For local development**, create a `.claude/settings.local.json` file in the repo root:
+The `pnpm install` step automatically creates `.mcp.json` from the example file. This gives you:
+- **Local Shipyard MCP** — runs from `apps/server/dist/index.js`
+- **HeroUI MCP** — component docs for UI development
 
-```json
-{
-  "mcpServers": {
-    "shipyard": {
-      "command": "node",
-      "args": ["apps/server/dist/index.js"],
-      "env": {
-        "NODE_ENV": "development",
-        "LOG_LEVEL": "debug"
-      }
-    }
-  }
-}
-```
+Claude Code auto-loads this when you work in the repo.
 
-**Note:** The root `.mcp.json` is for **plugin distribution** (uses `npx @schoolai/shipyard-mcp`). For local development, use the settings.local.json approach above.
+**Note:** `.mcp.json` is git-ignored (dev only). Plugin users get a separate production config without HeroUI.
 
 Verify it's available:
 ```bash

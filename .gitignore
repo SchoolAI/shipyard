@@ -167,3 +167,7 @@ plannotator/
 # macOS system files
 .DS_Store
 tmp/
+
+# Local MCP config (dev only, not distributed with plugin)
+# Run: cp .mcp.json.example .mcp.json
+.mcp.json

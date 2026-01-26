@@ -25,7 +25,8 @@
     "reset": "bash scripts/reset-all.sh",
     "hooks:local": "bash scripts/hooks-local.sh",
     "hooks:prod": "bash scripts/hooks-prod.sh",
-    "prepare": "simple-git-hooks"
+    "prepare": "simple-git-hooks",
+    "postinstall": "[ -f .mcp.json ] || cp .mcp.json.example .mcp.json 2>/dev/null || true"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.3.11",

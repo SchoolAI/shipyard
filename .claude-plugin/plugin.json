@@ -11,5 +11,13 @@
   "repository": "https://github.com/SchoolAI/shipyard",
   "license": "MIT",
   "keywords": ["planning", "collaboration", "review", "artifacts", "mcp", "hooks", "crdt", "p2p"],
-  "mcpServers": "./.mcp-plugin.json"
+  "mcpServers": {
+    "shipyard": {
+      "command": "npx",
+      "args": ["-y", "-p", "@schoolai/shipyard-mcp@latest", "mcp-server-shipyard"],
+      "env": {
+        "NODE_ENV": "production"
+      }
+    }
+  }
 }
