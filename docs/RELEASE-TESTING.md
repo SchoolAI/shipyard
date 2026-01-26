@@ -1,12 +1,34 @@
-# Release Candidate Testing Workflow
+# Release Testing Workflow
 
-A systematic approach to testing Shipyard release candidates before promoting to stable.
+A systematic approach to testing Shipyard releases.
 
-> **Last tested:** v0.2.3-RC (2026-01-25) - Found and fixed 8 bugs
+> **Last tested:** v0.4.0 (2026-01-26)
 
 ---
 
-## Quick Reference
+## Two Testing Modes
+
+| Mode | When to Use | What to Skip |
+|------|-------------|--------------|
+| **Post-Deployment** | Version already published to npm, plugin installed | Build steps, `pnpm dev:all` - go straight to functional testing |
+| **Pre-Publish** | Testing local changes before publishing | Nothing - full build verification needed |
+
+### Post-Deployment Testing (You're Here)
+
+If you've already published a version and have the plugin installed:
+
+1. **Skip** all build/install steps (already done by npm/plugin)
+2. **Skip** `pnpm dev:all` (MCP server runs via plugin automatically)
+3. **Go straight to** [Test Categories](#test-categories) below
+4. Use Claude Code with the installed plugin to test MCP tools directly
+
+### Pre-Publish Testing
+
+If testing local changes before publishing, use the [Pre-Release Checklist](#pre-release-checklist) below.
+
+---
+
+## Quick Reference (Pre-Publish Only)
 
 ```bash
 # Build and test locally
@@ -236,6 +258,95 @@ git log --oneline v0.2.3..HEAD -- apps/web/src/
 git log --oneline v0.2.3..HEAD | grep "feat:"
 ```
 
+### 8. Deliverables & Artifacts Tests
+
+Test the deliverable extraction and artifact upload workflow:
+
+| Test | How to Verify | Pass Criteria |
+|------|---------------|---------------|
+| Deliverable markers | Create task with `{#deliverable}` in checkbox items | Deliverables extracted and returned in `createTask` response |
+| Multiple deliverables | Create task with 3+ deliverable markers | All deliverables appear in `task.deliverables` array |
+| Deliverable IDs | Check `createTask` response | Each deliverable has unique `id` and `text` fields |
+| Image artifact | Call `addArtifact` with `type: 'image'` | Artifact uploads, appears in task UI |
+| HTML artifact | Call `addArtifact` with `type: 'html'` | HTML renders in artifact viewer |
+| Video artifact | Call `addArtifact` with `type: 'video'` | Video playable in artifact viewer |
+| Artifact linking | Pass `deliverableId` to `addArtifact` | Artifact linked to specific deliverable |
+| Auto-complete | Upload artifacts for all deliverables | `allDeliverablesComplete: true` and `snapshotUrl` returned |
+| UI rendering | View task in browser | Artifacts display correctly with previews |
+
+**Test commands:**
+
+```typescript
+// Create task with deliverables
+const task = await createTask({
+  title: "Test Deliverables",
+  content: `## Implementation
+- [ ] Add login page {#deliverable}
+- [ ] Add signup page {#deliverable}
+- [ ] Screenshot of auth flow {#deliverable}`
+});
+
+// Verify deliverables extracted
+console.log(task.deliverables);
+// Expected: [{ id: "del_xxx", text: "Add login page" }, ...]
+
+// Upload artifact linked to deliverable
+const result = await addArtifact({
+  taskId: task.taskId,
+  sessionToken: task.sessionToken,
+  type: 'image',
+  filename: 'login-screenshot.png',
+  source: 'file',
+  filePath: '/tmp/screenshot.png',
+  deliverableId: task.deliverables[0].id,
+  description: 'Screenshot of completed login page'
+});
+
+// Check auto-complete after all deliverables fulfilled
+if (result.allDeliverablesComplete) {
+  console.log('Task auto-completed:', result.snapshotUrl);
+}
+```
+
+**Edge cases to verify:**
+
+- Deliverable markers outside checkbox items (should be ignored)
+- Duplicate deliverable text (each should get unique ID)
+- Artifact upload without `deliverableId` (should work, not linked)
+- Re-uploading artifact for same deliverable (should replace or add?)
+
+### 9. Core Workflow Tests
+
+Essential workflows to verify every release:
+
+#### Share Link Testing
+
+| Test | How to Verify | Pass Criteria |
+|------|---------------|---------------|
+| Copy share URL | Click share button, copy URL | URL copied to clipboard |
+| Open in new browser | Paste URL in incognito/different browser | Task loads correctly |
+| Real-time sync | Make change in one window | Change appears in other window |
+
+#### Plan Mode Hooks Testing
+
+| Test | How to Verify | Pass Criteria |
+|------|---------------|---------------|
+| Enter plan mode | Press Shift+Tab in Claude Code | Plan mode activates |
+| Browser auto-open | Create plan content | Browser opens with task automatically |
+| Hook blocking | Exit plan mode | Hook blocks until human approval |
+| Approval flow | Approve in browser | Claude receives approval, can continue |
+
+#### Sign-In Flow Testing
+
+| Test | How to Verify | Pass Criteria |
+|------|---------------|---------------|
+| GitHub OAuth | Click sign in | Redirects to GitHub, returns authenticated |
+| Account display | Check sidebar after sign-in | Avatar and username shown |
+| Sign out | Click sign out | Returns to signed-out state |
+| Session persistence | Refresh page while signed in | Stays signed in |
+
+**Known issue:** "Mark as resolved" for diff comments may require page refresh or re-login to update UI - this is a state refresh issue, not a data bug.
+
 ---
 
 ## Bug Fix Workflow
@@ -435,6 +546,19 @@ Copy this for each RC:
 - [ ] Input requests logged
 - [ ] Blocker flag works
 - [ ] Markdown renders
+
+### Deliverables & Artifacts
+- [ ] Create task with deliverables
+- [ ] Upload artifact (image)
+- [ ] Upload artifact (html)
+- [ ] Link artifact to deliverable
+- [ ] Auto-complete on all deliverables fulfilled
+
+### Core Workflows
+- [ ] Share link works (copy URL, open in new window)
+- [ ] Plan mode hooks (Shift+Tab → browser opens)
+- [ ] Sign-in/sign-out flow
+- [ ] Mobile UI check (inputs, modals, navigation)
 
 ### UI Verification
 - [ ] Inbox page
