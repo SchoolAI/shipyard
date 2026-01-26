@@ -4,35 +4,142 @@ How to publish new versions of Shipyard to npm.
 
 ---
 
-## Quick Reference
+## Release Flow
 
-| Action | How | Result |
-|--------|-----|--------|
-| **Auto RC** | Push/merge to `main` | `0.1.0-next.{commit#}` → `@next` |
-| **Manual RC** | GitHub Actions → Run workflow | Same as above |
-| **Stable release** | Push tag `v0.2.0` | `0.2.0` → `@latest` |
-| **Prerelease tag** | Push tag `v0.2.0-rc.1` | `0.2.0-rc.1` → `@next` |
+```
+                            ┌─────────────────────────────────────┐
+                            │           DEVELOPMENT               │
+                            │  (commits merged to main branch)    │
+                            └──────────────┬──────────────────────┘
+                                           │
+              ┌────────────────────────────┼────────────────────────────┐
+              │                            │                            │
+              ▼                            ▼                            │
+  ┌───────────────────────┐    ┌───────────────────────┐               │
+  │  NIGHTLY BUILDS       │    │  READY FOR RELEASE?   │               │
+  │  (Automatic)          │    │                       │               │
+  │                       │    │  Trigger RC manually  │               │
+  │  2:15 AM UTC daily    │    │  Action: rc           │               │
+  │  0.3.2-nightly.DATE   │    └───────────┬───────────┘               │
+  │                       │                │                            │
+  │  For bleeding-edge    │                ▼                            │
+  │  testing only         │    ┌───────────────────────┐               │
+  └───────────────────────┘    │  RELEASE CANDIDATE    │               │
+              │                │                       │               │
+              │                │  0.3.2-rc.20260125    │               │
+              │                │  npm tag: @next       │               │
+              │                └───────────┬───────────┘               │
+              │                            │                            │
+              │                            ▼                            │
+              │                ┌───────────────────────┐               │
+              │                │  TESTING PHASE        │               │
+              │                │                       │               │
+              │                │  Team tests the RC    │               │
+              │                │  npm install ...@next │               │
+              │                └───────────┬───────────┘               │
+              │                            │                            │
+              │                   ┌────────┴────────┐                   │
+              │                   │                 │                   │
+              │                   ▼                 ▼                   │
+              │         ┌─────────────┐    ┌─────────────┐             │
+              │         │  PASSED ✓   │    │  FAILED ✗   │             │
+              │         └──────┬──────┘    └──────┬──────┘             │
+              │                │                  │                     │
+              │                ▼                  └─────────────────────┘
+              │    ┌───────────────────────┐              (fix & retry)
+              │    │  PROMOTE TO STABLE    │
+              │    │                       │
+              │    │  Action: promote      │
+              │    │  rc_version: 0.3.2-rc.20260125
+              │    │  stable_version: 0.4.0│
+              │    └───────────┬───────────┘
+              │                │
+              │                ▼
+              │    ┌───────────────────────┐
+              │    │  STABLE RELEASE       │
+              │    │                       │
+              │    │  0.4.0                │
+              │    │  npm tag: @latest     │
+              │    │  GitHub Release       │
+              │    └───────────────────────┘
+              │
+              ▼
+  ┌───────────────────────────────────────┐
+  │  OPTIONAL: Promote nightly directly   │
+  │                                       │
+  │  If a nightly has been well-tested,   │
+  │  you CAN promote it directly:         │
+  │                                       │
+  │  rc_version: 0.3.2-nightly.20260125   │
+  │  stable_version: 0.4.0                │
+  └───────────────────────────────────────┘
+```
+
+### The Two Paths
+
+**Standard Release Path (Recommended):**
+
+```
+Development → RC → Test → Promote → Stable
+```
+
+**Bleeding Edge Path (Optional):**
+
+```
+Development → Nightly (auto) → [well tested over time] → Promote → Stable
+```
+
+The nightlies are for continuous integration / early adopters who want the latest.
+The RC is explicitly "we're ready to release, final validation before going stable."
+
+---
+
+## Quick Summary
+
+| Path | Trigger | Version Example | npm Tag | Use Case |
+|------|---------|-----------------|---------|----------|
+| **Nightly** | Auto at 2:15 AM UTC | `0.3.2-nightly.20260125` | `@next` | Daily bleeding edge |
+| **Manual Nightly** | workflow_dispatch → nightly | `0.3.2-nightly.20260125` | `@next` | Force a nightly now |
+| **Release Candidate** | workflow_dispatch → rc | `0.3.2-rc.20260125` | `@next` | "This is stable-ready, test it" |
+| **Stable** | workflow_dispatch → promote | `0.4.0` | `@latest` | Production release |
 
 **All publishing uses OIDC trusted publishing** - no tokens to manage!
 
 ---
 
-## Automated RC Releases (Default)
+## Nightly Builds (Automatic)
 
-**Every push to main automatically publishes an RC:**
+**Every night at 2:15 AM UTC, if there are changes:**
 
 ```
-Push to main → publish-npm.yml → 0.1.0-next.435 published to @next
+Schedule triggers → check for changes → 0.3.2-nightly.20260125 published to @next
 ```
 
-**Version scheme:** `{base}-next.{commit_count}`
-- Predictable, incrementing, easy to reference
-- No manual work required!
+**Version scheme:** `{base}-nightly.{YYYYMMDD}`
+- Clear date stamp shows when it was built
+- Skipped if no commits since last nightly/rc
 
-**Install RC:**
+**Install nightly:**
 ```bash
+npm install @schoolai/shipyard-mcp@next
+# or
 npx -y -p @schoolai/shipyard-mcp@next mcp-server-shipyard
 ```
+
+---
+
+## Release Candidates (Manual)
+
+When you want to mark a build as ready for testing before a stable release:
+
+1. Go to: https://github.com/SchoolAI/shipyard/actions/workflows/publish-npm.yml
+2. Click **"Run workflow"**
+3. Select **"rc"** from the dropdown
+4. Click **"Run workflow"**
+
+**Version scheme:** `{base}-rc.{YYYYMMDD}`
+
+This signals "we think this is ready for stable, please test it."
 
 ---
 
@@ -40,54 +147,21 @@ npx -y -p @schoolai/shipyard-mcp@next mcp-server-shipyard
 
 When you're ready to make a version the default for users:
 
-### Option 1: Create a Git Tag (Recommended)
-
-```bash
-# 1. Update version in package-npm.json
-vim package-npm.json  # Set "version": "0.2.0"
-
-# 2. Commit the version bump
-git add package-npm.json
-git commit -m "chore: release v0.2.0"
-
-# 3. Create and push the tag
-git tag v0.2.0
-git push origin main v0.2.0
-```
-
-**What happens:**
-- GitHub Actions detects the `v*` tag
-- Publishes `0.2.0` to `@latest` tag
-- Users now get `0.2.0` by default
-
-### Option 2: Promote Existing RC
-
-If you've tested an RC and want to promote it without rebuilding:
-
-```bash
-# Promote RC to latest (no rebuild)
-npm dist-tag add @schoolai/shipyard-mcp@0.1.0-next.435 latest
-```
-
-Then update `package-npm.json` to match:
-```bash
-vim package-npm.json  # Set "version": "0.2.0"
-git commit -am "chore: release v0.2.0"
-git push origin main
-```
-
----
-
-## Manual Workflow Dispatch
-
-To manually trigger a publish without pushing code:
+### Using the Promote Action (Recommended)
 
 1. Go to: https://github.com/SchoolAI/shipyard/actions/workflows/publish-npm.yml
 2. Click **"Run workflow"**
-3. Select branch: `main`
-4. Click **"Run workflow"**
+3. Select **"promote"** from the dropdown
+4. Fill in:
+   - **rc_version:** The version to promote (e.g., `0.3.2-rc.20260125` or `0.3.2-nightly.20260125`)
+   - **stable_version:** The stable version (e.g., `0.4.0`)
+5. Click **"Run workflow"**
 
-This publishes an RC version (`0.1.0-next.{commit#}`) to `@next`.
+**What happens:**
+- Downloads the specified pre-release from npm
+- Re-publishes it as the stable version with `@latest` tag
+- Updates `package-npm.json` with the new version
+- Creates a git tag and GitHub release
 
 ---
 
@@ -101,11 +175,16 @@ This publishes an RC version (`0.1.0-next.{commit#}`) to `@next`.
 ├─────────────────────────────────────────────────────────────┤
 │                                                             │
 │  Triggers:                                                  │
-│  ├── push to main branch    → RC release (next tag)        │
-│  ├── push v* tag            → Stable release (latest tag)  │
-│  └── workflow_dispatch      → RC release (next tag)        │
+│  ├── schedule (2:15 AM UTC)  → Nightly build (@next)        │
+│  └── workflow_dispatch:                                     │
+│      ├── nightly             → Manual nightly (@next)       │
+│      ├── rc                  → Release candidate (@next)    │
+│      └── promote             → Stable release (@latest)     │
 │                                                             │
-│  Authentication: OIDC Trusted Publishing (no tokens!)      │
+│  Change Detection:                                          │
+│  └── Scheduled builds only run if changes since last tag    │
+│                                                             │
+│  Authentication: OIDC Trusted Publishing (no tokens!)       │
 │                                                             │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -118,55 +197,53 @@ This publishes an RC version (`0.1.0-next.{commit#}`) to `@next`.
 
 ### package-npm.json
 
-This file controls the base version for RC releases:
+This file controls the base version for builds:
 
 ```json
 {
-  "version": "0.2.0"
+  "version": "0.3.2"
 }
 ```
 
-**RC versions:** `{version}-next.{commit_count}`
-- If version is `0.2.0` → RCs are `0.2.0-next.435`, `0.2.0-next.436`, etc.
+**Nightly/RC versions:** `{version}-nightly.{YYYYMMDD}` or `{version}-rc.{YYYYMMDD}`
+- If version is `0.3.2` → builds are `0.3.2-nightly.20260125`, `0.3.2-rc.20260125`, etc.
 
 **When to update:**
-- When releasing a new stable version
-- When starting a new version series (e.g., `0.2.0` → `0.3.0`)
+- When releasing a new stable version (via promote action)
+- When starting a new version series (e.g., `0.3.0` → `0.4.0`)
 
 ### npm Dist Tags
 
 | Tag | What it means | Install command |
 |-----|---------------|-----------------|
 | `latest` | Stable release | `npm install @schoolai/shipyard-mcp` |
-| `next` | RC/prerelease | `npm install @schoolai/shipyard-mcp@next` |
+| `next` | Nightly/RC/prerelease | `npm install @schoolai/shipyard-mcp@next` |
 
 ---
 
 ## Example: Full Release Cycle
 
 ```bash
-# Day 1-5: Develop features, merge PRs to main
-# Each merge auto-publishes: 0.2.0-next.430, 0.2.0-next.431, etc.
+# Week 1-2: Develop features, merge PRs to main
+# Nightly builds auto-publish: 0.3.2-nightly.20260120, 0.3.2-nightly.20260121, etc.
 
-# Day 6: Ready to release v0.2.0
+# Ready to test for release:
+# Trigger RC manually via GitHub Actions
+# → 0.3.2-rc.20260125 published
 
-# 1. Test the latest RC
-npm view @schoolai/shipyard-mcp@next version  # 0.2.0-next.435
+# Test the RC:
+npm view @schoolai/shipyard-mcp@next version  # 0.3.2-rc.20260125
 npx -y -p @schoolai/shipyard-mcp@next mcp-server-shipyard
 # ✅ Works great!
 
-# 2. Create stable release
-git tag v0.2.0
-git push origin v0.2.0
+# Promote to stable via GitHub Actions:
+# action: promote
+# rc_version: 0.3.2-rc.20260125
+# stable_version: 0.4.0
+# → 0.4.0 published to @latest
 
-# 3. Verify
-npm view @schoolai/shipyard-mcp version  # 0.2.0 ✅
-
-# 4. Update base version for next cycle
-vim package-npm.json  # Set "version": "0.3.0"
-git commit -am "chore: start v0.3.0 development"
-git push origin main
-# Now RCs will be 0.3.0-next.436, 0.3.0-next.437, etc.
+# Verify:
+npm view @schoolai/shipyard-mcp version  # 0.4.0 ✅
 ```
 
 ---
@@ -177,13 +254,10 @@ If a published version has issues:
 
 ```bash
 # Deprecate the bad version (shows warning on install)
-npm deprecate @schoolai/shipyard-mcp@0.2.0 "Bug in auth, use 0.2.1"
+npm deprecate @schoolai/shipyard-mcp@0.4.0 "Bug in auth, use 0.4.1"
 
-# Publish a fix
-vim package-npm.json  # Set "version": "0.2.1"
-git commit -am "chore: release v0.2.1"
-git tag v0.2.1
-git push origin main v0.2.1
+# Promote an older nightly/RC to a new stable version
+# via GitHub Actions promote action
 ```
 
 **Note:** npm only allows unpublishing within 72 hours. After that, deprecate and publish a fix.
@@ -215,17 +289,22 @@ The workflow must be registered as a trusted publisher on npm:
 
 ### "Version already exists"
 
-npm doesn't allow republishing the same version. Either:
-- Bump the version in `package-npm.json`
-- Or wait for next commit (RC version increments automatically)
+npm doesn't allow republishing the same version:
+- If same day: Wait until tomorrow (version includes date)
+- Or manually bump the base version in `package-npm.json`
+
+### Nightly didn't run
+
+Check:
+- Are there changes since the last nightly/rc tag?
+- Check the workflow run logs for "No changes since..." message
 
 ### Workflow not triggering
 
 Check the trigger conditions:
-- **Push to main:** Must be a direct push or merged PR
-- **Tag push:** Tag must match `v*` pattern (e.g., `v0.2.0`)
+- **Schedule:** Runs at 2:15 AM UTC daily (only if changes)
 - **Manual:** Use "Run workflow" button in GitHub Actions
 
 ---
 
-*Last updated: 2026-01-21*
+*Last updated: 2026-01-25*

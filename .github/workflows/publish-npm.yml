@@ -1,16 +1,24 @@
 name: Publish to npm
 
 run-name: >-
-  ${{ github.event_name == 'workflow_dispatch' && inputs.action == 'promote'
+  ${{ github.event_name == 'schedule'
+      && 'Nightly Build'
+      || github.event_name == 'workflow_dispatch' && inputs.action == 'promote'
       && format('Promote {0} → {1}', inputs.rc_version, inputs.stable_version)
       || github.event_name == 'workflow_dispatch' && inputs.action == 'rc'
-      && 'Publish RC'
-      || github.event.head_commit.message }}
+      && 'Publish Release Candidate'
+      || github.event_name == 'workflow_dispatch' && inputs.action == 'nightly'
+      && 'Manual Nightly Build'
+      || 'Publish' }}
+
+concurrency:
+  group: publish-npm
+  cancel-in-progress: false
 
 on:
-  push:
-    branches:
-      - main  # Auto RC on every push
+  schedule:
+    # Nightly at 2:15 AM UTC (off-peak to avoid GitHub contention)
+    - cron: '15 2 * * *'
   workflow_dispatch:
     inputs:
       action:
@@ -18,21 +26,61 @@ on:
         required: true
         type: choice
         options:
-          - rc            # Publish RC from current commit
-          - promote       # Promote existing RC to stable
-        default: rc
+          - nightly       # Publish nightly build (same as scheduled)
+          - rc            # Publish release candidate (for testing before stable)
+          - promote       # Promote existing version to stable
+        default: nightly
       rc_version:
-        description: 'RC version to promote (only for promote action, e.g., 0.1.0-next.435)'
+        description: 'Version to promote (only for promote action, e.g., 0.3.2-nightly.20260125)'
         required: false
         type: string
       stable_version:
-        description: 'Stable version (only for promote action, e.g., 0.2.0)'
+        description: 'Stable version (only for promote action, e.g., 0.4.0)'
         required: false
         type: string
 
 jobs:
+  # Check if there are changes since last nightly/rc (skip empty builds)
+  check-changes:
+    runs-on: ubuntu-latest
+    # Only check for scheduled runs - manual triggers always build
+    if: github.event_name == 'schedule'
+    outputs:
+      has_changes: ${{ steps.check.outputs.has_changes }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for changes since last nightly/rc
+        id: check
+        run: |
+          # Find the most recent nightly or rc tag
+          LAST_PRERELEASE=$(git tag -l 'v*-nightly.*' -l 'v*-rc.*' | sort -V | tail -1)
+
+          if [ -z "$LAST_PRERELEASE" ]; then
+            echo "No previous nightly/rc found, will build"
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          else
+            CHANGES=$(git log "$LAST_PRERELEASE"..HEAD --oneline | wc -l)
+            if [ "$CHANGES" -gt 0 ]; then
+              echo "Found $CHANGES commits since $LAST_PRERELEASE"
+              echo "has_changes=true" >> $GITHUB_OUTPUT
+            else
+              echo "No changes since $LAST_PRERELEASE, skipping build"
+              echo "has_changes=false" >> $GITHUB_OUTPUT
+            fi
+          fi
+
   publish:
     runs-on: ubuntu-latest
+    # Run if: manual trigger OR (scheduled AND has changes)
+    needs: [check-changes]
+    if: |
+      always() &&
+      (github.event_name == 'workflow_dispatch' ||
+       (github.event_name == 'schedule' && needs.check-changes.outputs.has_changes == 'true'))
     permissions:
       contents: write   # For creating tags and commits
       id-token: write   # For npm OIDC trusted publishing
@@ -40,7 +88,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Need full history for commit count
+          fetch-depth: 0  # Need full history for tags
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v2
@@ -70,27 +118,48 @@ jobs:
       # ============================================
       - name: Promote RC to stable
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.action == 'promote' }}
+        env:
+          # Use env vars to prevent command injection from user inputs
+          INPUT_RC_VERSION: ${{ inputs.rc_version }}
+          INPUT_STABLE_VERSION: ${{ inputs.stable_version }}
         run: |
-          # Trim whitespace from inputs
-          RC_VERSION=$(echo "${{ inputs.rc_version }}" | xargs)
-          STABLE_VERSION=$(echo "${{ inputs.stable_version }}" | xargs)
+          # Trim whitespace from inputs (using env vars, not direct interpolation)
+          RC_VERSION=$(echo "$INPUT_RC_VERSION" | xargs)
+          STABLE_VERSION=$(echo "$INPUT_STABLE_VERSION" | xargs)
 
           if [ -z "$RC_VERSION" ] || [ -z "$STABLE_VERSION" ]; then
             echo "::error::Both rc_version and stable_version are required for promote action"
             exit 1
           fi
 
+          # Validate version formats (basic semver check)
+          if ! [[ "$RC_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+-(nightly|rc)\.[0-9]+$ ]]; then
+            echo "::error::Invalid rc_version format. Expected: X.Y.Z-nightly.YYYYMMDD or X.Y.Z-rc.YYYYMMDD"
+            exit 1
+          fi
+          if ! [[ "$STABLE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Invalid stable_version format. Expected: X.Y.Z"
+            exit 1
+          fi
+
           echo "Promoting $RC_VERSION → $STABLE_VERSION"
 
+          # Clean up any previous tarballs
+          rm -f schoolai-shipyard-mcp-*.tgz
+          rm -rf package/
+
           # Download the RC tarball
-          npm pack @schoolai/shipyard-mcp@$RC_VERSION
-          TARBALL=$(ls schoolai-shipyard-mcp-*.tgz)
+          if ! npm pack "@schoolai/shipyard-mcp@$RC_VERSION"; then
+            echo "::error::Failed to download $RC_VERSION from npm. Does it exist?"
+            exit 1
+          fi
+          TARBALL=$(ls -t schoolai-shipyard-mcp-*.tgz | head -1)
           echo "Downloaded: $TARBALL"
 
           # Extract, update version, repack
-          tar -xzf $TARBALL
+          tar -xzf "$TARBALL"
           cd package
-          npm version $STABLE_VERSION --no-git-tag-version --allow-same-version
+          npm version "$STABLE_VERSION" --no-git-tag-version --allow-same-version
           cd ..
 
           # Re-publish as stable (OIDC works with publish --provenance)
@@ -102,8 +171,10 @@ jobs:
 
       - name: Update version and create tag (promote)
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.action == 'promote' }}
+        env:
+          INPUT_STABLE_VERSION: ${{ inputs.stable_version }}
         run: |
-          STABLE_VERSION="${{ inputs.stable_version }}"
+          STABLE_VERSION=$(echo "$INPUT_STABLE_VERSION" | xargs)
 
           # Update package-npm.json
           node -e "
@@ -119,6 +190,9 @@ jobs:
           git add package-npm.json
           git commit -m "chore: release v$STABLE_VERSION"
           git tag "v$STABLE_VERSION"
+
+          # Pull latest changes before pushing (in case of concurrent commits)
+          git pull --rebase origin main
           git push origin main
           git push origin "v$STABLE_VERSION"
 
@@ -127,14 +201,19 @@ jobs:
       - name: Create GitHub Release (promote)
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.action == 'promote' }}
         uses: actions/github-script@v7
+        env:
+          INPUT_STABLE_VERSION: ${{ inputs.stable_version }}
+          INPUT_RC_VERSION: ${{ inputs.rc_version }}
         with:
           script: |
+            const stableVersion = process.env.INPUT_STABLE_VERSION.trim();
+            const rcVersion = process.env.INPUT_RC_VERSION.trim();
             await github.rest.repos.createRelease({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              tag_name: 'v${{ inputs.stable_version }}',
-              name: 'v${{ inputs.stable_version }}',
-              body: 'Promoted from RC: `${{ inputs.rc_version }}`\n\nInstall with:\n```bash\nnpm install @schoolai/shipyard-mcp\n# or\nnpx -y -p @schoolai/shipyard-mcp mcp-server-shipyard\n```',
+              tag_name: `v${stableVersion}`,
+              name: `v${stableVersion}`,
+              body: `Promoted from: \`${rcVersion}\`\n\nInstall with:\n\`\`\`bash\nnpm install @schoolai/shipyard-mcp\n# or\nnpx -y -p @schoolai/shipyard-mcp mcp-server-shipyard\n\`\`\``,
               draft: false,
               prerelease: false
             });
@@ -146,14 +225,25 @@ jobs:
         if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.action == 'promote') }}
         id: version
         run: |
-          # Push to main or manual dispatch: generate RC version
           BASE_VERSION=$(node -p "require('./package-npm.json').version")
-          COMMIT_COUNT=$(git rev-list --count HEAD)
-          VERSION="${BASE_VERSION}-next.${COMMIT_COUNT}"
+          DATE=$(date -u +%Y%m%d)
+
+          # Determine if this is a nightly or RC build
+          if [[ "${{ github.event_name }}" == "schedule" ]] || [[ "${{ inputs.action }}" == "nightly" ]]; then
+            # Nightly build: 0.3.2-nightly.20260125
+            VERSION="${BASE_VERSION}-nightly.${DATE}"
+            BUILD_TYPE="nightly"
+          else
+            # Release candidate: 0.3.2-rc.20260125
+            VERSION="${BASE_VERSION}-rc.${DATE}"
+            BUILD_TYPE="rc"
+          fi
+
           NPM_TAG="next"
-          echo "Publishing RC version: $VERSION → @next"
+          echo "Publishing ${BUILD_TYPE} version: $VERSION → @next"
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "npm_tag=$NPM_TAG" >> $GITHUB_OUTPUT
+          echo "build_type=$BUILD_TYPE" >> $GITHUB_OUTPUT
 
       - name: Prepare npm package
         if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.action == 'promote') }}
@@ -166,29 +256,62 @@ jobs:
         run: npm publish --access public --provenance --tag ${{ steps.version.outputs.npm_tag }}
 
       # ============================================
-      # POST-PUBLISH: Comments and summaries
+      # POST-PUBLISH: Tags, comments, and summaries
       # ============================================
-      - name: Comment on commit (RC releases)
-        if: ${{ github.event_name == 'push' }}
+      - name: Create git tag for tracking
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.action == 'promote') }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag "v${{ steps.version.outputs.version }}"
+          git push origin "v${{ steps.version.outputs.version }}"
+          echo "✅ Created tag v${{ steps.version.outputs.version }}"
+
+      - name: Create GitHub Pre-Release
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.action == 'promote') }}
         uses: actions/github-script@v7
         with:
           script: |
-            github.rest.repos.createCommitComment({
+            const buildType = '${{ steps.version.outputs.build_type }}';
+            const version = '${{ steps.version.outputs.version }}';
+            const isRC = buildType === 'rc';
+
+            await github.rest.repos.createRelease({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              commit_sha: context.sha,
-              body: `📦 Published RC: \`${{ steps.version.outputs.version }}\`\n\nInstall with:\n\`\`\`bash\nnpx -y -p @schoolai/shipyard-mcp@next mcp-server-shipyard\n\`\`\``
+              tag_name: `v${version}`,
+              name: isRC ? `Release Candidate ${version}` : `Nightly ${version}`,
+              body: `${isRC ? '🚀 Release Candidate' : '🌙 Nightly Build'}\n\nInstall with:\n\`\`\`bash\nnpm install @schoolai/shipyard-mcp@next\n# or\nnpx -y -p @schoolai/shipyard-mcp@next mcp-server-shipyard\n\`\`\``,
+              draft: false,
+              prerelease: true
             });
 
       - name: Summary
+        if: always()
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_ACTION: ${{ inputs.action }}
+          INPUT_RC_VERSION: ${{ inputs.rc_version }}
+          INPUT_STABLE_VERSION: ${{ inputs.stable_version }}
+          VERSION: ${{ steps.version.outputs.version }}
+          BUILD_TYPE: ${{ steps.version.outputs.build_type }}
+          NPM_TAG: ${{ steps.version.outputs.npm_tag }}
         run: |
-          echo "## Publish Complete" >> $GITHUB_STEP_SUMMARY
+          echo "## Publish Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ inputs.action }}" == "promote" ]]; then
-            echo "**Action:** Promoted RC to stable" >> $GITHUB_STEP_SUMMARY
-            echo "- RC Version: \`${{ inputs.rc_version }}\`" >> $GITHUB_STEP_SUMMARY
-            echo "- Stable Version: \`${{ inputs.stable_version }}\`" >> $GITHUB_STEP_SUMMARY
+          if [[ "$EVENT_NAME" == "workflow_dispatch" && "$INPUT_ACTION" == "promote" ]]; then
+            echo "**Action:** Promoted to stable" >> $GITHUB_STEP_SUMMARY
+            echo "- From: \`$INPUT_RC_VERSION\`" >> $GITHUB_STEP_SUMMARY
+            echo "- To: \`$INPUT_STABLE_VERSION\`" >> $GITHUB_STEP_SUMMARY
+          elif [[ -n "$VERSION" ]]; then
+            echo "**Build Type:** $BUILD_TYPE" >> $GITHUB_STEP_SUMMARY
+            echo "**Version:** \`$VERSION\`" >> $GITHUB_STEP_SUMMARY
+            echo "**npm Tag:** \`@$NPM_TAG\`" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Install with:" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+            echo "npm install @schoolai/shipyard-mcp@next" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
           else
-            echo "**Version:** \`${{ steps.version.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
-            echo "**npm Tag:** \`${{ steps.version.outputs.npm_tag }}\`" >> $GITHUB_STEP_SUMMARY
+            echo "**Status:** Build did not complete version determination" >> $GITHUB_STEP_SUMMARY
           fi
