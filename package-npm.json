@@ -1,6 +1,6 @@
 {
   "name": "@schoolai/shipyard-mcp",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Shipyard MCP server and CLI tools for distributed planning with CRDTs",
   "type": "module",
   "bin": {
