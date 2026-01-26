@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "wrangler dev --env development",
+    "dev": "wrangler dev --env development --inspector-port 9229",
     "deploy": "wrangler deploy",
     "tail": "wrangler tail",
     "secret:client-id": "wrangler secret put GITHUB_CLIENT_ID",
