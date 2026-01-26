@@ -57,7 +57,9 @@ function buildOriginMetadata(
   sessionId: string | undefined,
   metadata: Record<string, unknown> | undefined
 ): OriginMetadata | undefined {
-  if (!platform || !sessionId) return undefined;
+  if (!platform || !sessionId) {
+    return { platform: 'unknown' as const, cwd: process.cwd() };
+  }
 
   switch (platform) {
     case 'devin':
