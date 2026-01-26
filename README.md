@@ -65,7 +65,7 @@ Add to `~/.cursor/mcp.json`:
   "mcpServers": {
     "shipyard": {
       "command": "npx",
-      "args": ["-y", "@schoolai/shipyard-mcp@latest"]
+      "args": ["-y", "-p", "@schoolai/shipyard-mcp@latest", "mcp-server-shipyard"]
     }
   }
 }
@@ -76,7 +76,7 @@ Add to `~/.cursor/mcp.json`:
 Add via CLI:
 
 ```bash
-codex mcp add shipyard -- npx -y @schoolai/shipyard-mcp@latest
+codex mcp add shipyard -- npx -y -p @schoolai/shipyard-mcp@latest mcp-server-shipyard
 ```
 
 Or add to `~/.codex/config.toml`:
@@ -84,13 +84,13 @@ Or add to `~/.codex/config.toml`:
 ```toml
 [mcp_servers.shipyard]
 command = "npx"
-args = ["-y", "@schoolai/shipyard-mcp@latest"]
+args = ["-y", "-p", "@schoolai/shipyard-mcp@latest", "mcp-server-shipyard"]
 ```
 
 ### VS Code / GitHub Copilot
 
 ```bash
-code --add-mcp '{"name":"shipyard","command":"npx","args":["-y","@schoolai/shipyard-mcp@latest"]}'
+code --add-mcp '{"name":"shipyard","command":"npx","args":["-y","-p","@schoolai/shipyard-mcp@latest","mcp-server-shipyard"]}'
 ```
 
 <details>
@@ -108,7 +108,7 @@ Add to your config file:
   "mcpServers": {
     "shipyard": {
       "command": "npx",
-      "args": ["-y", "@schoolai/shipyard-mcp@latest"]
+      "args": ["-y", "-p", "@schoolai/shipyard-mcp@latest", "mcp-server-shipyard"]
     }
   }
 }
@@ -123,7 +123,7 @@ Add to `~/.codeium/windsurf/mcp_config.json`:
   "mcpServers": {
     "shipyard": {
       "command": "npx",
-      "args": ["-y", "@schoolai/shipyard-mcp@latest"]
+      "args": ["-y", "-p", "@schoolai/shipyard-mcp@latest", "mcp-server-shipyard"]
     }
   }
 }
@@ -145,7 +145,7 @@ Add to `~/.config/zed/settings.json`:
     "shipyard": {
       "command": {
         "path": "npx",
-        "args": ["-y", "@schoolai/shipyard-mcp@latest"]
+        "args": ["-y", "-p", "@schoolai/shipyard-mcp@latest", "mcp-server-shipyard"]
       }
     }
   }
@@ -160,7 +160,7 @@ Create `.continue/mcpServers/shipyard.yaml`:
 mcpServers:
   - name: Shipyard
     command: npx
-    args: ["-y", "@schoolai/shipyard-mcp@latest"]
+    args: ["-y", "-p", "@schoolai/shipyard-mcp@latest", "mcp-server-shipyard"]
 ```
 
 </details>
