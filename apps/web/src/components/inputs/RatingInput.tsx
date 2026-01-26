@@ -114,9 +114,9 @@ export function RatingInput({
                     className={`
                       text-2xl cursor-pointer transition-all select-none
                       hover:scale-110
-                      ${isFilled ? 'opacity-100' : 'opacity-50'}
-                      ${style === 'stars' ? (isFilled ? 'text-yellow-500' : 'text-gray-300') : ''}
-                      ${style === 'numbers' && isFilled ? 'font-bold' : ''}
+                      ${isFilled ? 'opacity-100' : 'opacity-40'}
+                      ${style === 'stars' ? (isFilled ? 'text-warning' : 'text-muted-foreground') : ''}
+                      ${style === 'numbers' && isFilled ? 'font-bold text-accent' : 'text-muted-foreground'}
                     `}
                     role="img"
                     aria-label={`${rating} out of ${maxVal}`}
@@ -137,7 +137,7 @@ export function RatingInput({
           </div>
         )}
 
-        {/* Escape hatch options - N/A and Other with custom button-like styling */}
+        {/* Escape hatch options - N/A and Other with button-like styling using HeroUI theme tokens */}
         <div className="flex gap-2 justify-center mt-2">
           <Radio value={NA_OPTION_VALUE}>
             <Radio.Control className="sr-only">
@@ -145,10 +145,10 @@ export function RatingInput({
             </Radio.Control>
             <Radio.Content>
               <span
-                className={`px-3 py-1 rounded text-sm cursor-pointer transition-colors ${
+                className={`px-3 py-1.5 rounded-md text-sm cursor-pointer transition-colors border ${
                   isNaSelected
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+                    ? 'bg-accent text-accent-foreground border-accent'
+                    : 'bg-default text-foreground border-border hover:bg-default/80'
                 } ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
                 {NA_OPTION_LABEL}
@@ -161,10 +161,10 @@ export function RatingInput({
             </Radio.Control>
             <Radio.Content>
               <span
-                className={`px-3 py-1 rounded text-sm cursor-pointer transition-colors ${
+                className={`px-3 py-1.5 rounded-md text-sm cursor-pointer transition-colors border ${
                   isOtherSelected
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+                    ? 'bg-accent text-accent-foreground border-accent'
+                    : 'bg-default text-foreground border-border hover:bg-default/80'
                 } ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
                 {RATING_OTHER_LABEL}

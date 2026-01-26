@@ -228,8 +228,8 @@ describe('RatingInput', () => {
     expect(ratingElements[0]).toHaveClass('opacity-100');
     expect(ratingElements[1]).toHaveClass('opacity-100');
     expect(ratingElements[2]).toHaveClass('opacity-100');
-    expect(ratingElements[3]).toHaveClass('opacity-50');
-    expect(ratingElements[4]).toHaveClass('opacity-50');
+    expect(ratingElements[3]).toHaveClass('opacity-40');
+    expect(ratingElements[4]).toHaveClass('opacity-40');
   });
 
   it('should show bold for filled numbers in numbers style', () => {
@@ -440,7 +440,7 @@ describe('RatingInput', () => {
 
       const naOption = screen.getByText('N/A');
       expect(naOption).toBeInTheDocument();
-      expect(naOption).toHaveClass('bg-primary');
+      expect(naOption).toHaveClass('bg-accent');
     });
 
     it('should select Other option when Other is selected (visual state managed via props)', () => {
@@ -460,7 +460,7 @@ describe('RatingInput', () => {
 
       const otherOption = screen.getByText('Other...');
       expect(otherOption).toBeInTheDocument();
-      expect(otherOption).toHaveClass('bg-primary');
+      expect(otherOption).toHaveClass('bg-accent');
     });
 
     it('should clear star fill when N/A is selected', () => {
