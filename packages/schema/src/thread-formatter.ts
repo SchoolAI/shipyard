@@ -44,9 +44,9 @@ export function formatThreadsForLLM(threads: Thread[], options: FormatThreadsOpt
         const author = resolveUser ? resolveUser(c.userId) : c.userId.slice(0, 8);
 
         if (idx === 0) {
-          return `${author}: ${text}`;
+          return `[thread:${thread.id}] ${author}: ${text}`;
         }
-        return `${author} (reply): ${text}`;
+        return `[comment:${c.id}] ${author} (reply): ${text}`;
       })
       .join('\n');
 

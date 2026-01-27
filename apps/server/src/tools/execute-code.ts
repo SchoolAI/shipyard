@@ -100,6 +100,8 @@ import { postUpdateTool } from './post-update.js';
 import { readDiffCommentsTool } from './read-diff-comments.js';
 import { readTaskTool } from './read-task.js';
 import { regenerateSessionTokenTool } from './regenerate-session-token.js';
+import { replyToDiffCommentTool } from './reply-to-diff-comment.js';
+import { replyToThreadCommentTool } from './reply-to-thread-comment.js';
 import { setupReviewNotificationTool } from './setup-review-notification.js';
 import { TOOL_NAMES } from './tool-names.js';
 import { updateBlockContentTool } from './update-block-content.js';
@@ -107,7 +109,7 @@ import { updateTaskTool } from './update-task.js';
 
 const BUNDLED_DOCS = `Execute TypeScript code that calls Shipyard APIs. Use this for multi-step workflows to reduce round-trips.
 
-⚠️ IMPORTANT LIMITATION: Dynamic imports (\`await import()\`) are NOT supported in the VM execution context. Use only the pre-provided functions in the execution environment (createTask, readTask, readDiffComments, updateTask, addArtifact, completeTask, updateBlockContent, linkPR, requestUserInput, regenerateSessionToken, postUpdate). All necessary APIs are already available in the sandbox.
+⚠️ IMPORTANT LIMITATION: Dynamic imports (\`await import()\`) are NOT supported in the VM execution context. Use only the pre-provided functions in the execution environment (createTask, readTask, readDiffComments, updateTask, addArtifact, completeTask, updateBlockContent, linkPR, replyToThreadComment, replyToDiffComment, requestUserInput, regenerateSessionToken, postUpdate). All necessary APIs are already available in the sandbox.
 
 ## Available APIs
 
@@ -292,6 +294,56 @@ const pr = await linkPR({
   prNumber: 42
 });
 console.log('Linked:', pr.title, pr.status);
+\`\`\`
+
+---
+
+### replyToThreadComment(opts): Promise<string>
+Reply to a BlockNote inline thread comment.
+
+Parameters:
+- taskId (string): Task ID
+- sessionToken (string): Session token
+- threadId (string): Thread ID from readTask output (format: [thread:abc123])
+- body (string): Reply text
+
+Returns: Success message with comment ID and thread ID
+
+Example:
+\`\`\`typescript
+const result = await replyToThreadComment({
+  taskId,
+  sessionToken,
+  threadId: 'thread-xyz789',
+  body: 'Good point! I\\'ll add that validation.'
+});
+console.log(result); // "Reply added to thread!..."
+\`\`\`
+
+---
+
+### replyToDiffComment(opts): Promise<string>
+Reply to a PR review comment or local diff comment.
+
+Parameters:
+- taskId (string): Task ID
+- sessionToken (string): Session token
+- commentId (string): Comment ID from readDiffComments (format: [pr:abc123] or [local:abc123])
+- body (string): Reply text
+
+Returns: Success message with reply comment ID and parent comment ID
+
+Automatically detects whether the comment is a PR or local diff comment.
+
+Example:
+\`\`\`typescript
+const result = await replyToDiffComment({
+  taskId,
+  sessionToken,
+  commentId: 'pr:xyz789',
+  body: 'Good catch! I\\'ll fix that in the next commit.'
+});
+console.log(result); // "Reply added to PR review comment!..."
 \`\`\`
 
 ---
@@ -865,6 +917,26 @@ async function setupReviewNotification(taskId: string, pollIntervalSeconds?: num
   return { script, fullResponse: text };
 }
 
+async function replyToThreadComment(opts: {
+  taskId: string;
+  sessionToken: string;
+  threadId: string;
+  body: string;
+}) {
+  const result = await replyToThreadCommentTool.handler(opts);
+  return getToolResultText(result);
+}
+
+async function replyToDiffComment(opts: {
+  taskId: string;
+  sessionToken: string;
+  commentId: string;
+  body: string;
+}) {
+  const result = await replyToDiffCommentTool.handler(opts);
+  return getToolResultText(result);
+}
+
 /**
  * Request user input via browser modal.
  * Supports both single-question mode (message + type) and multi-question mode (questions array).
@@ -1162,6 +1234,8 @@ export const executeCodeTool = {
         completeTask,
         updateBlockContent,
         linkPR,
+        replyToThreadComment,
+        replyToDiffComment,
         requestUserInput,
         regenerateSessionToken,
         postUpdate,

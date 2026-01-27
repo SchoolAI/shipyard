@@ -880,6 +880,8 @@ export const PRReviewCommentSchema = z.object({
   author: z.string(),
   createdAt: z.number(),
   resolved: z.boolean().optional(),
+  /** ID of the parent comment this is replying to (for threaded replies) */
+  inReplyTo: z.string().optional(),
 });
 
 /**
@@ -903,6 +905,8 @@ export const LocalDiffCommentSchema = z.object({
   lineContentHash: z.string().optional(),
   /** Machine ID identifying which machine's snapshot this comment was created on */
   machineId: z.string().optional(),
+  /** ID of the parent comment this is replying to (for threaded replies) */
+  inReplyTo: z.string().optional(),
 });
 
 /**

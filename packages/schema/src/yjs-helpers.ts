@@ -45,7 +45,7 @@ import {
   type PRReviewComment,
   PRReviewCommentSchema,
 } from './plan.js';
-import { parseThreads } from './thread.js';
+import { parseThreads, type Thread, ThreadSchema } from './thread.js';
 import { YDOC_KEYS } from './yjs-keys.js';
 
 /**
@@ -1096,6 +1096,116 @@ export function removeLocalDiffComment(ydoc: Y.Doc, commentId: string): boolean 
 
   array.delete(index, 1);
   return true;
+}
+
+/**
+ * Get a specific thread by ID from the Y.Doc.
+ * @returns The thread if found, null otherwise.
+ */
+export function getThread(ydoc: Y.Doc, threadId: string): Thread | null {
+  const threadsMap = ydoc.getMap(YDOC_KEYS.THREADS);
+  const threadData = threadsMap.get(threadId);
+
+  if (!threadData) return null;
+
+  const result = ThreadSchema.safeParse(threadData);
+  return result.success ? result.data : null;
+}
+
+/**
+ * Get a specific PR review comment by ID.
+ * @returns The comment if found, null otherwise.
+ */
+export function getPRReviewCommentById(ydoc: Y.Doc, commentId: string): PRReviewComment | null {
+  const comments = getPRReviewComments(ydoc);
+  return comments.find((c) => c.id === commentId) ?? null;
+}
+
+/**
+ * Get a specific local diff comment by ID.
+ * @returns The comment if found, null otherwise.
+ */
+export function getLocalDiffCommentById(ydoc: Y.Doc, commentId: string): LocalDiffComment | null {
+  const comments = getLocalDiffComments(ydoc);
+  return comments.find((c) => c.id === commentId) ?? null;
+}
+
+/**
+ * Reply to a PR review comment by creating a new comment with inReplyTo set.
+ * @param ydoc - The Y.Doc
+ * @param parentCommentId - ID of the comment to reply to
+ * @param body - Reply text
+ * @param author - Author of the reply
+ * @param actor - Optional actor name for transaction tracking
+ * @returns The newly created reply comment
+ * @throws Error if parent comment not found
+ */
+export function replyToPRReviewComment(
+  ydoc: Y.Doc,
+  parentCommentId: string,
+  body: string,
+  author: string,
+  actor?: string
+): PRReviewComment {
+  const parentComment = getPRReviewCommentById(ydoc, parentCommentId);
+
+  if (!parentComment) {
+    throw new Error(`PR review comment not found: ${parentCommentId}`);
+  }
+
+  const reply: PRReviewComment = {
+    id: nanoid(),
+    prNumber: parentComment.prNumber,
+    path: parentComment.path,
+    line: parentComment.line,
+    body,
+    author,
+    createdAt: Date.now(),
+    inReplyTo: parentCommentId,
+  };
+
+  addPRReviewComment(ydoc, reply, actor);
+  return reply;
+}
+
+/**
+ * Reply to a local diff comment by creating a new comment with inReplyTo set.
+ * @param ydoc - The Y.Doc
+ * @param parentCommentId - ID of the comment to reply to
+ * @param body - Reply text
+ * @param author - Author of the reply
+ * @param actor - Optional actor name for transaction tracking
+ * @returns The newly created reply comment
+ * @throws Error if parent comment not found
+ */
+export function replyToLocalDiffComment(
+  ydoc: Y.Doc,
+  parentCommentId: string,
+  body: string,
+  author: string,
+  actor?: string
+): LocalDiffComment {
+  const parentComment = getLocalDiffCommentById(ydoc, parentCommentId);
+
+  if (!parentComment) {
+    throw new Error(`Local diff comment not found: ${parentCommentId}`);
+  }
+
+  const reply: LocalDiffComment = {
+    id: nanoid(),
+    type: 'local',
+    path: parentComment.path,
+    line: parentComment.line,
+    body,
+    author,
+    createdAt: Date.now(),
+    baseRef: parentComment.baseRef,
+    lineContentHash: parentComment.lineContentHash,
+    inReplyTo: parentCommentId,
+  };
+
+  addLocalDiffComment(ydoc, reply, actor);
+  return reply;
 }
 
 function extractViewedByFromCrdt(existingViewedBy: unknown): Record<string, number> {

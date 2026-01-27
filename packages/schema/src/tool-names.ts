@@ -14,6 +14,8 @@ export const TOOL_NAMES = {
   READ_DIFF_COMMENTS: 'read_diff_comments',
   READ_TASK: 'read_task',
   REGENERATE_SESSION_TOKEN: 'regenerate_session_token',
+  REPLY_TO_DIFF_COMMENT: 'reply_to_diff_comment',
+  REPLY_TO_THREAD_COMMENT: 'reply_to_thread_comment',
   REQUEST_USER_INPUT: 'request_user_input',
   SETUP_REVIEW_NOTIFICATION: 'setup_review_notification',
   UPDATE_BLOCK_CONTENT: 'update_block_content',
