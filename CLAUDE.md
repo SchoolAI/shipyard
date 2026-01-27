@@ -148,6 +148,20 @@ Follow the **3+ Rule** from engineering-standards.md:
 
 This applies to all lint tools - no `// eslint-disable`, `// @ts-ignore`, `// biome-ignore`, etc.
 
+## Hook Build Artifacts
+
+**Always commit `apps/hook/dist/index.cjs`** after making changes to the hook source code.
+
+The Claude Code plugin runs hooks directly from the committed dist file — it doesn't build on install. If you modify anything in `apps/hook/src/`, you must:
+
+```bash
+pnpm --filter @shipyard/hook build
+git add apps/hook/dist/index.cjs
+git commit -m "chore: update hook dist build"
+```
+
+This is intentional: hooks need to work immediately after plugin install without requiring users to have a build toolchain.
+
 ## Git Worktree Gotchas
 
 When working in a git worktree (created via the `/wt` skill), some files have the **skip-worktree** flag set to prevent accidental commits of local config changes.
