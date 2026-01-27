@@ -847,27 +847,55 @@ export async function waitForApprovalHandler(
     let timeout: NodeJS.Timeout | null = null;
     let checkStatus: (() => void) | null = null;
 
+    /**
+     * Helper: Read reviewRequestId directly from Y.Map since it persists even after
+     * transition from pending_review to terminal states. The typed getPlanMetadata()
+     * helper only exposes reviewRequestId for pending_review status, but the
+     * Y.Map still contains it.
+     */
+    const getStoredReviewId = (): string | undefined => {
+      const metadataMap = ydoc.getMap(YDOC_KEYS.METADATA);
+      const value = metadataMap.get('reviewRequestId');
+      return typeof value === 'string' ? value : undefined;
+    };
+
+    /** Helper: Check if reviewRequestId matches and log warning if not */
+    const validateReviewId = (status: string, storedReviewId: string | undefined): boolean => {
+      if (storedReviewId === reviewRequestId) return true;
+
+      const isTerminal = status === 'in_progress' || status === 'changes_requested';
+      const message = isTerminal
+        ? '[SERVER OBSERVER] STALE APPROVAL: Terminal status with wrong reviewRequestId'
+        : '[SERVER OBSERVER] Review ID mismatch on pending_review, ignoring';
+
+      ctx.logger.warn(
+        { planId, expected: reviewRequestId, actual: storedReviewId, status },
+        message
+      );
+      return false;
+    };
+
     /** Helper: Check if status change should be processed (matching review ID + terminal state) */
     const shouldProcessStatusChange = (): boolean => {
       const currentMeta = getPlanMetadata(ydoc);
       if (!currentMeta) return false;
 
-      /** For pending_review, extract reviewRequestId */
-      const currentReviewId =
-        currentMeta.status === 'pending_review' ? currentMeta.reviewRequestId : undefined;
       const status = currentMeta.status;
+      const storedReviewId = getStoredReviewId();
+      const isTerminal = status === 'in_progress' || status === 'changes_requested';
 
-      /** Ignore stale decisions from previous review requests */
-      if (currentReviewId !== reviewRequestId && currentMeta.status === 'pending_review') {
-        ctx.logger.warn(
-          { planId, expected: reviewRequestId, actual: currentReviewId, status },
-          '[SERVER OBSERVER] Review ID mismatch, ignoring status change'
-        );
-        return false;
+      /** For terminal states, validate and return result */
+      if (isTerminal) {
+        return validateReviewId(status, storedReviewId);
       }
-      /** Only handle terminal states (approved or changes requested) */
-      const isTerminalState = status === 'in_progress' || status === 'changes_requested';
-      return isTerminalState;
+
+      /** For pending_review, validate but don't process (not terminal) */
+      if (status === 'pending_review') {
+        validateReviewId(status, storedReviewId);
+      }
+
+      /** Only terminal states should resolve the promise */
+      return false;
     };
 
     /** Helper: Clean up observer and timeout */
@@ -917,23 +945,17 @@ export async function waitForApprovalHandler(
         '[SERVER OBSERVER] Registering metadata observer'
       );
 
-      /** DEBUG: Add a test observer that logs ALL changes */
-      metadata.observe((event) => {
-        ctx.logger.info(
-          {
-            planId,
-            reviewRequestId,
-            keysChanged: Array.from(event.keysChanged),
-            target: event.target.constructor.name,
-          },
-          '[SERVER OBSERVER] *** METADATA MAP CHANGED *** (Raw Y.Map observer)'
-        );
-      });
-
       metadata.observe(checkStatus);
 
-      /** Check status immediately in case it's already set (shouldn't happen since we just set it to pending_review) */
-      checkStatus();
+      /**
+       * NOTE: We intentionally do NOT call checkStatus() immediately here.
+       * The issue (#182) was that checkStatus() would fire right away and
+       * auto-approve with stale data from a previous review cycle.
+       *
+       * Since we just transitioned to pending_review (or reused an existing
+       * pending_review state), there's no terminal state to process yet.
+       * The observer will fire when the user actually approves/rejects.
+       */
     } catch (err) {
       /** Cleanup observer and timeout if setup fails */
       if (timeout) clearTimeout(timeout);

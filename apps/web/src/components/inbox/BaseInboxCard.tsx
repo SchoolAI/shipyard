@@ -47,7 +47,7 @@ export function BaseInboxCard({
       >
         <TruncatedText
           text={title}
-          maxLength={50}
+          maxLength={30}
           className="font-medium text-foreground truncate"
         />
         <div className="flex items-center gap-2 flex-wrap">

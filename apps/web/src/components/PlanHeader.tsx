@@ -698,7 +698,7 @@ export function PlanHeader({
       {/* Title and status */}
       <TruncatedText
         text={display.title}
-        maxLength={50}
+        maxLength={30}
         className="text-lg md:text-xl font-semibold text-foreground truncate"
         as="h1"
       />

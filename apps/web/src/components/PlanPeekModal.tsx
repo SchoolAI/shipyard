@@ -14,6 +14,7 @@ import { IndexeddbPersistence } from 'y-indexeddb';
 import * as Y from 'yjs';
 import { TagChip } from '@/components/TagChip';
 import { Avatar } from '@/components/ui/avatar';
+import { TruncatedText } from '@/components/ui/TruncatedText';
 import { getPlanRoute } from '@/constants/routes';
 import { assertNever } from '@/utils/assert-never';
 import { formatRelativeTime } from '@/utils/formatters';
@@ -144,7 +145,7 @@ export function PlanPeekModal({ plan, isOpen, onClose }: PlanPeekModalProps) {
 
           <Modal.Header className="pr-10">
             <Modal.Heading className="text-lg font-semibold leading-snug pr-4">
-              {plan.title}
+              <TruncatedText text={plan.title} maxLength={30} />
             </Modal.Heading>
             <div className="flex items-center gap-2 mt-2 flex-wrap">
               <Chip size="sm" variant="soft" color={getStatusColor(plan.status)}>
