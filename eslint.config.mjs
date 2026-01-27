@@ -15,13 +15,19 @@ const localRules = {
         },
         messages: {
           noisyComment:
-            'STOP: Do NOT just convert this to /** */ format. Ask yourself: Is this comment actually useful?\n\n' +
+            'DELETE this comment unless it explains WHY (not WHAT).\n\n' +
             'Per docs/engineering-standards.md:\n' +
-            '• Comments explain WHY, not WHAT\n' +
-            '• If the comment explains what code does → delete it, fix the naming instead\n' +
-            '• Only keep comments for: non-obvious constraints, workarounds, performance decisions\n\n' +
-            'Single-line // comments are for directives only (TODO, @ts-expect-error, etc.).\n' +
-            'If this comment is truly necessary, use /** */ format.',
+            '• If comment explains WHAT the code does → DELETE it, improve naming instead\n' +
+            '• If comment explains WHY (constraint/workaround/perf decision) → keep it\n' +
+            '• Single-line // is ONLY for directives: @ts-expect-error, TODO, biome-ignore\n\n' +
+            'Examples of comments to DELETE:\n' +
+            '  // Loop through items  ← obvious from code\n' +
+            '  // Return the result   ← obvious from code\n' +
+            '  // Handle errors       ← obvious from catch block\n\n' +
+            'Examples of comments to KEEP:\n' +
+            '  /** Max 50 to prevent Firestore quota issues */\n' +
+            '  /** Retry needed - API returns 500 on first call */\n\n' +
+            'ACTION: DELETE this comment or use JSDoc (/** */) ONLY if it explains WHY.',
         },
         schema: [],
       },
