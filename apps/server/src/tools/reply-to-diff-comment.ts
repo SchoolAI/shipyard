@@ -86,7 +86,10 @@ reply_to_diff_comment({
     /** Get actor name for event logging */
     const actorName = await getGitHubUsername();
 
-    /** Try to find as PR review comment first */
+    /**
+     * Try to find as PR review comment first.
+     * replyToPRReviewComment handles validation and atomicity internally.
+     */
     const prComment = getPRReviewCommentById(ydoc, input.commentId);
     if (prComment) {
       try {
@@ -98,6 +101,11 @@ reply_to_diff_comment({
           actorName
         );
 
+        /**
+         * Log event after successful reply.
+         * Note: This is not atomic with comment add due to helper function design.
+         * Consider refactoring replyToPRReviewComment to include event logging.
+         */
         logPlanEvent(ydoc, 'comment_added', actorName, {
           commentId: reply.id,
           prNumber: prComment.prNumber,
@@ -133,7 +141,10 @@ The reply will appear in the Changes tab inline with the original comment.`,
       }
     }
 
-    /** Try to find as local diff comment */
+    /**
+     * Try to find as local diff comment.
+     * replyToLocalDiffComment handles validation and atomicity internally.
+     */
     const localComment = getLocalDiffCommentById(ydoc, input.commentId);
     if (localComment) {
       try {
@@ -145,6 +156,11 @@ The reply will appear in the Changes tab inline with the original comment.`,
           actorName
         );
 
+        /**
+         * Log event after successful reply.
+         * Note: This is not atomic with comment add due to helper function design.
+         * Consider refactoring replyToLocalDiffComment to include event logging.
+         */
         logPlanEvent(ydoc, 'comment_added', actorName, {
           commentId: reply.id,
         });

@@ -28491,7 +28491,7 @@ init_cjs_shims();
 // ../../packages/schema/dist/index.mjs
 init_cjs_shims();
 
-// ../../packages/schema/dist/yjs-helpers-CnIfjGAY.mjs
+// ../../packages/schema/dist/yjs-helpers-DIRWhP8_.mjs
 init_cjs_shims();
 
 // ../../packages/schema/dist/plan.mjs
@@ -42437,28 +42437,10 @@ var PlanEventBaseSchema = external_exports.object({
   inboxWorthy: external_exports.boolean().optional(),
   inboxFor: external_exports.union([external_exports.string(), external_exports.array(external_exports.string())]).optional()
 });
-var AgentActivityDataSchema = external_exports.discriminatedUnion("activityType", [
-  external_exports.object({
-    activityType: external_exports.literal("help_request"),
-    requestId: external_exports.string(),
-    message: external_exports.string()
-  }),
-  external_exports.object({
-    activityType: external_exports.literal("help_request_resolved"),
-    requestId: external_exports.string(),
-    resolution: external_exports.string().optional()
-  }),
-  external_exports.object({
-    activityType: external_exports.literal("blocker"),
-    message: external_exports.string(),
-    requestId: external_exports.string()
-  }),
-  external_exports.object({
-    activityType: external_exports.literal("blocker_resolved"),
-    requestId: external_exports.string(),
-    resolution: external_exports.string().optional()
-  })
-]);
+var AgentActivityDataSchema = external_exports.object({
+  activityType: external_exports.literal("update"),
+  message: external_exports.string()
+});
 var PlanEventSchema = external_exports.discriminatedUnion("type", [
   PlanEventBaseSchema.extend({ type: external_exports.enum([
     "plan_created",
@@ -42715,6 +42697,7 @@ var LocalDiffCommentSchema = external_exports.object({
   baseRef: external_exports.string(),
   resolved: external_exports.boolean().optional(),
   lineContentHash: external_exports.string().optional(),
+  machineId: external_exports.string().optional(),
   inReplyTo: external_exports.string().optional()
 });
 var GitHubArtifactParseSchema = external_exports.object({
@@ -42744,10 +42727,34 @@ var LocalArtifactParseSchema = external_exports.object({
   localArtifactId: external_exports.string()
 });
 
-// ../../packages/schema/dist/yjs-helpers-CnIfjGAY.mjs
+// ../../packages/schema/dist/yjs-helpers-DIRWhP8_.mjs
 function assertNever2(value) {
   throw new Error(`Unhandled discriminated union member: ${JSON.stringify(value)}`);
 }
+var SyncedFileChangeSchema = external_exports.object({
+  path: external_exports.string(),
+  status: external_exports.enum([
+    "added",
+    "modified",
+    "deleted",
+    "renamed"
+  ]),
+  patch: external_exports.string(),
+  staged: external_exports.boolean()
+});
+var ChangeSnapshotSchema = external_exports.object({
+  machineId: external_exports.string(),
+  machineName: external_exports.string(),
+  ownerId: external_exports.string(),
+  headSha: external_exports.string(),
+  branch: external_exports.string(),
+  cwd: external_exports.string(),
+  isLive: external_exports.boolean(),
+  updatedAt: external_exports.number(),
+  files: external_exports.array(SyncedFileChangeSchema),
+  totalAdditions: external_exports.number(),
+  totalDeletions: external_exports.number()
+});
 var AgentPresenceSchema = external_exports.object({
   agentType: external_exports.string(),
   sessionId: external_exports.string(),
@@ -43065,7 +43072,8 @@ var YDOC_KEYS = {
   EVENTS: "events",
   SNAPSHOTS: "snapshots",
   INPUT_REQUESTS: "inputRequests",
-  LOCAL_DIFF_COMMENTS: "localDiffComments"
+  LOCAL_DIFF_COMMENTS: "localDiffComments",
+  CHANGE_SNAPSHOTS: "changeSnapshots"
 };
 var validKeys = new Set(Object.values(YDOC_KEYS));
 var CommentBodySchema = external_exports.union([external_exports.string(), external_exports.array(external_exports.unknown())]);
@@ -43138,6 +43146,12 @@ var UrlKeyVersionSchema = external_exports.object({
   id: external_exports.string(),
   content: external_exports.array(external_exports.unknown())
 });
+var UrlDeliverableSchema = external_exports.object({
+  id: external_exports.string().optional(),
+  text: external_exports.string(),
+  linkedArtifactId: external_exports.string().nullable().optional(),
+  linkedAt: external_exports.number().optional()
+});
 var UrlEncodedPlanV1Schema = external_exports.object({
   v: external_exports.literal(1),
   id: external_exports.string(),
@@ -43145,9 +43159,9 @@ var UrlEncodedPlanV1Schema = external_exports.object({
   status: external_exports.enum(PlanStatusValues),
   repo: external_exports.string().optional(),
   pr: external_exports.number().optional(),
-  content: external_exports.array(external_exports.unknown()),
+  content: external_exports.array(external_exports.unknown()).optional(),
   artifacts: external_exports.array(ArtifactSchema).optional(),
-  deliverables: external_exports.array(DeliverableSchema).optional(),
+  deliverables: external_exports.array(UrlDeliverableSchema).optional(),
   comments: external_exports.array(external_exports.unknown()).optional()
 });
 var UrlEncodedPlanV2Schema = external_exports.object({
@@ -43157,9 +43171,9 @@ var UrlEncodedPlanV2Schema = external_exports.object({
   status: external_exports.enum(PlanStatusValues),
   repo: external_exports.string().optional(),
   pr: external_exports.number().optional(),
-  content: external_exports.array(external_exports.unknown()),
+  content: external_exports.array(external_exports.unknown()).optional(),
   artifacts: external_exports.array(ArtifactSchema).optional(),
-  deliverables: external_exports.array(DeliverableSchema).optional(),
+  deliverables: external_exports.array(UrlDeliverableSchema).optional(),
   comments: external_exports.array(external_exports.unknown()).optional(),
   versionRefs: external_exports.array(UrlSnapshotRefSchema).optional(),
   keyVersions: external_exports.array(UrlKeyVersionSchema).optional()
@@ -44323,20 +44337,20 @@ function truncate(text, maxLength) {
 }
 var TOOL_NAMES = {
   ADD_ARTIFACT: "add_artifact",
-  ADD_PR_REVIEW_COMMENT: "add_pr_review_comment",
   COMPLETE_TASK: "complete_task",
-  CREATE_PLAN: "create_plan",
+  CREATE_TASK: "create_task",
   EXECUTE_CODE: "execute_code",
   LINK_PR: "link_pr",
+  POST_UPDATE: "post_update",
   READ_DIFF_COMMENTS: "read_diff_comments",
-  READ_PLAN: "read_plan",
+  READ_TASK: "read_task",
   REGENERATE_SESSION_TOKEN: "regenerate_session_token",
   REPLY_TO_DIFF_COMMENT: "reply_to_diff_comment",
   REPLY_TO_THREAD_COMMENT: "reply_to_thread_comment",
   REQUEST_USER_INPUT: "request_user_input",
   SETUP_REVIEW_NOTIFICATION: "setup_review_notification",
   UPDATE_BLOCK_CONTENT: "update_block_content",
-  UPDATE_PLAN: "update_plan"
+  UPDATE_TASK: "update_task"
 };
 var PlanIdSchema = external_exports.object({ planId: external_exports.string().min(1) });
 var PlanStatusResponseSchema = external_exports.object({ status: external_exports.string() });
@@ -44382,6 +44396,12 @@ var ImportConversationResponseSchema = external_exports.discriminatedUnion("succ
   success: external_exports.literal(false),
   error: external_exports.string()
 })]);
+var MachineInfoResponseSchema = external_exports.object({
+  machineId: external_exports.string(),
+  machineName: external_exports.string(),
+  ownerId: external_exports.string(),
+  cwd: external_exports.string()
+});
 var t = initTRPC.context().create({ allowOutsideOfServer: true });
 var router = t.router;
 var publicProcedure = t.procedure;
@@ -44488,6 +44508,9 @@ var planRouter = router({
       error: "No working directory available"
     };
     return ctx.getFileContent(cwd, input.filePath);
+  }),
+  getMachineInfo: publicProcedure.input(PlanIdSchema).output(MachineInfoResponseSchema).query(async ({ ctx }) => {
+    return ctx.getMachineInfo();
   })
 });
 var subscriptionRouter = router({
@@ -44529,30 +44552,31 @@ function isBuffer(value) {
 init_cjs_shims();
 var TOOL_NAMES2 = {
   ADD_ARTIFACT: "add_artifact",
-  ADD_PR_REVIEW_COMMENT: "add_pr_review_comment",
   COMPLETE_TASK: "complete_task",
-  CREATE_PLAN: "create_plan",
+  CREATE_TASK: "create_task",
   EXECUTE_CODE: "execute_code",
   LINK_PR: "link_pr",
-  READ_PLAN: "read_plan",
+  POST_UPDATE: "post_update",
+  READ_DIFF_COMMENTS: "read_diff_comments",
+  READ_TASK: "read_task",
   REGENERATE_SESSION_TOKEN: "regenerate_session_token",
   REQUEST_USER_INPUT: "request_user_input",
   SETUP_REVIEW_NOTIFICATION: "setup_review_notification",
   UPDATE_BLOCK_CONTENT: "update_block_content",
-  UPDATE_PLAN: "update_plan"
+  UPDATE_TASK: "update_task"
 };
 var CRITICAL_USAGE_SECTION = `## CRITICAL: When to Use Shipyard
 
 \u26A0\uFE0F **MANDATORY USAGE RULE:**
 
 If Shipyard is available, you MUST use it for:
-- Creating implementation plans
+- Creating implementation tasks
 - Tracking work that needs human review
 - Documenting proof of work (screenshots, videos, test results)
-- ANY user request involving "plan", "track", "verify", or "prove"
+- ANY user request involving "task", "track", "verify", or "prove"
 
 **DO NOT:**
-- Create plans manually in chat or as markdown files
+- Create tasks manually in chat or as markdown files
 - Write implementation docs yourself when Shipyard is available
 - Suggest alternatives to Shipyard for trackable work
 - Overthink whether to use it - WHEN IN DOUBT, USE SHIPYARD
@@ -44593,13 +44617,14 @@ var ARTIFACT_TYPES_SECTION = `## Artifact Types
 
 | Type | Use For | File Formats |
 |------|---------|--------------|
-| \`screenshot\` | UI changes, visual proof, error states | .png, .jpg, .webp |
+| \`html\` | Test results, code reviews, reports, terminal output | .html |
+| \`image\` | UI screenshots, visual proof, error states | .png, .jpg, .webp |
 | \`video\` | Complex flows, interactions, animations | .mp4, .webm |
-| \`test_results\` | Test output, coverage reports | .json, .txt, .xml |
-| \`diff\` | Code changes, before/after comparisons | .diff, .patch |`;
+
+**Note:** HTML is the primary format for most artifacts. Use it for test results, coverage reports, code reviews, and any text-based output. Only use \`image\` for actual UI screenshots and \`video\` for multi-step flows.`;
 var TIPS_SECTION = `## Tips for Effective Use
 
-1. **Plan deliverables first** - Decide what proves success before coding
+1. **Define deliverables first** - Decide what proves success before coding
 2. **Capture during work** - Take screenshots as you implement, not after
 3. **Be specific** - "Login page with error state" beats "Screenshot"
 4. **Link every artifact** - Always set \`deliverableId\` for auto-completion
@@ -44616,7 +44641,7 @@ var USER_INPUT_SECTION = `## Human-Agent Communication
 
 **\`requestUserInput()\` inside \`${TOOL_NAMES2.EXECUTE_CODE}\` is THE primary way to communicate with humans during active work.**
 
-Shipyard is the central hub where humans manage AI agents. When you need to ask a question, get clarification, or request a decision - use \`requestUserInput()\`. The human is already in the browser viewing your plan. That's where conversations should happen.
+Shipyard is the central hub where humans manage AI agents. When you need to ask a question, get clarification, or request a decision - use \`requestUserInput()\`. The human is already in the browser viewing your task. That's where conversations should happen.
 
 ### Best Practice: Return the Response Value
 
@@ -44640,8 +44665,8 @@ Avoid \`console.log()\` for response values - it clutters output and isn't struc
 
 ### Why Use requestUserInput()
 
-- **Context:** The human sees your question alongside the plan, artifacts, and comments
-- **History:** All exchanges are logged in the plan's activity feed
+- **Context:** The human sees your question alongside the task, artifacts, and comments
+- **History:** All exchanges are logged in the task's activity feed
 - **Continuity:** The conversation stays attached to the work, not scattered across chat windows
 - **Flexibility:** 8 input types, multi-question forms, "Other" escape hatch for custom answers
 
@@ -44711,13 +44736,13 @@ var TROUBLESHOOTING_SECTION = `## Troubleshooting
 
 **No auto-complete:** Ensure every deliverable has an artifact with matching \`deliverableId\`.
 
-**Plan not syncing:** Check WebSocket connection to registry server.
+**Task not syncing:** Check WebSocket connection to registry server.
 
 **Input request times out:** User may not have seen it or needs more time. Default timeout is 30 minutes. Try again with a longer timeout or rephrase the question.
 
 **Input request declined:** User clicked "Decline." Rephrase your question, proceed with a reasonable default, or use a different approach.
 
-**No response to input:** Check if browser is connected to the plan. User may have closed the browser window.`;
+**No response to input:** Check if browser is connected to the task. User may have closed the browser window.`;
 var COMMON_INSTRUCTIONS = [
   CRITICAL_USAGE_SECTION,
   USER_INPUT_SECTION,
@@ -44727,17 +44752,17 @@ var COMMON_INSTRUCTIONS = [
   WHEN_NOT_TO_USE_SECTION,
   TROUBLESHOOTING_SECTION
 ].join("\n\n");
-var CLAUDE_CODE_HEADER = `[SHIPYARD] Collaborative planning with human review & proof-of-work tracking.`;
-var PLAN_MODE_WORKFLOW = `## How to Use (Claude Code with Hooks)
+var CLAUDE_CODE_HEADER = `[SHIPYARD] Collaborative task management with human review & proof-of-work tracking.`;
+var TASK_MODE_WORKFLOW = `## How to Use (Claude Code with Hooks)
 
-You have the **full Shipyard experience** with automatic hooks. Use native plan mode:
+You have the **full Shipyard experience** with automatic hooks. Use native task mode:
 
 ### Workflow
 
-1. **Enter plan mode** (Shift+Tab) \u2192 Browser opens with live plan automatically
-2. **Write your plan** with \`{#deliverable}\` markers for provable outcomes
-3. **Exit plan mode** \u2192 Hook **BLOCKS** until human approves or requests changes
-4. **On approval** \u2192 You automatically receive: planId, sessionToken, deliverable IDs
+1. **Enter task mode** (Shift+Tab) \u2192 Browser opens with live task automatically
+2. **Write your task** with \`{#deliverable}\` markers for provable outcomes
+3. **Exit task mode** \u2192 Hook **BLOCKS** until human approves or requests changes
+4. **On approval** \u2192 You automatically receive: taskId, sessionToken, deliverable IDs
 5. **Do the work** \u2192 Take screenshots/videos as you implement
 6. **Upload artifacts** \u2192 \`${TOOL_NAMES2.ADD_ARTIFACT}(filePath, deliverableId)\` for each deliverable
 7. **Auto-complete** \u2192 When all deliverables have artifacts, task completes with snapshot URL
@@ -44746,21 +44771,21 @@ You have the **full Shipyard experience** with automatic hooks. Use native plan 
 
 You only need ONE tool: \`${TOOL_NAMES2.ADD_ARTIFACT}\`
 
-The hook automatically injects everything you need (planId, sessionToken, deliverables).
+The hook automatically injects everything you need (taskId, sessionToken, deliverables).
 Just call \`${TOOL_NAMES2.ADD_ARTIFACT}\` with the file path and deliverable ID.
 
 \`\`\`typescript
 /**
  * Example: After approval, you'll have these in context
- * planId: "abc123"
+ * taskId: "abc123"
  * sessionToken: "xyz..."
  * deliverables: [{ id: "del_xxx", text: "Screenshot of login" }]
  */
 
 await addArtifact({
-  planId,
+  taskId,
   sessionToken,
-  type: 'screenshot',
+  type: 'image',
   filename: 'login-page.png',
   source: 'file',
   filePath: '/tmp/screenshot.png',
@@ -44769,13 +44794,32 @@ await addArtifact({
 \`\`\`
 
 When the last deliverable gets an artifact, the task auto-completes and returns a snapshot URL.`;
+var POSTING_UPDATES_SECTION = `## Posting Progress Updates
+
+For long-running tasks, keep reviewers informed with periodic updates:
+
+\`\`\`typescript
+await postUpdate({
+  taskId,
+  sessionToken,
+  message: "Starting work on authentication module"
+});
+\`\`\`
+
+**When to post updates:**
+- After completing a significant milestone
+- When switching focus to a different part of the task
+- If you've been working for a while without visible output
+- When you encounter something interesting or unexpected
+
+Think about what a human watching your work would want to know.`;
 var IMPORTANT_NOTES = `## Important Notes for Claude Code
 
-- **DO NOT call \`createPlan()\` directly** - The hook handles plan creation when you enter plan mode
+- **DO NOT call \`createTask()\` directly** - The hook handles task creation when you enter task mode
 - **DO NOT use the Shipyard skill** - The hook provides everything you need
 - **DO NOT poll for approval** - The hook blocks automatically until human decides
-- **DO use plan mode** for ANY work that needs tracking, verification, or human review
-- **DO use \`requestUserInput()\`** inside \`${TOOL_NAMES2.EXECUTE_CODE}\` instead of \`AskUserQuestion\` - The human is in the browser viewing your plan, questions should appear there`;
+- **DO use task mode** for ANY work that needs tracking, verification, or human review
+- **DO use \`requestUserInput()\`** inside \`${TOOL_NAMES2.EXECUTE_CODE}\` instead of \`AskUserQuestion\` - The human is in the browser viewing your task, questions should appear there`;
 var CLAUDE_CODE_INSTRUCTIONS = [
   CLAUDE_CODE_HEADER,
   "",
@@ -44783,7 +44827,9 @@ var CLAUDE_CODE_INSTRUCTIONS = [
   "",
   USER_INPUT_SECTION,
   "",
-  PLAN_MODE_WORKFLOW,
+  TASK_MODE_WORKFLOW,
+  "",
+  POSTING_UPDATES_SECTION,
   "",
   DELIVERABLES_SECTION,
   "",
@@ -44799,11 +44845,11 @@ var CLAUDE_CODE_INSTRUCTIONS = [
 ].join("\n");
 var MCP_DIRECT_HEADER = `# Shipyard: Your Agent Management Hub
 
-> **Shipyard is the central interface where humans manage AI agents.** Plans, artifacts, feedback, and communication all happen here.
+> **Shipyard is the central interface where humans manage AI agents.** Tasks, artifacts, feedback, and communication all happen here.
 
 Shipyard turns invisible agent work into reviewable, verifiable tasks. Instead of trusting that code was written correctly, reviewers see screenshots, videos, and test results as proof.
 
-**Key principle:** When you're working in Shipyard, ALL human-agent communication should happen through \`requestUserInput()\` inside \`${TOOL_NAMES2.EXECUTE_CODE}\`. The human is already in the browser viewing your plan - that's where they expect to interact with you.`;
+**Key principle:** When you're working in Shipyard, ALL human-agent communication should happen through \`requestUserInput()\` inside \`${TOOL_NAMES2.EXECUTE_CODE}\`. The human is already in the browser viewing your task - that's where they expect to interact with you.`;
 var MCP_TOOLS_OVERVIEW = `## Available MCP Tools
 
 | Tool | Purpose |
@@ -44812,15 +44858,15 @@ var MCP_TOOLS_OVERVIEW = `## Available MCP Tools
 
 ### requestUserInput(): Your Direct Line to the Human
 
-This is how you talk to humans during active work. Don't use your platform's built-in question tools (AskUserQuestion, etc.) - use \`requestUserInput()\` inside \`${TOOL_NAMES2.EXECUTE_CODE}\` instead. The human is in the browser viewing your plan, and that's where they expect to see your questions.
+This is how you talk to humans during active work. Don't use your platform's built-in question tools (AskUserQuestion, etc.) - use \`requestUserInput()\` inside \`${TOOL_NAMES2.EXECUTE_CODE}\` instead. The human is in the browser viewing your task, and that's where they expect to see your questions.
 
-All Shipyard operations (createPlan, addArtifact, requestUserInput, etc.) are available inside \`${TOOL_NAMES2.EXECUTE_CODE}\`.`;
+All Shipyard operations (createTask, addArtifact, requestUserInput, etc.) are available inside \`${TOOL_NAMES2.EXECUTE_CODE}\`.`;
 var MCP_WORKFLOW = `## Workflow (MCP Direct)
 
-### Step 1: Create Plan
+### Step 1: Create Task
 
 \`\`\`typescript
-const plan = await createPlan({
+const task = await createTask({
   title: "Add user authentication",
   content: \`
 ## Deliverables
@@ -44834,7 +44880,7 @@ const plan = await createPlan({
 \`
 });
 
-const { planId, sessionToken, deliverables, monitoringScript } = plan;
+const { taskId, sessionToken, deliverables, monitoringScript } = task;
 /** deliverables = [{ id: "del_xxx", text: "Screenshot of login page" }, ...] */
 \`\`\`
 
@@ -44851,7 +44897,7 @@ bash <(echo "$monitoringScript") &
 Or poll manually:
 
 \`\`\`typescript
-const status = await readPlan(planId, sessionToken);
+const status = await readTask(taskId, sessionToken);
 if (status.status === "in_progress") {
   /** Approved! Proceed with work */
 }
@@ -44868,9 +44914,9 @@ Implement the feature, taking screenshots/recordings as you go.
 
 \`\`\`typescript
 await addArtifact({
-  planId,
+  taskId,
   sessionToken,
-  type: 'screenshot',
+  type: 'image',
   filename: 'login-page.png',
   source: 'file',
   filePath: '/path/to/screenshot.png',
@@ -44878,9 +44924,9 @@ await addArtifact({
 });
 
 const result = await addArtifact({
-  planId,
+  taskId,
   sessionToken,
-  type: 'screenshot',
+  type: 'image',
   filename: 'error-handling.png',
   source: 'file',
   filePath: '/path/to/error.png',
@@ -44894,25 +44940,25 @@ if (result.allDeliverablesComplete) {
 \`\`\``;
 var API_REFERENCE = `## API Reference (inside execute_code)
 
-### createPlan(options)
+### createTask(options)
 
-Creates a new plan and opens it in the browser.
+Creates a new task and opens it in the browser.
 
 **Parameters:**
-- \`title\` (string) - Plan title
+- \`title\` (string) - Task title
 - \`content\` (string) - Markdown content with \`{#deliverable}\` markers
 - \`repo\` (string, optional) - GitHub repo for artifact storage
 - \`prNumber\` (number, optional) - PR number to link
 
-**Returns:** \`{ planId, sessionToken, url, deliverables, monitoringScript }\`
+**Returns:** \`{ taskId, sessionToken, url, deliverables, monitoringScript }\`
 
-### readPlan(planId, sessionToken, options?)
+### readTask(taskId, sessionToken, options?)
 
-Reads current plan state.
+Reads current task state.
 
 **Parameters:**
-- \`planId\` (string) - Plan ID
-- \`sessionToken\` (string) - Session token from createPlan
+- \`taskId\` (string) - Task ID
+- \`sessionToken\` (string) - Session token from createTask
 - \`options.includeAnnotations\` (boolean) - Include reviewer comments
 
 **Returns:** \`{ content, status, title, deliverables }\`
@@ -44922,9 +44968,9 @@ Reads current plan state.
 Uploads proof-of-work artifact.
 
 **Parameters:**
-- \`planId\` (string) - Plan ID
+- \`taskId\` (string) - Task ID
 - \`sessionToken\` (string) - Session token
-- \`type\` ('screenshot' | 'video' | 'test_results' | 'diff')
+- \`type\` ('html' | 'image' | 'video')
 - \`filename\` (string) - File name
 - \`source\` ('file' | 'url' | 'base64')
 - \`filePath\` (string) - Local file path (when source='file')
@@ -44996,7 +45042,7 @@ return { config: config.response };
 var HANDLING_FEEDBACK = `## Handling Reviewer Feedback
 
 \`\`\`typescript
-const status = await readPlan(planId, sessionToken, {
+const status = await readTask(taskId, sessionToken, {
   includeAnnotations: true
 });
 
@@ -45007,7 +45053,7 @@ if (status.status === "changes_requested") {
   /**
    * Make changes based on feedback
    * Upload new artifacts
-   * Plan will transition back to pending_review
+   * Task will transition back to pending_review
    */
 }
 \`\`\``;
@@ -45065,12 +45111,44 @@ var DEFAULT_AGENT_TYPE = "claude-code";
 // src/logger.ts
 init_cjs_shims();
 var import_node_fs = require("fs");
-var import_node_os = require("os");
-var import_node_path = require("path");
+var import_node_path2 = require("path");
 var import_pino = __toESM(require_pino());
 
-// src/config/env/server.ts
+// src/config/env/registry.ts
 init_cjs_shims();
+var import_node_os = require("os");
+var import_node_path = require("path");
+
+// ../../packages/shared/dist/index.mjs
+init_cjs_shims();
+
+// ../../packages/shared/dist/registry-config.mjs
+init_cjs_shims();
+var DEFAULT_REGISTRY_PORTS = [
+  32191,
+  32192,
+  32193,
+  32194,
+  32195,
+  32196,
+  32197,
+  32198,
+  32199
+];
+
+// ../../packages/shared/dist/index.mjs
+var import_node_crypto = require("crypto");
+function computeHash(content) {
+  return (0, import_node_crypto.createHash)("sha256").update(content).digest("hex").slice(0, 16);
+}
+function generateSessionToken() {
+  return (0, import_node_crypto.randomBytes)(32).toString("base64url");
+}
+function hashSessionToken(token) {
+  return (0, import_node_crypto.createHash)("sha256").update(token).digest("hex");
+}
+var APPROVAL_LONG_POLL_TIMEOUT_MS = 1800 * 1e3;
+var DEFAULT_TRPC_TIMEOUT_MS = 10 * 1e3;
 
 // src/config/config.ts
 init_cjs_shims();
@@ -45094,15 +45172,31 @@ ${errorMessages}`);
   }
 }
 
-// src/config/env/server.ts
+// src/config/env/registry.ts
 var schema = external_exports.object({
+  REGISTRY_PORT: external_exports.string().optional().transform((val) => {
+    if (!val) return DEFAULT_REGISTRY_PORTS;
+    const port = Number.parseInt(val, 10);
+    if (Number.isNaN(port)) {
+      throw new Error(`REGISTRY_PORT must be a valid number, got: ${val}`);
+    }
+    return [port];
+  }),
+  SHIPYARD_STATE_DIR: external_exports.string().optional().transform((val) => val || void 0).default(() => (0, import_node_path.join)((0, import_node_os.homedir)(), ".shipyard"))
+});
+var registryConfig = loadEnv(schema);
+
+// src/config/env/server.ts
+init_cjs_shims();
+var schema2 = external_exports.object({
   LOG_LEVEL: external_exports.enum(["debug", "info", "warn", "error"]).default("info")
 });
-var serverConfig = loadEnv(schema);
+var serverConfig = loadEnv(schema2);
 
 // src/logger.ts
-var LOG_DIR = (0, import_node_path.join)((0, import_node_os.homedir)(), ".shipyard");
-var LOG_FILE = (0, import_node_path.join)(LOG_DIR, "hook-debug.log");
+var LOG_DIR = registryConfig.SHIPYARD_STATE_DIR;
+var LOG_FILE = (0, import_node_path2.join)(LOG_DIR, "hook-debug.log");
+var HOOK_LOG_FILE = LOG_FILE;
 var isTest = process.env.NODE_ENV === "test" || process.env.VITEST;
 if (!isTest && !(0, import_node_fs.existsSync)(LOG_DIR)) {
   try {
@@ -45287,46 +45381,8 @@ ${feedbackText}`;
 // src/core/plan-manager.ts
 init_cjs_shims();
 
-// ../../packages/shared/dist/index.mjs
-init_cjs_shims();
-
-// ../../packages/shared/dist/registry-config.mjs
-init_cjs_shims();
-var DEFAULT_REGISTRY_PORTS = [32191, 32192];
-
-// ../../packages/shared/dist/index.mjs
-var import_node_crypto = require("crypto");
-function computeHash(content) {
-  return (0, import_node_crypto.createHash)("sha256").update(content).digest("hex").slice(0, 16);
-}
-function generateSessionToken() {
-  return (0, import_node_crypto.randomBytes)(32).toString("base64url");
-}
-function hashSessionToken(token) {
-  return (0, import_node_crypto.createHash)("sha256").update(token).digest("hex");
-}
-var APPROVAL_LONG_POLL_TIMEOUT_MS = 1800 * 1e3;
-var DEFAULT_TRPC_TIMEOUT_MS = 10 * 1e3;
-
 // src/http-client.ts
 init_cjs_shims();
-
-// src/config/env/registry.ts
-init_cjs_shims();
-var import_node_os2 = require("os");
-var import_node_path2 = require("path");
-var schema2 = external_exports.object({
-  REGISTRY_PORT: external_exports.string().optional().transform((val) => {
-    if (!val) return DEFAULT_REGISTRY_PORTS;
-    const port = Number.parseInt(val, 10);
-    if (Number.isNaN(port)) {
-      throw new Error(`REGISTRY_PORT must be a valid number, got: ${val}`);
-    }
-    return [port];
-  }),
-  SHIPYARD_STATE_DIR: external_exports.string().optional().default(() => (0, import_node_path2.join)((0, import_node_os2.homedir)(), ".shipyard"))
-});
-var registryConfig = loadEnv(schema2);
 
 // src/trpc-client.ts
 init_cjs_shims();
@@ -46704,7 +46760,10 @@ init_cjs_shims();
 // src/config/env/web.ts
 init_cjs_shims();
 var schema3 = external_exports.object({
-  SHIPYARD_WEB_URL: external_exports.string().url().default("https://schoolai.github.io/shipyard")
+  SHIPYARD_WEB_URL: external_exports.string().url().default(() => {
+    const nodeEnv = process.env.NODE_ENV || "development";
+    return nodeEnv === "production" ? "https://schoolai.github.io/shipyard" : "http://localhost:5173";
+  })
 });
 var webConfig = loadEnv(schema3);
 
@@ -46884,7 +46943,7 @@ async function checkReviewStatus(sessionId, planContent, originMetadata) {
     );
     return {
       allow: false,
-      message: "Internal error: Plan content found but session state missing. Check ~/.shipyard/hook-debug.log and report this issue."
+      message: `Internal error: Plan content found but session state missing. Check ${HOOK_LOG_FILE} and report this issue.`
     };
   }
   if (!state.planId) {
@@ -46903,7 +46962,7 @@ async function checkReviewStatus(sessionId, planContent, originMetadata) {
     logger.warn({ err, planId }, "Failed to get review status, blocking exit");
     return {
       allow: false,
-      message: "Cannot verify plan approval status. Ensure the Shipyard MCP server is running. Check ~/.shipyard/server-debug.log for details.",
+      message: "Cannot verify plan approval status. Ensure the Shipyard MCP server is running. Check server-debug.log in your Shipyard state directory for details.",
       planId
     };
   }
@@ -46970,7 +47029,7 @@ async function handlePlanExit(event) {
     const errorCode = err instanceof Error && "code" in err && typeof err.code === "string" ? err.code : void 0;
     logger.error({ err, message: errorMessage, code: errorCode }, "Failed to check review status");
     const isConnectionError = errorCode === "ECONNREFUSED" || errorCode === "ECONNRESET" || errorCode === "ETIMEDOUT" || errorCode === "ENOTFOUND" || errorMessage?.includes("connect") || errorMessage?.includes("timeout") || errorMessage?.includes("WebSocket") || errorMessage?.includes("not available");
-    const message = isConnectionError ? "Cannot connect to Shipyard server. Ensure the Shipyard MCP server is running. Check ~/.shipyard/hook-debug.log for details." : `Review system error: ${errorMessage}. Check ~/.shipyard/hook-debug.log for details.`;
+    const message = isConnectionError ? `Cannot connect to Shipyard server. Ensure the Shipyard MCP server is running. Check ${HOOK_LOG_FILE} for details.` : `Review system error: ${errorMessage}. Check ${HOOK_LOG_FILE} for details.`;
     return {
       allow: false,
       message
@@ -47085,7 +47144,7 @@ async function main() {
           hookEventName: "PermissionRequest",
           decision: {
             behavior: "deny",
-            message: `Hook error: ${errorMessage}. Check ~/.shipyard/hook-debug.log for details.`
+            message: `Hook error: ${errorMessage}. Check ${HOOK_LOG_FILE} for details.`
           }
         }
       })

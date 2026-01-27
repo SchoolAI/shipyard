@@ -1,10 +1,4 @@
-import {
-  getPlanMetadata,
-  getThread,
-  logPlanEvent,
-  type ThreadComment,
-  YDOC_KEYS,
-} from '@shipyard/schema';
+import { getPlanMetadata, logPlanEvent, ThreadCommentSchema, YDOC_KEYS } from '@shipyard/schema';
 import { nanoid } from 'nanoid';
 import { z } from 'zod';
 import { getOrCreateDoc } from '../doc-store.js';
@@ -81,9 +75,53 @@ reply_to_thread_comment({
       };
     }
 
-    /** Get the thread */
-    const thread = getThread(ydoc, input.threadId);
-    if (!thread) {
+    /** Get actor name for event logging */
+    const actorName = await getGitHubUsername();
+
+    /**
+     * Create and validate reply comment before transaction.
+     * Validation ensures comment structure is correct before CRDT write.
+     */
+    const reply = ThreadCommentSchema.parse({
+      id: nanoid(),
+      userId: 'AI', // TODO: Replace with proper identity after identity PR merges
+      body: input.body,
+      createdAt: Date.now(),
+    });
+
+    /**
+     * Atomically add reply to thread and log event.
+     * Thread existence check happens inside transaction to prevent TOCTOU race.
+     */
+    let updateSucceeded = false;
+    ydoc.transact(
+      () => {
+        const threadsMap = ydoc.getMap(YDOC_KEYS.THREADS);
+        const threadData = threadsMap.get(input.threadId);
+
+        if (!threadData || typeof threadData !== 'object' || !('comments' in threadData)) {
+          return;
+        }
+
+        const existingComments = Array.isArray(threadData.comments) ? threadData.comments : [];
+        const updatedThread = {
+          ...threadData,
+          comments: [...existingComments, reply],
+        };
+        threadsMap.set(input.threadId, updatedThread);
+
+        /** Log event in same transaction for atomicity */
+        logPlanEvent(ydoc, 'comment_added', actorName, {
+          commentId: reply.id,
+        });
+
+        updateSucceeded = true;
+      },
+      actorName ? { actor: actorName } : undefined
+    );
+
+    /** Return error if thread was not found or update failed */
+    if (!updateSucceeded) {
       return {
         content: [
           { type: 'text', text: `Thread "${input.threadId}" not found in plan "${input.taskId}".` },
@@ -91,40 +129,6 @@ reply_to_thread_comment({
         isError: true,
       };
     }
-
-    /** Get actor name for event logging */
-    const actorName = await getGitHubUsername();
-
-    /** Create reply comment */
-    const reply: ThreadComment = {
-      id: nanoid(),
-      userId: 'AI', // TODO: Replace with proper identity after identity PR merges
-      body: input.body,
-      createdAt: Date.now(),
-    };
-
-    /** Add reply to thread's comments array */
-    ydoc.transact(
-      () => {
-        const threadsMap = ydoc.getMap(YDOC_KEYS.THREADS);
-        const threadData = threadsMap.get(input.threadId);
-
-        if (threadData && typeof threadData === 'object' && 'comments' in threadData) {
-          const existingComments = Array.isArray(threadData.comments) ? threadData.comments : [];
-          const updatedThread = {
-            ...threadData,
-            comments: [...existingComments, reply],
-          };
-          threadsMap.set(input.threadId, updatedThread);
-        }
-      },
-      actorName ? { actor: actorName } : undefined
-    );
-
-    /** Log comment added event */
-    logPlanEvent(ydoc, 'comment_added', actorName, {
-      commentId: reply.id,
-    });
 
     logger.info(
       { taskId: input.taskId, threadId: input.threadId, commentId: reply.id },
