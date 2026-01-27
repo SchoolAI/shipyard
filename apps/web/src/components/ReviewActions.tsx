@@ -290,6 +290,12 @@ export function ReviewActions({
                   placeholder="Great work! Consider also..."
                   value={comment}
                   onChange={(e) => setComment(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey && !isSubmitting) {
+                      e.preventDefault();
+                      handleConfirm('approve');
+                    }
+                  }}
                   rows={3}
                   className="w-full pr-12"
                 />
@@ -356,6 +362,12 @@ export function ReviewActions({
                   placeholder="Please update the error handling to..."
                   value={comment}
                   onChange={(e) => setComment(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey && !isSubmitting) {
+                      e.preventDefault();
+                      handleConfirm('request_changes');
+                    }
+                  }}
                   rows={3}
                   className="w-full pr-12"
                 />
