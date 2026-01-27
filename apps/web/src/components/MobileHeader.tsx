@@ -5,6 +5,7 @@ import type { ReactNode } from 'react';
 import type * as Y from 'yjs';
 import { NotificationsButton } from '@/components/NotificationsButton';
 import { StatusChip } from '@/components/StatusChip';
+import { TruncatedText } from '@/components/ui/TruncatedText';
 
 interface MobileHeaderProps {
   /** Called when the menu button is pressed */
@@ -70,7 +71,12 @@ export function MobileHeader({
       </Button>
 
       <div className="flex items-center gap-1.5 flex-1 min-w-0">
-        <h1 className="text-xs font-semibold text-foreground truncate">{title}</h1>
+        <TruncatedText
+          text={title}
+          maxLength={30}
+          as="h1"
+          className="text-xs font-semibold text-foreground truncate"
+        />
       </div>
 
       {status && <StatusChip status={status} className="text-[11px] h-5 px-2 shrink-0" />}

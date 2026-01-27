@@ -118,7 +118,7 @@ export function KanbanCard({ plan, onHover, onPanelOpen }: KanbanCardProps) {
       >
         <Card.Header className="p-4">
           {/* Title with proper truncation and tooltip */}
-          {plan.title.length > 50 ? (
+          {plan.title.length > 30 ? (
             <Tooltip delay={0}>
               <Tooltip.Trigger>
                 <Card.Title

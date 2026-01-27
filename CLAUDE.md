@@ -139,6 +139,15 @@ Follow the **3+ Rule** from engineering-standards.md:
 - Target 30% per-file function coverage (not 100%)
 - Tests should rarely change
 
+## Lint Suppressions
+
+**NEVER use `biome-ignore` or similar lint suppression comments.** If code triggers a lint error:
+1. Refactor the code to fix the issue properly
+2. If the rule is wrong for the entire codebase, update biome.json to disable it globally
+3. Never suppress individual instances with comments
+
+This applies to all lint tools - no `// eslint-disable`, `// @ts-ignore`, `// biome-ignore`, etc.
+
 ## Git Worktree Gotchas
 
 When working in a git worktree (created via the `/wt` skill), some files have the **skip-worktree** flag set to prevent accidental commits of local config changes.
