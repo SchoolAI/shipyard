@@ -3,6 +3,8 @@ import { nanoid } from 'nanoid';
 import { z } from 'zod';
 import { getOrCreateDoc } from '../doc-store.js';
 import { logger } from '../logger.js';
+import { getClientInfo } from '../mcp-client-info.js';
+import { detectPlatform, getDisplayName } from '../platform-detection.js';
 import { getGitHubUsername } from '../server-identity.js';
 import { verifySessionToken } from '../session-token.js';
 import { TOOL_NAMES } from './tool-names.js';
@@ -75,8 +77,11 @@ reply_to_thread_comment({
       };
     }
 
-    /** Get actor name for event logging */
+    /** Get actor name for event logging and platform detection for comment identity */
     const actorName = await getGitHubUsername();
+    const clientInfoName = getClientInfo();
+    const { platform } = detectPlatform(clientInfoName);
+    const agentDisplayName = getDisplayName(platform, actorName);
 
     /**
      * Create and validate reply comment before transaction.
@@ -84,7 +89,7 @@ reply_to_thread_comment({
      */
     const reply = ThreadCommentSchema.parse({
       id: nanoid(),
-      userId: 'AI', // TODO: Replace with proper identity after identity PR merges
+      userId: agentDisplayName,
       body: input.body,
       createdAt: Date.now(),
     });

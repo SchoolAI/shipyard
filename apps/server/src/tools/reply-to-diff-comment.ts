@@ -9,6 +9,8 @@ import {
 import { z } from 'zod';
 import { getOrCreateDoc } from '../doc-store.js';
 import { logger } from '../logger.js';
+import { getClientInfo } from '../mcp-client-info.js';
+import { detectPlatform, getDisplayName } from '../platform-detection.js';
 import { getGitHubUsername } from '../server-identity.js';
 import { verifySessionToken } from '../session-token.js';
 import { TOOL_NAMES } from './tool-names.js';
@@ -83,8 +85,11 @@ reply_to_diff_comment({
       };
     }
 
-    /** Get actor name for event logging */
+    /** Get actor name for event logging and platform detection for comment identity */
     const actorName = await getGitHubUsername();
+    const clientInfoName = getClientInfo();
+    const { platform } = detectPlatform(clientInfoName);
+    const agentDisplayName = getDisplayName(platform, actorName);
 
     /**
      * Try to find as PR review comment first.
@@ -97,7 +102,7 @@ reply_to_diff_comment({
           ydoc,
           input.commentId,
           input.body,
-          'AI', // TODO: Replace with proper identity after identity PR merges
+          agentDisplayName,
           actorName
         );
 
@@ -152,7 +157,7 @@ The reply will appear in the Changes tab inline with the original comment.`,
           ydoc,
           input.commentId,
           input.body,
-          'AI', // TODO: Replace with proper identity after identity PR merges
+          agentDisplayName,
           actorName
         );
 
