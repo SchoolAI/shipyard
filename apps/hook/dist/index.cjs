@@ -45154,7 +45154,7 @@ var schema = external_exports.object({
     }
     return [port];
   }),
-  SHIPYARD_STATE_DIR: external_exports.string().optional().default(() => (0, import_node_path.join)((0, import_node_os.homedir)(), ".shipyard"))
+  SHIPYARD_STATE_DIR: external_exports.string().optional().transform((val) => val || void 0).default(() => (0, import_node_path.join)((0, import_node_os.homedir)(), ".shipyard"))
 });
 var registryConfig = loadEnv(schema);
 
@@ -46732,7 +46732,10 @@ init_cjs_shims();
 // src/config/env/web.ts
 init_cjs_shims();
 var schema3 = external_exports.object({
-  SHIPYARD_WEB_URL: external_exports.string().url().default("https://schoolai.github.io/shipyard")
+  SHIPYARD_WEB_URL: external_exports.string().url().default(() => {
+    const nodeEnv = process.env.NODE_ENV || "development";
+    return nodeEnv === "production" ? "https://schoolai.github.io/shipyard" : "http://localhost:5173";
+  })
 });
 var webConfig = loadEnv(schema3);
 

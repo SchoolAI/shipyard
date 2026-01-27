@@ -4,10 +4,18 @@ const CLIENT_ID = import.meta.env.VITE_GITHUB_CLIENT_ID;
 
 /**
  * GitHub OAuth worker URL.
- * For local development, set VITE_GITHUB_OAUTH_WORKER=http://localhost:4445
+ *
+ * Uses Vite MODE-based defaults:
+ * - development (default): http://localhost:4445
+ * - production: https://shipyard-github-oauth.jacob-191.workers.dev
+ *
+ * Can be overridden with VITE_GITHUB_OAUTH_WORKER environment variable.
  */
 const WORKER_URL =
-  import.meta.env.VITE_GITHUB_OAUTH_WORKER || 'https://shipyard-github-oauth.jacob-191.workers.dev';
+  import.meta.env.VITE_GITHUB_OAUTH_WORKER ||
+  (import.meta.env.MODE === 'production'
+    ? 'https://shipyard-github-oauth.jacob-191.workers.dev'
+    : 'http://localhost:4445');
 
 /**
  * Schema for GitHub OAuth token exchange error response.
