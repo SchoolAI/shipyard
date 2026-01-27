@@ -86,12 +86,12 @@ describe('registryConfig', () => {
       expect(registryConfig.SHIPYARD_STATE_DIR).toBe('/custom/path');
     });
 
-    it('should handle empty string as empty string (Zod default only triggers on undefined)', async () => {
+    it('should fall back to default when env var is empty string', async () => {
       process.env.SHIPYARD_STATE_DIR = '';
 
       const { registryConfig } = await import('./registry.js');
 
-      expect(registryConfig.SHIPYARD_STATE_DIR).toBe('');
+      expect(registryConfig.SHIPYARD_STATE_DIR).toBe(join(homedir(), '.shipyard'));
     });
 
     it('should handle relative paths', async () => {

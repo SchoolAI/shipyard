@@ -125,7 +125,7 @@ git push
 
 ## Debugging
 
-Hook logs go to `~/.shipyard/hook-debug.log`:
+Hook logs go to your Shipyard state directory (defaults to `~/.shipyard/hook-debug.log`, or `$SHIPYARD_STATE_DIR/hook-debug.log` if using worktrees):
 
 ```bash
 # Watch logs in real-time

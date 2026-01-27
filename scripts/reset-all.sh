@@ -88,7 +88,14 @@ fi
 echo ""
 echo "🗄️  Step 2: Clearing server-side storage..."
 
-SHIPYARD_DIR="$HOME/.shipyard"
+# Auto-detect worktree name to get correct state directory
+WORKTREE_NAME=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || basename "$(pwd)")
+if [ -f "$SCRIPT_DIR/worktree-env.sh" ]; then
+  eval "$("$SCRIPT_DIR/worktree-env.sh" "$WORKTREE_NAME" | grep SHIPYARD_STATE_DIR)"
+  SHIPYARD_DIR="$SHIPYARD_STATE_DIR"
+else
+  SHIPYARD_DIR="$HOME/.shipyard"
+fi
 
 if [ -d "$SHIPYARD_DIR/plans" ]; then
   # Count what we're deleting

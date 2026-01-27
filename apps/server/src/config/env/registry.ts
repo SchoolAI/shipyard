@@ -19,6 +19,7 @@ const schema = z.object({
   SHIPYARD_STATE_DIR: z
     .string()
     .optional()
+    .transform((val) => val || undefined)
     .default(() => join(homedir(), '.shipyard')),
 });
 

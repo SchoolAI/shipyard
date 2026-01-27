@@ -156,9 +156,10 @@ The setup script updates your `~/.claude/settings.json` to use local builds:
    grep "shipyard" ~/.claude/settings.json
    ```
 
-3. Check hook logs:
+3. Check hook logs (path varies if using worktrees):
    ```bash
    tail -f ~/.shipyard/hook-debug.log
+   # or $SHIPYARD_STATE_DIR/hook-debug.log if using worktrees
    ```
 
 4. Verify you ran the setup script:
