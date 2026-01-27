@@ -37,7 +37,12 @@ export {
   formatPRCommentsForLLM,
   getPRCommentsSummary,
 } from './diff-comment-formatter.js';
-export { type EnvironmentContext, EnvironmentContextSchema } from './environment.js';
+export {
+  type BrowserContext,
+  BrowserContextSchema,
+  type EnvironmentContext,
+  EnvironmentContextSchema,
+} from './environment.js';
 export type { GitHubPRResponse } from './github-validation.js';
 export { GitHubPRResponseSchema } from './github-validation.js';
 export type {
@@ -213,6 +218,7 @@ export {
 export type {
   AgentActivityData,
   AgentActivityType,
+  AgentPlatform,
   Artifact,
   ArtifactType,
   ClaudeCodeOriginMetadata,

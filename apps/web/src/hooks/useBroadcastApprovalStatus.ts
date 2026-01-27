@@ -1,4 +1,5 @@
-import { useEffect, useRef } from 'react';
+import type { BrowserContext } from '@shipyard/schema';
+import { useCallback, useEffect, useRef } from 'react';
 import type { WebrtcProvider } from 'y-webrtc';
 import type { GitHubIdentity } from '@/hooks/useGitHubAuth';
 import type { ApprovalStatus } from '@/hooks/useYDocApprovalStatus';
@@ -18,6 +19,53 @@ function colorFromString(str: string): string {
   return `hsl(${hue}, 70%, 50%)`;
 }
 
+/**
+ * Detect browser name from user agent string.
+ * Handles common browsers and edge cases.
+ */
+function detectBrowser(): string {
+  const ua = navigator.userAgent;
+
+  /* Order matters - check more specific browsers first */
+  if (ua.includes('Edg/')) return 'Edge';
+  if (ua.includes('OPR/') || ua.includes('Opera')) return 'Opera';
+  if (ua.includes('Brave')) return 'Brave';
+  if (ua.includes('Vivaldi')) return 'Vivaldi';
+  if (ua.includes('Chrome')) return 'Chrome';
+  if (ua.includes('Safari') && !ua.includes('Chrome')) return 'Safari';
+  if (ua.includes('Firefox')) return 'Firefox';
+
+  return 'Browser';
+}
+
+/**
+ * Detect operating system from user agent string.
+ */
+function detectOS(): string {
+  const ua = navigator.userAgent;
+
+  if (ua.includes('Mac OS X') || ua.includes('Macintosh')) return 'macOS';
+  if (ua.includes('Windows')) return 'Windows';
+  if (ua.includes('Linux') && !ua.includes('Android')) return 'Linux';
+  if (ua.includes('Android')) return 'Android';
+  if (ua.includes('iPhone') || ua.includes('iPad')) return 'iOS';
+  if (ua.includes('CrOS')) return 'ChromeOS';
+
+  return 'Unknown';
+}
+
+/**
+ * Get browser context with detected browser and OS.
+ * Only computed once and cached.
+ */
+function getBrowserContext(lastActive: number): BrowserContext {
+  return {
+    browser: detectBrowser(),
+    os: detectOS(),
+    lastActive,
+  };
+}
+
 interface UseBroadcastApprovalStatusOptions {
   rtcProvider: WebrtcProvider | null;
   githubIdentity: GitHubIdentity | null;
@@ -25,6 +73,9 @@ interface UseBroadcastApprovalStatusOptions {
   isOwner: boolean;
   planId: string;
 }
+
+/** Interval for updating lastActive timestamp (30 seconds) */
+const ACTIVITY_UPDATE_INTERVAL = 30_000;
 
 /**
  * Broadcasts the user's approval status to WebRTC awareness.
@@ -46,6 +97,30 @@ export function useBroadcastApprovalStatus({
 }: UseBroadcastApprovalStatusOptions): void {
   /** Store requestedAt timestamp to prevent it from refreshing on re-render */
   const requestedAtRef = useRef<number | null>(null);
+  /** Store last activity timestamp */
+  const lastActiveRef = useRef<number>(Date.now());
+  /** Store current planStatus to update only browserContext.lastActive */
+  const currentPlanStatusRef = useRef<PlanAwarenessState | null>(null);
+  /** Store last broadcast lastActive to only update on changes */
+  const lastBroadcastActiveRef = useRef<number | null>(null);
+
+  /** Update lastActive on user interaction */
+  const updateLastActive = useCallback(() => {
+    lastActiveRef.current = Date.now();
+  }, []);
+
+  /** Set up activity listeners */
+  useEffect(() => {
+    const events = ['mousedown', 'keydown', 'scroll', 'touchstart', 'focus'];
+    for (const event of events) {
+      window.addEventListener(event, updateLastActive, { passive: true });
+    }
+    return () => {
+      for (const event of events) {
+        window.removeEventListener(event, updateLastActive);
+      }
+    };
+  }, [updateLastActive]);
 
   useEffect(() => {
     if (!rtcProvider || !githubIdentity) {
@@ -62,10 +137,14 @@ export function useBroadcastApprovalStatus({
     /** Get WebRTC peerId from the room */
     const webrtcPeerId = getWebrtcPeerId(rtcProvider);
 
+    /** Get browser context with current lastActive */
+    const browserContext = getBrowserContext(lastActiveRef.current);
+
     /*
-     * Build the awareness state based on approval status
-     * Note: platform is omitted for browser users - it's only set by MCP servers
-     * useP2PPeers will default to 'browser' when platform is undefined
+     * Build the awareness state based on approval status.
+     * IMPORTANT: Must include platform: 'browser' so useP2PPeers can distinguish
+     * browsers from agents. This field was previously omitted which caused all
+     * peers to show as "browsers" even when agents were connected.
      */
     const baseState = {
       user: {
@@ -73,8 +152,10 @@ export function useBroadcastApprovalStatus({
         name: githubIdentity.displayName,
         color: colorFromString(githubIdentity.username),
       },
+      platform: 'browser' as const,
       isOwner,
       webrtcPeerId,
+      browserContext,
     };
 
     let planStatus: PlanAwarenessState;
@@ -108,11 +189,35 @@ export function useBroadcastApprovalStatus({
       return;
     }
 
+    /** Store for activity updates */
+    currentPlanStatusRef.current = planStatus;
+
     /** Broadcast to awareness */
     awareness.setLocalStateField('planStatus', planStatus);
 
+    /** Set up interval to periodically update lastActive (only if changed) */
+    const activityInterval = setInterval(() => {
+      if (!currentPlanStatusRef.current) return;
+
+      /** Only broadcast if lastActive has changed since last broadcast */
+      if (lastBroadcastActiveRef.current === lastActiveRef.current) return;
+
+      const updatedStatus: PlanAwarenessState = {
+        ...currentPlanStatusRef.current,
+        browserContext: {
+          ...currentPlanStatusRef.current.browserContext,
+          lastActive: lastActiveRef.current,
+        },
+      };
+      currentPlanStatusRef.current = updatedStatus;
+      lastBroadcastActiveRef.current = lastActiveRef.current;
+      awareness.setLocalStateField('planStatus', updatedStatus);
+    }, ACTIVITY_UPDATE_INTERVAL);
+
     /** Cleanup: Clear planStatus when component unmounts */
     return () => {
+      clearInterval(activityInterval);
+      currentPlanStatusRef.current = null;
       /*
        * Note: If browser closes ungracefully (force quit), awareness state
        * persists until WebRTC timeout (~30 seconds). This is expected behavior.

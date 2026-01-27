@@ -1,8 +1,6 @@
-/**
- * Platform detection tests - verify detection works for all supported platforms
- */
-
+import { getPlatformDisplayName } from '@shipyard/schema';
 import { afterEach, describe, expect, it } from 'vitest';
+import { getClientInfo, resetClientInfo, setClientInfo } from './mcp-client-info.js';
 import {
   detectPlatform,
   detectPlatformFromClientInfo,
@@ -157,5 +155,48 @@ describe('getDisplayName', () => {
     expect(getDisplayName('cursor', 'bob')).toBe('Cursor (bob)');
     expect(getDisplayName('codex', 'charlie')).toBe('Codex (charlie)');
     expect(getDisplayName('unknown', undefined)).toBe('Agent');
+  });
+});
+
+describe('resetClientInfo', () => {
+  afterEach(() => {
+    resetClientInfo();
+  });
+
+  it('resets client info to undefined', () => {
+    setClientInfo('claude-code');
+    expect(getClientInfo()).toBe('claude-code');
+
+    resetClientInfo();
+    expect(getClientInfo()).toBeUndefined();
+  });
+
+  it('allows re-setting client info after reset', () => {
+    setClientInfo('cursor');
+    resetClientInfo();
+    setClientInfo('windsurf');
+    expect(getClientInfo()).toBe('windsurf');
+  });
+});
+
+describe('getPlatformDisplayName security', () => {
+  it('returns safe fallback for unknown platforms (XSS prevention)', () => {
+    // Malicious input should not be echoed back
+    expect(getPlatformDisplayName('<script>alert("xss")</script>')).toBe('Unknown Agent');
+    expect(getPlatformDisplayName('javascript:alert(1)')).toBe('Unknown Agent');
+    expect(getPlatformDisplayName('"><img src=x onerror=alert(1)>')).toBe('Unknown Agent');
+  });
+
+  it('returns correct display name for valid platforms', () => {
+    expect(getPlatformDisplayName('claude-code')).toBe('Claude Code');
+    expect(getPlatformDisplayName('cursor')).toBe('Cursor');
+    expect(getPlatformDisplayName('unknown')).toBe('Agent');
+  });
+
+  it('does not return raw input for unrecognized values', () => {
+    const maliciousInput = 'malicious-platform-name';
+    const result = getPlatformDisplayName(maliciousInput);
+    expect(result).not.toBe(maliciousInput);
+    expect(result).toBe('Unknown Agent');
   });
 });

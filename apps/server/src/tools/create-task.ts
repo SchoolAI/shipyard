@@ -8,6 +8,7 @@ import {
   initPlanMetadata,
   logPlanEvent,
   type OriginMetadata,
+  OriginPlatformValues,
   PLAN_INDEX_DOC_NAME,
   setPlanIndexEntry,
   transitionPlanStatus,
@@ -26,20 +27,9 @@ import { TOOL_NAMES } from './tool-names.js';
 
 /**
  * Origin platforms for conversation export.
- * Claude Code uses hook, so only other platforms are listed here.
+ * Uses the canonical list from @shipyard/schema.
  */
-const OriginPlatformEnum = z.enum([
-  'aider',
-  'cline',
-  'codex',
-  'continue',
-  'cursor',
-  'devin',
-  'vscode',
-  'windsurf',
-  'zed',
-  'unknown',
-]);
+const OriginPlatformEnum = z.enum(OriginPlatformValues);
 
 const CreateTaskInput = z.object({
   title: z.string().describe('Task title'),
@@ -84,6 +74,8 @@ function buildOriginMetadata(
       };
     }
     case 'aider':
+    case 'browser':
+    case 'claude-code':
     case 'cline':
     case 'codex':
     case 'continue':
@@ -179,7 +171,7 @@ Bad deliverables (not provable):
         prNumber: { type: 'number', description: 'PR number. Required for artifact uploads.' },
         originPlatform: {
           type: 'string',
-          enum: ['devin', 'cursor', 'windsurf', 'aider', 'unknown'],
+          enum: [...OriginPlatformValues],
           description: 'Platform where this plan originated. Used for conversation export/import.',
         },
         originSessionId: {

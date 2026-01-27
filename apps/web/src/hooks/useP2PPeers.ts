@@ -8,7 +8,12 @@
  * @see Issue #41 - Context Teleportation
  */
 
-import { type EnvironmentContext, EnvironmentContextSchema } from '@shipyard/schema';
+import {
+  type BrowserContext,
+  BrowserContextSchema,
+  type EnvironmentContext,
+  EnvironmentContextSchema,
+} from '@shipyard/schema';
 import { useCallback, useEffect, useState } from 'react';
 import type { WebrtcProvider } from 'y-webrtc';
 import { z } from 'zod';
@@ -35,6 +40,8 @@ export interface ConnectedPeer {
   connectedAt: number;
   /** Environment context (project, branch, hostname) for agent identification */
   context?: EnvironmentContext;
+  /** Browser context (browser type, OS, last active) for browser peer identification */
+  browserContext?: BrowserContext;
 }
 
 /**
@@ -53,6 +60,7 @@ const AwarenessPlanStatusSchema = z.object({
   webrtcPeerId: z.string().optional(),
   platform: z.string().optional(),
   context: EnvironmentContextSchema.optional(),
+  browserContext: BrowserContextSchema.optional(),
 });
 
 const AwarenessStateSchema = z.object({
@@ -77,6 +85,7 @@ function extractPeerInfo(peerId: number, state: Record<string, unknown>): Connec
       isOwner: false,
       connectedAt: Date.now(),
       context: undefined,
+      browserContext: undefined,
     };
   }
 
@@ -92,6 +101,7 @@ function extractPeerInfo(peerId: number, state: Record<string, unknown>): Connec
       isOwner: false,
       connectedAt: Date.now(),
       context: planStatus?.context,
+      browserContext: planStatus?.browserContext,
     };
   }
 
@@ -103,6 +113,7 @@ function extractPeerInfo(peerId: number, state: Record<string, unknown>): Connec
     isOwner: planStatus.isOwner ?? false,
     connectedAt: Date.now(),
     context: planStatus.context,
+    browserContext: planStatus.browserContext,
   };
 }
 

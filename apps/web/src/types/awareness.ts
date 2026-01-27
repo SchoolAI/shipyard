@@ -1,4 +1,4 @@
-import type { EnvironmentContext, OriginPlatform } from '@shipyard/schema';
+import type { BrowserContext, EnvironmentContext, OriginPlatform } from '@shipyard/schema';
 
 /**
  * Approval status for a user in the awareness protocol.
@@ -48,6 +48,11 @@ export type PlanAwarenessState =
        * Helps users distinguish agents working from different machines/branches.
        */
       context?: EnvironmentContext;
+      /**
+       * Browser context for browser peer identification.
+       * Includes browser type, OS, and last active timestamp.
+       */
+      browserContext?: BrowserContext;
     }
   | {
       status: 'approved' | 'rejected';
@@ -78,6 +83,11 @@ export type PlanAwarenessState =
        * Helps users distinguish agents working from different machines/branches.
        */
       context?: EnvironmentContext;
+      /**
+       * Browser context for browser peer identification.
+       * Includes browser type, OS, and last active timestamp.
+       */
+      browserContext?: BrowserContext;
     };
 
 /** Helper to check if user object has required string fields */

@@ -33,9 +33,9 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
   mod
 ));
 
-// ../../node_modules/.pnpm/tsup@8.5.1_jiti@2.6.1_postcss@8.5.6_tsx@4.21.0_typescript@5.9.3/node_modules/tsup/assets/cjs_shims.js
+// ../../node_modules/.pnpm/tsup@8.5.1_jiti@2.6.1_postcss@8.5.6_tsx@4.21.0_typescript@5.9.3_yaml@2.8.2/node_modules/tsup/assets/cjs_shims.js
 var init_cjs_shims = __esm({
-  "../../node_modules/.pnpm/tsup@8.5.1_jiti@2.6.1_postcss@8.5.6_tsx@4.21.0_typescript@5.9.3/node_modules/tsup/assets/cjs_shims.js"() {
+  "../../node_modules/.pnpm/tsup@8.5.1_jiti@2.6.1_postcss@8.5.6_tsx@4.21.0_typescript@5.9.3_yaml@2.8.2/node_modules/tsup/assets/cjs_shims.js"() {
     "use strict";
   }
 });
@@ -42366,13 +42366,32 @@ var PlanStatusValues = [
   "completed"
 ];
 var OriginPlatformValues = [
-  "claude-code",
-  "devin",
-  "cursor",
-  "windsurf",
   "aider",
+  "browser",
+  "claude-code",
+  "cline",
+  "codex",
+  "continue",
+  "cursor",
+  "devin",
+  "vscode",
+  "windsurf",
+  "zed",
   "unknown"
 ];
+var AGENT_PLATFORMS = [
+  "aider",
+  "claude-code",
+  "cline",
+  "codex",
+  "continue",
+  "cursor",
+  "devin",
+  "vscode",
+  "windsurf",
+  "zed"
+];
+var AGENT_PLATFORMS_SET = new Set(AGENT_PLATFORMS);
 var ClaudeCodeOriginMetadataSchema = external_exports.object({
   platform: external_exports.literal("claude-code"),
   sessionId: external_exports.string(),
@@ -44149,6 +44168,11 @@ var EnvironmentContextSchema = external_exports.object({
   branch: external_exports.string().optional(),
   hostname: external_exports.string().optional(),
   repo: external_exports.string().optional()
+});
+var BrowserContextSchema = external_exports.object({
+  browser: external_exports.string().optional(),
+  os: external_exports.string().optional(),
+  lastActive: external_exports.number().optional()
 });
 var GitHubPRResponseSchema = external_exports.object({
   number: external_exports.number(),

@@ -29,9 +29,11 @@ export type PlanViewTab = (typeof PlanViewTabValues)[number];
 /**
  * Supported origin platforms for conversation export.
  * Used to identify where a plan/conversation originated.
+ * Includes 'browser' for web UI participants (not agents).
  */
 export const OriginPlatformValues = [
   'aider',
+  'browser',
   'claude-code',
   'cline',
   'codex',
@@ -45,12 +47,16 @@ export const OriginPlatformValues = [
 ] as const;
 export type OriginPlatform = (typeof OriginPlatformValues)[number];
 
+/** Agent platforms only (excludes 'browser') */
+export type AgentPlatform = Exclude<OriginPlatform, 'browser'>;
+
 /**
  * Display names for each platform.
  * Single source of truth for UI rendering across server and browser.
  */
 export const PLATFORM_DISPLAY_NAMES: Record<OriginPlatform, string> = {
   aider: 'Aider',
+  browser: 'Browser',
   'claude-code': 'Claude Code',
   cline: 'Cline',
   codex: 'Codex',
@@ -70,22 +76,21 @@ export const PLATFORM_DISPLAY_NAMES: Record<OriginPlatform, string> = {
  *
  * NOTE: Maps each clientInfo directly to its own platform - no assumptions or grouping.
  */
-export const MCP_CLIENT_INFO_MAP: Record<string, OriginPlatform> = {
+export const MCP_CLIENT_INFO_MAP: Record<string, AgentPlatform> = {
   aider: 'aider',
-  Aider: 'aider',
   'claude-code': 'claude-code',
   'claude-ai': 'claude-code',
-  Cline: 'cline',
-  Codex: 'codex',
+  cline: 'cline',
+  codex: 'codex',
   'codex-mcp-client': 'codex',
   'continue-cli-client': 'continue',
   'cursor-vscode': 'cursor',
-  Cursor: 'cursor',
-  'Visual Studio Code': 'vscode',
-  'Visual-Studio-Code': 'vscode',
-  Windsurf: 'windsurf',
+  cursor: 'cursor',
+  'visual studio code': 'vscode',
+  'visual-studio-code': 'vscode',
+  windsurf: 'windsurf',
   'windsurf-client': 'windsurf',
-  Zed: 'zed',
+  zed: 'zed',
 };
 
 /**
@@ -107,19 +112,26 @@ export const AGENT_PLATFORMS: readonly OriginPlatform[] = [
 ] as const;
 
 /**
+ * Set of agent platforms for O(1) lookup.
+ * Typed as Set<string> to accept both OriginPlatform and string without type assertions.
+ */
+const AGENT_PLATFORMS_SET: Set<string> = new Set(AGENT_PLATFORMS);
+
+/**
  * Check if a platform represents an AI agent (not a browser).
  */
 export function isAgentPlatform(platform: OriginPlatform | string): boolean {
-  return AGENT_PLATFORMS.some((p) => p === platform);
+  return AGENT_PLATFORMS_SET.has(platform);
 }
 
 /**
- * Get display name for a platform, with fallback for unknown platforms.
+ * Get display name for a platform, with safe fallback for unknown platforms.
  * Type-safe lookup without assertions.
+ * Returns 'Unknown Agent' for unrecognized platforms to prevent XSS from untrusted peer data.
  */
 export function getPlatformDisplayName(platform: string): string {
   const validPlatform = OriginPlatformValues.find((p) => p === platform);
-  return validPlatform ? PLATFORM_DISPLAY_NAMES[validPlatform] : platform;
+  return validPlatform ? PLATFORM_DISPLAY_NAMES[validPlatform] : 'Unknown Agent';
 }
 
 /**

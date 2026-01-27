@@ -20,16 +20,14 @@ export function detectPlatformFromClientInfo(
 ): OriginPlatform | null {
   if (!clientInfoName) return null;
 
-  const normalized = clientInfoName.trim();
+  const normalized = clientInfoName.trim().toLowerCase();
   return MCP_CLIENT_INFO_MAP[normalized] || null;
 }
 
-/** Check if PATH contains a specific string (case-insensitive) */
 function pathIncludes(path: string | undefined, search: string): boolean {
   return path?.toLowerCase().includes(search.toLowerCase()) ?? false;
 }
 
-/** Detect VS Code based platform (VS Code or Cursor) */
 function detectVSCodePlatform(env: NodeJS.ProcessEnv): OriginPlatform | null {
   if (!env.VSCODE_GIT_ASKPASS_MAIN && !env.VSCODE_NONCE) {
     return null;
@@ -43,17 +41,20 @@ function detectVSCodePlatform(env: NodeJS.ProcessEnv): OriginPlatform | null {
   return isCursor ? 'cursor' : 'vscode';
 }
 
-/** Detect platform from specific environment variables */
 function detectFromExplicitEnvVars(env: NodeJS.ProcessEnv): OriginPlatform | null {
   if (env.CLAUDECODE === '1' || env.CLAUDE_CODE_ENTRYPOINT) return 'claude-code';
   if (env.CURSOR_AGENT === '1') return 'cursor';
   if (env.CODEX_HOME) return 'codex';
   if (env.AIDER_MODEL) return 'aider';
-  if (env.DEVIN_SESSION_ID || env.DIRENV_DIR) return 'devin';
+  if (env.DEVIN_SESSION_ID) return 'devin';
   return null;
 }
 
-/** Detect platform from PATH environment variable */
+/**
+ * Detect platform from PATH environment variable.
+ * NOTE: PATH-based detection is a last resort fallback and can be spoofed.
+ * Only used when explicit env vars and clientInfo are unavailable.
+ */
 function detectFromPath(env: NodeJS.ProcessEnv): OriginPlatform | null {
   if (pathIncludes(env.PATH, 'windsurf')) return 'windsurf';
   if (pathIncludes(env.PATH, 'aider')) return 'aider';
