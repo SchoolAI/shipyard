@@ -7,6 +7,8 @@ import {
 import { WebrtcProvider } from 'y-webrtc';
 import type * as Y from 'yjs';
 import { logger } from './logger.js';
+import { getClientInfo } from './mcp-client-info.js';
+import { detectPlatform, getDisplayName } from './platform-detection.js';
 import { getEnvironmentContext, getGitHubUsername } from './server-identity.js';
 
 /**
@@ -92,7 +94,10 @@ export async function createWebRtcProvider(ydoc: Y.Doc, planId: string): Promise
   const username = await getGitHubUsername().catch(() => undefined);
   const fallbackId = `mcp-anon-${crypto.randomUUID().slice(0, 8)}`;
   const userId = username ? `mcp-${username}` : fallbackId;
-  const displayName = username ? `Claude Code (${username})` : 'Claude Code';
+
+  const clientInfoName = getClientInfo();
+  const { platform } = detectPlatform(clientInfoName);
+  const displayName = getDisplayName(platform, username);
 
   const awarenessState: McpAwarenessState = {
     user: {
@@ -100,7 +105,7 @@ export async function createWebRtcProvider(ydoc: Y.Doc, planId: string): Promise
       name: displayName,
       color: '#0066cc',
     },
-    platform: 'claude-code',
+    platform,
     status: 'approved',
     isOwner: true,
     webrtcPeerId: crypto.randomUUID(),
@@ -108,7 +113,7 @@ export async function createWebRtcProvider(ydoc: Y.Doc, planId: string): Promise
   };
   provider.awareness.setLocalStateField('planStatus', awarenessState);
   logger.info(
-    { planId, username: username ?? fallbackId, platform: 'claude-code', hasContext: true },
+    { planId, username: username ?? fallbackId, platform, hasContext: true },
     'MCP awareness state set'
   );
 

@@ -17,9 +17,10 @@ if [ -f scripts/worktree-env.sh ]; then
   fi
 fi
 
-# Build dependencies first
+# Build dependencies and server first (server must exist before mcpmon starts)
 pnpm --filter=@shipyard/schema build
 pnpm --filter=@shipyard/hook build
+pnpm --filter=@shipyard/server build
 
 # Run all services with concurrently
 exec pnpm exec concurrently \

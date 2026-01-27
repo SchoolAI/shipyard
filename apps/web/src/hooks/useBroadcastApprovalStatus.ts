@@ -64,7 +64,8 @@ export function useBroadcastApprovalStatus({
 
     /*
      * Build the awareness state based on approval status
-     * Note: 'platform' is omitted for browser users - it's only set by MCP servers
+     * Note: platform is omitted for browser users - it's only set by MCP servers
+     * useP2PPeers will default to 'browser' when platform is undefined
      */
     const baseState = {
       user: {

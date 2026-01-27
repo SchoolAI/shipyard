@@ -16,7 +16,9 @@ import {
   getArtifacts,
   getDeliverables,
   getPlanOwnerId,
+  getPlatformDisplayName,
   getSnapshots,
+  isAgentPlatform,
 } from '@shipyard/schema';
 import {
   Archive,
@@ -103,26 +105,6 @@ interface PresenceIndicatorsProps {
   connectedPeers: ConnectedPeer[];
 }
 
-/** Check if a platform represents an AI agent (not a browser). */
-function isAgentPlatform(platform: string): boolean {
-  const agentPlatforms = ['claude-code', 'devin', 'cursor', 'aider', 'copilot', 'cody'];
-  return agentPlatforms.includes(platform.toLowerCase());
-}
-
-/** Format platform name for display (e.g., 'claude-code' -> 'Claude Code') */
-function formatPlatformName(platform: string): string {
-  const platformNames: Record<string, string> = {
-    'claude-code': 'Claude Code',
-    devin: 'Devin',
-    cursor: 'Cursor',
-    aider: 'Aider',
-    copilot: 'GitHub Copilot',
-    cody: 'Sourcegraph Cody',
-    browser: 'Browser',
-  };
-  return platformNames[platform.toLowerCase()] ?? platform;
-}
-
 /** Renders hub connection and peer presence indicators */
 function PresenceIndicators({ connectedPeers }: PresenceIndicatorsProps) {
   const agents = connectedPeers.filter((p) => isAgentPlatform(p.platform));
@@ -175,7 +157,7 @@ function PresenceIndicators({ connectedPeers }: PresenceIndicatorsProps) {
               <div key={`agent-${idx}`} className="flex flex-col gap-1">
                 <div className="flex items-center gap-2">
                   <Bot className="w-3.5 h-3.5 text-accent" />
-                  <span className="font-medium">{formatPlatformName(agent.platform)}</span>
+                  <span className="font-medium">{getPlatformDisplayName(agent.platform)}</span>
                   {agent.name && agent.name !== `Peer ${idx}` && (
                     <span className="text-muted-foreground">({agent.name})</span>
                   )}

@@ -28,7 +28,18 @@ import { TOOL_NAMES } from './tool-names.js';
  * Origin platforms for conversation export.
  * Claude Code uses hook, so only other platforms are listed here.
  */
-const OriginPlatformEnum = z.enum(['devin', 'cursor', 'windsurf', 'aider', 'unknown']);
+const OriginPlatformEnum = z.enum([
+  'aider',
+  'cline',
+  'codex',
+  'continue',
+  'cursor',
+  'devin',
+  'vscode',
+  'windsurf',
+  'zed',
+  'unknown',
+]);
 
 const CreateTaskInput = z.object({
   title: z.string().describe('Task title'),
@@ -72,8 +83,13 @@ function buildOriginMetadata(
         generationId: typeof generationId === 'string' ? generationId : undefined,
       };
     }
-    case 'windsurf':
     case 'aider':
+    case 'cline':
+    case 'codex':
+    case 'continue':
+    case 'vscode':
+    case 'windsurf':
+    case 'zed':
     case 'unknown':
       return { platform: 'unknown' as const, cwd: process.cwd() };
     default: {

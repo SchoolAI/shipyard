@@ -31,14 +31,96 @@ export type PlanViewTab = (typeof PlanViewTabValues)[number];
  * Used to identify where a plan/conversation originated.
  */
 export const OriginPlatformValues = [
-  'claude-code',
-  'devin',
-  'cursor',
-  'windsurf',
   'aider',
+  'claude-code',
+  'cline',
+  'codex',
+  'continue',
+  'cursor',
+  'devin',
+  'vscode',
+  'windsurf',
+  'zed',
   'unknown',
 ] as const;
 export type OriginPlatform = (typeof OriginPlatformValues)[number];
+
+/**
+ * Display names for each platform.
+ * Single source of truth for UI rendering across server and browser.
+ */
+export const PLATFORM_DISPLAY_NAMES: Record<OriginPlatform, string> = {
+  aider: 'Aider',
+  'claude-code': 'Claude Code',
+  cline: 'Cline',
+  codex: 'Codex',
+  continue: 'Continue',
+  cursor: 'Cursor',
+  devin: 'Devin',
+  vscode: 'VS Code',
+  windsurf: 'Windsurf',
+  zed: 'Zed',
+  unknown: 'Agent',
+};
+
+/**
+ * Map of MCP clientInfo.name values to platform identifiers.
+ * Based on research from https://github.com/apify/mcp-client-capabilities
+ * Single source of truth for platform detection.
+ *
+ * NOTE: Maps each clientInfo directly to its own platform - no assumptions or grouping.
+ */
+export const MCP_CLIENT_INFO_MAP: Record<string, OriginPlatform> = {
+  aider: 'aider',
+  Aider: 'aider',
+  'claude-code': 'claude-code',
+  'claude-ai': 'claude-code',
+  Cline: 'cline',
+  Codex: 'codex',
+  'codex-mcp-client': 'codex',
+  'continue-cli-client': 'continue',
+  'cursor-vscode': 'cursor',
+  Cursor: 'cursor',
+  'Visual Studio Code': 'vscode',
+  'Visual-Studio-Code': 'vscode',
+  Windsurf: 'windsurf',
+  'windsurf-client': 'windsurf',
+  Zed: 'zed',
+};
+
+/**
+ * Agent platforms (MCP servers running AI agents).
+ * Platforms NOT in this list are considered browsers.
+ * Single source of truth for agent vs browser classification.
+ */
+export const AGENT_PLATFORMS: readonly OriginPlatform[] = [
+  'aider',
+  'claude-code',
+  'cline',
+  'codex',
+  'continue',
+  'cursor',
+  'devin',
+  'vscode',
+  'windsurf',
+  'zed',
+] as const;
+
+/**
+ * Check if a platform represents an AI agent (not a browser).
+ */
+export function isAgentPlatform(platform: OriginPlatform | string): boolean {
+  return AGENT_PLATFORMS.some((p) => p === platform);
+}
+
+/**
+ * Get display name for a platform, with fallback for unknown platforms.
+ * Type-safe lookup without assertions.
+ */
+export function getPlatformDisplayName(platform: string): string {
+  const validPlatform = OriginPlatformValues.find((p) => p === platform);
+  return validPlatform ? PLATFORM_DISPLAY_NAMES[validPlatform] : platform;
+}
 
 /**
  * Origin metadata for conversation export - discriminated by platform.
