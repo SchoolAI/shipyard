@@ -1,7 +1,6 @@
 import { mkdirSync, readFileSync, unlinkSync } from 'node:fs';
 import { readFile, unlink, writeFile } from 'node:fs/promises';
 import http from 'node:http';
-import { homedir } from 'node:os';
 import { join, resolve, sep } from 'node:path';
 
 import {
@@ -57,11 +56,11 @@ function getErrorStatus(error: unknown): number {
 }
 
 /** Shared LevelDB for all plans (no session-pid isolation) */
-const PERSISTENCE_DIR = join(homedir(), '.shipyard', 'plans');
+const PERSISTENCE_DIR = join(registryConfig.SHIPYARD_STATE_DIR, 'plans');
 
 /** Lock file to prevent multiple processes from starting the hub simultaneously */
-const HUB_LOCK_FILE = join(homedir(), '.shipyard', 'hub.lock');
-const SHIPYARD_DIR = join(homedir(), '.shipyard');
+const HUB_LOCK_FILE = join(registryConfig.SHIPYARD_STATE_DIR, 'hub.lock');
+const SHIPYARD_DIR = registryConfig.SHIPYARD_STATE_DIR;
 const MAX_LOCK_RETRIES = 3;
 
 /** Message types matching y-websocket protocol */
@@ -797,7 +796,7 @@ function createApp(): { app: express.Express; httpServer: http.Server } {
     }
 
     /** Path traversal protection: resolve full path and verify it's within artifacts directory */
-    const ARTIFACTS_DIR = join(homedir(), '.shipyard', 'artifacts');
+    const ARTIFACTS_DIR = join(registryConfig.SHIPYARD_STATE_DIR, 'artifacts');
     const fullPath = resolve(ARTIFACTS_DIR, planId, filename);
 
     if (!fullPath.startsWith(ARTIFACTS_DIR + sep)) {

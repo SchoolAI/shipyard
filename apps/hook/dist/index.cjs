@@ -45083,12 +45083,44 @@ var DEFAULT_AGENT_TYPE = "claude-code";
 // src/logger.ts
 init_cjs_shims();
 var import_node_fs = require("fs");
-var import_node_os = require("os");
-var import_node_path = require("path");
+var import_node_path2 = require("path");
 var import_pino = __toESM(require_pino());
 
-// src/config/env/server.ts
+// src/config/env/registry.ts
 init_cjs_shims();
+var import_node_os = require("os");
+var import_node_path = require("path");
+
+// ../../packages/shared/dist/index.mjs
+init_cjs_shims();
+
+// ../../packages/shared/dist/registry-config.mjs
+init_cjs_shims();
+var DEFAULT_REGISTRY_PORTS = [
+  32191,
+  32192,
+  32193,
+  32194,
+  32195,
+  32196,
+  32197,
+  32198,
+  32199
+];
+
+// ../../packages/shared/dist/index.mjs
+var import_node_crypto = require("crypto");
+function computeHash(content) {
+  return (0, import_node_crypto.createHash)("sha256").update(content).digest("hex").slice(0, 16);
+}
+function generateSessionToken() {
+  return (0, import_node_crypto.randomBytes)(32).toString("base64url");
+}
+function hashSessionToken(token) {
+  return (0, import_node_crypto.createHash)("sha256").update(token).digest("hex");
+}
+var APPROVAL_LONG_POLL_TIMEOUT_MS = 1800 * 1e3;
+var DEFAULT_TRPC_TIMEOUT_MS = 10 * 1e3;
 
 // src/config/config.ts
 init_cjs_shims();
@@ -45112,15 +45144,31 @@ ${errorMessages}`);
   }
 }
 
-// src/config/env/server.ts
+// src/config/env/registry.ts
 var schema = external_exports.object({
+  REGISTRY_PORT: external_exports.string().optional().transform((val) => {
+    if (!val) return DEFAULT_REGISTRY_PORTS;
+    const port = Number.parseInt(val, 10);
+    if (Number.isNaN(port)) {
+      throw new Error(`REGISTRY_PORT must be a valid number, got: ${val}`);
+    }
+    return [port];
+  }),
+  SHIPYARD_STATE_DIR: external_exports.string().optional().default(() => (0, import_node_path.join)((0, import_node_os.homedir)(), ".shipyard"))
+});
+var registryConfig = loadEnv(schema);
+
+// src/config/env/server.ts
+init_cjs_shims();
+var schema2 = external_exports.object({
   LOG_LEVEL: external_exports.enum(["debug", "info", "warn", "error"]).default("info")
 });
-var serverConfig = loadEnv(schema);
+var serverConfig = loadEnv(schema2);
 
 // src/logger.ts
-var LOG_DIR = (0, import_node_path.join)((0, import_node_os.homedir)(), ".shipyard");
-var LOG_FILE = (0, import_node_path.join)(LOG_DIR, "hook-debug.log");
+var LOG_DIR = registryConfig.SHIPYARD_STATE_DIR;
+var LOG_FILE = (0, import_node_path2.join)(LOG_DIR, "hook-debug.log");
+var HOOK_LOG_FILE = LOG_FILE;
 var isTest = process.env.NODE_ENV === "test" || process.env.VITEST;
 if (!isTest && !(0, import_node_fs.existsSync)(LOG_DIR)) {
   try {
@@ -45305,56 +45353,8 @@ ${feedbackText}`;
 // src/core/plan-manager.ts
 init_cjs_shims();
 
-// ../../packages/shared/dist/index.mjs
-init_cjs_shims();
-
-// ../../packages/shared/dist/registry-config.mjs
-init_cjs_shims();
-var DEFAULT_REGISTRY_PORTS = [
-  32191,
-  32192,
-  32193,
-  32194,
-  32195,
-  32196,
-  32197,
-  32198,
-  32199
-];
-
-// ../../packages/shared/dist/index.mjs
-var import_node_crypto = require("crypto");
-function computeHash(content) {
-  return (0, import_node_crypto.createHash)("sha256").update(content).digest("hex").slice(0, 16);
-}
-function generateSessionToken() {
-  return (0, import_node_crypto.randomBytes)(32).toString("base64url");
-}
-function hashSessionToken(token) {
-  return (0, import_node_crypto.createHash)("sha256").update(token).digest("hex");
-}
-var APPROVAL_LONG_POLL_TIMEOUT_MS = 1800 * 1e3;
-var DEFAULT_TRPC_TIMEOUT_MS = 10 * 1e3;
-
 // src/http-client.ts
 init_cjs_shims();
-
-// src/config/env/registry.ts
-init_cjs_shims();
-var import_node_os2 = require("os");
-var import_node_path2 = require("path");
-var schema2 = external_exports.object({
-  REGISTRY_PORT: external_exports.string().optional().transform((val) => {
-    if (!val) return DEFAULT_REGISTRY_PORTS;
-    const port = Number.parseInt(val, 10);
-    if (Number.isNaN(port)) {
-      throw new Error(`REGISTRY_PORT must be a valid number, got: ${val}`);
-    }
-    return [port];
-  }),
-  SHIPYARD_STATE_DIR: external_exports.string().optional().default(() => (0, import_node_path2.join)((0, import_node_os2.homedir)(), ".shipyard"))
-});
-var registryConfig = loadEnv(schema2);
 
 // src/trpc-client.ts
 init_cjs_shims();
@@ -46912,7 +46912,7 @@ async function checkReviewStatus(sessionId, planContent, originMetadata) {
     );
     return {
       allow: false,
-      message: "Internal error: Plan content found but session state missing. Check ~/.shipyard/hook-debug.log and report this issue."
+      message: `Internal error: Plan content found but session state missing. Check ${HOOK_LOG_FILE} and report this issue.`
     };
   }
   if (!state.planId) {
@@ -46931,7 +46931,7 @@ async function checkReviewStatus(sessionId, planContent, originMetadata) {
     logger.warn({ err, planId }, "Failed to get review status, blocking exit");
     return {
       allow: false,
-      message: "Cannot verify plan approval status. Ensure the Shipyard MCP server is running. Check ~/.shipyard/server-debug.log for details.",
+      message: "Cannot verify plan approval status. Ensure the Shipyard MCP server is running. Check server-debug.log in your Shipyard state directory for details.",
       planId
     };
   }
@@ -46998,7 +46998,7 @@ async function handlePlanExit(event) {
     const errorCode = err instanceof Error && "code" in err && typeof err.code === "string" ? err.code : void 0;
     logger.error({ err, message: errorMessage, code: errorCode }, "Failed to check review status");
     const isConnectionError = errorCode === "ECONNREFUSED" || errorCode === "ECONNRESET" || errorCode === "ETIMEDOUT" || errorCode === "ENOTFOUND" || errorMessage?.includes("connect") || errorMessage?.includes("timeout") || errorMessage?.includes("WebSocket") || errorMessage?.includes("not available");
-    const message = isConnectionError ? "Cannot connect to Shipyard server. Ensure the Shipyard MCP server is running. Check ~/.shipyard/hook-debug.log for details." : `Review system error: ${errorMessage}. Check ~/.shipyard/hook-debug.log for details.`;
+    const message = isConnectionError ? `Cannot connect to Shipyard server. Ensure the Shipyard MCP server is running. Check ${HOOK_LOG_FILE} for details.` : `Review system error: ${errorMessage}. Check ${HOOK_LOG_FILE} for details.`;
     return {
       allow: false,
       message
@@ -47113,7 +47113,7 @@ async function main() {
           hookEventName: "PermissionRequest",
           decision: {
             behavior: "deny",
-            message: `Hook error: ${errorMessage}. Check ~/.shipyard/hook-debug.log for details.`
+            message: `Hook error: ${errorMessage}. Check ${HOOK_LOG_FILE} for details.`
           }
         }
       })

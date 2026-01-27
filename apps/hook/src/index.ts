@@ -17,7 +17,7 @@ import { DEFAULT_AGENT_TYPE } from './constants.js';
 import { createPlan, updateContent } from './core/plan-manager.js';
 import { checkReviewStatus } from './core/review-status.js';
 import { getDeliverableContext, getSessionContext } from './http-client.js';
-import { logger } from './logger.js';
+import { HOOK_LOG_FILE, logger } from './logger.js';
 
 function getAdapter(): AgentAdapter {
   return claudeCodeAdapter;
@@ -99,8 +99,8 @@ async function handlePlanExit(
       errorMessage?.includes('not available');
 
     const message = isConnectionError
-      ? 'Cannot connect to Shipyard server. Ensure the Shipyard MCP server is running. Check ~/.shipyard/hook-debug.log for details.'
-      : `Review system error: ${errorMessage}. Check ~/.shipyard/hook-debug.log for details.`;
+      ? `Cannot connect to Shipyard server. Ensure the Shipyard MCP server is running. Check ${HOOK_LOG_FILE} for details.`
+      : `Review system error: ${errorMessage}. Check ${HOOK_LOG_FILE} for details.`;
 
     return {
       allow: false,
@@ -268,7 +268,7 @@ async function main(): Promise<void> {
           hookEventName: 'PermissionRequest',
           decision: {
             behavior: 'deny',
-            message: `Hook error: ${errorMessage}. Check ~/.shipyard/hook-debug.log for details.`,
+            message: `Hook error: ${errorMessage}. Check ${HOOK_LOG_FILE} for details.`,
           },
         },
       })

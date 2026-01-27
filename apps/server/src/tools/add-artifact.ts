@@ -504,11 +504,10 @@ async function handleAutoComplete(
   });
 
   /** Write snapshot URL to file (avoids token limit in response) */
-  const { homedir } = await import('node:os');
   const { join } = await import('node:path');
   const { mkdir } = await import('node:fs/promises');
 
-  const snapshotsDir = join(homedir(), '.shipyard', 'snapshots');
+  const snapshotsDir = join(registryConfig.SHIPYARD_STATE_DIR, 'snapshots');
   await mkdir(snapshotsDir, { recursive: true });
 
   const snapshotFile = join(snapshotsDir, `${taskId}.txt`);

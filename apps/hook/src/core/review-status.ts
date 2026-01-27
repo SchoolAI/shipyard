@@ -22,7 +22,7 @@ import {
   updatePlanContent,
   waitForApproval,
 } from '../http-client.js';
-import { logger } from '../logger.js';
+import { HOOK_LOG_FILE, logger } from '../logger.js';
 import { generateSessionToken, hashSessionToken } from '../session-token.js';
 import { createPlan } from './plan-manager.js';
 
@@ -287,8 +287,7 @@ export async function checkReviewStatus(
     );
     return {
       allow: false,
-      message:
-        'Internal error: Plan content found but session state missing. Check ~/.shipyard/hook-debug.log and report this issue.',
+      message: `Internal error: Plan content found but session state missing. Check ${HOOK_LOG_FILE} and report this issue.`,
     };
   }
 
@@ -315,7 +314,7 @@ export async function checkReviewStatus(
     return {
       allow: false,
       message:
-        'Cannot verify plan approval status. Ensure the Shipyard MCP server is running. Check ~/.shipyard/server-debug.log for details.',
+        'Cannot verify plan approval status. Ensure the Shipyard MCP server is running. Check server-debug.log in your Shipyard state directory for details.',
       planId,
     };
   }

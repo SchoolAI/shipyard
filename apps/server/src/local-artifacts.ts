@@ -1,7 +1,7 @@
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
-import { homedir } from 'node:os';
 import { join, resolve, sep } from 'node:path';
 import { hasErrorCode } from '@shipyard/schema';
+import { registryConfig } from './config/env/registry.js';
 import { logger } from './logger.js';
 
 /** ============ PUBLIC API (Exports) ============ */
@@ -90,4 +90,4 @@ export async function deleteArtifactsForPlan(planId: string): Promise<void> {
 
 /** ============ PRIVATE IMPLEMENTATION ============ */
 
-const ARTIFACTS_DIR = join(homedir(), '.shipyard', 'artifacts');
+const ARTIFACTS_DIR = join(registryConfig.SHIPYARD_STATE_DIR, 'artifacts');

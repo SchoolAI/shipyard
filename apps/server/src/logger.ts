@@ -1,20 +1,20 @@
 /**
  * Logger for the MCP server process.
  * CRITICAL: Must log to stderr since stdout is reserved for MCP JSON-RPC protocol.
- * Also logs to ~/.shipyard/server-debug.log for debugging.
+ * Also logs to $SHIPYARD_STATE_DIR/server-debug.log for debugging.
  *
  * Log destinations:
  * - stderr: Visible in Claude Code's MCP server output (Settings > MCP > shipyard > output)
- * - file: ~/.shipyard/server-debug.log for post-mortem debugging
+ * - file: $SHIPYARD_STATE_DIR/server-debug.log for post-mortem debugging
  */
 
 import { mkdirSync } from 'node:fs';
-import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import pino from 'pino';
+import { registryConfig } from './config/env/registry.js';
 import { serverConfig } from './config/env/server.js';
 
-const LOG_FILE = join(homedir(), '.shipyard', 'server-debug.log');
+const LOG_FILE = join(registryConfig.SHIPYARD_STATE_DIR, 'server-debug.log');
 
 /** Ensure log directory exists */
 try {
