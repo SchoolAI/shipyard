@@ -57,7 +57,15 @@ function isValidTab(tab: string | null): tab is PlanViewTab {
 export function PlanPage() {
   const { id } = useParams<{ id: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
-  const urlPlan = searchParams.has('d') ? getPlanFromUrl() : null;
+
+  /**
+   * Memoize urlPlan based on the actual 'd' parameter value.
+   * getPlanFromUrl() returns a new object reference every call,
+   * which would cause snapshotYdoc to be recreated on every render,
+   * triggering infinite re-renders in child components.
+   */
+  const encodedPlanData = searchParams.get('d');
+  const urlPlan = useMemo(() => (encodedPlanData ? getPlanFromUrl() : null), [encodedPlanData]);
   const isSnapshot = urlPlan !== null;
 
   /** Read tab from URL, default to 'plan' if invalid or missing */
@@ -106,7 +114,13 @@ export function PlanPage() {
 
     if (urlPlan.deliverables) {
       const deliverablesArray = doc.getArray<Deliverable>(YDOC_KEYS.DELIVERABLES);
-      deliverablesArray.push(urlPlan.deliverables);
+      const deliverablesWithIds = urlPlan.deliverables.map((d, i) => ({
+        id: d.id ?? `deliverable-${i}`,
+        text: d.text,
+        linkedArtifactId: d.linkedArtifactId ?? undefined,
+        linkedAt: d.linkedAt,
+      }));
+      deliverablesArray.push(deliverablesWithIds);
     } else if (urlPlan.content) {
       const deliverables = extractDeliverables(urlPlan.content);
       const deliverablesArray = doc.getArray<Deliverable>(YDOC_KEYS.DELIVERABLES);
@@ -227,15 +241,16 @@ export function PlanPage() {
 
   useEffect(() => {
     if (isSnapshot && urlPlan) {
-      setMetadata({
+      const snapshotMetadata: PlanMetadata = {
         id: urlPlan.id,
         title: urlPlan.title,
-        status: 'draft',
         repo: urlPlan.repo,
         pr: urlPlan.pr,
         createdAt: 0,
         updatedAt: 0,
-      });
+        status: 'draft',
+      };
+      setMetadata(snapshotMetadata);
       return;
     }
 
@@ -477,13 +492,13 @@ export function PlanPage() {
         )}
 
         {/* Tabbed content using PlanContent component */}
-        {isSnapshot && urlPlan?.content ? (
+        {isSnapshot && urlPlan ? (
           <PlanContent
             mode="snapshot"
             ydoc={ydoc}
             metadata={metadata}
             syncState={syncState}
-            initialContent={urlPlan.content}
+            initialContent={urlPlan.content ?? []}
             initialTab={initialTab}
             onTabChange={handleTabChange}
           />
@@ -533,18 +548,20 @@ export function PlanPage() {
             status={metadata.status}
             hubConnected={syncState?.connected}
             peerCount={syncState?.peerCount}
-            indexDoc={indexDoc}
+            indexDoc={isSnapshot ? null : indexDoc}
             planId={planId}
             inboxCount={totalInboxCount}
             isLoadingInbox={isLoading}
             rightContent={
-              <MobileActionsMenu
-                planId={planId}
-                ydoc={ydoc}
-                rtcProvider={rtcProvider}
-                metadata={metadata}
-                indexDoc={indexDoc}
-              />
+              !isSnapshot ? (
+                <MobileActionsMenu
+                  planId={planId}
+                  ydoc={ydoc}
+                  rtcProvider={rtcProvider}
+                  metadata={metadata}
+                  indexDoc={indexDoc}
+                />
+              ) : undefined
             }
           />
         </div>

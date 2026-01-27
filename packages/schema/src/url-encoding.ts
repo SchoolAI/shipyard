@@ -3,8 +3,6 @@ import { z } from 'zod';
 import {
   type Artifact,
   ArtifactSchema,
-  type Deliverable,
-  DeliverableSchema,
   type PlanMetadata,
   type PlanSnapshot,
   PlanStatusValues,
@@ -35,8 +33,20 @@ export interface UrlKeyVersion {
 }
 
 /**
+ * Deliverable from URL encoding.
+ * Similar to Deliverable but with optional id (can be generated on import).
+ */
+export interface UrlDeliverable {
+  id?: string;
+  text: string;
+  linkedArtifactId?: string | null;
+  linkedAt?: number;
+}
+
+/**
  * URL-encoded plan structure v1 (legacy).
  * This is a snapshot of the plan state that can be shared via URL.
+ * Content is optional for minimal snapshots (e.g., OG preview without full content).
  */
 export interface UrlEncodedPlanV1 {
   v: 1;
@@ -47,16 +57,16 @@ export interface UrlEncodedPlanV1 {
   repo?: string;
   pr?: number;
   /** Content from URL is unknown[] and needs validation before use as Block[] */
-  content: unknown[];
+  content?: unknown[];
   artifacts?: Artifact[];
-  /** Deliverables with linkage info (which artifact fulfills each deliverable) */
-  deliverables?: Deliverable[];
+  deliverables?: UrlDeliverable[];
   comments?: unknown[];
 }
 
 /**
  * URL-encoded plan structure v2 with version history.
  * Includes lightweight refs for all versions + full content for key versions.
+ * Content is optional for minimal snapshots.
  */
 export interface UrlEncodedPlanV2 {
   v: 2;
@@ -67,10 +77,9 @@ export interface UrlEncodedPlanV2 {
   repo?: string;
   pr?: number;
   /** Current content (the latest version) - unknown[] from URL, needs validation */
-  content: unknown[];
+  content?: unknown[];
   artifacts?: Artifact[];
-  /** Deliverables with linkage info */
-  deliverables?: Deliverable[];
+  deliverables?: UrlDeliverable[];
   comments?: unknown[];
 
   /** Version history metadata (lightweight refs, not full content) */
@@ -115,8 +124,20 @@ const UrlKeyVersionSchema = z.object({
 });
 
 /**
+ * Deliverable schema for URL encoding - more permissive than CRDT schema.
+ * ID is optional (can be generated), linkedArtifactId can be null or undefined.
+ */
+const UrlDeliverableSchema = z.object({
+  id: z.string().optional(),
+  text: z.string(),
+  linkedArtifactId: z.string().nullable().optional(),
+  linkedAt: z.number().optional(),
+});
+
+/**
  * Zod schema for URL-encoded plan v1.
  * IMPORTANT: URL data is UNTRUSTED - this schema validates external input.
+ * Content is optional for minimal snapshots (e.g., from OG proxy worker).
  */
 const UrlEncodedPlanV1Schema = z.object({
   v: z.literal(1),
@@ -125,15 +146,16 @@ const UrlEncodedPlanV1Schema = z.object({
   status: z.enum(PlanStatusValues),
   repo: z.string().optional(),
   pr: z.number().optional(),
-  content: z.array(z.unknown()),
+  content: z.array(z.unknown()).optional(),
   artifacts: z.array(ArtifactSchema).optional(),
-  deliverables: z.array(DeliverableSchema).optional(),
+  deliverables: z.array(UrlDeliverableSchema).optional(),
   comments: z.array(z.unknown()).optional(),
 });
 
 /**
  * Zod schema for URL-encoded plan v2 with version history.
  * IMPORTANT: URL data is UNTRUSTED - this schema validates external input.
+ * Content is optional for minimal snapshots.
  */
 const UrlEncodedPlanV2Schema = z.object({
   v: z.literal(2),
@@ -142,9 +164,9 @@ const UrlEncodedPlanV2Schema = z.object({
   status: z.enum(PlanStatusValues),
   repo: z.string().optional(),
   pr: z.number().optional(),
-  content: z.array(z.unknown()),
+  content: z.array(z.unknown()).optional(),
   artifacts: z.array(ArtifactSchema).optional(),
-  deliverables: z.array(DeliverableSchema).optional(),
+  deliverables: z.array(UrlDeliverableSchema).optional(),
   comments: z.array(z.unknown()).optional(),
   versionRefs: z.array(UrlSnapshotRefSchema).optional(),
   keyVersions: z.array(UrlKeyVersionSchema).optional(),
@@ -198,15 +220,13 @@ export function decodePlan(encoded: string): UrlEncodedPlan | null {
 
     const parsed: unknown = JSON.parse(json);
 
-    /** Validate untrusted URL data with Zod schema */
     const result = UrlEncodedPlanSchema.safeParse(parsed);
     if (!result.success) {
-      /** Invalid URL data - could be corrupted or malicious */
       return null;
     }
 
     return result.data;
-  } catch (_error) {
+  } catch {
     return null;
   }
 }

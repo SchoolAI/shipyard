@@ -52,6 +52,12 @@ export interface UseHeaderActionsReturn {
   handleDropdownAction: (key: React.Key) => void;
 }
 
+/** Options for configuring the header actions hook */
+export interface UseHeaderActionsOptions {
+  /** Callback for copying snapshot URL (handled by parent with access to editor) */
+  onCopySnapshotUrl?: () => void;
+}
+
 /**
  * Hook for managing PlanHeader actions and dialog states.
  *
@@ -60,13 +66,15 @@ export interface UseHeaderActionsReturn {
  * @param planId - Current plan ID
  * @param isArchived - Whether the plan is archived
  * @param rtcProvider - WebRTC provider for conversation transfer
+ * @param options - Optional configuration
  */
 export function useHeaderActions(
   ydoc: Y.Doc,
   indexDoc: Y.Doc | null,
   planId: string,
   isArchived: boolean,
-  rtcProvider: WebrtcProvider | null
+  rtcProvider: WebrtcProvider | null,
+  options: UseHeaderActionsOptions = {}
 ): UseHeaderActionsReturn {
   const { identity: githubIdentity } = useGitHubAuth();
   const { actor } = useUserIdentity();
@@ -207,6 +215,9 @@ export function useHeaderActions(
     switch (key) {
       case 'share':
         handleShare();
+        break;
+      case 'copy-snapshot-url':
+        options.onCopySnapshotUrl?.();
         break;
       case 'import':
         mobileImportInputRef.current?.click();

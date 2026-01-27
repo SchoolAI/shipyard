@@ -12,7 +12,8 @@
     "test": "echo 'No tests yet for og-proxy-worker'"
   },
   "dependencies": {
-    "lz-string": "^1.5.0"
+    "lz-string": "^1.5.0",
+    "workers-og": "^0.0.27"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260122.0",

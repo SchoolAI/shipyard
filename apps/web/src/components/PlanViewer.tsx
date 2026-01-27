@@ -56,6 +56,8 @@ interface PlanViewerProps {
   currentSnapshot?: { content: unknown[] } | null;
   /** Callback to receive editor instance for snapshots - Issue #42 */
   onEditorReady?: (editor: BlockNoteEditor) => void;
+  /** Hide the auth prompt (for read-only/embed modes) */
+  hideAuthPrompt?: boolean;
 }
 
 /**
@@ -192,6 +194,7 @@ export function PlanViewer({
   initialContent: _initialContent,
   currentSnapshot = null,
   onEditorReady,
+  hideAuthPrompt = false,
 }: PlanViewerProps) {
   /** Comments are fully enabled only when identity is set */
   const hasComments = identity !== null;
@@ -493,7 +496,7 @@ export function PlanViewer({
       role="application"
       aria-label="Plan viewer with comments"
     >
-      {!identity && (
+      {!identity && !hideAuthPrompt && (
         <Alert status="default" className="mb-4">
           <Alert.Indicator>
             <User className="w-4 h-4" />

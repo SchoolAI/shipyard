@@ -43125,6 +43125,12 @@ var UrlKeyVersionSchema = external_exports.object({
   id: external_exports.string(),
   content: external_exports.array(external_exports.unknown())
 });
+var UrlDeliverableSchema = external_exports.object({
+  id: external_exports.string().optional(),
+  text: external_exports.string(),
+  linkedArtifactId: external_exports.string().nullable().optional(),
+  linkedAt: external_exports.number().optional()
+});
 var UrlEncodedPlanV1Schema = external_exports.object({
   v: external_exports.literal(1),
   id: external_exports.string(),
@@ -43132,9 +43138,9 @@ var UrlEncodedPlanV1Schema = external_exports.object({
   status: external_exports.enum(PlanStatusValues),
   repo: external_exports.string().optional(),
   pr: external_exports.number().optional(),
-  content: external_exports.array(external_exports.unknown()),
+  content: external_exports.array(external_exports.unknown()).optional(),
   artifacts: external_exports.array(ArtifactSchema).optional(),
-  deliverables: external_exports.array(DeliverableSchema).optional(),
+  deliverables: external_exports.array(UrlDeliverableSchema).optional(),
   comments: external_exports.array(external_exports.unknown()).optional()
 });
 var UrlEncodedPlanV2Schema = external_exports.object({
@@ -43144,9 +43150,9 @@ var UrlEncodedPlanV2Schema = external_exports.object({
   status: external_exports.enum(PlanStatusValues),
   repo: external_exports.string().optional(),
   pr: external_exports.number().optional(),
-  content: external_exports.array(external_exports.unknown()),
+  content: external_exports.array(external_exports.unknown()).optional(),
   artifacts: external_exports.array(ArtifactSchema).optional(),
-  deliverables: external_exports.array(DeliverableSchema).optional(),
+  deliverables: external_exports.array(UrlDeliverableSchema).optional(),
   comments: external_exports.array(external_exports.unknown()).optional(),
   versionRefs: external_exports.array(UrlSnapshotRefSchema).optional(),
   keyVersions: external_exports.array(UrlKeyVersionSchema).optional()

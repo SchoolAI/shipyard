@@ -11,13 +11,21 @@ import {
   Tooltip,
 } from '@heroui/react';
 import type { A2AMessage, PlanIndexEntry, PlanMetadata } from '@shipyard/schema';
-import { getPlanOwnerId } from '@shipyard/schema';
+import {
+  createPlanUrlWithHistory,
+  getArtifacts,
+  getDeliverables,
+  getPlanOwnerId,
+  getSnapshots,
+} from '@shipyard/schema';
 import {
   Archive,
   ArchiveRestore,
   Bot,
   Check,
   GitPullRequest,
+  Link2,
+  Loader2,
   MessageSquare,
   MessageSquareReply,
   MessageSquareShare,
@@ -26,6 +34,8 @@ import {
   Share2,
   Tag,
 } from 'lucide-react';
+import { useCallback, useState } from 'react';
+import { toast } from 'sonner';
 import type { WebrtcProvider } from 'y-webrtc';
 import type * as Y from 'yjs';
 import { AgentRequestsBadge } from '@/components/AgentRequestsBadge';
@@ -214,6 +224,121 @@ function PresenceIndicators({ connectedPeers }: PresenceIndicatorsProps) {
   );
 }
 
+/**
+ * Get the OG Proxy Worker base URL.
+ * Uses env var for local dev, defaults to production worker.
+ */
+function getOgProxyBaseUrl(): string {
+  return import.meta.env.VITE_OG_PROXY_URL || 'https://shipyard-og-proxy.jacob-191.workers.dev';
+}
+
+/** Props for copy snapshot URL button */
+interface CopySnapshotUrlButtonProps {
+  ydoc: Y.Doc;
+  metadata: PlanMetadata;
+  editor: BlockNoteEditor | null;
+}
+
+/**
+ * Button to generate and copy a shareable snapshot URL.
+ * The URL includes all plan data encoded in the query string and
+ * uses the OG proxy worker for proper Open Graph metadata.
+ */
+function CopySnapshotUrlButton({ ydoc, metadata, editor }: CopySnapshotUrlButtonProps) {
+  const [copied, setCopied] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  const copyToClipboard = useCallback(async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      /** Fallback for older browsers */
+      const textArea = document.createElement('textarea');
+      textArea.value = text;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+    }
+  }, []);
+
+  const handleCopySnapshotUrl = useCallback(async () => {
+    if (!editor) {
+      toast.error('Editor not ready');
+      return;
+    }
+
+    setIsGenerating(true);
+
+    try {
+      /** Get current content blocks from the editor */
+      const content = editor.document;
+
+      /** Get artifacts, deliverables, and snapshots from Y.Doc */
+      const artifacts = getArtifacts(ydoc);
+      const deliverables = getDeliverables(ydoc);
+      const snapshots = getSnapshots(ydoc);
+
+      /** Generate the snapshot URL using OG proxy worker as base */
+      const baseUrl = getOgProxyBaseUrl();
+      const snapshotUrl = createPlanUrlWithHistory(
+        baseUrl,
+        {
+          id: metadata.id,
+          title: metadata.title,
+          status: metadata.status,
+          repo: metadata.repo,
+          pr: metadata.pr,
+          content,
+          artifacts,
+          deliverables,
+        },
+        snapshots
+      );
+
+      /** Copy to clipboard */
+      await copyToClipboard(snapshotUrl);
+
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+
+      toast.success('Snapshot URL copied to clipboard');
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      toast.error(`Failed to generate snapshot URL: ${errorMessage}`);
+    } finally {
+      setIsGenerating(false);
+    }
+  }, [editor, ydoc, metadata, copyToClipboard]);
+
+  const button = (
+    <Button
+      isIconOnly
+      variant="ghost"
+      size="sm"
+      onPress={handleCopySnapshotUrl}
+      isDisabled={!editor}
+      className="touch-target"
+      aria-label="Copy snapshot URL"
+    >
+      {copied ? (
+        <Check className="w-4 h-4 text-success" />
+      ) : isGenerating ? (
+        <Loader2 className="w-4 h-4 animate-spin" />
+      ) : (
+        <Link2 className="w-4 h-4" />
+      )}
+    </Button>
+  );
+
+  return (
+    <Tooltip delay={0}>
+      <Tooltip.Trigger>{button}</Tooltip.Trigger>
+      <Tooltip.Content>Copy snapshot URL for sharing</Tooltip.Content>
+    </Tooltip>
+  );
+}
+
 /** Props for desktop action buttons */
 interface DesktopActionsProps {
   planId: string;
@@ -224,9 +349,11 @@ interface DesktopActionsProps {
   isArchived: boolean;
   onHandoffDialogOpen: () => void;
   onArchiveToggle: () => void;
+  metadata: PlanMetadata;
+  editor: BlockNoteEditor | null;
 }
 
-/** Desktop action buttons (share, import, handoff, link PR, archive) */
+/** Desktop action buttons (share, import, handoff, link PR, archive, copy snapshot URL) */
 function DesktopActions({
   planId,
   ydoc,
@@ -236,10 +363,13 @@ function DesktopActions({
   isArchived,
   onHandoffDialogOpen,
   onArchiveToggle,
+  metadata,
+  editor,
 }: DesktopActionsProps) {
   return (
     <>
       <ShareButton planId={planId} rtcProvider={rtcProvider} isOwner={isOwner} ydoc={ydoc} />
+      <CopySnapshotUrlButton ydoc={ydoc} metadata={metadata} editor={editor} />
 
       <Tooltip delay={0}>
         <ImportConversationButton planId={planId} ydoc={ydoc} rtcProvider={rtcProvider} />
@@ -305,6 +435,11 @@ function MobileDropdownMenu({
           <Dropdown.Item id="share" textValue="Share">
             <Share2 className="w-4 h-4 shrink-0 text-muted" />
             <Label>Share</Label>
+          </Dropdown.Item>
+
+          <Dropdown.Item id="copy-snapshot-url" textValue="Copy snapshot URL">
+            <Link2 className="w-4 h-4 shrink-0 text-muted" />
+            <Label>Copy snapshot URL</Label>
           </Dropdown.Item>
 
           <Dropdown.Item id="import" textValue="Resume conversation">
@@ -478,8 +613,63 @@ export function PlanHeader({
   const ownerId = getPlanOwnerId(ydoc);
   const { connectedPeers } = useP2PPeers(rtcProvider);
 
+  /** Handler for copying snapshot URL (used by mobile dropdown) */
+  const handleCopySnapshotUrl = useCallback(async () => {
+    if (!editor) {
+      toast.error('Editor not ready');
+      return;
+    }
+
+    try {
+      /** Get current content blocks from the editor */
+      const content = editor.document;
+
+      /** Get artifacts, deliverables, and snapshots from Y.Doc */
+      const artifacts = getArtifacts(ydoc);
+      const deliverables = getDeliverables(ydoc);
+      const snapshots = getSnapshots(ydoc);
+
+      /** Generate the snapshot URL using OG proxy worker as base */
+      const baseUrl = getOgProxyBaseUrl();
+      const snapshotUrl = createPlanUrlWithHistory(
+        baseUrl,
+        {
+          id: metadata.id,
+          title: metadata.title,
+          status: metadata.status,
+          repo: metadata.repo,
+          pr: metadata.pr,
+          content,
+          artifacts,
+          deliverables,
+        },
+        snapshots
+      );
+
+      /** Copy to clipboard */
+      try {
+        await navigator.clipboard.writeText(snapshotUrl);
+      } catch {
+        /** Fallback for older browsers */
+        const textArea = document.createElement('textarea');
+        textArea.value = snapshotUrl;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+      }
+
+      toast.success('Snapshot URL copied to clipboard');
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      toast.error(`Failed to generate snapshot URL: ${errorMessage}`);
+    }
+  }, [editor, ydoc, metadata]);
+
   /** Use extracted hook for header actions */
-  const headerActions = useHeaderActions(ydoc, indexDoc, planId, isArchived, rtcProvider);
+  const headerActions = useHeaderActions(ydoc, indexDoc, planId, isArchived, rtcProvider, {
+    onCopySnapshotUrl: handleCopySnapshotUrl,
+  });
   const {
     isHandoffDialogOpen,
     setIsHandoffDialogOpen,
@@ -630,6 +820,8 @@ export function PlanHeader({
               isArchived={isArchived}
               onHandoffDialogOpen={() => setIsHandoffDialogOpen(true)}
               onArchiveToggle={handleArchiveToggle}
+              metadata={metadata}
+              editor={editor}
             />
             <LinkPRButton ydoc={ydoc} isOpen={isLinkPROpen} onOpenChange={setIsLinkPROpen} />
 
