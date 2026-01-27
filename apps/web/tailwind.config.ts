@@ -5,35 +5,35 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        /** Primary Brand (Teal) */
+        /** Primary Brand (Picton Blue) */
         primary: {
-          DEFAULT: '#0D9488' /** teal-600 */,
-          400: '#2dd4bf',
-          500: '#14B8A6',
-          600: '#0D9488',
-          700: '#0f766e',
-          800: '#115e59',
+          DEFAULT: '#42cde5' /** picton-blue */,
+          400: '#42cde5',
+          500: '#42cde5',
+          600: '#42cde5',
+          700: '#348fa3',
+          800: '#266f7f',
         },
 
-        /** Neutrals (Slate - replaces gray) */
+        /** Neutrals (Blue-tinted: Blue Bayoux, Geyser, Wild Blue Yonder) */
         slate: {
-          50: '#f8fafc',
-          100: '#f1f5f9',
-          200: '#e2e8f0',
-          300: '#cbd5e1',
-          400: '#94a3b8',
-          500: '#64748b',
-          600: '#475569',
-          700: '#334155',
-          800: '#1e293b',
-          900: '#0F172A',
-          950: '#020617',
+          50: '#d6e1e0',
+          100: '#d6e1e0',
+          200: '#d6e1e0',
+          300: '#748fb0',
+          400: '#748fb0',
+          500: '#4a5b74',
+          600: '#4a5b74',
+          700: '#4a5b74',
+          800: '#13192e',
+          900: '#13192e',
+          950: '#13192e',
         },
 
-        /** Accent (Violet - AI indicators) */
+        /** Accent (My Pink - AI indicators) */
         accent: {
-          DEFAULT: '#8b5cf6',
-          light: '#a78bfa',
+          DEFAULT: '#cb9380',
+          light: '#daa89d',
         },
 
         /** Semantic Status Colors */
@@ -47,29 +47,29 @@ const config: Config = {
           dark: '#059669',
         },
         warning: {
-          DEFAULT: '#f59e0b' /** amber-500 */,
-          100: '#fef3c7' /** amber-100 */,
-          500: '#f59e0b' /** amber-500 */,
-          600: '#d97706' /** amber-600 */,
-          light: '#fef3c7',
-          dark: '#d97706',
+          DEFAULT: '#cc5113' /** orange-roughy */,
+          100: '#f5dcc8' /** orange-roughy-100 */,
+          500: '#cc5113' /** orange-roughy */,
+          600: '#a63f0d' /** orange-roughy-dark */,
+          light: '#f5dcc8',
+          dark: '#a63f0d',
         },
         danger: {
-          DEFAULT: '#f43f5e' /** rose-500 */,
-          100: '#ffe4e6' /** rose-100 */,
-          400: '#fb7185' /** rose-400 (for syntax highlighting) */,
-          500: '#f43f5e' /** rose-500 */,
-          600: '#e11d48' /** rose-600 */,
-          light: '#ffe4e6',
-          dark: '#e11d48',
+          DEFAULT: '#a51100' /** bright-red */,
+          100: '#ffcccc' /** bright-red-100 */,
+          400: '#d32f2f' /** bright-red-400 */,
+          500: '#a51100' /** bright-red */,
+          600: '#7a0c00' /** bright-red-dark */,
+          light: '#ffcccc',
+          dark: '#7a0c00',
         },
         info: {
-          DEFAULT: '#3b82f6' /** blue-500 */,
+          DEFAULT: '#748fb0' /** wild-blue-yonder */,
           100: '#dbeafe' /** blue-100 */,
-          500: '#3b82f6' /** blue-500 */,
-          600: '#2563eb' /** blue-600 */,
+          500: '#748fb0' /** wild-blue-yonder */,
+          600: '#5a7090' /** wild-blue-yonder-dark */,
           light: '#dbeafe',
-          dark: '#2563eb',
+          dark: '#5a7090',
         },
 
         /** Semantic tokens using CSS variables (theme-aware) */
@@ -88,7 +88,7 @@ const config: Config = {
           foreground: 'var(--muted-foreground)',
         },
         destructive: {
-          DEFAULT: '#f97316' /** orange-500 (changes requested) */,
+          DEFAULT: '#cc5113' /** orange-roughy (changes requested) */,
           foreground: 'var(--snow)',
         },
         border: 'var(--muted)',

@@ -2,11 +2,11 @@
 set -euo pipefail
 
 # Cleanup script for shipyard development servers
-# Kills only dev server processes, not editors or Claude sessions
+# Kills ALL shipyard dev processes comprehensively
 
-echo "🧹 Cleaning up shipyard dev servers..."
+echo "Cleaning up shipyard dev servers..."
 
-# Function to safely kill processes by pattern
+# Function to force kill processes by pattern (uses SIGKILL directly for reliability)
 kill_by_pattern() {
   local pattern="$1"
   local description="$2"
@@ -16,22 +16,12 @@ kill_by_pattern() {
 
   if [ -n "$pids" ]; then
     echo "  Killing $description..."
-    # Try graceful shutdown first (SIGTERM)
-    echo "$pids" | xargs kill 2>/dev/null || true
-
-    # Wait a moment for graceful shutdown
-    sleep 1
-
-    # Force kill any remaining processes (SIGKILL)
-    remaining=$(pgrep -f "$pattern" 2>/dev/null || true)
-    if [ -n "$remaining" ]; then
-      echo "  Force killing $description..."
-      echo "$remaining" | xargs kill -9 2>/dev/null || true
-    fi
+    # Use SIGKILL directly for reliable termination
+    echo "$pids" | xargs kill -9 2>/dev/null || true
   fi
 }
 
-# Function to kill processes by port
+# Function to force kill processes by port
 kill_by_port() {
   local port="$1"
   local description="$2"
@@ -41,41 +31,75 @@ kill_by_port() {
 
   if [ -n "$pids" ]; then
     echo "  Killing $description on port $port..."
-    echo "$pids" | xargs kill 2>/dev/null || true
-    sleep 1
-
-    # Force kill if still running
-    remaining=$(lsof -ti ":$port" 2>/dev/null || true)
-    if [ -n "$remaining" ]; then
-      echo "  Force killing $description on port $port..."
-      echo "$remaining" | xargs kill -9 2>/dev/null || true
-    fi
+    echo "$pids" | xargs kill -9 2>/dev/null || true
   fi
+}
+
+# Function to verify a port is free
+verify_port_free() {
+  local port="$1"
+  if lsof -ti ":$port" >/dev/null 2>&1; then
+    return 1
+  fi
+  return 0
 }
 
 # 1. Kill concurrently first (this will cascade to child processes)
 kill_by_pattern "concurrently.*shipyard" "concurrently orchestrator"
+kill_by_pattern "concurrently.*schema.*server.*signal" "concurrently (dev:all)"
 
-# Give it a moment for cascade
-sleep 1
-
-# 2. Kill specific dev server processes if they survived
+# 2. Kill MCP server processes (all variations)
+kill_by_pattern "node.*apps/server/dist/index.js" "MCP server (node dist/index.js)"
+kill_by_pattern "node.*apps/server/dist/index.mjs" "MCP server (node dist/index.mjs)"
 kill_by_pattern "tsx.*apps/server/src/server.ts" "MCP server (tsx)"
-kill_by_pattern "node.*apps/server/dist/index.mjs" "MCP server (built)"
-kill_by_pattern "tsx.*apps/signaling/src/server.ts" "Signaling server"
-kill_by_pattern "vite.*apps/web" "Vite dev server"
-kill_by_pattern "wrangler.*github-oauth-worker.*dev" "Wrangler OAuth worker"
-kill_by_pattern "wrangler.*og-proxy-worker.*dev" "Wrangler OG proxy worker"
-kill_by_pattern "tsdown.*--watch" "tsdown watch (schema)"
-kill_by_pattern "tsup.*--watch" "tsup watch (hook)"
+kill_by_pattern "tsx.*apps/server" "MCP server (tsx generic)"
 
-# 3. Kill by specific dev ports as backup
-kill_by_port "5173" "Vite (web)"
-kill_by_port "4444" "Signaling server"
-kill_by_port "8787" "Wrangler (OAuth)"
-kill_by_port "8788" "Wrangler (OG proxy)"
+# 3. Kill Wrangler dev workers (all variations)
+kill_by_pattern "wrangler dev" "Wrangler dev (all workers)"
+kill_by_pattern "wrangler.*og-proxy-worker" "Wrangler OG proxy worker"
+kill_by_pattern "wrangler.*github-oauth-worker" "Wrangler OAuth worker"
+kill_by_pattern "workerd" "Workerd runtime"
 
-echo "🗑️  Removing build artifacts..."
+# 4. Kill Vite dev server
+kill_by_pattern "vite.*apps/web" "Vite dev server (web)"
+kill_by_pattern "node.*vite" "Vite via node"
+kill_by_pattern "vite" "Vite (generic)"
+
+# 5. Kill signaling server
+kill_by_pattern "tsx.*apps/signaling" "Signaling server (tsx)"
+kill_by_pattern "node.*apps/signaling" "Signaling server (node)"
+
+# 6. Kill turbo and build watchers
+kill_by_pattern "turbo.*run.*dev" "Turbo dev"
+kill_by_pattern "tsup.*--watch" "tsup watch"
+kill_by_pattern "tsdown.*--watch" "tsdown watch"
+
+# 7. Kill by specific dev ports (comprehensive port cleanup)
+echo "  Cleaning up ports..."
+for port in 5173 4444 4446 8787 8788 32191 32192; do
+  kill_by_port "$port" "process"
+done
+
+# 8. Brief pause to allow processes to terminate
+sleep 0.5
+
+# 9. Verify all ports are free
+echo ""
+echo "Verifying ports are free..."
+all_ports_free=true
+for port in 5173 4444 4446 8787 8788 32191 32192; do
+  if ! verify_port_free "$port"; then
+    echo "  WARNING: Port $port is still in use!"
+    all_ports_free=false
+  fi
+done
+
+if [ "$all_ports_free" = true ]; then
+  echo "  All ports are free"
+fi
+
+echo ""
+echo "Removing build artifacts..."
 
 shipyard_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
@@ -89,6 +113,7 @@ rm -rf "$shipyard_dir/node_modules/.vite"
 rm -rf "$shipyard_dir/test-results"
 rm -rf "$shipyard_dir/.playwright"
 
-echo "✅ Cleanup complete!"
+echo ""
+echo "Cleanup complete!"
 echo ""
 echo "Tip: Run 'pnpm dev:all' to start all services again"

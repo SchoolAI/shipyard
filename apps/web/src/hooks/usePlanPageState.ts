@@ -121,7 +121,15 @@ export interface UsePlanPageStateReturn {
 export function usePlanPageState(): UsePlanPageStateReturn {
   const { id: routeId } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
-  const urlPlan = searchParams.has('d') ? getPlanFromUrl() : null;
+
+  /**
+   * Memoize urlPlan based on the actual 'd' parameter value.
+   * getPlanFromUrl() returns a new object reference every call,
+   * which would cause snapshotYdoc to be recreated on every render,
+   * triggering infinite re-renders in child components.
+   */
+  const encodedPlanData = searchParams.get('d');
+  const urlPlan = useMemo(() => (encodedPlanData ? getPlanFromUrl() : null), [encodedPlanData]);
   const isSnapshot = urlPlan !== null;
   const planId = isSnapshot ? (urlPlan?.id ?? '') : (routeId ?? '');
 
@@ -146,7 +154,13 @@ export function usePlanPageState(): UsePlanPageStateReturn {
 
     if (urlPlan.deliverables) {
       const deliverablesArray = doc.getArray<Deliverable>(YDOC_KEYS.DELIVERABLES);
-      deliverablesArray.push(urlPlan.deliverables);
+      const deliverablesWithIds = urlPlan.deliverables.map((d, i) => ({
+        id: d.id ?? `deliverable-${i}`,
+        text: d.text,
+        linkedArtifactId: d.linkedArtifactId ?? undefined,
+        linkedAt: d.linkedAt,
+      }));
+      deliverablesArray.push(deliverablesWithIds);
     } else if (urlPlan.content) {
       const deliverables = extractDeliverables(urlPlan.content);
       const deliverablesArray = doc.getArray<Deliverable>(YDOC_KEYS.DELIVERABLES);

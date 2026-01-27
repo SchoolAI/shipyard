@@ -195,6 +195,175 @@ function TabButton({ tab, activeView, onClick, icon, label, badge }: TabButtonPr
   );
 }
 
+/** Props for PlanTabContent */
+interface PlanTabContentProps {
+  mode: 'live' | 'snapshot';
+  ydoc: Y.Doc;
+  identity?: UserIdentity | null;
+  provider?: CollaborationProvider | null;
+  onRequestIdentity?: () => void;
+  currentSnapshot?: { content: unknown[] } | null;
+  onEditorReady?: (editor: BlockNoteEditor) => void;
+  initialContent?: unknown[];
+}
+
+/** Renders the Plan tab content */
+function PlanTabContent({
+  mode,
+  ydoc,
+  identity,
+  provider,
+  onRequestIdentity,
+  currentSnapshot,
+  onEditorReady,
+  initialContent,
+}: PlanTabContentProps) {
+  if (mode === 'live') {
+    return (
+      <PlanViewer
+        key={identity?.id ?? 'anonymous'}
+        ydoc={ydoc}
+        identity={identity ?? null}
+        provider={provider ?? null}
+        onRequestIdentity={onRequestIdentity}
+        currentSnapshot={currentSnapshot}
+        onEditorReady={onEditorReady}
+      />
+    );
+  }
+
+  if (initialContent && initialContent.length > 0) {
+    return (
+      <PlanViewer
+        key="snapshot"
+        ydoc={ydoc}
+        identity={null}
+        provider={null}
+        initialContent={initialContent}
+        currentSnapshot={{ content: initialContent }}
+        hideAuthPrompt={true}
+      />
+    );
+  }
+
+  return (
+    <div className="p-8 text-center">
+      <p className="text-muted-foreground">
+        This snapshot contains metadata only. No plan content available.
+      </p>
+    </div>
+  );
+}
+
+/** Props for TabNavigationBar */
+interface TabNavigationBarProps {
+  activeView: PlanViewTab;
+  onTabChange: (tab: PlanViewTab) => void;
+  mode: 'live' | 'snapshot';
+  deliverableCount: { completed: number; total: number };
+  versionNav?: VersionNavigationState;
+  changesViewState: ChangesViewState | null;
+  metadata: PlanMetadata;
+  ydoc: Y.Doc;
+}
+
+/** Tab navigation bar with tabs and optional controls */
+function TabNavigationBar({
+  activeView,
+  onTabChange,
+  mode,
+  deliverableCount,
+  versionNav,
+  changesViewState,
+  metadata,
+  ydoc,
+}: TabNavigationBarProps) {
+  const showVersionSelector =
+    activeView === 'plan' && mode === 'live' && versionNav && versionNav.snapshots.length > 0;
+
+  const showChangesControls = activeView === 'changes' && changesViewState !== null;
+
+  return (
+    <div className="border-b border-separator bg-surface px-2 md:px-6 shrink-0">
+      <div className="flex items-center justify-between pt-1 md:pt-2">
+        <div className="flex gap-0 md:gap-4 overflow-x-auto md:overflow-visible">
+          <TabButton
+            tab="plan"
+            activeView={activeView}
+            onClick={onTabChange}
+            icon={<FileText className="w-3.5 h-3.5 md:w-4 md:h-4" />}
+            label="Plan"
+          />
+          <TabButton
+            tab="deliverables"
+            activeView={activeView}
+            onClick={onTabChange}
+            icon={<Package className="w-3.5 h-3.5 md:w-4 md:h-4" />}
+            label="Deliverables"
+            badge={
+              deliverableCount.total > 0 ? (
+                <span className="text-[10px] md:text-xs opacity-70">
+                  ({deliverableCount.completed}/{deliverableCount.total})
+                </span>
+              ) : undefined
+            }
+          />
+          {mode === 'live' && (
+            <>
+              <TabButton
+                tab="activity"
+                activeView={activeView}
+                onClick={onTabChange}
+                icon={<Clock className="w-3.5 h-3.5 md:w-4 md:h-4" />}
+                label="Activity"
+              />
+              <TabButton
+                tab="changes"
+                activeView={activeView}
+                onClick={onTabChange}
+                icon={<GitPullRequest className="w-3.5 h-3.5 md:w-4 md:h-4" />}
+                label="Changes"
+              />
+            </>
+          )}
+        </div>
+
+        {showVersionSelector && versionNav && (
+          <div className="hidden md:block">
+            <VersionSelector
+              currentSnapshot={versionNav.currentSnapshot}
+              totalSnapshots={versionNav.snapshots.length}
+              currentIndex={versionNav.currentIndex}
+              canGoPrevious={versionNav.canGoPrevious}
+              canGoNext={versionNav.canGoNext}
+              onPrevious={versionNav.goToPrevious}
+              onNext={versionNav.goToNext}
+              onCurrent={versionNav.goToCurrent}
+            />
+          </div>
+        )}
+
+        {showChangesControls && changesViewState && (
+          <div className="hidden md:block">
+            <ChangesHeaderControls state={changesViewState} repo={metadata.repo} ydoc={ydoc} />
+          </div>
+        )}
+      </div>
+
+      {showChangesControls && changesViewState && (
+        <div className="md:hidden py-2 border-t border-separator/50 mt-1">
+          <ChangesHeaderControls
+            state={changesViewState}
+            repo={metadata.repo}
+            ydoc={ydoc}
+            isMobile
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
 /**
  * Tabbed plan content viewer.
  * Shows Plan, Deliverables, and Changes tabs with their respective content.
@@ -236,114 +405,34 @@ export function PlanContent(props: PlanContentProps) {
     return () => document.removeEventListener('switch-plan-tab', handleSwitchTab);
   }, [handleTabChange]);
 
+  const versionNav = props.mode === 'live' ? props.versionNav : undefined;
+
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      {/* Tab navigation */}
-      <div className="border-b border-separator bg-surface px-2 md:px-6 shrink-0">
-        {/* Tabs row - always visible */}
-        <div className="flex items-center justify-between pt-1 md:pt-2">
-          {/* Tabs - scrollable on mobile */}
-          <div className="flex gap-0 md:gap-4 overflow-x-auto md:overflow-visible">
-            <TabButton
-              tab="plan"
-              activeView={activeView}
-              onClick={handleTabChange}
-              icon={<FileText className="w-3.5 h-3.5 md:w-4 md:h-4" />}
-              label="Plan"
-            />
-            <TabButton
-              tab="activity"
-              activeView={activeView}
-              onClick={handleTabChange}
-              icon={<Clock className="w-3.5 h-3.5 md:w-4 md:h-4" />}
-              label="Activity"
-            />
-            <TabButton
-              tab="deliverables"
-              activeView={activeView}
-              onClick={handleTabChange}
-              icon={<Package className="w-3.5 h-3.5 md:w-4 md:h-4" />}
-              label="Deliverables"
-              badge={
-                deliverableCount.total > 0 ? (
-                  <span className="text-[10px] md:text-xs opacity-70">
-                    ({deliverableCount.completed}/{deliverableCount.total})
-                  </span>
-                ) : undefined
-              }
-            />
-            <TabButton
-              tab="changes"
-              activeView={activeView}
-              onClick={handleTabChange}
-              icon={<GitPullRequest className="w-3.5 h-3.5 md:w-4 md:h-4" />}
-              label="Changes"
-            />
-          </div>
+      <TabNavigationBar
+        activeView={activeView}
+        onTabChange={handleTabChange}
+        mode={props.mode}
+        deliverableCount={deliverableCount}
+        versionNav={versionNav}
+        changesViewState={changesViewState}
+        metadata={metadata}
+        ydoc={ydoc}
+      />
 
-          {/* Version selector on the right - only show on Plan tab when versions exist (desktop only) */}
-          {activeView === 'plan' &&
-            props.mode === 'live' &&
-            props.versionNav &&
-            props.versionNav.snapshots.length > 0 && (
-              <div className="hidden md:block">
-                <VersionSelector
-                  currentSnapshot={props.versionNav.currentSnapshot}
-                  totalSnapshots={props.versionNav.snapshots.length}
-                  currentIndex={props.versionNav.currentIndex}
-                  canGoPrevious={props.versionNav.canGoPrevious}
-                  canGoNext={props.versionNav.canGoNext}
-                  onPrevious={props.versionNav.goToPrevious}
-                  onNext={props.versionNav.goToNext}
-                  onCurrent={props.versionNav.goToCurrent}
-                />
-              </div>
-            )}
-
-          {/* Changes header controls - desktop only (hidden on mobile) */}
-          {activeView === 'changes' && changesViewState && (
-            <div className="hidden md:block">
-              <ChangesHeaderControls state={changesViewState} repo={metadata.repo} ydoc={ydoc} />
-            </div>
-          )}
-        </div>
-
-        {/* Mobile-only row for Changes header controls - separate row for breathing room */}
-        {activeView === 'changes' && changesViewState && (
-          <div className="md:hidden py-2 border-t border-separator/50 mt-1">
-            <ChangesHeaderControls
-              state={changesViewState}
-              repo={metadata.repo}
-              ydoc={ydoc}
-              isMobile
-            />
-          </div>
-        )}
-      </div>
-
-      {/* Tab content */}
       {activeView === 'plan' && (
         <div className="flex-1 overflow-y-auto bg-background">
           <div className="max-w-4xl mx-auto px-1 py-2 md:p-6 space-y-3 md:space-y-6">
-            {props.mode === 'live' ? (
-              <PlanViewer
-                key={props.identity?.id ?? 'anonymous'}
-                ydoc={ydoc}
-                identity={props.identity}
-                provider={props.provider}
-                onRequestIdentity={props.onRequestIdentity}
-                currentSnapshot={props.currentSnapshot}
-                onEditorReady={props.onEditorReady}
-              />
-            ) : (
-              <PlanViewer
-                key="snapshot"
-                ydoc={ydoc}
-                identity={null}
-                provider={null}
-                initialContent={props.initialContent}
-              />
-            )}
+            <PlanTabContent
+              mode={props.mode}
+              ydoc={ydoc}
+              identity={props.mode === 'live' ? props.identity : undefined}
+              provider={props.mode === 'live' ? props.provider : undefined}
+              onRequestIdentity={props.mode === 'live' ? props.onRequestIdentity : undefined}
+              currentSnapshot={props.mode === 'live' ? props.currentSnapshot : undefined}
+              onEditorReady={props.mode === 'live' ? props.onEditorReady : undefined}
+              initialContent={initialContent}
+            />
             <Attachments ydoc={ydoc} registryPort={syncState.registryPort} />
           </div>
         </div>
