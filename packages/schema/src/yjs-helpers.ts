@@ -1104,12 +1104,16 @@ export function removeLocalDiffComment(ydoc: Y.Doc, commentId: string): boolean 
  */
 export function getThread(ydoc: Y.Doc, threadId: string): Thread | null {
   const threadsMap = ydoc.getMap(YDOC_KEYS.THREADS);
-  const threadData = threadsMap.get(threadId);
+  const threadsData = threadsMap.toJSON();
 
-  if (!threadData) return null;
+  for (const [_key, value] of Object.entries(threadsData)) {
+    const result = ThreadSchema.safeParse(value);
+    if (result.success && result.data.id === threadId) {
+      return result.data;
+    }
+  }
 
-  const result = ThreadSchema.safeParse(threadData);
-  return result.success ? result.data : null;
+  return null;
 }
 
 /**
