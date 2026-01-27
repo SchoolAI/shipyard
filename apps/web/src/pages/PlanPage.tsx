@@ -4,6 +4,7 @@ import {
   type AnyInputRequest,
   AnyInputRequestSchema,
   addArtifact,
+  approveUser,
   type Deliverable,
   extractDeliverables,
   getPlanFromUrl,
@@ -16,8 +17,8 @@ import {
   setPlanMetadata,
   YDOC_KEYS,
 } from '@shipyard/schema';
-import { LogIn } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { AlertCircle, LogIn } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import * as Y from 'yjs';
 import { AnyInputRequestModal } from '@/components/AnyInputRequestModal';
@@ -37,12 +38,16 @@ import { useActivePlanSync } from '@/contexts/ActivePlanSyncContext';
 import { usePlanIndexContext } from '@/contexts/PlanIndexContext';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
 import { useInputRequests } from '@/hooks/useInputRequests';
+import { useInviteToken } from '@/hooks/useInviteToken';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { useLocalIdentity } from '@/hooks/useLocalIdentity';
 import { useMultiProviderSync } from '@/hooks/useMultiProviderSync';
 import { usePendingUserNotifications } from '@/hooks/usePendingUserNotifications';
 import { useVersionNavigation } from '@/hooks/useVersionNavigation';
 import { colorFromString } from '@/utils/color';
+
+/** Timeout in milliseconds for invite redemption (30 seconds) */
+const INVITE_REDEMPTION_TIMEOUT_MS = 30000;
 
 /**
  * Check if a string is a valid PlanViewTab.
@@ -67,6 +72,9 @@ export function PlanPage() {
   const encodedPlanData = searchParams.get('d');
   const urlPlan = useMemo(() => (encodedPlanData ? getPlanFromUrl() : null), [encodedPlanData]);
   const isSnapshot = urlPlan !== null;
+
+  const inviteParam = searchParams.get('invite');
+  const hasInviteToken = inviteParam !== null;
 
   /** Read tab from URL, default to 'plan' if invalid or missing */
   const tabFromUrl = searchParams.get('tab');
@@ -183,6 +191,52 @@ export function PlanPage() {
   usePendingUserNotifications(rtcProvider, isOwner);
 
   const versionNav = useVersionNavigation(isSnapshot ? null : ydoc);
+
+  /**
+   * Invite token handling - runs early so it works during "Processing Invite Link" phase.
+   * This is critical: WaitingRoomGate only renders after metadata exists, but during
+   * invite flow we need to redeem the invite BEFORE metadata syncs.
+   */
+  const { redemptionState, clearInviteToken } = useInviteToken(planId, rtcProvider, githubIdentity);
+
+  /**
+   * Track if we've already called approveUser for a specific user to prevent duplicate calls.
+   * Stores the username for which approval was attempted.
+   */
+  const approvalAttemptedForUserRef = useRef<string | null>(null);
+
+  /** Track invite redemption timeout */
+  const [inviteTimedOut, setInviteTimedOut] = useState(false);
+
+  /** Auto-approve user when invite redemption succeeds */
+  useEffect(() => {
+    if (
+      redemptionState.status === 'success' &&
+      githubIdentity &&
+      approvalAttemptedForUserRef.current !== githubIdentity.username
+    ) {
+      approvalAttemptedForUserRef.current = githubIdentity.username;
+      approveUser(ydoc, githubIdentity.username, 'invite-redemption');
+    }
+  }, [redemptionState.status, githubIdentity, ydoc]);
+
+  /** Timeout for invite redemption */
+  useEffect(() => {
+    if (
+      hasInviteToken &&
+      githubIdentity &&
+      !metadata &&
+      (redemptionState.status === 'has_invite' ||
+        redemptionState.status === 'redeeming' ||
+        redemptionState.status === 'waiting_for_auth')
+    ) {
+      const timeout = setTimeout(() => setInviteTimedOut(true), INVITE_REDEMPTION_TIMEOUT_MS);
+      return () => clearTimeout(timeout);
+    }
+    /** Reset timeout state when metadata arrives or status changes */
+    setInviteTimedOut(false);
+    return undefined;
+  }, [hasInviteToken, githubIdentity, metadata, redemptionState.status]);
 
   useEffect(() => {
     let isMounted = true;
@@ -421,6 +475,91 @@ export function PlanPage() {
                 <LogIn className="w-4 h-4" />
                 Sign in with GitHub
               </Button>
+            </div>
+          </div>
+        );
+      }
+
+      if (hasInviteToken) {
+        /** Handle invite redemption error */
+        if (redemptionState.status === 'error') {
+          return (
+            <div className="flex items-center justify-center min-h-[60vh] p-4">
+              <div className="bg-surface border border-separator rounded-lg p-8 max-w-md w-full text-center">
+                <div className="flex justify-center mb-6">
+                  <AlertCircle className="w-12 h-12 text-danger" />
+                </div>
+                <h1 className="text-xl font-semibold text-foreground mb-2">Invite Link Error</h1>
+                <p className="text-muted-foreground mb-4">
+                  {redemptionState.error === 'expired' && 'This invite link has expired.'}
+                  {redemptionState.error === 'exhausted' &&
+                    'This invite link has reached its maximum uses.'}
+                  {redemptionState.error === 'revoked' && 'This invite link has been revoked.'}
+                  {redemptionState.error === 'invalid' && 'This invite link is invalid.'}
+                  {redemptionState.error === 'already_redeemed' &&
+                    "You've already used this invite link."}
+                </p>
+                <div className="flex flex-col gap-2">
+                  <Button onPress={() => clearInviteToken()} variant="secondary" className="w-full">
+                    Request Manual Access
+                  </Button>
+                  <Button
+                    onPress={() => window.location.reload()}
+                    variant="ghost"
+                    size="sm"
+                    className="w-full"
+                  >
+                    Try Again
+                  </Button>
+                </div>
+              </div>
+            </div>
+          );
+        }
+
+        /** Handle invite redemption timeout */
+        if (inviteTimedOut) {
+          return (
+            <div className="flex items-center justify-center min-h-[60vh] p-4">
+              <div className="bg-surface border border-separator rounded-lg p-8 max-w-md w-full text-center">
+                <div className="flex justify-center mb-6">
+                  <AlertCircle className="w-12 h-12 text-warning" />
+                </div>
+                <h1 className="text-xl font-semibold text-foreground mb-2">Connection Timeout</h1>
+                <p className="text-muted-foreground mb-4">
+                  Could not connect to the task owner&apos;s session to redeem your invite.
+                </p>
+                <p className="text-sm text-muted-foreground mb-6">
+                  The task owner may be offline. Try again later or request manual access.
+                </p>
+                <div className="flex flex-col gap-2">
+                  <Button
+                    onPress={() => window.location.reload()}
+                    variant="primary"
+                    className="w-full"
+                  >
+                    Retry
+                  </Button>
+                  <Button onPress={() => clearInviteToken()} variant="secondary" className="w-full">
+                    Request Manual Access
+                  </Button>
+                </div>
+              </div>
+            </div>
+          );
+        }
+
+        /** Still processing invite */
+        return (
+          <div className="flex items-center justify-center min-h-[60vh] p-4">
+            <div className="flex flex-col items-center gap-4 text-center max-w-md">
+              <Spinner size="lg" />
+              <div>
+                <p className="text-foreground font-medium mb-2">Processing Invite Link</p>
+                <p className="text-sm text-muted-foreground">
+                  Setting up your access to this task...
+                </p>
+              </div>
             </div>
           </div>
         );
