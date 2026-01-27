@@ -43,20 +43,20 @@ interface TokenExchangeResponse {
 
 /**
  * Allowed origins by environment - restrict CORS to prevent phishing attacks
+ * In development, allow any origin for flexibility with different dev server ports.
  */
-const ALLOWED_ORIGINS = {
-  development: [
-    'http://localhost:5173',
-    'http://localhost:5174',
-    'http://127.0.0.1:5173',
-    'http://127.0.0.1:5174',
-  ],
-  production: ['https://shipyard.pages.dev', 'https://schoolai.github.io'],
-};
+const ALLOWED_ORIGINS_PRODUCTION = ['https://shipyard.pages.dev', 'https://schoolai.github.io'];
 
 function getCorsHeaders(origin: string | null, env: Env): Record<string, string> | null {
-  const allowedOrigins = ALLOWED_ORIGINS[env.ENVIRONMENT] || ALLOWED_ORIGINS.production;
-  const isAllowed = origin && allowedOrigins.includes(origin);
+  if (env.ENVIRONMENT === 'development') {
+    return {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type',
+    };
+  }
+
+  const isAllowed = origin && ALLOWED_ORIGINS_PRODUCTION.includes(origin);
 
   if (!isAllowed) {
     return null;
