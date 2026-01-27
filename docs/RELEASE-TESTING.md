@@ -502,6 +502,78 @@ Reference from our testing session (2026-01-25):
    - Capture test output
    - Summarize pass/fail counts
 
+### Autonomous Agent Smoke Testing
+
+Have an agent autonomously exercise random MCP functionality to catch unexpected failures. This complements structured testing by finding edge cases humans might not think to test.
+
+**How to run:**
+
+```
+"Run a smoke test of the Shipyard MCP - randomly exercise various tools
+and operations to verify basic functionality. Try creating tasks,
+reading them, posting updates, requesting user input, etc.
+Report any errors or unexpected behavior."
+```
+
+**What the agent should do:**
+
+1. **Create a test task** - Verify `createTask` works with various content
+2. **Read the task back** - Confirm `readTask` returns expected data
+3. **Post updates** - Test `postUpdate` with different message content
+4. **Request user input** - Try different input types (text, choice, confirm, number)
+5. **Exercise execute_code** - Run simple operations to verify the sandbox works
+6. **Check error handling** - Intentionally pass bad data and verify graceful errors
+
+**Example smoke test script (in execute_code):**
+
+```typescript
+// Basic smoke test
+const task = await createTask({
+  title: "Smoke Test " + Date.now(),
+  content: "- [ ] Test item {#deliverable}"
+});
+
+// Verify task created
+const readResult = await readTask(task.taskId, task.sessionToken);
+if (readResult.status !== 'draft') {
+  throw new Error('Unexpected initial status: ' + readResult.status);
+}
+
+// Post an update
+await postUpdate({
+  taskId: task.taskId,
+  sessionToken: task.sessionToken,
+  message: "Smoke test update"
+});
+
+// Request input (will timeout if no human, that's OK)
+const inputResult = await requestUserInput({
+  message: "Smoke test - click any option",
+  type: "choice",
+  options: ["Option A", "Option B"],
+  timeout: 30
+});
+
+return {
+  taskCreated: !!task.taskId,
+  taskReadable: readResult.title === task.title,
+  inputStatus: inputResult.status,
+  success: true
+};
+```
+
+**When to run:**
+- After deploying a new RC
+- After significant MCP server changes
+- As a quick sanity check before promoting to stable
+
+**What it catches:**
+- Broken tool implementations
+- Missing dependencies
+- Serialization issues
+- WebSocket connection problems
+- Unexpected runtime errors
+
 ### What Still Needs Human Testing
 
 1. **Visual UI verification** - Layout, colors, responsiveness
