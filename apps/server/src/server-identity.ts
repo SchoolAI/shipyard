@@ -1,7 +1,7 @@
 import { execSync } from 'node:child_process';
 import crypto from 'node:crypto';
 import os from 'node:os';
-import { basename } from 'node:path';
+import { basename, dirname } from 'node:path';
 import type { EnvironmentContext } from '@shipyard/schema';
 import { z } from 'zod';
 import { githubConfig } from './config/env/github.js';
@@ -237,8 +237,15 @@ function getGitBranch(): string | undefined {
  * Provides metadata about where the agent is running (project, branch, hostname, repo).
  */
 export function getEnvironmentContext(): EnvironmentContext {
+  const cwd = process.cwd();
+  const currentDir = basename(cwd);
+  const parentDir = basename(dirname(cwd));
+
+  const projectName =
+    parentDir && currentDir ? `${parentDir}/${currentDir}` : currentDir || undefined;
+
   return {
-    projectName: basename(process.cwd()) || undefined,
+    projectName,
     branch: getGitBranch(),
     hostname: os.hostname(),
     repo: getRepositoryFullName() || undefined,

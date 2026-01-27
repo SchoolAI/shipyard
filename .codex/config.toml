@@ -3,8 +3,8 @@
 
 [mcp_servers.shipyard]
 command = "npx"
-args = ["mcpmon", "--watch", "apps/server/dist/index.js", "--ext", "js", "--", "node", "apps/server/dist/index.js"]
-env = { NODE_ENV = "development", SHIPYARD_WEB_URL = "http://localhost:5173" }
+args = ["mcpmon", "--watch", "apps/server/dist", "--ext", "js", "--", "node", "apps/server/dist/index.js"]
+env = { NODE_ENV = "development", SHIPYARD_WEB_URL = "http://localhost:5173", SIGNALING_URL = "ws://localhost:4444" }
 
 [mcp_servers.heroui-react]
 command = "npx"

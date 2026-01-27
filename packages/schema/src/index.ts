@@ -37,7 +37,12 @@ export {
   formatPRCommentsForLLM,
   getPRCommentsSummary,
 } from './diff-comment-formatter.js';
-export { type EnvironmentContext, EnvironmentContextSchema } from './environment.js';
+export {
+  type BrowserContext,
+  BrowserContextSchema,
+  type EnvironmentContext,
+  EnvironmentContextSchema,
+} from './environment.js';
 export type { GitHubPRResponse } from './github-validation.js';
 export { GitHubPRResponseSchema } from './github-validation.js';
 export type {
@@ -213,6 +218,7 @@ export {
 export type {
   AgentActivityData,
   AgentActivityType,
+  AgentPlatform,
   Artifact,
   ArtifactType,
   ClaudeCodeOriginMetadata,
@@ -238,6 +244,7 @@ export type {
   StepCompletion,
 } from './plan.js';
 export {
+  AGENT_PLATFORMS,
   AgentActivityDataSchema,
   AgentActivityTypes,
   ArtifactSchema,
@@ -252,12 +259,16 @@ export {
   DeliverableSchema,
   DevinOriginMetadataSchema,
   getArtifactUrl,
+  getPlatformDisplayName,
+  isAgentPlatform,
   isInboxWorthy,
   LinkedPRSchema,
   LinkedPRStatusValues,
   LocalDiffCommentSchema,
+  MCP_CLIENT_INFO_MAP,
   OriginMetadataSchema,
   OriginPlatformValues,
+  PLATFORM_DISPLAY_NAMES,
   PlanEventSchema,
   PlanEventTypes,
   PlanMetadataSchema,

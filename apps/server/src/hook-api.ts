@@ -110,11 +110,7 @@ export async function handleCreateSession(req: Request, res: Response): Promise<
 
     const ydoc = await getOrCreateDoc(planId);
 
-    const origin = parseClaudeCodeOrigin(input.metadata) || {
-      platform: 'claude-code' as const,
-      sessionId: input.sessionId,
-      transcriptPath: '',
-    };
+    const origin = parseClaudeCodeOrigin(input.metadata) || undefined;
 
     initPlanMetadata(ydoc, {
       id: planId,

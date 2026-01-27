@@ -9,6 +9,7 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import { initAsClient, initAsHub } from './doc-store.js';
 import { logger } from './logger.js';
+import { setClientInfo } from './mcp-client-info.js';
 import {
   isRegistryRunning,
   releaseHubLock,
@@ -79,6 +80,16 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
 }));
 
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
+  /** Capture clientInfo on first tool call (handshake is complete by now) */
+  const clientInfo = server.getClientVersion();
+  if (clientInfo?.name) {
+    setClientInfo(clientInfo.name);
+    logger.info(
+      { clientName: clientInfo.name, clientVersion: clientInfo.version },
+      'MCP client info captured from tool call'
+    );
+  }
+
   const { name, arguments: args } = request.params;
 
   if (name === TOOL_NAMES.EXECUTE_CODE) {
