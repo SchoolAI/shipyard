@@ -38,6 +38,7 @@
   ],
   "scripts": {
     "dev": "tsup --watch --onSuccess 'node dist/index.js'",
+    "dev:watch": "tsup --watch",
     "build": "tsup",
     "test": "vitest run",
     "test:watch": "vitest",

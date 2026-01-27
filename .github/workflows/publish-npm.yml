@@ -184,10 +184,19 @@ jobs:
             fs.writeFileSync('package-npm.json', JSON.stringify(pkg, null, 2) + '\n');
           "
 
+          # Update .claude-plugin/plugin.json (keep plugin version in sync)
+          node -e "
+            const fs = require('fs');
+            const pluginPath = '.claude-plugin/plugin.json';
+            const plugin = JSON.parse(fs.readFileSync(pluginPath, 'utf8'));
+            plugin.version = '$STABLE_VERSION';
+            fs.writeFileSync(pluginPath, JSON.stringify(plugin, null, 2) + '\n');
+          "
+
           # Commit and tag
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add package-npm.json
+          git add package-npm.json .claude-plugin/plugin.json
           git commit -m "chore: release v$STABLE_VERSION"
           git tag "v$STABLE_VERSION"
 

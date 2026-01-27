@@ -4,10 +4,8 @@
     "docs/BRIEF.md",
     "docs/engineering-standards.md",
     "docs/architecture.md",
-    "docs/systems-inventory.md",
-    "docs/ydoc-key-reference.md",
-    "docs/milestones/*.md"
+    "docs/SETUP.md"
   ],
-  "exclude": ["docs/original-vision/*", "docs/image-generation-prompts.md"],
+  "exclude": [],
   "maxLinesPerFile": 500
 }

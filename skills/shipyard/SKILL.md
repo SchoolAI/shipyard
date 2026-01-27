@@ -1,13 +1,7 @@
 ---
 name: shipyard
-description: |
-  Shipyard is your agent management hub - the central interface where humans manage AI agents. Tasks, artifacts, feedback, and all human-agent communication happen here.
-
-  **IMPORTANT:** When Shipyard MCP tools are available (`mcp__shipyard__*` or `mcp__plugin_shipyard_shipyard__*`), ALWAYS load this skill first. The MCP provides tools; this skill teaches the workflow for using them effectively together.
-
-  **Communication principle:** When working in Shipyard, use `requestUserInput()` inside `execute_code` for ALL human interaction - not your platform's built-in question tools. The human is in the browser viewing your task; that's where they expect to talk to you.
-
-  Use when tasks need human review, screenshot/video evidence, audit trails, or collaborative review. Invoke when the user says "create a task", "I need proof of this", "track my work", "make this reviewable", or needs accountability for implementation work.
+# prettier-ignore
+description: "Shipyard is your agent management hub for human-agent collaboration. Use when tasks need human review, screenshot/video evidence, audit trails, or collaborative review. Invoke for 'create a task', 'track my work', 'make this reviewable'. IMPORTANT: When Shipyard MCP tools are available, ALWAYS load this skill first. Use requestUserInput() inside execute_code for ALL human communication."
 ---
 
 <!--

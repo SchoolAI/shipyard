@@ -51,7 +51,7 @@ export default defineConfig(({ mode }) => ({
   base: mode === 'production' ? '/shipyard/' : '/',
   plugins: [tailwindcss(), react(), githubPagesSpa()],
   server: {
-    port: 5173,
+    port: Number.parseInt(process.env.VITE_PORT || '5173', 10),
     host: true,
     open: true,
     /** Watch workspace packages for changes */

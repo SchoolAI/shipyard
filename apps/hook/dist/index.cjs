@@ -45304,7 +45304,17 @@ init_cjs_shims();
 
 // ../../packages/shared/dist/registry-config.mjs
 init_cjs_shims();
-var DEFAULT_REGISTRY_PORTS = [32191, 32192];
+var DEFAULT_REGISTRY_PORTS = [
+  32191,
+  32192,
+  32193,
+  32194,
+  32195,
+  32196,
+  32197,
+  32198,
+  32199
+];
 
 // ../../packages/shared/dist/index.mjs
 var import_node_crypto = require("crypto");

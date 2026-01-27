@@ -16,12 +16,14 @@ describe('registryConfig', () => {
   });
 
   describe('REGISTRY_PORT', () => {
-    it('should return default ports [32191, 32192] when env var not set', async () => {
+    it('should return default ports [32191-32199] when env var not set', async () => {
       delete process.env.REGISTRY_PORT;
 
       const { registryConfig } = await import('./registry.js');
 
-      expect(registryConfig.REGISTRY_PORT).toEqual([32191, 32192]);
+      expect(registryConfig.REGISTRY_PORT).toEqual([
+        32191, 32192, 32193, 32194, 32195, 32196, 32197, 32198, 32199,
+      ]);
     });
 
     it('should return single port array when env var is set to valid number', async () => {
@@ -45,7 +47,9 @@ describe('registryConfig', () => {
 
       const { registryConfig } = await import('./registry.js');
 
-      expect(registryConfig.REGISTRY_PORT).toEqual([32191, 32192]);
+      expect(registryConfig.REGISTRY_PORT).toEqual([
+        32191, 32192, 32193, 32194, 32195, 32196, 32197, 32198, 32199,
+      ]);
     });
 
     it('should handle port 0', async () => {

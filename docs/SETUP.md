@@ -47,39 +47,35 @@ pnpm build
 
 ## Running the App
 
-### 1. Start Web UI
-
+**Just run:**
 ```bash
-pnpm dev:web
+pnpm dev:all
 ```
 
-Opens on `http://localhost:5173`
+This starts all services:
+- Web UI on `http://localhost:5173`
+- MCP server with hot reload (auto-restarts on code changes)
+- Signaling server, OAuth worker, OG proxy
+- Auto-configures unique ports if running in a feature worktree
 
-### 2. MCP Server Setup
+**Parallel worktrees?** No setup needed - just run `pnpm dev:all` in each worktree. Auto-detects branch and assigns unique ports.
 
-The `pnpm install` step automatically creates `.mcp.json` from the example file. This gives you:
-- **Local Shipyard MCP** — runs from `apps/server/dist/index.js`
-- **HeroUI MCP** — component docs for UI development
+### Testing the MCP
 
-Claude Code auto-loads this when you work in the repo.
+Verify the MCP is available in Claude Code:
 
-**Note:** `.mcp.json` is git-ignored (dev only). Plugin users get a separate production config without HeroUI.
-
-Verify it's available:
 ```bash
-# Restart Claude Code, then:
+# In Claude Code:
 /mcp
 # Should see "shipyard MCP" under Project MCPs
 ```
 
-### 3. Test It
-
-Start a new Claude Code session and ask:
+Test creating a task:
 ```
 "Create an implementation plan for adding user authentication"
 ```
 
-Claude will call the `create_task` tool → browser opens with task!
+Browser should open with the task.
 
 ---
 
@@ -395,6 +391,20 @@ pnpm build
 
 The IDE needs the built `.d.mts` files from schema package.
 
+### Port Conflicts (EADDRINUSE)
+
+If auto-configuration doesn't resolve port conflicts, create a `.env` file:
+
+```bash
+# .env (or .env.local)
+REGISTRY_PORT=32195
+VITE_PORT=5176
+PORT=4484
+SHIPYARD_STATE_DIR=~/.shipyard-custom
+```
+
+The `dev:all` script will use these values.
+
 ---
 
-*Last updated: 2026-01-14*
+*Last updated: 2026-01-26*
