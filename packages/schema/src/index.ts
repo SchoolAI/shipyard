@@ -44,6 +44,14 @@ export {
   type EnvironmentContext,
   EnvironmentContextSchema,
 } from './environment.js';
+export type { EpochCloseCode, EpochCloseReason } from './epoch.js';
+export {
+  DEFAULT_EPOCH,
+  EPOCH_CLOSE_CODES,
+  EPOCH_CLOSE_REASONS,
+  getEpochFromMetadata,
+  isEpochValid,
+} from './epoch.js';
 export type { GitHubPRResponse } from './github-validation.js';
 export { GitHubPRResponseSchema } from './github-validation.js';
 export type {

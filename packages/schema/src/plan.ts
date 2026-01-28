@@ -646,6 +646,7 @@ interface PlanMetadataBase {
   title: string;
   createdAt: number;
   updatedAt: number;
+  epoch?: number;
   repo?: string;
   pr?: number;
   ownerId?: string;
@@ -724,6 +725,7 @@ const PlanMetadataBaseSchema = z.object({
   title: z.string(),
   createdAt: z.number(),
   updatedAt: z.number(),
+  epoch: z.number().optional(),
   repo: z.string().optional(),
   pr: z.number().optional(),
   ownerId: z.string().optional(),
