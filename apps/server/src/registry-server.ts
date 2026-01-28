@@ -296,7 +296,10 @@ function shouldRejectForEpoch(doc: Y.Doc, planId: string): boolean {
 
   if (planId === 'plan-index') {
     const metadata = getPlanIndexMetadata(doc);
-    if (!metadata) return false;
+    if (!metadata) {
+      logger.warn({ planId }, 'Plan-index metadata missing - rejecting for security');
+      return true;
+    }
 
     const planEpoch = getEpochFromMetadata(metadata);
     if (!isEpochValid(planEpoch, minimumEpoch)) {
@@ -307,7 +310,10 @@ function shouldRejectForEpoch(doc: Y.Doc, planId: string): boolean {
   }
 
   const metadata = getPlanMetadata(doc);
-  if (!metadata) return false;
+  if (!metadata) {
+    logger.warn({ planId }, 'Plan metadata missing - rejecting for security');
+    return true;
+  }
 
   const planEpoch = getEpochFromMetadata(metadata);
   if (!isEpochValid(planEpoch, minimumEpoch)) {

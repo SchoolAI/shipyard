@@ -35,6 +35,9 @@ const schema = z.object({
        * IMPORTANT: MINIMUM_EPOCH should only increase, never decrease.
        * Decreasing this value can cause data corruption by accepting stale updates
        * from old Y.Doc instances that should have been invalidated.
+       *
+       * WARNING: This value MUST match the signaling server's MINIMUM_EPOCH.
+       * Mismatched values allow clients to bypass validation via P2P WebRTC sync.
        */
       return epoch;
     }),

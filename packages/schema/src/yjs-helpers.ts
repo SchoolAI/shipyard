@@ -593,6 +593,11 @@ export function initPlanIndexMetadata(ydoc: Y.Doc, init: InitPlanIndexMetadataPa
   map.set('createdAt', now);
   map.set('updatedAt', now);
   map.set('epoch', init.epoch ?? DEFAULT_EPOCH);
+
+  const result = getPlanIndexMetadata(ydoc);
+  if (!result) {
+    throw new Error('Failed to initialize plan-index metadata');
+  }
 }
 
 export function getPlanIndexMetadata(ydoc: Y.Doc): PlanIndexMetadata | null {
@@ -601,12 +606,15 @@ export function getPlanIndexMetadata(ydoc: Y.Doc): PlanIndexMetadata | null {
 
   if (!metadata || typeof metadata !== 'object') return null;
   if (metadata.id !== 'plan-index') return null;
+  if (typeof metadata.createdAt !== 'number') return null;
+  if (typeof metadata.updatedAt !== 'number') return null;
+  if (typeof metadata.epoch !== 'number') return null;
 
   return {
     id: 'plan-index',
-    createdAt: metadata.createdAt as number,
-    updatedAt: metadata.updatedAt as number,
-    epoch: metadata.epoch as number,
+    createdAt: metadata.createdAt,
+    updatedAt: metadata.updatedAt,
+    epoch: metadata.epoch,
   };
 }
 

@@ -6,6 +6,10 @@ const schema = z.object({
   PORT: z.coerce.number().default(4444),
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
+  /*
+   * WARNING: This value MUST match the registry server's MINIMUM_EPOCH.
+   * Mismatched values allow clients to bypass validation.
+   */
   MINIMUM_EPOCH: z
     .string()
     .optional()

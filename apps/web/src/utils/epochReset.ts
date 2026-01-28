@@ -2,7 +2,12 @@ import { EPOCH_CLOSE_CODES, EPOCH_CLOSE_REASONS } from '@shipyard/schema';
 import * as Y from 'yjs';
 
 const RESET_ATTEMPTS_KEY = 'shipyard-epoch-reset-attempts';
+const RESET_IN_PROGRESS_KEY = 'shipyard-epoch-reset-in-progress';
 const MAX_RESET_ATTEMPTS = 2;
+
+export function isEpochResetInProgress(): boolean {
+  return sessionStorage.getItem(RESET_IN_PROGRESS_KEY) === 'true';
+}
 
 export function isEpochRejection(code: number, reason?: string): boolean {
   return (
@@ -15,6 +20,10 @@ async function deletePlanDatabase(planId: string): Promise<boolean> {
   return new Promise((resolve) => {
     const request = indexedDB.deleteDatabase(planId);
 
+    /*
+     * 10s timeout: IndexedDB deletion usually completes in <1s
+     * Handles blocked state when other tabs have open connections
+     */
     const timeout = setTimeout(() => {
       resolve(false);
     }, 10000);
@@ -50,10 +59,12 @@ export async function handleEpochRejection(planId: string): Promise<void> {
 
   if (attempts >= MAX_RESET_ATTEMPTS) {
     sessionStorage.removeItem(RESET_ATTEMPTS_KEY);
+    sessionStorage.removeItem(RESET_IN_PROGRESS_KEY);
     throw new Error('Failed to clear IndexedDB after 2 attempts. Manual intervention required.');
   }
 
   sessionStorage.setItem(RESET_ATTEMPTS_KEY, String(attempts + 1));
+  sessionStorage.setItem(RESET_IN_PROGRESS_KEY, 'true');
 
   const success = await deletePlanDatabase(planId);
 
