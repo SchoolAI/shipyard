@@ -28491,7 +28491,7 @@ init_cjs_shims();
 // ../../packages/schema/dist/index.mjs
 init_cjs_shims();
 
-// ../../packages/schema/dist/yjs-helpers-DIIpiq6m.mjs
+// ../../packages/schema/dist/yjs-helpers-Dr_mkpZM.mjs
 init_cjs_shims();
 
 // ../../packages/schema/dist/plan.mjs
@@ -42727,7 +42727,7 @@ var LocalArtifactParseSchema = external_exports.object({
   localArtifactId: external_exports.string()
 });
 
-// ../../packages/schema/dist/yjs-helpers-DIIpiq6m.mjs
+// ../../packages/schema/dist/yjs-helpers-Dr_mkpZM.mjs
 function assertNever2(value) {
   throw new Error(`Unhandled discriminated union member: ${JSON.stringify(value)}`);
 }
@@ -42851,6 +42851,12 @@ var CreateSubscriptionRequestSchema = external_exports.object({
   threshold: external_exports.number().positive().optional()
 });
 var CreateSubscriptionResponseSchema = external_exports.object({ clientId: external_exports.string() });
+var INPUT_REQUEST_TIMEOUT = {
+  MIN_SECONDS: 300,
+  MAX_SECONDS: 14400,
+  DEFAULT_SECONDS: 1800
+};
+var DEFAULT_INPUT_REQUEST_TIMEOUT_SECONDS = INPUT_REQUEST_TIMEOUT.DEFAULT_SECONDS;
 var InputRequestStatusValues = [
   "pending",
   "answered",
@@ -42863,7 +42869,7 @@ var InputRequestBaseSchema = external_exports.object({
   message: external_exports.string().min(1, "Message cannot be empty"),
   status: external_exports.enum(InputRequestStatusValues),
   defaultValue: external_exports.string().optional(),
-  timeout: external_exports.number().int().min(300, "Timeout must be at least 5 minutes (300 seconds)").max(1800, "Timeout cannot exceed 30 minutes (1800 seconds)").optional(),
+  timeout: external_exports.number().int().min(INPUT_REQUEST_TIMEOUT.MIN_SECONDS, `Timeout must be at least ${INPUT_REQUEST_TIMEOUT.MIN_SECONDS} seconds (5 minutes)`).max(INPUT_REQUEST_TIMEOUT.MAX_SECONDS, `Timeout cannot exceed ${INPUT_REQUEST_TIMEOUT.MAX_SECONDS} seconds (4 hours)`).optional(),
   planId: external_exports.string().optional(),
   response: external_exports.unknown().optional(),
   answeredAt: external_exports.number().optional(),
@@ -43048,7 +43054,7 @@ var MultiQuestionInputRequestSchema = external_exports.object({
   type: external_exports.literal("multi"),
   questions: external_exports.array(QuestionSchema).min(1, "At least one question is required").max(MAX_QUESTIONS_PER_REQUEST, `Maximum ${MAX_QUESTIONS_PER_REQUEST} questions allowed (8 recommended for optimal UX)`),
   status: external_exports.enum(InputRequestStatusValues),
-  timeout: external_exports.number().int().min(10, "Timeout must be at least 10 seconds").max(14400, "Timeout cannot exceed 4 hours").optional(),
+  timeout: external_exports.number().int().min(INPUT_REQUEST_TIMEOUT.MIN_SECONDS, `Timeout must be at least ${INPUT_REQUEST_TIMEOUT.MIN_SECONDS} seconds (5 minutes)`).max(INPUT_REQUEST_TIMEOUT.MAX_SECONDS, `Timeout cannot exceed ${INPUT_REQUEST_TIMEOUT.MAX_SECONDS} seconds (4 hours)`).optional(),
   planId: external_exports.string().optional(),
   responses: external_exports.record(external_exports.string(), external_exports.unknown()).optional(),
   answeredAt: external_exports.number().optional(),
