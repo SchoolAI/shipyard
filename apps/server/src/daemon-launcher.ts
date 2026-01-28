@@ -88,6 +88,34 @@ async function waitForDaemon(): Promise<boolean> {
 }
 
 /**
+ * Checks if auto-start is configured by attempting to import and call the function.
+ * Returns false if the import fails (daemon not built yet).
+ */
+async function isAutoStartConfigured(): Promise<boolean> {
+  try {
+    const { isAutoStartConfigured } = await import('../../daemon/dist/auto-start.js');
+    return await isAutoStartConfigured();
+  } catch {
+    // Daemon not built yet or auto-start module unavailable
+    return false;
+  }
+}
+
+/**
+ * Sets up auto-start configuration by attempting to import and call the function.
+ * Returns false if the import fails (daemon not built yet).
+ */
+async function setupAutoStart(): Promise<boolean> {
+  try {
+    const { setupAutoStart } = await import('../../daemon/dist/auto-start.js');
+    return await setupAutoStart();
+  } catch (err) {
+    logger.warn({ err }, 'Failed to import auto-start module - daemon may not be built yet');
+    return false;
+  }
+}
+
+/**
  * Ensures the daemon is running. If not, spawns it and waits for it to be ready.
  * Logs status but does not throw - daemon is optional for MCP functionality.
  */
@@ -97,6 +125,22 @@ export async function ensureDaemonRunning(): Promise<void> {
   if (port) {
     logger.info({ port }, 'Daemon already running, skipping spawn');
     return;
+  }
+
+  /** Check if auto-start is configured */
+  const isConfigured = await isAutoStartConfigured();
+  logger.info({ isConfigured }, 'Checking auto-start configuration');
+
+  if (!isConfigured) {
+    logger.info('Setting up daemon auto-start on boot');
+    const success = await setupAutoStart();
+    if (success) {
+      logger.info('Auto-start configured successfully - daemon will survive reboots');
+    } else {
+      logger.warn('Failed to configure auto-start, falling back to manual spawn');
+    }
+  } else {
+    logger.info('Auto-start already configured - daemon will auto-start on boot');
   }
 
   /** Spawn detached daemon */

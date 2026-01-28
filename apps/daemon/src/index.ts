@@ -5,11 +5,20 @@
  * to trigger local agent sessions (Claude Code, etc.)
  */
 
+import { existsSync, mkdirSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 import { releaseDaemonLock, tryAcquireDaemonLock } from './lock-manager.js';
 import { startWebSocketServer } from './websocket-server.js';
 
 async function main(): Promise<void> {
   console.log('Shipyard daemon starting...');
+
+  // Ensure .shipyard directory exists for logs and lock files
+  const shipyardDir = join(homedir(), '.shipyard');
+  if (!existsSync(shipyardDir)) {
+    mkdirSync(shipyardDir, { recursive: true });
+  }
 
   const acquired = await tryAcquireDaemonLock();
   if (!acquired) {

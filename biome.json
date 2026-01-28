@@ -143,6 +143,16 @@
       "linter": {
         "enabled": false
       }
+    },
+    {
+      "includes": ["apps/server/src/daemon-launcher.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": "off"
+          }
+        }
+      }
     }
   ]
 }
