@@ -1,3 +1,4 @@
+import { getEpochFromMetadata, getSignalingConnections } from '@shipyard/schema';
 import { DEFAULT_REGISTRY_PORTS } from '@shipyard/shared/registry-config';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { IndexeddbPersistence } from 'y-indexeddb';
@@ -614,6 +615,39 @@ export function useMultiProviderSync(
         }
       };
       rtc.on('synced', rtcSyncedListener);
+
+      const sendEpochValidation = () => {
+        const signalingConns = getSignalingConnections(rtc);
+        const signalingWs = signalingConns[0]?.ws;
+
+        if (signalingWs && signalingWs.readyState === WebSocket.OPEN) {
+          const metadata = ydoc.getMap('metadata').toJSON();
+          const epoch = getEpochFromMetadata(metadata);
+
+          signalingWs.send(
+            JSON.stringify({
+              type: 'validate_epoch',
+              planId: docName,
+              epoch,
+            })
+          );
+
+          const handleSignalingError = (event: MessageEvent) => {
+            try {
+              const data = JSON.parse(event.data);
+              if (data.type === 'error' && data.error === 'epoch_too_old') {
+                handleEpochRejection(docName);
+              }
+            } catch {
+              /* Ignore parse errors */
+            }
+          };
+
+          signalingWs.addEventListener('message', handleSignalingError);
+        }
+      };
+
+      setTimeout(sendEpochValidation, 1000);
 
       /*
        * Clear awareness on page unload so other peers see us leave immediately

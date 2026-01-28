@@ -9,6 +9,7 @@
  * over platform-specific storage, crypto, and WebSocket operations.
  */
 
+export { handleValidateEpoch } from './epoch-validation.js';
 export {
   handleCreateInvite,
   handleListInvites,
