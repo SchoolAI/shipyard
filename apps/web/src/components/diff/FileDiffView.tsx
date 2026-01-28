@@ -270,7 +270,8 @@ export const FileDiffView = memo(function FileDiffView({
         <Alert.Content>
           <Alert.Title>No Diff Available</Alert.Title>
           <Alert.Description>
-            The diff for <code>{filename}</code> is not available (may be a binary file).
+            The diff for <code>{filename}</code> is not available (binary file, too large, or no
+            content changes).
           </Alert.Description>
         </Alert.Content>
       </Alert>
