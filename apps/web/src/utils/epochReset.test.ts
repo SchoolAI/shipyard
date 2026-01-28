@@ -145,5 +145,26 @@ describe('epochReset utilities', () => {
 
       expect(mockReload).toHaveBeenCalled();
     });
+
+    it('should handle plan-index rejection', async () => {
+      mockDeleteDatabase.mockImplementation(() => {
+        const request = {
+          onsuccess: null as (() => void) | null,
+          onerror: null,
+          onblocked: null,
+        };
+        setTimeout(() => {
+          request.onsuccess?.();
+        }, 0);
+        return request;
+      });
+
+      const promise = handleEpochRejection('plan-index');
+      await vi.runAllTimersAsync();
+      await promise;
+
+      expect(mockDeleteDatabase).toHaveBeenCalledWith('plan-index');
+      expect(mockReload).toHaveBeenCalled();
+    });
   });
 });
