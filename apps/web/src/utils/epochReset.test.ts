@@ -9,6 +9,14 @@ describe('epochReset utilities', () => {
 
   const mockDeleteDatabase = vi.fn();
   const mockReload = vi.fn();
+  const mockSessionStorage = {
+    getItem: vi.fn(),
+    setItem: vi.fn(),
+    removeItem: vi.fn(),
+    clear: vi.fn(),
+    key: vi.fn(),
+    length: 0,
+  };
 
   beforeEach(async () => {
     vi.resetModules();
@@ -22,12 +30,20 @@ describe('epochReset utilities', () => {
       value: { reload: mockReload },
     });
 
+    Object.defineProperty(window, 'sessionStorage', {
+      writable: true,
+      value: mockSessionStorage,
+    });
+
     const module = await import('./epochReset');
     isEpochRejection = module.isEpochRejection;
     handleEpochRejection = module.handleEpochRejection;
 
     mockDeleteDatabase.mockReset();
     mockReload.mockReset();
+    mockSessionStorage.getItem.mockReturnValue(null);
+    mockSessionStorage.setItem.mockReset();
+    mockSessionStorage.removeItem.mockReset();
   });
 
   afterEach(() => {
@@ -118,14 +134,13 @@ describe('epochReset utilities', () => {
           onblocked: null,
           error: { message: 'test error' },
         };
-        setTimeout(() => {
+        queueMicrotask(() => {
           request.onerror?.call(request as IDBOpenDBRequest, {} as Event);
-        }, 0);
+        });
         return request;
       });
 
       const promise = handleEpochRejection('test-plan-id');
-      await vi.runAllTimersAsync();
       await promise;
 
       expect(mockReload).toHaveBeenCalled();
