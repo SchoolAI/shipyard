@@ -264,6 +264,7 @@ Bad deliverables (not provable):
       updatedAt: finalMetadata.updatedAt,
       ownerId,
       tags: input.tags,
+      epoch: registryConfig.MINIMUM_EPOCH,
       deleted: false,
     });
     logger.info({ taskId }, 'Task index updated');

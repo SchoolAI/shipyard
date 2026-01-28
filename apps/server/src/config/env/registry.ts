@@ -31,6 +31,11 @@ const schema = z.object({
       if (Number.isNaN(epoch) || epoch < 1) {
         throw new Error(`MINIMUM_EPOCH must be a positive integer, got: ${val}`);
       }
+      /*
+       * IMPORTANT: MINIMUM_EPOCH should only increase, never decrease.
+       * Decreasing this value can cause data corruption by accepting stale updates
+       * from old Y.Doc instances that should have been invalidated.
+       */
       return epoch;
     }),
 });

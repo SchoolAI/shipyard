@@ -354,12 +354,24 @@ export function useMultiProviderSync(
     (
       ws: WebsocketProvider | null,
       wsStatusListener: (() => void) | null,
-      wsSyncListener: (() => void) | null
+      wsSyncListener: (() => void) | null,
+      wsCloseHandler: ((event: CloseEvent) => void) | null
     ) => {
       if (!ws) return;
 
       if (wsStatusListener) ws.off('status', wsStatusListener);
       if (wsSyncListener) ws.off('sync', wsSyncListener);
+
+      /** Remove close handler from underlying WebSocket if present */
+      if (wsCloseHandler) {
+        // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- Accessing internal y-websocket API
+        const wsInternal = ws as WebsocketProvider & WebsocketProviderInternal;
+        const wsSocket = wsInternal.ws;
+        if (wsSocket) {
+          wsSocket.removeEventListener('close', wsCloseHandler);
+        }
+      }
+
       ws.disconnect();
       ws.destroy();
     },
@@ -414,6 +426,7 @@ export function useMultiProviderSync(
     const visibilityGracePeriodTimeoutRef: { current: ReturnType<typeof setTimeout> | null } = {
       current: null,
     };
+    let wsCloseHandler: ((event: CloseEvent) => void) | null = null;
 
     /** IndexedDB persistence */
     const idbProvider = new IndexeddbPersistence(docName, ydoc);
@@ -470,27 +483,39 @@ export function useMultiProviderSync(
       wsProviderRef.current = ws;
       setWsProvider(ws);
 
-      const setupCloseHandler = () => {
-        /*
-         * Access underlying WebSocket for epoch rejection handling.
-         * y-websocket exposes ws property internally but not in types.
-         */
-        // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- Accessing internal y-websocket API
-        const wsInternal = ws as WebsocketProvider & WebsocketProviderInternal;
-        const wsSocket = wsInternal.ws;
-        if (wsSocket) {
-          wsSocket.addEventListener('close', (event) => {
-            if (isEpochRejection(event.code, event.reason)) {
-              handleEpochRejection(docName);
-            }
-          });
+      /*
+       * Access underlying WebSocket for epoch rejection handling.
+       * y-websocket exposes ws property internally but not in types.
+       */
+      // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- Accessing internal y-websocket API
+      const wsInternal = ws as WebsocketProvider & WebsocketProviderInternal;
+
+      /*
+       * Store close handler reference for cleanup to prevent memory leak.
+       * Race condition fix: Attach handler IMMEDIATELY after creating provider,
+       * not in status callback which may be too late if connection closes immediately.
+       */
+      wsCloseHandler = (event: CloseEvent) => {
+        if (isEpochRejection(event.code, event.reason)) {
+          handleEpochRejection(docName);
         }
       };
+
+      const attachCloseHandlerIfReady = () => {
+        const wsSocket = wsInternal.ws;
+        if (wsSocket && wsCloseHandler) {
+          wsSocket.addEventListener('close', wsCloseHandler);
+        }
+      };
+
+      /** Try to attach handler immediately */
+      attachCloseHandlerIfReady();
 
       /** Store listener references for cleanup */
       wsStatusListener = () => {
         if (mountedRef.current) {
-          setupCloseHandler();
+          /** Ensure handler is attached on status changes (catches lazy socket creation) */
+          attachCloseHandlerIfReady();
 
           /** Clear timeout when connection succeeds */
           const wsConnected = ws?.wsconnected ?? false;
@@ -629,7 +654,7 @@ export function useMultiProviderSync(
        * IMPORTANT: Remove event listeners BEFORE destroying providers
        * This prevents memory leaks from accumulated listeners in React StrictMode
        */
-      cleanupWebSocketProvider(ws, wsStatusListener, wsSyncListener);
+      cleanupWebSocketProvider(ws, wsStatusListener, wsSyncListener, wsCloseHandler);
       wsProviderRef.current = null;
       setWsProvider(null);
 
