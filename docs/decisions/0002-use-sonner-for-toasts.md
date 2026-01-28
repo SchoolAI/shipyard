@@ -32,12 +32,24 @@ Sonner is a lightweight, headless toast library that:
 - Has excellent accessibility (ARIA live regions, focus management)
 - Supports promise-based toasts for async operations
 
+## Configuration Required
+
+**Dark mode requires explicit theme prop.** Sonner does not auto-detect `data-theme` attributes.
+
+We use a `ThemedToaster` wrapper component (`apps/web/src/components/ThemedToaster.tsx`) that:
+1. Uses our `useTheme` hook to get the resolved theme (light/dark)
+2. Passes the theme to Sonner's `Toaster` component
+
+This ensures toasts follow the user's in-app theme choice, not just system preference.
+
+**CSS fallback:** We also define Sonner CSS variables in `index.css` that inherit from our theme variables, providing defense-in-depth if the theme prop fails.
+
 ## Consequences
 
 ### Positive
 
 - Clean API: `toast.success("Saved!")` — no complex setup
-- Adapts to light/dark themes automatically
+- Adapts to light/dark themes via ThemedToaster wrapper
 - Small bundle (~3KB gzipped)
 - No conflicts with HeroUI v3 components
 - Can be removed easily when HeroUI v3 adds native Toast
