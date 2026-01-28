@@ -414,10 +414,10 @@ Parameters:
 - multiSelect (boolean, optional): For 'choice' type - allow selecting multiple options (checkboxes)
 - displayAs (string, optional): For 'choice' type - override automatic UI ('radio' | 'checkbox' | 'dropdown')
 - defaultValue (string, optional): Pre-filled value for text/multiline inputs
-- timeout (number, optional): Timeout in seconds (default: 1800, min: 10, max: 14400)
-  - Simple yes/no or quick choices: 300-600 seconds (5-10 minutes)
-  - Complex questions with code examples: 600-1200 seconds (10-20 minutes)
+- timeout (number, optional): Timeout in seconds (default: 1800, min: 300, max: 14400)
+  - Minimum (300 = 5 minutes) - shorter timeouts are rejected
   - Default (1800 = 30 minutes) is suitable for most cases
+  - Complex questions with code examples: 600-1200 seconds (10-20 minutes)
   - Max (14400 = 4 hours) for extended user sessions
   - Note: System-level timeouts may cause earlier cancellation
 - taskId (string, optional): Optional metadata to link request to task (for activity log filtering)

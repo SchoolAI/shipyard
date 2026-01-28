@@ -14,6 +14,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@shipyard/schema": "workspace:*",
     "ws": "^8.18.0"
   },
   "devDependencies": {

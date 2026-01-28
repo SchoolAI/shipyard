@@ -17,8 +17,8 @@ import {
   type Deliverable,
   DeliverableSchema,
   getPlanMetadataWithValidation,
-  type InputRequest,
-  InputRequestSchema,
+  type AnyInputRequest,
+  AnyInputRequestSchema,
   type LinkedPR,
   LinkedPRSchema,
   type PlanEvent,
@@ -185,7 +185,7 @@ export function validateYDoc(doc: Y.Doc, planId: string): ValidationReport {
   results.push(validateArray(doc, YDOC_KEYS.EVENTS, PlanEventSchema));
   results.push(validateArray(doc, YDOC_KEYS.SNAPSHOTS, PlanSnapshotSchema));
   results.push(validateArray(doc, YDOC_KEYS.PR_REVIEW_COMMENTS, PRReviewCommentSchema));
-  results.push(validateArray(doc, YDOC_KEYS.INPUT_REQUESTS, InputRequestSchema));
+  results.push(validateArray(doc, YDOC_KEYS.INPUT_REQUESTS, AnyInputRequestSchema));
 
   const isCorrupted = results.some((r) => !r.valid);
 
@@ -302,9 +302,9 @@ export function attachCRDTValidation(planId: string, doc: Y.Doc): void {
 
   /** Validate input requests array */
   doc
-    .getArray<InputRequest>(YDOC_KEYS.INPUT_REQUESTS)
+    .getArray<AnyInputRequest>(YDOC_KEYS.INPUT_REQUESTS)
     .observe(
-      createArrayObserver<InputRequest>(planId, YDOC_KEYS.INPUT_REQUESTS, InputRequestSchema)
+      createArrayObserver<AnyInputRequest>(planId, YDOC_KEYS.INPUT_REQUESTS, AnyInputRequestSchema)
     );
 
   logger.debug({ planId }, 'CRDT validation observers attached');

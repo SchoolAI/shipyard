@@ -6,7 +6,7 @@
  */
 
 import { execSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync } from 'node:fs';
+import { existsSync, mkdirSync, writeFileSync, unlinkSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 
@@ -44,6 +44,13 @@ async function setupMacOS(): Promise<boolean> {
 		const daemonPath = getDaemonExecutablePath();
 		const nodePath = getNodeExecutablePath();
 
+		// Get user ID (only available on POSIX systems)
+		const uid = process.getuid?.();
+		if (uid === undefined) {
+			console.error('Cannot get user ID - process.getuid() not available');
+			return false;
+		}
+
 		// Create LaunchAgents directory if it doesn't exist
 		const launchAgentsDir = dirname(plistPath);
 		if (!existsSync(launchAgentsDir)) {
@@ -80,19 +87,19 @@ async function setupMacOS(): Promise<boolean> {
 
 		// Load the LaunchAgent (starts it now and on future boots)
 		try {
-			execSync(`launchctl bootstrap gui/${process.getuid()} "${plistPath}"`, {
+			execSync(`launchctl bootstrap gui/${uid} "${plistPath}"`, {
 				stdio: 'ignore',
 			});
 		} catch (err) {
 			// If already loaded, unload and reload
 			try {
-				execSync(`launchctl bootout gui/${process.getuid()}/com.shipyard.daemon`, {
+				execSync(`launchctl bootout gui/${uid}/com.shipyard.daemon`, {
 					stdio: 'ignore',
 				});
 			} catch {
 				// Ignore bootout errors (may not be loaded)
 			}
-			execSync(`launchctl bootstrap gui/${process.getuid()} "${plistPath}"`, {
+			execSync(`launchctl bootstrap gui/${uid} "${plistPath}"`, {
 				stdio: 'ignore',
 			});
 		}
@@ -275,13 +282,18 @@ export async function isAutoStartConfigured(): Promise<boolean> {
  */
 async function removeMacOS(): Promise<void> {
 	try {
-		// Unload the service
-		try {
-			execSync(`launchctl bootout gui/${process.getuid()}/com.shipyard.daemon`, {
-				stdio: 'ignore',
-			});
-		} catch {
-			// Ignore errors (may not be loaded)
+		// Get user ID (only available on POSIX systems)
+		const uid = process.getuid?.();
+
+		// Unload the service (only if we can get the uid)
+		if (uid !== undefined) {
+			try {
+				execSync(`launchctl bootout gui/${uid}/com.shipyard.daemon`, {
+					stdio: 'ignore',
+				});
+			} catch {
+				// Ignore errors (may not be loaded)
+			}
 		}
 
 		// Remove plist file

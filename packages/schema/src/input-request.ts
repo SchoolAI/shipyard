@@ -2,6 +2,20 @@ import { nanoid } from 'nanoid';
 import { z } from 'zod';
 
 /**
+ * Input request timeout limits.
+ * Both single-question and multi-question schemas use these same values
+ * to ensure consistent validation across the codebase.
+ */
+export const INPUT_REQUEST_TIMEOUT = {
+  /** Minimum timeout in seconds (5 minutes) */
+  MIN_SECONDS: 300,
+  /** Maximum timeout in seconds (4 hours) */
+  MAX_SECONDS: 14400,
+  /** Default timeout in seconds (30 minutes) */
+  DEFAULT_SECONDS: 1800,
+} as const;
+
+/**
  * Default timeout in seconds for input requests when not explicitly specified.
  * Used as fallback in:
  * - InputRequestModal.tsx (browser countdown)
@@ -11,7 +25,7 @@ import { z } from 'zod';
  * Server-side timeout in input-request-manager.ts uses the request's timeout
  * or 0 (no timeout) if not specified, but clients use this default for UI display.
  */
-export const DEFAULT_INPUT_REQUEST_TIMEOUT_SECONDS = 1800;
+export const DEFAULT_INPUT_REQUEST_TIMEOUT_SECONDS = INPUT_REQUEST_TIMEOUT.DEFAULT_SECONDS;
 
 /**
  * Valid input request types.
@@ -63,8 +77,14 @@ const InputRequestBaseSchema = z.object({
   timeout: z
     .number()
     .int()
-    .min(300, 'Timeout must be at least 5 minutes (300 seconds)')
-    .max(1800, 'Timeout cannot exceed 30 minutes (1800 seconds)')
+    .min(
+      INPUT_REQUEST_TIMEOUT.MIN_SECONDS,
+      `Timeout must be at least ${INPUT_REQUEST_TIMEOUT.MIN_SECONDS} seconds (5 minutes)`
+    )
+    .max(
+      INPUT_REQUEST_TIMEOUT.MAX_SECONDS,
+      `Timeout cannot exceed ${INPUT_REQUEST_TIMEOUT.MAX_SECONDS} seconds (4 hours)`
+    )
     .optional(),
   /** Optional plan ID to associate request with a specific plan (null/undefined = global) */
   planId: z.string().optional(),
@@ -224,12 +244,6 @@ export type EmailInputRequest = z.infer<typeof EmailInputSchema>;
 export type DateInputRequest = z.infer<typeof DateInputSchema>;
 export type RatingInputRequest = z.infer<typeof RatingInputSchema>;
 
-/**
- * @deprecated Use ChoiceInputRequest with displayAs='dropdown' instead.
- * Kept for backward compatibility - old dropdown requests are migrated to choice.
- */
-export type DropdownInputRequest = ChoiceInputRequest;
-
 /** Base params for creating any input request */
 interface CreateInputRequestBaseParams {
   message: string;
@@ -317,16 +331,6 @@ export type CreateInputRequestParams =
   | CreateEmailInputParams
   | CreateDateInputParams
   | CreateRatingInputParams;
-
-/**
- * @deprecated Use CreateChoiceInputParams with displayAs='dropdown' instead.
- */
-export interface CreateDropdownInputParams extends CreateInputRequestBaseParams {
-  type: 'choice';
-  options: ChoiceOption[];
-  displayAs: 'dropdown';
-  placeholder?: string;
-}
 
 /**
  * Create a new input request with auto-generated fields.
@@ -654,8 +658,14 @@ export const MultiQuestionInputRequestSchema = z
     timeout: z
       .number()
       .int()
-      .min(10, 'Timeout must be at least 10 seconds')
-      .max(14400, 'Timeout cannot exceed 4 hours')
+      .min(
+        INPUT_REQUEST_TIMEOUT.MIN_SECONDS,
+        `Timeout must be at least ${INPUT_REQUEST_TIMEOUT.MIN_SECONDS} seconds (5 minutes)`
+      )
+      .max(
+        INPUT_REQUEST_TIMEOUT.MAX_SECONDS,
+        `Timeout cannot exceed ${INPUT_REQUEST_TIMEOUT.MAX_SECONDS} seconds (4 hours)`
+      )
       .optional(),
     /** Optional plan ID to associate request with a specific plan */
     planId: z.string().optional(),
