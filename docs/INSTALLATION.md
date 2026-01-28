@@ -8,7 +8,11 @@ How to install Shipyard MCP server across different LLM clients and IDEs.
 
 **For Claude Code users (recommended):**
 ```bash
-/plugin install SchoolAI/shipyard
+# Step 1: Add the marketplace
+/plugin marketplace add https://github.com/SchoolAI/shipyard.git
+
+# Step 2: Install the plugin
+/plugin install shipyard@schoolai-shipyard
 ```
 
 **For other clients:** See client-specific instructions below.
@@ -36,7 +40,11 @@ Claude Code offers the most comprehensive Shipyard experience with plugin suppor
 Installs the full plugin including MCP server, hooks, and skills:
 
 ```bash
-/plugin install SchoolAI/shipyard
+# Step 1: Add the marketplace
+/plugin marketplace add https://github.com/SchoolAI/shipyard.git
+
+# Step 2: Install the plugin
+/plugin install shipyard@schoolai-shipyard
 ```
 
 **What you get:**
@@ -47,12 +55,12 @@ Installs the full plugin including MCP server, hooks, and skills:
 
 **To update:**
 ```bash
-/plugin update shipyard
+/plugin update shipyard@schoolai-shipyard
 ```
 
 **Verification:**
 ```bash
-/plugin list              # Should show "shipyard"
+/plugin list              # Should show "shipyard@schoolai-shipyard"
 /shipyard                 # Access Shipyard skills
 ```
 
@@ -437,12 +445,16 @@ export PATH=~/.npm-global/bin:$PATH
 
 ### Claude Code plugin not found
 
-The plugin install command should be:
+The plugin requires two steps:
 ```bash
-/plugin install SchoolAI/shipyard
+# Step 1: Add the marketplace
+/plugin marketplace add https://github.com/SchoolAI/shipyard.git
+
+# Step 2: Install the plugin
+/plugin install shipyard@schoolai-shipyard
 ```
 
-Not from a marketplace - it installs directly from the GitHub repository.
+Make sure to add the marketplace first before attempting to install.
 
 ### Browser won't open
 
@@ -465,7 +477,7 @@ Not from a marketplace - it installs directly from the GitHub repository.
 ### Claude Code (plugin)
 
 ```bash
-/plugin uninstall shipyard
+/plugin uninstall shipyard@schoolai-shipyard
 ```
 
 ### Claude Code (MCP only)

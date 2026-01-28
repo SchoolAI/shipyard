@@ -2,7 +2,7 @@
 
 A systematic approach to testing Shipyard releases.
 
-> **Last tested:** v0.4.0 (2026-01-26)
+> **Last tested:** v0.4.1-rc.20260128 (2026-01-27)
 
 ---
 
@@ -21,6 +21,32 @@ If you've already published a version and have the plugin installed:
 2. **Skip** `pnpm dev:all` (MCP server runs via plugin automatically)
 3. **Go straight to** [Test Categories](#test-categories) below
 4. Use Claude Code with the installed plugin to test MCP tools directly
+
+### Dogfooding: Use Shipyard During Testing
+
+**Use Shipyard itself to coordinate testing.** This serves two purposes:
+1. Tests the MCP tools and UI in real-world usage
+2. Keeps all testing coordination in one place (the task's activity feed)
+
+**How to dogfood:**
+- Create a test task via `execute_code` with `createTask()`
+- Use `requestUserInput()` to ask for manual verification of UI features
+- Log findings with `postUpdate()` as you test
+- The activity timeline becomes your testing log
+
+**Example - asking user to verify UI:**
+```typescript
+const result = await requestUserInput({
+  questions: [
+    { message: "Does the inbox click work on first try?", type: "choice", options: ["Yes", "No"] },
+    { message: "Is dark mode toast readable?", type: "choice", options: ["Yes", "No"] }
+  ],
+  timeout: 600
+});
+return { verifications: result.response };
+```
+
+This keeps everything in Shipyard rather than scattered across chat and notes.
 
 ### Pre-Publish Testing
 
@@ -47,33 +73,158 @@ pnpm test  # Should see: 695 tests pass (389 schema + 155 server + 151 web)
 
 ### How RCs Work
 
-With nightly builds (not per-push), RCs are created on a schedule:
+Shipyard has two types of pre-releases, both published to `@next`:
 
 ```
-Version format: {base-version}-next.{commit-count}
+Nightly:  {base-version}-nightly.{YYYYMMDD}  (automatic, 2:15 AM UTC)
+RC:       {base-version}-rc.{YYYYMMDD}       (manual trigger)
+
 npm tag: @next (NOT @latest)
-Example: 0.2.3-next.485
+Example: 0.4.1-rc.20260128
 ```
 
 RCs are:
 - Safe to publish (users must explicitly install `@next`)
 - Versioned separately from stable
-- Testable via: `npx @schoolai/shipyard-mcp@next`
+- Testable via: `npx -y -p @schoolai/shipyard-mcp@next mcp-server-shipyard`
+
+**Triggering releases via CLI:**
+
+```bash
+# Trigger nightly build (same as automatic)
+gh workflow run publish-npm.yml -f action=nightly
+
+# Trigger RC release
+gh workflow run publish-npm.yml -f action=rc
+```
 
 ### Promoting RC to Stable
 
 When confident in an RC:
 
+**Option 1: GitHub Actions UI**
 1. Go to **Actions > Publish to npm > Run workflow**
 2. Select action: `promote`
-3. Enter RC version: `0.2.3-next.485`
-4. Enter stable version: `0.2.3`
+3. Enter RC version: `0.4.1-rc.20260128`
+4. Enter stable version: `0.4.2`
 5. Run workflow
+
+**Option 2: CLI**
+```bash
+gh workflow run publish-npm.yml \
+  -f action=promote \
+  -f rc_version=0.4.1-rc.20260128 \
+  -f stable_version=0.4.2
+```
 
 This:
 - Downloads RC tarball from npm
 - Re-publishes as stable with `@latest` tag
 - Creates git tag and GitHub release
+
+### Setting Up Claude Code for RC Testing
+
+The Shipyard plugin has two components that need to be tested:
+1. **MCP server** (npm package) - The tools and APIs
+2. **Hooks + Skills** (GitHub plugin) - Plan mode behavior, skills
+
+To test an RC, you want the **RC MCP server** but the **latest hooks/skills from git**.
+
+**Step 1: Update the plugin to get latest hooks/skills**
+
+```bash
+/plugin update shipyard@schoolai-shipyard
+```
+
+This pulls the latest code from the GitHub repository.
+
+**Step 2: Override MCP to use RC version**
+
+Create or update `.mcp.json` in your project root:
+
+```json
+{
+  "mcpServers": {
+    "shipyard": {
+      "command": "npx",
+      "args": ["-y", "-p", "@schoolai/shipyard-mcp@next", "mcp-server-shipyard"],
+      "env": {
+        "NODE_ENV": "production"
+      }
+    }
+  }
+}
+```
+
+The project-level `.mcp.json` overrides the plugin's MCP configuration.
+
+**Step 3: Reload MCP**
+
+```bash
+/mcp reload
+```
+
+**Step 4: Verify RC is loaded**
+
+```bash
+# Check versions
+npm view @schoolai/shipyard-mcp@next version   # Should show RC version
+npm view @schoolai/shipyard-mcp@latest version # Should show stable version
+
+# Verify MCP is running
+/mcp
+# Should show "shipyard" under Project MCPs
+```
+
+**Why this works:**
+- Plugin provides hooks + skills (from git, latest code)
+- Project `.mcp.json` overrides the MCP server (from npm `@next` tag)
+- You test the RC server code with the latest plugin behavior
+
+**Step 5: Create a testing task list**
+
+Create a todo list to track testing progress. Use Claude Code's task tools or Shipyard itself:
+
+```typescript
+// In execute_code - create a Shipyard task for testing
+const task = await createTask({
+  title: "RC Testing - v0.4.1-rc.20260128",
+  content: `## Testing Checklist
+- [ ] Core functionality (createTask, readTask, postUpdate) {#deliverable}
+- [ ] Input system (all 8 types) {#deliverable}
+- [ ] Artifacts & deliverables {#deliverable}
+- [ ] Platform hooks (plan mode, AskUserQuestion rejection)
+- [ ] Mobile testing
+- [ ] Bug fixes from RC doc
+`
+});
+```
+
+This ensures you track what's tested and creates an audit trail.
+
+**Step 6: After testing - Revert `.mcp.json`**
+
+⚠️ **Important:** After RC testing, revert `.mcp.json` back to local development configuration:
+
+```json
+{
+  "mcpServers": {
+    "shipyard": {
+      "command": "npx",
+      "args": ["mcpmon", "--watch", "apps/server/dist/index.js", "--ext", "js", "--", "node", "apps/server/dist/index.js"],
+      "env": {
+        "NODE_ENV": "development",
+        "SHIPYARD_WEB_URL": "http://localhost:5173",
+        "SIGNALING_URL": "ws://localhost:4444"
+      }
+    }
+  }
+}
+```
+
+Then reload: `/mcp reload`
+
+**Don't forget this step!** Leaving `.mcp.json` pointing to `@next` will use the npm package instead of your local development build.
 
 ---
 
@@ -346,6 +497,61 @@ Essential workflows to verify every release:
 | Session persistence | Refresh page while signed in | Stays signed in |
 
 **Known issue:** "Mark as resolved" for diff comments may require page refresh or re-login to update UI - this is a state refresh issue, not a data bug.
+
+---
+
+## Platform-Specific Integration Tests
+
+Different platforms have different hook capabilities. Test platform-specific integrations separately.
+
+### Claude Code (Full Integration)
+
+Claude Code has hooks that intercept built-in tools and redirect to Shipyard.
+
+#### Hook Tests
+
+| Test | How to Verify | Pass Criteria |
+|------|---------------|---------------|
+| **AskUserQuestion Rejection** | Call `AskUserQuestion` tool directly | Hook blocks it, suggests `requestUserInput()` instead |
+| **Plan Mode Entry** | Press Shift+Tab to enter plan mode | Browser opens with new task automatically |
+| **Plan Mode Approval** | Exit plan mode (Shift+Tab again) | Hook blocks until human approves in browser |
+| **Session Context Injection** | After approval, check for taskId/sessionToken | Variables injected into context |
+
+**Testing AskUserQuestion rejection:**
+```
+# In Claude Code, try to use the built-in tool:
+"Ask the user what color they prefer using AskUserQuestion"
+
+# Expected: Hook intercepts and returns message suggesting requestUserInput()
+# NOT Expected: A direct prompt to the user via Claude Code's UI
+```
+
+**Testing Plan Mode:**
+```
+# 1. Press Shift+Tab to enter plan mode
+# 2. Write a plan with deliverables
+# 3. Press Shift+Tab to exit
+# 4. Verify: Browser opened, hook blocks for approval
+# 5. Approve in browser
+# 6. Verify: Agent receives taskId, sessionToken, deliverables
+```
+
+#### Skill Tests
+
+| Test | How to Verify | Pass Criteria |
+|------|---------------|---------------|
+| **Skill Loading** | `/shipyard` or invoke Shipyard skill | Skill loads without error |
+| **MCP + Skill Together** | Use skill guidance to call MCP tools | Both work in harmony |
+
+### Other Platforms (MCP Only)
+
+Cursor, Windsurf, Claude Desktop, etc. only have MCP access (no hooks).
+
+| Test | How to Verify | Pass Criteria |
+|------|---------------|---------------|
+| **MCP Tools Available** | Check tool list in platform | `execute_code` tool visible |
+| **execute_code Works** | Run `createTask()` inside sandbox | Task created, URL returned |
+| **Monitoring Script** | Run bash script from `createTask` response | Script polls for approval status |
 
 ---
 
