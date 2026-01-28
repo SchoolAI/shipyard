@@ -574,6 +574,42 @@ export function initPlanMetadata(ydoc: Y.Doc, init: InitPlanMetadataParams): voi
   }
 }
 
+export interface PlanIndexMetadata {
+  id: 'plan-index';
+  createdAt: number;
+  updatedAt: number;
+  epoch: number;
+}
+
+export interface InitPlanIndexMetadataParams {
+  epoch?: number;
+}
+
+export function initPlanIndexMetadata(ydoc: Y.Doc, init: InitPlanIndexMetadataParams = {}): void {
+  const map = ydoc.getMap(YDOC_KEYS.METADATA);
+  const now = Date.now();
+
+  map.set('id', 'plan-index');
+  map.set('createdAt', now);
+  map.set('updatedAt', now);
+  map.set('epoch', init.epoch ?? DEFAULT_EPOCH);
+}
+
+export function getPlanIndexMetadata(ydoc: Y.Doc): PlanIndexMetadata | null {
+  const map = ydoc.getMap(YDOC_KEYS.METADATA);
+  const metadata = map.toJSON();
+
+  if (!metadata || typeof metadata !== 'object') return null;
+  if (metadata.id !== 'plan-index') return null;
+
+  return {
+    id: 'plan-index',
+    createdAt: metadata.createdAt as number,
+    updatedAt: metadata.updatedAt as number,
+    epoch: metadata.epoch as number,
+  };
+}
+
 export function getStepCompletions(ydoc: Y.Doc): Map<string, boolean> {
   const steps = ydoc.getMap<boolean>('stepCompletions');
   return new Map(steps.entries());
