@@ -244,12 +244,6 @@ export type EmailInputRequest = z.infer<typeof EmailInputSchema>;
 export type DateInputRequest = z.infer<typeof DateInputSchema>;
 export type RatingInputRequest = z.infer<typeof RatingInputSchema>;
 
-/**
- * @deprecated Use ChoiceInputRequest with displayAs='dropdown' instead.
- * Kept for backward compatibility - old dropdown requests are migrated to choice.
- */
-export type DropdownInputRequest = ChoiceInputRequest;
-
 /** Base params for creating any input request */
 interface CreateInputRequestBaseParams {
   message: string;
@@ -337,16 +331,6 @@ export type CreateInputRequestParams =
   | CreateEmailInputParams
   | CreateDateInputParams
   | CreateRatingInputParams;
-
-/**
- * @deprecated Use CreateChoiceInputParams with displayAs='dropdown' instead.
- */
-export interface CreateDropdownInputParams extends CreateInputRequestBaseParams {
-  type: 'choice';
-  options: ChoiceOption[];
-  displayAs: 'dropdown';
-  placeholder?: string;
-}
 
 /**
  * Create a new input request with auto-generated fields.
