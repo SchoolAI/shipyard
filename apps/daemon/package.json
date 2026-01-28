@@ -1,0 +1,29 @@
+{
+  "name": "shipyard",
+  "version": "0.1.0",
+  "description": "Agent launcher daemon - enables browser to trigger local Claude Code sessions",
+  "type": "module",
+  "bin": {
+    "shipyard": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "start": "node dist/index.js",
+    "test": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "@types/ws": "^8.5.13",
+    "tsup": "^8.5.1",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  },
+  "engines": {
+    "node": ">=22.14.0"
+  }
+}
