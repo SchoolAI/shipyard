@@ -28491,7 +28491,7 @@ init_cjs_shims();
 // ../../packages/schema/dist/index.mjs
 init_cjs_shims();
 
-// ../../packages/schema/dist/yjs-helpers-CmikQBE7.mjs
+// ../../packages/schema/dist/yjs-helpers-CdBcMmbj.mjs
 init_cjs_shims();
 
 // ../../packages/schema/dist/plan.mjs
@@ -42683,7 +42683,8 @@ var PRReviewCommentSchema = external_exports.object({
   body: external_exports.string(),
   author: external_exports.string(),
   createdAt: external_exports.number(),
-  resolved: external_exports.boolean().optional()
+  resolved: external_exports.boolean().optional(),
+  inReplyTo: external_exports.string().optional()
 });
 var LocalDiffCommentSchema = external_exports.object({
   id: external_exports.string(),
@@ -42696,7 +42697,8 @@ var LocalDiffCommentSchema = external_exports.object({
   baseRef: external_exports.string(),
   resolved: external_exports.boolean().optional(),
   lineContentHash: external_exports.string().optional(),
-  machineId: external_exports.string().optional()
+  machineId: external_exports.string().optional(),
+  inReplyTo: external_exports.string().optional()
 });
 var GitHubArtifactParseSchema = external_exports.object({
   id: external_exports.string(),
@@ -42725,7 +42727,7 @@ var LocalArtifactParseSchema = external_exports.object({
   localArtifactId: external_exports.string()
 });
 
-// ../../packages/schema/dist/yjs-helpers-CmikQBE7.mjs
+// ../../packages/schema/dist/yjs-helpers-CdBcMmbj.mjs
 function assertNever2(value) {
   throw new Error(`Unhandled discriminated union member: ${JSON.stringify(value)}`);
 }
@@ -44316,8 +44318,8 @@ function formatThreadsForLLM(threads, options = {}) {
     const comments = thread.comments.map((c, idx) => {
       const text = extractTextFromCommentBody(c.body);
       const author = resolveUser ? resolveUser(c.userId) : c.userId.slice(0, 8);
-      if (idx === 0) return `${author}: ${text}`;
-      return `${author} (reply): ${text}`;
+      if (idx === 0) return `[thread:${thread.id}] ${author}: ${text}`;
+      return `[comment:${c.id}] ${author} (reply): ${text}`;
     }).join("\n");
     return `${location}${thread.resolved ? " [Resolved]" : ""}
 ${comments}`;
@@ -44343,6 +44345,8 @@ var TOOL_NAMES = {
   READ_DIFF_COMMENTS: "read_diff_comments",
   READ_TASK: "read_task",
   REGENERATE_SESSION_TOKEN: "regenerate_session_token",
+  REPLY_TO_DIFF_COMMENT: "reply_to_diff_comment",
+  REPLY_TO_THREAD_COMMENT: "reply_to_thread_comment",
   REQUEST_USER_INPUT: "request_user_input",
   SETUP_REVIEW_NOTIFICATION: "setup_review_notification",
   UPDATE_BLOCK_CONTENT: "update_block_content",

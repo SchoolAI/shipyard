@@ -28,15 +28,18 @@ export type FormatPRCommentsOptions = FormatDiffCommentsOptions;
 
 /** Common fields needed for formatting a comment line */
 interface FormattableComment {
+  id: string;
   line: number;
   author: string;
   resolved?: boolean;
   body: string;
+  inReplyTo?: string;
 }
 
 /** Extended comment with staleness info for formatting */
 interface FormattableCommentWithStaleness extends FormattableComment {
   staleness?: StalenessInfo;
+  commentType: 'pr' | 'local';
 }
 
 /**
@@ -63,7 +66,7 @@ function groupBy<T, K extends string | number>(
 
 /**
  * Format a single comment as a markdown list item.
- * Includes resolved and staleness markers when applicable.
+ * Includes comment ID, resolved and staleness markers, and reply indicators.
  */
 function formatCommentLine(comment: FormattableCommentWithStaleness): string {
   const markers: string[] = [];
@@ -81,23 +84,43 @@ function formatCommentLine(comment: FormattableCommentWithStaleness): string {
 
   const markerStr = markers.length > 0 ? ` ${markers.join(' ')}` : '';
   const body = comment.body.replace(/\n/g, ' ').trim();
-  return `- Line ${comment.line} (${comment.author})${markerStr}: ${body}`;
+  const idPrefix = `[${comment.commentType}:${comment.id}]`;
+  const replyIndicator = comment.inReplyTo ? ' ↳ Reply' : '';
+
+  return `- ${idPrefix} Line ${comment.line} (${comment.author})${replyIndicator}${markerStr}: ${body}`;
 }
 
 /** Local comment augmented with staleness for formatting */
 interface LocalCommentWithStaleness extends LocalDiffComment {
   staleness?: StalenessInfo;
+  commentType: 'local';
+}
+
+/** PR comment with type marker for formatting */
+interface PRCommentWithType extends PRReviewComment {
+  commentType: 'pr';
 }
 
 /**
  * Format a group of comments for a single file.
- * Sorts by line number and formats each as a list item.
+ * Sorts by line number (parents before replies at same line) and formats each as a list item.
  */
 function formatFileSection<T extends FormattableCommentWithStaleness & { path: string }>(
   path: string,
   comments: T[]
 ): string {
-  const sorted = [...comments].sort((a, b) => a.line - b.line);
+  /**
+   * Sort comments by line number, then by parent/reply relationship.
+   * At the same line, parent comments appear before their replies.
+   */
+  const sorted = [...comments].sort((a, b) => {
+    if (a.line !== b.line) {
+      return a.line - b.line;
+    }
+    const aIsReply = a.inReplyTo ? 1 : 0;
+    const bIsReply = b.inReplyTo ? 1 : 0;
+    return aIsReply - bIsReply;
+  });
   const lines = sorted.map(formatCommentLine);
   return `### ${path}\n${lines.join('\n')}`;
 }
@@ -127,8 +150,12 @@ function formatPRCommentsSections(comments: PRReviewComment[]): string[] {
   );
 
   return byPR.map(([prNumber, prComments]) => {
+    const prCommentsWithType: PRCommentWithType[] = prComments.map((c) => ({
+      ...c,
+      commentType: 'pr' as const,
+    }));
     const byFile = groupBy(
-      prComments,
+      prCommentsWithType,
       (c) => c.path,
       (a, b) => a.localeCompare(b)
     );
@@ -195,7 +222,7 @@ export function formatDiffCommentsForLLM(
       const key = `${comment.path}:${comment.line}`;
       const currentLineContent = lineContentMap?.get(key);
       const staleness = computeCommentStaleness(comment, currentHeadSha, currentLineContent);
-      return { ...comment, staleness };
+      return { ...comment, staleness, commentType: 'local' as const };
     });
     sections.push(formatLocalCommentsSection(localWithStaleness));
   }

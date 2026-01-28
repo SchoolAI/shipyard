@@ -43,22 +43,31 @@ interface TokenExchangeResponse {
 
 /**
  * Allowed origins by environment - restrict CORS to prevent phishing attacks
- * In development, allow any origin for flexibility with different dev server ports.
+ *
+ * Development: Allow any localhost port for worktree flexibility
+ * Production: Strict whitelist
  */
 const ALLOWED_ORIGINS_PRODUCTION = ['https://shipyard.pages.dev', 'https://schoolai.github.io'];
 
-function getCorsHeaders(origin: string | null, env: Env): Record<string, string> | null {
-  if (env.ENVIRONMENT === 'development') {
-    return {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
-    };
+function isAllowedOrigin(origin: string | null, env: Env): boolean {
+  if (!origin) {
+    return false;
   }
 
-  const isAllowed = origin && ALLOWED_ORIGINS_PRODUCTION.includes(origin);
+  if (env.ENVIRONMENT === 'production') {
+    return ALLOWED_ORIGINS_PRODUCTION.includes(origin);
+  }
 
-  if (!isAllowed) {
+  try {
+    const url = new URL(origin);
+    return url.hostname === 'localhost' || url.hostname === '127.0.0.1';
+  } catch {
+    return false;
+  }
+}
+
+function getCorsHeaders(origin: string | null, env: Env): Record<string, string> | null {
+  if (!isAllowedOrigin(origin, env)) {
     return null;
   }
 

@@ -17,6 +17,7 @@ import {
   getPlanMetadataWithValidation,
   getPlanOwnerId,
   getRejectedUsers,
+  getThread,
   getViewedBy,
   initPlanMetadata,
   isApprovalRequired,
@@ -27,6 +28,8 @@ import {
   linkPR,
   markMachineDisconnected,
   markPlanAsViewed,
+  parseCommentId,
+  parseThreadId,
   rejectUser,
   removeArtifact,
   removeChangeSnapshot,
@@ -1664,5 +1667,264 @@ describe('Change Snapshot helpers', () => {
     expect(snapshots.has('machine-1')).toBe(true);
     expect(snapshots.has('machine-2')).toBe(true);
     expect(snapshots.has('machine-3')).toBe(true);
+  });
+});
+
+describe('Thread helpers', () => {
+  let ydoc: Y.Doc;
+
+  beforeEach(() => {
+    ydoc = new Y.Doc();
+  });
+
+  describe('getThread', () => {
+    it('returns null for empty threads map', () => {
+      const result = getThread(ydoc, 'nonexistent');
+      expect(result).toBe(null);
+    });
+
+    it('finds thread by ID when key matches thread.id', () => {
+      const threadsMap = ydoc.getMap('threads');
+      const threadId = 'thread-123';
+      const thread = {
+        id: threadId,
+        comments: [
+          { id: 'comment-1', userId: 'user1', body: 'Test comment', createdAt: Date.now() },
+        ],
+      };
+      threadsMap.set(threadId, thread);
+
+      const result = getThread(ydoc, threadId);
+      expect(result).not.toBe(null);
+      expect(result?.id).toBe(threadId);
+      expect(result?.comments).toHaveLength(1);
+    });
+
+    it('finds thread when key differs from thread.id (fallback iteration)', () => {
+      const threadsMap = ydoc.getMap('threads');
+      const mapKey = 'some-key';
+      const threadId = 'thread-456';
+      const thread = {
+        id: threadId,
+        comments: [
+          { id: 'comment-1', userId: 'user1', body: 'Test comment', createdAt: Date.now() },
+        ],
+      };
+      threadsMap.set(mapKey, thread);
+
+      const result = getThread(ydoc, threadId);
+      expect(result).not.toBe(null);
+      expect(result?.id).toBe(threadId);
+    });
+
+    it('handles resolved threads', () => {
+      const threadsMap = ydoc.getMap('threads');
+      const threadId = 'thread-789';
+      const thread = {
+        id: threadId,
+        comments: [
+          { id: 'comment-1', userId: 'user1', body: 'Test comment', createdAt: Date.now() },
+        ],
+        resolved: true,
+        selectedText: 'some text',
+      };
+      threadsMap.set(threadId, thread);
+
+      const result = getThread(ydoc, threadId);
+      expect(result).not.toBe(null);
+      expect(result?.resolved).toBe(true);
+      expect(result?.selectedText).toBe('some text');
+    });
+
+    it('returns null when thread.id does not match requested ID', () => {
+      const threadsMap = ydoc.getMap('threads');
+      const thread = {
+        id: 'different-id',
+        comments: [
+          { id: 'comment-1', userId: 'user1', body: 'Test comment', createdAt: Date.now() },
+        ],
+      };
+      threadsMap.set('some-key', thread);
+
+      const result = getThread(ydoc, 'nonexistent-id');
+      expect(result).toBe(null);
+    });
+
+    it('handles multiple threads and finds correct one', () => {
+      const threadsMap = ydoc.getMap('threads');
+
+      const thread1 = {
+        id: 'thread-1',
+        comments: [{ id: 'c1', userId: 'user1', body: 'Comment 1', createdAt: Date.now() }],
+      };
+      const thread2 = {
+        id: 'thread-2',
+        comments: [{ id: 'c2', userId: 'user2', body: 'Comment 2', createdAt: Date.now() }],
+      };
+      const thread3 = {
+        id: 'thread-3',
+        comments: [{ id: 'c3', userId: 'user3', body: 'Comment 3', createdAt: Date.now() }],
+      };
+
+      threadsMap.set('thread-1', thread1);
+      threadsMap.set('thread-2', thread2);
+      threadsMap.set('thread-3', thread3);
+
+      const result = getThread(ydoc, 'thread-2');
+      expect(result).not.toBe(null);
+      expect(result?.id).toBe('thread-2');
+      expect(result?.comments[0]?.body).toBe('Comment 2');
+    });
+
+    it('filters out invalid threads when searching', () => {
+      const threadsMap = ydoc.getMap('threads');
+
+      // Add valid thread
+      const validThread = {
+        id: 'valid-thread',
+        comments: [{ id: 'c1', userId: 'user1', body: 'Valid', createdAt: Date.now() }],
+      };
+      threadsMap.set('valid-thread', validThread);
+
+      // Add invalid entries
+      threadsMap.set('invalid-1', { id: 'invalid-1' }); // missing comments
+      threadsMap.set('invalid-2', null);
+      threadsMap.set('invalid-3', 'not an object');
+
+      const result = getThread(ydoc, 'valid-thread');
+      expect(result).not.toBe(null);
+      expect(result?.id).toBe('valid-thread');
+    });
+
+    it('finds thread using wrapped format from export [thread:id]', () => {
+      const threadsMap = ydoc.getMap('threads');
+      const threadId = '0e63dc87-28ab-4587-8c6b-029216f33ced';
+      const thread = {
+        id: threadId,
+        comments: [
+          { id: 'comment-1', userId: 'user1', body: 'Test comment', createdAt: Date.now() },
+        ],
+      };
+      threadsMap.set(threadId, thread);
+
+      /** Should find thread using wrapped format from export */
+      const result = getThread(ydoc, `[thread:${threadId}]`);
+      expect(result).not.toBe(null);
+      expect(result?.id).toBe(threadId);
+    });
+
+    it('finds thread using prefix format thread:id', () => {
+      const threadsMap = ydoc.getMap('threads');
+      const threadId = 'abc123';
+      const thread = {
+        id: threadId,
+        comments: [{ id: 'comment-1', userId: 'user1', body: 'Test', createdAt: Date.now() }],
+      };
+      threadsMap.set(threadId, thread);
+
+      /** Should find thread using prefix format */
+      const result = getThread(ydoc, `thread:${threadId}`);
+      expect(result).not.toBe(null);
+      expect(result?.id).toBe(threadId);
+    });
+  });
+
+  describe('parseThreadId', () => {
+    it('returns bare ID unchanged', () => {
+      expect(parseThreadId('abc123')).toBe('abc123');
+      expect(parseThreadId('0e63dc87-28ab-4587-8c6b-029216f33ced')).toBe(
+        '0e63dc87-28ab-4587-8c6b-029216f33ced'
+      );
+    });
+
+    it('extracts ID from wrapped format [thread:id]', () => {
+      expect(parseThreadId('[thread:abc123]')).toBe('abc123');
+      expect(parseThreadId('[thread:0e63dc87-28ab-4587-8c6b-029216f33ced]')).toBe(
+        '0e63dc87-28ab-4587-8c6b-029216f33ced'
+      );
+    });
+
+    it('extracts ID from prefix format thread:id', () => {
+      expect(parseThreadId('thread:abc123')).toBe('abc123');
+      expect(parseThreadId('thread:0e63dc87-28ab-4587-8c6b-029216f33ced')).toBe(
+        '0e63dc87-28ab-4587-8c6b-029216f33ced'
+      );
+    });
+
+    it('handles edge cases', () => {
+      /** Empty string */
+      expect(parseThreadId('')).toBe('');
+
+      /** Already unwrapped */
+      expect(parseThreadId('simple-id')).toBe('simple-id');
+
+      /** Partial wrapper - only brackets no prefix */
+      expect(parseThreadId('[abc123]')).toBe('[abc123]');
+    });
+  });
+
+  describe('parseCommentId', () => {
+    it('returns bare ID with unknown type', () => {
+      const result = parseCommentId('abc123');
+      expect(result.type).toBe('unknown');
+      expect(result.id).toBe('abc123');
+    });
+
+    it('extracts PR comment from wrapped format [pr:id]', () => {
+      const result = parseCommentId('[pr:abc123]');
+      expect(result.type).toBe('pr');
+      expect(result.id).toBe('abc123');
+    });
+
+    it('extracts PR comment from prefix format pr:id', () => {
+      const result = parseCommentId('pr:abc123');
+      expect(result.type).toBe('pr');
+      expect(result.id).toBe('abc123');
+    });
+
+    it('extracts local comment from wrapped format [local:id]', () => {
+      const result = parseCommentId('[local:abc123]');
+      expect(result.type).toBe('local');
+      expect(result.id).toBe('abc123');
+    });
+
+    it('extracts local comment from prefix format local:id', () => {
+      const result = parseCommentId('local:abc123');
+      expect(result.type).toBe('local');
+      expect(result.id).toBe('abc123');
+    });
+
+    it('extracts comment from wrapped format [comment:id]', () => {
+      const result = parseCommentId('[comment:abc123]');
+      expect(result.type).toBe('comment');
+      expect(result.id).toBe('abc123');
+    });
+
+    it('extracts comment from prefix format comment:id', () => {
+      const result = parseCommentId('comment:abc123');
+      expect(result.type).toBe('comment');
+      expect(result.id).toBe('abc123');
+    });
+
+    it('handles UUID-style IDs', () => {
+      const uuid = '0e63dc87-28ab-4587-8c6b-029216f33ced';
+      expect(parseCommentId(`[pr:${uuid}]`)).toEqual({ type: 'pr', id: uuid });
+      expect(parseCommentId(`pr:${uuid}`)).toEqual({ type: 'pr', id: uuid });
+      expect(parseCommentId(`[local:${uuid}]`)).toEqual({ type: 'local', id: uuid });
+    });
+
+    it('handles edge cases', () => {
+      /** Empty string */
+      expect(parseCommentId('')).toEqual({ type: 'unknown', id: '' });
+
+      /** Partial wrapper */
+      expect(parseCommentId('[abc123]')).toEqual({ type: 'unknown', id: '[abc123]' });
+
+      /** Invalid type */
+      expect(parseCommentId('[invalid:abc123]')).toEqual({
+        type: 'unknown',
+        id: '[invalid:abc123]',
+      });
+    });
   });
 });

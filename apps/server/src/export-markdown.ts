@@ -236,9 +236,9 @@ function formatThread(
     const authorName = resolveUser ? resolveUser(comment.userId) : comment.userId.slice(0, 8);
 
     if (idx === 0) {
-      output += `> **${authorName}:** ${bodyText}\n`;
+      output += `[thread:${thread.id}] **${authorName}:** ${bodyText}\n`;
     } else {
-      output += `>\n> **${authorName} (Reply):** ${bodyText}\n`;
+      output += `[comment:${comment.id}] **${authorName} (Reply):** ${bodyText}\n`;
     }
   });
 
