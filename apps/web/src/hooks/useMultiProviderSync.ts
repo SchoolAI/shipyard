@@ -43,6 +43,39 @@ interface CachedProvider {
 const webrtcProviderCache = new Map<string, CachedProvider>();
 
 /**
+ * Create a visibility change handler for WebSocket connection management.
+ * Problem: Browsers throttle background tabs, delaying timers to 60s after 5 min.
+ * y-websocket expects messages every 30s, so background tabs disconnect.
+ *
+ * Solution: Proactively disconnect when tab goes hidden (after grace period),
+ * and reconnect when tab becomes visible again.
+ */
+function createVisibilityChangeHandler(
+  wsProviderRef: React.MutableRefObject<WebsocketProvider | null>,
+  gracePeriodTimeoutRef: { current: ReturnType<typeof setTimeout> | null }
+): () => void {
+  return () => {
+    if (document.visibilityState === 'hidden') {
+      gracePeriodTimeoutRef.current = setTimeout(() => {
+        const currentWs = wsProviderRef.current;
+        if (currentWs?.wsconnected) {
+          currentWs.disconnect();
+        }
+      }, 10000);
+    } else {
+      if (gracePeriodTimeoutRef.current) {
+        clearTimeout(gracePeriodTimeoutRef.current);
+        gracePeriodTimeoutRef.current = null;
+      }
+      const currentWs = wsProviderRef.current;
+      if (currentWs && !currentWs.wsconnected) {
+        currentWs.connect();
+      }
+    }
+  };
+}
+
+/**
  * Get or create a WebRTC provider for a room.
  * Uses reference counting to manage lifecycle across multiple consumers.
  */
@@ -370,6 +403,11 @@ export function useMultiProviderSync(
     let wsSyncListener: (() => void) | null = null;
     let awarenessChangeListener: (() => void) | null = null;
     let rtcSyncedListener: (() => void) | null = null;
+    let visibilityChangeListener: (() => void) | null = null;
+    /** Ref for visibility grace period timeout (enables cleanup via ref.current) */
+    const visibilityGracePeriodTimeoutRef: { current: ReturnType<typeof setTimeout> | null } = {
+      current: null,
+    };
 
     /** IndexedDB persistence */
     const idbProvider = new IndexeddbPersistence(docName, ydoc);
@@ -415,6 +453,12 @@ export function useMultiProviderSync(
       ws = new WebsocketProvider(hubUrl, docName, ydoc, {
         connect: true,
         maxBackoffTime: 2500,
+        /**
+         * Send sync message every 15 seconds to keep connection alive.
+         * Without this, y-websocket's 30-second timeout + browser tab throttling
+         * (which delays timers to 60s after 5 min background) causes disconnects.
+         */
+        resyncInterval: 15000,
       });
 
       wsProviderRef.current = ws;
@@ -438,6 +482,13 @@ export function useMultiProviderSync(
         if (mountedRef.current) updateSyncState();
       };
       ws.on('sync', wsSyncListener);
+
+      /** Set up visibility change handler for browser tab throttling */
+      visibilityChangeListener = createVisibilityChangeHandler(
+        wsProviderRef,
+        visibilityGracePeriodTimeoutRef
+      );
+      document.addEventListener('visibilitychange', visibilityChangeListener);
     })();
 
     /*
@@ -582,6 +633,14 @@ export function useMultiProviderSync(
       /** Remove beforeunload listener */
       if (handleBeforeUnload) {
         window.removeEventListener('beforeunload', handleBeforeUnload);
+      }
+
+      /** Remove visibility change listener and clear grace period timeout */
+      if (visibilityChangeListener) {
+        document.removeEventListener('visibilitychange', visibilityChangeListener);
+      }
+      if (visibilityGracePeriodTimeoutRef.current) {
+        clearTimeout(visibilityGracePeriodTimeoutRef.current);
       }
     };
   }, [
