@@ -5,7 +5,11 @@ import { IndexeddbPersistence } from 'y-indexeddb';
 import { WebrtcProvider } from 'y-webrtc';
 import { WebsocketProvider } from 'y-websocket';
 import * as Y from 'yjs';
-import { handleEpochRejection, isEpochRejection } from '../utils/epochReset';
+import {
+  handleEpochRejection,
+  isEpochRejection,
+  isEpochResetInProgress,
+} from '../utils/epochReset';
 
 interface WebsocketProviderInternal {
   ws?: WebSocket;
@@ -530,7 +534,13 @@ export function useMultiProviderSync(
       ws.on('status', wsStatusListener);
 
       wsSyncListener = () => {
-        if (mountedRef.current) updateSyncState();
+        if (mountedRef.current) {
+          /** Clear epoch reset flag after successful WebSocket sync */
+          if (isEpochResetInProgress()) {
+            sessionStorage.removeItem('shipyard-epoch-reset-in-progress');
+          }
+          updateSyncState();
+        }
       };
       ws.on('sync', wsSyncListener);
 
@@ -553,7 +563,7 @@ export function useMultiProviderSync(
     );
 
     /** WebRTC P2P sync - simple setup without authentication */
-    if (enableWebRTC) {
+    if (enableWebRTC && !isEpochResetInProgress()) {
       const envSignaling = import.meta.env.VITE_WEBRTC_SIGNALING;
       const signalingServer = envSignaling || DEFAULT_SIGNALING_SERVER;
 
@@ -616,11 +626,14 @@ export function useMultiProviderSync(
       };
       rtc.on('synced', rtcSyncedListener);
 
+      /** Send epoch validation immediately when signaling WebSocket opens */
       const sendEpochValidation = () => {
         const signalingConns = getSignalingConnections(rtc);
         const signalingWs = signalingConns[0]?.ws;
 
-        if (signalingWs && signalingWs.readyState === WebSocket.OPEN) {
+        if (!signalingWs) return;
+
+        const doValidation = () => {
           const metadata = ydoc.getMap('metadata').toJSON();
           const epoch = getEpochFromMetadata(metadata);
 
@@ -644,10 +657,17 @@ export function useMultiProviderSync(
           };
 
           signalingWs.addEventListener('message', handleSignalingError);
+        };
+
+        /** Send immediately if already open, otherwise wait for open event */
+        if (signalingWs.readyState === WebSocket.OPEN) {
+          doValidation();
+        } else {
+          signalingWs.addEventListener('open', doValidation, { once: true });
         }
       };
 
-      setTimeout(sendEpochValidation, 1000);
+      sendEpochValidation();
 
       /*
        * Clear awareness on page unload so other peers see us leave immediately
