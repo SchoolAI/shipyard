@@ -128,6 +128,25 @@
   --field-placeholder: oklch(0.5 0.01 263.45);
 }
 
+/*
+ * Sonner Toast Theming
+ * CSS variables that Sonner uses internally. These provide defense-in-depth
+ * by ensuring toasts always match our theme, even if the theme prop fails.
+ * See: https://sonner.emilkowal.ski/styling
+ */
+:root {
+  --sonner-toast-bg: var(--surface);
+  --sonner-toast-border-color: var(--muted);
+  --sonner-toast-text-color: var(--foreground);
+}
+
+[data-theme="dark"] [data-sonner-toaster],
+.dark [data-sonner-toaster] {
+  --sonner-toast-bg: var(--surface);
+  --sonner-toast-border-color: var(--muted);
+  --sonner-toast-text-color: var(--foreground);
+}
+
 /* Base styling - ensure proper background colors */
 html,
 body {

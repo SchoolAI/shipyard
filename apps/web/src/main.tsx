@@ -25,8 +25,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { httpBatchLink } from '@trpc/client';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { Toaster } from 'sonner';
 import { App } from './App';
+import { ThemedToaster } from './components/ThemedToaster';
 import { resetAllBrowserStorage } from './utils/resetStorage';
 import { trpc } from './utils/trpc';
 
@@ -89,7 +89,7 @@ ReactDOM.createRoot(root).render(
       <QueryClientProvider client={queryClient}>
         <MantineProvider>
           <App />
-          <Toaster position="bottom-right" richColors closeButton />
+          <ThemedToaster />
         </MantineProvider>
       </QueryClientProvider>
     </trpc.Provider>
