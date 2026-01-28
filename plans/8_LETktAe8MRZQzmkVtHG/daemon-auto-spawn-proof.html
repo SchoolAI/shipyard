@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Daemon Auto-Spawn Proof</title>
+  <style>
+    body {
+      font-family: 'SF Mono', Monaco, monospace;
+      background: #1e1e1e;
+      color: #d4d4d4;
+      padding: 20px;
+    }
+    h1 { color: #4ec9b0; }
+    .success { color: #22c55e; }
+    .success::before { content: "✓ "; }
+    .section {
+      background: #252526;
+      border: 1px solid #3e3e42;
+      border-radius: 4px;
+      padding: 16px;
+      margin: 16px 0;
+    }
+    .section h2 { color: #569cd6; margin-top: 0; }
+    pre {
+      background: #1e1e1e;
+      border: 1px solid #3e3e42;
+      padding: 12px;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Daemon Auto-Spawn on MCP Startup - Proof</h1>
+  
+  <div class="section">
+    <h2>Test Flow</h2>
+    <pre>1. Kill any existing daemon
+2. Start MCP server
+3. <span class="success">Daemon auto-spawns (detached)</span>
+4. Kill MCP server  
+5. <span class="success">Daemon survives</span></pre>
+  </div>
+
+  <div class="section">
+    <h2>Self-Propagating Bootstrap</h2>
+    <pre>MCP checks: Is daemon running?
+  → fetch('http://localhost:56609/health')
+  → NO (404/timeout)
+
+MCP spawns detached daemon:
+  → spawn('node', ['daemon/dist/index.js'], {
+      detached: true,
+      stdio: 'ignore'
+    })
+  → daemon.unref()
+
+<span class="success">Daemon starts on port 56609</span>
+
+MCP exits
+<span class="success">Daemon survives (detached process)</span></pre>
+  </div>
+
+  <div class="section">
+    <h2>Implementation</h2>
+    <pre>File: apps/server/src/daemon-launcher.ts
+Function: ensureDaemonRunning()
+
+Called from: apps/server/src/index.ts
+Location: After registry initialization, before MCP server starts
+
+Ports: [56609, 49548] with fallback
+Timeout: 5 seconds for daemon to become ready</pre>
+  </div>
+
+  <div class="section">
+    <h2>Verification</h2>
+    <pre><span class="success">✓ MCP started (PID: 73996)</span>
+<span class="success">✓ Daemon running</span>
+<span class="success">✓ Daemon survived MCP exit</span></pre>
+  </div>
+</body>
+</html>
