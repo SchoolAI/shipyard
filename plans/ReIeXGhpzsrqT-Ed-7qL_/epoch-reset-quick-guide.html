@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Epoch Reset - Quick Reference</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 900px;
+      margin: 40px auto;
+      padding: 20px;
+      background: #f5f5f5;
+      line-height: 1.6;
+    }
+    h1 { color: #1a1a1a; border-bottom: 3px solid #2563eb; padding-bottom: 10px; }
+    h2 { color: #2563eb; margin-top: 25px; }
+    .card {
+      background: white;
+      border-radius: 8px;
+      padding: 20px;
+      margin: 15px 0;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .warning {
+      background: #fef3c7;
+      border-left: 5px solid #f59e0b;
+      padding: 15px;
+      margin: 15px 0;
+    }
+    .success {
+      background: #dcfce7;
+      border-left: 5px solid #22c55e;
+      padding: 15px;
+      margin: 15px 0;
+    }
+    code {
+      background: #e5e7eb;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-family: 'Monaco', monospace;
+      font-size: 0.9em;
+    }
+    pre {
+      background: #1f2937;
+      color: #f3f4f6;
+      padding: 15px;
+      border-radius: 6px;
+      overflow-x: auto;
+      font-size: 0.85em;
+    }
+    ol, ul { margin: 10px 0; padding-left: 25px; }
+    li { margin: 8px 0; }
+  </style>
+</head>
+<body>
+  <h1>🔄 Epoch Reset - Quick Reference Guide</h1>
+
+  <div class="warning">
+    <strong>⚠️ Before You Start</strong>
+    <p>Resetting epochs will clear all data from affected peers. Coordinate with your team before triggering a reset.</p>
+  </div>
+
+  <div class="card">
+    <h2>When to Use</h2>
+    <ul>
+      <li>CRDT data corruption spread across multiple devices</li>
+      <li>Need to force all peers to start with clean state</li>
+      <li>Testing/development - want to clear everyone's data</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>Quick Start (3 Steps)</h2>
+
+    <h3>Step 1: Set Environment Variable</h3>
+    <pre>export MINIMUM_EPOCH=2</pre>
+    <p>Increment from current value (1→2, 2→3, etc.). Never decrease.</p>
+
+    <h3>Step 2: Restart Servers</h3>
+    <pre>pnpm dev:all</pre>
+    <p>Both registry and signaling servers will pick up the new MINIMUM_EPOCH.</p>
+
+    <h3>Step 3: Notify Users</h3>
+    <p>Tell beta users to reload their browsers. They'll be automatically reset.</p>
+  </div>
+
+  <div class="card">
+    <h2>What Happens</h2>
+    <ol>
+      <li><strong>Server rejects connection</strong> - Code 4100 (hub) or error message (P2P)</li>
+      <li><strong>Client clears IndexedDB</strong> - Deletes corrupted plan data</li>
+      <li><strong>Page reloads</strong> - Fresh sync from server (which may be empty)</li>
+      <li><strong>New data created</strong> - Plans now have epoch=2</li>
+    </ol>
+  </div>
+
+  <div class="card">
+    <h2>Nuclear Option (Full Reset)</h2>
+    <p>To clear server-side data too:</p>
+    <pre># Stop servers
+Ctrl+C
+
+# Clear server storage
+rm -rf ~/.shipyard/plans/
+
+# Restart with bumped epoch
+export MINIMUM_EPOCH=2
+pnpm dev:all</pre>
+    <p>This gives everyone a completely clean slate.</p>
+  </div>
+
+  <div class="card">
+    <h2>Verification</h2>
+
+    <h3>Check Server Logs</h3>
+    <pre># Registry server should show:
+{"msg":"Rejecting connection: epoch too old","planEpoch":1,"minimumEpoch":2}
+
+# Signaling server should show:
+[ValidateEpoch] Rejecting client for plan xxx: epoch 1 < minimum 2</pre>
+
+    <h3>Check Browser</h3>
+    <ol>
+      <li>Open DevTools → Console</li>
+      <li>Look for: <code>[Shipyard] Plan "xxx" rejected: epoch too old</code></li>
+      <li>Check Application → IndexedDB → plan databases should be cleared</li>
+    </ol>
+  </div>
+
+  <div class="success">
+    <h2>✅ Success Criteria</h2>
+    <ul>
+      <li>All peers with epoch=1 are rejected and reload</li>
+      <li>New plans created have epoch=2</li>
+      <li>No corrupted data propagates via hub or P2P</li>
+      <li>System is operational with clean state</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>Troubleshooting</h2>
+
+    <h3>Infinite Reload Loop</h3>
+    <p><strong>Cause:</strong> IndexedDB delete failed but page keeps reloading.</p>
+    <p><strong>Fix:</strong> Close all Shipyard tabs. Delete IndexedDB manually via DevTools. Then reload.</p>
+
+    <h3>Peers Still Have Old Data</h3>
+    <p><strong>Cause:</strong> Server MINIMUM_EPOCH wasn't bumped or server didn't restart.</p>
+    <p><strong>Fix:</strong> Verify <code>echo $MINIMUM_EPOCH</code> shows new value. Restart servers.</p>
+
+    <h3>P2P Still Syncing Corrupted Data</h3>
+    <p><strong>Cause:</strong> Signaling server not updated or offline.</p>
+    <p><strong>Fix:</strong> Ensure signaling server is running with same MINIMUM_EPOCH as registry.</p>
+  </div>
+
+  <div class="card">
+    <h2>Configuration Files</h2>
+
+    <table style="width: 100%; border-collapse: collapse;">
+      <tr>
+        <th style="padding: 10px; text-align: left; background: #f9fafb; border-bottom: 2px solid #e5e7eb;">Component</th>
+        <th style="padding: 10px; text-align: left; background: #f9fafb; border-bottom: 2px solid #e5e7eb;">Config File</th>
+        <th style="padding: 10px; text-align: left; background: #f9fafb; border-bottom: 2px solid #e5e7eb;">Env Var</th>
+      </tr>
+      <tr>
+        <td style="padding: 10px; border-bottom: 1px solid #e5e7eb;">Registry</td>
+        <td style="padding: 10px; border-bottom: 1px solid #e5e7eb;"><code>apps/server/src/config/env/registry.ts</code></td>
+        <td style="padding: 10px; border-bottom: 1px solid #e5e7eb;"><code>MINIMUM_EPOCH</code></td>
+      </tr>
+      <tr>
+        <td style="padding: 10px; border-bottom: 1px solid #e5e7eb;">Signaling</td>
+        <td style="padding: 10px; border-bottom: 1px solid #e5e7eb;"><code>apps/signaling/src/config/env/server.ts</code></td>
+        <td style="padding: 10px; border-bottom: 1px solid #e5e7eb;"><code>MINIMUM_EPOCH</code></td>
+      </tr>
+      <tr>
+        <td style="padding: 10px;">Schema</td>
+        <td style="padding: 10px;"><code>packages/schema/src/epoch.ts</code></td>
+        <td style="padding: 10px;"><code>DEFAULT_EPOCH=1</code> (constant)</td>
+      </tr>
+    </table>
+  </div>
+
+  <hr>
+  <p style="text-align: center; color: #6b7280; font-size: 0.9em;">
+    Quick Reference | Generated: 2026-01-28 00:35 MST
+  </p>
+</body>
+</html>
