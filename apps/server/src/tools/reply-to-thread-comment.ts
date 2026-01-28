@@ -1,4 +1,11 @@
-import { getPlanMetadata, logPlanEvent, ThreadCommentSchema, YDOC_KEYS } from '@shipyard/schema';
+import {
+  getPlanMetadata,
+  logPlanEvent,
+  parseThreadId,
+  ThreadCommentSchema,
+  toPlainObject,
+  YDOC_KEYS,
+} from '@shipyard/schema';
 import { nanoid } from 'nanoid';
 import { z } from 'zod';
 import { getOrCreateDoc } from '../doc-store.js';
@@ -84,6 +91,14 @@ reply_to_thread_comment({
     const agentDisplayName = getDisplayName(platform, actorName);
 
     /**
+     * Parse thread ID to extract actual UUID from wrapped format.
+     * Supports both bare IDs and wrapped format from export: "[thread:abc123]"
+     */
+    const parsedThreadId = parseThreadId(input.threadId);
+
+    logger.debug({ inputThreadId: input.threadId, parsedThreadId }, 'Parsed thread ID from input');
+
+    /**
      * Create and validate reply comment before transaction.
      * Validation ensures comment structure is correct before CRDT write.
      */
@@ -99,12 +114,29 @@ reply_to_thread_comment({
      * Thread existence check happens inside transaction to prevent TOCTOU race.
      */
     let updateSucceeded = false;
+
     ydoc.transact(
       () => {
         const threadsMap = ydoc.getMap(YDOC_KEYS.THREADS);
-        const threadData = threadsMap.get(input.threadId);
+        const threadDataRaw = threadsMap.get(parsedThreadId);
 
-        if (!threadData || typeof threadData !== 'object' || !('comments' in threadData)) {
+        if (!threadDataRaw || typeof threadDataRaw !== 'object') {
+          return;
+        }
+
+        /**
+         * Handle both Y.Map and plain object.
+         * toPlainObject safely converts Y.Map (which has toJSON) to plain object.
+         * CRITICAL: Without this conversion, spreading a Y.Map copies internal
+         * circular references, causing "Maximum call stack size exceeded" errors
+         * when Yjs tries to encode the data.
+         */
+        const threadData = toPlainObject(threadDataRaw);
+        if (!threadData) {
+          return;
+        }
+
+        if (!('comments' in threadData)) {
           return;
         }
 
@@ -113,7 +145,7 @@ reply_to_thread_comment({
           ...threadData,
           comments: [...existingComments, reply],
         };
-        threadsMap.set(input.threadId, updatedThread);
+        threadsMap.set(parsedThreadId, updatedThread);
 
         /** Log event in same transaction for atomicity */
         logPlanEvent(ydoc, 'comment_added', actorName, {
@@ -129,14 +161,19 @@ reply_to_thread_comment({
     if (!updateSucceeded) {
       return {
         content: [
-          { type: 'text', text: `Thread "${input.threadId}" not found in plan "${input.taskId}".` },
+          {
+            type: 'text',
+            text: `Thread "${parsedThreadId}" not found in plan "${input.taskId}".${
+              input.threadId !== parsedThreadId ? ` (parsed from input: "${input.threadId}")` : ''
+            }`,
+          },
         ],
         isError: true,
       };
     }
 
     logger.info(
-      { taskId: input.taskId, threadId: input.threadId, commentId: reply.id },
+      { taskId: input.taskId, threadId: parsedThreadId, commentId: reply.id },
       'Thread reply added'
     );
 
@@ -147,7 +184,7 @@ reply_to_thread_comment({
           text: `Reply added to thread!
 
 Comment ID: ${reply.id}
-Thread ID: ${input.threadId}
+Thread ID: ${parsedThreadId}
 
 The reply will appear in the comments panel when viewing this plan.`,
         },

@@ -59,8 +59,71 @@ import { YDOC_KEYS } from './yjs-keys.js';
  * @returns Array of unknown items that must be validated before use
  */
 function toUnknownArray<T = unknown>(array: Y.Array<T>): unknown[] {
-  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- Converting Yjs any to unknown for type safety
-  return array.toJSON() as unknown[];
+  return array.toJSON();
+}
+
+/**
+ * Type guard to check if a value has a toJSON method (like Y.Map, Y.Array, etc).
+ * Used to safely convert Yjs types to plain objects without unsafe type assertions.
+ *
+ * This replaces the pattern:
+ *   typeof (value as { toJSON?: () => unknown }).toJSON === 'function'
+ *
+ * With the type-safe pattern:
+ *   if (hasToJSON(value)) { value.toJSON(); }
+ *
+ * @param value - The value to check
+ * @returns True if the value has a toJSON method
+ */
+export function hasToJSON(value: unknown): value is { toJSON: () => unknown } {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'toJSON' in value &&
+    typeof value.toJSON === 'function'
+  );
+}
+
+/**
+ * Type guard to check if a value is a plain object (not array, not null).
+ * Used to safely narrow unknown to Record<string, unknown>.
+ *
+ * @param value - The value to check
+ * @returns True if the value is a plain object
+ */
+export function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Safely convert a value to a plain object.
+ * Handles both Y.Map (which has toJSON) and plain objects.
+ *
+ * This is the recommended way to extract data from Y.Doc map entries
+ * where the value could be either a Y.Map or a plain object depending
+ * on CRDT sync state.
+ *
+ * @param value - The value to convert (Y.Map or plain object)
+ * @returns Plain object representation of the value
+ */
+export function toPlainObject(value: unknown): Record<string, unknown> | null {
+  if (typeof value !== 'object' || value === null) {
+    return null;
+  }
+
+  if (hasToJSON(value)) {
+    const json = value.toJSON();
+    if (isPlainObject(json)) {
+      return json;
+    }
+    return null;
+  }
+
+  if (isPlainObject(value)) {
+    return value;
+  }
+
+  return null;
 }
 
 /**
@@ -1099,16 +1162,103 @@ export function removeLocalDiffComment(ydoc: Y.Doc, commentId: string): boolean 
 }
 
 /**
+ * Parse a thread ID from various formats.
+ * Supports:
+ * - Bare UUID: "0e63dc87-28ab-4587-8c6b-029216f33ced"
+ * - Wrapped format from export: "[thread:0e63dc87-28ab-4587-8c6b-029216f33ced]"
+ * - Bare format with prefix: "thread:0e63dc87-28ab-4587-8c6b-029216f33ced"
+ *
+ * @returns The extracted thread ID (without wrapper/prefix)
+ */
+export function parseThreadId(threadId: string): string {
+  /**
+   * Match wrapped format: [thread:xxx]
+   * Also handle if user passes with or without brackets
+   */
+  const wrappedMatch = threadId.match(/^\[?thread:([^\]]+)\]?$/);
+  if (wrappedMatch?.[1]) {
+    return wrappedMatch[1];
+  }
+
+  /** Return as-is if no wrapper found */
+  return threadId;
+}
+
+/**
+ * Result of parsing a comment ID.
+ */
+export interface ParsedCommentId {
+  /** The comment type: 'pr', 'local', 'comment', or 'unknown' */
+  type: 'pr' | 'local' | 'comment' | 'unknown';
+  /** The extracted comment ID (without wrapper/prefix) */
+  id: string;
+}
+
+/**
+ * Parse a comment ID from various formats.
+ * Supports:
+ * - Bare ID: "abc123"
+ * - Wrapped PR format: "[pr:abc123]" or "pr:abc123"
+ * - Wrapped local format: "[local:abc123]" or "local:abc123"
+ * - Wrapped comment format: "[comment:abc123]" or "comment:abc123"
+ *
+ * @returns Parsed comment info with type and extracted ID
+ */
+export function parseCommentId(commentId: string): ParsedCommentId {
+  /**
+   * Match wrapped format: [type:xxx] or type:xxx
+   * Types: pr, local, comment
+   */
+  const wrappedMatch = commentId.match(/^\[?(pr|local|comment):([^\]]+)\]?$/);
+  if (wrappedMatch?.[1] && wrappedMatch?.[2]) {
+    return {
+      // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- Regex validates type is one of pr|local|comment
+      type: wrappedMatch[1] as 'pr' | 'local' | 'comment',
+      id: wrappedMatch[2],
+    };
+  }
+
+  /** Return as-is with unknown type if no wrapper found */
+  return {
+    type: 'unknown',
+    id: commentId,
+  };
+}
+
+/**
  * Get a specific thread by ID from the Y.Doc.
+ * Supports both bare thread IDs and wrapped format from export (e.g., "[thread:abc123]").
  * @returns The thread if found, null otherwise.
  */
 export function getThread(ydoc: Y.Doc, threadId: string): Thread | null {
   const threadsMap = ydoc.getMap(YDOC_KEYS.THREADS);
   const threadsData = threadsMap.toJSON();
 
+  /**
+   * Parse the thread ID to extract the actual UUID.
+   * This handles both bare IDs and wrapped format from export.
+   */
+  const parsedId = parseThreadId(threadId);
+
+  /**
+   * BlockNote stores threads with the thread ID as the key.
+   * First, try direct key lookup (most efficient).
+   */
+  const directLookup = threadsData[parsedId];
+  if (directLookup) {
+    const result = ThreadSchema.safeParse(directLookup);
+    if (result.success) {
+      return result.data;
+    }
+  }
+
+  /**
+   * Fallback: iterate through all threads and match by thread.id field.
+   * This handles cases where the key might not match the thread.id.
+   */
   for (const [_key, value] of Object.entries(threadsData)) {
     const result = ThreadSchema.safeParse(value);
-    if (result.success && result.data.id === threadId) {
+    if (result.success && result.data.id === parsedId) {
       return result.data;
     }
   }

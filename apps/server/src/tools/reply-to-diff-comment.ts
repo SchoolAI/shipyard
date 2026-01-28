@@ -3,6 +3,7 @@ import {
   getPlanMetadata,
   getPRReviewCommentById,
   logPlanEvent,
+  parseCommentId,
   replyToLocalDiffComment,
   replyToPRReviewComment,
 } from '@shipyard/schema';
@@ -59,6 +60,15 @@ reply_to_diff_comment({
     },
   },
 
+  /**
+   * Complexity of 20 is acceptable here because the function handles:
+   * - Input validation and session verification
+   * - Comment ID parsing with type detection
+   * - Two distinct comment types (PR vs local) with separate error handling
+   * - Success/error responses for each code path
+   * Extracting helpers would fragment the error handling context.
+   */
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Tool handler needs unified error handling for two comment types
   handler: async (args: unknown) => {
     const input = ReplyToDiffCommentInput.parse(args);
 
@@ -92,15 +102,29 @@ reply_to_diff_comment({
     const agentDisplayName = getDisplayName(platform, actorName);
 
     /**
-     * Try to find as PR review comment first.
+     * Parse comment ID to extract actual ID from wrapped format.
+     * Supports: "[pr:abc123]", "pr:abc123", "[local:abc123]", "local:abc123", or bare "abc123"
+     */
+    const parsed = parseCommentId(input.commentId);
+
+    logger.debug(
+      { inputCommentId: input.commentId, parsedType: parsed.type, parsedId: parsed.id },
+      'Parsed comment ID from input'
+    );
+
+    /**
+     * Try to find as PR review comment first (if type is 'pr' or 'unknown').
      * replyToPRReviewComment handles validation and atomicity internally.
      */
-    const prComment = getPRReviewCommentById(ydoc, input.commentId);
+    const prComment =
+      parsed.type === 'pr' || parsed.type === 'unknown'
+        ? getPRReviewCommentById(ydoc, parsed.id)
+        : null;
     if (prComment) {
       try {
         const reply = replyToPRReviewComment(
           ydoc,
-          input.commentId,
+          parsed.id,
           input.body,
           agentDisplayName,
           actorName
@@ -117,7 +141,7 @@ reply_to_diff_comment({
         });
 
         logger.info(
-          { taskId: input.taskId, commentId: reply.id, parentCommentId: input.commentId },
+          { taskId: input.taskId, commentId: reply.id, parentCommentId: parsed.id },
           'PR review comment reply added'
         );
 
@@ -128,7 +152,7 @@ reply_to_diff_comment({
               text: `Reply added to PR review comment!
 
 Comment ID: ${reply.id}
-Parent Comment ID: ${input.commentId}
+Parent Comment ID: ${parsed.id}
 PR: #${prComment.prNumber}
 File: ${prComment.path}:${prComment.line}
 
@@ -137,7 +161,7 @@ The reply will appear in the Changes tab inline with the original comment.`,
           ],
         };
       } catch (error) {
-        logger.error({ error, commentId: input.commentId }, 'Failed to reply to PR comment');
+        logger.error({ error, commentId: parsed.id }, 'Failed to reply to PR comment');
         const errorMessage = error instanceof Error ? error.message : String(error);
         return {
           content: [{ type: 'text', text: `Error: ${errorMessage}` }],
@@ -147,15 +171,18 @@ The reply will appear in the Changes tab inline with the original comment.`,
     }
 
     /**
-     * Try to find as local diff comment.
+     * Try to find as local diff comment (if type is 'local' or 'unknown').
      * replyToLocalDiffComment handles validation and atomicity internally.
      */
-    const localComment = getLocalDiffCommentById(ydoc, input.commentId);
+    const localComment =
+      parsed.type === 'local' || parsed.type === 'unknown'
+        ? getLocalDiffCommentById(ydoc, parsed.id)
+        : null;
     if (localComment) {
       try {
         const reply = replyToLocalDiffComment(
           ydoc,
-          input.commentId,
+          parsed.id,
           input.body,
           agentDisplayName,
           actorName
@@ -171,7 +198,7 @@ The reply will appear in the Changes tab inline with the original comment.`,
         });
 
         logger.info(
-          { taskId: input.taskId, commentId: reply.id, parentCommentId: input.commentId },
+          { taskId: input.taskId, commentId: reply.id, parentCommentId: parsed.id },
           'Local diff comment reply added'
         );
 
@@ -182,7 +209,7 @@ The reply will appear in the Changes tab inline with the original comment.`,
               text: `Reply added to local diff comment!
 
 Comment ID: ${reply.id}
-Parent Comment ID: ${input.commentId}
+Parent Comment ID: ${parsed.id}
 File: ${localComment.path}:${localComment.line}
 
 The reply will appear in the Changes tab inline with the original comment.`,
@@ -190,7 +217,7 @@ The reply will appear in the Changes tab inline with the original comment.`,
           ],
         };
       } catch (error) {
-        logger.error({ error, commentId: input.commentId }, 'Failed to reply to local comment');
+        logger.error({ error, commentId: parsed.id }, 'Failed to reply to local comment');
         const errorMessage = error instanceof Error ? error.message : String(error);
         return {
           content: [{ type: 'text', text: `Error: ${errorMessage}` }],
@@ -204,7 +231,9 @@ The reply will appear in the Changes tab inline with the original comment.`,
       content: [
         {
           type: 'text',
-          text: `Comment "${input.commentId}" not found in plan "${input.taskId}". Make sure the comment ID is correct and the comment exists.`,
+          text: `Comment "${parsed.id}" not found in plan "${input.taskId}".${
+            input.commentId !== parsed.id ? ` (parsed from input: "${input.commentId}")` : ''
+          } Make sure the comment ID is correct and the comment exists.`,
         },
       ],
       isError: true,

@@ -20,6 +20,7 @@ import { ActivityTimeline } from '@/components/ActivityTimeline';
 import { Attachments } from '@/components/Attachments';
 import { ChangesHeaderControls } from '@/components/ChangesHeaderControls';
 import { ChangesView, type ChangesViewState } from '@/components/ChangesView';
+import { PlanViewerWithComments } from '@/components/comments';
 import { DeliverablesView } from '@/components/DeliverablesView';
 import { PlanViewer } from '@/components/PlanViewer';
 import { VersionSelector } from '@/components/VersionSelector';
@@ -219,8 +220,12 @@ function PlanTabContent({
   initialContent,
 }: PlanTabContentProps) {
   if (mode === 'live') {
+    /**
+     * Use PlanViewerWithComments for live mode to show the comment gutter.
+     * The gutter only appears on desktop when the user has identity.
+     */
     return (
-      <PlanViewer
+      <PlanViewerWithComments
         key={identity?.id ?? 'anonymous'}
         ydoc={ydoc}
         identity={identity ?? null}
@@ -241,7 +246,6 @@ function PlanTabContent({
         provider={null}
         initialContent={initialContent}
         currentSnapshot={{ content: initialContent }}
-        hideAuthPrompt={true}
       />
     );
   }
