@@ -4,6 +4,11 @@ import { IndexeddbPersistence } from 'y-indexeddb';
 import { WebrtcProvider } from 'y-webrtc';
 import { WebsocketProvider } from 'y-websocket';
 import * as Y from 'yjs';
+import { handleEpochRejection, isEpochRejection } from '../utils/epochReset';
+
+interface WebsocketProviderInternal {
+  ws?: WebSocket;
+}
 
 /**
  * WebRTC signaling server URL.
@@ -465,9 +470,28 @@ export function useMultiProviderSync(
       wsProviderRef.current = ws;
       setWsProvider(ws);
 
+      const setupCloseHandler = () => {
+        /*
+         * Access underlying WebSocket for epoch rejection handling.
+         * y-websocket exposes ws property internally but not in types.
+         */
+        // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- Accessing internal y-websocket API
+        const wsInternal = ws as WebsocketProvider & WebsocketProviderInternal;
+        const wsSocket = wsInternal.ws;
+        if (wsSocket) {
+          wsSocket.addEventListener('close', (event) => {
+            if (isEpochRejection(event.code, event.reason)) {
+              handleEpochRejection(docName);
+            }
+          });
+        }
+      };
+
       /** Store listener references for cleanup */
       wsStatusListener = () => {
         if (mountedRef.current) {
+          setupCloseHandler();
+
           /** Clear timeout when connection succeeds */
           const wsConnected = ws?.wsconnected ?? false;
           if (wsConnected && timedOutRef.current) {
