@@ -6,8 +6,12 @@ import { join, resolve, sep } from 'node:path';
 import {
   appRouter,
   type Context,
+  EPOCH_CLOSE_CODES,
+  EPOCH_CLOSE_REASONS,
+  getEpochFromMetadata,
   getPlanMetadata,
   hasErrorCode,
+  isEpochValid,
   type PlanStore,
   parseWebSocketUrl,
 } from '@shipyard/schema';
@@ -285,6 +289,20 @@ function initPersistence(): void {
   }
 }
 
+function shouldRejectForEpoch(doc: Y.Doc, planId: string): boolean {
+  const metadata = getPlanMetadata(doc);
+  if (!metadata) return false;
+
+  const planEpoch = getEpochFromMetadata(metadata);
+  const minimumEpoch = registryConfig.MINIMUM_EPOCH;
+
+  if (!isEpochValid(planEpoch, minimumEpoch)) {
+    logger.warn({ planId, planEpoch, minimumEpoch }, 'Plan epoch below minimum');
+    return true;
+  }
+  return false;
+}
+
 async function getDoc(docName: string): Promise<Y.Doc> {
   initPersistence();
   const persistence = ldb;
@@ -438,6 +456,15 @@ function handleWebSocketConnection(ws: WebSocket, req: http.IncomingMessage): vo
   (async () => {
     try {
       doc = await getDoc(planId);
+
+      if (shouldRejectForEpoch(doc, planId)) {
+        ws.close(
+          EPOCH_CLOSE_CODES.EPOCH_TOO_OLD,
+          EPOCH_CLOSE_REASONS[EPOCH_CLOSE_CODES.EPOCH_TOO_OLD]
+        );
+        return;
+      }
+
       const awarenessResult = awarenessMap.get(planId);
       if (!awarenessResult) {
         throw new Error(`Awareness not found for planId: ${planId}`);
