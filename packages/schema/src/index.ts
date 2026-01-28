@@ -26,6 +26,7 @@ export {
   summarizeA2AConversation,
   validateA2AMessages,
 } from './conversation-export.js';
+export type { ClientMessage, ServerMessage } from './daemon-types.js';
 export { formatDeliverablesForLLM } from './deliverable-formatter.js';
 export { extractDeliverables } from './deliverable-parser.js';
 export type {

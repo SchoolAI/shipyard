@@ -3,6 +3,7 @@ import { Archive, ChevronRight, Inbox, LayoutGrid, Search } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { AccountSection } from '@/components/account';
+import { CreateTaskButton } from '@/components/CreateTaskButton';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { CollapsiblePanel } from '@/components/ui/collapsible-panel';
 import { getPlanRoute } from '@/constants/routes';
@@ -100,6 +101,11 @@ function CollapsedSidebar({
           </Tooltip.Trigger>
           <Tooltip.Content>Expand sidebar</Tooltip.Content>
         </Tooltip>
+      </div>
+
+      {/* Create Task button */}
+      <div className="px-3 py-2 border-b border-separator flex items-center justify-center">
+        <CreateTaskButton collapsed />
       </div>
 
       <nav className="flex-1 flex flex-col items-center gap-2 px-3 pt-2 overflow-y-auto">
@@ -285,6 +291,11 @@ export function Sidebar({ onNavigate, inDrawer = false }: SidebarProps) {
             <Tooltip.Content>{inDrawer ? 'Close menu' : 'Collapse sidebar'}</Tooltip.Content>
           </Tooltip>
         </div>
+      </div>
+
+      {/* Create Task button */}
+      <div className="px-3 py-2 border-b border-separator">
+        <CreateTaskButton collapsed={false} />
       </div>
 
       <div className="px-3 py-2 border-b border-separator space-y-1">

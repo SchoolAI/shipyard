@@ -1,19 +1,11 @@
 /**
- * TypeScript types for daemon WebSocket protocol
+ * TypeScript types for daemon WebSocket protocol.
+ * Protocol types are now exported from @shipyard/schema for sharing with web client.
  */
 
-export type ClientMessage =
-  | { type: 'start-agent'; taskId: string; prompt: string; cwd?: string }
-  | { type: 'stop-agent'; taskId: string }
-  | { type: 'list-agents' };
+import type { ChildProcess } from 'node:child_process';
 
-export type ServerMessage =
-  | { type: 'started'; taskId: string; pid: number }
-  | { type: 'output'; taskId: string; data: string; stream: 'stdout' | 'stderr' }
-  | { type: 'completed'; taskId: string; exitCode: number }
-  | { type: 'stopped'; taskId: string }
-  | { type: 'agents'; list: Array<{ taskId: string; pid: number }> }
-  | { type: 'error'; taskId?: string; message: string };
+export type { ClientMessage, ServerMessage } from '@shipyard/schema';
 
 export interface SpawnAgentOptions {
   taskId: string;
@@ -23,6 +15,6 @@ export interface SpawnAgentOptions {
 
 export interface ActiveAgent {
   taskId: string;
-  process: import('node:child_process').ChildProcess;
+  process: ChildProcess;
   pid: number;
 }
