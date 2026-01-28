@@ -104,7 +104,7 @@ describe('epochReset utilities', () => {
       });
 
       const promise = handleEpochRejection('test-plan-id');
-      await vi.advanceTimersByTimeAsync(5000);
+      await vi.advanceTimersByTimeAsync(10000);
       await promise;
 
       expect(mockReload).toHaveBeenCalled();
