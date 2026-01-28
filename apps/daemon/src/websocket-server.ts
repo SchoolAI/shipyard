@@ -15,10 +15,6 @@ import { handleClientMessage } from './protocol.js';
 const PORTS = [56609, 49548];
 const startTime = Date.now();
 
-/**
- * Starts the WebSocket server on available port.
- * Returns the port number if successful, null if all ports in use.
- */
 export async function startWebSocketServer(): Promise<number | null> {
   const server = createServer((req, res) => {
     /** Health check endpoint */

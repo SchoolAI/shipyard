@@ -9,20 +9,8 @@ import { spawn } from 'node:child_process';
 import type { ChildProcess } from 'node:child_process';
 import type { ActiveAgent, SpawnAgentOptions } from './types.js';
 
-/**
- * Map of active agents by task ID
- */
 const activeAgents = new Map<string, ActiveAgent>();
 
-/**
- * Spawns a Claude Code process for the given task.
- * Returns the child process instance.
- *
- * The process is spawned with:
- * - stdio: ['ignore', 'pipe', 'pipe'] - capture stdout/stderr
- * - env: SHIPYARD_TASK_ID for context
- * - cwd: working directory for the task
- */
 export function spawnClaudeCode(opts: SpawnAgentOptions): ChildProcess {
   const { taskId, prompt, cwd } = opts;
 
@@ -65,10 +53,6 @@ export function spawnClaudeCode(opts: SpawnAgentOptions): ChildProcess {
   return child;
 }
 
-/**
- * Stops the agent for the given task ID.
- * Returns true if agent was found and stopped, false otherwise.
- */
 export function stopAgent(taskId: string): boolean {
   const agent = activeAgents.get(taskId);
   if (!agent) {
@@ -81,9 +65,6 @@ export function stopAgent(taskId: string): boolean {
   return true;
 }
 
-/**
- * Returns a list of all active agents.
- */
 export function listAgents(): Array<{ taskId: string; pid: number }> {
   return Array.from(activeAgents.values()).map((agent) => ({
     taskId: agent.taskId,
@@ -91,10 +72,6 @@ export function listAgents(): Array<{ taskId: string; pid: number }> {
   }));
 }
 
-/**
- * Gets the child process for a task ID.
- * Returns undefined if no agent is running for that task.
- */
 export function getAgentProcess(taskId: string): ChildProcess | undefined {
   return activeAgents.get(taskId)?.process;
 }

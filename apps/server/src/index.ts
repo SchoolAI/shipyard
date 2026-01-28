@@ -7,6 +7,7 @@ import {
   ListToolsRequestSchema,
   McpError,
 } from '@modelcontextprotocol/sdk/types.js';
+import { ensureDaemonRunning } from './daemon-launcher.js';
 import { initAsClient, initAsHub } from './doc-store.js';
 import { logger } from './logger.js';
 import { setClientInfo } from './mcp-client-info.js';
@@ -55,6 +56,9 @@ if (!registryPort) {
   logger.info({ registryPort }, 'Connecting to registry hub as client');
   await initAsClient(registryPort);
 }
+
+/** Ensure agent launcher daemon is running (self-propagating bootstrap) */
+await ensureDaemonRunning();
 
 const server = new Server(
   {

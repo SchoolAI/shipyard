@@ -14,9 +14,6 @@ const SHIPYARD_DIR = join(homedir(), '.shipyard');
 const DAEMON_LOCK_FILE = join(SHIPYARD_DIR, 'daemon.lock');
 const MAX_LOCK_RETRIES = 3;
 
-/**
- * Type guard for error codes
- */
 function hasErrorCode(error: unknown, code: string): boolean {
   return (
     typeof error === 'object' &&
@@ -26,10 +23,6 @@ function hasErrorCode(error: unknown, code: string): boolean {
   );
 }
 
-/**
- * Reads the PID from the lock file.
- * Returns null if file doesn't exist or is invalid.
- */
 async function readLockHolderPid(): Promise<number | null> {
   try {
     const content = await readFile(DAEMON_LOCK_FILE, 'utf-8');
@@ -41,10 +34,6 @@ async function readLockHolderPid(): Promise<number | null> {
   }
 }
 
-/**
- * Checks if the lock holder process is alive.
- * Returns true if process is alive, false if dead or unknown.
- */
 function isLockHolderAlive(pid: number): boolean {
   try {
     process.kill(pid, 0);
@@ -54,10 +43,6 @@ function isLockHolderAlive(pid: number): boolean {
   }
 }
 
-/**
- * Attempts to remove a stale lock file.
- * Returns true if removal succeeded or was unnecessary.
- */
 async function tryRemoveStaleLock(stalePid: number, retryCount: number): Promise<boolean> {
   console.warn(`Removing stale daemon lock (pid: ${stalePid}, retry: ${retryCount})`);
   try {
@@ -69,9 +54,6 @@ async function tryRemoveStaleLock(stalePid: number, retryCount: number): Promise
   }
 }
 
-/**
- * Registers cleanup handler to remove lock file on process exit.
- */
 function registerLockCleanupHandler(): void {
   process.once('exit', () => {
     try {
@@ -82,11 +64,6 @@ function registerLockCleanupHandler(): void {
   });
 }
 
-/**
- * Handles the case when lock file already exists.
- * Checks if holder is alive, and if not, removes stale lock and retries.
- * Returns true if lock was acquired on retry, false otherwise.
- */
 async function handleExistingLock(retryCount: number): Promise<boolean> {
   const pid = await readLockHolderPid();
   if (pid === null) return false;
@@ -110,10 +87,7 @@ async function handleExistingLock(retryCount: number): Promise<boolean> {
 }
 
 /**
- * Attempts to acquire exclusive lock for daemon startup.
  * Uses atomic file creation (wx flag) to prevent race conditions.
- * Returns true if lock acquired, false if another process holds the lock.
- * Max retries: 3 attempts to remove stale locks before giving up.
  */
 export async function tryAcquireDaemonLock(retryCount = 0): Promise<boolean> {
   try {
@@ -131,10 +105,6 @@ export async function tryAcquireDaemonLock(retryCount = 0): Promise<boolean> {
   }
 }
 
-/**
- * Releases the daemon lock file.
- * Called on graceful shutdown.
- */
 export async function releaseDaemonLock(): Promise<void> {
   try {
     await unlink(DAEMON_LOCK_FILE);

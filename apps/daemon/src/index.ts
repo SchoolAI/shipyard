@@ -11,14 +11,12 @@ import { startWebSocketServer } from './websocket-server.js';
 async function main(): Promise<void> {
   console.log('Shipyard daemon starting...');
 
-  /** Acquire exclusive lock */
   const acquired = await tryAcquireDaemonLock();
   if (!acquired) {
     console.error('Failed to acquire daemon lock - another instance may be running');
     process.exit(1);
   }
 
-  /** Start WebSocket server */
   const port = await startWebSocketServer();
   if (!port) {
     await releaseDaemonLock();
@@ -30,7 +28,6 @@ async function main(): Promise<void> {
   console.log('Ready to accept agent launch requests');
 }
 
-/** Graceful shutdown handlers */
 process.on('SIGTERM', async () => {
   console.log('Received SIGTERM, shutting down...');
   await releaseDaemonLock();
@@ -43,7 +40,6 @@ process.on('SIGINT', async () => {
   process.exit(0);
 });
 
-/** Handle uncaught errors */
 process.on('uncaughtException', async (err) => {
   console.error('Uncaught exception:', err);
   await releaseDaemonLock();
@@ -56,7 +52,6 @@ process.on('unhandledRejection', async (reason) => {
   process.exit(1);
 });
 
-/** Start daemon */
 main().catch(async (err) => {
   console.error('Failed to start daemon:', err);
   await releaseDaemonLock();
