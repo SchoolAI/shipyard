@@ -90,41 +90,11 @@ function getGitDiff(cwd: string): string {
 }
 
 /**
- * Merge file status with diff information.
+ * Sort files alphabetically by path.
+ * Files are pre-filtered to only include those with actual content changes.
  */
-function mergeFilesWithStatus(
-  staged: LocalFileChange[],
-  unstaged: LocalFileChange[],
-  diffFiles: LocalFileChange[]
-): LocalFileChange[] {
-  const allPaths = new Set([
-    ...staged.map((f) => f.path),
-    ...unstaged.map((f) => f.path),
-    ...diffFiles.map((f) => f.path),
-  ]);
-
-  const mergedFiles: LocalFileChange[] = [];
-  for (const path of allPaths) {
-    const diffFile = diffFiles.find((f) => f.path === path);
-    const stagedFile = staged.find((f) => f.path === path);
-    const unstagedFile = unstaged.find((f) => f.path === path);
-
-    if (diffFile) {
-      mergedFiles.push(diffFile);
-    } else {
-      /** File has status but no diff (binary, or other edge case) */
-      const status = stagedFile?.status ?? unstagedFile?.status ?? 'modified';
-      mergedFiles.push({
-        path,
-        status,
-        additions: 0,
-        deletions: 0,
-        patch: undefined,
-      });
-    }
-  }
-
-  return mergedFiles.sort((a, b) => a.path.localeCompare(b.path));
+function sortFilesByPath(diffFiles: LocalFileChange[]): LocalFileChange[] {
+  return [...diffFiles].sort((a, b) => a.path.localeCompare(b.path));
 }
 
 /** --- Main Function --- */
@@ -153,14 +123,21 @@ export function getLocalChanges(cwd: string): LocalChangesResult {
 
     /** Get status (staged, unstaged, untracked) */
     const statusOutput = execGit('git status --porcelain', { cwd, timeout: 10000 }) ?? '';
-    const { staged, unstaged, untracked } = parseGitStatus(statusOutput);
+    const { staged: rawStaged, unstaged: rawUnstaged, untracked } = parseGitStatus(statusOutput);
 
     /** Get diff and parse into file changes */
     const diffOutput = getGitDiff(cwd);
     const diffFiles = parseDiffOutput(diffOutput);
 
-    /** Merge status info into files */
-    const mergedFiles = mergeFilesWithStatus(staged, unstaged, diffFiles);
+    /** Create a set of paths that have actual content changes */
+    const diffPaths = new Set(diffFiles.map((f) => f.path));
+
+    /** Filter staged/unstaged to only include files with actual content changes */
+    const staged = rawStaged.filter((f) => diffPaths.has(f.path));
+    const unstaged = rawUnstaged.filter((f) => diffPaths.has(f.path));
+
+    /** Sort files alphabetically */
+    const sortedFiles = sortFilesByPath(diffFiles);
 
     logger.debug(
       {
@@ -170,7 +147,8 @@ export function getLocalChanges(cwd: string): LocalChangesResult {
         stagedCount: staged.length,
         unstagedCount: unstaged.length,
         untrackedCount: untracked.length,
-        filesCount: mergedFiles.length,
+        filesCount: sortedFiles.length,
+        filteredOut: rawStaged.length + rawUnstaged.length - staged.length - unstaged.length,
       },
       'Got local changes'
     );
@@ -183,7 +161,7 @@ export function getLocalChanges(cwd: string): LocalChangesResult {
       staged,
       unstaged,
       untracked,
-      files: mergedFiles,
+      files: sortedFiles,
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
