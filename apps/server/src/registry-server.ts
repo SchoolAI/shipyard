@@ -411,6 +411,10 @@ function processMessage(
         awarenessProtocol.applyAwarenessUpdate(awareness, decoding.readVarUint8Array(decoder), ws);
         break;
       }
+      default: {
+        logger.warn({ messageType, planId }, 'Unknown message type received');
+        break;
+      }
     }
   } catch (err) {
     logger.error({ err, planId }, 'Failed to process message');

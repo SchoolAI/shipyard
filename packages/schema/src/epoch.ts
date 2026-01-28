@@ -1,5 +1,4 @@
 /**
- * RFC 6455 reserves 4000-4999 for application-specific close codes.
  * WebSocket close codes for epoch-based rejection.
  * RFC 6455 reserves 4000-4999 for application-specific codes.
  */
