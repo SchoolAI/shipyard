@@ -172,32 +172,39 @@ export function markEventAsViewed(
   eventId: string,
   username: string
 ): void {
-  const viewedByRoot = ydoc.getMap(PLAN_INDEX_EVENT_VIEWED_BY_KEY);
-  const rawPlanEvents = viewedByRoot.get(planId);
+  /**
+   * Wrap all nested map operations in a transaction to prevent observers
+   * from firing with intermediate state (e.g., planEvents created but
+   * eventViews not yet set).
+   */
+  ydoc.transact(() => {
+    const viewedByRoot = ydoc.getMap(PLAN_INDEX_EVENT_VIEWED_BY_KEY);
+    const rawPlanEvents = viewedByRoot.get(planId);
 
-  /** Validate CRDT data structure - could be corrupted */
-  let planEvents: Y.Map<unknown>;
-  if (rawPlanEvents instanceof Y.Map) {
-    planEvents = rawPlanEvents;
-  } else {
-    /** Corrupted or missing - recreate the map */
-    planEvents = new Y.Map();
-    viewedByRoot.set(planId, planEvents);
-  }
+    /** Validate CRDT data structure - could be corrupted */
+    let planEvents: Y.Map<unknown>;
+    if (rawPlanEvents instanceof Y.Map) {
+      planEvents = rawPlanEvents;
+    } else {
+      /** Corrupted or missing - recreate the map */
+      planEvents = new Y.Map();
+      viewedByRoot.set(planId, planEvents);
+    }
 
-  const rawEventViews = planEvents.get(eventId);
+    const rawEventViews = planEvents.get(eventId);
 
-  /** Validate nested CRDT data structure */
-  let eventViews: Y.Map<unknown>;
-  if (rawEventViews instanceof Y.Map) {
-    eventViews = rawEventViews;
-  } else {
-    /** Corrupted or missing - recreate the map */
-    eventViews = new Y.Map();
-    planEvents.set(eventId, eventViews);
-  }
+    /** Validate nested CRDT data structure */
+    let eventViews: Y.Map<unknown>;
+    if (rawEventViews instanceof Y.Map) {
+      eventViews = rawEventViews;
+    } else {
+      /** Corrupted or missing - recreate the map */
+      eventViews = new Y.Map();
+      planEvents.set(eventId, eventViews);
+    }
 
-  eventViews.set(username, Date.now());
+    eventViews.set(username, Date.now());
+  });
 }
 
 /**

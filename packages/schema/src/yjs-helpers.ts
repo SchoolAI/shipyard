@@ -521,36 +521,50 @@ export interface InitPlanMetadataParams {
 }
 
 export function initPlanMetadata(ydoc: Y.Doc, init: InitPlanMetadataParams): void {
-  const map = ydoc.getMap(YDOC_KEYS.METADATA);
-  const now = Date.now();
+  /**
+   * CRITICAL: Wrap all map.set() operations in a transaction.
+   * Without this, CRDT observers fire after EACH set() with incomplete data,
+   * causing validation errors like "No matching discriminator" when status
+   * field hasn't been set yet.
+   */
+  ydoc.transact(() => {
+    const map = ydoc.getMap(YDOC_KEYS.METADATA);
+    const now = Date.now();
 
-  map.set('id', init.id);
-  map.set('title', init.title);
-  map.set('status', 'draft');
-  map.set('createdAt', now);
-  map.set('updatedAt', now);
+    map.set('id', init.id);
+    map.set('title', init.title);
+    map.set('status', 'draft');
+    map.set('createdAt', now);
+    map.set('updatedAt', now);
 
-  if (init.repo) map.set('repo', init.repo);
-  if (init.pr) map.set('pr', init.pr);
+    if (init.repo) map.set('repo', init.repo);
+    if (init.pr) map.set('pr', init.pr);
 
-  if (init.ownerId) {
-    map.set('ownerId', init.ownerId);
-    map.set('approvedUsers', [init.ownerId]);
-    map.set('approvalRequired', init.approvalRequired ?? true);
-  }
+    if (init.ownerId) {
+      map.set('ownerId', init.ownerId);
+      map.set('approvedUsers', [init.ownerId]);
+      map.set('approvalRequired', init.approvalRequired ?? true);
+    }
 
-  if (init.sessionTokenHash) {
-    map.set('sessionTokenHash', init.sessionTokenHash);
-  }
+    if (init.sessionTokenHash) {
+      map.set('sessionTokenHash', init.sessionTokenHash);
+    }
 
-  if (init.origin) {
-    map.set('origin', init.origin);
-  }
+    if (init.origin) {
+      map.set('origin', init.origin);
+    }
 
-  if (init.tags) {
-    map.set('tags', init.tags);
-  }
+    if (init.tags) {
+      map.set('tags', init.tags);
+    }
+  });
 
+  /**
+   * Validate AFTER transaction completes, not inside.
+   * If validation throws inside transaction, the writes are already applied
+   * (Yjs transactions don't rollback on throw). By validating outside,
+   * we maintain the same pattern as addArtifact() and other functions.
+   */
   const result = getPlanMetadataWithValidation(ydoc);
   if (!result.success) {
     throw new Error(`Failed to initialize metadata: ${result.error}`);
@@ -1010,8 +1024,14 @@ export function updateLinkedPRStatus(
   const pr = existing[index];
   if (!pr) return false;
 
-  array.delete(index, 1);
-  array.insert(index, [{ ...pr, status }]);
+  /**
+   * Wrap delete + insert in a transaction to prevent observers from
+   * firing with intermediate state (item deleted but not yet reinserted).
+   */
+  ydoc.transact(() => {
+    array.delete(index, 1);
+    array.insert(index, [{ ...pr, status }]);
+  });
 
   return true;
 }
@@ -1056,8 +1076,14 @@ export function resolvePRReviewComment(ydoc: Y.Doc, commentId: string, resolved:
   const comment = existing[index];
   if (!comment) return false;
 
-  array.delete(index, 1);
-  array.insert(index, [{ ...comment, resolved }]);
+  /**
+   * Wrap delete + insert in a transaction to prevent observers from
+   * firing with intermediate state (item deleted but not yet reinserted).
+   */
+  ydoc.transact(() => {
+    array.delete(index, 1);
+    array.insert(index, [{ ...comment, resolved }]);
+  });
 
   return true;
 }
@@ -1136,8 +1162,14 @@ export function resolveLocalDiffComment(
   const comment = existing[index];
   if (!comment) return false;
 
-  array.delete(index, 1);
-  array.insert(index, [{ ...comment, resolved }]);
+  /**
+   * Wrap delete + insert in a transaction to prevent observers from
+   * firing with intermediate state (item deleted but not yet reinserted).
+   */
+  ydoc.transact(() => {
+    array.delete(index, 1);
+    array.insert(index, [{ ...comment, resolved }]);
+  });
 
   return true;
 }
