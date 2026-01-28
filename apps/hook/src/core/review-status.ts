@@ -37,22 +37,51 @@ interface ReviewDecision {
 
 /** --- Approval Handling Helpers --- */
 
+interface ApprovalMessageParams {
+  prefix: string;
+  planId: string;
+  sessionToken: string;
+  url: string;
+  deliverables: Array<{ id: string; text: string }>;
+  reviewComment?: string;
+}
+
 /**
- * Build the approval message with deliverable count and optional reviewer comment.
+ * Build the approval message with credentials and deliverable IDs.
+ * IMPORTANT: Credentials MUST be in the message because PermissionRequest
+ * is the ONLY reliable delivery mechanism. PostToolUse may race and fail
+ * to inject context if session registration hasn't completed.
  */
-function buildApprovalMessage(
-  prefix: string,
-  deliverableCount: number,
-  reviewComment?: string
-): string {
-  const countText = `${deliverableCount} deliverable${deliverableCount === 1 ? '' : 's'}`;
-  const feedbackText = reviewComment ? `\n\nReviewer comment: ${reviewComment}` : '';
-  return `${prefix} You have ${countText}. Use add_artifact(filePath, deliverableId) to upload proof-of-work.${feedbackText}`;
+function buildApprovalMessage(params: ApprovalMessageParams): string {
+  const { prefix, planId, sessionToken, url, deliverables, reviewComment } = params;
+  const countText = `${deliverables.length} deliverable${deliverables.length === 1 ? '' : 's'}`;
+  const reviewerComment = reviewComment ? `\n\nReviewer comment: ${reviewComment}` : '';
+
+  const deliverablesList = deliverables
+    .map((d) => `- "${d.text}" → deliverableId="${d.id}"`)
+    .join('\n');
+
+  return `${prefix} You have ${countText}.
+
+## Session Credentials
+planId="${planId}"
+sessionToken="${sessionToken}"
+url="${url}"
+
+## Deliverables
+${deliverablesList || '(No deliverables defined)'}
+
+## How to Upload Proof-of-Work
+Use add_artifact(planId, sessionToken, filePath, deliverableId) for each deliverable.${reviewerComment}`;
 }
 
 /**
  * Generate session token and store it on the server.
  * Returns a CoreResponse for either success or failure.
+ *
+ * IMPORTANT: Credentials (planId, sessionToken, url, deliverables) MUST be included
+ * in the message because PermissionRequest is the ONLY reliable delivery mechanism.
+ * PostToolUse may race and fail if session registration hasn't completed.
  */
 async function handleApproval(
   planId: string,
@@ -61,31 +90,45 @@ async function handleApproval(
 ): Promise<CoreResponse> {
   const sessionToken = generateSessionToken();
   const sessionTokenHash = hashSessionToken(sessionToken);
-  const deliverableCount = (decision.deliverables ?? []).length;
+  const deliverables = (decision.deliverables ?? []).map((d) => ({
+    id: d.id,
+    text: d.text,
+  }));
 
-  logger.info({ planId }, 'Generating session token for approved plan');
+  logger.info(
+    { planId, deliverableCount: deliverables.length },
+    'Generating session token for approved plan'
+  );
 
   try {
     const tokenResult = await setSessionToken(planId, sessionTokenHash);
     const url = tokenResult.url;
 
     logger.info(
-      { planId, url, deliverableCount },
+      { planId, url, deliverableCount: deliverables.length },
       'Session token set and stored by server with deliverables'
     );
 
     return {
       allow: true,
-      message: buildApprovalMessage(messagePrefix, deliverableCount, decision.reviewComment),
+      message: buildApprovalMessage({
+        prefix: messagePrefix,
+        planId,
+        sessionToken,
+        url,
+        deliverables,
+        reviewComment: decision.reviewComment,
+      }),
       planId,
       sessionToken,
       url,
+      deliverables,
     };
   } catch (err) {
     logger.error({ err, planId }, 'Failed to set session token, approving without it');
     return {
       allow: true,
-      message: `${messagePrefix.replace('!', '')} (session token unavailable)`,
+      message: `${messagePrefix.replace('!', '')} (session token unavailable - check server logs)`,
       planId,
     };
   }

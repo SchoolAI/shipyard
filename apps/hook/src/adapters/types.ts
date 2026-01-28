@@ -70,6 +70,7 @@ export interface CoreResponse {
   planId?: string;
   url?: string;
   sessionToken?: string;
+  deliverables?: Array<{ id: string; text: string }>;
   hookType?: 'permission_request' | 'post_tool_use' | 'tool_deny';
   additionalContext?: string;
   denyReason?: string;
