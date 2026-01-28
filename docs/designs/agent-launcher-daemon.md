@@ -2,7 +2,9 @@
 
 > Design doc for Issue #140: Trigger local agents from Shipyard browser
 
-**Status:** Draft
+**Status:** Phases 1-3 Complete
+**Commits:** 30d913c, f8c70cf, 64fbc93
+**Next:** Phase 4 polish, then ship
 **Author:** Claude + Jacob
 **Date:** 2026-01-27
 
@@ -512,16 +514,17 @@ User can: Watch, Stop, or Continue reviewing
 
 ## Implementation Phases
 
-### Phase 1: Daemon Core (MVP)
+### Phase 1: Daemon Core (MVP) ✅ COMPLETE
 
+**Commit:** 30d913c
 **Scope:**
-- [ ] Create `apps/daemon/` package
-- [ ] WebSocket server on port 9999
-- [ ] Health check endpoint
-- [ ] Lock file management
-- [ ] Claude Code spawning only
-- [ ] Output streaming
-- [ ] Agent stop functionality
+- [x] Create `apps/daemon/` package
+- [x] WebSocket server on ports 56609/49548 with fallback
+- [x] Health check endpoint
+- [x] Lock file management
+- [x] Claude Code spawning only
+- [x] Output streaming
+- [x] Agent stop functionality
 
 **Not in Phase 1:**
 - Multiple agent types
@@ -530,33 +533,36 @@ User can: Watch, Stop, or Continue reviewing
 
 **Effort:** 2-3 days
 
-### Phase 2: MCP Integration
+### Phase 2: MCP Integration ✅ COMPLETE
 
+**Commit:** f8c70cf
 **Scope:**
-- [ ] Add `daemon-launcher.ts` to MCP server
-- [ ] Auto-spawn daemon on MCP startup
-- [ ] Health check before operations
-- [ ] Graceful fallback if daemon unavailable
+- [x] Add `daemon-launcher.ts` to MCP server
+- [x] Auto-spawn daemon on MCP startup
+- [x] Health check before operations
+- [x] Graceful fallback if daemon unavailable
 
 **Effort:** 1 day
 
-### Phase 3: Browser UI
+### Phase 3: Browser UI ✅ COMPLETE
 
+**Commit:** 64fbc93
 **Scope:**
-- [ ] `useDaemon` React hook
-- [ ] "Start Agent" button in sidebar (collapsed + expanded)
-- [ ] Agent selection modal
-- [ ] Output viewer panel
-- [ ] Stop agent button
-- [ ] Connection status indicator
+- [x] `useDaemon` React hook
+- [x] "+ Create Task" button in sidebar (collapsed + expanded)
+- [x] Agent launcher modal with task input
+- [x] Output viewer panel
+- [x] Stop agent button
+- [x] Connection status indicator
 
 **Effort:** 2-3 days
 
-### Phase 4: Polish
+### Phase 4: Polish 🚧 IN PROGRESS
 
 **Scope:**
 - [ ] NPX packaging as `shipyard` (unscoped)
-- [ ] Documentation
+- [ ] Documentation (SETUP.md, this file)
+- [ ] Final cleanup
 - [ ] Codex support (future)
 - [ ] Worktree integration (future)
 - [ ] ~~Keyboard shortcuts (Cmd+K)~~ - Deferred, no UI infrastructure

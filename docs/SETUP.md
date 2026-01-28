@@ -79,6 +79,55 @@ Browser should open with the task.
 
 ---
 
+## Agent Launcher Daemon
+
+The daemon enables browser → agent triggering. Click "+ Create Task" in Shipyard UI to launch Claude Code on your machine.
+
+### How It Works
+
+**Self-propagating bootstrap:**
+1. First Claude Code session with Shipyard MCP
+2. MCP auto-spawns daemon (detached process)
+3. Daemon survives when Claude Code exits
+4. Browser can trigger new Claude Code sessions
+
+**Ports:** 56609 (primary), 49548 (fallback)
+**Lock file:** `~/.shipyard/daemon.lock`
+
+### Manual Control
+
+```bash
+# Start daemon manually
+npx shipyard
+
+# Check if running
+curl http://localhost:56609/health
+
+# Stop daemon
+pkill -f "shipyard/apps/daemon"
+
+# Or kill via PID from lock file
+kill $(cat ~/.shipyard/daemon.lock | head -1)
+```
+
+### Troubleshooting
+
+**Daemon not starting:**
+- Check lock file: `cat ~/.shipyard/daemon.lock`
+- Check for stale lock (process dead): `ps aux | grep <PID>`
+- Remove stale lock: `rm ~/.shipyard/daemon.lock`
+
+**Port conflicts:**
+- Daemon tries ports [56609, 49548] with automatic fallback
+- If both in use, daemon won't start
+
+**Browser can't connect:**
+- Verify daemon running: `curl http://localhost:56609/health`
+- Check browser console for WebSocket errors
+- Ensure no firewall blocking localhost connections
+
+---
+
 ## Local Hooks Setup
 
 **For testing hook changes locally (without installing the plugin).**
