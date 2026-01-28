@@ -9,8 +9,10 @@ import {
   EPOCH_CLOSE_CODES,
   EPOCH_CLOSE_REASONS,
   getEpochFromMetadata,
+  getPlanIndexMetadata,
   getPlanMetadata,
   hasErrorCode,
+  initPlanIndexMetadata,
   isEpochValid,
   type PlanStore,
 } from '@shipyard/schema';
@@ -290,12 +292,24 @@ function initPersistence(): void {
 }
 
 function shouldRejectForEpoch(doc: Y.Doc, planId: string): boolean {
+  const minimumEpoch = registryConfig.MINIMUM_EPOCH;
+
+  if (planId === 'plan-index') {
+    const metadata = getPlanIndexMetadata(doc);
+    if (!metadata) return false;
+
+    const planEpoch = getEpochFromMetadata(metadata);
+    if (!isEpochValid(planEpoch, minimumEpoch)) {
+      logger.warn({ planId, planEpoch, minimumEpoch }, 'Plan-index epoch below minimum');
+      return true;
+    }
+    return false;
+  }
+
   const metadata = getPlanMetadata(doc);
   if (!metadata) return false;
 
   const planEpoch = getEpochFromMetadata(metadata);
-  const minimumEpoch = registryConfig.MINIMUM_EPOCH;
-
   if (!isEpochValid(planEpoch, minimumEpoch)) {
     logger.warn({ planId, planEpoch, minimumEpoch }, 'Plan epoch below minimum');
     return true;
@@ -317,6 +331,14 @@ async function getDoc(docName: string): Promise<Y.Doc> {
     const persistedDoc = await persistence.getYDoc(docName);
     const state = Y.encodeStateAsUpdate(persistedDoc);
     Y.applyUpdate(doc, state);
+
+    if (docName === 'plan-index') {
+      const metadata = getPlanIndexMetadata(doc);
+      if (!metadata) {
+        initPlanIndexMetadata(doc, { epoch: registryConfig.MINIMUM_EPOCH });
+        logger.info({ epoch: registryConfig.MINIMUM_EPOCH }, 'Initialized plan-index metadata');
+      }
+    }
 
     doc.on('update', (update: Uint8Array) => {
       persistence.storeUpdate(docName, update);

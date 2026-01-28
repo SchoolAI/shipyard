@@ -1,6 +1,8 @@
 import {
   DEFAULT_EPOCH,
   getEpochFromMetadata,
+  getPlanIndexMetadata,
+  initPlanIndexMetadata,
   initPlanMetadata,
   isEpochValid,
 } from '@shipyard/schema';
@@ -45,6 +47,41 @@ describe('epoch validation', () => {
       initPlanMetadata(ydoc, { id: 'test', title: 'Test' });
       const metadata = ydoc.getMap('metadata');
       expect(metadata.get('epoch')).toBe(DEFAULT_EPOCH);
+    });
+  });
+
+  describe('plan-index metadata', () => {
+    it('should initialize plan-index metadata with epoch', () => {
+      const ydoc = new Y.Doc();
+      initPlanIndexMetadata(ydoc, { epoch: 5 });
+      const metadata = getPlanIndexMetadata(ydoc);
+      expect(metadata).not.toBeNull();
+      expect(metadata?.id).toBe('plan-index');
+      expect(metadata?.epoch).toBe(5);
+      expect(metadata?.createdAt).toBeTypeOf('number');
+      expect(metadata?.updatedAt).toBeTypeOf('number');
+    });
+
+    it('should default to DEFAULT_EPOCH when not provided', () => {
+      const ydoc = new Y.Doc();
+      initPlanIndexMetadata(ydoc);
+      const metadata = getPlanIndexMetadata(ydoc);
+      expect(metadata?.epoch).toBe(DEFAULT_EPOCH);
+    });
+
+    it('should return null if metadata is not plan-index', () => {
+      const ydoc = new Y.Doc();
+      initPlanMetadata(ydoc, { id: 'test', title: 'Test' });
+      const metadata = getPlanIndexMetadata(ydoc);
+      expect(metadata).toBeNull();
+    });
+
+    it('should return null if metadata is missing required fields', () => {
+      const ydoc = new Y.Doc();
+      const map = ydoc.getMap('metadata');
+      map.set('id', 'plan-index');
+      const metadata = getPlanIndexMetadata(ydoc);
+      expect(metadata).toBeNull();
     });
   });
 });
