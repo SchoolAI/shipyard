@@ -50,7 +50,12 @@ function handleSubscribe(
       error: 'epoch_too_old',
       message: `Client epoch (${clientEpoch}) is below server minimum (${minimumEpoch})`,
     });
-    /** NOTE: PlatformAdapter lacks closeConnection - client must close on error */
+    /*
+     * Note: We cannot close the WebSocket connection here because PlatformAdapter
+     * doesn't expose a closeConnection method. The client is responsible for
+     * closing the connection after receiving the error message.
+     * Future enhancement: Add closeConnection(ws, code, reason) to PlatformAdapter.
+     */
     return;
   }
 
