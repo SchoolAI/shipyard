@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Epoch Reset System - Review Report</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 1400px;
+      margin: 40px auto;
+      padding: 20px;
+      background: #f5f5f5;
+      line-height: 1.6;
+    }
+    h1 { color: #1a1a1a; border-bottom: 3px solid #ef4444; padding-bottom: 10px; }
+    h2 { color: #2563eb; margin-top: 30px; }
+    h3 { color: #1a1a1a; margin-top: 20px; }
+    .summary {
+      background: white;
+      border-radius: 8px;
+      padding: 20px;
+      margin: 20px 0;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .critical { border-left: 5px solid #dc2626; background: #fee; padding: 20px; margin: 15px 0; }
+    .high { border-left: 5px solid #f97316; background: #fff7ed; padding: 20px; margin: 15px 0; }
+    .medium { border-left: 5px solid #eab308; background: #fefce8; padding: 20px; margin: 15px 0; }
+    .low { border-left: 5px solid #3b82f6; background: #eff6ff; padding: 15px; margin: 10px 0; }
+    .compliant { border-left: 5px solid #22c55e; background: #f0fdf4; padding: 15px; margin: 10px 0; }
+    .badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 12px;
+      font-size: 0.85em;
+      margin-right: 8px;
+      font-weight: bold;
+    }
+    .badge.critical { background: #dc2626; color: white; }
+    .badge.high { background: #f97316; color: white; }
+    .badge.medium { background: #eab308; color: #854d0e; }
+    .badge.low { background: #3b82f6; color: white; }
+    code {
+      background: #e5e7eb;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-family: 'Monaco', 'Courier New', monospace;
+      font-size: 0.9em;
+    }
+    pre {
+      background: #1f2937;
+      color: #f3f4f6;
+      padding: 15px;
+      border-radius: 6px;
+      overflow-x: auto;
+      font-size: 0.85em;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 15px 0;
+    }
+    th, td {
+      padding: 12px;
+      text-align: left;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    th {
+      background: #f9fafb;
+      font-weight: 600;
+    }
+    .file-ref {
+      font-family: 'Monaco', monospace;
+      font-size: 0.85em;
+      color: #6b7280;
+    }
+  </style>
+</head>
+<body>
+  <h1>🔍 Epoch-Based P2P Reset - Review Report</h1>
+
+  <div class="summary">
+    <h2>Executive Summary</h2>
+    <p><strong>Overall Assessment:</strong> <span class="badge critical">CRITICAL ISSUES FOUND</span></p>
+    <p>Two <strong>critical design flaws</strong> undermine the epoch mechanism. The implementation is technically sound, but the architecture doesn't account for P2P propagation and CRDT mutability.</p>
+
+    <table>
+      <tr>
+        <th>Severity</th>
+        <th>Count</th>
+        <th>Must Fix?</th>
+      </tr>
+      <tr>
+        <td><span class="badge critical">Critical</span></td>
+        <td>2</td>
+        <td>YES - Design flaws</td>
+      </tr>
+      <tr>
+        <td><span class="badge high">High</span></td>
+        <td>3</td>
+        <td>YES - User experience blockers</td>
+      </tr>
+      <tr>
+        <td><span class="badge medium">Medium</span></td>
+        <td>5</td>
+        <td>RECOMMENDED</td>
+      </tr>
+      <tr>
+        <td><span class="badge low">Low</span></td>
+        <td>3</td>
+        <td>OPTIONAL</td>
+      </tr>
+    </table>
+  </div>
+
+  <h2>🚨 Critical Issues (Design Flaws)</h2>
+
+  <div class="critical">
+    <h3>Issue 1: WebRTC P2P Does NOT Propagate Epoch Validation</h3>
+    <p><span class="badge critical">CRITICAL</span> <span class="file-ref">Design gap</span></p>
+
+    <p><strong>Problem:</strong> The epoch field syncs via CRDT, but WebRTC peers never validate it. The server only checks epoch on WebSocket connections. Two browsers can sync corrupted data directly via P2P, bypassing the server entirely.</p>
+
+    <p><strong>Impact:</strong> The entire reset mechanism can be bypassed. A peer with epoch=1 (corrupted) can:</p>
+    <ol>
+      <li>Connect to another peer via WebRTC (signaling doesn't validate epochs)</li>
+      <li>Sync its corrupted Y.Doc state</li>
+      <li>The receiving peer now has corrupted data despite MINIMUM_EPOCH=2</li>
+    </ol>
+
+    <p><strong>Evidence:</strong></p>
+    <pre>// apps/web/src/hooks/useMultiProviderSync.ts:478-549
+rtc = getOrCreateWebrtcProvider(roomName, ydoc, signalingServer);
+// No epoch validation - just creates provider and starts syncing</pre>
+
+    <p><strong>Fix Options:</strong></p>
+    <ul>
+      <li><strong>Option A:</strong> Add browser-side epoch validation after WebRTC sync</li>
+      <li><strong>Option B:</strong> Disable WebRTC when hub connection shows epoch mismatch</li>
+      <li><strong>Option C:</strong> Make signaling server validate epochs (requires server control)</li>
+    </ul>
+  </div>
+
+  <div class="critical">
+    <h3>Issue 2: Epoch Can Be Overwritten Via CRDT Sync</h3>
+    <p><span class="badge critical">CRITICAL</span> <span class="file-ref">packages/schema/src/yjs-helpers.ts:534</span></p>
+
+    <p><strong>Problem:</strong> Epoch is stored in Y.Map as a regular field. It syncs like any other CRDT data using last-writer-wins semantics. A stale peer can overwrite the epoch value during sync.</p>
+
+    <p><strong>Impact:</strong> A peer with epoch=1 that joins late could write its epoch value to the Y.Doc, overwriting epoch=5 from other peers. This defeats the versioning mechanism.</p>
+
+    <p><strong>Evidence:</strong></p>
+    <pre>// yjs-helpers.ts:534
+map.set('epoch', init.epoch ?? DEFAULT_EPOCH);
+// Just a regular Y.Map field - no special handling</pre>
+
+    <p><strong>Current behavior:</strong></p>
+    <ol>
+      <li>Server creates plan with epoch=2</li>
+      <li>Offline peer with old code (epoch=1) reconnects</li>
+      <li>CRDT sync runs - peer's epoch=1 could win depending on timestamps</li>
+      <li>All peers now have epoch=1 despite MINIMUM_EPOCH=2</li>
+    </ol>
+
+    <p><strong>Fix Options:</strong></p>
+    <ul>
+      <li><strong>Option A:</strong> Epoch should be server-only metadata (not in Y.Doc)</li>
+      <li><strong>Option B:</strong> Use Y.Map transactions with conflict resolution (always take max)</li>
+      <li><strong>Option C:</strong> Validate epoch BEFORE applying any CRDT updates</li>
+    </ul>
+  </div>
+
+  <h2>⚠️ High Severity Issues</h2>
+
+  <div class="high">
+    <h3>Issue 3: IndexedDB Delete Failure → Infinite Reload Loop</h3>
+    <p><span class="badge high">HIGH</span> <span class="file-ref">apps/web/src/utils/epochReset.ts:10-36</span></p>
+
+    <p><strong>Problem:</strong> If <code>deletePlanDatabase()</code> fails or times out, it returns <code>false</code>. But <code>handleEpochRejection()</code> ignores this and calls <code>window.location.reload()</code> anyway. Browser reloads, y-indexeddb loads same corrupted data, epoch rejection triggers again.</p>
+
+    <pre>async function deletePlanDatabase(planId: string): Promise&lt;boolean&gt; {
+  const timeout = setTimeout(() => {
+    resolve(false);  // Failure returns false, doesn't throw
+  }, 5000);
+}
+
+export async function handleEpochRejection(planId: string): Promise&lt;void&gt; {
+  await deletePlanDatabase(planId);  // Result ignored!
+  window.location.reload();  // Reloads even if delete failed
+}</pre>
+
+    <p><strong>Fix:</strong> Add sessionStorage flag to track reset attempts. If delete fails twice, show error UI instead of looping.</p>
+  </div>
+
+  <div class="high">
+    <h3>Issue 4: onblocked Event Not Handled - User Stuck</h3>
+    <p><span class="badge high">HIGH</span> <span class="file-ref">apps/web/src/utils/epochReset.ts:28-30</span></p>
+
+    <p><strong>Problem:</strong> When other tabs have IndexedDB open, <code>onblocked</code> fires but handler just waits. If connections don't close within 5 seconds, timeout hits and Issue 3 occurs.</p>
+
+    <p><strong>Impact:</strong> Users with multiple Shipyard tabs get stuck in reload loop.</p>
+
+    <p><strong>Fix:</strong></p>
+    <ul>
+      <li>Use BroadcastChannel to tell other tabs to close their connections</li>
+      <li>Show UI: "Please close other Shipyard tabs to complete reset"</li>
+      <li>Increase timeout or provide manual retry button</li>
+    </ul>
+  </div>
+
+  <div class="high">
+    <h3>Issue 5: WebSocket Close Handler Race Condition</h3>
+    <p><span class="badge high">HIGH</span> <span class="file-ref">apps/web/src/hooks/useMultiProviderSync.ts:428-443</span></p>
+
+    <p><strong>Problem:</strong> Close handler is attached in <code>wsStatusListener</code> callback. If the server closes with 4100 before the callback fires, the rejection is missed.</p>
+
+    <p><strong>Impact:</strong> Epoch rejection could be silently ignored, leaving corrupted data.</p>
+
+    <p><strong>Fix:</strong> Attach handler immediately after creating WebsocketProvider, with null check.</p>
+  </div>
+
+  <h2>🟡 Medium Severity Issues</h2>
+
+  <div class="medium">
+    <h3>Issue 6: WebSocket Access Without Runtime Check (Standards Violation)</h3>
+    <p><span class="badge medium">MEDIUM</span> <span class="file-ref">apps/web/src/hooks/useMultiProviderSync.ts:433-437</span></p>
+
+    <p><strong>Problem:</strong> Code accesses <code>wsInternal.ws</code> without checking if it's defined. Also uses type assertion with eslint-disable.</p>
+
+    <pre>const wsInternal = ws as WebsocketProvider & WebsocketProviderInternal;
+const wsSocket = wsInternal.ws;  // Could be undefined
+if (wsSocket) {  // Check happens, but after unsafe access
+  wsSocket.addEventListener(...);
+}</pre>
+
+    <p><strong>Standards violation:</strong> Project forbids <code>eslint-disable</code> comments.</p>
+
+    <p><strong>Fix:</strong> Add runtime check before accessing <code>.ws</code> property.</p>
+  </div>
+
+  <div class="medium">
+    <h3>Issue 7: MINIMUM_EPOCH Can Decrease Between Restarts</h3>
+    <p><span class="badge medium">MEDIUM</span> <span class="file-ref">apps/server/src/config/env/registry.ts</span></p>
+
+    <p><strong>Problem:</strong> No validation prevents MINIMUM_EPOCH from decreasing. If admin accidentally sets it lower, previously-reset clients become "valid" again.</p>
+
+    <p><strong>Fix:</strong> Store previous MINIMUM_EPOCH persistently, validate new value is >= old value.</p>
+  </div>
+
+  <div class="medium">
+    <h3>Issue 8: Missing Epoch in Plan Index</h3>
+    <p><span class="badge medium">MEDIUM</span> <span class="file-ref">apps/server/src/tools/create-task.ts:259-268</span></p>
+
+    <p><strong>Problem:</strong> Plan index doesn't include epoch, so you can't filter stale plans without loading full Y.Docs.</p>
+
+    <p><strong>Fix:</strong> Add epoch to PlanIndexEntry schema.</p>
+  </div>
+
+  <div class="medium">
+    <h3>Issue 9: No Telemetry for Epoch Rejections</h3>
+    <p><span class="badge medium">MEDIUM</span> <span class="file-ref">apps/server/src/registry-server.ts:292-304</span></p>
+
+    <p><strong>Problem:</strong> Only <code>logger.warn</code> when rejecting. No metrics to track how many rejections occur.</p>
+
+    <p><strong>Fix:</strong> Add structured telemetry for operations monitoring.</p>
+  </div>
+
+  <div class="medium">
+    <h3>Issue 10: window.location.reload() Can Fail</h3>
+    <p><span class="badge medium">MEDIUM</span> <span class="file-ref">apps/web/src/utils/epochReset.ts:36</span></p>
+
+    <p><strong>Problem:</strong> Reload can be blocked by service workers, beforeunload handlers, or browser extensions.</p>
+
+    <p><strong>Impact:</strong> Client left with deleted IndexedDB but corrupted in-memory Y.Doc.</p>
+
+    <p><strong>Fix:</strong> Force navigation or destroy Y.Doc as fallback.</p>
+  </div>
+
+  <h2>🔵 Low Severity Issues</h2>
+
+  <div class="low">
+    <h3>Issue 11: No Integration Tests</h3>
+    <p><span class="badge low">LOW</span></p>
+    <p>Unit tests don't catch Issues 1-2 because they mock providers. Need end-to-end test with real Y.Doc/WebSocket/WebRTC.</p>
+  </div>
+
+  <div class="low">
+    <h3>Issue 12: Hardcoded 5-Second Timeout</h3>
+    <p><span class="badge low">LOW</span> <span class="file-ref">apps/web/src/utils/epochReset.ts:14</span></p>
+    <p>May not be enough time on slow devices or large databases.</p>
+  </div>
+
+  <div class="low">
+    <h3>Issue 13: Memory Leak - Close Handler Not Removed</h3>
+    <p><span class="badge low">LOW</span> <span class="file-ref">apps/web/src/hooks/useMultiProviderSync.ts:437-441</span></p>
+    <p>Handler added to WebSocket but never explicitly removed on reconnection.</p>
+  </div>
+
+  <h2>✅ Standards Compliance</h2>
+
+  <div class="compliant">
+    <h3>Fully Compliant Areas</h3>
+    <ul>
+      <li><strong>Type Safety:</strong> No <code>any</code> types, proper Zod validation throughout</li>
+      <li><strong>Testing:</strong> Functional tests covering behavior and edge cases</li>
+      <li><strong>File Organization:</strong> Public APIs at top, clean exports</li>
+      <li><strong>Breaking Changes:</strong> Freely implemented (no backwards compat shims)</li>
+    </ul>
+  </div>
+
+  <div class="medium">
+    <h3>Minor Standards Issues</h3>
+    <ul>
+      <li><strong>Comments:</strong> Some "what" comments instead of "why" (see epoch.ts:1-3)</li>
+      <li><strong>Exhaustive checking:</strong> Message type switch missing default case</li>
+      <li><strong>ESLint suppression:</strong> One eslint-disable comment (violates CLAUDE.md)</li>
+    </ul>
+  </div>
+
+  <h2>📊 Questions Answered</h2>
+
+  <table>
+    <tr>
+      <th>Question</th>
+      <th>Answer</th>
+    </tr>
+    <tr>
+      <td>What breaks if server restarts mid-reset?</td>
+      <td>Works correctly if MINIMUM_EPOCH stays same or increases. Breaks if MINIMUM_EPOCH decreases.</td>
+    </tr>
+    <tr>
+      <td>What if IndexedDB.deleteDatabase() blocked?</td>
+      <td><strong>Infinite reload loop</strong> (Issues 3 & 4)</td>
+    </tr>
+    <tr>
+      <td>What if window.location.reload() fails?</td>
+      <td>Client stuck with deleted DB but corrupted in-memory state (Issue 10)</td>
+    </tr>
+    <tr>
+      <td>Can peer with epoch=5 corrupt peer with epoch=1?</td>
+      <td><strong>YES via WebRTC</strong> - no validation happens (Issue 1)</td>
+    </tr>
+    <tr>
+      <td>Can stale peer overwrite epoch=5 with epoch=1?</td>
+      <td><strong>YES via CRDT last-writer-wins</strong> (Issue 2)</td>
+    </tr>
+    <tr>
+      <td>Is eslint-disable justified?</td>
+      <td><strong>NO</strong> - violates CLAUDE.md standards (Issue 6)</td>
+    </tr>
+  </table>
+
+  <h2>🔧 Recommended Fixes</h2>
+
+  <div class="summary">
+    <h3>Priority 1: Address Critical Design Flaws</h3>
+    <p>Two approaches to fix Issues 1 & 2:</p>
+
+    <h4>Approach A: Server-Authoritative Epoch (Complex)</h4>
+    <ul>
+      <li>Move epoch out of Y.Doc (server-only metadata)</li>
+      <li>Send epoch in WebSocket handshake, validate before sync</li>
+      <li>Add epoch to WebRTC awareness state, validate on peer connection</li>
+      <li>Prevent epoch from being written to CRDT at all</li>
+    </ul>
+
+    <h4>Approach B: Disable WebRTC During Reset (Simple)</h4>
+    <ul>
+      <li>When hub detects epoch mismatch, send "disable P2P" signal</li>
+      <li>Client disconnects WebRTC, only syncs via hub</li>
+      <li>After reset completes, re-enable WebRTC</li>
+      <li>Simpler but requires hub coordination</li>
+    </ul>
+
+    <h4>Approach C: Hub-Only Mode for Beta (Simplest)</h4>
+    <ul>
+      <li>Since this is beta cleanup only, just disable WebRTC globally</li>
+      <li>Set <code>enableWebRTC: false</code> in config</li>
+      <li>All sync goes through hub - epoch validation always happens</li>
+      <li>Re-enable WebRTC after beta phase</li>
+    </ul>
+
+    <h3>Priority 2: Fix High Severity UX Issues</h3>
+    <ul>
+      <li><strong>Issue 3:</strong> Add sessionStorage flag to prevent reload loop</li>
+      <li><strong>Issue 4:</strong> Show UI for blocked IndexedDB, use BroadcastChannel</li>
+      <li><strong>Issue 5:</strong> Attach close handler immediately, not in callback</li>
+    </ul>
+
+    <h3>Priority 3: Standards Compliance</h3>
+    <ul>
+      <li><strong>Issue 6:</strong> Remove eslint-disable, add runtime check or update biome.json globally</li>
+      <li>Clean up "what" comments to explain "why"</li>
+      <li>Add exhaustive default to message type switch</li>
+    </ul>
+  </div>
+
+  <h2>🎯 Recommendation</h2>
+
+  <div class="summary">
+    <p><strong>For beta cleanup:</strong> Use <strong>Approach C</strong> (disable WebRTC temporarily)</p>
+    <p><strong>Rationale:</strong></p>
+    <ul>
+      <li>Simplest fix - one-line config change</li>
+      <li>Eliminates both critical issues immediately</li>
+      <li>Acceptable for beta (small user base, all local testing)</li>
+      <li>Can re-enable WebRTC after data is clean</li>
+    </ul>
+
+    <p><strong>For production:</strong> Implement <strong>Approach A</strong> (server-authoritative epoch)</p>
+    <p><strong>Rationale:</strong></p>
+    <ul>
+      <li>Proper solution for distributed system</li>
+      <li>Maintains P2P benefits (offline editing, etc.)</li>
+      <li>Epoch becomes a control plane concern, not data plane</li>
+    </ul>
+  </div>
+
+  <hr>
+  <p style="text-align: center; color: #6b7280; font-size: 0.9em;">
+    Reviews by: Opus (Adversarial) + Sonnet (Standards) | Generated: 2026-01-27
+  </p>
+</body>
+</html>
