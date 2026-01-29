@@ -23,9 +23,10 @@
 
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import http from 'node:http';
-import type { WebSocket } from 'ws';
-import { WebSocketServer } from 'ws';
+import { WebSocket, WebSocketServer } from 'ws';
 import {
+  checkAuthDeadlines,
+  handleAuthenticate,
   handleCreateInvite,
   handleListInvites,
   handlePublish,
@@ -41,6 +42,7 @@ import { serverConfig } from './config/env/server.js';
 import { logger } from './logger.js';
 
 const PING_TIMEOUT_MS = 30000;
+const AUTH_DEADLINE_CHECK_INTERVAL_MS = 5000;
 const port = serverConfig.PORT;
 
 const adapter = new NodePlatformAdapter();
@@ -93,6 +95,7 @@ function onConnection(conn: WebSocket): void {
   });
 
   conn.on('close', () => {
+    adapter.clearAuthDeadline(conn);
     adapter.unsubscribeFromAllTopics(conn);
     closed = true;
     clearInterval(pingInterval);
@@ -132,6 +135,11 @@ function onConnection(conn: WebSocket): void {
           adapter.sendMessage(conn, { type: 'pong' });
           break;
 
+        case 'authenticate':
+          /** Pass raw parsed data for secondary validation in handler */
+          await handleAuthenticate(adapter, conn, message);
+          break;
+
         case 'create_invite':
           await handleCreateInvite(adapter, conn, message);
           break;
@@ -169,11 +177,28 @@ server.listen(port);
 
 logger.info({ port }, 'Signaling server running');
 
+/**
+ * Periodic check for expired auth deadlines.
+ * Connections that don't authenticate within 10 seconds are disconnected.
+ */
+const authDeadlineInterval = setInterval(() => {
+  const disconnected = checkAuthDeadlines(adapter, (ws) => {
+    if (ws instanceof WebSocket && ws.readyState === WebSocket.OPEN) {
+      ws.close(1008, 'Authentication timeout');
+    }
+  });
+  if (disconnected > 0) {
+    logger.info({ count: disconnected }, 'Disconnected connections due to auth timeout');
+  }
+}, AUTH_DEADLINE_CHECK_INTERVAL_MS);
+
 process.on('SIGTERM', () => {
+  clearInterval(authDeadlineInterval);
   server.close();
 });
 
 process.on('SIGINT', () => {
+  clearInterval(authDeadlineInterval);
   server.close();
   process.exit(0);
 });

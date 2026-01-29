@@ -49,7 +49,6 @@ export interface PlatformAdapter {
    * Get invite redemption by user (checks if user redeemed ANY token for this plan).
    * Key format: 'redemption:{planId}:{userId}'
    * Returns undefined if no redemption exists.
-   * @deprecated Use getSpecificInviteRedemption for token-specific checks
    */
   getInviteRedemption(planId: string, userId: string): Promise<InviteRedemption | undefined>;
 
@@ -126,19 +125,19 @@ export interface PlatformAdapter {
    * --- Topic (Pub/Sub) Operations ---
    * Topics represent WebRTC rooms (plan IDs). Clients subscribe to topics
    * to receive signaling messages for that room.
+   *
+   * Two-message authentication pattern:
+   * 1. subscribe message -> adds to PENDING (no data access)
+   * 2. authenticate message -> validates, then activates subscription
+   * 3. Only ACTIVATED subscriptions can publish/receive data
    */
 
   /**
    * Get all WebSocket connections subscribed to a topic.
    * Returns empty array if topic has no subscribers.
+   * NOTE: Only returns ACTIVATED subscribers, not pending ones.
    */
   getTopicSubscribers(topic: string): unknown[];
-
-  /**
-   * Subscribe a WebSocket connection to a topic.
-   * Connection will receive all messages published to this topic.
-   */
-  subscribeToTopic(ws: unknown, topic: string): void;
 
   /**
    * Unsubscribe a WebSocket connection from a topic.
@@ -151,6 +150,77 @@ export interface PlatformAdapter {
    * Called when connection closes.
    */
   unsubscribeFromAllTopics(ws: unknown): void;
+
+  /*
+   * --- Pending Subscription Management (Two-Message Auth) ---
+   * Subscriptions start as "pending" and must be authenticated before activation.
+   */
+
+  /**
+   * Add a pending subscription for a WebSocket connection.
+   * Pending subscriptions cannot publish or receive data.
+   */
+  addPendingSubscription(ws: unknown, topic: string): void;
+
+  /**
+   * Get all pending subscriptions for a WebSocket connection.
+   * Returns empty array if no pending subscriptions.
+   */
+  getPendingSubscriptions(ws: unknown): string[];
+
+  /**
+   * Activate a pending subscription after successful authentication.
+   * Moves subscription from pending to active, allowing data flow.
+   * Returns true if subscription was pending and is now active.
+   */
+  activatePendingSubscription(ws: unknown, topic: string): boolean;
+
+  /**
+   * Check if a subscription is pending (not yet authenticated).
+   */
+  isSubscriptionPending(ws: unknown, topic: string): boolean;
+
+  /**
+   * Check if a subscription is active (authenticated and can send/receive data).
+   */
+  isSubscriptionActive(ws: unknown, topic: string): boolean;
+
+  /**
+   * Set authentication deadline for a connection.
+   * Connection should be closed if auth is not received by deadline.
+   */
+  setAuthDeadline(ws: unknown, timestamp: number): void;
+
+  /**
+   * Clear authentication deadline for a connection.
+   * Called after successful authentication.
+   */
+  clearAuthDeadline(ws: unknown): void;
+
+  /**
+   * Get authentication deadline for a connection.
+   * Returns null if no deadline set.
+   */
+  getAuthDeadline(ws: unknown): number | null;
+
+  /**
+   * Get all connections that have auth deadlines set.
+   * Used by the timeout enforcement mechanism to check for expired connections.
+   * Returns array of objects with ws and deadline timestamp.
+   */
+  getAllConnectionsWithDeadlines(): Array<{ ws: unknown; deadline: number }>;
+
+  /**
+   * Set the user ID for a connection.
+   * Called after successful authentication.
+   */
+  setConnectionUserId(ws: unknown, userId: string): void;
+
+  /**
+   * Get the user ID for a connection.
+   * Returns null if not authenticated.
+   */
+  getConnectionUserId(ws: unknown): string | null;
 
   /*
    * --- Authentication Operations ---

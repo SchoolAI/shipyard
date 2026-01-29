@@ -9,6 +9,7 @@
  * over platform-specific storage, crypto, and WebSocket operations.
  */
 
+export { handleAuthenticate } from './authenticate.js';
 export { handleValidateEpoch } from './epoch-validation.js';
 export {
   handleCreateInvite,
@@ -17,4 +18,4 @@ export {
   handleRevokeInvite,
 } from './invites.js';
 export { handlePublish } from './publish.js';
-export { handleSubscribe, handleUnsubscribe } from './subscribe.js';
+export { handleSubscribe, handleUnsubscribe, checkAuthDeadlines } from './subscribe.js';
