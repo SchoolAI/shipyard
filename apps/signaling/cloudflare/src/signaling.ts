@@ -27,6 +27,7 @@ import {
   handleRevokeInvite,
   handleSubscribe,
   handleUnsubscribe,
+  handleValidateEpoch,
 } from '@signaling/handlers/index.js';
 import type { SignalingMessage } from '@signaling/types.js';
 import { CloudflarePlatformAdapter } from './adapter.js';
@@ -34,6 +35,13 @@ import { logger } from './logger.js';
 
 /** Check for expired auth deadlines every 5 seconds */
 const AUTH_DEADLINE_CHECK_INTERVAL_MS = 5000;
+
+/**
+ * Minimum epoch for this server.
+ * TODO: Move to environment variable in wrangler.toml
+ * CRITICAL: Must match registry server's MINIMUM_EPOCH value
+ */
+const MINIMUM_EPOCH = 1;
 
 interface Env {
   SIGNALING_ROOM: DurableObjectNamespace;
@@ -93,7 +101,6 @@ export class SignalingRoom extends DurableObject<Env> {
       logger.info({ count: disconnected }, 'Disconnected connections due to auth timeout');
     }
 
-    /** Schedule next check */
     await this.ctx.storage.setAlarm(Date.now() + AUTH_DEADLINE_CHECK_INTERVAL_MS);
   }
 
@@ -101,19 +108,12 @@ export class SignalingRoom extends DurableObject<Env> {
    * Handle incoming HTTP requests (WebSocket upgrades)
    */
   async fetch(_request: Request): Promise<Response> {
-    /** Adapter is already initialized via blockConcurrencyWhile in constructor */
-
-    /** Create the WebSocket pair */
     const pair = new WebSocketPair();
     const [client, server] = Object.values(pair);
 
-    /*
-     * Accept the WebSocket with hibernation support
-     * This tells the runtime this connection can hibernate
-     */
+    /** NOTE: Hibernation support enables DO to sleep while keeping connections open */
     this.ctx.acceptWebSocket(server);
 
-    /** Return the client side of the WebSocket */
     return new Response(null, {
       status: 101,
       webSocket: client,
@@ -125,23 +125,16 @@ export class SignalingRoom extends DurableObject<Env> {
    * Called when a message arrives (may wake DO from hibernation)
    */
   async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
-    /*
-     * Adapter is initialized via blockConcurrencyWhile in constructor
-     * which also runs on hibernation wake
-     */
+    /** NOTE: Adapter initialized in constructor with blockConcurrencyWhile (runs on hibernation wake) */
 
     try {
       const data: SignalingMessage = JSON.parse(
         typeof message === 'string' ? message : new TextDecoder().decode(message)
       );
 
-      /*
-       * Handle each message type with exhaustive switch
-       * All handlers use the platform adapter for storage/messaging
-       */
       switch (data.type) {
         case 'subscribe':
-          handleSubscribe(this.adapter, ws, data);
+          handleSubscribe(this.adapter, ws, data, MINIMUM_EPOCH);
           break;
 
         case 'unsubscribe':
@@ -155,6 +148,10 @@ export class SignalingRoom extends DurableObject<Env> {
         case 'ping':
           /** Handled by setWebSocketAutoResponse, but just in case */
           ws.send(JSON.stringify({ type: 'pong' }));
+          break;
+
+        case 'validate_epoch':
+          handleValidateEpoch(this.adapter, ws, data, MINIMUM_EPOCH);
           break;
 
         case 'authenticate':

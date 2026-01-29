@@ -2,13 +2,14 @@
  * Subscribe handler for signaling server.
  *
  * Two-message authentication pattern:
- * 1. subscribe: Adds subscription as PENDING (no data access yet)
+ * 1. subscribe: Validates epoch, adds subscription as PENDING (no data access yet)
  * 2. authenticate: Validates credentials, activates subscription
  *
  * SECURITY: Subscribe alone grants NO access. All data is blocked until
  * authenticate message is received and validated.
  */
 
+import { DEFAULT_EPOCH, isEpochValid } from '@shipyard/schema';
 import type { PlatformAdapter } from '../platform.js';
 import type { AuthErrorResponse, SubscribeMessage, UnsubscribeMessage } from '../types.js';
 
@@ -20,23 +21,45 @@ const AUTH_DEADLINE_MS = 10000;
 /**
  * Handle subscribe message from client (y-webrtc sends this automatically).
  *
- * SECURITY: This ONLY adds topics to PENDING state. No data flows until
- * the authenticate message is received and validated. This prevents
- * unauthorized access to plan data.
+ * SECURITY:
+ * 1. Validates client epoch first - rejects stale clients
+ * 2. Adds topics to PENDING state only - no data flows until authenticate succeeds
+ * 3. Sets auth deadline - connection closed if authenticate not received in time
+ *
+ * This combines epoch validation with two-message authentication for defense in depth.
  *
  * @param platform - Platform adapter for storage/messaging
  * @param ws - WebSocket connection (platform-specific type)
- * @param message - Subscribe message with topics
+ * @param message - Subscribe message with topics and epoch
+ * @param minimumEpoch - Minimum allowed epoch for this server
  */
-function handleSubscribe(platform: PlatformAdapter, ws: unknown, message: SubscribeMessage): void {
-  // Topics are added as PENDING only - no data access until authenticate succeeds
+function handleSubscribe(
+  platform: PlatformAdapter,
+  ws: unknown,
+  message: SubscribeMessage,
+  minimumEpoch: number
+): void {
+  const clientEpoch = message.epoch ?? DEFAULT_EPOCH;
+
+  if (!isEpochValid(clientEpoch, minimumEpoch)) {
+    platform.warn(
+      `[Subscribe] Rejecting client: epoch ${clientEpoch} < minimum ${minimumEpoch}`
+    );
+    platform.sendMessage(ws, {
+      type: 'error',
+      error: 'epoch_too_old',
+      message: `Client epoch (${clientEpoch}) is below server minimum (${minimumEpoch})`,
+    });
+    /** NOTE: PlatformAdapter lacks closeConnection - client must close on error */
+    return;
+  }
+
   for (const topic of message.topics ?? []) {
     if (typeof topic !== 'string') continue;
     platform.addPendingSubscription(ws, topic);
     platform.debug(`[Subscribe] Client pending subscription to topic: ${topic} (awaiting auth)`);
   }
 
-  // Auth deadline enforces timely authentication - connection closed if exceeded
   const deadline = Date.now() + AUTH_DEADLINE_MS;
   platform.setAuthDeadline(ws, deadline);
   platform.debug(`[Subscribe] Auth deadline set: ${AUTH_DEADLINE_MS}ms`);

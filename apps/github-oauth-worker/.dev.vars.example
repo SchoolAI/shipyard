@@ -1,5 +1,10 @@
-# Copy this file to .dev.vars and fill in your values
-# .dev.vars is gitignored and used by wrangler dev
+# This file shows the required environment variables for Wrangler
+#
+# NOTE: We now use .env.development (tracked in git) instead of .dev.vars (gitignored)
+# This allows the secrets to work in git worktrees without manual copying.
+#
+# For development, the actual secrets are in .env.development
+# For production, Cloudflare secrets are used instead
 
 GITHUB_CLIENT_ID=your_github_oauth_client_id
 GITHUB_CLIENT_SECRET=your_github_oauth_client_secret

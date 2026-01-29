@@ -38,7 +38,7 @@ export function StartAgentModal({ isOpen, onClose }: StartAgentModalProps) {
       setPrompt('');
       onClose();
     } catch {
-      // Error is silently ignored - daemon will report via WebSocket
+      /** Error is silently ignored - daemon will report via WebSocket */
     } finally {
       setIsSubmitting(false);
     }

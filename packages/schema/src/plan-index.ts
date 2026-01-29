@@ -35,6 +35,8 @@ interface PlanIndexEntryBase {
   ownerId: string;
   /** Tags for categorization (copied from plan metadata for fast filtering) */
   tags?: string[];
+  /** Epoch number for detecting outdated plans (fast filtering without loading full Y.Doc) */
+  epoch: number;
 }
 
 /**
@@ -65,6 +67,7 @@ export const PlanIndexEntrySchema = z.discriminatedUnion('deleted', [
     updatedAt: z.number(),
     ownerId: z.string(),
     tags: z.array(z.string()).optional(),
+    epoch: z.number(),
   }),
   z.object({
     deleted: z.literal(true),
@@ -75,6 +78,7 @@ export const PlanIndexEntrySchema = z.discriminatedUnion('deleted', [
     updatedAt: z.number(),
     ownerId: z.string(),
     tags: z.array(z.string()).optional(),
+    epoch: z.number(),
     deletedAt: z.number(),
     deletedBy: z.string(),
   }),

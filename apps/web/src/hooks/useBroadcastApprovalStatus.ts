@@ -26,7 +26,6 @@ function colorFromString(str: string): string {
 function detectBrowser(): string {
   const ua = navigator.userAgent;
 
-  /* Order matters - check more specific browsers first */
   if (ua.includes('Edg/')) return 'Edge';
   if (ua.includes('OPR/') || ua.includes('Opera')) return 'Opera';
   if (ua.includes('Brave')) return 'Brave';

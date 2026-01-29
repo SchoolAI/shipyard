@@ -48,19 +48,33 @@ cat << EOF
 # Shipyard worktree environment for: ${WORKTREE_NAME}
 # Slot: ${SLOT} (based on hash of worktree name)
 
+# Core identifiers
 export SHIPYARD_WORKTREE_NAME="${WORKTREE_NAME}"
 export SHIPYARD_STATE_DIR="${STATE_DIR}"
+
+# Server ports
 export REGISTRY_PORT="${REGISTRY_PORT}"
 export PORT="${SIGNALING_PORT}"
 export VITE_PORT="${VITE_PORT}"
 
-# For wrangler workers (pass as CLI flags):
-# --port ${OAUTH_PORT} for github-oauth-worker
-# --port ${OG_PROXY_PORT} for og-proxy-worker
-# --inspector-port ${INSPECTOR_PORT_1} for github-oauth-worker
-# --inspector-port ${INSPECTOR_PORT_2} for og-proxy-worker
+# Wrangler worker ports (used by dev-all.sh)
+export OAUTH_PORT="${OAUTH_PORT}"
+export OG_PROXY_PORT="${OG_PROXY_PORT}"
+export INSPECTOR_PORT_1="${INSPECTOR_PORT_1}"
+export INSPECTOR_PORT_2="${INSPECTOR_PORT_2}"
 
-# Port assignments:
+# Node.js service URLs (MCP server, hook)
+export SIGNALING_URL="ws://localhost:${SIGNALING_PORT}"
+export SHIPYARD_WEB_URL="http://localhost:${VITE_PORT}"
+
+# Vite browser-side environment variables
+# These get compiled into the browser bundle at build time
+export VITE_WEBRTC_SIGNALING="ws://localhost:${SIGNALING_PORT}"
+export VITE_GITHUB_OAUTH_WORKER="http://localhost:${OAUTH_PORT}"
+export VITE_OG_PROXY_URL="http://localhost:${OG_PROXY_PORT}"
+export VITE_REGISTRY_PORT="${REGISTRY_PORT}"
+
+# Port assignments summary:
 # - Registry/WebSocket: ${REGISTRY_PORT}
 # - Signaling server: ${SIGNALING_PORT}
 # - OAuth worker: ${OAUTH_PORT}
@@ -68,9 +82,4 @@ export VITE_PORT="${VITE_PORT}"
 # - Vite dev server: ${VITE_PORT}
 # - Inspector ports: ${INSPECTOR_PORT_1}, ${INSPECTOR_PORT_2}
 # - State directory: ${STATE_DIR}
-
-# To use, add to your shell:
-#   source scripts/worktree-env.sh ${WORKTREE_NAME}
-# Or create a .envrc file (if using direnv):
-#   echo 'eval "\$(scripts/worktree-env.sh ${WORKTREE_NAME})"' > .envrc
 EOF

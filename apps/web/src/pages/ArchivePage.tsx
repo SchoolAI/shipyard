@@ -166,6 +166,7 @@ export function ArchivePage() {
         id: entry.id,
         title: entry.title,
         status: entry.status,
+        epoch: entry.epoch,
         createdAt: entry.createdAt,
         updatedAt: Date.now(),
         ownerId: entry.ownerId,

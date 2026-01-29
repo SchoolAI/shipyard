@@ -38,7 +38,7 @@ async function isDaemonRunning(): Promise<number | null> {
         return port;
       }
     } catch {
-      // Not running on this port, try next
+      /** Not running on this port - continue to next */
     }
   }
   return null;
@@ -96,7 +96,7 @@ async function isAutoStartConfigured(): Promise<boolean> {
     const { isAutoStartConfigured } = await import('../../daemon/dist/auto-start.js');
     return await isAutoStartConfigured();
   } catch {
-    // Daemon not built yet or auto-start module unavailable
+    /** Daemon not built yet or auto-start module unavailable */
     return false;
   }
 }

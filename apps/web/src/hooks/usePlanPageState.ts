@@ -273,6 +273,8 @@ export function usePlanPageState(): UsePlanPageStateReturn {
           createdAt: existingEntry.createdAt,
           updatedAt: existingEntry.updatedAt,
           ownerId: existingEntry.ownerId,
+          tags: existingEntry.tags,
+          epoch: existingEntry.epoch,
           deleted: true,
           deletedAt: Date.now(),
           deletedBy: 'Unknown',

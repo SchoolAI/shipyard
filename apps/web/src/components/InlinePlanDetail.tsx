@@ -25,11 +25,11 @@ import { getPlanRoute } from '@/constants/routes';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
 import { useLocalIdentity } from '@/hooks/useLocalIdentity';
 import { useMultiProviderSync } from '@/hooks/useMultiProviderSync';
+import { usePlanIndex } from '@/hooks/usePlanIndex';
 import { colorFromString } from '@/utils/color';
 import { formatRelativeTime } from '@/utils/formatters';
 import { setSidebarCollapsed } from '@/utils/uiPreferences';
 
-/** Callback context provided to approve/requestChanges handlers */
 export interface PlanActionContext {
   planId: string;
   ydoc: Y.Doc;
@@ -78,14 +78,12 @@ export function InlinePlanDetail({
   const [showAuthChoice, setShowAuthChoice] = useState(false);
   const [showLocalSignIn, setShowLocalSignIn] = useState(false);
 
-  /** Plan data for panel */
   const [panelMetadata, setPanelMetadata] = useState<PlanMetadata | null>(null);
   const [panelDeliverableStats, setPanelDeliverableStats] = useState({ completed: 0, total: 0 });
   const [panelLastActivity, setPanelLastActivity] = useState('');
   const [loadTimeout, setLoadTimeout] = useState(false);
   const [editor, setEditor] = useState<BlockNoteEditor | null>(null);
 
-  /** Sync providers for selected plan */
   const {
     ydoc: panelYdoc,
     syncState: panelSyncState,
@@ -93,7 +91,6 @@ export function InlinePlanDetail({
     rtcProvider: panelRtcProvider,
   } = useMultiProviderSync(planId || '');
 
-  /** Timeout for loading state (detect invalid planIds) */
   useEffect(() => {
     if (!planId) {
       setLoadTimeout(false);
@@ -122,12 +119,10 @@ export function InlinePlanDetail({
       const metadata = getPlanMetadata(panelYdoc);
       setPanelMetadata(metadata);
 
-      /** Update deliverable stats */
       const deliverables = getDeliverables(panelYdoc);
       const completed = deliverables.filter((d) => d.linkedArtifactId).length;
       setPanelDeliverableStats({ completed, total: deliverables.length });
 
-      /** Format last activity */
       if (metadata?.updatedAt) {
         setPanelLastActivity(`Updated ${formatRelativeTime(metadata.updatedAt)}`);
       }
@@ -137,7 +132,18 @@ export function InlinePlanDetail({
     return () => metaMap.unobserve(update);
   }, [planId, panelYdoc, panelSyncState.idbSynced]);
 
-  /** Identity for comments - Priority: GitHub > Local > null */
+  /** Mark plan as read once panel metadata loads (decouples from click handler) */
+  const currentUsername = githubIdentity?.username || localIdentity?.username;
+  const { markPlanAsRead, allInboxPlans } = usePlanIndex(currentUsername);
+  useEffect(() => {
+    if (!planId || !panelMetadata) return;
+
+    const plan = allInboxPlans.find((p) => p.id === planId);
+    if (plan?.isUnread) {
+      markPlanAsRead(planId);
+    }
+  }, [planId, panelMetadata, allInboxPlans, markPlanAsRead]);
+
   const identity = githubIdentity
     ? {
         id: githubIdentity.username,
@@ -168,7 +174,6 @@ export function InlinePlanDetail({
     [setLocalIdentity]
   );
 
-  /** Navigate to full plan page */
   const handleFullScreen = useCallback(() => {
     if (planId) {
       setSidebarCollapsed(true);
@@ -176,7 +181,6 @@ export function InlinePlanDetail({
     }
   }, [planId, navigate]);
 
-  /** Default approve handler - navigate to plan page */
   const handleApprove = useCallback(() => {
     if (onApprove && planId && panelMetadata) {
       onApprove({ planId, ydoc: panelYdoc, metadata: panelMetadata });
@@ -185,7 +189,6 @@ export function InlinePlanDetail({
     }
   }, [onApprove, planId, panelYdoc, panelMetadata, navigate]);
 
-  /** Default request changes handler - navigate to plan page */
   const handleRequestChanges = useCallback(() => {
     if (onRequestChanges && planId && panelMetadata) {
       onRequestChanges({ planId, ydoc: panelYdoc, metadata: panelMetadata });
@@ -194,10 +197,8 @@ export function InlinePlanDetail({
     }
   }, [onRequestChanges, planId, panelYdoc, panelMetadata, navigate]);
 
-  /** Prefer WebSocket when connected, fall back to WebRTC */
   const activeProvider = panelWsProvider ?? panelRtcProvider;
 
-  /** Auth modals - always rendered */
   const authModals = (
     <>
       <GitHubAuthOverlay authState={authState} />
@@ -215,7 +216,6 @@ export function InlinePlanDetail({
     </>
   );
 
-  /** Plan selected and metadata loaded */
   if (planId && panelMetadata) {
     return (
       <>
@@ -254,7 +254,6 @@ export function InlinePlanDetail({
     );
   }
 
-  /** Plan selected but still loading */
   if (planId) {
     if (loadTimeout) {
       return (
@@ -285,7 +284,6 @@ export function InlinePlanDetail({
     );
   }
 
-  /** No plan selected */
   return (
     <>
       <div className="flex items-center justify-center h-full text-muted-foreground">

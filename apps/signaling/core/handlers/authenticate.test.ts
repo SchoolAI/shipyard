@@ -295,7 +295,7 @@ describe('authenticate handler - two-message authentication pattern', () => {
         type: 'subscribe',
         topics: ['shipyard-plan-abc'],
       };
-      handleSubscribe(platform, ws, subscribeMsg);
+      handleSubscribe(platform, ws, subscribeMsg, 1);
 
       expect(platform.isSubscriptionPending(ws, 'shipyard-plan-abc')).toBe(true);
       expect(platform.isSubscriptionActive(ws, 'shipyard-plan-abc')).toBe(false);
@@ -348,7 +348,7 @@ describe('authenticate handler - two-message authentication pattern', () => {
         type: 'subscribe',
         topics: ['shipyard-plan-abc'],
       };
-      handleSubscribe(platform, ws, subscribeMsg);
+      handleSubscribe(platform, ws, subscribeMsg, 1);
 
       /** Step 2: Authenticate with invite */
       const authMsg: AuthenticateMessage = {
@@ -693,7 +693,7 @@ describe('authenticate handler - two-message authentication pattern', () => {
         type: 'subscribe',
         topics: ['shipyard-plan-abc'],
       };
-      handleSubscribe(platform, ws, subscribeMsg);
+      handleSubscribe(platform, ws, subscribeMsg, 1);
 
       /** Another user is subscribed and authenticated */
       const ws2 = createMockWebSocket('ws-2');
@@ -717,7 +717,7 @@ describe('authenticate handler - two-message authentication pattern', () => {
       platform._gitHubTokens.set('alice-token', 'alice');
 
       /** Subscribe and authenticate */
-      handleSubscribe(platform, ws, { type: 'subscribe', topics: ['shipyard-plan-abc'] });
+      handleSubscribe(platform, ws, { type: 'subscribe', topics: ['shipyard-plan-abc'] }, 1);
       await handleAuthenticate(platform, ws, {
         type: 'authenticate',
         auth: 'owner',
@@ -751,7 +751,7 @@ describe('authenticate handler - two-message authentication pattern', () => {
       handleSubscribe(platform, ws, {
         type: 'subscribe',
         topics: ['shipyard-plan-abc', 'some-other-topic', 'shipyard-plan-def'],
-      });
+      }, 1);
 
       /** Verify all are pending */
       expect(platform.isSubscriptionPending(ws, 'shipyard-plan-abc')).toBe(true);
@@ -781,7 +781,7 @@ describe('authenticate handler - two-message authentication pattern', () => {
       platform._gitHubTokens.set('alice-token', 'alice');
 
       /** Subscribe (sets deadline) */
-      handleSubscribe(platform, ws, { type: 'subscribe', topics: ['shipyard-plan-abc'] });
+      handleSubscribe(platform, ws, { type: 'subscribe', topics: ['shipyard-plan-abc'] }, 1);
       expect(platform.getAuthDeadline(ws)).not.toBeNull();
 
       /** Authenticate (clears deadline) */
@@ -859,7 +859,7 @@ describe('authenticate handler - two-message authentication pattern', () => {
       handleSubscribe(platform, ws, {
         type: 'subscribe',
         topics: ['shipyard-plan-123'],
-      });
+      }, 1);
 
       /** Verify deadline was set */
       expect(platform.getAuthDeadline(ws)).not.toBeNull();
@@ -891,7 +891,7 @@ describe('authenticate handler - two-message authentication pattern', () => {
       handleSubscribe(platform, ws, {
         type: 'subscribe',
         topics: ['shipyard-plan-123'],
-      });
+      }, 1);
 
       /** Verify deadline was set */
       expect(platform.getAuthDeadline(ws)).not.toBeNull();
@@ -929,7 +929,7 @@ describe('authenticate handler - two-message authentication pattern', () => {
       handleSubscribe(platform, ws, {
         type: 'subscribe',
         topics: ['shipyard-plan-123'],
-      });
+      }, 1);
 
       /** Advance 3 seconds */
       vi.advanceTimersByTime(3000);
@@ -938,7 +938,7 @@ describe('authenticate handler - two-message authentication pattern', () => {
       handleSubscribe(platform, ws2, {
         type: 'subscribe',
         topics: ['shipyard-plan-456'],
-      });
+      }, 1);
 
       /** Advance 5 seconds (now at 8s total) */
       vi.advanceTimersByTime(5000);
@@ -947,7 +947,7 @@ describe('authenticate handler - two-message authentication pattern', () => {
       handleSubscribe(platform, ws3, {
         type: 'subscribe',
         topics: ['shipyard-plan-789'],
-      });
+      }, 1);
 
       /** Advance 3 more seconds (now at 11s total) */
       vi.advanceTimersByTime(3000);
@@ -977,7 +977,7 @@ describe('authenticate handler - two-message authentication pattern', () => {
       handleSubscribe(platform, ws, {
         type: 'subscribe',
         topics: ['shipyard-plan-123'],
-      });
+      }, 1);
 
       /** Deadline should be set */
       expect(platform.getAuthDeadline(ws)).not.toBeNull();

@@ -4,38 +4,34 @@ set -e
 # Type Assertion Enforcement Script
 # ==================================
 # Runs ESLint to enforce no type assertions (except `as const`).
+#
+# Opt-out approach: lint everything except explicitly excluded paths
+# New packages are automatically covered
 
-PACKAGES=(
-  "packages/shared"
-  "packages/schema"
-  "apps/github-oauth-worker"
-  "apps/signaling/src"
-  "apps/signaling/cloudflare"
-  "apps/signaling/core"
-  "apps/signaling/node"
-  "apps/server"
-  "apps/hook"
-  "apps/web"
+EXCLUDE_PATTERNS=(
+  "node_modules"
+  "dist"
+  "build"
+  "*.config.*"
+  "spikes"
+  "**/*.test.ts"
+  "**/*.test.tsx"
+  "**/__tests__/**"
 )
 
 echo "Checking type assertions (ESLint)..."
 
-PATHS=""
-for pkg in "${PACKAGES[@]}"; do
-  if [ -d "$pkg/src" ]; then
-    PATHS="$PATHS $pkg/src/"
-  elif [ -d "$pkg" ]; then
-    PATHS="$PATHS $pkg/"
-  fi
+# Build ignore args
+IGNORE_ARGS=""
+for pattern in "${EXCLUDE_PATTERNS[@]}"; do
+  IGNORE_ARGS="$IGNORE_ARGS --ignore-pattern \"$pattern\""
 done
 
-if [ -z "$PATHS" ]; then
-  echo "No packages configured for type assertion checking."
-  exit 0
-fi
-
-# Run ESLint with type assertion rules (exclude test files)
-if ! pnpm eslint $PATHS --ext .ts,.tsx --ignore-pattern "**/*.test.ts" --ignore-pattern "**/__tests__/**" --max-warnings 0 2>&1; then
+# Lint all ts/tsx files in apps/ and packages/
+# Note: --no-error-on-unmatched-pattern handles missing .tsx in packages/
+# Only check type assertion rule (disable comment rules which are checked separately)
+# --report-unused-disable-directives-severity=off prevents warnings about disabled rules
+if ! eval "pnpm eslint 'apps/**/*.ts' 'apps/**/*.tsx' 'packages/**/*.ts' 'packages/**/*.tsx' $IGNORE_ARGS --no-error-on-unmatched-pattern --rule 'local/no-noisy-single-line-comments: off' --rule 'multiline-comment-style: off' --rule 'spaced-comment: off' --report-unused-disable-directives-severity=off --max-warnings 0" 2>&1; then
   echo ""
   echo "Type assertion violations found!"
   echo ""

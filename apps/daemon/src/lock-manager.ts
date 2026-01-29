@@ -1,7 +1,5 @@
 /**
- * PID-based lock file management for daemon singleton
- *
- * Copied pattern from apps/server/src/registry-server.ts (lines 79-194)
+ * PID-based lock file management for daemon singleton.
  * Ensures only one daemon instance runs at a time.
  */
 
@@ -15,12 +13,11 @@ const DAEMON_LOCK_FILE = join(SHIPYARD_DIR, 'daemon.lock');
 const MAX_LOCK_RETRIES = 3;
 
 function hasErrorCode(error: unknown, code: string): boolean {
-  return (
-    typeof error === 'object' &&
-    error !== null &&
-    'code' in error &&
-    (error as { code: unknown }).code === code
-  );
+  if (typeof error !== 'object' || error === null || !('code' in error)) {
+    return false;
+  }
+  const errorWithCode: { code: unknown } = error;
+  return errorWithCode.code === code;
 }
 
 async function readLockHolderPid(): Promise<number | null> {
@@ -58,9 +55,7 @@ function registerLockCleanupHandler(): void {
   process.once('exit', () => {
     try {
       unlinkSync(DAEMON_LOCK_FILE);
-    } catch {
-      /** Lock may already be cleaned up */
-    }
+    } catch {}
   });
 }
 
@@ -73,7 +68,6 @@ async function handleExistingLock(retryCount: number): Promise<boolean> {
     return false;
   }
 
-  /** Process dead - check retry limit before attempting removal */
   if (retryCount >= MAX_LOCK_RETRIES) {
     console.error(
       `Max retries exceeded while removing stale daemon lock (pid: ${pid}, retries: ${retryCount})`
@@ -81,7 +75,6 @@ async function handleExistingLock(retryCount: number): Promise<boolean> {
     return false;
   }
 
-  /** Attempt to remove stale lock and retry */
   await tryRemoveStaleLock(pid, retryCount);
   return tryAcquireDaemonLock(retryCount + 1);
 }
@@ -110,7 +103,6 @@ export async function releaseDaemonLock(): Promise<void> {
     await unlink(DAEMON_LOCK_FILE);
     console.log('Released daemon lock');
   } catch (err) {
-    /** Lock file may already be cleaned up by exit handler */
     console.debug('Daemon lock already released');
   }
 }

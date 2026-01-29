@@ -10,6 +10,7 @@
  */
 
 export { handleAuthenticate } from './authenticate.js';
+export { handleValidateEpoch } from './epoch-validation.js';
 export {
   handleCreateInvite,
   handleListInvites,

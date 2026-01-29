@@ -14,7 +14,6 @@ import { startWebSocketServer } from './websocket-server.js';
 async function main(): Promise<void> {
   console.log('Shipyard daemon starting...');
 
-  // Ensure .shipyard directory exists for logs and lock files
   const shipyardDir = join(homedir(), '.shipyard');
   if (!existsSync(shipyardDir)) {
     mkdirSync(shipyardDir, { recursive: true });

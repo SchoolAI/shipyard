@@ -14,6 +14,7 @@ import {
   YDOC_KEYS,
 } from '@shipyard/schema';
 import { AlertOctagon } from 'lucide-react';
+import type React from 'react';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import type * as Y from 'yjs';
@@ -110,6 +111,40 @@ function getRequestDisplayMessage(request: AnyInputRequest): string {
 const blockerIcon = <AlertOctagon className="w-5 h-5 text-danger" />;
 
 /**
+ * Toast description component that includes message and optional "View Plan" link.
+ * Opens plan in same tab when clicked.
+ */
+function ToastDescription({
+  message,
+  planId,
+}: {
+  message: string;
+  planId?: string;
+}): React.ReactElement {
+  const handleViewPlan = (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (planId) {
+      window.location.href = `/task/${planId}`;
+    }
+  };
+
+  return (
+    <div className="space-y-1">
+      <MarkdownContent content={message} variant="toast" className="line-clamp-2" />
+      {planId && (
+        <button
+          type="button"
+          onClick={handleViewPlan}
+          className="text-xs text-accent hover:underline flex items-center gap-1"
+        >
+          View Plan →
+        </button>
+      )}
+    </div>
+  );
+}
+
+/**
  * Show a grouped toast for multiple pending requests.
  */
 function showGroupedToast(count: number, hasBlocker: boolean, onClick: () => void): void {
@@ -133,6 +168,7 @@ function showGroupedToast(count: number, hasBlocker: boolean, onClick: () => voi
 
 /**
  * Show a toast for a single input request.
+ * Includes "View Plan" link when planId is available.
  */
 function showSingleRequestToast(request: AnyInputRequest, onClick: () => void): void {
   const isBlocker = request.isBlocker;
@@ -144,11 +180,7 @@ function showSingleRequestToast(request: AnyInputRequest, onClick: () => void): 
     position: 'top-right',
     duration: 60000,
     description: (
-      <MarkdownContent
-        content={getRequestDisplayMessage(request)}
-        variant="toast"
-        className="line-clamp-2"
-      />
+      <ToastDescription message={getRequestDisplayMessage(request)} planId={request.planId} />
     ),
     icon: isBlocker ? blockerIcon : undefined,
     action: { label: 'Respond', onClick },

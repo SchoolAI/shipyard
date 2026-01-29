@@ -34,6 +34,7 @@ import {
   handleRevokeInvite,
   handleSubscribe,
   handleUnsubscribe,
+  handleValidateEpoch,
 } from '../core/handlers/index.js';
 import { SignalingMessageSchema } from '../core/types.js';
 import { NodePlatformAdapter } from '../node/adapter.js';
@@ -115,7 +116,7 @@ function onConnection(conn: WebSocket): void {
 
       switch (message.type) {
         case 'subscribe':
-          handleSubscribe(adapter, conn, message);
+          handleSubscribe(adapter, conn, message, serverConfig.MINIMUM_EPOCH);
           break;
 
         case 'unsubscribe':
@@ -124,6 +125,10 @@ function onConnection(conn: WebSocket): void {
 
         case 'publish':
           handlePublish(adapter, conn, message);
+          break;
+
+        case 'validate_epoch':
+          handleValidateEpoch(adapter, conn, message, serverConfig.MINIMUM_EPOCH);
           break;
 
         case 'ping':

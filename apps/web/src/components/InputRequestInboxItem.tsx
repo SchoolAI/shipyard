@@ -1,17 +1,25 @@
 /**
  * Inbox item component for displaying input requests in the inbox list.
- * Shows request type, message, and countdown timer.
+ * Shows request type, message, plan link (if available), and countdown timer.
+ *
+ * Hybrid interaction pattern:
+ * - Click plan title → selects plan in detail panel (via onSelectPlan)
+ * - Click card body → opens input request modal (via onClick)
  */
 
 import { Card, Chip } from '@heroui/react';
 import { type AnyInputRequest, DEFAULT_INPUT_REQUEST_TIMEOUT_SECONDS } from '@shipyard/schema';
-import { AlertOctagon, Clock } from 'lucide-react';
+import { AlertOctagon, Clock, ExternalLink } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { MarkdownContent } from '@/components/ui/MarkdownContent';
 
 interface InputRequestInboxItemProps {
   request: AnyInputRequest;
   onClick: () => void;
+  /** Optional: plan title for display (looked up from index) */
+  planTitle?: string;
+  /** Optional: callback to select the plan in the detail panel */
+  onSelectPlan?: (planId: string) => void;
 }
 
 /** Get display message for any input request type */
@@ -32,7 +40,12 @@ function getDisplayType(request: AnyInputRequest): string {
   return request.type;
 }
 
-export function InputRequestInboxItem({ request, onClick }: InputRequestInboxItemProps) {
+export function InputRequestInboxItem({
+  request,
+  onClick,
+  planTitle,
+  onSelectPlan,
+}: InputRequestInboxItemProps) {
   const [remainingTime, setRemainingTime] = useState(0);
 
   /** Calculate remaining time from createdAt */
@@ -81,6 +94,22 @@ export function InputRequestInboxItem({ request, onClick }: InputRequestInboxIte
               <Chip variant="soft" color="default" size="sm">
                 {getDisplayType(request)}
               </Chip>
+              {/* Plan link - clicking selects plan in detail panel */}
+              {request.planId && onSelectPlan && (
+                <button
+                  type="button"
+                  className="text-xs text-accent hover:underline flex items-center gap-0.5"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (request.planId) {
+                      onSelectPlan(request.planId);
+                    }
+                  }}
+                >
+                  <ExternalLink className="w-3 h-3" />
+                  {planTitle || 'View Plan'}
+                </button>
+              )}
             </div>
 
             <div className="text-sm font-medium text-foreground mb-1 line-clamp-2">

@@ -24,6 +24,7 @@ import {
 } from '@shipyard/schema';
 import type * as Y from 'yjs';
 import { z } from 'zod';
+import { registryConfig } from '../config/env/registry.js';
 import { webConfig } from '../config/env/web.js';
 import { getOrCreateDoc } from '../doc-store.js';
 import { getOctokit, parseRepoString } from '../github-artifacts.js';
@@ -254,6 +255,7 @@ export async function performAutoComplete(params: AutoCompleteParams): Promise<A
       createdAt: metadata.createdAt ?? Date.now(),
       updatedAt: Date.now(),
       ownerId: metadata.ownerId,
+      epoch: metadata.epoch ?? registryConfig.MINIMUM_EPOCH,
       deleted: false,
     });
   } else {
