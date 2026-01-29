@@ -18,7 +18,14 @@ function isOriginPlatform(value: string | undefined): value is OriginPlatform {
 }
 
 import { DEFAULT_REGISTRY_PORTS } from '@shipyard/shared/registry-config';
-import { Check, Download, MessageSquare, MessageSquareReply, Terminal } from 'lucide-react';
+import {
+  Check,
+  Download,
+  MessageSquare,
+  MessageSquareReply,
+  PlayCircle,
+  Terminal,
+} from 'lucide-react';
 import type React from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -31,6 +38,7 @@ import {
   type ReceivedConversation,
   useConversationTransfer,
 } from '@/hooks/useConversationTransfer';
+import { useDaemon } from '@/hooks/useDaemon';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
 import { useImportConversationToast } from '@/hooks/useImportConversationToast';
 import { createVanillaTRPCClient } from '@/utils/trpc-client';
@@ -282,16 +290,20 @@ function ReceivedReviewModal({
   received,
   onDownload,
   onImportToClaudeCode,
+  onLaunchAgent,
   isImporting,
   registryAvailable,
+  daemonConnected,
 }: {
   isOpen: boolean;
   onClose: () => void;
   received: ReceivedConversation;
   onDownload: () => void;
   onImportToClaudeCode: () => void;
+  onLaunchAgent: () => void;
   isImporting: boolean;
   registryAvailable: boolean;
+  daemonConnected: boolean;
 }) {
   const { messages, meta, summary } = received;
   const previewMessages = messages.slice(0, 5);
@@ -362,30 +374,32 @@ function ReceivedReviewModal({
               Dismiss
             </Button>
             {/* TODO(#9): Platform-specific import buttons
-                Currently only shows "Import to Claude Code" if registry is available.
+                Currently shows Claude Code options if available.
                 Should detect which platforms are running (Cursor, Devin, etc.) and show
                 only relevant buttons. See A2A research in docs/research/ */}
-            {registryAvailable ? (
-              <>
-                <Button variant="secondary" onPress={onDownload}>
-                  <Download className="w-4 h-4" />
-                  Download
-                </Button>
-                <Button onPress={onImportToClaudeCode} isDisabled={isImporting}>
-                  {isImporting ? (
-                    <Spinner size="sm" color="current" />
-                  ) : (
-                    <Terminal className="w-4 h-4" />
-                  )}
-                  Import to Claude Code
-                </Button>
-              </>
-            ) : (
-              <Button onPress={onDownload}>
-                <Download className="w-4 h-4" />
-                Download File
+            <Button variant="secondary" onPress={onDownload}>
+              <Download className="w-4 h-4" />
+              Download
+            </Button>
+            {daemonConnected ? (
+              <Button onPress={onLaunchAgent} isDisabled={isImporting}>
+                {isImporting ? (
+                  <Spinner size="sm" color="current" />
+                ) : (
+                  <PlayCircle className="w-4 h-4" />
+                )}
+                Launch Agent
               </Button>
-            )}
+            ) : registryAvailable ? (
+              <Button onPress={onImportToClaudeCode} isDisabled={isImporting}>
+                {isImporting ? (
+                  <Spinner size="sm" color="current" />
+                ) : (
+                  <Terminal className="w-4 h-4" />
+                )}
+                Import to Claude Code
+              </Button>
+            ) : null}
           </Modal.Footer>
         </Modal.Dialog>
       </Modal.Container>
@@ -405,7 +419,9 @@ export function ImportConversationHandler({
   const [selectedReceived, setSelectedReceived] = useState<ReceivedConversation | null>(null);
   const [isReviewOpen, setIsReviewOpen] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
+  const [pendingLaunchTaskId, setPendingLaunchTaskId] = useState<string | null>(null);
   const registryAvailable = useRegistryAvailable();
+  const { connected: daemonConnected, startAgentWithContext, lastError, lastStarted } = useDaemon();
   const { identity } = useGitHubAuth();
   const { actor } = useUserIdentity();
 
@@ -413,6 +429,43 @@ export function ImportConversationHandler({
     setSelectedReceived(received);
     setIsReviewOpen(true);
   });
+
+  useEffect(() => {
+    if (lastError) {
+      toast.error(`Daemon error: ${lastError}`);
+      setPendingLaunchTaskId(null);
+    }
+  }, [lastError]);
+
+  useEffect(() => {
+    if (lastStarted && pendingLaunchTaskId === lastStarted.taskId && selectedReceived) {
+      /** Update CRDT with actual sessionId from daemon */
+      const sourcePlatform = selectedReceived.meta.sourcePlatform;
+      const platform: OriginPlatform = isOriginPlatform(sourcePlatform)
+        ? sourcePlatform
+        : 'unknown';
+      const newVersion: ConversationVersion = {
+        versionId: crypto.randomUUID(),
+        creator: identity?.username || 'anonymous',
+        platform,
+        sessionId: lastStarted.sessionId || selectedReceived.meta.sourceSessionId,
+        messageCount: selectedReceived.meta.messageCount,
+        createdAt: Date.now(),
+        handedOff: false,
+      };
+      addConversationVersion(ydoc, newVersion);
+
+      /** Log activity event */
+      logPlanEvent(ydoc, 'conversation_imported', actor, {
+        sourcePlatform: selectedReceived.meta.sourcePlatform,
+        messageCount: selectedReceived.meta.messageCount,
+        sourceSessionId: selectedReceived.meta.sourceSessionId.slice(0, 8),
+      });
+
+      toast.success(`Launched agent (PID: ${lastStarted.pid})`);
+      setPendingLaunchTaskId(null);
+    }
+  }, [lastStarted, pendingLaunchTaskId, selectedReceived, identity?.username, actor, ydoc]);
 
   function handleDownload() {
     if (!selectedReceived) return;
@@ -493,6 +546,41 @@ export function ImportConversationHandler({
     }
   }, [selectedReceived, ydoc, identity?.username, actor]);
 
+  function handleLaunchAgent() {
+    if (!selectedReceived) return;
+
+    setIsImporting(true);
+
+    try {
+      const taskId = selectedReceived.meta.planId;
+
+      /** Send to daemon to start agent with context */
+      startAgentWithContext(
+        taskId,
+        {
+          messages: selectedReceived.messages,
+          meta: selectedReceived.meta,
+        },
+        '/tmp'
+      );
+
+      /** Track that we're waiting for this agent to start */
+      setPendingLaunchTaskId(taskId);
+
+      /** CRDT update moved to useEffect that fires when 'started' message arrives */
+
+      /** Close modal - success/error toasts handled by useEffect hooks */
+      setIsReviewOpen(false);
+      setSelectedReceived(null);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to launch agent';
+      toast.error(message);
+      setPendingLaunchTaskId(null);
+    } finally {
+      setIsImporting(false);
+    }
+  }
+
   function handleClose() {
     setIsReviewOpen(false);
     setSelectedReceived(null);
@@ -509,8 +597,10 @@ export function ImportConversationHandler({
       received={selectedReceived}
       onDownload={handleDownload}
       onImportToClaudeCode={handleImportToClaudeCode}
+      onLaunchAgent={handleLaunchAgent}
       isImporting={isImporting}
       registryAvailable={registryAvailable}
+      daemonConnected={daemonConnected}
     />
   );
 }

@@ -3,6 +3,9 @@
  *
  * Listens on localhost ports [56609, 49548] with fallback.
  * Provides health check endpoint and WebSocket upgrade.
+ *
+ * Server is a singleton - calling startWebSocketServer() multiple times
+ * returns the same port without starting additional servers.
  */
 
 import type { IncomingMessage } from 'node:http';
@@ -15,7 +18,33 @@ import { handleClientMessage } from './protocol.js';
 const PORTS = [56609, 49548];
 const startTime = Date.now();
 
+/** Singleton state for the WebSocket server */
+let serverPort: number | null = null;
+let serverStarting: Promise<number | null> | null = null;
+
 export async function startWebSocketServer(): Promise<number | null> {
+  /** Return existing port if server already running */
+  if (serverPort !== null) {
+    return serverPort;
+  }
+
+  /** If server is currently starting, wait for it */
+  if (serverStarting !== null) {
+    return serverStarting;
+  }
+
+  /** Start the server and cache the promise to handle concurrent calls */
+  serverStarting = doStartWebSocketServer();
+
+  try {
+    serverPort = await serverStarting;
+    return serverPort;
+  } finally {
+    serverStarting = null;
+  }
+}
+
+async function doStartWebSocketServer(): Promise<number | null> {
   const server = createServer((req, res) => {
     if (req.url === '/health' && req.method === 'GET') {
       res.writeHead(200, { 'Content-Type': 'application/json' });

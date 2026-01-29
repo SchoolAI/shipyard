@@ -21,6 +21,10 @@
     "./yjs": {
       "import": "./dist/yjs-helpers.mjs",
       "types": "./dist/yjs-helpers.d.mts"
+    },
+    "./claude-paths": {
+      "import": "./dist/claude-paths.mjs",
+      "types": "./dist/claude-paths.d.mts"
     }
   },
   "scripts": {

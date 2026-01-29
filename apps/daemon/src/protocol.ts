@@ -6,10 +6,20 @@
  */
 
 import type { WebSocket } from 'ws';
-import { listAgents, spawnClaudeCode, stopAgent } from './agent-spawner.js';
+import type { A2AMessage, ConversationExportMeta } from '@shipyard/schema';
+import { assertNever } from '@shipyard/schema';
+import { listAgents, spawnClaudeCode, spawnClaudeCodeWithContext, stopAgent } from './agent-spawner.js';
 import type { ClientMessage, ServerMessage } from './types.js';
 
+const MAX_PAYLOAD_SIZE = 15 * 1024 * 1024; // 15MB
+
 export function handleClientMessage(ws: WebSocket, data: string): void {
+  // Check payload size before parsing to prevent DoS attacks
+  if (data.length > MAX_PAYLOAD_SIZE) {
+    sendError(ws, undefined, 'Payload exceeds maximum size limit');
+    return;
+  }
+
   try {
     const message: ClientMessage = JSON.parse(data);
 
@@ -17,16 +27,17 @@ export function handleClientMessage(ws: WebSocket, data: string): void {
       case 'start-agent':
         handleStartAgent(ws, message);
         break;
+      case 'start-agent-with-context':
+        handleStartAgentWithContext(ws, message);
+        break;
       case 'stop-agent':
         handleStopAgent(ws, message);
         break;
       case 'list-agents':
         handleListAgents(ws);
         break;
-      default: {
-        const exhaustiveCheck: never = message;
-        sendError(ws, undefined, `Unknown message type: ${JSON.stringify(exhaustiveCheck)}`);
-      }
+      default:
+        assertNever(message);
     }
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : String(err);
@@ -48,8 +59,10 @@ function handleStartAgent(
       return;
     }
 
+    /** Send started event */
     send(ws, { type: 'started', taskId, pid: child.pid });
 
+    /** Stream stdout */
     child.stdout?.on('data', (data: Buffer) => {
       send(ws, {
         type: 'output',
@@ -59,6 +72,7 @@ function handleStartAgent(
       });
     });
 
+    /** Stream stderr */
     child.stderr?.on('data', (data: Buffer) => {
       send(ws, {
         type: 'output',
@@ -68,6 +82,7 @@ function handleStartAgent(
       });
     });
 
+    /** Send completion event */
     child.once('exit', (code) => {
       send(ws, {
         type: 'completed',
@@ -95,6 +110,64 @@ function handleStopAgent(ws: WebSocket, message: { type: 'stop-agent'; taskId: s
 function handleListAgents(ws: WebSocket): void {
   const agents = listAgents();
   send(ws, { type: 'agents', list: agents });
+}
+
+async function handleStartAgentWithContext(
+  ws: WebSocket,
+  message: { type: 'start-agent-with-context'; taskId: string; cwd: string; a2aPayload: { messages: A2AMessage[]; meta: ConversationExportMeta } }
+): Promise<void> {
+  const { taskId, cwd, a2aPayload } = message;
+
+  try {
+    const { child, sessionId } = await spawnClaudeCodeWithContext({
+      taskId,
+      cwd,
+      a2aPayload: {
+        messages: a2aPayload.messages,
+        meta: a2aPayload.meta,
+      },
+    });
+
+    if (!child.pid) {
+      sendError(ws, taskId, 'Failed to spawn Claude Code process with context');
+      return;
+    }
+
+    /** Send started event */
+    send(ws, { type: 'started', taskId, pid: child.pid, sessionId });
+
+    /** Stream stdout */
+    child.stdout?.on('data', (data: Buffer) => {
+      send(ws, {
+        type: 'output',
+        taskId,
+        data: data.toString('utf-8'),
+        stream: 'stdout',
+      });
+    });
+
+    /** Stream stderr */
+    child.stderr?.on('data', (data: Buffer) => {
+      send(ws, {
+        type: 'output',
+        taskId,
+        data: data.toString('utf-8'),
+        stream: 'stderr',
+      });
+    });
+
+    /** Send completion event */
+    child.once('exit', (code) => {
+      send(ws, {
+        type: 'completed',
+        taskId,
+        exitCode: code ?? -1,
+      });
+    });
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    sendError(ws, taskId, `Failed to start agent with context: ${errorMessage}`);
+  }
 }
 
 function send(ws: WebSocket, message: ServerMessage): void {

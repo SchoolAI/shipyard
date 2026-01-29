@@ -284,7 +284,7 @@ describe('Protocol Handler', () => {
       expect(messages).toHaveLength(1);
       expect(messages[0]).toMatchObject({
         type: 'error',
-        message: expect.stringContaining('Unknown message type'),
+        message: expect.stringContaining('Unhandled discriminated union member'),
       });
     });
 

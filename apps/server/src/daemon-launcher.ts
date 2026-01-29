@@ -93,8 +93,11 @@ async function waitForDaemon(): Promise<boolean> {
  */
 async function isAutoStartConfigured(): Promise<boolean> {
   try {
-    const { isAutoStartConfigured } = await import('../../daemon/dist/auto-start.js');
-    return await isAutoStartConfigured();
+    // @ts-expect-error - Dynamic import of daemon module without types
+    const module = (await import('../../daemon/dist/auto-start.js')) as {
+      isAutoStartConfigured: () => Promise<boolean>;
+    };
+    return await module.isAutoStartConfigured();
   } catch {
     /** Daemon not built yet or auto-start module unavailable */
     return false;
@@ -107,8 +110,11 @@ async function isAutoStartConfigured(): Promise<boolean> {
  */
 async function setupAutoStart(): Promise<boolean> {
   try {
-    const { setupAutoStart } = await import('../../daemon/dist/auto-start.js');
-    return await setupAutoStart();
+    // @ts-expect-error - Dynamic import of daemon module without types
+    const module = (await import('../../daemon/dist/auto-start.js')) as {
+      setupAutoStart: () => Promise<boolean>;
+    };
+    return await module.setupAutoStart();
   } catch (err) {
     logger.warn({ err }, 'Failed to import auto-start module - daemon may not be built yet');
     return false;

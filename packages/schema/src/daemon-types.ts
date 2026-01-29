@@ -3,13 +3,24 @@
  * Shared between daemon server and web client.
  */
 
+import type { A2AMessage, ConversationExportMeta } from './conversation-export.js';
+
 export type ClientMessage =
   | { type: 'start-agent'; taskId: string; prompt: string; cwd?: string }
   | { type: 'stop-agent'; taskId: string }
-  | { type: 'list-agents' };
+  | { type: 'list-agents' }
+  | {
+      type: 'start-agent-with-context';
+      taskId: string;
+      cwd: string;
+      a2aPayload: {
+        messages: A2AMessage[];
+        meta: ConversationExportMeta;
+      };
+    };
 
 export type ServerMessage =
-  | { type: 'started'; taskId: string; pid: number }
+  | { type: 'started'; taskId: string; pid: number; sessionId?: string }
   | { type: 'output'; taskId: string; data: string; stream: 'stdout' | 'stderr' }
   | { type: 'completed'; taskId: string; exitCode: number }
   | { type: 'stopped'; taskId: string }

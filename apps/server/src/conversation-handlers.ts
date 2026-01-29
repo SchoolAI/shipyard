@@ -4,8 +4,6 @@
  */
 
 import { mkdir, writeFile } from 'node:fs/promises';
-import { homedir } from 'node:os';
-import { join } from 'node:path';
 import {
   a2aToClaudeCode,
   type ConversationContext,
@@ -14,6 +12,7 @@ import {
   type ImportConversationResponse,
   validateA2AMessages,
 } from '@shipyard/schema';
+import { getProjectPath, getSessionTranscriptPath } from '@shipyard/schema/claude-paths';
 import { nanoid } from 'nanoid';
 
 interface ImportConversationInput {
@@ -59,13 +58,10 @@ export async function importConversationHandler(
     const claudeMessages = a2aToClaudeCode(valid, sessionId);
     const jsonl = formatAsClaudeCodeJSONL(claudeMessages);
 
-    const projectName = meta?.planId
-      ? `shipyard-${meta.planId.slice(0, 8)}`
-      : process.cwd().split('/').pop() || 'shipyard';
-
-    const projectPath = join(homedir(), '.claude', 'projects', projectName);
+    /** Use shared path helpers */
+    const projectPath = getProjectPath(meta?.planId);
     await mkdir(projectPath, { recursive: true });
-    const transcriptPath = join(projectPath, `${sessionId}.jsonl`);
+    const transcriptPath = getSessionTranscriptPath(projectPath, sessionId);
 
     await writeFile(transcriptPath, jsonl, 'utf-8');
 

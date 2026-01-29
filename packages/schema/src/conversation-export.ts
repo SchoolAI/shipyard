@@ -311,6 +311,11 @@ const ClaudeCodeContentBlockSchema = z
           content: record.content,
           is_error: typeof record.is_error === 'boolean' ? record.is_error : undefined,
         };
+      default: {
+        // Exhaustive check on discriminant (val has passthrough props, so check type field)
+        const _exhaustive: never = val.type;
+        return assertNever(_exhaustive);
+      }
     }
   });
 
