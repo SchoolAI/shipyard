@@ -34,8 +34,8 @@ exec pnpm exec concurrently \
   --names "schema,server,signal,oauth,ogproxy,web,hook" \
   --prefix-colors "gray,green,cyan,blue,red,magenta,yellow" \
   "pnpm dev:schema" \
-  "pnpm dev:server:watch" \
-  "pnpm dev:signaling" \
+  "bash -c 'export REGISTRY_PORT=${REGISTRY_PORT}; pnpm dev:server:watch'" \
+  "bash scripts/dev-signaling-wrapper.sh" \
   "pnpm --filter @shipyard/github-oauth-worker exec wrangler dev --env development --port ${OAUTH_PORT} --inspector-port ${INSPECTOR_PORT_1}" \
   "pnpm --filter @shipyard/og-proxy-worker exec wrangler dev --env development --port ${OG_PROXY_PORT} --inspector-port ${INSPECTOR_PORT_2} --var UPSTREAM_URL:http://localhost:${VITE_PORT} --var CANONICAL_BASE_URL:http://localhost:${OG_PROXY_PORT}" \
   "pnpm dev:web" \
