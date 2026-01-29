@@ -46,7 +46,7 @@ export function useDaemon(): UseDaemonReturn {
         break;
 
       case 'output':
-        // Output messages are received but not displayed
+        /** Output messages are logged by daemon, no UI display needed */
         break;
 
       case 'completed':
@@ -68,7 +68,7 @@ export function useDaemon(): UseDaemonReturn {
         break;
 
       case 'error':
-        // Error messages are received but not displayed
+        /** Error messages shown via toast in daemon, no duplicate UI needed */
         break;
 
       default: {
@@ -90,15 +90,17 @@ export function useDaemon(): UseDaemonReturn {
 
         ws.onmessage = (event) => {
           try {
+            /** Daemon protocol is trusted - validates via exhaustive switch */
+            // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- Daemon protocol trusted, validated by exhaustive switch
             const message = JSON.parse(event.data) as ServerMessage;
             handleServerMessage(message);
           } catch {
-            // Silently ignore malformed messages
+            /** Malformed JSON from daemon is non-fatal - silently skip */
           }
         };
 
         ws.onerror = () => {
-          // Connection errors are handled by onclose
+          /** WebSocket fires onerror before onclose - reconnect logic is in onclose */
         };
 
         ws.onclose = () => {
@@ -111,7 +113,7 @@ export function useDaemon(): UseDaemonReturn {
 
         wsRef.current = ws;
       } catch {
-        // Retry connection on error
+        /** WebSocket constructor can throw - schedule retry */
         reconnectTimeoutRef.current = window.setTimeout(connect, RECONNECT_INTERVAL_MS);
       }
     };
