@@ -23,8 +23,10 @@ export function handleClientMessage(ws: WebSocket, data: string): void {
       case 'list-agents':
         handleListAgents(ws);
         break;
-      default:
-        sendError(ws, undefined, `Unknown message type: ${(message as { type: string }).type}`);
+      default: {
+        const exhaustiveCheck: never = message;
+        sendError(ws, undefined, `Unknown message type: ${JSON.stringify(exhaustiveCheck)}`);
+      }
     }
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : String(err);

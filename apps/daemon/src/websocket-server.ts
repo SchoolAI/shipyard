@@ -75,8 +75,9 @@ export async function startWebSocketServer(): Promise<number | null> {
 
       return port;
     } catch (err) {
-      const error = err as NodeJS.ErrnoException;
-      if (error.code === 'EADDRINUSE') {
+      const isErrnoException = (e: unknown): e is NodeJS.ErrnoException =>
+        e instanceof Error && 'code' in e;
+      if (isErrnoException(err) && err.code === 'EADDRINUSE') {
         console.log(`Port ${port} in use, trying next port`);
         continue;
       }

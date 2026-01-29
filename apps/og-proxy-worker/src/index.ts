@@ -60,23 +60,62 @@ function isCrawler(userAgent: string): boolean {
   return CRAWLER_PATTERNS.some((pattern) => pattern.test(userAgent));
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isPlanStatus(value: unknown): value is PlanStatus {
+  return typeof value === 'string' && PLAN_STATUS_VALUES.some((status) => status === value);
+}
+
+function isDeliverable(value: unknown): value is { text: string; linkedArtifactId?: string } {
+  if (!isRecord(value)) return false;
+  if (typeof value.text !== 'string') return false;
+  if (value.linkedArtifactId !== undefined && typeof value.linkedArtifactId !== 'string')
+    return false;
+  return true;
+}
+
 function decodePlan(encoded: string): DecodedPlan | null {
   try {
     const json = lzstring.decompressFromEncodedURIComponent(encoded);
     if (!json) return null;
 
-    const parsed = JSON.parse(json) as Record<string, unknown>;
+    const parsed: unknown = JSON.parse(json);
+    if (!isRecord(parsed)) return null;
 
     if (typeof parsed.v !== 'number') return null;
     if (typeof parsed.id !== 'string') return null;
     if (typeof parsed.title !== 'string') return null;
-    if (typeof parsed.status !== 'string') return null;
+    if (!isPlanStatus(parsed.status)) return null;
 
-    if (!PLAN_STATUS_VALUES.includes(parsed.status as PlanStatus)) {
-      return null;
+    const plan: DecodedPlan = {
+      v: parsed.v,
+      id: parsed.id,
+      title: parsed.title,
+      status: parsed.status,
+    };
+
+    if (typeof parsed.repo === 'string') {
+      plan.repo = parsed.repo;
     }
 
-    return parsed as unknown as DecodedPlan;
+    if (typeof parsed.pr === 'number') {
+      plan.pr = parsed.pr;
+    }
+
+    if (Array.isArray(parsed.content)) {
+      plan.content = parsed.content;
+    }
+
+    if (Array.isArray(parsed.deliverables)) {
+      const validDeliverables = parsed.deliverables.filter(isDeliverable);
+      if (validDeliverables.length > 0) {
+        plan.deliverables = validDeliverables;
+      }
+    }
+
+    return plan;
   } catch (error) {
     logger.error({ error }, 'Failed to decode plan');
     return null;
@@ -116,27 +155,22 @@ function getStatusLabel(status: PlanStatus): string {
 function extractTextFromContent(content: unknown[]): string[] {
   const texts: string[] = [];
   for (const item of content) {
-    if (item && typeof item === 'object') {
-      const c = item as Record<string, unknown>;
-      if (typeof c.text === 'string') {
-        texts.push(c.text);
-      }
+    if (isRecord(item) && typeof item.text === 'string') {
+      texts.push(item.text);
     }
   }
   return texts;
 }
 
 function collectBlockText(block: unknown, textParts: string[]): void {
-  if (!block || typeof block !== 'object') return;
+  if (!isRecord(block)) return;
 
-  const b = block as Record<string, unknown>;
-
-  if (Array.isArray(b.content)) {
-    textParts.push(...extractTextFromContent(b.content));
+  if (Array.isArray(block.content)) {
+    textParts.push(...extractTextFromContent(block.content));
   }
 
-  if (Array.isArray(b.children)) {
-    for (const child of b.children) {
+  if (Array.isArray(block.children)) {
+    for (const child of block.children) {
       collectBlockText(child, textParts);
     }
   }

@@ -13,12 +13,11 @@ const DAEMON_LOCK_FILE = join(SHIPYARD_DIR, 'daemon.lock');
 const MAX_LOCK_RETRIES = 3;
 
 function hasErrorCode(error: unknown, code: string): boolean {
-  return (
-    typeof error === 'object' &&
-    error !== null &&
-    'code' in error &&
-    (error as { code: unknown }).code === code
-  );
+  if (typeof error !== 'object' || error === null || !('code' in error)) {
+    return false;
+  }
+  const errorWithCode: { code: unknown } = error;
+  return errorWithCode.code === code;
 }
 
 async function readLockHolderPid(): Promise<number | null> {
