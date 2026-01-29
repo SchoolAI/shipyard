@@ -70,6 +70,7 @@ export async function handleEpochRejection(planId: string): Promise<void> {
 
   if (success) {
     sessionStorage.removeItem(RESET_ATTEMPTS_KEY);
+    sessionStorage.removeItem(RESET_IN_PROGRESS_KEY);
     window.location.reload();
   } else if (attempts + 1 >= MAX_RESET_ATTEMPTS) {
     forceResetDocument(planId);

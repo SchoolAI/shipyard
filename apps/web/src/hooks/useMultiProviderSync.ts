@@ -492,10 +492,13 @@ export function useMultiProviderSync(
       /** Extract port from hub URL for local artifact URLs */
       registryPortRef.current = extractPortFromUrl(hubUrl);
 
-      /** Connect with epoch in URL query param */
-      const wsUrlWithEpoch = `${hubUrl}?epoch=${epoch}`;
-
-      ws = new WebsocketProvider(wsUrlWithEpoch, docName, ydoc, {
+      /**
+       * Connect with epoch in URL query param using y-websocket's params option.
+       * CRITICAL: Do NOT embed query params in serverUrl - y-websocket constructs
+       * URL as serverUrl + '/' + roomname + '?' + params, so embedding ?epoch=X
+       * in serverUrl creates malformed URLs like ws://host?epoch=2/plan-index.
+       */
+      ws = new WebsocketProvider(hubUrl, docName, ydoc, {
         connect: true,
         maxBackoffTime: 2500,
         /**
@@ -504,6 +507,7 @@ export function useMultiProviderSync(
          * (which delays timers to 60s after 5 min background) causes disconnects.
          */
         resyncInterval: 15000,
+        params: { epoch: String(epoch) },
       });
 
       wsProviderRef.current = ws;
