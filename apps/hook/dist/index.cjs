@@ -44224,7 +44224,8 @@ var InviteTokenSchema = external_exports.object({
   maxUses: external_exports.number().nullable(),
   useCount: external_exports.number(),
   revoked: external_exports.boolean(),
-  label: external_exports.string().optional()
+  label: external_exports.string().optional(),
+  version: external_exports.number()
 });
 var InviteRedemptionSchema = external_exports.object({
   redeemedBy: external_exports.string(),

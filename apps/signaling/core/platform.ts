@@ -49,7 +49,6 @@ export interface PlatformAdapter {
    * Get invite redemption by user (checks if user redeemed ANY token for this plan).
    * Key format: 'redemption:{planId}:{userId}'
    * Returns undefined if no redemption exists.
-   * @deprecated Use getSpecificInviteRedemption for token-specific checks
    */
   getInviteRedemption(planId: string, userId: string): Promise<InviteRedemption | undefined>;
 
@@ -139,13 +138,6 @@ export interface PlatformAdapter {
    * NOTE: Only returns ACTIVATED subscribers, not pending ones.
    */
   getTopicSubscribers(topic: string): unknown[];
-
-  /**
-   * Subscribe a WebSocket connection to a topic.
-   * Connection will receive all messages published to this topic.
-   * @deprecated Use addPendingSubscription + activatePendingSubscription for new code
-   */
-  subscribeToTopic(ws: unknown, topic: string): void;
 
   /**
    * Unsubscribe a WebSocket connection from a topic.

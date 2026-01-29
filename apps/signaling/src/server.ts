@@ -94,6 +94,7 @@ function onConnection(conn: WebSocket): void {
   });
 
   conn.on('close', () => {
+    adapter.clearAuthDeadline(conn);
     adapter.unsubscribeFromAllTopics(conn);
     closed = true;
     clearInterval(pingInterval);

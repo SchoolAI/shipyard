@@ -234,11 +234,13 @@ const RevokeInviteRequestSchema = z.object({
   type: z.literal('revoke_invite'),
   planId: z.string(),
   tokenId: z.string(),
+  authToken: z.string(),
 });
 
 const ListInvitesRequestSchema = z.object({
   type: z.literal('list_invites'),
   planId: z.string(),
+  authToken: z.string(),
 });
 
 /** Authenticate message schemas (discriminated union on 'auth' field) */

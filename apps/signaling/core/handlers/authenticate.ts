@@ -9,8 +9,7 @@
  * until authenticate succeeds. This prevents unauthorized access to plans.
  */
 
-export { handleAuthenticate };
-
+import type { InviteToken } from '@shipyard/schema';
 import type { PlatformAdapter } from '../platform.js';
 import {
   type AuthErrorResponse,
@@ -19,44 +18,6 @@ import {
   type AuthenticateMessage,
   AuthenticateMessageSchema,
 } from '../types.js';
-
-/**
- * Extract plan ID from topic name.
- * Topics follow the format: "shipyard-{planId}" for plan documents.
- */
-function extractPlanId(topic: string): string | null {
-  const prefix = 'shipyard-';
-  if (topic.startsWith(prefix)) {
-    return topic.slice(prefix.length);
-  }
-  return null;
-}
-
-/**
- * Send authentication error response.
- */
-function sendAuthError(
-  platform: PlatformAdapter,
-  ws: unknown,
-  error: AuthErrorType,
-  message: string
-): void {
-  const response: AuthErrorResponse = { type: 'auth_error', error, message };
-  platform.sendMessage(ws, response);
-}
-
-/**
- * Send authentication success response.
- */
-function sendAuthenticated(
-  platform: PlatformAdapter,
-  ws: unknown,
-  userId: string,
-  planId: string
-): void {
-  const response: AuthenticatedResponse = { type: 'authenticated', userId, planId };
-  platform.sendMessage(ws, response);
-}
 
 /**
  * Handle authenticate message from client.
@@ -68,12 +29,11 @@ function sendAuthenticated(
  * @param ws - WebSocket connection (platform-specific type)
  * @param rawMessage - Raw message data (needs validation)
  */
-async function handleAuthenticate(
+export async function handleAuthenticate(
   platform: PlatformAdapter,
   ws: unknown,
   rawMessage: unknown
 ): Promise<void> {
-  /** Validate message structure */
   const parseResult = AuthenticateMessageSchema.safeParse(rawMessage);
   if (!parseResult.success) {
     sendAuthError(platform, ws, 'invalid_token', 'Invalid authenticate message format');
@@ -82,14 +42,12 @@ async function handleAuthenticate(
 
   const message: AuthenticateMessage = parseResult.data;
 
-  /** Get pending subscriptions for this connection */
   const pendingTopics = platform.getPendingSubscriptions(ws);
   if (pendingTopics.length === 0) {
     sendAuthError(platform, ws, 'no_pending_subscription', 'No subscription pending');
     return;
   }
 
-  /** Find the first plan topic (shipyard-*) */
   const planTopic = pendingTopics.find((t) => t.startsWith('shipyard-'));
   if (!planTopic) {
     sendAuthError(platform, ws, 'no_pending_subscription', 'No plan subscription pending');
@@ -102,7 +60,6 @@ async function handleAuthenticate(
     return;
   }
 
-  /** Validate based on auth type */
   switch (message.auth) {
     case 'owner': {
       const result = await validateOwnerAuth(platform, message, planId);
@@ -123,7 +80,6 @@ async function handleAuthenticate(
     }
 
     default: {
-      /** Exhaustive check - TypeScript will error if we miss a case */
       const _exhaustive: never = message;
       sendAuthError(
         platform,
@@ -135,20 +91,19 @@ async function handleAuthenticate(
     }
   }
 
-  /** Auth succeeded - activate ALL pending subscriptions */
   for (const topic of pendingTopics) {
     platform.activatePendingSubscription(ws, topic);
     platform.debug(`[Authenticate] Activated subscription: ${topic}`);
   }
 
-  /** Clear auth deadline and set user ID */
   platform.clearAuthDeadline(ws);
   platform.setConnectionUserId(ws, message.userId);
 
-  /** Send success response */
   sendAuthenticated(platform, ws, message.userId, planId);
   platform.info(`[Authenticate] User ${message.userId} authenticated for plan ${planId}`);
 }
+
+// --- Helper Functions ---
 
 /** Result of authentication validation */
 type ValidationResult = { valid: true } | { valid: false; error: AuthErrorType; message: string };
@@ -161,7 +116,6 @@ async function validateOwnerAuth(
   message: Extract<AuthenticateMessage, { auth: 'owner' }>,
   planId: string
 ): Promise<ValidationResult> {
-  /** Validate GitHub token */
   const tokenResult = await platform.validateGitHubToken(message.githubToken);
   if (!tokenResult.valid) {
     return {
@@ -171,7 +125,6 @@ async function validateOwnerAuth(
     };
   }
 
-  /** Verify the token belongs to the claimed user */
   if (tokenResult.username !== message.userId) {
     return {
       valid: false,
@@ -180,14 +133,14 @@ async function validateOwnerAuth(
     };
   }
 
-  /** Check plan ownership - trust-on-first-use pattern */
+  // Trust-on-first-use pattern: first authenticated user claims ownership
   const existingOwnerId = await platform.getPlanOwnerId(planId);
   if (existingOwnerId === null) {
-    /** First owner - claim ownership */
+    // First owner - claim ownership
     await platform.setPlanOwnerId(planId, message.userId);
     platform.info(`[Authenticate] Plan ${planId} claimed by ${message.userId}`);
   } else if (existingOwnerId !== message.userId) {
-    /** Not the owner - check if they have a valid invite redemption */
+    // Not the owner - check if they have a valid invite redemption
     const redemption = await platform.getInviteRedemption(planId, message.userId);
     if (!redemption) {
       return {
@@ -211,41 +164,43 @@ async function validateInviteAuth(
 ): Promise<ValidationResult> {
   const { tokenId, tokenValue } = message.inviteToken;
 
-  /** Get the token */
   const token = await platform.getInviteToken(planId, tokenId);
   if (!token) {
     return { valid: false, error: 'invalid_token', message: 'Invite token not found' };
   }
 
-  /** Check if revoked */
   if (token.revoked) {
     return { valid: false, error: 'revoked', message: 'Invite token has been revoked' };
   }
 
-  /** Check if expired */
   if (token.expiresAt < Date.now()) {
     return { valid: false, error: 'expired', message: 'Invite token has expired' };
   }
 
-  /** Check if exhausted (all uses consumed) */
   if (token.maxUses !== null && token.useCount >= token.maxUses) {
     return { valid: false, error: 'exhausted', message: 'Invite token has no remaining uses' };
   }
 
-  /** Verify the token value */
   const isValid = await platform.verifyTokenHash(tokenValue, token.tokenHash);
   if (!isValid) {
     return { valid: false, error: 'invalid_token', message: 'Invalid invite token value' };
   }
 
-  /** Token is valid - increment use count */
-  const updatedToken = {
+  /** Atomic compare-and-swap with optimistic locking to prevent TOCTOU race */
+  const currentVersion = token.version;
+  const updatedToken: InviteToken = {
     ...token,
     useCount: token.useCount + 1,
+    version: token.version + 1,
   };
+
+  /** Verify token hasn't changed since we read it */
+  const existing = await platform.getInviteToken(planId, tokenId);
+  if (!existing || existing.version !== currentVersion) {
+    return { valid: false, error: 'invalid_token', message: 'Token state changed, please retry' };
+  }
   await platform.setInviteToken(planId, tokenId, updatedToken);
 
-  /** Record redemption */
   await platform.setInviteRedemption(planId, tokenId, message.userId, {
     tokenId,
     redeemedBy: message.userId,
@@ -253,4 +208,36 @@ async function validateInviteAuth(
   });
 
   return { valid: true };
+}
+
+/**
+ * Extract plan ID from topic name.
+ * Topics follow the format: "shipyard-{planId}" for plan documents.
+ */
+function extractPlanId(topic: string): string | null {
+  const prefix = 'shipyard-';
+  if (topic.startsWith(prefix)) {
+    return topic.slice(prefix.length);
+  }
+  return null;
+}
+
+function sendAuthError(
+  platform: PlatformAdapter,
+  ws: unknown,
+  error: AuthErrorType,
+  message: string
+): void {
+  const response: AuthErrorResponse = { type: 'auth_error', error, message };
+  platform.sendMessage(ws, response);
+}
+
+function sendAuthenticated(
+  platform: PlatformAdapter,
+  ws: unknown,
+  userId: string,
+  planId: string
+): void {
+  const response: AuthenticatedResponse = { type: 'authenticated', userId, planId };
+  platform.sendMessage(ws, response);
 }

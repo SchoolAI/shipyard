@@ -92,12 +92,6 @@ export class NodePlatformAdapter implements PlatformAdapter {
   private connectionStates = new WeakMap<WebSocket, ConnectionState>();
 
   /**
-   * Map from connection to set of subscribed topics (for cleanup).
-   * @deprecated Use connectionStates.activeTopics instead
-   */
-  private connectionTopics = new WeakMap<WebSocket, Set<string>>();
-
-  /**
    * Connections with auth deadlines (for timeout enforcement).
    * Maps WebSocket to deadline timestamp. Needed because WeakMap is not iterable.
    */
@@ -291,27 +285,6 @@ export class NodePlatformAdapter implements PlatformAdapter {
     return subscribers ? Array.from(subscribers) : [];
   }
 
-  subscribeToTopic(ws: unknown, topic: string): void {
-    if (!isWebSocket(ws)) {
-      this.error('[subscribeToTopic] Invalid WebSocket');
-      return;
-    }
-
-    let topicSubscribers = this.topics.get(topic);
-    if (!topicSubscribers) {
-      topicSubscribers = new Set<WebSocket>();
-      this.topics.set(topic, topicSubscribers);
-    }
-    topicSubscribers.add(ws);
-
-    let socketTopics = this.connectionTopics.get(ws);
-    if (!socketTopics) {
-      socketTopics = new Set<string>();
-      this.connectionTopics.set(ws, socketTopics);
-    }
-    socketTopics.add(topic);
-  }
-
   unsubscribeFromTopic(ws: unknown, topic: string): void {
     if (!isWebSocket(ws)) {
       this.error('[unsubscribeFromTopic] Invalid WebSocket');
@@ -326,9 +299,11 @@ export class NodePlatformAdapter implements PlatformAdapter {
       }
     }
 
-    const socketTopics = this.connectionTopics.get(ws);
-    if (socketTopics) {
-      socketTopics.delete(topic);
+    /** Also clean up from connection state */
+    const state = this.connectionStates.get(ws);
+    if (state) {
+      state.activeTopics.delete(topic);
+      state.pendingTopics.delete(topic);
     }
   }
 
@@ -367,13 +342,6 @@ export class NodePlatformAdapter implements PlatformAdapter {
       this.removeFromAllTopicsInSet(ws, state.activeTopics);
       state.activeTopics.clear();
       state.pendingTopics.clear();
-    }
-
-    /** Also clean up legacy connectionTopics */
-    const socketTopics = this.connectionTopics.get(ws);
-    if (socketTopics) {
-      this.removeFromAllTopicsInSet(ws, socketTopics);
-      socketTopics.clear();
     }
   }
 

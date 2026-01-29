@@ -9,10 +9,10 @@
  * authenticate message is received and validated.
  */
 
-export { handleSubscribe, handleUnsubscribe, checkAuthDeadlines };
-
 import type { PlatformAdapter } from '../platform.js';
 import type { AuthErrorResponse, SubscribeMessage, UnsubscribeMessage } from '../types.js';
+
+export { handleSubscribe, handleUnsubscribe, checkAuthDeadlines };
 
 /** Auth deadline: 10 seconds to send authenticate message after subscribe */
 const AUTH_DEADLINE_MS = 10000;
@@ -29,14 +29,14 @@ const AUTH_DEADLINE_MS = 10000;
  * @param message - Subscribe message with topics
  */
 function handleSubscribe(platform: PlatformAdapter, ws: unknown, message: SubscribeMessage): void {
-  /** Add each topic to pending subscriptions (no data access granted) */
+  // Topics are added as PENDING only - no data access until authenticate succeeds
   for (const topic of message.topics ?? []) {
     if (typeof topic !== 'string') continue;
     platform.addPendingSubscription(ws, topic);
     platform.debug(`[Subscribe] Client pending subscription to topic: ${topic} (awaiting auth)`);
   }
 
-  /** Set auth deadline - connection will be closed if auth not received in time */
+  // Auth deadline enforces timely authentication - connection closed if exceeded
   const deadline = Date.now() + AUTH_DEADLINE_MS;
   platform.setAuthDeadline(ws, deadline);
   platform.debug(`[Subscribe] Auth deadline set: ${AUTH_DEADLINE_MS}ms`);
