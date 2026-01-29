@@ -238,7 +238,8 @@ export function ImportConversationButton({
   );
 }
 
-const REGISTRY_URL = `http://localhost:${DEFAULT_REGISTRY_PORTS[0]}`;
+const REGISTRY_PORT = import.meta.env.VITE_REGISTRY_PORT || DEFAULT_REGISTRY_PORTS[0];
+const REGISTRY_URL = `http://localhost:${REGISTRY_PORT}`;
 
 /*
  * TODO(#9): Platform detection - Currently hard-coded to only detect Claude Code

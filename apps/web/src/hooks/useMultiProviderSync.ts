@@ -182,8 +182,9 @@ async function discoverHubUrl(): Promise<string> {
     }
   }
 
-  /** Fallback to default if discovery fails */
-  return `ws://localhost:${DEFAULT_REGISTRY_PORTS[0]}`;
+  /** Fallback to default if discovery fails - prefer env var if set */
+  const fallbackPort = envPort ? Number.parseInt(envPort, 10) : DEFAULT_REGISTRY_PORTS[0];
+  return `ws://localhost:${fallbackPort}`;
 }
 
 /**

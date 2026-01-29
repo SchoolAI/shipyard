@@ -12,6 +12,8 @@ import { useUserIdentity } from '@/contexts/UserIdentityContext';
 import { useConversationTransfer } from '@/hooks/useConversationTransfer';
 import { type ConnectedPeer, useP2PPeers } from '@/hooks/useP2PPeers';
 
+const REGISTRY_PORT = import.meta.env.VITE_REGISTRY_PORT || DEFAULT_REGISTRY_PORTS[0];
+
 interface HandoffConversationDialogProps {
   /** Plan ID for handoff metadata */
   planId: string;
@@ -188,7 +190,7 @@ export function HandoffConversationDialog({
       setIsLoadingTranscript(true);
       setTranscriptError(null);
 
-      fetch(`http://localhost:${DEFAULT_REGISTRY_PORTS[0]}/api/plan/${planId}/transcript`)
+      fetch(`http://localhost:${REGISTRY_PORT}/api/plan/${planId}/transcript`)
         .then((res) => {
           if (res.ok) return res.text();
           throw new Error('Failed to fetch transcript');
@@ -227,7 +229,7 @@ export function HandoffConversationDialog({
     setTranscriptError(null);
     setIsLoadingTranscript(true);
 
-    fetch(`http://localhost:${DEFAULT_REGISTRY_PORTS[0]}/api/plan/${planId}/transcript`)
+    fetch(`http://localhost:${REGISTRY_PORT}/api/plan/${planId}/transcript`)
       .then((res) => {
         if (res.ok) return res.text();
         throw new Error('Failed to fetch transcript');
