@@ -19,29 +19,53 @@ const localRules = {
             'Per docs/engineering-standards.md:\n' +
             '• If comment explains WHAT the code does → DELETE it, improve naming instead\n' +
             '• If comment explains WHY (constraint/workaround/perf decision) → keep it\n' +
-            '• Single-line // is ONLY for directives: @ts-expect-error, TODO, biome-ignore\n\n' +
+            '• Single-line // and /* */ are ONLY for directives: @ts-expect-error, TODO, biome-ignore\n' +
+            '• Using /* */ instead of // does NOT bypass this rule\n' +
+            '• JSDoc (/** */) is allowed for documentation\n\n' +
             'Examples of comments to DELETE:\n' +
-            '  // Loop through items  ← obvious from code\n' +
-            '  // Return the result   ← obvious from code\n' +
-            '  // Handle errors       ← obvious from catch block\n\n' +
+            '  // Loop through items     ← obvious from code\n' +
+            '  /* Return the result */   ← /* */ doesn\'t bypass the rule\n' +
+            '  // Handle errors          ← obvious from catch block\n\n' +
             'Examples of comments to KEEP:\n' +
-            '  /** Max 50 to prevent Firestore quota issues */\n' +
-            '  /** Retry needed - API returns 500 on first call */\n\n' +
-            'ACTION: DELETE this comment or use JSDoc (/** */) ONLY if it explains WHY.',
+            '  /** Max 50 to prevent Firestore quota issues */   ← JSDoc OK\n' +
+            '  // TODO: refactor this                            ← directive OK\n\n' +
+            'ACTION: DELETE this comment, or convert to JSDoc (/** */) if it explains WHY.',
         },
         schema: [],
       },
       create(context) {
         const sourceCode = context.sourceCode || context.getSourceCode();
+        const filename = context.filename || context.getFilename();
+        const isTsx = filename.endsWith('.tsx');
 
         return {
           Program() {
             const comments = sourceCode.getAllComments();
 
             for (const comment of comments) {
-              if (comment.type !== 'Line') continue;
-
               const text = comment.value.trim();
+
+              /**
+               * Skip multi-line block comments (legitimate JSDoc, license headers, etc.)
+               * Only check: Line comments (//) and single-line non-JSDoc Block comments
+               */
+              const isMultiLineBlock =
+                comment.type === 'Block' && comment.loc.start.line !== comment.loc.end.line;
+              if (isMultiLineBlock) continue;
+
+              /**
+               * Allow JSDoc comments (start with double asterisk).
+               * Block comments have value without the leading slash-star, so JSDoc value starts with *.
+               * This allows JSDoc but blocks regular block comments.
+               */
+              const isJSDoc = comment.type === 'Block' && comment.value.startsWith('*');
+              if (isJSDoc) continue;
+
+              /**
+               * Allow block comments in .tsx files since JSX requires {/* syntax.
+               * You can't use // in JSX, so these aren't bypass attempts.
+               */
+              if (isTsx && comment.type === 'Block') continue;
 
               const allowedPatterns = [
                 /^@ts-/,

@@ -46,10 +46,8 @@ function handleStartAgent(
       return;
     }
 
-    /** Send started event */
     send(ws, { type: 'started', taskId, pid: child.pid });
 
-    /** Stream stdout */
     child.stdout?.on('data', (data: Buffer) => {
       send(ws, {
         type: 'output',
@@ -59,7 +57,6 @@ function handleStartAgent(
       });
     });
 
-    /** Stream stderr */
     child.stderr?.on('data', (data: Buffer) => {
       send(ws, {
         type: 'output',
@@ -69,7 +66,6 @@ function handleStartAgent(
       });
     });
 
-    /** Send completion event */
     child.once('exit', (code) => {
       send(ws, {
         type: 'completed',

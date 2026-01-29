@@ -389,9 +389,7 @@ export function PreviewTestPage() {
       if (dataParam) {
         return `${OG_PROXY_WORKER_URL}?d=${dataParam}`;
       }
-    } catch {
-      /* invalid URL */
-    }
+    } catch {}
 
     return '';
   }, [decodedPlan, inputUrl]);
