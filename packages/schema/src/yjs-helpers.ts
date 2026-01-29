@@ -1,6 +1,7 @@
 import { nanoid } from 'nanoid';
 import * as Y from 'yjs';
 import { assertNever } from './assert-never.js';
+import { DEFAULT_EPOCH } from './epoch.js';
 import { type AgentPresence, AgentPresenceSchema } from './hook-api.js';
 
 /**
@@ -518,6 +519,7 @@ export interface InitPlanMetadataParams {
   sessionTokenHash?: string;
   origin?: OriginMetadata;
   tags?: string[];
+  epoch?: number;
 }
 
 export function initPlanMetadata(ydoc: Y.Doc, init: InitPlanMetadataParams): void {
@@ -536,6 +538,7 @@ export function initPlanMetadata(ydoc: Y.Doc, init: InitPlanMetadataParams): voi
     map.set('status', 'draft');
     map.set('createdAt', now);
     map.set('updatedAt', now);
+    map.set('epoch', init.epoch ?? DEFAULT_EPOCH);
 
     if (init.repo) map.set('repo', init.repo);
     if (init.pr) map.set('pr', init.pr);
@@ -569,6 +572,50 @@ export function initPlanMetadata(ydoc: Y.Doc, init: InitPlanMetadataParams): voi
   if (!result.success) {
     throw new Error(`Failed to initialize metadata: ${result.error}`);
   }
+}
+
+export interface PlanIndexMetadata {
+  id: 'plan-index';
+  createdAt: number;
+  updatedAt: number;
+  epoch: number;
+}
+
+export interface InitPlanIndexMetadataParams {
+  epoch?: number;
+}
+
+export function initPlanIndexMetadata(ydoc: Y.Doc, init: InitPlanIndexMetadataParams = {}): void {
+  const map = ydoc.getMap(YDOC_KEYS.METADATA);
+  const now = Date.now();
+
+  map.set('id', 'plan-index');
+  map.set('createdAt', now);
+  map.set('updatedAt', now);
+  map.set('epoch', init.epoch ?? DEFAULT_EPOCH);
+
+  const result = getPlanIndexMetadata(ydoc);
+  if (!result) {
+    throw new Error('Failed to initialize plan-index metadata');
+  }
+}
+
+export function getPlanIndexMetadata(ydoc: Y.Doc): PlanIndexMetadata | null {
+  const map = ydoc.getMap(YDOC_KEYS.METADATA);
+  const metadata = map.toJSON();
+
+  if (!metadata || typeof metadata !== 'object') return null;
+  if (metadata.id !== 'plan-index') return null;
+  if (typeof metadata.createdAt !== 'number') return null;
+  if (typeof metadata.updatedAt !== 'number') return null;
+  if (typeof metadata.epoch !== 'number') return null;
+
+  return {
+    id: 'plan-index',
+    createdAt: metadata.createdAt,
+    updatedAt: metadata.updatedAt,
+    epoch: metadata.epoch,
+  };
 }
 
 export function getStepCompletions(ydoc: Y.Doc): Map<string, boolean> {

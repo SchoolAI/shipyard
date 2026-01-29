@@ -361,6 +361,14 @@ describe('useMultiProviderSync', () => {
         await vi.advanceTimersByTimeAsync(100);
       });
 
+      /**
+       * WebSocket provider is created after IDB sync, so simulate IDB sync first
+       */
+      await act(async () => {
+        mockIndexeddbProviders[0]!.simulateSynced();
+        await vi.advanceTimersByTimeAsync(0);
+      });
+
       const wsProvider = mockWebsocketProviders[0]!;
       const rtcProvider = mockWebrtcProviders[0]!;
 
@@ -380,6 +388,14 @@ describe('useMultiProviderSync', () => {
 
       await act(async () => {
         await vi.advanceTimersByTimeAsync(100);
+      });
+
+      /**
+       * WebSocket provider is created after IDB sync, so simulate IDB sync first
+       */
+      await act(async () => {
+        mockIndexeddbProviders[0]!.simulateSynced();
+        await vi.advanceTimersByTimeAsync(0);
       });
 
       const wsProvider = mockWebsocketProviders[0]!;
@@ -426,6 +442,18 @@ describe('useMultiProviderSync', () => {
         await vi.advanceTimersByTimeAsync(100);
       });
 
+      /**
+       * Need to sync first IDB provider before timeout to create first WS provider.
+       * Otherwise, first WS provider is never created and we can't test reconnection.
+       */
+      await act(async () => {
+        mockIndexeddbProviders[0]!.simulateSynced();
+        await vi.advanceTimersByTimeAsync(0);
+      });
+
+      const initialWsCount = mockWebsocketProviders.length;
+      expect(initialWsCount).toBe(1);
+
       await act(async () => {
         await vi.advanceTimersByTimeAsync(CONNECTION_TIMEOUT);
       });
@@ -442,7 +470,17 @@ describe('useMultiProviderSync', () => {
 
       expect(result.current.syncState.timedOut).toBe(false);
 
-      expect(mockWebsocketProviders.length).toBeGreaterThan(1);
+      /**
+       * After reconnect, new IDB and WS providers are created.
+       * Wait for IDB sync to trigger WS provider creation.
+       */
+      await act(async () => {
+        const latestIdb = mockIndexeddbProviders[mockIndexeddbProviders.length - 1]!;
+        latestIdb.simulateSynced();
+        await vi.advanceTimersByTimeAsync(0);
+      });
+
+      expect(mockWebsocketProviders.length).toBeGreaterThan(initialWsCount);
     });
 
     it('should clear timeout state when connection succeeds after previous timeout', async () => {
@@ -466,6 +504,16 @@ describe('useMultiProviderSync', () => {
         await vi.advanceTimersByTimeAsync(100);
       });
 
+      /**
+       * After reconnect, new IDB and WS providers are created.
+       * Wait for IDB sync to trigger WS provider creation.
+       */
+      await act(async () => {
+        const latestIdb = mockIndexeddbProviders[mockIndexeddbProviders.length - 1]!;
+        latestIdb.simulateSynced();
+        await vi.advanceTimersByTimeAsync(0);
+      });
+
       const newWsProvider = mockWebsocketProviders[mockWebsocketProviders.length - 1]!;
 
       await act(async () => {
@@ -483,6 +531,14 @@ describe('useMultiProviderSync', () => {
 
       await act(async () => {
         await vi.advanceTimersByTimeAsync(100);
+      });
+
+      /**
+       * WebSocket provider is created after IDB sync, so simulate IDB sync first
+       */
+      await act(async () => {
+        mockIndexeddbProviders[0]!.simulateSynced();
+        await vi.advanceTimersByTimeAsync(0);
       });
 
       const wsProvider = mockWebsocketProviders[0]!;
@@ -539,6 +595,14 @@ describe('useMultiProviderSync', () => {
         await vi.advanceTimersByTimeAsync(100);
       });
 
+      /**
+       * WebSocket provider is created after IDB sync, so simulate IDB sync first
+       */
+      await act(async () => {
+        mockIndexeddbProviders[0]!.simulateSynced();
+        await vi.advanceTimersByTimeAsync(0);
+      });
+
       for (let i = 0; i < 5; i++) {
         await act(async () => {
           result.current.reconnect();
@@ -548,6 +612,15 @@ describe('useMultiProviderSync', () => {
 
       await act(async () => {
         await vi.advanceTimersByTimeAsync(100);
+      });
+
+      /**
+       * After reconnect, simulate IDB sync for the latest provider
+       */
+      await act(async () => {
+        const latestIdb = mockIndexeddbProviders[mockIndexeddbProviders.length - 1]!;
+        latestIdb.simulateSynced();
+        await vi.advanceTimersByTimeAsync(0);
       });
 
       const lastWsProvider = mockWebsocketProviders[mockWebsocketProviders.length - 1]!;
@@ -561,6 +634,14 @@ describe('useMultiProviderSync', () => {
 
       await act(async () => {
         await vi.advanceTimersByTimeAsync(100);
+      });
+
+      /**
+       * WebSocket provider is created after IDB sync, so simulate IDB sync first
+       */
+      await act(async () => {
+        mockIndexeddbProviders[0]!.simulateSynced();
+        await vi.advanceTimersByTimeAsync(0);
       });
 
       unmount();
@@ -597,6 +678,14 @@ describe('useMultiProviderSync', () => {
         await vi.advanceTimersByTimeAsync(100);
       });
 
+      /**
+       * WebSocket provider is created after IDB sync, so simulate IDB sync first
+       */
+      await act(async () => {
+        mockIndexeddbProviders[0]!.simulateSynced();
+        await vi.advanceTimersByTimeAsync(0);
+      });
+
       expect(result.current.syncState.connected).toBe(false);
 
       await act(async () => {
@@ -612,6 +701,14 @@ describe('useMultiProviderSync', () => {
 
       await act(async () => {
         await vi.advanceTimersByTimeAsync(100);
+      });
+
+      /**
+       * WebSocket provider is created after IDB sync, so simulate IDB sync first
+       */
+      await act(async () => {
+        mockIndexeddbProviders[0]!.simulateSynced();
+        await vi.advanceTimersByTimeAsync(0);
       });
 
       expect(result.current.syncState.synced).toBe(false);
@@ -676,6 +773,14 @@ describe('useMultiProviderSync', () => {
         await vi.advanceTimersByTimeAsync(100);
       });
 
+      /**
+       * WebSocket provider is created after IDB sync, so simulate IDB sync first
+       */
+      await act(async () => {
+        mockIndexeddbProviders[0]!.simulateSynced();
+        await vi.advanceTimersByTimeAsync(0);
+      });
+
       expect(result.current.wsProvider).toBeDefined();
       expect(result.current.rtcProvider).toBeDefined();
     });
@@ -689,6 +794,14 @@ describe('useMultiProviderSync', () => {
 
       await act(async () => {
         await vi.advanceTimersByTimeAsync(100);
+      });
+
+      /**
+       * WebSocket provider is created after IDB sync, so simulate IDB sync first
+       */
+      await act(async () => {
+        mockIndexeddbProviders[0]!.simulateSynced();
+        await vi.advanceTimersByTimeAsync(0);
       });
 
       expect(result.current.rtcProvider).toBeNull();
@@ -756,6 +869,15 @@ describe('useMultiProviderSync', () => {
         await vi.advanceTimersByTimeAsync(100);
       });
 
+      /**
+       * WebSocket provider is created after IDB sync, so simulate IDB sync first
+       * Registry port is extracted when hub URL is discovered, which happens after IDB sync
+       */
+      await act(async () => {
+        mockIndexeddbProviders[0]!.simulateSynced();
+        await vi.advanceTimersByTimeAsync(0);
+      });
+
       expect(result.current.syncState.registryPort).toBeDefined();
     });
 
@@ -766,6 +888,14 @@ describe('useMultiProviderSync', () => {
 
       await act(async () => {
         await vi.advanceTimersByTimeAsync(100);
+      });
+
+      /**
+       * WebSocket provider is created after IDB sync, so simulate IDB sync first
+       */
+      await act(async () => {
+        mockIndexeddbProviders[0]!.simulateSynced();
+        await vi.advanceTimersByTimeAsync(0);
       });
 
       expect(mockWebsocketProviders.length).toBeGreaterThan(0);

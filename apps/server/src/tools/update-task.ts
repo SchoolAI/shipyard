@@ -13,6 +13,7 @@ import {
 } from '@shipyard/schema';
 import { nanoid } from 'nanoid';
 import { z } from 'zod';
+import { registryConfig } from '../config/env/registry.js';
 import { getOrCreateDoc } from '../doc-store.js';
 import { logger } from '../logger.js';
 import { getGitHubUsername } from '../server-identity.js';
@@ -239,6 +240,7 @@ STATUSES:
         updatedAt: Date.now(),
         ownerId: existingMetadata.ownerId,
         tags: input.tags ?? existingMetadata.tags,
+        epoch: existingMetadata.epoch ?? registryConfig.MINIMUM_EPOCH,
         deleted: false,
       });
     } else {

@@ -47,6 +47,7 @@ export type {
 export interface SubscribeMessage {
   type: 'subscribe';
   topics: string[];
+  epoch?: number;
 }
 
 /**
@@ -67,6 +68,16 @@ export interface PublishMessage {
   from?: string /** y-webrtc client ID (not user ID) */;
   clients?: number /** Number of clients in the room (added by server) */;
   [key: string]: unknown /** y-webrtc adds various fields (to, signal, etc.) */;
+}
+
+/**
+ * Epoch validation request from client.
+ * Sent before subscribing to rooms to validate epoch.
+ */
+export interface ValidateEpochMessage {
+  type: 'validate_epoch';
+  planId: string;
+  epoch: number;
 }
 
 /**
@@ -109,6 +120,7 @@ export type SignalingMessage =
   | SubscribeMessage
   | UnsubscribeMessage
   | PublishMessage
+  | ValidateEpochMessage
   | PingMessage
   | CreateInviteRequest
   | RedeemInviteRequest
@@ -139,6 +151,7 @@ export type TokenValidationError = 'invalid' | 'revoked' | 'expired' | 'exhauste
 const SubscribeMessageSchema = z.object({
   type: z.literal('subscribe'),
   topics: z.array(z.string()),
+  epoch: z.number().optional(),
 });
 
 const UnsubscribeMessageSchema = z.object({
@@ -154,6 +167,12 @@ const PublishMessageSchema = z
     clients: z.number().optional(),
   })
   .passthrough();
+
+const ValidateEpochMessageSchema = z.object({
+  type: z.literal('validate_epoch'),
+  planId: z.string(),
+  epoch: z.number(),
+});
 
 const PingMessageSchema = z.object({
   type: z.literal('ping'),
@@ -195,6 +214,7 @@ export const SignalingMessageSchema = z.discriminatedUnion('type', [
   SubscribeMessageSchema,
   UnsubscribeMessageSchema,
   PublishMessageSchema,
+  ValidateEpochMessageSchema,
   PingMessageSchema,
   CreateInviteRequestSchema,
   RedeemInviteRequestSchema,

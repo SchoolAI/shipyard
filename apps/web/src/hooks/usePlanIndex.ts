@@ -1,6 +1,7 @@
 import {
   clearPlanIndexViewedBy,
   getAllViewedByFromIndex,
+  getEpochFromMetadata,
   getPlanIndex,
   getPlanMetadata,
   getPlanOwnerId,
@@ -105,6 +106,7 @@ async function loadPlanFromIndexedDB(
       id: metadata.id,
       title: metadata.title,
       status: metadata.status,
+      epoch: getEpochFromMetadata(metadata),
       createdAt: metadata.createdAt ?? Date.now(),
       updatedAt: metadata.updatedAt ?? Date.now(),
       ownerId,

@@ -28491,7 +28491,7 @@ init_cjs_shims();
 // ../../packages/schema/dist/index.mjs
 init_cjs_shims();
 
-// ../../packages/schema/dist/yjs-helpers-Dr_mkpZM.mjs
+// ../../packages/schema/dist/yjs-helpers-Cgp3Mo2m.mjs
 init_cjs_shims();
 
 // ../../packages/schema/dist/plan.mjs
@@ -42581,6 +42581,7 @@ var PlanMetadataBaseSchema = external_exports.object({
   title: external_exports.string(),
   createdAt: external_exports.number(),
   updatedAt: external_exports.number(),
+  epoch: external_exports.number().optional(),
   repo: external_exports.string().optional(),
   pr: external_exports.number().optional(),
   ownerId: external_exports.string().optional(),
@@ -42727,7 +42728,7 @@ var LocalArtifactParseSchema = external_exports.object({
   localArtifactId: external_exports.string()
 });
 
-// ../../packages/schema/dist/yjs-helpers-Dr_mkpZM.mjs
+// ../../packages/schema/dist/yjs-helpers-Cgp3Mo2m.mjs
 function assertNever2(value) {
   throw new Error(`Unhandled discriminated union member: ${JSON.stringify(value)}`);
 }
@@ -42755,6 +42756,8 @@ var ChangeSnapshotSchema = external_exports.object({
   totalAdditions: external_exports.number(),
   totalDeletions: external_exports.number()
 });
+var EPOCH_CLOSE_CODES = { EPOCH_TOO_OLD: 4100 };
+var EPOCH_CLOSE_REASONS = { [EPOCH_CLOSE_CODES.EPOCH_TOO_OLD]: "epoch_too_old" };
 var AgentPresenceSchema = external_exports.object({
   agentType: external_exports.string(),
   sessionId: external_exports.string(),
@@ -44297,7 +44300,8 @@ var PlanIndexEntrySchema = external_exports.discriminatedUnion("deleted", [exter
   createdAt: external_exports.number(),
   updatedAt: external_exports.number(),
   ownerId: external_exports.string(),
-  tags: external_exports.array(external_exports.string()).optional()
+  tags: external_exports.array(external_exports.string()).optional(),
+  epoch: external_exports.number()
 }), external_exports.object({
   deleted: external_exports.literal(true),
   id: external_exports.string(),
@@ -44307,6 +44311,7 @@ var PlanIndexEntrySchema = external_exports.discriminatedUnion("deleted", [exter
   updatedAt: external_exports.number(),
   ownerId: external_exports.string(),
   tags: external_exports.array(external_exports.string()).optional(),
+  epoch: external_exports.number(),
   deletedAt: external_exports.number(),
   deletedBy: external_exports.string()
 })]);

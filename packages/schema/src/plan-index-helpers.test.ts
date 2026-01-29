@@ -22,6 +22,7 @@ describe('Plan Index Helpers', () => {
       createdAt: number;
       updatedAt: number;
       ownerId: string;
+      epoch: number;
       deleted: boolean;
       deletedAt: number;
       deletedBy: string;
@@ -35,6 +36,7 @@ describe('Plan Index Helpers', () => {
       createdAt: Date.now(),
       updatedAt: Date.now(),
       ownerId: 'test-user',
+      epoch: 1,
       ...rest,
     };
 

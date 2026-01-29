@@ -26,6 +26,7 @@ import {
 } from '@shipyard/schema';
 import type { Request, Response } from 'express';
 import { nanoid } from 'nanoid';
+import { registryConfig } from './config/env/registry.js';
 import { webConfig } from './config/env/web.js';
 import { getOrCreateDoc } from './doc-store.js';
 import { logger } from './logger.js';
@@ -153,6 +154,7 @@ export async function handleCreateSession(req: Request, res: Response): Promise<
       createdAt: now,
       updatedAt: now,
       ownerId,
+      epoch: registryConfig.MINIMUM_EPOCH,
       deleted: false,
     });
 
@@ -234,6 +236,7 @@ export async function handleUpdateContent(req: Request, res: Response): Promise<
         createdAt: metadata.createdAt ?? now,
         updatedAt: now,
         ownerId: metadata.ownerId,
+        epoch: metadata.epoch ?? registryConfig.MINIMUM_EPOCH,
         deleted: false,
       });
     } else {

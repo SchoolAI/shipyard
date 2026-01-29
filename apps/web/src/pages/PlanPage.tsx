@@ -381,6 +381,7 @@ export function PlanPage() {
           id: existingEntry.id,
           title: existingEntry.title,
           status: existingEntry.status,
+          epoch: existingEntry.epoch,
           createdAt: existingEntry.createdAt,
           updatedAt: existingEntry.updatedAt,
           ownerId: existingEntry.ownerId,

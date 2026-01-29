@@ -18,6 +18,7 @@ import { nanoid } from 'nanoid';
 import open from 'open';
 import type * as Y from 'yjs';
 import { z } from 'zod';
+import { registryConfig } from '../config/env/registry.js';
 import { webConfig } from '../config/env/web.js';
 import { getOrCreateDoc, hasActiveConnections } from '../doc-store.js';
 import { logger } from '../logger.js';
@@ -227,6 +228,7 @@ Bad deliverables (not provable):
       sessionTokenHash,
       origin,
       tags: input.tags,
+      epoch: registryConfig.MINIMUM_EPOCH,
     });
 
     const transitionResult = transitionPlanStatus(
@@ -262,6 +264,7 @@ Bad deliverables (not provable):
       updatedAt: finalMetadata.updatedAt,
       ownerId,
       tags: input.tags,
+      epoch: registryConfig.MINIMUM_EPOCH,
       deleted: false,
     });
     logger.info({ taskId }, 'Task index updated');

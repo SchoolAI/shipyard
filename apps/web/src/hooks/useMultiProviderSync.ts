@@ -1,9 +1,19 @@
+import { getEpochFromMetadata, getSignalingConnections } from '@shipyard/schema';
 import { DEFAULT_REGISTRY_PORTS } from '@shipyard/shared/registry-config';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { IndexeddbPersistence } from 'y-indexeddb';
 import { WebrtcProvider } from 'y-webrtc';
 import { WebsocketProvider } from 'y-websocket';
 import * as Y from 'yjs';
+import {
+  handleEpochRejection,
+  isEpochRejection,
+  isEpochResetInProgress,
+} from '../utils/epochReset';
+
+interface WebsocketProviderInternal {
+  ws?: WebSocket;
+}
 
 /**
  * WebRTC signaling server URL.
@@ -158,6 +168,20 @@ function releaseWebrtcProvider(roomName: string): void {
     cached.provider.disconnect();
     cached.provider.destroy();
     webrtcProviderCache.delete(roomName);
+  }
+}
+
+/**
+ * Extract port number from a WebSocket URL.
+ * Falls back to 32191 (default registry port) if parsing fails.
+ */
+function extractPortFromUrl(wsUrl: string): number | null {
+  try {
+    const url = new URL(wsUrl);
+    const port = Number.parseInt(url.port || '32191', 10);
+    return port;
+  } catch {
+    return null;
   }
 }
 
@@ -349,12 +373,24 @@ export function useMultiProviderSync(
     (
       ws: WebsocketProvider | null,
       wsStatusListener: (() => void) | null,
-      wsSyncListener: (() => void) | null
+      wsSyncListener: (() => void) | null,
+      wsCloseHandler: ((event: CloseEvent) => void) | null
     ) => {
       if (!ws) return;
 
       if (wsStatusListener) ws.off('status', wsStatusListener);
       if (wsSyncListener) ws.off('sync', wsSyncListener);
+
+      /** Remove close handler from underlying WebSocket if present */
+      if (wsCloseHandler) {
+        // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- Accessing internal y-websocket API
+        const wsInternal = ws as WebsocketProvider & WebsocketProviderInternal;
+        const wsSocket = wsInternal.ws;
+        if (wsSocket) {
+          wsSocket.removeEventListener('close', wsCloseHandler);
+        }
+      }
+
       ws.disconnect();
       ws.destroy();
     },
@@ -409,30 +445,41 @@ export function useMultiProviderSync(
     const visibilityGracePeriodTimeoutRef: { current: ReturnType<typeof setTimeout> | null } = {
       current: null,
     };
+    let wsCloseHandler: ((event: CloseEvent) => void) | null = null;
 
     /** IndexedDB persistence */
     const idbProvider = new IndexeddbPersistence(docName, ydoc);
 
-    /** Track when IndexedDB has synced - this means local data is available */
-    idbProvider.whenSynced.then(() => {
-      if (mountedRef.current) {
-        idbSyncedRef.current = true;
-        updateSyncState();
+    /**
+     * Track when IndexedDB has synced - this means local data is available.
+     * CRITICAL: We must wait for IDB to sync BEFORE connecting to WebSocket
+     * so we can read the epoch from the doc and send it in the URL.
+     * This changes loading order from parallel to sequential (IDB then WS).
+     */
+    idbProvider.whenSynced.then(async () => {
+      if (!mountedRef.current) return;
 
-        /*
-         * Fire event so useSharedPlans can discover newly synced plans
-         * Only fire for plan documents (not plan-index)
-         */
-        if (docName !== 'plan-index') {
-          window.dispatchEvent(
-            new CustomEvent('indexeddb-plan-synced', { detail: { planId: docName } })
-          );
-        }
+      idbSyncedRef.current = true;
+      updateSyncState();
+
+      /*
+       * Fire event so useSharedPlans can discover newly synced plans
+       * Only fire for plan documents (not plan-index)
+       */
+      if (docName !== 'plan-index') {
+        window.dispatchEvent(
+          new CustomEvent('indexeddb-plan-synced', { detail: { planId: docName } })
+        );
       }
-    });
 
-    /** Connect to single Registry Hub with port discovery */
-    (async () => {
+      /**
+       * NOW we can read epoch from the doc and connect with it in the URL.
+       * This is the production pattern used by Hocuspocus and y-sweet.
+       */
+      const metadata = ydoc.getMap('metadata').toJSON();
+      const epoch = getEpochFromMetadata(metadata);
+
+      /** Connect to single Registry Hub with port discovery */
       const envHubUrl = import.meta.env.VITE_HUB_URL;
       const hubUrl = envHubUrl ? envHubUrl : await discoverHubUrl();
 
@@ -443,14 +490,14 @@ export function useMultiProviderSync(
       if (!mountedRef.current) return;
 
       /** Extract port from hub URL for local artifact URLs */
-      try {
-        const url = new URL(hubUrl);
-        const port = Number.parseInt(url.port || '32191', 10);
-        registryPortRef.current = port;
-      } catch {
-        registryPortRef.current = null;
-      }
+      registryPortRef.current = extractPortFromUrl(hubUrl);
 
+      /**
+       * Connect with epoch in URL query param using y-websocket's params option.
+       * CRITICAL: Do NOT embed query params in serverUrl - y-websocket constructs
+       * URL as serverUrl + '/' + roomname + '?' + params, so embedding ?epoch=X
+       * in serverUrl creates malformed URLs like ws://host?epoch=2/plan-index.
+       */
       ws = new WebsocketProvider(hubUrl, docName, ydoc, {
         connect: true,
         maxBackoffTime: 2500,
@@ -460,14 +507,46 @@ export function useMultiProviderSync(
          * (which delays timers to 60s after 5 min background) causes disconnects.
          */
         resyncInterval: 15000,
+        params: { epoch: String(epoch) },
       });
 
       wsProviderRef.current = ws;
       setWsProvider(ws);
 
+      /*
+       * Access underlying WebSocket for epoch rejection handling.
+       * y-websocket exposes ws property internally but not in types.
+       */
+      // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- Accessing internal y-websocket API
+      const wsInternal = ws as WebsocketProvider & WebsocketProviderInternal;
+
+      /*
+       * Store close handler reference for cleanup to prevent memory leak.
+       * Race condition fix: Attach handler IMMEDIATELY after creating provider,
+       * not in status callback which may be too late if connection closes immediately.
+       */
+      wsCloseHandler = (event: CloseEvent) => {
+        if (isEpochRejection(event.code, event.reason)) {
+          handleEpochRejection(docName);
+        }
+      };
+
+      const attachCloseHandlerIfReady = () => {
+        const wsSocket = wsInternal.ws;
+        if (wsSocket && wsCloseHandler) {
+          wsSocket.addEventListener('close', wsCloseHandler);
+        }
+      };
+
+      /** Try to attach handler immediately */
+      attachCloseHandlerIfReady();
+
       /** Store listener references for cleanup */
       wsStatusListener = () => {
         if (mountedRef.current) {
+          /** Ensure handler is attached on status changes (catches lazy socket creation) */
+          attachCloseHandlerIfReady();
+
           /** Clear timeout when connection succeeds */
           const wsConnected = ws?.wsconnected ?? false;
           if (wsConnected && timedOutRef.current) {
@@ -480,7 +559,13 @@ export function useMultiProviderSync(
       ws.on('status', wsStatusListener);
 
       wsSyncListener = () => {
-        if (mountedRef.current) updateSyncState();
+        if (mountedRef.current) {
+          /** Clear epoch reset flag after successful WebSocket sync */
+          if (isEpochResetInProgress()) {
+            sessionStorage.removeItem('shipyard-epoch-reset-in-progress');
+          }
+          updateSyncState();
+        }
       };
       ws.on('sync', wsSyncListener);
 
@@ -490,7 +575,7 @@ export function useMultiProviderSync(
         visibilityGracePeriodTimeoutRef
       );
       document.addEventListener('visibilitychange', visibilityChangeListener);
-    })();
+    });
 
     /*
      * Connection timeout: If not connected within 10 seconds, show offline state
@@ -503,7 +588,7 @@ export function useMultiProviderSync(
     );
 
     /** WebRTC P2P sync - simple setup without authentication */
-    if (enableWebRTC) {
+    if (enableWebRTC && !isEpochResetInProgress()) {
       const envSignaling = import.meta.env.VITE_WEBRTC_SIGNALING;
       const signalingServer = envSignaling || DEFAULT_SIGNALING_SERVER;
 
@@ -566,6 +651,49 @@ export function useMultiProviderSync(
       };
       rtc.on('synced', rtcSyncedListener);
 
+      /** Send epoch validation immediately when signaling WebSocket opens */
+      const sendEpochValidation = () => {
+        const signalingConns = getSignalingConnections(rtc);
+        const signalingWs = signalingConns[0]?.ws;
+
+        if (!signalingWs) return;
+
+        const doValidation = () => {
+          const metadata = ydoc.getMap('metadata').toJSON();
+          const epoch = getEpochFromMetadata(metadata);
+
+          signalingWs.send(
+            JSON.stringify({
+              type: 'validate_epoch',
+              planId: docName,
+              epoch,
+            })
+          );
+
+          const handleSignalingError = (event: MessageEvent) => {
+            try {
+              const data = JSON.parse(event.data);
+              if (data.type === 'error' && data.error === 'epoch_too_old') {
+                handleEpochRejection(docName);
+              }
+            } catch {
+              /** Ignore parse errors - non-JSON messages are normal WebRTC signaling traffic */
+            }
+          };
+
+          signalingWs.addEventListener('message', handleSignalingError);
+        };
+
+        /** Send immediately if already open, otherwise wait for open event */
+        if (signalingWs.readyState === WebSocket.OPEN) {
+          doValidation();
+        } else {
+          signalingWs.addEventListener('open', doValidation, { once: true });
+        }
+      };
+
+      sendEpochValidation();
+
       /*
        * Clear awareness on page unload so other peers see us leave immediately
        * instead of waiting for the 30-second awareness timeout
@@ -605,7 +733,7 @@ export function useMultiProviderSync(
        * IMPORTANT: Remove event listeners BEFORE destroying providers
        * This prevents memory leaks from accumulated listeners in React StrictMode
        */
-      cleanupWebSocketProvider(ws, wsStatusListener, wsSyncListener);
+      cleanupWebSocketProvider(ws, wsStatusListener, wsSyncListener, wsCloseHandler);
       wsProviderRef.current = null;
       setWsProvider(null);
 
