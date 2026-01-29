@@ -6,6 +6,7 @@ import { join, resolve, sep } from 'node:path';
 import {
   appRouter,
   type Context,
+  DEFAULT_EPOCH,
   EPOCH_CLOSE_CODES,
   EPOCH_CLOSE_REASONS,
   getEpochFromMetadata,
@@ -450,8 +451,24 @@ function processMessage(
 }
 
 function handleWebSocketConnection(ws: WebSocket, req: http.IncomingMessage): void {
-  const { docName: planId } = parseWebSocketUrl(req.url || '/');
-  logger.info({ planId }, 'WebSocket client connected to registry');
+  const { docName: planId, clientEpoch } = parseWebSocketUrl(req.url || '/');
+
+  /**
+   * VALIDATE IMMEDIATELY - before doc load, before message buffering.
+   * This is the production pattern used by Hocuspocus and y-sweet.
+   * The client sends its epoch in the URL, server validates BEFORE any sync.
+   */
+  const minimumEpoch = registryConfig.MINIMUM_EPOCH;
+  if (clientEpoch !== null && !isEpochValid(clientEpoch, minimumEpoch)) {
+    logger.warn(
+      { planId, clientEpoch, minimumEpoch },
+      'Rejecting client: epoch too old (URL param)'
+    );
+    ws.close(EPOCH_CLOSE_CODES.EPOCH_TOO_OLD, EPOCH_CLOSE_REASONS[EPOCH_CLOSE_CODES.EPOCH_TOO_OLD]);
+    return;
+  }
+
+  logger.info({ planId, clientEpoch }, 'WebSocket client connected to registry');
 
   /*
    * CRITICAL: Buffer for messages that arrive before doc is ready.
