@@ -41,7 +41,7 @@ const AUTH_DEADLINE_CHECK_INTERVAL_MS = 5000;
  * TODO: Move to environment variable in wrangler.toml
  * CRITICAL: Must match registry server's MINIMUM_EPOCH value
  */
-const MINIMUM_EPOCH = 1;
+const MINIMUM_EPOCH = 2;
 
 interface Env {
   SIGNALING_ROOM: DurableObjectNamespace;
