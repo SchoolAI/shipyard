@@ -17,6 +17,7 @@
  */
 
 import { DurableObject } from 'cloudflare:workers';
+import { DEFAULT_EPOCH } from '@shipyard/schema';
 import {
   checkAuthDeadlines,
   handleAuthenticate,
@@ -38,10 +39,10 @@ const AUTH_DEADLINE_CHECK_INTERVAL_MS = 5000;
 
 /**
  * Minimum epoch for this server.
+ * Uses DEFAULT_EPOCH from schema to stay in sync with registry/signaling servers.
  * TODO: Move to environment variable in wrangler.toml
- * CRITICAL: Must match registry server's MINIMUM_EPOCH value
  */
-const MINIMUM_EPOCH = 2;
+const MINIMUM_EPOCH = DEFAULT_EPOCH;
 
 interface Env {
   SIGNALING_ROOM: DurableObjectNamespace;
