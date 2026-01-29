@@ -684,6 +684,10 @@ interface InboxAccordionContentProps {
   handleViewEvent: (planId: string, tab?: PlanViewTab) => void;
   handleMarkEventRead: (planId: string, eventId: string) => void;
   handleMarkEventUnread: (planId: string, eventId: string) => void;
+  /** Look up plan title by ID */
+  getPlanTitle: (planId: string) => string | undefined;
+  /** Select a plan to show in detail panel */
+  handleSelectPlan: (planId: string) => void;
 }
 
 /** Renders all inbox accordion sections - extracts conditional logic from main component */
@@ -699,6 +703,8 @@ function InboxAccordionContent({
   handleViewEvent,
   handleMarkEventRead,
   handleMarkEventUnread,
+  getPlanTitle,
+  handleSelectPlan,
 }: InboxAccordionContentProps) {
   return (
     <Accordion
@@ -727,6 +733,8 @@ function InboxAccordionContent({
                     })
                   );
                 }}
+                planTitle={request.planId ? getPlanTitle(request.planId) : undefined}
+                onSelectPlan={request.planId ? handleSelectPlan : undefined}
               />
             ))}
           </div>
@@ -1097,6 +1105,21 @@ export function InboxPage() {
     [indexDoc, selectedPlanId]
   );
 
+  /** Look up plan title from owned plans (for input request items) */
+  const getPlanTitle = useCallback(
+    (planId: string): string | undefined => {
+      const plan = allOwnedPlans.find((p) => p.id === planId);
+      return plan?.title;
+    },
+    [allOwnedPlans]
+  );
+
+  /** Select a plan to show in the detail panel (for input request plan links) */
+  const handleSelectPlan = useCallback((planId: string) => {
+    setSelectedPlanId(planId);
+    setSelectedTab('plan');
+  }, []);
+
   /** Keyboard shortcut handlers - all extracted to top level */
   const handleFullScreen = useCallback(() => {
     if (selectedPlanId) {
@@ -1196,6 +1219,8 @@ export function InboxPage() {
             handleViewEvent={handleViewEvent}
             handleMarkEventRead={handleMarkEventRead}
             handleMarkEventUnread={handleMarkEventUnread}
+            getPlanTitle={getPlanTitle}
+            handleSelectPlan={handleSelectPlan}
           />
         </div>
       </div>
