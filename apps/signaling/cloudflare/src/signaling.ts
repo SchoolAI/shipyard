@@ -87,10 +87,10 @@ export class SignalingRoom extends DurableObject<Env> {
    */
   async alarm(): Promise<void> {
     const disconnected = checkAuthDeadlines(this.adapter, (ws) => {
-      if (ws && typeof ws === 'object' && 'close' in ws) {
-        const socket = ws as WebSocket;
+      /** Check if this is a WebSocket-like object with a close method */
+      if (ws && typeof ws === 'object' && 'close' in ws && typeof ws.close === 'function') {
         try {
-          socket.close(1008, 'Authentication timeout');
+          ws.close(1008, 'Authentication timeout');
         } catch {
           /** Connection may already be closed */
         }
@@ -146,7 +146,6 @@ export class SignalingRoom extends DurableObject<Env> {
           break;
 
         case 'ping':
-          /** Handled by setWebSocketAutoResponse, but just in case */
           ws.send(JSON.stringify({ type: 'pong' }));
           break;
 
@@ -155,7 +154,6 @@ export class SignalingRoom extends DurableObject<Env> {
           break;
 
         case 'authenticate':
-          /** Pass raw parsed data for secondary validation in handler */
           await handleAuthenticate(this.adapter, ws, data);
           break;
 

@@ -103,8 +103,6 @@ export async function handleAuthenticate(
   platform.info(`[Authenticate] User ${message.userId} authenticated for plan ${planId}`);
 }
 
-// --- Helper Functions ---
-
 /** Result of authentication validation */
 type ValidationResult = { valid: true } | { valid: false; error: AuthErrorType; message: string };
 
@@ -133,14 +131,13 @@ async function validateOwnerAuth(
     };
   }
 
-  // Trust-on-first-use pattern: first authenticated user claims ownership
+  /** NOTE: Trust-on-first-use pattern - first authenticated user claims ownership */
   const existingOwnerId = await platform.getPlanOwnerId(planId);
   if (existingOwnerId === null) {
-    // First owner - claim ownership
     await platform.setPlanOwnerId(planId, message.userId);
     platform.info(`[Authenticate] Plan ${planId} claimed by ${message.userId}`);
   } else if (existingOwnerId !== message.userId) {
-    // Not the owner - check if they have a valid invite redemption
+    /** NOTE: Not the owner - check for valid invite redemption */
     const redemption = await platform.getInviteRedemption(planId, message.userId);
     if (!redemption) {
       return {

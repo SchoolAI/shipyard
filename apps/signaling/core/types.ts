@@ -308,3 +308,23 @@ export const SignalingMessageSchema = z.discriminatedUnion('type', [
     .object({ type: z.literal('authenticate') })
     .passthrough(),
 ]);
+
+/** --- Response Schemas --- */
+
+/**
+ * Schema for authenticated response.
+ */
+export const AuthenticatedResponseSchema = z.object({
+  type: z.literal('authenticated'),
+  userId: z.string(),
+  planId: z.string(),
+});
+
+/**
+ * Schema for authentication error response.
+ */
+export const AuthErrorResponseSchema = z.object({
+  type: z.literal('auth_error'),
+  error: z.string(),
+  message: z.string(),
+});

@@ -11,6 +11,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { WebrtcProvider } from 'y-webrtc';
+import { z } from 'zod';
 import { getSignalingConnections, type SignalingConnection } from '@/types/y-webrtc-internals';
 import type { GitHubIdentity } from './useGitHubAuth';
 
@@ -38,18 +39,18 @@ type AuthenticateInviteMessage = {
 
 type AuthenticateMessage = AuthenticateOwnerMessage | AuthenticateInviteMessage;
 
-/** Response types from server */
-interface AuthenticatedResponse {
-  type: 'authenticated';
-  userId: string;
-  planId: string;
-}
+/** Zod schemas for runtime validation of server responses */
+const AuthenticatedResponseSchema = z.object({
+  type: z.literal('authenticated'),
+  userId: z.string(),
+  planId: z.string(),
+});
 
-interface AuthErrorResponse {
-  type: 'auth_error';
-  error: string;
-  message: string;
-}
+const AuthErrorResponseSchema = z.object({
+  type: z.literal('auth_error'),
+  error: z.string(),
+  message: z.string(),
+});
 
 /** Props for the hook */
 export interface UseAuthenticatedSignalingOptions {
@@ -160,18 +161,22 @@ export function useAuthenticatedSignaling(
       const data = JSON.parse(event.data);
 
       if (data.type === 'authenticated') {
-        const response = data as AuthenticatedResponse;
-        setAuthState({
-          status: 'authenticated',
-          userId: response.userId,
-          planId: response.planId,
-        });
+        const parseResult = AuthenticatedResponseSchema.safeParse(data);
+        if (parseResult.success) {
+          setAuthState({
+            status: 'authenticated',
+            userId: parseResult.data.userId,
+            planId: parseResult.data.planId,
+          });
+        }
       } else if (data.type === 'auth_error') {
-        const response = data as AuthErrorResponse;
-        setAuthState({
-          status: 'error',
-          error: response.message || response.error,
-        });
+        const parseResult = AuthErrorResponseSchema.safeParse(data);
+        if (parseResult.success) {
+          setAuthState({
+            status: 'error',
+            error: parseResult.data.message || parseResult.data.error,
+          });
+        }
       }
     } catch {
       /** Not JSON or not our message - ignore */
