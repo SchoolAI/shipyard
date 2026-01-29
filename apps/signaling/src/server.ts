@@ -26,6 +26,7 @@ import http from 'node:http';
 import type { WebSocket } from 'ws';
 import { WebSocketServer } from 'ws';
 import {
+  handleAuthenticate,
   handleCreateInvite,
   handleListInvites,
   handlePublish,
@@ -125,6 +126,11 @@ function onConnection(conn: WebSocket): void {
 
         case 'ping':
           adapter.sendMessage(conn, { type: 'pong' });
+          break;
+
+        case 'authenticate':
+          /** Pass raw parsed data for secondary validation in handler */
+          await handleAuthenticate(adapter, conn, message);
           break;
 
         case 'create_invite':

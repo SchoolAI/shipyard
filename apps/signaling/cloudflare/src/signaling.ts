@@ -18,6 +18,7 @@
 
 import { DurableObject } from 'cloudflare:workers';
 import {
+  handleAuthenticate,
   handleCreateInvite,
   handleListInvites,
   handlePublish,
@@ -114,6 +115,11 @@ export class SignalingRoom extends DurableObject<Env> {
         case 'ping':
           /** Handled by setWebSocketAutoResponse, but just in case */
           ws.send(JSON.stringify({ type: 'pong' }));
+          break;
+
+        case 'authenticate':
+          /** Pass raw parsed data for secondary validation in handler */
+          await handleAuthenticate(this.adapter, ws, data);
           break;
 
         case 'create_invite':

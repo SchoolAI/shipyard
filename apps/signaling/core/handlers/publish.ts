@@ -2,7 +2,7 @@
  * Publish handler for signaling server.
  *
  * Handles broadcasting messages to topic subscribers.
- * Simple relay - no authentication or approval filtering.
+ * SECURITY: Only relays messages from ACTIVATED (authenticated) connections.
  */
 
 export { handlePublish };
@@ -13,12 +13,21 @@ import type { PublishMessage } from '../types.js';
 /**
  * Handle publish message - relay to all topic subscribers.
  *
+ * SECURITY: Sender must have an ACTIVE subscription to the topic.
+ * Pending (unauthenticated) subscriptions cannot publish.
+ *
  * @param platform - Platform adapter for storage/messaging
  * @param ws - WebSocket connection of the sender
  * @param message - Publish message to broadcast
  */
 function handlePublish(platform: PlatformAdapter, ws: unknown, message: PublishMessage): void {
   if (!message.topic) return;
+
+  /** SECURITY: Check if sender has ACTIVE subscription (not just pending) */
+  if (!platform.isSubscriptionActive(ws, message.topic)) {
+    platform.debug(`[Publish] BLOCKED: Sender not authenticated for topic: ${message.topic}`);
+    return;
+  }
 
   const subscribers = platform.getTopicSubscribers(message.topic);
 
@@ -39,7 +48,7 @@ function handlePublish(platform: PlatformAdapter, ws: unknown, message: PublishM
     clients: subscribers.length,
   };
 
-  /** Broadcast to all subscribers except sender */
+  /** Broadcast to all ACTIVE subscribers except sender */
   for (const subscriber of subscribers) {
     if (subscriber === ws) continue;
     platform.sendMessage(subscriber, outMessage);

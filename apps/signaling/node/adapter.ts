@@ -4,7 +4,9 @@
  * This adapter wraps Node.js-specific functionality (ws WebSockets, node:crypto,
  * in-memory Maps) into the platform-agnostic interface that core handlers use.
  *
- * Simplified for basic pub/sub signaling - no approval state or message queueing.
+ * Two-message authentication pattern:
+ * - subscribe: Adds topics to PENDING state
+ * - authenticate: Validates credentials, moves to ACTIVE state
  *
  * Storage: Uses in-memory Maps (suitable for single-process development server)
  * Crypto: Uses node:crypto (synchronous, wrapped in Promise.resolve())
@@ -37,6 +39,20 @@ function isWebSocket(value: unknown): value is WebSocket {
 }
 
 /**
+ * Connection state for two-message auth pattern.
+ */
+interface ConnectionState {
+  /** Topics awaiting authentication */
+  pendingTopics: Set<string>;
+  /** Topics with active (authenticated) subscription */
+  activeTopics: Set<string>;
+  /** Auth deadline timestamp (null if no deadline) */
+  authDeadline: number | null;
+  /** User ID after authentication (null if not authenticated) */
+  userId: string | null;
+}
+
+/**
  * Node.js platform adapter implementation.
  *
  * Uses in-memory Maps for storage (suitable for single-process dev server).
@@ -65,14 +81,38 @@ export class NodePlatformAdapter implements PlatformAdapter {
 
   /**
    * Map from topic-name to set of subscribed clients.
+   * NOTE: Only contains ACTIVE (authenticated) subscriptions.
    */
   private topics = new Map<string, Set<WebSocket>>();
 
   /**
-   * Map from connection to set of subscribed topics.
-   * Used for efficient cleanup when connection closes.
+   * Connection state for each WebSocket.
+   * Tracks pending/active topics, auth deadline, and user ID.
+   */
+  private connectionStates = new WeakMap<WebSocket, ConnectionState>();
+
+  /**
+   * Map from connection to set of subscribed topics (for cleanup).
+   * @deprecated Use connectionStates.activeTopics instead
    */
   private connectionTopics = new WeakMap<WebSocket, Set<string>>();
+
+  /**
+   * Get or create connection state for a WebSocket.
+   */
+  private getConnectionState(ws: WebSocket): ConnectionState {
+    let state = this.connectionStates.get(ws);
+    if (!state) {
+      state = {
+        pendingTopics: new Set(),
+        activeTopics: new Set(),
+        authDeadline: null,
+        userId: null,
+      };
+      this.connectionStates.set(ws, state);
+    }
+    return state;
+  }
 
   /** --- Storage Operations --- */
 
@@ -286,26 +326,156 @@ export class NodePlatformAdapter implements PlatformAdapter {
     }
   }
 
+  /**
+   * Remove a WebSocket from a topic's subscriber set.
+   * Cleans up the topic entry if no subscribers remain.
+   */
+  private removeFromTopicSubscribers(ws: WebSocket, topic: string): void {
+    const topicSubscribers = this.topics.get(topic);
+    if (topicSubscribers) {
+      topicSubscribers.delete(ws);
+      if (topicSubscribers.size === 0) {
+        this.topics.delete(topic);
+      }
+    }
+  }
+
+  /**
+   * Remove a WebSocket from all topics in a Set.
+   */
+  private removeFromAllTopicsInSet(ws: WebSocket, topicSet: Set<string>): void {
+    for (const topic of topicSet) {
+      this.removeFromTopicSubscribers(ws, topic);
+    }
+  }
+
   unsubscribeFromAllTopics(ws: unknown): void {
     if (!isWebSocket(ws)) {
       this.error('[unsubscribeFromAllTopics] Invalid WebSocket');
       return;
     }
-    const socketTopics = this.connectionTopics.get(ws);
 
-    if (!socketTopics) return;
-
-    for (const topic of socketTopics) {
-      const topicSubscribers = this.topics.get(topic);
-      if (topicSubscribers) {
-        topicSubscribers.delete(ws);
-        if (topicSubscribers.size === 0) {
-          this.topics.delete(topic);
-        }
-      }
+    /** Clean up using connection state */
+    const state = this.connectionStates.get(ws);
+    if (state) {
+      this.removeFromAllTopicsInSet(ws, state.activeTopics);
+      state.activeTopics.clear();
+      state.pendingTopics.clear();
     }
 
-    socketTopics.clear();
+    /** Also clean up legacy connectionTopics */
+    const socketTopics = this.connectionTopics.get(ws);
+    if (socketTopics) {
+      this.removeFromAllTopicsInSet(ws, socketTopics);
+      socketTopics.clear();
+    }
+  }
+
+  /** --- Pending Subscription Management (Two-Message Auth) --- */
+
+  addPendingSubscription(ws: unknown, topic: string): void {
+    if (!isWebSocket(ws)) {
+      this.error('[addPendingSubscription] Invalid WebSocket');
+      return;
+    }
+    const state = this.getConnectionState(ws);
+    state.pendingTopics.add(topic);
+  }
+
+  getPendingSubscriptions(ws: unknown): string[] {
+    if (!isWebSocket(ws)) {
+      return [];
+    }
+    const state = this.connectionStates.get(ws);
+    return state ? Array.from(state.pendingTopics) : [];
+  }
+
+  activatePendingSubscription(ws: unknown, topic: string): boolean {
+    if (!isWebSocket(ws)) {
+      this.error('[activatePendingSubscription] Invalid WebSocket');
+      return false;
+    }
+
+    const state = this.getConnectionState(ws);
+
+    /** Must be pending to activate */
+    if (!state.pendingTopics.has(topic)) {
+      return false;
+    }
+
+    /** Move from pending to active */
+    state.pendingTopics.delete(topic);
+    state.activeTopics.add(topic);
+
+    /** Add to topics map (for getTopicSubscribers) */
+    let topicSubscribers = this.topics.get(topic);
+    if (!topicSubscribers) {
+      topicSubscribers = new Set<WebSocket>();
+      this.topics.set(topic, topicSubscribers);
+    }
+    topicSubscribers.add(ws);
+
+    return true;
+  }
+
+  isSubscriptionPending(ws: unknown, topic: string): boolean {
+    if (!isWebSocket(ws)) {
+      return false;
+    }
+    const state = this.connectionStates.get(ws);
+    return state?.pendingTopics.has(topic) ?? false;
+  }
+
+  isSubscriptionActive(ws: unknown, topic: string): boolean {
+    if (!isWebSocket(ws)) {
+      return false;
+    }
+    const state = this.connectionStates.get(ws);
+    return state?.activeTopics.has(topic) ?? false;
+  }
+
+  setAuthDeadline(ws: unknown, timestamp: number): void {
+    if (!isWebSocket(ws)) {
+      this.error('[setAuthDeadline] Invalid WebSocket');
+      return;
+    }
+    const state = this.getConnectionState(ws);
+    state.authDeadline = timestamp;
+  }
+
+  clearAuthDeadline(ws: unknown): void {
+    if (!isWebSocket(ws)) {
+      return;
+    }
+    const state = this.connectionStates.get(ws);
+    if (state) {
+      state.authDeadline = null;
+    }
+  }
+
+  getAuthDeadline(ws: unknown): number | null {
+    if (!isWebSocket(ws)) {
+      return null;
+    }
+    const state = this.connectionStates.get(ws);
+    return state?.authDeadline ?? null;
+  }
+
+  setConnectionUserId(ws: unknown, userId: string): void {
+    if (!isWebSocket(ws)) {
+      this.error('[setConnectionUserId] Invalid WebSocket');
+      return;
+    }
+    const state = this.getConnectionState(ws);
+    state.userId = userId;
+  }
+
+  getConnectionUserId(ws: unknown): string | null {
+    if (!isWebSocket(ws)) {
+      return null;
+    }
+    const state = this.connectionStates.get(ws);
+    return state?.userId ?? null;
   }
 
   /*

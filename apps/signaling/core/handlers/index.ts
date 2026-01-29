@@ -9,6 +9,7 @@
  * over platform-specific storage, crypto, and WebSocket operations.
  */
 
+export { handleAuthenticate } from './authenticate.js';
 export {
   handleCreateInvite,
   handleListInvites,

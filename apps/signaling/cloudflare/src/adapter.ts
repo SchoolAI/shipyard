@@ -5,7 +5,9 @@
  * Web Crypto API, hibernating WebSockets) into the platform-agnostic interface
  * that core handlers use.
  *
- * Simplified for basic pub/sub signaling - no approval state or message queueing.
+ * Two-message authentication pattern:
+ * - subscribe: Adds topics to PENDING state
+ * - authenticate: Validates credentials, moves to ACTIVE state
  *
  * Storage: Uses ctx.storage for persistent storage that survives hibernation
  * Crypto: Uses Web Crypto API (all operations are async)
@@ -40,15 +42,29 @@ function isNonNullObject(value: unknown): value is Record<string, unknown> {
  */
 interface SerializedConnectionState {
   id: string;
-  topics: string[];
+  /** Topics awaiting authentication (pending) */
+  pendingTopics: string[];
+  /** Topics with active (authenticated) subscription */
+  activeTopics: string[];
+  /** Auth deadline timestamp (null if no deadline) */
+  authDeadline: number | null;
+  /** User ID after authentication (null if not authenticated) */
+  userId: string | null;
 }
 
 /**
- * In-memory connection state with proper Set for topics.
+ * In-memory connection state with proper Sets for topics.
  */
 interface ConnectionState {
   id: string;
-  topics: Set<string>;
+  /** Topics awaiting authentication (pending) */
+  pendingTopics: Set<string>;
+  /** Topics with active (authenticated) subscription */
+  activeTopics: Set<string>;
+  /** Auth deadline timestamp (null if no deadline) */
+  authDeadline: number | null;
+  /** User ID after authentication (null if not authenticated) */
+  userId: string | null;
 }
 
 /**
@@ -56,7 +72,10 @@ interface ConnectionState {
  */
 const SerializedConnectionStateSchema = z.object({
   id: z.string(),
-  topics: z.array(z.string()),
+  pendingTopics: z.array(z.string()),
+  activeTopics: z.array(z.string()),
+  authDeadline: z.number().nullable(),
+  userId: z.string().nullable(),
 });
 
 /**
@@ -232,6 +251,7 @@ export class CloudflarePlatformAdapter implements PlatformAdapter {
   /**
    * Restore topic subscriptions from hibernated WebSocket attachments.
    * Called on hibernation wake to rebuild the topics map.
+   * NOTE: Only restores ACTIVE topics, not pending ones.
    */
   private restoreTopicsFromHibernation(): void {
     const websockets = this.ctx.getWebSockets();
@@ -241,10 +261,14 @@ export class CloudflarePlatformAdapter implements PlatformAdapter {
       if (isSerializedConnectionState(attachment)) {
         const state: ConnectionState = {
           id: attachment.id,
-          topics: new Set(attachment.topics),
+          pendingTopics: new Set(attachment.pendingTopics),
+          activeTopics: new Set(attachment.activeTopics),
+          authDeadline: attachment.authDeadline,
+          userId: attachment.userId,
         };
 
-        for (const topic of state.topics) {
+        /** Only add ACTIVE topics to the topics map */
+        for (const topic of state.activeTopics) {
           if (!this.topics.has(topic)) {
             this.topics.set(topic, new Set());
           }
@@ -547,6 +571,9 @@ export class CloudflarePlatformAdapter implements PlatformAdapter {
     return subscribers ? Array.from(subscribers) : [];
   }
 
+  /**
+   * @deprecated Use addPendingSubscription + activatePendingSubscription for new code
+   */
   subscribeToTopic(ws: unknown, topic: string): void {
     if (!isCloudflareWebSocket(ws)) {
       logger.error({}, '[subscribeToTopic] Invalid WebSocket');
@@ -558,16 +585,8 @@ export class CloudflarePlatformAdapter implements PlatformAdapter {
     }
     this.topics.get(topic)?.add(ws);
 
-    let state = this.getConnectionState(ws);
-    if (!state) {
-      state = {
-        id: crypto.randomUUID(),
-        topics: new Set(),
-      };
-      this.connectionStates.set(ws, state);
-    }
-    state.topics.add(topic);
-
+    const state = this.getOrCreateConnectionState(ws);
+    state.activeTopics.add(topic);
     this.persistConnectionState(ws, state);
   }
 
@@ -587,7 +606,8 @@ export class CloudflarePlatformAdapter implements PlatformAdapter {
 
     const state = this.getConnectionState(ws);
     if (state) {
-      state.topics.delete(topic);
+      state.activeTopics.delete(topic);
+      state.pendingTopics.delete(topic);
       this.persistConnectionState(ws, state);
     }
   }
@@ -601,7 +621,8 @@ export class CloudflarePlatformAdapter implements PlatformAdapter {
 
     if (!state) return;
 
-    for (const topic of state.topics) {
+    /** Unsubscribe from all active topics */
+    for (const topic of state.activeTopics) {
       const subscribers = this.topics.get(topic);
       if (subscribers) {
         subscribers.delete(ws);
@@ -611,7 +632,118 @@ export class CloudflarePlatformAdapter implements PlatformAdapter {
       }
     }
 
-    state.topics.clear();
+    state.activeTopics.clear();
+    state.pendingTopics.clear();
+  }
+
+  /** --- Pending Subscription Management (Two-Message Auth) --- */
+
+  addPendingSubscription(ws: unknown, topic: string): void {
+    if (!isCloudflareWebSocket(ws)) {
+      logger.error({}, '[addPendingSubscription] Invalid WebSocket');
+      return;
+    }
+    const state = this.getOrCreateConnectionState(ws);
+    state.pendingTopics.add(topic);
+    this.persistConnectionState(ws, state);
+  }
+
+  getPendingSubscriptions(ws: unknown): string[] {
+    if (!isCloudflareWebSocket(ws)) {
+      return [];
+    }
+    const state = this.connectionStates.get(ws);
+    return state ? Array.from(state.pendingTopics) : [];
+  }
+
+  activatePendingSubscription(ws: unknown, topic: string): boolean {
+    if (!isCloudflareWebSocket(ws)) {
+      logger.error({}, '[activatePendingSubscription] Invalid WebSocket');
+      return false;
+    }
+
+    const state = this.getOrCreateConnectionState(ws);
+
+    /** Must be pending to activate */
+    if (!state.pendingTopics.has(topic)) {
+      return false;
+    }
+
+    /** Move from pending to active */
+    state.pendingTopics.delete(topic);
+    state.activeTopics.add(topic);
+
+    /** Add to topics map (for getTopicSubscribers) */
+    if (!this.topics.has(topic)) {
+      this.topics.set(topic, new Set());
+    }
+    this.topics.get(topic)?.add(ws);
+
+    this.persistConnectionState(ws, state);
+    return true;
+  }
+
+  isSubscriptionPending(ws: unknown, topic: string): boolean {
+    if (!isCloudflareWebSocket(ws)) {
+      return false;
+    }
+    const state = this.connectionStates.get(ws);
+    return state?.pendingTopics.has(topic) ?? false;
+  }
+
+  isSubscriptionActive(ws: unknown, topic: string): boolean {
+    if (!isCloudflareWebSocket(ws)) {
+      return false;
+    }
+    const state = this.connectionStates.get(ws);
+    return state?.activeTopics.has(topic) ?? false;
+  }
+
+  setAuthDeadline(ws: unknown, timestamp: number): void {
+    if (!isCloudflareWebSocket(ws)) {
+      logger.error({}, '[setAuthDeadline] Invalid WebSocket');
+      return;
+    }
+    const state = this.getOrCreateConnectionState(ws);
+    state.authDeadline = timestamp;
+    this.persistConnectionState(ws, state);
+  }
+
+  clearAuthDeadline(ws: unknown): void {
+    if (!isCloudflareWebSocket(ws)) {
+      return;
+    }
+    const state = this.connectionStates.get(ws);
+    if (state) {
+      state.authDeadline = null;
+      this.persistConnectionState(ws, state);
+    }
+  }
+
+  getAuthDeadline(ws: unknown): number | null {
+    if (!isCloudflareWebSocket(ws)) {
+      return null;
+    }
+    const state = this.connectionStates.get(ws);
+    return state?.authDeadline ?? null;
+  }
+
+  setConnectionUserId(ws: unknown, userId: string): void {
+    if (!isCloudflareWebSocket(ws)) {
+      logger.error({}, '[setConnectionUserId] Invalid WebSocket');
+      return;
+    }
+    const state = this.getOrCreateConnectionState(ws);
+    state.userId = userId;
+    this.persistConnectionState(ws, state);
+  }
+
+  getConnectionUserId(ws: unknown): string | null {
+    if (!isCloudflareWebSocket(ws)) {
+      return null;
+    }
+    const state = this.connectionStates.get(ws);
+    return state?.userId ?? null;
   }
 
   /** --- Logging --- */
@@ -668,7 +800,10 @@ export class CloudflarePlatformAdapter implements PlatformAdapter {
     if (isSerializedConnectionState(attachment)) {
       const state: ConnectionState = {
         id: attachment.id,
-        topics: new Set(attachment.topics),
+        pendingTopics: new Set(attachment.pendingTopics),
+        activeTopics: new Set(attachment.activeTopics),
+        authDeadline: attachment.authDeadline,
+        userId: attachment.userId,
       };
       this.connectionStates.set(ws, state);
       return state;
@@ -678,12 +813,33 @@ export class CloudflarePlatformAdapter implements PlatformAdapter {
   }
 
   /**
+   * Get or create connection state for a WebSocket.
+   */
+  private getOrCreateConnectionState(ws: WebSocket): ConnectionState {
+    const existing = this.getConnectionState(ws);
+    if (existing) return existing;
+
+    const state: ConnectionState = {
+      id: crypto.randomUUID(),
+      pendingTopics: new Set(),
+      activeTopics: new Set(),
+      authDeadline: null,
+      userId: null,
+    };
+    this.connectionStates.set(ws, state);
+    return state;
+  }
+
+  /**
    * Persist connection state to WebSocket attachment for hibernation survival.
    */
   private persistConnectionState(ws: WebSocket, state: ConnectionState): void {
     ws.serializeAttachment({
       id: state.id,
-      topics: Array.from(state.topics),
+      pendingTopics: Array.from(state.pendingTopics),
+      activeTopics: Array.from(state.activeTopics),
+      authDeadline: state.authDeadline,
+      userId: state.userId,
     } satisfies SerializedConnectionState);
   }
 }
