@@ -23,8 +23,10 @@ export function handleClientMessage(ws: WebSocket, data: string): void {
       case 'list-agents':
         handleListAgents(ws);
         break;
-      default:
-        sendError(ws, undefined, `Unknown message type: ${(message as { type: string }).type}`);
+      default: {
+        const exhaustiveCheck: never = message;
+        sendError(ws, undefined, `Unknown message type: ${JSON.stringify(exhaustiveCheck)}`);
+      }
     }
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : String(err);
@@ -46,10 +48,8 @@ function handleStartAgent(
       return;
     }
 
-    /** Send started event */
     send(ws, { type: 'started', taskId, pid: child.pid });
 
-    /** Stream stdout */
     child.stdout?.on('data', (data: Buffer) => {
       send(ws, {
         type: 'output',
@@ -59,7 +59,6 @@ function handleStartAgent(
       });
     });
 
-    /** Stream stderr */
     child.stderr?.on('data', (data: Buffer) => {
       send(ws, {
         type: 'output',
@@ -69,7 +68,6 @@ function handleStartAgent(
       });
     });
 
-    /** Send completion event */
     child.once('exit', (code) => {
       send(ws, {
         type: 'completed',

@@ -17,7 +17,6 @@ const startTime = Date.now();
 
 export async function startWebSocketServer(): Promise<number | null> {
   const server = createServer((req, res) => {
-    /** Health check endpoint */
     if (req.url === '/health' && req.method === 'GET') {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(
@@ -29,21 +28,18 @@ export async function startWebSocketServer(): Promise<number | null> {
       return;
     }
 
-    /** All other HTTP requests are rejected */
     res.writeHead(404);
     res.end('Not Found');
   });
 
   const wss = new WebSocketServer({ noServer: true });
 
-  /** Handle WebSocket upgrade */
   server.on('upgrade', (request: IncomingMessage, socket: Duplex, head: Buffer) => {
     wss.handleUpgrade(request, socket, head, (ws: WebSocket) => {
       wss.emit('connection', ws, request);
     });
   });
 
-  /** Handle WebSocket connections */
   wss.on('connection', (ws: WebSocket) => {
     console.log('WebSocket client connected');
 
@@ -60,7 +56,6 @@ export async function startWebSocketServer(): Promise<number | null> {
     });
   });
 
-  /** Try each port with fallback */
   for (const port of PORTS) {
     try {
       await new Promise<void>((resolve, reject) => {
@@ -80,8 +75,9 @@ export async function startWebSocketServer(): Promise<number | null> {
 
       return port;
     } catch (err) {
-      const error = err as NodeJS.ErrnoException;
-      if (error.code === 'EADDRINUSE') {
+      const isErrnoException = (e: unknown): e is NodeJS.ErrnoException =>
+        e instanceof Error && 'code' in e;
+      if (isErrnoException(err) && err.code === 'EADDRINUSE') {
         console.log(`Port ${port} in use, trying next port`);
         continue;
       }

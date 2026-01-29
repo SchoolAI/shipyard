@@ -39,7 +39,7 @@ async function deletePlanDatabase(planId: string): Promise<boolean> {
     };
 
     request.onblocked = () => {
-      /* Keep waiting - will eventually succeed or timeout */
+      /** IndexedDB deletion blocked by open connections - will succeed once they close */
     };
   });
 }
@@ -49,7 +49,7 @@ function forceResetDocument(planId: string): void {
     const ydoc = new Y.Doc({ guid: planId });
     ydoc.destroy();
   } catch {
-    /* Ignore errors - best effort cleanup */
+    /** Ignore Y.Doc errors - cleanup is best effort before redirect */
   }
   window.location.href = '/';
 }

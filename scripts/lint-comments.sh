@@ -1,12 +1,14 @@
 #!/bin/bash
 set -e
 
-PACKAGES=(
-  "packages/shared"
-  "packages/schema"
-  "apps/github-oauth-worker"
-  "apps/signaling"
-  "apps/hook"
+# Opt-out approach: lint everything except explicitly excluded paths
+# New packages are automatically covered
+EXCLUDE_PATTERNS=(
+  "node_modules"
+  "dist"
+  "build"
+  "*.config.*"
+  "spikes"
 )
 
 # Must match allowedPatterns in eslint-local-rules.mjs
@@ -22,9 +24,17 @@ ALLOWED_PREFIXES=(
 
 echo "🔍 Checking comment style (ESLint)..."
 
-PATHS=$(printf "%s/src/ " "${PACKAGES[@]}")
+# Build ignore args
+IGNORE_ARGS=""
+for pattern in "${EXCLUDE_PATTERNS[@]}"; do
+  IGNORE_ARGS="$IGNORE_ARGS --ignore-pattern \"$pattern\""
+done
 
-if ! pnpm eslint $PATHS --ext .ts,.tsx --max-warnings 0; then
+# Lint all ts/tsx files in apps/ and packages/
+# Note: --no-error-on-unmatched-pattern handles missing .tsx in packages/
+# Only check comment-related rules (disable type assertion rule which is checked separately)
+# --report-unused-disable-directives-severity=off prevents warnings about disabled rules
+if ! eval "pnpm eslint 'apps/**/*.ts' 'apps/**/*.tsx' 'packages/**/*.ts' 'packages/**/*.tsx' $IGNORE_ARGS --no-error-on-unmatched-pattern --rule '@typescript-eslint/consistent-type-assertions: off' --report-unused-disable-directives-severity=off --max-warnings 0"; then
   echo ""
   echo "❌ Comment style violations found!"
   echo ""
@@ -39,7 +49,7 @@ if ! pnpm eslint $PATHS --ext .ts,.tsx --max-warnings 0; then
   echo ""
   echo "🔧 To fix violations:"
   echo "   1. DELETE if comment describes 'what' code does (code should be self-documenting)"
-  echo "   2. Convert to /** */ multi-line if explaining non-obvious 'why'"
+  echo "   2. Convert to /** */ JSDoc if explaining non-obvious 'why'"
   echo "   3. Add NOTE: prefix if keeping as single-line"
   echo ""
   exit 1

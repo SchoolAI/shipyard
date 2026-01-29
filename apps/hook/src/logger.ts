@@ -35,9 +35,7 @@ const isTest = process.env.NODE_ENV === 'test' || process.env.VITEST;
 if (!isTest && !existsSync(LOG_DIR)) {
   try {
     mkdirSync(LOG_DIR, { recursive: true });
-  } catch {
-    /* Directory creation failed - continue without file logging */
-  }
+  } catch {}
 }
 
 const streams = isTest

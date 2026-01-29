@@ -677,7 +677,7 @@ export function useMultiProviderSync(
                 handleEpochRejection(docName);
               }
             } catch {
-              /* Ignore parse errors */
+              /** Ignore parse errors - non-JSON messages are normal WebRTC signaling traffic */
             }
           };
 
