@@ -39,6 +39,57 @@ export type {
   RevokeInviteRequest,
 };
 
+/** --- Authentication Messages (Two-Message Pattern) --- */
+
+/**
+ * Authentication message sent after subscribe.
+ * Browser sends this immediately after y-webrtc's subscribe message.
+ */
+export type AuthenticateMessage =
+  | {
+      type: 'authenticate';
+      auth: 'owner';
+      userId: string;
+      githubToken: string;
+    }
+  | {
+      type: 'authenticate';
+      auth: 'invite';
+      userId: string;
+      inviteToken: { tokenId: string; tokenValue: string };
+    };
+
+/**
+ * Successful authentication response.
+ */
+export interface AuthenticatedResponse {
+  type: 'authenticated';
+  userId: string;
+  planId: string;
+}
+
+/**
+ * Authentication error types.
+ */
+export type AuthErrorType =
+  | 'invalid_token'
+  | 'unauthorized'
+  | 'timeout'
+  | 'rejected'
+  | 'expired'
+  | 'revoked'
+  | 'exhausted'
+  | 'no_pending_subscription';
+
+/**
+ * Authentication error response.
+ */
+export interface AuthErrorResponse {
+  type: 'auth_error';
+  error: AuthErrorType;
+  message: string;
+}
+
 /** --- Core Signaling Protocol Messages (y-webrtc) --- */
 
 /**
@@ -122,6 +173,7 @@ export type SignalingMessage =
   | PublishMessage
   | ValidateEpochMessage
   | PingMessage
+  | AuthenticateMessage
   | CreateInviteRequest
   | RedeemInviteRequest
   | RevokeInviteRequest
@@ -135,6 +187,8 @@ export type OutgoingMessage =
   | PublishMessage
   | PongMessage
   | ErrorMessage
+  | AuthenticatedResponse
+  | AuthErrorResponse
   | InviteCreatedResponse
   | InviteRedemptionResult
   | InviteRevokedResponse
@@ -199,12 +253,41 @@ const RevokeInviteRequestSchema = z.object({
   type: z.literal('revoke_invite'),
   planId: z.string(),
   tokenId: z.string(),
+  authToken: z.string(),
 });
 
 const ListInvitesRequestSchema = z.object({
   type: z.literal('list_invites'),
   planId: z.string(),
+  authToken: z.string(),
 });
+
+/** Authenticate message schemas (discriminated union on 'auth' field) */
+const AuthenticateOwnerSchema = z.object({
+  type: z.literal('authenticate'),
+  auth: z.literal('owner'),
+  userId: z.string(),
+  githubToken: z.string(),
+});
+
+const AuthenticateInviteSchema = z.object({
+  type: z.literal('authenticate'),
+  auth: z.literal('invite'),
+  userId: z.string(),
+  inviteToken: z.object({
+    tokenId: z.string(),
+    tokenValue: z.string(),
+  }),
+});
+
+/**
+ * Schema for authenticate messages.
+ * Uses a union since z.discriminatedUnion requires different type values.
+ */
+export const AuthenticateMessageSchema = z.union([
+  AuthenticateOwnerSchema,
+  AuthenticateInviteSchema,
+]);
 
 /**
  * Zod schema for validating incoming signaling messages.
@@ -220,4 +303,28 @@ export const SignalingMessageSchema = z.discriminatedUnion('type', [
   RedeemInviteRequestSchema,
   RevokeInviteRequestSchema,
   ListInvitesRequestSchema,
+  /** Authenticate uses special schema since it has nested discriminator on 'auth' */
+  z
+    .object({ type: z.literal('authenticate') })
+    .passthrough(),
 ]);
+
+/** --- Response Schemas --- */
+
+/**
+ * Schema for authenticated response.
+ */
+export const AuthenticatedResponseSchema = z.object({
+  type: z.literal('authenticated'),
+  userId: z.string(),
+  planId: z.string(),
+});
+
+/**
+ * Schema for authentication error response.
+ */
+export const AuthErrorResponseSchema = z.object({
+  type: z.literal('auth_error'),
+  error: z.string(),
+  message: z.string(),
+});

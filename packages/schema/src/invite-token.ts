@@ -26,6 +26,8 @@ export interface InviteToken {
   revoked: boolean;
   /** Optional label for the invite (e.g., "Team review", "PR #42") */
   label?: string;
+  /** Version for optimistic locking (prevents TOCTOU race conditions) */
+  version: number;
 }
 
 export const InviteTokenSchema = z.object({
@@ -39,6 +41,7 @@ export const InviteTokenSchema = z.object({
   useCount: z.number(),
   revoked: z.boolean(),
   label: z.string().optional(),
+  version: z.number(),
 });
 
 /**
@@ -122,6 +125,8 @@ export interface RevokeInviteRequest {
   type: 'revoke_invite';
   planId: string;
   tokenId: string;
+  /** GitHub OAuth token for authentication */
+  authToken: string;
 }
 
 /**
@@ -139,6 +144,8 @@ export interface InviteRevokedResponse {
 export interface ListInvitesRequest {
   type: 'list_invites';
   planId: string;
+  /** GitHub OAuth token for authentication */
+  authToken: string;
 }
 
 /**
