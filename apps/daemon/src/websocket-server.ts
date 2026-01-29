@@ -11,8 +11,9 @@
 import type { IncomingMessage } from 'node:http';
 import { createServer } from 'node:http';
 import type { Duplex } from 'node:stream';
-import { WebSocketServer } from 'ws';
 import type { WebSocket } from 'ws';
+import { WebSocketServer } from 'ws';
+import { listAgents } from './agent-spawner.js';
 import { handleClientMessage } from './protocol.js';
 
 const PORTS = [56609, 49548];
@@ -46,6 +47,7 @@ export async function startWebSocketServer(): Promise<number | null> {
 
 async function doStartWebSocketServer(): Promise<number | null> {
   const server = createServer((req, res) => {
+    /** Health check endpoint */
     if (req.url === '/health' && req.method === 'GET') {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(
@@ -57,18 +59,35 @@ async function doStartWebSocketServer(): Promise<number | null> {
       return;
     }
 
+    /** Debug endpoint to list active agents via HTTP (no WebSocket needed) */
+    if (req.url === '/debug/agents' && req.method === 'GET') {
+      const agents = listAgents();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(
+        JSON.stringify({
+          agents,
+          count: agents.length,
+          uptime: Date.now() - startTime,
+        })
+      );
+      return;
+    }
+
+    /** All other HTTP requests are rejected */
     res.writeHead(404);
     res.end('Not Found');
   });
 
   const wss = new WebSocketServer({ noServer: true });
 
+  /** Handle WebSocket upgrade */
   server.on('upgrade', (request: IncomingMessage, socket: Duplex, head: Buffer) => {
     wss.handleUpgrade(request, socket, head, (ws: WebSocket) => {
       wss.emit('connection', ws, request);
     });
   });
 
+  /** Handle WebSocket connections */
   wss.on('connection', (ws: WebSocket) => {
     console.log('WebSocket client connected');
 
@@ -85,6 +104,7 @@ async function doStartWebSocketServer(): Promise<number | null> {
     });
   });
 
+  /** Try each port with fallback */
   for (const port of PORTS) {
     try {
       await new Promise<void>((resolve, reject) => {
@@ -104,9 +124,8 @@ async function doStartWebSocketServer(): Promise<number | null> {
 
       return port;
     } catch (err) {
-      const isErrnoException = (e: unknown): e is NodeJS.ErrnoException =>
-        e instanceof Error && 'code' in e;
-      if (isErrnoException(err) && err.code === 'EADDRINUSE') {
+      const error = err as NodeJS.ErrnoException;
+      if (error.code === 'EADDRINUSE') {
         console.log(`Port ${port} in use, trying next port`);
         continue;
       }

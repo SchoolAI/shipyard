@@ -61,6 +61,7 @@ export interface Context {
   logger: Logger;
   /** Hook API handlers */
   hookHandlers: HookHandlers;
+  /** Conversation import/export handlers */
   /** Get local git changes for a working directory */
   getLocalChanges: (cwd: string) => LocalChangesResult;
   /** Get content of a file from a working directory */

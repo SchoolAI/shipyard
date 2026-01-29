@@ -24,5 +24,5 @@ export type ServerMessage =
   | { type: 'output'; taskId: string; data: string; stream: 'stdout' | 'stderr' }
   | { type: 'completed'; taskId: string; exitCode: number }
   | { type: 'stopped'; taskId: string }
-  | { type: 'agents'; list: Array<{ taskId: string; pid: number }> }
+  | { type: 'agents'; list: Array<{ taskId: string; pid: number; uptime?: number }> }
   | { type: 'error'; taskId?: string; message: string };

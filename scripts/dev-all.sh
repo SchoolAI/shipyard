@@ -22,10 +22,11 @@ if [ -f scripts/worktree-env.sh ]; then
   fi
 fi
 
-# Build dependencies and server first (server must exist before mcpmon starts)
+# Build dependencies, server, and daemon first (must exist before runtime)
 pnpm --filter=@shipyard/schema build
 pnpm --filter=@shipyard/hook build
 pnpm --filter=@shipyard/server build
+pnpm --filter=shipyard build
 
 # Run all services with concurrently
 # Note: Wrangler workers are called directly (not via turbo) to pass dynamic port flags

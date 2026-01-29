@@ -27,4 +27,5 @@ export interface ActiveAgent {
   taskId: string;
   process: ChildProcess;
   pid: number;
+  startedAt: number;
 }

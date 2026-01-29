@@ -5,21 +5,33 @@
  * Protocol matches types defined in @shipyard/schema/daemon-types
  */
 
-import type { ClientMessage, ServerMessage } from '@shipyard/schema';
+import type {
+  A2AMessage,
+  ClientMessage,
+  ConversationExportMeta,
+  ServerMessage,
+} from '@shipyard/schema';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { daemonConfig } from '@/config/daemon';
 
 interface DaemonState {
   connected: boolean;
   agents: Array<{ taskId: string; pid: number }>;
+  lastError: string | null;
+  lastStarted: { taskId: string; pid: number; sessionId?: string } | null;
 }
 
 interface UseDaemonReturn extends DaemonState {
   startAgent: (taskId: string, prompt: string, cwd?: string) => void;
+  startAgentWithContext: (
+    taskId: string,
+    a2aPayload: { messages: A2AMessage[]; meta: ConversationExportMeta },
+    cwd?: string
+  ) => void;
   stopAgent: (taskId: string) => void;
 }
 
-const DAEMON_WS_URL = 'ws://localhost:56609';
-const RECONNECT_INTERVAL_MS = 5000;
+const { DAEMON_WS_URL, DAEMON_RECONNECT_INTERVAL_MS } = daemonConfig;
 
 /**
  * Hook that manages WebSocket connection to the daemon server.
@@ -31,6 +43,8 @@ export function useDaemon(): UseDaemonReturn {
   const [state, setState] = useState<DaemonState>({
     connected: false,
     agents: [],
+    lastError: null,
+    lastStarted: null,
   });
 
   const wsRef = useRef<WebSocket | null>(null);
@@ -42,11 +56,12 @@ export function useDaemon(): UseDaemonReturn {
         setState((prev) => ({
           ...prev,
           agents: [...prev.agents, { taskId: message.taskId, pid: message.pid }],
+          lastStarted: { taskId: message.taskId, pid: message.pid, sessionId: message.sessionId },
         }));
         break;
 
       case 'output':
-        /** Output messages are logged by daemon, no UI display needed */
+        // Output messages are received but not displayed
         break;
 
       case 'completed':
@@ -68,7 +83,10 @@ export function useDaemon(): UseDaemonReturn {
         break;
 
       case 'error':
-        /** Error messages shown via toast in daemon, no duplicate UI needed */
+        setState((prev) => ({
+          ...prev,
+          lastError: message.message,
+        }));
         break;
 
       default: {
@@ -90,17 +108,15 @@ export function useDaemon(): UseDaemonReturn {
 
         ws.onmessage = (event) => {
           try {
-            /** Daemon protocol is trusted - validates via exhaustive switch */
-            // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- Daemon protocol trusted, validated by exhaustive switch
             const message = JSON.parse(event.data) as ServerMessage;
             handleServerMessage(message);
           } catch {
-            /** Malformed JSON from daemon is non-fatal - silently skip */
+            // Silently ignore malformed messages
           }
         };
 
         ws.onerror = () => {
-          /** WebSocket fires onerror before onclose - reconnect logic is in onclose */
+          // Connection errors are handled by onclose
         };
 
         ws.onclose = () => {
@@ -108,13 +124,13 @@ export function useDaemon(): UseDaemonReturn {
 
           reconnectTimeoutRef.current = window.setTimeout(() => {
             connect();
-          }, RECONNECT_INTERVAL_MS);
+          }, DAEMON_RECONNECT_INTERVAL_MS);
         };
 
         wsRef.current = ws;
       } catch {
-        /** WebSocket constructor can throw - schedule retry */
-        reconnectTimeoutRef.current = window.setTimeout(connect, RECONNECT_INTERVAL_MS);
+        // Retry connection on error
+        reconnectTimeoutRef.current = window.setTimeout(connect, DAEMON_RECONNECT_INTERVAL_MS);
       }
     };
 
@@ -147,6 +163,25 @@ export function useDaemon(): UseDaemonReturn {
     wsRef.current.send(JSON.stringify(message));
   };
 
+  const startAgentWithContext = (
+    taskId: string,
+    a2aPayload: { messages: A2AMessage[]; meta: ConversationExportMeta },
+    cwd?: string
+  ) => {
+    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+      return;
+    }
+
+    const message: ClientMessage = {
+      type: 'start-agent-with-context',
+      taskId,
+      cwd: cwd ?? '/tmp',
+      a2aPayload,
+    };
+
+    wsRef.current.send(JSON.stringify(message));
+  };
+
   const stopAgent = (taskId: string) => {
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
       return;
@@ -163,6 +198,7 @@ export function useDaemon(): UseDaemonReturn {
   return {
     ...state,
     startAgent,
+    startAgentWithContext,
     stopAgent,
   };
 }

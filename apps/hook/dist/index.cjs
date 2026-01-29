@@ -42411,10 +42411,12 @@ var UnknownOriginMetadataSchema = external_exports.object({
   platform: external_exports.literal("unknown"),
   cwd: external_exports.string()
 });
+var BrowserOriginMetadataSchema = external_exports.object({ platform: external_exports.literal("browser") });
 var OriginMetadataSchema = external_exports.discriminatedUnion("platform", [
   ClaudeCodeOriginMetadataSchema,
   DevinOriginMetadataSchema,
   CursorOriginMetadataSchema,
+  BrowserOriginMetadataSchema,
   UnknownOriginMetadataSchema
 ]);
 var ConversationVersionBaseSchema = external_exports.object({
@@ -44211,7 +44213,6 @@ var ROUTES = {
   HOOK_REVIEW: (planId) => `/api/hook/plan/${planId}/review`,
   HOOK_SESSION_TOKEN: (planId) => `/api/hook/plan/${planId}/session-token`,
   HOOK_PRESENCE: (planId) => `/api/hook/plan/${planId}/presence`,
-  CONVERSATION_IMPORT: "/api/conversation/import",
   WEB_TASK: (planId) => `/task/${planId}`
 };
 function createPlanWebUrl(baseUrl, planId) {
@@ -44414,13 +44415,19 @@ var MachineInfoResponseSchema = external_exports.object({
   ownerId: external_exports.string(),
   cwd: external_exports.string()
 });
+var CreatePlanRequestSchema = external_exports.object({
+  title: external_exports.string().min(1),
+  ownerId: external_exports.string().optional()
+});
+var CreatePlanResponseSchema = external_exports.object({
+  planId: external_exports.string(),
+  sessionToken: external_exports.string(),
+  url: external_exports.string()
+});
 var t = initTRPC.context().create({ allowOutsideOfServer: true });
 var router = t.router;
 var publicProcedure = t.procedure;
 var middleware = t.middleware;
-var conversationRouter = router({ import: publicProcedure.input(ImportConversationRequestSchema).output(ImportConversationResponseSchema).mutation(async ({ input, ctx }) => {
-  return ctx.conversationHandlers.importConversation(input, ctx);
-}) });
 var hookRouter = router({
   createSession: publicProcedure.input(CreateHookSessionRequestSchema).output(CreateHookSessionResponseSchema).mutation(async ({ input, ctx }) => {
     return ctx.hookHandlers.createSession(input, ctx);
@@ -44475,6 +44482,9 @@ var hookRouter = router({
   })
 });
 var planRouter = router({
+  create: publicProcedure.input(CreatePlanRequestSchema).output(CreatePlanResponseSchema).mutation(async ({ input, ctx }) => {
+    return ctx.createPlan(input);
+  }),
   getStatus: publicProcedure.input(PlanIdSchema).output(PlanStatusResponseSchema).query(async ({ input, ctx }) => {
     const metadata = getPlanMetadata(await ctx.getOrCreateDoc(input.planId));
     if (!metadata) throw new TRPCError({
@@ -44553,8 +44563,7 @@ var subscriptionRouter = router({
 var appRouter = router({
   hook: hookRouter,
   plan: planRouter,
-  subscription: subscriptionRouter,
-  conversation: conversationRouter
+  subscription: subscriptionRouter
 });
 function isBuffer(value) {
   return Buffer.isBuffer(value);

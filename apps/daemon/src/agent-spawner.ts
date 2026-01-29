@@ -5,9 +5,12 @@
  * Each agent runs with SHIPYARD_TASK_ID environment variable.
  */
 
-import { spawn } from 'node:child_process';
+import { spawn, execSync } from 'node:child_process';
 import type { ChildProcess } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   a2aToClaudeCode,
   formatAsClaudeCodeJSONL,
@@ -20,6 +23,32 @@ import type { ActiveAgent, SpawnAgentOptions, SpawnWithContextOptions } from './
 
 const activeAgents = new Map<string, ActiveAgent>();
 
+function getClaudePath(): string {
+  try {
+    return execSync('which claude', { encoding: 'utf-8' }).trim();
+  } catch {
+    return 'claude';
+  }
+}
+
+function getMcpConfigPath(): string | null {
+  const currentFile = fileURLToPath(import.meta.url);
+  const daemonDir = dirname(currentFile);
+  const projectRoot = resolve(daemonDir, '../../..');
+
+  const candidates = [
+    join(projectRoot, '.mcp.json'),
+    join(process.cwd(), '.mcp.json'),
+  ];
+
+  for (const path of candidates) {
+    if (existsSync(path)) {
+      return path;
+    }
+  }
+  return null;
+}
+
 export function spawnClaudeCode(opts: SpawnAgentOptions): ChildProcess {
   const { taskId, prompt, cwd } = opts;
 
@@ -31,9 +60,16 @@ export function spawnClaudeCode(opts: SpawnAgentOptions): ChildProcess {
 
   console.log(`Spawning Claude Code for task ${taskId} in ${cwd}`);
 
+  const mcpConfigPath = getMcpConfigPath();
+  const args = ['-p', prompt, '--allowedTools', 'mcp__shipyard__*'];
+
+  if (mcpConfigPath) {
+    args.push('--mcp-config', mcpConfigPath);
+  }
+
   const child = spawn(
-    'claude',
-    ['-p', prompt, '--allowedTools', 'mcp__shipyard__*'],
+    getClaudePath(),
+    args,
     {
       cwd,
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -50,6 +86,7 @@ export function spawnClaudeCode(opts: SpawnAgentOptions): ChildProcess {
       taskId,
       process: child,
       pid: child.pid,
+      startedAt: Date.now(),
     });
   }
 
@@ -74,10 +111,12 @@ export function stopAgent(taskId: string): boolean {
   return true;
 }
 
-export function listAgents(): Array<{ taskId: string; pid: number }> {
+export function listAgents(): Array<{ taskId: string; pid: number; uptime: number }> {
+  const now = Date.now();
   return Array.from(activeAgents.values()).map((agent) => ({
     taskId: agent.taskId,
     pid: agent.pid,
+    uptime: now - agent.startedAt,
   }));
 }
 
@@ -137,10 +176,22 @@ export async function spawnClaudeCodeWithContext(
   console.log(`Created session file for task ${taskId}: ${transcriptPath}`);
   console.log(`Spawning Claude Code with session ${sessionId}`);
 
-  /** Spawn with --resume flag */
+  const mcpConfigPath = getMcpConfigPath();
+  const args = [
+    '-r', sessionId,
+    '-p', '',
+    '--dangerously-skip-permissions',
+    '--allowedTools', 'mcp__shipyard__*',
+  ];
+
+  if (mcpConfigPath) {
+    args.push('--mcp-config', mcpConfigPath);
+    console.log(`Using MCP config: ${mcpConfigPath}`);
+  }
+
   const child = spawn(
-    'claude',
-    ['-r', sessionId, '--allowedTools', 'mcp__shipyard__*'],
+    getClaudePath(),
+    args,
     {
       cwd,
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -157,6 +208,7 @@ export async function spawnClaudeCodeWithContext(
       taskId,
       process: child,
       pid: child.pid,
+      startedAt: Date.now(),
     });
   }
 
