@@ -728,6 +728,20 @@ export class CloudflarePlatformAdapter implements PlatformAdapter {
     return state?.authDeadline ?? null;
   }
 
+  getAllConnectionsWithDeadlines(): Array<{ ws: unknown; deadline: number }> {
+    const result: Array<{ ws: unknown; deadline: number }> = [];
+    const websockets = this.ctx.getWebSockets();
+
+    for (const ws of websockets) {
+      const state = this.getConnectionState(ws);
+      if (state !== null && state.authDeadline !== null) {
+        result.push({ ws, deadline: state.authDeadline });
+      }
+    }
+
+    return result;
+  }
+
   setConnectionUserId(ws: unknown, userId: string): void {
     if (!isCloudflareWebSocket(ws)) {
       logger.error({}, '[setConnectionUserId] Invalid WebSocket');

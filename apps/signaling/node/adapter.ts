@@ -98,6 +98,12 @@ export class NodePlatformAdapter implements PlatformAdapter {
   private connectionTopics = new WeakMap<WebSocket, Set<string>>();
 
   /**
+   * Connections with auth deadlines (for timeout enforcement).
+   * Maps WebSocket to deadline timestamp. Needed because WeakMap is not iterable.
+   */
+  private connectionsWithDeadlines = new Map<WebSocket, number>();
+
+  /**
    * Get or create connection state for a WebSocket.
    */
   private getConnectionState(ws: WebSocket): ConnectionState {
@@ -441,6 +447,7 @@ export class NodePlatformAdapter implements PlatformAdapter {
     }
     const state = this.getConnectionState(ws);
     state.authDeadline = timestamp;
+    this.connectionsWithDeadlines.set(ws, timestamp);
   }
 
   clearAuthDeadline(ws: unknown): void {
@@ -451,6 +458,9 @@ export class NodePlatformAdapter implements PlatformAdapter {
     if (state) {
       state.authDeadline = null;
     }
+    if (isWebSocket(ws)) {
+      this.connectionsWithDeadlines.delete(ws);
+    }
   }
 
   getAuthDeadline(ws: unknown): number | null {
@@ -459,6 +469,14 @@ export class NodePlatformAdapter implements PlatformAdapter {
     }
     const state = this.connectionStates.get(ws);
     return state?.authDeadline ?? null;
+  }
+
+  getAllConnectionsWithDeadlines(): Array<{ ws: unknown; deadline: number }> {
+    const result: Array<{ ws: unknown; deadline: number }> = [];
+    for (const [ws, deadline] of this.connectionsWithDeadlines.entries()) {
+      result.push({ ws, deadline });
+    }
+    return result;
   }
 
   setConnectionUserId(ws: unknown, userId: string): void {

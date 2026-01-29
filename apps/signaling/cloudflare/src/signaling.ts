@@ -18,6 +18,7 @@
 
 import { DurableObject } from 'cloudflare:workers';
 import {
+  checkAuthDeadlines,
   handleAuthenticate,
   handleCreateInvite,
   handleListInvites,
@@ -30,6 +31,9 @@ import {
 import type { SignalingMessage } from '@signaling/types.js';
 import { CloudflarePlatformAdapter } from './adapter.js';
 import { logger } from './logger.js';
+
+/** Check for expired auth deadlines every 5 seconds */
+const AUTH_DEADLINE_CHECK_INTERVAL_MS = 5000;
 
 interface Env {
   SIGNALING_ROOM: DurableObjectNamespace;
@@ -54,7 +58,43 @@ export class SignalingRoom extends DurableObject<Env> {
      */
     ctx.blockConcurrencyWhile(async () => {
       await this.adapter.initialize();
+      await this.scheduleAuthDeadlineCheck();
     });
+  }
+
+  /**
+   * Schedule the next auth deadline check alarm.
+   * Only schedules if there isn't already an alarm set.
+   */
+  private async scheduleAuthDeadlineCheck(): Promise<void> {
+    const existingAlarm = await this.ctx.storage.getAlarm();
+    if (existingAlarm === null) {
+      await this.ctx.storage.setAlarm(Date.now() + AUTH_DEADLINE_CHECK_INTERVAL_MS);
+    }
+  }
+
+  /**
+   * Handle alarm for periodic auth deadline checks.
+   * This is hibernation-friendly: the DO wakes up, checks deadlines, then can hibernate again.
+   */
+  async alarm(): Promise<void> {
+    const disconnected = checkAuthDeadlines(this.adapter, (ws) => {
+      if (ws && typeof ws === 'object' && 'close' in ws) {
+        const socket = ws as WebSocket;
+        try {
+          socket.close(1008, 'Authentication timeout');
+        } catch {
+          /** Connection may already be closed */
+        }
+      }
+    });
+
+    if (disconnected > 0) {
+      logger.info({ count: disconnected }, 'Disconnected connections due to auth timeout');
+    }
+
+    /** Schedule next check */
+    await this.ctx.storage.setAlarm(Date.now() + AUTH_DEADLINE_CHECK_INTERVAL_MS);
   }
 
   /**

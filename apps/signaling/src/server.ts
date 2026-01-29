@@ -23,9 +23,9 @@
 
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import http from 'node:http';
-import type { WebSocket } from 'ws';
-import { WebSocketServer } from 'ws';
+import { WebSocket, WebSocketServer } from 'ws';
 import {
+  checkAuthDeadlines,
   handleAuthenticate,
   handleCreateInvite,
   handleListInvites,
@@ -41,6 +41,7 @@ import { serverConfig } from './config/env/server.js';
 import { logger } from './logger.js';
 
 const PING_TIMEOUT_MS = 30000;
+const AUTH_DEADLINE_CHECK_INTERVAL_MS = 5000;
 const port = serverConfig.PORT;
 
 const adapter = new NodePlatformAdapter();
@@ -170,11 +171,28 @@ server.listen(port);
 
 logger.info({ port }, 'Signaling server running');
 
+/**
+ * Periodic check for expired auth deadlines.
+ * Connections that don't authenticate within 10 seconds are disconnected.
+ */
+const authDeadlineInterval = setInterval(() => {
+  const disconnected = checkAuthDeadlines(adapter, (ws) => {
+    if (ws instanceof WebSocket && ws.readyState === WebSocket.OPEN) {
+      ws.close(1008, 'Authentication timeout');
+    }
+  });
+  if (disconnected > 0) {
+    logger.info({ count: disconnected }, 'Disconnected connections due to auth timeout');
+  }
+}, AUTH_DEADLINE_CHECK_INTERVAL_MS);
+
 process.on('SIGTERM', () => {
+  clearInterval(authDeadlineInterval);
   server.close();
 });
 
 process.on('SIGINT', () => {
+  clearInterval(authDeadlineInterval);
   server.close();
   process.exit(0);
 });

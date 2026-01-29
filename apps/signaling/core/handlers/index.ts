@@ -17,4 +17,4 @@ export {
   handleRevokeInvite,
 } from './invites.js';
 export { handlePublish } from './publish.js';
-export { handleSubscribe, handleUnsubscribe } from './subscribe.js';
+export { handleSubscribe, handleUnsubscribe, checkAuthDeadlines } from './subscribe.js';

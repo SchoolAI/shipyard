@@ -9,10 +9,10 @@
  * authenticate message is received and validated.
  */
 
-export { handleSubscribe, handleUnsubscribe };
+export { handleSubscribe, handleUnsubscribe, checkAuthDeadlines };
 
 import type { PlatformAdapter } from '../platform.js';
-import type { SubscribeMessage, UnsubscribeMessage } from '../types.js';
+import type { AuthErrorResponse, SubscribeMessage, UnsubscribeMessage } from '../types.js';
 
 /** Auth deadline: 10 seconds to send authenticate message after subscribe */
 const AUTH_DEADLINE_MS = 10000;
@@ -59,4 +59,41 @@ function handleUnsubscribe(
     if (typeof topic !== 'string') continue;
     platform.unsubscribeFromTopic(ws, topic);
   }
+}
+
+/**
+ * Check for expired auth deadlines and disconnect timed-out connections.
+ *
+ * This function should be called periodically (e.g., every 5 seconds) to
+ * enforce the 10-second authentication deadline on pending subscriptions.
+ *
+ * @param platform - Platform adapter for storage/messaging
+ * @param closeConnection - Platform-specific function to close a WebSocket
+ * @returns Number of connections disconnected due to timeout
+ */
+function checkAuthDeadlines(
+  platform: PlatformAdapter,
+  closeConnection: (ws: unknown) => void
+): number {
+  const now = Date.now();
+  const connectionsWithDeadlines = platform.getAllConnectionsWithDeadlines();
+  let disconnectedCount = 0;
+
+  for (const { ws, deadline } of connectionsWithDeadlines) {
+    if (deadline <= now) {
+      const errorMessage: AuthErrorResponse = {
+        type: 'auth_error',
+        error: 'timeout',
+        message: 'Authentication timeout: authenticate message not received within 10 seconds',
+      };
+      platform.sendMessage(ws, errorMessage);
+      platform.unsubscribeFromAllTopics(ws);
+      platform.clearAuthDeadline(ws);
+      closeConnection(ws);
+      disconnectedCount++;
+      platform.debug(`[Auth Timeout] Connection closed due to auth deadline expiration`);
+    }
+  }
+
+  return disconnectedCount;
 }

@@ -6,11 +6,11 @@
  * 2. Owner auth: GitHub token validation and ownership checks
  * 3. Invite token: validation, expiration, revocation, exhaustion
  * 4. Flow integrity: proper ordering and state transitions
- * 5. Timeout behavior: documented as TODO (not implemented in tests)
+ * 5. Timeout behavior: 10-second auth deadline enforcement
  */
 
 import type { InviteRedemption, InviteToken } from '@shipyard/schema';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PlatformAdapter } from '../platform.js';
 import type {
   AuthErrorResponse,
@@ -21,14 +21,14 @@ import type {
 } from '../types.js';
 import { handleAuthenticate } from './authenticate.js';
 import { handlePublish } from './publish.js';
-import { handleSubscribe } from './subscribe.js';
+import { checkAuthDeadlines, handleSubscribe } from './subscribe.js';
 
 /**
  * Create a mock WebSocket for testing.
  * Uses a simple object that can be used as a key in Maps.
  */
-function createMockWebSocket(id: string = 'ws-1'): { id: string } {
-  return { id };
+function createMockWebSocket(id: string = 'ws-1'): { id: string; close: ReturnType<typeof vi.fn> } {
+  return { id, close: vi.fn() };
 }
 
 /**
@@ -200,6 +200,14 @@ function createMockPlatform(): PlatformAdapter & {
 
     getAuthDeadline: vi.fn((ws: unknown) => {
       return authDeadlines.get(ws) ?? null;
+    }),
+
+    getAllConnectionsWithDeadlines: vi.fn(() => {
+      const result: Array<{ ws: unknown; deadline: number }> = [];
+      for (const [ws, deadline] of authDeadlines.entries()) {
+        result.push({ ws, deadline });
+      }
+      return result;
     }),
 
     setConnectionUserId: vi.fn((ws: unknown, userId: string) => {
@@ -836,23 +844,156 @@ describe('authenticate handler - two-message authentication pattern', () => {
   });
 
   describe('timeout behavior', () => {
-    /**
-     * TODO: Implement timeout tests when timeout handling is added.
-     *
-     * Expected behavior:
-     * - Subscribe without authenticate within 10 seconds -> connection closed
-     * - Auth deadline is enforced by a separate timeout mechanism (not in handler)
-     *
-     * Test scenario:
-     * 1. Subscribe to topic (sets auth deadline to Date.now() + 10000)
-     * 2. Wait 10+ seconds without sending authenticate
-     * 3. Connection should be closed with auth_error 'timeout'
-     *
-     * This requires either:
-     * - Testing with real timers (slow)
-     * - Mocking Date.now() and triggering timeout check
-     * - Testing the timeout enforcement separately from the handler
-     */
-    it.todo('subscribe without authenticate should timeout at 10s');
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('subscribe without authenticate should timeout at 10s', () => {
+      const mockClose = vi.fn();
+
+      /** Subscribe without auth */
+      handleSubscribe(platform, ws, {
+        type: 'subscribe',
+        topics: ['shipyard-plan-123'],
+      });
+
+      /** Verify deadline was set */
+      expect(platform.getAuthDeadline(ws)).not.toBeNull();
+
+      /** Fast-forward time past the deadline (11 seconds) */
+      vi.advanceTimersByTime(11000);
+
+      /** Run timeout checker */
+      const disconnected = checkAuthDeadlines(platform, mockClose);
+
+      /** Verify connection was closed with timeout error */
+      expect(disconnected).toBe(1);
+      expect(mockClose).toHaveBeenCalledWith(ws);
+
+      /** Verify timeout error message was sent */
+      const messages = getAllMessages(platform, ws);
+      const timeoutMessage = messages.find(
+        (m) => (m as AuthErrorResponse).type === 'auth_error' && (m as AuthErrorResponse).error === 'timeout'
+      );
+      expect(timeoutMessage).toBeDefined();
+      expect((timeoutMessage as AuthErrorResponse).message).toContain('timeout');
+    });
+
+    it('auth received before deadline -> no timeout', async () => {
+      const mockClose = vi.fn();
+      platform._gitHubTokens.set('valid-token', 'alice');
+
+      /** Subscribe (sets deadline) */
+      handleSubscribe(platform, ws, {
+        type: 'subscribe',
+        topics: ['shipyard-plan-123'],
+      });
+
+      /** Verify deadline was set */
+      expect(platform.getAuthDeadline(ws)).not.toBeNull();
+
+      /** Authenticate before deadline (5 seconds in) */
+      vi.advanceTimersByTime(5000);
+
+      await handleAuthenticate(platform, ws, {
+        type: 'authenticate',
+        auth: 'owner',
+        userId: 'alice',
+        githubToken: 'valid-token',
+      });
+
+      /** Deadline should be cleared after successful auth */
+      expect(platform.getAuthDeadline(ws)).toBeNull();
+
+      /** Advance time past original deadline */
+      vi.advanceTimersByTime(6000);
+
+      /** Run timeout checker */
+      const disconnected = checkAuthDeadlines(platform, mockClose);
+
+      /** No connections should be disconnected */
+      expect(disconnected).toBe(0);
+      expect(mockClose).not.toHaveBeenCalled();
+    });
+
+    it('multiple connections, only expired ones disconnected', () => {
+      const mockClose = vi.fn();
+      const ws2 = createMockWebSocket('ws-2');
+      const ws3 = createMockWebSocket('ws-3');
+
+      /** ws1: Subscribe at time 0 */
+      handleSubscribe(platform, ws, {
+        type: 'subscribe',
+        topics: ['shipyard-plan-123'],
+      });
+
+      /** Advance 3 seconds */
+      vi.advanceTimersByTime(3000);
+
+      /** ws2: Subscribe at time 3s */
+      handleSubscribe(platform, ws2, {
+        type: 'subscribe',
+        topics: ['shipyard-plan-456'],
+      });
+
+      /** Advance 5 seconds (now at 8s total) */
+      vi.advanceTimersByTime(5000);
+
+      /** ws3: Subscribe at time 8s */
+      handleSubscribe(platform, ws3, {
+        type: 'subscribe',
+        topics: ['shipyard-plan-789'],
+      });
+
+      /** Advance 3 more seconds (now at 11s total) */
+      vi.advanceTimersByTime(3000);
+
+      /** At 11s: ws1 deadline expired (10s), ws2 not expired (13s), ws3 not expired (18s) */
+      const disconnected = checkAuthDeadlines(platform, mockClose);
+
+      expect(disconnected).toBe(1);
+      expect(mockClose).toHaveBeenCalledTimes(1);
+      expect(mockClose).toHaveBeenCalledWith(ws);
+
+      /** Advance 3 more seconds (now at 14s total) */
+      vi.advanceTimersByTime(3000);
+
+      /** At 14s: ws2 deadline expired (13s), ws3 not expired (18s) */
+      const disconnected2 = checkAuthDeadlines(platform, mockClose);
+
+      expect(disconnected2).toBe(1);
+      expect(mockClose).toHaveBeenCalledTimes(2);
+      expect(mockClose).toHaveBeenCalledWith(ws2);
+    });
+
+    it('deadline cleared after successful auth', async () => {
+      platform._gitHubTokens.set('valid-token', 'alice');
+
+      /** Subscribe (sets deadline) */
+      handleSubscribe(platform, ws, {
+        type: 'subscribe',
+        topics: ['shipyard-plan-123'],
+      });
+
+      /** Deadline should be set */
+      expect(platform.getAuthDeadline(ws)).not.toBeNull();
+      expect(platform.getAllConnectionsWithDeadlines().length).toBe(1);
+
+      /** Authenticate */
+      await handleAuthenticate(platform, ws, {
+        type: 'authenticate',
+        auth: 'owner',
+        userId: 'alice',
+        githubToken: 'valid-token',
+      });
+
+      /** Deadline should be cleared */
+      expect(platform.getAuthDeadline(ws)).toBeNull();
+      expect(platform.getAllConnectionsWithDeadlines().length).toBe(0);
+    });
   });
 });

@@ -212,6 +212,13 @@ export interface PlatformAdapter {
   getAuthDeadline(ws: unknown): number | null;
 
   /**
+   * Get all connections that have auth deadlines set.
+   * Used by the timeout enforcement mechanism to check for expired connections.
+   * Returns array of objects with ws and deadline timestamp.
+   */
+  getAllConnectionsWithDeadlines(): Array<{ ws: unknown; deadline: number }>;
+
+  /**
    * Set the user ID for a connection.
    * Called after successful authentication.
    */
