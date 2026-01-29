@@ -4,7 +4,7 @@
  * Updates Y.Doc with user response or cancellation.
  */
 
-import { Alert, Button, Card, Chip, Form, Modal } from '@heroui/react';
+import { Alert, Button, Card, Chip, Form, Link, Modal } from '@heroui/react';
 import {
   type AnswerInputRequestResult,
   answerInputRequest,
@@ -15,7 +15,7 @@ import {
   type InputRequest,
   logPlanEvent,
 } from '@shipyard/schema';
-import { AlertOctagon } from 'lucide-react';
+import { AlertOctagon, ExternalLink } from 'lucide-react';
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -536,17 +536,30 @@ export function InputRequestModal({
 
           <Card className={request.isBlocker ? 'border-2 border-danger ring-2 ring-danger/20' : ''}>
             <Card.Header>
-              <div className="flex items-center gap-2">
-                {request.isBlocker && <AlertOctagon className="w-5 h-5 text-danger shrink-0" />}
-                <h2 className="text-xl font-semibold">
-                  {request.isBlocker
-                    ? 'BLOCKER: Agent needs your input'
-                    : 'Agent is requesting input'}
-                </h2>
-                {request.isBlocker && (
-                  <Chip color="danger" variant="primary" size="sm">
-                    BLOCKER
-                  </Chip>
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  {request.isBlocker && <AlertOctagon className="w-5 h-5 text-danger shrink-0" />}
+                  <h2 className="text-xl font-semibold">
+                    {request.isBlocker
+                      ? 'BLOCKER: Agent needs your input'
+                      : 'Agent is requesting input'}
+                  </h2>
+                  {request.isBlocker && (
+                    <Chip color="danger" variant="primary" size="sm">
+                      BLOCKER
+                    </Chip>
+                  )}
+                </div>
+                {request.planId && (
+                  <Link
+                    href={`/task/${request.planId}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="shrink-0 text-sm text-accent hover:underline flex items-center gap-1"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    View Plan
+                  </Link>
                 )}
               </div>
             </Card.Header>
