@@ -172,6 +172,20 @@ function releaseWebrtcProvider(roomName: string): void {
 }
 
 /**
+ * Extract port number from a WebSocket URL.
+ * Falls back to 32191 (default registry port) if parsing fails.
+ */
+function extractPortFromUrl(wsUrl: string): number | null {
+  try {
+    const url = new URL(wsUrl);
+    const port = Number.parseInt(url.port || '32191', 10);
+    return port;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Discover the hub URL by checking registry endpoints.
  * Tries ports 32191 and 32192 to handle hub restarts.
  */
@@ -436,26 +450,36 @@ export function useMultiProviderSync(
     /** IndexedDB persistence */
     const idbProvider = new IndexeddbPersistence(docName, ydoc);
 
-    /** Track when IndexedDB has synced - this means local data is available */
-    idbProvider.whenSynced.then(() => {
-      if (mountedRef.current) {
-        idbSyncedRef.current = true;
-        updateSyncState();
+    /**
+     * Track when IndexedDB has synced - this means local data is available.
+     * CRITICAL: We must wait for IDB to sync BEFORE connecting to WebSocket
+     * so we can read the epoch from the doc and send it in the URL.
+     * This changes loading order from parallel to sequential (IDB then WS).
+     */
+    idbProvider.whenSynced.then(async () => {
+      if (!mountedRef.current) return;
 
-        /*
-         * Fire event so useSharedPlans can discover newly synced plans
-         * Only fire for plan documents (not plan-index)
-         */
-        if (docName !== 'plan-index') {
-          window.dispatchEvent(
-            new CustomEvent('indexeddb-plan-synced', { detail: { planId: docName } })
-          );
-        }
+      idbSyncedRef.current = true;
+      updateSyncState();
+
+      /*
+       * Fire event so useSharedPlans can discover newly synced plans
+       * Only fire for plan documents (not plan-index)
+       */
+      if (docName !== 'plan-index') {
+        window.dispatchEvent(
+          new CustomEvent('indexeddb-plan-synced', { detail: { planId: docName } })
+        );
       }
-    });
 
-    /** Connect to single Registry Hub with port discovery */
-    (async () => {
+      /**
+       * NOW we can read epoch from the doc and connect with it in the URL.
+       * This is the production pattern used by Hocuspocus and y-sweet.
+       */
+      const metadata = ydoc.getMap('metadata').toJSON();
+      const epoch = getEpochFromMetadata(metadata);
+
+      /** Connect to single Registry Hub with port discovery */
       const envHubUrl = import.meta.env.VITE_HUB_URL;
       const hubUrl = envHubUrl ? envHubUrl : await discoverHubUrl();
 
@@ -466,15 +490,12 @@ export function useMultiProviderSync(
       if (!mountedRef.current) return;
 
       /** Extract port from hub URL for local artifact URLs */
-      try {
-        const url = new URL(hubUrl);
-        const port = Number.parseInt(url.port || '32191', 10);
-        registryPortRef.current = port;
-      } catch {
-        registryPortRef.current = null;
-      }
+      registryPortRef.current = extractPortFromUrl(hubUrl);
 
-      ws = new WebsocketProvider(hubUrl, docName, ydoc, {
+      /** Connect with epoch in URL query param */
+      const wsUrlWithEpoch = `${hubUrl}?epoch=${epoch}`;
+
+      ws = new WebsocketProvider(wsUrlWithEpoch, docName, ydoc, {
         connect: true,
         maxBackoffTime: 2500,
         /**
@@ -550,7 +571,7 @@ export function useMultiProviderSync(
         visibilityGracePeriodTimeoutRef
       );
       document.addEventListener('visibilitychange', visibilityChangeListener);
-    })();
+    });
 
     /*
      * Connection timeout: If not connected within 10 seconds, show offline state

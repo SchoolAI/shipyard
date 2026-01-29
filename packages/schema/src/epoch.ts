@@ -13,7 +13,7 @@ export const EPOCH_CLOSE_REASONS = {
 
 export type EpochCloseReason = (typeof EPOCH_CLOSE_REASONS)[EpochCloseCode];
 
-export const DEFAULT_EPOCH = 1;
+export const DEFAULT_EPOCH = 2;
 
 export function getEpochFromMetadata(metadata: { epoch?: number }): number {
   return metadata.epoch ?? DEFAULT_EPOCH;
