@@ -399,7 +399,15 @@ function processMessage(
 }
 
 function handleWebSocketConnection(ws: WebSocket, req: http.IncomingMessage): void {
-  const planId = req.url?.slice(1) || 'default';
+  /**
+   * Extract planId from URL, stripping query params.
+   * Browser sends epoch as ?epoch=X but we must not include it in the doc name.
+   * Without this, MCP connects to "planId" while browser connects to "planId?epoch=2".
+   */
+  const fullUrl = req.url || '/';
+  const urlParts = fullUrl.split('?');
+  const planId = urlParts[0]?.slice(1) || 'default';
+
   logger.info({ planId }, 'WebSocket client connected to registry');
 
   /*

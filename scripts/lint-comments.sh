@@ -1,12 +1,11 @@
 #!/bin/bash
 set -e
 
-# Opt-out approach: lint everything except explicitly excluded paths
-# New packages are automatically covered
 EXCLUDE_PATTERNS=(
   "node_modules"
   "dist"
   "build"
+  ".wrangler"
   "*.config.*"
   "spikes"
 )
