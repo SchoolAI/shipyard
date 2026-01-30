@@ -9,7 +9,6 @@
 
 import type * as Y from 'yjs';
 import type { LocalChangesResult } from '../local-changes.js';
-import type { ConversationHandlers } from './routers/conversation.js';
 import type { HookHandlers } from './routers/hook.js';
 import type { ChangesResponse, SubscriptionCreateParams } from './schemas.js';
 
@@ -57,8 +56,6 @@ export interface Context {
   logger: Logger;
   /** Hook API handlers */
   hookHandlers: HookHandlers;
-  /** Conversation import/export handlers */
-  conversationHandlers: ConversationHandlers;
   /** Get local git changes for a working directory */
   getLocalChanges: (cwd: string) => LocalChangesResult;
   /** Get content of a file from a working directory */

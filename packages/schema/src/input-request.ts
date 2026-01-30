@@ -1,5 +1,6 @@
 import { nanoid } from 'nanoid';
 import { z } from 'zod';
+import { assertNever } from './assert-never.js';
 
 /**
  * Input request timeout limits.
@@ -407,6 +408,8 @@ export function createInputRequest(params: CreateInputRequestParams): InputReque
         labels: params.labels,
       };
       break;
+    default:
+      assertNever(params);
   }
 
   const parseResult = InputRequestSchema.safeParse(request);

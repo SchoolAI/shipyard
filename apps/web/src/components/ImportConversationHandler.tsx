@@ -1,39 +1,19 @@
 import { Button, Card, Modal, Spinner } from '@heroui/react';
-import {
-  type A2AMessage,
-  addConversationVersion,
-  type ConversationExportMeta,
-  type ConversationVersion,
-  logPlanEvent,
-  type OriginPlatform,
-  OriginPlatformValues,
-} from '@shipyard/schema';
-
-/** Set of valid OriginPlatform values for efficient lookup */
-const ORIGIN_PLATFORM_SET = new Set<string>(OriginPlatformValues);
-
-/** Type guard to validate OriginPlatform values */
-function isOriginPlatform(value: string | undefined): value is OriginPlatform {
-  return typeof value === 'string' && ORIGIN_PLATFORM_SET.has(value);
-}
-
-import { DEFAULT_REGISTRY_PORTS } from '@shipyard/shared/registry-config';
-import { Check, Download, MessageSquare, MessageSquareReply, Terminal } from 'lucide-react';
+import type { A2AMessage, ConversationExportMeta } from '@shipyard/schema';
+import { Check, MessageSquare, MessageSquareReply } from 'lucide-react';
 import type React from 'react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { toast } from 'sonner';
 import type { WebrtcProvider } from 'y-webrtc';
 import type * as Y from 'yjs';
 import { Avatar } from '@/components/ui/avatar';
-import { useUserIdentity } from '@/contexts/UserIdentityContext';
 import {
   type ImportResult,
   type ReceivedConversation,
   useConversationTransfer,
 } from '@/hooks/useConversationTransfer';
-import { useGitHubAuth } from '@/hooks/useGitHubAuth';
 import { useImportConversationToast } from '@/hooks/useImportConversationToast';
-import { createVanillaTRPCClient } from '@/utils/trpc-client';
+import { StartAgentModal } from './StartAgentModal';
 
 interface ImportConversationHandlerProps {
   /** Plan ID */
@@ -238,161 +218,6 @@ export function ImportConversationButton({
   );
 }
 
-const REGISTRY_PORT = import.meta.env.VITE_REGISTRY_PORT || DEFAULT_REGISTRY_PORTS[0];
-const REGISTRY_URL = `http://localhost:${REGISTRY_PORT}`;
-
-/*
- * TODO(#9): Platform detection - Currently hard-coded to only detect Claude Code
- * Should detect available platforms (Cursor, Devin, Windsurf, etc.) and show
- * appropriate import buttons. See: https://github.com/jacobpetterle/shipyard/issues/9
- */
-function useRegistryAvailable(): boolean {
-  const [available, setAvailable] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function check() {
-      try {
-        const res = await fetch(`${REGISTRY_URL}/registry`, {
-          signal: AbortSignal.timeout(2000),
-        });
-        if (!cancelled && res.ok) {
-          setAvailable(true);
-        }
-      } catch {
-        if (!cancelled) {
-          setAvailable(false);
-        }
-      }
-    }
-
-    check();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  return available;
-}
-
-function ReceivedReviewModal({
-  isOpen,
-  onClose,
-  received,
-  onDownload,
-  onImportToClaudeCode,
-  isImporting,
-  registryAvailable,
-}: {
-  isOpen: boolean;
-  onClose: () => void;
-  received: ReceivedConversation;
-  onDownload: () => void;
-  onImportToClaudeCode: () => void;
-  isImporting: boolean;
-  registryAvailable: boolean;
-}) {
-  const { messages, meta, summary } = received;
-  const previewMessages = messages.slice(0, 5);
-  const hasMore = messages.length > 5;
-
-  return (
-    <Modal.Backdrop isOpen={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <Modal.Container size="md">
-        <Modal.Dialog>
-          <Modal.CloseTrigger />
-          <Modal.Header>
-            <Modal.Icon className="bg-success-soft text-success-soft-foreground">
-              <MessageSquare className="size-5" />
-            </Modal.Icon>
-            <Modal.Heading>Resume Handed-Off Conversation</Modal.Heading>
-            <p className="text-sm leading-5 text-muted-foreground">{summary.title}</p>
-          </Modal.Header>
-
-          <Modal.Body className="p-4">
-            <Card variant="secondary" className="mb-4">
-              <Card.Content className="p-3">
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  <div>
-                    <span className="text-muted-foreground">Source:</span>{' '}
-                    <span className="text-foreground">{meta.sourcePlatform}</span>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Messages:</span>{' '}
-                    <span className="text-foreground">{meta.messageCount}</span>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Received:</span>{' '}
-                    <span className="text-foreground">
-                      {new Date(received.receivedAt).toLocaleString()}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Session:</span>{' '}
-                    <span className="text-foreground font-mono text-xs">
-                      {meta.sourceSessionId.slice(0, 8)}...
-                    </span>
-                  </div>
-                </div>
-              </Card.Content>
-            </Card>
-
-            <p className="text-sm text-muted-foreground mb-3">Conversation preview:</p>
-            <div className="space-y-3 max-h-[300px] overflow-y-auto">
-              {previewMessages.map((msg, idx) => (
-                <MessagePreview key={msg.messageId || idx} message={msg} />
-              ))}
-              {hasMore && (
-                <p className="text-sm text-muted-foreground text-center py-2">
-                  ... and {messages.length - 5} more messages
-                </p>
-              )}
-            </div>
-
-            {!registryAvailable && (
-              <p className="text-sm text-muted-foreground mt-3 italic">
-                Registry server not running. Download file to import manually.
-              </p>
-            )}
-          </Modal.Body>
-
-          <Modal.Footer>
-            <Button variant="secondary" onPress={onClose}>
-              Dismiss
-            </Button>
-            {/* TODO(#9): Platform-specific import buttons
-                Currently only shows "Import to Claude Code" if registry is available.
-                Should detect which platforms are running (Cursor, Devin, etc.) and show
-                only relevant buttons. See A2A research in docs/research/ */}
-            {registryAvailable ? (
-              <>
-                <Button variant="secondary" onPress={onDownload}>
-                  <Download className="w-4 h-4" />
-                  Download
-                </Button>
-                <Button onPress={onImportToClaudeCode} isDisabled={isImporting}>
-                  {isImporting ? (
-                    <Spinner size="sm" color="current" />
-                  ) : (
-                    <Terminal className="w-4 h-4" />
-                  )}
-                  Import to Claude Code
-                </Button>
-              </>
-            ) : (
-              <Button onPress={onDownload}>
-                <Download className="w-4 h-4" />
-                Download File
-              </Button>
-            )}
-          </Modal.Footer>
-        </Modal.Dialog>
-      </Modal.Container>
-    </Modal.Backdrop>
-  );
-}
-
 export function ImportConversationHandler({
   planId,
   ydoc,
@@ -404,94 +229,11 @@ export function ImportConversationHandler({
 }) {
   const [selectedReceived, setSelectedReceived] = useState<ReceivedConversation | null>(null);
   const [isReviewOpen, setIsReviewOpen] = useState(false);
-  const [isImporting, setIsImporting] = useState(false);
-  const registryAvailable = useRegistryAvailable();
-  const { identity } = useGitHubAuth();
-  const { actor } = useUserIdentity();
 
   useImportConversationToast(planId, ydoc, rtcProvider, (received) => {
     setSelectedReceived(received);
     setIsReviewOpen(true);
   });
-
-  function handleDownload() {
-    if (!selectedReceived) return;
-
-    const exportPackage = {
-      meta: selectedReceived.meta,
-      messages: selectedReceived.messages,
-    };
-
-    const jsonString = JSON.stringify(exportPackage, null, 2);
-    const blob = new Blob([jsonString], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const filename = `conversation-${selectedReceived.meta.planId.slice(0, 8)}-${Date.now()}.a2a.json`;
-
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = filename;
-    anchor.click();
-    URL.revokeObjectURL(url);
-
-    toast.success(`Downloaded conversation as ${filename}`);
-  }
-
-  const handleImportToClaudeCode = useCallback(async () => {
-    if (!selectedReceived) return;
-
-    setIsImporting(true);
-
-    try {
-      /** Use vanilla tRPC client for imperative code */
-      const trpcClient = createVanillaTRPCClient(REGISTRY_URL);
-      const result = await trpcClient.conversation.import.mutate({
-        a2aMessages: selectedReceived.messages,
-        meta: selectedReceived.meta,
-      });
-
-      /** Track conversation import in CRDT */
-      const sourcePlatform = selectedReceived.meta.sourcePlatform;
-      const platform: OriginPlatform = isOriginPlatform(sourcePlatform)
-        ? sourcePlatform
-        : 'unknown';
-      const newVersion: ConversationVersion = {
-        versionId: crypto.randomUUID(),
-        creator: identity?.username || 'anonymous',
-        platform,
-        sessionId: selectedReceived.meta.sourceSessionId,
-        messageCount: selectedReceived.meta.messageCount,
-        createdAt: Date.now(),
-        handedOff: false,
-      };
-      addConversationVersion(ydoc, newVersion);
-
-      /** Log activity event */
-      logPlanEvent(ydoc, 'conversation_imported', actor, {
-        sourcePlatform: selectedReceived.meta.sourcePlatform,
-        messageCount: selectedReceived.meta.messageCount,
-        sourceSessionId: selectedReceived.meta.sourceSessionId.slice(0, 8),
-      });
-
-      if (result.success) {
-        toast.success(
-          `Created Claude Code session: ${result.sessionId}\nPath: ${result.transcriptPath}`,
-          { duration: 8000 }
-        );
-      }
-
-      setIsReviewOpen(false);
-      setSelectedReceived(null);
-    } catch (error) {
-      /** tRPC throws on errors - handle gracefully */
-      const message =
-        error instanceof Error
-          ? error.message
-          : 'Registry server not available. Download file instead.';
-      toast.error(message);
-    } finally {
-      setIsImporting(false);
-    }
-  }, [selectedReceived, ydoc, identity?.username, actor]);
 
   function handleClose() {
     setIsReviewOpen(false);
@@ -503,14 +245,14 @@ export function ImportConversationHandler({
   }
 
   return (
-    <ReceivedReviewModal
+    <StartAgentModal
       isOpen={isReviewOpen}
       onClose={handleClose}
-      received={selectedReceived}
-      onDownload={handleDownload}
-      onImportToClaudeCode={handleImportToClaudeCode}
-      isImporting={isImporting}
-      registryAvailable={registryAvailable}
+      a2aConversation={{
+        messages: selectedReceived.messages,
+        meta: selectedReceived.meta,
+        summary: selectedReceived.summary,
+      }}
     />
   );
 }

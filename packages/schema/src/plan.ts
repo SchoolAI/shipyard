@@ -161,10 +161,15 @@ export const UnknownOriginMetadataSchema = z.object({
   cwd: z.string(),
 });
 
+export const BrowserOriginMetadataSchema = z.object({
+  platform: z.literal('browser'),
+});
+
 export const OriginMetadataSchema = z.discriminatedUnion('platform', [
   ClaudeCodeOriginMetadataSchema,
   DevinOriginMetadataSchema,
   CursorOriginMetadataSchema,
+  BrowserOriginMetadataSchema,
   UnknownOriginMetadataSchema,
 ]);
 

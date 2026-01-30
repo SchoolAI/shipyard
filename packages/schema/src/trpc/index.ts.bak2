@@ -7,6 +7,7 @@
  * - Context type for server implementation
  */
 
+import { conversationRouter } from './routers/conversation.js';
 import { hookRouter } from './routers/hook.js';
 import { planRouter } from './routers/plan.js';
 import { subscriptionRouter } from './routers/subscription.js';
@@ -16,11 +17,14 @@ export const appRouter = router({
   hook: hookRouter,
   plan: planRouter,
   subscription: subscriptionRouter,
+  conversation: conversationRouter,
 });
 
 export type AppRouter = typeof appRouter;
 
 export type { Context, CreateContextFn, Logger, MachineInfo, PlanStore } from './context.js';
+export type { ConversationContext, ConversationHandlers } from './routers/conversation.js';
+export { conversationRouter } from './routers/conversation.js';
 export type {
   ApprovalResult,
   HookContext,
@@ -36,6 +40,8 @@ export type {
   ChangeType,
   DeleteSubscriptionResponse,
   HasConnectionsResponse,
+  ImportConversationRequest,
+  ImportConversationResponse,
   MachineInfoResponse,
   PlanIdInput,
   PlanStatusResponse,
@@ -51,6 +57,8 @@ export {
   ChangeTypeSchema,
   DeleteSubscriptionResponseSchema,
   HasConnectionsResponseSchema,
+  ImportConversationRequestSchema,
+  ImportConversationResponseSchema,
   MachineInfoResponseSchema,
   PlanIdSchema,
   PlanStatusResponseSchema,

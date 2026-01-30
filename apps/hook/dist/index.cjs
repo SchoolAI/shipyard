@@ -28491,7 +28491,7 @@ init_cjs_shims();
 // ../../packages/schema/dist/index.mjs
 init_cjs_shims();
 
-// ../../packages/schema/dist/yjs-helpers-Cgp3Mo2m.mjs
+// ../../packages/schema/dist/yjs-helpers-Hl36yo7d.mjs
 init_cjs_shims();
 
 // ../../packages/schema/dist/plan.mjs
@@ -42411,10 +42411,12 @@ var UnknownOriginMetadataSchema = external_exports.object({
   platform: external_exports.literal("unknown"),
   cwd: external_exports.string()
 });
+var BrowserOriginMetadataSchema = external_exports.object({ platform: external_exports.literal("browser") });
 var OriginMetadataSchema = external_exports.discriminatedUnion("platform", [
   ClaudeCodeOriginMetadataSchema,
   DevinOriginMetadataSchema,
   CursorOriginMetadataSchema,
+  BrowserOriginMetadataSchema,
   UnknownOriginMetadataSchema
 ]);
 var ConversationVersionBaseSchema = external_exports.object({
@@ -42728,7 +42730,7 @@ var LocalArtifactParseSchema = external_exports.object({
   localArtifactId: external_exports.string()
 });
 
-// ../../packages/schema/dist/yjs-helpers-Cgp3Mo2m.mjs
+// ../../packages/schema/dist/yjs-helpers-Hl36yo7d.mjs
 function assertNever2(value) {
   throw new Error(`Unhandled discriminated union member: ${JSON.stringify(value)}`);
 }
@@ -44139,6 +44141,10 @@ var ClaudeCodeContentBlockSchema = external_exports.object({ type: external_expo
         content: record2.content,
         is_error: typeof record2.is_error === "boolean" ? record2.is_error : void 0
       };
+    default: {
+      const _exhaustive = val.type;
+      return assertNever$1(_exhaustive);
+    }
   }
 });
 var ClaudeCodeUsageSchema = external_exports.object({
@@ -44168,12 +44174,84 @@ var ClaudeCodeMessageSchema = external_exports.object({
   costUSD: external_exports.number().optional(),
   durationMs: external_exports.number().optional()
 });
+function assertNever$1(x) {
+  throw new Error(`Unhandled case: ${JSON.stringify(x)}`);
+}
 var UsageMetadataSchema = external_exports.object({
   input_tokens: external_exports.number(),
   output_tokens: external_exports.number(),
   cache_creation_input_tokens: external_exports.number().optional(),
   cache_read_input_tokens: external_exports.number().optional()
 });
+var StartAgentMessageSchema = external_exports.object({
+  type: external_exports.literal("start-agent"),
+  taskId: external_exports.string().min(1, "taskId is required"),
+  prompt: external_exports.string(),
+  cwd: external_exports.string().optional()
+});
+var StopAgentMessageSchema = external_exports.object({
+  type: external_exports.literal("stop-agent"),
+  taskId: external_exports.string().min(1, "taskId is required")
+});
+var ListAgentsMessageSchema = external_exports.object({ type: external_exports.literal("list-agents") });
+var A2APayloadSchema = external_exports.object({
+  messages: external_exports.array(A2AMessageSchema),
+  meta: ConversationExportMetaSchema
+});
+var StartAgentWithContextMessageSchema = external_exports.object({
+  type: external_exports.literal("start-agent-with-context"),
+  taskId: external_exports.string().min(1, "taskId is required"),
+  cwd: external_exports.string().min(1, "cwd is required"),
+  a2aPayload: A2APayloadSchema
+});
+var ClientMessageSchema = external_exports.discriminatedUnion("type", [
+  StartAgentMessageSchema,
+  StopAgentMessageSchema,
+  ListAgentsMessageSchema,
+  StartAgentWithContextMessageSchema
+]);
+var StartedMessageSchema = external_exports.object({
+  type: external_exports.literal("started"),
+  taskId: external_exports.string(),
+  pid: external_exports.number(),
+  sessionId: external_exports.string().optional()
+});
+var OutputMessageSchema = external_exports.object({
+  type: external_exports.literal("output"),
+  taskId: external_exports.string(),
+  data: external_exports.string(),
+  stream: external_exports.enum(["stdout", "stderr"])
+});
+var CompletedMessageSchema = external_exports.object({
+  type: external_exports.literal("completed"),
+  taskId: external_exports.string(),
+  exitCode: external_exports.number()
+});
+var StoppedMessageSchema = external_exports.object({
+  type: external_exports.literal("stopped"),
+  taskId: external_exports.string()
+});
+var AgentsMessageSchema = external_exports.object({
+  type: external_exports.literal("agents"),
+  list: external_exports.array(external_exports.object({
+    taskId: external_exports.string(),
+    pid: external_exports.number(),
+    uptime: external_exports.number().optional()
+  }))
+});
+var ErrorMessageSchema = external_exports.object({
+  type: external_exports.literal("error"),
+  taskId: external_exports.string().optional(),
+  message: external_exports.string()
+});
+var ServerMessageSchema = external_exports.discriminatedUnion("type", [
+  StartedMessageSchema,
+  OutputMessageSchema,
+  CompletedMessageSchema,
+  StoppedMessageSchema,
+  AgentsMessageSchema,
+  ErrorMessageSchema
+]);
 var EnvironmentContextSchema = external_exports.object({
   projectName: external_exports.string().optional(),
   branch: external_exports.string().optional(),
@@ -44211,7 +44289,6 @@ var ROUTES = {
   HOOK_REVIEW: (planId) => `/api/hook/plan/${planId}/review`,
   HOOK_SESSION_TOKEN: (planId) => `/api/hook/plan/${planId}/session-token`,
   HOOK_PRESENCE: (planId) => `/api/hook/plan/${planId}/presence`,
-  CONVERSATION_IMPORT: "/api/conversation/import",
   WEB_TASK: (planId) => `/task/${planId}`
 };
 function createPlanWebUrl(baseUrl, planId) {
@@ -44293,6 +44370,35 @@ var ConversationExportEndSchema = external_exports.object({
 });
 var textEncoder = new TextEncoder();
 var textDecoder = new TextDecoder();
+var AgentLaunchRequestSchema = external_exports.object({
+  requestId: external_exports.string(),
+  taskId: external_exports.string(),
+  prompt: external_exports.string().optional(),
+  cwd: external_exports.string().optional(),
+  a2aPayload: external_exports.object({
+    messages: external_exports.array(external_exports.unknown()),
+    meta: external_exports.object({
+      exportId: external_exports.string(),
+      sourcePlatform: external_exports.string(),
+      sourceSessionId: external_exports.string(),
+      planId: external_exports.string(),
+      exportedAt: external_exports.number(),
+      messageCount: external_exports.number(),
+      compressedBytes: external_exports.number().optional(),
+      uncompressedBytes: external_exports.number().optional()
+    })
+  }).optional(),
+  sentAt: external_exports.number().int().positive()
+});
+var AgentLaunchResponseSchema = external_exports.object({
+  requestId: external_exports.string(),
+  success: external_exports.boolean(),
+  taskId: external_exports.string(),
+  pid: external_exports.number().optional(),
+  sessionId: external_exports.string().optional(),
+  error: external_exports.string().optional(),
+  sentAt: external_exports.number().int().positive()
+});
 var PlanIndexEntrySchema = external_exports.discriminatedUnion("deleted", [external_exports.object({
   deleted: external_exports.literal(false),
   id: external_exports.string(),
@@ -44418,9 +44524,6 @@ var t = initTRPC.context().create({ allowOutsideOfServer: true });
 var router = t.router;
 var publicProcedure = t.procedure;
 var middleware = t.middleware;
-var conversationRouter = router({ import: publicProcedure.input(ImportConversationRequestSchema).output(ImportConversationResponseSchema).mutation(async ({ input, ctx }) => {
-  return ctx.conversationHandlers.importConversation(input, ctx);
-}) });
 var hookRouter = router({
   createSession: publicProcedure.input(CreateHookSessionRequestSchema).output(CreateHookSessionResponseSchema).mutation(async ({ input, ctx }) => {
     return ctx.hookHandlers.createSession(input, ctx);
@@ -44553,8 +44656,7 @@ var subscriptionRouter = router({
 var appRouter = router({
   hook: hookRouter,
   plan: planRouter,
-  subscription: subscriptionRouter,
-  conversation: conversationRouter
+  subscription: subscriptionRouter
 });
 function isBuffer(value) {
   return Buffer.isBuffer(value);
@@ -44855,6 +44957,50 @@ var CLAUDE_CODE_INSTRUCTIONS = [
   "",
   TROUBLESHOOTING_SECTION
 ].join("\n");
+var AUTONOMOUS_WORKFLOW = `## Workflow
+
+You are running autonomously to complete a Shipyard task that was already created.
+
+### Critical Instructions
+
+1. **DO NOT create a new task** - You are ALREADY in an existing task
+2. **Read the task first** - Call \`${TOOL_NAMES2.READ_TASK}(taskId, sessionToken)\` to see what to build
+3. **Work autonomously** - Don't wait for approval, just do the work
+4. **Upload artifacts** - Call \`${TOOL_NAMES2.ADD_ARTIFACT}(...)\` for each deliverable as you complete them
+5. **Use \`requestUserInput()\`** - If you need clarification, ask via browser modal (inside \`${TOOL_NAMES2.EXECUTE_CODE}\`)
+
+### Step-by-Step
+
+\`\`\`typescript
+// 1. Read the task to understand what to build
+const task = await readTask(taskId, sessionToken);
+// Returns: { content, deliverables: [{ id, text, completed }], status, ... }
+
+// 2. Do the work described in task.content
+// ... implement the feature, build the app, etc ...
+
+// 3. Upload artifacts as you go
+await addArtifact({
+  taskId,
+  sessionToken,
+  type: 'image',
+  filename: 'screenshot.png',
+  source: 'file',
+  filePath: '/tmp/screenshot.png',
+  deliverableId: task.deliverables[0].id,
+  description: 'Screenshot of working feature'
+});
+
+// 4. Repeat for all deliverables
+// When the last deliverable gets an artifact, task auto-completes
+\`\`\``;
+var IMPORTANT_NOTES$1 = `## Important Notes
+
+- **DO NOT call \`createTask()\`** - The task already exists, you're working on it
+- **DO NOT use the Shipyard skill** - These instructions are everything you need
+- **DO use \`${TOOL_NAMES2.EXECUTE_CODE}\`** - All Shipyard APIs are available inside it
+- **DO use \`requestUserInput()\`** - For asking questions during work
+- **Working directory** - Save temporary files to your cwd, they'll be available for upload`;
 var MCP_DIRECT_HEADER = `# Shipyard: Your Agent Management Hub
 
 > **Shipyard is the central interface where humans manage AI agents.** Tasks, artifacts, feedback, and communication all happen here.

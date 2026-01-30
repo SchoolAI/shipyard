@@ -208,9 +208,9 @@ async function readStdin(): Promise<string> {
 /**
  * Output SessionStart context for Claude to see.
  *
- * Uses shared instructions from @shipyard/shared/instructions to keep
- * Claude Code and MCP-direct platforms in sync. The CLAUDE_CODE_INSTRUCTIONS
- * is specifically tailored for users with hooks (plan mode workflow).
+ * This hook only runs for interactive sessions (users running Claude Code directly).
+ * Daemon-spawned autonomous agents don't load the plugin at all - they get their
+ * instructions via --append-system-prompt instead.
  *
  * For MCP-direct platforms (Cursor, Windsurf, etc.), see skills/shipyard/SKILL.md
  * which uses MCP_DIRECT_INSTRUCTIONS from the same shared module.

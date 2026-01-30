@@ -3,6 +3,8 @@
  *
  * On first Claude Code session, spawns a detached daemon that survives
  * when the MCP server exits. This enables browser → agent triggering.
+ *
+ * Supports per-worktree daemons via DAEMON_PORT and SHIPYARD_STATE_DIR env vars.
  */
 
 import { spawn } from 'node:child_process';
@@ -10,7 +12,9 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { logger } from './logger.js';
 
-const DAEMON_PORTS = [56609, 49548];
+/** Get daemon port from env, default to 56609 for main worktree */
+const DAEMON_PORT = process.env.DAEMON_PORT ? Number.parseInt(process.env.DAEMON_PORT, 10) : 56609;
+
 const DAEMON_STARTUP_TIMEOUT_MS = 5000;
 const DAEMON_POLL_INTERVAL_MS = 500;
 
@@ -28,40 +32,44 @@ function getDaemonPath(): string {
  * Returns the port if daemon is responding, null otherwise.
  */
 async function isDaemonRunning(): Promise<number | null> {
-  for (const port of DAEMON_PORTS) {
-    try {
-      const res = await fetch(`http://localhost:${port}/health`, {
-        signal: AbortSignal.timeout(1000),
-      });
-      if (res.ok) {
-        logger.info({ port }, 'Daemon already running');
-        return port;
-      }
-    } catch {
-      /** Not running on this port - continue to next */
+  try {
+    const res = await fetch(`http://localhost:${DAEMON_PORT}/health`, {
+      signal: AbortSignal.timeout(1000),
+    });
+    if (res.ok) {
+      logger.info({ port: DAEMON_PORT }, 'Daemon already running');
+      return DAEMON_PORT;
     }
-  }
+  } catch {}
   return null;
 }
 
 /**
  * Spawns the daemon as a detached process.
  * The daemon survives when the parent (MCP server) exits.
+ * Passes through worktree-specific env vars so daemon uses correct ports/paths.
  */
 function spawnDetachedDaemon(): void {
   const daemonPath = getDaemonPath();
 
-  logger.info({ daemonPath }, 'Spawning detached daemon');
+  logger.info({ daemonPath, port: DAEMON_PORT }, 'Spawning detached daemon');
 
   const daemon = spawn('node', [daemonPath], {
     detached: true,
     stdio: 'ignore',
     cwd: process.cwd(),
+    env: {
+      ...process.env,
+      DAEMON_PORT: String(DAEMON_PORT),
+      ...(process.env.SHIPYARD_STATE_DIR && { SHIPYARD_STATE_DIR: process.env.SHIPYARD_STATE_DIR }),
+      ...(process.env.SHIPYARD_WEB_URL && { SHIPYARD_WEB_URL: process.env.SHIPYARD_WEB_URL }),
+      ...(process.env.LOG_LEVEL && { LOG_LEVEL: process.env.LOG_LEVEL }),
+    },
   });
 
   daemon.unref();
 
-  logger.info({ pid: daemon.pid }, 'Daemon spawned');
+  logger.info({ pid: daemon.pid, port: DAEMON_PORT }, 'Daemon spawned');
 }
 
 /**
@@ -93,10 +101,18 @@ async function waitForDaemon(): Promise<boolean> {
  */
 async function isAutoStartConfigured(): Promise<boolean> {
   try {
-    const { isAutoStartConfigured } = await import('../../daemon/dist/auto-start.js');
-    return await isAutoStartConfigured();
+    const module: unknown = await import('../../daemon/dist/auto-start.js');
+    if (
+      module &&
+      typeof module === 'object' &&
+      'isAutoStartConfigured' in module &&
+      typeof module.isAutoStartConfigured === 'function'
+    ) {
+      const result = await module.isAutoStartConfigured();
+      return typeof result === 'boolean' ? result : false;
+    }
+    return false;
   } catch {
-    /** Daemon not built yet or auto-start module unavailable */
     return false;
   }
 }
@@ -107,8 +123,17 @@ async function isAutoStartConfigured(): Promise<boolean> {
  */
 async function setupAutoStart(): Promise<boolean> {
   try {
-    const { setupAutoStart } = await import('../../daemon/dist/auto-start.js');
-    return await setupAutoStart();
+    const module: unknown = await import('../../daemon/dist/auto-start.js');
+    if (
+      module &&
+      typeof module === 'object' &&
+      'setupAutoStart' in module &&
+      typeof module.setupAutoStart === 'function'
+    ) {
+      const result = await module.setupAutoStart();
+      return typeof result === 'boolean' ? result : false;
+    }
+    return false;
   } catch (err) {
     logger.warn({ err }, 'Failed to import auto-start module - daemon may not be built yet');
     return false;
@@ -120,14 +145,12 @@ async function setupAutoStart(): Promise<boolean> {
  * Logs status but does not throw - daemon is optional for MCP functionality.
  */
 export async function ensureDaemonRunning(): Promise<void> {
-  /** Check if daemon is already running */
   const port = await isDaemonRunning();
   if (port) {
     logger.info({ port }, 'Daemon already running, skipping spawn');
     return;
   }
 
-  /** Check if auto-start is configured */
   const isConfigured = await isAutoStartConfigured();
   logger.info({ isConfigured }, 'Checking auto-start configuration');
 
@@ -143,11 +166,9 @@ export async function ensureDaemonRunning(): Promise<void> {
     logger.info('Auto-start already configured - daemon will auto-start on boot');
   }
 
-  /** Spawn detached daemon */
   try {
     spawnDetachedDaemon();
 
-    /** Wait for daemon to be ready */
     const ready = await waitForDaemon();
     if (ready) {
       logger.info('Daemon bootstrap successful');

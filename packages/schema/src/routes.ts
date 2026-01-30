@@ -24,8 +24,6 @@ export const ROUTES = {
   HOOK_SESSION_TOKEN: (planId: string) => `/api/hook/plan/${planId}/session-token`,
   HOOK_PRESENCE: (planId: string) => `/api/hook/plan/${planId}/presence`,
 
-  CONVERSATION_IMPORT: '/api/conversation/import',
-
   WEB_TASK: (planId: string) => `/task/${planId}`,
 } as const;
 

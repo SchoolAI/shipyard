@@ -23,6 +23,8 @@ if [ "$WORKTREE_NAME" = "default" ] || \
   SLOT=0
 else
   # Generate a consistent hash from the worktree name (1-8 for 8 possible non-default slots)
+  # Note: Only 8 slots (1-8) for feature worktrees. Hash collisions are possible
+  # but unlikely in practice. If two worktrees collide, one daemon will fail to start.
   HASH=$(echo -n "$WORKTREE_NAME" | md5 | cut -c1-4)
   SLOT=$(( (16#$HASH % 8) + 1 ))
 fi
@@ -33,6 +35,7 @@ SIGNALING_PORT=$((4444 + SLOT * 10))
 OAUTH_PORT=$((4445 + SLOT * 10))
 OG_PROXY_PORT=$((4446 + SLOT * 10))
 VITE_PORT=$((5173 + SLOT))
+DAEMON_PORT=$((56609 + SLOT))
 INSPECTOR_PORT_1=$((9229 + SLOT * 2))
 INSPECTOR_PORT_2=$((9230 + SLOT * 2))
 
@@ -63,9 +66,10 @@ export OG_PROXY_PORT="${OG_PROXY_PORT}"
 export INSPECTOR_PORT_1="${INSPECTOR_PORT_1}"
 export INSPECTOR_PORT_2="${INSPECTOR_PORT_2}"
 
-# Node.js service URLs (MCP server, hook)
+# Node.js service URLs (MCP server, hook, daemon)
 export SIGNALING_URL="ws://localhost:${SIGNALING_PORT}"
 export SHIPYARD_WEB_URL="http://localhost:${VITE_PORT}"
+export DAEMON_PORT="${DAEMON_PORT}"
 
 # Vite browser-side environment variables
 # These get compiled into the browser bundle at build time
@@ -73,6 +77,7 @@ export VITE_WEBRTC_SIGNALING="ws://localhost:${SIGNALING_PORT}"
 export VITE_GITHUB_OAUTH_WORKER="http://localhost:${OAUTH_PORT}"
 export VITE_OG_PROXY_URL="http://localhost:${OG_PROXY_PORT}"
 export VITE_REGISTRY_PORT="${REGISTRY_PORT}"
+export VITE_DAEMON_WS_URL="ws://localhost:${DAEMON_PORT}"
 
 # Port assignments summary:
 # - Registry/WebSocket: ${REGISTRY_PORT}
@@ -80,6 +85,7 @@ export VITE_REGISTRY_PORT="${REGISTRY_PORT}"
 # - OAuth worker: ${OAUTH_PORT}
 # - OG Proxy worker: ${OG_PROXY_PORT}
 # - Vite dev server: ${VITE_PORT}
+# - Daemon WebSocket: ${DAEMON_PORT}
 # - Inspector ports: ${INSPECTOR_PORT_1}, ${INSPECTOR_PORT_2}
 # - State directory: ${STATE_DIR}
 EOF

@@ -6,15 +6,8 @@ import { join, resolve, sep } from 'node:path';
 import {
   appRouter,
   type Context,
-  DEFAULT_EPOCH,
-  EPOCH_CLOSE_CODES,
-  EPOCH_CLOSE_REASONS,
-  getEpochFromMetadata,
-  getPlanIndexMetadata,
   getPlanMetadata,
   hasErrorCode,
-  initPlanIndexMetadata,
-  isEpochValid,
   type PlanStore,
 } from '@shipyard/schema';
 import { createExpressMiddleware } from '@trpc/server/adapters/express';
@@ -27,7 +20,6 @@ import * as awarenessProtocol from 'y-protocols/awareness';
 import * as syncProtocol from 'y-protocols/sync';
 import * as Y from 'yjs';
 import { registryConfig } from './config/env/registry.js';
-import { createConversationHandlers } from './conversation-handlers.js';
 import { attachCRDTValidation } from './crdt-validation.js';
 import { getFileContent, getLocalChanges } from './git-local-changes.js';
 import { getOctokit, parseRepoString } from './github-artifacts.js';
@@ -292,38 +284,6 @@ function initPersistence(): void {
   }
 }
 
-function shouldRejectForEpoch(doc: Y.Doc, planId: string): boolean {
-  const minimumEpoch = registryConfig.MINIMUM_EPOCH;
-
-  if (planId === 'plan-index') {
-    const metadata = getPlanIndexMetadata(doc);
-    if (!metadata) {
-      logger.warn({ planId }, 'Plan-index metadata missing - rejecting for security');
-      return true;
-    }
-
-    const planEpoch = getEpochFromMetadata(metadata);
-    if (!isEpochValid(planEpoch, minimumEpoch)) {
-      logger.warn({ planId, planEpoch, minimumEpoch }, 'Plan-index epoch below minimum');
-      return true;
-    }
-    return false;
-  }
-
-  const metadata = getPlanMetadata(doc);
-  if (!metadata) {
-    logger.warn({ planId }, 'Plan metadata missing - rejecting for security');
-    return true;
-  }
-
-  const planEpoch = getEpochFromMetadata(metadata);
-  if (!isEpochValid(planEpoch, minimumEpoch)) {
-    logger.warn({ planId, planEpoch, minimumEpoch }, 'Plan epoch below minimum');
-    return true;
-  }
-  return false;
-}
-
 async function getDoc(docName: string): Promise<Y.Doc> {
   initPersistence();
   const persistence = ldb;
@@ -338,14 +298,6 @@ async function getDoc(docName: string): Promise<Y.Doc> {
     const persistedDoc = await persistence.getYDoc(docName);
     const state = Y.encodeStateAsUpdate(persistedDoc);
     Y.applyUpdate(doc, state);
-
-    if (docName === 'plan-index') {
-      const metadata = getPlanIndexMetadata(doc);
-      if (!metadata) {
-        initPlanIndexMetadata(doc, { epoch: registryConfig.MINIMUM_EPOCH });
-        logger.info({ epoch: registryConfig.MINIMUM_EPOCH }, 'Initialized plan-index metadata');
-      }
-    }
 
     doc.on('update', (update: Uint8Array) => {
       persistence.storeUpdate(docName, update);
@@ -440,10 +392,6 @@ function processMessage(
         awarenessProtocol.applyAwarenessUpdate(awareness, decoding.readVarUint8Array(decoder), ws);
         break;
       }
-      default: {
-        logger.warn({ messageType, planId }, 'Unknown message type received');
-        break;
-      }
     }
   } catch (err) {
     logger.error({ err, planId }, 'Failed to process message');
@@ -451,40 +399,8 @@ function processMessage(
 }
 
 function handleWebSocketConnection(ws: WebSocket, req: http.IncomingMessage): void {
-  const fullUrl = req.url || '/';
-
-  /** Parse URL to extract planId and epoch query param */
-  const urlParts = fullUrl.split('?');
-  const planId = urlParts[0]?.slice(1) || 'default';
-
-  let clientEpoch = DEFAULT_EPOCH;
-  if (urlParts[1]) {
-    const params = new URLSearchParams(urlParts[1]);
-    const epochParam = params.get('epoch');
-    if (epochParam) {
-      const parsed = Number.parseInt(epochParam, 10);
-      if (!Number.isNaN(parsed)) {
-        clientEpoch = parsed;
-      }
-    }
-  }
-
-  /**
-   * VALIDATE IMMEDIATELY - before doc load, before message buffering.
-   * This is the production pattern used by Hocuspocus and y-sweet.
-   * The client sends its epoch in the URL, server validates BEFORE any sync.
-   */
-  const minimumEpoch = registryConfig.MINIMUM_EPOCH;
-  if (!isEpochValid(clientEpoch, minimumEpoch)) {
-    logger.warn(
-      { planId, clientEpoch, minimumEpoch },
-      'Rejecting client: epoch too old (URL param)'
-    );
-    ws.close(EPOCH_CLOSE_CODES.EPOCH_TOO_OLD, EPOCH_CLOSE_REASONS[EPOCH_CLOSE_CODES.EPOCH_TOO_OLD]);
-    return;
-  }
-
-  logger.info({ planId, clientEpoch }, 'WebSocket client connected to registry');
+  const planId = req.url?.slice(1) || 'default';
+  logger.info({ planId }, 'WebSocket client connected to registry');
 
   /*
    * CRITICAL: Buffer for messages that arrive before doc is ready.
@@ -521,15 +437,6 @@ function handleWebSocketConnection(ws: WebSocket, req: http.IncomingMessage): vo
   (async () => {
     try {
       doc = await getDoc(planId);
-
-      if (shouldRejectForEpoch(doc, planId)) {
-        ws.close(
-          EPOCH_CLOSE_CODES.EPOCH_TOO_OLD,
-          EPOCH_CLOSE_REASONS[EPOCH_CLOSE_CODES.EPOCH_TOO_OLD]
-        );
-        return;
-      }
-
       const awarenessResult = awarenessMap.get(planId);
       if (!awarenessResult) {
         throw new Error(`Awareness not found for planId: ${planId}`);
@@ -791,16 +698,12 @@ function createPlanStore(): PlanStore {
  * Creates tRPC context for each request.
  * Provides dependencies to all tRPC procedures.
  */
-function createContext(): Context & {
-  hookHandlers: ReturnType<typeof createHookHandlers>;
-  conversationHandlers: ReturnType<typeof createConversationHandlers>;
-} {
+function createContext(): Context {
   return {
     getOrCreateDoc,
     getPlanStore: createPlanStore,
     logger,
     hookHandlers: createHookHandlers(),
-    conversationHandlers: createConversationHandlers(),
     getLocalChanges,
     getFileContent,
     getMachineInfo: async () => ({

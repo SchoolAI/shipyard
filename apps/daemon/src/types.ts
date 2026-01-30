@@ -4,6 +4,7 @@
  */
 
 import type { ChildProcess } from 'node:child_process';
+import type { A2AMessage, ConversationExportMeta } from '@shipyard/schema';
 
 export type { ClientMessage, ServerMessage } from '@shipyard/schema';
 
@@ -13,8 +14,18 @@ export interface SpawnAgentOptions {
   cwd: string;
 }
 
+export interface SpawnWithContextOptions {
+  taskId: string;
+  cwd: string;
+  a2aPayload: {
+    messages: A2AMessage[];
+    meta: ConversationExportMeta;
+  };
+}
+
 export interface ActiveAgent {
   taskId: string;
   process: ChildProcess;
   pid: number;
+  startedAt: number;
 }
