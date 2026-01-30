@@ -17,7 +17,6 @@ import {
   validateA2AMessages,
 } from '@shipyard/schema';
 import { getProjectPath, getSessionTranscriptPath } from '@shipyard/schema/claude-paths';
-import { buildDaemonInstructions } from '@shipyard/shared/instructions';
 import { nanoid } from 'nanoid';
 import { daemonConfig } from './config.js';
 import { logger } from './logger.js';
@@ -65,7 +64,16 @@ function getClaudePath(): string {
 
 function buildShipyardSystemPrompt(taskId: string): string {
   const taskUrl = `${daemonConfig.SHIPYARD_WEB_URL}/task/${taskId}`;
-  return buildDaemonInstructions(taskId, taskUrl);
+  return `[SHIPYARD AUTONOMOUS AGENT]
+
+You are working on an existing Shipyard task.
+
+Task ID: ${taskId}
+Browser View: ${taskUrl}
+
+The human created this task in the browser and is viewing your progress.
+
+Use the Shipyard MCP tools to read the task and upload artifacts as you complete deliverables.`;
 }
 
 async function buildCommonSpawnArgs(taskId: string, mcpConfigPath: string | null): Promise<string[]> {

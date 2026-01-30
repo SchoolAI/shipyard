@@ -11,6 +11,10 @@ export default defineConfig({
    * External dependencies will be installed by npm when package is installed
    */
   noExternal: ['@shipyard/schema', '@shipyard/shared'],
+  /**
+   * Exclude daemon dist files - server imports them dynamically at runtime
+   */
+  external: [/\.\.\/daemon\/dist/],
   target: 'node22.14',
   shims: false,
 });

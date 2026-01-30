@@ -14,8 +14,10 @@ import {
 } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { SHIPYARD_MARKETPLACE_NAME, SHIPYARD_MARKETPLACE_URL } from './constants.js';
 import { logger } from './logger.js';
+
+const SHIPYARD_MARKETPLACE_NAME = 'schoolai-shipyard';
+const SHIPYARD_MARKETPLACE_URL = 'https://github.com/SchoolAI/shipyard.git';
 
 interface ClaudeSettings {
   extraKnownMarketplaces?: Record<string, { source: { source: string; repo: string } }>;
