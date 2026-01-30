@@ -5,8 +5,6 @@
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 import {
-  CreatePlanRequestSchema,
-  CreatePlanResponseSchema,
   getPlanMetadata,
   HasConnectionsResponseSchema,
   LocalChangesResultSchema,
@@ -20,18 +18,6 @@ import { publicProcedure, router } from '../trpc.js';
  * Plan router - queries plan status and connection state.
  */
 export const planRouter = router({
-  /**
-   * Create a new plan with proper server-side syncing.
-   * Initializes Y.Doc via getOrCreateDoc for proper CRDT syncing,
-   * sets up metadata, adds to plan index, and returns session token.
-   */
-  create: publicProcedure
-    .input(CreatePlanRequestSchema)
-    .output(CreatePlanResponseSchema)
-    .mutation(async ({ input, ctx }) => {
-      return ctx.createPlan(input);
-    }),
-
   /**
    * Get the current status of a plan.
    * GET /api/plan/:id/status

@@ -33,12 +33,13 @@ pnpm --filter=shipyard build
 # All env vars from worktree-env.sh are passed explicitly since concurrently subprocess inheritance is unreliable
 exec pnpm exec concurrently \
   --kill-others-on-fail \
-  --names "schema,server,signal,oauth,ogproxy,web,hook" \
-  --prefix-colors "gray,green,cyan,blue,red,magenta,yellow" \
+  --names "schema,server,signal,oauth,ogproxy,web,hook,daemon" \
+  --prefix-colors "gray,green,cyan,blue,red,magenta,yellow,white" \
   "pnpm dev:schema" \
-  "REGISTRY_PORT=${REGISTRY_PORT} SHIPYARD_WEB_URL=${SHIPYARD_WEB_URL} SIGNALING_URL=${SIGNALING_URL} pnpm --filter @shipyard/server dev" \
+  "REGISTRY_PORT=${REGISTRY_PORT} SHIPYARD_WEB_URL=${SHIPYARD_WEB_URL} SIGNALING_URL=${SIGNALING_URL} DAEMON_PORT=${DAEMON_PORT} SHIPYARD_STATE_DIR=${SHIPYARD_STATE_DIR} pnpm --filter @shipyard/server dev" \
   "PORT=${PORT} pnpm --filter @shipyard/signaling exec tsx src/server.ts" \
   "pnpm --filter @shipyard/github-oauth-worker exec wrangler dev --env development --port ${OAUTH_PORT} --inspector-port ${INSPECTOR_PORT_1}" \
   "pnpm --filter @shipyard/og-proxy-worker exec wrangler dev --env development --port ${OG_PROXY_PORT} --inspector-port ${INSPECTOR_PORT_2} --var UPSTREAM_URL:http://localhost:${VITE_PORT} --var CANONICAL_BASE_URL:http://localhost:${OG_PROXY_PORT}" \
-  "VITE_PORT=${VITE_PORT} VITE_WEBRTC_SIGNALING=${VITE_WEBRTC_SIGNALING} VITE_GITHUB_OAUTH_WORKER=${VITE_GITHUB_OAUTH_WORKER} VITE_OG_PROXY_URL=${VITE_OG_PROXY_URL} VITE_REGISTRY_PORT=${VITE_REGISTRY_PORT} pnpm dev:web" \
-  "SHIPYARD_WEB_URL=${SHIPYARD_WEB_URL} pnpm dev:hook"
+  "VITE_PORT=${VITE_PORT} VITE_WEBRTC_SIGNALING=${VITE_WEBRTC_SIGNALING} VITE_GITHUB_OAUTH_WORKER=${VITE_GITHUB_OAUTH_WORKER} VITE_OG_PROXY_URL=${VITE_OG_PROXY_URL} VITE_REGISTRY_PORT=${VITE_REGISTRY_PORT} VITE_DAEMON_WS_URL=${VITE_DAEMON_WS_URL} pnpm dev:web" \
+  "SHIPYARD_WEB_URL=${SHIPYARD_WEB_URL} pnpm dev:hook" \
+  "DAEMON_PORT=${DAEMON_PORT} SHIPYARD_STATE_DIR=${SHIPYARD_STATE_DIR} SHIPYARD_WEB_URL=${SHIPYARD_WEB_URL} pnpm --filter shipyard dev"

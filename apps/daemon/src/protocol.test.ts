@@ -50,7 +50,7 @@ describe('Protocol Handler', () => {
       const mockChild = createMockChildProcess();
 
       vi.doMock('./agent-spawner.js', () => ({
-        spawnClaudeCode: vi.fn(() => mockChild),
+        spawnClaudeCode: vi.fn().mockResolvedValue(mockChild),
         stopAgent: vi.fn(),
         listAgents: vi.fn(() => []),
       }));
@@ -67,7 +67,10 @@ describe('Protocol Handler', () => {
 
       handleClientMessage(ws, message);
 
-      expect(messages).toHaveLength(1);
+      // Wait for async handlers to complete
+      await vi.waitFor(() => {
+        expect(messages).toHaveLength(1);
+      });
       expect(messages[0]).toMatchObject({
         type: 'started',
         taskId: 'task-123',
@@ -79,7 +82,7 @@ describe('Protocol Handler', () => {
       const mockChild = createMockChildProcess();
 
       vi.doMock('./agent-spawner.js', () => ({
-        spawnClaudeCode: vi.fn(() => mockChild),
+        spawnClaudeCode: vi.fn().mockResolvedValue(mockChild),
         stopAgent: vi.fn(),
         listAgents: vi.fn(() => []),
       }));
@@ -94,6 +97,11 @@ describe('Protocol Handler', () => {
       });
 
       handleClientMessage(ws, message);
+
+      // Wait for async handlers to complete
+      await vi.waitFor(() => {
+        expect(messages.some((m) => m.type === 'started')).toBe(true);
+      });
 
       mockChild.stdout?.emit('data', Buffer.from('Hello stdout\n'));
 
@@ -109,7 +117,7 @@ describe('Protocol Handler', () => {
       const mockChild = createMockChildProcess();
 
       vi.doMock('./agent-spawner.js', () => ({
-        spawnClaudeCode: vi.fn(() => mockChild),
+        spawnClaudeCode: vi.fn().mockResolvedValue(mockChild),
         stopAgent: vi.fn(),
         listAgents: vi.fn(() => []),
       }));
@@ -124,6 +132,11 @@ describe('Protocol Handler', () => {
       });
 
       handleClientMessage(ws, message);
+
+      // Wait for async handlers to complete
+      await vi.waitFor(() => {
+        expect(messages.some((m) => m.type === 'started')).toBe(true);
+      });
 
       mockChild.stderr?.emit('data', Buffer.from('Error output\n'));
 
@@ -139,7 +152,7 @@ describe('Protocol Handler', () => {
       const mockChild = createMockChildProcess();
 
       vi.doMock('./agent-spawner.js', () => ({
-        spawnClaudeCode: vi.fn(() => mockChild),
+        spawnClaudeCode: vi.fn().mockResolvedValue(mockChild),
         stopAgent: vi.fn(),
         listAgents: vi.fn(() => []),
       }));
@@ -154,6 +167,11 @@ describe('Protocol Handler', () => {
       });
 
       handleClientMessage(ws, message);
+
+      // Wait for async handlers to complete
+      await vi.waitFor(() => {
+        expect(messages.some((m) => m.type === 'started')).toBe(true);
+      });
 
       mockChild.emit('exit', 0);
 
@@ -261,7 +279,7 @@ describe('Protocol Handler', () => {
       expect(messages).toHaveLength(1);
       expect(messages[0]).toMatchObject({
         type: 'error',
-        message: expect.stringContaining('Failed to parse message'),
+        message: expect.stringContaining('Invalid JSON'),
       });
     });
 
@@ -284,7 +302,7 @@ describe('Protocol Handler', () => {
       expect(messages).toHaveLength(1);
       expect(messages[0]).toMatchObject({
         type: 'error',
-        message: expect.stringContaining('Unhandled discriminated union member'),
+        message: expect.stringContaining('Invalid message format'),
       });
     });
 
@@ -293,7 +311,7 @@ describe('Protocol Handler', () => {
       mockChild.pid = undefined;
 
       vi.doMock('./agent-spawner.js', () => ({
-        spawnClaudeCode: vi.fn(() => mockChild),
+        spawnClaudeCode: vi.fn().mockResolvedValue(mockChild),
         stopAgent: vi.fn(),
         listAgents: vi.fn(() => []),
       }));
@@ -309,11 +327,14 @@ describe('Protocol Handler', () => {
 
       handleClientMessage(ws, message);
 
-      expect(messages).toHaveLength(1);
+      // Wait for async handlers to complete
+      await vi.waitFor(() => {
+        expect(messages).toHaveLength(1);
+      });
       expect(messages[0]).toMatchObject({
         type: 'error',
         taskId: 'task-123',
-        message: 'Failed to spawn Claude Code process',
+        message: expect.stringContaining('Failed to spawn Claude Code'),
       });
     });
   });

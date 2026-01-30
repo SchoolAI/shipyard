@@ -6,36 +6,26 @@ import { join, resolve, sep } from 'node:path';
 import {
   appRouter,
   type Context,
-  type CreatePlanRequest,
-  type CreatePlanResponse,
-  createPlanWebUrl,
   getPlanMetadata,
   hasErrorCode,
-  initPlanMetadata,
-  logPlanEvent,
-  PLAN_INDEX_DOC_NAME,
   type PlanStore,
-  setPlanIndexEntry,
 } from '@shipyard/schema';
 import { createExpressMiddleware } from '@trpc/server/adapters/express';
 import express, { type Request, type Response } from 'express';
 import * as decoding from 'lib0/decoding';
 import * as encoding from 'lib0/encoding';
-import { nanoid } from 'nanoid';
 import { type WebSocket, WebSocketServer } from 'ws';
 import { LeveldbPersistence } from 'y-leveldb';
 import * as awarenessProtocol from 'y-protocols/awareness';
 import * as syncProtocol from 'y-protocols/sync';
 import * as Y from 'yjs';
 import { registryConfig } from './config/env/registry.js';
-import { webConfig } from './config/env/web.js';
 import { attachCRDTValidation } from './crdt-validation.js';
 import { getFileContent, getLocalChanges } from './git-local-changes.js';
 import { getOctokit, parseRepoString } from './github-artifacts.js';
 import { createHookHandlers } from './hook-handlers.js';
 import { logger } from './logger.js';
 import { getGitHubUsername, getMachineId, getMachineName } from './server-identity.js';
-import { generateSessionToken, hashSessionToken } from './session-token.js';
 import {
   attachObservers,
   type ChangeType,
@@ -705,57 +695,6 @@ function createPlanStore(): PlanStore {
 }
 
 /**
- * Create a new plan with server-side CRDT initialization.
- * This ensures the Y.Doc is created via getOrCreateDoc for proper syncing.
- */
-async function createPlan(request: CreatePlanRequest): Promise<CreatePlanResponse> {
-  const planId = nanoid();
-  const sessionToken = generateSessionToken();
-  const sessionTokenHash = hashSessionToken(sessionToken);
-  const now = Date.now();
-
-  logger.info({ planId, title: request.title }, 'Creating plan via tRPC');
-
-  const ownerId = request.ownerId || (await getGitHubUsername()) || 'anonymous';
-
-  /** Get or create the plan Y.Doc via server's doc store for proper syncing */
-  const ydoc = await getOrCreateDoc(planId);
-
-  /** Initialize plan metadata */
-  initPlanMetadata(ydoc, {
-    id: planId,
-    title: request.title,
-    sessionTokenHash,
-    ownerId,
-    origin: { platform: 'browser' as const },
-  });
-
-  logPlanEvent(ydoc, 'plan_created', ownerId);
-
-  /** Add to plan index */
-  const indexDoc = await getOrCreateDoc(PLAN_INDEX_DOC_NAME);
-  setPlanIndexEntry(indexDoc, {
-    id: planId,
-    title: request.title,
-    status: 'draft',
-    createdAt: now,
-    updatedAt: now,
-    ownerId,
-    deleted: false,
-  });
-
-  logger.info({ planId }, 'Plan created and added to index');
-
-  const url = createPlanWebUrl(webConfig.SHIPYARD_WEB_URL, planId);
-
-  return {
-    planId,
-    sessionToken,
-    url,
-  };
-}
-
-/**
  * Creates tRPC context for each request.
  * Provides dependencies to all tRPC procedures.
  */
@@ -773,7 +712,6 @@ function createContext(): Context {
       ownerId: await getGitHubUsername(),
       cwd: process.cwd(),
     }),
-    createPlan,
   };
 }
 

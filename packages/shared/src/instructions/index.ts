@@ -27,7 +27,8 @@ export {
   USER_INPUT_SECTION,
   WHEN_NOT_TO_USE_SECTION,
 } from './common.js';
-
+/** Daemon-spawned autonomous agent exports */
+export { buildDaemonInstructions } from './daemon-autonomous.js';
 /** MCP-direct platform exports (Cursor, Windsurf, etc.) */
 export {
   API_REFERENCE,

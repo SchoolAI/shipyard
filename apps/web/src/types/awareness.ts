@@ -6,6 +6,52 @@ import type { BrowserContext, EnvironmentContext, OriginPlatform } from '@shipya
 export type ApprovalStatus = 'pending' | 'approved' | 'rejected';
 
 /**
+ * Common fields shared between pending and approved/rejected states.
+ */
+interface BasePlanAwarenessFields {
+  user: {
+    id: string;
+    name: string;
+    color: string;
+  };
+  isOwner: boolean;
+  /**
+   * Which plan this state applies to.
+   * Used to scope approval status to specific plans.
+   */
+  planId: string;
+  /**
+   * Platform type for this peer (browser, MCP server, etc.)
+   * Used to distinguish between different types of participants.
+   */
+  platform?: OriginPlatform;
+  /**
+   * WebRTC peerId (UUID) for P2P transfers.
+   * This is different from the awareness clientID (number).
+   * The webrtcPeerId is used as the key in room.webrtcConns.
+   */
+  webrtcPeerId?: string;
+  /**
+   * Environment context for agent identification.
+   * Helps users distinguish agents working from different machines/branches.
+   */
+  context?: EnvironmentContext;
+  /**
+   * Browser context for browser peer identification.
+   * Includes browser type, OS, and last active timestamp.
+   */
+  browserContext?: BrowserContext;
+  /**
+   * Whether this peer has a connected daemon for agent launching.
+   * Used for P2P agent launching - mobile browsers can launch agents
+   * via peers that have daemon connections.
+   *
+   * @see Issue #218 - A2A for Daemon (P2P Agent Launching)
+   */
+  hasDaemon?: boolean;
+}
+
+/**
  * Awareness state for a user in a plan.
  * Used for WebRTC awareness protocol to communicate user presence and approval status.
  *
@@ -13,82 +59,18 @@ export type ApprovalStatus = 'pending' | 'approved' | 'rejected';
  * Awareness is used for real-time presence and to show pending access requests.
  */
 export type PlanAwarenessState =
-  | {
+  | (BasePlanAwarenessFields & {
       status: 'pending';
-      user: {
-        id: string;
-        name: string;
-        color: string;
-      };
-      isOwner: boolean;
       requestedAt: number;
-      /**
-       * Which plan is being requested.
-       * Used to scope approval requests to specific plans.
-       */
-      planId: string;
       /**
        * When the request expires (Unix timestamp in milliseconds).
        * Default: 24 hours from requestedAt.
        */
       expiresAt: number;
-      /**
-       * Platform type for this peer (browser, MCP server, etc.)
-       * Used to distinguish between different types of participants.
-       */
-      platform?: OriginPlatform;
-      /**
-       * WebRTC peerId (UUID) for P2P transfers.
-       * This is different from the awareness clientID (number).
-       * The webrtcPeerId is used as the key in room.webrtcConns.
-       */
-      webrtcPeerId?: string;
-      /**
-       * Environment context for agent identification.
-       * Helps users distinguish agents working from different machines/branches.
-       */
-      context?: EnvironmentContext;
-      /**
-       * Browser context for browser peer identification.
-       * Includes browser type, OS, and last active timestamp.
-       */
-      browserContext?: BrowserContext;
-    }
-  | {
+    })
+  | (BasePlanAwarenessFields & {
       status: 'approved' | 'rejected';
-      user: {
-        id: string;
-        name: string;
-        color: string;
-      };
-      isOwner: boolean;
-      /**
-       * Which plan this approval/rejection applies to.
-       * Used to scope approval status to specific plans.
-       */
-      planId: string;
-      /**
-       * Platform type for this peer (browser, MCP server, etc.)
-       * Used to distinguish between different types of participants.
-       */
-      platform?: OriginPlatform;
-      /**
-       * WebRTC peerId (UUID) for P2P transfers.
-       * This is different from the awareness clientID (number).
-       * The webrtcPeerId is used as the key in room.webrtcConns.
-       */
-      webrtcPeerId?: string;
-      /**
-       * Environment context for agent identification.
-       * Helps users distinguish agents working from different machines/branches.
-       */
-      context?: EnvironmentContext;
-      /**
-       * Browser context for browser peer identification.
-       * Includes browser type, OS, and last active timestamp.
-       */
-      browserContext?: BrowserContext;
-    };
+    });
 
 /** Helper to check if user object has required string fields */
 function isValidUser(user: unknown): boolean {

@@ -91,7 +91,7 @@ The daemon enables browser → agent triggering. Click "+ Create Task" in Shipya
 3. Daemon survives when Claude Code exits
 4. Browser can trigger new Claude Code sessions
 
-**Ports:** 56609 (primary), 49548 (fallback)
+**Port:** 56609 (configurable via DAEMON_PORT)
 **Lock file:** `~/.shipyard/daemon.lock`
 
 ### Manual Control
@@ -118,8 +118,7 @@ kill $(cat ~/.shipyard/daemon.lock | head -1)
 - Remove stale lock: `rm ~/.shipyard/daemon.lock`
 
 **Port conflicts:**
-- Daemon tries ports [56609, 49548] with automatic fallback
-- If both in use, daemon won't start
+- If port in use, daemon won't start
 
 **Browser can't connect:**
 - Verify daemon running: `curl http://localhost:56609/health`

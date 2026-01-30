@@ -1,7 +1,7 @@
 /**
  * WebSocket server for daemon communication
  *
- * Listens on localhost ports [56609, 49548] with fallback.
+ * Listens on localhost on a configurable port (DAEMON_PORT env var).
  * Provides health check endpoint and WebSocket upgrade.
  *
  * Server is a singleton - calling startWebSocketServer() multiple times
@@ -14,10 +14,23 @@ import type { Duplex } from 'node:stream';
 import type { WebSocket } from 'ws';
 import { WebSocketServer } from 'ws';
 import { listAgents } from './agent-spawner.js';
+import { daemonConfig } from './config.js';
+import { logger } from './logger.js';
 import { handleClientMessage } from './protocol.js';
 
-const PORTS = [56609, 49548];
 const startTime = Date.now();
+
+/**
+ * Type guard to check if an error has a specific code property.
+ * Avoids unsafe type casts like `as NodeJS.ErrnoException`.
+ */
+function hasErrorCode(error: unknown, code: string): boolean {
+  if (typeof error !== 'object' || error === null || !('code' in error)) {
+    return false;
+  }
+  const errorObj = Object.fromEntries(Object.entries(error));
+  return errorObj.code === code;
+}
 
 /** Singleton state for the WebSocket server */
 let serverPort: number | null = null;
@@ -89,50 +102,43 @@ async function doStartWebSocketServer(): Promise<number | null> {
 
   /** Handle WebSocket connections */
   wss.on('connection', (ws: WebSocket) => {
-    console.log('WebSocket client connected');
+    logger.info('WebSocket client connected');
 
     ws.on('message', (data: Buffer) => {
       handleClientMessage(ws, data.toString('utf-8'));
     });
 
     ws.on('close', () => {
-      console.log('WebSocket client disconnected');
+      logger.info('WebSocket client disconnected');
     });
 
     ws.on('error', (err: Error) => {
-      console.error('WebSocket error:', err);
+      logger.error({ err }, 'WebSocket error');
     });
   });
 
-  /** Try each port with fallback */
-  for (const port of PORTS) {
-    try {
-      await new Promise<void>((resolve, reject) => {
-        server.once('error', (err: NodeJS.ErrnoException) => {
-          if (err.code === 'EADDRINUSE') {
-            reject(err);
-          } else {
-            reject(err);
-          }
-        });
+  const port = daemonConfig.DAEMON_PORT;
 
-        server.listen(port, 'localhost', () => {
-          console.log(`WebSocket server listening on localhost:${port}`);
-          resolve();
-        });
+  try {
+    await new Promise<void>((resolve, reject) => {
+      server.once('error', (err: NodeJS.ErrnoException) => {
+        reject(err);
       });
 
-      return port;
-    } catch (err) {
-      const error = err as NodeJS.ErrnoException;
-      if (error.code === 'EADDRINUSE') {
-        console.log(`Port ${port} in use, trying next port`);
-        continue;
-      }
-      throw err;
-    }
-  }
+      server.listen(port, 'localhost', () => {
+        logger.info({ port }, 'WebSocket server listening on localhost');
+        resolve();
+      });
+    });
 
-  console.error('All ports in use');
-  return null;
+    return port;
+  } catch (err) {
+    if (hasErrorCode(err, 'EADDRINUSE')) {
+      logger.error({ port }, 'Port already in use - cannot start daemon');
+    } else {
+      const message = err instanceof Error ? err.message : String(err);
+      logger.error({ port, err: message }, 'Failed to start WebSocket server');
+    }
+    return null;
+  }
 }

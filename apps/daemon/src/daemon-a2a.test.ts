@@ -120,7 +120,9 @@ describe('start-agent-with-context handler', () => {
 		await handleClientMessage(ws, message);
 
 		/** Wait for async handler to complete */
-		await new Promise((resolve) => setTimeout(resolve, 100));
+		await vi.waitFor(() => {
+			expect(messages).toHaveLength(1);
+		});
 
 		expect(messages).toHaveLength(1);
 		expect(messages[0]).toMatchObject({
@@ -157,7 +159,9 @@ describe('start-agent-with-context handler', () => {
 		await handleClientMessage(ws, message);
 
 		/** Wait for handler setup */
-		await new Promise((resolve) => setTimeout(resolve, 100));
+		await vi.waitFor(() => {
+			expect(messages.length).toBeGreaterThanOrEqual(1);
+		});
 
 		mockChild.stdout?.emit('data', Buffer.from('Agent output\n'));
 
@@ -193,7 +197,9 @@ describe('start-agent-with-context handler', () => {
 		});
 
 		await handleClientMessage(ws, message);
-		await new Promise((resolve) => setTimeout(resolve, 100));
+		await vi.waitFor(() => {
+			expect(messages.length).toBeGreaterThanOrEqual(1);
+		});
 
 		mockChild.emit('exit', 0);
 
@@ -229,13 +235,14 @@ describe('start-agent-with-context handler', () => {
 		});
 
 		await handleClientMessage(ws, message);
-		await new Promise((resolve) => setTimeout(resolve, 100));
+		await vi.waitFor(() => {
+			expect(messages).toHaveLength(1);
+		});
 
-		expect(messages).toHaveLength(1);
 		expect(messages[0]).toMatchObject({
 			type: 'error',
 			taskId: 'task-123',
-			message: 'Failed to spawn Claude Code process with context',
+			message: expect.stringContaining('Failed to spawn Claude Code process with context'),
 		});
 	});
 
@@ -263,13 +270,14 @@ describe('start-agent-with-context handler', () => {
 		});
 
 		await handleClientMessage(ws, message);
-		await new Promise((resolve) => setTimeout(resolve, 100));
+		await vi.waitFor(() => {
+			expect(messages).toHaveLength(1);
+		});
 
-		expect(messages).toHaveLength(1);
 		expect(messages[0]).toMatchObject({
 			type: 'error',
 			taskId: 'task-123',
-			message: expect.stringContaining('Spawn failed'),
+			message: expect.stringContaining('Failed to start agent with context'),
 		});
 	});
 });

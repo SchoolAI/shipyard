@@ -71,6 +71,13 @@ interface UseBroadcastApprovalStatusOptions {
   approvalStatus: ApprovalStatus | undefined;
   isOwner: boolean;
   planId: string;
+  /**
+   * Whether this browser has a connected daemon.
+   * Used for P2P agent launching - other peers can launch agents via this peer.
+   *
+   * @see Issue #218 - A2A for Daemon (P2P Agent Launching)
+   */
+  hasDaemon?: boolean;
 }
 
 /** Interval for updating lastActive timestamp (30 seconds) */
@@ -93,6 +100,7 @@ export function useBroadcastApprovalStatus({
   approvalStatus,
   isOwner,
   planId,
+  hasDaemon,
 }: UseBroadcastApprovalStatusOptions): void {
   /** Store requestedAt timestamp to prevent it from refreshing on re-render */
   const requestedAtRef = useRef<number | null>(null);
@@ -155,6 +163,7 @@ export function useBroadcastApprovalStatus({
       isOwner,
       webrtcPeerId,
       browserContext,
+      hasDaemon,
     };
 
     let planStatus: PlanAwarenessState;
@@ -227,5 +236,5 @@ export function useBroadcastApprovalStatus({
         awareness.setLocalStateField('planStatus', null);
       }
     };
-  }, [rtcProvider, githubIdentity, approvalStatus, isOwner, planId]);
+  }, [rtcProvider, githubIdentity, approvalStatus, isOwner, planId, hasDaemon]);
 }

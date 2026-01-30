@@ -15,7 +15,10 @@
   },
   "dependencies": {
     "@shipyard/schema": "workspace:*",
+    "@shipyard/shared": "workspace:*",
+    "dotenv": "^17.2.3",
     "nanoid": "^5.1.6",
+    "pino": "^10.2.1",
     "ws": "^8.18.0",
     "zod": "^4.3.5"
   },

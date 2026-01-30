@@ -10,12 +10,7 @@
 import type * as Y from 'yjs';
 import type { LocalChangesResult } from '../local-changes.js';
 import type { HookHandlers } from './routers/hook.js';
-import type {
-  ChangesResponse,
-  CreatePlanRequest,
-  CreatePlanResponse,
-  SubscriptionCreateParams,
-} from './schemas.js';
+import type { ChangesResponse, SubscriptionCreateParams } from './schemas.js';
 
 /**
  * Logger interface for dependency injection.
@@ -67,8 +62,6 @@ export interface Context {
   getFileContent: (cwd: string, filePath: string) => { content: string | null; error?: string };
   /** Get machine identity information */
   getMachineInfo: () => Promise<MachineInfo>;
-  /** Create a new plan with proper server-side syncing */
-  createPlan: (request: CreatePlanRequest) => Promise<CreatePlanResponse>;
 }
 
 /**

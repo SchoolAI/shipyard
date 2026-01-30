@@ -153,7 +153,6 @@ export const A2AMessageSchema = z
     }
   )
   .transform((val) => {
-    /** After refine validates, parts is guaranteed to be A2APart[] */
     const parts: A2APart[] = val.parts.map((p) => {
       if (!p || typeof p !== 'object') {
         throw new Error('Invalid part: not an object');
@@ -312,7 +311,6 @@ const ClaudeCodeContentBlockSchema = z
           is_error: typeof record.is_error === 'boolean' ? record.is_error : undefined,
         };
       default: {
-        // Exhaustive check on discriminant (val has passthrough props, so check type field)
         const _exhaustive: never = val.type;
         return assertNever(_exhaustive);
       }

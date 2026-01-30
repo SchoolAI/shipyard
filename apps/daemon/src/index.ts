@@ -6,62 +6,65 @@
  */
 
 import { existsSync, mkdirSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { join } from 'node:path';
-import { releaseDaemonLock, tryAcquireDaemonLock } from './lock-manager.js';
+import { daemonConfig } from './config.js';
+import { getStateDir, releaseDaemonLock, tryAcquireDaemonLock } from './lock-manager.js';
+import { logger } from './logger.js';
+import { ensureShipyardPlugin } from './plugin-setup.js';
 import { startWebSocketServer } from './websocket-server.js';
 
 async function main(): Promise<void> {
-  console.log('Shipyard daemon starting...');
+  logger.info({ port: daemonConfig.DAEMON_PORT, stateDir: daemonConfig.SHIPYARD_STATE_DIR }, 'Shipyard daemon starting...');
 
-  const shipyardDir = join(homedir(), '.shipyard');
+  const shipyardDir = getStateDir();
   if (!existsSync(shipyardDir)) {
     mkdirSync(shipyardDir, { recursive: true });
   }
 
+  ensureShipyardPlugin();
+
   const acquired = await tryAcquireDaemonLock();
   if (!acquired) {
-    console.error('Failed to acquire daemon lock - another instance may be running');
+    logger.error('Failed to acquire daemon lock - another instance may be running');
     process.exit(1);
   }
 
   const port = await startWebSocketServer();
   if (!port) {
     await releaseDaemonLock();
-    console.error('Failed to start WebSocket server - all ports in use');
+    logger.error('Failed to start WebSocket server - all ports in use');
     process.exit(1);
   }
 
-  console.log(`Daemon running on port ${port}`);
-  console.log('Ready to accept agent launch requests');
+  logger.info({ port }, 'Daemon running');
+  logger.info('Ready to accept agent launch requests');
 }
 
 process.on('SIGTERM', async () => {
-  console.log('Received SIGTERM, shutting down...');
+  logger.info('Received SIGTERM, shutting down...');
   await releaseDaemonLock();
   process.exit(0);
 });
 
 process.on('SIGINT', async () => {
-  console.log('Received SIGINT, shutting down...');
+  logger.info('Received SIGINT, shutting down...');
   await releaseDaemonLock();
   process.exit(0);
 });
 
 process.on('uncaughtException', async (err) => {
-  console.error('Uncaught exception:', err);
+  logger.error({ err }, 'Uncaught exception');
   await releaseDaemonLock();
   process.exit(1);
 });
 
 process.on('unhandledRejection', async (reason) => {
-  console.error('Unhandled rejection:', reason);
+  logger.error({ reason }, 'Unhandled rejection');
   await releaseDaemonLock();
   process.exit(1);
 });
 
 main().catch(async (err) => {
-  console.error('Failed to start daemon:', err);
+  logger.error({ err }, 'Failed to start daemon');
   await releaseDaemonLock();
   process.exit(1);
 });

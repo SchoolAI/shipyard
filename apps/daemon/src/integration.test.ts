@@ -17,7 +17,6 @@ import { join } from 'node:path';
 const testDir = await mkdtemp(join(tmpdir(), 'daemon-integration-'));
 process.env.CLAUDE_PROJECTS_DIR = testDir;
 
-import { readFile } from 'node:fs/promises';
 import type { A2AMessage, ConversationExportMeta } from '@shipyard/schema';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { WebSocket } from 'ws';
@@ -177,7 +176,8 @@ describe('Daemon Integration Tests', () => {
 
 			expect(response.type).toBe('error');
 			if (response.type !== 'error') throw new Error('Expected error response');
-			expect(response.message).toContain('Invalid A2A messages');
+			// Schema validation catches invalid messages before they reach the spawner
+			expect(response.message).toContain('Invalid message format');
 		});
 	});
 

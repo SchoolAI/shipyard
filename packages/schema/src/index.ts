@@ -27,6 +27,7 @@ export {
   validateA2AMessages,
 } from './conversation-export.js';
 export type { ClientMessage, ServerMessage } from './daemon-types.js';
+export { ClientMessageSchema, ServerMessageSchema } from './daemon-types.js';
 export { formatDeliverablesForLLM } from './deliverable-formatter.js';
 export { extractDeliverables } from './deliverable-parser.js';
 export type {
@@ -198,27 +199,40 @@ export {
   LocalFileChangeSchema,
 } from './local-changes.js';
 export type {
+  AgentLaunchRequest,
+  AgentLaunchResponse,
   ChunkMessage,
   ConversationExportEnd,
   ConversationExportStartMeta,
+  DecodedP2PAgentMessage,
   DecodedP2PMessage,
   P2PMessageTypeValue,
 } from './p2p-messages.js';
 export {
+  AgentLaunchRequestSchema,
+  AgentLaunchResponseSchema,
   assertNeverP2PMessage,
   ChunkMessageSchema,
   ConversationExportEndSchema,
   ConversationExportStartMetaSchema,
+  decodeAgentLaunchRequest,
+  decodeAgentLaunchResponse,
   decodeChunkMessage,
   decodeExportEndMessage,
   decodeExportStartMessage,
+  decodeP2PAgentMessage,
   decodeP2PMessage,
+  encodeAgentLaunchRequest,
+  encodeAgentLaunchResponse,
   encodeChunkMessage,
   encodeExportEndMessage,
   encodeExportStartMessage,
+  isAgentLaunchRequest,
+  isAgentLaunchResponse,
   isConversationChunk,
   isConversationExportEnd,
   isConversationExportStart,
+  isP2PAgentLaunchMessage,
   isP2PConversationMessage,
   P2PMessageType,
 } from './p2p-messages.js';
@@ -345,8 +359,6 @@ export type {
   ChangeType,
   Context,
   CreateContextFn,
-  CreatePlanRequest,
-  CreatePlanResponse,
   DeleteSubscriptionResponse,
   HasConnectionsResponse,
   HookContext,
@@ -372,8 +384,6 @@ export {
   ChangeSchema,
   ChangesResponseSchema,
   ChangeTypeSchema,
-  CreatePlanRequestSchema,
-  CreatePlanResponseSchema,
   DeleteSubscriptionResponseSchema,
   HasConnectionsResponseSchema,
   hookRouter,

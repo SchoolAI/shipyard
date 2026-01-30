@@ -1,32 +1,41 @@
 /**
- * PID-based lock file management for daemon singleton.
- * Ensures only one daemon instance runs at a time.
+ * PID-based lock file management for daemon singleton
+ *
+ * Copied pattern from apps/server/src/registry-server.ts (lines 79-194)
+ * Ensures only one daemon instance runs at a time per worktree.
  */
 
 import { mkdirSync, unlinkSync } from 'node:fs';
 import { readFile, unlink, writeFile } from 'node:fs/promises';
-import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { daemonConfig } from './config.js';
+import { logger } from './logger.js';
 
-const SHIPYARD_DIR = join(homedir(), '.shipyard');
-const DAEMON_LOCK_FILE = join(SHIPYARD_DIR, 'daemon.lock');
 const MAX_LOCK_RETRIES = 3;
+
+function getStateDir(): string {
+  return daemonConfig.SHIPYARD_STATE_DIR;
+}
+
+function getLockFilePath(): string {
+  return join(getStateDir(), 'daemon.lock');
+}
 
 function hasErrorCode(error: unknown, code: string): boolean {
   if (typeof error !== 'object' || error === null || !('code' in error)) {
     return false;
   }
-  const errorWithCode: { code: unknown } = error;
-  return errorWithCode.code === code;
+  const errorObj = Object.fromEntries(Object.entries(error));
+  return errorObj.code === code;
 }
 
 async function readLockHolderPid(): Promise<number | null> {
   try {
-    const content = await readFile(DAEMON_LOCK_FILE, 'utf-8');
+    const content = await readFile(getLockFilePath(), 'utf-8');
     const pidStr = content.split('\n')[0] ?? '';
     return Number.parseInt(pidStr, 10);
   } catch (readErr) {
-    console.error('Failed to read daemon lock file:', readErr);
+    logger.error({ err: readErr }, 'Failed to read daemon lock file');
     return null;
   }
 }
@@ -41,21 +50,24 @@ function isLockHolderAlive(pid: number): boolean {
 }
 
 async function tryRemoveStaleLock(stalePid: number, retryCount: number): Promise<boolean> {
-  console.warn(`Removing stale daemon lock (pid: ${stalePid}, retry: ${retryCount})`);
+  logger.warn({ stalePid, retryCount }, 'Removing stale daemon lock');
   try {
-    await unlink(DAEMON_LOCK_FILE);
+    await unlink(getLockFilePath());
     return true;
   } catch (unlinkErr) {
-    console.error('Failed to remove stale daemon lock:', unlinkErr);
+    logger.error({ err: unlinkErr }, 'Failed to remove stale daemon lock');
     return false;
   }
 }
 
 function registerLockCleanupHandler(): void {
+  const lockFile = getLockFilePath();
   process.once('exit', () => {
     try {
-      unlinkSync(DAEMON_LOCK_FILE);
-    } catch {}
+      unlinkSync(lockFile);
+    } catch {
+      /** Lock may already be cleaned up */
+    }
   });
 }
 
@@ -64,17 +76,20 @@ async function handleExistingLock(retryCount: number): Promise<boolean> {
   if (pid === null) return false;
 
   if (isLockHolderAlive(pid)) {
-    console.log(`Daemon lock held by active process (pid: ${pid})`);
+    logger.info({ pid }, 'Daemon lock held by active process');
     return false;
   }
 
+  /** Process dead - check retry limit before attempting removal */
   if (retryCount >= MAX_LOCK_RETRIES) {
-    console.error(
-      `Max retries exceeded while removing stale daemon lock (pid: ${pid}, retries: ${retryCount})`
+    logger.error(
+      { pid, retryCount },
+      'Max retries exceeded while removing stale daemon lock'
     );
     return false;
   }
 
+  /** Attempt to remove stale lock and retry */
   await tryRemoveStaleLock(pid, retryCount);
   return tryAcquireDaemonLock(retryCount + 1);
 }
@@ -84,25 +99,31 @@ async function handleExistingLock(retryCount: number): Promise<boolean> {
  */
 export async function tryAcquireDaemonLock(retryCount = 0): Promise<boolean> {
   try {
-    mkdirSync(SHIPYARD_DIR, { recursive: true });
-    await writeFile(DAEMON_LOCK_FILE, `${process.pid}\n${Date.now()}`, { flag: 'wx' });
+    const stateDir = getStateDir();
+    const lockFile = getLockFilePath();
+    mkdirSync(stateDir, { recursive: true });
+    await writeFile(lockFile, `${process.pid}\n${Date.now()}`, { flag: 'wx' });
     registerLockCleanupHandler();
-    console.log(`Acquired daemon lock (pid: ${process.pid})`);
+    logger.info({ pid: process.pid, lockFile }, 'Acquired daemon lock');
     return true;
   } catch (err) {
     if (hasErrorCode(err, 'EEXIST')) {
       return handleExistingLock(retryCount);
     }
-    console.error('Failed to acquire daemon lock:', err);
+    logger.error({ err }, 'Failed to acquire daemon lock');
     return false;
   }
 }
 
 export async function releaseDaemonLock(): Promise<void> {
   try {
-    await unlink(DAEMON_LOCK_FILE);
-    console.log('Released daemon lock');
-  } catch (err) {
-    console.debug('Daemon lock already released');
+    await unlink(getLockFilePath());
+    logger.info('Released daemon lock');
+  } catch {
+    /** Lock file may already be cleaned up by exit handler */
+    logger.debug('Daemon lock already released');
   }
 }
+
+/** Export for use in other modules */
+export { getStateDir };

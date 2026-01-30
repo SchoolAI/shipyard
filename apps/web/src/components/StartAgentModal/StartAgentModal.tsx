@@ -1,36 +1,49 @@
 /**
- * Unified modal for starting an agent (Claude Code).
+ * Unified modal for starting an agent (Claude Code) or creating tasks.
  * Supports both:
  * - Creating new tasks from scratch
  * - Launching from received A2A conversations
  *
- * Both paths auto-create Shipyard plans with session tokens via tRPC.
+ * Plans are created in the browser using Yjs with multi-provider sync:
+ * - IndexedDB: Local persistence for offline support
+ * - WebSocket: Sync with registry server when available
+ * - WebRTC: P2P sync for mobile and multi-device scenarios
+ *
+ * Agent launch paths (in order of preference):
+ * 1. Local daemon: Uses daemon WebSocket (fastest, default for desktop)
+ * 2. P2P peer daemon: Launches via connected peer with daemon (mobile fallback)
+ * 3. Browser-only: Creates plan without launching agent (no daemon available)
+ *
+ * @see Issue #218 - A2A for Daemon (P2P Agent Launching)
  */
 
 import type { A2AMessage, ConversationExportMeta, OriginPlatform } from '@shipyard/schema';
 import { addConversationVersion, OriginPlatformValues } from '@shipyard/schema';
-import { DEFAULT_REGISTRY_PORTS } from '@shipyard/shared/registry-config';
 
 function isOriginPlatform(value: string | undefined): value is OriginPlatform {
-  return OriginPlatformValues.includes(value as OriginPlatform);
+  if (value === undefined) return false;
+  return OriginPlatformValues.some((p) => p === value);
 }
 
-import { Alert, Button, Card, Label, Link, Modal, TextArea, TextField } from '@heroui/react';
+import { Button, Card, Label, Modal, TextArea, TextField } from '@heroui/react';
 import confetti from 'canvas-confetti';
-import { CheckCircle2, ExternalLink } from 'lucide-react';
 import type React from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import type * as Y from 'yjs';
 import { ProgressBar } from '@/components/ui/ProgressBar';
-import { getPlanRoute } from '@/constants/routes';
+import { usePlanIndexContext } from '@/contexts/PlanIndexContext';
 import { useUserIdentity } from '@/contexts/UserIdentityContext';
 import { useDaemon } from '@/hooks/useDaemon';
 import { useGitHubAuth } from '@/hooks/useGitHubAuth';
+import type { ConnectedPeer } from '@/hooks/useP2PPeers';
+import { createPlanBrowserOnly } from '@/utils/createPlanBrowserOnly';
+import type { P2PAgentLaunchOptions, P2PAgentLaunchResult } from '@/utils/P2PAgentLaunchManager';
 import { injectShipyardContext } from '@/utils/shipyardContextInjector';
-import { createVanillaTRPCClient } from '@/utils/trpc-client';
+import { DaemonWarning } from './DaemonWarning';
+import { SuccessAlert } from './SuccessAlert';
 
-interface StartAgentModalProps {
+export interface StartAgentModalProps {
   isOpen: boolean;
   onClose: () => void;
   /** Optional A2A conversation to launch with */
@@ -41,6 +54,16 @@ interface StartAgentModalProps {
   };
   /** Working directory for agent (defaults to /tmp) */
   cwd?: string;
+  /**
+   * Peers that have daemon access for P2P launching.
+   * @see Issue #218 - A2A for Daemon (P2P Agent Launching)
+   */
+  peersWithDaemon?: ConnectedPeer[];
+  /**
+   * Callback to launch agent via P2P peer.
+   * @see Issue #218 - A2A for Daemon (P2P Agent Launching)
+   */
+  launchViaP2P?: (peerId: string, options: P2PAgentLaunchOptions) => Promise<P2PAgentLaunchResult>;
 }
 
 type CreationPhase =
@@ -48,32 +71,10 @@ type CreationPhase =
   | 'creating-plan'
   | 'injecting-context'
   | 'launching'
+  | 'launching-p2p'
   | 'done'
-  | 'success';
-
-/**
- * Discover the registry server URL by checking known ports.
- * Tries DEFAULT_REGISTRY_PORTS to find a running server.
- */
-async function discoverRegistryUrl(): Promise<string | null> {
-  const envPort = import.meta.env.VITE_REGISTRY_PORT;
-  const ports = envPort ? [Number.parseInt(envPort, 10)] : DEFAULT_REGISTRY_PORTS;
-
-  for (const port of ports) {
-    try {
-      const res = await fetch(`http://localhost:${port}/registry`, {
-        signal: AbortSignal.timeout(1000),
-      });
-      if (res.ok) {
-        return `http://localhost:${port}`;
-      }
-    } catch {
-      /** Continue to next port */
-    }
-  }
-
-  return null;
-}
+  | 'success'
+  | 'plan-created-no-agent';
 
 /** Update CRDT with conversation version when agent starts with A2A context */
 function updateCrdtWithVersion(
@@ -97,16 +98,77 @@ function updateCrdtWithVersion(
   addConversationVersion(ydoc, newVersion);
 }
 
+/** Fire celebratory confetti animation */
+function fireConfetti(triggeredRef: React.MutableRefObject<boolean>) {
+  if (triggeredRef.current) return;
+  triggeredRef.current = true;
+
+  const duration = 1500;
+  const end = Date.now() + duration;
+
+  const frame = () => {
+    confetti({
+      particleCount: 3,
+      angle: 60,
+      spread: 55,
+      origin: { x: 0, y: 0.7 },
+      colors: ['#10b981', '#34d399', '#6ee7b7', '#a7f3d0'],
+    });
+    confetti({
+      particleCount: 3,
+      angle: 120,
+      spread: 55,
+      origin: { x: 1, y: 0.7 },
+      colors: ['#10b981', '#34d399', '#6ee7b7', '#a7f3d0'],
+    });
+
+    if (Date.now() < end) {
+      requestAnimationFrame(frame);
+    }
+  };
+
+  frame();
+
+  confetti({
+    particleCount: 100,
+    spread: 70,
+    origin: { y: 0.6 },
+    colors: ['#10b981', '#34d399', '#6ee7b7', '#a7f3d0', '#fbbf24', '#f59e0b'],
+  });
+}
+
+/** Get the submit button label based on connection and conversation state */
+function getSubmitLabel(connected: boolean, hasA2aConversation: boolean): string {
+  if (!connected) return 'Create Task';
+  return hasA2aConversation ? 'Launch with Conversation' : 'Start Agent';
+}
+
+/** Handle daemon error and reset state */
+function handleDaemonError(
+  lastError: string,
+  lastErrorRef: React.MutableRefObject<string | null>,
+  setCreationPhase: (phase: CreationPhase) => void,
+  setProgress: (progress: number) => void,
+  setPendingPlanId: (id: string | null) => void
+) {
+  toast.error(`Agent launch failed: ${lastError}`);
+  setCreationPhase('idle');
+  setProgress(0);
+  setPendingPlanId(null);
+  lastErrorRef.current = lastError;
+}
+
 /**
  * Unified modal for starting agents.
  * Handles both simple task creation and launching from A2A conversations.
- * Auto-creates Shipyard plans with session tokens via tRPC for proper server-side syncing.
  */
 export function StartAgentModal({
   isOpen,
   onClose,
   a2aConversation,
   cwd = '/tmp',
+  peersWithDaemon: _peersWithDaemon = [],
+  launchViaP2P: _launchViaP2P,
 }: StartAgentModalProps) {
   const [prompt, setPrompt] = useState('');
   const [creationPhase, setCreationPhase] = useState<CreationPhase>('idle');
@@ -117,70 +179,34 @@ export function StartAgentModal({
   const { startAgent, startAgentWithContext, connected, lastStarted, lastError } = useDaemon();
   const { actor } = useUserIdentity();
   const { identity } = useGitHubAuth();
+  const { ydoc: indexDoc } = usePlanIndexContext();
   const successTimeoutRef = useRef<number | null>(null);
   const confettiTriggered = useRef(false);
   const lastErrorRef = useRef<string | null>(null);
+  const browserPlanCleanupRef = useRef<(() => void) | null>(null);
 
-  const isProcessing = creationPhase !== 'idle' && creationPhase !== 'success';
+  const isProcessing =
+    creationPhase !== 'idle' &&
+    creationPhase !== 'success' &&
+    creationPhase !== 'plan-created-no-agent';
 
-  /** Fire celebratory confetti animation */
-  const fireConfetti = useCallback(() => {
-    if (confettiTriggered.current) return;
-    confettiTriggered.current = true;
-
-    const duration = 1500;
-    const end = Date.now() + duration;
-
-    const frame = () => {
-      confetti({
-        particleCount: 3,
-        angle: 60,
-        spread: 55,
-        origin: { x: 0, y: 0.7 },
-        colors: ['#10b981', '#34d399', '#6ee7b7', '#a7f3d0'],
-      });
-      confetti({
-        particleCount: 3,
-        angle: 120,
-        spread: 55,
-        origin: { x: 1, y: 0.7 },
-        colors: ['#10b981', '#34d399', '#6ee7b7', '#a7f3d0'],
-      });
-
-      if (Date.now() < end) {
-        requestAnimationFrame(frame);
-      }
-    };
-
-    frame();
-
-    // Also fire a burst from center
-    confetti({
-      particleCount: 100,
-      spread: 70,
-      origin: { y: 0.6 },
-      colors: ['#10b981', '#34d399', '#6ee7b7', '#a7f3d0', '#fbbf24', '#f59e0b'],
-    });
+  const handleFireConfetti = useCallback(() => {
+    fireConfetti(confettiTriggered);
   }, []);
 
-  /** Handle success when agent starts */
   useEffect(() => {
     const shouldShowSuccess =
       lastStarted && pendingPlanId === lastStarted.taskId && creationPhase === 'done';
 
     if (!shouldShowSuccess) return;
 
-    /** Update CRDT with actual sessionId from daemon */
     if (pendingPlanYdoc && a2aConversation) {
       updateCrdtWithVersion(pendingPlanYdoc, a2aConversation, lastStarted, identity?.username);
     }
 
-    /** Show success state and fire confetti */
     setSuccessInfo({ pid: lastStarted.pid, planId: pendingPlanId });
     setCreationPhase('success');
-    fireConfetti();
-
-    /** Don't auto-close - let user navigate to plan URL or close manually */
+    handleFireConfetti();
   }, [
     lastStarted,
     pendingPlanId,
@@ -188,20 +214,18 @@ export function StartAgentModal({
     pendingPlanYdoc,
     a2aConversation,
     identity?.username,
-    fireConfetti,
+    handleFireConfetti,
   ]);
 
-  /** Monitor daemon errors and show toast */
   useEffect(() => {
-    if (lastError && lastError !== lastErrorRef.current && isProcessing) {
-      toast.error(`Agent launch failed: ${lastError}`);
-      setCreationPhase('idle');
-      setProgress(0);
-      lastErrorRef.current = lastError;
-    }
-  }, [lastError, isProcessing]);
+    const isWaitingForDaemon = creationPhase === 'done' || creationPhase === 'launching';
+    const isNewError = lastError && lastError !== lastErrorRef.current;
 
-  /** Cleanup timeout on unmount */
+    if (isNewError && isWaitingForDaemon) {
+      handleDaemonError(lastError, lastErrorRef, setCreationPhase, setProgress, setPendingPlanId);
+    }
+  }, [lastError, creationPhase]);
+
   useEffect(() => {
     return () => {
       if (successTimeoutRef.current !== null) {
@@ -210,87 +234,96 @@ export function StartAgentModal({
     };
   }, []);
 
-  /**
-   * Create a plan via tRPC for proper server-side syncing.
-   * The server handles Y.Doc creation via getOrCreateDoc(), ensuring
-   * the plan is properly synced to all connected clients.
-   */
   async function createPlan(
     title: string
-  ): Promise<{ planId: string; sessionToken: string; url: string }> {
-    const registryUrl = await discoverRegistryUrl();
-
-    if (!registryUrl) {
-      throw new Error('Could not connect to Shipyard server. Make sure the server is running.');
-    }
-
-    const trpc = createVanillaTRPCClient(registryUrl);
-    const ownerId = actor || 'anonymous';
-
-    const result = await trpc.plan.create.mutate({
+  ): Promise<{ planId: string; sessionToken: string; url: string; ydoc: Y.Doc }> {
+    const result = await createPlanBrowserOnly({
       title,
-      ownerId,
+      ownerId: actor || 'anonymous',
+      indexDoc,
     });
 
-    return result;
+    browserPlanCleanupRef.current = result.cleanup;
+
+    return {
+      planId: result.planId,
+      sessionToken: result.sessionToken,
+      url: result.url,
+      ydoc: result.ydoc,
+    };
+  }
+
+  function launchWithA2A(planId: string, sessionToken: string, webUrl: string) {
+    if (!a2aConversation) return;
+
+    const messagesWithContext = injectShipyardContext(a2aConversation.messages, {
+      planId,
+      sessionToken,
+      webUrl,
+      additionalPrompt: prompt || undefined,
+    });
+
+    startAgentWithContext(
+      planId,
+      {
+        messages: messagesWithContext,
+        meta: { ...a2aConversation.meta, planId },
+      },
+      cwd
+    );
+  }
+
+  function launchAgentLocally(planId: string, sessionToken: string, webUrl: string) {
+    setProgress(66);
+    setCreationPhase('launching');
+    setProgress(80);
+    setPendingPlanId(planId);
+
+    if (a2aConversation) {
+      launchWithA2A(planId, sessionToken, webUrl);
+    } else {
+      startAgent(planId, prompt.trim());
+    }
+  }
+
+  function handleBrowserOnlyMode(planId: string) {
+    setProgress(100);
+    setSuccessInfo({ pid: 0, planId });
+    setCreationPhase('plan-created-no-agent');
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!connected || (!a2aConversation && !prompt.trim())) return;
+
+    if (!a2aConversation && !prompt.trim()) return;
+
+    lastErrorRef.current = null;
 
     setCreationPhase('creating-plan');
     setProgress(10);
 
     try {
       const title = a2aConversation?.summary.title || prompt.slice(0, 100) || 'Agent Task';
-      const { planId, sessionToken, url: webUrl } = await createPlan(title);
 
-      /** The plan Y.Doc is created on the server, so we don't have a local reference */
-      setPendingPlanYdoc(null);
+      const { planId, sessionToken, url: webUrl, ydoc: planYdoc } = await createPlan(title);
 
+      setPendingPlanYdoc(planYdoc);
       setProgress(33);
+
+      if (!connected) {
+        handleBrowserOnlyMode(planId);
+        return;
+      }
+
       setCreationPhase('injecting-context');
       setProgress(50);
-
-      if (a2aConversation) {
-        const messagesWithContext = injectShipyardContext(a2aConversation.messages, {
-          planId,
-          sessionToken,
-          webUrl,
-          additionalPrompt: prompt || undefined,
-        });
-
-        setProgress(66);
-        setCreationPhase('launching');
-        setProgress(80);
-
-        startAgentWithContext(
-          planId,
-          {
-            messages: messagesWithContext,
-            meta: { ...a2aConversation.meta, planId },
-          },
-          cwd
-        );
-
-        setPendingPlanId(planId);
-      } else {
-        setProgress(66);
-        setCreationPhase('launching');
-        setProgress(80);
-
-        setPendingPlanId(planId);
-        startAgent(planId, prompt.trim(), cwd);
-      }
+      launchAgentLocally(planId, sessionToken, webUrl);
 
       setProgress(100);
       setCreationPhase('done');
     } catch (error) {
       const message =
-        error instanceof Error
-          ? error.message
-          : 'Failed to create plan. Check that the Shipyard server is running.';
+        error instanceof Error ? error.message : 'Failed to create plan. Please try again.';
       toast.error(message);
       setCreationPhase('idle');
       setProgress(0);
@@ -310,6 +343,9 @@ export function StartAgentModal({
     confettiTriggered.current = false;
     onClose();
   };
+
+  const showSuccess = creationPhase === 'success' || creationPhase === 'plan-created-no-agent';
+  const submitLabel = getSubmitLabel(connected, !!a2aConversation);
 
   return (
     <Modal.Backdrop
@@ -373,46 +409,17 @@ export function StartAgentModal({
                 )}
 
                 {creationPhase === 'success' && successInfo && (
-                  <div className="animate-in zoom-in-95 fade-in duration-300">
-                    <Alert
-                      status="success"
-                      className="border-2 border-success/30 shadow-lg shadow-success/10"
-                    >
-                      <Alert.Indicator>
-                        <CheckCircle2 className="w-5 h-5 text-success animate-in spin-in-180 duration-500" />
-                      </Alert.Indicator>
-                      <Alert.Content>
-                        <Alert.Title className="text-lg font-semibold">Agent launched!</Alert.Title>
-                        <Alert.Description className="text-muted-foreground">
-                          Running with PID {successInfo.pid}
-                        </Alert.Description>
-                        <div className="mt-2">
-                          <Link
-                            href={`${window.location.origin}${getPlanRoute(successInfo.planId)}`}
-                            target="_blank"
-                            className="text-sm text-accent hover:text-accent/80 underline-offset-2 hover:underline"
-                          >
-                            Open plan
-                            <Link.Icon className="ml-1 size-3">
-                              <ExternalLink />
-                            </Link.Icon>
-                          </Link>
-                        </div>
-                      </Alert.Content>
-                    </Alert>
-                  </div>
+                  <SuccessAlert successInfo={successInfo} variant="agent-launched" />
                 )}
 
-                {!connected && (
-                  <div className="px-3 py-2 rounded-lg bg-danger/10 border border-danger/20">
-                    <p className="text-sm text-danger">
-                      Daemon not connected. Please ensure the daemon is running.
-                    </p>
-                  </div>
+                {creationPhase === 'plan-created-no-agent' && successInfo && (
+                  <SuccessAlert successInfo={successInfo} variant="plan-created" />
                 )}
+
+                {!connected && creationPhase === 'idle' && <DaemonWarning />}
 
                 <div className="flex gap-2 justify-end pt-2">
-                  {creationPhase === 'success' ? (
+                  {showSuccess ? (
                     <Button variant="secondary" onPress={handleCancel} type="button">
                       Close
                     </Button>
@@ -429,14 +436,12 @@ export function StartAgentModal({
                       <Button
                         type="submit"
                         isDisabled={
-                          creationPhase !== 'idle' ||
-                          !connected ||
-                          (!a2aConversation && !prompt.trim())
+                          creationPhase !== 'idle' || (!a2aConversation && !prompt.trim())
                         }
                         isPending={isProcessing}
                         variant="primary"
                       >
-                        {a2aConversation ? 'Launch with Conversation' : 'Start Agent'}
+                        {submitLabel}
                       </Button>
                     </>
                   )}

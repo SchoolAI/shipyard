@@ -159,18 +159,3 @@ export const MachineInfoResponseSchema = z.object({
 });
 
 export type MachineInfoResponse = z.infer<typeof MachineInfoResponseSchema>;
-
-export const CreatePlanRequestSchema = z.object({
-  title: z.string().min(1),
-  ownerId: z.string().optional(),
-});
-
-export type CreatePlanRequest = z.infer<typeof CreatePlanRequestSchema>;
-
-export const CreatePlanResponseSchema = z.object({
-  planId: z.string(),
-  sessionToken: z.string(),
-  url: z.string(),
-});
-
-export type CreatePlanResponse = z.infer<typeof CreatePlanResponseSchema>;

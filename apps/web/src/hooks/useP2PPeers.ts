@@ -42,6 +42,14 @@ export interface ConnectedPeer {
   context?: EnvironmentContext;
   /** Browser context (browser type, OS, last active) for browser peer identification */
   browserContext?: BrowserContext;
+  /**
+   * Whether this peer has a connected daemon for agent launching.
+   * Used for P2P agent launching - mobile browsers can launch agents
+   * via peers that have daemon connections.
+   *
+   * @see Issue #218 - A2A for Daemon (P2P Agent Launching)
+   */
+  hasDaemon?: boolean;
 }
 
 /**
@@ -61,6 +69,7 @@ const AwarenessPlanStatusSchema = z.object({
   platform: z.string().optional(),
   context: EnvironmentContextSchema.optional(),
   browserContext: BrowserContextSchema.optional(),
+  hasDaemon: z.boolean().optional(),
 });
 
 const AwarenessStateSchema = z.object({
@@ -102,6 +111,7 @@ function extractPeerInfo(peerId: number, state: Record<string, unknown>): Connec
       connectedAt: Date.now(),
       context: planStatus?.context,
       browserContext: planStatus?.browserContext,
+      hasDaemon: planStatus?.hasDaemon,
     };
   }
 
@@ -114,6 +124,7 @@ function extractPeerInfo(peerId: number, state: Record<string, unknown>): Connec
     connectedAt: Date.now(),
     context: planStatus.context,
     browserContext: planStatus.browserContext,
+    hasDaemon: planStatus.hasDaemon,
   };
 }
 
