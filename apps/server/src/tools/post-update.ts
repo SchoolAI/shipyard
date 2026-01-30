@@ -10,7 +10,7 @@ import { TOOL_NAMES } from './tool-names.js';
 
 const PostUpdateInput = z.object({
   taskId: z.string().describe('The task ID'),
-  sessionToken: z.string().describe('Session token from plan approval'),
+  sessionToken: z.string().describe('Session token from create_task'),
   message: z.string().describe('Update content (markdown)'),
 });
 
@@ -46,7 +46,7 @@ Updates appear in the Activity tab and keep reviewers informed.`,
       type: 'object',
       properties: {
         taskId: { type: 'string', description: 'The task ID' },
-        sessionToken: { type: 'string', description: 'Session token from plan approval' },
+        sessionToken: { type: 'string', description: 'Session token from create_task' },
         message: { type: 'string', description: 'Update content (markdown supported)' },
       },
       required: ['taskId', 'sessionToken', 'message'],
@@ -66,11 +66,22 @@ Updates appear in the Activity tab and keep reviewers informed.`,
     }
 
     /** Verify session token */
+    if (!sessionToken || sessionToken === 'undefined' || sessionToken === 'null') {
+      return errorResponse(
+        `sessionToken is required for task "${taskId}". ` +
+          'Use the sessionToken returned from createTask(). ' +
+          'If you lost your token, use regenerateSessionToken(taskId).'
+      );
+    }
     if (
       !metadata.sessionTokenHash ||
       !verifySessionToken(sessionToken, metadata.sessionTokenHash)
     ) {
-      return errorResponse(`Invalid session token for task "${taskId}".`);
+      return errorResponse(
+        `Invalid session token for task "${taskId}". ` +
+          'The sessionToken must be the one returned from createTask(). ' +
+          'If you lost your token, use regenerateSessionToken(taskId) to get a new one.'
+      );
     }
 
     /** Get actor name for event logging */

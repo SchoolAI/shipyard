@@ -91,11 +91,37 @@ link_pr({
 
     /** Verify session token */
     if (
+      !input.sessionToken ||
+      input.sessionToken === 'undefined' ||
+      input.sessionToken === 'null'
+    ) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text:
+              `sessionToken is required for task "${input.taskId}". ` +
+              'Use the sessionToken returned from createTask(). ' +
+              'If you lost your token, use regenerateSessionToken(taskId).',
+          },
+        ],
+        isError: true,
+      };
+    }
+    if (
       !metadata.sessionTokenHash ||
       !verifySessionToken(input.sessionToken, metadata.sessionTokenHash)
     ) {
       return {
-        content: [{ type: 'text', text: `Invalid session token for task "${input.taskId}".` }],
+        content: [
+          {
+            type: 'text',
+            text:
+              `Invalid session token for task "${input.taskId}". ` +
+              'The sessionToken must be the one returned from createTask(). ' +
+              'If you lost your token, use regenerateSessionToken(taskId) to get a new one.',
+          },
+        ],
         isError: true,
       };
     }

@@ -111,6 +111,8 @@ const BUNDLED_DOCS = `Execute TypeScript code that calls Shipyard APIs. Use this
 
 ⚠️ IMPORTANT LIMITATION: Dynamic imports (\`await import()\`) are NOT supported in the VM execution context. Use only the pre-provided functions in the execution environment (createTask, readTask, readDiffComments, updateTask, addArtifact, completeTask, updateBlockContent, linkPR, replyToThreadComment, replyToDiffComment, requestUserInput, regenerateSessionToken, postUpdate). All necessary APIs are already available in the sandbox.
 
+⚠️ NO process.env ACCESS: The sandbox does NOT have access to \`process.env\`. Session tokens are returned from \`createTask()\` and must be passed explicitly to subsequent API calls. If you lose your session token, use \`regenerateSessionToken(taskId)\` to get a new one.
+
 ## Available APIs
 
 ### createTask(opts): Promise<{ taskId, sessionToken, url, deliverables, monitoringScript }>

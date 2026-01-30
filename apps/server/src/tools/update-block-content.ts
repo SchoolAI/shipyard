@@ -125,12 +125,34 @@ Example with deliverables:
       };
     }
 
+    if (!sessionToken || sessionToken === 'undefined' || sessionToken === 'null') {
+      return {
+        content: [
+          {
+            type: 'text',
+            text:
+              `sessionToken is required for task "${taskId}". ` +
+              'Use the sessionToken returned from createTask(). ' +
+              'If you lost your token, use regenerateSessionToken(taskId).',
+          },
+        ],
+        isError: true,
+      };
+    }
     if (
       !metadata.sessionTokenHash ||
       !verifySessionToken(sessionToken, metadata.sessionTokenHash)
     ) {
       return {
-        content: [{ type: 'text', text: `Invalid session token for task "${taskId}".` }],
+        content: [
+          {
+            type: 'text',
+            text:
+              `Invalid session token for task "${taskId}". ` +
+              'The sessionToken must be the one returned from createTask(). ' +
+              'If you lost your token, use regenerateSessionToken(taskId) to get a new one.',
+          },
+        ],
         isError: true,
       };
     }

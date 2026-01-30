@@ -20,7 +20,7 @@ import { TOOL_NAMES } from './tool-names.js';
 
 const ReplyToDiffCommentInput = z.object({
   taskId: z.string().describe('Plan ID'),
-  sessionToken: z.string().describe('Session token from create_plan'),
+  sessionToken: z.string().describe('Session token from create_task'),
   commentId: z.string().describe('Comment ID (PR or local diff comment)'),
   body: z.string().describe('Reply text'),
 });
@@ -52,7 +52,7 @@ reply_to_diff_comment({
       type: 'object',
       properties: {
         taskId: { type: 'string', description: 'Plan ID' },
-        sessionToken: { type: 'string', description: 'Session token from create_plan' },
+        sessionToken: { type: 'string', description: 'Session token from create_task' },
         commentId: { type: 'string', description: 'Comment ID (PR or local)' },
         body: { type: 'string', description: 'Reply text' },
       },
@@ -86,11 +86,37 @@ reply_to_diff_comment({
 
     /** Verify session token */
     if (
+      !input.sessionToken ||
+      input.sessionToken === 'undefined' ||
+      input.sessionToken === 'null'
+    ) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text:
+              `sessionToken is required for task "${input.taskId}". ` +
+              'Use the sessionToken returned from createTask(). ' +
+              'If you lost your token, use regenerateSessionToken(taskId).',
+          },
+        ],
+        isError: true,
+      };
+    }
+    if (
       !metadata.sessionTokenHash ||
       !verifySessionToken(input.sessionToken, metadata.sessionTokenHash)
     ) {
       return {
-        content: [{ type: 'text', text: `Invalid session token for plan "${input.taskId}".` }],
+        content: [
+          {
+            type: 'text',
+            text:
+              `Invalid session token for task "${input.taskId}". ` +
+              'The sessionToken must be the one returned from createTask(). ' +
+              'If you lost your token, use regenerateSessionToken(taskId) to get a new one.',
+          },
+        ],
         isError: true,
       };
     }

@@ -137,10 +137,25 @@ async function validateSessionAndGetMetadata(
     return { success: false, response: errorResponse(`Task "${taskId}" not found.`) };
   }
 
+  if (!sessionToken || sessionToken === 'undefined' || sessionToken === 'null') {
+    return {
+      success: false,
+      response: errorResponse(
+        `sessionToken is required for task "${taskId}". ` +
+          'Use the sessionToken returned from createTask(). ' +
+          'If you lost your token, use regenerateSessionToken(taskId).'
+      ),
+    };
+  }
+
   if (!metadata.sessionTokenHash || !verifySessionToken(sessionToken, metadata.sessionTokenHash)) {
     return {
       success: false,
-      response: errorResponse(`Invalid session token for task "${taskId}".`),
+      response: errorResponse(
+        `Invalid session token for task "${taskId}". ` +
+          'The sessionToken must be the one returned from createTask(). ' +
+          'If you lost your token, use regenerateSessionToken(taskId) to get a new one.'
+      ),
     };
   }
 
