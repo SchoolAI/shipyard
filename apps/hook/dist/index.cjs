@@ -28491,7 +28491,7 @@ init_cjs_shims();
 // ../../packages/schema/dist/index.mjs
 init_cjs_shims();
 
-// ../../packages/schema/dist/yjs-helpers-Hl36yo7d.mjs
+// ../../packages/schema/dist/yjs-helpers-DdJ_UNn3.mjs
 init_cjs_shims();
 
 // ../../packages/schema/dist/plan.mjs
@@ -42730,7 +42730,7 @@ var LocalArtifactParseSchema = external_exports.object({
   localArtifactId: external_exports.string()
 });
 
-// ../../packages/schema/dist/yjs-helpers-Hl36yo7d.mjs
+// ../../packages/schema/dist/yjs-helpers-DdJ_UNn3.mjs
 function assertNever2(value) {
   throw new Error(`Unhandled discriminated union member: ${JSON.stringify(value)}`);
 }

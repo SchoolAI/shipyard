@@ -9,6 +9,7 @@ import {
   getPlanMetadata,
   hasErrorCode,
   type PlanStore,
+  parseWebSocketUrl,
 } from '@shipyard/schema';
 import { createExpressMiddleware } from '@trpc/server/adapters/express';
 import express, { type Request, type Response } from 'express';
@@ -399,15 +400,7 @@ function processMessage(
 }
 
 function handleWebSocketConnection(ws: WebSocket, req: http.IncomingMessage): void {
-  /**
-   * Extract planId from URL, stripping query params.
-   * Browser sends epoch as ?epoch=X but we must not include it in the doc name.
-   * Without this, MCP connects to "planId" while browser connects to "planId?epoch=2".
-   */
-  const fullUrl = req.url || '/';
-  const urlParts = fullUrl.split('?');
-  const planId = urlParts[0]?.slice(1) || 'default';
-
+  const { docName: planId } = parseWebSocketUrl(req.url || '/');
   logger.info({ planId }, 'WebSocket client connected to registry');
 
   /*

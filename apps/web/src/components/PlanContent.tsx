@@ -451,7 +451,7 @@ export function PlanContent(props: PlanContentProps) {
       )}
 
       {activeView === 'deliverables' && (
-        <div className="flex-1 overflow-hidden bg-background">
+        <div className="flex-1 overflow-y-auto bg-background">
           <DeliverablesView
             ydoc={ydoc}
             metadata={metadata}
