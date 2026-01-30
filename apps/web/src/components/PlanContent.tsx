@@ -426,18 +426,22 @@ export function PlanContent(props: PlanContentProps) {
 
       {activeView === 'plan' && (
         <div className="flex-1 overflow-y-auto bg-background">
-          <div className="max-w-4xl mx-auto px-1 py-2 md:p-6 space-y-3 md:space-y-6">
-            <PlanTabContent
-              mode={props.mode}
-              ydoc={ydoc}
-              identity={props.mode === 'live' ? props.identity : undefined}
-              provider={props.mode === 'live' ? props.provider : undefined}
-              onRequestIdentity={props.mode === 'live' ? props.onRequestIdentity : undefined}
-              currentSnapshot={props.mode === 'live' ? props.currentSnapshot : undefined}
-              onEditorReady={props.mode === 'live' ? props.onEditorReady : undefined}
-              initialContent={initialContent}
-            />
-            <Attachments ydoc={ydoc} registryPort={syncState.registryPort} />
+          <div className="grid grid-cols-[1fr_minmax(0,896px)_1fr] px-1 py-2 md:py-6">
+            <div />
+            <div className="md:px-6 space-y-3 md:space-y-6">
+              <PlanTabContent
+                mode={props.mode}
+                ydoc={ydoc}
+                identity={props.mode === 'live' ? props.identity : undefined}
+                provider={props.mode === 'live' ? props.provider : undefined}
+                onRequestIdentity={props.mode === 'live' ? props.onRequestIdentity : undefined}
+                currentSnapshot={props.mode === 'live' ? props.currentSnapshot : undefined}
+                onEditorReady={props.mode === 'live' ? props.onEditorReady : undefined}
+                initialContent={initialContent}
+              />
+              <Attachments ydoc={ydoc} registryPort={syncState.registryPort} />
+            </div>
+            <div />
           </div>
         </div>
       )}

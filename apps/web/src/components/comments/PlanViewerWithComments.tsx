@@ -153,26 +153,21 @@ export function PlanViewerWithComments({
     );
   }
 
-  /** Desktop: centered document with floating comment gutter */
   return (
-    <div className="flex justify-center gap-6 h-full">
-      {/* Editor container - centered with max-width */}
-      <div ref={containerRef} className="flex-1 max-w-4xl">
-        <PlanViewer
-          key={identity?.name ?? 'anonymous'}
-          ydoc={ydoc}
-          identity={identity}
-          provider={provider}
-          initialContent={initialContent}
-          currentSnapshot={currentSnapshot}
-          onEditorReady={handleEditorReady}
-          onAddComment={shouldShowGutter ? handleAddComment : undefined}
-        />
-      </div>
+    <div ref={containerRef} className="relative">
+      <PlanViewer
+        key={identity?.name ?? 'anonymous'}
+        ydoc={ydoc}
+        identity={identity}
+        provider={provider}
+        initialContent={initialContent}
+        currentSnapshot={currentSnapshot}
+        onEditorReady={handleEditorReady}
+        onAddComment={shouldShowGutter ? handleAddComment : undefined}
+      />
 
-      {/* Comment gutter - floating to the right with gap (desktop only) */}
       {shouldShowGutter && isReady && (
-        <div className="w-80 shrink-0">
+        <div className="absolute top-0 left-full w-80 ml-4">
           <CommentGutter
             ydoc={ydoc}
             blockPositions={positions}
