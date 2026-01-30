@@ -125,12 +125,30 @@ OUTPUT FORMAT:
     const metadata = doc.getMap('metadata').toJSON();
     const tokenHash =
       typeof metadata.sessionTokenHash === 'string' ? metadata.sessionTokenHash : '';
+
+    if (!sessionToken || sessionToken === 'undefined' || sessionToken === 'null') {
+      return {
+        content: [
+          {
+            type: 'text',
+            text:
+              `sessionToken is required for task "${taskId}". ` +
+              'Use the sessionToken returned from createTask(). ' +
+              'If you lost your token, use regenerateSessionToken(taskId).',
+          },
+        ],
+        isError: true,
+      };
+    }
     if (!tokenHash || !verifySessionToken(sessionToken, tokenHash)) {
       return {
         content: [
           {
             type: 'text',
-            text: `Invalid session token for task "${taskId}".`,
+            text:
+              `Invalid session token for task "${taskId}". ` +
+              'The sessionToken must be the one returned from createTask(). ' +
+              'If you lost your token, use regenerateSessionToken(taskId) to get a new one.',
           },
         ],
         isError: true,

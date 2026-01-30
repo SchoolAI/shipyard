@@ -84,6 +84,8 @@ This skill complements the Shipyard MCP server. The MCP provides the `execute_co
 
 **Communication principle:** ALWAYS use `requestUserInput()` instead of your platform's built-in question tools (AskUserQuestion, Cursor prompts, etc.). The human is viewing your task in the browser - that's where they expect to see your questions.
 
+**⚠️ IMPORTANT: No process.env in execute_code sandbox.** Session tokens are returned from `createTask()` and must be passed explicitly to subsequent API calls. If you lose your token, use `regenerateSessionToken(taskId)`.
+
 ## Quick Start
 
 1. **Create task** with deliverables (provable outcomes)

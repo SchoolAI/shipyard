@@ -140,6 +140,24 @@ STATUSES:
 
     /** Verify session token */
     if (
+      !input.sessionToken ||
+      input.sessionToken === 'undefined' ||
+      input.sessionToken === 'null'
+    ) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text:
+              `sessionToken is required for task "${input.taskId}". ` +
+              'Use the sessionToken returned from createTask(). ' +
+              'If you lost your token, use regenerateSessionToken(taskId).',
+          },
+        ],
+        isError: true,
+      };
+    }
+    if (
       !existingMetadata.sessionTokenHash ||
       !verifySessionToken(input.sessionToken, existingMetadata.sessionTokenHash)
     ) {
@@ -147,7 +165,10 @@ STATUSES:
         content: [
           {
             type: 'text',
-            text: `Invalid session token for task "${input.taskId}".`,
+            text:
+              `Invalid session token for task "${input.taskId}". ` +
+              'The sessionToken must be the one returned from createTask(). ' +
+              'If you lost your token, use regenerateSessionToken(taskId) to get a new one.',
           },
         ],
         isError: true,
