@@ -1,12 +1,18 @@
 import { Button, Checkbox, Chip, Disclosure } from '@heroui/react';
 import type { Artifact } from '@shipyard/schema';
 import { useState } from 'react';
+import { useIsMobile } from '@/hooks/useIsMobile';
+import { cn } from '@/lib/utils';
 import { formatRelativeTime } from '@/utils/formatters';
 import { ArtifactRenderer } from './ArtifactRenderer';
 
 interface DeliverableCardProps {
   artifact: Artifact;
   registryPort: number | null;
+  /** Whether this card is selected (desktop side panel mode) */
+  isSelected?: boolean;
+  /** Callback when card is selected (desktop: opens side panel) */
+  onSelect?: (artifact: Artifact) => void;
 }
 
 /**
@@ -75,63 +81,115 @@ function ArtifactTypeIcon({ type }: { type: Artifact['type'] }) {
 }
 
 /**
- * Individual deliverable card showing artifact status and preview.
- * Uses HeroUI v3 compound components.
+ * Card content - shared between interactive and non-interactive modes.
  */
-export function DeliverableCard({ artifact, registryPort }: DeliverableCardProps) {
-  /** Check if artifact is attached based on storage type */
+function CardContent({
+  artifact,
+  registryPort,
+  useSidePanel,
+}: {
+  artifact: Artifact;
+  registryPort: number | null;
+  useSidePanel: boolean;
+}) {
   const isAttached = artifact.storage === 'github' ? !!artifact.url : !!artifact.localArtifactId;
   const displayName = artifact.description || artifact.filename;
   const [isExpanded, setIsExpanded] = useState(false);
 
   return (
-    <div className="bg-surface border border-separator rounded-lg p-4">
-      <div className="flex items-start gap-4">
-        {/* Read-only checkbox showing attached status */}
-        <Checkbox isReadOnly isSelected={isAttached} className="mt-0.5">
-          <Checkbox.Control>
-            <Checkbox.Indicator />
-          </Checkbox.Control>
-        </Checkbox>
+    <div className="flex items-start gap-4 w-full text-left">
+      {/* Read-only checkbox showing attached status */}
+      <Checkbox isReadOnly isSelected={isAttached} className="mt-0.5">
+        <Checkbox.Control>
+          <Checkbox.Indicator />
+        </Checkbox.Control>
+      </Checkbox>
 
-        <div className="flex-1 min-w-0">
-          {/* Header: icon + name + status chip */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <ArtifactTypeIcon type={artifact.type} />
-            <span className="font-medium text-foreground truncate">{displayName}</span>
-            <Chip size="sm" color={isAttached ? 'success' : 'default'} variant="soft">
-              {isAttached ? 'attached' : 'pending'}
-            </Chip>
-          </div>
-
-          {/* Collapsible preview (only if artifact is attached) */}
-          {isAttached && (
-            <Disclosure className="mt-3" isExpanded={isExpanded} onExpandedChange={setIsExpanded}>
-              <Disclosure.Heading>
-                <Button slot="trigger" variant="tertiary" size="sm">
-                  {artifact.filename}
-                  <Disclosure.Indicator />
-                </Button>
-              </Disclosure.Heading>
-              <Disclosure.Content>
-                <div className="mt-2">
-                  {/* Only render when expanded - fixes loading spinner issue */}
-                  {isExpanded && (
-                    <ArtifactRenderer artifact={artifact} registryPort={registryPort} />
-                  )}
-                </div>
-              </Disclosure.Content>
-            </Disclosure>
-          )}
-
-          {/* Timestamp if attached */}
-          {artifact.uploadedAt && (
-            <span className="text-xs text-muted-foreground mt-2 block">
-              Attached {formatRelativeTime(artifact.uploadedAt)}
-            </span>
-          )}
+      <div className="flex-1 min-w-0">
+        {/* Header: icon + name + status chip */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <ArtifactTypeIcon type={artifact.type} />
+          <span className="font-medium text-foreground truncate">{displayName}</span>
+          <Chip size="sm" color={isAttached ? 'success' : 'default'} variant="soft">
+            {isAttached ? 'attached' : 'pending'}
+          </Chip>
         </div>
+
+        {/* Mobile: Collapsible preview (only if artifact is attached) */}
+        {isAttached && !useSidePanel && (
+          <Disclosure className="mt-3" isExpanded={isExpanded} onExpandedChange={setIsExpanded}>
+            <Disclosure.Heading>
+              <Button slot="trigger" variant="tertiary" size="sm">
+                {artifact.filename}
+                <Disclosure.Indicator />
+              </Button>
+            </Disclosure.Heading>
+            <Disclosure.Content>
+              <div className="mt-2">
+                {/* Only render when expanded - fixes loading spinner issue */}
+                {isExpanded && <ArtifactRenderer artifact={artifact} registryPort={registryPort} />}
+              </div>
+            </Disclosure.Content>
+          </Disclosure>
+        )}
+
+        {/* Desktop: Show filename hint (artifact opens in side panel) */}
+        {isAttached && useSidePanel && (
+          <p className="text-sm text-muted-foreground mt-2">{artifact.filename}</p>
+        )}
+
+        {/* Timestamp if attached */}
+        {artifact.uploadedAt && (
+          <span className="text-xs text-muted-foreground mt-2 block">
+            Attached {formatRelativeTime(artifact.uploadedAt)}
+          </span>
+        )}
       </div>
+    </div>
+  );
+}
+
+/**
+ * Individual deliverable card showing artifact status and preview.
+ * Uses HeroUI v3 compound components.
+ *
+ * Desktop: Clicking opens artifact in side panel (via onSelect)
+ * Mobile: Clicking expands artifact inline (via Disclosure)
+ */
+export function DeliverableCard({
+  artifact,
+  registryPort,
+  isSelected = false,
+  onSelect,
+}: DeliverableCardProps) {
+  const isMobile = useIsMobile();
+
+  /** Check if artifact is attached based on storage type */
+  const isAttached = artifact.storage === 'github' ? !!artifact.url : !!artifact.localArtifactId;
+
+  /** Desktop: use side panel; Mobile: use inline expansion */
+  const useSidePanel = !isMobile && onSelect !== undefined;
+  const isInteractive = useSidePanel && isAttached;
+
+  const cardClassName = cn(
+    'bg-surface border rounded-lg p-4 transition-colors w-full',
+    isSelected ? 'border-primary ring-1 ring-primary' : 'border-separator',
+    isInteractive && 'cursor-pointer hover:border-primary/50'
+  );
+
+  /** Interactive mode: render as button */
+  if (isInteractive) {
+    return (
+      <button type="button" className={cardClassName} onClick={() => onSelect(artifact)}>
+        <CardContent artifact={artifact} registryPort={registryPort} useSidePanel={useSidePanel} />
+      </button>
+    );
+  }
+
+  /** Non-interactive mode: render as div */
+  return (
+    <div className={cardClassName}>
+      <CardContent artifact={artifact} registryPort={registryPort} useSidePanel={useSidePanel} />
     </div>
   );
 }

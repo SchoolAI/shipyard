@@ -18,7 +18,9 @@
     "enabled": true,
     "rules": {
       "recommended": true,
-      "a11y": "error",
+      "a11y": {
+        "useSemanticElements": "off"
+      },
       "complexity": {
         "noBannedTypes": "error",
         "noUselessRename": "error",

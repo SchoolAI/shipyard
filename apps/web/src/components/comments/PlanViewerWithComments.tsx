@@ -135,10 +135,29 @@ export function PlanViewerWithComments({
   /** Get user ID for comment identity */
   const userId = identity?.id ?? null;
 
+  /** Mobile: no panels, just the editor */
+  if (isMobile) {
+    return (
+      <div ref={containerRef}>
+        <PlanViewer
+          key={identity?.name ?? 'anonymous'}
+          ydoc={ydoc}
+          identity={identity}
+          provider={provider}
+          initialContent={initialContent}
+          currentSnapshot={currentSnapshot}
+          onEditorReady={handleEditorReady}
+          onAddComment={undefined}
+        />
+      </div>
+    );
+  }
+
+  /** Desktop: centered document with floating comment gutter */
   return (
-    <div className="flex gap-4">
-      {/* Editor container with position tracking */}
-      <div ref={containerRef} className="flex-1 min-w-0">
+    <div className="flex justify-center gap-6 h-full">
+      {/* Editor container - centered with max-width */}
+      <div ref={containerRef} className="flex-1 max-w-4xl">
         <PlanViewer
           key={identity?.name ?? 'anonymous'}
           ydoc={ydoc}
@@ -151,18 +170,20 @@ export function PlanViewerWithComments({
         />
       </div>
 
-      {/* Comment gutter (desktop only) */}
+      {/* Comment gutter - floating to the right with gap (desktop only) */}
       {shouldShowGutter && isReady && (
-        <CommentGutter
-          ydoc={ydoc}
-          blockPositions={positions}
-          userId={userId}
-          onScrollToBlock={handleScrollToBlock}
-          isVisible={true}
-          width={300}
-          openComposerRequest={openComposerRequest}
-          onComposerStateChange={handleComposerStateChange}
-        />
+        <div className="w-80 shrink-0">
+          <CommentGutter
+            ydoc={ydoc}
+            blockPositions={positions}
+            userId={userId}
+            onScrollToBlock={handleScrollToBlock}
+            isVisible={true}
+            width={320}
+            openComposerRequest={openComposerRequest}
+            onComposerStateChange={handleComposerStateChange}
+          />
+        </div>
       )}
     </div>
   );
