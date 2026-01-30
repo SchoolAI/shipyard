@@ -4,13 +4,17 @@ import { test } from '@playwright/test';
 
 const SCREENSHOTS_DIR = join(process.cwd(), 'screenshots');
 
+// Use VITE_PORT env var for worktree support, otherwise default to 5173
+const VITE_PORT = process.env.VITE_PORT || '5173';
+const BASE_URL = `http://localhost:${VITE_PORT}`;
+
 // Ensure screenshots directory exists
 mkdirSync(SCREENSHOTS_DIR, { recursive: true });
 
 test.describe('Three-Column Layout Screenshots', () => {
   test.beforeEach(async ({ page }) => {
     // Navigate to app
-    await page.goto('http://localhost:5173');
+    await page.goto(BASE_URL);
     // Wait for initial load
     await page.waitForLoadState('networkidle');
   });
@@ -30,7 +34,7 @@ test.describe('Three-Column Layout Screenshots', () => {
 
   test('2. Inbox view (empty)', async ({ page }) => {
     // Navigate to inbox
-    await page.goto('http://localhost:5173/inbox');
+    await page.goto(`${BASE_URL}/inbox`);
     await page.waitForLoadState('networkidle');
 
     // Wait for inbox zero message or inbox content
@@ -46,7 +50,7 @@ test.describe('Three-Column Layout Screenshots', () => {
   test('3. Inbox view with items selected', async ({ page }) => {
     // This test assumes there are plans in the inbox
     // If inbox is empty, this will show the empty state
-    await page.goto('http://localhost:5173/inbox');
+    await page.goto(`${BASE_URL}/inbox`);
     await page.waitForLoadState('networkidle');
 
     // Try to click the first plan if it exists
@@ -66,7 +70,7 @@ test.describe('Three-Column Layout Screenshots', () => {
   });
 
   test('4. Board view', async ({ page }) => {
-    await page.goto('http://localhost:5173/board');
+    await page.goto(`${BASE_URL}/board`);
     await page.waitForLoadState('networkidle');
 
     // Wait for board columns to render
@@ -79,7 +83,7 @@ test.describe('Three-Column Layout Screenshots', () => {
   });
 
   test('5. Archive view', async ({ page }) => {
-    await page.goto('http://localhost:5173/archive');
+    await page.goto(`${BASE_URL}/archive`);
     await page.waitForLoadState('networkidle');
 
     // Wait for archive header
@@ -92,7 +96,7 @@ test.describe('Three-Column Layout Screenshots', () => {
   });
 
   test('6. Search results', async ({ page }) => {
-    await page.goto('http://localhost:5173/search');
+    await page.goto(`${BASE_URL}/search`);
     await page.waitForLoadState('networkidle');
 
     // Wait for search page to load
@@ -114,7 +118,7 @@ test.describe('Three-Column Layout Screenshots', () => {
   });
 
   test('7. Search with selection', async ({ page }) => {
-    await page.goto('http://localhost:5173/search');
+    await page.goto(`${BASE_URL}/search`);
     await page.waitForLoadState('networkidle');
 
     // Type a search query

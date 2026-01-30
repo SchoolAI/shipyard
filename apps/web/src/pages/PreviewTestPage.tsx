@@ -35,13 +35,25 @@ import { useSearchParams } from 'react-router-dom';
 /** Production OG proxy URL */
 const OG_PROXY_WORKER_URL_PROD = 'https://shipyard-og-proxy.jacob-191.workers.dev';
 
-/** Development OG proxy URL (proxies to local web app) */
-const OG_PROXY_WORKER_URL_DEV = 'http://localhost:4446';
-
-/** Worker URL for the OG proxy - uses env var, or dev/prod defaults */
-const OG_PROXY_WORKER_URL =
-  import.meta.env.VITE_OG_PROXY_URL ||
-  (import.meta.env.DEV ? OG_PROXY_WORKER_URL_DEV : OG_PROXY_WORKER_URL_PROD);
+/**
+ * Worker URL for the OG proxy.
+ *
+ * Uses Vite MODE-based defaults:
+ * - development: http://localhost:{og proxy port from env or 4446}
+ * - production: https://shipyard-og-proxy.jacob-191.workers.dev
+ *
+ * Can be overridden with VITE_OG_PROXY_URL environment variable.
+ * In worktrees, this is set by worktree-env.sh to avoid port conflicts.
+ */
+const OG_PROXY_WORKER_URL = (() => {
+  if (import.meta.env.VITE_OG_PROXY_URL) {
+    return import.meta.env.VITE_OG_PROXY_URL;
+  }
+  if (import.meta.env.DEV) {
+    return 'http://localhost:4446';
+  }
+  return OG_PROXY_WORKER_URL_PROD;
+})();
 
 interface CopyButtonProps {
   text: string;

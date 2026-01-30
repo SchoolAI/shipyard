@@ -46774,7 +46774,11 @@ init_cjs_shims();
 var schema3 = external_exports.object({
   SHIPYARD_WEB_URL: external_exports.string().url().default(() => {
     const nodeEnv = process.env.NODE_ENV || "development";
-    return nodeEnv === "production" ? "https://schoolai.github.io/shipyard" : "http://localhost:5173";
+    if (nodeEnv === "production") {
+      return "https://schoolai.github.io/shipyard";
+    }
+    const vitePort = process.env.VITE_PORT || "5173";
+    return `http://localhost:${vitePort}`;
   })
 });
 var webConfig = loadEnv(schema3);

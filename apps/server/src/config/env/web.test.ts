@@ -17,10 +17,21 @@ describe('webConfig', () => {
     it('should default to localhost when NODE_ENV is not set (development mode)', async () => {
       delete process.env.SHIPYARD_WEB_URL;
       delete process.env.NODE_ENV;
+      delete process.env.VITE_PORT;
 
       const { webConfig } = await import('./web.js');
 
       expect(webConfig.SHIPYARD_WEB_URL).toBe('http://localhost:5173');
+    });
+
+    it('should use VITE_PORT for default URL in development mode (worktree support)', async () => {
+      delete process.env.SHIPYARD_WEB_URL;
+      delete process.env.NODE_ENV;
+      process.env.VITE_PORT = '5181';
+
+      const { webConfig } = await import('./web.js');
+
+      expect(webConfig.SHIPYARD_WEB_URL).toBe('http://localhost:5181');
     });
 
     it('should default to production URL when NODE_ENV=production', async () => {

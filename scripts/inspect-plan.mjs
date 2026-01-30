@@ -22,7 +22,9 @@ console.log(`\n🔍 Inspecting plan: ${planId}\n`);
 const ydoc = new Y.Doc();
 
 // Get WebSocket URL from registry
-const registryUrl = 'http://localhost:32191/sessions';
+// Use REGISTRY_PORT env var if set (for worktree support), otherwise default to 32191
+const registryPort = process.env.REGISTRY_PORT || '32191';
+const registryUrl = `http://localhost:${registryPort}/sessions`;
 let wsUrl;
 
 try {

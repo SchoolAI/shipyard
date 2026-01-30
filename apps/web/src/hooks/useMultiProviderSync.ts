@@ -19,15 +19,19 @@ interface WebsocketProviderInternal {
  * WebRTC signaling server URL.
  *
  * Uses Vite MODE-based defaults:
- * - development (default): ws://localhost:4444
+ * - development (default): ws://localhost:{signaling port from env or 4444}
  * - production: wss://shipyard-signaling.jacob-191.workers.dev
  *
  * Can be overridden with VITE_WEBRTC_SIGNALING environment variable.
+ * In worktrees, this is set by worktree-env.sh to avoid port conflicts.
  */
-const DEFAULT_SIGNALING_SERVER =
-  import.meta.env.MODE === 'production'
-    ? 'wss://shipyard-signaling.jacob-191.workers.dev'
-    : 'ws://localhost:4444';
+const DEFAULT_SIGNALING_SERVER = (() => {
+  if (import.meta.env.MODE === 'production') {
+    return 'wss://shipyard-signaling.jacob-191.workers.dev';
+  }
+  /** VITE_WEBRTC_SIGNALING is the full URL, use it directly if set */
+  return import.meta.env.VITE_WEBRTC_SIGNALING || 'ws://localhost:4444';
+})();
 
 /**
  * Module-level cache for WebRTC providers to prevent duplicate room errors.

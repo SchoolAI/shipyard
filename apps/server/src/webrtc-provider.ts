@@ -6,6 +6,7 @@ import {
 } from '@shipyard/schema';
 import { WebrtcProvider } from 'y-webrtc';
 import type * as Y from 'yjs';
+import { signalingConfig } from './config/env/signaling.js';
 import { logger } from './logger.js';
 import { getClientInfo } from './mcp-client-info.js';
 import { detectPlatform, getDisplayName } from './platform-detection.js';
@@ -28,23 +29,8 @@ interface McpAwarenessState {
   context?: EnvironmentContext;
 }
 
-/**
- * WebRTC signaling server URL.
- *
- * Uses NODE_ENV-based defaults:
- * - development (default): ws://localhost:4444
- * - production: wss://shipyard-signaling.jacob-191.workers.dev
- *
- * Can be overridden with SIGNALING_URL environment variable.
- */
-const SIGNALING_SERVER =
-  process.env.SIGNALING_URL ||
-  (() => {
-    const nodeEnv = process.env.NODE_ENV || 'development';
-    return nodeEnv === 'production'
-      ? 'wss://shipyard-signaling.jacob-191.workers.dev'
-      : 'ws://localhost:4444';
-  })();
+/** WebRTC signaling server URL from validated config */
+const SIGNALING_SERVER = signalingConfig.SIGNALING_URL;
 
 /**
  * Create a WebRTC provider that connects MCP to the peer mesh.
