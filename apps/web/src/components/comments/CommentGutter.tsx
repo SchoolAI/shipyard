@@ -67,8 +67,6 @@ interface CommentGutterProps {
   isVisible?: boolean;
   /** Current user ID for identity */
   userId: string | null;
-  /** Current user display name */
-  userName?: string;
   /** Callback to scroll editor to a block */
   onScrollToBlock?: (blockId: string) => void;
   /** Width of the gutter */
@@ -209,17 +207,13 @@ export function CommentGutter({
   /**
    * Ref callback to attach ResizeObserver to thread card elements.
    * Each element is observed when mounted. WeakSet prevents double-observing.
-   * Returns a new callback per threadId to maintain stable refs across re-renders.
    */
-  const createThreadCardRefCallback = useCallback(
-    (_threadId: string) => (el: HTMLDivElement | null) => {
-      if (el && observerRef.current && !observedElementsRef.current.has(el)) {
-        observerRef.current.observe(el);
-        observedElementsRef.current.add(el);
-      }
-    },
-    []
-  );
+  const threadCardRefCallback = useCallback((el: HTMLDivElement | null) => {
+    if (el && observerRef.current && !observedElementsRef.current.has(el)) {
+      observerRef.current.observe(el);
+      observedElementsRef.current.add(el);
+    }
+  }, []);
 
   /** Calculate positioned threads using measured heights */
   const positionedThreads = useMemo(
@@ -312,7 +306,7 @@ export function CommentGutter({
       aria-label="Comment threads"
     >
       {/* Sticky container for threads */}
-      <div className="sticky top-0 h-screen overflow-y-auto py-4 px-2">
+      <div className="sticky top-0 h-screen overflow-y-auto py-4 pr-2">
         {/* Empty state */}
         {!hasThreads && !showComposer && (
           <div className="flex flex-col items-center justify-center h-32 text-muted-foreground">
@@ -327,7 +321,7 @@ export function CommentGutter({
           {positionedThreads.map(({ thread, blockId, adjustedY }) => (
             <div
               key={thread.id}
-              ref={createThreadCardRefCallback(thread.id)}
+              ref={threadCardRefCallback}
               data-thread-id={thread.id}
               className="absolute left-0 right-0 transition-all duration-200 ease-out"
               style={{ top: adjustedY }}
