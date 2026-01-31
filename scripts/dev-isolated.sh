@@ -80,6 +80,33 @@ echo "  OG Proxy:   ${OG_PROXY_PORT}"
 echo "  Daemon:     ${DAEMON_PORT}"
 echo ""
 
+# Check for port conflicts before starting
+check_port() {
+  local port=$1
+  local name=$2
+  if lsof -Pi :$port -sTCP:LISTEN -t >/dev/null 2>&1 ; then
+    echo "⚠️  Warning: Port $port ($name) is already in use"
+    return 1
+  fi
+  return 0
+}
+
+PORT_CONFLICT=0
+check_port "$REGISTRY_PORT" "Registry" || PORT_CONFLICT=1
+check_port "$PORT" "Signaling" || PORT_CONFLICT=1
+check_port "$VITE_PORT" "Vite" || PORT_CONFLICT=1
+check_port "$DAEMON_PORT" "Daemon" || PORT_CONFLICT=1
+
+if [ $PORT_CONFLICT -eq 1 ]; then
+  echo ""
+  echo "Port conflicts detected. You have a few options:"
+  echo "  1. Stop the conflicting services: pnpm cleanup"
+  echo "  2. Run Docker in a different worktree (automatic unique ports)"
+  echo "  3. Press Ctrl+C to abort, or wait 5 seconds to continue anyway..."
+  echo ""
+  sleep 5
+fi
+
 # Cleanup function to run on exit
 cleanup() {
   echo ""
