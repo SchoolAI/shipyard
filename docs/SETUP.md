@@ -122,6 +122,19 @@ pnpm docker:clean    # Remove containers, volumes, and images
 - Browser connects via localhost exposed ports
 - Claude spawn requests logged to `daemon-logs` volume (not executed)
 
+### Configuring Log Level
+
+By default, Docker mode runs all services with `LOG_LEVEL=debug` for detailed logging. To change this:
+
+1. Set `LOG_LEVEL` environment variable before running:
+   ```bash
+   LOG_LEVEL=info pnpm dev:isolated
+   ```
+
+2. Or edit `.env.docker` after it's generated (changes lost on next run)
+
+Valid levels: `debug`, `info`, `warn`, `error`
+
 ### Prerequisites
 
 - Docker Desktop installed and running

@@ -60,6 +60,9 @@ OAUTH_PORT=${OAUTH_PORT}
 OG_PROXY_PORT=${OG_PROXY_PORT}
 DAEMON_PORT=${DAEMON_PORT}
 
+# Logging (default to debug for development)
+LOG_LEVEL=${LOG_LEVEL:-debug}
+
 # Vite browser-side environment variables
 VITE_WEBRTC_SIGNALING=ws://localhost:${PORT}
 VITE_GITHUB_OAUTH_WORKER=http://localhost:${OAUTH_PORT}

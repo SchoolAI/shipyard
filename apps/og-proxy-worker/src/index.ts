@@ -13,6 +13,7 @@ export interface Env {
   ENVIRONMENT: 'development' | 'production';
   UPSTREAM_URL: string;
   CANONICAL_BASE_URL: string;
+  LOG_LEVEL?: 'debug' | 'info' | 'warn' | 'error';
 }
 
 const PLAN_STATUS_VALUES = [
@@ -710,6 +711,10 @@ function buildOgHtml(plan: DecodedPlan, fullUrl: string, encodedPlan: string, en
 
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    if (env.LOG_LEVEL) {
+      logger.setLevel(env.LOG_LEVEL);
+    }
+
     const url = new URL(request.url);
     const userAgent = request.headers.get('User-Agent') || '';
 

@@ -40,6 +40,7 @@ services:
       - DAEMON_PORT=${DAEMON_PORT:-56609}
       # Node options
       - NODE_ENV=development
+      - LOG_LEVEL=${LOG_LEVEL:-debug}
     volumes:
       # Persistent data storage
       - shipyard-data:/data/shipyard
@@ -68,6 +69,7 @@ services:
     environment:
       - PORT=${SIGNALING_PORT:-4444}
       - NODE_ENV=development
+      - LOG_LEVEL=${LOG_LEVEL:-debug}
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:${SIGNALING_PORT:-4444}/"]
       interval: 10s
@@ -119,6 +121,7 @@ services:
   #   environment:
   #     - OAUTH_PORT=${OAUTH_PORT:-4445}
   #     - NODE_ENV=development
+  #     - LOG_LEVEL=${LOG_LEVEL:-debug}
   #     - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID:-}
   #     - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET:-}
   #   networks:
@@ -140,6 +143,7 @@ services:
   #     - OG_PROXY_PORT=${OG_PROXY_PORT:-4446}
   #     - VITE_PORT=${VITE_PORT:-5173}
   #     - NODE_ENV=development
+  #     - LOG_LEVEL=${LOG_LEVEL:-debug}
   #   depends_on:
   #     - web
   #   networks:
@@ -162,6 +166,7 @@ services:
       - CLAUDE_EXECUTABLE=/usr/local/bin/claude-shim.sh
       - CLAUDE_SHIM_LOG_DIR=/var/log/shipyard
       - NODE_ENV=development
+      - LOG_LEVEL=${LOG_LEVEL:-debug}
     volumes:
       # Persistent data storage (shared with registry)
       - shipyard-data:/data/shipyard

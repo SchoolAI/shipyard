@@ -20,6 +20,10 @@ class CloudflareLogger {
     this.logLevel = level;
   }
 
+  setLevel(level: LogLevel): void {
+    this.logLevel = level;
+  }
+
   private shouldLog(level: LogLevel): boolean {
     const levels: LogLevel[] = ['debug', 'info', 'warn', 'error'];
     const currentLevelIndex = levels.indexOf(this.logLevel);
