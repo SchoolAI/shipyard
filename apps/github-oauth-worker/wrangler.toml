@@ -12,10 +12,12 @@ local_protocol = "http"
 # Default to production since that's what the deployed worker should be
 [vars]
 ENVIRONMENT = "production"
+LOG_LEVEL = "info"
 
 # Development environment overrides (use: wrangler dev --env development)
 [env.development.vars]
 ENVIRONMENT = "development"
+LOG_LEVEL = "debug"
 
 # Secrets (set via wrangler secret put):
 # - GITHUB_CLIENT_ID

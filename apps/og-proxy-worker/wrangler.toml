@@ -15,9 +15,11 @@ local_protocol = "http"
 ENVIRONMENT = "production"
 UPSTREAM_URL = "https://schoolai.github.io/shipyard"
 CANONICAL_BASE_URL = "https://shipyard-og-proxy.jacob-191.workers.dev"
+LOG_LEVEL = "info"
 
 # Development environment overrides (use: wrangler dev --env development)
 [env.development.vars]
 ENVIRONMENT = "development"
 UPSTREAM_URL = "http://localhost:5173"
 CANONICAL_BASE_URL = "http://localhost:4446"
+LOG_LEVEL = "debug"

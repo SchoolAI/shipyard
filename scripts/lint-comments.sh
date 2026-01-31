@@ -47,9 +47,9 @@ if ! eval "pnpm eslint 'apps/**/*.ts' 'apps/**/*.tsx' 'packages/**/*.ts' 'packag
   done
   echo ""
   echo "🔧 To fix violations:"
-  echo "   1. DELETE if comment describes 'what' code does (code should be self-documenting)"
-  echo "   2. Convert to /** */ JSDoc if explaining non-obvious 'why'"
-  echo "   3. Add NOTE: prefix if keeping as single-line"
+  echo "   1. DELETE the comment (preferred - make code self-documenting instead)"
+  echo "   2. If truly needed: Convert to /** */ JSDoc if explaining non-obvious 'why'"
+  echo "   3. If truly needed: Add NOTE: prefix if keeping as single-line"
   echo ""
   exit 1
 fi

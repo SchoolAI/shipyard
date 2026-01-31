@@ -19,6 +19,7 @@ export interface Env {
   GITHUB_CLIENT_ID: string;
   GITHUB_CLIENT_SECRET: string;
   ENVIRONMENT: 'development' | 'production';
+  LOG_LEVEL?: 'debug' | 'info' | 'warn' | 'error';
 }
 
 interface TokenRequest {
@@ -88,6 +89,10 @@ function isMobileUserAgent(userAgent: string): boolean {
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
+    if (env.LOG_LEVEL) {
+      logger.setLevel(env.LOG_LEVEL);
+    }
+
     const url = new URL(request.url);
     const origin = request.headers.get('Origin');
     const corsHeaders = getCorsHeaders(origin, env);
