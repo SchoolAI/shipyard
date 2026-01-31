@@ -6,6 +6,7 @@ import {
 } from '@shipyard/schema';
 import { WebrtcProvider } from 'y-webrtc';
 import type * as Y from 'yjs';
+import { githubConfig } from './config/env/github.js';
 import { signalingConfig } from './config/env/signaling.js';
 import { logger } from './logger.js';
 import { getClientInfo } from './mcp-client-info.js';
@@ -108,9 +109,86 @@ export async function createWebRtcProvider(ydoc: Y.Doc, planId: string): Promise
   };
   provider.awareness.setLocalStateField('planStatus', awarenessState);
   logger.info(
-    { planId, username: username ?? fallbackId, platform, hasContext: true },
+    {
+      planId,
+      username: username ?? fallbackId,
+      platform,
+      hasContext: true,
+      awarenessClientId: provider.awareness.clientID,
+    },
     'MCP awareness state set'
   );
+
+  /** Debug: Log awareness state after a delay to see if it persists */
+  setTimeout(() => {
+    const localState = provider.awareness.getLocalState();
+    logger.info(
+      {
+        planId,
+        hasLocalState: !!localState,
+        planStatusSet: !!localState?.planStatus,
+        connected: provider.connected,
+      },
+      'WebRTC awareness check after 2s'
+    );
+  }, 2000);
+
+  /**
+   * Send authentication to signaling server after connection is established.
+   * This must happen AFTER y-webrtc sends its subscribe message.
+   * We listen for the 'status' event with connected=true to know when to send.
+   */
+  const sendAuthWhenReady = () => {
+    const githubToken = githubConfig.GITHUB_TOKEN;
+    if (!githubToken) {
+      logger.warn(
+        { planId },
+        'No GitHub token - skipping signaling auth (WebRTC presence may not work)'
+      );
+      return;
+    }
+
+    /**
+     * Wait for signaling connection to be established and subscribe to be processed.
+     * The 'status' event fires when signaling WebSocket connects.
+     */
+    const statusHandler = (event: { connected: boolean }) => {
+      if (!event.connected) return;
+
+      /** Give y-webrtc time to send subscribe before we send authenticate */
+      setTimeout(() => {
+        const signalingConns = getSignalingConnections(provider);
+        for (const conn of signalingConns) {
+          const ws = conn.ws;
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            const authMsg = JSON.stringify({
+              type: 'authenticate',
+              auth: 'owner',
+              userId: username ?? fallbackId,
+              githubToken,
+            });
+            ws.send(authMsg);
+            logger.info(
+              { planId, userId: username ?? fallbackId },
+              'Sent authenticate to signaling'
+            );
+          }
+        }
+      }, 1000);
+
+      /** Remove handler after first connect */
+      provider.off('status', statusHandler);
+    };
+
+    provider.on('status', statusHandler);
+
+    /** Also try sending immediately if already connected */
+    if (provider.connected) {
+      statusHandler({ connected: true });
+    }
+  };
+
+  sendAuthWhenReady();
 
   /*
    * Push approval state to signaling server (required for access control)

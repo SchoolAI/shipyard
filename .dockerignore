@@ -1,0 +1,54 @@
+# Build artifacts and caches
+node_modules
+dist
+.turbo
+.vite
+
+# Git and version control
+.git
+.gitignore
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Environment files (built dynamically for containers)
+.env*
+*.local
+
+# IDE and editor configs
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Test artifacts
+coverage
+.nyc_output
+
+# Temporary files
+tmp
+.tmp
+
+# Documentation (not needed in containers)
+docs
+*.md
+!README.md
+
+# Spike/prototype code (not for production)
+spikes
+
+# Plugin metadata (not needed in containers)
+.claude-plugin
+.claude
+.codex
+.grit
+.playwright-mcp
+
+# GitHub workflows
+.github

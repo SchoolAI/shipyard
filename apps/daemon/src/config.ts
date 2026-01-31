@@ -75,6 +75,19 @@ const schema = z.object({
 	 * Defaults to http://localhost:5173
 	 */
 	SHIPYARD_WEB_URL: z.string().default('http://localhost:5173'),
+	/**
+	 * When true, shim Claude execution instead of spawning.
+	 * Used in Docker mode where Claude Code isn't available.
+	 */
+	DOCKER_MODE: z
+		.string()
+		.optional()
+		.transform((val) => val === 'true' || val === '1'),
+	/**
+	 * Directory for Claude shim logs in Docker mode.
+	 * Only used when DOCKER_MODE is enabled.
+	 */
+	CLAUDE_SHIM_LOG_DIR: z.string().default('/var/log/shipyard'),
 });
 
 export const daemonConfig = loadEnv(schema);

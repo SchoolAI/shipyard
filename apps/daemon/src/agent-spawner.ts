@@ -5,17 +5,13 @@
  * Each agent runs with SHIPYARD_TASK_ID environment variable.
  */
 
-import { execSync, spawn } from 'node:child_process';
 import type { ChildProcess } from 'node:child_process';
+import { execSync, spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import {
-  a2aToClaudeCode,
-  formatAsClaudeCodeJSONL,
-  validateA2AMessages,
-} from '@shipyard/schema';
+import { a2aToClaudeCode, formatAsClaudeCodeJSONL, validateA2AMessages } from '@shipyard/schema';
 import { getProjectPath, getSessionTranscriptPath } from '@shipyard/schema/claude-paths';
 import { nanoid } from 'nanoid';
 import { daemonConfig } from './config.js';
@@ -76,12 +72,13 @@ The human created this task in the browser and is viewing your progress.
 Use the Shipyard MCP tools to read the task and upload artifacts as you complete deliverables.`;
 }
 
-async function buildCommonSpawnArgs(taskId: string, mcpConfigPath: string | null): Promise<string[]> {
+async function buildCommonSpawnArgs(
+  taskId: string,
+  mcpConfigPath: string | null
+): Promise<string[]> {
   const systemPrompt = buildShipyardSystemPrompt(taskId);
 
-  const args = [
-    '--dangerously-skip-permissions',
-  ];
+  const args = ['--dangerously-skip-permissions'];
 
   if (daemonConfig.LOG_LEVEL === 'debug') {
     const debugLogPath = `/tmp/shipyard-agent-${taskId}-debug.log`;
@@ -103,7 +100,6 @@ async function buildCommonSpawnArgs(taskId: string, mcpConfigPath: string | null
 
   return args;
 }
-
 
 function buildMcpConfigArgs(mcpConfigPath: string | null): string[] {
   if (mcpConfigPath) {
@@ -130,6 +126,39 @@ function trackAgent(taskId: string, child: ChildProcess): void {
   });
 }
 
+/**
+ * Shim for Claude Code spawning in Docker mode.
+ * Logs spawn request to file instead of executing Claude Code (which isn't available in containers).
+ * Returns a mock process that immediately exits to avoid breaking callers.
+ */
+async function shimClaudeSpawn(taskId: string, args: string[], cwd: string): Promise<ChildProcess> {
+  const logDir = daemonConfig.CLAUDE_SHIM_LOG_DIR;
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const logFile = join(logDir, `claude-spawn-${taskId}-${timestamp}.log`);
+
+  await mkdir(logDir, { recursive: true });
+
+  const logContent = `=== Claude Spawn Request (Docker Mode) ===
+Timestamp: ${new Date().toISOString()}
+Task ID: ${taskId}
+Working Directory: ${cwd}
+Arguments: ${args.join(' ')}
+Environment:
+  SHIPYARD_TASK_ID=${taskId}
+  SHIPYARD_WEB_URL=${daemonConfig.SHIPYARD_WEB_URL}
+
+[SHIMMED] Claude Code would be spawned here in native mode.
+For prompt evaluation, see daemon-logs volume.
+`;
+
+  await writeFile(logFile, logContent, 'utf-8');
+  logger.info({ taskId, logFile }, '[DOCKER_MODE] Claude spawn shimmed');
+
+  const mockProcess = spawn('echo', ['Claude spawn shimmed']);
+  trackAgent(taskId, mockProcess);
+  return mockProcess;
+}
+
 function stopExistingAgentIfRunning(taskId: string): void {
   if (activeAgents.has(taskId)) {
     logger.info({ taskId }, 'Stopping existing agent');
@@ -146,10 +175,7 @@ async function getResolvedMcpConfigPath(): Promise<string | null> {
   const daemonDir = dirname(currentFile);
   const projectRoot = resolve(daemonDir, '../../..');
 
-  const candidates = [
-    join(projectRoot, '.mcp.json'),
-    join(process.cwd(), '.mcp.json'),
-  ];
+  const candidates = [join(projectRoot, '.mcp.json'), join(process.cwd(), '.mcp.json')];
 
   let sourcePath: string | null = null;
   for (const path of candidates) {
@@ -171,7 +197,9 @@ async function getResolvedMcpConfigPath(): Promise<string | null> {
   try {
     config = JSON.parse(configContent);
   } catch (err) {
-    throw new Error(`Failed to parse MCP config at ${sourcePath}: ${err instanceof Error ? err.message : String(err)}`);
+    throw new Error(
+      `Failed to parse MCP config at ${sourcePath}: ${err instanceof Error ? err.message : String(err)}`
+    );
   }
 
   if (config.mcpServers) {
@@ -212,6 +240,13 @@ export async function spawnClaudeCode(opts: SpawnAgentOptions): Promise<ChildPro
 
     await mkdir(cwd, { recursive: true });
 
+    if (daemonConfig.DOCKER_MODE) {
+      const mcpConfigPath = await getResolvedMcpConfigPath();
+      const commonArgs = await buildCommonSpawnArgs(taskId, mcpConfigPath);
+      const args = ['-p', prompt, ...commonArgs];
+      return shimClaudeSpawn(taskId, args, cwd);
+    }
+
     const claudePath = getClaudePath();
     const mcpConfigPath = await getResolvedMcpConfigPath();
     const commonArgs = await buildCommonSpawnArgs(taskId, mcpConfigPath);
@@ -219,18 +254,14 @@ export async function spawnClaudeCode(opts: SpawnAgentOptions): Promise<ChildPro
 
     logger.info({ taskId, command: claudePath, args: args.join(' '), cwd }, 'Spawning Claude Code');
 
-    const child = spawn(
-      claudePath,
-      args,
-      {
-        cwd,
-        stdio: ['ignore', 'pipe', 'pipe'],
-        env: {
-          ...process.env,
-          SHIPYARD_TASK_ID: taskId,
-        },
-      }
-    );
+    const child = spawn(claudePath, args, {
+      cwd,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      env: {
+        ...process.env,
+        SHIPYARD_TASK_ID: taskId,
+      },
+    });
 
     child.on('error', (err) => {
       logger.error({ taskId, err: err.message }, 'Spawn error');
@@ -331,20 +362,24 @@ export async function spawnClaudeCodeWithContext(
     const commonArgs = await buildCommonSpawnArgs(taskId, mcpConfigPath);
     const args = ['-r', sessionId, '-p', 'Continue working on this task.', ...commonArgs];
 
-    logger.info({ taskId, sessionId, command: claudePath, args: args.join(' '), cwd }, 'Spawning Claude Code with session');
+    if (daemonConfig.DOCKER_MODE) {
+      const child = await shimClaudeSpawn(taskId, args, cwd);
+      return { child, sessionId };
+    }
 
-    const child = spawn(
-      claudePath,
-      args,
-      {
-        cwd,
-        stdio: ['ignore', 'pipe', 'pipe'],
-        env: {
-          ...process.env,
-          SHIPYARD_TASK_ID: taskId,
-        },
-      }
+    logger.info(
+      { taskId, sessionId, command: claudePath, args: args.join(' '), cwd },
+      'Spawning Claude Code with session'
     );
+
+    const child = spawn(claudePath, args, {
+      cwd,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      env: {
+        ...process.env,
+        SHIPYARD_TASK_ID: taskId,
+      },
+    });
 
     child.on('error', (err) => {
       logger.error({ taskId, err: err.message }, 'Spawn error');

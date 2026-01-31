@@ -1,0 +1,193 @@
+# Docker Compose configuration for isolated Shipyard development
+#
+# Services:
+#   - registry: MCP server with WebSocket sync (exposed :32191)
+#   - signaling: WebRTC signaling (exposed :4444 for browser WebRTC)
+#   - web: Vite dev server (exposed :5173)
+#   - oauth: GitHub OAuth worker (internal :4445)
+#   - og-proxy: OpenGraph proxy worker (internal :4446)
+#   - daemon: Agent launcher daemon (exposed :56609)
+#
+# Usage:
+#   docker compose up --build           # Start all services
+#   docker compose up --build registry  # Start specific service
+#   pnpm dev:isolated                   # Use wrapper script (recommended)
+#
+# Volumes:
+#   - shipyard-data: Persisted plan data (registry + daemon)
+#   - daemon-logs: Claude spawn request logs
+#
+# Environment variables can be overridden via .env.docker file
+
+services:
+  # ==========================================================================
+  # REGISTRY - MCP Server with WebSocket sync
+  # ==========================================================================
+  registry:
+    build:
+      context: .
+      target: registry
+    ports:
+      - "${REGISTRY_PORT:-32191}:${REGISTRY_PORT:-32191}"
+    environment:
+      # Server configuration
+      - REGISTRY_PORT=${REGISTRY_PORT:-32191}
+      - SHIPYARD_STATE_DIR=/data/shipyard
+      # URLs for internal service communication
+      - SIGNALING_URL=ws://signaling:${SIGNALING_PORT:-4444}
+      - SHIPYARD_WEB_URL=http://web:${VITE_PORT:-5173}
+      - DAEMON_PORT=${DAEMON_PORT:-56609}
+      # Node options
+      - NODE_ENV=development
+    volumes:
+      # Persistent data storage
+      - shipyard-data:/data/shipyard
+      # Read-only access to Claude config (for MCP discovery)
+      - ${HOME}/.claude/projects:/root/.claude/projects:ro
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:${REGISTRY_PORT:-32191}/registry"]
+      interval: 10s
+      timeout: 3s
+      start_period: 5s
+      retries: 3
+    networks:
+      - shipyard
+
+  # ==========================================================================
+  # SIGNALING - WebRTC signaling server
+  # ==========================================================================
+  signaling:
+    build:
+      context: .
+      target: signaling
+    ports:
+      # Exposed for browser WebRTC connections
+      - "${SIGNALING_PORT:-4444}:${SIGNALING_PORT:-4444}"
+    environment:
+      - PORT=${SIGNALING_PORT:-4444}
+      - NODE_ENV=development
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:${SIGNALING_PORT:-4444}/"]
+      interval: 10s
+      timeout: 3s
+      start_period: 5s
+      retries: 3
+    networks:
+      - shipyard
+
+  # ==========================================================================
+  # WEB - Vite dev server with HMR
+  # ==========================================================================
+  web:
+    build:
+      context: .
+      target: web
+    ports:
+      - "${VITE_PORT:-5173}:${VITE_PORT:-5173}"
+    environment:
+      # Vite configuration
+      - VITE_PORT=${VITE_PORT:-5173}
+      # Browser-side URLs (these compile into the bundle)
+      # Note: Browser uses localhost, not Docker network names
+      - VITE_WEBRTC_SIGNALING=ws://localhost:${SIGNALING_PORT:-4444}
+      - VITE_GITHUB_OAUTH_WORKER=http://localhost:${OAUTH_PORT:-4445}
+      - VITE_OG_PROXY_URL=http://localhost:${OG_PROXY_PORT:-4446}
+      - VITE_REGISTRY_PORT=${REGISTRY_PORT:-32191}
+      - VITE_DAEMON_WS_URL=ws://localhost:${DAEMON_PORT:-56609}
+      - NODE_ENV=development
+    depends_on:
+      registry:
+        condition: service_healthy
+    networks:
+      - shipyard
+
+  # ==========================================================================
+  # OAUTH - GitHub OAuth worker (Cloudflare Wrangler)
+  # ==========================================================================
+  oauth:
+    build:
+      context: .
+      target: oauth
+    ports:
+      # Exposed for browser OAuth flow
+      - "${OAUTH_PORT:-4445}:${OAUTH_PORT:-4445}"
+    environment:
+      - OAUTH_PORT=${OAUTH_PORT:-4445}
+      - NODE_ENV=development
+      # GitHub OAuth credentials (set in .env.docker or environment)
+      - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID:-}
+      - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET:-}
+    networks:
+      - shipyard
+
+  # ==========================================================================
+  # OG-PROXY - OpenGraph proxy worker (Cloudflare Wrangler)
+  # ==========================================================================
+  og-proxy:
+    build:
+      context: .
+      target: og-proxy
+    ports:
+      # Exposed for social media crawlers and sharing previews
+      - "${OG_PROXY_PORT:-4446}:${OG_PROXY_PORT:-4446}"
+    environment:
+      - OG_PROXY_PORT=${OG_PROXY_PORT:-4446}
+      - VITE_PORT=${VITE_PORT:-5173}
+      - NODE_ENV=development
+    depends_on:
+      - web
+    networks:
+      - shipyard
+
+  # ==========================================================================
+  # DAEMON - Agent launcher daemon
+  # ==========================================================================
+  daemon:
+    build:
+      context: .
+      target: daemon
+    ports:
+      - "${DAEMON_PORT:-56609}:${DAEMON_PORT:-56609}"
+    environment:
+      - DAEMON_PORT=${DAEMON_PORT:-56609}
+      - SHIPYARD_STATE_DIR=/data/shipyard
+      - SHIPYARD_WEB_URL=http://web:${VITE_PORT:-5173}
+      - CLAUDE_EXECUTABLE=/usr/local/bin/claude-shim.sh
+      - CLAUDE_SHIM_LOG_DIR=/var/log/shipyard
+      - NODE_ENV=development
+    volumes:
+      # Persistent data storage (shared with registry)
+      - shipyard-data:/data/shipyard
+      # Read-only access to Claude config
+      - ${HOME}/.claude:/root/.claude:ro
+      # Claude spawn logs
+      - daemon-logs:/var/log/shipyard
+    depends_on:
+      registry:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "pgrep", "-f", "node.*daemon"]
+      interval: 10s
+      timeout: 3s
+      start_period: 5s
+      retries: 3
+    networks:
+      - shipyard
+
+# =============================================================================
+# VOLUMES
+# =============================================================================
+volumes:
+  # Persistent storage for plans and CRDT data
+  shipyard-data:
+    name: shipyard-data-${WORKTREE_NAME:-default}
+  # Claude spawn request logs (for debugging)
+  daemon-logs:
+    name: shipyard-daemon-logs-${WORKTREE_NAME:-default}
+
+# =============================================================================
+# NETWORKS
+# =============================================================================
+networks:
+  shipyard:
+    name: shipyard-${WORKTREE_NAME:-default}

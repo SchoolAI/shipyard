@@ -79,6 +79,70 @@ Browser should open with the task.
 
 ---
 
+## Docker Compose Mode (Isolated Development)
+
+For fully isolated development with predictable cleanup, use Docker Compose mode:
+
+```bash
+pnpm dev:isolated
+```
+
+This runs all services in Docker containers with:
+- Static ports (no hashing) - Registry always on :32191, Web on :5173
+- Isolated state per worktree (separate Docker volumes)
+- Predictable cleanup (`docker compose down`)
+- Daemon shims Claude execution (logs spawn requests instead of executing)
+
+### Why Use Docker Mode
+
+**Use Docker when:**
+- Testing multi-worktree scenarios
+- Need clean slate environments
+- Want predictable port assignments
+- Developing on the Docker infrastructure itself
+
+**Use native (`pnpm dev:all`) when:**
+- Quick iteration on code changes (faster HMR)
+- Using Claude Code agent features (daemon shimmed in Docker)
+- Default development workflow
+
+### Docker Commands
+
+```bash
+pnpm dev:isolated    # Start all services in Docker
+pnpm docker:logs     # Follow logs from all containers
+pnpm docker:down     # Stop containers
+pnpm docker:clean    # Remove containers, volumes, and images
+```
+
+### How It Works
+
+- Each worktree gets unique ports via `.env.docker` (auto-generated from `worktree-env.sh`)
+- Services communicate internally via Docker network
+- Browser connects via localhost exposed ports
+- Claude spawn requests logged to `daemon-logs` volume (not executed)
+
+### Prerequisites
+
+- Docker Desktop installed and running
+- Same Node.js/pnpm requirements as native mode
+
+### Inspecting Shim Logs
+
+In Docker mode, the daemon logs Claude spawn requests instead of executing them:
+
+```bash
+# View recent shim logs
+docker compose exec daemon ls -lt /var/log/shipyard
+
+# Read a specific log
+docker compose exec daemon cat /var/log/shipyard/claude-spawn-{taskId}-{timestamp}.log
+```
+
+These logs show what prompts would be sent to Claude, useful for prompt evaluation.
+
+---
+
 ## Agent Launcher Daemon
 
 The daemon enables browser → agent triggering. Click "+ Create Task" in Shipyard UI to launch Claude Code on your machine.

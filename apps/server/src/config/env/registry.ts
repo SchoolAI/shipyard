@@ -6,6 +6,10 @@ import { z } from 'zod';
 import { loadEnv } from '../config.js';
 
 const schema = z.object({
+  SHIPYARD_MODE: z
+    .enum(['hub', 'client', 'auto'])
+    .default('auto')
+    .describe('Hub runs registry server, client connects to existing hub, auto detects'),
   REGISTRY_PORT: z
     .string()
     .optional()

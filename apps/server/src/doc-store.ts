@@ -94,14 +94,42 @@ export async function getOrCreateDoc(docName: string): Promise<Y.Doc> {
 
   /** Add WebRTC provider for P2P sync (enabled by default) */
   if (!webrtcProviders.has(docName)) {
+    logger.debug({ docName }, 'Creating WebRTC provider for plan');
     try {
       const provider = await createWebRtcProvider(doc, docName);
       webrtcProviders.set(docName, provider);
-      logger.info({ docName }, 'WebRTC P2P sync enabled for plan');
+      logger.info({ docName, connected: provider.connected }, 'WebRTC P2P sync enabled for plan');
+
+      /** Debug: Check awareness immediately after creation */
+      setTimeout(() => {
+        const awareness = provider.awareness;
+        const localState = awareness.getLocalState();
+        logger.debug(
+          {
+            docName,
+            connected: provider.connected,
+            awarenessClientId: awareness.clientID,
+            hasLocalState: !!localState,
+            planStatus: localState?.planStatus,
+          },
+          'WebRTC provider status check'
+        );
+      }, 2000);
     } catch (error) {
-      logger.error({ error, docName }, 'Failed to create WebRTC provider - P2P sync unavailable');
+      const errorDetails = {
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        errorType: error?.constructor?.name,
+        errorObj: error,
+      };
+      logger.error(
+        { error: errorDetails, docName },
+        'Failed to create WebRTC provider - P2P sync unavailable'
+      );
       /** Continue without WebRTC - local sync still works */
     }
+  } else {
+    logger.debug({ docName }, 'WebRTC provider already exists for this plan');
   }
 
   return doc;
