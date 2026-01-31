@@ -24,6 +24,7 @@ services:
   # REGISTRY - MCP Server with WebSocket sync
   # ==========================================================================
   registry:
+    platform: linux/amd64
     build:
       context: .
       target: registry
@@ -58,6 +59,7 @@ services:
   # SIGNALING - WebRTC signaling server
   # ==========================================================================
   signaling:
+    platform: linux/amd64
     build:
       context: .
       target: signaling
@@ -81,6 +83,7 @@ services:
   # WEB - Vite dev server with HMR
   # ==========================================================================
   web:
+    platform: linux/amd64
     build:
       context: .
       target: web
@@ -105,48 +108,52 @@ services:
 
   # ==========================================================================
   # OAUTH - GitHub OAuth worker (Cloudflare Wrangler)
+  # DISABLED: Wrangler doesn't work in Docker on Apple Silicon (Rosetta issues)
+  # For GitHub OAuth testing, run natively: pnpm --filter @shipyard/github-oauth-worker exec wrangler dev
   # ==========================================================================
-  oauth:
-    build:
-      context: .
-      target: oauth
-    ports:
-      # Exposed for browser OAuth flow
-      - "${OAUTH_PORT:-4445}:${OAUTH_PORT:-4445}"
-    environment:
-      - OAUTH_PORT=${OAUTH_PORT:-4445}
-      - NODE_ENV=development
-      - LOG_LEVEL=${LOG_LEVEL:-debug}
-      # GitHub OAuth credentials (set in .env.docker or environment)
-      - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID:-}
-      - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET:-}
-    networks:
-      - shipyard
+  # oauth:
+  #   platform: linux/amd64
+  #   build:
+  #     context: .
+  #     target: oauth
+  #   ports:
+  #     - "${OAUTH_PORT:-4445}:${OAUTH_PORT:-4445}"
+  #   environment:
+  #     - OAUTH_PORT=${OAUTH_PORT:-4445}
+  #     - NODE_ENV=development
+  #     - LOG_LEVEL=${LOG_LEVEL:-debug}
+  #     - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID:-}
+  #     - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET:-}
+  #   networks:
+  #     - shipyard
 
   # ==========================================================================
   # OG-PROXY - OpenGraph proxy worker (Cloudflare Wrangler)
+  # DISABLED: Wrangler doesn't work in Docker on Apple Silicon (Rosetta issues)
+  # For OG preview testing, run natively: pnpm --filter @shipyard/og-proxy-worker exec wrangler dev
   # ==========================================================================
-  og-proxy:
-    build:
-      context: .
-      target: og-proxy
-    ports:
-      # Exposed for social media crawlers and sharing previews
-      - "${OG_PROXY_PORT:-4446}:${OG_PROXY_PORT:-4446}"
-    environment:
-      - OG_PROXY_PORT=${OG_PROXY_PORT:-4446}
-      - VITE_PORT=${VITE_PORT:-5173}
-      - NODE_ENV=development
-      - LOG_LEVEL=${LOG_LEVEL:-debug}
-    depends_on:
-      - web
-    networks:
-      - shipyard
+  # og-proxy:
+  #   platform: linux/amd64
+  #   build:
+  #     context: .
+  #     target: og-proxy
+  #   ports:
+  #     - "${OG_PROXY_PORT:-4446}:${OG_PROXY_PORT:-4446}"
+  #   environment:
+  #     - OG_PROXY_PORT=${OG_PROXY_PORT:-4446}
+  #     - VITE_PORT=${VITE_PORT:-5173}
+  #     - NODE_ENV=development
+  #     - LOG_LEVEL=${LOG_LEVEL:-debug}
+  #   depends_on:
+  #     - web
+  #   networks:
+  #     - shipyard
 
   # ==========================================================================
   # DAEMON - Agent launcher daemon
   # ==========================================================================
   daemon:
+    platform: linux/amd64
     build:
       context: .
       target: daemon

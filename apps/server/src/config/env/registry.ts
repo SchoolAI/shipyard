@@ -10,6 +10,10 @@ const schema = z.object({
     .enum(['hub', 'client', 'auto'])
     .default('auto')
     .describe('Hub runs registry server, client connects to existing hub, auto detects'),
+  REGISTRY_HUB_URL: z
+    .string()
+    .optional()
+    .describe('Explicit hub URL for client mode (e.g., ws://localhost:32191). If set, forces client mode.'),
   REGISTRY_PORT: z
     .string()
     .optional()

@@ -5,9 +5,12 @@
       "args": ["mcpmon", "--watch", "apps/server/dist", "--ext", "js", "--", "node", "apps/server/dist/index.js"],
       "env": {
         "NODE_ENV": "development",
-        "SHIPYARD_WEB_URL": "http://localhost:5173",
-        "SIGNALING_URL": "ws://localhost:4444"
-      }
+        "SHIPYARD_WEB_URL": "http://localhost:5180",
+        "SIGNALING_URL": "ws://localhost:4514",
+        "REGISTRY_PORT": "32198",
+        "SHIPYARD_MODE": "auto"
+      },
+      "__comment": "Auto mode: If Docker hub is running, MCP connects as client. Otherwise becomes hub. For Docker workflow, start containers first with 'pnpm dev:isolated'"
     },
     "heroui-react": {
       "command": "npx",

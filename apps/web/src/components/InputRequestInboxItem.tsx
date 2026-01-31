@@ -101,9 +101,7 @@ export function InputRequestInboxItem({
                   className="text-xs text-accent hover:underline flex items-center gap-0.5"
                   onClick={(e) => {
                     e.stopPropagation();
-                    if (request.planId) {
-                      onSelectPlan(request.planId);
-                    }
+                    if (request.planId) onSelectPlan(request.planId);
                   }}
                 >
                   <ExternalLink className="w-3 h-3" />
