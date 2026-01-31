@@ -14,7 +14,12 @@
 # =============================================================================
 # BASE STAGE - Common setup for all services
 # =============================================================================
-FROM node:22-alpine AS base
+# Use Debian-based image (glibc) instead of Alpine (musl)
+# @roamhq/wrtc requires glibc 2.32+ and won't work with musl
+FROM --platform=linux/amd64 node:22-slim AS base
+
+# Install build tools for native modules (wrtc, etc.)
+RUN apt-get update && apt-get install -y python3 make g++ wget && rm -rf /var/lib/apt/lists/*
 
 # Install pnpm via corepack (matches project's packageManager field)
 RUN corepack enable && corepack prepare pnpm@10.9.0 --activate
@@ -22,7 +27,7 @@ RUN corepack enable && corepack prepare pnpm@10.9.0 --activate
 WORKDIR /app
 
 # Copy workspace configuration first for layer caching
-COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
+COPY pnpm-workspace.yaml pnpm-lock.yaml package.json .npmrc ./
 COPY tsconfig.base.json turbo.json biome.json ./
 
 # Copy all package.json files to leverage Docker cache
@@ -36,8 +41,11 @@ COPY apps/github-oauth-worker/package.json apps/github-oauth-worker/
 COPY apps/og-proxy-worker/package.json apps/og-proxy-worker/
 COPY apps/hook/package.json apps/hook/
 
-# Install all dependencies (skip postinstall scripts - not needed in Docker)
-RUN pnpm install --frozen-lockfile --ignore-scripts
+# Copy hook scripts for postinstall (prevents install failure)
+COPY apps/hook/scripts apps/hook/scripts
+
+# Install all dependencies with native module builds
+RUN pnpm install --frozen-lockfile
 
 # Copy source for schema (needed by all services)
 COPY packages/schema packages/schema

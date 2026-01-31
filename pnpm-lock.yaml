@@ -198,6 +198,9 @@ importers:
       '@roamhq/wrtc':
         specifier: ^0.9.1
         version: 0.9.1
+      '@roamhq/wrtc-linux-x64':
+        specifier: ^0.9.1
+        version: 0.9.1
       '@trpc/server':
         specifier: ^11.8.1
         version: 11.8.1(typescript@5.9.3)
@@ -8682,8 +8685,7 @@ snapshots:
   '@roamhq/wrtc-linux-arm64@0.9.1':
     optional: true
 
-  '@roamhq/wrtc-linux-x64@0.9.1':
-    optional: true
+  '@roamhq/wrtc-linux-x64@0.9.1': {}
 
   '@roamhq/wrtc-win32-x64@0.9.1':
     optional: true

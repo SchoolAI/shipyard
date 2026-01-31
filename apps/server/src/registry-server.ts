@@ -6,7 +6,6 @@ import { join, resolve, sep } from 'node:path';
 import {
   appRouter,
   type Context,
-  DEFAULT_EPOCH,
   EPOCH_CLOSE_CODES,
   EPOCH_CLOSE_REASONS,
   getEpochFromMetadata,

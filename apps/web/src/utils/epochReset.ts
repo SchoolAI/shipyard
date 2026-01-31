@@ -49,7 +49,7 @@ function forceResetDocument(planId: string): void {
     const ydoc = new Y.Doc({ guid: planId });
     ydoc.destroy();
   } catch {
-    /* Ignore errors - best effort cleanup */
+    /** Ignore Y.Doc errors - cleanup is best effort before redirect */
   }
   window.location.href = '/';
 }
