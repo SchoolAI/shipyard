@@ -19,7 +19,6 @@ import {
 import { createLogger, type Logger } from "../utils/logger";
 import type {
 	AgentInfo,
-	BrowserSession,
 	PassedClaims,
 	PersonalConnectionType,
 	SerializedPersonalConnectionState,
@@ -80,7 +79,7 @@ export class PersonalRoom extends DurableObject<Env> {
 	/**
 	 * Handle incoming HTTP/WebSocket request.
 	 */
-	async fetch(request: Request): Promise<Response> {
+	override async fetch(request: Request): Promise<Response> {
 		const upgradeHeader = request.headers.get("Upgrade");
 		if (upgradeHeader !== "websocket") {
 			return new Response("Expected WebSocket upgrade", { status: 426 });
@@ -99,14 +98,12 @@ export class PersonalRoom extends DurableObject<Env> {
 		}
 
 		const pair = new WebSocketPair();
-		const [client, server] = Object.values(pair);
+		const [client, server] = Object.values(pair) as [WebSocket, WebSocket];
 
-		// Determine connection type from User-Agent or other header
 		const userAgent = request.headers.get("User-Agent") ?? "";
 		const isAgent = userAgent.includes("shipyard-daemon");
 		const type: PersonalConnectionType = isAgent ? "agent" : "browser";
 
-		// Create connection state
 		const state: ConnectionState = {
 			id: crypto.randomUUID(),
 			type,
@@ -118,12 +115,10 @@ export class PersonalRoom extends DurableObject<Env> {
 			state.sessionId = crypto.randomUUID();
 		}
 
-		// Store state and accept
 		this.ctx.acceptWebSocket(server);
 		this.connections.set(server, state);
 		this.persistConnectionState(server, state);
 
-		// Send authenticated message and current agents list
 		this.sendMessage(server, {
 			type: "authenticated",
 			userId: claims.sub,
@@ -143,7 +138,7 @@ export class PersonalRoom extends DurableObject<Env> {
 	/**
 	 * WebSocket message handler (hibernation-aware).
 	 */
-	async webSocketMessage(
+	override async webSocketMessage(
 		ws: WebSocket,
 		message: string | ArrayBuffer,
 	): Promise<void> {
@@ -180,7 +175,7 @@ export class PersonalRoom extends DurableObject<Env> {
 	/**
 	 * WebSocket close handler.
 	 */
-	async webSocketClose(
+	override async webSocketClose(
 		ws: WebSocket,
 		code: number,
 		reason: string,
@@ -190,12 +185,10 @@ export class PersonalRoom extends DurableObject<Env> {
 
 		this.logger.info("Connection closed", { type: state.type, code, reason });
 
-		// If agent, unregister
 		if (state.type === "agent" && state.agentId) {
 			delete this.agents[state.agentId];
 			await this.ctx.storage.put("agents", this.agents);
 
-			// Broadcast agent left
 			broadcastExcept(
 				this.connections,
 				{
@@ -212,12 +205,10 @@ export class PersonalRoom extends DurableObject<Env> {
 	/**
 	 * WebSocket error handler.
 	 */
-	async webSocketError(ws: WebSocket, error: unknown): Promise<void> {
+	override async webSocketError(ws: WebSocket, error: unknown): Promise<void> {
 		this.logger.error("WebSocket error", { error: String(error) });
 		await this.webSocketClose(ws, 1011, "WebSocket error");
 	}
-
-	// ============ Message Handlers ============
 
 	private async handleMessage(
 		ws: WebSocket,
@@ -242,10 +233,10 @@ export class PersonalRoom extends DurableObject<Env> {
 			case "spawn-agent":
 				this.handleSpawnAgent(ws, state, msg);
 				break;
-			default: {
-				const _exhaustive: never = msg;
+			default:
+				// Exhaustiveness check - TypeScript ensures all cases are handled
+				msg satisfies never;
 				this.sendError(ws, "unknown_type", `Unknown message type`);
-			}
 		}
 	}
 

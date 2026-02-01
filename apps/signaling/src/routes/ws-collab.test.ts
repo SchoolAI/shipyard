@@ -1,17 +1,19 @@
 import { env } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
 import type { PresignedUrlPayload } from "../auth/types";
+import type { Env } from "../env";
+import { hmacSign } from "../utils/crypto";
 import { app } from "./index";
 
 /**
  * Helper to create a valid pre-signed URL token for testing
  */
-function createPresignedToken(
+async function createPresignedToken(
 	roomId: string,
 	taskId = "task-123",
 	inviterId = "gh_12345",
 	expiresInMs = 60 * 60 * 1000, // 1 hour
-): string {
+): Promise<string> {
 	const payload: PresignedUrlPayload = {
 		roomId,
 		taskId,
@@ -25,16 +27,18 @@ function createPresignedToken(
 		.replace(/\//g, "_")
 		.replace(/=+$/, "");
 
-	// In production, this would be signed with HMAC
-	// For testing the route validation (not crypto), we use a placeholder signature
-	// The validatePresignedUrl function currently doesn't verify signature (TODO in code)
-	return `${payloadB64}.test_signature`;
+	// Sign with HMAC using test secret
+	const signature = await hmacSign(
+		payloadB64,
+		(env as unknown as Env).JWT_SECRET,
+	);
+	return `${payloadB64}.${signature}`;
 }
 
 /**
  * Helper to create an expired pre-signed URL token
  */
-function createExpiredToken(roomId: string): string {
+async function createExpiredToken(roomId: string): Promise<string> {
 	const payload: PresignedUrlPayload = {
 		roomId,
 		taskId: "task-123",
@@ -48,14 +52,19 @@ function createExpiredToken(roomId: string): string {
 		.replace(/\//g, "_")
 		.replace(/=+$/, "");
 
-	return `${payloadB64}.test_signature`;
+	// Sign with HMAC using test secret
+	const signature = await hmacSign(
+		payloadB64,
+		(env as unknown as Env).JWT_SECRET,
+	);
+	return `${payloadB64}.${signature}`;
 }
 
 describe("GET /collab/:roomId (WebSocket)", () => {
 	const testRoomId = "test-room-abc123";
 
 	it("returns 426 without Upgrade header", async () => {
-		const token = createPresignedToken(testRoomId);
+		const token = await createPresignedToken(testRoomId);
 
 		const res = await app.request(
 			`/collab/${testRoomId}?token=${token}`,
@@ -66,7 +75,7 @@ describe("GET /collab/:roomId (WebSocket)", () => {
 		);
 
 		expect(res.status).toBe(426);
-		const json = await res.json();
+		const json = (await res.json()) as Record<string, unknown>;
 		expect(json.error).toBe("upgrade_required");
 		expect(json.message).toBe("WebSocket upgrade required");
 	});
@@ -84,7 +93,7 @@ describe("GET /collab/:roomId (WebSocket)", () => {
 		);
 
 		expect(res.status).toBe(401);
-		const json = await res.json();
+		const json = (await res.json()) as Record<string, unknown>;
 		expect(json.error).toBe("missing_token");
 		expect(json.message).toBe("token query param required");
 	});
@@ -102,7 +111,7 @@ describe("GET /collab/:roomId (WebSocket)", () => {
 		);
 
 		expect(res.status).toBe(401);
-		const json = await res.json();
+		const json = (await res.json()) as Record<string, unknown>;
 		expect(json.error).toBe("invalid_token");
 		expect(json.message).toBe("Invalid or expired token");
 	});
@@ -123,12 +132,12 @@ describe("GET /collab/:roomId (WebSocket)", () => {
 		);
 
 		expect(res.status).toBe(401);
-		const json = await res.json();
+		const json = (await res.json()) as Record<string, unknown>;
 		expect(json.error).toBe("invalid_token");
 	});
 
 	it("returns 401 for expired token", async () => {
-		const token = createExpiredToken(testRoomId);
+		const token = await createExpiredToken(testRoomId);
 
 		const res = await app.request(
 			`/collab/${testRoomId}?token=${token}`,
@@ -143,13 +152,13 @@ describe("GET /collab/:roomId (WebSocket)", () => {
 
 		expect(res.status).toBe(401);
 		// The route checks expiration and returns 401 with "expired" error
-		const json = await res.json();
+		const json = (await res.json()) as Record<string, unknown>;
 		expect(json.error).toBe("invalid_token");
 	});
 
 	it("returns 403 when roomId does not match token payload", async () => {
 		// Create token for different room
-		const token = createPresignedToken("different-room");
+		const token = await createPresignedToken("different-room");
 
 		const res = await app.request(
 			`/collab/${testRoomId}?token=${token}`,
@@ -163,13 +172,13 @@ describe("GET /collab/:roomId (WebSocket)", () => {
 		);
 
 		expect(res.status).toBe(403);
-		const json = await res.json();
+		const json = (await res.json()) as Record<string, unknown>;
 		expect(json.error).toBe("forbidden");
 		expect(json.message).toBe("roomId does not match token");
 	});
 
 	it("accepts valid WebSocket upgrade request with matching token", async () => {
-		const token = createPresignedToken(testRoomId);
+		const token = await createPresignedToken(testRoomId);
 
 		const res = await app.request(
 			`/collab/${testRoomId}?token=${token}`,
@@ -192,7 +201,7 @@ describe("GET /collab/:roomId (WebSocket)", () => {
 	});
 
 	it("handles URL-encoded token", async () => {
-		const token = createPresignedToken(testRoomId);
+		const token = await createPresignedToken(testRoomId);
 		const encodedToken = encodeURIComponent(token);
 
 		const res = await app.request(
@@ -238,7 +247,7 @@ describe("GET /collab/:roomId (WebSocket)", () => {
 		);
 
 		expect(res.status).toBe(401);
-		const json = await res.json();
+		const json = (await res.json()) as Record<string, unknown>;
 		expect(json.error).toBe("invalid_token");
 	});
 
@@ -256,13 +265,13 @@ describe("GET /collab/:roomId (WebSocket)", () => {
 		);
 
 		expect(res.status).toBe(401);
-		const json = await res.json();
+		const json = (await res.json()) as Record<string, unknown>;
 		expect(json.error).toBe("invalid_token");
 	});
 
 	it("handles special characters in roomId", async () => {
 		const specialRoomId = "room-with-dashes_and_underscores";
-		const token = createPresignedToken(specialRoomId);
+		const token = await createPresignedToken(specialRoomId);
 
 		const res = await app.request(
 			`/collab/${specialRoomId}?token=${token}`,
@@ -280,7 +289,7 @@ describe("GET /collab/:roomId (WebSocket)", () => {
 	});
 
 	it("returns 426 for non-GET requests without upgrade", async () => {
-		const token = createPresignedToken(testRoomId);
+		const token = await createPresignedToken(testRoomId);
 
 		// POST should also require upgrade header
 		const res = await app.request(

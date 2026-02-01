@@ -5,8 +5,8 @@
  */
 
 import { z } from "zod";
-import type { GitHubUser, ShipyardJWTClaims } from "./types";
 import { hmacSign, hmacVerify } from "../utils/crypto";
+import type { GitHubUser, ShipyardJWTClaims } from "./types";
 
 /** Schema for validating JWT payload structure */
 const ShipyardJWTClaimsSchema = z.object({
@@ -83,7 +83,6 @@ export async function validateToken(
 		const payloadB64 = parts[1];
 		const signatureB64 = parts[2];
 
-		// Type guard after length check
 		if (!headerB64 || !payloadB64 || !signatureB64) return null;
 
 		const isValid = await hmacVerify(

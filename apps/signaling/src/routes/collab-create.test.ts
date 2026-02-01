@@ -1,6 +1,7 @@
 import { env } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
 import { generateSessionToken } from "../auth/jwt";
+import type { Env } from "../env";
 import { app } from "./index";
 
 /**
@@ -12,7 +13,7 @@ async function createTestToken(
 ): Promise<string> {
 	return generateSessionToken(
 		{ id: userId, login: username },
-		env.JWT_SECRET,
+		(env as unknown as Env).JWT_SECRET,
 	);
 }
 
@@ -54,7 +55,7 @@ describe("POST /collab/create", () => {
 		);
 
 		expect(res.status).toBe(401);
-		const json = await res.json();
+		const json = (await res.json()) as Record<string, unknown>;
 		expect(json.error).toBe("unauthorized");
 		expect(json.message).toBe("Bearer token required");
 	});
@@ -74,7 +75,7 @@ describe("POST /collab/create", () => {
 		);
 
 		expect(res.status).toBe(401);
-		const json = await res.json();
+		const json = (await res.json()) as Record<string, unknown>;
 		expect(json.error).toBe("unauthorized");
 	});
 
@@ -93,7 +94,7 @@ describe("POST /collab/create", () => {
 		);
 
 		expect(res.status).toBe(401);
-		const json = await res.json();
+		const json = (await res.json()) as Record<string, unknown>;
 		expect(json.error).toBe("invalid_token");
 		expect(json.message).toBe("Invalid or expired token");
 	});
@@ -115,7 +116,7 @@ describe("POST /collab/create", () => {
 		);
 
 		expect(res.status).toBe(401);
-		const json = await res.json();
+		const json = (await res.json()) as Record<string, unknown>;
 		expect(json.error).toBe("invalid_token");
 	});
 
@@ -136,7 +137,7 @@ describe("POST /collab/create", () => {
 		);
 
 		expect(res.status).toBe(400);
-		const json = await res.json();
+		const json = (await res.json()) as Record<string, unknown>;
 		expect(json.error).toBe("invalid_body");
 	});
 
@@ -157,7 +158,7 @@ describe("POST /collab/create", () => {
 		);
 
 		expect(res.status).toBe(400);
-		const json = await res.json();
+		const json = (await res.json()) as Record<string, unknown>;
 		expect(json.error).toBe("validation_error");
 		expect(json.details).toBeDefined();
 	});
@@ -179,7 +180,7 @@ describe("POST /collab/create", () => {
 		);
 
 		expect(res.status).toBe(400);
-		const json = await res.json();
+		const json = (await res.json()) as Record<string, unknown>;
 		expect(json.error).toBe("validation_error");
 	});
 
@@ -200,7 +201,7 @@ describe("POST /collab/create", () => {
 		);
 
 		expect(res.status).toBe(200);
-		const json = await res.json();
+		const json = (await res.json()) as Record<string, unknown>;
 
 		// Verify response structure
 		expect(json.url).toBeDefined();
@@ -210,7 +211,7 @@ describe("POST /collab/create", () => {
 
 		expect(json.roomId).toBeDefined();
 		expect(typeof json.roomId).toBe("string");
-		expect(json.roomId.length).toBe(16); // generateId(16)
+		expect((json.roomId as string).length).toBe(16); // generateId(16)
 
 		expect(json.expiresAt).toBeDefined();
 		expect(typeof json.expiresAt).toBe("number");
@@ -235,7 +236,7 @@ describe("POST /collab/create", () => {
 		);
 
 		expect(res.status).toBe(200);
-		const json = await res.json();
+		const json = (await res.json()) as Record<string, unknown>;
 
 		// Verify expiration is approximately 30 minutes from now
 		const expectedExpiry = Date.now() + expiresInMinutes * 60 * 1000;
@@ -262,7 +263,7 @@ describe("POST /collab/create", () => {
 		);
 
 		expect(res1.status).toBe(400);
-		const json1 = await res1.json();
+		const json1 = (await res1.json()) as Record<string, unknown>;
 		expect(json1.error).toBe("validation_error");
 
 		// Test maximum bound (> 24 hours)
@@ -280,7 +281,7 @@ describe("POST /collab/create", () => {
 		);
 
 		expect(res2.status).toBe(400);
-		const json2 = await res2.json();
+		const json2 = (await res2.json()) as Record<string, unknown>;
 		expect(json2.error).toBe("validation_error");
 	});
 
@@ -301,7 +302,7 @@ describe("POST /collab/create", () => {
 		);
 
 		expect(res.status).toBe(200);
-		const json = await res.json();
+		const json = (await res.json()) as Record<string, unknown>;
 
 		// Default is 60 minutes
 		const expectedExpiry = Date.now() + 60 * 60 * 1000;

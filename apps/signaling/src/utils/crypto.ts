@@ -26,8 +26,8 @@ export function timingSafeCompare(a: string, b: string): boolean {
 	let result = aBytes.length === bBytes.length ? 0 : 1;
 
 	for (let i = 0; i < maxLen; i++) {
-		const aByte = i < aBytes.length ? aBytes[i] : 0;
-		const bByte = i < bBytes.length ? bBytes[i] : 0;
+		const aByte = i < aBytes.length ? (aBytes[i] ?? 0) : 0;
+		const bByte = i < bBytes.length ? (bBytes[i] ?? 0) : 0;
 		result |= aByte ^ bByte;
 	}
 
@@ -46,7 +46,10 @@ export function generateId(length = 21): string {
 
 	let id = "";
 	for (let i = 0; i < length; i++) {
-		id += alphabet[randomBytes[i] % alphabet.length];
+		const byte = randomBytes[i];
+		if (byte !== undefined) {
+			id += alphabet[byte % alphabet.length];
+		}
 	}
 	return id;
 }

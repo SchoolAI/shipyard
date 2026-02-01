@@ -1,6 +1,7 @@
 import { env } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
 import { generateSessionToken } from "../auth/jwt";
+import type { Env } from "../env";
 import { app } from "./index";
 
 /**
@@ -10,7 +11,10 @@ async function createTestToken(
 	userId = 12345,
 	username = "testuser",
 ): Promise<string> {
-	return generateSessionToken({ id: userId, login: username }, env.JWT_SECRET);
+	return generateSessionToken(
+		{ id: userId, login: username },
+		(env as unknown as Env).JWT_SECRET,
+	);
 }
 
 describe("GET /personal/:userId (WebSocket)", () => {
@@ -26,7 +30,7 @@ describe("GET /personal/:userId (WebSocket)", () => {
 		);
 
 		expect(res.status).toBe(426);
-		const json = await res.json();
+		const json = (await res.json()) as Record<string, unknown>;
 		expect(json.error).toBe("upgrade_required");
 		expect(json.message).toBe("WebSocket upgrade required");
 	});
@@ -44,7 +48,7 @@ describe("GET /personal/:userId (WebSocket)", () => {
 		);
 
 		expect(res.status).toBe(401);
-		const json = await res.json();
+		const json = (await res.json()) as Record<string, unknown>;
 		expect(json.error).toBe("missing_token");
 		expect(json.message).toBe("token query param required");
 	});
@@ -62,7 +66,7 @@ describe("GET /personal/:userId (WebSocket)", () => {
 		);
 
 		expect(res.status).toBe(401);
-		const json = await res.json();
+		const json = (await res.json()) as Record<string, unknown>;
 		expect(json.error).toBe("invalid_token");
 		expect(json.message).toBe("Invalid or expired token");
 	});
@@ -80,7 +84,7 @@ describe("GET /personal/:userId (WebSocket)", () => {
 		);
 
 		expect(res.status).toBe(401);
-		const json = await res.json();
+		const json = (await res.json()) as Record<string, unknown>;
 		expect(json.error).toBe("invalid_token");
 	});
 
@@ -100,7 +104,7 @@ describe("GET /personal/:userId (WebSocket)", () => {
 		);
 
 		expect(res.status).toBe(403);
-		const json = await res.json();
+		const json = (await res.json()) as Record<string, unknown>;
 		expect(json.error).toBe("forbidden");
 		expect(json.message).toBe("userId does not match token");
 	});
@@ -185,7 +189,7 @@ describe("GET /personal/:userId (WebSocket)", () => {
 		);
 
 		expect(res.status).toBe(401);
-		const json = await res.json();
+		const json = (await res.json()) as Record<string, unknown>;
 		expect(json.error).toBe("invalid_token");
 	});
 });

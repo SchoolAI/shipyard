@@ -14,6 +14,7 @@ export {
   type TaskDocumentShape,
   type TaskDocument,
   type MutableTaskDocument,
+  type TaskCore,
   type TaskMeta,
   type TaskComment,
   type TaskEvent,
@@ -21,10 +22,11 @@ export {
   type TaskDeliverable,
   type TaskLinkedPR,
 
-  // Task index schema and types
-  TaskIndexSchema,
-  type TaskIndexShape,
-  type TaskIndex,
-  type MutableTaskIndex,
+  // Global room schema and types
+  GlobalRoomSchema,
+  type GlobalRoomShape,
+  type GlobalRoom,
+  type MutableGlobalRoom,
   type InputRequest,
+  type TaskInputRequest,
 } from './shapes.js';

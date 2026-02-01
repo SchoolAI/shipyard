@@ -1,5 +1,11 @@
 # Shipyard Rebirth: Loro + Tiptap Migration Plan
 
+## Spike Validation ✅
+
+**Status:** Technical validation complete (2026-02-01)
+**Results:** All P0 and P1 criteria passed
+**See:** [../../spikes/tiptap-loro/FINDINGS.md](../../spikes/tiptap-loro/FINDINGS.md) for comprehensive validation report
+
 ## Context
 
 This is a **greenfield rebuild** based on production learnings, not a preservation migration. We validated that BlockNote-as-data-format was the wrong choice and are rebuilding with Loro + Tiptap.
@@ -124,13 +130,16 @@ apps/
    - Test actual behavior
    - Decide support or document limitation
 
-**B. Spike Work (Next 2-3 days)**
+**B. Spike Work (Next 2-3 days)** ✅ COMPLETE
 3. Spike: Tiptap + Loro
-   - Minimal Vite app
-   - Tiptap + loro-prosemirror integration
-   - Test editing, comments, sync
-   - Validate Loro cursor API
-   - **Prove it works before committing**
+   - ✅ Minimal Vite app created
+   - ✅ Tiptap + loro-prosemirror integration working
+   - ✅ Editing, formatting, sync validated
+   - ✅ Comment marks validated
+   - ✅ Cursor API validated (18 comprehensive tests)
+   - ✅ Drag handle integrated
+   - ⚠️ Cursor presence requires loro-extended network adapters (documented)
+   - **See:** `spikes/tiptap-loro/FINDINGS.md` for full results
 
 **C. Setup (Final 1-2 days)**
 4. Create package structure
@@ -140,10 +149,10 @@ apps/
 
 **Deliverables:**
 - [ ] Loro Shape designed and documented (ADR)
-- [ ] Spike proves Tiptap + Loro works
+- [x] **Spike proves Tiptap + Loro works** ✅ (2026-02-01)
 - [ ] Edge URL limit researched
 - [ ] Package structure created
-- [ ] Go/No-Go decision made
+- [x] **Go/No-Go decision made** ✅ GO - Proceed with migration
 
 ---
 

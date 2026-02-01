@@ -17,7 +17,6 @@ import {
 } from "../protocol/webrtc-relay";
 import { createLogger, type Logger } from "../utils/logger";
 import type {
-	Participant,
 	PassedCollabPayload,
 	SerializedCollabConnectionState,
 } from "./types";
@@ -79,7 +78,7 @@ export class CollabRoom extends DurableObject<Env> {
 	/**
 	 * Handle incoming HTTP/WebSocket request.
 	 */
-	async fetch(request: Request): Promise<Response> {
+	override async fetch(request: Request): Promise<Response> {
 		const upgradeHeader = request.headers.get("Upgrade");
 		if (upgradeHeader !== "websocket") {
 			return new Response("Expected WebSocket upgrade", { status: 426 });
@@ -121,7 +120,7 @@ export class CollabRoom extends DurableObject<Env> {
 			userId === this.ownerId ? "owner" : "collaborator";
 
 		const pair = new WebSocketPair();
-		const [client, server] = Object.values(pair);
+		const [client, server] = Object.values(pair) as [WebSocket, WebSocket];
 
 		const state: ConnectionState = {
 			id: crypto.randomUUID(),
@@ -167,7 +166,7 @@ export class CollabRoom extends DurableObject<Env> {
 	/**
 	 * WebSocket message handler (hibernation-aware).
 	 */
-	async webSocketMessage(
+	override async webSocketMessage(
 		ws: WebSocket,
 		message: string | ArrayBuffer,
 	): Promise<void> {
@@ -204,7 +203,7 @@ export class CollabRoom extends DurableObject<Env> {
 	/**
 	 * WebSocket close handler.
 	 */
-	async webSocketClose(
+	override async webSocketClose(
 		ws: WebSocket,
 		code: number,
 		reason: string,
@@ -224,13 +223,12 @@ export class CollabRoom extends DurableObject<Env> {
 			type: "participant-left",
 			userId: state.userId,
 		} satisfies CollabRoomServerMessage);
-
 	}
 
 	/**
 	 * WebSocket error handler.
 	 */
-	async webSocketError(ws: WebSocket, error: unknown): Promise<void> {
+	override async webSocketError(ws: WebSocket, error: unknown): Promise<void> {
 		this.logger.error("WebSocket error", { error: String(error) });
 		await this.webSocketClose(ws, 1011, "WebSocket error");
 	}
@@ -238,7 +236,7 @@ export class CollabRoom extends DurableObject<Env> {
 	/**
 	 * Alarm handler for room expiration.
 	 */
-	async alarm(): Promise<void> {
+	override async alarm(): Promise<void> {
 		this.logger.info("Room expired, closing connections");
 
 		for (const ws of this.participants.keys()) {
@@ -265,10 +263,9 @@ export class CollabRoom extends DurableObject<Env> {
 			case "webrtc-ice":
 				this.handleWebRTCRelay(ws, state, msg);
 				break;
-			default: {
-				const _exhaustive: never = msg;
+			default:
+				msg satisfies never;
 				this.sendError(ws, "unknown_type", `Unknown message type`);
-			}
 		}
 	}
 

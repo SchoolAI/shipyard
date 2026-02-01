@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { validateToken } from "../auth/jwt";
-import type { Env } from "../env";
 import type { PassedCollabPayload } from "../durable-objects/types";
+import type { Env } from "../env";
 import { createLogger } from "../utils/logger";
 import { validatePresignedUrlAsync } from "../utils/presigned-url";
 

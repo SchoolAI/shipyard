@@ -28,7 +28,7 @@ describe("POST /auth/github/callback", () => {
 		);
 
 		expect(res.status).toBe(400);
-		const json = await res.json();
+		const json = (await res.json()) as Record<string, unknown>;
 		expect(json.error).toBe("invalid_body");
 	});
 
@@ -44,7 +44,7 @@ describe("POST /auth/github/callback", () => {
 		);
 
 		expect(res.status).toBe(400);
-		const json = await res.json();
+		const json = (await res.json()) as Record<string, unknown>;
 		expect(json.error).toBe("missing_code");
 		expect(json.message).toBe("code is required");
 	});
@@ -61,7 +61,7 @@ describe("POST /auth/github/callback", () => {
 		);
 
 		expect(res.status).toBe(400);
-		const json = await res.json();
+		const json = (await res.json()) as Record<string, unknown>;
 		expect(json.error).toBe("missing_redirect_uri");
 		expect(json.message).toBe("redirect_uri is required");
 	});
@@ -94,7 +94,7 @@ describe("POST /auth/github/callback", () => {
 		);
 
 		expect(res.status).toBe(401);
-		const json = await res.json();
+		const json = (await res.json()) as Record<string, unknown>;
 		expect(json.error).toBe("token_exchange_failed");
 	});
 
@@ -103,11 +103,9 @@ describe("POST /auth/github/callback", () => {
 		fetchMock
 			.get(GITHUB_TOKEN_URL)
 			.intercept({ path: "/login/oauth/access_token", method: "POST" })
-			.reply(
-				200,
-				JSON.stringify({ access_token: "gho_test_token" }),
-				{ headers: { "Content-Type": "application/json" } },
-			);
+			.reply(200, JSON.stringify({ access_token: "gho_test_token" }), {
+				headers: { "Content-Type": "application/json" },
+			});
 
 		// Mock failed user fetch
 		fetchMock
@@ -129,7 +127,7 @@ describe("POST /auth/github/callback", () => {
 		);
 
 		expect(res.status).toBe(401);
-		const json = await res.json();
+		const json = (await res.json()) as Record<string, unknown>;
 		expect(json.error).toBe("user_fetch_failed");
 	});
 
@@ -138,11 +136,9 @@ describe("POST /auth/github/callback", () => {
 		fetchMock
 			.get(GITHUB_TOKEN_URL)
 			.intercept({ path: "/login/oauth/access_token", method: "POST" })
-			.reply(
-				200,
-				JSON.stringify({ access_token: "gho_test_token" }),
-				{ headers: { "Content-Type": "application/json" } },
-			);
+			.reply(200, JSON.stringify({ access_token: "gho_test_token" }), {
+				headers: { "Content-Type": "application/json" },
+			});
 
 		// Mock successful user fetch
 		fetchMock
@@ -173,12 +169,12 @@ describe("POST /auth/github/callback", () => {
 		);
 
 		expect(res.status).toBe(200);
-		const json = await res.json();
+		const json = (await res.json()) as Record<string, unknown>;
 
 		// Verify response structure
 		expect(json.token).toBeDefined();
 		expect(typeof json.token).toBe("string");
-		expect(json.token.split(".")).toHaveLength(3); // JWT has 3 parts
+		expect((json.token as string).split(".")).toHaveLength(3); // JWT has 3 parts
 
 		expect(json.user).toEqual({
 			id: "gh_12345",
@@ -194,11 +190,9 @@ describe("POST /auth/github/callback", () => {
 		fetchMock
 			.get(GITHUB_TOKEN_URL)
 			.intercept({ path: "/login/oauth/access_token", method: "POST" })
-			.reply(
-				200,
-				JSON.stringify({ access_token: "gho_test_token" }),
-				{ headers: { "Content-Type": "application/json" } },
-			);
+			.reply(200, JSON.stringify({ access_token: "gho_test_token" }), {
+				headers: { "Content-Type": "application/json" },
+			});
 
 		// Mock successful user fetch
 		fetchMock
@@ -233,7 +227,7 @@ describe("POST /auth/github/callback", () => {
 		);
 
 		expect(res.status).toBe(200);
-		const json = await res.json();
+		const json = (await res.json()) as Record<string, unknown>;
 		expect(json.is_mobile).toBe(true);
 	});
 
@@ -242,11 +236,9 @@ describe("POST /auth/github/callback", () => {
 		fetchMock
 			.get(GITHUB_TOKEN_URL)
 			.intercept({ path: "/login/oauth/access_token", method: "POST" })
-			.reply(
-				200,
-				JSON.stringify({ access_token: "gho_test_token" }),
-				{ headers: { "Content-Type": "application/json" } },
-			);
+			.reply(200, JSON.stringify({ access_token: "gho_test_token" }), {
+				headers: { "Content-Type": "application/json" },
+			});
 
 		// Mock successful user fetch
 		fetchMock
@@ -280,7 +272,7 @@ describe("POST /auth/github/callback", () => {
 		);
 
 		expect(res.status).toBe(200);
-		const json = await res.json();
+		const json = (await res.json()) as Record<string, unknown>;
 		expect(json.is_mobile).toBe(true);
 	});
 });
