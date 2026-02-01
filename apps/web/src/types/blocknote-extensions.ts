@@ -19,8 +19,8 @@
  * Provides undo/redo commands for collaborative editing.
  */
 export interface YUndoExtension {
-  undoCommand?: (state: unknown, dispatch: unknown, view: unknown) => void;
-  redoCommand?: (state: unknown, dispatch: unknown, view: unknown) => void;
+	undoCommand?: (state: unknown, dispatch: unknown, view: unknown) => void;
+	redoCommand?: (state: unknown, dispatch: unknown, view: unknown) => void;
 }
 
 /**
@@ -39,17 +39,19 @@ export interface YUndoExtension {
  * ```
  */
 export function isYUndoExtension(ext: unknown): ext is YUndoExtension {
-  if (ext === null || ext === undefined) {
-    return false;
-  }
-  if (typeof ext !== 'object') {
-    return false;
-  }
-  /** Check that it has at least one of the expected commands (or could be empty object before init) */
-  const obj = Object.fromEntries(Object.entries(ext));
-  const hasUndo = !('undoCommand' in obj) || typeof obj.undoCommand === 'function';
-  const hasRedo = !('redoCommand' in obj) || typeof obj.redoCommand === 'function';
-  return hasUndo && hasRedo;
+	if (ext === null || ext === undefined) {
+		return false;
+	}
+	if (typeof ext !== "object") {
+		return false;
+	}
+	/** Check that it has at least one of the expected commands (or could be empty object before init) */
+	const obj = Object.fromEntries(Object.entries(ext));
+	const hasUndo =
+		!("undoCommand" in obj) || typeof obj.undoCommand === "function";
+	const hasRedo =
+		!("redoCommand" in obj) || typeof obj.redoCommand === "function";
+	return hasUndo && hasRedo;
 }
 
 /**
@@ -65,11 +67,11 @@ export function isYUndoExtension(ext: unknown): ext is YUndoExtension {
  * ```
  */
 export function getYUndoExtension(editor: {
-  getExtension: (name: string) => unknown;
+	getExtension: (name: string) => unknown;
 }): YUndoExtension | undefined {
-  const ext = editor.getExtension('yUndo');
-  if (isYUndoExtension(ext)) {
-    return ext;
-  }
-  return undefined;
+	const ext = editor.getExtension("yUndo");
+	if (isYUndoExtension(ext)) {
+		return ext;
+	}
+	return undefined;
 }

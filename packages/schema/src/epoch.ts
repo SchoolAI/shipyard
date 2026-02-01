@@ -3,13 +3,14 @@
  * RFC 6455 reserves 4000-4999 for application-specific codes.
  */
 export const EPOCH_CLOSE_CODES = {
-  EPOCH_TOO_OLD: 4100,
+	EPOCH_TOO_OLD: 4100,
 } as const;
 
-export type EpochCloseCode = (typeof EPOCH_CLOSE_CODES)[keyof typeof EPOCH_CLOSE_CODES];
+export type EpochCloseCode =
+	(typeof EPOCH_CLOSE_CODES)[keyof typeof EPOCH_CLOSE_CODES];
 
 export const EPOCH_CLOSE_REASONS = {
-  [EPOCH_CLOSE_CODES.EPOCH_TOO_OLD]: 'epoch_too_old',
+	[EPOCH_CLOSE_CODES.EPOCH_TOO_OLD]: "epoch_too_old",
 } as const;
 
 export type EpochCloseReason = (typeof EPOCH_CLOSE_REASONS)[EpochCloseCode];
@@ -17,21 +18,21 @@ export type EpochCloseReason = (typeof EPOCH_CLOSE_REASONS)[EpochCloseCode];
 export const DEFAULT_EPOCH = 2;
 
 export function getEpochFromMetadata(metadata: { epoch?: number }): number {
-  return metadata.epoch ?? DEFAULT_EPOCH;
+	return metadata.epoch ?? DEFAULT_EPOCH;
 }
 
 export function isEpochValid(epoch: number, minimumEpoch: number): boolean {
-  return epoch >= minimumEpoch;
+	return epoch >= minimumEpoch;
 }
 
 /**
  * Result of parsing a WebSocket URL for Y.Doc sync.
  */
 export interface ParsedWebSocketUrl {
-  /** Document name (planId or 'plan-index') */
-  docName: string;
-  /** Client's epoch from query param, or null if not provided */
-  clientEpoch: number | null;
+	/** Document name (planId or 'plan-index') */
+	docName: string;
+	/** Client's epoch from query param, or null if not provided */
+	clientEpoch: number | null;
 }
 
 /**
@@ -48,21 +49,21 @@ export interface ParsedWebSocketUrl {
  * @returns Parsed docName and clientEpoch
  */
 export function parseWebSocketUrl(url: string): ParsedWebSocketUrl {
-  const cleanUrl = url || '/';
-  const urlParts = cleanUrl.split('?');
-  const docName = urlParts[0]?.replace(/^\//, '') || 'default';
+	const cleanUrl = url || "/";
+	const urlParts = cleanUrl.split("?");
+	const docName = urlParts[0]?.replace(/^\//, "") || "default";
 
-  let clientEpoch: number | null = null;
-  if (urlParts[1]) {
-    const params = new URLSearchParams(urlParts[1]);
-    const epochParam = params.get('epoch');
-    if (epochParam) {
-      const parsed = Number.parseInt(epochParam, 10);
-      if (!Number.isNaN(parsed)) {
-        clientEpoch = parsed;
-      }
-    }
-  }
+	let clientEpoch: number | null = null;
+	if (urlParts[1]) {
+		const params = new URLSearchParams(urlParts[1]);
+		const epochParam = params.get("epoch");
+		if (epochParam) {
+			const parsed = Number.parseInt(epochParam, 10);
+			if (!Number.isNaN(parsed)) {
+				clientEpoch = parsed;
+			}
+		}
+	}
 
-  return { docName, clientEpoch };
+	return { docName, clientEpoch };
 }

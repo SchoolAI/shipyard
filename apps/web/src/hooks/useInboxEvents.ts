@@ -4,30 +4,33 @@
  */
 
 import {
-  getPlanEvents,
-  isEventUnread,
-  isInboxWorthy,
-  PLAN_INDEX_EVENT_VIEWED_BY_KEY,
-  type PlanEvent,
-  type PlanIndexEntry,
-} from '@shipyard/schema';
-import { useEffect, useState } from 'react';
-import { IndexeddbPersistence } from 'y-indexeddb';
-import * as Y from 'yjs';
+	getPlanEvents,
+	isEventUnread,
+	isInboxWorthy,
+	PLAN_INDEX_EVENT_VIEWED_BY_KEY,
+	type PlanEvent,
+	type PlanIndexEntry,
+} from "@shipyard/schema";
+import { useEffect, useState } from "react";
+import { IndexeddbPersistence } from "y-indexeddb";
+import * as Y from "yjs";
 
 export interface InboxEventItem {
-  /** Plan this event belongs to */
-  plan: PlanIndexEntry;
-  /** The inbox-worthy event */
-  event: PlanEvent;
-  /** Event timestamp (for sorting) */
-  timestamp: number;
-  /** Whether this event is unread for the current user */
-  isUnread: boolean;
+	/** Plan this event belongs to */
+	plan: PlanIndexEntry;
+	/** The inbox-worthy event */
+	event: PlanEvent;
+	/** Event timestamp (for sorting) */
+	timestamp: number;
+	/** Whether this event is unread for the current user */
+	isUnread: boolean;
 }
 
 /** Cache to avoid reloading the same plan events */
-const eventsCache = new Map<string, { events: PlanEvent[]; timestamp: number }>();
+const eventsCache = new Map<
+	string,
+	{ events: PlanEvent[]; timestamp: number }
+>();
 const CACHE_TTL = 30_000;
 
 /**
@@ -35,29 +38,29 @@ const CACHE_TTL = 30_000;
  * Results are cached for 30 seconds to avoid repeated loads.
  */
 async function loadPlanEvents(planId: string): Promise<PlanEvent[]> {
-  /** Check cache first */
-  const cached = eventsCache.get(planId);
-  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
-    return cached.events;
-  }
+	/** Check cache first */
+	const cached = eventsCache.get(planId);
+	if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+		return cached.events;
+	}
 
-  try {
-    const planDoc = new Y.Doc();
-    const idb = new IndexeddbPersistence(planId, planDoc);
-    await idb.whenSynced;
+	try {
+		const planDoc = new Y.Doc();
+		const idb = new IndexeddbPersistence(planId, planDoc);
+		await idb.whenSynced;
 
-    const events = getPlanEvents(planDoc);
+		const events = getPlanEvents(planDoc);
 
-    idb.destroy();
+		idb.destroy();
 
-    /** Cache the result */
-    eventsCache.set(planId, { events, timestamp: Date.now() });
+		/** Cache the result */
+		eventsCache.set(planId, { events, timestamp: Date.now() });
 
-    return events;
-  } catch {
-    /** Return empty array on error */
-    return [];
-  }
+		return events;
+	} catch {
+		/** Return empty array on error */
+		return [];
+	}
 }
 
 /**
@@ -70,89 +73,89 @@ async function loadPlanEvents(planId: string): Promise<PlanEvent[]> {
  * @returns List of inbox event items with read state, sorted by timestamp descending
  */
 export function useInboxEvents(
-  plans: PlanIndexEntry[],
-  currentUsername: string | null,
-  indexDoc: Y.Doc
+	plans: PlanIndexEntry[],
+	currentUsername: string | null,
+	indexDoc: Y.Doc,
 ): InboxEventItem[] {
-  const [inboxEvents, setInboxEvents] = useState<InboxEventItem[]>([]);
-  const [eventViewedByVersion, setEventViewedByVersion] = useState(0);
+	const [inboxEvents, setInboxEvents] = useState<InboxEventItem[]>([]);
+	const [eventViewedByVersion, setEventViewedByVersion] = useState(0);
 
-  useEffect(() => {
-    const eventViewedByRoot = indexDoc.getMap(PLAN_INDEX_EVENT_VIEWED_BY_KEY);
+	useEffect(() => {
+		const eventViewedByRoot = indexDoc.getMap(PLAN_INDEX_EVENT_VIEWED_BY_KEY);
 
-    const handleViewedByChange = () => {
-      setEventViewedByVersion((v) => v + 1);
-    };
+		const handleViewedByChange = () => {
+			setEventViewedByVersion((v) => v + 1);
+		};
 
-    eventViewedByRoot.observeDeep(handleViewedByChange);
+		eventViewedByRoot.observeDeep(handleViewedByChange);
 
-    return () => {
-      eventViewedByRoot.unobserveDeep(handleViewedByChange);
-    };
-  }, [indexDoc]);
+		return () => {
+			eventViewedByRoot.unobserveDeep(handleViewedByChange);
+		};
+	}, [indexDoc]);
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: eventViewedByVersion is intentionally included to reload events when read state changes
-  useEffect(() => {
-    if (!currentUsername || plans.length === 0) {
-      setInboxEvents([]);
-      return;
-    }
+	// biome-ignore lint/correctness/useExhaustiveDependencies: eventViewedByVersion is intentionally included to reload events when read state changes
+	useEffect(() => {
+		if (!currentUsername || plans.length === 0) {
+			setInboxEvents([]);
+			return;
+		}
 
-    let isActive = true;
+		let isActive = true;
 
-    async function loadAllEvents() {
-      const allEvents: InboxEventItem[] = [];
+		async function loadAllEvents() {
+			const allEvents: InboxEventItem[] = [];
 
-      /** Load events from each plan in parallel */
-      const eventPromises = plans.map(async (plan) => {
-        const events = await loadPlanEvents(plan.id);
+			/** Load events from each plan in parallel */
+			const eventPromises = plans.map(async (plan) => {
+				const events = await loadPlanEvents(plan.id);
 
-        /*
-         * Filter for inbox-worthy events for this user
-         * currentUsername is guaranteed non-null by the outer condition
-         * Pass plan.ownerId to resolve 'owner' in inboxFor field
-         */
-        const inboxWorthyEvents = events.filter((event) => {
-          if (!currentUsername) return false;
-          return isInboxWorthy(event, currentUsername, plan.ownerId);
-        });
+				/*
+				 * Filter for inbox-worthy events for this user
+				 * currentUsername is guaranteed non-null by the outer condition
+				 * Pass plan.ownerId to resolve 'owner' in inboxFor field
+				 */
+				const inboxWorthyEvents = events.filter((event) => {
+					if (!currentUsername) return false;
+					return isInboxWorthy(event, currentUsername, plan.ownerId);
+				});
 
-        /*
-         * Map to InboxEventItem with isUnread
-         * currentUsername is guaranteed non-null by outer guard
-         */
-        return inboxWorthyEvents.map((event) => ({
-          plan,
-          event,
-          timestamp: event.timestamp,
-          isUnread: currentUsername
-            ? isEventUnread(indexDoc, plan.id, event.id, currentUsername)
-            : true,
-        }));
-      });
+				/*
+				 * Map to InboxEventItem with isUnread
+				 * currentUsername is guaranteed non-null by outer guard
+				 */
+				return inboxWorthyEvents.map((event) => ({
+					plan,
+					event,
+					timestamp: event.timestamp,
+					isUnread: currentUsername
+						? isEventUnread(indexDoc, plan.id, event.id, currentUsername)
+						: true,
+				}));
+			});
 
-      const results = await Promise.all(eventPromises);
+			const results = await Promise.all(eventPromises);
 
-      /** Flatten and sort by timestamp descending */
-      for (const items of results) {
-        allEvents.push(...items);
-      }
+			/** Flatten and sort by timestamp descending */
+			for (const items of results) {
+				allEvents.push(...items);
+			}
 
-      allEvents.sort((a, b) => b.timestamp - a.timestamp);
+			allEvents.sort((a, b) => b.timestamp - a.timestamp);
 
-      if (isActive) {
-        setInboxEvents(allEvents);
-      }
-    }
+			if (isActive) {
+				setInboxEvents(allEvents);
+			}
+		}
 
-    loadAllEvents();
+		loadAllEvents();
 
-    return () => {
-      isActive = false;
-    };
-  }, [plans, currentUsername, indexDoc, eventViewedByVersion]);
+		return () => {
+			isActive = false;
+		};
+	}, [plans, currentUsername, indexDoc, eventViewedByVersion]);
 
-  return inboxEvents;
+	return inboxEvents;
 }
 
 /**
@@ -160,12 +163,12 @@ export function useInboxEvents(
  * Call this when a plan's events are updated.
  */
 export function invalidateInboxEventsCache(planId: string): void {
-  eventsCache.delete(planId);
+	eventsCache.delete(planId);
 }
 
 /**
  * Clear the entire inbox events cache.
  */
 export function clearInboxEventsCache(): void {
-  eventsCache.clear();
+	eventsCache.clear();
 }

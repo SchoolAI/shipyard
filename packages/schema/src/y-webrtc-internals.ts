@@ -23,33 +23,33 @@
  * Signaling connection internal structure from y-webrtc.
  */
 export interface SignalingConnection {
-  ws: WebSocket | null;
-  connected?: boolean;
-  on?(event: 'connect', handler: () => void): void;
-  off?(event: 'connect', handler: () => void): void;
+	ws: WebSocket | null;
+	connected?: boolean;
+	on?(event: "connect", handler: () => void): void;
+	off?(event: "connect", handler: () => void): void;
 }
 
 /**
  * WebRTC peer connection wrapper from y-webrtc.
  */
 export interface WebrtcConn<TPeer = unknown> {
-  peer: TPeer;
+	peer: TPeer;
 }
 
 /**
  * WebRTC room internal structure from y-webrtc.
  */
 export interface WebrtcRoom<TPeer = unknown> {
-  peerId?: string;
-  webrtcConns?: Map<string, WebrtcConn<TPeer>>;
+	peerId?: string;
+	webrtcConns?: Map<string, WebrtcConn<TPeer>>;
 }
 
 /**
  * Internal properties of WebrtcProvider that aren't in the public API.
  */
 export interface WebrtcProviderInternals<TPeer = unknown> {
-  signalingConns?: SignalingConnection[];
-  room?: WebrtcRoom<TPeer> | null;
+	signalingConns?: SignalingConnection[];
+	room?: WebrtcRoom<TPeer> | null;
 }
 
 /*
@@ -63,10 +63,10 @@ export interface WebrtcProviderInternals<TPeer = unknown> {
  * Runtime check before accessing internal y-webrtc properties.
  */
 function hasSignalingConns(obj: unknown): obj is { signalingConns: unknown[] } {
-  if (obj === null || typeof obj !== 'object') return false;
-  if (!('signalingConns' in obj)) return false;
-  const record = Object.fromEntries(Object.entries(obj));
-  return Array.isArray(record.signalingConns);
+	if (obj === null || typeof obj !== "object") return false;
+	if (!("signalingConns" in obj)) return false;
+	const record = Object.fromEntries(Object.entries(obj));
+	return Array.isArray(record.signalingConns);
 }
 
 /**
@@ -78,12 +78,14 @@ function hasSignalingConns(obj: unknown): obj is { signalingConns: unknown[] } {
  *
  * @param provider - A WebrtcProvider instance (typed as unknown to avoid y-webrtc dependency)
  */
-export function getSignalingConnections(provider: unknown): SignalingConnection[] {
-  if (hasSignalingConns(provider)) {
-    // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- y-webrtc internal API not exported
-    return provider.signalingConns as SignalingConnection[];
-  }
-  return [];
+export function getSignalingConnections(
+	provider: unknown,
+): SignalingConnection[] {
+	if (hasSignalingConns(provider)) {
+		// eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- y-webrtc internal API not exported
+		return provider.signalingConns as SignalingConnection[];
+	}
+	return [];
 }
 
 /**
@@ -93,9 +95,9 @@ export function getSignalingConnections(provider: unknown): SignalingConnection[
  * @param provider - A WebrtcProvider instance (typed as unknown to avoid y-webrtc dependency)
  */
 export function getWebrtcPeerId(provider: unknown): string | undefined {
-  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- y-webrtc internal API not exported
-  const internal = provider as WebrtcProviderInternals | null | undefined;
-  return internal?.room?.peerId;
+	// eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- y-webrtc internal API not exported
+	const internal = provider as WebrtcProviderInternals | null | undefined;
+	return internal?.room?.peerId;
 }
 
 /**
@@ -104,8 +106,13 @@ export function getWebrtcPeerId(provider: unknown): string | undefined {
  *
  * @param provider - A WebrtcProvider instance (typed as unknown to avoid y-webrtc dependency)
  */
-export function getWebrtcRoom<TPeer = unknown>(provider: unknown): WebrtcRoom<TPeer> | null {
-  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- y-webrtc internal API not exported
-  const internal = provider as WebrtcProviderInternals<TPeer> | null | undefined;
-  return internal?.room ?? null;
+export function getWebrtcRoom<TPeer = unknown>(
+	provider: unknown,
+): WebrtcRoom<TPeer> | null {
+	// eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- y-webrtc internal API not exported
+	const internal = provider as
+		| WebrtcProviderInternals<TPeer>
+		| null
+		| undefined;
+	return internal?.room ?? null;
 }

@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from "zod";
 
 /**
  * Load and validate environment variables using a Zod schema.
@@ -24,22 +24,26 @@ import { z } from 'zod';
  * ```
  */
 export function loadEnv<T extends z.ZodSchema>(schema: T): z.infer<T> {
-  try {
-    return schema.parse(process.env);
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      const testResult = schema.safeParse(undefined);
-      if (testResult.success) {
-        return testResult.data;
-      }
-      if (!error.issues || !Array.isArray(error.issues)) {
-        throw new Error('Environment variable validation failed (no error details available)');
-      }
-      const errorMessages = error.issues
-        .map((err) => ` - ${err.path.join('.')}: ${err.message}`)
-        .join('\n');
-      throw new Error(`Environment variable validation failed: \n${errorMessages}`);
-    }
-    throw error;
-  }
+	try {
+		return schema.parse(process.env);
+	} catch (error) {
+		if (error instanceof z.ZodError) {
+			const testResult = schema.safeParse(undefined);
+			if (testResult.success) {
+				return testResult.data;
+			}
+			if (!error.issues || !Array.isArray(error.issues)) {
+				throw new Error(
+					"Environment variable validation failed (no error details available)",
+				);
+			}
+			const errorMessages = error.issues
+				.map((err) => ` - ${err.path.join(".")}: ${err.message}`)
+				.join("\n");
+			throw new Error(
+				`Environment variable validation failed: \n${errorMessages}`,
+			);
+		}
+		throw error;
+	}
 }

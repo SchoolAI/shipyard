@@ -14,7 +14,9 @@
  *
  * NOT the same as WebRTCPeerId!
  */
-export type AwarenessClientId = number & { readonly __brand: 'AwarenessClientId' };
+export type AwarenessClientId = number & {
+	readonly __brand: "AwarenessClientId";
+};
 
 /**
  * y-webrtc peer ID.
@@ -23,41 +25,41 @@ export type AwarenessClientId = number & { readonly __brand: 'AwarenessClientId'
  *
  * NOT the same as AwarenessClientId!
  */
-export type WebRTCPeerId = string & { readonly __brand: 'WebRTCPeerId' };
+export type WebRTCPeerId = string & { readonly __brand: "WebRTCPeerId" };
 
 /**
  * Plan ID.
  * A nanoid (21 character) string generated when a plan is created.
  * Used in URLs, Y.Doc document names, and IndexedDB keys.
  */
-export type PlanId = string & { readonly __brand: 'PlanId' };
+export type PlanId = string & { readonly __brand: "PlanId" };
 
 /**
  * GitHub username.
  * Used for user identity, plan ownership, and approval system.
  */
-export type GitHubUsername = string & { readonly __brand: 'GitHubUsername' };
+export type GitHubUsername = string & { readonly __brand: "GitHubUsername" };
 
 /**
  * Session token.
  * A nanoid string used for authenticating MCP API requests.
  * The hash of this token is stored in the Y.Doc.
  */
-export type SessionToken = string & { readonly __brand: 'SessionToken' };
+export type SessionToken = string & { readonly __brand: "SessionToken" };
 
 /**
  * Review request ID.
  * A nanoid string generated when a review is requested.
  * Used to prevent stale review decisions.
  */
-export type ReviewRequestId = string & { readonly __brand: 'ReviewRequestId' };
+export type ReviewRequestId = string & { readonly __brand: "ReviewRequestId" };
 
 /**
  * Export ID.
  * A UUID string generated for P2P conversation transfers.
  * Used to track multi-chunk transfers.
  */
-export type ExportId = string & { readonly __brand: 'ExportId' };
+export type ExportId = string & { readonly __brand: "ExportId" };
 
 /**
  * Creates a PlanId from a string.
@@ -67,8 +69,8 @@ export type ExportId = string & { readonly __brand: 'ExportId' };
  * The eslint-disable is necessary because TypeScript's branded types pattern requires casts.
  */
 export function asPlanId(id: string): PlanId {
-  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- Branded type cast is intentional
-  return id as PlanId;
+	// eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- Branded type cast is intentional
+	return id as PlanId;
 }
 
 /**
@@ -78,8 +80,8 @@ export function asPlanId(id: string): PlanId {
  * NOTE: Branded type casts are intentional - they're the only way to create branded types.
  */
 export function asAwarenessClientId(id: number): AwarenessClientId {
-  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- Branded type cast is intentional
-  return id as AwarenessClientId;
+	// eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- Branded type cast is intentional
+	return id as AwarenessClientId;
 }
 
 /**
@@ -89,8 +91,8 @@ export function asAwarenessClientId(id: number): AwarenessClientId {
  * NOTE: Branded type casts are intentional - they're the only way to create branded types.
  */
 export function asWebRTCPeerId(id: string): WebRTCPeerId {
-  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- Branded type cast is intentional
-  return id as WebRTCPeerId;
+	// eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- Branded type cast is intentional
+	return id as WebRTCPeerId;
 }
 
 /**
@@ -100,6 +102,6 @@ export function asWebRTCPeerId(id: string): WebRTCPeerId {
  * NOTE: Branded type casts are intentional - they're the only way to create branded types.
  */
 export function asGitHubUsername(username: string): GitHubUsername {
-  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- Branded type cast is intentional
-  return username as GitHubUsername;
+	// eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- Branded type cast is intentional
+	return username as GitHubUsername;
 }

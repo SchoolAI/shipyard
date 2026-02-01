@@ -1,15 +1,15 @@
-import { execSync } from 'node:child_process';
-import crypto from 'node:crypto';
-import os from 'node:os';
-import { basename, dirname } from 'node:path';
-import type { EnvironmentContext } from '@shipyard/schema';
-import { z } from 'zod';
-import { githubConfig } from './config/env/github.js';
-import { logger } from './logger.js';
+import { execSync } from "node:child_process";
+import crypto from "node:crypto";
+import os from "node:os";
+import { basename, dirname } from "node:path";
+import type { EnvironmentContext } from "@shipyard/schema";
+import { z } from "zod";
+import { githubConfig } from "./config/env/github.js";
+import { logger } from "./logger.js";
 
 /** Schema for GitHub API /user response (minimal fields we use) */
 const GitHubUserResponseSchema = z.object({
-  login: z.string().optional(),
+	login: z.string().optional(),
 });
 
 let cachedUsername: string | null = null;
@@ -22,154 +22,160 @@ let cachedRepoName: string | null = null;
  * Returns null if not in a git repo or gh CLI is not available.
  */
 export function getRepositoryFullName(): string | null {
-  if (cachedRepoName !== null) {
-    return cachedRepoName || null;
-  }
+	if (cachedRepoName !== null) {
+		return cachedRepoName || null;
+	}
 
-  try {
-    const repoName = execSync('gh repo view --json nameWithOwner --jq .nameWithOwner', {
-      encoding: 'utf-8',
-      timeout: 5000,
-      stdio: ['pipe', 'pipe', 'pipe'],
-    }).trim();
+	try {
+		const repoName = execSync(
+			"gh repo view --json nameWithOwner --jq .nameWithOwner",
+			{
+				encoding: "utf-8",
+				timeout: 5000,
+				stdio: ["pipe", "pipe", "pipe"],
+			},
+		).trim();
 
-    if (!repoName) {
-      cachedRepoName = '';
-      return null;
-    }
+		if (!repoName) {
+			cachedRepoName = "";
+			return null;
+		}
 
-    cachedRepoName = repoName;
-    return cachedRepoName;
-  } catch {
-    /** Not in a git repo, or gh CLI not available - that's okay, repo is optional */
-    cachedRepoName = '';
-    return null;
-  }
+		cachedRepoName = repoName;
+		return cachedRepoName;
+	} catch {
+		/** Not in a git repo, or gh CLI not available - that's okay, repo is optional */
+		cachedRepoName = "";
+		return null;
+	}
 }
 
 export async function getGitHubUsername(): Promise<string> {
-  /*
-   * No cache expiration needed: The MCP server runs as an ephemeral child process of
-   * Claude Code. Each Claude session spawns a fresh server process with empty cache.
-   * The username is fetched once per session and cached for the process lifetime,
-   * which is inherently bounded by the session duration.
-   */
-  if (usernameResolved && cachedUsername) {
-    return cachedUsername;
-  }
+	/*
+	 * No cache expiration needed: The MCP server runs as an ephemeral child process of
+	 * Claude Code. Each Claude session spawns a fresh server process with empty cache.
+	 * The username is fetched once per session and cached for the process lifetime,
+	 * which is inherently bounded by the session duration.
+	 */
+	if (usernameResolved && cachedUsername) {
+		return cachedUsername;
+	}
 
-  /** 1. Try GITHUB_USERNAME env var (explicit) */
-  if (githubConfig.GITHUB_USERNAME) {
-    cachedUsername = githubConfig.GITHUB_USERNAME;
-    usernameResolved = true;
-    logger.info({ username: cachedUsername }, 'Using GITHUB_USERNAME from env');
-    return cachedUsername;
-  }
+	/** 1. Try GITHUB_USERNAME env var (explicit) */
+	if (githubConfig.GITHUB_USERNAME) {
+		cachedUsername = githubConfig.GITHUB_USERNAME;
+		usernameResolved = true;
+		logger.info({ username: cachedUsername }, "Using GITHUB_USERNAME from env");
+		return cachedUsername;
+	}
 
-  /** 2. Try GITHUB_TOKEN + API */
-  if (githubConfig.GITHUB_TOKEN) {
-    const username = await getUsernameFromToken(githubConfig.GITHUB_TOKEN);
-    if (username) {
-      cachedUsername = username;
-      usernameResolved = true;
-      logger.info({ username }, 'Resolved username from GITHUB_TOKEN via API');
-      return cachedUsername;
-    }
-  }
+	/** 2. Try GITHUB_TOKEN + API */
+	if (githubConfig.GITHUB_TOKEN) {
+		const username = await getUsernameFromToken(githubConfig.GITHUB_TOKEN);
+		if (username) {
+			cachedUsername = username;
+			usernameResolved = true;
+			logger.info({ username }, "Resolved username from GITHUB_TOKEN via API");
+			return cachedUsername;
+		}
+	}
 
-  /** 3. Try gh CLI */
-  const cliUsername = getUsernameFromCLI();
-  if (cliUsername) {
-    cachedUsername = cliUsername;
-    usernameResolved = true;
-    logger.info({ username: cliUsername }, 'Resolved username from gh CLI');
-    return cachedUsername;
-  }
+	/** 3. Try gh CLI */
+	const cliUsername = getUsernameFromCLI();
+	if (cliUsername) {
+		cachedUsername = cliUsername;
+		usernameResolved = true;
+		logger.info({ username: cliUsername }, "Resolved username from gh CLI");
+		return cachedUsername;
+	}
 
-  /** 4. Try git config (unverified) */
-  const gitUsername = getUsernameFromGitConfig();
-  if (gitUsername) {
-    cachedUsername = gitUsername;
-    usernameResolved = true;
-    logger.warn({ username: gitUsername }, 'Using git config user.name (UNVERIFIED)');
-    return cachedUsername;
-  }
+	/** 4. Try git config (unverified) */
+	const gitUsername = getUsernameFromGitConfig();
+	if (gitUsername) {
+		cachedUsername = gitUsername;
+		usernameResolved = true;
+		logger.warn(
+			{ username: gitUsername },
+			"Using git config user.name (UNVERIFIED)",
+		);
+		return cachedUsername;
+	}
 
-  /** 5. Try OS username (unverified) */
-  const osUsername = process.env.USER || process.env.USERNAME;
-  if (osUsername) {
-    /*
-     * Issue 3: Sanitize OS username - Windows usernames can contain spaces/special characters
-     * Replace invalid characters with underscores to match GitHub username format
-     */
-    cachedUsername = osUsername.replace(/[^a-zA-Z0-9_-]/g, '_');
-    usernameResolved = true;
-    logger.warn(
-      { username: cachedUsername, original: osUsername },
-      'Using sanitized OS username (UNVERIFIED)'
-    );
-    return cachedUsername;
-  }
+	/** 5. Try OS username (unverified) */
+	const osUsername = process.env.USER || process.env.USERNAME;
+	if (osUsername) {
+		/*
+		 * Issue 3: Sanitize OS username - Windows usernames can contain spaces/special characters
+		 * Replace invalid characters with underscores to match GitHub username format
+		 */
+		cachedUsername = osUsername.replace(/[^a-zA-Z0-9_-]/g, "_");
+		usernameResolved = true;
+		logger.warn(
+			{ username: cachedUsername, original: osUsername },
+			"Using sanitized OS username (UNVERIFIED)",
+		);
+		return cachedUsername;
+	}
 
-  /** 6. All failed */
-  usernameResolved = true;
-  throw new Error(
-    'GitHub username required but could not be determined.\n\n' +
-      'Configure ONE of:\n' +
-      '1. GITHUB_USERNAME=your-username (explicit)\n' +
-      '2. GITHUB_TOKEN=ghp_xxx (will fetch from API)\n' +
-      '3. gh auth login (uses CLI)\n' +
-      '4. git config --global user.name "your-username"\n' +
-      '5. Set USER or USERNAME environment variable\n\n' +
-      'For remote agents: Use option 1 or 2'
-  );
+	/** 6. All failed */
+	usernameResolved = true;
+	throw new Error(
+		"GitHub username required but could not be determined.\n\n" +
+			"Configure ONE of:\n" +
+			"1. GITHUB_USERNAME=your-username (explicit)\n" +
+			"2. GITHUB_TOKEN=ghp_xxx (will fetch from API)\n" +
+			"3. gh auth login (uses CLI)\n" +
+			'4. git config --global user.name "your-username"\n' +
+			"5. Set USER or USERNAME environment variable\n\n" +
+			"For remote agents: Use option 1 or 2",
+	);
 }
 
 async function getUsernameFromToken(token: string): Promise<string | null> {
-  try {
-    const response = await fetch('https://api.github.com/user', {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: 'application/vnd.github.v3+json',
-        'User-Agent': 'shipyard-mcp-server',
-      },
-      signal: AbortSignal.timeout(5000),
-    });
+	try {
+		const response = await fetch("https://api.github.com/user", {
+			headers: {
+				Authorization: `Bearer ${token}`,
+				Accept: "application/vnd.github.v3+json",
+				"User-Agent": "shipyard-mcp-server",
+			},
+			signal: AbortSignal.timeout(5000),
+		});
 
-    if (!response.ok) return null;
+		if (!response.ok) return null;
 
-    const user = GitHubUserResponseSchema.parse(await response.json());
-    return user.login ?? null;
-  } catch (error) {
-    logger.debug({ error }, 'GitHub API failed');
-    return null;
-  }
+		const user = GitHubUserResponseSchema.parse(await response.json());
+		return user.login ?? null;
+	} catch (error) {
+		logger.debug({ error }, "GitHub API failed");
+		return null;
+	}
 }
 
 function getUsernameFromCLI(): string | null {
-  try {
-    const username = execSync('gh api user --jq .login', {
-      encoding: 'utf-8',
-      timeout: 5000,
-      stdio: ['pipe', 'pipe', 'pipe'],
-    }).trim();
-    return username || null;
-  } catch {
-    return null;
-  }
+	try {
+		const username = execSync("gh api user --jq .login", {
+			encoding: "utf-8",
+			timeout: 5000,
+			stdio: ["pipe", "pipe", "pipe"],
+		}).trim();
+		return username || null;
+	} catch {
+		return null;
+	}
 }
 
 function getUsernameFromGitConfig(): string | null {
-  try {
-    const username = execSync('git config user.name', {
-      encoding: 'utf-8',
-      timeout: 5000,
-      stdio: ['pipe', 'pipe', 'pipe'],
-    }).trim();
-    return username || null;
-  } catch {
-    return null;
-  }
+	try {
+		const username = execSync("git config user.name", {
+			encoding: "utf-8",
+			timeout: 5000,
+			stdio: ["pipe", "pipe", "pipe"],
+		}).trim();
+		return username || null;
+	} catch {
+		return null;
+	}
 }
 
 /**
@@ -179,39 +185,42 @@ function getUsernameFromGitConfig(): string | null {
  * Returns null if no verified auth is available.
  */
 export async function getVerifiedGitHubUsername(): Promise<string | null> {
-  /** Try GITHUB_USERNAME env var (if set, assumed verified) */
-  if (githubConfig.GITHUB_USERNAME) {
-    logger.info({ username: githubConfig.GITHUB_USERNAME }, 'Using GITHUB_USERNAME from env');
-    return githubConfig.GITHUB_USERNAME;
-  }
+	/** Try GITHUB_USERNAME env var (if set, assumed verified) */
+	if (githubConfig.GITHUB_USERNAME) {
+		logger.info(
+			{ username: githubConfig.GITHUB_USERNAME },
+			"Using GITHUB_USERNAME from env",
+		);
+		return githubConfig.GITHUB_USERNAME;
+	}
 
-  /** Try GITHUB_TOKEN + API call (verified) */
-  if (githubConfig.GITHUB_TOKEN) {
-    try {
-      const username = await getUsernameFromToken(githubConfig.GITHUB_TOKEN);
-      if (username) {
-        logger.info({ username }, 'Got verified username from GITHUB_TOKEN');
-        return username;
-      }
-    } catch (error) {
-      logger.warn({ error }, 'Failed to get username from GITHUB_TOKEN');
-    }
-  }
+	/** Try GITHUB_TOKEN + API call (verified) */
+	if (githubConfig.GITHUB_TOKEN) {
+		try {
+			const username = await getUsernameFromToken(githubConfig.GITHUB_TOKEN);
+			if (username) {
+				logger.info({ username }, "Got verified username from GITHUB_TOKEN");
+				return username;
+			}
+		} catch (error) {
+			logger.warn({ error }, "Failed to get username from GITHUB_TOKEN");
+		}
+	}
 
-  /** Try gh CLI (verified) */
-  try {
-    const username = getUsernameFromCLI();
-    if (username) {
-      logger.info({ username }, 'Got verified username from gh CLI');
-      return username;
-    }
-  } catch (error) {
-    logger.debug({ error }, 'Failed to get username from gh CLI');
-  }
+	/** Try gh CLI (verified) */
+	try {
+		const username = getUsernameFromCLI();
+		if (username) {
+			logger.info({ username }, "Got verified username from gh CLI");
+			return username;
+		}
+	} catch (error) {
+		logger.debug({ error }, "Failed to get username from gh CLI");
+	}
 
-  /** Do NOT fall back to git config or USER env var */
-  logger.warn('No verified GitHub authentication available');
-  return null;
+	/** Do NOT fall back to git config or USER env var */
+	logger.warn("No verified GitHub authentication available");
+	return null;
 }
 
 /**
@@ -219,17 +228,17 @@ export async function getVerifiedGitHubUsername(): Promise<string | null> {
  * Returns undefined if not in a git repo or git is not available.
  */
 function getGitBranch(): string | undefined {
-  try {
-    return (
-      execSync('git branch --show-current', {
-        encoding: 'utf-8',
-        timeout: 2000,
-        stdio: ['pipe', 'pipe', 'pipe'],
-      }).trim() || undefined
-    );
-  } catch {
-    return undefined;
-  }
+	try {
+		return (
+			execSync("git branch --show-current", {
+				encoding: "utf-8",
+				timeout: 2000,
+				stdio: ["pipe", "pipe", "pipe"],
+			}).trim() || undefined
+		);
+	} catch {
+		return undefined;
+	}
 }
 
 /**
@@ -237,62 +246,69 @@ function getGitBranch(): string | undefined {
  * Provides metadata about where the agent is running (project, branch, hostname, repo).
  */
 export function getEnvironmentContext(): EnvironmentContext {
-  const cwd = process.cwd();
-  const currentDir = basename(cwd);
-  const parentDir = basename(dirname(cwd));
+	const cwd = process.cwd();
+	const currentDir = basename(cwd);
+	const parentDir = basename(dirname(cwd));
 
-  const projectName =
-    parentDir && currentDir ? `${parentDir}/${currentDir}` : currentDir || undefined;
+	const projectName =
+		parentDir && currentDir
+			? `${parentDir}/${currentDir}`
+			: currentDir || undefined;
 
-  return {
-    projectName,
-    branch: getGitBranch(),
-    hostname: os.hostname(),
-    repo: getRepositoryFullName() || undefined,
-  };
+	return {
+		projectName,
+		branch: getGitBranch(),
+		hostname: os.hostname(),
+		repo: getRepositoryFullName() || undefined,
+	};
 }
 
 let cachedMachineId: string | null = null;
 
 export function getMachineId(): string {
-  if (cachedMachineId) {
-    return cachedMachineId;
-  }
+	if (cachedMachineId) {
+		return cachedMachineId;
+	}
 
-  const hostname = os.hostname();
-  const user = process.env.USER || process.env.USERNAME;
-  const cwd = process.cwd();
+	const hostname = os.hostname();
+	const user = process.env.USER || process.env.USERNAME;
+	const cwd = process.cwd();
 
-  if (!hostname) {
-    throw new Error('Could not determine hostname for machine ID');
-  }
-  if (!user) {
-    throw new Error('Could not determine username for machine ID (set USER or USERNAME env var)');
-  }
+	if (!hostname) {
+		throw new Error("Could not determine hostname for machine ID");
+	}
+	if (!user) {
+		throw new Error(
+			"Could not determine username for machine ID (set USER or USERNAME env var)",
+		);
+	}
 
-  const hash = crypto.createHash('sha256');
-  hash.update(`${hostname}:${user}:${cwd}`);
-  cachedMachineId = hash.digest('hex').slice(0, 16);
+	const hash = crypto.createHash("sha256");
+	hash.update(`${hostname}:${user}:${cwd}`);
+	cachedMachineId = hash.digest("hex").slice(0, 16);
 
-  logger.info({ machineId: cachedMachineId, hostname, user, cwd }, 'Generated machine ID');
-  return cachedMachineId;
+	logger.info(
+		{ machineId: cachedMachineId, hostname, user, cwd },
+		"Generated machine ID",
+	);
+	return cachedMachineId;
 }
 
 export function getMachineName(): string {
-  const hostname = os.hostname();
+	const hostname = os.hostname();
 
-  if (hostname.endsWith('.local')) {
-    return hostname.slice(0, -6);
-  }
+	if (hostname.endsWith(".local")) {
+		return hostname.slice(0, -6);
+	}
 
-  if (hostname.includes('-')) {
-    const parts = hostname.split('-');
-    if (parts.length >= 2) {
-      const possessivePart = parts[0];
-      const typePart = parts.slice(1).join(' ');
-      return `${possessivePart}'s ${typePart}`;
-    }
-  }
+	if (hostname.includes("-")) {
+		const parts = hostname.split("-");
+		if (parts.length >= 2) {
+			const possessivePart = parts[0];
+			const typePart = parts.slice(1).join(" ");
+			return `${possessivePart}'s ${typePart}`;
+		}
+	}
 
-  return hostname;
+	return hostname;
 }

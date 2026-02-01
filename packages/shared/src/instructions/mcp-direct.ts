@@ -5,15 +5,15 @@
  */
 
 import {
-  ARTIFACT_TYPES_SECTION,
-  CRITICAL_USAGE_SECTION,
-  DELIVERABLES_SECTION,
-  TIPS_SECTION,
-  TROUBLESHOOTING_SECTION,
-  USER_INPUT_SECTION,
-  WHEN_NOT_TO_USE_SECTION,
-} from './common.js';
-import { TOOL_NAMES } from './tool-names.js';
+	ARTIFACT_TYPES_SECTION,
+	CRITICAL_USAGE_SECTION,
+	DELIVERABLES_SECTION,
+	TIPS_SECTION,
+	TROUBLESHOOTING_SECTION,
+	USER_INPUT_SECTION,
+	WHEN_NOT_TO_USE_SECTION,
+} from "./common.js";
+import { TOOL_NAMES } from "./tool-names.js";
 
 export const MCP_DIRECT_HEADER = `# Shipyard: Your Agent Management Hub
 
@@ -238,27 +238,27 @@ if (status.status === "changes_requested") {
  * Complete MCP-direct instructions for SKILL.md and other non-hook platforms.
  */
 export const MCP_DIRECT_INSTRUCTIONS = [
-  MCP_DIRECT_HEADER,
-  '',
-  CRITICAL_USAGE_SECTION,
-  '',
-  USER_INPUT_SECTION,
-  '',
-  MCP_TOOLS_OVERVIEW,
-  '',
-  MCP_WORKFLOW,
-  '',
-  DELIVERABLES_SECTION,
-  '',
-  ARTIFACT_TYPES_SECTION,
-  '',
-  API_REFERENCE,
-  '',
-  HANDLING_FEEDBACK,
-  '',
-  TIPS_SECTION,
-  '',
-  WHEN_NOT_TO_USE_SECTION,
-  '',
-  TROUBLESHOOTING_SECTION,
-].join('\n');
+	MCP_DIRECT_HEADER,
+	"",
+	CRITICAL_USAGE_SECTION,
+	"",
+	USER_INPUT_SECTION,
+	"",
+	MCP_TOOLS_OVERVIEW,
+	"",
+	MCP_WORKFLOW,
+	"",
+	DELIVERABLES_SECTION,
+	"",
+	ARTIFACT_TYPES_SECTION,
+	"",
+	API_REFERENCE,
+	"",
+	HANDLING_FEEDBACK,
+	"",
+	TIPS_SECTION,
+	"",
+	WHEN_NOT_TO_USE_SECTION,
+	"",
+	TROUBLESHOOTING_SECTION,
+].join("\n");

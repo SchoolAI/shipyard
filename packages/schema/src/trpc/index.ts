@@ -7,57 +7,63 @@
  * - Context type for server implementation
  */
 
-import { hookRouter } from './routers/hook.js';
-import { planRouter } from './routers/plan.js';
-import { subscriptionRouter } from './routers/subscription.js';
-import { router } from './trpc.js';
+import { hookRouter } from "./routers/hook.js";
+import { planRouter } from "./routers/plan.js";
+import { subscriptionRouter } from "./routers/subscription.js";
+import { router } from "./trpc.js";
 
 export const appRouter = router({
-  hook: hookRouter,
-  plan: planRouter,
-  subscription: subscriptionRouter,
+	hook: hookRouter,
+	plan: planRouter,
+	subscription: subscriptionRouter,
 });
 
 export type AppRouter = typeof appRouter;
 
-export type { Context, CreateContextFn, Logger, MachineInfo, PlanStore } from './context.js';
 export type {
-  ApprovalResult,
-  HookContext,
-  HookHandlers,
-  SessionContextResult,
-} from './routers/hook.js';
-export { hookRouter } from './routers/hook.js';
-export { planRouter } from './routers/plan.js';
-export { subscriptionRouter } from './routers/subscription.js';
+	Context,
+	CreateContextFn,
+	Logger,
+	MachineInfo,
+	PlanStore,
+} from "./context.js";
 export type {
-  Change,
-  ChangesResponse,
-  ChangeType,
-  DeleteSubscriptionResponse,
-  HasConnectionsResponse,
-  MachineInfoResponse,
-  PlanIdInput,
-  PlanStatusResponse,
-  SetSessionTokenRequest,
-  SetSessionTokenResponse,
-  SubscriptionClientIdInput,
-  SubscriptionCreateParams,
-} from './schemas.js';
+	ApprovalResult,
+	HookContext,
+	HookHandlers,
+	SessionContextResult,
+} from "./routers/hook.js";
+export { hookRouter } from "./routers/hook.js";
+export { planRouter } from "./routers/plan.js";
+export { subscriptionRouter } from "./routers/subscription.js";
+export type {
+	Change,
+	ChangesResponse,
+	ChangeType,
+	DeleteSubscriptionResponse,
+	HasConnectionsResponse,
+	MachineInfoResponse,
+	PlanIdInput,
+	PlanStatusResponse,
+	SetSessionTokenRequest,
+	SetSessionTokenResponse,
+	SubscriptionClientIdInput,
+	SubscriptionCreateParams,
+} from "./schemas.js";
 
 export {
-  ChangeSchema,
-  ChangesResponseSchema,
-  ChangeTypeSchema,
-  DeleteSubscriptionResponseSchema,
-  HasConnectionsResponseSchema,
-  MachineInfoResponseSchema,
-  PlanIdSchema,
-  PlanStatusResponseSchema,
-  SetSessionTokenRequestSchema,
-  SetSessionTokenResponseSchema,
-  SubscriptionClientIdSchema,
-} from './schemas.js';
+	ChangeSchema,
+	ChangesResponseSchema,
+	ChangeTypeSchema,
+	DeleteSubscriptionResponseSchema,
+	HasConnectionsResponseSchema,
+	MachineInfoResponseSchema,
+	PlanIdSchema,
+	PlanStatusResponseSchema,
+	SetSessionTokenRequestSchema,
+	SetSessionTokenResponseSchema,
+	SubscriptionClientIdSchema,
+} from "./schemas.js";
 
 /*
  * NOTE: middleware, publicProcedure, and router are NOT exported here

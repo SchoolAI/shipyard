@@ -9,7 +9,7 @@
  * the importing file (../../daemon/dist/auto-start.js) and TypeScript needs a
  * pattern that matches regardless of resolution context.
  */
-declare module '*/daemon/dist/auto-start.js' {
-  export function isAutoStartConfigured(): Promise<boolean>;
-  export function setupAutoStart(): Promise<boolean>;
+declare module "*/daemon/dist/auto-start.js" {
+	export function isAutoStartConfigured(): Promise<boolean>;
+	export function setupAutoStart(): Promise<boolean>;
 }

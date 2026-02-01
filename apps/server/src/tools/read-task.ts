@@ -1,41 +1,46 @@
 import {
-  formatDeliverablesForLLM,
-  formatDiffCommentsForLLM,
-  getDeliverables,
-  getLinkedPRs,
-  getPlanMetadata,
-  getPRReviewComments,
-} from '@shipyard/schema';
-import { z } from 'zod';
-import { getOrCreateDoc } from '../doc-store.js';
-import { exportPlanToMarkdown } from '../export-markdown.js';
-import { verifySessionToken } from '../session-token.js';
-import { formatLinkedPRsSection, formatPlanHeader } from './response-formatters.js';
-import { TOOL_NAMES } from './tool-names.js';
+	formatDeliverablesForLLM,
+	formatDiffCommentsForLLM,
+	getDeliverables,
+	getLinkedPRs,
+	getPlanMetadata,
+	getPRReviewComments,
+} from "@shipyard/schema";
+import { z } from "zod";
+import { getOrCreateDoc } from "../doc-store.js";
+import { exportPlanToMarkdown } from "../export-markdown.js";
+import { verifySessionToken } from "../session-token.js";
+import {
+	formatLinkedPRsSection,
+	formatPlanHeader,
+} from "./response-formatters.js";
+import { TOOL_NAMES } from "./tool-names.js";
 
 const ReadTaskInput = z.object({
-  taskId: z.string().describe('The task ID to read'),
-  sessionToken: z.string().describe('Session token from create_task'),
-  includeAnnotations: z
-    .boolean()
-    .optional()
-    .describe('Include comment threads/annotations in the response (default: false)'),
-  includeLinkedPRs: z
-    .boolean()
-    .optional()
-    .describe('Include linked PRs section in the response (default: false)'),
-  includePRComments: z
-    .boolean()
-    .optional()
-    .describe(
-      'Include inline PR review comments (diff line comments) in the response (default: false)'
-    ),
+	taskId: z.string().describe("The task ID to read"),
+	sessionToken: z.string().describe("Session token from create_task"),
+	includeAnnotations: z
+		.boolean()
+		.optional()
+		.describe(
+			"Include comment threads/annotations in the response (default: false)",
+		),
+	includeLinkedPRs: z
+		.boolean()
+		.optional()
+		.describe("Include linked PRs section in the response (default: false)"),
+	includePRComments: z
+		.boolean()
+		.optional()
+		.describe(
+			"Include inline PR review comments (diff line comments) in the response (default: false)",
+		),
 });
 
 export const readTaskTool = {
-  definition: {
-    name: TOOL_NAMES.READ_TASK,
-    description: `Read a specific task by ID, returning its metadata and content in markdown format.
+	definition: {
+		name: TOOL_NAMES.READ_TASK,
+		description: `Read a specific task by ID, returning its metadata and content in markdown format.
 
 NOTE FOR CLAUDE CODE USERS: If you just received task approval via the hook, deliverable IDs were already provided in the approval message. You only need this tool if:
 - You need to check human feedback (set includeAnnotations=true)
@@ -60,126 +65,133 @@ OUTPUT INCLUDES:
 - Activity: Input requests and user responses if includeAnnotations=true
 - Linked PRs: PR list with status, URL, branch if includeLinkedPRs=true
 - PR Comments: Inline diff comments by file and line if includePRComments=true`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        taskId: { type: 'string', description: 'The task ID to read' },
-        sessionToken: { type: 'string', description: 'Session token from create_task' },
-        includeAnnotations: {
-          type: 'boolean',
-          description:
-            'Include comment threads/annotations in the response (default: false). Set true to see human feedback.',
-        },
-        includeLinkedPRs: {
-          type: 'boolean',
-          description:
-            'Include linked PRs section in the response (default: false). Set true to see linked PRs.',
-        },
-        includePRComments: {
-          type: 'boolean',
-          description:
-            'Include inline PR review comments (diff line comments) in the response (default: false). Set true to see inline diff feedback.',
-        },
-      },
-      required: ['taskId', 'sessionToken'],
-    },
-  },
+		inputSchema: {
+			type: "object",
+			properties: {
+				taskId: { type: "string", description: "The task ID to read" },
+				sessionToken: {
+					type: "string",
+					description: "Session token from create_task",
+				},
+				includeAnnotations: {
+					type: "boolean",
+					description:
+						"Include comment threads/annotations in the response (default: false). Set true to see human feedback.",
+				},
+				includeLinkedPRs: {
+					type: "boolean",
+					description:
+						"Include linked PRs section in the response (default: false). Set true to see linked PRs.",
+				},
+				includePRComments: {
+					type: "boolean",
+					description:
+						"Include inline PR review comments (diff line comments) in the response (default: false). Set true to see inline diff feedback.",
+				},
+			},
+			required: ["taskId", "sessionToken"],
+		},
+	},
 
-  handler: async (args: unknown) => {
-    const {
-      taskId,
-      sessionToken,
-      includeAnnotations = false,
-      includeLinkedPRs = false,
-      includePRComments = false,
-    } = ReadTaskInput.parse(args);
-    const doc = await getOrCreateDoc(taskId);
-    const metadata = getPlanMetadata(doc);
+	handler: async (args: unknown) => {
+		const {
+			taskId,
+			sessionToken,
+			includeAnnotations = false,
+			includeLinkedPRs = false,
+			includePRComments = false,
+		} = ReadTaskInput.parse(args);
+		const doc = await getOrCreateDoc(taskId);
+		const metadata = getPlanMetadata(doc);
 
-    if (!metadata) {
-      return {
-        content: [
-          {
-            type: 'text',
-            text: `Task "${taskId}" not found or has no metadata.`,
-          },
-        ],
-        isError: true,
-      };
-    }
+		if (!metadata) {
+			return {
+				content: [
+					{
+						type: "text",
+						text: `Task "${taskId}" not found or has no metadata.`,
+					},
+				],
+				isError: true,
+			};
+		}
 
-    if (!sessionToken || sessionToken === 'undefined' || sessionToken === 'null') {
-      return {
-        content: [
-          {
-            type: 'text',
-            text:
-              `sessionToken is required for task "${taskId}". ` +
-              'Use the sessionToken returned from createTask(). ' +
-              'If you lost your token, use regenerateSessionToken(taskId).',
-          },
-        ],
-        isError: true,
-      };
-    }
-    if (
-      !metadata.sessionTokenHash ||
-      !verifySessionToken(sessionToken, metadata.sessionTokenHash)
-    ) {
-      return {
-        content: [
-          {
-            type: 'text',
-            text:
-              `Invalid session token for task "${taskId}". ` +
-              'The sessionToken must be the one returned from createTask(). ' +
-              'If you lost your token, use regenerateSessionToken(taskId) to get a new one.',
-          },
-        ],
-        isError: true,
-      };
-    }
+		if (
+			!sessionToken ||
+			sessionToken === "undefined" ||
+			sessionToken === "null"
+		) {
+			return {
+				content: [
+					{
+						type: "text",
+						text:
+							`sessionToken is required for task "${taskId}". ` +
+							"Use the sessionToken returned from createTask(). " +
+							"If you lost your token, use regenerateSessionToken(taskId).",
+					},
+				],
+				isError: true,
+			};
+		}
+		if (
+			!metadata.sessionTokenHash ||
+			!verifySessionToken(sessionToken, metadata.sessionTokenHash)
+		) {
+			return {
+				content: [
+					{
+						type: "text",
+						text:
+							`Invalid session token for task "${taskId}". ` +
+							"The sessionToken must be the one returned from createTask(). " +
+							"If you lost your token, use regenerateSessionToken(taskId) to get a new one.",
+					},
+				],
+				isError: true,
+			};
+		}
 
-    const markdown = await exportPlanToMarkdown(doc, {
-      includeResolved: includeAnnotations,
-      includeActivity: includeAnnotations,
-    });
+		const markdown = await exportPlanToMarkdown(doc, {
+			includeResolved: includeAnnotations,
+			includeActivity: includeAnnotations,
+		});
 
-    let output = formatPlanHeader(metadata);
-    output += markdown;
+		let output = formatPlanHeader(metadata);
+		output += markdown;
 
-    const deliverables = getDeliverables(doc);
-    const deliverablesText = formatDeliverablesForLLM(deliverables);
-    if (deliverablesText) {
-      output += '\n\n---\n\n';
-      output += deliverablesText;
-    }
+		const deliverables = getDeliverables(doc);
+		const deliverablesText = formatDeliverablesForLLM(deliverables);
+		if (deliverablesText) {
+			output += "\n\n---\n\n";
+			output += deliverablesText;
+		}
 
-    if (includeLinkedPRs) {
-      const linkedPRs = getLinkedPRs(doc);
-      output += formatLinkedPRsSection(linkedPRs);
-    }
+		if (includeLinkedPRs) {
+			const linkedPRs = getLinkedPRs(doc);
+			output += formatLinkedPRsSection(linkedPRs);
+		}
 
-    if (includePRComments) {
-      const prComments = getPRReviewComments(doc);
-      if (prComments.length > 0) {
-        const prCommentsText = formatDiffCommentsForLLM(prComments, {
-          includeResolved: false,
-        });
-        if (prCommentsText) {
-          output += '\n\n---\n\n';
-          output += prCommentsText;
-        }
-      }
-    }
+		if (includePRComments) {
+			const prComments = getPRReviewComments(doc);
+			if (prComments.length > 0) {
+				const prCommentsText = formatDiffCommentsForLLM(prComments, {
+					includeResolved: false,
+				});
+				if (prCommentsText) {
+					output += "\n\n---\n\n";
+					output += prCommentsText;
+				}
+			}
+		}
 
-    return {
-      content: [
-        {
-          type: 'text',
-          text: output,
-        },
-      ],
-    };
-  },
+		return {
+			content: [
+				{
+					type: "text",
+					text: output,
+				},
+			],
+		};
+	},
 };

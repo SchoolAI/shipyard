@@ -1,24 +1,24 @@
-import { z } from 'zod';
-import { type PlanStatusType, PlanStatusValues } from './plan.js';
+import { z } from "zod";
+import { type PlanStatusType, PlanStatusValues } from "./plan.js";
 
 /**
  * The document name for the plan index Y.Doc.
  * This is a special Y.Doc that tracks all plan metadata for the sidebar.
  */
-export const PLAN_INDEX_DOC_NAME = 'plan-index';
+export const PLAN_INDEX_DOC_NAME = "plan-index";
 
 /**
  * The key for the viewedBy map within the plan-index Y.Doc.
  * Stores per-plan viewedBy data as nested Y.Maps for CRDT merging.
  * Structure: Y.Map<planId, Y.Map<username, timestamp>>
  */
-export const PLAN_INDEX_VIEWED_BY_KEY = 'viewedBy';
+export const PLAN_INDEX_VIEWED_BY_KEY = "viewedBy";
 
 /**
  * Known IndexedDB database names that are NOT plan documents.
  * Used to filter when querying for shared plans.
  */
-export const NON_PLAN_DB_NAMES = ['plan-index', 'idb-keyval'] as const;
+export const NON_PLAN_DB_NAMES = ["plan-index", "idb-keyval"] as const;
 
 export type { PlanStatusType };
 
@@ -26,17 +26,17 @@ export type { PlanStatusType };
  * Base fields shared by all plan index entries.
  */
 interface PlanIndexEntryBase {
-  id: string;
-  title: string;
-  status: PlanStatusType;
-  createdAt: number;
-  updatedAt: number;
-  /** GitHub username of the plan owner */
-  ownerId: string;
-  /** Tags for categorization (copied from plan metadata for fast filtering) */
-  tags?: string[];
-  /** Epoch number for detecting outdated plans (fast filtering without loading full Y.Doc) */
-  epoch: number;
+	id: string;
+	title: string;
+	status: PlanStatusType;
+	createdAt: number;
+	updatedAt: number;
+	/** GitHub username of the plan owner */
+	ownerId: string;
+	/** Tags for categorization (copied from plan metadata for fast filtering) */
+	tags?: string[];
+	/** Epoch number for detecting outdated plans (fast filtering without loading full Y.Doc) */
+	epoch: number;
 }
 
 /**
@@ -44,42 +44,42 @@ interface PlanIndexEntryBase {
  * Uses a discriminated union to ensure deletedAt and deletedBy always appear together.
  */
 export type PlanIndexEntry =
-  | (PlanIndexEntryBase & { deleted: false })
-  | (PlanIndexEntryBase & {
-      deleted: true;
-      /** Timestamp when plan was archived/deleted (hidden from sidebar by default) */
-      deletedAt: number;
-      /** Display name of who archived/deleted the plan */
-      deletedBy: string;
-    });
+	| (PlanIndexEntryBase & { deleted: false })
+	| (PlanIndexEntryBase & {
+			deleted: true;
+			/** Timestamp when plan was archived/deleted (hidden from sidebar by default) */
+			deletedAt: number;
+			/** Display name of who archived/deleted the plan */
+			deletedBy: string;
+	  });
 
 /**
  * Zod schema for validating plan index entries from Y.Map.
  * Uses discriminated union on 'deleted' field for better validation performance.
  */
-export const PlanIndexEntrySchema = z.discriminatedUnion('deleted', [
-  z.object({
-    deleted: z.literal(false),
-    id: z.string(),
-    title: z.string(),
-    status: z.enum(PlanStatusValues),
-    createdAt: z.number(),
-    updatedAt: z.number(),
-    ownerId: z.string(),
-    tags: z.array(z.string()).optional(),
-    epoch: z.number(),
-  }),
-  z.object({
-    deleted: z.literal(true),
-    id: z.string(),
-    title: z.string(),
-    status: z.enum(PlanStatusValues),
-    createdAt: z.number(),
-    updatedAt: z.number(),
-    ownerId: z.string(),
-    tags: z.array(z.string()).optional(),
-    epoch: z.number(),
-    deletedAt: z.number(),
-    deletedBy: z.string(),
-  }),
+export const PlanIndexEntrySchema = z.discriminatedUnion("deleted", [
+	z.object({
+		deleted: z.literal(false),
+		id: z.string(),
+		title: z.string(),
+		status: z.enum(PlanStatusValues),
+		createdAt: z.number(),
+		updatedAt: z.number(),
+		ownerId: z.string(),
+		tags: z.array(z.string()).optional(),
+		epoch: z.number(),
+	}),
+	z.object({
+		deleted: z.literal(true),
+		id: z.string(),
+		title: z.string(),
+		status: z.enum(PlanStatusValues),
+		createdAt: z.number(),
+		updatedAt: z.number(),
+		ownerId: z.string(),
+		tags: z.array(z.string()).optional(),
+		epoch: z.number(),
+		deletedAt: z.number(),
+		deletedBy: z.string(),
+	}),
 ]);

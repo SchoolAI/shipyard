@@ -8,19 +8,19 @@
  */
 
 export {
-  createSubscription,
-  deleteSubscription,
-  getChanges,
-  getSubscription,
-  getSubscriptionsForPlan,
-  notifyChange,
-  startCleanupInterval,
-} from './manager.js';
-export { attachObservers, detachObservers, hasObservers } from './observers.js';
+	createSubscription,
+	deleteSubscription,
+	getChanges,
+	getSubscription,
+	getSubscriptionsForPlan,
+	notifyChange,
+	startCleanupInterval,
+} from "./manager.js";
+export { attachObservers, detachObservers, hasObservers } from "./observers.js";
 export type {
-  Change,
-  ChangesResponse,
-  ChangeType,
-  Subscription,
-  SubscriptionConfig,
-} from './types.js';
+	Change,
+	ChangesResponse,
+	ChangeType,
+	Subscription,
+	SubscriptionConfig,
+} from "./types.js";

@@ -1,33 +1,33 @@
-import wrtc from '@roamhq/wrtc';
+import wrtc from "@roamhq/wrtc";
 import {
-  type EnvironmentContext,
-  getSignalingConnections,
-  type OriginPlatform,
-} from '@shipyard/schema';
-import { WebrtcProvider } from 'y-webrtc';
-import type * as Y from 'yjs';
-import { githubConfig } from './config/env/github.js';
-import { signalingConfig } from './config/env/signaling.js';
-import { logger } from './logger.js';
-import { getClientInfo } from './mcp-client-info.js';
-import { detectPlatform, getDisplayName } from './platform-detection.js';
-import { getEnvironmentContext, getGitHubUsername } from './server-identity.js';
+	type EnvironmentContext,
+	getSignalingConnections,
+	type OriginPlatform,
+} from "@shipyard/schema";
+import { WebrtcProvider } from "y-webrtc";
+import type * as Y from "yjs";
+import { githubConfig } from "./config/env/github.js";
+import { signalingConfig } from "./config/env/signaling.js";
+import { logger } from "./logger.js";
+import { getClientInfo } from "./mcp-client-info.js";
+import { detectPlatform, getDisplayName } from "./platform-detection.js";
+import { getEnvironmentContext, getGitHubUsername } from "./server-identity.js";
 
 /**
  * MCP awareness state broadcasted to peers.
  * Matches PlanAwarenessState from web package but defined locally to avoid circular dependency.
  */
 interface McpAwarenessState {
-  user: {
-    id: string;
-    name: string;
-    color: string;
-  };
-  platform: OriginPlatform;
-  status: 'approved' | 'pending' | 'rejected';
-  isOwner: boolean;
-  webrtcPeerId: string;
-  context?: EnvironmentContext;
+	user: {
+		id: string;
+		name: string;
+		color: string;
+	};
+	platform: OriginPlatform;
+	status: "approved" | "pending" | "rejected";
+	isOwner: boolean;
+	webrtcPeerId: string;
+	context?: EnvironmentContext;
 }
 
 /** WebRTC signaling server URL from validated config */
@@ -47,169 +47,180 @@ const SIGNALING_SERVER = signalingConfig.SIGNALING_URL;
  */
 // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- Node.js polyfill for WebRTC globals required by simple-peer
 const globalAny = globalThis as Record<string, unknown>;
-if (typeof globalAny.RTCPeerConnection === 'undefined') {
-  globalAny.RTCPeerConnection = wrtc.RTCPeerConnection;
-  globalAny.RTCSessionDescription = wrtc.RTCSessionDescription;
-  globalAny.RTCIceCandidate = wrtc.RTCIceCandidate;
+if (typeof globalAny.RTCPeerConnection === "undefined") {
+	globalAny.RTCPeerConnection = wrtc.RTCPeerConnection;
+	globalAny.RTCSessionDescription = wrtc.RTCSessionDescription;
+	globalAny.RTCIceCandidate = wrtc.RTCIceCandidate;
 }
 
-export async function createWebRtcProvider(ydoc: Y.Doc, planId: string): Promise<WebrtcProvider> {
-  /** Build ICE servers configuration */
-  const iceServers: Array<{ urls: string; username?: string; credential?: string }> = [
-    { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun1.l.google.com:19302' },
-  ];
+export async function createWebRtcProvider(
+	ydoc: Y.Doc,
+	planId: string,
+): Promise<WebrtcProvider> {
+	/** Build ICE servers configuration */
+	const iceServers: Array<{
+		urls: string;
+		username?: string;
+		credential?: string;
+	}> = [
+		{ urls: "stun:stun.l.google.com:19302" },
+		{ urls: "stun:stun1.l.google.com:19302" },
+	];
 
-  /** Add TURN server if configured */
-  if (process.env.TURN_URL && process.env.TURN_USERNAME && process.env.TURN_CREDENTIAL) {
-    iceServers.push({
-      urls: process.env.TURN_URL,
-      username: process.env.TURN_USERNAME,
-      credential: process.env.TURN_CREDENTIAL,
-    });
-    logger.info({ turnUrl: process.env.TURN_URL }, 'TURN server configured');
-  }
+	/** Add TURN server if configured */
+	if (
+		process.env.TURN_URL &&
+		process.env.TURN_USERNAME &&
+		process.env.TURN_CREDENTIAL
+	) {
+		iceServers.push({
+			urls: process.env.TURN_URL,
+			username: process.env.TURN_USERNAME,
+			credential: process.env.TURN_CREDENTIAL,
+		});
+		logger.info({ turnUrl: process.env.TURN_URL }, "TURN server configured");
+	}
 
-  /** Create provider with room name based on plan ID */
-  const roomName = `shipyard-${planId}`;
-  const provider = new WebrtcProvider(roomName, ydoc, {
-    signaling: [SIGNALING_SERVER],
-    peerOpts: {
-      // @ts-expect-error - wrtc type definitions don't match runtime structure
-      wrtc: wrtc.default || wrtc,
-      config: {
-        iceServers,
-      },
-    },
-  });
+	/** Create provider with room name based on plan ID */
+	const roomName = `shipyard-${planId}`;
+	const provider = new WebrtcProvider(roomName, ydoc, {
+		signaling: [SIGNALING_SERVER],
+		peerOpts: {
+			// @ts-expect-error - wrtc type definitions don't match runtime structure
+			wrtc: wrtc.default || wrtc,
+			config: {
+				iceServers,
+			},
+		},
+	});
 
-  /*
-   * Broadcast MCP identity via awareness protocol and push to signaling
-   * Use .catch() to ensure awareness is always set, even if GitHub auth fails
-   */
-  const username = await getGitHubUsername().catch(() => undefined);
-  const fallbackId = `mcp-anon-${crypto.randomUUID().slice(0, 8)}`;
-  const userId = username ? `mcp-${username}` : fallbackId;
+	/*
+	 * Broadcast MCP identity via awareness protocol and push to signaling
+	 * Use .catch() to ensure awareness is always set, even if GitHub auth fails
+	 */
+	const username = await getGitHubUsername().catch(() => undefined);
+	const fallbackId = `mcp-anon-${crypto.randomUUID().slice(0, 8)}`;
+	const userId = username ? `mcp-${username}` : fallbackId;
 
-  const clientInfoName = getClientInfo();
-  const { platform } = detectPlatform(clientInfoName);
-  const displayName = getDisplayName(platform, username);
+	const clientInfoName = getClientInfo();
+	const { platform } = detectPlatform(clientInfoName);
+	const displayName = getDisplayName(platform, username);
 
-  const awarenessState: McpAwarenessState = {
-    user: {
-      id: userId,
-      name: displayName,
-      color: '#0066cc',
-    },
-    platform,
-    status: 'approved',
-    isOwner: true,
-    webrtcPeerId: crypto.randomUUID(),
-    context: getEnvironmentContext(),
-  };
-  provider.awareness.setLocalStateField('planStatus', awarenessState);
-  logger.info(
-    {
-      planId,
-      username: username ?? fallbackId,
-      platform,
-      hasContext: true,
-      awarenessClientId: provider.awareness.clientID,
-    },
-    'MCP awareness state set'
-  );
+	const awarenessState: McpAwarenessState = {
+		user: {
+			id: userId,
+			name: displayName,
+			color: "#0066cc",
+		},
+		platform,
+		status: "approved",
+		isOwner: true,
+		webrtcPeerId: crypto.randomUUID(),
+		context: getEnvironmentContext(),
+	};
+	provider.awareness.setLocalStateField("planStatus", awarenessState);
+	logger.info(
+		{
+			planId,
+			username: username ?? fallbackId,
+			platform,
+			hasContext: true,
+			awarenessClientId: provider.awareness.clientID,
+		},
+		"MCP awareness state set",
+	);
 
-  /** Debug: Log awareness state after a delay to see if it persists */
-  setTimeout(() => {
-    const localState = provider.awareness.getLocalState();
-    logger.info(
-      {
-        planId,
-        hasLocalState: !!localState,
-        planStatusSet: !!localState?.planStatus,
-        connected: provider.connected,
-      },
-      'WebRTC awareness check after 2s'
-    );
-  }, 2000);
+	/** Debug: Log awareness state after a delay to see if it persists */
+	setTimeout(() => {
+		const localState = provider.awareness.getLocalState();
+		logger.info(
+			{
+				planId,
+				hasLocalState: !!localState,
+				planStatusSet: !!localState?.planStatus,
+				connected: provider.connected,
+			},
+			"WebRTC awareness check after 2s",
+		);
+	}, 2000);
 
-  /**
-   * Send authentication to signaling server after connection is established.
-   * This must happen AFTER y-webrtc sends its subscribe message.
-   * We listen for the 'status' event with connected=true to know when to send.
-   */
-  const sendAuthWhenReady = () => {
-    const githubToken = githubConfig.GITHUB_TOKEN;
-    if (!githubToken) {
-      logger.warn(
-        { planId },
-        'No GitHub token - skipping signaling auth (WebRTC presence may not work)'
-      );
-      return;
-    }
+	/**
+	 * Send authentication to signaling server after connection is established.
+	 * This must happen AFTER y-webrtc sends its subscribe message.
+	 * We listen for the 'status' event with connected=true to know when to send.
+	 */
+	const sendAuthWhenReady = () => {
+		const githubToken = githubConfig.GITHUB_TOKEN;
+		if (!githubToken) {
+			logger.warn(
+				{ planId },
+				"No GitHub token - skipping signaling auth (WebRTC presence may not work)",
+			);
+			return;
+		}
 
-    /**
-     * Wait for signaling connection to be established and subscribe to be processed.
-     * The 'status' event fires when signaling WebSocket connects.
-     */
-    const statusHandler = (event: { connected: boolean }) => {
-      if (!event.connected) return;
+		/**
+		 * Wait for signaling connection to be established and subscribe to be processed.
+		 * The 'status' event fires when signaling WebSocket connects.
+		 */
+		const statusHandler = (event: { connected: boolean }) => {
+			if (!event.connected) return;
 
-      /** Give y-webrtc time to send subscribe before we send authenticate */
-      setTimeout(() => {
-        const signalingConns = getSignalingConnections(provider);
-        for (const conn of signalingConns) {
-          const ws = conn.ws;
-          if (ws && ws.readyState === WebSocket.OPEN) {
-            const authMsg = JSON.stringify({
-              type: 'authenticate',
-              auth: 'owner',
-              userId: username ?? fallbackId,
-              githubToken,
-            });
-            ws.send(authMsg);
-            logger.info(
-              { planId, userId: username ?? fallbackId },
-              'Sent authenticate to signaling'
-            );
-          }
-        }
-      }, 1000);
+			/** Give y-webrtc time to send subscribe before we send authenticate */
+			setTimeout(() => {
+				const signalingConns = getSignalingConnections(provider);
+				for (const conn of signalingConns) {
+					const ws = conn.ws;
+					if (ws && ws.readyState === WebSocket.OPEN) {
+						const authMsg = JSON.stringify({
+							type: "authenticate",
+							auth: "owner",
+							userId: username ?? fallbackId,
+							githubToken,
+						});
+						ws.send(authMsg);
+						logger.info(
+							{ planId, userId: username ?? fallbackId },
+							"Sent authenticate to signaling",
+						);
+					}
+				}
+			}, 1000);
 
-      /** Remove handler after first connect */
-      provider.off('status', statusHandler);
-    };
+			/** Remove handler after first connect */
+			provider.off("status", statusHandler);
+		};
 
-    provider.on('status', statusHandler);
+		provider.on("status", statusHandler);
 
-    /** Also try sending immediately if already connected */
-    if (provider.connected) {
-      statusHandler({ connected: true });
-    }
-  };
+		/** Also try sending immediately if already connected */
+		if (provider.connected) {
+			statusHandler({ connected: true });
+		}
+	};
 
-  sendAuthWhenReady();
+	sendAuthWhenReady();
 
-  /*
-   * Push approval state to signaling server (required for access control)
-   * Use fallback ID if no username available
-   */
-  sendApprovalStateToSignaling(provider, planId, username ?? fallbackId);
+	/*
+	 * Push approval state to signaling server (required for access control)
+	 * Use fallback ID if no username available
+	 */
+	sendApprovalStateToSignaling(provider, planId, username ?? fallbackId);
 
-  /** Set up event listeners for monitoring */
-  setupProviderListeners(provider, planId);
+	/** Set up event listeners for monitoring */
+	setupProviderListeners(provider, planId);
 
-  logger.info(
-    {
-      planId,
-      roomName,
-      signaling: SIGNALING_SERVER,
-      hasTurn: iceServers.length > 2,
-    },
-    'WebRTC provider created'
-  );
+	logger.info(
+		{
+			planId,
+			roomName,
+			signaling: SIGNALING_SERVER,
+			hasTurn: iceServers.length > 2,
+		},
+		"WebRTC provider created",
+	);
 
-  return provider;
+	return provider;
 }
 
 /**
@@ -221,44 +232,50 @@ export async function createWebRtcProvider(ydoc: Y.Doc, planId: string): Promise
  * @param username - The GitHub username (owner)
  */
 function sendApprovalStateToSignaling(
-  provider: WebrtcProvider,
-  planId: string,
-  username: string
+	provider: WebrtcProvider,
+	planId: string,
+	username: string,
 ): void {
-  /** Access signaling connections (internal y-webrtc API via shared type guard) */
-  const signalingConns = getSignalingConnections(provider);
+	/** Access signaling connections (internal y-webrtc API via shared type guard) */
+	const signalingConns = getSignalingConnections(provider);
 
-  if (signalingConns.length === 0) {
-    /** Schedule approval state push after signaling connects */
-    setTimeout(() => sendApprovalStateToSignaling(provider, planId, username), 1000);
-    return;
-  }
+	if (signalingConns.length === 0) {
+		/** Schedule approval state push after signaling connects */
+		setTimeout(
+			() => sendApprovalStateToSignaling(provider, planId, username),
+			1000,
+		);
+		return;
+	}
 
-  /** Send user identity first (so signaling knows which user this connection belongs to) */
-  const identifyMessage = JSON.stringify({
-    type: 'subscribe',
-    topics: [],
-    userId: username,
-  });
+	/** Send user identity first (so signaling knows which user this connection belongs to) */
+	const identifyMessage = JSON.stringify({
+		type: "subscribe",
+		topics: [],
+		userId: username,
+	});
 
-  /** Then send approval state (MCP is owner, so approve itself) */
-  const approvalStateMessage = JSON.stringify({
-    type: 'approval_state',
-    planId,
-    ownerId: username,
-    approvedUsers: [username],
-    rejectedUsers: [],
-  });
+	/** Then send approval state (MCP is owner, so approve itself) */
+	const approvalStateMessage = JSON.stringify({
+		type: "approval_state",
+		planId,
+		ownerId: username,
+		approvedUsers: [username],
+		rejectedUsers: [],
+	});
 
-  for (const conn of signalingConns) {
-    // NOTE: SignalingConnection.ws is typed but may be null
-    const ws = conn.ws;
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(identifyMessage);
-      ws.send(approvalStateMessage);
-      logger.info({ planId, username }, 'Pushed identity and approval state to signaling server');
-    }
-  }
+	for (const conn of signalingConns) {
+		// NOTE: SignalingConnection.ws is typed but may be null
+		const ws = conn.ws;
+		if (ws && ws.readyState === WebSocket.OPEN) {
+			ws.send(identifyMessage);
+			ws.send(approvalStateMessage);
+			logger.info(
+				{ planId, username },
+				"Pushed identity and approval state to signaling server",
+			);
+		}
+	}
 }
 
 /**
@@ -267,55 +284,61 @@ function sendApprovalStateToSignaling(
  * @param provider - The WebRTC provider instance
  * @param planId - The plan ID for logging context
  */
-function setupProviderListeners(provider: WebrtcProvider, planId: string): void {
-  /** Track peer connections */
-  provider.on('peers', (event: { added: string[]; removed: string[]; webrtcPeers: string[] }) => {
-    const peerCount = event.webrtcPeers.length;
+function setupProviderListeners(
+	provider: WebrtcProvider,
+	planId: string,
+): void {
+	/** Track peer connections */
+	provider.on(
+		"peers",
+		(event: { added: string[]; removed: string[]; webrtcPeers: string[] }) => {
+			const peerCount = event.webrtcPeers.length;
 
-    if (event.added.length > 0) {
-      logger.info(
-        {
-          planId,
-          added: event.added,
-          totalPeers: peerCount,
-        },
-        'WebRTC peer connected'
-      );
-    }
+			if (event.added.length > 0) {
+				logger.info(
+					{
+						planId,
+						added: event.added,
+						totalPeers: peerCount,
+					},
+					"WebRTC peer connected",
+				);
+			}
 
-    if (event.removed.length > 0) {
-      logger.info(
-        {
-          planId,
-          removed: event.removed,
-          totalPeers: peerCount,
-        },
-        'WebRTC peer disconnected'
-      );
-    }
-  });
+			if (event.removed.length > 0) {
+				logger.info(
+					{
+						planId,
+						removed: event.removed,
+						totalPeers: peerCount,
+					},
+					"WebRTC peer disconnected",
+				);
+			}
+		},
+	);
 
-  /** Track sync status */
-  provider.on('synced', (event: { synced: boolean }) => {
-    logger.info(
-      {
-        planId,
-        synced: event.synced,
-      },
-      'WebRTC sync status changed'
-    );
-  });
+	/** Track sync status */
+	provider.on("synced", (event: { synced: boolean }) => {
+		logger.info(
+			{
+				planId,
+				synced: event.synced,
+			},
+			"WebRTC sync status changed",
+		);
+	});
 
-  /** Track signaling connection status */
-  provider.on('status', (event: { connected: boolean }) => {
-    logger.info(
-      {
-        planId,
-        connected: event.connected,
-      },
-      'WebRTC signaling status changed'
-    );
-  });
+	/** Track signaling connection status */
+	provider.on("status", (event: { connected: boolean }) => {
+		logger.info(
+			{
+				planId,
+				connected: event.connected,
+			},
+			"WebRTC signaling status changed",
+		);
+	});
 }
 
 /**
@@ -324,7 +347,10 @@ function setupProviderListeners(provider: WebrtcProvider, planId: string): void 
  * @param provider - The WebRTC provider to destroy
  * @param planId - The plan ID for logging context
  */
-export function destroyWebRtcProvider(provider: WebrtcProvider, planId: string): void {
-  logger.info({ planId }, 'Destroying WebRTC provider');
-  provider.destroy();
+export function destroyWebRtcProvider(
+	provider: WebrtcProvider,
+	planId: string,
+): void {
+	logger.info({ planId }, "Destroying WebRTC provider");
+	provider.destroy();
 }

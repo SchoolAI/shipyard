@@ -16,7 +16,7 @@ let clientInfoName: string | undefined;
  * Called once when the MCP server connects to a client.
  */
 export function setClientInfo(name: string | undefined): void {
-  clientInfoName = name;
+	clientInfoName = name;
 }
 
 /**
@@ -24,7 +24,7 @@ export function setClientInfo(name: string | undefined): void {
  * Returns undefined if no client has connected yet.
  */
 export function getClientInfo(): string | undefined {
-  return clientInfoName;
+	return clientInfoName;
 }
 
 /**
@@ -32,5 +32,5 @@ export function getClientInfo(): string | undefined {
  * Clears the stored client name so detection can be re-run.
  */
 export function resetClientInfo(): void {
-  clientInfoName = undefined;
+	clientInfoName = undefined;
 }

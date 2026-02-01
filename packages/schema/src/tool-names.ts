@@ -5,21 +5,21 @@
  * This is the single source of truth for MCP tool names across all packages.
  */
 export const TOOL_NAMES = {
-  ADD_ARTIFACT: 'add_artifact',
-  COMPLETE_TASK: 'complete_task',
-  CREATE_TASK: 'create_task',
-  EXECUTE_CODE: 'execute_code',
-  LINK_PR: 'link_pr',
-  POST_UPDATE: 'post_update',
-  READ_DIFF_COMMENTS: 'read_diff_comments',
-  READ_TASK: 'read_task',
-  REGENERATE_SESSION_TOKEN: 'regenerate_session_token',
-  REPLY_TO_DIFF_COMMENT: 'reply_to_diff_comment',
-  REPLY_TO_THREAD_COMMENT: 'reply_to_thread_comment',
-  REQUEST_USER_INPUT: 'request_user_input',
-  SETUP_REVIEW_NOTIFICATION: 'setup_review_notification',
-  UPDATE_BLOCK_CONTENT: 'update_block_content',
-  UPDATE_TASK: 'update_task',
+	ADD_ARTIFACT: "add_artifact",
+	COMPLETE_TASK: "complete_task",
+	CREATE_TASK: "create_task",
+	EXECUTE_CODE: "execute_code",
+	LINK_PR: "link_pr",
+	POST_UPDATE: "post_update",
+	READ_DIFF_COMMENTS: "read_diff_comments",
+	READ_TASK: "read_task",
+	REGENERATE_SESSION_TOKEN: "regenerate_session_token",
+	REPLY_TO_DIFF_COMMENT: "reply_to_diff_comment",
+	REPLY_TO_THREAD_COMMENT: "reply_to_thread_comment",
+	REQUEST_USER_INPUT: "request_user_input",
+	SETUP_REVIEW_NOTIFICATION: "setup_review_notification",
+	UPDATE_BLOCK_CONTENT: "update_block_content",
+	UPDATE_TASK: "update_task",
 } as const;
 
 export type ToolName = (typeof TOOL_NAMES)[keyof typeof TOOL_NAMES];

@@ -1,43 +1,45 @@
-import * as child_process from 'node:child_process';
-import * as fs from 'node:fs';
-import * as os from 'node:os';
-import * as path from 'node:path';
-import * as vm from 'node:vm';
-import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
+import * as child_process from "node:child_process";
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
+import * as vm from "node:vm";
+import ffmpegInstaller from "@ffmpeg-installer/ffmpeg";
 import {
-  type CreateChoiceInputParams,
-  type CreateConfirmInputParams,
-  type CreateDateInputParams,
-  type CreateEmailInputParams,
-  type CreateInputRequestParams,
-  type CreateMultilineInputParams,
-  type CreateNumberInputParams,
-  type CreateRatingInputParams,
-  type CreateTextInputParams,
-  getArtifacts,
-  getDeliverables,
-  getPlanMetadata,
-  PLAN_INDEX_DOC_NAME,
-  type Question,
-} from '@shipyard/schema';
-import { z } from 'zod';
-import { registryConfig } from '../config/env/registry.js';
-import { getOrCreateDoc } from '../doc-store.js';
-import { logger } from '../logger.js';
-import { addArtifactTool } from './add-artifact.js';
+	type CreateChoiceInputParams,
+	type CreateConfirmInputParams,
+	type CreateDateInputParams,
+	type CreateEmailInputParams,
+	type CreateInputRequestParams,
+	type CreateMultilineInputParams,
+	type CreateNumberInputParams,
+	type CreateRatingInputParams,
+	type CreateTextInputParams,
+	getArtifacts,
+	getDeliverables,
+	getPlanMetadata,
+	PLAN_INDEX_DOC_NAME,
+	type Question,
+} from "@shipyard/schema";
+import { z } from "zod";
+import { registryConfig } from "../config/env/registry.js";
+import { getOrCreateDoc } from "../doc-store.js";
+import { logger } from "../logger.js";
+import { addArtifactTool } from "./add-artifact.js";
 
 /**
  * Extract text from MCP tool result content.
  * MCP tools return { content: [{ type: 'text', text: string }] }.
  * Defensive against malformed results.
  */
-function getToolResultText(result: { content?: unknown[] } | undefined | null): string {
-  if (!result || !Array.isArray(result.content)) return '';
-  const first = result.content[0];
-  if (!first || typeof first !== 'object') return '';
-  const record = Object.fromEntries(Object.entries(first));
-  const text = record.text;
-  return typeof text === 'string' ? text : '';
+function getToolResultText(
+	result: { content?: unknown[] } | undefined | null,
+): string {
+	if (!result || !Array.isArray(result.content)) return "";
+	const first = result.content[0];
+	if (!first || typeof first !== "object") return "";
+	const record = Object.fromEntries(Object.entries(first));
+	const text = record.text;
+	return typeof text === "string" ? text : "";
 }
 
 /**
@@ -46,66 +48,71 @@ function getToolResultText(result: { content?: unknown[] } | undefined | null): 
  * Returns { details, message, stack } for structured logging.
  */
 async function serializeError(error: unknown): Promise<{
-  details: Record<string, unknown>;
-  message: string;
-  stack?: string;
+	details: Record<string, unknown>;
+	message: string;
+	stack?: string;
 }> {
-  const { z } = await import('zod');
+	const { z } = await import("zod");
 
-  if (error instanceof z.ZodError) {
-    const formattedIssues = error.issues
-      .map((issue) => `  - ${issue.path.join('.')}: ${issue.message}`)
-      .join('\n');
-    const message = `Validation error:\n${formattedIssues}`;
-    return {
-      details: { name: 'ZodError', message, issues: error.issues, stack: error.stack },
-      message,
-      stack: error.stack,
-    };
-  }
+	if (error instanceof z.ZodError) {
+		const formattedIssues = error.issues
+			.map((issue) => `  - ${issue.path.join(".")}: ${issue.message}`)
+			.join("\n");
+		const message = `Validation error:\n${formattedIssues}`;
+		return {
+			details: {
+				name: "ZodError",
+				message,
+				issues: error.issues,
+				stack: error.stack,
+			},
+			message,
+			stack: error.stack,
+		};
+	}
 
-  if (error instanceof Error) {
-    return {
-      details: {
-        name: error.name,
-        message: error.message,
-        stack: error.stack,
-        cause: error.cause instanceof Error ? error.cause.message : error.cause,
-      },
-      message: error.message,
-      stack: error.stack,
-    };
-  }
+	if (error instanceof Error) {
+		return {
+			details: {
+				name: error.name,
+				message: error.message,
+				stack: error.stack,
+				cause: error.cause instanceof Error ? error.cause.message : error.cause,
+			},
+			message: error.message,
+			stack: error.stack,
+		};
+	}
 
-  if (error && typeof error === 'object') {
-    /** Use 'in' check to safely access message property without type assertion */
-    const message =
-      'message' in error && typeof error.message === 'string'
-        ? error.message
-        : JSON.stringify(error).slice(0, 500) || 'Unknown error';
-    return {
-      details: { raw: JSON.stringify(error).slice(0, 1000) },
-      message,
-    };
-  }
+	if (error && typeof error === "object") {
+		/** Use 'in' check to safely access message property without type assertion */
+		const message =
+			"message" in error && typeof error.message === "string"
+				? error.message
+				: JSON.stringify(error).slice(0, 500) || "Unknown error";
+		return {
+			details: { raw: JSON.stringify(error).slice(0, 1000) },
+			message,
+		};
+	}
 
-  const message = String(error) || 'Unknown error';
-  return { details: { raw: message }, message };
+	const message = String(error) || "Unknown error";
+	return { details: { raw: message }, message };
 }
 
-import { completeTaskTool } from './complete-task.js';
-import { createTaskTool } from './create-task.js';
-import { linkPRTool } from './link-pr.js';
-import { postUpdateTool } from './post-update.js';
-import { readDiffCommentsTool } from './read-diff-comments.js';
-import { readTaskTool } from './read-task.js';
-import { regenerateSessionTokenTool } from './regenerate-session-token.js';
-import { replyToDiffCommentTool } from './reply-to-diff-comment.js';
-import { replyToThreadCommentTool } from './reply-to-thread-comment.js';
-import { setupReviewNotificationTool } from './setup-review-notification.js';
-import { TOOL_NAMES } from './tool-names.js';
-import { updateBlockContentTool } from './update-block-content.js';
-import { updateTaskTool } from './update-task.js';
+import { completeTaskTool } from "./complete-task.js";
+import { createTaskTool } from "./create-task.js";
+import { linkPRTool } from "./link-pr.js";
+import { postUpdateTool } from "./post-update.js";
+import { readDiffCommentsTool } from "./read-diff-comments.js";
+import { readTaskTool } from "./read-task.js";
+import { regenerateSessionTokenTool } from "./regenerate-session-token.js";
+import { replyToDiffCommentTool } from "./reply-to-diff-comment.js";
+import { replyToThreadCommentTool } from "./reply-to-thread-comment.js";
+import { setupReviewNotificationTool } from "./setup-review-notification.js";
+import { TOOL_NAMES } from "./tool-names.js";
+import { updateBlockContentTool } from "./update-block-content.js";
+import { updateTaskTool } from "./update-task.js";
 
 const BUNDLED_DOCS = `Execute TypeScript code that calls Shipyard APIs. Use this for multi-step workflows to reduce round-trips.
 
@@ -692,7 +699,7 @@ return { taskId: task.taskId, snapshotUrl: result.snapshotUrl };
 `;
 
 const ExecuteCodeInput = z.object({
-  code: z.string().describe('TypeScript code to execute'),
+	code: z.string().describe("TypeScript code to execute"),
 });
 
 /**
@@ -702,241 +709,264 @@ const ExecuteCodeInput = z.object({
 const scriptTracker: string[] = [];
 
 async function createTask(opts: {
-  title: string;
-  content: string;
-  repo?: string;
-  prNumber?: number;
+	title: string;
+	content: string;
+	repo?: string;
+	prNumber?: number;
 }) {
-  const result = await createTaskTool.handler(opts);
-  const text = getToolResultText(result);
-  const taskId = text.match(/ID: (\S+)/)?.[1] || '';
+	const result = await createTaskTool.handler(opts);
+	const text = getToolResultText(result);
+	const taskId = text.match(/ID: (\S+)/)?.[1] || "";
 
-  let deliverables: Array<{ id: string; text: string }> = [];
-  if (taskId) {
-    const ydoc = await getOrCreateDoc(taskId);
-    const allDeliverables = getDeliverables(ydoc);
-    deliverables = allDeliverables.map((d) => ({ id: d.id, text: d.text }));
-  }
+	let deliverables: Array<{ id: string; text: string }> = [];
+	if (taskId) {
+		const ydoc = await getOrCreateDoc(taskId);
+		const allDeliverables = getDeliverables(ydoc);
+		deliverables = allDeliverables.map((d) => ({ id: d.id, text: d.text }));
+	}
 
-  const { script: monitoringScript } = await setupReviewNotification(taskId, 30);
+	const { script: monitoringScript } = await setupReviewNotification(
+		taskId,
+		30,
+	);
 
-  scriptTracker.push(`Task "${taskId}" created.\n\n${monitoringScript}`);
+	scriptTracker.push(`Task "${taskId}" created.\n\n${monitoringScript}`);
 
-  return {
-    taskId,
-    sessionToken: text.match(/Session Token: (\S+)/)?.[1] || '',
-    url: text.match(/URL: (\S+)/)?.[1] || '',
-    deliverables,
-    monitoringScript,
-  };
+	return {
+		taskId,
+		sessionToken: text.match(/Session Token: (\S+)/)?.[1] || "",
+		url: text.match(/URL: (\S+)/)?.[1] || "",
+		deliverables,
+		monitoringScript,
+	};
 }
 
 async function readTask(
-  taskId: string,
-  sessionToken: string,
-  opts?: { includeAnnotations?: boolean; includeLinkedPRs?: boolean }
+	taskId: string,
+	sessionToken: string,
+	opts?: { includeAnnotations?: boolean; includeLinkedPRs?: boolean },
 ) {
-  const result = await readTaskTool.handler({
-    taskId,
-    sessionToken,
-    includeAnnotations: opts?.includeAnnotations,
-    includeLinkedPRs: opts?.includeLinkedPRs,
-  });
-  const text = getToolResultText(result);
+	const result = await readTaskTool.handler({
+		taskId,
+		sessionToken,
+		includeAnnotations: opts?.includeAnnotations,
+		includeLinkedPRs: opts?.includeLinkedPRs,
+	});
+	const text = getToolResultText(result);
 
-  const ydoc = await getOrCreateDoc(taskId);
-  const metadata = getPlanMetadata(ydoc);
-  const deliverables = getDeliverables(ydoc).map((d) => ({
-    id: d.id,
-    text: d.text,
-    completed: !!d.linkedArtifactId,
-  }));
+	const ydoc = await getOrCreateDoc(taskId);
+	const metadata = getPlanMetadata(ydoc);
+	const deliverables = getDeliverables(ydoc).map((d) => ({
+		id: d.id,
+		text: d.text,
+		completed: !!d.linkedArtifactId,
+	}));
 
-  return {
-    content: text,
-    status: metadata?.status || '',
-    title: metadata?.title || '',
-    repo: metadata?.repo,
-    pr: metadata?.pr,
-    deliverables,
-    isError: result.isError,
-  };
+	return {
+		content: text,
+		status: metadata?.status || "",
+		title: metadata?.title || "",
+		repo: metadata?.repo,
+		pr: metadata?.pr,
+		deliverables,
+		isError: result.isError,
+	};
 }
 
 async function readDiffComments(
-  taskId: string,
-  sessionToken: string,
-  opts?: { includeLocal?: boolean; includePR?: boolean; includeResolved?: boolean }
+	taskId: string,
+	sessionToken: string,
+	opts?: {
+		includeLocal?: boolean;
+		includePR?: boolean;
+		includeResolved?: boolean;
+	},
 ) {
-  const result = await readDiffCommentsTool.handler({
-    taskId,
-    sessionToken,
-    includeLocal: opts?.includeLocal,
-    includePR: opts?.includePR,
-    includeResolved: opts?.includeResolved,
-  });
-  const firstContent = result.content[0];
-  const text = firstContent && 'text' in firstContent ? firstContent.text : '';
-  return text;
+	const result = await readDiffCommentsTool.handler({
+		taskId,
+		sessionToken,
+		includeLocal: opts?.includeLocal,
+		includePR: opts?.includePR,
+		includeResolved: opts?.includeResolved,
+	});
+	const firstContent = result.content[0];
+	const text = firstContent && "text" in firstContent ? firstContent.text : "";
+	return text;
 }
 
 async function updateTask(
-  taskId: string,
-  sessionToken: string,
-  updates: { title?: string; status?: string }
+	taskId: string,
+	sessionToken: string,
+	updates: { title?: string; status?: string },
 ) {
-  await updateTaskTool.handler({ taskId, sessionToken, ...updates });
+	await updateTaskTool.handler({ taskId, sessionToken, ...updates });
 
-  const { script: monitoringScript } = await setupReviewNotification(taskId, 30);
+	const { script: monitoringScript } = await setupReviewNotification(
+		taskId,
+		30,
+	);
 
-  scriptTracker.push(`Task "${taskId}" updated.\n\n${monitoringScript}`);
+	scriptTracker.push(`Task "${taskId}" updated.\n\n${monitoringScript}`);
 
-  return {
-    success: true,
-    monitoringScript,
-  };
+	return {
+		success: true,
+		monitoringScript,
+	};
 }
 
 type AddArtifactOpts = {
-  taskId: string;
-  sessionToken: string;
-  type: string;
-  filename: string;
-  description?: string;
-  deliverableId?: string;
+	taskId: string;
+	sessionToken: string;
+	type: string;
+	filename: string;
+	description?: string;
+	deliverableId?: string;
 } & (
-  | { source: 'file'; filePath: string }
-  | { source: 'url'; contentUrl: string }
-  | { source: 'base64'; content: string }
+	| { source: "file"; filePath: string }
+	| { source: "url"; contentUrl: string }
+	| { source: "base64"; content: string }
 );
 
 async function addArtifact(opts: AddArtifactOpts) {
-  const result = await addArtifactTool.handler(opts);
-  const text = getToolResultText(result);
+	const result = await addArtifactTool.handler(opts);
+	const text = getToolResultText(result);
 
-  if (result.isError) {
-    return { isError: true, error: text };
-  }
+	if (result.isError) {
+		return { isError: true, error: text };
+	}
 
-  const ydoc = await getOrCreateDoc(opts.taskId);
-  const artifacts = getArtifacts(ydoc);
-  const deliverables = getDeliverables(ydoc);
+	const ydoc = await getOrCreateDoc(opts.taskId);
+	const artifacts = getArtifacts(ydoc);
+	const deliverables = getDeliverables(ydoc);
 
-  const addedArtifact = artifacts.find((a) => a.filename === opts.filename);
+	const addedArtifact = artifacts.find((a) => a.filename === opts.filename);
 
-  const allDeliverablesComplete =
-    deliverables.length > 0 && deliverables.every((d) => d.linkedArtifactId);
+	const allDeliverablesComplete =
+		deliverables.length > 0 && deliverables.every((d) => d.linkedArtifactId);
 
-  const metadata = getPlanMetadata(ydoc);
+	const metadata = getPlanMetadata(ydoc);
 
-  let artifactUrl = '';
-  if (addedArtifact) {
-    artifactUrl =
-      addedArtifact.storage === 'github'
-        ? addedArtifact.url
-        : `http://localhost:${registryConfig.REGISTRY_PORT[0]}/artifacts/${addedArtifact.localArtifactId}`;
-  }
+	let artifactUrl = "";
+	if (addedArtifact) {
+		artifactUrl =
+			addedArtifact.storage === "github"
+				? addedArtifact.url
+				: `http://localhost:${registryConfig.REGISTRY_PORT[0]}/artifacts/${addedArtifact.localArtifactId}`;
+	}
 
-  return {
-    artifactId: addedArtifact?.id || '',
-    url: artifactUrl,
-    allDeliverablesComplete,
-    snapshotUrl: metadata?.status === 'completed' ? metadata.snapshotUrl : undefined,
-    isError: false,
-  };
+	return {
+		artifactId: addedArtifact?.id || "",
+		url: artifactUrl,
+		allDeliverablesComplete,
+		snapshotUrl:
+			metadata?.status === "completed" ? metadata.snapshotUrl : undefined,
+		isError: false,
+	};
 }
 
-async function completeTask(taskId: string, sessionToken: string, summary?: string) {
-  const result = await completeTaskTool.handler({ taskId, sessionToken, summary });
-  const text = getToolResultText(result);
+async function completeTask(
+	taskId: string,
+	sessionToken: string,
+	summary?: string,
+) {
+	const result = await completeTaskTool.handler({
+		taskId,
+		sessionToken,
+		summary,
+	});
+	const text = getToolResultText(result);
 
-  if (result.isError) {
-    return { isError: true, error: text };
-  }
+	if (result.isError) {
+		return { isError: true, error: text };
+	}
 
-  const ydoc = await getOrCreateDoc(taskId);
-  const metadata = getPlanMetadata(ydoc);
+	const ydoc = await getOrCreateDoc(taskId);
+	const metadata = getPlanMetadata(ydoc);
 
-  return {
-    snapshotUrl: metadata?.status === 'completed' ? metadata.snapshotUrl || '' : '',
-    status: metadata?.status || '',
-    isError: false,
-  };
+	return {
+		snapshotUrl:
+			metadata?.status === "completed" ? metadata.snapshotUrl || "" : "",
+		status: metadata?.status || "",
+		isError: false,
+	};
 }
 
 async function updateBlockContent(
-  taskId: string,
-  sessionToken: string,
-  operations: Array<{
-    type: 'update' | 'insert' | 'delete' | 'replace_all';
-    blockId?: string;
-    afterBlockId?: string | null;
-    content?: string;
-  }>
+	taskId: string,
+	sessionToken: string,
+	operations: Array<{
+		type: "update" | "insert" | "delete" | "replace_all";
+		blockId?: string;
+		afterBlockId?: string | null;
+		content?: string;
+	}>,
 ) {
-  await updateBlockContentTool.handler({ taskId, sessionToken, operations });
+	await updateBlockContentTool.handler({ taskId, sessionToken, operations });
 }
 
 async function linkPR(opts: {
-  taskId: string;
-  sessionToken: string;
-  prNumber: number;
-  branch?: string;
-  repo?: string;
+	taskId: string;
+	sessionToken: string;
+	prNumber: number;
+	branch?: string;
+	repo?: string;
 }) {
-  const result = await linkPRTool.handler(opts);
-  const text = getToolResultText(result);
+	const result = await linkPRTool.handler(opts);
+	const text = getToolResultText(result);
 
-  if (result.isError) {
-    throw new Error(text);
-  }
+	if (result.isError) {
+		throw new Error(text);
+	}
 
-  const prNumber = opts.prNumber;
-  const urlMatch = text.match(/URL: (https:\/\/[^\s]+)/);
-  const statusMatch = text.match(/Status: (\w+)/);
-  const branchMatch = text.match(/Branch: ([^\n]+)/);
-  const titleMatch = text.match(/PR: #\d+ - ([^\n]+)/);
+	const prNumber = opts.prNumber;
+	const urlMatch = text.match(/URL: (https:\/\/[^\s]+)/);
+	const statusMatch = text.match(/Status: (\w+)/);
+	const branchMatch = text.match(/Branch: ([^\n]+)/);
+	const titleMatch = text.match(/PR: #\d+ - ([^\n]+)/);
 
-  return {
-    prNumber,
-    url: urlMatch?.[1] || '',
-    status: statusMatch?.[1] || '',
-    branch: branchMatch?.[1] || '',
-    title: titleMatch?.[1] || '',
-  };
+	return {
+		prNumber,
+		url: urlMatch?.[1] || "",
+		status: statusMatch?.[1] || "",
+		branch: branchMatch?.[1] || "",
+		title: titleMatch?.[1] || "",
+	};
 }
 
-async function setupReviewNotification(taskId: string, pollIntervalSeconds?: number) {
-  const result = await setupReviewNotificationTool.handler({
-    taskId,
-    pollIntervalSeconds: pollIntervalSeconds ?? 30,
-  });
-  const text = getToolResultText(result);
+async function setupReviewNotification(
+	taskId: string,
+	pollIntervalSeconds?: number,
+) {
+	const result = await setupReviewNotificationTool.handler({
+		taskId,
+		pollIntervalSeconds: pollIntervalSeconds ?? 30,
+	});
+	const text = getToolResultText(result);
 
-  const scriptMatch = text.match(/```bash\n([\s\S]*?)\n```/);
-  const script = scriptMatch?.[1] || '';
+	const scriptMatch = text.match(/```bash\n([\s\S]*?)\n```/);
+	const script = scriptMatch?.[1] || "";
 
-  return { script, fullResponse: text };
+	return { script, fullResponse: text };
 }
 
 async function replyToThreadComment(opts: {
-  taskId: string;
-  sessionToken: string;
-  threadId: string;
-  body: string;
+	taskId: string;
+	sessionToken: string;
+	threadId: string;
+	body: string;
 }) {
-  const result = await replyToThreadCommentTool.handler(opts);
-  return getToolResultText(result);
+	const result = await replyToThreadCommentTool.handler(opts);
+	return getToolResultText(result);
 }
 
 async function replyToDiffComment(opts: {
-  taskId: string;
-  sessionToken: string;
-  commentId: string;
-  body: string;
+	taskId: string;
+	sessionToken: string;
+	commentId: string;
+	body: string;
 }) {
-  const result = await replyToDiffCommentTool.handler(opts);
-  return getToolResultText(result);
+	const result = await replyToDiffCommentTool.handler(opts);
+	return getToolResultText(result);
 }
 
 /**
@@ -944,341 +974,368 @@ async function replyToDiffComment(opts: {
  * Supports both single-question mode (message + type) and multi-question mode (questions array).
  */
 async function requestUserInput(
-  opts:
-    | {
-        /** Single-question mode */
-        message: string;
-        type: 'text' | 'choice' | 'confirm' | 'multiline' | 'number' | 'email' | 'date' | 'rating';
-        options?: string[];
-        multiSelect?: boolean;
-        displayAs?: 'radio' | 'checkbox' | 'dropdown';
-        defaultValue?: string;
-        timeout?: number;
-        taskId?: string;
-        /** If true, this request is blocking the agent from proceeding. Shows as red/urgent. */
-        isBlocker?: boolean;
-        min?: number;
-        max?: number;
-        format?: 'integer' | 'decimal' | 'currency' | 'percentage';
-        minDate?: string;
-        maxDate?: string;
-        domain?: string;
-        style?: 'stars' | 'numbers' | 'emoji';
-        labels?: { low?: string; high?: string };
-        questions?: never;
-      }
-    | {
-        /** Multi-question mode */
-        questions: Question[];
-        timeout?: number;
-        taskId?: string;
-        /** If true, this request is blocking the agent from proceeding. Shows as red/urgent. */
-        isBlocker?: boolean;
-        message?: never;
-        type?: never;
-      }
+	opts:
+		| {
+				/** Single-question mode */
+				message: string;
+				type:
+					| "text"
+					| "choice"
+					| "confirm"
+					| "multiline"
+					| "number"
+					| "email"
+					| "date"
+					| "rating";
+				options?: string[];
+				multiSelect?: boolean;
+				displayAs?: "radio" | "checkbox" | "dropdown";
+				defaultValue?: string;
+				timeout?: number;
+				taskId?: string;
+				/** If true, this request is blocking the agent from proceeding. Shows as red/urgent. */
+				isBlocker?: boolean;
+				min?: number;
+				max?: number;
+				format?: "integer" | "decimal" | "currency" | "percentage";
+				minDate?: string;
+				maxDate?: string;
+				domain?: string;
+				style?: "stars" | "numbers" | "emoji";
+				labels?: { low?: string; high?: string };
+				questions?: never;
+		  }
+		| {
+				/** Multi-question mode */
+				questions: Question[];
+				timeout?: number;
+				taskId?: string;
+				/** If true, this request is blocking the agent from proceeding. Shows as red/urgent. */
+				isBlocker?: boolean;
+				message?: never;
+				type?: never;
+		  },
 ) {
-  const { InputRequestManager } = await import('../services/input-request-manager.js');
+	const { InputRequestManager } = await import(
+		"../services/input-request-manager.js"
+	);
 
-  /*
-   * Always use plan-index doc so browser can see requests from all agents
-   * Browser is already connected to plan-index for plan discovery
-   */
-  const ydoc = await getOrCreateDoc(PLAN_INDEX_DOC_NAME);
+	/*
+	 * Always use plan-index doc so browser can see requests from all agents
+	 * Browser is already connected to plan-index for plan discovery
+	 */
+	const ydoc = await getOrCreateDoc(PLAN_INDEX_DOC_NAME);
 
-  const manager = new InputRequestManager();
+	const manager = new InputRequestManager();
 
-  if ('questions' in opts && opts.questions) {
-    const validQuestions = opts.questions.filter((q): q is NonNullable<typeof q> => q != null);
-    if (validQuestions.length === 0) {
-      throw new Error(
-        'questions array is empty after filtering. Each question must be an object with "message" and "type" fields.'
-      );
-    }
+	if ("questions" in opts && opts.questions) {
+		const validQuestions = opts.questions.filter(
+			(q): q is NonNullable<typeof q> => q != null,
+		);
+		if (validQuestions.length === 0) {
+			throw new Error(
+				'questions array is empty after filtering. Each question must be an object with "message" and "type" fields.',
+			);
+		}
 
-    const requestId = await manager.createMultiQuestionRequest(ydoc, {
-      questions: validQuestions,
-      timeout: opts.timeout,
-      planId: opts.taskId,
-      isBlocker: opts.isBlocker,
-    });
+		const requestId = await manager.createMultiQuestionRequest(ydoc, {
+			questions: validQuestions,
+			timeout: opts.timeout,
+			planId: opts.taskId,
+			isBlocker: opts.isBlocker,
+		});
 
-    const result = await manager.waitForResponse(ydoc, requestId, opts.timeout);
+		const result = await manager.waitForResponse(ydoc, requestId, opts.timeout);
 
-    if (result.status === 'answered') {
-      return {
-        success: true as const,
-        response: result.response,
-        status: result.status,
-        reason: undefined,
-      };
-    }
+		if (result.status === "answered") {
+			return {
+				success: true as const,
+				response: result.response,
+				status: result.status,
+				reason: undefined,
+			};
+		}
 
-    if (result.status === 'declined') {
-      return {
-        success: false as const,
-        response: undefined,
-        status: result.status,
-        reason: result.reason,
-      };
-    }
+		if (result.status === "declined") {
+			return {
+				success: false as const,
+				response: undefined,
+				status: result.status,
+				reason: result.reason,
+			};
+		}
 
-    return {
-      success: false as const,
-      response: undefined,
-      status: result.status,
-      reason: result.reason,
-    };
-  }
+		return {
+			success: false as const,
+			response: undefined,
+			status: result.status,
+			reason: result.reason,
+		};
+	}
 
-  let params: CreateInputRequestParams;
+	let params: CreateInputRequestParams;
 
-  switch (opts.type) {
-    case 'choice':
-      params = {
-        message: opts.message,
-        defaultValue: opts.defaultValue,
-        timeout: opts.timeout,
-        planId: opts.taskId,
-        isBlocker: opts.isBlocker,
-        type: opts.type,
-        options: opts.options ?? [],
-        multiSelect: opts.multiSelect,
-        displayAs: opts.displayAs,
-      } satisfies CreateChoiceInputParams;
-      break;
-    case 'number':
-      params = {
-        message: opts.message,
-        defaultValue: opts.defaultValue,
-        timeout: opts.timeout,
-        planId: opts.taskId,
-        isBlocker: opts.isBlocker,
-        type: opts.type,
-        min: opts.min,
-        max: opts.max,
-        format: opts.format,
-      } satisfies CreateNumberInputParams;
-      break;
-    case 'email':
-      params = {
-        message: opts.message,
-        defaultValue: opts.defaultValue,
-        timeout: opts.timeout,
-        planId: opts.taskId,
-        isBlocker: opts.isBlocker,
-        type: opts.type,
-        domain: opts.domain,
-      } satisfies CreateEmailInputParams;
-      break;
-    case 'date':
-      params = {
-        message: opts.message,
-        defaultValue: opts.defaultValue,
-        timeout: opts.timeout,
-        planId: opts.taskId,
-        isBlocker: opts.isBlocker,
-        type: opts.type,
-        min: opts.minDate,
-        max: opts.maxDate,
-      } satisfies CreateDateInputParams;
-      break;
-    case 'rating':
-      params = {
-        message: opts.message,
-        defaultValue: opts.defaultValue,
-        timeout: opts.timeout,
-        planId: opts.taskId,
-        isBlocker: opts.isBlocker,
-        type: opts.type,
-        min: opts.min,
-        max: opts.max,
-        style: opts.style,
-        labels: opts.labels,
-      } satisfies CreateRatingInputParams;
-      break;
-    default:
-      params = {
-        message: opts.message,
-        defaultValue: opts.defaultValue,
-        timeout: opts.timeout,
-        planId: opts.taskId,
-        isBlocker: opts.isBlocker,
-        type: opts.type,
-      } satisfies CreateTextInputParams | CreateMultilineInputParams | CreateConfirmInputParams;
-  }
+	switch (opts.type) {
+		case "choice":
+			params = {
+				message: opts.message,
+				defaultValue: opts.defaultValue,
+				timeout: opts.timeout,
+				planId: opts.taskId,
+				isBlocker: opts.isBlocker,
+				type: opts.type,
+				options: opts.options ?? [],
+				multiSelect: opts.multiSelect,
+				displayAs: opts.displayAs,
+			} satisfies CreateChoiceInputParams;
+			break;
+		case "number":
+			params = {
+				message: opts.message,
+				defaultValue: opts.defaultValue,
+				timeout: opts.timeout,
+				planId: opts.taskId,
+				isBlocker: opts.isBlocker,
+				type: opts.type,
+				min: opts.min,
+				max: opts.max,
+				format: opts.format,
+			} satisfies CreateNumberInputParams;
+			break;
+		case "email":
+			params = {
+				message: opts.message,
+				defaultValue: opts.defaultValue,
+				timeout: opts.timeout,
+				planId: opts.taskId,
+				isBlocker: opts.isBlocker,
+				type: opts.type,
+				domain: opts.domain,
+			} satisfies CreateEmailInputParams;
+			break;
+		case "date":
+			params = {
+				message: opts.message,
+				defaultValue: opts.defaultValue,
+				timeout: opts.timeout,
+				planId: opts.taskId,
+				isBlocker: opts.isBlocker,
+				type: opts.type,
+				min: opts.minDate,
+				max: opts.maxDate,
+			} satisfies CreateDateInputParams;
+			break;
+		case "rating":
+			params = {
+				message: opts.message,
+				defaultValue: opts.defaultValue,
+				timeout: opts.timeout,
+				planId: opts.taskId,
+				isBlocker: opts.isBlocker,
+				type: opts.type,
+				min: opts.min,
+				max: opts.max,
+				style: opts.style,
+				labels: opts.labels,
+			} satisfies CreateRatingInputParams;
+			break;
+		default:
+			params = {
+				message: opts.message,
+				defaultValue: opts.defaultValue,
+				timeout: opts.timeout,
+				planId: opts.taskId,
+				isBlocker: opts.isBlocker,
+				type: opts.type,
+			} satisfies
+				| CreateTextInputParams
+				| CreateMultilineInputParams
+				| CreateConfirmInputParams;
+	}
 
-  const requestId = await manager.createRequest(ydoc, params);
+	const requestId = await manager.createRequest(ydoc, params);
 
-  const result = await manager.waitForResponse(ydoc, requestId, opts.timeout);
+	const result = await manager.waitForResponse(ydoc, requestId, opts.timeout);
 
-  if (result.status === 'answered') {
-    return {
-      success: true as const,
-      response: result.response,
-      status: result.status,
-      reason: undefined,
-    };
-  }
+	if (result.status === "answered") {
+		return {
+			success: true as const,
+			response: result.response,
+			status: result.status,
+			reason: undefined,
+		};
+	}
 
-  if (result.status === 'declined') {
-    return {
-      success: false as const,
-      response: undefined,
-      status: result.status,
-      reason: result.reason,
-    };
-  }
+	if (result.status === "declined") {
+		return {
+			success: false as const,
+			response: undefined,
+			status: result.status,
+			reason: result.reason,
+		};
+	}
 
-  return {
-    success: false as const,
-    response: undefined,
-    status: result.status,
-    reason: result.reason,
-  };
+	return {
+		success: false as const,
+		response: undefined,
+		status: result.status,
+		reason: result.reason,
+	};
 }
 
 async function regenerateSessionToken(taskId: string) {
-  const result = await regenerateSessionTokenTool.handler({ taskId });
-  const text = getToolResultText(result);
+	const result = await regenerateSessionTokenTool.handler({ taskId });
+	const text = getToolResultText(result);
 
-  if (result.isError) {
-    throw new Error(text);
-  }
+	if (result.isError) {
+		throw new Error(text);
+	}
 
-  const tokenMatch = text.match(/New Session Token: (\S+)/);
-  return {
-    sessionToken: tokenMatch?.[1] || '',
-    taskId,
-  };
+	const tokenMatch = text.match(/New Session Token: (\S+)/);
+	return {
+		sessionToken: tokenMatch?.[1] || "",
+		taskId,
+	};
 }
 
-async function postUpdate(opts: { taskId: string; sessionToken: string; message: string }) {
-  const result = await postUpdateTool.handler(opts);
-  const text = getToolResultText(result);
+async function postUpdate(opts: {
+	taskId: string;
+	sessionToken: string;
+	message: string;
+}) {
+	const result = await postUpdateTool.handler(opts);
+	const text = getToolResultText(result);
 
-  if (result.isError) {
-    return { isError: true as const, error: text, success: false as const };
-  }
+	if (result.isError) {
+		return { isError: true as const, error: text, success: false as const };
+	}
 
-  return { isError: false as const, success: true as const };
+	return { isError: false as const, success: true as const };
 }
 
 export const executeCodeTool = {
-  definition: {
-    name: TOOL_NAMES.EXECUTE_CODE,
-    description: BUNDLED_DOCS,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        code: {
-          type: 'string',
-          description: 'TypeScript code to execute with access to all Shipyard APIs',
-        },
-      },
-      required: ['code'],
-    },
-  },
+	definition: {
+		name: TOOL_NAMES.EXECUTE_CODE,
+		description: BUNDLED_DOCS,
+		inputSchema: {
+			type: "object",
+			properties: {
+				code: {
+					type: "string",
+					description:
+						"TypeScript code to execute with access to all Shipyard APIs",
+				},
+			},
+			required: ["code"],
+		},
+	},
 
-  handler: async (args: unknown) => {
-    const { code } = ExecuteCodeInput.parse(args);
+	handler: async (args: unknown) => {
+		const { code } = ExecuteCodeInput.parse(args);
 
-    logger.info({ codeLength: code.length }, 'Executing code');
+		logger.info({ codeLength: code.length }, "Executing code");
 
-    scriptTracker.length = 0;
+		scriptTracker.length = 0;
 
-    try {
-      async function encodeVideo(opts: {
-        framesDir: string;
-        fps?: number;
-        outputPath?: string;
-      }): Promise<string> {
-        const fps = opts.fps || 6;
-        const outputPath = opts.outputPath || path.join(os.tmpdir(), `video-${Date.now()}.mp4`);
+		try {
+			async function encodeVideo(opts: {
+				framesDir: string;
+				fps?: number;
+				outputPath?: string;
+			}): Promise<string> {
+				const fps = opts.fps || 6;
+				const outputPath =
+					opts.outputPath || path.join(os.tmpdir(), `video-${Date.now()}.mp4`);
 
-        const { spawnSync } = child_process;
-        const result = spawnSync(
-          ffmpegInstaller.path,
-          [
-            '-y',
-            '-framerate',
-            String(fps),
-            '-i',
-            path.join(opts.framesDir, 'frame-%06d.jpg'),
-            '-vf',
-            'scale=trunc(iw/2)*2:trunc(ih/2)*2',
-            '-c:v',
-            'libx264',
-            '-pix_fmt',
-            'yuv420p',
-            '-preset',
-            'fast',
-            outputPath,
-          ],
-          { encoding: 'utf-8', timeout: 60000 }
-        );
+				const { spawnSync } = child_process;
+				const result = spawnSync(
+					ffmpegInstaller.path,
+					[
+						"-y",
+						"-framerate",
+						String(fps),
+						"-i",
+						path.join(opts.framesDir, "frame-%06d.jpg"),
+						"-vf",
+						"scale=trunc(iw/2)*2:trunc(ih/2)*2",
+						"-c:v",
+						"libx264",
+						"-pix_fmt",
+						"yuv420p",
+						"-preset",
+						"fast",
+						outputPath,
+					],
+					{ encoding: "utf-8", timeout: 60000 },
+				);
 
-        if (result.status !== 0) {
-          throw new Error(`FFmpeg encoding failed: ${result.stderr?.slice(-300)}`);
-        }
+				if (result.status !== 0) {
+					throw new Error(
+						`FFmpeg encoding failed: ${result.stderr?.slice(-300)}`,
+					);
+				}
 
-        fs.rmSync(opts.framesDir, { recursive: true, force: true });
+				fs.rmSync(opts.framesDir, { recursive: true, force: true });
 
-        return outputPath;
-      }
+				return outputPath;
+			}
 
-      const sandbox = {
-        createTask,
-        readTask,
-        readDiffComments,
-        updateTask,
-        addArtifact,
-        completeTask,
-        updateBlockContent,
-        linkPR,
-        replyToThreadComment,
-        replyToDiffComment,
-        requestUserInput,
-        regenerateSessionToken,
-        postUpdate,
-        encodeVideo,
-        child_process,
-        fs,
-        path,
-        os,
-        ffmpegPath: ffmpegInstaller.path,
-        console: {
-          log: (...logArgs: unknown[]) => logger.info({ output: logArgs }, 'console.log'),
-          error: (...logArgs: unknown[]) => logger.error({ output: logArgs }, 'console.error'),
-        },
-      };
+			const sandbox = {
+				createTask,
+				readTask,
+				readDiffComments,
+				updateTask,
+				addArtifact,
+				completeTask,
+				updateBlockContent,
+				linkPR,
+				replyToThreadComment,
+				replyToDiffComment,
+				requestUserInput,
+				regenerateSessionToken,
+				postUpdate,
+				encodeVideo,
+				child_process,
+				fs,
+				path,
+				os,
+				ffmpegPath: ffmpegInstaller.path,
+				console: {
+					log: (...logArgs: unknown[]) =>
+						logger.info({ output: logArgs }, "console.log"),
+					error: (...logArgs: unknown[]) =>
+						logger.error({ output: logArgs }, "console.error"),
+				},
+			};
 
-      const wrappedCode = `(async () => { ${code} })()`;
+			const wrappedCode = `(async () => { ${code} })()`;
 
-      const context = vm.createContext(sandbox);
-      const script = new vm.Script(wrappedCode);
-      const result = await script.runInContext(context, { timeout: 120000 });
+			const context = vm.createContext(sandbox);
+			const script = new vm.Script(wrappedCode);
+			const result = await script.runInContext(context, { timeout: 120000 });
 
-      logger.info({ result }, 'Code execution complete');
+			logger.info({ result }, "Code execution complete");
 
-      const content: Array<{ type: string; text: string }> = [
-        {
-          type: 'text',
-          text:
-            typeof result === 'object' ? JSON.stringify(result, null, 2) : String(result ?? 'Done'),
-        },
-      ];
+			const content: Array<{ type: string; text: string }> = [
+				{
+					type: "text",
+					text:
+						typeof result === "object"
+							? JSON.stringify(result, null, 2)
+							: String(result ?? "Done"),
+				},
+			];
 
-      /*
-       * Auto-append monitoring script reminder if createTask or updateTask was called
-       * This ensures non-hook agents always see how to wait for approval
-       */
-      const latestScript = scriptTracker[scriptTracker.length - 1];
-      if (latestScript) {
-        const [taskAction, ...scriptParts] = latestScript.split('\n\n');
-        content.push({
-          type: 'text',
-          text: `
+			/*
+			 * Auto-append monitoring script reminder if createTask or updateTask was called
+			 * This ensures non-hook agents always see how to wait for approval
+			 */
+			const latestScript = scriptTracker[scriptTracker.length - 1];
+			if (latestScript) {
+				const [taskAction, ...scriptParts] = latestScript.split("\n\n");
+				content.push({
+					type: "text",
+					text: `
 
 ---
 **⚠️ IMPORTANT FOR NON-HOOK AGENTS (Cursor, Devin, Windsurf, etc.):**
@@ -1286,27 +1343,27 @@ export const executeCodeTool = {
 ${taskAction} To wait for human approval before proceeding, run this monitoring script in background:
 
 \`\`\`bash
-${scriptParts.join('\n\n')}
+${scriptParts.join("\n\n")}
 \`\`\`
 
 Save the script to a file and run: \`bash script.sh &\`
 The script will exit when the human approves or requests changes.`,
-        });
-      }
+				});
+			}
 
-      return { content };
-    } catch (error) {
-      const { details, message, stack } = await serializeError(error);
-      logger.error({ error: details, code }, 'Code execution failed');
+			return { content };
+		} catch (error) {
+			const { details, message, stack } = await serializeError(error);
+			logger.error({ error: details, code }, "Code execution failed");
 
-      const errorText = stack
-        ? `Execution error: ${message}\n\nStack trace:\n${stack}`
-        : `Execution error: ${message}`;
+			const errorText = stack
+				? `Execution error: ${message}\n\nStack trace:\n${stack}`
+				: `Execution error: ${message}`;
 
-      return {
-        content: [{ type: 'text', text: errorText }],
-        isError: true,
-      };
-    }
-  },
+			return {
+				content: [{ type: "text", text: errorText }],
+				isError: true,
+			};
+		}
+	},
 };

@@ -3,8 +3,8 @@
  * Used by both browser UI (useLocalDiffComments hook) and MCP server (read-diff-comments tool).
  */
 
-import { hashLineContent } from './line-content-hash.js';
-import type { LocalDiffComment } from './plan.js';
+import { hashLineContent } from "./line-content-hash.js";
+import type { LocalDiffComment } from "./plan.js";
 
 /**
  * Type of staleness detected for a local diff comment.
@@ -12,14 +12,14 @@ import type { LocalDiffComment } from './plan.js';
  * - 'head_changed': HEAD SHA has changed since comment was created
  * - 'content_changed': Line content has changed (but HEAD is same)
  */
-export type StalenessType = 'none' | 'head_changed' | 'content_changed';
+export type StalenessType = "none" | "head_changed" | "content_changed";
 
 /**
  * Staleness information for a comment.
  */
 export interface StalenessInfo {
-  type: StalenessType;
-  isStale: boolean;
+	type: StalenessType;
+	isStale: boolean;
 }
 
 /**
@@ -27,10 +27,10 @@ export interface StalenessInfo {
  * Used by UI components to display staleness warnings.
  */
 export interface LocalDiffCommentWithStaleness extends LocalDiffComment {
-  /** Whether this comment may be outdated */
-  isStale: boolean;
-  /** Type of staleness detected */
-  stalenessType: StalenessType;
+	/** Whether this comment may be outdated */
+	isStale: boolean;
+	/** Type of staleness detected */
+	stalenessType: StalenessType;
 }
 
 /**
@@ -48,22 +48,22 @@ export interface LocalDiffCommentWithStaleness extends LocalDiffComment {
  * @returns StalenessInfo with type and isStale flag
  */
 export function computeCommentStaleness(
-  comment: LocalDiffComment,
-  currentHeadSha?: string,
-  currentLineContent?: string
+	comment: LocalDiffComment,
+	currentHeadSha?: string,
+	currentLineContent?: string,
 ): StalenessInfo {
-  if (currentHeadSha && comment.baseRef !== currentHeadSha) {
-    return { type: 'head_changed', isStale: true };
-  }
+	if (currentHeadSha && comment.baseRef !== currentHeadSha) {
+		return { type: "head_changed", isStale: true };
+	}
 
-  if (currentLineContent !== undefined && comment.lineContentHash) {
-    const currentHash = hashLineContent(currentLineContent);
-    if (currentHash !== comment.lineContentHash) {
-      return { type: 'content_changed', isStale: true };
-    }
-  }
+	if (currentLineContent !== undefined && comment.lineContentHash) {
+		const currentHash = hashLineContent(currentLineContent);
+		if (currentHash !== comment.lineContentHash) {
+			return { type: "content_changed", isStale: true };
+		}
+	}
 
-  return { type: 'none', isStale: false };
+	return { type: "none", isStale: false };
 }
 
 /**
@@ -75,14 +75,14 @@ export function computeCommentStaleness(
  * @returns true if content has changed since comment was created
  */
 export function isLineContentStale(
-  comment: LocalDiffComment,
-  currentLineContent?: string
+	comment: LocalDiffComment,
+	currentLineContent?: string,
 ): boolean {
-  if (!comment.lineContentHash || currentLineContent === undefined) {
-    return false;
-  }
-  const currentHash = hashLineContent(currentLineContent);
-  return comment.lineContentHash !== currentHash;
+	if (!comment.lineContentHash || currentLineContent === undefined) {
+		return false;
+	}
+	const currentHash = hashLineContent(currentLineContent);
+	return comment.lineContentHash !== currentHash;
 }
 
 /**
@@ -95,16 +95,20 @@ export function isLineContentStale(
  * @returns Comment with staleness information
  */
 export function withStalenessInfo(
-  comment: LocalDiffComment,
-  currentHeadSha?: string,
-  currentLineContent?: string
+	comment: LocalDiffComment,
+	currentHeadSha?: string,
+	currentLineContent?: string,
 ): LocalDiffCommentWithStaleness {
-  const staleness = computeCommentStaleness(comment, currentHeadSha, currentLineContent);
-  return {
-    ...comment,
-    isStale: staleness.isStale,
-    stalenessType: staleness.type,
-  };
+	const staleness = computeCommentStaleness(
+		comment,
+		currentHeadSha,
+		currentLineContent,
+	);
+	return {
+		...comment,
+		isStale: staleness.isStale,
+		stalenessType: staleness.type,
+	};
 }
 
 /**
@@ -117,27 +121,27 @@ export function withStalenessInfo(
  * @returns Array of comments with staleness information
  */
 export function withStalenessInfoBatch(
-  comments: LocalDiffComment[],
-  currentHeadSha?: string,
-  lineContentMap?: Map<string, string>
+	comments: LocalDiffComment[],
+	currentHeadSha?: string,
+	lineContentMap?: Map<string, string>,
 ): LocalDiffCommentWithStaleness[] {
-  return comments.map((comment) => {
-    const key = `${comment.path}:${comment.line}`;
-    const currentLineContent = lineContentMap?.get(key);
-    return withStalenessInfo(comment, currentHeadSha, currentLineContent);
-  });
+	return comments.map((comment) => {
+		const key = `${comment.path}:${comment.line}`;
+		const currentLineContent = lineContentMap?.get(key);
+		return withStalenessInfo(comment, currentHeadSha, currentLineContent);
+	});
 }
 
 /**
  * Check if a diff line is a header that should be skipped.
  */
 function isDiffHeader(line: string): boolean {
-  return (
-    line.startsWith('diff --git') ||
-    line.startsWith('index ') ||
-    line.startsWith('---') ||
-    line.startsWith('+++')
-  );
+	return (
+		line.startsWith("diff --git") ||
+		line.startsWith("index ") ||
+		line.startsWith("---") ||
+		line.startsWith("+++")
+	);
 }
 
 /**
@@ -145,55 +149,55 @@ function isDiffHeader(line: string): boolean {
  * Returns the updated line number.
  */
 function processLineDiff(
-  line: string,
-  currentLineNumber: number,
-  filePath: string,
-  lineContentMap: Map<string, string>
+	line: string,
+	currentLineNumber: number,
+	filePath: string,
+	lineContentMap: Map<string, string>,
 ): number {
-  const hunkMatch = line.match(/^@@.*\+(\d+)/);
-  if (hunkMatch?.[1]) {
-    return Number.parseInt(hunkMatch[1], 10);
-  }
+	const hunkMatch = line.match(/^@@.*\+(\d+)/);
+	if (hunkMatch?.[1]) {
+		return Number.parseInt(hunkMatch[1], 10);
+	}
 
-  if (isDiffHeader(line)) {
-    return currentLineNumber;
-  }
+	if (isDiffHeader(line)) {
+		return currentLineNumber;
+	}
 
-  if (line.startsWith('-')) {
-    return currentLineNumber;
-  }
+	if (line.startsWith("-")) {
+		return currentLineNumber;
+	}
 
-  if (line.startsWith('+')) {
-    const content = line.slice(1);
-    lineContentMap.set(`${filePath}:${currentLineNumber}`, content);
-    return currentLineNumber + 1;
-  }
+	if (line.startsWith("+")) {
+		const content = line.slice(1);
+		lineContentMap.set(`${filePath}:${currentLineNumber}`, content);
+		return currentLineNumber + 1;
+	}
 
-  if (line.startsWith(' ') || line === '') {
-    const content = line.startsWith(' ') ? line.slice(1) : '';
-    lineContentMap.set(`${filePath}:${currentLineNumber}`, content);
-    return currentLineNumber + 1;
-  }
+	if (line.startsWith(" ") || line === "") {
+		const content = line.startsWith(" ") ? line.slice(1) : "";
+		lineContentMap.set(`${filePath}:${currentLineNumber}`, content);
+		return currentLineNumber + 1;
+	}
 
-  /** Lines starting with '\' (e.g., "\ No newline at end of file") are metadata */
-  return currentLineNumber;
+	/** Lines starting with '\' (e.g., "\ No newline at end of file") are metadata */
+	return currentLineNumber;
 }
 
 /**
  * Process a file's patch and add entries to the line content map.
  */
 function processFilePatch(
-  file: { path: string; patch?: string },
-  lineContentMap: Map<string, string>
+	file: { path: string; patch?: string },
+	lineContentMap: Map<string, string>,
 ): void {
-  if (!file.patch) return;
+	if (!file.patch) return;
 
-  const lines = file.patch.split('\n');
-  let currentLine = 0;
+	const lines = file.patch.split("\n");
+	let currentLine = 0;
 
-  for (const line of lines) {
-    currentLine = processLineDiff(line, currentLine, file.path, lineContentMap);
-  }
+	for (const line of lines) {
+		currentLine = processLineDiff(line, currentLine, file.path, lineContentMap);
+	}
 }
 
 /**
@@ -208,15 +212,15 @@ function processFilePatch(
  * @returns Map of "path:line" to line content
  */
 export function buildLineContentMap(
-  files: Array<{ path: string; patch?: string }>
+	files: Array<{ path: string; patch?: string }>,
 ): Map<string, string> {
-  const lineContentMap = new Map<string, string>();
+	const lineContentMap = new Map<string, string>();
 
-  for (const file of files) {
-    processFilePatch(file, lineContentMap);
-  }
+	for (const file of files) {
+		processFilePatch(file, lineContentMap);
+	}
 
-  return lineContentMap;
+	return lineContentMap;
 }
 
 /**
@@ -227,16 +231,16 @@ export function buildLineContentMap(
  * @returns Formatted marker string or empty string
  */
 export function formatStalenessMarker(staleness: StalenessInfo): string {
-  if (!staleness.isStale) {
-    return '';
-  }
+	if (!staleness.isStale) {
+		return "";
+	}
 
-  switch (staleness.type) {
-    case 'head_changed':
-      return '[STALE: HEAD changed]';
-    case 'content_changed':
-      return '[STALE: Line content changed]';
-    default:
-      return '';
-  }
+	switch (staleness.type) {
+		case "head_changed":
+			return "[STALE: HEAD changed]";
+		case "content_changed":
+			return "[STALE: Line content changed]";
+		default:
+			return "";
+	}
 }

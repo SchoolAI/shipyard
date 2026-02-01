@@ -9,13 +9,13 @@
  */
 
 import {
-  ARTIFACT_TYPES_SECTION,
-  DELIVERABLES_SECTION,
-  TIPS_SECTION,
-  USER_INPUT_SECTION,
-  WHEN_NOT_TO_USE_SECTION,
-} from './common.js';
-import { TOOL_NAMES } from './tool-names.js';
+	ARTIFACT_TYPES_SECTION,
+	DELIVERABLES_SECTION,
+	TIPS_SECTION,
+	USER_INPUT_SECTION,
+	WHEN_NOT_TO_USE_SECTION,
+} from "./common.js";
+import { TOOL_NAMES } from "./tool-names.js";
 
 export const AUTONOMOUS_HEADER = `[SHIPYARD AUTONOMOUS AGENT]`;
 
@@ -65,7 +65,10 @@ export const IMPORTANT_NOTES = `## Important Notes
 - **DO use \`requestUserInput()\`** - For asking questions during work
 - **Working directory** - Save temporary files to your cwd, they'll be available for upload`;
 
-export const CONTEXT_SECTION = (taskId: string, taskUrl: string) => `## Your Task Context
+export const CONTEXT_SECTION = (
+	taskId: string,
+	taskUrl: string,
+) => `## Your Task Context
 
 - **Task ID**: ${taskId}
 - **Session Token**: Available via \`${TOOL_NAMES.READ_TASK}()\` or in environment
@@ -78,24 +81,27 @@ The human created this task in the browser and is viewing your progress at the U
  * Complete instructions for daemon-spawned autonomous agents.
  * Replaces task mode workflow with direct MCP tool usage.
  */
-export function buildDaemonInstructions(taskId: string, taskUrl: string): string {
-  return [
-    AUTONOMOUS_HEADER,
-    '',
-    CONTEXT_SECTION(taskId, taskUrl),
-    '',
-    AUTONOMOUS_WORKFLOW,
-    '',
-    USER_INPUT_SECTION,
-    '',
-    DELIVERABLES_SECTION,
-    '',
-    ARTIFACT_TYPES_SECTION,
-    '',
-    IMPORTANT_NOTES,
-    '',
-    TIPS_SECTION,
-    '',
-    WHEN_NOT_TO_USE_SECTION,
-  ].join('\n');
+export function buildDaemonInstructions(
+	taskId: string,
+	taskUrl: string,
+): string {
+	return [
+		AUTONOMOUS_HEADER,
+		"",
+		CONTEXT_SECTION(taskId, taskUrl),
+		"",
+		AUTONOMOUS_WORKFLOW,
+		"",
+		USER_INPUT_SECTION,
+		"",
+		DELIVERABLES_SECTION,
+		"",
+		ARTIFACT_TYPES_SECTION,
+		"",
+		IMPORTANT_NOTES,
+		"",
+		TIPS_SECTION,
+		"",
+		WHEN_NOT_TO_USE_SECTION,
+	].join("\n");
 }

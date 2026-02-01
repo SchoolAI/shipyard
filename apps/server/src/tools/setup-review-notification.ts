@@ -1,21 +1,21 @@
-import { PlanStatusValues } from '@shipyard/schema';
-import { z } from 'zod';
-import { registryConfig } from '../config/env/registry.js';
-import { TOOL_NAMES } from './tool-names.js';
+import { PlanStatusValues } from "@shipyard/schema";
+import { z } from "zod";
+import { registryConfig } from "../config/env/registry.js";
+import { TOOL_NAMES } from "./tool-names.js";
 
 const SetupReviewNotificationInput = z.object({
-  taskId: z.string().describe('Task ID to monitor'),
-  pollIntervalSeconds: z
-    .number()
-    .optional()
-    .default(30)
-    .describe('Polling interval in seconds (default: 30)'),
+	taskId: z.string().describe("Task ID to monitor"),
+	pollIntervalSeconds: z
+		.number()
+		.optional()
+		.default(30)
+		.describe("Polling interval in seconds (default: 30)"),
 });
 
 export const setupReviewNotificationTool = {
-  definition: {
-    name: TOOL_NAMES.SETUP_REVIEW_NOTIFICATION,
-    description: `Returns a bash script to monitor task review status.
+	definition: {
+		name: TOOL_NAMES.SETUP_REVIEW_NOTIFICATION,
+		description: `Returns a bash script to monitor task review status.
 
 NOTE FOR CLAUDE CODE USERS: If you have the shipyard hook installed, you DON'T need this tool. The hook automatically blocks until the human approves or requests changes. This tool is only for agents WITHOUT hook support.
 
@@ -26,36 +26,38 @@ USAGE (for non-hook agents):
 4. Exits when status becomes 'in_progress' (approved) or 'changes_requested' (needs work)
 
 REQUIREMENTS: The script requires 'jq' for URL encoding. Install with: brew install jq (macOS) or apt install jq (Linux)`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        taskId: { type: 'string', description: 'Task ID to monitor' },
-        pollIntervalSeconds: {
-          type: 'number',
-          description: 'Polling interval in seconds (default: 30)',
-        },
-      },
-      required: ['taskId'],
-    },
-  },
+		inputSchema: {
+			type: "object",
+			properties: {
+				taskId: { type: "string", description: "Task ID to monitor" },
+				pollIntervalSeconds: {
+					type: "number",
+					description: "Polling interval in seconds (default: 30)",
+				},
+			},
+			required: ["taskId"],
+		},
+	},
 
-  handler: async (args: unknown) => {
-    const input = SetupReviewNotificationInput.parse(args);
-    const { taskId, pollIntervalSeconds = 30 } = input;
+	handler: async (args: unknown) => {
+		const input = SetupReviewNotificationInput.parse(args);
+		const { taskId, pollIntervalSeconds = 30 } = input;
 
-    const registryPort = registryConfig.REGISTRY_PORT[0];
-    const trpcUrl = `http://localhost:${registryPort}/trpc`;
+		const registryPort = registryConfig.REGISTRY_PORT[0];
+		const trpcUrl = `http://localhost:${registryPort}/trpc`;
 
-    /** Use actual status enum values to ensure script stays in sync with schema */
-    const statusInProgress = PlanStatusValues.find((s) => s === 'in_progress');
-    const statusChangesRequested = PlanStatusValues.find((s) => s === 'changes_requested');
+		/** Use actual status enum values to ensure script stays in sync with schema */
+		const statusInProgress = PlanStatusValues.find((s) => s === "in_progress");
+		const statusChangesRequested = PlanStatusValues.find(
+			(s) => s === "changes_requested",
+		);
 
-    if (!statusInProgress || !statusChangesRequested) {
-      throw new Error('Required status values not found in PlanStatusValues');
-    }
+		if (!statusInProgress || !statusChangesRequested) {
+			throw new Error("Required status values not found in PlanStatusValues");
+		}
 
-    /** Standard tRPC v10+ HTTP format (no superjson transformer) */
-    const script = `#!/bin/bash
+		/** Standard tRPC v10+ HTTP format (no superjson transformer) */
+		const script = `#!/bin/bash
 # Monitor task "${taskId}" for approval status changes
 # Polls the Shipyard registry server and exits when approved/rejected
 
@@ -111,11 +113,11 @@ while true; do
   fi
 done`;
 
-    return {
-      content: [
-        {
-          type: 'text',
-          text: `Notification script for task "${taskId}":
+		return {
+			content: [
+				{
+					type: "text",
+					text: `Notification script for task "${taskId}":
 
 \`\`\`bash
 ${script}
@@ -128,8 +130,8 @@ The script:
 - Polls every ${pollIntervalSeconds} seconds
 - Exits when status becomes in_progress (approved) or changes_requested (needs work)
 - Requires \`jq\` for URL encoding (install: brew install jq)`,
-        },
-      ],
-    };
-  },
+				},
+			],
+		};
+	},
 };

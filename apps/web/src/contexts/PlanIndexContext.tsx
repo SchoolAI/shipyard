@@ -1,6 +1,9 @@
-import { createContext, type ReactNode, useContext } from 'react';
-import { useGitHubAuth } from '@/hooks/useGitHubAuth';
-import { type PlanIndexState, usePlanIndex as usePlanIndexHook } from '@/hooks/usePlanIndex';
+import { createContext, type ReactNode, useContext } from "react";
+import { useGitHubAuth } from "@/hooks/useGitHubAuth";
+import {
+	type PlanIndexState,
+	usePlanIndex as usePlanIndexHook,
+} from "@/hooks/usePlanIndex";
 
 /**
  * Context for sharing the plan index state across components.
@@ -16,7 +19,7 @@ import { type PlanIndexState, usePlanIndex as usePlanIndexHook } from '@/hooks/u
 const PlanIndexContext = createContext<PlanIndexState | undefined>(undefined);
 
 interface PlanIndexProviderProps {
-  children: ReactNode;
+	children: ReactNode;
 }
 
 /**
@@ -24,10 +27,14 @@ interface PlanIndexProviderProps {
  * Must be placed inside GitHubAuthProvider to access the current user's identity.
  */
 export function PlanIndexProvider({ children }: PlanIndexProviderProps) {
-  const { identity: githubIdentity } = useGitHubAuth();
-  const planIndexState = usePlanIndexHook(githubIdentity?.username);
+	const { identity: githubIdentity } = useGitHubAuth();
+	const planIndexState = usePlanIndexHook(githubIdentity?.username);
 
-  return <PlanIndexContext.Provider value={planIndexState}>{children}</PlanIndexContext.Provider>;
+	return (
+		<PlanIndexContext.Provider value={planIndexState}>
+			{children}
+		</PlanIndexContext.Provider>
+	);
 }
 
 /**
@@ -37,9 +44,11 @@ export function PlanIndexProvider({ children }: PlanIndexProviderProps) {
  * @throws Error if used outside of PlanIndexProvider
  */
 export function usePlanIndexContext(): PlanIndexState {
-  const context = useContext(PlanIndexContext);
-  if (!context) {
-    throw new Error('usePlanIndexContext must be used within a PlanIndexProvider');
-  }
-  return context;
+	const context = useContext(PlanIndexContext);
+	if (!context) {
+		throw new Error(
+			"usePlanIndexContext must be used within a PlanIndexProvider",
+		);
+	}
+	return context;
 }

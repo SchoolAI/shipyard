@@ -5,15 +5,15 @@
  */
 
 import {
-  ARTIFACT_TYPES_SECTION,
-  CRITICAL_USAGE_SECTION,
-  DELIVERABLES_SECTION,
-  TIPS_SECTION,
-  TROUBLESHOOTING_SECTION,
-  USER_INPUT_SECTION,
-  WHEN_NOT_TO_USE_SECTION,
-} from './common.js';
-import { TOOL_NAMES } from './tool-names.js';
+	ARTIFACT_TYPES_SECTION,
+	CRITICAL_USAGE_SECTION,
+	DELIVERABLES_SECTION,
+	TIPS_SECTION,
+	TROUBLESHOOTING_SECTION,
+	USER_INPUT_SECTION,
+	WHEN_NOT_TO_USE_SECTION,
+} from "./common.js";
+import { TOOL_NAMES } from "./tool-names.js";
 
 export const CLAUDE_CODE_HEADER = `[SHIPYARD] Collaborative task management with human review & proof-of-work tracking.`;
 
@@ -92,25 +92,25 @@ export const IMPORTANT_NOTES = `## Important Notes for Claude Code
  * This replaces the need for a separate skill in Claude Code.
  */
 export const CLAUDE_CODE_INSTRUCTIONS = [
-  CLAUDE_CODE_HEADER,
-  '',
-  CRITICAL_USAGE_SECTION,
-  '',
-  USER_INPUT_SECTION,
-  '',
-  TASK_MODE_WORKFLOW,
-  '',
-  POSTING_UPDATES_SECTION,
-  '',
-  DELIVERABLES_SECTION,
-  '',
-  ARTIFACT_TYPES_SECTION,
-  '',
-  IMPORTANT_NOTES,
-  '',
-  TIPS_SECTION,
-  '',
-  WHEN_NOT_TO_USE_SECTION,
-  '',
-  TROUBLESHOOTING_SECTION,
-].join('\n');
+	CLAUDE_CODE_HEADER,
+	"",
+	CRITICAL_USAGE_SECTION,
+	"",
+	USER_INPUT_SECTION,
+	"",
+	TASK_MODE_WORKFLOW,
+	"",
+	POSTING_UPDATES_SECTION,
+	"",
+	DELIVERABLES_SECTION,
+	"",
+	ARTIFACT_TYPES_SECTION,
+	"",
+	IMPORTANT_NOTES,
+	"",
+	TIPS_SECTION,
+	"",
+	WHEN_NOT_TO_USE_SECTION,
+	"",
+	TROUBLESHOOTING_SECTION,
+].join("\n");

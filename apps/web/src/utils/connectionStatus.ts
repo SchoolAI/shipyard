@@ -7,24 +7,30 @@
  * Check if there are any active connections (hub WebSocket or P2P).
  * Used to determine if showing "Offline" vs "Connected/Syncing".
  */
-export function hasAnyConnection(hubConnected: boolean, peerCount: number): boolean {
-  return hubConnected || peerCount > 0;
+export function hasAnyConnection(
+	hubConnected: boolean,
+	peerCount: number,
+): boolean {
+	return hubConnected || peerCount > 0;
 }
 
 /**
  * Format connection details for display.
  * Returns string like "(hub, 2 P2P)" or null if no connections.
  */
-export function formatConnectionInfo(hubConnected: boolean, peerCount: number): string | null {
-  const parts: string[] = [];
+export function formatConnectionInfo(
+	hubConnected: boolean,
+	peerCount: number,
+): string | null {
+	const parts: string[] = [];
 
-  if (hubConnected) {
-    parts.push('hub');
-  }
+	if (hubConnected) {
+		parts.push("hub");
+	}
 
-  if (peerCount > 0) {
-    parts.push(`${peerCount} P2P`);
-  }
+	if (peerCount > 0) {
+		parts.push(`${peerCount} P2P`);
+	}
 
-  return parts.length > 0 ? `(${parts.join(', ')})` : null;
+	return parts.length > 0 ? `(${parts.join(", ")})` : null;
 }

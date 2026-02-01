@@ -1,11 +1,15 @@
-import { MCP_CLIENT_INFO_MAP, type OriginPlatform, PLATFORM_DISPLAY_NAMES } from '@shipyard/schema';
+import {
+	MCP_CLIENT_INFO_MAP,
+	type OriginPlatform,
+	PLATFORM_DISPLAY_NAMES,
+} from "@shipyard/schema";
 
 /**
  * Platform detection result with platform name and display name for UI.
  */
 export interface PlatformDetection {
-  platform: OriginPlatform;
-  displayName: string;
+	platform: OriginPlatform;
+	displayName: string;
 }
 
 /**
@@ -16,38 +20,41 @@ export interface PlatformDetection {
  * @returns Platform identifier or null if not recognized
  */
 export function detectPlatformFromClientInfo(
-  clientInfoName: string | undefined
+	clientInfoName: string | undefined,
 ): OriginPlatform | null {
-  if (!clientInfoName) return null;
+	if (!clientInfoName) return null;
 
-  const normalized = clientInfoName.trim().toLowerCase();
-  return MCP_CLIENT_INFO_MAP[normalized] || null;
+	const normalized = clientInfoName.trim().toLowerCase();
+	return MCP_CLIENT_INFO_MAP[normalized] || null;
 }
 
 function pathIncludes(path: string | undefined, search: string): boolean {
-  return path?.toLowerCase().includes(search.toLowerCase()) ?? false;
+	return path?.toLowerCase().includes(search.toLowerCase()) ?? false;
 }
 
 function detectVSCodePlatform(env: NodeJS.ProcessEnv): OriginPlatform | null {
-  if (!env.VSCODE_GIT_ASKPASS_MAIN && !env.VSCODE_NONCE) {
-    return null;
-  }
+	if (!env.VSCODE_GIT_ASKPASS_MAIN && !env.VSCODE_NONCE) {
+		return null;
+	}
 
-  const isCursor =
-    pathIncludes(env.VSCODE_GIT_ASKPASS_MAIN, 'cursor') ||
-    pathIncludes(env.PATH, 'cursor') ||
-    pathIncludes(env.VSCODE_CWD, 'Cursor');
+	const isCursor =
+		pathIncludes(env.VSCODE_GIT_ASKPASS_MAIN, "cursor") ||
+		pathIncludes(env.PATH, "cursor") ||
+		pathIncludes(env.VSCODE_CWD, "Cursor");
 
-  return isCursor ? 'cursor' : 'vscode';
+	return isCursor ? "cursor" : "vscode";
 }
 
-function detectFromExplicitEnvVars(env: NodeJS.ProcessEnv): OriginPlatform | null {
-  if (env.CLAUDECODE === '1' || env.CLAUDE_CODE_ENTRYPOINT) return 'claude-code';
-  if (env.CURSOR_AGENT === '1') return 'cursor';
-  if (env.CODEX_HOME) return 'codex';
-  if (env.AIDER_MODEL) return 'aider';
-  if (env.DEVIN_SESSION_ID) return 'devin';
-  return null;
+function detectFromExplicitEnvVars(
+	env: NodeJS.ProcessEnv,
+): OriginPlatform | null {
+	if (env.CLAUDECODE === "1" || env.CLAUDE_CODE_ENTRYPOINT)
+		return "claude-code";
+	if (env.CURSOR_AGENT === "1") return "cursor";
+	if (env.CODEX_HOME) return "codex";
+	if (env.AIDER_MODEL) return "aider";
+	if (env.DEVIN_SESSION_ID) return "devin";
+	return null;
 }
 
 /**
@@ -56,12 +63,12 @@ function detectFromExplicitEnvVars(env: NodeJS.ProcessEnv): OriginPlatform | nul
  * Only used when explicit env vars and clientInfo are unavailable.
  */
 function detectFromPath(env: NodeJS.ProcessEnv): OriginPlatform | null {
-  if (pathIncludes(env.PATH, 'windsurf')) return 'windsurf';
-  if (pathIncludes(env.PATH, 'aider')) return 'aider';
-  if (pathIncludes(env.PATH, 'continue')) return 'continue';
-  if (pathIncludes(env.PATH, 'zed')) return 'zed';
-  if (pathIncludes(env.PATH, 'cline')) return 'cline';
-  return null;
+	if (pathIncludes(env.PATH, "windsurf")) return "windsurf";
+	if (pathIncludes(env.PATH, "aider")) return "aider";
+	if (pathIncludes(env.PATH, "continue")) return "continue";
+	if (pathIncludes(env.PATH, "zed")) return "zed";
+	if (pathIncludes(env.PATH, "cline")) return "cline";
+	return null;
 }
 
 /**
@@ -71,15 +78,15 @@ function detectFromPath(env: NodeJS.ProcessEnv): OriginPlatform | null {
  * @returns Platform identifier or null if not detected
  */
 export function detectPlatformFromEnvironment(): OriginPlatform | null {
-  const env = process.env;
+	const env = process.env;
 
-  const explicitResult = detectFromExplicitEnvVars(env);
-  if (explicitResult) return explicitResult;
+	const explicitResult = detectFromExplicitEnvVars(env);
+	if (explicitResult) return explicitResult;
 
-  const vscodeResult = detectVSCodePlatform(env);
-  if (vscodeResult) return vscodeResult;
+	const vscodeResult = detectVSCodePlatform(env);
+	if (vscodeResult) return vscodeResult;
 
-  return detectFromPath(env);
+	return detectFromPath(env);
 }
 
 /**
@@ -93,20 +100,20 @@ export function detectPlatformFromEnvironment(): OriginPlatform | null {
  * @returns Platform detection result with platform and display name
  */
 export function detectPlatform(clientInfoName?: string): PlatformDetection {
-  let platform = detectPlatformFromClientInfo(clientInfoName);
+	let platform = detectPlatformFromClientInfo(clientInfoName);
 
-  if (!platform) {
-    platform = detectPlatformFromEnvironment();
-  }
+	if (!platform) {
+		platform = detectPlatformFromEnvironment();
+	}
 
-  if (!platform) {
-    platform = 'unknown';
-  }
+	if (!platform) {
+		platform = "unknown";
+	}
 
-  return {
-    platform,
-    displayName: PLATFORM_DISPLAY_NAMES[platform],
-  };
+	return {
+		platform,
+		displayName: PLATFORM_DISPLAY_NAMES[platform],
+	};
 }
 
 /**
@@ -118,7 +125,10 @@ export function detectPlatform(clientInfoName?: string): PlatformDetection {
  * @param username - Optional GitHub username
  * @returns Formatted display name for awareness state
  */
-export function getDisplayName(platform: OriginPlatform, username?: string): string {
-  const platformName = PLATFORM_DISPLAY_NAMES[platform];
-  return username ? `${platformName} (${username})` : platformName;
+export function getDisplayName(
+	platform: OriginPlatform,
+	username?: string,
+): string {
+	const platformName = PLATFORM_DISPLAY_NAMES[platform];
+	return username ? `${platformName} (${username})` : platformName;
 }

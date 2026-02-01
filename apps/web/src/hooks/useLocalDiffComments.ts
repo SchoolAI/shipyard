@@ -1,14 +1,14 @@
 import {
-  computeCommentStaleness,
-  getLocalDiffComments,
-  isLineContentStale,
-  type LocalDiffComment,
-  type LocalDiffCommentWithStaleness,
-  type StalenessType,
-  YDOC_KEYS,
-} from '@shipyard/schema';
-import { useEffect, useState } from 'react';
-import type * as Y from 'yjs';
+	computeCommentStaleness,
+	getLocalDiffComments,
+	isLineContentStale,
+	type LocalDiffComment,
+	type LocalDiffCommentWithStaleness,
+	type StalenessType,
+	YDOC_KEYS,
+} from "@shipyard/schema";
+import { useEffect, useState } from "react";
+import type * as Y from "yjs";
 
 export type { LocalDiffCommentWithStaleness, StalenessType };
 
@@ -34,33 +34,35 @@ export type LocalDiffCommentWithStale = LocalDiffCommentWithStaleness;
  * @returns Array of local diff comments with staleness flags
  */
 export function useLocalDiffComments(
-  ydoc: Y.Doc,
-  currentHeadSha?: string
+	ydoc: Y.Doc,
+	currentHeadSha?: string,
 ): LocalDiffCommentWithStaleness[] {
-  const [comments, setComments] = useState<LocalDiffCommentWithStaleness[]>([]);
+	const [comments, setComments] = useState<LocalDiffCommentWithStaleness[]>([]);
 
-  useEffect(() => {
-    const array = ydoc.getArray<LocalDiffComment>(YDOC_KEYS.LOCAL_DIFF_COMMENTS);
+	useEffect(() => {
+		const array = ydoc.getArray<LocalDiffComment>(
+			YDOC_KEYS.LOCAL_DIFF_COMMENTS,
+		);
 
-    const update = () => {
-      const rawComments = getLocalDiffComments(ydoc);
-      const withStale = rawComments.map((comment) => {
-        const staleness = computeCommentStaleness(comment, currentHeadSha);
-        return {
-          ...comment,
-          isStale: staleness.isStale,
-          stalenessType: staleness.type,
-        };
-      });
-      setComments(withStale);
-    };
+		const update = () => {
+			const rawComments = getLocalDiffComments(ydoc);
+			const withStale = rawComments.map((comment) => {
+				const staleness = computeCommentStaleness(comment, currentHeadSha);
+				return {
+					...comment,
+					isStale: staleness.isStale,
+					stalenessType: staleness.type,
+				};
+			});
+			setComments(withStale);
+		};
 
-    update();
-    array.observe(update);
-    return () => array.unobserve(update);
-  }, [ydoc, currentHeadSha]);
+		update();
+		array.observe(update);
+		return () => array.unobserve(update);
+	}, [ydoc, currentHeadSha]);
 
-  return comments;
+	return comments;
 }
 
 /**
@@ -77,10 +79,10 @@ export { isLineContentStale };
  * Gets local diff comments for a specific file path.
  */
 export function getLocalCommentsForFile(
-  comments: LocalDiffCommentWithStaleness[],
-  path: string
+	comments: LocalDiffCommentWithStaleness[],
+	path: string,
 ): LocalDiffCommentWithStaleness[] {
-  return comments.filter((c) => c.path === path);
+	return comments.filter((c) => c.path === path);
 }
 
 /**
@@ -92,24 +94,24 @@ export function getLocalCommentsForFile(
  * @returns Comments with full staleness detection (including content hash)
  */
 export function computeFullStaleness(
-  comments: LocalDiffCommentWithStaleness[],
-  lineContentMap: Map<number, string>
+	comments: LocalDiffCommentWithStaleness[],
+	lineContentMap: Map<number, string>,
 ): LocalDiffCommentWithStaleness[] {
-  return comments.map((comment) => {
-    if (comment.stalenessType === 'head_changed') {
-      return comment;
-    }
+	return comments.map((comment) => {
+		if (comment.stalenessType === "head_changed") {
+			return comment;
+		}
 
-    const currentLineContent = lineContentMap.get(comment.line);
-    if (isLineContentStale(comment, currentLineContent)) {
-      const stalenessType: StalenessType = 'content_changed';
-      return {
-        ...comment,
-        isStale: true,
-        stalenessType,
-      };
-    }
+		const currentLineContent = lineContentMap.get(comment.line);
+		if (isLineContentStale(comment, currentLineContent)) {
+			const stalenessType: StalenessType = "content_changed";
+			return {
+				...comment,
+				isStale: true,
+				stalenessType,
+			};
+		}
 
-    return comment;
-  });
+		return comment;
+	});
 }

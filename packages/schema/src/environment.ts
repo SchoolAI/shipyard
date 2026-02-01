@@ -1,18 +1,18 @@
-import { z } from 'zod';
+import { z } from "zod";
 
 /**
  * Zod schema for environment context.
  * Used to validate awareness data from P2P peers (untrusted source).
  */
 export const EnvironmentContextSchema = z.object({
-  /** Project directory name (e.g., "shipyard") */
-  projectName: z.string().optional(),
-  /** Git branch name (e.g., "feature/auth") */
-  branch: z.string().optional(),
-  /** Machine hostname (e.g., "jacobs-macbook") */
-  hostname: z.string().optional(),
-  /** GitHub repo (e.g., "SchoolAI/shipyard") */
-  repo: z.string().optional(),
+	/** Project directory name (e.g., "shipyard") */
+	projectName: z.string().optional(),
+	/** Git branch name (e.g., "feature/auth") */
+	branch: z.string().optional(),
+	/** Machine hostname (e.g., "jacobs-macbook") */
+	hostname: z.string().optional(),
+	/** GitHub repo (e.g., "SchoolAI/shipyard") */
+	repo: z.string().optional(),
 });
 
 /**
@@ -33,12 +33,12 @@ export type EnvironmentContext = z.infer<typeof EnvironmentContextSchema>;
  * Used to validate awareness data from browser peers (untrusted source).
  */
 export const BrowserContextSchema = z.object({
-  /** Browser name (e.g., "Chrome", "Safari", "Firefox") */
-  browser: z.string().optional(),
-  /** Operating system (e.g., "macOS", "Windows", "Linux") */
-  os: z.string().optional(),
-  /** Last activity timestamp (when user last interacted with the page) */
-  lastActive: z.number().optional(),
+	/** Browser name (e.g., "Chrome", "Safari", "Firefox") */
+	browser: z.string().optional(),
+	/** Operating system (e.g., "macOS", "Windows", "Linux") */
+	os: z.string().optional(),
+	/** Last activity timestamp (when user last interacted with the page) */
+	lastActive: z.number().optional(),
 });
 
 /**

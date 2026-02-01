@@ -8,19 +8,19 @@
  * - file: $SHIPYARD_STATE_DIR/server-debug.log for post-mortem debugging
  */
 
-import { mkdirSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import pino from 'pino';
-import { registryConfig } from './config/env/registry.js';
-import { serverConfig } from './config/env/server.js';
+import { mkdirSync } from "node:fs";
+import { dirname, join } from "node:path";
+import pino from "pino";
+import { registryConfig } from "./config/env/registry.js";
+import { serverConfig } from "./config/env/server.js";
 
-const LOG_FILE = join(registryConfig.SHIPYARD_STATE_DIR, 'server-debug.log');
+const LOG_FILE = join(registryConfig.SHIPYARD_STATE_DIR, "server-debug.log");
 
 /** Ensure log directory exists */
 try {
-  mkdirSync(dirname(LOG_FILE), { recursive: true });
+	mkdirSync(dirname(LOG_FILE), { recursive: true });
 } catch {
-  /** Directory already exists or can't be created - continue anyway */
+	/** Directory already exists or can't be created - continue anyway */
 }
 
 /*
@@ -28,14 +28,14 @@ try {
  * In development, use pino-pretty for stderr only (file gets raw JSON)
  */
 const streams: pino.StreamEntry[] = [
-  { stream: pino.destination(2) },
-  { stream: pino.destination(LOG_FILE) },
+	{ stream: pino.destination(2) },
+	{ stream: pino.destination(LOG_FILE) },
 ];
 
 export const logger = pino(
-  {
-    level: serverConfig.LOG_LEVEL,
-    timestamp: pino.stdTimeFunctions.isoTime,
-  },
-  pino.multistream(streams)
+	{
+		level: serverConfig.LOG_LEVEL,
+		timestamp: pino.stdTimeFunctions.isoTime,
+	},
+	pino.multistream(streams),
 );

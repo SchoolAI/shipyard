@@ -4,23 +4,23 @@
  * Handles both PR review comments and local diff comments.
  */
 
-import type { DiffComment, LocalDiffComment, PRReviewComment } from './plan.js';
+import type { DiffComment, LocalDiffComment, PRReviewComment } from "./plan.js";
 import {
-  buildLineContentMap,
-  computeCommentStaleness,
-  formatStalenessMarker,
-  type StalenessInfo,
-} from './staleness-detection.js';
+	buildLineContentMap,
+	computeCommentStaleness,
+	formatStalenessMarker,
+	type StalenessInfo,
+} from "./staleness-detection.js";
 
 export interface FormatDiffCommentsOptions {
-  /** Include resolved comments (default: false) */
-  includeResolved?: boolean;
-  /** Current HEAD SHA for staleness detection (local comments only) */
-  currentHeadSha?: string;
-  /** Map of "path:line" to current line content for staleness detection */
-  lineContentMap?: Map<string, string>;
-  /** Array of file changes with patches - alternative to lineContentMap */
-  files?: Array<{ path: string; patch?: string }>;
+	/** Include resolved comments (default: false) */
+	includeResolved?: boolean;
+	/** Current HEAD SHA for staleness detection (local comments only) */
+	currentHeadSha?: string;
+	/** Map of "path:line" to current line content for staleness detection */
+	lineContentMap?: Map<string, string>;
+	/** Array of file changes with patches - alternative to lineContentMap */
+	files?: Array<{ path: string; patch?: string }>;
 }
 
 /** Backwards compatibility alias */
@@ -28,18 +28,18 @@ export type FormatPRCommentsOptions = FormatDiffCommentsOptions;
 
 /** Common fields needed for formatting a comment line */
 interface FormattableComment {
-  id: string;
-  line: number;
-  author: string;
-  resolved?: boolean;
-  body: string;
-  inReplyTo?: string;
+	id: string;
+	line: number;
+	author: string;
+	resolved?: boolean;
+	body: string;
+	inReplyTo?: string;
 }
 
 /** Extended comment with staleness info for formatting */
 interface FormattableCommentWithStaleness extends FormattableComment {
-  staleness?: StalenessInfo;
-  commentType: 'pr' | 'local';
+	staleness?: StalenessInfo;
+	commentType: "pr" | "local";
 }
 
 /**
@@ -47,21 +47,21 @@ interface FormattableCommentWithStaleness extends FormattableComment {
  * Returns entries sorted by key.
  */
 function groupBy<T, K extends string | number>(
-  items: T[],
-  getKey: (item: T) => K,
-  sortKeys: (a: K, b: K) => number
+	items: T[],
+	getKey: (item: T) => K,
+	sortKeys: (a: K, b: K) => number,
 ): [K, T[]][] {
-  const grouped = new Map<K, T[]>();
-  for (const item of items) {
-    const key = getKey(item);
-    const existing = grouped.get(key);
-    if (existing) {
-      existing.push(item);
-    } else {
-      grouped.set(key, [item]);
-    }
-  }
-  return Array.from(grouped.entries()).sort(([a], [b]) => sortKeys(a, b));
+	const grouped = new Map<K, T[]>();
+	for (const item of items) {
+		const key = getKey(item);
+		const existing = grouped.get(key);
+		if (existing) {
+			existing.push(item);
+		} else {
+			grouped.set(key, [item]);
+		}
+	}
+	return Array.from(grouped.entries()).sort(([a], [b]) => sortKeys(a, b));
 }
 
 /**
@@ -69,113 +69,118 @@ function groupBy<T, K extends string | number>(
  * Includes comment ID, resolved and staleness markers, and reply indicators.
  */
 function formatCommentLine(comment: FormattableCommentWithStaleness): string {
-  const markers: string[] = [];
+	const markers: string[] = [];
 
-  if (comment.resolved) {
-    markers.push('[RESOLVED]');
-  }
+	if (comment.resolved) {
+		markers.push("[RESOLVED]");
+	}
 
-  if (comment.staleness) {
-    const stalenessMarker = formatStalenessMarker(comment.staleness);
-    if (stalenessMarker) {
-      markers.push(stalenessMarker);
-    }
-  }
+	if (comment.staleness) {
+		const stalenessMarker = formatStalenessMarker(comment.staleness);
+		if (stalenessMarker) {
+			markers.push(stalenessMarker);
+		}
+	}
 
-  const markerStr = markers.length > 0 ? ` ${markers.join(' ')}` : '';
-  const body = comment.body.replace(/\n/g, ' ').trim();
-  const idPrefix = `[${comment.commentType}:${comment.id}]`;
-  const replyIndicator = comment.inReplyTo ? ' ↳ Reply' : '';
+	const markerStr = markers.length > 0 ? ` ${markers.join(" ")}` : "";
+	const body = comment.body.replace(/\n/g, " ").trim();
+	const idPrefix = `[${comment.commentType}:${comment.id}]`;
+	const replyIndicator = comment.inReplyTo ? " ↳ Reply" : "";
 
-  return `- ${idPrefix} Line ${comment.line} (${comment.author})${replyIndicator}${markerStr}: ${body}`;
+	return `- ${idPrefix} Line ${comment.line} (${comment.author})${replyIndicator}${markerStr}: ${body}`;
 }
 
 /** Local comment augmented with staleness for formatting */
 interface LocalCommentWithStaleness extends LocalDiffComment {
-  staleness?: StalenessInfo;
-  commentType: 'local';
+	staleness?: StalenessInfo;
+	commentType: "local";
 }
 
 /** PR comment with type marker for formatting */
 interface PRCommentWithType extends PRReviewComment {
-  commentType: 'pr';
+	commentType: "pr";
 }
 
 /**
  * Format a group of comments for a single file.
  * Sorts by line number (parents before replies at same line) and formats each as a list item.
  */
-function formatFileSection<T extends FormattableCommentWithStaleness & { path: string }>(
-  path: string,
-  comments: T[]
-): string {
-  /**
-   * Sort comments by line number, then by parent/reply relationship.
-   * At the same line, parent comments appear before their replies.
-   */
-  const sorted = [...comments].sort((a, b) => {
-    if (a.line !== b.line) {
-      return a.line - b.line;
-    }
-    const aIsReply = a.inReplyTo ? 1 : 0;
-    const bIsReply = b.inReplyTo ? 1 : 0;
-    return aIsReply - bIsReply;
-  });
-  const lines = sorted.map(formatCommentLine);
-  return `### ${path}\n${lines.join('\n')}`;
+function formatFileSection<
+	T extends FormattableCommentWithStaleness & { path: string },
+>(path: string, comments: T[]): string {
+	/**
+	 * Sort comments by line number, then by parent/reply relationship.
+	 * At the same line, parent comments appear before their replies.
+	 */
+	const sorted = [...comments].sort((a, b) => {
+		if (a.line !== b.line) {
+			return a.line - b.line;
+		}
+		const aIsReply = a.inReplyTo ? 1 : 0;
+		const bIsReply = b.inReplyTo ? 1 : 0;
+		return aIsReply - bIsReply;
+	});
+	const lines = sorted.map(formatCommentLine);
+	return `### ${path}\n${lines.join("\n")}`;
 }
 
 /**
  * Format local diff comments into a markdown section.
  * Includes staleness markers if staleness info is provided.
  */
-function formatLocalCommentsSection(comments: LocalCommentWithStaleness[]): string {
-  const byFile = groupBy(
-    comments,
-    (c) => c.path,
-    (a, b) => a.localeCompare(b)
-  );
-  const fileSections = byFile.map(([path, fileComments]) => formatFileSection(path, fileComments));
-  return `## Local Changes Comments\n\n${fileSections.join('\n\n')}`;
+function formatLocalCommentsSection(
+	comments: LocalCommentWithStaleness[],
+): string {
+	const byFile = groupBy(
+		comments,
+		(c) => c.path,
+		(a, b) => a.localeCompare(b),
+	);
+	const fileSections = byFile.map(([path, fileComments]) =>
+		formatFileSection(path, fileComments),
+	);
+	return `## Local Changes Comments\n\n${fileSections.join("\n\n")}`;
 }
 
 /**
  * Format PR review comments into markdown sections (one per PR).
  */
 function formatPRCommentsSections(comments: PRReviewComment[]): string[] {
-  const byPR = groupBy(
-    comments,
-    (c) => c.prNumber,
-    (a, b) => a - b
-  );
+	const byPR = groupBy(
+		comments,
+		(c) => c.prNumber,
+		(a, b) => a - b,
+	);
 
-  return byPR.map(([prNumber, prComments]) => {
-    const prCommentsWithType: PRCommentWithType[] = prComments.map((c) => ({
-      ...c,
-      commentType: 'pr' as const,
-    }));
-    const byFile = groupBy(
-      prCommentsWithType,
-      (c) => c.path,
-      (a, b) => a.localeCompare(b)
-    );
-    const fileSections = byFile.map(([path, fileComments]) =>
-      formatFileSection(path, fileComments)
-    );
-    return `## PR Review Comments (PR #${prNumber})\n\n${fileSections.join('\n\n')}`;
-  });
+	return byPR.map(([prNumber, prComments]) => {
+		const prCommentsWithType: PRCommentWithType[] = prComments.map((c) => ({
+			...c,
+			commentType: "pr" as const,
+		}));
+		const byFile = groupBy(
+			prCommentsWithType,
+			(c) => c.path,
+			(a, b) => a.localeCompare(b),
+		);
+		const fileSections = byFile.map(([path, fileComments]) =>
+			formatFileSection(path, fileComments),
+		);
+		return `## PR Review Comments (PR #${prNumber})\n\n${fileSections.join("\n\n")}`;
+	});
 }
 
 /**
  * Separate comments into local and PR types.
  */
 function separateCommentTypes(comments: DiffComment[]): {
-  local: LocalDiffComment[];
-  pr: PRReviewComment[];
+	local: LocalDiffComment[];
+	pr: PRReviewComment[];
 } {
-  const local = comments.filter((c): c is LocalDiffComment => 'type' in c && c.type === 'local');
-  const pr = comments.filter((c): c is PRReviewComment => !('type' in c));
-  return { local, pr };
+	const local = comments.filter(
+		(c): c is LocalDiffComment => "type" in c && c.type === "local",
+	);
+	const pr = comments.filter((c): c is PRReviewComment => !("type" in c));
+	return { local, pr };
 }
 
 /**
@@ -199,45 +204,54 @@ function separateCommentTypes(comments: DiffComment[]): {
  * ```
  */
 export function formatDiffCommentsForLLM(
-  comments: DiffComment[],
-  options: FormatDiffCommentsOptions = {}
+	comments: DiffComment[],
+	options: FormatDiffCommentsOptions = {},
 ): string {
-  const { includeResolved = false, currentHeadSha, files } = options;
+	const { includeResolved = false, currentHeadSha, files } = options;
 
-  const lineContentMap = options.lineContentMap ?? (files ? buildLineContentMap(files) : undefined);
+	const lineContentMap =
+		options.lineContentMap ?? (files ? buildLineContentMap(files) : undefined);
 
-  const unresolvedComments = comments.filter((c) => !c.resolved);
-  const resolvedCount = comments.length - unresolvedComments.length;
-  const commentsToShow = includeResolved ? comments : unresolvedComments;
+	const unresolvedComments = comments.filter((c) => !c.resolved);
+	const resolvedCount = comments.length - unresolvedComments.length;
+	const commentsToShow = includeResolved ? comments : unresolvedComments;
 
-  if (commentsToShow.length === 0) {
-    return resolvedCount > 0 ? `All ${resolvedCount} diff comment(s) have been resolved.` : '';
-  }
+	if (commentsToShow.length === 0) {
+		return resolvedCount > 0
+			? `All ${resolvedCount} diff comment(s) have been resolved.`
+			: "";
+	}
 
-  const { local, pr } = separateCommentTypes(commentsToShow);
-  const sections: string[] = [];
+	const { local, pr } = separateCommentTypes(commentsToShow);
+	const sections: string[] = [];
 
-  if (local.length > 0) {
-    const localWithStaleness: LocalCommentWithStaleness[] = local.map((comment) => {
-      const key = `${comment.path}:${comment.line}`;
-      const currentLineContent = lineContentMap?.get(key);
-      const staleness = computeCommentStaleness(comment, currentHeadSha, currentLineContent);
-      return { ...comment, staleness, commentType: 'local' as const };
-    });
-    sections.push(formatLocalCommentsSection(localWithStaleness));
-  }
+	if (local.length > 0) {
+		const localWithStaleness: LocalCommentWithStaleness[] = local.map(
+			(comment) => {
+				const key = `${comment.path}:${comment.line}`;
+				const currentLineContent = lineContentMap?.get(key);
+				const staleness = computeCommentStaleness(
+					comment,
+					currentHeadSha,
+					currentLineContent,
+				);
+				return { ...comment, staleness, commentType: "local" as const };
+			},
+		);
+		sections.push(formatLocalCommentsSection(localWithStaleness));
+	}
 
-  if (pr.length > 0) {
-    sections.push(...formatPRCommentsSections(pr));
-  }
+	if (pr.length > 0) {
+		sections.push(...formatPRCommentsSections(pr));
+	}
 
-  let output = sections.join('\n\n');
+	let output = sections.join("\n\n");
 
-  if (!includeResolved && resolvedCount > 0) {
-    output += `\n\n---\n(${resolvedCount} resolved comment(s) not shown)`;
-  }
+	if (!includeResolved && resolvedCount > 0) {
+		output += `\n\n---\n(${resolvedCount} resolved comment(s) not shown)`;
+	}
 
-  return output;
+	return output;
 }
 
 /**
@@ -245,40 +259,40 @@ export function formatDiffCommentsForLLM(
  * Backwards compatibility wrapper for formatDiffCommentsForLLM.
  */
 export function formatPRCommentsForLLM(
-  comments: PRReviewComment[],
-  options: FormatPRCommentsOptions = {}
+	comments: PRReviewComment[],
+	options: FormatPRCommentsOptions = {},
 ): string {
-  return formatDiffCommentsForLLM(comments, options);
+	return formatDiffCommentsForLLM(comments, options);
 }
 
 /**
  * Get summary stats for PR review comments.
  */
 export function getPRCommentsSummary(comments: PRReviewComment[]): {
-  total: number;
-  unresolved: number;
-  resolved: number;
-  byFile: Map<string, number>;
+	total: number;
+	unresolved: number;
+	resolved: number;
+	byFile: Map<string, number>;
 } {
-  const byFile = new Map<string, number>();
-  let unresolved = 0;
-  let resolved = 0;
+	const byFile = new Map<string, number>();
+	let unresolved = 0;
+	let resolved = 0;
 
-  for (const comment of comments) {
-    if (comment.resolved) {
-      resolved++;
-    } else {
-      unresolved++;
-    }
+	for (const comment of comments) {
+		if (comment.resolved) {
+			resolved++;
+		} else {
+			unresolved++;
+		}
 
-    const count = byFile.get(comment.path) ?? 0;
-    byFile.set(comment.path, count + 1);
-  }
+		const count = byFile.get(comment.path) ?? 0;
+		byFile.set(comment.path, count + 1);
+	}
 
-  return {
-    total: comments.length,
-    unresolved,
-    resolved,
-    byFile,
-  };
+	return {
+		total: comments.length,
+		unresolved,
+		resolved,
+		byFile,
+	};
 }

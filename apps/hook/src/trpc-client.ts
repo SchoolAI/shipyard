@@ -3,10 +3,10 @@
  * Provides type-safe RPC calls with automatic request batching.
  */
 
-import type { AppRouter } from '@shipyard/schema';
-import { DEFAULT_TRPC_TIMEOUT_MS } from '@shipyard/shared';
-import { createTRPCClient, httpBatchLink } from '@trpc/client';
-import { Agent } from 'undici';
+import type { AppRouter } from "@shipyard/schema";
+import { DEFAULT_TRPC_TIMEOUT_MS } from "@shipyard/shared";
+import { createTRPCClient, httpBatchLink } from "@trpc/client";
+import { Agent } from "undici";
 
 let cachedClient: ReturnType<typeof createTRPCClient<AppRouter>> | null = null;
 let cachedBaseUrl: string | null = null;
@@ -21,12 +21,12 @@ let cachedBaseUrl: string | null = null;
  * to match our 30-minute approval timeout.
  */
 function createLongPollingAgent(timeoutMs: number): Agent {
-  return new Agent({
-    headersTimeout: timeoutMs,
-    bodyTimeout: timeoutMs,
-    keepAliveTimeout: timeoutMs,
-    keepAliveMaxTimeout: timeoutMs,
-  });
+	return new Agent({
+		headersTimeout: timeoutMs,
+		bodyTimeout: timeoutMs,
+		keepAliveTimeout: timeoutMs,
+		keepAliveMaxTimeout: timeoutMs,
+	});
 }
 
 /**
@@ -36,46 +36,49 @@ function createLongPollingAgent(timeoutMs: number): Agent {
  * @param baseUrl - The base URL of the registry server
  * @param timeoutMs - Request timeout in milliseconds (default: 10000)
  */
-export function getTRPCClient(baseUrl: string, timeoutMs = DEFAULT_TRPC_TIMEOUT_MS) {
-  // NOTE: Don't cache clients with custom timeouts - long-polling needs dedicated instances
-  if (timeoutMs !== DEFAULT_TRPC_TIMEOUT_MS) {
-    const agent = createLongPollingAgent(timeoutMs);
+export function getTRPCClient(
+	baseUrl: string,
+	timeoutMs = DEFAULT_TRPC_TIMEOUT_MS,
+) {
+	// NOTE: Don't cache clients with custom timeouts - long-polling needs dedicated instances
+	if (timeoutMs !== DEFAULT_TRPC_TIMEOUT_MS) {
+		const agent = createLongPollingAgent(timeoutMs);
 
-    return createTRPCClient<AppRouter>({
-      links: [
-        httpBatchLink({
-          url: `${baseUrl}/trpc`,
-          fetch: (url, options) => {
-            return fetch(url, {
-              ...options,
-              signal: AbortSignal.timeout(timeoutMs),
-              dispatcher: agent,
-            });
-          },
-        }),
-      ],
-    });
-  }
+		return createTRPCClient<AppRouter>({
+			links: [
+				httpBatchLink({
+					url: `${baseUrl}/trpc`,
+					fetch: (url, options) => {
+						return fetch(url, {
+							...options,
+							signal: AbortSignal.timeout(timeoutMs),
+							dispatcher: agent,
+						});
+					},
+				}),
+			],
+		});
+	}
 
-  if (cachedClient && cachedBaseUrl === baseUrl) {
-    return cachedClient;
-  }
+	if (cachedClient && cachedBaseUrl === baseUrl) {
+		return cachedClient;
+	}
 
-  cachedClient = createTRPCClient<AppRouter>({
-    links: [
-      httpBatchLink({
-        url: `${baseUrl}/trpc`,
-        fetch: (url, options) => {
-          return fetch(url, {
-            ...options,
-            signal: AbortSignal.timeout(timeoutMs),
-          });
-        },
-      }),
-    ],
-  });
-  cachedBaseUrl = baseUrl;
-  return cachedClient;
+	cachedClient = createTRPCClient<AppRouter>({
+		links: [
+			httpBatchLink({
+				url: `${baseUrl}/trpc`,
+				fetch: (url, options) => {
+					return fetch(url, {
+						...options,
+						signal: AbortSignal.timeout(timeoutMs),
+					});
+				},
+			}),
+		],
+	});
+	cachedBaseUrl = baseUrl;
+	return cachedClient;
 }
 
 /**
@@ -83,6 +86,6 @@ export function getTRPCClient(baseUrl: string, timeoutMs = DEFAULT_TRPC_TIMEOUT_
  * Useful for testing or when the server URL changes.
  */
 export function resetTRPCClient() {
-  cachedClient = null;
-  cachedBaseUrl = null;
+	cachedClient = null;
+	cachedBaseUrl = null;
 }

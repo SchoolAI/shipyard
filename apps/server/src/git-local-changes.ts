@@ -1,18 +1,22 @@
 /**
  * Git local changes helper - runs git commands to get working tree diff.
  */
-import { execSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
-import { isAbsolute, join, normalize } from 'node:path';
-import type { GitFileStatus, LocalChangesResult, LocalFileChange } from '@shipyard/schema';
-import { logger } from './logger.js';
+import { execSync } from "node:child_process";
+import { readFileSync } from "node:fs";
+import { isAbsolute, join, normalize } from "node:path";
+import type {
+	GitFileStatus,
+	LocalChangesResult,
+	LocalFileChange,
+} from "@shipyard/schema";
+import { logger } from "./logger.js";
 
 /** --- Git Command Helpers --- */
 
 interface GitExecOptions {
-  cwd: string;
-  timeout?: number;
-  maxBuffer?: number;
+	cwd: string;
+	timeout?: number;
+	maxBuffer?: number;
 }
 
 /**
@@ -20,17 +24,17 @@ interface GitExecOptions {
  * Returns null if command fails.
  */
 function execGit(command: string, opts: GitExecOptions): string | null {
-  try {
-    return execSync(command, {
-      cwd: opts.cwd,
-      encoding: 'utf-8',
-      timeout: opts.timeout ?? 5000,
-      maxBuffer: opts.maxBuffer,
-      stdio: ['pipe', 'pipe', 'pipe'],
-    }).trim();
-  } catch {
-    return null;
-  }
+	try {
+		return execSync(command, {
+			cwd: opts.cwd,
+			encoding: "utf-8",
+			timeout: opts.timeout ?? 5000,
+			maxBuffer: opts.maxBuffer,
+			stdio: ["pipe", "pipe", "pipe"],
+		}).trim();
+	} catch {
+		return null;
+	}
 }
 
 /**
@@ -38,55 +42,65 @@ function execGit(command: string, opts: GitExecOptions): string | null {
  * Returns error result if initialization fails.
  */
 function ensureGitRepo(cwd: string): LocalChangesResult | null {
-  const isRepo = execGit('git rev-parse --is-inside-work-tree', { cwd });
-  if (isRepo !== null) return null;
+	const isRepo = execGit("git rev-parse --is-inside-work-tree", { cwd });
+	if (isRepo !== null) return null;
 
-  /** Not a git repo - auto-initialize */
-  logger.info({ cwd }, 'Not a git repo, initializing with git init');
-  const initResult = execGit('git init', { cwd });
+	/** Not a git repo - auto-initialize */
+	logger.info({ cwd }, "Not a git repo, initializing with git init");
+	const initResult = execGit("git init", { cwd });
 
-  if (initResult === null) {
-    logger.error({ cwd }, 'Failed to initialize git repository');
-    return {
-      available: false,
-      reason: 'git_error',
-      message: 'Failed to initialize git repository',
-    };
-  }
+	if (initResult === null) {
+		logger.error({ cwd }, "Failed to initialize git repository");
+		return {
+			available: false,
+			reason: "git_error",
+			message: "Failed to initialize git repository",
+		};
+	}
 
-  logger.info({ cwd }, 'Git repository initialized');
-  return null;
+	logger.info({ cwd }, "Git repository initialized");
+	return null;
 }
 
 /**
  * Get the current branch name, falling back to short SHA for detached HEAD.
  */
 function getCurrentBranchName(cwd: string): string {
-  const branch = execGit('git rev-parse --abbrev-ref HEAD', { cwd });
+	const branch = execGit("git rev-parse --abbrev-ref HEAD", { cwd });
 
-  if (!branch) {
-    logger.warn({ cwd }, 'Could not get current branch');
-    return 'unknown';
-  }
+	if (!branch) {
+		logger.warn({ cwd }, "Could not get current branch");
+		return "unknown";
+	}
 
-  /** If detached HEAD, get short commit SHA */
-  if (branch === 'HEAD') {
-    return execGit('git rev-parse --short HEAD', { cwd }) ?? 'unknown';
-  }
+	/** If detached HEAD, get short commit SHA */
+	if (branch === "HEAD") {
+		return execGit("git rev-parse --short HEAD", { cwd }) ?? "unknown";
+	}
 
-  return branch;
+	return branch;
 }
 
 /**
  * Get git diff output, trying HEAD first then falling back to --cached.
  */
 function getGitDiff(cwd: string): string {
-  const headDiff = execGit('git diff HEAD', { cwd, timeout: 30000, maxBuffer: 10 * 1024 * 1024 });
-  if (headDiff !== null) return headDiff;
+	const headDiff = execGit("git diff HEAD", {
+		cwd,
+		timeout: 30000,
+		maxBuffer: 10 * 1024 * 1024,
+	});
+	if (headDiff !== null) return headDiff;
 
-  /** diff HEAD fails if no commits yet, try diff --cached instead */
-  logger.debug({ cwd }, 'git diff HEAD failed, trying --cached');
-  return execGit('git diff --cached', { cwd, timeout: 30000, maxBuffer: 10 * 1024 * 1024 }) ?? '';
+	/** diff HEAD fails if no commits yet, try diff --cached instead */
+	logger.debug({ cwd }, "git diff HEAD failed, trying --cached");
+	return (
+		execGit("git diff --cached", {
+			cwd,
+			timeout: 30000,
+			maxBuffer: 10 * 1024 * 1024,
+		}) ?? ""
+	);
 }
 
 /**
@@ -94,7 +108,7 @@ function getGitDiff(cwd: string): string {
  * Files are pre-filtered to only include those with actual content changes.
  */
 function sortFilesByPath(diffFiles: LocalFileChange[]): LocalFileChange[] {
-  return [...diffFiles].sort((a, b) => a.path.localeCompare(b.path));
+	return [...diffFiles].sort((a, b) => a.path.localeCompare(b.path));
 }
 
 /** --- Main Function --- */
@@ -104,75 +118,84 @@ function sortFilesByPath(diffFiles: LocalFileChange[]): LocalFileChange[] {
  * Runs git status and git diff commands to build a structured response.
  */
 export function getLocalChanges(cwd: string): LocalChangesResult {
-  try {
-    /** Ensure git repo exists (auto-init if needed) */
-    const repoError = ensureGitRepo(cwd);
-    if (repoError) return repoError;
+	try {
+		/** Ensure git repo exists (auto-init if needed) */
+		const repoError = ensureGitRepo(cwd);
+		if (repoError) return repoError;
 
-    /** Get current branch */
-    const branch = getCurrentBranchName(cwd);
+		/** Get current branch */
+		const branch = getCurrentBranchName(cwd);
 
-    /** Get HEAD SHA for staleness detection in comments */
-    let headSha: string | undefined;
-    try {
-      headSha = execGit('git rev-parse HEAD', { cwd }) ?? undefined;
-    } catch {
-      /** No commits yet */
-      headSha = undefined;
-    }
+		/** Get HEAD SHA for staleness detection in comments */
+		let headSha: string | undefined;
+		try {
+			headSha = execGit("git rev-parse HEAD", { cwd }) ?? undefined;
+		} catch {
+			/** No commits yet */
+			headSha = undefined;
+		}
 
-    /** Get status (staged, unstaged, untracked) */
-    const statusOutput = execGit('git status --porcelain', { cwd, timeout: 10000 }) ?? '';
-    const { staged: rawStaged, unstaged: rawUnstaged, untracked } = parseGitStatus(statusOutput);
+		/** Get status (staged, unstaged, untracked) */
+		const statusOutput =
+			execGit("git status --porcelain", { cwd, timeout: 10000 }) ?? "";
+		const {
+			staged: rawStaged,
+			unstaged: rawUnstaged,
+			untracked,
+		} = parseGitStatus(statusOutput);
 
-    /** Get diff and parse into file changes */
-    const diffOutput = getGitDiff(cwd);
-    const diffFiles = parseDiffOutput(diffOutput);
+		/** Get diff and parse into file changes */
+		const diffOutput = getGitDiff(cwd);
+		const diffFiles = parseDiffOutput(diffOutput);
 
-    /** Create a set of paths that have actual content changes */
-    const diffPaths = new Set(diffFiles.map((f) => f.path));
+		/** Create a set of paths that have actual content changes */
+		const diffPaths = new Set(diffFiles.map((f) => f.path));
 
-    /** Filter staged/unstaged to only include files with actual content changes */
-    const staged = rawStaged.filter((f) => diffPaths.has(f.path));
-    const unstaged = rawUnstaged.filter((f) => diffPaths.has(f.path));
+		/** Filter staged/unstaged to only include files with actual content changes */
+		const staged = rawStaged.filter((f) => diffPaths.has(f.path));
+		const unstaged = rawUnstaged.filter((f) => diffPaths.has(f.path));
 
-    /** Sort files alphabetically */
-    const sortedFiles = sortFilesByPath(diffFiles);
+		/** Sort files alphabetically */
+		const sortedFiles = sortFilesByPath(diffFiles);
 
-    logger.debug(
-      {
-        cwd,
-        branch,
-        headSha,
-        stagedCount: staged.length,
-        unstagedCount: unstaged.length,
-        untrackedCount: untracked.length,
-        filesCount: sortedFiles.length,
-        filteredOut: rawStaged.length + rawUnstaged.length - staged.length - unstaged.length,
-      },
-      'Got local changes'
-    );
+		logger.debug(
+			{
+				cwd,
+				branch,
+				headSha,
+				stagedCount: staged.length,
+				unstagedCount: unstaged.length,
+				untrackedCount: untracked.length,
+				filesCount: sortedFiles.length,
+				filteredOut:
+					rawStaged.length +
+					rawUnstaged.length -
+					staged.length -
+					unstaged.length,
+			},
+			"Got local changes",
+		);
 
-    return {
-      available: true,
-      branch,
-      baseBranch: 'HEAD',
-      headSha,
-      staged,
-      unstaged,
-      untracked,
-      files: sortedFiles,
-    };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error';
-    logger.error({ error, cwd }, 'Failed to get local changes');
+		return {
+			available: true,
+			branch,
+			baseBranch: "HEAD",
+			headSha,
+			staged,
+			unstaged,
+			untracked,
+			files: sortedFiles,
+		};
+	} catch (error) {
+		const message = error instanceof Error ? error.message : "Unknown error";
+		logger.error({ error, cwd }, "Failed to get local changes");
 
-    return {
-      available: false,
-      reason: 'git_error',
-      message: `Git error: ${message}`,
-    };
-  }
+		return {
+			available: false,
+			reason: "git_error",
+			message: `Git error: ${message}`,
+		};
+	}
 }
 
 /**
@@ -185,81 +208,81 @@ export function getLocalChanges(cwd: string): LocalChangesResult {
  */
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Git status parsing requires many conditional branches
 function parseGitStatus(output: string): {
-  staged: LocalFileChange[];
-  unstaged: LocalFileChange[];
-  untracked: string[];
+	staged: LocalFileChange[];
+	unstaged: LocalFileChange[];
+	untracked: string[];
 } {
-  const staged: LocalFileChange[] = [];
-  const unstaged: LocalFileChange[] = [];
-  const untracked: string[] = [];
+	const staged: LocalFileChange[] = [];
+	const unstaged: LocalFileChange[] = [];
+	const untracked: string[] = [];
 
-  for (const line of output.split('\n')) {
-    if (!line || line.length < 3) continue;
+	for (const line of output.split("\n")) {
+		if (!line || line.length < 3) continue;
 
-    const x = line[0];
-    const y = line[1];
-    let path = line.slice(3);
+		const x = line[0];
+		const y = line[1];
+		let path = line.slice(3);
 
-    /** Handle renamed files: "R  old -> new" */
-    if (path.includes(' -> ')) {
-      path = path.split(' -> ')[1] ?? path;
-    }
+		/** Handle renamed files: "R  old -> new" */
+		if (path.includes(" -> ")) {
+			path = path.split(" -> ")[1] ?? path;
+		}
 
-    /** Untracked files */
-    if (x === '?' && y === '?') {
-      untracked.push(path);
-      continue;
-    }
+		/** Untracked files */
+		if (x === "?" && y === "?") {
+			untracked.push(path);
+			continue;
+		}
 
-    /** Ignored files - skip */
-    if (x === '!' && y === '!') {
-      continue;
-    }
+		/** Ignored files - skip */
+		if (x === "!" && y === "!") {
+			continue;
+		}
 
-    /** Staged changes */
-    if (x && x !== ' ' && x !== '?') {
-      staged.push({
-        path,
-        status: parseStatusChar(x),
-        additions: 0,
-        deletions: 0,
-      });
-    }
+		/** Staged changes */
+		if (x && x !== " " && x !== "?") {
+			staged.push({
+				path,
+				status: parseStatusChar(x),
+				additions: 0,
+				deletions: 0,
+			});
+		}
 
-    /** Unstaged changes */
-    if (y && y !== ' ' && y !== '?') {
-      unstaged.push({
-        path,
-        status: parseStatusChar(y),
-        additions: 0,
-        deletions: 0,
-      });
-    }
-  }
+		/** Unstaged changes */
+		if (y && y !== " " && y !== "?") {
+			unstaged.push({
+				path,
+				status: parseStatusChar(y),
+				additions: 0,
+				deletions: 0,
+			});
+		}
+	}
 
-  return { staged, unstaged, untracked };
+	return { staged, unstaged, untracked };
 }
 
 /**
  * Convert git status character to our status type.
  */
 function parseStatusChar(char: string): GitFileStatus {
-  switch (char) {
-    case 'A':
-      return 'added';
-    case 'M':
-      return 'modified';
-    case 'D':
-      return 'deleted';
-    case 'R':
-      return 'renamed';
-    case 'C':
-      return 'copied';
-    case 'U':
-      return 'modified';
-    default:
-      return 'modified';
-  }
+	switch (char) {
+		case "A":
+			return "added";
+		case "M":
+			return "modified";
+		case "D":
+			return "deleted";
+		case "R":
+			return "renamed";
+		case "C":
+			return "copied";
+		case "U":
+			return "modified";
+		default:
+			return "modified";
+	}
 }
 
 /**
@@ -267,82 +290,82 @@ function parseStatusChar(char: string): GitFileStatus {
  */
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Diff parsing requires many conditional branches
 function parseDiffOutput(diff: string): LocalFileChange[] {
-  const files: LocalFileChange[] = [];
+	const files: LocalFileChange[] = [];
 
-  if (!diff.trim()) {
-    return files;
-  }
+	if (!diff.trim()) {
+		return files;
+	}
 
-  /** Split by file boundary: "diff --git a/... b/..." */
-  const fileDiffs = diff.split(/(?=diff --git )/);
+	/** Split by file boundary: "diff --git a/... b/..." */
+	const fileDiffs = diff.split(/(?=diff --git )/);
 
-  for (const fileDiff of fileDiffs) {
-    if (!fileDiff.trim()) continue;
+	for (const fileDiff of fileDiffs) {
+		if (!fileDiff.trim()) continue;
 
-    /** Extract filename from "diff --git a/path b/path" */
-    const headerMatch = fileDiff.match(/^diff --git a\/(.+?) b\/(.+)/m);
-    if (!headerMatch) continue;
+		/** Extract filename from "diff --git a/path b/path" */
+		const headerMatch = fileDiff.match(/^diff --git a\/(.+?) b\/(.+)/m);
+		if (!headerMatch) continue;
 
-    const path = headerMatch[2] ?? headerMatch[1];
-    if (!path) continue;
+		const path = headerMatch[2] ?? headerMatch[1];
+		if (!path) continue;
 
-    /** Check if binary file */
-    if (fileDiff.includes('Binary files')) {
-      files.push({
-        path,
-        status: detectStatus(fileDiff),
-        additions: 0,
-        deletions: 0,
-        patch: undefined,
-      });
-      continue;
-    }
+		/** Check if binary file */
+		if (fileDiff.includes("Binary files")) {
+			files.push({
+				path,
+				status: detectStatus(fileDiff),
+				additions: 0,
+				deletions: 0,
+				patch: undefined,
+			});
+			continue;
+		}
 
-    /** Count additions and deletions */
-    let additions = 0;
-    let deletions = 0;
+		/** Count additions and deletions */
+		let additions = 0;
+		let deletions = 0;
 
-    for (const line of fileDiff.split('\n')) {
-      if (line.startsWith('+') && !line.startsWith('+++')) {
-        additions++;
-      } else if (line.startsWith('-') && !line.startsWith('---')) {
-        deletions++;
-      }
-    }
+		for (const line of fileDiff.split("\n")) {
+			if (line.startsWith("+") && !line.startsWith("+++")) {
+				additions++;
+			} else if (line.startsWith("-") && !line.startsWith("---")) {
+				deletions++;
+			}
+		}
 
-    /** Extract the patch (everything after the header) */
-    const patchStart = fileDiff.indexOf('@@');
-    const patch = patchStart >= 0 ? fileDiff.slice(patchStart) : undefined;
+		/** Extract the patch (everything after the header) */
+		const patchStart = fileDiff.indexOf("@@");
+		const patch = patchStart >= 0 ? fileDiff.slice(patchStart) : undefined;
 
-    files.push({
-      path,
-      status: detectStatus(fileDiff),
-      additions,
-      deletions,
-      patch,
-    });
-  }
+		files.push({
+			path,
+			status: detectStatus(fileDiff),
+			additions,
+			deletions,
+			patch,
+		});
+	}
 
-  return files;
+	return files;
 }
 
 /**
  * Detect file status from diff header.
  */
 function detectStatus(fileDiff: string): GitFileStatus {
-  if (fileDiff.includes('new file mode')) {
-    return 'added';
-  }
-  if (fileDiff.includes('deleted file mode')) {
-    return 'deleted';
-  }
-  if (fileDiff.includes('rename from')) {
-    return 'renamed';
-  }
-  if (fileDiff.includes('copy from')) {
-    return 'copied';
-  }
-  return 'modified';
+	if (fileDiff.includes("new file mode")) {
+		return "added";
+	}
+	if (fileDiff.includes("deleted file mode")) {
+		return "deleted";
+	}
+	if (fileDiff.includes("rename from")) {
+		return "renamed";
+	}
+	if (fileDiff.includes("copy from")) {
+		return "copied";
+	}
+	return "modified";
 }
 
 /**
@@ -350,39 +373,39 @@ function detectStatus(fileDiff: string): GitFileStatus {
  * Validates the path is within the working directory (no directory traversal).
  */
 export function getFileContent(
-  cwd: string,
-  filePath: string
+	cwd: string,
+	filePath: string,
 ): { content: string | null; error?: string } {
-  try {
-    /** Prevent directory traversal attacks */
-    const normalizedPath = normalize(filePath);
-    if (isAbsolute(normalizedPath) || normalizedPath.startsWith('..')) {
-      return { content: null, error: 'Invalid file path' };
-    }
+	try {
+		/** Prevent directory traversal attacks */
+		const normalizedPath = normalize(filePath);
+		if (isAbsolute(normalizedPath) || normalizedPath.startsWith("..")) {
+			return { content: null, error: "Invalid file path" };
+		}
 
-    const fullPath = join(cwd, normalizedPath);
+		const fullPath = join(cwd, normalizedPath);
 
-    /** Double-check the resolved path is within cwd */
-    if (!fullPath.startsWith(cwd)) {
-      return { content: null, error: 'Invalid file path' };
-    }
+		/** Double-check the resolved path is within cwd */
+		if (!fullPath.startsWith(cwd)) {
+			return { content: null, error: "Invalid file path" };
+		}
 
-    const content = readFileSync(fullPath, { encoding: 'utf-8' });
+		const content = readFileSync(fullPath, { encoding: "utf-8" });
 
-    /** Limit content size to prevent memory issues (10MB) */
-    if (content.length > 10 * 1024 * 1024) {
-      return { content: null, error: 'File too large to display' };
-    }
+		/** Limit content size to prevent memory issues (10MB) */
+		if (content.length > 10 * 1024 * 1024) {
+			return { content: null, error: "File too large to display" };
+		}
 
-    return { content };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error';
-    if (message.includes('ENOENT')) {
-      return { content: null, error: 'File not found' };
-    }
-    if (message.includes('EISDIR')) {
-      return { content: null, error: 'Path is a directory' };
-    }
-    return { content: null, error: `Failed to read file: ${message}` };
-  }
+		return { content };
+	} catch (error) {
+		const message = error instanceof Error ? error.message : "Unknown error";
+		if (message.includes("ENOENT")) {
+			return { content: null, error: "File not found" };
+		}
+		if (message.includes("EISDIR")) {
+			return { content: null, error: "Path is a directory" };
+		}
+		return { content: null, error: `Failed to read file: ${message}` };
+	}
 }

@@ -1,6 +1,10 @@
-import { getPRReviewCommentsForPR, type PRReviewComment, YDOC_KEYS } from '@shipyard/schema';
-import { useEffect, useState } from 'react';
-import type * as Y from 'yjs';
+import {
+	getPRReviewCommentsForPR,
+	type PRReviewComment,
+	YDOC_KEYS,
+} from "@shipyard/schema";
+import { useEffect, useState } from "react";
+import type * as Y from "yjs";
 
 /**
  * Hook to observe PR review comments for a specific PR from Y.Doc.
@@ -10,27 +14,33 @@ import type * as Y from 'yjs';
  * @param prNumber - PR number to filter comments by
  * @returns Array of PR review comments for the specified PR
  */
-export function usePRReviewComments(ydoc: Y.Doc, prNumber: number): PRReviewComment[] {
-  const [comments, setComments] = useState<PRReviewComment[]>([]);
+export function usePRReviewComments(
+	ydoc: Y.Doc,
+	prNumber: number,
+): PRReviewComment[] {
+	const [comments, setComments] = useState<PRReviewComment[]>([]);
 
-  useEffect(() => {
-    const array = ydoc.getArray<PRReviewComment>(YDOC_KEYS.PR_REVIEW_COMMENTS);
+	useEffect(() => {
+		const array = ydoc.getArray<PRReviewComment>(YDOC_KEYS.PR_REVIEW_COMMENTS);
 
-    const update = () => {
-      setComments(getPRReviewCommentsForPR(ydoc, prNumber));
-    };
+		const update = () => {
+			setComments(getPRReviewCommentsForPR(ydoc, prNumber));
+		};
 
-    update();
-    array.observe(update);
-    return () => array.unobserve(update);
-  }, [ydoc, prNumber]);
+		update();
+		array.observe(update);
+		return () => array.unobserve(update);
+	}, [ydoc, prNumber]);
 
-  return comments;
+	return comments;
 }
 
 /**
  * Gets comments for a specific file path.
  */
-export function getCommentsForFile(comments: PRReviewComment[], path: string): PRReviewComment[] {
-  return comments.filter((c) => c.path === path);
+export function getCommentsForFile(
+	comments: PRReviewComment[],
+	path: string,
+): PRReviewComment[] {
+	return comments.filter((c) => c.path === path);
 }

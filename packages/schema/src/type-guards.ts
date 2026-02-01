@@ -32,11 +32,11 @@
  * ```
  */
 export function isErrnoException(err: unknown): err is NodeJS.ErrnoException {
-  if (!(err instanceof Error)) return false;
-  if (!('code' in err)) return false;
-  const errRecord = Object.fromEntries(Object.entries(err));
-  const code = errRecord.code;
-  return typeof code === 'string' || code === undefined;
+	if (!(err instanceof Error)) return false;
+	if (!("code" in err)) return false;
+	const errRecord = Object.fromEntries(Object.entries(err));
+	const code = errRecord.code;
+	return typeof code === "string" || code === undefined;
 }
 
 /**
@@ -51,10 +51,10 @@ export function isErrnoException(err: unknown): err is NodeJS.ErrnoException {
  * ```
  */
 export function hasErrorCode(
-  err: unknown,
-  code: string
+	err: unknown,
+	code: string,
 ): err is NodeJS.ErrnoException & { code: string } {
-  return isErrnoException(err) && err.code === code;
+	return isErrnoException(err) && err.code === code;
 }
 
 /*
@@ -79,5 +79,5 @@ export function hasErrorCode(
  * ```
  */
 export function isBuffer(value: unknown): value is Buffer {
-  return Buffer.isBuffer(value);
+	return Buffer.isBuffer(value);
 }

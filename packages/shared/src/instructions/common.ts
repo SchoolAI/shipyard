@@ -3,7 +3,7 @@
  * These are the platform-agnostic concepts that apply everywhere.
  */
 
-import { TOOL_NAMES } from './tool-names.js';
+import { TOOL_NAMES } from "./tool-names.js";
 
 export const CRITICAL_USAGE_SECTION = `## CRITICAL: When to Use Shipyard
 
@@ -195,11 +195,11 @@ export const TROUBLESHOOTING_SECTION = `## Troubleshooting
  * Platform-specific modules can import individual sections or this combined one.
  */
 export const COMMON_INSTRUCTIONS = [
-  CRITICAL_USAGE_SECTION,
-  USER_INPUT_SECTION,
-  DELIVERABLES_SECTION,
-  ARTIFACT_TYPES_SECTION,
-  TIPS_SECTION,
-  WHEN_NOT_TO_USE_SECTION,
-  TROUBLESHOOTING_SECTION,
-].join('\n\n');
+	CRITICAL_USAGE_SECTION,
+	USER_INPUT_SECTION,
+	DELIVERABLES_SECTION,
+	ARTIFACT_TYPES_SECTION,
+	TIPS_SECTION,
+	WHEN_NOT_TO_USE_SECTION,
+	TROUBLESHOOTING_SECTION,
+].join("\n\n");

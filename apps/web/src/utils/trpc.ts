@@ -1,5 +1,5 @@
-import type { AppRouter } from '@shipyard/schema';
-import { createTRPCReact } from '@trpc/react-query';
+import type { AppRouter } from "@shipyard/schema";
+import { createTRPCReact } from "@trpc/react-query";
 
 /**
  * tRPC React hooks for use in React components.

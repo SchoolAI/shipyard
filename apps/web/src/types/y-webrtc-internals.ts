@@ -8,11 +8,11 @@
  * @see Issue #80 - Type assertion cleanup
  */
 export {
-  getSignalingConnections,
-  getWebrtcPeerId,
-  getWebrtcRoom,
-  type SignalingConnection,
-  type WebrtcConn,
-  type WebrtcProviderInternals,
-  type WebrtcRoom,
-} from '@shipyard/schema';
+	getSignalingConnections,
+	getWebrtcPeerId,
+	getWebrtcRoom,
+	type SignalingConnection,
+	type WebrtcConn,
+	type WebrtcProviderInternals,
+	type WebrtcRoom,
+} from "@shipyard/schema";

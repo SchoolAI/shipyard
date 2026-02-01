@@ -3,13 +3,17 @@
  * Used by both registry server and daemon for consistent session file management.
  */
 
-import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { homedir } from "node:os";
+import { join } from "node:path";
 
 /**
  * Base directory for Claude Code projects.
  */
-export const DEFAULT_CLAUDE_PROJECTS_DIR = join(homedir(), '.claude', 'projects');
+export const DEFAULT_CLAUDE_PROJECTS_DIR = join(
+	homedir(),
+	".claude",
+	"projects",
+);
 
 /**
  * Gets the project path for a Shipyard plan.
@@ -19,10 +23,12 @@ export const DEFAULT_CLAUDE_PROJECTS_DIR = join(homedir(), '.claude', 'projects'
  * @returns Project directory path
  */
 export function getProjectPath(planId?: string, baseDir?: string): string {
-  const safePlanId = planId?.replace(/[^a-zA-Z0-9_-]/g, '') || '';
-  const projectName = safePlanId ? `shipyard-${safePlanId.slice(0, 8)}` : 'shipyard';
-  const projectsDir = baseDir || DEFAULT_CLAUDE_PROJECTS_DIR;
-  return join(projectsDir, projectName);
+	const safePlanId = planId?.replace(/[^a-zA-Z0-9_-]/g, "") || "";
+	const projectName = safePlanId
+		? `shipyard-${safePlanId.slice(0, 8)}`
+		: "shipyard";
+	const projectsDir = baseDir || DEFAULT_CLAUDE_PROJECTS_DIR;
+	return join(projectsDir, projectName);
 }
 
 /**
@@ -32,7 +38,10 @@ export function getProjectPath(planId?: string, baseDir?: string): string {
  * @param sessionId - Claude Code session ID
  * @returns Full path to the .jsonl session file
  */
-export function getSessionTranscriptPath(projectPath: string, sessionId: string): string {
-  const safeSessionId = sessionId.replace(/[^a-zA-Z0-9_-]/g, '');
-  return join(projectPath, `${safeSessionId}.jsonl`);
+export function getSessionTranscriptPath(
+	projectPath: string,
+	sessionId: string,
+): string {
+	const safeSessionId = sessionId.replace(/[^a-zA-Z0-9_-]/g, "");
+	return join(projectPath, `${safeSessionId}.jsonl`);
 }
