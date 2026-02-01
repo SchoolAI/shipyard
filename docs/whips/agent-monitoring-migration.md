@@ -352,27 +352,32 @@ packages/schema/src/y-webrtc-internals.ts    # 112 lines
 |---|----------|--------|----------|
 | 11 | Hook migration | **Resolved** | Hooks share utils with MCP server. Try to start daemon if not running, or connect to existing. |
 | 12 | Session token → JWT | **Resolved** | Complete break. No migration path needed (no users). |
-| 13 | Plan-index doc | **Resolved** | Becomes **Task Index** - global normalized view per room. Synced via WebRTC P2P at connection time, NOT through signaling (privacy-by-design). |
+| 13 | Plan-index doc | **Resolved** | Becomes **RoomSchema.taskIndex** - denormalized task metadata per room. Synced via WebRTC P2P at connection time, NOT through signaling (privacy-by-design). |
+| 16 | Input request location | **Resolved** | Per-task only in TaskDocumentSchema. No global requests. |
 | 14 | GitHub OAuth worker | **Resolved** | Merge into signaling worker (same trust boundary). |
 | 15 | Daemon lock management | **Resolved** | Yes, singleton daemon still required. |
 
-### Key Architecture Clarification: Task Index
+### Key Architecture Clarification: RoomSchema & TaskIndex
 
-The signaling server **never sees private data**. The Task Index works as follows:
+The signaling server **never sees private data**. The RoomSchema works as follows:
 
 ```
-Personal Room (signaling)           Task Index (Loro doc)
-├── Presence only                   ├── Normalized task metadata
-├── Agent registry (ids, status)    ├── Per-task summaries
-├── WebRTC signaling relay          └── Synced P2P at connection
-└── NO task content                     (not through signaling)
+Personal Room (signaling)           RoomSchema (Loro doc)
+├── Presence only                   ├── taskIndex: denormalized metadata
+├── Agent registry (ids, status)    │   └── taskId, title, status, ownerId,
+├── WebRTC signaling relay          │       hasPendingRequests, lastUpdated
+├── NO task content                 └── Synced P2P at connection
+                                        (not through signaling)
 
 Flow:
 1. Browser connects to Personal Room via signaling
 2. Signaling facilitates WebRTC handshake to daemon
-3. Once WebRTC established, Task Index syncs P2P (direct)
-4. Signaling never sees task content or metadata
+3. Once WebRTC established, RoomSchema syncs P2P (direct)
+4. TaskDocuments sync P2P based on visibility permissions
+5. Signaling never sees task content or metadata
 ```
+
+**Note:** Input requests removed from RoomSchema - they live in TaskDocumentSchema only.
 
 ---
 

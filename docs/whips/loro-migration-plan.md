@@ -16,21 +16,22 @@
 
 **Two document types:**
 1. **TaskDocumentSchema** - One per task (meta, content, comments, artifacts, deliverables, events, linkedPRs, inputRequests, changeSnapshots)
-2. **GlobalRoomSchema** - One per room (inputRequests with taskId field)
+2. **RoomSchema** - One per room (taskIndex with denormalized task metadata for dashboard)
 
 **Duplication eliminated via base schemas:**
 - CommentBaseFields (7 fields × 4 variants)
 - EventBaseFields (5 fields × 20 variants)
 - ArtifactBaseFields (5 fields × 2 variants)
-- InputRequestBaseFields (9 fields × 8 variants × 2 schemas)
-- Variant-specific field constants (TextInputFields, ChoiceInputFields, etc.)
-- **Total: ~346 lines of duplication eliminated**
+- InputRequestBaseFields (9 fields × 9 variants)
+- **Total: ~260 lines of duplication eliminated**
 
 **Architecture decisions:**
-- Hybrid inputRequests: Global has `taskId` field, per-task doesn't (implicit from parent doc)
+- Input requests live ONLY in TaskDocumentSchema (no taskId field - implicit from parent doc)
+- RoomSchema has taskIndex with denormalized metadata (taskId, title, status, ownerId, hasPendingRequests, lastUpdated, createdAt)
 - All identity fields (id, title, status) in meta struct (Loro doc constraint - can only contain containers at root)
 - ChangeSnapshots fully typed using Shape.struct() (not JSON-stringified)
 - Discriminated unions everywhere: comments by 'kind', events by 'type', artifacts by 'storage', inputRequests by 'type'
+- Cross-document operations update both TaskDocument and RoomSchema.taskIndex atomically via shared helpers
 
 ### Key Technical Learnings
 
@@ -55,6 +56,24 @@
 - Only add JSDoc for non-obvious info: formats, constraints, relationships
 - Remove all "EXISTS:", "UI:", "If removed:" commentary
 - Result: 910 → 536 lines (41% reduction)
+
+**5. Document isolation via loro-extended visibility**
+- One WebRTC connection per room, multiple docs sync over it
+- `visibility` permission controls which docs sync to which peers
+- Document-level isolation (not sub-document encryption)
+- Same task doc can sync over multiple meshes (Personal Room + Collab Room)
+- No sub-document encryption needed
+
+**6. Cross-document coordination**
+- Operations update BOTH TaskDocument and RoomSchema.taskIndex atomically
+- Shared helper pattern in `@shipyard/loro-schema`
+- Example: `updateTaskStatus(taskDoc, roomDoc, newStatus)` updates both
+- Ensures denormalized taskIndex stays consistent with source of truth
+
+**7. ownerId nullability**
+- Made non-nullable in both TaskDocumentSchema.meta and RoomSchema.taskIndex
+- Tasks always have an owner (set at creation time)
+- Simplifies permission checks
 
 ## Context
 

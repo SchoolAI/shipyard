@@ -79,33 +79,24 @@ TOOL_NAMES = {
 
 ---
 
-### ❌ OPEN: Permission Granularity
+### ✅ RESOLVED: Permission Granularity (2026-02-01)
 
 **Question:** What specific operations need permissions?
 
-**Status:** FULL REDESIGN - Don't assume current code
+**Answer:** JWT scope + loro-extended visibility + operations enforce access
 
-**Current Code Has:**
-```typescript
-// packages/schema/src/plan.ts (current, will be replaced)
-approvalRequired?: boolean;
-approvedUsers?: string[];
-rejectedUsers?: string[];
-```
+**Implementation:**
+- **JWT scope exists** in agent tokens: `{ scope: "task:abc123" }`
+- **loro-extended permissions** control document sync:
+  - `visibility(doc, peer)` - Controls which docs sync to which peers
+  - `mutability(doc, peer)` - Controls who can modify docs
+- **Operations/helpers validate** before allowing writes
+- **Shared permission logic** between all peers (browser, daemon, agents)
 
-**Architecture Doc Proposes:**
-```typescript
-permissions: {
-  roles: {
-    "owner": ["*"],
-    "collaborator": ["plan:read", "plan:write", "events:write"],
-    "viewer": ["plan:read", "events:read"]
-  },
-  grants: {
-    "user-alice": "collaborator"
-  }
-}
-```
+**No fine-grained permissions in CRDT for v1:**
+- Full access if you have access to the doc
+- Document-level isolation via visibility is sufficient
+- Operations ensure only valid transitions
 
 **Action Required:**
 - Design full permission model from scratch
@@ -506,6 +497,64 @@ awareness.setLocalStateField('planStatus', {
 - Agent type registry (start simple, iterate)
 - Multi-machine coordination (not needed for v1)
 - Archival strategy (LevelDB sufficient for now)
+
+---
+
+### ✅ RESOLVED: Document Isolation (2026-02-01)
+
+**Question:** How to prevent unauthorized access to task data in P2P meshes?
+
+**Answer:** loro-extended `visibility` permission at document level
+
+**Implementation:**
+- One WebRTC connection per room (Personal or Collab)
+- Multiple docs sync over that connection
+- `visibility(doc, peer)` controls which docs sync to which peers
+- No sub-document encryption needed
+- Same task doc can sync over multiple meshes (Personal Room + Collab Room)
+
+**Security model:**
+- Joining mesh ≠ access to all docs
+- Docs only announced to authorized peers
+- Once synced, can't retroactively revoke (P2P limitation)
+- Compromise of healthy peer = that peer's data leaked (unavoidable)
+
+---
+
+### ✅ RESOLVED: Input Request Location (2026-02-01)
+
+**Question:** Where do input requests live - global room or per-task?
+
+**Answer:** Per-task ONLY in TaskDocumentSchema
+
+**Rationale:**
+- Input requests are part of task collaboration
+- All peers with task access should see and can answer requests
+- No `taskId` field needed (implicit from parent doc)
+- Assumption: Tasks are created in UI first (no "general" requests)
+- Simplifies schema, removes duplication
+
+**Removed:**
+- GlobalRoomSchema.inputRequests (deleted)
+- taskId field from TaskDocumentSchema.inputRequests
+
+---
+
+### ✅ RESOLVED: ownerId Nullability (2026-02-01)
+
+**Question:** Can ownerId be null?
+
+**Answer:** No - ownerId is non-nullable everywhere
+
+**Changes:**
+- TaskDocumentSchema.meta.ownerId: `Shape.plain.string()` (removed `.nullable()`)
+- RoomSchema.taskIndex.ownerId: `Shape.plain.string()` (non-nullable)
+
+**Rationale:**
+- Every task has an owner (created by user or agent on user's behalf)
+- Set at creation time
+- Simplifies permission checks
+- Clearer ownership model
 
 ---
 

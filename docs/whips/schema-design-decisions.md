@@ -16,8 +16,11 @@
 | **PR vs local comments** | Keep separate | Different temporal models and validation |
 | **Change snapshots** | Keep | Enables collaborative review on uncommitted code |
 | **Presence audit trail** | Optional | Written but never read - decide if needed |
-| **Global requests** | Extend plan-index doc | Already exists, add AGENTS key |
+| **Global requests** | REMOVED | Tasks created in UI first, no general requests needed |
 | **Validators** | Zod at boundaries | Shape = structure, Zod = validation |
+| **Task index** | RoomSchema.taskIndex | Denormalized for dashboard, cross-doc helpers maintain consistency |
+| **ownerId nullability** | Non-nullable | Tasks always have an owner |
+| **Document isolation** | loro-extended visibility | Document-level permissions, one connection per room |
 
 ---
 
@@ -203,43 +206,100 @@ changeSnapshots: Shape.record(Shape.plain.string())  // machineId → snapshot
 
 ## 8. Global Agent Requests
 
-### Solution: Extend plan-index Doc
+### Status: SUPERSEDED (2026-02-01)
 
-**Current:** plan-index already stores:
-- Plans registry
-- Input requests (cross-plan)
-- ViewedBy state
+**Previous decision:** Extend plan-index doc with global input requests
 
-**Add:**
-```typescript
-// In plan-index doc
-agents: Shape.record(
-  Shape.struct({
-    machineId: Shape.plain.string(),
-    machineName: Shape.plain.string(),
-    ownerId: Shape.plain.string(),
-    sessionId: Shape.plain.string(),
-    connectedAt: Shape.plain.number(),
-    lastSeenAt: Shape.plain.number(),
-    activePlans: Shape.list(Shape.plain.string()),  // planIds
-  })
-)
-```
+**New decision:** Input requests live ONLY in TaskDocumentSchema
+- Assumption: Tasks are always created in UI first (not by agents)
+- No "general" input requests without a task context
+- Collaborative: all peers with task access see and can answer requests
+- Simplifies the data model significantly
 
-**Why plan-index:**
-- Already exists and syncs globally
-- Browser already connects to it
-- Consistent with input requests pattern
-- No signaling server coupling
-
-**Don't use signaling server:**
-- Ephemeral state only
-- Not designed for data storage
-- Cloudflare DO memory limits
+**Why this works:**
+- Same task doc syncs over multiple meshes (Personal Room + Collab Room)
+- Input requests are part of task collaboration
+- Dashboard aggregates from taskIndex.hasPendingRequests (denormalized flag)
 
 ---
 
-## 9. Validators & Branded Types
+## 9. RoomSchema & TaskIndex
+
+### Decision: Denormalized Index for Dashboard
+
+**RoomSchema** (renamed from GlobalRoomSchema):
+```typescript
+RoomSchema = Shape.doc({
+  taskIndex: Shape.list(
+    Shape.plain.struct({
+      taskId: Shape.plain.string(),
+      title: Shape.plain.string(),
+      status: Shape.plain.string('draft', 'pending_review', ...),
+      ownerId: Shape.plain.string(),  // Non-nullable
+      hasPendingRequests: Shape.plain.boolean(),
+      lastUpdated: Shape.plain.number(),
+      createdAt: Shape.plain.number(),
+    })
+  )
+})
+```
+
+**Removed from GlobalRoomSchema:**
+- `inputRequests` - now only in TaskDocumentSchema
+- `repo` field in taskIndex - not needed for dashboard
+
+**Why denormalized index:**
+- Dashboard needs quick access to task metadata without loading full TaskDocuments
+- Avoids expensive queries when listing 50+ tasks
+- Cross-document helpers ensure consistency between source and index
+- RoomSchema is always synced (lightweight), TaskDocuments loaded on-demand
+
+**Consistency strategy:**
+- Shared helpers update both TaskDocument.meta and RoomSchema.taskIndex
+- Example: `updateTaskStatus(taskDoc, roomDoc, status)` updates both atomically
+- Any peer can call helpers (browser, daemon, agents)
+
+---
+
+## 10. Cross-Document Coordination
+
+### Pattern: Shared Helpers
+
+Operations that affect both TaskDocument and RoomSchema use shared helpers in `@shipyard/loro-schema`:
+
+```typescript
+export function updateTaskStatus(
+  taskDoc: MutableTaskDocument,
+  roomDoc: MutableRoom,
+  newStatus: TaskStatus
+): void {
+  // Update source of truth
+  taskDoc.meta.status = newStatus
+  taskDoc.meta.updatedAt = Date.now()
+
+  // Update denormalized index
+  const entry = roomDoc.taskIndex.find(t => t.taskId === taskDoc.meta.id)
+  if (entry) {
+    entry.status = newStatus
+    entry.lastUpdated = Date.now()
+  }
+}
+```
+
+**Why helpers over events:**
+- Synchronous, atomic updates
+- Type-safe at compile time
+- No event ordering concerns
+- Shared between all peers (consistent behavior)
+
+**Document isolation:**
+- One WebRTC connection per room, multiple docs sync over it
+- loro-extended's `visibility` permission controls which docs sync to which peers
+- No sub-document encryption needed - document-level isolation is sufficient
+
+---
+
+## 11. Validators & Branded Types
 
 ### Pattern: Shape + Zod + Branded Types
 
@@ -289,30 +349,28 @@ function getTaskMeta(doc): TaskMeta {
 
 Based on all research findings:
 
-### Immediate Changes to spikes/loro-schema/src/shapes.ts
+### Implementation Status (Updated 2026-02-01)
 
-- [ ] Add literal types: `status: Shape.plain.string('draft', 'pending_review', ...)`
-- [ ] Add literal types: `type: Shape.plain.string('html', 'image', 'video')`
-- [ ] Add literal types: All enum-like fields
-- [ ] Keep flat metadata structure (don't nest GitHub/archive/session)
-- [ ] Keep separate prReviewComments and localDiffComments
-- [ ] Keep changeSnapshots (machineId → snapshot)
-- [ ] Decide: Keep or remove presence audit trail
-- [ ] Document that snapshots are for URLs, not time-travel
-- [ ] Add comments field designs (cursor API vs blockId)
+**Completed:**
+- [x] Add literal types: `status: Shape.plain.string('draft', 'pending_review', ...)`
+- [x] Add literal types: `type: Shape.plain.string('html', 'image', 'video')`
+- [x] Add literal types: All enum-like fields
+- [x] Keep flat metadata structure (don't nest GitHub/archive/session)
+- [x] Keep separate pr/local/inline/overall comments (discriminated union by 'kind')
+- [x] Keep changeSnapshots (machineId → snapshot)
+- [x] Create validators.ts with Zod schemas
+- [x] Create types.ts with branded types
+- [x] Rename GlobalRoomSchema → RoomSchema
+- [x] Add taskIndex to RoomSchema
+- [x] Remove inputRequests from RoomSchema
+- [x] Make ownerId non-nullable
+- [x] Inline input request field constants
 
-### Additional Files Needed
-
-- [ ] Create validators.ts with Zod schemas
-- [ ] Create types.ts with branded types
-- [ ] Define global agent schema for plan-index extension
-- [ ] Document permission model (still open)
-
-### Week 1 Blockers Remaining
-
-- [ ] Design permissions model (full design from scratch)
-- [ ] Spike comment anchoring (Loro cursor API with Tiptap)
-- [ ] Spike content structure (verify loro-prosemirror expects Shape.any())
+**Remaining:**
+- [ ] Build TaskDocument class with cross-doc helpers
+- [ ] Build RoomDocument class
+- [ ] Implement loro-extended visibility permissions
+- [ ] Wire JWT scope to permission checks
 
 ---
 
