@@ -188,16 +188,21 @@ export function setPlanMetadata(ydoc: Y.Doc, updates: Partial<PlanMetadata>) {
 - Chrome: 2M characters ✅
 - Firefox: 65K characters ✅
 - Safari: 80K characters ✅
-- Edge: 2K characters?? ⚠️ (verifying)
+- Edge: **32K characters** ✅ (Chromium-based, 2K is legacy IE limit)
 - Opera: 190K characters ✅
+
+**Edge Research Finding:**
+- Official Microsoft docs: 2,083 chars (legacy IE limit)
+- Actual Chromium limit: 32,779 chars (SISTRIX testing)
+- Edge is Chromium-based since 2019 → uses Chromium limits
+- **32KB plans WILL work in Edge**
 
 **Decision:**
 - All data encoded in `?d=` parameter
 - lz-string compression (~40-60% reduction)
-- Typical plan: ~10-20KB compressed (well under limits)
+- Typical plan: ~10-20KB compressed (well under all limits)
 - No server storage (free hosting on GitHub Pages)
-
-**Edge Support:** TBD - researching actual limit (Edge is Chromium-based, should match Chrome)
+- Document Edge as "best effort" (not officially supported by MS docs)
 
 ---
 
@@ -524,9 +529,9 @@ Before starting implementation, resolve critical questions:
    - Validate sync works (multi-tab editing)
    - **Prove the editor stack works before committing**
 
-3. **Edge URL Limit Research**
-   - Verify 2K vs 2M character limit
-   - Test actual behavior (not just specs)
-   - Decide: Support Edge or document as unsupported
+3. ✅ **Edge URL Limit Research** - RESOLVED
+   - Chromium-based Edge supports 32K+ URLs
+   - 2K limit is legacy IE (not relevant)
+   - 32KB plans will work in Edge
 
 **These 3 items are blockers for proceeding.** Don't start implementation until validated.
