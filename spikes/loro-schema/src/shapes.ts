@@ -66,6 +66,56 @@ const InputRequestBaseFields = {
   isBlocker: Shape.plain.boolean().nullable(),
 } as const;
 
+/**
+ * Variant-specific fields for each input request type.
+ * Extracted to avoid duplication between global and per-task schemas.
+ */
+const TextInputFields = {
+  defaultValue: Shape.plain.string().nullable(),
+  placeholder: Shape.plain.string().nullable(),
+} as const;
+
+const MultilineInputFields = {
+  defaultValue: Shape.plain.string().nullable(),
+  placeholder: Shape.plain.string().nullable(),
+} as const;
+
+const ChoiceInputFields = {
+  options: Shape.plain.any(), // Array<{ label: string, value: string, description?: string }>
+  multiSelect: Shape.plain.boolean().nullable(),
+  displayAs: Shape.plain.string('radio', 'checkbox', 'dropdown').nullable(),
+  placeholder: Shape.plain.string().nullable(),
+} as const;
+
+const NumberInputFields = {
+  min: Shape.plain.number().nullable(),
+  max: Shape.plain.number().nullable(),
+  format: Shape.plain.string('integer', 'decimal', 'currency', 'percentage').nullable(),
+  defaultValue: Shape.plain.number().nullable(),
+} as const;
+
+const EmailInputFields = {
+  domain: Shape.plain.string().nullable(),
+  placeholder: Shape.plain.string().nullable(),
+} as const;
+
+const DateInputFields = {
+  min: Shape.plain.number().nullable(), // Unix timestamp
+  max: Shape.plain.number().nullable(), // Unix timestamp
+} as const;
+
+const RatingInputFields = {
+  min: Shape.plain.number().nullable(),
+  max: Shape.plain.number().nullable(),
+  ratingStyle: Shape.plain.string('stars', 'numbers', 'emoji').nullable(),
+  ratingLabels: Shape.plain.any(), // { low?: string, high?: string }
+} as const;
+
+const MultiInputFields = {
+  questions: Shape.plain.any(), // Array of nested question definitions
+  responses: Shape.plain.any(), // Record<questionId, answer>
+} as const;
+
 // ============================================================================
 // TASK DOCUMENT SCHEMA
 // ============================================================================
@@ -623,30 +673,21 @@ export const TaskDocumentSchema: DocShape = Shape.doc({
       text: Shape.plain.struct({
         type: Shape.plain.string('text'),
         ...InputRequestBaseFields,
-        // Text-specific
-        defaultValue: Shape.plain.string().nullable(),
-        placeholder: Shape.plain.string().nullable(),
+        ...TextInputFields,
       }),
 
       // Multi-line text input (textarea)
       multiline: Shape.plain.struct({
         type: Shape.plain.string('multiline'),
         ...InputRequestBaseFields,
-        // Multiline-specific
-        defaultValue: Shape.plain.string().nullable(),
-        placeholder: Shape.plain.string().nullable(),
+        ...MultilineInputFields,
       }),
 
       // Choice selection (radio/checkbox/dropdown)
       choice: Shape.plain.struct({
         type: Shape.plain.string('choice'),
         ...InputRequestBaseFields,
-        // Choice-specific (REQUIRED)
-        options: Shape.plain.any(), // Array<{ label: string, value: string, description?: string }>
-        // Choice-specific (optional)
-        multiSelect: Shape.plain.boolean().nullable(),
-        displayAs: Shape.plain.string('radio', 'checkbox', 'dropdown').nullable(),
-        placeholder: Shape.plain.string().nullable(),
+        ...ChoiceInputFields,
       }),
 
       // Yes/No confirmation
@@ -659,50 +700,35 @@ export const TaskDocumentSchema: DocShape = Shape.doc({
       number: Shape.plain.struct({
         type: Shape.plain.string('number'),
         ...InputRequestBaseFields,
-        // Number-specific
-        min: Shape.plain.number().nullable(),
-        max: Shape.plain.number().nullable(),
-        format: Shape.plain.string('integer', 'decimal', 'currency', 'percentage').nullable(),
-        defaultValue: Shape.plain.number().nullable(),
+        ...NumberInputFields,
       }),
 
       // Email input
       email: Shape.plain.struct({
         type: Shape.plain.string('email'),
         ...InputRequestBaseFields,
-        // Email-specific
-        domain: Shape.plain.string().nullable(),
-        placeholder: Shape.plain.string().nullable(),
+        ...EmailInputFields,
       }),
 
       // Date picker
       date: Shape.plain.struct({
         type: Shape.plain.string('date'),
         ...InputRequestBaseFields,
-        // Date-specific
-        min: Shape.plain.number().nullable(), // Unix timestamp
-        max: Shape.plain.number().nullable(), // Unix timestamp
+        ...DateInputFields,
       }),
 
       // Rating input (1-5 stars, etc.)
       rating: Shape.plain.struct({
         type: Shape.plain.string('rating'),
         ...InputRequestBaseFields,
-        // Rating-specific
-        min: Shape.plain.number().nullable(),
-        max: Shape.plain.number().nullable(),
-        ratingStyle: Shape.plain.string('stars', 'numbers', 'emoji').nullable(),
-        ratingLabels: Shape.plain.any(), // { low?: string, high?: string }
+        ...RatingInputFields,
       }),
 
       // Multi-question form
       multi: Shape.plain.struct({
         type: Shape.plain.string('multi'),
         ...InputRequestBaseFields,
-        // Multi-specific (REQUIRED)
-        questions: Shape.plain.any(), // Array of nested question definitions
-        // Multi-specific (optional)
-        responses: Shape.plain.any(), // Record<questionId, answer>
+        ...MultiInputFields,
       }),
     })
   ),
@@ -761,9 +787,7 @@ export const GlobalRoomSchema: DocShape = Shape.doc({
         type: Shape.plain.string('text'),
         ...InputRequestBaseFields,
         taskId: Shape.plain.string().nullable(),
-        // Text-specific
-        defaultValue: Shape.plain.string().nullable(),
-        placeholder: Shape.plain.string().nullable(),
+        ...TextInputFields,
       }),
 
       // Multi-line text input (textarea)
@@ -771,9 +795,7 @@ export const GlobalRoomSchema: DocShape = Shape.doc({
         type: Shape.plain.string('multiline'),
         ...InputRequestBaseFields,
         taskId: Shape.plain.string().nullable(),
-        // Multiline-specific
-        defaultValue: Shape.plain.string().nullable(),
-        placeholder: Shape.plain.string().nullable(),
+        ...MultilineInputFields,
       }),
 
       // Choice selection (radio/checkbox/dropdown)
@@ -781,12 +803,7 @@ export const GlobalRoomSchema: DocShape = Shape.doc({
         type: Shape.plain.string('choice'),
         ...InputRequestBaseFields,
         taskId: Shape.plain.string().nullable(),
-        // Choice-specific (REQUIRED)
-        options: Shape.plain.any(), // Array<{ label: string, value: string, description?: string }>
-        // Choice-specific (optional)
-        multiSelect: Shape.plain.boolean().nullable(),
-        displayAs: Shape.plain.string('radio', 'checkbox', 'dropdown').nullable(),
-        placeholder: Shape.plain.string().nullable(),
+        ...ChoiceInputFields,
       }),
 
       // Yes/No confirmation
@@ -801,11 +818,7 @@ export const GlobalRoomSchema: DocShape = Shape.doc({
         type: Shape.plain.string('number'),
         ...InputRequestBaseFields,
         taskId: Shape.plain.string().nullable(),
-        // Number-specific
-        min: Shape.plain.number().nullable(),
-        max: Shape.plain.number().nullable(),
-        format: Shape.plain.string('integer', 'decimal', 'currency', 'percentage').nullable(),
-        defaultValue: Shape.plain.number().nullable(),
+        ...NumberInputFields,
       }),
 
       // Email input
@@ -813,9 +826,7 @@ export const GlobalRoomSchema: DocShape = Shape.doc({
         type: Shape.plain.string('email'),
         ...InputRequestBaseFields,
         taskId: Shape.plain.string().nullable(),
-        // Email-specific
-        domain: Shape.plain.string().nullable(),
-        placeholder: Shape.plain.string().nullable(),
+        ...EmailInputFields,
       }),
 
       // Date picker
@@ -823,9 +834,7 @@ export const GlobalRoomSchema: DocShape = Shape.doc({
         type: Shape.plain.string('date'),
         ...InputRequestBaseFields,
         taskId: Shape.plain.string().nullable(),
-        // Date-specific
-        min: Shape.plain.number().nullable(), // Unix timestamp
-        max: Shape.plain.number().nullable(), // Unix timestamp
+        ...DateInputFields,
       }),
 
       // Rating input (1-5 stars, etc.)
@@ -833,11 +842,7 @@ export const GlobalRoomSchema: DocShape = Shape.doc({
         type: Shape.plain.string('rating'),
         ...InputRequestBaseFields,
         taskId: Shape.plain.string().nullable(),
-        // Rating-specific
-        min: Shape.plain.number().nullable(),
-        max: Shape.plain.number().nullable(),
-        ratingStyle: Shape.plain.string('stars', 'numbers', 'emoji').nullable(),
-        ratingLabels: Shape.plain.any(), // { low?: string, high?: string }
+        ...RatingInputFields,
       }),
 
       // Multi-question form
@@ -845,10 +850,7 @@ export const GlobalRoomSchema: DocShape = Shape.doc({
         type: Shape.plain.string('multi'),
         ...InputRequestBaseFields,
         taskId: Shape.plain.string().nullable(),
-        // Multi-specific (REQUIRED)
-        questions: Shape.plain.any(), // Array of nested question definitions
-        // Multi-specific (optional)
-        responses: Shape.plain.any(), // Record<questionId, answer>
+        ...MultiInputFields,
       }),
     })
   ),
