@@ -59,7 +59,7 @@
   },
   "packageManager": "pnpm@10.9.0",
   "simple-git-hooks": {
-    "pre-commit": "pnpm check"
+    "pre-commit": "bash scripts/check-file-allowlist.sh && pnpm check"
   },
   "dependencies": {
     "nanoid": "^5.1.6"
