@@ -163,7 +163,7 @@ mcpServers:
 
 </details>
 
-**[Full installation guide with troubleshooting →](./docs/INSTALLATION.md)**
+**[Full installation guide with troubleshooting →](./docs/installation.md)**
 
 ## Platform Support
 
@@ -173,7 +173,7 @@ mcpServers:
 | **Codex, VS Code, Cursor, Windsurf** | MCP tools — manual workflow, full functionality |
 | **Other MCP clients** | Basic — depends on platform capabilities |
 
-**[See detailed compatibility matrix →](./docs/INSTALLATION.md#feature-comparison)**
+**[See detailed compatibility matrix →](./docs/installation.md#feature-comparison)**
 
 <details>
 <summary><strong>Using Shipyard skills on other platforms</strong></summary>
@@ -247,8 +247,8 @@ Works completely locally. Add GitHub only if you need remote reviewers to access
 
 | Doc | Description |
 |-----|-------------|
-| **[Installation](./docs/INSTALLATION.md)** | Platform-specific setup guides |
-| **[Setup](./docs/SETUP.md)** | Development setup, troubleshooting |
+| **[Installation](./docs/installation.md)** | Platform-specific setup guides |
+| **[Setup](./docs/development.md)** | Development setup, troubleshooting |
 | **[Architecture](./docs/architecture.md)** | Data model, sync topology, tech choices |
 | **[Brief](./docs/BRIEF.md)** | 30-second project context |
 

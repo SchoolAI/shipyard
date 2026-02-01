@@ -1,10 +1,12 @@
 # Release Process
 
-How to publish new versions of Shipyard to npm.
+How to publish and test Shipyard releases.
 
 ---
 
-## Release Flow
+## Part 1: Publishing Releases
+
+### Release Flow
 
 ```
                             ┌─────────────────────────────────────┐
@@ -42,7 +44,7 @@ How to publish new versions of Shipyard to npm.
               │                   │                 │                   │
               │                   ▼                 ▼                   │
               │         ┌─────────────┐    ┌─────────────┐             │
-              │         │  PASSED ✓   │    │  FAILED ✗   │             │
+              │         │  PASSED     │    │  FAILED     │             │
               │         └──────┬──────┘    └──────┬──────┘             │
               │                │                  │                     │
               │                ▼                  └─────────────────────┘
@@ -75,26 +77,7 @@ How to publish new versions of Shipyard to npm.
   └───────────────────────────────────────┘
 ```
 
-### The Two Paths
-
-**Standard Release Path (Recommended):**
-
-```
-Development → RC → Test → Promote → Stable
-```
-
-**Bleeding Edge Path (Optional):**
-
-```
-Development → Nightly (auto) → [well tested over time] → Promote → Stable
-```
-
-The nightlies are for continuous integration / early adopters who want the latest.
-The RC is explicitly "we're ready to release, final validation before going stable."
-
----
-
-## Quick Summary
+### Quick Summary
 
 | Path | Trigger | Version Example | npm Tag | Use Case |
 |------|---------|-----------------|---------|----------|
@@ -105,99 +88,32 @@ The RC is explicitly "we're ready to release, final validation before going stab
 
 **All publishing uses OIDC trusted publishing** - no tokens to manage!
 
----
+### Triggering Releases
 
-## Nightly Builds (Automatic)
-
-**Every night at 2:15 AM UTC, if there are changes:**
-
-```
-Schedule triggers → check for changes → 0.3.2-nightly.20260125 published to @next
-```
-
-**Version scheme:** `{base}-nightly.{YYYYMMDD}`
-- Clear date stamp shows when it was built
-- Skipped if no commits since last nightly/rc
-
-**Install nightly:**
-```bash
-npm install @schoolai/shipyard-mcp@next
-# or
-npx -y -p @schoolai/shipyard-mcp@next mcp-server-shipyard
-```
-
----
-
-## Release Candidates (Manual)
-
-When you want to mark a build as ready for testing before a stable release:
-
+**Via GitHub Actions UI:**
 1. Go to: https://github.com/SchoolAI/shipyard/actions/workflows/publish-npm.yml
 2. Click **"Run workflow"**
-3. Select **"rc"** from the dropdown
+3. Select action type (nightly, rc, or promote)
 4. Click **"Run workflow"**
 
-**Version scheme:** `{base}-rc.{YYYYMMDD}`
+**Via CLI:**
+```bash
+# Trigger nightly build
+gh workflow run publish-npm.yml -f action=nightly
 
-This signals "we think this is ready for stable, please test it."
+# Trigger RC release
+gh workflow run publish-npm.yml -f action=rc
 
----
-
-## Publishing a Stable Release
-
-When you're ready to make a version the default for users:
-
-### Using the Promote Action (Recommended)
-
-1. Go to: https://github.com/SchoolAI/shipyard/actions/workflows/publish-npm.yml
-2. Click **"Run workflow"**
-3. Select **"promote"** from the dropdown
-4. Fill in:
-   - **rc_version:** The version to promote (e.g., `0.3.2-rc.20260125` or `0.3.2-nightly.20260125`)
-   - **stable_version:** The stable version (e.g., `0.4.0`)
-5. Click **"Run workflow"**
-
-**What happens:**
-- Downloads the specified pre-release from npm
-- Re-publishes it as the stable version with `@latest` tag
-- Updates `package-npm.json` with the new version
-- Creates a git tag and GitHub release
-
----
-
-## Workflow Architecture
-
-**Single workflow handles everything:** `.github/workflows/publish-npm.yml`
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    publish-npm.yml                          │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  Triggers:                                                  │
-│  ├── schedule (2:15 AM UTC)  → Nightly build (@next)        │
-│  └── workflow_dispatch:                                     │
-│      ├── nightly             → Manual nightly (@next)       │
-│      ├── rc                  → Release candidate (@next)    │
-│      └── promote             → Stable release (@latest)     │
-│                                                             │
-│  Change Detection:                                          │
-│  └── Scheduled builds only run if changes since last tag    │
-│                                                             │
-│  Authentication: OIDC Trusted Publishing (no tokens!)       │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
+# Promote RC to stable
+gh workflow run publish-npm.yml \
+  -f action=promote \
+  -f rc_version=0.4.1-rc.20260128 \
+  -f stable_version=0.4.2
 ```
 
-**Why one workflow?** npm's OIDC trusted publishing only allows one workflow per package. Consolidating ensures all publishes use secure OIDC auth.
+### Version Management
 
----
-
-## Version Management
-
-### package-npm.json
-
-This file controls the base version for builds:
+The `package-npm.json` file controls the base version:
 
 ```json
 {
@@ -205,106 +121,182 @@ This file controls the base version for builds:
 }
 ```
 
-**Nightly/RC versions:** `{version}-nightly.{YYYYMMDD}` or `{version}-rc.{YYYYMMDD}`
-- If version is `0.3.2` → builds are `0.3.2-nightly.20260125`, `0.3.2-rc.20260125`, etc.
-
-**When to update:**
-- When releasing a new stable version (via promote action)
-- When starting a new version series (e.g., `0.3.0` → `0.4.0`)
-
-### npm Dist Tags
+**npm Dist Tags:**
 
 | Tag | What it means | Install command |
 |-----|---------------|-----------------|
 | `latest` | Stable release | `npm install @schoolai/shipyard-mcp` |
 | `next` | Nightly/RC/prerelease | `npm install @schoolai/shipyard-mcp@next` |
 
----
-
-## Example: Full Release Cycle
+### Rollback
 
 ```bash
-# Week 1-2: Develop features, merge PRs to main
-# Nightly builds auto-publish: 0.3.2-nightly.20260120, 0.3.2-nightly.20260121, etc.
-
-# Ready to test for release:
-# Trigger RC manually via GitHub Actions
-# → 0.3.2-rc.20260125 published
-
-# Test the RC:
-npm view @schoolai/shipyard-mcp@next version  # 0.3.2-rc.20260125
-npx -y -p @schoolai/shipyard-mcp@next mcp-server-shipyard
-# ✅ Works great!
-
-# Promote to stable via GitHub Actions:
-# action: promote
-# rc_version: 0.3.2-rc.20260125
-# stable_version: 0.4.0
-# → 0.4.0 published to @latest
-
-# Verify:
-npm view @schoolai/shipyard-mcp version  # 0.4.0 ✅
-```
-
----
-
-## Rollback
-
-If a published version has issues:
-
-```bash
-# Deprecate the bad version (shows warning on install)
+# Deprecate a bad version
 npm deprecate @schoolai/shipyard-mcp@0.4.0 "Bug in auth, use 0.4.1"
 
-# Promote an older nightly/RC to a new stable version
-# via GitHub Actions promote action
+# Then promote an older RC to a new stable version
 ```
-
-**Note:** npm only allows unpublishing within 72 hours. After that, deprecate and publish a fix.
 
 ---
 
-## Claude Code Plugin Version
+## Part 2: Testing Releases
 
-The GitHub plugin is separate from npm:
+### Two Testing Modes
 
-| File | Purpose |
-|------|---------|
-| `.claude-plugin/plugin.json` | Plugin metadata and version |
-| `.mcp.json` | MCP server config (points to npm package) |
-| `hooks/hooks.json` | Hook configurations |
-| `skills/` | Skill definitions |
+| Mode | When to Use | What to Skip |
+|------|-------------|--------------|
+| **Post-Deployment** | Version already published to npm | Build steps - go straight to functional testing |
+| **Pre-Publish** | Testing local changes before publishing | Nothing - full build verification needed |
 
-**Recommendation:** Keep plugin version in sync with npm for clarity.
+### Pre-Publish Quick Reference
+
+```bash
+# Build and test locally
+pnpm install && pnpm build && pnpm check
+
+# Start all services
+pnpm cleanup && pnpm dev:all
+
+# Run full test suite
+pnpm test
+```
+
+### Setting Up Claude Code for RC Testing
+
+The Shipyard plugin has two components:
+1. **MCP server** (npm package) - The tools and APIs
+2. **Hooks + Skills** (GitHub plugin) - Plan mode behavior, skills
+
+**Step 1: Update plugin for latest hooks/skills**
+```bash
+/plugin update shipyard@schoolai-shipyard
+```
+
+**Step 2: Override MCP to use RC version**
+
+Create `.mcp.json` in your project root:
+```json
+{
+  "mcpServers": {
+    "shipyard": {
+      "command": "npx",
+      "args": ["-y", "-p", "@schoolai/shipyard-mcp@next", "mcp-server-shipyard"],
+      "env": {
+        "NODE_ENV": "production"
+      }
+    }
+  }
+}
+```
+
+**Step 3: Reload and verify**
+```bash
+/mcp reload
+npm view @schoolai/shipyard-mcp@next version  # Should show RC version
+```
+
+**Step 4: After testing - Revert `.mcp.json`**
+
+Restore to local development configuration to avoid using npm package instead of local build.
+
+### Test Categories
+
+#### Core Functionality
+| Test | Pass Criteria |
+|------|---------------|
+| Create plan | Browser opens with plan visible |
+| Plan content | Title, content, checkboxes render |
+| Plan sync | Changes appear in Claude `read_plan` |
+| Deliverables | `{#deliverable}` markers extracted and listed |
+
+#### Input System (8 types)
+| Type | Expected Behavior |
+|------|-------------------|
+| text | Single-line text input |
+| multiline | Multi-line textarea |
+| choice | Radio buttons with "Other" escape hatch |
+| confirm | Yes/No buttons |
+| number | Numeric input with validation |
+| email | Email validation |
+| date | Date picker |
+| rating | Stars (<=5) or numbers (>5) |
+
+#### Platform Hooks (Claude Code)
+| Test | Pass Criteria |
+|------|---------------|
+| AskUserQuestion Rejection | Hook blocks it, suggests `requestUserInput()` |
+| Plan Mode Entry | Browser opens with new task |
+| Plan Mode Approval | Hook blocks until human approves |
+| Session Context | taskId/sessionToken injected after approval |
+
+#### Artifacts & Deliverables
+| Test | Pass Criteria |
+|------|---------------|
+| Image artifact | Uploads, appears in task UI |
+| HTML artifact | Renders in artifact viewer |
+| Video artifact | Playable in artifact viewer |
+| Auto-complete | Returns `snapshotUrl` when all deliverables fulfilled |
+
+### Bug Fix Workflow
+
+When bugs are found during RC testing:
+
+1. **Document the bug**
+2. **Fix and verify locally**
+3. **Run tests:** `pnpm check`
+4. **Commit with clear message**
+
+### Testing Checklist Template
+
+```markdown
+## RC Testing: vX.Y.Z-rc.NNN
+
+### Build Verification
+- [ ] `pnpm install` - Dependencies install
+- [ ] `pnpm build` - All packages build
+- [ ] `pnpm check` - All checks pass
+
+### Core Features
+- [ ] Create plan via MCP
+- [ ] Plan renders in browser
+- [ ] Real-time sync works
+- [ ] Deliverables extract correctly
+
+### Input System
+- [ ] text, multiline, choice, confirm
+- [ ] number, email, date, rating
+- [ ] Multi-question form
+
+### Workflows
+- [ ] Share link works
+- [ ] Plan mode hooks
+- [ ] Sign-in/sign-out flow
+
+### Ready to Promote?
+- [ ] All tests pass
+- [ ] Manual testing complete
+- [ ] No blocking issues found
+```
 
 ---
 
 ## Troubleshooting
 
 ### "OIDC authentication failed"
-
-The workflow must be registered as a trusted publisher on npm:
-1. Go to: https://www.npmjs.com/package/@schoolai/shipyard-mcp/access
-2. Verify `publish-npm.yml` is listed under "Trusted Publishers"
+Verify `publish-npm.yml` is listed under "Trusted Publishers" at:
+https://www.npmjs.com/package/@schoolai/shipyard-mcp/access
 
 ### "Version already exists"
-
-npm doesn't allow republishing the same version:
-- If same day: Wait until tomorrow (version includes date)
-- Or manually bump the base version in `package-npm.json`
+npm doesn't allow republishing. Wait until tomorrow (version includes date) or bump the base version.
 
 ### Nightly didn't run
+Check workflow logs for "No changes since..." - it skips if no commits since last tag.
 
-Check:
-- Are there changes since the last nightly/rc tag?
-- Check the workflow run logs for "No changes since..." message
-
-### Workflow not triggering
-
-Check the trigger conditions:
-- **Schedule:** Runs at 2:15 AM UTC daily (only if changes)
-- **Manual:** Use "Run workflow" button in GitHub Actions
+### RC not loading in Claude Code
+1. Verify `.mcp.json` points to `@next`
+2. Run `/mcp reload`
+3. Check: `npm view @schoolai/shipyard-mcp@next version`
 
 ---
 
-*Last updated: 2026-01-25*
+*Last updated: 2026-01-31*

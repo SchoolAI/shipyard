@@ -92,6 +92,7 @@
     }
   },
   "overrides": [
+    // TODO: Add kebab-case file naming enforcement for apps/**/*.ts and packages/**/*.ts during migration
     {
       "includes": ["**/*.test.ts", "**/*.spec.ts"],
       "linter": {

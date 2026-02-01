@@ -1,5 +1,7 @@
 # Shipyard Architecture
 
+> **TODO:** This document is stale (last updated 2026-01-02) and needs a comprehensive refresh to reflect current implementation. Key areas to update: network topology, technology versions, URL encoding format, and remove outdated references.
+
 This document captures the current architecture based on research and spikes conducted on 2026-01-02.
 
 **Key Technology Decisions:** See [decisions/](./decisions/) for the evolution of architectural choices.

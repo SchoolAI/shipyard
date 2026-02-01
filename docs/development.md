@@ -2,7 +2,7 @@
 
 Developer guide for running Shipyard locally and contributing to the codebase.
 
-> **Note:** For end-user installation (Claude Code plugin or npm package), see [INSTALLATION.md](./INSTALLATION.md).
+> **Note:** For end-user installation (Claude Code plugin or npm package), see [installation.md](./installation.md).
 
 ---
 
