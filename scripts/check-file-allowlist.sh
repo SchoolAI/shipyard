@@ -18,7 +18,6 @@ ALLOWED_DOCS=(
   "docs/engineering-standards.md"
   "docs/installation.md"
   "docs/releasing.md"
-  "docs/plugin-development.md"
   "docs/cost-analysis.md"
 
   # Apps

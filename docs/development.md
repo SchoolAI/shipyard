@@ -533,4 +533,93 @@ The `dev:all` script will use these values.
 
 ---
 
-*Last updated: 2026-01-26*
+## Plugin Development
+
+Notes for maintainers working on the Shipyard Claude Code plugin.
+
+### Plugin Structure
+
+```
+.claude-plugin/
+├── plugin.json          # Plugin manifest (MUST declare all components)
+├── mcp.json             # MCP server configuration
+hooks/
+├── hooks.json           # Hook definitions
+apps/hook/
+├── dist/index.js        # Built hook binary (MUST be committed)
+├── src/                 # TypeScript source
+└── tsup.config.ts       # Build configuration
+skills/
+└── shipyard/
+    └── SKILL.md         # Skill instructions
+```
+
+### Common Gotchas
+
+**1. Hooks Must Be Declared in plugin.json**
+
+Claude Code does NOT auto-discover hooks. You must explicitly declare them:
+
+```json
+{
+  "skills": "./skills/",
+  "mcpServers": "./.mcp-plugin.json",
+  "hooks": "./hooks/hooks.json"  // ← REQUIRED or hooks silently ignored
+}
+```
+
+**Symptom:** Hooks exist in `hooks/hooks.json` but never fire.
+
+**2. Built Artifacts Must Be Committed**
+
+Claude Code plugins don't support `postInstall` scripts. This means:
+- `apps/hook/dist/` must be in git (not gitignored)
+- After changing hook source, rebuild AND commit: `pnpm --filter @shipyard/hook build`
+
+**Symptom:** Plugin installs but hooks fail with "Cannot find module".
+
+**3. pino Requires CJS Build Format**
+
+pino uses internal dynamic `require()` calls that break in ESM bundles. Build as CommonJS in `tsup.config.ts`:
+
+```typescript
+export default defineConfig({
+  format: ['cjs'],  // NOT 'esm' - pino breaks
+  outExtension: () => ({ js: '.js' }),
+});
+```
+
+**4. Hook Response Format for PreToolUse Deny**
+
+To block a tool, output this JSON to stdout with exit code 0:
+
+```json
+{
+  "hookSpecificOutput": {
+    "hookEventName": "PreToolUse",
+    "permissionDecision": "deny",
+    "permissionDecisionReason": "Your reason here"
+  }
+}
+```
+
+### Testing Hooks
+
+Test hook directly without Claude Code:
+
+```bash
+echo '{"session_id":"test","hook_event_name":"PreToolUse","tool_name":"AskUserQuestion","permission_mode":"default"}' | node apps/hook/dist/index.js
+```
+
+### Debugging
+
+Hook logs go to `~/.shipyard/hook-debug.log` (or `$SHIPYARD_STATE_DIR/hook-debug.log` in worktrees):
+
+```bash
+tail -f ~/.shipyard/hook-debug.log
+grep "AskUserQuestion\|ExitPlanMode" ~/.shipyard/hook-debug.log
+```
+
+---
+
+*Last updated: 2026-01-31*
