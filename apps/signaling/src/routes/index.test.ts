@@ -1,7 +1,7 @@
 import { env } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
+import { ROUTES } from "../client/routes";
 import { app } from "./index";
-import { ROUTES } from "./routes";
 
 describe("App Configuration", () => {
 	describe("404 handler", () => {

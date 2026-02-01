@@ -1,8 +1,8 @@
 import { env } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
+import { ROUTES } from "../client/routes";
 import type { Env } from "../env";
 import { app } from "./index";
-import { ROUTES } from "./routes";
 
 describe(`GET ${ROUTES.HEALTH}`, () => {
 	it("returns 200 with correct JSON structure", async () => {

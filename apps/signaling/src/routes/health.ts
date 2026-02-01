@@ -1,6 +1,6 @@
 import { Hono } from "hono";
+import { ROUTES } from "../client/routes";
 import type { Env } from "../env";
-import { ROUTES } from "./routes";
 
 /**
  * Health check route.

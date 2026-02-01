@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import { ROUTE_DESCRIPTIONS } from "../client/routes";
 import type { Env } from "../env";
 import { isAllowedOrigin } from "../utils/cors";
 import { createLogger } from "../utils/logger";
@@ -7,7 +8,6 @@ import { errorResponse } from "../utils/route-helpers";
 import { authGitHubRoute } from "./auth-github";
 import { collabCreateRoute } from "./collab-create";
 import { healthRoute } from "./health";
-import { ROUTE_DESCRIPTIONS } from "./routes";
 import { wsCollabRoute } from "./ws-collab";
 import { wsPersonalRoute } from "./ws-personal";
 

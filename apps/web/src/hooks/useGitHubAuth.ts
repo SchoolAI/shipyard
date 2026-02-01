@@ -2,7 +2,6 @@ import type React from "react";
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { z } from "zod";
 import {
-	getGitHubUser,
 	handleCallback,
 	startWebFlow,
 	validateToken,
@@ -166,21 +165,19 @@ async function processOAuthCallback(
 	try {
 		const redirectUri =
 			window.location.origin + (import.meta.env.BASE_URL || "/");
-		const { access_token, scope } = await handleCallback(
-			code,
-			state,
-			redirectUri,
-		);
+		// New signaling server returns Shipyard JWT and user info directly
+		const { token, user } = await handleCallback(code, state, redirectUri);
 
-		const user = await getGitHubUser(access_token);
-
+		// Note: The signaling server issues a Shipyard JWT, not a GitHub access token.
+		// User info comes from the response, not a separate API call.
 		const newIdentity: GitHubIdentity = {
-			token: access_token,
-			username: user.login,
-			displayName: user.name || user.login,
-			avatarUrl: user.avatar_url,
+			token,
+			username: user.username,
+			displayName: user.username, // TODO: Consider adding name to signaling response
+			avatarUrl: undefined, // TODO: Consider adding avatar_url to signaling response
 			createdAt: Date.now(),
-			scope: scope || "",
+			// Note: Shipyard JWTs don't have GitHub scopes. This is now a Shipyard token.
+			scope: "",
 		};
 
 		setStoredIdentity(newIdentity);

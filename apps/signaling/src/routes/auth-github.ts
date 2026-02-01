@@ -6,11 +6,11 @@ import {
 } from "../auth/github";
 import { generateSessionToken } from "../auth/jwt";
 import type { TokenExchangeResponse } from "../auth/types";
+import { ROUTES } from "../client/routes";
 import { AuthGitHubCallbackRequestSchema } from "../client/schemas";
 import type { Env } from "../env";
 import { createLogger } from "../utils/logger";
 import { errorResponse, parseAndValidateBody } from "../utils/route-helpers";
-import { ROUTES } from "./routes";
 
 /**
  * GitHub OAuth callback route.

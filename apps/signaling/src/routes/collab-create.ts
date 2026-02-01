@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { validateToken } from "../auth/jwt";
+import { ROUTES } from "../client/routes";
 import {
 	CollabCreateRequestSchema,
 	type CollabCreateResponse,
@@ -13,7 +14,6 @@ import {
 	invalidTokenResponse,
 	parseAndValidateBody,
 } from "../utils/route-helpers";
-import { ROUTES } from "./routes";
 
 /**
  * Create collaboration room route.

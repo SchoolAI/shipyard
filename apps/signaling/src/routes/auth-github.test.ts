@@ -1,7 +1,7 @@
 import { env, fetchMock } from "cloudflare:test";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
+import { ROUTES } from "../client/routes";
 import { app } from "./index";
-import { ROUTES } from "./routes";
 
 // GitHub API endpoints
 const GITHUB_TOKEN_URL = "https://github.com";

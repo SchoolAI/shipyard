@@ -521,23 +521,3 @@ export const CollabRoomServerMessageSchema = z.discriminatedUnion("type", [
 export type CollabRoomServerMessage = z.infer<
 	typeof CollabRoomServerMessageSchema
 >;
-
-/**
- * @deprecated Use CollabCreateRequestSchema instead
- */
-export const CreateCollabRequestSchema = CollabCreateRequestSchema;
-
-/**
- * @deprecated Use CollabCreateRequest instead
- */
-export type CreateCollabRequest = CollabCreateRequest;
-
-/**
- * Interface for CreateCollabResponse (kept for backwards compatibility).
- * @deprecated Use CollabCreateResponse instead
- */
-export interface CreateCollabResponse {
-	url: string;
-	roomId: string;
-	expiresAt: number;
-}

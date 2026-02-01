@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { validateToken } from "../auth/jwt";
+import { ROUTES } from "../client/routes";
 import type { Env } from "../env";
 import { createLogger } from "../utils/logger";
 import {
@@ -8,7 +9,6 @@ import {
 	requireQueryParam,
 	requireWebSocketUpgrade,
 } from "../utils/route-helpers";
-import { ROUTES } from "./routes";
 
 /**
  * Personal Room WebSocket route.
