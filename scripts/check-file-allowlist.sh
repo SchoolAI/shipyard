@@ -4,7 +4,7 @@ set -euo pipefail
 # Pre-commit hook: Enforce allowlist for documentation and scripts
 # Prevents AI agents from creating/modifying files without explicit approval
 
-# Allowlisted markdown files (entire repo)
+# Allowlisted markdown/text files (entire repo - complete inventory)
 ALLOWED_DOCS=(
   # Root level
   "README.md"
@@ -42,6 +42,35 @@ ALLOWED_DOCS=(
   ".codex/README.md"
   ".grit/README.md"
   ".claude/plans/custom-comment-system.md"
+
+  # Spikes (proof-of-concept code)
+  "spikes/README.md"
+  "spikes/COMPARISON.md"
+  "spikes/SIGNALING-COMPARISON.md"
+  "spikes/plan-notator-analysis.md"
+  "spikes/cloudflare-signaling/README.md"
+  "spikes/deno-signaling/README.md"
+  "spikes/flyio-signaling/README.md"
+  "spikes/loro-markdown-sync/README.md"
+  "spikes/loro-markdown-sync/plan-a.md"
+  "spikes/loro-markdown-sync/plan-b.md"
+  "spikes/loro-markdown-sync/commands.txt"
+  "spikes/port-range-scan/README.md"
+  "spikes/public-signaling-test/README.md"
+  "spikes/registry-server/README.md"
+  "spikes/registry-server/REGISTRY-FORMAT.md"
+  "spikes/registry-server/SUMMARY.md"
+  "spikes/registry-server/TEST-CHECKLIST.md"
+  "spikes/registry-server/VERIFICATION.md"
+  "spikes/vite-registry-plugin/README.md"
+  "spikes/vite-registry-plugin/SUMMARY.md"
+  "spikes/plannotator/README.md"
+  "spikes/plannotator/CLAUDE.md"
+  "spikes/plannotator/CONTRIBUTING.md"
+  "spikes/plannotator/apps/hook/README.md"
+  "spikes/plannotator/apps/opencode-plugin/README.md"
+  "spikes/plannotator/tests/README.md"
+  "spikes/plannotator/tests/manual/ssh/DOCKER_SSH_TEST.md"
 )
 
 # Allowlisted scripts
@@ -78,8 +107,8 @@ while IFS= read -r file; do
   [[ "$file" =~ node_modules ]] && continue
   [[ "$file" =~ ^\. ]] && [[ ! "$file" =~ ^\.claude/ ]] && [[ ! "$file" =~ ^\.codex/ ]] && [[ ! "$file" =~ ^\.grit/ ]] && continue
 
-  # Check markdown files
-  if [[ "$file" =~ \.md$ ]]; then
+  # Check markdown and text files
+  if [[ "$file" =~ \.(md|txt)$ ]]; then
     # Exception: docs/wips/ is a sandbox
     if [[ "$file" =~ ^docs/wips/ ]]; then
       continue
