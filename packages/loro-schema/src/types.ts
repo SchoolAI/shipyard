@@ -169,11 +169,10 @@ export type RatingStyle = (typeof RatingStyleValues)[number];
  */
 export type {
 	ChangeSnapshot,
-	GlobalRoom,
-	GlobalRoomShape,
-	InputRequest,
-	MutableGlobalRoom,
+	MutableRoom,
 	MutableTaskDocument,
+	Room,
+	RoomShape,
 	SyncedFileChange,
 	TaskArtifact,
 	TaskComment,
@@ -181,6 +180,7 @@ export type {
 	TaskDocument,
 	TaskDocumentShape,
 	TaskEvent,
+	TaskIndexEntry,
 	TaskInputRequest,
 	TaskLinkedPR,
 	TaskMeta,

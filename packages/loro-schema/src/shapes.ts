@@ -77,108 +77,16 @@ const InputRequestBaseFields = {
 	isBlocker: Shape.plain.boolean().nullable(),
 } as const;
 
-/**
- * Variant-specific fields for each input request type.
- * Extracted to avoid duplication between global and per-task schemas.
- */
-const TextInputFields = {
-	defaultValue: Shape.plain.string().nullable(),
-	placeholder: Shape.plain.string().nullable(),
-} as const;
-
-const MultilineInputFields = {
-	defaultValue: Shape.plain.string().nullable(),
-	placeholder: Shape.plain.string().nullable(),
-} as const;
-
-const ChoiceInputFields = {
-	options: Shape.plain.array(
-		Shape.plain.struct({
-			label: Shape.plain.string(),
-			value: Shape.plain.string(),
-			description: Shape.plain.string().nullable(),
-		}),
-	),
-	multiSelect: Shape.plain.boolean().nullable(),
-	displayAs: Shape.plain.string("radio", "checkbox", "dropdown").nullable(),
-	placeholder: Shape.plain.string().nullable(),
-} as const;
-
-const NumberInputFields = {
-	min: Shape.plain.number().nullable(),
-	max: Shape.plain.number().nullable(),
-	format: Shape.plain
-		.string("integer", "decimal", "currency", "percentage")
-		.nullable(),
-	defaultValue: Shape.plain.number().nullable(),
-} as const;
-
-const EmailInputFields = {
-	domain: Shape.plain.string().nullable(),
-	placeholder: Shape.plain.string().nullable(),
-} as const;
-
-const DateInputFields = {
-	/** Unix timestamp in milliseconds */
-	min: Shape.plain.number().nullable(),
-	/** Unix timestamp in milliseconds */
-	max: Shape.plain.number().nullable(),
-} as const;
-
-const RatingInputFields = {
-	min: Shape.plain.number().nullable(),
-	max: Shape.plain.number().nullable(),
-	ratingStyle: Shape.plain.string("stars", "numbers", "emoji").nullable(),
-	ratingLabels: Shape.plain
-		.struct({
-			low: Shape.plain.string().nullable(),
-			high: Shape.plain.string().nullable(),
-		})
-		.nullable(),
-} as const;
-
-const MultiInputFields = {
-	/**
-	 * Nested questions - each can have varying structure.
-	 * Using union to support different question types within multi-input.
-	 */
-	questions: Shape.plain.array(
-		Shape.plain.union([
-			Shape.plain.struct({
-				type: Shape.plain.string("text"),
-				message: Shape.plain.string(),
-				placeholder: Shape.plain.string().nullable(),
-			}),
-			Shape.plain.struct({
-				type: Shape.plain.string("choice"),
-				message: Shape.plain.string(),
-				options: Shape.plain.array(Shape.plain.string()),
-			}),
-			Shape.plain.struct({
-				type: Shape.plain.string("confirm"),
-				message: Shape.plain.string(),
-			}),
-		]),
-	),
-	responses: Shape.plain.record(
-		Shape.plain.union([
-			Shape.plain.string(),
-			Shape.plain.number(),
-			Shape.plain.boolean(),
-			Shape.plain.array(Shape.plain.string()),
-		]),
-	),
-} as const;
 
 /**
  * Shape definition for individual file changes in a ChangeSnapshot.
  */
-const SyncedFileChangeFields = {
+const SyncedFileChangeShape = Shape.plain.struct({
 	path: Shape.plain.string(),
 	status: Shape.plain.string("added", "modified", "deleted", "renamed"),
 	patch: Shape.plain.string(),
 	staged: Shape.plain.boolean(),
-} as const;
+});
 
 /**
  * Individual task document schema.
@@ -429,17 +337,28 @@ export const TaskDocumentSchema: DocShape = Shape.doc({
 			text: Shape.plain.struct({
 				type: Shape.plain.string("text"),
 				...InputRequestBaseFields,
-				...TextInputFields,
+				defaultValue: Shape.plain.string().nullable(),
+				placeholder: Shape.plain.string().nullable(),
 			}),
 			multiline: Shape.plain.struct({
 				type: Shape.plain.string("multiline"),
 				...InputRequestBaseFields,
-				...MultilineInputFields,
+				defaultValue: Shape.plain.string().nullable(),
+				placeholder: Shape.plain.string().nullable(),
 			}),
 			choice: Shape.plain.struct({
 				type: Shape.plain.string("choice"),
 				...InputRequestBaseFields,
-				...ChoiceInputFields,
+				options: Shape.plain.array(
+					Shape.plain.struct({
+						label: Shape.plain.string(),
+						value: Shape.plain.string(),
+						description: Shape.plain.string().nullable(),
+					}),
+				),
+				multiSelect: Shape.plain.boolean().nullable(),
+				displayAs: Shape.plain.string("radio", "checkbox", "dropdown").nullable(),
+				placeholder: Shape.plain.string().nullable(),
 			}),
 			confirm: Shape.plain.struct({
 				type: Shape.plain.string("confirm"),
@@ -448,27 +367,73 @@ export const TaskDocumentSchema: DocShape = Shape.doc({
 			number: Shape.plain.struct({
 				type: Shape.plain.string("number"),
 				...InputRequestBaseFields,
-				...NumberInputFields,
+				min: Shape.plain.number().nullable(),
+				max: Shape.plain.number().nullable(),
+				format: Shape.plain
+					.string("integer", "decimal", "currency", "percentage")
+					.nullable(),
+				defaultValue: Shape.plain.number().nullable(),
 			}),
 			email: Shape.plain.struct({
 				type: Shape.plain.string("email"),
 				...InputRequestBaseFields,
-				...EmailInputFields,
+				domain: Shape.plain.string().nullable(),
+				placeholder: Shape.plain.string().nullable(),
 			}),
 			date: Shape.plain.struct({
 				type: Shape.plain.string("date"),
 				...InputRequestBaseFields,
-				...DateInputFields,
+				/** Unix timestamp in milliseconds */
+				min: Shape.plain.number().nullable(),
+				/** Unix timestamp in milliseconds */
+				max: Shape.plain.number().nullable(),
 			}),
 			rating: Shape.plain.struct({
 				type: Shape.plain.string("rating"),
 				...InputRequestBaseFields,
-				...RatingInputFields,
+				min: Shape.plain.number().nullable(),
+				max: Shape.plain.number().nullable(),
+				ratingStyle: Shape.plain.string("stars", "numbers", "emoji").nullable(),
+				ratingLabels: Shape.plain
+					.struct({
+						low: Shape.plain.string().nullable(),
+						high: Shape.plain.string().nullable(),
+					})
+					.nullable(),
 			}),
 			multi: Shape.plain.struct({
 				type: Shape.plain.string("multi"),
 				...InputRequestBaseFields,
-				...MultiInputFields,
+				/**
+				 * Nested questions - each can have varying structure.
+				 * Using union to support different question types within multi-input.
+				 */
+				questions: Shape.plain.array(
+					Shape.plain.union([
+						Shape.plain.struct({
+							type: Shape.plain.string("text"),
+							message: Shape.plain.string(),
+							placeholder: Shape.plain.string().nullable(),
+						}),
+						Shape.plain.struct({
+							type: Shape.plain.string("choice"),
+							message: Shape.plain.string(),
+							options: Shape.plain.array(Shape.plain.string()),
+						}),
+						Shape.plain.struct({
+							type: Shape.plain.string("confirm"),
+							message: Shape.plain.string(),
+						}),
+					]),
+				),
+				responses: Shape.plain.record(
+					Shape.plain.union([
+						Shape.plain.string(),
+						Shape.plain.number(),
+						Shape.plain.boolean(),
+						Shape.plain.array(Shape.plain.string()),
+					]),
+				),
 			}),
 		}),
 	),
@@ -483,7 +448,7 @@ export const TaskDocumentSchema: DocShape = Shape.doc({
 			cwd: Shape.plain.string(),
 			isLive: Shape.plain.boolean(),
 			updatedAt: Shape.plain.number(),
-			files: Shape.list(Shape.plain.struct(SyncedFileChangeFields)),
+			files: Shape.list(SyncedFileChangeShape),
 			totalAdditions: Shape.plain.number(),
 			totalDeletions: Shape.plain.number(),
 		}),
@@ -491,65 +456,32 @@ export const TaskDocumentSchema: DocShape = Shape.doc({
 }) satisfies DocShape;
 
 /**
- * Global room document schema.
- * One doc per room, shared across all tasks.
+ * Room document schema.
+ * One doc per room (Personal or Collab), contains task index for dashboard.
+ *
+ * Input requests live in TaskDocumentSchema, not here.
+ * This schema is intentionally minimal - just enough for dashboard/discovery.
  */
-export const GlobalRoomSchema: DocShape = Shape.doc({
-	inputRequests: Shape.list(
-		Shape.plain.discriminatedUnion("type", {
-			text: Shape.plain.struct({
-				type: Shape.plain.string("text"),
-				...InputRequestBaseFields,
-				taskId: Shape.plain.string().nullable(),
-				...TextInputFields,
-			}),
-			multiline: Shape.plain.struct({
-				type: Shape.plain.string("multiline"),
-				...InputRequestBaseFields,
-				taskId: Shape.plain.string().nullable(),
-				...MultilineInputFields,
-			}),
-			choice: Shape.plain.struct({
-				type: Shape.plain.string("choice"),
-				...InputRequestBaseFields,
-				taskId: Shape.plain.string().nullable(),
-				...ChoiceInputFields,
-			}),
-			confirm: Shape.plain.struct({
-				type: Shape.plain.string("confirm"),
-				...InputRequestBaseFields,
-				taskId: Shape.plain.string().nullable(),
-			}),
-			number: Shape.plain.struct({
-				type: Shape.plain.string("number"),
-				...InputRequestBaseFields,
-				taskId: Shape.plain.string().nullable(),
-				...NumberInputFields,
-			}),
-			email: Shape.plain.struct({
-				type: Shape.plain.string("email"),
-				...InputRequestBaseFields,
-				taskId: Shape.plain.string().nullable(),
-				...EmailInputFields,
-			}),
-			date: Shape.plain.struct({
-				type: Shape.plain.string("date"),
-				...InputRequestBaseFields,
-				taskId: Shape.plain.string().nullable(),
-				...DateInputFields,
-			}),
-			rating: Shape.plain.struct({
-				type: Shape.plain.string("rating"),
-				...InputRequestBaseFields,
-				taskId: Shape.plain.string().nullable(),
-				...RatingInputFields,
-			}),
-			multi: Shape.plain.struct({
-				type: Shape.plain.string("multi"),
-				...InputRequestBaseFields,
-				taskId: Shape.plain.string().nullable(),
-				...MultiInputFields,
-			}),
+export const RoomSchema: DocShape = Shape.doc({
+	/**
+	 * Denormalized task metadata for dashboard display.
+	 * Updated by TaskDocument operations when task state changes.
+	 */
+	taskIndex: Shape.list(
+		Shape.plain.struct({
+			taskId: Shape.plain.string(),
+			title: Shape.plain.string(),
+			status: Shape.plain.string(
+				"draft",
+				"pending_review",
+				"changes_requested",
+				"in_progress",
+				"completed",
+			),
+			ownerId: Shape.plain.string(),
+			hasPendingRequests: Shape.plain.boolean(),
+			lastUpdated: Shape.plain.number(),
+			createdAt: Shape.plain.number(),
 		}),
 	),
 });
@@ -572,15 +504,23 @@ export type ChangeSnapshot = Infer<
 	typeof TaskDocumentSchema.shapes.changeSnapshots
 >;
 
-/** Individual file change in a ChangeSnapshot */
-export interface SyncedFileChange {
+/**
+ * TODO (2026-02-01): Workaround for @loro-extended/change@5.3.0 bug
+ *
+ * The published npm version doesn't export BooleanValueShape, StringValueShape, etc.,
+ * causing TS4023 errors when using Infer<typeof SyncedFileChangeShape> in exported types.
+ *
+ * The loro-extended source code already has the fix, but it hasn't been published yet.
+ * Once a newer version is published with these exports, replace with:
+ * export type SyncedFileChange = Infer<typeof SyncedFileChangeShape>;
+ */
+export type SyncedFileChange = {
 	path: string;
 	status: "added" | "modified" | "deleted" | "renamed";
 	patch: string;
 	staged: boolean;
-}
-
-export type GlobalRoomShape = typeof GlobalRoomSchema;
-export type GlobalRoom = Infer<typeof GlobalRoomSchema>;
-export type MutableGlobalRoom = InferMutableType<typeof GlobalRoomSchema>;
-export type InputRequest = Infer<typeof GlobalRoomSchema.shapes.inputRequests>;
+};
+export type RoomShape = typeof RoomSchema;
+export type Room = Infer<typeof RoomSchema>;
+export type MutableRoom = InferMutableType<typeof RoomSchema>;
+export type TaskIndexEntry = Infer<typeof RoomSchema.shapes.taskIndex>;

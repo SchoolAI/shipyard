@@ -427,58 +427,16 @@ export const TaskInputRequestSchema = z.discriminatedUnion("type", [
 	MultiInputRequestSchema,
 ]);
 
-/** Global input request schemas (with taskId) */
-export const GlobalTextInputRequestSchema = TextInputRequestSchema.extend({
-	taskId: z.string().nullable(),
+/** Task index entry schema (for room dashboard) */
+export const TaskIndexEntrySchema = z.object({
+	taskId: IdSchema,
+	title: z.string(),
+	status: TaskStatusSchema,
+	ownerId: IdSchema,
+	hasPendingRequests: z.boolean(),
+	lastUpdated: TimestampSchema,
+	createdAt: TimestampSchema,
 });
-
-export const GlobalMultilineInputRequestSchema =
-	MultilineInputRequestSchema.extend({
-		taskId: z.string().nullable(),
-	});
-
-export const GlobalChoiceInputRequestSchema = ChoiceInputRequestSchema.extend({
-	taskId: z.string().nullable(),
-});
-
-export const GlobalConfirmInputRequestSchema = ConfirmInputRequestSchema.extend(
-	{
-		taskId: z.string().nullable(),
-	},
-);
-
-export const GlobalNumberInputRequestSchema = NumberInputRequestSchema.extend({
-	taskId: z.string().nullable(),
-});
-
-export const GlobalEmailInputRequestSchema = EmailInputRequestSchema.extend({
-	taskId: z.string().nullable(),
-});
-
-export const GlobalDateInputRequestSchema = DateInputRequestSchema.extend({
-	taskId: z.string().nullable(),
-});
-
-export const GlobalRatingInputRequestSchema = RatingInputRequestSchema.extend({
-	taskId: z.string().nullable(),
-});
-
-export const GlobalMultiInputRequestSchema = MultiInputRequestSchema.extend({
-	taskId: z.string().nullable(),
-});
-
-/** Global input request discriminated union */
-export const GlobalInputRequestSchema = z.discriminatedUnion("type", [
-	GlobalTextInputRequestSchema,
-	GlobalMultilineInputRequestSchema,
-	GlobalChoiceInputRequestSchema,
-	GlobalConfirmInputRequestSchema,
-	GlobalNumberInputRequestSchema,
-	GlobalEmailInputRequestSchema,
-	GlobalDateInputRequestSchema,
-	GlobalRatingInputRequestSchema,
-	GlobalMultiInputRequestSchema,
-]);
 
 /** Synced file change schema */
 export const SyncedFileChangeSchema = z.object({
@@ -532,6 +490,4 @@ export type ValidatedTaskLinkedPR = z.infer<typeof TaskLinkedPRSchema>;
 export type ValidatedTaskInputRequest = z.infer<typeof TaskInputRequestSchema>;
 export type ValidatedChangeSnapshot = z.infer<typeof ChangeSnapshotSchema>;
 export type ValidatedSyncedFileChange = z.infer<typeof SyncedFileChangeSchema>;
-export type ValidatedGlobalInputRequest = z.infer<
-	typeof GlobalInputRequestSchema
->;
+export type ValidatedTaskIndexEntry = z.infer<typeof TaskIndexEntrySchema>;

@@ -3,7 +3,7 @@
  * Provides ID generators and utility functions.
  *
  * For document mutations, use @loro-extended/change's `change()` function
- * with the TypedDoc created from TaskDocumentSchema or GlobalRoomSchema.
+ * with the TypedDoc created from TaskDocumentSchema or RoomSchema.
  */
 
 import { nanoid } from "nanoid";
