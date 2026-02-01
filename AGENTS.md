@@ -50,6 +50,36 @@ Always verify the component exists and check its v3 API:
 - Reference https://v3.heroui.com for web docs
 - Don't assume v2 patterns work in v3
 
+## Loro Reference (Local Repository)
+
+**Path:** `/Users/jacobpetterle/Working Directory/loro-extended`
+
+For any Loro-related work (CRDT internals, API reference, examples, types), **always search the local loro-extended repository**. Never use web search for Loro documentation—the local copy is faster and more reliable.
+
+### Setup
+
+If the repository is not cloned, clone it first:
+
+```bash
+cd "/Users/jacobpetterle/Working Directory"
+git clone https://github.com/SchoolAI/loro-extended.git
+```
+
+### Usage
+
+When you need Loro information:
+1. **Search the local repo** — Use Glob/Grep on `/Users/jacobpetterle/Working Directory/loro-extended`
+2. **Check examples** — Look in `examples/` or `tests/` directories
+3. **Check types** — Look in `src/` for TypeScript definitions
+4. **Never web search** — The local copy has everything you need
+
+### Why Local Over Web
+
+- **Faster** — No network latency, instant file access
+- **Complete** — Full source code, not just docs
+- **Reliable** — Always available, no rate limits
+- **Searchable** — Grep through entire codebase
+
 ## Project Structure
 
 ```
