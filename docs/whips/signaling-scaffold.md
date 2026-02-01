@@ -1,8 +1,10 @@
 # New Signaling Server Scaffold
 
 **Created:** 2026-01-31
-**Status:** Planning
+**Status:** ✅ Completed (2026-02-01)
 **Scope:** Directory structure and file responsibilities for new signaling worker
+
+**Outcome:** Successfully implemented in `apps/signaling/` with full test coverage and production readiness.
 
 ---
 

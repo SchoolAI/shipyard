@@ -8,6 +8,12 @@ import {
 import { generateId } from "../utils/crypto";
 import { createLogger } from "../utils/logger";
 import { generatePresignedUrlAsync } from "../utils/presigned-url";
+import {
+	extractBearerToken,
+	invalidTokenResponse,
+	parseAndValidateBody,
+} from "../utils/route-helpers";
+import { ROUTES } from "./routes";
 
 /**
  * Create collaboration room route.
@@ -19,49 +25,25 @@ import { generatePresignedUrlAsync } from "../utils/presigned-url";
  */
 export const collabCreateRoute = new Hono<{ Bindings: Env }>();
 
-collabCreateRoute.post("/collab/create", async (c) => {
+collabCreateRoute.post(ROUTES.COLLAB_CREATE, async (c) => {
 	const logger = createLogger(c.env);
 
-	const authHeader = c.req.header("Authorization");
-	if (!authHeader?.startsWith("Bearer ")) {
-		return c.json(
-			{ error: "unauthorized", message: "Bearer token required" },
-			401,
-		);
-	}
+	const tokenResult = extractBearerToken(c);
+	if (!tokenResult.ok) return tokenResult.error;
 
-	const token = authHeader.slice(7);
-	const claims = await validateToken(token, c.env.JWT_SECRET);
+	const claims = await validateToken(tokenResult.value, c.env.JWT_SECRET);
 	if (!claims) {
-		return c.json(
-			{ error: "invalid_token", message: "Invalid or expired token" },
-			401,
-		);
+		return invalidTokenResponse(c);
 	}
 
-	let body: unknown;
-	try {
-		body = await c.req.json();
-	} catch {
-		return c.json({ error: "invalid_body", message: "Invalid JSON body" }, 400);
-	}
+	const bodyResult = await parseAndValidateBody(c, CreateCollabRequestSchema);
+	if (!bodyResult.ok) return bodyResult.error;
 
-	const parseResult = CreateCollabRequestSchema.safeParse(body);
-	if (!parseResult.success) {
-		return c.json(
-			{
-				error: "validation_error",
-				message: "Invalid request body",
-				details: parseResult.error.issues,
-			},
-			400,
-		);
-	}
-
-	const { taskId, expiresInMinutes } = parseResult.data;
+	const { taskId, expiresInMinutes } = bodyResult.value;
 
 	const roomId = generateId(16);
-	const expiresAt = Date.now() + expiresInMinutes * 60 * 1000;
+	// expiresInMinutes has a default value in the schema, so it's always defined after parsing
+	const expiresAt = Date.now() + (expiresInMinutes ?? 60) * 60 * 1000;
 
 	const baseUrl =
 		c.env.ENVIRONMENT === "production"

@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import type { Env } from "../env";
+import { ROUTES } from "./routes";
 
 /**
  * Health check route.
@@ -9,7 +10,7 @@ import type { Env } from "../env";
  */
 export const healthRoute = new Hono<{ Bindings: Env }>();
 
-healthRoute.get("/health", (c) => {
+healthRoute.get(ROUTES.HEALTH, (c) => {
 	return c.json({
 		status: "ok",
 		service: "shipyard-signaling",

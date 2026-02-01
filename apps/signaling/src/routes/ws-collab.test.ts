@@ -4,6 +4,7 @@ import type { PresignedUrlPayload } from "../auth/types";
 import type { Env } from "../env";
 import { hmacSign } from "../utils/crypto";
 import { app } from "./index";
+import { ROUTES } from "./routes";
 
 /**
  * Helper to create a valid pre-signed URL token for testing
@@ -60,7 +61,7 @@ async function createExpiredToken(roomId: string): Promise<string> {
 	return `${payloadB64}.${signature}`;
 }
 
-describe("GET /collab/:roomId (WebSocket)", () => {
+describe(`GET ${ROUTES.WS_COLLAB} (WebSocket)`, () => {
 	const testRoomId = "test-room-abc123";
 
 	it("returns 426 without Upgrade header", async () => {

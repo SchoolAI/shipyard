@@ -4,6 +4,14 @@ import type { PassedCollabPayload } from "../durable-objects/types";
 import type { Env } from "../env";
 import { createLogger } from "../utils/logger";
 import { validatePresignedUrlAsync } from "../utils/presigned-url";
+import {
+	expiredResponse,
+	forbiddenResponse,
+	invalidTokenResponse,
+	requireQueryParam,
+	requireWebSocketUpgrade,
+} from "../utils/route-helpers";
+import { ROUTES } from "./routes";
 
 /**
  * Collab Room WebSocket route.
@@ -15,33 +23,23 @@ import { validatePresignedUrlAsync } from "../utils/presigned-url";
  */
 export const wsCollabRoute = new Hono<{ Bindings: Env }>();
 
-wsCollabRoute.get("/collab/:roomId", async (c) => {
+wsCollabRoute.get(ROUTES.WS_COLLAB, async (c) => {
 	const logger = createLogger(c.env);
 	const roomId = c.req.param("roomId");
-	const token = c.req.query("token");
 	const userToken = c.req.query("userToken");
 
-	const upgradeHeader = c.req.header("Upgrade");
-	if (upgradeHeader !== "websocket") {
-		return c.json(
-			{ error: "upgrade_required", message: "WebSocket upgrade required" },
-			426,
-		);
-	}
+	const upgradeResult = requireWebSocketUpgrade(c);
+	if (!upgradeResult.ok) return upgradeResult.error;
 
-	if (!token) {
-		return c.json(
-			{ error: "missing_token", message: "token query param required" },
-			401,
-		);
-	}
+	const tokenResult = requireQueryParam(c, "token");
+	if (!tokenResult.ok) return tokenResult.error;
 
-	const payload = await validatePresignedUrlAsync(token, c.env.JWT_SECRET);
+	const payload = await validatePresignedUrlAsync(
+		tokenResult.value,
+		c.env.JWT_SECRET,
+	);
 	if (!payload) {
-		return c.json(
-			{ error: "invalid_token", message: "Invalid or expired token" },
-			401,
-		);
+		return invalidTokenResponse(c);
 	}
 
 	if (payload.roomId !== roomId) {
@@ -49,17 +47,11 @@ wsCollabRoute.get("/collab/:roomId", async (c) => {
 			urlRoomId: roomId,
 			tokenRoomId: payload.roomId,
 		});
-		return c.json(
-			{ error: "forbidden", message: "roomId does not match token" },
-			403,
-		);
+		return forbiddenResponse(c, "roomId does not match token");
 	}
 
 	if (Date.now() > payload.exp) {
-		return c.json(
-			{ error: "expired", message: "Collaboration link has expired" },
-			401,
-		);
+		return expiredResponse(c, "Collaboration link has expired");
 	}
 
 	let userClaims: { sub: string; ghUser: string } | undefined;

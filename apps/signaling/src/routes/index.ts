@@ -3,9 +3,11 @@ import { cors } from "hono/cors";
 import type { Env } from "../env";
 import { isAllowedOrigin } from "../utils/cors";
 import { createLogger } from "../utils/logger";
+import { errorResponse } from "../utils/route-helpers";
 import { authGitHubRoute } from "./auth-github";
 import { collabCreateRoute } from "./collab-create";
 import { healthRoute } from "./health";
+import { ROUTE_DESCRIPTIONS } from "./routes";
 import { wsCollabRoute } from "./ws-collab";
 import { wsPersonalRoute } from "./ws-personal";
 
@@ -55,13 +57,7 @@ app.notFound((c) => {
 		{
 			error: "not_found",
 			message: "Endpoint not found",
-			endpoints: [
-				"GET /health",
-				"POST /auth/github/callback",
-				"POST /collab/create",
-				"WS /personal/:userId",
-				"WS /collab/:roomId",
-			],
+			endpoints: [...ROUTE_DESCRIPTIONS],
 		},
 		404,
 	);
@@ -70,8 +66,5 @@ app.notFound((c) => {
 app.onError((err, c) => {
 	const logger = createLogger(c.env);
 	logger.error("unhandled error", { error: err.message, stack: err.stack });
-	return c.json(
-		{ error: "internal_error", message: "Internal server error" },
-		500,
-	);
+	return errorResponse(c, "internal_error", "Internal server error", 500);
 });

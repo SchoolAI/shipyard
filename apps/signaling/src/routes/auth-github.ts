@@ -5,12 +5,15 @@ import {
 	isMobileUserAgent,
 } from "../auth/github";
 import { generateSessionToken } from "../auth/jwt";
-import type {
-	TokenExchangeRequest,
-	TokenExchangeResponse,
-} from "../auth/types";
+import type { TokenExchangeResponse } from "../auth/types";
 import type { Env } from "../env";
+import { AuthGitHubCallbackRequestSchema } from "../schemas";
 import { createLogger } from "../utils/logger";
+import {
+	errorResponse,
+	parseAndValidateBody,
+} from "../utils/route-helpers";
+import { ROUTES } from "./routes";
 
 /**
  * GitHub OAuth callback route.
@@ -21,46 +24,33 @@ import { createLogger } from "../utils/logger";
  */
 export const authGitHubRoute = new Hono<{ Bindings: Env }>();
 
-authGitHubRoute.post("/auth/github/callback", async (c) => {
+authGitHubRoute.post(ROUTES.AUTH_GITHUB_CALLBACK, async (c) => {
 	const logger = createLogger(c.env);
 
-	let body: TokenExchangeRequest;
-	try {
-		body = await c.req.json();
-	} catch {
-		return c.json({ error: "invalid_body", message: "Invalid JSON body" }, 400);
-	}
+	const bodyResult = await parseAndValidateBody(c, AuthGitHubCallbackRequestSchema);
+	if (!bodyResult.ok) return bodyResult.error;
 
-	if (!body.code || typeof body.code !== "string") {
-		return c.json({ error: "missing_code", message: "code is required" }, 400);
-	}
-	if (!body.redirect_uri || typeof body.redirect_uri !== "string") {
-		return c.json(
-			{ error: "missing_redirect_uri", message: "redirect_uri is required" },
-			400,
-		);
-	}
+	const { code, redirect_uri } = bodyResult.value;
 
 	const tokenResult = await exchangeCodeForToken(
-		body.code,
-		body.redirect_uri,
+		code,
+		redirect_uri,
 		c.env.GITHUB_CLIENT_ID,
 		c.env.GITHUB_CLIENT_SECRET,
 	);
 
 	if ("error" in tokenResult) {
 		logger.warn("GitHub token exchange failed", { error: tokenResult.error });
-		return c.json(
-			{ error: "token_exchange_failed", message: tokenResult.error },
-			401,
-		);
+		return errorResponse(c, "token_exchange_failed", tokenResult.error, 401);
 	}
 
 	const user = await fetchGitHubUser(tokenResult.accessToken);
 	if (!user) {
 		logger.warn("Failed to fetch GitHub user");
-		return c.json(
-			{ error: "user_fetch_failed", message: "Could not fetch GitHub user" },
+		return errorResponse(
+			c,
+			"user_fetch_failed",
+			"Could not fetch GitHub user",
 			401,
 		);
 	}

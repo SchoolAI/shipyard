@@ -123,193 +123,74 @@ const MultiInputFields = {
 /**
  * Individual task document schema.
  * One doc per task, contains all task-specific state.
- *
- * Structure:
- * - meta struct: All task metadata (identity, timestamps, ownership, etc.)
- * - Root level: Content and feature arrays (comments, artifacts, events, etc.)
- *
- * Note: Loro docs can only contain container types (list, record, struct, text, tree),
- * so all plain values must be wrapped in a struct.
  */
 export const TaskDocumentSchema: DocShape = Shape.doc({
-  // ============================================================================
-  // METADATA
-  // ============================================================================
-
-  //
-  // META - All task metadata
-  //
-  // Contains: identity (id, title, status), timestamps, ownership, tracking, archive state, origin info
-  //
   meta: Shape.struct({
-    // === Identity ===
-
-    // EXISTS: Unique task identifier (nanoid)
-    // UI: URL routing, IndexedDB keys, React keys, panel selection
-    // If removed: FATAL - cannot identify or navigate to tasks
     id: Shape.plain.string(),
-
-    // EXISTS: Task title extracted from first heading
-    // UI: PlanHeader, KanbanCard, Inbox, Search - all display titles
-    // If removed: HIGH - tasks display as empty/unnamed
     title: Shape.plain.string(),
-
-    // EXISTS: Workflow state (discriminator in Y.Doc)
-    // UI: StatusChip colors, Kanban columns, Inbox filtering, Review actions
-    // If removed: FATAL - entire workflow system breaks
     status: Shape.plain.string('draft', 'pending_review', 'changes_requested', 'in_progress', 'completed'),
 
-    // === Timestamps ===
-
-    // EXISTS: Creation timestamp
-    // UI: Fallback for sorting (rarely displayed)
-    // If removed: LOW - lose creation timestamp
+    /** Unix timestamp in milliseconds */
     createdAt: Shape.plain.number(),
 
-    // EXISTS: Last modification timestamp (auto-updated on every setTaskMetadata)
-    // UI: "Updated 5 min ago", sorting, unread detection (compared to viewedBy)
-    // If removed: HIGH - sorting breaks, unread indicators break
+    /** Unix timestamp in milliseconds */
     updatedAt: Shape.plain.number(),
 
-    // EXISTS (conditional): When task was completed
-    // UI: Not prominently displayed
-    // If removed: LOW - lose completion timestamp
+    /** Unix timestamp in milliseconds */
     completedAt: Shape.plain.number().nullable(),
 
-    // EXISTS (conditional): Who completed the task
-    // UI: Not prominently displayed
-    // If removed: LOW - lose completion attribution
     completedBy: Shape.plain.string().nullable(),
 
-    // === Ownership ===
-
-    // EXISTS: GitHub username who owns this task
-    // UI: Owner avatar on KanbanCard, "My Tasks" vs "Shared" filtering
-    // Server: Permission checks use getTaskOwnerId()
-    // If removed: FATAL - ownership broken, permission system collapses
-    //
-    // FUTURE: Will become Shipyard internal user ID when adding auth system
-    //   - Currently: GitHub username (e.g., "jacobpetterle")
-    //   - Future: Shipyard user UUID, mapped to auth provider (GitHub, Google, email, etc.)
-    //   - Migration: When adding auth, create User entity with internal ID
+    /**
+     * GitHub username who owns this task.
+     * Will become Shipyard user ID when adding auth system.
+     */
     ownerId: Shape.plain.string().nullable(),
 
-    // === Session ===
-
-    // EXISTS: CRDT schema version for breaking change detection
-    // Server: Signaling rejects connections from outdated clients
-    // If removed: MEDIUM - cannot force client upgrades on schema changes
+    /** CRDT schema version for breaking change detection */
     epoch: Shape.plain.number().nullable(),
 
-    // === Origin Tracking ===
-
-    // EXISTS: Platform metadata (discriminated union: claude-code, devin, cursor, browser, unknown)
-    // UI: PlanHeader checks for transcript path for handoff feature
-    // Stored as JSON.stringify(OriginMetadata)
-    // If removed: MEDIUM - lose conversation handoff feature
+    /** JSON-stringified OriginMetadata (platform: claude-code, devin, cursor, browser, unknown) */
     origin: Shape.plain.string().nullable(),
 
-    // === GitHub Integration ===
-
-    // EXISTS: GitHub repo (e.g., "owner/repo")
-    // UI: PlanHeader displays repo name, required for artifact uploads
-    // If removed: HIGH - GitHub integration breaks, no artifact uploads
-    // Note: linkedPRs does NOT store repo - this is task-level metadata, keep it
+    /** GitHub repo in "owner/repo" format */
     repo: Shape.plain.string().nullable(),
 
-    // === Tags ===
-
-    // EXISTS: Flexible categorization (e.g., ["ui", "bug", "project:mobile-app"])
-    // UI: TagChips in PlanHeader, KanbanCard, Inbox; TagEditor; SearchPage filtering
-    // If removed: MEDIUM - lose tagging/categorization feature
     tags: Shape.list(Shape.plain.string()),
 
-    // === View Tracking ===
-
-    // EXISTS: username → last viewed timestamp
-    // UI: usePlanIndex isPlanUnread() comparison, inbox unread indicators
-    // If removed: HIGH - lose inbox unread indicators
+    /** username → Unix timestamp of last view */
     viewedBy: Shape.record(Shape.plain.number()),
 
-    // === Archive ===
-
-    // EXISTS: When task was archived
-    // UI: isArchived state, badge, filtered from active lists
-    // If removed: HIGH - archive feature breaks
+    /** Unix timestamp in milliseconds */
     archivedAt: Shape.plain.number().nullable(),
 
-    // EXISTS: Who archived the task
-    // UI: Not prominently displayed (audit trail)
-    // If removed: LOW - lose archive attribution
     archivedBy: Shape.plain.string().nullable(),
   }),
 
-  // ============================================================================
-  // CONTENT
-  // ============================================================================
-
-  //
-  // CONTENT - Tiptap/ProseMirror document
-  //
-  // Y.Doc: YDOC_KEYS.DOCUMENT_FRAGMENT = "document" (Y.XmlFragment, BlockNote-managed)
-  //
-  // Current Architecture (BlockNote):
-  //   - Creation: markdown → ServerBlockNoteEditor.tryParseMarkdownToBlocks() → blocksToYXmlFragment()
-  //   - Reading: yXmlFragmentToBlocks() → blocksToMarkdownLossy()
-  //   - Browser: BlockNoteView binds to Y.XmlFragment for collaborative editing
-  //
-  // Loro Migration:
-  //   - Shape.any() because loro-prosemirror manages its own internal structure
-  //   - Tiptap exports standard JSON (unlike BlockNote's opaque Y.XmlFragment)
-  //   - All BlockNote helpers replaced with Tiptap equivalents
-  //
-  // UI: PlanViewer - the entire task content editor
-  // If removed: FATAL - this IS the task content, app is completely non-functional
+  /** Tiptap/loro-prosemirror document (loro-prosemirror manages internal structure) */
   content: Shape.any(),
 
-  //
-  // COMMENTS - Unified comment storage (all comment types)
-  //
-  // Merges previously separate comment storage:
-  //   - Inline comments (on task content blocks)
-  //   - PR review comments (on GitHub PR diffs)
-  //   - Local diff comments (on uncommitted changes)
-  //   - Overall comments (global task-level feedback)
-  //
-  // Y.Doc: Previously split across threads, prReviewComments, localDiffComments
-  // Loro: Unified commentId → comment with discriminated union by 'kind'
-  //
-  // UI: CommentGutter, ThreadCard, DiffCommentCard, overall review panel
-  // If removed: FATAL - lose all commenting features
-  //
-  // commentId → comment data (discriminated by 'kind')
-  //
+  /** commentId → comment (discriminated by 'kind': inline, pr, local, overall) */
   comments: Shape.record(
     Shape.plain.discriminatedUnion('kind', {
-      // Inline comments on task content blocks
       inline: Shape.plain.struct({
         kind: Shape.plain.string('inline'),
         ...CommentBaseFields,
-        // Inline-specific: links to content block
         blockId: Shape.plain.string(),
         selectedText: Shape.plain.string().nullable(),
       }),
 
-      // PR review comments on GitHub PR diffs
       pr: Shape.plain.struct({
         kind: Shape.plain.string('pr'),
         ...CommentBaseFields,
-        // PR-specific: which PR/file/line
         prNumber: Shape.plain.number(),
         path: Shape.plain.string(),
         line: Shape.plain.number(),
       }),
 
-      // Local diff comments on uncommitted changes
       local: Shape.plain.struct({
         kind: Shape.plain.string('local'),
         ...CommentBaseFields,
-        // Local-specific: file/line + staleness tracking
         path: Shape.plain.string(),
         line: Shape.plain.number(),
         baseRef: Shape.plain.string(),
@@ -317,7 +198,6 @@ export const TaskDocumentSchema: DocShape = Shape.doc({
         machineId: Shape.plain.string().nullable(),
       }),
 
-      // Overall task-level comments (not anchored to specific content)
       overall: Shape.plain.struct({
         kind: Shape.plain.string('overall'),
         ...CommentBaseFields,
@@ -325,151 +205,78 @@ export const TaskDocumentSchema: DocShape = Shape.doc({
     })
   ),
 
-  // REMOVED: stepCompletions - Unused feature (StepCheckbox.tsx never imported)
-  // Native Tiptap checkboxes handle checkbox state in content
-  // Only add back if separate completion tracking needed for activity timeline
-
-  //
-  // ARTIFACTS - Uploaded proof files
-  //
-  // Y.Doc: YDOC_KEYS.ARTIFACTS = "artifacts" - EXISTS
-  // Helpers: getArtifacts(), addArtifact(), removeArtifact(), linkArtifactToDeliverable()
-  //
-  // Feature: Proof-of-work attachments that agents upload to demonstrate deliverable completion
-  // Storage: CRDT stores METADATA only. Binary content stored separately:
-  //   - github: raw.githubusercontent.com/{owner}/{repo}/plan-artifacts/plans/{planId}/{filename}
-  //   - local: {SHIPYARD_STATE_DIR}/artifacts/{planId}/{filename}
-  //
-  // UI: Attachments grid, DeliverableCard preview, ArtifactRenderer (iframe/img/video)
-  // If removed: FATAL - entire proof-of-work system breaks, no artifact uploads
-  //
-  // Types: html (test results, terminal output), image (screenshots), video (demos)
-  // Storage: github (when GITHUB_TOKEN configured), local (fallback)
-  //
-  // Discriminated union by 'storage' - each variant has required storage-specific fields
-  //
+  /**
+   * Artifact metadata (discriminated by 'storage': github, local).
+   * Binary content stored separately (not in CRDT).
+   */
   artifacts: Shape.list(
     Shape.plain.discriminatedUnion('storage', {
-      // GitHub-stored artifacts (raw.githubusercontent.com)
       github: Shape.plain.struct({
         storage: Shape.plain.string('github'),
         ...ArtifactBaseFields,
-        // GitHub-specific: full URL to raw content (REQUIRED)
+        /** Full URL to raw.githubusercontent.com content */
         url: Shape.plain.string(),
       }),
 
-      // Locally-stored artifacts (served from MCP server)
       local: Shape.plain.struct({
         storage: Shape.plain.string('local'),
         ...ArtifactBaseFields,
-        // Local-specific: path identifier "{planId}/{filename}" (REQUIRED)
+        /** Path identifier in format "{planId}/{filename}" */
         localArtifactId: Shape.plain.string(),
       }),
     })
   ),
 
-  //
-  // DELIVERABLES - Checkboxes marked with {#deliverable}
-  //
-  // Y.Doc: YDOC_KEYS.DELIVERABLES = "deliverables" - EXISTS and MATCHES
-  // Helpers: getDeliverables(), addDeliverable(), linkArtifactToDeliverable()
-  // Parser: deliverable-parser.ts extracts from BlockNote blocks via {#deliverable} marker
-  //
-  // Feature: Measurable outcomes that agents must PROVE with artifacts
-  // Extraction: create-task parses content for `- [ ] Something {#deliverable}` markers
-  // Linking: add_artifact with deliverableId sets linkedArtifactId
-  // Auto-complete: When ALL deliverables have linkedArtifactId, task auto-completes
-  //
-  // UI: DeliverablesView tab, DeliverableCard, progress indicators ("2/3 deliverables")
-  // If removed: FATAL - entire proof-of-work tracking system breaks
-  //
-  // vs stepCompletions: Steps = implementation checkboxes (any checkbox)
-  //                     Deliverables = proof checkboxes (require artifact)
-  // vs artifacts: Deliverables = expectations (what to prove)
-  //               Artifacts = proof files (evidence)
-  //
+  /**
+   * Measurable outcomes extracted from content checkboxes marked with {#deliverable}.
+   * Task auto-completes when all deliverables have linked artifacts.
+   */
   deliverables: Shape.list(
     Shape.plain.struct({
-      // EXISTS: BlockNote block ID of the checkbox with {#deliverable} marker
-      // UI: React keys, artifact linking target, LLM output includes `{id="..."}`
-      // If removed: FATAL - cannot link artifacts, cannot render lists
       id: Shape.plain.string(),
-
-      // EXISTS: Checkbox text with {#deliverable} marker stripped
-      // UI: Displayed as deliverable description in cards and modals
-      // If removed: FATAL - deliverables have no description, feature useless
       text: Shape.plain.string(),
-
-      // EXISTS: Artifact ID that proves this deliverable (set by linkArtifactToDeliverable)
-      // UI: Determines completed vs pending status, shows checkmark, enables preview
-      // Server: All fulfilled check triggers auto-complete
-      // If removed: FATAL - cannot track completion, auto-complete never triggers
       linkedArtifactId: Shape.plain.string().nullable(),
 
-      // EXISTS: Timestamp when artifact was linked
-      // UI: Not currently displayed
-      // If removed: LOW - lose audit trail, no current UI impact
+      /** Unix timestamp in milliseconds */
       linkedAt: Shape.plain.number().nullable(),
     })
   ),
 
-  //
-  // EVENTS - Activity timeline
-  //
-  // Y.Doc: YDOC_KEYS.EVENTS = "events" - EXISTS
-  // Type: Y.Array<TaskEvent> (discriminated union with ~24 event types)
-  // Helpers: logTaskEvent(), getTaskEvents()
-  //
-  // Feature: Audit trail of all actions on a task
-  // UI: ActivityTimeline grouped by day, ActivityEvent with type-specific rendering
-  // If removed: HIGH - lose activity history, audit trail, inbox notifications
-  //
-  // Discriminated union by 'type' - each event has type-specific data fields
-  //
+  /** Activity timeline (discriminated by 'type') */
   events: Shape.list(
     Shape.plain.discriminatedUnion('type', {
-      // Task lifecycle events
       task_created: Shape.plain.struct({
         type: Shape.plain.string('task_created'),
         ...EventBaseFields,
       }),
-
       status_changed: Shape.plain.struct({
         type: Shape.plain.string('status_changed'),
         ...EventBaseFields,
         fromStatus: Shape.plain.string(),
         toStatus: Shape.plain.string(),
       }),
-
       completed: Shape.plain.struct({
         type: Shape.plain.string('completed'),
         ...EventBaseFields,
       }),
-
       task_archived: Shape.plain.struct({
         type: Shape.plain.string('task_archived'),
         ...EventBaseFields,
       }),
-
       task_unarchived: Shape.plain.struct({
         type: Shape.plain.string('task_unarchived'),
         ...EventBaseFields,
       }),
-
-      // Review events
       approved: Shape.plain.struct({
         type: Shape.plain.string('approved'),
         ...EventBaseFields,
         message: Shape.plain.string().nullable(),
       }),
-
       changes_requested: Shape.plain.struct({
         type: Shape.plain.string('changes_requested'),
         ...EventBaseFields,
         message: Shape.plain.string().nullable(),
       }),
-
-      // Comment events
       comment_added: Shape.plain.struct({
         type: Shape.plain.string('comment_added'),
         ...EventBaseFields,
@@ -477,15 +284,12 @@ export const TaskDocumentSchema: DocShape = Shape.doc({
         threadId: Shape.plain.string().nullable(),
         preview: Shape.plain.string().nullable(),
       }),
-
       comment_resolved: Shape.plain.struct({
         type: Shape.plain.string('comment_resolved'),
         ...EventBaseFields,
         commentId: Shape.plain.string(),
         threadId: Shape.plain.string().nullable(),
       }),
-
-      // Artifact events
       artifact_uploaded: Shape.plain.struct({
         type: Shape.plain.string('artifact_uploaded'),
         ...EventBaseFields,
@@ -493,7 +297,6 @@ export const TaskDocumentSchema: DocShape = Shape.doc({
         filename: Shape.plain.string(),
         artifactType: Shape.plain.string().nullable(),
       }),
-
       deliverable_linked: Shape.plain.struct({
         type: Shape.plain.string('deliverable_linked'),
         ...EventBaseFields,
@@ -501,29 +304,22 @@ export const TaskDocumentSchema: DocShape = Shape.doc({
         artifactId: Shape.plain.string(),
         deliverableText: Shape.plain.string().nullable(),
       }),
-
-      // PR events
       pr_linked: Shape.plain.struct({
         type: Shape.plain.string('pr_linked'),
         ...EventBaseFields,
         prNumber: Shape.plain.number(),
         title: Shape.plain.string().nullable(),
       }),
-
       pr_unlinked: Shape.plain.struct({
         type: Shape.plain.string('pr_unlinked'),
         ...EventBaseFields,
         prNumber: Shape.plain.number(),
       }),
-
-      // Content events
       content_edited: Shape.plain.struct({
         type: Shape.plain.string('content_edited'),
         ...EventBaseFields,
         summary: Shape.plain.string().nullable(),
       }),
-
-      // Input request events
       input_request_created: Shape.plain.struct({
         type: Shape.plain.string('input_request_created'),
         ...EventBaseFields,
@@ -531,63 +327,49 @@ export const TaskDocumentSchema: DocShape = Shape.doc({
         message: Shape.plain.string(),
         isBlocker: Shape.plain.boolean().nullable(),
       }),
-
       input_request_answered: Shape.plain.struct({
         type: Shape.plain.string('input_request_answered'),
         ...EventBaseFields,
         requestId: Shape.plain.string(),
       }),
-
       input_request_declined: Shape.plain.struct({
         type: Shape.plain.string('input_request_declined'),
         ...EventBaseFields,
         requestId: Shape.plain.string(),
       }),
-
       input_request_cancelled: Shape.plain.struct({
         type: Shape.plain.string('input_request_cancelled'),
         ...EventBaseFields,
         requestId: Shape.plain.string(),
       }),
-
-      // Agent activity
       agent_activity: Shape.plain.struct({
         type: Shape.plain.string('agent_activity'),
         ...EventBaseFields,
         message: Shape.plain.string(),
         isBlocker: Shape.plain.boolean().nullable(),
       }),
-
-      // Tag events
       tag_added: Shape.plain.struct({
         type: Shape.plain.string('tag_added'),
         ...EventBaseFields,
         tag: Shape.plain.string(),
       }),
-
       tag_removed: Shape.plain.struct({
         type: Shape.plain.string('tag_removed'),
         ...EventBaseFields,
         tag: Shape.plain.string(),
       }),
-
-      // Ownership events
       owner_changed: Shape.plain.struct({
         type: Shape.plain.string('owner_changed'),
         ...EventBaseFields,
         fromOwner: Shape.plain.string().nullable(),
         toOwner: Shape.plain.string(),
       }),
-
-      // Repo events
       repo_changed: Shape.plain.struct({
         type: Shape.plain.string('repo_changed'),
         ...EventBaseFields,
         fromRepo: Shape.plain.string().nullable(),
         toRepo: Shape.plain.string(),
       }),
-
-      // Title events
       title_changed: Shape.plain.struct({
         type: Shape.plain.string('title_changed'),
         ...EventBaseFields,
@@ -597,134 +379,64 @@ export const TaskDocumentSchema: DocShape = Shape.doc({
     })
   ),
 
-  //
-  // LINKED_PRS - GitHub PR references
-  //
-  // Y.Doc: YDOC_KEYS.LINKED_PRS = "linkedPRs" - EXISTS
-  // Helpers: getLinkedPRs(), linkPR(), unlinkPR(), getLinkedPR(), updateLinkedPRStatus()
-  //
-  // Feature: Track GitHub PRs associated with a task for diff viewing and review
-  // Linking methods:
-  //   1. Auto-link: complete_task/add-artifact detects current branch, queries GitHub API
-  //   2. Manual MCP: link_pr tool with prNumber
-  //   3. Manual UI: LinkPRButton component
-  //
-  // UI: ChangesView (PR cards, diff viewer), KanbanCard (PR count), PlanHeader
-  // If removed: FATAL - no PR integration, cannot view diffs or leave review comments
-  //
-  // Relationship to prReviewComments: linkedPRs lists which PRs exist,
-  //   prReviewComments stores inline comments referencing PRs by prNumber
-  //
+  /** GitHub PR references */
   linkedPRs: Shape.list(
     Shape.plain.struct({
-      // EXISTS: GitHub PR number (e.g., 123 for PR #123)
-      // UI: Displayed as "#123" in cards, used to match selected PR, filter comments
-      // If removed: FATAL - entire PR linking system breaks
       prNumber: Shape.plain.number(),
 
-      // REMOVED: url - Reconstruct dynamically as `https://github.com/${repo}/pull/${prNumber}`
-      // Saves storage, always accurate, no sync needed
-
-      // EXISTS: PR state from GitHub API (cached, not auto-fetched)
-      // UI: Colored status chip (draft=gray, open=green, merged=purple, closed=red)
-      // Server: Used to avoid linking closed/merged PRs during auto-link
-      // If removed: HIGH - lose visual state indication, auto-link logic degraded
-      //
-      // Why cached not auto-fetched:
-      //   - GitHub API rate limits (5000 req/hr authenticated, 60/hr unauthenticated)
-      //   - Fetching on every render would be slow (network latency)
-      //   - ChangesView refreshes from API on mount, updates CRDT if changed
-      //   - Cached value prevents unnecessary API calls for unchanged PRs
-      //
-      // Alternative: Could fetch on-demand with staleness indicator if status is old
+      /** Cached from GitHub API (not auto-fetched to avoid rate limits) */
       status: Shape.plain.string('draft', 'open', 'merged', 'closed'),
 
-      // REMOVED: linkedAt - Use pr_linked event timestamp instead
-      // Activity log already records when PR was linked
-
-      // NEW: Branch name (from Y.Doc optional field)
-      // UI: Shows branch badge in PRCard
-      // If removed: MINOR - lose context about which branch PR came from
       branch: Shape.plain.string().nullable(),
-
-      // NEW: PR title (from Y.Doc optional field)
-      // UI: Shows PR title instead of just "#123"
-      // If removed: MODERATE - users see only numbers, need to click to GitHub
       title: Shape.plain.string().nullable(),
     })
   ),
 
-  //
-  // INPUT REQUESTS - Per-task user input requests
-  //
-  // Architecture: Hybrid model with both global and per-task requests
-  //   - GlobalRoomSchema.inputRequests: Global requests (with taskId field for association)
-  //   - TaskDocumentSchema.inputRequests: Task-specific requests (no taskId needed)
-  //
-  // Use per-task for: Task-specific questions, deliverable clarifications
-  // Use global for: Room-level settings, user preferences
-  //
-  // UI: InputRequestModal shows both, filtered by task context
-  // If removed: MODERATE - lose per-task input requests (global still works)
-  //
+  /**
+   * Per-task input requests (discriminated by 'type').
+   * No taskId field - implicit from parent document.
+   */
   inputRequests: Shape.list(
     Shape.plain.discriminatedUnion('type', {
-      // Simple text input (single line)
       text: Shape.plain.struct({
         type: Shape.plain.string('text'),
         ...InputRequestBaseFields,
         ...TextInputFields,
       }),
-
-      // Multi-line text input (textarea)
       multiline: Shape.plain.struct({
         type: Shape.plain.string('multiline'),
         ...InputRequestBaseFields,
         ...MultilineInputFields,
       }),
-
-      // Choice selection (radio/checkbox/dropdown)
       choice: Shape.plain.struct({
         type: Shape.plain.string('choice'),
         ...InputRequestBaseFields,
         ...ChoiceInputFields,
       }),
-
-      // Yes/No confirmation
       confirm: Shape.plain.struct({
         type: Shape.plain.string('confirm'),
         ...InputRequestBaseFields,
       }),
-
-      // Numeric input
       number: Shape.plain.struct({
         type: Shape.plain.string('number'),
         ...InputRequestBaseFields,
         ...NumberInputFields,
       }),
-
-      // Email input
       email: Shape.plain.struct({
         type: Shape.plain.string('email'),
         ...InputRequestBaseFields,
         ...EmailInputFields,
       }),
-
-      // Date picker
       date: Shape.plain.struct({
         type: Shape.plain.string('date'),
         ...InputRequestBaseFields,
         ...DateInputFields,
       }),
-
-      // Rating input (1-5 stars, etc.)
       rating: Shape.plain.struct({
         type: Shape.plain.string('rating'),
         ...InputRequestBaseFields,
         ...RatingInputFields,
       }),
-
-      // Multi-question form
       multi: Shape.plain.struct({
         type: Shape.plain.string('multi'),
         ...InputRequestBaseFields,
@@ -733,119 +445,68 @@ export const TaskDocumentSchema: DocShape = Shape.doc({
     })
   ),
 
-  // NOTE: prReviewComments and localDiffComments have been merged into the unified
-  // 'comments' field above using a discriminated union by 'kind'.
-  // - PR comments: kind='pr' with prNumber, path, line
-  // - Local diff comments: kind='local' with path, line, baseRef, lineContentHash, machineId
-  // This eliminates duplicate schemas and provides type-safe comment handling.
-
-  //
-  // CHANGE_SNAPSHOTS - Machine-specific git diffs
-  //
-  // Enables collaborative review on uncommitted code
-  changeSnapshots: Shape.record(Shape.plain.string()),  // machineId → JSON.stringify(ChangeSnapshot)
-
-  // NOTE: snapshots removed - derived on-demand for URL generation, not stored in doc
-  // NOTE: presence removed - use loro-extended ephemeral presence only
+  /** machineId → JSON-stringified ChangeSnapshot */
+  changeSnapshots: Shape.record(Shape.plain.string()),
 }) satisfies DocShape;
-
-// ============================================================================
-// GLOBAL ROOM SCHEMA
-// ============================================================================
 
 /**
  * Global room document schema.
- * One doc per room, shared across all tasks for discovery and cross-task coordination.
+ * One doc per room, shared across all tasks.
  */
 export const GlobalRoomSchema: DocShape = Shape.doc({
-  // REMOVED: tasks - Rely on primary task docs instead of duplicating metadata
-  // Research confirmed: Delta sync is tiny, IndexedDB caching makes this performant
-  // Inbox/Kanban will load task docs on-demand (loro-extended supports selective sync)
-  // Eliminates dual-write complexity and sync burden
-
-  //
-  // INPUT REQUESTS - Global room-level user input requests
-  //
-  // Y.Doc: YDOC_KEYS.INPUT_REQUESTS in plan-index doc - ALL requests stored globally
-  // Loro: Hybrid model - global requests have taskId, per-task requests don't
-  //
-  // Architecture:
-  //   - Global requests (here): Have taskId field for task association
-  //   - Per-task requests (TaskDocumentSchema): No taskId field (implicit)
-  //   - Browser connects to both docs, merges for display
-  //   - Activity events (input_request_created, input_request_answered) log to specific task docs
-  //
-  // UI: InputRequestModal, toast notifications, AgentRequestsBadge
-  // If removed: FATAL - agents cannot request user input
-  //
-  // Discriminated union by 'type' - each input type has specific fields
-  //
+  /**
+   * Global input requests (discriminated by 'type').
+   * Has taskId field for task association.
+   */
   inputRequests: Shape.list(
     Shape.plain.discriminatedUnion('type', {
-      // Simple text input (single line)
       text: Shape.plain.struct({
         type: Shape.plain.string('text'),
         ...InputRequestBaseFields,
         taskId: Shape.plain.string().nullable(),
         ...TextInputFields,
       }),
-
-      // Multi-line text input (textarea)
       multiline: Shape.plain.struct({
         type: Shape.plain.string('multiline'),
         ...InputRequestBaseFields,
         taskId: Shape.plain.string().nullable(),
         ...MultilineInputFields,
       }),
-
-      // Choice selection (radio/checkbox/dropdown)
       choice: Shape.plain.struct({
         type: Shape.plain.string('choice'),
         ...InputRequestBaseFields,
         taskId: Shape.plain.string().nullable(),
         ...ChoiceInputFields,
       }),
-
-      // Yes/No confirmation
       confirm: Shape.plain.struct({
         type: Shape.plain.string('confirm'),
         ...InputRequestBaseFields,
         taskId: Shape.plain.string().nullable(),
       }),
-
-      // Numeric input
       number: Shape.plain.struct({
         type: Shape.plain.string('number'),
         ...InputRequestBaseFields,
         taskId: Shape.plain.string().nullable(),
         ...NumberInputFields,
       }),
-
-      // Email input
       email: Shape.plain.struct({
         type: Shape.plain.string('email'),
         ...InputRequestBaseFields,
         taskId: Shape.plain.string().nullable(),
         ...EmailInputFields,
       }),
-
-      // Date picker
       date: Shape.plain.struct({
         type: Shape.plain.string('date'),
         ...InputRequestBaseFields,
         taskId: Shape.plain.string().nullable(),
         ...DateInputFields,
       }),
-
-      // Rating input (1-5 stars, etc.)
       rating: Shape.plain.struct({
         type: Shape.plain.string('rating'),
         ...InputRequestBaseFields,
         taskId: Shape.plain.string().nullable(),
         ...RatingInputFields,
       }),
-
-      // Multi-question form
       multi: Shape.plain.struct({
         type: Shape.plain.string('multi'),
         ...InputRequestBaseFields,
@@ -854,46 +515,22 @@ export const GlobalRoomSchema: DocShape = Shape.doc({
       }),
     })
   ),
-
-  // REMOVED: agents - Not used (changeSnapshots has machineId, WebRTC awareness has real-time presence)
-  // Research confirmed: Diff per machine uses changeSnapshots, agent status uses WebRTC awareness
-  // This was a new field with no actual consumers
-
-  // REMOVED: viewedBy (global) - Keep only per-task viewedBy in TaskDocumentSchema.meta
-  // User decision: "Only makes sense on the document level"
-  // Inbox will load task docs to check unread status (performant with loro-extended selective sync)
 });
 
-// ============================================================================
-// TYPE EXPORTS
-// ============================================================================
-
-// Task Document Types
+// Type exports
 export type TaskDocumentShape = typeof TaskDocumentSchema;
 export type TaskDocument = Infer<typeof TaskDocumentSchema>;
 export type MutableTaskDocument = InferMutableType<typeof TaskDocumentSchema>;
 export type TaskMeta = Infer<typeof TaskDocumentSchema.shapes.meta>;
-
-// Comment types (discriminated union by 'kind')
 export type TaskComment = Infer<typeof TaskDocumentSchema.shapes.comments>;
-
-// Event types (discriminated union by 'type')
 export type TaskEvent = Infer<typeof TaskDocumentSchema.shapes.events>;
-
-// Artifact types (discriminated union by 'storage')
 export type TaskArtifact = Infer<typeof TaskDocumentSchema.shapes.artifacts>;
-
 export type TaskDeliverable = Infer<typeof TaskDocumentSchema.shapes.deliverables>;
 export type TaskLinkedPR = Infer<typeof TaskDocumentSchema.shapes.linkedPRs>;
+export type TaskInputRequest = Infer<typeof TaskDocumentSchema.shapes.inputRequests>;
 
-// Global Room Types
 export type GlobalRoomShape = typeof GlobalRoomSchema;
 export type GlobalRoom = Infer<typeof GlobalRoomSchema>;
 export type MutableGlobalRoom = InferMutableType<typeof GlobalRoomSchema>;
-
-// Input request types (discriminated union by 'type')
 export type InputRequest = Infer<typeof GlobalRoomSchema.shapes.inputRequests>;
-
-// Per-task input request types (same structure, no taskId)
-export type TaskInputRequest = Infer<typeof TaskDocumentSchema.shapes.inputRequests>;
 

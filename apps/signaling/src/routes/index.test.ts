@@ -1,6 +1,7 @@
 import { env } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
 import { app } from "./index";
+import { ROUTES } from "./routes";
 
 describe("App Configuration", () => {
 	describe("404 handler", () => {
@@ -28,18 +29,18 @@ describe("App Configuration", () => {
 			const json = (await res.json()) as Record<string, unknown>;
 
 			// Verify key endpoints are listed
-			expect(json.endpoints).toContain("GET /health");
-			expect(json.endpoints).toContain("POST /auth/github/callback");
-			expect(json.endpoints).toContain("POST /collab/create");
-			expect(json.endpoints).toContain("WS /personal/:userId");
-			expect(json.endpoints).toContain("WS /collab/:roomId");
+			expect(json.endpoints).toContain(`GET ${ROUTES.HEALTH}`);
+			expect(json.endpoints).toContain(`POST ${ROUTES.AUTH_GITHUB_CALLBACK}`);
+			expect(json.endpoints).toContain(`POST ${ROUTES.COLLAB_CREATE}`);
+			expect(json.endpoints).toContain(`WS ${ROUTES.WS_PERSONAL}`);
+			expect(json.endpoints).toContain(`WS ${ROUTES.WS_COLLAB}`);
 		});
 	});
 
 	describe("CORS middleware", () => {
 		it("allows requests from localhost in test environment", async () => {
 			const res = await app.request(
-				"/health",
+				ROUTES.HEALTH,
 				{
 					method: "GET",
 					headers: {
@@ -57,7 +58,7 @@ describe("App Configuration", () => {
 
 		it("handles OPTIONS preflight requests", async () => {
 			const res = await app.request(
-				"/health",
+				ROUTES.HEALTH,
 				{
 					method: "OPTIONS",
 					headers: {
@@ -77,7 +78,7 @@ describe("App Configuration", () => {
 
 		it("rejects requests from disallowed origins", async () => {
 			const res = await app.request(
-				"/health",
+				ROUTES.HEALTH,
 				{
 					method: "GET",
 					headers: {
@@ -99,7 +100,7 @@ describe("App Configuration", () => {
 			// Trigger an error by calling a route that doesn't exist with POST
 			// (The route handler will throw because req.json() is called but body is missing)
 			const res = await app.request(
-				"/auth/github/callback",
+				ROUTES.AUTH_GITHUB_CALLBACK,
 				{
 					method: "POST",
 					headers: {
@@ -122,7 +123,7 @@ describe("App Configuration", () => {
 		it("logs all requests (verified by response)", async () => {
 			// We can't directly verify logging in tests, but we can verify
 			// the middleware doesn't break the request pipeline
-			const res = await app.request("/health", {}, env);
+			const res = await app.request(ROUTES.HEALTH, {}, env);
 
 			expect(res.status).toBe(200);
 			const json = (await res.json()) as Record<string, unknown>;
@@ -141,13 +142,13 @@ describe("App Configuration", () => {
 
 	describe("Route mounting", () => {
 		it("mounts health check route", async () => {
-			const res = await app.request("/health", {}, env);
+			const res = await app.request(ROUTES.HEALTH, {}, env);
 			expect(res.status).toBe(200);
 		});
 
 		it("mounts auth routes", async () => {
 			const res = await app.request(
-				"/auth/github/callback",
+				ROUTES.AUTH_GITHUB_CALLBACK,
 				{
 					method: "POST",
 					headers: { "Content-Type": "application/json" },
@@ -161,7 +162,7 @@ describe("App Configuration", () => {
 
 		it("mounts collab creation route", async () => {
 			const res = await app.request(
-				"/collab/create",
+				ROUTES.COLLAB_CREATE,
 				{
 					method: "POST",
 					headers: { "Content-Type": "application/json" },

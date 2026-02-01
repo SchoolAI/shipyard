@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { generateSessionToken } from "../auth/jwt";
 import type { Env } from "../env";
 import { app } from "./index";
+import { ROUTES } from "./routes";
 
 /**
  * Helper to create a valid JWT for testing
@@ -17,7 +18,7 @@ async function createTestToken(
 	);
 }
 
-describe("GET /personal/:userId (WebSocket)", () => {
+describe(`GET ${ROUTES.WS_PERSONAL} (WebSocket)`, () => {
 	it("returns 426 without Upgrade header", async () => {
 		const token = await createTestToken();
 

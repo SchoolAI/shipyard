@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { generateSessionToken } from "../auth/jwt";
 import type { Env } from "../env";
 import { app } from "./index";
+import { ROUTES } from "./routes";
 
 /**
  * Helper to create a valid JWT for testing
@@ -42,10 +43,10 @@ function createExpiredToken(): string {
 	return `${header}.${payload}.invalid_signature`;
 }
 
-describe("POST /collab/create", () => {
+describe(`POST ${ROUTES.COLLAB_CREATE}`, () => {
 	it("returns 401 without Authorization header", async () => {
 		const res = await app.request(
-			"/collab/create",
+			ROUTES.COLLAB_CREATE,
 			{
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
@@ -62,7 +63,7 @@ describe("POST /collab/create", () => {
 
 	it("returns 401 for invalid Authorization format", async () => {
 		const res = await app.request(
-			"/collab/create",
+			ROUTES.COLLAB_CREATE,
 			{
 				method: "POST",
 				headers: {
@@ -81,7 +82,7 @@ describe("POST /collab/create", () => {
 
 	it("returns 401 for invalid JWT", async () => {
 		const res = await app.request(
-			"/collab/create",
+			ROUTES.COLLAB_CREATE,
 			{
 				method: "POST",
 				headers: {
@@ -103,7 +104,7 @@ describe("POST /collab/create", () => {
 		const expiredToken = createExpiredToken();
 
 		const res = await app.request(
-			"/collab/create",
+			ROUTES.COLLAB_CREATE,
 			{
 				method: "POST",
 				headers: {
@@ -124,7 +125,7 @@ describe("POST /collab/create", () => {
 		const token = await createTestToken();
 
 		const res = await app.request(
-			"/collab/create",
+			ROUTES.COLLAB_CREATE,
 			{
 				method: "POST",
 				headers: {
@@ -145,7 +146,7 @@ describe("POST /collab/create", () => {
 		const token = await createTestToken();
 
 		const res = await app.request(
-			"/collab/create",
+			ROUTES.COLLAB_CREATE,
 			{
 				method: "POST",
 				headers: {
@@ -167,7 +168,7 @@ describe("POST /collab/create", () => {
 		const token = await createTestToken();
 
 		const res = await app.request(
-			"/collab/create",
+			ROUTES.COLLAB_CREATE,
 			{
 				method: "POST",
 				headers: {
@@ -188,7 +189,7 @@ describe("POST /collab/create", () => {
 		const token = await createTestToken();
 
 		const res = await app.request(
-			"/collab/create",
+			ROUTES.COLLAB_CREATE,
 			{
 				method: "POST",
 				headers: {
@@ -223,7 +224,7 @@ describe("POST /collab/create", () => {
 		const expiresInMinutes = 30;
 
 		const res = await app.request(
-			"/collab/create",
+			ROUTES.COLLAB_CREATE,
 			{
 				method: "POST",
 				headers: {
@@ -250,7 +251,7 @@ describe("POST /collab/create", () => {
 
 		// Test minimum bound
 		const res1 = await app.request(
-			"/collab/create",
+			ROUTES.COLLAB_CREATE,
 			{
 				method: "POST",
 				headers: {
@@ -268,7 +269,7 @@ describe("POST /collab/create", () => {
 
 		// Test maximum bound (> 24 hours)
 		const res2 = await app.request(
-			"/collab/create",
+			ROUTES.COLLAB_CREATE,
 			{
 				method: "POST",
 				headers: {
@@ -289,7 +290,7 @@ describe("POST /collab/create", () => {
 		const token = await createTestToken();
 
 		const res = await app.request(
-			"/collab/create",
+			ROUTES.COLLAB_CREATE,
 			{
 				method: "POST",
 				headers: {

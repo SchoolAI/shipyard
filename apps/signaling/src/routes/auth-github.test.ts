@@ -1,12 +1,13 @@
 import { env, fetchMock } from "cloudflare:test";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { app } from "./index";
+import { ROUTES } from "./routes";
 
 // GitHub API endpoints
 const GITHUB_TOKEN_URL = "https://github.com";
 const GITHUB_API_URL = "https://api.github.com";
 
-describe("POST /auth/github/callback", () => {
+describe(`POST ${ROUTES.AUTH_GITHUB_CALLBACK}`, () => {
 	beforeAll(() => {
 		fetchMock.activate();
 		fetchMock.disableNetConnect();
@@ -18,7 +19,7 @@ describe("POST /auth/github/callback", () => {
 
 	it("returns 400 for invalid JSON body", async () => {
 		const res = await app.request(
-			"/auth/github/callback",
+			ROUTES.AUTH_GITHUB_CALLBACK,
 			{
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
@@ -34,7 +35,7 @@ describe("POST /auth/github/callback", () => {
 
 	it("returns 400 for missing code", async () => {
 		const res = await app.request(
-			"/auth/github/callback",
+			ROUTES.AUTH_GITHUB_CALLBACK,
 			{
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
@@ -45,13 +46,13 @@ describe("POST /auth/github/callback", () => {
 
 		expect(res.status).toBe(400);
 		const json = (await res.json()) as Record<string, unknown>;
-		expect(json.error).toBe("missing_code");
-		expect(json.message).toBe("code is required");
+		expect(json.error).toBe("validation_error");
+		expect(json.details).toBeDefined();
 	});
 
 	it("returns 400 for missing redirect_uri", async () => {
 		const res = await app.request(
-			"/auth/github/callback",
+			ROUTES.AUTH_GITHUB_CALLBACK,
 			{
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
@@ -62,8 +63,8 @@ describe("POST /auth/github/callback", () => {
 
 		expect(res.status).toBe(400);
 		const json = (await res.json()) as Record<string, unknown>;
-		expect(json.error).toBe("missing_redirect_uri");
-		expect(json.message).toBe("redirect_uri is required");
+		expect(json.error).toBe("validation_error");
+		expect(json.details).toBeDefined();
 	});
 
 	it("returns 401 for invalid code (GitHub API error)", async () => {
@@ -81,7 +82,7 @@ describe("POST /auth/github/callback", () => {
 			);
 
 		const res = await app.request(
-			"/auth/github/callback",
+			ROUTES.AUTH_GITHUB_CALLBACK,
 			{
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
@@ -114,7 +115,7 @@ describe("POST /auth/github/callback", () => {
 			.reply(401, "Unauthorized");
 
 		const res = await app.request(
-			"/auth/github/callback",
+			ROUTES.AUTH_GITHUB_CALLBACK,
 			{
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
@@ -156,7 +157,7 @@ describe("POST /auth/github/callback", () => {
 			);
 
 		const res = await app.request(
-			"/auth/github/callback",
+			ROUTES.AUTH_GITHUB_CALLBACK,
 			{
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
@@ -210,7 +211,7 @@ describe("POST /auth/github/callback", () => {
 			);
 
 		const res = await app.request(
-			"/auth/github/callback",
+			ROUTES.AUTH_GITHUB_CALLBACK,
 			{
 				method: "POST",
 				headers: {
@@ -255,7 +256,7 @@ describe("POST /auth/github/callback", () => {
 			);
 
 		const res = await app.request(
-			"/auth/github/callback",
+			ROUTES.AUTH_GITHUB_CALLBACK,
 			{
 				method: "POST",
 				headers: {

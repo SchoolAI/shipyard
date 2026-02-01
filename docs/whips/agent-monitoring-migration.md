@@ -1,7 +1,8 @@
 # Agent Monitoring System Migration
 
 **Created:** 2026-01-31
-**Status:** Planning
+**Status:** Phase 1 Complete (Signaling Infrastructure)
+**Updated:** 2026-02-01
 **Scope:** Architecture migration from current Yjs/y-webrtc topology to loro-extended with Personal/Collab room model
 
 ---
@@ -398,34 +399,50 @@ Flow:
 
 ## Implementation Sequence
 
-### Phase 1: Signaling Infrastructure (Week 1-2)
+### Phase 1: Signaling Infrastructure ✅ COMPLETE (2026-02-01)
 
 **Goal:** New room topology + Shipyard JWT auth
 
-1. Create PersonalRoom Durable Object
+**Completed:**
+1. ✅ Created PersonalRoom Durable Object
    - User authentication (GitHub OAuth → Shipyard JWT)
    - Agent registry (machineId, agentType, status)
    - WebRTC signaling relay
+   - Message handlers for agent lifecycle
 
-2. Create CollabRoom Durable Object
+2. ✅ Created CollabRoom Durable Object
    - Pre-signed URL validation
-   - Participant management
+   - Participant management (owner/collaborator roles)
    - Task bridging
+   - WebRTC relay with user identity
 
-3. Implement Shipyard JWT
-   - Token generation (after OAuth)
-   - Token validation (signature check)
-   - Agent token scoping
+3. ✅ Implemented Shipyard JWT
+   - Token generation (7-day session, 24-hour agent tokens)
+   - Token validation (HMAC-SHA256 signature check)
+   - Agent token scoping (task + machine)
+   - Pre-signed URL generation/validation
 
-4. Update OAuth worker
-   - Merge into signaling worker (or keep separate)
-   - Issue Shipyard JWT instead of passing GitHub token
+4. ✅ Updated Authentication
+   - GitHub OAuth flow maintained in separate worker
+   - Signaling validates tokens (not merged yet)
+   - All routes use Shipyard JWT
+
+**Additional Achievements:**
+- ✅ Fan-in based coverage system (60% for high fan-in modules)
+- ✅ 107 integration tests (100% route coverage)
+- ✅ Zero type errors, zero lint errors
+- ✅ Zod schemas for all request/response bodies
+- ✅ Typed client with full API surface
+- ✅ Route constants centralized
+- ✅ Server validated and running
 
 **Deliverables:**
-- [ ] PersonalRoom DO with auth
-- [ ] CollabRoom DO with pre-signed URLs
-- [ ] Shipyard JWT generation/validation
-- [ ] Signaling worker deployed
+- [x] PersonalRoom DO with auth
+- [x] CollabRoom DO with pre-signed URLs
+- [x] Shipyard JWT generation/validation
+- [x] Signaling worker ready for deployment
+
+**See:** `/private/tmp/claude/.../scratchpad/signaling-completion-report.md` for full details
 
 ### Phase 2: Daemon Consolidation (Week 3-4)
 

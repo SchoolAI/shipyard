@@ -2,6 +2,13 @@ import { Hono } from "hono";
 import { validateToken } from "../auth/jwt";
 import type { Env } from "../env";
 import { createLogger } from "../utils/logger";
+import {
+	forbiddenResponse,
+	invalidTokenResponse,
+	requireQueryParam,
+	requireWebSocketUpgrade,
+} from "../utils/route-helpers";
+import { ROUTES } from "./routes";
 
 /**
  * Personal Room WebSocket route.
@@ -13,40 +20,24 @@ import { createLogger } from "../utils/logger";
  */
 export const wsPersonalRoute = new Hono<{ Bindings: Env }>();
 
-wsPersonalRoute.get("/personal/:userId", async (c) => {
+wsPersonalRoute.get(ROUTES.WS_PERSONAL, async (c) => {
 	const logger = createLogger(c.env);
 	const userId = c.req.param("userId");
-	const token = c.req.query("token");
 
-	const upgradeHeader = c.req.header("Upgrade");
-	if (upgradeHeader !== "websocket") {
-		return c.json(
-			{ error: "upgrade_required", message: "WebSocket upgrade required" },
-			426,
-		);
-	}
+	const upgradeResult = requireWebSocketUpgrade(c);
+	if (!upgradeResult.ok) return upgradeResult.error;
 
-	if (!token) {
-		return c.json(
-			{ error: "missing_token", message: "token query param required" },
-			401,
-		);
-	}
+	const tokenResult = requireQueryParam(c, "token");
+	if (!tokenResult.ok) return tokenResult.error;
 
-	const claims = await validateToken(token, c.env.JWT_SECRET);
+	const claims = await validateToken(tokenResult.value, c.env.JWT_SECRET);
 	if (!claims) {
-		return c.json(
-			{ error: "invalid_token", message: "Invalid or expired token" },
-			401,
-		);
+		return invalidTokenResponse(c);
 	}
 
 	if (claims.sub !== userId) {
 		logger.warn("userId mismatch", { urlUserId: userId, tokenSub: claims.sub });
-		return c.json(
-			{ error: "forbidden", message: "userId does not match token" },
-			403,
-		);
+		return forbiddenResponse(c, "userId does not match token");
 	}
 
 	const roomId = c.env.PERSONAL_ROOM.idFromName(userId);
