@@ -12,7 +12,7 @@
     "lint:comments": "bash scripts/lint-comments.sh",
     "lint:typeassertions": "bash scripts/lint-typeassertions.sh",
     "lint:fix": "turbo run lint:fix",
-    "check": "turbo run test typecheck lint && pnpm lint:comments && pnpm lint:typeassertions",
+    "check": "bash scripts/validate-file-allowlist.sh && turbo run test typecheck lint && pnpm lint:comments && pnpm lint:typeassertions",
     "dev:all": "bash scripts/dev-all.sh",
     "dev:local": "bash scripts/dev-local.sh",
     "dev:schema": "turbo run dev --filter=@shipyard/schema",

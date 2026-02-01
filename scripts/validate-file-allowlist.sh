@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Pre-commit hook: Enforce allowlist for documentation and scripts
-# Prevents AI agents from creating/modifying files without explicit approval
+# Validation script: Check ALL existing files against allowlist
+# Unlike pre-commit hook, this checks the entire repo state
 
-# Allowlisted markdown/text files (entire repo - complete inventory)
+# Source the allowlist from the pre-commit script
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Define allowlists inline (keep in sync with check-file-allowlist.sh)
 ALLOWED_DOCS=(
   # Root level
   "README.md"
@@ -72,7 +75,6 @@ ALLOWED_DOCS=(
   "spikes/plannotator/tests/manual/ssh/DOCKER_SSH_TEST.md"
 )
 
-# Allowlisted scripts
 ALLOWED_SCRIPTS=(
   "scripts/check-npm-deps.js"
   "scripts/dev-all.sh"
@@ -91,10 +93,16 @@ ALLOWED_SCRIPTS=(
   "scripts/generate-icons.py"
   "scripts/inspect-plan.mjs"
   "scripts/check-file-allowlist.sh"
+  "scripts/validate-file-allowlist.sh"
 )
 
-# Get staged files (new or modified)
-staged_files=$(git diff --cached --name-only --diff-filter=AM)
+# Find all markdown and text files (excluding node_modules, .git, loro-extended-repo)
+all_files=$(find . -type f \( -name "*.md" -o -name "*.txt" \) \
+  -not -path "*/node_modules/*" \
+  -not -path "*/.git/*" \
+  -not -path "*/spikes/loro-extended-repo/*" \
+  -not -path "*/dist/*" \
+  | sed 's|^\./||')
 
 violations=()
 
@@ -102,23 +110,18 @@ while IFS= read -r file; do
   # Skip empty lines
   [[ -z "$file" ]] && continue
 
-  # Skip node_modules and hidden files
-  [[ "$file" =~ node_modules ]] && continue
-  [[ "$file" =~ ^\. ]] && [[ ! "$file" =~ ^\.claude/ ]] && [[ ! "$file" =~ ^\.codex/ ]] && [[ ! "$file" =~ ^\.grit/ ]] && continue
+  # Exception: docs/whips/ is a sandbox
+  if [[ "$file" =~ ^docs/whips/ ]]; then
+    continue
+  fi
 
-  # Check markdown and text files
+  # Exception: docs/decisions/ (ADRs)
+  if [[ "$file" =~ ^docs/decisions/ ]]; then
+    continue
+  fi
+
+  # Check if in docs allowlist
   if [[ "$file" =~ \.(md|txt)$ ]]; then
-    # Exception: docs/whips/ is a sandbox
-    if [[ "$file" =~ ^docs/whips/ ]]; then
-      continue
-    fi
-
-    # Exception: docs/decisions/ (ADRs can be added)
-    if [[ "$file" =~ ^docs/decisions/ ]]; then
-      continue
-    fi
-
-    # Check if in allowlist
     is_allowed=false
     for allowed in "${ALLOWED_DOCS[@]}"; do
       if [[ "$file" == "$allowed" ]]; then
@@ -132,7 +135,7 @@ while IFS= read -r file; do
     fi
   fi
 
-  # Check scripts
+  # Check if in scripts allowlist
   if [[ "$file" =~ ^scripts/ ]]; then
     is_allowed=false
     for allowed in "${ALLOWED_SCRIPTS[@]}"; do
@@ -146,31 +149,28 @@ while IFS= read -r file; do
       violations+=("$file")
     fi
   fi
-done <<< "$staged_files"
+done <<< "$all_files"
 
 if [[ ${#violations[@]} -gt 0 ]]; then
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-  echo "❌ BLOCKED: Files not in allowlist"
+  echo "❌ VALIDATION FAILED: Files exist that are not in allowlist"
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo ""
+  echo "The following files are not in the allowlist:"
   echo ""
   for file in "${violations[@]}"; do
     echo "  • $file"
   done
   echo ""
-  echo "📋 Documentation changes require intentional approval:"
-  echo ""
-  echo "  For temporary notes:"
-  echo "    → Use docs/whips/ (sandbox, can be deleted anytime)"
-  echo ""
-  echo "  For permanent documentation:"
-  echo "    → Ask user for approval before adding/modifying"
-  echo "    → Then add to allowlist in scripts/check-file-allowlist.sh"
-  echo ""
-  echo "  For architecture decisions:"
-  echo "    → Use docs/decisions/ (ADRs are auto-allowed)"
+  echo "To fix:"
+  echo "  1. If temporary: Move to docs/wips/"
+  echo "  2. If permanent: Add to allowlist in scripts/check-file-allowlist.sh AND scripts/validate-file-allowlist.sh"
+  echo "  3. If obsolete: Delete the file"
   echo ""
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
   exit 1
 fi
 
+file_count=$(echo "$all_files" | grep -c . || echo 0)
+echo "✅ File allowlist validation passed ($file_count files checked)"
 exit 0
