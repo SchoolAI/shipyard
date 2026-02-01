@@ -106,33 +106,44 @@ apps/
 
 ### Phase 1: Foundation (Week 1)
 
-**Goal:** Set up loro-extended + new packages
+**Goal:** Validate approach with spikes, design schema
 
 **Tasks:**
-1. Create `packages/loro-schema/`
-   - Copy plan types from old schema (PlanMetadata, Artifact, etc.)
-   - Define Loro Shape for Task document
-   - Implement basic helpers (getMetadata, setMetadata, etc.)
-   - Copy URL encoding (format agnostic)
 
-2. Create `packages/editor/`
-   - Basic Tiptap setup
-   - Drag handle (from @tiptap/extension-drag-handle-react)
-   - Bubble menu (from @tiptap/react)
-   - Wire loro-prosemirror (LoroSyncPlugin)
-   - HeroUI v3 styling
+**A. Design Work (First 2-3 days)**
+1. Design Loro Shape
+   - Full schema: metadata, content, comments, events, permissions
+   - Container types (Tree, Map, List, Text)
+   - Permission model (roles, grants, operations)
+   - Signaling server permissions
+   - Event storage format
+   - **Document in new ADR**
 
-3. Add dependencies
-   - `loro-crdt`
-   - `loro-prosemirror`
-   - `@loro-extended/repo`
-   - `@loro-extended/adapter-webrtc`
-   - `@tiptap/react`, `@tiptap/starter-kit`, `@tiptap/extension-drag-handle-react`
+2. Research Edge URL limit
+   - Verify 2K vs 2M character limit
+   - Test actual behavior
+   - Decide support or document limitation
+
+**B. Spike Work (Next 2-3 days)**
+3. Spike: Tiptap + Loro
+   - Minimal Vite app
+   - Tiptap + loro-prosemirror integration
+   - Test editing, comments, sync
+   - Validate Loro cursor API
+   - **Prove it works before committing**
+
+**C. Setup (Final 1-2 days)**
+4. Create package structure
+   - `packages/loro-schema/` with designed Shape
+   - `packages/editor/` with proven spike code
+   - Add dependencies
 
 **Deliverables:**
-- [ ] packages/loro-schema builds and exports types
-- [ ] packages/editor renders in Storybook/Vite dev
-- [ ] Basic editing works (type, format, drag blocks)
+- [ ] Loro Shape designed and documented (ADR)
+- [ ] Spike proves Tiptap + Loro works
+- [ ] Edge URL limit researched
+- [ ] Package structure created
+- [ ] Go/No-Go decision made
 
 ---
 

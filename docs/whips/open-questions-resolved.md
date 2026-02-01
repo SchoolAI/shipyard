@@ -79,24 +79,19 @@ TOOL_NAMES = {
 
 ---
 
-### ✅ RESOLVED: Permission Granularity
+### ❌ OPEN: Permission Granularity
 
 **Question:** What specific operations need permissions?
 
-**Answer from Code:**
-```typescript
-// packages/schema/src/plan.ts
-interface PlanMetadata {
-  approvalRequired?: boolean;   // Owner-controlled
-  approvedUsers?: string[];     // Whitelist
-  rejectedUsers?: string[];     // Blacklist
-}
-```
+**Status:** FULL REDESIGN - Don't assume current code
 
-**Current Model:**
-- Binary: approved or rejected (no granular permissions)
-- Owner has full control
-- Approved users can read/write (no distinction)
+**Current Code Has:**
+```typescript
+// packages/schema/src/plan.ts (current, will be replaced)
+approvalRequired?: boolean;
+approvedUsers?: string[];
+rejectedUsers?: string[];
+```
 
 **Architecture Doc Proposes:**
 ```typescript
@@ -112,38 +107,36 @@ permissions: {
 }
 ```
 
-**Gap:** Current code has no granular permissions
-
-**Recommendation for Loro:** Implement granular permissions as proposed
-- Store in Loro doc (same as proposal)
-- Add permission checks before operations
-- NEW WORK (not in current code)
+**Action Required:**
+- Design full permission model from scratch
+- Include signaling server permissions too
+- Don't assume current schema
+- **This is a Week 1 design task**
 
 ---
 
-### ✅ RESOLVED: Delegation Depth
+### ✅ RESOLVED: Invite Delegation
 
-**Question:** Can collaborators grant access to others, or only owners?
+**Question:** Can approved users invite more users, or only the owner?
 
-**Answer from Code:**
+**Answer:** OWNER ONLY (simplest, two-way door)
+
+**What this means:**
+- Alice creates plan → Alice is owner
+- Alice can invite Bob (creates invite token)
+- Bob CANNOT invite Carol (only Alice can)
+- No cascading - only the original owner grants access
+
+**Current code enforces this:**
 ```typescript
-// Current: Invite system (apps/signaling/core/handlers/invites.ts)
-// Only plan OWNER can create invites
-// Invites checked in: handleCreateInvite()
-
-const planOwnerId = await platform.getPlanOwnerId(planId);
-if (!planOwnerId) {
-  // Trust-on-first-use: caller becomes owner
-  await platform.setPlanOwnerId(planId, userId);
-}
+// apps/signaling/core/handlers/invites.ts
+// Only plan owner can create invites
 if (planOwnerId && planOwnerId !== userId) {
   return error('unauthorized', 'Only plan owner can create invites');
 }
 ```
 
-**Decision:** Only owners can invite (no delegation)
-
-**Recommendation for Loro:** Keep this - simpler security model
+**Loro:** Keep owner-only (simplest security, easy to change later)
 
 ---
 
@@ -167,19 +160,21 @@ export function setPlanMetadata(ydoc: Y.Doc, updates: Partial<PlanMetadata>) {
 
 ---
 
-### ✅ RESOLVED: Steps Mutability
+### ✅ RESOLVED: Plan Content Mutability
 
-**Question:** Mutable via CRDT?
+**Question:** Is plan content editable after creation?
 
-**Answer from Code:**
-```typescript
-// Steps are in content, edited via BlockNote
-// Content is fully mutable
-```
+**Answer:** YES - plans are collaborative documents
 
-**Decision:** Mutable (content is editable)
+**Current:**
+- Plan content edited in BlockNote (fully mutable)
+- Agents can update via UPDATE_BLOCK_CONTENT tool
+- Humans can edit in browser
 
-**Recommendation for Loro:** Keep mutable - it's the plan content
+**Loro:**
+- Same - Tiptap content is editable
+- Agents update via Loro operations
+- Collaborative editing via loro-prosemirror
 
 ---
 
@@ -187,17 +182,22 @@ export function setPlanMetadata(ydoc: Y.Doc, updates: Partial<PlanMetadata>) {
 
 **Question:** Inline or hash fallback?
 
-**Answer from Code:**
-```typescript
-// packages/schema/src/url-encoding.ts
-// Always inline, no hash fallback implemented
-// Uses lz-string compression
-// No size limit checking
-```
+**Answer:** INLINE ONLY (that's the point - free, no server storage)
 
-**Decision:** Inline only (works for current sizes)
+**Browser Limits:**
+- Chrome: 2M characters ✅
+- Firefox: 65K characters ✅
+- Safari: 80K characters ✅
+- Edge: 2K characters?? ⚠️ (verifying)
+- Opera: 190K characters ✅
 
-**Recommendation for Loro:** Start with inline, add warning if > 32KB
+**Decision:**
+- All data encoded in `?d=` parameter
+- lz-string compression (~40-60% reduction)
+- Typical plan: ~10-20KB compressed (well under limits)
+- No server storage (free hosting on GitHub Pages)
+
+**Edge Support:** TBD - researching actual limit (Edge is Chromium-based, should match Chrome)
 
 ---
 
@@ -475,21 +475,22 @@ awareness.setLocalStateField('planStatus', {
 
 ## Summary
 
-### Answered by Current Code (9 questions)
+### Answered by Current Code (7 questions)
 - ✅ Task ID: nanoid()
 - ✅ Artifact URL: raw.githubusercontent.com/{repo}/plan-artifacts/{planId}/{filename}
 - ✅ MCP tools: 13 tools defined
-- ✅ Permissions: Binary (approved/rejected), need to add granular
-- ✅ Delegation: Owner only (no delegation)
-- ✅ Title: Currently mutable, should make immutable
-- ✅ Steps: Mutable (content editable)
-- ✅ URL size: Inline only
-- ✅ TURN: Optional, not configured
+- ✅ Delegation: Owner only (simplest)
+- ✅ Plan content: Mutable (editable)
+- ✅ URL encoding: Inline only (free, no server)
+- ✅ TURN: Optional, Cloudflare Calls recommended
 
-### New Critical Questions (3 questions)
-- 🔴 Loro Shape design (Week 1 blocker)
-- 🔴 Comment anchoring with Loro cursors (Week 1 spike needed)
-- 🔴 Presence API compatibility (Week 1 validation)
+### Open for Design (2 questions)
+- ❌ Permissions: Full redesign (don't assume current schema)
+- ❌ Title mutability: TBD (make immutable for URL stability?)
+
+### New Critical Questions (2 questions)
+- 🔴 Loro Shape design - FULL schema including permissions (Week 1 blocker)
+- 🔴 Tiptap + Loro spike - Comments, blocks, cursor API (Week 1 validation)
 
 ### New Medium Questions (3 questions)
 - 🟡 Event storage format in Loro
@@ -507,24 +508,25 @@ awareness.setLocalStateField('planStatus', {
 
 Before starting implementation, resolve critical questions:
 
-1. **Design Loro Shape**
-   - Map out exact container structure
-   - Define Shape API calls
-   - Validate with loro-extended docs
+1. **Design Loro Shape (FULL SCHEMA)**
+   - Map out exact container structure (Tree, Map, List, Text)
+   - Define permissions model (roles, grants, operations)
+   - Design event storage format (LoroList structure)
+   - Define metadata fields
+   - Validate with loro-extended Shape API
+   - **This is the foundation - get this right**
 
-2. **Spike Comment Anchoring**
-   - Test Loro cursor API with Tiptap
-   - Validate cursor survives edits
-   - Ensure position tracking works
+2. **Spike: Tiptap + Loro Integration**
+   - Build minimal editor: Tiptap + loro-prosemirror
+   - Test basic editing (type, format, blocks)
+   - Test comment marks (selection anchoring)
+   - Test Loro cursor API (comment positioning)
+   - Validate sync works (multi-tab editing)
+   - **Prove the editor stack works before committing**
 
-3. **Validate loro-extended Presence**
-   - Check if custom fields supported
-   - Test change events
-   - Verify cleanup behavior
+3. **Edge URL Limit Research**
+   - Verify 2K vs 2M character limit
+   - Test actual behavior (not just specs)
+   - Decide: Support Edge or document as unsupported
 
-4. **Design Event Storage**
-   - Decide on LoroList structure
-   - Define event schema in Loro
-   - Test performance with 1000s of events
-
-**These 4 items are blockers for proceeding.** Don't start Week 2 until resolved.
+**These 3 items are blockers for proceeding.** Don't start implementation until validated.
