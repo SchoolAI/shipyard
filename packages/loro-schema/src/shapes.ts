@@ -77,6 +77,201 @@ const InputRequestBaseFields = {
 	isBlocker: Shape.plain.boolean().nullable(),
 } as const;
 
+// =============================================================================
+// Input Request Variant-Specific Fields
+// =============================================================================
+// These field definitions are extracted so they can be reused in both:
+// 1. Top-level inputRequests (discriminated union with full base fields)
+// 2. Multi input's nested questions (union with simplified base fields)
+// =============================================================================
+
+/**
+ * Variant-specific fields for text input requests.
+ * Shared between top-level and multi-nested text inputs.
+ */
+const TextInputVariantFields = {
+	defaultValue: Shape.plain.string().nullable(),
+	placeholder: Shape.plain.string().nullable(),
+} as const;
+
+/**
+ * Variant-specific fields for multiline input requests.
+ * Shared between top-level and multi-nested multiline inputs.
+ */
+const MultilineInputVariantFields = {
+	defaultValue: Shape.plain.string().nullable(),
+	placeholder: Shape.plain.string().nullable(),
+} as const;
+
+/**
+ * Choice option shape used in choice input requests.
+ */
+const ChoiceOptionShape = Shape.plain.struct({
+	label: Shape.plain.string(),
+	value: Shape.plain.string(),
+	description: Shape.plain.string().nullable(),
+});
+
+/**
+ * Variant-specific fields for choice input requests.
+ * Shared between top-level and multi-nested choice inputs.
+ */
+const ChoiceInputVariantFields = {
+	options: Shape.plain.array(ChoiceOptionShape),
+	multiSelect: Shape.plain.boolean().nullable(),
+	displayAs: Shape.plain.string("radio", "checkbox", "dropdown").nullable(),
+	placeholder: Shape.plain.string().nullable(),
+} as const;
+
+/**
+ * Variant-specific fields for number input requests.
+ * Shared between top-level and multi-nested number inputs.
+ */
+const NumberInputVariantFields = {
+	min: Shape.plain.number().nullable(),
+	max: Shape.plain.number().nullable(),
+	format: Shape.plain
+		.string("integer", "decimal", "currency", "percentage")
+		.nullable(),
+	defaultValue: Shape.plain.number().nullable(),
+} as const;
+
+/**
+ * Variant-specific fields for email input requests.
+ * Shared between top-level and multi-nested email inputs.
+ */
+const EmailInputVariantFields = {
+	domain: Shape.plain.string().nullable(),
+	placeholder: Shape.plain.string().nullable(),
+} as const;
+
+/**
+ * Variant-specific fields for date input requests.
+ * Shared between top-level and multi-nested date inputs.
+ */
+const DateInputVariantFields = {
+	/** Unix timestamp in milliseconds */
+	min: Shape.plain.number().nullable(),
+	/** Unix timestamp in milliseconds */
+	max: Shape.plain.number().nullable(),
+} as const;
+
+/**
+ * Rating labels shape used in rating input requests.
+ */
+const RatingLabelsShape = Shape.plain
+	.struct({
+		low: Shape.plain.string().nullable(),
+		high: Shape.plain.string().nullable(),
+	})
+	.nullable();
+
+/**
+ * Variant-specific fields for rating input requests.
+ * Shared between top-level and multi-nested rating inputs.
+ */
+const RatingInputVariantFields = {
+	min: Shape.plain.number().nullable(),
+	max: Shape.plain.number().nullable(),
+	ratingStyle: Shape.plain.string("stars", "numbers", "emoji").nullable(),
+	ratingLabels: RatingLabelsShape,
+} as const;
+
+// Confirm has no variant-specific fields (only type + base fields)
+
+// =============================================================================
+// Multi Input Nested Question Shapes
+// =============================================================================
+// These shapes are used for questions inside a multi input request.
+// They have a simplified base (only message) plus the variant-specific fields.
+// =============================================================================
+
+/**
+ * Nested text question shape for multi inputs.
+ */
+const MultiQuestionTextShape = Shape.plain.struct({
+	type: Shape.plain.string("text"),
+	message: Shape.plain.string(),
+	...TextInputVariantFields,
+});
+
+/**
+ * Nested multiline question shape for multi inputs.
+ */
+const MultiQuestionMultilineShape = Shape.plain.struct({
+	type: Shape.plain.string("multiline"),
+	message: Shape.plain.string(),
+	...MultilineInputVariantFields,
+});
+
+/**
+ * Nested choice question shape for multi inputs.
+ */
+const MultiQuestionChoiceShape = Shape.plain.struct({
+	type: Shape.plain.string("choice"),
+	message: Shape.plain.string(),
+	...ChoiceInputVariantFields,
+});
+
+/**
+ * Nested confirm question shape for multi inputs.
+ */
+const MultiQuestionConfirmShape = Shape.plain.struct({
+	type: Shape.plain.string("confirm"),
+	message: Shape.plain.string(),
+});
+
+/**
+ * Nested number question shape for multi inputs.
+ */
+const MultiQuestionNumberShape = Shape.plain.struct({
+	type: Shape.plain.string("number"),
+	message: Shape.plain.string(),
+	...NumberInputVariantFields,
+});
+
+/**
+ * Nested email question shape for multi inputs.
+ */
+const MultiQuestionEmailShape = Shape.plain.struct({
+	type: Shape.plain.string("email"),
+	message: Shape.plain.string(),
+	...EmailInputVariantFields,
+});
+
+/**
+ * Nested date question shape for multi inputs.
+ */
+const MultiQuestionDateShape = Shape.plain.struct({
+	type: Shape.plain.string("date"),
+	message: Shape.plain.string(),
+	...DateInputVariantFields,
+});
+
+/**
+ * Nested rating question shape for multi inputs.
+ */
+const MultiQuestionRatingShape = Shape.plain.struct({
+	type: Shape.plain.string("rating"),
+	message: Shape.plain.string(),
+	...RatingInputVariantFields,
+});
+
+/**
+ * Union of all nested question shapes for multi inputs.
+ * Supports all 8 input types: text, multiline, choice, confirm, number, email, date, rating.
+ */
+const MultiQuestionUnionShape = Shape.plain.union([
+	MultiQuestionTextShape,
+	MultiQuestionMultilineShape,
+	MultiQuestionChoiceShape,
+	MultiQuestionConfirmShape,
+	MultiQuestionNumberShape,
+	MultiQuestionEmailShape,
+	MultiQuestionDateShape,
+	MultiQuestionRatingShape,
+]);
+
 
 /**
  * Shape definition for individual file changes in a ChangeSnapshot.
@@ -110,11 +305,13 @@ export const TaskDocumentSchema: DocShape = Shape.doc({
 		completedBy: Shape.plain.string().nullable(),
 
 		ownerId: Shape.plain.string().nullable(),
-		epoch: Shape.plain.number().nullable(),
+		epoch: Shape.plain.number(),
+		// ASK: what is this?
 		origin: Shape.plain.string().nullable(),
 		repo: Shape.plain.string().nullable(),
 
 		tags: Shape.list(Shape.plain.string()),
+		// ASK: what is this for?
 		viewedBy: Shape.record(Shape.plain.number()),
 
 		archivedAt: Shape.plain.number().nullable(),
@@ -170,11 +367,12 @@ export const TaskDocumentSchema: DocShape = Shape.doc({
 				url: Shape.plain.string(),
 			}),
 
-			local: Shape.plain.struct({
-				storage: Shape.plain.string("local"),
-				...ArtifactBaseFields,
-				localArtifactId: Shape.plain.string(),
-			}),
+			// TODO: may add local support in the future
+			// local: Shape.plain.struct({
+			// 	storage: Shape.plain.string("local"),
+			// 	...ArtifactBaseFields,
+			// 	localArtifactId: Shape.plain.string(),
+			// }),
 		}),
 	),
 
@@ -254,11 +452,6 @@ export const TaskDocumentSchema: DocShape = Shape.doc({
 				prNumber: Shape.plain.number(),
 				title: Shape.plain.string().nullable(),
 			}),
-			pr_unlinked: Shape.plain.struct({
-				type: Shape.plain.string("pr_unlinked"),
-				...EventBaseFields,
-				prNumber: Shape.plain.number(),
-			}),
 			content_edited: Shape.plain.struct({
 				type: Shape.plain.string("content_edited"),
 				...EventBaseFields,
@@ -292,28 +485,6 @@ export const TaskDocumentSchema: DocShape = Shape.doc({
 				message: Shape.plain.string(),
 				isBlocker: Shape.plain.boolean().nullable(),
 			}),
-			tag_added: Shape.plain.struct({
-				type: Shape.plain.string("tag_added"),
-				...EventBaseFields,
-				tag: Shape.plain.string(),
-			}),
-			tag_removed: Shape.plain.struct({
-				type: Shape.plain.string("tag_removed"),
-				...EventBaseFields,
-				tag: Shape.plain.string(),
-			}),
-			owner_changed: Shape.plain.struct({
-				type: Shape.plain.string("owner_changed"),
-				...EventBaseFields,
-				fromOwner: Shape.plain.string().nullable(),
-				toOwner: Shape.plain.string(),
-			}),
-			repo_changed: Shape.plain.struct({
-				type: Shape.plain.string("repo_changed"),
-				...EventBaseFields,
-				fromRepo: Shape.plain.string().nullable(),
-				toRepo: Shape.plain.string(),
-			}),
 			title_changed: Shape.plain.struct({
 				type: Shape.plain.string("title_changed"),
 				...EventBaseFields,
@@ -337,28 +508,17 @@ export const TaskDocumentSchema: DocShape = Shape.doc({
 			text: Shape.plain.struct({
 				type: Shape.plain.string("text"),
 				...InputRequestBaseFields,
-				defaultValue: Shape.plain.string().nullable(),
-				placeholder: Shape.plain.string().nullable(),
+				...TextInputVariantFields,
 			}),
 			multiline: Shape.plain.struct({
 				type: Shape.plain.string("multiline"),
 				...InputRequestBaseFields,
-				defaultValue: Shape.plain.string().nullable(),
-				placeholder: Shape.plain.string().nullable(),
+				...MultilineInputVariantFields,
 			}),
 			choice: Shape.plain.struct({
 				type: Shape.plain.string("choice"),
 				...InputRequestBaseFields,
-				options: Shape.plain.array(
-					Shape.plain.struct({
-						label: Shape.plain.string(),
-						value: Shape.plain.string(),
-						description: Shape.plain.string().nullable(),
-					}),
-				),
-				multiSelect: Shape.plain.boolean().nullable(),
-				displayAs: Shape.plain.string("radio", "checkbox", "dropdown").nullable(),
-				placeholder: Shape.plain.string().nullable(),
+				...ChoiceInputVariantFields,
 			}),
 			confirm: Shape.plain.struct({
 				type: Shape.plain.string("confirm"),
@@ -367,65 +527,31 @@ export const TaskDocumentSchema: DocShape = Shape.doc({
 			number: Shape.plain.struct({
 				type: Shape.plain.string("number"),
 				...InputRequestBaseFields,
-				min: Shape.plain.number().nullable(),
-				max: Shape.plain.number().nullable(),
-				format: Shape.plain
-					.string("integer", "decimal", "currency", "percentage")
-					.nullable(),
-				defaultValue: Shape.plain.number().nullable(),
+				...NumberInputVariantFields,
 			}),
 			email: Shape.plain.struct({
 				type: Shape.plain.string("email"),
 				...InputRequestBaseFields,
-				domain: Shape.plain.string().nullable(),
-				placeholder: Shape.plain.string().nullable(),
+				...EmailInputVariantFields,
 			}),
 			date: Shape.plain.struct({
 				type: Shape.plain.string("date"),
 				...InputRequestBaseFields,
-				/** Unix timestamp in milliseconds */
-				min: Shape.plain.number().nullable(),
-				/** Unix timestamp in milliseconds */
-				max: Shape.plain.number().nullable(),
+				...DateInputVariantFields,
 			}),
 			rating: Shape.plain.struct({
 				type: Shape.plain.string("rating"),
 				...InputRequestBaseFields,
-				min: Shape.plain.number().nullable(),
-				max: Shape.plain.number().nullable(),
-				ratingStyle: Shape.plain.string("stars", "numbers", "emoji").nullable(),
-				ratingLabels: Shape.plain
-					.struct({
-						low: Shape.plain.string().nullable(),
-						high: Shape.plain.string().nullable(),
-					})
-					.nullable(),
+				...RatingInputVariantFields,
 			}),
 			multi: Shape.plain.struct({
 				type: Shape.plain.string("multi"),
 				...InputRequestBaseFields,
 				/**
-				 * Nested questions - each can have varying structure.
-				 * Using union to support different question types within multi-input.
+				 * Nested questions supporting all 8 input types.
+				 * Each question has a simplified base (message only) plus variant-specific fields.
 				 */
-				questions: Shape.plain.array(
-					Shape.plain.union([
-						Shape.plain.struct({
-							type: Shape.plain.string("text"),
-							message: Shape.plain.string(),
-							placeholder: Shape.plain.string().nullable(),
-						}),
-						Shape.plain.struct({
-							type: Shape.plain.string("choice"),
-							message: Shape.plain.string(),
-							options: Shape.plain.array(Shape.plain.string()),
-						}),
-						Shape.plain.struct({
-							type: Shape.plain.string("confirm"),
-							message: Shape.plain.string(),
-						}),
-					]),
-				),
+				questions: Shape.plain.array(MultiQuestionUnionShape),
 				responses: Shape.plain.record(
 					Shape.plain.union([
 						Shape.plain.string(),
@@ -466,8 +592,10 @@ export const RoomSchema: DocShape = Shape.doc({
 	/**
 	 * Denormalized task metadata for dashboard display.
 	 * Updated by TaskDocument operations when task state changes.
+	 *
+	 * Using Record keyed by taskId for O(1) lookups instead of O(n) list scans.
 	 */
-	taskIndex: Shape.list(
+	taskIndex: Shape.record(
 		Shape.plain.struct({
 			taskId: Shape.plain.string(),
 			title: Shape.plain.string(),
