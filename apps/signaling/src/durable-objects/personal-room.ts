@@ -5,12 +5,12 @@
  */
 
 import { DurableObject } from "cloudflare:workers";
-import type { Env } from "../env";
 import {
 	type PersonalRoomClientMessage,
 	PersonalRoomClientMessageSchema,
 	type PersonalRoomServerMessage,
-} from "../protocol/messages";
+} from "../client/schemas";
+import type { Env } from "../env";
 import {
 	broadcastExcept,
 	findWebSocketByMachineId,

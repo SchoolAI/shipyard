@@ -4,8 +4,9 @@ on:
   push:
     branches: [main]
     paths:
-      - 'apps/signaling/cloudflare/**'
-      - 'apps/signaling/core/**'
+      - 'apps/signaling/src/**'
+      - 'apps/signaling/wrangler.toml'
+      - 'apps/signaling/package.json'
       - '.github/workflows/deploy-signaling.yml'
   workflow_dispatch:
 
@@ -38,11 +39,19 @@ jobs:
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          workingDirectory: apps/signaling/cloudflare
+          workingDirectory: apps/signaling
           command: deploy
           packageManager: pnpm
+          secrets: |
+            GITHUB_CLIENT_ID
+            GITHUB_CLIENT_SECRET
+            JWT_SECRET
+        env:
+          GITHUB_CLIENT_ID: ${{ vars.GH_OAUTH_CLIENT_ID }}
+          GITHUB_CLIENT_SECRET: ${{ secrets.GH_OAUTH_CLIENT_SECRET }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
 
       - name: Summary
         run: |
-          echo "✅ Signaling server deployed"
+          echo "Signaling server deployed (includes OAuth)"
           echo "URL: wss://shipyard-signaling.jacob-191.workers.dev"

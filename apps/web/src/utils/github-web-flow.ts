@@ -3,23 +3,26 @@ import { z } from "zod";
 const CLIENT_ID = import.meta.env.VITE_GITHUB_CLIENT_ID;
 
 /**
- * GitHub OAuth worker URL.
+ * Signaling server URL (handles OAuth via /auth/github/callback endpoint).
  *
  * Uses Vite MODE-based defaults:
- * - development (default): http://localhost:{oauth port from env or 4445}
- * - production: https://shipyard-github-oauth.jacob-191.workers.dev
+ * - development (default): http://localhost:{signaling port from env or 4444}
+ * - production: https://shipyard-signaling.jacob-191.workers.dev
  *
  * Can be overridden with VITE_GITHUB_OAUTH_WORKER environment variable.
  * In worktrees, this is set by worktree-env.sh to avoid port conflicts.
+ *
+ * Note: The signaling server now handles OAuth and issues Shipyard JWTs.
+ * The endpoint is POST /auth/github/callback (not /token-exchange).
  */
 const WORKER_URL = (() => {
 	if (import.meta.env.VITE_GITHUB_OAUTH_WORKER) {
 		return import.meta.env.VITE_GITHUB_OAUTH_WORKER;
 	}
 	if (import.meta.env.MODE === "production") {
-		return "https://shipyard-github-oauth.jacob-191.workers.dev";
+		return "https://shipyard-signaling.jacob-191.workers.dev";
 	}
-	return "http://localhost:4445";
+	return "http://localhost:4444";
 })();
 
 /**
@@ -32,12 +35,16 @@ const OAuthErrorResponseSchema = z.object({
 });
 
 /**
- * Schema for GitHub OAuth token exchange success response.
+ * Schema for OAuth token exchange success response from signaling server.
+ * Returns a Shipyard JWT (not a GitHub access token).
  * SECURITY: External API response - validate before use.
  */
 const TokenExchangeResponseSchema = z.object({
-	access_token: z.string(),
-	scope: z.string().optional(),
+	token: z.string(),
+	user: z.object({
+		id: z.string(),
+		username: z.string(),
+	}),
 	is_mobile: z.boolean().optional(),
 });
 
@@ -109,7 +116,7 @@ export async function handleCallback(
 	}
 	sessionStorage.removeItem("github-oauth-state");
 
-	const response = await fetch(`${WORKER_URL}/token-exchange`, {
+	const response = await fetch(`${WORKER_URL}/auth/github/callback`, {
 		method: "POST",
 		headers: { "Content-Type": "application/json" },
 		body: JSON.stringify({ code, redirect_uri: redirectUri }),

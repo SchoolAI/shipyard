@@ -8,10 +8,6 @@
 
 import { type DocShape, type Infer, type InferMutableType, Shape } from '@loro-extended/change';
 
-// ============================================================================
-// BASE SCHEMAS (Reusable Components)
-// ============================================================================
-
 /**
  * Base fields shared across all comment types.
  * Used by: inline, pr, local, overall comments
@@ -126,10 +122,6 @@ const SyncedFileChangeSchema = Shape.plain.struct({
   patch: Shape.plain.string(),
   staged: Shape.plain.boolean(),
 });
-
-// ============================================================================
-// TASK DOCUMENT SCHEMA
-// ============================================================================
 
 /**
  * Individual task document schema.
@@ -543,7 +535,6 @@ export const GlobalRoomSchema: DocShape = Shape.doc({
   ),
 });
 
-// Type exports
 export type TaskDocumentShape = typeof TaskDocumentSchema;
 export type TaskDocument = Infer<typeof TaskDocumentSchema>;
 export type MutableTaskDocument = InferMutableType<typeof TaskDocumentSchema>;

@@ -23,6 +23,7 @@
  * @module client
  */
 
+import { ROUTES } from "./routes";
 import {
 	type AuthGitHubCallbackRequest,
 	AuthGitHubCallbackRequestSchema,
@@ -37,8 +38,7 @@ import {
 	HealthResponseSchema,
 	type ValidationErrorResponse,
 	ValidationErrorResponseSchema,
-} from "../schemas";
-import { ROUTES } from "./routes";
+} from "./schemas";
 
 export { ROUTE_DESCRIPTIONS, ROUTES } from "./routes";
 

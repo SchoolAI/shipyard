@@ -5,12 +5,12 @@
  */
 
 import { DurableObject } from "cloudflare:workers";
-import type { Env } from "../env";
 import {
 	type CollabRoomClientMessage,
 	CollabRoomClientMessageSchema,
 	type CollabRoomServerMessage,
-} from "../protocol/messages";
+} from "../client/schemas";
+import type { Env } from "../env";
 import {
 	broadcastExcept,
 	findWebSocketByUserId,

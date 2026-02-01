@@ -56,16 +56,22 @@ WORKTREE_NAME=${WORKTREE_NAME}
 REGISTRY_PORT=${REGISTRY_PORT}
 SIGNALING_PORT=${PORT}
 VITE_PORT=${VITE_PORT}
-OAUTH_PORT=${OAUTH_PORT}
 OG_PROXY_PORT=${OG_PROXY_PORT}
 DAEMON_PORT=${DAEMON_PORT}
+
+# Signaling server secrets (required for OAuth)
+# Set these environment variables before running, or leave empty for testing
+GITHUB_CLIENT_ID=\${GITHUB_CLIENT_ID:-}
+GITHUB_CLIENT_SECRET=\${GITHUB_CLIENT_SECRET:-}
+JWT_SECRET=\${JWT_SECRET:-}
 
 # Logging (default to debug for development)
 LOG_LEVEL=${LOG_LEVEL:-debug}
 
 # Vite browser-side environment variables
 VITE_WEBRTC_SIGNALING=ws://localhost:${PORT}
-VITE_GITHUB_OAUTH_WORKER=http://localhost:${OAUTH_PORT}
+# OAuth is now handled by signaling server (same base URL)
+VITE_GITHUB_OAUTH_WORKER=http://localhost:${PORT}
 VITE_OG_PROXY_URL=http://localhost:${OG_PROXY_PORT}
 VITE_REGISTRY_PORT=${REGISTRY_PORT}
 VITE_DAEMON_WS_URL=ws://localhost:${DAEMON_PORT}
@@ -76,9 +82,8 @@ EOF
 
 echo "Generated .env.docker with ports:"
 echo "  Registry:   ${REGISTRY_PORT}"
-echo "  Signaling:  ${PORT}"
+echo "  Signaling:  ${PORT} (incl. OAuth)"
 echo "  Vite:       ${VITE_PORT}"
-echo "  OAuth:      ${OAUTH_PORT}"
 echo "  OG Proxy:   ${OG_PROXY_PORT}"
 echo "  Daemon:     ${DAEMON_PORT}"
 echo ""

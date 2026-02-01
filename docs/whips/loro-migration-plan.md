@@ -6,6 +6,56 @@
 **Results:** All P0 and P1 criteria passed
 **See:** [../../spikes/tiptap-loro/FINDINGS.md](../../spikes/tiptap-loro/FINDINGS.md) for comprehensive validation report
 
+## Schema Design ✅
+
+**Status:** Complete (2026-02-01)
+**Location:** `spikes/loro-schema/src/shapes.ts` (536 lines)
+**Key learnings documented below**
+
+### Design Outcomes
+
+**Two document types:**
+1. **TaskDocumentSchema** - One per task (meta, content, comments, artifacts, deliverables, events, linkedPRs, inputRequests, changeSnapshots)
+2. **GlobalRoomSchema** - One per room (inputRequests with taskId field)
+
+**Duplication eliminated via base schemas:**
+- CommentBaseFields (7 fields × 4 variants)
+- EventBaseFields (5 fields × 20 variants)
+- ArtifactBaseFields (5 fields × 2 variants)
+- InputRequestBaseFields (9 fields × 8 variants × 2 schemas)
+- Variant-specific field constants (TextInputFields, ChoiceInputFields, etc.)
+- **Total: ~346 lines of duplication eliminated**
+
+**Architecture decisions:**
+- Hybrid inputRequests: Global has `taskId` field, per-task doesn't (implicit from parent doc)
+- All identity fields (id, title, status) in meta struct (Loro doc constraint - can only contain containers at root)
+- ChangeSnapshots fully typed using Shape.struct() (not JSON-stringified)
+- Discriminated unions everywhere: comments by 'kind', events by 'type', artifacts by 'storage', inputRequests by 'type'
+
+### Key Technical Learnings
+
+**1. Shape.plain.struct() vs Shape.struct()**
+- `Shape.plain.struct()` → ValueShape (can only contain values)
+- `Shape.struct()` → ContainerShape (can contain lists, records, counters, etc.)
+- Use container version when nesting containers (e.g., ChangeSnapshot with files list)
+
+**2. Loro doc constraints**
+- Can only contain container types at root: list, record, struct, text, tree, counter
+- Plain values (string, number, boolean) must be wrapped in a struct
+- This is why meta is a struct, not individual fields
+
+**3. Base schema patterns from loro-extended**
+- Extract common fields as constants with `as const`
+- Use spread operator (...) to compose into structs
+- Create field constant objects for variant-specific fields
+- Follows loro-extended examples: asks package, quiz-challenge, bumper-cars
+
+**4. Comment philosophy**
+- Field names + types should tell the story
+- Only add JSDoc for non-obvious info: formats, constraints, relationships
+- Remove all "EXISTS:", "UI:", "If removed:" commentary
+- Result: 910 → 536 lines (41% reduction)
+
 ## Context
 
 This is a **greenfield rebuild** based on production learnings, not a preservation migration. We validated that BlockNote-as-data-format was the wrong choice and are rebuilding with Loro + Tiptap.
@@ -116,19 +166,24 @@ apps/
 
 **Tasks:**
 
-**A. Design Work (First 2-3 days)**
-1. Design Loro Shape
-   - Full schema: metadata, content, comments, events, permissions
-   - Container types (Tree, Map, List, Text)
-   - Permission model (roles, grants, operations)
-   - Signaling server permissions
-   - Event storage format
-   - **Document in new ADR**
+**A. Design Work (First 2-3 days)** ✅ COMPLETE (2026-02-01)
+1. Design Loro Shape ✅
+   - ✅ Full schema: metadata, content, comments, events, inputRequests, changeSnapshots
+   - ✅ Discriminated unions for polymorphic types (comments by 'kind', events by 'type', artifacts by 'storage', inputRequests by 'type')
+   - ✅ Base schemas extracted to eliminate duplication (~346 lines saved)
+   - ✅ Hybrid inputRequests architecture (global with taskId + per-task without)
+   - ✅ Type-safe changeSnapshots using Shape.struct() for nested containers
+   - **See:** `spikes/loro-schema/src/shapes.ts` (536 lines, down from 960 initial)
+   - **Key learnings:**
+     - Shape.plain.struct() = ValueShape (can't contain containers)
+     - Shape.struct() = ContainerShape (can contain lists, records)
+     - Use base field constants + spread for DRY discriminated unions
+     - Loro docs can only contain containers at root (wrapped id/title/status in meta struct)
 
 2. Research Edge URL limit
-   - Verify 2K vs 2M character limit
-   - Test actual behavior
-   - Decide support or document limitation
+   - [ ] Verify 2K vs 2M character limit
+   - [ ] Test actual behavior
+   - [ ] Decide support or document limitation
 
 **B. Spike Work (Next 2-3 days)** ✅ COMPLETE
 3. Spike: Tiptap + Loro
@@ -141,17 +196,20 @@ apps/
    - ⚠️ Cursor presence requires loro-extended network adapters (documented)
    - **See:** `spikes/tiptap-loro/FINDINGS.md` for full results
 
-**C. Setup (Final 1-2 days)**
+**C. Setup (Final 1-2 days)** 🚧 IN PROGRESS
 4. Create package structure
-   - `packages/loro-schema/` with designed Shape
-   - `packages/editor/` with proven spike code
-   - Add dependencies
+   - ✅ `spikes/loro-schema/` created with complete Shape definitions
+   - ✅ Base schemas extracted (CommentBaseFields, EventBaseFields, etc.)
+   - ✅ All types passing (no typecasting)
+   - [ ] Promote spike to `packages/loro-schema/`
+   - [ ] `packages/editor/` with proven spike code
+   - [ ] Add dependencies to main packages
 
 **Deliverables:**
-- [ ] Loro Shape designed and documented (ADR)
+- [x] **Loro Shape designed and implemented** ✅ (2026-02-01)
 - [x] **Spike proves Tiptap + Loro works** ✅ (2026-02-01)
 - [ ] Edge URL limit researched
-- [ ] Package structure created
+- [ ] Package structure promoted to packages/
 - [x] **Go/No-Go decision made** ✅ GO - Proceed with migration
 
 ---

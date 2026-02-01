@@ -76,21 +76,24 @@ HEALTHCHECK --interval=10s --timeout=3s --start-period=5s --retries=3 \
 CMD ["node", "apps/server/dist/index.js"]
 
 # =============================================================================
-# SIGNALING STAGE - WebRTC signaling server
+# SIGNALING STAGE - WebRTC signaling + OAuth server (Cloudflare Wrangler)
 # =============================================================================
 FROM base AS signaling
 
-# Copy signaling source (no build needed, runs with tsx)
+# Copy signaling source (Cloudflare Worker, runs with wrangler)
 COPY apps/signaling apps/signaling
 
 EXPOSE 4444
 
-# Health check - signaling server responds OK on any HTTP path
-HEALTHCHECK --interval=10s --timeout=3s --start-period=5s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:${PORT:-4444}/ || exit 1
+# Health check - signaling server has /health endpoint
+HEALTHCHECK --interval=10s --timeout=3s --start-period=10s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:${PORT:-4444}/health || exit 1
 
-# Run with tsx (TypeScript execution)
-CMD ["pnpm", "--filter", "@shipyard/signaling", "exec", "tsx", "src/server.ts"]
+# Run Wrangler dev server
+# --local flag runs without Cloudflare account
+# --env development uses development environment vars
+# Shell form needed for environment variable expansion
+CMD pnpm --filter @shipyard/signaling exec wrangler dev --env development --port ${PORT:-4444} --local
 
 # =============================================================================
 # WEB STAGE - Vite dev server with HMR

@@ -32,7 +32,7 @@ fi
 # Calculate unique ports based on slot
 REGISTRY_PORT=$((32191 + SLOT))
 SIGNALING_PORT=$((4444 + SLOT * 10))
-OAUTH_PORT=$((4445 + SLOT * 10))
+# Note: OAuth is now handled by signaling server (same port)
 OG_PROXY_PORT=$((4446 + SLOT * 10))
 VITE_PORT=$((5173 + SLOT))
 DAEMON_PORT=$((56609 + SLOT))
@@ -61,7 +61,7 @@ export PORT="${SIGNALING_PORT}"
 export VITE_PORT="${VITE_PORT}"
 
 # Wrangler worker ports (used by dev-all.sh)
-export OAUTH_PORT="${OAUTH_PORT}"
+# Note: OAuth is now handled by signaling server (PORT variable above)
 export OG_PROXY_PORT="${OG_PROXY_PORT}"
 export INSPECTOR_PORT_1="${INSPECTOR_PORT_1}"
 export INSPECTOR_PORT_2="${INSPECTOR_PORT_2}"
@@ -74,15 +74,15 @@ export DAEMON_PORT="${DAEMON_PORT}"
 # Vite browser-side environment variables
 # These get compiled into the browser bundle at build time
 export VITE_WEBRTC_SIGNALING="ws://localhost:${SIGNALING_PORT}"
-export VITE_GITHUB_OAUTH_WORKER="http://localhost:${OAUTH_PORT}"
+# OAuth is now handled by signaling server (same base URL)
+export VITE_GITHUB_OAUTH_WORKER="http://localhost:${SIGNALING_PORT}"
 export VITE_OG_PROXY_URL="http://localhost:${OG_PROXY_PORT}"
 export VITE_REGISTRY_PORT="${REGISTRY_PORT}"
 export VITE_DAEMON_WS_URL="ws://localhost:${DAEMON_PORT}"
 
 # Port assignments summary:
 # - Registry/WebSocket: ${REGISTRY_PORT}
-# - Signaling server: ${SIGNALING_PORT}
-# - OAuth worker: ${OAUTH_PORT}
+# - Signaling server (incl. OAuth): ${SIGNALING_PORT}
 # - OG Proxy worker: ${OG_PROXY_PORT}
 # - Vite dev server: ${VITE_PORT}
 # - Daemon WebSocket: ${DAEMON_PORT}

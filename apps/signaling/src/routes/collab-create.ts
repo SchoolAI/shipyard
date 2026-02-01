@@ -1,10 +1,10 @@
 import { Hono } from "hono";
 import { validateToken } from "../auth/jwt";
-import type { Env } from "../env";
 import {
-	CreateCollabRequestSchema,
-	type CreateCollabResponse,
-} from "../protocol/messages";
+	CollabCreateRequestSchema,
+	type CollabCreateResponse,
+} from "../client/schemas";
+import type { Env } from "../env";
 import { generateId } from "../utils/crypto";
 import { createLogger } from "../utils/logger";
 import { generatePresignedUrlAsync } from "../utils/presigned-url";
@@ -36,7 +36,7 @@ collabCreateRoute.post(ROUTES.COLLAB_CREATE, async (c) => {
 		return invalidTokenResponse(c);
 	}
 
-	const bodyResult = await parseAndValidateBody(c, CreateCollabRequestSchema);
+	const bodyResult = await parseAndValidateBody(c, CollabCreateRequestSchema);
 	if (!bodyResult.ok) return bodyResult.error;
 
 	const { taskId, expiresInMinutes } = bodyResult.value;
@@ -55,7 +55,7 @@ collabCreateRoute.post(ROUTES.COLLAB_CREATE, async (c) => {
 		c.env.JWT_SECRET,
 	);
 
-	const response: CreateCollabResponse = {
+	const response: CollabCreateResponse = {
 		url: presignedUrl,
 		roomId,
 		expiresAt,
