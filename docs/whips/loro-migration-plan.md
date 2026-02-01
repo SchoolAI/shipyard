@@ -425,34 +425,29 @@ Using their architecture doc's one-doc-many-containers approach.
 
 ## Rollout Strategy
 
-### Feature Flag Approach
+### Clean Cut-Over (No Feature Flags)
 
-**Environment variable:** `CRDT_ENGINE=yjs|loro`
+**Week 1-5: Build on Branch**
+- All development on `loro-migration` branch
+- No feature flags - just build the new system
+- Delete old code as we go (no parallel systems)
 
-**Phase A: Parallel Development**
-```typescript
-// apps/server/src/index.ts
-if (process.env.CRDT_ENGINE === 'loro') {
-  await startLoroServer();
-} else {
-  await startRegistryServer(); // Old code
-}
-```
+**Week 6: Integration Testing**
+- Full E2E testing on branch
+- Load testing
+- Multi-device testing
+- Fix critical bugs
 
-**Phase B: Beta Testing**
-- Deploy Loro version to staging
-- Test with real workflows
+**Week 7: Deploy**
+- Merge to main (breaking change)
+- Deploy to production
+- Existing data is obsolete (fresh start)
+- Users create new plans
+
+**Week 8: Monitor**
+- Watch for issues
 - Fix bugs
-
-**Phase C: Cut Over**
-- Set `CRDT_ENGINE=loro` in production
-- Monitor for issues
-- Remove old code after 1 week
-
-**Phase D: Cleanup**
-- Delete all Yjs code
-- Remove feature flag
-- Update docs
+- Stabilize
 
 ---
 
@@ -520,9 +515,9 @@ if (process.env.CRDT_ENGINE === 'loro') {
 
 ### Rollback Plan
 
-- Keep Yjs code during beta (feature flag)
-- Export tool: Loro → Markdown (data rescue)
-- Fast revert: flip `CRDT_ENGINE=yjs`
+- None - this is a one-way door
+- Old branch stays in git history if we need to reference
+- No data migration (fresh start)
 
 ---
 

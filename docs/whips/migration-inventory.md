@@ -326,9 +326,8 @@ const metadata = getPlanMetadata(loroDoc);
 
 ### If Migration Fails
 
-**Week 1-2:** Just delete new packages, revert dependency changes
-**Week 3-4:** Feature flag flip back to Yjs
-**Week 5+:** Export data to markdown, reimport to old system
+**Anytime:** Abandon branch, stay on main (old code intact in git history)
+**No rollback needed:** Working on separate branch until ready to merge
 
 ### If loro-extended Has Issues
 
