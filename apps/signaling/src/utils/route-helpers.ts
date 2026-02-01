@@ -18,10 +18,6 @@ export type RouteResult<T> =
 	| { ok: true; value: T }
 	| { ok: false; error: Response };
 
-// ============================================================================
-// Error Response Helpers
-// ============================================================================
-
 /**
  * Standard error response codes used throughout the API.
  */
@@ -80,10 +76,6 @@ export function validationErrorResponse(
 		400,
 	);
 }
-
-// ============================================================================
-// JSON Body Parsing
-// ============================================================================
 
 /**
  * Parse JSON body from request with error handling.
@@ -146,10 +138,6 @@ export async function parseAndValidateBody<T>(
 	return { ok: true, value: parseResult.data };
 }
 
-// ============================================================================
-// Authentication Helpers
-// ============================================================================
-
 /**
  * Extract Bearer token from Authorization header.
  *
@@ -207,10 +195,6 @@ export function requireQueryParam(
 	return { ok: true, value };
 }
 
-// ============================================================================
-// WebSocket Helpers
-// ============================================================================
-
 /**
  * Verify WebSocket upgrade header is present.
  *
@@ -236,10 +220,6 @@ export function requireWebSocketUpgrade(c: Context): RouteResult<void> {
 
 	return { ok: true, value: undefined };
 }
-
-// ============================================================================
-// Token Validation Response Helpers
-// ============================================================================
 
 /**
  * Create invalid token error response.

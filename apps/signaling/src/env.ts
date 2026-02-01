@@ -11,10 +11,9 @@ const EnvironmentSchema = z
 	.default("development");
 
 /**
- * Environment schema for the signaling worker.
- * Validates env bindings at runtime.
+ * Base environment schema (without computed fields).
  */
-export const EnvSchema = z.object({
+const BaseEnvSchema = z.object({
 	PERSONAL_ROOM: z.custom<DurableObjectNamespace>((val) => val !== undefined),
 	COLLAB_ROOM: z.custom<DurableObjectNamespace>((val) => val !== undefined),
 
@@ -25,6 +24,23 @@ export const EnvSchema = z.object({
 	ENVIRONMENT: EnvironmentSchema,
 	LOG_LEVEL: LogLevelSchema.optional(),
 });
+
+/** Production base URL for the signaling worker */
+const PRODUCTION_BASE_URL = "https://shipyard-signaling.jacob-191.workers.dev";
+/** Development base URL for the signaling worker */
+const DEVELOPMENT_BASE_URL = "http://localhost:4444";
+
+/**
+ * Environment schema for the signaling worker.
+ * Validates env bindings at runtime and computes BASE_URL from ENVIRONMENT.
+ */
+export const EnvSchema = BaseEnvSchema.transform((data) => ({
+	...data,
+	BASE_URL:
+		data.ENVIRONMENT === "production"
+			? PRODUCTION_BASE_URL
+			: DEVELOPMENT_BASE_URL,
+}));
 
 export type Env = z.infer<typeof EnvSchema>;
 

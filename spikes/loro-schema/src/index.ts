@@ -20,6 +20,8 @@ export {
   type TaskArtifact,
   type TaskDeliverable,
   type TaskLinkedPR,
+  type ChangeSnapshot,
+  type SyncedFileChange,
 
   // Global room schema and types
   GlobalRoomSchema,

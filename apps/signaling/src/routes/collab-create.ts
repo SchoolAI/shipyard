@@ -42,16 +42,10 @@ collabCreateRoute.post(ROUTES.COLLAB_CREATE, async (c) => {
 	const { taskId, expiresInMinutes } = bodyResult.value;
 
 	const roomId = generateId(16);
-	// expiresInMinutes has a default value in the schema, so it's always defined after parsing
 	const expiresAt = Date.now() + (expiresInMinutes ?? 60) * 60 * 1000;
 
-	const baseUrl =
-		c.env.ENVIRONMENT === "production"
-			? "https://shipyard-signaling.jacob-191.workers.dev"
-			: `http://localhost:4444`;
-
 	const presignedUrl = await generatePresignedUrlAsync(
-		baseUrl,
+		c.env.BASE_URL,
 		{
 			roomId,
 			taskId,

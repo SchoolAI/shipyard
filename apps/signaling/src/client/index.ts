@@ -40,7 +40,6 @@ import {
 } from "../schemas";
 import { ROUTES } from "./routes";
 
-// Re-export routes for client consumers
 export { ROUTE_DESCRIPTIONS, ROUTES } from "./routes";
 
 /**
@@ -221,15 +220,18 @@ export class SignalingClient {
 			);
 		}
 
-		const response = await this.fetch(`${this.baseUrl}${ROUTES.COLLAB_CREATE}`, {
-			method: "POST",
-			headers: {
-				...this.defaultHeaders,
-				"Content-Type": "application/json",
-				Authorization: `Bearer ${token}`,
+		const response = await this.fetch(
+			`${this.baseUrl}${ROUTES.COLLAB_CREATE}`,
+			{
+				method: "POST",
+				headers: {
+					...this.defaultHeaders,
+					"Content-Type": "application/json",
+					Authorization: `Bearer ${token}`,
+				},
+				body: JSON.stringify(requestResult.data),
 			},
-			body: JSON.stringify(requestResult.data),
-		});
+		);
 
 		const data = await response.json();
 

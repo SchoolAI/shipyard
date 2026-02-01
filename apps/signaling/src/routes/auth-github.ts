@@ -9,10 +9,7 @@ import type { TokenExchangeResponse } from "../auth/types";
 import type { Env } from "../env";
 import { AuthGitHubCallbackRequestSchema } from "../schemas";
 import { createLogger } from "../utils/logger";
-import {
-	errorResponse,
-	parseAndValidateBody,
-} from "../utils/route-helpers";
+import { errorResponse, parseAndValidateBody } from "../utils/route-helpers";
 import { ROUTES } from "./routes";
 
 /**
@@ -27,7 +24,10 @@ export const authGitHubRoute = new Hono<{ Bindings: Env }>();
 authGitHubRoute.post(ROUTES.AUTH_GITHUB_CALLBACK, async (c) => {
 	const logger = createLogger(c.env);
 
-	const bodyResult = await parseAndValidateBody(c, AuthGitHubCallbackRequestSchema);
+	const bodyResult = await parseAndValidateBody(
+		c,
+		AuthGitHubCallbackRequestSchema,
+	);
 	if (!bodyResult.ok) return bodyResult.error;
 
 	const { code, redirect_uri } = bodyResult.value;

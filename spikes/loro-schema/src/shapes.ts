@@ -116,6 +116,17 @@ const MultiInputFields = {
   responses: Shape.plain.any(), // Record<questionId, answer>
 } as const;
 
+/**
+ * Schema for individual file changes in a ChangeSnapshot.
+ */
+const SyncedFileChangeSchema = Shape.plain.struct({
+  path: Shape.plain.string(),
+  status: Shape.plain.string('added', 'modified', 'deleted', 'renamed'),
+  /** Unified diff patch */
+  patch: Shape.plain.string(),
+  staged: Shape.plain.boolean(),
+});
+
 // ============================================================================
 // TASK DOCUMENT SCHEMA
 // ============================================================================
@@ -445,8 +456,23 @@ export const TaskDocumentSchema: DocShape = Shape.doc({
     })
   ),
 
-  /** machineId → JSON-stringified ChangeSnapshot */
-  changeSnapshots: Shape.record(Shape.plain.string()),
+  /** machineId → ChangeSnapshot (git diff state per machine) */
+  changeSnapshots: Shape.record(
+    Shape.struct({
+      machineId: Shape.plain.string(),
+      machineName: Shape.plain.string(),
+      ownerId: Shape.plain.string(),
+      headSha: Shape.plain.string(),
+      branch: Shape.plain.string(),
+      cwd: Shape.plain.string(),
+      isLive: Shape.plain.boolean(),
+      /** Unix timestamp in milliseconds */
+      updatedAt: Shape.plain.number(),
+      files: Shape.list(SyncedFileChangeSchema),
+      totalAdditions: Shape.plain.number(),
+      totalDeletions: Shape.plain.number(),
+    })
+  ),
 }) satisfies DocShape;
 
 /**
@@ -528,6 +554,8 @@ export type TaskArtifact = Infer<typeof TaskDocumentSchema.shapes.artifacts>;
 export type TaskDeliverable = Infer<typeof TaskDocumentSchema.shapes.deliverables>;
 export type TaskLinkedPR = Infer<typeof TaskDocumentSchema.shapes.linkedPRs>;
 export type TaskInputRequest = Infer<typeof TaskDocumentSchema.shapes.inputRequests>;
+export type ChangeSnapshot = Infer<typeof TaskDocumentSchema.shapes.changeSnapshots>;
+export type SyncedFileChange = Infer<typeof SyncedFileChangeSchema>;
 
 export type GlobalRoomShape = typeof GlobalRoomSchema;
 export type GlobalRoom = Infer<typeof GlobalRoomSchema>;

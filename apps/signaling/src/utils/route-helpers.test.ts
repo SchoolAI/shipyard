@@ -36,10 +36,6 @@ async function makeRequest(
 }
 
 describe("route-helpers", () => {
-	// ==========================================================================
-	// Error Response Helpers
-	// ==========================================================================
-
 	describe("errorResponse", () => {
 		it("creates 400 error response with correct structure", async () => {
 			const app = createTestApp();
@@ -177,10 +173,6 @@ describe("route-helpers", () => {
 			expect(json.message).toBe("Invalid request body");
 		});
 	});
-
-	// ==========================================================================
-	// JSON Body Parsing
-	// ==========================================================================
 
 	describe("parseJsonBody", () => {
 		it("successfully parses valid JSON body", async () => {
@@ -345,10 +337,6 @@ describe("route-helpers", () => {
 		});
 	});
 
-	// ==========================================================================
-	// Authentication Helpers
-	// ==========================================================================
-
 	describe("extractBearerToken", () => {
 		it("extracts token from valid Bearer header", async () => {
 			const app = createTestApp();
@@ -500,10 +488,6 @@ describe("route-helpers", () => {
 		});
 	});
 
-	// ==========================================================================
-	// WebSocket Helpers
-	// ==========================================================================
-
 	describe("requireWebSocketUpgrade", () => {
 		it("succeeds when Upgrade header is websocket", async () => {
 			const app = createTestApp();
@@ -554,10 +538,6 @@ describe("route-helpers", () => {
 		});
 	});
 
-	// ==========================================================================
-	// Token Validation Response Helpers
-	// ==========================================================================
-
 	describe("invalidTokenResponse", () => {
 		it("creates correct error response", async () => {
 			const app = createTestApp();
@@ -605,10 +585,6 @@ describe("route-helpers", () => {
 			expect(json.message).toBe("Collaboration link has expired");
 		});
 	});
-
-	// ==========================================================================
-	// ErrorCodes
-	// ==========================================================================
 
 	describe("ErrorCodes", () => {
 		it("exports all expected error codes", () => {
