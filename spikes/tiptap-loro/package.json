@@ -1,0 +1,41 @@
+{
+  "name": "tiptap-loro-spike",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "ws-server": "node ws-server.js",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@loro-extended/adapter-websocket": "^5.3.0",
+    "@loro-extended/react": "^5.3.0",
+    "@loro-extended/repo": "^5.3.0",
+    "@tiptap/core": "^3.18.0",
+    "@tiptap/extension-drag-handle": "^3.18.0",
+    "@tiptap/extension-drag-handle-react": "^3.18.0",
+    "@tiptap/extension-placeholder": "^3.18.0",
+    "@tiptap/pm": "^3.18.0",
+    "@tiptap/react": "^3.18.0",
+    "@tiptap/starter-kit": "^3.18.0",
+    "loro-crdt": "^1.10.5",
+    "loro-prosemirror": "^0.4.2",
+    "react": "^18.3.0",
+    "react-dom": "^18.3.0",
+    "ws": "^8.19.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.0",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.0",
+    "typescript": "^5.9.3",
+    "vite": "^6.0.0",
+    "vite-plugin-top-level-await": "^1.6.0",
+    "vite-plugin-wasm": "^3.5.0",
+    "vitest": "^3.0.0"
+  }
+}

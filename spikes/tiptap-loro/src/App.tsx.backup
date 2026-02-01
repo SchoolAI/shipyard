@@ -1,0 +1,106 @@
+import { useState, useCallback } from "react";
+import { WsClientNetworkAdapter } from "@loro-extended/adapter-websocket/client";
+import { RepoProvider, useRepo } from "@loro-extended/react";
+import { Shape } from "@loro-extended/repo";
+import { Editor } from "./Editor";
+
+/**
+ * Schema for the ProseMirror document.
+ * Uses Shape.any() because loro-prosemirror manages the structure internally.
+ */
+const ProseMirrorDocSchema = Shape.doc({
+  doc: Shape.any(),
+});
+
+/**
+ * Create WebSocket adapter for network sync
+ */
+const wsAdapter = new WsClientNetworkAdapter({
+  url: (peerId) => `ws://localhost:8765?peerId=${peerId}`,
+  reconnect: {
+    enabled: true,
+    maxAttempts: 10,
+    baseDelay: 1000,
+    maxDelay: 30000,
+  },
+  keepaliveInterval: 30000,
+});
+
+/**
+ * Inner component that uses the Repo hook
+ */
+function AppInner() {
+  const repo = useRepo();
+  const [docKey] = useState(0);
+
+  // Get or create the shared document
+  const handle = repo.get("spike-doc", ProseMirrorDocSchema);
+
+  const logDocState = useCallback(() => {
+    console.log("[App] Doc state:", handle.loroDoc.toJSON());
+    console.log("[App] Doc version:", handle.loroDoc.version().toJSON());
+  }, [handle]);
+
+  return (
+    <div>
+      <h1>Tiptap + Loro Validation Spike (WebSocket Sync)</h1>
+
+      <div className="controls">
+        <button onClick={logDocState}>Log Doc State</button>
+      </div>
+
+      <div style={{ marginBottom: 16, padding: 12, background: "#e8f4f8", borderRadius: 8, fontSize: 13 }}>
+        <strong>Architecture:</strong> loro-extended Repo with WebSocket P2P sync
+        <br />
+        <strong>Network:</strong> Real WebSocket connection to ws://localhost:8765
+        <br />
+        <strong>Cursor presence:</strong> Should now work with network sync
+        <br /><br />
+        <strong>Keyboard Shortcuts:</strong>
+        <br />
+        <code>Cmd+B</code> Bold | <code>Cmd+I</code> Italic | <code>Cmd+Z</code> Undo | <code>Cmd+Shift+Z</code> Redo
+        <br />
+        <code>Cmd+Shift+C</code> Apply Comment Mark
+        <br /><br />
+        <strong>Test Cursor Presence:</strong>
+        <br />
+        1. Type in Editor A → should see text appear in Editor B
+        <br />
+        2. Watch for colored cursor indicator in Editor B showing where Editor A is typing
+        <br />
+        3. Open in two browser tabs to test multi-peer cursor presence
+      </div>
+
+      <div className="container" key={docKey}>
+        <Editor
+          name="Editor A"
+          handle={handle}
+          color="#007aff"
+        />
+        <Editor
+          name="Editor B"
+          handle={handle}
+          color="#34c759"
+        />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Main App with RepoProvider
+ */
+export function App() {
+  return (
+    <RepoProvider
+      config={{
+        identity: {
+          name: "tiptap-loro-spike",
+        },
+        adapters: [wsAdapter],
+      }}
+    >
+      <AppInner />
+    </RepoProvider>
+  );
+}

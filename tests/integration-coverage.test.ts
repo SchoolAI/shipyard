@@ -62,8 +62,12 @@ interface CoverageRequirement {
  * ```
  */
 const COVERAGE_REQUIREMENTS: CoverageRequirement[] = [
-	// TODO: Add directories that require integration test coverage
-	// See examples above for the pattern format
+	{
+		sourceDir: 'apps/signaling/src/routes',
+		testSuffix: '.test.ts',
+		sourcePattern: /^(?!.*\.test\.ts$).*\.ts$/,
+		description: 'Signaling Routes',
+	},
 ];
 
 interface FileInfo {

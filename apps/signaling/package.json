@@ -1,32 +1,33 @@
 {
   "name": "@shipyard/signaling",
-  "version": "0.1.0",
-  "type": "module",
+  "version": "0.0.1",
   "private": true,
-  "description": "WebRTC signaling server for P2P peer discovery",
+  "type": "module",
   "scripts": {
-    "dev": "tsx src/server.ts",
-    "start": "tsx src/server.ts",
-    "build": "tsdown src/server.ts --format esm --out-dir dist",
+    "dev": "wrangler dev --env development",
+    "deploy": "wrangler deploy",
+    "tail": "wrangler tail",
+    "build": "echo 'Cloudflare Workers build via wrangler deploy'",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check src && pnpm lint:comments && pnpm lint:typeassertions",
+    "lint:fix": "biome check src --write",
+    "lint:comments": "eslint 'src/**/*.ts' --rule '@typescript-eslint/consistent-type-assertions: off' --report-unused-disable-directives-severity=off --max-warnings 0",
+    "lint:typeassertions": "eslint 'src/**/*.ts' --rule 'local/no-noisy-single-line-comments: off' --rule 'multiline-comment-style: off' --rule 'spaced-comment: off' --report-unused-disable-directives-severity=off --max-warnings 0",
+    "secret:github-client-id": "wrangler secret put GITHUB_CLIENT_ID",
+    "secret:github-client-secret": "wrangler secret put GITHUB_CLIENT_SECRET",
+    "secret:jwt-secret": "wrangler secret put JWT_SECRET"
   },
   "dependencies": {
-    "@shipyard/schema": "workspace:*",
-    "lib0": "^0.2.117",
-    "nanoid": "^5.1.6",
-    "pino": "^10.2.1",
-    "ws": "^8.19.0",
-    "zod": "^4.3.5"
+    "hono": "^4.7.4",
+    "zod": "^3.24.2"
   },
   "devDependencies": {
-    "@types/node": "^25.0.10",
-    "@types/ws": "^8.18.1",
-    "pino-pretty": "^13.1.3",
-    "tsdown": "0.20.0-beta.4",
-    "tsx": "^4.21.0",
+    "@cloudflare/workers-types": "^4.20260122.0",
+    "@cloudflare/vitest-pool-workers": "^0.8.0",
     "typescript": "^5.9.3",
-    "vitest": "^4.0.17"
+    "vitest": "^3.0.4",
+    "wrangler": "^4.59.3"
   }
 }

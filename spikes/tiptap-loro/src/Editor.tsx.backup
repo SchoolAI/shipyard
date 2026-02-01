@@ -1,0 +1,196 @@
+import { useEditor, EditorContent } from "@tiptap/react";
+import { Extension } from "@tiptap/core";
+import { DragHandle } from "@tiptap/extension-drag-handle-react";
+import {
+  LoroSyncPlugin,
+  LoroUndoPlugin,
+  LoroEphemeralCursorPlugin,
+  CursorEphemeralStore,
+  undo,
+  redo,
+  type LoroDocType,
+} from "loro-prosemirror";
+import type { HandleWithEphemerals } from "@loro-extended/repo";
+import type { PeerID } from "loro-crdt";
+import { useEffect, useState, useCallback, useRef } from "react";
+import { createExtensions } from "./extensions";
+
+interface EditorProps {
+  name: string;
+  handle: HandleWithEphemerals<any, any>;
+  color: string;
+}
+
+/**
+ * Create a Tiptap extension that wraps loro-prosemirror plugins.
+ */
+function createLoroExtension(
+  handle: HandleWithEphemerals<any, any>,
+  cursorStore: CursorEphemeralStore,
+  userName: string,
+  userColor: string
+) {
+  const loroDoc = handle.loroDoc;
+
+  return Extension.create({
+    name: "loro",
+
+    addProseMirrorPlugins() {
+      const typedDoc = loroDoc as unknown as LoroDocType;
+      const rootMap = loroDoc.getMap("doc");
+      const containerId = rootMap.id;
+
+      console.log(`[LoroExtension] Creating plugins with containerId:`, containerId);
+
+      return [
+        LoroSyncPlugin({
+          doc: typedDoc,
+          containerId,
+        }),
+        LoroUndoPlugin({
+          doc: loroDoc,
+        }),
+        LoroEphemeralCursorPlugin(cursorStore, {
+          user: {
+            name: userName,
+            color: userColor,
+          },
+          createCursor: (_userId) => {
+            const cursor = document.createElement("div");
+            cursor.style.position = "absolute";
+            cursor.style.width = "2px";
+            cursor.style.height = "1.2em";
+            cursor.style.backgroundColor = userColor;
+            cursor.style.pointerEvents = "none";
+            cursor.style.zIndex = "10";
+            cursor.style.animation = "blink 1s step-end infinite";
+
+            const label = document.createElement("div");
+            label.textContent = userName;
+            label.style.position = "absolute";
+            label.style.top = "-22px";
+            label.style.left = "-2px";
+            label.style.padding = "2px 6px";
+            label.style.borderRadius = "3px";
+            label.style.fontSize = "11px";
+            label.style.fontWeight = "600";
+            label.style.backgroundColor = userColor;
+            label.style.color = "white";
+            label.style.whiteSpace = "nowrap";
+            label.style.pointerEvents = "none";
+
+            cursor.appendChild(label);
+            return cursor;
+          },
+          createSelection: (_userId) => ({
+            style: `background-color: ${userColor}; opacity: 0.3;`,
+          }),
+        }),
+      ];
+    },
+
+    addKeyboardShortcuts() {
+      return {
+        "Mod-z": () => {
+          const { state, dispatch } = this.editor.view;
+          return undo(state, dispatch);
+        },
+        "Mod-y": () => {
+          const { state, dispatch } = this.editor.view;
+          return redo(state, dispatch);
+        },
+        "Mod-Shift-z": () => {
+          const { state, dispatch } = this.editor.view;
+          return redo(state, dispatch);
+        },
+      };
+    },
+  });
+}
+
+export function Editor({ name, handle, color }: EditorProps) {
+  const [status, setStatus] = useState<string>("Initializing...");
+  const [docVersion, setDocVersion] = useState<number>(0);
+  const cursorStoreRef = useRef<CursorEphemeralStore | null>(null);
+
+  // Create cursor store and register with handle for network sync
+  if (!cursorStoreRef.current) {
+    const cursorStore = new CursorEphemeralStore(handle.peerId as PeerID);
+    // Register with handle for automatic network sync
+    handle.addEphemeral("cursors", cursorStore);
+    cursorStoreRef.current = cursorStore;
+    console.log(`[${name}] Created and registered cursor store`);
+  }
+
+  const editor = useEditor(
+    {
+      extensions: [
+        ...createExtensions(`Start typing in ${name}...`),
+        createLoroExtension(handle, cursorStoreRef.current!, name, color),
+      ],
+      content: "",
+      onUpdate: ({ editor }) => {
+        const text = editor.getText();
+        console.log(`[${name}] Document updated, chars: ${text.length}`);
+      },
+    },
+    [handle]
+  );
+
+  // Subscribe to Loro document changes
+  useEffect(() => {
+    const unsubscribe = handle.loroDoc.subscribe((event) => {
+      const version = handle.loroDoc.version().toJSON();
+      const versionNum = Object.values(version).reduce((a, b) => a + b, 0);
+      setDocVersion(versionNum);
+
+      if (event.by === "local") {
+        setStatus(`Local edit (v${versionNum})`);
+      } else if (event.by === "import") {
+        setStatus(`Synced from peer (v${versionNum})`);
+      } else {
+        setStatus(`${event.by} (v${versionNum})`);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [handle, name]);
+
+  const applyComment = useCallback(() => {
+    if (!editor) return;
+    const { from, to } = editor.state.selection;
+    if (from === to) {
+      console.log(`[${name}] No selection - select text first`);
+      return;
+    }
+    const commentId = `comment-${Date.now()}`;
+    console.log(`[${name}] Applying comment mark:`, commentId);
+    editor.chain().focus().setComment(commentId).run();
+  }, [editor, name]);
+
+  return (
+    <div className="editor-wrapper" style={{ borderLeftColor: color, borderLeftWidth: 4 }}>
+      <div className="editor-label" style={{ color }}>
+        {name}
+      </div>
+      <div className="editor-container">
+        {editor && (
+          <DragHandle editor={editor}>
+            <div className="drag-handle" title="Drag to reorder">
+              ⠿
+            </div>
+          </DragHandle>
+        )}
+        <EditorContent editor={editor} />
+      </div>
+      <div className="status-bar">
+        Status: {status} | Version: {docVersion}
+      </div>
+      <div style={{ marginTop: 8, display: "flex", gap: 8 }}>
+        <button onClick={applyComment} style={{ fontSize: 12 }}>
+          Apply Comment (Mod+Shift+C)
+        </button>
+      </div>
+    </div>
+  );
+}

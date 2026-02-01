@@ -132,7 +132,7 @@
       }
     },
     {
-      "includes": ["apps/github-oauth-worker/src/logger.ts", "apps/signaling/**/logger.ts"],
+      "includes": ["apps/github-oauth-worker/src/logger.ts", "apps/signaling/**/logger.ts", "apps/signaling-new/**/logger.ts"],
       "linter": {
         "rules": {
           "suspicious": {

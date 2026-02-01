@@ -3,7 +3,9 @@
   "docs": [
     "docs/engineering-standards.md",
     "docs/architecture.md",
-    "docs/development.md"
+    "docs/development.md",
+    "docs/whips/agent-monitoring-migration.md",
+    "docs/whips/loro-migration-plan.md"
   ],
   "exclude": [],
   "maxLinesPerFile": 500

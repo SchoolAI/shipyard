@@ -20,16 +20,11 @@ export {
   type TaskArtifact,
   type TaskDeliverable,
   type TaskLinkedPR,
-  type TaskInputRequest,
-  type TaskPRReviewComment,
-  type TaskLocalDiffComment,
 
   // Task index schema and types
   TaskIndexSchema,
   type TaskIndexShape,
   type TaskIndex,
   type MutableTaskIndex,
-  type TaskIndexEntry,
-  type GlobalInputRequest,
-  type AgentInfo,
+  type InputRequest,
 } from './shapes.js';

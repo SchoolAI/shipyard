@@ -242,6 +242,43 @@ Daemon resumes agent with prior context + response
 
 ---
 
+## Migration Strategy
+
+### Greenfield + Legacy Rename
+
+**Approach:** Don't migrate existing apps - create new ones and rename old to `-legacy`.
+
+**Why this works:**
+- No backwards compatibility concerns (no users yet)
+- No commits breaking things mid-migration
+- Clean separation between old and new
+- Can reference legacy code while building new
+- Delete legacy apps when new ones are stable
+
+**Rename Pattern:**
+```
+apps/signaling/           → apps/signaling-legacy/
+apps/github-oauth-worker/ → apps/github-oauth-worker-legacy/
+apps/server/              → apps/server-legacy/
+apps/daemon/              → (merged into new apps/server/)
+apps/web/                 → apps/web-legacy/ (maybe)
+```
+
+**New Apps to Create:**
+```
+apps/signaling/           # New: Personal + Collab rooms, Shipyard JWT
+apps/server/              # New: Daemon + MCP server combined, loro-extended
+apps/web/                 # New or heavy refactor (TBD)
+```
+
+**Packages:**
+```
+packages/schema/          → packages/schema-legacy/
+packages/loro-schema/     # New: Loro shapes, validators, helpers
+```
+
+---
+
 ## Migration Delta
 
 ### What Changes
@@ -291,32 +328,50 @@ packages/schema/src/y-webrtc-internals.ts    # 112 lines
 
 ---
 
-## Open Questions
+## Open Questions (Resolved)
 
 ### From Architecture Doc
 
-| # | Question | Status | Notes |
-|---|----------|--------|-------|
-| 1 | Agent type registry location | Open | Config file? Fetched from signaling? Hard-coded? |
-| 2 | Task hydration at spawn | Open | Agent fetches (pull) vs daemon passes (push)? |
-| 3 | Collab room permissions | Open | View-only vs interactive? Per-user capabilities? |
-| 4 | Run history / archival | Open | R2? Filesystem? Keep in LevelDB? |
-| 5 | Multi-machine naming | Open | How to disambiguate same agent type on multiple machines? |
-| 6 | Schema evolution | Open | How to handle breaking changes with P2P sync? |
-| 7 | MCP tool surface | Open | Which tools does daemon expose? How do they map to Loro events? |
-| 8 | TURN provider | Open | Cloudflare Calls? Metered.ca? Self-hosted coturn? |
-| 9 | Permission granularity | Open | What specific operations need separate permissions? |
-| 10 | Delegation depth | Open | Can collaborators grant access to others, or only owners? |
+| # | Question | Status | Decision |
+|---|----------|--------|----------|
+| 1 | Agent type registry location | **Deferred** | Not needed for v1. Feature work for later. |
+| 2 | Task hydration at spawn | **Resolved** | Push model (current behavior). Daemon passes context. |
+| 3 | Collab room permissions | **Deferred** | Full access if in room. No fine-grained permissions for v1. |
+| 4 | Run history / archival | **Resolved** | Keep in LevelDB forever. Storage is cheap, even 1000s of tasks is fine. |
+| 5 | Multi-machine naming | **Deferred** | Not solving for v1. |
+| 6 | Schema evolution | **Resolved** | Epochs + clean cuts. Will figure out proper evolution later. |
+| 7 | MCP tool surface | **Resolved** | Keep existing tools (execute_code sandbox with all APIs). |
+| 8 | TURN provider | **Deferred** | Has GitHub issue. Will address separately. |
+| 9 | Permission granularity | **Deferred** | No fine-grained permissions for v1. Full access or no access. |
+| 10 | Delegation depth | **Resolved** | Owners only can grant access. |
 
 ### From Current Implementation Analysis
 
-| # | Question | Status | Notes |
-|---|----------|--------|-------|
-| 11 | Hook migration | Open | How do hooks work with daemon-as-MCP-server? |
-| 12 | Session token → JWT | Open | Migration path for existing tokens? |
-| 13 | Plan-index doc | Open | Does Personal Room replace it? Or complement? |
-| 14 | GitHub OAuth worker | Open | Merge into signaling worker? Keep separate? |
-| 15 | Daemon lock management | Open | Still needed if daemon = MCP server? |
+| # | Question | Status | Decision |
+|---|----------|--------|----------|
+| 11 | Hook migration | **Resolved** | Hooks share utils with MCP server. Try to start daemon if not running, or connect to existing. |
+| 12 | Session token → JWT | **Resolved** | Complete break. No migration path needed (no users). |
+| 13 | Plan-index doc | **Resolved** | Becomes **Task Index** - global normalized view per room. Synced via WebRTC P2P at connection time, NOT through signaling (privacy-by-design). |
+| 14 | GitHub OAuth worker | **Resolved** | Merge into signaling worker (same trust boundary). |
+| 15 | Daemon lock management | **Resolved** | Yes, singleton daemon still required. |
+
+### Key Architecture Clarification: Task Index
+
+The signaling server **never sees private data**. The Task Index works as follows:
+
+```
+Personal Room (signaling)           Task Index (Loro doc)
+├── Presence only                   ├── Normalized task metadata
+├── Agent registry (ids, status)    ├── Per-task summaries
+├── WebRTC signaling relay          └── Synced P2P at connection
+└── NO task content                     (not through signaling)
+
+Flow:
+1. Browser connects to Personal Room via signaling
+2. Signaling facilitates WebRTC handshake to daemon
+3. Once WebRTC established, Task Index syncs P2P (direct)
+4. Signaling never sees task content or metadata
+```
 
 ---
 
