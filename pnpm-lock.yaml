@@ -514,6 +514,43 @@ importers:
         specifier: ^4.0.18
         version: 4.0.18(@types/node@25.0.10)(happy-dom@20.3.7)(jiti@2.6.1)(jsdom@25.0.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.2)
 
+  packages/loro-schema:
+    dependencies:
+      '@loro-extended/change':
+        specifier: link:../../../loro-extended/packages/change
+        version: link:../../../loro-extended/packages/change
+      '@loro-extended/react':
+        specifier: link:../../../loro-extended/packages/react
+        version: link:../../../loro-extended/packages/react
+      '@loro-extended/repo':
+        specifier: link:../../../loro-extended/packages/repo
+        version: link:../../../loro-extended/packages/repo
+      loro-crdt:
+        specifier: ^1.10.3
+        version: 1.10.5
+      loro-prosemirror:
+        specifier: ^0.1.0
+        version: 0.1.0(loro-crdt@1.10.5)(prosemirror-model@1.25.4)(prosemirror-state@1.4.4)(prosemirror-view@1.41.5)
+      nanoid:
+        specifier: ^5.1.6
+        version: 5.1.6
+      zod:
+        specifier: ^4.3.5
+        version: 4.3.5
+    devDependencies:
+      '@types/node':
+        specifier: ^25.0.10
+        version: 25.0.10
+      tsdown:
+        specifier: 0.20.0-beta.4
+        version: 0.20.0-beta.4(typescript@5.9.3)
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^4.0.17
+        version: 4.0.18(@types/node@25.0.10)(happy-dom@20.3.7)(jiti@2.6.1)(jsdom@25.0.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.2)
+
   packages/schema:
     dependencies:
       '@blocknote/core':
@@ -4571,6 +4608,17 @@ packages:
 
   longest-streak@3.1.0:
     resolution: {integrity: sha512-9Ri+o0JYgehTaVBBDoMqIl8GXtbWg711O3srftcHhZ0dqnETqLaoIK0x17fUw9rFSlK/0NlsKe0Ahhyl5pXE2g==}
+
+  loro-crdt@1.10.5:
+    resolution: {integrity: sha512-ZUCCiI0FbMWDI1dNhpmvjSyKQVZd7oD9JifRqcO+B2Kx+bDRBgd4QFf2SetHd9efQmnzJAGapHRVM2anTTrTuw==}
+
+  loro-prosemirror@0.1.0:
+    resolution: {integrity: sha512-fRo0NOluxfzmqt2kZ+3wzw5Kxs5XTyQ4lF2+qwRy9/9YRRcSMPvlBXtoDP6YntwZQAws6GE2Vi4W8AcS29XpSg==}
+    peerDependencies:
+      loro-crdt: ^1.0.7
+      prosemirror-model: ^1.18.1
+      prosemirror-state: ^1.4.1
+      prosemirror-view: ^1.28.0
 
   loupe@3.2.1:
     resolution: {integrity: sha512-CdzqowRJCeLU72bHvWqwRBBlLcMEtIvGrlvef74kMnV2AolS9Y8xUv1I0U/MNAWMhBlKIoyuEgoJ0t/bbwHbLQ==}
@@ -10683,6 +10731,16 @@ snapshots:
   lodash.merge@4.6.2: {}
 
   longest-streak@3.1.0: {}
+
+  loro-crdt@1.10.5: {}
+
+  loro-prosemirror@0.1.0(loro-crdt@1.10.5)(prosemirror-model@1.25.4)(prosemirror-state@1.4.4)(prosemirror-view@1.41.5):
+    dependencies:
+      lib0: 0.2.117
+      loro-crdt: 1.10.5
+      prosemirror-model: 1.25.4
+      prosemirror-state: 1.4.4
+      prosemirror-view: 1.41.5
 
   loupe@3.2.1: {}
 

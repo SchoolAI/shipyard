@@ -171,3 +171,6 @@ tmp/
 # Local MCP config (dev only, not distributed with plugin)
 # Run: cp .mcp.json.example .mcp.json
 .mcp.json
+
+# Claude Code local plans (session-specific, not committed)
+.claude/plans/

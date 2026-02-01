@@ -22,13 +22,14 @@ ALLOWED_DOCS=(
   "docs/installation.md"
   "docs/releasing.md"
 
-  # Apps
-  "apps/github-oauth-worker/README.md"
-  "apps/hook/README.md"
-  "apps/signaling/README.md"
-  "apps/og-proxy-worker/DEPLOYMENT.md"
-  "apps/og-proxy-worker/README.md"
-  "apps/daemon/AUTO_START.md"
+  # ADRs (require explicit listing, not auto-allowed)
+  "docs/decisions/0001-use-yjs-not-loro.md"
+  "docs/decisions/0002-use-sonner-for-toasts.md"
+  "docs/decisions/0003-mobile-oauth-user-agent-detection.md"
+  "docs/decisions/0004-validation-boundaries.md"
+  "docs/decisions/0005-rebrand-peer-plan-to-shipyard.md"
+  "docs/decisions/0006-webrtc-p2p-sync-infrastructure.md"
+  "docs/decisions/template.md"
 
   # Skills
   "skills/shipyard/README.md"
@@ -37,13 +38,9 @@ ALLOWED_DOCS=(
   "skills/shipyard/examples/task-example.md"
   "skills/shipyard/examples/video-recording.md"
 
-  # Tests
-  "tests/test-comment-replies.md"
-
   # Config
   ".codex/README.md"
   ".grit/README.md"
-  ".claude/plans/custom-comment-system.md"
 )
 
 ALLOWED_SCRIPTS=(
@@ -83,11 +80,6 @@ while IFS= read -r file; do
 
   # Exception: docs/whips/ is a sandbox
   if [[ "$file" =~ ^docs/whips/ ]]; then
-    continue
-  fi
-
-  # Exception: docs/decisions/ (ADRs)
-  if [[ "$file" =~ ^docs/decisions/ ]]; then
     continue
   fi
 
@@ -139,9 +131,10 @@ if [[ ${#violations[@]} -gt 0 ]]; then
   done
   echo ""
   echo "To fix:"
-  echo "  1. If temporary: Move to docs/wips/"
+  echo "  1. If temporary: Move to docs/whips/"
   echo "  2. If permanent: Add to allowlist in scripts/check-file-allowlist.sh AND scripts/validate-file-allowlist.sh"
-  echo "  3. If obsolete: Delete the file"
+  echo "  3. If architecture decision: Add ADR to docs/decisions/ AND update allowlist"
+  echo "  4. If obsolete: Delete the file"
   echo ""
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
   exit 1
