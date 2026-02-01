@@ -21,7 +21,6 @@ wsCollabRoute.get("/collab/:roomId", async (c) => {
 	const token = c.req.query("token");
 	const userToken = c.req.query("userToken");
 
-	// Validate WebSocket upgrade request
 	const upgradeHeader = c.req.header("Upgrade");
 	if (upgradeHeader !== "websocket") {
 		return c.json(
@@ -30,7 +29,6 @@ wsCollabRoute.get("/collab/:roomId", async (c) => {
 		);
 	}
 
-	// Validate pre-signed URL token
 	if (!token) {
 		return c.json(
 			{ error: "missing_token", message: "token query param required" },
@@ -46,7 +44,6 @@ wsCollabRoute.get("/collab/:roomId", async (c) => {
 		);
 	}
 
-	// Verify roomId matches token payload
 	if (payload.roomId !== roomId) {
 		logger.warn("roomId mismatch", {
 			urlRoomId: roomId,
@@ -58,7 +55,6 @@ wsCollabRoute.get("/collab/:roomId", async (c) => {
 		);
 	}
 
-	// Check expiration
 	if (Date.now() > payload.exp) {
 		return c.json(
 			{ error: "expired", message: "Collaboration link has expired" },
@@ -66,22 +62,17 @@ wsCollabRoute.get("/collab/:roomId", async (c) => {
 		);
 	}
 
-	// Validate optional user JWT for identity
 	let userClaims: { sub: string; ghUser: string } | undefined;
 	if (userToken) {
 		const claims = await validateToken(userToken, c.env.JWT_SECRET);
 		if (claims) {
 			userClaims = { sub: claims.sub, ghUser: claims.ghUser };
 		}
-		// If userToken is provided but invalid, we continue without user identity
-		// (the presigned URL is still valid, just anonymous access)
 	}
 
-	// Forward to CollabRoom Durable Object
 	const doId = c.env.COLLAB_ROOM.idFromName(roomId);
 	const room = c.env.COLLAB_ROOM.get(doId);
 
-	// Pass payload with user claims as header for DO to read
 	const collabPayload: PassedCollabPayload = {
 		...payload,
 		userClaims,

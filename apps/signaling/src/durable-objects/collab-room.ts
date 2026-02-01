@@ -120,7 +120,12 @@ export class CollabRoom extends DurableObject<Env> {
 			userId === this.ownerId ? "owner" : "collaborator";
 
 		const pair = new WebSocketPair();
-		const [client, server] = Object.values(pair) as [WebSocket, WebSocket];
+		const values = Object.values(pair);
+		const client = values[0];
+		const server = values[1];
+		if (!client || !server) {
+			return new Response("WebSocket pair creation failed", { status: 500 });
+		}
 
 		const state: ConnectionState = {
 			id: crypto.randomUUID(),
@@ -336,12 +341,15 @@ export class CollabRoom extends DurableObject<Env> {
 		obj: unknown,
 	): obj is SerializedCollabConnectionState {
 		if (!obj || typeof obj !== "object") return false;
-		const o = obj as Record<string, unknown>;
 		return (
-			typeof o.id === "string" &&
-			typeof o.userId === "string" &&
-			typeof o.username === "string" &&
-			(o.role === "owner" || o.role === "collaborator")
+			"id" in obj &&
+			typeof obj.id === "string" &&
+			"userId" in obj &&
+			typeof obj.userId === "string" &&
+			"username" in obj &&
+			typeof obj.username === "string" &&
+			"role" in obj &&
+			(obj.role === "owner" || obj.role === "collaborator")
 		);
 	}
 }

@@ -98,7 +98,12 @@ export class PersonalRoom extends DurableObject<Env> {
 		}
 
 		const pair = new WebSocketPair();
-		const [client, server] = Object.values(pair) as [WebSocket, WebSocket];
+		const values = Object.values(pair);
+		const client = values[0];
+		const server = values[1];
+		if (!client || !server) {
+			return new Response("WebSocket pair creation failed", { status: 500 });
+		}
 
 		const userAgent = request.headers.get("User-Agent") ?? "";
 		const isAgent = userAgent.includes("shipyard-daemon");
@@ -234,7 +239,6 @@ export class PersonalRoom extends DurableObject<Env> {
 				this.handleSpawnAgent(ws, state, msg);
 				break;
 			default:
-				// Exhaustiveness check - TypeScript ensures all cases are handled
 				msg satisfies never;
 				this.sendError(ws, "unknown_type", `Unknown message type`);
 		}
@@ -245,12 +249,10 @@ export class PersonalRoom extends DurableObject<Env> {
 		state: ConnectionState,
 		msg: Extract<PersonalRoomClientMessage, { type: "register-agent" }>,
 	): Promise<void> {
-		// Update connection state with agent info
 		state.agentId = msg.agentId;
 		state.machineId = msg.machineId;
 		this.persistConnectionState(ws, state);
 
-		// Create agent info
 		const now = Date.now();
 		const agentInfo: AgentInfo = {
 			agentId: msg.agentId,
@@ -262,11 +264,9 @@ export class PersonalRoom extends DurableObject<Env> {
 			lastSeenAt: now,
 		};
 
-		// Add to registry and persist
 		this.agents[msg.agentId] = agentInfo;
 		await this.ctx.storage.put("agents", this.agents);
 
-		// Broadcast agent joined to all other connections
 		broadcastExcept(
 			this.connections,
 			{
@@ -287,24 +287,20 @@ export class PersonalRoom extends DurableObject<Env> {
 		state: ConnectionState,
 		msg: Extract<PersonalRoomClientMessage, { type: "unregister-agent" }>,
 	): Promise<void> {
-		// Verify agent exists
 		if (!this.agents[msg.agentId]) {
 			this.sendError(ws, "not_found", `Agent ${msg.agentId} not found`);
 			return;
 		}
 
-		// Remove from registry and persist
 		delete this.agents[msg.agentId];
 		await this.ctx.storage.put("agents", this.agents);
 
-		// Clear agent info from connection state
 		if (state.agentId === msg.agentId) {
 			state.agentId = undefined;
 			state.machineId = undefined;
 			this.persistConnectionState(ws, state);
 		}
 
-		// Broadcast agent left to all other connections
 		broadcastExcept(
 			this.connections,
 			{
@@ -322,20 +318,17 @@ export class PersonalRoom extends DurableObject<Env> {
 		_state: ConnectionState,
 		msg: Extract<PersonalRoomClientMessage, { type: "agent-status" }>,
 	): Promise<void> {
-		// Verify agent exists
 		const agent = this.agents[msg.agentId];
 		if (!agent) {
 			this.sendError(ws, "not_found", `Agent ${msg.agentId} not found`);
 			return;
 		}
 
-		// Update agent status
 		agent.status = msg.status;
 		agent.activeTaskId = msg.activeTaskId;
 		agent.lastSeenAt = Date.now();
 		await this.ctx.storage.put("agents", this.agents);
 
-		// Broadcast status change to all other connections
 		broadcastExcept(
 			this.connections,
 			{
@@ -361,7 +354,6 @@ export class PersonalRoom extends DurableObject<Env> {
 			{ type: "webrtc-offer" | "webrtc-answer" | "webrtc-ice" }
 		>,
 	): void {
-		// Find target WebSocket by machineId
 		const targetWs = findWebSocketByMachineId(
 			this.connections,
 			msg.targetMachineId,
@@ -377,10 +369,8 @@ export class PersonalRoom extends DurableObject<Env> {
 			return;
 		}
 
-		// Relay the message to target, adding sender's machineId
 		const relayMsg: PersonalRoomServerMessage = {
 			...msg,
-			// Replace targetMachineId with sender's machineId for the receiver
 			targetMachineId: state.machineId ?? state.id,
 		};
 
@@ -398,11 +388,9 @@ export class PersonalRoom extends DurableObject<Env> {
 		_state: ConnectionState,
 		msg: Extract<PersonalRoomClientMessage, { type: "spawn-agent" }>,
 	): void {
-		// Find daemon connection by machineId
 		const daemonWs = findWebSocketByMachineId(this.connections, msg.machineId);
 
 		if (!daemonWs) {
-			// Daemon not connected, send error response
 			this.sendMessage(ws, {
 				type: "spawn-result",
 				requestId: msg.requestId,
@@ -413,8 +401,6 @@ export class PersonalRoom extends DurableObject<Env> {
 			return;
 		}
 
-		// Forward spawn request to daemon
-		// The daemon will handle the actual spawning and respond with spawn-result
 		relayMessage(daemonWs, msg);
 
 		this.logger.info("Spawn request forwarded to daemon", {
@@ -424,14 +410,10 @@ export class PersonalRoom extends DurableObject<Env> {
 		});
 	}
 
-	// ============ Helpers ============
-
 	private sendMessage(ws: WebSocket, msg: PersonalRoomServerMessage): void {
 		try {
 			ws.send(JSON.stringify(msg));
-		} catch {
-			// Connection may be closed
-		}
+		} catch {}
 	}
 
 	private sendError(
@@ -460,12 +442,15 @@ export class PersonalRoom extends DurableObject<Env> {
 		obj: unknown,
 	): obj is SerializedPersonalConnectionState {
 		if (!obj || typeof obj !== "object") return false;
-		const o = obj as Record<string, unknown>;
 		return (
-			typeof o.id === "string" &&
-			(o.type === "agent" || o.type === "browser") &&
-			typeof o.userId === "string" &&
-			typeof o.username === "string"
+			"id" in obj &&
+			typeof obj.id === "string" &&
+			"type" in obj &&
+			(obj.type === "agent" || obj.type === "browser") &&
+			"userId" in obj &&
+			typeof obj.userId === "string" &&
+			"username" in obj &&
+			typeof obj.username === "string"
 		);
 	}
 }

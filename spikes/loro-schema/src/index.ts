@@ -14,7 +14,6 @@ export {
   type TaskDocumentShape,
   type TaskDocument,
   type MutableTaskDocument,
-  type TaskCore,
   type TaskMeta,
   type TaskComment,
   type TaskEvent,

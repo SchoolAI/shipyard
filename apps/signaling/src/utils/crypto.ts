@@ -95,8 +95,6 @@ export async function hmacVerify(
 	return timingSafeCompare(signature, expectedSignature);
 }
 
-// ============ Internal helpers ============
-
 function base64UrlEncode(bytes: Uint8Array): string {
 	let binary = "";
 	for (const byte of bytes) {

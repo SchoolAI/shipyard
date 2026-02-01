@@ -4,7 +4,7 @@ import { defineWorkersConfig } from '@cloudflare/vitest-pool-workers/config'
 import {
   DEFAULT_TIER_THRESHOLDS,
   generateCoverageThresholds,
-} from './scripts/analyze-fan-in'
+} from '../../scripts/analyze-fan-in'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 

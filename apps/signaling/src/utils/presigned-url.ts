@@ -6,6 +6,26 @@ import type { PresignedUrlPayload } from "../auth/types";
 import { hmacSign, hmacVerify } from "./crypto";
 
 /**
+ * Type guard for PresignedUrlPayload.
+ */
+function isValidPresignedUrlPayload(obj: unknown): obj is PresignedUrlPayload {
+	if (!obj || typeof obj !== "object") return false;
+	return (
+		"roomId" in obj &&
+		typeof obj.roomId === "string" &&
+		obj.roomId.length > 0 &&
+		"taskId" in obj &&
+		typeof obj.taskId === "string" &&
+		obj.taskId.length > 0 &&
+		"inviterId" in obj &&
+		typeof obj.inviterId === "string" &&
+		obj.inviterId.length > 0 &&
+		"exp" in obj &&
+		typeof obj.exp === "number"
+	);
+}
+
+/**
  * Generate a pre-signed URL for collab room access.
  *
  * URL format: {baseUrl}/collab/{roomId}?token={signed_token}
@@ -38,28 +58,20 @@ export async function validatePresignedUrlAsync(
 		const payloadB64 = parts[0];
 		const signature = parts[1];
 
-		// Type guard after length check
 		if (!payloadB64 || !signature) return null;
 
-		// Verify signature
 		const isValid = await hmacVerify(payloadB64, signature, secret);
 		if (!isValid) return null;
 
-		// Decode payload
 		const payloadJson = base64UrlDecode(payloadB64);
-		const payload = JSON.parse(payloadJson) as PresignedUrlPayload;
+		const parsed: unknown = JSON.parse(payloadJson);
 
-		// Validate required fields
-		if (
-			!payload.roomId ||
-			!payload.taskId ||
-			!payload.inviterId ||
-			!payload.exp
-		) {
+		if (!isValidPresignedUrlPayload(parsed)) {
 			return null;
 		}
 
-		// Check expiration
+		const payload = parsed;
+
 		if (Date.now() > payload.exp) {
 			return null;
 		}
@@ -69,8 +81,6 @@ export async function validatePresignedUrlAsync(
 		return null;
 	}
 }
-
-// ============ Internal helpers ============
 
 function base64UrlEncode(str: string): string {
 	const base64 = btoa(str);

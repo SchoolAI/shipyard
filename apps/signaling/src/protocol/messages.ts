@@ -4,8 +4,6 @@
 
 import { z } from "zod";
 
-// ============ Personal Room Messages (Client → Server) ============
-
 export const RegisterAgentSchema = z.object({
 	type: z.literal("register-agent"),
 	agentId: z.string(),
@@ -29,21 +27,21 @@ export const AgentStatusSchema = z.object({
 export const WebRTCOfferSchema = z.object({
 	type: z.literal("webrtc-offer"),
 	targetMachineId: z.string(),
-	offer: z.unknown(), // RTCSessionDescriptionInit
+	offer: z.unknown(),
 	requestId: z.string().optional(),
 });
 
 export const WebRTCAnswerSchema = z.object({
 	type: z.literal("webrtc-answer"),
 	targetMachineId: z.string(),
-	answer: z.unknown(), // RTCSessionDescriptionInit
+	answer: z.unknown(),
 	requestId: z.string().optional(),
 });
 
 export const WebRTCIceSchema = z.object({
 	type: z.literal("webrtc-ice"),
 	targetMachineId: z.string(),
-	candidate: z.unknown(), // RTCIceCandidateInit
+	candidate: z.unknown(),
 });
 
 export const SpawnAgentSchema = z.object({
@@ -68,8 +66,6 @@ export const PersonalRoomClientMessageSchema = z.discriminatedUnion("type", [
 export type PersonalRoomClientMessage = z.infer<
 	typeof PersonalRoomClientMessageSchema
 >;
-
-// ============ Personal Room Messages (Server → Client) ============
 
 export const AuthenticatedSchema = z.object({
 	type: z.literal("authenticated"),
@@ -131,16 +127,14 @@ export const PersonalRoomServerMessageSchema = z.discriminatedUnion("type", [
 	AgentStatusChangedSchema,
 	SpawnResultSchema,
 	ErrorMessageSchema,
-	WebRTCOfferSchema, // Relayed
-	WebRTCAnswerSchema, // Relayed
-	WebRTCIceSchema, // Relayed
+	WebRTCOfferSchema,
+	WebRTCAnswerSchema,
+	WebRTCIceSchema,
 ]);
 
 export type PersonalRoomServerMessage = z.infer<
 	typeof PersonalRoomServerMessageSchema
 >;
-
-// ============ Collab Room Messages (Client → Server) ============
 
 export const CollabWebRTCOfferSchema = z.object({
 	type: z.literal("webrtc-offer"),
@@ -169,8 +163,6 @@ export const CollabRoomClientMessageSchema = z.discriminatedUnion("type", [
 export type CollabRoomClientMessage = z.infer<
 	typeof CollabRoomClientMessageSchema
 >;
-
-// ============ Collab Room Messages (Server → Client) ============
 
 export const ParticipantSchema = z.object({
 	userId: z.string(),
@@ -206,20 +198,18 @@ export const CollabRoomServerMessageSchema = z.discriminatedUnion("type", [
 	ParticipantJoinedSchema,
 	ParticipantLeftSchema,
 	ErrorMessageSchema,
-	CollabWebRTCOfferSchema, // Relayed
-	CollabWebRTCAnswerSchema, // Relayed
-	CollabWebRTCIceSchema, // Relayed
+	CollabWebRTCOfferSchema,
+	CollabWebRTCAnswerSchema,
+	CollabWebRTCIceSchema,
 ]);
 
 export type CollabRoomServerMessage = z.infer<
 	typeof CollabRoomServerMessageSchema
 >;
 
-// ============ HTTP Request/Response Types ============
-
 export const CreateCollabRequestSchema = z.object({
 	taskId: z.string().min(1),
-	expiresInMinutes: z.number().min(1).max(1440).default(60), // 1 min to 24 hours
+	expiresInMinutes: z.number().min(1).max(1440).default(60),
 });
 
 export type CreateCollabRequest = z.infer<typeof CreateCollabRequestSchema>;

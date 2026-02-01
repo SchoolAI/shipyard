@@ -24,7 +24,6 @@ export const authGitHubRoute = new Hono<{ Bindings: Env }>();
 authGitHubRoute.post("/auth/github/callback", async (c) => {
 	const logger = createLogger(c.env);
 
-	// Parse request body
 	let body: TokenExchangeRequest;
 	try {
 		body = await c.req.json();
@@ -32,7 +31,6 @@ authGitHubRoute.post("/auth/github/callback", async (c) => {
 		return c.json({ error: "invalid_body", message: "Invalid JSON body" }, 400);
 	}
 
-	// Validate required fields
 	if (!body.code || typeof body.code !== "string") {
 		return c.json({ error: "missing_code", message: "code is required" }, 400);
 	}
@@ -43,7 +41,6 @@ authGitHubRoute.post("/auth/github/callback", async (c) => {
 		);
 	}
 
-	// Exchange code for GitHub token
 	const tokenResult = await exchangeCodeForToken(
 		body.code,
 		body.redirect_uri,
@@ -59,7 +56,6 @@ authGitHubRoute.post("/auth/github/callback", async (c) => {
 		);
 	}
 
-	// Fetch GitHub user info
 	const user = await fetchGitHubUser(tokenResult.accessToken);
 	if (!user) {
 		logger.warn("Failed to fetch GitHub user");
@@ -69,10 +65,8 @@ authGitHubRoute.post("/auth/github/callback", async (c) => {
 		);
 	}
 
-	// Generate Shipyard JWT
 	const shipyardToken = await generateSessionToken(user, c.env.JWT_SECRET);
 
-	// Check for mobile
 	const userAgent = c.req.header("User-Agent");
 	const isMobile = isMobileUserAgent(userAgent ?? null);
 

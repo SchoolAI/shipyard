@@ -15,16 +15,13 @@ const EnvironmentSchema = z
  * Validates env bindings at runtime.
  */
 export const EnvSchema = z.object({
-	// Durable Objects (runtime bindings, validated as custom type)
 	PERSONAL_ROOM: z.custom<DurableObjectNamespace>((val) => val !== undefined),
 	COLLAB_ROOM: z.custom<DurableObjectNamespace>((val) => val !== undefined),
 
-	// Secrets
 	GITHUB_CLIENT_ID: z.string().min(1, "GITHUB_CLIENT_ID required"),
 	GITHUB_CLIENT_SECRET: z.string().min(1, "GITHUB_CLIENT_SECRET required"),
 	JWT_SECRET: z.string().min(32, "JWT_SECRET must be at least 32 chars"),
 
-	// Config
 	ENVIRONMENT: EnvironmentSchema,
 	LOG_LEVEL: LogLevelSchema.optional(),
 });

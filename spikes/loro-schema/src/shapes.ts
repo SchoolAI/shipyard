@@ -74,26 +74,26 @@ const InputRequestBaseFields = {
  * Individual task document schema.
  * One doc per task, contains all task-specific state.
  *
- * Structure follows hybrid metadata pattern (from WorldStateSchema research):
- * - core struct: Core identity (id, title, status)
- * - meta struct: Auxiliary metadata (timestamps, ownership, tracking, etc.)
- * - Root level: Content and feature arrays
+ * Structure:
+ * - meta struct: All task metadata (identity, timestamps, ownership, etc.)
+ * - Root level: Content and feature arrays (comments, artifacts, events, etc.)
  *
  * Note: Loro docs can only contain container types (list, record, struct, text, tree),
- * so core identity fields are wrapped in a struct rather than at true root level.
+ * so all plain values must be wrapped in a struct.
  */
 export const TaskDocumentSchema: DocShape = Shape.doc({
   // ============================================================================
-  // CORE IDENTITY
+  // METADATA
   // ============================================================================
 
   //
-  // CORE - Essential task identity
+  // META - All task metadata
   //
-  // Contains: id, title, status
-  // Immutable simple values wrapped in struct (Loro doc constraint)
+  // Contains: identity (id, title, status), timestamps, ownership, tracking, archive state, origin info
   //
-  core: Shape.struct({
+  meta: Shape.struct({
+    // === Identity ===
+
     // EXISTS: Unique task identifier (nanoid)
     // UI: URL routing, IndexedDB keys, React keys, panel selection
     // If removed: FATAL - cannot identify or navigate to tasks
@@ -108,19 +108,7 @@ export const TaskDocumentSchema: DocShape = Shape.doc({
     // UI: StatusChip colors, Kanban columns, Inbox filtering, Review actions
     // If removed: FATAL - entire workflow system breaks
     status: Shape.plain.string('draft', 'pending_review', 'changes_requested', 'in_progress', 'completed'),
-  }),
 
-  // ============================================================================
-  // AUXILIARY METADATA
-  // ============================================================================
-
-  //
-  // META - Auxiliary task metadata
-  //
-  // Contains: timestamps, ownership, tracking, archive state, origin info
-  // Grouped separately from core identity (id, title, status)
-  //
-  meta: Shape.struct({
     // === Timestamps ===
 
     // EXISTS: Creation timestamp
@@ -207,7 +195,7 @@ export const TaskDocumentSchema: DocShape = Shape.doc({
   }),
 
   // ============================================================================
-  // CORE CONTENT (root level)
+  // CONTENT
   // ============================================================================
 
   //
@@ -882,7 +870,6 @@ export const GlobalRoomSchema: DocShape = Shape.doc({
 export type TaskDocumentShape = typeof TaskDocumentSchema;
 export type TaskDocument = Infer<typeof TaskDocumentSchema>;
 export type MutableTaskDocument = InferMutableType<typeof TaskDocumentSchema>;
-export type TaskCore = Infer<typeof TaskDocumentSchema.shapes.core>;
 export type TaskMeta = Infer<typeof TaskDocumentSchema.shapes.meta>;
 
 // Comment types (discriminated union by 'kind')

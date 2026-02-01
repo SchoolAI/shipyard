@@ -22,7 +22,6 @@ export const collabCreateRoute = new Hono<{ Bindings: Env }>();
 collabCreateRoute.post("/collab/create", async (c) => {
 	const logger = createLogger(c.env);
 
-	// Validate JWT from Authorization header
 	const authHeader = c.req.header("Authorization");
 	if (!authHeader?.startsWith("Bearer ")) {
 		return c.json(
@@ -40,7 +39,6 @@ collabCreateRoute.post("/collab/create", async (c) => {
 		);
 	}
 
-	// Parse and validate request body
 	let body: unknown;
 	try {
 		body = await c.req.json();
@@ -62,11 +60,9 @@ collabCreateRoute.post("/collab/create", async (c) => {
 
 	const { taskId, expiresInMinutes } = parseResult.data;
 
-	// Generate room ID and pre-signed URL
 	const roomId = generateId(16);
 	const expiresAt = Date.now() + expiresInMinutes * 60 * 1000;
 
-	// Determine base URL for pre-signed URL
 	const baseUrl =
 		c.env.ENVIRONMENT === "production"
 			? "https://shipyard-signaling.jacob-191.workers.dev"

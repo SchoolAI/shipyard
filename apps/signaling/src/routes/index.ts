@@ -12,12 +12,14 @@ import { wsPersonalRoute } from "./ws-personal";
 /**
  * Main Hono application with all routes registered.
  */
-export const app = new Hono<{ Bindings: Env }>();
+export const app = new Hono<{
+	Bindings: Env;
+	Variables: { logger: ReturnType<typeof createLogger> };
+}>();
 
-// Global middleware: logging
 app.use("*", async (c, next) => {
 	const logger = createLogger(c.env);
-	c.set("logger" as never, logger);
+	c.set("logger", logger);
 	const start = Date.now();
 	await next();
 	logger.info("request", {
@@ -28,7 +30,6 @@ app.use("*", async (c, next) => {
 	});
 });
 
-// Global middleware: CORS
 app.use(
 	"*",
 	cors({
@@ -43,14 +44,12 @@ app.use(
 	}),
 );
 
-// Mount routes
 app.route("/", healthRoute);
 app.route("/", authGitHubRoute);
 app.route("/", collabCreateRoute);
 app.route("/", wsPersonalRoute);
 app.route("/", wsCollabRoute);
 
-// Catch-all 404
 app.notFound((c) => {
 	return c.json(
 		{
@@ -68,7 +67,6 @@ app.notFound((c) => {
 	);
 });
 
-// Global error handler
 app.onError((err, c) => {
 	const logger = createLogger(c.env);
 	logger.error("unhandled error", { error: err.message, stack: err.stack });

@@ -38,9 +38,9 @@ export interface SerializedPersonalConnectionState {
 	type: PersonalConnectionType;
 	userId: string;
 	username: string;
-	machineId?: string; // For agents
-	agentId?: string; // For agents
-	sessionId?: string; // For browsers
+	machineId?: string;
+	agentId?: string;
+	sessionId?: string;
 }
 
 /** Serialized state for WebSocket hibernation (CollabRoom) */

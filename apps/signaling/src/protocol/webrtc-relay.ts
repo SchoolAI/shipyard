@@ -68,9 +68,7 @@ export function broadcastExcept(
 			try {
 				ws.send(messageStr);
 				sent++;
-			} catch {
-				// Connection may be closed, ignore
-			}
+			} catch {}
 		}
 	}
 

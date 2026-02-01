@@ -22,7 +22,6 @@ export function isAllowedOrigin(origin: string | null, env: Env): boolean {
 		return ALLOWED_ORIGINS_PRODUCTION.includes(origin);
 	}
 
-	// Development: allow any localhost
 	try {
 		const url = new URL(origin);
 		return url.hostname === "localhost" || url.hostname === "127.0.0.1";
@@ -48,6 +47,6 @@ export function getCorsHeaders(
 		"Access-Control-Allow-Methods": "GET, POST, OPTIONS",
 		"Access-Control-Allow-Headers":
 			"Content-Type, Authorization, Upgrade, Connection",
-		"Access-Control-Max-Age": "86400", // 24 hours
+		"Access-Control-Max-Age": "86400",
 	};
 }

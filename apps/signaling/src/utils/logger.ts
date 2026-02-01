@@ -75,9 +75,10 @@ export class Logger {
 	}
 
 	private getLevelName(): LogLevel {
-		for (const [name, value] of Object.entries(LOG_LEVELS)) {
-			if (value === this.level) {
-				return name as LogLevel;
+		const levels: LogLevel[] = ["debug", "info", "warn", "error"];
+		for (const name of levels) {
+			if (LOG_LEVELS[name] === this.level) {
+				return name;
 			}
 		}
 		return "info";

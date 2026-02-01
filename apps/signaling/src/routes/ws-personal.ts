@@ -18,7 +18,6 @@ wsPersonalRoute.get("/personal/:userId", async (c) => {
 	const userId = c.req.param("userId");
 	const token = c.req.query("token");
 
-	// Validate WebSocket upgrade request
 	const upgradeHeader = c.req.header("Upgrade");
 	if (upgradeHeader !== "websocket") {
 		return c.json(
@@ -27,7 +26,6 @@ wsPersonalRoute.get("/personal/:userId", async (c) => {
 		);
 	}
 
-	// Validate JWT
 	if (!token) {
 		return c.json(
 			{ error: "missing_token", message: "token query param required" },
@@ -43,7 +41,6 @@ wsPersonalRoute.get("/personal/:userId", async (c) => {
 		);
 	}
 
-	// Verify userId matches token subject
 	if (claims.sub !== userId) {
 		logger.warn("userId mismatch", { urlUserId: userId, tokenSub: claims.sub });
 		return c.json(
@@ -52,11 +49,9 @@ wsPersonalRoute.get("/personal/:userId", async (c) => {
 		);
 	}
 
-	// Forward to PersonalRoom Durable Object
 	const roomId = c.env.PERSONAL_ROOM.idFromName(userId);
 	const room = c.env.PERSONAL_ROOM.get(roomId);
 
-	// Pass claims as header for DO to read
 	const headers = new Headers(c.req.raw.headers);
 	headers.set("X-Shipyard-Claims", JSON.stringify(claims));
 
