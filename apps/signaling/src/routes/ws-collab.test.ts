@@ -1,7 +1,7 @@
 import { env } from "cloudflare:test";
+import { ROUTES } from "@shipyard/signaling";
 import { describe, expect, it } from "vitest";
 import type { PresignedUrlPayload } from "../auth/types";
-import { ROUTES } from "../client/routes";
 import type { Env } from "../env";
 import { hmacSign } from "../utils/crypto";
 import { app } from "./index";

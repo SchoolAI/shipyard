@@ -9,7 +9,7 @@ import {
 	type CollabRoomClientMessage,
 	CollabRoomClientMessageSchema,
 	type CollabRoomServerMessage,
-} from "../client/schemas";
+} from "@shipyard/signaling";
 import type { Env } from "../env";
 import {
 	broadcastExcept,

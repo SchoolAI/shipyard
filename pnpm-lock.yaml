@@ -289,6 +289,9 @@ importers:
 
   apps/signaling:
     dependencies:
+      '@shipyard/signaling':
+        specifier: workspace:*
+        version: link:../../packages/signaling
       hono:
         specifier: ^4.7.4
         version: 4.11.3
@@ -545,6 +548,37 @@ importers:
         specifier: ^4.0.18
         version: 4.0.18(@types/node@25.0.10)(happy-dom@20.3.7)(jiti@2.6.1)(jsdom@25.0.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.2)
 
+  packages/loro-schema:
+    dependencies:
+      '@loro-extended/change':
+        specifier: ^5.3.0
+        version: 5.3.0(loro-crdt@1.10.5)
+      lz-string:
+        specifier: ^1.5.0
+        version: 1.5.0
+      nanoid:
+        specifier: ^5.1.6
+        version: 5.1.6
+      zod:
+        specifier: ^4.3.5
+        version: 4.3.5
+    devDependencies:
+      '@types/node':
+        specifier: ^25.0.10
+        version: 25.0.10
+      loro-crdt:
+        specifier: ^1.10.3
+        version: 1.10.5
+      tsdown:
+        specifier: 0.20.0-beta.4
+        version: 0.20.0-beta.4(typescript@5.9.3)
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^4.0.17
+        version: 4.0.18(@types/node@25.0.10)(happy-dom@20.3.7)(jiti@2.6.1)(jsdom@25.0.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.2)
+
   packages/schema:
     dependencies:
       '@blocknote/core':
@@ -584,6 +618,22 @@ importers:
       '@types/node':
         specifier: ^25.0.10
         version: 25.0.10
+      tsdown:
+        specifier: 0.20.0-beta.4
+        version: 0.20.0-beta.4(typescript@5.9.3)
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^4.0.17
+        version: 4.0.18(@types/node@25.0.10)(happy-dom@20.3.7)(jiti@2.6.1)(jsdom@25.0.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.2)
+
+  packages/signaling:
+    dependencies:
+      zod:
+        specifier: ^3.24.2
+        version: 3.25.76
+    devDependencies:
       tsdown:
         specifier: 0.20.0-beta.4
         version: 0.20.0-beta.4(typescript@5.9.3)
@@ -2011,6 +2061,11 @@ packages:
 
   '@jridgewell/trace-mapping@0.3.9':
     resolution: {integrity: sha512-3Belt6tdc8bPgAtbcmdtNJlirVoTmEb5e2gC94PnkwEW9jI6CAHUeoG85tjWP5WquqfavoMtMwiG4P926ZKKuQ==}
+
+  '@loro-extended/change@5.3.0':
+    resolution: {integrity: sha512-hv567NFC3/KMrUBLxqSzvCmE2e7xWDkjhltsMeDuz37r8u4DjJNztuaOKv3+fEByfLY0mBfpavPxzBiLDQIIIA==}
+    peerDependencies:
+      loro-crdt: ^1.10.3
 
   '@mantine/core@8.3.13':
     resolution: {integrity: sha512-ZgW4vqN4meaPyIMxzAufBvsgmJRfYZdTpsrAOcS8pWy7m9e8i685E7XsAxnwJCOIHudpvpvt+7Bx7VaIjEsYEw==}
@@ -5029,6 +5084,9 @@ packages:
 
   longest-streak@3.1.0:
     resolution: {integrity: sha512-9Ri+o0JYgehTaVBBDoMqIl8GXtbWg711O3srftcHhZ0dqnETqLaoIK0x17fUw9rFSlK/0NlsKe0Ahhyl5pXE2g==}
+
+  loro-crdt@1.10.5:
+    resolution: {integrity: sha512-ZUCCiI0FbMWDI1dNhpmvjSyKQVZd7oD9JifRqcO+B2Kx+bDRBgd4QFf2SetHd9efQmnzJAGapHRVM2anTTrTuw==}
 
   loupe@3.2.1:
     resolution: {integrity: sha512-CdzqowRJCeLU72bHvWqwRBBlLcMEtIvGrlvef74kMnV2AolS9Y8xUv1I0U/MNAWMhBlKIoyuEgoJ0t/bbwHbLQ==}
@@ -8072,6 +8130,10 @@ snapshots:
     dependencies:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
+
+  '@loro-extended/change@5.3.0(loro-crdt@1.10.5)':
+    dependencies:
+      loro-crdt: 1.10.5
 
   '@mantine/core@8.3.13(@mantine/hooks@8.3.13(react@19.2.3))(@types/react@19.2.9)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)':
     dependencies:
@@ -11630,6 +11692,8 @@ snapshots:
   lodash.merge@4.6.2: {}
 
   longest-streak@3.1.0: {}
+
+  loro-crdt@1.10.5: {}
 
   loupe@3.2.1: {}
 

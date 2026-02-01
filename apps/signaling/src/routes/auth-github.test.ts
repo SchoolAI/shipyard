@@ -1,6 +1,6 @@
 import { env, fetchMock } from "cloudflare:test";
+import { ROUTES } from "@shipyard/signaling";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
-import { ROUTES } from "../client/routes";
 import { app } from "./index";
 
 // GitHub API endpoints

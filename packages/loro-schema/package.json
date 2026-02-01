@@ -1,0 +1,59 @@
+{
+  "name": "@shipyard/loro-schema",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Loro-based schema and CRDT helpers for Shipyard",
+  "main": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.mjs",
+      "types": "./dist/index.d.mts"
+    },
+    "./shapes": {
+      "import": "./dist/shapes.mjs",
+      "types": "./dist/shapes.d.mts"
+    },
+    "./validators": {
+      "import": "./dist/validators.mjs",
+      "types": "./dist/validators.d.mts"
+    },
+    "./types": {
+      "import": "./dist/types.mjs",
+      "types": "./dist/types.d.mts"
+    },
+    "./helpers": {
+      "import": "./dist/helpers.mjs",
+      "types": "./dist/helpers.d.mts"
+    },
+    "./url": {
+      "import": "./dist/url-encoding.mjs",
+      "types": "./dist/url-encoding.d.mts"
+    }
+  },
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsdown --watch",
+    "test": "vitest run --passWithNoTests",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check src",
+    "lint:fix": "biome check src --write"
+  },
+  "dependencies": {
+    "@loro-extended/change": "^5.3.0",
+    "zod": "^4.3.5",
+    "lz-string": "^1.5.0",
+    "nanoid": "^5.1.6"
+  },
+  "peerDependencies": {
+    "loro-crdt": "^1.10.3"
+  },
+  "devDependencies": {
+    "@types/node": "^25.0.10",
+    "tsdown": "0.20.0-beta.4",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.17",
+    "loro-crdt": "^1.10.3"
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "name": "@shipyard/signaling",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Shared types and client for the Shipyard signaling server",
+  "main": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.mjs",
+      "types": "./dist/index.d.mts"
+    },
+    "./client": {
+      "import": "./dist/client/index.mjs",
+      "types": "./dist/client/index.d.mts"
+    }
+  },
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsdown --watch",
+    "test": "vitest run --passWithNoTests",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check src",
+    "lint:fix": "biome check src --write"
+  },
+  "dependencies": {
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "tsdown": "0.20.0-beta.4",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.17"
+  }
+}

@@ -9,7 +9,7 @@ import {
 	type PersonalRoomClientMessage,
 	PersonalRoomClientMessageSchema,
 	type PersonalRoomServerMessage,
-} from "../client/schemas";
+} from "@shipyard/signaling";
 import type { Env } from "../env";
 import {
 	broadcastExcept,

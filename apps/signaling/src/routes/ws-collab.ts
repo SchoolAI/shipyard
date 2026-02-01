@@ -1,6 +1,6 @@
+import { ROUTES } from "@shipyard/signaling";
 import { Hono } from "hono";
 import { validateToken } from "../auth/jwt";
-import { ROUTES } from "../client/routes";
 import type { PassedCollabPayload } from "../durable-objects/types";
 import type { Env } from "../env";
 import { createLogger } from "../utils/logger";

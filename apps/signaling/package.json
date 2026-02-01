@@ -1,5 +1,5 @@
 {
-  "name": "@shipyard/signaling",
+  "name": "@shipyard/signaling-server",
   "version": "0.0.1",
   "private": true,
   "type": "module",
@@ -22,6 +22,7 @@
     "secret:jwt-secret": "wrangler secret put JWT_SECRET"
   },
   "dependencies": {
+    "@shipyard/signaling": "workspace:*",
     "hono": "^4.7.4",
     "zod": "^3.24.2"
   },

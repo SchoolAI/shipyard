@@ -1,6 +1,6 @@
 import { env } from "cloudflare:test";
+import { ROUTES } from "@shipyard/signaling";
 import { describe, expect, it } from "vitest";
-import { ROUTES } from "../client/routes";
 import { app } from "./index";
 
 describe("App Configuration", () => {

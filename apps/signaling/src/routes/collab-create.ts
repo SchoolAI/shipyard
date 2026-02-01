@@ -1,10 +1,10 @@
-import { Hono } from "hono";
-import { validateToken } from "../auth/jwt";
-import { ROUTES } from "../client/routes";
 import {
 	CollabCreateRequestSchema,
 	type CollabCreateResponse,
-} from "../client/schemas";
+	ROUTES,
+} from "@shipyard/signaling";
+import { Hono } from "hono";
+import { validateToken } from "../auth/jwt";
 import type { Env } from "../env";
 import { generateId } from "../utils/crypto";
 import { createLogger } from "../utils/logger";
