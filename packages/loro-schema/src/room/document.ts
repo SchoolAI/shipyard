@@ -46,18 +46,10 @@ export class RoomDocument {
 		this.#roomDoc = roomDoc;
 	}
 
-	// ═══════════════════════════════════════════════════════════════
-	// Container Accessors (Readonly)
-	// ═══════════════════════════════════════════════════════════════
-
 	/** Get the underlying typed room document */
 	get roomDoc(): TypedDoc<RoomShape> {
 		return this.#roomDoc;
 	}
-
-	// ═══════════════════════════════════════════════════════════════
-	// Convenience Helpers
-	// ═══════════════════════════════════════════════════════════════
 
 	/**
 	 * Get all tasks sorted by lastUpdated descending.
@@ -73,7 +65,6 @@ export class RoomDocument {
 		>;
 		const tasks = Object.values(taskIndex);
 
-		// Sort by lastUpdated descending (most recent first)
 		return tasks.sort((a, b) => b.lastUpdated - a.lastUpdated);
 	}
 
@@ -102,7 +93,6 @@ export class RoomDocument {
 
 		const viewedAt = task.viewedBy[username];
 		if (viewedAt === undefined) {
-			// User has never viewed this task
 			return true;
 		}
 
@@ -126,7 +116,6 @@ export class RoomDocument {
 
 		const eventViewedByUsers = task.eventViewedBy[eventId];
 		if (!eventViewedByUsers) {
-			// Event has never been viewed by anyone
 			return true;
 		}
 
@@ -134,11 +123,5 @@ export class RoomDocument {
 		return viewedAt === undefined;
 	}
 
-	// ═══════════════════════════════════════════════════════════════
-	// Lifecycle
-	// ═══════════════════════════════════════════════════════════════
-
-	dispose(): void {
-		// No cleanup needed - RoomDocument doesn't manage subscriptions
-	}
+	dispose(): void {}
 }

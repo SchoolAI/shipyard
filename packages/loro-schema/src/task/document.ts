@@ -75,10 +75,6 @@ export class TaskDocument {
 		this.#taskId = taskId;
 	}
 
-	// ═══════════════════════════════════════════════════════════════
-	// Container Accessors (Mutable)
-	// ═══════════════════════════════════════════════════════════════
-
 	/** Get the task ID */
 	get taskId(): TaskId {
 		return this.#taskId;
@@ -93,9 +89,6 @@ export class TaskDocument {
 	get roomDoc(): TypedDoc<RoomShape> {
 		return this.#roomDoc;
 	}
-
-	// Type-safe accessors using any to work around schema typing issues
-	// (TaskDocumentSchema has explicit `: DocShape` annotation which loses type info)
 
 	/** Task metadata (id, title, status, timestamps, etc.) */
 	get meta() {
@@ -143,16 +136,6 @@ export class TaskDocument {
 	}
 
 	/**
-	 * Get the underlying LoroDoc for editor integration.
-	 * Use loro(taskDoc.taskDoc).doc to access the raw LoroDoc.
-	 */
-	// Removed - callers should use loro() helper instead
-
-	// ═══════════════════════════════════════════════════════════════
-	// Cross-Doc Sync Methods
-	// ═══════════════════════════════════════════════════════════════
-
-	/**
 	 * Update task status and sync to room index.
 	 * Handles status transition logic.
 	 *
@@ -170,27 +153,22 @@ export class TaskDocument {
 		// eslint-disable-next-line no-restricted-syntax -- Loro schema returns string, we know it's TaskStatus from Shape definition
 		const currentStatus = taskMeta.status as TaskStatus;
 
-		// Update task document meta
 		taskMeta.status = status;
 		taskMeta.updatedAt = now;
 
-		// Handle completion
 		if (status === "completed") {
 			taskMeta.completedAt = now;
 			taskMeta.completedBy = actor;
 		} else if (currentStatus === "completed") {
-			// Transitioning away from completed
 			taskMeta.completedAt = null;
 			taskMeta.completedBy = null;
 		}
 
-		// Log the status change event
 		this.logEvent("status_changed", actor, {
 			fromStatus: currentStatus,
 			toStatus: status,
 		});
 
-		// Update room index (if entry exists)
 		const roomTaskIndex = this.#roomDoc.taskIndex;
 		const taskIndexEntry = roomTaskIndex.get(this.#taskId);
 		if (taskIndexEntry) {
@@ -225,7 +203,6 @@ export class TaskDocument {
 	 * - roomDoc.taskIndex[taskId].lastUpdated
 	 */
 	syncPendingRequestsToRoom(): void {
-		// Check if any input requests have pending status
 		const requests = this.#taskDoc.inputRequests.toJSON();
 		const hasPending = requests.some(
 			(req: { status: string }) => req.status === "pending",
@@ -238,10 +215,6 @@ export class TaskDocument {
 			taskIndexEntry.lastUpdated = Date.now();
 		}
 	}
-
-	// ═══════════════════════════════════════════════════════════════
-	// Event Helper
-	// ═══════════════════════════════════════════════════════════════
 
 	/**
 	 * Log an event to the timeline.
@@ -269,7 +242,6 @@ export class TaskDocument {
 		const inboxWorthy = options?.inboxWorthy ?? null;
 		const inboxFor = options?.inboxFor ?? null;
 
-		// Build the event object
 		// eslint-disable-next-line no-restricted-syntax -- Cast is safe: function signature ensures `data` contains all required fields for type T
 		const event = {
 			id,
@@ -281,10 +253,8 @@ export class TaskDocument {
 			...data,
 		} as unknown as Extract<TaskEventItem, { type: T }>;
 
-		// Add to task document events
 		this.#taskDoc.events.push(event);
 
-		// If inbox-worthy, also add to room index inboxEvents
 		if (inboxWorthy) {
 			const roomTaskIndex = this.#roomDoc.taskIndex;
 			const taskIndexEntry = roomTaskIndex.get(this.#taskId);
@@ -296,11 +266,5 @@ export class TaskDocument {
 		return id;
 	}
 
-	// ═══════════════════════════════════════════════════════════════
-	// Lifecycle
-	// ═══════════════════════════════════════════════════════════════
-
-	dispose(): void {
-		// No cleanup needed - callers manage subscriptions
-	}
+	dispose(): void {}
 }

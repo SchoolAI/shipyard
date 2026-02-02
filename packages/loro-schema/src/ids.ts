@@ -4,16 +4,10 @@
 
 import { nanoid } from "nanoid";
 
-// ============================================================================
-// Branded Type Helper
-// ============================================================================
+/** Branded type helper utility */
 
 declare const __brand: unique symbol;
 type Brand<T, B> = T & { readonly [__brand]: B };
-
-// ============================================================================
-// Branded ID Types
-// ============================================================================
 
 /** Task ID - unique identifier for a task document */
 export type TaskId = Brand<string, "TaskId">;
@@ -41,10 +35,6 @@ export type InputRequestId = Brand<string, "InputRequestId">;
 
 /** Thread ID - unique identifier for a comment thread */
 export type ThreadId = Brand<string, "ThreadId">;
-
-// ============================================================================
-// ID Generators
-// ============================================================================
 
 export function generateTaskId(): TaskId {
 	return nanoid() as TaskId;

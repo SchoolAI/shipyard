@@ -2,13 +2,12 @@
  * @shipyard/loro-schema - Loro schema and document classes for Shipyard
  */
 
-// Re-export Loro utilities for convenience
 export {
 	type Infer,
 	type InferMutableType,
 	Shape,
 } from "@loro-extended/change";
-// Branded ID types
+
 export type {
 	ArtifactId,
 	CommentId,
@@ -20,7 +19,7 @@ export type {
 	TaskId,
 	ThreadId,
 } from "./ids.js";
-// ID generators
+
 export {
 	generateArtifactId,
 	generateCommentId,
@@ -32,7 +31,7 @@ export {
 	generateThreadId,
 } from "./ids.js";
 export { type GetTasksOptions, RoomDocument } from "./room/document.js";
-// Inferred types (primary types for consumers)
+
 export type {
 	ChangeSnapshot,
 	MutableRoom,
@@ -52,7 +51,6 @@ export type {
 	TaskMeta,
 } from "./shapes.js";
 
-// Schemas (for advanced use)
 export { RoomSchema, TaskDocumentSchema } from "./shapes.js";
-// Document classes (primary API)
+
 export { TaskDocument, type TaskStatus } from "./task/document.js";

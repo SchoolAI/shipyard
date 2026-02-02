@@ -370,12 +370,14 @@ export const TaskDocumentSchema = Shape.doc({
 				url: Shape.plain.string(),
 			}),
 
-			// TODO: may add local support in the future
-			// local: Shape.plain.struct({
-			// 	storage: Shape.plain.string("local"),
-			// 	...ArtifactBaseFields,
-			// 	localArtifactId: Shape.plain.string(),
-			// }),
+			/**
+			 * TODO: may add local support in the future
+			 * local: Shape.plain.struct({
+			 * 	storage: Shape.plain.string("local"),
+			 * 	...ArtifactBaseFields,
+			 * 	localArtifactId: Shape.plain.string(),
+			 * }),
+			 */
 		}),
 	),
 
@@ -515,7 +517,6 @@ export type MutableTaskDocument = InferMutableType<typeof TaskDocumentSchema>;
 /** Task metadata inferred from schema */
 export type TaskMeta = Infer<typeof TaskDocumentSchema.shapes.meta>;
 
-// Internal types using Infer (not exported for cross-package use)
 type TaskCommentInternal = Infer<typeof TaskDocumentSchema.shapes.comments>;
 type TaskEventInternal = Infer<typeof TaskDocumentSchema.shapes.events>;
 type TaskArtifactInternal = Infer<typeof TaskDocumentSchema.shapes.artifacts>;
@@ -527,13 +528,11 @@ type TaskInputRequestInternal = Infer<
 	typeof TaskDocumentSchema.shapes.inputRequests
 >;
 
-// Event item type (element of events list)
 export type TaskEventItem = Infer<typeof TaskEventShape>;
 type ChangeSnapshotInternal = Infer<
 	typeof TaskDocumentSchema.shapes.changeSnapshots
 >;
 
-// Export aliases for the internal types (consumers should be aware these may be `unknown`)
 export type TaskComment = TaskCommentInternal;
 export type TaskEvent = TaskEventInternal;
 export type TaskArtifact = TaskArtifactInternal;
