@@ -21,6 +21,11 @@
 | **Task index** | RoomSchema.taskIndex | Denormalized for dashboard, cross-doc helpers maintain consistency |
 | **ownerId nullability** | Non-nullable | Tasks always have an owner |
 | **Document isolation** | loro-extended visibility | Document-level permissions, one connection per room |
+| **origin field** | Removed | Platform provenance not needed for v1, can add later if needed |
+| **viewedBy location** | RoomSchema only | Per-user inbox state, not task content |
+| **Approval workflow** | Removed | Access control via JWT + loro-extended visibility, not CRDT fields |
+| **taskIndex structure** | Record (not List) | O(1) lookups by taskId for dashboard queries |
+| **Step completions** | Removed | Not needed for v1 |
 
 ---
 
