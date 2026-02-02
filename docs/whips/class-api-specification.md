@@ -232,7 +232,7 @@ get taskIndex(): ReadonlyRecordRef<TaskId, TaskIndexEntry>
 
 ---
 
-### Convenience Helpers
+### Convenience Helpers (Read-Only)
 
 ```typescript
 /**
@@ -257,6 +257,8 @@ isTaskUnread(taskId: TaskId, username: string): boolean
 isEventUnread(taskId: TaskId, eventId: EventId, username: string): boolean
 ```
 
+**Note:** All mutations to taskIndex happen via TaskDocument sync methods as side effects. RoomDocument only provides read access.
+
 ---
 
 ### Lifecycle
@@ -274,22 +276,55 @@ dispose(): void  // Cleanup (minimal - no subscriptions managed)
 ```typescript
 const tasks = roomDoc.getTasks()
 const unreadTasks = tasks.filter(t => roomDoc.isTaskUnread(t.taskId, username))
+const inboxEvents = tasks.flatMap(t => t.inboxEvents)
 ```
 
-#### Mark as Read (Direct Container Mutation)
+#### Mark as Read (Direct Container Mutation - ViewedBy Only)
 ```typescript
+// ViewedBy is per-user UI state - safe to mutate directly
 const task = roomDoc.taskIndex.get(taskId)
 task.viewedBy.set(username, Date.now())
 ```
 
-#### Mark Event as Read (Direct Container Mutation)
+#### Mark Event as Read (Direct Container Mutation - ViewedBy Only)
 ```typescript
 const task = roomDoc.taskIndex.get(taskId)
 const eventViewedByUser = task.eventViewedBy.get(eventId) ?? task.eventViewedBy.set(eventId, new Map())
 eventViewedByUser.set(username, Date.now())
 ```
 
-**Note:** TaskIndex itself is NOT mutated by RoomDocument. Only TaskDocument sync methods update task metadata. ViewedBy is the only field RoomDocument callers mutate directly (it's per-user UI state).
+#### Task Creation (Factory Pattern)
+```typescript
+// Factory/service handles creating both task and index entry
+function createTask(roomDoc, params) {
+  const taskId = generateTaskId()
+
+  // 1. Create task doc
+  const taskDoc = createTypedDoc(TaskDocumentSchema)
+  taskDoc.meta.id = taskId
+  taskDoc.meta.title = params.title
+  // ...
+
+  // 2. Add to room index
+  roomDoc.taskIndex.set(taskId, {
+    taskId,
+    title: params.title,
+    status: 'draft',
+    ownerId: params.ownerId,
+    hasPendingRequests: false,
+    lastUpdated: Date.now(),
+    createdAt: Date.now(),
+    viewedBy: {},
+    eventViewedBy: {},
+    inboxEvents: [],
+  })
+
+  // 3. Return wrapped TaskDocument
+  return new TaskDocument(taskDoc, roomDoc, taskId)
+}
+```
+
+**Note:** Only viewedBy/eventViewedBy are mutated directly by callers (per-user UI state). All other taskIndex fields are updated by TaskDocument sync methods.
 
 ---
 
