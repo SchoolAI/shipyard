@@ -5,24 +5,16 @@
  * @see docs/whips/daemon-mcp-server-merge.md#4-use-loro-extended-adapters
  */
 
-// TODO: Import from @loro-extended/adapter-leveldb/server
-// import { LevelDBStorageAdapter } from '@loro-extended/adapter-leveldb/server'
+import { LevelDBStorageAdapter } from "@loro-extended/adapter-leveldb/server";
+import { getDataDir } from "../../utils/paths.js";
 
-import type { Env } from "../../env.js";
-
-/**
- * Storage adapter interface (placeholder until loro-extended types available).
- */
-export interface StorageAdapter {
-	// TODO: Define based on loro-extended adapter interface
-	close(): Promise<void>;
-}
+export type { LevelDBStorageAdapter };
 
 /**
  * Create a LevelDB storage adapter for persisting Loro documents.
+ * Uses the Shipyard data directory (~/.shipyard/data).
  */
-export function createStorage(_env: Env): StorageAdapter {
-	// TODO: Implement using LevelDBStorageAdapter
-	// return new LevelDBStorageAdapter(env.DATA_DIR)
-	throw new Error("Not implemented");
+export function createStorageAdapter(): LevelDBStorageAdapter {
+	const dbPath = getDataDir();
+	return new LevelDBStorageAdapter(dbPath);
 }

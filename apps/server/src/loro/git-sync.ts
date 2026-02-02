@@ -7,8 +7,21 @@
  * @see docs/whips/daemon-mcp-server-merge.md#git-sync-flow
  */
 
-// TODO: Import from @shipyard/loro-schema
-// import type { ChangeSnapshot } from '@shipyard/loro-schema'
+import { execSync } from "node:child_process";
+import { readFile, stat } from "node:fs/promises";
+import { join } from "node:path";
+import type { HandleWithEphemerals } from "@loro-extended/repo";
+import type {
+	SyncedFileChange,
+	TaskDocumentShape,
+} from "@shipyard/loro-schema";
+import { logger } from "../utils/logger.js";
+
+/** Default max file size for untracked files (100KB) */
+const DEFAULT_MAX_FILE_SIZE = 100 * 1024;
+
+/** Default polling interval (5 seconds) */
+const DEFAULT_POLL_INTERVAL = 5000;
 
 /**
  * Git sync configuration.
@@ -22,7 +35,7 @@ export interface GitSyncConfig {
 	ownerId: string;
 	/** Working directory to watch */
 	cwd: string;
-	/** Polling interval in ms (if not using file watcher) */
+	/** Polling interval in ms (default 5000) */
 	pollInterval?: number;
 	/** Max file size to include content (default 100KB) */
 	maxFileSize?: number;
@@ -39,36 +52,53 @@ export interface GitFileChange {
 }
 
 /**
- * Get current git changes in a directory.
- * Includes staged, unstaged, and untracked files.
+ * Result from getGitChanges.
  */
-export async function getGitChanges(_cwd: string): Promise<{
+export interface GitChangesResult {
 	files: GitFileChange[];
 	headSha: string;
 	branch: string;
 	totalAdditions: number;
 	totalDeletions: number;
-}> {
-	// TODO: Implement using child_process git commands
-	// git diff --cached (staged)
-	// git diff (unstaged)
-	// git ls-files --others --exclude-standard (untracked)
-	throw new Error("Not implemented");
 }
 
 /**
- * Start git sync for a task document.
- * Pushes changes to changeSnapshots[machineId] periodically or on file change.
+ * Execute a git command and return the output.
  */
-export function startGitSync(
-	_docId: string,
-	_config: GitSyncConfig,
-): () => void {
-	// TODO: Implement git sync
-	// Option 1: File watcher (chokidar)
-	// Option 2: Periodic polling
-	// On change: get git changes, write to doc.changeSnapshots[machineId]
-	throw new Error("Not implemented");
+function gitExec(cwd: string, args: string): string {
+	try {
+		return execSync(`git ${args}`, {
+			cwd,
+			encoding: "utf-8",
+			timeout: 10000,
+			stdio: ["pipe", "pipe", "pipe"],
+		}).trim();
+	} catch {
+		// Return empty string on error (e.g., not a git repo)
+		return "";
+	}
+}
+
+/**
+ * Parse git diff --numstat output to count additions/deletions.
+ */
+function parseNumstat(output: string): {
+	additions: number;
+	deletions: number;
+} {
+	let additions = 0;
+	let deletions = 0;
+
+	for (const line of output.split("\n")) {
+		if (!line) continue;
+		const parts = line.split("\t");
+		const add = parts[0] ?? "";
+		const del = parts[1] ?? "";
+		if (add !== "-") additions += Number.parseInt(add, 10) || 0;
+		if (del !== "-") deletions += Number.parseInt(del, 10) || 0;
+	}
+
+	return { additions, deletions };
 }
 
 /**
@@ -76,11 +106,248 @@ export function startGitSync(
  * @returns file content or empty string if too large
  */
 export async function readUntrackedFile(
-	_filePath: string,
-	_maxSize: number,
+	filePath: string,
+	maxSize: number,
 ): Promise<string> {
-	// TODO: Implement
-	// if (stat.size > maxSize) return ''
-	// return fs.readFile(filePath, 'utf-8')
-	throw new Error("Not implemented");
+	try {
+		const stats = await stat(filePath);
+		if (stats.size > maxSize) {
+			return "";
+		}
+		return await readFile(filePath, "utf-8");
+	} catch {
+		return "";
+	}
+}
+
+/**
+ * Get current git changes in a directory.
+ * Includes staged, unstaged, and untracked files.
+ */
+export async function getGitChanges(
+	cwd: string,
+	maxFileSize: number = DEFAULT_MAX_FILE_SIZE,
+): Promise<GitChangesResult> {
+	const files: GitFileChange[] = [];
+	let totalAdditions = 0;
+	let totalDeletions = 0;
+
+	// Get HEAD SHA
+	const headSha = gitExec(cwd, "rev-parse HEAD") || "0000000";
+
+	// Get current branch
+	const branch = gitExec(cwd, "rev-parse --abbrev-ref HEAD") || "unknown";
+
+	// Get staged changes
+	const stagedDiff = gitExec(cwd, "diff --cached --name-status");
+	const stagedNumstat = gitExec(cwd, "diff --cached --numstat");
+	const stagedStats = parseNumstat(stagedNumstat);
+	totalAdditions += stagedStats.additions;
+	totalDeletions += stagedStats.deletions;
+
+	for (const line of stagedDiff.split("\n")) {
+		if (!line) continue;
+		const parts = line.split("\t");
+		const status = parts[0];
+		const filePath = parts[1];
+		if (!status || !filePath) continue;
+
+		const statusMap: Record<string, SyncedFileChange["status"]> = {
+			A: "added",
+			M: "modified",
+			D: "deleted",
+			R: "renamed",
+		};
+
+		const patch = gitExec(cwd, `diff --cached -- "${filePath}"`);
+		const statusKey = status[0] ?? "M";
+		files.push({
+			path: filePath,
+			status: statusMap[statusKey] ?? "modified",
+			patch,
+			staged: true,
+		});
+	}
+
+	// Get unstaged changes
+	const unstagedDiff = gitExec(cwd, "diff --name-status");
+	const unstagedNumstat = gitExec(cwd, "diff --numstat");
+	const unstagedStats = parseNumstat(unstagedNumstat);
+	totalAdditions += unstagedStats.additions;
+	totalDeletions += unstagedStats.deletions;
+
+	for (const line of unstagedDiff.split("\n")) {
+		if (!line) continue;
+		const parts = line.split("\t");
+		const status = parts[0];
+		const filePath = parts[1];
+		if (!status || !filePath) continue;
+
+		// Skip if already tracked as staged
+		if (files.some((f) => f.path === filePath && f.staged)) continue;
+
+		const statusMap: Record<string, SyncedFileChange["status"]> = {
+			A: "added",
+			M: "modified",
+			D: "deleted",
+			R: "renamed",
+		};
+
+		const patch = gitExec(cwd, `diff -- "${filePath}"`);
+		const statusKey = status[0] ?? "M";
+		files.push({
+			path: filePath,
+			status: statusMap[statusKey] ?? "modified",
+			patch,
+			staged: false,
+		});
+	}
+
+	// Get untracked files
+	const untrackedOutput = gitExec(cwd, "ls-files --others --exclude-standard");
+
+	for (const path of untrackedOutput.split("\n")) {
+		if (!path) continue;
+
+		const fullPath = join(cwd, path);
+		const content = await readUntrackedFile(fullPath, maxFileSize);
+
+		// Count lines in untracked file as additions
+		if (content) {
+			totalAdditions += content.split("\n").length;
+		}
+
+		files.push({
+			path,
+			status: "added",
+			patch: content, // Include content for untracked files under size limit
+			staged: false,
+		});
+	}
+
+	return {
+		files,
+		headSha,
+		branch,
+		totalAdditions,
+		totalDeletions,
+	};
+}
+
+/**
+ * Start git sync for a task document.
+ * Pushes changes to changeSnapshots[machineId] periodically.
+ */
+export function startGitSync(
+	handle: HandleWithEphemerals<TaskDocumentShape, Record<string, never>>,
+	config: GitSyncConfig,
+): () => void {
+	const {
+		machineId,
+		machineName,
+		ownerId,
+		cwd,
+		pollInterval = DEFAULT_POLL_INTERVAL,
+		maxFileSize = DEFAULT_MAX_FILE_SIZE,
+	} = config;
+
+	let stopped = false;
+	let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+	logger.info({ machineId, cwd, pollInterval }, "Starting git sync");
+
+	/**
+	 * Sync git changes to the document.
+	 */
+	async function sync(): Promise<void> {
+		if (stopped) return;
+
+		try {
+			const changes = await getGitChanges(cwd, maxFileSize);
+
+			// biome-ignore lint/suspicious/noExplicitAny: Loro TypedDoc typing requires any for change callback
+			handle.change((doc: any) => {
+				// Get or create the changeSnapshot entry
+				let snapshot = doc.changeSnapshots.get(machineId);
+				if (!snapshot) {
+					doc.changeSnapshots.set(machineId, {
+						machineId,
+						machineName,
+						ownerId,
+						headSha: changes.headSha,
+						branch: changes.branch,
+						cwd,
+						isLive: true,
+						updatedAt: Date.now(),
+						files: [],
+						totalAdditions: 0,
+						totalDeletions: 0,
+					});
+					snapshot = doc.changeSnapshots.get(machineId);
+				}
+
+				// Update the snapshot
+				snapshot.headSha = changes.headSha;
+				snapshot.branch = changes.branch;
+				snapshot.isLive = true;
+				snapshot.updatedAt = Date.now();
+				snapshot.totalAdditions = changes.totalAdditions;
+				snapshot.totalDeletions = changes.totalDeletions;
+
+				// Clear and repopulate files list
+				while (snapshot.files.length > 0) {
+					snapshot.files.delete(0);
+				}
+
+				for (const file of changes.files) {
+					snapshot.files.push({
+						path: file.path,
+						status: file.status,
+						patch: file.patch,
+						staged: file.staged,
+					});
+				}
+			});
+
+			logger.debug(
+				{ machineId, fileCount: changes.files.length },
+				"Git sync completed",
+			);
+		} catch (error) {
+			logger.error({ error, machineId, cwd }, "Git sync failed");
+		}
+
+		// Schedule next sync
+		if (!stopped) {
+			timeoutId = setTimeout(sync, pollInterval);
+		}
+	}
+
+	// Start the sync loop
+	sync();
+
+	// Return cleanup function
+	return () => {
+		stopped = true;
+		if (timeoutId) {
+			clearTimeout(timeoutId);
+			timeoutId = null;
+		}
+
+		// Mark as not live
+		try {
+			// biome-ignore lint/suspicious/noExplicitAny: Loro TypedDoc typing requires any for change callback
+			handle.change((doc: any) => {
+				const snapshot = doc.changeSnapshots.get(machineId);
+				if (snapshot) {
+					snapshot.isLive = false;
+					snapshot.updatedAt = Date.now();
+				}
+			});
+		} catch {
+			// Ignore errors during cleanup
+		}
+
+		logger.info({ machineId }, "Git sync stopped");
+	};
 }

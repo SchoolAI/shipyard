@@ -98,18 +98,6 @@ importers:
         specifier: ^2.1.0
         version: 2.1.9(@types/node@22.19.7)(happy-dom@20.3.7)(jsdom@25.0.1)(lightningcss@1.30.2)
 
-  apps/github-oauth-worker:
-    devDependencies:
-      '@cloudflare/workers-types':
-        specifier: ^4.20260122.0
-        version: 4.20260122.0
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      wrangler:
-        specifier: ^4.59.3
-        version: 4.59.3(@cloudflare/workers-types@4.20260122.0)
-
   apps/hook:
     dependencies:
       '@blocknote/server-util':
@@ -162,79 +150,6 @@ importers:
         specifier: ^4.0.17
         version: 4.0.18(@types/node@25.0.10)(happy-dom@20.3.7)(jiti@2.6.1)(jsdom@25.0.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.2)
 
-  apps/mcp-server:
-    dependencies:
-      '@loro-extended/adapter-leveldb':
-        specifier: ^5.3.0
-        version: 5.3.0(loro-crdt@1.10.5)
-      '@loro-extended/adapter-webrtc':
-        specifier: ^5.3.0
-        version: 5.3.0(loro-crdt@1.10.5)
-      '@loro-extended/adapter-websocket':
-        specifier: ^5.3.0
-        version: 5.3.0(loro-crdt@1.10.5)
-      '@loro-extended/change':
-        specifier: ^5.3.0
-        version: 5.3.0(loro-crdt@1.10.5)
-      '@modelcontextprotocol/sdk':
-        specifier: ^1.25.3
-        version: 1.25.3(hono@4.11.3)(zod@3.25.76)
-      '@octokit/rest':
-        specifier: ^22.0.1
-        version: 22.0.1
-      '@shipyard/loro-schema':
-        specifier: workspace:*
-        version: link:../../packages/loro-schema
-      '@shipyard/signaling':
-        specifier: workspace:*
-        version: link:../../packages/signaling
-      express:
-        specifier: ^5.2.1
-        version: 5.2.1
-      nanoid:
-        specifier: ^5.1.6
-        version: 5.1.6
-      pino:
-        specifier: ^10.2.1
-        version: 10.2.1
-      ws:
-        specifier: ^8.19.0
-        version: 8.19.0
-      zod:
-        specifier: ^3.24.2
-        version: 3.25.76
-    devDependencies:
-      '@shipyard/shared':
-        specifier: workspace:*
-        version: link:../../packages/shared
-      '@types/express':
-        specifier: ^5.0.6
-        version: 5.0.6
-      '@types/node':
-        specifier: ^25.0.10
-        version: 25.0.10
-      '@types/ws':
-        specifier: ^8.18.1
-        version: 8.18.1
-      '@vitest/coverage-istanbul':
-        specifier: ^3.0.4
-        version: 3.2.4(vitest@3.2.4(@types/debug@4.1.12)(@types/node@25.0.10)(happy-dom@20.3.7)(jiti@2.6.1)(jsdom@25.0.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.2))
-      pino-pretty:
-        specifier: ^13.1.3
-        version: 13.1.3
-      tsup:
-        specifier: ^8.5.1
-        version: 8.5.1(jiti@2.6.1)(postcss@8.5.6)(tsx@4.21.0)(typescript@5.9.3)(yaml@2.8.2)
-      tsx:
-        specifier: ^4.21.0
-        version: 4.21.0
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^3.0.4
-        version: 3.2.4(@types/debug@4.1.12)(@types/node@25.0.10)(happy-dom@20.3.7)(jiti@2.6.1)(jsdom@25.0.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.2)
-
   apps/og-proxy-worker:
     dependencies:
       lz-string:
@@ -266,6 +181,9 @@ importers:
         specifier: ^5.3.0
         version: 5.3.0(loro-crdt@1.10.5)
       '@loro-extended/change':
+        specifier: ^5.3.0
+        version: 5.3.0(loro-crdt@1.10.5)
+      '@loro-extended/repo':
         specifier: ^5.3.0
         version: 5.3.0(loro-crdt@1.10.5)
       '@modelcontextprotocol/sdk':
@@ -469,49 +387,6 @@ importers:
       wrangler:
         specifier: ^4.59.3
         version: 4.59.3(@cloudflare/workers-types@4.20260122.0)
-
-  apps/signaling-legacy:
-    dependencies:
-      '@shipyard/schema':
-        specifier: workspace:*
-        version: link:../../packages/schema
-      lib0:
-        specifier: ^0.2.117
-        version: 0.2.117
-      nanoid:
-        specifier: ^5.1.6
-        version: 5.1.6
-      pino:
-        specifier: ^10.2.1
-        version: 10.2.1
-      ws:
-        specifier: ^8.19.0
-        version: 8.19.0
-      zod:
-        specifier: ^4.3.5
-        version: 4.3.5
-    devDependencies:
-      '@types/node':
-        specifier: ^25.0.10
-        version: 25.0.10
-      '@types/ws':
-        specifier: ^8.18.1
-        version: 8.18.1
-      pino-pretty:
-        specifier: ^13.1.3
-        version: 13.1.3
-      tsdown:
-        specifier: 0.20.0-beta.4
-        version: 0.20.0-beta.4(typescript@5.9.3)
-      tsx:
-        specifier: ^4.21.0
-        version: 4.21.0
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^4.0.17
-        version: 4.0.18(@types/node@25.0.10)(happy-dom@20.3.7)(jiti@2.6.1)(jsdom@25.0.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.2)
 
   apps/web:
     dependencies:
@@ -728,40 +603,6 @@ importers:
         specifier: ^4.0.17
         version: 4.0.18(@types/node@25.0.10)(happy-dom@20.3.7)(jiti@2.6.1)(jsdom@25.0.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.2)
 
-  packages/schema:
-    dependencies:
-      '@blocknote/core':
-        specifier: ^0.46.1
-        version: 0.46.1(@types/hast@3.0.4)(highlight.js@11.11.1)(lowlight@3.3.0)
-      '@trpc/server':
-        specifier: ^11.8.1
-        version: 11.8.1(typescript@5.9.3)
-      lz-string:
-        specifier: ^1.5.0
-        version: 1.5.0
-      nanoid:
-        specifier: ^5.1.6
-        version: 5.1.6
-      yjs:
-        specifier: ^13.6.29
-        version: 13.6.29
-      zod:
-        specifier: ^4.3.5
-        version: 4.3.5
-    devDependencies:
-      '@types/node':
-        specifier: ^25.0.10
-        version: 25.0.10
-      tsdown:
-        specifier: 0.20.0-beta.4
-        version: 0.20.0-beta.4(typescript@5.9.3)
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^4.0.17
-        version: 4.0.18(@types/node@25.0.10)(happy-dom@20.3.7)(jiti@2.6.1)(jsdom@25.0.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.2)
-
   packages/schema-legacy:
     dependencies:
       '@blocknote/core':
@@ -782,21 +623,6 @@ importers:
       zod:
         specifier: ^4.3.5
         version: 4.3.5
-    devDependencies:
-      '@types/node':
-        specifier: ^25.0.10
-        version: 25.0.10
-      tsdown:
-        specifier: 0.20.0-beta.4
-        version: 0.20.0-beta.4(typescript@5.9.3)
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^4.0.17
-        version: 4.0.18(@types/node@25.0.10)(happy-dom@20.3.7)(jiti@2.6.1)(jsdom@25.0.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.2)
-
-  packages/shared:
     devDependencies:
       '@types/node':
         specifier: ^25.0.10
@@ -3255,7 +3081,6 @@ packages:
 
   '@roamhq/wrtc-linux-x64@0.9.1':
     resolution: {integrity: sha512-LuhzPdMM3i8vs/ifdj1F1pjpX2OhJSCWdh03UQXjRHoX+Fi1oJXiZRwKoVKu1BbsKCYfJ8m9jZB1ZU4Lhi8yHw==}
-    cpu: [x64]
     os: [linux]
 
   '@roamhq/wrtc-win32-x64@0.9.1':

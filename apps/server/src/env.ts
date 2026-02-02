@@ -2,6 +2,8 @@
  * Environment configuration with Zod validation.
  */
 
+import { homedir } from "node:os";
+import { join } from "node:path";
 import { z } from "zod";
 
 const LogLevelSchema = z
@@ -37,6 +39,11 @@ export const EnvSchema = z.object({
 
 	/** Directory for Claude shim logs in Docker mode */
 	CLAUDE_SHIM_LOG_DIR: z.string().default("/tmp/shipyard-shim-logs"),
+
+	/** Directory where Claude Code session files are stored */
+	CLAUDE_PROJECTS_DIR: z
+		.string()
+		.default(join(homedir(), ".claude", "projects")),
 });
 
 export type Env = z.infer<typeof EnvSchema>;

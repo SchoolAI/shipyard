@@ -6,23 +6,33 @@
  * @see docs/whips/daemon-mcp-server-merge.md#4-use-loro-extended-adapters
  */
 
-// TODO: Import from @loro-extended/adapter-webrtc
-// import { WebRtcDataChannelAdapter } from '@loro-extended/adapter-webrtc'
+import { WebRtcDataChannelAdapter } from "@loro-extended/adapter-webrtc";
 
-/**
- * WebRTC adapter interface (placeholder until loro-extended types available).
- */
-export interface WebRtcAdapter {
-	// TODO: Define based on loro-extended adapter interface
-	attachToDataChannel(channel: unknown): void;
-}
+export { WebRtcDataChannelAdapter };
 
 /**
  * Create a WebRTC adapter for P2P Loro sync.
+ * This adapter uses the "Bring Your Own Data Channel" approach.
+ * Callers manage WebRTC connections (e.g., via simple-peer) and
+ * attach data channels to this adapter for Loro sync.
+ *
+ * Note: RTCDataChannel is a browser-only type. On the server side,
+ * use a library like wrtc to get compatible data channels.
+ *
+ * @example
+ * ```typescript
+ * const adapter = createWebRtcAdapter();
+ * // When a WebRTC connection is established
+ * peer.on('connect', () => {
+ *   const dataChannel = peer._pc.createDataChannel('loro-sync', { ordered: true });
+ *   adapter.attachDataChannel(remotePeerId, dataChannel);
+ * });
+ * // When connection closes
+ * peer.on('close', () => {
+ *   adapter.detachDataChannel(remotePeerId);
+ * });
+ * ```
  */
-export function createWebRtcAdapter(): WebRtcAdapter {
-	// TODO: Implement using WebRtcDataChannelAdapter
-	// const adapter = new WebRtcDataChannelAdapter()
-	// return adapter
-	throw new Error("Not implemented");
+export function createWebRtcAdapter(): WebRtcDataChannelAdapter {
+	return new WebRtcDataChannelAdapter();
 }

@@ -6,28 +6,44 @@
  * @see docs/whips/daemon-mcp-server-merge.md#4-use-loro-extended-adapters
  */
 
-// TODO: Import from @loro-extended/adapter-websocket/server
-// import { WsServerNetworkAdapter } from '@loro-extended/adapter-websocket/server'
+import {
+	WsServerNetworkAdapter,
+	wrapWsSocket,
+} from "@loro-extended/adapter-websocket/server";
+import type { PeerID } from "@loro-extended/repo";
+import type { WebSocket, WebSocketServer } from "ws";
+import { logger } from "../../utils/logger.js";
 
-import type { WebSocketServer } from "ws";
-
-/**
- * WebSocket adapter interface (placeholder until loro-extended types available).
- */
-export interface WebSocketAdapter {
-	// TODO: Define based on loro-extended adapter interface
-	handleConnection(ws: unknown): void;
-}
+export { WsServerNetworkAdapter, wrapWsSocket };
 
 /**
- * Create a WebSocket adapter for Loro sync.
+ * Create a WebSocket adapter for Loro sync and attach it to a WebSocket server.
+ * Handles incoming connections and wraps them for loro-extended.
  */
 export function createWebSocketAdapter(
-	_wss: WebSocketServer,
-): WebSocketAdapter {
-	// TODO: Implement using WsServerNetworkAdapter
-	// const adapter = new WsServerNetworkAdapter()
-	// wss.on('connection', ws => adapter.handleConnection({ socket: wrapWsSocket(ws) }))
-	// return adapter
-	throw new Error("Not implemented");
+	wss: WebSocketServer,
+): WsServerNetworkAdapter {
+	const adapter = new WsServerNetworkAdapter();
+
+	wss.on("connection", (ws: WebSocket, req) => {
+		// Extract peer ID from query string if provided
+		const url = new URL(req.url ?? "/", `http://${req.headers.host}`);
+		const peerId = url.searchParams.get("peerId") as PeerID | null;
+
+		logger.debug({ peerId, url: req.url }, "WebSocket connection attempt");
+
+		const { connection, start } = adapter.handleConnection({
+			socket: wrapWsSocket(ws),
+			peerId: peerId ?? undefined,
+		});
+
+		logger.info(
+			{ peerId: connection.peerId, channelId: connection.channelId },
+			"WebSocket client connected",
+		);
+
+		start();
+	});
+
+	return adapter;
 }
