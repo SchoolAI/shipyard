@@ -176,13 +176,9 @@ export const TaskDocumentSchema: DocShape = Shape.doc({
 
 		ownerId: Shape.plain.string().nullable(),
 		epoch: Shape.plain.number(),
-		// ASK: what is this?
-		origin: Shape.plain.string().nullable(),
 		repo: Shape.plain.string().nullable(),
 
 		tags: Shape.list(Shape.plain.string()),
-		// ASK: what is this for?
-		viewedBy: Shape.record(Shape.plain.number()),
 
 		archivedAt: Shape.plain.number().nullable(),
 		archivedBy: Shape.plain.string().nullable(),
@@ -442,9 +438,10 @@ export const RoomSchema: DocShape = Shape.doc({
 	 * Updated by TaskDocument operations when task state changes.
 	 *
 	 * Using Record keyed by taskId for O(1) lookups instead of O(n) list scans.
+	 * Includes viewedBy tracking nested per-task.
 	 */
 	taskIndex: Shape.record(
-		Shape.plain.struct({
+		Shape.struct({
 			taskId: Shape.plain.string(),
 			title: Shape.plain.string(),
 			status: Shape.plain.string(
@@ -458,6 +455,16 @@ export const RoomSchema: DocShape = Shape.doc({
 			hasPendingRequests: Shape.plain.boolean(),
 			lastUpdated: Shape.plain.number(),
 			createdAt: Shape.plain.number(),
+
+			/**
+			 * Per-task read tracking for inbox: username → timestamp
+			 */
+			viewedBy: Shape.record(Shape.plain.number()),
+
+			/**
+			 * Per-task event read tracking for inbox: eventId → username → timestamp
+			 */
+			eventViewedBy: Shape.record(Shape.record(Shape.plain.number())),
 		}),
 	),
 });
