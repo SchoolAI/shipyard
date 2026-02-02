@@ -68,7 +68,7 @@ export class RoomDocument {
 	 */
 	getTasks(_options?: GetTasksOptions): TaskIndexEntryValue[] {
 		// biome-ignore lint/suspicious/noExplicitAny: loro-extended@5.3.0 typing workaround
-		const taskIndex = (this.#roomDoc as any).taskIndex.toJSON() as Record<
+		const taskIndex = this.#roomDoc.taskIndex.toJSON() as Record<
 			string,
 			TaskIndexEntryValue
 		>;
@@ -93,7 +93,7 @@ export class RoomDocument {
 	 */
 	isTaskUnread(taskId: TaskId, username: string): boolean {
 		// biome-ignore lint/suspicious/noExplicitAny: loro-extended@5.3.0 typing workaround
-		const taskIndex = (this.#roomDoc as any).taskIndex.toJSON() as Record<
+		const taskIndex = this.#roomDoc.taskIndex.toJSON() as Record<
 			string,
 			TaskIndexEntryValue
 		>;
@@ -118,7 +118,7 @@ export class RoomDocument {
 	 */
 	isEventUnread(taskId: TaskId, eventId: EventId, username: string): boolean {
 		// biome-ignore lint/suspicious/noExplicitAny: loro-extended@5.3.0 typing workaround
-		const taskIndex = (this.#roomDoc as any).taskIndex.toJSON() as Record<
+		const taskIndex = this.#roomDoc.taskIndex.toJSON() as Record<
 			string,
 			TaskIndexEntryValue
 		>;
