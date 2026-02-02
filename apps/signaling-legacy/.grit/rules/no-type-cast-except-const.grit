@@ -1,6 +1,0 @@
-language js
-
-`$value as $type` where {
-  $type <: not `const`,
-  register_diagnostic(span=$type, message="Type casts are not allowed except 'as const'. Fix the types instead.", severity="error")
-}
