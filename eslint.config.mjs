@@ -154,12 +154,17 @@ export default [
       'local/no-noisy-single-line-comments': 'error',
 
       // Type assertion rules - STRICT MODE
+      // Ban all type assertions except `as const` and `as never`
+      // Using no-restricted-syntax because consistent-type-assertions with assertionStyle:'never'
+      // allows `as const` but incorrectly blocks `as never` (needed for exhaustive switches)
       // Note: Biome handles noExplicitAny and noNonNullAssertion
-      // ESLint only needed for consistent-type-assertions (Biome doesn't have this)
-      '@typescript-eslint/consistent-type-assertions': [
+      'no-restricted-syntax': [
         'error',
         {
-          assertionStyle: 'never',
+          selector:
+            'TSAsExpression:not([typeAnnotation.type="TSTypeReference"][typeAnnotation.typeName.name="const"]):not([typeAnnotation.type="TSNeverKeyword"])',
+          message:
+            'Type assertions are not allowed. Use type guards, Zod validation, or fix the types. Only `as const` and `as never` are permitted.',
         },
       ],
     },

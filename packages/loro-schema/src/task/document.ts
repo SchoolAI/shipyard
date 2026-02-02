@@ -10,7 +10,7 @@
 import type { TypedDoc } from "@loro-extended/change";
 import type { EventId, TaskId } from "../ids.js";
 import { generateEventId } from "../ids.js";
-import type { RoomShape, TaskDocumentShape } from "../shapes.js";
+import type { RoomShape, TaskDocumentShape, TaskEventItem } from "../shapes.js";
 
 /** Task status values */
 export type TaskStatus =
@@ -21,34 +21,38 @@ export type TaskStatus =
 	| "completed";
 
 /**
- * Event types supported by logEvent.
- * Due to TypeScript limitations with the current schema typing,
- * we define this inline rather than extracting from TaskEvent.
+ * Event types derived from the TaskEventItem discriminated union.
  */
-export type EventType =
-	| "task_created"
-	| "status_changed"
-	| "completed"
-	| "task_archived"
-	| "task_unarchived"
-	| "approved"
-	| "changes_requested"
-	| "comment_added"
-	| "comment_resolved"
-	| "artifact_uploaded"
-	| "deliverable_linked"
-	| "pr_linked"
-	| "content_edited"
-	| "input_request_created"
-	| "input_request_answered"
-	| "input_request_declined"
-	| "input_request_cancelled"
-	| "agent_activity"
-	| "title_changed"
-	| "spawn_requested"
-	| "spawn_started"
-	| "spawn_completed"
-	| "spawn_failed";
+export type EventType = TaskEventItem["type"];
+
+/**
+ * Base fields that are auto-populated by logEvent.
+ * These don't need to be passed in the data parameter.
+ */
+type EventAutoFields =
+	| "id"
+	| "type"
+	| "actor"
+	| "timestamp"
+	| "inboxWorthy"
+	| "inboxFor";
+
+/**
+ * Extract the extra data fields required for a specific event type.
+ * Returns the fields that must be passed via the `data` parameter.
+ */
+type EventDataFor<T extends EventType> = Omit<
+	Extract<TaskEventItem, { type: T }>,
+	EventAutoFields
+>;
+
+/**
+ * Determines if an event type requires extra data fields.
+ * Used to make the `data` parameter optional for events with no extra fields.
+ */
+type RequiresData<T extends EventType> = keyof EventDataFor<T> extends never
+	? false
+	: true;
 
 /** Options for logEvent */
 export interface LogEventOptions {
@@ -163,6 +167,7 @@ export class TaskDocument {
 	updateStatus(status: TaskStatus, actor: string): void {
 		const now = Date.now();
 		const taskMeta = this.#taskDoc.meta;
+		// eslint-disable-next-line no-restricted-syntax -- Loro schema returns string, we know it's TaskStatus from Shape definition
 		const currentStatus = taskMeta.status as TaskStatus;
 
 		// Update task document meta
@@ -243,19 +248,29 @@ export class TaskDocument {
 	 * Convenience wrapper that auto-fills timestamp and generates ID.
 	 *
 	 * If inboxWorthy is true, also adds the event to roomDoc.taskIndex.inboxEvents.
+	 *
+	 * @example
+	 * // Events with no extra fields - data is optional
+	 * logEvent("task_created", "user123");
+	 *
+	 * // Events with extra fields - data is required and type-checked
+	 * logEvent("status_changed", "user123", { fromStatus: "draft", toStatus: "in_progress" });
 	 */
-	logEvent(
-		type: EventType,
+	logEvent<T extends EventType>(
+		type: T,
 		actor: string,
-		data?: Record<string, unknown>,
-		options?: LogEventOptions,
+		...args: RequiresData<T> extends true
+			? [data: EventDataFor<T>, options?: LogEventOptions]
+			: [data?: EventDataFor<T>, options?: LogEventOptions]
 	): EventId {
+		const [data, options] = args;
 		const id = generateEventId();
 		const timestamp = Date.now();
 		const inboxWorthy = options?.inboxWorthy ?? null;
 		const inboxFor = options?.inboxFor ?? null;
 
 		// Build the event object
+		// eslint-disable-next-line no-restricted-syntax -- Cast is safe: function signature ensures `data` contains all required fields for type T
 		const event = {
 			id,
 			type,
@@ -264,7 +279,7 @@ export class TaskDocument {
 			inboxWorthy,
 			inboxFor,
 			...data,
-		} as any; // Type system doesn't narrow discriminated union dynamically
+		} as unknown as Extract<TaskEventItem, { type: T }>;
 
 		// Add to task document events
 		this.#taskDoc.events.push(event);

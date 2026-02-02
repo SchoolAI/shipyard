@@ -1,5 +1,5 @@
 {
-  "name": "@shipyard/server",
+  "name": "@shipyard/server-legacy",
   "version": "0.1.0",
   "type": "module",
   "description": "MCP server for Shipyard collaborative planning with CRDTs",

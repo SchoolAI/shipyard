@@ -154,8 +154,9 @@ const SyncedFileChangeShape = Shape.plain.struct({
 /**
  * Task event discriminated union shape.
  * Shared between TaskDocumentSchema.events and RoomSchema.taskIndex.inboxEvents.
+ * Exported for type extraction in TaskDocument.logEvent().
  */
-const TaskEventShape = Shape.plain.discriminatedUnion("type", {
+export const TaskEventShape = Shape.plain.discriminatedUnion("type", {
 	task_created: Shape.plain.struct({
 		type: Shape.plain.string("task_created"),
 		...EventBaseFields,

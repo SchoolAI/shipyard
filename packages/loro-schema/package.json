@@ -37,8 +37,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
-    "lint": "biome check src",
+    "lint": "biome check src && eslint 'src/**/*.ts' --no-warn-ignored --report-unused-disable-directives-severity=off --max-warnings 0",
     "lint:fix": "biome check src --write",
+    "lint:typeassertions": "eslint 'src/**/*.ts' --no-warn-ignored --report-unused-disable-directives-severity=off --max-warnings 0",
     "check": "pnpm typecheck && pnpm lint && pnpm test && pnpm build"
   },
   "dependencies": {
