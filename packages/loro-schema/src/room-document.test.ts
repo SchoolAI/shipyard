@@ -40,9 +40,4 @@ describe("RoomDocument", () => {
 	});
 
 	// TODO: Add tests for helper methods when implemented
-	describe.skip("convenience helpers", () => {
-		it.todo("queries tasks by status");
-		it.todo("queries tasks with pending input requests");
-		it.todo("queries inbox events for a user");
-	});
 });

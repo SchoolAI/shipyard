@@ -55,9 +55,4 @@ describe("TaskDocument", () => {
 	});
 
 	// TODO: Add tests for cross-doc sync methods when implemented
-	describe.skip("cross-doc sync", () => {
-		it.todo("syncs task title changes to room taskIndex");
-		it.todo("syncs task status changes to room taskIndex");
-		it.todo("syncs inbox-worthy events to room taskIndex.inboxEvents");
-	});
 });
