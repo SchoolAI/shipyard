@@ -30,6 +30,7 @@
     "analyze:fan-in": "tsx ../../scripts/analyze-fan-in.ts"
   },
   "dependencies": {
+    "@hono/node-server": "^1.19.9",
     "@loro-extended/adapter-leveldb": "^5.3.0",
     "@loro-extended/adapter-webrtc": "^5.3.0",
     "@loro-extended/adapter-websocket": "^5.3.0",

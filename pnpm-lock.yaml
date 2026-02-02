@@ -171,6 +171,9 @@ importers:
 
   apps/server:
     dependencies:
+      '@hono/node-server':
+        specifier: ^1.19.9
+        version: 1.19.9(hono@4.11.3)
       '@loro-extended/adapter-leveldb':
         specifier: ^5.3.0
         version: 5.3.0(loro-crdt@1.10.5)
@@ -3081,6 +3084,7 @@ packages:
 
   '@roamhq/wrtc-linux-x64@0.9.1':
     resolution: {integrity: sha512-LuhzPdMM3i8vs/ifdj1F1pjpX2OhJSCWdh03UQXjRHoX+Fi1oJXiZRwKoVKu1BbsKCYfJ8m9jZB1ZU4Lhi8yHw==}
+    cpu: [x64]
     os: [linux]
 
   '@roamhq/wrtc-win32-x64@0.9.1':
