@@ -558,6 +558,9 @@ type TaskLinkedPRInternal = Infer<typeof TaskDocumentSchema.shapes.linkedPRs>;
 type TaskInputRequestInternal = Infer<
 	typeof TaskDocumentSchema.shapes.inputRequests
 >;
+
+// Event item type (element of events list)
+export type TaskEventItem = Infer<typeof TaskEventShape>;
 type ChangeSnapshotInternal = Infer<
 	typeof TaskDocumentSchema.shapes.changeSnapshots
 >;
