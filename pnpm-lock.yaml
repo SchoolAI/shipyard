@@ -58,7 +58,7 @@ importers:
         specifier: ^4.0.17
         version: 4.0.18(@types/node@25.0.10)(happy-dom@20.3.7)(jiti@2.6.1)(jsdom@25.0.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.2)
 
-  apps/daemon:
+  apps/daemon-legacy:
     dependencies:
       '@shipyard/schema':
         specifier: workspace:*
@@ -162,6 +162,79 @@ importers:
         specifier: ^4.0.17
         version: 4.0.18(@types/node@25.0.10)(happy-dom@20.3.7)(jiti@2.6.1)(jsdom@25.0.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.2)
 
+  apps/mcp-server:
+    dependencies:
+      '@loro-extended/adapter-leveldb':
+        specifier: ^5.3.0
+        version: 5.3.0(loro-crdt@1.10.5)
+      '@loro-extended/adapter-webrtc':
+        specifier: ^5.3.0
+        version: 5.3.0(loro-crdt@1.10.5)
+      '@loro-extended/adapter-websocket':
+        specifier: ^5.3.0
+        version: 5.3.0(loro-crdt@1.10.5)
+      '@loro-extended/change':
+        specifier: ^5.3.0
+        version: 5.3.0(loro-crdt@1.10.5)
+      '@modelcontextprotocol/sdk':
+        specifier: ^1.25.3
+        version: 1.25.3(hono@4.11.3)(zod@3.25.76)
+      '@octokit/rest':
+        specifier: ^22.0.1
+        version: 22.0.1
+      '@shipyard/loro-schema':
+        specifier: workspace:*
+        version: link:../../packages/loro-schema
+      '@shipyard/signaling':
+        specifier: workspace:*
+        version: link:../../packages/signaling
+      express:
+        specifier: ^5.2.1
+        version: 5.2.1
+      nanoid:
+        specifier: ^5.1.6
+        version: 5.1.6
+      pino:
+        specifier: ^10.2.1
+        version: 10.2.1
+      ws:
+        specifier: ^8.19.0
+        version: 8.19.0
+      zod:
+        specifier: ^3.24.2
+        version: 3.25.76
+    devDependencies:
+      '@shipyard/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
+      '@types/express':
+        specifier: ^5.0.6
+        version: 5.0.6
+      '@types/node':
+        specifier: ^25.0.10
+        version: 25.0.10
+      '@types/ws':
+        specifier: ^8.18.1
+        version: 8.18.1
+      '@vitest/coverage-istanbul':
+        specifier: ^3.0.4
+        version: 3.2.4(vitest@3.2.4(@types/debug@4.1.12)(@types/node@25.0.10)(happy-dom@20.3.7)(jiti@2.6.1)(jsdom@25.0.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.2))
+      pino-pretty:
+        specifier: ^13.1.3
+        version: 13.1.3
+      tsup:
+        specifier: ^8.5.1
+        version: 8.5.1(jiti@2.6.1)(postcss@8.5.6)(tsx@4.21.0)(typescript@5.9.3)(yaml@2.8.2)
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.0.4
+        version: 3.2.4(@types/debug@4.1.12)(@types/node@25.0.10)(happy-dom@20.3.7)(jiti@2.6.1)(jsdom@25.0.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.2)
+
   apps/og-proxy-worker:
     dependencies:
       lz-string:
@@ -181,7 +254,7 @@ importers:
         specifier: ^4.59.3
         version: 4.59.3(@cloudflare/workers-types@4.20260122.0)
 
-  apps/server:
+  apps/server-legacy:
     dependencies:
       '@blocknote/core':
         specifier: ^0.46.1
@@ -2062,8 +2135,28 @@ packages:
   '@jridgewell/trace-mapping@0.3.9':
     resolution: {integrity: sha512-3Belt6tdc8bPgAtbcmdtNJlirVoTmEb5e2gC94PnkwEW9jI6CAHUeoG85tjWP5WquqfavoMtMwiG4P926ZKKuQ==}
 
+  '@levischuck/tiny-cbor@0.3.2':
+    resolution: {integrity: sha512-v15eUU94R54eghlKZJtO/hwJmYC7w4ZIj/ybAJT2tMKdcrJNlXm7axCHS8xrQiC1wPlAQNemiwEpuBUaFGwJlQ==}
+
+  '@logtape/logtape@1.3.7':
+    resolution: {integrity: sha512-YgF+q9op97oLLPwc7TcTNIllTArVtTwkwyKky6XVzAXQcBrvFXXtMuwJSryONAyOUSItrx994O/HABOrszZyFg==}
+
+  '@loro-extended/adapter-leveldb@5.3.0':
+    resolution: {integrity: sha512-OwoBRz//SoJwh8o7iBQ8rGL5mcRVGZSKhtds23lJ96tJBc4sjqsh15t7s4itJc7FLrFefsiPaERqUHX6aJEzlg==}
+
+  '@loro-extended/adapter-webrtc@5.3.0':
+    resolution: {integrity: sha512-3L6bcZ7R4sVe9tLUjz0w5jIQtdEHAuG42bnLzXwRBslhvTTrPsEt02BfZd9HH9PJkdk5q02EO856YFtfxBmNoQ==}
+
+  '@loro-extended/adapter-websocket@5.3.0':
+    resolution: {integrity: sha512-tdCGTZudljpJaTyH699ha9nwVVjApAdyDwNRMUz/KuHX3zwp/PXtbrJBVIg0QOZoEqPCDJH0DWi7hwpG/XsUFw==}
+
   '@loro-extended/change@5.3.0':
     resolution: {integrity: sha512-hv567NFC3/KMrUBLxqSzvCmE2e7xWDkjhltsMeDuz37r8u4DjJNztuaOKv3+fEByfLY0mBfpavPxzBiLDQIIIA==}
+    peerDependencies:
+      loro-crdt: ^1.10.3
+
+  '@loro-extended/repo@5.3.0':
+    resolution: {integrity: sha512-dQsfMPz+DeK4t9JBEEMUnz2OfhqDKn6PZlgVrxCocLriQHAQNJA4mU374uYuocgztSRIUFGmOqPkAToIVpDdHA==}
     peerDependencies:
       loro-crdt: ^1.10.3
 
@@ -3037,6 +3130,7 @@ packages:
 
   '@roamhq/wrtc-linux-x64@0.9.1':
     resolution: {integrity: sha512-LuhzPdMM3i8vs/ifdj1F1pjpX2OhJSCWdh03UQXjRHoX+Fi1oJXiZRwKoVKu1BbsKCYfJ8m9jZB1ZU4Lhi8yHw==}
+    cpu: [x64]
     os: [linux]
 
   '@roamhq/wrtc-win32-x64@0.9.1':
@@ -4295,6 +4389,10 @@ packages:
   electron-to-chromium@1.5.267:
     resolution: {integrity: sha512-0Drusm6MVRXSOJpGbaSVgcQsuB4hEkMpHXaVstcPmhu5LIedxs1xNK/nIxmQIU/RPC0+1/o0AVZfBTkTNJOdUw==}
 
+  emittery@1.2.0:
+    resolution: {integrity: sha512-KxdRyyFcS85pH3dnU8Y5yFUm2YJdaHwcBZWrfG8o89ZY9a13/f9itbN+YG3ELbBo9Pg5zvIozstmuV8bX13q6g==}
+    engines: {node: '>=14.16'}
+
   emoji-mart@5.6.0:
     resolution: {integrity: sha512-eJp3QRe79pjwa+duv+n7+5YsNhRcMl812EcFVwrnRvYKoNPoQb5qxU8DG6Bgwji0akHdp6D4Ln6tYLG58MFSow==}
 
@@ -5347,6 +5445,10 @@ packages:
 
   ms@2.1.3:
     resolution: {integrity: sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA==}
+
+  mutative@1.3.0:
+    resolution: {integrity: sha512-8MJj6URmOZAV70dpFe1YnSppRTKC4DsMkXQiBDFayLcDI4ljGokHxmpqaBQuDWa4iAxWaJJ1PS8vAmbntjjKmQ==}
+    engines: {node: '>=14.0'}
 
   mz@2.7.0:
     resolution: {integrity: sha512-z81GNO7nnYMEhrGh9LeymoE4+Yr0Wn5McHIZMK5cfQCl+NDX08sCZgUc9/6MHni9IWuFLm1Z3HTCXu2z9fN62Q==}
@@ -6538,6 +6640,10 @@ packages:
 
   uuid@8.3.2:
     resolution: {integrity: sha512-+NYs2QeMWy+GWFOEm9xnn6HCDp0l7QBD7ml8zLUmJ+93Q5NF0NocErnwkTkXVFNiX3/fpC6afS8Dhb/gz7R7eg==}
+    hasBin: true
+
+  uuid@9.0.1:
+    resolution: {integrity: sha512-b+1eJOlsR9K8HJpow9Ok3fiWOWSIcIzXodvv0rQjVoOVNpWMpxf1wZNpt4y9h10odCNrqnYp1OBzRktckBe3sA==}
     hasBin: true
 
   vary@1.1.2:
@@ -8131,9 +8237,42 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
 
+  '@levischuck/tiny-cbor@0.3.2': {}
+
+  '@logtape/logtape@1.3.7': {}
+
+  '@loro-extended/adapter-leveldb@5.3.0(loro-crdt@1.10.5)':
+    dependencies:
+      '@loro-extended/repo': 5.3.0(loro-crdt@1.10.5)
+      classic-level: 1.4.1
+    transitivePeerDependencies:
+      - loro-crdt
+
+  '@loro-extended/adapter-webrtc@5.3.0(loro-crdt@1.10.5)':
+    dependencies:
+      '@loro-extended/repo': 5.3.0(loro-crdt@1.10.5)
+    transitivePeerDependencies:
+      - loro-crdt
+
+  '@loro-extended/adapter-websocket@5.3.0(loro-crdt@1.10.5)':
+    dependencies:
+      '@levischuck/tiny-cbor': 0.3.2
+      '@loro-extended/repo': 5.3.0(loro-crdt@1.10.5)
+    transitivePeerDependencies:
+      - loro-crdt
+
   '@loro-extended/change@5.3.0(loro-crdt@1.10.5)':
     dependencies:
       loro-crdt: 1.10.5
+
+  '@loro-extended/repo@5.3.0(loro-crdt@1.10.5)':
+    dependencies:
+      '@logtape/logtape': 1.3.7
+      '@loro-extended/change': 5.3.0(loro-crdt@1.10.5)
+      emittery: 1.2.0
+      loro-crdt: 1.10.5
+      mutative: 1.3.0
+      uuid: 9.0.1
 
   '@mantine/core@8.3.13(@mantine/hooks@8.3.13(react@19.2.3))(@types/react@19.2.9)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)':
     dependencies:
@@ -8156,6 +8295,28 @@ snapshots:
   '@mantine/utils@6.0.22(react@19.2.3)':
     dependencies:
       react: 19.2.3
+
+  '@modelcontextprotocol/sdk@1.25.3(hono@4.11.3)(zod@3.25.76)':
+    dependencies:
+      '@hono/node-server': 1.19.9(hono@4.11.3)
+      ajv: 8.17.1
+      ajv-formats: 3.0.1(ajv@8.17.1)
+      content-type: 1.0.5
+      cors: 2.8.5
+      cross-spawn: 7.0.6
+      eventsource: 3.0.7
+      eventsource-parser: 3.0.6
+      express: 5.2.1
+      express-rate-limit: 7.5.1(express@5.2.1)
+      jose: 6.1.3
+      json-schema-typed: 8.0.2
+      pkce-challenge: 5.0.1
+      raw-body: 3.0.2
+      zod: 3.25.76
+      zod-to-json-schema: 3.25.1(zod@3.25.76)
+    transitivePeerDependencies:
+      - hono
+      - supports-color
 
   '@modelcontextprotocol/sdk@1.25.3(hono@4.11.3)(zod@4.3.5)':
     dependencies:
@@ -10751,6 +10912,8 @@ snapshots:
 
   electron-to-chromium@1.5.267: {}
 
+  emittery@1.2.0: {}
+
   emoji-mart@5.6.0: {}
 
   emoji-regex-xs@2.0.1: {}
@@ -12181,6 +12344,8 @@ snapshots:
 
   ms@2.1.3: {}
 
+  mutative@1.3.0: {}
+
   mz@2.7.0:
     dependencies:
       any-promise: 1.3.0
@@ -13586,6 +13751,8 @@ snapshots:
 
   uuid@8.3.2: {}
 
+  uuid@9.0.1: {}
+
   vary@1.1.2: {}
 
   vaul@1.1.2(@types/react-dom@19.2.3(@types/react@19.2.9))(@types/react@19.2.9)(react-dom@19.2.3(react@19.2.3))(react@19.2.3):
@@ -14000,6 +14167,10 @@ snapshots:
       '@speed-highlight/core': 1.2.14
       cookie: 1.1.1
       youch-core: 0.3.3
+
+  zod-to-json-schema@3.25.1(zod@3.25.76):
+    dependencies:
+      zod: 3.25.76
 
   zod-to-json-schema@3.25.1(zod@4.3.5):
     dependencies:

@@ -1,0 +1,59 @@
+{
+  "name": "@shipyard/mcp-server",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Unified MCP server and daemon for Shipyard with Loro CRDT sync",
+  "main": "./dist/index.js",
+  "bin": "./dist/index.js",
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "import": "./dist/index.js"
+    }
+  },
+  "engines": {
+    "node": ">=22.14.0"
+  },
+  "scripts": {
+    "dev": "tsup --watch --onSuccess 'node dist/index.js'",
+    "dev:daemon": "tsup --watch --onSuccess 'node dist/index.js --daemon'",
+    "build": "tsup",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check src",
+    "lint:fix": "biome check src --write",
+    "analyze:fan-in": "tsx ../../scripts/analyze-fan-in.ts"
+  },
+  "dependencies": {
+    "@loro-extended/adapter-leveldb": "^5.3.0",
+    "@loro-extended/adapter-websocket": "^5.3.0",
+    "@loro-extended/adapter-webrtc": "^5.3.0",
+    "@loro-extended/change": "^5.3.0",
+    "@modelcontextprotocol/sdk": "^1.25.3",
+    "@octokit/rest": "^22.0.1",
+    "@shipyard/loro-schema": "workspace:*",
+    "@shipyard/signaling": "workspace:*",
+    "express": "^5.2.1",
+    "nanoid": "^5.1.6",
+    "pino": "^10.2.1",
+    "ws": "^8.19.0",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@shipyard/shared": "workspace:*",
+    "@types/express": "^5.0.6",
+    "@types/node": "^25.0.10",
+    "@types/ws": "^8.18.1",
+    "@vitest/coverage-istanbul": "^3.0.4",
+    "pino-pretty": "^13.1.3",
+    "tsup": "^8.5.1",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "vitest": "^3.0.4"
+  }
+}

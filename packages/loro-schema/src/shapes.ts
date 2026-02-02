@@ -142,7 +142,6 @@ const QuestionUnionShape = Shape.plain.discriminatedUnion("type", {
 	number: NumberQuestionShape,
 });
 
-
 /**
  * Shape definition for individual file changes in a ChangeSnapshot.
  */
@@ -175,6 +174,7 @@ export const TaskDocumentSchema: DocShape = Shape.doc({
 		completedBy: Shape.plain.string().nullable(),
 
 		ownerId: Shape.plain.string().nullable(),
+		sessionTokenHash: Shape.plain.string(),
 		epoch: Shape.plain.number(),
 		repo: Shape.plain.string().nullable(),
 
@@ -356,6 +356,32 @@ export const TaskDocumentSchema: DocShape = Shape.doc({
 				...EventBaseFields,
 				fromTitle: Shape.plain.string(),
 				toTitle: Shape.plain.string(),
+			}),
+			spawn_requested: Shape.plain.struct({
+				type: Shape.plain.string("spawn_requested"),
+				...EventBaseFields,
+				targetMachineId: Shape.plain.string(),
+				prompt: Shape.plain.string(),
+				cwd: Shape.plain.string(),
+				requestedBy: Shape.plain.string(),
+			}),
+			spawn_started: Shape.plain.struct({
+				type: Shape.plain.string("spawn_started"),
+				...EventBaseFields,
+				requestId: Shape.plain.string(),
+				pid: Shape.plain.number(),
+			}),
+			spawn_completed: Shape.plain.struct({
+				type: Shape.plain.string("spawn_completed"),
+				...EventBaseFields,
+				requestId: Shape.plain.string(),
+				exitCode: Shape.plain.number(),
+			}),
+			spawn_failed: Shape.plain.struct({
+				type: Shape.plain.string("spawn_failed"),
+				...EventBaseFields,
+				requestId: Shape.plain.string(),
+				error: Shape.plain.string(),
 			}),
 		}),
 	),

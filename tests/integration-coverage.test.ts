@@ -68,6 +68,30 @@ const COVERAGE_REQUIREMENTS: CoverageRequirement[] = [
 		sourcePattern: /^(?!.*\.test\.ts$).*\.ts$/,
 		description: 'Signaling Routes',
 	},
+	{
+		sourceDir: 'apps/mcp-server/src/routes',
+		testSuffix: '.test.ts',
+		sourcePattern: /^(?!.*\.test\.ts$).*\.ts$/,
+		description: 'MCP Server HTTP Routes',
+	},
+	{
+		sourceDir: 'apps/mcp-server/src/mcp/tools',
+		testSuffix: '.test.ts',
+		sourcePattern: /^(?!.*\.test\.ts$).*\.ts$/,
+		description: 'MCP Server Tools',
+	},
+	{
+		sourceDir: 'apps/mcp-server/src/events',
+		testSuffix: '.test.ts',
+		sourcePattern: /^(?!.*\.test\.ts$).*\.ts$/,
+		description: 'MCP Server Event Handlers',
+	},
+	{
+		sourceDir: 'apps/mcp-server/src/agents',
+		testSuffix: '.test.ts',
+		sourcePattern: /^(?!.*\.test\.ts$).*\.ts$/,
+		description: 'MCP Server Agent Spawning',
+	},
 ];
 
 interface FileInfo {
