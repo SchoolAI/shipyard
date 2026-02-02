@@ -512,41 +512,8 @@ export type TaskDocumentShape = typeof TaskDocumentSchema;
 export type TaskDocument = Infer<typeof TaskDocumentSchema>;
 export type MutableTaskDocument = InferMutableType<typeof TaskDocumentSchema>;
 
-/**
- * TODO (2026-02-01): Workaround for @loro-extended/change@5.3.0 bug
- *
- * The published npm version doesn't export BooleanValueShape, StringValueShape, etc.,
- * causing TS4023 errors when using Infer<typeof ...> in exported types.
- *
- * Explicit interface definitions are used below instead of Infer<> to ensure
- * proper type exports. Once a newer version of @loro-extended/change is published
- * with these exports, we can switch back to using Infer<>.
- */
-
-/**
- * Task metadata type - explicitly defined for cross-package compatibility.
- */
-export interface TaskMeta {
-	id: string;
-	title: string;
-	status:
-		| "draft"
-		| "pending_review"
-		| "changes_requested"
-		| "in_progress"
-		| "completed";
-	createdAt: number;
-	updatedAt: number;
-	completedAt: number | null;
-	completedBy: string | null;
-	ownerId: string | null;
-	sessionTokenHash: string;
-	epoch: number;
-	repo: string | null;
-	tags: string[];
-	archivedAt: number | null;
-	archivedBy: string | null;
-}
+/** Task metadata inferred from schema */
+export type TaskMeta = Infer<typeof TaskDocumentSchema.shapes.meta>;
 
 // Internal types using Infer (not exported for cross-package use)
 type TaskCommentInternal = Infer<typeof TaskDocumentSchema.shapes.comments>;
