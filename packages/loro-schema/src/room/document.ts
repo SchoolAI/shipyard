@@ -67,7 +67,6 @@ export class RoomDocument {
 	 * all tasks since TaskIndex doesn't track archived status.
 	 */
 	getTasks(_options?: GetTasksOptions): TaskIndexEntryValue[] {
-		// biome-ignore lint/suspicious/noExplicitAny: loro-extended@5.3.0 typing workaround
 		const taskIndex = this.#roomDoc.taskIndex.toJSON() as Record<
 			string,
 			TaskIndexEntryValue
@@ -92,7 +91,6 @@ export class RoomDocument {
 	 * @returns true if the task has been updated since the user last viewed it
 	 */
 	isTaskUnread(taskId: TaskId, username: string): boolean {
-		// biome-ignore lint/suspicious/noExplicitAny: loro-extended@5.3.0 typing workaround
 		const taskIndex = this.#roomDoc.taskIndex.toJSON() as Record<
 			string,
 			TaskIndexEntryValue
@@ -117,7 +115,6 @@ export class RoomDocument {
 	 * @returns true if the event has not been marked as read by the user
 	 */
 	isEventUnread(taskId: TaskId, eventId: EventId, username: string): boolean {
-		// biome-ignore lint/suspicious/noExplicitAny: loro-extended@5.3.0 typing workaround
 		const taskIndex = this.#roomDoc.taskIndex.toJSON() as Record<
 			string,
 			TaskIndexEntryValue
