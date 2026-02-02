@@ -4,10 +4,9 @@ export default defineConfig({
   entry: [
     'src/index.ts',
     'src/shapes.ts',
-    'src/validators.ts',
-    'src/types.ts',
-    'src/helpers.ts',
-    'src/url-encoding.ts',
+    'src/ids.ts',
+    'src/task-document.ts',
+    'src/room-document.ts',
   ],
   format: ['esm'],
   dts: true,

@@ -1,39 +1,48 @@
 /**
- * @shipyard/loro-schema - Loro-based schema and CRDT helpers for Shipyard
- *
- * This package provides the Loro document schema for Shipyard task documents,
- * along with type definitions, validators, and helper functions for type-safe
- * CRDT operations.
+ * @shipyard/loro-schema - Loro schema and document classes for Shipyard
  */
 
+// Re-export Loro utilities for convenience
+export { type Infer, type InferMutableType, Shape } from "@loro-extended/change";
+
+// Shapes (for advanced use cases)
+export { TaskDocumentSchema, RoomSchema } from "./shapes.js";
+
+// Inferred types (primary types for consumers)
+export type {
+	ChangeSnapshot,
+	MutableRoom,
+	MutableTaskDocument,
+	Room,
+	RoomShape,
+	SyncedFileChange,
+	TaskArtifact,
+	TaskComment,
+	TaskDeliverable,
+	TaskDocument as TaskDocumentType,
+	TaskDocumentShape,
+	TaskEvent,
+	TaskIndexEntry,
+	TaskInputRequest,
+	TaskLinkedPR,
+	TaskMeta,
+} from "./shapes.js";
+
+// Branded ID types
+export type {
+	ArtifactId,
+	CommentId,
+	DeliverableId,
+	EventId,
+	InputRequestId,
+	MachineId,
+	SessionToken,
+	TaskId,
+	ThreadId,
+} from "./ids.js";
+
+// ID generators
 export {
-	type Infer,
-	type InferMutableType,
-	Shape,
-} from "@loro-extended/change";
-export {
-	type AddChangeSnapshotParams,
-	type AddDeliverableParams,
-	type AddGitHubArtifactParams,
-	type AddInlineCommentParams,
-	type AddLocalArtifactParams,
-	type AddLocalCommentParams,
-	type AddOverallCommentParams,
-	type AddPRCommentParams,
-	type BaseEventParams,
-	type CreateTaskParams,
-	createChangeSnapshot,
-	createDeliverable,
-	createEvent,
-	createGitHubArtifact,
-	createInlineComment,
-	createLinkedPR,
-	createLocalArtifact,
-	createLocalComment,
-	createOverallComment,
-	createPRComment,
-	createTaskMetaData,
-	type EventData,
 	generateArtifactId,
 	generateCommentId,
 	generateDeliverableId,
@@ -42,119 +51,8 @@ export {
 	generateMachineId,
 	generateTaskId,
 	generateThreadId,
-	isTaskUnread,
-	type LinkPRParams,
-	type LogEventParams,
-	normalizeTag,
-	type UpdateTaskMetaParams,
-} from "./helpers.js";
-export {
-	type ChangeSnapshot,
-	type MutableRoom,
-	type MutableTaskDocument,
-	type Room,
-	RoomSchema,
-	type RoomShape,
-	type SyncedFileChange,
-	type TaskArtifact,
-	type TaskComment,
-	type TaskDeliverable,
-	type TaskDocument,
-	TaskDocumentSchema,
-	type TaskDocumentShape,
-	type TaskEvent,
-	type TaskIndexEntry,
-	type TaskInputRequest,
-	type TaskLinkedPR,
-	type TaskMeta,
-} from "./shapes.js";
-export {
-	type ArtifactId,
-	type ArtifactStorage,
-	ArtifactStorageValues,
-	type ArtifactType,
-	ArtifactTypeValues,
-	type ChoiceDisplay,
-	ChoiceDisplayValues,
-	type CommentId,
-	type CommentKind,
-	CommentKindValues,
-	type DeliverableId,
-	type EventId,
-	type EventType,
-	EventTypeValues,
-	type FileChangeStatus,
-	FileChangeStatusValues,
-	type InputRequestId,
-	type InputRequestStatus,
-	InputRequestStatusValues,
-	type InputRequestType,
-	InputRequestTypeValues,
-	type MachineId,
-	type NumberFormat,
-	NumberFormatValues,
-	type PRStatus,
-	PRStatusValues,
-	type RatingStyle,
-	RatingStyleValues,
-	type SessionToken,
-	type TaskId,
-	type TaskStatus,
-	TaskStatusValues,
-	type ThreadId,
-} from "./types.js";
-export {
-	createTaskUrl,
-	createTaskUrlWithHistory,
-	decodeTask,
-	encodeTask,
-	getTaskFromUrl,
-	type TaskSnapshot,
-	type UrlDeliverable,
-	type UrlEncodedTask,
-	type UrlKeyVersion,
-	type UrlSnapshotRef,
-} from "./url-encoding.js";
-export {
-	ArtifactStorageSchema,
-	ArtifactTypeSchema,
-	ChangeSnapshotSchema,
-	ChoiceDisplaySchema,
-	CommentKindSchema,
-	EventTypeSchema,
-	FileChangeStatusSchema,
-	GitHubArtifactSchema,
-	IdSchema,
-	InlineCommentSchema,
-	InputRequestStatusSchema,
-	InputRequestTypeSchema,
-	LocalArtifactSchema,
-	LocalCommentSchema,
-	NumberFormatSchema,
-	OptionalTimestampSchema,
-	OverallCommentSchema,
-	PRCommentSchema,
-	PRStatusSchema,
-	RatingStyleSchema,
-	SyncedFileChangeSchema,
-	TaskArtifactSchema,
-	TaskCommentSchema,
-	TaskDeliverableSchema,
-	TaskEventSchema,
-	TaskIndexEntrySchema,
-	TaskInputRequestSchema,
-	TaskLinkedPRSchema,
-	TaskMetaSchema,
-	TaskStatusSchema,
-	TimestampSchema,
-	type ValidatedChangeSnapshot,
-	type ValidatedSyncedFileChange,
-	type ValidatedTaskArtifact,
-	type ValidatedTaskComment,
-	type ValidatedTaskDeliverable,
-	type ValidatedTaskEvent,
-	type ValidatedTaskIndexEntry,
-	type ValidatedTaskInputRequest,
-	type ValidatedTaskLinkedPR,
-	type ValidatedTaskMeta,
-} from "./validators.js";
+} from "./ids.js";
+
+// Document classes (primary API)
+export { TaskDocument } from "./task-document.js";
+export { RoomDocument } from "./room-document.js";
