@@ -4,7 +4,7 @@
  */
 
 import { timingSafeEqual } from "node:crypto";
-import type { TaskDocument, TaskMeta, TaskId } from "@shipyard/loro-schema";
+import type { TaskDocument, TaskMeta } from "@shipyard/loro-schema";
 import { hashSessionToken } from "./session-token.js";
 
 // TODO: Import from Loro repo when available
@@ -129,6 +129,7 @@ export function verifySessionToken(
 
 /**
  * Formats the metadata header section for task output.
+ * Accepts TaskMeta type from getTaskDocument result.
  */
 export function formatTaskHeader(meta: TaskMeta): string {
 	let output = `# ${meta.title}\n\n`;

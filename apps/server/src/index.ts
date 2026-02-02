@@ -28,15 +28,15 @@
 
 import { spawn } from "node:child_process";
 import { mkdirSync } from "node:fs";
-import { WebSocketServer } from "ws";
 import { serve } from "@hono/node-server";
-import { parseEnv, type Env } from "./env.js";
-import { createApp, type AppContext } from "./http/routes/index.js";
+import { WebSocketServer } from "ws";
+import { type Env, parseEnv } from "./env.js";
 import { initGitHubClient } from "./http/helpers/github.js";
+import { type AppContext, createApp } from "./http/routes/index.js";
 import { createRepo } from "./loro/repo.js";
 import { startMcpServer } from "./mcp/index.js";
-import { tryAcquireLock, releaseLock, isLocked } from "./utils/daemon-lock.js";
-import { initLogger, getLogger } from "./utils/logger.js";
+import { isLocked, releaseLock, tryAcquireLock } from "./utils/daemon-lock.js";
+import { getLogger, initLogger } from "./utils/logger.js";
 import { getStateDir } from "./utils/paths.js";
 
 /** Parse CLI arguments */
@@ -170,7 +170,9 @@ async function runDaemon(env: Env): Promise<void> {
 	// Acquire daemon lock
 	const acquired = await tryAcquireLock();
 	if (!acquired) {
-		log.error("Failed to acquire daemon lock - another instance may be running");
+		log.error(
+			"Failed to acquire daemon lock - another instance may be running",
+		);
 		process.exit(1);
 	}
 

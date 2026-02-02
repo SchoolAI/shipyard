@@ -13,10 +13,54 @@
 // import { registerTools } from './tools/index.js'
 
 /**
- * MCP Server instance type (placeholder).
+ * MCP tool handler function signature.
+ */
+export type ToolHandler = (args: unknown) => Promise<{
+	content: Array<{ type: string; text: string }>;
+	isError?: boolean;
+}>;
+
+/**
+ * MCP tool input schema property definition.
+ * Supports JSON Schema-like property definitions.
+ */
+export interface ToolInputSchemaProperty {
+	type: string;
+	description?: string;
+	enum?: readonly string[];
+	items?: ToolInputSchemaProperty;
+	nullable?: boolean;
+	properties?: Record<string, ToolInputSchemaProperty>;
+	required?: readonly string[];
+}
+
+/**
+ * MCP tool input schema definition.
+ */
+export interface ToolInputSchema {
+	[key: string]: ToolInputSchemaProperty;
+}
+
+/**
+ * MCP Server instance type.
+ * Follows the pattern from @modelcontextprotocol/sdk where tools are registered
+ * with definitions and handlers.
  */
 export interface McpServer {
-	// TODO: Define based on MCP SDK
+	/**
+	 * Register a tool with the MCP server.
+	 * @param name - Unique tool name
+	 * @param description - Tool description for LLM
+	 * @param inputSchema - JSON schema for tool inputs
+	 * @param handler - Async function to handle tool calls
+	 */
+	tool(
+		name: string,
+		description: string,
+		inputSchema: ToolInputSchema,
+		handler: ToolHandler,
+	): void;
+
 	start(): Promise<void>;
 	stop(): Promise<void>;
 }

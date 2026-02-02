@@ -8,7 +8,6 @@
  */
 
 import { generateTaskId } from "@shipyard/loro-schema";
-import { nanoid } from "nanoid";
 import { z } from "zod";
 import { parseEnv } from "../../env.js";
 import {

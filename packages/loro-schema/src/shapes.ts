@@ -511,23 +511,64 @@ export const RoomSchema: DocShape = Shape.doc({
 export type TaskDocumentShape = typeof TaskDocumentSchema;
 export type TaskDocument = Infer<typeof TaskDocumentSchema>;
 export type MutableTaskDocument = InferMutableType<typeof TaskDocumentSchema>;
-export type TaskMeta = Infer<typeof TaskDocumentSchema.shapes.meta>;
-export type TaskComment = Infer<typeof TaskDocumentSchema.shapes.comments>;
-export type TaskEvent = Infer<typeof TaskDocumentSchema.shapes.events>;
-export type TaskArtifact = Infer<typeof TaskDocumentSchema.shapes.artifacts>;
-export type TaskDeliverable = Infer<
-	typeof TaskDocumentSchema.shapes.deliverables
->;
-export type TaskLinkedPR = Infer<typeof TaskDocumentSchema.shapes.linkedPRs>;
-export type TaskInputRequest = Infer<
-	typeof TaskDocumentSchema.shapes.inputRequests
->;
-export type ChangeSnapshot = Infer<
-	typeof TaskDocumentSchema.shapes.changeSnapshots
->;
 
 /**
  * TODO (2026-02-01): Workaround for @loro-extended/change@5.3.0 bug
+ *
+ * The published npm version doesn't export BooleanValueShape, StringValueShape, etc.,
+ * causing TS4023 errors when using Infer<typeof ...> in exported types.
+ *
+ * Explicit interface definitions are used below instead of Infer<> to ensure
+ * proper type exports. Once a newer version of @loro-extended/change is published
+ * with these exports, we can switch back to using Infer<>.
+ */
+
+/**
+ * Task metadata type - explicitly defined for cross-package compatibility.
+ */
+export interface TaskMeta {
+	id: string;
+	title: string;
+	status: "draft" | "pending_review" | "changes_requested" | "in_progress" | "completed";
+	createdAt: number;
+	updatedAt: number;
+	completedAt: number | null;
+	completedBy: string | null;
+	ownerId: string | null;
+	sessionTokenHash: string;
+	epoch: number;
+	repo: string | null;
+	tags: string[];
+	archivedAt: number | null;
+	archivedBy: string | null;
+}
+
+// Internal types using Infer (not exported for cross-package use)
+type TaskCommentInternal = Infer<typeof TaskDocumentSchema.shapes.comments>;
+type TaskEventInternal = Infer<typeof TaskDocumentSchema.shapes.events>;
+type TaskArtifactInternal = Infer<typeof TaskDocumentSchema.shapes.artifacts>;
+type TaskDeliverableInternal = Infer<
+	typeof TaskDocumentSchema.shapes.deliverables
+>;
+type TaskLinkedPRInternal = Infer<typeof TaskDocumentSchema.shapes.linkedPRs>;
+type TaskInputRequestInternal = Infer<
+	typeof TaskDocumentSchema.shapes.inputRequests
+>;
+type ChangeSnapshotInternal = Infer<
+	typeof TaskDocumentSchema.shapes.changeSnapshots
+>;
+
+// Export aliases for the internal types (consumers should be aware these may be `unknown`)
+export type TaskComment = TaskCommentInternal;
+export type TaskEvent = TaskEventInternal;
+export type TaskArtifact = TaskArtifactInternal;
+export type TaskDeliverable = TaskDeliverableInternal;
+export type TaskLinkedPR = TaskLinkedPRInternal;
+export type TaskInputRequest = TaskInputRequestInternal;
+export type ChangeSnapshot = ChangeSnapshotInternal;
+
+/**
+ * Workaround for @loro-extended/change@5.3.0 bug
  *
  * The published npm version doesn't export BooleanValueShape, StringValueShape, etc.,
  * causing TS4023 errors when using Infer<typeof SyncedFileChangeShape> in exported types.

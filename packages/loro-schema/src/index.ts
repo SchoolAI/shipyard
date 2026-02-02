@@ -55,4 +55,4 @@ export type {
 // Schemas (for advanced use)
 export { RoomSchema, TaskDocumentSchema } from "./shapes.js";
 // Document classes (primary API)
-export { TaskDocument } from "./task/document.js";
+export { TaskDocument, type TaskStatus } from "./task/document.js";
