@@ -453,7 +453,7 @@ export const TaskDocumentSchema: DocShape = Shape.doc({
 			totalDeletions: Shape.plain.number(),
 		}),
 	),
-}) satisfies DocShape;
+});
 
 /**
  * Room document schema.

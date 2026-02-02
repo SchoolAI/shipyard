@@ -9,7 +9,30 @@
 
 import type { TypedDoc } from "@loro-extended/change";
 import type { EventId, TaskId } from "../ids.js";
-import type { RoomShape, TaskIndexEntry } from "../shapes.js";
+import type { RoomShape } from "../shapes.js";
+
+/**
+ * Manual TaskIndexEntry type definition.
+ * The inferred type from Loro schema has issues with nested records.
+ */
+export interface TaskIndexEntryValue {
+	taskId: string;
+	title: string;
+	status:
+		| "draft"
+		| "pending_review"
+		| "changes_requested"
+		| "in_progress"
+		| "completed";
+	ownerId: string;
+	hasPendingRequests: boolean;
+	lastUpdated: number;
+	createdAt: number;
+	viewedBy: Record<string, number>;
+	eventViewedBy: Record<string, Record<string, number>>;
+	// biome-ignore lint/suspicious/noExplicitAny: Complex nested event union type
+	inboxEvents: any[];
+}
 
 export interface GetTasksOptions {
 	/** Include archived tasks (default: false) */
@@ -43,22 +66,22 @@ export class RoomDocument {
 	 * field is on TaskDocument, not TaskIndex. For now, this method returns
 	 * all tasks since TaskIndex doesn't track archived status.
 	 */
-	getTasks(_options?: GetTasksOptions): TaskIndexEntry[] {
-		const taskIndex: Record<string, TaskIndexEntry> =
-			// @ts-expect-error - loro-extended@5.3.0 bug: toJSON() returns unknown with DocShape annotation
-			this.#roomDoc.taskIndex.toJSON();
+	getTasks(_options?: GetTasksOptions): TaskIndexEntryValue[] {
+		// biome-ignore lint/suspicious/noExplicitAny: loro-extended@5.3.0 typing workaround
+		const taskIndex = (this.#roomDoc as any).taskIndex.toJSON() as Record<
+			string,
+			TaskIndexEntryValue
+		>;
 		const tasks = Object.values(taskIndex);
 
 		// Sort by lastUpdated descending (most recent first)
-		// @ts-expect-error - loro-extended@5.3.0 bug: unknown types after toJSON()
 		return tasks.sort((a, b) => b.lastUpdated - a.lastUpdated);
 	}
 
 	/**
 	 * Get tasks with hasPendingRequests = true.
 	 */
-	getTasksWithPendingRequests(): TaskIndexEntry[] {
-		// @ts-expect-error - loro-extended@5.3.0 bug: unknown types after toJSON()
+	getTasksWithPendingRequests(): TaskIndexEntryValue[] {
 		return this.getTasks().filter((task) => task.hasPendingRequests);
 	}
 
@@ -69,22 +92,22 @@ export class RoomDocument {
 	 * @returns true if the task has been updated since the user last viewed it
 	 */
 	isTaskUnread(taskId: TaskId, username: string): boolean {
-		const taskIndex: Record<string, TaskIndexEntry> =
-			// @ts-expect-error - loro-extended@5.3.0 bug: toJSON() returns unknown with DocShape annotation
-			this.#roomDoc.taskIndex.toJSON();
+		// biome-ignore lint/suspicious/noExplicitAny: loro-extended@5.3.0 typing workaround
+		const taskIndex = (this.#roomDoc as any).taskIndex.toJSON() as Record<
+			string,
+			TaskIndexEntryValue
+		>;
 		const task = taskIndex[taskId];
 		if (!task) {
 			return false;
 		}
 
-		// @ts-expect-error - loro-extended@5.3.0 bug: unknown types after toJSON()
 		const viewedAt = task.viewedBy[username];
 		if (viewedAt === undefined) {
 			// User has never viewed this task
 			return true;
 		}
 
-		// @ts-expect-error - loro-extended@5.3.0 bug: unknown types after toJSON()
 		return task.lastUpdated > viewedAt;
 	}
 
@@ -94,15 +117,16 @@ export class RoomDocument {
 	 * @returns true if the event has not been marked as read by the user
 	 */
 	isEventUnread(taskId: TaskId, eventId: EventId, username: string): boolean {
-		// @ts-expect-error - loro-extended@5.3.0 bug: toJSON() returns unknown with DocShape annotation
-		const taskIndex: Record<string, TaskIndexEntry> =
-			this.#roomDoc.taskIndex.toJSON();
+		// biome-ignore lint/suspicious/noExplicitAny: loro-extended@5.3.0 typing workaround
+		const taskIndex = (this.#roomDoc as any).taskIndex.toJSON() as Record<
+			string,
+			TaskIndexEntryValue
+		>;
 		const task = taskIndex[taskId];
 		if (!task) {
 			return false;
 		}
 
-		// @ts-expect-error - loro-extended@5.3.0 bug: unknown types after toJSON()
 		const eventViewedByUsers = task.eventViewedBy[eventId];
 		if (!eventViewedByUsers) {
 			// Event has never been viewed by anyone
