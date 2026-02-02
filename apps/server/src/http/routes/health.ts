@@ -4,35 +4,35 @@
  * GET /health - Returns daemon health status for MCP startup validation.
  */
 
-import type { Request, Response } from "express";
+import { Hono } from "hono";
+import { ROUTES } from "../../client/index.js";
 
-/** Daemon start time for uptime calculation */
-let startTime: number | null = null;
-
-/**
- * Initialize the health route with the daemon start time.
- */
-export function initHealth(): void {
-	startTime = Date.now();
+export interface HealthContext {
+	startTime: number | null;
 }
 
 /**
- * Health check handler.
- *
- * Response 200: { status: 'ok', uptime: number }
- * Response 503: { status: 'error', message: string }
+ * Create health route with injected context.
  */
-export function healthRoute(_req: Request, res: Response): void {
-	if (startTime === null) {
-		res.status(503).json({
-			status: "error",
-			message: "Server not initialized",
-		});
-		return;
-	}
+export function createHealthRoute(ctx: HealthContext) {
+	const app = new Hono();
 
-	res.json({
-		status: "ok",
-		uptime: Date.now() - startTime,
+	app.get(ROUTES.HEALTH, (c) => {
+		if (ctx.startTime === null) {
+			return c.json(
+				{
+					status: "error",
+					message: "Server not initialized",
+				},
+				503,
+			);
+		}
+
+		return c.json({
+			status: "ok",
+			uptime: Date.now() - ctx.startTime,
+		});
 	});
+
+	return app;
 }

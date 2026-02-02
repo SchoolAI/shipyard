@@ -139,7 +139,7 @@ const SyncedFileChangeShape = Shape.plain.struct({
  * Individual task document schema.
  * One doc per task, contains all task-specific state.
  */
-export const TaskDocumentSchema = Shape.doc({
+export const TaskDocumentSchema: DocShape = Shape.doc({
 	meta: Shape.struct({
 		id: Shape.plain.string(),
 		title: Shape.plain.string(),

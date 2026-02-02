@@ -5,6 +5,7 @@
  */
 
 import {
+	type DocShape,
 	type Infer,
 	type InferMutableType,
 	Shape,
@@ -18,7 +19,7 @@ import { TaskEventShape } from "../internal/event-shape.js";
  * Input requests live in TaskDocumentSchema, not here.
  * This schema is intentionally minimal - just enough for dashboard/discovery.
  */
-export const RoomSchema = Shape.doc({
+export const RoomSchema: DocShape = Shape.doc({
 	/**
 	 * Denormalized task metadata for dashboard display.
 	 * Updated by TaskDocument operations when task state changes.

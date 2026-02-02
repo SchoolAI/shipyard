@@ -5,51 +5,119 @@
  * Only 2 endpoints for PR data needed by the diff viewer.
  */
 
-import type { Request, Response } from "express";
+import { Hono } from "hono";
+import { ROUTES } from "../../client/index.js";
+import type { GitHubClient, PRFile } from "../helpers/github.js";
 
-// TODO: Import GitHub helper
-// import { getGitHubClient } from '../helpers/github.js'
+export interface GitHubProxyContext {
+	getClient: () => GitHubClient | null;
+	parseRepo: (planId: string) => { owner: string; repo: string } | null;
+}
 
-/**
- * GET /api/plans/:id/pr-diff/:prNumber
- *
- * Returns raw diff text for a PR.
- * Response 200: string (raw diff)
- * Response 404: { error: 'PR not found' }
- * Response 500: { error: 'GitHub API error' }
- */
-export async function prDiffRoute(req: Request, res: Response): Promise<void> {
-	const { id: _planId, prNumber } = req.params;
-
-	// TODO: Implement using GitHub service
-	// const client = getGitHubClient()
-	// const diff = await client.getPRDiff(repo, Number(prNumber))
-	// res.type('text/plain').send(diff)
-
-	res.status(501).json({
-		error: "not_implemented",
-		prNumber,
-	});
+export interface GitHubProxyError {
+	code: "not_found" | "github_error" | "not_initialized" | "invalid_plan";
+	message: string;
 }
 
 /**
- * GET /api/plans/:id/pr-files/:prNumber
- *
- * Returns list of changed files in a PR.
- * Response 200: Array<{ path, additions, deletions, status }>
- * Response 404: { error: 'PR not found' }
- * Response 500: { error: 'GitHub API error' }
+ * Create GitHub proxy routes with injected dependencies.
  */
-export async function prFilesRoute(req: Request, res: Response): Promise<void> {
-	const { id: _planId, prNumber } = req.params;
+export function createGitHubProxyRoutes(ctx: GitHubProxyContext) {
+	const app = new Hono();
 
-	// TODO: Implement using GitHub service
-	// const client = getGitHubClient()
-	// const files = await client.getPRFiles(repo, Number(prNumber))
-	// res.json(files)
+	app.get(ROUTES.PR_DIFF, async (c) => {
+		const { id: planId, prNumber } = c.req.param();
+		const prNum = Number(prNumber);
 
-	res.status(501).json({
-		error: "not_implemented",
-		prNumber,
+		if (Number.isNaN(prNum) || prNum <= 0) {
+			return c.json<GitHubProxyError>(
+				{ code: "not_found", message: "Invalid PR number" },
+				404,
+			);
+		}
+
+		const client = ctx.getClient();
+		if (!client) {
+			return c.json<GitHubProxyError>(
+				{ code: "not_initialized", message: "GitHub client not initialized" },
+				500,
+			);
+		}
+
+		const repoInfo = ctx.parseRepo(planId);
+		if (!repoInfo) {
+			return c.json<GitHubProxyError>(
+				{ code: "invalid_plan", message: "Could not determine repository" },
+				400,
+			);
+		}
+
+		try {
+			const diff = await client.getPRDiff(repoInfo.owner, repoInfo.repo, prNum);
+			return c.text(diff);
+		} catch (error) {
+			const err = error as Error & { status?: number };
+			if (err.status === 404) {
+				return c.json<GitHubProxyError>(
+					{ code: "not_found", message: "PR not found" },
+					404,
+				);
+			}
+			return c.json<GitHubProxyError>(
+				{ code: "github_error", message: err.message || "GitHub API error" },
+				500,
+			);
+		}
 	});
+
+	app.get(ROUTES.PR_FILES, async (c) => {
+		const { id: planId, prNumber } = c.req.param();
+		const prNum = Number(prNumber);
+
+		if (Number.isNaN(prNum) || prNum <= 0) {
+			return c.json<GitHubProxyError>(
+				{ code: "not_found", message: "Invalid PR number" },
+				404,
+			);
+		}
+
+		const client = ctx.getClient();
+		if (!client) {
+			return c.json<GitHubProxyError>(
+				{ code: "not_initialized", message: "GitHub client not initialized" },
+				500,
+			);
+		}
+
+		const repoInfo = ctx.parseRepo(planId);
+		if (!repoInfo) {
+			return c.json<GitHubProxyError>(
+				{ code: "invalid_plan", message: "Could not determine repository" },
+				400,
+			);
+		}
+
+		try {
+			const files = await client.getPRFiles(
+				repoInfo.owner,
+				repoInfo.repo,
+				prNum,
+			);
+			return c.json<PRFile[]>(files);
+		} catch (error) {
+			const err = error as Error & { status?: number };
+			if (err.status === 404) {
+				return c.json<GitHubProxyError>(
+					{ code: "not_found", message: "PR not found" },
+					404,
+				);
+			}
+			return c.json<GitHubProxyError>(
+				{ code: "github_error", message: err.message || "GitHub API error" },
+				500,
+			);
+		}
+	});
+
+	return app;
 }

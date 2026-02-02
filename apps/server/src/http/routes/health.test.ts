@@ -5,17 +5,32 @@
  * @see docs/whips/daemon-mcp-server-merge.md#http-endpoints-interface
  */
 
-import { describe, it } from "vitest";
+import { describe, expect, it } from "vitest";
+import { createHealthRoute } from "./health.js";
 
 describe("GET /health", () => {
-	describe("when server is initialized", () => {
-		it.todo("returns 200 with status 'ok'");
-		it.todo("includes uptime in milliseconds");
-		it.todo("uptime increases on subsequent calls");
+	it("returns 200 with status ok and uptime when initialized", async () => {
+		const startTime = Date.now() - 1000;
+		const app = createHealthRoute({ startTime });
+
+		const res = await app.request("/health");
+
+		expect(res.status).toBe(200);
+		const json = (await res.json()) as { status: string; uptime: number };
+		expect(json.status).toBe("ok");
+		expect(json.uptime).toBeGreaterThanOrEqual(1000);
 	});
 
-	describe("when server is not initialized", () => {
-		it.todo("returns 503 with status 'error'");
-		it.todo("includes error message");
+	it("returns 503 when not initialized", async () => {
+		const app = createHealthRoute({ startTime: null });
+
+		const res = await app.request("/health");
+
+		expect(res.status).toBe(503);
+		const json = (await res.json()) as { status: string; message: string };
+		expect(json).toMatchObject({
+			status: "error",
+			message: "Server not initialized",
+		});
 	});
 });
