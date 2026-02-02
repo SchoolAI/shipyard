@@ -235,7 +235,8 @@ changeSnapshots: Shape.record(Shape.plain.string())  // machineId → snapshot
 **RoomSchema** (renamed from GlobalRoomSchema):
 ```typescript
 RoomSchema = Shape.doc({
-  taskIndex: Shape.list(
+  // Task metadata index keyed by taskId for O(1) lookups
+  taskIndex: Shape.record(
     Shape.plain.struct({
       taskId: Shape.plain.string(),
       title: Shape.plain.string(),
@@ -245,16 +246,31 @@ RoomSchema = Shape.doc({
       lastUpdated: Shape.plain.number(),
       createdAt: Shape.plain.number(),
     })
-  )
+  ),
+
+  // Plan-level read tracking: taskId → username → timestamp
+  viewedBy: Shape.record(Shape.record(Shape.plain.number())),
+
+  // Event-level read tracking: taskId → eventId → username → timestamp
+  eventViewedBy: Shape.record(Shape.record(Shape.record(Shape.plain.number()))),
 })
 ```
 
-**Removed from GlobalRoomSchema:**
-- `inputRequests` - now only in TaskDocumentSchema
-- `repo` field in taskIndex - not needed for dashboard
+**Removed from TaskDocumentSchema.meta:**
+- `origin` - Platform provenance not needed for v1
+- `viewedBy` - Moved to RoomSchema (per-user state)
+- `approvalRequired`, `approvedUsers`, `rejectedUsers` - Access control via JWT + visibility
+
+**Removed from RoomSchema:**
+- `inputRequests` - Now only in TaskDocumentSchema
+
+**Added to RoomSchema:**
+- `viewedBy` - Plan-level read tracking for inbox (taskId → username → timestamp)
+- `eventViewedBy` - Event-level read tracking for inbox (taskId → eventId → username → timestamp)
 
 **Why denormalized index:**
 - Dashboard needs quick access to task metadata without loading full TaskDocuments
+- O(1) lookups by taskId (Record instead of List)
 - Avoids expensive queries when listing 50+ tasks
 - Cross-document helpers ensure consistency between source and index
 - RoomSchema is always synced (lightweight), TaskDocuments loaded on-demand
@@ -282,8 +298,8 @@ export function updateTaskStatus(
   taskDoc.meta.status = newStatus
   taskDoc.meta.updatedAt = Date.now()
 
-  // Update denormalized index
-  const entry = roomDoc.taskIndex.find(t => t.taskId === taskDoc.meta.id)
+  // Update denormalized index (Record keyed by taskId)
+  const entry = roomDoc.taskIndex.get(taskDoc.meta.id)
   if (entry) {
     entry.status = newStatus
     entry.lastUpdated = Date.now()
@@ -304,7 +320,42 @@ export function updateTaskStatus(
 
 ---
 
-## 11. Validators & Branded Types
+## 11. Input Request Variant Fields
+
+### Decision: Extract for Reuse in Multi Questions
+
+**Problem:** Multi input requests have nested questions that should support all 8 input types (text, multiline, choice, confirm, number, email, date, rating). The field definitions were duplicated.
+
+**Solution:** Extract variant-specific fields as constants:
+
+```typescript
+const TextInputVariantFields = {
+  defaultValue: Shape.plain.string().nullable(),
+  placeholder: Shape.plain.string().nullable(),
+} as const
+
+const NumberInputVariantFields = {
+  min: Shape.plain.number().nullable(),
+  max: Shape.plain.number().nullable(),
+  format: Shape.plain.string("integer", "decimal", "currency", "percentage").nullable(),
+  defaultValue: Shape.plain.number().nullable(),
+} as const
+
+// ... similar for email, date, choice, rating
+```
+
+**Usage:**
+- Top-level input requests: `{ type: "text", ...InputRequestBaseFields, ...TextInputVariantFields }`
+- Multi questions: `{ type: "text", message, ...TextInputVariantFields }`
+
+**Benefits:**
+- No duplication between top-level and multi-nested input requests
+- Multi questions support all 8 input types (was only 3)
+- Choice options in multi questions use full schema with label/value/description
+
+---
+
+## 12. Validators & Branded Types
 
 ### Pattern: Shape + Zod + Branded Types
 
@@ -369,7 +420,11 @@ Based on all research findings:
 - [x] Add taskIndex to RoomSchema
 - [x] Remove inputRequests from RoomSchema
 - [x] Make ownerId non-nullable
-- [x] Inline input request field constants
+- [x] Extract input variant fields for reuse in multi questions
+- [x] Multi questions support all 8 input types
+- [x] taskIndex changed from List to Record for O(1) lookups
+- [x] viewedBy and eventViewedBy added to RoomSchema
+- [x] origin, approval fields removed from TaskDocumentSchema.meta
 
 **Remaining:**
 - [ ] Build TaskDocument class with cross-doc helpers
