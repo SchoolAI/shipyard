@@ -31,7 +31,7 @@ export {
 	generateTaskId,
 	generateThreadId,
 } from "./ids.js";
-export { RoomDocument } from "./room-document.js";
+export { RoomDocument, type GetTasksOptions } from "./room-document.js";
 // Inferred types (primary types for consumers)
 export type {
 	ChangeSnapshot,
