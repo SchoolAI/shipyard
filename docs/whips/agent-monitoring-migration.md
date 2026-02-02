@@ -449,34 +449,49 @@ Flow:
 
 **See:** `/private/tmp/claude/.../scratchpad/signaling-completion-report.md` for full details
 
-### Phase 2: Daemon Consolidation (Week 3-4)
+### Phase 2: Daemon Consolidation (Week 3-4) 🚧 IN PROGRESS
 
-**Goal:** Daemon becomes the MCP server
+**Status:** Architecture defined (2026-02-01), implementation pending
+**Goal:** Merge daemon + MCP server with Loro-based spawning
 
-1. Merge daemon into apps/server
-   - Keep agent spawning logic
-   - Keep lock management (adapted)
-   - Add WebRTC peer capability
+**See:** [loro-migration-plan.md](./loro-migration-plan.md) Appendix A for full architecture
 
-2. Update daemon to connect to Personal Room
-   - Register on startup
-   - Maintain presence
-   - Receive spawn requests from browser
+**Key Changes from Initial Plan:**
 
-3. Implement Loro sync in daemon
-   - LevelDBStorageAdapter
-   - WebRTCAdapter (takes signaling channel)
-   - loro-extended Repo setup
+1. **HTTP Endpoints Reduced to 3** (not migrated to Personal Room)
+   - Spawn requests via Loro doc events (not WebSocket to Personal Room)
+   - Only keep: /health, /api/plans/:id/pr-diff, /api/plans/:id/pr-files
+   - Everything else via Loro sync
 
-4. Update agent spawning
-   - Pass Shipyard agent token
-   - Pass task context from Loro doc
+2. **No RPC Pattern** - Push model only
+   - Daemon auto-pushes git changes to changeSnapshots
+   - No browser → daemon request/response
+   - Browser reads reactively from Loro subscriptions
+
+3. **Use loro-extended Adapters**
+   - Don't build custom adapters
+   - Use @loro-extended/adapter-leveldb, adapter-websocket, adapter-webrtc
+   - Our code is thin wrappers for configuration
+
+4. **Spawn Flow**
+   - Browser writes spawn_requested event to task Loro doc
+   - Daemon subscribes to events list
+   - Daemon spawns when targetMachineId matches
+   - Daemon writes spawn_started, spawn_completed events
+   - Uses @shipyard/signaling schemas (already exist)
+
+**New App: apps/mcp-server/**
+```
+Replaces: apps/server + apps/daemon
+Structure: See loro-migration-plan.md Appendix A
+```
 
 **Deliverables:**
-- [ ] Daemon merged into server
-- [ ] Daemon connects to Personal Room
-- [ ] Loro persistence working
-- [ ] Agent spawning with new tokens
+- [ ] apps/mcp-server/ created with full structure
+- [ ] Daemon merges into mcp-server (agent spawning)
+- [ ] Loro persistence with LevelDB
+- [ ] Git auto-sync to changeSnapshots
+- [ ] Spawn via Loro events working
 
 ### Phase 3: Browser Migration (Week 5-6)
 

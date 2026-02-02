@@ -22,7 +22,7 @@
 | **ownerId nullability** | Non-nullable | Tasks always have an owner |
 | **Document isolation** | loro-extended visibility | Document-level permissions, one connection per room |
 | **origin field** | Removed | Platform provenance not needed for v1, can add later if needed |
-| **viewedBy location** | RoomSchema only | Per-user inbox state, not task content |
+| **viewedBy location** | Nested in taskIndex | Per-task read state grouped with task metadata |
 | **Approval workflow** | Removed | Access control via JWT + loro-extended visibility, not CRDT fields |
 | **taskIndex structure** | Record (not List) | O(1) lookups by taskId for dashboard queries |
 | **Step completions** | Removed | Not needed for v1 |
@@ -276,9 +276,10 @@ RoomSchema = Shape.doc({
 - RoomSchema is always synced (lightweight), TaskDocuments loaded on-demand
 
 **Consistency strategy:**
-- Shared helpers update both TaskDocument.meta and RoomSchema.taskIndex
-- Example: `updateTaskStatus(taskDoc, roomDoc, status)` updates both atomically
-- Any peer can call helpers (browser, daemon, agents)
+- TaskDocument sync methods update RoomSchema.taskIndex as side effect
+- TaskIndex is READ ONLY from RoomDocument perspective
+- Only TaskDocument mutations update taskIndex metadata
+- ViewedBy tracking (per-user state) is the ONLY field callers mutate directly in taskIndex
 
 ---
 
@@ -299,11 +300,12 @@ export function updateTaskStatus(
   taskDoc.meta.updatedAt = Date.now()
 
   // Update denormalized index (Record keyed by taskId)
-  const entry = roomDoc.taskIndex.get(taskDoc.meta.id)
-  if (entry) {
-    entry.status = newStatus
-    entry.lastUpdated = Date.now()
+  const taskEntry = this.roomDoc.taskIndex.get(this.taskId)
+  if (taskEntry) {
+    taskEntry.status = newStatus
+    taskEntry.lastUpdated = Date.now()
   }
+  // Note: This is internal to TaskDocument class, not exposed to callers
 }
 ```
 
@@ -423,7 +425,7 @@ Based on all research findings:
 - [x] Extract input variant fields for reuse in multi questions
 - [x] Multi questions support all 8 input types
 - [x] taskIndex changed from List to Record for O(1) lookups
-- [x] viewedBy and eventViewedBy added to RoomSchema
+- [x] viewedBy and eventViewedBy nested in taskIndex entries
 - [x] origin, approval fields removed from TaskDocumentSchema.meta
 
 **Remaining:**

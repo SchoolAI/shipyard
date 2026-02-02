@@ -355,37 +355,126 @@ apps/
 
 ---
 
-### Phase 5: Daemon + Auth (Week 5)
+### Phase 5: Daemon Merge (Week 5) 🚧 IN PROGRESS
 
-**Goal:** Merge daemon, implement Shipyard JWT
+**Status:** Architecture defined (2026-02-01), implementation pending
+**Goal:** Merge daemon into MCP server with Loro-based event spawning
 
-**Tasks:**
-1. Merge daemon into server
-   - Move agent-spawner.ts to apps/server
-   - Keep lock manager
-   - Add WebSocket endpoint to loro-server
-   - Bridge browser ↔ agent via Loro sync
+**Key Architectural Decisions:**
 
-2. Implement Shipyard JWT
-   - JWT generation in hook
-   - JWT validation in server
-   - Update session-token.ts
-   - Add expiration + scopes
+1. **No RPC Pattern** - Eliminated entirely
+   - Daemon pushes git changes to changeSnapshots (file watcher or periodic)
+   - Daemon includes untracked files < 100KB in snapshots
+   - Browser reads reactively from Loro subscriptions
+   - No request/response messaging needed
 
-3. Signaling updates
-   - Adapt protocol for loro-extended WebRTC adapter
-   - Test with Cloudflare DO
-   - Deprecate Node.js adapter
+2. **HTTP Endpoints Reduced to 3**
+   - `GET /health` - Daemon health check
+   - `GET /api/plans/:id/pr-diff/:prNumber` - GitHub proxy (CORS)
+   - `GET /api/plans/:id/pr-files/:prNumber` - GitHub proxy (CORS)
+   - Everything else via Loro doc sync
+
+3. **Session Registry Simplified**
+   - Keep minimal mapping: `Map<sessionId, { planId, expiresAt }>`
+   - Eliminate lifecycle tracking (derive from meta.status + events)
+   - Helper functions in `packages/loro-schema/src/session.ts`
+   - Why needed: `sessionId` (Claude Code's) ≠ `planId` (ours)
+
+4. **Use loro-extended Adapters** (Don't reinvent)
+   - `@loro-extended/adapter-leveldb` - Ready to use
+   - `@loro-extended/adapter-websocket` - Server + client
+   - `@loro-extended/adapter-webrtc` - Attach data channels
+   - Our files are thin wrappers for configuration
+
+5. **Spawn via Loro Events** (Use existing signaling schemas)
+   - Use `@shipyard/signaling` schemas (already defined)
+   - Browser writes spawn_requested event to Loro doc
+   - Daemon subscribes, spawns agent, writes spawn_started
+   - No separate WebSocket protocol needed
+
+**New Directory Structure: apps/mcp-server/**
+
+```
+apps/mcp-server/
+├── src/
+│   ├── index.ts                    # Entry point
+│   ├── env.ts                      # Zod env schema
+│   │
+│   ├── loro/                       # Thin adapter wrappers
+│   │   ├── index.ts                # Repo + adapters setup
+│   │   ├── storage.ts              # LevelDBStorageAdapter config
+│   │   ├── websocket.ts            # WsServerNetworkAdapter setup
+│   │   └── webrtc.ts               # WebRtcDataChannelAdapter setup
+│   │
+│   ├── routes/                     # 3 HTTP endpoints
+│   │   ├── index.ts                # Express app + CORS
+│   │   ├── health.ts               # GET /health
+│   │   └── github-proxy.ts         # PR diff + files
+│   │
+│   ├── mcp/                        # MCP stdio server
+│   │   ├── index.ts                # MCP Server setup
+│   │   ├── tools/                  # 14 tool files
+│   │   └── sandbox/                # execute_code VM
+│   │
+│   ├── agents/                     # Agent spawning
+│   │   ├── spawner.ts              # spawnClaudeCode()
+│   │   └── tracker.ts              # Active agent registry
+│   │
+│   ├── events/                     # Event handling
+│   │   ├── handlers.ts             # Watch Loro events, spawn agents
+│   │   └── git-sync.ts             # Push git to changeSnapshots
+│   │
+│   ├── services/                   # Server services
+│   │   ├── session.ts              # SessionRegistry (in-memory)
+│   │   ├── identity.ts             # getMachineId(), getGitHubUsername()
+│   │   └── github.ts               # Octokit helpers
+│   │
+│   └── util/                       # Utilities
+│       ├── logger.ts               # Pino logger
+│       ├── daemon-lock.ts          # Lock file management
+│       └── paths.ts                # State directory paths
+```
+
+**Package Updates:**
+
+```
+packages/loro-schema/src/
+├── shapes.ts                        # UPDATED: Add spawn events + sessionTokenHash
+├── session.ts                       # NEW: SessionInfo types
+└── ...
+
+packages/shared/src/
+├── identity.ts                      # NEW: generateMachineId()
+└── ...
+
+packages/signaling/src/
+└── schemas.ts                       # USE: SpawnAgentSchema (already exists)
+```
+
+**Schema Changes:**
+
+1. Add to TaskDocumentSchema.meta:
+```typescript
+sessionTokenHash: Shape.plain.string(),  // NOT nullable
+```
+
+2. Add spawn events to events discriminated union:
+```typescript
+spawn_requested, spawn_started, spawn_completed, spawn_failed
+```
 
 **Deletions:**
-- [ ] DELETE apps/daemon/ (merge into server)
-- [ ] DELETE session token hash logic
+- [ ] DELETE apps/server/ (rename to apps/server-legacy first)
+- [ ] DELETE apps/daemon/ (code merged into mcp-server)
+- [ ] DELETE subscription system (use Loro subscriptions)
+- [ ] DELETE local artifact serving (GitHub-only)
 
 **Deliverables:**
-- [ ] Browser can spawn agents via server
-- [ ] Agents receive Shipyard JWT
-- [ ] JWT validation works
-- [ ] Signaling works with Cloudflare
+- [ ] apps/mcp-server/ created with new structure
+- [ ] Browser spawns agents via Loro events
+- [ ] Daemon pushes git changes automatically
+- [ ] Hook connects via WebSocket Loro client
+- [ ] 3 HTTP endpoints only
 
 ---
 
@@ -678,3 +767,231 @@ Your intuition that it "won't take as long" suggests you have confidence in loro
 4. **Test sync** - loro-extended Repo with adapters
 
 Want me to start with any of these?
+
+---
+
+## Appendix A: Daemon Merge Architecture (2026-02-01)
+
+**Status:** Architecture fully defined, implementation pending
+**Discussion:** Full conversation captured in chat session 2026-02-01
+
+### Executive Summary
+
+The daemon merge consolidates `apps/daemon/` and `apps/server/` into a single `apps/mcp-server/` with:
+- **3 HTTP endpoints** (down from 15+)
+- **No RPC pattern** (daemon pushes to Loro, browser reads)
+- **loro-extended adapters** (not custom implementations)
+- **Spawn via Loro events** (using existing @shipyard/signaling schemas)
+- **Net: -1,500 to -2,500 lines of code**
+
+### Key Architectural Patterns
+
+#### 1. Push Model (Not RPC)
+
+**OLD:** Browser polls server for git changes every 5 seconds
+```
+Browser → HTTP tRPC → MCP Server → git commands → return changes
+```
+
+**NEW:** Daemon auto-pushes git changes to Loro doc
+```
+Daemon watches git (file watcher) → writes to changeSnapshots → Browser reads (reactive)
+```
+
+**Benefits:**
+- Eliminates polling overhead
+- Browser always has latest state
+- Simpler architecture (no request/response)
+
+#### 2. Spawn Lifecycle via Events
+
+**Browser writes:**
+```typescript
+doc.get('events').push({
+  type: 'spawn_requested',
+  targetMachineId: 'desktop-abc',
+  prompt: 'Implement feature X',
+  cwd: '/path/to/project',
+  requestedBy: userId,
+})
+```
+
+**Daemon watches:**
+```typescript
+handle.subscribe(
+  (p) => p.events,
+  (events) => {
+    for (const event of events) {
+      if (event.type === 'spawn_requested' &&
+          event.targetMachineId === myMachineId) {
+        spawnClaudeCode(event)
+        doc.get('events').push({ type: 'spawn_started', pid: 12345 })
+      }
+    }
+  }
+)
+```
+
+**No collision:** `targetMachineId` ensures only one daemon processes request.
+
+#### 3. Session Registry Rationale
+
+**Why it exists:**
+- `sessionId` (Claude Code's internal ID) ≠ `planId` (ours)
+- Idempotency: Claude restarts → same sessionId returns existing plan
+- Post-exit injection: Hook needs planId by looking up sessionId
+
+**What remains:**
+```typescript
+sessionRegistry: Map<sessionId, { planId, expiresAt }>
+```
+
+**What's eliminated:**
+- Lifecycle state tracking (derive from meta.status + events)
+- Deliverables cache (in Loro doc)
+- Review feedback cache (in events)
+
+#### 4. Use loro-extended Packages
+
+**DON'T build custom adapters:**
+```typescript
+// loro/storage.ts - Just configuration
+import { LevelDBStorageAdapter } from '@loro-extended/adapter-leveldb/server'
+export const storage = new LevelDBStorageAdapter('./data.db')
+```
+
+**Their packages:**
+- `@loro-extended/adapter-leveldb` (73 lines, production-ready)
+- `@loro-extended/adapter-websocket` (server + client)
+- `@loro-extended/adapter-webrtc` (attach to data channels)
+
+### HTTP Endpoints Final Count: 3
+
+| Endpoint | Purpose | Why Can't Eliminate |
+|----------|---------|---------------------|
+| `GET /health` | Daemon health check | MCP needs to verify daemon running |
+| `GET /api/plans/:id/pr-diff/:prNumber` | GitHub API proxy | GitHub blocks browser CORS |
+| `GET /api/plans/:id/pr-files/:prNumber` | GitHub API proxy | Same CORS issue |
+
+**Everything else via Loro doc sync.**
+
+### Eliminated Endpoints (12+)
+
+**All hook.* tRPC (8):**
+- createSession → Hook writes directly to Loro doc
+- waitForApproval → Hook subscribes to meta.status changes
+- updateContent → Hook parses markdown + writes to Loro
+- All others → Direct Loro doc read/write
+
+**All plan.* tRPC (4):**
+- getLocalChanges → Daemon pushes to changeSnapshots
+- getMachineInfo → Daemon writes machine info to doc
+- getFileContent → Include untracked files in changeSnapshots
+- hasConnections → Removed (browser knows if it's open)
+
+**Other (3):**
+- /artifacts/* → GitHub-only artifacts
+- /api/plan/:id/transcript → Deferred (WebRTC data channel later)
+- /registry → Not needed (fixed port, just connect)
+
+### Component Flows
+
+#### Git Sync Flow
+
+```
+Daemon watches git (file watcher or periodic)
+  ↓
+Detects changes (staged, unstaged, untracked)
+  ↓
+Reads untracked files < 100KB
+  ↓
+Writes to changeSnapshots[machineId]
+  ↓
+Browser reads reactively (Loro subscription)
+```
+
+#### Hook Connection Flow
+
+```
+Hook starts (CLI process)
+  ↓
+Connects to ws://localhost:56609/ws (Loro WebSocket adapter)
+  ↓
+Hook writes task to Loro doc
+  ↓
+Hook subscribes to meta.status
+  ↓
+Hook blocks until status === 'in_progress' (approved)
+  ↓
+Hook continues (no HTTP polling!)
+```
+
+#### MCP Process Flow
+
+```
+Claude Code: npx @shipyard/mcp-server
+  ↓
+Check: GET /health
+  ↓ (if not running)
+Spawn daemon: node dist/index.js --daemon
+  ↓
+Poll /health until success
+  ↓
+MCP ready → stdio to Claude Code
+  (Daemon handles all MCP tools)
+```
+
+### Open Questions Resolved
+
+| Question | Resolution | Date |
+|----------|------------|------|
+| Need RPC pattern? | ❌ NO - Push model only | 2026-02-01 |
+| Session registry? | ✅ YES - Minimal (sessionId → planId) | 2026-02-01 |
+| Untracked files? | ✅ Include in changeSnapshots (< 100KB) | 2026-02-01 |
+| Agent output streaming? | ❌ NO - Skip for v1 | 2026-02-01 |
+| Stop agent button? | ❌ NO - Defer for v1 | 2026-02-01 |
+| Browser opening? | ❌ NO - Removed feature | 2026-02-01 |
+| Spawn schemas? | ✅ Use @shipyard/signaling (exists) | 2026-02-01 |
+| sessionTokenHash nullable? | ❌ NO - Required field | 2026-02-01 |
+| Reinventing adapters? | ❌ NO - Use loro-extended | 2026-02-01 |
+| Local artifacts? | ❌ NO - GitHub-only | 2026-02-01 |
+| hoist routes/ up? | ✅ YES - Only 3 endpoints | 2026-02-01 |
+
+### Migration Checklist Updates
+
+**Phase 5 (Week 5) - Daemon Merge:**
+- [ ] Create apps/mcp-server/ directory structure
+- [ ] Configure loro-extended adapters (thin wrappers)
+- [ ] Implement events/handlers.ts (spawn lifecycle)
+- [ ] Implement events/git-sync.ts (auto-push)
+- [ ] Port agents/ from daemon
+- [ ] Port MCP tools from server (update imports)
+- [ ] Add 3 HTTP routes
+- [ ] Update packages/loro-schema with spawn events
+- [ ] Add packages/loro-schema/src/session.ts
+- [ ] Add packages/shared/src/identity.ts
+- [ ] Rename apps/server → apps/server-legacy
+- [ ] Rename apps/daemon → apps/daemon-legacy (after merge)
+
+**Phase 6 (Week 6) - Browser + Hook:**
+- [ ] Create useLoroSync hook
+- [ ] Hook becomes WebSocket Loro client
+- [ ] Browser spawns via spawn_requested events
+- [ ] Test git auto-sync
+- [ ] Verify 3 endpoints only
+
+### Success Metrics
+
+**By end of Phase 5:**
+- [ ] apps/mcp-server/ builds successfully
+- [ ] Daemon starts and accepts Loro connections
+- [ ] Browser can write spawn_requested event
+- [ ] Daemon spawns agent on event
+- [ ] Git changes auto-sync to browser
+- [ ] Hook connects via WebSocket
+- [ ] Only 3 HTTP endpoints exist
+- [ ] ~1,500-2,500 net lines deleted
+
+---
+
+*Last updated: 2026-02-01*

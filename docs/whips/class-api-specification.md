@@ -1,193 +1,119 @@
 # TaskDocument & RoomDocument Class API Specification
 
 **Date:** 2026-02-01
-**Status:** Proposal based on comprehensive UI inventory
-**Purpose:** Define exact API surface for loro-extended migration
+**Status:** Minimal viable API
+**Pattern:** Thin coordination layer over Loro containers
+
+---
+
+## Design Philosophy
+
+Classes provide:
+1. **Mutable container accessors** - Direct CRDT access for reads and writes
+2. **Sync methods** - ONLY for cross-doc coordination (the hard part)
+3. **Event helper** - Convenience for logging timeline events
+4. **Lifecycle** - dispose() for cleanup
+
+Classes do NOT provide:
+- ❌ Convenience getters (use containers directly)
+- ❌ Custom subscriptions (use `loro()` + events)
+- ❌ Wrapper methods for simple container operations (push, set, delete)
+
+**Callers are responsible for:**
+- Mutating containers directly
+- Logging events (optional but recommended)
+- Calling sync methods when needed (documented)
 
 ---
 
 ## TaskDocument Class
 
-### Constructor & Lifecycle
+### Container Accessors (Mutable)
 
 ```typescript
-constructor(
-  taskDoc: TypedDoc<TaskDocumentSchema>,
-  roomDoc: TypedDoc<RoomSchema>,
-  taskId: TaskId
-)
-
-dispose(): void  // Cleanup subscriptions
-get isDisposed(): boolean
-```
-
----
-
-### Readonly Container Accessors
-
-**Pattern:** Expose CRDT containers directly as readonly refs instead of individual getters.
-
-```typescript
-// Core containers (direct CRDT access)
-get meta(): ReadonlyStructRef<TaskMeta>
-get content(): any  // For Tiptap/loro-prosemirror - Shape.any()
-get comments(): ReadonlyRecordRef<string, TaskComment>
-get artifacts(): ReadonlyListRef<TaskArtifact>
-get deliverables(): ReadonlyListRef<TaskDeliverable>
-get events(): ReadonlyListRef<TaskEvent>
-get linkedPRs(): ReadonlyListRef<TaskLinkedPR>
-get inputRequests(): ReadonlyListRef<TaskInputRequest>
-get changeSnapshots(): ReadonlyRecordRef<MachineId, ChangeSnapshot>
+// Core containers - direct read/write access
+get meta(): MutableStructRef<TaskMeta>
+get content(): any  // Shape.any() - loro-prosemirror manages this
+get comments(): MutableRecordRef<CommentId, TaskComment>
+get artifacts(): MutableListRef<TaskArtifact>
+get deliverables(): MutableListRef<TaskDeliverable>
+get events(): MutableListRef<TaskEvent>
+get linkedPRs(): MutableListRef<TaskLinkedPR>
+get inputRequests(): MutableListRef<TaskInputRequest>
+get changeSnapshots(): MutableRecordRef<MachineId, ChangeSnapshot>
 
 // For editor integration
 get loroDoc(): LoroDoc
 // Editor uses: loroDoc.getMap("content").id for LoroSyncPlugin
+```
 
-// Usage examples:
+**Usage:**
+```typescript
+// Read
 const status = taskDoc.meta.status
 const title = taskDoc.meta.title
 const allArtifacts = taskDoc.artifacts.toJSON()
-for (const artifact of taskDoc.artifacts.values()) { ... }
-```
 
-**Benefits:**
-- No copying overhead
-- Direct CRDT access for efficiency
-- Callers can subscribe to specific containers
-- ~20 getter methods collapsed into ~8 container accessors
+// Write
+taskDoc.meta.title = "New Title"
+taskDoc.artifacts.push(newArtifact)
+taskDoc.comments.set(commentId, comment)
+
+// Subscribe
+loro(taskDoc.meta).subscribe(() => {...})
+loro(taskDoc.events).subscribe(() => {...})  // All events
+```
 
 ---
 
-### Metadata Mutations
+### Cross-Doc Sync Methods (Only 3!)
 
 ```typescript
-// Mutations (updates task + room index)
+/**
+ * Update task status and sync to room index.
+ * Handles status transition logic and snapshot creation.
+ *
+ * Cross-doc updates:
+ * - taskDoc.meta.status
+ * - taskDoc.meta.updatedAt
+ * - taskDoc.meta.completedAt/completedBy (if completed)
+ * - roomDoc.taskIndex[taskId].status
+ * - roomDoc.taskIndex[taskId].lastUpdated
+ * - Creates snapshot if status is terminal
+ * - Logs status_changed event
+ */
 updateStatus(status: TaskStatus, actor: string): void
-updateTitle(title: string, actor: string): void
-setTags(tags: string[], actor: string): void
+
+/**
+ * Sync title to room index.
+ * Call after mutating meta.title directly.
+ *
+ * Cross-doc updates:
+ * - roomDoc.taskIndex[taskId].title
+ * - roomDoc.taskIndex[taskId].lastUpdated
+ */
+syncTitleToRoom(): void
+
+/**
+ * Recalculate hasPendingRequests flag and sync to room index.
+ * Call after ANY mutation to inputRequests list (add, answer, decline, cancel).
+ *
+ * Cross-doc updates:
+ * - roomDoc.taskIndex[taskId].hasPendingRequests
+ * - roomDoc.taskIndex[taskId].lastUpdated
+ */
+syncPendingRequestsToRoom(): void
 ```
 
 ---
 
-### Input Request Operations
+### Event Helper
 
 ```typescript
-// Mutations only (read via taskDoc.inputRequests container)
-addInputRequest(params: AddInputRequestParams): InputRequestId
-answerInputRequest(
-  requestId: InputRequestId,
-  response: unknown,
-  answeredBy: string
-): void
-declineInputRequest(requestId: InputRequestId): void
-cancelInputRequest(requestId: InputRequestId): void
-```
-
-**Subscriptions:** Callers subscribe to `taskDoc.events` and filter for `input_request_*` event types.
-
----
-
-### Thread/Comment Operations
-
-```typescript
-// Mutations only (read via taskDoc.comments container)
-createThread(
-  blockId: string,
-  body: string,
-  userId: string,
-  selectedText?: string
-): ThreadId
-
-addReply(threadId: ThreadId, body: string, userId: string): CommentId
-toggleThreadResolved(threadId: ThreadId): void
-deleteThread(threadId: ThreadId): void
-```
-
-**Note:** Callers read threads via `taskDoc.comments` and subscribe via `loro(taskDoc.comments).subscribe(...)`
-
-**Open Question:** Current schema has `comments: Shape.record(...)` discriminated by 'kind' (inline/pr/local/overall), but current UI uses "threads" concept. How do threads map to the comment schema?
-
-**Note:** Comments have 4 kinds:
-- `inline` - Thread comments on task content blocks
-- `pr` - Comments on GitHub PR diffs
-- `local` - Comments on local uncommitted changes
-- `overall` - General task comments
-
-Are threads == inline comments? Or do threads aggregate multiple comment kinds?
-
----
-
-### Artifact Operations
-
-```typescript
-// Mutations only (read via taskDoc.artifacts container)
-addArtifact(
-  artifact: AddGitHubArtifactParams | AddLocalArtifactParams,
-  storage: "github" | "local",
-  actor: string
-): ArtifactId
-
-removeArtifact(artifactId: ArtifactId): void
-```
-
----
-
-### Deliverable Operations
-
-```typescript
-// Mutations only (read via taskDoc.deliverables container)
-setDeliverables(deliverables: TaskDeliverable[]): void  // Initial set from content extraction
-linkArtifactToDeliverable(
-  deliverableId: DeliverableId,
-  artifactId: ArtifactId,
-  actor: string
-): void
-
-// Computed helper
-get allDeliverablesLinked(): boolean  // Convenience - checks if all have linkedArtifactId
-```
-
----
-
-### Linked PR Operations
-
-```typescript
-// Mutations only (read via taskDoc.linkedPRs container)
-linkPR(pr: LinkPRParams, actor: string): void
-unlinkPR(prNumber: number): void
-updateLinkedPRStatus(prNumber: number, status: PRStatus): void
-```
-
----
-
-### Change Snapshot Operations
-
-```typescript
-// Mutations only (read via taskDoc.changeSnapshots container)
-setChangeSnapshot(snapshot: AddChangeSnapshotParams): void
-markMachineDisconnected(machineId: MachineId): void
-```
-
----
-
-### Local Diff Comment Operations
-
-```typescript
-// Mutations only (read via taskDoc.comments container - discriminated by 'kind')
-addLocalDiffComment(comment: AddLocalDiffCommentParams, actor: string): CommentId
-resolveLocalDiffComment(commentId: CommentId, resolved: boolean): void
-removeLocalDiffComment(commentId: CommentId): void
-
-// Note: All comment kinds (inline, pr, local, overall) stored in taskDoc.comments
-```
-
----
-
-### Event Operations
-
-```typescript
-// Mutations only (read via taskDoc.events container)
-// Usually internal to other operations
+/**
+ * Log an event to the timeline.
+ * Convenience wrapper that auto-fills timestamp and generates ID.
+ */
 logEvent<T extends EventType>(
   type: T,
   actor: string,
@@ -198,179 +124,250 @@ logEvent<T extends EventType>(
 
 ---
 
-### Snapshot Operations
-
-**Open Question:** Does TaskDocumentSchema have a snapshots container? Need to verify in schema.
+### Lifecycle
 
 ```typescript
-// If snapshots exist:
-// get snapshots(): ReadonlyListRef<Snapshot>
+constructor(
+  taskDoc: TypedDoc<TaskDocumentSchema>,
+  roomDoc: TypedDoc<RoomSchema>,
+  taskId: TaskId
+)
 
-// Mutations (usually internal to status transitions)
-createSnapshot(reason: string, actor: string, status: TaskStatus): void
-```
-
----
-
-### Subscriptions
-
-**Pattern:** NO custom subscriptions. Callers subscribe directly to containers or events.
-
-```typescript
-// Callers subscribe to what they need:
-loro(taskDoc.meta).subscribe(...)       // Metadata changes
-loro(taskDoc.events).subscribe(...)     // All events (including input requests)
-loro(taskDoc.artifacts).subscribe(...)  // Artifact changes
-loro(taskDoc.comments).subscribe(...)   // Comment/thread changes
-
-// For change detection, filter events:
-loro(taskDoc.events).subscribe(() => {
-  const recent = taskDoc.events.get(taskDoc.events.length - 1)
-  if (recent.type === 'input_request_created') {
-    // Handle new request
-  }
-})
-```
-
-**No methods needed** - direct CRDT subscription is cleaner and more flexible.
-
----
-
-## RoomDocument Class
-
-### Constructor & Lifecycle
-
-```typescript
-constructor(roomDoc: TypedDoc<RoomSchema>)
+/**
+ * Cleanup internal state. Container subscriptions managed by callers.
+ */
 dispose(): void
 ```
 
 ---
 
-### Task Index Operations
+### Usage Examples
 
+#### Add Input Request
 ```typescript
-// Readonly container accessor
-get taskIndex(): ReadonlyRecordRef<TaskId, TaskIndexEntry>
+const id = generateInputRequestId()
+taskDoc.inputRequests.push({
+  type: 'text',
+  id,
+  message: "What color?",
+  status: 'pending',
+  createdAt: Date.now(),
+  expiresAt: Date.now() + 86400000,
+  response: null,
+  answeredAt: null,
+  answeredBy: null,
+  isBlocker: null,
+  defaultValue: null,
+  placeholder: null,
+})
+taskDoc.logEvent('input_request_created', actor, { requestId: id })
+taskDoc.syncPendingRequestsToRoom()
+```
 
-// Convenience helpers (could also be done by callers)
-getTasks(options?: { includeArchived?: boolean }): TaskIndexEntry[]  // Sorted by lastUpdated
-getTasksWithPendingRequests(): TaskIndexEntry[]
+#### Answer Input Request
+```typescript
+const requests = taskDoc.inputRequests.toJSON()
+const idx = requests.findIndex(r => r.id === requestId)
+const request = taskDoc.inputRequests.get(idx)
 
-// Mutations
-addTask(params: {
-  taskId: TaskId,
-  title: string,
-  status: TaskStatus,
-  ownerId: string,
-  hasPendingRequests?: boolean
-}): void
+request.status = 'answered'
+request.response = response
+request.answeredAt = Date.now()
+request.answeredBy = answeredBy
 
-updateTask(taskId: TaskId, updates: Partial<{
-  title: string,
-  status: TaskStatus,
-  ownerId: string,
-  hasPendingRequests: boolean
-}>): void
+taskDoc.logEvent('input_request_answered', actor, { requestId })
+taskDoc.syncPendingRequestsToRoom()
+```
 
-removeTask(taskId: TaskId): void
+#### Add Artifact
+```typescript
+const artifact = createGitHubArtifact({
+  type: 'image',
+  filename: 'screenshot.png',
+  url: 'https://...'
+})
+taskDoc.artifacts.push(artifact)
+taskDoc.logEvent('artifact_uploaded', actor, {
+  artifactId: artifact.id,
+  filename: artifact.filename
+})
+```
 
-// Low-level subscriptions done directly:
-// loro(roomDoc.taskIndex).subscribe(...)
+#### Create Thread
+```typescript
+const comment = createInlineComment({
+  threadId: generateThreadId(),
+  body: "Nice work!",
+  author: userId,
+  blockId: blockId,
+})
+taskDoc.comments.set(comment.id, comment)
+taskDoc.logEvent('comment_added', actor, {
+  commentId: comment.id,
+  threadId: comment.threadId
+})
 ```
 
 ---
 
-### ViewedBy Operations (Inbox Read State)
+## RoomDocument Class
+
+### Container Accessors (Readonly)
 
 ```typescript
-// Readonly container accessors
-get viewedBy(): ReadonlyRecordRef<TaskId, ReadonlyRecordRef<string, number>>
-get eventViewedBy(): ReadonlyRecordRef<TaskId, ReadonlyRecordRef<EventId, ReadonlyRecordRef<string, number>>>
+/**
+ * Task index with nested viewedBy tracking.
+ *
+ * Structure: taskId → {
+ *   taskId, title, status, ownerId, hasPendingRequests, lastUpdated, createdAt,
+ *   viewedBy: username → timestamp,
+ *   eventViewedBy: eventId → username → timestamp
+ * }
+ *
+ * READ ONLY - Do not mutate directly. TaskDocument sync methods update this.
+ */
+get taskIndex(): ReadonlyRecordRef<TaskId, TaskIndexEntry>
+```
 
-// Mutations
-markPlanAsRead(taskId: TaskId, username: string): void
-markPlanAsUnread(taskId: TaskId, username: string): void
+**Note:** RoomDocument has NO mutation methods. TaskIndex is updated by TaskDocument's sync methods as a side effect.
 
-markEventAsViewed(taskId: TaskId, eventId: EventId, username: string): void
-clearEventViewedBy(taskId: TaskId, eventId: EventId, username: string): void
+---
 
-// Convenience helpers
-isPlanUnread(taskId: TaskId, username: string, taskUpdatedAt: number): boolean
+### Convenience Helpers
+
+```typescript
+/**
+ * Get all tasks sorted by lastUpdated.
+ */
+getTasks(options?: { includeArchived?: boolean }): TaskIndexEntry[]
+
+/**
+ * Get tasks with hasPendingRequests = true.
+ */
+getTasksWithPendingRequests(): TaskIndexEntry[]
+
+/**
+ * Check if a task is unread for a user.
+ * Compares viewedBy timestamp against task's lastUpdated.
+ */
+isTaskUnread(taskId: TaskId, username: string): boolean
+
+/**
+ * Check if a specific event is unread for a user.
+ */
 isEventUnread(taskId: TaskId, eventId: EventId, username: string): boolean
 ```
 
-**Subscriptions:** Callers subscribe directly via `loro(roomDoc.viewedBy).subscribe(...)` or `loro(roomDoc.eventViewedBy).subscribe(...)`
-
 ---
 
-### Navigation Target Operations
+### Lifecycle
 
 ```typescript
-// For daemon → browser navigation (open specific task)
-getNavigationTarget(): TaskId | null
-setNavigationTarget(taskId: TaskId): void
-clearNavigationTarget(): void
+constructor(roomDoc: TypedDoc<RoomSchema>)
+dispose(): void  // Cleanup (minimal - no subscriptions managed)
 ```
 
-**Open Question:** Is navigation target in RoomSchema or a separate ephemeral channel?
+---
+
+### Usage Examples
+
+#### Read Tasks
+```typescript
+const tasks = roomDoc.getTasks()
+const unreadTasks = tasks.filter(t => roomDoc.isTaskUnread(t.taskId, username))
+```
+
+#### Mark as Read (Direct Container Mutation)
+```typescript
+const task = roomDoc.taskIndex.get(taskId)
+task.viewedBy.set(username, Date.now())
+```
+
+#### Mark Event as Read (Direct Container Mutation)
+```typescript
+const task = roomDoc.taskIndex.get(taskId)
+const eventViewedByUser = task.eventViewedBy.get(eventId) ?? task.eventViewedBy.set(eventId, new Map())
+eventViewedByUser.set(username, Date.now())
+```
+
+**Note:** TaskIndex itself is NOT mutated by RoomDocument. Only TaskDocument sync methods update task metadata. ViewedBy is the only field RoomDocument callers mutate directly (it's per-user UI state).
 
 ---
 
-## Open Questions Summary
+## Resolved Questions
 
-| # | Question | Impact |
+| # | Question | Answer |
 |---|----------|--------|
-| 1 | Threads vs Comments schema mapping | How do threads (UI concept) map to comments (schema) |
-| 2 | Snapshots container in TaskDocumentSchema | Need to verify snapshots are in schema |
-| 3 | Local diff comments storage | Separate container or part of comments discriminated union? |
-| 4 | Navigation target location | RoomSchema or separate ephemeral? |
-| 5 | viewedBy in TaskDocumentSchema.meta | We removed it, but current UI calls markPlanAsViewed on task doc - is this only RoomSchema or both? |
-| 6 | Content export method | Do we need getContentAsBlocks() or is editor.getJSON() sufficient? |
+| 1 | Snapshots container? | **Not needed in CRDT.** Snapshots generated dynamically from URL encoding, not stored in schema. |
+| 2 | Navigation target? | **Not needed.** Will handle daemon → browser navigation differently. |
+| 3 | Threads vs Comments? | **Threads = UI grouping.** Flat comments with `threadId` + `inReplyTo` for threading. Root comment (`inReplyTo: null`) represents thread. No schema changes needed. |
+| 4 | ViewedBy structure? | **Nested in taskIndex.** Both viewedBy and eventViewedBy live inside each task entry. |
+| 5 | Task index mutations? | **Read-only from RoomDocument.** Only TaskDocument sync methods update taskIndex. |
 
 ---
 
-## Features Intentionally Removed
+## Method Count Summary
 
-| Feature | Reason |
-|---------|--------|
-| Approval workflow (approvalRequired, approvedUsers, rejectedUsers) | Access control via JWT + loro-extended visibility |
-| Step completions | Not needed for v1 |
-| origin field | Platform provenance not needed for v1 |
-| viewedBy in TaskDocument.meta | Moved to RoomSchema only (per-user state) |
-
----
-
-## Next Steps
-
-1. **Answer open questions** - Verify schema for snapshots, local diff comments, navigation target
-2. **Verify threads mapping** - Understand threads vs comments schema relationship
-3. **Finalize class signatures** - Create actual TypeScript interface definitions
-4. **Begin implementation** - Start with TaskDocument or RoomDocument
-
----
-
-## Method Count (Final)
-
-**TaskDocument:** ~18-20 methods
-- ~9 readonly container accessors (meta, content, comments, artifacts, deliverables, events, linkedPRs, inputRequests, changeSnapshots)
-- ~10-12 mutation methods
-- NO custom subscriptions (callers use loro() directly)
+**TaskDocument:** 13 total
+- 9 container accessors
+- 3 sync methods
+- 1 event helper
 - dispose()
 
-**RoomDocument:** ~10-12 methods
-- ~3 readonly container accessors (taskIndex, viewedBy, eventViewedBy)
-- ~3 task index mutations
-- ~4 viewedBy mutations
-- ~2 navigation target methods
-- ~2 convenience helpers (getTasks, isPlanUnread)
-- NO custom subscriptions
+**RoomDocument:** 5 total
+- 1 container accessor (taskIndex with nested viewedBy)
+- 3 convenience helpers (getTasks, getTasksWithPendingRequests, isTaskUnread, isEventUnread)
 - dispose()
 
-**Massive simplification** from original ~50+ methods. Classes focus on:
-1. ✅ Cross-doc coordination
-2. ✅ Event logging
-3. ✅ Validated mutations
-4. ✅ Readonly container access
-5. ❌ NO convenience getters
-6. ❌ NO custom subscriptions (use loro() + events)
+**Total:** 18 methods across both classes (was ~50)
+
+**Key simplifications:**
+- RoomDocument has NO mutation methods (taskIndex updated by TaskDocument only)
+- ViewedBy nested in taskIndex (not separate containers)
+- No snapshots container (dynamically generated from URL)
+- No navigation target (not needed in schema)
+
+---
+
+## Benefits of Minimal API
+
+1. **Simpler to implement** - 3 sync methods vs 15+ mutation wrappers
+2. **Simpler to test** - Test sync logic, not wrappers
+3. **More flexible** - Callers can compose operations however they want
+4. **Matches CRDT philosophy** - Expose the data, provide helpers for hard parts
+5. **Easier to maintain** - Less code to maintain
+6. **Still protects** - Cross-doc coordination encapsulated, type safety enforced
+
+---
+
+## What Callers Must Remember
+
+1. **Call sync methods** after mutations that affect room index:
+   - After `meta.title` changes → `syncTitleToRoom()`
+   - After `inputRequests` changes → `syncPendingRequestsToRoom()`
+   - After `meta.status` changes → use `updateStatus()` (handles sync)
+
+2. **Log events** (optional):
+   - Use `logEvent()` helper for timeline
+   - If forgotten, just missing audit trail
+
+3. **Use factories** for object creation:
+   - `createInlineComment(params)` → proper structure
+   - `createGitHubArtifact(params)` → proper structure
+   - Available from `@shipyard/loro-schema`
+
+---
+
+## Implementation Priority
+
+**Phase 1: Core sync logic**
+- TaskDocument with 3 sync methods
+- RoomDocument with 0 methods (just container accessors)
+
+**Phase 2: Convenience helpers (if needed)**
+- Add back specific methods if callers struggle
+- Start minimal, grow based on actual pain points
+
+**Phase 3: Advanced (if needed)**
+- Custom subscriptions for complex change detection
+- Validation helpers beyond type system
