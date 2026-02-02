@@ -7,8 +7,8 @@
 
 import type { Request, Response } from "express";
 
-// TODO: Import GitHub service
-// import { getGitHubClient } from '../services/github.js'
+// TODO: Import GitHub helper
+// import { getGitHubClient } from '../helpers/github.js'
 
 /**
  * GET /api/plans/:id/pr-diff/:prNumber

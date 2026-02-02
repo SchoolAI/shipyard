@@ -8,7 +8,7 @@
 // TODO: Import from @loro-extended/adapter-leveldb/server
 // import { LevelDBStorageAdapter } from '@loro-extended/adapter-leveldb/server'
 
-import type { Env } from "../env.js";
+import type { Env } from "../../env.js";
 
 /**
  * Storage adapter interface (placeholder until loro-extended types available).

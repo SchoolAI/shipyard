@@ -8,7 +8,7 @@
 // TODO: Import Octokit
 // import { Octokit } from '@octokit/rest'
 
-import type { Env } from "../env.js";
+import type { Env } from "../../env.js";
 
 /**
  * GitHub PR file info.
