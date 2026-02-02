@@ -71,7 +71,7 @@ loro(taskDoc.events).subscribe(() => {...})  // All events
 ```typescript
 /**
  * Update task status and sync to room index.
- * Handles status transition logic and snapshot creation.
+ * Handles status transition logic.
  *
  * Cross-doc updates:
  * - taskDoc.meta.status
@@ -79,7 +79,6 @@ loro(taskDoc.events).subscribe(() => {...})  // All events
  * - taskDoc.meta.completedAt/completedBy (if completed)
  * - roomDoc.taskIndex[taskId].status
  * - roomDoc.taskIndex[taskId].lastUpdated
- * - Creates snapshot if status is terminal
  * - Logs status_changed event
  */
 updateStatus(status: TaskStatus, actor: string): void
