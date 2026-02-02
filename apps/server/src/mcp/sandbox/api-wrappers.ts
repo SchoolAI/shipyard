@@ -250,7 +250,7 @@ done`;
 export async function addArtifact(opts: {
 	taskId: string;
 	sessionToken: string;
-	type: string;
+	type: "html" | "image" | "video";
 	filename: string;
 	source: "file" | "url" | "base64";
 	filePath?: string;

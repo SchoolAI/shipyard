@@ -30,10 +30,15 @@ import { spawn } from "node:child_process";
 import { mkdirSync } from "node:fs";
 import { serve } from "@hono/node-server";
 import { WebSocketServer } from "ws";
+import { initSpawner } from "./agents/spawner.js";
 import { type Env, parseEnv } from "./env.js";
 import { initGitHubClient } from "./http/helpers/github.js";
 import { type AppContext, createApp } from "./http/routes/index.js";
-import { createRepo } from "./loro/repo.js";
+import {
+	startSpawnRequestCleanup,
+	stopSpawnRequestCleanup,
+} from "./loro/handlers.js";
+import { createRepo, resetRepo } from "./loro/repo.js";
 import { startMcpServer } from "./mcp/index.js";
 import { isLocked, releaseLock, tryAcquireLock } from "./utils/daemon-lock.js";
 import { getLogger, initLogger } from "./utils/logger.js";
@@ -184,6 +189,14 @@ async function runDaemon(env: Env): Promise<void> {
 	// Initialize GitHub client (optional - may not have token)
 	initGitHubClient(env);
 
+	// Initialize spawner with environment config
+	initSpawner(env);
+	log.info("Agent spawner initialized");
+
+	// Start spawn request cleanup (memory leak prevention)
+	startSpawnRequestCleanup();
+	log.info("Spawn request cleanup started");
+
 	// Create WebSocket server (standalone, will be attached to HTTP server)
 	const wss = new WebSocketServer({ noServer: true });
 
@@ -229,11 +242,26 @@ async function runDaemon(env: Env): Promise<void> {
 	const shutdown = async (signal: string) => {
 		log.info({ signal }, "Received shutdown signal");
 
+		// Stop spawn request cleanup
+		stopSpawnRequestCleanup();
+		log.debug("Spawn request cleanup stopped");
+
 		// Close HTTP server
 		server.close();
 
 		// Close WebSocket server
 		wss.close();
+
+		// Give time for in-flight operations to complete
+		await new Promise((resolve) => setTimeout(resolve, 100));
+
+		// Reset Loro repo (closes LevelDB)
+		try {
+			resetRepo();
+			log.debug("Loro repo reset");
+		} catch (err) {
+			log.warn({ err }, "Error resetting Loro repo during shutdown");
+		}
 
 		// Release daemon lock
 		await releaseLock();
@@ -248,12 +276,24 @@ async function runDaemon(env: Env): Promise<void> {
 	// Handle uncaught errors
 	process.on("uncaughtException", async (err) => {
 		log.error({ err }, "Uncaught exception");
+		stopSpawnRequestCleanup();
+		try {
+			resetRepo();
+		} catch {
+			// Ignore errors during cleanup
+		}
 		await releaseLock();
 		process.exit(1);
 	});
 
 	process.on("unhandledRejection", async (reason) => {
 		log.error({ reason }, "Unhandled rejection");
+		stopSpawnRequestCleanup();
+		try {
+			resetRepo();
+		} catch {
+			// Ignore errors during cleanup
+		}
 		await releaseLock();
 		process.exit(1);
 	});

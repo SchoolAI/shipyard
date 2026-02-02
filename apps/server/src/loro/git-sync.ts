@@ -7,7 +7,7 @@
  * @see docs/whips/daemon-mcp-server-merge.md#git-sync-flow
  */
 
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 import type { HandleWithEphemerals } from "@loro-extended/repo";
@@ -64,10 +64,14 @@ export interface GitChangesResult {
 
 /**
  * Execute a git command and return the output.
+ * Uses execFileSync to avoid shell injection vulnerabilities.
+ *
+ * @param cwd - Working directory
+ * @param args - Array of arguments to pass to git
  */
-function gitExec(cwd: string, args: string): string {
+function gitExec(cwd: string, args: string[]): string {
 	try {
-		return execSync(`git ${args}`, {
+		return execFileSync("git", args, {
 			cwd,
 			encoding: "utf-8",
 			timeout: 10000,
@@ -133,14 +137,15 @@ export async function getGitChanges(
 	let totalDeletions = 0;
 
 	// Get HEAD SHA
-	const headSha = gitExec(cwd, "rev-parse HEAD") || "0000000";
+	const headSha = gitExec(cwd, ["rev-parse", "HEAD"]) || "0000000";
 
 	// Get current branch
-	const branch = gitExec(cwd, "rev-parse --abbrev-ref HEAD") || "unknown";
+	const branch =
+		gitExec(cwd, ["rev-parse", "--abbrev-ref", "HEAD"]) || "unknown";
 
 	// Get staged changes
-	const stagedDiff = gitExec(cwd, "diff --cached --name-status");
-	const stagedNumstat = gitExec(cwd, "diff --cached --numstat");
+	const stagedDiff = gitExec(cwd, ["diff", "--cached", "--name-status"]);
+	const stagedNumstat = gitExec(cwd, ["diff", "--cached", "--numstat"]);
 	const stagedStats = parseNumstat(stagedNumstat);
 	totalAdditions += stagedStats.additions;
 	totalDeletions += stagedStats.deletions;
@@ -159,7 +164,7 @@ export async function getGitChanges(
 			R: "renamed",
 		};
 
-		const patch = gitExec(cwd, `diff --cached -- "${filePath}"`);
+		const patch = gitExec(cwd, ["diff", "--cached", "--", filePath]);
 		const statusKey = status[0] ?? "M";
 		files.push({
 			path: filePath,
@@ -170,8 +175,8 @@ export async function getGitChanges(
 	}
 
 	// Get unstaged changes
-	const unstagedDiff = gitExec(cwd, "diff --name-status");
-	const unstagedNumstat = gitExec(cwd, "diff --numstat");
+	const unstagedDiff = gitExec(cwd, ["diff", "--name-status"]);
+	const unstagedNumstat = gitExec(cwd, ["diff", "--numstat"]);
 	const unstagedStats = parseNumstat(unstagedNumstat);
 	totalAdditions += unstagedStats.additions;
 	totalDeletions += unstagedStats.deletions;
@@ -193,7 +198,7 @@ export async function getGitChanges(
 			R: "renamed",
 		};
 
-		const patch = gitExec(cwd, `diff -- "${filePath}"`);
+		const patch = gitExec(cwd, ["diff", "--", filePath]);
 		const statusKey = status[0] ?? "M";
 		files.push({
 			path: filePath,
@@ -204,7 +209,11 @@ export async function getGitChanges(
 	}
 
 	// Get untracked files
-	const untrackedOutput = gitExec(cwd, "ls-files --others --exclude-standard");
+	const untrackedOutput = gitExec(cwd, [
+		"ls-files",
+		"--others",
+		"--exclude-standard",
+	]);
 
 	for (const path of untrackedOutput.split("\n")) {
 		if (!path) continue;

@@ -32,17 +32,26 @@ export function createWebSocketAdapter(
 
 		logger.debug({ peerId, url: req.url }, "WebSocket connection attempt");
 
-		const { connection, start } = adapter.handleConnection({
-			socket: wrapWsSocket(ws),
-			peerId: peerId ?? undefined,
-		});
+		try {
+			const { connection, start } = adapter.handleConnection({
+				socket: wrapWsSocket(ws),
+				peerId: peerId ?? undefined,
+			});
 
-		logger.info(
-			{ peerId: connection.peerId, channelId: connection.channelId },
-			"WebSocket client connected",
-		);
+			logger.info(
+				{ peerId: connection.peerId, channelId: connection.channelId },
+				"WebSocket client connected",
+			);
 
-		start();
+			start();
+		} catch (error) {
+			logger.error(
+				{ error, peerId, url: req.url },
+				"Failed to handle WebSocket connection",
+			);
+			// Close the socket on error
+			ws.close(1011, "Internal error handling connection");
+		}
 	});
 
 	return adapter;

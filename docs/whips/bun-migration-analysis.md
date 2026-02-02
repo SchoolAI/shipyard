@@ -10,7 +10,40 @@
 
 This document analyzes the feasibility of migrating Shipyard from Node.js to Bun during the ongoing Loro migration. The analysis covers compatibility with all current and planned apps/packages, identifies blockers, and provides recommendations.
 
-**Bottom Line:** Bun is viable for most components with significant performance benefits, but has specific compatibility challenges with LevelDB native bindings and the `ws` package. A hybrid approach is recommended.
+**Bottom Line:** Bun is viable for most components with significant performance benefits, but has specific compatibility challenges with LevelDB native bindings. A hybrid approach using **pnpm for workspace management + Bun for runtime/builds** is recommended.
+
+---
+
+## Final Recommendation: What Should Use Bun
+
+### Use Bun (Runtime + Build)
+
+| Component | Build | Runtime | Why |
+|-----------|-------|---------|-----|
+| `packages/loro-schema/` | **Bun** | N/A | Pure TS, no native deps |
+| `packages/signaling/` | **Bun** | N/A | Pure TS, Zod only |
+| `apps/hook/` | **Bun** | **Bun** | 4x faster CLI startup, no blockers |
+
+### Use Bun (Build Only)
+
+| Component | Build | Runtime | Why |
+|-----------|-------|---------|-----|
+| `apps/web/` | **Bun** | Browser | Faster Vite dev server; runtime is browser, not Bun |
+| `apps/signaling/` | **Bun** | CF Workers (V8) | CF Workers use V8; Bun for faster installs |
+| `apps/og-proxy-worker/` | **Bun** | CF Workers (V8) | Same as signaling |
+
+### Keep Node.js (For Now)
+
+| Component | Build | Runtime | Why |
+|-----------|-------|---------|-----|
+| `apps/server/` | Bun OK | **Node.js** | LevelDB native bindings blocker |
+
+### Key Clarifications
+
+1. **pnpm + Bun work together** - Use pnpm for workspace management, Bun as runtime
+2. **Packages are interoperable** - Bun-built packages can be imported by Node.js apps
+3. **Browser apps** - `apps/web/` runs in the browser; Bun only helps during development
+4. **CF Workers** - Architectural constraint; CF uses V8, cannot use Bun runtime
 
 ---
 
@@ -181,13 +214,23 @@ Same as signaling - Bun for dev/build only.
 
 **Post-Migration Stack:** Vite 7, React 19, Tailwind v4, Tiptap + loro-prosemirror
 
-**Bun Compatibility:** **Development only**
+**Bun Compatibility:** **Build/dev only - runtime is the browser**
 
-- Use `bunx --bun vite dev` for faster dev server
-- Use `bun install` for faster dependency installation
-- Build output still targets browsers (no runtime change)
+The web app runs in the user's browser, not in Bun or Node.js:
 
-**Recommendation:** **Use Bun for development** - Faster HMR, faster installs.
+```
+Development:  Bun → runs Vite dev server → Browser executes code
+Production:   Bun → runs Vite build → outputs JS bundle → Browser executes code
+```
+
+Bun helps during development:
+- `bunx --bun vite dev` - Faster dev server startup
+- `bunx --bun vite build` - Faster build
+- Faster HMR (Hot Module Replacement)
+
+But the production runtime is always the user's browser (Chrome, Safari, Firefox, etc.).
+
+**Recommendation:** **Use Bun for build/dev** - Faster development experience.
 
 ### 6. `packages/loro-schema/`
 
@@ -215,18 +258,50 @@ Same as signaling - Bun for dev/build only.
 
 ## Workspace & Tooling Compatibility
 
-### Package Manager
+### Package Manager: pnpm + Bun Hybrid (Recommended)
 
-| Feature | pnpm | Bun |
-|---------|------|-----|
-| Workspace support | **Mature** | **Good** |
-| `workspace:*` protocol | **Yes** | **Yes** |
-| Filtering (`--filter`) | **Excellent** | **Good** |
-| Strict dependency resolution | **Yes** | **No** |
-| Disk space savings | **Excellent** | **Good** |
-| Install speed | Fast | **Fastest** |
+**Use pnpm for package management, Bun for runtime execution.**
 
-**Recommendation:** Can migrate to Bun package manager, but pnpm is more mature for complex monorepos.
+```bash
+# pnpm manages dependencies and workspaces
+pnpm install                          # Uses pnpm-workspace.yaml
+pnpm --filter @shipyard/hook build    # Workspace filtering
+
+# Bun executes the code
+bun run apps/hook/dist/index.js       # Fast runtime
+bunx --bun vite dev                   # Fast dev server
+```
+
+**Why this works:**
+- pnpm creates `node_modules/` structure
+- Bun reads from the same `node_modules/`
+- Both understand `workspace:*` protocol
+- Keep your existing `pnpm-workspace.yaml`
+
+| Feature | pnpm | Bun Package Manager |
+|---------|------|---------------------|
+| Workspace support | **Mature** | Good |
+| `workspace:*` protocol | **Yes** | Yes |
+| `pnpm-workspace.yaml` | **Yes** | ❌ No |
+| Filtering (`--filter`) | **Excellent** | Good |
+| Strict dependency resolution | **Yes** | No |
+
+**Recommendation:** Keep pnpm for workspace management. Bun's package manager doesn't support `pnpm-workspace.yaml`.
+
+### Package Interoperability
+
+**Bun-built packages work with Node.js apps:**
+
+```
+packages/loro-schema/     (built with Bun)
+         ↓ outputs standard ES modules
+         ↓
+apps/server/              (runs on Node.js)
+         ↓ imports normally
+         ✅ Works - same JavaScript output
+```
+
+Both Bun and Node.js output standard JavaScript. The runtime only matters for execution, not for the output format. A package built with Bun can be imported by any JavaScript runtime.
 
 ### Build Tools
 
@@ -418,4 +493,4 @@ Based on benchmarks:
 
 ---
 
-*Last updated: 2026-02-01*
+*Last updated: 2026-02-02*

@@ -45,6 +45,65 @@ interface TaskEventItem {
 /** Track which spawn requests we've already processed */
 const processedSpawnRequests = new Set<string>();
 
+/** Max age for processed spawn requests (1 hour) */
+const PROCESSED_SPAWN_REQUEST_MAX_AGE_MS = 60 * 60 * 1000;
+
+/** Cleanup interval for processed spawn requests (5 minutes) */
+const PROCESSED_SPAWN_REQUEST_CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
+
+/** Track spawn request timestamps for cleanup */
+const spawnRequestTimestamps = new Map<string, number>();
+
+/** Cleanup timer ID */
+let cleanupTimerId: ReturnType<typeof setInterval> | null = null;
+
+/**
+ * Start the periodic cleanup of processed spawn requests.
+ * Should be called during server startup.
+ */
+export function startSpawnRequestCleanup(): () => void {
+	if (cleanupTimerId !== null) {
+		// Already running
+		return () => stopSpawnRequestCleanup();
+	}
+
+	cleanupTimerId = setInterval(() => {
+		const now = Date.now();
+		const expiredIds: string[] = [];
+
+		for (const [id, timestamp] of spawnRequestTimestamps) {
+			if (now - timestamp > PROCESSED_SPAWN_REQUEST_MAX_AGE_MS) {
+				expiredIds.push(id);
+			}
+		}
+
+		for (const id of expiredIds) {
+			processedSpawnRequests.delete(id);
+			spawnRequestTimestamps.delete(id);
+		}
+
+		if (expiredIds.length > 0) {
+			logger.debug(
+				{ count: expiredIds.length },
+				"Cleaned up expired spawn request IDs",
+			);
+		}
+	}, PROCESSED_SPAWN_REQUEST_CLEANUP_INTERVAL_MS);
+
+	return () => stopSpawnRequestCleanup();
+}
+
+/**
+ * Stop the periodic cleanup of processed spawn requests.
+ * Should be called during server shutdown.
+ */
+export function stopSpawnRequestCleanup(): void {
+	if (cleanupTimerId !== null) {
+		clearInterval(cleanupTimerId);
+		cleanupTimerId = null;
+	}
+}
+
 /**
  * Check if an event is a spawn_requested event.
  */
@@ -79,6 +138,7 @@ export async function handleSpawnRequested(
 	}
 
 	processedSpawnRequests.add(event.id);
+	spawnRequestTimestamps.set(event.id, Date.now());
 
 	logger.info(
 		{ eventId: event.id, taskId: ctx.taskId, cwd: event.cwd },
@@ -118,21 +178,36 @@ export async function handleSpawnRequested(
 			"Agent spawned successfully",
 		);
 
-		// Track process exit
+		// Track process exit with error handling
 		child.once("exit", (exitCode) => {
-			// biome-ignore lint/suspicious/noExplicitAny: Loro TypedDoc typing requires any for change callback
-			handle.change((doc: any) => {
-				doc.events.push({
-					type: "spawn_completed",
-					id: `spawn-completed-${event.id}`,
-					actor: "daemon",
-					timestamp: Date.now(),
-					inboxWorthy: null,
-					inboxFor: null,
-					requestId: event.id,
-					exitCode: exitCode ?? 0,
+			try {
+				// biome-ignore lint/suspicious/noExplicitAny: Loro TypedDoc typing requires any for change callback
+				handle.change((doc: any) => {
+					doc.events.push({
+						type: "spawn_completed",
+						id: `spawn-completed-${event.id}`,
+						actor: "daemon",
+						timestamp: Date.now(),
+						inboxWorthy: null,
+						inboxFor: null,
+						requestId: event.id,
+						exitCode: exitCode ?? 0,
+					});
 				});
-			});
+			} catch (exitError) {
+				logger.error(
+					{ eventId: event.id, exitCode, error: exitError },
+					"Failed to write spawn_completed event",
+				);
+			}
+		});
+
+		// Handle process errors
+		child.once("error", (processError) => {
+			logger.error(
+				{ eventId: event.id, error: processError },
+				"Spawned process error",
+			);
 		});
 	} catch (error) {
 		logger.error({ eventId: event.id, error }, "Failed to spawn agent");
@@ -199,4 +274,5 @@ export function subscribeToEvents(
  */
 export function clearProcessedSpawnRequests(): void {
 	processedSpawnRequests.clear();
+	spawnRequestTimestamps.clear();
 }
