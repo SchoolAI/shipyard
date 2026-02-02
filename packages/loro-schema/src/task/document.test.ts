@@ -1,10 +1,9 @@
-import { beforeEach, describe, expect, it } from "vitest";
-import { LoroDoc } from "loro-crdt";
 import { createTypedDoc } from "@loro-extended/change";
-import { TaskDocument } from "./document.js";
-import { TaskDocumentSchema } from "./schema.js";
-import { RoomSchema } from "../room/schema.js";
+import { LoroDoc } from "loro-crdt";
+import { beforeEach, describe, expect, it } from "vitest";
 import { generateTaskId, type TaskId } from "../ids.js";
+import { RoomSchema, TaskDocumentSchema } from "../shapes.js";
+import { TaskDocument } from "./document.js";
 
 describe("TaskDocument", () => {
 	let taskDoc: ReturnType<typeof createTypedDoc<typeof TaskDocumentSchema>>;
@@ -188,9 +187,14 @@ describe("TaskDocument", () => {
 		});
 
 		it("should add inbox-worthy event to room index", () => {
-			task.logEvent("input_request_created", "test-user", { requestId: "req-1", message: "Test?" }, {
-				inboxWorthy: true,
-			});
+			task.logEvent(
+				"input_request_created",
+				"test-user",
+				{ requestId: "req-1", message: "Test?" },
+				{
+					inboxWorthy: true,
+				},
+			);
 
 			const entry = roomDoc.taskIndex.get(taskId);
 			const inboxEvents = entry?.inboxEvents.toJSON();
@@ -209,10 +213,15 @@ describe("TaskDocument", () => {
 		});
 
 		it("should support inboxFor field", () => {
-			task.logEvent("comment_added", "test-user", { commentId: "c1", threadId: null, preview: null }, {
-				inboxWorthy: true,
-				inboxFor: "owner",
-			});
+			task.logEvent(
+				"comment_added",
+				"test-user",
+				{ commentId: "c1", threadId: null, preview: null },
+				{
+					inboxWorthy: true,
+					inboxFor: "owner",
+				},
+			);
 
 			const events = taskDoc.events.toJSON();
 			expect(events[0]?.inboxFor).toBe("owner");

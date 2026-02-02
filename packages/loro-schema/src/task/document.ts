@@ -9,10 +9,9 @@
 
 import type { TypedDoc } from "@loro-extended/change";
 import type { LoroDoc } from "loro-crdt";
-import { generateEventId } from "../ids.js";
 import type { EventId, TaskId } from "../ids.js";
-import type { RoomShape } from "../room/schema.js";
-import type { TaskDocumentShape } from "./schema.js";
+import { generateEventId } from "../ids.js";
+import type { RoomShape, TaskDocumentShape } from "../shapes.js";
 
 /** Task status values */
 export type TaskStatus =
@@ -96,47 +95,65 @@ export class TaskDocument {
 	// (TaskDocumentSchema has explicit `: DocShape` annotation which loses type info)
 
 	/** Task metadata (id, title, status, timestamps, etc.) */
+	// biome-ignore lint/suspicious/noExplicitAny: loro-extended bug workaround
 	get meta(): any {
+		// biome-ignore lint/suspicious/noExplicitAny: loro-extended bug workaround
 		return (this.#taskDoc as any).meta;
 	}
 
 	/** Tiptap editor content (managed by loro-prosemirror) */
+	// biome-ignore lint/suspicious/noExplicitAny: loro-extended bug workaround
 	get content(): any {
+		// biome-ignore lint/suspicious/noExplicitAny: loro-extended bug workaround
 		return (this.#taskDoc as any).content;
 	}
 
 	/** Comments keyed by CommentId */
+	// biome-ignore lint/suspicious/noExplicitAny: loro-extended bug workaround
 	get comments(): any {
+		// biome-ignore lint/suspicious/noExplicitAny: loro-extended bug workaround
 		return (this.#taskDoc as any).comments;
 	}
 
 	/** Task artifacts (images, html, video) */
+	// biome-ignore lint/suspicious/noExplicitAny: loro-extended bug workaround
 	get artifacts(): any {
+		// biome-ignore lint/suspicious/noExplicitAny: loro-extended bug workaround
 		return (this.#taskDoc as any).artifacts;
 	}
 
 	/** Task deliverables */
+	// biome-ignore lint/suspicious/noExplicitAny: loro-extended bug workaround
 	get deliverables(): any {
+		// biome-ignore lint/suspicious/noExplicitAny: loro-extended bug workaround
 		return (this.#taskDoc as any).deliverables;
 	}
 
 	/** Task timeline events */
+	// biome-ignore lint/suspicious/noExplicitAny: loro-extended bug workaround
 	get events(): any {
+		// biome-ignore lint/suspicious/noExplicitAny: loro-extended bug workaround
 		return (this.#taskDoc as any).events;
 	}
 
 	/** Linked pull requests */
+	// biome-ignore lint/suspicious/noExplicitAny: loro-extended bug workaround
 	get linkedPRs(): any {
+		// biome-ignore lint/suspicious/noExplicitAny: loro-extended bug workaround
 		return (this.#taskDoc as any).linkedPRs;
 	}
 
 	/** Input requests from agent to user */
+	// biome-ignore lint/suspicious/noExplicitAny: loro-extended bug workaround
 	get inputRequests(): any {
+		// biome-ignore lint/suspicious/noExplicitAny: loro-extended bug workaround
 		return (this.#taskDoc as any).inputRequests;
 	}
 
 	/** Change snapshots keyed by MachineId */
+	// biome-ignore lint/suspicious/noExplicitAny: loro-extended bug workaround
 	get changeSnapshots(): any {
+		// biome-ignore lint/suspicious/noExplicitAny: loro-extended bug workaround
 		return (this.#taskDoc as any).changeSnapshots;
 	}
 
@@ -144,14 +161,13 @@ export class TaskDocument {
 	get loroDoc(): LoroDoc {
 		// Access the internal LoroDoc from the typed doc
 		// The TypedDoc proxy exposes loroDoc or _doc internally
+		// biome-ignore lint/suspicious/noExplicitAny: loro-extended bug workaround
 		const doc = this.#taskDoc as any;
 		if (doc.loroDoc) {
 			return doc.loroDoc;
 		}
 		// Fallback: try to get from loro() accessor
-		throw new Error(
-			"Cannot access loroDoc - use loro(taskDoc).doc instead",
-		);
+		throw new Error("Cannot access loroDoc - use loro(taskDoc).doc instead");
 	}
 
 	// ═══════════════════════════════════════════════════════════════
@@ -172,6 +188,7 @@ export class TaskDocument {
 	 */
 	updateStatus(status: TaskStatus, actor: string): void {
 		const now = Date.now();
+		// biome-ignore lint/suspicious/noExplicitAny: loro-extended bug workaround
 		const taskMeta = (this.#taskDoc as any).meta;
 		const currentStatus = taskMeta.status as TaskStatus;
 

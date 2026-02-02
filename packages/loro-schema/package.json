@@ -38,7 +38,8 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "lint": "biome check src",
-    "lint:fix": "biome check src --write"
+    "lint:fix": "biome check src --write",
+    "check": "pnpm typecheck && pnpm lint && pnpm test && pnpm build"
   },
   "dependencies": {
     "@loro-extended/change": "^5.3.0",

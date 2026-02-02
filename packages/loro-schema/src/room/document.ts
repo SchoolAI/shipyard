@@ -9,7 +9,7 @@
 
 import type { TypedDoc } from "@loro-extended/change";
 import type { EventId, TaskId } from "../ids.js";
-import type { RoomShape, TaskIndexEntry } from "./schema.js";
+import type { RoomShape, TaskIndexEntry } from "../shapes.js";
 
 export interface GetTasksOptions {
 	/** Include archived tasks (default: false) */
@@ -44,23 +44,21 @@ export class RoomDocument {
 	 * all tasks since TaskIndex doesn't track archived status.
 	 */
 	getTasks(_options?: GetTasksOptions): TaskIndexEntry[] {
-		const taskIndex = this.#roomDoc.taskIndex.toJSON() as unknown as Record<
-			string,
-			TaskIndexEntry
-		>;
+		const taskIndex: Record<string, TaskIndexEntry> =
+			// @ts-expect-error - loro-extended@5.3.0 bug: toJSON() returns unknown with DocShape annotation
+			this.#roomDoc.taskIndex.toJSON();
 		const tasks = Object.values(taskIndex);
 
 		// Sort by lastUpdated descending (most recent first)
-		return tasks.sort(
-			(a: TaskIndexEntry, b: TaskIndexEntry) =>
-				(b.lastUpdated as unknown as number) - (a.lastUpdated as unknown as number),
-		);
+		// @ts-expect-error - loro-extended@5.3.0 bug: unknown types after toJSON()
+		return tasks.sort((a, b) => b.lastUpdated - a.lastUpdated);
 	}
 
 	/**
 	 * Get tasks with hasPendingRequests = true.
 	 */
 	getTasksWithPendingRequests(): TaskIndexEntry[] {
+		// @ts-expect-error - loro-extended@5.3.0 bug: unknown types after toJSON()
 		return this.getTasks().filter((task) => task.hasPendingRequests);
 	}
 
@@ -71,18 +69,22 @@ export class RoomDocument {
 	 * @returns true if the task has been updated since the user last viewed it
 	 */
 	isTaskUnread(taskId: TaskId, username: string): boolean {
-		const taskIndex = this.#roomDoc.taskIndex.toJSON();
+		const taskIndex: Record<string, TaskIndexEntry> =
+			// @ts-expect-error - loro-extended@5.3.0 bug: toJSON() returns unknown with DocShape annotation
+			this.#roomDoc.taskIndex.toJSON();
 		const task = taskIndex[taskId];
 		if (!task) {
 			return false;
 		}
 
+		// @ts-expect-error - loro-extended@5.3.0 bug: unknown types after toJSON()
 		const viewedAt = task.viewedBy[username];
 		if (viewedAt === undefined) {
 			// User has never viewed this task
 			return true;
 		}
 
+		// @ts-expect-error - loro-extended@5.3.0 bug: unknown types after toJSON()
 		return task.lastUpdated > viewedAt;
 	}
 
@@ -92,12 +94,15 @@ export class RoomDocument {
 	 * @returns true if the event has not been marked as read by the user
 	 */
 	isEventUnread(taskId: TaskId, eventId: EventId, username: string): boolean {
-		const taskIndex = this.#roomDoc.taskIndex.toJSON();
+		// @ts-expect-error - loro-extended@5.3.0 bug: toJSON() returns unknown with DocShape annotation
+		const taskIndex: Record<string, TaskIndexEntry> =
+			this.#roomDoc.taskIndex.toJSON();
 		const task = taskIndex[taskId];
 		if (!task) {
 			return false;
 		}
 
+		// @ts-expect-error - loro-extended@5.3.0 bug: unknown types after toJSON()
 		const eventViewedByUsers = task.eventViewedBy[eventId];
 		if (!eventViewedByUsers) {
 			// Event has never been viewed by anyone
