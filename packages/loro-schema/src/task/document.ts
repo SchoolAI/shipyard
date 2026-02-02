@@ -94,47 +94,47 @@ export class TaskDocument {
 	// (TaskDocumentSchema has explicit `: DocShape` annotation which loses type info)
 
 	/** Task metadata (id, title, status, timestamps, etc.) */
-	get meta(): any {
+	get meta() {
 		return this.#taskDoc.meta;
 	}
 
 	/** Tiptap editor content (managed by loro-prosemirror) */
-	get content(): any {
+	get content() {
 		return this.#taskDoc.content;
 	}
 
 	/** Comments keyed by CommentId */
-	get comments(): any {
+	get comments() {
 		return this.#taskDoc.comments;
 	}
 
 	/** Task artifacts (images, html, video) */
-	get artifacts(): any {
+	get artifacts() {
 		return this.#taskDoc.artifacts;
 	}
 
 	/** Task deliverables */
-	get deliverables(): any {
+	get deliverables() {
 		return this.#taskDoc.deliverables;
 	}
 
 	/** Task timeline events */
-	get events(): any {
+	get events() {
 		return this.#taskDoc.events;
 	}
 
 	/** Linked pull requests */
-	get linkedPRs(): any {
+	get linkedPRs() {
 		return this.#taskDoc.linkedPRs;
 	}
 
 	/** Input requests from agent to user */
-	get inputRequests(): any {
+	get inputRequests() {
 		return this.#taskDoc.inputRequests;
 	}
 
 	/** Change snapshots keyed by MachineId */
-	get changeSnapshots(): any {
+	get changeSnapshots() {
 		return this.#taskDoc.changeSnapshots;
 	}
 
