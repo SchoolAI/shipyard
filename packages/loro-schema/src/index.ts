@@ -3,11 +3,35 @@
  */
 
 // Re-export Loro utilities for convenience
-export { type Infer, type InferMutableType, Shape } from "@loro-extended/change";
-
-// Shapes (for advanced use cases)
-export { TaskDocumentSchema, RoomSchema } from "./shapes.js";
-
+export {
+	type Infer,
+	type InferMutableType,
+	Shape,
+} from "@loro-extended/change";
+// Branded ID types
+export type {
+	ArtifactId,
+	CommentId,
+	DeliverableId,
+	EventId,
+	InputRequestId,
+	MachineId,
+	SessionToken,
+	TaskId,
+	ThreadId,
+} from "./ids.js";
+// ID generators
+export {
+	generateArtifactId,
+	generateCommentId,
+	generateDeliverableId,
+	generateEventId,
+	generateInputRequestId,
+	generateMachineId,
+	generateTaskId,
+	generateThreadId,
+} from "./ids.js";
+export { RoomDocument } from "./room-document.js";
 // Inferred types (primary types for consumers)
 export type {
 	ChangeSnapshot,
@@ -27,32 +51,7 @@ export type {
 	TaskLinkedPR,
 	TaskMeta,
 } from "./shapes.js";
-
-// Branded ID types
-export type {
-	ArtifactId,
-	CommentId,
-	DeliverableId,
-	EventId,
-	InputRequestId,
-	MachineId,
-	SessionToken,
-	TaskId,
-	ThreadId,
-} from "./ids.js";
-
-// ID generators
-export {
-	generateArtifactId,
-	generateCommentId,
-	generateDeliverableId,
-	generateEventId,
-	generateInputRequestId,
-	generateMachineId,
-	generateTaskId,
-	generateThreadId,
-} from "./ids.js";
-
+// Shapes (for advanced use cases)
+export { RoomSchema, TaskDocumentSchema } from "./shapes.js";
 // Document classes (primary API)
 export { TaskDocument } from "./task-document.js";
-export { RoomDocument } from "./room-document.js";

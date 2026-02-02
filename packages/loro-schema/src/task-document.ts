@@ -7,31 +7,43 @@
  * - Event logging helper
  */
 
-import type { LoroDoc } from "loro-crdt";
 import type { TypedDoc } from "@loro-extended/change";
-import type { TaskDocumentShape, RoomShape } from "./shapes.js";
 import type { TaskId } from "./ids.js";
+import type { RoomShape, TaskDocumentShape } from "./shapes.js";
 
 export class TaskDocument {
-	private readonly taskDoc: TypedDoc<TaskDocumentShape>;
-	private readonly roomDoc: TypedDoc<RoomShape>;
-	private readonly taskId: TaskId;
+	readonly #taskDoc: TypedDoc<TaskDocumentShape>;
+	readonly #roomDoc: TypedDoc<RoomShape>;
+	readonly #taskId: TaskId;
 
 	constructor(
 		taskDoc: TypedDoc<TaskDocumentShape>,
 		roomDoc: TypedDoc<RoomShape>,
 		taskId: TaskId,
 	) {
-		this.taskDoc = taskDoc;
-		this.roomDoc = roomDoc;
-		this.taskId = taskId;
+		this.#taskDoc = taskDoc;
+		this.#roomDoc = roomDoc;
+		this.#taskId = taskId;
 	}
 
 	// ═══════════════════════════════════════════════════════════════
 	// Container Accessors (Mutable)
 	// ═══════════════════════════════════════════════════════════════
 
-	// TODO: Implement container accessors
+	/** Get the task ID */
+	get taskId(): TaskId {
+		return this.#taskId;
+	}
+
+	/** Get the underlying typed task document */
+	get taskDoc(): TypedDoc<TaskDocumentShape> {
+		return this.#taskDoc;
+	}
+
+	/** Get the underlying typed room document */
+	get roomDoc(): TypedDoc<RoomShape> {
+		return this.#roomDoc;
+	}
 
 	// ═══════════════════════════════════════════════════════════════
 	// Cross-Doc Sync Methods

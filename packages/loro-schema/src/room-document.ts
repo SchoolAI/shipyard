@@ -11,17 +11,20 @@ import type { TypedDoc } from "@loro-extended/change";
 import type { RoomShape } from "./shapes.js";
 
 export class RoomDocument {
-	private readonly roomDoc: TypedDoc<RoomShape>;
+	readonly #roomDoc: TypedDoc<RoomShape>;
 
 	constructor(roomDoc: TypedDoc<RoomShape>) {
-		this.roomDoc = roomDoc;
+		this.#roomDoc = roomDoc;
 	}
 
 	// ═══════════════════════════════════════════════════════════════
 	// Container Accessors (Readonly)
 	// ═══════════════════════════════════════════════════════════════
 
-	// TODO: Implement container accessor
+	/** Get the underlying typed room document */
+	get roomDoc(): TypedDoc<RoomShape> {
+		return this.#roomDoc;
+	}
 
 	// ═══════════════════════════════════════════════════════════════
 	// Convenience Helpers
