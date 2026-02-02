@@ -8,7 +8,7 @@
  */
 
 import type { HandleWithEphemerals } from "@loro-extended/repo";
-import type { TaskDocumentShape, TaskEvent } from "@shipyard/loro-schema";
+import type { TaskDocumentShape } from "@shipyard/loro-schema";
 import { trackAgent } from "../agents/tracker.js";
 import { logger } from "../utils/logger.js";
 
@@ -20,7 +20,7 @@ export interface EventHandlerContext {
 	taskId: string;
 }
 
-/** Spawn requested event shape */
+/** Spawn requested event shape - using index signature for compatibility */
 export interface SpawnRequestedEvent {
 	type: "spawn_requested";
 	id: string;
@@ -32,6 +32,14 @@ export interface SpawnRequestedEvent {
 	prompt: string;
 	cwd: string;
 	requestedBy: string;
+	[key: string]: unknown;
+}
+
+/** Generic event type for type guards (single event, not array) */
+interface TaskEventItem {
+	type: string;
+	id: string;
+	[key: string]: unknown;
 }
 
 /** Track which spawn requests we've already processed */
@@ -40,13 +48,10 @@ const processedSpawnRequests = new Set<string>();
 /**
  * Check if an event is a spawn_requested event.
  */
-function isSpawnRequestedEvent(event: TaskEvent): event is SpawnRequestedEvent {
-	return (
-		typeof event === "object" &&
-		event !== null &&
-		"type" in event &&
-		event.type === "spawn_requested"
-	);
+function isSpawnRequestedEvent(
+	event: TaskEventItem,
+): event is SpawnRequestedEvent {
+	return event.type === "spawn_requested";
 }
 
 /**
@@ -168,7 +173,7 @@ export function subscribeToEvents(
 		// biome-ignore lint/suspicious/noExplicitAny: Loro TypedDoc typing requires any for subscribe callback
 		(events: any) => {
 			// Get all events as array
-			const eventArray = events.toArray() as TaskEvent[];
+			const eventArray = events.toArray() as TaskEventItem[];
 			const newEvents = eventArray.slice(lastSeenEventCount);
 			lastSeenEventCount = eventArray.length;
 

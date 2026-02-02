@@ -7,7 +7,6 @@
  */
 
 import {
-	type DocShape,
 	type Infer,
 	type InferMutableType,
 	Shape,
@@ -293,7 +292,7 @@ const TaskEventShape = Shape.plain.discriminatedUnion("type", {
  * Individual task document schema.
  * One doc per task, contains all task-specific state.
  */
-export const TaskDocumentSchema: DocShape = Shape.doc({
+export const TaskDocumentSchema = Shape.doc({
 	meta: Shape.struct({
 		id: Shape.plain.string(),
 		title: Shape.plain.string(),
@@ -462,7 +461,7 @@ export const TaskDocumentSchema: DocShape = Shape.doc({
  * Input requests live in TaskDocumentSchema, not here.
  * This schema is intentionally minimal - just enough for dashboard/discovery.
  */
-export const RoomSchema: DocShape = Shape.doc({
+export const RoomSchema = Shape.doc({
 	/**
 	 * Denormalized task metadata for dashboard display.
 	 * Updated by TaskDocument operations when task state changes.
@@ -529,7 +528,12 @@ export type MutableTaskDocument = InferMutableType<typeof TaskDocumentSchema>;
 export interface TaskMeta {
 	id: string;
 	title: string;
-	status: "draft" | "pending_review" | "changes_requested" | "in_progress" | "completed";
+	status:
+		| "draft"
+		| "pending_review"
+		| "changes_requested"
+		| "in_progress"
+		| "completed";
 	createdAt: number;
 	updatedAt: number;
 	completedAt: number | null;

@@ -98,77 +98,70 @@ export class TaskDocument {
 	// biome-ignore lint/suspicious/noExplicitAny: loro-extended bug workaround
 	get meta(): any {
 		// biome-ignore lint/suspicious/noExplicitAny: loro-extended bug workaround
-		return (this.#taskDoc as any).meta;
+		return this.#taskDoc.meta;
 	}
 
 	/** Tiptap editor content (managed by loro-prosemirror) */
 	// biome-ignore lint/suspicious/noExplicitAny: loro-extended bug workaround
 	get content(): any {
 		// biome-ignore lint/suspicious/noExplicitAny: loro-extended bug workaround
-		return (this.#taskDoc as any).content;
+		return this.#taskDoc.content;
 	}
 
 	/** Comments keyed by CommentId */
 	// biome-ignore lint/suspicious/noExplicitAny: loro-extended bug workaround
 	get comments(): any {
 		// biome-ignore lint/suspicious/noExplicitAny: loro-extended bug workaround
-		return (this.#taskDoc as any).comments;
+		return this.#taskDoc.comments;
 	}
 
 	/** Task artifacts (images, html, video) */
 	// biome-ignore lint/suspicious/noExplicitAny: loro-extended bug workaround
 	get artifacts(): any {
 		// biome-ignore lint/suspicious/noExplicitAny: loro-extended bug workaround
-		return (this.#taskDoc as any).artifacts;
+		return this.#taskDoc.artifacts;
 	}
 
 	/** Task deliverables */
 	// biome-ignore lint/suspicious/noExplicitAny: loro-extended bug workaround
 	get deliverables(): any {
 		// biome-ignore lint/suspicious/noExplicitAny: loro-extended bug workaround
-		return (this.#taskDoc as any).deliverables;
+		return this.#taskDoc.deliverables;
 	}
 
 	/** Task timeline events */
 	// biome-ignore lint/suspicious/noExplicitAny: loro-extended bug workaround
 	get events(): any {
 		// biome-ignore lint/suspicious/noExplicitAny: loro-extended bug workaround
-		return (this.#taskDoc as any).events;
+		return this.#taskDoc.events;
 	}
 
 	/** Linked pull requests */
 	// biome-ignore lint/suspicious/noExplicitAny: loro-extended bug workaround
 	get linkedPRs(): any {
 		// biome-ignore lint/suspicious/noExplicitAny: loro-extended bug workaround
-		return (this.#taskDoc as any).linkedPRs;
+		return this.#taskDoc.linkedPRs;
 	}
 
 	/** Input requests from agent to user */
 	// biome-ignore lint/suspicious/noExplicitAny: loro-extended bug workaround
 	get inputRequests(): any {
 		// biome-ignore lint/suspicious/noExplicitAny: loro-extended bug workaround
-		return (this.#taskDoc as any).inputRequests;
+		return this.#taskDoc.inputRequests;
 	}
 
 	/** Change snapshots keyed by MachineId */
 	// biome-ignore lint/suspicious/noExplicitAny: loro-extended bug workaround
 	get changeSnapshots(): any {
 		// biome-ignore lint/suspicious/noExplicitAny: loro-extended bug workaround
-		return (this.#taskDoc as any).changeSnapshots;
+		return this.#taskDoc.changeSnapshots;
 	}
 
-	/** Get the underlying LoroDoc for editor integration */
-	get loroDoc(): LoroDoc {
-		// Access the internal LoroDoc from the typed doc
-		// The TypedDoc proxy exposes loroDoc or _doc internally
-		// biome-ignore lint/suspicious/noExplicitAny: loro-extended bug workaround
-		const doc = this.#taskDoc as any;
-		if (doc.loroDoc) {
-			return doc.loroDoc;
-		}
-		// Fallback: try to get from loro() accessor
-		throw new Error("Cannot access loroDoc - use loro(taskDoc).doc instead");
-	}
+	/**
+	 * Get the underlying LoroDoc for editor integration.
+	 * Use loro(taskDoc.taskDoc).doc to access the raw LoroDoc.
+	 */
+	// Removed - callers should use loro() helper instead
 
 	// ═══════════════════════════════════════════════════════════════
 	// Cross-Doc Sync Methods
@@ -189,7 +182,7 @@ export class TaskDocument {
 	updateStatus(status: TaskStatus, actor: string): void {
 		const now = Date.now();
 		// biome-ignore lint/suspicious/noExplicitAny: loro-extended bug workaround
-		const taskMeta = (this.#taskDoc as any).meta;
+		const taskMeta = this.#taskDoc.meta;
 		const currentStatus = taskMeta.status as TaskStatus;
 
 		// Update task document meta
@@ -213,7 +206,7 @@ export class TaskDocument {
 		});
 
 		// Update room index (if entry exists)
-		const roomTaskIndex = (this.#roomDoc as any).taskIndex;
+		const roomTaskIndex = this.#roomDoc.taskIndex;
 		const taskIndexEntry = roomTaskIndex.get(this.#taskId);
 		if (taskIndexEntry) {
 			taskIndexEntry.status = status;
@@ -230,10 +223,10 @@ export class TaskDocument {
 	 * - roomDoc.taskIndex[taskId].lastUpdated
 	 */
 	syncTitleToRoom(): void {
-		const roomTaskIndex = (this.#roomDoc as any).taskIndex;
+		const roomTaskIndex = this.#roomDoc.taskIndex;
 		const taskIndexEntry = roomTaskIndex.get(this.#taskId);
 		if (taskIndexEntry) {
-			taskIndexEntry.title = (this.#taskDoc as any).meta.title;
+			taskIndexEntry.title = this.#taskDoc.meta.title;
 			taskIndexEntry.lastUpdated = Date.now();
 		}
 	}
@@ -248,12 +241,12 @@ export class TaskDocument {
 	 */
 	syncPendingRequestsToRoom(): void {
 		// Check if any input requests have pending status
-		const requests = (this.#taskDoc as any).inputRequests.toJSON();
+		const requests = this.#taskDoc.inputRequests.toJSON();
 		const hasPending = requests.some(
 			(req: { status: string }) => req.status === "pending",
 		);
 
-		const roomTaskIndex = (this.#roomDoc as any).taskIndex;
+		const roomTaskIndex = this.#roomDoc.taskIndex;
 		const taskIndexEntry = roomTaskIndex.get(this.#taskId);
 		if (taskIndexEntry) {
 			taskIndexEntry.hasPendingRequests = hasPending;
@@ -291,14 +284,14 @@ export class TaskDocument {
 			inboxWorthy,
 			inboxFor,
 			...data,
-		};
+		} as any; // Type system doesn't narrow discriminated union dynamically
 
 		// Add to task document events
-		(this.#taskDoc as any).events.push(event);
+		this.#taskDoc.events.push(event);
 
 		// If inbox-worthy, also add to room index inboxEvents
 		if (inboxWorthy) {
-			const roomTaskIndex = (this.#roomDoc as any).taskIndex;
+			const roomTaskIndex = this.#roomDoc.taskIndex;
 			const taskIndexEntry = roomTaskIndex.get(this.#taskId);
 			if (taskIndexEntry) {
 				taskIndexEntry.inboxEvents.push(event);

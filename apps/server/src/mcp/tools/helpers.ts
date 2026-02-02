@@ -4,11 +4,19 @@
  */
 
 import { timingSafeEqual } from "node:crypto";
-import type { TaskDocument, TaskMeta } from "@shipyard/loro-schema";
+import {
+	RoomSchema,
+	TaskDocument,
+	TaskDocumentSchema,
+	type TaskId,
+	type TaskMeta,
+} from "@shipyard/loro-schema";
+import { getRepo } from "../../loro/repo.js";
+import { logger } from "../../utils/logger.js";
 import { hashSessionToken } from "./session-token.js";
 
-// TODO: Import from Loro repo when available
-// import { getRepo } from '../../loro/repo.js'
+/** Well-known room document ID */
+const ROOM_DOC_ID = "room";
 
 /** --- Response Helpers --- */
 
@@ -36,26 +44,122 @@ export type TaskDocumentResult =
  * Returns the TaskDocument wrapper and metadata.
  */
 export async function getTaskDocument(
-	_taskId: string,
+	taskId: string,
 ): Promise<TaskDocumentResult> {
-	// TODO: Implement using Loro repo
-	// const repo = getRepo()
-	// const taskDoc = await repo.open(taskId, TaskDocumentSchema)
-	// const roomDoc = await repo.open(ROOM_DOC_ID, RoomSchema)
-	// const doc = new TaskDocument(taskDoc, roomDoc, taskId as TaskId)
-	// const meta = doc.meta.toJSON()
-	// return { success: true, doc, meta }
-	throw new Error("Not implemented - Loro repo integration pending");
+	try {
+		const repo = getRepo();
+
+		/** Get the task document handle - Loro Repo uses get() not open() */
+		const taskHandle = repo.get(taskId, TaskDocumentSchema);
+
+		/** Check if document exists by checking if it has been loaded */
+		if (!repo.has(taskId)) {
+			return {
+				success: false,
+				error: `Task "${taskId}" not found. Check the task ID and try again.`,
+			};
+		}
+
+		/** Get the room document handle for cross-doc operations */
+		const roomHandle = repo.get(ROOM_DOC_ID, RoomSchema);
+
+		/** Create TaskDocument wrapper using the typed doc from handles */
+		const doc = new TaskDocument(
+			taskHandle.doc,
+			roomHandle.doc,
+			taskId as TaskId,
+		);
+
+		/** Extract metadata as plain object */
+		// biome-ignore lint/suspicious/noExplicitAny: Loro typing workaround
+		const metaContainer = (taskHandle.doc as any).meta;
+		const meta: TaskMeta = {
+			id: metaContainer.id ?? taskId,
+			title: metaContainer.title ?? "",
+			status: metaContainer.status ?? "draft",
+			createdAt: metaContainer.createdAt ?? Date.now(),
+			updatedAt: metaContainer.updatedAt ?? Date.now(),
+			completedAt: metaContainer.completedAt ?? null,
+			completedBy: metaContainer.completedBy ?? null,
+			ownerId: metaContainer.ownerId ?? null,
+			sessionTokenHash: metaContainer.sessionTokenHash ?? "",
+			epoch: metaContainer.epoch ?? 1,
+			repo: metaContainer.repo ?? null,
+			tags: metaContainer.tags?.toJSON?.() ?? [],
+			archivedAt: metaContainer.archivedAt ?? null,
+			archivedBy: metaContainer.archivedBy ?? null,
+		};
+
+		logger.debug({ taskId }, "Task document loaded");
+
+		return { success: true, doc, meta };
+	} catch (error) {
+		const message = error instanceof Error ? error.message : "Unknown error";
+		logger.error({ taskId, error: message }, "Failed to get task document");
+		return {
+			success: false,
+			error: `Failed to load task "${taskId}": ${message}`,
+		};
+	}
 }
 
 /**
  * Get or create a task document (for creating new tasks).
+ * The Loro repo's get() method creates the doc if it doesn't exist.
  */
 export async function getOrCreateTaskDocument(
-	_taskId: string,
+	taskId: string,
 ): Promise<TaskDocumentResult> {
-	// TODO: Implement using Loro repo with create option
-	throw new Error("Not implemented - Loro repo integration pending");
+	try {
+		const repo = getRepo();
+
+		/** Get or create the task document handle */
+		const taskHandle = repo.get(taskId, TaskDocumentSchema);
+
+		/** Get or create the room document handle for cross-doc operations */
+		const roomHandle = repo.get(ROOM_DOC_ID, RoomSchema);
+
+		/** Create TaskDocument wrapper using the typed doc from handles */
+		const doc = new TaskDocument(
+			taskHandle.doc,
+			roomHandle.doc,
+			taskId as TaskId,
+		);
+
+		/** Extract metadata as plain object (may be empty for new docs) */
+		// biome-ignore lint/suspicious/noExplicitAny: Loro typing workaround
+		const metaContainer = (taskHandle.doc as any).meta;
+		const meta: TaskMeta = {
+			id: metaContainer.id ?? taskId,
+			title: metaContainer.title ?? "",
+			status: metaContainer.status ?? "draft",
+			createdAt: metaContainer.createdAt ?? Date.now(),
+			updatedAt: metaContainer.updatedAt ?? Date.now(),
+			completedAt: metaContainer.completedAt ?? null,
+			completedBy: metaContainer.completedBy ?? null,
+			ownerId: metaContainer.ownerId ?? null,
+			sessionTokenHash: metaContainer.sessionTokenHash ?? "",
+			epoch: metaContainer.epoch ?? 1,
+			repo: metaContainer.repo ?? null,
+			tags: metaContainer.tags?.toJSON?.() ?? [],
+			archivedAt: metaContainer.archivedAt ?? null,
+			archivedBy: metaContainer.archivedBy ?? null,
+		};
+
+		logger.debug({ taskId }, "Task document opened/created");
+
+		return { success: true, doc, meta };
+	} catch (error) {
+		const message = error instanceof Error ? error.message : "Unknown error";
+		logger.error(
+			{ taskId, error: message },
+			"Failed to get/create task document",
+		);
+		return {
+			success: false,
+			error: `Failed to create task "${taskId}": ${message}`,
+		};
+	}
 }
 
 /** --- Session Token Verification --- */

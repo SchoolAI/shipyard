@@ -578,8 +578,8 @@ importers:
   packages/loro-schema:
     dependencies:
       '@loro-extended/change':
-        specifier: ^5.3.0
-        version: 5.3.0(loro-crdt@1.10.5)
+        specifier: file:../../../loro-extended/packages/change
+        version: file:../loro-extended/packages/change(loro-crdt@1.10.5)
       lz-string:
         specifier: ^1.5.0
         version: 1.5.0
@@ -2109,6 +2109,11 @@ packages:
     peerDependencies:
       loro-crdt: ^1.10.3
 
+  '@loro-extended/change@file:../loro-extended/packages/change':
+    resolution: {directory: ../loro-extended/packages/change, type: directory}
+    peerDependencies:
+      loro-crdt: ^1.10.3
+
   '@loro-extended/repo@5.3.0':
     resolution: {integrity: sha512-dQsfMPz+DeK4t9JBEEMUnz2OfhqDKn6PZlgVrxCocLriQHAQNJA4mU374uYuocgztSRIUFGmOqPkAToIVpDdHA==}
     peerDependencies:
@@ -3084,7 +3089,6 @@ packages:
 
   '@roamhq/wrtc-linux-x64@0.9.1':
     resolution: {integrity: sha512-LuhzPdMM3i8vs/ifdj1F1pjpX2OhJSCWdh03UQXjRHoX+Fi1oJXiZRwKoVKu1BbsKCYfJ8m9jZB1ZU4Lhi8yHw==}
-    cpu: [x64]
     os: [linux]
 
   '@roamhq/wrtc-win32-x64@0.9.1':
@@ -8216,6 +8220,10 @@ snapshots:
       - loro-crdt
 
   '@loro-extended/change@5.3.0(loro-crdt@1.10.5)':
+    dependencies:
+      loro-crdt: 1.10.5
+
+  '@loro-extended/change@file:../loro-extended/packages/change(loro-crdt@1.10.5)':
     dependencies:
       loro-crdt: 1.10.5
 

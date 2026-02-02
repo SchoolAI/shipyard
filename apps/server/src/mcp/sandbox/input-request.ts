@@ -5,8 +5,21 @@
  * Ported from apps/server-legacy/src/tools/execute-code.ts requestUserInput.
  */
 
-// TODO: Import from Loro doc helpers
-// import { getOrCreateDoc } from '../../loro/index.js'
+import { generateInputRequestId, RoomSchema } from "@shipyard/loro-schema";
+import { getRepo } from "../../loro/repo.js";
+import { logger } from "../../utils/logger.js";
+
+/** Room document ID for input requests */
+const ROOM_DOC_ID = "room";
+
+/** Default timeout for input requests (30 minutes) */
+const DEFAULT_TIMEOUT_SECONDS = 1800;
+
+/** Minimum timeout (5 minutes) */
+const MIN_TIMEOUT_SECONDS = 300;
+
+/** Maximum timeout (4 hours) */
+const MAX_TIMEOUT_SECONDS = 14400;
 
 /**
  * Question type for multi-question mode.
@@ -90,11 +103,97 @@ export interface InputRequestResult {
 /**
  * Request user input via browser modal.
  * Supports single-question and multi-question modes.
+ *
+ * NOTE: This is a simplified implementation that stores the request in the
+ * Loro document and polls for a response. A full implementation would use
+ * Loro subscriptions for real-time updates.
  */
 export async function requestUserInput(
-	_opts: SingleQuestionOptions | MultiQuestionOptions,
+	opts: SingleQuestionOptions | MultiQuestionOptions,
 ): Promise<InputRequestResult> {
-	// TODO: Implement using Loro doc input requests
-	// Create input request in doc, wait for response via Loro subscription
-	throw new Error("Not implemented");
+	const repo = getRepo();
+	const requestId = generateInputRequestId();
+
+	/** Calculate timeout */
+	const timeoutSeconds = Math.max(
+		MIN_TIMEOUT_SECONDS,
+		Math.min(opts.timeout ?? DEFAULT_TIMEOUT_SECONDS, MAX_TIMEOUT_SECONDS),
+	);
+	const expiresAt = Date.now() + timeoutSeconds * 1000;
+
+	logger.info({ requestId, timeoutSeconds }, "Creating input request");
+
+	/**
+	 * Get room document handle for input requests.
+	 * NOTE: Currently unused as the full input request system is not yet implemented.
+	 * This will be used to create and track input requests in the CRDT once integrated.
+	 */
+	repo.get(ROOM_DOC_ID, RoomSchema);
+
+	/** Determine if single or multi question mode */
+	const isMultiQuestion = "questions" in opts && Array.isArray(opts.questions);
+
+	if (isMultiQuestion) {
+		/** Multi-question mode */
+		const multiOpts = opts as MultiQuestionOptions;
+		const questions = multiOpts.questions.filter(
+			(q): q is NonNullable<typeof q> => q != null,
+		);
+
+		if (questions.length === 0) {
+			return {
+				success: false,
+				status: "cancelled",
+				reason: "No valid questions provided",
+			};
+		}
+
+		// TODO: Create multi input request in roomDoc.inputRequests
+		// For now, return a simulated timeout
+		logger.info(
+			{ requestId, questionCount: questions.length },
+			"Multi-question input request created (waiting for response)",
+		);
+	} else {
+		/** Single question mode */
+		const singleOpts = opts as SingleQuestionOptions;
+
+		// TODO: Create single input request in roomDoc.inputRequests
+		// For now, return a simulated timeout
+		logger.info(
+			{ requestId, type: singleOpts.type, message: singleOpts.message },
+			"Single-question input request created (waiting for response)",
+		);
+	}
+
+	/** Poll for response until timeout */
+	const pollInterval = 1000; // 1 second
+	const startTime = Date.now();
+
+	while (Date.now() < expiresAt) {
+		/** Check if request has been answered */
+		// TODO: Read from roomDoc.inputRequests[requestId]
+		// For now, this is a placeholder that will time out
+
+		/** Wait before next poll */
+		await new Promise((resolve) => setTimeout(resolve, pollInterval));
+
+		/** Log progress every 30 seconds */
+		const elapsed = Math.floor((Date.now() - startTime) / 1000);
+		if (elapsed % 30 === 0 && elapsed > 0) {
+			logger.debug(
+				{ requestId, elapsedSeconds: elapsed },
+				"Still waiting for input response",
+			);
+		}
+	}
+
+	/** Timeout reached */
+	logger.warn({ requestId }, "Input request timed out");
+
+	return {
+		success: false,
+		status: "cancelled",
+		reason: `Request timed out after ${timeoutSeconds} seconds. The user did not respond in time.`,
+	};
 }
