@@ -436,6 +436,12 @@ export const TaskIndexEntrySchema = z.object({
 	hasPendingRequests: z.boolean(),
 	lastUpdated: TimestampSchema,
 	createdAt: TimestampSchema,
+	/** Per-task read tracking for inbox: username -> timestamp */
+	viewedBy: z.record(z.string(), TimestampSchema),
+	/** Per-task event read tracking for inbox: eventId -> username -> timestamp */
+	eventViewedBy: z.record(z.string(), z.record(z.string(), TimestampSchema)),
+	/** Inbox-worthy events (denormalized from TaskDocument.events) */
+	inboxEvents: z.array(TaskEventSchema),
 });
 
 /** Synced file change schema */
