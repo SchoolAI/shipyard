@@ -44,11 +44,17 @@ export class RoomDocument {
 	 * all tasks since TaskIndex doesn't track archived status.
 	 */
 	getTasks(_options?: GetTasksOptions): TaskIndexEntry[] {
-		const taskIndex = this.#roomDoc.taskIndex.toJSON();
+		const taskIndex = this.#roomDoc.taskIndex.toJSON() as unknown as Record<
+			string,
+			TaskIndexEntry
+		>;
 		const tasks = Object.values(taskIndex);
 
 		// Sort by lastUpdated descending (most recent first)
-		return tasks.sort((a, b) => b.lastUpdated - a.lastUpdated);
+		return tasks.sort(
+			(a: TaskIndexEntry, b: TaskIndexEntry) =>
+				(b.lastUpdated as unknown as number) - (a.lastUpdated as unknown as number),
+		);
 	}
 
 	/**
