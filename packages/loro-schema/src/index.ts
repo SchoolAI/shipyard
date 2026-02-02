@@ -31,14 +31,11 @@ export {
 	generateTaskId,
 	generateThreadId,
 } from "./ids.js";
-export { RoomDocument, type GetTasksOptions } from "./room-document.js";
+export { RoomDocument, type GetTasksOptions } from "./room/document.js";
 // Inferred types (primary types for consumers)
 export type {
 	ChangeSnapshot,
-	MutableRoom,
 	MutableTaskDocument,
-	Room,
-	RoomShape,
 	SyncedFileChange,
 	TaskArtifact,
 	TaskComment,
@@ -46,12 +43,18 @@ export type {
 	TaskDocument as TaskDocumentType,
 	TaskDocumentShape,
 	TaskEvent,
-	TaskIndexEntry,
 	TaskInputRequest,
 	TaskLinkedPR,
 	TaskMeta,
-} from "./shapes.js";
+} from "./task/schema.js";
+export type {
+	MutableRoom,
+	Room,
+	RoomShape,
+	TaskIndexEntry,
+} from "./room/schema.js";
 // Shapes (for advanced use cases)
-export { RoomSchema, TaskDocumentSchema } from "./shapes.js";
+export { RoomSchema } from "./room/schema.js";
+export { TaskDocumentSchema } from "./task/schema.js";
 // Document classes (primary API)
-export { TaskDocument } from "./task-document.js";
+export { TaskDocument } from "./task/document.js";

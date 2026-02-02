@@ -1,9 +1,7 @@
 /**
- * Loro Shape definitions for Shipyard.
+ * Task document schema and types.
  *
- * Two document types:
- * 1. Task document (one per task)
- * 2. Global room document (one per room)
+ * Defines the Loro shape for individual task documents.
  */
 
 import {
@@ -12,6 +10,7 @@ import {
 	type InferMutableType,
 	Shape,
 } from "@loro-extended/change";
+import { TaskEventShape } from "../internal/event-shape.js";
 
 /**
  * Base fields shared across all comment types.
@@ -25,22 +24,6 @@ const CommentBaseFields = {
 	createdAt: Shape.plain.number(),
 	resolved: Shape.plain.boolean(),
 	inReplyTo: Shape.plain.string().nullable(),
-} as const;
-
-/**
- * Base fields shared across all event types.
- * Used by: All 20+ event variants
- */
-const EventBaseFields = {
-	id: Shape.plain.string(),
-	actor: Shape.plain.string(),
-	timestamp: Shape.plain.number(),
-	inboxWorthy: Shape.plain.boolean().nullable(),
-	inboxFor: Shape.plain.union([
-		Shape.plain.string(),
-		Shape.plain.array(Shape.plain.string()),
-		Shape.plain.null(),
-	]),
 } as const;
 
 /**
@@ -150,143 +133,6 @@ const SyncedFileChangeShape = Shape.plain.struct({
 	status: Shape.plain.string("added", "modified", "deleted", "renamed"),
 	patch: Shape.plain.string(),
 	staged: Shape.plain.boolean(),
-});
-
-/**
- * Task event discriminated union shape.
- * Shared between TaskDocumentSchema.events and RoomSchema.taskIndex.inboxEvents.
- */
-const TaskEventShape = Shape.plain.discriminatedUnion("type", {
-	task_created: Shape.plain.struct({
-		type: Shape.plain.string("task_created"),
-		...EventBaseFields,
-	}),
-	status_changed: Shape.plain.struct({
-		type: Shape.plain.string("status_changed"),
-		...EventBaseFields,
-		fromStatus: Shape.plain.string(),
-		toStatus: Shape.plain.string(),
-	}),
-	completed: Shape.plain.struct({
-		type: Shape.plain.string("completed"),
-		...EventBaseFields,
-	}),
-	task_archived: Shape.plain.struct({
-		type: Shape.plain.string("task_archived"),
-		...EventBaseFields,
-	}),
-	task_unarchived: Shape.plain.struct({
-		type: Shape.plain.string("task_unarchived"),
-		...EventBaseFields,
-	}),
-	approved: Shape.plain.struct({
-		type: Shape.plain.string("approved"),
-		...EventBaseFields,
-		message: Shape.plain.string().nullable(),
-	}),
-	changes_requested: Shape.plain.struct({
-		type: Shape.plain.string("changes_requested"),
-		...EventBaseFields,
-		message: Shape.plain.string().nullable(),
-	}),
-	comment_added: Shape.plain.struct({
-		type: Shape.plain.string("comment_added"),
-		...EventBaseFields,
-		commentId: Shape.plain.string(),
-		threadId: Shape.plain.string().nullable(),
-		preview: Shape.plain.string().nullable(),
-	}),
-	comment_resolved: Shape.plain.struct({
-		type: Shape.plain.string("comment_resolved"),
-		...EventBaseFields,
-		commentId: Shape.plain.string(),
-		threadId: Shape.plain.string().nullable(),
-	}),
-	artifact_uploaded: Shape.plain.struct({
-		type: Shape.plain.string("artifact_uploaded"),
-		...EventBaseFields,
-		artifactId: Shape.plain.string(),
-		filename: Shape.plain.string(),
-		artifactType: Shape.plain.string().nullable(),
-	}),
-	deliverable_linked: Shape.plain.struct({
-		type: Shape.plain.string("deliverable_linked"),
-		...EventBaseFields,
-		deliverableId: Shape.plain.string(),
-		artifactId: Shape.plain.string(),
-		deliverableText: Shape.plain.string().nullable(),
-	}),
-	pr_linked: Shape.plain.struct({
-		type: Shape.plain.string("pr_linked"),
-		...EventBaseFields,
-		prNumber: Shape.plain.number(),
-		title: Shape.plain.string().nullable(),
-	}),
-	content_edited: Shape.plain.struct({
-		type: Shape.plain.string("content_edited"),
-		...EventBaseFields,
-		summary: Shape.plain.string().nullable(),
-	}),
-	input_request_created: Shape.plain.struct({
-		type: Shape.plain.string("input_request_created"),
-		...EventBaseFields,
-		requestId: Shape.plain.string(),
-		message: Shape.plain.string(),
-		isBlocker: Shape.plain.boolean().nullable(),
-	}),
-	input_request_answered: Shape.plain.struct({
-		type: Shape.plain.string("input_request_answered"),
-		...EventBaseFields,
-		requestId: Shape.plain.string(),
-	}),
-	input_request_declined: Shape.plain.struct({
-		type: Shape.plain.string("input_request_declined"),
-		...EventBaseFields,
-		requestId: Shape.plain.string(),
-	}),
-	input_request_cancelled: Shape.plain.struct({
-		type: Shape.plain.string("input_request_cancelled"),
-		...EventBaseFields,
-		requestId: Shape.plain.string(),
-	}),
-	agent_activity: Shape.plain.struct({
-		type: Shape.plain.string("agent_activity"),
-		...EventBaseFields,
-		message: Shape.plain.string(),
-		isBlocker: Shape.plain.boolean().nullable(),
-	}),
-	title_changed: Shape.plain.struct({
-		type: Shape.plain.string("title_changed"),
-		...EventBaseFields,
-		fromTitle: Shape.plain.string(),
-		toTitle: Shape.plain.string(),
-	}),
-	spawn_requested: Shape.plain.struct({
-		type: Shape.plain.string("spawn_requested"),
-		...EventBaseFields,
-		targetMachineId: Shape.plain.string(),
-		prompt: Shape.plain.string(),
-		cwd: Shape.plain.string(),
-		requestedBy: Shape.plain.string(),
-	}),
-	spawn_started: Shape.plain.struct({
-		type: Shape.plain.string("spawn_started"),
-		...EventBaseFields,
-		requestId: Shape.plain.string(),
-		pid: Shape.plain.number(),
-	}),
-	spawn_completed: Shape.plain.struct({
-		type: Shape.plain.string("spawn_completed"),
-		...EventBaseFields,
-		requestId: Shape.plain.string(),
-		exitCode: Shape.plain.number(),
-	}),
-	spawn_failed: Shape.plain.struct({
-		type: Shape.plain.string("spawn_failed"),
-		...EventBaseFields,
-		requestId: Shape.plain.string(),
-		error: Shape.plain.string(),
-	}),
 });
 
 /**
@@ -455,59 +301,6 @@ export const TaskDocumentSchema: DocShape = Shape.doc({
 	),
 }) satisfies DocShape;
 
-/**
- * Room document schema.
- * One doc per room (Personal or Collab), contains task index for dashboard.
- *
- * Input requests live in TaskDocumentSchema, not here.
- * This schema is intentionally minimal - just enough for dashboard/discovery.
- */
-export const RoomSchema: DocShape = Shape.doc({
-	/**
-	 * Denormalized task metadata for dashboard display.
-	 * Updated by TaskDocument operations when task state changes.
-	 *
-	 * Using Record keyed by taskId for O(1) lookups instead of O(n) list scans.
-	 * Includes viewedBy tracking nested per-task.
-	 */
-	taskIndex: Shape.record(
-		Shape.struct({
-			taskId: Shape.plain.string(),
-			title: Shape.plain.string(),
-			status: Shape.plain.string(
-				"draft",
-				"pending_review",
-				"changes_requested",
-				"in_progress",
-				"completed",
-			),
-			ownerId: Shape.plain.string(),
-			hasPendingRequests: Shape.plain.boolean(),
-			lastUpdated: Shape.plain.number(),
-			createdAt: Shape.plain.number(),
-
-			/**
-			 * Per-task read tracking for inbox: username → timestamp
-			 */
-			viewedBy: Shape.record(Shape.plain.number()),
-
-			/**
-			 * Per-task event read tracking for inbox: eventId → username → timestamp
-			 */
-			eventViewedBy: Shape.record(Shape.record(Shape.plain.number())),
-
-			/**
-			 * Inbox-worthy events for this task (denormalized from TaskDocument.events).
-			 * Only includes events with inboxWorthy: true.
-			 * Synced by TaskDocument.logEvent() when event is inbox-worthy.
-			 *
-			 * This enables building inbox view without loading full task documents.
-			 */
-			inboxEvents: Shape.list(TaskEventShape),
-		}),
-	),
-});
-
 export type TaskDocumentShape = typeof TaskDocumentSchema;
 export type TaskDocument = Infer<typeof TaskDocumentSchema>;
 export type MutableTaskDocument = InferMutableType<typeof TaskDocumentSchema>;
@@ -542,7 +335,3 @@ export type SyncedFileChange = {
 	patch: string;
 	staged: boolean;
 };
-export type RoomShape = typeof RoomSchema;
-export type Room = Infer<typeof RoomSchema>;
-export type MutableRoom = InferMutableType<typeof RoomSchema>;
-export type TaskIndexEntry = Infer<typeof RoomSchema.shapes.taskIndex>;

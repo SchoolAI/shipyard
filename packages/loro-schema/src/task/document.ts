@@ -9,9 +9,10 @@
 
 import type { TypedDoc } from "@loro-extended/change";
 import type { LoroDoc } from "loro-crdt";
-import { generateEventId } from "./ids.js";
-import type { EventId, TaskId } from "./ids.js";
-import type { RoomShape, TaskDocumentShape } from "./shapes.js";
+import { generateEventId } from "../ids.js";
+import type { EventId, TaskId } from "../ids.js";
+import type { RoomShape } from "../room/schema.js";
+import type { TaskDocumentShape } from "./schema.js";
 
 /** Task status values */
 export type TaskStatus =

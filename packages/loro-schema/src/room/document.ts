@@ -8,8 +8,8 @@
  */
 
 import type { TypedDoc } from "@loro-extended/change";
-import type { EventId, TaskId } from "./ids.js";
-import type { RoomShape, TaskIndexEntry } from "./shapes.js";
+import type { EventId, TaskId } from "../ids.js";
+import type { RoomShape, TaskIndexEntry } from "./schema.js";
 
 export interface GetTasksOptions {
 	/** Include archived tasks (default: false) */
