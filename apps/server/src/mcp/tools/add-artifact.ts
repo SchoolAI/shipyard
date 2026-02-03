@@ -7,9 +7,13 @@
  * @see docs/whips/daemon-mcp-server-merge.md#mcp-tools
  */
 
-import { readFile } from "node:fs/promises";
 import { generateArtifactId } from "@shipyard/loro-schema";
 import { z } from "zod";
+import {
+	type ContentSource,
+	resolveArtifactContent,
+	validateArtifactType,
+} from "../../utils/artifact-helpers.js";
 import {
 	GitHubAuthError,
 	isGitHubConfigured,
@@ -27,9 +31,6 @@ import {
 
 /** Tool name constant */
 const TOOL_NAME = "add_artifact";
-
-/** Artifact types */
-type ArtifactType = "html" | "image" | "video";
 
 /** Input Schema - base fields */
 const AddArtifactInputBase = z.object({
@@ -64,68 +65,16 @@ const AddArtifactInput = z.discriminatedUnion("source", [
 ]);
 
 /**
- * Validates that the artifact type matches the file extension.
+ * Convert Zod-parsed input to ContentSource type.
  */
-function validateArtifactType(type: ArtifactType, filename: string): void {
-	const ext = filename.split(".").pop()?.toLowerCase();
-
-	const validExtensions: Record<ArtifactType, string[]> = {
-		html: ["html", "htm"],
-		image: ["png", "jpg", "jpeg", "gif", "webp", "svg"],
-		video: ["mp4", "webm", "mov", "avi"],
-	};
-
-	const valid = validExtensions[type];
-	if (!valid || !ext || !valid.includes(ext)) {
-		throw new Error(
-			`Invalid file extension for artifact type '${type}'.\n\n` +
-				`Expected: ${valid?.join(", ") || "unknown"}\n` +
-				`Got: ${ext || "no extension"}`,
-		);
-	}
-}
-
-/**
- * Resolve artifact content from various sources.
- */
-async function resolveArtifactContent(
-	input: z.infer<typeof AddArtifactInput>,
-): Promise<
-	{ success: true; content: string } | { success: false; error: string }
-> {
+function toContentSource(input: z.infer<typeof AddArtifactInput>): ContentSource {
 	switch (input.source) {
-		case "file": {
-			try {
-				const fileBuffer = await readFile(input.filePath);
-				return { success: true, content: fileBuffer.toString("base64") };
-			} catch (error) {
-				const message =
-					error instanceof Error ? error.message : "Unknown error";
-				return { success: false, error: `Failed to read file: ${message}` };
-			}
-		}
-
-		case "url": {
-			try {
-				const response = await fetch(input.contentUrl);
-				if (!response.ok) {
-					throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-				}
-				const arrayBuffer = await response.arrayBuffer();
-				return {
-					success: true,
-					content: Buffer.from(arrayBuffer).toString("base64"),
-				};
-			} catch (error) {
-				const message =
-					error instanceof Error ? error.message : "Unknown error";
-				return { success: false, error: `Failed to fetch URL: ${message}` };
-			}
-		}
-
-		case "base64": {
-			return { success: true, content: input.content };
-		}
+		case "file":
+			return { source: "file", filePath: input.filePath };
+		case "url":
+			return { source: "url", contentUrl: input.contentUrl };
+		case "base64":
+			return { source: "base64", content: input.content };
 	}
 }
 
@@ -229,7 +178,7 @@ ARTIFACT TYPES:
 			}
 
 			/** Resolve content */
-			const contentResult = await resolveArtifactContent(input);
+			const contentResult = await resolveArtifactContent(toContentSource(input));
 			if (!contentResult.success) {
 				return errorResponse(contentResult.error);
 			}

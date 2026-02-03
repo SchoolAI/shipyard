@@ -55,6 +55,18 @@ function createMockServer(): {
 	};
 }
 
+/** Get a registered tool or throw an error if not found */
+function getTool(
+	server: ReturnType<typeof createMockServer>,
+	name: string,
+): { schema: ToolInputSchema; handler: ToolHandler } {
+	const tool = server.registeredTools.get(name);
+	if (!tool) {
+		throw new Error(`Tool "${name}" not registered`);
+	}
+	return tool;
+}
+
 function createMockTaskDoc(overrides?: { ownerId?: string | null }) {
 	return {
 		meta: {
@@ -89,9 +101,7 @@ describe("MCP Tool: regenerate_session_token", () => {
 
 			const server = createMockServer();
 			registerRegenerateSessionTokenTool(server as unknown as McpServer);
-			const { handler } = server.registeredTools.get(
-				"regenerate_session_token",
-			)!;
+			const { handler } = getTool(server, "regenerate_session_token");
 
 			const result = await handler({ taskId: "task-123" });
 
@@ -110,9 +120,7 @@ describe("MCP Tool: regenerate_session_token", () => {
 
 			const server = createMockServer();
 			registerRegenerateSessionTokenTool(server as unknown as McpServer);
-			const { handler } = server.registeredTools.get(
-				"regenerate_session_token",
-			)!;
+			const { handler } = getTool(server, "regenerate_session_token");
 
 			await handler({ taskId: "task-123" });
 
@@ -131,9 +139,7 @@ describe("MCP Tool: regenerate_session_token", () => {
 
 			const server = createMockServer();
 			registerRegenerateSessionTokenTool(server as unknown as McpServer);
-			const { handler } = server.registeredTools.get(
-				"regenerate_session_token",
-			)!;
+			const { handler } = getTool(server, "regenerate_session_token");
 
 			await handler({ taskId: "task-123" });
 
@@ -152,9 +158,7 @@ describe("MCP Tool: regenerate_session_token", () => {
 
 			const server = createMockServer();
 			registerRegenerateSessionTokenTool(server as unknown as McpServer);
-			const { handler } = server.registeredTools.get(
-				"regenerate_session_token",
-			)!;
+			const { handler } = getTool(server, "regenerate_session_token");
 
 			const result1 = await handler({ taskId: "task-123" });
 			const token1 = result1.content[0]?.text?.match(
@@ -182,9 +186,7 @@ describe("MCP Tool: regenerate_session_token", () => {
 
 			const server = createMockServer();
 			registerRegenerateSessionTokenTool(server as unknown as McpServer);
-			const { handler } = server.registeredTools.get(
-				"regenerate_session_token",
-			)!;
+			const { handler } = getTool(server, "regenerate_session_token");
 
 			const result = await handler({ taskId: "task-123" });
 			const token = result.content[0]?.text?.match(

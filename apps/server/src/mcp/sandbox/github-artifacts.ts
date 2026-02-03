@@ -1,85 +1,39 @@
 /**
- * GitHub artifact upload helpers.
+ * GitHub artifact upload helpers for sandbox.
  *
- * Ported from apps/server-legacy/src/github-artifacts.ts
- * Handles uploading artifacts to GitHub's plan-artifacts branch.
+ * This file re-exports from consolidated helper modules and provides
+ * sandbox-specific upload functionality.
+ *
+ * Uses consolidated helpers from:
+ * - ../../utils/artifact-helpers.ts (parseRepoString)
+ * - ../../utils/github-helpers.ts (getOctokit, isGitHubConfigured, etc.)
+ *
+ * @see docs/engineering-standards.md (3+ Rule)
  */
 
-import { execSync } from "node:child_process";
-import { Octokit } from "@octokit/rest";
-import { parseEnv } from "../../env.js";
+import { parseRepoString } from "../../utils/artifact-helpers.js";
+import {
+	GitHubAuthError,
+	getCurrentBranch,
+	getErrorStatus,
+	getOctokit,
+	isAuthError,
+	isGitHubConfigured,
+	tryAutoLinkPR,
+} from "../../utils/github-helpers.js";
 import { logger } from "../../utils/logger.js";
 
 const ARTIFACTS_BRANCH = "plan-artifacts";
 
-/**
- * Parse a "owner/repo" string into owner and repo components.
- */
-export function parseRepoString(repo: string): {
-	owner: string;
-	repoName: string;
-} {
-	const parts = repo.split("/");
-	if (parts.length !== 2 || !parts[0] || !parts[1]) {
-		throw new Error(`Invalid repo format: "${repo}". Expected "owner/repo".`);
-	}
-	return { owner: parts[0], repoName: parts[1] };
-}
-
-/**
- * Get GitHub token from environment.
- */
-function getGitHubToken(): string | null {
-	const env = parseEnv();
-	return env.GITHUB_TOKEN ?? null;
-}
-
-/**
- * Check if GitHub is configured (has valid token).
- */
-export function isGitHubConfigured(): boolean {
-	return !!getGitHubToken();
-}
-
-/**
- * Custom error class for GitHub authentication failures.
- */
-export class GitHubAuthError extends Error {
-	constructor(message: string) {
-		super(message);
-		this.name = "GitHubAuthError";
-	}
-}
-
-/**
- * Get Octokit instance with token.
- * Returns null if no token is available.
- */
-export function getOctokit(): Octokit | null {
-	const token = getGitHubToken();
-	if (!token) {
-		return null;
-	}
-	return new Octokit({ auth: token });
-}
-
-/**
- * Extract status code from an error if it has one.
- */
-function getErrorStatus(error: unknown): number | undefined {
-	if (!error || typeof error !== "object") return undefined;
-	const record = Object.fromEntries(Object.entries(error));
-	const status = record.status;
-	return typeof status === "number" ? status : undefined;
-}
-
-/**
- * Check if an error is an authentication error (401/403).
- */
-function isAuthError(error: unknown): boolean {
-	const status = getErrorStatus(error);
-	return status === 401 || status === 403;
-}
+/** Re-export for backwards compatibility */
+export {
+	GitHubAuthError,
+	getCurrentBranch,
+	getOctokit,
+	isGitHubConfigured,
+	parseRepoString,
+	tryAutoLinkPR,
+};
 
 /**
  * Ensures the artifacts branch exists.
@@ -223,94 +177,5 @@ export async function uploadArtifact(
 			);
 		}
 		throw error;
-	}
-}
-
-/**
- * Get the current git branch name.
- * Returns null if not on a branch or git is unavailable.
- */
-export function getCurrentBranch(): string | null {
-	try {
-		const branch = execSync("git branch --show-current", {
-			encoding: "utf-8",
-			timeout: 5000,
-			stdio: ["pipe", "pipe", "pipe"],
-		}).trim();
-
-		if (!branch) {
-			logger.debug("Not on a branch (possibly detached HEAD)");
-			return null;
-		}
-
-		return branch;
-	} catch (error) {
-		logger.debug({ error }, "Could not detect current git branch");
-		return null;
-	}
-}
-
-/**
- * Try to auto-link a PR from the current git branch.
- * Returns PR info if found, null otherwise.
- */
-export async function tryAutoLinkPR(repo: string): Promise<{
-	prNumber: number;
-	url: string;
-	status: "draft" | "open" | "merged" | "closed";
-	branch: string;
-	title: string;
-} | null> {
-	const branch = getCurrentBranch();
-	if (!branch) return null;
-
-	const octokit = getOctokit();
-	if (!octokit) {
-		logger.debug("No GitHub token available for PR lookup");
-		return null;
-	}
-
-	const { owner, repoName } = parseRepoString(repo);
-
-	try {
-		/** Look for open PRs from this branch */
-		const { data: prs } = await octokit.pulls.list({
-			owner,
-			repo: repoName,
-			head: `${owner}:${branch}`,
-			state: "open",
-		});
-
-		if (prs.length === 0) {
-			logger.debug({ branch, repo }, "No open PR found on branch");
-			return null;
-		}
-
-		/** Use the first (most recent) PR */
-		const pr = prs[0];
-		if (!pr) return null;
-
-		/** Determine PR status */
-		let status: "draft" | "open" | "merged" | "closed";
-		if (pr.merged_at) {
-			status = "merged";
-		} else if (pr.state === "closed") {
-			status = "closed";
-		} else if (pr.draft) {
-			status = "draft";
-		} else {
-			status = "open";
-		}
-
-		return {
-			prNumber: pr.number,
-			url: pr.html_url,
-			status,
-			branch,
-			title: pr.title,
-		};
-	} catch (error) {
-		logger.warn({ error, repo, branch }, "Failed to lookup PR from GitHub");
-		return null;
 	}
 }

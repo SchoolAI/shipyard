@@ -50,6 +50,18 @@ function createMockServer(): {
 	};
 }
 
+/** Get a registered tool or throw an error if not found */
+function getTool(
+	server: ReturnType<typeof createMockServer>,
+	name: string,
+): { schema: ToolInputSchema; handler: ToolHandler } {
+	const tool = server.registeredTools.get(name);
+	if (!tool) {
+		throw new Error(`Tool "${name}" not registered`);
+	}
+	return tool;
+}
+
 describe("MCP Tool: execute_code", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
@@ -66,7 +78,7 @@ describe("MCP Tool: execute_code", () => {
 
 			const server = createMockServer();
 			registerExecuteCodeTool(server as unknown as McpServer);
-			const { handler } = server.registeredTools.get("execute_code")!;
+			const { handler } = getTool(server, "execute_code");
 
 			await handler({ code: "return { result: 'test' }" });
 
@@ -78,7 +90,7 @@ describe("MCP Tool: execute_code", () => {
 
 			const server = createMockServer();
 			registerExecuteCodeTool(server as unknown as McpServer);
-			const { handler } = server.registeredTools.get("execute_code")!;
+			const { handler } = getTool(server, "execute_code");
 
 			await handler({ code: "await createTask({ title: 'Test' })" });
 
@@ -90,7 +102,7 @@ describe("MCP Tool: execute_code", () => {
 
 			const server = createMockServer();
 			registerExecuteCodeTool(server as unknown as McpServer);
-			const { handler } = server.registeredTools.get("execute_code")!;
+			const { handler } = getTool(server, "execute_code");
 
 			const result = await handler({ code: "return { taskId: 'test-123' }" });
 
@@ -102,7 +114,7 @@ describe("MCP Tool: execute_code", () => {
 
 			const server = createMockServer();
 			registerExecuteCodeTool(server as unknown as McpServer);
-			const { handler } = server.registeredTools.get("execute_code")!;
+			const { handler } = getTool(server, "execute_code");
 
 			const result = await handler({ code: "console.log('Hello')" });
 
@@ -117,7 +129,7 @@ describe("MCP Tool: execute_code", () => {
 
 			const server = createMockServer();
 			registerExecuteCodeTool(server as unknown as McpServer);
-			const { handler } = server.registeredTools.get("execute_code")!;
+			const { handler } = getTool(server, "execute_code");
 
 			const result = await handler({ code: "fs.readFileSync('./test')" });
 
@@ -130,7 +142,7 @@ describe("MCP Tool: execute_code", () => {
 
 			const server = createMockServer();
 			registerExecuteCodeTool(server as unknown as McpServer);
-			const { handler } = server.registeredTools.get("execute_code")!;
+			const { handler } = getTool(server, "execute_code");
 
 			const result = await handler({ code: "child_process.exec('ls')" });
 
@@ -148,7 +160,7 @@ describe("MCP Tool: execute_code", () => {
 
 			const server = createMockServer();
 			registerExecuteCodeTool(server as unknown as McpServer);
-			const { handler } = server.registeredTools.get("execute_code")!;
+			const { handler } = getTool(server, "execute_code");
 
 			const result = await handler({ code: "while(true) {}" });
 
@@ -161,7 +173,7 @@ describe("MCP Tool: execute_code", () => {
 
 			const server = createMockServer();
 			registerExecuteCodeTool(server as unknown as McpServer);
-			const { handler } = server.registeredTools.get("execute_code")!;
+			const { handler } = getTool(server, "execute_code");
 
 			// Just verify execution completes
 			const result = await handler({ code: "const x = []" });
@@ -182,7 +194,7 @@ describe("MCP Tool: execute_code", () => {
 
 			const server = createMockServer();
 			registerExecuteCodeTool(server as unknown as McpServer);
-			const { handler } = server.registeredTools.get("execute_code")!;
+			const { handler } = getTool(server, "execute_code");
 
 			const result = await handler({ code: "const x =" });
 
@@ -202,7 +214,7 @@ describe("MCP Tool: execute_code", () => {
 
 			const server = createMockServer();
 			registerExecuteCodeTool(server as unknown as McpServer);
-			const { handler } = server.registeredTools.get("execute_code")!;
+			const { handler } = getTool(server, "execute_code");
 
 			const result = await handler({ code: "const obj = null; obj.x" });
 
@@ -221,7 +233,7 @@ describe("MCP Tool: execute_code", () => {
 
 			const server = createMockServer();
 			registerExecuteCodeTool(server as unknown as McpServer);
-			const { handler } = server.registeredTools.get("execute_code")!;
+			const { handler } = getTool(server, "execute_code");
 
 			const result = await handler({
 				code: "await Promise.reject(new Error('fail'))",

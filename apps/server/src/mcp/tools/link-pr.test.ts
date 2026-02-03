@@ -61,6 +61,18 @@ function createMockServer(): {
 	};
 }
 
+/** Get a registered tool or throw an error if not found */
+function getTool(
+	server: ReturnType<typeof createMockServer>,
+	name: string,
+): { schema: ToolInputSchema; handler: ToolHandler } {
+	const tool = server.registeredTools.get(name);
+	if (!tool) {
+		throw new Error(`Tool "${name}" not registered`);
+	}
+	return tool;
+}
+
 function createMockTaskDoc() {
 	const linkedPRs: unknown[] = [];
 	return {
@@ -114,7 +126,7 @@ describe("MCP Tool: link_pr", () => {
 
 			const server = createMockServer();
 			registerLinkPRTool(server as unknown as McpServer);
-			const { handler } = server.registeredTools.get("link_pr")!;
+			const { handler } = getTool(server, "link_pr");
 
 			const result = await handler({
 				taskId: "task-123",
@@ -148,7 +160,7 @@ describe("MCP Tool: link_pr", () => {
 
 			const server = createMockServer();
 			registerLinkPRTool(server as unknown as McpServer);
-			const { handler } = server.registeredTools.get("link_pr")!;
+			const { handler } = getTool(server, "link_pr");
 
 			await handler({
 				taskId: "task-123",
@@ -188,7 +200,7 @@ describe("MCP Tool: link_pr", () => {
 
 			const server = createMockServer();
 			registerLinkPRTool(server as unknown as McpServer);
-			const { handler } = server.registeredTools.get("link_pr")!;
+			const { handler } = getTool(server, "link_pr");
 
 			await handler({
 				taskId: "task-123",
@@ -210,7 +222,7 @@ describe("MCP Tool: link_pr", () => {
 		it("requires PR number", async () => {
 			const server = createMockServer();
 			registerLinkPRTool(server as unknown as McpServer);
-			const { handler } = server.registeredTools.get("link_pr")!;
+			const { handler } = getTool(server, "link_pr");
 
 			await expect(
 				handler({ taskId: "task-123", sessionToken: "token" }),
@@ -231,7 +243,7 @@ describe("MCP Tool: link_pr", () => {
 
 			const server = createMockServer();
 			registerLinkPRTool(server as unknown as McpServer);
-			const { handler } = server.registeredTools.get("link_pr")!;
+			const { handler } = getTool(server, "link_pr");
 
 			const result = await handler({
 				taskId: "task-123",
@@ -266,7 +278,7 @@ describe("MCP Tool: link_pr", () => {
 
 			const server = createMockServer();
 			registerLinkPRTool(server as unknown as McpServer);
-			const { handler } = server.registeredTools.get("link_pr")!;
+			const { handler } = getTool(server, "link_pr");
 
 			await handler({
 				taskId: "task-123",

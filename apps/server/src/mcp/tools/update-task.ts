@@ -22,19 +22,22 @@ import {
 /** Tool name constant */
 const TOOL_NAME = "update_task";
 
+/** Valid task statuses - must match TaskStatus type */
+const TASK_STATUSES = [
+	"draft",
+	"pending_review",
+	"changes_requested",
+	"in_progress",
+	"completed",
+] as const satisfies readonly TaskStatus[];
+
 /** Input Schema */
 const UpdateTaskInput = z.object({
 	taskId: z.string().describe("The task ID to update"),
 	sessionToken: z.string().describe("Session token from create_task"),
 	title: z.string().optional().describe("New title"),
 	status: z
-		.enum([
-			"draft",
-			"pending_review",
-			"changes_requested",
-			"in_progress",
-			"completed",
-		])
+		.enum(TASK_STATUSES)
 		.optional()
 		.describe("New status"),
 	tags: z
@@ -118,7 +121,7 @@ STATUSES:
 
 			/** Handle status change */
 			if (input.status && input.status !== existingMeta.status) {
-				doc.updateStatus(input.status as TaskStatus, actorName);
+				doc.updateStatus(input.status, actorName);
 			}
 
 			/** Update title if provided */

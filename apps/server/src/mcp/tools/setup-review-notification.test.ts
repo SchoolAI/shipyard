@@ -46,6 +46,18 @@ function createMockServer(): {
 	};
 }
 
+/** Get a registered tool or throw an error if not found */
+function getTool(
+	server: ReturnType<typeof createMockServer>,
+	name: string,
+): { schema: ToolInputSchema; handler: ToolHandler } {
+	const tool = server.registeredTools.get(name);
+	if (!tool) {
+		throw new Error(`Tool "${name}" not registered`);
+	}
+	return tool;
+}
+
 describe("MCP Tool: setup_review_notification", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
@@ -60,9 +72,7 @@ describe("MCP Tool: setup_review_notification", () => {
 		it("configures notification preferences (returns script)", async () => {
 			const server = createMockServer();
 			registerSetupReviewNotificationTool(server as unknown as McpServer);
-			const { handler } = server.registeredTools.get(
-				"setup_review_notification",
-			)!;
+			const { handler } = getTool(server, "setup_review_notification");
 
 			const result = await handler({
 				taskId: "task-123",
@@ -76,9 +86,7 @@ describe("MCP Tool: setup_review_notification", () => {
 		it("stores settings (includes port in script)", async () => {
 			const server = createMockServer();
 			registerSetupReviewNotificationTool(server as unknown as McpServer);
-			const { handler } = server.registeredTools.get(
-				"setup_review_notification",
-			)!;
+			const { handler } = getTool(server, "setup_review_notification");
 
 			const result = await handler({
 				taskId: "task-123",
@@ -95,9 +103,7 @@ describe("MCP Tool: setup_review_notification", () => {
 		it("validates notification type (uses default poll interval)", async () => {
 			const server = createMockServer();
 			registerSetupReviewNotificationTool(server as unknown as McpServer);
-			const { handler } = server.registeredTools.get(
-				"setup_review_notification",
-			)!;
+			const { handler } = getTool(server, "setup_review_notification");
 
 			const result = await handler({ taskId: "task-123" });
 
@@ -108,9 +114,7 @@ describe("MCP Tool: setup_review_notification", () => {
 		it("validates target settings (script contains task ID)", async () => {
 			const server = createMockServer();
 			registerSetupReviewNotificationTool(server as unknown as McpServer);
-			const { handler } = server.registeredTools.get(
-				"setup_review_notification",
-			)!;
+			const { handler } = getTool(server, "setup_review_notification");
 
 			const result = await handler({
 				taskId: "my-special-task-id",

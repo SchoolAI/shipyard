@@ -78,6 +78,18 @@ function createMockServer(): {
 	};
 }
 
+/** Get a registered tool or throw an error if not found */
+function getTool(
+	server: ReturnType<typeof createMockServer>,
+	name: string,
+): { schema: ToolInputSchema; handler: ToolHandler } {
+	const tool = server.registeredTools.get(name);
+	if (!tool) {
+		throw new Error(`Tool "${name}" not registered`);
+	}
+	return tool;
+}
+
 function createMockTaskDoc() {
 	const artifacts: unknown[] = [];
 	const deliverables = [
@@ -127,7 +139,7 @@ describe("MCP Tool: add_artifact", () => {
 
 			const server = createMockServer();
 			registerAddArtifactTool(server as unknown as McpServer);
-			const { handler } = server.registeredTools.get("add_artifact")!;
+			const { handler } = getTool(server, "add_artifact");
 
 			const result = await handler({
 				taskId: "task-123",
@@ -152,7 +164,7 @@ describe("MCP Tool: add_artifact", () => {
 
 			const server = createMockServer();
 			registerAddArtifactTool(server as unknown as McpServer);
-			const { handler } = server.registeredTools.get("add_artifact")!;
+			const { handler } = getTool(server, "add_artifact");
 
 			const result = await handler({
 				taskId: "task-123",
@@ -178,7 +190,7 @@ describe("MCP Tool: add_artifact", () => {
 
 			const server = createMockServer();
 			registerAddArtifactTool(server as unknown as McpServer);
-			const { handler } = server.registeredTools.get("add_artifact")!;
+			const { handler } = getTool(server, "add_artifact");
 
 			await handler({
 				taskId: "task-123",
@@ -212,7 +224,7 @@ describe("MCP Tool: add_artifact", () => {
 
 			const server = createMockServer();
 			registerAddArtifactTool(server as unknown as McpServer);
-			const { handler } = server.registeredTools.get("add_artifact")!;
+			const { handler } = getTool(server, "add_artifact");
 
 			await handler({
 				taskId: "task-123",
@@ -231,7 +243,7 @@ describe("MCP Tool: add_artifact", () => {
 		it("requires artifact type", async () => {
 			const server = createMockServer();
 			registerAddArtifactTool(server as unknown as McpServer);
-			const { handler } = server.registeredTools.get("add_artifact")!;
+			const { handler } = getTool(server, "add_artifact");
 
 			await expect(
 				handler({
@@ -254,7 +266,7 @@ describe("MCP Tool: add_artifact", () => {
 
 			const server = createMockServer();
 			registerAddArtifactTool(server as unknown as McpServer);
-			const { handler } = server.registeredTools.get("add_artifact")!;
+			const { handler } = getTool(server, "add_artifact");
 
 			const result = await handler({
 				taskId: "task-123",
@@ -281,7 +293,7 @@ describe("MCP Tool: add_artifact", () => {
 
 			const server = createMockServer();
 			registerAddArtifactTool(server as unknown as McpServer);
-			const { handler } = server.registeredTools.get("add_artifact")!;
+			const { handler } = getTool(server, "add_artifact");
 
 			await handler({
 				taskId: "task-123",

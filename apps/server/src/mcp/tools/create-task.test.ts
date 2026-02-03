@@ -78,6 +78,18 @@ function createMockServer(): {
 	};
 }
 
+/** Get a registered tool or throw an error if not found */
+function getTool(
+	server: ReturnType<typeof createMockServer>,
+	name: string,
+): { schema: ToolInputSchema; handler: ToolHandler } {
+	const tool = server.registeredTools.get(name);
+	if (!tool) {
+		throw new Error(`Tool "${name}" not registered`);
+	}
+	return tool;
+}
+
 function createMockTaskDoc() {
 	const events: unknown[] = [];
 	const meta = {
@@ -136,7 +148,7 @@ describe("MCP Tool: create_task", () => {
 
 			const server = createMockServer();
 			registerCreateTaskTool(server as unknown as McpServer);
-			const { handler } = server.registeredTools.get("create_task")!;
+			const { handler } = getTool(server, "create_task");
 
 			const result = await handler({
 				title: "Test Task",
@@ -160,7 +172,7 @@ describe("MCP Tool: create_task", () => {
 
 			const server = createMockServer();
 			registerCreateTaskTool(server as unknown as McpServer);
-			const { handler } = server.registeredTools.get("create_task")!;
+			const { handler } = getTool(server, "create_task");
 
 			const result1 = await handler({ title: "Task 1", content: "Content 1" });
 			const result2 = await handler({ title: "Task 2", content: "Content 2" });
@@ -186,7 +198,7 @@ describe("MCP Tool: create_task", () => {
 
 			const server = createMockServer();
 			registerCreateTaskTool(server as unknown as McpServer);
-			const { handler } = server.registeredTools.get("create_task")!;
+			const { handler } = getTool(server, "create_task");
 
 			await handler({ title: "Test Task", content: "Content" });
 
@@ -203,7 +215,7 @@ describe("MCP Tool: create_task", () => {
 
 			const server = createMockServer();
 			registerCreateTaskTool(server as unknown as McpServer);
-			const { handler } = server.registeredTools.get("create_task")!;
+			const { handler } = getTool(server, "create_task");
 
 			await handler({ title: "My Task", content: "My content" });
 
@@ -218,7 +230,7 @@ describe("MCP Tool: create_task", () => {
 		it("requires title", async () => {
 			const server = createMockServer();
 			registerCreateTaskTool(server as unknown as McpServer);
-			const { handler } = server.registeredTools.get("create_task")!;
+			const { handler } = getTool(server, "create_task");
 
 			await expect(handler({ content: "No title" })).rejects.toThrow();
 		});
@@ -233,7 +245,7 @@ describe("MCP Tool: create_task", () => {
 
 			const server = createMockServer();
 			registerCreateTaskTool(server as unknown as McpServer);
-			const { handler } = server.registeredTools.get("create_task")!;
+			const { handler } = getTool(server, "create_task");
 
 			const result = await handler({
 				title: "Test",
@@ -260,7 +272,7 @@ describe("MCP Tool: create_task", () => {
 
 			const server = createMockServer();
 			registerCreateTaskTool(server as unknown as McpServer);
-			const { handler } = server.registeredTools.get("create_task")!;
+			const { handler } = getTool(server, "create_task");
 
 			await handler({ title: "Test Task", content: "Content" });
 

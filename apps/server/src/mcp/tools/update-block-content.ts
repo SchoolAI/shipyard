@@ -8,6 +8,7 @@
  */
 
 import { z } from "zod";
+import { assertNever } from "../../utils/assert-never.js";
 import { getGitHubUsername } from "../../utils/identity.js";
 import { logger } from "../../utils/logger.js";
 import type { McpServer } from "../index.js";
@@ -169,6 +170,9 @@ Example with deliverables:
 							`Would replace all content (${op.content.length} chars)`,
 						);
 						break;
+
+					default:
+						return assertNever(op);
 				}
 			}
 

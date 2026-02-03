@@ -60,6 +60,18 @@ function createMockServer(): {
 	};
 }
 
+/** Get a registered tool or throw an error if not found */
+function getTool(
+	server: ReturnType<typeof createMockServer>,
+	name: string,
+): { schema: ToolInputSchema; handler: ToolHandler } {
+	const tool = server.registeredTools.get(name);
+	if (!tool) {
+		throw new Error(`Tool "${name}" not registered`);
+	}
+	return tool;
+}
+
 function createMockTaskDoc() {
 	return {
 		meta: {
@@ -93,7 +105,7 @@ describe("MCP Tool: update_block_content", () => {
 
 			const server = createMockServer();
 			registerUpdateBlockContentTool(server as unknown as McpServer);
-			const { handler } = server.registeredTools.get("update_block_content")!;
+			const { handler } = getTool(server, "update_block_content");
 
 			const result = await handler({
 				taskId: "task-123",
@@ -118,7 +130,7 @@ describe("MCP Tool: update_block_content", () => {
 
 			const server = createMockServer();
 			registerUpdateBlockContentTool(server as unknown as McpServer);
-			const { handler } = server.registeredTools.get("update_block_content")!;
+			const { handler } = getTool(server, "update_block_content");
 
 			const result = await handler({
 				taskId: "task-123",
@@ -143,7 +155,7 @@ describe("MCP Tool: update_block_content", () => {
 
 			const server = createMockServer();
 			registerUpdateBlockContentTool(server as unknown as McpServer);
-			const { handler } = server.registeredTools.get("update_block_content")!;
+			const { handler } = getTool(server, "update_block_content");
 
 			await handler({
 				taskId: "task-123",
@@ -165,7 +177,7 @@ describe("MCP Tool: update_block_content", () => {
 		it("requires block ID for update", async () => {
 			const server = createMockServer();
 			registerUpdateBlockContentTool(server as unknown as McpServer);
-			const { handler } = server.registeredTools.get("update_block_content")!;
+			const { handler } = getTool(server, "update_block_content");
 
 			await expect(
 				handler({
@@ -184,7 +196,7 @@ describe("MCP Tool: update_block_content", () => {
 
 			const server = createMockServer();
 			registerUpdateBlockContentTool(server as unknown as McpServer);
-			const { handler } = server.registeredTools.get("update_block_content")!;
+			const { handler } = getTool(server, "update_block_content");
 
 			const result = await handler({
 				taskId: "non-existent",
@@ -207,7 +219,7 @@ describe("MCP Tool: update_block_content", () => {
 
 			const server = createMockServer();
 			registerUpdateBlockContentTool(server as unknown as McpServer);
-			const { handler } = server.registeredTools.get("update_block_content")!;
+			const { handler } = getTool(server, "update_block_content");
 
 			await handler({
 				taskId: "task-123",

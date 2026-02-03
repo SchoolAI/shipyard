@@ -473,6 +473,22 @@ function getSessionTranscriptPath(
 }
 
 /**
+ * Type guard for A2A messages.
+ * Validates that an unknown value has the required A2AMessage structure.
+ */
+function isA2AMessage(msg: unknown): msg is A2AMessage {
+	if (typeof msg !== "object" || msg === null) {
+		return false;
+	}
+	const candidate = msg as Record<string, unknown>;
+	return (
+		typeof candidate.messageId === "string" &&
+		typeof candidate.role === "string" &&
+		Array.isArray(candidate.parts)
+	);
+}
+
+/**
  * Validate A2A messages.
  * Simple validation that checks required fields.
  */
@@ -485,17 +501,8 @@ function validateA2AMessages(messages: unknown[]): {
 
 	for (let i = 0; i < messages.length; i++) {
 		const msg = messages[i];
-		if (
-			typeof msg === "object" &&
-			msg !== null &&
-			"messageId" in msg &&
-			"role" in msg &&
-			"parts" in msg &&
-			typeof (msg as A2AMessage).messageId === "string" &&
-			typeof (msg as A2AMessage).role === "string" &&
-			Array.isArray((msg as A2AMessage).parts)
-		) {
-			valid.push(msg as A2AMessage);
+		if (isA2AMessage(msg)) {
+			valid.push(msg);
 		} else {
 			errors.push({
 				index: i,

@@ -125,13 +125,10 @@ export async function requestUserInput(
 	// and track input requests in the CRDT.
 	void repo; // Placeholder to avoid unused variable warning
 
-	/** Determine if single or multi question mode */
-	const isMultiQuestion = "questions" in opts && Array.isArray(opts.questions);
-
-	if (isMultiQuestion) {
+	/** Determine if single or multi question mode using type narrowing */
+	if ("questions" in opts) {
 		/** Multi-question mode */
-		const multiOpts = opts as MultiQuestionOptions;
-		const questions = multiOpts.questions.filter(
+		const questions = opts.questions.filter(
 			(q): q is NonNullable<typeof q> => q != null,
 		);
 
@@ -151,12 +148,10 @@ export async function requestUserInput(
 		);
 	} else {
 		/** Single question mode */
-		const singleOpts = opts as SingleQuestionOptions;
-
 		// TODO: Create single input request in roomDoc.inputRequests
 		// For now, return a simulated timeout
 		logger.info(
-			{ requestId, type: singleOpts.type, message: singleOpts.message },
+			{ requestId, type: opts.type, message: opts.message },
 			"Single-question input request created (waiting for response)",
 		);
 	}

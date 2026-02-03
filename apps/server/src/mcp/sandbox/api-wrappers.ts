@@ -6,7 +6,6 @@
  * Ported from apps/server-legacy/src/tools/execute-code.ts.
  */
 
-import { readFile } from "node:fs/promises";
 import {
 	generateArtifactId,
 	generateDeliverableId,
@@ -15,6 +14,16 @@ import {
 	type TaskMeta,
 } from "@shipyard/loro-schema";
 import { parseEnv } from "../../env.js";
+import {
+	type ContentSource,
+	resolveArtifactContent,
+	validateArtifactType,
+} from "../../utils/artifact-helpers.js";
+import {
+	GitHubAuthError,
+	isGitHubConfigured,
+	tryAutoLinkPR,
+} from "../../utils/github-helpers.js";
 import {
 	getGitHubUsername,
 	getRepositoryFullName,
@@ -29,114 +38,7 @@ import {
 	generateSessionToken,
 	hashSessionToken,
 } from "../tools/session-token.js";
-import {
-	GitHubAuthError,
-	isGitHubConfigured,
-	tryAutoLinkPR,
-	uploadArtifact as uploadToGitHub,
-} from "./github-artifacts.js";
-
-/** --- Content Resolution --- */
-
-type ContentSource =
-	| { source: "file"; filePath: string }
-	| { source: "url"; contentUrl: string }
-	| { source: "base64"; content: string };
-
-type ContentResult =
-	| { success: true; content: string }
-	| { success: false; error: string };
-
-/**
- * Resolves artifact content from various sources (file, url, base64).
- * Returns base64-encoded content or an error message.
- */
-async function resolveArtifactContent(
-	input: ContentSource,
-): Promise<ContentResult> {
-	switch (input.source) {
-		case "file": {
-			logger.info({ filePath: input.filePath }, "Reading file from path");
-			try {
-				const fileBuffer = await readFile(input.filePath);
-				return { success: true, content: fileBuffer.toString("base64") };
-			} catch (error) {
-				logger.error(
-					{ error, filePath: input.filePath },
-					"Failed to read file",
-				);
-				const message =
-					error instanceof Error ? error.message : "Unknown error";
-				return { success: false, error: `Failed to read file: ${message}` };
-			}
-		}
-
-		case "url": {
-			logger.info(
-				{ contentUrl: input.contentUrl },
-				"Fetching content from URL",
-			);
-			try {
-				const response = await fetch(input.contentUrl);
-				if (!response.ok) {
-					throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-				}
-				const arrayBuffer = await response.arrayBuffer();
-				return {
-					success: true,
-					content: Buffer.from(arrayBuffer).toString("base64"),
-				};
-			} catch (error) {
-				logger.error(
-					{ error, contentUrl: input.contentUrl },
-					"Failed to fetch URL",
-				);
-				const message =
-					error instanceof Error ? error.message : "Unknown error";
-				return { success: false, error: `Failed to fetch URL: ${message}` };
-			}
-		}
-
-		case "base64": {
-			return { success: true, content: input.content };
-		}
-	}
-}
-
-/** --- Artifact Type Validation --- */
-
-type ArtifactType = "html" | "image" | "video";
-
-/**
- * Validates that the artifact type matches the file extension.
- */
-function validateArtifactType(type: ArtifactType, filename: string): void {
-	const ext = filename.split(".").pop()?.toLowerCase();
-
-	const validExtensions: Record<ArtifactType, string[]> = {
-		html: ["html", "htm"],
-		image: ["png", "jpg", "jpeg", "gif", "webp", "svg"],
-		video: ["mp4", "webm", "mov", "avi"],
-	};
-
-	const valid = validExtensions[type];
-	if (!valid || !ext || !valid.includes(ext)) {
-		const suggestions: Record<ArtifactType, string> = {
-			html: "HTML is the primary format for test results, terminal output, code reviews, and structured data. Use self-contained HTML with inline CSS and base64 images.",
-			image:
-				'Images are for actual UI screenshots only. For terminal output or test results, use type: "html" instead.',
-			video:
-				'Videos are for browser automation flows and complex interactions. For static content, use type: "image" or "html".',
-		};
-
-		throw new Error(
-			`Invalid file extension for artifact type '${type}'.\n\n` +
-				`Expected: ${valid?.join(", ") || "unknown"}\n` +
-				`Got: ${ext || "no extension"}\n\n` +
-				`Tip: ${suggestions[type]}`,
-		);
-	}
-}
+import { uploadArtifact as uploadToGitHub } from "./github-artifacts.js";
 
 /** --- Markdown Parsing for Deliverables --- */
 
@@ -162,8 +64,8 @@ function extractDeliverablesFromMarkdown(
 	/** Match checkbox items with {#deliverable} marker */
 	const regex = /^\s*[-*]\s*\[\s*[xX ]?\s*\]\s*(.+?)\s*\{#deliverable\}\s*$/gm;
 
-	let match: RegExpExecArray | null;
-	while ((match = regex.exec(content)) !== null) {
+	let match: RegExpExecArray | null = regex.exec(content);
+	while (match !== null) {
 		const text = match[1]?.trim();
 		if (text) {
 			deliverables.push({
@@ -171,6 +73,7 @@ function extractDeliverablesFromMarkdown(
 				text,
 			});
 		}
+		match = regex.exec(content);
 	}
 
 	return deliverables;

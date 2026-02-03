@@ -8,6 +8,7 @@
  */
 
 import { z } from "zod";
+import { parseRepoString } from "../../utils/artifact-helpers.js";
 import { getGitHubUsername } from "../../utils/identity.js";
 import { logger } from "../../utils/logger.js";
 import type { McpServer } from "../index.js";
@@ -46,21 +47,6 @@ const GitHubPRResponseSchema = z.object({
 		ref: z.string(),
 	}),
 });
-
-/**
- * Parse repository string into owner and repo name.
- */
-function parseRepoString(repo: string): { owner: string; repoName: string } {
-	const parts = repo.split("/");
-	if (parts.length !== 2) {
-		throw new Error(`Invalid repo format: ${repo}. Expected owner/repo.`);
-	}
-	const [owner, repoName] = parts;
-	if (!owner || !repoName) {
-		throw new Error(`Invalid repo format: ${repo}. Expected owner/repo.`);
-	}
-	return { owner, repoName };
-}
 
 /**
  * Register the link_pr tool.

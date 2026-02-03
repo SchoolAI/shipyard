@@ -25,8 +25,10 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --noEmit",
-    "lint": "biome check src",
+    "lint": "biome check src && pnpm lint:comments && pnpm lint:typeassertions",
     "lint:fix": "biome check src --write",
+    "lint:comments": "eslint 'src/**/*.ts' --rule '@typescript-eslint/consistent-type-assertions: off' --report-unused-disable-directives-severity=off --max-warnings 0",
+    "lint:typeassertions": "eslint 'src/**/*.ts' --rule 'local/no-noisy-single-line-comments: off' --rule 'multiline-comment-style: off' --rule 'spaced-comment: off' --report-unused-disable-directives-severity=off --max-warnings 0",
     "analyze:fan-in": "tsx ../../scripts/analyze-fan-in.ts"
   },
   "dependencies": {

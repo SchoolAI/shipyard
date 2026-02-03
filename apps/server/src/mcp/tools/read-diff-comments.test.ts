@@ -52,6 +52,18 @@ function createMockServer(): {
 	};
 }
 
+/** Get a registered tool or throw an error if not found */
+function getTool(
+	server: ReturnType<typeof createMockServer>,
+	name: string,
+): { schema: ToolInputSchema; handler: ToolHandler } {
+	const tool = server.registeredTools.get(name);
+	if (!tool) {
+		throw new Error(`Tool "${name}" not registered`);
+	}
+	return tool;
+}
+
 function createMockTaskDoc(comments?: Record<string, unknown>) {
 	return {
 		meta: {
@@ -95,7 +107,7 @@ describe("MCP Tool: read_diff_comments", () => {
 
 			const server = createMockServer();
 			registerReadDiffCommentsTool(server as unknown as McpServer);
-			const { handler } = server.registeredTools.get("read_diff_comments")!;
+			const { handler } = getTool(server, "read_diff_comments");
 
 			const result = await handler({
 				taskId: "task-123",
@@ -126,7 +138,7 @@ describe("MCP Tool: read_diff_comments", () => {
 
 			const server = createMockServer();
 			registerReadDiffCommentsTool(server as unknown as McpServer);
-			const { handler } = server.registeredTools.get("read_diff_comments")!;
+			const { handler } = getTool(server, "read_diff_comments");
 
 			const result = await handler({
 				taskId: "task-123",
@@ -159,7 +171,7 @@ describe("MCP Tool: read_diff_comments", () => {
 
 			const server = createMockServer();
 			registerReadDiffCommentsTool(server as unknown as McpServer);
-			const { handler } = server.registeredTools.get("read_diff_comments")!;
+			const { handler } = getTool(server, "read_diff_comments");
 
 			const result = await handler({
 				taskId: "task-123",
@@ -180,7 +192,7 @@ describe("MCP Tool: read_diff_comments", () => {
 
 			const server = createMockServer();
 			registerReadDiffCommentsTool(server as unknown as McpServer);
-			const { handler } = server.registeredTools.get("read_diff_comments")!;
+			const { handler } = getTool(server, "read_diff_comments");
 
 			const result = await handler({
 				taskId: "task-123",
@@ -201,7 +213,7 @@ describe("MCP Tool: read_diff_comments", () => {
 
 			const server = createMockServer();
 			registerReadDiffCommentsTool(server as unknown as McpServer);
-			const { handler } = server.registeredTools.get("read_diff_comments")!;
+			const { handler } = getTool(server, "read_diff_comments");
 
 			const result = await handler({
 				taskId: "non-existent",
@@ -222,7 +234,7 @@ describe("MCP Tool: read_diff_comments", () => {
 
 			const server = createMockServer();
 			registerReadDiffCommentsTool(server as unknown as McpServer);
-			const { handler } = server.registeredTools.get("read_diff_comments")!;
+			const { handler } = getTool(server, "read_diff_comments");
 
 			const result = await handler({
 				taskId: "task-123",

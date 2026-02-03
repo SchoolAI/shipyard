@@ -60,6 +60,18 @@ function createMockServer(): {
 	};
 }
 
+/** Get a registered tool or throw an error if not found */
+function getTool(
+	server: ReturnType<typeof createMockServer>,
+	name: string,
+): { schema: ToolInputSchema; handler: ToolHandler } {
+	const tool = server.registeredTools.get(name);
+	if (!tool) {
+		throw new Error(`Tool "${name}" not registered`);
+	}
+	return tool;
+}
+
 function createMockTaskDoc() {
 	const events: unknown[] = [];
 	return {
@@ -97,7 +109,7 @@ describe("MCP Tool: post_update", () => {
 
 			const server = createMockServer();
 			registerPostUpdateTool(server as unknown as McpServer);
-			const { handler } = server.registeredTools.get("post_update")!;
+			const { handler } = getTool(server, "post_update");
 
 			const result = await handler({
 				taskId: "task-123",
@@ -119,7 +131,7 @@ describe("MCP Tool: post_update", () => {
 
 			const server = createMockServer();
 			registerPostUpdateTool(server as unknown as McpServer);
-			const { handler } = server.registeredTools.get("post_update")!;
+			const { handler } = getTool(server, "post_update");
 
 			await handler({
 				taskId: "task-123",
@@ -146,7 +158,7 @@ describe("MCP Tool: post_update", () => {
 
 			const server = createMockServer();
 			registerPostUpdateTool(server as unknown as McpServer);
-			const { handler } = server.registeredTools.get("post_update")!;
+			const { handler } = getTool(server, "post_update");
 
 			await handler({
 				taskId: "task-123",
@@ -167,7 +179,7 @@ describe("MCP Tool: post_update", () => {
 
 			const server = createMockServer();
 			registerPostUpdateTool(server as unknown as McpServer);
-			const { handler } = server.registeredTools.get("post_update")!;
+			const { handler } = getTool(server, "post_update");
 
 			await handler({
 				taskId: "task-123",
@@ -187,7 +199,7 @@ describe("MCP Tool: post_update", () => {
 		it("requires message content", async () => {
 			const server = createMockServer();
 			registerPostUpdateTool(server as unknown as McpServer);
-			const { handler } = server.registeredTools.get("post_update")!;
+			const { handler } = getTool(server, "post_update");
 
 			await expect(
 				handler({ taskId: "task-123", sessionToken: "token" }),
@@ -202,7 +214,7 @@ describe("MCP Tool: post_update", () => {
 
 			const server = createMockServer();
 			registerPostUpdateTool(server as unknown as McpServer);
-			const { handler } = server.registeredTools.get("post_update")!;
+			const { handler } = getTool(server, "post_update");
 
 			const result = await handler({
 				taskId: "non-existent",
@@ -225,7 +237,7 @@ describe("MCP Tool: post_update", () => {
 
 			const server = createMockServer();
 			registerPostUpdateTool(server as unknown as McpServer);
-			const { handler } = server.registeredTools.get("post_update")!;
+			const { handler } = getTool(server, "post_update");
 
 			await handler({
 				taskId: "task-123",

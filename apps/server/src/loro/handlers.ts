@@ -116,10 +116,11 @@ function isSpawnRequestedEvent(
  * Handle type for task documents.
  * Uses a simplified type to avoid complex generic constraint issues with DocShape.
  */
-// biome-ignore lint/suspicious/noExplicitAny: Loro TypedDoc typing requires simplified handle type
 type TaskDocHandle = {
+	// biome-ignore lint/suspicious/noExplicitAny: Loro TypedDoc typing requires simplified handle type
 	change: (fn: (doc: any) => void) => void;
 	subscribe: (
+		// biome-ignore lint/suspicious/noExplicitAny: Loro TypedDoc typing requires simplified handle type
 		selector: any,
 		callback: (events: { toArray: () => unknown[] }) => void,
 	) => () => void;

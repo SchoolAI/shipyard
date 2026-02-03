@@ -57,6 +57,18 @@ function createMockServer(): {
 	};
 }
 
+/** Get a registered tool or throw an error if not found */
+function getTool(
+	server: ReturnType<typeof createMockServer>,
+	name: string,
+): { schema: ToolInputSchema; handler: ToolHandler } {
+	const tool = server.registeredTools.get(name);
+	if (!tool) {
+		throw new Error(`Tool "${name}" not registered`);
+	}
+	return tool;
+}
+
 function createMockTaskDoc(comments?: Record<string, unknown>) {
 	const allComments = comments ?? {
 		"comment-1": {
@@ -107,7 +119,7 @@ describe("MCP Tool: reply_to_diff_comment", () => {
 
 			const server = createMockServer();
 			registerReplyToDiffCommentTool(server as unknown as McpServer);
-			const { handler } = server.registeredTools.get("reply_to_diff_comment")!;
+			const { handler } = getTool(server, "reply_to_diff_comment");
 
 			const result = await handler({
 				taskId: "task-123",
@@ -130,7 +142,7 @@ describe("MCP Tool: reply_to_diff_comment", () => {
 
 			const server = createMockServer();
 			registerReplyToDiffCommentTool(server as unknown as McpServer);
-			const { handler } = server.registeredTools.get("reply_to_diff_comment")!;
+			const { handler } = getTool(server, "reply_to_diff_comment");
 
 			await handler({
 				taskId: "task-123",
@@ -157,7 +169,7 @@ describe("MCP Tool: reply_to_diff_comment", () => {
 
 			const server = createMockServer();
 			registerReplyToDiffCommentTool(server as unknown as McpServer);
-			const { handler } = server.registeredTools.get("reply_to_diff_comment")!;
+			const { handler } = getTool(server, "reply_to_diff_comment");
 
 			const result = await handler({
 				taskId: "task-123",
@@ -176,7 +188,7 @@ describe("MCP Tool: reply_to_diff_comment", () => {
 		it("requires comment ID", async () => {
 			const server = createMockServer();
 			registerReplyToDiffCommentTool(server as unknown as McpServer);
-			const { handler } = server.registeredTools.get("reply_to_diff_comment")!;
+			const { handler } = getTool(server, "reply_to_diff_comment");
 
 			await expect(
 				handler({ taskId: "task-123", sessionToken: "token", body: "Reply" }),
@@ -186,7 +198,7 @@ describe("MCP Tool: reply_to_diff_comment", () => {
 		it("requires reply body", async () => {
 			const server = createMockServer();
 			registerReplyToDiffCommentTool(server as unknown as McpServer);
-			const { handler } = server.registeredTools.get("reply_to_diff_comment")!;
+			const { handler } = getTool(server, "reply_to_diff_comment");
 
 			await expect(
 				handler({
@@ -209,7 +221,7 @@ describe("MCP Tool: reply_to_diff_comment", () => {
 
 			const server = createMockServer();
 			registerReplyToDiffCommentTool(server as unknown as McpServer);
-			const { handler } = server.registeredTools.get("reply_to_diff_comment")!;
+			const { handler } = getTool(server, "reply_to_diff_comment");
 
 			const result = await handler({
 				taskId: "task-123",
@@ -232,7 +244,7 @@ describe("MCP Tool: reply_to_diff_comment", () => {
 
 			const server = createMockServer();
 			registerReplyToDiffCommentTool(server as unknown as McpServer);
-			const { handler } = server.registeredTools.get("reply_to_diff_comment")!;
+			const { handler } = getTool(server, "reply_to_diff_comment");
 
 			const result = await handler({
 				taskId: "task-123",

@@ -143,8 +143,9 @@ describe("Agent Spawner", () => {
 			const spawnArgs = mockSpawn.mock.calls[0]?.[1] as string[] | undefined;
 			expect(spawnArgs).toBeDefined();
 			expect(spawnArgs).toContain("-p");
-			const promptIndex = spawnArgs?.indexOf("-p");
-			expect(spawnArgs?.[promptIndex + 1]).toBe("Implement the feature");
+			if (!spawnArgs) throw new Error("spawnArgs should be defined");
+			const promptIndex = spawnArgs.indexOf("-p");
+			expect(spawnArgs[promptIndex + 1]).toBe("Implement the feature");
 		});
 
 		it("sets working directory to cwd", async () => {

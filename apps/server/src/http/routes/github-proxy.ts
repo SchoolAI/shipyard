@@ -20,6 +20,20 @@ export interface GitHubProxyError {
 }
 
 /**
+ * GitHub API error with optional status code.
+ */
+interface GitHubAPIError extends Error {
+	status?: number;
+}
+
+/**
+ * Type guard for GitHub API errors.
+ */
+function isGitHubAPIError(error: unknown): error is GitHubAPIError {
+	return error instanceof Error;
+}
+
+/**
  * Create GitHub proxy routes with injected dependencies.
  */
 export function createGitHubProxyRoutes(ctx: GitHubProxyContext) {
@@ -56,15 +70,20 @@ export function createGitHubProxyRoutes(ctx: GitHubProxyContext) {
 			const diff = await client.getPRDiff(repoInfo.owner, repoInfo.repo, prNum);
 			return c.text(diff);
 		} catch (error) {
-			const err = error as Error & { status?: number };
-			if (err.status === 404) {
+			if (isGitHubAPIError(error)) {
+				if (error.status === 404) {
+					return c.json<GitHubProxyError>(
+						{ code: "not_found", message: "PR not found" },
+						404,
+					);
+				}
 				return c.json<GitHubProxyError>(
-					{ code: "not_found", message: "PR not found" },
-					404,
+					{ code: "github_error", message: error.message || "GitHub API error" },
+					500,
 				);
 			}
 			return c.json<GitHubProxyError>(
-				{ code: "github_error", message: err.message || "GitHub API error" },
+				{ code: "github_error", message: "GitHub API error" },
 				500,
 			);
 		}
@@ -105,15 +124,20 @@ export function createGitHubProxyRoutes(ctx: GitHubProxyContext) {
 			);
 			return c.json<PRFile[]>(files);
 		} catch (error) {
-			const err = error as Error & { status?: number };
-			if (err.status === 404) {
+			if (isGitHubAPIError(error)) {
+				if (error.status === 404) {
+					return c.json<GitHubProxyError>(
+						{ code: "not_found", message: "PR not found" },
+						404,
+					);
+				}
 				return c.json<GitHubProxyError>(
-					{ code: "not_found", message: "PR not found" },
-					404,
+					{ code: "github_error", message: error.message || "GitHub API error" },
+					500,
 				);
 			}
 			return c.json<GitHubProxyError>(
-				{ code: "github_error", message: err.message || "GitHub API error" },
+				{ code: "github_error", message: "GitHub API error" },
 				500,
 			);
 		}

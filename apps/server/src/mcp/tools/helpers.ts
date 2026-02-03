@@ -67,7 +67,9 @@ export async function getTaskDocument(
 
 		/** Create TaskDocument wrapper using the typed doc from handles */
 		const doc = new TaskDocument(
+			// biome-ignore lint/suspicious/noExplicitAny: Loro DocShape constraint workaround
 			taskHandle.doc as any,
+			// biome-ignore lint/suspicious/noExplicitAny: Loro DocShape constraint workaround
 			roomHandle.doc as any,
 			taskId as TaskId,
 		);
@@ -125,7 +127,9 @@ export async function getOrCreateTaskDocument(
 
 		/** Create TaskDocument wrapper using the typed doc from handles */
 		const doc = new TaskDocument(
+			// biome-ignore lint/suspicious/noExplicitAny: Loro DocShape constraint workaround
 			taskHandle.doc as any,
+			// biome-ignore lint/suspicious/noExplicitAny: Loro DocShape constraint workaround
 			roomHandle.doc as any,
 			taskId as TaskId,
 		);

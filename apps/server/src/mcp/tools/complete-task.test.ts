@@ -57,6 +57,18 @@ function createMockServer(): {
 	};
 }
 
+/** Get a registered tool or throw an error if not found */
+function getTool(
+	server: ReturnType<typeof createMockServer>,
+	name: string,
+): { schema: ToolInputSchema; handler: ToolHandler } {
+	const tool = server.registeredTools.get(name);
+	if (!tool) {
+		throw new Error(`Tool "${name}" not registered`);
+	}
+	return tool;
+}
+
 function createMockTaskDoc(overrides?: {
 	status?: string;
 	hasArtifacts?: boolean;
@@ -103,7 +115,7 @@ describe("MCP Tool: complete_task", () => {
 
 			const server = createMockServer();
 			registerCompleteTaskTool(server as unknown as McpServer);
-			const { handler } = server.registeredTools.get("complete_task")!;
+			const { handler } = getTool(server, "complete_task");
 
 			await handler({
 				taskId: "task-123",
@@ -129,7 +141,7 @@ describe("MCP Tool: complete_task", () => {
 
 			const server = createMockServer();
 			registerCompleteTaskTool(server as unknown as McpServer);
-			const { handler } = server.registeredTools.get("complete_task")!;
+			const { handler } = getTool(server, "complete_task");
 
 			await handler({
 				taskId: "task-123",
@@ -152,7 +164,7 @@ describe("MCP Tool: complete_task", () => {
 
 			const server = createMockServer();
 			registerCompleteTaskTool(server as unknown as McpServer);
-			const { handler } = server.registeredTools.get("complete_task")!;
+			const { handler } = getTool(server, "complete_task");
 
 			const result = await handler({
 				taskId: "task-123",
@@ -169,7 +181,7 @@ describe("MCP Tool: complete_task", () => {
 		it("requires task ID", async () => {
 			const server = createMockServer();
 			registerCompleteTaskTool(server as unknown as McpServer);
-			const { handler } = server.registeredTools.get("complete_task")!;
+			const { handler } = getTool(server, "complete_task");
 
 			await expect(handler({ sessionToken: "token" })).rejects.toThrow();
 		});
@@ -182,7 +194,7 @@ describe("MCP Tool: complete_task", () => {
 
 			const server = createMockServer();
 			registerCompleteTaskTool(server as unknown as McpServer);
-			const { handler } = server.registeredTools.get("complete_task")!;
+			const { handler } = getTool(server, "complete_task");
 
 			const result = await handler({
 				taskId: "non-existent",
@@ -208,7 +220,7 @@ describe("MCP Tool: complete_task", () => {
 
 			const server = createMockServer();
 			registerCompleteTaskTool(server as unknown as McpServer);
-			const { handler } = server.registeredTools.get("complete_task")!;
+			const { handler } = getTool(server, "complete_task");
 
 			const result = await handler({
 				taskId: "task-123",

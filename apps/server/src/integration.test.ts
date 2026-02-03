@@ -23,7 +23,15 @@ import { EventEmitter } from "node:events";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { generateTaskId, type TaskId } from "@shipyard/loro-schema";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+	afterEach,
+	beforeAll,
+	beforeEach,
+	describe,
+	expect,
+	it,
+	vi,
+} from "vitest";
 
 // ==================== MOCKS ====================
 
@@ -591,24 +599,34 @@ describe("Integration: Git Sync", () => {
 });
 
 describe("Integration: Lock Management", () => {
-	// These tests use real file operations via require to bypass ESM mocks
+	// These tests use real file operations via vi.importActual to bypass ESM mocks
 	// We use unique temp directories per test to avoid cross-test pollution
 
-	// Get real fs functions via require (bypasses vitest mocks)
-	const realFs = (() => {
-		// eslint-disable-next-line @typescript-eslint/no-var-requires
-		const fs = require("node:fs");
-		return {
-			existsSync: fs.existsSync as typeof import("node:fs").existsSync,
-			mkdirSync: fs.mkdirSync as typeof import("node:fs").mkdirSync,
-			writeFileSync: fs.writeFileSync as typeof import("node:fs").writeFileSync,
-			readFileSync: fs.readFileSync as typeof import("node:fs").readFileSync,
-			unlinkSync: fs.unlinkSync as typeof import("node:fs").unlinkSync,
-			rmSync: fs.rmSync as typeof import("node:fs").rmSync,
-		};
-	})();
+	// Real fs functions loaded via vi.importActual (bypasses vitest mocks)
+	let realFs: {
+		existsSync: typeof import("node:fs").existsSync;
+		mkdirSync: typeof import("node:fs").mkdirSync;
+		writeFileSync: typeof import("node:fs").writeFileSync;
+		readFileSync: typeof import("node:fs").readFileSync;
+		unlinkSync: typeof import("node:fs").unlinkSync;
+		rmSync: typeof import("node:fs").rmSync;
+	};
 
 	let testStateDir: string;
+
+	// Load real fs module before tests run
+	beforeAll(async () => {
+		// vi.importActual bypasses vitest mocks to get the real implementation
+		const fs = await vi.importActual<typeof import("node:fs")>("node:fs");
+		realFs = {
+			existsSync: fs.existsSync,
+			mkdirSync: fs.mkdirSync,
+			writeFileSync: fs.writeFileSync,
+			readFileSync: fs.readFileSync,
+			unlinkSync: fs.unlinkSync,
+			rmSync: fs.rmSync,
+		};
+	});
 
 	beforeEach(() => {
 		// Create a unique temp dir for each test

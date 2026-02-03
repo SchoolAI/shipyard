@@ -3,82 +3,41 @@
  *
  * Uploads artifacts to the plan-artifacts branch on GitHub.
  * Ported from apps/server-legacy/src/github-artifacts.ts
+ *
+ * Uses consolidated helpers from:
+ * - ./artifact-helpers.ts (parseRepoString, resolveArtifactContent)
+ * - ./github-helpers.ts (getOctokit, isGitHubConfigured, etc.)
  */
 
-import { Octokit } from "@octokit/rest";
 import { logger } from "./logger.js";
+import {
+	type ContentResult,
+	type ContentSource,
+	parseRepoString,
+	resolveArtifactContent,
+} from "./artifact-helpers.js";
+import {
+	GitHubAuthError,
+	getErrorStatus,
+	getOctokit,
+	isAuthError,
+	isGitHubConfigured,
+	resolveGitHubToken,
+} from "./github-helpers.js";
 
 const ARTIFACTS_BRANCH = "plan-artifacts";
 
-/**
- * Parse a "owner/repo" string into owner and repo components.
- * Throws if the format is invalid.
- */
-export function parseRepoString(repo: string): {
-	owner: string;
-	repoName: string;
-} {
-	const parts = repo.split("/");
-	if (parts.length !== 2 || !parts[0] || !parts[1]) {
-		throw new Error(`Invalid repo format: "${repo}". Expected "owner/repo".`);
-	}
-	return { owner: parts[0], repoName: parts[1] };
-}
-
-/**
- * Resolve GitHub token from environment.
- */
-export function resolveGitHubToken(): string | null {
-	return process.env.GITHUB_TOKEN ?? null;
-}
-
-/**
- * Checks if GitHub is configured (has valid token).
- */
-export function isGitHubConfigured(): boolean {
-	return !!resolveGitHubToken();
-}
-
-/**
- * Get Octokit instance with token from environment.
- * Returns null if no token is available.
- */
-export function getOctokit(): Octokit | null {
-	const token = resolveGitHubToken();
-	if (!token) {
-		return null;
-	}
-	return new Octokit({ auth: token });
-}
-
-/**
- * Extract status code from an error if it has one.
- */
-function getErrorStatus(error: unknown): number | undefined {
-	if (!error || typeof error !== "object") return undefined;
-	if ("status" in error && typeof error.status === "number") {
-		return error.status;
-	}
-	return undefined;
-}
-
-/**
- * Check if an error is an authentication error (401/403).
- */
-export function isAuthError(error: unknown): boolean {
-	const status = getErrorStatus(error);
-	return status === 401 || status === 403;
-}
-
-/**
- * Custom error class for GitHub authentication failures.
- */
-export class GitHubAuthError extends Error {
-	constructor(message: string) {
-		super(message);
-		this.name = "GitHubAuthError";
-	}
-}
+/** Re-export for backwards compatibility */
+export {
+	GitHubAuthError,
+	getOctokit,
+	isAuthError,
+	isGitHubConfigured,
+	parseRepoString,
+	resolveArtifactContent,
+	resolveGitHubToken,
+};
+export type { ContentResult, ContentSource };
 
 /**
  * Ensures the artifacts branch exists.
@@ -207,74 +166,4 @@ export async function uploadArtifact(
 	logger.info({ repo, path, url }, "Artifact uploaded");
 
 	return url;
-}
-
-/**
- * Resolve artifact content from various sources.
- */
-export type ContentSource =
-	| { source: "file"; filePath: string }
-	| { source: "url"; contentUrl: string }
-	| { source: "base64"; content: string };
-
-export type ContentResult =
-	| { success: true; content: string }
-	| { success: false; error: string };
-
-/**
- * Resolves artifact content from file, URL, or base64.
- * Returns base64-encoded content.
- */
-export async function resolveArtifactContent(
-	input: ContentSource,
-): Promise<ContentResult> {
-	const { readFile } = await import("node:fs/promises");
-
-	switch (input.source) {
-		case "file": {
-			logger.info({ filePath: input.filePath }, "Reading file from path");
-			try {
-				const fileBuffer = await readFile(input.filePath);
-				return { success: true, content: fileBuffer.toString("base64") };
-			} catch (error) {
-				logger.error(
-					{ error, filePath: input.filePath },
-					"Failed to read file",
-				);
-				const message =
-					error instanceof Error ? error.message : "Unknown error";
-				return { success: false, error: `Failed to read file: ${message}` };
-			}
-		}
-
-		case "url": {
-			logger.info(
-				{ contentUrl: input.contentUrl },
-				"Fetching content from URL",
-			);
-			try {
-				const response = await fetch(input.contentUrl);
-				if (!response.ok) {
-					throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-				}
-				const arrayBuffer = await response.arrayBuffer();
-				return {
-					success: true,
-					content: Buffer.from(arrayBuffer).toString("base64"),
-				};
-			} catch (error) {
-				logger.error(
-					{ error, contentUrl: input.contentUrl },
-					"Failed to fetch URL",
-				);
-				const message =
-					error instanceof Error ? error.message : "Unknown error";
-				return { success: false, error: `Failed to fetch URL: ${message}` };
-			}
-		}
-
-		case "base64": {
-			return { success: true, content: input.content };
-		}
-	}
 }
