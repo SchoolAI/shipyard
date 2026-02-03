@@ -115,9 +115,6 @@ importers:
       pino:
         specifier: ^10.2.1
         version: 10.2.1
-      undici:
-        specifier: ^7.19.0
-        version: 7.19.0
       y-websocket:
         specifier: ^3.0.0
         version: 3.0.0(yjs@13.6.29)
@@ -134,15 +131,15 @@ importers:
       '@shipyard/shared':
         specifier: workspace:*
         version: link:../../packages/shared-legacy
-      '@types/node':
-        specifier: ^25.0.10
-        version: 25.0.10
+      '@types/bun':
+        specifier: ^1.2.11
+        version: 1.3.8
+      bunup:
+        specifier: ^0.16.22
+        version: 0.16.22(typescript@5.9.3)
       pino-pretty:
         specifier: ^13.1.3
         version: 13.1.3
-      tsup:
-        specifier: ^8.5.1
-        version: 8.5.1(jiti@2.6.1)(postcss@8.5.6)(tsx@4.21.0)(typescript@5.9.3)(yaml@2.8.2)
       typescript:
         specifier: ^5.9.3
         version: 5.9.3
@@ -3887,6 +3884,9 @@ packages:
   '@types/body-parser@1.19.6':
     resolution: {integrity: sha512-HLFeCYgz89uk22N5Qg3dvGvsv46B8GLvKKo1zKG4NybA8U2DiEO3w9lqGg29t/tfLRJpJ6iQxnVw4OnB7MoM9g==}
 
+  '@types/bun@1.3.8':
+    resolution: {integrity: sha512-3LvWJ2q5GerAXYxO2mffLTqOzEu5qnhEAlh48Vnu8WQfnmSwbgagjGZV6BoHKJztENYEDn6QmVd949W4uESRJA==}
+
   '@types/canvas-confetti@1.9.0':
     resolution: {integrity: sha512-aBGj/dULrimR1XDZLtG9JwxX1b4HPRF6CX9Yfwh3NvstZEm1ZL7RBnel4keCPSqs1ANRu1u2Aoz9R+VmtjYuTg==}
 
@@ -4316,6 +4316,9 @@ packages:
 
   buffer@6.0.3:
     resolution: {integrity: sha512-FTiCpNxtwiZZHEZbcbTIcZjERVICn9yq/pDFkTl95/AxzD1naBctN7YO68riM/gLSDY7sdrMby8hofADYuuqOA==}
+
+  bun-types@1.3.8:
+    resolution: {integrity: sha512-fL99nxdOWvV4LqjmC+8Q9kW3M4QTtTR1eePs94v5ctGqU8OeceWrSUaRw3JYb7tU3FkMIAjkueehrHPPPGKi5Q==}
 
   bundle-name@4.1.0:
     resolution: {integrity: sha512-tjwM5exMg6BGRI+kNmTntNsvdZS1X8BFYS6tnJ2hdH0kVxM6/eVZ2xy+FqStSWvYmtfFMDLIxurorHwDKfDz5Q==}
@@ -10598,6 +10601,10 @@ snapshots:
       '@types/connect': 3.4.38
       '@types/node': 25.0.10
 
+  '@types/bun@1.3.8':
+    dependencies:
+      bun-types: 1.3.8
+
   '@types/canvas-confetti@1.9.0': {}
 
   '@types/chai@5.2.3':
@@ -11120,6 +11127,10 @@ snapshots:
     dependencies:
       base64-js: 1.5.1
       ieee754: 1.2.1
+
+  bun-types@1.3.8:
+    dependencies:
+      '@types/node': 25.0.10
 
   bundle-name@4.1.0:
     dependencies:

@@ -1,33 +1,34 @@
 /**
  * tRPC client for communicating with the shipyard registry server.
  * Provides type-safe RPC calls with automatic request batching.
+ *
+ * NOTE: This client runs in Bun, which has native fetch with proper timeout handling.
+ * No need for undici Agent workarounds - Bun's fetch handles long-polling correctly.
  */
 
 import type { AppRouter } from "@shipyard/schema";
 import { DEFAULT_TRPC_TIMEOUT_MS } from "@shipyard/shared";
 import { createTRPCClient, httpBatchLink } from "@trpc/client";
-import { Agent } from "undici";
 
 let cachedClient: ReturnType<typeof createTRPCClient<AppRouter>> | null = null;
 let cachedBaseUrl: string | null = null;
 
 /**
- * Create a custom undici Agent for long-polling requests.
- * Node.js fetch (undici) has internal timeouts separate from AbortSignal:
- * - headersTimeout: Time to receive response headers (default: 300s = 5 min)
- * - bodyTimeout: Time to receive response body (default: 300s = 5 min)
+ * Custom fetch wrapper with timeout for tRPC.
+ * Bun's native fetch is functionally compatible with tRPC but has slightly
+ * different TypeScript types. We cast to satisfy tRPC's expectations.
  *
- * For long-polling (waiting for user approval), we need to extend these
- * to match our 30-minute approval timeout.
+ * @internal
  */
-function createLongPollingAgent(timeoutMs: number): Agent {
-	return new Agent({
-		headersTimeout: timeoutMs,
-		bodyTimeout: timeoutMs,
-		keepAliveTimeout: timeoutMs,
-		keepAliveMaxTimeout: timeoutMs,
-	});
-}
+// biome-ignore lint/suspicious/noExplicitAny: Bun fetch is compatible with tRPC at runtime, only types differ
+const createFetchWithTimeout = (timeoutMs: number): any => {
+	return async (url: string | URL, options?: RequestInit) => {
+		return fetch(url, {
+			...options,
+			signal: AbortSignal.timeout(timeoutMs),
+		});
+	};
+};
 
 /**
  * Get a tRPC client configured for the given base URL.
@@ -42,19 +43,11 @@ export function getTRPCClient(
 ) {
 	// NOTE: Don't cache clients with custom timeouts - long-polling needs dedicated instances
 	if (timeoutMs !== DEFAULT_TRPC_TIMEOUT_MS) {
-		const agent = createLongPollingAgent(timeoutMs);
-
 		return createTRPCClient<AppRouter>({
 			links: [
 				httpBatchLink({
 					url: `${baseUrl}/trpc`,
-					fetch: (url, options) => {
-						return fetch(url, {
-							...options,
-							signal: AbortSignal.timeout(timeoutMs),
-							dispatcher: agent,
-						});
-					},
+					fetch: createFetchWithTimeout(timeoutMs),
 				}),
 			],
 		});
@@ -68,12 +61,7 @@ export function getTRPCClient(
 		links: [
 			httpBatchLink({
 				url: `${baseUrl}/trpc`,
-				fetch: (url, options) => {
-					return fetch(url, {
-						...options,
-						signal: AbortSignal.timeout(timeoutMs),
-					});
-				},
+				fetch: createFetchWithTimeout(timeoutMs),
 			}),
 		],
 	});
