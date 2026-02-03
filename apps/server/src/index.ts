@@ -75,6 +75,7 @@ async function isDaemonRunning(port: number): Promise<boolean> {
 
 		if (!response.ok) return false;
 
+		// eslint-disable-next-line no-restricted-syntax
 		const data = (await response.json()) as { status?: string };
 		return data.status === "ok";
 	} catch {

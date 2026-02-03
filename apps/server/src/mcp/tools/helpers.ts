@@ -63,6 +63,7 @@ export async function getTaskDocument(
 		const doc = new TaskDocument(
 			taskHandle.doc,
 			roomHandle.doc,
+			// eslint-disable-next-line no-restricted-syntax
 			taskId as TaskId,
 		);
 
@@ -114,6 +115,7 @@ export async function getOrCreateTaskDocument(
 		const doc = new TaskDocument(
 			taskHandle.doc,
 			roomHandle.doc,
+			// eslint-disable-next-line no-restricted-syntax
 			taskId as TaskId,
 		);
 

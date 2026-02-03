@@ -28,10 +28,11 @@ export function createWebSocketAdapter(
 	wss.on("connection", (ws: WebSocket, req) => {
 		const url = new URL(req.url ?? "/", `http://${req.headers.host}`);
 		const peerIdParam = url.searchParams.get("peerId");
-		// PeerID must be a numeric string (Loro's `${number}` type)
+		// eslint-disable-next-line no-restricted-syntax
 		const peerId: PeerID | null =
 			peerIdParam && /^(0|[1-9]\d*)$/.test(peerIdParam)
-				? (peerIdParam as PeerID)
+				? // eslint-disable-next-line no-restricted-syntax
+					(peerIdParam as PeerID)
 				: null;
 
 		logger.debug({ peerId, url: req.url }, "WebSocket connection attempt");

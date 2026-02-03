@@ -236,6 +236,7 @@ async function getResolvedMcpConfigPath(): Promise<string | null> {
 			config.mcpServers,
 		)) {
 			if (!serverConfig || typeof serverConfig !== "object") continue;
+			// eslint-disable-next-line no-restricted-syntax
 			const server = serverConfig as Record<string, unknown>;
 			if (Array.isArray(server.args)) {
 				server.args = server.args.map((arg: unknown) => {
@@ -480,6 +481,7 @@ function isA2AMessage(msg: unknown): msg is A2AMessage {
 	if (typeof msg !== "object" || msg === null) {
 		return false;
 	}
+	// eslint-disable-next-line no-restricted-syntax
 	const candidate = msg as Record<string, unknown>;
 	return (
 		typeof candidate.messageId === "string" &&

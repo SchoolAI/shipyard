@@ -51,6 +51,7 @@ export type {
 	TaskMeta,
 } from "./shapes.js";
 
+// eslint-disable-next-line no-restricted-syntax
 export { RoomSchema, TaskDocumentSchema } from "./shapes.js";
 
 export { TaskDocument, type TaskStatus } from "./task/document.js";

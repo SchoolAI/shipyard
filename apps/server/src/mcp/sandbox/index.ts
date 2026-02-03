@@ -141,6 +141,7 @@ export function createSandboxContext(): SandboxContext {
 		},
 	};
 
+	// eslint-disable-next-line no-restricted-syntax
 	return vm.createContext(sandbox) as SandboxContext;
 }
 

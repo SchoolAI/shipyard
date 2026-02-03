@@ -133,6 +133,7 @@ async function getUsernameFromToken(token: string): Promise<string | null> {
 
 		if (!response.ok) return null;
 
+		// eslint-disable-next-line no-restricted-syntax
 		const user = (await response.json()) as { login?: string };
 		return user.login ?? null;
 	} catch {

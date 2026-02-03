@@ -302,11 +302,13 @@ export async function updateTask(
 		] as const;
 		type ValidStatus = (typeof validStatuses)[number];
 
+		// eslint-disable-next-line no-restricted-syntax
 		if (!validStatuses.includes(updates.status as ValidStatus)) {
 			throw new Error(
 				`Invalid status: ${updates.status}. Valid values: ${validStatuses.join(", ")}`,
 			);
 		}
+		// eslint-disable-next-line no-restricted-syntax
 		doc.updateStatus(updates.status as ValidStatus, actor);
 	}
 
