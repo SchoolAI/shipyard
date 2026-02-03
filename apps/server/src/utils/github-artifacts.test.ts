@@ -33,6 +33,18 @@ vi.mock("@octokit/rest", () => ({
 	Octokit: vi.fn(() => mockOctokit),
 }));
 
+/** Mock github-helpers to return our mock Octokit when token exists */
+vi.mock("./github-helpers.js", async () => {
+	const actual = await vi.importActual<typeof import("./github-helpers.js")>("./github-helpers.js");
+	return {
+		...actual,
+		getOctokit: vi.fn(() => {
+			const token = process.env.GITHUB_TOKEN;
+			return token ? mockOctokit : null;
+		}),
+	};
+});
+
 /** Import after mocks */
 import {
 	ensureArtifactsBranch,

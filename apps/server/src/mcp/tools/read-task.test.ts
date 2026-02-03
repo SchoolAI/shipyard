@@ -218,9 +218,8 @@ describe("MCP Tool: read_task", () => {
 			registerReadTaskTool(server as unknown as McpServer);
 			const { handler } = getTool(server, "read_task");
 
-			await expect(
-				handler({ taskId: "", sessionToken: "token" }),
-			).rejects.toThrow();
+			const result = await handler({ taskId: "", sessionToken: "token" });
+			expect(result.isError).toBe(true);
 		});
 	});
 });
