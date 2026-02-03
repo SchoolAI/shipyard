@@ -20,6 +20,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { TaskDocument } from "@shipyard/loro-schema";
 import { nanoid } from "nanoid";
+import { z } from "zod";
 import type { Env } from "../env.js";
 import { getLogger } from "../utils/logger.js";
 import { getAgent, hasAgent, trackAgent, untrackAgent } from "./tracker.js";
@@ -34,16 +35,32 @@ export interface SpawnAgentOptions {
 }
 
 /**
+ * Zod schema for A2A message part.
+ */
+const A2AMessagePartSchema = z.object({
+	type: z.string(),
+	text: z.string().optional(),
+	data: z.unknown().optional(),
+	uri: z.string().optional(),
+});
+
+/**
+ * Zod schema for A2A message.
+ * Validates conversation context messages for agent spawning.
+ */
+const A2AMessageSchema = z.object({
+	messageId: z.string(),
+	role: z.enum(["user", "agent"]),
+	parts: z.array(A2AMessagePartSchema),
+	contextId: z.string().optional(),
+	taskId: z.string().optional(),
+	metadata: z.record(z.string(), z.unknown()).optional(),
+});
+
+/**
  * A2A message types for conversation context transfer.
  */
-export interface A2AMessage {
-	messageId: string;
-	role: "user" | "agent";
-	parts: Array<{ type: string; text?: string; data?: unknown; uri?: string }>;
-	contextId?: string;
-	taskId?: string;
-	metadata?: Record<string, unknown>;
-}
+export type A2AMessage = z.infer<typeof A2AMessageSchema>;
 
 /**
  * Options for spawning with conversation context.
@@ -188,6 +205,16 @@ async function buildCommonSpawnArgs(
 }
 
 /**
+ * Zod schema for MCP server config entry.
+ * Used to validate individual server configs when resolving paths.
+ */
+const McpServerConfigSchema = z
+	.object({
+		args: z.array(z.unknown()).optional(),
+	})
+	.passthrough();
+
+/**
  * Resolves MCP config with absolute paths and writes to temp file.
  * This ensures relative paths in .mcp.json work regardless of spawned agent's cwd.
  */
@@ -236,9 +263,10 @@ async function getResolvedMcpConfigPath(): Promise<string | null> {
 			config.mcpServers,
 		)) {
 			if (!serverConfig || typeof serverConfig !== "object") continue;
-			// eslint-disable-next-line no-restricted-syntax
-			const server = serverConfig as Record<string, unknown>;
-			if (Array.isArray(server.args)) {
+			const parseResult = McpServerConfigSchema.safeParse(serverConfig);
+			if (!parseResult.success) continue;
+			const server = parseResult.data;
+			if (server.args) {
 				server.args = server.args.map((arg: unknown) => {
 					if (typeof arg !== "string") return arg;
 					if (
@@ -475,19 +503,10 @@ function getSessionTranscriptPath(
 
 /**
  * Type guard for A2A messages.
- * Validates that an unknown value has the required A2AMessage structure.
+ * Uses Zod schema validation to check the A2AMessage structure.
  */
 function isA2AMessage(msg: unknown): msg is A2AMessage {
-	if (typeof msg !== "object" || msg === null) {
-		return false;
-	}
-	// eslint-disable-next-line no-restricted-syntax
-	const candidate = msg as Record<string, unknown>;
-	return (
-		typeof candidate.messageId === "string" &&
-		typeof candidate.role === "string" &&
-		Array.isArray(candidate.parts)
-	);
+	return A2AMessageSchema.safeParse(msg).success;
 }
 
 /**
