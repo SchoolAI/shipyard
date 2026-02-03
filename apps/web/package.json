@@ -4,9 +4,9 @@
   "type": "module",
   "description": "Web UI for shipyard",
   "scripts": {
-    "dev": "vite --open",
-    "build": "vite build",
-    "preview": "vite preview",
+    "dev": "bunx --bun vite --open",
+    "build": "bunx --bun vite build",
+    "preview": "bunx --bun vite preview",
     "typecheck": "tsc --noEmit",
     "lint": "biome check src",
     "lint:fix": "biome check src --write",
