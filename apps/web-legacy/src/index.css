@@ -1,0 +1,328 @@
+/*
+ * Tailwind CSS v4
+ *
+ * Third-party CSS (Mantine, BlockNote) is imported in main.tsx
+ * to avoid @import ordering issues with Tailwind's vite plugin.
+ */
+@import "tailwindcss";
+@import "@heroui/styles";
+
+/* Custom color palette - Tailwind v4 uses @theme for configuration */
+@theme {
+  /* Primary Brand (Picton Blue) */
+  --color-primary-400: #42cde5;
+  --color-primary-500: #42cde5;
+  --color-primary-600: #42cde5;
+  --color-primary-700: #348fa3;
+  --color-primary-800: #266f7f;
+  --color-primary: #42cde5;
+
+  /* Neutrals (Blue-tinted: Blue Bayoux, Geyser, Wild Blue Yonder) */
+  --color-slate-50: #d6e1e0;
+  --color-slate-100: #d6e1e0;
+  --color-slate-200: #d6e1e0;
+  --color-slate-300: #748fb0;
+  --color-slate-400: #748fb0;
+  --color-slate-500: #4a5b74;
+  --color-slate-600: #4a5b74;
+  --color-slate-700: #4a5b74;
+  --color-slate-800: #13192e;
+  --color-slate-900: #13192e;
+  --color-slate-950: #13192e;
+
+  /* Accent (My Pink - AI indicators) */
+  --color-accent: #cb9380;
+  --color-accent-light: #daa89d;
+
+  /* Semantic Status Colors */
+  --color-success-100: #d1fae5;
+  --color-success-400: #34d399;
+  --color-success-500: #10b981;
+  --color-success-600: #059669;
+  --color-success: #10b981;
+  --color-success-light: #d1fae5;
+  --color-success-dark: #059669;
+
+  --color-warning-100: #f5dcc8;
+  --color-warning-500: #cc5113;
+  --color-warning-600: #a63f0d;
+  --color-warning: #cc5113;
+  --color-warning-light: #f5dcc8;
+  --color-warning-dark: #a63f0d;
+
+  --color-danger-100: #ffcccc;
+  --color-danger-400: #d32f2f;
+  --color-danger-500: #a51100;
+  --color-danger-600: #7a0c00;
+  --color-danger: #a51100;
+  --color-danger-light: #ffcccc;
+  --color-danger-dark: #7a0c00;
+
+  --color-info-100: #dbeafe;
+  --color-info-500: #748fb0;
+  --color-info-600: #5a7090;
+  --color-info: #748fb0;
+  --color-info-light: #dbeafe;
+  --color-info-dark: #5a7090;
+
+  /* shadcn/ui semantic tokens */
+  --color-background: #ffffff;
+  --color-foreground: #18181b;
+  --color-muted: #f4f4f5;
+  --color-muted-foreground: #71717a;
+  --color-destructive: #cc5113;
+  --color-destructive-foreground: #ffffff;
+  --color-border: #e4e4e7;
+  --color-input: #e4e4e7;
+  --color-ring: #42cde5;
+  --color-surface: #ffffff;
+}
+
+/* HeroUI Theme Overrides */
+:root {
+  /* Base primitives (shared) */
+  --snow: oklch(0.9911 0 0);
+  --eclipse: oklch(0.2103 0.0059 285.89);
+
+  /* Light mode - subtle gray background with proper contrast */
+  --background: oklch(0.98 0 0);
+  --background-subtle: oklch(0.95 0 0);
+  --foreground: oklch(0.18 0 0);
+  --surface: oklch(0.9911 0 0);
+  --muted: oklch(0.88 0 0);
+  --muted-foreground: oklch(0.48 0 0);
+
+  --field-placeholder: oklch(0.5 0 0);
+
+  /* Picton Blue accent with My Pink fallback */
+  --accent: oklch(0.6439 0.1906 199.38);
+  --accent-foreground: var(--snow);
+  --success: oklch(0.7329 0.1935 150.81);
+  --success-foreground: var(--eclipse);
+  /* Orange Roughy warning */
+  --warning: oklch(0.5525 0.1544 36.58);
+  --warning-foreground: var(--eclipse);
+  /* Bright Red danger */
+  --danger: oklch(0.4421 0.2009 27.38);
+  --danger-foreground: var(--snow);
+  --focus: var(--accent);
+  --ring: var(--accent);
+
+  /* Map Tailwind utilities to HeroUI variables */
+  --color-muted-foreground: oklch(0.48 0 0);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-muted: var(--muted);
+}
+
+[data-theme="dark"],
+.dark {
+  --background: oklch(0.08 0.002 263.45);
+  --background-subtle: oklch(0.11 0.003 263.45);
+  --foreground: oklch(0.95 0 0);
+  --surface: oklch(0.16 0.003 263.45);
+  --overlay: oklch(0.18 0.003 263.45);
+  --muted: oklch(0.28 0.015 263.45);
+  --muted-foreground: oklch(0.65 0.02 263.45);
+  --field-placeholder: oklch(0.5 0.01 263.45);
+}
+
+/*
+ * Sonner Toast Theming
+ * CSS variables that Sonner uses internally. These provide defense-in-depth
+ * by ensuring toasts always match our theme, even if the theme prop fails.
+ * See: https://sonner.emilkowal.ski/styling
+ */
+:root {
+  --sonner-toast-bg: var(--surface);
+  --sonner-toast-border-color: var(--muted);
+  --sonner-toast-text-color: var(--foreground);
+}
+
+[data-theme="dark"] [data-sonner-toaster],
+.dark [data-sonner-toaster] {
+  --sonner-toast-bg: var(--surface);
+  --sonner-toast-border-color: var(--muted);
+  --sonner-toast-text-color: var(--foreground);
+}
+
+/* Base styling - ensure proper background colors */
+html,
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+}
+
+#root {
+  background-color: var(--background);
+  color: var(--foreground);
+}
+
+/* Global: Pointer cursor for all interactive elements */
+button,
+[role="button"],
+[type="button"],
+[type="submit"],
+[type="reset"],
+a[href],
+select,
+summary,
+input[type="checkbox"],
+input[type="radio"],
+label[for] {
+  cursor: pointer;
+}
+
+/* Disabled states should show not-allowed cursor */
+button:disabled,
+[role="button"]:disabled,
+[disabled] {
+  cursor: not-allowed;
+}
+
+/*
+ * Hide own collaboration cursor
+ * When only one user is present, we hide the collaboration cursor
+ * since it's just showing your own position which is redundant.
+ * The cursor uses inline styles for color, so we hide based on the
+ * data attribute added by our useEffect.
+ */
+.bn-collaboration-cursor__base[data-is-own-cursor="true"] {
+  /* biome-ignore lint/complexity/noImportantStyles: Required to override BlockNote's inline cursor styles */
+  display: none !important;
+}
+
+/*
+ * Hide scrollbars globally while maintaining scroll functionality
+ * Uses cross-browser approach for Firefox, Chrome, Safari, Edge
+ */
+* {
+  scrollbar-width: none; /* Firefox */
+}
+
+*::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Edge */
+}
+
+/*
+ * Mobile Responsive Utilities
+ * Safe areas for notched devices, dynamic viewport, and touch targets
+ */
+
+/* Safe area padding for notched devices (iPhone X+, etc.) */
+.pt-safe {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.pl-safe {
+  padding-left: env(safe-area-inset-left, 0px);
+}
+.pr-safe {
+  padding-right: env(safe-area-inset-right, 0px);
+}
+
+/* Dynamic viewport height - handles mobile browser address bar */
+.h-screen-safe {
+  height: 100dvh;
+}
+
+/* Minimum tap target size for accessibility (44x44px per Apple/Google guidelines) */
+/* Only enforce on mobile - desktop can use smaller buttons */
+@media (max-width: 767px) {
+  .touch-target {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
+/* Mobile BlockNote toolbar - larger touch targets */
+@media (max-width: 767px) {
+  .bn-toolbar button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .bn-thread {
+    max-width: calc(100vw - 32px);
+  }
+
+  /* Ensure floating comment UI doesn't overflow */
+  .bn-floating-composer,
+  .bn-floating-thread {
+    max-width: calc(100vw - 24px);
+  }
+
+  /* Reduce BlockNote editor padding on mobile for more content space */
+  /* Multi-level approach - padding comes from multiple sources */
+  .bn-container {
+    /* biome-ignore lint/complexity/noImportantStyles: Required to override BlockNote's inline styles */
+    padding-left: 0 !important;
+    /* biome-ignore lint/complexity/noImportantStyles: Required to override BlockNote's inline styles */
+    padding-right: 0 !important;
+  }
+
+  .bn-editor {
+    /* biome-ignore lint/complexity/noImportantStyles: Required to override BlockNote's inline styles */
+    padding-left: 0 !important;
+    /* biome-ignore lint/complexity/noImportantStyles: Required to override BlockNote's inline styles */
+    padding-right: 0 !important;
+  }
+
+  .bn-block {
+    /* biome-ignore lint/complexity/noImportantStyles: Required to override BlockNote's inline styles */
+    padding-left: 0 !important;
+    /* biome-ignore lint/complexity/noImportantStyles: Required to override BlockNote's inline styles */
+    padding-right: 0 !important;
+  }
+
+  /* Final content padding - balanced for mobile */
+  .bn-editor .ProseMirror {
+    /* biome-ignore lint/complexity/noImportantStyles: Required to override BlockNote's inline styles */
+    padding-left: 20px !important;
+    /* biome-ignore lint/complexity/noImportantStyles: Required to override BlockNote's inline styles */
+    padding-right: 20px !important;
+  }
+}
+
+/* Mobile-specific BlockNote padding override */
+@media (max-width: 767px) {
+  .mobile-blocknote .bn-container,
+  .mobile-blocknote .bn-editor,
+  .mobile-blocknote .bn-block-outer,
+  .mobile-blocknote .bn-block-content,
+  .mobile-blocknote [data-node-type] {
+    /* biome-ignore lint/complexity/noImportantStyles: Required to override BlockNote's inline styles */
+    padding-left: 0 !important;
+    /* biome-ignore lint/complexity/noImportantStyles: Required to override BlockNote's inline styles */
+    padding-right: 0 !important;
+    /* biome-ignore lint/complexity/noImportantStyles: Required to override BlockNote's inline styles */
+    margin-left: 0 !important;
+    /* biome-ignore lint/complexity/noImportantStyles: Required to override BlockNote's inline styles */
+    margin-right: 0 !important;
+  }
+
+  .mobile-blocknote .ProseMirror {
+    /* biome-ignore lint/complexity/noImportantStyles: Required to override BlockNote's inline styles */
+    padding-left: 16px !important;
+    /* biome-ignore lint/complexity/noImportantStyles: Required to override BlockNote's inline styles */
+    padding-right: 16px !important;
+  }
+}
+
+/* Voice recording pulse animation */
+@keyframes voice-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(239, 68, 68, 0);
+  }
+}
+
+.voice-recording {
+  animation: voice-pulse 1.5s ease-in-out infinite;
+}

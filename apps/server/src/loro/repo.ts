@@ -9,6 +9,7 @@
  * @see docs/whips/daemon-mcp-server-merge.md#4-use-loro-extended-adapters
  */
 
+import type { DocContext, PeerContext } from "@loro-extended/repo";
 import { Repo } from "@loro-extended/repo";
 import type { WebSocketServer } from "ws";
 import { createStorageAdapter } from "./adapters/storage.js";
@@ -56,8 +57,7 @@ export function createRepo(wss: WebSocketServer): Repo {
 		},
 		adapters: [storageAdapter, wsAdapter, webrtcAdapter],
 		permissions: {
-			/** biome-ignore lint/suspicious/noExplicitAny: Loro permissions callback typing */
-			visibility(_doc: any, peer: any) {
+			visibility(_doc: DocContext, peer: PeerContext) {
 				if (peer.channelKind === "storage") return true;
 				return false;
 			},

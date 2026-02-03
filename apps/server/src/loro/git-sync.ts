@@ -10,7 +10,10 @@
 import { execFileSync } from "node:child_process";
 import { readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
-import type { SyncedFileChange } from "@shipyard/loro-schema";
+import type {
+	MutableTaskDocument,
+	SyncedFileChange,
+} from "@shipyard/loro-schema";
 import { logger } from "../utils/logger.js";
 
 /** Default max file size for untracked files (100KB) */
@@ -233,10 +236,10 @@ export async function getGitChanges(
 
 /**
  * Handle type for task documents.
- * Uses a simplified type to avoid complex generic constraint issues with DocShape.
  */
-// biome-ignore lint/suspicious/noExplicitAny: Loro TypedDoc typing requires simplified handle type
-type TaskDocHandle = { change: (fn: (doc: any) => void) => void };
+type TaskDocHandle = {
+	change: (fn: (doc: MutableTaskDocument) => void) => void;
+};
 
 /**
  * Start git sync for a task document.
@@ -269,8 +272,7 @@ export function startGitSync(
 		try {
 			const changes = await getGitChanges(cwd, maxFileSize);
 
-			// biome-ignore lint/suspicious/noExplicitAny: Loro TypedDoc typing requires any for change callback
-			handle.change((doc: any) => {
+			handle.change((doc) => {
 				let snapshot = doc.changeSnapshots.get(machineId);
 				if (!snapshot) {
 					doc.changeSnapshots.set(machineId, {
@@ -333,8 +335,7 @@ export function startGitSync(
 		}
 
 		try {
-			// biome-ignore lint/suspicious/noExplicitAny: Loro TypedDoc typing requires any for change callback
-			handle.change((doc: any) => {
+			handle.change((doc) => {
 				const snapshot = doc.changeSnapshots.get(machineId);
 				if (snapshot) {
 					snapshot.isLive = false;

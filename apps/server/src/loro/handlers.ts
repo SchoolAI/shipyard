@@ -7,6 +7,7 @@
  * @see docs/whips/daemon-mcp-server-merge.md#spawn-agent-flow
  */
 
+import type { MutableTaskDocument } from "@shipyard/loro-schema";
 import { trackAgent } from "../agents/tracker.js";
 import { logger } from "../utils/logger.js";
 
@@ -112,14 +113,11 @@ function isSpawnRequestedEvent(
 
 /**
  * Handle type for task documents.
- * Uses a simplified type to avoid complex generic constraint issues with DocShape.
  */
 type TaskDocHandle = {
-	// biome-ignore lint/suspicious/noExplicitAny: Loro TypedDoc typing requires simplified handle type
-	change: (fn: (doc: any) => void) => void;
+	change: (fn: (doc: MutableTaskDocument) => void) => void;
 	subscribe: (
-		// biome-ignore lint/suspicious/noExplicitAny: Loro TypedDoc typing requires simplified handle type
-		selector: any,
+		selector: (doc: MutableTaskDocument) => unknown,
 		callback: (events: { toArray: () => unknown[] }) => void,
 	) => () => void;
 };
@@ -165,8 +163,7 @@ export async function handleSpawnRequested(
 
 		trackAgent(ctx.taskId, child);
 
-		// biome-ignore lint/suspicious/noExplicitAny: Loro TypedDoc typing requires any for change callback
-		handle.change((doc: any) => {
+		handle.change((doc) => {
 			doc.events.push({
 				type: "spawn_started",
 				id: `spawn-started-${event.id}`,
@@ -186,8 +183,7 @@ export async function handleSpawnRequested(
 
 		child.once("exit", (exitCode) => {
 			try {
-				// biome-ignore lint/suspicious/noExplicitAny: Loro TypedDoc typing requires any for change callback
-				handle.change((doc: any) => {
+				handle.change((doc) => {
 					doc.events.push({
 						type: "spawn_completed",
 						id: `spawn-completed-${event.id}`,
@@ -216,8 +212,7 @@ export async function handleSpawnRequested(
 	} catch (error) {
 		logger.error({ eventId: event.id, error }, "Failed to spawn agent");
 
-		// biome-ignore lint/suspicious/noExplicitAny: Loro TypedDoc typing requires any for change callback
-		handle.change((doc: any) => {
+		handle.change((doc) => {
 			doc.events.push({
 				type: "spawn_failed",
 				id: `spawn-failed-${event.id}`,
