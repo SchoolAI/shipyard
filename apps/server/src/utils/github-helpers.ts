@@ -13,8 +13,8 @@
 
 import { execSync } from "node:child_process";
 import { Octokit } from "@octokit/rest";
-import { logger } from "./logger.js";
 import { parseRepoString } from "./artifact-helpers.js";
+import { logger } from "./logger.js";
 
 /**
  * Resolve GitHub token from environment.

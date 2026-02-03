@@ -34,7 +34,6 @@ class SessionRegistry {
 			planId,
 			expiresAt: Date.now() + ttlMs,
 		});
-		// Maintain reverse index
 		this.planToSession.set(planId, sessionId);
 	}
 
@@ -58,7 +57,6 @@ class SessionRegistry {
 		const sessionId = this.planToSession.get(planId);
 		if (!sessionId) return null;
 
-		// Validate session is still active
 		const entry = this.sessions.get(sessionId);
 		if (!entry || Date.now() > entry.expiresAt) {
 			this.planToSession.delete(planId);
@@ -96,7 +94,6 @@ class SessionRegistry {
 		let removed = 0;
 		for (const [sessionId, entry] of this.sessions) {
 			if (now > entry.expiresAt) {
-				// Clean up reverse index only if it still points to this session
 				const currentSessionId = this.planToSession.get(entry.planId);
 				if (currentSessionId === sessionId) {
 					this.planToSession.delete(entry.planId);

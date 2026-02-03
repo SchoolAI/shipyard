@@ -59,7 +59,6 @@ function formatDiffCommentsForLLM(
 		return "No diff comments found.";
 	}
 
-	// Group by kind (pr vs local)
 	const prComments = filtered.filter((c) => c.kind === "pr");
 	const localComments = filtered.filter((c) => c.kind === "local");
 
@@ -67,7 +66,6 @@ function formatDiffCommentsForLLM(
 
 	if (prComments.length > 0) {
 		output += "## PR Review Comments\n\n";
-		// Group by file
 		const byFile = new Map<string, typeof prComments>();
 		for (const c of prComments) {
 			const existing = byFile.get(c.path) || [];
@@ -90,7 +88,6 @@ function formatDiffCommentsForLLM(
 
 	if (localComments.length > 0) {
 		output += "## Local Diff Comments\n\n";
-		// Group by file
 		const byFile = new Map<string, typeof localComments>();
 		for (const c of localComments) {
 			const existing = byFile.get(c.path) || [];
@@ -186,8 +183,7 @@ OUTPUT FORMAT:
 				return errorResponse(tokenError);
 			}
 
-			/** Get comments from doc */
-			const allComments = doc.comments.toJSON() as Record<
+			const allComments: Record<
 				string,
 				{
 					kind: string;
@@ -198,9 +194,7 @@ OUTPUT FORMAT:
 					line?: number;
 					resolved: boolean;
 				}
-			>;
-
-			/** Filter to diff comments (pr and local kinds) */
+			> = doc.comments.toJSON();
 			const diffComments: Array<{
 				kind: string;
 				id: string;

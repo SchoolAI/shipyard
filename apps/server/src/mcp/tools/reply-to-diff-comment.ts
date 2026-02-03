@@ -37,13 +37,11 @@ function parseCommentId(input: string): {
 	type: "pr" | "local" | "unknown";
 	id: string;
 } {
-	// Remove brackets if present
 	let cleaned = input.trim();
 	if (cleaned.startsWith("[") && cleaned.endsWith("]")) {
 		cleaned = cleaned.slice(1, -1);
 	}
 
-	// Check for prefix
 	if (cleaned.startsWith("pr:")) {
 		return { type: "pr", id: cleaned.slice(3) };
 	}
@@ -51,7 +49,6 @@ function parseCommentId(input: string): {
 		return { type: "local", id: cleaned.slice(6) };
 	}
 
-	// No prefix - unknown type, try both
 	return { type: "unknown", id: cleaned };
 }
 
@@ -128,8 +125,7 @@ reply_to_diff_comment({
 				"Parsed comment ID from input",
 			);
 
-			/** Get all comments */
-			const allComments = doc.comments.toJSON() as Record<
+			const allComments: Record<
 				string,
 				{
 					kind: string;
@@ -139,9 +135,7 @@ reply_to_diff_comment({
 					line?: number;
 					prNumber?: number;
 				}
-			>;
-
-			/** Find the parent comment */
+			> = doc.comments.toJSON();
 			let parentComment:
 				| {
 						kind: string;
@@ -176,7 +170,6 @@ reply_to_diff_comment({
 				);
 			}
 
-			/** Create reply comment */
 			const replyId = generateCommentId();
 			const reply = {
 				kind: parentComment.kind,
@@ -187,7 +180,6 @@ reply_to_diff_comment({
 				createdAt: Date.now(),
 				resolved: false,
 				inReplyTo: parsed.id,
-				// Copy location info from parent
 				...(parentComment.path && { path: parentComment.path }),
 				...(parentComment.line !== undefined && { line: parentComment.line }),
 				...(parentComment.prNumber !== undefined && {

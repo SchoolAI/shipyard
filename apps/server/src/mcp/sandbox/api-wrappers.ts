@@ -292,17 +292,14 @@ export async function updateTask(
 		doc.syncTitleToRoom();
 	}
 
-	/** Update status if provided */
 	if (updates.status) {
-		doc.updateStatus(
-			updates.status as
-				| "draft"
-				| "pending_review"
-				| "changes_requested"
-				| "in_progress"
-				| "completed",
-			actor,
-		);
+		const status:
+			| "draft"
+			| "pending_review"
+			| "changes_requested"
+			| "in_progress"
+			| "completed" = updates.status;
+		doc.updateStatus(status, actor);
 	}
 
 	const env = parseEnv();
@@ -490,14 +487,13 @@ export async function addArtifact(opts: {
 		artifactType: type,
 	});
 
-	/** Link to deliverable if specified */
 	if (opts.deliverableId) {
-		const deliverablesArray = doc.deliverables.toJSON() as Array<{
+		const deliverablesArray: Array<{
 			id: string;
 			text: string;
 			linkedArtifactId: string | null;
 			linkedAt: number | null;
-		}>;
+		}> = doc.deliverables.toJSON();
 		const deliverableIndex = deliverablesArray.findIndex(
 			(d) => d.id === opts.deliverableId,
 		);
@@ -534,10 +530,9 @@ export async function addArtifact(opts: {
 		}
 	}
 
-	/** Check if all deliverables are complete */
-	const updatedDeliverables = doc.deliverables.toJSON() as Array<{
+	const updatedDeliverables: Array<{
 		linkedArtifactId: string | null;
-	}>;
+	}> = doc.deliverables.toJSON();
 	const allComplete =
 		updatedDeliverables.length > 0 &&
 		updatedDeliverables.every((d) => d.linkedArtifactId);
@@ -908,9 +903,9 @@ export async function readDiffComments(
 
 	for (const [id, comment] of Object.entries(comments)) {
 		if (!comment || typeof comment !== "object") continue;
-		const c = comment as Record<string, unknown>;
+		const c: Record<string, unknown> = comment;
 
-		const kind = c.kind as string;
+		const kind: string = String(c.kind ?? "");
 		const includeLocal = opts?.includeLocal !== false;
 		const includePR = opts?.includePR !== false;
 		const includeResolved = opts?.includeResolved === true;

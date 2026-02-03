@@ -61,9 +61,6 @@ const UpdateBlockContentInput = z.object({
 		.describe("Array of operations to perform atomically"),
 });
 
-// BlockOperation type used internally in operations array
-// type BlockOperation = z.infer<typeof BlockOperationSchema>;
-
 /**
  * Register the update_block_content tool.
  */
@@ -148,8 +145,10 @@ Example with deliverables:
 			/** Get actor name */
 			const actorName = await getGitHubUsername();
 
-			// TODO: Implement block operations when loro-prosemirror integration is ready
-			// For now, log the operations and return a placeholder response
+			/*
+			 * TODO: Implement block operations when loro-prosemirror integration is ready
+			 * For now, log the operations and return a placeholder response
+			 */
 
 			const results: string[] = [];
 			for (const op of operations) {

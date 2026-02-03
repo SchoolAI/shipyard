@@ -236,7 +236,7 @@ async function getResolvedMcpConfigPath(): Promise<string | null> {
 			config.mcpServers,
 		)) {
 			if (!serverConfig || typeof serverConfig !== "object") continue;
-			const server = serverConfig as Record<string, unknown>;
+			const server: Record<string, unknown> = serverConfig;
 			if (Array.isArray(server.args)) {
 				server.args = server.args.map((arg: unknown) => {
 					if (typeof arg !== "string") return arg;
@@ -480,7 +480,7 @@ function isA2AMessage(msg: unknown): msg is A2AMessage {
 	if (typeof msg !== "object" || msg === null) {
 		return false;
 	}
-	const candidate = msg as Record<string, unknown>;
+	const candidate: Record<string, unknown> = msg;
 	return (
 		typeof candidate.messageId === "string" &&
 		typeof candidate.role === "string" &&

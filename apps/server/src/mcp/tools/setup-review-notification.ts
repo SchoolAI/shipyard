@@ -55,10 +55,12 @@ REQUIREMENTS: The script requires 'jq' for URL encoding. Install with: brew inst
 			const env = parseEnv();
 			const registryPort = env.PORT;
 
-			// NOTE: With the new Loro architecture, status changes are pushed via CRDT sync
-			// rather than polled via tRPC. This script is a legacy fallback for non-hook agents.
-			// In the new architecture, agents should connect via WebSocket and subscribe to
-			// doc changes directly.
+			/*
+			 * NOTE: With the new Loro architecture, status changes are pushed via CRDT sync
+			 * rather than polled via tRPC. This script is a legacy fallback for non-hook agents.
+			 * In the new architecture, agents should connect via WebSocket and subscribe to
+			 * doc changes directly.
+			 */
 
 			const script = `#!/bin/bash
 # Monitor task "${taskId}" for approval status changes

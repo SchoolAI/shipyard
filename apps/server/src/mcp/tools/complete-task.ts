@@ -87,8 +87,7 @@ RETURNS:
 				);
 			}
 
-			/** Check artifacts exist */
-			const artifacts = doc.artifacts.toJSON() as Array<{ id: string }>;
+			const artifacts: Array<{ id: string }> = doc.artifacts.toJSON();
 			if (artifacts.length === 0) {
 				return errorResponse(
 					"Cannot complete: no deliverables attached. Upload artifacts first using add_artifact.",
@@ -103,8 +102,10 @@ RETURNS:
 
 			logger.info({ taskId: input.taskId }, "Task marked complete");
 
-			// TODO: Generate snapshot URL with history
-			// TODO: Auto-link PR from current branch
+			/*
+			 * TODO: Generate snapshot URL with history
+			 * TODO: Auto-link PR from current branch
+			 */
 			const snapshotUrl = `(Snapshot URL generation pending - taskId: ${input.taskId})`;
 
 			return {

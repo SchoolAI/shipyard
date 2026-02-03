@@ -9,7 +9,6 @@
  * - ./github-helpers.ts (getOctokit, isGitHubConfigured, etc.)
  */
 
-import { logger } from "./logger.js";
 import {
 	type ContentResult,
 	type ContentSource,
@@ -24,6 +23,7 @@ import {
 	isGitHubConfigured,
 	resolveGitHubToken,
 } from "./github-helpers.js";
+import { logger } from "./logger.js";
 
 const ARTIFACTS_BRANCH = "plan-artifacts";
 

@@ -171,9 +171,10 @@ link_pr({
 							? "draft"
 							: "open";
 
+				const typedStatus: "draft" | "open" | "merged" | "closed" = status;
 				const linkedPR = {
 					prNumber: input.prNumber,
-					status: status as "draft" | "open" | "merged" | "closed",
+					status: typedStatus,
 					branch: input.branch || validatedPR.head.ref,
 					title: validatedPR.title,
 				};

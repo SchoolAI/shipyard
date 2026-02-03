@@ -178,35 +178,37 @@ OUTPUT INCLUDES:
 			/** Build output */
 			let output = formatTaskHeader(meta);
 
-			// TODO: Export content to markdown when loro-prosemirror integration is ready
-			// For now, just note that content is in Loro format
+			/*
+			 * TODO: Export content to markdown when loro-prosemirror integration is ready
+			 * For now, just note that content is in Loro format
+			 */
 			output += "(Content stored in Loro format - export pending)\n";
 
-			/** Get deliverables */
-			const deliverables = doc.deliverables.toJSON() as Array<{
+			const deliverables: Array<{
 				id: string;
 				text: string;
 				linkedArtifactId: string | null;
-			}>;
+			}> = doc.deliverables.toJSON();
 			const deliverablesText = formatDeliverablesForLLM(deliverables);
 			if (deliverablesText) {
 				output += "\n\n---\n\n";
 				output += deliverablesText;
 			}
 
-			/** Include linked PRs if requested */
 			if (includeLinkedPRs) {
-				const linkedPRs = doc.linkedPRs.toJSON() as Array<{
+				const linkedPRs: Array<{
 					prNumber: number;
 					status: string;
 					branch: string | null;
 					title: string | null;
-				}>;
+				}> = doc.linkedPRs.toJSON();
 				output += formatLinkedPRsSection(linkedPRs);
 			}
 
-			// TODO: Include PR comments when comment formatting is implemented
-			// TODO: Include annotations when comment export is implemented
+			/*
+			 * TODO: Include PR comments when comment formatting is implemented
+			 * TODO: Include annotations when comment export is implemented
+			 */
 
 			return {
 				content: [

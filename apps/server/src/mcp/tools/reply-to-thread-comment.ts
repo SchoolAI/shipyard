@@ -36,12 +36,10 @@ const ReplyToThreadCommentInput = z.object({
 function parseThreadId(input: string): string {
 	let cleaned = input.trim();
 
-	// Remove brackets if present
 	if (cleaned.startsWith("[") && cleaned.endsWith("]")) {
 		cleaned = cleaned.slice(1, -1);
 	}
 
-	// Remove thread: prefix if present
 	if (cleaned.startsWith("thread:")) {
 		cleaned = cleaned.slice(7);
 	}
@@ -116,8 +114,7 @@ reply_to_thread_comment({
 				"Parsed thread ID from input",
 			);
 
-			/** Find the thread in inline comments */
-			const allComments = doc.comments.toJSON() as Record<
+			const allComments: Record<
 				string,
 				{
 					kind: string;
@@ -125,9 +122,8 @@ reply_to_thread_comment({
 					threadId: string;
 					blockId?: string;
 				}
-			>;
+			> = doc.comments.toJSON();
 
-			// Find any comment with matching threadId that's an inline comment
 			let foundThread = false;
 			let blockId: string | undefined;
 

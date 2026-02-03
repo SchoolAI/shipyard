@@ -50,7 +50,6 @@ export function getRepositoryFullName(): string | null {
 		cachedRepoName = repoName;
 		return cachedRepoName;
 	} catch {
-		// Not in a git repo, or gh CLI not available - that's okay, repo is optional
 		cachedRepoName = "";
 		return null;
 	}
@@ -65,19 +64,16 @@ export function getRepositoryFullName(): string | null {
  * 5. OS username (unverified)
  */
 export async function getGitHubUsername(): Promise<string> {
-	// Return cached value if resolved
 	if (usernameResolved && cachedUsername) {
 		return cachedUsername;
 	}
 
-	// 1. Try GITHUB_USERNAME env var (explicit)
 	if (process.env.GITHUB_USERNAME) {
 		cachedUsername = process.env.GITHUB_USERNAME;
 		usernameResolved = true;
 		return cachedUsername;
 	}
 
-	// 2. Try GITHUB_TOKEN + API
 	if (process.env.GITHUB_TOKEN) {
 		const username = await getUsernameFromToken(process.env.GITHUB_TOKEN);
 		if (username) {
@@ -87,7 +83,6 @@ export async function getGitHubUsername(): Promise<string> {
 		}
 	}
 
-	// 3. Try gh CLI
 	const cliUsername = getUsernameFromCLI();
 	if (cliUsername) {
 		cachedUsername = cliUsername;
@@ -95,7 +90,6 @@ export async function getGitHubUsername(): Promise<string> {
 		return cachedUsername;
 	}
 
-	// 4. Try git config (unverified)
 	const gitUsername = getUsernameFromGitConfig();
 	if (gitUsername) {
 		cachedUsername = gitUsername;
@@ -103,16 +97,13 @@ export async function getGitHubUsername(): Promise<string> {
 		return cachedUsername;
 	}
 
-	// 5. Try OS username (unverified)
 	const osUsername = process.env.USER || process.env.USERNAME;
 	if (osUsername) {
-		// Sanitize OS username - Windows usernames can contain spaces/special characters
 		cachedUsername = osUsername.replace(/[^a-zA-Z0-9_-]/g, "_");
 		usernameResolved = true;
 		return cachedUsername;
 	}
 
-	// 6. All failed
 	usernameResolved = true;
 	throw new Error(
 		"GitHub username required but could not be determined.\n\n" +
@@ -142,7 +133,7 @@ async function getUsernameFromToken(token: string): Promise<string | null> {
 
 		if (!response.ok) return null;
 
-		const user = (await response.json()) as { login?: string };
+		const user: { login?: string } = await response.json();
 		return user.login ?? null;
 	} catch {
 		return null;
@@ -188,12 +179,10 @@ function getUsernameFromGitConfig(): string | null {
  * Returns null if no verified auth is available.
  */
 export async function getVerifiedGitHubUsername(): Promise<string | null> {
-	// Try GITHUB_USERNAME env var (if set, assumed verified)
 	if (process.env.GITHUB_USERNAME) {
 		return process.env.GITHUB_USERNAME;
 	}
 
-	// Try GITHUB_TOKEN + API call (verified)
 	if (process.env.GITHUB_TOKEN) {
 		const username = await getUsernameFromToken(process.env.GITHUB_TOKEN);
 		if (username) {
@@ -201,13 +190,11 @@ export async function getVerifiedGitHubUsername(): Promise<string | null> {
 		}
 	}
 
-	// Try gh CLI (verified)
 	const username = getUsernameFromCLI();
 	if (username) {
 		return username;
 	}
 
-	// Do NOT fall back to git config or USER env var
 	return null;
 }
 
@@ -310,12 +297,10 @@ export function getMachineId(): string {
 export function getMachineName(): string {
 	const h = hostname();
 
-	// Strip .local suffix (macOS)
 	if (h.endsWith(".local")) {
 		return h.slice(0, -6);
 	}
 
-	// Handle hyphenated names like "jacob-macbook"
 	if (h.includes("-")) {
 		const parts = h.split("-");
 		if (parts.length >= 2) {

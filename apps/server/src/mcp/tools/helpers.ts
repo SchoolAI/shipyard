@@ -49,11 +49,9 @@ export async function getTaskDocument(
 	try {
 		const repo = getRepo();
 
-		/** Get the task document handle - Loro Repo uses get() not open() */
-		// biome-ignore lint/suspicious/noExplicitAny: Loro DocShape constraint workaround
+		// eslint-disable-next-line no-restricted-syntax
 		const taskHandle = repo.get(taskId, TaskDocumentSchema as any);
 
-		/** Check if document exists by checking if it has been loaded */
 		if (!repo.has(taskId)) {
 			return {
 				success: false,
@@ -61,21 +59,18 @@ export async function getTaskDocument(
 			};
 		}
 
-		/** Get the room document handle for cross-doc operations */
-		// biome-ignore lint/suspicious/noExplicitAny: Loro DocShape constraint workaround
+		// eslint-disable-next-line no-restricted-syntax
 		const roomHandle = repo.get(ROOM_DOC_ID, RoomSchema as any);
 
-		/** Create TaskDocument wrapper using the typed doc from handles */
+		/* eslint-disable no-restricted-syntax */
 		const doc = new TaskDocument(
-			// biome-ignore lint/suspicious/noExplicitAny: Loro DocShape constraint workaround
 			taskHandle.doc as any,
-			// biome-ignore lint/suspicious/noExplicitAny: Loro DocShape constraint workaround
 			roomHandle.doc as any,
 			taskId as TaskId,
 		);
+		/* eslint-enable no-restricted-syntax */
 
-		/** Extract metadata as plain object */
-		// biome-ignore lint/suspicious/noExplicitAny: Loro typing workaround
+		// eslint-disable-next-line no-restricted-syntax
 		const metaContainer = (taskHandle.doc as any).meta;
 		const meta: TaskMeta = {
 			id: metaContainer.id ?? taskId,
@@ -117,25 +112,21 @@ export async function getOrCreateTaskDocument(
 	try {
 		const repo = getRepo();
 
-		/** Get or create the task document handle */
-		// biome-ignore lint/suspicious/noExplicitAny: Loro DocShape constraint workaround
+		// eslint-disable-next-line no-restricted-syntax
 		const taskHandle = repo.get(taskId, TaskDocumentSchema as any);
 
-		/** Get or create the room document handle for cross-doc operations */
-		// biome-ignore lint/suspicious/noExplicitAny: Loro DocShape constraint workaround
+		// eslint-disable-next-line no-restricted-syntax
 		const roomHandle = repo.get(ROOM_DOC_ID, RoomSchema as any);
 
-		/** Create TaskDocument wrapper using the typed doc from handles */
+		/* eslint-disable no-restricted-syntax */
 		const doc = new TaskDocument(
-			// biome-ignore lint/suspicious/noExplicitAny: Loro DocShape constraint workaround
 			taskHandle.doc as any,
-			// biome-ignore lint/suspicious/noExplicitAny: Loro DocShape constraint workaround
 			roomHandle.doc as any,
 			taskId as TaskId,
 		);
+		/* eslint-enable no-restricted-syntax */
 
-		/** Extract metadata as plain object (may be empty for new docs) */
-		// biome-ignore lint/suspicious/noExplicitAny: Loro typing workaround
+		// eslint-disable-next-line no-restricted-syntax
 		const metaContainer = (taskHandle.doc as any).meta;
 		const meta: TaskMeta = {
 			id: metaContainer.id ?? taskId,
@@ -182,7 +173,6 @@ export function verifySessionToken(
 	storedHash: string | null | undefined,
 	taskId: string,
 ): string | null {
-	/** Check for missing/invalid token */
 	if (
 		!sessionToken ||
 		sessionToken === "undefined" ||
@@ -195,7 +185,6 @@ export function verifySessionToken(
 		);
 	}
 
-	/** Check for missing hash (task has no token set) */
 	if (!storedHash) {
 		return (
 			`Invalid session token for task "${taskId}". ` +
@@ -204,7 +193,6 @@ export function verifySessionToken(
 		);
 	}
 
-	/** Verify token using constant-time comparison */
 	const tokenHash = hashSessionToken(sessionToken);
 
 	try {
@@ -227,7 +215,7 @@ export function verifySessionToken(
 			);
 		}
 
-		return null; // Valid token
+		return null;
 	} catch {
 		return (
 			`Invalid session token for task "${taskId}". ` +

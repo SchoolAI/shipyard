@@ -78,7 +78,10 @@ export function createGitHubProxyRoutes(ctx: GitHubProxyContext) {
 					);
 				}
 				return c.json<GitHubProxyError>(
-					{ code: "github_error", message: error.message || "GitHub API error" },
+					{
+						code: "github_error",
+						message: error.message || "GitHub API error",
+					},
 					500,
 				);
 			}
@@ -132,7 +135,10 @@ export function createGitHubProxyRoutes(ctx: GitHubProxyContext) {
 					);
 				}
 				return c.json<GitHubProxyError>(
-					{ code: "github_error", message: error.message || "GitHub API error" },
+					{
+						code: "github_error",
+						message: error.message || "GitHub API error",
+					},
 					500,
 				);
 			}

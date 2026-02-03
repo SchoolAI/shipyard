@@ -67,7 +67,9 @@ const AddArtifactInput = z.discriminatedUnion("source", [
 /**
  * Convert Zod-parsed input to ContentSource type.
  */
-function toContentSource(input: z.infer<typeof AddArtifactInput>): ContentSource {
+function toContentSource(
+	input: z.infer<typeof AddArtifactInput>,
+): ContentSource {
 	switch (input.source) {
 		case "file":
 			return { source: "file", filePath: input.filePath };
@@ -178,7 +180,9 @@ ARTIFACT TYPES:
 			}
 
 			/** Resolve content */
-			const contentResult = await resolveArtifactContent(toContentSource(input));
+			const contentResult = await resolveArtifactContent(
+				toContentSource(input),
+			);
 			if (!contentResult.success) {
 				return errorResponse(contentResult.error);
 			}
@@ -262,12 +266,11 @@ ARTIFACT TYPES:
 				artifactType: type,
 			});
 
-			/** Link to deliverable if specified */
 			if (input.deliverableId) {
-				const deliverables = doc.deliverables.toJSON() as Array<{
+				const deliverables: Array<{
 					id: string;
 					linkedArtifactId: string | null;
-				}>;
+				}> = doc.deliverables.toJSON();
 				const deliverableIndex = deliverables.findIndex(
 					(d) => d.id === input.deliverableId,
 				);
@@ -286,10 +289,9 @@ ARTIFACT TYPES:
 				}
 			}
 
-			/** Check if all deliverables are complete for auto-completion */
-			const allDeliverables = doc.deliverables.toJSON() as Array<{
+			const allDeliverables: Array<{
 				linkedArtifactId: string | null;
-			}>;
+			}> = doc.deliverables.toJSON();
 			const allComplete =
 				allDeliverables.length > 0 &&
 				allDeliverables.every((d) => d.linkedArtifactId);

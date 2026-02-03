@@ -7,7 +7,6 @@
  * @see docs/whips/daemon-mcp-server-merge.md#spawn-agent-flow
  */
 
-// Note: Using simplified handle type to avoid Loro DocShape constraint issues
 import { trackAgent } from "../agents/tracker.js";
 import { logger } from "../utils/logger.js";
 
@@ -62,7 +61,6 @@ let cleanupTimerId: ReturnType<typeof setInterval> | null = null;
  */
 export function startSpawnRequestCleanup(): () => void {
 	if (cleanupTimerId !== null) {
-		// Already running
 		return () => stopSpawnRequestCleanup();
 	}
 
@@ -135,7 +133,6 @@ export async function handleSpawnRequested(
 	ctx: EventHandlerContext,
 	handle: TaskDocHandle,
 ): Promise<void> {
-	// Skip if not targeted at this machine
 	if (event.targetMachineId !== ctx.machineId) {
 		logger.debug(
 			{ eventId: event.id, targetMachineId: event.targetMachineId },
@@ -144,7 +141,6 @@ export async function handleSpawnRequested(
 		return;
 	}
 
-	// Skip if already processed (idempotency)
 	if (processedSpawnRequests.has(event.id)) {
 		logger.debug({ eventId: event.id }, "Spawn request already processed");
 		return;
@@ -159,7 +155,6 @@ export async function handleSpawnRequested(
 	);
 
 	try {
-		// Dynamic import to avoid circular dependency
 		const { spawnClaudeCode } = await import("../agents/spawner.js");
 
 		const child = await spawnClaudeCode({
@@ -168,10 +163,8 @@ export async function handleSpawnRequested(
 			cwd: event.cwd,
 		});
 
-		// Track the agent
 		trackAgent(ctx.taskId, child);
 
-		// Write spawn_started event
 		// biome-ignore lint/suspicious/noExplicitAny: Loro TypedDoc typing requires any for change callback
 		handle.change((doc: any) => {
 			doc.events.push({
@@ -191,7 +184,6 @@ export async function handleSpawnRequested(
 			"Agent spawned successfully",
 		);
 
-		// Track process exit with error handling
 		child.once("exit", (exitCode) => {
 			try {
 				// biome-ignore lint/suspicious/noExplicitAny: Loro TypedDoc typing requires any for change callback
@@ -215,7 +207,6 @@ export async function handleSpawnRequested(
 			}
 		});
 
-		// Handle process errors
 		child.once("error", (processError) => {
 			logger.error(
 				{ eventId: event.id, error: processError },
@@ -225,7 +216,6 @@ export async function handleSpawnRequested(
 	} catch (error) {
 		logger.error({ eventId: event.id, error }, "Failed to spawn agent");
 
-		// Write spawn_failed event
 		// biome-ignore lint/suspicious/noExplicitAny: Loro TypedDoc typing requires any for change callback
 		handle.change((doc: any) => {
 			doc.events.push({
@@ -252,7 +242,6 @@ export function subscribeToEvents(
 ): () => void {
 	logger.debug({ taskId: ctx.taskId }, "Subscribing to task events");
 
-	// Track the last seen event count to only process new events
 	let lastSeenEventCount = 0;
 
 	const unsubscribe = handle.subscribe(
@@ -260,12 +249,10 @@ export function subscribeToEvents(
 		(doc: any) => doc.events,
 		// biome-ignore lint/suspicious/noExplicitAny: Loro TypedDoc typing requires any for subscribe callback
 		(events: any) => {
-			// Get all events as array
-			const eventArray = events.toArray() as TaskEventItem[];
+			const eventArray: TaskEventItem[] = events.toArray();
 			const newEvents = eventArray.slice(lastSeenEventCount);
 			lastSeenEventCount = eventArray.length;
 
-			// Process new spawn_requested events
 			for (const event of newEvents) {
 				if (isSpawnRequestedEvent(event)) {
 					handleSpawnRequested(event, ctx, handle).catch((error) => {

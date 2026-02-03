@@ -178,10 +178,12 @@ Bad deliverables (not provable):
 			/** Log task created event */
 			doc.logEvent("task_created", ownerId);
 
-			// TODO: Parse markdown content and extract deliverables
-			// For now, store raw content and extract deliverables later
-			// const blocks = await parseMarkdownToBlocks(input.content)
-			// extractDeliverables(blocks).forEach(d => doc.deliverables.push(d))
+			/*
+			 * TODO: Parse markdown content and extract deliverables
+			 * For now, store raw content and extract deliverables later
+			 * const blocks = await parseMarkdownToBlocks(input.content)
+			 * extractDeliverables(blocks).forEach(d => doc.deliverables.push(d))
+			 */
 
 			/** Build task URL */
 			const env = parseEnv();

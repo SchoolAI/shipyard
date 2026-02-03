@@ -47,7 +47,6 @@ export async function ensureArtifactsBranch(repo: string): Promise<void> {
 
 	const { owner, repoName } = parseRepoString(repo);
 
-	/** Check if branch exists */
 	try {
 		await octokit.repos.getBranch({
 			owner,
@@ -106,7 +105,8 @@ export interface UploadArtifactParams {
 	repo: string;
 	taskId: string;
 	filename: string;
-	content: string; // base64 encoded
+	/** Base64 encoded content */
+	content: string;
 }
 
 /**

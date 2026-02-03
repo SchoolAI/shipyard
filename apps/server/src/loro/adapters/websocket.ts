@@ -26,9 +26,8 @@ export function createWebSocketAdapter(
 	const adapter = new WsServerNetworkAdapter();
 
 	wss.on("connection", (ws: WebSocket, req) => {
-		// Extract peer ID from query string if provided
 		const url = new URL(req.url ?? "/", `http://${req.headers.host}`);
-		const peerId = url.searchParams.get("peerId") as PeerID | null;
+		const peerId: PeerID | null = url.searchParams.get("peerId");
 
 		logger.debug({ peerId, url: req.url }, "WebSocket connection attempt");
 
@@ -49,7 +48,6 @@ export function createWebSocketAdapter(
 				{ error, peerId, url: req.url },
 				"Failed to handle WebSocket connection",
 			);
-			// Close the socket on error
 			ws.close(1011, "Internal error handling connection");
 		}
 	});

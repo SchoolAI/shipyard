@@ -275,7 +275,7 @@ export function createMockTaskDocument(taskId: string) {
 				timestamp: Date.now(),
 				inboxWorthy: null,
 				inboxFor: null,
-				...((data as object) ?? {}),
+				...(data ?? {}),
 			});
 			return eventId;
 		}),

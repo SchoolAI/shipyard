@@ -60,14 +60,13 @@ async function encodeVideo(opts: {
 	const outputPath =
 		opts.outputPath || path.join(os.tmpdir(), `video-${Date.now()}.mp4`);
 
-	/** Try to find ffmpeg in common locations */
 	const ffmpegPaths = [
 		"/usr/bin/ffmpeg",
 		"/usr/local/bin/ffmpeg",
 		"/opt/homebrew/bin/ffmpeg",
 	];
 
-	let ffmpegPath = "ffmpeg"; // Default to PATH
+	let ffmpegPath = "ffmpeg";
 	for (const p of ffmpegPaths) {
 		if (fs.existsSync(p)) {
 			ffmpegPath = p;
@@ -113,7 +112,6 @@ async function encodeVideo(opts: {
  */
 export function createSandboxContext(): SandboxContext {
 	const sandbox = {
-		/** Shipyard API wrappers */
 		createTask: apiWrappers.createTask,
 		readTask: apiWrappers.readTask,
 		updateTask: apiWrappers.updateTask,
@@ -128,16 +126,13 @@ export function createSandboxContext(): SandboxContext {
 		regenerateSessionToken: apiWrappers.regenerateSessionToken,
 		requestUserInput,
 
-		/** Utility functions */
 		encodeVideo,
 
-		/** Node.js modules (limited subset) */
 		child_process,
 		fs,
 		path,
 		os,
 
-		/** Console logging (redirects to server logger) */
 		console: {
 			log: (...logArgs: unknown[]) =>
 				logger.info({ output: logArgs }, "console.log"),
@@ -146,7 +141,7 @@ export function createSandboxContext(): SandboxContext {
 		},
 	};
 
-	return vm.createContext(sandbox) as SandboxContext;
+	return vm.createContext(sandbox);
 }
 
 /**

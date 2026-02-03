@@ -74,7 +74,6 @@ function gitExec(cwd: string, args: string[]): string {
 			stdio: ["pipe", "pipe", "pipe"],
 		}).trim();
 	} catch {
-		// Return empty string on error (e.g., not a git repo)
 		return "";
 	}
 }
@@ -132,14 +131,11 @@ export async function getGitChanges(
 	let totalAdditions = 0;
 	let totalDeletions = 0;
 
-	// Get HEAD SHA
 	const headSha = gitExec(cwd, ["rev-parse", "HEAD"]) || "0000000";
 
-	// Get current branch
 	const branch =
 		gitExec(cwd, ["rev-parse", "--abbrev-ref", "HEAD"]) || "unknown";
 
-	// Get staged changes
 	const stagedDiff = gitExec(cwd, ["diff", "--cached", "--name-status"]);
 	const stagedNumstat = gitExec(cwd, ["diff", "--cached", "--numstat"]);
 	const stagedStats = parseNumstat(stagedNumstat);
@@ -170,7 +166,6 @@ export async function getGitChanges(
 		});
 	}
 
-	// Get unstaged changes
 	const unstagedDiff = gitExec(cwd, ["diff", "--name-status"]);
 	const unstagedNumstat = gitExec(cwd, ["diff", "--numstat"]);
 	const unstagedStats = parseNumstat(unstagedNumstat);
@@ -184,7 +179,6 @@ export async function getGitChanges(
 		const filePath = parts[1];
 		if (!status || !filePath) continue;
 
-		// Skip if already tracked as staged
 		if (files.some((f) => f.path === filePath && f.staged)) continue;
 
 		const statusMap: Record<string, SyncedFileChange["status"]> = {
@@ -204,7 +198,6 @@ export async function getGitChanges(
 		});
 	}
 
-	// Get untracked files
 	const untrackedOutput = gitExec(cwd, [
 		"ls-files",
 		"--others",
@@ -217,7 +210,6 @@ export async function getGitChanges(
 		const fullPath = join(cwd, path);
 		const content = await readUntrackedFile(fullPath, maxFileSize);
 
-		// Count lines in untracked file as additions
 		if (content) {
 			totalAdditions += content.split("\n").length;
 		}
@@ -225,7 +217,7 @@ export async function getGitChanges(
 		files.push({
 			path,
 			status: "added",
-			patch: content, // Include content for untracked files under size limit
+			patch: content,
 			staged: false,
 		});
 	}
@@ -279,7 +271,6 @@ export function startGitSync(
 
 			// biome-ignore lint/suspicious/noExplicitAny: Loro TypedDoc typing requires any for change callback
 			handle.change((doc: any) => {
-				// Get or create the changeSnapshot entry
 				let snapshot = doc.changeSnapshots.get(machineId);
 				if (!snapshot) {
 					doc.changeSnapshots.set(machineId, {
@@ -298,7 +289,6 @@ export function startGitSync(
 					snapshot = doc.changeSnapshots.get(machineId);
 				}
 
-				// Update the snapshot
 				snapshot.headSha = changes.headSha;
 				snapshot.branch = changes.branch;
 				snapshot.isLive = true;
@@ -306,7 +296,6 @@ export function startGitSync(
 				snapshot.totalAdditions = changes.totalAdditions;
 				snapshot.totalDeletions = changes.totalDeletions;
 
-				// Clear and repopulate files list
 				while (snapshot.files.length > 0) {
 					snapshot.files.delete(0);
 				}
@@ -329,16 +318,13 @@ export function startGitSync(
 			logger.error({ error, machineId, cwd }, "Git sync failed");
 		}
 
-		// Schedule next sync
 		if (!stopped) {
 			timeoutId = setTimeout(sync, pollInterval);
 		}
 	}
 
-	// Start the sync loop
 	sync();
 
-	// Return cleanup function
 	return () => {
 		stopped = true;
 		if (timeoutId) {
@@ -346,7 +332,6 @@ export function startGitSync(
 			timeoutId = null;
 		}
 
-		// Mark as not live
 		try {
 			// biome-ignore lint/suspicious/noExplicitAny: Loro TypedDoc typing requires any for change callback
 			handle.change((doc: any) => {
@@ -356,9 +341,7 @@ export function startGitSync(
 					snapshot.updatedAt = Date.now();
 				}
 			});
-		} catch {
-			// Ignore errors during cleanup
-		}
+		} catch {}
 
 		logger.info({ machineId }, "Git sync stopped");
 	};

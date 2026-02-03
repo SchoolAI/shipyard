@@ -15,7 +15,6 @@ export type {
 	SpawnWithContextOptions,
 	SpawnWithContextResult,
 } from "./spawner.js";
-// Spawner exports
 export {
 	initSpawner,
 	spawnClaudeCode,
@@ -23,7 +22,6 @@ export {
 	stopAgent,
 } from "./spawner.js";
 export type { ActiveAgent, AgentSummary } from "./tracker.js";
-// Tracker exports
 export {
 	agentCount,
 	getAgent,

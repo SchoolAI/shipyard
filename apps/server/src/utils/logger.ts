@@ -30,12 +30,8 @@ export function createLogger(env: Env): pino.Logger {
 		/** Directory already exists or can't be created - continue anyway */
 	}
 
-	/**
-	 * Create logger that writes to BOTH stderr and a file
-	 * In development, use pino-pretty for stderr only (file gets raw JSON)
-	 */
 	const streams: pino.StreamEntry[] = [
-		{ stream: pino.destination(2) }, // stderr
+		{ stream: pino.destination(2) },
 		{ stream: pino.destination(logFile) },
 	];
 
@@ -73,7 +69,8 @@ export function getLogger(): pino.Logger {
  * Lazy logger proxy for modules that import logger before initialization.
  * Use getLogger() when possible for explicit control.
  */
-export const logger = new Proxy({} as pino.Logger, {
+/* eslint-disable no-restricted-syntax */
+export const logger: pino.Logger = new Proxy({} as pino.Logger, {
 	get(_target, prop) {
 		const actualLogger = getLogger();
 		const value = actualLogger[prop as keyof pino.Logger];
@@ -83,3 +80,4 @@ export const logger = new Proxy({} as pino.Logger, {
 		return value;
 	},
 });
+/* eslint-enable no-restricted-syntax */

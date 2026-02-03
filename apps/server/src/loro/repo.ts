@@ -56,11 +56,9 @@ export function createRepo(wss: WebSocketServer): Repo {
 		},
 		adapters: [storageAdapter, wsAdapter, webrtcAdapter],
 		permissions: {
-			// Allow storage adapter to reveal documents
-			// biome-ignore lint/suspicious/noExplicitAny: Loro permissions callback typing
+			/** biome-ignore lint/suspicious/noExplicitAny: Loro permissions callback typing */
 			visibility(_doc: any, peer: any) {
 				if (peer.channelKind === "storage") return true;
-				// Don't reveal documents unrelated to what the client asks for
 				return false;
 			},
 		},

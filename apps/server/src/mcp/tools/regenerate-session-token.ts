@@ -57,7 +57,6 @@ SECURITY:
 
 			logger.info({ taskId }, "Attempting to regenerate session token");
 
-			/** Get current user's verified GitHub identity */
 			const currentUser = await getVerifiedGitHubUsername();
 
 			if (!currentUser) {
@@ -106,10 +105,9 @@ Note: git config user.name is NOT accepted for security-critical operations.`,
 			doc.meta.sessionTokenHash = newTokenHash;
 			doc.meta.updatedAt = Date.now();
 
-			/** Log event for audit trail */
 			doc.logEvent("title_changed", currentUser, {
 				fromTitle: meta.title,
-				toTitle: meta.title, // Not actually changing title, but using existing event type
+				toTitle: meta.title,
 			});
 
 			logger.info(

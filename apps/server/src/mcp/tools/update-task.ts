@@ -36,10 +36,7 @@ const UpdateTaskInput = z.object({
 	taskId: z.string().describe("The task ID to update"),
 	sessionToken: z.string().describe("Session token from create_task"),
 	title: z.string().optional().describe("New title"),
-	status: z
-		.enum(TASK_STATUSES)
-		.optional()
-		.describe("New status"),
+	status: z.enum(TASK_STATUSES).optional().describe("New status"),
 	tags: z
 		.array(z.string())
 		.optional()
@@ -137,14 +134,11 @@ STATUSES:
 				});
 			}
 
-			/** Update tags if provided */
 			if (input.tags !== undefined) {
 				const tagsContainer = doc.meta.tags;
-				// Clear existing tags
 				while (tagsContainer.length > 0) {
 					tagsContainer.delete(0, 1);
 				}
-				// Add new tags
 				for (const tag of input.tags) {
 					tagsContainer.push(tag);
 				}

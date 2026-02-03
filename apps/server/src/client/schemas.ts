@@ -15,10 +15,6 @@
 
 import { z } from "zod";
 
-// =============================================================================
-// Standard Error Responses
-// =============================================================================
-
 /**
  * Standard error response schema used across all endpoints.
  */
@@ -57,10 +53,6 @@ export const NotFoundResponseSchema = ErrorResponseSchema.extend({
 
 export type NotFoundResponse = z.infer<typeof NotFoundResponseSchema>;
 
-// =============================================================================
-// Path Parameters
-// =============================================================================
-
 /**
  * Path parameters for PR-related endpoints.
  */
@@ -72,10 +64,6 @@ export const PrPathParamsSchema = z.object({
 });
 
 export type PrPathParams = z.infer<typeof PrPathParamsSchema>;
-
-// =============================================================================
-// GET /health
-// =============================================================================
 
 /**
  * GET /health success response schema.
@@ -101,10 +89,6 @@ export const HealthErrorResponseSchema = z.object({
 });
 
 export type HealthErrorResponse = z.infer<typeof HealthErrorResponseSchema>;
-
-// =============================================================================
-// GET /api/plans/:id/pr-diff/:prNumber
-// =============================================================================
 
 /**
  * GET /api/plans/:id/pr-diff/:prNumber success response.
@@ -135,10 +119,6 @@ export const PrDiffErrorResponseSchema = z.discriminatedUnion("error", [
 ]);
 
 export type PrDiffErrorResponse = z.infer<typeof PrDiffErrorResponseSchema>;
-
-// =============================================================================
-// GET /api/plans/:id/pr-files/:prNumber
-// =============================================================================
 
 /**
  * File change status in a PR.

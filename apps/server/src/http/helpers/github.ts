@@ -5,8 +5,10 @@
  * Used by github-proxy routes.
  */
 
-// TODO: Import Octokit
-// import { Octokit } from '@octokit/rest'
+/*
+ * TODO: Import Octokit
+ * import { Octokit } from '@octokit/rest'
+ */
 
 import type { Env } from "../../env.js";
 
@@ -35,8 +37,10 @@ let client: GitHubClient | null = null;
  * Initialize the GitHub client with env config.
  */
 export function initGitHubClient(_env: Env): void {
-	// TODO: Create Octokit instance with token
-	// client = new Octokit({ auth: env.GITHUB_TOKEN })
+	/*
+	 * TODO: Create Octokit instance with token
+	 * client = new Octokit({ auth: env.GITHUB_TOKEN })
+	 */
 	client = null;
 }
 

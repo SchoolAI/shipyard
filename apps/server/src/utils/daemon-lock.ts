@@ -21,7 +21,9 @@ function hasErrorCode(error: unknown, code: string): boolean {
 	if (typeof error !== "object" || error === null || !("code" in error)) {
 		return false;
 	}
-	return (error as { code: string }).code === code;
+	// eslint-disable-next-line no-restricted-syntax
+	const errorWithCode = error as { code: string };
+	return errorWithCode.code === code;
 }
 
 /**
@@ -83,16 +85,13 @@ async function handleExistingLock(retryCount: number): Promise<boolean> {
 	if (pid === null) return false;
 
 	if (isProcessAlive(pid)) {
-		// Lock held by active process
 		return false;
 	}
 
-	// Process dead - check retry limit before attempting removal
 	if (retryCount >= MAX_LOCK_RETRIES) {
 		return false;
 	}
 
-	// Attempt to remove stale lock and retry
 	await tryRemoveStaleLock(pid);
 	return tryAcquireLock(retryCount + 1);
 }
@@ -108,13 +107,10 @@ export async function tryAcquireLock(retryCount = 0): Promise<boolean> {
 		const stateDir = getStateDir();
 		const lockFile = getLockFilePath();
 
-		// Ensure state directory exists
 		mkdirSync(stateDir, { recursive: true });
 
-		// Atomic write - fails if file exists
 		await writeFile(lockFile, `${process.pid}\n${Date.now()}`, { flag: "wx" });
 
-		// Register cleanup handler
 		registerLockCleanupHandler();
 
 		return true;
@@ -170,32 +166,24 @@ export function acquireLock(): boolean {
 	const lockPath = getLockFilePath();
 
 	if (existsSync(lockPath)) {
-		// Check if process is still running
 		try {
 			const pid = Number.parseInt(readFileSync(lockPath, "utf-8").trim(), 10);
 			if (!Number.isNaN(pid)) {
 				if (isProcessAlive(pid)) {
-					// Process exists, lock is held
 					return false;
 				}
-				// Process doesn't exist, stale lock
 				unlinkSync(lockPath);
 			}
-		} catch {
-			// Can't read lock file, try to acquire
-		}
+		} catch {}
 	}
 
-	// Ensure directory exists
 	mkdirSync(dirname(lockPath), { recursive: true });
 
-	// Write our PID to lock file
 	try {
 		writeFileSync(lockPath, String(process.pid), { flag: "wx" });
 		registerLockCleanupHandler();
 		return true;
 	} catch {
-		// Another process beat us
 		return false;
 	}
 }

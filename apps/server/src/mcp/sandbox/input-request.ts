@@ -111,7 +111,6 @@ export async function requestUserInput(
 	const repo = getRepo();
 	const requestId = generateInputRequestId();
 
-	/** Calculate timeout */
 	const timeoutSeconds = Math.max(
 		MIN_TIMEOUT_SECONDS,
 		Math.min(opts.timeout ?? DEFAULT_TIMEOUT_SECONDS, MAX_TIMEOUT_SECONDS),
@@ -120,14 +119,10 @@ export async function requestUserInput(
 
 	logger.info({ requestId, timeoutSeconds }, "Creating input request");
 
-	// NOTE: Currently unused as the full input request system is not yet implemented.
-	// TODO: When integrated, use repo.get(ROOM_DOC_ID, RoomSchema) to create
-	// and track input requests in the CRDT.
-	void repo; // Placeholder to avoid unused variable warning
+	// TODO: When integrated, use repo.get(ROOM_DOC_ID, RoomSchema) to create input requests
+	void repo;
 
-	/** Determine if single or multi question mode using type narrowing */
 	if ("questions" in opts) {
-		/** Multi-question mode */
 		const questions = opts.questions.filter(
 			(q): q is NonNullable<typeof q> => q != null,
 		);
@@ -141,34 +136,26 @@ export async function requestUserInput(
 		}
 
 		// TODO: Create multi input request in roomDoc.inputRequests
-		// For now, return a simulated timeout
 		logger.info(
 			{ requestId, questionCount: questions.length },
 			"Multi-question input request created (waiting for response)",
 		);
 	} else {
-		/** Single question mode */
 		// TODO: Create single input request in roomDoc.inputRequests
-		// For now, return a simulated timeout
 		logger.info(
 			{ requestId, type: opts.type, message: opts.message },
 			"Single-question input request created (waiting for response)",
 		);
 	}
 
-	/** Poll for response until timeout */
-	const pollInterval = 1000; // 1 second
+	const pollInterval = 1000;
 	const startTime = Date.now();
 
 	while (Date.now() < expiresAt) {
-		/** Check if request has been answered */
 		// TODO: Read from roomDoc.inputRequests[requestId]
-		// For now, this is a placeholder that will time out
 
-		/** Wait before next poll */
 		await new Promise((resolve) => setTimeout(resolve, pollInterval));
 
-		/** Log progress every 30 seconds */
 		const elapsed = Math.floor((Date.now() - startTime) / 1000);
 		if (elapsed % 30 === 0 && elapsed > 0) {
 			logger.debug(
@@ -178,7 +165,6 @@ export async function requestUserInput(
 		}
 	}
 
-	/** Timeout reached */
 	logger.warn({ requestId }, "Input request timed out");
 
 	return {

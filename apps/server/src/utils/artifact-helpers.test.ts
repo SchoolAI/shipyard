@@ -27,9 +27,9 @@ import { readFile } from "node:fs/promises";
 import {
 	ARTIFACT_SUGGESTIONS,
 	type ArtifactType,
-	VALID_EXTENSIONS,
 	parseRepoString,
 	resolveArtifactContent,
+	VALID_EXTENSIONS,
 	validateArtifactType,
 } from "./artifact-helpers.js";
 
@@ -121,9 +121,9 @@ describe("artifact-helpers", () => {
 			it("fetches URL and returns base64 content", async () => {
 				const mockResponse = {
 					ok: true,
-					arrayBuffer: vi.fn().mockResolvedValue(
-						new TextEncoder().encode("url content").buffer,
-					),
+					arrayBuffer: vi
+						.fn()
+						.mockResolvedValue(new TextEncoder().encode("url content").buffer),
 				};
 				global.fetch = vi.fn().mockResolvedValue(mockResponse);
 
@@ -272,9 +272,7 @@ describe("artifact-helpers", () => {
 					validateArtifactType("html", "wrong.png");
 				} catch (error) {
 					expect((error as Error).message).toContain("Tip:");
-					expect((error as Error).message).toContain(
-						ARTIFACT_SUGGESTIONS.html,
-					);
+					expect((error as Error).message).toContain(ARTIFACT_SUGGESTIONS.html);
 				}
 			});
 		});
