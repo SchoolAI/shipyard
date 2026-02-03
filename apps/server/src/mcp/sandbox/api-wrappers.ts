@@ -10,6 +10,8 @@ import {
 	generateArtifactId,
 	generateDeliverableId,
 	generateTaskId,
+	isTaskStatus,
+	TASK_STATUSES,
 	type TaskDocument,
 	type TaskMeta,
 } from "@shipyard/loro-schema";
@@ -293,23 +295,12 @@ export async function updateTask(
 	}
 
 	if (updates.status) {
-		const validStatuses = [
-			"draft",
-			"pending_review",
-			"changes_requested",
-			"in_progress",
-			"completed",
-		] as const;
-		type ValidStatus = (typeof validStatuses)[number];
-
-		// eslint-disable-next-line no-restricted-syntax
-		if (!validStatuses.includes(updates.status as ValidStatus)) {
+		if (!isTaskStatus(updates.status)) {
 			throw new Error(
-				`Invalid status: ${updates.status}. Valid values: ${validStatuses.join(", ")}`,
+				`Invalid status: ${updates.status}. Valid values: ${TASK_STATUSES.join(", ")}`,
 			);
 		}
-		// eslint-disable-next-line no-restricted-syntax
-		doc.updateStatus(updates.status as ValidStatus, actor);
+		doc.updateStatus(updates.status, actor);
 	}
 
 	const env = parseEnv();

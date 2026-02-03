@@ -1,8 +1,0 @@
-import { defineConfig } from 'tsdown';
-
-export default defineConfig({
-  entry: ['src/index.ts', 'src/plan.ts', 'src/url-encoding.ts', 'src/yjs-helpers.ts', 'src/claude-paths.ts'],
-  format: ['esm'],
-  dts: true,
-  clean: false /** Don't clean in watch mode - tsdown rebuilds changed files */,
-});

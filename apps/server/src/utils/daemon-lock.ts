@@ -15,15 +15,22 @@ import { getLockFilePath, getStateDir } from "./paths.js";
 const MAX_LOCK_RETRIES = 3;
 
 /**
+ * Type guard for NodeJS.ErrnoException.
+ */
+function isErrnoException(err: unknown): err is NodeJS.ErrnoException {
+	if (!(err instanceof Error)) return false;
+	if (!("code" in err)) return false;
+	return typeof err.code === "string" || typeof err.code === "undefined";
+}
+
+/**
  * Check if an error has a specific code.
  */
 function hasErrorCode(error: unknown, code: string): boolean {
-	if (typeof error !== "object" || error === null || !("code" in error)) {
+	if (!isErrnoException(error)) {
 		return false;
 	}
-	// eslint-disable-next-line no-restricted-syntax
-	const errorWithCode = error as { code: string };
-	return errorWithCode.code === code;
+	return error.code === code;
 }
 
 /**

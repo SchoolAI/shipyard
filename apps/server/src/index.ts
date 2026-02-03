@@ -31,6 +31,7 @@ import { mkdirSync } from "node:fs";
 import { serve } from "@hono/node-server";
 import { WebSocketServer } from "ws";
 import { initSpawner } from "./agents/spawner.js";
+import { HealthResponseSchema } from "./client/schemas.js";
 import { type Env, parseEnv } from "./env.js";
 import { initGitHubClient } from "./http/helpers/github.js";
 import { type AppContext, createApp } from "./http/routes/index.js";
@@ -75,9 +76,9 @@ async function isDaemonRunning(port: number): Promise<boolean> {
 
 		if (!response.ok) return false;
 
-		// eslint-disable-next-line no-restricted-syntax
-		const data = (await response.json()) as { status?: string };
-		return data.status === "ok";
+		const json = await response.json();
+		const result = HealthResponseSchema.safeParse(json);
+		return result.success && result.data.status === "ok";
 	} catch {
 		return false;
 	}

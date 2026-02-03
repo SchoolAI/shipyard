@@ -29,6 +29,15 @@ export {
 	generateMachineId,
 	generateTaskId,
 	generateThreadId,
+	toArtifactId,
+	toCommentId,
+	toDeliverableId,
+	toEventId,
+	toInputRequestId,
+	toMachineId,
+	toSessionToken,
+	toTaskId,
+	toThreadId,
 } from "./ids.js";
 export { type GetTasksOptions, RoomDocument } from "./room/document.js";
 
@@ -54,4 +63,9 @@ export type {
 // eslint-disable-next-line no-restricted-syntax
 export { RoomSchema, TaskDocumentSchema } from "./shapes.js";
 
-export { TaskDocument, type TaskStatus } from "./task/document.js";
+export {
+	isTaskStatus,
+	TASK_STATUSES,
+	TaskDocument,
+	type TaskStatus,
+} from "./task/document.js";

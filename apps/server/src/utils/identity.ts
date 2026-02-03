@@ -11,6 +11,12 @@ import { execSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { hostname, userInfo } from "node:os";
 import { basename, dirname } from "node:path";
+import { z } from "zod";
+
+/** Schema for validating GitHub user API response */
+const GitHubUserLoginSchema = z.object({
+	login: z.string().optional(),
+});
 
 /** Cache for GitHub username */
 let cachedUsername: string | null = null;
@@ -133,9 +139,10 @@ async function getUsernameFromToken(token: string): Promise<string | null> {
 
 		if (!response.ok) return null;
 
-		// eslint-disable-next-line no-restricted-syntax
-		const user = (await response.json()) as { login?: string };
-		return user.login ?? null;
+		const json: unknown = await response.json();
+		const result = GitHubUserLoginSchema.safeParse(json);
+		if (!result.success) return null;
+		return result.data.login ?? null;
 	} catch {
 		return null;
 	}

@@ -12,13 +12,22 @@ import type { EventId, TaskId } from "../ids.js";
 import { generateEventId } from "../ids.js";
 import type { RoomShape, TaskDocumentShape, TaskEventItem } from "../shapes.js";
 
+/** All valid task status values */
+export const TASK_STATUSES = [
+	"draft",
+	"pending_review",
+	"changes_requested",
+	"in_progress",
+	"completed",
+] as const;
+
 /** Task status values */
-export type TaskStatus =
-	| "draft"
-	| "pending_review"
-	| "changes_requested"
-	| "in_progress"
-	| "completed";
+export type TaskStatus = (typeof TASK_STATUSES)[number];
+
+/** Type guard to check if a string is a valid TaskStatus */
+export function isTaskStatus(value: string): value is TaskStatus {
+	return TASK_STATUSES.includes(value as TaskStatus);
+}
 
 /**
  * Event types derived from the TaskEventItem discriminated union.

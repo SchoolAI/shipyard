@@ -10,7 +10,7 @@ import {
 	WsServerNetworkAdapter,
 	wrapWsSocket,
 } from "@loro-extended/adapter-websocket/server";
-import type { PeerID } from "@loro-extended/repo";
+import { type PeerID, validatePeerId } from "@loro-extended/repo";
 import type { WebSocket, WebSocketServer } from "ws";
 import { logger } from "../../utils/logger.js";
 
@@ -28,19 +28,21 @@ export function createWebSocketAdapter(
 	wss.on("connection", (ws: WebSocket, req) => {
 		const url = new URL(req.url ?? "/", `http://${req.headers.host}`);
 		const peerIdParam = url.searchParams.get("peerId");
-		// eslint-disable-next-line no-restricted-syntax
-		const peerId: PeerID | null =
-			peerIdParam && /^(0|[1-9]\d*)$/.test(peerIdParam)
-				? // eslint-disable-next-line no-restricted-syntax
-					(peerIdParam as PeerID)
-				: null;
+
+		let peerId: PeerID | undefined;
+		if (peerIdParam) {
+			try {
+				validatePeerId(peerIdParam);
+				peerId = peerIdParam;
+			} catch {}
+		}
 
 		logger.debug({ peerId, url: req.url }, "WebSocket connection attempt");
 
 		try {
 			const { connection, start } = adapter.handleConnection({
 				socket: wrapWsSocket(ws),
-				peerId: peerId ?? undefined,
+				peerId,
 			});
 
 			logger.info(
