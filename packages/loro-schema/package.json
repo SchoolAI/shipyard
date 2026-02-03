@@ -3,37 +3,17 @@
   "version": "0.1.0",
   "type": "module",
   "description": "Loro-based schema and CRDT helpers for Shipyard",
-  "main": "./dist/index.mjs",
-  "types": "./dist/index.d.mts",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "import": "./dist/index.mjs",
-      "types": "./dist/index.d.mts"
-    },
-    "./shapes": {
-      "import": "./dist/shapes.mjs",
-      "types": "./dist/shapes.d.mts"
-    },
-    "./validators": {
-      "import": "./dist/validators.mjs",
-      "types": "./dist/validators.d.mts"
-    },
-    "./types": {
-      "import": "./dist/types.mjs",
-      "types": "./dist/types.d.mts"
-    },
-    "./helpers": {
-      "import": "./dist/helpers.mjs",
-      "types": "./dist/helpers.d.mts"
-    },
-    "./url": {
-      "import": "./dist/url-encoding.mjs",
-      "types": "./dist/url-encoding.d.mts"
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
     }
   },
   "scripts": {
-    "build": "tsdown",
-    "dev": "tsdown --watch",
+    "build": "bunup",
+    "dev": "bunup --watch",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
@@ -53,7 +33,7 @@
   },
   "devDependencies": {
     "@types/node": "^25.0.10",
-    "tsdown": "0.20.0-beta.4",
+    "bunup": "^0.16.22",
     "typescript": "^5.9.3",
     "vitest": "^4.0.17",
     "loro-crdt": "^1.10.3"

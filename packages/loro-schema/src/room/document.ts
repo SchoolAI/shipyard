@@ -30,8 +30,7 @@ export interface TaskIndexEntryValue {
 	createdAt: number;
 	viewedBy: Record<string, number>;
 	eventViewedBy: Record<string, Record<string, number>>;
-	// biome-ignore lint/suspicious/noExplicitAny: Complex nested event union type
-	inboxEvents: any[];
+	inboxEvents: TaskEventItem[];
 }
 
 export interface GetTasksOptions {

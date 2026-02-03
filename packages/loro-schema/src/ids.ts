@@ -37,33 +37,41 @@ export type InputRequestId = Brand<string, "InputRequestId">;
 export type ThreadId = Brand<string, "ThreadId">;
 
 export function generateTaskId(): TaskId {
+	// eslint-disable-next-line no-restricted-syntax -- Branded type requires assertion
 	return nanoid() as TaskId;
 }
 
 export function generateCommentId(): CommentId {
+	// eslint-disable-next-line no-restricted-syntax -- Branded type requires assertion
 	return nanoid() as CommentId;
 }
 
 export function generateArtifactId(): ArtifactId {
+	// eslint-disable-next-line no-restricted-syntax -- Branded type requires assertion
 	return nanoid() as ArtifactId;
 }
 
 export function generateDeliverableId(): DeliverableId {
+	// eslint-disable-next-line no-restricted-syntax -- Branded type requires assertion
 	return nanoid() as DeliverableId;
 }
 
 export function generateEventId(): EventId {
+	// eslint-disable-next-line no-restricted-syntax -- Branded type requires assertion
 	return nanoid() as EventId;
 }
 
 export function generateInputRequestId(): InputRequestId {
+	// eslint-disable-next-line no-restricted-syntax -- Branded type requires assertion
 	return nanoid() as InputRequestId;
 }
 
 export function generateMachineId(): MachineId {
+	// eslint-disable-next-line no-restricted-syntax -- Branded type requires assertion
 	return nanoid() as MachineId;
 }
 
 export function generateThreadId(): ThreadId {
+	// eslint-disable-next-line no-restricted-syntax -- Branded type requires assertion
 	return nanoid() as ThreadId;
 }

@@ -242,7 +242,7 @@ export class TaskDocument {
 		const inboxWorthy = options?.inboxWorthy ?? null;
 		const inboxFor = options?.inboxFor ?? null;
 
-		// eslint-disable-next-line no-restricted-syntax -- Cast is safe: function signature ensures `data` contains all required fields for type T
+		// eslint-disable-next-line no-restricted-syntax -- Discriminated union construction
 		const event = {
 			id,
 			type,
