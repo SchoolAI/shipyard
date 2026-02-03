@@ -9,7 +9,7 @@
 
 import type { TypedDoc } from "@loro-extended/change";
 import type { EventId, TaskId } from "../ids.js";
-import type { RoomShape } from "../shapes.js";
+import type { RoomShape, TaskEventItem } from "../shapes.js";
 
 /**
  * Manual TaskIndexEntry type definition.
