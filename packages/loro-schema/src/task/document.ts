@@ -150,8 +150,7 @@ export class TaskDocument {
 	updateStatus(status: TaskStatus, actor: string): void {
 		const now = Date.now();
 		const taskMeta = this.#taskDoc.meta;
-		// eslint-disable-next-line no-restricted-syntax -- Loro schema returns string, we know it's TaskStatus from Shape definition
-		const currentStatus = taskMeta.status as TaskStatus;
+		const currentStatus = taskMeta.status;
 
 		taskMeta.status = status;
 		taskMeta.updatedAt = now;

@@ -9,29 +9,10 @@
 
 import type { TypedDoc } from "@loro-extended/change";
 import type { EventId, TaskId } from "../ids.js";
-import type { RoomShape, TaskEventItem } from "../shapes.js";
+import type { RoomShape, TaskIndexEntry } from "../shapes.js";
 
-/**
- * Manual TaskIndexEntry type definition.
- * The inferred type from Loro schema has issues with nested records.
- */
-export interface TaskIndexEntryValue {
-	taskId: string;
-	title: string;
-	status:
-		| "draft"
-		| "pending_review"
-		| "changes_requested"
-		| "in_progress"
-		| "completed";
-	ownerId: string;
-	hasPendingRequests: boolean;
-	lastUpdated: number;
-	createdAt: number;
-	viewedBy: Record<string, number>;
-	eventViewedBy: Record<string, Record<string, number>>;
-	inboxEvents: TaskEventItem[];
-}
+/** Task index entry value type derived from schema */
+export type TaskIndexEntryValue = TaskIndexEntry[string];
 
 export interface GetTasksOptions {
 	/** Include archived tasks (default: false) */
@@ -58,11 +39,9 @@ export class RoomDocument {
 	 * all tasks since TaskIndex doesn't track archived status.
 	 */
 	getTasks(_options?: GetTasksOptions): TaskIndexEntryValue[] {
-		const taskIndex = this.#roomDoc.taskIndex.toJSON() as Record<
-			string,
-			TaskIndexEntryValue
-		>;
-		const tasks = Object.values(taskIndex);
+		const taskIndex = this.#roomDoc.taskIndex;
+		const tasks: (typeof taskIndex)[keyof typeof taskIndex][] =
+			Object.values(taskIndex);
 
 		return tasks.sort((a, b) => b.lastUpdated - a.lastUpdated);
 	}
@@ -81,16 +60,12 @@ export class RoomDocument {
 	 * @returns true if the task has been updated since the user last viewed it
 	 */
 	isTaskUnread(taskId: TaskId, username: string): boolean {
-		const taskIndex = this.#roomDoc.taskIndex.toJSON() as Record<
-			string,
-			TaskIndexEntryValue
-		>;
-		const task = taskIndex[taskId];
+		const task = this.#roomDoc.taskIndex.get(taskId);
 		if (!task) {
 			return false;
 		}
 
-		const viewedAt = task.viewedBy[username];
+		const viewedAt = task.viewedBy.get(username);
 		if (viewedAt === undefined) {
 			return true;
 		}
@@ -104,21 +79,17 @@ export class RoomDocument {
 	 * @returns true if the event has not been marked as read by the user
 	 */
 	isEventUnread(taskId: TaskId, eventId: EventId, username: string): boolean {
-		const taskIndex = this.#roomDoc.taskIndex.toJSON() as Record<
-			string,
-			TaskIndexEntryValue
-		>;
-		const task = taskIndex[taskId];
+		const task = this.#roomDoc.taskIndex.get(taskId);
 		if (!task) {
 			return false;
 		}
 
-		const eventViewedByUsers = task.eventViewedBy[eventId];
+		const eventViewedByUsers = task.eventViewedBy.get(eventId);
 		if (!eventViewedByUsers) {
 			return true;
 		}
 
-		const viewedAt = eventViewedByUsers[username];
+		const viewedAt = eventViewedByUsers.get(username);
 		return viewedAt === undefined;
 	}
 
