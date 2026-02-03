@@ -38,7 +38,6 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.3.11",
-    "vitest": "^4.0.17",
     "@typescript-eslint/eslint-plugin": "^8.53.1",
     "@typescript-eslint/parser": "^8.53.1",
     "concurrently": "^9.2.1",
@@ -48,10 +47,11 @@
     "mcpmon": "^1.0.1",
     "playwright": "^1.57.0",
     "simple-git-hooks": "^2.13.1",
-    "tsup": "^8.5.1",
-    "tsx": "^4.21.0",
+    "tsup": "catalog:",
+    "tsx": "catalog:",
     "turbo": "^2.7.5",
-    "typescript": "^5.9.3"
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   },
   "engines": {
     "node": ">=22.14.0",
@@ -62,6 +62,6 @@
     "pre-commit": "pnpm check"
   },
   "dependencies": {
-    "nanoid": "^5.1.6"
+    "nanoid": "catalog:"
   }
 }

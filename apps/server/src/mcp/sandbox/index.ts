@@ -141,7 +141,7 @@ export function createSandboxContext(): SandboxContext {
 		},
 	};
 
-	return vm.createContext(sandbox);
+	return vm.createContext(sandbox) as SandboxContext;
 }
 
 /**

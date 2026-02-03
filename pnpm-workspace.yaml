@@ -1,3 +1,105 @@
 packages:
   - 'packages/*'
   - 'apps/*'
+
+catalog:
+  # ===== loro-extended packages (enforce 5.4.1) =====
+  "@loro-extended/adapter-leveldb": "^5.4.1"
+  "@loro-extended/adapter-webrtc": "^5.4.1"
+  "@loro-extended/adapter-websocket": "^5.4.1"
+  "@loro-extended/change": "^5.4.1"
+  "@loro-extended/repo": "^5.4.1"
+  loro-crdt: "^1.10.3"
+
+  # ===== Build tools =====
+  typescript: "^5.9.3"
+  tsup: "^8.5.1"
+  tsx: "^4.21.0"
+  bunup: "^0.16.22"
+  tsdown: "0.20.0-beta.4"
+  vitest: "^4.0.17"
+  "@vitest/coverage-istanbul": "^3.0.4"
+  "@vitest/coverage-v8": "^4.0.17"
+
+  # ===== Runtime dependencies =====
+  zod: "^4.3.5"
+  hono: "^4.11.3"
+  pino: "^10.2.1"
+  pino-pretty: "^13.1.3"
+  nanoid: "^5.1.6"
+  ws: "^8.19.0"
+  express: "^5.2.1"
+  lz-string: "^1.5.0"
+
+  # ===== Yjs ecosystem =====
+  yjs: "^13.6.29"
+  y-websocket: "^3.0.0"
+  y-webrtc: "^10.3.0"
+  y-protocols: "^1.0.7"
+  y-leveldb: "^0.2.0"
+  y-indexeddb: "^9.0.12"
+  lib0: "^0.2.117"
+
+  # ===== BlockNote =====
+  "@blocknote/core": "^0.46.1"
+  "@blocknote/mantine": "^0.46.1"
+  "@blocknote/react": "^0.46.1"
+  "@blocknote/server-util": "^0.46.1"
+
+  # ===== React =====
+  react: "^19.2.3"
+  react-dom: "^19.2.3"
+  "@types/react": "^19.2.9"
+  "@types/react-dom": "^19.2.3"
+
+  # ===== tRPC =====
+  "@trpc/client": "^11.8.1"
+  "@trpc/server": "^11.8.1"
+  "@trpc/react-query": "^11.8.1"
+
+  # ===== External API clients =====
+  "@modelcontextprotocol/sdk": "^1.25.3"
+  "@octokit/rest": "^22.0.1"
+
+  # ===== Cloudflare =====
+  wrangler: "^4.59.3"
+  "@cloudflare/workers-types": "^4.20260122.0"
+  "@cloudflare/vitest-pool-workers": "^0.8.0"
+
+  # ===== Node types =====
+  "@types/node": "^25.0.10"
+  "@types/ws": "^8.18.1"
+  "@types/express": "^5.0.6"
+  "@types/bun": "^1.2.11"
+
+  # ===== Testing libraries =====
+  "@testing-library/jest-dom": "^6.9.1"
+  "@testing-library/react": "^16.3.0"
+  "@testing-library/user-event": "^14.6.1"
+  happy-dom: "^20.3.7"
+
+  # ===== HeroUI and styling =====
+  "@heroui/react": "3.0.0-beta.3"
+  "@heroui/styles": "3.0.0-beta.3"
+  tailwindcss: "^4.1.18"
+  "@tailwindcss/vite": "^4.1.18"
+  tailwind-merge: "^3.4.0"
+  tailwind-variants: "^3.2.2"
+
+  # ===== Mantine =====
+  "@mantine/core": "^8.3.13"
+  "@mantine/hooks": "^8.3.13"
+
+  # ===== Vite =====
+  vite: "^7.3.1"
+  "@vitejs/plugin-react": "^5.1.2"
+
+  # ===== Misc dependencies =====
+  open: "^11.0.0"
+  dotenv: "^17.2.3"
+
+# Named catalogs for specific version requirements
+catalogs:
+  # zod v3 - used by Cloudflare Workers which need zod v3 compatibility
+  zod3:
+    zod: "npm:zod@^3.24.2"

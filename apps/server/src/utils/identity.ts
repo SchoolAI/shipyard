@@ -133,7 +133,7 @@ async function getUsernameFromToken(token: string): Promise<string | null> {
 
 		if (!response.ok) return null;
 
-		const user: { login?: string } = await response.json();
+		const user = (await response.json()) as { login?: string };
 		return user.login ?? null;
 	} catch {
 		return null;

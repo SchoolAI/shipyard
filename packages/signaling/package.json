@@ -39,11 +39,11 @@
     "lint:fix": "biome check src --write"
   },
   "dependencies": {
-    "zod": "^3.24.2"
+    "zod": "catalog:zod3"
   },
   "devDependencies": {
-    "bunup": "^0.16.22",
-    "typescript": "^5.9.3",
-    "vitest": "^4.0.17"
+    "bunup": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }

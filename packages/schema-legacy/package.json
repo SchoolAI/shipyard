@@ -37,17 +37,17 @@
     "lint:fix": "biome check src --write"
   },
   "dependencies": {
-    "@blocknote/core": "^0.46.1",
-    "@trpc/server": "^11.8.1",
-    "lz-string": "^1.5.0",
-    "nanoid": "^5.1.6",
-    "yjs": "^13.6.29",
-    "zod": "^4.3.5"
+    "@blocknote/core": "catalog:",
+    "@trpc/server": "catalog:",
+    "lz-string": "catalog:",
+    "nanoid": "catalog:",
+    "yjs": "catalog:",
+    "zod": "catalog:"
   },
   "devDependencies": {
-    "@types/node": "^25.0.10",
-    "tsdown": "0.20.0-beta.4",
-    "typescript": "^5.9.3",
-    "vitest": "^4.0.17"
+    "@types/node": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }

@@ -116,7 +116,8 @@ export function clearMockTasks(): void {
 /**
  * Create a mock TaskDocument that follows the real interface.
  */
-export function createMockTaskDocument(taskId: string) {
+// biome-ignore lint/suspicious/noExplicitAny: Test utility mock requires any for complex spy types
+export function createMockTaskDocument(taskId: string): any {
 	const task = taskStore.get(taskId);
 	if (!task) {
 		throw new Error(`Mock task ${taskId} not found`);

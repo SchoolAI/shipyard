@@ -23,16 +23,16 @@
   },
   "dependencies": {
     "@shipyard/signaling": "workspace:*",
-    "hono": "^4.7.4",
-    "zod": "^3.24.2"
+    "hono": "catalog:",
+    "zod": "catalog:zod3"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20260122.0",
-    "@cloudflare/vitest-pool-workers": "^0.8.0",
-    "@vitest/coverage-istanbul": "^3.0.4",
-    "tsx": "^4.21.0",
-    "typescript": "^5.9.3",
-    "vitest": "^3.0.4",
-    "wrangler": "^4.59.3"
+    "@cloudflare/workers-types": "catalog:",
+    "@cloudflare/vitest-pool-workers": "catalog:",
+    "@vitest/coverage-istanbul": "catalog:",
+    "tsx": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:",
+    "wrangler": "catalog:"
   }
 }

@@ -293,13 +293,21 @@ export async function updateTask(
 	}
 
 	if (updates.status) {
-		const status:
-			| "draft"
-			| "pending_review"
-			| "changes_requested"
-			| "in_progress"
-			| "completed" = updates.status;
-		doc.updateStatus(status, actor);
+		const validStatuses = [
+			"draft",
+			"pending_review",
+			"changes_requested",
+			"in_progress",
+			"completed",
+		] as const;
+		type ValidStatus = (typeof validStatuses)[number];
+
+		if (!validStatuses.includes(updates.status as ValidStatus)) {
+			throw new Error(
+				`Invalid status: ${updates.status}. Valid values: ${validStatuses.join(", ")}`,
+			);
+		}
+		doc.updateStatus(updates.status as ValidStatus, actor);
 	}
 
 	const env = parseEnv();

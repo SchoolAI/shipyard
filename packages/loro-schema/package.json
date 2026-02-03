@@ -23,19 +23,19 @@
     "check": "pnpm typecheck && pnpm lint && pnpm test && pnpm build"
   },
   "dependencies": {
-    "@loro-extended/change": "^5.4.1",
-    "zod": "^4.3.5",
-    "lz-string": "^1.5.0",
-    "nanoid": "^5.1.6"
+    "@loro-extended/change": "catalog:",
+    "zod": "catalog:",
+    "lz-string": "catalog:",
+    "nanoid": "catalog:"
   },
   "peerDependencies": {
-    "loro-crdt": "^1.10.3"
+    "loro-crdt": "catalog:"
   },
   "devDependencies": {
-    "@types/node": "^25.0.10",
-    "bunup": "^0.16.22",
-    "typescript": "^5.9.3",
-    "vitest": "^4.0.17",
-    "loro-crdt": "^1.10.3"
+    "@types/node": "catalog:",
+    "bunup": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:",
+    "loro-crdt": "catalog:"
   }
 }

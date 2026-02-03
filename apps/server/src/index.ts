@@ -75,7 +75,7 @@ async function isDaemonRunning(port: number): Promise<boolean> {
 
 		if (!response.ok) return false;
 
-		const data: { status?: string } = await response.json();
+		const data = (await response.json()) as { status?: string };
 		return data.status === "ok";
 	} catch {
 		return false;

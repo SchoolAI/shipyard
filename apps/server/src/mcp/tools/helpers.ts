@@ -49,8 +49,7 @@ export async function getTaskDocument(
 	try {
 		const repo = getRepo();
 
-		// eslint-disable-next-line no-restricted-syntax
-		const taskHandle = repo.get(taskId, TaskDocumentSchema as any);
+		const taskHandle = repo.get(taskId, TaskDocumentSchema);
 
 		if (!repo.has(taskId)) {
 			return {
@@ -59,19 +58,15 @@ export async function getTaskDocument(
 			};
 		}
 
-		// eslint-disable-next-line no-restricted-syntax
-		const roomHandle = repo.get(ROOM_DOC_ID, RoomSchema as any);
+		const roomHandle = repo.get(ROOM_DOC_ID, RoomSchema);
 
-		/* eslint-disable no-restricted-syntax */
 		const doc = new TaskDocument(
-			taskHandle.doc as any,
-			roomHandle.doc as any,
+			taskHandle.doc,
+			roomHandle.doc,
 			taskId as TaskId,
 		);
-		/* eslint-enable no-restricted-syntax */
 
-		// eslint-disable-next-line no-restricted-syntax
-		const metaContainer = (taskHandle.doc as any).meta;
+		const metaContainer = taskHandle.doc.meta;
 		const meta: TaskMeta = {
 			id: metaContainer.id ?? taskId,
 			title: metaContainer.title ?? "",
@@ -112,22 +107,17 @@ export async function getOrCreateTaskDocument(
 	try {
 		const repo = getRepo();
 
-		// eslint-disable-next-line no-restricted-syntax
-		const taskHandle = repo.get(taskId, TaskDocumentSchema as any);
+		const taskHandle = repo.get(taskId, TaskDocumentSchema);
 
-		// eslint-disable-next-line no-restricted-syntax
-		const roomHandle = repo.get(ROOM_DOC_ID, RoomSchema as any);
+		const roomHandle = repo.get(ROOM_DOC_ID, RoomSchema);
 
-		/* eslint-disable no-restricted-syntax */
 		const doc = new TaskDocument(
-			taskHandle.doc as any,
-			roomHandle.doc as any,
+			taskHandle.doc,
+			roomHandle.doc,
 			taskId as TaskId,
 		);
-		/* eslint-enable no-restricted-syntax */
 
-		// eslint-disable-next-line no-restricted-syntax
-		const metaContainer = (taskHandle.doc as any).meta;
+		const metaContainer = taskHandle.doc.meta;
 		const meta: TaskMeta = {
 			id: metaContainer.id ?? taskId,
 			title: metaContainer.title ?? "",
