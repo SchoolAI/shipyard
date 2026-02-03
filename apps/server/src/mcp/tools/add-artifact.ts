@@ -10,6 +10,11 @@
 import { readFile } from "node:fs/promises";
 import { generateArtifactId } from "@shipyard/loro-schema";
 import { z } from "zod";
+import {
+	GitHubAuthError,
+	isGitHubConfigured,
+	uploadArtifact,
+} from "../../utils/github-artifacts.js";
 import { getGitHubUsername } from "../../utils/identity.js";
 import { logger } from "../../utils/logger.js";
 import type { McpServer } from "../index.js";
@@ -253,14 +258,39 @@ ARTIFACT TYPES:
 
 			/** Create artifact object */
 			const artifactId = generateArtifactId();
+			let artifactUrl = "(upload pending)";
+
+			/** Try GitHub upload if configured and repo is set */
+			if (isGitHubConfigured() && meta.repo) {
+				try {
+					artifactUrl = await uploadArtifact({
+						repo: meta.repo,
+						planId: taskId,
+						filename,
+						content: contentResult.content,
+					});
+					logger.info({ taskId, artifactId, url: artifactUrl }, "Artifact uploaded to GitHub");
+				} catch (error) {
+					if (error instanceof GitHubAuthError) {
+						return errorResponse(`GitHub Authentication Error\n\n${error.message}`);
+					}
+					const message = error instanceof Error ? error.message : "Unknown error";
+					logger.warn({ taskId, error: message }, "GitHub upload failed");
+					return errorResponse(`Failed to upload artifact: ${message}`);
+				}
+			} else {
+				const reason = !isGitHubConfigured() ? "GITHUB_TOKEN not set" : "Task has no repo configured";
+				return errorResponse(`Cannot upload artifact: ${reason}.\n\nTo enable GitHub uploads:\n1. Set GITHUB_TOKEN in your MCP config\n2. Ensure the task has a repo set`);
+			}
+
 			const artifact = {
-				storage: "github" as const, // TODO: Implement fallback to local
+				storage: "github" as const,
 				id: artifactId,
 				type,
 				filename,
 				description: input.description ?? null,
 				uploadedAt: Date.now(),
-				url: `(GitHub upload pending - content: ${contentResult.content.length} bytes)`,
+				url: artifactUrl,
 			};
 
 			/** Add artifact to doc */
