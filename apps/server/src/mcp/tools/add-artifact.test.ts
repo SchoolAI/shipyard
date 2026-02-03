@@ -107,7 +107,9 @@ describe("MCP Tool: add_artifact", () => {
 		mockGetGitHubUsername.mockResolvedValue("test-user");
 		mockReadFile.mockResolvedValue(Buffer.from("fake file content"));
 		mockIsGitHubConfigured.mockReturnValue(true);
-		mockUploadArtifact.mockResolvedValue("https://raw.githubusercontent.com/test-org/test-repo/plan-artifacts/plans/task-123/screenshot.png");
+		mockUploadArtifact.mockResolvedValue(
+			"https://raw.githubusercontent.com/test-org/test-repo/plan-artifacts/plans/task-123/screenshot.png",
+		);
 	});
 
 	afterEach(() => {
@@ -197,7 +199,7 @@ describe("MCP Tool: add_artifact", () => {
 			});
 
 			const artifacts = mockDoc.artifacts.toJSON() as Array<{ id: string }>;
-			expect(artifacts[0].id).not.toBe(artifacts[1].id);
+			expect(artifacts[0]?.id).not.toBe(artifacts[1]?.id);
 		});
 
 		it("associates artifact with task", async () => {

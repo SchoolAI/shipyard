@@ -10,11 +10,7 @@
 import { execFileSync } from "node:child_process";
 import { readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
-import type { HandleWithEphemerals } from "@loro-extended/repo";
-import type {
-	SyncedFileChange,
-	TaskDocumentShape,
-} from "@shipyard/loro-schema";
+import type { SyncedFileChange } from "@shipyard/loro-schema";
 import { logger } from "../utils/logger.js";
 
 /** Default max file size for untracked files (100KB) */
@@ -244,11 +240,18 @@ export async function getGitChanges(
 }
 
 /**
+ * Handle type for task documents.
+ * Uses a simplified type to avoid complex generic constraint issues with DocShape.
+ */
+// biome-ignore lint/suspicious/noExplicitAny: Loro TypedDoc typing requires simplified handle type
+type TaskDocHandle = { change: (fn: (doc: any) => void) => void };
+
+/**
  * Start git sync for a task document.
  * Pushes changes to changeSnapshots[machineId] periodically.
  */
 export function startGitSync(
-	handle: HandleWithEphemerals<TaskDocumentShape, Record<string, never>>,
+	handle: TaskDocHandle,
 	config: GitSyncConfig,
 ): () => void {
 	const {

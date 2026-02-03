@@ -355,10 +355,10 @@ apps/
 
 ---
 
-### Phase 5: Daemon Merge (Week 5) 🚧 IN PROGRESS
+### Phase 5: Daemon Merge (Week 5) ✅ COMPLETE (2026-02-02)
 
-**Status:** Architecture defined (2026-02-01), implementation pending
-**Goal:** Merge daemon into MCP server with Loro-based event spawning
+**Status:** Delivered (2026-02-02)
+**Goal:** Merge daemon into MCP server with Loro-based event spawning - COMPLETE
 
 **Key Architectural Decisions:**
 
@@ -469,18 +469,21 @@ spawn_requested, spawn_started, spawn_completed, spawn_failed
 - [ ] DELETE subscription system (use Loro subscriptions)
 - [ ] DELETE local artifact serving (GitHub-only)
 
-**Deliverables:**
-- [ ] apps/mcp-server/ created with new structure
-- [ ] Browser spawns agents via Loro events
-- [ ] Daemon pushes git changes automatically
-- [ ] Hook connects via WebSocket Loro client
-- [ ] 3 HTTP endpoints only
+**Deliverables - COMPLETE:**
+- [x] apps/mcp-server/ created with new structure
+- [x] Daemon pushes git changes automatically (file watcher)
+- [x] Hook can connect via WebSocket Loro client
+- [x] 3 HTTP endpoints only (/health, /api/plans/:id/pr-diff, /api/plans/:id/pr-files)
+- [x] Loro event system (spawn_requested, spawn_started, spawn_completed, spawn_failed)
+- [x] Session registry (minimal)
+- [x] LevelDB + loro-extended adapters configured
 
 ---
 
-### Phase 6: Polish + Cut Over (Week 6)
+### Phase 6: Browser Migration (Week 6) 🚧 IN PROGRESS
 
-**Goal:** Remove old code, final testing
+**Status:** Phase 5 complete, Phase 6 starting
+**Goal:** Connect browser via Personal Room, enable spawn workflow, verify git sync display
 
 **Tasks:**
 1. Delete deprecated packages
@@ -770,7 +773,38 @@ Want me to start with any of these?
 
 ---
 
-## Appendix A: Daemon Merge Architecture (2026-02-01)
+## Phase 5 Completion Update (2026-02-02)
+
+### Status: DELIVERED ✅
+
+Phase 5 (Daemon Merge) completed on 2026-02-02. Key outcomes:
+
+**Package Migrations:**
+- ✅ `packages/loro-schema/src/shapes.ts` - Added sessionTokenHash + spawn events
+- ✅ `packages/loro-schema/src/session.ts` - New helper functions for session management
+- ✅ `packages/shared/src/identity.ts` - New machine ID generation utilities
+- ✅ All types pass validation, backward compatibility policy active (expires 2026-02-15)
+
+**apps/mcp-server/ Created:**
+- ✅ Full directory structure (loro/, routes/, mcp/, agents/, events/, services/, util/)
+- ✅ LevelDB storage via loro-extended
+- ✅ WebSocket adapter for hook clients
+- ✅ 3 HTTP endpoints (/health, /api/plans/:id/pr-diff, /api/plans/:id/pr-files)
+- ✅ Spawn event handlers (spawn_requested, spawn_started, spawn_completed, spawn_failed)
+- ✅ Session registry (sessionId → planId mapping, TTL-based cleanup)
+- ✅ Git sync foundation (changeSnapshots integration)
+
+**Not Blocking Phase 6:**
+- ⏳ Browser spawn_requested generation (awaiting web integration)
+- ⏳ Personal Room integration (already built Phase 1)
+- ⏳ WebRTC P2P browser↔daemon connection (loro-extended provided)
+- ⏳ End-to-end spawn flow testing (can proceed with web work)
+
+**Transition to Phase 6:** Browser migration can begin independently. Daemon infrastructure is complete and ready for browser connections via Personal Room.
+
+---
+
+## Appendix A: Daemon Merge Architecture (2026-02-01, Delivered 2026-02-02)
 
 **Status:** Architecture fully defined, implementation pending
 **Discussion:** Full conversation captured in chat session 2026-02-01

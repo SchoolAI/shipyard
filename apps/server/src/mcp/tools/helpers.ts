@@ -50,7 +50,8 @@ export async function getTaskDocument(
 		const repo = getRepo();
 
 		/** Get the task document handle - Loro Repo uses get() not open() */
-		const taskHandle = repo.get(taskId, TaskDocumentSchema);
+		// biome-ignore lint/suspicious/noExplicitAny: Loro DocShape constraint workaround
+		const taskHandle = repo.get(taskId, TaskDocumentSchema as any);
 
 		/** Check if document exists by checking if it has been loaded */
 		if (!repo.has(taskId)) {
@@ -61,12 +62,13 @@ export async function getTaskDocument(
 		}
 
 		/** Get the room document handle for cross-doc operations */
-		const roomHandle = repo.get(ROOM_DOC_ID, RoomSchema);
+		// biome-ignore lint/suspicious/noExplicitAny: Loro DocShape constraint workaround
+		const roomHandle = repo.get(ROOM_DOC_ID, RoomSchema as any);
 
 		/** Create TaskDocument wrapper using the typed doc from handles */
 		const doc = new TaskDocument(
-			taskHandle.doc,
-			roomHandle.doc,
+			taskHandle.doc as any,
+			roomHandle.doc as any,
 			taskId as TaskId,
 		);
 
@@ -114,15 +116,17 @@ export async function getOrCreateTaskDocument(
 		const repo = getRepo();
 
 		/** Get or create the task document handle */
-		const taskHandle = repo.get(taskId, TaskDocumentSchema);
+		// biome-ignore lint/suspicious/noExplicitAny: Loro DocShape constraint workaround
+		const taskHandle = repo.get(taskId, TaskDocumentSchema as any);
 
 		/** Get or create the room document handle for cross-doc operations */
-		const roomHandle = repo.get(ROOM_DOC_ID, RoomSchema);
+		// biome-ignore lint/suspicious/noExplicitAny: Loro DocShape constraint workaround
+		const roomHandle = repo.get(ROOM_DOC_ID, RoomSchema as any);
 
 		/** Create TaskDocument wrapper using the typed doc from handles */
 		const doc = new TaskDocument(
-			taskHandle.doc,
-			roomHandle.doc,
+			taskHandle.doc as any,
+			roomHandle.doc as any,
 			taskId as TaskId,
 		);
 

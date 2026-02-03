@@ -132,10 +132,7 @@ export async function ensureArtifactsBranch(repo: string): Promise<void> {
 			sha: refData.object.sha,
 		});
 
-		logger.info(
-			{ repo, branch: ARTIFACTS_BRANCH },
-			"Created artifacts branch",
-		);
+		logger.info({ repo, branch: ARTIFACTS_BRANCH }, "Created artifacts branch");
 	} catch (error: unknown) {
 		const message = error instanceof Error ? error.message : "Unknown error";
 		throw new Error(
@@ -251,7 +248,10 @@ export async function resolveArtifactContent(
 		}
 
 		case "url": {
-			logger.info({ contentUrl: input.contentUrl }, "Fetching content from URL");
+			logger.info(
+				{ contentUrl: input.contentUrl },
+				"Fetching content from URL",
+			);
 			try {
 				const response = await fetch(input.contentUrl);
 				if (!response.ok) {

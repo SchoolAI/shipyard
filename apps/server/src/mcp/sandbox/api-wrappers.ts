@@ -61,7 +61,10 @@ async function resolveArtifactContent(
 				const fileBuffer = await readFile(input.filePath);
 				return { success: true, content: fileBuffer.toString("base64") };
 			} catch (error) {
-				logger.error({ error, filePath: input.filePath }, "Failed to read file");
+				logger.error(
+					{ error, filePath: input.filePath },
+					"Failed to read file",
+				);
 				const message =
 					error instanceof Error ? error.message : "Unknown error";
 				return { success: false, error: `Failed to read file: ${message}` };
@@ -69,7 +72,10 @@ async function resolveArtifactContent(
 		}
 
 		case "url": {
-			logger.info({ contentUrl: input.contentUrl }, "Fetching content from URL");
+			logger.info(
+				{ contentUrl: input.contentUrl },
+				"Fetching content from URL",
+			);
 			try {
 				const response = await fetch(input.contentUrl);
 				if (!response.ok) {
@@ -148,7 +154,9 @@ interface ExtractedDeliverable {
  *
  * Ported from @shipyard/schema extractDeliverables
  */
-function extractDeliverablesFromMarkdown(content: string): ExtractedDeliverable[] {
+function extractDeliverablesFromMarkdown(
+	content: string,
+): ExtractedDeliverable[] {
 	const deliverables: ExtractedDeliverable[] = [];
 
 	/** Match checkbox items with {#deliverable} marker */
@@ -525,7 +533,10 @@ export async function addArtifact(opts: {
 				filename,
 				content: contentResult.content,
 			});
-			logger.info({ taskId, artifactId, url: artifactUrl }, "Artifact uploaded to GitHub");
+			logger.info(
+				{ taskId, artifactId, url: artifactUrl },
+				"Artifact uploaded to GitHub",
+			);
 		} catch (error) {
 			if (error instanceof GitHubAuthError) {
 				return {
@@ -545,9 +556,14 @@ export async function addArtifact(opts: {
 		}
 	} else {
 		/** No GitHub configured - note this in the URL */
-		const reason = !githubConfigured ? "GITHUB_TOKEN not set" : "repo not configured";
+		const reason = !githubConfigured
+			? "GITHUB_TOKEN not set"
+			: "repo not configured";
 		artifactUrl = `(local only - ${reason})`;
-		logger.info({ taskId, artifactId, reason }, "Artifact stored locally (no GitHub upload)");
+		logger.info(
+			{ taskId, artifactId, reason },
+			"Artifact stored locally (no GitHub upload)",
+		);
 	}
 
 	/** Create artifact object */
@@ -623,11 +639,19 @@ export async function addArtifact(opts: {
 		updatedDeliverables.length > 0 &&
 		updatedDeliverables.every((d) => d.linkedArtifactId);
 
-	logger.info({ taskId, artifactId, allComplete }, "Artifact added via sandbox");
+	logger.info(
+		{ taskId, artifactId, allComplete },
+		"Artifact added via sandbox",
+	);
 
 	/** Handle auto-completion if all deliverables are fulfilled */
 	if (allComplete) {
-		const autoCompleteResult = await performAutoComplete(doc, meta, actor, taskId);
+		const autoCompleteResult = await performAutoComplete(
+			doc,
+			meta,
+			actor,
+			taskId,
+		);
 		return {
 			artifactId,
 			url: artifactUrl,
@@ -721,11 +745,21 @@ export async function completeTask(
 	taskId: string,
 	sessionToken: string,
 	summary?: string,
-): Promise<{ snapshotUrl: string; status: string; isError: boolean; error?: string }> {
+): Promise<{
+	snapshotUrl: string;
+	status: string;
+	isError: boolean;
+	error?: string;
+}> {
 	/** Get task document */
 	const taskResult = await getTaskDocument(taskId);
 	if (!taskResult.success) {
-		return { snapshotUrl: "", status: "error", isError: true, error: taskResult.error };
+		return {
+			snapshotUrl: "",
+			status: "error",
+			isError: true,
+			error: taskResult.error,
+		};
 	}
 	const { doc, meta } = taskResult;
 
@@ -736,7 +770,12 @@ export async function completeTask(
 		taskId,
 	);
 	if (tokenError) {
-		return { snapshotUrl: "", status: "error", isError: true, error: tokenError };
+		return {
+			snapshotUrl: "",
+			status: "error",
+			isError: true,
+			error: tokenError,
+		};
 	}
 
 	/** Check if there are any artifacts */
@@ -746,7 +785,8 @@ export async function completeTask(
 			snapshotUrl: "",
 			status: "error",
 			isError: true,
-			error: "Cannot complete: no artifacts uploaded. Upload artifacts first using addArtifact.",
+			error:
+				"Cannot complete: no artifacts uploaded. Upload artifacts first using addArtifact.",
 		};
 	}
 
@@ -765,7 +805,11 @@ export async function completeTask(
 
 	logger.info({ taskId }, "Task completed via sandbox");
 
-	return { snapshotUrl: result.snapshotUrl, status: "completed", isError: false };
+	return {
+		snapshotUrl: result.snapshotUrl,
+		status: "completed",
+		isError: false,
+	};
 }
 
 /**

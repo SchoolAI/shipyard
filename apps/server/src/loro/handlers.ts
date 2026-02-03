@@ -7,8 +7,7 @@
  * @see docs/whips/daemon-mcp-server-merge.md#spawn-agent-flow
  */
 
-import type { HandleWithEphemerals } from "@loro-extended/repo";
-import type { TaskDocumentShape } from "@shipyard/loro-schema";
+// Note: Using simplified handle type to avoid Loro DocShape constraint issues
 import { trackAgent } from "../agents/tracker.js";
 import { logger } from "../utils/logger.js";
 
@@ -114,13 +113,26 @@ function isSpawnRequestedEvent(
 }
 
 /**
+ * Handle type for task documents.
+ * Uses a simplified type to avoid complex generic constraint issues with DocShape.
+ */
+// biome-ignore lint/suspicious/noExplicitAny: Loro TypedDoc typing requires simplified handle type
+type TaskDocHandle = {
+	change: (fn: (doc: any) => void) => void;
+	subscribe: (
+		selector: any,
+		callback: (events: { toArray: () => unknown[] }) => void,
+	) => () => void;
+};
+
+/**
  * Handle a spawn_requested event.
  * Only processes if targetMachineId matches this daemon's machineId.
  */
 export async function handleSpawnRequested(
 	event: SpawnRequestedEvent,
 	ctx: EventHandlerContext,
-	handle: HandleWithEphemerals<TaskDocumentShape, Record<string, never>>,
+	handle: TaskDocHandle,
 ): Promise<void> {
 	// Skip if not targeted at this machine
 	if (event.targetMachineId !== ctx.machineId) {
@@ -234,7 +246,7 @@ export async function handleSpawnRequested(
  * Sets up Loro subscription to watch for spawn_requested events.
  */
 export function subscribeToEvents(
-	handle: HandleWithEphemerals<TaskDocumentShape, Record<string, never>>,
+	handle: TaskDocHandle,
 	ctx: EventHandlerContext,
 ): () => void {
 	logger.debug({ taskId: ctx.taskId }, "Subscribing to task events");

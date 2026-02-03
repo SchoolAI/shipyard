@@ -5,12 +5,9 @@
  * Ported from apps/server-legacy/src/tools/execute-code.ts requestUserInput.
  */
 
-import { generateInputRequestId, RoomSchema } from "@shipyard/loro-schema";
+import { generateInputRequestId } from "@shipyard/loro-schema";
 import { getRepo } from "../../loro/repo.js";
 import { logger } from "../../utils/logger.js";
-
-/** Room document ID for input requests */
-const ROOM_DOC_ID = "room";
 
 /** Default timeout for input requests (30 minutes) */
 const DEFAULT_TIMEOUT_SECONDS = 1800;
@@ -123,12 +120,10 @@ export async function requestUserInput(
 
 	logger.info({ requestId, timeoutSeconds }, "Creating input request");
 
-	/**
-	 * Get room document handle for input requests.
-	 * NOTE: Currently unused as the full input request system is not yet implemented.
-	 * This will be used to create and track input requests in the CRDT once integrated.
-	 */
-	repo.get(ROOM_DOC_ID, RoomSchema);
+	// NOTE: Currently unused as the full input request system is not yet implemented.
+	// TODO: When integrated, use repo.get(ROOM_DOC_ID, RoomSchema) to create
+	// and track input requests in the CRDT.
+	void repo; // Placeholder to avoid unused variable warning
 
 	/** Determine if single or multi question mode */
 	const isMultiQuestion = "questions" in opts && Array.isArray(opts.questions);

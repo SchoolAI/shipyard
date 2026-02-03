@@ -121,7 +121,8 @@ describe("GitHub Artifacts", () => {
 		it("creates branch if it does not exist", async () => {
 			process.env.GITHUB_TOKEN = "test-token";
 			const notFoundError = new Error("Not Found");
-			(notFoundError as NodeJS.ErrnoException & { status: number }).status = 404;
+			(notFoundError as NodeJS.ErrnoException & { status: number }).status =
+				404;
 			mockOctokit.repos.getBranch.mockRejectedValue(notFoundError);
 			mockOctokit.repos.get.mockResolvedValue({
 				data: { default_branch: "main" },
@@ -154,7 +155,8 @@ describe("GitHub Artifacts", () => {
 			process.env.GITHUB_TOKEN = "test-token";
 			mockOctokit.repos.getBranch.mockResolvedValue({ status: 200 });
 			const notFoundError = new Error("Not Found");
-			(notFoundError as NodeJS.ErrnoException & { status: number }).status = 404;
+			(notFoundError as NodeJS.ErrnoException & { status: number }).status =
+				404;
 			mockOctokit.repos.getContent.mockRejectedValue(notFoundError);
 			mockOctokit.repos.createOrUpdateFileContents.mockResolvedValue({
 				status: 201,

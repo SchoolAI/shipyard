@@ -140,10 +140,11 @@ describe("Agent Spawner", () => {
 				cwd: "/test/dir",
 			});
 
-			const spawnArgs = mockSpawn.mock.calls[0][1] as string[];
+			const spawnArgs = mockSpawn.mock.calls[0]?.[1] as string[] | undefined;
+			expect(spawnArgs).toBeDefined();
 			expect(spawnArgs).toContain("-p");
-			const promptIndex = spawnArgs.indexOf("-p");
-			expect(spawnArgs[promptIndex + 1]).toBe("Implement the feature");
+			const promptIndex = spawnArgs?.indexOf("-p");
+			expect(spawnArgs?.[promptIndex + 1]).toBe("Implement the feature");
 		});
 
 		it("sets working directory to cwd", async () => {
@@ -156,8 +157,10 @@ describe("Agent Spawner", () => {
 				cwd: "/custom/working/dir",
 			});
 
-			const spawnOptions = mockSpawn.mock.calls[0][2] as { cwd: string };
-			expect(spawnOptions.cwd).toBe("/custom/working/dir");
+			const spawnOptions = mockSpawn.mock.calls[0]?.[2] as
+				| { cwd: string }
+				| undefined;
+			expect(spawnOptions?.cwd).toBe("/custom/working/dir");
 		});
 
 		it("configures MCP server args", async () => {
@@ -170,7 +173,7 @@ describe("Agent Spawner", () => {
 				cwd: "/test/dir",
 			});
 
-			const spawnArgs = mockSpawn.mock.calls[0][1] as string[];
+			const spawnArgs = mockSpawn.mock.calls[0]?.[1] as string[] | undefined;
 			expect(spawnArgs).toContain("--dangerously-skip-permissions");
 		});
 
@@ -254,7 +257,7 @@ describe("Agent Spawner", () => {
 
 			// Check that writeFile was called with JSONL content
 			const writeFileCall = mockWriteFile.mock.calls[0];
-			const content = writeFileCall[1] as string;
+			const content = writeFileCall?.[1] as string;
 			expect(content).toContain("First message");
 			expect(content).toContain("Response");
 		});

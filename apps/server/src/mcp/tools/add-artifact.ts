@@ -269,18 +269,28 @@ ARTIFACT TYPES:
 						filename,
 						content: contentResult.content,
 					});
-					logger.info({ taskId, artifactId, url: artifactUrl }, "Artifact uploaded to GitHub");
+					logger.info(
+						{ taskId, artifactId, url: artifactUrl },
+						"Artifact uploaded to GitHub",
+					);
 				} catch (error) {
 					if (error instanceof GitHubAuthError) {
-						return errorResponse(`GitHub Authentication Error\n\n${error.message}`);
+						return errorResponse(
+							`GitHub Authentication Error\n\n${error.message}`,
+						);
 					}
-					const message = error instanceof Error ? error.message : "Unknown error";
+					const message =
+						error instanceof Error ? error.message : "Unknown error";
 					logger.warn({ taskId, error: message }, "GitHub upload failed");
 					return errorResponse(`Failed to upload artifact: ${message}`);
 				}
 			} else {
-				const reason = !isGitHubConfigured() ? "GITHUB_TOKEN not set" : "Task has no repo configured";
-				return errorResponse(`Cannot upload artifact: ${reason}.\n\nTo enable GitHub uploads:\n1. Set GITHUB_TOKEN in your MCP config\n2. Ensure the task has a repo set`);
+				const reason = !isGitHubConfigured()
+					? "GITHUB_TOKEN not set"
+					: "Task has no repo configured";
+				return errorResponse(
+					`Cannot upload artifact: ${reason}.\n\nTo enable GitHub uploads:\n1. Set GITHUB_TOKEN in your MCP config\n2. Ensure the task has a repo set`,
+				);
 			}
 
 			const artifact = {

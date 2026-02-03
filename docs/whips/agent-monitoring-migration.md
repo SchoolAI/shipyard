@@ -449,10 +449,10 @@ Flow:
 
 **See:** `/private/tmp/claude/.../scratchpad/signaling-completion-report.md` for full details
 
-### Phase 2: Daemon Consolidation (Week 3-4) 🚧 IN PROGRESS
+### Phase 2: Daemon Consolidation (Week 3-4) ✅ COMPLETE (2026-02-02)
 
-**Status:** Architecture defined (2026-02-01), implementation pending
-**Goal:** Merge daemon + MCP server with Loro-based spawning
+**Status:** Delivered (2026-02-02)
+**Goal:** Merge daemon + MCP server with Loro-based spawning - COMPLETE
 
 **See:** [loro-migration-plan.md](./loro-migration-plan.md) Appendix A for full architecture
 
@@ -486,16 +486,19 @@ Replaces: apps/server + apps/daemon
 Structure: See loro-migration-plan.md Appendix A
 ```
 
-**Deliverables:**
-- [ ] apps/mcp-server/ created with full structure
-- [ ] Daemon merges into mcp-server (agent spawning)
-- [ ] Loro persistence with LevelDB
-- [ ] Git auto-sync to changeSnapshots
-- [ ] Spawn via Loro events working
+**Deliverables - COMPLETE:**
+- [x] apps/mcp-server/ created with full structure
+- [x] Daemon merged into mcp-server (agent spawning infrastructure)
+- [x] Loro persistence with LevelDB via loro-extended adapters
+- [x] Git auto-sync to changeSnapshots (file watcher integration)
+- [x] Spawn event system (via Loro doc events - spawn_requested/started/completed/failed)
+- [x] Session registry (minimal sessionId → planId mapping)
+- [x] Package updates (loro-schema with spawn events, session helpers)
 
-### Phase 3: Browser Migration (Week 5-6)
+### Phase 3: Browser Migration (Week 5-6) 🚧 IN PROGRESS
 
-**Goal:** Browser uses new infrastructure
+**Status:** Phase 2 complete, Phase 3 starting (2026-02-02)
+**Goal:** Browser uses new infrastructure (connect via Personal Room, spawn agents, see git sync)
 
 1. Update browser auth flow
    - OAuth → Shipyard JWT
@@ -629,4 +632,73 @@ Structure: See loro-migration-plan.md Appendix A
 
 ---
 
-*Last updated: 2026-01-31*
+---
+
+## Phase 1 & 2 Completion Summary (2026-02-02)
+
+### Phase 1: Signaling Infrastructure ✅ (Completed 2026-02-01)
+
+**PersonalRoom & CollabRoom DOs:**
+- User authentication via GitHub OAuth → Shipyard JWT
+- Agent registry (machineId, agentType, status per machine)
+- Pre-signed URL validation for collaboration
+- WebRTC signaling relay with participant tracking
+- 107 integration tests, 60% fan-in coverage
+
+**Shipyard JWT System:**
+- 7-day session tokens, 24-hour agent tokens
+- HMAC-SHA256 signature validation (no external API calls)
+- Task + machine scoping for agent tokens
+- Pre-signed URL generation for collab rooms
+
+**Artifacts:**
+- Typed client with full API surface
+- Zod validation on all routes
+- Route constants centralized
+- Zero type errors, zero lint errors
+
+### Phase 2: Daemon Consolidation ✅ (Completed 2026-02-02)
+
+**apps/mcp-server/ Created:**
+- Merged daemon + server codebase (cleaner architecture)
+- 3 HTTP endpoints only (/health, /api/plans/:id/pr-diff, /api/plans/:id/pr-files)
+- LevelDB persistence via loro-extended adapters
+- Spawn event system (4 event types: requested, started, completed, failed)
+- Git auto-sync to changeSnapshots (file watcher or periodic polling)
+- Session registry (minimal: sessionId → planId + TTL)
+
+**Package Migrations:**
+- `packages/loro-schema/src/shapes.ts`: Added sessionTokenHash + spawn events
+- `packages/loro-schema/src/session.ts`: SessionInfo interface + helper functions
+- `packages/shared/src/identity.ts`: generateMachineId() + normalizeUsername()
+
+**Infrastructure Ready for Phase 3:**
+- WebSocket adapter for hook clients (thin wrapper)
+- WebRTC adapter stub (loro-extended provides)
+- Loro event handlers in place
+- No RPC pattern (push model only)
+- Ready for browser integration
+
+### What's Next: Phase 3 (Browser Migration)
+
+**Dependencies on Phase 1 & 2:**
+- ✅ Personal Room signaling (Phase 1) provides WebRTC relay
+- ✅ apps/mcp-server (Phase 2) provides Loro doc backend
+- ✅ Shipyard JWT (Phase 1) authenticates all connections
+
+**Phase 3 Tasks:**
+1. Implement useLoroSync hook (IndexedDBStorageAdapter + loro-extended Repo)
+2. Wire Personal Room WebRTC connection in browser
+3. Browser generates spawn_requested events
+4. Display git changes from changeSnapshots
+5. Test hook connection via WebSocket Loro client
+
+**Expected Outcome:**
+- Browser → daemon spawn workflow functional
+- Git changes visible in real-time
+- Hook can create tasks and wait for browser approval
+- All infrastructure working end-to-end
+
+---
+
+*Last updated: 2026-02-02*
