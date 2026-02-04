@@ -1,1 +1,0 @@
-export { VoiceInputButton } from './VoiceInputButton';

@@ -209,13 +209,16 @@ export async function handleSpawnRequested(
     }
 
     child.once('exit', (exitCode, signal) => {
+      // Trim stderr to first 1KB to avoid bloating the event log
+      const stderrTrimmed = stderrOutput.slice(0, 1000) || null;
+
       logger.info(
         {
           eventId: event.id,
           taskId: ctx.taskId,
           exitCode,
           signal,
-          stderr: stderrOutput.slice(0, 1000),
+          stderr: stderrTrimmed,
         },
         'Agent process exited'
       );
@@ -238,6 +241,8 @@ export async function handleSpawnRequested(
             inboxFor: null,
             requestId: event.id,
             exitCode: exitCode ?? 0,
+            signal: signal ?? null,
+            stderr: stderrTrimmed,
           });
         });
       } catch (exitError) {
@@ -264,6 +269,7 @@ export async function handleSpawnRequested(
         inboxFor: null,
         requestId: event.id,
         error: error instanceof Error ? error.message : String(error),
+        stderr: null, // No stderr available when spawn fails early
       });
     });
   }

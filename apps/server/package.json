@@ -49,7 +49,6 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@shipyard/shared": "workspace:*",
     "@types/express": "catalog:",
     "@types/node": "catalog:",
     "@types/ws": "catalog:",

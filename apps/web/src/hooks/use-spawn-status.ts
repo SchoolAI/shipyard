@@ -8,6 +8,10 @@ export interface SpawnStatus {
   phase: SpawnPhase;
   pid?: number;
   exitCode?: number;
+  /** Signal that terminated the process (e.g., 'SIGTERM', 'SIGKILL') */
+  signal?: string | null;
+  /** First 1KB of stderr output for debugging */
+  stderr?: string | null;
   error?: string;
   timestamp?: number;
 }
@@ -49,6 +53,7 @@ function deriveStatus(spawnEvents: SpawnEvents): SpawnStatus {
     return {
       phase: 'failed',
       error: failed.error,
+      stderr: failed.stderr,
       timestamp: failed.timestamp,
     };
   }
@@ -58,6 +63,8 @@ function deriveStatus(spawnEvents: SpawnEvents): SpawnStatus {
       phase: 'completed',
       pid: started?.pid,
       exitCode: completed.exitCode,
+      signal: completed.signal,
+      stderr: completed.stderr,
       timestamp: completed.timestamp,
     };
   }

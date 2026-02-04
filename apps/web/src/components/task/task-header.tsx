@@ -1,17 +1,11 @@
 import { Button, Chip, Popover, Separator, Tooltip } from '@heroui/react';
 import { isTaskStatus, type TaskId } from '@shipyard/loro-schema';
-import { Archive, ArchiveRestore, MessageSquareShare, Tag } from 'lucide-react';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { Archive, ArchiveRestore, Tag } from 'lucide-react';
+import { useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { AgentRequestsBadge } from '@/components/agent-requests-badge';
 import { AgentStatusIndicator } from '@/components/agent-status-indicator';
 import { CopySnapshotUrlButton, useCopySnapshotUrl } from '@/components/copy-snapshot-url-button';
-import { HandoffConversationDialog } from '@/components/handoff-conversation-dialog';
-import {
-  ImportConversationButton,
-  ImportReviewModal,
-  useImportConversation,
-} from '@/components/import-conversation-handler';
 import { LinkPRButton } from '@/components/link-pr-button';
 import { type MobileDropdownAction, MobileDropdownMenu } from '@/components/mobile-dropdown-menu';
 import { NotificationsButton } from '@/components/notifications-button';
@@ -26,7 +20,6 @@ import { SyncStatus } from '@/components/sync-status';
 import { TagChip } from '@/components/tag-chip';
 import { TagEditor } from '@/components/tag-editor';
 import { TruncatedText } from '@/components/ui/truncated-text';
-import type { A2AMessage } from '@/hooks/use-conversation-transfer';
 import { type ConnectedPeer as HookConnectedPeer, useP2PPeers } from '@/hooks/use-p2p-peers';
 import { useServerConnection } from '@/hooks/use-server-connection';
 import { useTaskMeta } from '@/loro/selectors/task-selectors';
@@ -66,25 +59,15 @@ interface TaskHeaderProps {
   taskId: TaskId;
   isSnapshot?: boolean;
   isMobile?: boolean;
-  /** Messages to hand off (optional - enables handoff button when provided) */
-  handoffMessages?: A2AMessage[];
 }
 
 interface DesktopActionsProps {
   taskId: TaskId;
-  hasOriginTranscript: boolean;
   isArchived: boolean;
-  onHandoffOpen: () => void;
   onArchiveToggle: () => void;
 }
 
-function DesktopActions({
-  taskId,
-  hasOriginTranscript,
-  isArchived,
-  onHandoffOpen,
-  onArchiveToggle,
-}: DesktopActionsProps) {
+function DesktopActions({ taskId, isArchived, onArchiveToggle }: DesktopActionsProps) {
   return (
     <>
       <Separator orientation="vertical" className="h-6" />
@@ -92,31 +75,6 @@ function DesktopActions({
       <ShareButton taskId={taskId} />
 
       <CopySnapshotUrlButton taskId={taskId} />
-
-      <Tooltip delay={0}>
-        <Tooltip.Trigger>
-          <ImportConversationButton taskId={taskId} />
-        </Tooltip.Trigger>
-        <Tooltip.Content>Resume a handed-off conversation</Tooltip.Content>
-      </Tooltip>
-
-      {hasOriginTranscript && (
-        <Tooltip delay={0}>
-          <Tooltip.Trigger>
-            <Button
-              isIconOnly
-              variant="ghost"
-              size="sm"
-              aria-label="Handoff conversation to another agent"
-              onPress={onHandoffOpen}
-              className="touch-target"
-            >
-              <MessageSquareShare className="w-4 h-4" />
-            </Button>
-          </Tooltip.Trigger>
-          <Tooltip.Content>Handoff conversation to another agent</Tooltip.Content>
-        </Tooltip>
-      )}
 
       <Tooltip delay={0}>
         <Tooltip.Trigger>
@@ -141,7 +99,6 @@ function DesktopActions({
 
 interface MobileActionsProps {
   taskId: TaskId;
-  hasOriginTranscript: boolean;
   isArchived: boolean;
   isLinkPROpen: boolean;
   onLinkPROpenChange: (open: boolean) => void;
@@ -150,7 +107,6 @@ interface MobileActionsProps {
 
 function MobileActions({
   taskId,
-  hasOriginTranscript,
   isArchived,
   isLinkPROpen,
   onLinkPROpenChange,
@@ -158,12 +114,7 @@ function MobileActions({
 }: MobileActionsProps) {
   return (
     <>
-      <MobileDropdownMenu
-        taskId={taskId}
-        hasOriginTranscript={hasOriginTranscript}
-        isArchived={isArchived}
-        onAction={onAction}
-      />
+      <MobileDropdownMenu taskId={taskId} isArchived={isArchived} onAction={onAction} />
 
       <LinkPRButton
         taskId={taskId}
@@ -207,10 +158,8 @@ interface HeaderActionBarProps {
   serverConnected: boolean;
   peerCount: number;
   mappedPeers: PresenceConnectedPeer[];
-  hasOriginTranscript: boolean;
   isArchived: boolean;
   isLinkPROpen: boolean;
-  onHandoffOpen: () => void;
   onArchiveToggle: () => void;
   onLinkPROpenChange: (open: boolean) => void;
   onMobileAction: (action: MobileDropdownAction) => void;
@@ -224,10 +173,8 @@ function HeaderActionBar({
   serverConnected,
   peerCount,
   mappedPeers,
-  hasOriginTranscript,
   isArchived,
   isLinkPROpen,
-  onHandoffOpen,
   onArchiveToggle,
   onLinkPROpenChange,
   onMobileAction,
@@ -242,18 +189,11 @@ function HeaderActionBar({
       <NotificationsButton taskId={taskId} />
 
       {!isMobile && (
-        <DesktopActions
-          taskId={taskId}
-          hasOriginTranscript={hasOriginTranscript}
-          isArchived={isArchived}
-          onHandoffOpen={onHandoffOpen}
-          onArchiveToggle={onArchiveToggle}
-        />
+        <DesktopActions taskId={taskId} isArchived={isArchived} onArchiveToggle={onArchiveToggle} />
       )}
       {isMobile && (
         <MobileActions
           taskId={taskId}
-          hasOriginTranscript={hasOriginTranscript}
           isArchived={isArchived}
           isLinkPROpen={isLinkPROpen}
           onLinkPROpenChange={onLinkPROpenChange}
@@ -351,32 +291,16 @@ function buildTaskUrl(taskId: TaskId): string {
   return `${base}/task/${taskId}`;
 }
 
-export function TaskHeader({
-  taskId,
-  isSnapshot = false,
-  isMobile = false,
-  handoffMessages,
-}: TaskHeaderProps) {
+export function TaskHeader({ taskId, isSnapshot = false, isMobile = false }: TaskHeaderProps) {
   const meta = useTaskMeta(taskId);
   const taskDoc = useTaskDocument(taskId);
   const [isTagEditorOpen, setIsTagEditorOpen] = useState(false);
-  const [isHandoffDialogOpen, setIsHandoffDialogOpen] = useState(false);
   const [isLinkPROpen, setIsLinkPROpen] = useState(false);
   const { connectedPeers, peerCount } = useP2PPeers();
   const serverConnected = useServerConnection();
   const copySnapshotUrl = useCopySnapshotUrl(taskId);
 
-  const mobileImportInputRef = useRef<HTMLInputElement>(null);
-  const {
-    handleFileSelect: handleMobileFileSelect,
-    isReviewOpen: isMobileReviewOpen,
-    importedData: mobileImportData,
-    clearImportData: clearMobileImportData,
-    handleConfirmImport: confirmMobileImport,
-  } = useImportConversation(taskId);
-
   const isArchived = Boolean(meta.archivedAt);
-  const hasOriginTranscript = Boolean(handoffMessages && handoffMessages.length > 0);
   const mappedPeers = useMemo(() => connectedPeers.map(mapPeerForPresence), [connectedPeers]);
   const syncState = useMemo(
     () => deriveSyncState(serverConnected, peerCount),
@@ -384,7 +308,6 @@ export function TaskHeader({
   );
 
   const handleArchiveToggle = useCallback(() => {
-    const now = Date.now();
     const actor = meta.ownerId || 'unknown';
 
     if (isArchived) {
@@ -392,7 +315,7 @@ export function TaskHeader({
       taskDoc.meta.archivedBy = null;
       taskDoc.logEvent('task_unarchived', actor, {});
     } else {
-      taskDoc.meta.archivedAt = now;
+      taskDoc.meta.archivedAt = Date.now();
       taskDoc.meta.archivedBy = actor;
       taskDoc.logEvent('task_archived', actor, {});
     }
@@ -420,8 +343,6 @@ export function TaskHeader({
           });
         },
         'copy-snapshot-url': copySnapshotUrl,
-        import: () => mobileImportInputRef.current?.click(),
-        handoff: () => setIsHandoffDialogOpen(true),
         'link-pr': () => setIsLinkPROpen(true),
         archive: handleArchiveToggle,
         unarchive: handleArchiveToggle,
@@ -470,42 +391,13 @@ export function TaskHeader({
           serverConnected={serverConnected}
           peerCount={peerCount}
           mappedPeers={mappedPeers}
-          hasOriginTranscript={hasOriginTranscript}
           isArchived={isArchived}
           isLinkPROpen={isLinkPROpen}
-          onHandoffOpen={() => setIsHandoffDialogOpen(true)}
           onArchiveToggle={handleArchiveToggle}
           onLinkPROpenChange={setIsLinkPROpen}
           onMobileAction={handleMobileDropdownAction}
         />
       )}
-
-      <input
-        ref={mobileImportInputRef}
-        type="file"
-        accept=".json,.a2a.json"
-        onChange={handleMobileFileSelect}
-        className="hidden"
-        aria-label="Import conversation file"
-      />
-
-      {mobileImportData?.success && (
-        <ImportReviewModal
-          isOpen={isMobileReviewOpen}
-          onClose={clearMobileImportData}
-          messages={mobileImportData.messages}
-          meta={mobileImportData.meta}
-          summary={mobileImportData.summary}
-          onConfirm={confirmMobileImport}
-        />
-      )}
-
-      <HandoffConversationDialog
-        taskId={taskId}
-        isOpen={isHandoffDialogOpen}
-        onClose={() => setIsHandoffDialogOpen(false)}
-        messages={handoffMessages}
-      />
     </div>
   );
 }

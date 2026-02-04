@@ -288,12 +288,18 @@ export const TaskEventShape = Shape.plain.discriminatedUnion('type', {
     ...EventBaseFields,
     requestId: Shape.plain.string(),
     exitCode: Shape.plain.number(),
+    /** Signal that terminated the process (e.g., 'SIGTERM', 'SIGKILL') */
+    signal: Shape.plain.string().nullable(),
+    /** First 1KB of stderr output for debugging */
+    stderr: Shape.plain.string().nullable(),
   }),
   spawn_failed: Shape.plain.struct({
     type: Shape.plain.string('spawn_failed'),
     ...EventBaseFields,
     requestId: Shape.plain.string(),
     error: Shape.plain.string(),
+    /** First 1KB of stderr output for debugging */
+    stderr: Shape.plain.string().nullable(),
   }),
 });
 

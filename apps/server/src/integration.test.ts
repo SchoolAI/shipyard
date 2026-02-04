@@ -105,8 +105,8 @@ function createMockChildProcess(pid = 12345): ChildProcess {
   const mockProcess = Object.assign(emitter, {
     pid,
     stdin: null,
-    stdout: { pipe: vi.fn() },
-    stderr: { pipe: vi.fn() },
+    stdout: { pipe: vi.fn(), on: vi.fn() },
+    stderr: { pipe: vi.fn(), on: vi.fn() },
     stdio: [null, null, null, null, null] as [null, null, null, null, null],
     killed: false,
     exitCode: null,

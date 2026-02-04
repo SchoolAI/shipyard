@@ -286,9 +286,8 @@ function buildCommonSpawnArgs(taskId: string, mcpConfigJson: string | null): str
   const args = ['--dangerously-skip-permissions'];
 
   if (env.LOG_LEVEL === 'debug') {
-    const debugLogPath = `/tmp/shipyard-agent-${taskId}-debug.log`;
-    args.push('--debug', 'api,hooks', '--debug-file', debugLogPath);
-    logger.info({ debugLogPath }, 'Debug logging enabled for spawned agent');
+    args.push('--debug', 'api,hooks');
+    logger.info({ taskId }, 'Debug logging enabled for spawned agent');
   }
 
   args.push('--append-system-prompt', systemPrompt);
@@ -460,11 +459,15 @@ function logSpawnCompleted(
   taskDoc: TaskDocument,
   requestId: string,
   exitCode: number,
+  signal: string | null,
+  stderr: string | null,
   actor: string
 ): void {
   taskDoc.logEvent('spawn_completed', actor, {
     requestId,
     exitCode,
+    signal,
+    stderr,
   });
 }
 
@@ -475,11 +478,13 @@ function logSpawnFailed(
   taskDoc: TaskDocument,
   requestId: string,
   error: string,
+  stderr: string | null,
   actor: string
 ): void {
   taskDoc.logEvent('spawn_failed', actor, {
     requestId,
     error,
+    stderr,
   });
 }
 
@@ -545,17 +550,21 @@ export async function spawnClaudeCode(
     child.on('error', (err) => {
       logger.error({ taskId, err: err.message }, 'Spawn error');
       if (taskDoc) {
-        logSpawnFailed(taskDoc, requestId, err.message, actor);
+        // Trim stderr to first 1KB to avoid bloating the event log
+        const stderrTrimmed = stderrOutput.slice(0, 1000) || null;
+        logSpawnFailed(taskDoc, requestId, err.message, stderrTrimmed, actor);
       }
     });
 
     child.on('exit', (code, signal) => {
+      // Trim stderr to first 1KB to avoid bloating the event log
+      const stderrTrimmed = stderrOutput.slice(0, 1000) || null;
       logger.info(
-        { taskId, exitCode: code, signal, stderrOutput: stderrOutput.slice(0, 1000) },
+        { taskId, exitCode: code, signal, stderrOutput: stderrTrimmed },
         'Agent process exited'
       );
       if (taskDoc) {
-        logSpawnCompleted(taskDoc, requestId, code ?? 0, actor);
+        logSpawnCompleted(taskDoc, requestId, code ?? 0, signal ?? null, stderrTrimmed, actor);
       }
     });
 
@@ -569,7 +578,7 @@ export async function spawnClaudeCode(
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : String(err);
     if (taskDoc) {
-      logSpawnFailed(taskDoc, requestId, errorMessage, actor);
+      logSpawnFailed(taskDoc, requestId, errorMessage, null, actor);
     }
     throw err;
   } finally {
@@ -786,17 +795,21 @@ export async function spawnClaudeCodeWithContext(
     child.on('error', (err) => {
       logger.error({ taskId, err: err.message }, 'Spawn error');
       if (taskDoc) {
-        logSpawnFailed(taskDoc, requestId, err.message, actor);
+        // Trim stderr to first 1KB to avoid bloating the event log
+        const stderrTrimmed = stderrOutput.slice(0, 1000) || null;
+        logSpawnFailed(taskDoc, requestId, err.message, stderrTrimmed, actor);
       }
     });
 
     child.on('exit', (code, signal) => {
+      // Trim stderr to first 1KB to avoid bloating the event log
+      const stderrTrimmed = stderrOutput.slice(0, 1000) || null;
       logger.info(
-        { taskId, exitCode: code, signal, stderrOutput: stderrOutput.slice(0, 1000) },
+        { taskId, exitCode: code, signal, stderrOutput: stderrTrimmed },
         'Agent process exited'
       );
       if (taskDoc) {
-        logSpawnCompleted(taskDoc, requestId, code ?? 0, actor);
+        logSpawnCompleted(taskDoc, requestId, code ?? 0, signal ?? null, stderrTrimmed, actor);
       }
     });
 
@@ -810,7 +823,7 @@ export async function spawnClaudeCodeWithContext(
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : String(err);
     if (taskDoc) {
-      logSpawnFailed(taskDoc, requestId, errorMessage, actor);
+      logSpawnFailed(taskDoc, requestId, errorMessage, null, actor);
     }
     throw err;
   } finally {

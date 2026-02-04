@@ -7,32 +7,19 @@
  * Actions include:
  * - Share: Copy task link
  * - Copy snapshot URL: Copy current state URL
- * - Resume conversation: Import a handed-off conversation
- * - Handoff conversation: Hand off to another agent (conditional)
  * - Link PR: Associate a GitHub PR
  * - Archive/Unarchive: Toggle archived state
  */
 
 import { Button, Dropdown, Label } from '@heroui/react';
 import type { TaskId } from '@shipyard/loro-schema';
-import {
-  Archive,
-  ArchiveRestore,
-  GitPullRequest,
-  Link2,
-  MessageSquareReply,
-  MessageSquareShare,
-  MoreVertical,
-  Share2,
-} from 'lucide-react';
+import { Archive, ArchiveRestore, GitPullRequest, Link2, MoreVertical, Share2 } from 'lucide-react';
 import type React from 'react';
 
 /** Action keys for the mobile dropdown menu */
 const MOBILE_DROPDOWN_ACTIONS = [
   'share',
   'copy-snapshot-url',
-  'import',
-  'handoff',
   'link-pr',
   'archive',
   'unarchive',
@@ -48,8 +35,6 @@ function isMobileDropdownAction(value: unknown): value is MobileDropdownAction {
 interface MobileDropdownMenuProps {
   /** The task ID (used for context, not directly in component) */
   taskId: TaskId;
-  /** Whether the task has an origin transcript that can be handed off */
-  hasOriginTranscript: boolean;
   /** Whether the task is currently archived */
   isArchived: boolean;
   /** Callback when an action is selected */
@@ -66,7 +51,6 @@ interface MobileDropdownMenuProps {
  */
 export function MobileDropdownMenu({
   taskId: _taskId,
-  hasOriginTranscript,
   isArchived,
   onAction,
   className,
@@ -102,18 +86,6 @@ export function MobileDropdownMenu({
             <Link2 className="w-4 h-4 shrink-0 text-muted" />
             <Label>Copy snapshot URL</Label>
           </Dropdown.Item>
-
-          <Dropdown.Item id="import" textValue="Resume conversation">
-            <MessageSquareReply className="w-4 h-4 shrink-0 text-muted" />
-            <Label>Resume conversation</Label>
-          </Dropdown.Item>
-
-          {hasOriginTranscript && (
-            <Dropdown.Item id="handoff" textValue="Handoff conversation">
-              <MessageSquareShare className="w-4 h-4 shrink-0 text-muted" />
-              <Label>Handoff conversation</Label>
-            </Dropdown.Item>
-          )}
 
           <Dropdown.Item id="link-pr" textValue="Link PR">
             <GitPullRequest className="w-4 h-4 shrink-0 text-muted" />

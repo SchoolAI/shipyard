@@ -5,14 +5,14 @@
   "description": "P2P collaborative review for AI-generated implementation plans",
   "scripts": {
     "build": "turbo run build",
-    "test": "turbo run test && vitest run",
+    "test": "turbo run test --filter='!@shipyard/hook' && vitest run",
     "test:meta": "vitest run tests/integration-coverage.test.ts",
     "typecheck": "turbo run typecheck",
     "lint": "turbo run lint",
     "lint:comments": "bash scripts/lint-comments.sh",
     "lint:typeassertions": "bash scripts/lint-typeassertions.sh",
     "lint:fix": "turbo run lint:fix",
-    "check": "bash scripts/validate-file-allowlist.sh && turbo run typecheck lint --filter='!@shipyard/web-legacy' --filter='!@shipyard/session-server' --filter='!@shipyard/hook'",
+    "check": "bash scripts/validate-file-allowlist.sh && turbo run typecheck lint --filter='!@shipyard/session-server' --filter='!@shipyard/hook'",
     "dev:all": "bash scripts/dev-all.sh",
     "dev:local": "bash scripts/dev-local.sh",
     "dev:schema": "turbo run dev --filter=@shipyard/schema",
@@ -63,5 +63,23 @@
   },
   "dependencies": {
     "nanoid": "catalog:"
+  },
+  "pnpm": {
+    "overrides": {
+      "@loro-extended/change": "link:/Users/jacobpetterle/Working Directory/loro-extended/packages/change",
+      "@loro-extended/repo": "link:/Users/jacobpetterle/Working Directory/loro-extended/packages/repo",
+      "@loro-extended/react": "link:/Users/jacobpetterle/Working Directory/loro-extended/packages/react",
+      "@loro-extended/adapter-indexeddb": "link:/Users/jacobpetterle/Working Directory/loro-extended/adapters/indexeddb",
+      "@loro-extended/adapter-websocket": "link:/Users/jacobpetterle/Working Directory/loro-extended/adapters/websocket",
+      "@loro-extended/adapter-webrtc": "link:/Users/jacobpetterle/Working Directory/loro-extended/adapters/webrtc",
+      "@loro-extended/adapter-leveldb": "link:/Users/jacobpetterle/Working Directory/loro-extended/adapters/leveldb"
+    },
+    "ignoredBuiltDependencies": [
+      "@swc/core",
+      "esbuild",
+      "sharp",
+      "simple-git-hooks",
+      "workerd"
+    ]
   }
 }

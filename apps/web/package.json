@@ -27,7 +27,6 @@
     "@loro-extended/react": "catalog:",
     "@loro-extended/repo": "catalog:",
     "@shipyard/loro-schema": "workspace:*",
-    "@shipyard/shared": "workspace:*",
     "@shipyard/session": "workspace:*",
     "@tanstack/react-query": "^5.90.19",
     "@tiptap/core": "^3.18.0",

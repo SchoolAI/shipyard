@@ -28,11 +28,11 @@
   },
   "devDependencies": {
     "@cloudflare/workers-types": "catalog:",
-    "@cloudflare/vitest-pool-workers": "catalog:",
-    "@vitest/coverage-istanbul": "catalog:",
+    "@cloudflare/vitest-pool-workers": "^0.12.9",
+    "@vitest/coverage-istanbul": "^3.0.4",
     "tsx": "catalog:",
     "typescript": "catalog:",
-    "vitest": "catalog:",
+    "vitest": "^3.2.0",
     "wrangler": "catalog:"
   }
 }

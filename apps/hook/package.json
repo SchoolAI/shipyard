@@ -61,7 +61,6 @@
   },
   "devDependencies": {
     "@shipyard/loro-schema": "workspace:*",
-    "@shipyard/shared": "workspace:*",
     "@types/bun": "catalog:",
     "bunup": "catalog:",
     "pino-pretty": "catalog:",
