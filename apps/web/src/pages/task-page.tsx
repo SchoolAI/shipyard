@@ -145,7 +145,7 @@ function TaskPageContent({ taskId, isSnapshot = false }: TaskPageContentProps) {
         isLocalViewing={isLocalViewing}
       >
         <div className="flex h-screen flex-col">
-          <header className="shrink-0 border-b border-separator bg-surface px-4 py-3 md:px-6">
+          <header className="shrink-0 border-b border-separator bg-surface px-2 py-1 md:px-6 md:py-2">
             <TaskHeader taskId={taskId} isMobile={isMobile} />
           </header>
 

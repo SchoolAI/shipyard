@@ -154,7 +154,7 @@ export function ReviewActions({ taskId, currentStatus, onStatusChange }: ReviewA
       >
         <Button
           size="sm"
-          className="bg-success hover:bg-success-dark text-success-foreground text-xs px-3 rounded-lg min-h-[28px] h-7"
+          className="bg-success hover:bg-success-dark text-white text-xs px-3 rounded-lg min-h-[28px] h-7"
           onPress={() => handleButtonPress('approve')}
           isDisabled={
             isSubmitting || currentStatus === 'in_progress' || currentStatus === 'completed'
@@ -206,7 +206,7 @@ export function ReviewActions({ taskId, currentStatus, onStatusChange }: ReviewA
                 </Button>
                 <Button
                   size="sm"
-                  className="bg-success text-success-foreground"
+                  className="bg-success text-white"
                   onPress={() => handleConfirm('approve')}
                   isDisabled={isSubmitting}
                   isPending={isSubmitting}

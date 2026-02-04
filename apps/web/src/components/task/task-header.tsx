@@ -1,10 +1,19 @@
+/**
+ * TaskHeader - Main header bar for task pages.
+ *
+ * Layout matches the original design:
+ * - Left side: Title, Status, AgentRequestsBadge, badges (snapshot, repo, archived)
+ * - Left side (continued): Tags, TagEditor
+ * - Right side (ml-auto): Presence, ApprovalPanel, ReviewActions, Separator, DesktopActions
+ */
+
 import { Button, Chip, Popover, Separator, Tooltip } from '@heroui/react';
 import { isTaskStatus, type TaskId } from '@shipyard/loro-schema';
 import { Archive, ArchiveRestore, Tag } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { AgentRequestsBadge } from '@/components/agent-requests-badge';
-import { AgentStatusIndicator } from '@/components/agent-status-indicator';
+import { ApprovalPanel } from '@/components/approval-panel';
 import { CopySnapshotUrlButton, useCopySnapshotUrl } from '@/components/copy-snapshot-url-button';
 import { LinkPRButton } from '@/components/link-pr-button';
 import { type MobileDropdownAction, MobileDropdownMenu } from '@/components/mobile-dropdown-menu';
@@ -16,12 +25,10 @@ import {
 import { ReviewActions } from '@/components/review-actions';
 import { ShareButton } from '@/components/share-button';
 import { StatusChip } from '@/components/status-chip';
-import { SyncStatus } from '@/components/sync-status';
 import { TagChip } from '@/components/tag-chip';
 import { TagEditor } from '@/components/tag-editor';
 import { TruncatedText } from '@/components/ui/truncated-text';
 import { type ConnectedPeer as HookConnectedPeer, useP2PPeers } from '@/hooks/use-p2p-peers';
-import { useServerConnection } from '@/hooks/use-server-connection';
 import { useTaskMeta } from '@/loro/selectors/task-selectors';
 import { useTaskDocument } from '@/loro/use-task-document';
 
@@ -61,6 +68,114 @@ interface TaskHeaderProps {
   isMobile?: boolean;
 }
 
+async function copyToClipboardWithFallback(text: string): Promise<void> {
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    const textArea = document.createElement('textarea');
+    textArea.value = text;
+    document.body.appendChild(textArea);
+    textArea.select();
+    document.execCommand('copy');
+    document.body.removeChild(textArea);
+  }
+}
+
+function buildTaskUrl(taskId: TaskId): string {
+  const base = window.location.origin + (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
+  return `${base}/task/${taskId}`;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Sub-components
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface HeaderBadgesProps {
+  isSnapshot: boolean;
+  isArchived: boolean;
+  repo?: string;
+  pr?: number;
+}
+
+function HeaderBadges({ isSnapshot, isArchived, repo, pr }: HeaderBadgesProps) {
+  return (
+    <>
+      {isSnapshot && (
+        <Chip color="warning" variant="soft" className="shrink-0">
+          snapshot
+        </Chip>
+      )}
+      {(repo || pr) && (
+        <span className="shrink-0 text-xs text-muted-foreground md:text-sm">
+          {repo}
+          {pr && ` #${pr}`}
+        </span>
+      )}
+      {isArchived && (
+        <Chip color="default" variant="soft" className="shrink-0">
+          archived
+        </Chip>
+      )}
+    </>
+  );
+}
+
+interface TagsDisplayProps {
+  tags: string[];
+}
+
+function TagsDisplay({ tags }: TagsDisplayProps) {
+  if (tags.length === 0) return null;
+
+  return (
+    <div className="flex items-center gap-1">
+      {tags.slice(0, 3).map((tag) => (
+        <TagChip key={tag} tag={tag} size="sm" />
+      ))}
+      {tags.length > 3 && <span className="text-xs text-muted-foreground">+{tags.length - 3}</span>}
+    </div>
+  );
+}
+
+interface TagEditorPopoverProps {
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+  tags: string[];
+  onTagsChange: (newTags: string[]) => void;
+}
+
+function TagEditorPopover({ isOpen, onOpenChange, tags, onTagsChange }: TagEditorPopoverProps) {
+  return (
+    <Popover isOpen={isOpen} onOpenChange={onOpenChange}>
+      <Tooltip delay={0}>
+        <Tooltip.Trigger>
+          <Button isIconOnly variant="ghost" size="sm" aria-label="Edit tags" className="touch-target">
+            <Tag className="h-4 w-4" />
+          </Button>
+        </Tooltip.Trigger>
+        <Tooltip.Content>Edit tags</Tooltip.Content>
+      </Tooltip>
+
+      <Popover.Content placement="bottom" className="w-96">
+        <Popover.Dialog>
+          <Popover.Arrow />
+          <Popover.Heading>Edit Tags</Popover.Heading>
+
+          <div className="mt-3">
+            <TagEditor tags={[...tags]} onTagsChange={onTagsChange} />
+          </div>
+
+          <div className="mt-4 flex justify-end gap-2">
+            <Button size="sm" variant="ghost" onPress={() => onOpenChange(false)}>
+              Done
+            </Button>
+          </div>
+        </Popover.Dialog>
+      </Popover.Content>
+    </Popover>
+  );
+}
+
 interface DesktopActionsProps {
   taskId: TaskId;
   isArchived: boolean;
@@ -69,9 +184,7 @@ interface DesktopActionsProps {
 
 function DesktopActions({ taskId, isArchived, onArchiveToggle }: DesktopActionsProps) {
   return (
-    <>
-      <Separator orientation="vertical" className="h-6" />
-
+    <div className="flex items-center gap-2">
       <ShareButton taskId={taskId} />
 
       <CopySnapshotUrlButton taskId={taskId} />
@@ -83,17 +196,24 @@ function DesktopActions({ taskId, isArchived, onArchiveToggle }: DesktopActionsP
         <Tooltip.Content>Link a GitHub pull request</Tooltip.Content>
       </Tooltip>
 
-      <Button
-        isIconOnly
-        variant="ghost"
-        size="sm"
-        aria-label={isArchived ? 'Unarchive task' : 'Archive task'}
-        onPress={onArchiveToggle}
-        className="touch-target"
-      >
-        {isArchived ? <ArchiveRestore className="w-4 h-4" /> : <Archive className="w-4 h-4" />}
-      </Button>
-    </>
+      <Tooltip delay={0}>
+        <Tooltip.Trigger>
+          <Button
+            isIconOnly
+            variant="ghost"
+            size="sm"
+            aria-label={isArchived ? 'Unarchive task' : 'Archive task'}
+            onPress={onArchiveToggle}
+            className="touch-target"
+          >
+            {isArchived ? <ArchiveRestore className="h-4 w-4" /> : <Archive className="h-4 w-4" />}
+          </Button>
+        </Tooltip.Trigger>
+        <Tooltip.Content>{isArchived ? 'Unarchive task' : 'Archive task'}</Tooltip.Content>
+      </Tooltip>
+
+      <NotificationsButton taskId={taskId} />
+    </div>
   );
 }
 
@@ -126,186 +246,20 @@ function MobileActions({
   );
 }
 
-interface HeaderBadgesProps {
-  isSnapshot: boolean;
-  isArchived: boolean;
-  repo?: string;
-}
-
-function HeaderBadges({ isSnapshot, isArchived, repo }: HeaderBadgesProps) {
-  return (
-    <>
-      {isSnapshot && (
-        <Chip color="warning" variant="soft" className="shrink-0">
-          snapshot
-        </Chip>
-      )}
-      {repo && <span className="text-xs md:text-sm text-muted-foreground shrink-0">{repo}</span>}
-      {isArchived && (
-        <Chip color="default" variant="soft" className="shrink-0">
-          archived
-        </Chip>
-      )}
-    </>
-  );
-}
-
-interface HeaderActionBarProps {
-  taskId: TaskId;
-  isSnapshot: boolean;
-  isMobile: boolean;
-  syncState: 'offline' | 'synced';
-  serverConnected: boolean;
-  peerCount: number;
-  mappedPeers: PresenceConnectedPeer[];
-  isArchived: boolean;
-  isLinkPROpen: boolean;
-  onArchiveToggle: () => void;
-  onLinkPROpenChange: (open: boolean) => void;
-  onMobileAction: (action: MobileDropdownAction) => void;
-}
-
-function HeaderActionBar({
-  taskId,
-  isSnapshot,
-  isMobile,
-  syncState,
-  serverConnected,
-  peerCount,
-  mappedPeers,
-  isArchived,
-  isLinkPROpen,
-  onArchiveToggle,
-  onLinkPROpenChange,
-  onMobileAction,
-}: HeaderActionBarProps) {
-  return (
-    <div className="flex items-center gap-2 ml-auto shrink-0">
-      {!isMobile && (
-        <SyncStatus syncState={syncState} serverConnected={serverConnected} peerCount={peerCount} />
-      )}
-      {syncState !== 'offline' && <PresenceIndicators connectedPeers={mappedPeers} />}
-      <AgentRequestsBadge taskId={taskId} isSnapshot={isSnapshot} />
-      <NotificationsButton taskId={taskId} />
-
-      {!isMobile && (
-        <DesktopActions taskId={taskId} isArchived={isArchived} onArchiveToggle={onArchiveToggle} />
-      )}
-      {isMobile && (
-        <MobileActions
-          taskId={taskId}
-          isArchived={isArchived}
-          isLinkPROpen={isLinkPROpen}
-          onLinkPROpenChange={onLinkPROpenChange}
-          onAction={onMobileAction}
-        />
-      )}
-    </div>
-  );
-}
-
-interface TagsDisplayProps {
-  tags: string[];
-}
-
-function TagsDisplay({ tags }: TagsDisplayProps) {
-  if (tags.length === 0) return null;
-
-  return (
-    <div className="flex gap-1 items-center">
-      {tags.slice(0, 3).map((tag) => (
-        <TagChip key={tag} tag={tag} size="sm" />
-      ))}
-      {tags.length > 3 && <span className="text-xs text-muted-foreground">+{tags.length - 3}</span>}
-    </div>
-  );
-}
-
-interface TagEditorPopoverProps {
-  isOpen: boolean;
-  onOpenChange: (open: boolean) => void;
-  tags: string[];
-  onTagsChange: (newTags: string[]) => void;
-}
-
-function TagEditorPopover({ isOpen, onOpenChange, tags, onTagsChange }: TagEditorPopoverProps) {
-  return (
-    <Popover isOpen={isOpen} onOpenChange={onOpenChange}>
-      <Tooltip delay={0}>
-        <Tooltip.Trigger>
-          <Button
-            isIconOnly
-            variant="ghost"
-            size="sm"
-            aria-label="Edit tags"
-            className="touch-target"
-          >
-            <Tag className="w-4 h-4" />
-          </Button>
-        </Tooltip.Trigger>
-        <Tooltip.Content>Edit tags</Tooltip.Content>
-      </Tooltip>
-
-      <Popover.Content placement="bottom" className="w-96">
-        <Popover.Dialog>
-          <Popover.Arrow />
-          <Popover.Heading>Edit Tags</Popover.Heading>
-
-          <div className="mt-3">
-            <TagEditor tags={[...tags]} onTagsChange={onTagsChange} />
-          </div>
-
-          <div className="flex justify-end gap-2 mt-4">
-            <Button size="sm" variant="ghost" onPress={() => onOpenChange(false)}>
-              Done
-            </Button>
-          </div>
-        </Popover.Dialog>
-      </Popover.Content>
-    </Popover>
-  );
-}
-
-function deriveSyncState(serverConnected: boolean, peerCount: number): 'offline' | 'synced' {
-  if (!serverConnected && peerCount === 0) {
-    return 'offline';
-  }
-  return 'synced';
-}
-
-async function copyToClipboardWithFallback(text: string): Promise<void> {
-  try {
-    await navigator.clipboard.writeText(text);
-  } catch {
-    const textArea = document.createElement('textarea');
-    textArea.value = text;
-    document.body.appendChild(textArea);
-    textArea.select();
-    document.execCommand('copy');
-    document.body.removeChild(textArea);
-  }
-}
-
-function buildTaskUrl(taskId: TaskId): string {
-  const base = window.location.origin + (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
-  return `${base}/task/${taskId}`;
-}
+// ─────────────────────────────────────────────────────────────────────────────
+// Main Component
+// ─────────────────────────────────────────────────────────────────────────────
 
 export function TaskHeader({ taskId, isSnapshot = false, isMobile = false }: TaskHeaderProps) {
   const meta = useTaskMeta(taskId);
   const taskDoc = useTaskDocument(taskId);
   const [isTagEditorOpen, setIsTagEditorOpen] = useState(false);
   const [isLinkPROpen, setIsLinkPROpen] = useState(false);
-  const { connectedPeers, peerCount } = useP2PPeers();
-  const serverConnected = useServerConnection();
+  const { connectedPeers } = useP2PPeers();
   const copySnapshotUrl = useCopySnapshotUrl(taskId);
 
   const isArchived = Boolean(meta.archivedAt);
   const mappedPeers = useMemo(() => connectedPeers.map(mapPeerForPresence), [connectedPeers]);
-  const syncState = useMemo(
-    () => deriveSyncState(serverConnected, peerCount),
-    [serverConnected, peerCount]
-  );
 
   const handleArchiveToggle = useCallback(() => {
     const actor = meta.ownerId || 'unknown';
@@ -352,26 +306,32 @@ export function TaskHeader({ taskId, isSnapshot = false, isMobile = false }: Tas
     [taskId, copySnapshotUrl, handleArchiveToggle]
   );
 
-  const showReviewActions =
-    !isSnapshot && meta.status === 'pending_review' && isTaskStatus(meta.status);
+  const showReviewActions = !isSnapshot && meta.status === 'pending_review' && isTaskStatus(meta.status);
   const statusToDisplay = isTaskStatus(meta.status) ? meta.status : 'draft';
 
   return (
-    <div className="flex flex-wrap items-center gap-2 w-full">
+    <div className="flex w-full flex-wrap items-center gap-2">
+      {/* ─── Left side: Title, Status, AgentRequestsBadge ─── */}
       <TruncatedText
         text={meta.title}
         maxLength={30}
-        className="text-lg md:text-xl font-semibold text-foreground truncate"
+        className="truncate text-lg font-semibold text-foreground md:text-xl"
         as="h1"
       />
       <StatusChip status={statusToDisplay} className="shrink-0" />
 
-      <HeaderBadges isSnapshot={isSnapshot} isArchived={isArchived} repo={meta.repo ?? undefined} />
+      {/* AgentRequestsBadge - prominent position after status (old layout) */}
+      {!isSnapshot && <AgentRequestsBadge taskId={taskId} isSnapshot={isSnapshot} />}
 
-      {!isSnapshot && (
-        <AgentStatusIndicator taskId={taskId} variant={isMobile ? 'compact' : 'full'} />
-      )}
-      {showReviewActions && <ReviewActions taskId={taskId} currentStatus={meta.status} />}
+      {/* ─── Badges: snapshot, repo/PR, archived ─── */}
+      <HeaderBadges
+        isSnapshot={isSnapshot}
+        isArchived={isArchived}
+        repo={meta.repo ?? undefined}
+        pr={undefined}
+      />
+
+      {/* ─── Tags + Editor ─── */}
       {!isSnapshot && <TagsDisplay tags={meta.tags} />}
       {!isSnapshot && (
         <TagEditorPopover
@@ -382,21 +342,39 @@ export function TaskHeader({ taskId, isSnapshot = false, isMobile = false }: Tas
         />
       )}
 
+      {/* ─── Right side: Presence, ApprovalPanel, ReviewActions, Actions ─── */}
       {!isSnapshot && (
-        <HeaderActionBar
-          taskId={taskId}
-          isSnapshot={isSnapshot}
-          isMobile={isMobile}
-          syncState={syncState}
-          serverConnected={serverConnected}
-          peerCount={peerCount}
-          mappedPeers={mappedPeers}
-          isArchived={isArchived}
-          isLinkPROpen={isLinkPROpen}
-          onArchiveToggle={handleArchiveToggle}
-          onLinkPROpenChange={setIsLinkPROpen}
-          onMobileAction={handleMobileDropdownAction}
-        />
+        <div className="ml-auto flex shrink-0 items-center gap-2">
+          {/* Presence indicators */}
+          <PresenceIndicators connectedPeers={mappedPeers} />
+
+          {/* Approval panel for task owners (pending access requests) */}
+          <ApprovalPanel taskId={taskId} />
+
+          {/* Review actions (desktop inline, mobile floating) */}
+          {!isMobile && showReviewActions && (
+            <>
+              <ReviewActions taskId={taskId} currentStatus={meta.status} />
+              <Separator orientation="vertical" className="h-6" />
+            </>
+          )}
+
+          {/* Desktop actions */}
+          {!isMobile && (
+            <DesktopActions taskId={taskId} isArchived={isArchived} onArchiveToggle={handleArchiveToggle} />
+          )}
+
+          {/* Mobile actions */}
+          {isMobile && (
+            <MobileActions
+              taskId={taskId}
+              isArchived={isArchived}
+              isLinkPROpen={isLinkPROpen}
+              onLinkPROpenChange={setIsLinkPROpen}
+              onAction={handleMobileDropdownAction}
+            />
+          )}
+        </div>
       )}
     </div>
   );
