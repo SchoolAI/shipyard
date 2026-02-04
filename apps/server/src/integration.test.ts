@@ -97,6 +97,67 @@ import {
 
 // ==================== TEST HELPERS ====================
 
+// -------------------- Git Mock Helpers --------------------
+
+/**
+ * Configuration for git command mock responses.
+ * Each property corresponds to a git command pattern and its return value.
+ */
+interface GitMockConfig {
+  headSha: string;
+  branch: string;
+  cachedNameStatus: string;
+  cachedNumstat: string;
+  nameStatus: string;
+  numstat: string;
+  lsFilesOthers: string;
+  diff: string;
+}
+
+/**
+ * Default git mock configuration for basic test scenarios.
+ */
+const DEFAULT_GIT_MOCK_CONFIG: GitMockConfig = {
+  headSha: 'abc1234',
+  branch: 'main',
+  cachedNameStatus: '',
+  cachedNumstat: '',
+  nameStatus: 'M\tfile.ts',
+  numstat: '10\t5\tfile.ts',
+  lsFilesOthers: '',
+  diff: '+added line\n-removed line',
+};
+
+/**
+ * Match a git command and return the appropriate mock response.
+ * This helper reduces cognitive complexity by consolidating git command matching logic.
+ */
+function matchGitCommand(argsStr: string, config: GitMockConfig): string | null {
+  // Order matters: more specific patterns first
+  if (argsStr.includes('rev-parse HEAD')) return config.headSha;
+  if (argsStr.includes('--abbrev-ref HEAD')) return config.branch;
+  if (argsStr.includes('diff --cached --name-status')) return config.cachedNameStatus;
+  if (argsStr.includes('diff --cached --numstat')) return config.cachedNumstat;
+  if (argsStr.includes('diff --name-status')) return config.nameStatus;
+  if (argsStr.includes('diff --numstat')) return config.numstat;
+  if (argsStr.includes('ls-files --others')) return config.lsFilesOthers;
+  if (argsStr.includes('diff --')) return config.diff;
+  return null;
+}
+
+/**
+ * Create a mock implementation for execFileSync that handles git commands.
+ * Uses the provided config to determine responses for each git command type.
+ */
+function createGitExecFileSyncMock(config: GitMockConfig = DEFAULT_GIT_MOCK_CONFIG) {
+  return (_cmd: string, args: string[], _opts: unknown): string => {
+    const argsStr = args?.join(' ') ?? '';
+    return matchGitCommand(argsStr, config) ?? '';
+  };
+}
+
+// -------------------- Process Mock Helpers --------------------
+
 /**
  * Create a mock ChildProcess for testing.
  */
@@ -469,18 +530,7 @@ describe('Integration: Git Sync', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Git sync uses execFileSync, not execSync
-    mockExecFileSync.mockImplementation((_cmd: string, args: string[], _opts: unknown) => {
-      const argsStr = args?.join(' ') ?? '';
-      if (argsStr.includes('rev-parse HEAD')) return 'abc1234';
-      if (argsStr.includes('--abbrev-ref HEAD')) return 'main';
-      if (argsStr.includes('diff --cached --name-status')) return '';
-      if (argsStr.includes('diff --cached --numstat')) return '';
-      if (argsStr.includes('diff --name-status')) return 'M\tfile.ts';
-      if (argsStr.includes('diff --numstat')) return '10\t5\tfile.ts';
-      if (argsStr.includes('ls-files --others')) return '';
-      if (argsStr.includes('diff --')) return '+added line\n-removed line';
-      return '';
-    });
+    mockExecFileSync.mockImplementation(createGitExecFileSyncMock());
   });
 
   describe('getGitChanges', () => {
@@ -538,18 +588,18 @@ describe('Integration: Git Sync', () => {
       const taskDoc = createMockTaskDocument(taskId);
 
       // Mock modified file with different values
-      mockExecFileSync.mockImplementation((_cmd: string, args: string[], _opts: unknown) => {
-        const argsStr = args?.join(' ') ?? '';
-        if (argsStr.includes('rev-parse HEAD')) return 'def5678';
-        if (argsStr.includes('--abbrev-ref HEAD')) return 'feature-branch';
-        if (argsStr.includes('diff --cached --name-status')) return '';
-        if (argsStr.includes('diff --cached --numstat')) return '';
-        if (argsStr.includes('diff --name-status')) return 'M\tsrc/test.ts';
-        if (argsStr.includes('diff --numstat')) return '5\t2\tsrc/test.ts';
-        if (argsStr.includes('ls-files --others')) return '';
-        if (argsStr.includes('diff --')) return '@@ -1,5 +1,8 @@\n+new code';
-        return '';
-      });
+      mockExecFileSync.mockImplementation(
+        createGitExecFileSyncMock({
+          headSha: 'def5678',
+          branch: 'feature-branch',
+          cachedNameStatus: '',
+          cachedNumstat: '',
+          nameStatus: 'M\tsrc/test.ts',
+          numstat: '5\t2\tsrc/test.ts',
+          lsFilesOthers: '',
+          diff: '@@ -1,5 +1,8 @@\n+new code',
+        })
+      );
 
       const mockHandle = createMockHandle(taskDoc);
 

@@ -10,8 +10,8 @@
 import { z } from 'zod';
 import { getGitHubUsername } from '../../utils/identity.js';
 import { logger } from '../../utils/logger.js';
+import { errorResponse, getTaskDocument, successResponse, verifySessionToken } from '../helpers.js';
 import type { McpServer } from '../index.js';
-import { errorResponse, getTaskDocument, successResponse, verifySessionToken } from './helpers.js';
 
 /** Tool name constant */
 const TOOL_NAME = 'post_update';

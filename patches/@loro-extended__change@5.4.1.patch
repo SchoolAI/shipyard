@@ -1,0 +1,13 @@
+diff --git a/dist/index.js b/dist/index.js
+index 5cc0b6c9d1e9106d607106850fa32cd64abddad8..0f3936dc6959ec1cce5533fb30c1c4ea41538fe8 100644
+--- a/dist/index.js
++++ b/dist/index.js	
+@@ -478,7 +478,7 @@ function mergeDiscriminatedUnion(shape, crdtValue, placeholderValue) {
+     return crdtValue !== void 0 ? crdtValue : placeholderValue;
+   }
+   const placeholderDiscriminant = placeholderObj[shape.discriminantKey];
+-  const effectivePlaceholderValue = placeholderDiscriminant === discriminantValue ? placeholderValue : void 0;
++  const effectivePlaceholderValue = placeholderDiscriminant === discriminantValue ? placeholderValue : deriveShapePlaceholder(variantShape);
+   return mergeValue(variantShape, crdtValue, effectivePlaceholderValue);
+ }
+ function transformTreeNodes(nodes, dataShape) {

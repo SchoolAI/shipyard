@@ -307,6 +307,89 @@ const McpServerConfigSchema = z
   .passthrough();
 
 /**
+ * Find the first MCP config file that exists from candidate paths.
+ */
+function findMcpConfigPath(projectRoot: string): string | null {
+  const candidates = [join(projectRoot, '.mcp.json'), join(process.cwd(), '.mcp.json')];
+  return candidates.find((path) => existsSync(path)) ?? null;
+}
+
+/**
+ * Parse MCP config JSON from file content.
+ */
+function parseMcpConfig(
+  configContent: string,
+  sourcePath: string
+): { mcpServers?: Record<string, unknown> } {
+  try {
+    return JSON.parse(configContent);
+  } catch (err) {
+    throw new Error(
+      `Failed to parse MCP config at ${sourcePath}: ${err instanceof Error ? err.message : String(err)}`
+    );
+  }
+}
+
+/**
+ * Check if a string argument looks like a relative path that should be resolved.
+ */
+function isRelativePathArg(arg: string): boolean {
+  return arg.includes('/') && !arg.startsWith('/') && !arg.startsWith('-');
+}
+
+/**
+ * Resolve a single argument to an absolute path if it's a relative path that exists.
+ */
+function resolveArgPath(
+  arg: unknown,
+  projectRoot: string,
+  serverName: string,
+  logger: ReturnType<typeof getLogger>
+): unknown {
+  if (typeof arg !== 'string') return arg;
+  if (!isRelativePathArg(arg)) return arg;
+
+  const absolutePath = resolve(projectRoot, arg);
+  logger.debug(
+    { serverName, arg, absolutePath, exists: existsSync(absolutePath) },
+    'Resolving MCP config path'
+  );
+
+  if (!existsSync(absolutePath)) {
+    logger.warn({ serverName, arg, absolutePath }, 'MCP config path not found, keeping relative');
+    return arg;
+  }
+
+  logger.info(
+    { serverName, relativePath: arg, absolutePath },
+    'Resolved MCP config path to absolute'
+  );
+  return absolutePath;
+}
+
+/**
+ * Resolve relative paths in server config args to absolute paths.
+ */
+function resolveServerConfigPaths(
+  serverConfig: unknown,
+  serverName: string,
+  projectRoot: string,
+  logger: ReturnType<typeof getLogger>
+): void {
+  if (!serverConfig || typeof serverConfig !== 'object') return;
+
+  const parseResult = McpServerConfigSchema.safeParse(serverConfig);
+  if (!parseResult.success) return;
+
+  const originalServer = serverConfig as Record<string, unknown>;
+  if (!Array.isArray(originalServer.args)) return;
+
+  originalServer.args = originalServer.args.map((arg: unknown) =>
+    resolveArgPath(arg, projectRoot, serverName, logger)
+  );
+}
+
+/**
  * Resolves MCP config with absolute paths and returns as JSON string.
  * This ensures relative paths in .mcp.json work regardless of spawned agent's cwd.
  *
@@ -319,67 +402,15 @@ function getResolvedMcpConfigJson(): string | null {
   const serverDir = dirname(currentFile);
   const projectRoot = resolve(serverDir, '../../..');
 
-  const candidates = [join(projectRoot, '.mcp.json'), join(process.cwd(), '.mcp.json')];
-
-  let sourcePath: string | null = null;
-  for (const path of candidates) {
-    if (existsSync(path)) {
-      sourcePath = path;
-      break;
-    }
-  }
-
-  if (!sourcePath) {
-    return null;
-  }
+  const sourcePath = findMcpConfigPath(projectRoot);
+  if (!sourcePath) return null;
 
   const configContent = readFileSync(sourcePath, 'utf-8');
-  let config: { mcpServers?: Record<string, unknown> };
-  try {
-    config = JSON.parse(configContent);
-  } catch (err) {
-    throw new Error(
-      `Failed to parse MCP config at ${sourcePath}: ${err instanceof Error ? err.message : String(err)}`
-    );
-  }
+  const config = parseMcpConfig(configContent, sourcePath);
 
   if (config.mcpServers) {
     for (const [serverName, serverConfig] of Object.entries(config.mcpServers)) {
-      if (!serverConfig || typeof serverConfig !== 'object') continue;
-      const parseResult = McpServerConfigSchema.safeParse(serverConfig);
-      if (!parseResult.success) continue;
-
-      // Mutate the ORIGINAL config object, not the Zod-parsed copy
-      const originalServer = serverConfig as Record<string, unknown>;
-      if (Array.isArray(originalServer.args)) {
-        originalServer.args = originalServer.args.map((arg: unknown) => {
-          if (typeof arg !== 'string') return arg;
-          if (arg.includes('/') && !arg.startsWith('/') && !arg.startsWith('-')) {
-            const absolutePath = resolve(projectRoot, arg);
-            logger.debug(
-              {
-                serverName,
-                arg,
-                absolutePath,
-                exists: existsSync(absolutePath),
-              },
-              'Resolving MCP config path'
-            );
-            if (existsSync(absolutePath)) {
-              logger.info(
-                { serverName, relativePath: arg, absolutePath },
-                'Resolved MCP config path to absolute'
-              );
-              return absolutePath;
-            }
-            logger.warn(
-              { serverName, arg, absolutePath },
-              'MCP config path not found, keeping relative'
-            );
-          }
-          return arg;
-        });
-      }
+      resolveServerConfigPaths(serverConfig, serverName, projectRoot, logger);
     }
   }
 
@@ -489,6 +520,100 @@ function logSpawnFailed(
 }
 
 /**
+ * Trim stderr output to first 1KB to avoid bloating the event log.
+ */
+function trimStderr(stderrOutput: string): string | null {
+  return stderrOutput.slice(0, 1000) || null;
+}
+
+/**
+ * Context for spawn event logging callbacks.
+ */
+interface SpawnEventContext {
+  taskId: string;
+  requestId: string;
+  actor: string;
+  taskDoc?: TaskDocument;
+  logger: ReturnType<typeof getLogger>;
+}
+
+/**
+ * Creates a stderr buffer that captures output.
+ */
+function createStderrBuffer(child: ChildProcess): { getOutput: () => string } {
+  let output = '';
+  if (child.stderr) {
+    child.stderr.on('data', (data: Buffer) => {
+      output += data.toString();
+    });
+  }
+  return { getOutput: () => output };
+}
+
+/**
+ * Attach event handlers to a spawned child process.
+ */
+function attachChildEventHandlers(
+  child: ChildProcess,
+  stderrBuffer: { getOutput: () => string },
+  ctx: SpawnEventContext
+): void {
+  child.on('error', (err) => {
+    ctx.logger.error({ taskId: ctx.taskId, err: err.message }, 'Spawn error');
+    if (ctx.taskDoc) {
+      logSpawnFailed(
+        ctx.taskDoc,
+        ctx.requestId,
+        err.message,
+        trimStderr(stderrBuffer.getOutput()),
+        ctx.actor
+      );
+    }
+  });
+
+  child.on('exit', (code, signal) => {
+    const stderrTrimmed = trimStderr(stderrBuffer.getOutput());
+    ctx.logger.info(
+      { taskId: ctx.taskId, exitCode: code, signal, stderrOutput: stderrTrimmed },
+      'Agent process exited'
+    );
+    if (ctx.taskDoc) {
+      logSpawnCompleted(
+        ctx.taskDoc,
+        ctx.requestId,
+        code ?? 0,
+        signal ?? null,
+        stderrTrimmed,
+        ctx.actor
+      );
+    }
+  });
+}
+
+/**
+ * Spawn the actual Claude process.
+ */
+function spawnClaudeProcess(taskId: string, args: string[], cwd: string): ChildProcess {
+  const claudePath = getClaudePath();
+  return spawn(claudePath, args, {
+    cwd,
+    stdio: ['ignore', 'pipe', 'pipe'],
+    env: { ...process.env, SHIPYARD_TASK_ID: taskId },
+  });
+}
+
+/**
+ * Handle spawn failure by logging the event if taskDoc is present.
+ */
+function handleSpawnError(err: unknown, ctx: SpawnEventContext): never {
+  const errorMessage = err instanceof Error ? err.message : String(err);
+  if (ctx.taskDoc) {
+    logSpawnFailed(ctx.taskDoc, ctx.requestId, errorMessage, null, ctx.actor);
+  }
+  throw err;
+}
+
+/**
  * Spawn a new Claude Code agent for a task.
  *
  * @param opts - Spawn options including taskId, prompt, and cwd
@@ -502,85 +627,37 @@ export async function spawnClaudeCode(
   const { taskId, prompt, cwd } = opts;
   const env = getEnv();
   const logger = getLogger();
-  const requestId = nanoid();
-  const actor = 'system';
+  const ctx: SpawnEventContext = { taskId, requestId: nanoid(), actor: 'system', taskDoc, logger };
 
   const releaseLock = await acquireSpawnLock(taskId);
 
   try {
     stopExistingAgentIfRunning(taskId);
-
     await mkdir(cwd, { recursive: true });
 
     const mcpConfigJson = getResolvedMcpConfigJson();
-    const commonArgs = buildCommonSpawnArgs(taskId, mcpConfigJson);
-    const args = ['-p', prompt, ...commonArgs];
+    const args = ['-p', prompt, ...buildCommonSpawnArgs(taskId, mcpConfigJson)];
 
     if (env.DOCKER_MODE) {
       const child = await shimClaudeSpawn(taskId, args, cwd);
-
-      if (taskDoc && child.pid) {
-        logSpawnStarted(taskDoc, requestId, child.pid, actor);
-      }
-
+      if (taskDoc && child.pid) logSpawnStarted(taskDoc, ctx.requestId, child.pid, ctx.actor);
       return child;
     }
 
-    const claudePath = getClaudePath();
+    logger.info(
+      { taskId, command: getClaudePath(), args: args.join(' '), cwd },
+      'Spawning Claude Code'
+    );
 
-    logger.info({ taskId, command: claudePath, args: args.join(' '), cwd }, 'Spawning Claude Code');
-
-    const child = spawn(claudePath, args, {
-      cwd,
-      stdio: ['ignore', 'pipe', 'pipe'],
-      env: {
-        ...process.env,
-        SHIPYARD_TASK_ID: taskId,
-      },
-    });
-
-    // Capture stderr for debugging
-    let stderrOutput = '';
-    if (child.stderr) {
-      child.stderr.on('data', (data: Buffer) => {
-        stderrOutput += data.toString();
-      });
-    }
-
-    child.on('error', (err) => {
-      logger.error({ taskId, err: err.message }, 'Spawn error');
-      if (taskDoc) {
-        // Trim stderr to first 1KB to avoid bloating the event log
-        const stderrTrimmed = stderrOutput.slice(0, 1000) || null;
-        logSpawnFailed(taskDoc, requestId, err.message, stderrTrimmed, actor);
-      }
-    });
-
-    child.on('exit', (code, signal) => {
-      // Trim stderr to first 1KB to avoid bloating the event log
-      const stderrTrimmed = stderrOutput.slice(0, 1000) || null;
-      logger.info(
-        { taskId, exitCode: code, signal, stderrOutput: stderrTrimmed },
-        'Agent process exited'
-      );
-      if (taskDoc) {
-        logSpawnCompleted(taskDoc, requestId, code ?? 0, signal ?? null, stderrTrimmed, actor);
-      }
-    });
-
+    const child = spawnClaudeProcess(taskId, args, cwd);
+    const stderrBuffer = createStderrBuffer(child);
+    attachChildEventHandlers(child, stderrBuffer, ctx);
     trackAgent(taskId, child);
 
-    if (taskDoc && child.pid) {
-      logSpawnStarted(taskDoc, requestId, child.pid, actor);
-    }
-
+    if (taskDoc && child.pid) logSpawnStarted(taskDoc, ctx.requestId, child.pid, ctx.actor);
     return child;
   } catch (err) {
-    const errorMessage = err instanceof Error ? err.message : String(err);
-    if (taskDoc) {
-      logSpawnFailed(taskDoc, requestId, errorMessage, null, actor);
-    }
-    throw err;
+    handleSpawnError(err, ctx);
   } finally {
     releaseLock();
   }
@@ -706,6 +783,50 @@ function formatAsClaudeCodeJSONL(
 }
 
 /**
+ * Validate A2A payload and extract valid messages.
+ * Throws descriptive errors for invalid input.
+ */
+function extractValidA2AMessages(a2aPayload: SpawnWithContextOptions['a2aPayload']): A2AMessage[] {
+  if (!Array.isArray(a2aPayload.messages)) {
+    throw new Error('a2aPayload.messages must be an array');
+  }
+
+  const { valid, errors } = validateA2AMessages(a2aPayload.messages);
+  if (errors.length > 0) {
+    throw new Error(`Invalid A2A messages: ${errors.map((e) => e.error).join(', ')}`);
+  }
+
+  if (valid.length === 0) {
+    throw new Error('Cannot spawn agent with empty conversation');
+  }
+
+  return valid;
+}
+
+/**
+ * Create and write the session transcript file.
+ */
+async function createSessionTranscript(
+  taskId: string,
+  planId: string,
+  messages: A2AMessage[],
+  logger: ReturnType<typeof getLogger>
+): Promise<{ sessionId: string; transcriptPath: string }> {
+  const sessionId = nanoid();
+  const claudeMessages = a2aToClaudeCode(messages, sessionId);
+  const jsonl = formatAsClaudeCodeJSONL(claudeMessages);
+
+  const projectPath = getProjectPath(planId);
+  await mkdir(projectPath, { recursive: true });
+
+  const transcriptPath = getSessionTranscriptPath(projectPath, sessionId);
+  await writeFile(transcriptPath, jsonl, 'utf-8');
+
+  logger.info({ taskId, transcriptPath }, 'Created session file');
+  return { sessionId, transcriptPath };
+}
+
+/**
  * Spawns Claude Code with full conversation context from A2A payload.
  * Creates a session file and spawns with --resume flag.
  *
@@ -720,112 +841,47 @@ export async function spawnClaudeCodeWithContext(
   const { taskId, cwd, a2aPayload } = opts;
   const env = getEnv();
   const logger = getLogger();
-  const requestId = nanoid();
-  const actor = 'system';
+  const ctx: SpawnEventContext = { taskId, requestId: nanoid(), actor: 'system', taskDoc, logger };
 
   const releaseLock = await acquireSpawnLock(taskId);
 
   try {
     stopExistingAgentIfRunning(taskId);
-
     await mkdir(cwd, { recursive: true });
 
-    if (!Array.isArray(a2aPayload.messages)) {
-      throw new Error('a2aPayload.messages must be an array');
-    }
-
-    const { valid, errors } = validateA2AMessages(a2aPayload.messages);
-    if (errors.length > 0) {
-      throw new Error(`Invalid A2A messages: ${errors.map((e) => e.error).join(', ')}`);
-    }
-
-    if (valid.length === 0) {
-      throw new Error('Cannot spawn agent with empty conversation');
-    }
-
-    const sessionId = nanoid();
-    const claudeMessages = a2aToClaudeCode(valid, sessionId);
-    const jsonl = formatAsClaudeCodeJSONL(claudeMessages);
-
+    const validMessages = extractValidA2AMessages(a2aPayload);
     const planId = a2aPayload.meta.planId ?? taskId;
-
-    const projectPath = getProjectPath(planId);
-    await mkdir(projectPath, { recursive: true });
-
-    const transcriptPath = getSessionTranscriptPath(projectPath, sessionId);
-    await writeFile(transcriptPath, jsonl, 'utf-8');
-
-    logger.info({ taskId, transcriptPath }, 'Created session file');
+    const { sessionId } = await createSessionTranscript(taskId, planId, validMessages, logger);
 
     const mcpConfigJson = getResolvedMcpConfigJson();
-    const commonArgs = buildCommonSpawnArgs(taskId, mcpConfigJson);
-    const args = ['-r', sessionId, '-p', 'Continue working on this task.', ...commonArgs];
+    const args = [
+      '-r',
+      sessionId,
+      '-p',
+      'Continue working on this task.',
+      ...buildCommonSpawnArgs(taskId, mcpConfigJson),
+    ];
 
     if (env.DOCKER_MODE) {
       const child = await shimClaudeSpawn(taskId, args, cwd);
-      if (taskDoc && child.pid) {
-        logSpawnStarted(taskDoc, requestId, child.pid, actor);
-      }
+      if (taskDoc && child.pid) logSpawnStarted(taskDoc, ctx.requestId, child.pid, ctx.actor);
       return { child, sessionId };
     }
 
-    const claudePath = getClaudePath();
     logger.info(
-      { taskId, sessionId, command: claudePath, args: args.join(' '), cwd },
+      { taskId, sessionId, command: getClaudePath(), args: args.join(' '), cwd },
       'Spawning Claude Code with session'
     );
 
-    const child = spawn(claudePath, args, {
-      cwd,
-      stdio: ['ignore', 'pipe', 'pipe'],
-      env: {
-        ...process.env,
-        SHIPYARD_TASK_ID: taskId,
-      },
-    });
-
-    // Capture stderr for debugging
-    let stderrOutput = '';
-    if (child.stderr) {
-      child.stderr.on('data', (data: Buffer) => {
-        stderrOutput += data.toString();
-      });
-    }
-
-    child.on('error', (err) => {
-      logger.error({ taskId, err: err.message }, 'Spawn error');
-      if (taskDoc) {
-        // Trim stderr to first 1KB to avoid bloating the event log
-        const stderrTrimmed = stderrOutput.slice(0, 1000) || null;
-        logSpawnFailed(taskDoc, requestId, err.message, stderrTrimmed, actor);
-      }
-    });
-
-    child.on('exit', (code, signal) => {
-      // Trim stderr to first 1KB to avoid bloating the event log
-      const stderrTrimmed = stderrOutput.slice(0, 1000) || null;
-      logger.info(
-        { taskId, exitCode: code, signal, stderrOutput: stderrTrimmed },
-        'Agent process exited'
-      );
-      if (taskDoc) {
-        logSpawnCompleted(taskDoc, requestId, code ?? 0, signal ?? null, stderrTrimmed, actor);
-      }
-    });
-
+    const child = spawnClaudeProcess(taskId, args, cwd);
+    const stderrBuffer = createStderrBuffer(child);
+    attachChildEventHandlers(child, stderrBuffer, ctx);
     trackAgent(taskId, child);
 
-    if (taskDoc && child.pid) {
-      logSpawnStarted(taskDoc, requestId, child.pid, actor);
-    }
-
+    if (taskDoc && child.pid) logSpawnStarted(taskDoc, ctx.requestId, child.pid, ctx.actor);
     return { child, sessionId };
   } catch (err) {
-    const errorMessage = err instanceof Error ? err.message : String(err);
-    if (taskDoc) {
-      logSpawnFailed(taskDoc, requestId, errorMessage, null, actor);
-    }
-    throw err;
+    handleSpawnError(err, ctx);
   } finally {
     releaseLock();
   }

@@ -7,9 +7,10 @@
  * @see docs/whips/daemon-mcp-server-merge.md#mcp-tools
  */
 
-import { generateArtifactId } from '@shipyard/loro-schema';
+import { generateArtifactId, type TaskDocument, type TaskMeta } from '@shipyard/loro-schema';
 import { z } from 'zod';
 import {
+  type ArtifactType,
   type ContentSource,
   resolveArtifactContent,
   validateArtifactType,
@@ -21,8 +22,14 @@ import {
 } from '../../utils/github-artifacts.js';
 import { getGitHubUsername } from '../../utils/identity.js';
 import { logger } from '../../utils/logger.js';
+import {
+  errorResponse,
+  getTaskDocument,
+  successResponse,
+  type ToolResponse,
+  verifySessionToken,
+} from '../helpers.js';
 import type { McpServer } from '../index.js';
-import { errorResponse, getTaskDocument, successResponse, verifySessionToken } from './helpers.js';
 
 /** Tool name constant */
 const TOOL_NAME = 'add_artifact';
@@ -53,10 +60,31 @@ const AddArtifactInput = z.discriminatedUnion('source', [
   }),
 ]);
 
+type AddArtifactInputType = z.infer<typeof AddArtifactInput>;
+
+/** Artifact type used for storage */
+type Artifact = {
+  storage: 'github';
+  id: string;
+  type: 'html' | 'image' | 'video';
+  filename: string;
+  description: string | null;
+  uploadedAt: number;
+  url: string;
+};
+
+/** Deliverable shape from the document */
+type Deliverable = {
+  id: string;
+  linkedArtifactId: string | null;
+};
+
+// --- Helper Functions ---
+
 /**
  * Convert Zod-parsed input to ContentSource type.
  */
-function toContentSource(input: z.infer<typeof AddArtifactInput>): ContentSource {
+function toContentSource(input: AddArtifactInputType): ContentSource {
   switch (input.source) {
     case 'file':
       return { source: 'file', filePath: input.filePath };
@@ -65,6 +93,248 @@ function toContentSource(input: z.infer<typeof AddArtifactInput>): ContentSource
     case 'base64':
       return { source: 'base64', content: input.content };
   }
+}
+
+/**
+ * Validate artifact type matches filename extension.
+ * Returns error response if invalid, null if valid.
+ */
+function validateType(type: ArtifactType, filename: string): ToolResponse | null {
+  try {
+    validateArtifactType(type, filename);
+    return null;
+  } catch (error) {
+    return errorResponse(error instanceof Error ? error.message : 'Invalid artifact type');
+  }
+}
+
+/**
+ * Check GitHub configuration and return error if not ready.
+ */
+function checkGitHubConfig(meta: TaskMeta): ToolResponse | null {
+  if (isGitHubConfigured() && meta.repo) {
+    return null;
+  }
+
+  const reason = !isGitHubConfigured() ? 'GITHUB_TOKEN not set' : 'Task has no repo configured';
+  return errorResponse(
+    `Cannot upload artifact: ${reason}.\n\nTo enable GitHub uploads:\n1. Set GITHUB_TOKEN in your MCP config\n2. Ensure the task has a repo set`
+  );
+}
+
+/**
+ * Upload artifact to GitHub.
+ * Returns the URL on success, or an error response on failure.
+ */
+async function uploadToGitHub(
+  repo: string,
+  taskId: string,
+  filename: string,
+  content: string,
+  artifactId: string
+): Promise<{ url: string } | { error: ToolResponse }> {
+  try {
+    const url = await uploadArtifact({
+      repo,
+      planId: taskId,
+      filename,
+      content,
+    });
+    logger.info({ taskId, artifactId, url }, 'Artifact uploaded to GitHub');
+    return { url };
+  } catch (error) {
+    if (error instanceof GitHubAuthError) {
+      return { error: errorResponse(`GitHub Authentication Error\n\n${error.message}`) };
+    }
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    logger.warn({ taskId, error: message }, 'GitHub upload failed');
+    return { error: errorResponse(`Failed to upload artifact: ${message}`) };
+  }
+}
+
+/**
+ * Create artifact object for storage.
+ */
+function createArtifact(
+  artifactId: string,
+  type: 'html' | 'image' | 'video',
+  filename: string,
+  description: string | undefined,
+  url: string
+): Artifact {
+  return {
+    storage: 'github',
+    id: artifactId,
+    type,
+    filename,
+    description: description ?? null,
+    uploadedAt: Date.now(),
+    url,
+  };
+}
+
+/**
+ * Link artifact to deliverable if requested and valid.
+ */
+function linkDeliverable(
+  doc: TaskDocument,
+  deliverableId: string | undefined,
+  artifactId: string,
+  actorName: string,
+  taskId: string
+): void {
+  if (!deliverableId) {
+    return;
+  }
+
+  const deliverables: Deliverable[] = doc.deliverables.toJSON();
+  const deliverableIndex = deliverables.findIndex((d) => d.id === deliverableId);
+
+  if (deliverableIndex === -1) {
+    return;
+  }
+
+  // TODO: Update deliverable with artifact ID
+  doc.logEvent('deliverable_linked', actorName, {
+    deliverableId,
+    artifactId,
+    deliverableText: null,
+  });
+  logger.info({ taskId, artifactId, deliverableId }, 'Artifact linked to deliverable');
+}
+
+/**
+ * Check if all deliverables are complete.
+ */
+function checkAllDeliverablesComplete(doc: TaskDocument): {
+  allComplete: boolean;
+  remaining: number;
+} {
+  const deliverables: Deliverable[] = doc.deliverables.toJSON();
+  const allComplete = deliverables.length > 0 && deliverables.every((d) => d.linkedArtifactId);
+  const remaining = deliverables.filter((d) => !d.linkedArtifactId).length;
+  return { allComplete, remaining };
+}
+
+/**
+ * Build success response message for uploaded artifact.
+ */
+function buildSuccessResponse(
+  artifactId: string,
+  type: string,
+  filename: string,
+  deliverableId: string | undefined,
+  allComplete: boolean,
+  remaining: number
+): ToolResponse {
+  const linkedText = deliverableId ? `\nLinked to deliverable: ${deliverableId}` : '';
+
+  if (allComplete) {
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `Artifact uploaded!
+ID: ${artifactId}
+Type: ${type}
+Filename: ${filename}${linkedText}
+
+ALL DELIVERABLES COMPLETE! Task will auto-complete.
+(Full auto-completion with snapshot URL pending Loro integration)`,
+        },
+      ],
+    };
+  }
+
+  return successResponse(
+    `Artifact uploaded!\nID: ${artifactId}\nType: ${type}\nFilename: ${filename}${linkedText}\n\n${remaining} deliverable(s) remaining.`
+  );
+}
+
+// --- Tool Handler ---
+
+/**
+ * Handle the add_artifact tool request.
+ */
+async function handleAddArtifact(args: unknown): Promise<ToolResponse> {
+  const input = AddArtifactInput.parse(args);
+  const { taskId, sessionToken, type, filename } = input;
+
+  // Validate artifact type
+  const typeError = validateType(type, filename);
+  if (typeError) {
+    return typeError;
+  }
+
+  // Resolve content
+  const contentResult = await resolveArtifactContent(toContentSource(input));
+  if (!contentResult.success) {
+    return errorResponse(contentResult.error);
+  }
+
+  // Get task document
+  const taskResult = await getTaskDocument(taskId);
+  if (!taskResult.success) {
+    return errorResponse(taskResult.error);
+  }
+  const { doc, meta } = taskResult;
+
+  // Verify session token
+  const tokenError = verifySessionToken(sessionToken, meta.sessionTokenHash, taskId);
+  if (tokenError) {
+    return errorResponse(tokenError);
+  }
+
+  // Check GitHub configuration
+  const configError = checkGitHubConfig(meta);
+  if (configError) {
+    return configError;
+  }
+
+  logger.info({ taskId, type, filename }, 'Adding artifact');
+
+  const artifactId = generateArtifactId();
+
+  // Upload to GitHub (meta.repo is guaranteed non-null by checkGitHubConfig)
+  const uploadResult = await uploadToGitHub(
+    meta.repo as string,
+    taskId,
+    filename,
+    contentResult.content,
+    artifactId
+  );
+  if ('error' in uploadResult) {
+    return uploadResult.error;
+  }
+
+  // Create and store artifact
+  const artifact = createArtifact(artifactId, type, filename, input.description, uploadResult.url);
+  doc.artifacts.push(artifact);
+
+  // Log upload event
+  const actorName = await getGitHubUsername();
+  doc.logEvent('artifact_uploaded', actorName, {
+    artifactId,
+    filename,
+    artifactType: type,
+  });
+
+  // Link to deliverable if requested
+  linkDeliverable(doc, input.deliverableId, artifactId, actorName, taskId);
+
+  // Check completion status
+  const { allComplete, remaining } = checkAllDeliverablesComplete(doc);
+
+  logger.info({ taskId, artifactId }, 'Artifact added');
+
+  return buildSuccessResponse(
+    artifactId,
+    type,
+    filename,
+    input.deliverableId,
+    allComplete,
+    remaining
+  );
 }
 
 /**
@@ -152,146 +422,6 @@ ARTIFACT TYPES:
           'ID of the deliverable this fulfills (from read_task output). Automatically marks deliverable as completed.',
       },
     },
-    async (args: unknown) => {
-      const input = AddArtifactInput.parse(args);
-      const { taskId, sessionToken, type, filename } = input;
-
-      /** Validate artifact type matches file extension */
-      try {
-        validateArtifactType(type, filename);
-      } catch (error) {
-        return errorResponse(error instanceof Error ? error.message : 'Invalid artifact type');
-      }
-
-      /** Resolve content */
-      const contentResult = await resolveArtifactContent(toContentSource(input));
-      if (!contentResult.success) {
-        return errorResponse(contentResult.error);
-      }
-
-      /** Get task document */
-      const taskResult = await getTaskDocument(taskId);
-      if (!taskResult.success) {
-        return errorResponse(taskResult.error);
-      }
-      const { doc, meta } = taskResult;
-
-      /** Verify session token */
-      const tokenError = verifySessionToken(sessionToken, meta.sessionTokenHash, taskId);
-      if (tokenError) {
-        return errorResponse(tokenError);
-      }
-
-      /** Get actor name */
-      const actorName = await getGitHubUsername();
-
-      logger.info({ taskId, type, filename }, 'Adding artifact');
-
-      /** Create artifact object */
-      const artifactId = generateArtifactId();
-      let artifactUrl = '(upload pending)';
-
-      /** Try GitHub upload if configured and repo is set */
-      if (isGitHubConfigured() && meta.repo) {
-        try {
-          artifactUrl = await uploadArtifact({
-            repo: meta.repo,
-            planId: taskId,
-            filename,
-            content: contentResult.content,
-          });
-          logger.info({ taskId, artifactId, url: artifactUrl }, 'Artifact uploaded to GitHub');
-        } catch (error) {
-          if (error instanceof GitHubAuthError) {
-            return errorResponse(`GitHub Authentication Error\n\n${error.message}`);
-          }
-          const message = error instanceof Error ? error.message : 'Unknown error';
-          logger.warn({ taskId, error: message }, 'GitHub upload failed');
-          return errorResponse(`Failed to upload artifact: ${message}`);
-        }
-      } else {
-        const reason = !isGitHubConfigured()
-          ? 'GITHUB_TOKEN not set'
-          : 'Task has no repo configured';
-        return errorResponse(
-          `Cannot upload artifact: ${reason}.\n\nTo enable GitHub uploads:\n1. Set GITHUB_TOKEN in your MCP config\n2. Ensure the task has a repo set`
-        );
-      }
-
-      const artifact = {
-        storage: 'github' as const,
-        id: artifactId,
-        type,
-        filename,
-        description: input.description ?? null,
-        uploadedAt: Date.now(),
-        url: artifactUrl,
-      };
-
-      /** Add artifact to doc */
-      doc.artifacts.push(artifact);
-
-      /** Log event */
-      doc.logEvent('artifact_uploaded', actorName, {
-        artifactId,
-        filename,
-        artifactType: type,
-      });
-
-      if (input.deliverableId) {
-        const deliverables: Array<{
-          id: string;
-          linkedArtifactId: string | null;
-        }> = doc.deliverables.toJSON();
-        const deliverableIndex = deliverables.findIndex((d) => d.id === input.deliverableId);
-
-        if (deliverableIndex !== -1) {
-          // TODO: Update deliverable with artifact ID
-          doc.logEvent('deliverable_linked', actorName, {
-            deliverableId: input.deliverableId,
-            artifactId,
-            deliverableText: null,
-          });
-          logger.info(
-            { taskId, artifactId, deliverableId: input.deliverableId },
-            'Artifact linked to deliverable'
-          );
-        }
-      }
-
-      const allDeliverables: Array<{
-        linkedArtifactId: string | null;
-      }> = doc.deliverables.toJSON();
-      const allComplete =
-        allDeliverables.length > 0 && allDeliverables.every((d) => d.linkedArtifactId);
-
-      logger.info({ taskId, artifactId }, 'Artifact added');
-
-      const linkedText = input.deliverableId
-        ? `\nLinked to deliverable: ${input.deliverableId}`
-        : '';
-
-      if (allComplete) {
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `Artifact uploaded!
-ID: ${artifactId}
-Type: ${type}
-Filename: ${filename}${linkedText}
-
-ALL DELIVERABLES COMPLETE! Task will auto-complete.
-(Full auto-completion with snapshot URL pending Loro integration)`,
-            },
-          ],
-        };
-      }
-
-      const remaining = allDeliverables.filter((d) => !d.linkedArtifactId).length;
-      return successResponse(
-        `Artifact uploaded!\nID: ${artifactId}\nType: ${type}\nFilename: ${filename}${linkedText}\n\n${remaining} deliverable(s) remaining.`
-      );
-    }
+    handleAddArtifact
   );
 }

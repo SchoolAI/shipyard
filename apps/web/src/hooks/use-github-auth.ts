@@ -150,8 +150,6 @@ async function processOAuthCallback(
     const redirectUri = window.location.origin + (import.meta.env.BASE_URL || '/');
     const { token, user } = await handleCallback(code, state, redirectUri);
 
-    if (signal.aborted) return;
-
     const ghIdMatch = user.id.match(/^gh_(\d+)$/);
     const avatarUrl = ghIdMatch
       ? `https://avatars.githubusercontent.com/u/${ghIdMatch[1]}`
@@ -166,7 +164,13 @@ async function processOAuthCallback(
       scope: '',
     };
 
+    // Store identity BEFORE checking abort signal - localStorage is idempotent
+    // and we want the identity persisted even if React StrictMode unmounts us
     setStoredIdentity(newIdentity);
+
+    // Only skip React state updates if aborted (to avoid updating unmounted component)
+    if (signal.aborted) return;
+
     setAuthState({ status: 'success' });
 
     const returnUrl = sessionStorage.getItem(RETURN_URL_KEY);

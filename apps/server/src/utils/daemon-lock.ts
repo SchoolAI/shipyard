@@ -13,6 +13,12 @@ import { dirname } from 'node:path';
 import { getLockFilePath, getStateDir } from './paths.js';
 
 const MAX_LOCK_RETRIES = 3;
+const MAX_LOCK_AGE_MS = 60 * 1000; // 60 seconds - if lock is older than this and health check fails, assume stale
+
+interface LockInfo {
+  pid: number;
+  timestamp: number;
+}
 
 /**
  * Type guard for NodeJS.ErrnoException.
@@ -34,13 +40,16 @@ function hasErrorCode(error: unknown, code: string): boolean {
 }
 
 /**
- * Read the PID from the lock file.
+ * Read lock file info (PID and timestamp).
  */
-async function readLockHolderPid(): Promise<number | null> {
+async function readLockInfo(): Promise<LockInfo | null> {
   try {
     const content = await readFile(getLockFilePath(), 'utf-8');
-    const pidStr = content.split('\n')[0] ?? '';
-    return Number.parseInt(pidStr, 10);
+    const lines = content.split('\n');
+    const pid = Number.parseInt(lines[0] ?? '', 10);
+    const timestamp = Number.parseInt(lines[1] ?? '', 10);
+    if (Number.isNaN(pid)) return null;
+    return { pid, timestamp: Number.isNaN(timestamp) ? 0 : timestamp };
   } catch {
     return null;
   }
@@ -71,36 +80,71 @@ async function tryRemoveStaleLock(_stalePid: number): Promise<boolean> {
 }
 
 /**
- * Register a cleanup handler to remove lock on process exit.
+ * Register cleanup handlers to remove lock on process exit.
+ *
+ * IMPORTANT: We must handle signals explicitly because:
+ * - 'exit' event only fires AFTER the process decides to exit
+ * - SIGINT/SIGTERM default behavior is to terminate immediately
+ * - Without signal handlers, Ctrl+C leaves stale lock files
  */
 function registerLockCleanupHandler(): void {
   const lockFile = getLockFilePath();
-  process.once('exit', () => {
+
+  const cleanup = () => {
     try {
       unlinkSync(lockFile);
     } catch {
       /** Lock may already be cleaned up */
     }
-  });
+  };
+
+  // Handle clean exit
+  process.once('exit', cleanup);
+
+  // Handle termination signals - must explicitly exit after cleanup
+  const signalHandler = (signal: string) => {
+    cleanup();
+    process.exit(signal === 'SIGINT' ? 130 : 143); // Standard exit codes
+  };
+
+  process.once('SIGINT', () => signalHandler('SIGINT'));
+  process.once('SIGTERM', () => signalHandler('SIGTERM'));
+  process.once('SIGHUP', () => signalHandler('SIGHUP'));
 }
 
 /**
  * Handle an existing lock file - check if holder is alive.
  */
 async function handleExistingLock(retryCount: number): Promise<boolean> {
-  const pid = await readLockHolderPid();
-  if (pid === null) return false;
+  const lockInfo = await readLockInfo();
+  if (lockInfo === null) return false;
 
-  if (isProcessAlive(pid)) {
+  const { pid, timestamp } = lockInfo;
+  const lockAge = Date.now() - timestamp;
+
+  // If process is alive and lock is recent, it's legitimately held
+  if (isProcessAlive(pid) && lockAge < MAX_LOCK_AGE_MS) {
     return false;
   }
 
-  if (retryCount >= MAX_LOCK_RETRIES) {
-    return false;
+  // If lock is very old (> MAX_LOCK_AGE_MS), assume stale even if PID exists
+  // This handles PID reuse where a different process got the same PID
+  if (lockAge > MAX_LOCK_AGE_MS) {
+    // Lock is old - likely stale (daemon should have updated or exited)
+    await tryRemoveStaleLock(pid);
+    return tryAcquireLock(retryCount + 1);
   }
 
-  await tryRemoveStaleLock(pid);
-  return tryAcquireLock(retryCount + 1);
+  // Process is dead but lock is recent
+  if (!isProcessAlive(pid)) {
+    if (retryCount >= MAX_LOCK_RETRIES) {
+      return false;
+    }
+    await tryRemoveStaleLock(pid);
+    return tryAcquireLock(retryCount + 1);
+  }
+
+  return false;
 }
 
 /**

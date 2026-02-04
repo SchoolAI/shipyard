@@ -10,9 +10,9 @@
 import { z } from 'zod';
 import { getVerifiedGitHubUsername } from '../../utils/identity.js';
 import { logger } from '../../utils/logger.js';
+import { generateSessionToken, hashSessionToken } from '../../utils/session-token.js';
+import { errorResponse, getTaskDocument } from '../helpers.js';
 import type { McpServer } from '../index.js';
-import { errorResponse, getTaskDocument } from './helpers.js';
-import { generateSessionToken, hashSessionToken } from './session-token.js';
 
 /** Tool name constant */
 const TOOL_NAME = 'regenerate_session_token';

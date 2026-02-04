@@ -7,7 +7,16 @@ export {
   type InferMutableType,
   Shape,
 } from '@loro-extended/change';
-
+export type { EpochCloseCode } from './epoch.js';
+export {
+  DEFAULT_EPOCH,
+  EPOCH_CLOSE_CODES,
+  formatEpochCloseReason,
+  isEpochRejection,
+  isEpochValid,
+  parseEpochFromReason,
+  parseEpochParam,
+} from './epoch.js';
 export type {
   ArtifactId,
   CommentId,
@@ -19,7 +28,6 @@ export type {
   TaskId,
   ThreadId,
 } from './ids.js';
-
 export {
   generateArtifactId,
   generateCommentId,

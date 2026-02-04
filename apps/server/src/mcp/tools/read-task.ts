@@ -8,8 +8,13 @@
  */
 
 import { z } from 'zod';
+import {
+  errorResponse,
+  formatTaskHeader,
+  getTaskDocument,
+  verifySessionToken,
+} from '../helpers.js';
 import type { McpServer } from '../index.js';
-import { errorResponse, formatTaskHeader, getTaskDocument, verifySessionToken } from './helpers.js';
 
 /** Tool name constant */
 const TOOL_NAME = 'read_task';

@@ -65,21 +65,15 @@
     "nanoid": "catalog:"
   },
   "pnpm": {
-    "overrides": {
-      "@loro-extended/change": "link:/Users/jacobpetterle/Working Directory/loro-extended/packages/change",
-      "@loro-extended/repo": "link:/Users/jacobpetterle/Working Directory/loro-extended/packages/repo",
-      "@loro-extended/react": "link:/Users/jacobpetterle/Working Directory/loro-extended/packages/react",
-      "@loro-extended/adapter-indexeddb": "link:/Users/jacobpetterle/Working Directory/loro-extended/adapters/indexeddb",
-      "@loro-extended/adapter-websocket": "link:/Users/jacobpetterle/Working Directory/loro-extended/adapters/websocket",
-      "@loro-extended/adapter-webrtc": "link:/Users/jacobpetterle/Working Directory/loro-extended/adapters/webrtc",
-      "@loro-extended/adapter-leveldb": "link:/Users/jacobpetterle/Working Directory/loro-extended/adapters/leveldb"
-    },
     "ignoredBuiltDependencies": [
       "@swc/core",
       "esbuild",
       "sharp",
       "simple-git-hooks",
       "workerd"
-    ]
+    ],
+    "patchedDependencies": {
+      "@loro-extended/change@5.4.1": "patches/@loro-extended__change@5.4.1.patch"
+    }
   }
 }

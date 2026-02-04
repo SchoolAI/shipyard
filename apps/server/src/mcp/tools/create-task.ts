@@ -11,89 +11,107 @@ import { generateTaskId, getTaskUrl } from '@shipyard/loro-schema';
 import { z } from 'zod';
 import { parseEnv } from '../../env.js';
 
+/** Creates a Tiptap heading node */
+function createHeadingNode(level: 1 | 2 | 3, text: string): object {
+  return {
+    type: 'heading',
+    attrs: { level },
+    content: [{ type: 'text', text }],
+  };
+}
+
+/** Creates a Tiptap checkbox/task item node */
+function createTaskItemNode(checked: boolean, text: string): object {
+  return {
+    type: 'taskItem',
+    attrs: { checked },
+    content: [
+      {
+        type: 'paragraph',
+        content: [{ type: 'text', text }],
+      },
+    ],
+  };
+}
+
+/** Creates a Tiptap bullet list item node */
+function createBulletListItemNode(text: string): object {
+  return {
+    type: 'bulletListItem',
+    content: [
+      {
+        type: 'paragraph',
+        content: [{ type: 'text', text }],
+      },
+    ],
+  };
+}
+
+/** Creates a Tiptap paragraph node */
+function createParagraphNode(text?: string): object {
+  if (!text) {
+    return { type: 'paragraph' };
+  }
+  return {
+    type: 'paragraph',
+    content: [{ type: 'text', text }],
+  };
+}
+
+/** Parses a single markdown line into a Tiptap node */
+function parseMarkdownLine(line: string): object {
+  if (line.trim() === '') {
+    return createParagraphNode();
+  }
+
+  if (line.startsWith('# ')) {
+    return createHeadingNode(1, line.slice(2));
+  }
+
+  if (line.startsWith('## ')) {
+    return createHeadingNode(2, line.slice(3));
+  }
+
+  if (line.startsWith('### ')) {
+    return createHeadingNode(3, line.slice(4));
+  }
+
+  if (line.startsWith('- [ ] ') || line.startsWith('- [x] ')) {
+    const checked = line.startsWith('- [x] ');
+    return createTaskItemNode(checked, line.slice(6));
+  }
+
+  if (line.startsWith('- ')) {
+    return createBulletListItemNode(line.slice(2));
+  }
+
+  return createParagraphNode(line);
+}
+
 /**
  * Convert markdown content to simple Tiptap JSON structure.
  * This creates a basic document with paragraphs that Tiptap can render.
  */
 function markdownToTiptapJson(markdown: string): object {
-  // Split into lines and create paragraph nodes
   const lines = markdown.split('\n');
-  const content: object[] = [];
-
-  for (const line of lines) {
-    if (line.trim() === '') {
-      // Empty line - add empty paragraph
-      content.push({ type: 'paragraph' });
-    } else if (line.startsWith('# ')) {
-      // H1 heading
-      content.push({
-        type: 'heading',
-        attrs: { level: 1 },
-        content: [{ type: 'text', text: line.slice(2) }],
-      });
-    } else if (line.startsWith('## ')) {
-      // H2 heading
-      content.push({
-        type: 'heading',
-        attrs: { level: 2 },
-        content: [{ type: 'text', text: line.slice(3) }],
-      });
-    } else if (line.startsWith('### ')) {
-      // H3 heading
-      content.push({
-        type: 'heading',
-        attrs: { level: 3 },
-        content: [{ type: 'text', text: line.slice(4) }],
-      });
-    } else if (line.startsWith('- [ ] ') || line.startsWith('- [x] ')) {
-      // Checkbox item
-      const checked = line.startsWith('- [x] ');
-      const text = line.slice(6);
-      content.push({
-        type: 'taskItem',
-        attrs: { checked },
-        content: [
-          {
-            type: 'paragraph',
-            content: [{ type: 'text', text }],
-          },
-        ],
-      });
-    } else if (line.startsWith('- ')) {
-      // Bullet list item
-      content.push({
-        type: 'bulletListItem',
-        content: [
-          {
-            type: 'paragraph',
-            content: [{ type: 'text', text: line.slice(2) }],
-          },
-        ],
-      });
-    } else {
-      // Regular paragraph
-      content.push({
-        type: 'paragraph',
-        content: [{ type: 'text', text: line }],
-      });
-    }
-  }
+  const content = lines.map(parseMarkdownLine);
 
   return {
     type: 'doc',
-    content: content.length > 0 ? content : [{ type: 'paragraph' }],
+    content: content.length > 0 ? content : [createParagraphNode()],
   };
 }
 
+import type { TaskDocument } from '@shipyard/loro-schema';
 import {
   getEnvironmentContext,
   getGitHubUsername,
   getRepositoryFullName,
 } from '../../utils/identity.js';
 import { logger } from '../../utils/logger.js';
+import { generateSessionToken, hashSessionToken } from '../../utils/session-token.js';
+import { getOrCreateTaskDocument } from '../helpers.js';
 import type { McpServer } from '../index.js';
-import { getOrCreateTaskDocument } from './helpers.js';
-import { generateSessionToken, hashSessionToken } from './session-token.js';
 
 /** Tool name constant */
 const TOOL_NAME = 'create_task';
@@ -134,6 +152,104 @@ const CreateTaskInput = z.object({
     .optional()
     .describe('Tags for categorization (e.g., ["ui", "bug", "project:mobile-app"])'),
 });
+
+/** Inferred input type from CreateTaskInput schema */
+type CreateTaskInputType = z.infer<typeof CreateTaskInput>;
+
+/** Resolves the repository from input or auto-detection */
+function resolveRepository(inputRepo: string | undefined): string | undefined {
+  if (inputRepo) {
+    return inputRepo;
+  }
+  const detected = getRepositoryFullName();
+  if (detected) {
+    logger.info({ repo: detected }, 'Auto-detected repository from current directory');
+    return detected;
+  }
+  return undefined;
+}
+
+/** Initializes task metadata on the document */
+function initializeTaskMetadata(
+  doc: TaskDocument,
+  taskId: string,
+  input: CreateTaskInputType,
+  sessionTokenHash: string,
+  ownerId: string | null,
+  repo: string | undefined,
+  now: number
+): void {
+  const meta = doc.meta;
+  meta.id = taskId;
+  meta.title = input.title;
+  meta.status = 'pending_review';
+  meta.createdAt = now;
+  meta.updatedAt = now;
+  meta.ownerId = ownerId;
+  meta.sessionTokenHash = sessionTokenHash;
+  meta.epoch = 1;
+  meta.repo = repo ?? null;
+  // Tasks created from MCP agent are public by default (no approval required)
+  meta.approvalRequired = false;
+
+  if (input.tags) {
+    for (const tag of input.tags) {
+      meta.tags.push(tag);
+    }
+  }
+}
+
+/** Stores task content as Tiptap JSON if provided */
+function storeTaskContent(doc: TaskDocument, content: string | undefined): void {
+  if (!content) {
+    return;
+  }
+  const tiptapContent = markdownToTiptapJson(content);
+  doc.taskDoc.content = tiptapContent;
+  logger.debug({ contentKeys: Object.keys(tiptapContent) }, 'Stored task content');
+}
+
+/** Builds the repository info string for response */
+function buildRepoInfoString(repo: string | undefined, wasProvided: boolean): string {
+  if (!repo) {
+    return 'Repo: Not set (provide repo and prNumber for artifact uploads)';
+  }
+  const suffix = wasProvided ? '' : ' (auto-detected)';
+  return `Repo: ${repo}${suffix}`;
+}
+
+/** Builds the success response for task creation */
+function buildSuccessResponse(
+  taskId: string,
+  sessionToken: string,
+  repoInfo: string,
+  url: string
+): { content: Array<{ type: string; text: string }> } {
+  const envContext = getEnvironmentContext();
+  const projectName = envContext.projectName || 'unknown';
+  const branch = envContext.branch || 'unknown';
+
+  return {
+    content: [
+      {
+        type: 'text',
+        text: `Task created!
+ID: ${taskId}
+Session Token: ${sessionToken}
+${repoInfo}
+URL: ${url}
+Context: ${projectName} / ${branch}
+
+IMPORTANT: Save the session token - it's required for add_artifact calls.
+
+Next steps:
+1. Wait for human to review and approve the task in the browser
+2. Once approved, use add_artifact to upload proof for each deliverable
+3. When all deliverables have artifacts, the task auto-completes with a snapshot URL`,
+      },
+    ],
+  };
+}
 
 /**
  * Register the create_task tool.
@@ -201,18 +317,12 @@ Bad deliverables (not provable):
       const sessionTokenHash = hashSessionToken(sessionToken);
       const now = Date.now();
 
-      const repo = input.repo || getRepositoryFullName() || undefined;
-      if (repo && !input.repo) {
-        logger.info({ repo }, 'Auto-detected repository from current directory');
-      }
-
+      const repo = resolveRepository(input.repo);
       logger.info({ taskId, title: input.title, repo }, 'Creating task');
 
-      /** Get owner identity */
       const ownerId = await getGitHubUsername();
       logger.info({ ownerId }, 'GitHub username for task ownership');
 
-      /** Create task document */
       const taskResult = await getOrCreateTaskDocument(taskId);
       if (!taskResult.success) {
         return {
@@ -220,68 +330,17 @@ Bad deliverables (not provable):
           isError: true,
         };
       }
-      const { doc, meta: _meta } = taskResult;
+      const { doc } = taskResult;
 
-      /** Initialize metadata */
-      const meta = doc.meta;
-      meta.id = taskId;
-      meta.title = input.title;
-      meta.status = 'pending_review';
-      meta.createdAt = now;
-      meta.updatedAt = now;
-      meta.ownerId = ownerId;
-      meta.sessionTokenHash = sessionTokenHash;
-      meta.epoch = 1;
-      meta.repo = repo ?? null;
-      // Tasks created from MCP agent are public by default (no approval required)
-      meta.approvalRequired = false;
-
-      if (input.tags) {
-        const tagsContainer = meta.tags;
-        for (const tag of input.tags) {
-          tagsContainer.push(tag);
-        }
-      }
-
-      /** Log task created event */
+      initializeTaskMetadata(doc, taskId, input, sessionTokenHash, ownerId, repo, now);
       doc.logEvent('task_created', ownerId);
+      storeTaskContent(doc, input.content);
 
-      /** Store content as Tiptap JSON */
-      if (input.content) {
-        const tiptapContent = markdownToTiptapJson(input.content);
-        doc.taskDoc.content = tiptapContent;
-        logger.debug({ contentKeys: Object.keys(tiptapContent) }, 'Stored task content');
-      }
-
-      /** Build task URL */
       const env = parseEnv();
       const url = getTaskUrl(taskId, env.WEB_URL);
+      const repoInfo = buildRepoInfoString(repo, Boolean(input.repo));
 
-      const envContext = getEnvironmentContext();
-      const repoInfo = repo
-        ? `Repo: ${repo}${!input.repo ? ' (auto-detected)' : ''}`
-        : 'Repo: Not set (provide repo and prNumber for artifact uploads)';
-
-      return {
-        content: [
-          {
-            type: 'text',
-            text: `Task created!
-ID: ${taskId}
-Session Token: ${sessionToken}
-${repoInfo}
-URL: ${url}
-Context: ${envContext.projectName || 'unknown'} / ${envContext.branch || 'unknown'}
-
-IMPORTANT: Save the session token - it's required for add_artifact calls.
-
-Next steps:
-1. Wait for human to review and approve the task in the browser
-2. Once approved, use add_artifact to upload proof for each deliverable
-3. When all deliverables have artifacts, the task auto-completes with a snapshot URL`,
-          },
-        ],
-      };
+      return buildSuccessResponse(taskId, sessionToken, repoInfo, url);
     }
   );
 }

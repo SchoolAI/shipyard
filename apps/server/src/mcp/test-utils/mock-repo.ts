@@ -5,7 +5,7 @@
  */
 
 import { vi } from 'vitest';
-import { generateSessionToken, hashSessionToken } from '../tools/session-token.js';
+import { generateSessionToken, hashSessionToken } from '../../utils/session-token.js';
 
 /** Test session token that can be used across tests */
 export const TEST_SESSION_TOKEN = 'test-session-token-12345';

@@ -12,7 +12,7 @@ const mockGetTaskDocument = vi.fn();
 const mockVerifySessionToken = vi.fn();
 const mockGetGitHubUsername = vi.fn();
 
-vi.mock('./helpers.js', () => ({
+vi.mock('../helpers.js', () => ({
   getTaskDocument: (...args: unknown[]) => mockGetTaskDocument(...args),
   verifySessionToken: (...args: unknown[]) => mockVerifySessionToken(...args),
   errorResponse: (msg: string) => ({

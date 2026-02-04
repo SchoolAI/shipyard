@@ -5,6 +5,8 @@ const LOCAL_STORAGE_KEYS = [
   'shipyard-view-preferences',
   'kanban-hide-empty-columns',
   'shipyard:diff-view-mode',
+  'shipyard-epoch',
+  'shipyard-peer-id',
   'theme',
 ] as const;
 
@@ -12,6 +14,8 @@ const SESSION_STORAGE_KEYS = [
   'github-oauth-state',
   'github-oauth-return-url',
   'shipyard-removed-servers',
+  'shipyard-epoch-reset-needed',
+  'shipyard-epoch-pending-value',
 ] as const;
 
 function isShipyardDatabase(name: string): boolean {

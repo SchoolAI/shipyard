@@ -11,12 +11,80 @@ import {
   type TaskMeta,
   toTaskId,
 } from '@shipyard/loro-schema';
-import { getRepo } from '../../loro/repo.js';
-import { logger } from '../../utils/logger.js';
-import { hashSessionToken } from './session-token.js';
+import { getRepo } from '../loro/repo.js';
+import { logger } from '../utils/logger.js';
+import { hashSessionToken } from '../utils/session-token.js';
 
 /** Well-known room document ID */
 const ROOM_DOC_ID = 'room';
+
+/** --- Meta Construction Helpers --- */
+
+/** Type alias for meta container from Loro document */
+type MetaContainer = Record<string, unknown>;
+
+/** Extract a string field with a default value */
+function str(container: MetaContainer, key: string, defaultVal: string): string {
+  return (container[key] as string | undefined) ?? defaultVal;
+}
+
+/** Extract an optional string field */
+function strOrNull(container: MetaContainer, key: string): string | null {
+  return (container[key] as string | null | undefined) ?? null;
+}
+
+/** Extract a number field with a default value */
+function num(container: MetaContainer, key: string, defaultVal: number): number {
+  return (container[key] as number | undefined) ?? defaultVal;
+}
+
+/** Extract an optional number field */
+function numOrNull(container: MetaContainer, key: string): number | null {
+  return (container[key] as number | null | undefined) ?? null;
+}
+
+/** Extract a boolean field with a default value */
+function bool(container: MetaContainer, key: string, defaultVal: boolean): boolean {
+  return (container[key] as boolean | undefined) ?? defaultVal;
+}
+
+/**
+ * Extract array from a field that may be a Loro list or plain array.
+ */
+function extractArrayField(field: unknown): string[] {
+  if (!field) return [];
+  if (Array.isArray(field)) return field;
+  if (typeof field === 'object' && 'toJSON' in field && typeof field.toJSON === 'function') {
+    return field.toJSON();
+  }
+  return [];
+}
+
+/**
+ * Extract TaskMeta from a Loro document's meta container.
+ * Provides defaults for all optional fields.
+ */
+function buildTaskMeta(meta: MetaContainer, taskId: string): TaskMeta {
+  return {
+    id: str(meta, 'id', taskId),
+    title: str(meta, 'title', ''),
+    status: (meta.status as TaskMeta['status'] | undefined) ?? 'draft',
+    createdAt: num(meta, 'createdAt', Date.now()),
+    updatedAt: num(meta, 'updatedAt', Date.now()),
+    completedAt: numOrNull(meta, 'completedAt'),
+    completedBy: strOrNull(meta, 'completedBy'),
+    ownerId: strOrNull(meta, 'ownerId'),
+    sessionTokenHash: str(meta, 'sessionTokenHash', ''),
+    epoch: num(meta, 'epoch', 1),
+    repo: strOrNull(meta, 'repo'),
+    tags: extractArrayField(meta.tags),
+    archivedAt: numOrNull(meta, 'archivedAt'),
+    archivedBy: strOrNull(meta, 'archivedBy'),
+    approvalRequired: bool(meta, 'approvalRequired', false),
+    approvedUsers: extractArrayField(meta.approvedUsers),
+    rejectedUsers: extractArrayField(meta.rejectedUsers),
+  };
+}
 
 /** --- Response Helpers --- */
 
@@ -46,7 +114,6 @@ export type TaskDocumentResult =
 export async function getTaskDocument(taskId: string): Promise<TaskDocumentResult> {
   try {
     const repo = getRepo();
-
     const taskHandle = repo.get(taskId, TaskDocumentSchema);
 
     if (!repo.has(taskId)) {
@@ -57,32 +124,10 @@ export async function getTaskDocument(taskId: string): Promise<TaskDocumentResul
     }
 
     const roomHandle = repo.get(ROOM_DOC_ID, RoomSchema);
-
     const doc = new TaskDocument(taskHandle.doc, roomHandle.doc, toTaskId(taskId));
-
-    const metaContainer = taskHandle.doc.meta;
-    const meta: TaskMeta = {
-      id: metaContainer.id ?? taskId,
-      title: metaContainer.title ?? '',
-      status: metaContainer.status ?? 'draft',
-      createdAt: metaContainer.createdAt ?? Date.now(),
-      updatedAt: metaContainer.updatedAt ?? Date.now(),
-      completedAt: metaContainer.completedAt ?? null,
-      completedBy: metaContainer.completedBy ?? null,
-      ownerId: metaContainer.ownerId ?? null,
-      sessionTokenHash: metaContainer.sessionTokenHash ?? '',
-      epoch: metaContainer.epoch ?? 1,
-      repo: metaContainer.repo ?? null,
-      tags: metaContainer.tags?.toJSON?.() ?? [],
-      archivedAt: metaContainer.archivedAt ?? null,
-      archivedBy: metaContainer.archivedBy ?? null,
-      approvalRequired: metaContainer.approvalRequired ?? false,
-      approvedUsers: metaContainer.approvedUsers?.toJSON?.() ?? [],
-      rejectedUsers: metaContainer.rejectedUsers?.toJSON?.() ?? [],
-    };
+    const meta = buildTaskMeta(taskHandle.doc.meta, taskId);
 
     logger.debug({ taskId }, 'Task document loaded');
-
     return { success: true, doc, meta };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
@@ -101,36 +146,12 @@ export async function getTaskDocument(taskId: string): Promise<TaskDocumentResul
 export async function getOrCreateTaskDocument(taskId: string): Promise<TaskDocumentResult> {
   try {
     const repo = getRepo();
-
     const taskHandle = repo.get(taskId, TaskDocumentSchema);
-
     const roomHandle = repo.get(ROOM_DOC_ID, RoomSchema);
-
     const doc = new TaskDocument(taskHandle.doc, roomHandle.doc, toTaskId(taskId));
-
-    const metaContainer = taskHandle.doc.meta;
-    const meta: TaskMeta = {
-      id: metaContainer.id ?? taskId,
-      title: metaContainer.title ?? '',
-      status: metaContainer.status ?? 'draft',
-      createdAt: metaContainer.createdAt ?? Date.now(),
-      updatedAt: metaContainer.updatedAt ?? Date.now(),
-      completedAt: metaContainer.completedAt ?? null,
-      completedBy: metaContainer.completedBy ?? null,
-      ownerId: metaContainer.ownerId ?? null,
-      sessionTokenHash: metaContainer.sessionTokenHash ?? '',
-      epoch: metaContainer.epoch ?? 1,
-      repo: metaContainer.repo ?? null,
-      tags: metaContainer.tags?.toJSON?.() ?? [],
-      archivedAt: metaContainer.archivedAt ?? null,
-      archivedBy: metaContainer.archivedBy ?? null,
-      approvalRequired: metaContainer.approvalRequired ?? false,
-      approvedUsers: metaContainer.approvedUsers?.toJSON?.() ?? [],
-      rejectedUsers: metaContainer.rejectedUsers?.toJSON?.() ?? [],
-    };
+    const meta = buildTaskMeta(taskHandle.doc.meta, taskId);
 
     logger.debug({ taskId }, 'Task document opened/created');
-
     return { success: true, doc, meta };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';

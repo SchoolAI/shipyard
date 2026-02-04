@@ -25,8 +25,8 @@ import {
 import { GitHubAuthError, isGitHubConfigured, tryAutoLinkPR } from '../../utils/github-helpers.js';
 import { getGitHubUsername, getRepositoryFullName } from '../../utils/identity.js';
 import { logger } from '../../utils/logger.js';
-import { getOrCreateTaskDocument, getTaskDocument, verifySessionToken } from '../tools/helpers.js';
-import { generateSessionToken, hashSessionToken } from '../tools/session-token.js';
+import { generateSessionToken, hashSessionToken } from '../../utils/session-token.js';
+import { getOrCreateTaskDocument, getTaskDocument, verifySessionToken } from '../helpers.js';
 import { uploadArtifact as uploadToGitHub } from './github-artifacts.js';
 
 /** --- Markdown Parsing for Deliverables --- */
@@ -299,6 +299,137 @@ done`;
   return { success: true, monitoringScript };
 }
 
+/** Error response for addArtifact */
+interface AddArtifactErrorResponse {
+  artifactId: '';
+  url: '';
+  allDeliverablesComplete: false;
+  isError: true;
+  error: string;
+}
+
+/** Success response for addArtifact */
+interface AddArtifactSuccessResponse {
+  artifactId: string;
+  url: string;
+  allDeliverablesComplete: boolean;
+  snapshotUrl?: string;
+  isError: false;
+}
+
+type AddArtifactResponse = AddArtifactErrorResponse | AddArtifactSuccessResponse;
+
+/** Create a standardized error response for addArtifact */
+function createArtifactError(error: string): AddArtifactErrorResponse {
+  return {
+    artifactId: '',
+    url: '',
+    allDeliverablesComplete: false,
+    isError: true,
+    error,
+  };
+}
+
+/** Resolve content source from options */
+function resolveContentSource(opts: {
+  source: 'file' | 'url' | 'base64';
+  filePath?: string;
+  contentUrl?: string;
+  content?: string;
+}): ContentSource | null {
+  if (opts.source === 'file' && opts.filePath) {
+    return { source: 'file', filePath: opts.filePath };
+  }
+  if (opts.source === 'url' && opts.contentUrl) {
+    return { source: 'url', contentUrl: opts.contentUrl };
+  }
+  if (opts.source === 'base64' && opts.content) {
+    return { source: 'base64', content: opts.content };
+  }
+  return null;
+}
+
+/** Upload artifact to GitHub or return local-only URL */
+async function uploadArtifactToStorage(opts: {
+  taskId: string;
+  artifactId: string;
+  filename: string;
+  content: string;
+  repo: string | null;
+}): Promise<{ url: string } | { error: string }> {
+  const { taskId, artifactId, filename, content, repo } = opts;
+  const githubConfigured = isGitHubConfigured();
+
+  if (!githubConfigured || !repo) {
+    const reason = !githubConfigured ? 'GITHUB_TOKEN not set' : 'repo not configured';
+    logger.info({ taskId, artifactId, reason }, 'Artifact stored locally (no GitHub upload)');
+    return { url: `(local only - ${reason})` };
+  }
+
+  try {
+    const url = await uploadToGitHub({ repo, taskId, filename, content });
+    logger.info({ taskId, artifactId, url }, 'Artifact uploaded to GitHub');
+    return { url };
+  } catch (error) {
+    if (error instanceof GitHubAuthError) {
+      return { error: error.message };
+    }
+    logger.warn({ error, taskId }, 'GitHub upload failed, artifact stored without remote URL');
+    return { url: `(GitHub upload failed: ${error instanceof Error ? error.message : 'unknown'})` };
+  }
+}
+
+/** Link an artifact to a deliverable */
+function linkArtifactToDeliverable(opts: {
+  doc: TaskDocument;
+  deliverableId: string;
+  artifactId: string;
+  actor: string;
+  taskId: string;
+}): void {
+  const { doc, deliverableId, artifactId, actor, taskId } = opts;
+
+  const deliverablesArray: Array<{
+    id: string;
+    text: string;
+    linkedArtifactId: string | null;
+    linkedAt: number | null;
+  }> = doc.deliverables.toJSON();
+
+  const deliverableIndex = deliverablesArray.findIndex((d) => d.id === deliverableId);
+  if (deliverableIndex === -1) {
+    logger.warn({ taskId, deliverableId }, 'Deliverable not found for linking');
+    return;
+  }
+
+  const deliverable = deliverablesArray[deliverableIndex];
+  if (!deliverable) {
+    return;
+  }
+
+  doc.deliverables.delete(deliverableIndex, 1);
+  doc.deliverables.insert(deliverableIndex, {
+    id: deliverable.id,
+    text: deliverable.text,
+    linkedArtifactId: artifactId,
+    linkedAt: Date.now(),
+  });
+
+  doc.logEvent('deliverable_linked', actor, {
+    deliverableId,
+    artifactId,
+    deliverableText: deliverable.text,
+  });
+
+  logger.info({ taskId, artifactId, deliverableId }, 'Artifact linked to deliverable');
+}
+
+/** Check if all deliverables are complete */
+function areAllDeliverablesComplete(doc: TaskDocument): boolean {
+  const deliverables: Array<{ linkedArtifactId: string | null }> = doc.deliverables.toJSON();
+  return deliverables.length > 0 && deliverables.every((d) => d.linkedArtifactId);
+}
+
 /**
  * Add an artifact to a task.
  */
@@ -313,123 +444,62 @@ export async function addArtifact(opts: {
   content?: string;
   deliverableId?: string;
   description?: string;
-}): Promise<{
-  artifactId: string;
-  url: string;
-  allDeliverablesComplete: boolean;
-  snapshotUrl?: string;
-  isError: boolean;
-  error?: string;
-}> {
+}): Promise<AddArtifactResponse> {
   const { taskId, sessionToken, type, filename } = opts;
 
   /** Validate artifact type */
   try {
     validateArtifactType(type, filename);
   } catch (error) {
-    return {
-      artifactId: '',
-      url: '',
-      allDeliverablesComplete: false,
-      isError: true,
-      error: error instanceof Error ? error.message : 'Invalid artifact type',
-    };
+    return createArtifactError(error instanceof Error ? error.message : 'Invalid artifact type');
   }
 
   /** Get task document */
   const taskResult = await getTaskDocument(taskId);
   if (!taskResult.success) {
-    return {
-      artifactId: '',
-      url: '',
-      allDeliverablesComplete: false,
-      isError: true,
-      error: taskResult.error,
-    };
+    return createArtifactError(taskResult.error);
   }
   const { doc, meta } = taskResult;
 
   /** Verify session token */
   const tokenError = verifySessionToken(sessionToken, meta.sessionTokenHash, taskId);
   if (tokenError) {
-    return {
-      artifactId: '',
-      url: '',
-      allDeliverablesComplete: false,
-      isError: true,
-      error: tokenError,
-    };
+    return createArtifactError(tokenError);
   }
 
   /** Resolve content based on source type */
-  let contentSource: ContentSource;
-  if (opts.source === 'file' && opts.filePath) {
-    contentSource = { source: 'file', filePath: opts.filePath };
-  } else if (opts.source === 'url' && opts.contentUrl) {
-    contentSource = { source: 'url', contentUrl: opts.contentUrl };
-  } else if (opts.source === 'base64' && opts.content) {
-    contentSource = { source: 'base64', content: opts.content };
-  } else {
-    return {
-      artifactId: '',
-      url: '',
-      allDeliverablesComplete: false,
-      isError: true,
-      error: `Missing content for source type '${opts.source}'. Provide filePath, contentUrl, or content.`,
-    };
+  const contentSource = resolveContentSource(opts);
+  if (!contentSource) {
+    return createArtifactError(
+      `Missing content for source type '${opts.source}'. Provide filePath, contentUrl, or content.`
+    );
   }
 
   const contentResult = await resolveArtifactContent(contentSource);
   if (!contentResult.success) {
-    return {
-      artifactId: '',
-      url: '',
-      allDeliverablesComplete: false,
-      isError: true,
-      error: contentResult.error,
-    };
+    return createArtifactError(contentResult.error);
   }
 
   const actor = await getGitHubUsername();
   const artifactId = generateArtifactId();
 
-  /** Try to upload to GitHub if configured */
-  let artifactUrl: string;
-  const githubConfigured = isGitHubConfigured();
-  const hasRepo = !!meta.repo;
+  /** Upload to storage */
+  const uploadResult = await uploadArtifactToStorage({
+    taskId,
+    artifactId,
+    filename,
+    content: contentResult.content,
+    repo: meta.repo,
+  });
 
-  if (githubConfigured && hasRepo && meta.repo) {
-    try {
-      artifactUrl = await uploadToGitHub({
-        repo: meta.repo,
-        taskId,
-        filename,
-        content: contentResult.content,
-      });
-      logger.info({ taskId, artifactId, url: artifactUrl }, 'Artifact uploaded to GitHub');
-    } catch (error) {
-      if (error instanceof GitHubAuthError) {
-        return {
-          artifactId: '',
-          url: '',
-          allDeliverablesComplete: false,
-          isError: true,
-          error: error.message,
-        };
-      }
-      /** Log error but continue without GitHub upload */
-      logger.warn({ error, taskId }, 'GitHub upload failed, artifact stored without remote URL');
-      artifactUrl = `(GitHub upload failed: ${error instanceof Error ? error.message : 'unknown'})`;
-    }
-  } else {
-    /** No GitHub configured - note this in the URL */
-    const reason = !githubConfigured ? 'GITHUB_TOKEN not set' : 'repo not configured';
-    artifactUrl = `(local only - ${reason})`;
-    logger.info({ taskId, artifactId, reason }, 'Artifact stored locally (no GitHub upload)');
+  if ('error' in uploadResult) {
+    return createArtifactError(uploadResult.error);
   }
 
-  /** Create artifact object */
-  const artifact = {
+  const artifactUrl = uploadResult.url;
+
+  /** Create and add artifact to doc */
+  doc.artifacts.push({
     storage: 'github' as const,
     id: artifactId,
     type,
@@ -437,65 +507,22 @@ export async function addArtifact(opts: {
     description: opts.description ?? null,
     uploadedAt: Date.now(),
     url: artifactUrl,
-  };
-
-  /** Add artifact to doc */
-  doc.artifacts.push(artifact);
-
-  /** Log event */
-  doc.logEvent('artifact_uploaded', actor, {
-    artifactId,
-    filename,
-    artifactType: type,
   });
 
+  doc.logEvent('artifact_uploaded', actor, { artifactId, filename, artifactType: type });
+
+  /** Link to deliverable if specified */
   if (opts.deliverableId) {
-    const deliverablesArray: Array<{
-      id: string;
-      text: string;
-      linkedArtifactId: string | null;
-      linkedAt: number | null;
-    }> = doc.deliverables.toJSON();
-    const deliverableIndex = deliverablesArray.findIndex((d) => d.id === opts.deliverableId);
-
-    if (deliverableIndex !== -1) {
-      /** Update the deliverable with the linked artifact */
-      const deliverable = deliverablesArray[deliverableIndex];
-      if (deliverable) {
-        /** Delete and re-insert with updated fields */
-        doc.deliverables.delete(deliverableIndex, 1);
-        doc.deliverables.insert(deliverableIndex, {
-          id: deliverable.id,
-          text: deliverable.text,
-          linkedArtifactId: artifactId,
-          linkedAt: Date.now(),
-        });
-
-        doc.logEvent('deliverable_linked', actor, {
-          deliverableId: opts.deliverableId,
-          artifactId,
-          deliverableText: deliverable.text,
-        });
-
-        logger.info(
-          { taskId, artifactId, deliverableId: opts.deliverableId },
-          'Artifact linked to deliverable'
-        );
-      }
-    } else {
-      logger.warn(
-        { taskId, deliverableId: opts.deliverableId },
-        'Deliverable not found for linking'
-      );
-    }
+    linkArtifactToDeliverable({
+      doc,
+      deliverableId: opts.deliverableId,
+      artifactId,
+      actor,
+      taskId,
+    });
   }
 
-  const updatedDeliverables: Array<{
-    linkedArtifactId: string | null;
-  }> = doc.deliverables.toJSON();
-  const allComplete =
-    updatedDeliverables.length > 0 && updatedDeliverables.every((d) => d.linkedArtifactId);
-
+  const allComplete = areAllDeliverablesComplete(doc);
   logger.info({ taskId, artifactId, allComplete }, 'Artifact added via sandbox');
 
   /** Handle auto-completion if all deliverables are fulfilled */
@@ -797,6 +824,62 @@ export async function postUpdate(opts: {
   return { success: true, isError: false };
 }
 
+/** Filter options for diff comments */
+interface DiffCommentFilterOptions {
+  includeLocal: boolean;
+  includePR: boolean;
+  includeResolved: boolean;
+}
+
+/** Parse filter options with defaults */
+function parseDiffCommentFilterOptions(opts?: {
+  includeLocal?: boolean;
+  includePR?: boolean;
+  includeResolved?: boolean;
+}): DiffCommentFilterOptions {
+  return {
+    includeLocal: opts?.includeLocal !== false,
+    includePR: opts?.includePR !== false,
+    includeResolved: opts?.includeResolved === true,
+  };
+}
+
+/** Check if a comment should be included based on filters */
+function shouldIncludeComment(
+  comment: Record<string, unknown>,
+  filters: DiffCommentFilterOptions
+): boolean {
+  const kind = String(comment.kind ?? '');
+
+  if (kind === 'local' && !filters.includeLocal) {
+    return false;
+  }
+  if (kind === 'pr' && !filters.includePR) {
+    return false;
+  }
+  if (comment.resolved && !filters.includeResolved) {
+    return false;
+  }
+  return true;
+}
+
+/** Format a single diff comment as markdown */
+function formatDiffComment(id: string, comment: Record<string, unknown>): string {
+  const kind = String(comment.kind ?? '');
+  let output = `## [${kind}:${id}]\n`;
+  output += `**Author:** ${comment.author || 'unknown'}\n`;
+
+  if (comment.path) {
+    output += `**File:** ${comment.path}\n`;
+  }
+  if (comment.line) {
+    output += `**Line:** ${comment.line}\n`;
+  }
+
+  output += `\n${comment.body || ''}\n\n`;
+  return output;
+}
+
 /**
  * Read diff comments.
  */
@@ -828,27 +911,21 @@ export async function readDiffComments(
     return 'No diff comments found.';
   }
 
+  const filters = parseDiffCommentFilterOptions(opts);
   let output = '# Diff Comments\n\n';
   let count = 0;
 
   for (const [id, comment] of Object.entries(comments)) {
-    if (!comment || typeof comment !== 'object') continue;
-    const c: Record<string, unknown> = comment;
+    if (!comment || typeof comment !== 'object') {
+      continue;
+    }
 
-    const kind: string = String(c.kind ?? '');
-    const includeLocal = opts?.includeLocal !== false;
-    const includePR = opts?.includePR !== false;
-    const includeResolved = opts?.includeResolved === true;
+    const c = comment as Record<string, unknown>;
+    if (!shouldIncludeComment(c, filters)) {
+      continue;
+    }
 
-    if (kind === 'local' && !includeLocal) continue;
-    if (kind === 'pr' && !includePR) continue;
-    if (c.resolved && !includeResolved) continue;
-
-    output += `## [${kind}:${id}]\n`;
-    output += `**Author:** ${c.author || 'unknown'}\n`;
-    if (c.path) output += `**File:** ${c.path}\n`;
-    if (c.line) output += `**Line:** ${c.line}\n`;
-    output += `\n${c.body || ''}\n\n`;
+    output += formatDiffComment(id, c);
     count++;
   }
 

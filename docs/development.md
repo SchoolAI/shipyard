@@ -464,6 +464,33 @@ window.__resetShipyard()
 
 Both options only work in development mode.
 
+### Epoch Reset (Guaranteed Clean Slate)
+
+When you have multiple peers connected (browser tabs, MCP servers), clearing one peer's storage won't help because other peers will re-sync their data back. The **epoch reset** solves this by invalidating ALL clients at once.
+
+```bash
+# Set a higher epoch and restart the server
+SHIPYARD_EPOCH=2 pnpm dev:all
+```
+
+This forces ALL connected clients to clear their storage and reconnect. The server rejects any client without a matching epoch, so there's no way for stale data to sneak through.
+
+**100% guaranteed** - every client must send a valid epoch. No epoch = rejected. Old epoch = rejected.
+
+**When to use:**
+- You want to completely clear all data everywhere
+- Multiple browser tabs open
+- Remote P2P peers connected
+- `pnpm reset` alone isn't clearing data
+
+**How it works:**
+1. Set `SHIPYARD_EPOCH=2` (or higher) when starting the server
+2. All clients with epoch < 2 are rejected with close code 4100
+3. Client receives the required epoch in the close reason (`epoch_too_old:2`)
+4. Client stores the required epoch, clears storage, reloads
+5. After reload, client connects with epoch=2
+6. Server accepts, client syncs fresh data
+
 ### Production Reset (GitHub Pages)
 
 The `?reset=all` URL parameter only works in development mode. To reset production storage:

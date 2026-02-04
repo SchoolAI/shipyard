@@ -100,6 +100,126 @@ function parseNumstat(output: string): {
   return { additions, deletions };
 }
 
+/** Map git status codes to SyncedFileChange status */
+const GIT_STATUS_MAP: Record<string, SyncedFileChange['status']> = {
+  A: 'added',
+  M: 'modified',
+  D: 'deleted',
+  R: 'renamed',
+};
+
+/**
+ * Parse a single line from git diff --name-status output.
+ * @returns Parsed status and path, or null if invalid
+ */
+function parseNameStatusLine(line: string): { status: string; path: string } | null {
+  if (!line) return null;
+  const parts = line.split('\t');
+  const status = parts[0];
+  const path = parts[1];
+  if (!status || !path) return null;
+  return { status, path };
+}
+
+/**
+ * Create a GitFileChange from parsed git output.
+ */
+function createFileChange(
+  cwd: string,
+  path: string,
+  statusCode: string,
+  staged: boolean,
+  diffArgs: string[]
+): GitFileChange {
+  const patch = gitExec(cwd, diffArgs);
+  const statusKey = statusCode[0] ?? 'M';
+  return {
+    path,
+    status: GIT_STATUS_MAP[statusKey] ?? 'modified',
+    patch,
+    staged,
+  };
+}
+
+/**
+ * Process staged files from git diff output.
+ */
+function processStagedFiles(cwd: string, stagedDiff: string): GitFileChange[] {
+  const files: GitFileChange[] = [];
+
+  for (const line of stagedDiff.split('\n')) {
+    const parsed = parseNameStatusLine(line);
+    if (!parsed) continue;
+
+    files.push(
+      createFileChange(cwd, parsed.path, parsed.status, true, [
+        'diff',
+        '--cached',
+        '--',
+        parsed.path,
+      ])
+    );
+  }
+
+  return files;
+}
+
+/**
+ * Process unstaged files from git diff output.
+ * Skips files that are already staged.
+ */
+function processUnstagedFiles(
+  cwd: string,
+  unstagedDiff: string,
+  stagedPaths: Set<string>
+): GitFileChange[] {
+  const files: GitFileChange[] = [];
+
+  for (const line of unstagedDiff.split('\n')) {
+    const parsed = parseNameStatusLine(line);
+    if (!parsed) continue;
+    if (stagedPaths.has(parsed.path)) continue;
+
+    files.push(
+      createFileChange(cwd, parsed.path, parsed.status, false, ['diff', '--', parsed.path])
+    );
+  }
+
+  return files;
+}
+
+/**
+ * Process untracked files.
+ */
+async function processUntrackedFiles(
+  cwd: string,
+  untrackedOutput: string,
+  maxFileSize: number
+): Promise<{ files: GitFileChange[]; additions: number }> {
+  const files: GitFileChange[] = [];
+  let additions = 0;
+
+  for (const path of untrackedOutput.split('\n')) {
+    if (!path) continue;
+
+    const fullPath = join(cwd, path);
+    const content = await readUntrackedFile(fullPath, maxFileSize);
+
+    if (content) {
+      additions += content.split('\n').length;
+    }
+
+    files.push({
+      path,
+      status: 'added',
+      patch: content,
+      staged: false,
+    });
+  }
+
+  return { files, additions };
+}
+
 /**
  * Read content of untracked file if under size limit.
  * @returns file content or empty string if too large
@@ -124,102 +244,30 @@ export async function getGitChanges(
   cwd: string,
   maxFileSize: number = DEFAULT_MAX_FILE_SIZE
 ): Promise<GitChangesResult> {
-  const files: GitFileChange[] = [];
-  let totalAdditions = 0;
-  let totalDeletions = 0;
-
   const headSha = gitExec(cwd, ['rev-parse', 'HEAD']) || '0000000';
-
   const branch = gitExec(cwd, ['rev-parse', '--abbrev-ref', 'HEAD']) || 'unknown';
 
+  // Process staged files
   const stagedDiff = gitExec(cwd, ['diff', '--cached', '--name-status']);
-  const stagedNumstat = gitExec(cwd, ['diff', '--cached', '--numstat']);
-  const stagedStats = parseNumstat(stagedNumstat);
-  totalAdditions += stagedStats.additions;
-  totalDeletions += stagedStats.deletions;
+  const stagedStats = parseNumstat(gitExec(cwd, ['diff', '--cached', '--numstat']));
+  const stagedFiles = processStagedFiles(cwd, stagedDiff);
+  const stagedPaths = new Set(stagedFiles.map((f) => f.path));
 
-  for (const line of stagedDiff.split('\n')) {
-    if (!line) continue;
-    const parts = line.split('\t');
-    const status = parts[0];
-    const filePath = parts[1];
-    if (!status || !filePath) continue;
-
-    const statusMap: Record<string, SyncedFileChange['status']> = {
-      A: 'added',
-      M: 'modified',
-      D: 'deleted',
-      R: 'renamed',
-    };
-
-    const patch = gitExec(cwd, ['diff', '--cached', '--', filePath]);
-    const statusKey = status[0] ?? 'M';
-    files.push({
-      path: filePath,
-      status: statusMap[statusKey] ?? 'modified',
-      patch,
-      staged: true,
-    });
-  }
-
+  // Process unstaged files (skip already staged)
   const unstagedDiff = gitExec(cwd, ['diff', '--name-status']);
-  const unstagedNumstat = gitExec(cwd, ['diff', '--numstat']);
-  const unstagedStats = parseNumstat(unstagedNumstat);
-  totalAdditions += unstagedStats.additions;
-  totalDeletions += unstagedStats.deletions;
+  const unstagedStats = parseNumstat(gitExec(cwd, ['diff', '--numstat']));
+  const unstagedFiles = processUnstagedFiles(cwd, unstagedDiff, stagedPaths);
 
-  for (const line of unstagedDiff.split('\n')) {
-    if (!line) continue;
-    const parts = line.split('\t');
-    const status = parts[0];
-    const filePath = parts[1];
-    if (!status || !filePath) continue;
-
-    if (files.some((f) => f.path === filePath && f.staged)) continue;
-
-    const statusMap: Record<string, SyncedFileChange['status']> = {
-      A: 'added',
-      M: 'modified',
-      D: 'deleted',
-      R: 'renamed',
-    };
-
-    const patch = gitExec(cwd, ['diff', '--', filePath]);
-    const statusKey = status[0] ?? 'M';
-    files.push({
-      path: filePath,
-      status: statusMap[statusKey] ?? 'modified',
-      patch,
-      staged: false,
-    });
-  }
-
+  // Process untracked files
   const untrackedOutput = gitExec(cwd, ['ls-files', '--others', '--exclude-standard']);
-
-  for (const path of untrackedOutput.split('\n')) {
-    if (!path) continue;
-
-    const fullPath = join(cwd, path);
-    const content = await readUntrackedFile(fullPath, maxFileSize);
-
-    if (content) {
-      totalAdditions += content.split('\n').length;
-    }
-
-    files.push({
-      path,
-      status: 'added',
-      patch: content,
-      staged: false,
-    });
-  }
+  const untracked = await processUntrackedFiles(cwd, untrackedOutput, maxFileSize);
 
   return {
-    files,
+    files: [...stagedFiles, ...unstagedFiles, ...untracked.files],
     headSha,
     branch,
-    totalAdditions,
-    totalDeletions,
+    totalAdditions: stagedStats.additions + unstagedStats.additions + untracked.additions,
+    totalDeletions: stagedStats.deletions + unstagedStats.deletions,
   };
 }
 

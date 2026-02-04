@@ -11,8 +11,8 @@ import { generateCommentId } from '@shipyard/loro-schema';
 import { z } from 'zod';
 import { getGitHubUsername } from '../../utils/identity.js';
 import { logger } from '../../utils/logger.js';
+import { errorResponse, getTaskDocument, verifySessionToken } from '../helpers.js';
 import type { McpServer } from '../index.js';
-import { errorResponse, getTaskDocument, verifySessionToken } from './helpers.js';
 
 /** Tool name constant */
 const TOOL_NAME = 'reply_to_thread_comment';
@@ -41,6 +41,45 @@ function parseThreadId(input: string): string {
   }
 
   return cleaned;
+}
+
+interface ThreadSearchResult {
+  found: true;
+  blockId: string | undefined;
+}
+
+interface ThreadNotFoundResult {
+  found: false;
+}
+
+type FindThreadResult = ThreadSearchResult | ThreadNotFoundResult;
+
+/**
+ * Search for a thread in the comments map by threadId.
+ */
+function findThreadInComments(
+  allComments: Record<string, { kind: string; id: string; threadId: string; blockId?: string }>,
+  parsedThreadId: string
+): FindThreadResult {
+  for (const comment of Object.values(allComments)) {
+    if (comment.threadId === parsedThreadId && comment.kind === 'inline') {
+      return { found: true, blockId: comment.blockId };
+    }
+  }
+  return { found: false };
+}
+
+/**
+ * Build the error message for a thread not found.
+ */
+function buildThreadNotFoundError(
+  parsedThreadId: string,
+  inputThreadId: string,
+  taskId: string
+): string {
+  const parsedDiffers = inputThreadId !== parsedThreadId;
+  const suffix = parsedDiffers ? ` (parsed from input: "${inputThreadId}")` : '';
+  return `Thread "${parsedThreadId}" not found in task "${taskId}".${suffix}`;
 }
 
 /**
@@ -117,24 +156,15 @@ reply_to_thread_comment({
         }
       > = doc.comments.toJSON();
 
-      let foundThread = false;
-      let blockId: string | undefined;
+      const threadResult = findThreadInComments(allComments, parsedThreadId);
 
-      for (const comment of Object.values(allComments)) {
-        if (comment.threadId === parsedThreadId && comment.kind === 'inline') {
-          foundThread = true;
-          blockId = comment.blockId;
-          break;
-        }
-      }
-
-      if (!foundThread) {
+      if (!threadResult.found) {
         return errorResponse(
-          `Thread "${parsedThreadId}" not found in task "${input.taskId}".${
-            input.threadId !== parsedThreadId ? ` (parsed from input: "${input.threadId}")` : ''
-          }`
+          buildThreadNotFoundError(parsedThreadId, input.threadId, input.taskId)
         );
       }
+
+      const { blockId } = threadResult;
 
       /** Create reply comment */
       const replyId = generateCommentId();

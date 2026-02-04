@@ -8,11 +8,22 @@
  */
 
 import { z } from 'zod';
+import { errorResponse, getTaskDocument, verifySessionToken } from '../helpers.js';
 import type { McpServer } from '../index.js';
-import { errorResponse, getTaskDocument, verifySessionToken } from './helpers.js';
 
 /** Tool name constant */
 const TOOL_NAME = 'read_diff_comments';
+
+/** Comment type for diff comments */
+interface DiffComment {
+  kind: string;
+  id: string;
+  body: string;
+  author: string;
+  path: string;
+  line: number;
+  resolved: boolean;
+}
 
 /** Input Schema */
 const ReadDiffCommentsInput = z.object({
@@ -27,20 +38,56 @@ const ReadDiffCommentsInput = z.object({
 });
 
 /**
+ * Group comments by file path.
+ */
+function groupByFilePath(comments: DiffComment[]): Map<string, DiffComment[]> {
+  const byFile = new Map<string, DiffComment[]>();
+  for (const comment of comments) {
+    const existing = byFile.get(comment.path) ?? [];
+    existing.push(comment);
+    byFile.set(comment.path, existing);
+  }
+  return byFile;
+}
+
+/**
+ * Format a single comment for output.
+ */
+function formatComment(comment: DiffComment, kindPrefix: string): string {
+  const resolvedMarker = comment.resolved ? '  (resolved)\n' : '';
+  return `- Line ${comment.line} [${kindPrefix}:${comment.id}]: @${comment.author}\n  ${comment.body}\n${resolvedMarker}\n`;
+}
+
+/**
+ * Format a section of comments (PR or local).
+ */
+function formatCommentSection(
+  comments: DiffComment[],
+  sectionTitle: string,
+  kindPrefix: string
+): string {
+  if (comments.length === 0) {
+    return '';
+  }
+
+  let output = `## ${sectionTitle}\n\n`;
+  const byFile = groupByFilePath(comments);
+
+  for (const [path, fileComments] of byFile) {
+    output += `### ${path}\n\n`;
+    const sortedComments = fileComments.sort((a, b) => a.line - b.line);
+    for (const comment of sortedComments) {
+      output += formatComment(comment, kindPrefix);
+    }
+  }
+
+  return output;
+}
+
+/**
  * Format diff comments for LLM output.
  */
-function formatDiffCommentsForLLM(
-  comments: Array<{
-    kind: string;
-    id: string;
-    body: string;
-    author: string;
-    path: string;
-    line: number;
-    resolved: boolean;
-  }>,
-  includeResolved: boolean
-): string {
+function formatDiffCommentsForLLM(comments: DiffComment[], includeResolved: boolean): string {
   const filtered = includeResolved ? comments : comments.filter((c) => !c.resolved);
 
   if (filtered.length === 0) {
@@ -50,53 +97,76 @@ function formatDiffCommentsForLLM(
   const prComments = filtered.filter((c) => c.kind === 'pr');
   const localComments = filtered.filter((c) => c.kind === 'local');
 
-  let output = '';
+  const prSection = formatCommentSection(prComments, 'PR Review Comments', 'pr');
+  const localSection = formatCommentSection(localComments, 'Local Diff Comments', 'local');
 
-  if (prComments.length > 0) {
-    output += '## PR Review Comments\n\n';
-    const byFile = new Map<string, typeof prComments>();
-    for (const c of prComments) {
-      const existing = byFile.get(c.path) || [];
-      existing.push(c);
-      byFile.set(c.path, existing);
+  return prSection + localSection;
+}
+
+/** Raw comment type from document */
+interface RawComment {
+  kind: string;
+  id: string;
+  body: string;
+  author: string;
+  path?: string;
+  line?: number;
+  resolved: boolean;
+}
+
+/**
+ * Check if a comment should be included based on filters.
+ */
+function shouldIncludeComment(
+  comment: RawComment,
+  includeLocal: boolean,
+  includePR: boolean
+): boolean {
+  const isPRComment = comment.kind === 'pr' && includePR;
+  const isLocalComment = comment.kind === 'local' && includeLocal;
+  return isPRComment || isLocalComment;
+}
+
+/**
+ * Check if a comment has valid diff location (path and line).
+ */
+function hasValidDiffLocation(comment: RawComment): comment is RawComment & {
+  path: string;
+  line: number;
+} {
+  return comment.path !== undefined && comment.line !== undefined;
+}
+
+/**
+ * Extract diff comments from raw comments based on filters.
+ */
+function extractDiffComments(
+  allComments: Record<string, RawComment>,
+  includeLocal: boolean,
+  includePR: boolean
+): DiffComment[] {
+  const diffComments: DiffComment[] = [];
+
+  for (const comment of Object.values(allComments)) {
+    if (!shouldIncludeComment(comment, includeLocal, includePR)) {
+      continue;
+    }
+    if (!hasValidDiffLocation(comment)) {
+      continue;
     }
 
-    for (const [path, fileComments] of byFile) {
-      output += `### ${path}\n\n`;
-      for (const c of fileComments.sort((a, b) => a.line - b.line)) {
-        output += `- Line ${c.line} [pr:${c.id}]: @${c.author}\n`;
-        output += `  ${c.body}\n`;
-        if (c.resolved) {
-          output += '  (resolved)\n';
-        }
-        output += '\n';
-      }
-    }
+    diffComments.push({
+      kind: comment.kind,
+      id: comment.id,
+      body: comment.body,
+      author: comment.author,
+      path: comment.path,
+      line: comment.line,
+      resolved: comment.resolved,
+    });
   }
 
-  if (localComments.length > 0) {
-    output += '## Local Diff Comments\n\n';
-    const byFile = new Map<string, typeof localComments>();
-    for (const c of localComments) {
-      const existing = byFile.get(c.path) || [];
-      existing.push(c);
-      byFile.set(c.path, existing);
-    }
-
-    for (const [path, fileComments] of byFile) {
-      output += `### ${path}\n\n`;
-      for (const c of fileComments.sort((a, b) => a.line - b.line)) {
-        output += `- Line ${c.line} [local:${c.id}]: @${c.author}\n`;
-        output += `  ${c.body}\n`;
-        if (c.resolved) {
-          output += '  (resolved)\n';
-        }
-        output += '\n';
-      }
-    }
-  }
-
-  return output;
+  return diffComments;
 }
 
 /**
@@ -166,43 +236,8 @@ OUTPUT FORMAT:
         return errorResponse(tokenError);
       }
 
-      const allComments: Record<
-        string,
-        {
-          kind: string;
-          id: string;
-          body: string;
-          author: string;
-          path?: string;
-          line?: number;
-          resolved: boolean;
-        }
-      > = doc.comments.toJSON();
-      const diffComments: Array<{
-        kind: string;
-        id: string;
-        body: string;
-        author: string;
-        path: string;
-        line: number;
-        resolved: boolean;
-      }> = [];
-
-      for (const comment of Object.values(allComments)) {
-        if ((comment.kind === 'pr' && includePR) || (comment.kind === 'local' && includeLocal)) {
-          if (comment.path && comment.line !== undefined) {
-            diffComments.push({
-              kind: comment.kind,
-              id: comment.id,
-              body: comment.body,
-              author: comment.author,
-              path: comment.path,
-              line: comment.line,
-              resolved: comment.resolved,
-            });
-          }
-        }
-      }
+      const allComments: Record<string, RawComment> = doc.comments.toJSON();
+      const diffComments = extractDiffComments(allComments, includeLocal, includePR);
 
       /** Format for output */
       const formatted = formatDiffCommentsForLLM(diffComments, includeResolved);

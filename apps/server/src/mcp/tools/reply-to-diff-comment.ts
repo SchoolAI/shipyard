@@ -7,12 +7,12 @@
  * @see docs/whips/daemon-mcp-server-merge.md#mcp-tools
  */
 
-import { generateCommentId } from '@shipyard/loro-schema';
+import { generateCommentId, type TaskDocument } from '@shipyard/loro-schema';
 import { z } from 'zod';
 import { getGitHubUsername } from '../../utils/identity.js';
 import { logger } from '../../utils/logger.js';
+import { errorResponse, getTaskDocument, verifySessionToken } from '../helpers.js';
 import type { McpServer } from '../index.js';
-import { errorResponse, getTaskDocument, verifySessionToken } from './helpers.js';
 
 /** Tool name constant */
 const TOOL_NAME = 'reply_to_diff_comment';
@@ -25,14 +25,27 @@ const ReplyToDiffCommentInput = z.object({
   body: z.string().describe('Reply text'),
 });
 
+/** Comment type from the document */
+interface DiffComment {
+  kind: string;
+  id: string;
+  threadId: string;
+  path?: string;
+  line?: number;
+  prNumber?: number;
+}
+
+/** Parsed comment ID result */
+interface ParsedCommentId {
+  type: 'pr' | 'local' | 'unknown';
+  id: string;
+}
+
 /**
  * Parse comment ID to extract type and actual ID.
  * Supports: "[pr:abc123]", "pr:abc123", "[local:abc123]", "local:abc123", or bare "abc123"
  */
-function parseCommentId(input: string): {
-  type: 'pr' | 'local' | 'unknown';
-  id: string;
-} {
+function parseCommentId(input: string): ParsedCommentId {
   let cleaned = input.trim();
   if (cleaned.startsWith('[') && cleaned.endsWith(']')) {
     cleaned = cleaned.slice(1, -1);
@@ -46,6 +59,121 @@ function parseCommentId(input: string): {
   }
 
   return { type: 'unknown', id: cleaned };
+}
+
+/**
+ * Check if a comment matches the parsed type.
+ */
+function commentMatchesParsedType(
+  comment: DiffComment,
+  parsedType: ParsedCommentId['type']
+): boolean {
+  if (parsedType === 'unknown') return true;
+  if (parsedType === 'pr' && comment.kind === 'pr') return true;
+  if (parsedType === 'local' && comment.kind === 'local') return true;
+  return false;
+}
+
+/**
+ * Find a parent comment by ID and type from all comments.
+ */
+function findParentComment(
+  allComments: Record<string, DiffComment>,
+  parsed: ParsedCommentId
+): DiffComment | undefined {
+  for (const comment of Object.values(allComments)) {
+    if (comment.id === parsed.id && commentMatchesParsedType(comment, parsed.type)) {
+      return comment;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Build the reply object with inherited properties from the parent comment.
+ */
+function buildReply(
+  parentComment: DiffComment,
+  parsedId: string,
+  body: string,
+  actorName: string
+): Record<string, unknown> {
+  const replyId = generateCommentId();
+  const baseReply = {
+    kind: parentComment.kind,
+    id: replyId,
+    threadId: parentComment.threadId,
+    body,
+    author: actorName,
+    createdAt: Date.now(),
+    resolved: false,
+    inReplyTo: parsedId,
+  };
+
+  const optionalFields: Record<string, unknown> = {};
+  if (parentComment.path) {
+    optionalFields.path = parentComment.path;
+  }
+  if (parentComment.line !== undefined) {
+    optionalFields.line = parentComment.line;
+  }
+  if (parentComment.prNumber !== undefined) {
+    optionalFields.prNumber = parentComment.prNumber;
+  }
+
+  return { ...baseReply, ...optionalFields, _replyId: replyId };
+}
+
+/**
+ * Save the reply to the document and log the event.
+ */
+function saveReplyToDocument(
+  doc: TaskDocument,
+  reply: Record<string, unknown>,
+  actorName: string,
+  body: string
+): string {
+  const replyId = reply._replyId as string;
+  const { _replyId, ...replyData } = reply;
+
+  doc.comments.set(replyId, replyData);
+
+  doc.logEvent('comment_added', actorName, {
+    commentId: replyId,
+    threadId: reply.threadId as string,
+    preview: body.slice(0, 100),
+  });
+
+  return replyId;
+}
+
+/**
+ * Format the location info string for the response.
+ */
+function formatLocationInfo(parentComment: DiffComment): string {
+  if (parentComment.path && parentComment.line !== undefined) {
+    return `\nFile: ${parentComment.path}:${parentComment.line}`;
+  }
+  return '';
+}
+
+/**
+ * Build the error message for a missing comment.
+ */
+function buildCommentNotFoundError(
+  parsedId: string,
+  inputCommentId: string,
+  taskId: string
+): string {
+  const parsedNote = inputCommentId !== parsedId ? ` (parsed from input: "${inputCommentId}")` : '';
+  return `Comment "${parsedId}" not found in task "${taskId}".${parsedNote} Make sure the comment ID is correct and the comment exists.`;
+}
+
+/**
+ * Get the comment type label for display.
+ */
+function getCommentTypeLabel(kind: string): string {
+  return kind === 'pr' ? 'PR review' : 'local diff';
 }
 
 /**
@@ -86,14 +214,12 @@ reply_to_diff_comment({
 
       logger.info({ taskId: input.taskId, commentId: input.commentId }, 'Replying to diff comment');
 
-      /** Get task document */
       const taskResult = await getTaskDocument(input.taskId);
       if (!taskResult.success) {
         return errorResponse(taskResult.error);
       }
       const { doc, meta } = taskResult;
 
-      /** Verify session token */
       const tokenError = verifySessionToken(
         input.sessionToken,
         meta.sessionTokenHash,
@@ -103,116 +229,37 @@ reply_to_diff_comment({
         return errorResponse(tokenError);
       }
 
-      /** Get actor name */
       const actorName = await getGitHubUsername();
-
-      /** Parse comment ID */
       const parsed = parseCommentId(input.commentId);
 
       logger.debug(
-        {
-          inputCommentId: input.commentId,
-          parsedType: parsed.type,
-          parsedId: parsed.id,
-        },
+        { inputCommentId: input.commentId, parsedType: parsed.type, parsedId: parsed.id },
         'Parsed comment ID from input'
       );
 
-      const allComments: Record<
-        string,
-        {
-          kind: string;
-          id: string;
-          threadId: string;
-          path?: string;
-          line?: number;
-          prNumber?: number;
-        }
-      > = doc.comments.toJSON();
-      let parentComment:
-        | {
-            kind: string;
-            id: string;
-            threadId: string;
-            path?: string;
-            line?: number;
-            prNumber?: number;
-          }
-        | undefined;
-
-      for (const comment of Object.values(allComments)) {
-        if (comment.id === parsed.id) {
-          if (
-            parsed.type === 'unknown' ||
-            (parsed.type === 'pr' && comment.kind === 'pr') ||
-            (parsed.type === 'local' && comment.kind === 'local')
-          ) {
-            parentComment = comment;
-            break;
-          }
-        }
-      }
+      const allComments = doc.comments.toJSON() as Record<string, DiffComment>;
+      const parentComment = findParentComment(allComments, parsed);
 
       if (!parentComment) {
-        return errorResponse(
-          `Comment "${parsed.id}" not found in task "${input.taskId}".${
-            input.commentId !== parsed.id ? ` (parsed from input: "${input.commentId}")` : ''
-          } Make sure the comment ID is correct and the comment exists.`
-        );
+        return errorResponse(buildCommentNotFoundError(parsed.id, input.commentId, input.taskId));
       }
 
-      const replyId = generateCommentId();
-      const reply = {
-        kind: parentComment.kind,
-        id: replyId,
-        threadId: parentComment.threadId,
-        body: input.body,
-        author: actorName,
-        createdAt: Date.now(),
-        resolved: false,
-        inReplyTo: parsed.id,
-        ...(parentComment.path && { path: parentComment.path }),
-        ...(parentComment.line !== undefined && { line: parentComment.line }),
-        ...(parentComment.prNumber !== undefined && {
-          prNumber: parentComment.prNumber,
-        }),
-      };
-
-      /** Add reply to comments */
-      const commentsMap = doc.comments;
-      commentsMap.set(replyId, reply);
-
-      /** Log event */
-      doc.logEvent('comment_added', actorName, {
-        commentId: replyId,
-        threadId: parentComment.threadId,
-        preview: input.body.slice(0, 100),
-      });
+      const reply = buildReply(parentComment, parsed.id, input.body, actorName);
+      const replyId = saveReplyToDocument(doc, reply, actorName, input.body);
 
       logger.info(
-        {
-          taskId: input.taskId,
-          commentId: replyId,
-          parentCommentId: parsed.id,
-        },
-        `${parentComment.kind === 'pr' ? 'PR review' : 'Local diff'} comment reply added`
+        { taskId: input.taskId, commentId: replyId, parentCommentId: parsed.id },
+        `${getCommentTypeLabel(parentComment.kind)} comment reply added`
       );
 
-      const locationInfo =
-        parentComment.path && parentComment.line !== undefined
-          ? `\nFile: ${parentComment.path}:${parentComment.line}`
-          : '';
+      const locationInfo = formatLocationInfo(parentComment);
+      const typeLabel = getCommentTypeLabel(parentComment.kind);
 
       return {
         content: [
           {
             type: 'text',
-            text: `Reply added to ${parentComment.kind === 'pr' ? 'PR review' : 'local diff'} comment!
-
-Comment ID: ${replyId}
-Parent Comment ID: ${parsed.id}${locationInfo}
-
-The reply will appear in the Changes tab inline with the original comment.`,
+            text: `Reply added to ${typeLabel} comment!\n\nComment ID: ${replyId}\nParent Comment ID: ${parsed.id}${locationInfo}\n\nThe reply will appear in the Changes tab inline with the original comment.`,
           },
         ],
       };
