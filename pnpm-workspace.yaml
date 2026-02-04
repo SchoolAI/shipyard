@@ -4,10 +4,12 @@ packages:
 
 catalog:
   # ===== loro-extended packages (enforce 5.4.1) =====
+  "@loro-extended/adapter-indexeddb": "^5.4.1"
   "@loro-extended/adapter-leveldb": "^5.4.1"
   "@loro-extended/adapter-webrtc": "^5.4.1"
   "@loro-extended/adapter-websocket": "^5.4.1"
   "@loro-extended/change": "^5.4.1"
+  "@loro-extended/react": "^5.4.1"
   "@loro-extended/repo": "^5.4.1"
   loro-crdt: "^1.10.3"
 

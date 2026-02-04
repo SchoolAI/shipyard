@@ -2,13 +2,13 @@
 #
 # Services:
 #   - registry: MCP server with WebSocket sync (exposed :32191)
-#   - signaling: WebRTC signaling + OAuth server (exposed :4444)
+#   - session: WebRTC signaling + OAuth server (exposed :4444)
 #   - web: Vite dev server (exposed :5173)
 #   - og-proxy: OpenGraph proxy worker (internal :4446) - DISABLED
-#   - daemon: Agent launcher daemon (exposed :56609)
+#   - daemon: Agent launcher daemon (exposed :4445)
 #
-# Note: OAuth is now integrated into the signaling service.
-# The signaling server handles GitHub OAuth and issues Shipyard JWTs.
+# Note: OAuth is now integrated into the session server.
+# The session server handles GitHub OAuth and issues Shipyard JWTs.
 #
 # Usage:
 #   docker compose up --build           # Start all services
@@ -21,7 +21,7 @@
 #
 # Environment variables can be overridden via .env.docker file
 #
-# Required secrets for signaling (set in .env.docker):
+# Required secrets for session server (set in .env.docker):
 #   - GITHUB_CLIENT_ID: GitHub OAuth App client ID
 #   - GITHUB_CLIENT_SECRET: GitHub OAuth App client secret
 #   - JWT_SECRET: Secret for signing Shipyard JWTs (min 32 chars)
@@ -42,9 +42,9 @@ services:
       - REGISTRY_PORT=${REGISTRY_PORT:-32191}
       - SHIPYARD_STATE_DIR=/data/shipyard
       # URLs for internal service communication
-      - SIGNALING_URL=ws://signaling:${SIGNALING_PORT:-4444}
+      - SESSION_URL=ws://session:${SESSION_PORT:-4444}
       - SHIPYARD_WEB_URL=http://web:${VITE_PORT:-5173}
-      - DAEMON_PORT=${DAEMON_PORT:-56609}
+      - SERVER_PORT=${SERVER_PORT:-4445}
       # Node options
       - NODE_ENV=development
       - LOG_LEVEL=${LOG_LEVEL:-debug}
@@ -63,22 +63,22 @@ services:
       - shipyard
 
   # ==========================================================================
-  # SIGNALING - WebRTC signaling + OAuth server (Cloudflare Wrangler)
+  # SESSION - WebRTC signaling + OAuth server (Cloudflare Wrangler)
   # ==========================================================================
   # NOTE: Wrangler doesn't work reliably in Docker on Apple Silicon (Rosetta issues)
-  # For local development, run natively: pnpm --filter @shipyard/signaling dev
+  # For local development, run natively: pnpm --filter @shipyard/session-server dev
   # ==========================================================================
-  signaling:
+  session:
     platform: linux/amd64
     build:
       context: .
-      target: signaling
+      target: session
     ports:
       # Exposed for browser WebRTC connections and OAuth
-      - "${SIGNALING_PORT:-4444}:${SIGNALING_PORT:-4444}"
+      - "${SESSION_PORT:-4444}:${SESSION_PORT:-4444}"
     environment:
       # Wrangler dev server port
-      - PORT=${SIGNALING_PORT:-4444}
+      - PORT=${SESSION_PORT:-4444}
       # Required secrets (set in .env.docker or use defaults for testing)
       - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID:-}
       - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET:-}
@@ -87,7 +87,7 @@ services:
       - NODE_ENV=development
       - LOG_LEVEL=${LOG_LEVEL:-debug}
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:${SIGNALING_PORT:-4444}/health"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:${SESSION_PORT:-4444}/health"]
       interval: 10s
       timeout: 3s
       start_period: 10s
@@ -110,12 +110,12 @@ services:
       - VITE_PORT=${VITE_PORT:-5173}
       # Browser-side URLs (these compile into the bundle)
       # Note: Browser uses localhost, not Docker network names
-      - VITE_WEBRTC_SIGNALING=ws://localhost:${SIGNALING_PORT:-4444}
-      # OAuth is now handled by signaling server (same base URL, /auth/github/callback endpoint)
-      - VITE_GITHUB_OAUTH_WORKER=http://localhost:${SIGNALING_PORT:-4444}
+      - VITE_WEBRTC_SIGNALING=ws://localhost:${SESSION_PORT:-4444}
+      # OAuth is now handled by session server (same base URL, /auth/github/callback endpoint)
+      - VITE_GITHUB_OAUTH_WORKER=http://localhost:${SESSION_PORT:-4444}
       - VITE_OG_PROXY_URL=http://localhost:${OG_PROXY_PORT:-4446}
       - VITE_REGISTRY_PORT=${REGISTRY_PORT:-32191}
-      - VITE_DAEMON_WS_URL=ws://localhost:${DAEMON_PORT:-56609}
+      - VITE_DAEMON_WS_URL=ws://localhost:${SERVER_PORT:-4445}
       - NODE_ENV=development
     depends_on:
       registry:
@@ -124,8 +124,8 @@ services:
       - shipyard
 
   # ==========================================================================
-  # OAUTH - REMOVED: OAuth is now handled by the signaling service
-  # The new signaling server (apps/signaling/) handles both WebRTC signaling
+  # OAUTH - REMOVED: OAuth is now handled by the session server
+  # The session server (apps/session-server/) handles both WebRTC signaling
   # and GitHub OAuth with Shipyard JWT issuance.
   # ==========================================================================
 
@@ -160,9 +160,9 @@ services:
       context: .
       target: daemon
     ports:
-      - "${DAEMON_PORT:-56609}:${DAEMON_PORT:-56609}"
+      - "${SERVER_PORT:-4445}:${SERVER_PORT:-4445}"
     environment:
-      - DAEMON_PORT=${DAEMON_PORT:-56609}
+      - SERVER_PORT=${SERVER_PORT:-4445}
       - SHIPYARD_STATE_DIR=/data/shipyard
       - SHIPYARD_WEB_URL=http://web:${VITE_PORT:-5173}
       - CLAUDE_EXECUTABLE=/usr/local/bin/claude-shim.sh
@@ -194,14 +194,14 @@ services:
 volumes:
   # Persistent storage for plans and CRDT data
   shipyard-data:
-    name: shipyard-data-${WORKTREE_NAME:-default}
+    name: shipyard-data-${COMPOSE_PROJECT_NAME:-shipyard}
   # Claude spawn request logs (for debugging)
   daemon-logs:
-    name: shipyard-daemon-logs-${WORKTREE_NAME:-default}
+    name: shipyard-daemon-logs-${COMPOSE_PROJECT_NAME:-shipyard}
 
 # =============================================================================
 # NETWORKS
 # =============================================================================
 networks:
   shipyard:
-    name: shipyard-${WORKTREE_NAME:-default}
+    name: shipyard-${COMPOSE_PROJECT_NAME:-shipyard}

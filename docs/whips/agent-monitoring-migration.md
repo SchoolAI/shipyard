@@ -513,15 +513,45 @@ Structure: See loro-migration-plan.md Appendix A
    - Display agent registry (dashboard)
    - Handle spawn requests via Personal Room
 
-4. Implement collab room joining
-   - Pre-signed URL handling
-   - CollabRoom WebRTC connection
+4. ~~Implement collab room joining~~
+   - ~~Pre-signed URL handling~~
+   - ~~CollabRoom WebRTC connection~~
+   - **DEFERRED:** Using simplified sharing (see below)
 
 **Deliverables:**
 - [ ] Browser auth with Shipyard JWT
 - [ ] useLoroSync hook working
 - [ ] Personal Room dashboard
-- [ ] Collab room joining
+- [x] ~~Collab room joining~~ **DEFERRED** - Using simplified URL sharing
+
+### Simplified Sharing Decision (2026-02-03)
+
+**Decision:** Keep simplified sharing for initial release. Full invite/access control can be added later.
+
+**Current Sharing Model:**
+- ShareButton copies task URL directly
+- No invite token redemption flow
+- No WaitingRoomGate component
+- Tasks are accessible via URL (Loro P2P handles sync)
+
+**Deferred Components:**
+- `WaitingRoomGate` - Would control access before allowing task viewing
+- Invite token redemption - Would validate tokens before granting access
+- Pre-signed URL expiration - CollabRoom URLs with time limits
+
+**Rationale:**
+- **Pro:** Simpler implementation, works naturally with Loro P2P architecture
+- **Pro:** Faster to ship initial version
+- **Pro:** URL-based sharing is intuitive (like Google Docs "anyone with link")
+- **Con:** Less control over who can access shared tasks
+- **Con:** No revocation mechanism for shared links
+
+**Path Forward:**
+When access control is needed, can add:
+1. JWT-based access tokens embedded in URLs
+2. Server-side validation before WebRTC handshake
+3. CollabRoom with participant management
+4. Link expiration and revocation
 
 ### Phase 4: Hook Migration (Week 7)
 
@@ -576,14 +606,14 @@ Structure: See loro-migration-plan.md Appendix A
 - [ ] Personal Room shows all user's agents
 - [ ] Browser can spawn agent via Personal Room
 - [ ] Loro sync works browser ↔ daemon
-- [ ] Collab rooms work for sharing
+- [x] ~~Collab rooms work for sharing~~ **DEFERRED** - Using simplified URL sharing
 - [ ] Shipyard JWT auth working
 
 ### Should Have (P1)
 - [ ] Agent pause/resume for blocking input
 - [ ] Multi-machine agent registry
-- [ ] Pre-signed URL expiration
-- [ ] Permission model enforced
+- [x] ~~Pre-signed URL expiration~~ **DEFERRED** - Using simplified URL sharing
+- [x] ~~Permission model enforced~~ **DEFERRED** - Using simplified URL sharing
 
 ### Nice to Have (P2)
 - [ ] Directory discovery in browser
@@ -701,4 +731,4 @@ Structure: See loro-migration-plan.md Appendix A
 
 ---
 
-*Last updated: 2026-02-02*
+*Last updated: 2026-02-03*

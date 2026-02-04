@@ -1,0 +1,168 @@
+import { Button, Checkbox, Chip, Disclosure } from '@heroui/react';
+import type { TaskArtifact } from '@shipyard/loro-schema';
+import { useState } from 'react';
+import { ArtifactRenderer } from '@/components/artifacts/artifact-renderer';
+import { cn } from '@/lib/utils';
+import { formatRelativeTime } from '@/utils/formatters';
+
+type ArtifactType = TaskArtifact[number];
+
+interface DeliverableCardProps {
+  artifact: ArtifactType;
+  isSelected?: boolean;
+  onSelect?: (artifact: ArtifactType) => void;
+  isMobile: boolean;
+}
+
+function ArtifactTypeIcon({ type }: { type: ArtifactType['type'] }) {
+  const iconClass = 'w-4 h-4 text-muted-foreground';
+
+  switch (type) {
+    case 'html':
+      return (
+        <svg
+          className={iconClass}
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+          aria-hidden="true"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+          />
+        </svg>
+      );
+    case 'image':
+      return (
+        <svg
+          className={iconClass}
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+          aria-hidden="true"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+          />
+        </svg>
+      );
+    case 'video':
+      return (
+        <svg
+          className={iconClass}
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+          aria-hidden="true"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
+          />
+        </svg>
+      );
+    default: {
+      const _exhaustive: never = type;
+      throw new Error(`Unknown artifact type: ${_exhaustive}`);
+    }
+  }
+}
+
+function isArtifactAttached(artifact: ArtifactType): boolean {
+  return artifact.storage === 'github' && Boolean(artifact.url);
+}
+
+function CardContent({
+  artifact,
+  useSidePanel,
+}: {
+  artifact: ArtifactType;
+  useSidePanel: boolean;
+}) {
+  const isAttached = isArtifactAttached(artifact);
+  const displayName = artifact.description || artifact.filename;
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  return (
+    <div className="flex items-start gap-4 w-full text-left">
+      <Checkbox isReadOnly isSelected={isAttached} className="mt-0.5">
+        <Checkbox.Control>
+          <Checkbox.Indicator />
+        </Checkbox.Control>
+      </Checkbox>
+
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <ArtifactTypeIcon type={artifact.type} />
+          <span className="font-medium text-foreground truncate">{displayName}</span>
+          <Chip size="sm" color={isAttached ? 'success' : 'default'} variant="soft">
+            {isAttached ? 'attached' : 'pending'}
+          </Chip>
+        </div>
+
+        {isAttached && !useSidePanel && (
+          <Disclosure className="mt-3" isExpanded={isExpanded} onExpandedChange={setIsExpanded}>
+            <Disclosure.Heading>
+              <Button slot="trigger" variant="tertiary" size="sm">
+                {artifact.filename}
+                <Disclosure.Indicator />
+              </Button>
+            </Disclosure.Heading>
+            <Disclosure.Content>
+              <div className="mt-2">{isExpanded && <ArtifactRenderer artifact={artifact} />}</div>
+            </Disclosure.Content>
+          </Disclosure>
+        )}
+
+        {isAttached && useSidePanel && (
+          <p className="text-sm text-muted-foreground mt-2">{artifact.filename}</p>
+        )}
+
+        {artifact.uploadedAt && (
+          <span className="text-xs text-muted-foreground mt-2 block">
+            Attached {formatRelativeTime(artifact.uploadedAt)}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export function DeliverableCard({
+  artifact,
+  isSelected = false,
+  onSelect,
+  isMobile,
+}: DeliverableCardProps) {
+  const isAttached = isArtifactAttached(artifact);
+  const useSidePanel = !isMobile && onSelect !== undefined;
+  const isInteractive = useSidePanel && isAttached;
+
+  const cardClassName = cn(
+    'bg-surface border rounded-lg p-4 transition-colors w-full',
+    isSelected ? 'border-primary ring-1 ring-primary' : 'border-separator',
+    isInteractive && 'cursor-pointer hover:border-primary/50'
+  );
+
+  if (isInteractive) {
+    return (
+      <button type="button" className={cardClassName} onClick={() => onSelect(artifact)}>
+        <CardContent artifact={artifact} useSidePanel={useSidePanel} />
+      </button>
+    );
+  }
+
+  return (
+    <div className={cardClassName}>
+      <CardContent artifact={artifact} useSidePanel={useSidePanel} />
+    </div>
+  );
+}

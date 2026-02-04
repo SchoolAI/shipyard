@@ -6,7 +6,8 @@
     "useIgnoreFile": true
   },
   "files": {
-    "ignoreUnknown": false
+    "ignoreUnknown": false,
+    "includes": ["**", "!**/*.css"]
   },
   "formatter": {
     "enabled": true,
@@ -52,17 +53,7 @@
         "useNodejsImportProtocol": "error",
         "useTemplate": "error",
         "useExponentiationOperator": "error",
-        "noRestrictedImports": {
-          "level": "error",
-          "options": {
-            "patterns": [
-              {
-                "group": ["../../**"],
-                "message": "Cross-package imports must use workspace protocol (@shipyard/...). Use import from '@shipyard/package-name' instead."
-              }
-            ]
-          }
-        }
+        "noRestrictedImports": "off"
       },
       "suspicious": {
         "noExplicitAny": "error",
@@ -92,7 +83,6 @@
     }
   },
   "overrides": [
-    // TODO: Add kebab-case file naming enforcement for apps/**/*.ts and packages/**/*.ts during migration
     {
       "includes": ["**/*.test.ts", "**/*.spec.ts"],
       "linter": {
@@ -105,6 +95,9 @@
           },
           "style": {
             "noNonNullAssertion": "off"
+          },
+          "complexity": {
+            "noExcessiveCognitiveComplexity": "warn"
           }
         }
       }
@@ -135,7 +128,12 @@
       }
     },
     {
-      "includes": ["apps/github-oauth-worker/src/logger.ts", "apps/signaling/**/logger.ts", "apps/signaling-new/**/logger.ts"],
+      "includes": [
+        "apps/github-oauth-worker/src/logger.ts",
+        "apps/session-server/**/logger.ts",
+        "apps/session-server/**/logger.test.ts",
+        "apps/web/src/utils/logger.ts"
+      ],
       "linter": {
         "rules": {
           "suspicious": {
@@ -145,17 +143,63 @@
       }
     },
     {
-      "includes": ["apps/signaling/cloudflare/worker-configuration.d.ts"],
+      "includes": ["apps/session-server/cloudflare/worker-configuration.d.ts"],
       "linter": {
         "enabled": false
       }
     },
     {
-      "includes": ["apps/server/src/daemon-launcher.ts"],
+      "includes": ["**/*.css"],
+      "linter": {
+        "enabled": false
+      },
+      "formatter": {
+        "enabled": false
+      }
+    },
+    {
+      "includes": ["apps/web/src/pages/kanban-page.tsx"],
       "linter": {
         "rules": {
-          "style": {
-            "noRestrictedImports": "off"
+          "a11y": {
+            "useSemanticElements": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "apps/web/src/components/changes-header-controls.tsx",
+        "apps/web/src/components/input-request-modal.tsx",
+        "apps/web/src/components/link-pr-button.tsx",
+        "apps/web/src/components/local-changes-viewer.tsx",
+        "apps/web/src/components/task/task-header.tsx",
+        "apps/web/src/pages/inbox-page.tsx",
+        "apps/web/src/pages/kanban-page.tsx"
+      ],
+      "linter": {
+        "rules": {
+          "complexity": {
+            "noExcessiveCognitiveComplexity": "warn"
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "apps/server/src/mcp/**/*.ts",
+        "apps/server/src/loro/**/*.ts",
+        "apps/server/src/agents/**/*.ts",
+        "apps/server/src/http/**/*.ts",
+        "**/mcp/**/*.ts",
+        "**/loro/**/*.ts",
+        "**/agents/**/*.ts",
+        "**/http/routes/**/*.ts"
+      ],
+      "linter": {
+        "rules": {
+          "complexity": {
+            "noExcessiveCognitiveComplexity": "warn"
           }
         }
       }

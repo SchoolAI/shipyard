@@ -65,10 +65,10 @@ kill_by_pattern "vite.*apps/web" "Vite dev server (web)"
 kill_by_pattern "node.*vite" "Vite via node"
 kill_by_pattern "vite" "Vite (generic)"
 
-# 5. Kill signaling server (now runs via wrangler, but keep tsx pattern for legacy)
-kill_by_pattern "tsx.*apps/signaling" "Signaling server (tsx - legacy)"
-kill_by_pattern "node.*apps/signaling" "Signaling server (node)"
-kill_by_pattern "wrangler.*@shipyard/signaling" "Signaling server (wrangler)"
+# 5. Kill session server (now runs via wrangler, but keep tsx pattern for legacy)
+kill_by_pattern "tsx.*apps/session-server" "Session server (tsx - legacy)"
+kill_by_pattern "node.*apps/session-server" "Session server (node)"
+kill_by_pattern "wrangler.*@shipyard/session-server" "Session server (wrangler)"
 
 # 6. Kill turbo and build watchers
 kill_by_pattern "turbo.*run.*dev" "Turbo dev"

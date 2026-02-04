@@ -32,7 +32,7 @@
     "@radix-ui/react-avatar": "^1.1.11",
     "@radix-ui/react-separator": "^1.1.8",
     "@radix-ui/react-slot": "^1.2.4",
-    "@shipyard/schema": "workspace:*",
+    "@shipyard/loro-schema": "workspace:*",
     "@shipyard/shared": "workspace:*",
     "@tanstack/react-query": "^5.90.19",
     "@tiptap/extensions": "^3.16.0",

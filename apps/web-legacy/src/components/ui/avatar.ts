@@ -4,5 +4,5 @@
  * These are properly typed - no type assertions needed
  */
 
-export type { AvatarProps } from "@heroui/react";
-export { Avatar } from "@heroui/react";
+export type { AvatarProps } from '@heroui/react';
+export { Avatar } from '@heroui/react';

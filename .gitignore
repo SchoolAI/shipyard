@@ -174,3 +174,6 @@ tmp/
 
 # Claude Code local plans (session-specific, not committed)
 .claude/plans/
+
+# Local dev state directory (logs, persistence, claude projects)
+.dev-state/

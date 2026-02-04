@@ -1,1 +1,1 @@
-export { Chip } from "@heroui/react";
+export { Chip } from '@heroui/react';

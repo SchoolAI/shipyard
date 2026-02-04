@@ -131,7 +131,13 @@ export const TaskDocumentSchema: DocShape = Shape.doc({
   meta: Shape.struct({
     id: Shape.plain.string(),
     title: Shape.plain.string(),
-    status: Shape.plain.string('draft', 'pending_review', 'changes_requested', 'in_progress', 'completed'),
+    status: Shape.plain.string(
+      'draft',
+      'pending_review',
+      'changes_requested',
+      'in_progress',
+      'completed'
+    ),
 
     /** Unix timestamp in milliseconds */
     createdAt: Shape.plain.number(),
@@ -552,4 +558,3 @@ export type GlobalRoomShape = typeof GlobalRoomSchema;
 export type GlobalRoom = Infer<typeof GlobalRoomSchema>;
 export type MutableGlobalRoom = InferMutableType<typeof GlobalRoomSchema>;
 export type InputRequest = Infer<typeof GlobalRoomSchema.shapes.inputRequests>;
-

@@ -1,4 +1,4 @@
-import { Mark, mergeAttributes } from "@tiptap/core";
+import { Mark, mergeAttributes } from '@tiptap/core';
 
 /**
  * Custom comment mark for P1 validation.
@@ -7,12 +7,12 @@ import { Mark, mergeAttributes } from "@tiptap/core";
  * The commentId attribute links to a comment stored elsewhere (e.g., in Loro).
  */
 export const CommentMark = Mark.create({
-  name: "comment",
+  name: 'comment',
 
   addOptions() {
     return {
       HTMLAttributes: {
-        class: "comment-mark",
+        class: 'comment-mark',
       },
     };
   },
@@ -21,25 +21,21 @@ export const CommentMark = Mark.create({
     return {
       commentId: {
         default: null,
-        parseHTML: (element) => element.getAttribute("data-comment-id"),
+        parseHTML: (element) => element.getAttribute('data-comment-id'),
         renderHTML: (attributes) => {
           if (!attributes.commentId) return {};
-          return { "data-comment-id": attributes.commentId };
+          return { 'data-comment-id': attributes.commentId };
         },
       },
     };
   },
 
   parseHTML() {
-    return [{ tag: "span[data-comment-id]" }];
+    return [{ tag: 'span[data-comment-id]' }];
   },
 
   renderHTML({ HTMLAttributes }) {
-    return [
-      "span",
-      mergeAttributes(this.options.HTMLAttributes, HTMLAttributes),
-      0,
-    ];
+    return ['span', mergeAttributes(this.options.HTMLAttributes, HTMLAttributes), 0];
   },
 
   addCommands() {
@@ -60,9 +56,9 @@ export const CommentMark = Mark.create({
   addKeyboardShortcuts() {
     return {
       // Mod+Shift+C to add a comment (generates a random ID for demo)
-      "Mod-Shift-c": () => {
+      'Mod-Shift-c': () => {
         const commentId = `comment-${Date.now()}`;
-        console.log("[CommentMark] Creating comment with ID:", commentId);
+        console.log('[CommentMark] Creating comment with ID:', commentId);
         return this.editor.commands.setComment(commentId);
       },
     };
@@ -70,7 +66,7 @@ export const CommentMark = Mark.create({
 });
 
 // Type augmentation for Tiptap commands
-declare module "@tiptap/core" {
+declare module '@tiptap/core' {
   interface Commands<ReturnType> {
     comment: {
       setComment: (commentId: string) => ReturnType;

@@ -1,0 +1,39 @@
+{
+  "id": "/shipyard/",
+  "name": "Shipyard",
+  "short_name": "Shipyard",
+  "description": "Agent verification workspace. Build, track, and ship verified work with human-in-the-loop collaboration and P2P sync.",
+  "start_url": "/shipyard/",
+  "scope": "/shipyard/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0D9488",
+  "orientation": "any",
+  "categories": ["productivity", "developer-tools", "utilities"],
+  "icons": [
+    {
+      "src": "/shipyard/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/shipyard/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/shipyard/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/shipyard/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

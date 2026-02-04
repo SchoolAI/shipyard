@@ -1,16 +1,16 @@
 /**
  * PID-based lock file management for daemon singleton.
  *
- * Ensures only one daemon instance runs at a time per worktree.
+ * Ensures only one daemon instance runs at a time.
  * Uses atomic file creation (wx flag) to prevent race conditions.
  *
  * Ported from apps/daemon-legacy/src/lock-manager.ts
  */
 
-import { mkdirSync, unlinkSync } from "node:fs";
-import { readFile, unlink, writeFile } from "node:fs/promises";
-import { dirname } from "node:path";
-import { getLockFilePath, getStateDir } from "./paths.js";
+import { mkdirSync, unlinkSync } from 'node:fs';
+import { readFile, unlink, writeFile } from 'node:fs/promises';
+import { dirname } from 'node:path';
+import { getLockFilePath, getStateDir } from './paths.js';
 
 const MAX_LOCK_RETRIES = 3;
 
@@ -18,89 +18,89 @@ const MAX_LOCK_RETRIES = 3;
  * Type guard for NodeJS.ErrnoException.
  */
 function isErrnoException(err: unknown): err is NodeJS.ErrnoException {
-	if (!(err instanceof Error)) return false;
-	if (!("code" in err)) return false;
-	return typeof err.code === "string" || typeof err.code === "undefined";
+  if (!(err instanceof Error)) return false;
+  if (!('code' in err)) return false;
+  return typeof err.code === 'string' || typeof err.code === 'undefined';
 }
 
 /**
  * Check if an error has a specific code.
  */
 function hasErrorCode(error: unknown, code: string): boolean {
-	if (!isErrnoException(error)) {
-		return false;
-	}
-	return error.code === code;
+  if (!isErrnoException(error)) {
+    return false;
+  }
+  return error.code === code;
 }
 
 /**
  * Read the PID from the lock file.
  */
 async function readLockHolderPid(): Promise<number | null> {
-	try {
-		const content = await readFile(getLockFilePath(), "utf-8");
-		const pidStr = content.split("\n")[0] ?? "";
-		return Number.parseInt(pidStr, 10);
-	} catch {
-		return null;
-	}
+  try {
+    const content = await readFile(getLockFilePath(), 'utf-8');
+    const pidStr = content.split('\n')[0] ?? '';
+    return Number.parseInt(pidStr, 10);
+  } catch {
+    return null;
+  }
 }
 
 /**
  * Check if a process is alive by sending signal 0.
  */
 function isProcessAlive(pid: number): boolean {
-	try {
-		process.kill(pid, 0);
-		return true;
-	} catch {
-		return false;
-	}
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /**
  * Try to remove a stale lock file.
  */
 async function tryRemoveStaleLock(_stalePid: number): Promise<boolean> {
-	try {
-		await unlink(getLockFilePath());
-		return true;
-	} catch {
-		return false;
-	}
+  try {
+    await unlink(getLockFilePath());
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /**
  * Register a cleanup handler to remove lock on process exit.
  */
 function registerLockCleanupHandler(): void {
-	const lockFile = getLockFilePath();
-	process.once("exit", () => {
-		try {
-			unlinkSync(lockFile);
-		} catch {
-			/** Lock may already be cleaned up */
-		}
-	});
+  const lockFile = getLockFilePath();
+  process.once('exit', () => {
+    try {
+      unlinkSync(lockFile);
+    } catch {
+      /** Lock may already be cleaned up */
+    }
+  });
 }
 
 /**
  * Handle an existing lock file - check if holder is alive.
  */
 async function handleExistingLock(retryCount: number): Promise<boolean> {
-	const pid = await readLockHolderPid();
-	if (pid === null) return false;
+  const pid = await readLockHolderPid();
+  if (pid === null) return false;
 
-	if (isProcessAlive(pid)) {
-		return false;
-	}
+  if (isProcessAlive(pid)) {
+    return false;
+  }
 
-	if (retryCount >= MAX_LOCK_RETRIES) {
-		return false;
-	}
+  if (retryCount >= MAX_LOCK_RETRIES) {
+    return false;
+  }
 
-	await tryRemoveStaleLock(pid);
-	return tryAcquireLock(retryCount + 1);
+  await tryRemoveStaleLock(pid);
+  return tryAcquireLock(retryCount + 1);
 }
 
 /**
@@ -110,56 +110,56 @@ async function handleExistingLock(retryCount: number): Promise<boolean> {
  * @returns true if lock acquired, false if another daemon is running
  */
 export async function tryAcquireLock(retryCount = 0): Promise<boolean> {
-	try {
-		const stateDir = getStateDir();
-		const lockFile = getLockFilePath();
+  try {
+    const stateDir = getStateDir();
+    const lockFile = getLockFilePath();
 
-		mkdirSync(stateDir, { recursive: true });
+    mkdirSync(stateDir, { recursive: true });
 
-		await writeFile(lockFile, `${process.pid}\n${Date.now()}`, { flag: "wx" });
+    await writeFile(lockFile, `${process.pid}\n${Date.now()}`, { flag: 'wx' });
 
-		registerLockCleanupHandler();
+    registerLockCleanupHandler();
 
-		return true;
-	} catch (err) {
-		if (hasErrorCode(err, "EEXIST")) {
-			return handleExistingLock(retryCount);
-		}
-		return false;
-	}
+    return true;
+  } catch (err) {
+    if (hasErrorCode(err, 'EEXIST')) {
+      return handleExistingLock(retryCount);
+    }
+    return false;
+  }
 }
 
 /**
  * Release the daemon lock.
  */
 export async function releaseLock(): Promise<void> {
-	try {
-		await unlink(getLockFilePath());
-	} catch {
-		/** Lock file may already be cleaned up by exit handler */
-	}
+  try {
+    await unlink(getLockFilePath());
+  } catch {
+    /** Lock file may already be cleaned up by exit handler */
+  }
 }
 
 /**
  * Check if the daemon lock is held (and holder is alive).
  */
 export function isLocked(): boolean {
-	try {
-		const { readFileSync, existsSync } = require("node:fs");
-		const lockPath = getLockFilePath();
+  try {
+    const { readFileSync, existsSync } = require('node:fs');
+    const lockPath = getLockFilePath();
 
-		if (!existsSync(lockPath)) return false;
+    if (!existsSync(lockPath)) return false;
 
-		const content = readFileSync(lockPath, "utf-8");
-		const pidStr = content.split("\n")[0] ?? "";
-		const pid = Number.parseInt(pidStr, 10);
+    const content = readFileSync(lockPath, 'utf-8');
+    const pidStr = content.split('\n')[0] ?? '';
+    const pid = Number.parseInt(pidStr, 10);
 
-		if (Number.isNaN(pid)) return false;
+    if (Number.isNaN(pid)) return false;
 
-		return isProcessAlive(pid);
-	} catch {
-		return false;
-	}
+    return isProcessAlive(pid);
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -169,28 +169,28 @@ export function isLocked(): boolean {
  * @returns true if lock acquired, false if another daemon is running
  */
 export function acquireLock(): boolean {
-	const { existsSync, readFileSync, writeFileSync } = require("node:fs");
-	const lockPath = getLockFilePath();
+  const { existsSync, readFileSync, writeFileSync } = require('node:fs');
+  const lockPath = getLockFilePath();
 
-	if (existsSync(lockPath)) {
-		try {
-			const pid = Number.parseInt(readFileSync(lockPath, "utf-8").trim(), 10);
-			if (!Number.isNaN(pid)) {
-				if (isProcessAlive(pid)) {
-					return false;
-				}
-				unlinkSync(lockPath);
-			}
-		} catch {}
-	}
+  if (existsSync(lockPath)) {
+    try {
+      const pid = Number.parseInt(readFileSync(lockPath, 'utf-8').trim(), 10);
+      if (!Number.isNaN(pid)) {
+        if (isProcessAlive(pid)) {
+          return false;
+        }
+        unlinkSync(lockPath);
+      }
+    } catch {}
+  }
 
-	mkdirSync(dirname(lockPath), { recursive: true });
+  mkdirSync(dirname(lockPath), { recursive: true });
 
-	try {
-		writeFileSync(lockPath, String(process.pid), { flag: "wx" });
-		registerLockCleanupHandler();
-		return true;
-	} catch {
-		return false;
-	}
+  try {
+    writeFileSync(lockPath, String(process.pid), { flag: 'wx' });
+    registerLockCleanupHandler();
+    return true;
+  } catch {
+    return false;
+  }
 }

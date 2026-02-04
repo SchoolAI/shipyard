@@ -6,7 +6,7 @@
  * @see docs/whips/daemon-mcp-server-merge.md#4-use-loro-extended-adapters
  */
 
-import { WebRtcDataChannelAdapter } from "@loro-extended/adapter-webrtc";
+import { WebRtcDataChannelAdapter } from '@loro-extended/adapter-webrtc';
 
 export { WebRtcDataChannelAdapter };
 
@@ -34,5 +34,5 @@ export { WebRtcDataChannelAdapter };
  * ```
  */
 export function createWebRtcAdapter(): WebRtcDataChannelAdapter {
-	return new WebRtcDataChannelAdapter();
+  return new WebRtcDataChannelAdapter();
 }

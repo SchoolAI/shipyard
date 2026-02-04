@@ -1,10 +1,7 @@
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-import { defineConfig } from "vitest/config";
-import {
-	DEFAULT_TIER_THRESHOLDS,
-	generateCoverageThresholds,
-} from "../../scripts/analyze-fan-in";
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { defineConfig } from 'vitest/config';
+import { DEFAULT_TIER_THRESHOLDS, generateCoverageThresholds } from '../../scripts/analyze-fan-in';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -14,35 +11,31 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
  * Disable with: DISABLE_FANIN_COVERAGE=1
  */
 const fanInEnabled = !process.env.DISABLE_FANIN_COVERAGE;
-const fanInThresholds = generateCoverageThresholds(
-	"./src",
-	DEFAULT_TIER_THRESHOLDS,
-	fanInEnabled,
-);
+const fanInThresholds = generateCoverageThresholds('./src', DEFAULT_TIER_THRESHOLDS, fanInEnabled);
 
 export default defineConfig({
-	test: {
-		passWithNoTests: true,
-		retry: 0,
-		globals: true,
+  test: {
+    passWithNoTests: true,
+    retry: 0,
+    globals: true,
 
-		coverage: {
-			provider: "istanbul",
-			reporter: ["text", "html", "json-summary", "lcov"],
-			reportsDirectory: "./coverage",
-			include: ["src/**/*.ts"],
-			exclude: [
-				"src/**/*.test.ts",
-				"src/**/*.spec.ts",
-				"src/**/test-utils/**",
-				"src/**/__tests__/**",
-			],
-			thresholds: {
-				functions: 30,
-				...fanInThresholds,
-			},
-		},
+    coverage: {
+      provider: 'istanbul',
+      reporter: ['text', 'html', 'json-summary', 'lcov'],
+      reportsDirectory: './coverage',
+      include: ['src/**/*.ts'],
+      exclude: [
+        'src/**/*.test.ts',
+        'src/**/*.spec.ts',
+        'src/**/test-utils/**',
+        'src/**/__tests__/**',
+      ],
+      thresholds: {
+        functions: 30,
+        ...fanInThresholds,
+      },
+    },
 
-		exclude: ["node_modules", "dist"],
-	},
+    exclude: ['node_modules', 'dist'],
+  },
 });

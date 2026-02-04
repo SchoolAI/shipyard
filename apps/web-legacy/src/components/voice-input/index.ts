@@ -1,1 +1,1 @@
-export { VoiceInputButton } from "./VoiceInputButton";
+export { VoiceInputButton } from './VoiceInputButton';

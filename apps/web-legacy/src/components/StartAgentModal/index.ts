@@ -1,2 +1,2 @@
-export type { StartAgentModalProps } from "./StartAgentModal";
-export { StartAgentModal } from "./StartAgentModal";
+export type { StartAgentModalProps } from './StartAgentModal';
+export { StartAgentModal } from './StartAgentModal';

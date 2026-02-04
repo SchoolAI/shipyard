@@ -12,36 +12,36 @@
  * @see docs/whips/daemon-mcp-server-merge.md#spawn-agent-flow
  */
 
-import type { ChildProcess } from "node:child_process";
-import { execSync, spawn } from "node:child_process";
-import { existsSync } from "node:fs";
-import { mkdir, writeFile } from "node:fs/promises";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-import type { TaskDocument } from "@shipyard/loro-schema";
-import { nanoid } from "nanoid";
-import { z } from "zod";
-import type { Env } from "../env.js";
-import { getLogger } from "../utils/logger.js";
-import { getAgent, hasAgent, trackAgent, untrackAgent } from "./tracker.js";
+import type { ChildProcess } from 'node:child_process';
+import { execSync, spawn } from 'node:child_process';
+import { existsSync, readFileSync } from 'node:fs';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import type { TaskDocument } from '@shipyard/loro-schema';
+import { nanoid } from 'nanoid';
+import { z } from 'zod';
+import type { Env } from '../env.js';
+import { getLogger } from '../utils/logger.js';
+import { getAgent, hasAgent, trackAgent, untrackAgent } from './tracker.js';
 
 /**
  * Options for spawning an agent.
  */
 export interface SpawnAgentOptions {
-	taskId: string;
-	prompt: string;
-	cwd: string;
+  taskId: string;
+  prompt: string;
+  cwd: string;
 }
 
 /**
  * Zod schema for A2A message part.
  */
 const A2AMessagePartSchema = z.object({
-	type: z.string(),
-	text: z.string().optional(),
-	data: z.unknown().optional(),
-	uri: z.string().optional(),
+  type: z.string(),
+  text: z.string().optional(),
+  data: z.unknown().optional(),
+  uri: z.string().optional(),
 });
 
 /**
@@ -49,12 +49,12 @@ const A2AMessagePartSchema = z.object({
  * Validates conversation context messages for agent spawning.
  */
 const A2AMessageSchema = z.object({
-	messageId: z.string(),
-	role: z.enum(["user", "agent"]),
-	parts: z.array(A2AMessagePartSchema),
-	contextId: z.string().optional(),
-	taskId: z.string().optional(),
-	metadata: z.record(z.string(), z.unknown()).optional(),
+  messageId: z.string(),
+  role: z.enum(['user', 'agent']),
+  parts: z.array(A2AMessagePartSchema),
+  contextId: z.string().optional(),
+  taskId: z.string().optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
 /**
@@ -66,20 +66,20 @@ export type A2AMessage = z.infer<typeof A2AMessageSchema>;
  * Options for spawning with conversation context.
  */
 export interface SpawnWithContextOptions {
-	taskId: string;
-	cwd: string;
-	a2aPayload: {
-		messages: A2AMessage[];
-		meta: { planId?: string };
-	};
+  taskId: string;
+  cwd: string;
+  a2aPayload: {
+    messages: A2AMessage[];
+    meta: { planId?: string };
+  };
 }
 
 /**
  * Result of spawning with context.
  */
 export interface SpawnWithContextResult {
-	child: ChildProcess;
-	sessionId: string;
+  child: ChildProcess;
+  sessionId: string;
 }
 
 /**
@@ -99,7 +99,7 @@ let spawnerEnv: Env | null = null;
  * Must be called before using any spawn functions.
  */
 export function initSpawner(env: Env): void {
-	spawnerEnv = env;
+  spawnerEnv = env;
 }
 
 /**
@@ -107,10 +107,10 @@ export function initSpawner(env: Env): void {
  * Throws if not initialized.
  */
 function getEnv(): Env {
-	if (!spawnerEnv) {
-		throw new Error("Spawner not initialized. Call initSpawner() first.");
-	}
-	return spawnerEnv;
+  if (!spawnerEnv) {
+    throw new Error('Spawner not initialized. Call initSpawner() first.');
+  }
+  return spawnerEnv;
 }
 
 /**
@@ -119,89 +119,182 @@ function getEnv(): Env {
  * Returns a release function that must be called when the spawn is complete.
  */
 async function acquireSpawnLock(taskId: string): Promise<() => void> {
-	while (true) {
-		const existingLock = spawnLocks.get(taskId);
-		if (existingLock) {
-			await existingLock;
-			continue;
-		}
-		let releaseLock!: () => void;
-		const lockPromise = new Promise<void>((resolve) => {
-			releaseLock = resolve;
-		});
-		spawnLocks.set(taskId, lockPromise);
-		return () => {
-			spawnLocks.delete(taskId);
-			releaseLock();
-		};
-	}
+  while (true) {
+    const existingLock = spawnLocks.get(taskId);
+    if (existingLock) {
+      await existingLock;
+      continue;
+    }
+    let releaseLock!: () => void;
+    const lockPromise = new Promise<void>((resolve) => {
+      releaseLock = resolve;
+    });
+    spawnLocks.set(taskId, lockPromise);
+    return () => {
+      spawnLocks.delete(taskId);
+      releaseLock();
+    };
+  }
 }
 
 /**
  * Get the path to the Claude CLI executable.
  */
 function getClaudePath(): string {
-	try {
-		return execSync("which claude", { encoding: "utf-8" }).trim();
-	} catch {
-		return "claude";
-	}
+  try {
+    return execSync('which claude', { encoding: 'utf-8' }).trim();
+  } catch {
+    return 'claude';
+  }
 }
 
 /**
- * Build the system prompt that identifies the agent as a Shipyard autonomous agent.
+ * Build the comprehensive system prompt for Shipyard autonomous agents.
  */
 function buildShipyardSystemPrompt(taskId: string): string {
-	const env = getEnv();
-	const taskUrl = `${env.WEB_URL}/task/${taskId}`;
-	return `[SHIPYARD AUTONOMOUS AGENT]
+  const env = getEnv();
+  const taskUrl = `${env.WEB_URL}/task/${taskId}`;
 
-You are working on an existing Shipyard task.
+  return `[SHIPYARD AUTONOMOUS AGENT]
 
-Task ID: ${taskId}
-Browser View: ${taskUrl}
+## Your Task Context
 
-The human created this task in the browser and is viewing your progress.
+- **Task ID**: ${taskId}
+- **Browser View**: ${taskUrl}
+- **Environment Variable**: SHIPYARD_TASK_ID=${taskId}
 
-Use the Shipyard MCP tools to read the task and upload artifacts as you complete deliverables.`;
+The human created this task in the browser and is viewing your progress at the URL above.
+
+## Workflow
+
+You are running autonomously to complete a Shipyard task that was already created.
+
+### Critical Instructions
+
+1. **DO NOT create a new task** - You are ALREADY in an existing task
+2. **Read the task first** - Call \`read_task(taskId, sessionToken)\` to see what to build
+3. **Work autonomously** - Don't wait for approval, just do the work
+4. **Upload artifacts** - Call \`add_artifact(...)\` for each deliverable as you complete them
+5. **Use \`requestUserInput()\`** - If you need clarification, ask via browser modal (inside \`execute_code\`)
+
+### Step-by-Step
+
+\`\`\`typescript
+// 1. Read the task to understand what to build
+const task = await readTask(taskId, sessionToken);
+// Returns: { content, deliverables: [{ id, text, completed }], status, ... }
+
+// 2. Do the work described in task.content
+// ... implement the feature, build the app, etc ...
+
+// 3. Upload artifacts as you go
+await addArtifact({
+  taskId,
+  sessionToken,
+  type: 'image',
+  filename: 'screenshot.png',
+  source: 'file',
+  filePath: '/tmp/screenshot.png',
+  deliverableId: task.deliverables[0].id,
+  description: 'Screenshot of working feature'
+});
+
+// 4. Repeat for all deliverables
+// When the last deliverable gets an artifact, task auto-completes
+\`\`\`
+
+## User Input
+
+**THE primary human-agent communication channel in Shipyard.** ALWAYS use this instead of platform-specific question tools.
+
+If you need to ask the human a question during work, use \`requestUserInput()\` inside \`execute_code\`:
+
+\`\`\`typescript
+const result = await requestUserInput({
+  type: 'text',
+  message: 'What color scheme should I use?',
+  isBlocker: false  // Set true to pause work until answered
+});
+
+if (result.success && result.response) {
+  console.log('User said:', result.response);
+}
+\`\`\`
+
+## What are Deliverables?
+
+Deliverables are measurable outcomes you can prove with artifacts (screenshots, videos, test results).
+
+Good deliverables (provable):
+\`\`\`
+- [ ] Screenshot of working login page {#deliverable}
+- [ ] Video showing feature in action {#deliverable}
+- [ ] Test results showing all tests pass {#deliverable}
+\`\`\`
+
+Bad deliverables (implementation details, not provable):
+\`\`\`
+- [ ] Implement getUserMedia API  ← This is a task, not a deliverable
+- [ ] Add error handling          ← Can't prove this with an artifact
+\`\`\`
+
+## Artifact Types
+
+- **image**: PNG, JPG screenshots of UI, terminal output, diagrams
+- **video**: MP4 recordings of feature demos, user flows
+- **html**: Standalone HTML pages, reports, test results
+
+## Important Notes
+
+- **DO NOT call \`create_task()\`** - The task already exists, you're working on it
+- **DO NOT use the Shipyard skill** - These instructions are everything you need
+- **DO use \`execute_code\`** - All Shipyard APIs are available inside it
+- **DO use \`requestUserInput()\`** - For asking questions during work
+- **Working directory** - Save temporary files to your cwd, they'll be available for upload
+
+## Tips
+
+- Read the task FIRST to understand deliverables before starting work
+- Take screenshots/videos as you go (don't wait until the end)
+- Use \`requestUserInput()\` if unclear - don't guess requirements
+- Session token is required for all API calls - get it from \`readTask()\` response`;
 }
 
 /**
  * Build MCP config arguments for the spawned Claude process.
+ * Passes config as inline JSON string using --mcp-config flag.
+ * Claude Code supports both file paths and JSON strings for this flag.
  */
-function buildMcpConfigArgs(mcpConfigPath: string | null): string[] {
-	const logger = getLogger();
-	if (mcpConfigPath) {
-		logger.info({ mcpConfigPath }, "Using MCP config");
-		return ["--mcp-config", mcpConfigPath];
-	}
-	logger.warn("No MCP config found - Shipyard tools will not be available");
-	return [];
+function buildMcpConfigArgs(mcpConfigJson: string | null): string[] {
+  const logger = getLogger();
+  if (mcpConfigJson) {
+    logger.info('Using inline MCP config JSON');
+    return ['--mcp-config', mcpConfigJson];
+  }
+  logger.warn('No MCP config found - Shipyard tools will not be available');
+  return [];
 }
 
 /**
  * Build common spawn arguments shared between spawn functions.
  */
-async function buildCommonSpawnArgs(
-	taskId: string,
-	mcpConfigPath: string | null,
-): Promise<string[]> {
-	const env = getEnv();
-	const logger = getLogger();
-	const systemPrompt = buildShipyardSystemPrompt(taskId);
+function buildCommonSpawnArgs(taskId: string, mcpConfigJson: string | null): string[] {
+  const env = getEnv();
+  const logger = getLogger();
+  const systemPrompt = buildShipyardSystemPrompt(taskId);
 
-	const args = ["--dangerously-skip-permissions"];
+  const args = ['--dangerously-skip-permissions'];
 
-	if (env.LOG_LEVEL === "debug") {
-		const debugLogPath = `/tmp/shipyard-agent-${taskId}-debug.log`;
-		args.push("--debug", "api,hooks", "--debug-file", debugLogPath);
-		logger.info({ debugLogPath }, "Debug logging enabled for spawned agent");
-	}
+  if (env.LOG_LEVEL === 'debug') {
+    const debugLogPath = `/tmp/shipyard-agent-${taskId}-debug.log`;
+    args.push('--debug', 'api,hooks', '--debug-file', debugLogPath);
+    logger.info({ debugLogPath }, 'Debug logging enabled for spawned agent');
+  }
 
-	args.push("--append-system-prompt", systemPrompt);
-	args.push(...buildMcpConfigArgs(mcpConfigPath));
+  args.push('--append-system-prompt', systemPrompt);
+  args.push(...buildMcpConfigArgs(mcpConfigJson));
 
-	return args;
+  return args;
 }
 
 /**
@@ -209,100 +302,105 @@ async function buildCommonSpawnArgs(
  * Used to validate individual server configs when resolving paths.
  */
 const McpServerConfigSchema = z
-	.object({
-		args: z.array(z.unknown()).optional(),
-	})
-	.passthrough();
+  .object({
+    args: z.array(z.unknown()).optional(),
+  })
+  .passthrough();
 
 /**
- * Resolves MCP config with absolute paths and writes to temp file.
+ * Resolves MCP config with absolute paths and returns as JSON string.
  * This ensures relative paths in .mcp.json work regardless of spawned agent's cwd.
+ *
+ * Claude Code's --mcp-config flag accepts both file paths and JSON strings,
+ * so we serialize directly to JSON instead of writing to a temp file.
  */
-async function getResolvedMcpConfigPath(): Promise<string | null> {
-	const logger = getLogger();
-	const currentFile = fileURLToPath(import.meta.url);
-	const serverDir = dirname(currentFile);
-	const projectRoot = resolve(serverDir, "../../../..");
+function getResolvedMcpConfigJson(): string | null {
+  const logger = getLogger();
+  const currentFile = fileURLToPath(import.meta.url);
+  const serverDir = dirname(currentFile);
+  const projectRoot = resolve(serverDir, '../../..');
 
-	const candidates = [
-		join(projectRoot, ".mcp.json"),
-		join(process.cwd(), ".mcp.json"),
-	];
+  const candidates = [join(projectRoot, '.mcp.json'), join(process.cwd(), '.mcp.json')];
 
-	let sourcePath: string | null = null;
-	for (const path of candidates) {
-		if (existsSync(path)) {
-			sourcePath = path;
-			break;
-		}
-	}
+  let sourcePath: string | null = null;
+  for (const path of candidates) {
+    if (existsSync(path)) {
+      sourcePath = path;
+      break;
+    }
+  }
 
-	if (!sourcePath) {
-		return null;
-	}
+  if (!sourcePath) {
+    return null;
+  }
 
-	const {
-		readFile,
-		writeFile: writeFileFn,
-		mkdir: mkdirFn,
-	} = await import("node:fs/promises");
-	const { tmpdir } = await import("node:os");
+  const configContent = readFileSync(sourcePath, 'utf-8');
+  let config: { mcpServers?: Record<string, unknown> };
+  try {
+    config = JSON.parse(configContent);
+  } catch (err) {
+    throw new Error(
+      `Failed to parse MCP config at ${sourcePath}: ${err instanceof Error ? err.message : String(err)}`
+    );
+  }
 
-	const configContent = await readFile(sourcePath, "utf-8");
-	let config: { mcpServers?: Record<string, unknown> };
-	try {
-		config = JSON.parse(configContent);
-	} catch (err) {
-		throw new Error(
-			`Failed to parse MCP config at ${sourcePath}: ${err instanceof Error ? err.message : String(err)}`,
-		);
-	}
+  if (config.mcpServers) {
+    for (const [serverName, serverConfig] of Object.entries(config.mcpServers)) {
+      if (!serverConfig || typeof serverConfig !== 'object') continue;
+      const parseResult = McpServerConfigSchema.safeParse(serverConfig);
+      if (!parseResult.success) continue;
 
-	if (config.mcpServers) {
-		for (const [_serverName, serverConfig] of Object.entries(
-			config.mcpServers,
-		)) {
-			if (!serverConfig || typeof serverConfig !== "object") continue;
-			const parseResult = McpServerConfigSchema.safeParse(serverConfig);
-			if (!parseResult.success) continue;
-			const server = parseResult.data;
-			if (server.args) {
-				server.args = server.args.map((arg: unknown) => {
-					if (typeof arg !== "string") return arg;
-					if (
-						arg.includes("/") &&
-						!arg.startsWith("/") &&
-						!arg.startsWith("-")
-					) {
-						const absolutePath = resolve(projectRoot, arg);
-						if (existsSync(absolutePath)) {
-							return absolutePath;
-						}
-					}
-					return arg;
-				});
-			}
-		}
-	}
+      // Mutate the ORIGINAL config object, not the Zod-parsed copy
+      const originalServer = serverConfig as Record<string, unknown>;
+      if (Array.isArray(originalServer.args)) {
+        originalServer.args = originalServer.args.map((arg: unknown) => {
+          if (typeof arg !== 'string') return arg;
+          if (arg.includes('/') && !arg.startsWith('/') && !arg.startsWith('-')) {
+            const absolutePath = resolve(projectRoot, arg);
+            logger.debug(
+              {
+                serverName,
+                arg,
+                absolutePath,
+                exists: existsSync(absolutePath),
+              },
+              'Resolving MCP config path'
+            );
+            if (existsSync(absolutePath)) {
+              logger.info(
+                { serverName, relativePath: arg, absolutePath },
+                'Resolved MCP config path to absolute'
+              );
+              return absolutePath;
+            }
+            logger.warn(
+              { serverName, arg, absolutePath },
+              'MCP config path not found, keeping relative'
+            );
+          }
+          return arg;
+        });
+      }
+    }
+  }
 
-	const tempDir = join(tmpdir(), "shipyard-server");
-	await mkdirFn(tempDir, { recursive: true });
-	const tempConfigPath = join(tempDir, "mcp-config.json");
-	await writeFileFn(tempConfigPath, JSON.stringify(config, null, 2), "utf-8");
-
-	logger.info({ tempConfigPath }, "Created resolved MCP config");
-	return tempConfigPath;
+  const jsonString = JSON.stringify(config);
+  logger.info(
+    { sourcePath, configLength: jsonString.length },
+    'Resolved MCP config to JSON string'
+  );
+  return jsonString;
 }
 
 /**
  * Stop any existing agent for a task before spawning a new one.
  */
 function stopExistingAgentIfRunning(taskId: string): void {
-	const logger = getLogger();
-	if (hasAgent(taskId)) {
-		logger.info({ taskId }, "Stopping existing agent");
-		stopAgent(taskId);
-	}
+  const logger = getLogger();
+  if (hasAgent(taskId)) {
+    logger.info({ taskId }, 'Stopping existing agent');
+    stopAgent(taskId);
+  }
 }
 
 /**
@@ -310,24 +408,20 @@ function stopExistingAgentIfRunning(taskId: string): void {
  * Logs spawn request to file instead of executing Claude Code (which isn't available in containers).
  * Returns a mock process that immediately exits to avoid breaking callers.
  */
-async function shimClaudeSpawn(
-	taskId: string,
-	args: string[],
-	cwd: string,
-): Promise<ChildProcess> {
-	const env = getEnv();
-	const logger = getLogger();
-	const logDir = env.CLAUDE_SHIM_LOG_DIR;
-	const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-	const logFile = join(logDir, `claude-spawn-${taskId}-${timestamp}.log`);
+async function shimClaudeSpawn(taskId: string, args: string[], cwd: string): Promise<ChildProcess> {
+  const env = getEnv();
+  const logger = getLogger();
+  const logDir = env.CLAUDE_SHIM_LOG_DIR;
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const logFile = join(logDir, `claude-spawn-${taskId}-${timestamp}.log`);
 
-	await mkdir(logDir, { recursive: true });
+  await mkdir(logDir, { recursive: true });
 
-	const logContent = `=== Claude Spawn Request (Docker Mode) ===
+  const logContent = `=== Claude Spawn Request (Docker Mode) ===
 Timestamp: ${new Date().toISOString()}
 Task ID: ${taskId}
 Working Directory: ${cwd}
-Arguments: ${args.join(" ")}
+Arguments: ${args.join(' ')}
 Environment:
   SHIPYARD_TASK_ID=${taskId}
   WEB_URL=${env.WEB_URL}
@@ -336,57 +430,57 @@ Environment:
 For prompt evaluation, see daemon-logs volume.
 `;
 
-	await writeFile(logFile, logContent, "utf-8");
-	logger.info({ taskId, logFile }, "[DOCKER_MODE] Claude spawn shimmed");
+  await writeFile(logFile, logContent, 'utf-8');
+  logger.info({ taskId, logFile }, '[DOCKER_MODE] Claude spawn shimmed');
 
-	const mockProcess = spawn("echo", ["Claude spawn shimmed"]);
-	trackAgent(taskId, mockProcess);
-	return mockProcess;
+  const mockProcess = spawn('echo', ['Claude spawn shimmed']);
+  trackAgent(taskId, mockProcess);
+  return mockProcess;
 }
 
 /**
  * Log a spawn_started event to the Loro task document.
  */
 function logSpawnStarted(
-	taskDoc: TaskDocument,
-	requestId: string,
-	pid: number,
-	actor: string,
+  taskDoc: TaskDocument,
+  requestId: string,
+  pid: number,
+  actor: string
 ): void {
-	taskDoc.logEvent("spawn_started", actor, {
-		requestId,
-		pid,
-	});
+  taskDoc.logEvent('spawn_started', actor, {
+    requestId,
+    pid,
+  });
 }
 
 /**
  * Log a spawn_completed event to the Loro task document.
  */
 function logSpawnCompleted(
-	taskDoc: TaskDocument,
-	requestId: string,
-	exitCode: number,
-	actor: string,
+  taskDoc: TaskDocument,
+  requestId: string,
+  exitCode: number,
+  actor: string
 ): void {
-	taskDoc.logEvent("spawn_completed", actor, {
-		requestId,
-		exitCode,
-	});
+  taskDoc.logEvent('spawn_completed', actor, {
+    requestId,
+    exitCode,
+  });
 }
 
 /**
  * Log a spawn_failed event to the Loro task document.
  */
 function logSpawnFailed(
-	taskDoc: TaskDocument,
-	requestId: string,
-	error: string,
-	actor: string,
+  taskDoc: TaskDocument,
+  requestId: string,
+  error: string,
+  actor: string
 ): void {
-	taskDoc.logEvent("spawn_failed", actor, {
-		requestId,
-		error,
-	});
+  taskDoc.logEvent('spawn_failed', actor, {
+    requestId,
+    error,
+  });
 }
 
 /**
@@ -397,83 +491,90 @@ function logSpawnFailed(
  * @returns The spawned ChildProcess
  */
 export async function spawnClaudeCode(
-	opts: SpawnAgentOptions,
-	taskDoc?: TaskDocument,
+  opts: SpawnAgentOptions,
+  taskDoc?: TaskDocument
 ): Promise<ChildProcess> {
-	const { taskId, prompt, cwd } = opts;
-	const env = getEnv();
-	const logger = getLogger();
-	const requestId = nanoid();
-	const actor = "system";
+  const { taskId, prompt, cwd } = opts;
+  const env = getEnv();
+  const logger = getLogger();
+  const requestId = nanoid();
+  const actor = 'system';
 
-	const releaseLock = await acquireSpawnLock(taskId);
+  const releaseLock = await acquireSpawnLock(taskId);
 
-	try {
-		stopExistingAgentIfRunning(taskId);
+  try {
+    stopExistingAgentIfRunning(taskId);
 
-		await mkdir(cwd, { recursive: true });
+    await mkdir(cwd, { recursive: true });
 
-		if (env.DOCKER_MODE) {
-			const mcpConfigPath = await getResolvedMcpConfigPath();
-			const commonArgs = await buildCommonSpawnArgs(taskId, mcpConfigPath);
-			const args = ["-p", prompt, ...commonArgs];
-			const child = await shimClaudeSpawn(taskId, args, cwd);
+    const mcpConfigJson = getResolvedMcpConfigJson();
+    const commonArgs = buildCommonSpawnArgs(taskId, mcpConfigJson);
+    const args = ['-p', prompt, ...commonArgs];
 
-			if (taskDoc && child.pid) {
-				logSpawnStarted(taskDoc, requestId, child.pid, actor);
-			}
+    if (env.DOCKER_MODE) {
+      const child = await shimClaudeSpawn(taskId, args, cwd);
 
-			return child;
-		}
+      if (taskDoc && child.pid) {
+        logSpawnStarted(taskDoc, requestId, child.pid, actor);
+      }
 
-		const claudePath = getClaudePath();
-		const mcpConfigPath = await getResolvedMcpConfigPath();
-		const commonArgs = await buildCommonSpawnArgs(taskId, mcpConfigPath);
-		const args = ["-p", prompt, ...commonArgs];
+      return child;
+    }
 
-		logger.info(
-			{ taskId, command: claudePath, args: args.join(" "), cwd },
-			"Spawning Claude Code",
-		);
+    const claudePath = getClaudePath();
 
-		const child = spawn(claudePath, args, {
-			cwd,
-			stdio: ["ignore", "pipe", "pipe"],
-			env: {
-				...process.env,
-				SHIPYARD_TASK_ID: taskId,
-			},
-		});
+    logger.info({ taskId, command: claudePath, args: args.join(' '), cwd }, 'Spawning Claude Code');
 
-		child.on("error", (err) => {
-			logger.error({ taskId, err: err.message }, "Spawn error");
-			if (taskDoc) {
-				logSpawnFailed(taskDoc, requestId, err.message, actor);
-			}
-		});
+    const child = spawn(claudePath, args, {
+      cwd,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      env: {
+        ...process.env,
+        SHIPYARD_TASK_ID: taskId,
+      },
+    });
 
-		child.on("exit", (code) => {
-			if (taskDoc) {
-				logSpawnCompleted(taskDoc, requestId, code ?? 0, actor);
-			}
-		});
+    // Capture stderr for debugging
+    let stderrOutput = '';
+    if (child.stderr) {
+      child.stderr.on('data', (data: Buffer) => {
+        stderrOutput += data.toString();
+      });
+    }
 
-		trackAgent(taskId, child);
+    child.on('error', (err) => {
+      logger.error({ taskId, err: err.message }, 'Spawn error');
+      if (taskDoc) {
+        logSpawnFailed(taskDoc, requestId, err.message, actor);
+      }
+    });
 
-		if (taskDoc && child.pid) {
-			logSpawnStarted(taskDoc, requestId, child.pid, actor);
-		}
+    child.on('exit', (code, signal) => {
+      logger.info(
+        { taskId, exitCode: code, signal, stderrOutput: stderrOutput.slice(0, 1000) },
+        'Agent process exited'
+      );
+      if (taskDoc) {
+        logSpawnCompleted(taskDoc, requestId, code ?? 0, actor);
+      }
+    });
 
-		return child;
-	} catch (err) {
-		const errorMessage = err instanceof Error ? err.message : String(err);
-		if (taskDoc) {
-			logSpawnFailed(taskDoc, requestId, errorMessage, actor);
-		}
-		throw err;
-	} finally {
-		releaseLock();
-	}
+    trackAgent(taskId, child);
+
+    if (taskDoc && child.pid) {
+      logSpawnStarted(taskDoc, requestId, child.pid, actor);
+    }
+
+    return child;
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    if (taskDoc) {
+      logSpawnFailed(taskDoc, requestId, errorMessage, actor);
+    }
+    throw err;
+  } finally {
+    releaseLock();
+  }
 }
 
 /**
@@ -481,24 +582,19 @@ export async function spawnClaudeCode(
  * Ported from @shipyard/schema claude-paths.ts
  */
 function getProjectPath(planId?: string): string {
-	const env = getEnv();
-	const safePlanId = planId?.replace(/[^a-zA-Z0-9_-]/g, "") || "";
-	const projectName = safePlanId
-		? `shipyard-${safePlanId.slice(0, 8)}`
-		: "shipyard";
-	return join(env.CLAUDE_PROJECTS_DIR, projectName);
+  const env = getEnv();
+  const safePlanId = planId?.replace(/[^a-zA-Z0-9_-]/g, '') || '';
+  const projectName = safePlanId ? `shipyard-${safePlanId.slice(0, 8)}` : 'shipyard';
+  return join(env.CLAUDE_PROJECTS_DIR, projectName);
 }
 
 /**
  * Gets the full path for a session transcript file.
  * Ported from @shipyard/schema claude-paths.ts
  */
-function getSessionTranscriptPath(
-	projectPath: string,
-	sessionId: string,
-): string {
-	const safeSessionId = sessionId.replace(/[^a-zA-Z0-9_-]/g, "");
-	return join(projectPath, `${safeSessionId}.jsonl`);
+function getSessionTranscriptPath(projectPath: string, sessionId: string): string {
+  const safeSessionId = sessionId.replace(/[^a-zA-Z0-9_-]/g, '');
+  return join(projectPath, `${safeSessionId}.jsonl`);
 }
 
 /**
@@ -506,7 +602,7 @@ function getSessionTranscriptPath(
  * Uses Zod schema validation to check the A2AMessage structure.
  */
 function isA2AMessage(msg: unknown): msg is A2AMessage {
-	return A2AMessageSchema.safeParse(msg).success;
+  return A2AMessageSchema.safeParse(msg).success;
 }
 
 /**
@@ -514,25 +610,25 @@ function isA2AMessage(msg: unknown): msg is A2AMessage {
  * Simple validation that checks required fields.
  */
 function validateA2AMessages(messages: unknown[]): {
-	valid: A2AMessage[];
-	errors: Array<{ index: number; error: string }>;
+  valid: A2AMessage[];
+  errors: Array<{ index: number; error: string }>;
 } {
-	const valid: A2AMessage[] = [];
-	const errors: Array<{ index: number; error: string }> = [];
+  const valid: A2AMessage[] = [];
+  const errors: Array<{ index: number; error: string }> = [];
 
-	for (let i = 0; i < messages.length; i++) {
-		const msg = messages[i];
-		if (isA2AMessage(msg)) {
-			valid.push(msg);
-		} else {
-			errors.push({
-				index: i,
-				error: "Invalid A2A message structure",
-			});
-		}
-	}
+  for (let i = 0; i < messages.length; i++) {
+    const msg = messages[i];
+    if (isA2AMessage(msg)) {
+      valid.push(msg);
+    } else {
+      errors.push({
+        index: i,
+        error: 'Invalid A2A message structure',
+      });
+    }
+  }
 
-	return { valid, errors };
+  return { valid, errors };
 }
 
 /**
@@ -540,64 +636,64 @@ function validateA2AMessages(messages: unknown[]): {
  * Simplified conversion that handles text and data parts.
  */
 function a2aToClaudeCode(
-	messages: A2AMessage[],
-	sessionId: string,
+  messages: A2AMessage[],
+  sessionId: string
 ): Array<{
-	sessionId: string;
-	type: string;
-	message: { role: string; content: Array<{ type: string; text?: string }> };
-	uuid: string;
-	timestamp: string;
-	parentUuid?: string;
+  sessionId: string;
+  type: string;
+  message: { role: string; content: Array<{ type: string; text?: string }> };
+  uuid: string;
+  timestamp: string;
+  parentUuid?: string;
 }> {
-	let parentUuid: string | undefined;
+  let parentUuid: string | undefined;
 
-	return messages.map((msg) => {
-		const uuid = msg.messageId;
-		const role = msg.role === "user" ? "user" : "assistant";
-		const type = msg.role === "user" ? "user" : "assistant";
+  return messages.map((msg) => {
+    const uuid = msg.messageId;
+    const role = msg.role === 'user' ? 'user' : 'assistant';
+    const type = msg.role === 'user' ? 'user' : 'assistant';
 
-		const content = msg.parts.map((part) => {
-			if (part.type === "text" && part.text) {
-				return { type: "text", text: part.text };
-			}
-			if (part.type === "data") {
-				return {
-					type: "text",
-					text: `[Data: ${JSON.stringify(part.data)}]`,
-				};
-			}
-			return { type: "text", text: `[${part.type}]` };
-		});
+    const content = msg.parts.map((part) => {
+      if (part.type === 'text' && part.text) {
+        return { type: 'text', text: part.text };
+      }
+      if (part.type === 'data') {
+        return {
+          type: 'text',
+          text: `[Data: ${JSON.stringify(part.data)}]`,
+        };
+      }
+      return { type: 'text', text: `[${part.type}]` };
+    });
 
-		const result = {
-			sessionId,
-			type,
-			message: { role, content },
-			uuid,
-			timestamp: new Date().toISOString(),
-			...(parentUuid && { parentUuid }),
-		};
+    const result = {
+      sessionId,
+      type,
+      message: { role, content },
+      uuid,
+      timestamp: new Date().toISOString(),
+      ...(parentUuid && { parentUuid }),
+    };
 
-		parentUuid = uuid;
-		return result;
-	});
+    parentUuid = uuid;
+    return result;
+  });
 }
 
 /**
  * Format messages as JSONL string.
  */
 function formatAsClaudeCodeJSONL(
-	messages: Array<{
-		sessionId: string;
-		type: string;
-		message: { role: string; content: unknown[] };
-		uuid: string;
-		timestamp: string;
-		parentUuid?: string;
-	}>,
+  messages: Array<{
+    sessionId: string;
+    type: string;
+    message: { role: string; content: unknown[] };
+    uuid: string;
+    timestamp: string;
+    parentUuid?: string;
+  }>
 ): string {
-	return messages.map((msg) => JSON.stringify(msg)).join("\n");
+  return messages.map((msg) => JSON.stringify(msg)).join('\n');
 }
 
 /**
@@ -609,113 +705,117 @@ function formatAsClaudeCodeJSONL(
  * @returns The spawned ChildProcess and sessionId
  */
 export async function spawnClaudeCodeWithContext(
-	opts: SpawnWithContextOptions,
-	taskDoc?: TaskDocument,
+  opts: SpawnWithContextOptions,
+  taskDoc?: TaskDocument
 ): Promise<SpawnWithContextResult> {
-	const { taskId, cwd, a2aPayload } = opts;
-	const env = getEnv();
-	const logger = getLogger();
-	const requestId = nanoid();
-	const actor = "system";
+  const { taskId, cwd, a2aPayload } = opts;
+  const env = getEnv();
+  const logger = getLogger();
+  const requestId = nanoid();
+  const actor = 'system';
 
-	const releaseLock = await acquireSpawnLock(taskId);
+  const releaseLock = await acquireSpawnLock(taskId);
 
-	try {
-		stopExistingAgentIfRunning(taskId);
+  try {
+    stopExistingAgentIfRunning(taskId);
 
-		await mkdir(cwd, { recursive: true });
+    await mkdir(cwd, { recursive: true });
 
-		if (!Array.isArray(a2aPayload.messages)) {
-			throw new Error("a2aPayload.messages must be an array");
-		}
+    if (!Array.isArray(a2aPayload.messages)) {
+      throw new Error('a2aPayload.messages must be an array');
+    }
 
-		const { valid, errors } = validateA2AMessages(a2aPayload.messages);
-		if (errors.length > 0) {
-			throw new Error(
-				`Invalid A2A messages: ${errors.map((e) => e.error).join(", ")}`,
-			);
-		}
+    const { valid, errors } = validateA2AMessages(a2aPayload.messages);
+    if (errors.length > 0) {
+      throw new Error(`Invalid A2A messages: ${errors.map((e) => e.error).join(', ')}`);
+    }
 
-		if (valid.length === 0) {
-			throw new Error("Cannot spawn agent with empty conversation");
-		}
+    if (valid.length === 0) {
+      throw new Error('Cannot spawn agent with empty conversation');
+    }
 
-		const sessionId = nanoid();
-		const claudeMessages = a2aToClaudeCode(valid, sessionId);
-		const jsonl = formatAsClaudeCodeJSONL(claudeMessages);
+    const sessionId = nanoid();
+    const claudeMessages = a2aToClaudeCode(valid, sessionId);
+    const jsonl = formatAsClaudeCodeJSONL(claudeMessages);
 
-		const planId = a2aPayload.meta.planId ?? taskId;
+    const planId = a2aPayload.meta.planId ?? taskId;
 
-		const projectPath = getProjectPath(planId);
-		await mkdir(projectPath, { recursive: true });
+    const projectPath = getProjectPath(planId);
+    await mkdir(projectPath, { recursive: true });
 
-		const transcriptPath = getSessionTranscriptPath(projectPath, sessionId);
-		await writeFile(transcriptPath, jsonl, "utf-8");
+    const transcriptPath = getSessionTranscriptPath(projectPath, sessionId);
+    await writeFile(transcriptPath, jsonl, 'utf-8');
 
-		logger.info({ taskId, transcriptPath }, "Created session file");
+    logger.info({ taskId, transcriptPath }, 'Created session file');
 
-		const claudePath = getClaudePath();
-		const mcpConfigPath = await getResolvedMcpConfigPath();
-		const commonArgs = await buildCommonSpawnArgs(taskId, mcpConfigPath);
-		const args = [
-			"-r",
-			sessionId,
-			"-p",
-			"Continue working on this task.",
-			...commonArgs,
-		];
+    const mcpConfigJson = getResolvedMcpConfigJson();
+    const commonArgs = buildCommonSpawnArgs(taskId, mcpConfigJson);
+    const args = ['-r', sessionId, '-p', 'Continue working on this task.', ...commonArgs];
 
-		if (env.DOCKER_MODE) {
-			const child = await shimClaudeSpawn(taskId, args, cwd);
-			if (taskDoc && child.pid) {
-				logSpawnStarted(taskDoc, requestId, child.pid, actor);
-			}
-			return { child, sessionId };
-		}
+    if (env.DOCKER_MODE) {
+      const child = await shimClaudeSpawn(taskId, args, cwd);
+      if (taskDoc && child.pid) {
+        logSpawnStarted(taskDoc, requestId, child.pid, actor);
+      }
+      return { child, sessionId };
+    }
 
-		logger.info(
-			{ taskId, sessionId, command: claudePath, args: args.join(" "), cwd },
-			"Spawning Claude Code with session",
-		);
+    const claudePath = getClaudePath();
+    logger.info(
+      { taskId, sessionId, command: claudePath, args: args.join(' '), cwd },
+      'Spawning Claude Code with session'
+    );
 
-		const child = spawn(claudePath, args, {
-			cwd,
-			stdio: ["ignore", "pipe", "pipe"],
-			env: {
-				...process.env,
-				SHIPYARD_TASK_ID: taskId,
-			},
-		});
+    const child = spawn(claudePath, args, {
+      cwd,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      env: {
+        ...process.env,
+        SHIPYARD_TASK_ID: taskId,
+      },
+    });
 
-		child.on("error", (err) => {
-			logger.error({ taskId, err: err.message }, "Spawn error");
-			if (taskDoc) {
-				logSpawnFailed(taskDoc, requestId, err.message, actor);
-			}
-		});
+    // Capture stderr for debugging
+    let stderrOutput = '';
+    if (child.stderr) {
+      child.stderr.on('data', (data: Buffer) => {
+        stderrOutput += data.toString();
+      });
+    }
 
-		child.on("exit", (code) => {
-			if (taskDoc) {
-				logSpawnCompleted(taskDoc, requestId, code ?? 0, actor);
-			}
-		});
+    child.on('error', (err) => {
+      logger.error({ taskId, err: err.message }, 'Spawn error');
+      if (taskDoc) {
+        logSpawnFailed(taskDoc, requestId, err.message, actor);
+      }
+    });
 
-		trackAgent(taskId, child);
+    child.on('exit', (code, signal) => {
+      logger.info(
+        { taskId, exitCode: code, signal, stderrOutput: stderrOutput.slice(0, 1000) },
+        'Agent process exited'
+      );
+      if (taskDoc) {
+        logSpawnCompleted(taskDoc, requestId, code ?? 0, actor);
+      }
+    });
 
-		if (taskDoc && child.pid) {
-			logSpawnStarted(taskDoc, requestId, child.pid, actor);
-		}
+    trackAgent(taskId, child);
 
-		return { child, sessionId };
-	} catch (err) {
-		const errorMessage = err instanceof Error ? err.message : String(err);
-		if (taskDoc) {
-			logSpawnFailed(taskDoc, requestId, errorMessage, actor);
-		}
-		throw err;
-	} finally {
-		releaseLock();
-	}
+    if (taskDoc && child.pid) {
+      logSpawnStarted(taskDoc, requestId, child.pid, actor);
+    }
+
+    return { child, sessionId };
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    if (taskDoc) {
+      logSpawnFailed(taskDoc, requestId, errorMessage, actor);
+    }
+    throw err;
+  } finally {
+    releaseLock();
+  }
 }
 
 /**
@@ -726,14 +826,14 @@ export async function spawnClaudeCodeWithContext(
  * @returns true if agent was found and stopped, false if no agent was running for this task
  */
 export function stopAgent(taskId: string): boolean {
-	const logger = getLogger();
-	const agent = getAgent(taskId);
-	if (!agent) {
-		return false;
-	}
+  const logger = getLogger();
+  const agent = getAgent(taskId);
+  if (!agent) {
+    return false;
+  }
 
-	agent.process.kill("SIGTERM");
-	untrackAgent(taskId);
-	logger.info({ taskId }, "Stopped agent");
-	return true;
+  agent.process.kill('SIGTERM');
+  untrackAgent(taskId);
+  logger.info({ taskId }, 'Stopped agent');
+  return true;
 }

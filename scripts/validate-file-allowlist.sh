@@ -58,7 +58,6 @@ ALLOWED_SCRIPTS=(
   "scripts/setup-hooks-dev.sh"
   "scripts/restore-hooks-prod.sh"
   "scripts/claude-shim.sh"
-  "scripts/worktree-env.sh"
   "scripts/generate-icons.py"
   "scripts/inspect-plan.mjs"
   "scripts/check-file-allowlist.sh"

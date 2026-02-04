@@ -4,7 +4,7 @@ import { test } from '@playwright/test';
 
 const SCREENSHOTS_DIR = join(process.cwd(), 'screenshots');
 
-// Use VITE_PORT env var for worktree support, otherwise default to 5173
+// Use VITE_PORT env var if set, otherwise default to 5173
 const VITE_PORT = process.env.VITE_PORT || '5173';
 const BASE_URL = `http://localhost:${VITE_PORT}`;
 

@@ -1,204 +1,170 @@
-/**
- * MCP stdio server setup.
- *
- * Configures the Model Context Protocol server with Shipyard tools.
- * Handles stdio transport to Claude Code.
- */
-
-import { Server } from "@modelcontextprotocol/sdk/server/index.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
 import {
-	CallToolRequestSchema,
-	ErrorCode,
-	ListToolsRequestSchema,
-	McpError,
-} from "@modelcontextprotocol/sdk/types.js";
-import { getLogger } from "../utils/logger.js";
-import { registerTools } from "./tools/index.js";
+  CallToolRequestSchema,
+  ErrorCode,
+  ListToolsRequestSchema,
+  McpError,
+} from '@modelcontextprotocol/sdk/types.js';
+import { getLogger } from '../utils/logger.js';
+import { registerTools } from './tools/index.js';
 
-/**
- * MCP tool handler function signature.
- */
 export type ToolHandler = (args: unknown) => Promise<{
-	content: Array<{ type: string; text: string }>;
-	isError?: boolean;
+  content: Array<{ type: string; text: string }>;
+  isError?: boolean;
 }>;
 
-/**
- * MCP tool input schema property definition.
- * Supports JSON Schema-like property definitions.
- */
 export interface ToolInputSchemaProperty {
-	type: string;
-	description?: string;
-	enum?: readonly string[];
-	items?: ToolInputSchemaProperty;
-	nullable?: boolean;
-	properties?: Record<string, ToolInputSchemaProperty>;
-	required?: readonly string[];
+  type: string;
+  description?: string;
+  enum?: readonly string[];
+  items?: ToolInputSchemaProperty;
+  nullable?: boolean;
+  properties?: Record<string, ToolInputSchemaProperty>;
+  required?: readonly string[];
 }
 
-/**
- * MCP tool input schema definition.
- */
 export interface ToolInputSchema {
-	[key: string]: ToolInputSchemaProperty;
+  [key: string]: ToolInputSchemaProperty;
 }
 
-/**
- * Tool definition stored internally.
- */
 interface ToolDefinition {
-	name: string;
-	description: string;
-	inputSchema: {
-		type: "object";
-		properties: ToolInputSchema;
-		required?: string[];
-	};
+  name: string;
+  description: string;
+  inputSchema: {
+    type: 'object';
+    properties: ToolInputSchema;
+    required?: string[];
+  };
 }
 
-/**
- * Internal tool registry.
- */
 interface ToolRegistry {
-	definitions: Map<string, ToolDefinition>;
-	handlers: Map<string, ToolHandler>;
+  definitions: Map<string, ToolDefinition>;
+  handlers: Map<string, ToolHandler>;
 }
 
-/**
- * MCP Server instance type.
- * Follows the pattern from @modelcontextprotocol/sdk where tools are registered
- * with definitions and handlers.
- */
 export interface McpServer {
-	/**
-	 * Register a tool with the MCP server.
-	 * @param name - Unique tool name
-	 * @param description - Tool description for LLM
-	 * @param inputSchema - JSON schema for tool inputs
-	 * @param handler - Async function to handle tool calls
-	 */
-	tool(
-		name: string,
-		description: string,
-		inputSchema: ToolInputSchema,
-		handler: ToolHandler,
-	): void;
-
-	/** Connect to transport and start handling requests */
-	connect(transport: StdioServerTransport): Promise<void>;
-
-	/** Get the underlying MCP SDK server */
-	getSdkServer(): Server;
+  tool(name: string, description: string, inputSchema: ToolInputSchema, handler: ToolHandler): void;
+  connect(transport: WebStandardStreamableHTTPServerTransport): Promise<void>;
+  getSdkServer(): Server;
 }
 
-/**
- * Create and configure the MCP server with all Shipyard tools.
- */
+let mcpServer: McpServer | null = null;
+let mcpTransport: WebStandardStreamableHTTPServerTransport | null = null;
+
 export function createMcpServer(): McpServer {
-	const log = getLogger();
+  const log = getLogger();
 
-	/** Create the MCP SDK server */
-	const sdkServer = new Server(
-		{
-			name: "shipyard",
-			version: "0.1.0",
-		},
-		{
-			capabilities: {
-				tools: {},
-			},
-			instructions: `IMPORTANT: When working with Shipyard, use requestUserInput() inside execute_code for ALL human interaction instead of platform-specific question tools (AskUserQuestion, etc.). The human is in the browser viewing your plan - that's where they expect to interact with you.`,
-		},
-	);
+  const sdkServer = new Server(
+    {
+      name: 'shipyard',
+      version: '0.1.0',
+    },
+    {
+      capabilities: {
+        tools: {},
+      },
+      instructions: `IMPORTANT: When working with Shipyard, use requestUserInput() inside execute_code for ALL human interaction instead of platform-specific question tools (AskUserQuestion, etc.). The human is in the browser viewing your plan - that's where they expect to interact with you.`,
+    }
+  );
 
-	/** Tool registry for definitions and handlers */
-	const registry: ToolRegistry = {
-		definitions: new Map(),
-		handlers: new Map(),
-	};
+  const registry: ToolRegistry = {
+    definitions: new Map(),
+    handlers: new Map(),
+  };
 
-	/** McpServer wrapper that exposes tool() registration */
-	const server: McpServer = {
-		tool(
-			name: string,
-			description: string,
-			inputSchema: ToolInputSchema,
-			handler: ToolHandler,
-		): void {
-			log.debug({ name }, "Registering tool");
+  const server: McpServer = {
+    tool(
+      name: string,
+      description: string,
+      inputSchema: ToolInputSchema,
+      handler: ToolHandler
+    ): void {
+      log.debug({ name }, 'Registering tool');
 
-			registry.definitions.set(name, {
-				name,
-				description,
-				inputSchema: {
-					type: "object",
-					properties: inputSchema,
-				},
-			});
-			registry.handlers.set(name, handler);
-		},
+      registry.definitions.set(name, {
+        name,
+        description,
+        inputSchema: {
+          type: 'object',
+          properties: inputSchema,
+        },
+      });
+      registry.handlers.set(name, handler);
+    },
 
-		async connect(transport: StdioServerTransport): Promise<void> {
-			await sdkServer.connect(transport);
-		},
+    async connect(transport: WebStandardStreamableHTTPServerTransport): Promise<void> {
+      await sdkServer.connect(transport);
+    },
 
-		getSdkServer(): Server {
-			return sdkServer;
-		},
-	};
+    getSdkServer(): Server {
+      return sdkServer;
+    },
+  };
 
-	/** Register all tools */
-	registerTools(server);
-	log.info({ toolCount: registry.definitions.size }, "Tools registered");
+  registerTools(server);
+  log.info({ toolCount: registry.definitions.size }, 'Tools registered');
 
-	/** Handle list tools request */
-	sdkServer.setRequestHandler(ListToolsRequestSchema, async () => ({
-		tools: Array.from(registry.definitions.values()),
-	}));
+  sdkServer.setRequestHandler(ListToolsRequestSchema, async () => ({
+    tools: Array.from(registry.definitions.values()),
+  }));
 
-	/** Handle call tool request */
-	sdkServer.setRequestHandler(CallToolRequestSchema, async (request) => {
-		const { name, arguments: args } = request.params;
+  sdkServer.setRequestHandler(CallToolRequestSchema, async (request) => {
+    const { name, arguments: args } = request.params;
 
-		const handler = registry.handlers.get(name);
-		if (!handler) {
-			throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${name}`);
-		}
+    const handler = registry.handlers.get(name);
+    if (!handler) {
+      throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${name}`);
+    }
 
-		log.info({ tool: name }, "Executing tool");
+    log.info({ tool: name }, 'Executing tool');
 
-		try {
-			return await handler(args ?? {});
-		} catch (error) {
-			const message =
-				error instanceof Error ? error.message : "Unknown error occurred";
-			log.error({ tool: name, error: message }, "Tool execution failed");
+    try {
+      return await handler(args ?? {});
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error occurred';
+      log.error({ tool: name, error: message }, 'Tool execution failed');
 
-			return {
-				content: [{ type: "text", text: `Error: ${message}` }],
-				isError: true,
-			};
-		}
-	});
+      return {
+        content: [{ type: 'text', text: `Error: ${message}` }],
+        isError: true,
+      };
+    }
+  });
 
-	return server;
+  return server;
 }
 
-/**
- * Start the MCP server with stdio transport.
- * Called when running in MCP mode (not daemon mode).
- */
-export async function startMcpServer(): Promise<void> {
-	const log = getLogger();
+export function initMcpServer(): void {
+  const log = getLogger();
 
-	log.info("Starting MCP server with stdio transport");
+  if (mcpServer !== null) {
+    log.warn('MCP server already initialized');
+    return;
+  }
 
-	const server = createMcpServer();
-	const transport = new StdioServerTransport();
+  mcpServer = createMcpServer();
+  mcpTransport = new WebStandardStreamableHTTPServerTransport({
+    enableJsonResponse: true,
+  });
 
-	await server.connect(transport);
+  mcpServer.connect(mcpTransport).then(() => {
+    log.info('MCP server connected to HTTP transport');
+  });
+}
 
-	log.info("MCP server connected to stdio transport");
+export function getMcpServer(): McpServer {
+  if (mcpServer === null) {
+    throw new Error('MCP server not initialized - call initMcpServer() first');
+  }
+  return mcpServer;
+}
+
+export function getMcpTransport(): WebStandardStreamableHTTPServerTransport | null {
+  return mcpTransport;
+}
+
+export function resetMcpServer(): void {
+  mcpServer = null;
+  mcpTransport = null;
 }

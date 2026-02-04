@@ -22,7 +22,6 @@ export {
   type TaskLinkedPR,
   type ChangeSnapshot,
   type SyncedFileChange,
-
   // Global room schema and types
   GlobalRoomSchema,
   type GlobalRoomShape,

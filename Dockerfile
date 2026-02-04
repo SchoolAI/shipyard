@@ -3,9 +3,9 @@
 # Stages:
 #   - base: Common dependencies, pnpm setup, schema build
 #   - registry: MCP server with WebSocket sync
-#   - signaling: WebRTC signaling server
+#   - session: WebRTC signaling + OAuth server
 #   - web: Vite dev server with HMR
-#   - oauth: GitHub OAuth worker (Wrangler)
+#   - oauth: GitHub OAuth worker (Wrangler) - DEPRECATED
 #   - og-proxy: OpenGraph proxy worker (Wrangler)
 #   - daemon: Agent launcher daemon
 #
@@ -34,7 +34,7 @@ COPY tsconfig.base.json turbo.json biome.json ./
 COPY packages/schema/package.json packages/schema/
 COPY packages/shared/package.json packages/shared/
 COPY apps/server/package.json apps/server/
-COPY apps/signaling/package.json apps/signaling/
+COPY apps/session-server/package.json apps/session-server/
 COPY apps/web/package.json apps/web/
 COPY apps/daemon/package.json apps/daemon/
 COPY apps/github-oauth-worker/package.json apps/github-oauth-worker/
@@ -76,16 +76,16 @@ HEALTHCHECK --interval=10s --timeout=3s --start-period=5s --retries=3 \
 CMD ["node", "apps/server/dist/index.js"]
 
 # =============================================================================
-# SIGNALING STAGE - WebRTC signaling + OAuth server (Cloudflare Wrangler)
+# SESSION STAGE - WebRTC signaling + OAuth server (Cloudflare Wrangler)
 # =============================================================================
-FROM base AS signaling
+FROM base AS session
 
-# Copy signaling source (Cloudflare Worker, runs with wrangler)
-COPY apps/signaling apps/signaling
+# Copy session server source (Cloudflare Worker, runs with wrangler)
+COPY apps/session-server apps/session-server
 
 EXPOSE 4444
 
-# Health check - signaling server has /health endpoint
+# Health check - session server has /health endpoint
 HEALTHCHECK --interval=10s --timeout=3s --start-period=10s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:${PORT:-4444}/health || exit 1
 
@@ -93,7 +93,7 @@ HEALTHCHECK --interval=10s --timeout=3s --start-period=10s --retries=3 \
 # --local flag runs without Cloudflare account
 # --env development uses development environment vars
 # Shell form needed for environment variable expansion
-CMD pnpm --filter @shipyard/signaling exec wrangler dev --env development --port ${PORT:-4444} --local
+CMD pnpm --filter @shipyard/session-server exec wrangler dev --env development --port ${PORT:-4444} --local
 
 # =============================================================================
 # WEB STAGE - Vite dev server with HMR

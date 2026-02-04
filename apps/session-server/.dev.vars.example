@@ -1,0 +1,12 @@
+# Development secrets for wrangler dev
+# Copy to .dev.vars and fill in the values
+
+# GitHub OAuth App credentials (same app used by web app)
+# Get the client secret from: https://github.com/settings/developers
+# Look for the OAuth App with Client ID: Ov23liNnbDyIs6wu4Btd
+GITHUB_CLIENT_ID=Ov23liNnbDyIs6wu4Btd
+GITHUB_CLIENT_SECRET=your_client_secret_here
+
+# JWT signing secret (at least 32 characters)
+# For local dev, any random string works. For production, use a secure random value.
+JWT_SECRET=test_jwt_secret_for_local_development_only_minimum_32_chars

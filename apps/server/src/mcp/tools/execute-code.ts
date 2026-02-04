@@ -9,21 +9,17 @@
  * @see docs/whips/daemon-mcp-server-merge.md#mcp-tools
  */
 
-import { z } from "zod";
-import { logger } from "../../utils/logger.js";
-import type { McpServer } from "../index.js";
-import {
-	createSandboxContext,
-	executeInSandbox,
-	serializeError,
-} from "../sandbox/index.js";
+import { z } from 'zod';
+import { logger } from '../../utils/logger.js';
+import type { McpServer } from '../index.js';
+import { createSandboxContext, executeInSandbox, serializeError } from '../sandbox/index.js';
 
 /** Tool name constant */
-const TOOL_NAME = "execute_code";
+const TOOL_NAME = 'execute_code';
 
 /** Input validation schema */
 const ExecuteCodeInput = z.object({
-	code: z.string().describe("TypeScript code to execute"),
+  code: z.string().describe('TypeScript code to execute'),
 });
 
 /** Bundled documentation for LLM */
@@ -118,54 +114,53 @@ await addArtifact({
  * Register the execute_code tool.
  */
 export function registerExecuteCodeTool(server: McpServer): void {
-	server.tool(
-		TOOL_NAME,
-		BUNDLED_DOCS,
-		{
-			code: {
-				type: "string",
-				description:
-					"TypeScript code to execute with access to all Shipyard APIs",
-			},
-		},
-		async (args: unknown) => {
-			const { code } = ExecuteCodeInput.parse(args);
+  server.tool(
+    TOOL_NAME,
+    BUNDLED_DOCS,
+    {
+      code: {
+        type: 'string',
+        description: 'TypeScript code to execute with access to all Shipyard APIs',
+      },
+    },
+    async (args: unknown) => {
+      const { code } = ExecuteCodeInput.parse(args);
 
-			logger.info({ codeLength: code.length }, "Executing code");
+      logger.info({ codeLength: code.length }, 'Executing code');
 
-			try {
-				/** Create sandbox context with all APIs */
-				const context = createSandboxContext();
+      try {
+        /** Create sandbox context with all APIs */
+        const context = createSandboxContext();
 
-				/** Execute the code */
-				const result = await executeInSandbox(code, context);
+        /** Execute the code */
+        const result = await executeInSandbox(code, context);
 
-				logger.info({ result }, "Code execution complete");
+        logger.info({ result }, 'Code execution complete');
 
-				const content: Array<{ type: string; text: string }> = [
-					{
-						type: "text",
-						text:
-							typeof result === "object"
-								? JSON.stringify(result, null, 2)
-								: String(result ?? "Done"),
-					},
-				];
+        const content: Array<{ type: string; text: string }> = [
+          {
+            type: 'text',
+            text:
+              typeof result === 'object'
+                ? JSON.stringify(result, null, 2)
+                : String(result ?? 'Done'),
+          },
+        ];
 
-				return { content };
-			} catch (error) {
-				const { details, message, stack } = await serializeError(error);
-				logger.error({ error: details, code }, "Code execution failed");
+        return { content };
+      } catch (error) {
+        const { details, message, stack } = await serializeError(error);
+        logger.error({ error: details, code }, 'Code execution failed');
 
-				const errorText = stack
-					? `Execution error: ${message}\n\nStack trace:\n${stack}`
-					: `Execution error: ${message}`;
+        const errorText = stack
+          ? `Execution error: ${message}\n\nStack trace:\n${stack}`
+          : `Execution error: ${message}`;
 
-				return {
-					content: [{ type: "text", text: errorText }],
-					isError: true,
-				};
-			}
-		},
-	);
+        return {
+          content: [{ type: 'text', text: errorText }],
+          isError: true,
+        };
+      }
+    }
+  );
 }

@@ -4,11 +4,11 @@
  */
 
 export const ROUTES = {
-	INBOX: "/inbox",
-	BOARD: "/board",
-	SEARCH: "/search",
-	ARCHIVE: "/archive",
-	TASK: "/task",
+  INBOX: '/inbox',
+  BOARD: '/board',
+  SEARCH: '/search',
+  ARCHIVE: '/archive',
+  TASK: '/task',
 } as const;
 
 /**
@@ -19,5 +19,5 @@ export const ROUTES = {
  * @returns Route path like "/task/abc123"
  */
 export function getPlanRoute(planId: string): string {
-	return `${ROUTES.TASK}/${planId}`;
+  return `${ROUTES.TASK}/${planId}`;
 }

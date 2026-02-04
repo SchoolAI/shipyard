@@ -24,7 +24,7 @@ const localRules = {
             '• JSDoc (/** */) is allowed for documentation\n\n' +
             'Examples of comments to DELETE:\n' +
             '  // Loop through items     ← obvious from code\n' +
-            '  /* Return the result */   ← /* */ doesn\'t bypass the rule\n' +
+            "  /* Return the result */   ← /* */ doesn't bypass the rule\n" +
             '  // Handle errors          ← obvious from catch block\n\n' +
             'Examples of comments to KEEP:\n' +
             '  /** Max 50 to prevent Firestore quota issues */   ← JSDoc OK\n' +

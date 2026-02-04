@@ -51,13 +51,10 @@ PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 # --- Step 1: Kill all shipyard processes ---
 echo "🔪 Step 1: Killing all shipyard processes..."
 
-# Get all PIDs for shipyard directory (excludes worktrees and VS Code)
-# Matches: Working Directory/shipyard/
-# Excludes: shipyard-wt/, biome lsp-proxy, tmux sessions
+# Get all PIDs for shipyard directory (excludes VS Code tooling)
 echo "  Finding shipyard processes..."
 pids=$(ps aux | \
   grep -E "Working Directory/shipyard/" | \
-  grep -v "shipyard-wt" | \
   grep -v "biome lsp-proxy" | \
   grep -v "biome __run_server" | \
   grep -v "tmux" | \
@@ -88,14 +85,8 @@ fi
 echo ""
 echo "🗄️  Step 2: Clearing server-side storage..."
 
-# Auto-detect worktree name to get correct state directory
-WORKTREE_NAME=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || basename "$(pwd)")
-if [ -f "$SCRIPT_DIR/worktree-env.sh" ]; then
-  eval "$("$SCRIPT_DIR/worktree-env.sh" "$WORKTREE_NAME" | grep SHIPYARD_STATE_DIR)"
-  SHIPYARD_DIR="$SHIPYARD_STATE_DIR"
-else
-  SHIPYARD_DIR="$HOME/.shipyard"
-fi
+# Fixed state directory
+SHIPYARD_DIR="$HOME/.shipyard"
 
 if [ -d "$SHIPYARD_DIR/plans" ]; then
   # Count what we're deleting
@@ -163,8 +154,8 @@ fi
 echo ""
 echo "🌐 Step 3: Clearing browser storage..."
 
-# Check if Vite dev server is actually responding (not just stale connections)
-VITE_PORT=${PORT:-5173}
+# Fixed Vite port
+VITE_PORT=5173
 VITE_RUNNING=false
 
 if curl -s --max-time 2 "http://localhost:$VITE_PORT" >/dev/null 2>&1; then

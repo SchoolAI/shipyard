@@ -4,7 +4,6 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import type { Plugin } from 'vite';
 import { defineConfig } from 'vite';
-import topLevelAwait from 'vite-plugin-top-level-await';
 import wasm from 'vite-plugin-wasm';
 
 function githubPagesSpa(): Plugin {
@@ -40,13 +39,7 @@ function githubPagesSpa(): Plugin {
 
 export default defineConfig(({ mode }) => ({
   base: mode === 'production' ? '/shipyard/' : '/',
-  plugins: [
-    wasm(),
-    topLevelAwait(),
-    tailwindcss(),
-    react(),
-    githubPagesSpa(),
-  ],
+  plugins: [wasm(), tailwindcss(), react(), githubPagesSpa()],
   server: {
     port: Number.parseInt(process.env.VITE_PORT || '5173', 10),
     host: true,

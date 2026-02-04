@@ -10,23 +10,23 @@
  */
 
 export type {
-	A2AMessage,
-	SpawnAgentOptions,
-	SpawnWithContextOptions,
-	SpawnWithContextResult,
-} from "./spawner.js";
+  A2AMessage,
+  SpawnAgentOptions,
+  SpawnWithContextOptions,
+  SpawnWithContextResult,
+} from './spawner.js';
 export {
-	initSpawner,
-	spawnClaudeCode,
-	spawnClaudeCodeWithContext,
-	stopAgent,
-} from "./spawner.js";
-export type { ActiveAgent, AgentSummary } from "./tracker.js";
+  initSpawner,
+  spawnClaudeCode,
+  spawnClaudeCodeWithContext,
+  stopAgent,
+} from './spawner.js';
+export type { ActiveAgent, AgentSummary } from './tracker.js';
 export {
-	agentCount,
-	getAgent,
-	hasAgent,
-	listAgents,
-	trackAgent,
-	untrackAgent,
-} from "./tracker.js";
+  agentCount,
+  getAgent,
+  hasAgent,
+  listAgents,
+  trackAgent,
+  untrackAgent,
+} from './tracker.js';

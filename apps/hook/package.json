@@ -60,7 +60,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@shipyard/schema": "workspace:*",
+    "@shipyard/loro-schema": "workspace:*",
     "@shipyard/shared": "workspace:*",
     "@types/bun": "catalog:",
     "bunup": "catalog:",

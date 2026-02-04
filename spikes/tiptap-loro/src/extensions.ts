@@ -1,6 +1,6 @@
-import StarterKit from "@tiptap/starter-kit";
-import Placeholder from "@tiptap/extension-placeholder";
-import { CommentMark } from "./comment-mark";
+import StarterKit from '@tiptap/starter-kit';
+import Placeholder from '@tiptap/extension-placeholder';
+import { CommentMark } from './comment-mark';
 
 /**
  * Tiptap extensions bundle for the spike.

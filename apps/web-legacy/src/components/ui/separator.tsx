@@ -13,4 +13,4 @@
  *
  * <Separator orientation="vertical" />
  */
-export { Separator } from "@heroui/react";
+export { Separator } from '@heroui/react';

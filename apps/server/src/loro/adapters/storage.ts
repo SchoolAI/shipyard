@@ -5,8 +5,8 @@
  * @see docs/whips/daemon-mcp-server-merge.md#4-use-loro-extended-adapters
  */
 
-import { LevelDBStorageAdapter } from "@loro-extended/adapter-leveldb/server";
-import { getDataDir } from "../../utils/paths.js";
+import { LevelDBStorageAdapter } from '@loro-extended/adapter-leveldb/server';
+import { getDataDir } from '../../utils/paths.js';
 
 export type { LevelDBStorageAdapter };
 
@@ -15,6 +15,6 @@ export type { LevelDBStorageAdapter };
  * Uses the Shipyard data directory (~/.shipyard/data).
  */
 export function createStorageAdapter(): LevelDBStorageAdapter {
-	const dbPath = getDataDir();
-	return new LevelDBStorageAdapter(dbPath);
+  const dbPath = getDataDir();
+  return new LevelDBStorageAdapter(dbPath);
 }

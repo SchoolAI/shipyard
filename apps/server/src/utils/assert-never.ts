@@ -15,7 +15,5 @@
  * if not all cases are handled in the switch statement.
  */
 export function assertNever(value: never): never {
-	throw new Error(
-		`Unhandled discriminated union member: ${JSON.stringify(value)}`,
-	);
+  throw new Error(`Unhandled discriminated union member: ${JSON.stringify(value)}`);
 }

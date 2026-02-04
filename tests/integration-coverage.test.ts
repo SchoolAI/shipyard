@@ -29,10 +29,10 @@ const ROOT_DIR = path.resolve(import.meta.dirname, '..');
  * - `description`: Human-readable description for error messages
  */
 interface CoverageRequirement {
-	sourceDir: string;
-	testSuffix: string;
-	sourcePattern: RegExp;
-	description: string;
+  sourceDir: string;
+  testSuffix: string;
+  sourcePattern: RegExp;
+  description: string;
 }
 
 /**
@@ -62,124 +62,124 @@ interface CoverageRequirement {
  * ```
  */
 const COVERAGE_REQUIREMENTS: CoverageRequirement[] = [
-	{
-		sourceDir: 'apps/signaling/src/routes',
-		testSuffix: '.test.ts',
-		sourcePattern: /^(?!.*\.test\.ts$).*\.ts$/,
-		description: 'Signaling Routes',
-	},
-	{
-		sourceDir: 'apps/server/src/http/routes',
-		testSuffix: '.test.ts',
-		sourcePattern: /^(?!.*\.test\.ts$).*\.ts$/,
-		description: 'Server HTTP Routes',
-	},
-	{
-		sourceDir: 'apps/server/src/mcp/tools',
-		testSuffix: '.test.ts',
-		sourcePattern: /^(?!.*\.test\.ts$).*\.ts$/,
-		description: 'Server MCP Tools',
-	},
-	// High fan-in models - TaskDocument and RoomDocument are coordination layers
-	// that will be used across MCP tools, routes, and WebSocket handlers
-	{
-		sourceDir: 'packages/loro-schema/src',
-		testSuffix: '.test.ts',
-		sourcePattern: /^(task-document|room-document)\.ts$/,
-		description: 'Loro Schema High Fan-In Models',
-	},
+  {
+    sourceDir: 'apps/session-server/src/routes',
+    testSuffix: '.test.ts',
+    sourcePattern: /^(?!.*\.test\.ts$).*\.ts$/,
+    description: 'Session Server Routes',
+  },
+  {
+    sourceDir: 'apps/server/src/http/routes',
+    testSuffix: '.test.ts',
+    sourcePattern: /^(?!.*\.test\.ts$).*\.ts$/,
+    description: 'Server HTTP Routes',
+  },
+  {
+    sourceDir: 'apps/server/src/mcp/tools',
+    testSuffix: '.test.ts',
+    sourcePattern: /^(?!.*\.test\.ts$).*\.ts$/,
+    description: 'Server MCP Tools',
+  },
+  // High fan-in models - TaskDocument and RoomDocument are coordination layers
+  // that will be used across MCP tools, routes, and WebSocket handlers
+  {
+    sourceDir: 'packages/loro-schema/src',
+    testSuffix: '.test.ts',
+    sourcePattern: /^(task-document|room-document)\.ts$/,
+    description: 'Loro Schema High Fan-In Models',
+  },
 ];
 
 interface FileInfo {
-	name: string;
-	sourcePath: string;
-	expectedTestPath: string;
-	hasTest: boolean;
+  name: string;
+  sourcePath: string;
+  expectedTestPath: string;
+  hasTest: boolean;
 }
 
 function findSourceFiles(requirement: CoverageRequirement): FileInfo[] {
-	const sourceDir = path.join(ROOT_DIR, requirement.sourceDir);
+  const sourceDir = path.join(ROOT_DIR, requirement.sourceDir);
 
-	if (!fs.existsSync(sourceDir)) {
-		return [];
-	}
+  if (!fs.existsSync(sourceDir)) {
+    return [];
+  }
 
-	const files = fs.readdirSync(sourceDir);
-	const sourceFiles = files.filter((f) => requirement.sourcePattern.test(f));
+  const files = fs.readdirSync(sourceDir);
+  const sourceFiles = files.filter((f) => requirement.sourcePattern.test(f));
 
-	return sourceFiles.map((file) => {
-		const baseName = file.replace(/\.ts$/, '');
-		const expectedTestPath = path.join(sourceDir, `${baseName}${requirement.testSuffix}`);
+  return sourceFiles.map((file) => {
+    const baseName = file.replace(/\.ts$/, '');
+    const expectedTestPath = path.join(sourceDir, `${baseName}${requirement.testSuffix}`);
 
-		return {
-			name: file,
-			sourcePath: path.join(sourceDir, file),
-			expectedTestPath,
-			hasTest: fs.existsSync(expectedTestPath),
-		};
-	});
+    return {
+      name: file,
+      sourcePath: path.join(sourceDir, file),
+      expectedTestPath,
+      hasTest: fs.existsSync(expectedTestPath),
+    };
+  });
 }
 
 function formatMissingTests(files: FileInfo[], requirement: CoverageRequirement): string {
-	const missing = files.filter((f) => !f.hasTest);
+  const missing = files.filter((f) => !f.hasTest);
 
-	if (missing.length === 0) {
-		return '';
-	}
+  if (missing.length === 0) {
+    return '';
+  }
 
-	const lines = [
-		`\n${requirement.description} missing integration tests:`,
-		'',
-		...missing.map((f) => {
-			const relativePath = path.relative(ROOT_DIR, f.expectedTestPath);
-			return `  - ${f.name} → create: ${relativePath}`;
-		}),
-		'',
-		`Total: ${missing.length} file(s) missing tests in ${requirement.sourceDir}`,
-	];
+  const lines = [
+    `\n${requirement.description} missing integration tests:`,
+    '',
+    ...missing.map((f) => {
+      const relativePath = path.relative(ROOT_DIR, f.expectedTestPath);
+      return `  - ${f.name} → create: ${relativePath}`;
+    }),
+    '',
+    `Total: ${missing.length} file(s) missing tests in ${requirement.sourceDir}`,
+  ];
 
-	return lines.join('\n');
+  return lines.join('\n');
 }
 
 describe('Integration Test Coverage', () => {
-	if (COVERAGE_REQUIREMENTS.length === 0) {
-		it.skip('no coverage requirements configured (see TODO in test file)', () => {
-			// This test is skipped until directories are configured
-		});
-		return;
-	}
+  if (COVERAGE_REQUIREMENTS.length === 0) {
+    it.skip('no coverage requirements configured (see TODO in test file)', () => {
+      // This test is skipped until directories are configured
+    });
+    return;
+  }
 
-	for (const requirement of COVERAGE_REQUIREMENTS) {
-		describe(requirement.description, () => {
-			const files = findSourceFiles(requirement);
+  for (const requirement of COVERAGE_REQUIREMENTS) {
+    describe(requirement.description, () => {
+      const files = findSourceFiles(requirement);
 
-			if (files.length === 0) {
-				it.skip(`no source files found in ${requirement.sourceDir}`, () => {
-					// Directory is empty or doesn't exist
-				});
-				return;
-			}
+      if (files.length === 0) {
+        it.skip(`no source files found in ${requirement.sourceDir}`, () => {
+          // Directory is empty or doesn't exist
+        });
+        return;
+      }
 
-			it(`all source files in ${requirement.sourceDir} have integration tests`, () => {
-				const missing = files.filter((f) => !f.hasTest);
+      it(`all source files in ${requirement.sourceDir} have integration tests`, () => {
+        const missing = files.filter((f) => !f.hasTest);
 
-				if (missing.length > 0) {
-					const errorMessage = formatMissingTests(files, requirement);
-					expect.fail(errorMessage);
-				}
+        if (missing.length > 0) {
+          const errorMessage = formatMissingTests(files, requirement);
+          expect.fail(errorMessage);
+        }
 
-				expect(missing).toHaveLength(0);
-			});
+        expect(missing).toHaveLength(0);
+      });
 
-			it(`reports coverage stats for ${requirement.description}`, () => {
-				const covered = files.filter((f) => f.hasTest).length;
-				const total = files.length;
-				const percentage = total > 0 ? Math.round((covered / total) * 100) : 100;
+      it(`reports coverage stats for ${requirement.description}`, () => {
+        const covered = files.filter((f) => f.hasTest).length;
+        const total = files.length;
+        const percentage = total > 0 ? Math.round((covered / total) * 100) : 100;
 
-				console.log(`  ${requirement.description}: ${covered}/${total} (${percentage}%)`);
+        console.log(`  ${requirement.description}: ${covered}/${total} (${percentage}%)`);
 
-				expect(covered).toBe(total);
-			});
-		});
-	}
+        expect(covered).toBe(total);
+      });
+    });
+  }
 });

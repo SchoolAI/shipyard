@@ -7,30 +7,30 @@
  * @see docs/whips/daemon-mcp-server-merge.md#mcp-tools
  */
 
-import { z } from "zod";
-import { parseEnv } from "../../env.js";
-import type { McpServer } from "../index.js";
+import { z } from 'zod';
+import { parseEnv } from '../../env.js';
+import type { McpServer } from '../index.js';
 
 /** Tool name constant */
-const TOOL_NAME = "setup_review_notification";
+const TOOL_NAME = 'setup_review_notification';
 
 /** Input Schema */
 const SetupReviewNotificationInput = z.object({
-	taskId: z.string().describe("Task ID to monitor"),
-	pollIntervalSeconds: z
-		.number()
-		.optional()
-		.default(30)
-		.describe("Polling interval in seconds (default: 30)"),
+  taskId: z.string().describe('Task ID to monitor'),
+  pollIntervalSeconds: z
+    .number()
+    .optional()
+    .default(30)
+    .describe('Polling interval in seconds (default: 30)'),
 });
 
 /**
  * Register the setup_review_notification tool.
  */
 export function registerSetupReviewNotificationTool(server: McpServer): void {
-	server.tool(
-		TOOL_NAME,
-		`Returns a bash script to monitor task review status.
+  server.tool(
+    TOOL_NAME,
+    `Returns a bash script to monitor task review status.
 
 NOTE FOR CLAUDE CODE USERS: If you have the shipyard hook installed, you DON'T need this tool. The hook automatically blocks until the human approves or requests changes. This tool is only for agents WITHOUT hook support.
 
@@ -41,28 +41,28 @@ USAGE (for non-hook agents):
 4. Exits when status becomes 'in_progress' (approved) or 'changes_requested' (needs work)
 
 REQUIREMENTS: The script requires 'jq' for URL encoding. Install with: brew install jq (macOS) or apt install jq (Linux)`,
-		{
-			taskId: { type: "string", description: "Task ID to monitor" },
-			pollIntervalSeconds: {
-				type: "number",
-				description: "Polling interval in seconds (default: 30)",
-			},
-		},
-		async (args: unknown) => {
-			const input = SetupReviewNotificationInput.parse(args);
-			const { taskId, pollIntervalSeconds = 30 } = input;
+    {
+      taskId: { type: 'string', description: 'Task ID to monitor' },
+      pollIntervalSeconds: {
+        type: 'number',
+        description: 'Polling interval in seconds (default: 30)',
+      },
+    },
+    async (args: unknown) => {
+      const input = SetupReviewNotificationInput.parse(args);
+      const { taskId, pollIntervalSeconds = 30 } = input;
 
-			const env = parseEnv();
-			const registryPort = env.PORT;
+      const env = parseEnv();
+      const registryPort = env.PORT;
 
-			/*
-			 * NOTE: With the new Loro architecture, status changes are pushed via CRDT sync
-			 * rather than polled via tRPC. This script is a legacy fallback for non-hook agents.
-			 * In the new architecture, agents should connect via WebSocket and subscribe to
-			 * doc changes directly.
-			 */
+      /*
+       * NOTE: With the new Loro architecture, status changes are pushed via CRDT sync
+       * rather than polled via tRPC. This script is a legacy fallback for non-hook agents.
+       * In the new architecture, agents should connect via WebSocket and subscribe to
+       * doc changes directly.
+       */
 
-			const script = `#!/bin/bash
+      const script = `#!/bin/bash
 # Monitor task "${taskId}" for approval status changes
 # Polls the Shipyard registry server and exits when approved/rejected
 
@@ -114,11 +114,11 @@ while true; do
   # 4. Exit when status is 'in_progress' or 'changes_requested'
 done`;
 
-			return {
-				content: [
-					{
-						type: "text",
-						text: `Notification script for task "${taskId}":
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Notification script for task "${taskId}":
 
 \`\`\`bash
 ${script}
@@ -134,9 +134,9 @@ The script:
 
 **NOTE:** With the new Loro architecture, status changes sync via CRDT rather than polling.
 For production use, consider connecting via WebSocket and subscribing to document changes.`,
-					},
-				],
-			};
-		},
-	);
+          },
+        ],
+      };
+    }
+  );
 }

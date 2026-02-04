@@ -15,7 +15,7 @@
 ---
 
 <div align="center">
-  <img src="docs/assets/hero-inbox-split.png" alt="Shipyard Inbox with Task Detail" width="800">
+  <img src="assets/hero-inbox-split.png" alt="Shipyard Inbox with Task Detail" width="800">
   <p><em>Inbox showing tasks needing review with split panel detail view</em></p>
 </div>
 
@@ -222,10 +222,10 @@ See [skills/shipyard/README.md](./skills/shipyard/README.md) for platform-specif
 <summary><strong>See more screenshots</strong></summary>
 
 ### Kanban Board
-<img src="docs/assets/board-view.png" alt="Kanban board with drag-drop columns" width="600">
+<img src="assets/board-view.png" alt="Kanban board with drag-drop columns" width="600">
 
 ### Full Task Detail
-<img src="docs/assets/task-detail-full.png" alt="Task with deliverables and content" width="600">
+<img src="assets/task-detail-full.png" alt="Task with deliverables and content" width="600">
 
 </details>
 

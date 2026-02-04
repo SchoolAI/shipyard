@@ -1,303 +1,257 @@
 #!/usr/bin/env node
-/**
- * Unified MCP Server + Daemon for Shipyard
- *
- * Entry point that detects mode and starts appropriate services:
- * - Launcher mode (default): Ensures daemon is running, then exits
- * - Daemon mode (--daemon): Background server with Loro sync
- *
- * Startup sequence:
- * 1. Parse CLI args (--daemon flag)
- * 2. Initialize logger
- * 3. Load environment config
- * 4. If --daemon mode:
- *    - Check/acquire daemon lock
- *    - Start WebSocket server
- *    - Create Loro Repo with adapters
- *    - Start HTTP server
- *    - Start MCP server
- *    - Setup graceful shutdown
- * 5. If launcher mode:
- *    - Check if daemon running (GET /health)
- *    - If not running: spawn daemon (detached)
- *    - Poll /health until success
- *    - Exit (daemon continues)
- *
- * @see docs/whips/daemon-mcp-server-merge.md
- */
 
-import { spawn } from "node:child_process";
-import { mkdirSync } from "node:fs";
-import { serve } from "@hono/node-server";
-import { WebSocketServer } from "ws";
-import { initSpawner } from "./agents/spawner.js";
-import { HealthResponseSchema } from "./client/schemas.js";
-import { type Env, parseEnv } from "./env.js";
-import { initGitHubClient } from "./http/helpers/github.js";
-import { type AppContext, createApp } from "./http/routes/index.js";
+import { mkdirSync } from 'node:fs';
+
+import { serve } from '@hono/node-server';
+import { WebSocketServer } from 'ws';
+
+import { initSpawner } from './agents/spawner.js';
+import { type Env, parseEnv } from './env.js';
+import { initGitHubClient } from './http/helpers/github.js';
+import { type AppContext, createApp } from './http/routes/index.js';
 import {
-	startSpawnRequestCleanup,
-	stopSpawnRequestCleanup,
-} from "./loro/handlers.js";
-import { createRepo, resetRepo } from "./loro/repo.js";
-import { startMcpServer } from "./mcp/index.js";
-import { isLocked, releaseLock, tryAcquireLock } from "./utils/daemon-lock.js";
-import { getLogger, initLogger } from "./utils/logger.js";
-import { getStateDir } from "./utils/paths.js";
-
-/** Parse CLI arguments */
-function parseArgs(): { daemon: boolean } {
-	return {
-		daemon: process.argv.includes("--daemon"),
-	};
-}
-
-/** Health check polling configuration */
-const HEALTH_CHECK_INTERVAL_MS = 200;
-const HEALTH_CHECK_MAX_ATTEMPTS = 50;
-const HEALTH_CHECK_TIMEOUT_MS = 1000;
+  startSpawnRequestCleanup,
+  stopAllGitSyncs,
+  stopSpawnRequestCleanup,
+} from './loro/handlers.js';
+import { createRepo, resetRepo } from './loro/repo.js';
+import { startTaskWatcher } from './loro/task-watcher.js';
+import { initMcpServer, resetMcpServer } from './mcp/index.js';
+import { isLocked, releaseLock, tryAcquireLock } from './utils/daemon-lock.js';
+import { getLogger, initLogger } from './utils/logger.js';
+import { getStateDir } from './utils/paths.js';
 
 /**
- * Check if daemon is running by hitting the health endpoint.
+ * Check if daemon is already running and healthy.
  */
-async function isDaemonRunning(port: number): Promise<boolean> {
-	try {
-		const controller = new AbortController();
-		const timeout = setTimeout(
-			() => controller.abort(),
-			HEALTH_CHECK_TIMEOUT_MS,
-		);
-
-		const response = await fetch(`http://127.0.0.1:${port}/health`, {
-			signal: controller.signal,
-		});
-
-		clearTimeout(timeout);
-
-		if (!response.ok) return false;
-
-		const json = await response.json();
-		const result = HealthResponseSchema.safeParse(json);
-		return result.success && result.data.status === "ok";
-	} catch {
-		return false;
-	}
+async function isDaemonHealthy(port: number): Promise<boolean> {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 2000);
+    const response = await fetch(`http://localhost:${port}/health`, {
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+    if (response.ok) {
+      const data = (await response.json()) as { status?: string };
+      return data.status === 'ok';
+    }
+    return false;
+  } catch {
+    return false;
+  }
 }
 
-/**
- * Poll health endpoint until daemon is ready.
- */
-async function waitForDaemon(
-	port: number,
-	maxAttempts: number = HEALTH_CHECK_MAX_ATTEMPTS,
-): Promise<boolean> {
-	for (let attempt = 0; attempt < maxAttempts; attempt++) {
-		if (await isDaemonRunning(port)) {
-			return true;
-		}
-		await new Promise((resolve) =>
-			setTimeout(resolve, HEALTH_CHECK_INTERVAL_MS),
-		);
-	}
-	return false;
-}
-
-/**
- * Spawn daemon as detached background process.
- */
-function spawnDaemon(): void {
-	const scriptPath = process.argv[1];
-	if (!scriptPath) {
-		throw new Error("Cannot determine script path for daemon spawn");
-	}
-
-	const child = spawn(process.execPath, [scriptPath, "--daemon"], {
-		detached: true,
-		stdio: "ignore",
-		env: process.env,
-	});
-
-	child.unref();
-}
-
-/**
- * Launcher mode: ensure daemon is running, then exit.
- */
-async function runLauncher(env: Env): Promise<void> {
-	const log = getLogger();
-	const port = env.PORT;
-
-	log.info({ port }, "Launcher mode: checking if daemon is running");
-
-	if (await isDaemonRunning(port)) {
-		log.info({ port }, "Daemon already running");
-		process.exit(0);
-	}
-
-	if (isLocked()) {
-		log.info("Lock held, waiting for daemon to become ready");
-		const ready = await waitForDaemon(port);
-		if (ready) {
-			log.info({ port }, "Daemon is ready");
-			process.exit(0);
-		}
-		log.error("Daemon failed to become ready within timeout");
-		process.exit(1);
-	}
-
-	log.info("Spawning daemon process");
-	spawnDaemon();
-
-	const ready = await waitForDaemon(port);
-	if (ready) {
-		log.info({ port }, "Daemon started successfully");
-		process.exit(0);
-	}
-
-	log.error("Daemon failed to start within timeout");
-	process.exit(1);
-}
-
-/**
- * Daemon mode: start all services.
- */
 async function runDaemon(env: Env): Promise<void> {
-	const log = getLogger();
-	const port = env.PORT;
+  const log = getLogger();
+  const port = env.PORT;
 
-	log.info({ port, stateDir: getStateDir() }, "Daemon mode: starting services");
+  log.info({ port, stateDir: getStateDir() }, 'Starting shipyard daemon');
 
-	mkdirSync(getStateDir(), { recursive: true });
+  mkdirSync(getStateDir(), { recursive: true });
 
-	const acquired = await tryAcquireLock();
-	if (!acquired) {
-		log.error(
-			"Failed to acquire daemon lock - another instance may be running",
-		);
-		process.exit(1);
-	}
+  // Check if daemon is already running and healthy
+  if (await isDaemonHealthy(port)) {
+    log.info('Healthy daemon already running, exiting');
+    process.exit(0);
+  }
 
-	log.info("Daemon lock acquired");
+  // Check lock file (daemon might be starting or stuck)
+  if (isLocked()) {
+    // Lock exists but health check failed - might be starting up, wait and retry
+    log.info('Lock exists, waiting for daemon to become healthy...');
+    await new Promise((resolve) => setTimeout(resolve, 2000));
 
-	const startTime = Date.now();
+    if (await isDaemonHealthy(port)) {
+      log.info('Daemon became healthy, exiting');
+      process.exit(0);
+    }
 
-	initGitHubClient(env);
+    // Still not healthy - stale lock, try to take over
+    log.warn('Daemon not responding, assuming stale lock');
+  }
 
-	initSpawner(env);
-	log.info("Agent spawner initialized");
+  const acquired = await tryAcquireLock();
+  if (!acquired) {
+    // Another process grabbed the lock while we were checking
+    // Try health check one more time
+    if (await isDaemonHealthy(port)) {
+      log.info('Another daemon started, exiting');
+      process.exit(0);
+    }
+    log.error('Failed to acquire daemon lock and no healthy daemon found');
+    process.exit(1);
+  }
 
-	startSpawnRequestCleanup();
-	log.info("Spawn request cleanup started");
+  log.info('Daemon lock acquired');
 
-	const wss = new WebSocketServer({ noServer: true });
+  const startTime = Date.now();
 
-	createRepo(wss);
-	log.info("Loro Repo created with adapters");
+  initGitHubClient(env);
 
-	const appContext: AppContext = {
-		health: { startTime },
-		github: {
-			getClient: () => null, // TODO: Return actual client when initialized
-			parseRepo: (_planId: string) => null, // TODO: Parse repo from plan metadata
-		},
-	};
-	const app = createApp(appContext);
+  initSpawner(env);
+  log.info('Agent spawner initialized');
 
-	const server = serve({
-		fetch: app.fetch,
-		port,
-	});
+  startSpawnRequestCleanup();
+  log.info('Spawn request cleanup started');
 
-	server.on("upgrade", (request, socket, head) => {
-		wss.handleUpgrade(request, socket, head, (ws) => {
-			wss.emit("connection", ws, request);
-		});
-	});
+  const wss = new WebSocketServer({ noServer: true });
 
-	log.info({ port }, "HTTP server started");
+  createRepo(wss);
+  log.info('Loro Repo created with adapters');
 
-	try {
-		await startMcpServer();
-		log.info("MCP server started");
-	} catch (err) {
-		log.debug({ err }, "MCP server not started (expected in daemon mode)");
-	}
+  const stopWatcher = startTaskWatcher();
+  log.info('Task watcher started - monitoring spawn events');
 
-	const shutdown = async (signal: string) => {
-		log.info({ signal }, "Received shutdown signal");
+  initMcpServer();
+  log.info('MCP server initialized on /mcp endpoint');
 
-		stopSpawnRequestCleanup();
-		log.debug("Spawn request cleanup stopped");
+  const appContext: AppContext = {
+    health: { startTime },
+    github: {
+      getClient: () => null,
+      parseRepo: (_planId: string) => null,
+    },
+  };
+  const app = createApp(appContext);
 
-		server.close();
+  const server = serve({
+    fetch: app.fetch,
+    port,
+  });
 
-		wss.close();
+  server.on('upgrade', (request, socket, head) => {
+    wss.handleUpgrade(request, socket, head, (ws) => {
+      wss.emit('connection', ws, request);
+    });
+  });
 
-		await new Promise((resolve) => setTimeout(resolve, 100));
+  log.info({ port }, 'HTTP server started');
 
-		try {
-			resetRepo();
-			log.debug("Loro repo reset");
-		} catch (err) {
-			log.warn({ err }, "Error resetting Loro repo during shutdown");
-		}
+  const shutdown = async (signal: string) => {
+    log.info({ signal }, 'Received shutdown signal');
 
-		await releaseLock();
+    stopWatcher();
+    log.debug('Task watcher stopped');
 
-		log.info("Shutdown complete");
-		process.exit(0);
-	};
+    stopAllGitSyncs();
+    log.debug('All git syncs stopped');
 
-	process.on("SIGTERM", () => shutdown("SIGTERM"));
-	process.on("SIGINT", () => shutdown("SIGINT"));
+    stopSpawnRequestCleanup();
+    log.debug('Spawn request cleanup stopped');
 
-	process.on("uncaughtException", async (err) => {
-		log.error({ err }, "Uncaught exception");
-		stopSpawnRequestCleanup();
-		try {
-			resetRepo();
-		} catch {}
-		await releaseLock();
-		process.exit(1);
-	});
+    // Wait for HTTP server to fully close (releases port)
+    await new Promise<void>((resolve) => {
+      server.close(() => {
+        log.debug('HTTP server closed');
+        resolve();
+      });
+    });
 
-	process.on("unhandledRejection", async (reason) => {
-		log.error({ reason }, "Unhandled rejection");
-		stopSpawnRequestCleanup();
-		try {
-			resetRepo();
-		} catch {}
-		await releaseLock();
-		process.exit(1);
-	});
+    // Wait for WebSocket server to fully close
+    await new Promise<void>((resolve, reject) => {
+      wss.close((err) => {
+        if (err) {
+          log.warn({ err }, 'Error closing WebSocket server');
+          reject(err);
+        } else {
+          log.debug('WebSocket server closed');
+          resolve();
+        }
+      });
+    }).catch(() => {
+      // Continue shutdown even if WS close fails
+    });
 
-	log.info({ port }, "Daemon running");
+    try {
+      resetRepo();
+      log.debug('Loro repo reset');
+    } catch (err) {
+      log.warn({ err }, 'Error resetting Loro repo during shutdown');
+    }
+
+    resetMcpServer();
+    log.debug('MCP server reset');
+
+    // Now it's safe to release the lock - port is guaranteed to be released
+    await releaseLock();
+
+    log.info('Shutdown complete');
+    process.exit(0);
+  };
+
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
+
+  process.on('uncaughtException', async (err) => {
+    log.error({ err }, 'Uncaught exception');
+    try {
+      stopWatcher();
+    } catch {}
+    stopAllGitSyncs();
+    stopSpawnRequestCleanup();
+
+    // Close servers before releasing lock
+    try {
+      await new Promise<void>((resolve) => {
+        server.close(() => resolve());
+      });
+      await new Promise<void>((resolve) => {
+        wss.close(() => resolve());
+      });
+    } catch {}
+
+    try {
+      resetRepo();
+    } catch {}
+    resetMcpServer();
+    await releaseLock();
+    process.exit(1);
+  });
+
+  process.on('unhandledRejection', async (reason) => {
+    log.error({ reason }, 'Unhandled rejection');
+    try {
+      stopWatcher();
+    } catch {}
+    stopAllGitSyncs();
+    stopSpawnRequestCleanup();
+
+    // Close servers before releasing lock
+    try {
+      await new Promise<void>((resolve) => {
+        server.close(() => resolve());
+      });
+      await new Promise<void>((resolve) => {
+        wss.close(() => resolve());
+      });
+    } catch {}
+
+    try {
+      resetRepo();
+    } catch {}
+    resetMcpServer();
+    await releaseLock();
+    process.exit(1);
+  });
+
+  log.info({ port }, 'Daemon running');
+  log.info({ endpoints: ['/health', '/ws', '/mcp'] }, 'Available endpoints');
 }
 
-/**
- * Main entry point.
- */
 export async function main(): Promise<void> {
-	const args = parseArgs();
+  const env = parseEnv();
 
-	const env = parseEnv();
+  initLogger(env);
+  const log = getLogger();
 
-	initLogger(env);
-	const log = getLogger();
+  log.info('Shipyard daemon starting');
 
-	log.info(
-		{ mode: args.daemon ? "daemon" : "launcher" },
-		"Shipyard server starting",
-	);
-
-	if (args.daemon) {
-		await runDaemon(env);
-	} else {
-		await runLauncher(env);
-	}
+  await runDaemon(env);
 }
 
 main().catch((err) => {
-	console.error("Fatal error:", err);
-	process.exit(1);
+  const log = getLogger();
+  log.fatal({ err }, 'Fatal error');
+  process.exit(1);
 });

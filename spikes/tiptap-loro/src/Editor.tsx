@@ -1,16 +1,10 @@
-import { useEditor, EditorContent } from "@tiptap/react";
-import { Extension } from "@tiptap/core";
-import { DragHandle } from "@tiptap/extension-drag-handle-react";
-import {
-  LoroSyncPlugin,
-  LoroUndoPlugin,
-  undo,
-  redo,
-  type LoroDocType,
-} from "loro-prosemirror";
-import type { LoroDoc } from "loro-crdt";
-import { useEffect, useState, useCallback } from "react";
-import { createExtensions } from "./extensions";
+import { useEditor, EditorContent } from '@tiptap/react';
+import { Extension } from '@tiptap/core';
+import { DragHandle } from '@tiptap/extension-drag-handle-react';
+import { LoroSyncPlugin, LoroUndoPlugin, undo, redo, type LoroDocType } from 'loro-prosemirror';
+import type { LoroDoc } from 'loro-crdt';
+import { useEffect, useState, useCallback } from 'react';
+import { createExtensions } from './extensions';
 
 interface EditorProps {
   name: string;
@@ -20,11 +14,11 @@ interface EditorProps {
 
 function createLoroExtension(loroDoc: LoroDoc) {
   return Extension.create({
-    name: "loro",
+    name: 'loro',
 
     addProseMirrorPlugins() {
       const typedDoc = loroDoc as unknown as LoroDocType;
-      const rootMap = loroDoc.getMap("doc");
+      const rootMap = loroDoc.getMap('doc');
       const containerId = rootMap.id;
 
       return [
@@ -40,15 +34,15 @@ function createLoroExtension(loroDoc: LoroDoc) {
 
     addKeyboardShortcuts() {
       return {
-        "Mod-z": () => {
+        'Mod-z': () => {
           const { state, dispatch } = this.editor.view;
           return undo(state, dispatch);
         },
-        "Mod-y": () => {
+        'Mod-y': () => {
           const { state, dispatch } = this.editor.view;
           return redo(state, dispatch);
         },
-        "Mod-Shift-z": () => {
+        'Mod-Shift-z': () => {
           const { state, dispatch } = this.editor.view;
           return redo(state, dispatch);
         },
@@ -58,16 +52,13 @@ function createLoroExtension(loroDoc: LoroDoc) {
 }
 
 export function Editor({ name, loroDoc, color }: EditorProps) {
-  const [status, setStatus] = useState<string>("Initializing...");
+  const [status, setStatus] = useState<string>('Initializing...');
   const [docVersion, setDocVersion] = useState<number>(0);
 
   const editor = useEditor(
     {
-      extensions: [
-        ...createExtensions(`Start typing in ${name}...`),
-        createLoroExtension(loroDoc),
-      ],
-      content: "",
+      extensions: [...createExtensions(`Start typing in ${name}...`), createLoroExtension(loroDoc)],
+      content: '',
       onUpdate: ({ editor }) => {
         const text = editor.getText();
         console.log(`[${name}] Document updated, chars: ${text.length}`);
@@ -82,9 +73,9 @@ export function Editor({ name, loroDoc, color }: EditorProps) {
       const versionNum = Object.values(version).reduce((a, b) => a + b, 0);
       setDocVersion(versionNum);
 
-      if (event.by === "local") {
+      if (event.by === 'local') {
         setStatus(`Local edit (v${versionNum})`);
-      } else if (event.by === "import") {
+      } else if (event.by === 'import') {
         setStatus(`Synced from peer (v${versionNum})`);
       } else {
         setStatus(`${event.by} (v${versionNum})`);
@@ -124,7 +115,7 @@ export function Editor({ name, loroDoc, color }: EditorProps) {
       <div className="status-bar">
         Status: {status} | Version: {docVersion}
       </div>
-      <div style={{ marginTop: 8, display: "flex", gap: 8 }}>
+      <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
         <button onClick={applyComment} style={{ fontSize: 12 }}>
           Apply Comment (Mod+Shift+C)
         </button>

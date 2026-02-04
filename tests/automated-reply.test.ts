@@ -29,7 +29,7 @@ console.log('🚀 Starting automated comment reply test...\n');
 
 // Test 1: BlockNote Thread Reply
 console.log('📝 Test 1: BlockNote Thread Reply');
-console.log('=' .repeat(50));
+console.log('='.repeat(50));
 
 const threadDoc = new Y.Doc();
 const planId1 = `test-blocknote-${Date.now()}`;
@@ -79,7 +79,7 @@ console.log('💬 Replying to thread...');
 const replyComment: ThreadComment = {
   id: nanoid(),
   userId: 'AI',
-  body: 'Good point! I\'ll add detailed acceptance criteria in the task description.',
+  body: "Good point! I'll add detailed acceptance criteria in the task description.",
   createdAt: Date.now(),
 };
 
@@ -164,7 +164,7 @@ console.log('💬 Replying to diff comment...');
 const reply = replyToPRReviewComment(
   diffDoc,
   originalCommentId,
-  'Good catch! I\'ll add Zod validation to sanitize all user inputs in the next commit.',
+  "Good catch! I'll add Zod validation to sanitize all user inputs in the next commit.",
   'AI',
   'test-actor'
 );
@@ -179,8 +179,18 @@ console.log();
 // Verify replies
 const allCommentsAfter = getPRReviewComments(diffDoc);
 console.log('✅ Verification: Now have', allCommentsAfter.length, 'comments');
-console.log('   Comment 1 (original):', allCommentsAfter[0].author, '- inReplyTo:', allCommentsAfter[0].inReplyTo || 'null');
-console.log('   Comment 2 (reply):', allCommentsAfter[1].author, '- inReplyTo:', allCommentsAfter[1].inReplyTo);
+console.log(
+  '   Comment 1 (original):',
+  allCommentsAfter[0].author,
+  '- inReplyTo:',
+  allCommentsAfter[0].inReplyTo || 'null'
+);
+console.log(
+  '   Comment 2 (reply):',
+  allCommentsAfter[1].author,
+  '- inReplyTo:',
+  allCommentsAfter[1].inReplyTo
+);
 console.log();
 
 // Format as it would appear in readDiffComments output
@@ -191,7 +201,9 @@ console.log('### src/utils/validator.ts');
 for (const comment of allCommentsAfter.sort((a, b) => a.line - b.line)) {
   const prefix = `[pr:${comment.id}]`;
   const replyIndicator = comment.inReplyTo ? ' ↳ Reply' : '';
-  console.log(`- ${prefix} Line ${comment.line} (${comment.author})${replyIndicator}: ${comment.body}`);
+  console.log(
+    `- ${prefix} Line ${comment.line} (${comment.author})${replyIndicator}: ${comment.body}`
+  );
 }
 console.log();
 console.log();

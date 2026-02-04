@@ -1,6 +1,6 @@
-import { useState, useCallback, useRef, useEffect } from "react";
-import { LoroDoc, type PeerID } from "loro-crdt";
-import { Editor } from "./Editor";
+import { useState, useCallback, useRef, useEffect } from 'react';
+import { LoroDoc, type PeerID } from 'loro-crdt';
+import { Editor } from './Editor';
 
 /**
  * Main App with two editors sharing a Loro document via manual export/import sync.
@@ -18,14 +18,14 @@ export function App() {
   if (!docARef.current) {
     const docA = new LoroDoc();
     docA.setPeerId(BigInt(1));
-    console.log("[App] Created LoroDoc A (peer 1)");
+    console.log('[App] Created LoroDoc A (peer 1)');
     docARef.current = docA;
   }
 
   if (!docBRef.current) {
     const docB = new LoroDoc();
     docB.setPeerId(BigInt(2));
-    console.log("[App] Created LoroDoc B (peer 2)");
+    console.log('[App] Created LoroDoc B (peer 2)');
     docBRef.current = docB;
   }
 
@@ -37,8 +37,8 @@ export function App() {
 
     const sync = () => {
       try {
-        const updatesFromA = docA.export({ mode: "update" });
-        const updatesFromB = docB.export({ mode: "update" });
+        const updatesFromA = docA.export({ mode: 'update' });
+        const updatesFromB = docB.export({ mode: 'update' });
 
         if (updatesFromA.byteLength > 0) {
           docB.import(updatesFromA);
@@ -47,7 +47,7 @@ export function App() {
           docA.import(updatesFromB);
         }
       } catch (err) {
-        console.error("[Sync] Error:", err);
+        console.error('[Sync] Error:', err);
       }
     };
 
@@ -70,7 +70,7 @@ export function App() {
     const docB = new LoroDoc();
     docB.setPeerId(BigInt(Date.now() + 1));
 
-    console.log("[App] Reset both LoroDoc instances");
+    console.log('[App] Reset both LoroDoc instances');
     docARef.current = docA;
     docBRef.current = docB;
     setDocKey((k) => k + 1);
@@ -78,8 +78,8 @@ export function App() {
 
   const logDocState = useCallback(() => {
     if (!docARef.current || !docBRef.current) return;
-    console.log("[App] Doc A:", docARef.current.toJSON());
-    console.log("[App] Doc B:", docBRef.current.toJSON());
+    console.log('[App] Doc A:', docARef.current.toJSON());
+    console.log('[App] Doc B:', docBRef.current.toJSON());
   }, []);
 
   return (
@@ -91,20 +91,31 @@ export function App() {
         <button onClick={logDocState}>Log Doc State</button>
       </div>
 
-      <div style={{ marginBottom: 16, padding: 12, background: "#e8f4f8", borderRadius: 8, fontSize: 13 }}>
+      <div
+        style={{
+          marginBottom: 16,
+          padding: 12,
+          background: '#e8f4f8',
+          borderRadius: 8,
+          fontSize: 13,
+        }}
+      >
         <strong>Status:</strong> ✅ All P0 and P1 criteria validated
         <br />
         <strong>Architecture:</strong> Two separate LoroDoc instances with manual sync (50ms)
-        <br /><br />
+        <br />
+        <br />
         <strong>Keyboard Shortcuts:</strong>
         <br />
-        <code>Cmd+B</code> Bold | <code>Cmd+I</code> Italic | <code>Cmd+Z</code> Undo | <code>Cmd+Shift+Z</code> Redo
+        <code>Cmd+B</code> Bold | <code>Cmd+I</code> Italic | <code>Cmd+Z</code> Undo |{' '}
+        <code>Cmd+Shift+Z</code> Redo
         <br />
         <code>Cmd+Shift+C</code> Apply Comment Mark
-        <br /><br />
-        <strong>Validated:</strong>
         <br />
-        ✅ Content sync | ✅ Formatting | ✅ Undo/redo | ✅ Comment marks | ✅ Cursor API | ✅ Drag handle
+        <br />
+        <strong>Validated:</strong>
+        <br />✅ Content sync | ✅ Formatting | ✅ Undo/redo | ✅ Comment marks | ✅ Cursor API | ✅
+        Drag handle
       </div>
 
       <div className="container" key={docKey}>

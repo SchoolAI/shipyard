@@ -1,8 +1,8 @@
-import { z } from "zod";
-import { loadEnv } from "../config.js";
+import { z } from 'zod';
+import { loadEnv } from '../config.js';
 
 const schema = z.object({
-	LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
+  LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
 });
 
 export const serverConfig = loadEnv(schema);

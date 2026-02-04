@@ -6,9 +6,9 @@
  * No need for undici Agent workarounds - Bun's fetch handles long-polling correctly.
  */
 
-import type { AppRouter } from "@shipyard/schema";
-import { DEFAULT_TRPC_TIMEOUT_MS } from "@shipyard/shared";
-import { createTRPCClient, httpBatchLink } from "@trpc/client";
+import type { AppRouter } from '@shipyard/schema';
+import { DEFAULT_TRPC_TIMEOUT_MS } from '@shipyard/shared';
+import { createTRPCClient, httpBatchLink } from '@trpc/client';
 
 let cachedClient: ReturnType<typeof createTRPCClient<AppRouter>> | null = null;
 let cachedBaseUrl: string | null = null;
@@ -22,12 +22,12 @@ let cachedBaseUrl: string | null = null;
  */
 // biome-ignore lint/suspicious/noExplicitAny: Bun fetch is compatible with tRPC at runtime, only types differ
 const createFetchWithTimeout = (timeoutMs: number): any => {
-	return async (url: string | URL, options?: RequestInit) => {
-		return fetch(url, {
-			...options,
-			signal: AbortSignal.timeout(timeoutMs),
-		});
-	};
+  return async (url: string | URL, options?: RequestInit) => {
+    return fetch(url, {
+      ...options,
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+  };
 };
 
 /**
@@ -37,36 +37,33 @@ const createFetchWithTimeout = (timeoutMs: number): any => {
  * @param baseUrl - The base URL of the registry server
  * @param timeoutMs - Request timeout in milliseconds (default: 10000)
  */
-export function getTRPCClient(
-	baseUrl: string,
-	timeoutMs = DEFAULT_TRPC_TIMEOUT_MS,
-) {
-	// NOTE: Don't cache clients with custom timeouts - long-polling needs dedicated instances
-	if (timeoutMs !== DEFAULT_TRPC_TIMEOUT_MS) {
-		return createTRPCClient<AppRouter>({
-			links: [
-				httpBatchLink({
-					url: `${baseUrl}/trpc`,
-					fetch: createFetchWithTimeout(timeoutMs),
-				}),
-			],
-		});
-	}
+export function getTRPCClient(baseUrl: string, timeoutMs = DEFAULT_TRPC_TIMEOUT_MS) {
+  // NOTE: Don't cache clients with custom timeouts - long-polling needs dedicated instances
+  if (timeoutMs !== DEFAULT_TRPC_TIMEOUT_MS) {
+    return createTRPCClient<AppRouter>({
+      links: [
+        httpBatchLink({
+          url: `${baseUrl}/trpc`,
+          fetch: createFetchWithTimeout(timeoutMs),
+        }),
+      ],
+    });
+  }
 
-	if (cachedClient && cachedBaseUrl === baseUrl) {
-		return cachedClient;
-	}
+  if (cachedClient && cachedBaseUrl === baseUrl) {
+    return cachedClient;
+  }
 
-	cachedClient = createTRPCClient<AppRouter>({
-		links: [
-			httpBatchLink({
-				url: `${baseUrl}/trpc`,
-				fetch: createFetchWithTimeout(timeoutMs),
-			}),
-		],
-	});
-	cachedBaseUrl = baseUrl;
-	return cachedClient;
+  cachedClient = createTRPCClient<AppRouter>({
+    links: [
+      httpBatchLink({
+        url: `${baseUrl}/trpc`,
+        fetch: createFetchWithTimeout(timeoutMs),
+      }),
+    ],
+  });
+  cachedBaseUrl = baseUrl;
+  return cachedClient;
 }
 
 /**
@@ -74,6 +71,6 @@ export function getTRPCClient(
  * Useful for testing or when the server URL changes.
  */
 export function resetTRPCClient() {
-	cachedClient = null;
-	cachedBaseUrl = null;
+  cachedClient = null;
+  cachedBaseUrl = null;
 }

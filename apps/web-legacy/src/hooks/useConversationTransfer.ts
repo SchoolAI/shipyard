@@ -13,24 +13,24 @@
  */
 
 import {
-	type A2AMessage,
-	type ConversationExportMeta,
-	claudeCodeToA2A,
-	getPlanMetadata,
-	parseClaudeCodeTranscriptString,
-	summarizeA2AConversation,
-	validateA2AMessages,
-} from "@shipyard/schema";
-import { useCallback, useEffect, useRef, useState } from "react";
-import type { WebrtcProvider } from "y-webrtc";
-import type * as Y from "yjs";
-import { z } from "zod";
-import { getWebrtcRoom } from "@/types/y-webrtc-internals";
+  type A2AMessage,
+  type ConversationExportMeta,
+  claudeCodeToA2A,
+  getPlanMetadata,
+  parseClaudeCodeTranscriptString,
+  summarizeA2AConversation,
+  validateA2AMessages,
+} from '@shipyard/schema';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import type { WebrtcProvider } from 'y-webrtc';
+import type * as Y from 'yjs';
+import { z } from 'zod';
+import { getWebrtcRoom } from '@/types/y-webrtc-internals';
 import {
-	ConversationTransferManager,
-	type PeerConnection,
-	type SendOptions,
-} from "../utils/ConversationTransferManager";
+  ConversationTransferManager,
+  type PeerConnection,
+  type SendOptions,
+} from '../utils/ConversationTransferManager';
 
 /*
  * =============================================================================
@@ -43,107 +43,103 @@ import {
  * Discriminated union based on transfer stage.
  */
 export type TransferProgress =
-	| {
-			/** Transfer stage: preparing or compressing */
-			stage: "preparing" | "compressing";
-			/** Current chunk being processed */
-			current: number;
-			/** Total chunks */
-			total: number;
-	  }
-	| {
-			/** Transfer stage: actively transferring data */
-			stage: "transferring";
-			/** Unique ID for this transfer */
-			exportId: string;
-			/** Direction of transfer */
-			direction: "sending" | "receiving";
-			/** Target peer ID (for P2P) */
-			peerId: string;
-			/** Progress percentage (0-100) */
-			percentage: number;
-	  }
-	| {
-			/** Transfer stage: completed */
-			stage: "done";
-			/** Unique ID for this transfer */
-			exportId: string;
-	  };
+  | {
+      /** Transfer stage: preparing or compressing */
+      stage: 'preparing' | 'compressing';
+      /** Current chunk being processed */
+      current: number;
+      /** Total chunks */
+      total: number;
+    }
+  | {
+      /** Transfer stage: actively transferring data */
+      stage: 'transferring';
+      /** Unique ID for this transfer */
+      exportId: string;
+      /** Direction of transfer */
+      direction: 'sending' | 'receiving';
+      /** Target peer ID (for P2P) */
+      peerId: string;
+      /** Progress percentage (0-100) */
+      percentage: number;
+    }
+  | {
+      /** Transfer stage: completed */
+      stage: 'done';
+      /** Unique ID for this transfer */
+      exportId: string;
+    };
 
 /**
  * Schema for imported conversation files.
  */
 const ImportedConversationSchema = z.object({
-	meta: z.object({
-		exportId: z.string(),
-		sourcePlatform: z.string(),
-		sourceSessionId: z.string(),
-		planId: z.string(),
-		exportedAt: z.number(),
-		messageCount: z.number(),
-		compressedBytes: z.number().optional(),
-		uncompressedBytes: z.number().optional(),
-	}),
-	messages: z.array(z.unknown()),
+  meta: z.object({
+    exportId: z.string(),
+    sourcePlatform: z.string(),
+    sourceSessionId: z.string(),
+    planId: z.string(),
+    exportedAt: z.number(),
+    messageCount: z.number(),
+    compressedBytes: z.number().optional(),
+    uncompressedBytes: z.number().optional(),
+  }),
+  messages: z.array(z.unknown()),
 });
 
 /**
  * Result of an export operation.
  */
 export type ExportResult =
-	| { success: true; filename: string; messageCount: number }
-	| { success: false; error: string };
+  | { success: true; filename: string; messageCount: number }
+  | { success: false; error: string };
 
 /**
  * Result of an import operation.
  */
 export type ImportResult =
-	| {
-			success: true;
-			messages: A2AMessage[];
-			meta: ConversationExportMeta;
-			summary: { title: string; text: string };
-	  }
-	| { success: false; error: string };
+  | {
+      success: true;
+      messages: A2AMessage[];
+      meta: ConversationExportMeta;
+      summary: { title: string; text: string };
+    }
+  | { success: false; error: string };
 
 /**
  * Received conversation from P2P transfer.
  */
 export interface ReceivedConversation {
-	messages: A2AMessage[];
-	meta: ConversationExportMeta;
-	summary: { title: string; text: string };
-	receivedAt: number;
+  messages: A2AMessage[];
+  meta: ConversationExportMeta;
+  summary: { title: string; text: string };
+  receivedAt: number;
 }
 
 /**
  * Result type for the hook.
  */
 interface UseConversationTransferResult {
-	/** Export conversation to file download */
-	exportToFile: (transcript: string) => Promise<ExportResult>;
-	/** Import conversation from file */
-	importFromFile: (file: File) => Promise<ImportResult>;
-	/** Send conversation to P2P peer */
-	sendToPeer: (
-		peerId: string,
-		messages: A2AMessage[],
-		options?: SendOptions,
-	) => Promise<boolean>;
-	/** Cancel an in-progress transfer */
-	cancelTransfer: (exportId: string) => void;
-	/** Conversations received from P2P peers */
-	receivedConversations: ReceivedConversation[];
-	/** Clear received conversations */
-	clearReceived: () => void;
-	/** Current export/import/transfer progress */
-	progress: TransferProgress | null;
-	/** Whether an operation is in progress */
-	isProcessing: boolean;
-	/** List of connected peer IDs that can receive transfers */
-	connectedPeerIds: string[];
-	/** Whether P2P transfer is available (has connected peers) */
-	isP2PAvailable: boolean;
+  /** Export conversation to file download */
+  exportToFile: (transcript: string) => Promise<ExportResult>;
+  /** Import conversation from file */
+  importFromFile: (file: File) => Promise<ImportResult>;
+  /** Send conversation to P2P peer */
+  sendToPeer: (peerId: string, messages: A2AMessage[], options?: SendOptions) => Promise<boolean>;
+  /** Cancel an in-progress transfer */
+  cancelTransfer: (exportId: string) => void;
+  /** Conversations received from P2P peers */
+  receivedConversations: ReceivedConversation[];
+  /** Clear received conversations */
+  clearReceived: () => void;
+  /** Current export/import/transfer progress */
+  progress: TransferProgress | null;
+  /** Whether an operation is in progress */
+  isProcessing: boolean;
+  /** List of connected peer IDs that can receive transfers */
+  connectedPeerIds: string[];
+  /** Whether P2P transfer is available (has connected peers) */
+  isP2PAvailable: boolean;
 }
 
 /*
@@ -156,26 +152,24 @@ interface UseConversationTransferResult {
  * Extracts peer connections from a WebRTC provider.
  * This accesses internal y-webrtc state (not part of public API).
  */
-function extractPeersFromProvider(
-	provider: WebrtcProvider | null,
-): Map<string, PeerConnection> {
-	const peers = new Map<string, PeerConnection>();
+function extractPeersFromProvider(provider: WebrtcProvider | null): Map<string, PeerConnection> {
+  const peers = new Map<string, PeerConnection>();
 
-	if (!provider) return peers;
+  if (!provider) return peers;
 
-	/** Access internal room structure (undocumented API) */
-	const room = getWebrtcRoom<PeerConnection>(provider);
+  /** Access internal room structure (undocumented API) */
+  const room = getWebrtcRoom<PeerConnection>(provider);
 
-	if (!room || !room.webrtcConns) return peers;
+  if (!room || !room.webrtcConns) return peers;
 
-	/** Extract peer connections */
-	for (const [peerId, conn] of room.webrtcConns) {
-		if (conn.peer) {
-			peers.set(peerId, conn.peer);
-		}
-	}
+  /** Extract peer connections */
+  for (const [peerId, conn] of room.webrtcConns) {
+    if (conn.peer) {
+      peers.set(peerId, conn.peer);
+    }
+  }
 
-	return peers;
+  return peers;
 }
 
 /*
@@ -192,424 +186,402 @@ function extractPeersFromProvider(
  * @param rtcProvider - Optional WebRTC provider for P2P transfers
  */
 export function useConversationTransfer(
-	planId: string,
-	ydoc: Y.Doc,
-	rtcProvider: WebrtcProvider | null,
+  planId: string,
+  ydoc: Y.Doc,
+  rtcProvider: WebrtcProvider | null
 ): UseConversationTransferResult {
-	const [progress, setProgress] = useState<TransferProgress | null>(null);
-	const [isProcessing, setIsProcessing] = useState(false);
-	const [receivedConversations, setReceivedConversations] = useState<
-		ReceivedConversation[]
-	>([]);
-	const [connectedPeerIds, setConnectedPeerIds] = useState<string[]>([]);
+  const [progress, setProgress] = useState<TransferProgress | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [receivedConversations, setReceivedConversations] = useState<ReceivedConversation[]>([]);
+  const [connectedPeerIds, setConnectedPeerIds] = useState<string[]>([]);
 
-	/** Manager ref for P2P transfers */
-	const managerRef = useRef<ConversationTransferManager | null>(null);
-	/** Track peers we've added to the manager */
-	const trackedPeersRef = useRef<Map<string, PeerConnection>>(new Map());
-	/** Track last peer count to detect changes */
-	const lastPeerCountRef = useRef(0);
+  /** Manager ref for P2P transfers */
+  const managerRef = useRef<ConversationTransferManager | null>(null);
+  /** Track peers we've added to the manager */
+  const trackedPeersRef = useRef<Map<string, PeerConnection>>(new Map());
+  /** Track last peer count to detect changes */
+  const lastPeerCountRef = useRef(0);
 
-	/**
-	 * Get plan metadata for export.
-	 * Type-safe extraction of origin metadata using schema helper.
-	 */
-	const getPlanMetadataCallback = useCallback(() => {
-		const metadata = getPlanMetadata(ydoc);
-		return {
-			origin: metadata?.origin,
-		};
-	}, [ydoc]);
+  /**
+   * Get plan metadata for export.
+   * Type-safe extraction of origin metadata using schema helper.
+   */
+  const getPlanMetadataCallback = useCallback(() => {
+    const metadata = getPlanMetadata(ydoc);
+    return {
+      origin: metadata?.origin,
+    };
+  }, [ydoc]);
 
-	/** Initialize and manage P2P transfer manager */
-	useEffect(() => {
-		if (!rtcProvider) {
-			setConnectedPeerIds([]);
-			return;
-		}
+  /** Initialize and manage P2P transfer manager */
+  useEffect(() => {
+    if (!rtcProvider) {
+      setConnectedPeerIds([]);
+      return;
+    }
 
-		/** Extract peers from provider */
-		const peers = extractPeersFromProvider(rtcProvider);
-		trackedPeersRef.current = peers;
+    /** Extract peers from provider */
+    const peers = extractPeersFromProvider(rtcProvider);
+    trackedPeersRef.current = peers;
 
-		/** Create manager */
-		const manager = new ConversationTransferManager(peers);
-		managerRef.current = manager;
+    /** Create manager */
+    const manager = new ConversationTransferManager(peers);
+    managerRef.current = manager;
 
-		/** Set up receive callback */
-		const cleanupReceive = manager.onReceiveConversation((messages, meta) => {
-			const summary = summarizeA2AConversation(messages);
-			setReceivedConversations((prev) => [
-				...prev,
-				{ messages, meta, summary, receivedAt: Date.now() },
-			]);
-		});
+    /** Set up receive callback */
+    const cleanupReceive = manager.onReceiveConversation((messages, meta) => {
+      const summary = summarizeA2AConversation(messages);
+      setReceivedConversations((prev) => [
+        ...prev,
+        { messages, meta, summary, receivedAt: Date.now() },
+      ]);
+    });
 
-		/** Update connected peers list */
-		const updatePeerList = (): void => {
-			const currentPeers = extractPeersFromProvider(rtcProvider);
-			const ids = Array.from(currentPeers.entries())
-				.filter(([_, peer]) => peer.connected)
-				.map(([id]) => id);
-			setConnectedPeerIds(ids);
+    /** Update connected peers list */
+    const updatePeerList = (): void => {
+      const currentPeers = extractPeersFromProvider(rtcProvider);
+      const ids = Array.from(currentPeers.entries())
+        .filter(([_, peer]) => peer.connected)
+        .map(([id]) => id);
+      setConnectedPeerIds(ids);
 
-			/** Add new peers to manager */
-			for (const [peerId, peer] of currentPeers) {
-				if (!trackedPeersRef.current.has(peerId)) {
-					manager.addPeer(peerId, peer);
-					trackedPeersRef.current.set(peerId, peer);
-				}
-			}
+      /** Add new peers to manager */
+      for (const [peerId, peer] of currentPeers) {
+        if (!trackedPeersRef.current.has(peerId)) {
+          manager.addPeer(peerId, peer);
+          trackedPeersRef.current.set(peerId, peer);
+        }
+      }
 
-			/** Remove disconnected peers */
-			for (const peerId of trackedPeersRef.current.keys()) {
-				if (!currentPeers.has(peerId)) {
-					manager.removePeer(peerId);
-					trackedPeersRef.current.delete(peerId);
-				}
-			}
-		};
+      /** Remove disconnected peers */
+      for (const peerId of trackedPeersRef.current.keys()) {
+        if (!currentPeers.has(peerId)) {
+          manager.removePeer(peerId);
+          trackedPeersRef.current.delete(peerId);
+        }
+      }
+    };
 
-		/** Initial update */
-		updatePeerList();
+    /** Initial update */
+    updatePeerList();
 
-		/** Listen for peer changes via the provider's 'peers' event */
-		const handlePeersChange = (): void => {
-			updatePeerList();
-		};
+    /** Listen for peer changes via the provider's 'peers' event */
+    const handlePeersChange = (): void => {
+      updatePeerList();
+    };
 
-		rtcProvider.on("peers", handlePeersChange);
+    rtcProvider.on('peers', handlePeersChange);
 
-		/** Also update on 'synced' event - connections may be established after sync */
-		const handleSynced = (): void => {
-			updatePeerList();
-		};
-		rtcProvider.on("synced", handleSynced);
+    /** Also update on 'synced' event - connections may be established after sync */
+    const handleSynced = (): void => {
+      updatePeerList();
+    };
+    rtcProvider.on('synced', handleSynced);
 
-		/*
-		 * Poll for changes more frequently (500ms instead of 2s)
-		 * This catches race conditions where awareness is ahead of actual connections
-		 */
-		const pollInterval = setInterval(() => {
-			const currentPeers = extractPeersFromProvider(rtcProvider);
-			if (currentPeers.size !== lastPeerCountRef.current) {
-				lastPeerCountRef.current = currentPeers.size;
-				updatePeerList();
-			}
-		}, 500);
+    /*
+     * Poll for changes more frequently (500ms instead of 2s)
+     * This catches race conditions where awareness is ahead of actual connections
+     */
+    const pollInterval = setInterval(() => {
+      const currentPeers = extractPeersFromProvider(rtcProvider);
+      if (currentPeers.size !== lastPeerCountRef.current) {
+        lastPeerCountRef.current = currentPeers.size;
+        updatePeerList();
+      }
+    }, 500);
 
-		return () => {
-			cleanupReceive();
-			rtcProvider.off("peers", handlePeersChange);
-			rtcProvider.off("synced", handleSynced);
-			clearInterval(pollInterval);
-			manager.dispose();
-			managerRef.current = null;
-			trackedPeersRef.current.clear();
-		};
-	}, [rtcProvider]);
+    return () => {
+      cleanupReceive();
+      rtcProvider.off('peers', handlePeersChange);
+      rtcProvider.off('synced', handleSynced);
+      clearInterval(pollInterval);
+      manager.dispose();
+      managerRef.current = null;
+      trackedPeersRef.current.clear();
+    };
+  }, [rtcProvider]);
 
-	/**
-	 * Export conversation transcript to A2A file format.
-	 */
-	const exportToFile = useCallback(
-		async (transcript: string): Promise<ExportResult> => {
-			setIsProcessing(true);
-			setProgress({ current: 0, total: 3, stage: "preparing" });
+  /**
+   * Export conversation transcript to A2A file format.
+   */
+  const exportToFile = useCallback(
+    async (transcript: string): Promise<ExportResult> => {
+      setIsProcessing(true);
+      setProgress({ current: 0, total: 3, stage: 'preparing' });
 
-			try {
-				/** 1. Parse transcript */
-				const parseResult = parseClaudeCodeTranscriptString(transcript);
-				if (parseResult.messages.length === 0) {
-					return { success: false, error: "No messages found in transcript" };
-				}
+      try {
+        /** 1. Parse transcript */
+        const parseResult = parseClaudeCodeTranscriptString(transcript);
+        if (parseResult.messages.length === 0) {
+          return { success: false, error: 'No messages found in transcript' };
+        }
 
-				setProgress({ current: 1, total: 3, stage: "compressing" });
+        setProgress({ current: 1, total: 3, stage: 'compressing' });
 
-				/** 2. Convert to A2A format */
-				const a2aMessages = claudeCodeToA2A(parseResult.messages, planId);
+        /** 2. Convert to A2A format */
+        const a2aMessages = claudeCodeToA2A(parseResult.messages, planId);
 
-				/** 3. Build export package */
-				const metadata = getPlanMetadataCallback();
-				const sourcePlatform = metadata.origin?.platform ?? "claude-code";
-				const sourceSessionId =
-					(metadata.origin?.platform === "claude-code" &&
-						metadata.origin.sessionId) ||
-					(metadata.origin?.platform === "devin" &&
-						metadata.origin.sessionId) ||
-					planId;
-				const exportMeta: ConversationExportMeta = {
-					exportId: crypto.randomUUID(),
-					sourcePlatform,
-					sourceSessionId,
-					planId,
-					exportedAt: Date.now(),
-					messageCount: a2aMessages.length,
-					compressedBytes: 0,
-					uncompressedBytes: 0,
-				};
+        /** 3. Build export package */
+        const metadata = getPlanMetadataCallback();
+        const sourcePlatform = metadata.origin?.platform ?? 'claude-code';
+        const sourceSessionId =
+          (metadata.origin?.platform === 'claude-code' && metadata.origin.sessionId) ||
+          (metadata.origin?.platform === 'devin' && metadata.origin.sessionId) ||
+          planId;
+        const exportMeta: ConversationExportMeta = {
+          exportId: crypto.randomUUID(),
+          sourcePlatform,
+          sourceSessionId,
+          planId,
+          exportedAt: Date.now(),
+          messageCount: a2aMessages.length,
+          compressedBytes: 0,
+          uncompressedBytes: 0,
+        };
 
-				const exportPackage = {
-					meta: exportMeta,
-					messages: a2aMessages,
-				};
+        const exportPackage = {
+          meta: exportMeta,
+          messages: a2aMessages,
+        };
 
-				const jsonString = JSON.stringify(exportPackage, null, 2);
-				exportMeta.uncompressedBytes = jsonString.length;
+        const jsonString = JSON.stringify(exportPackage, null, 2);
+        exportMeta.uncompressedBytes = jsonString.length;
 
-				setProgress({ current: 2, total: 3, stage: "compressing" });
+        setProgress({ current: 2, total: 3, stage: 'compressing' });
 
-				/** 4. Download as file */
-				const blob = new Blob([jsonString], { type: "application/json" });
-				const url = URL.createObjectURL(blob);
-				const filename = `conversation-${planId.slice(0, 8)}-${Date.now()}.a2a.json`;
+        /** 4. Download as file */
+        const blob = new Blob([jsonString], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const filename = `conversation-${planId.slice(0, 8)}-${Date.now()}.a2a.json`;
 
-				const anchor = document.createElement("a");
-				anchor.href = url;
-				anchor.download = filename;
-				anchor.click();
-				URL.revokeObjectURL(url);
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.download = filename;
+        anchor.click();
+        URL.revokeObjectURL(url);
 
-				setProgress({
-					stage: "done",
-					exportId: exportMeta.exportId,
-				});
+        setProgress({
+          stage: 'done',
+          exportId: exportMeta.exportId,
+        });
 
-				return {
-					success: true,
-					filename,
-					messageCount: a2aMessages.length,
-				};
-			} catch (err) {
-				const errorMessage =
-					err instanceof Error ? err.message : "Unknown error during export";
-				return { success: false, error: errorMessage };
-			} finally {
-				setIsProcessing(false);
-				/** Clear progress after a short delay */
-				setTimeout(() => setProgress(null), 1000);
-			}
-		},
-		[planId, getPlanMetadataCallback],
-	);
+        return {
+          success: true,
+          filename,
+          messageCount: a2aMessages.length,
+        };
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : 'Unknown error during export';
+        return { success: false, error: errorMessage };
+      } finally {
+        setIsProcessing(false);
+        /** Clear progress after a short delay */
+        setTimeout(() => setProgress(null), 1000);
+      }
+    },
+    [planId, getPlanMetadataCallback]
+  );
 
-	/**
-	 * Import conversation from A2A JSON file.
-	 */
-	const importFromFile = useCallback(
-		async (file: File): Promise<ImportResult> => {
-			setIsProcessing(true);
-			setProgress({ current: 0, total: 3, stage: "preparing" });
+  /**
+   * Import conversation from A2A JSON file.
+   */
+  const importFromFile = useCallback(async (file: File): Promise<ImportResult> => {
+    setIsProcessing(true);
+    setProgress({ current: 0, total: 3, stage: 'preparing' });
 
-			try {
-				/** 1. Read file */
-				const content = await file.text();
-				setProgress({ current: 1, total: 3, stage: "compressing" });
+    try {
+      /** 1. Read file */
+      const content = await file.text();
+      setProgress({ current: 1, total: 3, stage: 'compressing' });
 
-				/** 2. Parse and validate */
-				const parsed: unknown = JSON.parse(content);
-				const validated = ImportedConversationSchema.safeParse(parsed);
+      /** 2. Parse and validate */
+      const parsed: unknown = JSON.parse(content);
+      const validated = ImportedConversationSchema.safeParse(parsed);
 
-				if (!validated.success) {
-					return {
-						success: false,
-						error: `Invalid file format: ${validated.error.message}`,
-					};
-				}
+      if (!validated.success) {
+        return {
+          success: false,
+          error: `Invalid file format: ${validated.error.message}`,
+        };
+      }
 
-				setProgress({ current: 2, total: 3, stage: "compressing" });
+      setProgress({ current: 2, total: 3, stage: 'compressing' });
 
-				/** 3. Validate messages */
-				const { valid, errors } = validateA2AMessages(validated.data.messages);
+      /** 3. Validate messages */
+      const { valid, errors } = validateA2AMessages(validated.data.messages);
 
-				if (errors.length > 0 && valid.length === 0) {
-					return {
-						success: false,
-						error: `No valid messages found. First error: ${errors[0]?.error}`,
-					};
-				}
+      if (errors.length > 0 && valid.length === 0) {
+        return {
+          success: false,
+          error: `No valid messages found. First error: ${errors[0]?.error}`,
+        };
+      }
 
-				/** 4. Generate summary */
-				const summary = summarizeA2AConversation(valid);
+      /** 4. Generate summary */
+      const summary = summarizeA2AConversation(valid);
 
-				const exportId = validated.data.meta.exportId;
-				setProgress({
-					stage: "done",
-					exportId,
-				});
+      const exportId = validated.data.meta.exportId;
+      setProgress({
+        stage: 'done',
+        exportId,
+      });
 
-				const meta: ConversationExportMeta = {
-					exportId: validated.data.meta.exportId,
-					sourcePlatform: validated.data.meta.sourcePlatform,
-					sourceSessionId: validated.data.meta.sourceSessionId,
-					planId: validated.data.meta.planId,
-					exportedAt: validated.data.meta.exportedAt,
-					messageCount: valid.length,
-					compressedBytes: validated.data.meta.compressedBytes ?? 0,
-					uncompressedBytes:
-						validated.data.meta.uncompressedBytes ?? content.length,
-				};
+      const meta: ConversationExportMeta = {
+        exportId: validated.data.meta.exportId,
+        sourcePlatform: validated.data.meta.sourcePlatform,
+        sourceSessionId: validated.data.meta.sourceSessionId,
+        planId: validated.data.meta.planId,
+        exportedAt: validated.data.meta.exportedAt,
+        messageCount: valid.length,
+        compressedBytes: validated.data.meta.compressedBytes ?? 0,
+        uncompressedBytes: validated.data.meta.uncompressedBytes ?? content.length,
+      };
 
-				return {
-					success: true,
-					messages: valid,
-					meta,
-					summary,
-				};
-			} catch (err) {
-				const errorMessage =
-					err instanceof Error ? err.message : "Unknown error during import";
-				return { success: false, error: errorMessage };
-			} finally {
-				setIsProcessing(false);
-				setTimeout(() => setProgress(null), 1000);
-			}
-		},
-		[],
-	);
+      return {
+        success: true,
+        messages: valid,
+        meta,
+        summary,
+      };
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error during import';
+      return { success: false, error: errorMessage };
+    } finally {
+      setIsProcessing(false);
+      setTimeout(() => setProgress(null), 1000);
+    }
+  }, []);
 
-	/**
-	 * Sync peers from provider to manager to catch race conditions.
-	 */
-	const syncPeersFromProvider = useCallback(() => {
-		const manager = managerRef.current;
-		if (!rtcProvider || !manager) return;
+  /**
+   * Sync peers from provider to manager to catch race conditions.
+   */
+  const syncPeersFromProvider = useCallback(() => {
+    const manager = managerRef.current;
+    if (!rtcProvider || !manager) return;
 
-		const currentPeers = extractPeersFromProvider(rtcProvider);
-		for (const [pid, peer] of currentPeers) {
-			if (!trackedPeersRef.current.has(pid)) {
-				manager.addPeer(pid, peer);
-				trackedPeersRef.current.set(pid, peer);
-			}
-		}
-	}, [rtcProvider]);
+    const currentPeers = extractPeersFromProvider(rtcProvider);
+    for (const [pid, peer] of currentPeers) {
+      if (!trackedPeersRef.current.has(pid)) {
+        manager.addPeer(pid, peer);
+        trackedPeersRef.current.set(pid, peer);
+      }
+    }
+  }, [rtcProvider]);
 
-	/**
-	 * Extract source session ID from metadata origin.
-	 */
-	const getSourceSessionId = useCallback(
-		(origin: ReturnType<typeof getPlanMetadataCallback>["origin"]): string => {
-			if (origin?.platform === "claude-code" && origin.sessionId) {
-				return origin.sessionId;
-			}
-			if (origin?.platform === "devin" && origin.sessionId) {
-				return origin.sessionId;
-			}
-			return planId;
-		},
-		[planId],
-	);
+  /**
+   * Extract source session ID from metadata origin.
+   */
+  const getSourceSessionId = useCallback(
+    (origin: ReturnType<typeof getPlanMetadataCallback>['origin']): string => {
+      if (origin?.platform === 'claude-code' && origin.sessionId) {
+        return origin.sessionId;
+      }
+      if (origin?.platform === 'devin' && origin.sessionId) {
+        return origin.sessionId;
+      }
+      return planId;
+    },
+    [planId]
+  );
 
-	/**
-	 * Send conversation to P2P peer via WebRTC.
-	 */
-	const sendToPeer = useCallback(
-		async (
-			peerId: string,
-			messages: A2AMessage[],
-			options: SendOptions = {},
-		): Promise<boolean> => {
-			const manager = managerRef.current;
-			if (!manager) {
-				return false;
-			}
+  /**
+   * Send conversation to P2P peer via WebRTC.
+   */
+  const sendToPeer = useCallback(
+    async (peerId: string, messages: A2AMessage[], options: SendOptions = {}): Promise<boolean> => {
+      const manager = managerRef.current;
+      if (!manager) {
+        return false;
+      }
 
-			/** Last-minute sync to catch race conditions where awareness is ahead of tracking */
-			syncPeersFromProvider();
+      /** Last-minute sync to catch race conditions where awareness is ahead of tracking */
+      syncPeersFromProvider();
 
-			const metadata = getPlanMetadataCallback();
-			const exportId = crypto.randomUUID();
+      const metadata = getPlanMetadataCallback();
+      const exportId = crypto.randomUUID();
 
-			setIsProcessing(true);
-			setProgress({ stage: "preparing", current: 0, total: 1 });
+      setIsProcessing(true);
+      setProgress({ stage: 'preparing', current: 0, total: 1 });
 
-			try {
-				await manager.sendConversation(
-					peerId,
-					messages,
-					{
-						sourcePlatform: metadata.origin?.platform ?? "claude-code",
-						sourceSessionId: getSourceSessionId(metadata.origin),
-						planId,
-						exportedAt: Date.now(),
-					},
-					{
-						onProgress: (sent, total) => {
-							const percentage = Math.round((sent / total) * 100);
-							setProgress({
-								stage: "transferring",
-								exportId,
-								direction: "sending",
-								peerId,
-								percentage,
-							});
-							options.onProgress?.(sent, total);
-						},
-						onComplete: () => {
-							setProgress({ stage: "done", exportId });
-							setTimeout(() => {
-								setProgress(null);
-								setIsProcessing(false);
-							}, 1000);
-							options.onComplete?.();
-						},
-						onError: (error) => {
-							setProgress(null);
-							setIsProcessing(false);
-							options.onError?.(error);
-						},
-					},
-				);
+      try {
+        await manager.sendConversation(
+          peerId,
+          messages,
+          {
+            sourcePlatform: metadata.origin?.platform ?? 'claude-code',
+            sourceSessionId: getSourceSessionId(metadata.origin),
+            planId,
+            exportedAt: Date.now(),
+          },
+          {
+            onProgress: (sent, total) => {
+              const percentage = Math.round((sent / total) * 100);
+              setProgress({
+                stage: 'transferring',
+                exportId,
+                direction: 'sending',
+                peerId,
+                percentage,
+              });
+              options.onProgress?.(sent, total);
+            },
+            onComplete: () => {
+              setProgress({ stage: 'done', exportId });
+              setTimeout(() => {
+                setProgress(null);
+                setIsProcessing(false);
+              }, 1000);
+              options.onComplete?.();
+            },
+            onError: (error) => {
+              setProgress(null);
+              setIsProcessing(false);
+              options.onError?.(error);
+            },
+          }
+        );
 
-				return true;
-			} catch (err) {
-				const error =
-					err instanceof Error
-						? err
-						: new Error("Unknown error during P2P transfer");
-				setProgress(null);
-				setIsProcessing(false);
-				options.onError?.(error);
-				return false;
-			}
-		},
-		[
-			getPlanMetadataCallback,
-			planId,
-			syncPeersFromProvider,
-			getSourceSessionId,
-		],
-	);
+        return true;
+      } catch (err) {
+        const error = err instanceof Error ? err : new Error('Unknown error during P2P transfer');
+        setProgress(null);
+        setIsProcessing(false);
+        options.onError?.(error);
+        return false;
+      }
+    },
+    [getPlanMetadataCallback, planId, syncPeersFromProvider, getSourceSessionId]
+  );
 
-	/**
-	 * Cancel an in-progress transfer.
-	 */
-	const cancelTransfer = useCallback((exportId: string): void => {
-		const manager = managerRef.current;
-		if (manager) {
-			manager.cancelTransfer(exportId);
-		}
-		setProgress(null);
-		setIsProcessing(false);
-	}, []);
+  /**
+   * Cancel an in-progress transfer.
+   */
+  const cancelTransfer = useCallback((exportId: string): void => {
+    const manager = managerRef.current;
+    if (manager) {
+      manager.cancelTransfer(exportId);
+    }
+    setProgress(null);
+    setIsProcessing(false);
+  }, []);
 
-	/**
-	 * Clear received conversations list.
-	 */
-	const clearReceived = useCallback(() => {
-		setReceivedConversations([]);
-	}, []);
+  /**
+   * Clear received conversations list.
+   */
+  const clearReceived = useCallback(() => {
+    setReceivedConversations([]);
+  }, []);
 
-	return {
-		exportToFile,
-		importFromFile,
-		sendToPeer,
-		cancelTransfer,
-		receivedConversations,
-		clearReceived,
-		progress,
-		isProcessing,
-		connectedPeerIds,
-		isP2PAvailable: connectedPeerIds.length > 0,
-	};
+  return {
+    exportToFile,
+    importFromFile,
+    sendToPeer,
+    cancelTransfer,
+    receivedConversations,
+    clearReceived,
+    progress,
+    isProcessing,
+    connectedPeerIds,
+    isP2PAvailable: connectedPeerIds.length > 0,
+  };
 }
