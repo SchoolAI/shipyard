@@ -35,6 +35,7 @@ export function parseEpochFromReason(reason: string): number | null {
   const epochStr = reason.slice('epoch_too_old:'.length);
   const parsed = Number.parseInt(epochStr, 10);
   if (!Number.isFinite(parsed) || parsed < 1) return null;
+  if (epochStr !== String(parsed)) return null;
   return parsed;
 }
 
@@ -68,6 +69,39 @@ export function parseEpochParam(searchParams: URLSearchParams): number | null {
 
   const parsed = Number.parseInt(epochParam, 10);
   if (!Number.isFinite(parsed) || parsed < 1) return null;
+  if (epochParam !== String(parsed)) return null;
 
   return parsed;
+}
+
+/**
+ * Build an epoch-versioned document ID.
+ * Pattern: "{prefix}:{key}:{epoch}"
+ * Example: buildDocumentId('task', 'abc123', 2) → "task:abc123:2"
+ */
+export function buildDocumentId(prefix: string, key: string, epoch: number): string {
+  if (prefix.includes(':') || key.includes(':')) {
+    throw new Error(
+      `Document ID parts must not contain colons: prefix="${prefix}", key="${key}"`
+    );
+  }
+  return `${prefix}:${key}:${epoch}`;
+}
+
+/**
+ * Parse an epoch-versioned document ID.
+ * Returns null if the format is invalid.
+ */
+export function parseDocumentId(id: string): { prefix: string; key: string; epoch: number } | null {
+  const parts = id.split(':');
+  if (parts.length !== 3) return null;
+
+  const [prefix, key, epochStr] = parts;
+  if (!prefix || !key || !epochStr) return null;
+
+  const epoch = Number.parseInt(epochStr, 10);
+  if (!Number.isFinite(epoch) || epoch < 1) return null;
+  if (epochStr !== String(epoch)) return null;
+
+  return { prefix, key, epoch };
 }

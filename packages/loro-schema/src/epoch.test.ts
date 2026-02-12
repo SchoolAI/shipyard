@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildDocumentId,
   DEFAULT_EPOCH,
   EPOCH_CLOSE_CODES,
   formatEpochCloseReason,
   isEpochRejection,
   isEpochValid,
+  parseDocumentId,
   parseEpochFromReason,
   parseEpochParam,
 } from './epoch.js';
@@ -33,6 +35,11 @@ describe('epoch utilities', () => {
       expect(parseEpochFromReason('epoch_too_old:-1')).toBe(null);
       expect(parseEpochFromReason('other_reason')).toBe(null);
       expect(parseEpochFromReason('')).toBe(null);
+    });
+
+    it('rejects partial numeric strings', () => {
+      expect(parseEpochFromReason('epoch_too_old:3abc')).toBe(null);
+      expect(parseEpochFromReason('epoch_too_old:3.5')).toBe(null);
     });
 
     it('roundtrips with formatEpochCloseReason', () => {
@@ -83,6 +90,11 @@ describe('epoch utilities', () => {
       expect(parseEpochParam(new URLSearchParams('epoch=0'))).toBe(null);
       expect(parseEpochParam(new URLSearchParams('epoch=-1'))).toBe(null);
     });
+
+    it('rejects partial numeric strings', () => {
+      expect(parseEpochParam(new URLSearchParams('epoch=3abc'))).toBe(null);
+      expect(parseEpochParam(new URLSearchParams('epoch=3.5'))).toBe(null);
+    });
   });
 
   describe('DEFAULT_EPOCH', () => {
@@ -90,6 +102,58 @@ describe('epoch utilities', () => {
       expect(DEFAULT_EPOCH).toBe(1);
       expect(Number.isInteger(DEFAULT_EPOCH)).toBe(true);
       expect(DEFAULT_EPOCH).toBeGreaterThan(0);
+    });
+  });
+
+  describe('buildDocumentId', () => {
+    it('builds epoch-versioned document ID', () => {
+      expect(buildDocumentId('task', 'abc123', 1)).toBe('task:abc123:1');
+      expect(buildDocumentId('task', 'xyz', 5)).toBe('task:xyz:5');
+      expect(buildDocumentId('session', 'sess-1', 2)).toBe('session:sess-1:2');
+    });
+
+    it('throws if prefix contains colon', () => {
+      expect(() => buildDocumentId('pre:fix', 'key', 1)).toThrow('must not contain colons');
+    });
+
+    it('throws if key contains colon', () => {
+      expect(() => buildDocumentId('prefix', 'key:val', 1)).toThrow('must not contain colons');
+    });
+
+    it('throws if both prefix and key contain colons', () => {
+      expect(() => buildDocumentId('a:b', 'c:d', 1)).toThrow('must not contain colons');
+    });
+  });
+
+  describe('parseDocumentId', () => {
+    it('parses valid document IDs', () => {
+      expect(parseDocumentId('task:abc123:1')).toEqual({ prefix: 'task', key: 'abc123', epoch: 1 });
+      expect(parseDocumentId('session:sess-1:5')).toEqual({
+        prefix: 'session',
+        key: 'sess-1',
+        epoch: 5,
+      });
+    });
+
+    it('returns null for invalid IDs', () => {
+      expect(parseDocumentId('task:abc')).toBe(null);
+      expect(parseDocumentId('task')).toBe(null);
+      expect(parseDocumentId('')).toBe(null);
+      expect(parseDocumentId('task:abc:0')).toBe(null);
+      expect(parseDocumentId('task:abc:-1')).toBe(null);
+      expect(parseDocumentId('task:abc:notanumber')).toBe(null);
+      expect(parseDocumentId('a:b:c:d')).toBe(null);
+    });
+
+    it('rejects non-integer epoch strings', () => {
+      expect(parseDocumentId('task:abc:3abc')).toBe(null);
+      expect(parseDocumentId('task:abc:3.5')).toBe(null);
+    });
+
+    it('roundtrips with buildDocumentId', () => {
+      const id = buildDocumentId('task', 'test-123', 3);
+      const parsed = parseDocumentId(id);
+      expect(parsed).toEqual({ prefix: 'task', key: 'test-123', epoch: 3 });
     });
   });
 });

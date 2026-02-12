@@ -1,5 +1,5 @@
 /**
- * @shipyard/loro-schema - Loro schema and document classes for Shipyard
+ * @shipyard/loro-schema - Loro schema and document types for Shipyard
  */
 
 export {
@@ -7,80 +7,48 @@ export {
   type InferMutableType,
   Shape,
 } from '@loro-extended/change';
+
 export type { EpochCloseCode } from './epoch.js';
 export {
+  buildDocumentId,
   DEFAULT_EPOCH,
   EPOCH_CLOSE_CODES,
   formatEpochCloseReason,
   isEpochRejection,
   isEpochValid,
+  parseDocumentId,
   parseEpochFromReason,
   parseEpochParam,
 } from './epoch.js';
-export type {
-  ArtifactId,
-  CommentId,
-  DeliverableId,
-  EventId,
-  InputRequestId,
-  MachineId,
-  SessionToken,
-  TaskId,
-  ThreadId,
-} from './ids.js';
+
+export type { SessionId, TaskId } from './ids.js';
 export {
-  generateArtifactId,
-  generateCommentId,
-  generateDeliverableId,
-  generateEventId,
-  generateInputRequestId,
-  generateMachineId,
+  generateSessionId,
   generateTaskId,
-  generateThreadId,
-  toArtifactId,
-  toCommentId,
-  toDeliverableId,
-  toEventId,
-  toInputRequestId,
-  toMachineId,
-  toSessionToken,
+  toSessionId,
   toTaskId,
-  toThreadId,
 } from './ids.js';
-export {
-  type BrowserContext,
-  type EnvironmentContext,
-  type PeerPresence,
-  PresenceSchema,
-  RoomEphemeralDeclarations,
-} from './presence.js';
-export { type GetTasksOptions, RoomDocument } from './room/document.js';
-export { getTaskPath, getTaskUrl, ROUTES } from './routes.js';
+
 export type {
-  ChangeSnapshot,
-  FrontierOpId,
-  MutableRoom,
+  A2AMessage,
+  A2APart,
+  A2ATaskState,
+  EpochDocument,
+  EpochDocumentShape,
+  MutableEpochDocument,
   MutableTaskDocument,
-  Room,
-  RoomShape,
-  SyncedFileChange,
-  TaskArtifact,
-  TaskComment,
-  TaskDeliverable,
-  TaskDocument as TaskDocumentType,
+  SessionEntry,
+  SessionState,
+  TaskDocument,
   TaskDocumentShape,
-  TaskEvent,
-  TaskEventItem,
-  TaskIndexEntry,
-  TaskInputRequest,
-  TaskLinkedPR,
   TaskMeta,
 } from './shapes.js';
-// eslint-disable-next-line no-restricted-syntax
-export { RoomSchema, TaskDocumentSchema } from './shapes.js';
 export {
-  isTaskStatus,
-  TASK_STATUSES,
-  TaskDocument,
-  type TaskStatus,
-} from './task/document.js';
+  A2A_TASK_STATES,
+  A2AMessageShape,
+  A2APartShape,
+  EpochDocumentSchema,
+  SESSION_STATES,
+  SessionEntryShape,
+  TaskDocumentSchema,
+} from './shapes.js';
