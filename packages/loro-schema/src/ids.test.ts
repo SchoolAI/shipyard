@@ -1,10 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  generateSessionId,
-  generateTaskId,
-  toSessionId,
-  toTaskId,
-} from './ids.js';
+import { generateSessionId, generateTaskId, toSessionId, toTaskId } from './ids.js';
 
 describe('id utilities', () => {
   describe('generateTaskId', () => {

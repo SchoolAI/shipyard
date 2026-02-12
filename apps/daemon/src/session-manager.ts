@@ -108,7 +108,7 @@ export class SessionManager {
       allowedTools?: string[];
       permissionMode?: PermissionMode;
       maxTurns?: number;
-    },
+    }
   ): Promise<SessionResult> {
     const sessions = this.#taskDoc.toJSON().sessions;
     const sessionEntry = sessions.find((s) => s.sessionId === sessionId);
@@ -158,10 +158,7 @@ export class SessionManager {
     return this.#processMessages(response, newSessionId);
   }
 
-  async #processMessages(
-    response: Query,
-    sessionId: string,
-  ): Promise<SessionResult> {
+  async #processMessages(response: Query, sessionId: string): Promise<SessionResult> {
     let agentSessionId = '';
 
     try {
@@ -226,10 +223,7 @@ export class SessionManager {
 
     if (message.type === 'assistant') {
       if ('error' in message && message.error) {
-        logger.warn(
-          { error: message.error, sessionId },
-          'Assistant message carried an error',
-        );
+        logger.warn({ error: message.error, sessionId }, 'Assistant message carried an error');
       }
       this.#appendAssistantMessage(message);
       return {};

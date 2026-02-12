@@ -307,7 +307,7 @@ describe('SessionManager', () => {
 
         expect(mockLogger.warn).toHaveBeenCalledWith(
           expect.objectContaining({ error: 'rate_limit' }),
-          'Assistant message carried an error',
+          'Assistant message carried an error'
         );
 
         const json = taskDoc.toJSON();
@@ -838,9 +838,7 @@ describe('SessionManager', () => {
 
       const json = taskDoc.toJSON();
       // Concurrent session should be untouched
-      const concurrentSession = json.sessions.find(
-        (s) => s.sessionId === 'concurrent-session-2'
-      );
+      const concurrentSession = json.sessions.find((s) => s.sessionId === 'concurrent-session-2');
       expect(concurrentSession?.status).toBe('active');
       expect(concurrentSession?.error).toBeNull();
 
@@ -886,9 +884,7 @@ describe('SessionManager', () => {
     });
 
     it('allows overriding systemPrompt with a string', async () => {
-      mockQuery.mockReturnValue(
-        mockQueryResponse([initMsg('sess-custom-sp'), successResult()])
-      );
+      mockQuery.mockReturnValue(mockQueryResponse([initMsg('sess-custom-sp'), successResult()]));
 
       await manager.createSession({
         prompt: 'Hello',
@@ -906,9 +902,7 @@ describe('SessionManager', () => {
     });
 
     it('allows overriding systemPrompt with preset + append', async () => {
-      mockQuery.mockReturnValue(
-        mockQueryResponse([initMsg('sess-preset-sp'), successResult()])
-      );
+      mockQuery.mockReturnValue(mockQueryResponse([initMsg('sess-preset-sp'), successResult()]));
 
       await manager.createSession({
         prompt: 'Hello',

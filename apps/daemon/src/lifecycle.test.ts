@@ -24,7 +24,7 @@ describe('LifecycleManager', () => {
       ((event: string, listener: (...args: unknown[]) => void) => {
         originalListeners.push({ event, listener });
         return originalOn(event, listener);
-      }) as typeof process.on,
+      }) as typeof process.on
     );
 
     vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);

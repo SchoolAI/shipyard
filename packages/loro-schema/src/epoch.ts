@@ -81,9 +81,7 @@ export function parseEpochParam(searchParams: URLSearchParams): number | null {
  */
 export function buildDocumentId(prefix: string, key: string, epoch: number): string {
   if (prefix.includes(':') || key.includes(':')) {
-    throw new Error(
-      `Document ID parts must not contain colons: prefix="${prefix}", key="${key}"`
-    );
+    throw new Error(`Document ID parts must not contain colons: prefix="${prefix}", key="${key}"`);
   }
   return `${prefix}:${key}:${epoch}`;
 }
