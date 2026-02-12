@@ -2,11 +2,14 @@ import { Button, Tooltip } from '@heroui/react';
 import { ArrowUp, Mic } from 'lucide-react';
 import type { KeyboardEvent } from 'react';
 import { useCallback, useRef, useState } from 'react';
+import type { SlashCommand } from '../hooks/use-slash-commands';
+import { useSlashCommands } from '../hooks/use-slash-commands';
 import { AttachmentPopover } from './composer/attachment-popover';
 import { ModelPicker, useModelPicker } from './composer/model-picker';
 import { PlanModeToggle } from './composer/plan-mode-toggle';
 import type { ReasoningLevel } from './composer/reasoning-effort';
 import { ReasoningEffort } from './composer/reasoning-effort';
+import { SlashCommandMenu } from './composer/slash-command-menu';
 
 interface ChatComposerProps {
   onSubmit: (message: string) => void;
@@ -22,6 +25,26 @@ export function ChatComposer({ onSubmit }: ChatComposerProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { selectedModelId, setSelectedModelId, supportsReasoning } = useModelPicker();
 
+  const handleSlashExecute = useCallback((_command: SlashCommand) => {
+    /** TODO: wire up actual command execution */
+  }, []);
+
+  const handleClearInput = useCallback(() => {
+    setValue('');
+    requestAnimationFrame(() => {
+      const textarea = textareaRef.current;
+      if (textarea) {
+        textarea.style.height = 'auto';
+        textarea.style.overflowY = 'hidden';
+      }
+    });
+  }, []);
+
+  const slashCommands = useSlashCommands({
+    onExecute: handleSlashExecute,
+    onClearInput: handleClearInput,
+  });
+
   const adjustHeight = useCallback(() => {
     const textarea = textareaRef.current;
     if (!textarea) return;
@@ -34,10 +57,12 @@ export function ChatComposer({ onSubmit }: ChatComposerProps) {
 
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-      setValue(e.target.value);
+      const newValue = e.target.value;
+      setValue(newValue);
+      slashCommands.handleInputChange(newValue);
       adjustHeight();
     },
-    [adjustHeight]
+    [adjustHeight, slashCommands]
   );
 
   const handleSubmit = useCallback(() => {
@@ -46,6 +71,7 @@ export function ChatComposer({ onSubmit }: ChatComposerProps) {
 
     onSubmit(trimmed);
     setValue('');
+    slashCommands.close();
 
     requestAnimationFrame(() => {
       const textarea = textareaRef.current;
@@ -54,23 +80,36 @@ export function ChatComposer({ onSubmit }: ChatComposerProps) {
         textarea.style.overflowY = 'hidden';
       }
     });
-  }, [value, onSubmit]);
+  }, [value, onSubmit, slashCommands]);
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLTextAreaElement>) => {
+      if (slashCommands.handleKeyDown(e)) {
+        return;
+      }
+
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
         handleSubmit();
       }
     },
-    [handleSubmit]
+    [handleSubmit, slashCommands]
   );
 
   const isEmpty = value.trim().length === 0;
 
   return (
-    <div className="w-full max-w-3xl mx-auto px-4 pb-2">
-      <div className="bg-zinc-900 rounded-2xl border border-zinc-800 shadow-lg">
+    <div className="w-full pb-2">
+      <div className="relative bg-zinc-900 rounded-2xl border border-zinc-800 shadow-lg">
+        {slashCommands.isOpen && (
+          <SlashCommandMenu
+            commands={slashCommands.filteredCommands}
+            selectedIndex={slashCommands.selectedIndex}
+            onSelect={slashCommands.selectCommand}
+            onClose={slashCommands.close}
+          />
+        )}
+
         {/* Textarea area */}
         <div className="px-4 pt-3 pb-2">
           <textarea

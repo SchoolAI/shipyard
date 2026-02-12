@@ -1,5 +1,6 @@
-import { Anchor, ChevronDown } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useAppHotkeys } from '../hooks/use-app-hotkeys';
 import { ChatComposer } from './chat-composer';
 import type { ChatMessageData } from './chat-message';
 import { ChatMessage } from './chat-message';
@@ -23,11 +24,9 @@ const SUGGESTION_CARDS = [
 
 function HeroState({ onSuggestionClick }: { onSuggestionClick: (text: string) => void }) {
   return (
-    <div className="flex flex-col items-center justify-center flex-1 px-4">
+    <div className="flex flex-col items-center justify-center flex-1 w-full max-w-3xl mx-auto px-4">
       <div className="flex flex-col items-center gap-4 mb-16">
-        <div className="w-16 h-16 rounded-full border-2 border-zinc-700 flex items-center justify-center">
-          <Anchor className="w-8 h-8 text-zinc-400" />
-        </div>
+        <img src="/icon.svg" alt="Shipyard" className="w-20 h-20 object-contain opacity-80" />
         <h2 className="text-2xl font-semibold text-zinc-100">Let's build</h2>
         <button
           type="button"
@@ -38,7 +37,7 @@ function HeroState({ onSuggestionClick }: { onSuggestionClick: (text: string) =>
         </button>
       </div>
 
-      <div className="w-full max-w-3xl">
+      <div className="w-full overflow-hidden">
         <div className="flex items-center justify-end mb-2">
           <button
             type="button"
@@ -47,15 +46,15 @@ function HeroState({ onSuggestionClick }: { onSuggestionClick: (text: string) =>
             Explore more
           </button>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 overflow-hidden">
           {SUGGESTION_CARDS.map((card) => (
             <button
               key={card.id}
               type="button"
-              className="text-left p-4 rounded-xl border border-zinc-800 bg-zinc-900/50 hover:bg-zinc-800/70 transition-colors cursor-pointer"
+              className="text-left p-4 rounded-xl border border-zinc-800 bg-zinc-900/50 hover:bg-zinc-800/70 transition-colors cursor-pointer overflow-hidden min-w-0"
               onClick={() => onSuggestionClick(card.text)}
             >
-              <p className="text-sm text-zinc-300 leading-relaxed">{card.text}</p>
+              <p className="text-sm text-zinc-300 leading-relaxed line-clamp-3">{card.text}</p>
             </button>
           ))}
         </div>
@@ -65,6 +64,7 @@ function HeroState({ onSuggestionClick }: { onSuggestionClick: (text: string) =>
 }
 
 export function ChatPage() {
+  useAppHotkeys();
   const [messages, setMessages] = useState<ChatMessageData[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -129,7 +129,7 @@ export function ChatPage() {
         <HeroState onSuggestionClick={handleSubmit} />
       )}
 
-      <div className="shrink-0">
+      <div className="shrink-0 w-full max-w-3xl mx-auto px-4">
         <ChatComposer onSubmit={handleSubmit} />
         <StatusBar />
       </div>

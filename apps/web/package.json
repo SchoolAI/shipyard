@@ -16,7 +16,8 @@
     "@heroui/styles": "catalog:",
     "lucide-react": "^0.511.0",
     "react": "catalog:",
-    "react-dom": "catalog:"
+    "react-dom": "catalog:",
+    "react-hotkeys-hook": "catalog:"
   },
   "devDependencies": {
     "@tailwindcss/vite": "catalog:",

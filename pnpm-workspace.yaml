@@ -36,6 +36,7 @@ catalog:
   react-dom: "^19.2.3"
   "@heroui/react": "3.0.0-beta.3"
   "@heroui/styles": "3.0.0-beta.3"
+  react-hotkeys-hook: "^5.2.4"
   tailwindcss: "^4.1.18"
   "@tailwindcss/vite": "^4.1.18"
   vite: "^7.3.1"

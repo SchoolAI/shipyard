@@ -1,4 +1,4 @@
-import { Button, Tooltip } from '@heroui/react';
+import { Button, Kbd, Tooltip } from '@heroui/react';
 import { Diff, Plus, Terminal } from 'lucide-react';
 
 export function TopBar() {
@@ -21,27 +21,6 @@ export function TopBar() {
               isIconOnly
               variant="ghost"
               size="sm"
-              aria-label="Toggle diff panel"
-              className="text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 w-8 h-8 min-w-0"
-            >
-              <Diff className="w-4 h-4" />
-            </Button>
-          </Tooltip.Trigger>
-          <Tooltip.Content>
-            <span className="flex items-center gap-2">
-              Toggle diff panel
-              <kbd className="text-[10px] text-zinc-400 bg-zinc-700 px-1.5 py-0.5 rounded">
-                Cmd+Shift+B
-              </kbd>
-            </span>
-          </Tooltip.Content>
-        </Tooltip>
-        <Tooltip>
-          <Tooltip.Trigger>
-            <Button
-              isIconOnly
-              variant="ghost"
-              size="sm"
               aria-label="Toggle terminal"
               className="text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 w-8 h-8 min-w-0"
             >
@@ -51,9 +30,33 @@ export function TopBar() {
           <Tooltip.Content>
             <span className="flex items-center gap-2">
               Toggle terminal
-              <kbd className="text-[10px] text-zinc-400 bg-zinc-700 px-1.5 py-0.5 rounded">
-                Cmd+J
-              </kbd>
+              <Kbd>
+                <Kbd.Abbr keyValue="command" />
+                <Kbd.Content>J</Kbd.Content>
+              </Kbd>
+            </span>
+          </Tooltip.Content>
+        </Tooltip>
+        <Tooltip>
+          <Tooltip.Trigger>
+            <Button
+              isIconOnly
+              variant="ghost"
+              size="sm"
+              aria-label="Toggle diff panel"
+              className="text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 w-8 h-8 min-w-0"
+            >
+              <Diff className="w-4 h-4" />
+            </Button>
+          </Tooltip.Trigger>
+          <Tooltip.Content>
+            <span className="flex items-center gap-2">
+              Toggle diff panel
+              <Kbd>
+                <Kbd.Abbr keyValue="command" />
+                <Kbd.Abbr keyValue="shift" />
+                <Kbd.Content>B</Kbd.Content>
+              </Kbd>
             </span>
           </Tooltip.Content>
         </Tooltip>
