@@ -1,0 +1,10 @@
+@import "tailwindcss";
+@import "@heroui/styles";
+
+@theme {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+}
