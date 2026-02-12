@@ -2,8 +2,6 @@
 
 Developer guide for running Shipyard locally and contributing to the codebase.
 
-> **Note:** For end-user installation (Claude Code plugin or npm package), see [installation.md](./installation.md).
-
 ---
 
 ## Prerequisites
@@ -14,258 +12,79 @@ Developer guide for running Shipyard locally and contributing to the codebase.
 
 ---
 
-## Important: Don't Install the Plugin for Local Dev
-
-**Do NOT install the `shipyard` plugin if you're developing this codebase.**
-
-The plugin is for end users only. When developing locally:
-- ✅ Use project hooks (`./hooks/hooks.json`)
-- ✅ Use project skills (`./skills/shipyard/`)
-- ✅ Use project MCP (`./.mcp.json`)
-
-**Why not both?**
-- Plugin hooks + project hooks run in parallel (duplicate triggers)
-- Can't disable local hooks (they always load from the project)
-- Causes confusion about which code is executing
-
-**If you already installed it:**
-```bash
-/plugin uninstall shipyard@schoolai-shipyard
-```
-
----
-
 ## Installation
 
 ```bash
-cd /Users/jacobpetterle/Working\ Directory/Shipyard
+cd /Users/jacobpetterle/Working\ Directory/shipyard
 pnpm install
 pnpm build
 ```
 
 ---
 
-## Running the App
-
-**Just run:**
-```bash
-pnpm dev:all
-```
-
-This starts all services:
-- Web UI on `http://localhost:5173`
-- MCP server with hot reload (auto-restarts on code changes)
-- Session server (handles OAuth + WebRTC signaling via Cloudflare Worker)
-
-### Testing the MCP
-
-Verify the MCP is available in Claude Code:
+## Running Services
 
 ```bash
-# In Claude Code:
-/mcp
-# Should see "shipyard MCP" under Project MCPs
+pnpm dev:all          # Start session server
+pnpm dev:session-server  # Start session server directly
+pnpm dev:og-proxy     # Start OG proxy worker (optional)
 ```
 
-Test creating a task:
-```
-"Create an implementation plan for adding user authentication"
-```
+### Active Apps
 
-Browser should open with the task.
+| App | Purpose | Port |
+|-----|---------|------|
+| `apps/session-server/` | Auth + WebRTC signaling (CF Workers) | 4444 |
+| `apps/og-proxy-worker/` | OG meta tags for social previews | 4446 |
+
+### Packages
+
+| Package | Purpose |
+|---------|---------|
+| `packages/loro-schema/` | Loro Shape definitions, typed docs, helpers |
+| `packages/session/` | Session/auth shared types and client |
 
 ---
 
-## Docker Compose Mode (Isolated Development)
+## OG Proxy Worker (Optional)
 
-For fully isolated development with predictable cleanup, use Docker Compose mode:
+Cloudflare Worker that injects dynamic Open Graph meta tags for social media crawlers.
 
-```bash
-pnpm dev:isolated
-```
-
-This runs all services in Docker containers with:
-- Static ports (no hashing) - Web on :5173
-- Isolated state per worktree (separate Docker volumes)
-- Predictable cleanup (`docker compose down`)
-
-### Why Use Docker Mode
-
-**Use Docker when:**
-- Testing multi-worktree scenarios
-- Need clean slate environments
-- Want predictable port assignments
-- Developing on the Docker infrastructure itself
-
-**Use native (`pnpm dev:all`) when:**
-- Quick iteration on code changes (faster HMR)
-- Using Claude Code agent features
-- Default development workflow
-
-### Docker Commands
+**When to run:** Only needed if testing social preview functionality.
 
 ```bash
-pnpm dev:isolated    # Start all services in Docker
-pnpm docker:logs     # Follow logs from all containers
-pnpm docker:down     # Stop containers
-pnpm docker:clean    # Remove containers, volumes, and images
+pnpm dev:og-proxy
+
+# Test with a crawler User-Agent
+curl -H "User-Agent: Slackbot" "http://localhost:4446/?d=YOUR_ENCODED_PLAN"
 ```
-
-### How It Works
-
-- Each worktree gets unique ports via `.env.docker` (auto-generated from `worktree-env.sh`)
-- Services communicate internally via Docker network
-- Browser connects via localhost exposed ports
-- Claude spawn requests logged to `daemon-logs` volume (not executed)
-
-### Configuring Log Level
-
-By default, Docker mode runs all services with `LOG_LEVEL=debug` for detailed logging. To change this:
-
-1. Set `LOG_LEVEL` environment variable before running:
-   ```bash
-   LOG_LEVEL=info pnpm dev:isolated
-   ```
-
-2. Or edit `.env.docker` after it's generated (changes lost on next run)
-
-Valid levels: `debug`, `info`, `warn`, `error`
-
-### Prerequisites
-
-- Docker Desktop installed and running
-- Same Node.js/pnpm requirements as native mode
 
 ---
 
-## Agent Launcher Daemon
-
-The daemon is built into the MCP server (`apps/server/`). It enables browser-to-agent triggering: click "+ Create Task" in the Shipyard UI to launch Claude Code on your machine. The daemon starts automatically when the MCP server runs.
-
----
-
-## Local Hooks Setup
-
-**For testing hook changes locally (without installing the plugin).**
-
-Similar to MCP, hooks need different configuration for local dev vs distribution:
-- **Distribution**: `hooks/hooks.json` uses `${CLAUDE_PLUGIN_ROOT}` (plugin install)
-- **Local Dev**: `~/.claude/settings.json` points to your local build
-
-### Quick Setup
+## Development Commands
 
 ```bash
-# 1. Switch to local development hooks
-./scripts/setup-hooks-dev.sh
-
-# 2. RESTART Claude Code (required!)
-#    Close and reopen Claude Code to pick up settings changes
-
-# 3. Make changes, rebuild
-vim apps/hook/src/adapters/claude-code.ts
-pnpm --filter @shipyard/hook build
-
-# 4. Switch back to production when done
-./scripts/restore-hooks-prod.sh
-```
-
-**⚠️ Important:** You MUST restart Claude Code after running `setup-hooks-dev.sh`. Claude Code reads `~/.claude/settings.json` on startup - changes aren't picked up while running.
-
-### What Gets Configured
-
-The setup script updates your `~/.claude/settings.json` to use local builds:
-
-**Hooks configured:**
-- `PreToolUse` → `AskUserQuestion` - Blocks built-in prompt, redirects to `requestUserInput()` in `execute_code`
-- `PermissionRequest` → `ExitPlanMode` - Handles plan approval (30min timeout)
-- `PostToolUse` → `ExitPlanMode` - Injects session context after approval
-- `SessionStart` - Loads project context
-
-**Before (production):**
-```json
-{
-  "hooks": {
-    "PermissionRequest": [{
-      "hooks": [{"command": "shipyard-hook"}]
-    }]
-  }
-}
-```
-
-**After (local dev):**
-```json
-{
-  "hooks": {
-    "PermissionRequest": [{
-      "hooks": [{"command": "node /Users/.../shipyard/apps/hook/dist/index.js"}]
-    }]
-  }
-}
-```
-
-### Requirements
-
-- `jq` must be installed: `brew install jq`
-
-### Troubleshooting Hooks
-
-**Hooks not firing?**
-
-1. Check if hook is built:
-   ```bash
-   ls -la apps/hook/dist/index.js
-   ```
-
-2. Check settings file points to local build:
-   ```bash
-   grep "shipyard" ~/.claude/settings.json
-   ```
-
-3. Check hook logs (path varies if using worktrees):
-   ```bash
-   tail -f ~/.shipyard/hook-debug.log
-   # or $SHIPYARD_STATE_DIR/hook-debug.log if using worktrees
-   ```
-
-4. Verify you ran the setup script:
-   ```bash
-   # If settings still show "shipyard-hook", run setup again
-   ./scripts/setup-hooks-dev.sh
-   ```
-
-**Restore from backup manually:**
-
-```bash
-# List backups (created automatically by setup script)
-ls -lt ~/.claude/settings.json.backup-*
-
-# Restore specific backup
-cp ~/.claude/settings.json.backup-1737445678 ~/.claude/settings.json
+pnpm check        # Run all checks (typecheck, lint, file allowlist)
+pnpm build        # Build all packages
+pnpm test         # Run all tests
+pnpm test:meta    # Run meta-tests (verify test files exist)
+pnpm lint:fix     # Auto-fix lint issues
+pnpm lint:comments       # Check comment style (ESLint)
+pnpm lint:typeassertions # Check type assertions (ESLint)
+pnpm cleanup      # Kill dev processes, remove build artifacts
+pnpm reset        # Nuclear reset: clear ALL data
 ```
 
 ---
 
 ## Environment Variables
 
-Each app has configurable environment variables. See the `.env.example` file in each app directory:
-
-- `apps/hook/.env.example` - Hook configuration
-- `apps/web/.env.example` - Web app configuration
-
-To customize:
-1. Copy `.env.example` to `.env` in the app directory
-2. Edit values as needed
-3. Restart the app
+Session server configuration is in `apps/session-server/`. See the wrangler config for environment bindings.
 
 ### GitHub Authentication
 
-For artifact uploads, the server needs a GitHub token. Priority order:
+For features requiring GitHub access:
 
-1. `GITHUB_TOKEN` environment variable (explicit override)
-2. `gh auth token` CLI command (if gh is installed and authenticated)
-3. null (feature gracefully disabled)
-
-To enable artifacts:
 ```bash
 # Option 1: Use gh CLI (recommended)
 gh auth login
@@ -274,316 +93,22 @@ gh auth login
 export GITHUB_TOKEN=ghp_your_token_here
 ```
 
-### Mobile OAuth Handling
-
-The GitHub OAuth flow automatically detects mobile browsers (iOS Safari, Android Chrome) to prevent potential deep linking issues with desktop apps.
-
-**How it works:**
-- OAuth worker detects mobile User-Agent during token exchange
-- Adds `is_mobile: true` flag to response for mobile devices
-- Web app logs mobile detection in console: `[OAuth] Mobile device detected`
-
-**Testing on mobile:**
-- iOS Safari: Open app, sign in with GitHub, verify OAuth completes in browser
-- Android Chrome: Same test, verify no unexpected app launches
-- Check browser console for mobile detection log
-
-**Note:** Deep linking to desktop apps during OAuth only occurs if Universal Links (iOS) or App Links (Android) are configured via `.well-known/` files on the domain. Currently, Shipyard has no such configuration, so mobile OAuth works correctly without intervention.
-
-For more details, see [ADR-0003](./decisions/0003-mobile-oauth-user-agent-detection.md).
-
----
-
-## OG Proxy Worker (Optional)
-
-Cloudflare Worker that injects dynamic Open Graph meta tags for social media crawlers.
-
-**When to run:** Only needed if testing social preview functionality (not required for normal development).
-
-### Why It Exists
-
-Static sites (GitHub Pages) serve the same HTML for all URLs. Social crawlers (Slackbot, Discord, etc.) don't execute JavaScript, so they can't see the plan title encoded in the `?d=` parameter. The worker decodes the URL and returns HTML with dynamic OG tags.
-
-### How It Works
-
-- **Crawlers** get HTML with dynamic OG tags (title, description, status)
-- **Regular users** get proxied to GitHub Pages (prod) or localhost:5173 (dev)
-
-### Running Locally
-
-```bash
-# Start the worker (port 4446)
-pnpm dev:og-proxy
-
-# In another terminal, test with a crawler User-Agent
-curl -H "User-Agent: Slackbot" "http://localhost:4446/?d=YOUR_ENCODED_PLAN"
-
-# Health check
-curl http://localhost:4446/health
-```
-
-### Testing
-
-Use the included test script:
-
-```bash
-# Test local (requires worker running)
-./apps/og-proxy-worker/test-worker.sh development
-
-# Test production
-./apps/og-proxy-worker/test-worker.sh production
-```
-
-### Production URL
-
-`https://shipyard-og-proxy.jacob-191.workers.dev`
-
-For architecture details, see `apps/og-proxy-worker/README.md`.
-
----
-
-## Development Commands
-
-```bash
-pnpm check        # Run all checks (test, typecheck, lint)
-pnpm build        # Build all packages
-pnpm test         # Run all tests
-pnpm lint:fix     # Auto-fix lint issues
-pnpm dev:web      # Start web UI dev server
-pnpm dev:server   # Start server in watch mode
-pnpm cleanup      # Kill dev processes, remove build artifacts
-pnpm reset        # Nuclear reset: clear ALL data (see below)
-```
-
----
-
-## Resetting Data
-
-The CRDT sync means data self-heals across peers. To fully reset for testing, you need to clear both server and browser storage simultaneously.
-
-### Nuclear Reset (Recommended)
-
-**CRITICAL: When using Claude Code, disable MCP first:**
-
-```bash
-# In Claude Code session:
-/mcp disable
-
-# Then run reset:
-pnpm reset
-
-# After reset completes, re-enable if needed:
-/mcp enable
-```
-
-**Why?** Claude Code auto-restarts the hub MCP server, causing it to re-sync data before the reset completes.
-
-**Before running:** Close ALL Shipyard browser tabs (regular AND incognito). Open tabs block IndexedDB deletion.
-
-**Limitation:** If remote P2P peers are connected, they'll re-sync data back. This reset is for local development only.
-
-The reset command:
-1. Kills all Shipyard processes (MCP servers, registry, signaling, Vite)
-2. Clears server-side LevelDB storage (`~/.Shipyard/plans/`)
-3. Opens browser to clear IndexedDB + localStorage
-
-### Browser-Only Reset (Dev Mode)
-
-If you only need to clear browser storage:
-
-**Option 1: URL parameter**
-```
-http://localhost:5173/?reset=all
-```
-
-**Option 2: Console**
-```javascript
-window.__resetShipyard()
-```
-
-Both options only work in development mode.
-
-### Epoch Reset (Guaranteed Clean Slate)
-
-When you have multiple peers connected (browser tabs, MCP servers), clearing one peer's storage won't help because other peers will re-sync their data back. The **epoch reset** solves this by invalidating ALL clients at once.
-
-```bash
-# Set a higher epoch and restart the server
-SHIPYARD_EPOCH=2 pnpm dev:all
-```
-
-This forces ALL connected clients to clear their storage and reconnect. The server rejects any client without a matching epoch, so there's no way for stale data to sneak through.
-
-**100% guaranteed** - every client must send a valid epoch. No epoch = rejected. Old epoch = rejected.
-
-**When to use:**
-- You want to completely clear all data everywhere
-- Multiple browser tabs open
-- Remote P2P peers connected
-- `pnpm reset` alone isn't clearing data
-
-**How it works:**
-1. Set `SHIPYARD_EPOCH=2` (or higher) when starting the server
-2. All clients with epoch < 2 are rejected with close code 4100
-3. Client receives the required epoch in the close reason (`epoch_too_old:2`)
-4. Client stores the required epoch, clears storage, reloads
-5. After reload, client connects with epoch=2
-6. Server accepts, client syncs fresh data
-
-### Production Reset (GitHub Pages)
-
-The `?reset=all` URL parameter only works in development mode. To reset production storage:
-
-1. Close all Shipyard browser tabs
-2. Kill any local MCP servers: `pkill -f "Shipyard"`
-3. Open GitHub Pages: https://schoolai.github.io/shipyard/
-4. Open DevTools → Application → Storage → **Clear site data**
-
-### Manual Reset
-
-If the script doesn't work:
-
-```bash
-# 1. Kill all processes
-pkill -f "Shipyard"
-
-# 2. Clear server storage
-rm -rf ~/.Shipyard/plans/
-
-# 3. Clear browser storage (in DevTools)
-# Application → Storage → Clear site data
-```
-
 ---
 
 ## Troubleshooting
 
-### MCP Server Not Starting
-
-Test the server directly:
-```bash
-node apps/server/dist/index.mjs
-```
-
-Should see: "MCP server started" in logs (stderr)
-
-### Web App Not Displaying Plan
-
-Check URL has `?d=` parameter with encoded data:
-```
-http://localhost:5173/?d=N4IgdghgtgpiBcIQBoQBc...
-```
-
 ### TypeScript Errors in IDE
 
-Run build first:
+Run build first — the IDE needs built `.d.mts` files from packages:
 ```bash
 pnpm build
 ```
 
-The IDE needs the built `.d.mts` files from the loro-schema package.
+### Port Conflicts
 
-### Port Conflicts (EADDRINUSE)
-
-If auto-configuration doesn't resolve port conflicts, create a `.env` file:
-
+Override ports with environment variables:
 ```bash
-# .env (or .env.local)
-REGISTRY_PORT=32195
-VITE_PORT=5176
-PORT=4484
-SHIPYARD_STATE_DIR=~/.shipyard-custom
-```
-
-The `dev:all` script will use these values.
-
----
-
-## Plugin Development
-
-Notes for maintainers working on the Shipyard Claude Code plugin.
-
-### Plugin Structure
-
-```
-.claude-plugin/
-├── plugin.json          # Plugin manifest (MUST declare all components)
-├── mcp.json             # MCP server configuration
-hooks/
-├── hooks.json           # Hook definitions
-apps/hook/
-├── dist/index.js        # Built hook binary (MUST be committed)
-├── src/                 # TypeScript source
-└── tsup.config.ts       # Build configuration
-skills/
-└── shipyard/
-    └── SKILL.md         # Skill instructions
-```
-
-### Common Gotchas
-
-**1. Hooks Must Be Declared in plugin.json**
-
-Claude Code does NOT auto-discover hooks. You must explicitly declare them:
-
-```json
-{
-  "skills": "./skills/",
-  "mcpServers": "./.mcp-plugin.json",
-  "hooks": "./hooks/hooks.json"  // ← REQUIRED or hooks silently ignored
-}
-```
-
-**Symptom:** Hooks exist in `hooks/hooks.json` but never fire.
-
-**2. Built Artifacts Must Be Committed**
-
-Claude Code plugins don't support `postInstall` scripts. This means:
-- `apps/hook/dist/` must be in git (not gitignored)
-- After changing hook source, rebuild AND commit: `pnpm --filter @shipyard/hook build`
-
-**Symptom:** Plugin installs but hooks fail with "Cannot find module".
-
-**3. pino Requires CJS Build Format**
-
-pino uses internal dynamic `require()` calls that break in ESM bundles. Build as CommonJS in `tsup.config.ts`:
-
-```typescript
-export default defineConfig({
-  format: ['cjs'],  // NOT 'esm' - pino breaks
-  outExtension: () => ({ js: '.js' }),
-});
-```
-
-**4. Hook Response Format for PreToolUse Deny**
-
-To block a tool, output this JSON to stdout with exit code 0:
-
-```json
-{
-  "hookSpecificOutput": {
-    "hookEventName": "PreToolUse",
-    "permissionDecision": "deny",
-    "permissionDecisionReason": "Your reason here"
-  }
-}
-```
-
-### Testing Hooks
-
-Test hook directly without Claude Code:
-
-```bash
-echo '{"session_id":"test","hook_event_name":"PreToolUse","tool_name":"AskUserQuestion","permission_mode":"default"}' | node apps/hook/dist/index.js
-```
-
-### Debugging
-
-Hook logs go to `~/.shipyard/hook-debug.log` (or `$SHIPYARD_STATE_DIR/hook-debug.log` in worktrees):
-
-```bash
-tail -f ~/.shipyard/hook-debug.log
-grep "AskUserQuestion\|ExitPlanMode" ~/.shipyard/hook-debug.log
+PORT=4445 pnpm dev:all
 ```
 
 ---

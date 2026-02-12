@@ -6,12 +6,8 @@
 
 ```
 apps/
-├── server/          # MCP server + daemon (Loro persistence, agent spawning)
-├── web/             # React app (TipTap editor, HeroUI v3, Tailwind v4)
-├── hook/            # Claude Code hooks
 ├── session-server/  # Auth + signaling (Cloudflare Workers + Durable Objects)
-├── og-proxy-worker/ # OG meta injection for social previews
-└── mcp-proxy/       # MCP proxy
+└── og-proxy-worker/ # OG meta injection for social previews
 packages/
 ├── loro-schema/     # Loro Shape definitions, helpers, types
 └── session/         # Session/auth shared types and client
