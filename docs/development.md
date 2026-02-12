@@ -25,9 +25,9 @@ pnpm build
 ## Running Services
 
 ```bash
-pnpm dev:all          # Start session server
+pnpm dev:all             # Start session server
 pnpm dev:session-server  # Start session server directly
-pnpm dev:og-proxy     # Start OG proxy worker (optional)
+pnpm dev:og-proxy        # Start OG proxy worker (optional)
 ```
 
 ### Active Apps
@@ -64,15 +64,13 @@ curl -H "User-Agent: Slackbot" "http://localhost:4446/?d=YOUR_ENCODED_PLAN"
 ## Development Commands
 
 ```bash
-pnpm check        # Run all checks (typecheck, lint, file allowlist)
-pnpm build        # Build all packages
-pnpm test         # Run all tests
-pnpm test:meta    # Run meta-tests (verify test files exist)
-pnpm lint:fix     # Auto-fix lint issues
+pnpm check               # Run all checks (typecheck, lint, file allowlist)
+pnpm build               # Build all packages
+pnpm test                # Run all tests
+pnpm test:meta           # Run meta-tests (verify test files exist)
+pnpm lint:fix            # Auto-fix lint issues
 pnpm lint:comments       # Check comment style (ESLint)
 pnpm lint:typeassertions # Check type assertions (ESLint)
-pnpm cleanup      # Kill dev processes, remove build artifacts
-pnpm reset        # Nuclear reset: clear ALL data
 ```
 
 ---
@@ -91,6 +89,35 @@ gh auth login
 
 # Option 2: Set explicit token
 export GITHUB_TOKEN=ghp_your_token_here
+```
+
+---
+
+## Resetting Data
+
+CRDTs make reset hard — peers re-sync old data. Shipyard uses epoch numbers to force all clients to clear storage simultaneously.
+
+### Epoch Reset
+
+```bash
+SHIPYARD_EPOCH=2 pnpm dev:all
+```
+
+All clients with epoch < 2 are rejected with close code 4100. Client clears storage and reconnects with the new epoch.
+
+**When to use:**
+- You want to completely clear all data everywhere
+- Multiple browser tabs or P2P peers connected
+- Normal reset isn't clearing data
+
+### Manual Reset
+
+```bash
+# Clear server storage
+rm -rf ~/.shipyard/plans/
+
+# Clear browser storage (in DevTools)
+# Application → Storage → Clear site data
 ```
 
 ---

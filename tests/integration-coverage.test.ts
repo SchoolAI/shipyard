@@ -36,8 +36,22 @@ interface CoverageRequirement {
 }
 
 /**
- * Add new directories here as apps are built.
- * Each entry requires every source file to have a corresponding test file.
+ * Directories that require integration test coverage.
+ *
+ * Add new entries as apps are built. Each entry requires every source
+ * file matching `sourcePattern` in `sourceDir` to have a corresponding
+ * test file with `testSuffix`.
+ *
+ * Example entry for a new app:
+ *
+ * ```typescript
+ * {
+ *   sourceDir: 'apps/my-app/src/routes',
+ *   testSuffix: '.test.ts',
+ *   sourcePattern: /^(?!.*\.test\.ts$).*\.ts$/,
+ *   description: 'My App Routes',
+ * },
+ * ```
  */
 const COVERAGE_REQUIREMENTS: CoverageRequirement[] = [
   {
