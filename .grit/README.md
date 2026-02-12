@@ -88,12 +88,12 @@ Already enabled in root `biome.json`:
 
 Test on a single file:
 ```bash
-pnpm biome lint apps/web/src/App.tsx
+pnpm biome lint packages/loro-schema/src/shapes.ts
 ```
 
 Test on a package:
 ```bash
-pnpm biome lint apps/signaling/src/
+pnpm biome lint apps/session-server/src/
 ```
 
 ---

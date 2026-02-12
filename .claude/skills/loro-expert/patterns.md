@@ -57,7 +57,7 @@ CRDTs make reset hard (peers re-sync old data). Shipyard uses epoch numbers:
 ## Repo Singleton (Server)
 
 ```ts
-// apps/server/src/loro/repo.ts
+/** Path TBD — server app will be rebuilt */
 const repo = new Repo({
   identity: { name: "shipyard-server", type: "service" },
   adapters: [leveldbAdapter, websocketAdapter, webrtcAdapter],
@@ -67,7 +67,7 @@ const repo = new Repo({
 ## React Selector Pattern
 
 ```ts
-// apps/web/src/loro/selectors/task-selectors.ts
+/** Path TBD — web app will be rebuilt */
 export function useTaskHandle(taskId: TaskId) {
   return useHandle(taskId, TaskDocumentSchema)
 }
@@ -97,8 +97,8 @@ export function useTaskTitle(taskId: TaskId) {
 - Shapes: `packages/loro-schema/src/shapes.ts`
 - TaskDocument: `packages/loro-schema/src/task/document.ts`
 - RoomDocument: `packages/loro-schema/src/room/document.ts`
-- React selectors: `apps/web/src/loro/selectors/task-selectors.ts`
-- Server repo: `apps/server/src/loro/repo.ts`
+- React selectors: Path TBD — web app will be rebuilt
+- Server repo: Path TBD — server app will be rebuilt
 
 ## Common Gotchas
 

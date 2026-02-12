@@ -38,8 +38,8 @@ When you add a route to a meta-test-covered directory, you must create both file
 
 ### Step-by-step
 
-1. **Create the route:** `apps/server/src/http/routes/my-route.ts`
-2. **Create the test:** `apps/server/src/http/routes/my-route.test.ts`
+1. **Create the route:** `apps/session-server/src/routes/my-route.ts`
+2. **Create the test:** `apps/session-server/src/routes/my-route.test.ts`
 3. **Use Zod for request/response schemas** (avoids `any` and `as X`)
 4. **Run checks:**
    ```bash
@@ -81,11 +81,7 @@ Key points:
 
 ## Pattern: Adding a New MCP Tool
 
-Same as routes -- `apps/server/src/mcp/tools/` is meta-test covered.
-
-1. **Create:** `apps/server/src/mcp/tools/my-tool.ts`
-2. **Create:** `apps/server/src/mcp/tools/my-tool.test.ts`
-3. **Verify:** `pnpm test:meta`
+Path TBD — server app will be rebuilt. When recreated, MCP tool directories should be meta-test covered.
 
 ---
 
@@ -156,8 +152,6 @@ This runs as part of `pnpm test` -- no separate CI step needed.
 | Directory | Coverage |
 |---|---|
 | `apps/session-server/src/routes` | All route files |
-| `apps/server/src/http/routes` | All HTTP route files |
-| `apps/server/src/mcp/tools` | All MCP tool files |
 | `packages/loro-schema/src` | `task-document.ts`, `room-document.ts` only |
 
 ### Adding a new covered directory

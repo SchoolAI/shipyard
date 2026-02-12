@@ -2,7 +2,7 @@
 
 ## Custom Color Palette
 
-Shipyard uses a nautical-themed palette (in `apps/web/src/index.css`):
+Shipyard uses a nautical-themed palette (path TBD — web app will be rebuilt):
 - **Accent**: Picton Blue `#42cde5` / `oklch(0.6439 0.1906 199.38)`
 - **Neutrals**: Blue-tinted slate (Blue Bayoux `#4a5b74`, Geyser `#d6e1e0`)
 - **Warning**: Orange Roughy `#cc5113`
@@ -11,7 +11,7 @@ Shipyard uses a nautical-themed palette (in `apps/web/src/index.css`):
 
 ## Tailwind Config
 
-Located at `apps/web/tailwind.config.ts` — extends colors with CSS variables, maps `background`, `foreground`, `surface`, `muted`, `border`.
+Path TBD (web app will be rebuilt) — extends colors with CSS variables, maps `background`, `foreground`, `surface`, `muted`, `border`.
 
 ## Modal Pattern
 
@@ -32,7 +32,7 @@ Always three-level compound:
 
 ## Drawer (Custom from Modal Primitives)
 
-`apps/web/src/components/ui/drawer.tsx` — builds slide-in drawer using Modal.Backdrop/Container/Dialog with CSS animations via data attributes.
+Path TBD (web app will be rebuilt) — builds slide-in drawer using Modal.Backdrop/Container/Dialog with CSS animations via data attributes.
 
 ## useOverlayState Hook
 
@@ -112,12 +112,7 @@ Uses **lucide-react** icons. Size pattern: `className="w-4 h-4"`.
 
 ## Key Files
 
-- CSS + Theme: `apps/web/src/index.css`
-- Tailwind Config: `apps/web/tailwind.config.ts`
-- Drawer: `apps/web/src/components/ui/drawer.tsx`
-- Sign-in Modal: `apps/web/src/components/sign-in-modal.tsx`
-- Theme Toggle: `apps/web/src/components/theme-toggle.tsx`
-- Sidebar: `apps/web/src/components/sidebar.tsx`
+All paths TBD — web app will be rebuilt. The patterns above remain valid for when the app is recreated.
 
 ## v2 vs v3 Differences
 

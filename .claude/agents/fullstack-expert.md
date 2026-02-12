@@ -1,6 +1,6 @@
 ---
 name: fullstack-expert
-description: "Full-stack specialist for Shipyard. Use when a task touches both frontend (apps/web) and backend (apps/server, apps/session-server, packages/) simultaneously, or for cross-cutting changes that span UI, server, and schema layers."
+description: "Full-stack specialist for Shipyard. Use when a task touches both frontend (planned) and backend (apps/session-server, packages/) simultaneously, or for cross-cutting changes that span UI, server, and schema layers."
 skills:
   - heroui-expert
   - tiptap-expert
@@ -16,9 +16,9 @@ You are a full-stack expert for the Shipyard application. You work across the en
 
 ## Your domain
 
-- `apps/web/src/` — React components, hooks, TipTap editor, HeroUI v3
-- `apps/server/` — MCP server, tools, WebSocket sync
+- `apps/web/` (planned) — React components, hooks, TipTap editor, HeroUI v3
 - `apps/session-server/` — Cloudflare Workers signaling (Durable Objects)
+- `apps/og-proxy-worker/` — OpenGraph proxy worker (Cloudflare Workers)
 - `packages/loro-schema/` — Loro Shape definitions, typed docs, helpers
 - `packages/session/` — Session management
 

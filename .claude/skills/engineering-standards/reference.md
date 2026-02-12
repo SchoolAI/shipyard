@@ -3,7 +3,7 @@
 ## Gate 1: Pre-commit Hook
 
 **Config:** `package.json` > `simple-git-hooks.pre-commit`
-**Runs:** `pnpm check` = `bash scripts/validate-file-allowlist.sh && turbo run typecheck lint --filter='!@shipyard/session-server' --filter='!@shipyard/hook'`
+**Runs:** `pnpm check` = `bash scripts/validate-file-allowlist.sh && turbo run typecheck lint`
 
 Blocks commit if any gate fails. Session server and hook are filtered out (separate CI).
 
@@ -167,7 +167,7 @@ Blocks commit if any gate fails. Session server and hook are filtered out (separ
 ## Gate 7: Fan-In Based Coverage
 
 **Config:** `scripts/analyze-fan-in.ts`
-**Integrated in:** `apps/server/vitest.config.ts`, `apps/session-server/vitest.config.ts`, `packages/loro-schema/vitest.config.ts`
+**Integrated in:** `apps/session-server/vitest.config.ts`, `packages/loro-schema/vitest.config.ts`
 **Disable:** `DISABLE_FANIN_COVERAGE=1`
 
 ### How it works
@@ -202,8 +202,6 @@ All tiers with fan-in >= 3 require the same 60% branch threshold. The tier names
 | Directory | Description | Required test suffix |
 |---|---|---|
 | `apps/session-server/src/routes` | Session server routes | `.test.ts` |
-| `apps/server/src/http/routes` | HTTP routes | `.test.ts` |
-| `apps/server/src/mcp/tools` | MCP tools | `.test.ts` |
 | `packages/loro-schema/src` | `task-document.ts`, `room-document.ts` only | `.test.ts` |
 
 ### How it works

@@ -36,30 +36,8 @@ interface CoverageRequirement {
 }
 
 /**
- * TODO: Add directories that require integration test coverage.
- *
- * Examples of patterns you might add:
- *
- * ```typescript
- * {
- *   sourceDir: 'apps/server/src/tools',
- *   testSuffix: '.test.ts',
- *   sourcePattern: /^(?!.*\.test\.ts$).*\.ts$/,
- *   description: 'MCP Tools',
- * },
- * {
- *   sourceDir: 'apps/server/src/routes',
- *   testSuffix: '.integration.test.ts',
- *   sourcePattern: /^(?!.*\.test\.ts$).*\.ts$/,
- *   description: 'HTTP Routes',
- * },
- * {
- *   sourceDir: 'apps/daemon/src/handlers',
- *   testSuffix: '.test.ts',
- *   sourcePattern: /^(?!.*\.test\.ts$).*\.ts$/,
- *   description: 'WebSocket Handlers',
- * },
- * ```
+ * Add new directories here as apps are built.
+ * Each entry requires every source file to have a corresponding test file.
  */
 const COVERAGE_REQUIREMENTS: CoverageRequirement[] = [
   {

@@ -108,10 +108,9 @@ The editor uses these extensions:
 
 ## Key Files
 
-- `apps/web/src/editor/task-editor.tsx` — Editor React component (useEditor)
-- `apps/web/src/editor/extensions.ts` — Extension definitions (LoroExtension, CommentMark)
-- `apps/server/src/mcp/tools/create-task.ts` — Server-side markdown-to-TipTap converter (lines 14-103)
-- `apps/web/src/components/task/task-content.tsx` — Task content wrapper component
+- Path TBD — Editor React component (useEditor) — app will be rebuilt
+- Path TBD — Extension definitions (LoroExtension, CommentMark) — app will be rebuilt
+- Path TBD — Server-side markdown-to-TipTap converter — app will be rebuilt
 
 ## Further Reading
 

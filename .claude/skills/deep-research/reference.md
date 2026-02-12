@@ -19,7 +19,7 @@ Your mission: determine the complete list of files that need to change, and trac
 
 Steps:
 1. Use Glob to find all files in these directories:
-   [LIST SPECIFIC DIRECTORIES, e.g., "apps/server/src/tools/", "packages/loro-schema/src/"]
+   [LIST SPECIFIC DIRECTORIES, e.g., "apps/session-server/src/routes/", "packages/loro-schema/src/"]
 
 2. Read barrel exports (index.ts) in each affected directory to understand module boundaries
 
@@ -63,7 +63,7 @@ Your mission: find 2-3 existing implementations that are the closest analogy to 
 
 Steps:
 1. Search for analogous features:
-   [SPECIFIC SEARCH STRATEGIES, e.g., "Grep for other MCP tool definitions in apps/server/src/tools/", "Find other React components that use useHandle in apps/web/src/"]
+   [SPECIFIC SEARCH STRATEGIES, e.g., "Grep for route definitions in apps/session-server/src/routes/", "Find Loro shape patterns in packages/loro-schema/src/"]
 
 2. Read the most promising matches THOROUGHLY -- full files, not snippets. You need to understand:
    - File naming conventions
@@ -166,10 +166,9 @@ Your mission: identify every API surface, schema definition, cross-package depen
 
 Steps:
 1. Find public API surfaces in affected areas:
-   - MCP tool definitions: Grep for "tool(" or "defineTool" in apps/server/src/
-   - React component props: Grep for "interface.*Props" or "type.*Props" in apps/web/src/
    - Loro shapes: Read packages/loro-schema/src/shapes.ts
-   - HTTP routes: Grep for "router\." or "app\." in affected server files
+   - HTTP routes: Grep for route definitions in apps/session-server/src/routes/
+   - Package exports: Read index.ts barrel files in affected packages
 
 2. Check schema impact:
    - Read packages/loro-schema/src/shapes.ts fully
@@ -274,13 +273,13 @@ Then ask: **"Does this plan look right? Should I proceed?"**
 ## Customizing Subagent Prompts by Feature Type
 
 ### New MCP Tool
-- File Scope Mapper: focus on `apps/server/src/tools/`, barrel exports, tool registration
+- File Scope Mapper: focus on server tool directory (path TBD — server app will be rebuilt), barrel exports, tool registration
 - Pattern Matcher: search for existing tool definitions, especially ones with similar Loro operations
-- Test Scout: check if `apps/server/src/tools/` is a meta-test covered directory
+- Test Scout: check if the tool directory is a meta-test covered directory
 - Boundary Mapper: focus on tool input schema, Loro shape changes, server-only vs synced data
 
 ### New React UI Feature
-- File Scope Mapper: focus on `apps/web/src/`, component directories, route files
+- File Scope Mapper: focus on web app component directory (path TBD — web app will be rebuilt), route files
 - Pattern Matcher: search for similar components, especially Loro hook usage patterns
 - Test Scout: check for component test patterns, React Testing Library setup
 - Boundary Mapper: focus on component props, Loro selectors, ephemeral state boundaries
@@ -316,15 +315,12 @@ Quick reference for subagent prompt customization.
 - `packages/loro-schema/src/room-document.ts` -- RoomDocument wrapper class
 - `packages/loro-schema/src/index.ts` -- barrel exports
 
-### Server Layer
-- `apps/server/src/tools/` -- MCP tool definitions
-- `apps/server/src/loro/` -- Server-side Loro repo, sync, adapters
-- `apps/server/src/index.ts` -- Server entry point
+### Session Server
+- `apps/session-server/src/routes/` -- HTTP and WebSocket routes
+- `apps/session-server/src/index.ts` -- Server entry point
 
-### Web Layer
-- `apps/web/src/components/` -- React components
-- `apps/web/src/loro/` -- Loro hooks, selectors, context
-- `apps/web/src/routes/` -- Page routes
+### Other Apps
+- `apps/og-proxy-worker/` -- OpenGraph proxy worker
 
 ### Infrastructure
 - `scripts/analyze-fan-in.ts` -- Fan-in coverage analysis

@@ -135,13 +135,8 @@ shipyard/
 │   ├── decisions/              # ADRs (decision log)
 │   └── whips/                  # Work-in-progress designs
 ├── apps/
-│   ├── server/                 # MCP server + daemon (merged)
-│   │                           #   Loro persistence (LevelDB), agent spawning
-│   ├── web/                    # React app (TipTap editor, HeroUI v3)
-│   ├── hook/                   # Claude Code hooks
 │   ├── session-server/         # Auth + signaling (CF Workers + Durable Objects)
-│   ├── og-proxy-worker/        # OG meta injection for social previews
-│   └── mcp-proxy/              # MCP proxy
+│   └── og-proxy-worker/        # OG meta injection for social previews
 ├── packages/
 │   ├── loro-schema/            # Loro Shape definitions, helpers, types
 │   └── session/                # Session/auth shared types and client

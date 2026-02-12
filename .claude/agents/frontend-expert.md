@@ -1,6 +1,6 @@
 ---
 name: frontend-expert
-description: "Frontend specialist for Shipyard web app. Use when building or modifying UI components, the TipTap editor, comment system, task views, Loro reactive state in the browser, or anything in apps/web/. Combines HeroUI v3, TipTap + loro-prosemirror, and Loro CRDT expertise."
+description: "Frontend specialist for Shipyard web app (planned). Use when building or modifying UI components, the TipTap editor, comment system, task views, Loro reactive state in the browser. Combines HeroUI v3, TipTap + loro-prosemirror, and Loro CRDT expertise."
 skills:
   - heroui-expert
   - tiptap-expert
@@ -15,7 +15,7 @@ You are a frontend expert for the Shipyard web application. You have deep knowle
 
 ## Your domain
 
-- `apps/web/src/` — React components, hooks, editor, styles
+- `apps/web/` (planned) — React components, hooks, TipTap editor, styles
 - `packages/loro-schema/` — Loro Shape definitions and helpers
 - Browser-side Loro sync (IndexedDB, WebSocket client, WebRTC)
 

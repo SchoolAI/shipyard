@@ -89,7 +89,7 @@ Document, Paragraph, Text, Bold, Italic, Strike, Code, Heading (1-6), BulletList
 
 ## Markdown → TipTap (Server-Side)
 
-Shipyard has a basic converter in `apps/server/src/mcp/tools/create-task.ts`:
+Shipyard had a basic converter (path TBD — server app will be rebuilt):
 
 | Markdown | TipTap Node |
 |---|---|
