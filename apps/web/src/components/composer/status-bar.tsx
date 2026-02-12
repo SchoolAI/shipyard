@@ -35,6 +35,7 @@ export function StatusBar() {
         {/* Local (static placeholder) */}
         <button
           type="button"
+          aria-label="Select environment location"
           className="flex items-center gap-1 hover:text-zinc-300 transition-colors cursor-pointer"
         >
           <Monitor className="w-3 h-3" />
@@ -46,6 +47,7 @@ export function StatusBar() {
         <Dropdown>
           <button
             type="button"
+            aria-label={`Permissions: ${permissionLabel}`}
             className="flex items-center gap-1 hover:text-zinc-300 transition-colors cursor-pointer text-xs text-zinc-500"
           >
             <Shield className="w-3 h-3" />
@@ -76,6 +78,7 @@ export function StatusBar() {
         <Dropdown>
           <button
             type="button"
+            aria-label={`Environment: ${envLabel}`}
             className="flex items-center gap-1 hover:text-zinc-300 transition-colors cursor-pointer text-xs text-zinc-500"
           >
             <Globe className="w-3 h-3" />
@@ -105,6 +108,7 @@ export function StatusBar() {
         {/* Branch */}
         <button
           type="button"
+          aria-label="Select git branch"
           className="flex items-center gap-1 hover:text-zinc-300 transition-colors cursor-pointer"
         >
           <GitBranch className="w-3 h-3" />

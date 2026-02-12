@@ -10,7 +10,6 @@ interface SlashCommandMenuProps {
 }
 
 const COMMAND_SHORTCUTS: Record<string, { keys: Array<'command' | 'shift'>; label: string }> = {
-  plan: { keys: ['command'], label: 'P' },
   clear: { keys: ['command', 'shift'], label: 'K' },
 };
 

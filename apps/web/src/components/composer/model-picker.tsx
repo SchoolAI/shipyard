@@ -45,6 +45,7 @@ export function ModelPicker({ selectedModelId, onModelChange }: ModelPickerProps
     <Dropdown>
       <button
         type="button"
+        aria-label={`Model: ${displayLabel}`}
         className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-colors cursor-pointer"
       >
         {displayLabel}

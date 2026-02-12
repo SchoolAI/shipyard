@@ -23,6 +23,7 @@ export function ReasoningEffort({ level, onLevelChange }: ReasoningEffortProps) 
     <Dropdown>
       <button
         type="button"
+        aria-label={`Reasoning effort: ${currentLabel}`}
         className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-colors cursor-pointer"
       >
         {currentLabel}

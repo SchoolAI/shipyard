@@ -118,6 +118,7 @@ export function ChatComposer({ onSubmit }: ChatComposerProps) {
             onChange={handleChange}
             onKeyDown={handleKeyDown}
             placeholder="Ask Shipyard anything"
+            aria-label="Message input"
             rows={1}
             className="w-full bg-transparent text-zinc-100 placeholder-zinc-500 text-sm leading-relaxed resize-none outline-none"
             style={{ minHeight: `${MIN_HEIGHT}px`, maxHeight: `${MAX_HEIGHT}px` }}

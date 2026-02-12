@@ -8,7 +8,9 @@ export function TopBar() {
         variant="ghost"
         size="sm"
         className="text-zinc-300 hover:text-zinc-100 gap-1.5"
-        onPress={() => {}}
+        onPress={() => {
+          /** TODO: open new task dialog */
+        }}
       >
         <Plus className="w-4 h-4" />
         New task
@@ -32,7 +34,7 @@ export function TopBar() {
               Toggle terminal
               <Kbd>
                 <Kbd.Abbr keyValue="command" />
-                <Kbd.Content>J</Kbd.Content>
+                <Kbd.Content>`</Kbd.Content>
               </Kbd>
             </span>
           </Tooltip.Content>
@@ -55,7 +57,7 @@ export function TopBar() {
               <Kbd>
                 <Kbd.Abbr keyValue="command" />
                 <Kbd.Abbr keyValue="shift" />
-                <Kbd.Content>B</Kbd.Content>
+                <Kbd.Content>G</Kbd.Content>
               </Kbd>
             </span>
           </Tooltip.Content>

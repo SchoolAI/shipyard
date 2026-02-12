@@ -3,7 +3,7 @@ import { useHotkeys } from 'react-hotkeys-hook';
 /** Global keyboard shortcuts for the Shipyard app. */
 export function useAppHotkeys() {
   useHotkeys(
-    'meta+j',
+    'meta+`',
     () => {
       /** TODO: toggle terminal panel */
     },
@@ -11,7 +11,7 @@ export function useAppHotkeys() {
   );
 
   useHotkeys(
-    'meta+shift+b',
+    'meta+shift+g',
     () => {
       /** TODO: toggle diff panel */
     },

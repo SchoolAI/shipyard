@@ -27,9 +27,10 @@ function HeroState({ onSuggestionClick }: { onSuggestionClick: (text: string) =>
     <div className="flex flex-col items-center justify-center flex-1 w-full max-w-3xl mx-auto px-4">
       <div className="flex flex-col items-center gap-4 mb-16">
         <img src="/icon.svg" alt="Shipyard" className="w-20 h-20 object-contain opacity-80" />
-        <h2 className="text-2xl font-semibold text-zinc-100">Let's build</h2>
+        <h2 className="text-2xl font-semibold text-zinc-100">What are we building?</h2>
         <button
           type="button"
+          aria-label="Select project"
           className="flex items-center gap-1 text-zinc-500 text-sm hover:text-zinc-300 transition-colors cursor-pointer"
         >
           New project
@@ -41,6 +42,7 @@ function HeroState({ onSuggestionClick }: { onSuggestionClick: (text: string) =>
         <div className="flex items-center justify-end mb-2">
           <button
             type="button"
+            aria-label="Explore more suggestions"
             className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors cursor-pointer"
           >
             Explore more
@@ -51,6 +53,7 @@ function HeroState({ onSuggestionClick }: { onSuggestionClick: (text: string) =>
             <button
               key={card.id}
               type="button"
+              aria-label={`Use suggestion: ${card.text}`}
               className="text-left p-4 rounded-xl border border-zinc-800 bg-zinc-900/50 hover:bg-zinc-800/70 transition-colors cursor-pointer overflow-hidden min-w-0"
               onClick={() => onSuggestionClick(card.text)}
             >
