@@ -1,4 +1,4 @@
-import { Dropdown, Label } from '@heroui/react';
+import { Button, Dropdown, Label } from '@heroui/react';
 import { ChevronDown, GitBranch, Globe, Monitor, Shield } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
@@ -45,23 +45,28 @@ export function StatusBar() {
 
         {/* Permissions */}
         <Dropdown>
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="sm"
             aria-label={`Permissions: ${permissionLabel}`}
-            className="flex items-center gap-1 hover:text-foreground transition-colors cursor-pointer text-xs text-muted"
+            className="flex items-center gap-1 hover:text-foreground transition-colors text-xs text-muted"
           >
             <Shield className="w-3 h-3" />
             {permissionLabel}
             <ChevronDown className="w-2.5 h-2.5" />
-          </button>
+          </Button>
           <Dropdown.Popover placement="top" className="min-w-[180px]">
             <Dropdown.Menu
               selectionMode="single"
               selectedKeys={permissionKeys}
               onSelectionChange={(keys) => {
                 const selected = [...keys][0];
-                if (typeof selected === 'string') {
-                  setPermission(selected as PermissionLevel);
+                if (
+                  selected === 'default' ||
+                  selected === 'accept-edits' ||
+                  selected === 'bypass'
+                ) {
+                  setPermission(selected);
                 }
               }}
             >
@@ -76,23 +81,24 @@ export function StatusBar() {
 
         {/* Environment */}
         <Dropdown>
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="sm"
             aria-label={`Environment: ${envLabel}`}
-            className="flex items-center gap-1 hover:text-foreground transition-colors cursor-pointer text-xs text-muted"
+            className="flex items-center gap-1 hover:text-foreground transition-colors text-xs text-muted"
           >
             <Globe className="w-3 h-3" />
             {envLabel}
             <ChevronDown className="w-2.5 h-2.5" />
-          </button>
+          </Button>
           <Dropdown.Popover placement="top" className="min-w-[160px]">
             <Dropdown.Menu
               selectionMode="single"
               selectedKeys={envKeys}
               onSelectionChange={(keys) => {
                 const selected = [...keys][0];
-                if (typeof selected === 'string') {
-                  setEnvironment(selected as EnvironmentOption);
+                if (selected === 'none' || selected === 'nodejs' || selected === 'python') {
+                  setEnvironment(selected);
                 }
               }}
             >

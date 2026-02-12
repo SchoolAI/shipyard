@@ -1,4 +1,4 @@
-import { Kbd, ListBox } from '@heroui/react';
+import { ListBox } from '@heroui/react';
 import { useEffect, useRef } from 'react';
 import type { SlashCommand } from '../../hooks/use-slash-commands';
 
@@ -8,10 +8,6 @@ interface SlashCommandMenuProps {
   onSelect: (command: SlashCommand) => void;
   onClose: () => void;
 }
-
-const COMMAND_SHORTCUTS: Record<string, { keys: Array<'command' | 'shift'>; label: string }> = {
-  clear: { keys: ['command', 'shift'], label: 'K' },
-};
 
 export function SlashCommandMenu({
   commands,
@@ -23,7 +19,7 @@ export function SlashCommandMenu({
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+      if (e.target instanceof Node && menuRef.current && !menuRef.current.contains(e.target)) {
         onClose();
       }
     }
@@ -58,7 +54,6 @@ export function SlashCommandMenu({
         >
           {commands.map((command, index) => {
             const Icon = command.icon;
-            const shortcut = COMMAND_SHORTCUTS[command.id];
             const isSelected = index === selectedIndex;
 
             return (
@@ -77,14 +72,6 @@ export function SlashCommandMenu({
                     <span className="text-xs text-muted truncate">{command.description}</span>
                   </div>
                 </div>
-                {shortcut && (
-                  <Kbd className="shrink-0 ml-auto">
-                    {shortcut.keys.map((key) => (
-                      <Kbd.Abbr key={key} keyValue={key} />
-                    ))}
-                    <Kbd.Content>{shortcut.label}</Kbd.Content>
-                  </Kbd>
-                )}
               </ListBox.Item>
             );
           })}

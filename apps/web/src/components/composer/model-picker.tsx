@@ -1,4 +1,4 @@
-import { Description, Dropdown, Label } from '@heroui/react';
+import { Button, Description, Dropdown, Label } from '@heroui/react';
 import { ChevronDown } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
@@ -43,14 +43,15 @@ export function ModelPicker({ selectedModelId, onModelChange }: ModelPickerProps
 
   return (
     <Dropdown>
-      <button
-        type="button"
+      <Button
+        variant="ghost"
+        size="sm"
         aria-label={`Model: ${displayLabel}`}
-        className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs text-muted hover:text-foreground hover:bg-default transition-colors cursor-pointer"
+        className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs text-muted hover:text-foreground hover:bg-default transition-colors"
       >
         {displayLabel}
         <ChevronDown className="w-3 h-3" />
-      </button>
+      </Button>
       <Dropdown.Popover placement="top start" className="min-w-[220px]">
         <Dropdown.Menu
           selectionMode="single"

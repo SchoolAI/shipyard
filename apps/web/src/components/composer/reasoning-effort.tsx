@@ -1,4 +1,4 @@
-import { Dropdown, Label } from '@heroui/react';
+import { Button, Dropdown, Label } from '@heroui/react';
 import { ChevronDown } from 'lucide-react';
 import { useMemo } from 'react';
 
@@ -21,22 +21,23 @@ export function ReasoningEffort({ level, onLevelChange }: ReasoningEffortProps) 
 
   return (
     <Dropdown>
-      <button
-        type="button"
+      <Button
+        variant="ghost"
+        size="sm"
         aria-label={`Reasoning effort: ${currentLabel}`}
-        className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs text-muted hover:text-foreground hover:bg-default transition-colors cursor-pointer"
+        className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs text-muted hover:text-foreground hover:bg-default transition-colors"
       >
         {currentLabel}
         <ChevronDown className="w-3 h-3" />
-      </button>
+      </Button>
       <Dropdown.Popover placement="top start" className="min-w-[140px]">
         <Dropdown.Menu
           selectionMode="single"
           selectedKeys={selectedKeys}
           onSelectionChange={(keys) => {
             const selected = [...keys][0];
-            if (typeof selected === 'string') {
-              onLevelChange(selected as ReasoningLevel);
+            if (selected === 'low' || selected === 'medium' || selected === 'high') {
+              onLevelChange(selected);
             }
           }}
         >

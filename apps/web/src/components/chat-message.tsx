@@ -60,9 +60,17 @@ function UserMessage({ message }: ChatMessageProps) {
   );
 }
 
+function assertNever(value: never): never {
+  throw new Error(`Unexpected message role: ${String(value)}`);
+}
+
 export function ChatMessage({ message }: ChatMessageProps) {
-  if (message.role === 'user') {
-    return <UserMessage message={message} />;
+  switch (message.role) {
+    case 'user':
+      return <UserMessage message={message} />;
+    case 'agent':
+      return <AgentMessage message={message} />;
+    default:
+      return assertNever(message.role);
   }
-  return <AgentMessage message={message} />;
 }
