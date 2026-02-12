@@ -1,9 +1,10 @@
-import { Anchor } from 'lucide-react';
+import { Anchor, ChevronDown } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ChatComposer } from './chat-composer';
 import type { ChatMessageData } from './chat-message';
 import { ChatMessage } from './chat-message';
 import { StatusBar } from './composer/status-bar';
+import { TopBar } from './top-bar';
 
 const SUGGESTION_CARDS = [
   {
@@ -28,20 +29,36 @@ function HeroState({ onSuggestionClick }: { onSuggestionClick: (text: string) =>
           <Anchor className="w-8 h-8 text-zinc-400" />
         </div>
         <h2 className="text-2xl font-semibold text-zinc-100">Let's build</h2>
-        <p className="text-zinc-500 text-sm">New project</p>
+        <button
+          type="button"
+          className="flex items-center gap-1 text-zinc-500 text-sm hover:text-zinc-300 transition-colors cursor-pointer"
+        >
+          New project
+          <ChevronDown className="w-3.5 h-3.5" />
+        </button>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full max-w-3xl">
-        {SUGGESTION_CARDS.map((card) => (
+      <div className="w-full max-w-3xl">
+        <div className="flex items-center justify-end mb-2">
           <button
-            key={card.id}
             type="button"
-            className="text-left p-4 rounded-xl border border-zinc-800 bg-zinc-900/50 hover:bg-zinc-800/70 transition-colors cursor-pointer"
-            onClick={() => onSuggestionClick(card.text)}
+            className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors cursor-pointer"
           >
-            <p className="text-sm text-zinc-300 leading-relaxed">{card.text}</p>
+            Explore more
           </button>
-        ))}
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {SUGGESTION_CARDS.map((card) => (
+            <button
+              key={card.id}
+              type="button"
+              className="text-left p-4 rounded-xl border border-zinc-800 bg-zinc-900/50 hover:bg-zinc-800/70 transition-colors cursor-pointer"
+              onClick={() => onSuggestionClick(card.text)}
+            >
+              <p className="text-sm text-zinc-300 leading-relaxed">{card.text}</p>
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -98,9 +115,7 @@ export function ChatPage() {
 
   return (
     <div className="flex flex-col h-dvh bg-zinc-950">
-      <header className="flex items-center justify-center px-4 py-3 border-b border-zinc-800/50">
-        <h1 className="text-sm font-medium text-zinc-300">Shipyard</h1>
-      </header>
+      <TopBar />
 
       {hasMessages ? (
         <div ref={scrollRef} className="flex-1 overflow-y-auto">

@@ -15,14 +15,14 @@ export function AttachmentPopover() {
           <Plus className="w-4 h-4" />
         </Button>
       </Popover.Trigger>
-      <Popover.Content placement="top start" className="w-56">
+      <Popover.Content placement="top start" className="w-48 p-0">
         <Popover.Dialog>
-          <div className="py-1">
+          <div className="py-0.5">
             <button
               type="button"
-              className="flex items-center gap-2.5 w-full px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-800 rounded-lg transition-colors cursor-pointer"
+              className="flex items-center gap-2 w-full px-2.5 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 rounded transition-colors cursor-pointer"
             >
-              <Paperclip className="w-4 h-4 text-zinc-400" />
+              <Paperclip className="w-3.5 h-3.5 text-zinc-400" />
               Add photos & files
             </button>
           </div>

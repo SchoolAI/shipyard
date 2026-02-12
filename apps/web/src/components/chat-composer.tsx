@@ -1,5 +1,5 @@
-import { Button } from '@heroui/react';
-import { ArrowUp } from 'lucide-react';
+import { Button, Tooltip } from '@heroui/react';
+import { ArrowUp, Mic } from 'lucide-react';
 import type { KeyboardEvent } from 'react';
 import { useCallback, useRef, useState } from 'react';
 import { AttachmentPopover } from './composer/attachment-popover';
@@ -96,17 +96,33 @@ export function ChatComposer({ onSubmit }: ChatComposerProps) {
             <PlanModeToggle isActive={planMode} onToggle={() => setPlanMode((p) => !p)} />
           </div>
 
-          <Button
-            isIconOnly
-            variant="primary"
-            size="sm"
-            aria-label="Send message"
-            isDisabled={isEmpty}
-            className="rounded-full w-8 h-8 min-w-0"
-            onPress={handleSubmit}
-          >
-            <ArrowUp className="w-4 h-4" />
-          </Button>
+          <div className="flex items-center gap-1">
+            <Tooltip>
+              <Tooltip.Trigger>
+                <Button
+                  isIconOnly
+                  variant="ghost"
+                  size="sm"
+                  aria-label="Voice input"
+                  className="rounded-full text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 w-8 h-8 min-w-0"
+                >
+                  <Mic className="w-4 h-4" />
+                </Button>
+              </Tooltip.Trigger>
+              <Tooltip.Content>Voice input</Tooltip.Content>
+            </Tooltip>
+            <Button
+              isIconOnly
+              variant="primary"
+              size="sm"
+              aria-label="Send message"
+              isDisabled={isEmpty}
+              className="rounded-full w-8 h-8 min-w-0"
+              onPress={handleSubmit}
+            >
+              <ArrowUp className="w-4 h-4" />
+            </Button>
+          </div>
         </div>
       </div>
     </div>

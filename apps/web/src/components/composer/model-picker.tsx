@@ -1,17 +1,33 @@
-import { Dropdown, Label } from '@heroui/react';
+import { Description, Dropdown, Label } from '@heroui/react';
 import { ChevronDown } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 interface ModelConfig {
   id: string;
   label: string;
+  description: string;
   supportsReasoning: boolean;
 }
 
 const MODELS: ModelConfig[] = [
-  { id: 'claude-code', label: 'claude-code', supportsReasoning: true },
-  { id: 'claude-opus', label: 'claude-opus', supportsReasoning: true },
-  { id: 'claude-sonnet', label: 'claude-sonnet', supportsReasoning: false },
+  {
+    id: 'claude-code',
+    label: 'claude-code',
+    description: 'Optimized for coding tasks',
+    supportsReasoning: true,
+  },
+  {
+    id: 'claude-opus',
+    label: 'claude-opus',
+    description: 'Most capable, deep reasoning',
+    supportsReasoning: true,
+  },
+  {
+    id: 'claude-sonnet',
+    label: 'claude-sonnet',
+    description: 'Fast and balanced',
+    supportsReasoning: false,
+  },
 ];
 
 export interface ModelPickerProps {
@@ -34,7 +50,7 @@ export function ModelPicker({ selectedModelId, onModelChange }: ModelPickerProps
         {displayLabel}
         <ChevronDown className="w-3 h-3" />
       </button>
-      <Dropdown.Popover placement="top start" className="min-w-[180px]">
+      <Dropdown.Popover placement="top start" className="min-w-[220px]">
         <Dropdown.Menu
           selectionMode="single"
           selectedKeys={selectedKeys}
@@ -48,6 +64,7 @@ export function ModelPicker({ selectedModelId, onModelChange }: ModelPickerProps
           {MODELS.map((model) => (
             <Dropdown.Item key={model.id} id={model.id} textValue={model.label}>
               <Label>{model.label}</Label>
+              <Description>{model.description}</Description>
             </Dropdown.Item>
           ))}
         </Dropdown.Menu>
