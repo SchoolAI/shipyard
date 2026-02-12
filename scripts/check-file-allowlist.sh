@@ -42,6 +42,7 @@ ALLOWED_SCRIPTS=(
   "scripts/lint-comments.sh"
   "scripts/lint-typeassertions.sh"
   "scripts/check-file-allowlist.sh"
+  "scripts/validate-file-allowlist.sh"
 )
 
 # Get staged files (new or modified)

@@ -129,10 +129,8 @@
     },
     {
       "includes": [
-        "apps/github-oauth-worker/src/logger.ts",
         "apps/session-server/**/logger.ts",
-        "apps/session-server/**/logger.test.ts",
-        "apps/web/src/utils/logger.ts"
+        "apps/session-server/**/logger.test.ts"
       ],
       "linter": {
         "rules": {
@@ -158,39 +156,7 @@
       }
     },
     {
-      "includes": ["apps/web/src/pages/kanban-page.tsx"],
-      "linter": {
-        "rules": {
-          "a11y": {
-            "useSemanticElements": "off"
-          }
-        }
-      }
-    },
-    {
       "includes": [
-        "apps/web/src/components/changes-header-controls.tsx",
-        "apps/web/src/components/input-request-modal.tsx",
-        "apps/web/src/components/link-pr-button.tsx",
-        "apps/web/src/components/local-changes-viewer.tsx",
-        "apps/web/src/components/task/task-header.tsx",
-        "apps/web/src/pages/inbox-page.tsx",
-        "apps/web/src/pages/kanban-page.tsx"
-      ],
-      "linter": {
-        "rules": {
-          "complexity": {
-            "noExcessiveCognitiveComplexity": "warn"
-          }
-        }
-      }
-    },
-    {
-      "includes": [
-        "apps/server/src/mcp/**/*.ts",
-        "apps/server/src/loro/**/*.ts",
-        "apps/server/src/agents/**/*.ts",
-        "apps/server/src/http/**/*.ts",
         "**/mcp/**/*.ts",
         "**/loro/**/*.ts",
         "**/agents/**/*.ts",
