@@ -18,8 +18,6 @@
     "dev:schema": "turbo run dev --filter=@shipyard/loro-schema",
     "dev:session-server": "turbo run dev --filter=@shipyard/session-server",
     "dev:og-proxy": "turbo run dev --filter=@shipyard/og-proxy-worker",
-    "cleanup": "bash scripts/cleanup.sh",
-    "reset": "bash scripts/reset-all.sh",
     "prepare": "simple-git-hooks"
   },
   "devDependencies": {

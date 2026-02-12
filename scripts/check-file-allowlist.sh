@@ -37,14 +37,10 @@ ALLOWED_DOCS=(
 # Allowlisted scripts
 ALLOWED_SCRIPTS=(
   "scripts/analyze-fan-in.ts"
-  "scripts/check-npm-deps.js"
   "scripts/dev-all.sh"
   "scripts/dev-local.sh"
-  "scripts/cleanup.sh"
-  "scripts/reset-all.sh"
   "scripts/lint-comments.sh"
   "scripts/lint-typeassertions.sh"
-  "scripts/generate-icons.py"
   "scripts/check-file-allowlist.sh"
 )
 
