@@ -26,6 +26,10 @@ packages/
 - **Build:** pnpm + tsup + Biome (NOT ESLint)
 - **Testing:** Vitest with fan-in based coverage
 
+## Task Tool Bug Workaround
+
+**Always use `run_in_background: true`** on all Task tool calls. There is a known Claude Code bug ([#22087](https://github.com/anthropics/claude-code/issues/22087)) where `classifyHandoffIfNeeded is not defined` crashes agents at completion. The bug is in the ctrl+b "move to background" handler — starting agents in background mode from the beginning bypasses it. Use `Read` on the `output_file` to retrieve results.
+
 ## Skills & Subagents
 
 Domain expertise is in skills — use subagents to keep the main context clean.

@@ -69,20 +69,6 @@ const COVERAGE_REQUIREMENTS: CoverageRequirement[] = [
     description: 'Session Server Routes',
   },
   {
-    sourceDir: 'apps/server/src/http/routes',
-    testSuffix: '.test.ts',
-    sourcePattern: /^(?!.*\.test\.ts$).*\.ts$/,
-    description: 'Server HTTP Routes',
-  },
-  {
-    sourceDir: 'apps/server/src/mcp/tools',
-    testSuffix: '.test.ts',
-    sourcePattern: /^(?!.*\.test\.ts$).*\.ts$/,
-    description: 'Server MCP Tools',
-  },
-  // High fan-in models - TaskDocument and RoomDocument are coordination layers
-  // that will be used across MCP tools, routes, and WebSocket handlers
-  {
     sourceDir: 'packages/loro-schema/src',
     testSuffix: '.test.ts',
     sourcePattern: /^(task-document|room-document)\.ts$/,

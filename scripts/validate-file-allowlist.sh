@@ -32,34 +32,21 @@ ALLOWED_DOCS=(
   "docs/decisions/0007-partial-bun-migration.md"
   "docs/decisions/template.md"
 
-  # Skills
-  "skills/shipyard/README.md"
-  "skills/shipyard/SKILL.md"
-  "skills/shipyard/examples/html-artifacts.md"
-  "skills/shipyard/examples/task-example.md"
-  "skills/shipyard/examples/video-recording.md"
-
   # Config
   ".codex/README.md"
   ".grit/README.md"
 )
 
 ALLOWED_SCRIPTS=(
+  "scripts/analyze-fan-in.ts"
   "scripts/check-npm-deps.js"
   "scripts/dev-all.sh"
-  "scripts/dev-isolated.sh"
   "scripts/dev-local.sh"
   "scripts/cleanup.sh"
   "scripts/reset-all.sh"
-  "scripts/hooks-local.sh"
-  "scripts/hooks-prod.sh"
   "scripts/lint-comments.sh"
   "scripts/lint-typeassertions.sh"
-  "scripts/setup-hooks-dev.sh"
-  "scripts/restore-hooks-prod.sh"
-  "scripts/claude-shim.sh"
   "scripts/generate-icons.py"
-  "scripts/inspect-plan.mjs"
   "scripts/check-file-allowlist.sh"
   "scripts/validate-file-allowlist.sh"
 )
@@ -77,6 +64,11 @@ violations=()
 while IFS= read -r file; do
   # Skip empty lines
   [[ -z "$file" ]] && continue
+
+  # Exception: .claude/ is project config (skills, agents, hooks)
+  if [[ "$file" =~ ^\.claude/ ]]; then
+    continue
+  fi
 
   # Exception: docs/whips/ is a sandbox
   if [[ "$file" =~ ^docs/whips/ ]]; then

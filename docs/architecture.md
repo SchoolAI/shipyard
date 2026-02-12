@@ -1,12 +1,65 @@
 # Shipyard Architecture
 
-> **TODO:** This document is stale (last updated 2026-01-02) and needs a comprehensive refresh to reflect current implementation. Key areas to update: network topology, technology versions, URL encoding format, and remove outdated references.
-
-This document captures the current architecture based on research and spikes conducted on 2026-01-02.
+This document captures the current architecture of Shipyard.
 
 **Key Technology Decisions:** See [decisions/](./decisions/) for the evolution of architectural choices.
 
-**Current stack:** Yjs + BlockNote ([ADR-0001](./decisions/0001-use-yjs-not-loro.md))
+**Current stack:** Loro CRDT (loro-extended) + TipTap + HeroUI v3
+
+---
+
+## High-Level Architecture
+
+Shipyard uses a **hub-and-spoke model** for real-time collaboration between humans and AI agents.
+
+```
+                          ┌──────────────────────────┐
+                          │   Session Server          │
+                          │   (CF Workers + Durable   │
+                          │    Objects)                │
+                          │   • Auth (Shipyard JWT)    │
+                          │   • WebRTC signaling       │
+                          │   • Peer discovery         │
+                          └─────────┬──────────────────┘
+                                    │
+                 ┌──────────────────┼──────────────────┐
+                 │                  │                   │
+        ┌────────▼───────┐  ┌──────▼───────┐  ┌───────▼───────┐
+        │  Developer A    │  │  Browser B    │  │  Phone C      │
+        │  Machine        │  │  (reviewer)   │  │  (mobile)     │
+        │                 │  │               │  │               │
+        │  ┌───────────┐  │  │  IndexedDB    │  │  IndexedDB    │
+        │  │ Daemon/MCP │  │  │  persistence  │  │  persistence  │
+        │  │ Server     │  │  │               │  │               │
+        │  │ (Node.js)  │  │  └───────────────┘  └───────────────┘
+        │  │ • LevelDB  │  │
+        │  │ • Agent    │  │         All peers sync via
+        │  │   spawning │  │         Loro CRDT over WebRTC
+        │  └─────┬──────┘  │
+        │        │ MCP     │
+        │   ┌────▼──────┐  │
+        │   │ AI Agents  │  │
+        │   │ • Claude   │  │
+        │   │ • Codex    │  │
+        │   │ • etc.     │  │
+        │   └────────────┘  │
+        └──────────────────┘
+```
+
+### Key Principles
+
+- The **daemon** (merged into `apps/server/`) runs on each developer machine and is the interface for ALL local agents
+- The **session server** connects peers: browsers, phones, other daemons
+- Data syncs via **Loro CRDT** using loro-extended adapters
+- P2P sync via **WebRTC**, persistence via **LevelDB** (server) and **IndexedDB** (browser)
+- Auth uses **Shipyard JWT** issued by the session server (GitHub OAuth for identity)
+
+### Room Topology
+
+| Room Type | Pattern | Purpose |
+|-----------|---------|---------|
+| Personal | `user:{id}` | One per user, tracks all agents across machines |
+| Collaboration | `collab:{uuid}` | Ad-hoc sharing, pre-signed URL access |
 
 ---
 
@@ -19,16 +72,16 @@ Shipyard uses a layered data model where different types of data live in differe
 │                    DATA HIERARCHY                               │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
-│  SOURCE OF TRUTH: Distributed CRDT State                        │
+│  SOURCE OF TRUTH: Distributed Loro CRDT State                   │
 │  ├── Browser IndexedDB (persistent, survives refresh)           │
-│  ├── Other peers' browsers (distributed backup)                 │
-│  └── MCP server (while session active)                          │
+│  ├── Other peers' storage (distributed backup)                  │
+│  └── Daemon LevelDB (while running on dev machine)              │
 │                                                                 │
 │  SNAPSHOTS: URLs                                                │
 │  ├── Can be generated anytime from current state                │
 │  ├── Shareable "save points"                                    │
 │  ├── Include: task structure + annotations + status             │
-│  └── Multiple snapshots can exist (version history)             │
+│  └── Compressed via lz-string in URL query params               │
 │                                                                 │
 │  BLOBS: GitHub                                                  │
 │  └── Binary artifacts only (screenshots, videos, test results)  │
@@ -43,81 +96,81 @@ URLs are **materialized views** of the current state that can be regenerated at 
 - Save points / bookmarks
 - Recovery mechanism if local state is lost
 
-The actual source of truth is the distributed CRDT state stored in browser IndexedDB and synced across peers. Task data lives in the CRDT, not in GitHub.
+The actual source of truth is the distributed Loro CRDT state synced across peers. Task data lives in the CRDT, not in GitHub.
 
 ---
 
-## Network Architecture
+## Technology Choices
+
+| Component | Choice | Key Packages |
+|-----------|--------|-------------|
+| CRDT | Loro | `loro-crdt`, `@loro-extended/*` (repo, adapters, react) |
+| Rich text editor | TipTap v3 | `@tiptap/react`, `@tiptap/starter-kit`, `loro-prosemirror` |
+| UI framework | HeroUI v3 + React | `@heroui/react`, `@heroui/styles`, Tailwind CSS v4 |
+| CRDT sync (P2P) | WebRTC | `@loro-extended/adapter-webrtc` |
+| CRDT sync (server) | WebSocket | `@loro-extended/adapter-websocket` |
+| Persistence (server) | LevelDB | `@loro-extended/adapter-leveldb` |
+| Persistence (browser) | IndexedDB | `@loro-extended/adapter-indexeddb` |
+| URL compression | lz-string | `lz-string` |
+| Auth/sessions | Shipyard JWT | `@shipyard/session`, GitHub OAuth |
+| Session server | Cloudflare Workers | Durable Objects for signaling |
+| MCP SDK | Official SDK | `@modelcontextprotocol/sdk` |
+| API layer | Hono | `hono`, `@hono/node-server` |
+| Build (apps) | tsup / Vite | `tsup` (server), `vite` (web) |
+| Build (packages) | bunup | `bunup` |
+| Linting | Biome | `@biomejs/biome` |
+| Testing | Vitest | `vitest` |
+| Package manager | pnpm | Workspace with catalogs |
+
+---
+
+## Project Structure
 
 ```
-┌────────────────────────────────────┐    ┌────────────────────────┐
-│     Your Machine                   │    │     Remote Peer        │
-│                                    │    │                        │
-│  ┌──────────────────────────────┐  │    │  ┌──────────────────┐  │
-│  │ AI Agent (Claude)            │  │    │  │ Browser          │  │
-│  └──────────┬───────────────────┘  │    │  │ (y-webrtc)       │  │
-│             │ MCP                  │    │  └──────────┬───────┘  │
-│             ▼                      │    └─────────────┼──────────┘
-│  ┌──────────────────────────────┐  │                  │
-│  │ MCP Server (Node.js)         │  │                  │
-│  │ • yjs                        │  │                  │ WebRTC P2P
-│  │ • y-websocket (server)       │  │                  │
-│  └──────────┬───────────────────┘  │                  │
-│             │ WebSocket            │                  │
-│             │ (localhost)          │                  │
-│             ▼                      │                  │
-│  ┌──────────────────────────────┐  │                  │
-│  │ Author's Browser             │◄─┼──────────────────┘
-│  │ • yjs                        │  │
-│  │ • y-websocket (client)       │  │
-│  │ • y-webrtc (for peers)       │  │
-│  │ • y-indexeddb (persistence)  │  │
-│  └──────────────────────────────┘  │
-└────────────────────────────────────┘
+shipyard/
+├── docs/
+│   ├── architecture.md         # This file
+│   ├── development.md          # Dev setup guide
+│   ├── engineering-standards.md # Code standards
+│   ├── decisions/              # ADRs (decision log)
+│   └── whips/                  # Work-in-progress designs
+├── apps/
+│   ├── server/                 # MCP server + daemon (merged)
+│   │                           #   Loro persistence (LevelDB), agent spawning
+│   ├── web/                    # React app (TipTap editor, HeroUI v3)
+│   ├── hook/                   # Claude Code hooks
+│   ├── session-server/         # Auth + signaling (CF Workers + Durable Objects)
+│   ├── og-proxy-worker/        # OG meta injection for social previews
+│   └── mcp-proxy/              # MCP proxy
+├── packages/
+│   ├── loro-schema/            # Loro Shape definitions, helpers, types
+│   └── session/                # Session/auth shared types and client
+└── spikes/                     # Proof of concept code
 ```
-
-### Sync Topology
-
-1. **MCP ↔ Browser**: WebSocket (validated in spike)
-2. **Browser ↔ Browser**: WebRTC via public signaling (`wss://signaling.yjs.dev`)
-3. **Persistence**: IndexedDB in each browser
 
 ---
 
 ## URL Encoding
 
-### Approach
-
-Based on research of production systems (itty.bitty, Excalidraw, textarea.my):
-
-- **Library**: `lz-string` with `compressToEncodedURIComponent()`
-- **Compression**: 40-60% reduction typical
-- **Safe capacity**: 2-4KB compressed (all browsers), up to 10KB (modern)
-
-### URL Structure
+Shipyard encodes task snapshots into shareable URLs using `lz-string`:
 
 ```
 https://{host}/?d={compressed-data}
 
 Where compressed-data = lz-string.compressToEncodedURIComponent(JSON.stringify({
   v: 1,                    // Version for forward compatibility
-  id: "task-abc123",       // Task ID (hash of initial content)
+  id: "task-abc123",       // Task ID
   repo: "org/repo",        // GitHub repo for artifacts
   pr: 42,                  // PR number
   title: "...",            // Task title
   steps: [...],            // Step definitions
-  artifacts: [...],        // Artifact references (filenames only)
+  artifacts: [...],        // Artifact references
   annotations: [...],      // Current annotations (snapshot)
   status: "pending_review" // Current status (snapshot)
 }))
 ```
 
-### Versioning
-
-The `v` field allows schema evolution:
-- `v: 1` = current schema
-- Future versions can add fields, change structure
-- Decoder checks version and handles accordingly
+Safe capacity: 2-4KB compressed (all browsers), up to 10KB (modern browsers).
 
 ---
 
@@ -128,7 +181,7 @@ The `v` field allows schema evolution:
 | Scenario | Data Lost | Recovery |
 |----------|-----------|----------|
 | Browser storage cleared | Local CRDT state | Sync from peers, or load URL snapshot |
-| All peers offline | Nothing | Load from local IndexedDB |
+| All peers offline | Nothing | Load from local IndexedDB or LevelDB |
 | GitHub artifacts deleted | Binary blobs | Task + annotations intact, just missing visuals |
 | User loses URL | Nothing | Generate new URL from current state |
 | **Catastrophic**: All storage + no peers + no URLs | Everything | Would need to recreate |
@@ -137,44 +190,21 @@ The `v` field allows schema evolution:
 
 Requires ALL of these simultaneously:
 1. User's browser storage cleared
-2. All peers' browser storage cleared
-3. No URL snapshots saved anywhere (bookmarks, messages, etc.)
+2. Daemon's LevelDB cleared
+3. All peers' storage cleared
+4. No URL snapshots saved anywhere (bookmarks, messages, etc.)
 
 The distributed nature of P2P means data naturally replicates across peers.
 
 ---
 
-## Technology Choices
-
-| Component | Choice | Package | Rationale |
-|-----------|--------|---------|-----------|
-| CRDT | Yjs | `yjs@13.6.0` | Mature, BlockNote-native |
-| Block editor | BlockNote | `@blocknote/react@0.18.0` | Notion-like UI, built-in comments |
-| MCP ↔ Browser | y-websocket | `y-websocket@2.0.4` | WebSocket provider for Yjs |
-| Browser ↔ Browser | y-webrtc | `y-webrtc@10.3.0` | P2P sync for remote reviewers |
-| Browser storage | IndexedDB | `y-indexeddb@9.0.12` | Persistence across sessions |
-| Comments | BlockNote native | `YjsThreadStore` | Threaded comments, reactions |
-| URL compression | lz-string | `lz-string@1.5.0` | Purpose-built for URL encoding, small, fast |
-| MCP SDK | Official SDK | `@modelcontextprotocol/sdk` | Agent integration |
-| UI framework | React | `react@18.3.0` | BlockNote is React-native |
-| Artifact storage | GitHub orphan branch | GitHub API | Same repo, same permissions |
-| Build tool | tsdown | `tsdown@0.3.1` | 49% faster than tsup |
-| Linting | Biome | `biome@1.9.4` | 20-50x faster than ESLint |
-| Testing | Vitest | `vitest@2.1.0` | Fast, parallel execution |
-
-See [engineering-standards.md](./engineering-standards.md#shipyard-tech-stack) for full stack details and [decisions/0001-use-yjs-not-loro.md](./decisions/0001-use-yjs-not-loro.md) for decision rationale.
-
----
-
-## Open Decisions (Two-Way Doors)
+## Open Decisions
 
 These decisions can be revised as we build:
 
 | Decision | Current Thinking | Revisable? |
 |----------|------------------|------------|
 | Task ID format | Hash of initial content | Yes |
-| Title mutability | Probably immutable | Yes |
-| Steps mutability | Probably mutable (via CRDT) | Yes |
 | URL max size handling | Start with inline, add hash fallback if needed | Yes |
 | Artifact URL pattern | `raw.githubusercontent.com/{repo}/task-artifacts/pr-{pr}/{task-id}/{file}` | Yes |
 
@@ -183,10 +213,11 @@ These decisions can be revised as we build:
 ## References
 
 - [loro-extended GitHub](https://github.com/SchoolAI/loro-extended)
-- [lz-string GitHub](https://github.com/pieroxy/lz-string)
+- [TipTap documentation](https://tiptap.dev)
+- [HeroUI v3 documentation](https://v3.heroui.com)
 - [MCP TypeScript SDK](https://github.com/modelcontextprotocol/typescript-sdk)
-- Spike code: `spikes/loro-websocket/`
+- [lz-string GitHub](https://github.com/pieroxy/lz-string)
 
 ---
 
-*Last updated: 2026-01-02*
+*Last updated: 2026-02-11*

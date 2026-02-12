@@ -33,31 +33,11 @@ catalog:
   express: "^5.2.1"
   lz-string: "^1.5.0"
 
-  # ===== Yjs ecosystem =====
-  yjs: "^13.6.29"
-  y-websocket: "^3.0.0"
-  y-webrtc: "^10.3.0"
-  y-protocols: "^1.0.7"
-  y-leveldb: "^0.2.0"
-  y-indexeddb: "^9.0.12"
-  lib0: "^0.2.117"
-
-  # ===== BlockNote =====
-  "@blocknote/core": "^0.46.1"
-  "@blocknote/mantine": "^0.46.1"
-  "@blocknote/react": "^0.46.1"
-  "@blocknote/server-util": "^0.46.1"
-
   # ===== React =====
   react: "^19.2.3"
   react-dom: "^19.2.3"
   "@types/react": "^19.2.9"
   "@types/react-dom": "^19.2.3"
-
-  # ===== tRPC =====
-  "@trpc/client": "^11.8.1"
-  "@trpc/server": "^11.8.1"
-  "@trpc/react-query": "^11.8.1"
 
   # ===== External API clients =====
   "@modelcontextprotocol/sdk": "^1.25.3"
@@ -87,10 +67,6 @@ catalog:
   "@tailwindcss/vite": "^4.1.18"
   tailwind-merge: "^3.4.0"
   tailwind-variants: "^3.2.2"
-
-  # ===== Mantine =====
-  "@mantine/core": "^8.3.13"
-  "@mantine/hooks": "^8.3.13"
 
   # ===== Vite =====
   vite: "^7.3.1"

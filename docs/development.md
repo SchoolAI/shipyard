@@ -55,10 +55,7 @@ pnpm dev:all
 This starts all services:
 - Web UI on `http://localhost:5173`
 - MCP server with hot reload (auto-restarts on code changes)
-- Signaling server, OAuth worker, OG proxy
-- Auto-configures unique ports if running in a feature worktree
-
-**Parallel worktrees?** No setup needed - just run `pnpm dev:all` in each worktree. Auto-detects branch and assigns unique ports.
+- Session server (handles OAuth + WebRTC signaling via Cloudflare Worker)
 
 ### Testing the MCP
 
@@ -88,10 +85,9 @@ pnpm dev:isolated
 ```
 
 This runs all services in Docker containers with:
-- Static ports (no hashing) - Registry always on :32191, Web on :5173
+- Static ports (no hashing) - Web on :5173
 - Isolated state per worktree (separate Docker volumes)
 - Predictable cleanup (`docker compose down`)
-- Daemon shims Claude execution (logs spawn requests instead of executing)
 
 ### Why Use Docker Mode
 
@@ -103,7 +99,7 @@ This runs all services in Docker containers with:
 
 **Use native (`pnpm dev:all`) when:**
 - Quick iteration on code changes (faster HMR)
-- Using Claude Code agent features (daemon shimmed in Docker)
+- Using Claude Code agent features
 - Default development workflow
 
 ### Docker Commands
@@ -140,67 +136,11 @@ Valid levels: `debug`, `info`, `warn`, `error`
 - Docker Desktop installed and running
 - Same Node.js/pnpm requirements as native mode
 
-### Inspecting Shim Logs
-
-In Docker mode, the daemon logs Claude spawn requests instead of executing them:
-
-```bash
-# View recent shim logs
-docker compose exec daemon ls -lt /var/log/shipyard
-
-# Read a specific log
-docker compose exec daemon cat /var/log/shipyard/claude-spawn-{taskId}-{timestamp}.log
-```
-
-These logs show what prompts would be sent to Claude, useful for prompt evaluation.
-
 ---
 
 ## Agent Launcher Daemon
 
-The daemon enables browser → agent triggering. Click "+ Create Task" in Shipyard UI to launch Claude Code on your machine.
-
-### How It Works
-
-**Self-propagating bootstrap:**
-1. First Claude Code session with Shipyard MCP
-2. MCP auto-spawns daemon (detached process)
-3. Daemon survives when Claude Code exits
-4. Browser can trigger new Claude Code sessions
-
-**Port:** 56609 (configurable via DAEMON_PORT)
-**Lock file:** `~/.shipyard/daemon.lock`
-
-### Manual Control
-
-```bash
-# Start daemon manually
-npx shipyard
-
-# Check if running
-curl http://localhost:56609/health
-
-# Stop daemon
-pkill -f "shipyard/apps/daemon"
-
-# Or kill via PID from lock file
-kill $(cat ~/.shipyard/daemon.lock | head -1)
-```
-
-### Troubleshooting
-
-**Daemon not starting:**
-- Check lock file: `cat ~/.shipyard/daemon.lock`
-- Check for stale lock (process dead): `ps aux | grep <PID>`
-- Remove stale lock: `rm ~/.shipyard/daemon.lock`
-
-**Port conflicts:**
-- If port in use, daemon won't start
-
-**Browser can't connect:**
-- Verify daemon running: `curl http://localhost:56609/health`
-- Check browser console for WebSocket errors
-- Ensure no firewall blocking localhost connections
+The daemon is built into the MCP server (`apps/server/`). It enables browser-to-agent triggering: click "+ Create Task" in the Shipyard UI to launch Claude Code on your machine. The daemon starts automatically when the MCP server runs.
 
 ---
 
@@ -309,9 +249,8 @@ cp ~/.claude/settings.json.backup-1737445678 ~/.claude/settings.json
 
 Each app has configurable environment variables. See the `.env.example` file in each app directory:
 
-- `apps/server/.env.example` - MCP server configuration
 - `apps/hook/.env.example` - Hook configuration
-- `apps/signaling/.env.example` - Signaling server configuration
+- `apps/web/.env.example` - Web app configuration
 
 To customize:
 1. Copy `.env.example` to `.env` in the app directory
@@ -542,7 +481,7 @@ Run build first:
 pnpm build
 ```
 
-The IDE needs the built `.d.mts` files from schema package.
+The IDE needs the built `.d.mts` files from the loro-schema package.
 
 ### Port Conflicts (EADDRINUSE)
 
@@ -649,4 +588,4 @@ grep "AskUserQuestion\|ExitPlanMode" ~/.shipyard/hook-debug.log
 
 ---
 
-*Last updated: 2026-01-31*
+*Last updated: 2026-02-11*

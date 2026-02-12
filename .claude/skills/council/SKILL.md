@@ -96,6 +96,8 @@ You are a [PERSONA NAME] reviewing a [DECISION TYPE] for the Shipyard project.
 
 **Subagent tool restrictions:** Each subagent should only use read-only research tools: Read, Grep, Glob, WebSearch, WebFetch. They CANNOT spawn their own subagents, edit files, or run commands.
 
+**Use existing agents for matching personas:** When the Standards Enforcer persona is selected, use `subagent_type: "engineering-standards"` instead of a generic agent — it auto-loads the engineering-standards skill with full rule knowledge. Similarly, use `subagent_type: "frontend-expert"` or `subagent_type: "backend-expert"` when a persona aligns with those domains.
+
 ### Step 4: Synthesize
 
 After all subagents return, write a structured synthesis:
