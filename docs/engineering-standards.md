@@ -173,63 +173,16 @@ const totalPrice = items.reduce((sum, item) => sum + item.price, 0);
 | Node Version | Node.js LTS | 22.14.0 | |
 | TypeScript | TypeScript | 5.9.x | Strict mode |
 | Build Tool | tsup | 8.5.1 | Workspace bundling |
+| CSS Framework | Tailwind CSS | 4.x | Used by HeroUI v3 |
 | Validation | zod | 3.23.x | Runtime validation |
 | Linting | Biome | 2.x | Fast, no ESLint |
 | Testing | Vitest | 4.x | Parallel execution |
-| CRDT | Yjs | 13.6.x | Collaborative editing |
-| Block Editor | BlockNote | 0.18.x | Notion-like UI |
-| MCP ↔ Browser | y-websocket | 2.0.x | WebSocket sync |
-| Browser ↔ Browser | y-webrtc | 10.3.x | P2P sync |
+| CRDT | Loro (via loro-extended) | latest | Collaborative editing |
+| Block Editor | TipTap + loro-prosemirror | latest | Rich text with CRDT sync |
+| Sync | loro-extended adapters | latest | WebSocket + P2P via Loro |
 | UI Framework | React | 18.x | |
 | UI Components | HeroUI v3 | beta | Tailwind v4 required |
 
-See [decisions/0001-use-yjs-not-loro.md](./decisions/0001-use-yjs-not-loro.md) for CRDT choice rationale.
-
 ---
 
-## AI-Assisted Development
-
-### Use Agents Aggressively
-
-Launch agents for any non-trivial task. They work in parallel while you do other things.
-
-```typescript
-// Launch multiple agents simultaneously
-Task("Implement feature X", ..., run_in_background: true)
-Task("Implement feature Y", ..., run_in_background: true)
-Task("Implement feature Z", ..., run_in_background: true)
-```
-
-### Always Run Adversarial Review
-
-After any significant implementation, run an adversarial review agent. The goal is to **disprove correctness**, not confirm it works.
-
-```markdown
-CRITICAL: Try to DISPROVE this is correct. Read FULL files for context.
-
-Look for:
-- Race conditions
-- Data loss scenarios
-- Memory leaks
-- Type safety holes
-- Missing error handling
-- Edge cases
-
-Report exact file:line references. If you find nothing wrong, state what you checked.
-```
-
-A review that says "looks good" provides zero value. Find what's wrong.
-
-### Model Selection
-
-| Task | Model |
-|------|-------|
-| Complex implementation | Opus |
-| Adversarial review | Opus |
-| Simple fixes | Sonnet or Haiku |
-
-When in doubt, use Opus for anything non-trivial.
-
----
-
-*Last updated: 2026-01-31*
+*Last updated: 2026-02-11*

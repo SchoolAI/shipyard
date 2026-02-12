@@ -3,38 +3,6 @@
     {
       "name": "shipyard",
       "path": "."
-    },
-    {
-      "name": "\ud83c\udf33\ud83d\udee1\ufe0f 103-exit-plan-permissions",
-      "path": "../shipyard-wt/103-exit-plan-permissions"
-    },
-    {
-      "name": "\ud83c\udf33\ud83d\udc41\ufe0f 162-agent-activity",
-      "path": "../shipyard-wt/162-agent-activity"
-    },
-    {
-      "name": "\ud83c\udf33\ud83d\udd27 181-crdt-corruptted-data",
-      "path": "../shipyard-wt/181-crdt-corruptted-data"
-    },
-    {
-      "name": "\ud83c\udf33\u2705 184-zero-changes",
-      "path": "../shipyard-wt/184-zero-changes"
-    },
-    {
-      "name": "\ud83c\udf33\ud83d\udd11 183-process-token",
-      "path": "../218-a2a-for-daemon-wt/183-process-token"
-    },
-    {
-      "name": "\ud83c\udf33\ud83e\uddf9 206-code-restrictions",
-      "path": "../218-a2a-for-daemon-wt/206-code-restrictions"
-    },
-    {
-      "name": "\ud83c\udf33\ud83d\udcdd 204-attribution",
-      "path": "../218-a2a-for-daemon-wt/204-attribution"
-    },
-    {
-      "name": "\ud83c\udf33\ud83c\udfa8 211-side-by-side",
-      "path": "../218-a2a-for-daemon-wt/211-side-by-side"
     }
   ]
 }
