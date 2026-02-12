@@ -46,7 +46,7 @@ export function ModelPicker({ selectedModelId, onModelChange }: ModelPickerProps
       <button
         type="button"
         aria-label={`Model: ${displayLabel}`}
-        className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-colors cursor-pointer"
+        className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs text-muted hover:text-foreground hover:bg-default transition-colors cursor-pointer"
       >
         {displayLabel}
         <ChevronDown className="w-3 h-3" />

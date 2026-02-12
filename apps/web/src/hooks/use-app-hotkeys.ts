@@ -1,20 +1,13 @@
 import { useHotkeys } from 'react-hotkeys-hook';
 
-/** Global keyboard shortcuts for the Shipyard app. */
-export function useAppHotkeys() {
-  useHotkeys(
-    'meta+`',
-    () => {
-      /** TODO: toggle terminal panel */
-    },
-    { preventDefault: true }
-  );
+interface AppHotkeyOptions {
+  onToggleTerminal: () => void;
+  onToggleDiff: () => void;
+}
 
-  useHotkeys(
-    'meta+shift+g',
-    () => {
-      /** TODO: toggle diff panel */
-    },
-    { preventDefault: true }
-  );
+/** Global keyboard shortcuts for the Shipyard app. */
+export function useAppHotkeys({ onToggleTerminal, onToggleDiff }: AppHotkeyOptions) {
+  useHotkeys('meta+`', onToggleTerminal, { preventDefault: true }, [onToggleTerminal]);
+
+  useHotkeys('meta+shift+g', onToggleDiff, { preventDefault: true }, [onToggleDiff]);
 }

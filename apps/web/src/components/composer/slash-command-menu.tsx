@@ -38,9 +38,9 @@ export function SlashCommandMenu({
 
   return (
     <div ref={menuRef} className="absolute bottom-full left-0 right-0 mb-2 z-50">
-      <div className="bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl overflow-hidden max-h-64">
-        <div className="px-3 py-2 border-b border-zinc-800">
-          <span className="text-xs text-zinc-500">Commands</span>
+      <div className="bg-surface border border-hull rounded-xl shadow-2xl overflow-hidden max-h-64">
+        <div className="px-3 py-2 border-b border-separator">
+          <span className="text-xs text-muted">Commands</span>
         </div>
         <ListBox
           aria-label="Slash commands"
@@ -67,14 +67,14 @@ export function SlashCommandMenu({
                 id={command.id}
                 textValue={command.name}
                 className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors ${
-                  isSelected ? 'bg-zinc-800' : 'hover:bg-zinc-800/50'
+                  isSelected ? 'bg-default' : 'hover:bg-default/50'
                 }`}
               >
                 <div className="flex items-center gap-3 flex-1 min-w-0">
-                  <Icon className="w-4 h-4 text-zinc-400 shrink-0" />
+                  <Icon className="w-4 h-4 text-muted shrink-0" />
                   <div className="flex flex-col min-w-0">
-                    <span className="text-sm text-zinc-200">{command.name}</span>
-                    <span className="text-xs text-zinc-500 truncate">{command.description}</span>
+                    <span className="text-sm text-foreground/90">{command.name}</span>
+                    <span className="text-xs text-muted truncate">{command.description}</span>
                   </div>
                 </div>
                 {shortcut && (

@@ -100,7 +100,7 @@ export function ChatComposer({ onSubmit }: ChatComposerProps) {
 
   return (
     <div className="w-full pb-2">
-      <div className="relative bg-zinc-900 rounded-2xl border border-zinc-800 shadow-lg">
+      <div className="relative bg-surface rounded-2xl border border-separator shadow-lg">
         {slashCommands.isOpen && (
           <SlashCommandMenu
             commands={slashCommands.filteredCommands}
@@ -120,14 +120,14 @@ export function ChatComposer({ onSubmit }: ChatComposerProps) {
             placeholder="Ask Shipyard anything"
             aria-label="Message input"
             rows={1}
-            className="w-full bg-transparent text-zinc-100 placeholder-zinc-500 text-sm leading-relaxed resize-none outline-none"
+            className="w-full bg-transparent text-foreground placeholder-muted text-sm leading-relaxed resize-none outline-none"
             style={{ minHeight: `${MIN_HEIGHT}px`, maxHeight: `${MAX_HEIGHT}px` }}
           />
         </div>
 
         {/* Bottom toolbar */}
-        <div className="flex items-center justify-between px-3 pb-3">
-          <div className="flex items-center gap-1">
+        <div className="flex items-center justify-between px-3 pb-3 gap-1">
+          <div className="flex items-center gap-1 overflow-x-auto min-w-0">
             <AttachmentPopover />
             <ModelPicker selectedModelId={selectedModelId} onModelChange={setSelectedModelId} />
             {supportsReasoning && (
@@ -136,7 +136,7 @@ export function ChatComposer({ onSubmit }: ChatComposerProps) {
             <PlanModeToggle isActive={planMode} onToggle={() => setPlanMode((p) => !p)} />
           </div>
 
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 shrink-0">
             <Tooltip>
               <Tooltip.Trigger>
                 <Button
@@ -144,7 +144,7 @@ export function ChatComposer({ onSubmit }: ChatComposerProps) {
                   variant="ghost"
                   size="sm"
                   aria-label="Voice input"
-                  className="rounded-full text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 w-8 h-8 min-w-0"
+                  className="rounded-full text-muted hover:text-foreground hover:bg-default w-8 h-8 min-w-0"
                 >
                   <Mic className="w-4 h-4" />
                 </Button>
@@ -157,7 +157,7 @@ export function ChatComposer({ onSubmit }: ChatComposerProps) {
               size="sm"
               aria-label="Send message"
               isDisabled={isEmpty}
-              className="rounded-full w-8 h-8 min-w-0"
+              className="rounded-full w-8 h-8 min-w-0 bg-accent text-accent-foreground"
               onPress={handleSubmit}
             >
               <ArrowUp className="w-4 h-4" />

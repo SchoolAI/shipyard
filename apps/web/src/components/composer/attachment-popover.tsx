@@ -10,7 +10,7 @@ export function AttachmentPopover() {
           variant="ghost"
           size="sm"
           aria-label="Add attachment"
-          className="rounded-full text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 w-7 h-7 min-w-0"
+          className="rounded-full text-muted hover:text-foreground hover:bg-default w-7 h-7 min-w-0"
         >
           <Plus className="w-4 h-4" />
         </Button>
@@ -20,9 +20,9 @@ export function AttachmentPopover() {
           <div className="py-px">
             <button
               type="button"
-              className="flex items-center gap-1.5 w-full px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-800 rounded-sm transition-colors cursor-pointer whitespace-nowrap"
+              className="flex items-center gap-1.5 w-full px-2 py-1 text-xs text-foreground/80 hover:bg-default rounded-sm transition-colors cursor-pointer whitespace-nowrap"
             >
-              <Paperclip className="w-3 h-3 text-zinc-400" />
+              <Paperclip className="w-3 h-3 text-muted" />
               Add photos & files
             </button>
           </div>

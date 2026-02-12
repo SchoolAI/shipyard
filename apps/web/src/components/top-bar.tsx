@@ -1,19 +1,24 @@
 import { Button, Kbd, Tooltip } from '@heroui/react';
 import { Diff, Plus, Terminal } from 'lucide-react';
 
-export function TopBar() {
+interface TopBarProps {
+  onToggleTerminal: () => void;
+  onToggleDiff: () => void;
+}
+
+export function TopBar({ onToggleTerminal, onToggleDiff }: TopBarProps) {
   return (
-    <div className="flex items-center justify-between px-4 py-2 border-b border-zinc-800/50">
+    <div className="flex items-center justify-between px-4 py-2 border-b border-separator/50">
       <Button
         variant="ghost"
         size="sm"
-        className="text-zinc-300 hover:text-zinc-100 gap-1.5"
+        className="text-foreground/80 hover:text-foreground gap-1.5"
         onPress={() => {
           /** TODO: open new task dialog */
         }}
       >
         <Plus className="w-4 h-4" />
-        New task
+        <span className="hidden sm:inline">New task</span>
       </Button>
 
       <div className="flex items-center gap-1">
@@ -24,7 +29,8 @@ export function TopBar() {
               variant="ghost"
               size="sm"
               aria-label="Toggle terminal"
-              className="text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 w-8 h-8 min-w-0"
+              onPress={onToggleTerminal}
+              className="text-muted hover:text-foreground hover:bg-default w-8 h-8 min-w-0"
             >
               <Terminal className="w-4 h-4" />
             </Button>
@@ -46,7 +52,8 @@ export function TopBar() {
               variant="ghost"
               size="sm"
               aria-label="Toggle diff panel"
-              className="text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 w-8 h-8 min-w-0"
+              onPress={onToggleDiff}
+              className="text-muted hover:text-foreground hover:bg-default w-8 h-8 min-w-0"
             >
               <Diff className="w-4 h-4" />
             </Button>

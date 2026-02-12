@@ -18,8 +18,8 @@ export function PlanModeToggle({ isActive, onToggle }: PlanModeToggleProps) {
           onPress={onToggle}
           className={`rounded-lg w-7 h-7 min-w-0 transition-colors ${
             isActive
-              ? 'bg-zinc-700 text-zinc-100'
-              : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'
+              ? 'bg-hull text-foreground'
+              : 'text-muted hover:text-foreground hover:bg-default'
           }`}
         >
           <ListChecks className="w-3.5 h-3.5" />

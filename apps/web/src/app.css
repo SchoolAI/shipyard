@@ -1,10 +1,109 @@
 @import "tailwindcss";
 @import "@heroui/styles";
 
+/*
+ * Shipyard Theme
+ *
+ * Palette derived from the Shipyard logo:
+ *   - Rust/copper containers  -> accent
+ *   - Teal/cyan ocean waves   -> secondary (used for links, info)
+ *   - Dark navy hull          -> backgrounds
+ *   - Steel blue tower        -> muted text
+ *
+ * HeroUI v3 dark-mode variables are set on .dark / [data-theme="dark"].
+ * Light mode inherits HeroUI defaults (unused for now).
+ */
+
+/* -- Dark theme overrides (Shipyard is dark-first) -- */
+.dark,
+[data-theme="dark"] {
+  /* Base: deep navy from the ship hull */
+  --background: oklch(0.145 0.02 250);
+  --foreground: oklch(0.95 0.005 250);
+
+  /* Surface: slightly lighter navy for cards/panels */
+  --surface: oklch(0.20 0.02 250);
+  --surface-foreground: var(--foreground);
+
+  /* Overlay: modals/popovers, a touch lighter than surface */
+  --overlay: oklch(0.23 0.02 250);
+  --overlay-foreground: var(--foreground);
+
+  /* Muted: steel-blue tone from the ship's tower */
+  --muted: oklch(0.60 0.03 240);
+
+  /* Default: subtle elevated bg (buttons, chips) */
+  --default: oklch(0.27 0.02 250);
+  --default-foreground: var(--foreground);
+
+  /* Accent: rust/copper from the cargo containers */
+  --accent: oklch(0.65 0.16 45);
+  --accent-foreground: oklch(0.98 0 0);
+
+  /* Secondary: teal/cyan from the ocean waves (available via custom token) */
+  --secondary: oklch(0.72 0.14 200);
+  --secondary-foreground: oklch(0.15 0.02 250);
+
+  /* Status colors */
+  --success: oklch(0.72 0.19 150);
+  --success-foreground: oklch(0.15 0.02 250);
+
+  --warning: oklch(0.78 0.14 76);
+  --warning-foreground: oklch(0.15 0.02 250);
+
+  --danger: oklch(0.60 0.20 25);
+  --danger-foreground: oklch(0.98 0 0);
+
+  /* Form fields */
+  --field-background: oklch(0.22 0.02 250);
+  --field-on-background: oklch(0.20 0.02 250);
+  --field-foreground: var(--foreground);
+  --field-placeholder: var(--muted);
+  --field-border: transparent;
+
+  /* Misc */
+  --border: oklch(1 0 0 / 0%);
+  --separator: oklch(0.25 0.02 250);
+  --focus: var(--accent);
+  --link: var(--secondary);
+  --scrollbar: oklch(0.40 0.02 250);
+
+  /* Segment */
+  --segment: oklch(0.35 0.015 250);
+  --segment-foreground: var(--foreground);
+
+  /* Shadows (dark mode: no visible shadows) */
+  --surface-shadow: 0 0 0 0 transparent inset;
+  --overlay-shadow: 0 0 0 0 transparent inset;
+  --field-shadow: 0 0 0 0 transparent inset;
+}
+
 @theme {
+  /* Map HeroUI semantic tokens to Tailwind utilities */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-surface: var(--surface);
+  --color-surface-foreground: var(--surface-foreground);
+  --color-overlay: var(--overlay);
+  --color-overlay-foreground: var(--overlay-foreground);
   --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
   --color-border: var(--border);
+  --color-separator: var(--separator);
+  --color-focus: var(--focus);
+  --color-link: var(--link);
+
+  /* Shipyard-specific utility colors for manual use */
+  --color-hull: oklch(0.35 0.03 240);
+  --color-hull-light: oklch(0.45 0.03 240);
+  --color-wave: oklch(0.72 0.14 200);
+  --color-wave-light: oklch(0.82 0.10 200);
+  --color-rust: oklch(0.65 0.16 45);
+  --color-rust-light: oklch(0.75 0.14 45);
 }
