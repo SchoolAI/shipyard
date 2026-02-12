@@ -16,6 +16,8 @@
     "dev:all": "bash scripts/dev-all.sh",
     "dev:local": "bash scripts/dev-local.sh",
     "dev:schema": "turbo run dev --filter=@shipyard/loro-schema",
+    "dev:web": "turbo run dev --filter=@shipyard/web",
+    "dev:daemon": "turbo run dev --filter=@shipyard/daemon",
     "dev:session-server": "turbo run dev --filter=@shipyard/session-server",
     "dev:og-proxy": "turbo run dev --filter=@shipyard/og-proxy-worker",
     "prepare": "simple-git-hooks"

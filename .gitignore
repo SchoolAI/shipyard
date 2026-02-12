@@ -175,3 +175,4 @@ tmp/
 
 # Local dev state directory (logs, persistence, claude projects)
 .dev-state/
+.tmp

@@ -1,7 +1,12 @@
-import { Button, Chip } from '@heroui/react';
-import { ArrowUp, ChevronDown, Plus } from 'lucide-react';
+import { Button } from '@heroui/react';
+import { ArrowUp } from 'lucide-react';
 import type { KeyboardEvent } from 'react';
 import { useCallback, useRef, useState } from 'react';
+import { AttachmentPopover } from './composer/attachment-popover';
+import { ModelPicker, useModelPicker } from './composer/model-picker';
+import { PlanModeToggle } from './composer/plan-mode-toggle';
+import type { ReasoningLevel } from './composer/reasoning-effort';
+import { ReasoningEffort } from './composer/reasoning-effort';
 
 interface ChatComposerProps {
   onSubmit: (message: string) => void;
@@ -12,7 +17,10 @@ const MIN_HEIGHT = 24;
 
 export function ChatComposer({ onSubmit }: ChatComposerProps) {
   const [value, setValue] = useState('');
+  const [planMode, setPlanMode] = useState(false);
+  const [reasoningLevel, setReasoningLevel] = useState<ReasoningLevel>('medium');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const { selectedModelId, setSelectedModelId, supportsReasoning } = useModelPicker();
 
   const adjustHeight = useCallback(() => {
     const textarea = textareaRef.current;
@@ -61,8 +69,9 @@ export function ChatComposer({ onSubmit }: ChatComposerProps) {
   const isEmpty = value.trim().length === 0;
 
   return (
-    <div className="w-full max-w-3xl mx-auto px-4 pb-4">
+    <div className="w-full max-w-3xl mx-auto px-4 pb-2">
       <div className="bg-zinc-900 rounded-2xl border border-zinc-800 shadow-lg">
+        {/* Textarea area */}
         <div className="px-4 pt-3 pb-2">
           <textarea
             ref={textareaRef}
@@ -76,29 +85,15 @@ export function ChatComposer({ onSubmit }: ChatComposerProps) {
           />
         </div>
 
+        {/* Bottom toolbar */}
         <div className="flex items-center justify-between px-3 pb-3">
-          <div className="flex items-center gap-2">
-            <Button
-              isIconOnly
-              variant="ghost"
-              size="sm"
-              aria-label="Add attachment"
-              className="rounded-full text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 w-8 h-8 min-w-0"
-              onPress={() => {}}
-            >
-              <Plus className="w-4 h-4" />
-            </Button>
-
-            <Chip
-              size="sm"
-              variant="soft"
-              className="text-zinc-400 bg-zinc-800 cursor-pointer select-none"
-            >
-              <span className="flex items-center gap-1">
-                claude-code
-                <ChevronDown className="w-3 h-3" />
-              </span>
-            </Chip>
+          <div className="flex items-center gap-1">
+            <AttachmentPopover />
+            <ModelPicker selectedModelId={selectedModelId} onModelChange={setSelectedModelId} />
+            {supportsReasoning && (
+              <ReasoningEffort level={reasoningLevel} onLevelChange={setReasoningLevel} />
+            )}
+            <PlanModeToggle isActive={planMode} onToggle={() => setPlanMode((p) => !p)} />
           </div>
 
           <Button
