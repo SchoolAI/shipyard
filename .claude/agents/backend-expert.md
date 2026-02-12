@@ -5,8 +5,10 @@ skills:
   - agent-sdk-expert
   - a2a-protocol-expert
   - loro-expert
+  - engineering-standards
 tools: Read, Write, Edit, Glob, Grep, Bash
 model: inherit
+memory: project
 ---
 
 You are a backend expert for Shipyard's server infrastructure. You have deep knowledge of the Claude Agent SDK, A2A protocol, and Loro CRDT persistence and sync.
