@@ -1,8 +1,8 @@
 import { Button, Tooltip } from '@heroui/react';
 import { ArrowUp, Mic } from 'lucide-react';
 import type { KeyboardEvent } from 'react';
-import { useCallback, useRef, useState } from 'react';
-import type { SlashCommand } from '../hooks/use-slash-commands';
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
+import type { SlashCommandAction } from '../hooks/use-slash-commands';
 import { useSlashCommands } from '../hooks/use-slash-commands';
 import { AttachmentPopover } from './composer/attachment-popover';
 import { ModelPicker, useModelPicker } from './composer/model-picker';
@@ -13,25 +13,73 @@ import { SlashCommandMenu } from './composer/slash-command-menu';
 
 interface ChatComposerProps {
   onSubmit: (message: string) => void;
+  onClearChat: () => void;
+}
+
+export interface ChatComposerHandle {
+  focus: () => void;
 }
 
 const MAX_HEIGHT = 200;
 const MIN_HEIGHT = 24;
 
-export function ChatComposer({ onSubmit }: ChatComposerProps) {
+function assertNever(x: never): never {
+  throw new Error(`Unhandled slash command action: ${JSON.stringify(x)}`);
+}
+
+export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(function ChatComposer(
+  { onSubmit, onClearChat },
+  ref
+) {
   const [value, setValue] = useState('');
   const [planMode, setPlanMode] = useState(false);
   const [reasoningLevel, setReasoningLevel] = useState<ReasoningLevel>('medium');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { selectedModelId, setSelectedModelId, supportsReasoning } = useModelPicker();
 
-  const handleSlashExecute = useCallback((_command: SlashCommand) => {
-    /** TODO: wire up actual command execution */
+  useImperativeHandle(
+    ref,
+    () => ({
+      focus: () => textareaRef.current?.focus(),
+    }),
+    []
+  );
+
+  const handleSlashExecute = useCallback(
+    (action: SlashCommandAction) => {
+      switch (action.kind) {
+        case 'toggle':
+          if (action.target === 'planMode') {
+            setPlanMode((prev) => !prev);
+          }
+          break;
+        case 'setModel':
+          setSelectedModelId(action.modelId);
+          break;
+        case 'setReasoning':
+          setReasoningLevel(action.level);
+          break;
+        case 'clear':
+          onClearChat();
+          break;
+        case 'help':
+          break;
+        default:
+          assertNever(action);
+      }
+    },
+    [setSelectedModelId, onClearChat]
+  );
+
+  const rafRef = useRef<number>(0);
+
+  useEffect(() => {
+    return () => cancelAnimationFrame(rafRef.current);
   }, []);
 
   const handleClearInput = useCallback(() => {
     setValue('');
-    requestAnimationFrame(() => {
+    rafRef.current = requestAnimationFrame(() => {
       const textarea = textareaRef.current;
       if (textarea) {
         textarea.style.height = 'auto';
@@ -73,7 +121,7 @@ export function ChatComposer({ onSubmit }: ChatComposerProps) {
     setValue('');
     slashCommands.close();
 
-    requestAnimationFrame(() => {
+    rafRef.current = requestAnimationFrame(() => {
       const textarea = textareaRef.current;
       if (textarea) {
         textarea.style.height = 'auto';
@@ -107,6 +155,7 @@ export function ChatComposer({ onSubmit }: ChatComposerProps) {
             selectedIndex={slashCommands.selectedIndex}
             onSelect={slashCommands.selectCommand}
             onClose={slashCommands.close}
+            onHover={slashCommands.setSelectedIndex}
           />
         )}
 
@@ -167,4 +216,4 @@ export function ChatComposer({ onSubmit }: ChatComposerProps) {
       </div>
     </div>
   );
-}
+});

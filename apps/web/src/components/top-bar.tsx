@@ -39,7 +39,7 @@ export function TopBar({ onToggleTerminal, onToggleDiff }: TopBarProps) {
             <span className="flex items-center gap-2">
               Toggle terminal
               <Kbd>
-                <Kbd.Abbr keyValue="command" />
+                <Kbd.Abbr keyValue="ctrl" />
                 <Kbd.Content>`</Kbd.Content>
               </Kbd>
             </span>

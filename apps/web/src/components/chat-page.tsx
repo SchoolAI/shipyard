@@ -1,11 +1,13 @@
 import { ChevronDown } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAppHotkeys } from '../hooks/use-app-hotkeys';
+import type { ChatComposerHandle } from './chat-composer';
 import { ChatComposer } from './chat-composer';
 import type { ChatMessageData } from './chat-message';
 import { ChatMessage } from './chat-message';
 import { StatusBar } from './composer/status-bar';
 import { DiffPanel } from './panels/diff-panel';
+import type { TerminalPanelHandle } from './panels/terminal-panel';
 import { TerminalPanel } from './panels/terminal-panel';
 import { TopBar } from './top-bar';
 
@@ -77,6 +79,27 @@ export function ChatPage() {
   const [isTerminalOpen, setIsTerminalOpen] = useState(false);
   const [isDiffOpen, setIsDiffOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const demoTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const composerRef = useRef<ChatComposerHandle>(null);
+  const terminalRef = useRef<TerminalPanelHandle>(null);
+  const prevTerminalOpen = useRef(false);
+
+  useEffect(() => {
+    return () => clearTimeout(demoTimerRef.current);
+  }, []);
+
+  useEffect(() => {
+    if (isTerminalOpen && !prevTerminalOpen.current) {
+      requestAnimationFrame(() => {
+        terminalRef.current?.focus();
+      });
+    } else if (!isTerminalOpen && prevTerminalOpen.current) {
+      requestAnimationFrame(() => {
+        composerRef.current?.focus();
+      });
+    }
+    prevTerminalOpen.current = isTerminalOpen;
+  }, [isTerminalOpen]);
 
   const toggleTerminal = useCallback(() => {
     setIsTerminalOpen((prev) => !prev);
@@ -118,7 +141,7 @@ export function ChatPage() {
 
     setMessages((prev) => [...prev, userMessage, thinkingMessage]);
 
-    setTimeout(() => {
+    demoTimerRef.current = setTimeout(() => {
       setMessages((prev) =>
         prev.map((msg) =>
           msg.id === thinkingMessage.id
@@ -132,6 +155,10 @@ export function ChatPage() {
         )
       );
     }, 2000);
+  }, []);
+
+  const handleClearChat = useCallback(() => {
+    setMessages([]);
   }, []);
 
   const hasMessages = messages.length > 0;
@@ -157,12 +184,16 @@ export function ChatPage() {
 
         {/* Composer */}
         <div className="shrink-0 w-full max-w-3xl mx-auto px-3 sm:px-4">
-          <ChatComposer onSubmit={handleSubmit} />
+          <ChatComposer ref={composerRef} onSubmit={handleSubmit} onClearChat={handleClearChat} />
           <StatusBar />
         </div>
 
         {/* Terminal panel */}
-        <TerminalPanel isOpen={isTerminalOpen} onClose={() => setIsTerminalOpen(false)} />
+        <TerminalPanel
+          ref={terminalRef}
+          isOpen={isTerminalOpen}
+          onClose={() => setIsTerminalOpen(false)}
+        />
       </div>
 
       {/* Diff side panel */}
