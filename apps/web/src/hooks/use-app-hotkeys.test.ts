@@ -15,12 +15,12 @@ describe('useAppHotkeys', () => {
     mockUseHotkeys.mockClear();
   });
 
-  it('registers ctrl+` for terminal toggle', () => {
+  it('registers ctrl+backquote for terminal toggle', () => {
     const onToggleTerminal = vi.fn();
     const onToggleDiff = vi.fn();
     renderHook(() => useAppHotkeys({ onToggleTerminal, onToggleDiff }));
 
-    const terminalCall = mockUseHotkeys.mock.calls.find((c) => c[0] === 'ctrl+`');
+    const terminalCall = mockUseHotkeys.mock.calls.find((c) => c[0] === 'ctrl+backquote');
     expect(terminalCall).toBeDefined();
     expect(terminalCall?.[1]).toBe(onToggleTerminal);
     expect(terminalCall?.[2]).toEqual({ preventDefault: true });
