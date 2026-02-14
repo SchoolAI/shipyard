@@ -181,9 +181,15 @@ async function main(): Promise<void> {
 
   const repo = await setupRepo(dataDir);
   const lifecycle = new LifecycleManager();
+
+  const cleanup = () => {
+    lifecycle.destroy();
+    repo.reset();
+  };
+
   lifecycle.onShutdown(async () => {
     log.info('Cleaning up repo...');
-    repo.reset();
+    cleanup();
   });
 
   const epoch = await loadEpoch(repo);
@@ -210,11 +216,11 @@ async function main(): Promise<void> {
     const errMsg = error instanceof Error ? error.message : String(error);
     const errStack = error instanceof Error ? error.stack : undefined;
     log.error({ err: errMsg, stack: errStack }, 'Session failed');
-    repo.reset();
+    cleanup();
     process.exit(1);
   }
 
-  repo.reset();
+  cleanup();
 }
 
 main().catch((error: unknown) => {

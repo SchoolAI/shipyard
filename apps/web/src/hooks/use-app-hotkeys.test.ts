@@ -23,7 +23,7 @@ describe('useAppHotkeys', () => {
     const terminalCall = mockUseHotkeys.mock.calls.find((c) => c[0] === 'ctrl+backquote');
     expect(terminalCall).toBeDefined();
     expect(terminalCall?.[1]).toBe(onToggleTerminal);
-    expect(terminalCall?.[2]).toEqual({ preventDefault: true });
+    expect(terminalCall?.[2]).toEqual({ preventDefault: true, enableOnFormTags: true });
   });
 
   it('registers meta+shift+g for diff toggle', () => {
@@ -34,6 +34,6 @@ describe('useAppHotkeys', () => {
     const diffCall = mockUseHotkeys.mock.calls.find((c) => c[0] === 'meta+shift+g');
     expect(diffCall).toBeDefined();
     expect(diffCall?.[1]).toBe(onToggleDiff);
-    expect(diffCall?.[2]).toEqual({ preventDefault: true });
+    expect(diffCall?.[2]).toEqual({ preventDefault: true, enableOnFormTags: true });
   });
 });

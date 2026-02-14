@@ -11,10 +11,27 @@ export class LifecycleManager {
   #abortControllers = new Set<AbortController>();
   #shutdownCallbacks: Array<() => Promise<void>> = [];
   #isShuttingDown = false;
+  #signalHandlers: { signal: string; handler: () => void }[] = [];
 
   constructor() {
-    process.on('SIGTERM', () => void this.#shutdown('SIGTERM'));
-    process.on('SIGINT', () => void this.#shutdown('SIGINT'));
+    const termHandler = () => void this.#shutdown('SIGTERM');
+    const intHandler = () => void this.#shutdown('SIGINT');
+    process.on('SIGTERM', termHandler);
+    process.on('SIGINT', intHandler);
+    this.#signalHandlers = [
+      { signal: 'SIGTERM', handler: termHandler },
+      { signal: 'SIGINT', handler: intHandler },
+    ];
+  }
+
+  destroy(): void {
+    for (const { signal, handler } of this.#signalHandlers) {
+      process.removeListener(signal, handler);
+    }
+    this.#signalHandlers = [];
+    this.#isShuttingDown = false;
+    this.#shutdownCallbacks = [];
+    this.#abortControllers.clear();
   }
 
   /**

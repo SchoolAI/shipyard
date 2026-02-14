@@ -7,7 +7,11 @@ interface AppHotkeyOptions {
 
 /** Global keyboard shortcuts for the Shipyard app. */
 export function useAppHotkeys({ onToggleTerminal, onToggleDiff }: AppHotkeyOptions) {
-  useHotkeys('ctrl+backquote', onToggleTerminal, { preventDefault: true }, [onToggleTerminal]);
+  useHotkeys('ctrl+backquote', onToggleTerminal, { preventDefault: true, enableOnFormTags: true }, [
+    onToggleTerminal,
+  ]);
 
-  useHotkeys('meta+shift+g', onToggleDiff, { preventDefault: true }, [onToggleDiff]);
+  useHotkeys('meta+shift+g', onToggleDiff, { preventDefault: true, enableOnFormTags: true }, [
+    onToggleDiff,
+  ]);
 }

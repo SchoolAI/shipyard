@@ -2,16 +2,29 @@
 
 ## Custom Color Palette
 
-Shipyard uses a nautical-themed palette (path TBD — web app will be rebuilt):
-- **Accent**: Picton Blue `#42cde5` / `oklch(0.6439 0.1906 199.38)`
-- **Neutrals**: Blue-tinted slate (Blue Bayoux `#4a5b74`, Geyser `#d6e1e0`)
-- **Warning**: Orange Roughy `#cc5113`
-- **Danger**: `#a51100`
-- **AI indicator**: My Pink `#cb9380`
+Shipyard uses a nautical-themed palette derived from the logo. Defined in `apps/web/src/app.css`:
+
+| Token | oklch | Source |
+|---|---|---|
+| **accent** | `oklch(0.65 0.16 45)` | Rust/copper cargo containers |
+| **secondary** | `oklch(0.72 0.14 200)` | Teal/cyan ocean waves |
+| **background** | `oklch(0.145 0.02 250)` | Deep navy ship hull |
+| **surface** | `oklch(0.20 0.02 250)` | Lighter navy for cards |
+| **default** | `oklch(0.27 0.02 250)` | Elevated bg (buttons, chips) |
+| **muted** | `oklch(0.60 0.03 240)` | Steel-blue tower |
+| **separator** | `oklch(0.25 0.02 250)` | Subtle navy borders |
+| **success** | `oklch(0.72 0.19 150)` | Green |
+| **warning** | `oklch(0.78 0.14 76)` | Amber |
+| **danger** | `oklch(0.60 0.20 25)` | Red |
+
+Custom Tailwind utilities (in `@theme` block):
+- `hull` / `hull-light` -- dark/light steel-blue for active states
+- `wave` / `wave-light` -- teal from logo, use for info/links
+- `rust` / `rust-light` -- warm copper, same hue as accent
 
 ## Tailwind Config
 
-Path TBD (web app will be rebuilt) — extends colors with CSS variables, maps `background`, `foreground`, `surface`, `muted`, `border`.
+Theme defined in `apps/web/src/app.css` using `@theme` directive (Tailwind v4). All semantic tokens mapped from HeroUI CSS variables to Tailwind utility classes.
 
 ## Modal Pattern
 
@@ -112,7 +125,9 @@ Uses **lucide-react** icons. Size pattern: `className="w-4 h-4"`.
 
 ## Key Files
 
-All paths TBD — web app will be rebuilt. The patterns above remain valid for when the app is recreated.
+- `apps/web/src/app.css` -- Theme variables + Tailwind `@theme` block
+- `apps/web/index.html` -- `class="dark" data-theme="dark"` on `<html>`
+- `apps/web/src/components/` -- All components use semantic tokens, zero hardcoded zinc/slate/gray
 
 ## v2 vs v3 Differences
 

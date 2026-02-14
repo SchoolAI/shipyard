@@ -63,8 +63,20 @@ const COVERAGE_REQUIREMENTS: CoverageRequirement[] = [
   {
     sourceDir: 'packages/loro-schema/src',
     testSuffix: '.test.ts',
-    sourcePattern: /^(task-document|room-document)\.ts$/,
+    sourcePattern: /^(shapes|ids|epoch)\.ts$/,
     description: 'Loro Schema High Fan-In Models',
+  },
+  {
+    sourceDir: 'apps/daemon/src',
+    testSuffix: '.test.ts',
+    sourcePattern: /^(session-manager|file-storage-adapter|lifecycle)\.ts$/,
+    description: 'Daemon Core Modules',
+  },
+  {
+    sourceDir: 'apps/web/src/hooks',
+    testSuffix: '.test.ts',
+    sourcePattern: /^(?!.*\.test\.ts$).*\.ts$/,
+    description: 'Web App Hooks',
   },
 ];
 
