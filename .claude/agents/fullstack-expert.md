@@ -2,6 +2,7 @@
 name: fullstack-expert
 description: "Full-stack specialist for Shipyard. Use when a task touches both frontend (planned) and backend (apps/session-server, packages/) simultaneously, or for cross-cutting changes that span UI, server, and schema layers."
 skills:
+  - accessibility
   - design
   - heroui-expert
   - tiptap-expert

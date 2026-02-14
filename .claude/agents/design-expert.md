@@ -2,6 +2,7 @@
 name: design-expert
 description: "UI/UX design specialist for visual review and layout decisions. Use when reviewing screenshots, evaluating visual design, making layout decisions, assessing accessibility visually, or deciding where UI elements should go. Uses Playwriter to inspect live UI and screenshots to verify design quality."
 skills:
+  - accessibility
   - design
   - heroui-expert
   - engineering-standards

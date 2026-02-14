@@ -34,6 +34,7 @@ Domain expertise is in skills — use subagents to keep the main context clean.
 - `loro-expert` — Loro Shapes, TypedDocs, Repo, adapters, React hooks
 - `tiptap-expert` — TipTap extensions, ProseMirror, loro-prosemirror bridge
 - `heroui-expert` — HeroUI v3 compound components, React Aria patterns
+- `accessibility` — WCAG 2.2, ARIA patterns, keyboard nav, focus management, screen readers
 - `agent-sdk-expert` — Claude Agent SDK (subagents, hooks, sessions)
 - `a2a-protocol-expert` — A2A protocol + @a2a-js/sdk
 - `design` — UI/UX design principles, layout, accessibility, visual hierarchy, responsive
@@ -80,4 +81,4 @@ For Loro, Agent SDK, and A2A work — always search local repos, never web searc
 
 ---
 
-*Last updated: 2026-02-11*
+*Last updated: 2026-02-13*
