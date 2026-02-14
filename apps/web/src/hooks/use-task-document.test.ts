@@ -5,6 +5,14 @@ const mockRepo = {
   get: vi.fn(),
 };
 
+const mockEphemeralStore = {
+  getAll: vi.fn(() => new Map()),
+  subscribe: vi.fn(() => () => {}),
+  set: vi.fn(),
+  get: vi.fn(),
+  delete: vi.fn(),
+};
+
 const mockHandle = {
   doc: {
     toJSON: vi.fn(() => ({
@@ -30,6 +38,8 @@ const mockHandle = {
     frontiers: vi.fn(() => []),
     subscribe: vi.fn(() => () => {}),
   },
+  permReqs: { ...mockEphemeralStore },
+  permResps: { ...mockEphemeralStore },
 };
 
 mockRepo.get.mockReturnValue(mockHandle);

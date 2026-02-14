@@ -25,6 +25,7 @@ import type { DiffPanelHandle } from './panels/diff-panel';
 import { DiffPanel } from './panels/diff-panel';
 import type { TerminalPanelHandle } from './panels/terminal-panel';
 import { TerminalPanel } from './panels/terminal-panel';
+import { PermissionCard } from './permission-card';
 import { SettingsPage } from './settings-page';
 import { ShortcutsModal } from './shortcuts-modal';
 import { Sidebar } from './sidebar';
@@ -142,6 +143,7 @@ export function ChatPage() {
   });
 
   const loroTask = useTaskDocument(activeTaskId);
+  const { pendingPermissions, respondToPermission } = loroTask;
 
   const storeMessages = activeTaskId ? messagesByTask[activeTaskId] : undefined;
   const allTasks = useTaskStore((s) => s.tasks);
@@ -466,6 +468,23 @@ export function ChatPage() {
                     {messages.map((msg) => (
                       <ChatMessage key={msg.id} message={msg} />
                     ))}
+                    {pendingPermissions.size > 0 && (
+                      <div
+                        className="space-y-3"
+                        role="region"
+                        aria-label="Pending permission requests"
+                        aria-live="polite"
+                      >
+                        {Array.from(pendingPermissions.entries()).map(([toolUseId, request]) => (
+                          <PermissionCard
+                            key={toolUseId}
+                            toolUseId={toolUseId}
+                            request={request}
+                            onRespond={respondToPermission}
+                          />
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               ) : (

@@ -1,4 +1,5 @@
 import type {
+  CanUseTool,
   PermissionMode,
   Query,
   SDKMessage,
@@ -24,6 +25,7 @@ export interface CreateSessionOptions {
   allowDangerouslySkipPermissions?: boolean;
   settingSources?: SettingSource[];
   systemPrompt?: string | { type: 'preset'; preset: 'claude_code'; append?: string };
+  canUseTool?: CanUseTool;
 }
 
 export interface SessionResult {
@@ -134,6 +136,7 @@ export class SessionManager {
         allowDangerouslySkipPermissions: opts.allowDangerouslySkipPermissions,
         settingSources: opts.settingSources ?? ['project'],
         systemPrompt: opts.systemPrompt ?? { type: 'preset', preset: 'claude_code' },
+        canUseTool: opts.canUseTool,
       },
     });
 
@@ -156,6 +159,7 @@ export class SessionManager {
       permissionMode?: PermissionMode;
       maxTurns?: number;
       allowDangerouslySkipPermissions?: boolean;
+      canUseTool?: CanUseTool;
     }
   ): Promise<SessionResult> {
     const sessions = this.#taskDoc.toJSON().sessions;
@@ -201,6 +205,7 @@ export class SessionManager {
         maxTurns: opts?.maxTurns,
         abortController: opts?.abortController,
         allowDangerouslySkipPermissions: opts?.allowDangerouslySkipPermissions,
+        canUseTool: opts?.canUseTool,
         settingSources: ['project'],
         systemPrompt: { type: 'preset', preset: 'claude_code' },
       },

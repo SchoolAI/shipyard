@@ -1,14 +1,18 @@
 import { mkdir } from 'node:fs/promises';
 import { homedir, hostname } from 'node:os';
 import { resolve } from 'node:path';
+import type { CanUseTool, PermissionResult } from '@anthropic-ai/claude-agent-sdk';
 import { WebRtcDataChannelAdapter } from '@loro-extended/adapter-webrtc';
 import { change } from '@loro-extended/change';
-import type { Handle } from '@loro-extended/repo';
+import type { HandleWithEphemerals } from '@loro-extended/repo';
 import { Repo } from '@loro-extended/repo';
 import {
   buildDocumentId,
+  classifyToolRisk,
   DEFAULT_EPOCH,
   EpochDocumentSchema,
+  PermissionRequestEphemeral,
+  PermissionResponseEphemeral,
   TaskDocumentSchema,
   type TaskDocumentShape,
 } from '@shipyard/loro-schema';
@@ -31,6 +35,19 @@ import { createSignalingHandle } from './signaling-setup.js';
 function assertNever(x: never): never {
   throw new Error(`Unhandled message type: ${JSON.stringify(x)}`);
 }
+
+/**
+ * Ephemeral namespace declarations for task documents.
+ * permReqs: daemon writes pending tool permission requests (browser reads)
+ * permResps: browser writes permission decisions (daemon reads)
+ */
+const TaskEphemeralDeclarations = {
+  permReqs: PermissionRequestEphemeral,
+  permResps: PermissionResponseEphemeral,
+};
+
+type TaskEphemeralDecls = typeof TaskEphemeralDeclarations;
+type TaskHandle = HandleWithEphemerals<TaskDocumentShape, TaskEphemeralDecls>;
 
 interface ActiveTask {
   taskId: string;
@@ -300,7 +317,7 @@ async function watchTaskDocument(
   const taskDocId = buildDocumentId('task', taskId, epoch);
   taskLog.info({ taskDocId, epoch }, 'Watching task document');
 
-  const taskHandle = ctx.repo.get(taskDocId, TaskDocumentSchema);
+  const taskHandle = ctx.repo.get(taskDocId, TaskDocumentSchema, TaskEphemeralDeclarations);
 
   try {
     await taskHandle.waitForSync({ kind: 'storage', timeout: 5_000 });
@@ -308,7 +325,11 @@ async function watchTaskDocument(
     taskLog.debug({ taskDocId }, 'No existing task data in storage');
   }
 
+  const opCountBefore = taskHandle.loroDoc.opCount();
+  taskLog.info({ taskDocId, opCount: opCountBefore }, 'Doc state before subscribe');
+
   const unsubscribe = taskHandle.subscribe((event) => {
+    taskLog.info({ taskDocId, eventBy: event.by }, 'Subscription event received');
     if (event.by === 'local') return;
 
     onTaskDocChanged(taskId, taskHandle, taskLog, ctx);
@@ -321,7 +342,14 @@ async function watchTaskDocument(
    * Also check immediately in case the doc already has a pending user message
    * (daemon restart scenario where the browser already wrote the message).
    */
-  if (taskHandle.loroDoc.opCount() > 0) {
+  const opCountAfter = taskHandle.loroDoc.opCount();
+  taskLog.info({ taskDocId, opCount: opCountAfter }, 'Doc state after subscribe');
+  if (opCountAfter > 0) {
+    const json = taskHandle.doc.toJSON();
+    taskLog.info(
+      { taskDocId, status: json.meta.status, conversationLen: json.conversation.length },
+      'Checking existing doc data'
+    );
     onTaskDocChanged(taskId, taskHandle, taskLog, ctx);
   }
 }
@@ -332,19 +360,31 @@ async function watchTaskDocument(
  */
 function onTaskDocChanged(
   taskId: string,
-  taskHandle: Handle<TaskDocumentShape>,
+  taskHandle: TaskHandle,
   taskLog: ReturnType<typeof createChildLogger>,
   ctx: MessageHandlerContext
 ): void {
   const doc = taskHandle.doc;
   const json = doc.toJSON();
 
-  if (json.meta.status === 'working') {
+  taskLog.info(
+    {
+      status: json.meta.status,
+      conversationLen: json.conversation.length,
+      lastRole: json.conversation[json.conversation.length - 1]?.role,
+      isActive: ctx.activeTasks.has(taskId),
+    },
+    'onTaskDocChanged evaluation'
+  );
+
+  if (json.meta.status === 'working' || json.meta.status === 'input-required') {
+    taskLog.debug({ status: json.meta.status }, 'Status blocks new work, skipping');
     return;
   }
 
   const conversation = json.conversation;
   if (conversation.length === 0) {
+    taskLog.debug('No conversation messages, skipping');
     return;
   }
 
@@ -400,6 +440,15 @@ function onTaskDocChanged(
       taskLog.error({ err: errMsg }, 'Task failed');
     })
     .finally(() => {
+      abortController.abort();
+
+      for (const [key] of taskHandle.permReqs.getAll()) {
+        taskHandle.permReqs.delete(key);
+      }
+      for (const [key] of taskHandle.permResps.getAll()) {
+        taskHandle.permResps.delete(key);
+      }
+
       ctx.activeTasks.delete(taskId);
       const unsub = ctx.watchedTasks.get(taskId);
       if (unsub) {
@@ -449,8 +498,97 @@ async function loadEpoch(repo: Repo): Promise<number> {
   return epochHandle.doc.toJSON().schema.version;
 }
 
+/**
+ * Build a canUseTool callback that tunnels permission requests to the browser
+ * via Loro ephemeral state and waits for the browser's response.
+ *
+ * Flow:
+ * 1. Daemon writes a PermissionRequest to the permReqs ephemeral namespace (keyed by toolUseID)
+ * 2. Daemon sets task status to 'input-required' via CRDT
+ * 3. Daemon subscribes to permResps ephemeral namespace for the matching toolUseID
+ * 4. Browser reads permReqs, shows UI, writes decision to permResps
+ * 5. Daemon receives the response, cleans up ephemeral entries, resolves the promise
+ *
+ * Concurrent safety: Each tool call gets its own toolUseID key, so multiple
+ * concurrent canUseTool calls do not interfere with each other.
+ */
+function buildCanUseTool(
+  taskHandle: TaskHandle,
+  taskLog: ReturnType<typeof createChildLogger>
+): CanUseTool {
+  return async (toolName, input, options) => {
+    const { signal, toolUseID, blockedPath, decisionReason, agentID } = options;
+
+    if (signal.aborted) {
+      return { behavior: 'deny', message: 'Task was aborted' };
+    }
+
+    const riskLevel = classifyToolRisk(toolName, input);
+
+    taskHandle.permReqs.set(toolUseID, {
+      toolName,
+      toolInput: JSON.stringify(input),
+      riskLevel,
+      reason: decisionReason ?? null,
+      blockedPath: blockedPath ?? null,
+      description: null,
+      agentId: agentID ?? null,
+      createdAt: Date.now(),
+    });
+
+    change(taskHandle.doc, (draft) => {
+      draft.meta.status = 'input-required';
+      draft.meta.updatedAt = Date.now();
+    });
+
+    taskLog.info({ toolName, toolUseID, riskLevel }, 'Permission request sent to browser');
+
+    return new Promise<PermissionResult>((resolve) => {
+      let unsub: (() => void) | undefined;
+
+      const onAbort = () => {
+        unsub?.();
+        taskHandle.permReqs.delete(toolUseID);
+        resolve({ behavior: 'deny', message: 'Task was aborted' });
+      };
+
+      signal.addEventListener('abort', onAbort, { once: true });
+
+      unsub = taskHandle.permResps.subscribe(({ key, value, source }) => {
+        if (source === 'local') return;
+        if (key !== toolUseID || !value) return;
+
+        unsub?.();
+        signal.removeEventListener('abort', onAbort);
+
+        taskHandle.permReqs.delete(toolUseID);
+        taskHandle.permResps.delete(toolUseID);
+
+        change(taskHandle.doc, (draft) => {
+          draft.meta.status = 'working';
+          draft.meta.updatedAt = Date.now();
+        });
+
+        taskLog.info(
+          { toolName, toolUseID, decision: value.decision },
+          'Permission response received'
+        );
+
+        if (value.decision === 'approved') {
+          resolve({ behavior: 'allow' });
+        } else {
+          resolve({
+            behavior: 'deny',
+            message: value.message ?? 'User denied permission',
+          });
+        }
+      });
+    });
+  };
+}
+
 interface RunTaskOptions {
-  taskHandle: Handle<TaskDocumentShape>;
+  taskHandle: TaskHandle;
   taskId: string;
   cwd: string;
   model?: string;
@@ -482,6 +620,9 @@ async function runTask(opts: RunTaskOptions): Promise<SessionResult> {
 
   log.info({ prompt: prompt.slice(0, 100) }, 'Running task with prompt from CRDT');
 
+  const canUseTool =
+    permissionMode === 'bypassPermissions' ? undefined : buildCanUseTool(taskHandle, log);
+
   const resumeInfo = manager.shouldResume();
   if (resumeInfo.resume && resumeInfo.sessionId) {
     log.info({ sessionId: resumeInfo.sessionId }, 'Resuming existing session');
@@ -491,6 +632,7 @@ async function runTask(opts: RunTaskOptions): Promise<SessionResult> {
       model,
       permissionMode,
       effort,
+      canUseTool,
       allowDangerouslySkipPermissions: permissionMode === 'bypassPermissions' ? true : undefined,
     });
   }
@@ -503,6 +645,7 @@ async function runTask(opts: RunTaskOptions): Promise<SessionResult> {
     permissionMode,
     effort,
     abortController,
+    canUseTool,
     allowDangerouslySkipPermissions: permissionMode === 'bypassPermissions' ? true : undefined,
   });
 }

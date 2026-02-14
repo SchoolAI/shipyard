@@ -131,3 +131,57 @@ export type SessionState = (typeof SESSION_STATES)[number];
 export type ReasoningEffort = (typeof REASONING_EFFORTS)[number];
 export type PermissionMode = (typeof PERMISSION_MODES)[number];
 export { A2A_TASK_STATES, PERMISSION_MODES, REASONING_EFFORTS, SESSION_STATES };
+
+const TOOL_RISK_LEVELS = ['low', 'medium', 'high'] as const;
+const PERMISSION_DECISIONS = ['approved', 'denied'] as const;
+
+/**
+ * Ephemeral permission request shape.
+ * Daemon writes one per pending tool permission, keyed by toolUseId.
+ * Synced to browser via loro-extended ephemeral over WebRTC.
+ */
+export const PermissionRequestEphemeral = Shape.plain.struct({
+  toolName: Shape.plain.string(),
+  toolInput: Shape.plain.string(),
+  riskLevel: Shape.plain.string(...TOOL_RISK_LEVELS),
+  reason: Shape.plain.string().nullable(),
+  blockedPath: Shape.plain.string().nullable(),
+  description: Shape.plain.string().nullable(),
+  agentId: Shape.plain.string().nullable(),
+  createdAt: Shape.plain.number(),
+});
+
+/**
+ * Ephemeral permission response shape.
+ * Browser writes one per resolved request, keyed by toolUseId.
+ * Daemon subscribes and resolves the canUseTool promise.
+ */
+export const PermissionResponseEphemeral = Shape.plain.struct({
+  decision: Shape.plain.string(...PERMISSION_DECISIONS),
+  message: Shape.plain.string().nullable(),
+  decidedAt: Shape.plain.number(),
+});
+
+export type ToolRiskLevel = (typeof TOOL_RISK_LEVELS)[number];
+export type PermissionDecision = (typeof PERMISSION_DECISIONS)[number];
+export type PermissionRequest = Infer<typeof PermissionRequestEphemeral>;
+export type PermissionResponse = Infer<typeof PermissionResponseEphemeral>;
+export { TOOL_RISK_LEVELS, PERMISSION_DECISIONS };
+
+const HIGH_RISK_TOOLS = new Set(['Write', 'NotebookEdit']);
+const MEDIUM_RISK_TOOLS = new Set(['Edit', 'WebFetch', 'WebSearch']);
+
+/**
+ * Classify tool risk level based on tool name and input heuristics.
+ * The SDK provides no risk level — this is our own classification.
+ */
+export function classifyToolRisk(toolName: string, input: Record<string, unknown>): ToolRiskLevel {
+  if (toolName === 'Bash') {
+    const cmd = typeof input.command === 'string' ? input.command : '';
+    if (/\brm\b|--force|--hard|\bdd\b|\bmkfs\b/.test(cmd)) return 'high';
+    return 'medium';
+  }
+  if (HIGH_RISK_TOOLS.has(toolName)) return 'high';
+  if (MEDIUM_RISK_TOOLS.has(toolName)) return 'medium';
+  return 'low';
+}
