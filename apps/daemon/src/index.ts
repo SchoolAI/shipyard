@@ -19,6 +19,7 @@ import { type Env, validateEnv } from './env.js';
 import { FileStorageAdapter } from './file-storage-adapter.js';
 import { LifecycleManager } from './lifecycle.js';
 import { createChildLogger, logger } from './logger.js';
+import { serve } from './serve.js';
 import { SessionManager, type SessionResult } from './session-manager.js';
 import { createDaemonSignaling, type DaemonSignaling } from './signaling.js';
 
@@ -29,6 +30,7 @@ interface CliArgs {
   cwd?: string;
   dataDir?: string;
   model?: string;
+  serve?: boolean;
 }
 
 function parseCliArgs(): CliArgs {
@@ -40,6 +42,7 @@ function parseCliArgs(): CliArgs {
       'data-dir': { type: 'string', short: 'd' },
       cwd: { type: 'string' },
       model: { type: 'string', short: 'm' },
+      serve: { type: 'boolean', short: 's' },
       help: { type: 'boolean', short: 'h' },
     },
     strict: true,
@@ -53,6 +56,7 @@ function parseCliArgs(): CliArgs {
         'Usage:',
         '  shipyard-daemon --prompt "Fix the bug in auth.ts" [options]',
         '  shipyard-daemon --resume <session-id> --task-id <id> [--prompt "Continue"]',
+        '  shipyard-daemon --serve',
         '',
         'Options:',
         '  -p, --prompt <text>      Prompt for the agent',
@@ -61,10 +65,11 @@ function parseCliArgs(): CliArgs {
         '  -d, --data-dir <path>    Data directory (default: ~/.shipyard/data)',
         '      --cwd <path>         Working directory for agent',
         '  -m, --model <name>       Model to use',
+        '  -s, --serve              Run in serve mode (signaling + spawn-agent)',
         '  -h, --help               Show this help',
         '',
         'Environment:',
-        '  ANTHROPIC_API_KEY         Required. API key for Claude.',
+        '  ANTHROPIC_API_KEY         API key for Claude (required for task mode)',
         '  SHIPYARD_DATA_DIR         Data directory (overridden by --data-dir)',
         '  LOG_LEVEL                 Log level: debug, info, warn, error (default: info)',
         '  SHIPYARD_SIGNALING_URL    Signaling server WebSocket URL (optional)',
@@ -83,6 +88,7 @@ function parseCliArgs(): CliArgs {
     cwd: values.cwd,
     dataDir: values['data-dir'],
     model: values.model,
+    serve: values.serve,
   };
 }
 
@@ -221,8 +227,17 @@ async function main(): Promise<void> {
   const env = validateEnv();
   const args = parseCliArgs();
 
+  if (args.serve) {
+    return serve(env);
+  }
+
   if (!args.prompt && !args.resume) {
-    logger.error('Either --prompt or --resume is required. Use --help for usage.');
+    logger.error('Either --prompt, --resume, or --serve is required. Use --help for usage.');
+    process.exit(1);
+  }
+
+  if (!env.ANTHROPIC_API_KEY) {
+    logger.error('ANTHROPIC_API_KEY is required when running tasks. Use --help for usage.');
     process.exit(1);
   }
 

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 export const EnvSchema = z.object({
-  ANTHROPIC_API_KEY: z.string().min(1),
+  ANTHROPIC_API_KEY: z.string().min(1).optional(),
   SHIPYARD_DATA_DIR: z.string().default('~/.shipyard/data'),
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
   SHIPYARD_SIGNALING_URL: z.string().url().optional(),

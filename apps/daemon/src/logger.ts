@@ -8,6 +8,6 @@ export const logger = pino({
       : undefined,
 });
 
-export function createChildLogger(context: { taskId?: string; sessionId?: string }) {
+export function createChildLogger(context: { taskId?: string; sessionId?: string; mode?: string }) {
   return logger.child(context);
 }
