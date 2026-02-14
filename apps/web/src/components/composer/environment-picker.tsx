@@ -88,7 +88,7 @@ export function EnvironmentPicker({
               className="flex items-center gap-1 hover:text-foreground transition-colors text-xs text-muted"
             >
               <Globe className="w-3 h-3 shrink-0" aria-hidden="true" />
-              <span className="truncate max-w-[12rem]">{label}</span>
+              <span className="truncate max-w-[8rem]">{label}</span>
               <ChevronDown className="w-2.5 h-2.5" aria-hidden="true" />
             </Button>
           </Tooltip.Trigger>

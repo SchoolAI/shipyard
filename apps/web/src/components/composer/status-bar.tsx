@@ -11,9 +11,9 @@ import type { ConnectionState } from '../../hooks/use-personal-room';
 import { EnvironmentPicker } from './environment-picker';
 
 const PERMISSION_LABELS: Record<PermissionMode, string> = {
-  default: 'Default permissions',
+  default: 'Default',
   'accept-edits': 'Accept edits',
-  bypass: 'Bypass permissions',
+  bypass: 'Bypass',
 };
 
 const ALL_PERMISSION_MODES: PermissionMode[] = ['default', 'accept-edits', 'bypass'];
@@ -96,7 +96,7 @@ export function StatusBar({
                   className="flex items-center gap-1 hover:text-foreground transition-colors text-xs text-muted"
                 >
                   <Monitor className="w-3 h-3 shrink-0" aria-hidden="true" />
-                  <span className="truncate max-w-[8rem]">{machinesLabel}</span>
+                  <span className="truncate max-w-[6rem]">{machinesLabel}</span>
                   <ChevronDown className="w-2.5 h-2.5 shrink-0" aria-hidden="true" />
                 </Button>
               </Tooltip.Trigger>
@@ -142,7 +142,7 @@ export function StatusBar({
         ) : (
           <span className="flex items-center gap-1 min-w-0">
             <Monitor className="w-3 h-3 shrink-0" aria-hidden="true" />
-            <span className="truncate max-w-[8rem]">{machinesLabel}</span>
+            <span className="truncate max-w-[6rem]">{machinesLabel}</span>
           </span>
         )}
 
@@ -194,7 +194,7 @@ export function StatusBar({
         {/* Branch */}
         <Tooltip>
           <Tooltip.Trigger>
-            <span className="flex items-center gap-1 min-w-0 max-w-[10rem]" role="status">
+            <span className="flex items-center gap-1 min-w-0 max-w-[7rem]" role="status">
               <GitBranch className="w-3 h-3 shrink-0" aria-hidden="true" />
               <span className="truncate">{branchLabel}</span>
             </span>
