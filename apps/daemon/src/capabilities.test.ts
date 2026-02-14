@@ -193,14 +193,14 @@ describe('findGitRepos', () => {
     expect(repos).toEqual(['/home/testuser/real-project']);
   });
 
-  it('skips dot-directories at depth > 0', async () => {
+  it('skips dot-directories at all depths', async () => {
     mockReaddir
-      .mockResolvedValueOnce([makeDirent('.hidden', true), makeDirent('visible', true)] as never)
+      .mockResolvedValueOnce([makeDirent('.cache', true), makeDirent('.nvm', true), makeDirent('visible', true)] as never)
       .mockResolvedValueOnce([makeDirent('.git', true)] as never);
 
-    const repos = await findGitRepos('/home/testuser/projects', 1);
+    const repos = await findGitRepos('/home/testuser');
 
-    expect(repos).toEqual(['/home/testuser/projects/visible']);
+    expect(repos).toEqual(['/home/testuser/visible']);
   });
 
   it('returns empty on readdir failure', async () => {

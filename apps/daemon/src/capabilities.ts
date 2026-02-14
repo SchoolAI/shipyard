@@ -104,7 +104,7 @@ export async function findGitRepos(dir: string, depth = 0): Promise<string[]> {
     const promises: Promise<string[]>[] = [];
     for (const entry of entries) {
       if (!entry.isDirectory()) continue;
-      if (entry.name.startsWith('.') && depth > 0) continue;
+      if (entry.name.startsWith('.')) continue;
       if (EXCLUDE_DIRS.has(entry.name)) continue;
       promises.push(findGitRepos(join(dir, entry.name), depth + 1));
     }
