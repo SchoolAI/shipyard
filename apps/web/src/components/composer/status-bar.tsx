@@ -1,4 +1,4 @@
-import { Button, Chip, Dropdown, Label } from '@heroui/react';
+import { Button, Chip, Dropdown, Label, ScrollShadow } from '@heroui/react';
 import type {
   GitRepoInfo,
   PermissionMode,
@@ -71,7 +71,12 @@ export function StatusBar({
 
   const permissionKeys = useMemo(() => new Set([permission]), [permission]);
 
-  const selectedEnvironment = availableEnvironments.find((e) => e.path === selectedEnvironmentPath);
+  const sortedEnvironments = useMemo(
+    () => [...availableEnvironments].sort((a, b) => a.name.localeCompare(b.name)),
+    [availableEnvironments]
+  );
+
+  const selectedEnvironment = sortedEnvironments.find((e) => e.path === selectedEnvironmentPath);
   const envKeys = useMemo(
     () => (selectedEnvironmentPath ? new Set([selectedEnvironmentPath]) : new Set<string>()),
     [selectedEnvironmentPath]
@@ -184,7 +189,7 @@ export function StatusBar({
         </Dropdown>
 
         {/* Environment */}
-        {availableEnvironments.length > 0 ? (
+        {sortedEnvironments.length > 0 ? (
           <Dropdown>
             <Button
               variant="ghost"
@@ -196,29 +201,35 @@ export function StatusBar({
               {envLabel}
               <ChevronDown className="w-2.5 h-2.5" />
             </Button>
-            <Dropdown.Popover placement="top" className="min-w-[200px]">
-              <Dropdown.Menu
-                selectionMode="single"
-                selectedKeys={envKeys}
-                onSelectionChange={(keys) => {
-                  const selected = [...keys][0];
-                  if (typeof selected === 'string' && onEnvironmentSelect) {
-                    onEnvironmentSelect(selected);
-                  }
-                }}
-              >
-                {availableEnvironments.map((env) => (
-                  <Dropdown.Item
-                    key={env.path}
-                    id={env.path}
-                    textValue={`${env.name} (${env.branch})`}
-                  >
-                    <Label>
-                      {env.name} ({env.branch})
-                    </Label>
-                  </Dropdown.Item>
-                ))}
-              </Dropdown.Menu>
+            <Dropdown.Popover placement="top" className="min-w-[220px] max-w-[320px]">
+              <ScrollShadow className="max-h-[300px]">
+                <Dropdown.Menu
+                  selectionMode="single"
+                  selectedKeys={envKeys}
+                  onSelectionChange={(keys) => {
+                    const selected = [...keys][0];
+                    if (typeof selected === 'string' && onEnvironmentSelect) {
+                      onEnvironmentSelect(selected);
+                    }
+                  }}
+                >
+                  {sortedEnvironments.map((env) => (
+                    <Dropdown.Item
+                      key={env.path}
+                      id={env.path}
+                      textValue={`${env.name} (${env.branch})`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <GitBranch className="w-3 h-3 shrink-0 text-muted" />
+                        <div className="min-w-0">
+                          <Label className="truncate block">{env.name}</Label>
+                          <span className="text-xs text-muted truncate block">{env.branch}</span>
+                        </div>
+                      </div>
+                    </Dropdown.Item>
+                  ))}
+                </Dropdown.Menu>
+              </ScrollShadow>
             </Dropdown.Popover>
           </Dropdown>
         ) : (

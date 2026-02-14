@@ -5,7 +5,7 @@ import type {
   PermissionMode,
   AgentInfo as SignalingAgentInfo,
 } from '@shipyard/session';
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useUIStore } from '../stores';
 
 export interface MachineGroup {
@@ -74,6 +74,12 @@ export function useMachineSelection(agents: SignalingAgentInfo[]) {
     selectedMachineId && machineStillConnected
       ? selectedMachineId
       : (machines[0]?.machineId ?? null);
+  useEffect(() => {
+    if (effectiveMachineId !== selectedMachineId) {
+      setSelectedMachineId(effectiveMachineId);
+    }
+  }, [effectiveMachineId, selectedMachineId, setSelectedMachineId]);
+
   const selectedMachine = machines.find((m) => m.machineId === effectiveMachineId) ?? null;
 
   return {

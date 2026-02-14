@@ -9,10 +9,13 @@ import type { ChatComposerHandle } from './chat-composer';
 import { ChatComposer } from './chat-composer';
 import type { ChatMessageData } from './chat-message';
 import { ChatMessage } from './chat-message';
+import { CommandPalette } from './command-palette';
 import { StatusBar } from './composer/status-bar';
 import { DiffPanel } from './panels/diff-panel';
 import type { TerminalPanelHandle } from './panels/terminal-panel';
 import { TerminalPanel } from './panels/terminal-panel';
+import { SettingsPage } from './settings-page';
+import { ShortcutsModal } from './shortcuts-modal';
 import { Sidebar } from './sidebar';
 import { TopBar } from './top-bar';
 
@@ -84,9 +87,11 @@ export function ChatPage() {
   const messagesByTask = useMessageStore((s) => s.messagesByTask);
   const isTerminalOpen = useUIStore((s) => s.isTerminalOpen);
   const isDiffOpen = useUIStore((s) => s.isDiffOpen);
+  const isSettingsOpen = useUIStore((s) => s.isSettingsOpen);
   const toggleTerminal = useUIStore((s) => s.toggleTerminal);
   const toggleDiff = useUIStore((s) => s.toggleDiff);
   const toggleSidebar = useUIStore((s) => s.toggleSidebar);
+  const setSettingsOpen = useUIStore((s) => s.setSettingsOpen);
 
   const storeMessages = activeTaskId ? messagesByTask[activeTaskId] : undefined;
   const messages: ChatMessageData[] = useMemo(
@@ -123,6 +128,10 @@ export function ChatPage() {
   const selectedEnvironmentPath = useUIStore((s) => s.selectedEnvironmentPath);
   const setSelectedEnvironmentPath = useUIStore((s) => s.setSelectedEnvironmentPath);
   const [permission, setPermission] = useState<PermissionMode>('default');
+
+  useEffect(() => {
+    setSelectedEnvironmentPath(null);
+  }, [selectedMachineId, setSelectedEnvironmentPath]);
 
   useEffect(() => {
     return () => clearTimeout(demoTimerRef.current);
@@ -173,16 +182,25 @@ export function ChatPage() {
     composerRef.current?.focus();
   }, []);
 
+  const handleToggleSettings = useCallback(() => {
+    setSettingsOpen(!isSettingsOpen);
+  }, [setSettingsOpen, isSettingsOpen]);
+
+  const handleCloseSettings = useCallback(() => {
+    setSettingsOpen(false);
+  }, [setSettingsOpen]);
+
   useAppHotkeys({
     onToggleTerminal: toggleTerminal,
     onToggleDiff: toggleDiff,
     onToggleSidebar: toggleSidebar,
     onNewTask: handleNewTask,
-    onOpenSettings: () => {},
-    onCommandPalette: () => {},
+    onOpenSettings: handleToggleSettings,
+    onCommandPalette: () => useUIStore.getState().toggleCommandPalette(),
     onNavigateNextTask: handleNavigateNextTask,
     onNavigatePrevTask: handleNavigatePrevTask,
     onFocusComposer: handleFocusComposer,
+    onShowShortcuts: () => useUIStore.getState().toggleShortcutsModal(),
   });
 
   const scrollToBottom = useCallback(() => {
@@ -235,45 +253,53 @@ export function ChatPage() {
 
   return (
     <div className="flex h-dvh bg-background">
+      <CommandPalette />
+      <ShortcutsModal />
       <Sidebar />
       {/* Main column: top bar + chat + terminal */}
-      <div className="flex flex-col flex-1 min-w-0">
+      <div className="flex flex-col flex-1 min-w-0" tabIndex={-1}>
         <TopBar onToggleTerminal={toggleTerminal} onToggleDiff={toggleDiff} />
 
-        {/* Chat area */}
-        {hasMessages ? (
-          <div ref={scrollRef} className="flex-1 overflow-y-auto">
-            <div className="max-w-3xl mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-4 sm:space-y-6">
-              {messages.map((msg) => (
-                <ChatMessage key={msg.id} message={msg} />
-              ))}
-            </div>
-          </div>
+        {isSettingsOpen ? (
+          <SettingsPage onBack={handleCloseSettings} />
         ) : (
-          <HeroState onSuggestionClick={handleSubmit} />
-        )}
+          <>
+            {/* Chat area */}
+            {hasMessages ? (
+              <div ref={scrollRef} className="flex-1 overflow-y-auto">
+                <div className="max-w-3xl mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-4 sm:space-y-6">
+                  {messages.map((msg) => (
+                    <ChatMessage key={msg.id} message={msg} />
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <HeroState onSuggestionClick={handleSubmit} />
+            )}
 
-        {/* Composer */}
-        <div className="shrink-0 w-full max-w-3xl mx-auto px-3 sm:px-4">
-          <ChatComposer
-            ref={composerRef}
-            onSubmit={handleSubmit}
-            onClearChat={handleClearChat}
-            availableModels={availableModels}
-          />
-          <StatusBar
-            connectionState={connectionState}
-            machines={machines}
-            selectedMachineId={selectedMachineId}
-            onMachineSelect={setSelectedMachineId}
-            availableEnvironments={availableEnvironments}
-            selectedEnvironmentPath={selectedEnvironmentPath}
-            onEnvironmentSelect={setSelectedEnvironmentPath}
-            availablePermissionModes={availablePermissionModes}
-            permission={permission}
-            onPermissionChange={setPermission}
-          />
-        </div>
+            {/* Composer */}
+            <div className="shrink-0 w-full max-w-3xl mx-auto px-3 sm:px-4">
+              <ChatComposer
+                ref={composerRef}
+                onSubmit={handleSubmit}
+                onClearChat={handleClearChat}
+                availableModels={availableModels}
+              />
+              <StatusBar
+                connectionState={connectionState}
+                machines={machines}
+                selectedMachineId={selectedMachineId}
+                onMachineSelect={setSelectedMachineId}
+                availableEnvironments={availableEnvironments}
+                selectedEnvironmentPath={selectedEnvironmentPath}
+                onEnvironmentSelect={setSelectedEnvironmentPath}
+                availablePermissionModes={availablePermissionModes}
+                permission={permission}
+                onPermissionChange={setPermission}
+              />
+            </div>
+          </>
+        )}
 
         {/* Terminal panel */}
         <TerminalPanel

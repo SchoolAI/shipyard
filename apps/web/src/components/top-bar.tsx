@@ -1,5 +1,6 @@
 import { Button, Kbd, Tooltip } from '@heroui/react';
 import { Diff, Terminal } from 'lucide-react';
+import { HOTKEYS } from '../constants/hotkeys';
 import { useTaskStore } from '../stores';
 import { MobileSidebarToggle } from './sidebar';
 
@@ -39,10 +40,7 @@ export function TopBar({ onToggleTerminal, onToggleDiff }: TopBarProps) {
           <Tooltip.Content>
             <span className="flex items-center gap-2">
               Toggle terminal
-              <Kbd>
-                <Kbd.Abbr keyValue="ctrl" />
-                <Kbd.Content>`</Kbd.Content>
-              </Kbd>
+              <Kbd>{HOTKEYS.toggleTerminal.display}</Kbd>
             </span>
           </Tooltip.Content>
         </Tooltip>
@@ -62,11 +60,7 @@ export function TopBar({ onToggleTerminal, onToggleDiff }: TopBarProps) {
           <Tooltip.Content>
             <span className="flex items-center gap-2">
               Toggle diff panel
-              <Kbd>
-                <Kbd.Abbr keyValue="command" />
-                <Kbd.Abbr keyValue="option" />
-                <Kbd.Content>B</Kbd.Content>
-              </Kbd>
+              <Kbd>{HOTKEYS.toggleDiff.display}</Kbd>
             </span>
           </Tooltip.Content>
         </Tooltip>

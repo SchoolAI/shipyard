@@ -1,5 +1,5 @@
 import { Button, Dropdown, Label } from '@heroui/react';
-import { ChevronDown } from 'lucide-react';
+import { Brain, ChevronDown } from 'lucide-react';
 import { useMemo } from 'react';
 
 export type ReasoningLevel = 'low' | 'medium' | 'high';
@@ -10,14 +10,35 @@ const LEVELS: { id: ReasoningLevel; label: string }[] = [
   { id: 'high', label: 'High' },
 ];
 
-interface ReasoningEffortProps {
+export interface ReasoningEffortProps {
   level: ReasoningLevel;
   onLevelChange: (level: ReasoningLevel) => void;
+  supportedEfforts?: ReasoningLevel[];
 }
 
-export function ReasoningEffort({ level, onLevelChange }: ReasoningEffortProps) {
+export function ReasoningEffort({ level, onLevelChange, supportedEfforts }: ReasoningEffortProps) {
+  const filteredLevels = useMemo(() => {
+    if (!supportedEfforts) return LEVELS;
+    return LEVELS.filter((l) => supportedEfforts.includes(l.id));
+  }, [supportedEfforts]);
+
   const selectedKeys = useMemo(() => new Set([level]), [level]);
   const currentLabel = LEVELS.find((l) => l.id === level)?.label ?? 'Medium';
+
+  if (filteredLevels.length <= 1) {
+    return (
+      <Button
+        variant="ghost"
+        size="sm"
+        aria-label="Extended thinking enabled"
+        className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs text-muted cursor-default"
+        isDisabled
+      >
+        <Brain className="w-3 h-3" />
+        Thinking
+      </Button>
+    );
+  }
 
   return (
     <Dropdown>
@@ -27,6 +48,7 @@ export function ReasoningEffort({ level, onLevelChange }: ReasoningEffortProps) 
         aria-label={`Reasoning effort: ${currentLabel}`}
         className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs text-muted hover:text-foreground hover:bg-default transition-colors"
       >
+        <Brain className="w-3 h-3" />
         {currentLabel}
         <ChevronDown className="w-3 h-3" />
       </Button>
@@ -41,7 +63,7 @@ export function ReasoningEffort({ level, onLevelChange }: ReasoningEffortProps) 
             }
           }}
         >
-          {LEVELS.map((l) => (
+          {filteredLevels.map((l) => (
             <Dropdown.Item key={l.id} id={l.id} textValue={l.label}>
               <Label>{l.label}</Label>
             </Dropdown.Item>

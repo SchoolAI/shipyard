@@ -21,7 +21,14 @@ describe('mergeCapabilities', () => {
       makeAgent({
         agentId: 'a1',
         capabilities: {
-          models: [{ id: 'opus', label: 'Opus', provider: 'claude-code', supportsReasoning: true }],
+          models: [
+            {
+              id: 'opus',
+              label: 'Opus',
+              provider: 'claude-code',
+              reasoning: { efforts: ['low', 'medium', 'high'], defaultEffort: 'high' },
+            },
+          ],
           environments: [{ path: '/proj', name: 'proj', branch: 'main' }],
           permissionModes: ['default'],
         },
@@ -29,9 +36,7 @@ describe('mergeCapabilities', () => {
       makeAgent({
         agentId: 'a2',
         capabilities: {
-          models: [
-            { id: 'sonnet', label: 'Sonnet', provider: 'claude-code', supportsReasoning: false },
-          ],
+          models: [{ id: 'sonnet', label: 'Sonnet', provider: 'claude-code' }],
           environments: [{ path: '/other', name: 'other', branch: 'dev' }],
           permissionModes: ['accept-edits'],
         },
@@ -49,7 +54,14 @@ describe('mergeCapabilities', () => {
       makeAgent({
         agentId: 'a1',
         capabilities: {
-          models: [{ id: 'opus', label: 'Opus', provider: 'claude-code', supportsReasoning: true }],
+          models: [
+            {
+              id: 'opus',
+              label: 'Opus',
+              provider: 'claude-code',
+              reasoning: { efforts: ['low', 'medium', 'high'], defaultEffort: 'high' },
+            },
+          ],
           environments: [],
           permissionModes: [],
         },
@@ -58,7 +70,12 @@ describe('mergeCapabilities', () => {
         agentId: 'a2',
         capabilities: {
           models: [
-            { id: 'opus', label: 'Opus Dupe', provider: 'claude-code', supportsReasoning: true },
+            {
+              id: 'opus',
+              label: 'Opus Dupe',
+              provider: 'claude-code',
+              reasoning: { efforts: ['low', 'medium', 'high'], defaultEffort: 'high' },
+            },
           ],
           environments: [],
           permissionModes: [],
@@ -116,7 +133,14 @@ describe('useMachineSelection', () => {
     const agents: SignalingAgentInfo[] = [
       makeAgent({
         capabilities: {
-          models: [{ id: 'opus', label: 'Opus', provider: 'claude-code', supportsReasoning: true }],
+          models: [
+            {
+              id: 'opus',
+              label: 'Opus',
+              provider: 'claude-code',
+              reasoning: { efforts: ['low', 'medium', 'high'], defaultEffort: 'high' },
+            },
+          ],
           environments: [],
           permissionModes: ['default'],
         },
@@ -146,7 +170,14 @@ describe('useMachineSelection', () => {
         machineId: 'machine-1',
         machineName: 'Machine A',
         capabilities: {
-          models: [{ id: 'opus', label: 'Opus', provider: 'claude-code', supportsReasoning: true }],
+          models: [
+            {
+              id: 'opus',
+              label: 'Opus',
+              provider: 'claude-code',
+              reasoning: { efforts: ['low', 'medium', 'high'], defaultEffort: 'high' },
+            },
+          ],
           environments: [],
           permissionModes: [],
         },
@@ -156,9 +187,7 @@ describe('useMachineSelection', () => {
         machineId: 'machine-2',
         machineName: 'Machine B',
         capabilities: {
-          models: [
-            { id: 'sonnet', label: 'Sonnet', provider: 'claude-code', supportsReasoning: false },
-          ],
+          models: [{ id: 'sonnet', label: 'Sonnet', provider: 'claude-code' }],
           environments: [],
           permissionModes: [],
         },
@@ -186,7 +215,14 @@ describe('useMachineSelection', () => {
         agentId: 'a1',
         machineId: 'machine-1',
         capabilities: {
-          models: [{ id: 'opus', label: 'Opus', provider: 'claude-code', supportsReasoning: true }],
+          models: [
+            {
+              id: 'opus',
+              label: 'Opus',
+              provider: 'claude-code',
+              reasoning: { efforts: ['low', 'medium', 'high'], defaultEffort: 'high' },
+            },
+          ],
           environments: [{ path: '/proj', name: 'proj', branch: 'main' }],
           permissionModes: ['default'],
         },
@@ -195,9 +231,7 @@ describe('useMachineSelection', () => {
         agentId: 'a2',
         machineId: 'machine-1',
         capabilities: {
-          models: [
-            { id: 'sonnet', label: 'Sonnet', provider: 'claude-code', supportsReasoning: false },
-          ],
+          models: [{ id: 'sonnet', label: 'Sonnet', provider: 'claude-code' }],
           environments: [{ path: '/other', name: 'other', branch: 'dev' }],
           permissionModes: ['bypass'],
         },

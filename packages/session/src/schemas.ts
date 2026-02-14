@@ -233,13 +233,27 @@ export const PresignedUrlPayloadSchema = z.object({
 export type PresignedUrlPayload = z.infer<typeof PresignedUrlPayloadSchema>;
 
 /**
+ * Reasoning capability schema for models that support configurable reasoning effort.
+ */
+export const ReasoningCapabilitySchema = z
+  .object({
+    efforts: z.array(z.enum(['low', 'medium', 'high'])).min(1),
+    defaultEffort: z.enum(['low', 'medium', 'high']),
+  })
+  .refine((data) => data.efforts.includes(data.defaultEffort), {
+    message: 'defaultEffort must be one of the supported efforts',
+  });
+
+export type ReasoningCapability = z.infer<typeof ReasoningCapabilitySchema>;
+
+/**
  * Model info schema for machine capabilities.
  */
 export const ModelInfoSchema = z.object({
   id: z.string(),
   label: z.string(),
   provider: z.string(),
-  supportsReasoning: z.boolean(),
+  reasoning: ReasoningCapabilitySchema.optional(),
 });
 
 export type ModelInfo = z.infer<typeof ModelInfoSchema>;

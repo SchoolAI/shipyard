@@ -13,7 +13,11 @@ import {
 import type { Env } from '../env';
 import { broadcastExcept, findWebSocketByUserId } from '../protocol/webrtc-relay';
 import { createLogger, type Logger } from '../utils/logger';
-import type { PassedCollabPayload, SerializedCollabConnectionState } from './types';
+import {
+  type PassedCollabPayload,
+  PassedCollabPayloadSchema,
+  type SerializedCollabConnectionState,
+} from './types';
 
 function assertNever(x: never): never {
   throw new Error(`Unhandled message type: ${JSON.stringify(x)}`);
@@ -89,7 +93,12 @@ export class CollabRoom extends DurableObject<Env> {
 
     let payload: PassedCollabPayload;
     try {
-      payload = JSON.parse(payloadHeader);
+      const parsed: unknown = JSON.parse(payloadHeader);
+      const result = PassedCollabPayloadSchema.safeParse(parsed);
+      if (!result.success) {
+        return new Response('Invalid collab payload', { status: 401 });
+      }
+      payload = result.data;
     } catch {
       return new Response('Invalid collab payload', { status: 401 });
     }

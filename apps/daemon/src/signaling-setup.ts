@@ -31,8 +31,9 @@ export async function createSignalingHandle(
   if (env.SHIPYARD_USER_TOKEN) {
     wsUrl.searchParams.set('token', env.SHIPYARD_USER_TOKEN);
   }
+  wsUrl.searchParams.set('clientType', 'agent');
 
-  const capabilities = await detectCapabilities({ cwd: process.cwd() });
+  const capabilities = await detectCapabilities();
   log.info(
     { models: capabilities.models.length, environments: capabilities.environments.length },
     'Detected machine capabilities'

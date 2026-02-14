@@ -6,6 +6,7 @@ vi.mock('react-hotkeys-hook', () => ({
 
 import { renderHook } from '@testing-library/react';
 import { useHotkeys } from 'react-hotkeys-hook';
+import { HOTKEYS } from '../constants/hotkeys';
 import { useAppHotkeys } from './use-app-hotkeys';
 
 const mockUseHotkeys = vi.mocked(useHotkeys);
@@ -24,6 +25,7 @@ function defaultCallbacks() {
     onNavigateNextTask: vi.fn(),
     onNavigatePrevTask: vi.fn(),
     onFocusComposer: vi.fn(),
+    onShowShortcuts: vi.fn(),
   };
 }
 
@@ -41,7 +43,7 @@ describe('useAppHotkeys', () => {
       const cbs = defaultCallbacks();
       renderHook(() => useAppHotkeys(cbs));
 
-      const call = findCall('ctrl+backquote');
+      const call = findCall(HOTKEYS.toggleTerminal.key);
       expect(call).toBeDefined();
       expect(call?.[1]).toBe(cbs.onToggleTerminal);
       expect(call?.[2]).toEqual(GLOBAL_OPTIONS);
@@ -51,7 +53,7 @@ describe('useAppHotkeys', () => {
       const cbs = defaultCallbacks();
       renderHook(() => useAppHotkeys(cbs));
 
-      const call = findCall('meta+alt+b');
+      const call = findCall(HOTKEYS.toggleDiff.key);
       expect(call).toBeDefined();
       expect(call?.[1]).toBe(cbs.onToggleDiff);
       expect(call?.[2]).toEqual(GLOBAL_OPTIONS);
@@ -61,19 +63,9 @@ describe('useAppHotkeys', () => {
       const cbs = defaultCallbacks();
       renderHook(() => useAppHotkeys(cbs));
 
-      const call = findCall('meta+b');
+      const call = findCall(HOTKEYS.toggleSidebar.key);
       expect(call).toBeDefined();
       expect(call?.[1]).toBe(cbs.onToggleSidebar);
-      expect(call?.[2]).toEqual(GLOBAL_OPTIONS);
-    });
-
-    it('registers meta+shift+n for new task', () => {
-      const cbs = defaultCallbacks();
-      renderHook(() => useAppHotkeys(cbs));
-
-      const call = findCall('meta+shift+n');
-      expect(call).toBeDefined();
-      expect(call?.[1]).toBe(cbs.onNewTask);
       expect(call?.[2]).toEqual(GLOBAL_OPTIONS);
     });
 
@@ -81,7 +73,7 @@ describe('useAppHotkeys', () => {
       const cbs = defaultCallbacks();
       renderHook(() => useAppHotkeys(cbs));
 
-      const call = findCall('meta+comma');
+      const call = findCall(HOTKEYS.settings.key);
       expect(call).toBeDefined();
       expect(call?.[1]).toBe(cbs.onOpenSettings);
       expect(call?.[2]).toEqual(GLOBAL_OPTIONS);
@@ -91,19 +83,39 @@ describe('useAppHotkeys', () => {
       const cbs = defaultCallbacks();
       renderHook(() => useAppHotkeys(cbs));
 
-      const call = findCall('meta+k');
+      const call = findCall(HOTKEYS.commandPalette.key);
       expect(call).toBeDefined();
       expect(call?.[1]).toBe(cbs.onCommandPalette);
+      expect(call?.[2]).toEqual(GLOBAL_OPTIONS);
+    });
+
+    it('registers meta+slash for show shortcuts', () => {
+      const cbs = defaultCallbacks();
+      renderHook(() => useAppHotkeys(cbs));
+
+      const call = findCall(HOTKEYS.showShortcuts.key);
+      expect(call).toBeDefined();
+      expect(call?.[1]).toBe(cbs.onShowShortcuts);
       expect(call?.[2]).toEqual(GLOBAL_OPTIONS);
     });
   });
 
   describe('non-input shortcuts (disabled in form tags)', () => {
+    it('registers c for new task', () => {
+      const cbs = defaultCallbacks();
+      renderHook(() => useAppHotkeys(cbs));
+
+      const call = findCall(HOTKEYS.newTask.key);
+      expect(call).toBeDefined();
+      expect(call?.[1]).toBe(cbs.onNewTask);
+      expect(call?.[2]).toEqual(NON_INPUT_OPTIONS);
+    });
+
     it('registers j for navigate next task', () => {
       const cbs = defaultCallbacks();
       renderHook(() => useAppHotkeys(cbs));
 
-      const call = findCall('j');
+      const call = findCall(HOTKEYS.navigateNext.key);
       expect(call).toBeDefined();
       expect(call?.[1]).toBe(cbs.onNavigateNextTask);
       expect(call?.[2]).toEqual(NON_INPUT_OPTIONS);
@@ -113,7 +125,7 @@ describe('useAppHotkeys', () => {
       const cbs = defaultCallbacks();
       renderHook(() => useAppHotkeys(cbs));
 
-      const call = findCall('k');
+      const call = findCall(HOTKEYS.navigatePrev.key);
       expect(call).toBeDefined();
       expect(call?.[1]).toBe(cbs.onNavigatePrevTask);
       expect(call?.[2]).toEqual(NON_INPUT_OPTIONS);
@@ -123,19 +135,29 @@ describe('useAppHotkeys', () => {
       const cbs = defaultCallbacks();
       renderHook(() => useAppHotkeys(cbs));
 
-      const call = findCall('e');
+      const call = findCall(HOTKEYS.focusComposer.key);
       expect(call).toBeDefined();
       expect(call?.[1]).toBe(cbs.onFocusComposer);
       expect(call?.[2]).toEqual(NON_INPUT_OPTIONS);
     });
 
-    it('registers / for focus composer', () => {
+    it('registers slash for focus composer', () => {
       const cbs = defaultCallbacks();
       renderHook(() => useAppHotkeys(cbs));
 
-      const call = findCall('/');
+      const call = findCall(HOTKEYS.focusComposerAlt.key);
       expect(call).toBeDefined();
       expect(call?.[1]).toBe(cbs.onFocusComposer);
+      expect(call?.[2]).toEqual(NON_INPUT_OPTIONS);
+    });
+
+    it('registers shift+/ for show shortcuts', () => {
+      const cbs = defaultCallbacks();
+      renderHook(() => useAppHotkeys(cbs));
+
+      const call = findCall(HOTKEYS.showShortcutsAlt.key);
+      expect(call).toBeDefined();
+      expect(call?.[1]).toBe(cbs.onShowShortcuts);
       expect(call?.[2]).toEqual(NON_INPUT_OPTIONS);
     });
   });

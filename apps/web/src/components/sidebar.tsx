@@ -1,6 +1,7 @@
 import { Button, Kbd, Tooltip } from '@heroui/react';
 import { Menu, PanelLeftClose, PanelLeftOpen, Plus, Settings } from 'lucide-react';
 import { useCallback } from 'react';
+import { HOTKEYS } from '../constants/hotkeys';
 import { useMessageStore, useTaskStore, useUIStore } from '../stores';
 import type { AgentState, TaskData } from '../stores/types';
 
@@ -157,10 +158,7 @@ export function Sidebar() {
               <Tooltip.Content>
                 <span className="flex items-center gap-2">
                   Collapse sidebar
-                  <Kbd>
-                    <Kbd.Abbr keyValue="command" />
-                    <Kbd.Content>B</Kbd.Content>
-                  </Kbd>
+                  <Kbd>{HOTKEYS.toggleSidebar.display}</Kbd>
                 </span>
               </Tooltip.Content>
             </Tooltip>
@@ -185,10 +183,7 @@ export function Sidebar() {
               <Tooltip.Content placement="right">
                 <span className="flex items-center gap-2">
                   Expand sidebar
-                  <Kbd>
-                    <Kbd.Abbr keyValue="command" />
-                    <Kbd.Content>B</Kbd.Content>
-                  </Kbd>
+                  <Kbd>{HOTKEYS.toggleSidebar.display}</Kbd>
                 </span>
               </Tooltip.Content>
             </Tooltip>
@@ -201,14 +196,24 @@ export function Sidebar() {
         {/* New task row -- ghost style, matches other sidebar rows */}
         {isExpanded ? (
           <div className="px-1.5 mb-1">
-            <button
-              type="button"
-              className="flex items-center gap-2.5 w-full px-2.5 py-2 rounded-lg text-left text-sm text-muted hover:text-foreground hover:bg-default/30 transition-colors"
-              onClick={handleNewTask}
-            >
-              <Plus className="w-4 h-4" />
-              New task
-            </button>
+            <Tooltip>
+              <Tooltip.Trigger>
+                <button
+                  type="button"
+                  className="flex items-center gap-2.5 w-full px-2.5 py-2 rounded-lg text-left text-sm text-muted hover:text-foreground hover:bg-default/30 transition-colors"
+                  onClick={handleNewTask}
+                >
+                  <Plus className="w-4 h-4" />
+                  New task
+                </button>
+              </Tooltip.Trigger>
+              <Tooltip.Content>
+                <span className="flex items-center gap-2">
+                  New task
+                  <Kbd>{HOTKEYS.newTask.display}</Kbd>
+                </span>
+              </Tooltip.Content>
+            </Tooltip>
           </div>
         ) : (
           <div className="flex justify-center mb-1">
@@ -228,11 +233,7 @@ export function Sidebar() {
               <Tooltip.Content placement="right">
                 <span className="flex items-center gap-2">
                   New task
-                  <Kbd>
-                    <Kbd.Abbr keyValue="command" />
-                    <Kbd.Abbr keyValue="shift" />
-                    <Kbd.Content>N</Kbd.Content>
-                  </Kbd>
+                  <Kbd>{HOTKEYS.newTask.display}</Kbd>
                 </span>
               </Tooltip.Content>
             </Tooltip>
@@ -266,17 +267,25 @@ export function Sidebar() {
         {/* Settings -- pinned to bottom, separated by whitespace only */}
         <div className="mt-auto shrink-0 p-2">
           {isExpanded ? (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="w-full justify-start text-muted hover:text-foreground gap-2"
-              onPress={() => {
-                /* settings not yet implemented */
-              }}
-            >
-              <Settings className="w-4 h-4" />
-              Settings
-            </Button>
+            <Tooltip>
+              <Tooltip.Trigger>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full justify-start text-muted hover:text-foreground gap-2"
+                  onPress={() => useUIStore.getState().setSettingsOpen(true)}
+                >
+                  <Settings className="w-4 h-4" />
+                  Settings
+                </Button>
+              </Tooltip.Trigger>
+              <Tooltip.Content>
+                <span className="flex items-center gap-2">
+                  Settings
+                  <Kbd>{HOTKEYS.settings.display}</Kbd>
+                </span>
+              </Tooltip.Content>
+            </Tooltip>
           ) : (
             <Tooltip>
               <Tooltip.Trigger>
@@ -286,9 +295,7 @@ export function Sidebar() {
                   size="sm"
                   aria-label="Settings"
                   className="text-muted hover:text-foreground hover:bg-default/50 w-8 h-8 min-w-0"
-                  onPress={() => {
-                    /* settings not yet implemented */
-                  }}
+                  onPress={() => useUIStore.getState().setSettingsOpen(true)}
                 >
                   <Settings className="w-4 h-4" />
                 </Button>
@@ -296,10 +303,7 @@ export function Sidebar() {
               <Tooltip.Content placement="right">
                 <span className="flex items-center gap-2">
                   Settings
-                  <Kbd>
-                    <Kbd.Abbr keyValue="command" />
-                    <Kbd.Content>,</Kbd.Content>
-                  </Kbd>
+                  <Kbd>{HOTKEYS.settings.display}</Kbd>
                 </span>
               </Tooltip.Content>
             </Tooltip>

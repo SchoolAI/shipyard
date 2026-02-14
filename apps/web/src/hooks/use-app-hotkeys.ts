@@ -1,4 +1,5 @@
 import { useHotkeys } from 'react-hotkeys-hook';
+import { HOTKEYS } from '../constants/hotkeys';
 
 interface AppHotkeyOptions {
   onToggleTerminal: () => void;
@@ -10,6 +11,7 @@ interface AppHotkeyOptions {
   onNavigateNextTask: () => void;
   onNavigatePrevTask: () => void;
   onFocusComposer: () => void;
+  onShowShortcuts: () => void;
 }
 
 const GLOBAL_OPTIONS = { preventDefault: true, enableOnFormTags: true } as const;
@@ -25,23 +27,27 @@ export function useAppHotkeys({
   onNavigateNextTask,
   onNavigatePrevTask,
   onFocusComposer,
+  onShowShortcuts,
 }: AppHotkeyOptions) {
-  useHotkeys('ctrl+backquote', onToggleTerminal, GLOBAL_OPTIONS, [onToggleTerminal]);
+  useHotkeys(HOTKEYS.toggleTerminal.key, onToggleTerminal, GLOBAL_OPTIONS, [onToggleTerminal]);
 
-  useHotkeys('meta+alt+b', onToggleDiff, GLOBAL_OPTIONS, [onToggleDiff]);
+  useHotkeys(HOTKEYS.toggleDiff.key, onToggleDiff, GLOBAL_OPTIONS, [onToggleDiff]);
 
-  useHotkeys('meta+b', onToggleSidebar, GLOBAL_OPTIONS, [onToggleSidebar]);
+  useHotkeys(HOTKEYS.toggleSidebar.key, onToggleSidebar, GLOBAL_OPTIONS, [onToggleSidebar]);
 
-  useHotkeys('meta+shift+n', onNewTask, GLOBAL_OPTIONS, [onNewTask]);
+  useHotkeys(HOTKEYS.newTask.key, onNewTask, NON_INPUT_OPTIONS, [onNewTask]);
 
-  useHotkeys('meta+comma', onOpenSettings, GLOBAL_OPTIONS, [onOpenSettings]);
+  useHotkeys(HOTKEYS.settings.key, onOpenSettings, GLOBAL_OPTIONS, [onOpenSettings]);
 
-  useHotkeys('meta+k', onCommandPalette, GLOBAL_OPTIONS, [onCommandPalette]);
+  useHotkeys(HOTKEYS.commandPalette.key, onCommandPalette, GLOBAL_OPTIONS, [onCommandPalette]);
 
-  useHotkeys('j', onNavigateNextTask, NON_INPUT_OPTIONS, [onNavigateNextTask]);
+  useHotkeys(HOTKEYS.navigateNext.key, onNavigateNextTask, NON_INPUT_OPTIONS, [onNavigateNextTask]);
 
-  useHotkeys('k', onNavigatePrevTask, NON_INPUT_OPTIONS, [onNavigatePrevTask]);
+  useHotkeys(HOTKEYS.navigatePrev.key, onNavigatePrevTask, NON_INPUT_OPTIONS, [onNavigatePrevTask]);
 
-  useHotkeys('e', onFocusComposer, NON_INPUT_OPTIONS, [onFocusComposer]);
-  useHotkeys('/', onFocusComposer, NON_INPUT_OPTIONS, [onFocusComposer]);
+  useHotkeys(HOTKEYS.focusComposer.key, onFocusComposer, NON_INPUT_OPTIONS, [onFocusComposer]);
+  useHotkeys(HOTKEYS.focusComposerAlt.key, onFocusComposer, NON_INPUT_OPTIONS, [onFocusComposer]);
+
+  useHotkeys(HOTKEYS.showShortcuts.key, onShowShortcuts, GLOBAL_OPTIONS, [onShowShortcuts]);
+  useHotkeys(HOTKEYS.showShortcutsAlt.key, onShowShortcuts, NON_INPUT_OPTIONS, [onShowShortcuts]);
 }

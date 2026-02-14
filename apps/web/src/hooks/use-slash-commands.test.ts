@@ -45,9 +45,9 @@ describe('useSlashCommands', () => {
     const { result } = setup();
     act(() => result.current.handleInputChange('/model'));
     const ids = result.current.filteredCommands.map((c) => c.id);
-    expect(ids).toContain('model:claude-code');
-    expect(ids).toContain('model:claude-opus');
-    expect(ids).toContain('model:claude-sonnet');
+    expect(ids).toContain('model:claude-opus-4-6');
+    expect(ids).toContain('model:claude-sonnet-4-5');
+    expect(ids).toContain('model:claude-haiku-4-5');
     expect(result.current.filteredCommands).toHaveLength(3);
   });
 
@@ -55,16 +55,16 @@ describe('useSlashCommands', () => {
     const { result } = setup();
     act(() => result.current.handleInputChange('/opus'));
     expect(result.current.filteredCommands).toHaveLength(1);
-    expect(result.current.filteredCommands[0]?.id).toBe('model:claude-opus');
+    expect(result.current.filteredCommands[0]?.id).toBe('model:claude-opus-4-6');
   });
 
   it('matches parentLabel for sub-items', () => {
     const { result } = setup();
     act(() => result.current.handleInputChange('/switch'));
     const ids = result.current.filteredCommands.map((c) => c.id);
-    expect(ids).toContain('model:claude-code');
-    expect(ids).toContain('model:claude-opus');
-    expect(ids).toContain('model:claude-sonnet');
+    expect(ids).toContain('model:claude-opus-4-6');
+    expect(ids).toContain('model:claude-sonnet-4-5');
+    expect(ids).toContain('model:claude-haiku-4-5');
   });
 
   it('filters reasoning sub-items with "/reason"', () => {
@@ -108,7 +108,7 @@ describe('useSlashCommands', () => {
     act(() => {
       result.current.handleKeyDown(makeKeyEvent('Enter'));
     });
-    expect(onExecute).toHaveBeenCalledWith({ kind: 'setModel', modelId: 'claude-opus' });
+    expect(onExecute).toHaveBeenCalledWith({ kind: 'setModel', modelId: 'claude-opus-4-6' });
   });
 
   it('ArrowDown cycles selectedIndex forward with wrapping', () => {

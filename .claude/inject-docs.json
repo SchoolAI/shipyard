@@ -1,8 +1,6 @@
 {
   "description": "Docs to inject into Claude Code context at session start",
-  "docs": [
-    "docs/engineering-standards.md"
-  ],
+  "docs": ["docs/engineering-standards.md"],
   "exclude": [],
   "maxLinesPerFile": 500
 }

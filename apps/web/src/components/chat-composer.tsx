@@ -8,8 +8,7 @@ import { useSlashCommands } from '../hooks/use-slash-commands';
 import { AttachmentPopover } from './composer/attachment-popover';
 import { ModelPicker, useModelPicker } from './composer/model-picker';
 import { PlanModeToggle } from './composer/plan-mode-toggle';
-import type { ReasoningLevel } from './composer/reasoning-effort';
-import { ReasoningEffort } from './composer/reasoning-effort';
+import { ReasoningEffort, type ReasoningLevel } from './composer/reasoning-effort';
 import { SlashCommandMenu } from './composer/slash-command-menu';
 
 interface ChatComposerProps {
@@ -37,7 +36,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
   const [planMode, setPlanMode] = useState(false);
   const [reasoningLevel, setReasoningLevel] = useState<ReasoningLevel>('medium');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const { selectedModelId, setSelectedModelId, supportsReasoning } =
+  const { selectedModelId, setSelectedModelId, models, reasoning } =
     useModelPicker(availableModels);
 
   useImperativeHandle(
@@ -47,6 +46,12 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
     }),
     []
   );
+
+  useEffect(() => {
+    if (reasoning && !reasoning.efforts.includes(reasoningLevel)) {
+      setReasoningLevel(reasoning.defaultEffort);
+    }
+  }, [reasoning, reasoningLevel]);
 
   const handleSlashExecute = useCallback(
     (action: SlashCommandAction) => {
@@ -139,6 +144,12 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
         return;
       }
 
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        textareaRef.current?.blur();
+        return;
+      }
+
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
         handleSubmit();
@@ -184,10 +195,14 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
             <ModelPicker
               selectedModelId={selectedModelId}
               onModelChange={setSelectedModelId}
-              availableModels={availableModels}
+              models={models}
             />
-            {supportsReasoning && (
-              <ReasoningEffort level={reasoningLevel} onLevelChange={setReasoningLevel} />
+            {reasoning && (
+              <ReasoningEffort
+                level={reasoningLevel}
+                onLevelChange={setReasoningLevel}
+                supportedEfforts={reasoning.efforts}
+              />
             )}
             <PlanModeToggle isActive={planMode} onToggle={() => setPlanMode((p) => !p)} />
           </div>

@@ -5,6 +5,9 @@ export interface UIStore {
   isSidebarExpanded: boolean;
   isTerminalOpen: boolean;
   isDiffOpen: boolean;
+  isSettingsOpen: boolean;
+  isCommandPaletteOpen: boolean;
+  isShortcutsModalOpen: boolean;
   selectedMachineId: string | null;
   selectedEnvironmentPath: string | null;
 
@@ -14,6 +17,11 @@ export interface UIStore {
   setTerminalOpen: (open: boolean) => void;
   toggleDiff: () => void;
   setDiffOpen: (open: boolean) => void;
+  setSettingsOpen: (open: boolean) => void;
+  setCommandPaletteOpen: (open: boolean) => void;
+  toggleCommandPalette: () => void;
+  setShortcutsModalOpen: (open: boolean) => void;
+  toggleShortcutsModal: () => void;
   setSelectedMachineId: (id: string | null) => void;
   setSelectedEnvironmentPath: (path: string | null) => void;
 }
@@ -25,6 +33,9 @@ export const useUIStore = create<UIStore>()(
         isSidebarExpanded: true,
         isTerminalOpen: false,
         isDiffOpen: false,
+        isSettingsOpen: false,
+        isCommandPaletteOpen: false,
+        isShortcutsModalOpen: false,
         selectedMachineId: null,
         selectedEnvironmentPath: null,
 
@@ -51,6 +62,28 @@ export const useUIStore = create<UIStore>()(
           set((state) => ({ isDiffOpen: !state.isDiffOpen }), undefined, 'ui/toggleDiff'),
 
         setDiffOpen: (open) => set({ isDiffOpen: open }, undefined, 'ui/setDiffOpen'),
+
+        setSettingsOpen: (open) => set({ isSettingsOpen: open }, undefined, 'ui/setSettingsOpen'),
+
+        setCommandPaletteOpen: (open) =>
+          set({ isCommandPaletteOpen: open }, undefined, 'ui/setCommandPaletteOpen'),
+
+        toggleCommandPalette: () =>
+          set(
+            (state) => ({ isCommandPaletteOpen: !state.isCommandPaletteOpen }),
+            undefined,
+            'ui/toggleCommandPalette'
+          ),
+
+        setShortcutsModalOpen: (open) =>
+          set({ isShortcutsModalOpen: open }, undefined, 'ui/setShortcutsModalOpen'),
+
+        toggleShortcutsModal: () =>
+          set(
+            (state) => ({ isShortcutsModalOpen: !state.isShortcutsModalOpen }),
+            undefined,
+            'ui/toggleShortcutsModal'
+          ),
 
         setSelectedMachineId: (id) =>
           set({ selectedMachineId: id }, undefined, 'ui/setSelectedMachineId'),

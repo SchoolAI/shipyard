@@ -13,11 +13,12 @@ import {
 import type { Env } from '../env';
 import { broadcastExcept, findWebSocketByMachineId, relayMessage } from '../protocol/webrtc-relay';
 import { createLogger, type Logger } from '../utils/logger';
-import type {
-  AgentInfo,
-  PassedClaims,
-  PersonalConnectionType,
-  SerializedPersonalConnectionState,
+import {
+  type AgentInfo,
+  type PassedClaims,
+  PassedClaimsSchema,
+  type PersonalConnectionType,
+  type SerializedPersonalConnectionState,
 } from './types';
 
 function assertNever(x: never): never {
@@ -116,7 +117,12 @@ export class PersonalRoom extends DurableObject<Env> {
 
     let claims: PassedClaims;
     try {
-      claims = JSON.parse(claimsHeader);
+      const parsed: unknown = JSON.parse(claimsHeader);
+      const result = PassedClaimsSchema.safeParse(parsed);
+      if (!result.success) {
+        return new Response('Invalid claims', { status: 401 });
+      }
+      claims = result.data;
     } catch {
       return new Response('Invalid claims', { status: 401 });
     }
@@ -129,9 +135,9 @@ export class PersonalRoom extends DurableObject<Env> {
       return new Response('WebSocket pair creation failed', { status: 500 });
     }
 
-    const userAgent = request.headers.get('User-Agent') ?? '';
-    const isAgent = userAgent.includes('shipyard-daemon');
-    const type: PersonalConnectionType = isAgent ? 'agent' : 'browser';
+    const url = new URL(request.url);
+    const clientType = url.searchParams.get('clientType');
+    const type: PersonalConnectionType = clientType === 'agent' ? 'agent' : 'browser';
 
     const state: ConnectionState = {
       id: crypto.randomUUID(),
@@ -268,6 +274,11 @@ export class PersonalRoom extends DurableObject<Env> {
     state: ConnectionState,
     msg: Extract<PersonalRoomClientMessage, { type: 'register-agent' }>
   ): Promise<void> {
+    if (state.type !== 'agent') {
+      this.sendError(ws, 'forbidden', 'Only agent connections can register');
+      return;
+    }
+
     const isReregistration = msg.agentId in this.agents;
 
     if (isReregistration) {
@@ -459,9 +470,14 @@ export class PersonalRoom extends DurableObject<Env> {
 
   private handleSpawnAgent(
     ws: WebSocket,
-    _state: ConnectionState,
+    state: ConnectionState,
     msg: Extract<PersonalRoomClientMessage, { type: 'spawn-agent' }>
   ): void {
+    if (state.type !== 'browser') {
+      this.sendError(ws, 'forbidden', 'Only browser connections can spawn agents');
+      return;
+    }
+
     const daemonWs = findWebSocketByMachineId(this.connections, msg.machineId);
 
     if (!daemonWs) {

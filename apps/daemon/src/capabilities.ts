@@ -1,5 +1,7 @@
 import { execFile } from 'node:child_process';
-import { basename } from 'node:path';
+import { readdir } from 'node:fs/promises';
+import { homedir } from 'node:os';
+import { basename, join } from 'node:path';
 import {
   type GitRepoInfo,
   type MachineCapabilities,
@@ -31,66 +33,119 @@ export async function detectModels(): Promise<ModelInfo[]> {
         id: 'claude-opus-4-6',
         label: 'Claude Opus 4.6',
         provider: 'claude-code',
-        supportsReasoning: true,
+        reasoning: { efforts: ['low', 'medium', 'high'], defaultEffort: 'high' },
+      },
+      {
+        id: 'claude-opus-4-6[1m]',
+        label: 'Claude Opus 4.6 (1M)',
+        provider: 'claude-code',
+        reasoning: { efforts: ['low', 'medium', 'high'], defaultEffort: 'high' },
       },
       {
         id: 'claude-sonnet-4-5-20250929',
         label: 'Claude Sonnet 4.5',
         provider: 'claude-code',
-        supportsReasoning: false,
       },
       {
         id: 'claude-haiku-4-5-20251001',
         label: 'Claude Haiku 4.5',
         provider: 'claude-code',
-        supportsReasoning: false,
       }
     );
   } catch {}
 
   try {
     await run('which', ['codex']);
-    models.push({
-      id: 'codex-mini-latest',
-      label: 'Codex Mini',
-      provider: 'codex',
-      supportsReasoning: false,
-    });
+    models.push(
+      {
+        id: 'gpt-5.3-codex',
+        label: 'GPT-5.3 Codex',
+        provider: 'codex',
+      },
+      {
+        id: 'gpt-5.2-codex',
+        label: 'GPT-5.2 Codex',
+        provider: 'codex',
+        reasoning: { efforts: ['low', 'medium', 'high'], defaultEffort: 'medium' },
+      }
+    );
   } catch {}
 
   return models;
 }
 
-export async function detectEnvironments(cwd: string): Promise<GitRepoInfo[]> {
+const EXCLUDE_DIRS = new Set([
+  'node_modules',
+  'Library',
+  'Applications',
+  'Pictures',
+  'Music',
+  'Movies',
+  'go',
+  '.Trash',
+]);
+
+const MAX_DEPTH = 4;
+
+export async function findGitRepos(dir: string, depth = 0): Promise<string[]> {
+  if (depth > MAX_DEPTH) return [];
+
   try {
-    const [toplevel, branchResult] = await Promise.all([
-      run('git', ['rev-parse', '--show-toplevel'], cwd),
-      run('git', ['branch', '--show-current'], cwd),
-    ]);
-    const branch = branchResult || 'HEAD';
+    const entries = await readdir(dir, { withFileTypes: true });
 
-    let remote: string | undefined;
-    try {
-      remote = await run('git', ['remote', 'get-url', 'origin'], cwd);
-    } catch {}
+    for (const entry of entries) {
+      if (entry.name === '.git') {
+        return [dir];
+      }
+    }
 
-    const env: GitRepoInfo = {
-      path: toplevel,
-      name: basename(toplevel),
-      branch,
-      ...(remote !== undefined && { remote }),
-    };
+    if (depth >= MAX_DEPTH) return [];
 
-    return [env];
+    const promises: Promise<string[]>[] = [];
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+      if (entry.name.startsWith('.') && depth > 0) continue;
+      if (EXCLUDE_DIRS.has(entry.name)) continue;
+      promises.push(findGitRepos(join(dir, entry.name), depth + 1));
+    }
+
+    const results = await Promise.all(promises);
+    return results.flat();
   } catch {
     return [];
   }
 }
 
-export async function detectCapabilities(options?: { cwd?: string }): Promise<MachineCapabilities> {
-  const cwd = options?.cwd ?? process.cwd();
+export async function getRepoMetadata(repoPath: string): Promise<GitRepoInfo | null> {
+  try {
+    const [branchResult, remoteResult] = await Promise.allSettled([
+      run('git', ['branch', '--show-current'], repoPath),
+      run('git', ['remote', 'get-url', 'origin'], repoPath),
+    ]);
 
-  const [models, environments] = await Promise.all([detectModels(), detectEnvironments(cwd)]);
+    const branch = branchResult.status === 'fulfilled' ? branchResult.value || 'HEAD' : 'HEAD';
+    const remote =
+      remoteResult.status === 'fulfilled' ? remoteResult.value || undefined : undefined;
+
+    return {
+      path: repoPath,
+      name: basename(repoPath),
+      branch,
+      ...(remote && { remote }),
+    };
+  } catch {
+    return null;
+  }
+}
+
+export async function detectEnvironments(): Promise<GitRepoInfo[]> {
+  const repoPaths = await findGitRepos(homedir());
+  const repoInfos = await Promise.all(repoPaths.map(getRepoMetadata));
+  return repoInfos.filter((info): info is GitRepoInfo => info !== null);
+}
+
+export async function detectCapabilities(): Promise<MachineCapabilities> {
+  const [models, environments] = await Promise.all([detectModels(), detectEnvironments()]);
 
   const permissionModes = [...PermissionModeSchema.options];
 

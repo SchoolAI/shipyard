@@ -3,6 +3,7 @@
  */
 
 import type { AgentInfo as SchemaAgentInfo } from '@shipyard/session';
+import { z } from 'zod';
 
 /** Agent registered in PersonalRoom -- extends the schema type with server-only fields */
 export interface AgentInfo extends SchemaAgentInfo {
@@ -48,21 +49,24 @@ export interface SerializedCollabConnectionState {
 }
 
 /** Claims passed from route to DO via header */
-export interface PassedClaims {
-  sub: string;
-  ghUser: string;
-  ghId: number;
-}
+export const PassedClaimsSchema = z.object({
+  sub: z.string(),
+  ghUser: z.string(),
+  ghId: z.number(),
+});
+export type PassedClaims = z.infer<typeof PassedClaimsSchema>;
 
 /** Collab payload passed from route to DO via header */
-export interface PassedCollabPayload {
-  roomId: string;
-  taskId: string;
-  inviterId: string;
-  exp: number;
-  /** User claims from JWT (may be absent for anonymous access) */
-  userClaims?: {
-    sub: string;
-    ghUser: string;
-  };
-}
+export const PassedCollabPayloadSchema = z.object({
+  roomId: z.string(),
+  taskId: z.string(),
+  inviterId: z.string(),
+  exp: z.number(),
+  userClaims: z
+    .object({
+      sub: z.string(),
+      ghUser: z.string(),
+    })
+    .optional(),
+});
+export type PassedCollabPayload = z.infer<typeof PassedCollabPayloadSchema>;

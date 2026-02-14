@@ -1,5 +1,5 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
 import { LoroDoc, type PeerID } from 'loro-crdt';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Editor } from './Editor';
 
 /**

@@ -1,9 +1,9 @@
-import { useEditor, EditorContent } from '@tiptap/react';
 import { Extension } from '@tiptap/core';
 import { DragHandle } from '@tiptap/extension-drag-handle-react';
-import { LoroSyncPlugin, LoroUndoPlugin, undo, redo, type LoroDocType } from 'loro-prosemirror';
+import { EditorContent, useEditor } from '@tiptap/react';
 import type { LoroDoc } from 'loro-crdt';
-import { useEffect, useState, useCallback } from 'react';
+import { type LoroDocType, LoroSyncPlugin, LoroUndoPlugin, redo, undo } from 'loro-prosemirror';
+import { useCallback, useEffect, useState } from 'react';
 import { createExtensions } from './extensions';
 
 interface EditorProps {

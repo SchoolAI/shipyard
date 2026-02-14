@@ -12,8 +12,9 @@
  * position index itself. When text is inserted/deleted before the cursor,
  * the cursor position updates to point to the same character.
  */
-import { describe, it, expect, beforeEach } from 'vitest';
-import { LoroDoc, type Cursor } from 'loro-crdt';
+
+import { type Cursor, LoroDoc } from 'loro-crdt';
+import { beforeEach, describe, expect, it } from 'vitest';
 
 describe('Loro Cursor API for Comment Anchoring', () => {
   let doc: LoroDoc;

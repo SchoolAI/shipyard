@@ -19,7 +19,7 @@ const FAKE_CAPABILITIES: MachineCapabilities = {
       id: 'claude-opus-4-6',
       label: 'Claude Opus 4.6',
       provider: 'claude-code',
-      supportsReasoning: true,
+      reasoning: { efforts: ['low', 'medium', 'high'], defaultEffort: 'high' },
     },
   ],
   environments: [

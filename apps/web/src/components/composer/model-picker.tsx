@@ -1,59 +1,45 @@
 import { Button, Description, Dropdown, Label } from '@heroui/react';
-import type { ModelInfo } from '@shipyard/session';
+import type { ModelInfo, ReasoningCapability } from '@shipyard/session';
 import { ChevronDown } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
-interface ModelConfig {
+export interface ModelConfig {
   id: string;
   label: string;
   description: string;
-  supportsReasoning: boolean;
+  reasoning?: ReasoningCapability;
 }
 
 const FALLBACK_MODELS: ModelConfig[] = [
   {
-    id: 'claude-code',
-    label: 'claude-code',
-    description: 'Optimized for coding tasks',
-    supportsReasoning: true,
-  },
-  {
-    id: 'claude-opus',
-    label: 'claude-opus',
+    id: 'claude-opus-4-6',
+    label: 'Claude Opus 4.6',
     description: 'Most capable, deep reasoning',
-    supportsReasoning: true,
+    reasoning: { efforts: ['low', 'medium', 'high'], defaultEffort: 'high' },
   },
   {
-    id: 'claude-sonnet',
-    label: 'claude-sonnet',
+    id: 'claude-sonnet-4-5-20250929',
+    label: 'Claude Sonnet 4.5',
     description: 'Fast and balanced',
-    supportsReasoning: false,
+  },
+  {
+    id: 'claude-haiku-4-5-20251001',
+    label: 'Claude Haiku 4.5',
+    description: 'Fastest responses',
   },
 ];
 
 export interface ModelPickerProps {
   selectedModelId: string;
   onModelChange: (modelId: string) => void;
-  availableModels?: ModelInfo[];
+  models: ModelConfig[];
 }
 
-export function ModelPicker({ selectedModelId, onModelChange, availableModels }: ModelPickerProps) {
-  const models: ModelConfig[] = useMemo(() => {
-    if (availableModels && availableModels.length > 0) {
-      return availableModels.map((m) => ({
-        id: m.id,
-        label: m.label,
-        description: m.provider,
-        supportsReasoning: m.supportsReasoning,
-      }));
-    }
-    return FALLBACK_MODELS;
-  }, [availableModels]);
-
+export function ModelPicker({ selectedModelId, onModelChange, models }: ModelPickerProps) {
   const selectedKeys = useMemo(() => new Set([selectedModelId]), [selectedModelId]);
 
   const selectedModel = models.find((m) => m.id === selectedModelId);
-  const displayLabel = selectedModel?.label ?? models[0]?.label ?? 'claude-code';
+  const displayLabel = selectedModel?.label ?? models[0]?.label ?? 'Claude Opus 4.6';
 
   return (
     <Dropdown>
@@ -89,38 +75,39 @@ export function ModelPicker({ selectedModelId, onModelChange, availableModels }:
   );
 }
 
+function mapModels(availableModels?: ModelInfo[]): ModelConfig[] {
+  if (availableModels && availableModels.length > 0) {
+    return availableModels.map((m) => ({
+      id: m.id,
+      label: m.label,
+      description: m.provider,
+      reasoning: m.reasoning,
+    }));
+  }
+  return FALLBACK_MODELS;
+}
+
 export function useModelPicker(availableModels?: ModelInfo[]) {
-  const [selectedModelId, setSelectedModelId] = useState('claude-code');
+  const [selectedModelId, setSelectedModelId] = useState('claude-opus-4-6');
 
   useEffect(() => {
     if (!availableModels || availableModels.length === 0) {
-      setSelectedModelId('claude-code');
+      setSelectedModelId('claude-opus-4-6');
       return;
     }
-    if (!availableModels.some((m) => m.id === selectedModelId)) {
-      const firstModel = availableModels[0];
-      if (firstModel) {
-        setSelectedModelId(firstModel.id);
-      }
-    }
-  }, [availableModels, selectedModelId]);
-
-  const models: ModelConfig[] = useMemo(() => {
-    if (availableModels && availableModels.length > 0) {
-      return availableModels.map((m) => ({
-        id: m.id,
-        label: m.label,
-        description: m.provider,
-        supportsReasoning: m.supportsReasoning,
-      }));
-    }
-    return FALLBACK_MODELS;
+    setSelectedModelId((prev) => {
+      if (availableModels.some((m) => m.id === prev)) return prev;
+      return availableModels[0]?.id ?? prev;
+    });
   }, [availableModels]);
+
+  const models = useMemo(() => mapModels(availableModels), [availableModels]);
 
   const selectedModel = models.find((m) => m.id === selectedModelId);
   return {
     selectedModelId,
     setSelectedModelId,
-    supportsReasoning: selectedModel?.supportsReasoning ?? false,
+    models,
+    reasoning: selectedModel?.reasoning,
   };
 }
