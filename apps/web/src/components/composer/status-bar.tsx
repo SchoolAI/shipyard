@@ -84,105 +84,110 @@ export function StatusBar({
       role="status"
       aria-label="Connection status"
     >
-      <div className="flex items-center gap-x-3 text-xs text-muted overflow-hidden">
-        {machines.length > 0 ? (
-          <Dropdown>
-            <Tooltip>
-              <Tooltip.Trigger>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  aria-label={`Machines: ${machinesLabel}`}
-                  className="flex items-center gap-1 hover:text-foreground transition-colors text-xs text-muted"
+      <div className="flex items-center flex-nowrap gap-x-2 gap-y-1 text-xs text-muted sm:gap-x-3 overflow-hidden">
+        {/* Machine picker */}
+        <div className="flex items-center min-w-0">
+          {machines.length > 0 ? (
+            <Dropdown>
+              <Tooltip>
+                <Tooltip.Trigger>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    aria-label={`Machines: ${machinesLabel}`}
+                    className="flex items-center gap-1 hover:text-foreground transition-colors text-xs text-muted"
+                  >
+                    <Monitor className="w-3 h-3 shrink-0" aria-hidden="true" />
+                    <span className="truncate max-w-[4rem] sm:max-w-[6rem]">{machinesLabel}</span>
+                    <ChevronDown className="w-2.5 h-2.5 shrink-0" aria-hidden="true" />
+                  </Button>
+                </Tooltip.Trigger>
+                <Tooltip.Content>{machinesLabel}</Tooltip.Content>
+              </Tooltip>
+              <Dropdown.Popover placement="top" className="min-w-[200px]">
+                <Dropdown.Menu
+                  selectionMode="single"
+                  selectedKeys={machineKeys}
+                  onSelectionChange={(keys) => {
+                    const selected = [...keys][0];
+                    if (typeof selected === 'string' && onMachineSelect) {
+                      onMachineSelect(selected);
+                    }
+                  }}
                 >
-                  <Monitor className="w-3 h-3 shrink-0" aria-hidden="true" />
-                  <span className="truncate max-w-[6rem]">{machinesLabel}</span>
-                  <ChevronDown className="w-2.5 h-2.5 shrink-0" aria-hidden="true" />
-                </Button>
-              </Tooltip.Trigger>
-              <Tooltip.Content>{machinesLabel}</Tooltip.Content>
-            </Tooltip>
-            <Dropdown.Popover placement="top" className="min-w-[200px]">
+                  {machines.map((machine) => (
+                    <Dropdown.Item
+                      key={machine.machineId}
+                      id={machine.machineId}
+                      textValue={machine.machineName}
+                    >
+                      <div className="flex items-center justify-between w-full gap-2">
+                        <Label>{machine.machineName}</Label>
+                        <div className="flex gap-1">
+                          {machine.agents.map((agent) => (
+                            <Chip
+                              key={agent.agentId}
+                              size="sm"
+                              variant="soft"
+                              color={STATUS_COLOR[agent.status]}
+                            >
+                              {agent.status}
+                            </Chip>
+                          ))}
+                        </div>
+                      </div>
+                    </Dropdown.Item>
+                  ))}
+                </Dropdown.Menu>
+              </Dropdown.Popover>
+            </Dropdown>
+          ) : (
+            <span className="flex items-center gap-1 min-w-0">
+              <Monitor className="w-3 h-3 shrink-0" aria-hidden="true" />
+              <span className="truncate max-w-[4rem] sm:max-w-[6rem]">{machinesLabel}</span>
+            </span>
+          )}
+        </div>
+
+        {/* Permissions */}
+        <div className="flex items-center min-w-0">
+          <Dropdown>
+            <Button
+              variant="ghost"
+              size="sm"
+              aria-label={`Permissions: ${permissionLabel}`}
+              className="flex items-center gap-1 hover:text-foreground transition-colors text-xs text-muted"
+            >
+              <Shield className="w-3 h-3 shrink-0" aria-hidden="true" />
+              <span className="hidden sm:inline">{permissionLabel}</span>
+              <ChevronDown className="w-2.5 h-2.5 shrink-0" aria-hidden="true" />
+            </Button>
+            <Dropdown.Popover placement="top" className="min-w-[180px]">
               <Dropdown.Menu
                 selectionMode="single"
-                selectedKeys={machineKeys}
+                selectedKeys={permissionKeys}
                 onSelectionChange={(keys) => {
                   const selected = [...keys][0];
-                  if (typeof selected === 'string' && onMachineSelect) {
-                    onMachineSelect(selected);
+                  if (
+                    typeof selected === 'string' &&
+                    (selected === 'default' ||
+                      selected === 'accept-edits' ||
+                      selected === 'bypass') &&
+                    onPermissionChange
+                  ) {
+                    onPermissionChange(selected);
                   }
                 }}
               >
-                {machines.map((machine) => (
-                  <Dropdown.Item
-                    key={machine.machineId}
-                    id={machine.machineId}
-                    textValue={machine.machineName}
-                  >
-                    <div className="flex items-center justify-between w-full gap-2">
-                      <Label>{machine.machineName}</Label>
-                      <div className="flex gap-1">
-                        {machine.agents.map((agent) => (
-                          <Chip
-                            key={agent.agentId}
-                            size="sm"
-                            variant="soft"
-                            color={STATUS_COLOR[agent.status]}
-                          >
-                            {agent.status}
-                          </Chip>
-                        ))}
-                      </div>
-                    </div>
+                {permissionModes.map((mode) => (
+                  <Dropdown.Item key={mode} id={mode} textValue={PERMISSION_LABELS[mode]}>
+                    <Label>{PERMISSION_LABELS[mode]}</Label>
                   </Dropdown.Item>
                 ))}
               </Dropdown.Menu>
             </Dropdown.Popover>
           </Dropdown>
-        ) : (
-          <span className="flex items-center gap-1 min-w-0">
-            <Monitor className="w-3 h-3 shrink-0" aria-hidden="true" />
-            <span className="truncate max-w-[6rem]">{machinesLabel}</span>
-          </span>
-        )}
-
-        {/* Permissions */}
-        <Dropdown>
-          <Button
-            variant="ghost"
-            size="sm"
-            aria-label={`Permissions: ${permissionLabel}`}
-            className="flex items-center gap-1 hover:text-foreground transition-colors text-xs text-muted"
-          >
-            <Shield className="w-3 h-3" aria-hidden="true" />
-            {permissionLabel}
-            <ChevronDown className="w-2.5 h-2.5" aria-hidden="true" />
-          </Button>
-          <Dropdown.Popover placement="top" className="min-w-[180px]">
-            <Dropdown.Menu
-              selectionMode="single"
-              selectedKeys={permissionKeys}
-              onSelectionChange={(keys) => {
-                const selected = [...keys][0];
-                if (
-                  typeof selected === 'string' &&
-                  (selected === 'default' ||
-                    selected === 'accept-edits' ||
-                    selected === 'bypass') &&
-                  onPermissionChange
-                ) {
-                  onPermissionChange(selected);
-                }
-              }}
-            >
-              {permissionModes.map((mode) => (
-                <Dropdown.Item key={mode} id={mode} textValue={PERMISSION_LABELS[mode]}>
-                  <Label>{PERMISSION_LABELS[mode]}</Label>
-                </Dropdown.Item>
-              ))}
-            </Dropdown.Menu>
-          </Dropdown.Popover>
-        </Dropdown>
+        </div>
 
         {/* Environment */}
         <EnvironmentPicker
@@ -194,7 +199,10 @@ export function StatusBar({
         {/* Branch */}
         <Tooltip>
           <Tooltip.Trigger>
-            <span className="flex items-center gap-1 min-w-0 max-w-[7rem]" role="status">
+            <span
+              className="flex items-center gap-1 min-w-0 max-w-[5rem] sm:max-w-[7rem]"
+              role="status"
+            >
               <GitBranch className="w-3 h-3 shrink-0" aria-hidden="true" />
               <span className="truncate">{branchLabel}</span>
             </span>

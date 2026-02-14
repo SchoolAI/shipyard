@@ -211,27 +211,30 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
           </div>
 
           <div className="flex items-center gap-1 shrink-0">
-            <Tooltip>
-              <Tooltip.Trigger>
-                <Button
-                  isIconOnly
-                  variant="ghost"
-                  size="sm"
-                  aria-label="Voice input"
-                  className="rounded-full text-muted hover:text-foreground hover:bg-default w-11 h-11 sm:w-8 sm:h-8 min-w-0"
-                >
-                  <Mic className="w-4 h-4" />
-                </Button>
-              </Tooltip.Trigger>
-              <Tooltip.Content>Voice input</Tooltip.Content>
-            </Tooltip>
+            {/* Voice input -- hidden on mobile (placeholder, saves space) */}
+            <div className="hidden sm:flex">
+              <Tooltip>
+                <Tooltip.Trigger>
+                  <Button
+                    isIconOnly
+                    variant="ghost"
+                    size="sm"
+                    aria-label="Voice input"
+                    className="rounded-full text-muted hover:text-foreground hover:bg-default w-8 h-8 min-w-0"
+                  >
+                    <Mic className="w-4 h-4" />
+                  </Button>
+                </Tooltip.Trigger>
+                <Tooltip.Content>Voice input</Tooltip.Content>
+              </Tooltip>
+            </div>
             <Button
               isIconOnly
               variant="primary"
               size="sm"
               aria-label="Send message"
               isDisabled={isEmpty}
-              className="rounded-full w-11 h-11 sm:w-8 sm:h-8 min-w-0 bg-accent text-accent-foreground"
+              className="rounded-full w-9 h-9 sm:w-8 sm:h-8 min-w-0 bg-accent text-accent-foreground"
               onPress={handleSubmit}
             >
               <ArrowUp className="w-4 h-4" />

@@ -4,12 +4,30 @@ import {
   forwardRef,
   type KeyboardEvent,
   useCallback,
+  useEffect,
   useImperativeHandle,
   useRef,
   useState,
 } from 'react';
 import { useResizablePanel } from '../../hooks/use-resizable-panel';
 import { useUIStore } from '../../stores';
+
+const SM_BREAKPOINT = 640;
+
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(
+    () => typeof window !== 'undefined' && window.innerWidth < SM_BREAKPOINT
+  );
+
+  useEffect(() => {
+    const mql = window.matchMedia(`(max-width: ${SM_BREAKPOINT - 1}px)`);
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    mql.addEventListener('change', handler);
+    return () => mql.removeEventListener('change', handler);
+  }, []);
+
+  return isMobile;
+}
 
 interface DiffPanelProps {
   isOpen: boolean;
@@ -33,6 +51,8 @@ export const DiffPanel = forwardRef<DiffPanelHandle, DiffPanelProps>(function Di
 
   const diffPanelWidth = useUIStore((s) => s.diffPanelWidth);
   const setDiffPanelWidth = useUIStore((s) => s.setDiffPanelWidth);
+
+  const isMobile = useIsMobile();
 
   const { panelRef, separatorProps, panelStyle, isDragging } = useResizablePanel({
     isOpen,
@@ -73,13 +93,15 @@ export const DiffPanel = forwardRef<DiffPanelHandle, DiffPanelProps>(function Di
       aria-label="Diff panel"
       aria-hidden={!isOpen}
       inert={!isOpen || undefined}
-      style={panelStyle}
-      className={`relative shrink-0 border-l border-separator bg-background overflow-hidden h-full max-sm:fixed max-sm:inset-0 max-sm:z-30 max-sm:w-full! max-sm:h-full! max-sm:border-l-0 ${
-        isDragging ? '' : 'motion-safe:transition-[width] motion-safe:duration-300 ease-in-out'
+      style={isMobile ? undefined : panelStyle}
+      className={`shrink-0 bg-background overflow-hidden ${
+        isMobile
+          ? `fixed inset-0 z-30 ${isOpen ? '' : 'hidden'}`
+          : `relative h-full border-l border-separator ${isDragging ? '' : 'motion-safe:transition-[width] motion-safe:duration-300 ease-in-out'}`
       }`}
     >
-      {/* Drag handle / separator */}
-      {isOpen && <div {...separatorProps} />}
+      {/* Drag handle / separator (desktop only) */}
+      {isOpen && !isMobile && <div {...separatorProps} />}
 
       <div className="flex flex-col h-full min-w-0 sm:min-w-[400px]">
         {/* Header */}

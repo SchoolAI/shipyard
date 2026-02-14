@@ -47,9 +47,9 @@ export function ModelPicker({ selectedModelId, onModelChange, models }: ModelPic
         variant="ghost"
         size="sm"
         aria-label={`Model: ${displayLabel}`}
-        className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs text-muted hover:text-foreground hover:bg-default transition-colors"
+        className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs text-muted hover:text-foreground hover:bg-default transition-colors max-w-[8rem] sm:max-w-none"
       >
-        {displayLabel}
+        <span className="truncate">{displayLabel}</span>
         <ChevronDown className="w-3 h-3" aria-hidden="true" />
       </Button>
       <Dropdown.Popover placement="top start" className="min-w-[220px]">

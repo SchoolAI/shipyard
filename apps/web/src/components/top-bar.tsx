@@ -34,7 +34,7 @@ export function TopBar({ onToggleTerminal, onToggleDiff }: TopBarProps) {
               size="sm"
               aria-label="Toggle terminal"
               onPress={onToggleTerminal}
-              className="text-muted hover:text-foreground hover:bg-default w-11 h-11 sm:w-8 sm:h-8 min-w-0"
+              className="hidden sm:inline-flex text-muted hover:text-foreground hover:bg-default w-8 h-8 min-w-0"
             >
               <Terminal className="w-4 h-4" />
             </Button>
@@ -54,7 +54,7 @@ export function TopBar({ onToggleTerminal, onToggleDiff }: TopBarProps) {
               size="sm"
               aria-label="Toggle diff panel"
               onPress={onToggleDiff}
-              className="text-muted hover:text-foreground hover:bg-default w-11 h-11 sm:w-8 sm:h-8 min-w-0"
+              className="text-muted hover:text-foreground hover:bg-default w-9 h-9 sm:w-8 sm:h-8 min-w-0"
             >
               <Diff className="w-4 h-4" />
             </Button>

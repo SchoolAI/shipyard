@@ -14,6 +14,7 @@ export interface UIStore {
   selectedEnvironmentPath: string | null;
   theme: Theme;
   diffPanelWidth: number;
+  terminalPanelHeight: number;
 
   toggleSidebar: () => void;
   setSidebarExpanded: (expanded: boolean) => void;
@@ -31,6 +32,7 @@ export interface UIStore {
   setSelectedEnvironmentPath: (path: string | null) => void;
   setTheme: (theme: Theme) => void;
   setDiffPanelWidth: (width: number) => void;
+  setTerminalPanelHeight: (height: number) => void;
 }
 
 export const useUIStore = create<UIStore>()(
@@ -47,6 +49,8 @@ export const useUIStore = create<UIStore>()(
         selectedEnvironmentPath: null,
         theme: 'dark',
         diffPanelWidth: typeof window !== 'undefined' ? Math.round(window.innerWidth * 0.5) : 600,
+        terminalPanelHeight:
+          typeof window !== 'undefined' ? Math.round(window.innerHeight * 0.4) : 400,
 
         toggleSidebar: () =>
           set(
@@ -114,6 +118,12 @@ export const useUIStore = create<UIStore>()(
           const clamped = Math.min(Math.max(width, 400), max);
           set({ diffPanelWidth: clamped }, undefined, 'ui/setDiffPanelWidth');
         },
+
+        setTerminalPanelHeight: (height) => {
+          const max = typeof window !== 'undefined' ? Math.floor(window.innerHeight * 0.7) : 700;
+          const clamped = Math.min(Math.max(height, 100), max);
+          set({ terminalPanelHeight: clamped }, undefined, 'ui/setTerminalPanelHeight');
+        },
       }),
       {
         name: 'shipyard-ui',
@@ -124,6 +134,7 @@ export const useUIStore = create<UIStore>()(
           selectedEnvironmentPath: state.selectedEnvironmentPath,
           theme: state.theme,
           diffPanelWidth: state.diffPanelWidth,
+          terminalPanelHeight: state.terminalPanelHeight,
         }),
       }
     ),
