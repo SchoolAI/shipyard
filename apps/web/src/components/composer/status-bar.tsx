@@ -194,9 +194,9 @@ export function StatusBar({
         {/* Branch */}
         <Tooltip>
           <Tooltip.Trigger>
-            <span className="flex items-center gap-1 max-w-[10rem] overflow-hidden" role="status">
+            <span className="flex items-center gap-1 min-w-0 max-w-[10rem]" role="status">
               <GitBranch className="w-3 h-3 shrink-0" aria-hidden="true" />
-              <span className="text-ellipsis overflow-hidden whitespace-nowrap">{branchLabel}</span>
+              <span className="truncate">{branchLabel}</span>
             </span>
           </Tooltip.Trigger>
           <Tooltip.Content>{branchLabel}</Tooltip.Content>
