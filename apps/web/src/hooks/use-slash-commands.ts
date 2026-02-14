@@ -1,13 +1,24 @@
+import type { PermissionMode } from '@shipyard/loro-schema';
 import type { GitRepoInfo } from '@shipyard/session';
 import type { LucideIcon } from 'lucide-react';
-import { Brain, Cpu, FolderGit, HelpCircle, ListChecks, Trash2 } from 'lucide-react';
+import {
+  Brain,
+  Cpu,
+  FileCheck,
+  FolderGit,
+  HelpCircle,
+  ListChecks,
+  Shield,
+  ShieldOff,
+  Trash2,
+} from 'lucide-react';
 import type { KeyboardEvent } from 'react';
 import { useCallback, useMemo, useState } from 'react';
 import type { ReasoningLevel } from '../components/composer/reasoning-effort';
 import { fuzzyScore } from '../utils/fuzzy-match';
 
 export type SlashCommandAction =
-  | { kind: 'toggle'; target: 'planMode' }
+  | { kind: 'setPermissionMode'; mode: PermissionMode }
   | { kind: 'setModel'; modelId: string }
   | { kind: 'setReasoning'; level: ReasoningLevel }
   | { kind: 'setEnvironment'; path: string }
@@ -28,10 +39,37 @@ const COMMANDS: SlashCommandItem[] = [
   {
     id: 'plan',
     name: 'Plan mode',
-    description: 'Toggle plan mode on/off',
+    description: 'Switch to plan mode (no tool execution)',
     icon: ListChecks,
-    keywords: ['plan', 'planning', 'toggle'],
-    action: { kind: 'toggle', target: 'planMode' },
+    keywords: ['plan', 'planning'],
+    action: { kind: 'setPermissionMode', mode: 'plan' },
+  },
+  {
+    id: 'permission:default',
+    name: 'Default permissions',
+    description: 'Prompt for dangerous operations',
+    icon: Shield,
+    keywords: ['permission', 'default', 'safe'],
+    action: { kind: 'setPermissionMode', mode: 'default' },
+    parentLabel: 'Permission mode',
+  },
+  {
+    id: 'permission:accept-edits',
+    name: 'Accept edits',
+    description: 'Auto-accept file edits',
+    icon: FileCheck,
+    keywords: ['permission', 'accept', 'edits'],
+    action: { kind: 'setPermissionMode', mode: 'accept-edits' },
+    parentLabel: 'Permission mode',
+  },
+  {
+    id: 'permission:bypass',
+    name: 'Bypass permissions',
+    description: 'Skip all permission checks',
+    icon: ShieldOff,
+    keywords: ['permission', 'bypass', 'skip', 'yolo'],
+    action: { kind: 'setPermissionMode', mode: 'bypass' },
+    parentLabel: 'Permission mode',
   },
   {
     id: 'model:claude-opus-4-6',

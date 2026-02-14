@@ -96,6 +96,47 @@ describe('mergeCapabilities', () => {
     expect(result.permissionModes).toEqual([]);
   });
 
+  it('extracts homeDir from first agent with homeDir capability', () => {
+    const agents: SignalingAgentInfo[] = [
+      makeAgent({
+        agentId: 'a1',
+        capabilities: {
+          models: [],
+          environments: [],
+          permissionModes: [],
+          homeDir: '/Users/test',
+        },
+      }),
+      makeAgent({
+        agentId: 'a2',
+        capabilities: {
+          models: [],
+          environments: [],
+          permissionModes: [],
+        },
+      }),
+    ];
+
+    const result = mergeCapabilities(agents);
+    expect(result.homeDir).toBe('/Users/test');
+  });
+
+  it('returns undefined homeDir when no agent provides it', () => {
+    const agents: SignalingAgentInfo[] = [
+      makeAgent({
+        agentId: 'a1',
+        capabilities: {
+          models: [],
+          environments: [],
+          permissionModes: [],
+        },
+      }),
+    ];
+
+    const result = mergeCapabilities(agents);
+    expect(result.homeDir).toBeUndefined();
+  });
+
   it('deduplicates permission modes', () => {
     const agents: SignalingAgentInfo[] = [
       makeAgent({
@@ -207,6 +248,37 @@ describe('useMachineSelection', () => {
     expect(result.current.selectedMachineId).toBe('machine-2');
     expect(result.current.selectedMachine?.machineName).toBe('Machine B');
     expect(result.current.availableModels[0]?.id).toBe('sonnet');
+  });
+
+  it('exposes homeDir from selected machine capabilities', () => {
+    const agents: SignalingAgentInfo[] = [
+      makeAgent({
+        capabilities: {
+          models: [],
+          environments: [],
+          permissionModes: [],
+          homeDir: '/Users/test',
+        },
+      }),
+    ];
+
+    const { result } = renderHook(() => useMachineSelection(agents));
+    expect(result.current.homeDir).toBe('/Users/test');
+  });
+
+  it('returns undefined homeDir when no machine provides it', () => {
+    const agents: SignalingAgentInfo[] = [
+      makeAgent({
+        capabilities: {
+          models: [],
+          environments: [],
+          permissionModes: [],
+        },
+      }),
+    ];
+
+    const { result } = renderHook(() => useMachineSelection(agents));
+    expect(result.current.homeDir).toBeUndefined();
   });
 
   it('merges capabilities from multiple agents on the same machine', () => {

@@ -1,4 +1,5 @@
 import { hostname } from 'node:os';
+import type { MachineCapabilities } from '@shipyard/session';
 import { PersonalRoomConnection } from '@shipyard/session';
 import { detectCapabilities } from './capabilities.js';
 import type { Env } from './env.js';
@@ -8,6 +9,7 @@ import { createDaemonSignaling, type DaemonSignaling } from './signaling.js';
 export interface SignalingHandle {
   signaling: DaemonSignaling;
   connection: PersonalRoomConnection;
+  capabilities: MachineCapabilities;
 }
 
 /**
@@ -55,5 +57,5 @@ export async function createSignalingHandle(
     }
   });
 
-  return { signaling, connection };
+  return { signaling, connection, capabilities };
 }

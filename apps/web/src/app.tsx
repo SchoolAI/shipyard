@@ -1,7 +1,12 @@
 import { ChatPage } from './components/chat-page';
 import { useThemeEffect } from './hooks/use-theme-effect';
+import { ShipyardRepoProvider } from './providers/repo-provider';
 
 export function App() {
   useThemeEffect();
-  return <ChatPage />;
+  return (
+    <ShipyardRepoProvider>
+      <ChatPage />
+    </ShipyardRepoProvider>
+  );
 }

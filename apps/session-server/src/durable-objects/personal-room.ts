@@ -258,11 +258,11 @@ export class PersonalRoom extends DurableObject<Env> {
       case 'webrtc-ice':
         this.handleWebRTCRelay(ws, state, msg);
         break;
-      case 'spawn-agent':
-        this.handleSpawnAgent(ws, state, msg);
+      case 'notify-task':
+        this.handleNotifyTask(ws, state, msg);
         break;
-      case 'spawn-result':
-        this.handleSpawnResult(ws, state, msg);
+      case 'task-ack':
+        this.handleTaskAck(ws, state, msg);
         break;
       case 'update-capabilities':
         await this.handleUpdateCapabilities(ws, state, msg);
@@ -457,27 +457,28 @@ export class PersonalRoom extends DurableObject<Env> {
       return;
     }
 
+    const fromMachineId = state.machineId ?? state.id;
     const relayMsg: PersonalRoomServerMessage = {
       ...msg,
-      targetMachineId: state.machineId ?? state.id,
+      fromMachineId,
     };
 
     relayMessage(targetWs, relayMsg);
 
     this.logger.debug('WebRTC message relayed', {
       type: msg.type,
-      from: state.machineId ?? state.id,
+      from: fromMachineId,
       to: msg.targetMachineId,
     });
   }
 
-  private handleSpawnAgent(
+  private handleNotifyTask(
     ws: WebSocket,
     state: ConnectionState,
-    msg: Extract<PersonalRoomClientMessage, { type: 'spawn-agent' }>
+    msg: Extract<PersonalRoomClientMessage, { type: 'notify-task' }>
   ): void {
     if (state.type !== 'browser') {
-      this.sendError(ws, 'forbidden', 'Only browser connections can spawn agents');
+      this.sendError(ws, 'forbidden', 'Only browser connections can notify tasks');
       return;
     }
 
@@ -485,10 +486,10 @@ export class PersonalRoom extends DurableObject<Env> {
 
     if (!daemonWs) {
       this.sendMessage(ws, {
-        type: 'spawn-result',
+        type: 'task-ack',
         requestId: msg.requestId,
         taskId: msg.taskId,
-        success: false,
+        accepted: false,
         error: `Daemon on machine ${msg.machineId} not connected`,
       });
       return;
@@ -496,20 +497,20 @@ export class PersonalRoom extends DurableObject<Env> {
 
     relayMessage(daemonWs, msg);
 
-    this.logger.info('Spawn request forwarded to daemon', {
+    this.logger.info('Task notification forwarded to daemon', {
       requestId: msg.requestId,
       machineId: msg.machineId,
       taskId: msg.taskId,
     });
   }
 
-  private handleSpawnResult(
+  private handleTaskAck(
     ws: WebSocket,
     state: ConnectionState,
-    msg: Extract<PersonalRoomClientMessage, { type: 'spawn-result' }>
+    msg: Extract<PersonalRoomClientMessage, { type: 'task-ack' }>
   ): void {
     if (state.type !== 'agent') {
-      this.sendError(ws, 'forbidden', 'Only agent connections can send spawn results');
+      this.sendError(ws, 'forbidden', 'Only agent connections can send task acknowledgments');
       return;
     }
 
@@ -519,10 +520,10 @@ export class PersonalRoom extends DurableObject<Env> {
       }
     }
 
-    this.logger.info('Spawn result relayed to browsers', {
+    this.logger.info('Task ack relayed to browsers', {
       requestId: msg.requestId,
       taskId: msg.taskId,
-      success: msg.success,
+      accepted: msg.accepted,
     });
   }
 

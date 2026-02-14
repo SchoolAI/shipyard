@@ -14,7 +14,9 @@ import { logger } from './logger.js';
 export interface CreateSessionOptions {
   prompt: string;
   cwd: string;
+  machineId?: string;
   model?: string;
+  effort?: 'low' | 'medium' | 'high';
   allowedTools?: string[];
   permissionMode?: PermissionMode;
   maxTurns?: number;
@@ -49,6 +51,47 @@ export class SessionManager {
   }
 
   /**
+   * Extract the latest user message text from the conversation.
+   * Walks backwards from the end to find the most recent user turn,
+   * then concatenates all text parts.
+   *
+   * Returns null if no user message exists.
+   */
+  getLatestUserPrompt(): string | null {
+    const conversation = this.#taskDoc.toJSON().conversation;
+    for (let i = conversation.length - 1; i >= 0; i--) {
+      const msg = conversation[i];
+      if (msg?.role === 'user') {
+        return msg.parts
+          .filter((p): p is { kind: 'text'; text: string } => p.kind === 'text')
+          .map((p) => p.text)
+          .join('\n');
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Determine whether to resume an existing session or start fresh.
+   *
+   * Walks backwards through sessions to find the most recent one with a
+   * non-empty agentSessionId that has not failed. If found, returns
+   * { resume: true, sessionId } so the caller can pass it to resumeSession().
+   */
+  shouldResume(): { resume: boolean; sessionId?: string } {
+    const sessions = this.#taskDoc.toJSON().sessions;
+    if (sessions.length === 0) return { resume: false };
+
+    for (let i = sessions.length - 1; i >= 0; i--) {
+      const session = sessions[i];
+      if (session?.agentSessionId && session.status !== 'failed') {
+        return { resume: true, sessionId: session.sessionId };
+      }
+    }
+    return { resume: false };
+  }
+
+  /**
    * Create a new Claude Code session and stream messages to the task doc.
    *
    * 1. Pushes a 'pending' session entry
@@ -67,6 +110,7 @@ export class SessionManager {
         status: 'pending',
         cwd: opts.cwd,
         model: opts.model ?? null,
+        machineId: opts.machineId ?? null,
         createdAt: now,
         completedAt: null,
         totalCostUsd: null,
@@ -82,6 +126,7 @@ export class SessionManager {
       options: {
         cwd: opts.cwd,
         model: opts.model,
+        effort: opts.effort,
         allowedTools: opts.allowedTools,
         permissionMode: opts.permissionMode,
         maxTurns: opts.maxTurns,
@@ -104,10 +149,13 @@ export class SessionManager {
     prompt: string,
     opts?: {
       abortController?: AbortController;
+      machineId?: string;
       model?: string;
+      effort?: 'low' | 'medium' | 'high';
       allowedTools?: string[];
       permissionMode?: PermissionMode;
       maxTurns?: number;
+      allowDangerouslySkipPermissions?: boolean;
     }
   ): Promise<SessionResult> {
     const sessions = this.#taskDoc.toJSON().sessions;
@@ -130,6 +178,7 @@ export class SessionManager {
         status: 'pending',
         cwd: sessionEntry.cwd,
         model: opts?.model ?? sessionEntry.model,
+        machineId: opts?.machineId ?? sessionEntry.machineId,
         createdAt: now,
         completedAt: null,
         totalCostUsd: null,
@@ -146,10 +195,12 @@ export class SessionManager {
         resume: sessionEntry.agentSessionId,
         cwd: sessionEntry.cwd,
         model: opts?.model,
+        effort: opts?.effort,
         allowedTools: opts?.allowedTools,
         permissionMode: opts?.permissionMode,
         maxTurns: opts?.maxTurns,
         abortController: opts?.abortController,
+        allowDangerouslySkipPermissions: opts?.allowDangerouslySkipPermissions,
         settingSources: ['project'],
         systemPrompt: { type: 'preset', preset: 'claude_code' },
       },

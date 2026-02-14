@@ -7,6 +7,7 @@ import {
 import { useEffect, useState } from 'react';
 import { assertNever } from '../utils/assert-never';
 
+export type TaskAck = Extract<PersonalRoomServerMessage, { type: 'task-ack' }>;
 export type { AgentInfo, ConnectionState };
 
 interface PersonalRoomConfig {
@@ -17,14 +18,18 @@ export function usePersonalRoom(config: PersonalRoomConfig | null) {
   const [agents, setAgents] = useState<AgentInfo[]>([]);
   const [connectionState, setConnectionState] = useState<ConnectionState>('disconnected');
   const [connection, setConnection] = useState<PersonalRoomConnection | null>(null);
+  const [lastTaskAck, setLastTaskAck] = useState<TaskAck | null>(null);
 
   useEffect(() => {
     if (!config) {
       setAgents([]);
       setConnectionState('disconnected');
       setConnection(null);
+      setLastTaskAck(null);
       return;
     }
+
+    setLastTaskAck(null);
 
     const conn = new PersonalRoomConnection({ url: config.url });
     setConnection(conn);
@@ -60,9 +65,11 @@ export function usePersonalRoom(config: PersonalRoomConfig | null) {
           break;
         case 'error':
           break;
+        case 'task-ack':
+          setLastTaskAck(msg);
+          break;
         case 'authenticated':
-        case 'spawn-agent':
-        case 'spawn-result':
+        case 'notify-task':
         case 'webrtc-offer':
         case 'webrtc-answer':
         case 'webrtc-ice':
@@ -86,5 +93,5 @@ export function usePersonalRoom(config: PersonalRoomConfig | null) {
     };
   }, [config?.url]);
 
-  return { agents, connectionState, connection };
+  return { agents, connectionState, connection, lastTaskAck };
 }

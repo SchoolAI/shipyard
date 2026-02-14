@@ -273,7 +273,7 @@ export type GitRepoInfo = z.infer<typeof GitRepoInfoSchema>;
 /**
  * Permission mode schema for machine capabilities.
  */
-export const PermissionModeSchema = z.enum(['default', 'accept-edits', 'bypass']);
+export const PermissionModeSchema = z.enum(['default', 'accept-edits', 'plan', 'bypass']);
 
 export type PermissionMode = z.infer<typeof PermissionModeSchema>;
 
@@ -284,6 +284,7 @@ export const MachineCapabilitiesSchema = z.object({
   models: z.array(ModelInfoSchema),
   environments: z.array(GitRepoInfoSchema),
   permissionModes: z.array(PermissionModeSchema),
+  homeDir: z.string().optional(),
 });
 
 export type MachineCapabilities = z.infer<typeof MachineCapabilitiesSchema>;
@@ -320,43 +321,66 @@ export const AgentStatusSchema = z.object({
 
 /**
  * WebRTC offer message schema for personal room WebSocket.
+ *
+ * When sent by a client: `targetMachineId` is the intended recipient.
+ * When relayed by the server: `fromMachineId` is added to identify the sender.
  */
 export const WebRTCOfferSchema = z.object({
   type: z.literal('webrtc-offer'),
   targetMachineId: z.string(),
+  fromMachineId: z.string().optional(),
   offer: z.unknown(),
   requestId: z.string().optional(),
 });
 
 /**
  * WebRTC answer message schema for personal room WebSocket.
+ *
+ * When sent by a client: `targetMachineId` is the intended recipient.
+ * When relayed by the server: `fromMachineId` is added to identify the sender.
  */
 export const WebRTCAnswerSchema = z.object({
   type: z.literal('webrtc-answer'),
   targetMachineId: z.string(),
+  fromMachineId: z.string().optional(),
   answer: z.unknown(),
   requestId: z.string().optional(),
 });
 
 /**
  * WebRTC ICE candidate message schema for personal room WebSocket.
+ *
+ * When sent by a client: `targetMachineId` is the intended recipient.
+ * When relayed by the server: `fromMachineId` is added to identify the sender.
  */
 export const WebRTCIceSchema = z.object({
   type: z.literal('webrtc-ice'),
   targetMachineId: z.string(),
+  fromMachineId: z.string().optional(),
   candidate: z.unknown(),
 });
 
 /**
- * Spawn agent request message schema for personal room WebSocket.
+ * Notify task message schema for personal room WebSocket.
+ * Content-free discovery signal — prompt lives in the Loro CRDT, not signaling.
+ * Primary use: daemon restart recovery (browser re-sends for active tasks).
  */
-export const SpawnAgentSchema = z.object({
-  type: z.literal('spawn-agent'),
+export const NotifyTaskSchema = z.object({
+  type: z.literal('notify-task'),
   requestId: z.string(),
   machineId: z.string(),
   taskId: z.string(),
-  prompt: z.string(),
-  cwd: z.string().optional(),
+});
+
+/**
+ * Task acknowledgment message schema for personal room WebSocket.
+ */
+export const TaskAckSchema = z.object({
+  type: z.literal('task-ack'),
+  requestId: z.string(),
+  taskId: z.string(),
+  accepted: z.boolean(),
+  error: z.string().optional(),
 });
 
 /**
@@ -369,17 +393,6 @@ export const UpdateCapabilitiesSchema = z.object({
 });
 
 /**
- * Spawn result message schema for personal room WebSocket.
- */
-export const SpawnResultSchema = z.object({
-  type: z.literal('spawn-result'),
-  requestId: z.string(),
-  taskId: z.string(),
-  success: z.boolean(),
-  error: z.string().optional(),
-});
-
-/**
  * Union of all client-to-server messages for personal room WebSocket.
  */
 export const PersonalRoomClientMessageSchema = z.discriminatedUnion('type', [
@@ -389,8 +402,8 @@ export const PersonalRoomClientMessageSchema = z.discriminatedUnion('type', [
   WebRTCOfferSchema,
   WebRTCAnswerSchema,
   WebRTCIceSchema,
-  SpawnAgentSchema,
-  SpawnResultSchema,
+  NotifyTaskSchema,
+  TaskAckSchema,
   UpdateCapabilitiesSchema,
 ]);
 
@@ -483,8 +496,8 @@ export const PersonalRoomServerMessageSchema = z.discriminatedUnion('type', [
   AgentLeftSchema,
   AgentStatusChangedSchema,
   AgentCapabilitiesChangedSchema,
-  SpawnAgentSchema,
-  SpawnResultSchema,
+  NotifyTaskSchema,
+  TaskAckSchema,
   ErrorMessageSchema,
   WebRTCOfferSchema,
   WebRTCAnswerSchema,

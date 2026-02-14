@@ -1,6 +1,10 @@
 import { renderHook } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
+const mockRepo = {
+  get: vi.fn(),
+};
+
 const mockHandle = {
   doc: {
     toJSON: vi.fn(() => ({
@@ -10,6 +14,12 @@ const mockHandle = {
         status: 'submitted',
         createdAt: 1000,
         updatedAt: 2000,
+      },
+      config: {
+        model: null,
+        cwd: null,
+        reasoningEffort: null,
+        permissionMode: null,
       },
       conversation: [],
       sessions: [],
@@ -22,8 +32,13 @@ const mockHandle = {
   },
 };
 
+mockRepo.get.mockReturnValue(mockHandle);
+
+vi.mock('../providers/repo-provider', () => ({
+  useRepo: vi.fn(() => mockRepo),
+}));
+
 vi.mock('@loro-extended/react', () => ({
-  useHandle: vi.fn(() => mockHandle),
   useDoc: vi.fn((_handle: unknown, selector: (doc: unknown) => unknown) => {
     const json = mockHandle.doc.toJSON();
     return selector(json);
@@ -40,7 +55,6 @@ describe('useTaskDocument', () => {
     expect(result.current.conversation).toEqual([]);
     expect(result.current.sessions).toEqual([]);
     expect(result.current.isLoading).toBe(false);
-    expect(result.current.handle).toBeNull();
   });
 
   it('returns document data when taskId is provided', () => {
@@ -55,7 +69,6 @@ describe('useTaskDocument', () => {
     });
     expect(result.current.conversation).toEqual([]);
     expect(result.current.sessions).toEqual([]);
-    expect(result.current.handle).toBe(mockHandle);
   });
 
   it('reports isLoading as false when meta is present', () => {

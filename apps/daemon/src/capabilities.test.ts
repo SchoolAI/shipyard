@@ -319,6 +319,6 @@ describe('detectCapabilities', () => {
 
     expect(caps.models).toHaveLength(4);
     expect(caps.environments).toHaveLength(1);
-    expect(caps.permissionModes).toEqual(['default', 'accept-edits', 'bypass']);
+    expect(caps.permissionModes).toEqual(['default', 'accept-edits', 'plan', 'bypass']);
   });
 });

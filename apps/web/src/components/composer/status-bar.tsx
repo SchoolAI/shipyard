@@ -1,22 +1,10 @@
 import { Button, Chip, Dropdown, Label, Tooltip } from '@heroui/react';
-import type {
-  GitRepoInfo,
-  PermissionMode,
-  AgentInfo as SignalingAgentInfo,
-} from '@shipyard/session';
-import { ChevronDown, GitBranch, Monitor, Shield } from 'lucide-react';
+import type { GitRepoInfo, AgentInfo as SignalingAgentInfo } from '@shipyard/session';
+import { ChevronDown, GitBranch, Monitor } from 'lucide-react';
 import { useMemo } from 'react';
 import type { MachineGroup } from '../../hooks/use-machine-selection';
 import type { ConnectionState } from '../../hooks/use-personal-room';
 import { EnvironmentPicker } from './environment-picker';
-
-const PERMISSION_LABELS: Record<PermissionMode, string> = {
-  default: 'Default',
-  'accept-edits': 'Accept edits',
-  bypass: 'Bypass',
-};
-
-const ALL_PERMISSION_MODES: PermissionMode[] = ['default', 'accept-edits', 'bypass'];
 
 const STATUS_COLOR: Record<SignalingAgentInfo['status'], 'success' | 'warning' | 'danger'> = {
   idle: 'success',
@@ -43,9 +31,7 @@ export interface StatusBarProps {
   availableEnvironments?: GitRepoInfo[];
   selectedEnvironmentPath?: string | null;
   onEnvironmentSelect?: (path: string | null) => void;
-  availablePermissionModes?: PermissionMode[];
-  permission?: PermissionMode;
-  onPermissionChange?: (mode: PermissionMode) => void;
+  homeDir?: string;
 }
 
 export function StatusBar({
@@ -56,27 +42,20 @@ export function StatusBar({
   availableEnvironments = [],
   selectedEnvironmentPath,
   onEnvironmentSelect,
-  availablePermissionModes,
-  permission = 'default',
-  onPermissionChange,
+  homeDir,
 }: StatusBarProps) {
   const machineKeys = useMemo(
     () => (selectedMachineId ? new Set([selectedMachineId]) : new Set<string>()),
     [selectedMachineId]
   );
 
-  const permissionModes =
-    availablePermissionModes && availablePermissionModes.length > 0
-      ? availablePermissionModes
-      : ALL_PERMISSION_MODES;
-
-  const permissionKeys = useMemo(() => new Set([permission]), [permission]);
-
   const selectedEnvironment = availableEnvironments.find((e) => e.path === selectedEnvironmentPath);
 
-  const permissionLabel = PERMISSION_LABELS[permission] ?? 'Default permissions';
   const machinesLabel = machineLabel(machines, connectionState);
-  const branchLabel = selectedEnvironment ? selectedEnvironment.branch : 'main';
+  const isSelectedHomeDir = selectedEnvironment && homeDir && selectedEnvironment.path === homeDir;
+  const isUsingHomeDir = !selectedEnvironment && homeDir;
+  const isHomeDir = isSelectedHomeDir || isUsingHomeDir;
+  const branchLabel = isHomeDir ? '~' : selectedEnvironment ? selectedEnvironment.branch : 'main';
 
   return (
     <div
@@ -149,66 +128,29 @@ export function StatusBar({
           )}
         </div>
 
-        {/* Permissions */}
-        <div className="flex items-center min-w-0">
-          <Dropdown>
-            <Button
-              variant="ghost"
-              size="sm"
-              aria-label={`Permissions: ${permissionLabel}`}
-              className="flex items-center gap-1 hover:text-foreground transition-colors text-xs text-muted"
-            >
-              <Shield className="w-3 h-3 shrink-0" aria-hidden="true" />
-              <span className="hidden sm:inline">{permissionLabel}</span>
-              <ChevronDown className="w-2.5 h-2.5 shrink-0" aria-hidden="true" />
-            </Button>
-            <Dropdown.Popover placement="top" className="min-w-[180px]">
-              <Dropdown.Menu
-                selectionMode="single"
-                selectedKeys={permissionKeys}
-                onSelectionChange={(keys) => {
-                  const selected = [...keys][0];
-                  if (
-                    typeof selected === 'string' &&
-                    (selected === 'default' ||
-                      selected === 'accept-edits' ||
-                      selected === 'bypass') &&
-                    onPermissionChange
-                  ) {
-                    onPermissionChange(selected);
-                  }
-                }}
-              >
-                {permissionModes.map((mode) => (
-                  <Dropdown.Item key={mode} id={mode} textValue={PERMISSION_LABELS[mode]}>
-                    <Label>{PERMISSION_LABELS[mode]}</Label>
-                  </Dropdown.Item>
-                ))}
-              </Dropdown.Menu>
-            </Dropdown.Popover>
-          </Dropdown>
-        </div>
-
         {/* Environment */}
         <EnvironmentPicker
           environments={availableEnvironments}
           selectedPath={selectedEnvironmentPath ?? null}
           onSelect={onEnvironmentSelect ?? (() => {})}
+          homeDir={homeDir}
         />
 
-        {/* Branch */}
-        <Tooltip>
-          <Tooltip.Trigger>
-            <span
-              className="flex items-center gap-1 min-w-0 max-w-[5rem] sm:max-w-[7rem]"
-              role="status"
-            >
-              <GitBranch className="w-3 h-3 shrink-0" aria-hidden="true" />
-              <span className="truncate">{branchLabel}</span>
-            </span>
-          </Tooltip.Trigger>
-          <Tooltip.Content>{branchLabel}</Tooltip.Content>
-        </Tooltip>
+        {/* Branch -- only shown for real project environments */}
+        {selectedEnvironment && !isHomeDir && (
+          <Tooltip>
+            <Tooltip.Trigger>
+              <span
+                className="flex items-center gap-1 min-w-0 max-w-[5rem] sm:max-w-[7rem]"
+                role="status"
+              >
+                <GitBranch className="w-3 h-3 shrink-0" aria-hidden="true" />
+                <span className="truncate">{branchLabel}</span>
+              </span>
+            </Tooltip.Trigger>
+            <Tooltip.Content>{branchLabel}</Tooltip.Content>
+          </Tooltip>
+        )}
       </div>
     </div>
   );

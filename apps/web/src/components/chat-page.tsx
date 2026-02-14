@@ -1,16 +1,21 @@
+import { change } from '@loro-extended/change';
 import type { A2APart } from '@shipyard/loro-schema';
-import { generateTaskId } from '@shipyard/loro-schema';
-import type { PermissionMode } from '@shipyard/session';
+import {
+  buildDocumentId,
+  DEFAULT_EPOCH,
+  generateTaskId,
+  TaskDocumentSchema,
+} from '@shipyard/loro-schema';
 import { ChevronDown } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useAppHotkeys } from '../hooks/use-app-hotkeys';
 import { useMachineSelection } from '../hooks/use-machine-selection';
 import { usePersonalRoom } from '../hooks/use-personal-room';
 import { useTaskDocument } from '../hooks/use-task-document';
 import { useWebRTCSync } from '../hooks/use-webrtc-sync';
-import { useWebRtcAdapter } from '../providers/repo-provider';
+import { useRepo, useWebRtcAdapter } from '../providers/repo-provider';
 import { useMessageStore, useTaskStore, useUIStore } from '../stores';
-import type { ChatComposerHandle } from './chat-composer';
+import type { ChatComposerHandle, SubmitPayload } from './chat-composer';
 import { ChatComposer } from './chat-composer';
 import type { ChatMessageData } from './chat-message';
 import { ChatMessage } from './chat-message';
@@ -42,7 +47,12 @@ const SUGGESTION_CARDS = [
   },
 ];
 
-function HeroState({ onSuggestionClick }: { onSuggestionClick: (text: string) => void }) {
+interface HeroStateProps {
+  onSuggestionClick: (text: string) => void;
+  environmentLabel?: string;
+}
+
+function HeroState({ onSuggestionClick, environmentLabel }: HeroStateProps) {
   return (
     <div className="flex flex-col items-center flex-1 w-full max-w-3xl mx-auto px-3 sm:px-4 min-h-0 overflow-hidden">
       <div className="flex-1 min-h-0" />
@@ -61,7 +71,7 @@ function HeroState({ onSuggestionClick }: { onSuggestionClick: (text: string) =>
           aria-label="Select project"
           className="flex items-center gap-1 text-muted text-sm hover:text-foreground transition-colors shrink-0"
         >
-          New project
+          {environmentLabel ?? 'New project'}
           <ChevronDown className="w-3.5 h-3.5" aria-hidden="true" />
         </button>
       </div>
@@ -113,17 +123,17 @@ export function ChatPage() {
     const url = import.meta.env.VITE_PERSONAL_ROOM_URL;
     return typeof url === 'string' && url.length > 0 ? { url } : null;
   }, []);
-  const { agents, connectionState, connection, lastSpawnResult } =
-    usePersonalRoom(personalRoomConfig);
+  const { agents, connectionState, connection, lastTaskAck } = usePersonalRoom(personalRoomConfig);
   const {
     machines,
     selectedMachineId,
     setSelectedMachineId,
     availableModels,
     availableEnvironments,
-    availablePermissionModes,
+    homeDir,
   } = useMachineSelection(agents);
 
+  const repo = useRepo();
   const webrtcAdapter = useWebRtcAdapter();
   const { peerState: _peerState } = useWebRTCSync({
     connection,
@@ -134,9 +144,12 @@ export function ChatPage() {
   const loroTask = useTaskDocument(activeTaskId);
 
   const storeMessages = activeTaskId ? messagesByTask[activeTaskId] : undefined;
+  const allTasks = useTaskStore((s) => s.tasks);
+  const activeTask = allTasks.find((t) => t.id === activeTaskId);
+  const agentName = activeTask?.agent?.name;
   const messages: ChatMessageData[] = useMemo(() => {
     if (useLoro && loroTask.conversation.length > 0) {
-      return loroTask.conversation.map((msg) => ({
+      const mapped: ChatMessageData[] = loroTask.conversation.map((msg) => ({
         id: msg.messageId ?? crypto.randomUUID(),
         role: msg.role === 'agent' ? ('agent' as const) : ('user' as const),
         content:
@@ -146,7 +159,22 @@ export function ChatPage() {
             )
             .map((p) => p.text)
             .join('\n') ?? '',
+        agentName: msg.role === 'agent' ? agentName : undefined,
       }));
+
+      const status = loroTask.meta?.status;
+      const isInFlight = status === 'submitted' || status === 'working';
+      const lastMsg = mapped[mapped.length - 1];
+      if (isInFlight && lastMsg?.role === 'user') {
+        mapped.push({
+          id: '__thinking__',
+          role: 'agent' as const,
+          content: '',
+          isThinking: true,
+        });
+      }
+
+      return mapped;
     }
     return (
       storeMessages?.map((m) => ({
@@ -154,9 +182,10 @@ export function ChatPage() {
         role: m.role,
         content: m.content,
         isThinking: m.isThinking,
+        agentName: m.role === 'agent' ? agentName : undefined,
       })) ?? []
     );
-  }, [loroTask.conversation, storeMessages]);
+  }, [loroTask.conversation, loroTask.meta?.status, storeMessages, agentName]);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const demoTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -168,11 +197,15 @@ export function ChatPage() {
 
   const selectedEnvironmentPath = useUIStore((s) => s.selectedEnvironmentPath);
   const setSelectedEnvironmentPath = useUIStore((s) => s.setSelectedEnvironmentPath);
-  const [permission, setPermission] = useState<PermissionMode>('default');
 
   useEffect(() => {
-    setSelectedEnvironmentPath(null);
-  }, [selectedMachineId, setSelectedEnvironmentPath]);
+    if (!homeDir) {
+      const firstEnv = availableEnvironments[0]?.path ?? null;
+      setSelectedEnvironmentPath(firstEnv);
+    } else {
+      setSelectedEnvironmentPath(null);
+    }
+  }, [selectedMachineId, availableEnvironments, homeDir, setSelectedEnvironmentPath]);
 
   useEffect(() => {
     return () => clearTimeout(demoTimerRef.current);
@@ -273,38 +306,54 @@ export function ChatPage() {
   }, [messages, scrollToBottom]);
 
   useEffect(() => {
-    if (!lastSpawnResult || !activeTaskId) return;
+    if (!lastTaskAck || !activeTaskId) return;
+
+    if (lastTaskAck.accepted) return;
 
     const msgStore = useMessageStore.getState();
     const taskMessages = msgStore.messagesByTask[activeTaskId] ?? [];
     const thinking = taskMessages.find((m) => m.isThinking);
-
-    if (!thinking) return;
-
-    if (lastSpawnResult.success) {
+    if (thinking) {
       msgStore.updateMessage(activeTaskId, thinking.id, {
         isThinking: false,
-        content: 'Agent is working... (waiting for Loro sync)',
-      });
-    } else {
-      msgStore.updateMessage(activeTaskId, thinking.id, {
-        isThinking: false,
-        content: `Agent spawn failed: ${lastSpawnResult.error ?? 'Unknown error'}`,
+        content: `Task rejected: ${lastTaskAck.error ?? 'Unknown error'}`,
       });
     }
-  }, [lastSpawnResult, activeTaskId]);
+  }, [lastTaskAck, activeTaskId]);
+
+  useEffect(() => {
+    if (!connection || !activeTaskId || !selectedMachineId) return;
+
+    const unsub = connection.onMessage((msg) => {
+      if (msg.type === 'agent-joined' && msg.agent.machineId === selectedMachineId) {
+        const status = loroTask.meta?.status;
+        const isInFlight = status === 'submitted' || status === 'working';
+        if (isInFlight) {
+          connection.send({
+            type: 'notify-task',
+            requestId: crypto.randomUUID(),
+            machineId: selectedMachineId,
+            taskId: activeTaskId,
+          });
+        }
+      }
+    });
+
+    return unsub;
+  }, [connection, activeTaskId, selectedMachineId, loroTask.meta?.status]);
 
   const handleSubmit = useCallback(
-    (content: string) => {
+    (payload: SubmitPayload) => {
+      const { message, model, reasoningEffort, permissionMode } = payload;
       const taskId = generateTaskId();
-      const currentTaskId = activeTaskId ?? createAndActivateTask(content.slice(0, 80), taskId);
+      const currentTaskId = activeTaskId ?? createAndActivateTask(message.slice(0, 80), taskId);
 
       const msgStore = useMessageStore.getState();
 
       msgStore.addMessage(currentTaskId, {
         taskId: currentTaskId,
         role: 'user',
-        content,
+        content: message,
       });
 
       const thinkingId = msgStore.addMessage(currentTaskId, {
@@ -314,14 +363,45 @@ export function ChatPage() {
         isThinking: true,
       });
 
+      if (useLoro && repo) {
+        const docId = buildDocumentId('task', currentTaskId, DEFAULT_EPOCH);
+        const handle = repo.get(docId, TaskDocumentSchema);
+
+        const now = Date.now();
+        const isNewTask = handle.loroDoc.opCount() === 0;
+
+        change(handle.doc, (draft) => {
+          if (isNewTask) {
+            draft.meta.id = currentTaskId;
+            draft.meta.title = message.slice(0, 80);
+            draft.meta.createdAt = now;
+          }
+          draft.meta.status = 'submitted';
+          draft.meta.updatedAt = now;
+
+          draft.config.model = model || null;
+          draft.config.cwd = selectedEnvironmentPath ?? homeDir ?? null;
+          draft.config.reasoningEffort = reasoningEffort;
+          draft.config.permissionMode = permissionMode;
+
+          draft.conversation.push({
+            messageId: crypto.randomUUID(),
+            role: 'user',
+            contextId: null,
+            taskId: currentTaskId,
+            parts: [{ kind: 'text', text: message }],
+            referenceTaskIds: [],
+            timestamp: now,
+          });
+        });
+      }
+
       if (connection && selectedMachineId) {
         connection.send({
-          type: 'spawn-agent',
+          type: 'notify-task',
           requestId: crypto.randomUUID(),
           machineId: selectedMachineId,
           taskId: currentTaskId,
-          prompt: content,
-          cwd: selectedEnvironmentPath ?? undefined,
         });
       } else {
         demoTimerRef.current = setTimeout(() => {
@@ -333,7 +413,15 @@ export function ChatPage() {
         }, 500);
       }
     },
-    [activeTaskId, createAndActivateTask, connection, selectedMachineId, selectedEnvironmentPath]
+    [
+      activeTaskId,
+      createAndActivateTask,
+      connection,
+      selectedMachineId,
+      selectedEnvironmentPath,
+      homeDir,
+      repo,
+    ]
   );
 
   const handleClearChat = useCallback(() => {
@@ -342,6 +430,15 @@ export function ChatPage() {
   }, [activeTaskId]);
 
   const hasMessages = messages.length > 0;
+
+  const selectedEnv = availableEnvironments.find((e) => e.path === selectedEnvironmentPath);
+  const heroEnvironmentLabel = selectedEnv
+    ? homeDir && selectedEnv.path === homeDir
+      ? '~ (Home)'
+      : `${selectedEnv.name} (${selectedEnv.branch})`
+    : homeDir
+      ? '~ (Home)'
+      : undefined;
 
   return (
     <div className="flex h-dvh bg-background">
@@ -365,14 +462,24 @@ export function ChatPage() {
                   aria-label="Chat messages"
                   aria-relevant="additions"
                 >
-                  <div className="max-w-3xl mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-4 sm:space-y-6">
+                  <div className="max-w-3xl mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-3 sm:space-y-5">
                     {messages.map((msg) => (
                       <ChatMessage key={msg.id} message={msg} />
                     ))}
                   </div>
                 </div>
               ) : (
-                <HeroState onSuggestionClick={handleSubmit} />
+                <HeroState
+                  environmentLabel={heroEnvironmentLabel}
+                  onSuggestionClick={(text) =>
+                    handleSubmit({
+                      message: text,
+                      model: '',
+                      reasoningEffort: 'medium',
+                      permissionMode: 'default',
+                    })
+                  }
+                />
               )}
 
               {/* Composer */}
@@ -393,9 +500,7 @@ export function ChatPage() {
                   availableEnvironments={availableEnvironments}
                   selectedEnvironmentPath={selectedEnvironmentPath}
                   onEnvironmentSelect={setSelectedEnvironmentPath}
-                  availablePermissionModes={availablePermissionModes}
-                  permission={permission}
-                  onPermissionChange={setPermission}
+                  homeDir={homeDir}
                 />
               </div>
             </>

@@ -1,11 +1,13 @@
-import { Avatar, Button, Tooltip } from '@heroui/react';
+import { Button, Tooltip } from '@heroui/react';
 import { Bot, Check, Copy } from 'lucide-react';
-import type { ComponentPropsWithoutRef } from 'react';
+import type { ComponentPropsWithoutRef, ReactNode } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import rehypeHighlight from 'rehype-highlight';
 import remarkGfm from 'remark-gfm';
 import { assertNever } from '../utils/assert-never';
+import { ClaudeIcon, GeminiIcon, OpenAIIcon } from './agent-icons';
+import { AsciiShipThinking } from './thinking/ascii-ship';
 
 export type MessageRole = 'user' | 'agent';
 
@@ -14,13 +16,14 @@ export interface ChatMessageData {
   role: MessageRole;
   content: string;
   isThinking?: boolean;
+  agentName?: string;
 }
 
 interface ChatMessageProps {
   message: ChatMessageData;
 }
 
-function ThinkingDots() {
+export function ThinkingDots() {
   return (
     <span className="inline-flex items-center gap-1" role="status">
       <span className="sr-only">Agent is thinking</span>
@@ -294,20 +297,70 @@ const markdownComponents: ComponentPropsWithoutRef<typeof ReactMarkdown>['compon
 const REMARK_PLUGINS = [remarkGfm];
 const REHYPE_PLUGINS = [rehypeHighlight];
 
+interface AgentAvatarConfig {
+  icon: ReactNode;
+  label: string;
+  bgClass: string;
+}
+
+function resolveAgentAvatar(agentName?: string): AgentAvatarConfig {
+  const name = agentName?.toLowerCase() ?? '';
+
+  if (name.includes('claude') || name.includes('anthropic')) {
+    return {
+      icon: <ClaudeIcon className="w-3.5 h-3.5 text-agent-claude-fg" />,
+      label: 'Claude',
+      bgClass: 'bg-agent-claude-bg',
+    };
+  }
+
+  if (
+    name.includes('gpt') ||
+    name.includes('codex') ||
+    name.includes('openai') ||
+    name === 'o1' ||
+    name.includes('o1-') ||
+    name === 'o3' ||
+    name.includes('o3-')
+  ) {
+    return {
+      icon: <OpenAIIcon className="w-3.5 h-3.5 text-agent-openai-fg" />,
+      label: 'OpenAI',
+      bgClass: 'bg-agent-openai-bg',
+    };
+  }
+
+  if (name.includes('gemini') || name.includes('google')) {
+    return {
+      icon: <GeminiIcon className="w-3.5 h-3.5 text-agent-gemini-fg" />,
+      label: 'Gemini',
+      bgClass: 'bg-agent-gemini-bg',
+    };
+  }
+
+  return {
+    icon: <Bot className="w-3.5 h-3.5 text-muted" />,
+    label: 'Agent',
+    bgClass: 'bg-default',
+  };
+}
+
 function AgentMessage({ message }: ChatMessageProps) {
+  const avatar = resolveAgentAvatar(message.agentName);
+
   return (
     <div className="flex items-start gap-3 max-w-3xl">
-      <Avatar className="size-7 shrink-0 bg-default mt-0.5">
-        <Avatar.Fallback>
-          <Bot className="w-4 h-4 text-muted" />
-        </Avatar.Fallback>
-      </Avatar>
+      <div
+        className={`size-7 shrink-0 mt-0.5 rounded-full flex items-center justify-center ${avatar.bgClass}`}
+      >
+        {avatar.icon}
+      </div>
 
       <div className="flex-1 min-w-0">
-        <span className="sr-only">Agent:</span>
+        <span className="text-xs font-medium text-muted mb-1 block">{avatar.label}</span>
         {message.isThinking ? (
-          <div className="py-2">
-            <ThinkingDots />
+          <div className="py-1">
+            <AsciiShipThinking />
           </div>
         ) : (
           <div className="text-sm text-foreground/90 leading-relaxed prose-shipyard">
@@ -328,7 +381,7 @@ function AgentMessage({ message }: ChatMessageProps) {
 function UserMessage({ message }: ChatMessageProps) {
   return (
     <div className="flex justify-end max-w-3xl ml-auto">
-      <div className="bg-default rounded-xl px-4 py-2.5 max-w-[80%]">
+      <div className="bg-default rounded-2xl px-4 py-2.5 max-w-[80%]">
         <span className="sr-only">You:</span>
         <div className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">
           {message.content}

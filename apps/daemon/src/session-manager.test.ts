@@ -546,6 +546,7 @@ describe('SessionManager', () => {
         status: 'completed',
         cwd: '/workspace',
         model: 'claude-opus-4-6',
+        machineId: null,
         createdAt: now,
         completedAt: now + 10000,
         totalCostUsd: 0.03,
@@ -622,6 +623,7 @@ describe('SessionManager', () => {
         status: 'pending',
         cwd: '/tmp',
         model: null,
+        machineId: null,
         createdAt: now,
         completedAt: null,
         totalCostUsd: null,
@@ -773,6 +775,7 @@ describe('SessionManager', () => {
             status: 'active',
             cwd: '/other',
             model: null,
+            machineId: null,
             createdAt: Date.now(),
             completedAt: null,
             totalCostUsd: null,
@@ -820,6 +823,7 @@ describe('SessionManager', () => {
             status: 'active',
             cwd: '/other',
             model: null,
+            machineId: null,
             createdAt: Date.now(),
             completedAt: null,
             totalCostUsd: null,
@@ -929,6 +933,7 @@ describe('SessionManager', () => {
           status: 'completed',
           cwd: '/workspace',
           model: 'claude-opus-4-6',
+          machineId: null,
           createdAt: now,
           completedAt: now + 10000,
           totalCostUsd: 0.03,
@@ -951,6 +956,297 @@ describe('SessionManager', () => {
           }),
         })
       );
+    });
+  });
+
+  describe('getLatestUserPrompt', () => {
+    it('returns null when conversation is empty', () => {
+      expect(manager.getLatestUserPrompt()).toBeNull();
+    });
+
+    it('returns the text from the last user message', () => {
+      taskDoc.conversation.push({
+        messageId: 'msg-1',
+        role: 'user',
+        contextId: null,
+        taskId,
+        parts: [{ kind: 'text', text: 'Hello world' }],
+        referenceTaskIds: [],
+        timestamp: Date.now(),
+      });
+
+      expect(manager.getLatestUserPrompt()).toBe('Hello world');
+    });
+
+    it('concatenates multiple text parts with newlines', () => {
+      taskDoc.conversation.push({
+        messageId: 'msg-multi',
+        role: 'user',
+        contextId: null,
+        taskId,
+        parts: [
+          { kind: 'text', text: 'First part' },
+          { kind: 'text', text: 'Second part' },
+        ],
+        referenceTaskIds: [],
+        timestamp: Date.now(),
+      });
+
+      expect(manager.getLatestUserPrompt()).toBe('First part\nSecond part');
+    });
+
+    it('skips agent messages and returns the last user message', () => {
+      taskDoc.conversation.push({
+        messageId: 'msg-user-1',
+        role: 'user',
+        contextId: null,
+        taskId,
+        parts: [{ kind: 'text', text: 'First user msg' }],
+        referenceTaskIds: [],
+        timestamp: Date.now(),
+      });
+      taskDoc.conversation.push({
+        messageId: 'msg-agent-1',
+        role: 'agent',
+        contextId: null,
+        taskId,
+        parts: [{ kind: 'text', text: 'Agent response' }],
+        referenceTaskIds: [],
+        timestamp: Date.now(),
+      });
+      taskDoc.conversation.push({
+        messageId: 'msg-user-2',
+        role: 'user',
+        contextId: null,
+        taskId,
+        parts: [{ kind: 'text', text: 'Follow-up question' }],
+        referenceTaskIds: [],
+        timestamp: Date.now(),
+      });
+
+      expect(manager.getLatestUserPrompt()).toBe('Follow-up question');
+    });
+
+    it('returns null when only agent messages exist', () => {
+      taskDoc.conversation.push({
+        messageId: 'msg-agent',
+        role: 'agent',
+        contextId: null,
+        taskId,
+        parts: [{ kind: 'text', text: 'Agent only' }],
+        referenceTaskIds: [],
+        timestamp: Date.now(),
+      });
+
+      expect(manager.getLatestUserPrompt()).toBeNull();
+    });
+
+    it('ignores non-text parts (file, data)', () => {
+      taskDoc.conversation.push({
+        messageId: 'msg-mixed',
+        role: 'user',
+        contextId: null,
+        taskId,
+        parts: [
+          { kind: 'file', name: 'test.txt', mimeType: 'text/plain', uri: null, bytes: null },
+          { kind: 'text', text: 'With a file' },
+        ],
+        referenceTaskIds: [],
+        timestamp: Date.now(),
+      });
+
+      expect(manager.getLatestUserPrompt()).toBe('With a file');
+    });
+  });
+
+  describe('shouldResume', () => {
+    it('returns { resume: false } when sessions is empty', () => {
+      expect(manager.shouldResume()).toEqual({ resume: false });
+    });
+
+    it('returns { resume: true, sessionId } for a completed session with agentSessionId', () => {
+      taskDoc.sessions.push({
+        sessionId: 'sess-1',
+        agentSessionId: 'agent-sess-1',
+        status: 'completed',
+        cwd: '/tmp',
+        model: null,
+        machineId: null,
+        createdAt: now,
+        completedAt: now + 5000,
+        totalCostUsd: 0.01,
+        durationMs: 5000,
+        error: null,
+      });
+
+      expect(manager.shouldResume()).toEqual({
+        resume: true,
+        sessionId: 'sess-1',
+      });
+    });
+
+    it('returns { resume: false } when all sessions have failed', () => {
+      taskDoc.sessions.push({
+        sessionId: 'sess-failed',
+        agentSessionId: 'agent-sess-failed',
+        status: 'failed',
+        cwd: '/tmp',
+        model: null,
+        machineId: null,
+        createdAt: now,
+        completedAt: now + 5000,
+        totalCostUsd: null,
+        durationMs: null,
+        error: 'Something went wrong',
+      });
+
+      expect(manager.shouldResume()).toEqual({ resume: false });
+    });
+
+    it('returns { resume: false } when sessions have no agentSessionId', () => {
+      taskDoc.sessions.push({
+        sessionId: 'sess-no-agent',
+        agentSessionId: '',
+        status: 'pending',
+        cwd: '/tmp',
+        model: null,
+        machineId: null,
+        createdAt: now,
+        completedAt: null,
+        totalCostUsd: null,
+        durationMs: null,
+        error: null,
+      });
+
+      expect(manager.shouldResume()).toEqual({ resume: false });
+    });
+
+    it('picks the most recent non-failed session', () => {
+      taskDoc.sessions.push({
+        sessionId: 'sess-old',
+        agentSessionId: 'agent-old',
+        status: 'completed',
+        cwd: '/tmp',
+        model: null,
+        machineId: null,
+        createdAt: now,
+        completedAt: now + 1000,
+        totalCostUsd: 0.01,
+        durationMs: 1000,
+        error: null,
+      });
+      taskDoc.sessions.push({
+        sessionId: 'sess-failed',
+        agentSessionId: 'agent-failed',
+        status: 'failed',
+        cwd: '/tmp',
+        model: null,
+        machineId: null,
+        createdAt: now + 2000,
+        completedAt: now + 3000,
+        totalCostUsd: null,
+        durationMs: null,
+        error: 'crash',
+      });
+      taskDoc.sessions.push({
+        sessionId: 'sess-latest',
+        agentSessionId: 'agent-latest',
+        status: 'active',
+        cwd: '/tmp',
+        model: null,
+        machineId: null,
+        createdAt: now + 4000,
+        completedAt: null,
+        totalCostUsd: null,
+        durationMs: null,
+        error: null,
+      });
+
+      expect(manager.shouldResume()).toEqual({
+        resume: true,
+        sessionId: 'sess-latest',
+      });
+    });
+  });
+
+  describe('machineId support', () => {
+    it('stores machineId in session entry when creating a session', async () => {
+      mockQuery.mockReturnValue(mockQueryResponse([initMsg('sess-machine'), successResult()]));
+
+      const result = await manager.createSession({
+        prompt: 'Hello',
+        cwd: '/tmp',
+        machineId: 'my-machine-1',
+      });
+
+      const json = taskDoc.toJSON();
+      const session = json.sessions.find((s) => s.sessionId === result.sessionId);
+      expect(session?.machineId).toBe('my-machine-1');
+    });
+
+    it('defaults machineId to null when not provided', async () => {
+      mockQuery.mockReturnValue(mockQueryResponse([initMsg('sess-no-machine'), successResult()]));
+
+      const result = await manager.createSession({
+        prompt: 'Hello',
+        cwd: '/tmp',
+      });
+
+      const json = taskDoc.toJSON();
+      const session = json.sessions.find((s) => s.sessionId === result.sessionId);
+      expect(session?.machineId).toBeNull();
+    });
+
+    it('stores machineId in resumed session entry', async () => {
+      taskDoc.sessions.push({
+        sessionId: 'orig-for-machine',
+        agentSessionId: 'agent-orig-machine',
+        status: 'completed',
+        cwd: '/workspace',
+        model: null,
+        machineId: 'original-machine',
+        createdAt: now,
+        completedAt: now + 5000,
+        totalCostUsd: 0.01,
+        durationMs: 5000,
+        error: null,
+      });
+
+      mockQuery.mockReturnValue(
+        mockQueryResponse([initMsg('agent-orig-machine'), successResult()])
+      );
+
+      const result = await manager.resumeSession('orig-for-machine', 'Continue', {
+        machineId: 'new-machine',
+      });
+
+      const json = taskDoc.toJSON();
+      const newSession = json.sessions.find((s) => s.sessionId === result.sessionId);
+      expect(newSession?.machineId).toBe('new-machine');
+    });
+
+    it('falls back to original machineId when resuming without override', async () => {
+      taskDoc.sessions.push({
+        sessionId: 'orig-machine-fallback',
+        agentSessionId: 'agent-fallback',
+        status: 'completed',
+        cwd: '/workspace',
+        model: null,
+        machineId: 'inherited-machine',
+        createdAt: now,
+        completedAt: now + 5000,
+        totalCostUsd: 0.01,
+        durationMs: 5000,
+        error: null,
+      });
+
+      mockQuery.mockReturnValue(mockQueryResponse([initMsg('agent-fallback'), successResult()]));
+
+      const result = await manager.resumeSession('orig-machine-fallback', 'Continue');
+
+      const json = taskDoc.toJSON();
+      const newSession = json.sessions.find((s) => s.sessionId === result.sessionId);
+      expect(newSession?.machineId).toBe('inherited-machine');
     });
   });
 });

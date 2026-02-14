@@ -38,7 +38,7 @@ import {
   HealthResponseSchema,
   type ValidationErrorResponse,
   ValidationErrorResponseSchema,
-} from './schemas';
+} from '@shipyard/session';
 
 export { ROUTE_DESCRIPTIONS, ROUTES } from './routes';
 

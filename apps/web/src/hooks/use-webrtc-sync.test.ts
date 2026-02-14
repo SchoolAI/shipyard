@@ -210,7 +210,8 @@ describe('useWebRTCSync', () => {
     act(() => {
       mockConn._emitMessage({
         type: 'webrtc-answer',
-        targetMachineId: 'machine-1',
+        targetMachineId: 'browser-connection-id',
+        fromMachineId: 'machine-1',
         answer: { type: 'answer', sdp: 'answer-sdp' },
       });
     });
@@ -237,7 +238,8 @@ describe('useWebRTCSync', () => {
     act(() => {
       mockConn._emitMessage({
         type: 'webrtc-ice',
-        targetMachineId: 'machine-1',
+        targetMachineId: 'browser-connection-id',
+        fromMachineId: 'machine-1',
         candidate: { candidate: 'ice-candidate', sdpMid: '0' },
       });
     });

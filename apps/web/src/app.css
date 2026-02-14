@@ -72,6 +72,14 @@
   --segment: oklch(0.35 0.015 250);
   --segment-foreground: var(--foreground);
 
+  /* Agent provider colors */
+  --agent-claude-bg: oklch(0.22 0.04 45);
+  --agent-claude-fg: oklch(0.65 0.12 45);
+  --agent-openai-bg: oklch(0.22 0.03 160);
+  --agent-openai-fg: oklch(0.65 0.10 160);
+  --agent-gemini-bg: oklch(0.22 0.04 280);
+  --agent-gemini-fg: oklch(0.65 0.12 280);
+
   /* Shadows (dark mode: no visible shadows) */
   --surface-shadow: 0 0 0 0 transparent inset;
   --overlay-shadow: 0 0 0 0 transparent inset;
@@ -136,6 +144,14 @@
   --segment: oklch(0.90 0.005 250);
   --segment-foreground: var(--foreground);
 
+  /* Agent provider colors */
+  --agent-claude-bg: oklch(0.94 0.03 45);
+  --agent-claude-fg: oklch(0.45 0.14 45);
+  --agent-openai-bg: oklch(0.94 0.03 160);
+  --agent-openai-fg: oklch(0.45 0.12 160);
+  --agent-gemini-bg: oklch(0.94 0.03 280);
+  --agent-gemini-fg: oklch(0.45 0.14 280);
+
   /* Shadows (light mode: subtle elevation) */
   --surface-shadow: 0 1px 3px 0 oklch(0 0 0 / 8%) inset;
   --overlay-shadow: 0 4px 16px 0 oklch(0 0 0 / 12%);
@@ -171,8 +187,40 @@
   --color-rust: oklch(0.65 0.16 45);
   --color-rust-light: oklch(0.75 0.14 45);
 
+  /* Agent provider colors */
+  --color-agent-claude-bg: var(--agent-claude-bg);
+  --color-agent-claude-fg: var(--agent-claude-fg);
+  --color-agent-openai-bg: var(--agent-openai-bg);
+  --color-agent-openai-fg: var(--agent-openai-fg);
+  --color-agent-gemini-bg: var(--agent-gemini-bg);
+  --color-agent-gemini-fg: var(--agent-gemini-fg);
+
   /* Code block background */
   --color-code-block: oklch(0.12 0.02 250);
+
+  /* Wave pulse animation for thinking indicator */
+  --animate-wave-pulse: wave-pulse 1.8s ease-in-out infinite;
+
+  /* ASCII ship sail animation (stays within wave bounds) */
+  --animate-sail: sail 5s linear infinite;
+
+  /* ASCII ship vertical bob (subtle wave-riding bounce) */
+  --animate-ship-bob: ship-bob 1.2s ease-in-out infinite;
+
+  /* Wave shimmer animation for ASCII waves */
+  --animate-wave-shimmer: wave-shimmer 2.4s ease-in-out infinite;
+
+  /* Wave shimmer — delayed variant for staggered wave lines */
+  --animate-wave-shimmer-delayed: wave-shimmer 2.4s ease-in-out 0.8s infinite;
+
+  /* Wave shimmer — slow variant for deepest wave line */
+  --animate-wave-shimmer-slow: wave-shimmer 3.2s ease-in-out 0.4s infinite;
+
+  /* Ring sweep animation for pulsing ring thinking indicator */
+  --animate-ring-sweep: ring-sweep 3s linear infinite;
+
+  /* Shimmer sweep animation for code skeleton loading */
+  --animate-shimmer: shimmer 2s ease-in-out infinite;
 }
 
 /*
@@ -366,6 +414,105 @@
 .light .hljs-property,
 [data-theme="light"] .hljs-property {
   color: oklch(0.45 0.08 200);
+}
+
+/*
+ * ASCII ship sail animation: ship translates left-to-right within wave bounds.
+ * Uses percentage-based left values so the ship never overshoots the tildes.
+ * The ship is ~3ch wide; the container is ~13ch, so max left is ~77% (10/13).
+ */
+@keyframes sail {
+  0% {
+    left: -3ch;
+  }
+  5% {
+    left: 0%;
+  }
+  95% {
+    left: calc(100% - 3ch);
+  }
+  100% {
+    left: calc(100% + 0.5ch);
+  }
+}
+
+/* Subtle vertical bob for the ship riding waves (2px amplitude) */
+@keyframes ship-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-2px);
+  }
+}
+
+/* Subtle opacity shimmer on ASCII wave characters */
+@keyframes wave-shimmer {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+/* Wave pulse animation for the thinking indicator */
+@keyframes wave-pulse {
+  0%,
+  100% {
+    width: 2rem;
+    transform: translateY(0);
+    opacity: var(--wave-opacity);
+  }
+  50% {
+    width: 3rem;
+    transform: translateY(-2px);
+    opacity: calc(var(--wave-opacity) + 0.2);
+  }
+}
+
+/* Pulsing ring thinking indicator: animated conic-gradient sweep */
+@property --ring-angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+
+@keyframes ring-sweep {
+  to {
+    --ring-angle: 360deg;
+  }
+}
+
+.ring-sweep-gradient {
+  background: conic-gradient(
+    from var(--ring-angle),
+    transparent 0deg,
+    var(--color-secondary) 90deg,
+    transparent 180deg
+  );
+  mask: radial-gradient(
+    farthest-side,
+    transparent calc(100% - 2px),
+    #000 calc(100% - 2px)
+  );
+  -webkit-mask: radial-gradient(
+    farthest-side,
+    transparent calc(100% - 2px),
+    #000 calc(100% - 2px)
+  );
+}
+
+/* Code shimmer: diagonal gradient sweep for skeleton loading bars */
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
 }
 
 /* Respect reduced motion preference for all animations */

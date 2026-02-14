@@ -84,22 +84,7 @@ export function createPeerManager(config: PeerManagerConfig): PeerManager {
     return factoryPromise;
   }
 
-  async function getOrCreatePeer(machineId: string): Promise<MinimalPeerConnection> {
-    const existing = peers.get(machineId);
-    if (existing) return existing;
-
-    const pending = pendingCreates.get(machineId);
-    if (pending) return pending;
-
-    const promise = createPeer(machineId);
-    pendingCreates.set(machineId, promise);
-    return promise;
-  }
-
-  async function createPeer(machineId: string): Promise<MinimalPeerConnection> {
-    const factory = await getFactory();
-    const pc = factory();
-
+  function setupPeerHandlers(machineId: string, pc: MinimalPeerConnection): void {
     pc.onicecandidate = (event) => {
       if (event.candidate) {
         config.onIceCandidate(machineId, {
@@ -111,14 +96,15 @@ export function createPeerManager(config: PeerManagerConfig): PeerManager {
     };
 
     pc.ondatachannel = (event) => {
-      logger.debug({ machineId }, 'Data channel received');
+      logger.info({ machineId }, 'Data channel received from browser');
       // eslint-disable-next-line no-restricted-syntax -- RTCDataChannel from node-datachannel satisfies the adapter interface
       config.webrtcAdapter.attachDataChannel(machineIdToPeerId(machineId), event.channel as never);
+      logger.info({ machineId }, 'Data channel attached to Loro adapter');
     };
 
     pc.onconnectionstatechange = () => {
       const state = pc.connectionState;
-      logger.debug({ machineId, state }, 'Peer connection state changed');
+      logger.info({ machineId, state }, 'Peer connection state changed');
 
       if (state === 'failed' || state === 'closed') {
         config.webrtcAdapter.detachDataChannel(machineIdToPeerId(machineId));
@@ -127,36 +113,89 @@ export function createPeerManager(config: PeerManagerConfig): PeerManager {
       }
     };
 
-    peers.set(machineId, pc);
-    pendingCreates.delete(machineId);
-    return pc;
+    // eslint-disable-next-line no-restricted-syntax -- node-datachannel polyfill supports these handlers
+    (pc as unknown as { onsignalingstatechange: (() => void) | null }).onsignalingstatechange =
+      () => {
+        // eslint-disable-next-line no-restricted-syntax -- reading state from underlying connection
+        const sigState = (pc as unknown as { signalingState: string }).signalingState;
+        logger.info({ machineId, signalingState: sigState }, 'Signaling state changed');
+      };
+
+    // eslint-disable-next-line no-restricted-syntax -- node-datachannel polyfill supports these handlers
+    (
+      pc as unknown as { onicegatheringstatechange: (() => void) | null }
+    ).onicegatheringstatechange = () => {
+      // eslint-disable-next-line no-restricted-syntax -- reading state from underlying connection
+      const iceState = (pc as unknown as { iceGatheringState: string }).iceGatheringState;
+      logger.info({ machineId, iceGatheringState: iceState }, 'ICE gathering state changed');
+    };
   }
 
   return {
     async handleOffer(fromMachineId, offer) {
-      const pc = await getOrCreatePeer(fromMachineId);
-      await pc.setRemoteDescription(offer);
-      const answer = await pc.createAnswer();
-      await pc.setLocalDescription(answer);
-      config.onAnswer(fromMachineId, { type: 'answer', sdp: answer.sdp });
+      logger.info({ fromMachineId }, 'Handling WebRTC offer');
+      const existing = peers.get(fromMachineId);
+      if (existing) {
+        logger.debug({ fromMachineId }, 'Closing existing peer connection');
+        existing.close();
+        peers.delete(fromMachineId);
+      }
+
+      const promise = (async () => {
+        const factory = await getFactory();
+        const pc = factory();
+        logger.debug({ fromMachineId }, 'Created peer connection');
+        setupPeerHandlers(fromMachineId, pc);
+        logger.debug({ fromMachineId }, 'Setting remote description (offer)');
+        await pc.setRemoteDescription(offer);
+        logger.debug({ fromMachineId }, 'Creating answer');
+        const answer = await pc.createAnswer();
+        logger.debug(
+          { fromMachineId, hasAnswerSdp: !!answer.sdp },
+          'Setting local description (answer)'
+        );
+        await pc.setLocalDescription(answer);
+        peers.set(fromMachineId, pc);
+        pendingCreates.delete(fromMachineId);
+        logger.info({ fromMachineId }, 'Sending WebRTC answer');
+        config.onAnswer(fromMachineId, { type: 'answer', sdp: answer.sdp });
+        return pc;
+      })();
+
+      pendingCreates.set(fromMachineId, promise);
+      await promise;
     },
 
     async handleAnswer(fromMachineId, answer) {
-      const pc = peers.get(fromMachineId);
+      logger.debug({ fromMachineId }, 'Handling WebRTC answer');
+      let pc = peers.get(fromMachineId);
       if (!pc) {
-        logger.warn({ fromMachineId }, 'Received answer for unknown peer');
-        return;
+        const pending = pendingCreates.get(fromMachineId);
+        if (pending) {
+          pc = await pending;
+        } else {
+          logger.warn({ fromMachineId }, 'Received answer for unknown peer');
+          return;
+        }
       }
       await pc.setRemoteDescription(answer);
+      logger.debug({ fromMachineId }, 'Remote description (answer) set');
     },
 
     async handleIce(fromMachineId, candidate) {
-      const pc = peers.get(fromMachineId);
+      logger.debug({ fromMachineId }, 'Handling WebRTC ICE candidate');
+      let pc = peers.get(fromMachineId);
       if (!pc) {
-        logger.warn({ fromMachineId }, 'Received ICE candidate for unknown peer');
-        return;
+        const pending = pendingCreates.get(fromMachineId);
+        if (pending) {
+          pc = await pending;
+        } else {
+          logger.warn({ fromMachineId }, 'Received ICE candidate for unknown peer');
+          return;
+        }
       }
       await pc.addIceCandidate(candidate);
+      logger.debug({ fromMachineId }, 'ICE candidate added');
     },
 
     destroy() {

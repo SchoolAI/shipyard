@@ -1,4 +1,5 @@
 import { Button, Tooltip } from '@heroui/react';
+import type { PermissionMode } from '@shipyard/loro-schema';
 import type { GitRepoInfo, ModelInfo } from '@shipyard/session';
 import { ArrowUp, Mic } from 'lucide-react';
 import type { KeyboardEvent } from 'react';
@@ -8,12 +9,19 @@ import { useSlashCommands } from '../hooks/use-slash-commands';
 import { assertNever } from '../utils/assert-never';
 import { AttachmentPopover } from './composer/attachment-popover';
 import { ModelPicker, useModelPicker } from './composer/model-picker';
-import { PlanModeToggle } from './composer/plan-mode-toggle';
+import { PermissionModePicker } from './composer/permission-mode-picker';
 import { ReasoningEffort, type ReasoningLevel } from './composer/reasoning-effort';
 import { SlashCommandMenu } from './composer/slash-command-menu';
 
+export interface SubmitPayload {
+  message: string;
+  model: string;
+  reasoningEffort: ReasoningLevel;
+  permissionMode: PermissionMode;
+}
+
 interface ChatComposerProps {
-  onSubmit: (message: string) => void;
+  onSubmit: (payload: SubmitPayload) => void;
   onClearChat: () => void;
   availableModels?: ModelInfo[];
   availableEnvironments?: GitRepoInfo[];
@@ -32,7 +40,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
   ref
 ) {
   const [value, setValue] = useState('');
-  const [planMode, setPlanMode] = useState(false);
+  const [permissionMode, setPermissionMode] = useState<PermissionMode>('default');
   const [reasoningLevel, setReasoningLevel] = useState<ReasoningLevel>('medium');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { selectedModelId, setSelectedModelId, models, reasoning } =
@@ -55,10 +63,8 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
   const handleSlashExecute = useCallback(
     (action: SlashCommandAction) => {
       switch (action.kind) {
-        case 'toggle':
-          if (action.target === 'planMode') {
-            setPlanMode((prev) => !prev);
-          }
+        case 'setPermissionMode':
+          setPermissionMode(action.mode);
           break;
         case 'setModel':
           setSelectedModelId(action.modelId);
@@ -128,7 +134,12 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
     const trimmed = value.trim();
     if (!trimmed) return;
 
-    onSubmit(trimmed);
+    onSubmit({
+      message: trimmed,
+      model: selectedModelId,
+      reasoningEffort: reasoningLevel,
+      permissionMode,
+    });
     setValue('');
     slashCommands.close();
 
@@ -139,7 +150,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
         textarea.style.overflowY = 'hidden';
       }
     });
-  }, [value, onSubmit, slashCommands]);
+  }, [value, onSubmit, slashCommands, selectedModelId, reasoningLevel, permissionMode]);
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -186,7 +197,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
             placeholder="Ask Shipyard anything"
             aria-label="Message input"
             rows={1}
-            className="w-full bg-transparent text-foreground placeholder-muted text-sm leading-relaxed resize-none outline-none"
+            className="w-full bg-transparent text-foreground placeholder-muted/70 text-sm leading-relaxed resize-none outline-none"
             style={{ minHeight: `${MIN_HEIGHT}px`, maxHeight: `${MAX_HEIGHT}px` }}
           />
         </div>
@@ -207,7 +218,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
                 supportedEfforts={reasoning.efforts}
               />
             )}
-            <PlanModeToggle isActive={planMode} onToggle={() => setPlanMode((p) => !p)} />
+            <PermissionModePicker mode={permissionMode} onModeChange={setPermissionMode} />
           </div>
 
           <div className="flex items-center gap-1 shrink-0">

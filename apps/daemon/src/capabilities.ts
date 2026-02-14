@@ -149,5 +149,5 @@ export async function detectCapabilities(): Promise<MachineCapabilities> {
 
   const permissionModes = [...PermissionModeSchema.options];
 
-  return { models, environments, permissionModes };
+  return { models, environments, permissionModes, homeDir: homedir() };
 }

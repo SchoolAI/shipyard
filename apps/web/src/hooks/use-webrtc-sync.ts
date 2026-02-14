@@ -67,7 +67,10 @@ export function useWebRTCSync(options: {
     const unsubMessage = connection.onMessage((msg: PersonalRoomServerMessage) => {
       if (disposed) return;
 
-      if (msg.type === 'webrtc-answer' && msg.targetMachineId === targetMachineId) {
+      if (
+        msg.type === 'webrtc-answer' &&
+        (msg.fromMachineId === targetMachineId || msg.targetMachineId === targetMachineId)
+      ) {
         // eslint-disable-next-line no-restricted-syntax -- WebRTC payloads are opaque (z.unknown) bridged to browser WebRTC API
         const answer = msg.answer as RTCSessionDescriptionInit;
         pc.setRemoteDescription(new RTCSessionDescription(answer)).catch(() => {
@@ -75,7 +78,10 @@ export function useWebRTCSync(options: {
         });
       }
 
-      if (msg.type === 'webrtc-ice' && msg.targetMachineId === targetMachineId) {
+      if (
+        msg.type === 'webrtc-ice' &&
+        (msg.fromMachineId === targetMachineId || msg.targetMachineId === targetMachineId)
+      ) {
         // eslint-disable-next-line no-restricted-syntax -- WebRTC payloads are opaque (z.unknown) bridged to browser WebRTC API
         const candidate = msg.candidate as RTCIceCandidateInit;
         pc.addIceCandidate(new RTCIceCandidate(candidate)).catch(() => {

@@ -58,6 +58,21 @@ const A2A_TASK_STATES = [
 
 const SESSION_STATES = ['pending', 'active', 'completed', 'failed', 'interrupted'] as const;
 
+const REASONING_EFFORTS = ['low', 'medium', 'high'] as const;
+const PERMISSION_MODES = ['default', 'accept-edits', 'plan', 'bypass'] as const;
+
+/**
+ * Task configuration shape.
+ * Per-turn session config written by the browser, read by the daemon.
+ * Lives in the CRDT so it syncs naturally and never touches signaling.
+ */
+export const TaskConfigShape = Shape.struct({
+  model: Shape.plain.string().nullable(),
+  cwd: Shape.plain.string().nullable(),
+  reasoningEffort: Shape.plain.string(...REASONING_EFFORTS).nullable(),
+  permissionMode: Shape.plain.string(...PERMISSION_MODES).nullable(),
+});
+
 /**
  * Agent session entry shape.
  * Tracks a single Claude Code session associated with a task.
@@ -68,6 +83,7 @@ export const SessionEntryShape = Shape.plain.struct({
   status: Shape.plain.string(...SESSION_STATES),
   cwd: Shape.plain.string(),
   model: Shape.plain.string().nullable(),
+  machineId: Shape.plain.string().nullable(),
   createdAt: Shape.plain.number(),
   completedAt: Shape.plain.number().nullable(),
   totalCostUsd: Shape.plain.number().nullable(),
@@ -89,6 +105,8 @@ export const TaskDocumentSchema = Shape.doc({
     updatedAt: Shape.plain.number(),
   }),
 
+  config: TaskConfigShape,
+
   conversation: Shape.list(A2AMessageShape),
 
   sessions: Shape.list(SessionEntryShape),
@@ -103,10 +121,13 @@ export type TaskDocument = Infer<typeof TaskDocumentSchema>;
 export type MutableTaskDocument = InferMutableType<typeof TaskDocumentSchema>;
 
 export type TaskMeta = Infer<typeof TaskDocumentSchema.shapes.meta>;
+export type TaskConfig = Infer<typeof TaskConfigShape>;
 export type A2APart = Infer<typeof A2APartShape>;
 export type A2AMessage = Infer<typeof A2AMessageShape>;
 export type SessionEntry = Infer<typeof SessionEntryShape>;
 
 export type A2ATaskState = (typeof A2A_TASK_STATES)[number];
 export type SessionState = (typeof SESSION_STATES)[number];
-export { A2A_TASK_STATES, SESSION_STATES };
+export type ReasoningEffort = (typeof REASONING_EFFORTS)[number];
+export type PermissionMode = (typeof PERMISSION_MODES)[number];
+export { A2A_TASK_STATES, PERMISSION_MODES, REASONING_EFFORTS, SESSION_STATES };

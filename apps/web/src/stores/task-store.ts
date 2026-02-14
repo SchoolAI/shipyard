@@ -8,8 +8,8 @@ export interface TaskStore {
   activeTaskId: string | null;
 
   setActiveTask: (id: string | null) => void;
-  createTask: (title: string) => string;
-  createAndActivateTask: (title: string) => string;
+  createTask: (title: string, id?: string) => string;
+  createAndActivateTask: (title: string, id?: string) => string;
   updateTask: (id: string, updates: Partial<TaskData>) => void;
   deleteTask: (id: string) => void;
 }
@@ -69,8 +69,8 @@ export const useTaskStore = create<TaskStore>()(
 
       setActiveTask: (id) => set({ activeTaskId: id }, undefined, 'tasks/setActiveTask'),
 
-      createTask: (title) => {
-        const id = crypto.randomUUID();
+      createTask: (title, existingId) => {
+        const id = existingId ?? crypto.randomUUID();
         const timestamp = Date.now();
         set(
           (state) => ({
@@ -92,8 +92,8 @@ export const useTaskStore = create<TaskStore>()(
         return id;
       },
 
-      createAndActivateTask: (title) => {
-        const id = get().createTask(title);
+      createAndActivateTask: (title, existingId) => {
+        const id = get().createTask(title, existingId);
         set({ activeTaskId: id }, undefined, 'tasks/createAndActivateTask');
         useMessageStore.getState().clearMessages(id);
         return id;

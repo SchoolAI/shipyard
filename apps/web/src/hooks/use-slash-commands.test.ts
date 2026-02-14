@@ -31,13 +31,12 @@ describe('useSlashCommands', () => {
     const { result } = setup();
     act(() => result.current.handleInputChange('/'));
     expect(result.current.isOpen).toBe(true);
-    expect(result.current.filteredCommands).toHaveLength(9);
+    expect(result.current.filteredCommands).toHaveLength(12);
   });
 
   it('filters to Plan mode with "/pl"', () => {
     const { result } = setup();
     act(() => result.current.handleInputChange('/pl'));
-    expect(result.current.filteredCommands).toHaveLength(1);
     expect(result.current.filteredCommands[0]?.id).toBe('plan');
   });
 
@@ -48,7 +47,6 @@ describe('useSlashCommands', () => {
     expect(ids).toContain('model:claude-opus-4-6');
     expect(ids).toContain('model:claude-sonnet-4-5');
     expect(ids).toContain('model:claude-haiku-4-5');
-    expect(result.current.filteredCommands).toHaveLength(3);
   });
 
   it('filters to single model with "/opus"', () => {

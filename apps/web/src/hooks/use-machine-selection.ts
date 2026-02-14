@@ -15,33 +15,52 @@ export interface MachineGroup {
   capabilities: MachineCapabilities;
 }
 
-export function mergeCapabilities(agents: SignalingAgentInfo[]): MachineCapabilities {
-  const models: ModelInfo[] = [];
-  const environments: GitRepoInfo[] = [];
-  const permissionModes = new Set<PermissionMode>();
-  const seenModelIds = new Set<string>();
-  const seenEnvPaths = new Set<string>();
+function dedupeModels(caps: MachineCapabilities[]): ModelInfo[] {
+  const seen = new Set<string>();
+  const result: ModelInfo[] = [];
+  for (const c of caps) {
+    for (const model of c.models) {
+      if (!seen.has(model.id)) {
+        seen.add(model.id);
+        result.push(model);
+      }
+    }
+  }
+  return result;
+}
 
-  for (const agent of agents) {
-    if (!agent.capabilities) continue;
-    for (const model of agent.capabilities.models) {
-      if (!seenModelIds.has(model.id)) {
-        seenModelIds.add(model.id);
-        models.push(model);
+function dedupeEnvironments(caps: MachineCapabilities[]): GitRepoInfo[] {
+  const seen = new Set<string>();
+  const result: GitRepoInfo[] = [];
+  for (const c of caps) {
+    for (const env of c.environments) {
+      if (!seen.has(env.path)) {
+        seen.add(env.path);
+        result.push(env);
       }
     }
-    for (const env of agent.capabilities.environments) {
-      if (!seenEnvPaths.has(env.path)) {
-        seenEnvPaths.add(env.path);
-        environments.push(env);
-      }
-    }
-    for (const mode of agent.capabilities.permissionModes) {
+  }
+  return result;
+}
+
+export function mergeCapabilities(agents: SignalingAgentInfo[]): MachineCapabilities {
+  const caps = agents.map((a) => a.capabilities).filter((c): c is MachineCapabilities => c != null);
+
+  const permissionModes = new Set<PermissionMode>();
+  for (const c of caps) {
+    for (const mode of c.permissionModes) {
       permissionModes.add(mode);
     }
   }
 
-  return { models, environments, permissionModes: [...permissionModes] };
+  const homeDir = caps.find((c) => c.homeDir)?.homeDir;
+
+  return {
+    models: dedupeModels(caps),
+    environments: dedupeEnvironments(caps),
+    permissionModes: [...permissionModes],
+    homeDir,
+  };
 }
 
 export function useMachineSelection(agents: SignalingAgentInfo[]) {
@@ -82,13 +101,29 @@ export function useMachineSelection(agents: SignalingAgentInfo[]) {
 
   const selectedMachine = machines.find((m) => m.machineId === effectiveMachineId) ?? null;
 
+  const availableModels = useMemo(
+    () => selectedMachine?.capabilities.models ?? [],
+    [selectedMachine]
+  );
+  const availableEnvironments = useMemo(
+    () => selectedMachine?.capabilities.environments ?? [],
+    [selectedMachine]
+  );
+  const availablePermissionModes = useMemo(
+    () => selectedMachine?.capabilities.permissionModes ?? [],
+    [selectedMachine]
+  );
+
+  const homeDir = selectedMachine?.capabilities.homeDir;
+
   return {
     machines,
     selectedMachineId: effectiveMachineId,
     setSelectedMachineId,
     selectedMachine,
-    availableModels: selectedMachine?.capabilities.models ?? [],
-    availableEnvironments: selectedMachine?.capabilities.environments ?? [],
-    availablePermissionModes: selectedMachine?.capabilities.permissionModes ?? [],
+    availableModels,
+    availableEnvironments,
+    availablePermissionModes,
+    homeDir,
   };
 }
