@@ -1,4 +1,4 @@
-import { Button, ListBox, Popover, ScrollShadow } from '@heroui/react';
+import { Button, ListBox, Popover, ScrollShadow, Tooltip } from '@heroui/react';
 import type { GitRepoInfo } from '@shipyard/session';
 import { Check, ChevronDown, Globe, Search } from 'lucide-react';
 import type { Key } from 'react';
@@ -78,18 +78,23 @@ export function EnvironmentPicker({
 
   return (
     <Popover isOpen={isOpen} onOpenChange={handleOpenChange}>
-      <Popover.Trigger>
-        <Button
-          variant="ghost"
-          size="sm"
-          aria-label={`Environment: ${label}`}
-          className="flex items-center gap-1 hover:text-foreground transition-colors text-xs text-muted"
-        >
-          <Globe className="w-3 h-3 shrink-0" aria-hidden="true" />
-          <span className="truncate max-w-[12rem]">{label}</span>
-          <ChevronDown className="w-2.5 h-2.5" aria-hidden="true" />
-        </Button>
-      </Popover.Trigger>
+      <Tooltip isDisabled={isOpen}>
+        <Popover.Trigger>
+          <Tooltip.Trigger>
+            <Button
+              variant="ghost"
+              size="sm"
+              aria-label={`Environment: ${label}`}
+              className="flex items-center gap-1 hover:text-foreground transition-colors text-xs text-muted"
+            >
+              <Globe className="w-3 h-3 shrink-0" aria-hidden="true" />
+              <span className="truncate max-w-[12rem]">{label}</span>
+              <ChevronDown className="w-2.5 h-2.5" aria-hidden="true" />
+            </Button>
+          </Tooltip.Trigger>
+        </Popover.Trigger>
+        <Tooltip.Content>{label}</Tooltip.Content>
+      </Tooltip>
       <Popover.Content placement="top" className="w-auto min-w-[240px] max-w-[340px] p-0">
         <Popover.Dialog>
           <div className="flex flex-col">

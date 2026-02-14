@@ -76,7 +76,7 @@ export function StatusBar({
 
   const permissionLabel = PERMISSION_LABELS[permission] ?? 'Default permissions';
   const machinesLabel = machineLabel(machines, connectionState);
-  const branchLabel = selectedEnvironment ? `From ${selectedEnvironment.branch}` : 'From main';
+  const branchLabel = selectedEnvironment ? selectedEnvironment.branch : 'main';
 
   return (
     <div
