@@ -72,7 +72,6 @@ web_modules/
 .env
 .env.*
 !.env.example
-!.env.development
 
 # Wrangler local secrets and build output
 .dev.vars

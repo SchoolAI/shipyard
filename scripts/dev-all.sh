@@ -8,7 +8,7 @@ SESSION_PORT=4444
 
 # Load daemon env for serve mode
 set -a
-source apps/daemon/.env.development
+source apps/daemon/.env
 set +a
 
 # Build dependencies first

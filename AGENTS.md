@@ -38,6 +38,7 @@ Domain expertise is in skills — use subagents to keep the main context clean.
 - `agent-sdk-expert` — Claude Agent SDK (subagents, hooks, sessions)
 - `a2a-protocol-expert` — A2A protocol + @a2a-js/sdk
 - `design` — UI/UX design principles, layout, accessibility, visual hierarchy, responsive
+- `mobile` — Mobile-first responsive, touch interactions, viewport units, safe areas, virtual keyboard, container queries
 - `engineering-standards` — Quality gates, Biome, fan-in coverage, meta-tests
 - `council` — Multi-agent deliberation for design decisions
 - `deep-research` — Context saturation before implementation
