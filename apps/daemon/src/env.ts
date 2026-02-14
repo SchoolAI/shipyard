@@ -4,6 +4,10 @@ export const EnvSchema = z.object({
   ANTHROPIC_API_KEY: z.string().min(1),
   SHIPYARD_DATA_DIR: z.string().default('~/.shipyard/data'),
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
+  SHIPYARD_SIGNALING_URL: z.string().url().optional(),
+  SHIPYARD_USER_TOKEN: z.string().optional(),
+  SHIPYARD_MACHINE_ID: z.string().optional(),
+  SHIPYARD_MACHINE_NAME: z.string().optional(),
 });
 
 export type Env = z.infer<typeof EnvSchema>;

@@ -18,5 +18,6 @@
  * @module
  */
 
+export * from './personal-room-connection';
 export * from './routes';
 export * from './schemas';

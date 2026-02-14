@@ -338,6 +338,8 @@ export const AgentInfoSchema = z.object({
   activeTaskId: z.string().optional(),
 });
 
+export type AgentInfo = z.infer<typeof AgentInfoSchema>;
+
 /**
  * Agents list message schema for personal room WebSocket.
  */

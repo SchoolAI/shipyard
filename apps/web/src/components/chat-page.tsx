@@ -1,6 +1,7 @@
 import { ChevronDown } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAppHotkeys } from '../hooks/use-app-hotkeys';
+import { usePersonalRoom } from '../hooks/use-personal-room';
 import type { ChatComposerHandle } from './chat-composer';
 import { ChatComposer } from './chat-composer';
 import type { ChatMessageData } from './chat-message';
@@ -83,6 +84,12 @@ export function ChatPage() {
   const composerRef = useRef<ChatComposerHandle>(null);
   const terminalRef = useRef<TerminalPanelHandle>(null);
   const prevTerminalOpen = useRef(false);
+
+  const personalRoomConfig = useMemo(() => {
+    const url = import.meta.env.VITE_PERSONAL_ROOM_URL;
+    return typeof url === 'string' && url.length > 0 ? { url } : null;
+  }, []);
+  const { agents, connectionState } = usePersonalRoom(personalRoomConfig);
 
   useEffect(() => {
     return () => clearTimeout(demoTimerRef.current);
@@ -185,7 +192,7 @@ export function ChatPage() {
         {/* Composer */}
         <div className="shrink-0 w-full max-w-3xl mx-auto px-3 sm:px-4">
           <ChatComposer ref={composerRef} onSubmit={handleSubmit} onClearChat={handleClearChat} />
-          <StatusBar />
+          <StatusBar agents={agents} connectionState={connectionState} />
         </div>
 
         {/* Terminal panel */}

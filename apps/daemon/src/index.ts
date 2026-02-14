@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
 import { mkdir } from 'node:fs/promises';
-import { homedir } from 'node:os';
+import { homedir, hostname } from 'node:os';
 import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { change, type createTypedDoc } from '@loro-extended/change';
@@ -13,11 +13,13 @@ import {
   generateTaskId,
   TaskDocumentSchema,
 } from '@shipyard/loro-schema';
-import { validateEnv } from './env.js';
+import { PersonalRoomConnection } from '@shipyard/session';
+import { type Env, validateEnv } from './env.js';
 import { FileStorageAdapter } from './file-storage-adapter.js';
 import { LifecycleManager } from './lifecycle.js';
 import { createChildLogger, logger } from './logger.js';
 import { SessionManager, type SessionResult } from './session-manager.js';
+import { createDaemonSignaling, type DaemonSignaling } from './signaling.js';
 
 interface CliArgs {
   prompt?: string;
@@ -64,6 +66,10 @@ function parseCliArgs(): CliArgs {
         '  ANTHROPIC_API_KEY         Required. API key for Claude.',
         '  SHIPYARD_DATA_DIR         Data directory (overridden by --data-dir)',
         '  LOG_LEVEL                 Log level: debug, info, warn, error (default: info)',
+        '  SHIPYARD_SIGNALING_URL    Signaling server WebSocket URL (optional)',
+        '  SHIPYARD_USER_TOKEN       JWT for signaling auth (optional)',
+        '  SHIPYARD_MACHINE_ID       Machine identifier (default: os.hostname())',
+        '  SHIPYARD_MACHINE_NAME     Human-readable machine name (default: os.hostname())',
       ].join('\n')
     );
     process.exit(0);
@@ -77,6 +83,45 @@ function parseCliArgs(): CliArgs {
     dataDir: values['data-dir'],
     model: values.model,
   };
+}
+
+interface SignalingHandle {
+  signaling: DaemonSignaling;
+  connection: PersonalRoomConnection;
+}
+
+function setupSignaling(
+  env: Env,
+  log: ReturnType<typeof createChildLogger>
+): SignalingHandle | null {
+  if (!env.SHIPYARD_SIGNALING_URL) {
+    return null;
+  }
+
+  const machineId = env.SHIPYARD_MACHINE_ID ?? hostname();
+  const machineName = env.SHIPYARD_MACHINE_NAME ?? hostname();
+  const wsUrl = new URL(env.SHIPYARD_SIGNALING_URL);
+  if (env.SHIPYARD_USER_TOKEN) {
+    wsUrl.searchParams.set('token', env.SHIPYARD_USER_TOKEN);
+  }
+
+  const connection = new PersonalRoomConnection({ url: wsUrl.toString() });
+  const signaling = createDaemonSignaling({
+    connection,
+    machineId,
+    machineName,
+    agentType: 'daemon',
+  });
+
+  connection.onStateChange((state) => {
+    if (state === 'connected') {
+      signaling.register();
+      log.info({ machineId, machineName }, 'Registered with signaling server');
+    }
+  });
+  connection.connect();
+
+  return { signaling, connection };
 }
 
 async function setupRepo(dataDir: string) {
@@ -181,14 +226,21 @@ async function main(): Promise<void> {
 
   const repo = await setupRepo(dataDir);
   const lifecycle = new LifecycleManager();
+  const signalingHandle = setupSignaling(env, log);
 
+  let cleanedUp = false;
   const cleanup = () => {
+    if (cleanedUp) return;
+    cleanedUp = true;
+    signalingHandle?.signaling.unregister();
+    signalingHandle?.signaling.destroy();
+    signalingHandle?.connection.disconnect();
     lifecycle.destroy();
     repo.reset();
   };
 
   lifecycle.onShutdown(async () => {
-    log.info('Cleaning up repo...');
+    log.info('Cleaning up...');
     cleanup();
   });
 

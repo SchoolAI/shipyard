@@ -9,8 +9,8 @@
     "shipyard-daemon": "./dist/index.js"
   },
   "scripts": {
-    "build": "bunup",
-    "dev": "bunup --watch",
+    "build": "tsup",
+    "dev": "tsup --watch",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
@@ -20,6 +20,7 @@
   },
   "dependencies": {
     "@shipyard/loro-schema": "workspace:*",
+    "@shipyard/session": "workspace:*",
     "@anthropic-ai/claude-agent-sdk": "catalog:",
     "@loro-extended/change": "catalog:",
     "@loro-extended/repo": "catalog:",
@@ -30,12 +31,12 @@
   },
   "devDependencies": {
     "@types/node": "catalog:",
-    "bunup": "catalog:",
+    "tsup": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:",
     "pino-pretty": "catalog:"
   },
   "engines": {
-    "bun": ">=1.1.0"
+    "node": ">=22"
   }
 }
