@@ -92,7 +92,7 @@ export function StatusBar({
   const branchLabel = selectedEnvironment ? `From ${selectedEnvironment.branch}` : 'From main';
 
   return (
-    <div className="w-full max-w-3xl mx-auto pb-3">
+    <div className="w-full max-w-3xl mx-auto pb-3" role="status" aria-label="Connection status">
       <div className="flex items-center flex-wrap gap-x-3 gap-y-1 text-xs text-muted">
         {machines.length > 0 ? (
           <Dropdown>
@@ -102,9 +102,9 @@ export function StatusBar({
               aria-label={`Machines: ${machinesLabel}`}
               className="flex items-center gap-1 hover:text-foreground transition-colors text-xs text-muted"
             >
-              <Monitor className="w-3 h-3" />
+              <Monitor className="w-3 h-3" aria-hidden="true" />
               {machinesLabel}
-              <ChevronDown className="w-2.5 h-2.5" />
+              <ChevronDown className="w-2.5 h-2.5" aria-hidden="true" />
             </Button>
             <Dropdown.Popover placement="top" className="min-w-[200px]">
               <Dropdown.Menu
@@ -145,7 +145,7 @@ export function StatusBar({
           </Dropdown>
         ) : (
           <span className="flex items-center gap-1">
-            <Monitor className="w-3 h-3" />
+            <Monitor className="w-3 h-3" aria-hidden="true" />
             {machinesLabel}
           </span>
         )}
@@ -158,9 +158,9 @@ export function StatusBar({
             aria-label={`Permissions: ${permissionLabel}`}
             className="flex items-center gap-1 hover:text-foreground transition-colors text-xs text-muted"
           >
-            <Shield className="w-3 h-3" />
+            <Shield className="w-3 h-3" aria-hidden="true" />
             {permissionLabel}
-            <ChevronDown className="w-2.5 h-2.5" />
+            <ChevronDown className="w-2.5 h-2.5" aria-hidden="true" />
           </Button>
           <Dropdown.Popover placement="top" className="min-w-[180px]">
             <Dropdown.Menu
@@ -197,9 +197,9 @@ export function StatusBar({
               aria-label={`Environment: ${envLabel}`}
               className="flex items-center gap-1 hover:text-foreground transition-colors text-xs text-muted"
             >
-              <Globe className="w-3 h-3" />
+              <Globe className="w-3 h-3" aria-hidden="true" />
               {envLabel}
-              <ChevronDown className="w-2.5 h-2.5" />
+              <ChevronDown className="w-2.5 h-2.5" aria-hidden="true" />
             </Button>
             <Dropdown.Popover placement="top" className="min-w-[220px] max-w-[320px]">
               <ScrollShadow className="max-h-[300px]">
@@ -220,7 +220,7 @@ export function StatusBar({
                       textValue={`${env.name} (${env.branch})`}
                     >
                       <div className="flex items-center gap-2">
-                        <GitBranch className="w-3 h-3 shrink-0 text-muted" />
+                        <GitBranch className="w-3 h-3 shrink-0 text-muted" aria-hidden="true" />
                         <div className="min-w-0">
                           <Label className="truncate block">{env.name}</Label>
                           <span className="text-xs text-muted truncate block">{env.branch}</span>
@@ -234,14 +234,14 @@ export function StatusBar({
           </Dropdown>
         ) : (
           <span className="flex items-center gap-1">
-            <Globe className="w-3 h-3" />
+            <Globe className="w-3 h-3" aria-hidden="true" />
             No environment
           </span>
         )}
 
         {/* Branch */}
         <span className="flex items-center gap-1">
-          <GitBranch className="w-3 h-3" />
+          <GitBranch className="w-3 h-3" aria-hidden="true" />
           {branchLabel}
         </span>
       </div>

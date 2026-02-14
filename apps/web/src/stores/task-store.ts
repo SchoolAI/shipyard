@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
+import { useMessageStore } from './message-store';
 import type { TaskData } from './types';
 
 export interface TaskStore {
@@ -8,6 +9,7 @@ export interface TaskStore {
 
   setActiveTask: (id: string | null) => void;
   createTask: (title: string) => string;
+  createAndActivateTask: (title: string) => string;
   updateTask: (id: string, updates: Partial<TaskData>) => void;
   deleteTask: (id: string) => void;
 }
@@ -59,7 +61,7 @@ const MOCK_TASKS: TaskData[] = [
 
 export const useTaskStore = create<TaskStore>()(
   devtools(
-    (set) => ({
+    (set, get) => ({
       tasks: MOCK_TASKS,
       activeTaskId: 'task-1',
 
@@ -85,6 +87,13 @@ export const useTaskStore = create<TaskStore>()(
           undefined,
           'tasks/createTask'
         );
+        return id;
+      },
+
+      createAndActivateTask: (title) => {
+        const id = get().createTask(title);
+        set({ activeTaskId: id }, undefined, 'tasks/createAndActivateTask');
+        useMessageStore.getState().clearMessages(id);
         return id;
       },
 

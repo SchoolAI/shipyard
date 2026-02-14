@@ -3,6 +3,7 @@ import { Brain, Cpu, HelpCircle, ListChecks, Trash2 } from 'lucide-react';
 import type { KeyboardEvent } from 'react';
 import { useCallback, useMemo, useState } from 'react';
 import type { ReasoningLevel } from '../components/composer/reasoning-effort';
+import { fuzzyScore } from '../utils/fuzzy-match';
 
 export type SlashCommandAction =
   | { kind: 'toggle'; target: 'planMode' }
@@ -35,7 +36,7 @@ const COMMANDS: SlashCommandItem[] = [
     name: 'Claude Opus 4.6',
     description: 'Most capable, deep reasoning',
     icon: Cpu,
-    keywords: ['model', 'switch', 'claude', 'opus'],
+    keywords: ['model', 'switch', 'claude', 'opus', '4.6', '46'],
     action: { kind: 'setModel', modelId: 'claude-opus-4-6' },
     parentLabel: 'Switch model',
   },
@@ -44,7 +45,7 @@ const COMMANDS: SlashCommandItem[] = [
     name: 'Claude Sonnet 4.5',
     description: 'Fast and balanced',
     icon: Cpu,
-    keywords: ['model', 'switch', 'claude', 'sonnet'],
+    keywords: ['model', 'switch', 'claude', 'sonnet', '4.5', '45'],
     action: { kind: 'setModel', modelId: 'claude-sonnet-4-5-20250929' },
     parentLabel: 'Switch model',
   },
@@ -53,7 +54,7 @@ const COMMANDS: SlashCommandItem[] = [
     name: 'Claude Haiku 4.5',
     description: 'Fastest responses',
     icon: Cpu,
-    keywords: ['model', 'switch', 'claude', 'haiku'],
+    keywords: ['model', 'switch', 'claude', 'haiku', '4.5', '45'],
     action: { kind: 'setModel', modelId: 'claude-haiku-4-5-20251001' },
     parentLabel: 'Switch model',
   },
@@ -131,14 +132,16 @@ export function useSlashCommands({
     if (!isOpen) return [];
     if (!query) return COMMANDS;
 
-    const lowerQuery = query.toLowerCase();
-    return COMMANDS.filter(
-      (cmd) =>
-        cmd.name.toLowerCase().includes(lowerQuery) ||
-        cmd.id.toLowerCase().includes(lowerQuery) ||
-        cmd.keywords.some((kw) => kw.includes(lowerQuery)) ||
-        (cmd.parentLabel?.toLowerCase().includes(lowerQuery) ?? false)
-    );
+    const scored = COMMANDS.map((cmd) => {
+      const targets = [cmd.name, cmd.id, ...(cmd.parentLabel ? [cmd.parentLabel] : [])];
+      const targetScore = Math.max(...targets.map((t) => fuzzyScore(query, t)));
+      const keywordScore = Math.max(...cmd.keywords.map((kw) => fuzzyScore(query, kw)));
+      const best = Math.max(targetScore, keywordScore);
+      return { cmd, score: best };
+    }).filter((entry) => entry.score >= 0);
+
+    scored.sort((a, b) => b.score - a.score);
+    return scored.map((entry) => entry.cmd);
   }, [isOpen, query]);
 
   const close = useCallback(() => {
@@ -158,7 +161,7 @@ export function useSlashCommands({
 
   const handleInputChange = useCallback(
     (value: string) => {
-      const slashMatch = /(?:^|\s)\/([\w]*)$/.exec(value);
+      const slashMatch = /(?:^|\s)\/([\w.-]*)$/.exec(value);
 
       if (slashMatch) {
         const matchedQuery = slashMatch[1] ?? '';

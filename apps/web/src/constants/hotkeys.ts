@@ -92,5 +92,3 @@ export const HOTKEYS = {
     global: false,
   },
 } as const satisfies Record<string, HotkeyDef>;
-
-export type HotkeyAction = keyof typeof HOTKEYS;

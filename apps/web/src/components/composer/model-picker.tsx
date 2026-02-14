@@ -50,7 +50,7 @@ export function ModelPicker({ selectedModelId, onModelChange, models }: ModelPic
         className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs text-muted hover:text-foreground hover:bg-default transition-colors"
       >
         {displayLabel}
-        <ChevronDown className="w-3 h-3" />
+        <ChevronDown className="w-3 h-3" aria-hidden="true" />
       </Button>
       <Dropdown.Popover placement="top start" className="min-w-[220px]">
         <Dropdown.Menu

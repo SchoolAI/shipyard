@@ -16,9 +16,9 @@ export function SettingsPage({ onBack }: SettingsPageProps) {
     <div
       ref={containerRef}
       role="region"
-      aria-label="Settings"
+      aria-labelledby="settings-heading"
       tabIndex={-1}
-      className="flex-1 overflow-y-auto outline-none"
+      className="flex-1 overflow-y-auto focus-visible-ring"
       onKeyDown={(e) => {
         if (e.key === 'Escape') {
           e.preventDefault();
@@ -36,7 +36,9 @@ export function SettingsPage({ onBack }: SettingsPageProps) {
           >
             <ArrowLeft className="w-4 h-4" />
           </button>
-          <h2 className="text-xl font-semibold text-foreground">Settings</h2>
+          <h2 className="text-xl font-semibold text-foreground" id="settings-heading">
+            Settings
+          </h2>
         </div>
 
         <p className="text-sm text-muted">Settings will appear here.</p>

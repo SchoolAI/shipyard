@@ -22,7 +22,7 @@ export function AttachmentPopover() {
               type="button"
               className="flex items-center gap-1.5 w-full px-2 py-1 text-xs text-foreground/80 hover:bg-default rounded-sm transition-colors whitespace-nowrap"
             >
-              <Paperclip className="w-3 h-3 text-muted" />
+              <Paperclip className="w-3 h-3 text-muted" aria-hidden="true" />
               Add photos & files
             </button>
           </div>

@@ -11,6 +11,7 @@ import type { ChatMessageData } from './chat-message';
 import { ChatMessage } from './chat-message';
 import { CommandPalette } from './command-palette';
 import { StatusBar } from './composer/status-bar';
+import type { DiffPanelHandle } from './panels/diff-panel';
 import { DiffPanel } from './panels/diff-panel';
 import type { TerminalPanelHandle } from './panels/terminal-panel';
 import { TerminalPanel } from './panels/terminal-panel';
@@ -40,17 +41,17 @@ function HeroState({ onSuggestionClick }: { onSuggestionClick: (text: string) =>
       <div className="flex flex-col items-center gap-4 mb-12 sm:mb-16">
         <img
           src="/icon.svg"
-          alt="Shipyard"
+          alt=""
           className="w-16 h-16 sm:w-20 sm:h-20 object-contain opacity-80"
         />
-        <h2 className="text-xl sm:text-2xl font-semibold text-foreground">What are we building?</h2>
+        <h1 className="text-xl sm:text-2xl font-semibold text-foreground">What are we building?</h1>
         <button
           type="button"
           aria-label="Select project"
           className="flex items-center gap-1 text-muted text-sm hover:text-foreground transition-colors"
         >
           New project
-          <ChevronDown className="w-3.5 h-3.5" />
+          <ChevronDown className="w-3.5 h-3.5" aria-hidden="true" />
         </button>
       </div>
 
@@ -109,7 +110,9 @@ export function ChatPage() {
   const demoTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const composerRef = useRef<ChatComposerHandle>(null);
   const terminalRef = useRef<TerminalPanelHandle>(null);
+  const diffRef = useRef<DiffPanelHandle>(null);
   const prevTerminalOpen = useRef(false);
+  const prevDiffOpen = useRef(false);
 
   const personalRoomConfig = useMemo(() => {
     const url = import.meta.env.VITE_PERSONAL_ROOM_URL;
@@ -150,15 +153,34 @@ export function ChatPage() {
     prevTerminalOpen.current = isTerminalOpen;
   }, [isTerminalOpen]);
 
+  useEffect(() => {
+    if (isDiffOpen && !prevDiffOpen.current) {
+      requestAnimationFrame(() => {
+        diffRef.current?.focus();
+      });
+    } else if (!isDiffOpen && prevDiffOpen.current) {
+      requestAnimationFrame(() => {
+        composerRef.current?.focus();
+      });
+    }
+    prevDiffOpen.current = isDiffOpen;
+  }, [isDiffOpen]);
+
+  useEffect(() => {
+    if (activeTaskId && !isTerminalOpen) {
+      requestAnimationFrame(() => {
+        composerRef.current?.focus();
+      });
+    }
+  }, [activeTaskId, isTerminalOpen]);
+
   const tasks = useTaskStore((s) => s.tasks);
-  const createTask = useTaskStore((s) => s.createTask);
   const setActiveTask = useTaskStore((s) => s.setActiveTask);
+  const createAndActivateTask = useTaskStore((s) => s.createAndActivateTask);
 
   const handleNewTask = useCallback(() => {
-    const id = createTask('New task');
-    setActiveTask(id);
-    useMessageStore.getState().clearMessages(id);
-  }, [createTask, setActiveTask]);
+    createAndActivateTask('New task');
+  }, [createAndActivateTask]);
 
   const handleNavigateNextTask = useCallback(() => {
     const currentIndex = tasks.findIndex((t) => t.id === activeTaskId);
@@ -182,9 +204,7 @@ export function ChatPage() {
     composerRef.current?.focus();
   }, []);
 
-  const handleToggleSettings = useCallback(() => {
-    setSettingsOpen(!isSettingsOpen);
-  }, [setSettingsOpen, isSettingsOpen]);
+  const toggleSettings = useUIStore((s) => s.toggleSettings);
 
   const handleCloseSettings = useCallback(() => {
     setSettingsOpen(false);
@@ -195,7 +215,7 @@ export function ChatPage() {
     onToggleDiff: toggleDiff,
     onToggleSidebar: toggleSidebar,
     onNewTask: handleNewTask,
-    onOpenSettings: handleToggleSettings,
+    onOpenSettings: toggleSettings,
     onCommandPalette: () => useUIStore.getState().toggleCommandPalette(),
     onNavigateNextTask: handleNavigateNextTask,
     onNavigatePrevTask: handleNavigatePrevTask,
@@ -256,50 +276,57 @@ export function ChatPage() {
       <CommandPalette />
       <ShortcutsModal />
       <Sidebar />
-      {/* Main column: top bar + chat + terminal */}
       <div className="flex flex-col flex-1 min-w-0" tabIndex={-1}>
         <TopBar onToggleTerminal={toggleTerminal} onToggleDiff={toggleDiff} />
 
-        {isSettingsOpen ? (
-          <SettingsPage onBack={handleCloseSettings} />
-        ) : (
-          <>
-            {/* Chat area */}
-            {hasMessages ? (
-              <div ref={scrollRef} className="flex-1 overflow-y-auto">
-                <div className="max-w-3xl mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-4 sm:space-y-6">
-                  {messages.map((msg) => (
-                    <ChatMessage key={msg.id} message={msg} />
-                  ))}
+        <main id="main-content" className="flex flex-col flex-1 min-h-0">
+          {isSettingsOpen ? (
+            <SettingsPage onBack={handleCloseSettings} />
+          ) : (
+            <>
+              {/* Chat area */}
+              {hasMessages ? (
+                <div
+                  ref={scrollRef}
+                  className="flex-1 overflow-y-auto"
+                  role="log"
+                  aria-label="Chat messages"
+                  aria-relevant="additions"
+                >
+                  <div className="max-w-3xl mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-4 sm:space-y-6">
+                    {messages.map((msg) => (
+                      <ChatMessage key={msg.id} message={msg} />
+                    ))}
+                  </div>
                 </div>
-              </div>
-            ) : (
-              <HeroState onSuggestionClick={handleSubmit} />
-            )}
+              ) : (
+                <HeroState onSuggestionClick={handleSubmit} />
+              )}
 
-            {/* Composer */}
-            <div className="shrink-0 w-full max-w-3xl mx-auto px-3 sm:px-4">
-              <ChatComposer
-                ref={composerRef}
-                onSubmit={handleSubmit}
-                onClearChat={handleClearChat}
-                availableModels={availableModels}
-              />
-              <StatusBar
-                connectionState={connectionState}
-                machines={machines}
-                selectedMachineId={selectedMachineId}
-                onMachineSelect={setSelectedMachineId}
-                availableEnvironments={availableEnvironments}
-                selectedEnvironmentPath={selectedEnvironmentPath}
-                onEnvironmentSelect={setSelectedEnvironmentPath}
-                availablePermissionModes={availablePermissionModes}
-                permission={permission}
-                onPermissionChange={setPermission}
-              />
-            </div>
-          </>
-        )}
+              {/* Composer */}
+              <div className="shrink-0 w-full max-w-3xl mx-auto px-3 sm:px-4">
+                <ChatComposer
+                  ref={composerRef}
+                  onSubmit={handleSubmit}
+                  onClearChat={handleClearChat}
+                  availableModels={availableModels}
+                />
+                <StatusBar
+                  connectionState={connectionState}
+                  machines={machines}
+                  selectedMachineId={selectedMachineId}
+                  onMachineSelect={setSelectedMachineId}
+                  availableEnvironments={availableEnvironments}
+                  selectedEnvironmentPath={selectedEnvironmentPath}
+                  onEnvironmentSelect={setSelectedEnvironmentPath}
+                  availablePermissionModes={availablePermissionModes}
+                  permission={permission}
+                  onPermissionChange={setPermission}
+                />
+              </div>
+            </>
+          )}
+        </main>
 
         {/* Terminal panel */}
         <TerminalPanel
@@ -310,7 +337,11 @@ export function ChatPage() {
       </div>
 
       {/* Diff side panel */}
-      <DiffPanel isOpen={isDiffOpen} onClose={() => useUIStore.getState().setDiffOpen(false)} />
+      <DiffPanel
+        ref={diffRef}
+        isOpen={isDiffOpen}
+        onClose={() => useUIStore.getState().setDiffOpen(false)}
+      />
     </div>
   );
 }

@@ -5,12 +5,9 @@ import {
   type PersonalRoomServerMessage,
 } from '@shipyard/session';
 import { useEffect, useState } from 'react';
+import { assertNever } from '../utils/assert-never';
 
 export type { AgentInfo, ConnectionState };
-
-function assertNever(value: never): never {
-  throw new Error(`Unhandled personal room message type: ${String(value)}`);
-}
 
 interface PersonalRoomConfig {
   url: string;

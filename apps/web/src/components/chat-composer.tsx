@@ -5,6 +5,7 @@ import type { KeyboardEvent } from 'react';
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import type { SlashCommandAction } from '../hooks/use-slash-commands';
 import { useSlashCommands } from '../hooks/use-slash-commands';
+import { assertNever } from '../utils/assert-never';
 import { AttachmentPopover } from './composer/attachment-popover';
 import { ModelPicker, useModelPicker } from './composer/model-picker';
 import { PlanModeToggle } from './composer/plan-mode-toggle';
@@ -23,10 +24,6 @@ export interface ChatComposerHandle {
 
 const MAX_HEIGHT = 200;
 const MIN_HEIGHT = 24;
-
-function assertNever(x: never): never {
-  throw new Error(`Unhandled slash command action: ${JSON.stringify(x)}`);
-}
 
 export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(function ChatComposer(
   { onSubmit, onClearChat, availableModels },
@@ -162,7 +159,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
 
   return (
     <div className="w-full pb-2">
-      <div className="relative bg-surface rounded-2xl border border-separator shadow-lg">
+      <div className="relative bg-surface rounded-xl border border-separator focus-within:border-focus focus-within:ring-1 focus-within:ring-focus">
         {slashCommands.isOpen && (
           <SlashCommandMenu
             commands={slashCommands.filteredCommands}

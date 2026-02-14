@@ -10,8 +10,8 @@
  *   - Dark navy hull          -> backgrounds
  *   - Steel blue tower        -> muted text
  *
- * HeroUI v3 dark-mode variables are set on .dark / [data-theme="dark"].
- * Light mode inherits HeroUI defaults (unused for now).
+ * HeroUI v3 variables are set on .dark / .light and [data-theme] selectors.
+ * Both dark and light themes use Shipyard palette colors.
  */
 
 /* -- Dark theme overrides (Shipyard is dark-first) -- */
@@ -78,6 +78,70 @@
   --field-shadow: 0 0 0 0 transparent inset;
 }
 
+/* -- Light theme -- */
+.light,
+[data-theme="light"] {
+  /* Base: warm white with a hint of navy undertone */
+  --background: oklch(0.97 0.005 250);
+  --foreground: oklch(0.15 0.02 250);
+
+  /* Surface: slightly off-white for cards/panels */
+  --surface: oklch(1.00 0 0);
+  --surface-foreground: var(--foreground);
+
+  /* Overlay: pure white for modals/popovers */
+  --overlay: oklch(1.00 0 0);
+  --overlay-foreground: var(--foreground);
+
+  /* Muted: steel-blue at higher lightness for secondary text */
+  --muted: oklch(0.50 0.03 240);
+
+  /* Default: light gray for buttons, chips */
+  --default: oklch(0.92 0.005 250);
+  --default-foreground: var(--foreground);
+
+  /* Accent: same rust/copper, slightly deepened for light bg contrast */
+  --accent: oklch(0.55 0.18 45);
+  --accent-foreground: oklch(0.98 0 0);
+
+  /* Secondary: teal/cyan, deepened for light bg readability */
+  --secondary: oklch(0.50 0.14 200);
+  --secondary-foreground: oklch(0.98 0 0);
+
+  /* Status colors -- darkened for light bg contrast */
+  --success: oklch(0.50 0.17 150);
+  --success-foreground: oklch(0.98 0 0);
+
+  --warning: oklch(0.60 0.16 76);
+  --warning-foreground: oklch(0.15 0.02 250);
+
+  --danger: oklch(0.52 0.22 25);
+  --danger-foreground: oklch(0.98 0 0);
+
+  /* Form fields */
+  --field-background: oklch(0.96 0.005 250);
+  --field-on-background: oklch(0.94 0.005 250);
+  --field-foreground: var(--foreground);
+  --field-placeholder: var(--muted);
+  --field-border: oklch(0.85 0.01 250);
+
+  /* Misc */
+  --border: oklch(0.88 0.01 250);
+  --separator: oklch(0.88 0.01 250);
+  --focus: var(--accent);
+  --link: var(--secondary);
+  --scrollbar: oklch(0.78 0.01 250);
+
+  /* Segment */
+  --segment: oklch(0.90 0.005 250);
+  --segment-foreground: var(--foreground);
+
+  /* Shadows (light mode: subtle elevation) */
+  --surface-shadow: 0 1px 3px 0 oklch(0 0 0 / 8%) inset;
+  --overlay-shadow: 0 4px 16px 0 oklch(0 0 0 / 12%);
+  --field-shadow: 0 1px 2px 0 oklch(0 0 0 / 5%) inset;
+}
+
 @theme {
   /* Map HeroUI semantic tokens to Tailwind utilities */
   --color-background: var(--background);
@@ -106,6 +170,9 @@
   --color-wave-light: oklch(0.82 0.10 200);
   --color-rust: oklch(0.65 0.16 45);
   --color-rust-light: oklch(0.75 0.14 45);
+
+  /* Code block background */
+  --color-code-block: oklch(0.12 0.02 250);
 }
 
 /*
@@ -193,4 +260,129 @@
 
 .hljs-strong {
   font-weight: 700;
+}
+
+/*
+ * Light-mode syntax highlighting overrides
+ * Darkened values to maintain readable contrast on light backgrounds.
+ */
+
+.light .hljs,
+[data-theme="light"] .hljs {
+  color: oklch(0.25 0.02 250);
+}
+
+.light .hljs-keyword,
+.light .hljs-selector-tag,
+.light .hljs-built_in,
+.light .hljs-name,
+.light .hljs-tag,
+[data-theme="light"] .hljs-keyword,
+[data-theme="light"] .hljs-selector-tag,
+[data-theme="light"] .hljs-built_in,
+[data-theme="light"] .hljs-name,
+[data-theme="light"] .hljs-tag {
+  color: oklch(0.45 0.16 300);
+}
+
+.light .hljs-string,
+.light .hljs-title,
+.light .hljs-section,
+.light .hljs-attribute,
+.light .hljs-literal,
+.light .hljs-template-tag,
+.light .hljs-template-variable,
+.light .hljs-type,
+[data-theme="light"] .hljs-string,
+[data-theme="light"] .hljs-title,
+[data-theme="light"] .hljs-section,
+[data-theme="light"] .hljs-attribute,
+[data-theme="light"] .hljs-literal,
+[data-theme="light"] .hljs-template-tag,
+[data-theme="light"] .hljs-template-variable,
+[data-theme="light"] .hljs-type {
+  color: oklch(0.42 0.14 200);
+}
+
+.light .hljs-number,
+.light .hljs-symbol,
+.light .hljs-bullet,
+.light .hljs-link,
+[data-theme="light"] .hljs-number,
+[data-theme="light"] .hljs-symbol,
+[data-theme="light"] .hljs-bullet,
+[data-theme="light"] .hljs-link {
+  color: oklch(0.50 0.18 45);
+}
+
+.light .hljs-variable,
+.light .hljs-params,
+.light .hljs-regexp,
+[data-theme="light"] .hljs-variable,
+[data-theme="light"] .hljs-params,
+[data-theme="light"] .hljs-regexp {
+  color: oklch(0.50 0.10 80);
+}
+
+.light .hljs-comment,
+.light .hljs-quote,
+[data-theme="light"] .hljs-comment,
+[data-theme="light"] .hljs-quote {
+  color: oklch(0.55 0.02 240);
+  font-style: italic;
+}
+
+.light .hljs-meta,
+.light .hljs-meta .hljs-keyword,
+[data-theme="light"] .hljs-meta,
+[data-theme="light"] .hljs-meta .hljs-keyword {
+  color: oklch(0.48 0.18 25);
+}
+
+.light .hljs-deletion,
+[data-theme="light"] .hljs-deletion {
+  color: oklch(0.48 0.20 25);
+  background: oklch(0.92 0.04 25);
+}
+
+.light .hljs-addition,
+[data-theme="light"] .hljs-addition {
+  color: oklch(0.40 0.17 150);
+  background: oklch(0.92 0.04 150);
+}
+
+.light .hljs-title.class_,
+.light .hljs-title.function_,
+[data-theme="light"] .hljs-title.class_,
+[data-theme="light"] .hljs-title.function_ {
+  color: oklch(0.52 0.14 76);
+}
+
+.light .hljs-attr,
+[data-theme="light"] .hljs-attr {
+  color: oklch(0.42 0.14 200);
+}
+
+.light .hljs-property,
+[data-theme="light"] .hljs-property {
+  color: oklch(0.45 0.08 200);
+}
+
+/* Respect reduced motion preference for all animations */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Visible focus indicator for programmatically focusable containers */
+.focus-visible-ring:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+  border-radius: 0.5rem;
 }

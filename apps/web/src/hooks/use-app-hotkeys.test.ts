@@ -4,15 +4,21 @@ vi.mock('react-hotkeys-hook', () => ({
   useHotkeys: vi.fn(),
 }));
 
+vi.mock('../stores', () => ({
+  useUIStore: vi.fn(() => false),
+}));
+
 import { renderHook } from '@testing-library/react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { HOTKEYS } from '../constants/hotkeys';
+import { useUIStore } from '../stores';
 import { useAppHotkeys } from './use-app-hotkeys';
 
 const mockUseHotkeys = vi.mocked(useHotkeys);
+const mockUseUIStore = vi.mocked(useUIStore);
 
 const GLOBAL_OPTIONS = { preventDefault: true, enableOnFormTags: true };
-const NON_INPUT_OPTIONS = { preventDefault: true, enableOnFormTags: false };
+const NON_INPUT_OPTIONS = { preventDefault: true, enableOnFormTags: false, enabled: true };
 
 function defaultCallbacks() {
   return {
@@ -159,6 +165,29 @@ describe('useAppHotkeys', () => {
       expect(call).toBeDefined();
       expect(call?.[1]).toBe(cbs.onShowShortcuts);
       expect(call?.[2]).toEqual(NON_INPUT_OPTIONS);
+    });
+  });
+
+  describe('overlay guard', () => {
+    it('disables non-input hotkeys when an overlay is open', () => {
+      mockUseUIStore.mockImplementation(() => true as ReturnType<typeof useUIStore>);
+      const cbs = defaultCallbacks();
+      renderHook(() => useAppHotkeys(cbs));
+
+      const disabledOpts = { preventDefault: true, enableOnFormTags: false, enabled: false };
+
+      expect(findCall(HOTKEYS.newTask.key)?.[2]).toEqual(disabledOpts);
+      expect(findCall(HOTKEYS.navigateNext.key)?.[2]).toEqual(disabledOpts);
+      expect(findCall(HOTKEYS.navigatePrev.key)?.[2]).toEqual(disabledOpts);
+      expect(findCall(HOTKEYS.focusComposer.key)?.[2]).toEqual(disabledOpts);
+      expect(findCall(HOTKEYS.focusComposerAlt.key)?.[2]).toEqual(disabledOpts);
+      expect(findCall(HOTKEYS.showShortcutsAlt.key)?.[2]).toEqual(disabledOpts);
+
+      expect(findCall(HOTKEYS.toggleTerminal.key)?.[2]).toEqual(GLOBAL_OPTIONS);
+      expect(findCall(HOTKEYS.commandPalette.key)?.[2]).toEqual(GLOBAL_OPTIONS);
+      expect(findCall(HOTKEYS.showShortcuts.key)?.[2]).toEqual(GLOBAL_OPTIONS);
+
+      mockUseUIStore.mockImplementation(() => false as ReturnType<typeof useUIStore>);
     });
   });
 });

@@ -11,27 +11,11 @@ import {
 } from 'lucide-react';
 import { useCallback } from 'react';
 import { HOTKEYS } from '../constants/hotkeys';
-import { useMessageStore, useTaskStore, useUIStore } from '../stores';
-import type { TaskData } from '../stores/types';
-
-function statusDotColor(agent: TaskData['agent']): string {
-  if (!agent) return 'bg-muted/40';
-  switch (agent.state) {
-    case 'running':
-      return 'bg-warning motion-safe:animate-pulse';
-    case 'idle':
-      return 'bg-success';
-    case 'error':
-      return 'bg-danger';
-    default: {
-      const _exhaustive: never = agent.state;
-      return _exhaustive;
-    }
-  }
-}
+import { useTaskStore, useUIStore } from '../stores';
+import { statusDotColor } from '../utils/task-status';
 
 const ITEM_CLASS =
-  'flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer text-sm font-normal text-foreground/80 data-[selected=true]:bg-default/40 data-[selected=true]:text-foreground transition-colors';
+  'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-normal text-foreground/80 data-[selected=true]:bg-default/40 data-[selected=true]:text-foreground transition-colors';
 
 const GROUP_HEADING_CLASS =
   '[&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:pt-2 [&_[cmdk-group-heading]]:pb-1 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-muted/60';
@@ -55,9 +39,7 @@ export function CommandPalette() {
   );
 
   const handleNewTask = useCallback(() => {
-    const id = useTaskStore.getState().createTask('New task');
-    useTaskStore.getState().setActiveTask(id);
-    useMessageStore.getState().clearMessages(id);
+    useTaskStore.getState().createAndActivateTask('New task');
     close();
   }, [close]);
 
@@ -95,7 +77,7 @@ export function CommandPalette() {
       overlayClassName="fixed inset-0 bg-black/60"
       contentClassName="fixed top-[20%] left-1/2 -translate-x-1/2 w-full max-w-lg"
     >
-      <div className="bg-surface border border-hull rounded-2xl shadow-2xl overflow-hidden">
+      <div className="bg-surface border border-separator rounded-xl overflow-hidden">
         <div className="flex items-center gap-2.5 px-4 border-b border-separator">
           <Search className="w-4 h-4 text-muted/60 shrink-0" aria-hidden="true" />
           <Command.Input
@@ -132,7 +114,7 @@ export function CommandPalette() {
 
           <Command.Group heading="Actions" className={GROUP_HEADING_CLASS}>
             <Command.Item value="New Task" onSelect={handleNewTask} className={ITEM_CLASS}>
-              <Plus className="w-4 h-4 text-muted shrink-0" />
+              <Plus className="w-4 h-4 text-muted shrink-0" aria-hidden="true" />
               <span className="flex-1">New Task</span>
               <Kbd>{HOTKEYS.newTask.display}</Kbd>
             </Command.Item>
@@ -142,7 +124,7 @@ export function CommandPalette() {
               onSelect={handleToggleTerminal}
               className={ITEM_CLASS}
             >
-              <Terminal className="w-4 h-4 text-muted shrink-0" />
+              <Terminal className="w-4 h-4 text-muted shrink-0" aria-hidden="true" />
               <span className="flex-1">Toggle Terminal</span>
               <Kbd>{HOTKEYS.toggleTerminal.display}</Kbd>
             </Command.Item>
@@ -152,7 +134,7 @@ export function CommandPalette() {
               onSelect={handleToggleDiff}
               className={ITEM_CLASS}
             >
-              <GitCompareArrows className="w-4 h-4 text-muted shrink-0" />
+              <GitCompareArrows className="w-4 h-4 text-muted shrink-0" aria-hidden="true" />
               <span className="flex-1">Toggle Diff Panel</span>
               <Kbd>{HOTKEYS.toggleDiff.display}</Kbd>
             </Command.Item>
@@ -162,13 +144,13 @@ export function CommandPalette() {
               onSelect={handleToggleSidebar}
               className={ITEM_CLASS}
             >
-              <PanelLeftClose className="w-4 h-4 text-muted shrink-0" />
+              <PanelLeftClose className="w-4 h-4 text-muted shrink-0" aria-hidden="true" />
               <span className="flex-1">Toggle Sidebar</span>
               <Kbd>{HOTKEYS.toggleSidebar.display}</Kbd>
             </Command.Item>
 
             <Command.Item value="Settings" onSelect={handleOpenSettings} className={ITEM_CLASS}>
-              <Settings className="w-4 h-4 text-muted shrink-0" />
+              <Settings className="w-4 h-4 text-muted shrink-0" aria-hidden="true" />
               <span className="flex-1">Settings</span>
               <Kbd>{HOTKEYS.settings.display}</Kbd>
             </Command.Item>
@@ -178,7 +160,7 @@ export function CommandPalette() {
               onSelect={handleShowShortcuts}
               className={ITEM_CLASS}
             >
-              <Keyboard className="w-4 h-4 text-muted shrink-0" />
+              <Keyboard className="w-4 h-4 text-muted shrink-0" aria-hidden="true" />
               <span className="flex-1">Keyboard Shortcuts</span>
               <Kbd>{HOTKEYS.showShortcutsAlt.display}</Kbd>
             </Command.Item>

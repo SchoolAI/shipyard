@@ -46,7 +46,7 @@ export function SlashCommandMenu({
 
   return (
     <div ref={menuRef} className="absolute bottom-full left-0 right-0 mb-2 z-50">
-      <div className="bg-surface border border-hull rounded-xl shadow-2xl overflow-hidden max-h-64">
+      <div className="bg-surface border border-separator rounded-xl shadow-2xl overflow-hidden max-h-64">
         <div className="px-3 py-2 border-b border-separator shrink-0">
           <span className="text-xs text-muted">Commands</span>
         </div>

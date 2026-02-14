@@ -10,5 +10,5 @@ export type {
   TaskData,
   TaskStatus,
 } from './types';
-export type { UIStore } from './ui-store';
+export type { Theme, UIStore } from './ui-store';
 export { useUIStore } from './ui-store';

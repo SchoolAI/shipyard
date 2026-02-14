@@ -34,7 +34,7 @@ export function ReasoningEffort({ level, onLevelChange, supportedEfforts }: Reas
         className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs text-muted cursor-default"
         isDisabled
       >
-        <Brain className="w-3 h-3" />
+        <Brain className="w-3 h-3" aria-hidden="true" />
         Thinking
       </Button>
     );
@@ -48,9 +48,9 @@ export function ReasoningEffort({ level, onLevelChange, supportedEfforts }: Reas
         aria-label={`Reasoning effort: ${currentLabel}`}
         className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs text-muted hover:text-foreground hover:bg-default transition-colors"
       >
-        <Brain className="w-3 h-3" />
+        <Brain className="w-3 h-3" aria-hidden="true" />
         {currentLabel}
-        <ChevronDown className="w-3 h-3" />
+        <ChevronDown className="w-3 h-3" aria-hidden="true" />
       </Button>
       <Dropdown.Popover placement="top start" className="min-w-[140px]">
         <Dropdown.Menu

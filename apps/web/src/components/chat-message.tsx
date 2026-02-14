@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import rehypeHighlight from 'rehype-highlight';
 import remarkGfm from 'remark-gfm';
+import { assertNever } from '../utils/assert-never';
 
 export type MessageRole = 'user' | 'agent';
 
@@ -21,10 +22,20 @@ interface ChatMessageProps {
 
 function ThinkingDots() {
   return (
-    <span className="inline-flex items-center gap-1">
-      <span className="w-1.5 h-1.5 bg-muted rounded-full animate-bounce [animation-delay:0ms]" />
-      <span className="w-1.5 h-1.5 bg-muted rounded-full animate-bounce [animation-delay:150ms]" />
-      <span className="w-1.5 h-1.5 bg-muted rounded-full animate-bounce [animation-delay:300ms]" />
+    <span className="inline-flex items-center gap-1" role="status">
+      <span className="sr-only">Agent is thinking</span>
+      <span
+        className="w-1.5 h-1.5 bg-muted rounded-full motion-safe:animate-bounce [animation-delay:0ms]"
+        aria-hidden="true"
+      />
+      <span
+        className="w-1.5 h-1.5 bg-muted rounded-full motion-safe:animate-bounce [animation-delay:150ms]"
+        aria-hidden="true"
+      />
+      <span
+        className="w-1.5 h-1.5 bg-muted rounded-full motion-safe:animate-bounce [animation-delay:300ms]"
+        aria-hidden="true"
+      />
     </span>
   );
 }
@@ -39,11 +50,14 @@ function CopyButton({ code }: { code: string }) {
   }, []);
 
   const handleCopy = useCallback(() => {
-    navigator.clipboard.writeText(code).then(() => {
-      setCopied(true);
-      clearTimeout(timerRef.current);
-      timerRef.current = setTimeout(() => setCopied(false), 2000);
-    });
+    navigator.clipboard.writeText(code).then(
+      () => {
+        setCopied(true);
+        clearTimeout(timerRef.current);
+        timerRef.current = setTimeout(() => setCopied(false), 2000);
+      },
+      () => {}
+    );
   }, [code]);
 
   return (
@@ -54,7 +68,7 @@ function CopyButton({ code }: { code: string }) {
           variant="ghost"
           size="sm"
           aria-label={copied ? 'Copied' : 'Copy code'}
-          className="absolute top-2 right-2 rounded-md w-7 h-7 min-w-0 text-muted hover:text-foreground hover:bg-default/60 opacity-0 group-hover:opacity-100 transition-opacity"
+          className="absolute top-2 right-2 rounded-md w-7 h-7 min-w-0 text-muted hover:text-foreground hover:bg-default/60 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 motion-safe:transition-opacity"
           onPress={handleCopy}
         >
           {copied ? (
@@ -102,7 +116,7 @@ const markdownComponents: ComponentPropsWithoutRef<typeof ReactMarkdown>['compon
     return (
       <div className="group relative my-3">
         <pre
-          className="bg-[oklch(0.12_0.02_250)] rounded-lg p-4 overflow-x-auto text-sm leading-relaxed border border-separator/50"
+          className="bg-[var(--color-code-block)] rounded-lg p-4 overflow-x-auto text-sm leading-relaxed border border-separator/50"
           {...rest}
         >
           {children}
@@ -290,6 +304,7 @@ function AgentMessage({ message }: ChatMessageProps) {
       </Avatar>
 
       <div className="flex-1 min-w-0">
+        <span className="sr-only">Agent:</span>
         {message.isThinking ? (
           <div className="py-2">
             <ThinkingDots />
@@ -313,17 +328,14 @@ function AgentMessage({ message }: ChatMessageProps) {
 function UserMessage({ message }: ChatMessageProps) {
   return (
     <div className="flex justify-end max-w-3xl ml-auto">
-      <div className="bg-default rounded-2xl px-4 py-2.5 max-w-[80%]">
+      <div className="bg-default rounded-xl px-4 py-2.5 max-w-[80%]">
+        <span className="sr-only">You:</span>
         <div className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">
           {message.content}
         </div>
       </div>
     </div>
   );
-}
-
-function assertNever(value: never): never {
-  throw new Error(`Unexpected message role: ${String(value)}`);
 }
 
 export function ChatMessage({ message }: ChatMessageProps) {

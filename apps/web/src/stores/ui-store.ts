@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
 
+export type Theme = 'dark' | 'light' | 'system';
+
 export interface UIStore {
   isSidebarExpanded: boolean;
   isTerminalOpen: boolean;
@@ -10,6 +12,7 @@ export interface UIStore {
   isShortcutsModalOpen: boolean;
   selectedMachineId: string | null;
   selectedEnvironmentPath: string | null;
+  theme: Theme;
 
   toggleSidebar: () => void;
   setSidebarExpanded: (expanded: boolean) => void;
@@ -18,12 +21,14 @@ export interface UIStore {
   toggleDiff: () => void;
   setDiffOpen: (open: boolean) => void;
   setSettingsOpen: (open: boolean) => void;
+  toggleSettings: () => void;
   setCommandPaletteOpen: (open: boolean) => void;
   toggleCommandPalette: () => void;
   setShortcutsModalOpen: (open: boolean) => void;
   toggleShortcutsModal: () => void;
   setSelectedMachineId: (id: string | null) => void;
   setSelectedEnvironmentPath: (path: string | null) => void;
+  setTheme: (theme: Theme) => void;
 }
 
 export const useUIStore = create<UIStore>()(
@@ -38,6 +43,7 @@ export const useUIStore = create<UIStore>()(
         isShortcutsModalOpen: false,
         selectedMachineId: null,
         selectedEnvironmentPath: null,
+        theme: 'dark',
 
         toggleSidebar: () =>
           set(
@@ -65,6 +71,13 @@ export const useUIStore = create<UIStore>()(
 
         setSettingsOpen: (open) => set({ isSettingsOpen: open }, undefined, 'ui/setSettingsOpen'),
 
+        toggleSettings: () =>
+          set(
+            (state) => ({ isSettingsOpen: !state.isSettingsOpen }),
+            undefined,
+            'ui/toggleSettings'
+          ),
+
         setCommandPaletteOpen: (open) =>
           set({ isCommandPaletteOpen: open }, undefined, 'ui/setCommandPaletteOpen'),
 
@@ -90,13 +103,17 @@ export const useUIStore = create<UIStore>()(
 
         setSelectedEnvironmentPath: (path) =>
           set({ selectedEnvironmentPath: path }, undefined, 'ui/setSelectedEnvironmentPath'),
+
+        setTheme: (theme) => set({ theme }, undefined, 'ui/setTheme'),
       }),
       {
         name: 'shipyard-ui',
+        version: 1,
         partialize: (state) => ({
           isSidebarExpanded: state.isSidebarExpanded,
           selectedMachineId: state.selectedMachineId,
           selectedEnvironmentPath: state.selectedEnvironmentPath,
+          theme: state.theme,
         }),
       }
     ),

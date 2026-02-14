@@ -14,7 +14,8 @@ export function PlanModeToggle({ isActive, onToggle }: PlanModeToggleProps) {
           isIconOnly
           variant="ghost"
           size="sm"
-          aria-label="Toggle plan mode"
+          aria-label={isActive ? 'Disable plan mode' : 'Enable plan mode'}
+          aria-pressed={isActive}
           onPress={onToggle}
           className={`rounded-lg w-7 h-7 min-w-0 transition-colors ${
             isActive

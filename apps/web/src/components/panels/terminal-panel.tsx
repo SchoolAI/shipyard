@@ -25,13 +25,17 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
 
     return (
       <div
-        className={`shrink-0 border-t border-separator bg-background transition-[height] duration-300 ease-in-out overflow-hidden ${
+        role="region"
+        aria-label="Terminal"
+        aria-hidden={!isOpen}
+        inert={!isOpen || undefined}
+        className={`shrink-0 border-t border-separator bg-background motion-safe:transition-[height] motion-safe:duration-300 ease-in-out overflow-hidden ${
           isOpen ? 'h-[40dvh]' : 'h-0'
         }`}
       >
         <div className="flex items-center justify-between px-4 py-2 border-b border-separator/50">
           <div className="flex items-center gap-2 text-xs text-muted font-medium">
-            <Terminal className="w-3.5 h-3.5" />
+            <Terminal className="w-3.5 h-3.5" aria-hidden="true" />
             Terminal
           </div>
           <Button
@@ -40,7 +44,7 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
             size="sm"
             aria-label="Close terminal"
             onPress={onClose}
-            className="text-muted hover:text-foreground hover:bg-default w-6 h-6 min-w-0"
+            className="text-muted hover:text-foreground hover:bg-default w-8 h-8 min-w-0"
           >
             <X className="w-3.5 h-3.5" />
           </Button>
@@ -48,14 +52,14 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
         <div
           ref={contentRef}
           role="region"
-          aria-label="Terminal content"
+          aria-label="Terminal output"
           tabIndex={isOpen ? 0 : -1}
           onKeyDown={(e) => {
             if (e.key === 'Escape') {
               onClose();
             }
           }}
-          className="flex items-center justify-center h-[calc(100%-37px)] text-sm text-muted outline-none"
+          className="flex items-center justify-center h-[calc(100%-37px)] text-sm text-muted focus-visible-ring"
         >
           Terminal will appear here
         </div>

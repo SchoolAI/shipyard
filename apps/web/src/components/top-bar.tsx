@@ -15,11 +15,13 @@ export function TopBar({ onToggleTerminal, onToggleDiff }: TopBarProps) {
   const activeTask = activeTaskId ? tasks.find((t) => t.id === activeTaskId) : undefined;
 
   return (
-    <div className="flex items-center justify-between px-4 py-2 border-b border-separator/50">
+    <header className="flex items-center justify-between px-4 py-2 border-b border-separator/50 h-12">
       <div className="flex items-center gap-2 min-w-0">
         <MobileSidebarToggle />
-        {activeTask && (
-          <span className="text-sm text-foreground font-medium truncate">{activeTask.title}</span>
+        {activeTask ? (
+          <h1 className="text-sm text-foreground font-medium truncate">{activeTask.title}</h1>
+        ) : (
+          <span className="text-sm text-muted truncate">Shipyard</span>
         )}
       </div>
 
@@ -65,6 +67,6 @@ export function TopBar({ onToggleTerminal, onToggleDiff }: TopBarProps) {
           </Tooltip.Content>
         </Tooltip>
       </div>
-    </div>
+    </header>
   );
 }

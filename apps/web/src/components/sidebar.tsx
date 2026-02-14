@@ -2,8 +2,10 @@ import { Button, Kbd, Tooltip } from '@heroui/react';
 import { Menu, PanelLeftClose, PanelLeftOpen, Plus, Settings } from 'lucide-react';
 import { useCallback } from 'react';
 import { HOTKEYS } from '../constants/hotkeys';
-import { useMessageStore, useTaskStore, useUIStore } from '../stores';
-import type { AgentState, TaskData } from '../stores/types';
+import { useTaskStore, useUIStore } from '../stores';
+import type { TaskData } from '../stores/types';
+import { statusDotColor } from '../utils/task-status';
+import { ThemeToggle } from './theme-toggle';
 
 function relativeTime(timestamp: number): string {
   const seconds = Math.floor((Date.now() - timestamp) / 1000);
@@ -16,35 +18,9 @@ function relativeTime(timestamp: number): string {
   return `${days}d`;
 }
 
-function assertNever(value: never): never {
-  throw new Error(`Unexpected agent state: ${String(value)}`);
-}
-
-function statusDotColor(agent: TaskData['agent']): string {
-  if (!agent) return 'bg-muted/40';
-  switch (agent.state) {
-    case 'running':
-      return 'bg-warning motion-safe:animate-pulse';
-    case 'idle':
-      return 'bg-success';
-    case 'error':
-      return 'bg-danger';
-    default:
-      return assertNever(agent.state);
-  }
-}
-
-function agentStateLabel(state: AgentState): string {
-  switch (state) {
-    case 'running':
-      return 'running';
-    case 'idle':
-      return 'idle';
-    case 'error':
-      return 'error';
-    default:
-      return assertNever(state);
-  }
+function statusDotTitle(agent: TaskData['agent']): string {
+  if (!agent) return 'No agent';
+  return agent.state;
 }
 
 function TaskItem({
@@ -59,7 +35,8 @@ function TaskItem({
   onSelect: () => void;
 }) {
   const dotClass = statusDotColor(task.agent);
-  const stateLabel = task.agent ? `, ${agentStateLabel(task.agent.state)}` : '';
+  const dotTitle = statusDotTitle(task.agent);
+  const stateLabel = task.agent ? `, ${task.agent.state}` : '';
 
   if (!isExpanded) {
     return (
@@ -75,7 +52,11 @@ function TaskItem({
             }`}
             onClick={onSelect}
           >
-            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dotClass}`} aria-hidden="true" />
+            <span
+              className={`w-1.5 h-1.5 rounded-full shrink-0 ${dotClass}`}
+              aria-hidden="true"
+              title={dotTitle}
+            />
           </button>
         </Tooltip.Trigger>
         <Tooltip.Content placement="right">
@@ -98,7 +79,11 @@ function TaskItem({
       }`}
       onClick={onSelect}
     >
-      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dotClass}`} aria-hidden="true" />
+      <span
+        className={`w-1.5 h-1.5 rounded-full shrink-0 ${dotClass}`}
+        aria-hidden="true"
+        title={dotTitle}
+      />
       <span className="text-sm truncate flex-1 min-w-0">{task.title}</span>
       <span className="text-xs text-muted/60 shrink-0">{relativeTime(task.updatedAt)}</span>
     </button>
@@ -118,20 +103,18 @@ export function Sidebar() {
   const tasks = useTaskStore((s) => s.tasks);
   const activeTaskId = useTaskStore((s) => s.activeTaskId);
   const setActiveTask = useTaskStore((s) => s.setActiveTask);
-  const createTask = useTaskStore((s) => s.createTask);
+  const createAndActivateTask = useTaskStore((s) => s.createAndActivateTask);
   const isExpanded = useUIStore((s) => s.isSidebarExpanded);
   const toggleSidebar = useUIStore((s) => s.toggleSidebar);
 
   const handleNewTask = useCallback(() => {
-    const id = createTask('New task');
-    setActiveTask(id);
-    useMessageStore.getState().clearMessages(id);
-  }, [createTask, setActiveTask]);
+    createAndActivateTask('New task');
+  }, [createAndActivateTask]);
 
   return (
     <nav
       aria-label="Task navigation"
-      className={`hidden md:flex flex-col border-r border-separator bg-background shrink-0 transition-[width] duration-300 ease-in-out overflow-hidden ${
+      className={`hidden md:flex flex-col border-r border-separator bg-background shrink-0 motion-safe:transition-[width] motion-safe:duration-300 ease-in-out overflow-hidden ${
         isExpanded ? 'w-[260px]' : 'w-12'
       }`}
     >
@@ -203,7 +186,7 @@ export function Sidebar() {
                   className="flex items-center gap-2.5 w-full px-2.5 py-2 rounded-lg text-left text-sm text-muted hover:text-foreground hover:bg-default/30 transition-colors"
                   onClick={handleNewTask}
                 >
-                  <Plus className="w-4 h-4" />
+                  <Plus className="w-4 h-4" aria-hidden="true" />
                   New task
                 </button>
               </Tooltip.Trigger>
@@ -264,49 +247,55 @@ export function Sidebar() {
           )}
         </div>
 
-        {/* Settings -- pinned to bottom, separated by whitespace only */}
+        {/* Settings + Theme toggle -- pinned to bottom */}
         <div className="mt-auto shrink-0 p-2">
           {isExpanded ? (
-            <Tooltip>
-              <Tooltip.Trigger>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="w-full justify-start text-muted hover:text-foreground gap-2"
-                  onPress={() => useUIStore.getState().setSettingsOpen(true)}
-                >
-                  <Settings className="w-4 h-4" />
-                  Settings
-                </Button>
-              </Tooltip.Trigger>
-              <Tooltip.Content>
-                <span className="flex items-center gap-2">
-                  Settings
-                  <Kbd>{HOTKEYS.settings.display}</Kbd>
-                </span>
-              </Tooltip.Content>
-            </Tooltip>
+            <div className="flex items-center gap-1">
+              <Tooltip>
+                <Tooltip.Trigger>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="flex-1 justify-start text-muted hover:text-foreground gap-2"
+                    onPress={() => useUIStore.getState().setSettingsOpen(true)}
+                  >
+                    <Settings className="w-4 h-4" />
+                    Settings
+                  </Button>
+                </Tooltip.Trigger>
+                <Tooltip.Content>
+                  <span className="flex items-center gap-2">
+                    Settings
+                    <Kbd>{HOTKEYS.settings.display}</Kbd>
+                  </span>
+                </Tooltip.Content>
+              </Tooltip>
+              <ThemeToggle />
+            </div>
           ) : (
-            <Tooltip>
-              <Tooltip.Trigger>
-                <Button
-                  isIconOnly
-                  variant="ghost"
-                  size="sm"
-                  aria-label="Settings"
-                  className="text-muted hover:text-foreground hover:bg-default/50 w-8 h-8 min-w-0"
-                  onPress={() => useUIStore.getState().setSettingsOpen(true)}
-                >
-                  <Settings className="w-4 h-4" />
-                </Button>
-              </Tooltip.Trigger>
-              <Tooltip.Content placement="right">
-                <span className="flex items-center gap-2">
-                  Settings
-                  <Kbd>{HOTKEYS.settings.display}</Kbd>
-                </span>
-              </Tooltip.Content>
-            </Tooltip>
+            <div className="flex flex-col items-center gap-1">
+              <Tooltip>
+                <Tooltip.Trigger>
+                  <Button
+                    isIconOnly
+                    variant="ghost"
+                    size="sm"
+                    aria-label="Settings"
+                    className="text-muted hover:text-foreground hover:bg-default/50 w-8 h-8 min-w-0"
+                    onPress={() => useUIStore.getState().setSettingsOpen(true)}
+                  >
+                    <Settings className="w-4 h-4" />
+                  </Button>
+                </Tooltip.Trigger>
+                <Tooltip.Content placement="right">
+                  <span className="flex items-center gap-2">
+                    Settings
+                    <Kbd>{HOTKEYS.settings.display}</Kbd>
+                  </span>
+                </Tooltip.Content>
+              </Tooltip>
+              <ThemeToggle />
+            </div>
           )}
         </div>
       </div>
