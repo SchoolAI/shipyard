@@ -348,7 +348,7 @@ export function ChatPage() {
       <CommandPalette />
       <ShortcutsModal />
       <Sidebar />
-      <div className="flex flex-col flex-1 min-w-0" tabIndex={-1}>
+      <div className="flex flex-col flex-1 min-w-0 min-h-0" tabIndex={-1}>
         <TopBar onToggleTerminal={toggleTerminal} onToggleDiff={toggleDiff} />
 
         <main id="main-content" className="flex flex-col flex-1 min-h-0">
@@ -360,7 +360,7 @@ export function ChatPage() {
               {hasMessages ? (
                 <div
                   ref={scrollRef}
-                  className="flex-1 overflow-y-auto"
+                  className="flex-1 min-h-0 overflow-y-auto"
                   role="log"
                   aria-label="Chat messages"
                   aria-relevant="additions"
