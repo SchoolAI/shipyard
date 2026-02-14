@@ -158,6 +158,7 @@ export const PermissionRequestEphemeral = Shape.plain.struct({
  */
 export const PermissionResponseEphemeral = Shape.plain.struct({
   decision: Shape.plain.string(...PERMISSION_DECISIONS),
+  persist: Shape.plain.boolean(),
   message: Shape.plain.string().nullable(),
   decidedAt: Shape.plain.number(),
 });

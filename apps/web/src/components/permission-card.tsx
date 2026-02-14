@@ -11,7 +11,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 interface PermissionCardProps {
   toolUseId: string;
   request: PermissionRequest;
-  onRespond: (toolUseId: string, decision: PermissionDecision, message?: string) => void;
+  onRespond: (toolUseId: string, decision: PermissionDecision, opts?: { persist?: boolean; message?: string }) => void;
 }
 
 const RISK_BORDER_CLASS: Record<ToolRiskLevel, string> = {

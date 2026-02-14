@@ -575,7 +575,10 @@ function buildCanUseTool(
         );
 
         if (value.decision === 'approved') {
-          resolve({ behavior: 'allow', updatedPermissions: suggestions });
+          resolve({
+            behavior: 'allow',
+            updatedPermissions: value.persist ? suggestions : undefined,
+          });
         } else {
           resolve({
             behavior: 'deny',
