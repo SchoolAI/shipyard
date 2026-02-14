@@ -517,7 +517,7 @@ function buildCanUseTool(
   taskLog: ReturnType<typeof createChildLogger>
 ): CanUseTool {
   return async (toolName, input, options) => {
-    const { signal, toolUseID, blockedPath, decisionReason, agentID } = options;
+    const { signal, toolUseID, blockedPath, decisionReason, agentID, suggestions } = options;
 
     if (signal.aborted) {
       return { behavior: 'deny', message: 'Task was aborted' };
@@ -575,7 +575,7 @@ function buildCanUseTool(
         );
 
         if (value.decision === 'approved') {
-          resolve({ behavior: 'allow' });
+          resolve({ behavior: 'allow', updatedPermissions: suggestions });
         } else {
           resolve({
             behavior: 'deny',
