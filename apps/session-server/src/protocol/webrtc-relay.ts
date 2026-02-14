@@ -5,12 +5,12 @@
 /**
  * Find WebSocket by machine ID (for PersonalRoom).
  */
-export function findWebSocketByMachineId<T extends { machineId?: string }>(
+export function findWebSocketByMachineId<T extends { id?: string; machineId?: string }>(
   connections: Map<WebSocket, T>,
   targetMachineId: string
 ): WebSocket | null {
   for (const [ws, state] of connections) {
-    if (state.machineId === targetMachineId) {
+    if (state.machineId === targetMachineId || state.id === targetMachineId) {
       return ws;
     }
   }

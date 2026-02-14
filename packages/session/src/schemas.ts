@@ -369,6 +369,17 @@ export const UpdateCapabilitiesSchema = z.object({
 });
 
 /**
+ * Spawn result message schema for personal room WebSocket.
+ */
+export const SpawnResultSchema = z.object({
+  type: z.literal('spawn-result'),
+  requestId: z.string(),
+  taskId: z.string(),
+  success: z.boolean(),
+  error: z.string().optional(),
+});
+
+/**
  * Union of all client-to-server messages for personal room WebSocket.
  */
 export const PersonalRoomClientMessageSchema = z.discriminatedUnion('type', [
@@ -379,6 +390,7 @@ export const PersonalRoomClientMessageSchema = z.discriminatedUnion('type', [
   WebRTCAnswerSchema,
   WebRTCIceSchema,
   SpawnAgentSchema,
+  SpawnResultSchema,
   UpdateCapabilitiesSchema,
 ]);
 
@@ -443,17 +455,6 @@ export const AgentStatusChangedSchema = z.object({
 });
 
 /**
- * Spawn result message schema for personal room WebSocket.
- */
-export const SpawnResultSchema = z.object({
-  type: z.literal('spawn-result'),
-  requestId: z.string(),
-  taskId: z.string(),
-  success: z.boolean(),
-  error: z.string().optional(),
-});
-
-/**
  * Error message schema for WebSocket connections.
  */
 export const ErrorMessageSchema = z.object({
@@ -482,6 +483,7 @@ export const PersonalRoomServerMessageSchema = z.discriminatedUnion('type', [
   AgentLeftSchema,
   AgentStatusChangedSchema,
   AgentCapabilitiesChangedSchema,
+  SpawnAgentSchema,
   SpawnResultSchema,
   ErrorMessageSchema,
   WebRTCOfferSchema,

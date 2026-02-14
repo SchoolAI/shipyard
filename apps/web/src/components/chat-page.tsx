@@ -1,3 +1,4 @@
+import { generateTaskId } from '@shipyard/loro-schema';
 import type { PermissionMode } from '@shipyard/session';
 import { ChevronDown } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -118,7 +119,7 @@ export function ChatPage() {
     const url = import.meta.env.VITE_PERSONAL_ROOM_URL;
     return typeof url === 'string' && url.length > 0 ? { url } : null;
   }, []);
-  const { agents, connectionState } = usePersonalRoom(personalRoomConfig);
+  const { agents, connectionState, connection } = usePersonalRoom(personalRoomConfig);
   const {
     machines,
     selectedMachineId,
@@ -253,15 +254,28 @@ export function ChatPage() {
         isThinking: true,
       });
 
-      demoTimerRef.current = setTimeout(() => {
-        useMessageStore.getState().updateMessage(activeTaskId, thinkingId, {
-          isThinking: false,
-          content:
-            "I received your message. This is a static demo, so I can't actually process requests yet. Once connected to the agent backend, I'll be able to help with real tasks.",
+      if (connection && selectedMachineId) {
+        const taskId = generateTaskId();
+        const requestId = crypto.randomUUID();
+        connection.send({
+          type: 'spawn-agent',
+          requestId,
+          machineId: selectedMachineId,
+          taskId,
+          prompt: content,
+          cwd: selectedEnvironmentPath ?? undefined,
         });
-      }, 2000);
+      } else {
+        demoTimerRef.current = setTimeout(() => {
+          useMessageStore.getState().updateMessage(activeTaskId, thinkingId, {
+            isThinking: false,
+            content:
+              'No machine connected. Select a machine and ensure the connection is active to send tasks to an agent.',
+          });
+        }, 500);
+      }
     },
-    [activeTaskId]
+    [activeTaskId, connection, selectedMachineId, selectedEnvironmentPath]
   );
 
   const handleClearChat = useCallback(() => {
@@ -310,6 +324,8 @@ export function ChatPage() {
                   onSubmit={handleSubmit}
                   onClearChat={handleClearChat}
                   availableModels={availableModels}
+                  availableEnvironments={availableEnvironments}
+                  onEnvironmentSelect={setSelectedEnvironmentPath}
                 />
                 <StatusBar
                   connectionState={connectionState}

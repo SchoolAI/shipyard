@@ -16,15 +16,18 @@ interface PersonalRoomConfig {
 export function usePersonalRoom(config: PersonalRoomConfig | null) {
   const [agents, setAgents] = useState<AgentInfo[]>([]);
   const [connectionState, setConnectionState] = useState<ConnectionState>('disconnected');
+  const [connection, setConnection] = useState<PersonalRoomConnection | null>(null);
 
   useEffect(() => {
     if (!config) {
       setAgents([]);
       setConnectionState('disconnected');
+      setConnection(null);
       return;
     }
 
     const conn = new PersonalRoomConnection({ url: config.url });
+    setConnection(conn);
 
     const unsubMessage = conn.onMessage((msg: PersonalRoomServerMessage) => {
       switch (msg.type) {
@@ -58,6 +61,7 @@ export function usePersonalRoom(config: PersonalRoomConfig | null) {
         case 'error':
           break;
         case 'authenticated':
+        case 'spawn-agent':
         case 'spawn-result':
         case 'webrtc-offer':
         case 'webrtc-answer':
@@ -78,8 +82,9 @@ export function usePersonalRoom(config: PersonalRoomConfig | null) {
       unsubMessage();
       unsubState();
       conn.disconnect();
+      setConnection(null);
     };
   }, [config?.url]);
 
-  return { agents, connectionState };
+  return { agents, connectionState, connection };
 }

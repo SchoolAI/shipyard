@@ -261,6 +261,9 @@ export class PersonalRoom extends DurableObject<Env> {
       case 'spawn-agent':
         this.handleSpawnAgent(ws, state, msg);
         break;
+      case 'spawn-result':
+        this.handleSpawnResult(ws, state, msg);
+        break;
       case 'update-capabilities':
         await this.handleUpdateCapabilities(ws, state, msg);
         break;
@@ -497,6 +500,29 @@ export class PersonalRoom extends DurableObject<Env> {
       requestId: msg.requestId,
       machineId: msg.machineId,
       taskId: msg.taskId,
+    });
+  }
+
+  private handleSpawnResult(
+    ws: WebSocket,
+    state: ConnectionState,
+    msg: Extract<PersonalRoomClientMessage, { type: 'spawn-result' }>
+  ): void {
+    if (state.type !== 'agent') {
+      this.sendError(ws, 'forbidden', 'Only agent connections can send spawn results');
+      return;
+    }
+
+    for (const [connWs, connState] of this.connections) {
+      if (connState.type === 'browser') {
+        this.sendMessage(connWs, msg);
+      }
+    }
+
+    this.logger.info('Spawn result relayed to browsers', {
+      requestId: msg.requestId,
+      taskId: msg.taskId,
+      success: msg.success,
     });
   }
 

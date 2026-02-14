@@ -70,7 +70,7 @@ const COVERAGE_REQUIREMENTS: CoverageRequirement[] = [
     sourceDir: 'apps/daemon/src',
     testSuffix: '.test.ts',
     sourcePattern:
-      /^(session-manager|file-storage-adapter|lifecycle|capabilities|signaling|env)\.ts$/,
+      /^(session-manager|file-storage-adapter|lifecycle|capabilities|signaling|env|peer-manager)\.ts$/,
     description: 'Daemon Core Modules',
   },
   {

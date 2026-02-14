@@ -4,8 +4,11 @@ packages:
 
 catalog:
   # ===== loro-extended packages =====
-  "@loro-extended/change": "^5.4.1"
-  "@loro-extended/repo": "^5.4.1"
+  "@loro-extended/change": "^5.4.2"
+  "@loro-extended/repo": "^5.4.2"
+  "@loro-extended/react": "^5.4.2"
+  "@loro-extended/adapter-webrtc": "^5.4.2"
+  "@loro-extended/adapter-indexeddb": "^5.4.2"
   loro-crdt: "^1.10.3"
 
   # ===== Build tools =====

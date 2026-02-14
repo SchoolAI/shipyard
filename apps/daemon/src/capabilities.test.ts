@@ -195,7 +195,11 @@ describe('findGitRepos', () => {
 
   it('skips dot-directories at all depths', async () => {
     mockReaddir
-      .mockResolvedValueOnce([makeDirent('.cache', true), makeDirent('.nvm', true), makeDirent('visible', true)] as never)
+      .mockResolvedValueOnce([
+        makeDirent('.cache', true),
+        makeDirent('.nvm', true),
+        makeDirent('visible', true),
+      ] as never)
       .mockResolvedValueOnce([makeDirent('.git', true)] as never);
 
     const repos = await findGitRepos('/home/testuser');

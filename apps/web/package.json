@@ -15,8 +15,15 @@
   "dependencies": {
     "@heroui/react": "catalog:",
     "@heroui/styles": "catalog:",
+    "@loro-extended/adapter-indexeddb": "catalog:",
+    "@loro-extended/adapter-webrtc": "catalog:",
+    "@loro-extended/change": "catalog:",
+    "@loro-extended/react": "catalog:",
+    "@loro-extended/repo": "catalog:",
+    "@shipyard/loro-schema": "workspace:*",
     "@shipyard/session": "workspace:*",
     "cmdk": "^1.1.1",
+    "loro-crdt": "catalog:",
     "lucide-react": "^0.511.0",
     "react": "catalog:",
     "react-dom": "catalog:",
@@ -36,6 +43,7 @@
     "tailwindcss": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
+    "vite-plugin-wasm": "^3.5.0",
     "vitest": "catalog:"
   }
 }

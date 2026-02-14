@@ -22,9 +22,11 @@
     "@shipyard/loro-schema": "workspace:*",
     "@shipyard/session": "workspace:*",
     "@anthropic-ai/claude-agent-sdk": "catalog:",
+    "@loro-extended/adapter-webrtc": "catalog:",
     "@loro-extended/change": "catalog:",
     "@loro-extended/repo": "catalog:",
     "loro-crdt": "catalog:",
+    "node-datachannel": "^0.32.1",
     "pino": "catalog:",
     "nanoid": "catalog:",
     "zod": "catalog:"

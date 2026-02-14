@@ -220,4 +220,16 @@ describe('usePersonalRoom', () => {
 
     expect(result.current.connectionState).toBe('disconnected');
   });
+
+  it('exposes the connection instance when url is provided', () => {
+    const { result } = renderHook(() => usePersonalRoom({ url: 'ws://test' }));
+
+    expect(result.current.connection).toBe(mockConn);
+  });
+
+  it('returns null connection when url is null', () => {
+    const { result } = renderHook(() => usePersonalRoom(null));
+
+    expect(result.current.connection).toBeNull();
+  });
 });
