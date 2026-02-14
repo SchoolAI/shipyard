@@ -1,5 +1,5 @@
 import { Button, Tooltip } from '@heroui/react';
-import type { ModelInfo } from '@shipyard/session';
+import type { GitRepoInfo, ModelInfo } from '@shipyard/session';
 import { ArrowUp, Mic } from 'lucide-react';
 import type { KeyboardEvent } from 'react';
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
@@ -16,6 +16,8 @@ interface ChatComposerProps {
   onSubmit: (message: string) => void;
   onClearChat: () => void;
   availableModels?: ModelInfo[];
+  availableEnvironments?: GitRepoInfo[];
+  onEnvironmentSelect?: (path: string) => void;
 }
 
 export interface ChatComposerHandle {
@@ -26,7 +28,7 @@ const MAX_HEIGHT = 200;
 const MIN_HEIGHT = 24;
 
 export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(function ChatComposer(
-  { onSubmit, onClearChat, availableModels },
+  { onSubmit, onClearChat, availableModels, availableEnvironments, onEnvironmentSelect },
   ref
 ) {
   const [value, setValue] = useState('');
@@ -64,6 +66,9 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
         case 'setReasoning':
           setReasoningLevel(action.level);
           break;
+        case 'setEnvironment':
+          onEnvironmentSelect?.(action.path);
+          break;
         case 'clear':
           onClearChat();
           break;
@@ -73,7 +78,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
           assertNever(action);
       }
     },
-    [setSelectedModelId, onClearChat]
+    [setSelectedModelId, onClearChat, onEnvironmentSelect]
   );
 
   const rafRef = useRef<number>(0);
@@ -96,6 +101,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
   const slashCommands = useSlashCommands({
     onExecute: handleSlashExecute,
     onClearInput: handleClearInput,
+    environments: availableEnvironments,
   });
 
   const adjustHeight = useCallback(() => {
@@ -212,7 +218,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
                   variant="ghost"
                   size="sm"
                   aria-label="Voice input"
-                  className="rounded-full text-muted hover:text-foreground hover:bg-default w-8 h-8 min-w-0"
+                  className="rounded-full text-muted hover:text-foreground hover:bg-default w-11 h-11 sm:w-8 sm:h-8 min-w-0"
                 >
                   <Mic className="w-4 h-4" />
                 </Button>
@@ -225,7 +231,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
               size="sm"
               aria-label="Send message"
               isDisabled={isEmpty}
-              className="rounded-full w-8 h-8 min-w-0 bg-accent text-accent-foreground"
+              className="rounded-full w-11 h-11 sm:w-8 sm:h-8 min-w-0 bg-accent text-accent-foreground"
               onPress={handleSubmit}
             >
               <ArrowUp className="w-4 h-4" />

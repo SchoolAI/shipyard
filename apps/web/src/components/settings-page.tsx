@@ -31,7 +31,7 @@ export function SettingsPage({ onBack }: SettingsPageProps) {
           <button
             type="button"
             aria-label="Back to chat"
-            className="flex items-center justify-center w-8 h-8 rounded-lg text-muted hover:text-foreground hover:bg-default/30 transition-colors"
+            className="flex items-center justify-center w-11 h-11 sm:w-8 sm:h-8 rounded-lg text-muted hover:text-foreground hover:bg-default/30 transition-colors"
             onClick={onBack}
           >
             <ArrowLeft className="w-4 h-4" />

@@ -205,7 +205,7 @@ export function useResizablePanel({
     onDoubleClick: handleDoubleClick,
     style: { touchAction: 'none' } as CSSProperties,
     className: [
-      'absolute left-0 top-0 bottom-0 w-2 -translate-x-1/2 cursor-col-resize z-10',
+      'absolute left-0 top-0 bottom-0 w-2 -translate-x-1/2 cursor-col-resize z-10 max-sm:hidden',
       'before:absolute before:inset-y-0 before:left-1/2 before:-translate-x-1/2',
       'before:w-px before:bg-transparent',
       'hover:before:bg-accent focus-visible:before:bg-accent',

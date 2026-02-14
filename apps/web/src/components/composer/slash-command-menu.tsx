@@ -21,13 +21,13 @@ export function SlashCommandMenu({
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
+    function handleClickOutside(e: PointerEvent) {
       if (e.target instanceof Node && menuRef.current && !menuRef.current.contains(e.target)) {
         onClose();
       }
     }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener('pointerdown', handleClickOutside);
+    return () => document.removeEventListener('pointerdown', handleClickOutside);
   }, [onClose]);
 
   useEffect(() => {
@@ -45,7 +45,10 @@ export function SlashCommandMenu({
   };
 
   return (
-    <div ref={menuRef} className="absolute bottom-full left-0 right-0 mb-2 z-50">
+    <div
+      ref={menuRef}
+      className="absolute bottom-full left-0 right-0 mb-2 z-50 max-h-[50dvh] overflow-y-auto"
+    >
       <div className="bg-surface border border-separator rounded-xl shadow-2xl overflow-hidden max-h-64">
         <div className="px-3 py-2 border-b border-separator shrink-0">
           <span className="text-xs text-muted">Commands</span>

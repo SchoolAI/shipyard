@@ -74,14 +74,14 @@ export const DiffPanel = forwardRef<DiffPanelHandle, DiffPanelProps>(function Di
       aria-hidden={!isOpen}
       inert={!isOpen || undefined}
       style={panelStyle}
-      className={`relative shrink-0 border-l border-separator bg-background overflow-hidden h-full max-sm:!w-full max-sm:min-w-0 ${
+      className={`relative shrink-0 border-l border-separator bg-background overflow-hidden h-full max-sm:fixed max-sm:inset-0 max-sm:z-30 max-sm:w-full! max-sm:h-full! max-sm:border-l-0 ${
         isDragging ? '' : 'motion-safe:transition-[width] motion-safe:duration-300 ease-in-out'
       }`}
     >
       {/* Drag handle / separator */}
       {isOpen && <div {...separatorProps} />}
 
-      <div className="flex flex-col h-full min-w-[400px] max-sm:min-w-full">
+      <div className="flex flex-col h-full min-w-0 sm:min-w-[400px]">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-2 border-b border-separator/50">
           <span className="text-xs text-muted font-medium">Uncommitted changes</span>
@@ -91,7 +91,7 @@ export const DiffPanel = forwardRef<DiffPanelHandle, DiffPanelProps>(function Di
             size="sm"
             aria-label="Close diff panel"
             onPress={onClose}
-            className="text-muted hover:text-foreground hover:bg-default w-8 h-8 min-w-0"
+            className="text-muted hover:text-foreground hover:bg-default w-11 h-11 sm:w-8 sm:h-8 min-w-0"
           >
             <X className="w-3.5 h-3.5" />
           </Button>

@@ -1,5 +1,6 @@
+import type { GitRepoInfo } from '@shipyard/session';
 import type { LucideIcon } from 'lucide-react';
-import { Brain, Cpu, HelpCircle, ListChecks, Trash2 } from 'lucide-react';
+import { Brain, Cpu, FolderGit, HelpCircle, ListChecks, Trash2 } from 'lucide-react';
 import type { KeyboardEvent } from 'react';
 import { useCallback, useMemo, useState } from 'react';
 import type { ReasoningLevel } from '../components/composer/reasoning-effort';
@@ -9,6 +10,7 @@ export type SlashCommandAction =
   | { kind: 'toggle'; target: 'planMode' }
   | { kind: 'setModel'; modelId: string }
   | { kind: 'setReasoning'; level: ReasoningLevel }
+  | { kind: 'setEnvironment'; path: string }
   | { kind: 'clear' }
   | { kind: 'help' };
 
@@ -118,31 +120,51 @@ interface SlashCommandState {
 interface UseSlashCommandsOptions {
   onExecute: (action: SlashCommandAction) => void;
   onClearInput: () => void;
+  environments?: GitRepoInfo[];
 }
 
 export function useSlashCommands({
   onExecute,
   onClearInput,
+  environments,
 }: UseSlashCommandsOptions): SlashCommandState {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
 
+  const allCommands = useMemo(() => {
+    const envCommands: SlashCommandItem[] = (environments ?? []).map((env) => ({
+      id: `env:${env.path}`,
+      name: `${env.name} (${env.branch})`,
+      description: env.path,
+      icon: FolderGit,
+      keywords: ['env', 'environment', 'repo', env.name, env.branch, env.path],
+      action: { kind: 'setEnvironment' as const, path: env.path },
+      parentLabel: 'Environment',
+    }));
+    return [...COMMANDS, ...envCommands];
+  }, [environments]);
+
   const filteredCommands = useMemo(() => {
     if (!isOpen) return [];
-    if (!query) return COMMANDS;
+    if (!query) return allCommands;
 
-    const scored = COMMANDS.map((cmd) => {
-      const targets = [cmd.name, cmd.id, ...(cmd.parentLabel ? [cmd.parentLabel] : [])];
-      const targetScore = Math.max(...targets.map((t) => fuzzyScore(query, t)));
-      const keywordScore = Math.max(...cmd.keywords.map((kw) => fuzzyScore(query, kw)));
-      const best = Math.max(targetScore, keywordScore);
-      return { cmd, score: best };
-    }).filter((entry) => entry.score >= 0);
+    const scored = allCommands
+      .map((cmd) => {
+        const targets = [cmd.name, cmd.id, ...(cmd.parentLabel ? [cmd.parentLabel] : [])];
+        const targetScore = Math.max(-1, ...targets.map((t) => fuzzyScore(query, t)));
+        const keywordScore =
+          cmd.keywords.length > 0
+            ? Math.max(-1, ...cmd.keywords.map((kw) => fuzzyScore(query, kw)))
+            : -1;
+        const best = Math.max(targetScore, keywordScore);
+        return { cmd, score: best };
+      })
+      .filter((entry) => entry.score >= 0);
 
     scored.sort((a, b) => b.score - a.score);
     return scored.map((entry) => entry.cmd);
-  }, [isOpen, query]);
+  }, [isOpen, query, allCommands]);
 
   const close = useCallback(() => {
     setIsOpen(false);

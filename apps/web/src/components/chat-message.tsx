@@ -68,7 +68,7 @@ function CopyButton({ code }: { code: string }) {
           variant="ghost"
           size="sm"
           aria-label={copied ? 'Copied' : 'Copy code'}
-          className="absolute top-2 right-2 rounded-md w-7 h-7 min-w-0 text-muted hover:text-foreground hover:bg-default/60 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 motion-safe:transition-opacity"
+          className="absolute top-2 right-2 rounded-md w-7 h-7 min-w-0 text-muted hover:text-foreground hover:bg-default/60 sm:opacity-0 sm:group-hover:opacity-100 focus-visible:opacity-100 motion-safe:transition-opacity"
           onPress={handleCopy}
         >
           {copied ? (

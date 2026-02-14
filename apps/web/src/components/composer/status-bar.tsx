@@ -1,13 +1,14 @@
-import { Button, Chip, Dropdown, Label, ScrollShadow } from '@heroui/react';
+import { Button, Chip, Dropdown, Label, Tooltip } from '@heroui/react';
 import type {
   GitRepoInfo,
   PermissionMode,
   AgentInfo as SignalingAgentInfo,
 } from '@shipyard/session';
-import { ChevronDown, GitBranch, Globe, Monitor, Shield } from 'lucide-react';
+import { ChevronDown, GitBranch, Monitor, Shield } from 'lucide-react';
 import { useMemo } from 'react';
 import type { MachineGroup } from '../../hooks/use-machine-selection';
 import type { ConnectionState } from '../../hooks/use-personal-room';
+import { EnvironmentPicker } from './environment-picker';
 
 const PERMISSION_LABELS: Record<PermissionMode, string> = {
   default: 'Default permissions',
@@ -71,41 +72,36 @@ export function StatusBar({
 
   const permissionKeys = useMemo(() => new Set([permission]), [permission]);
 
-  const sortedEnvironments = useMemo(
-    () => [...availableEnvironments].sort((a, b) => a.name.localeCompare(b.name)),
-    [availableEnvironments]
-  );
-
-  const selectedEnvironment = sortedEnvironments.find((e) => e.path === selectedEnvironmentPath);
-  const envKeys = useMemo(
-    () => (selectedEnvironmentPath ? new Set([selectedEnvironmentPath]) : new Set<string>()),
-    [selectedEnvironmentPath]
-  );
+  const selectedEnvironment = availableEnvironments.find((e) => e.path === selectedEnvironmentPath);
 
   const permissionLabel = PERMISSION_LABELS[permission] ?? 'Default permissions';
-  const envLabel = selectedEnvironment
-    ? `${selectedEnvironment.name} (${selectedEnvironment.branch})`
-    : availableEnvironments.length > 0
-      ? 'Select environment'
-      : 'No environment';
   const machinesLabel = machineLabel(machines, connectionState);
   const branchLabel = selectedEnvironment ? `From ${selectedEnvironment.branch}` : 'From main';
 
   return (
-    <div className="w-full max-w-3xl mx-auto pb-3" role="status" aria-label="Connection status">
-      <div className="flex items-center flex-wrap gap-x-3 gap-y-1 text-xs text-muted">
+    <div
+      className="w-full max-w-3xl mx-auto pb-[max(0.75rem,env(safe-area-inset-bottom))]"
+      role="status"
+      aria-label="Connection status"
+    >
+      <div className="flex items-center gap-x-3 text-xs text-muted overflow-hidden">
         {machines.length > 0 ? (
           <Dropdown>
-            <Button
-              variant="ghost"
-              size="sm"
-              aria-label={`Machines: ${machinesLabel}`}
-              className="flex items-center gap-1 hover:text-foreground transition-colors text-xs text-muted"
-            >
-              <Monitor className="w-3 h-3" aria-hidden="true" />
-              {machinesLabel}
-              <ChevronDown className="w-2.5 h-2.5" aria-hidden="true" />
-            </Button>
+            <Tooltip>
+              <Tooltip.Trigger>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  aria-label={`Machines: ${machinesLabel}`}
+                  className="flex items-center gap-1 hover:text-foreground transition-colors text-xs text-muted"
+                >
+                  <Monitor className="w-3 h-3 shrink-0" aria-hidden="true" />
+                  <span className="truncate max-w-[8rem]">{machinesLabel}</span>
+                  <ChevronDown className="w-2.5 h-2.5 shrink-0" aria-hidden="true" />
+                </Button>
+              </Tooltip.Trigger>
+              <Tooltip.Content>{machinesLabel}</Tooltip.Content>
+            </Tooltip>
             <Dropdown.Popover placement="top" className="min-w-[200px]">
               <Dropdown.Menu
                 selectionMode="single"
@@ -144,9 +140,9 @@ export function StatusBar({
             </Dropdown.Popover>
           </Dropdown>
         ) : (
-          <span className="flex items-center gap-1">
-            <Monitor className="w-3 h-3" aria-hidden="true" />
-            {machinesLabel}
+          <span className="flex items-center gap-1 min-w-0">
+            <Monitor className="w-3 h-3 shrink-0" aria-hidden="true" />
+            <span className="truncate max-w-[8rem]">{machinesLabel}</span>
           </span>
         )}
 
@@ -189,61 +185,22 @@ export function StatusBar({
         </Dropdown>
 
         {/* Environment */}
-        {sortedEnvironments.length > 0 ? (
-          <Dropdown>
-            <Button
-              variant="ghost"
-              size="sm"
-              aria-label={`Environment: ${envLabel}`}
-              className="flex items-center gap-1 hover:text-foreground transition-colors text-xs text-muted"
-            >
-              <Globe className="w-3 h-3" aria-hidden="true" />
-              {envLabel}
-              <ChevronDown className="w-2.5 h-2.5" aria-hidden="true" />
-            </Button>
-            <Dropdown.Popover placement="top" className="min-w-[220px] max-w-[320px]">
-              <ScrollShadow className="max-h-[300px]">
-                <Dropdown.Menu
-                  selectionMode="single"
-                  selectedKeys={envKeys}
-                  onSelectionChange={(keys) => {
-                    const selected = [...keys][0];
-                    if (typeof selected === 'string' && onEnvironmentSelect) {
-                      onEnvironmentSelect(selected);
-                    }
-                  }}
-                >
-                  {sortedEnvironments.map((env) => (
-                    <Dropdown.Item
-                      key={env.path}
-                      id={env.path}
-                      textValue={`${env.name} (${env.branch})`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <GitBranch className="w-3 h-3 shrink-0 text-muted" aria-hidden="true" />
-                        <div className="min-w-0">
-                          <Label className="truncate block">{env.name}</Label>
-                          <span className="text-xs text-muted truncate block">{env.branch}</span>
-                        </div>
-                      </div>
-                    </Dropdown.Item>
-                  ))}
-                </Dropdown.Menu>
-              </ScrollShadow>
-            </Dropdown.Popover>
-          </Dropdown>
-        ) : (
-          <span className="flex items-center gap-1">
-            <Globe className="w-3 h-3" aria-hidden="true" />
-            No environment
-          </span>
-        )}
+        <EnvironmentPicker
+          environments={availableEnvironments}
+          selectedPath={selectedEnvironmentPath ?? null}
+          onSelect={onEnvironmentSelect ?? (() => {})}
+        />
 
         {/* Branch */}
-        <span className="flex items-center gap-1">
-          <GitBranch className="w-3 h-3" aria-hidden="true" />
-          {branchLabel}
-        </span>
+        <Tooltip>
+          <Tooltip.Trigger>
+            <span className="flex items-center gap-1 min-w-0 shrink" role="status">
+              <GitBranch className="w-3 h-3 shrink-0" aria-hidden="true" />
+              <span className="truncate">{branchLabel}</span>
+            </span>
+          </Tooltip.Trigger>
+          <Tooltip.Content>{branchLabel}</Tooltip.Content>
+        </Tooltip>
       </div>
     </div>
   );

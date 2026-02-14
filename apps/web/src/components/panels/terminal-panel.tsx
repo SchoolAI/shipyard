@@ -30,7 +30,7 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
         aria-hidden={!isOpen}
         inert={!isOpen || undefined}
         className={`shrink-0 border-t border-separator bg-background motion-safe:transition-[height] motion-safe:duration-300 ease-in-out overflow-hidden ${
-          isOpen ? 'h-[40dvh]' : 'h-0'
+          isOpen ? 'h-[30dvh] sm:h-[40dvh]' : 'h-0'
         }`}
       >
         <div className="flex items-center justify-between px-4 py-2 border-b border-separator/50">
@@ -44,7 +44,7 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
             size="sm"
             aria-label="Close terminal"
             onPress={onClose}
-            className="text-muted hover:text-foreground hover:bg-default w-8 h-8 min-w-0"
+            className="text-muted hover:text-foreground hover:bg-default w-11 h-11 sm:w-8 sm:h-8 min-w-0"
           >
             <X className="w-3.5 h-3.5" />
           </Button>

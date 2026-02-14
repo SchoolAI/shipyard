@@ -17,7 +17,7 @@ export function PlanModeToggle({ isActive, onToggle }: PlanModeToggleProps) {
           aria-label={isActive ? 'Disable plan mode' : 'Enable plan mode'}
           aria-pressed={isActive}
           onPress={onToggle}
-          className={`rounded-lg w-7 h-7 min-w-0 transition-colors ${
+          className={`rounded-lg w-11 h-11 sm:w-7 sm:h-7 min-w-0 transition-colors ${
             isActive
               ? 'bg-hull text-foreground'
               : 'text-muted hover:text-foreground hover:bg-default'
