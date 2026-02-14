@@ -71,10 +71,12 @@ const MOCK_MESSAGES: Record<string, MessageData[]> = {
   ],
 };
 
+const useMockData = import.meta.env.VITE_DATA_SOURCE !== 'loro';
+
 export const useMessageStore = create<MessageStore>()(
   devtools(
     (set) => ({
-      messagesByTask: MOCK_MESSAGES,
+      messagesByTask: useMockData ? MOCK_MESSAGES : {},
 
       addMessage: (taskId, message) => {
         const id = crypto.randomUUID();

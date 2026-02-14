@@ -59,11 +59,13 @@ const MOCK_TASKS: TaskData[] = [
   },
 ];
 
+const useMockData = import.meta.env.VITE_DATA_SOURCE !== 'loro';
+
 export const useTaskStore = create<TaskStore>()(
   devtools(
     (set, get) => ({
-      tasks: MOCK_TASKS,
-      activeTaskId: 'task-1',
+      tasks: useMockData ? MOCK_TASKS : [],
+      activeTaskId: useMockData ? 'task-1' : null,
 
       setActiveTask: (id) => set({ activeTaskId: id }, undefined, 'tasks/setActiveTask'),
 
