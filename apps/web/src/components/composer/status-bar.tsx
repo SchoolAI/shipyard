@@ -1,48 +1,27 @@
 import { Button, Chip, Dropdown, Label } from '@heroui/react';
+import type {
+  GitRepoInfo,
+  PermissionMode,
+  AgentInfo as SignalingAgentInfo,
+} from '@shipyard/session';
 import { ChevronDown, GitBranch, Globe, Monitor, Shield } from 'lucide-react';
-import { useMemo, useState } from 'react';
-import type { AgentInfo, ConnectionState } from '../../hooks/use-personal-room';
+import { useMemo } from 'react';
+import type { MachineGroup } from '../../hooks/use-machine-selection';
+import type { ConnectionState } from '../../hooks/use-personal-room';
 
-type PermissionLevel = 'default' | 'accept-edits' | 'bypass';
+const PERMISSION_LABELS: Record<PermissionMode, string> = {
+  default: 'Default permissions',
+  'accept-edits': 'Accept edits',
+  bypass: 'Bypass permissions',
+};
 
-const PERMISSIONS: { id: PermissionLevel; label: string }[] = [
-  { id: 'default', label: 'Default permissions' },
-  { id: 'accept-edits', label: 'Accept edits' },
-  { id: 'bypass', label: 'Bypass permissions' },
-];
+const ALL_PERMISSION_MODES: PermissionMode[] = ['default', 'accept-edits', 'bypass'];
 
-type EnvironmentOption = 'none' | 'nodejs' | 'python';
-
-const ENVIRONMENTS: { id: EnvironmentOption; label: string }[] = [
-  { id: 'none', label: 'No environment' },
-  { id: 'nodejs', label: 'Node.js' },
-  { id: 'python', label: 'Python' },
-];
-
-const STATUS_COLOR: Record<AgentInfo['status'], 'success' | 'warning' | 'danger'> = {
+const STATUS_COLOR: Record<SignalingAgentInfo['status'], 'success' | 'warning' | 'danger'> = {
   idle: 'success',
   running: 'warning',
   error: 'danger',
 };
-
-interface MachineGroup {
-  machineId: string;
-  machineName: string;
-  agents: AgentInfo[];
-}
-
-function groupByMachine(agents: AgentInfo[]): MachineGroup[] {
-  const map = new Map<string, MachineGroup>();
-  for (const agent of agents) {
-    let group = map.get(agent.machineId);
-    if (!group) {
-      group = { machineId: agent.machineId, machineName: agent.machineName, agents: [] };
-      map.set(agent.machineId, group);
-    }
-    group.agents.push(agent);
-  }
-  return [...map.values()];
-}
 
 function machineLabel(machines: MachineGroup[], connectionState: ConnectionState): string {
   if (connectionState !== 'connected' || machines.length === 0) {
@@ -56,22 +35,56 @@ function machineLabel(machines: MachineGroup[], connectionState: ConnectionState
 }
 
 export interface StatusBarProps {
-  agents?: AgentInfo[];
   connectionState?: ConnectionState;
+  machines: MachineGroup[];
+  selectedMachineId?: string | null;
+  onMachineSelect?: (machineId: string) => void;
+  availableEnvironments?: GitRepoInfo[];
+  selectedEnvironmentPath?: string | null;
+  onEnvironmentSelect?: (path: string | null) => void;
+  availablePermissionModes?: PermissionMode[];
+  permission?: PermissionMode;
+  onPermissionChange?: (mode: PermissionMode) => void;
 }
 
-export function StatusBar({ agents = [], connectionState = 'disconnected' }: StatusBarProps) {
-  const [permission, setPermission] = useState<PermissionLevel>('default');
-  const [environment, setEnvironment] = useState<EnvironmentOption>('none');
+export function StatusBar({
+  connectionState = 'disconnected',
+  machines,
+  selectedMachineId,
+  onMachineSelect,
+  availableEnvironments = [],
+  selectedEnvironmentPath,
+  onEnvironmentSelect,
+  availablePermissionModes,
+  permission = 'default',
+  onPermissionChange,
+}: StatusBarProps) {
+  const machineKeys = useMemo(
+    () => (selectedMachineId ? new Set([selectedMachineId]) : new Set<string>()),
+    [selectedMachineId]
+  );
+
+  const permissionModes =
+    availablePermissionModes && availablePermissionModes.length > 0
+      ? availablePermissionModes
+      : ALL_PERMISSION_MODES;
 
   const permissionKeys = useMemo(() => new Set([permission]), [permission]);
-  const envKeys = useMemo(() => new Set([environment]), [environment]);
-  const machines = useMemo(() => groupByMachine(agents), [agents]);
 
-  const permissionLabel =
-    PERMISSIONS.find((p) => p.id === permission)?.label ?? 'Default permissions';
-  const envLabel = ENVIRONMENTS.find((e) => e.id === environment)?.label ?? 'No environment';
+  const selectedEnvironment = availableEnvironments.find((e) => e.path === selectedEnvironmentPath);
+  const envKeys = useMemo(
+    () => (selectedEnvironmentPath ? new Set([selectedEnvironmentPath]) : new Set<string>()),
+    [selectedEnvironmentPath]
+  );
+
+  const permissionLabel = PERMISSION_LABELS[permission] ?? 'Default permissions';
+  const envLabel = selectedEnvironment
+    ? `${selectedEnvironment.name} (${selectedEnvironment.branch})`
+    : availableEnvironments.length > 0
+      ? 'Select environment'
+      : 'No environment';
   const machinesLabel = machineLabel(machines, connectionState);
+  const branchLabel = selectedEnvironment ? `From ${selectedEnvironment.branch}` : 'From main';
 
   return (
     <div className="w-full max-w-3xl mx-auto pb-3">
@@ -89,23 +102,39 @@ export function StatusBar({ agents = [], connectionState = 'disconnected' }: Sta
               <ChevronDown className="w-2.5 h-2.5" />
             </Button>
             <Dropdown.Popover placement="top" className="min-w-[200px]">
-              <Dropdown.Menu selectionMode="none">
-                {machines.flatMap((machine) =>
-                  machine.agents.map((agent) => (
-                    <Dropdown.Item
-                      key={agent.agentId}
-                      id={agent.agentId}
-                      textValue={`${machine.machineName} - ${agent.agentType}`}
-                    >
-                      <div className="flex items-center justify-between w-full gap-2">
-                        <Label>{machine.machineName}</Label>
-                        <Chip size="sm" variant="soft" color={STATUS_COLOR[agent.status]}>
-                          {agent.status}
-                        </Chip>
+              <Dropdown.Menu
+                selectionMode="single"
+                selectedKeys={machineKeys}
+                onSelectionChange={(keys) => {
+                  const selected = [...keys][0];
+                  if (typeof selected === 'string' && onMachineSelect) {
+                    onMachineSelect(selected);
+                  }
+                }}
+              >
+                {machines.map((machine) => (
+                  <Dropdown.Item
+                    key={machine.machineId}
+                    id={machine.machineId}
+                    textValue={machine.machineName}
+                  >
+                    <div className="flex items-center justify-between w-full gap-2">
+                      <Label>{machine.machineName}</Label>
+                      <div className="flex gap-1">
+                        {machine.agents.map((agent) => (
+                          <Chip
+                            key={agent.agentId}
+                            size="sm"
+                            variant="soft"
+                            color={STATUS_COLOR[agent.status]}
+                          >
+                            {agent.status}
+                          </Chip>
+                        ))}
                       </div>
-                    </Dropdown.Item>
-                  ))
-                )}
+                    </div>
+                  </Dropdown.Item>
+                ))}
               </Dropdown.Menu>
             </Dropdown.Popover>
           </Dropdown>
@@ -135,17 +164,19 @@ export function StatusBar({ agents = [], connectionState = 'disconnected' }: Sta
               onSelectionChange={(keys) => {
                 const selected = [...keys][0];
                 if (
-                  selected === 'default' ||
-                  selected === 'accept-edits' ||
-                  selected === 'bypass'
+                  typeof selected === 'string' &&
+                  (selected === 'default' ||
+                    selected === 'accept-edits' ||
+                    selected === 'bypass') &&
+                  onPermissionChange
                 ) {
-                  setPermission(selected);
+                  onPermissionChange(selected);
                 }
               }}
             >
-              {PERMISSIONS.map((perm) => (
-                <Dropdown.Item key={perm.id} id={perm.id} textValue={perm.label}>
-                  <Label>{perm.label}</Label>
+              {permissionModes.map((mode) => (
+                <Dropdown.Item key={mode} id={mode} textValue={PERMISSION_LABELS[mode]}>
+                  <Label>{PERMISSION_LABELS[mode]}</Label>
                 </Dropdown.Item>
               ))}
             </Dropdown.Menu>
@@ -153,47 +184,55 @@ export function StatusBar({ agents = [], connectionState = 'disconnected' }: Sta
         </Dropdown>
 
         {/* Environment */}
-        <Dropdown>
-          <Button
-            variant="ghost"
-            size="sm"
-            aria-label={`Environment: ${envLabel}`}
-            className="flex items-center gap-1 hover:text-foreground transition-colors text-xs text-muted"
-          >
-            <Globe className="w-3 h-3" />
-            {envLabel}
-            <ChevronDown className="w-2.5 h-2.5" />
-          </Button>
-          <Dropdown.Popover placement="top" className="min-w-[160px]">
-            <Dropdown.Menu
-              selectionMode="single"
-              selectedKeys={envKeys}
-              onSelectionChange={(keys) => {
-                const selected = [...keys][0];
-                if (selected === 'none' || selected === 'nodejs' || selected === 'python') {
-                  setEnvironment(selected);
-                }
-              }}
+        {availableEnvironments.length > 0 ? (
+          <Dropdown>
+            <Button
+              variant="ghost"
+              size="sm"
+              aria-label={`Environment: ${envLabel}`}
+              className="flex items-center gap-1 hover:text-foreground transition-colors text-xs text-muted"
             >
-              {ENVIRONMENTS.map((env) => (
-                <Dropdown.Item key={env.id} id={env.id} textValue={env.label}>
-                  <Label>{env.label}</Label>
-                </Dropdown.Item>
-              ))}
-            </Dropdown.Menu>
-          </Dropdown.Popover>
-        </Dropdown>
+              <Globe className="w-3 h-3" />
+              {envLabel}
+              <ChevronDown className="w-2.5 h-2.5" />
+            </Button>
+            <Dropdown.Popover placement="top" className="min-w-[200px]">
+              <Dropdown.Menu
+                selectionMode="single"
+                selectedKeys={envKeys}
+                onSelectionChange={(keys) => {
+                  const selected = [...keys][0];
+                  if (typeof selected === 'string' && onEnvironmentSelect) {
+                    onEnvironmentSelect(selected);
+                  }
+                }}
+              >
+                {availableEnvironments.map((env) => (
+                  <Dropdown.Item
+                    key={env.path}
+                    id={env.path}
+                    textValue={`${env.name} (${env.branch})`}
+                  >
+                    <Label>
+                      {env.name} ({env.branch})
+                    </Label>
+                  </Dropdown.Item>
+                ))}
+              </Dropdown.Menu>
+            </Dropdown.Popover>
+          </Dropdown>
+        ) : (
+          <span className="flex items-center gap-1">
+            <Globe className="w-3 h-3" />
+            No environment
+          </span>
+        )}
 
         {/* Branch */}
-        <button
-          type="button"
-          aria-label="Select git branch"
-          className="flex items-center gap-1 hover:text-foreground transition-colors cursor-pointer"
-        >
+        <span className="flex items-center gap-1">
           <GitBranch className="w-3 h-3" />
-          From main
-          <ChevronDown className="w-2.5 h-2.5" />
-        </button>
+          {branchLabel}
+        </span>
       </div>
     </div>
   );

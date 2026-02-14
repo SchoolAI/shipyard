@@ -69,7 +69,7 @@ export function SlashCommandMenu({
                     command.parentLabel ? `${command.parentLabel} ${command.name}` : command.name
                   }
                   data-index={index}
-                  className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors ${
+                  className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
                     isSelected ? 'bg-default' : 'hover:bg-default/50'
                   }`}
                   onHoverStart={() => {

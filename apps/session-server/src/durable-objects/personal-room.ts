@@ -20,6 +20,10 @@ import type {
   SerializedPersonalConnectionState,
 } from './types';
 
+function assertNever(x: never): never {
+  throw new Error(`Unhandled message type: ${JSON.stringify(x)}`);
+}
+
 /** Connection state for each WebSocket */
 interface ConnectionState {
   id: string;
@@ -47,6 +51,11 @@ export class PersonalRoom extends DurableObject<Env> {
 
   /**
    * Initialize state from storage.
+   *
+   * After restoring WebSocket connections, prune any agents from storage
+   * that no longer have a live WebSocket. This handles the case where the
+   * DO reinitializes (e.g. wrangler dev restart) and the old agent
+   * processes are gone but their entries survived in SQLite-backed storage.
    */
   private async initialize(): Promise<void> {
     const storedAgents = await this.ctx.storage.get<Record<string, AgentInfo>>('agents');
@@ -68,6 +77,26 @@ export class PersonalRoom extends DurableObject<Env> {
           sessionId: attachment.sessionId,
         });
       }
+    }
+
+    const connectedAgentIds = new Set<string>();
+    for (const state of this.connections.values()) {
+      if (state.agentId) {
+        connectedAgentIds.add(state.agentId);
+      }
+    }
+
+    let cleaned = false;
+    for (const agentId of Object.keys(this.agents)) {
+      if (!connectedAgentIds.has(agentId)) {
+        delete this.agents[agentId];
+        cleaned = true;
+        this.logger.info('Pruned stale agent on initialization', { agentId });
+      }
+    }
+
+    if (cleaned) {
+      await this.ctx.storage.put('agents', this.agents);
     }
   }
 
@@ -226,9 +255,11 @@ export class PersonalRoom extends DurableObject<Env> {
       case 'spawn-agent':
         this.handleSpawnAgent(ws, state, msg);
         break;
+      case 'update-capabilities':
+        await this.handleUpdateCapabilities(ws, state, msg);
+        break;
       default:
-        msg satisfies never;
-        this.sendError(ws, 'unknown_type', `Unknown message type`);
+        assertNever(msg);
     }
   }
 
@@ -237,6 +268,18 @@ export class PersonalRoom extends DurableObject<Env> {
     state: ConnectionState,
     msg: Extract<PersonalRoomClientMessage, { type: 'register-agent' }>
   ): Promise<void> {
+    const isReregistration = msg.agentId in this.agents;
+
+    if (isReregistration) {
+      for (const [existingWs, existingState] of this.connections) {
+        if (existingState.agentId === msg.agentId && existingWs !== ws) {
+          existingState.agentId = undefined;
+          existingState.machineId = undefined;
+          this.persistConnectionState(existingWs, existingState);
+        }
+      }
+    }
+
     state.agentId = msg.agentId;
     state.machineId = msg.machineId;
     this.persistConnectionState(ws, state);
@@ -248,7 +291,8 @@ export class PersonalRoom extends DurableObject<Env> {
       machineName: msg.machineName,
       agentType: msg.agentType,
       status: 'idle',
-      registeredAt: now,
+      ...(msg.capabilities && { capabilities: msg.capabilities }),
+      registeredAt: isReregistration ? (this.agents[msg.agentId]?.registeredAt ?? now) : now,
       lastSeenAt: now,
     };
 
@@ -264,7 +308,7 @@ export class PersonalRoom extends DurableObject<Env> {
       ws
     );
 
-    this.logger.info('Agent registered', {
+    this.logger.info(isReregistration ? 'Agent re-registered' : 'Agent registered', {
       agentId: msg.agentId,
       machineId: msg.machineId,
     });
@@ -331,6 +375,41 @@ export class PersonalRoom extends DurableObject<Env> {
     this.logger.debug('Agent status updated', {
       agentId: msg.agentId,
       status: msg.status,
+    });
+  }
+
+  private async handleUpdateCapabilities(
+    ws: WebSocket,
+    state: ConnectionState,
+    msg: Extract<PersonalRoomClientMessage, { type: 'update-capabilities' }>
+  ): Promise<void> {
+    if (state.agentId !== msg.agentId) {
+      this.sendError(ws, 'forbidden', 'Cannot update capabilities for another agent');
+      return;
+    }
+
+    const agent = this.agents[msg.agentId];
+    if (!agent) {
+      this.sendError(ws, 'not_found', `Agent ${msg.agentId} not found`);
+      return;
+    }
+
+    agent.capabilities = msg.capabilities;
+    agent.lastSeenAt = Date.now();
+    await this.ctx.storage.put('agents', this.agents);
+
+    broadcastExcept(
+      this.connections,
+      {
+        type: 'agent-capabilities-changed',
+        agentId: msg.agentId,
+        capabilities: msg.capabilities,
+      } satisfies PersonalRoomServerMessage,
+      ws
+    );
+
+    this.logger.debug('Agent capabilities updated', {
+      agentId: msg.agentId,
     });
   }
 

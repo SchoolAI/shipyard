@@ -1,4 +1,5 @@
 import { Button, Tooltip } from '@heroui/react';
+import type { ModelInfo } from '@shipyard/session';
 import { ArrowUp, Mic } from 'lucide-react';
 import type { KeyboardEvent } from 'react';
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
@@ -14,6 +15,7 @@ import { SlashCommandMenu } from './composer/slash-command-menu';
 interface ChatComposerProps {
   onSubmit: (message: string) => void;
   onClearChat: () => void;
+  availableModels?: ModelInfo[];
 }
 
 export interface ChatComposerHandle {
@@ -28,14 +30,15 @@ function assertNever(x: never): never {
 }
 
 export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(function ChatComposer(
-  { onSubmit, onClearChat },
+  { onSubmit, onClearChat, availableModels },
   ref
 ) {
   const [value, setValue] = useState('');
   const [planMode, setPlanMode] = useState(false);
   const [reasoningLevel, setReasoningLevel] = useState<ReasoningLevel>('medium');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const { selectedModelId, setSelectedModelId, supportsReasoning } = useModelPicker();
+  const { selectedModelId, setSelectedModelId, supportsReasoning } =
+    useModelPicker(availableModels);
 
   useImperativeHandle(
     ref,
@@ -178,7 +181,11 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
         <div className="flex items-center justify-between px-3 pb-3 gap-1">
           <div className="flex items-center gap-1 overflow-x-auto min-w-0">
             <AttachmentPopover />
-            <ModelPicker selectedModelId={selectedModelId} onModelChange={setSelectedModelId} />
+            <ModelPicker
+              selectedModelId={selectedModelId}
+              onModelChange={setSelectedModelId}
+              availableModels={availableModels}
+            />
             {supportsReasoning && (
               <ReasoningEffort level={reasoningLevel} onLevelChange={setReasoningLevel} />
             )}

@@ -128,10 +128,7 @@
       }
     },
     {
-      "includes": [
-        "apps/session-server/**/logger.ts",
-        "apps/session-server/**/logger.test.ts"
-      ],
+      "includes": ["apps/session-server/**/logger.ts", "apps/session-server/**/logger.test.ts"],
       "linter": {
         "rules": {
           "suspicious": {

@@ -42,7 +42,7 @@ export function DiffPanel({ isOpen, onClose }: DiffPanelProps) {
             aria-selected={activeTab === 'unstaged'}
             aria-controls="diff-tabpanel-unstaged"
             id="diff-tab-unstaged"
-            className={`flex-1 px-4 py-2 text-xs font-medium transition-colors cursor-pointer ${
+            className={`flex-1 px-4 py-2 text-xs font-medium transition-colors ${
               activeTab === 'unstaged'
                 ? 'text-foreground border-b-2 border-accent'
                 : 'text-muted hover:text-foreground'
@@ -57,7 +57,7 @@ export function DiffPanel({ isOpen, onClose }: DiffPanelProps) {
             aria-selected={activeTab === 'staged'}
             aria-controls="diff-tabpanel-staged"
             id="diff-tab-staged"
-            className={`flex-1 px-4 py-2 text-xs font-medium transition-colors cursor-pointer ${
+            className={`flex-1 px-4 py-2 text-xs font-medium transition-colors ${
               activeTab === 'staged'
                 ? 'text-foreground border-b-2 border-accent'
                 : 'text-muted hover:text-foreground'

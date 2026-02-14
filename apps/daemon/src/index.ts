@@ -14,6 +14,7 @@ import {
   TaskDocumentSchema,
 } from '@shipyard/loro-schema';
 import { PersonalRoomConnection } from '@shipyard/session';
+import { detectCapabilities } from './capabilities.js';
 import { type Env, validateEnv } from './env.js';
 import { FileStorageAdapter } from './file-storage-adapter.js';
 import { LifecycleManager } from './lifecycle.js';
@@ -90,10 +91,10 @@ interface SignalingHandle {
   connection: PersonalRoomConnection;
 }
 
-function setupSignaling(
+async function setupSignaling(
   env: Env,
   log: ReturnType<typeof createChildLogger>
-): SignalingHandle | null {
+): Promise<SignalingHandle | null> {
   if (!env.SHIPYARD_SIGNALING_URL) {
     return null;
   }
@@ -105,12 +106,19 @@ function setupSignaling(
     wsUrl.searchParams.set('token', env.SHIPYARD_USER_TOKEN);
   }
 
+  const capabilities = await detectCapabilities({ cwd: process.cwd() });
+  log.info(
+    { models: capabilities.models.length, environments: capabilities.environments.length },
+    'Detected machine capabilities'
+  );
+
   const connection = new PersonalRoomConnection({ url: wsUrl.toString() });
   const signaling = createDaemonSignaling({
     connection,
     machineId,
     machineName,
     agentType: 'daemon',
+    capabilities,
   });
 
   connection.onStateChange((state) => {
@@ -226,7 +234,7 @@ async function main(): Promise<void> {
 
   const repo = await setupRepo(dataDir);
   const lifecycle = new LifecycleManager();
-  const signalingHandle = setupSignaling(env, log);
+  const signalingHandle = await setupSignaling(env, log);
 
   let cleanedUp = false;
   const cleanup = () => {

@@ -32,6 +32,18 @@ LOG_LEVEL = "info"
 ENVIRONMENT = "development"
 LOG_LEVEL = "debug"
 
+[[env.development.durable_objects.bindings]]
+name = "PERSONAL_ROOM"
+class_name = "PersonalRoom"
+
+[[env.development.durable_objects.bindings]]
+name = "COLLAB_ROOM"
+class_name = "CollabRoom"
+
+[[env.development.migrations]]
+tag = "v1"
+new_sqlite_classes = ["PersonalRoom", "CollabRoom"]
+
 # Secrets (set via wrangler secret put):
 # - GITHUB_CLIENT_ID
 # - GITHUB_CLIENT_SECRET

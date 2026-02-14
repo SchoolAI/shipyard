@@ -1,6 +1,7 @@
 import { Button, Description, Dropdown, Label } from '@heroui/react';
+import type { ModelInfo } from '@shipyard/session';
 import { ChevronDown } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 interface ModelConfig {
   id: string;
@@ -9,7 +10,7 @@ interface ModelConfig {
   supportsReasoning: boolean;
 }
 
-const MODELS: ModelConfig[] = [
+const FALLBACK_MODELS: ModelConfig[] = [
   {
     id: 'claude-code',
     label: 'claude-code',
@@ -33,13 +34,26 @@ const MODELS: ModelConfig[] = [
 export interface ModelPickerProps {
   selectedModelId: string;
   onModelChange: (modelId: string) => void;
+  availableModels?: ModelInfo[];
 }
 
-export function ModelPicker({ selectedModelId, onModelChange }: ModelPickerProps) {
+export function ModelPicker({ selectedModelId, onModelChange, availableModels }: ModelPickerProps) {
+  const models: ModelConfig[] = useMemo(() => {
+    if (availableModels && availableModels.length > 0) {
+      return availableModels.map((m) => ({
+        id: m.id,
+        label: m.label,
+        description: m.provider,
+        supportsReasoning: m.supportsReasoning,
+      }));
+    }
+    return FALLBACK_MODELS;
+  }, [availableModels]);
+
   const selectedKeys = useMemo(() => new Set([selectedModelId]), [selectedModelId]);
 
-  const selectedModel = MODELS.find((m) => m.id === selectedModelId);
-  const displayLabel = selectedModel?.label ?? 'claude-code';
+  const selectedModel = models.find((m) => m.id === selectedModelId);
+  const displayLabel = selectedModel?.label ?? models[0]?.label ?? 'claude-code';
 
   return (
     <Dropdown>
@@ -63,7 +77,7 @@ export function ModelPicker({ selectedModelId, onModelChange }: ModelPickerProps
             }
           }}
         >
-          {MODELS.map((model) => (
+          {models.map((model) => (
             <Dropdown.Item key={model.id} id={model.id} textValue={model.label}>
               <Label>{model.label}</Label>
               <Description>{model.description}</Description>
@@ -75,9 +89,29 @@ export function ModelPicker({ selectedModelId, onModelChange }: ModelPickerProps
   );
 }
 
-export function useModelPicker() {
+export function useModelPicker(availableModels?: ModelInfo[]) {
   const [selectedModelId, setSelectedModelId] = useState('claude-code');
-  const selectedModel = MODELS.find((m) => m.id === selectedModelId);
+
+  useEffect(() => {
+    const firstModel = availableModels?.[0];
+    if (firstModel && !availableModels.some((m) => m.id === selectedModelId)) {
+      setSelectedModelId(firstModel.id);
+    }
+  }, [availableModels, selectedModelId]);
+
+  const models: ModelConfig[] = useMemo(() => {
+    if (availableModels && availableModels.length > 0) {
+      return availableModels.map((m) => ({
+        id: m.id,
+        label: m.label,
+        description: m.provider,
+        supportsReasoning: m.supportsReasoning,
+      }));
+    }
+    return FALLBACK_MODELS;
+  }, [availableModels]);
+
+  const selectedModel = models.find((m) => m.id === selectedModelId);
   return {
     selectedModelId,
     setSelectedModelId,

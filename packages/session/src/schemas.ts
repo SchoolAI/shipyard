@@ -233,6 +233,48 @@ export const PresignedUrlPayloadSchema = z.object({
 export type PresignedUrlPayload = z.infer<typeof PresignedUrlPayloadSchema>;
 
 /**
+ * Model info schema for machine capabilities.
+ */
+export const ModelInfoSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  provider: z.string(),
+  supportsReasoning: z.boolean(),
+});
+
+export type ModelInfo = z.infer<typeof ModelInfoSchema>;
+
+/**
+ * Git repo info schema for machine capabilities.
+ */
+export const GitRepoInfoSchema = z.object({
+  path: z.string(),
+  name: z.string(),
+  branch: z.string(),
+  remote: z.string().optional(),
+});
+
+export type GitRepoInfo = z.infer<typeof GitRepoInfoSchema>;
+
+/**
+ * Permission mode schema for machine capabilities.
+ */
+export const PermissionModeSchema = z.enum(['default', 'accept-edits', 'bypass']);
+
+export type PermissionMode = z.infer<typeof PermissionModeSchema>;
+
+/**
+ * Machine capabilities schema — advertised by daemons at registration time.
+ */
+export const MachineCapabilitiesSchema = z.object({
+  models: z.array(ModelInfoSchema),
+  environments: z.array(GitRepoInfoSchema),
+  permissionModes: z.array(PermissionModeSchema),
+});
+
+export type MachineCapabilities = z.infer<typeof MachineCapabilitiesSchema>;
+
+/**
  * Register agent message schema for personal room WebSocket.
  */
 export const RegisterAgentSchema = z.object({
@@ -241,6 +283,7 @@ export const RegisterAgentSchema = z.object({
   machineId: z.string(),
   machineName: z.string(),
   agentType: z.string(),
+  capabilities: MachineCapabilitiesSchema.optional(),
 });
 
 /**
@@ -303,6 +346,15 @@ export const SpawnAgentSchema = z.object({
 });
 
 /**
+ * Update capabilities message schema for personal room WebSocket.
+ */
+export const UpdateCapabilitiesSchema = z.object({
+  type: z.literal('update-capabilities'),
+  agentId: z.string(),
+  capabilities: MachineCapabilitiesSchema,
+});
+
+/**
  * Union of all client-to-server messages for personal room WebSocket.
  */
 export const PersonalRoomClientMessageSchema = z.discriminatedUnion('type', [
@@ -313,6 +365,7 @@ export const PersonalRoomClientMessageSchema = z.discriminatedUnion('type', [
   WebRTCAnswerSchema,
   WebRTCIceSchema,
   SpawnAgentSchema,
+  UpdateCapabilitiesSchema,
 ]);
 
 export type PersonalRoomClientMessage = z.infer<typeof PersonalRoomClientMessageSchema>;
@@ -336,6 +389,7 @@ export const AgentInfoSchema = z.object({
   agentType: z.string(),
   status: z.enum(['idle', 'running', 'error']),
   activeTaskId: z.string().optional(),
+  capabilities: MachineCapabilitiesSchema.optional(),
 });
 
 export type AgentInfo = z.infer<typeof AgentInfoSchema>;
@@ -396,6 +450,15 @@ export const ErrorMessageSchema = z.object({
 });
 
 /**
+ * Agent capabilities changed notification message schema for personal room WebSocket.
+ */
+export const AgentCapabilitiesChangedSchema = z.object({
+  type: z.literal('agent-capabilities-changed'),
+  agentId: z.string(),
+  capabilities: MachineCapabilitiesSchema,
+});
+
+/**
  * Union of all server-to-client messages for personal room WebSocket.
  */
 export const PersonalRoomServerMessageSchema = z.discriminatedUnion('type', [
@@ -404,6 +467,7 @@ export const PersonalRoomServerMessageSchema = z.discriminatedUnion('type', [
   AgentJoinedSchema,
   AgentLeftSchema,
   AgentStatusChangedSchema,
+  AgentCapabilitiesChangedSchema,
   SpawnResultSchema,
   ErrorMessageSchema,
   WebRTCOfferSchema,

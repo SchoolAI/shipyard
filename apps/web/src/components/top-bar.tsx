@@ -1,5 +1,7 @@
 import { Button, Kbd, Tooltip } from '@heroui/react';
-import { Diff, Plus, Terminal } from 'lucide-react';
+import { Diff, Terminal } from 'lucide-react';
+import { useTaskStore } from '../stores';
+import { MobileSidebarToggle } from './sidebar';
 
 interface TopBarProps {
   onToggleTerminal: () => void;
@@ -7,19 +9,18 @@ interface TopBarProps {
 }
 
 export function TopBar({ onToggleTerminal, onToggleDiff }: TopBarProps) {
+  const activeTaskId = useTaskStore((s) => s.activeTaskId);
+  const tasks = useTaskStore((s) => s.tasks);
+  const activeTask = activeTaskId ? tasks.find((t) => t.id === activeTaskId) : undefined;
+
   return (
     <div className="flex items-center justify-between px-4 py-2 border-b border-separator/50">
-      <Button
-        variant="ghost"
-        size="sm"
-        className="text-foreground/80 hover:text-foreground gap-1.5"
-        onPress={() => {
-          /** TODO: open new task dialog */
-        }}
-      >
-        <Plus className="w-4 h-4" />
-        <span className="hidden sm:inline">New task</span>
-      </Button>
+      <div className="flex items-center gap-2 min-w-0">
+        <MobileSidebarToggle />
+        {activeTask && (
+          <span className="text-sm text-foreground font-medium truncate">{activeTask.title}</span>
+        )}
+      </div>
 
       <div className="flex items-center gap-1">
         <Tooltip>
@@ -63,8 +64,8 @@ export function TopBar({ onToggleTerminal, onToggleDiff }: TopBarProps) {
               Toggle diff panel
               <Kbd>
                 <Kbd.Abbr keyValue="command" />
-                <Kbd.Abbr keyValue="shift" />
-                <Kbd.Content>G</Kbd.Content>
+                <Kbd.Abbr keyValue="option" />
+                <Kbd.Content>B</Kbd.Content>
               </Kbd>
             </span>
           </Tooltip.Content>

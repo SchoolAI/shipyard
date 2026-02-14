@@ -2,14 +2,10 @@
  * Durable Object state types.
  */
 
-/** Agent registered in PersonalRoom */
-export interface AgentInfo {
-  agentId: string;
-  machineId: string;
-  machineName: string;
-  agentType: string;
-  status: 'idle' | 'running' | 'error';
-  activeTaskId?: string;
+import type { AgentInfo as SchemaAgentInfo } from '@shipyard/session';
+
+/** Agent registered in PersonalRoom -- extends the schema type with server-only fields */
+export interface AgentInfo extends SchemaAgentInfo {
   registeredAt: number;
   lastSeenAt: number;
 }
