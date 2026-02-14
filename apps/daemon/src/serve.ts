@@ -541,7 +541,10 @@ function buildCanUseTool(
       draft.meta.updatedAt = Date.now();
     });
 
-    taskLog.info({ toolName, toolUseID, riskLevel }, 'Permission request sent to browser');
+    taskLog.info(
+      { toolName, toolUseID, riskLevel, decisionReason, blockedPath, hasSuggestions: !!suggestions?.length },
+      'Permission request sent to browser'
+    );
 
     return new Promise<PermissionResult>((resolve) => {
       let unsub: (() => void) | undefined;
@@ -570,14 +573,14 @@ function buildCanUseTool(
         });
 
         taskLog.info(
-          { toolName, toolUseID, decision: value.decision },
+          { toolName, toolUseID, decision: value.decision, persist: value.persist, hasSuggestions: !!suggestions?.length },
           'Permission response received'
         );
 
         if (value.decision === 'approved') {
           resolve({
             behavior: 'allow',
-            updatedPermissions: value.persist ? suggestions : undefined,
+            updatedPermissions: suggestions,
           });
         } else {
           resolve({
