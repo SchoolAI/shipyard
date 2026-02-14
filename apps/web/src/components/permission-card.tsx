@@ -1,4 +1,4 @@
-import { Button } from '@heroui/react';
+import { Button, Dropdown } from '@heroui/react';
 import {
   type PermissionDecision,
   type PermissionRequest,
@@ -6,12 +6,16 @@ import {
   type ToolRiskLevel,
 } from '@shipyard/loro-schema';
 import { Check, ChevronDown, ChevronUp, Shield, X } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { type Key, useCallback, useEffect, useRef, useState } from 'react';
 
 interface PermissionCardProps {
   toolUseId: string;
   request: PermissionRequest;
-  onRespond: (toolUseId: string, decision: PermissionDecision, opts?: { persist?: boolean; message?: string }) => void;
+  onRespond: (
+    toolUseId: string,
+    decision: PermissionDecision,
+    opts?: { persist?: boolean; message?: string }
+  ) => void;
 }
 
 const RISK_BORDER_CLASS: Record<ToolRiskLevel, string> = {
@@ -107,6 +111,20 @@ export function PermissionCard({ toolUseId, request, onRespond }: PermissionCard
     setIsResolved(true);
     onRespond(toolUseId, 'approved');
   }, [toolUseId, onRespond]);
+
+  const handleAlwaysAllow = useCallback(() => {
+    setIsResolved(true);
+    onRespond(toolUseId, 'approved', { persist: true });
+  }, [toolUseId, onRespond]);
+
+  const handleDropdownAction = useCallback(
+    (key: Key) => {
+      if (key === 'always') {
+        handleAlwaysAllow();
+      }
+    },
+    [handleAlwaysAllow]
+  );
 
   const handleDeny = useCallback(() => {
     setIsResolved(true);
@@ -204,16 +222,38 @@ export function PermissionCard({ toolUseId, request, onRespond }: PermissionCard
 
       {/* Action buttons */}
       <div className="flex items-center gap-2">
-        <Button
-          ref={allowRef}
-          variant="primary"
-          size="sm"
-          onPress={handleAllow}
-          className="min-w-[80px]"
-        >
-          <Check className="w-3.5 h-3.5" aria-hidden="true" />
-          Allow
-        </Button>
+        {/* Allow split button: main Allow + dropdown chevron for "Always allow" */}
+        <div className="flex items-center">
+          <Button
+            ref={allowRef}
+            variant="primary"
+            size="sm"
+            onPress={handleAllow}
+            className="rounded-r-none min-w-[80px]"
+          >
+            <Check className="w-3.5 h-3.5" aria-hidden="true" />
+            Allow
+          </Button>
+          <Dropdown>
+            <Button
+              variant="primary"
+              size="sm"
+              isIconOnly
+              aria-label="More allow options"
+              className="rounded-l-none border-l border-l-white/20 min-w-0 w-8 min-h-[44px] sm:min-h-0"
+            >
+              <ChevronDown className="w-3 h-3" aria-hidden="true" />
+            </Button>
+            <Dropdown.Popover placement="bottom end" className="min-w-[200px]">
+              <Dropdown.Menu onAction={handleDropdownAction} aria-label="Allow options">
+                <Dropdown.Item key="always" id="always" textValue="Always allow this tool">
+                  Always allow this tool
+                </Dropdown.Item>
+              </Dropdown.Menu>
+            </Dropdown.Popover>
+          </Dropdown>
+        </div>
+
         <Button variant="danger-soft" size="sm" onPress={handleDeny} className="min-w-[80px]">
           <X className="w-3.5 h-3.5" aria-hidden="true" />
           Deny

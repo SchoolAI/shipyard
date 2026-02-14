@@ -31,7 +31,11 @@ export interface TaskDocumentResult {
   conversation: A2AMessage[];
   sessions: SessionEntry[];
   pendingPermissions: Map<string, PermissionRequest>;
-  respondToPermission: (toolUseId: string, decision: PermissionDecision, opts?: { persist?: boolean; message?: string }) => void;
+  respondToPermission: (
+    toolUseId: string,
+    decision: PermissionDecision,
+    opts?: { persist?: boolean; message?: string }
+  ) => void;
   isLoading: boolean;
 }
 
@@ -101,7 +105,11 @@ export function useTaskDocument(taskId: string | null): TaskDocumentResult {
   }, [handle, taskId]);
 
   const respondToPermission = useCallback(
-    (toolUseId: string, decision: PermissionDecision, opts?: { persist?: boolean; message?: string }) => {
+    (
+      toolUseId: string,
+      decision: PermissionDecision,
+      opts?: { persist?: boolean; message?: string }
+    ) => {
       handle.permResps.set(toolUseId, {
         decision,
         persist: opts?.persist ?? false,
