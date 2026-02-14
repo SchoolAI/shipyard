@@ -12,6 +12,14 @@ import type { A2AMessage, SessionState, TaskDocumentShape } from '@shipyard/loro
 import { nanoid } from 'nanoid';
 import { logger } from './logger.js';
 
+const SHIPYARD_SYSTEM_PROMPT_APPEND = `
+# Shipyard Permission System
+
+You are running inside Shipyard, a collaborative workspace with a built-in permission system.
+
+CRITICAL: Never ask the user conversationally for permission to perform an action. Always attempt the tool call directly. The permission system will prompt the user for approval automatically when needed. If a tool call is denied, you will receive the denial as a tool result — do not preemptively refuse or ask "should I proceed?" for file operations, bash commands, or any other tool use. Just call the tool.
+`;
+
 export interface CreateSessionOptions {
   prompt: string;
   cwd: string;
@@ -135,7 +143,11 @@ export class SessionManager {
         abortController: opts.abortController,
         allowDangerouslySkipPermissions: opts.allowDangerouslySkipPermissions,
         settingSources: opts.settingSources ?? ['project'],
-        systemPrompt: opts.systemPrompt ?? { type: 'preset', preset: 'claude_code' },
+        systemPrompt: opts.systemPrompt ?? {
+          type: 'preset',
+          preset: 'claude_code',
+          append: SHIPYARD_SYSTEM_PROMPT_APPEND,
+        },
         canUseTool: opts.canUseTool,
       },
     });
@@ -207,7 +219,11 @@ export class SessionManager {
         allowDangerouslySkipPermissions: opts?.allowDangerouslySkipPermissions,
         canUseTool: opts?.canUseTool,
         settingSources: ['project'],
-        systemPrompt: { type: 'preset', preset: 'claude_code' },
+        systemPrompt: {
+          type: 'preset',
+          preset: 'claude_code',
+          append: SHIPYARD_SYSTEM_PROMPT_APPEND,
+        },
       },
     });
 

@@ -863,7 +863,7 @@ describe('SessionManager', () => {
         expect.objectContaining({
           options: expect.objectContaining({
             settingSources: ['project'],
-            systemPrompt: { type: 'preset', preset: 'claude_code' },
+            systemPrompt: expect.objectContaining({ type: 'preset', preset: 'claude_code' }),
           }),
         })
       );
@@ -952,7 +952,7 @@ describe('SessionManager', () => {
         expect.objectContaining({
           options: expect.objectContaining({
             settingSources: ['project'],
-            systemPrompt: { type: 'preset', preset: 'claude_code' },
+            systemPrompt: expect.objectContaining({ type: 'preset', preset: 'claude_code' }),
           }),
         })
       );
