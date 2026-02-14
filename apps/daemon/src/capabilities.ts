@@ -46,9 +46,7 @@ export async function detectModels(): Promise<ModelInfo[]> {
         supportsReasoning: false,
       }
     );
-  } catch {
-    // claude CLI not available
-  }
+  } catch {}
 
   try {
     await run('which', ['codex']);
@@ -58,9 +56,7 @@ export async function detectModels(): Promise<ModelInfo[]> {
       provider: 'codex',
       supportsReasoning: false,
     });
-  } catch {
-    // codex CLI not available
-  }
+  } catch {}
 
   return models;
 }
@@ -76,9 +72,7 @@ export async function detectEnvironments(cwd: string): Promise<GitRepoInfo[]> {
     let remote: string | undefined;
     try {
       remote = await run('git', ['remote', 'get-url', 'origin'], cwd);
-    } catch {
-      // no remote configured
-    }
+    } catch {}
 
     const env: GitRepoInfo = {
       path: toplevel,

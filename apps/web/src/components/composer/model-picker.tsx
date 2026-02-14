@@ -93,9 +93,15 @@ export function useModelPicker(availableModels?: ModelInfo[]) {
   const [selectedModelId, setSelectedModelId] = useState('claude-code');
 
   useEffect(() => {
-    const firstModel = availableModels?.[0];
-    if (firstModel && !availableModels.some((m) => m.id === selectedModelId)) {
-      setSelectedModelId(firstModel.id);
+    if (!availableModels || availableModels.length === 0) {
+      setSelectedModelId('claude-code');
+      return;
+    }
+    if (!availableModels.some((m) => m.id === selectedModelId)) {
+      const firstModel = availableModels[0];
+      if (firstModel) {
+        setSelectedModelId(firstModel.id);
+      }
     }
   }, [availableModels, selectedModelId]);
 

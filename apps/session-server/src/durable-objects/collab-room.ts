@@ -15,6 +15,10 @@ import { broadcastExcept, findWebSocketByUserId } from '../protocol/webrtc-relay
 import { createLogger, type Logger } from '../utils/logger';
 import type { PassedCollabPayload, SerializedCollabConnectionState } from './types';
 
+function assertNever(x: never): never {
+  throw new Error(`Unhandled message type: ${JSON.stringify(x)}`);
+}
+
 /** Connection state for each WebSocket */
 interface ConnectionState {
   id: string;
@@ -255,8 +259,7 @@ export class CollabRoom extends DurableObject<Env> {
         this.handleWebRTCRelay(ws, state, msg);
         break;
       default:
-        msg satisfies never;
-        this.sendError(ws, 'unknown_type', `Unknown message type`);
+        assertNever(msg);
     }
   }
 

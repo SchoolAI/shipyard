@@ -319,6 +319,11 @@ export class PersonalRoom extends DurableObject<Env> {
     state: ConnectionState,
     msg: Extract<PersonalRoomClientMessage, { type: 'unregister-agent' }>
   ): Promise<void> {
+    if (state.agentId !== msg.agentId) {
+      this.sendError(ws, 'forbidden', 'Cannot unregister another agent');
+      return;
+    }
+
     if (!this.agents[msg.agentId]) {
       this.sendError(ws, 'not_found', `Agent ${msg.agentId} not found`);
       return;
@@ -347,9 +352,14 @@ export class PersonalRoom extends DurableObject<Env> {
 
   private async handleAgentStatus(
     ws: WebSocket,
-    _state: ConnectionState,
+    state: ConnectionState,
     msg: Extract<PersonalRoomClientMessage, { type: 'agent-status' }>
   ): Promise<void> {
+    if (state.agentId !== msg.agentId) {
+      this.sendError(ws, 'forbidden', 'Cannot update status for another agent');
+      return;
+    }
+
     const agent = this.agents[msg.agentId];
     if (!agent) {
       this.sendError(ws, 'not_found', `Agent ${msg.agentId} not found`);

@@ -80,7 +80,11 @@ export class PersonalRoomConnection {
   }
 
   send(msg: PersonalRoomClientMessage): void {
-    this.ws?.send(JSON.stringify(msg));
+    try {
+      this.ws?.send(JSON.stringify(msg));
+    } catch {
+      /** WebSocket may be in CLOSING/CLOSED state */
+    }
   }
 
   onMessage(handler: (msg: PersonalRoomServerMessage) => void): () => void {

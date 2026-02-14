@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
 import { mkdir } from 'node:fs/promises';
-import { homedir, hostname } from 'node:os';
+import { homedir } from 'node:os';
 import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { change, type createTypedDoc } from '@loro-extended/change';
@@ -13,15 +13,13 @@ import {
   generateTaskId,
   TaskDocumentSchema,
 } from '@shipyard/loro-schema';
-import { PersonalRoomConnection } from '@shipyard/session';
-import { detectCapabilities } from './capabilities.js';
 import { type Env, validateEnv } from './env.js';
 import { FileStorageAdapter } from './file-storage-adapter.js';
 import { LifecycleManager } from './lifecycle.js';
 import { createChildLogger, logger } from './logger.js';
 import { serve } from './serve.js';
 import { SessionManager, type SessionResult } from './session-manager.js';
-import { createDaemonSignaling, type DaemonSignaling } from './signaling.js';
+import { createSignalingHandle, type SignalingHandle } from './signaling-setup.js';
 
 interface CliArgs {
   prompt?: string;
@@ -92,50 +90,15 @@ function parseCliArgs(): CliArgs {
   };
 }
 
-interface SignalingHandle {
-  signaling: DaemonSignaling;
-  connection: PersonalRoomConnection;
-}
-
 async function setupSignaling(
   env: Env,
   log: ReturnType<typeof createChildLogger>
 ): Promise<SignalingHandle | null> {
-  if (!env.SHIPYARD_SIGNALING_URL) {
-    return null;
+  const handle = await createSignalingHandle(env, log);
+  if (handle) {
+    handle.connection.connect();
   }
-
-  const machineId = env.SHIPYARD_MACHINE_ID ?? hostname();
-  const machineName = env.SHIPYARD_MACHINE_NAME ?? hostname();
-  const wsUrl = new URL(env.SHIPYARD_SIGNALING_URL);
-  if (env.SHIPYARD_USER_TOKEN) {
-    wsUrl.searchParams.set('token', env.SHIPYARD_USER_TOKEN);
-  }
-
-  const capabilities = await detectCapabilities({ cwd: process.cwd() });
-  log.info(
-    { models: capabilities.models.length, environments: capabilities.environments.length },
-    'Detected machine capabilities'
-  );
-
-  const connection = new PersonalRoomConnection({ url: wsUrl.toString() });
-  const signaling = createDaemonSignaling({
-    connection,
-    machineId,
-    machineName,
-    agentType: 'daemon',
-    capabilities,
-  });
-
-  connection.onStateChange((state) => {
-    if (state === 'connected') {
-      signaling.register();
-      log.info({ machineId, machineName }, 'Registered with signaling server');
-    }
-  });
-  connection.connect();
-
-  return { signaling, connection };
+  return handle;
 }
 
 async function setupRepo(dataDir: string) {
