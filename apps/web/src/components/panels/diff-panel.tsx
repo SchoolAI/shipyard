@@ -8,6 +8,8 @@ import {
   useRef,
   useState,
 } from 'react';
+import { useResizablePanel } from '../../hooks/use-resizable-panel';
+import { useUIStore } from '../../stores';
 
 interface DiffPanelProps {
   isOpen: boolean;
@@ -28,6 +30,15 @@ export const DiffPanel = forwardRef<DiffPanelHandle, DiffPanelProps>(function Di
 ) {
   const [activeTab, setActiveTab] = useState<DiffTab>('unstaged');
   const contentRef = useRef<HTMLDivElement>(null);
+
+  const diffPanelWidth = useUIStore((s) => s.diffPanelWidth);
+  const setDiffPanelWidth = useUIStore((s) => s.setDiffPanelWidth);
+
+  const { panelRef, separatorProps, panelStyle, isDragging } = useResizablePanel({
+    isOpen,
+    width: diffPanelWidth,
+    onWidthChange: setDiffPanelWidth,
+  });
 
   useImperativeHandle(
     ref,
@@ -58,13 +69,18 @@ export const DiffPanel = forwardRef<DiffPanelHandle, DiffPanelProps>(function Di
 
   return (
     <aside
+      ref={panelRef}
       aria-label="Diff panel"
       aria-hidden={!isOpen}
       inert={!isOpen || undefined}
-      className={`shrink-0 border-l border-separator bg-background motion-safe:transition-[width] motion-safe:duration-300 ease-in-out overflow-hidden h-full ${
-        isOpen ? 'w-[40vw] min-w-[400px] max-sm:w-full max-sm:min-w-0' : 'w-0'
+      style={panelStyle}
+      className={`relative shrink-0 border-l border-separator bg-background overflow-hidden h-full max-sm:!w-full max-sm:min-w-0 ${
+        isDragging ? '' : 'motion-safe:transition-[width] motion-safe:duration-300 ease-in-out'
       }`}
     >
+      {/* Drag handle / separator */}
+      {isOpen && <div {...separatorProps} />}
+
       <div className="flex flex-col h-full min-w-[400px] max-sm:min-w-full">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-2 border-b border-separator/50">

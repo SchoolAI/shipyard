@@ -1,3 +1,5 @@
+export type { FrecencyStore } from './frecency-store';
+export { useFrecencyStore } from './frecency-store';
 export type { MessageStore } from './message-store';
 export { useMessageStore } from './message-store';
 export type { TaskStore } from './task-store';
