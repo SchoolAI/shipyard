@@ -80,6 +80,7 @@ export interface CreateSessionOptions {
   settingSources?: SettingSource[];
   systemPrompt?: string | { type: 'preset'; preset: 'claude_code'; append?: string };
   canUseTool?: CanUseTool;
+  stderr?: (data: string) => void;
 }
 
 export interface SessionResult {
@@ -204,6 +205,7 @@ export class SessionManager {
           append: SHIPYARD_SYSTEM_PROMPT_APPEND,
         },
         canUseTool: opts.canUseTool,
+        stderr: opts.stderr,
       },
     });
 
@@ -227,6 +229,7 @@ export class SessionManager {
       maxTurns?: number;
       allowDangerouslySkipPermissions?: boolean;
       canUseTool?: CanUseTool;
+      stderr?: (data: string) => void;
     }
   ): Promise<SessionResult> {
     const sessions = this.#taskDoc.toJSON().sessions;
@@ -274,6 +277,7 @@ export class SessionManager {
         abortController: opts?.abortController,
         allowDangerouslySkipPermissions: opts?.allowDangerouslySkipPermissions,
         canUseTool: opts?.canUseTool,
+        stderr: opts?.stderr,
         settingSources: ['project'],
         systemPrompt: {
           type: 'preset',

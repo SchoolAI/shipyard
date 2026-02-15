@@ -560,6 +560,80 @@ async function loadEpoch(repo: Repo): Promise<number> {
  * Concurrent safety: Each tool call gets its own toolUseID key, so multiple
  * concurrent canUseTool calls do not interfere with each other.
  */
+/**
+ * Convert a browser permission response into the Agent SDK's PermissionResult.
+ *
+ * SDK v0.2.39 Zod schema requires `updatedInput` even though the TypeScript
+ * type marks it optional. We pass the original input through to satisfy the
+ * schema without changing tool behavior.
+ */
+function toPermissionResult(
+  decision: string,
+  input: Record<string, unknown>,
+  persist: boolean,
+  suggestions: import('@anthropic-ai/claude-agent-sdk').PermissionUpdate[] | undefined,
+  message: string | null
+): PermissionResult {
+  if (decision === 'approved') {
+    const result: PermissionResult = {
+      behavior: 'allow',
+      updatedInput: input,
+    };
+    if (persist && suggestions?.length) {
+      result.updatedPermissions = suggestions;
+    }
+    return result;
+  }
+  return {
+    behavior: 'deny',
+    message: message ?? 'User denied permission',
+  };
+}
+
+interface PermissionResponseContext {
+  taskHandle: TaskHandle;
+  roomDoc: TypedDoc<TaskIndexDocumentShape>;
+  taskId: string;
+  taskLog: ReturnType<typeof createChildLogger>;
+  toolName: string;
+  toolUseID: string;
+  input: Record<string, unknown>;
+  suggestions: import('@anthropic-ai/claude-agent-sdk').PermissionUpdate[] | undefined;
+  value: { decision: string; persist: boolean; message: string | null };
+}
+
+/**
+ * Process a browser permission response: clean up ephemeral entries,
+ * update task status back to 'working', log the response, and return
+ * the SDK-compatible PermissionResult.
+ */
+function resolvePermissionResponse(ctx: PermissionResponseContext): PermissionResult {
+  const { taskHandle, roomDoc, taskId, taskLog, toolName, toolUseID, input, suggestions, value } =
+    ctx;
+
+  taskHandle.permReqs.delete(toolUseID);
+  taskHandle.permResps.delete(toolUseID);
+
+  change(taskHandle.doc, (draft) => {
+    draft.meta.status = 'working';
+    draft.meta.updatedAt = Date.now();
+  });
+  updateTaskInIndex(roomDoc, taskId, { status: 'working', updatedAt: Date.now() });
+
+  taskLog.info(
+    {
+      toolName,
+      toolUseID,
+      decision: value.decision,
+      persist: value.persist,
+      hasSuggestions: !!suggestions?.length,
+    },
+    'Permission response received'
+  );
+
+  return toPermissionResult(value.decision, input, value.persist, suggestions, value.message);
+}
+
 function buildCanUseTool(
   taskHandle: TaskHandle,
   taskLog: ReturnType<typeof createChildLogger>,
@@ -622,37 +696,19 @@ function buildCanUseTool(
         unsub?.();
         signal.removeEventListener('abort', onAbort);
 
-        taskHandle.permReqs.delete(toolUseID);
-        taskHandle.permResps.delete(toolUseID);
-
-        change(taskHandle.doc, (draft) => {
-          draft.meta.status = 'working';
-          draft.meta.updatedAt = Date.now();
-        });
-        updateTaskInIndex(roomDoc, taskId, { status: 'working', updatedAt: Date.now() });
-
-        taskLog.info(
-          {
+        resolve(
+          resolvePermissionResponse({
+            taskHandle,
+            roomDoc,
+            taskId,
+            taskLog,
             toolName,
             toolUseID,
-            decision: value.decision,
-            persist: value.persist,
-            hasSuggestions: !!suggestions?.length,
-          },
-          'Permission response received'
+            input,
+            suggestions,
+            value,
+          })
         );
-
-        if (value.decision === 'approved') {
-          resolve({
-            behavior: 'allow',
-            updatedPermissions: suggestions,
-          });
-        } else {
-          resolve({
-            behavior: 'deny',
-            message: value.message ?? 'User denied permission',
-          });
-        }
       });
     });
   };
@@ -701,6 +757,16 @@ async function runTask(opts: RunTaskOptions): Promise<SessionResult> {
       ? undefined
       : buildCanUseTool(taskHandle, log, roomDoc, taskId);
 
+  const stderr = (data: string) => {
+    const trimmed = data.trim();
+    if (!trimmed) return;
+    if (trimmed.includes('Error') || trimmed.includes('error')) {
+      log.error({ stderr: trimmed }, 'SDK subprocess error');
+    } else {
+      log.debug({ stderr: trimmed }, 'SDK subprocess stderr');
+    }
+  };
+
   const resumeInfo = manager.shouldResume();
   if (resumeInfo.resume && resumeInfo.sessionId) {
     log.info({ sessionId: resumeInfo.sessionId }, 'Resuming existing session');
@@ -711,6 +777,7 @@ async function runTask(opts: RunTaskOptions): Promise<SessionResult> {
       permissionMode,
       effort,
       canUseTool,
+      stderr,
       allowDangerouslySkipPermissions: permissionMode === 'bypassPermissions' ? true : undefined,
     });
   }
@@ -724,6 +791,7 @@ async function runTask(opts: RunTaskOptions): Promise<SessionResult> {
     effort,
     abortController,
     canUseTool,
+    stderr,
     allowDangerouslySkipPermissions: permissionMode === 'bypassPermissions' ? true : undefined,
   });
 }
