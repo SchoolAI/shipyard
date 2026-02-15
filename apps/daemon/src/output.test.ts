@@ -34,6 +34,7 @@ describe('completed session output verification', () => {
         role: 'user',
         content: [{ type: 'text', text: 'Refactor the database queries in user-service.ts' }],
         timestamp: now,
+        model: null,
       });
     });
 
@@ -43,6 +44,7 @@ describe('completed session output verification', () => {
         role: 'assistant',
         content: [{ type: 'text', text: 'I analyzed the queries and found 3 N+1 problems.' }],
         timestamp: now + 10_000,
+        model: null,
       });
     });
 
@@ -57,6 +59,7 @@ describe('completed session output verification', () => {
           },
         ],
         timestamp: now + 40_000,
+        model: null,
       });
     });
 
@@ -138,6 +141,7 @@ describe('completed session output verification', () => {
         role: 'assistant',
         content: [{ type: 'text', text: 'Starting deployment...' }],
         timestamp: now + 2000,
+        model: null,
       });
     });
 
@@ -195,6 +199,7 @@ describe('completed session output verification', () => {
         role: 'assistant',
         content: [{ type: 'text', text: 'Session 1 output' }],
         timestamp: now + 1000,
+        model: null,
       });
       draft.sessions.push({
         sessionId: session1Id,
@@ -221,6 +226,7 @@ describe('completed session output verification', () => {
         role: 'assistant',
         content: [{ type: 'text', text: 'Session 2 output (resumed)' }],
         timestamp: now + 60_000,
+        model: null,
       });
       draft.sessions.push({
         sessionId: session2Id,

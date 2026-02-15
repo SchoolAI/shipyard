@@ -33,7 +33,10 @@ You are running inside Shipyard, a collaborative workspace with a built-in permi
 CRITICAL: Never ask the user conversationally for permission to perform an action. Always attempt the tool call directly. The permission system will prompt the user for approval automatically when needed. If a tool call is denied, you will receive the denial as a tool result — do not preemptively refuse or ask "should I proceed?" for file operations, bash commands, or any other tool use. Just call the tool.
 `;
 
-function parseToolResultBlock(block: Record<string, unknown>): ContentBlock | null {
+function parseToolResultBlock(
+  block: Record<string, unknown>,
+  parentToolUseId: string | null
+): ContentBlock | null {
   if (typeof block.tool_use_id !== 'string') return null;
   const resultContent =
     typeof block.content === 'string' ? block.content : JSON.stringify(block.content ?? '');
@@ -42,16 +45,21 @@ function parseToolResultBlock(block: Record<string, unknown>): ContentBlock | nu
     toolUseId: block.tool_use_id,
     content: resultContent,
     isError: typeof block.is_error === 'boolean' ? block.is_error : false,
+    parentToolUseId,
   };
 }
 
-function parseToolUseBlock(block: Record<string, unknown>): ContentBlock | null {
+function parseToolUseBlock(
+  block: Record<string, unknown>,
+  parentToolUseId: string | null
+): ContentBlock | null {
   if (typeof block.id !== 'string' || typeof block.name !== 'string') return null;
   return {
     type: 'tool_use',
     toolUseId: block.id,
     toolName: block.name,
     input: safeStringify(block.input ?? {}),
+    parentToolUseId,
   };
 }
 
@@ -59,14 +67,17 @@ function parseToolUseBlock(block: Record<string, unknown>): ContentBlock | null 
  * Parse a single SDK content block (untyped record) into a typed ContentBlock.
  * Returns null for unrecognized or invalid block types (server_tool_use, redacted_thinking, etc.)
  */
-function parseSdkBlock(block: Record<string, unknown>): ContentBlock | null {
+function parseSdkBlock(
+  block: Record<string, unknown>,
+  parentToolUseId: string | null
+): ContentBlock | null {
   switch (block.type) {
     case 'text':
       return typeof block.text === 'string' ? { type: 'text', text: block.text } : null;
     case 'tool_use':
-      return parseToolUseBlock(block);
+      return parseToolUseBlock(block, parentToolUseId);
     case 'tool_result':
-      return parseToolResultBlock(block);
+      return parseToolResultBlock(block, parentToolUseId);
     case 'thinking':
       return typeof block.thinking === 'string' ? { type: 'thinking', text: block.thinking } : null;
     default:
@@ -113,6 +124,7 @@ export type StatusChangeCallback = (status: A2ATaskState) => void;
 export class SessionManager {
   readonly #taskDoc: TypedDoc<TaskDocumentShape>;
   readonly #onStatusChange: StatusChangeCallback | undefined;
+  #currentModel: string | null = null;
 
   constructor(taskDoc: TypedDoc<TaskDocumentShape>, onStatusChange?: StatusChangeCallback) {
     this.#taskDoc = taskDoc;
@@ -173,6 +185,7 @@ export class SessionManager {
    * 4. Returns the final SessionResult
    */
   async createSession(opts: CreateSessionOptions): Promise<SessionResult> {
+    this.#currentModel = opts.model ?? null;
     const sessionId = nanoid();
     const now = Date.now();
 
@@ -250,6 +263,7 @@ export class SessionManager {
       throw new Error(`Session ${sessionId} has no agentSessionId`);
     }
 
+    this.#currentModel = opts?.model ?? sessionEntry.model ?? null;
     const newSessionId = nanoid();
     const now = Date.now();
 
@@ -349,6 +363,9 @@ export class SessionManager {
   ): { agentSessionId?: string; sessionResult?: SessionResult } {
     if (message.type === 'system' && 'subtype' in message && message.subtype === 'init') {
       const initSessionId = message.session_id;
+      if ('model' in message && typeof message.model === 'string') {
+        this.#currentModel = message.model;
+      }
       const idx = this.#findSessionIndex(sessionId);
       change(this.#taskDoc, (draft) => {
         const session = idx >= 0 ? draft.sessions.get(idx) : undefined;
@@ -392,12 +409,16 @@ export class SessionManager {
     const rawContent = message.message.content;
     if (!Array.isArray(rawContent)) return;
 
+    const parentToolUseId = ('parent_tool_use_id' in message ? message.parent_tool_use_id : null) as
+      | string
+      | null;
+
     // eslint-disable-next-line no-restricted-syntax -- SDK content blocks typed as unknown[], need narrowing
     const sdkBlocks = rawContent as Array<Record<string, unknown>>;
     const toolResultBlocks: ContentBlock[] = [];
     for (const block of sdkBlocks) {
       if (block.type === 'tool_result') {
-        const parsed = parseSdkBlock(block);
+        const parsed = parseSdkBlock(block, parentToolUseId);
         if (parsed) toolResultBlocks.push(parsed);
       }
     }
@@ -423,6 +444,7 @@ export class SessionManager {
           role: 'assistant',
           content: toolResultBlocks,
           timestamp: Date.now(),
+          model: this.#currentModel,
         });
         draft.meta.updatedAt = Date.now();
       });
@@ -433,11 +455,15 @@ export class SessionManager {
     const rawContent = message.message.content;
     if (!Array.isArray(rawContent)) return;
 
+    const parentToolUseId = ('parent_tool_use_id' in message ? message.parent_tool_use_id : null) as
+      | string
+      | null;
+
     // eslint-disable-next-line no-restricted-syntax -- SDK content blocks typed as unknown[], need narrowing
     const sdkBlocks = rawContent as Array<Record<string, unknown>>;
     const contentBlocks: ContentBlock[] = [];
     for (const block of sdkBlocks) {
-      const parsed = parseSdkBlock(block);
+      const parsed = parseSdkBlock(block, parentToolUseId);
       if (parsed) contentBlocks.push(parsed);
     }
 
@@ -449,6 +475,7 @@ export class SessionManager {
         role: 'assistant',
         content: contentBlocks,
         timestamp: Date.now(),
+        model: this.#currentModel,
       });
       draft.meta.updatedAt = Date.now();
     });

@@ -165,8 +165,33 @@ export function ChatPage() {
   );
 
   const storeMessages = activeTaskId ? messagesByTask[activeTaskId] : undefined;
-  const agentName = undefined;
+
+  /** Build a lookup from model IDs to human-readable labels using available models. */
+  const modelLabelMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const m of availableModels) {
+      map.set(m.id, m.label);
+    }
+    return map;
+  }, [availableModels]);
+
   const messages: ChatMessageData[] = useMemo(() => {
+    /** Convert a raw model ID like "claude-opus-4-6" to a display label. */
+    function resolveModelLabel(modelId: string | null | undefined): string | undefined {
+      if (!modelId) return undefined;
+      const known = modelLabelMap.get(modelId);
+      if (known) return known;
+      return modelId
+        .replace(/-(\d{8})$/, '')
+        .split('-')
+        .map((part) =>
+          /^\d+$/.test(part) ? `${part}.` : part.charAt(0).toUpperCase() + part.slice(1)
+        )
+        .join(' ')
+        .replace(/\.\s/g, '.')
+        .replace(/\.$/, '');
+    }
+
     let raw: ChatMessageData[];
 
     if (useLoro && loroTask.conversation.length > 0) {
@@ -174,7 +199,7 @@ export function ChatPage() {
         id: msg.messageId ?? crypto.randomUUID(),
         role: msg.role,
         content: msg.content,
-        agentName: msg.role === 'assistant' ? agentName : undefined,
+        agentName: msg.role === 'assistant' ? resolveModelLabel(msg.model) : undefined,
       }));
 
       const status = loroTask.meta?.status;
@@ -195,7 +220,6 @@ export function ChatPage() {
           role: m.role,
           content: toContentBlocks(m.content),
           isThinking: m.isThinking,
-          agentName: m.role === 'assistant' ? agentName : undefined,
         })) ?? [];
     }
 
@@ -203,14 +227,20 @@ export function ChatPage() {
     const grouped: ChatMessageData[] = [];
     for (const msg of raw) {
       const last = grouped[grouped.length - 1];
-      if (last && last.role === msg.role && !last.isThinking && !msg.isThinking) {
+      if (
+        last &&
+        last.role === msg.role &&
+        last.agentName === msg.agentName &&
+        !last.isThinking &&
+        !msg.isThinking
+      ) {
         last.content = [...last.content, ...msg.content];
       } else {
         grouped.push({ ...msg, content: [...msg.content] });
       }
     }
     return grouped;
-  }, [loroTask.conversation, loroTask.meta?.status, storeMessages, agentName]);
+  }, [loroTask.conversation, loroTask.meta?.status, storeMessages, modelLabelMap]);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const demoTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -422,6 +452,7 @@ export function ChatPage() {
             role: 'user',
             content: [{ type: 'text', text: message }],
             timestamp: now,
+            model: null,
           });
         });
 
@@ -505,7 +536,7 @@ export function ChatPage() {
                   aria-label="Chat messages"
                   aria-relevant="additions"
                 >
-                  <div className="max-w-3xl mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-3 sm:space-y-5">
+                  <div className="max-w-3xl mx-auto px-3 sm:px-4 py-3 sm:py-4 space-y-2.5 sm:space-y-4">
                     {messages.map((msg) => (
                       <ChatMessage key={msg.id} message={msg} />
                     ))}

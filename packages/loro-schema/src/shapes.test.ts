@@ -61,6 +61,7 @@ describe('TaskDocumentSchema', () => {
         role: 'user',
         content: [{ type: 'text', text: 'Hello agent' }],
         timestamp: now,
+        model: null,
       });
 
       const json = doc.toJSON();
@@ -78,6 +79,7 @@ describe('TaskDocumentSchema', () => {
         role: 'assistant',
         content: [{ type: 'text', text: 'Hello human' }],
         timestamp: now + 1000,
+        model: null,
       });
 
       const json = doc.toJSON();
@@ -95,9 +97,11 @@ describe('TaskDocumentSchema', () => {
             toolUseId: 'tu-1',
             toolName: 'Read',
             input: JSON.stringify({ file_path: '/tmp/test.ts' }),
+            parentToolUseId: null,
           },
         ],
         timestamp: now,
+        model: null,
       });
 
       const json = doc.toJSON();
@@ -120,9 +124,11 @@ describe('TaskDocumentSchema', () => {
             toolUseId: 'tu-1',
             content: 'File contents here',
             isError: false,
+            parentToolUseId: null,
           },
         ],
         timestamp: now,
+        model: null,
       });
 
       const json = doc.toJSON();
@@ -146,6 +152,7 @@ describe('TaskDocumentSchema', () => {
           },
         ],
         timestamp: now,
+        model: null,
       });
 
       const json = doc.toJSON();
@@ -168,9 +175,11 @@ describe('TaskDocumentSchema', () => {
             toolUseId: 'tu-2',
             toolName: 'Read',
             input: JSON.stringify({ file_path: '/src/main.ts' }),
+            parentToolUseId: null,
           },
         ],
         timestamp: now,
+        model: null,
       });
 
       const json = doc.toJSON();
@@ -190,9 +199,11 @@ describe('TaskDocumentSchema', () => {
             toolUseId: 'tu-3',
             content: 'Permission denied: /etc/shadow',
             isError: true,
+            parentToolUseId: null,
           },
         ],
         timestamp: now,
+        model: null,
       });
 
       const json = doc.toJSON();

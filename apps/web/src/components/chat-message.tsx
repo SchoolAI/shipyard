@@ -1,27 +1,23 @@
-import { Button, Chip, Tooltip } from '@heroui/react';
+import { Button, Tooltip } from '@heroui/react';
 import type { ContentBlock } from '@shipyard/loro-schema';
 import {
   AlertCircle,
-  Bot,
+  BrainCircuit,
   Check,
   CheckCircle2,
   ChevronDown,
-  ChevronUp,
   Copy,
-  FileEdit,
-  FileSearch,
-  Search,
-  SquareTerminal,
-  Wrench,
+  Layers,
+  Loader2,
 } from 'lucide-react';
-import type { ComponentPropsWithoutRef, ReactNode } from 'react';
-import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import type { ComponentPropsWithoutRef } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import rehypeHighlight from 'rehype-highlight';
 import remarkGfm from 'remark-gfm';
 import { assertNever } from '../utils/assert-never';
+import { type GroupedBlock, groupContentBlocks } from '../utils/group-content-blocks';
 import { summarizeToolAction, TOOL_ICON_LABELS } from '../utils/tool-summarizers';
-import { ClaudeIcon, GeminiIcon, OpenAIIcon } from './agent-icons';
 import { AsciiShipThinking } from './thinking/ascii-ship';
 
 export type MessageRole = 'user' | 'assistant';
@@ -132,9 +128,9 @@ const markdownComponents: ComponentPropsWithoutRef<typeof ReactMarkdown>['compon
     const codeText = extractText(innerContent ?? children);
 
     return (
-      <div className="group relative my-3">
+      <div className="group relative my-2">
         <pre
-          className="bg-[var(--color-code-block)] rounded-lg p-4 overflow-x-auto text-sm leading-relaxed border border-separator/50"
+          className="bg-[var(--color-code-block)] rounded-md p-3 overflow-x-auto text-sm leading-snug border border-separator/30"
           {...rest}
         >
           {children}
@@ -227,7 +223,7 @@ const markdownComponents: ComponentPropsWithoutRef<typeof ReactMarkdown>['compon
 
   li({ children, node: _, ...rest }) {
     return (
-      <li className="leading-relaxed" {...rest}>
+      <li className="leading-normal" {...rest}>
         {children}
       </li>
     );
@@ -246,7 +242,7 @@ const markdownComponents: ComponentPropsWithoutRef<typeof ReactMarkdown>['compon
 
   table({ children, node: _, ...rest }) {
     return (
-      <div className="overflow-x-auto my-3">
+      <div className="overflow-x-auto my-2">
         <table
           className="w-full text-sm border-collapse border border-separator rounded-lg"
           {...rest}
@@ -285,7 +281,7 @@ const markdownComponents: ComponentPropsWithoutRef<typeof ReactMarkdown>['compon
   },
 
   hr({ node: _, ...rest }) {
-    return <hr className="border-separator my-3" {...rest} />;
+    return <hr className="border-separator my-2" {...rest} />;
   },
 
   strong({ children, node: _, ...rest }) {
@@ -312,187 +308,287 @@ const markdownComponents: ComponentPropsWithoutRef<typeof ReactMarkdown>['compon
 const REMARK_PLUGINS = [remarkGfm];
 const REHYPE_PLUGINS = [rehypeHighlight];
 
-/* ---------- Tool icon resolution ---------- */
+/* ---------- ToolCallLine ---------- */
 
-const TOOL_ICONS: Record<string, ReactNode> = {
-  Bash: <SquareTerminal className="w-3 h-3" aria-hidden="true" />,
-  Edit: <FileEdit className="w-3 h-3" aria-hidden="true" />,
-  Write: <FileEdit className="w-3 h-3" aria-hidden="true" />,
-  Read: <FileSearch className="w-3 h-3" aria-hidden="true" />,
-  Glob: <Search className="w-3 h-3" aria-hidden="true" />,
-  Grep: <Search className="w-3 h-3" aria-hidden="true" />,
-};
-
-function toolIcon(toolName: string): ReactNode {
-  return TOOL_ICONS[toolName] ?? <Wrench className="w-3 h-3" aria-hidden="true" />;
+interface ToolCallLineProps {
+  toolUse: ContentBlock & { type: 'tool_use' };
+  toolResult: (ContentBlock & { type: 'tool_result' }) | null;
 }
 
-/* ---------- Collapsible detail helper ---------- */
+function ToolCallLine({ toolUse, toolResult }: ToolCallLineProps) {
+  const isError = toolResult?.isError ?? false;
+  const isPending = toolResult === null;
+  const [showDetails, setShowDetails] = useState(isError);
+  const [showInput, setShowInput] = useState(false);
+  const detailsPanelId = useId();
+  const inputPanelId = useId();
 
-const LONG_CONTENT_THRESHOLD = 1000;
-const LONG_CONTENT_LINE_THRESHOLD = 15;
+  const summary = summarizeToolAction(toolUse.toolName, toolUse.input);
+  const iconLabel = TOOL_ICON_LABELS[toolUse.toolName] ?? toolUse.toolName;
 
-function isLongContent(text: string): boolean {
-  return (
-    text.length > LONG_CONTENT_THRESHOLD || text.split('\n').length > LONG_CONTENT_LINE_THRESHOLD
-  );
-}
-
-/* ---------- ToolUseCard ---------- */
-
-interface ToolUseCardProps {
-  toolName: string;
-  input: string;
-}
-
-function ToolUseCard({ toolName, input }: ToolUseCardProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
-  const panelId = useId();
-  const summary = summarizeToolAction(toolName, input);
-  const iconLabel = TOOL_ICON_LABELS[toolName] ?? toolName;
-
-  let formattedInput = input;
-  try {
-    formattedInput = JSON.stringify(JSON.parse(input), null, 2);
-  } catch {
-    /* raw string is fine */
-  }
+  const formattedInput = useMemo(() => {
+    try {
+      return JSON.stringify(JSON.parse(toolUse.input), null, 2);
+    } catch {
+      return toolUse.input;
+    }
+  }, [toolUse.input]);
 
   return (
-    <div className="rounded-lg border border-separator/60 bg-surface/50 px-3 py-2">
-      {/* Summary row */}
-      <div className="flex items-center gap-2 min-w-0">
-        <Chip
-          size="sm"
-          variant="soft"
-          className="shrink-0 gap-1 text-muted bg-default/50 h-5 text-[0.6875rem]"
-          aria-label={iconLabel}
+    <div>
+      {/* Single-line summary row */}
+      <button
+        type="button"
+        className="flex items-center gap-2 w-full min-h-[36px] sm:min-h-0 py-0.5 min-w-0 text-left rounded hover:bg-default/20 motion-safe:transition-colors group/tool"
+        aria-expanded={showDetails}
+        aria-controls={detailsPanelId}
+        aria-disabled={isPending || undefined}
+        onClick={() => {
+          if (!isPending) setShowDetails((prev) => !prev);
+        }}
+      >
+        {/* Status icon */}
+        {isPending ? (
+          <Loader2
+            className="w-3.5 h-3.5 text-muted shrink-0 motion-safe:animate-spin"
+            role="status"
+            aria-label="Running"
+          />
+        ) : isError ? (
+          <AlertCircle className="w-3.5 h-3.5 text-danger shrink-0" aria-hidden="true" />
+        ) : (
+          <CheckCircle2 className="w-3.5 h-3.5 text-success/60 shrink-0" aria-hidden="true" />
+        )}
+
+        {/* Tool name */}
+        <span
+          className="text-xs text-foreground/50 font-mono shrink-0 w-10 truncate"
+          title={iconLabel}
         >
-          {toolIcon(toolName)}
-          {toolName}
-        </Chip>
-        <span className="text-xs text-foreground/70 font-mono truncate min-w-0" title={summary}>
+          {toolUse.toolName}
+        </span>
+
+        {/* Summary */}
+        <span
+          className="text-xs text-foreground/70 font-mono truncate min-w-0 flex-1"
+          title={summary}
+        >
           {summary}
         </span>
-      </div>
 
-      {/* Expandable detail */}
-      <div className="mt-1.5">
-        <button
-          type="button"
-          className="flex items-center gap-1 text-[0.6875rem] text-muted hover:text-foreground transition-colors"
-          aria-expanded={isExpanded}
-          aria-controls={panelId}
-          onClick={() => setIsExpanded((prev) => !prev)}
+        {/* Chevron */}
+        {!isPending && (
+          <ChevronDown
+            className={`w-3 h-3 text-muted shrink-0 opacity-0 group-hover/tool:opacity-100 focus-visible:opacity-100 motion-safe:transition-all ${showDetails ? 'rotate-180 opacity-100' : ''}`}
+            aria-hidden="true"
+          />
+        )}
+      </button>
+
+      {/* Expanded details */}
+      {showDetails && toolResult && (
+        <div
+          id={detailsPanelId}
+          role="region"
+          aria-label={`${toolUse.toolName} result`}
+          className={`ml-5 border-l-2 ${isError ? 'border-l-danger/50' : 'border-l-success/30'} pl-3 mt-0.5 mb-1`}
         >
-          {isExpanded ? (
-            <ChevronUp className="w-3 h-3" aria-hidden="true" />
-          ) : (
-            <ChevronDown className="w-3 h-3" aria-hidden="true" />
-          )}
-          {isExpanded ? 'Hide input' : 'Show input'}
-        </button>
-        {isExpanded && (
-          <pre
-            id={panelId}
-            className="mt-1.5 p-2.5 rounded-md bg-background text-[0.6875rem] text-foreground/70 font-mono overflow-x-auto max-h-48 border border-separator/40"
+          <span className="sr-only">{isError ? 'Error output' : 'Successful output'}</span>
+          <pre className="text-[0.6875rem] text-foreground/70 font-mono overflow-x-auto max-h-64 whitespace-pre-wrap break-all">
+            {toolResult.content}
+          </pre>
+
+          {/* Secondary: show raw input */}
+          <button
+            type="button"
+            className="flex items-center gap-1 mt-1.5 min-h-[36px] sm:min-h-0 text-[0.6875rem] text-muted hover:text-foreground motion-safe:transition-colors"
+            aria-expanded={showInput}
+            aria-controls={inputPanelId}
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowInput((prev) => !prev);
+            }}
           >
-            {formattedInput}
-          </pre>
-        )}
-      </div>
-    </div>
-  );
-}
-
-/* ---------- ToolResultCard ---------- */
-
-interface ToolResultCardProps {
-  content: string;
-  isError: boolean;
-}
-
-function ToolResultCard({ content, isError }: ToolResultCardProps) {
-  const isLong = isLongContent(content);
-  const [isExpanded, setIsExpanded] = useState(!isLong);
-  const panelId = useId();
-
-  const borderClass = isError ? 'border-danger/40' : 'border-separator/40';
-  const bgClass = isError ? 'bg-danger/5' : 'bg-surface/30';
-  const iconClass = isError ? 'text-danger' : 'text-success';
-  const labelText = isError ? 'Error' : 'Result';
-
-  /** Detect whether the content looks like JSON */
-  let isJson = false;
-  try {
-    JSON.parse(content);
-    isJson = true;
-  } catch {
-    /* not JSON */
-  }
-
-  const isCollapsedPreview = isLong && !isExpanded;
-
-  return (
-    <div className={`rounded-lg border ${borderClass} ${bgClass} px-3 py-2`}>
-      {/* Header */}
-      <div className="flex items-center gap-1.5 mb-1">
-        {isError ? (
-          <AlertCircle className={`w-3 h-3 ${iconClass}`} aria-hidden="true" />
-        ) : (
-          <CheckCircle2 className={`w-3 h-3 ${iconClass}`} aria-hidden="true" />
-        )}
-        <span className={`text-[0.6875rem] font-medium ${iconClass}`}>{labelText}</span>
-      </div>
-
-      {/* Content */}
-      <div id={panelId}>
-        {isCollapsedPreview ? (
-          <pre className="text-[0.6875rem] text-foreground/70 font-mono overflow-x-auto max-h-48 whitespace-pre-wrap break-all">
-            {content.slice(0, 200)}...
-          </pre>
-        ) : isJson ? (
-          <pre className="text-[0.6875rem] text-foreground/70 font-mono overflow-x-auto max-h-48 whitespace-pre-wrap break-all">
-            {content}
-          </pre>
-        ) : (
-          <div className="text-[0.6875rem] text-foreground/70 leading-relaxed">
-            <ReactMarkdown
-              remarkPlugins={REMARK_PLUGINS}
-              rehypePlugins={REHYPE_PLUGINS}
-              components={markdownComponents}
+            <ChevronDown
+              className={`w-3 h-3 motion-safe:transition-transform ${showInput ? 'rotate-180' : ''}`}
+              aria-hidden="true"
+            />
+            {showInput ? 'Hide input' : 'Show input'}
+          </button>
+          {showInput && (
+            <pre
+              id={inputPanelId}
+              className="mt-1 p-2 rounded-md bg-background text-[0.6875rem] text-foreground/50 font-mono overflow-x-auto max-h-48 border border-separator/30"
             >
-              {content}
-            </ReactMarkdown>
-          </div>
-        )}
-      </div>
-
-      {/* Expand/collapse for long content */}
-      {isLong && (
-        <button
-          type="button"
-          className="flex items-center gap-1 mt-1.5 text-[0.6875rem] text-muted hover:text-foreground transition-colors"
-          aria-expanded={isExpanded}
-          aria-controls={panelId}
-          onClick={() => setIsExpanded((prev) => !prev)}
-        >
-          {isExpanded ? (
-            <ChevronUp className="w-3 h-3" aria-hidden="true" />
-          ) : (
-            <ChevronDown className="w-3 h-3" aria-hidden="true" />
+              {formattedInput}
+            </pre>
           )}
-          {isExpanded ? 'Show less' : 'Show more'}
-        </button>
+        </div>
       )}
     </div>
   );
 }
 
-/* ---------- ContentBlockRenderer ---------- */
+/* ---------- ThinkingBlock ---------- */
 
-function ContentBlockRenderer({ block }: { block: ContentBlock }) {
-  switch (block.type) {
+interface ThinkingBlockProps {
+  block: ContentBlock & { type: 'thinking' };
+}
+
+function ThinkingBlock({ block }: ThinkingBlockProps) {
+  const [expanded, setExpanded] = useState(false);
+  const panelId = useId();
+
+  return (
+    <div>
+      {/* Single-line disclosure trigger */}
+      <button
+        type="button"
+        className="flex items-center gap-2 w-full min-h-[36px] sm:min-h-0 py-0.5 min-w-0 text-left rounded hover:bg-default/20 motion-safe:transition-colors group/thinking"
+        aria-expanded={expanded}
+        aria-controls={panelId}
+        onClick={() => setExpanded((prev) => !prev)}
+      >
+        <BrainCircuit className="w-3.5 h-3.5 text-secondary/60 shrink-0" aria-hidden="true" />
+
+        <span className="text-xs text-foreground/50 font-mono shrink-0">Reasoning</span>
+
+        <span className="text-xs text-muted truncate min-w-0 flex-1">
+          {expanded ? '' : block.text.slice(0, 80).replace(/\n/g, ' ')}
+          {!expanded && block.text.length > 80 ? '...' : ''}
+        </span>
+
+        <ChevronDown
+          className={`w-3 h-3 text-muted shrink-0 opacity-0 group-hover/thinking:opacity-100 focus-visible:opacity-100 motion-safe:transition-all ${expanded ? 'rotate-180 opacity-100' : ''}`}
+          aria-hidden="true"
+        />
+      </button>
+
+      {/* Expanded content */}
+      {expanded && (
+        <div
+          id={panelId}
+          role="region"
+          aria-label="Reasoning content"
+          className="ml-5 border-l-2 border-l-secondary/30 pl-3 mt-0.5 mb-1"
+        >
+          <span className="sr-only">Extended thinking</span>
+          <pre className="text-[0.6875rem] text-foreground/70 font-mono overflow-x-auto max-h-96 whitespace-pre-wrap break-words">
+            {block.text}
+          </pre>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ---------- SubagentGroup ---------- */
+
+interface SubagentGroupProps {
+  taskToolUse: ContentBlock & { type: 'tool_use' };
+  taskToolResult: (ContentBlock & { type: 'tool_result' }) | null;
+  children: GroupedBlock[];
+}
+
+function SubagentGroup({ taskToolUse, taskToolResult, children }: SubagentGroupProps) {
+  const isPending = taskToolResult === null;
+  const isError = taskToolResult?.isError ?? false;
+  const [expanded, setExpanded] = useState(false);
+  const panelId = useId();
+
+  const toolCallCount = children.filter(
+    (g) => g.kind === 'tool_invocation' || g.kind === 'subagent_group'
+  ).length;
+
+  const description = useMemo(() => {
+    try {
+      // eslint-disable-next-line no-restricted-syntax -- daemon-serialized JSON
+      const input = JSON.parse(taskToolUse.input) as Record<string, unknown>;
+      return typeof input.description === 'string' ? input.description : 'Subagent';
+    } catch {
+      return 'Subagent';
+    }
+  }, [taskToolUse.input]);
+
+  return (
+    <div>
+      {/* Collapsed single-line summary */}
+      <button
+        type="button"
+        className="flex items-center gap-2 w-full min-h-[36px] sm:min-h-0 py-0.5 min-w-0 text-left rounded hover:bg-default/20 motion-safe:transition-colors group/subagent"
+        aria-expanded={expanded}
+        aria-controls={panelId}
+        onClick={() => setExpanded((prev) => !prev)}
+      >
+        {/* Status icon */}
+        {isPending ? (
+          <Loader2
+            className="w-3.5 h-3.5 text-muted shrink-0 motion-safe:animate-spin"
+            role="status"
+            aria-label="Running"
+          />
+        ) : isError ? (
+          <AlertCircle className="w-3.5 h-3.5 text-danger shrink-0" aria-hidden="true" />
+        ) : (
+          <CheckCircle2 className="w-3.5 h-3.5 text-success/60 shrink-0" aria-hidden="true" />
+        )}
+
+        {/* Subagent icon + label */}
+        <Layers className="w-3.5 h-3.5 text-secondary/60 shrink-0" aria-hidden="true" />
+        <span className="text-xs text-foreground/50 font-mono shrink-0">Task</span>
+
+        {/* Description */}
+        <span
+          className="text-xs text-foreground/70 font-mono truncate min-w-0 flex-1"
+          title={description}
+        >
+          {description}
+        </span>
+
+        {/* Tool call count */}
+        {toolCallCount > 0 && (
+          <span className="text-[0.6875rem] text-muted shrink-0">
+            ({toolCallCount} tool{toolCallCount === 1 ? '' : 's'})
+          </span>
+        )}
+
+        {/* Chevron */}
+        <ChevronDown
+          className={`w-3 h-3 text-muted shrink-0 opacity-0 group-hover/subagent:opacity-100 focus-visible:opacity-100 motion-safe:transition-all ${expanded ? 'rotate-180 opacity-100' : ''}`}
+          aria-hidden="true"
+        />
+      </button>
+
+      {/* Expanded children */}
+      {expanded && (
+        <div
+          id={panelId}
+          role="region"
+          aria-label={`Subagent: ${description}`}
+          className="ml-5 border-l-2 border-l-secondary/30 pl-3 mt-0.5 mb-1 space-y-1"
+        >
+          {children.map((child, i) => (
+            <GroupedBlockRenderer
+              key={
+                child.kind === 'tool_invocation'
+                  ? child.toolUse.toolUseId
+                  : child.kind === 'subagent_group'
+                    ? child.taskToolUse.toolUseId
+                    : `${child.kind}-${i}`
+              }
+              group={child}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ---------- GroupedBlockRenderer ---------- */
+
+function GroupedBlockRenderer({ group }: { group: GroupedBlock }) {
+  switch (group.kind) {
     case 'text':
       return (
         <ReactMarkdown
@@ -500,104 +596,83 @@ function ContentBlockRenderer({ block }: { block: ContentBlock }) {
           rehypePlugins={REHYPE_PLUGINS}
           components={markdownComponents}
         >
-          {block.text}
+          {group.block.text}
         </ReactMarkdown>
       );
-    case 'tool_use':
-      return <ToolUseCard toolName={block.toolName} input={block.input} />;
-    case 'tool_result':
-      return <ToolResultCard content={block.content} isError={block.isError} />;
     case 'thinking':
-      return null;
+      return <ThinkingBlock block={group.block} />;
+    case 'tool_invocation':
+      return <ToolCallLine toolUse={group.toolUse} toolResult={group.toolResult} />;
+    case 'subagent_group':
+      return (
+        <SubagentGroup
+          taskToolUse={group.taskToolUse}
+          taskToolResult={group.taskToolResult}
+          children={group.children}
+        />
+      );
     default:
-      return assertNever(block);
+      return assertNever(group);
   }
 }
 
-/* ---------- Agent avatar resolution ---------- */
+/* ---------- Model label ---------- */
 
-interface AgentAvatarConfig {
-  icon: ReactNode;
-  label: string;
-  bgClass: string;
-}
+const VERSION_RE = /^(.+?)\s+([\d.]+)$/;
 
-function resolveAgentAvatar(agentName?: string): AgentAvatarConfig {
-  const name = agentName?.toLowerCase() ?? '';
-
-  if (name.includes('claude') || name.includes('anthropic')) {
-    return {
-      icon: <ClaudeIcon className="w-3.5 h-3.5 text-agent-claude-fg" />,
-      label: 'Claude',
-      bgClass: 'bg-agent-claude-bg',
-    };
+function ModelLabel({ name }: { name: string }) {
+  const match = VERSION_RE.exec(name);
+  if (match) {
+    return (
+      <span className="text-xs leading-none mb-1.5 block">
+        <span className="sr-only">Model: </span>
+        <span className="font-medium text-muted">{match[1]}</span>
+        <span className="font-normal text-muted/50 ml-0.5">{match[2]}</span>
+      </span>
+    );
   }
-
-  if (
-    name.includes('gpt') ||
-    name.includes('codex') ||
-    name.includes('openai') ||
-    name === 'o1' ||
-    name.includes('o1-') ||
-    name === 'o3' ||
-    name.includes('o3-')
-  ) {
-    return {
-      icon: <OpenAIIcon className="w-3.5 h-3.5 text-agent-openai-fg" />,
-      label: 'OpenAI',
-      bgClass: 'bg-agent-openai-bg',
-    };
-  }
-
-  if (name.includes('gemini') || name.includes('google')) {
-    return {
-      icon: <GeminiIcon className="w-3.5 h-3.5 text-agent-gemini-fg" />,
-      label: 'Gemini',
-      bgClass: 'bg-agent-gemini-bg',
-    };
-  }
-
-  return {
-    icon: <Bot className="w-3.5 h-3.5 text-muted" />,
-    label: 'Agent',
-    bgClass: 'bg-default',
-  };
+  return (
+    <span className="text-xs font-medium text-muted leading-none mb-1.5 block">
+      <span className="sr-only">Model: </span>
+      {name}
+    </span>
+  );
 }
 
 /* ---------- Message components ---------- */
 
 function AgentMessage({ message }: ChatMessageProps) {
-  const avatar = resolveAgentAvatar(message.agentName);
+  const grouped = useMemo(() => groupContentBlocks(message.content), [message.content]);
+  const modelLabel = message.agentName ?? 'Agent';
 
-  /** If every content block is a thinking block, there is nothing visible to render. */
-  const hasVisibleContent =
-    message.isThinking || message.content.some((b) => b.type !== 'thinking');
+  const hasVisibleContent = message.isThinking || grouped.some((g) => g.kind !== 'thinking');
   if (!hasVisibleContent) {
     return null;
   }
 
   return (
-    <div className="flex items-start gap-3 max-w-3xl">
-      <div
-        className={`size-7 shrink-0 mt-0.5 rounded-full flex items-center justify-center ${avatar.bgClass}`}
-      >
-        {avatar.icon}
-      </div>
-
-      <div className="flex-1 min-w-0">
-        <span className="text-xs font-medium text-muted mb-1 block">{avatar.label}</span>
-        {message.isThinking ? (
-          <div className="py-1">
-            <AsciiShipThinking />
-          </div>
-        ) : (
-          <div className="text-sm text-foreground/90 leading-relaxed prose-shipyard space-y-2">
-            {message.content.map((block, i) => (
-              <ContentBlockRenderer key={`${block.type}-${i}`} block={block} />
-            ))}
-          </div>
-        )}
-      </div>
+    <div className="flex flex-col max-w-3xl">
+      <ModelLabel name={modelLabel} />
+      {message.isThinking ? (
+        <div className="py-1">
+          <AsciiShipThinking />
+        </div>
+      ) : (
+        <div className="text-sm text-foreground/90 leading-normal prose-shipyard space-y-1.5">
+          {grouped.map((group, i) => (
+            <GroupedBlockRenderer
+              key={
+                group.kind === 'tool_invocation'
+                  ? group.toolUse.toolUseId
+                  : group.kind === 'subagent_group'
+                    ? group.taskToolUse.toolUseId
+                    : `${group.kind}-${i}`
+              }
+              group={group}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

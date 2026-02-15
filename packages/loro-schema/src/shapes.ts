@@ -31,12 +31,14 @@ export const ContentBlockShape = Shape.plain.discriminatedUnion('type', {
     toolUseId: Shape.plain.string(),
     toolName: Shape.plain.string(),
     input: Shape.plain.string(),
+    parentToolUseId: Shape.plain.string().nullable(),
   }),
   tool_result: Shape.plain.struct({
     type: Shape.plain.string('tool_result'),
     toolUseId: Shape.plain.string(),
     content: Shape.plain.string(),
     isError: Shape.plain.boolean(),
+    parentToolUseId: Shape.plain.string().nullable(),
   }),
   thinking: Shape.plain.struct({
     type: Shape.plain.string('thinking'),
@@ -53,6 +55,7 @@ export const MessageShape = Shape.plain.struct({
   role: Shape.plain.string('user', 'assistant'),
   content: Shape.plain.array(ContentBlockShape),
   timestamp: Shape.plain.number(),
+  model: Shape.plain.string().nullable(),
 });
 
 const A2A_TASK_STATES = [

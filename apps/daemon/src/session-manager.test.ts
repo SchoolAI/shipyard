@@ -293,7 +293,9 @@ describe('SessionManager', () => {
         expect(json.conversation[0]?.role).toBe('assistant');
         expect(json.conversation[0]?.content).toHaveLength(1);
         expect(json.conversation[0]?.content[0]).toEqual({ type: 'text', text: 'First response' });
+        expect(json.conversation[0]?.model).toBe('claude-opus-4-6');
         expect(json.conversation[1]?.content[0]).toEqual({ type: 'text', text: 'Second response' });
+        expect(json.conversation[1]?.model).toBe('claude-opus-4-6');
       });
 
       it('captures both text and tool_use blocks from assistant messages', async () => {
@@ -319,6 +321,7 @@ describe('SessionManager', () => {
           toolUseId: 'tool-1',
           toolName: 'Read',
           input: JSON.stringify({ file_path: '/tmp/test.ts' }),
+          parentToolUseId: null,
         });
       });
 
@@ -363,6 +366,7 @@ describe('SessionManager', () => {
           toolUseId: 'tool-2',
           toolName: 'Bash',
           input: JSON.stringify({ command: 'ls' }),
+          parentToolUseId: null,
         });
       });
     });
@@ -815,6 +819,7 @@ describe('SessionManager', () => {
         toolUseId: 'tool-1',
         content: 'file contents here',
         isError: false,
+        parentToolUseId: null,
       });
     });
 
@@ -839,6 +844,7 @@ describe('SessionManager', () => {
         toolUseId: 'tool-2',
         content: 'command failed',
         isError: true,
+        parentToolUseId: null,
       });
     });
 
@@ -879,6 +885,7 @@ describe('SessionManager', () => {
         toolUseId: 'tool-orphan',
         content: 'orphaned result',
         isError: false,
+        parentToolUseId: null,
       });
     });
   });
@@ -1102,6 +1109,7 @@ describe('SessionManager', () => {
         role: 'user',
         content: [{ type: 'text', text: 'Hello world' }],
         timestamp: Date.now(),
+        model: null,
       });
 
       expect(manager.getLatestUserPrompt()).toBe('Hello world');
@@ -1116,6 +1124,7 @@ describe('SessionManager', () => {
           { type: 'text', text: 'Second part' },
         ],
         timestamp: Date.now(),
+        model: null,
       });
 
       expect(manager.getLatestUserPrompt()).toBe('First part\nSecond part');
@@ -1127,18 +1136,21 @@ describe('SessionManager', () => {
         role: 'user',
         content: [{ type: 'text', text: 'First user msg' }],
         timestamp: Date.now(),
+        model: null,
       });
       taskDoc.conversation.push({
         messageId: 'msg-agent-1',
         role: 'assistant',
         content: [{ type: 'text', text: 'Assistant response' }],
         timestamp: Date.now(),
+        model: null,
       });
       taskDoc.conversation.push({
         messageId: 'msg-user-2',
         role: 'user',
         content: [{ type: 'text', text: 'Follow-up question' }],
         timestamp: Date.now(),
+        model: null,
       });
 
       expect(manager.getLatestUserPrompt()).toBe('Follow-up question');
@@ -1150,6 +1162,7 @@ describe('SessionManager', () => {
         role: 'assistant',
         content: [{ type: 'text', text: 'Assistant only' }],
         timestamp: Date.now(),
+        model: null,
       });
 
       expect(manager.getLatestUserPrompt()).toBeNull();
@@ -1160,10 +1173,17 @@ describe('SessionManager', () => {
         messageId: 'msg-mixed',
         role: 'user',
         content: [
-          { type: 'tool_result', toolUseId: 'tu-1', content: 'some result', isError: false },
+          {
+            type: 'tool_result',
+            toolUseId: 'tu-1',
+            content: 'some result',
+            isError: false,
+            parentToolUseId: null,
+          },
           { type: 'text', text: 'With a tool result' },
         ],
         timestamp: Date.now(),
+        model: null,
       });
 
       expect(manager.getLatestUserPrompt()).toBe('With a tool result');

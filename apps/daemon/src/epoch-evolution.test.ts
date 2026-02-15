@@ -38,12 +38,14 @@ describe('epoch evolution', () => {
           role: 'user',
           content: [{ type: 'text', text: 'Hello from epoch 1' }],
           timestamp: now,
+          model: null,
         });
         draft.conversation.push({
           messageId: 'msg-e1-2',
           role: 'assistant',
           content: [{ type: 'text', text: 'Assistant reply in epoch 1' }],
           timestamp: now + 100,
+          model: null,
         });
       });
 
@@ -227,6 +229,7 @@ describe('epoch evolution', () => {
           role: 'user',
           content: [{ type: 'text', text: 'Fix the auth bug in login.ts' }],
           timestamp: now,
+          model: null,
         });
       });
 
@@ -236,6 +239,7 @@ describe('epoch evolution', () => {
           role: 'assistant',
           content: [{ type: 'text', text: 'I found and fixed the bug.' }],
           timestamp: now + 5000,
+          model: null,
         });
         draft.meta.status = 'completed';
         draft.meta.updatedAt = now + 5000;
