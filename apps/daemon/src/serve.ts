@@ -70,12 +70,9 @@ const TaskEphemeralDeclarations = {
 type TaskEphemeralDecls = typeof TaskEphemeralDeclarations;
 type TaskHandle = HandleWithEphemerals<TaskDocumentShape, TaskEphemeralDecls>;
 
-const DIFF_POLL_INTERVAL_MS = 5_000;
-
 interface ActiveTask {
   taskId: string;
   abortController: AbortController;
-  diffPollTimer: ReturnType<typeof setInterval> | null;
 }
 
 /**
@@ -178,9 +175,6 @@ export async function serve(env: Env): Promise<void> {
     log.info({ state }, 'Connection state changed');
   });
 
-  const diffThrottles = new Map<string, ThrottleState>();
-  const branchDiffThrottles = new Map<string, ThrottleState>();
-
   connection.onMessage((msg) => {
     handleMessage(msg, {
       log,
@@ -191,8 +185,6 @@ export async function serve(env: Env): Promise<void> {
       lifecycle,
       activeTasks,
       watchedTasks,
-      diffThrottles,
-      branchDiffThrottles,
       peerManager,
       env,
       machineId,
@@ -209,18 +201,17 @@ export async function serve(env: Env): Promise<void> {
     branchWatcher.close();
 
     for (const task of activeTasks.values()) {
-      if (task.diffPollTimer) clearInterval(task.diffPollTimer);
       task.abortController.abort();
     }
     activeTasks.clear();
-    for (const state of diffThrottles.values()) {
-      if (state.timer) clearTimeout(state.timer);
+    for (const timer of diffDebounceTimers.values()) {
+      clearTimeout(timer);
     }
-    diffThrottles.clear();
-    for (const state of branchDiffThrottles.values()) {
-      if (state.timer) clearTimeout(state.timer);
+    diffDebounceTimers.clear();
+    for (const timer of branchDiffTimers.values()) {
+      clearTimeout(timer);
     }
-    branchDiffThrottles.clear();
+    branchDiffTimers.clear();
     for (const unsub of watchedTasks.values()) {
       unsub();
     }
@@ -238,11 +229,6 @@ export async function serve(env: Env): Promise<void> {
   await new Promise<never>(() => {});
 }
 
-interface ThrottleState {
-  timer: ReturnType<typeof setTimeout> | null;
-  pending: boolean;
-}
-
 interface MessageHandlerContext {
   log: ReturnType<typeof createChildLogger>;
   signaling: DaemonSignaling;
@@ -252,52 +238,34 @@ interface MessageHandlerContext {
   lifecycle: LifecycleManager;
   activeTasks: Map<string, ActiveTask>;
   watchedTasks: Map<string, () => void>;
-  diffThrottles: Map<string, ThrottleState>;
-  branchDiffThrottles: Map<string, ThrottleState>;
   peerManager: PeerManager;
   env: Env;
   machineId: string;
 }
 
-const DIFF_THROTTLE_MS = 2_000;
-const BRANCH_DIFF_THROTTLE_MS = 10_000;
+const DIFF_DEBOUNCE_MS = 2_000;
+const BRANCH_DIFF_DEBOUNCE_MS = 10_000;
+const diffDebounceTimers = new Map<string, ReturnType<typeof setTimeout>>();
+const branchDiffTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
-/**
- * Leading+trailing throttle: fires immediately on first call, then at most
- * once per cooldown interval. If additional calls arrive during cooldown,
- * a single trailing call fires when the cooldown expires.
- */
-function throttledDiffCapture(
+function debouncedDiffCapture(
   taskId: string,
   cwd: string,
   taskHandle: TaskHandle,
-  log: ReturnType<typeof createChildLogger>,
-  throttles: Map<string, ThrottleState>
+  log: ReturnType<typeof createChildLogger>
 ): void {
-  const existing = throttles.get(taskId);
+  const existing = diffDebounceTimers.get(taskId);
+  if (existing) clearTimeout(existing);
 
-  if (!existing || !existing.timer) {
-    captureDiffState(cwd, taskHandle, log).catch((err: unknown) => {
-      log.warn({ err }, 'Failed to capture diff state');
-    });
-
-    const state: ThrottleState = {
-      timer: setTimeout(() => {
-        const s = throttles.get(taskId);
-        if (s?.pending) {
-          s.pending = false;
-          s.timer = null;
-          throttledDiffCapture(taskId, cwd, taskHandle, log, throttles);
-        } else {
-          throttles.delete(taskId);
-        }
-      }, DIFF_THROTTLE_MS),
-      pending: false,
-    };
-    throttles.set(taskId, state);
-  } else {
-    existing.pending = true;
-  }
+  diffDebounceTimers.set(
+    taskId,
+    setTimeout(() => {
+      diffDebounceTimers.delete(taskId);
+      captureDiffState(cwd, taskHandle, log).catch((err: unknown) => {
+        log.warn({ err }, 'Failed to capture diff state');
+      });
+    }, DIFF_DEBOUNCE_MS)
+  );
 }
 
 async function captureDiffState(
@@ -325,41 +293,24 @@ async function captureDiffState(
   log.debug({ fileCount: files.length }, 'Diff state captured');
 }
 
-/**
- * Leading+trailing throttle for branch diff capture.
- * Same pattern as throttledDiffCapture but with a longer cooldown.
- */
-function throttledBranchDiffCapture(
+function debouncedBranchDiffCapture(
   taskId: string,
   cwd: string,
   taskHandle: TaskHandle,
-  log: ReturnType<typeof createChildLogger>,
-  throttles: Map<string, ThrottleState>
+  log: ReturnType<typeof createChildLogger>
 ): void {
-  const existing = throttles.get(taskId);
+  const existing = branchDiffTimers.get(taskId);
+  if (existing) clearTimeout(existing);
 
-  if (!existing || !existing.timer) {
-    captureBranchDiffState(cwd, taskHandle, log).catch((err: unknown) => {
-      log.warn({ err }, 'Failed to capture branch diff state');
-    });
-
-    const state: ThrottleState = {
-      timer: setTimeout(() => {
-        const s = throttles.get(taskId);
-        if (s?.pending) {
-          s.pending = false;
-          s.timer = null;
-          throttledBranchDiffCapture(taskId, cwd, taskHandle, log, throttles);
-        } else {
-          throttles.delete(taskId);
-        }
-      }, BRANCH_DIFF_THROTTLE_MS),
-      pending: false,
-    };
-    throttles.set(taskId, state);
-  } else {
-    existing.pending = true;
-  }
+  branchDiffTimers.set(
+    taskId,
+    setTimeout(() => {
+      branchDiffTimers.delete(taskId);
+      captureBranchDiffState(cwd, taskHandle, log).catch((err: unknown) => {
+        log.warn({ err }, 'Failed to capture branch diff state');
+      });
+    }, BRANCH_DIFF_DEBOUNCE_MS)
+  );
 }
 
 async function captureBranchDiffState(
@@ -400,15 +351,32 @@ async function captureTurnDiff(
   log: ReturnType<typeof createChildLogger>
 ): Promise<void> {
   const turnEndRef = await captureTreeSnapshot(cwd);
-  if (!turnStartRef || !turnEndRef || turnStartRef === turnEndRef) {
-    log.debug('No turn diff to capture (refs equal or missing)');
+  if (!turnStartRef || !turnEndRef) {
+    log.debug('No turn diff to capture (refs missing)');
     return;
   }
 
-  const [turnDiff, turnFiles] = await Promise.all([
-    getSnapshotDiff(cwd, turnStartRef, turnEndRef),
-    getSnapshotFiles(cwd, turnStartRef, turnEndRef),
-  ]);
+  let turnDiff = '';
+  let turnFiles: Array<{ path: string; status: string }> = [];
+
+  if (turnStartRef !== turnEndRef) {
+    [turnDiff, turnFiles] = await Promise.all([
+      getSnapshotDiff(cwd, turnStartRef, turnEndRef),
+      getSnapshotFiles(cwd, turnStartRef, turnEndRef),
+    ]);
+  }
+
+  if (!turnDiff && turnFiles.length === 0) {
+    [turnDiff, turnFiles] = await Promise.all([
+      getUnstagedDiff(cwd),
+      getChangedFiles(cwd),
+    ]);
+  }
+
+  if (!turnDiff && turnFiles.length === 0) {
+    log.debug('No turn diff to capture (no changes)');
+    return;
+  }
 
   change(taskHandle.doc, (draft) => {
     draft.diffState.lastTurnDiff = turnDiff;
@@ -570,9 +538,6 @@ async function watchTaskDocument(
 
   const json = taskHandle.doc.toJSON();
   const initialCwd = json.config.cwd ?? process.cwd();
-  captureDiffState(initialCwd, taskHandle, taskLog).catch((err: unknown) => {
-    taskLog.warn({ err }, 'Failed to capture initial working tree diff');
-  });
   captureBranchDiffState(initialCwd, taskHandle, taskLog).catch((err: unknown) => {
     taskLog.warn({ err }, 'Failed to capture initial branch diff');
   });
@@ -631,8 +596,8 @@ function onTaskDocChanged(
 
   if (json.meta.status === 'working' || json.meta.status === 'input-required') {
     const activeCwd = json.config.cwd ?? process.cwd();
-    throttledDiffCapture(taskId, activeCwd, taskHandle, taskLog, ctx.diffThrottles);
-    throttledBranchDiffCapture(taskId, activeCwd, taskHandle, taskLog, ctx.branchDiffThrottles);
+    debouncedDiffCapture(taskId, activeCwd, taskHandle, taskLog);
+    debouncedBranchDiffCapture(taskId, activeCwd, taskHandle, taskLog);
 
     taskLog.debug({ status: json.meta.status }, 'Status blocks new work, skipping');
     return;
@@ -664,13 +629,8 @@ function onTaskDocChanged(
 
   const abortController = ctx.lifecycle.createAbortController();
 
-  const activeTask: ActiveTask = { taskId, abortController, diffPollTimer: null };
+  const activeTask: ActiveTask = { taskId, abortController };
   ctx.activeTasks.set(taskId, activeTask);
-
-  activeTask.diffPollTimer = setInterval(() => {
-    throttledDiffCapture(taskId, cwd, taskHandle, taskLog, ctx.diffThrottles);
-    throttledBranchDiffCapture(taskId, cwd, taskHandle, taskLog, ctx.branchDiffThrottles);
-  }, DIFF_POLL_INTERVAL_MS);
 
   ctx.signaling.updateStatus('running', taskId);
 
@@ -733,14 +693,8 @@ interface CleanupTaskRunOptions {
 async function cleanupTaskRun(opts: CleanupTaskRunOptions): Promise<void> {
   const { taskId, cwd, taskHandle, taskLog, turnStartRefPromise, abortController, ctx } = opts;
 
-  const activeTask = ctx.activeTasks.get(taskId);
-  if (activeTask?.diffPollTimer) {
-    clearInterval(activeTask.diffPollTimer);
-    activeTask.diffPollTimer = null;
-  }
-
-  clearThrottleState(ctx.diffThrottles, taskId);
-  clearThrottleState(ctx.branchDiffThrottles, taskId);
+  clearDebouncedTimer(diffDebounceTimers, taskId);
+  clearDebouncedTimer(branchDiffTimers, taskId);
 
   try {
     await captureDiffState(cwd, taskHandle, taskLog);
@@ -779,11 +733,14 @@ async function cleanupTaskRun(opts: CleanupTaskRunOptions): Promise<void> {
   ctx.signaling.updateStatus('idle');
 }
 
-function clearThrottleState(throttles: Map<string, ThrottleState>, taskId: string): void {
-  const state = throttles.get(taskId);
-  if (state) {
-    if (state.timer) clearTimeout(state.timer);
-    throttles.delete(taskId);
+function clearDebouncedTimer(
+  timers: Map<string, ReturnType<typeof setTimeout>>,
+  taskId: string
+): void {
+  const timer = timers.get(taskId);
+  if (timer) {
+    clearTimeout(timer);
+    timers.delete(taskId);
   }
 }
 
@@ -1020,12 +977,12 @@ async function runTask(opts: RunTaskOptions): Promise<SessionResult> {
       : buildCanUseTool(taskHandle, log, roomDoc, taskId);
 
   const stderr = (data: string) => {
-    const cleaned = data.replace(/\x1b\[[0-9;]*[A-Za-z]/g, '').trim();
-    if (!cleaned) return;
-    if (cleaned.includes('Error') || cleaned.includes('error')) {
-      log.error({ stderr: cleaned }, 'SDK subprocess error');
+    const trimmed = data.trim();
+    if (!trimmed) return;
+    if (trimmed.includes('Error') || trimmed.includes('error')) {
+      log.error({ stderr: trimmed }, 'SDK subprocess error');
     } else {
-      log.debug({ stderr: cleaned }, 'SDK subprocess stderr');
+      log.debug({ stderr: trimmed }, 'SDK subprocess stderr');
     }
   };
 

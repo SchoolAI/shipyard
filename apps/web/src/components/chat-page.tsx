@@ -19,7 +19,6 @@ import { useTaskDocument } from '../hooks/use-task-document';
 import { useTaskIndex } from '../hooks/use-task-index';
 import { useWebRTCSync } from '../hooks/use-webrtc-sync';
 import { useRepo, useWebRtcAdapter } from '../providers/repo-provider';
-import type { DiffScope } from '../stores';
 import { useMessageStore, useTaskStore, useUIStore } from '../stores';
 import type { ChatComposerHandle, SubmitPayload } from './chat-composer';
 import { ChatComposer } from './chat-composer';
@@ -290,7 +289,7 @@ export function ChatPage() {
 
   useEffect(() => {
     if (isDiffOpen && !prevDiffOpen.current) {
-      setDiffLastViewedAt(diffScope, Date.now());
+      setDiffLastViewedAt(Date.now());
       requestAnimationFrame(() => {
         diffRef.current?.focus();
       });
@@ -300,7 +299,7 @@ export function ChatPage() {
       });
     }
     prevDiffOpen.current = isDiffOpen;
-  }, [isDiffOpen, setDiffLastViewedAt, diffScope]);
+  }, [isDiffOpen, setDiffLastViewedAt]);
 
   useEffect(() => {
     if (isDiffOpen && typeof window !== 'undefined' && window.innerWidth < 1280) {
@@ -524,13 +523,14 @@ export function ChatPage() {
     if (isDiffOpen) return false;
     const ds = loroTask.diffState;
     if (!ds) return false;
-    const scopeTimestamps: [DiffScope, number][] = [
-      ['working-tree', ds.updatedAt],
-      ['branch', ds.branchUpdatedAt],
-      ['last-turn', ds.lastTurnUpdatedAt],
-    ];
-    return scopeTimestamps.some(([scope, updatedAt]) => updatedAt > (diffLastViewedAt[scope] ?? 0));
-  }, [isDiffOpen, loroTask.diffState, diffLastViewedAt]);
+    const relevantUpdatedAt =
+      diffScope === 'branch'
+        ? ds.branchUpdatedAt
+        : diffScope === 'last-turn'
+          ? ds.lastTurnUpdatedAt
+          : ds.updatedAt;
+    return relevantUpdatedAt > diffLastViewedAt;
+  }, [isDiffOpen, loroTask.diffState, diffScope, diffLastViewedAt]);
 
   const hasMessages = messages.length > 0;
 

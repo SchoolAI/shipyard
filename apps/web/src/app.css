@@ -98,7 +98,7 @@ html, body {
   --field-shadow: 0 0 0 0 transparent inset;
 }
 
-/* @git-diff-view/react v0.0.39 overrides -- map to Shipyard tokens */
+/* @git-diff-view dark theme overrides -- map to Shipyard tokens */
 .dark .diff-tailwindcss-wrapper[data-theme="dark"] .diff-style-root,
 [data-theme="dark"] .diff-tailwindcss-wrapper[data-theme="dark"] .diff-style-root {
   --diff-add-content--: var(--diff-add-bg);
@@ -121,7 +121,7 @@ html, body {
   color: var(--foreground);
 }
 
-/* @git-diff-view/react v0.0.39 overrides -- map to Shipyard tokens */
+/* @git-diff-view light theme overrides -- map to Shipyard tokens */
 .light .diff-tailwindcss-wrapper[data-theme="light"] .diff-style-root,
 [data-theme="light"] .diff-tailwindcss-wrapper[data-theme="light"] .diff-style-root {
   --diff-add-content--: var(--diff-add-bg);

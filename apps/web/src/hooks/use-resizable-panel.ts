@@ -9,9 +9,9 @@ import {
   useState,
 } from 'react';
 
-const MIN_WIDTH = 320;
+const MIN_WIDTH = 400;
 const MAX_WIDTH_PERCENT = 0.8;
-const DEFAULT_WIDTH_PERCENT = 0.38;
+const DEFAULT_WIDTH_PERCENT = 0.5;
 const KEYBOARD_STEP = 20;
 
 interface UseResizablePanelOptions {
@@ -39,7 +39,6 @@ interface UseResizablePanelReturn {
     className: string;
   };
   panelStyle: CSSProperties;
-  clampedWidth: number;
   isDragging: boolean;
 }
 
@@ -57,20 +56,8 @@ export function useResizablePanel({
 }: UseResizablePanelOptions): UseResizablePanelReturn {
   const panelRef = useRef<HTMLElement | null>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [viewportWidth, setViewportWidth] = useState(() =>
-    typeof window !== 'undefined' ? window.innerWidth : 1200
-  );
   const onWidthChangeRef = useRef(onWidthChange);
   onWidthChangeRef.current = onWidthChange;
-
-  const widthRef = useRef(width);
-  widthRef.current = width;
-
-  useEffect(() => {
-    const handler = () => setViewportWidth(window.innerWidth);
-    window.addEventListener('resize', handler);
-    return () => window.removeEventListener('resize', handler);
-  }, []);
 
   const dragStateRef = useRef<{
     initialClientX: number;
@@ -80,8 +67,8 @@ export function useResizablePanel({
   } | null>(null);
 
   const getMaxWidth = useCallback(
-    () => Math.floor(viewportWidth * maxWidthPercent),
-    [viewportWidth, maxWidthPercent]
+    () => Math.floor(window.innerWidth * maxWidthPercent),
+    [maxWidthPercent]
   );
 
   useEffect(() => {
@@ -106,11 +93,10 @@ export function useResizablePanel({
 
       panel.style.transition = 'none';
 
-      const currentWidth = widthRef.current;
       dragStateRef.current = {
         initialClientX: e.clientX,
-        initialWidth: currentWidth,
-        currentWidth: currentWidth,
+        initialWidth: width,
+        currentWidth: width,
         rafId: null,
       };
       setIsDragging(true);
@@ -148,11 +134,10 @@ export function useResizablePanel({
         dragStateRef.current = null;
         setIsDragging(false);
 
-        // Keep the inline width set to the final value so there is no frame
-        // where the panel has no width constraint (which causes it to expand
-        // to full screen). React will overwrite this on next render via panelStyle.
-        panel.style.width = `${finalWidth}px`;
-        panel.style.removeProperty('transition');
+        requestAnimationFrame(() => {
+          panel.style.removeProperty('transition');
+          panel.style.removeProperty('width');
+        });
 
         onWidthChangeRef.current(finalWidth);
       };
@@ -161,7 +146,7 @@ export function useResizablePanel({
       target.addEventListener('pointerup', onPointerEnd);
       target.addEventListener('pointercancel', onPointerEnd);
     },
-    [minWidth, getMaxWidth]
+    [width, minWidth, getMaxWidth]
   );
 
   const handleKeyDown = useCallback(
@@ -205,7 +190,6 @@ export function useResizablePanel({
 
   const panelStyle: CSSProperties = {
     width: isOpen ? clampedWidth : 0,
-    willChange: isDragging ? 'width' : undefined,
   };
 
   const separatorProps = {
@@ -230,5 +214,5 @@ export function useResizablePanel({
     ].join(' '),
   };
 
-  return { panelRef, separatorProps, panelStyle, clampedWidth, isDragging };
+  return { panelRef, separatorProps, panelStyle, isDragging };
 }

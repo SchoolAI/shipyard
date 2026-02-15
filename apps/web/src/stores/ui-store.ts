@@ -19,7 +19,7 @@ export interface UIStore {
   diffWordWrap: boolean;
   diffScope: DiffScope;
   diffViewType: DiffViewType;
-  diffLastViewedAt: Record<DiffScope, number>;
+  diffLastViewedAt: number;
   terminalPanelHeight: number;
 
   toggleSidebar: () => void;
@@ -41,7 +41,7 @@ export interface UIStore {
   setDiffWordWrap: (wrap: boolean) => void;
   setDiffScope: (scope: DiffScope) => void;
   setDiffViewType: (type: DiffViewType) => void;
-  setDiffLastViewedAt: (scope: DiffScope, ts: number) => void;
+  setDiffLastViewedAt: (ts: number) => void;
   setTerminalPanelHeight: (height: number) => void;
 }
 
@@ -58,11 +58,11 @@ export const useUIStore = create<UIStore>()(
         selectedMachineId: null,
         selectedEnvironmentPath: null,
         theme: 'dark',
-        diffPanelWidth: typeof window !== 'undefined' ? Math.round(window.innerWidth * 0.38) : 520,
+        diffPanelWidth: typeof window !== 'undefined' ? Math.round(window.innerWidth * 0.5) : 600,
         diffWordWrap: false,
         diffScope: 'working-tree',
         diffViewType: 'unified',
-        diffLastViewedAt: { 'working-tree': 0, branch: 0, 'last-turn': 0 },
+        diffLastViewedAt: 0,
         terminalPanelHeight:
           typeof window !== 'undefined' ? Math.round(window.innerHeight * 0.4) : 400,
 
@@ -133,18 +133,12 @@ export const useUIStore = create<UIStore>()(
 
         setDiffViewType: (type) => set({ diffViewType: type }, undefined, 'ui/setDiffViewType'),
 
-        setDiffLastViewedAt: (scope, ts) =>
-          set(
-            (state) => ({
-              diffLastViewedAt: { ...state.diffLastViewedAt, [scope]: ts },
-            }),
-            undefined,
-            'ui/setDiffLastViewedAt'
-          ),
+        setDiffLastViewedAt: (ts) =>
+          set({ diffLastViewedAt: ts }, undefined, 'ui/setDiffLastViewedAt'),
 
         setDiffPanelWidth: (width) => {
           const max = typeof window !== 'undefined' ? Math.floor(window.innerWidth * 0.8) : 1200;
-          const clamped = Math.min(Math.max(width, 320), max);
+          const clamped = Math.min(Math.max(width, 400), max);
           set({ diffPanelWidth: clamped }, undefined, 'ui/setDiffPanelWidth');
         },
 
@@ -156,29 +150,7 @@ export const useUIStore = create<UIStore>()(
       }),
       {
         name: 'shipyard-ui',
-        version: 2,
-        migrate: (persisted, version) => {
-          const state = persisted as Record<string, unknown> as Partial<UIStore>;
-          if (version < 2) {
-            state.diffLastViewedAt = { 'working-tree': 0, branch: 0, 'last-turn': 0 };
-          }
-          return state as UIStore;
-        },
-        onRehydrateStorage: () => (state) => {
-          if (!state || typeof window === 'undefined') return;
-
-          const maxWidth = Math.floor(window.innerWidth * 0.8);
-          const clampedWidth = Math.min(Math.max(state.diffPanelWidth, 320), maxWidth);
-          if (clampedWidth !== state.diffPanelWidth) {
-            state.setDiffPanelWidth(clampedWidth);
-          }
-
-          const maxHeight = Math.floor(window.innerHeight * 0.7);
-          const clampedHeight = Math.min(Math.max(state.terminalPanelHeight, 100), maxHeight);
-          if (clampedHeight !== state.terminalPanelHeight) {
-            state.setTerminalPanelHeight(clampedHeight);
-          }
-        },
+        version: 1,
         partialize: (state) => ({
           isSidebarExpanded: state.isSidebarExpanded,
           selectedMachineId: state.selectedMachineId,

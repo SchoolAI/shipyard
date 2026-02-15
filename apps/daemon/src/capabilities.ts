@@ -46,10 +46,33 @@ function runWithTimeout(
 }
 
 const DIFF_TIMEOUT_MS = 15_000;
-const MAX_DIFF_SIZE = 1_000_000;
+const MAX_DIFF_SIZE = 200_000;
+
+async function withIntentToAdd<T>(cwd: string, fn: () => Promise<T>): Promise<T> {
+  let added = false;
+  try {
+    const untracked = await runWithTimeout(
+      'git',
+      ['ls-files', '--others', '--exclude-standard'],
+      cwd,
+      TIMEOUT_MS
+    );
+    if (untracked) {
+      await runWithTimeout('git', ['add', '-N', '.'], cwd, TIMEOUT_MS);
+      added = true;
+    }
+    return await fn();
+  } finally {
+    if (added) {
+      await runWithTimeout('git', ['reset'], cwd, TIMEOUT_MS).catch(() => {});
+    }
+  }
+}
 
 export async function getUnstagedDiff(cwd: string): Promise<string> {
-  const result = await runWithTimeout('git', ['diff', '--no-color'], cwd, DIFF_TIMEOUT_MS);
+  const result = await withIntentToAdd(cwd, () =>
+    runWithTimeout('git', ['diff', '--no-color'], cwd, DIFF_TIMEOUT_MS)
+  );
   return result.length > MAX_DIFF_SIZE
     ? `${result.slice(0, MAX_DIFF_SIZE)}\n\n... diff truncated (exceeds 1MB) ...\n`
     : result;
@@ -165,16 +188,6 @@ export async function getBranchFiles(
   }
 }
 
-/**
- * Capture the full working-tree state as a git ref for later diffing.
- *
- * Returns a stash ref (uncommitted changes) or HEAD (clean tree). Callers
- * diff the turn-start ref against the turn-end ref to produce a turn diff.
- * The two refs may be of different kinds (e.g., stash vs HEAD) when the agent
- * commits during a turn. This is intentional: git can diff any two tree-ish
- * objects, so a stash ref vs a HEAD ref produces correct results regardless
- * of whether the agent committed, staged, or left changes uncommitted.
- */
 export async function captureTreeSnapshot(cwd: string): Promise<string | null> {
   try {
     const stashRef = await runWithTimeout('git', ['stash', 'create'], cwd, DIFF_TIMEOUT_MS);
