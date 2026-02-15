@@ -2,8 +2,8 @@ import { Kbd } from '@heroui/react';
 import { Command } from 'cmdk';
 import { Search } from 'lucide-react';
 import { useCallback, useState } from 'react';
-import { useCommandRegistry } from '../../hooks/use-command-registry';
-import { useUIStore } from '../../stores';
+import { useCommandRegistry } from '../../../hooks/use-command-registry';
+import { useUIStore } from '../../../stores';
 import type { CommandItem } from './types';
 
 const ITEM_CLASS =

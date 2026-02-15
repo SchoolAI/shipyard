@@ -1,11 +1,11 @@
 import { type A2ATaskState, LOCAL_USER_ID, updateTaskInIndex } from '@shipyard/loro-schema';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
-import { createActionsProvider } from '../components/command-palette/providers/actions-provider';
-import { createMessageSearchProvider } from '../components/command-palette/providers/message-search-provider';
-import { createRecentProvider } from '../components/command-palette/providers/recent-provider';
-import { createTaskStatusProvider } from '../components/command-palette/providers/task-status-provider';
-import { createTasksProvider } from '../components/command-palette/providers/tasks-provider';
-import type { CommandContext, CommandItem } from '../components/command-palette/types';
+import { createActionsProvider } from '../components/composer/command-palette/providers/actions-provider';
+import { createMessageSearchProvider } from '../components/composer/command-palette/providers/message-search-provider';
+import { createRecentProvider } from '../components/composer/command-palette/providers/recent-provider';
+import { createTaskStatusProvider } from '../components/composer/command-palette/providers/task-status-provider';
+import { createTasksProvider } from '../components/composer/command-palette/providers/tasks-provider';
+import type { CommandContext, CommandItem } from '../components/composer/command-palette/types';
 import { useTaskStore, useUIStore } from '../stores';
 import { useFrecencyStore } from '../stores/frecency-store';
 import { useTaskIndex } from './use-task-index';

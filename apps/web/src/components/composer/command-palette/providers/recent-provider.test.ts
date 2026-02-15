@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { useFrecencyStore } from '../../../stores/frecency-store';
+import { useFrecencyStore } from '../../../../stores/frecency-store';
 import type { CommandContext, CommandItem, CommandProvider } from '../types';
 import { createRecentProvider } from './recent-provider';
 

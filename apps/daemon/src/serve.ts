@@ -367,10 +367,7 @@ async function captureTurnDiff(
   }
 
   if (!turnDiff && turnFiles.length === 0) {
-    [turnDiff, turnFiles] = await Promise.all([
-      getUnstagedDiff(cwd),
-      getChangedFiles(cwd),
-    ]);
+    [turnDiff, turnFiles] = await Promise.all([getUnstagedDiff(cwd), getChangedFiles(cwd)]);
   }
 
   if (!turnDiff && turnFiles.length === 0) {
@@ -537,7 +534,8 @@ async function watchTaskDocument(
   }
 
   const json = taskHandle.doc.toJSON();
-  const initialCwd = json.config.cwd ?? process.cwd();
+  const lastUserMsg = [...json.conversation].reverse().find((m) => m.role === 'user');
+  const initialCwd = lastUserMsg?.cwd ?? process.cwd();
   captureBranchDiffState(initialCwd, taskHandle, taskLog).catch((err: unknown) => {
     taskLog.warn({ err }, 'Failed to capture initial branch diff');
   });
@@ -595,7 +593,8 @@ function onTaskDocChanged(
   );
 
   if (json.meta.status === 'working' || json.meta.status === 'input-required') {
-    const activeCwd = json.config.cwd ?? process.cwd();
+    const activeLastUserMsg = [...json.conversation].reverse().find((m) => m.role === 'user');
+    const activeCwd = activeLastUserMsg?.cwd ?? process.cwd();
     debouncedDiffCapture(taskId, activeCwd, taskHandle, taskLog);
     debouncedBranchDiffCapture(taskId, activeCwd, taskHandle, taskLog);
 

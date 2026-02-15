@@ -3,10 +3,6 @@
     {
       "name": "shipyard",
       "path": "."
-    },
-    {
-      "name": "\ud83c\udf33\ud83d\udc41\ufe0f add-file-viewer",
-      "path": "../shipyard-wt/add-file-viewer"
     }
   ]
 }

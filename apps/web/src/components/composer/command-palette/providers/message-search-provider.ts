@@ -1,9 +1,9 @@
 import type { TaskIndexEntry } from '@shipyard/loro-schema';
 import { MessageSquare } from 'lucide-react';
-import { useMessageStore } from '../../../stores/message-store';
-import { useTaskStore } from '../../../stores/task-store';
-import type { MessageData } from '../../../stores/types';
-import { fuzzyScore } from '../../../utils/fuzzy-match';
+import { useMessageStore } from '../../../../stores/message-store';
+import { useTaskStore } from '../../../../stores/task-store';
+import type { MessageData } from '../../../../stores/types';
+import { fuzzyScore } from '../../../../utils/fuzzy-match';
 import type { CommandContext, CommandItem, CommandProvider } from '../types';
 
 const MAX_RESULTS = 10;

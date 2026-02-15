@@ -1,8 +1,8 @@
 import { GitCompareArrows, Keyboard, PanelLeftClose, Plus, Settings, Terminal } from 'lucide-react';
-import { HOTKEYS } from '../../../constants/hotkeys';
-import { useTaskStore } from '../../../stores/task-store';
-import { useUIStore } from '../../../stores/ui-store';
-import { fuzzyScore } from '../../../utils/fuzzy-match';
+import { HOTKEYS } from '../../../../constants/hotkeys';
+import { useTaskStore } from '../../../../stores/task-store';
+import { useUIStore } from '../../../../stores/ui-store';
+import { fuzzyScore } from '../../../../utils/fuzzy-match';
 import type { CommandContext, CommandItem, CommandProvider } from '../types';
 
 interface ActionDef {
