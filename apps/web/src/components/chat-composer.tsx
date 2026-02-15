@@ -1,6 +1,6 @@
-import { Button, Tooltip } from '@heroui/react';
+import { Button, Kbd, Tooltip } from '@heroui/react';
 import type { PermissionMode } from '@shipyard/loro-schema';
-import { ArrowUp, Mic } from 'lucide-react';
+import { ArrowUp, Mic, X } from 'lucide-react';
 import type { KeyboardEvent } from 'react';
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import type { GitRepoInfo, ModelInfo } from '../hooks/use-machine-selection';
@@ -40,6 +40,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
   ref
 ) {
   const [value, setValue] = useState('');
+  const [stashedText, setStashedText] = useState('');
   const [permissionMode, setPermissionMode] = useState<PermissionMode>('default');
   const [reasoningLevel, setReasoningLevel] = useState<ReasoningLevel>('medium');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -88,13 +89,14 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
   );
 
   const rafRef = useRef<number>(0);
+  const stashedTextRef = useRef(stashedText);
+  stashedTextRef.current = stashedText;
 
   useEffect(() => {
     return () => cancelAnimationFrame(rafRef.current);
   }, []);
 
-  const handleClearInput = useCallback(() => {
-    setValue('');
+  const resetTextareaHeight = useCallback(() => {
     rafRef.current = requestAnimationFrame(() => {
       const textarea = textareaRef.current;
       if (textarea) {
@@ -103,6 +105,27 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
       }
     });
   }, []);
+
+  const restoreStash = useCallback(() => {
+    const pending = stashedTextRef.current;
+    if (!pending) return;
+    setStashedText('');
+    setValue(pending);
+    rafRef.current = requestAnimationFrame(() => {
+      const textarea = textareaRef.current;
+      if (!textarea) return;
+      textarea.style.height = 'auto';
+      const scrollHeight = textarea.scrollHeight;
+      textarea.style.height = `${Math.min(scrollHeight, MAX_HEIGHT)}px`;
+      textarea.style.overflowY = scrollHeight > MAX_HEIGHT ? 'auto' : 'hidden';
+    });
+  }, []);
+
+  const handleClearInput = useCallback(() => {
+    setValue('');
+    resetTextareaHeight();
+    requestAnimationFrame(() => restoreStash());
+  }, [resetTextareaHeight, restoreStash]);
 
   const slashCommands = useSlashCommands({
     onExecute: handleSlashExecute,
@@ -142,15 +165,58 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
     });
     setValue('');
     slashCommands.close();
+    resetTextareaHeight();
+    requestAnimationFrame(() => restoreStash());
+  }, [
+    value,
+    onSubmit,
+    slashCommands,
+    selectedModelId,
+    reasoningLevel,
+    permissionMode,
+    resetTextareaHeight,
+    restoreStash,
+  ]);
 
+  const handleStash = useCallback(() => {
+    const trimmed = value.trim();
+    if (!trimmed) return;
+    setStashedText(trimmed);
+    setValue('');
+    resetTextareaHeight();
+  }, [value, resetTextareaHeight]);
+
+  const handleUnstash = useCallback(() => {
+    if (!stashedText) return;
+    setValue(stashedText);
+    setStashedText('');
     rafRef.current = requestAnimationFrame(() => {
-      const textarea = textareaRef.current;
-      if (textarea) {
-        textarea.style.height = 'auto';
-        textarea.style.overflowY = 'hidden';
-      }
+      adjustHeight();
+      textareaRef.current?.focus();
     });
-  }, [value, onSubmit, slashCommands, selectedModelId, reasoningLevel, permissionMode]);
+  }, [stashedText, adjustHeight]);
+
+  const handleDiscardStash = useCallback(() => {
+    setStashedText('');
+  }, []);
+
+  // Bind Cmd+S / Ctrl+S directly via addEventListener instead of react-hotkeys-hook.
+  // react-hotkeys-hook v5 has a known bug where enableOnFormTags doesn't fire when
+  // a textarea is focused (https://github.com/JohannesKlauss/react-hotkeys-hook/issues/1231).
+  // Since stash only makes sense while the user is typing, we need the raw listener.
+  useEffect(() => {
+    const onKeyDown = (e: globalThis.KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+        e.preventDefault();
+        const trimmed = textareaRef.current?.value.trim();
+        if (trimmed) {
+          handleStash();
+        }
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [handleStash]);
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -185,6 +251,37 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
             onClose={slashCommands.close}
             onHover={slashCommands.setSelectedIndex}
           />
+        )}
+
+        {/* Stash indicator */}
+        {stashedText && (
+          <div
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
+            className="flex items-center gap-2 px-4 pt-2.5 pb-1"
+          >
+            <button
+              type="button"
+              onClick={handleUnstash}
+              aria-label="Restore stashed prompt"
+              className="flex items-center gap-2 min-w-0 flex-1 group"
+            >
+              <span className="text-xs text-muted/50 shrink-0">Stashed</span>
+              <span className="text-xs text-muted/40 truncate">{stashedText}</span>
+              <Kbd className="text-[10px] opacity-40 shrink-0 hidden sm:inline-flex">
+                auto-restores
+              </Kbd>
+            </button>
+            <button
+              type="button"
+              onClick={handleDiscardStash}
+              aria-label="Discard stashed prompt"
+              className="text-muted/30 hover:text-muted/60 transition-colors shrink-0 p-0.5"
+            >
+              <X className="w-3 h-3" />
+            </button>
+          </div>
         )}
 
         {/* Textarea area */}

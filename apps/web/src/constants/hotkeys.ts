@@ -91,4 +91,11 @@ export const HOTKEYS = {
     description: 'Show keyboard shortcuts',
     global: false,
   },
+  stashPrompt: {
+    key: 'meta+s',
+    label: 'Stash Prompt',
+    display: '⌘S',
+    description: 'Stash current input for later',
+    global: true,
+  },
 } as const satisfies Record<string, HotkeyDef>;
