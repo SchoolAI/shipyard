@@ -37,6 +37,7 @@ Domain expertise is in skills — use subagents to keep the main context clean.
 - `accessibility` — WCAG 2.2, ARIA patterns, keyboard nav, focus management, screen readers
 - `agent-sdk-expert` — Claude Agent SDK (subagents, hooks, sessions)
 - `a2a-protocol-expert` — A2A protocol + @a2a-js/sdk
+- `mcp-protocol-expert` — MCP protocol + @modelcontextprotocol/sdk
 - `design` — UI/UX design principles, layout, accessibility, visual hierarchy, responsive
 - `mobile` — Mobile-first responsive, touch interactions, viewport units, safe areas, virtual keyboard, container queries
 - `engineering-standards` — Quality gates, Biome, fan-in coverage, meta-tests
@@ -50,7 +51,7 @@ Domain expertise is in skills — use subagents to keep the main context clean.
 
 ## Local Reference Repos
 
-For Loro, Agent SDK, and A2A work — always search local repos, never web search:
+For Loro, Agent SDK, A2A, and MCP work — always search local repos, never web search:
 
 | Repo | Path |
 |------|------|
@@ -58,6 +59,8 @@ For Loro, Agent SDK, and A2A work — always search local repos, never web searc
 | Claude Agent SDK | `/Users/jacobpetterle/Working Directory/claude-agent-sdk-typescript/` |
 | A2A spec | `/Users/jacobpetterle/Working Directory/A2A/` |
 | A2A JS SDK | `/Users/jacobpetterle/Working Directory/a2a-js/` |
+| MCP spec | `/Users/jacobpetterle/Working Directory/mcp-specification/` |
+| MCP TypeScript SDK | `/Users/jacobpetterle/Working Directory/mcp-typescript-sdk/` |
 
 ## Key Docs (read on-demand, not memorized)
 

@@ -4,6 +4,7 @@ description: "Adversarial code reviewer that tries to DISPROVE correctness. Use 
 skills:
   - engineering-standards
   - loro-expert
+  - accessibility
 tools: Read, Glob, Grep, Bash
 model: inherit
 memory: project

@@ -4,9 +4,11 @@ description: "Frontend specialist for Shipyard web app (planned). Use when build
 skills:
   - accessibility
   - design
+  - mobile
   - heroui-expert
   - tiptap-expert
   - loro-expert
+  - zustand-expert
   - engineering-standards
 tools: Read, Write, Edit, Glob, Grep, Bash
 model: inherit

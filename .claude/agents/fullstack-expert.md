@@ -4,11 +4,13 @@ description: "Full-stack specialist for Shipyard. Use when a task touches both f
 skills:
   - accessibility
   - design
+  - mobile
   - heroui-expert
   - tiptap-expert
   - loro-expert
   - agent-sdk-expert
   - a2a-protocol-expert
+  - mcp-protocol-expert
   - engineering-standards
 tools: Read, Write, Edit, Glob, Grep, Bash
 model: inherit

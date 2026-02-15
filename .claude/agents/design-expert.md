@@ -4,6 +4,7 @@ description: "UI/UX design specialist for visual review and layout decisions. Us
 skills:
   - accessibility
   - design
+  - mobile
   - heroui-expert
   - engineering-standards
   - tiptap-expert
