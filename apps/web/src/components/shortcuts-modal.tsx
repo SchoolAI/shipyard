@@ -1,31 +1,45 @@
 import { Kbd, Modal } from '@heroui/react';
-import { HOTKEYS } from '../constants/hotkeys';
+import { HOTKEYS, type HotkeyContext } from '../constants/hotkeys';
 import { useUIStore } from '../stores';
 
 interface DisplayShortcut {
   label: string;
   keys: string[];
-  global: boolean;
+  context: HotkeyContext;
 }
 
-function buildDisplayList(): { global: DisplayShortcut[]; navigation: DisplayShortcut[] } {
+const CONTEXT_LABELS: Record<HotkeyContext, string> = {
+  global: 'Global',
+  navigation: 'Navigation',
+  composer: 'Composer',
+};
+
+const CONTEXT_DESCRIPTIONS: Record<HotkeyContext, string> = {
+  global: 'Active everywhere, including form inputs',
+  navigation: 'Active when not typing in an input',
+  composer: 'Active when the message composer is focused',
+};
+
+function buildDisplayList(): Record<HotkeyContext, DisplayShortcut[]> {
   const grouped = new Map<string, DisplayShortcut>();
   for (const h of Object.values(HOTKEYS)) {
-    const existing = grouped.get(h.label);
+    const groupKey = `${h.context}:${h.label}`;
+    const existing = grouped.get(groupKey);
     if (existing) {
       existing.keys.push(h.display);
     } else {
-      grouped.set(h.label, { label: h.label, keys: [h.display], global: h.global });
+      grouped.set(groupKey, { label: h.label, keys: [h.display], context: h.context });
     }
   }
   const all = [...grouped.values()];
   return {
-    global: all.filter((s) => s.global),
-    navigation: all.filter((s) => !s.global),
+    global: all.filter((s) => s.context === 'global'),
+    navigation: all.filter((s) => s.context === 'navigation'),
+    composer: all.filter((s) => s.context === 'composer'),
   };
 }
 
-const { global: globalShortcuts, navigation: navigationShortcuts } = buildDisplayList();
+const sections = buildDisplayList();
 
 function ShortcutRow({ shortcut }: { shortcut: DisplayShortcut }) {
   return (
@@ -43,10 +57,18 @@ function ShortcutRow({ shortcut }: { shortcut: DisplayShortcut }) {
   );
 }
 
-function ShortcutSection({ title, shortcuts }: { title: string; shortcuts: DisplayShortcut[] }) {
+function ShortcutSection({
+  context,
+  shortcuts,
+}: {
+  context: HotkeyContext;
+  shortcuts: DisplayShortcut[];
+}) {
+  if (shortcuts.length === 0) return null;
   return (
     <div>
-      <h3 className="text-xs font-medium text-muted/60 mb-2">{title}</h3>
+      <h3 className="text-xs font-medium text-muted/60 mb-0.5">{CONTEXT_LABELS[context]}</h3>
+      <p className="text-[10px] text-muted/40 mb-2">{CONTEXT_DESCRIPTIONS[context]}</p>
       <div className="space-y-0.5">
         {shortcuts.map((s) => (
           <ShortcutRow key={s.label} shortcut={s} />
@@ -70,8 +92,11 @@ export function ShortcutsModal() {
             </h2>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-10">
-              <ShortcutSection title="Global" shortcuts={globalShortcuts} />
-              <ShortcutSection title="Navigation" shortcuts={navigationShortcuts} />
+              <div className="space-y-5">
+                <ShortcutSection context="global" shortcuts={sections.global} />
+                <ShortcutSection context="composer" shortcuts={sections.composer} />
+              </div>
+              <ShortcutSection context="navigation" shortcuts={sections.navigation} />
             </div>
 
             <p className="mt-5 text-xs text-muted/40 text-center">

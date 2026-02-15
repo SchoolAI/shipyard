@@ -178,14 +178,6 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
     restoreStash,
   ]);
 
-  const handleStash = useCallback(() => {
-    const trimmed = value.trim();
-    if (!trimmed) return;
-    setStashedText(trimmed);
-    setValue('');
-    resetTextareaHeight();
-  }, [value, resetTextareaHeight]);
-
   const handleUnstash = useCallback(() => {
     if (!stashedText) return;
     setValue(stashedText);
@@ -200,23 +192,27 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
     setStashedText('');
   }, []);
 
-  // Bind Cmd+S / Ctrl+S directly via addEventListener instead of react-hotkeys-hook.
-  // react-hotkeys-hook v5 has a known bug where enableOnFormTags doesn't fire when
-  // a textarea is focused (https://github.com/JohannesKlauss/react-hotkeys-hook/issues/1231).
-  // Since stash only makes sense while the user is typing, we need the raw listener.
+  /**
+   * NOTE: Raw addEventListener workaround — react-hotkeys-hook v5 enableOnFormTags
+   * doesn't fire when textarea is focused (github.com/JohannesKlauss/react-hotkeys-hook/issues/1231).
+   */
   useEffect(() => {
     const onKeyDown = (e: globalThis.KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 's') {
         e.preventDefault();
         const trimmed = textareaRef.current?.value.trim();
         if (trimmed) {
-          handleStash();
+          setStashedText(trimmed);
+          setValue('');
+          resetTextareaHeight();
+        } else if (stashedTextRef.current) {
+          handleUnstash();
         }
       }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [handleStash]);
+  }, [resetTextareaHeight, handleUnstash]);
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -268,10 +264,13 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
               className="flex items-center gap-2 min-w-0 flex-1 group"
             >
               <span className="text-xs text-muted/50 shrink-0">Stashed</span>
-              <span className="text-xs text-muted/40 truncate">{stashedText}</span>
-              <Kbd className="text-[10px] opacity-40 shrink-0 hidden sm:inline-flex">
-                auto-restores
-              </Kbd>
+              <span className="text-xs text-muted/40 truncate max-w-[200px]">{stashedText}</span>
+              <span className="text-[10px] text-muted/30 shrink-0 hidden sm:inline-flex items-center gap-1">
+                <Kbd className="text-[10px]">⌘S</Kbd>
+                <span>restore</span>
+                <span className="text-muted/20">·</span>
+                <span>auto-restores on send</span>
+              </span>
             </button>
             <button
               type="button"
