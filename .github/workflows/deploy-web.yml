@@ -41,6 +41,7 @@ jobs:
         run: npx wrangler pages deploy apps/web/dist --project-name=shipyard
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: 191909c2c1a28f6cb73d12e3362b874c
 
       - name: Summary
         run: echo "Web app deployed to https://shipyard.pages.dev"
