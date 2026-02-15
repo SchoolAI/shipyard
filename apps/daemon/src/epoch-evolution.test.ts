@@ -36,19 +36,13 @@ describe('epoch evolution', () => {
         draft.conversation.push({
           messageId: 'msg-e1-1',
           role: 'user',
-          contextId: null,
-          taskId,
-          parts: [{ kind: 'text', text: 'Hello from epoch 1' }],
-          referenceTaskIds: [],
+          content: [{ type: 'text', text: 'Hello from epoch 1' }],
           timestamp: now,
         });
         draft.conversation.push({
           messageId: 'msg-e1-2',
-          role: 'agent',
-          contextId: null,
-          taskId,
-          parts: [{ kind: 'text', text: 'Agent reply in epoch 1' }],
-          referenceTaskIds: [],
+          role: 'assistant',
+          content: [{ type: 'text', text: 'Assistant reply in epoch 1' }],
           timestamp: now + 100,
         });
       });
@@ -231,10 +225,7 @@ describe('epoch evolution', () => {
         draft.conversation.push({
           messageId: 'msg-1',
           role: 'user',
-          contextId: null,
-          taskId: id,
-          parts: [{ kind: 'text', text: 'Fix the auth bug in login.ts' }],
-          referenceTaskIds: [],
+          content: [{ type: 'text', text: 'Fix the auth bug in login.ts' }],
           timestamp: now,
         });
       });
@@ -242,11 +233,8 @@ describe('epoch evolution', () => {
       change(taskDocE1, (draft) => {
         draft.conversation.push({
           messageId: 'msg-2',
-          role: 'agent',
-          contextId: 'ctx-1',
-          taskId: id,
-          parts: [{ kind: 'text', text: 'I found and fixed the bug.' }],
-          referenceTaskIds: [],
+          role: 'assistant',
+          content: [{ type: 'text', text: 'I found and fixed the bug.' }],
           timestamp: now + 5000,
         });
         draft.meta.status = 'completed';

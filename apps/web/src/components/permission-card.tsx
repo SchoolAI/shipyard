@@ -7,6 +7,11 @@ import {
 } from '@shipyard/loro-schema';
 import { Check, ChevronDown, ChevronUp, Shield, X } from 'lucide-react';
 import { type Key, useCallback, useEffect, useRef, useState } from 'react';
+import { summarizeToolAction } from '../utils/tool-summarizers';
+
+function isToolRiskLevel(value: string): value is ToolRiskLevel {
+  return (TOOL_RISK_LEVELS as readonly string[]).includes(value);
+}
 
 interface PermissionCardProps {
   toolUseId: string;
@@ -45,65 +50,14 @@ function formatTimestamp(ts: number): string {
   });
 }
 
-function truncate(str: string, max: number): string {
-  return str.length > max ? `${str.slice(0, max)}...` : str;
-}
-
-function getStringField(input: Record<string, unknown>, key: string, fallback: string): string {
-  const val = input[key];
-  return typeof val === 'string' ? val : fallback;
-}
-
-function summarizeBash(input: Record<string, unknown>): string {
-  return truncate(getStringField(input, 'command', ''), 120);
-}
-
-function summarizeEdit(input: Record<string, unknown>): string {
-  const filePath = getStringField(input, 'file_path', 'file');
-  const oldStr = getStringField(input, 'old_string', '');
-  const lineCount = oldStr.split('\n').length;
-  return `${filePath} — editing ${lineCount} line${lineCount === 1 ? '' : 's'}`;
-}
-
-function summarizeWrite(input: Record<string, unknown>): string {
-  return `${getStringField(input, 'file_path', 'file')} — creating file`;
-}
-
-function summarizeRead(input: Record<string, unknown>): string {
-  return getStringField(input, 'file_path', 'file');
-}
-
-const TOOL_SUMMARIZERS: Record<string, (input: Record<string, unknown>) => string> = {
-  Bash: summarizeBash,
-  Edit: summarizeEdit,
-  Write: summarizeWrite,
-  Read: summarizeRead,
-};
-
-/**
- * Produce a human-readable summary of the tool action from its input JSON.
- * Falls back to a truncated raw input string for unknown tools.
- */
-function summarizeToolAction(toolName: string, toolInput: string): string {
-  try {
-    // eslint-disable-next-line no-restricted-syntax -- toolInput is daemon-serialized JSON, shape is known at write site
-    const input = JSON.parse(toolInput) as Record<string, unknown>;
-    const summarizer = TOOL_SUMMARIZERS[toolName];
-    if (summarizer) return summarizer(input);
-    return `${toolName}: ${truncate(toolInput, 100)}`;
-  } catch {
-    return `${toolName}: ${truncate(toolInput, 100)}`;
-  }
-}
-
 export function PermissionCard({ toolUseId, request, onRespond }: PermissionCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isResolved, setIsResolved] = useState(false);
   const allowRef = useRef<HTMLButtonElement>(null);
 
-  const riskLevel: ToolRiskLevel = TOOL_RISK_LEVELS.includes(request.riskLevel as ToolRiskLevel)
-    ? (request.riskLevel as ToolRiskLevel)
-    : 'low';
+  const riskLevel: ToolRiskLevel = isToolRiskLevel(request.riskLevel)
+    ? request.riskLevel
+    : 'medium';
   const borderClass = RISK_BORDER_CLASS[riskLevel];
   const summary = summarizeToolAction(request.toolName, request.toolInput);
 

@@ -167,37 +167,49 @@ export function ChatPage() {
   const storeMessages = activeTaskId ? messagesByTask[activeTaskId] : undefined;
   const agentName = undefined;
   const messages: ChatMessageData[] = useMemo(() => {
+    let raw: ChatMessageData[];
+
     if (useLoro && loroTask.conversation.length > 0) {
-      const mapped: ChatMessageData[] = loroTask.conversation.map((msg) => ({
+      raw = loroTask.conversation.map((msg) => ({
         id: msg.messageId ?? crypto.randomUUID(),
-        role: msg.role === 'assistant' ? ('agent' as const) : ('user' as const),
+        role: msg.role,
         content: msg.content,
         agentName: msg.role === 'assistant' ? agentName : undefined,
       }));
 
       const status = loroTask.meta?.status;
       const isInFlight = status === 'submitted' || status === 'working';
-      const lastMsg = mapped[mapped.length - 1];
+      const lastMsg = raw[raw.length - 1];
       if (isInFlight && lastMsg?.role === 'user') {
-        mapped.push({
+        raw.push({
           id: '__thinking__',
-          role: 'agent' as const,
+          role: 'assistant' as const,
           content: [],
           isThinking: true,
         });
       }
-
-      return mapped;
+    } else {
+      raw =
+        storeMessages?.map((m) => ({
+          id: m.id,
+          role: m.role,
+          content: toContentBlocks(m.content),
+          isThinking: m.isThinking,
+          agentName: m.role === 'assistant' ? agentName : undefined,
+        })) ?? [];
     }
-    return (
-      storeMessages?.map((m) => ({
-        id: m.id,
-        role: m.role,
-        content: toContentBlocks(m.content),
-        isThinking: m.isThinking,
-        agentName: m.role === 'agent' ? agentName : undefined,
-      })) ?? []
-    );
+
+    /** Group consecutive messages with the same role into a single entry. */
+    const grouped: ChatMessageData[] = [];
+    for (const msg of raw) {
+      const last = grouped[grouped.length - 1];
+      if (last && last.role === msg.role && !last.isThinking && !msg.isThinking) {
+        last.content = [...last.content, ...msg.content];
+      } else {
+        grouped.push({ ...msg, content: [...msg.content] });
+      }
+    }
+    return grouped;
   }, [loroTask.conversation, loroTask.meta?.status, storeMessages, agentName]);
 
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -251,7 +263,7 @@ export function ChatPage() {
   }, [isDiffOpen]);
 
   useEffect(() => {
-    if (activeTaskId && !isTerminalOpen) {
+    if (!isTerminalOpen) {
       requestAnimationFrame(() => {
         composerRef.current?.focus();
       });
@@ -330,7 +342,7 @@ export function ChatPage() {
     }
   }, [lastTaskAck, activeTaskId]);
 
-  // Ref avoids re-subscribing to connection.onMessage on every status change
+  /** NOTE: Ref avoids re-subscribing to connection.onMessage on every status change */
   const taskStatusRef = useRef(loroTask.meta?.status);
   taskStatusRef.current = loroTask.meta?.status;
 
@@ -379,7 +391,7 @@ export function ChatPage() {
 
       const thinkingId = msgStore.addMessage(currentTaskId, {
         taskId: currentTaskId,
-        role: 'agent',
+        role: 'assistant',
         content: '',
         isThinking: true,
       });
@@ -472,7 +484,7 @@ export function ChatPage() {
       : undefined;
 
   return (
-    <div className="flex h-dvh bg-background">
+    <div className="flex h-dvh overflow-hidden bg-background">
       <CommandPalette />
       <ShortcutsModal />
       <Sidebar />

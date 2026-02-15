@@ -17,6 +17,14 @@ import type {
 import { nanoid } from 'nanoid';
 import { logger } from './logger.js';
 
+function safeStringify(value: unknown): string {
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return '{}';
+  }
+}
+
 const SHIPYARD_SYSTEM_PROMPT_APPEND = `
 # Shipyard Permission System
 
@@ -43,7 +51,7 @@ function parseToolUseBlock(block: Record<string, unknown>): ContentBlock | null 
     type: 'tool_use',
     toolUseId: block.id,
     toolName: block.name,
-    input: JSON.stringify(block.input ?? {}),
+    input: safeStringify(block.input ?? {}),
   };
 }
 
@@ -361,6 +369,11 @@ export class SessionManager {
       return {};
     }
 
+    if (message.type === 'user' && !('isReplay' in message && message.isReplay)) {
+      this.#appendUserToolResults(message);
+      return {};
+    }
+
     if (message.type === 'result') {
       return {
         sessionResult: this.#handleResult(message, sessionId, agentSessionId),
@@ -368,6 +381,52 @@ export class SessionManager {
     }
 
     return {};
+  }
+
+  /**
+   * Extract tool_result blocks from SDK user messages (which carry tool outputs)
+   * and append them to the last assistant conversation entry so the UI can
+   * display tool completion status alongside the tool_use that triggered them.
+   */
+  #appendUserToolResults(message: SDKMessage & { type: 'user' }): void {
+    const rawContent = message.message.content;
+    if (!Array.isArray(rawContent)) return;
+
+    // eslint-disable-next-line no-restricted-syntax -- SDK content blocks typed as unknown[], need narrowing
+    const sdkBlocks = rawContent as Array<Record<string, unknown>>;
+    const toolResultBlocks: ContentBlock[] = [];
+    for (const block of sdkBlocks) {
+      if (block.type === 'tool_result') {
+        const parsed = parseSdkBlock(block);
+        if (parsed) toolResultBlocks.push(parsed);
+      }
+    }
+
+    if (toolResultBlocks.length === 0) return;
+
+    const conversation = this.#taskDoc.toJSON().conversation;
+    const lastMsg = conversation[conversation.length - 1];
+
+    if (lastMsg && lastMsg.role === 'assistant') {
+      const lastIdx = conversation.length - 1;
+      change(this.#taskDoc, (draft) => {
+        for (const block of toolResultBlocks) {
+          draft.conversation.get(lastIdx)?.content.push(block);
+        }
+        draft.meta.updatedAt = Date.now();
+      });
+    } else {
+      // No preceding assistant message -- store as a standalone assistant entry
+      change(this.#taskDoc, (draft) => {
+        draft.conversation.push({
+          messageId: nanoid(),
+          role: 'assistant',
+          content: toolResultBlocks,
+          timestamp: Date.now(),
+        });
+        draft.meta.updatedAt = Date.now();
+      });
+    }
   }
 
   #appendAssistantMessage(message: SDKMessage & { type: 'assistant' }): void {

@@ -156,6 +156,33 @@ function assistantMsgToolUseOnly() {
   };
 }
 
+function userToolResultMsg(toolUseId: string, content: string, isError = false) {
+  return {
+    type: 'user',
+    message: {
+      role: 'user',
+      content: [{ type: 'tool_result', tool_use_id: toolUseId, content, is_error: isError }],
+    },
+    parent_tool_use_id: null,
+    uuid: '00000000-0000-0000-0000-000000000005',
+    session_id: 'sess-1',
+  };
+}
+
+function userToolResultMsgReplay(toolUseId: string, content: string) {
+  return {
+    type: 'user',
+    message: {
+      role: 'user',
+      content: [{ type: 'tool_result', tool_use_id: toolUseId, content, is_error: false }],
+    },
+    parent_tool_use_id: null,
+    isReplay: true,
+    uuid: '00000000-0000-0000-0000-000000000006',
+    session_id: 'sess-1',
+  };
+}
+
 function successResult(opts: { result?: string; costUsd?: number; durationMs?: number } = {}) {
   return {
     type: 'result',
@@ -760,6 +787,99 @@ describe('SessionManager', () => {
 
       const json = taskDoc.toJSON();
       expect(json.conversation).toHaveLength(1);
+    });
+  });
+
+  describe('tool result capture from user messages', () => {
+    it('appends tool_result blocks to the last assistant message', async () => {
+      mockQuery.mockReturnValue(
+        mockQueryResponse([
+          initMsg('sess-1'),
+          assistantMsgWithToolUse('Reading the file...'),
+          userToolResultMsg('tool-1', 'file contents here'),
+          assistantMsg('Based on the file...'),
+          successResult(),
+        ])
+      );
+
+      await manager.createSession({ prompt: 'Hello', cwd: '/tmp' });
+
+      const json = taskDoc.toJSON();
+      // First assistant msg gets the tool_result appended, second assistant msg is separate
+      expect(json.conversation).toHaveLength(2);
+      const firstMsg = json.conversation[0];
+      // text + tool_use + tool_result
+      expect(firstMsg?.content).toHaveLength(3);
+      expect(firstMsg?.content[2]).toEqual({
+        type: 'tool_result',
+        toolUseId: 'tool-1',
+        content: 'file contents here',
+        isError: false,
+      });
+    });
+
+    it('captures error tool results', async () => {
+      mockQuery.mockReturnValue(
+        mockQueryResponse([
+          initMsg('sess-1'),
+          assistantMsgToolUseOnly(),
+          userToolResultMsg('tool-2', 'command failed', true),
+          successResult(),
+        ])
+      );
+
+      await manager.createSession({ prompt: 'Hello', cwd: '/tmp' });
+
+      const json = taskDoc.toJSON();
+      expect(json.conversation).toHaveLength(1);
+      const firstMsg = json.conversation[0];
+      expect(firstMsg?.content).toHaveLength(2);
+      expect(firstMsg?.content[1]).toEqual({
+        type: 'tool_result',
+        toolUseId: 'tool-2',
+        content: 'command failed',
+        isError: true,
+      });
+    });
+
+    it('ignores replay user messages', async () => {
+      mockQuery.mockReturnValue(
+        mockQueryResponse([
+          initMsg('sess-1'),
+          userToolResultMsgReplay('tool-old', 'replayed result'),
+          assistantMsg('Fresh response'),
+          successResult(),
+        ])
+      );
+
+      await manager.createSession({ prompt: 'Hello', cwd: '/tmp' });
+
+      const json = taskDoc.toJSON();
+      expect(json.conversation).toHaveLength(1);
+      expect(json.conversation[0]?.content).toHaveLength(1);
+      expect(json.conversation[0]?.content[0]?.type).toBe('text');
+    });
+
+    it('creates standalone entry when no preceding assistant message exists', async () => {
+      mockQuery.mockReturnValue(
+        mockQueryResponse([
+          initMsg('sess-1'),
+          userToolResultMsg('tool-orphan', 'orphaned result'),
+          successResult(),
+        ])
+      );
+
+      await manager.createSession({ prompt: 'Hello', cwd: '/tmp' });
+
+      const json = taskDoc.toJSON();
+      expect(json.conversation).toHaveLength(1);
+      expect(json.conversation[0]?.role).toBe('assistant');
+      expect(json.conversation[0]?.content[0]).toEqual({
+        type: 'tool_result',
+        toolUseId: 'tool-orphan',
+        content: 'orphaned result',
+        isError: false,
+      });
     });
   });
 

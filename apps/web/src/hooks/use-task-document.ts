@@ -1,8 +1,8 @@
 import { useDoc } from '@loro-extended/react';
 import {
-  type A2AMessage,
   buildDocumentId,
   DEFAULT_EPOCH,
+  type Message,
   type PermissionDecision,
   type PermissionRequest,
   PermissionRequestEphemeral,
@@ -28,7 +28,7 @@ const EPHEMERAL_DECLARATIONS = {
 
 export interface TaskDocumentResult {
   meta: TaskMeta | null;
-  conversation: A2AMessage[];
+  conversation: Message[];
   sessions: SessionEntry[];
   pendingPermissions: Map<string, PermissionRequest>;
   respondToPermission: (
@@ -63,7 +63,7 @@ export function useTaskDocument(taskId: string | null): TaskDocumentResult {
   );
 
   const meta = useDoc(handle, (d: { meta: TaskMeta }) => d.meta);
-  const conversation = useDoc(handle, (d: { conversation: A2AMessage[] }) => d.conversation);
+  const conversation = useDoc(handle, (d: { conversation: Message[] }) => d.conversation);
   const sessions = useDoc(handle, (d: { sessions: SessionEntry[] }) => d.sessions);
 
   /**

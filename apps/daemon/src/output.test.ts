@@ -32,10 +32,7 @@ describe('completed session output verification', () => {
       draft.conversation.push({
         messageId: 'msg-user-1',
         role: 'user',
-        contextId: null,
-        taskId,
-        parts: [{ kind: 'text', text: 'Refactor the database queries in user-service.ts' }],
-        referenceTaskIds: [],
+        content: [{ type: 'text', text: 'Refactor the database queries in user-service.ts' }],
         timestamp: now,
       });
     });
@@ -43,11 +40,8 @@ describe('completed session output verification', () => {
     change(doc, (draft) => {
       draft.conversation.push({
         messageId: 'msg-agent-1',
-        role: 'agent',
-        contextId: 'ctx-abc',
-        taskId,
-        parts: [{ kind: 'text', text: 'I analyzed the queries and found 3 N+1 problems.' }],
-        referenceTaskIds: [],
+        role: 'assistant',
+        content: [{ type: 'text', text: 'I analyzed the queries and found 3 N+1 problems.' }],
         timestamp: now + 10_000,
       });
     });
@@ -55,16 +49,13 @@ describe('completed session output verification', () => {
     change(doc, (draft) => {
       draft.conversation.push({
         messageId: 'msg-agent-2',
-        role: 'agent',
-        contextId: 'ctx-abc',
-        taskId,
-        parts: [
+        role: 'assistant',
+        content: [
           {
-            kind: 'text',
+            type: 'text',
             text: 'All 3 queries have been refactored to use batch loading. Tests pass.',
           },
         ],
-        referenceTaskIds: [],
         timestamp: now + 40_000,
       });
     });
@@ -109,19 +100,19 @@ describe('completed session output verification', () => {
 
     expect(json.conversation).toHaveLength(3);
 
-    const agentMessages = json.conversation.filter((m) => m.role === 'agent');
-    expect(agentMessages.length).toBeGreaterThanOrEqual(1);
+    const assistantMessages = json.conversation.filter((m) => m.role === 'assistant');
+    expect(assistantMessages.length).toBeGreaterThanOrEqual(1);
 
-    for (const msg of agentMessages) {
-      expect(msg.parts.length).toBeGreaterThan(0);
-      const hasTextPart = msg.parts.some((p) => p.kind === 'text');
-      expect(hasTextPart).toBe(true);
+    for (const msg of assistantMessages) {
+      expect(msg.content.length).toBeGreaterThan(0);
+      const hasTextBlock = msg.content.some((b) => b.type === 'text');
+      expect(hasTextBlock).toBe(true);
     }
 
-    const firstAgentMsg = agentMessages[0];
-    expect(firstAgentMsg).toBeDefined();
-    if (firstAgentMsg?.parts[0]?.kind === 'text') {
-      expect(firstAgentMsg.parts[0].text).toContain('N+1');
+    const firstAssistantMsg = assistantMessages[0];
+    expect(firstAssistantMsg).toBeDefined();
+    if (firstAssistantMsg?.content[0]?.type === 'text') {
+      expect(firstAssistantMsg.content[0].text).toContain('N+1');
     }
   });
 
@@ -144,11 +135,8 @@ describe('completed session output verification', () => {
     change(doc, (draft) => {
       draft.conversation.push({
         messageId: 'msg-agent-fail',
-        role: 'agent',
-        contextId: null,
-        taskId,
-        parts: [{ kind: 'text', text: 'Starting deployment...' }],
-        referenceTaskIds: [],
+        role: 'assistant',
+        content: [{ type: 'text', text: 'Starting deployment...' }],
         timestamp: now + 2000,
       });
     });
@@ -183,7 +171,7 @@ describe('completed session output verification', () => {
     expect(json.sessions[0]?.completedAt).toBe(failedAt);
 
     expect(json.conversation).toHaveLength(1);
-    expect(json.conversation[0]?.role).toBe('agent');
+    expect(json.conversation[0]?.role).toBe('assistant');
   });
 
   it('task doc with multiple sessions accumulates data correctly', () => {
@@ -204,11 +192,8 @@ describe('completed session output verification', () => {
     change(doc, (draft) => {
       draft.conversation.push({
         messageId: 'msg-s1',
-        role: 'agent',
-        contextId: null,
-        taskId,
-        parts: [{ kind: 'text', text: 'Session 1 output' }],
-        referenceTaskIds: [],
+        role: 'assistant',
+        content: [{ type: 'text', text: 'Session 1 output' }],
         timestamp: now + 1000,
       });
       draft.sessions.push({
@@ -233,11 +218,8 @@ describe('completed session output verification', () => {
       draft.meta.status = 'working';
       draft.conversation.push({
         messageId: 'msg-s2',
-        role: 'agent',
-        contextId: null,
-        taskId,
-        parts: [{ kind: 'text', text: 'Session 2 output (resumed)' }],
-        referenceTaskIds: [],
+        role: 'assistant',
+        content: [{ type: 'text', text: 'Session 2 output (resumed)' }],
         timestamp: now + 60_000,
       });
       draft.sessions.push({
@@ -266,11 +248,11 @@ describe('completed session output verification', () => {
     expect(json.sessions[1]?.status).toBe('completed');
 
     expect(json.conversation).toHaveLength(2);
-    if (json.conversation[0]?.parts[0]?.kind === 'text') {
-      expect(json.conversation[0].parts[0].text).toBe('Session 1 output');
+    if (json.conversation[0]?.content[0]?.type === 'text') {
+      expect(json.conversation[0].content[0].text).toBe('Session 1 output');
     }
-    if (json.conversation[1]?.parts[0]?.kind === 'text') {
-      expect(json.conversation[1].parts[0].text).toBe('Session 2 output (resumed)');
+    if (json.conversation[1]?.content[0]?.type === 'text') {
+      expect(json.conversation[1].content[0].text).toBe('Session 2 output (resumed)');
     }
 
     expect(json.meta.status).toBe('completed');

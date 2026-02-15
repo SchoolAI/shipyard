@@ -1,20 +1,35 @@
-import { Button, Tooltip } from '@heroui/react';
-import { Bot, Check, Copy } from 'lucide-react';
+import { Button, Chip, Tooltip } from '@heroui/react';
+import type { ContentBlock } from '@shipyard/loro-schema';
+import {
+  AlertCircle,
+  Bot,
+  Check,
+  CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+  Copy,
+  FileEdit,
+  FileSearch,
+  Search,
+  SquareTerminal,
+  Wrench,
+} from 'lucide-react';
 import type { ComponentPropsWithoutRef, ReactNode } from 'react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import rehypeHighlight from 'rehype-highlight';
 import remarkGfm from 'remark-gfm';
 import { assertNever } from '../utils/assert-never';
+import { summarizeToolAction, TOOL_ICON_LABELS } from '../utils/tool-summarizers';
 import { ClaudeIcon, GeminiIcon, OpenAIIcon } from './agent-icons';
 import { AsciiShipThinking } from './thinking/ascii-ship';
 
-export type MessageRole = 'user' | 'agent';
+export type MessageRole = 'user' | 'assistant';
 
 export interface ChatMessageData {
   id: string;
   role: MessageRole;
-  content: string;
+  content: ContentBlock[];
   isThinking?: boolean;
   agentName?: string;
 }
@@ -297,6 +312,210 @@ const markdownComponents: ComponentPropsWithoutRef<typeof ReactMarkdown>['compon
 const REMARK_PLUGINS = [remarkGfm];
 const REHYPE_PLUGINS = [rehypeHighlight];
 
+/* ---------- Tool icon resolution ---------- */
+
+const TOOL_ICONS: Record<string, ReactNode> = {
+  Bash: <SquareTerminal className="w-3 h-3" aria-hidden="true" />,
+  Edit: <FileEdit className="w-3 h-3" aria-hidden="true" />,
+  Write: <FileEdit className="w-3 h-3" aria-hidden="true" />,
+  Read: <FileSearch className="w-3 h-3" aria-hidden="true" />,
+  Glob: <Search className="w-3 h-3" aria-hidden="true" />,
+  Grep: <Search className="w-3 h-3" aria-hidden="true" />,
+};
+
+function toolIcon(toolName: string): ReactNode {
+  return TOOL_ICONS[toolName] ?? <Wrench className="w-3 h-3" aria-hidden="true" />;
+}
+
+/* ---------- Collapsible detail helper ---------- */
+
+const LONG_CONTENT_THRESHOLD = 1000;
+const LONG_CONTENT_LINE_THRESHOLD = 15;
+
+function isLongContent(text: string): boolean {
+  return (
+    text.length > LONG_CONTENT_THRESHOLD || text.split('\n').length > LONG_CONTENT_LINE_THRESHOLD
+  );
+}
+
+/* ---------- ToolUseCard ---------- */
+
+interface ToolUseCardProps {
+  toolName: string;
+  input: string;
+}
+
+function ToolUseCard({ toolName, input }: ToolUseCardProps) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const panelId = useId();
+  const summary = summarizeToolAction(toolName, input);
+  const iconLabel = TOOL_ICON_LABELS[toolName] ?? toolName;
+
+  let formattedInput = input;
+  try {
+    formattedInput = JSON.stringify(JSON.parse(input), null, 2);
+  } catch {
+    /* raw string is fine */
+  }
+
+  return (
+    <div className="rounded-lg border border-separator/60 bg-surface/50 px-3 py-2">
+      {/* Summary row */}
+      <div className="flex items-center gap-2 min-w-0">
+        <Chip
+          size="sm"
+          variant="soft"
+          className="shrink-0 gap-1 text-muted bg-default/50 h-5 text-[0.6875rem]"
+          aria-label={iconLabel}
+        >
+          {toolIcon(toolName)}
+          {toolName}
+        </Chip>
+        <span className="text-xs text-foreground/70 font-mono truncate min-w-0" title={summary}>
+          {summary}
+        </span>
+      </div>
+
+      {/* Expandable detail */}
+      <div className="mt-1.5">
+        <button
+          type="button"
+          className="flex items-center gap-1 text-[0.6875rem] text-muted hover:text-foreground transition-colors"
+          aria-expanded={isExpanded}
+          aria-controls={panelId}
+          onClick={() => setIsExpanded((prev) => !prev)}
+        >
+          {isExpanded ? (
+            <ChevronUp className="w-3 h-3" aria-hidden="true" />
+          ) : (
+            <ChevronDown className="w-3 h-3" aria-hidden="true" />
+          )}
+          {isExpanded ? 'Hide input' : 'Show input'}
+        </button>
+        {isExpanded && (
+          <pre
+            id={panelId}
+            className="mt-1.5 p-2.5 rounded-md bg-background text-[0.6875rem] text-foreground/70 font-mono overflow-x-auto max-h-48 border border-separator/40"
+          >
+            {formattedInput}
+          </pre>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ---------- ToolResultCard ---------- */
+
+interface ToolResultCardProps {
+  content: string;
+  isError: boolean;
+}
+
+function ToolResultCard({ content, isError }: ToolResultCardProps) {
+  const isLong = isLongContent(content);
+  const [isExpanded, setIsExpanded] = useState(!isLong);
+  const panelId = useId();
+
+  const borderClass = isError ? 'border-danger/40' : 'border-separator/40';
+  const bgClass = isError ? 'bg-danger/5' : 'bg-surface/30';
+  const iconClass = isError ? 'text-danger' : 'text-success';
+  const labelText = isError ? 'Error' : 'Result';
+
+  /** Detect whether the content looks like JSON */
+  let isJson = false;
+  try {
+    JSON.parse(content);
+    isJson = true;
+  } catch {
+    /* not JSON */
+  }
+
+  const isCollapsedPreview = isLong && !isExpanded;
+
+  return (
+    <div className={`rounded-lg border ${borderClass} ${bgClass} px-3 py-2`}>
+      {/* Header */}
+      <div className="flex items-center gap-1.5 mb-1">
+        {isError ? (
+          <AlertCircle className={`w-3 h-3 ${iconClass}`} aria-hidden="true" />
+        ) : (
+          <CheckCircle2 className={`w-3 h-3 ${iconClass}`} aria-hidden="true" />
+        )}
+        <span className={`text-[0.6875rem] font-medium ${iconClass}`}>{labelText}</span>
+      </div>
+
+      {/* Content */}
+      <div id={panelId}>
+        {isCollapsedPreview ? (
+          <pre className="text-[0.6875rem] text-foreground/70 font-mono overflow-x-auto max-h-48 whitespace-pre-wrap break-all">
+            {content.slice(0, 200)}...
+          </pre>
+        ) : isJson ? (
+          <pre className="text-[0.6875rem] text-foreground/70 font-mono overflow-x-auto max-h-48 whitespace-pre-wrap break-all">
+            {content}
+          </pre>
+        ) : (
+          <div className="text-[0.6875rem] text-foreground/70 leading-relaxed">
+            <ReactMarkdown
+              remarkPlugins={REMARK_PLUGINS}
+              rehypePlugins={REHYPE_PLUGINS}
+              components={markdownComponents}
+            >
+              {content}
+            </ReactMarkdown>
+          </div>
+        )}
+      </div>
+
+      {/* Expand/collapse for long content */}
+      {isLong && (
+        <button
+          type="button"
+          className="flex items-center gap-1 mt-1.5 text-[0.6875rem] text-muted hover:text-foreground transition-colors"
+          aria-expanded={isExpanded}
+          aria-controls={panelId}
+          onClick={() => setIsExpanded((prev) => !prev)}
+        >
+          {isExpanded ? (
+            <ChevronUp className="w-3 h-3" aria-hidden="true" />
+          ) : (
+            <ChevronDown className="w-3 h-3" aria-hidden="true" />
+          )}
+          {isExpanded ? 'Show less' : 'Show more'}
+        </button>
+      )}
+    </div>
+  );
+}
+
+/* ---------- ContentBlockRenderer ---------- */
+
+function ContentBlockRenderer({ block }: { block: ContentBlock }) {
+  switch (block.type) {
+    case 'text':
+      return (
+        <ReactMarkdown
+          remarkPlugins={REMARK_PLUGINS}
+          rehypePlugins={REHYPE_PLUGINS}
+          components={markdownComponents}
+        >
+          {block.text}
+        </ReactMarkdown>
+      );
+    case 'tool_use':
+      return <ToolUseCard toolName={block.toolName} input={block.input} />;
+    case 'tool_result':
+      return <ToolResultCard content={block.content} isError={block.isError} />;
+    case 'thinking':
+      return null;
+    default:
+      return assertNever(block);
+  }
+}
+
+/* ---------- Agent avatar resolution ---------- */
+
 interface AgentAvatarConfig {
   icon: ReactNode;
   label: string;
@@ -345,8 +564,17 @@ function resolveAgentAvatar(agentName?: string): AgentAvatarConfig {
   };
 }
 
+/* ---------- Message components ---------- */
+
 function AgentMessage({ message }: ChatMessageProps) {
   const avatar = resolveAgentAvatar(message.agentName);
+
+  /** If every content block is a thinking block, there is nothing visible to render. */
+  const hasVisibleContent =
+    message.isThinking || message.content.some((b) => b.type !== 'thinking');
+  if (!hasVisibleContent) {
+    return null;
+  }
 
   return (
     <div className="flex items-start gap-3 max-w-3xl">
@@ -363,14 +591,10 @@ function AgentMessage({ message }: ChatMessageProps) {
             <AsciiShipThinking />
           </div>
         ) : (
-          <div className="text-sm text-foreground/90 leading-relaxed prose-shipyard">
-            <ReactMarkdown
-              remarkPlugins={REMARK_PLUGINS}
-              rehypePlugins={REHYPE_PLUGINS}
-              components={markdownComponents}
-            >
-              {message.content}
-            </ReactMarkdown>
+          <div className="text-sm text-foreground/90 leading-relaxed prose-shipyard space-y-2">
+            {message.content.map((block, i) => (
+              <ContentBlockRenderer key={`${block.type}-${i}`} block={block} />
+            ))}
           </div>
         )}
       </div>
@@ -379,12 +603,17 @@ function AgentMessage({ message }: ChatMessageProps) {
 }
 
 function UserMessage({ message }: ChatMessageProps) {
+  const textContent = message.content
+    .filter((b): b is ContentBlock & { type: 'text' } => b.type === 'text')
+    .map((b) => b.text)
+    .join('\n');
+
   return (
     <div className="flex justify-end max-w-3xl ml-auto">
       <div className="bg-default rounded-2xl px-4 py-2.5 max-w-[80%]">
         <span className="sr-only">You:</span>
         <div className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">
-          {message.content}
+          {textContent}
         </div>
       </div>
     </div>
@@ -395,7 +624,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
   switch (message.role) {
     case 'user':
       return <UserMessage message={message} />;
-    case 'agent':
+    case 'assistant':
       return <AgentMessage message={message} />;
     default:
       return assertNever(message.role);
