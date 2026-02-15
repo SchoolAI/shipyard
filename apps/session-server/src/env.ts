@@ -22,7 +22,7 @@ const BaseEnvSchema = z.object({
 });
 
 /** Production base URL for the signaling worker */
-const PRODUCTION_BASE_URL = 'https://shipyard-signaling.jacob-191.workers.dev';
+const PRODUCTION_BASE_URL = 'https://shipyard-session-server.jacob-191.workers.dev';
 /** Development base URL for the signaling worker */
 const DEVELOPMENT_BASE_URL = 'http://localhost:4444';
 

@@ -1,21 +1,22 @@
-name: Deploy OG Proxy Worker
+name: Deploy Web App
 
 on:
   push:
     branches: [main]
     paths:
-      - 'apps/og-proxy-worker/**'
-      - '.github/workflows/deploy-og-proxy-worker.yml'
+      - 'apps/web/**'
+      - 'packages/**'
+      - '.github/workflows/deploy-web.yml'
   workflow_dispatch:
 
 concurrency:
-  group: deploy-og-proxy-worker
+  group: deploy-web
   cancel-in-progress: false
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    name: Deploy to Cloudflare Workers
+    name: Deploy to Cloudflare Pages
     steps:
       - uses: actions/checkout@v4
 
@@ -29,9 +30,16 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Deploy to Cloudflare Workers
+      - name: Build web app
+        run: pnpm turbo build --filter=@shipyard/web
+        env:
+          VITE_DATA_SOURCE: loro
+
+      - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          workingDirectory: apps/og-proxy-worker
-          command: deploy
+          command: pages deploy apps/web/dist --project-name=shipyard
+
+      - name: Summary
+        run: echo "Web app deployed to https://shipyard.pages.dev"

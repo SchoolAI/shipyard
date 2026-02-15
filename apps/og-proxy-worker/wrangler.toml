@@ -10,10 +10,10 @@ local_protocol = "http"
 
 # Production environment variables
 # NOTE: CANONICAL_BASE_URL should be the worker URL since that's what users share
-# Users share worker URL → crawler gets OG tags → regular users get proxied to GitHub Pages
+# Users share worker URL → crawler gets OG tags → regular users get proxied to Cloudflare Pages
 [vars]
 ENVIRONMENT = "production"
-UPSTREAM_URL = "https://schoolai.github.io/shipyard"
+UPSTREAM_URL = "https://shipyard.pages.dev"
 CANONICAL_BASE_URL = "https://shipyard-og-proxy.jacob-191.workers.dev"
 LOG_LEVEL = "info"
 

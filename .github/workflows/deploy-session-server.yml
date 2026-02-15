@@ -4,11 +4,14 @@ on:
   push:
     branches: [main]
     paths:
-      - 'apps/session-server/src/**'
-      - 'apps/session-server/wrangler.toml'
-      - 'apps/session-server/package.json'
+      - 'apps/session-server/**'
+      - 'packages/session/**'
       - '.github/workflows/deploy-session-server.yml'
   workflow_dispatch:
+
+concurrency:
+  group: deploy-session-server
+  cancel-in-progress: false
 
 jobs:
   deploy:
@@ -20,8 +23,6 @@ jobs:
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: 10.9.0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -33,7 +34,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build workspace dependencies
-        run: pnpm turbo build --filter=@shipyard/schema
+        run: pnpm turbo build --filter=@shipyard/session
 
       - name: Deploy to Cloudflare Workers
         uses: cloudflare/wrangler-action@v3
