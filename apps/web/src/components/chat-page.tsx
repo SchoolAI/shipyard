@@ -195,7 +195,7 @@ export function ChatPage() {
 
   const repo = useRepo();
   const webrtcAdapter = useWebRtcAdapter();
-  const { peerState: _peerState } = useWebRTCSync({
+  const { peerState: _peerState, terminalChannel } = useWebRTCSync({
     connection,
     webrtcAdapter,
     targetMachineId: selectedMachineId,
@@ -709,6 +709,8 @@ export function ChatPage() {
           ref={terminalRef}
           isOpen={isTerminalOpen}
           onClose={() => useUIStore.getState().setTerminalOpen(false)}
+          terminalChannel={terminalChannel}
+          selectedEnvironmentPath={selectedEnvironmentPath}
         />
       </div>
 

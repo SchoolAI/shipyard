@@ -42,6 +42,7 @@ export interface PeerManagerConfig {
   webrtcAdapter: WebRtcDataChannelAdapter;
   onAnswer: (targetMachineId: string, answer: SDPDescription) => void;
   onIceCandidate: (targetMachineId: string, candidate: ICECandidate) => void;
+  onTerminalChannel?: (machineId: string, channel: unknown) => void;
   /** Factory to create peer connections. Defaults to node-datachannel/polyfill. */
   createPeerConnection?: () => MinimalPeerConnection;
 }
@@ -96,10 +97,20 @@ export function createPeerManager(config: PeerManagerConfig): PeerManager {
     };
 
     pc.ondatachannel = (event) => {
-      logger.info({ machineId }, 'Data channel received from browser');
-      // eslint-disable-next-line no-restricted-syntax -- RTCDataChannel from node-datachannel satisfies the adapter interface
-      config.webrtcAdapter.attachDataChannel(machineIdToPeerId(machineId), event.channel as never);
-      logger.info({ machineId }, 'Data channel attached to Loro adapter');
+      // eslint-disable-next-line no-restricted-syntax -- node-datachannel channel type is opaque
+      const channel = event.channel as { label?: string };
+      if (channel.label === 'terminal-io') {
+        logger.info({ machineId }, 'Terminal data channel received');
+        config.onTerminalChannel?.(machineId, event.channel);
+      } else {
+        logger.info({ machineId }, 'Data channel received from browser');
+        // eslint-disable-next-line no-restricted-syntax -- RTCDataChannel from node-datachannel satisfies the adapter interface
+        config.webrtcAdapter.attachDataChannel(
+          machineIdToPeerId(machineId),
+          event.channel as never
+        );
+        logger.info({ machineId }, 'Data channel attached to Loro adapter');
+      }
     };
 
     pc.onconnectionstatechange = () => {

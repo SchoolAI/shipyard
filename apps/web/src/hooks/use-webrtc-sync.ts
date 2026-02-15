@@ -11,13 +11,15 @@ export function useWebRTCSync(options: {
   connection: PersonalRoomConnection | null;
   webrtcAdapter: WebRtcDataChannelAdapter | null;
   targetMachineId: string | null;
-}): { peerState: PeerState } {
+}): { peerState: PeerState; terminalChannel: RTCDataChannel | null } {
   const { connection, webrtcAdapter, targetMachineId } = options;
   const [peerState, setPeerState] = useState<PeerState>('idle');
+  const [terminalChannel, setTerminalChannel] = useState<RTCDataChannel | null>(null);
 
   useEffect(() => {
     if (!connection || !webrtcAdapter || !targetMachineId) {
       setPeerState('idle');
+      setTerminalChannel(null);
       return;
     }
 
@@ -27,8 +29,19 @@ export function useWebRTCSync(options: {
     let retryTimer: ReturnType<typeof setTimeout> | undefined;
     const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
     const dataChannel = pc.createDataChannel('loro-sync', { ordered: true });
+    const termChannel = pc.createDataChannel('terminal-io', { ordered: true });
+    termChannel.binaryType = 'arraybuffer';
 
     setPeerState('connecting');
+
+    termChannel.addEventListener('open', () => {
+      if (disposed) return;
+      setTerminalChannel(termChannel);
+    });
+    termChannel.addEventListener('close', () => {
+      if (disposed) return;
+      setTerminalChannel(null);
+    });
 
     dataChannel.addEventListener('open', () => {
       if (disposed) return;
@@ -124,10 +137,12 @@ export function useWebRTCSync(options: {
       unsubMessage();
       webrtcAdapter.detachDataChannel(peerId);
       dataChannel.close();
+      termChannel.close();
       pc.close();
       setPeerState('idle');
+      setTerminalChannel(null);
     };
   }, [connection, webrtcAdapter, targetMachineId]);
 
-  return { peerState };
+  return { peerState, terminalChannel };
 }

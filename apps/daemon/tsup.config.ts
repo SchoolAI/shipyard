@@ -5,4 +5,5 @@ export default defineConfig({
   format: 'esm',
   dts: { tsconfig: './tsconfig.json' },
   sourcemap: true,
+  external: ['node-pty', 'node-datachannel'],
 });
