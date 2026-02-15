@@ -13,6 +13,7 @@ import {
   EpochDocumentSchema,
   LOCAL_USER_ID,
   type MachineCapabilitiesEphemeralValue,
+  type PermissionDecision,
   PermissionRequestEphemeral,
   PermissionResponseEphemeral,
   ROOM_EPHEMERAL_DECLARATIONS,
@@ -563,26 +564,26 @@ async function loadEpoch(repo: Repo): Promise<number> {
 /**
  * Convert a browser permission response into the Agent SDK's PermissionResult.
  *
- * SDK v0.2.39 Zod schema requires `updatedInput` even though the TypeScript
- * type marks it optional. We pass the original input through to satisfy the
- * schema without changing tool behavior.
+ * `updatedInput` is set to the original input as a defensive identity
+ * pass-through. The SDK uses `updatedInput ?? originalInput` internally,
+ * so this is a no-op. If input modification is ever needed (e.g., letting
+ * the browser edit tool input before approval), this is where it would go.
+ *
+ * `updatedPermissions` forwards the SDK's suggestions so the SDK can apply
+ * session-scoped permission rules (e.g., "allow Bash for this directory").
  */
 function toPermissionResult(
-  decision: string,
+  decision: PermissionDecision,
   input: Record<string, unknown>,
-  persist: boolean,
   suggestions: import('@anthropic-ai/claude-agent-sdk').PermissionUpdate[] | undefined,
   message: string | null
 ): PermissionResult {
   if (decision === 'approved') {
-    const result: PermissionResult = {
+    return {
       behavior: 'allow',
       updatedInput: input,
+      updatedPermissions: suggestions,
     };
-    if (persist && suggestions?.length) {
-      result.updatedPermissions = suggestions;
-    }
-    return result;
   }
   return {
     behavior: 'deny',
@@ -631,7 +632,8 @@ function resolvePermissionResponse(ctx: PermissionResponseContext): PermissionRe
     'Permission response received'
   );
 
-  return toPermissionResult(value.decision, input, value.persist, suggestions, value.message);
+  const decision = value.decision === 'approved' ? 'approved' : 'denied';
+  return toPermissionResult(decision, input, suggestions, value.message);
 }
 
 function buildCanUseTool(
