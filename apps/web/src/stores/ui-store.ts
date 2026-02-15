@@ -4,18 +4,30 @@ import { devtools, persist } from 'zustand/middleware';
 export type Theme = 'dark' | 'light' | 'system';
 export type DiffScope = 'working-tree' | 'branch' | 'last-turn';
 export type DiffViewType = 'split' | 'unified';
+export type SidePanelId = 'diff' | 'plan' | 'deliverables';
 
 export interface UIStore {
   isSidebarExpanded: boolean;
   isTerminalOpen: boolean;
-  isDiffOpen: boolean;
   isSettingsOpen: boolean;
   isCommandPaletteOpen: boolean;
   isShortcutsModalOpen: boolean;
   selectedMachineId: string | null;
   selectedEnvironmentPath: string | null;
   theme: Theme;
+
+  activeSidePanel: SidePanelId | null;
+  sidePanelWidth: number;
+
+  /** @deprecated Use activeSidePanel === 'diff' instead */
+  isDiffOpen: boolean;
+  /** @deprecated Use activeSidePanel === 'plan' instead */
+  isPlanOpen: boolean;
+  /** @deprecated Use sidePanelWidth instead */
   diffPanelWidth: number;
+  /** @deprecated Use sidePanelWidth instead */
+  planPanelWidth: number;
+
   diffWordWrap: boolean;
   diffScope: DiffScope;
   diffViewType: DiffViewType;
@@ -28,8 +40,24 @@ export interface UIStore {
   setSidebarExpanded: (expanded: boolean) => void;
   toggleTerminal: () => void;
   setTerminalOpen: (open: boolean) => void;
+
+  setActiveSidePanel: (panel: SidePanelId | null) => void;
+  toggleSidePanel: (panel: SidePanelId) => void;
+  setSidePanelWidth: (width: number) => void;
+
+  /** @deprecated Use toggleSidePanel('diff') instead */
   toggleDiff: () => void;
+  /** @deprecated Use setActiveSidePanel(open ? 'diff' : null) instead */
   setDiffOpen: (open: boolean) => void;
+  /** @deprecated Use toggleSidePanel('plan') instead */
+  togglePlan: () => void;
+  /** @deprecated Use setActiveSidePanel(open ? 'plan' : null) instead */
+  setPlanOpen: (open: boolean) => void;
+  /** @deprecated Use setSidePanelWidth instead */
+  setDiffPanelWidth: (width: number) => void;
+  /** @deprecated Use setSidePanelWidth instead */
+  setPlanPanelWidth: (width: number) => void;
+
   setSettingsOpen: (open: boolean) => void;
   toggleSettings: () => void;
   setCommandPaletteOpen: (open: boolean) => void;
@@ -39,7 +67,6 @@ export interface UIStore {
   setSelectedMachineId: (id: string | null) => void;
   setSelectedEnvironmentPath: (path: string | null) => void;
   setTheme: (theme: Theme) => void;
-  setDiffPanelWidth: (width: number) => void;
   setDiffWordWrap: (wrap: boolean) => void;
   setDiffScope: (scope: DiffScope) => void;
   setDiffViewType: (type: DiffViewType) => void;
@@ -50,20 +77,29 @@ export interface UIStore {
   setTerminalPanelHeight: (height: number) => void;
 }
 
+const defaultPanelWidth = typeof window !== 'undefined' ? Math.round(window.innerWidth * 0.5) : 600;
+
 export const useUIStore = create<UIStore>()(
   devtools(
     persist(
-      (set) => ({
+      (set, get) => ({
         isSidebarExpanded: true,
         isTerminalOpen: false,
-        isDiffOpen: false,
         isSettingsOpen: false,
         isCommandPaletteOpen: false,
         isShortcutsModalOpen: false,
         selectedMachineId: null,
         selectedEnvironmentPath: null,
         theme: 'dark',
-        diffPanelWidth: typeof window !== 'undefined' ? Math.round(window.innerWidth * 0.5) : 600,
+
+        activeSidePanel: null,
+        sidePanelWidth: defaultPanelWidth,
+
+        isDiffOpen: false,
+        isPlanOpen: false,
+        diffPanelWidth: defaultPanelWidth,
+        planPanelWidth: defaultPanelWidth,
+
         diffWordWrap: false,
         diffScope: 'working-tree',
         diffViewType: 'unified',
@@ -92,10 +128,48 @@ export const useUIStore = create<UIStore>()(
 
         setTerminalOpen: (open) => set({ isTerminalOpen: open }, undefined, 'ui/setTerminalOpen'),
 
-        toggleDiff: () =>
-          set((state) => ({ isDiffOpen: !state.isDiffOpen }), undefined, 'ui/toggleDiff'),
+        setActiveSidePanel: (panel) =>
+          set(
+            {
+              activeSidePanel: panel,
+              isDiffOpen: panel === 'diff',
+              isPlanOpen: panel === 'plan',
+            },
+            undefined,
+            'ui/setActiveSidePanel'
+          ),
 
-        setDiffOpen: (open) => set({ isDiffOpen: open }, undefined, 'ui/setDiffOpen'),
+        toggleSidePanel: (panel) => {
+          const current = get().activeSidePanel;
+          const next = current === panel ? null : panel;
+          get().setActiveSidePanel(next);
+        },
+
+        setSidePanelWidth: (width) => {
+          const max = typeof window !== 'undefined' ? Math.floor(window.innerWidth * 0.8) : 1200;
+          const clamped = Math.min(Math.max(width, 400), max);
+          set(
+            {
+              sidePanelWidth: clamped,
+              diffPanelWidth: clamped,
+              planPanelWidth: clamped,
+            },
+            undefined,
+            'ui/setSidePanelWidth'
+          );
+        },
+
+        toggleDiff: () => get().toggleSidePanel('diff'),
+
+        setDiffOpen: (open) => get().setActiveSidePanel(open ? 'diff' : null),
+
+        togglePlan: () => get().toggleSidePanel('plan'),
+
+        setPlanOpen: (open) => get().setActiveSidePanel(open ? 'plan' : null),
+
+        setDiffPanelWidth: (width) => get().setSidePanelWidth(width),
+
+        setPlanPanelWidth: (width) => get().setSidePanelWidth(width),
 
         setSettingsOpen: (open) => set({ isSettingsOpen: open }, undefined, 'ui/setSettingsOpen'),
 
@@ -158,12 +232,6 @@ export const useUIStore = create<UIStore>()(
           set({ diffFileTreeWidth: clamped }, undefined, 'ui/setDiffFileTreeWidth');
         },
 
-        setDiffPanelWidth: (width) => {
-          const max = typeof window !== 'undefined' ? Math.floor(window.innerWidth * 0.8) : 1200;
-          const clamped = Math.min(Math.max(width, 400), max);
-          set({ diffPanelWidth: clamped }, undefined, 'ui/setDiffPanelWidth');
-        },
-
         setTerminalPanelHeight: (height) => {
           const max = typeof window !== 'undefined' ? Math.floor(window.innerHeight * 0.7) : 700;
           const clamped = Math.min(Math.max(height, 100), max);
@@ -172,12 +240,21 @@ export const useUIStore = create<UIStore>()(
       }),
       {
         name: 'shipyard-ui',
-        version: 2,
+        version: 3,
         migrate: (persisted, version) => {
+          // eslint-disable-next-line no-restricted-syntax -- zustand persist provides untyped state
           const state = persisted as Record<string, unknown>;
           if (version < 2) {
             state.isDiffFileTreeOpen ??= true;
             state.diffFileTreeWidth ??= 220;
+          }
+          if (version < 3) {
+            state.activeSidePanel = null;
+            const diffWidth =
+              typeof state.diffPanelWidth === 'number' ? state.diffPanelWidth : undefined;
+            const planWidth =
+              typeof state.planPanelWidth === 'number' ? state.planPanelWidth : undefined;
+            state.sidePanelWidth = diffWidth ?? planWidth ?? 600;
           }
           return state;
         },
@@ -186,7 +263,8 @@ export const useUIStore = create<UIStore>()(
           selectedMachineId: state.selectedMachineId,
           selectedEnvironmentPath: state.selectedEnvironmentPath,
           theme: state.theme,
-          diffPanelWidth: state.diffPanelWidth,
+          activeSidePanel: state.activeSidePanel,
+          sidePanelWidth: state.sidePanelWidth,
           diffWordWrap: state.diffWordWrap,
           diffScope: state.diffScope,
           diffViewType: state.diffViewType,

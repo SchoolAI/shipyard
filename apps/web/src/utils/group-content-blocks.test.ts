@@ -95,4 +95,59 @@ describe('groupContentBlocks', () => {
     expect(grouped).toHaveLength(1);
     expect(grouped[0]?.kind).toBe('tool_invocation');
   });
+
+  it('groups ExitPlanMode as plan kind with extracted markdown', () => {
+    const planInput = JSON.stringify({ plan: '# My Plan\n\n1. Step one\n2. Step two' });
+    const blocks: ContentBlock[] = [
+      {
+        type: 'tool_use',
+        toolUseId: 'epm-1',
+        toolName: 'ExitPlanMode',
+        input: planInput,
+        parentToolUseId: null,
+      },
+      toolResult('epm-1', 'Plan approved'),
+    ];
+    const grouped = groupContentBlocks(blocks);
+    expect(grouped).toHaveLength(1);
+    expect(grouped[0]?.kind).toBe('plan');
+
+    const plan = grouped[0] as GroupedBlock & { kind: 'plan' };
+    expect(plan.toolUse.toolUseId).toBe('epm-1');
+    expect(plan.toolResult?.content).toBe('Plan approved');
+    expect(plan.markdown).toBe('# My Plan\n\n1. Step one\n2. Step two');
+  });
+
+  it('handles ExitPlanMode with malformed JSON gracefully', () => {
+    const blocks: ContentBlock[] = [
+      {
+        type: 'tool_use',
+        toolUseId: 'epm-2',
+        toolName: 'ExitPlanMode',
+        input: 'not-json',
+        parentToolUseId: null,
+      },
+    ];
+    const grouped = groupContentBlocks(blocks);
+    expect(grouped).toHaveLength(1);
+    expect(grouped[0]?.kind).toBe('plan');
+
+    const plan = grouped[0] as GroupedBlock & { kind: 'plan' };
+    expect(plan.markdown).toBe('');
+  });
+
+  it('handles ExitPlanMode without plan field', () => {
+    const blocks: ContentBlock[] = [
+      {
+        type: 'tool_use',
+        toolUseId: 'epm-3',
+        toolName: 'ExitPlanMode',
+        input: '{}',
+        parentToolUseId: null,
+      },
+    ];
+    const grouped = groupContentBlocks(blocks);
+    const plan = grouped[0] as GroupedBlock & { kind: 'plan' };
+    expect(plan.markdown).toBe('');
+  });
 });

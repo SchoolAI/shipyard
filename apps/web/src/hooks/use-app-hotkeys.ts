@@ -6,6 +6,7 @@ import { useUIStore } from '../stores';
 interface AppHotkeyOptions {
   onToggleTerminal: () => void;
   onToggleDiff: () => void;
+  onTogglePlan: () => void;
   onToggleSidebar: () => void;
   onNewTask: () => void;
   onOpenSettings: () => void;
@@ -21,6 +22,7 @@ const GLOBAL_OPTIONS = { preventDefault: true, enableOnFormTags: true } as const
 export function useAppHotkeys({
   onToggleTerminal,
   onToggleDiff,
+  onTogglePlan,
   onToggleSidebar,
   onNewTask,
   onOpenSettings,
@@ -42,6 +44,8 @@ export function useAppHotkeys({
   useHotkeys(HOTKEYS.toggleTerminal.key, onToggleTerminal, GLOBAL_OPTIONS, [onToggleTerminal]);
 
   useHotkeys(HOTKEYS.toggleDiff.key, onToggleDiff, GLOBAL_OPTIONS, [onToggleDiff]);
+
+  useHotkeys(HOTKEYS.togglePlan.key, onTogglePlan, GLOBAL_OPTIONS, [onTogglePlan]);
 
   useHotkeys(HOTKEYS.toggleSidebar.key, onToggleSidebar, GLOBAL_OPTIONS, [onToggleSidebar]);
 

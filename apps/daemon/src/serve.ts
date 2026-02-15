@@ -1094,6 +1094,25 @@ function resolvePermissionResponse(ctx: PermissionResponseContext): PermissionRe
   });
   updateTaskInIndex(roomDoc, taskId, { status: 'working', updatedAt: Date.now() });
 
+  if (toolName === 'ExitPlanMode') {
+    const plans = taskHandle.doc.toJSON().plans;
+    const planIndex = plans.findIndex((p) => p.toolUseId === toolUseID);
+    if (planIndex >= 0) {
+      const reviewStatus = value.decision === 'approved' ? 'approved' : 'changes-requested';
+      change(taskHandle.doc, (draft) => {
+        const plan = draft.plans.get(planIndex);
+        if (plan) {
+          plan.reviewStatus = reviewStatus;
+          plan.reviewFeedback = value.message ?? null;
+        }
+      });
+      taskLog.info(
+        { toolUseID, reviewStatus, hasFeedback: !!value.message },
+        'Updated plan reviewStatus in CRDT'
+      );
+    }
+  }
+
   taskLog.info(
     {
       toolName,

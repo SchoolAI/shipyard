@@ -8,6 +8,7 @@ import {
   type PermissionRequest,
   PermissionRequestEphemeral,
   PermissionResponseEphemeral,
+  type PlanVersion,
   type SessionEntry,
   TaskDocumentSchema,
   type TaskMeta,
@@ -39,6 +40,7 @@ export interface TaskDocumentResult {
   meta: TaskMeta | null;
   conversation: Message[];
   sessions: SessionEntry[];
+  plans: PlanVersion[];
   diffState: DiffState | null;
   lastUserConfig: LastUserConfig | null;
   pendingPermissions: Map<string, PermissionRequest>;
@@ -76,6 +78,7 @@ export function useTaskDocument(taskId: string | null): TaskDocumentResult {
   const meta = useDoc(handle, (d: { meta: TaskMeta }) => d.meta);
   const conversation = useDoc(handle, (d: { conversation: Message[] }) => d.conversation);
   const sessions = useDoc(handle, (d: { sessions: SessionEntry[] }) => d.sessions);
+  const plans = useDoc(handle, (d: { plans: PlanVersion[] }) => d.plans);
   const diffState = useDoc(handle, (d: { diffState: DiffState }) => d.diffState);
 
   const lastUserConfig = useMemo((): LastUserConfig | null => {
@@ -159,6 +162,7 @@ export function useTaskDocument(taskId: string | null): TaskDocumentResult {
       meta: null,
       conversation: [],
       sessions: [],
+      plans: [],
       diffState: null,
       lastUserConfig: null,
       pendingPermissions: EMPTY_PERMISSIONS,
@@ -171,6 +175,7 @@ export function useTaskDocument(taskId: string | null): TaskDocumentResult {
     meta,
     conversation,
     sessions,
+    plans,
     diffState,
     lastUserConfig,
     pendingPermissions,

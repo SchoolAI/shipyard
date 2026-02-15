@@ -14,6 +14,7 @@ import type {
   SessionState,
   TaskDocumentShape,
 } from '@shipyard/loro-schema';
+import { extractPlanMarkdown } from '@shipyard/loro-schema';
 import { nanoid } from 'nanoid';
 import { logger } from './logger.js';
 
@@ -488,6 +489,49 @@ export class SessionManager {
       });
       draft.meta.updatedAt = Date.now();
     });
+
+    this.#extractPlansFromBlocks(contentBlocks);
+  }
+
+  /**
+   * Detect ExitPlanMode tool calls in content blocks and append plan versions
+   * to the task document's plans list.
+   */
+  #extractPlansFromBlocks(blocks: ContentBlock[]): void {
+    for (const block of blocks) {
+      if (block.type !== 'tool_use' || block.toolName !== 'ExitPlanMode') continue;
+
+      const planMarkdown = extractPlanMarkdown(block.input);
+      if (!planMarkdown) {
+        logger.warn(
+          { toolUseId: block.toolUseId },
+          'Failed to parse ExitPlanMode tool input as JSON'
+        );
+        continue;
+      }
+
+      const existingPlans = this.#taskDoc.toJSON().plans;
+      if (existingPlans.some((p) => p.toolUseId === block.toolUseId)) {
+        logger.debug(
+          { toolUseId: block.toolUseId },
+          'Plan already exists in CRDT, skipping duplicate'
+        );
+        continue;
+      }
+
+      change(this.#taskDoc, (draft) => {
+        draft.plans.push({
+          planId: nanoid(),
+          toolUseId: block.toolUseId,
+          markdown: planMarkdown,
+          reviewStatus: 'pending',
+          reviewFeedback: null,
+          createdAt: Date.now(),
+        });
+      });
+
+      logger.info({ toolUseId: block.toolUseId }, 'Extracted plan from ExitPlanMode tool call');
+    }
   }
 
   #handleResult(

@@ -30,47 +30,49 @@ function sortNodes(nodes: TreeNode[]): TreeNode[] {
   });
 }
 
+function addFileToTree(
+  file: SchemaDiffFile,
+  root: TreeNode[],
+  dirMap: Map<string, TreeNode>
+): void {
+  const normalized = file.path.replace(/\/+$/, '');
+  if (!normalized) return;
+  const parts = normalized.split('/');
+  let currentChildren = root;
+  let currentPath = '';
+
+  for (let i = 0; i < parts.length; i++) {
+    const part = parts[i];
+    if (!part) continue;
+    currentPath = currentPath ? `${currentPath}/${part}` : part;
+    const isLast = i === parts.length - 1;
+
+    if (isLast) {
+      currentChildren.push({
+        name: part,
+        path: file.path,
+        isDir: false,
+        status: file.status,
+        children: [],
+      });
+    } else {
+      let dirNode = dirMap.get(currentPath);
+      if (!dirNode) {
+        dirNode = { name: part, path: currentPath, isDir: true, children: [] };
+        dirMap.set(currentPath, dirNode);
+        currentChildren.push(dirNode);
+      }
+      currentChildren = dirNode.children;
+    }
+  }
+}
+
 function buildTree(files: readonly SchemaDiffFile[]): TreeNode[] {
   const root: TreeNode[] = [];
   const dirMap = new Map<string, TreeNode>();
-
   for (const file of files) {
-    const normalized = file.path.replace(/\/+$/, '');
-    if (!normalized) continue;
-    const parts = normalized.split('/');
-    let currentChildren = root;
-    let currentPath = '';
-
-    for (let i = 0; i < parts.length; i++) {
-      const part = parts[i]!;
-      currentPath = currentPath ? `${currentPath}/${part}` : part;
-      const isLast = i === parts.length - 1;
-
-      if (isLast) {
-        currentChildren.push({
-          name: part,
-          path: file.path,
-          isDir: false,
-          status: file.status,
-          children: [],
-        });
-      } else {
-        let dirNode = dirMap.get(currentPath);
-        if (!dirNode) {
-          dirNode = {
-            name: part,
-            path: currentPath,
-            isDir: true,
-            children: [],
-          };
-          dirMap.set(currentPath, dirNode);
-          currentChildren.push(dirNode);
-        }
-        currentChildren = dirNode.children;
-      }
-    }
+    addFileToTree(file, root, dirMap);
   }
-
   return collapseAndSort(root);
 }
 
@@ -79,8 +81,8 @@ function collapseAndSort(nodes: TreeNode[]): TreeNode[] {
     nodes.map((node) => {
       if (!node.isDir) return node;
       let collapsed = node;
-      while (collapsed.isDir && collapsed.children.length === 1 && collapsed.children[0]!.isDir) {
-        const child = collapsed.children[0]!;
+      while (collapsed.isDir && collapsed.children.length === 1 && collapsed.children[0]?.isDir) {
+        const child = collapsed.children[0];
         collapsed = {
           ...child,
           name: `${collapsed.name}/${child.name}`,
@@ -129,7 +131,9 @@ export function DiffFileTree({ files, selectedFile, onSelectFile, width }: DiffF
       const parts = file.path.replace(/\/+$/, '').split('/');
       let p = '';
       for (let i = 0; i < parts.length - 1; i++) {
-        p = p ? `${p}/${parts[i]}` : parts[i]!;
+        const segment = parts[i];
+        if (!segment) continue;
+        p = p ? `${p}/${segment}` : segment;
         dirs.add(p);
       }
     }
@@ -179,74 +183,88 @@ export function DiffFileTree({ files, selectedFile, onSelectFile, width }: DiffF
     itemRefs.current.get(index)?.focus();
   }, []);
 
+  const handleArrowDown = useCallback(() => {
+    if (focusIndex < visibleItems.length - 1) {
+      focusItem(focusIndex + 1);
+    }
+  }, [focusIndex, visibleItems.length, focusItem]);
+
+  const handleArrowUp = useCallback(() => {
+    if (focusIndex > 0) {
+      focusItem(focusIndex - 1);
+    }
+  }, [focusIndex, focusItem]);
+
+  const handleArrowRight = useCallback(
+    (item: FlatItem) => {
+      if (!item.node.isDir) return;
+      if (!expandedDirs.has(item.node.path)) {
+        handleToggleDir(item.node.path);
+      } else if (focusIndex < visibleItems.length - 1) {
+        focusItem(focusIndex + 1);
+      }
+    },
+    [expandedDirs, handleToggleDir, focusIndex, visibleItems.length, focusItem]
+  );
+
+  const handleArrowLeft = useCallback(
+    (item: FlatItem) => {
+      if (item.node.isDir && expandedDirs.has(item.node.path)) {
+        handleToggleDir(item.node.path);
+        return;
+      }
+      if (!item.parentPath) return;
+      const parentIndex = visibleItems.findIndex((vi) => vi.node.path === item.parentPath);
+      if (parentIndex >= 0) {
+        focusItem(parentIndex);
+      }
+    },
+    [expandedDirs, handleToggleDir, visibleItems, focusItem]
+  );
+
+  const handleActivate = useCallback(
+    (item: FlatItem) => {
+      if (item.node.isDir) {
+        handleToggleDir(item.node.path);
+      } else {
+        handleSelectFile(item.node.path);
+      }
+    },
+    [handleToggleDir, handleSelectFile]
+  );
+
   const handleTreeKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       const item = visibleItems[focusIndex];
       if (!item) return;
 
-      switch (e.key) {
-        case 'ArrowDown': {
-          e.preventDefault();
-          if (focusIndex < visibleItems.length - 1) {
-            focusItem(focusIndex + 1);
-          }
-          break;
-        }
-        case 'ArrowUp': {
-          e.preventDefault();
-          if (focusIndex > 0) {
-            focusItem(focusIndex - 1);
-          }
-          break;
-        }
-        case 'ArrowRight': {
-          e.preventDefault();
-          if (item.node.isDir) {
-            if (!expandedDirs.has(item.node.path)) {
-              handleToggleDir(item.node.path);
-            } else if (focusIndex < visibleItems.length - 1) {
-              focusItem(focusIndex + 1);
-            }
-          }
-          break;
-        }
-        case 'ArrowLeft': {
-          e.preventDefault();
-          if (item.node.isDir && expandedDirs.has(item.node.path)) {
-            handleToggleDir(item.node.path);
-          } else if (item.parentPath) {
-            const parentIndex = visibleItems.findIndex((vi) => vi.node.path === item.parentPath);
-            if (parentIndex >= 0) {
-              focusItem(parentIndex);
-            }
-          }
-          break;
-        }
-        case 'Home': {
-          e.preventDefault();
-          focusItem(0);
-          break;
-        }
-        case 'End': {
-          e.preventDefault();
-          if (visibleItems.length > 0) {
-            focusItem(visibleItems.length - 1);
-          }
-          break;
-        }
-        case 'Enter':
-        case ' ': {
-          e.preventDefault();
-          if (item.node.isDir) {
-            handleToggleDir(item.node.path);
-          } else {
-            handleSelectFile(item.node.path);
-          }
-          break;
-        }
+      const handlers: Record<string, () => void> = {
+        ArrowDown: () => handleArrowDown(),
+        ArrowUp: () => handleArrowUp(),
+        ArrowRight: () => handleArrowRight(item),
+        ArrowLeft: () => handleArrowLeft(item),
+        Home: () => focusItem(0),
+        End: () => focusItem(visibleItems.length - 1),
+        Enter: () => handleActivate(item),
+        ' ': () => handleActivate(item),
+      };
+
+      const handler = handlers[e.key];
+      if (handler) {
+        e.preventDefault();
+        handler();
       }
     },
-    [visibleItems, focusIndex, expandedDirs, handleToggleDir, handleSelectFile, focusItem]
+    [
+      visibleItems,
+      focusIndex,
+      handleArrowDown,
+      handleArrowUp,
+      handleArrowRight,
+      handleArrowLeft,
+      handleActivate,
+      focusItem,
+    ]
   );
 
   if (files.length === 0) return null;

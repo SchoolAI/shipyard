@@ -44,6 +44,7 @@ ALLOWED_SCRIPTS=(
   "scripts/lint-comments.sh"
   "scripts/lint-typeassertions.sh"
   "scripts/check-file-allowlist.sh"
+  "scripts/fix-node-pty-permissions.sh"
   "scripts/validate-file-allowlist.sh"
 )
 

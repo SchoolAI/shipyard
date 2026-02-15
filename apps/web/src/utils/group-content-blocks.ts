@@ -1,4 +1,5 @@
 import type { ContentBlock } from '@shipyard/loro-schema';
+import { extractPlanMarkdown } from '@shipyard/loro-schema';
 import { assertNever } from './assert-never';
 
 type ToolUseBlock = ContentBlock & { type: 'tool_use' };
@@ -17,6 +18,12 @@ export type GroupedBlock =
       taskToolUse: ToolUseBlock;
       taskToolResult: ToolResultBlock | null;
       children: GroupedBlock[];
+    }
+  | {
+      kind: 'plan';
+      toolUse: ToolUseBlock;
+      toolResult: ToolResultBlock | null;
+      markdown: string;
     };
 
 /**
@@ -92,6 +99,15 @@ function groupToolUse(
 ): GroupedBlock {
   const result = resultsByToolUseId.get(block.toolUseId) ?? null;
   if (result) consumedResultIds.add(block.toolUseId);
+
+  if (block.toolName === 'ExitPlanMode') {
+    return {
+      kind: 'plan',
+      toolUse: block,
+      toolResult: result,
+      markdown: extractPlanMarkdown(block.input),
+    };
+  }
 
   const childBlocks = childrenByParent.get(block.toolUseId);
   if (block.toolName === 'Task' && childBlocks && childBlocks.length > 0) {

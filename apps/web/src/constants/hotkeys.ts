@@ -30,6 +30,13 @@ export const HOTKEYS = {
     description: 'Show or hide the diff panel',
     context: 'global',
   },
+  togglePlan: {
+    key: 'meta+alt+p',
+    label: 'Toggle Plan Panel',
+    display: '\u2318\u2325P',
+    description: 'Show or hide the plan panel',
+    context: 'global',
+  },
   newTask: {
     key: 'c',
     label: 'New Task',
