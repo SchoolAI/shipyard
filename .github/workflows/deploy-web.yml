@@ -38,10 +38,9 @@ jobs:
           VITE_DATA_SOURCE: loro
 
       - name: Deploy to Cloudflare Pages
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          command: pages deploy apps/web/dist --project-name=shipyard
+        run: npx wrangler pages deploy apps/web/dist --project-name=shipyard
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
 
       - name: Summary
         run: echo "Web app deployed to https://shipyard.pages.dev"
