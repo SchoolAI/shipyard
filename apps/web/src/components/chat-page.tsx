@@ -166,6 +166,8 @@ export function ChatPage() {
 
   const storeMessages = activeTaskId ? messagesByTask[activeTaskId] : undefined;
 
+  const lastSubmittedModelRef = useRef<string | null>(null);
+
   /** Build a lookup from model IDs to human-readable labels using available models. */
   const modelLabelMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -211,6 +213,7 @@ export function ChatPage() {
           role: 'assistant' as const,
           content: [],
           isThinking: true,
+          agentName: resolveModelLabel(lastSubmittedModelRef.current),
         });
       }
     } else {
@@ -400,6 +403,7 @@ export function ChatPage() {
   const handleSubmit = useCallback(
     (payload: SubmitPayload) => {
       const { message, model, reasoningEffort, permissionMode } = payload;
+      lastSubmittedModelRef.current = model || null;
       const taskId = generateTaskId();
       let currentTaskId: string;
 

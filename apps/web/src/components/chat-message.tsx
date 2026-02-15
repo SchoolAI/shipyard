@@ -308,8 +308,6 @@ const markdownComponents: ComponentPropsWithoutRef<typeof ReactMarkdown>['compon
 const REMARK_PLUGINS = [remarkGfm];
 const REHYPE_PLUGINS = [rehypeHighlight];
 
-/* ---------- ToolCallLine ---------- */
-
 interface ToolCallLineProps {
   toolUse: ContentBlock & { type: 'tool_use' };
   toolResult: (ContentBlock & { type: 'tool_result' }) | null;
@@ -322,6 +320,10 @@ function ToolCallLine({ toolUse, toolResult }: ToolCallLineProps) {
   const [showInput, setShowInput] = useState(false);
   const detailsPanelId = useId();
   const inputPanelId = useId();
+
+  useEffect(() => {
+    if (isError) setShowDetails(true);
+  }, [isError]);
 
   const summary = summarizeToolAction(toolUse.toolName, toolUse.input);
   const iconLabel = TOOL_ICON_LABELS[toolUse.toolName] ?? toolUse.toolName;
@@ -429,8 +431,6 @@ function ToolCallLine({ toolUse, toolResult }: ToolCallLineProps) {
   );
 }
 
-/* ---------- ThinkingBlock ---------- */
-
 interface ThinkingBlockProps {
   block: ContentBlock & { type: 'thinking' };
 }
@@ -481,8 +481,6 @@ function ThinkingBlock({ block }: ThinkingBlockProps) {
     </div>
   );
 }
-
-/* ---------- SubagentGroup ---------- */
 
 interface SubagentGroupProps {
   taskToolUse: ContentBlock & { type: 'tool_use' };
@@ -585,8 +583,6 @@ function SubagentGroup({ taskToolUse, taskToolResult, children }: SubagentGroupP
   );
 }
 
-/* ---------- GroupedBlockRenderer ---------- */
-
 function GroupedBlockRenderer({ group }: { group: GroupedBlock }) {
   switch (group.kind) {
     case 'text':
@@ -616,8 +612,6 @@ function GroupedBlockRenderer({ group }: { group: GroupedBlock }) {
   }
 }
 
-/* ---------- Model label ---------- */
-
 const VERSION_RE = /^(.+?)\s+([\d.]+)$/;
 
 function ModelLabel({ name }: { name: string }) {
@@ -638,8 +632,6 @@ function ModelLabel({ name }: { name: string }) {
     </span>
   );
 }
-
-/* ---------- Message components ---------- */
 
 function AgentMessage({ message }: ChatMessageProps) {
   const grouped = useMemo(() => groupContentBlocks(message.content), [message.content]);

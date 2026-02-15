@@ -1,4 +1,5 @@
 import type { ContentBlock } from '@shipyard/loro-schema';
+import { assertNever } from './assert-never';
 
 type ToolUseBlock = ContentBlock & { type: 'tool_use' };
 type ToolResultBlock = ContentBlock & { type: 'tool_result' };
@@ -98,7 +99,11 @@ function groupToolUse(
       kind: 'subagent_group',
       taskToolUse: block,
       taskToolResult: result,
-      children: groupBlocksRecursive(childBlocks),
+      children: groupBlocksRecursive(
+        childBlocks.map((b) =>
+          b.type === 'tool_use' || b.type === 'tool_result' ? { ...b, parentToolUseId: null } : b
+        )
+      ),
     };
   }
   return { kind: 'tool_invocation', toolUse: block, toolResult: result };
@@ -130,7 +135,7 @@ function groupBlocksRecursive(blocks: ContentBlock[]): GroupedBlock[] {
         }
         break;
       default:
-        break;
+        assertNever(block);
     }
   }
 

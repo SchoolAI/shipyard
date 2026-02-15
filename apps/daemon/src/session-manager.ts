@@ -409,9 +409,8 @@ export class SessionManager {
     const rawContent = message.message.content;
     if (!Array.isArray(rawContent)) return;
 
-    const parentToolUseId = ('parent_tool_use_id' in message ? message.parent_tool_use_id : null) as
-      | string
-      | null;
+    const rawParent = 'parent_tool_use_id' in message ? message.parent_tool_use_id : null;
+    const parentToolUseId = typeof rawParent === 'string' ? rawParent : null;
 
     // eslint-disable-next-line no-restricted-syntax -- SDK content blocks typed as unknown[], need narrowing
     const sdkBlocks = rawContent as Array<Record<string, unknown>>;
@@ -437,7 +436,7 @@ export class SessionManager {
         draft.meta.updatedAt = Date.now();
       });
     } else {
-      // No preceding assistant message -- store as a standalone assistant entry
+      /** NOTE: No preceding assistant message -- store as a standalone assistant entry */
       change(this.#taskDoc, (draft) => {
         draft.conversation.push({
           messageId: nanoid(),
@@ -455,12 +454,18 @@ export class SessionManager {
     const rawContent = message.message.content;
     if (!Array.isArray(rawContent)) return;
 
-    const parentToolUseId = ('parent_tool_use_id' in message ? message.parent_tool_use_id : null) as
-      | string
-      | null;
+    const rawParent = 'parent_tool_use_id' in message ? message.parent_tool_use_id : null;
+    const parentToolUseId = typeof rawParent === 'string' ? rawParent : null;
 
     // eslint-disable-next-line no-restricted-syntax -- SDK content blocks typed as unknown[], need narrowing
     const sdkBlocks = rawContent as Array<Record<string, unknown>>;
+
+    // DEBUG: log raw block types to verify if thinking blocks arrive from the Agent SDK
+    logger.info(
+      { blockTypes: sdkBlocks.map((b) => b.type), blockCount: sdkBlocks.length },
+      'SDK assistant message block types'
+    );
+
     const contentBlocks: ContentBlock[] = [];
     for (const block of sdkBlocks) {
       const parsed = parseSdkBlock(block, parentToolUseId);
