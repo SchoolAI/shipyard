@@ -1,0 +1,265 @@
+name: Publish npm
+
+on:
+  schedule:
+    - cron: '15 2 * * *' # 2:15 AM UTC daily
+  workflow_dispatch:
+    inputs:
+      release_type:
+        description: 'Release type'
+        required: true
+        type: choice
+        options:
+          - rc
+          - promote
+      promote_version:
+        description: 'Version to promote (e.g. 0.1.0-nightly.20260215). Required for promote.'
+        required: false
+        type: string
+
+concurrency:
+  group: publish-npm
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    name: Publish @schoolai/shipyard
+    steps:
+      # ── Determine release type ──────────────────────────────────────
+      - name: Determine release type
+        id: release
+        run: |
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            echo "type=nightly" >> "$GITHUB_OUTPUT"
+          else
+            RELEASE_TYPE="${{ github.event.inputs.release_type }}"
+            echo "type=${RELEASE_TYPE}" >> "$GITHUB_OUTPUT"
+          fi
+
+      # ── Validate promote input ──────────────────────────────────────
+      - name: Validate promote version
+        if: steps.release.outputs.type == 'promote'
+        env:
+          PROMOTE_VERSION: ${{ github.event.inputs.promote_version }}
+        run: |
+          if [ -z "${PROMOTE_VERSION}" ]; then
+            echo "::error::promote_version is required for promote releases"
+            exit 1
+          fi
+          if ! echo "${PROMOTE_VERSION}" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+-(nightly|rc)\.[0-9]{8}$'; then
+            echo "::error::Invalid version format: ${PROMOTE_VERSION}. Expected: X.Y.Z-(nightly|rc).YYYYMMDD"
+            exit 1
+          fi
+
+      # ── Checkout ────────────────────────────────────────────────────
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      # ── Check for changes (nightly/RC only) ─────────────────────────
+      - name: Check for changes since last publish
+        if: steps.release.outputs.type != 'promote'
+        id: changes
+        run: |
+          LAST_TAG=$(git tag -l 'v*-nightly.*' 'v*-rc.*' --sort=-version:refname | head -1)
+          if [ -z "${LAST_TAG}" ]; then
+            echo "No previous publish tag found, will publish"
+            echo "has_changes=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "Comparing against ${LAST_TAG}"
+          CHANGED=$(git diff --name-only "${LAST_TAG}"..HEAD -- \
+            apps/daemon/ \
+            packages/loro-schema/ \
+            packages/session/ \
+          )
+          if [ -z "${CHANGED}" ]; then
+            echo "No changes since ${LAST_TAG}, skipping publish"
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Changes detected:"
+            echo "${CHANGED}"
+            echo "has_changes=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Skip if no changes
+        if: steps.release.outputs.type != 'promote' && steps.changes.outputs.has_changes == 'false'
+        run: |
+          echo "### Skipped" >> "$GITHUB_STEP_SUMMARY"
+          echo "No changes since last publish. Nothing to do." >> "$GITHUB_STEP_SUMMARY"
+
+      # ── Setup toolchain ─────────────────────────────────────────────
+      - uses: pnpm/action-setup@v4
+        if: steps.release.outputs.type == 'promote' || steps.changes.outputs.has_changes == 'true'
+
+      - uses: actions/setup-node@v4
+        if: steps.release.outputs.type == 'promote' || steps.changes.outputs.has_changes == 'true'
+        with:
+          node-version: '22.14.0'
+          cache: 'pnpm'
+          # NOTE: Do NOT set registry-url here — it conflicts with npm OIDC provenance
+
+      - uses: oven-sh/setup-bun@v2
+        if: steps.release.outputs.type == 'promote' || steps.changes.outputs.has_changes == 'true'
+
+      - name: Install npm@latest (OIDC support)
+        if: steps.release.outputs.type == 'promote' || steps.changes.outputs.has_changes == 'true'
+        run: npm install -g npm@latest
+
+      # ── Build (nightly/RC only) ─────────────────────────────────────
+      - name: Install dependencies
+        if: steps.release.outputs.type != 'promote' && steps.changes.outputs.has_changes == 'true'
+        run: pnpm install --frozen-lockfile
+
+      - name: Build daemon and workspace deps
+        if: steps.release.outputs.type != 'promote' && steps.changes.outputs.has_changes == 'true'
+        run: pnpm turbo build --filter=@shipyard/daemon
+
+      # ── Version stamp (nightly/RC) ──────────────────────────────────
+      - name: Compute version
+        if: steps.release.outputs.type != 'promote' && steps.changes.outputs.has_changes == 'true'
+        id: version
+        env:
+          RELEASE_TYPE: ${{ steps.release.outputs.type }}
+        run: |
+          BASE_VERSION=$(node -p "require('./apps/daemon/package-npm.json').version")
+          DATE_STAMP=$(date -u +%Y%m%d)
+          VERSION="${BASE_VERSION}-${RELEASE_TYPE}.${DATE_STAMP}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=v${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Computed version: ${VERSION}"
+
+      - name: Prepare npm package
+        if: steps.release.outputs.type != 'promote' && steps.changes.outputs.has_changes == 'true'
+        working-directory: apps/daemon
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          cp package-npm.json package.json
+          npm version "${VERSION}" --no-git-tag-version --allow-same-version
+
+      - name: Publish to npm (nightly/RC)
+        if: steps.release.outputs.type != 'promote' && steps.changes.outputs.has_changes == 'true'
+        working-directory: apps/daemon
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          echo "//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}" > .npmrc
+          npm publish --tag next --provenance --access public
+
+      - name: Git tag (nightly/RC)
+        if: steps.release.outputs.type != 'promote' && steps.changes.outputs.has_changes == 'true'
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag "${TAG}"
+          git push origin "${TAG}"
+
+      - name: GitHub pre-release (nightly/RC)
+        if: steps.release.outputs.type != 'promote' && steps.changes.outputs.has_changes == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
+          RELEASE_TYPE: ${{ steps.release.outputs.type }}
+        run: |
+          gh release create "${TAG}" \
+            --title "${RELEASE_TYPE}: ${VERSION}" \
+            --notes "Published \`@schoolai/shipyard@${VERSION}\` to npm with \`@next\` tag." \
+            --prerelease
+
+      # ── Promote to stable ───────────────────────────────────────────
+      - name: Promote to stable
+        if: steps.release.outputs.type == 'promote'
+        id: promote
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          PROMOTE_VERSION: ${{ github.event.inputs.promote_version }}
+        run: |
+          echo "//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}" > ~/.npmrc
+
+          # Extract base version (strip prerelease suffix)
+          STABLE_VERSION=$(echo "${PROMOTE_VERSION}" | sed 's/-.*//')
+          echo "stable_version=${STABLE_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=v${STABLE_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Promoting ${PROMOTE_VERSION} -> ${STABLE_VERSION}"
+
+          # Download the prerelease tarball
+          npm pack "@schoolai/shipyard@${PROMOTE_VERSION}" --pack-destination /tmp
+          TARBALL=$(ls /tmp/schoolai-shipyard-*.tgz)
+
+          # Extract, update version, repack
+          mkdir -p /tmp/promote-pkg
+          tar xzf "${TARBALL}" -C /tmp/promote-pkg
+          cd /tmp/promote-pkg/package
+          npm version "${STABLE_VERSION}" --no-git-tag-version --allow-same-version
+
+          # Publish as latest
+          npm publish --tag latest --access public
+
+      - name: Update base version and tag (promote)
+        if: steps.release.outputs.type == 'promote'
+        env:
+          STABLE_VERSION: ${{ steps.promote.outputs.stable_version }}
+          TAG: ${{ steps.promote.outputs.tag }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Update package-npm.json base version
+          cd apps/daemon
+          node -e "
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('package-npm.json', 'utf8'));
+            pkg.version = '${STABLE_VERSION}';
+            fs.writeFileSync('package-npm.json', JSON.stringify(pkg, null, 2) + '\n');
+          "
+          cd ../..
+
+          git add apps/daemon/package-npm.json
+          git commit -m "chore: bump @schoolai/shipyard to ${STABLE_VERSION}"
+          git tag "${TAG}"
+          git push origin HEAD "${TAG}"
+
+      - name: GitHub release (promote)
+        if: steps.release.outputs.type == 'promote'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.promote.outputs.tag }}
+          STABLE_VERSION: ${{ steps.promote.outputs.stable_version }}
+          PROMOTE_VERSION: ${{ github.event.inputs.promote_version }}
+        run: |
+          gh release create "${TAG}" \
+            --title "v${STABLE_VERSION}" \
+            --notes "Promoted \`@schoolai/shipyard@${PROMOTE_VERSION}\` to stable \`@${STABLE_VERSION}\`." \
+            --latest
+
+      # ── Summary ─────────────────────────────────────────────────────
+      - name: Summary
+        if: always()
+        env:
+          RELEASE_TYPE: ${{ steps.release.outputs.type }}
+          VERSION: ${{ steps.version.outputs.version }}
+          STABLE_VERSION: ${{ steps.promote.outputs.stable_version }}
+          PROMOTE_VERSION: ${{ github.event.inputs.promote_version }}
+          HAS_CHANGES: ${{ steps.changes.outputs.has_changes }}
+        run: |
+          if [ "${RELEASE_TYPE}" = "promote" ]; then
+            echo "### Published @schoolai/shipyard@${STABLE_VERSION} (stable)" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "Promoted from \`${PROMOTE_VERSION}\`" >> "$GITHUB_STEP_SUMMARY"
+          elif [ "${HAS_CHANGES}" = "true" ]; then
+            echo "### Published @schoolai/shipyard@${VERSION} (${RELEASE_TYPE})" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "Install: \`npm install @schoolai/shipyard@next\`" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "### Skipped (no changes)" >> "$GITHUB_STEP_SUMMARY"
+          fi

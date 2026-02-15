@@ -5,5 +5,18 @@ export default defineConfig({
   format: 'esm',
   dts: { tsconfig: './tsconfig.json' },
   sourcemap: true,
-  external: ['node-pty', 'node-datachannel'],
+  platform: 'node',
+  noExternal: [
+    '@shipyard/loro-schema',
+    '@shipyard/session',
+    '@loro-extended/change',
+    '@loro-extended/repo',
+    '@loro-extended/adapter-webrtc',
+    'zod',
+    'nanoid',
+  ],
+  external: ['node-pty', 'node-datachannel', 'loro-crdt', 'pino', '@anthropic-ai/claude-agent-sdk'],
+  banner: {
+    js: '#!/usr/bin/env node',
+  },
 });
