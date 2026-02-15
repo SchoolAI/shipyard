@@ -59,9 +59,7 @@ export function AuthGate({ children }: AuthGateProps) {
       })
       .catch((err: unknown) => {
         const message =
-          err instanceof Error
-            ? err.message
-            : 'Authentication failed. Please try again.';
+          err instanceof Error ? err.message : 'Authentication failed. Please try again.';
         setError(message);
       });
   }, [login, logout, setExchanging, setError]);
