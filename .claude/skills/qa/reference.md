@@ -6,7 +6,7 @@
 
 Each reviewer produces a findings table. Normalize each finding into:
 
-```
+```typescript
 {
   file: string,          // relative path
   line: number,          // primary line number
@@ -21,10 +21,11 @@ Each reviewer produces a findings table. Normalize each finding into:
 
 ### Step 2: Match Findings
 
-Two findings match if ANY of these conditions hold:
-1. **Exact match:** Same file + overlapping line ranges
-2. **Semantic match:** Same file + same issue category (e.g., both flag "type assertion" even at different lines)
-3. **Cross-file match:** Same issue pattern across files (e.g., "missing error handling" flagged in 3 different files by same reviewer = 1 issue, not 3)
+Two findings from different reviewers match if:
+1. **Exact match:** Same file + overlapping line ranges (primary matching rule)
+2. **Same-file match:** Same file + clearly the same issue even if line numbers differ slightly (e.g., both flag "type assertion on line 42" vs "unsafe cast on line 42-45")
+
+Do NOT attempt fuzzy semantic matching across different files or abstract issue categories. Keep matching simple and deterministic — if you're unsure whether two findings match, treat them as separate findings. It's better to present something as contested than to incorrectly auto-fix.
 
 ### Step 3: Classify
 
@@ -116,9 +117,7 @@ If more than 20 files changed:
 
 ### Reviewer Returns No Findings
 
-If a reviewer finds nothing wrong:
-- That counts as an implicit "approve" vote
-- A finding from another reviewer with 0 matching findings = contested (1 of 3)
+If a reviewer finds nothing wrong, their silence does NOT override another reviewer's findings. Classify the other reviewer's findings normally using the severity/confidence table above — a critical+high-confidence finding from a single reviewer is still contested (blocking), regardless of how many other reviewers found nothing.
 
 ### Fix Breaks Another Gate
 

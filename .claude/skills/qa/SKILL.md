@@ -42,15 +42,15 @@ Collect the implementation context before spawning reviewers.
 
 2. **Read the changed files** to understand what was implemented.
 
-3. **Determine domain** for the 3rd reviewer using this logic:
-   | Changed files contain | Select |
-   |----------------------|--------|
-   | `apps/web/**` only | `frontend-expert` |
-   | `apps/session-server/**` or `apps/daemon/**` | `backend-expert` |
-   | `packages/**` only | `backend-expert` |
-   | Both frontend and backend paths | `fullstack-expert` |
-   | `.tsx` with layout/style changes | `design-expert` |
-   | `.claude/skills/**` or docs only | Skip 3rd reviewer (use 2 only) |
+3. **Determine domain** for the 3rd reviewer. Evaluate rows top-to-bottom; first match wins:
+   | Priority | Changed files contain | Select |
+   |----------|----------------------|--------|
+   | 1 | `.claude/skills/**` or docs only | Skip 3rd reviewer (use 2 only) |
+   | 2 | Both `apps/web/**` and any backend path | `fullstack-expert` |
+   | 3 | `apps/web/**` only | `frontend-expert` |
+   | 4 | `apps/session-server/**`, `apps/daemon/**`, or `apps/og-proxy-worker/**` | `backend-expert` |
+   | 5 | `packages/**` only | `backend-expert` (add design checks to prompt if `packages/loro-schema/**` is touched, since it's shared with frontend) |
+   | 6 | No match above | Skip 3rd reviewer (use 2 only) |
 
 4. **Build the file list** as absolute paths for subagent prompts.
 
@@ -58,7 +58,7 @@ Collect the implementation context before spawning reviewers.
 
 Spawn reviewers in parallel using the Task tool. **All subagents use `run_in_background: true`** per AGENTS.md bug workaround.
 
-Use `Read` on each agent's `output_file` to retrieve results.
+After spawning all reviewers, **wait for each to complete** — the system sends a notification when each background task finishes. Then use `Read` on the `output_file` path returned by each Task call to retrieve the full reviewer output. Do NOT read output files before completion notifications arrive, or you may get partial results.
 
 **Reviewer 1: Adversarial Reviewer**
 
@@ -85,7 +85,7 @@ You are reviewing a post-implementation change in Shipyard.
 5. Reference specific file:line for every finding
 6. Rate confidence (high/medium/low) per finding
 
-## Output Format
+## Output Format (IMPORTANT: use EXACTLY this format, override any default format you may have)
 ### Findings
 | # | Severity | File:Line | Issue | Suggested Fix | Confidence |
 |---|----------|-----------|-------|---------------|------------|
@@ -123,7 +123,7 @@ You are reviewing code against Shipyard's engineering quality gates.
 5. Reference specific file:line for every finding
 6. Rate confidence (high/medium/low) per finding
 
-## Output Format
+## Output Format (IMPORTANT: use EXACTLY this format, override any default format you may have)
 ### Findings
 | # | Severity | File:Line | Issue | Suggested Fix | Confidence |
 |---|----------|-----------|-------|---------------|------------|
@@ -142,14 +142,14 @@ Use the domain-appropriate `subagent_type` from Phase 1. Give it the same file l
 After all reviewers return, analyze findings:
 
 1. **Parse findings** from each reviewer's output into a unified list
-2. **Match by location** — findings referencing the same file:line (or overlapping ranges) from 2+ reviewers are **unanimous**
+2. **Match by location** — findings referencing the same file + overlapping line ranges from 2+ reviewers are **unanimous**. Only match findings in the same file with clearly the same issue. When in doubt, treat as separate findings. See reference.md for the full matching algorithm.
 3. **Categorize:**
 
 | Category | Condition | Action |
 |----------|-----------|--------|
-| **Unanimous** | 2+ reviewers flag same file:line or same issue | Auto-fix |
-| **Contested** | Only 1 reviewer flags, or reviewers disagree on fix | Ask user |
-| **Informational** | Low severity + low confidence from 1 reviewer | Report but skip |
+| **Unanimous** | 2+ reviewers flag same file:line | Auto-fix |
+| **Contested** | 1 reviewer flags critical (any confidence) or high+high-confidence | Ask user |
+| **Informational** | 1 reviewer, medium/low severity, or high+low-confidence | Report but skip |
 
 4. **Present the consensus summary** to the user before fixing:
 
@@ -172,13 +172,13 @@ After all reviewers return, analyze findings:
 ### Phase 4: FIX
 
 1. **Apply unanimous fixes** — edit the files directly
-2. **For contested items** — use AskUserQuestion with each contested finding, presenting the different reviewer perspectives. Options: "Fix it", "Skip it", or user provides custom resolution
+2. **For contested items** — present ALL contested findings to the user at once in the Phase 3 summary table. Ask: "Which contested items should I fix? Reply with item numbers, 'all', or 'none'." Do NOT prompt for each item individually — batch them into a single user interaction.
 3. **Apply user-approved contested fixes**
 
 ### Phase 5: VERIFY
 
 1. Run `pnpm check` (pre-commit gates)
-2. Run tests on changed files: `pnpm vitest run [changed-test-files]`
+2. Run tests covering the modified source files. For each changed source file `foo.ts`, look for `foo.test.ts` in the same directory and run it: `pnpm vitest run path/to/foo.test.ts`. If no matching test file exists, run the full test suite for the affected package.
 3. Report results:
 
 ```markdown
@@ -197,7 +197,7 @@ After all reviewers return, analyze findings:
 [Any items that still need attention]
 ```
 
-If verification fails, diagnose and fix the failure, then re-verify (max 2 retries).
+If verification fails, diagnose and fix the failure, then re-verify (max 2 retries). After 2 failed retries, **stop**. Report the remaining failures to the user with full error output. Do NOT attempt further automated fixes. Present the option to revert all QA fixes (`git checkout` the changed files) or continue manually.
 
 ## Rules
 
