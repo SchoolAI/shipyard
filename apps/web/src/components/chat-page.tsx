@@ -13,6 +13,7 @@ import {
 } from '@shipyard/loro-schema';
 import { ChevronDown } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { PlanApprovalProvider } from '../contexts/plan-approval-context';
 import { useAppHotkeys } from '../hooks/use-app-hotkeys';
 import { useMachineSelection } from '../hooks/use-machine-selection';
 import { usePersonalRoom } from '../hooks/use-personal-room';
@@ -29,8 +30,10 @@ import { ChatMessage } from './chat-message';
 import { CommandPalette } from './command-palette';
 import type { ReasoningLevel } from './composer/reasoning-effort';
 import { StatusBar } from './composer/status-bar';
-import type { DiffPanelHandle } from './panels/diff-panel';
-import { DiffPanel } from './panels/diff-panel';
+import { DiffPanelContent } from './panels/diff-panel';
+import { PlanPanelContent } from './panels/plan-panel';
+import type { SidePanelHandle } from './panels/side-panel';
+import { SidePanel } from './panels/side-panel';
 import type { TerminalPanelHandle } from './panels/terminal-panel';
 import { TerminalPanel } from './panels/terminal-panel';
 import { PermissionCard } from './permission-card';
@@ -178,10 +181,10 @@ export function ChatPage() {
   const setActiveTask = useTaskStore((s) => s.setActiveTask);
   const messagesByTask = useMessageStore((s) => s.messagesByTask);
   const isTerminalOpen = useUIStore((s) => s.isTerminalOpen);
-  const isDiffOpen = useUIStore((s) => s.isDiffOpen);
+  const activeSidePanel = useUIStore((s) => s.activeSidePanel);
   const isSettingsOpen = useUIStore((s) => s.isSettingsOpen);
   const toggleTerminal = useUIStore((s) => s.toggleTerminal);
-  const toggleDiff = useUIStore((s) => s.toggleDiff);
+  const toggleSidePanel = useUIStore((s) => s.toggleSidePanel);
   const toggleSidebar = useUIStore((s) => s.toggleSidebar);
   const setSettingsOpen = useUIStore((s) => s.setSettingsOpen);
   const setSidebarExpanded = useUIStore((s) => s.setSidebarExpanded);
@@ -222,7 +225,7 @@ export function ChatPage() {
   const diffScope = useUIStore((s) => s.diffScope);
 
   const loroTask = useTaskDocument(activeTaskId);
-  const { pendingPermissions, respondToPermission } = loroTask;
+  const { pendingPermissions, respondToPermission, plans } = loroTask;
 
   const { taskIndex } = useTaskIndex(LOCAL_USER_ID);
   const taskList = useMemo(
@@ -315,9 +318,9 @@ export function ChatPage() {
   const demoTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const composerRef = useRef<ChatComposerHandle>(null);
   const terminalRef = useRef<TerminalPanelHandle>(null);
-  const diffRef = useRef<DiffPanelHandle>(null);
+  const sidePanelRef = useRef<SidePanelHandle>(null);
   const prevTerminalOpen = useRef(false);
-  const prevDiffOpen = useRef(false);
+  const prevSidePanelOpen = useRef(false);
 
   const selectedEnvironmentPath = useUIStore((s) => s.selectedEnvironmentPath);
   const setSelectedEnvironmentPath = useUIStore((s) => s.setSelectedEnvironmentPath);
@@ -372,24 +375,27 @@ export function ChatPage() {
   }, [isTerminalOpen]);
 
   useEffect(() => {
-    if (isDiffOpen && !prevDiffOpen.current) {
-      setDiffLastViewedAt(Date.now());
+    const isOpen = activeSidePanel !== null;
+    const wasOpen = prevSidePanelOpen.current;
+
+    if (isOpen && !wasOpen) {
+      if (activeSidePanel === 'diff') setDiffLastViewedAt(Date.now());
       requestAnimationFrame(() => {
-        diffRef.current?.focus();
+        sidePanelRef.current?.focus();
       });
-    } else if (!isDiffOpen && prevDiffOpen.current) {
+    } else if (!isOpen && wasOpen) {
       requestAnimationFrame(() => {
         composerRef.current?.focus();
       });
     }
-    prevDiffOpen.current = isDiffOpen;
-  }, [isDiffOpen, setDiffLastViewedAt]);
+    prevSidePanelOpen.current = isOpen;
+  }, [activeSidePanel, setDiffLastViewedAt]);
 
   useEffect(() => {
-    if (isDiffOpen && typeof window !== 'undefined' && window.innerWidth < 1280) {
+    if (activeSidePanel !== null && typeof window !== 'undefined' && window.innerWidth < 1280) {
       setSidebarExpanded(false);
     }
-  }, [isDiffOpen, setSidebarExpanded]);
+  }, [activeSidePanel, setSidebarExpanded]);
 
   useEffect(() => {
     if (!isTerminalOpen) {
@@ -433,7 +439,8 @@ export function ChatPage() {
 
   useAppHotkeys({
     onToggleTerminal: toggleTerminal,
-    onToggleDiff: toggleDiff,
+    onToggleDiff: useCallback(() => toggleSidePanel('diff'), [toggleSidePanel]),
+    onTogglePlan: useCallback(() => toggleSidePanel('plan'), [toggleSidePanel]),
     onToggleSidebar: toggleSidebar,
     onNewTask: handleNewTask,
     onOpenSettings: toggleSettings,
@@ -603,7 +610,7 @@ export function ChatPage() {
   }, [activeTaskId]);
 
   const hasUnviewedDiff = useMemo(() => {
-    if (isDiffOpen) return false;
+    if (activeSidePanel === 'diff') return false;
     const ds = loroTask.diffState;
     if (!ds) return false;
     const relevantUpdatedAt =
@@ -613,7 +620,7 @@ export function ChatPage() {
           ? ds.lastTurnUpdatedAt
           : ds.updatedAt;
     return relevantUpdatedAt > diffLastViewedAt;
-  }, [isDiffOpen, loroTask.diffState, diffScope, diffLastViewedAt]);
+  }, [activeSidePanel, loroTask.diffState, diffScope, diffLastViewedAt]);
 
   const hasMessages = messages.length > 0;
 
@@ -627,116 +634,122 @@ export function ChatPage() {
       : undefined;
 
   return (
-    <div className="flex h-dvh overflow-hidden bg-background">
-      <CommandPalette />
-      <ShortcutsModal />
-      <Sidebar />
-      <div className="flex flex-col flex-1 min-w-0 min-h-0" tabIndex={-1}>
-        <TopBar
-          onToggleTerminal={toggleTerminal}
-          onToggleDiff={toggleDiff}
-          hasUnviewedDiff={hasUnviewedDiff}
-        />
+    <PlanApprovalProvider
+      pendingPermissions={pendingPermissions}
+      respondToPermission={respondToPermission}
+      plans={plans}
+    >
+      <div className="flex h-dvh overflow-hidden bg-background">
+        <CommandPalette />
+        <ShortcutsModal />
+        <Sidebar />
+        <div className="flex flex-col flex-1 min-w-0 min-h-0" tabIndex={-1}>
+          <TopBar
+            onToggleTerminal={toggleTerminal}
+            onToggleSidePanel={useCallback(() => toggleSidePanel('diff'), [toggleSidePanel])}
+            hasUnviewedDiff={hasUnviewedDiff}
+          />
 
-        <main id="main-content" className="flex flex-col flex-1 min-h-0">
-          {isSettingsOpen ? (
-            <SettingsPage onBack={handleCloseSettings} />
-          ) : (
-            <>
-              {/* Chat area */}
-              {hasMessages ? (
-                <div
-                  ref={scrollRef}
-                  className="flex-1 min-h-0 overflow-y-auto"
-                  role="log"
-                  aria-label="Chat messages"
-                  aria-relevant="additions"
-                >
-                  <div className="max-w-3xl mx-auto px-3 sm:px-4 py-3 sm:py-4 space-y-2.5 sm:space-y-4">
-                    {messages.map((msg) => (
-                      <ChatMessage key={msg.id} message={msg} />
-                    ))}
-                    {pendingPermissions.size > 0 && (
-                      <div
-                        className="space-y-3"
-                        role="region"
-                        aria-label="Pending permission requests"
-                        aria-live="polite"
-                      >
-                        {Array.from(pendingPermissions.entries()).map(([toolUseId, request]) => (
-                          <PermissionCard
-                            key={toolUseId}
-                            toolUseId={toolUseId}
-                            request={request}
-                            onRespond={respondToPermission}
-                          />
-                        ))}
-                      </div>
-                    )}
+          <main id="main-content" className="flex flex-col flex-1 min-h-0">
+            {isSettingsOpen ? (
+              <SettingsPage onBack={handleCloseSettings} />
+            ) : (
+              <>
+                {/* Chat area */}
+                {hasMessages ? (
+                  <div
+                    ref={scrollRef}
+                    className="flex-1 min-h-0 overflow-y-auto"
+                    role="log"
+                    aria-label="Chat messages"
+                    aria-relevant="additions"
+                  >
+                    <div className="max-w-3xl mx-auto px-3 sm:px-4 py-3 sm:py-4 space-y-2.5 sm:space-y-4">
+                      {messages.map((msg) => (
+                        <ChatMessage key={msg.id} message={msg} />
+                      ))}
+                      {pendingPermissions.size > 0 && (
+                        <div
+                          className="space-y-3"
+                          role="region"
+                          aria-label="Pending permission requests"
+                          aria-live="polite"
+                        >
+                          {Array.from(pendingPermissions.entries())
+                            .filter(([_toolUseId, request]) => request.toolName !== 'ExitPlanMode')
+                            .map(([toolUseId, request]) => (
+                              <PermissionCard
+                                key={toolUseId}
+                                toolUseId={toolUseId}
+                                request={request}
+                                onRespond={respondToPermission}
+                              />
+                            ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
+                ) : (
+                  <HeroState
+                    environmentLabel={heroEnvironmentLabel}
+                    onSuggestionClick={(text) =>
+                      handleSubmit({
+                        message: text,
+                        model: composerModel,
+                        reasoningEffort: composerReasoning,
+                        permissionMode: composerPermission,
+                      })
+                    }
+                  />
+                )}
+
+                {/* Composer */}
+                <div className="shrink-0 w-full max-w-3xl mx-auto px-3 sm:px-4">
+                  <ChatComposer
+                    ref={composerRef}
+                    onSubmit={handleSubmit}
+                    onClearChat={handleClearChat}
+                    availableModels={availableModels}
+                    availableEnvironments={availableEnvironments}
+                    onEnvironmentSelect={setSelectedEnvironmentPath}
+                    selectedModelId={composerModel}
+                    onModelChange={setComposerModel}
+                    reasoningLevel={composerReasoning}
+                    onReasoningChange={setComposerReasoning}
+                    permissionMode={composerPermission}
+                    onPermissionChange={setComposerPermission}
+                  />
+                  <StatusBar
+                    connectionState={connectionState}
+                    machines={machines}
+                    selectedMachineId={selectedMachineId}
+                    onMachineSelect={setSelectedMachineId}
+                    availableEnvironments={availableEnvironments}
+                    selectedEnvironmentPath={selectedEnvironmentPath}
+                    onEnvironmentSelect={setSelectedEnvironmentPath}
+                    homeDir={homeDir}
+                  />
                 </div>
-              ) : (
-                <HeroState
-                  environmentLabel={heroEnvironmentLabel}
-                  onSuggestionClick={(text) =>
-                    handleSubmit({
-                      message: text,
-                      model: composerModel,
-                      reasoningEffort: composerReasoning,
-                      permissionMode: composerPermission,
-                    })
-                  }
-                />
-              )}
+              </>
+            )}
+          </main>
 
-              {/* Composer */}
-              <div className="shrink-0 w-full max-w-3xl mx-auto px-3 sm:px-4">
-                <ChatComposer
-                  ref={composerRef}
-                  onSubmit={handleSubmit}
-                  onClearChat={handleClearChat}
-                  availableModels={availableModels}
-                  availableEnvironments={availableEnvironments}
-                  onEnvironmentSelect={setSelectedEnvironmentPath}
-                  selectedModelId={composerModel}
-                  onModelChange={setComposerModel}
-                  reasoningLevel={composerReasoning}
-                  onReasoningChange={setComposerReasoning}
-                  permissionMode={composerPermission}
-                  onPermissionChange={setComposerPermission}
-                />
-                <StatusBar
-                  connectionState={connectionState}
-                  machines={machines}
-                  selectedMachineId={selectedMachineId}
-                  onMachineSelect={setSelectedMachineId}
-                  availableEnvironments={availableEnvironments}
-                  selectedEnvironmentPath={selectedEnvironmentPath}
-                  onEnvironmentSelect={setSelectedEnvironmentPath}
-                  homeDir={homeDir}
-                />
-              </div>
-            </>
-          )}
-        </main>
+          {/* Terminal panel */}
+          <TerminalPanel
+            ref={terminalRef}
+            isOpen={isTerminalOpen}
+            onClose={() => useUIStore.getState().setTerminalOpen(false)}
+            terminalChannel={terminalChannel}
+            selectedEnvironmentPath={selectedEnvironmentPath}
+          />
+        </div>
 
-        {/* Terminal panel */}
-        <TerminalPanel
-          ref={terminalRef}
-          isOpen={isTerminalOpen}
-          onClose={() => useUIStore.getState().setTerminalOpen(false)}
-          terminalChannel={terminalChannel}
-          selectedEnvironmentPath={selectedEnvironmentPath}
-        />
+        {/* Side panel (diff / plan) */}
+        <SidePanel ref={sidePanelRef}>
+          {activeSidePanel === 'diff' && <DiffPanelContent activeTaskId={activeTaskId} />}
+          {activeSidePanel === 'plan' && <PlanPanelContent activeTaskId={activeTaskId} />}
+        </SidePanel>
       </div>
-
-      {/* Diff side panel */}
-      <DiffPanel
-        ref={diffRef}
-        isOpen={isDiffOpen}
-        onClose={() => useUIStore.getState().setDiffOpen(false)}
-        activeTaskId={activeTaskId}
-      />
-    </div>
+    </PlanApprovalProvider>
   );
 }

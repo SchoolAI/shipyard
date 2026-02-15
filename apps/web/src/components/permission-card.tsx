@@ -175,7 +175,7 @@ export function PermissionCard({ toolUseId, request, onRespond }: PermissionCard
       </div>
 
       {/* Action buttons */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center justify-end gap-2">
         {/* Allow split button: main Allow + dropdown chevron for "Always allow" */}
         <div className="flex items-center">
           <Button

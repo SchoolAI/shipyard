@@ -1,6 +1,6 @@
 import { Button, Kbd, Tooltip } from '@heroui/react';
 import { LOCAL_USER_ID } from '@shipyard/loro-schema';
-import { Diff, Terminal } from 'lucide-react';
+import { PanelRight, Terminal } from 'lucide-react';
 import { HOTKEYS } from '../constants/hotkeys';
 import { useTaskIndex } from '../hooks/use-task-index';
 import { useTaskStore } from '../stores';
@@ -8,11 +8,11 @@ import { MobileSidebarToggle } from './sidebar';
 
 interface TopBarProps {
   onToggleTerminal: () => void;
-  onToggleDiff: () => void;
+  onToggleSidePanel: () => void;
   hasUnviewedDiff?: boolean;
 }
 
-export function TopBar({ onToggleTerminal, onToggleDiff, hasUnviewedDiff }: TopBarProps) {
+export function TopBar({ onToggleTerminal, onToggleSidePanel, hasUnviewedDiff }: TopBarProps) {
   const activeTaskId = useTaskStore((s) => s.activeTaskId);
   const { taskIndex } = useTaskIndex(LOCAL_USER_ID);
   const activeEntry = activeTaskId ? taskIndex[activeTaskId] : undefined;
@@ -56,11 +56,11 @@ export function TopBar({ onToggleTerminal, onToggleDiff, hasUnviewedDiff }: TopB
                 isIconOnly
                 variant="ghost"
                 size="sm"
-                aria-label="Toggle diff panel"
-                onPress={onToggleDiff}
+                aria-label="Toggle side panel"
+                onPress={onToggleSidePanel}
                 className="text-muted hover:text-foreground hover:bg-default w-9 h-9 sm:w-8 sm:h-8 min-w-0"
               >
-                <Diff className="w-4 h-4" />
+                <PanelRight className="w-4 h-4" />
               </Button>
               {hasUnviewedDiff && (
                 <span className="absolute top-0 right-0 w-2 h-2 rounded-full bg-accent" />
@@ -69,7 +69,7 @@ export function TopBar({ onToggleTerminal, onToggleDiff, hasUnviewedDiff }: TopB
           </Tooltip.Trigger>
           <Tooltip.Content>
             <span className="flex items-center gap-2">
-              Toggle diff panel
+              Toggle side panel
               <Kbd>{HOTKEYS.toggleDiff.display}</Kbd>
             </span>
           </Tooltip.Content>

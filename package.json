@@ -20,6 +20,7 @@
     "dev:daemon": "turbo run dev --filter=@shipyard/daemon",
     "dev:session-server": "turbo run dev --filter=@shipyard/session-server",
     "dev:og-proxy": "turbo run dev --filter=@shipyard/og-proxy-worker",
+    "postinstall": "bash scripts/fix-node-pty-permissions.sh",
     "prepare": "simple-git-hooks"
   },
   "devDependencies": {
@@ -47,6 +48,10 @@
       "esbuild",
       "simple-git-hooks",
       "workerd"
+    ],
+    "onlyBuiltDependencies": [
+      "node-datachannel",
+      "node-pty"
     ]
   }
 }

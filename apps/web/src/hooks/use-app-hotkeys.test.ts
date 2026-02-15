@@ -24,6 +24,7 @@ function defaultCallbacks() {
   return {
     onToggleTerminal: vi.fn(),
     onToggleDiff: vi.fn(),
+    onTogglePlan: vi.fn(),
     onToggleSidebar: vi.fn(),
     onNewTask: vi.fn(),
     onOpenSettings: vi.fn(),
@@ -92,6 +93,16 @@ describe('useAppHotkeys', () => {
       const call = findCall(HOTKEYS.commandPalette.key);
       expect(call).toBeDefined();
       expect(call?.[1]).toBe(cbs.onCommandPalette);
+      expect(call?.[2]).toEqual(GLOBAL_OPTIONS);
+    });
+
+    it('registers meta+alt+p for plan toggle', () => {
+      const cbs = defaultCallbacks();
+      renderHook(() => useAppHotkeys(cbs));
+
+      const call = findCall(HOTKEYS.togglePlan.key);
+      expect(call).toBeDefined();
+      expect(call?.[1]).toBe(cbs.onTogglePlan);
       expect(call?.[2]).toEqual(GLOBAL_OPTIONS);
     });
 

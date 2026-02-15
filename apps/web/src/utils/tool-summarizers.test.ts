@@ -130,6 +130,23 @@ describe('summarizeToolAction', () => {
     });
   });
 
+  describe('ExitPlanMode', () => {
+    it('returns first line of plan markdown stripped of heading markers', () => {
+      const input = JSON.stringify({ plan: '# Implementation Plan\n\n1. First step' });
+      expect(summarizeToolAction('ExitPlanMode', input)).toBe('Implementation Plan');
+    });
+
+    it('returns fallback when plan field is missing', () => {
+      const input = JSON.stringify({});
+      expect(summarizeToolAction('ExitPlanMode', input)).toBe('Plan ready for review');
+    });
+
+    it('returns fallback for empty plan', () => {
+      const input = JSON.stringify({ plan: '' });
+      expect(summarizeToolAction('ExitPlanMode', input)).toBe('Plan ready for review');
+    });
+  });
+
   describe('unknown tool', () => {
     it('returns tool name with truncated input', () => {
       const input = JSON.stringify({ foo: 'bar' });
@@ -157,7 +174,7 @@ describe('summarizeToolAction', () => {
 });
 
 describe('TOOL_SUMMARIZERS', () => {
-  it('has entries for all six known tools', () => {
+  it('has entries for all known tools', () => {
     expect(Object.keys(TOOL_SUMMARIZERS)).toEqual(
       expect.arrayContaining(['Bash', 'Edit', 'Write', 'Read', 'Glob', 'Grep'])
     );
@@ -179,5 +196,6 @@ describe('TOOL_ICON_LABELS', () => {
     expect(TOOL_ICON_LABELS.Glob).toBe('Find files');
     expect(TOOL_ICON_LABELS.Grep).toBe('Search');
     expect(TOOL_ICON_LABELS.Task).toBe('Subagent');
+    expect(TOOL_ICON_LABELS.ExitPlanMode).toBe('Plan');
   });
 });

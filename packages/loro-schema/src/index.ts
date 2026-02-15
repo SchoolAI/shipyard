@@ -7,7 +7,6 @@ export {
   type InferMutableType,
   Shape,
 } from '@loro-extended/change';
-
 export type { EpochCloseCode } from './epoch.js';
 export {
   buildDocumentId,
@@ -20,7 +19,6 @@ export {
   parseEpochFromReason,
   parseEpochParam,
 } from './epoch.js';
-
 export type { SessionId, TaskId } from './ids.js';
 export {
   generateSessionId,
@@ -29,6 +27,7 @@ export {
   toSessionId,
   toTaskId,
 } from './ids.js';
+export { extractPlanMarkdown } from './plan-helpers.js';
 export {
   addTaskToIndex,
   removeTaskFromIndex,
@@ -63,6 +62,8 @@ export type {
   PermissionMode,
   PermissionRequest,
   PermissionResponse,
+  PlanReviewStatus,
+  PlanVersion,
   ReasoningEffort,
   SessionEntry,
   SessionState,
@@ -83,6 +84,8 @@ export {
   PERMISSION_MODES,
   PermissionRequestEphemeral,
   PermissionResponseEphemeral,
+  PLAN_REVIEW_STATUSES,
+  PlanVersionShape,
   REASONING_EFFORTS,
   SESSION_STATES,
   SessionEntryShape,

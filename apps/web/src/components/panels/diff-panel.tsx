@@ -1,52 +1,18 @@
+export { DiffPanelContent };
+
 import { DiffModeEnum, DiffView } from '@git-diff-view/react';
 import '@git-diff-view/react/styles/diff-view.css';
 import { Button, Tooltip } from '@heroui/react';
 import type { DiffState, DiffFile as SchemaDiffFile } from '@shipyard/loro-schema';
-import { Columns2, PanelLeft, Rows3, WrapText, X } from 'lucide-react';
-import {
-  forwardRef,
-  type KeyboardEvent,
-  useCallback,
-  useEffect,
-  useImperativeHandle,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
-import { useResizablePanel } from '../../hooks/use-resizable-panel';
+import { Columns2, PanelLeft, Rows3, WrapText } from 'lucide-react';
+import { type KeyboardEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { useTaskDocument } from '../../hooks/use-task-document';
 import type { DiffScope, DiffViewType } from '../../stores';
 import { useUIStore } from '../../stores';
 import { assertNever } from '../../utils/assert-never';
 import { DiffFileTree } from './diff-file-tree';
 
-const SM_BREAKPOINT = 640;
 const SPLIT_MIN_WIDTH = 800;
-
-function useIsMobile() {
-  const [isMobile, setIsMobile] = useState(
-    () => typeof window !== 'undefined' && window.innerWidth < SM_BREAKPOINT
-  );
-
-  useEffect(() => {
-    const mql = window.matchMedia(`(max-width: ${SM_BREAKPOINT - 1}px)`);
-    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
-    mql.addEventListener('change', handler);
-    return () => mql.removeEventListener('change', handler);
-  }, []);
-
-  return isMobile;
-}
-
-interface DiffPanelProps {
-  isOpen: boolean;
-  onClose: () => void;
-  activeTaskId: string | null;
-}
-
-export interface DiffPanelHandle {
-  focus: () => void;
-}
 
 type DiffTab = 'unstaged' | 'staged';
 
@@ -321,27 +287,11 @@ function DiffBody({
   );
 }
 
-function getAsideClassName(isMobile: boolean, isOpen: boolean, isDragging: boolean): string {
-  const base = 'shrink-0 bg-background overflow-hidden';
-  if (isMobile) {
-    return `${base} fixed inset-0 z-30 ${isOpen ? '' : 'hidden'}`;
-  }
-  const transition = isDragging
-    ? ''
-    : 'motion-safe:transition-[width] motion-safe:duration-300 ease-in-out';
-  return `${base} relative h-full border-l border-separator ${transition}`;
-}
-
-export const DiffPanel = forwardRef<DiffPanelHandle, DiffPanelProps>(function DiffPanel(
-  { isOpen, onClose, activeTaskId },
-  ref
-) {
+function DiffPanelContent({ activeTaskId }: { activeTaskId: string | null }) {
   const [activeTab, setActiveTab] = useState<DiffTab>('unstaged');
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
-  const contentRef = useRef<HTMLDivElement>(null);
 
-  const diffPanelWidth = useUIStore((s) => s.diffPanelWidth);
-  const setDiffPanelWidth = useUIStore((s) => s.setDiffPanelWidth);
+  const sidePanelWidth = useUIStore((s) => s.sidePanelWidth);
   const diffWordWrap = useUIStore((s) => s.diffWordWrap);
   const setDiffWordWrap = useUIStore((s) => s.setDiffWordWrap);
   const diffScope = useUIStore((s) => s.diffScope);
@@ -352,23 +302,7 @@ export const DiffPanel = forwardRef<DiffPanelHandle, DiffPanelProps>(function Di
   const toggleDiffFileTree = useUIStore((s) => s.toggleDiffFileTree);
   const diffFileTreeWidth = useUIStore((s) => s.diffFileTreeWidth);
 
-  const isMobile = useIsMobile();
-
-  const { panelRef, separatorProps, panelStyle, isDragging } = useResizablePanel({
-    isOpen,
-    width: diffPanelWidth,
-    onWidthChange: setDiffPanelWidth,
-  });
-
   const { diffState } = useTaskDocument(activeTaskId);
-
-  useImperativeHandle(
-    ref,
-    () => ({
-      focus: () => contentRef.current?.focus(),
-    }),
-    []
-  );
 
   useEffect(() => {
     setSelectedFile(null);
@@ -399,96 +333,43 @@ export const DiffPanel = forwardRef<DiffPanelHandle, DiffPanelProps>(function Di
   const fileTreeLabel = isDiffFileTreeOpen ? 'Hide file tree' : 'Show file tree';
 
   return (
-    <aside
-      ref={panelRef}
-      aria-label="Diff panel"
-      aria-hidden={!isOpen}
-      inert={!isOpen || undefined}
-      style={isMobile ? undefined : panelStyle}
-      className={getAsideClassName(isMobile, isOpen, isDragging)}
-    >
-      {isOpen && !isMobile && <div {...separatorProps} />}
-
-      <div className="flex flex-col h-full min-w-0 sm:min-w-[400px]">
-        <div className="flex items-center justify-between px-4 py-2 border-b border-separator/50">
-          <div className="flex items-center gap-2">
-            <Tooltip delay={0}>
-              <Button
-                isIconOnly
-                variant="ghost"
-                size="sm"
-                aria-label={fileTreeLabel}
-                onPress={toggleDiffFileTree}
-                className={`text-muted hover:text-foreground hover:bg-default w-8 h-8 min-w-0 ${isDiffFileTreeOpen ? 'text-accent' : ''}`}
-              >
-                <PanelLeft className="w-3.5 h-3.5" />
-              </Button>
-              <Tooltip.Content>{fileTreeLabel}</Tooltip.Content>
-            </Tooltip>
-            <select
-              aria-label="Diff scope"
-              value={diffScope}
-              onChange={(e) => {
-                const value = e.target.value;
-                const validScope = SCOPE_OPTIONS.find((opt) => opt.value === value);
-                if (validScope) setDiffScope(validScope.value);
-              }}
-              className="text-xs text-muted font-medium bg-transparent border-none outline-none cursor-pointer hover:text-foreground transition-colors color-inherit [&_option]:bg-surface [&_option]:text-foreground"
-            >
-              {SCOPE_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="flex items-center gap-1">
-            <Tooltip delay={0}>
-              <Button
-                isIconOnly
-                variant="ghost"
-                size="sm"
-                aria-label={splitLabel}
-                onPress={() => setDiffViewType(isSplitViewActive ? 'unified' : 'split')}
-                className={`text-muted hover:text-foreground hover:bg-default w-8 h-8 min-w-0 ${isSplitViewActive ? 'text-accent' : ''}`}
-              >
-                <SplitIcon className="w-3.5 h-3.5" />
-              </Button>
-              <Tooltip.Content>{splitLabel}</Tooltip.Content>
-            </Tooltip>
-            <Tooltip delay={0}>
-              <Button
-                isIconOnly
-                variant="ghost"
-                size="sm"
-                aria-label={diffWordWrap ? 'Disable word wrap' : 'Enable word wrap'}
-                onPress={() => setDiffWordWrap(!diffWordWrap)}
-                className={`text-muted hover:text-foreground hover:bg-default w-8 h-8 min-w-0 ${diffWordWrap ? 'text-accent' : ''}`}
-              >
-                <WrapText className="w-3.5 h-3.5" />
-              </Button>
-              <Tooltip.Content>
-                {diffWordWrap ? 'Disable word wrap' : 'Enable word wrap'}
-              </Tooltip.Content>
-            </Tooltip>
-            <Button
-              isIconOnly
-              variant="ghost"
-              size="sm"
-              aria-label="Close diff panel"
-              onPress={onClose}
-              className="text-muted hover:text-foreground hover:bg-default w-11 h-11 sm:w-8 sm:h-8 min-w-0"
-            >
-              <X className="w-3.5 h-3.5" />
-            </Button>
-          </div>
-        </div>
+    <div className="flex flex-col h-full">
+      <div className="flex items-center gap-2 px-3 h-9 border-b border-separator/30">
+        <Tooltip delay={0}>
+          <Button
+            isIconOnly
+            variant="ghost"
+            size="sm"
+            aria-label={fileTreeLabel}
+            onPress={toggleDiffFileTree}
+            className={`text-muted hover:text-foreground hover:bg-default w-8 h-8 min-w-0 ${isDiffFileTreeOpen ? 'text-accent' : ''}`}
+          >
+            <PanelLeft className="w-3.5 h-3.5" />
+          </Button>
+          <Tooltip.Content>{fileTreeLabel}</Tooltip.Content>
+        </Tooltip>
+        <select
+          aria-label="Diff scope"
+          value={diffScope}
+          onChange={(e) => {
+            const value = e.target.value;
+            const validScope = SCOPE_OPTIONS.find((opt) => opt.value === value);
+            if (validScope) setDiffScope(validScope.value);
+          }}
+          className="text-xs text-muted font-medium bg-transparent border-none outline-none cursor-pointer hover:text-foreground transition-colors color-inherit [&_option]:bg-surface [&_option]:text-foreground"
+        >
+          {SCOPE_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
 
         {diffScope === 'working-tree' && (
           <div
             role="tablist"
             aria-label="Change categories"
-            className="flex border-b border-separator/50"
+            className="flex items-center gap-1 ml-1 h-full"
             onKeyDown={handleTablistKeyDown}
           >
             {TABS.map((tab) => (
@@ -500,9 +381,9 @@ export const DiffPanel = forwardRef<DiffPanelHandle, DiffPanelProps>(function Di
                 aria-controls={`diff-tabpanel-${tab}`}
                 id={`diff-tab-${tab}`}
                 tabIndex={activeTab === tab ? 0 : -1}
-                className={`flex-1 px-4 py-2 text-xs font-medium transition-colors ${
+                className={`relative h-full px-2 text-xs font-medium inline-flex items-center transition-colors ${
                   activeTab === tab
-                    ? 'text-foreground border-b-2 border-accent'
+                    ? 'text-foreground after:absolute after:bottom-0 after:left-0.5 after:right-0.5 after:h-0.5 after:bg-accent after:rounded-full'
                     : 'text-muted hover:text-foreground'
                 }`}
                 onClick={() => setActiveTab(tab)}
@@ -513,39 +394,67 @@ export const DiffPanel = forwardRef<DiffPanelHandle, DiffPanelProps>(function Di
           </div>
         )}
 
-        <div
-          ref={contentRef}
-          {...(diffScope === 'working-tree'
-            ? {
-                role: 'tabpanel' as const,
-                id: `diff-tabpanel-${activeTab}`,
-                'aria-labelledby': `diff-tab-${activeTab}`,
-              }
-            : {
-                role: 'region' as const,
-                'aria-label': 'Diff content',
-              })}
-          tabIndex={isOpen ? 0 : -1}
-          onKeyDown={(e) => {
-            if (e.key === 'Escape') onClose();
-          }}
-          className="flex flex-col flex-1 min-h-0 focus-visible-ring"
-        >
-          <DiffBody
-            activeTaskId={activeTaskId}
-            activeTab={activeTab}
-            scope={diffScope}
-            diffState={diffState}
-            wordWrap={diffWordWrap}
-            viewType={diffViewType}
-            panelWidth={diffPanelWidth}
-            selectedFile={selectedFile}
-            onSelectFile={setSelectedFile}
-            isFileTreeOpen={isDiffFileTreeOpen && !isMobile}
-            fileTreeWidth={diffFileTreeWidth}
-          />
+        <div className="flex-1" />
+
+        <div className="flex items-center gap-1">
+          <Tooltip delay={0}>
+            <Button
+              isIconOnly
+              variant="ghost"
+              size="sm"
+              aria-label={splitLabel}
+              onPress={() => setDiffViewType(isSplitViewActive ? 'unified' : 'split')}
+              className={`text-muted hover:text-foreground hover:bg-default w-8 h-8 min-w-0 ${isSplitViewActive ? 'text-accent' : ''}`}
+            >
+              <SplitIcon className="w-3.5 h-3.5" />
+            </Button>
+            <Tooltip.Content>{splitLabel}</Tooltip.Content>
+          </Tooltip>
+          <Tooltip delay={0}>
+            <Button
+              isIconOnly
+              variant="ghost"
+              size="sm"
+              aria-label={diffWordWrap ? 'Disable word wrap' : 'Enable word wrap'}
+              onPress={() => setDiffWordWrap(!diffWordWrap)}
+              className={`text-muted hover:text-foreground hover:bg-default w-8 h-8 min-w-0 ${diffWordWrap ? 'text-accent' : ''}`}
+            >
+              <WrapText className="w-3.5 h-3.5" />
+            </Button>
+            <Tooltip.Content>
+              {diffWordWrap ? 'Disable word wrap' : 'Enable word wrap'}
+            </Tooltip.Content>
+          </Tooltip>
         </div>
       </div>
-    </aside>
+
+      <div
+        {...(diffScope === 'working-tree'
+          ? {
+              role: 'tabpanel' as const,
+              id: `diff-tabpanel-${activeTab}`,
+              'aria-labelledby': `diff-tab-${activeTab}`,
+            }
+          : {
+              role: 'region' as const,
+              'aria-label': 'Diff content',
+            })}
+        className="flex flex-col flex-1 min-h-0"
+      >
+        <DiffBody
+          activeTaskId={activeTaskId}
+          activeTab={activeTab}
+          scope={diffScope}
+          diffState={diffState}
+          wordWrap={diffWordWrap}
+          viewType={diffViewType}
+          panelWidth={sidePanelWidth}
+          selectedFile={selectedFile}
+          onSelectFile={setSelectedFile}
+          isFileTreeOpen={isDiffFileTreeOpen}
+          fileTreeWidth={diffFileTreeWidth}
+        />
+      </div>
+    </div>
   );
-});
+}

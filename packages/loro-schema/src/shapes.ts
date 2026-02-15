@@ -117,6 +117,22 @@ export const SessionEntryShape = Shape.plain.struct({
   error: Shape.plain.string().nullable(),
 });
 
+const PLAN_REVIEW_STATUSES = ['pending', 'approved', 'changes-requested'] as const;
+
+/**
+ * Plan version shape.
+ * Each ExitPlanMode tool call creates a new version.
+ * Stored as an append-only list for history tracking.
+ */
+export const PlanVersionShape = Shape.plain.struct({
+  planId: Shape.plain.string(),
+  toolUseId: Shape.plain.string(),
+  markdown: Shape.plain.string(),
+  reviewStatus: Shape.plain.string(...PLAN_REVIEW_STATUSES),
+  reviewFeedback: Shape.plain.string().nullable(),
+  createdAt: Shape.plain.number(),
+});
+
 /**
  * Task document schema.
  * One doc per task. Contains metadata, conversation, and session tracking.
@@ -136,6 +152,8 @@ export const TaskDocumentSchema = Shape.doc({
   sessions: Shape.list(SessionEntryShape),
 
   diffState: DiffStateShape,
+
+  plans: Shape.list(PlanVersionShape),
 });
 
 export type EpochDocumentShape = typeof EpochDocumentSchema;
@@ -153,6 +171,8 @@ export type ContentBlockType = (typeof CONTENT_BLOCK_TYPES)[number];
 export type DiffFile = Infer<typeof DiffFileShape>;
 export type DiffState = Infer<typeof DiffStateShape>;
 export type SessionEntry = Infer<typeof SessionEntryShape>;
+export type PlanVersion = Infer<typeof PlanVersionShape>;
+export type PlanReviewStatus = (typeof PLAN_REVIEW_STATUSES)[number];
 
 export type A2ATaskState = (typeof A2A_TASK_STATES)[number];
 export type SessionState = (typeof SESSION_STATES)[number];
@@ -162,6 +182,7 @@ export {
   A2A_TASK_STATES,
   CONTENT_BLOCK_TYPES,
   PERMISSION_MODES,
+  PLAN_REVIEW_STATUSES,
   REASONING_EFFORTS,
   SESSION_STATES,
 };

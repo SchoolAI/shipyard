@@ -1,4 +1,4 @@
-import { Button, Tooltip } from '@heroui/react';
+import { Button, Chip, Tooltip } from '@heroui/react';
 import type { ContentBlock } from '@shipyard/loro-schema';
 import {
   AlertCircle,
@@ -6,17 +6,24 @@ import {
   Check,
   CheckCircle2,
   ChevronDown,
+  ClipboardList,
   Copy,
   Layers,
   Loader2,
+  MessageSquareX,
+  PanelRightOpen,
 } from 'lucide-react';
-import type { ComponentPropsWithoutRef } from 'react';
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
-import rehypeHighlight from 'rehype-highlight';
-import remarkGfm from 'remark-gfm';
+import { usePlanApproval } from '../contexts/plan-approval-context';
+import { useUIStore } from '../stores';
 import { assertNever } from '../utils/assert-never';
 import { type GroupedBlock, groupContentBlocks } from '../utils/group-content-blocks';
+import {
+  REHYPE_PLUGINS,
+  REMARK_PLUGINS,
+  markdownComponents as sharedMarkdownComponents,
+} from '../utils/markdown-components';
 import { summarizeToolAction, TOOL_ICON_LABELS } from '../utils/tool-summarizers';
 import { AsciiShipThinking } from './thinking/ascii-ship';
 
@@ -121,8 +128,8 @@ function extractText(children: React.ReactNode): string {
   return '';
 }
 
-/** Custom components for ReactMarkdown to apply Shipyard theme */
-const markdownComponents: ComponentPropsWithoutRef<typeof ReactMarkdown>['components'] = {
+const markdownComponents: typeof sharedMarkdownComponents = {
+  ...sharedMarkdownComponents,
   pre({ children, node: _, ...rest }) {
     const innerContent = isElementWithChildren(children) ? children.props.children : children;
     const codeText = extractText(innerContent ?? children);
@@ -139,174 +146,7 @@ const markdownComponents: ComponentPropsWithoutRef<typeof ReactMarkdown>['compon
       </div>
     );
   },
-
-  code({ className, children, node: _, ...rest }) {
-    const isBlock = className?.includes('hljs') || className?.includes('language-');
-    if (isBlock) {
-      return (
-        <code className={`${className ?? ''} text-[0.875rem]`} {...rest}>
-          {children}
-        </code>
-      );
-    }
-    return (
-      <code
-        className="bg-default/70 text-accent px-1.5 py-0.5 rounded text-[0.8125rem] font-mono"
-        {...rest}
-      >
-        {children}
-      </code>
-    );
-  },
-
-  h1({ children, node: _, ...rest }) {
-    return (
-      <h1 className="text-lg font-bold text-foreground mt-4 mb-2" {...rest}>
-        {children}
-      </h1>
-    );
-  },
-
-  h2({ children, node: _, ...rest }) {
-    return (
-      <h2 className="text-base font-semibold text-foreground mt-3 mb-1.5" {...rest}>
-        {children}
-      </h2>
-    );
-  },
-
-  h3({ children, node: _, ...rest }) {
-    return (
-      <h3 className="text-sm font-semibold text-foreground mt-2 mb-1" {...rest}>
-        {children}
-      </h3>
-    );
-  },
-
-  p({ children, node: _, ...rest }) {
-    return (
-      <p className="mb-2 last:mb-0 leading-relaxed" {...rest}>
-        {children}
-      </p>
-    );
-  },
-
-  a({ children, href, node: _, ...rest }) {
-    return (
-      <a
-        href={href}
-        className="text-secondary underline underline-offset-2 hover:text-wave-light transition-colors"
-        target="_blank"
-        rel="noopener noreferrer"
-        {...rest}
-      >
-        {children}
-      </a>
-    );
-  },
-
-  ul({ children, node: _, ...rest }) {
-    return (
-      <ul className="list-disc pl-5 mb-2 space-y-0.5" {...rest}>
-        {children}
-      </ul>
-    );
-  },
-
-  ol({ children, node: _, ...rest }) {
-    return (
-      <ol className="list-decimal pl-5 mb-2 space-y-0.5" {...rest}>
-        {children}
-      </ol>
-    );
-  },
-
-  li({ children, node: _, ...rest }) {
-    return (
-      <li className="leading-normal" {...rest}>
-        {children}
-      </li>
-    );
-  },
-
-  blockquote({ children, node: _, ...rest }) {
-    return (
-      <blockquote
-        className="border-l-2 border-accent pl-3 my-2 text-foreground/80 italic"
-        {...rest}
-      >
-        {children}
-      </blockquote>
-    );
-  },
-
-  table({ children, node: _, ...rest }) {
-    return (
-      <div className="overflow-x-auto my-2">
-        <table
-          className="w-full text-sm border-collapse border border-separator rounded-lg"
-          {...rest}
-        >
-          {children}
-        </table>
-      </div>
-    );
-  },
-
-  thead({ children, node: _, ...rest }) {
-    return (
-      <thead className="bg-default/50" {...rest}>
-        {children}
-      </thead>
-    );
-  },
-
-  th({ children, node: _, ...rest }) {
-    return (
-      <th
-        className="text-left font-semibold px-3 py-2 border border-separator text-foreground"
-        {...rest}
-      >
-        {children}
-      </th>
-    );
-  },
-
-  td({ children, node: _, ...rest }) {
-    return (
-      <td className="px-3 py-2 border border-separator" {...rest}>
-        {children}
-      </td>
-    );
-  },
-
-  hr({ node: _, ...rest }) {
-    return <hr className="border-separator my-2" {...rest} />;
-  },
-
-  strong({ children, node: _, ...rest }) {
-    return (
-      <strong className="font-semibold text-foreground" {...rest}>
-        {children}
-      </strong>
-    );
-  },
-
-  input({ checked, node: _, ...rest }) {
-    return (
-      <input
-        type="checkbox"
-        checked={checked}
-        disabled
-        className="mr-1.5 accent-accent"
-        {...rest}
-      />
-    );
-  },
 };
-
-const REMARK_PLUGINS = [remarkGfm];
-const REHYPE_PLUGINS = [rehypeHighlight];
 
 interface ToolCallLineProps {
   toolUse: ContentBlock & { type: 'tool_use' };
@@ -572,11 +412,162 @@ function SubagentGroup({ taskToolUse, taskToolResult, children }: SubagentGroupP
                   ? child.toolUse.toolUseId
                   : child.kind === 'subagent_group'
                     ? child.taskToolUse.toolUseId
-                    : `${child.kind}-${i}`
+                    : child.kind === 'plan'
+                      ? child.toolUse.toolUseId
+                      : `${child.kind}-${i}`
               }
               group={child}
             />
           ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PlanBlock({ group }: { group: GroupedBlock & { kind: 'plan' } }) {
+  const { pendingPermissions, respondToPermission, plans } = usePlanApproval();
+  const [expanded, setExpanded] = useState(true);
+  const [showFeedbackInput, setShowFeedbackInput] = useState(false);
+  const [feedbackText, setFeedbackText] = useState('');
+  const contentId = useId();
+
+  const planVersion = plans.find((p) => p.toolUseId === group.toolUse.toolUseId);
+  const reviewStatus = planVersion?.reviewStatus ?? 'pending';
+  const isPending = pendingPermissions.has(group.toolUse.toolUseId);
+
+  const borderColor =
+    reviewStatus === 'approved'
+      ? 'border-l-success'
+      : reviewStatus === 'changes-requested'
+        ? 'border-l-warning'
+        : 'border-l-secondary';
+
+  return (
+    <div
+      role="article"
+      aria-label="Plan"
+      className={`${borderColor} border-l-3 rounded-xl border border-separator/30 bg-surface/30 overflow-hidden motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2`}
+    >
+      {/* Header */}
+      <div className="flex items-center gap-2 px-4 py-2.5 border-b border-separator/30">
+        <ClipboardList className="w-4 h-4 text-secondary shrink-0" aria-hidden="true" />
+        <span className="text-sm font-medium text-foreground">Plan</span>
+        <span className="ml-auto shrink-0" />
+        <Button
+          isIconOnly
+          variant="ghost"
+          size="sm"
+          aria-label="Open plan in panel"
+          onPress={() => useUIStore.getState().setActiveSidePanel('plan')}
+          className="text-muted hover:text-foreground w-7 h-7 min-w-0"
+        >
+          <PanelRightOpen className="w-3.5 h-3.5" />
+        </Button>
+        <button
+          type="button"
+          aria-label={expanded ? 'Collapse plan' : 'Expand plan'}
+          aria-expanded={expanded}
+          aria-controls={contentId}
+          onClick={() => setExpanded((prev) => !prev)}
+          className="text-muted hover:text-foreground"
+        >
+          <ChevronDown
+            className={`w-3.5 h-3.5 motion-safe:transition-transform ${expanded ? 'rotate-180' : ''}`}
+            aria-hidden="true"
+          />
+        </button>
+      </div>
+
+      {/* Content */}
+      {expanded && (
+        <div
+          id={contentId}
+          className="px-4 py-3 max-h-80 overflow-y-auto text-sm text-foreground/90 leading-normal prose-shipyard"
+        >
+          <ReactMarkdown
+            remarkPlugins={REMARK_PLUGINS}
+            rehypePlugins={REHYPE_PLUGINS}
+            components={markdownComponents}
+          >
+            {group.markdown}
+          </ReactMarkdown>
+        </div>
+      )}
+
+      {/* Approval footer when pending */}
+      {isPending && (
+        <div className="flex flex-col items-end gap-2 px-4 py-3 border-t border-separator/30">
+          <div className="flex items-center gap-2">
+            <Button
+              variant="primary"
+              size="sm"
+              className="min-w-[100px]"
+              onPress={() => respondToPermission(group.toolUse.toolUseId, 'approved')}
+            >
+              <Check className="w-3.5 h-3.5" />
+              Approve
+            </Button>
+            <Button variant="ghost" size="sm" onPress={() => setShowFeedbackInput((prev) => !prev)}>
+              <MessageSquareX className="w-3.5 h-3.5" />
+              Request Changes
+            </Button>
+          </div>
+          {showFeedbackInput && (
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={feedbackText}
+                onChange={(e) => setFeedbackText(e.target.value)}
+                placeholder="Describe requested changes..."
+                className="flex-1 text-sm bg-background border border-separator/50 rounded-md px-3 py-1.5 text-foreground placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-secondary"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && feedbackText.trim()) {
+                    respondToPermission(group.toolUse.toolUseId, 'denied', {
+                      message: feedbackText.trim(),
+                    });
+                    setShowFeedbackInput(false);
+                    setFeedbackText('');
+                  }
+                }}
+                aria-label="Feedback for requested changes"
+              />
+              <Button
+                variant="ghost"
+                size="sm"
+                isDisabled={!feedbackText.trim()}
+                onPress={() => {
+                  respondToPermission(group.toolUse.toolUseId, 'denied', {
+                    message: feedbackText.trim(),
+                  });
+                  setShowFeedbackInput(false);
+                  setFeedbackText('');
+                }}
+              >
+                Send
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Status badge when already reviewed */}
+      {!isPending && reviewStatus === 'approved' && (
+        <div className="flex justify-end px-4 py-2 border-t border-separator/30">
+          <Chip size="sm" variant="soft" color="success">
+            <Check className="w-3.5 h-3.5" />
+            Approved
+          </Chip>
+        </div>
+      )}
+      {!isPending && reviewStatus === 'changes-requested' && (
+        <div className="flex flex-col items-end px-4 py-2 border-t border-separator/30">
+          <Chip size="sm" variant="soft" color="warning">
+            Changes Requested
+          </Chip>
+          {planVersion?.reviewFeedback && (
+            <p className="mt-1 text-xs text-muted">{planVersion.reviewFeedback}</p>
+          )}
         </div>
       )}
     </div>
@@ -607,6 +598,8 @@ function GroupedBlockRenderer({ group }: { group: GroupedBlock }) {
           children={group.children}
         />
       );
+    case 'plan':
+      return <PlanBlock group={group} />;
     default:
       return assertNever(group);
   }
@@ -658,7 +651,9 @@ function AgentMessage({ message }: ChatMessageProps) {
                   ? group.toolUse.toolUseId
                   : group.kind === 'subagent_group'
                     ? group.taskToolUse.toolUseId
-                    : `${group.kind}-${i}`
+                    : group.kind === 'plan'
+                      ? group.toolUse.toolUseId
+                      : `${group.kind}-${i}`
               }
               group={group}
             />

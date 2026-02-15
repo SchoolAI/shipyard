@@ -3,6 +3,8 @@
  * Shared between PermissionCard (pending tool calls) and ToolUseCard (completed tool calls).
  */
 
+import { extractPlanMarkdown } from '@shipyard/loro-schema';
+
 export function truncateToolInput(str: string, max: number): string {
   return str.length > max ? `${str.slice(0, max)}...` : str;
 }
@@ -43,6 +45,12 @@ function summarizeGrep(input: Record<string, unknown>): string {
   return path ? `/${pattern}/ in ${path}` : `/${pattern}/`;
 }
 
+function summarizeExitPlanModeFromRaw(toolInput: string): string {
+  const plan = extractPlanMarkdown(toolInput);
+  const firstLine = plan.replace(/^#+ /, '').split('\n')[0] ?? '';
+  return truncateToolInput(firstLine || 'Plan ready for review', 100);
+}
+
 export const TOOL_SUMMARIZERS: Record<string, (input: Record<string, unknown>) => string> = {
   Bash: summarizeBash,
   Edit: summarizeEdit,
@@ -57,6 +65,8 @@ export const TOOL_SUMMARIZERS: Record<string, (input: Record<string, unknown>) =
  * Falls back to a truncated raw input string for unknown tools.
  */
 export function summarizeToolAction(toolName: string, toolInput: string): string {
+  if (toolName === 'ExitPlanMode') return summarizeExitPlanModeFromRaw(toolInput);
+
   try {
     // eslint-disable-next-line no-restricted-syntax -- toolInput is daemon-serialized JSON, shape is known at write site
     const input = JSON.parse(toolInput) as Record<string, unknown>;
@@ -79,4 +89,5 @@ export const TOOL_ICON_LABELS: Record<string, string> = {
   Glob: 'Find files',
   Grep: 'Search',
   Task: 'Subagent',
+  ExitPlanMode: 'Plan',
 };
