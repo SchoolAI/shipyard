@@ -99,7 +99,7 @@ describe('epoch utilities', () => {
 
   describe('DEFAULT_EPOCH', () => {
     it('is a positive integer', () => {
-      expect(DEFAULT_EPOCH).toBe(1);
+      expect(DEFAULT_EPOCH).toBe(2);
       expect(Number.isInteger(DEFAULT_EPOCH)).toBe(true);
       expect(DEFAULT_EPOCH).toBeGreaterThan(0);
     });

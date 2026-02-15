@@ -129,12 +129,10 @@ export type StatusChangeCallback = (status: A2ATaskState) => void;
 interface ThinkingAccumulator {
   /** Map from content block index to accumulated thinking text. */
   blocks: Map<number, string>;
-  /** Parent tool use ID for the current stream, if any. */
-  parentToolUseId: string | null;
 }
 
 function createThinkingAccumulator(): ThinkingAccumulator {
-  return { blocks: new Map(), parentToolUseId: null };
+  return { blocks: new Map() };
 }
 
 export class SessionManager {
@@ -332,6 +330,7 @@ export class SessionManager {
   }
 
   async #processMessages(response: Query, sessionId: string): Promise<SessionResult> {
+    this.#thinkingAccumulator = createThinkingAccumulator();
     let agentSessionId = '';
 
     try {
@@ -432,8 +431,13 @@ export class SessionManager {
   #handleStreamEvent(message: SDKMessage & { type: 'stream_event' }): void {
     // eslint-disable-next-line no-restricted-syntax -- SDK event typed as opaque, need narrowing
     const event = message.event as Record<string, unknown>;
-    const parentId = 'parent_tool_use_id' in message ? message.parent_tool_use_id : null;
-    this.#thinkingAccumulator.parentToolUseId = typeof parentId === 'string' ? parentId : null;
+
+    // DEBUG: log content_block_start events to see if thinking blocks arrive
+    if (event.type === 'content_block_start') {
+      // eslint-disable-next-line no-restricted-syntax -- SDK content block typed as opaque
+      const cb = event.content_block as Record<string, unknown> | undefined;
+      logger.info({ eventType: event.type, blockType: cb?.type, index: event.index }, 'Stream content_block_start');
+    }
 
     if (event.type === 'content_block_start') {
       // eslint-disable-next-line no-restricted-syntax -- SDK content block typed as opaque
@@ -518,14 +522,16 @@ export class SessionManager {
 
     // eslint-disable-next-line no-restricted-syntax -- SDK content blocks typed as unknown[], need narrowing
     const sdkBlocks = rawContent as Array<Record<string, unknown>>;
-
-    // DEBUG: log raw block types to verify if thinking blocks arrive from the Agent SDK
-    logger.info(
-      { blockTypes: sdkBlocks.map((b) => b.type), blockCount: sdkBlocks.length },
-      'SDK assistant message block types'
-    );
-
     const contentBlocks: ContentBlock[] = [];
+
+    // Prepend thinking blocks accumulated from stream events.
+    // The SDK strips thinking from the final assistant message, so we
+    // reconstruct them from the raw stream events captured earlier.
+    const thinkingBlocks = this.#drainThinkingBlocks();
+    for (const block of thinkingBlocks) {
+      contentBlocks.push(block);
+    }
+
     for (const block of sdkBlocks) {
       const parsed = parseSdkBlock(block, parentToolUseId);
       if (parsed) contentBlocks.push(parsed);
@@ -543,6 +549,25 @@ export class SessionManager {
       });
       draft.meta.updatedAt = Date.now();
     });
+  }
+
+  /**
+   * Drain accumulated thinking blocks and reset the accumulator.
+   * Returns thinking ContentBlocks sorted by their stream index.
+   */
+  #drainThinkingBlocks(): ContentBlock[] {
+    const blocks: ContentBlock[] = [];
+    const entries = [...this.#thinkingAccumulator.blocks.entries()].sort(
+      ([a], [b]) => a - b
+    );
+    logger.info({ accumulatedCount: entries.length, sizes: entries.map(([i, t]) => ({ i, len: t.length })) }, 'Draining thinking blocks');
+    for (const [, text] of entries) {
+      if (text.length > 0) {
+        blocks.push({ type: 'thinking', text });
+      }
+    }
+    this.#thinkingAccumulator = createThinkingAccumulator();
+    return blocks;
   }
 
   #handleResult(

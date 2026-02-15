@@ -43,7 +43,7 @@ export function parseEpochFromReason(reason: string): number | null {
  * Default epoch for new installations.
  * Increment this when making breaking changes to the data format.
  */
-export const DEFAULT_EPOCH = 1;
+export const DEFAULT_EPOCH = 2;
 
 /**
  * Check if a WebSocket close event indicates epoch rejection.

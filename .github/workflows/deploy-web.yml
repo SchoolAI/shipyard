@@ -44,4 +44,4 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: 191909c2c1a28f6cb73d12e3362b874c
 
       - name: Summary
-        run: echo "Web app deployed to https://shipyard.pages.dev"
+        run: echo "Web app deployed to https://shipyard-92m.pages.dev"

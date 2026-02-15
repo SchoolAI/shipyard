@@ -6,7 +6,7 @@ import type { Env } from '../env';
 
 /** Production-allowed origins */
 export const ALLOWED_ORIGINS_PRODUCTION = [
-  'https://shipyard.pages.dev',
+  'https://shipyard-92m.pages.dev',
   'https://schoolai.github.io',
 ];
 

@@ -372,7 +372,7 @@ const OG_DESIGN = {
   },
 } as const;
 
-const STATIC_ASSETS_URL = 'https://shipyard.pages.dev';
+const STATIC_ASSETS_URL = 'https://shipyard-92m.pages.dev';
 
 /**
  * workers-og cannot fetch from localhost in wrangler dev mode,

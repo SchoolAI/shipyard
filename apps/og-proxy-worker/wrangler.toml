@@ -13,7 +13,7 @@ local_protocol = "http"
 # Users share worker URL → crawler gets OG tags → regular users get proxied to Cloudflare Pages
 [vars]
 ENVIRONMENT = "production"
-UPSTREAM_URL = "https://shipyard.pages.dev"
+UPSTREAM_URL = "https://shipyard-92m.pages.dev"
 CANONICAL_BASE_URL = "https://shipyard-og-proxy.jacob-191.workers.dev"
 LOG_LEVEL = "info"
 

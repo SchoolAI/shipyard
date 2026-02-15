@@ -357,11 +357,7 @@ async function watchTaskDocument(
   taskLog: ReturnType<typeof createChildLogger>,
   ctx: MessageHandlerContext
 ): Promise<void> {
-  // TODO: latent epoch mismatch -- browser uses DEFAULT_EPOCH for task doc IDs
-  // while daemon uses loadEpoch(). Both resolve to DEFAULT_EPOCH today, but if
-  // the epoch document ever advances, they will diverge. Fix by sharing epoch
-  // discovery or always using DEFAULT_EPOCH for task docs too.
-  const epoch = await loadEpoch(ctx.repo);
+  const epoch = DEFAULT_EPOCH;
   const taskDocId = buildDocumentId('task', taskId, epoch);
   taskLog.info({ taskDocId, epoch }, 'Watching task document');
 
