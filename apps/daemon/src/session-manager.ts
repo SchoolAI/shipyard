@@ -121,10 +121,27 @@ export interface SessionResult {
  */
 export type StatusChangeCallback = (status: A2ATaskState) => void;
 
+/**
+ * Accumulates thinking text from streaming events.
+ * The Agent SDK strips thinking blocks from the final SDKAssistantMessage,
+ * so we reconstruct them from SDKPartialAssistantMessage (stream_event) events.
+ */
+interface ThinkingAccumulator {
+  /** Map from content block index to accumulated thinking text. */
+  blocks: Map<number, string>;
+  /** Parent tool use ID for the current stream, if any. */
+  parentToolUseId: string | null;
+}
+
+function createThinkingAccumulator(): ThinkingAccumulator {
+  return { blocks: new Map(), parentToolUseId: null };
+}
+
 export class SessionManager {
   readonly #taskDoc: TypedDoc<TaskDocumentShape>;
   readonly #onStatusChange: StatusChangeCallback | undefined;
   #currentModel: string | null = null;
+  #thinkingAccumulator: ThinkingAccumulator = createThinkingAccumulator();
 
   constructor(taskDoc: TypedDoc<TaskDocumentShape>, onStatusChange?: StatusChangeCallback) {
     this.#taskDoc = taskDoc;
@@ -219,6 +236,7 @@ export class SessionManager {
         maxTurns: opts.maxTurns,
         abortController: opts.abortController,
         allowDangerouslySkipPermissions: opts.allowDangerouslySkipPermissions,
+        includePartialMessages: true,
         settingSources: opts.settingSources ?? ['project'],
         systemPrompt: opts.systemPrompt ?? {
           type: 'preset',
@@ -298,6 +316,7 @@ export class SessionManager {
         maxTurns: opts?.maxTurns,
         abortController: opts?.abortController,
         allowDangerouslySkipPermissions: opts?.allowDangerouslySkipPermissions,
+        includePartialMessages: true,
         canUseTool: opts?.canUseTool,
         stderr: opts?.stderr,
         settingSources: ['project'],
@@ -378,6 +397,11 @@ export class SessionManager {
       return { agentSessionId: initSessionId };
     }
 
+    if (message.type === 'stream_event') {
+      this.#handleStreamEvent(message);
+      return {};
+    }
+
     if (message.type === 'assistant') {
       if ('error' in message && message.error) {
         logger.warn({ error: message.error, sessionId }, 'Assistant message carried an error');
@@ -398,6 +422,41 @@ export class SessionManager {
     }
 
     return {};
+  }
+
+  /**
+   * Handle raw streaming events to accumulate thinking blocks.
+   * The Agent SDK strips thinking from the final SDKAssistantMessage,
+   * but raw stream events contain the full thinking content.
+   */
+  #handleStreamEvent(message: SDKMessage & { type: 'stream_event' }): void {
+    // eslint-disable-next-line no-restricted-syntax -- SDK event typed as opaque, need narrowing
+    const event = message.event as Record<string, unknown>;
+    const parentId = 'parent_tool_use_id' in message ? message.parent_tool_use_id : null;
+    this.#thinkingAccumulator.parentToolUseId = typeof parentId === 'string' ? parentId : null;
+
+    if (event.type === 'content_block_start') {
+      // eslint-disable-next-line no-restricted-syntax -- SDK content block typed as opaque
+      const contentBlock = event.content_block as Record<string, unknown> | undefined;
+      if (contentBlock?.type === 'thinking') {
+        const index = typeof event.index === 'number' ? event.index : -1;
+        if (index >= 0) {
+          this.#thinkingAccumulator.blocks.set(index, '');
+        }
+      }
+    }
+
+    if (event.type === 'content_block_delta') {
+      // eslint-disable-next-line no-restricted-syntax -- SDK delta typed as opaque
+      const delta = event.delta as Record<string, unknown> | undefined;
+      if (delta?.type === 'thinking_delta' && typeof delta.thinking === 'string') {
+        const index = typeof event.index === 'number' ? event.index : -1;
+        if (index >= 0 && this.#thinkingAccumulator.blocks.has(index)) {
+          const existing = this.#thinkingAccumulator.blocks.get(index) ?? '';
+          this.#thinkingAccumulator.blocks.set(index, existing + delta.thinking);
+        }
+      }
+    }
   }
 
   /**

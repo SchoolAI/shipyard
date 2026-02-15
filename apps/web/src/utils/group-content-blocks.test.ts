@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
 import type { ContentBlock } from '@shipyard/loro-schema';
+import { describe, expect, it } from 'vitest';
 import { type GroupedBlock, groupContentBlocks } from './group-content-blocks';
 
 function text(t: string): ContentBlock {
@@ -38,10 +38,7 @@ describe('groupContentBlocks', () => {
   });
 
   it('pairs tool_use with tool_result by toolUseId', () => {
-    const blocks: ContentBlock[] = [
-      toolUse('tu-1', 'Read'),
-      toolResult('tu-1', 'file contents'),
-    ];
+    const blocks: ContentBlock[] = [toolUse('tu-1', 'Read'), toolResult('tu-1', 'file contents')];
     const grouped = groupContentBlocks(blocks);
     expect(grouped).toHaveLength(1);
     expect(grouped[0]?.kind).toBe('tool_invocation');
