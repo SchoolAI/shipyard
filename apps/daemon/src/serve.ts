@@ -25,6 +25,7 @@ import {
 } from '@shipyard/loro-schema';
 import type { PersonalRoomServerMessage } from '@shipyard/session';
 import { createBranchWatcher } from './branch-watcher.js';
+import { getChangedFiles, getStagedDiff, getUnstagedDiff } from './capabilities.js';
 import type { Env } from './env.js';
 import { FileStorageAdapter } from './file-storage-adapter.js';
 import { LifecycleManager } from './lifecycle.js';
@@ -194,6 +195,10 @@ export async function serve(env: Env): Promise<void> {
       task.abortController.abort();
     }
     activeTasks.clear();
+    for (const timer of diffDebounceTimers.values()) {
+      clearTimeout(timer);
+    }
+    diffDebounceTimers.clear();
     for (const unsub of watchedTasks.values()) {
       unsub();
     }
@@ -223,6 +228,54 @@ interface MessageHandlerContext {
   peerManager: PeerManager;
   env: Env;
   machineId: string;
+}
+
+const DIFF_DEBOUNCE_MS = 2_000;
+const diffDebounceTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+function debouncedDiffCapture(
+  taskId: string,
+  cwd: string,
+  taskHandle: TaskHandle,
+  log: ReturnType<typeof createChildLogger>
+): void {
+  const existing = diffDebounceTimers.get(taskId);
+  if (existing) clearTimeout(existing);
+
+  diffDebounceTimers.set(
+    taskId,
+    setTimeout(() => {
+      diffDebounceTimers.delete(taskId);
+      captureDiffState(cwd, taskHandle, log).catch((err: unknown) => {
+        log.warn({ err }, 'Failed to capture diff state');
+      });
+    }, DIFF_DEBOUNCE_MS)
+  );
+}
+
+async function captureDiffState(
+  cwd: string,
+  taskHandle: TaskHandle,
+  log: ReturnType<typeof createChildLogger>
+): Promise<void> {
+  const [unstaged, staged, files] = await Promise.all([
+    getUnstagedDiff(cwd),
+    getStagedDiff(cwd),
+    getChangedFiles(cwd),
+  ]);
+  change(taskHandle.doc, (draft) => {
+    draft.diffState.unstaged = unstaged;
+    draft.diffState.staged = staged;
+    const fileList = draft.diffState.files;
+    if (fileList.length > 0) {
+      fileList.delete(0, fileList.length);
+    }
+    for (const file of files) {
+      fileList.push(file);
+    }
+    draft.diffState.updatedAt = Date.now();
+  });
+  log.debug({ fileCount: files.length }, 'Diff state captured');
 }
 
 function handleMessage(msg: PersonalRoomServerMessage, ctx: MessageHandlerContext): void {
@@ -422,6 +475,9 @@ function onTaskDocChanged(
   );
 
   if (json.meta.status === 'working' || json.meta.status === 'input-required') {
+    const activeCwd = json.config.cwd ?? process.cwd();
+    debouncedDiffCapture(taskId, activeCwd, taskHandle, taskLog);
+
     taskLog.debug({ status: json.meta.status }, 'Status blocks new work, skipping');
     return;
   }
@@ -484,7 +540,19 @@ function onTaskDocChanged(
       const errMsg = err instanceof Error ? err.message : String(err);
       taskLog.error({ err: errMsg }, 'Task failed');
     })
-    .finally(() => {
+    .finally(async () => {
+      const timer = diffDebounceTimers.get(taskId);
+      if (timer) {
+        clearTimeout(timer);
+        diffDebounceTimers.delete(taskId);
+      }
+
+      try {
+        await captureDiffState(cwd, taskHandle, taskLog);
+      } catch (err: unknown) {
+        taskLog.warn({ err }, 'Failed to capture final diff state');
+      }
+
       abortController.abort();
 
       for (const [key] of taskHandle.permReqs.getAll()) {

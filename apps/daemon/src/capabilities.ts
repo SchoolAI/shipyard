@@ -23,6 +23,64 @@ function run(command: string, args: string[], cwd?: string): Promise<string> {
   });
 }
 
+function runWithTimeout(
+  command: string,
+  args: string[],
+  cwd: string,
+  timeoutMs: number
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    execFile(
+      command,
+      args,
+      { timeout: timeoutMs, cwd, maxBuffer: 2 * 1024 * 1024 },
+      (error, stdout) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+        resolve(stdout.trim());
+      }
+    );
+  });
+}
+
+const DIFF_TIMEOUT_MS = 15_000;
+const MAX_DIFF_SIZE = 1_000_000;
+
+export async function getUnstagedDiff(cwd: string): Promise<string> {
+  const result = await runWithTimeout('git', ['diff', '--no-color'], cwd, DIFF_TIMEOUT_MS);
+  return result.length > MAX_DIFF_SIZE
+    ? `${result.slice(0, MAX_DIFF_SIZE)}\n\n... diff truncated (exceeds 1MB) ...\n`
+    : result;
+}
+
+export async function getStagedDiff(cwd: string): Promise<string> {
+  const result = await runWithTimeout(
+    'git',
+    ['diff', '--cached', '--no-color'],
+    cwd,
+    DIFF_TIMEOUT_MS
+  );
+  return result.length > MAX_DIFF_SIZE
+    ? `${result.slice(0, MAX_DIFF_SIZE)}\n\n... diff truncated (exceeds 1MB) ...\n`
+    : result;
+}
+
+export async function getChangedFiles(
+  cwd: string
+): Promise<Array<{ path: string; status: string }>> {
+  const out = await runWithTimeout('git', ['status', '--porcelain'], cwd, DIFF_TIMEOUT_MS);
+  if (!out) return [];
+  return out
+    .split('\n')
+    .filter(Boolean)
+    .map((line) => ({
+      status: line.slice(0, 2).trim(),
+      path: line.slice(3),
+    }));
+}
+
 export async function detectModels(): Promise<ModelInfo[]> {
   const models: ModelInfo[] = [];
 

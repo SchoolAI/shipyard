@@ -76,6 +76,22 @@ html, body {
   --segment: oklch(0.35 0.015 250);
   --segment-foreground: var(--foreground);
 
+  /* Agent provider colors */
+  --agent-claude-bg: oklch(0.22 0.04 45);
+  --agent-claude-fg: oklch(0.65 0.12 45);
+  --agent-openai-bg: oklch(0.22 0.03 160);
+  --agent-openai-fg: oklch(0.65 0.10 160);
+  --agent-gemini-bg: oklch(0.22 0.04 280);
+  --agent-gemini-fg: oklch(0.65 0.12 280);
+
+  /* Diff viewer */
+  --diff-add-bg: oklch(0.20 0.04 150);
+  --diff-add-fg: oklch(0.72 0.19 150);
+  --diff-remove-bg: oklch(0.20 0.04 25);
+  --diff-remove-fg: oklch(0.60 0.20 25);
+  --diff-hunk-bg: oklch(0.18 0.03 250);
+  --diff-hunk-fg: oklch(0.60 0.03 240);
+
   /* Shadows (dark mode: no visible shadows) */
   --surface-shadow: 0 0 0 0 transparent inset;
   --overlay-shadow: 0 0 0 0 transparent inset;
@@ -140,6 +156,22 @@ html, body {
   --segment: oklch(0.90 0.005 250);
   --segment-foreground: var(--foreground);
 
+  /* Agent provider colors */
+  --agent-claude-bg: oklch(0.94 0.03 45);
+  --agent-claude-fg: oklch(0.45 0.14 45);
+  --agent-openai-bg: oklch(0.94 0.03 160);
+  --agent-openai-fg: oklch(0.45 0.12 160);
+  --agent-gemini-bg: oklch(0.94 0.03 280);
+  --agent-gemini-fg: oklch(0.45 0.14 280);
+
+  /* Diff viewer */
+  --diff-add-bg: oklch(0.92 0.04 150);
+  --diff-add-fg: oklch(0.40 0.17 150);
+  --diff-remove-bg: oklch(0.92 0.04 25);
+  --diff-remove-fg: oklch(0.48 0.20 25);
+  --diff-hunk-bg: oklch(0.92 0.02 250);
+  --diff-hunk-fg: oklch(0.45 0.03 240);
+
   /* Shadows (light mode: subtle elevation) */
   --surface-shadow: 0 1px 3px 0 oklch(0 0 0 / 8%) inset;
   --overlay-shadow: 0 4px 16px 0 oklch(0 0 0 / 12%);
@@ -174,6 +206,22 @@ html, body {
   --color-wave-light: oklch(0.82 0.10 200);
   --color-rust: oklch(0.65 0.16 45);
   --color-rust-light: oklch(0.75 0.14 45);
+
+  /* Agent provider colors */
+  --color-agent-claude-bg: var(--agent-claude-bg);
+  --color-agent-claude-fg: var(--agent-claude-fg);
+  --color-agent-openai-bg: var(--agent-openai-bg);
+  --color-agent-openai-fg: var(--agent-openai-fg);
+  --color-agent-gemini-bg: var(--agent-gemini-bg);
+  --color-agent-gemini-fg: var(--agent-gemini-fg);
+
+  /* Diff viewer */
+  --color-diff-add-bg: var(--diff-add-bg);
+  --color-diff-add-fg: var(--diff-add-fg);
+  --color-diff-remove-bg: var(--diff-remove-bg);
+  --color-diff-remove-fg: var(--diff-remove-fg);
+  --color-diff-hunk-bg: var(--diff-hunk-bg);
+  --color-diff-hunk-fg: var(--diff-hunk-fg);
 
   /* Code block background */
   --color-code-block: oklch(0.12 0.02 250);

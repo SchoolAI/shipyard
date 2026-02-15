@@ -14,6 +14,7 @@ export interface UIStore {
   selectedEnvironmentPath: string | null;
   theme: Theme;
   diffPanelWidth: number;
+  diffWordWrap: boolean;
   terminalPanelHeight: number;
 
   toggleSidebar: () => void;
@@ -32,6 +33,7 @@ export interface UIStore {
   setSelectedEnvironmentPath: (path: string | null) => void;
   setTheme: (theme: Theme) => void;
   setDiffPanelWidth: (width: number) => void;
+  setDiffWordWrap: (wrap: boolean) => void;
   setTerminalPanelHeight: (height: number) => void;
 }
 
@@ -49,6 +51,7 @@ export const useUIStore = create<UIStore>()(
         selectedEnvironmentPath: null,
         theme: 'dark',
         diffPanelWidth: typeof window !== 'undefined' ? Math.round(window.innerWidth * 0.5) : 600,
+        diffWordWrap: false,
         terminalPanelHeight:
           typeof window !== 'undefined' ? Math.round(window.innerHeight * 0.4) : 400,
 
@@ -113,6 +116,8 @@ export const useUIStore = create<UIStore>()(
 
         setTheme: (theme) => set({ theme }, undefined, 'ui/setTheme'),
 
+        setDiffWordWrap: (wrap) => set({ diffWordWrap: wrap }, undefined, 'ui/setDiffWordWrap'),
+
         setDiffPanelWidth: (width) => {
           const max = typeof window !== 'undefined' ? Math.floor(window.innerWidth * 0.8) : 1200;
           const clamped = Math.min(Math.max(width, 400), max);
@@ -134,6 +139,7 @@ export const useUIStore = create<UIStore>()(
           selectedEnvironmentPath: state.selectedEnvironmentPath,
           theme: state.theme,
           diffPanelWidth: state.diffPanelWidth,
+          diffWordWrap: state.diffWordWrap,
           terminalPanelHeight: state.terminalPanelHeight,
         }),
       }

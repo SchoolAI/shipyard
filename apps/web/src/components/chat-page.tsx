@@ -131,6 +131,7 @@ export function ChatPage() {
   const toggleDiff = useUIStore((s) => s.toggleDiff);
   const toggleSidebar = useUIStore((s) => s.toggleSidebar);
   const setSettingsOpen = useUIStore((s) => s.setSettingsOpen);
+  const setSidebarExpanded = useUIStore((s) => s.setSidebarExpanded);
 
   const personalRoomConfig = useMemo(() => {
     const url = import.meta.env.VITE_PERSONAL_ROOM_URL;
@@ -294,6 +295,12 @@ export function ChatPage() {
     }
     prevDiffOpen.current = isDiffOpen;
   }, [isDiffOpen]);
+
+  useEffect(() => {
+    if (isDiffOpen && typeof window !== 'undefined' && window.innerWidth < 1280) {
+      setSidebarExpanded(false);
+    }
+  }, [isDiffOpen, setSidebarExpanded]);
 
   useEffect(() => {
     if (!isTerminalOpen) {
@@ -615,6 +622,7 @@ export function ChatPage() {
         ref={diffRef}
         isOpen={isDiffOpen}
         onClose={() => useUIStore.getState().setDiffOpen(false)}
+        activeTaskId={activeTaskId}
       />
     </div>
   );
