@@ -1,6 +1,6 @@
 import { Button, Description, Dropdown, Label } from '@heroui/react';
 import { ChevronDown } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import type { ModelInfo, ReasoningCapability } from '../../hooks/use-machine-selection';
 
 export interface ModelConfig {
@@ -87,26 +87,12 @@ function mapModels(availableModels?: ModelInfo[]): ModelConfig[] {
   return FALLBACK_MODELS;
 }
 
-export function useModelPicker(availableModels?: ModelInfo[]) {
-  const [selectedModelId, setSelectedModelId] = useState('claude-opus-4-6');
-
-  useEffect(() => {
-    if (!availableModels || availableModels.length === 0) {
-      setSelectedModelId('claude-opus-4-6');
-      return;
-    }
-    setSelectedModelId((prev) => {
-      if (availableModels.some((m) => m.id === prev)) return prev;
-      return availableModels[0]?.id ?? prev;
-    });
-  }, [availableModels]);
-
+export function useModelPicker(availableModels?: ModelInfo[], selectedModelId?: string) {
   const models = useMemo(() => mapModels(availableModels), [availableModels]);
 
-  const selectedModel = models.find((m) => m.id === selectedModelId);
+  const effectiveId = selectedModelId ?? models[0]?.id ?? 'claude-opus-4-6';
+  const selectedModel = models.find((m) => m.id === effectiveId);
   return {
-    selectedModelId,
-    setSelectedModelId,
     models,
     reasoning: selectedModel?.reasoning,
   };

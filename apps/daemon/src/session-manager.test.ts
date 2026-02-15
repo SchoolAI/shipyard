@@ -1110,6 +1110,10 @@ describe('SessionManager', () => {
         content: [{ type: 'text', text: 'Hello world' }],
         timestamp: Date.now(),
         model: null,
+        machineId: null,
+        reasoningEffort: null,
+        permissionMode: null,
+        cwd: null,
       });
 
       expect(manager.getLatestUserPrompt()).toBe('Hello world');
@@ -1125,6 +1129,10 @@ describe('SessionManager', () => {
         ],
         timestamp: Date.now(),
         model: null,
+        machineId: null,
+        reasoningEffort: null,
+        permissionMode: null,
+        cwd: null,
       });
 
       expect(manager.getLatestUserPrompt()).toBe('First part\nSecond part');
@@ -1137,6 +1145,10 @@ describe('SessionManager', () => {
         content: [{ type: 'text', text: 'First user msg' }],
         timestamp: Date.now(),
         model: null,
+        machineId: null,
+        reasoningEffort: null,
+        permissionMode: null,
+        cwd: null,
       });
       taskDoc.conversation.push({
         messageId: 'msg-agent-1',
@@ -1144,6 +1156,10 @@ describe('SessionManager', () => {
         content: [{ type: 'text', text: 'Assistant response' }],
         timestamp: Date.now(),
         model: null,
+        machineId: null,
+        reasoningEffort: null,
+        permissionMode: null,
+        cwd: null,
       });
       taskDoc.conversation.push({
         messageId: 'msg-user-2',
@@ -1151,6 +1167,10 @@ describe('SessionManager', () => {
         content: [{ type: 'text', text: 'Follow-up question' }],
         timestamp: Date.now(),
         model: null,
+        machineId: null,
+        reasoningEffort: null,
+        permissionMode: null,
+        cwd: null,
       });
 
       expect(manager.getLatestUserPrompt()).toBe('Follow-up question');
@@ -1163,6 +1183,10 @@ describe('SessionManager', () => {
         content: [{ type: 'text', text: 'Assistant only' }],
         timestamp: Date.now(),
         model: null,
+        machineId: null,
+        reasoningEffort: null,
+        permissionMode: null,
+        cwd: null,
       });
 
       expect(manager.getLatestUserPrompt()).toBeNull();
@@ -1184,6 +1208,10 @@ describe('SessionManager', () => {
         ],
         timestamp: Date.now(),
         model: null,
+        machineId: null,
+        reasoningEffort: null,
+        permissionMode: null,
+        cwd: null,
       });
 
       expect(manager.getLatestUserPrompt()).toBe('With a tool result');

@@ -125,6 +125,7 @@ export class SessionManager {
   readonly #taskDoc: TypedDoc<TaskDocumentShape>;
   readonly #onStatusChange: StatusChangeCallback | undefined;
   #currentModel: string | null = null;
+  #machineId: string | null = null;
 
   constructor(taskDoc: TypedDoc<TaskDocumentShape>, onStatusChange?: StatusChangeCallback) {
     this.#taskDoc = taskDoc;
@@ -186,6 +187,7 @@ export class SessionManager {
    */
   async createSession(opts: CreateSessionOptions): Promise<SessionResult> {
     this.#currentModel = opts.model ?? null;
+    this.#machineId = opts.machineId ?? null;
     const sessionId = nanoid();
     const now = Date.now();
 
@@ -264,6 +266,7 @@ export class SessionManager {
     }
 
     this.#currentModel = opts?.model ?? sessionEntry.model ?? null;
+    this.#machineId = opts?.machineId ?? sessionEntry.machineId ?? null;
     const newSessionId = nanoid();
     const now = Date.now();
 
@@ -444,6 +447,10 @@ export class SessionManager {
           content: toolResultBlocks,
           timestamp: Date.now(),
           model: this.#currentModel,
+          machineId: this.#machineId,
+          reasoningEffort: null,
+          permissionMode: null,
+          cwd: null,
         });
         draft.meta.updatedAt = Date.now();
       });
@@ -474,6 +481,10 @@ export class SessionManager {
         content: contentBlocks,
         timestamp: Date.now(),
         model: this.#currentModel,
+        machineId: this.#machineId,
+        reasoningEffort: null,
+        permissionMode: null,
+        cwd: null,
       });
       draft.meta.updatedAt = Date.now();
     });

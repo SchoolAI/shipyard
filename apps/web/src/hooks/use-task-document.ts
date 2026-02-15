@@ -27,11 +27,20 @@ const EPHEMERAL_DECLARATIONS = {
   permResps: PermissionResponseEphemeral,
 };
 
+export interface LastUserConfig {
+  model: string | null;
+  machineId: string | null;
+  reasoningEffort: string | null;
+  permissionMode: string | null;
+  cwd: string | null;
+}
+
 export interface TaskDocumentResult {
   meta: TaskMeta | null;
   conversation: Message[];
   sessions: SessionEntry[];
   diffState: DiffState | null;
+  lastUserConfig: LastUserConfig | null;
   pendingPermissions: Map<string, PermissionRequest>;
   respondToPermission: (
     toolUseId: string,
@@ -68,6 +77,22 @@ export function useTaskDocument(taskId: string | null): TaskDocumentResult {
   const conversation = useDoc(handle, (d: { conversation: Message[] }) => d.conversation);
   const sessions = useDoc(handle, (d: { sessions: SessionEntry[] }) => d.sessions);
   const diffState = useDoc(handle, (d: { diffState: DiffState }) => d.diffState);
+
+  const lastUserConfig = useMemo((): LastUserConfig | null => {
+    for (let i = conversation.length - 1; i >= 0; i--) {
+      const msg = conversation[i];
+      if (msg?.role === 'user') {
+        return {
+          model: msg.model ?? null,
+          machineId: msg.machineId ?? null,
+          reasoningEffort: msg.reasoningEffort ?? null,
+          permissionMode: msg.permissionMode ?? null,
+          cwd: msg.cwd ?? null,
+        };
+      }
+    }
+    return null;
+  }, [conversation]);
 
   /**
    * Permission requests from ephemeral state.
@@ -135,6 +160,7 @@ export function useTaskDocument(taskId: string | null): TaskDocumentResult {
       conversation: [],
       sessions: [],
       diffState: null,
+      lastUserConfig: null,
       pendingPermissions: EMPTY_PERMISSIONS,
       respondToPermission,
       isLoading: false,
@@ -146,6 +172,7 @@ export function useTaskDocument(taskId: string | null): TaskDocumentResult {
     conversation,
     sessions,
     diffState,
+    lastUserConfig,
     pendingPermissions,
     respondToPermission,
     isLoading: !meta,

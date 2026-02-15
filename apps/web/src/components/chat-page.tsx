@@ -1,16 +1,18 @@
 import { change } from '@loro-extended/change';
-import type { ContentBlock } from '@shipyard/loro-schema';
+import type { ContentBlock, PermissionMode } from '@shipyard/loro-schema';
 import {
   addTaskToIndex,
   buildDocumentId,
   DEFAULT_EPOCH,
   generateTaskId,
   LOCAL_USER_ID,
+  PERMISSION_MODES,
+  REASONING_EFFORTS,
   TaskDocumentSchema,
   TaskIndexDocumentSchema,
 } from '@shipyard/loro-schema';
 import { ChevronDown } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAppHotkeys } from '../hooks/use-app-hotkeys';
 import { useMachineSelection } from '../hooks/use-machine-selection';
 import { usePersonalRoom } from '../hooks/use-personal-room';
@@ -25,6 +27,7 @@ import { ChatComposer } from './chat-composer';
 import type { ChatMessageData } from './chat-message';
 import { ChatMessage } from './chat-message';
 import { CommandPalette } from './command-palette';
+import type { ReasoningLevel } from './composer/reasoning-effort';
 import { StatusBar } from './composer/status-bar';
 import type { DiffPanelHandle } from './panels/diff-panel';
 import { DiffPanel } from './panels/diff-panel';
@@ -37,6 +40,48 @@ import { Sidebar } from './sidebar';
 import { TopBar } from './top-bar';
 
 const useLoro = import.meta.env.VITE_DATA_SOURCE === 'loro';
+
+const VALID_EFFORTS: readonly string[] = REASONING_EFFORTS;
+const VALID_MODES: readonly string[] = PERMISSION_MODES;
+
+interface ComposerSeedTarget {
+  setModel: (v: string) => void;
+  setReasoning: (v: ReasoningLevel) => void;
+  setPermission: (v: PermissionMode) => void;
+  setEnvironment: (v: string) => void;
+  seededRef: React.MutableRefObject<string | null>;
+}
+
+function seedComposerState(
+  taskId: string | null,
+  config: {
+    model: string | null;
+    reasoningEffort: string | null;
+    permissionMode: string | null;
+    cwd: string | null;
+  } | null,
+  target: ComposerSeedTarget
+): void {
+  if (taskId !== target.seededRef.current) target.seededRef.current = null;
+
+  if (!config && !taskId) {
+    target.setModel('claude-opus-4-6');
+    target.setReasoning('medium');
+    target.setPermission('default');
+    return;
+  }
+  if (!config || target.seededRef.current === taskId) return;
+  target.seededRef.current = taskId;
+
+  if (config.model) target.setModel(config.model);
+  if (config.reasoningEffort && VALID_EFFORTS.includes(config.reasoningEffort)) {
+    target.setReasoning(config.reasoningEffort as ReasoningLevel);
+  }
+  if (config.permissionMode && VALID_MODES.includes(config.permissionMode)) {
+    target.setPermission(config.permissionMode as PermissionMode);
+  }
+  if (config.cwd) target.setEnvironment(config.cwd);
+}
 
 /** Wrap a plain text string into a ContentBlock[] for the legacy message store path. */
 function toContentBlocks(text: string): ContentBlock[] {
@@ -261,6 +306,29 @@ export function ChatPage() {
   const selectedEnvironmentPath = useUIStore((s) => s.selectedEnvironmentPath);
   const setSelectedEnvironmentPath = useUIStore((s) => s.setSelectedEnvironmentPath);
 
+  const [composerModel, setComposerModel] = useState('claude-opus-4-6');
+  const [composerReasoning, setComposerReasoning] = useState<ReasoningLevel>('medium');
+  const [composerPermission, setComposerPermission] = useState<PermissionMode>('default');
+
+  const seededTaskRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    seedComposerState(activeTaskId, loroTask.lastUserConfig, {
+      setModel: setComposerModel,
+      setReasoning: setComposerReasoning,
+      setPermission: setComposerPermission,
+      setEnvironment: setSelectedEnvironmentPath,
+      seededRef: seededTaskRef,
+    });
+  }, [activeTaskId, loroTask.lastUserConfig, setSelectedEnvironmentPath]);
+
+  useEffect(() => {
+    if (availableModels.length === 0) return;
+    if (!availableModels.some((m) => m.id === composerModel)) {
+      setComposerModel(availableModels[0]?.id ?? 'claude-opus-4-6');
+    }
+  }, [availableModels, composerModel]);
+
   useEffect(() => {
     if (!homeDir) {
       const firstEnv = availableEnvironments[0]?.path ?? null;
@@ -458,17 +526,16 @@ export function ChatPage() {
           draft.meta.status = 'submitted';
           draft.meta.updatedAt = now;
 
-          draft.config.model = model || null;
-          draft.config.cwd = selectedEnvironmentPath ?? homeDir ?? null;
-          draft.config.reasoningEffort = reasoningEffort;
-          draft.config.permissionMode = permissionMode;
-
           draft.conversation.push({
             messageId: crypto.randomUUID(),
             role: 'user',
             content: [{ type: 'text', text: message }],
             timestamp: now,
-            model: null,
+            model: model || null,
+            machineId: selectedMachineId ?? null,
+            reasoningEffort,
+            permissionMode,
+            cwd: selectedEnvironmentPath ?? homeDir ?? null,
           });
         });
 
@@ -598,9 +665,9 @@ export function ChatPage() {
                   onSuggestionClick={(text) =>
                     handleSubmit({
                       message: text,
-                      model: '',
-                      reasoningEffort: 'medium',
-                      permissionMode: 'default',
+                      model: composerModel,
+                      reasoningEffort: composerReasoning,
+                      permissionMode: composerPermission,
                     })
                   }
                 />
@@ -615,6 +682,12 @@ export function ChatPage() {
                   availableModels={availableModels}
                   availableEnvironments={availableEnvironments}
                   onEnvironmentSelect={setSelectedEnvironmentPath}
+                  selectedModelId={composerModel}
+                  onModelChange={setComposerModel}
+                  reasoningLevel={composerReasoning}
+                  onReasoningChange={setComposerReasoning}
+                  permissionMode={composerPermission}
+                  onPermissionChange={setComposerPermission}
                 />
                 <StatusBar
                   connectionState={connectionState}

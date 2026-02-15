@@ -62,6 +62,10 @@ describe('TaskDocumentSchema', () => {
         content: [{ type: 'text', text: 'Hello agent' }],
         timestamp: now,
         model: null,
+        machineId: null,
+        reasoningEffort: null,
+        permissionMode: null,
+        cwd: null,
       });
 
       const json = doc.toJSON();
@@ -80,6 +84,10 @@ describe('TaskDocumentSchema', () => {
         content: [{ type: 'text', text: 'Hello human' }],
         timestamp: now + 1000,
         model: null,
+        machineId: null,
+        reasoningEffort: null,
+        permissionMode: null,
+        cwd: null,
       });
 
       const json = doc.toJSON();
@@ -102,6 +110,10 @@ describe('TaskDocumentSchema', () => {
         ],
         timestamp: now,
         model: null,
+        machineId: null,
+        reasoningEffort: null,
+        permissionMode: null,
+        cwd: null,
       });
 
       const json = doc.toJSON();
@@ -129,6 +141,10 @@ describe('TaskDocumentSchema', () => {
         ],
         timestamp: now,
         model: null,
+        machineId: null,
+        reasoningEffort: null,
+        permissionMode: null,
+        cwd: null,
       });
 
       const json = doc.toJSON();
@@ -153,6 +169,10 @@ describe('TaskDocumentSchema', () => {
         ],
         timestamp: now,
         model: null,
+        machineId: null,
+        reasoningEffort: null,
+        permissionMode: null,
+        cwd: null,
       });
 
       const json = doc.toJSON();
@@ -180,6 +200,10 @@ describe('TaskDocumentSchema', () => {
         ],
         timestamp: now,
         model: null,
+        machineId: null,
+        reasoningEffort: null,
+        permissionMode: null,
+        cwd: null,
       });
 
       const json = doc.toJSON();
@@ -204,6 +228,10 @@ describe('TaskDocumentSchema', () => {
         ],
         timestamp: now,
         model: null,
+        machineId: null,
+        reasoningEffort: null,
+        permissionMode: null,
+        cwd: null,
       });
 
       const json = doc.toJSON();
@@ -226,6 +254,7 @@ describe('TaskDocumentSchema', () => {
         status: 'active',
         cwd: '/home/user/project',
         model: 'claude-opus-4-6',
+        machineId: null,
         createdAt: now,
         completedAt: null,
         totalCostUsd: null,
@@ -251,6 +280,7 @@ describe('TaskDocumentSchema', () => {
         status: 'completed',
         cwd: '/home/user/project',
         model: null,
+        machineId: null,
         createdAt: now,
         completedAt,
         totalCostUsd: 0.05,
@@ -271,6 +301,7 @@ describe('TaskDocumentSchema', () => {
         status: 'failed',
         cwd: '/tmp',
         model: null,
+        machineId: null,
         createdAt: now,
         completedAt: now + 1000,
         totalCostUsd: null,

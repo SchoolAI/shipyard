@@ -26,6 +26,12 @@ interface ChatComposerProps {
   availableModels?: ModelInfo[];
   availableEnvironments?: GitRepoInfo[];
   onEnvironmentSelect?: (path: string) => void;
+  selectedModelId: string;
+  onModelChange: (modelId: string) => void;
+  reasoningLevel: ReasoningLevel;
+  onReasoningChange: (level: ReasoningLevel) => void;
+  permissionMode: PermissionMode;
+  onPermissionChange: (mode: PermissionMode) => void;
 }
 
 export interface ChatComposerHandle {
@@ -36,16 +42,25 @@ const MAX_HEIGHT = 200;
 const MIN_HEIGHT = 24;
 
 export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(function ChatComposer(
-  { onSubmit, onClearChat, availableModels, availableEnvironments, onEnvironmentSelect },
+  {
+    onSubmit,
+    onClearChat,
+    availableModels,
+    availableEnvironments,
+    onEnvironmentSelect,
+    selectedModelId,
+    onModelChange,
+    reasoningLevel,
+    onReasoningChange,
+    permissionMode,
+    onPermissionChange,
+  },
   ref
 ) {
   const [value, setValue] = useState('');
   const [stashedText, setStashedText] = useState('');
-  const [permissionMode, setPermissionMode] = useState<PermissionMode>('default');
-  const [reasoningLevel, setReasoningLevel] = useState<ReasoningLevel>('medium');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const { selectedModelId, setSelectedModelId, models, reasoning } =
-    useModelPicker(availableModels);
+  const { models, reasoning } = useModelPicker(availableModels, selectedModelId);
 
   useImperativeHandle(
     ref,
@@ -57,21 +72,21 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
 
   useEffect(() => {
     if (reasoning && !reasoning.efforts.includes(reasoningLevel)) {
-      setReasoningLevel(reasoning.defaultEffort);
+      onReasoningChange(reasoning.defaultEffort);
     }
-  }, [reasoning, reasoningLevel]);
+  }, [reasoning, reasoningLevel, onReasoningChange]);
 
   const handleSlashExecute = useCallback(
     (action: SlashCommandAction) => {
       switch (action.kind) {
         case 'setPermissionMode':
-          setPermissionMode(action.mode);
+          onPermissionChange(action.mode);
           break;
         case 'setModel':
-          setSelectedModelId(action.modelId);
+          onModelChange(action.modelId);
           break;
         case 'setReasoning':
-          setReasoningLevel(action.level);
+          onReasoningChange(action.level);
           break;
         case 'setEnvironment':
           onEnvironmentSelect?.(action.path);
@@ -85,7 +100,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
           assertNever(action);
       }
     },
-    [setSelectedModelId, onClearChat, onEnvironmentSelect]
+    [onModelChange, onReasoningChange, onPermissionChange, onClearChat, onEnvironmentSelect]
   );
 
   const rafRef = useRef<number>(0);
@@ -304,17 +319,17 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
             <AttachmentPopover />
             <ModelPicker
               selectedModelId={selectedModelId}
-              onModelChange={setSelectedModelId}
+              onModelChange={onModelChange}
               models={models}
             />
             {reasoning && (
               <ReasoningEffort
                 level={reasoningLevel}
-                onLevelChange={setReasoningLevel}
+                onLevelChange={onReasoningChange}
                 supportedEfforts={reasoning.efforts}
               />
             )}
-            <PermissionModePicker mode={permissionMode} onModeChange={setPermissionMode} />
+            <PermissionModePicker mode={permissionMode} onModeChange={onPermissionChange} />
           </div>
 
           <div className="flex items-center gap-1 shrink-0">
