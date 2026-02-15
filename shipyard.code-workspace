@@ -3,6 +3,18 @@
     {
       "name": "shipyard",
       "path": "."
+    },
+    {
+      "name": "\ud83c\udf33\ud83d\udcac diff-commenting",
+      "path": "../shipyard-wt/diff-commenting"
+    },
+    {
+      "name": "\ud83c\udf33\ud83d\udce6 npm-registry-install",
+      "path": "../shipyard-wt/npm-registry-install"
+    },
+    {
+      "name": "\ud83c\udf33\ud83d\udd11 daemon\u2013cli-login",
+      "path": "../shipyard-wt/daemon\u2013cli-login"
     }
   ]
 }

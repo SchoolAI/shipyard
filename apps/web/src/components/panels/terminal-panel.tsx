@@ -169,7 +169,7 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
         {isOpen && <div {...separatorProps} />}
 
         <div className="overflow-hidden h-full flex flex-col">
-          <div className="flex items-center justify-between px-4 py-2 border-b border-separator/50">
+          <div className="flex items-center justify-between px-4 py-1.5 border-b border-separator/50 h-10">
             <div className="flex items-center gap-2 text-xs text-muted font-medium">
               <Terminal className="w-3.5 h-3.5" aria-hidden="true" />
               Terminal
