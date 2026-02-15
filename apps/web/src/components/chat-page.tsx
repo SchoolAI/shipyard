@@ -156,6 +156,10 @@ export function ChatPage() {
     targetMachineId: selectedMachineId,
   });
 
+  const diffLastViewedAt = useUIStore((s) => s.diffLastViewedAt);
+  const setDiffLastViewedAt = useUIStore((s) => s.setDiffLastViewedAt);
+  const diffScope = useUIStore((s) => s.diffScope);
+
   const loroTask = useTaskDocument(activeTaskId);
   const { pendingPermissions, respondToPermission } = loroTask;
 
@@ -285,6 +289,7 @@ export function ChatPage() {
 
   useEffect(() => {
     if (isDiffOpen && !prevDiffOpen.current) {
+      setDiffLastViewedAt(Date.now());
       requestAnimationFrame(() => {
         diffRef.current?.focus();
       });
@@ -294,7 +299,7 @@ export function ChatPage() {
       });
     }
     prevDiffOpen.current = isDiffOpen;
-  }, [isDiffOpen]);
+  }, [isDiffOpen, setDiffLastViewedAt]);
 
   useEffect(() => {
     if (isDiffOpen && typeof window !== 'undefined' && window.innerWidth < 1280) {
@@ -514,6 +519,19 @@ export function ChatPage() {
     useMessageStore.getState().clearMessages(activeTaskId);
   }, [activeTaskId]);
 
+  const hasUnviewedDiff = useMemo(() => {
+    if (isDiffOpen) return false;
+    const ds = loroTask.diffState;
+    if (!ds) return false;
+    const relevantUpdatedAt =
+      diffScope === 'branch'
+        ? ds.branchUpdatedAt
+        : diffScope === 'last-turn'
+          ? ds.lastTurnUpdatedAt
+          : ds.updatedAt;
+    return relevantUpdatedAt > diffLastViewedAt;
+  }, [isDiffOpen, loroTask.diffState, diffScope, diffLastViewedAt]);
+
   const hasMessages = messages.length > 0;
 
   const selectedEnv = availableEnvironments.find((e) => e.path === selectedEnvironmentPath);
@@ -531,7 +549,11 @@ export function ChatPage() {
       <ShortcutsModal />
       <Sidebar />
       <div className="flex flex-col flex-1 min-w-0 min-h-0" tabIndex={-1}>
-        <TopBar onToggleTerminal={toggleTerminal} onToggleDiff={toggleDiff} />
+        <TopBar
+          onToggleTerminal={toggleTerminal}
+          onToggleDiff={toggleDiff}
+          hasUnviewedDiff={hasUnviewedDiff}
+        />
 
         <main id="main-content" className="flex flex-col flex-1 min-h-0">
           {isSettingsOpen ? (

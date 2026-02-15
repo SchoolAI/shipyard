@@ -25,7 +25,17 @@ import {
 } from '@shipyard/loro-schema';
 import type { PersonalRoomServerMessage } from '@shipyard/session';
 import { createBranchWatcher } from './branch-watcher.js';
-import { getChangedFiles, getStagedDiff, getUnstagedDiff } from './capabilities.js';
+import {
+  captureTreeSnapshot,
+  getBranchDiff,
+  getBranchFiles,
+  getChangedFiles,
+  getDefaultBranch,
+  getSnapshotDiff,
+  getSnapshotFiles,
+  getStagedDiff,
+  getUnstagedDiff,
+} from './capabilities.js';
 import type { Env } from './env.js';
 import { FileStorageAdapter } from './file-storage-adapter.js';
 import { LifecycleManager } from './lifecycle.js';
@@ -199,6 +209,10 @@ export async function serve(env: Env): Promise<void> {
       clearTimeout(timer);
     }
     diffDebounceTimers.clear();
+    for (const timer of branchDiffTimers.values()) {
+      clearTimeout(timer);
+    }
+    branchDiffTimers.clear();
     for (const unsub of watchedTasks.values()) {
       unsub();
     }
@@ -231,7 +245,9 @@ interface MessageHandlerContext {
 }
 
 const DIFF_DEBOUNCE_MS = 2_000;
+const BRANCH_DIFF_DEBOUNCE_MS = 10_000;
 const diffDebounceTimers = new Map<string, ReturnType<typeof setTimeout>>();
+const branchDiffTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
 function debouncedDiffCapture(
   taskId: string,
@@ -276,6 +292,88 @@ async function captureDiffState(
     draft.diffState.updatedAt = Date.now();
   });
   log.debug({ fileCount: files.length }, 'Diff state captured');
+}
+
+function debouncedBranchDiffCapture(
+  taskId: string,
+  cwd: string,
+  taskHandle: TaskHandle,
+  log: ReturnType<typeof createChildLogger>
+): void {
+  const existing = branchDiffTimers.get(taskId);
+  if (existing) clearTimeout(existing);
+
+  branchDiffTimers.set(
+    taskId,
+    setTimeout(() => {
+      branchDiffTimers.delete(taskId);
+      captureBranchDiffState(cwd, taskHandle, log).catch((err: unknown) => {
+        log.warn({ err }, 'Failed to capture branch diff state');
+      });
+    }, BRANCH_DIFF_DEBOUNCE_MS)
+  );
+}
+
+async function captureBranchDiffState(
+  cwd: string,
+  taskHandle: TaskHandle,
+  log: ReturnType<typeof createChildLogger>
+): Promise<void> {
+  const baseBranch = await getDefaultBranch(cwd);
+  if (!baseBranch) {
+    log.debug('No default branch found, skipping branch diff');
+    return;
+  }
+
+  const [branchDiff, branchFiles] = await Promise.all([
+    getBranchDiff(cwd, baseBranch),
+    getBranchFiles(cwd, baseBranch),
+  ]);
+
+  change(taskHandle.doc, (draft) => {
+    draft.diffState.branchDiff = branchDiff;
+    draft.diffState.branchBase = baseBranch;
+    const fileList = draft.diffState.branchFiles;
+    if (fileList.length > 0) {
+      fileList.delete(0, fileList.length);
+    }
+    for (const file of branchFiles) {
+      fileList.push(file);
+    }
+    draft.diffState.branchUpdatedAt = Date.now();
+  });
+  log.debug({ baseBranch, fileCount: branchFiles.length }, 'Branch diff state captured');
+}
+
+async function captureTurnDiff(
+  cwd: string,
+  turnStartRef: string | null,
+  taskHandle: TaskHandle,
+  log: ReturnType<typeof createChildLogger>
+): Promise<void> {
+  const turnEndRef = await captureTreeSnapshot(cwd);
+  if (!turnStartRef || !turnEndRef || turnStartRef === turnEndRef) {
+    log.debug('No turn diff to capture (refs equal or missing)');
+    return;
+  }
+
+  const [turnDiff, turnFiles] = await Promise.all([
+    getSnapshotDiff(cwd, turnStartRef, turnEndRef),
+    getSnapshotFiles(cwd, turnStartRef, turnEndRef),
+  ]);
+
+  change(taskHandle.doc, (draft) => {
+    draft.diffState.lastTurnDiff = turnDiff;
+    const fileList = draft.diffState.lastTurnFiles;
+    if (fileList.length > 0) {
+      fileList.delete(0, fileList.length);
+    }
+    for (const file of turnFiles) {
+      fileList.push(file);
+    }
+    draft.diffState.lastTurnUpdatedAt = Date.now();
+  });
+  log.debug({ fromRef: turnStartRef, toRef: turnEndRef }, 'Turn diff captured');
 }
 
 function handleMessage(msg: PersonalRoomServerMessage, ctx: MessageHandlerContext): void {
@@ -422,6 +520,12 @@ async function watchTaskDocument(
     taskLog.debug({ taskDocId }, 'No existing task data in storage');
   }
 
+  const json = taskHandle.doc.toJSON();
+  const initialCwd = json.config.cwd ?? process.cwd();
+  captureBranchDiffState(initialCwd, taskHandle, taskLog).catch((err: unknown) => {
+    taskLog.warn({ err }, 'Failed to capture initial branch diff');
+  });
+
   const opCountBefore = taskHandle.loroDoc.opCount();
   taskLog.info({ taskDocId, opCount: opCountBefore }, 'Doc state before subscribe');
 
@@ -477,6 +581,7 @@ function onTaskDocChanged(
   if (json.meta.status === 'working' || json.meta.status === 'input-required') {
     const activeCwd = json.config.cwd ?? process.cwd();
     debouncedDiffCapture(taskId, activeCwd, taskHandle, taskLog);
+    debouncedBranchDiffCapture(taskId, activeCwd, taskHandle, taskLog);
 
     taskLog.debug({ status: json.meta.status }, 'Status blocks new work, skipping');
     return;
@@ -513,6 +618,12 @@ function onTaskDocChanged(
 
   ctx.signaling.updateStatus('running', taskId);
 
+  const turnStartRefPromise = captureTreeSnapshot(cwd);
+
+  turnStartRefPromise
+    .then((ref) => taskLog.debug({ turnStartRef: ref }, 'Captured turn start snapshot'))
+    .catch((err: unknown) => taskLog.warn({ err }, 'Failed to capture turn start snapshot'));
+
   runTask({
     taskHandle,
     taskId,
@@ -540,36 +651,81 @@ function onTaskDocChanged(
       const errMsg = err instanceof Error ? err.message : String(err);
       taskLog.error({ err: errMsg }, 'Task failed');
     })
-    .finally(async () => {
-      const timer = diffDebounceTimers.get(taskId);
-      if (timer) {
-        clearTimeout(timer);
-        diffDebounceTimers.delete(taskId);
-      }
+    .finally(() =>
+      cleanupTaskRun({
+        taskId,
+        cwd,
+        taskHandle,
+        taskLog,
+        turnStartRefPromise,
+        abortController,
+        ctx,
+      })
+    );
+}
 
-      try {
-        await captureDiffState(cwd, taskHandle, taskLog);
-      } catch (err: unknown) {
-        taskLog.warn({ err }, 'Failed to capture final diff state');
-      }
+interface CleanupTaskRunOptions {
+  taskId: string;
+  cwd: string;
+  taskHandle: TaskHandle;
+  taskLog: ReturnType<typeof createChildLogger>;
+  turnStartRefPromise: Promise<string | null>;
+  abortController: AbortController;
+  ctx: MessageHandlerContext;
+}
 
-      abortController.abort();
+async function cleanupTaskRun(opts: CleanupTaskRunOptions): Promise<void> {
+  const { taskId, cwd, taskHandle, taskLog, turnStartRefPromise, abortController, ctx } = opts;
 
-      for (const [key] of taskHandle.permReqs.getAll()) {
-        taskHandle.permReqs.delete(key);
-      }
-      for (const [key] of taskHandle.permResps.getAll()) {
-        taskHandle.permResps.delete(key);
-      }
+  clearDebouncedTimer(diffDebounceTimers, taskId);
+  clearDebouncedTimer(branchDiffTimers, taskId);
 
-      ctx.activeTasks.delete(taskId);
-      const unsub = ctx.watchedTasks.get(taskId);
-      if (unsub) {
-        unsub();
-        ctx.watchedTasks.delete(taskId);
-      }
-      ctx.signaling.updateStatus('idle');
-    });
+  try {
+    await captureDiffState(cwd, taskHandle, taskLog);
+  } catch (err: unknown) {
+    taskLog.warn({ err }, 'Failed to capture final diff state');
+  }
+
+  try {
+    await captureBranchDiffState(cwd, taskHandle, taskLog);
+  } catch (err: unknown) {
+    taskLog.warn({ err }, 'Failed to capture final branch diff state');
+  }
+
+  try {
+    const turnStartRef = await turnStartRefPromise;
+    await captureTurnDiff(cwd, turnStartRef, taskHandle, taskLog);
+  } catch (err: unknown) {
+    taskLog.warn({ err }, 'Failed to capture turn diff');
+  }
+
+  abortController.abort();
+
+  for (const [key] of taskHandle.permReqs.getAll()) {
+    taskHandle.permReqs.delete(key);
+  }
+  for (const [key] of taskHandle.permResps.getAll()) {
+    taskHandle.permResps.delete(key);
+  }
+
+  ctx.activeTasks.delete(taskId);
+  const unsub = ctx.watchedTasks.get(taskId);
+  if (unsub) {
+    unsub();
+    ctx.watchedTasks.delete(taskId);
+  }
+  ctx.signaling.updateStatus('idle');
+}
+
+function clearDebouncedTimer(
+  timers: Map<string, ReturnType<typeof setTimeout>>,
+  taskId: string
+): void {
+  const timer = timers.get(taskId);
+  if (timer) {
+    clearTimeout(timer);
+    timers.delete(taskId);
+  }
 }
 
 /**

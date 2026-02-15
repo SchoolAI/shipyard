@@ -1,20 +1,25 @@
+import { DiffModeEnum, DiffView } from '@git-diff-view/react';
+import '@git-diff-view/react/styles/diff-view.css';
 import { Button, Tooltip } from '@heroui/react';
-import type { DiffFile } from '@shipyard/loro-schema';
-import { ChevronDown, ChevronRight, WrapText, X } from 'lucide-react';
+import type { DiffState, DiffFile as SchemaDiffFile } from '@shipyard/loro-schema';
+import { ChevronDown, ChevronRight, Columns2, Rows3, WrapText, X } from 'lucide-react';
 import {
   forwardRef,
   type KeyboardEvent,
   useCallback,
   useEffect,
   useImperativeHandle,
+  useMemo,
   useRef,
   useState,
 } from 'react';
 import { useResizablePanel } from '../../hooks/use-resizable-panel';
 import { useTaskDocument } from '../../hooks/use-task-document';
+import type { DiffScope, DiffViewType } from '../../stores';
 import { useUIStore } from '../../stores';
 
 const SM_BREAKPOINT = 640;
+const SPLIT_MIN_WIDTH = 800;
 
 function useIsMobile() {
   const [isMobile, setIsMobile] = useState(
@@ -45,41 +50,6 @@ type DiffTab = 'unstaged' | 'staged';
 
 const TABS: DiffTab[] = ['unstaged', 'staged'];
 
-function classifyLine(line: string): 'add' | 'remove' | 'hunk' | 'header' | 'context' {
-  if (line.startsWith('--- ') || line.startsWith('+++ ')) return 'header';
-  if (line.startsWith('diff --git')) return 'header';
-  if (line.startsWith('+')) return 'add';
-  if (line.startsWith('-')) return 'remove';
-  if (line.startsWith('@@')) return 'hunk';
-  return 'context';
-}
-
-const LINE_STYLES = {
-  add: 'bg-diff-add-bg text-diff-add-fg',
-  remove: 'bg-diff-remove-bg text-diff-remove-fg',
-  hunk: 'bg-diff-hunk-bg text-diff-hunk-fg font-medium',
-  header: 'text-muted font-medium',
-  context: '',
-} as const;
-
-function DiffContent({ rawDiff, wordWrap }: { rawDiff: string; wordWrap: boolean }) {
-  const lines = rawDiff.split('\n');
-  return (
-    <pre
-      className={`text-xs font-mono leading-relaxed ${wordWrap ? 'whitespace-pre-wrap break-all' : 'whitespace-pre overflow-x-auto'}`}
-    >
-      {lines.map((line, i) => {
-        const kind = classifyLine(line);
-        return (
-          <div key={i} className={`px-4 ${LINE_STYLES[kind]}`}>
-            {line || '\u00A0'}
-          </div>
-        );
-      })}
-    </pre>
-  );
-}
-
 const STATUS_COLORS: Record<string, string> = {
   M: 'text-warning',
   A: 'text-success',
@@ -93,12 +63,92 @@ const STATUS_COLORS: Record<string, string> = {
   '??': 'text-muted',
 };
 
+const SCOPE_OPTIONS: { value: DiffScope; label: string }[] = [
+  { value: 'working-tree', label: 'Working Tree' },
+  { value: 'branch', label: 'Branch Changes' },
+  { value: 'last-turn', label: 'Last Turn' },
+];
+
+function useTheme(): 'dark' | 'light' {
+  const theme = useUIStore((s) => s.theme);
+  const [resolved, setResolved] = useState<'dark' | 'light'>(() => {
+    if (theme !== 'system') return theme;
+    if (typeof window === 'undefined') return 'dark';
+    return document.documentElement.classList.contains('light') ? 'light' : 'dark';
+  });
+
+  useEffect(() => {
+    if (theme !== 'system') {
+      setResolved(theme);
+      return;
+    }
+    const mql = window.matchMedia('(prefers-color-scheme: dark)');
+    setResolved(mql.matches ? 'dark' : 'light');
+    const handler = (e: MediaQueryListEvent) => setResolved(e.matches ? 'dark' : 'light');
+    mql.addEventListener('change', handler);
+    return () => mql.removeEventListener('change', handler);
+  }, [theme]);
+
+  return resolved;
+}
+
+function splitDiffByFile(rawDiff: string): string[] {
+  const segments: string[] = [];
+  let current = '';
+  for (const line of rawDiff.split('\n')) {
+    if (line.startsWith('diff --git ') && current) {
+      segments.push(current);
+      current = '';
+    }
+    current += `${line}\n`;
+  }
+  if (current.trim()) segments.push(current);
+  return segments;
+}
+
+function DiffContent({
+  rawDiff,
+  wordWrap,
+  viewType,
+  panelWidth,
+}: {
+  rawDiff: string;
+  wordWrap: boolean;
+  viewType: DiffViewType;
+  panelWidth: number;
+}) {
+  const resolvedTheme = useTheme();
+
+  const effectiveMode =
+    viewType === 'split' && panelWidth >= SPLIT_MIN_WIDTH
+      ? DiffModeEnum.Split
+      : DiffModeEnum.Unified;
+
+  const data = useMemo(
+    () => ({
+      hunks: splitDiffByFile(rawDiff),
+    }),
+    [rawDiff]
+  );
+
+  return (
+    <DiffView
+      data={data}
+      diffViewMode={effectiveMode}
+      diffViewWrap={wordWrap}
+      diffViewTheme={resolvedTheme}
+      diffViewHighlight
+      diffViewFontSize={12}
+    />
+  );
+}
+
 function FileList({
   files,
   isOpen,
   onToggle,
 }: {
-  files: readonly DiffFile[];
+  files: readonly SchemaDiffFile[];
   isOpen: boolean;
   onToggle: () => void;
 }) {
@@ -145,32 +195,85 @@ function EmptyState({ message }: { message: string }) {
   );
 }
 
+function getEmptyMessage(
+  scope: DiffScope,
+  activeTab: DiffTab,
+  diffState: DiffState | null
+): string | null {
+  switch (scope) {
+    case 'working-tree':
+      return `No ${activeTab} changes`;
+    case 'branch':
+      if (!diffState?.branchBase) return 'Could not detect base branch';
+      return 'No committed changes on this branch';
+    case 'last-turn':
+      if (!diffState?.lastTurnUpdatedAt) return 'No turn changes captured yet';
+      return 'No changes in the last turn';
+  }
+}
+
+function getDiffData(
+  scope: DiffScope,
+  activeTab: DiffTab,
+  diffState: DiffState | null
+): { diff: string | undefined; files: readonly SchemaDiffFile[]; updatedAt: number | undefined } {
+  if (!diffState) return { diff: undefined, files: [], updatedAt: undefined };
+
+  switch (scope) {
+    case 'working-tree':
+      return {
+        diff: activeTab === 'unstaged' ? diffState.unstaged : diffState.staged,
+        files: diffState.files,
+        updatedAt: diffState.updatedAt,
+      };
+    case 'branch':
+      return {
+        diff: diffState.branchDiff,
+        files: diffState.branchFiles,
+        updatedAt: diffState.branchUpdatedAt,
+      };
+    case 'last-turn':
+      return {
+        diff: diffState.lastTurnDiff,
+        files: diffState.lastTurnFiles,
+        updatedAt: diffState.lastTurnUpdatedAt,
+      };
+  }
+}
+
 function TabPanelContent({
   activeTaskId,
   activeTab,
-  activeDiff,
-  updatedAt,
-  files,
+  scope,
+  diffState,
   isFileListOpen,
   onToggleFileList,
   wordWrap,
+  viewType,
+  panelWidth,
 }: {
   activeTaskId: string | null;
   activeTab: DiffTab;
-  activeDiff: string | undefined;
-  updatedAt: number | undefined;
-  files: readonly DiffFile[];
+  scope: DiffScope;
+  diffState: DiffState | null;
   isFileListOpen: boolean;
   onToggleFileList: () => void;
   wordWrap: boolean;
+  viewType: DiffViewType;
+  panelWidth: number;
 }) {
+  const { diff, files, updatedAt } = getDiffData(scope, activeTab, diffState);
+
   if (!activeTaskId) return <EmptyState message="Select a task to see changes" />;
   if (!updatedAt) return <EmptyState message="Code changes will appear here" />;
-  if (!activeDiff) return <EmptyState message={`No ${activeTab} changes`} />;
+  if (!diff) {
+    const msg = getEmptyMessage(scope, activeTab, diffState);
+    return <EmptyState message={msg ?? 'No changes'} />;
+  }
   return (
     <div className="flex-1 min-h-0 overflow-y-auto">
       <FileList files={files} isOpen={isFileListOpen} onToggle={onToggleFileList} />
-      <DiffContent rawDiff={activeDiff} wordWrap={wordWrap} />
+      <DiffContent rawDiff={diff} wordWrap={wordWrap} viewType={viewType} panelWidth={panelWidth} />
     </div>
   );
 }
@@ -198,6 +301,10 @@ export const DiffPanel = forwardRef<DiffPanelHandle, DiffPanelProps>(function Di
   const setDiffPanelWidth = useUIStore((s) => s.setDiffPanelWidth);
   const diffWordWrap = useUIStore((s) => s.diffWordWrap);
   const setDiffWordWrap = useUIStore((s) => s.setDiffWordWrap);
+  const diffScope = useUIStore((s) => s.diffScope);
+  const setDiffScope = useUIStore((s) => s.setDiffScope);
+  const diffViewType = useUIStore((s) => s.diffViewType);
+  const setDiffViewType = useUIStore((s) => s.setDiffViewType);
 
   const isMobile = useIsMobile();
 
@@ -208,9 +315,6 @@ export const DiffPanel = forwardRef<DiffPanelHandle, DiffPanelProps>(function Di
   });
 
   const { diffState } = useTaskDocument(activeTaskId);
-
-  const activeDiff = activeTab === 'unstaged' ? diffState?.unstaged : diffState?.staged;
-  const files = diffState?.files ?? [];
 
   useImperativeHandle(
     ref,
@@ -239,6 +343,10 @@ export const DiffPanel = forwardRef<DiffPanelHandle, DiffPanelProps>(function Di
     [activeTab]
   );
 
+  const isSplitViewActive = diffViewType === 'split';
+  const SplitIcon = isSplitViewActive ? Rows3 : Columns2;
+  const splitLabel = isSplitViewActive ? 'Switch to unified view' : 'Switch to split view';
+
   return (
     <aside
       ref={panelRef}
@@ -252,8 +360,32 @@ export const DiffPanel = forwardRef<DiffPanelHandle, DiffPanelProps>(function Di
 
       <div className="flex flex-col h-full min-w-0 sm:min-w-[400px]">
         <div className="flex items-center justify-between px-4 py-2 border-b border-separator/50">
-          <span className="text-xs text-muted font-medium">Uncommitted changes</span>
+          <select
+            aria-label="Diff scope"
+            value={diffScope}
+            onChange={(e) => setDiffScope(e.target.value as DiffScope)}
+            className="text-xs text-muted font-medium bg-transparent border-none outline-none cursor-pointer hover:text-foreground transition-colors"
+          >
+            {SCOPE_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
           <div className="flex items-center gap-1">
+            <Tooltip delay={0}>
+              <Button
+                isIconOnly
+                variant="ghost"
+                size="sm"
+                aria-label={splitLabel}
+                onPress={() => setDiffViewType(isSplitViewActive ? 'unified' : 'split')}
+                className={`text-muted hover:text-foreground hover:bg-default w-8 h-8 min-w-0 ${isSplitViewActive ? 'text-accent' : ''}`}
+              >
+                <SplitIcon className="w-3.5 h-3.5" />
+              </Button>
+              <Tooltip.Content>{splitLabel}</Tooltip.Content>
+            </Tooltip>
             <Tooltip delay={0}>
               <Button
                 isIconOnly
@@ -282,32 +414,34 @@ export const DiffPanel = forwardRef<DiffPanelHandle, DiffPanelProps>(function Di
           </div>
         </div>
 
-        <div
-          role="tablist"
-          aria-label="Change categories"
-          className="flex border-b border-separator/50"
-          onKeyDown={handleTablistKeyDown}
-        >
-          {TABS.map((tab) => (
-            <button
-              key={tab}
-              type="button"
-              role="tab"
-              aria-selected={activeTab === tab}
-              aria-controls={`diff-tabpanel-${tab}`}
-              id={`diff-tab-${tab}`}
-              tabIndex={activeTab === tab ? 0 : -1}
-              className={`flex-1 px-4 py-2 text-xs font-medium transition-colors ${
-                activeTab === tab
-                  ? 'text-foreground border-b-2 border-accent'
-                  : 'text-muted hover:text-foreground'
-              }`}
-              onClick={() => setActiveTab(tab)}
-            >
-              {tab === 'unstaged' ? 'Unstaged' : 'Staged'}
-            </button>
-          ))}
-        </div>
+        {diffScope === 'working-tree' && (
+          <div
+            role="tablist"
+            aria-label="Change categories"
+            className="flex border-b border-separator/50"
+            onKeyDown={handleTablistKeyDown}
+          >
+            {TABS.map((tab) => (
+              <button
+                key={tab}
+                type="button"
+                role="tab"
+                aria-selected={activeTab === tab}
+                aria-controls={`diff-tabpanel-${tab}`}
+                id={`diff-tab-${tab}`}
+                tabIndex={activeTab === tab ? 0 : -1}
+                className={`flex-1 px-4 py-2 text-xs font-medium transition-colors ${
+                  activeTab === tab
+                    ? 'text-foreground border-b-2 border-accent'
+                    : 'text-muted hover:text-foreground'
+                }`}
+                onClick={() => setActiveTab(tab)}
+              >
+                {tab === 'unstaged' ? 'Unstaged' : 'Staged'}
+              </button>
+            ))}
+          </div>
+        )}
 
         <div
           ref={contentRef}
@@ -323,12 +457,13 @@ export const DiffPanel = forwardRef<DiffPanelHandle, DiffPanelProps>(function Di
           <TabPanelContent
             activeTaskId={activeTaskId}
             activeTab={activeTab}
-            activeDiff={activeDiff}
-            updatedAt={diffState?.updatedAt}
-            files={files}
+            scope={diffScope}
+            diffState={diffState}
             isFileListOpen={isFileListOpen}
             onToggleFileList={() => setIsFileListOpen((v) => !v)}
             wordWrap={diffWordWrap}
+            viewType={diffViewType}
+            panelWidth={diffPanelWidth}
           />
         </div>
       </div>

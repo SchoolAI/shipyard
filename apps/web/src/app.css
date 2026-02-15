@@ -98,6 +98,52 @@ html, body {
   --field-shadow: 0 0 0 0 transparent inset;
 }
 
+/* @git-diff-view dark theme overrides -- map to Shipyard tokens */
+.dark .diff-tailwindcss-wrapper[data-theme="dark"] .diff-style-root,
+[data-theme="dark"] .diff-tailwindcss-wrapper[data-theme="dark"] .diff-style-root {
+  --diff-add-content--: var(--diff-add-bg);
+  --diff-del-content--: var(--diff-remove-bg);
+  --diff-add-lineNumber--: var(--diff-add-bg);
+  --diff-del-lineNumber--: var(--diff-remove-bg);
+  --diff-add-content-highlight--: var(--diff-add-bg);
+  --diff-del-content-highlight--: var(--diff-remove-bg);
+  --diff-plain-content--: var(--background);
+  --diff-expand-content--: var(--surface);
+  --diff-plain-lineNumber--: var(--surface);
+  --diff-expand-lineNumber--: var(--surface);
+  --diff-plain-lineNumber-color--: var(--muted);
+  --diff-expand-lineNumber-color--: var(--muted);
+  --diff-hunk-content--: var(--diff-hunk-bg);
+  --diff-hunk-lineNumber--: var(--diff-hunk-bg);
+  --diff-hunk-content-color--: var(--diff-hunk-fg);
+  --diff-empty-content--: var(--surface);
+  --diff-border--: var(--separator);
+  color: var(--foreground);
+}
+
+/* @git-diff-view light theme overrides -- map to Shipyard tokens */
+.light .diff-tailwindcss-wrapper[data-theme="light"] .diff-style-root,
+[data-theme="light"] .diff-tailwindcss-wrapper[data-theme="light"] .diff-style-root {
+  --diff-add-content--: var(--diff-add-bg);
+  --diff-del-content--: var(--diff-remove-bg);
+  --diff-add-lineNumber--: var(--diff-add-bg);
+  --diff-del-lineNumber--: var(--diff-remove-bg);
+  --diff-add-content-highlight--: var(--diff-add-bg);
+  --diff-del-content-highlight--: var(--diff-remove-bg);
+  --diff-plain-content--: var(--background);
+  --diff-expand-content--: var(--surface);
+  --diff-plain-lineNumber--: var(--surface);
+  --diff-expand-lineNumber--: var(--surface);
+  --diff-plain-lineNumber-color--: var(--muted);
+  --diff-expand-lineNumber-color--: var(--muted);
+  --diff-hunk-content--: var(--diff-hunk-bg);
+  --diff-hunk-lineNumber--: var(--diff-hunk-bg);
+  --diff-hunk-content-color--: var(--diff-hunk-fg);
+  --diff-empty-content--: var(--surface);
+  --diff-border--: var(--separator);
+  color: var(--foreground);
+}
+
 /* -- Light theme -- */
 .light,
 [data-theme="light"] {
@@ -225,6 +271,8 @@ html, body {
 
   /* Code block background */
   --color-code-block: oklch(0.12 0.02 250);
+
+  --diff-view-font-family: var(--font-mono, ui-monospace, monospace);
 
   /* Wave pulse animation for thinking indicator */
   --animate-wave-pulse: wave-pulse 1.8s ease-in-out infinite;

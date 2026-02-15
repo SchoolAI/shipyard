@@ -15,11 +15,18 @@ vi.mock('node:os', () => ({
 import { execFile } from 'node:child_process';
 import { readdir } from 'node:fs/promises';
 import {
+  captureTreeSnapshot,
   detectCapabilities,
   detectEnvironments,
   detectModels,
   findGitRepos,
+  getBranchDiff,
+  getBranchFiles,
+  getDefaultBranch,
+  getMergeBase,
   getRepoMetadata,
+  getSnapshotDiff,
+  getSnapshotFiles,
 } from './capabilities.js';
 
 const mockExecFile = vi.mocked(execFile);
@@ -320,5 +327,296 @@ describe('detectCapabilities', () => {
     expect(caps.models).toHaveLength(4);
     expect(caps.environments).toHaveLength(1);
     expect(caps.permissionModes).toEqual(['default', 'accept-edits', 'plan', 'bypass']);
+  });
+});
+
+describe('getDefaultBranch', () => {
+  it('returns symbolic-ref result when available', async () => {
+    stubExecFile({
+      'git symbolic-ref refs/remotes/origin/HEAD --short': { stdout: 'origin/main' },
+    });
+
+    const branch = await getDefaultBranch('/repo');
+
+    expect(branch).toBe('origin/main');
+  });
+
+  it('falls back to origin/main when symbolic-ref fails', async () => {
+    stubExecFile({
+      'git symbolic-ref refs/remotes/origin/HEAD --short': {
+        error: new Error('not a symbolic ref'),
+      },
+      'git rev-parse --verify origin/main': { stdout: 'abc123' },
+    });
+
+    const branch = await getDefaultBranch('/repo');
+
+    expect(branch).toBe('origin/main');
+  });
+
+  it('falls back to origin/master when origin/main does not exist', async () => {
+    stubExecFile({
+      'git symbolic-ref refs/remotes/origin/HEAD --short': {
+        error: new Error('not a symbolic ref'),
+      },
+      'git rev-parse --verify origin/main': { error: new Error('not a valid ref') },
+      'git rev-parse --verify origin/master': { stdout: 'def456' },
+    });
+
+    const branch = await getDefaultBranch('/repo');
+
+    expect(branch).toBe('origin/master');
+  });
+
+  it('returns null when all candidates fail', async () => {
+    stubExecFile({
+      'git symbolic-ref refs/remotes/origin/HEAD --short': {
+        error: new Error('not a symbolic ref'),
+      },
+      'git rev-parse --verify origin/main': { error: new Error('not a valid ref') },
+      'git rev-parse --verify origin/master': { error: new Error('not a valid ref') },
+    });
+
+    const branch = await getDefaultBranch('/repo');
+
+    expect(branch).toBeNull();
+  });
+
+  it('returns null when symbolic-ref returns empty string', async () => {
+    stubExecFile({
+      'git symbolic-ref refs/remotes/origin/HEAD --short': { stdout: '' },
+      'git rev-parse --verify origin/main': { error: new Error('not a valid ref') },
+      'git rev-parse --verify origin/master': { error: new Error('not a valid ref') },
+    });
+
+    const branch = await getDefaultBranch('/repo');
+
+    expect(branch).toBeNull();
+  });
+});
+
+describe('getMergeBase', () => {
+  it('returns the merge-base commit hash', async () => {
+    stubExecFile({
+      'git merge-base origin/main HEAD': { stdout: 'abc123def456' },
+    });
+
+    const base = await getMergeBase('/repo', 'origin/main');
+
+    expect(base).toBe('abc123def456');
+  });
+
+  it('returns null when merge-base fails', async () => {
+    stubExecFile({
+      'git merge-base origin/main HEAD': { error: new Error('no merge base') },
+    });
+
+    const base = await getMergeBase('/repo', 'origin/main');
+
+    expect(base).toBeNull();
+  });
+});
+
+describe('getBranchDiff', () => {
+  it('returns diff between merge-base and HEAD', async () => {
+    stubExecFile({
+      'git merge-base origin/main HEAD': { stdout: 'abc123' },
+      'git diff abc123..HEAD --no-color': { stdout: 'diff --git a/file.ts b/file.ts\n+added line' },
+    });
+
+    const diff = await getBranchDiff('/repo', 'origin/main');
+
+    expect(diff).toBe('diff --git a/file.ts b/file.ts\n+added line');
+  });
+
+  it('returns empty string when merge-base fails', async () => {
+    stubExecFile({
+      'git merge-base origin/main HEAD': { error: new Error('no merge base') },
+    });
+
+    const diff = await getBranchDiff('/repo', 'origin/main');
+
+    expect(diff).toBe('');
+  });
+
+  it('returns empty string when diff command fails', async () => {
+    stubExecFile({
+      'git merge-base origin/main HEAD': { stdout: 'abc123' },
+      'git diff abc123..HEAD --no-color': { error: new Error('diff failed') },
+    });
+
+    const diff = await getBranchDiff('/repo', 'origin/main');
+
+    expect(diff).toBe('');
+  });
+
+  it('truncates diff exceeding 1MB', async () => {
+    const largeDiff = 'x'.repeat(1_100_000);
+    stubExecFile({
+      'git merge-base origin/main HEAD': { stdout: 'abc123' },
+      'git diff abc123..HEAD --no-color': { stdout: largeDiff },
+    });
+
+    const diff = await getBranchDiff('/repo', 'origin/main');
+
+    expect(diff.length).toBeLessThan(largeDiff.length);
+    expect(diff).toContain('... diff truncated (exceeds 1MB) ...');
+  });
+});
+
+describe('getBranchFiles', () => {
+  it('returns files changed between merge-base and HEAD', async () => {
+    stubExecFile({
+      'git merge-base origin/main HEAD': { stdout: 'abc123' },
+      'git diff --name-status abc123..HEAD': {
+        stdout: 'M\tsrc/index.ts\nA\tsrc/new-file.ts\nD\tsrc/old-file.ts',
+      },
+    });
+
+    const files = await getBranchFiles('/repo', 'origin/main');
+
+    expect(files).toEqual([
+      { status: 'M', path: 'src/index.ts' },
+      { status: 'A', path: 'src/new-file.ts' },
+      { status: 'D', path: 'src/old-file.ts' },
+    ]);
+  });
+
+  it('returns empty array when merge-base fails', async () => {
+    stubExecFile({
+      'git merge-base origin/main HEAD': { error: new Error('no merge base') },
+    });
+
+    const files = await getBranchFiles('/repo', 'origin/main');
+
+    expect(files).toEqual([]);
+  });
+
+  it('returns empty array when diff command fails', async () => {
+    stubExecFile({
+      'git merge-base origin/main HEAD': { stdout: 'abc123' },
+      'git diff --name-status abc123..HEAD': { error: new Error('diff failed') },
+    });
+
+    const files = await getBranchFiles('/repo', 'origin/main');
+
+    expect(files).toEqual([]);
+  });
+
+  it('returns empty array when diff output is empty', async () => {
+    stubExecFile({
+      'git merge-base origin/main HEAD': { stdout: 'abc123' },
+      'git diff --name-status abc123..HEAD': { stdout: '' },
+    });
+
+    const files = await getBranchFiles('/repo', 'origin/main');
+
+    expect(files).toEqual([]);
+  });
+});
+
+describe('captureTreeSnapshot', () => {
+  it('returns stash ref when stash create produces output', async () => {
+    stubExecFile({
+      'git stash create': { stdout: 'stash-ref-abc123' },
+    });
+
+    const ref = await captureTreeSnapshot('/repo');
+
+    expect(ref).toBe('stash-ref-abc123');
+  });
+
+  it('falls back to HEAD when stash create returns empty', async () => {
+    stubExecFile({
+      'git stash create': { stdout: '' },
+      'git rev-parse HEAD': { stdout: 'head-commit-abc123' },
+    });
+
+    const ref = await captureTreeSnapshot('/repo');
+
+    expect(ref).toBe('head-commit-abc123');
+  });
+
+  it('returns null when both stash create and rev-parse fail', async () => {
+    stubExecFile({
+      'git stash create': { error: new Error('stash failed') },
+    });
+
+    const ref = await captureTreeSnapshot('/repo');
+
+    expect(ref).toBeNull();
+  });
+});
+
+describe('getSnapshotDiff', () => {
+  it('returns diff between two refs', async () => {
+    stubExecFile({
+      'git diff abc123 def456 --no-color': {
+        stdout: 'diff --git a/file.ts b/file.ts\n-old line\n+new line',
+      },
+    });
+
+    const diff = await getSnapshotDiff('/repo', 'abc123', 'def456');
+
+    expect(diff).toBe('diff --git a/file.ts b/file.ts\n-old line\n+new line');
+  });
+
+  it('returns empty string when diff fails', async () => {
+    stubExecFile({
+      'git diff abc123 def456 --no-color': { error: new Error('bad ref') },
+    });
+
+    const diff = await getSnapshotDiff('/repo', 'abc123', 'def456');
+
+    expect(diff).toBe('');
+  });
+
+  it('truncates diff exceeding 1MB', async () => {
+    const largeDiff = 'y'.repeat(1_100_000);
+    stubExecFile({
+      'git diff abc123 def456 --no-color': { stdout: largeDiff },
+    });
+
+    const diff = await getSnapshotDiff('/repo', 'abc123', 'def456');
+
+    expect(diff.length).toBeLessThan(largeDiff.length);
+    expect(diff).toContain('... diff truncated (exceeds 1MB) ...');
+  });
+});
+
+describe('getSnapshotFiles', () => {
+  it('returns files changed between two refs', async () => {
+    stubExecFile({
+      'git diff --name-status abc123 def456': {
+        stdout: 'M\tsrc/index.ts\nA\tsrc/new.ts',
+      },
+    });
+
+    const files = await getSnapshotFiles('/repo', 'abc123', 'def456');
+
+    expect(files).toEqual([
+      { status: 'M', path: 'src/index.ts' },
+      { status: 'A', path: 'src/new.ts' },
+    ]);
+  });
+
+  it('returns empty array when diff fails', async () => {
+    stubExecFile({
+      'git diff --name-status abc123 def456': { error: new Error('bad ref') },
+    });
+
+    const files = await getSnapshotFiles('/repo', 'abc123', 'def456');
+
+    expect(files).toEqual([]);
+  });
+
+  it('returns empty array when diff output is empty', async () => {
+    stubExecFile({
+      'git diff --name-status abc123 def456': { stdout: '' },
+    });
+
+    const files = await getSnapshotFiles('/repo', 'abc123', 'def456');
+
+    expect(files).toEqual([]);
   });
 });

@@ -94,6 +94,15 @@ export const DiffStateShape = Shape.struct({
   staged: Shape.plain.string(),
   files: Shape.list(DiffFileShape),
   updatedAt: Shape.plain.number(),
+
+  branchDiff: Shape.plain.string(),
+  branchFiles: Shape.list(DiffFileShape),
+  branchBase: Shape.plain.string(),
+  branchUpdatedAt: Shape.plain.number(),
+
+  lastTurnDiff: Shape.plain.string(),
+  lastTurnFiles: Shape.list(DiffFileShape),
+  lastTurnUpdatedAt: Shape.plain.number(),
 });
 
 /**
