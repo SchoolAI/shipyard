@@ -45,6 +45,7 @@ import {
   type PeerManager,
   type SDPDescription,
 } from './peer-manager.js';
+import { createPtyManager, type PtyManager } from './pty-manager.js';
 import {
   SessionManager,
   type SessionResult,
@@ -55,6 +56,58 @@ import { createSignalingHandle } from './signaling-setup.js';
 
 function assertNever(x: never): never {
   throw new Error(`Unhandled message type: ${JSON.stringify(x)}`);
+}
+
+interface TerminalDataChannel {
+  send(data: string): void;
+  close(): void;
+  readyState?: string;
+  onmessage: ((event: { data: string | ArrayBuffer }) => void) | null;
+  onclose: (() => void) | null;
+}
+
+const CONTROL_PREFIX = '\x00\x01\x00';
+const TERMINAL_BUFFER_MAX_BYTES = 1_048_576;
+const TERMINAL_OPEN_TIMEOUT_MS = 10_000;
+const TERMINAL_CWD_TIMEOUT_MS = 5_000;
+
+/**
+ * Determine the best cwd for a new terminal session by checking the most
+ * recently active task's cwd. Falls back to process.cwd().
+ */
+function resolveTerminalCwd(
+  activeTasks: Map<string, ActiveTask>,
+  watchedTasks: Map<string, () => void>,
+  repo: Repo
+): string {
+  for (const taskId of activeTasks.keys()) {
+    const epoch = DEFAULT_EPOCH;
+    const taskDocId = buildDocumentId('task', taskId, epoch);
+    try {
+      const handle = repo.get(taskDocId, TaskDocumentSchema);
+      const json = handle.doc.toJSON();
+      const lastUserMsg = [...json.conversation].reverse().find((m) => m.role === 'user');
+      if (lastUserMsg?.cwd) return lastUserMsg.cwd;
+    } catch {
+      // Skip if doc not available
+    }
+  }
+
+  for (const taskId of watchedTasks.keys()) {
+    if (activeTasks.has(taskId)) continue;
+    const epoch = DEFAULT_EPOCH;
+    const taskDocId = buildDocumentId('task', taskId, epoch);
+    try {
+      const handle = repo.get(taskDocId, TaskDocumentSchema);
+      const json = handle.doc.toJSON();
+      const lastUserMsg = [...json.conversation].reverse().find((m) => m.role === 'user');
+      if (lastUserMsg?.cwd) return lastUserMsg.cwd;
+    } catch {
+      // Skip if doc not available
+    }
+  }
+
+  return process.cwd();
 }
 
 /**
@@ -113,6 +166,8 @@ export async function serve(env: Env): Promise<void> {
     adapters: [storage, webrtcAdapter],
   });
 
+  const terminalPtys = new Map<string, PtyManager>();
+
   const peerManager = createPeerManager({
     webrtcAdapter,
     onAnswer(targetMachineId, answer) {
@@ -128,6 +183,204 @@ export async function serve(env: Env): Promise<void> {
         targetMachineId,
         candidate,
       });
+    },
+    onTerminalChannel(fromMachineId, rawChannel) {
+      // eslint-disable-next-line no-restricted-syntax -- node-datachannel channel type is opaque
+      const channel = rawChannel as TerminalDataChannel;
+      const termLog = createChildLogger({ mode: `terminal:${fromMachineId}` });
+
+      const existingPty = terminalPtys.get(fromMachineId);
+      if (existingPty) {
+        termLog.info('Disposing existing PTY for reconnecting machine');
+        existingPty.dispose();
+        terminalPtys.delete(fromMachineId);
+      }
+
+      const ptyManager = createPtyManager();
+      terminalPtys.set(fromMachineId, ptyManager);
+      let ptySpawned = false;
+
+      /**
+       * Buffer PTY output until the data channel is fully open.
+       *
+       * node-datachannel fires ondatachannel when the remote-created channel
+       * arrives, but the channel may still be in "connecting" state. Calling
+       * send() before it transitions to "open" throws InvalidStateError,
+       * which silently drops the shell prompt and any early output -- resulting
+       * in a blank xterm.js screen on the browser side.
+       */
+      let channelOpen = channel.readyState === 'open';
+      const pendingBuffer: string[] = [];
+      let pendingBufferBytes = 0;
+
+      /** Buffer user input that arrives before the PTY is spawned. */
+      const preSpawnInputBuffer: string[] = [];
+
+      function disposeAndClose(reason: string): void {
+        termLog.warn({ reason }, 'Disposing terminal');
+        clearTimeout(openTimeout);
+        clearTimeout(cwdTimeout);
+        ptyManager.dispose();
+        terminalPtys.delete(fromMachineId);
+        if (channel.readyState === 'open') {
+          channel.close();
+        }
+      }
+
+      function flushPendingBuffer(): void {
+        for (const chunk of pendingBuffer) {
+          try {
+            channel.send(chunk);
+          } catch {
+            // Channel may have closed during flush
+          }
+        }
+        pendingBuffer.length = 0;
+        pendingBufferBytes = 0;
+      }
+
+      function sendOrBuffer(data: string): void {
+        if (channelOpen) {
+          try {
+            channel.send(data);
+          } catch {
+            // Channel may have closed between check and send
+          }
+        } else {
+          const byteLen = Buffer.byteLength(data);
+          if (pendingBufferBytes + byteLen > TERMINAL_BUFFER_MAX_BYTES) {
+            disposeAndClose('Pending buffer exceeded max size');
+            return;
+          }
+          pendingBuffer.push(data);
+          pendingBufferBytes += byteLen;
+        }
+      }
+
+      /** Timeout: if channel never opens, clean up. */
+      const openTimeout = setTimeout(() => {
+        if (!channelOpen) {
+          disposeAndClose('Data channel did not open within timeout');
+        }
+      }, TERMINAL_OPEN_TIMEOUT_MS);
+
+      // eslint-disable-next-line no-restricted-syntax -- node-datachannel polyfill RTCDataChannel extends EventTarget
+      const dcAsEventTarget = rawChannel as unknown as EventTarget;
+      dcAsEventTarget.addEventListener('open', () => {
+        termLog.info('Terminal data channel now open, flushing buffered output');
+        channelOpen = true;
+        clearTimeout(openTimeout);
+        flushPendingBuffer();
+      });
+
+      /**
+       * Spawn the PTY with the given cwd, wire up data/exit handlers,
+       * and flush any pre-spawn user input.
+       */
+      function spawnPty(cwd: string): void {
+        if (ptySpawned) return;
+        ptySpawned = true;
+        clearTimeout(cwdTimeout);
+
+        try {
+          ptyManager.spawn({ cwd });
+        } catch (err: unknown) {
+          termLog.error({ err }, 'Failed to spawn terminal PTY');
+          channel.close();
+          terminalPtys.delete(fromMachineId);
+          return;
+        }
+
+        ptyManager.onData((data) => {
+          sendOrBuffer(data);
+        });
+
+        ptyManager.onExit((exitCode, signal) => {
+          termLog.info({ exitCode, signal }, 'Terminal PTY exited');
+          if (channel.readyState === 'open') {
+            channel.close();
+          }
+          terminalPtys.delete(fromMachineId);
+        });
+
+        for (const input of preSpawnInputBuffer) {
+          try {
+            ptyManager.write(input);
+          } catch {
+            // PTY may have exited
+          }
+        }
+        preSpawnInputBuffer.length = 0;
+
+        termLog.info(
+          { cwd, pid: ptyManager.pid, channelReady: channelOpen },
+          'Terminal PTY wired to data channel'
+        );
+      }
+
+      /** Timeout: if no cwd message arrives, fall back to heuristic. */
+      const cwdTimeout = setTimeout(() => {
+        if (!ptySpawned) {
+          termLog.info('No cwd control message received, falling back to heuristic');
+          const fallbackCwd = resolveTerminalCwd(activeTasks, watchedTasks, repo);
+          spawnPty(fallbackCwd);
+        }
+      }, TERMINAL_CWD_TIMEOUT_MS);
+
+      function handleControlMessage(payload: string): void {
+        try {
+          // eslint-disable-next-line no-restricted-syntax -- JSON.parse returns unknown; fields validated on next lines
+          const ctrl = JSON.parse(payload) as {
+            type: string;
+            cols?: number;
+            rows?: number;
+            path?: string;
+          };
+          if (ctrl.type === 'cwd' && typeof ctrl.path === 'string') {
+            spawnPty(ctrl.path);
+          } else if (
+            ctrl.type === 'resize' &&
+            typeof ctrl.cols === 'number' &&
+            typeof ctrl.rows === 'number' &&
+            ptySpawned
+          ) {
+            ptyManager.resize(ctrl.cols, ctrl.rows);
+          }
+        } catch {
+          termLog.warn('Invalid control message received');
+        }
+      }
+
+      function handleDataInput(raw: string): void {
+        if (!ptySpawned) {
+          preSpawnInputBuffer.push(raw);
+          return;
+        }
+        try {
+          ptyManager.write(raw);
+        } catch {
+          // PTY may have exited
+        }
+      }
+
+      channel.onmessage = (event) => {
+        const raw =
+          typeof event.data === 'string' ? event.data : new TextDecoder().decode(event.data);
+        if (raw.startsWith(CONTROL_PREFIX)) {
+          handleControlMessage(raw.slice(CONTROL_PREFIX.length));
+        } else {
+          handleDataInput(raw);
+        }
+      };
+
+      channel.onclose = () => {
+        termLog.info('Terminal data channel closed');
+        channelOpen = false;
+        clearTimeout(openTimeout);
+        clearTimeout(cwdTimeout);
+        ptyManager.dispose();
+        terminalPtys.delete(fromMachineId);
+      };
     },
   });
 
@@ -216,6 +469,11 @@ export async function serve(env: Env): Promise<void> {
       unsub();
     }
     watchedTasks.clear();
+
+    for (const [id, ptyMgr] of terminalPtys) {
+      ptyMgr.dispose();
+      terminalPtys.delete(id);
+    }
 
     peerManager.destroy();
     signaling.unregister();

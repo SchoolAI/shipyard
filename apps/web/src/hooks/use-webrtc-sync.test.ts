@@ -32,6 +32,7 @@ function createMockAdapter() {
 }
 
 let mockDataChannelListeners: Record<string, Array<() => void>>;
+let mockTerminalChannelListeners: Record<string, Array<() => void>>;
 let mockPcListeners: Record<string, Array<(event?: unknown) => void>>;
 let mockPcConnectionState: string;
 
@@ -47,10 +48,25 @@ const mockDataChannel = {
   readyState: 'connecting',
 };
 
+const mockTerminalChannel = {
+  addEventListener: vi.fn((event: string, handler: () => void) => {
+    if (!mockTerminalChannelListeners[event]) {
+      mockTerminalChannelListeners[event] = [];
+    }
+    mockTerminalChannelListeners[event].push(handler);
+  }),
+  removeEventListener: vi.fn(),
+  close: vi.fn(),
+  readyState: 'connecting',
+  binaryType: 'blob',
+};
+
 const mockOffer = { type: 'offer', sdp: 'mock-sdp' };
 
 const mockPeerConnection = {
-  createDataChannel: vi.fn(() => mockDataChannel),
+  createDataChannel: vi.fn((label: string) =>
+    label === 'terminal-io' ? mockTerminalChannel : mockDataChannel
+  ),
   createOffer: vi.fn(() => Promise.resolve(mockOffer)),
   setLocalDescription: vi.fn(() => Promise.resolve()),
   setRemoteDescription: vi.fn(() => Promise.resolve()),
@@ -106,8 +122,10 @@ describe('useWebRTCSync', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockDataChannelListeners = {};
+    mockTerminalChannelListeners = {};
     mockPcListeners = {};
     mockPcConnectionState = 'new';
+    mockTerminalChannel.binaryType = 'blob';
   });
 
   it('returns idle when no connection is provided', () => {
@@ -153,6 +171,10 @@ describe('useWebRTCSync', () => {
     expect(mockPeerConnection.createDataChannel).toHaveBeenCalledWith('loro-sync', {
       ordered: true,
     });
+    expect(mockPeerConnection.createDataChannel).toHaveBeenCalledWith('terminal-io', {
+      ordered: true,
+    });
+    expect(mockTerminalChannel.binaryType).toBe('arraybuffer');
 
     await vi.waitFor(() => {
       expect(mockConn.send).toHaveBeenCalledWith(
@@ -247,6 +269,81 @@ describe('useWebRTCSync', () => {
     expect(mockPeerConnection.addIceCandidate).toHaveBeenCalled();
   });
 
+  it('returns terminalChannel as null initially', () => {
+    const { result } = renderHook(() =>
+      useWebRTCSync({
+        connection: null,
+        webrtcAdapter: null,
+        targetMachineId: null,
+      })
+    );
+
+    expect(result.current.terminalChannel).toBeNull();
+  });
+
+  it('sets terminalChannel when terminal data channel opens', async () => {
+    const mockConn = createMockConnection();
+    const mockAdapter = createMockAdapter();
+
+    const { result } = renderHook(() =>
+      useWebRTCSync({
+        connection: mockConn as never,
+        webrtcAdapter: mockAdapter as never,
+        targetMachineId: 'machine-1',
+      })
+    );
+
+    await vi.waitFor(() => {
+      expect(mockConn.send).toHaveBeenCalled();
+    });
+
+    expect(result.current.terminalChannel).toBeNull();
+
+    act(() => {
+      const openHandlers = mockTerminalChannelListeners.open;
+      if (openHandlers) {
+        for (const handler of openHandlers) handler();
+      }
+    });
+
+    expect(result.current.terminalChannel).toBe(mockTerminalChannel);
+  });
+
+  it('clears terminalChannel when terminal data channel closes', async () => {
+    const mockConn = createMockConnection();
+    const mockAdapter = createMockAdapter();
+
+    const { result } = renderHook(() =>
+      useWebRTCSync({
+        connection: mockConn as never,
+        webrtcAdapter: mockAdapter as never,
+        targetMachineId: 'machine-1',
+      })
+    );
+
+    await vi.waitFor(() => {
+      expect(mockConn.send).toHaveBeenCalled();
+    });
+
+    act(() => {
+      const openHandlers = mockTerminalChannelListeners.open;
+      if (openHandlers) {
+        for (const handler of openHandlers) handler();
+      }
+    });
+
+    expect(result.current.terminalChannel).toBe(mockTerminalChannel);
+
+    act(() => {
+      const closeHandlers = mockTerminalChannelListeners.close;
+      if (closeHandlers) {
+        for (const handler of closeHandlers) handler();
+      }
+    });
+
+    expect(result.current.terminalChannel).toBeNull();
+  });
+
   it('cleans up on unmount', async () => {
     const mockConn = createMockConnection();
     const mockAdapter = createMockAdapter();
@@ -266,6 +363,7 @@ describe('useWebRTCSync', () => {
     unmount();
 
     expect(mockDataChannel.close).toHaveBeenCalled();
+    expect(mockTerminalChannel.close).toHaveBeenCalled();
     expect(mockPeerConnection.close).toHaveBeenCalled();
     expect(mockAdapter.detachDataChannel).toHaveBeenCalledWith('machine-1');
   });
