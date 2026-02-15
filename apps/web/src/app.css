@@ -1,6 +1,10 @@
 @import "tailwindcss";
 @import "@heroui/styles";
 
+html, body {
+  overflow: hidden;
+}
+
 /*
  * Shipyard Theme
  *
