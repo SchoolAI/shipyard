@@ -1,3 +1,5 @@
+export type { AuthStore, AuthUser } from './auth-store';
+export { useAuthStore } from './auth-store';
 export type { FrecencyStore } from './frecency-store';
 export { useFrecencyStore } from './frecency-store';
 export type { MessageStore } from './message-store';

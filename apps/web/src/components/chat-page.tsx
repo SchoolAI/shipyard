@@ -21,7 +21,7 @@ import { useTaskDocument } from '../hooks/use-task-document';
 import { useTaskIndex } from '../hooks/use-task-index';
 import { useWebRTCSync } from '../hooks/use-webrtc-sync';
 import { useRepo, useWebRtcAdapter } from '../providers/repo-provider';
-import { useMessageStore, useTaskStore, useUIStore } from '../stores';
+import { useAuthStore, useMessageStore, useTaskStore, useUIStore } from '../stores';
 import type { ChatComposerHandle, SubmitPayload } from './chat-composer';
 import { ChatComposer } from './chat-composer';
 import type { ChatMessageData } from './chat-message';
@@ -43,6 +43,14 @@ const useLoro = import.meta.env.VITE_DATA_SOURCE === 'loro';
 
 const VALID_EFFORTS: readonly string[] = REASONING_EFFORTS;
 const VALID_MODES: readonly string[] = PERMISSION_MODES;
+
+function isReasoningLevel(value: string): value is ReasoningLevel {
+  return VALID_EFFORTS.includes(value);
+}
+
+function isPermissionMode(value: string): value is PermissionMode {
+  return VALID_MODES.includes(value);
+}
 
 interface ComposerSeedTarget {
   setModel: (v: string) => void;
@@ -74,11 +82,11 @@ function seedComposerState(
   target.seededRef.current = taskId;
 
   if (config.model) target.setModel(config.model);
-  if (config.reasoningEffort && VALID_EFFORTS.includes(config.reasoningEffort)) {
-    target.setReasoning(config.reasoningEffort as ReasoningLevel);
+  if (config.reasoningEffort && isReasoningLevel(config.reasoningEffort)) {
+    target.setReasoning(config.reasoningEffort);
   }
-  if (config.permissionMode && VALID_MODES.includes(config.permissionMode)) {
-    target.setPermission(config.permissionMode as PermissionMode);
+  if (config.permissionMode && isPermissionMode(config.permissionMode)) {
+    target.setPermission(config.permissionMode);
   }
   if (config.cwd) target.setEnvironment(config.cwd);
 }
@@ -178,10 +186,18 @@ export function ChatPage() {
   const setSettingsOpen = useUIStore((s) => s.setSettingsOpen);
   const setSidebarExpanded = useUIStore((s) => s.setSidebarExpanded);
 
+  const authToken = useAuthStore((s) => s.token);
+  const authUser = useAuthStore((s) => s.user);
+
   const personalRoomConfig = useMemo(() => {
-    const url = import.meta.env.VITE_PERSONAL_ROOM_URL;
-    return typeof url === 'string' && url.length > 0 ? { url } : null;
-  }, []);
+    if (!authToken || !authUser) return null;
+    const base = import.meta.env.VITE_SESSION_SERVER_URL;
+    if (typeof base !== 'string' || base.length === 0) return null;
+    const wsBase = base.replace(/^http:/, 'ws:').replace(/^https:/, 'wss:');
+    return {
+      url: `${wsBase}/personal/${encodeURIComponent(authUser.id)}?token=${encodeURIComponent(authToken)}`,
+    };
+  }, [authToken, authUser]);
   const { agents, connectionState, connection, lastTaskAck } = usePersonalRoom(personalRoomConfig);
   const capabilitiesByMachine = useRoomCapabilities(LOCAL_USER_ID);
   const {

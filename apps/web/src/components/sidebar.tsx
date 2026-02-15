@@ -4,9 +4,10 @@ import { Menu, PanelLeftClose, PanelLeftOpen, Plus, Settings } from 'lucide-reac
 import { useCallback, useMemo } from 'react';
 import { HOTKEYS } from '../constants/hotkeys';
 import { useTaskIndex } from '../hooks/use-task-index';
-import { useTaskStore, useUIStore } from '../stores';
+import { useAuthStore, useTaskStore, useUIStore } from '../stores';
 import { statusDotColor } from '../utils/task-status';
 import { ThemeToggle } from './theme-toggle';
+import { UserMenu } from './user-menu';
 
 function relativeTime(timestamp: number): string {
   const seconds = Math.floor((Date.now() - timestamp) / 1000);
@@ -102,6 +103,7 @@ export function Sidebar() {
   const { taskIndex } = useTaskIndex(LOCAL_USER_ID);
   const activeTaskId = useTaskStore((s) => s.activeTaskId);
   const setActiveTask = useTaskStore((s) => s.setActiveTask);
+  const user = useAuthStore((s) => s.user);
   const isExpanded = useUIStore((s) => s.isSidebarExpanded);
   const toggleSidebar = useUIStore((s) => s.toggleSidebar);
   const setSidebarExpanded = useUIStore((s) => s.setSidebarExpanded);
@@ -276,57 +278,62 @@ export function Sidebar() {
             )}
           </div>
 
-          {/* Settings + Theme toggle -- pinned to bottom */}
-          <div className="mt-auto shrink-0 p-2">
-            {isExpanded ? (
+          {/* User + Settings -- pinned to bottom */}
+          {isExpanded ? (
+            <div className="mt-auto shrink-0 px-2 py-2">
               <div className="flex items-center gap-1">
-                <Tooltip>
-                  <Tooltip.Trigger>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="flex-1 justify-start text-muted hover:text-foreground gap-2"
-                      onPress={() => useUIStore.getState().setSettingsOpen(true)}
-                    >
-                      <Settings className="w-4 h-4" />
-                      Settings
-                    </Button>
-                  </Tooltip.Trigger>
-                  <Tooltip.Content>
-                    <span className="flex items-center gap-2">
-                      Settings
-                      <Kbd>{HOTKEYS.settings.display}</Kbd>
-                    </span>
-                  </Tooltip.Content>
-                </Tooltip>
-                <ThemeToggle />
+                {user && <UserMenu collapsed={false} />}
+                <div className="flex items-center gap-0.5 ml-auto shrink-0">
+                  <Tooltip>
+                    <Tooltip.Trigger>
+                      <Button
+                        isIconOnly
+                        variant="ghost"
+                        size="sm"
+                        aria-label="Settings"
+                        className="text-muted hover:text-foreground hover:bg-default/50 w-8 h-8 min-w-0"
+                        onPress={() => useUIStore.getState().setSettingsOpen(true)}
+                      >
+                        <Settings className="w-4 h-4" />
+                      </Button>
+                    </Tooltip.Trigger>
+                    <Tooltip.Content>
+                      <span className="flex items-center gap-2">
+                        Settings
+                        <Kbd>{HOTKEYS.settings.display}</Kbd>
+                      </span>
+                    </Tooltip.Content>
+                  </Tooltip>
+                  <ThemeToggle />
+                </div>
               </div>
-            ) : (
-              <div className="flex flex-col items-center gap-1">
-                <Tooltip>
-                  <Tooltip.Trigger>
-                    <Button
-                      isIconOnly
-                      variant="ghost"
-                      size="sm"
-                      aria-label="Settings"
-                      className="text-muted hover:text-foreground hover:bg-default/50 w-8 h-8 min-w-0"
-                      onPress={() => useUIStore.getState().setSettingsOpen(true)}
-                    >
-                      <Settings className="w-4 h-4" />
-                    </Button>
-                  </Tooltip.Trigger>
-                  <Tooltip.Content placement="right">
-                    <span className="flex items-center gap-2">
-                      Settings
-                      <Kbd>{HOTKEYS.settings.display}</Kbd>
-                    </span>
-                  </Tooltip.Content>
-                </Tooltip>
-                <ThemeToggle />
-              </div>
-            )}
-          </div>
+            </div>
+          ) : (
+            <div className="mt-auto shrink-0 p-2 flex flex-col items-center gap-1">
+              {user && <UserMenu collapsed />}
+              <Tooltip>
+                <Tooltip.Trigger>
+                  <Button
+                    isIconOnly
+                    variant="ghost"
+                    size="sm"
+                    aria-label="Settings"
+                    className="text-muted hover:text-foreground hover:bg-default/50 w-8 h-8 min-w-0"
+                    onPress={() => useUIStore.getState().setSettingsOpen(true)}
+                  >
+                    <Settings className="w-4 h-4" />
+                  </Button>
+                </Tooltip.Trigger>
+                <Tooltip.Content placement="right">
+                  <span className="flex items-center gap-2">
+                    Settings
+                    <Kbd>{HOTKEYS.settings.display}</Kbd>
+                  </span>
+                </Tooltip.Content>
+              </Tooltip>
+              <ThemeToggle />
+            </div>
+          )}
         </div>
       </nav>
     </>
