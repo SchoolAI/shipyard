@@ -26,7 +26,7 @@ import type { ChatComposerHandle, SubmitPayload } from './chat-composer';
 import { ChatComposer } from './chat-composer';
 import type { ChatMessageData } from './chat-message';
 import { ChatMessage } from './chat-message';
-import { CommandPalette } from './composer/command-palette';
+import { CommandPalette } from './command-palette';
 import type { ReasoningLevel } from './composer/reasoning-effort';
 import { StatusBar } from './composer/status-bar';
 import type { DiffPanelHandle } from './panels/diff-panel';

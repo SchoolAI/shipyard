@@ -1,4 +1,4 @@
-import { useFrecencyStore } from '../../../../stores/frecency-store';
+import { useFrecencyStore } from '../../../stores/frecency-store';
 import type { CommandContext, CommandItem, CommandProvider } from '../types';
 
 const MAX_RECENT = 5;

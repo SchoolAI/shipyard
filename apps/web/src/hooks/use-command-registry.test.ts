@@ -1,18 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('../components/composer/command-palette/providers/actions-provider', () => ({
+vi.mock('../components/command-palette/providers/actions-provider', () => ({
   createActionsProvider: vi.fn(() => vi.fn(() => [])),
 }));
-vi.mock('../components/composer/command-palette/providers/message-search-provider', () => ({
+vi.mock('../components/command-palette/providers/message-search-provider', () => ({
   createMessageSearchProvider: vi.fn(() => vi.fn(() => [])),
 }));
-vi.mock('../components/composer/command-palette/providers/recent-provider', () => ({
+vi.mock('../components/command-palette/providers/recent-provider', () => ({
   createRecentProvider: vi.fn(() => vi.fn(() => [])),
 }));
-vi.mock('../components/composer/command-palette/providers/task-status-provider', () => ({
+vi.mock('../components/command-palette/providers/task-status-provider', () => ({
   createTaskStatusProvider: vi.fn(() => vi.fn(() => [])),
 }));
-vi.mock('../components/composer/command-palette/providers/tasks-provider', () => ({
+vi.mock('../components/command-palette/providers/tasks-provider', () => ({
   createTasksProvider: vi.fn(() => vi.fn(() => [])),
 }));
 vi.mock('../stores/frecency-store', () => ({
@@ -33,12 +33,12 @@ vi.mock('./use-task-index', () => ({
 }));
 
 import { renderHook } from '@testing-library/react';
-import { createActionsProvider } from '../components/composer/command-palette/providers/actions-provider';
-import { createMessageSearchProvider } from '../components/composer/command-palette/providers/message-search-provider';
-import { createRecentProvider } from '../components/composer/command-palette/providers/recent-provider';
-import { createTaskStatusProvider } from '../components/composer/command-palette/providers/task-status-provider';
-import { createTasksProvider } from '../components/composer/command-palette/providers/tasks-provider';
-import type { CommandItem, CommandProvider } from '../components/composer/command-palette/types';
+import { createActionsProvider } from '../components/command-palette/providers/actions-provider';
+import { createMessageSearchProvider } from '../components/command-palette/providers/message-search-provider';
+import { createRecentProvider } from '../components/command-palette/providers/recent-provider';
+import { createTaskStatusProvider } from '../components/command-palette/providers/task-status-provider';
+import { createTasksProvider } from '../components/command-palette/providers/tasks-provider';
+import type { CommandItem, CommandProvider } from '../components/command-palette/types';
 import { useCommandRegistry } from './use-command-registry';
 
 const mockRecord = vi.fn();

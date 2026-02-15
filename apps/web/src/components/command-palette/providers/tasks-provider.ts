@@ -1,7 +1,7 @@
 import type { TaskIndexEntry } from '@shipyard/loro-schema';
-import { useTaskStore } from '../../../../stores/task-store';
-import { fuzzyScore } from '../../../../utils/fuzzy-match';
-import { statusDotColor } from '../../../../utils/task-status';
+import { useTaskStore } from '../../../stores/task-store';
+import { fuzzyScore } from '../../../utils/fuzzy-match';
+import { statusDotColor } from '../../../utils/task-status';
 import type { CommandContext, CommandItem, CommandProvider } from '../types';
 
 export function createTasksProvider(

@@ -1,7 +1,7 @@
 import type { TaskIndexEntry } from '@shipyard/loro-schema';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { useMessageStore } from '../../../../stores/message-store';
-import { useTaskStore } from '../../../../stores/task-store';
+import { useMessageStore } from '../../../stores/message-store';
+import { useTaskStore } from '../../../stores/task-store';
 import type { CommandContext } from '../types';
 import { createMessageSearchProvider } from './message-search-provider';
 

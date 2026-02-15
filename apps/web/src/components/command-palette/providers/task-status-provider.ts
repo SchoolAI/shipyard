@@ -1,7 +1,7 @@
 import type { A2ATaskState, TaskIndexEntry } from '@shipyard/loro-schema';
 import type { LucideIcon } from 'lucide-react';
 import { AlertCircle, Ban, CheckCircle2, Circle, Loader, Play } from 'lucide-react';
-import { fuzzyScore } from '../../../../utils/fuzzy-match';
+import { fuzzyScore } from '../../../utils/fuzzy-match';
 import type { CommandContext, CommandItem, CommandProvider } from '../types';
 
 interface StatusOption {

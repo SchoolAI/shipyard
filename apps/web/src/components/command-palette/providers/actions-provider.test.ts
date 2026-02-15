@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { useTaskStore } from '../../../../stores/task-store';
-import { useUIStore } from '../../../../stores/ui-store';
+import { useTaskStore } from '../../../stores/task-store';
+import { useUIStore } from '../../../stores/ui-store';
 import type { CommandContext } from '../types';
 import { createActionsProvider } from './actions-provider';
 
