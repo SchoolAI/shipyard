@@ -24,7 +24,7 @@ const MOCK_MESSAGES: Record<string, MessageData[]> = {
     {
       id: 'msg-1b',
       taskId: 'task-1',
-      role: 'agent',
+      role: 'assistant',
       content:
         "I'll create the auth service with Express, Passport.js for JWT, and Vitest for tests. Let me start by setting up the project structure.",
       createdAt: now - 3540000,
@@ -39,7 +39,7 @@ const MOCK_MESSAGES: Record<string, MessageData[]> = {
     {
       id: 'msg-1d',
       taskId: 'task-1',
-      role: 'agent',
+      role: 'assistant',
       content:
         "Good call. I'll implement refresh token rotation with a `token_family` column to detect reuse. Each refresh grants a new access + refresh pair, and reuse of an old token invalidates the entire family.",
       createdAt: now - 2940000,
@@ -56,7 +56,7 @@ const MOCK_MESSAGES: Record<string, MessageData[]> = {
     {
       id: 'msg-2b',
       taskId: 'task-2',
-      role: 'agent',
+      role: 'assistant',
       content:
         "I've reviewed the migration. Two concerns:\n\n1. The `ALTER TABLE users DROP COLUMN legacy_id` is not backwards compatible — the old app version still reads this column.\n2. The index on `email` should be `CONCURRENTLY` to avoid locking in production.\n\nWant me to suggest fixes?",
       createdAt: now - 7140000,

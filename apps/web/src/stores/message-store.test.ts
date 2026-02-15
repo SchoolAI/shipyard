@@ -18,7 +18,7 @@ describe('useMessageStore', () => {
   it('creates a message array for a new task', () => {
     useMessageStore
       .getState()
-      .addMessage('task-new', { taskId: 'task-new', role: 'agent', content: 'First message' });
+      .addMessage('task-new', { taskId: 'task-new', role: 'assistant', content: 'First message' });
     const messages = useMessageStore.getState().messagesByTask['task-new'];
     expect(messages).toBeDefined();
     expect(messages![0]!.content).toBe('First message');
