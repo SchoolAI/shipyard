@@ -45,6 +45,7 @@ Domain expertise is in skills — use subagents to keep the main context clean.
 - `deep-research` — Context saturation before implementation
 
 **Manual-only skills** (invoke with `/skill-name`):
+- `/qa` — Post-implementation review + auto-fix
 - `/wt`, `/wts`, `/wt-rm` — Git worktree management
 - `/review-pr` — PR comment triage
 - `/site-branding` — Favicons, OG images, PWA setup
@@ -85,4 +86,4 @@ For Loro, Agent SDK, A2A, and MCP work — always search local repos, never web 
 
 ---
 
-*Last updated: 2026-02-13*
+*Last updated: 2026-02-14*
