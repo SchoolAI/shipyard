@@ -1,5 +1,11 @@
 import { nanoid } from 'nanoid';
 
+/**
+ * Canonical user ID for local (single-user) mode.
+ * Used as the userId segment in room document IDs.
+ */
+export const LOCAL_USER_ID = 'local-user';
+
 declare const __brand: unique symbol;
 type Brand<T, B> = T & { readonly [__brand]: B };
 

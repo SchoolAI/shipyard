@@ -1,8 +1,8 @@
 import { Button, ListBox, Popover, ScrollShadow, Tooltip } from '@heroui/react';
-import type { GitRepoInfo } from '@shipyard/session';
 import { AlertCircle, Check, ChevronDown, Globe, Home, Search } from 'lucide-react';
 import type { Key } from 'react';
 import { useCallback, useMemo, useRef, useState } from 'react';
+import type { GitRepoInfo } from '../../hooks/use-machine-selection';
 import { fuzzyScore } from '../../utils/fuzzy-match';
 
 const HOME_KEY = '__home__';

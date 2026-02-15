@@ -1,9 +1,10 @@
 import { Button, Kbd, Tooltip } from '@heroui/react';
+import { type A2ATaskState, LOCAL_USER_ID, type TaskIndexEntry } from '@shipyard/loro-schema';
 import { Menu, PanelLeftClose, PanelLeftOpen, Plus, Settings } from 'lucide-react';
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { HOTKEYS } from '../constants/hotkeys';
+import { useTaskIndex } from '../hooks/use-task-index';
 import { useTaskStore, useUIStore } from '../stores';
-import type { TaskData } from '../stores/types';
 import { statusDotColor } from '../utils/task-status';
 import { ThemeToggle } from './theme-toggle';
 
@@ -18,9 +19,8 @@ function relativeTime(timestamp: number): string {
   return `${days}d`;
 }
 
-function statusDotTitle(agent: TaskData['agent']): string {
-  if (!agent) return 'No agent';
-  return agent.state;
+function statusLabel(status: A2ATaskState): string {
+  return status;
 }
 
 function TaskItem({
@@ -29,14 +29,13 @@ function TaskItem({
   isExpanded,
   onSelect,
 }: {
-  task: TaskData;
+  task: TaskIndexEntry;
   isActive: boolean;
   isExpanded: boolean;
   onSelect: () => void;
 }) {
-  const dotClass = statusDotColor(task.agent);
-  const dotTitle = statusDotTitle(task.agent);
-  const stateLabel = task.agent ? `, ${task.agent.state}` : '';
+  const dotClass = statusDotColor(task.status);
+  const dotTitle = statusLabel(task.status);
 
   if (!isExpanded) {
     return (
@@ -46,7 +45,7 @@ function TaskItem({
             type="button"
             role="option"
             aria-selected={isActive}
-            aria-label={`${task.title}${stateLabel}`}
+            aria-label={`${task.title}, ${task.status}`}
             className={`flex items-center justify-center w-full h-9 rounded-lg transition-colors ${
               isActive ? 'bg-default/60' : 'hover:bg-default/30'
             }`}
@@ -71,7 +70,7 @@ function TaskItem({
       type="button"
       role="option"
       aria-selected={isActive}
-      aria-label={`${task.title}${stateLabel}`}
+      aria-label={`${task.title}, ${task.status}`}
       className={`flex items-center gap-2.5 w-full px-2.5 py-2 rounded-lg text-left transition-colors ${
         isActive
           ? 'bg-default/60 text-foreground'
@@ -100,17 +99,21 @@ function EmptyState() {
 }
 
 export function Sidebar() {
-  const tasks = useTaskStore((s) => s.tasks);
+  const { taskIndex } = useTaskIndex(LOCAL_USER_ID);
   const activeTaskId = useTaskStore((s) => s.activeTaskId);
   const setActiveTask = useTaskStore((s) => s.setActiveTask);
-  const createAndActivateTask = useTaskStore((s) => s.createAndActivateTask);
   const isExpanded = useUIStore((s) => s.isSidebarExpanded);
   const toggleSidebar = useUIStore((s) => s.toggleSidebar);
   const setSidebarExpanded = useUIStore((s) => s.setSidebarExpanded);
 
+  const tasks = useMemo(
+    () => Object.values(taskIndex).sort((a, b) => b.updatedAt - a.updatedAt),
+    [taskIndex]
+  );
+
   const handleNewTask = useCallback(() => {
-    createAndActivateTask('New task');
-  }, [createAndActivateTask]);
+    setActiveTask(null);
+  }, [setActiveTask]);
 
   const handleTaskSelect = useCallback(
     (taskId: string) => {
@@ -263,11 +266,11 @@ export function Sidebar() {
             ) : (
               tasks.map((task) => (
                 <TaskItem
-                  key={task.id}
+                  key={task.taskId}
                   task={task}
-                  isActive={task.id === activeTaskId}
+                  isActive={task.taskId === activeTaskId}
                   isExpanded={isExpanded}
-                  onSelect={() => handleTaskSelect(task.id)}
+                  onSelect={() => handleTaskSelect(task.taskId)}
                 />
               ))
             )}

@@ -25,16 +25,36 @@ export type { SessionId, TaskId } from './ids.js';
 export {
   generateSessionId,
   generateTaskId,
+  LOCAL_USER_ID,
   toSessionId,
   toTaskId,
 } from './ids.js';
-
+export {
+  addTaskToIndex,
+  removeTaskFromIndex,
+  updateTaskInIndex,
+} from './room-helpers.js';
 export type {
-  A2AMessage,
-  A2APart,
+  MachineCapabilitiesEphemeralShape,
+  MachineCapabilitiesEphemeralValue,
+  MutableTaskIndexDocument,
+  TaskIndexDocument,
+  TaskIndexDocumentShape,
+  TaskIndexEntry,
+} from './room-schema.js';
+export {
+  MachineCapabilitiesEphemeral,
+  ROOM_EPHEMERAL_DECLARATIONS,
+  TaskIndexDocumentSchema,
+  TaskIndexEntryShape,
+} from './room-schema.js';
+export type {
   A2ATaskState,
+  ContentBlock,
+  ContentBlockType,
   EpochDocument,
   EpochDocumentShape,
+  Message,
   MutableEpochDocument,
   MutableTaskDocument,
   PermissionDecision,
@@ -52,10 +72,11 @@ export type {
 } from './shapes.js';
 export {
   A2A_TASK_STATES,
-  A2AMessageShape,
-  A2APartShape,
+  CONTENT_BLOCK_TYPES,
+  ContentBlockShape,
   classifyToolRisk,
   EpochDocumentSchema,
+  MessageShape,
   PERMISSION_DECISIONS,
   PERMISSION_MODES,
   PermissionRequestEphemeral,

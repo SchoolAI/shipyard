@@ -68,16 +68,16 @@ describe('createActionsProvider', () => {
     }
   });
 
-  it('New Task calls createAndActivateTask and close', () => {
+  it('New Task calls setActiveTask(null) and close', () => {
+    useTaskStore.getState().setActiveTask('some-task');
     const context: CommandContext = { activeTaskId: null, query: '' };
     const items = provider(context);
     const newTaskItem = items.find((i) => i.id === 'action:new-task');
     expect(newTaskItem).toBeDefined();
 
-    const createAndActivateTask = vi.spyOn(useTaskStore.getState(), 'createAndActivateTask');
     newTaskItem!.onSelect();
 
-    expect(createAndActivateTask).toHaveBeenCalledWith('New task');
+    expect(useTaskStore.getState().activeTaskId).toBeNull();
     expect(close).toHaveBeenCalled();
   });
 

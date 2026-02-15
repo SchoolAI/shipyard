@@ -54,103 +54,154 @@ describe('TaskDocumentSchema', () => {
     });
   });
 
-  describe('conversation (A2A messages)', () => {
+  describe('conversation (MCP-aligned messages)', () => {
     it('adds a text message', () => {
       doc.conversation.push({
         messageId: 'msg-1',
         role: 'user',
-        contextId: null,
-        taskId: taskId,
-        parts: [{ kind: 'text', text: 'Hello agent' }],
-        referenceTaskIds: [],
+        content: [{ type: 'text', text: 'Hello agent' }],
         timestamp: now,
       });
 
       const json = doc.toJSON();
       expect(json.conversation).toHaveLength(1);
       expect(json.conversation[0]?.role).toBe('user');
-      expect(json.conversation[0]?.parts[0]?.kind).toBe('text');
-      if (json.conversation[0]?.parts[0]?.kind === 'text') {
-        expect(json.conversation[0].parts[0].text).toBe('Hello agent');
+      expect(json.conversation[0]?.content[0]?.type).toBe('text');
+      if (json.conversation[0]?.content[0]?.type === 'text') {
+        expect(json.conversation[0].content[0].text).toBe('Hello agent');
       }
     });
 
-    it('adds an agent response', () => {
+    it('adds an assistant response with text', () => {
       doc.conversation.push({
         messageId: 'msg-2',
-        role: 'agent',
-        contextId: 'ctx-1',
-        taskId: taskId,
-        parts: [{ kind: 'text', text: 'Hello human' }],
-        referenceTaskIds: [],
+        role: 'assistant',
+        content: [{ type: 'text', text: 'Hello human' }],
         timestamp: now + 1000,
       });
 
       const json = doc.toJSON();
-      expect(json.conversation[0]?.role).toBe('agent');
-      expect(json.conversation[0]?.contextId).toBe('ctx-1');
+      expect(json.conversation[0]?.role).toBe('assistant');
+      expect(json.conversation[0]?.content[0]?.type).toBe('text');
     });
 
-    it('supports data parts', () => {
+    it('supports tool_use blocks', () => {
       doc.conversation.push({
         messageId: 'msg-3',
-        role: 'agent',
-        contextId: null,
-        taskId: null,
-        parts: [{ kind: 'data', data: JSON.stringify({ key: 'value' }) }],
-        referenceTaskIds: [],
-        timestamp: now,
-      });
-
-      const json = doc.toJSON();
-      const part = json.conversation[0]?.parts[0];
-      expect(part?.kind).toBe('data');
-      if (part?.kind === 'data') {
-        expect(JSON.parse(part.data)).toEqual({ key: 'value' });
-      }
-    });
-
-    it('supports file parts', () => {
-      doc.conversation.push({
-        messageId: 'msg-4',
-        role: 'agent',
-        contextId: null,
-        taskId: null,
-        parts: [
+        role: 'assistant',
+        content: [
           {
-            kind: 'file',
-            name: 'output.txt',
-            mimeType: 'text/plain',
-            uri: null,
-            bytes: 'SGVsbG8=',
+            type: 'tool_use',
+            toolUseId: 'tu-1',
+            toolName: 'Read',
+            input: JSON.stringify({ file_path: '/tmp/test.ts' }),
           },
         ],
-        referenceTaskIds: [],
         timestamp: now,
       });
 
       const json = doc.toJSON();
-      const part = json.conversation[0]?.parts[0];
-      expect(part?.kind).toBe('file');
-      if (part?.kind === 'file') {
-        expect(part.name).toBe('output.txt');
-        expect(part.bytes).toBe('SGVsbG8=');
+      const block = json.conversation[0]?.content[0];
+      expect(block?.type).toBe('tool_use');
+      if (block?.type === 'tool_use') {
+        expect(block.toolUseId).toBe('tu-1');
+        expect(block.toolName).toBe('Read');
+        expect(JSON.parse(block.input)).toEqual({ file_path: '/tmp/test.ts' });
       }
     });
 
-    it('supports reference task IDs', () => {
+    it('supports tool_result blocks', () => {
       doc.conversation.push({
-        messageId: 'msg-5',
-        role: 'agent',
-        contextId: null,
-        taskId: null,
-        parts: [{ kind: 'text', text: 'See related tasks' }],
-        referenceTaskIds: ['task-a', 'task-b'],
+        messageId: 'msg-4',
+        role: 'user',
+        content: [
+          {
+            type: 'tool_result',
+            toolUseId: 'tu-1',
+            content: 'File contents here',
+            isError: false,
+          },
+        ],
         timestamp: now,
       });
 
       const json = doc.toJSON();
-      expect(json.conversation[0]?.referenceTaskIds).toEqual(['task-a', 'task-b']);
+      const block = json.conversation[0]?.content[0];
+      expect(block?.type).toBe('tool_result');
+      if (block?.type === 'tool_result') {
+        expect(block.toolUseId).toBe('tu-1');
+        expect(block.content).toBe('File contents here');
+        expect(block.isError).toBe(false);
+      }
+    });
+
+    it('supports thinking blocks', () => {
+      doc.conversation.push({
+        messageId: 'msg-5',
+        role: 'assistant',
+        content: [
+          {
+            type: 'thinking',
+            text: 'Let me analyze this problem...',
+          },
+        ],
+        timestamp: now,
+      });
+
+      const json = doc.toJSON();
+      const block = json.conversation[0]?.content[0];
+      expect(block?.type).toBe('thinking');
+      if (block?.type === 'thinking') {
+        expect(block.text).toBe('Let me analyze this problem...');
+      }
+    });
+
+    it('supports messages with mixed content blocks', () => {
+      doc.conversation.push({
+        messageId: 'msg-6',
+        role: 'assistant',
+        content: [
+          { type: 'thinking', text: 'I should read the file first.' },
+          { type: 'text', text: 'Let me check that file for you.' },
+          {
+            type: 'tool_use',
+            toolUseId: 'tu-2',
+            toolName: 'Read',
+            input: JSON.stringify({ file_path: '/src/main.ts' }),
+          },
+        ],
+        timestamp: now,
+      });
+
+      const json = doc.toJSON();
+      expect(json.conversation[0]?.content).toHaveLength(3);
+      expect(json.conversation[0]?.content[0]?.type).toBe('thinking');
+      expect(json.conversation[0]?.content[1]?.type).toBe('text');
+      expect(json.conversation[0]?.content[2]?.type).toBe('tool_use');
+    });
+
+    it('supports tool_result with error', () => {
+      doc.conversation.push({
+        messageId: 'msg-7',
+        role: 'user',
+        content: [
+          {
+            type: 'tool_result',
+            toolUseId: 'tu-3',
+            content: 'Permission denied: /etc/shadow',
+            isError: true,
+          },
+        ],
+        timestamp: now,
+      });
+
+      const json = doc.toJSON();
+      const block = json.conversation[0]?.content[0];
+      expect(block?.type).toBe('tool_result');
+      if (block?.type === 'tool_result') {
+        expect(block.isError).toBe(true);
+        expect(block.content).toContain('Permission denied');
+      }
     });
   });
 

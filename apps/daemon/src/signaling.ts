@@ -1,4 +1,4 @@
-import type { MachineCapabilities, PersonalRoomClientMessage } from '@shipyard/session';
+import type { PersonalRoomClientMessage } from '@shipyard/session';
 import { nanoid } from 'nanoid';
 
 export interface SignalingConnection {
@@ -10,13 +10,11 @@ export interface DaemonSignalingConfig {
   machineId: string;
   machineName: string;
   agentType: string;
-  capabilities?: MachineCapabilities;
 }
 
 export interface DaemonSignaling {
   register(): void;
   updateStatus(status: 'idle' | 'running' | 'error', taskId?: string): void;
-  updateCapabilities(capabilities: MachineCapabilities): void;
   unregister(): void;
   destroy(): void;
 }
@@ -36,7 +34,6 @@ export function createDaemonSignaling(config: DaemonSignalingConfig): DaemonSign
         machineId: config.machineId,
         machineName: config.machineName,
         agentType: config.agentType,
-        ...(config.capabilities && { capabilities: config.capabilities }),
       });
     },
 
@@ -46,14 +43,6 @@ export function createDaemonSignaling(config: DaemonSignalingConfig): DaemonSign
         agentId,
         status,
         ...(taskId !== undefined && { activeTaskId: taskId }),
-      });
-    },
-
-    updateCapabilities(capabilities) {
-      send({
-        type: 'update-capabilities',
-        agentId,
-        capabilities,
       });
     },
 

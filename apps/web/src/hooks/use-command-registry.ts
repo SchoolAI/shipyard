@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo } from 'react';
+import { type A2ATaskState, LOCAL_USER_ID, updateTaskInIndex } from '@shipyard/loro-schema';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { createActionsProvider } from '../components/command-palette/providers/actions-provider';
 import { createMessageSearchProvider } from '../components/command-palette/providers/message-search-provider';
 import { createRecentProvider } from '../components/command-palette/providers/recent-provider';
@@ -7,6 +8,7 @@ import { createTasksProvider } from '../components/command-palette/providers/tas
 import type { CommandContext, CommandItem } from '../components/command-palette/types';
 import { useTaskStore, useUIStore } from '../stores';
 import { useFrecencyStore } from '../stores/frecency-store';
+import { useTaskIndex } from './use-task-index';
 
 interface GroupedItems {
   group: string;
@@ -64,13 +66,39 @@ export function useCommandRegistry(isOpen = false): CommandRegistry {
     useUIStore.getState().setCommandPaletteOpen(false);
   }, []);
 
-  const tasksProvider = useMemo(() => createTasksProvider(close), [close]);
+  const { taskIndex, doc: roomDoc } = useTaskIndex(LOCAL_USER_ID);
+
+  const taskIndexRef = useRef(taskIndex);
+  taskIndexRef.current = taskIndex;
+  const getTaskIndex = useCallback(() => taskIndexRef.current, []);
+
+  const handleUpdateStatus = useCallback(
+    (taskId: string, status: A2ATaskState) => {
+      if (!roomDoc) return;
+      updateTaskInIndex(roomDoc, taskId, {
+        status,
+        updatedAt: Date.now(),
+      });
+    },
+    [roomDoc]
+  );
+
+  const tasksProvider = useMemo(
+    () => createTasksProvider(close, getTaskIndex),
+    [close, getTaskIndex]
+  );
 
   const actionsProvider = useMemo(() => createActionsProvider(close), [close]);
 
-  const taskStatusProvider = useMemo(() => createTaskStatusProvider(close), [close]);
+  const taskStatusProvider = useMemo(
+    () => createTaskStatusProvider(close, getTaskIndex, handleUpdateStatus),
+    [close, getTaskIndex, handleUpdateStatus]
+  );
 
-  const messageSearchProvider = useMemo(() => createMessageSearchProvider(close), [close]);
+  const messageSearchProvider = useMemo(
+    () => createMessageSearchProvider(close, getTaskIndex),
+    [close, getTaskIndex]
+  );
 
   const coreProviders = useMemo(
     () => [tasksProvider, actionsProvider, taskStatusProvider, messageSearchProvider],

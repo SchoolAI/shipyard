@@ -1,9 +1,9 @@
 import { Button, Tooltip } from '@heroui/react';
 import type { PermissionMode } from '@shipyard/loro-schema';
-import type { GitRepoInfo, ModelInfo } from '@shipyard/session';
 import { ArrowUp, Mic } from 'lucide-react';
 import type { KeyboardEvent } from 'react';
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
+import type { GitRepoInfo, ModelInfo } from '../hooks/use-machine-selection';
 import type { SlashCommandAction } from '../hooks/use-slash-commands';
 import { useSlashCommands } from '../hooks/use-slash-commands';
 import { assertNever } from '../utils/assert-never';

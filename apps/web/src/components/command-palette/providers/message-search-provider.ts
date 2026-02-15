@@ -1,7 +1,8 @@
+import type { TaskIndexEntry } from '@shipyard/loro-schema';
 import { MessageSquare } from 'lucide-react';
 import { useMessageStore } from '../../../stores/message-store';
 import { useTaskStore } from '../../../stores/task-store';
-import type { MessageData, TaskData } from '../../../stores/types';
+import type { MessageData } from '../../../stores/types';
 import { fuzzyScore } from '../../../utils/fuzzy-match';
 import type { CommandContext, CommandItem, CommandProvider } from '../types';
 
@@ -29,7 +30,7 @@ function createSnippet(content: string, query: string): string {
 function matchMessage(
   message: MessageData,
   query: string,
-  task: TaskData,
+  taskTitle: string,
   taskId: string,
   close: () => void,
   setActiveTask: (id: string | null) => void
@@ -42,9 +43,9 @@ function matchMessage(
     kind: 'message',
     label: createSnippet(message.content, query),
     icon: MessageSquare,
-    keywords: [task.title, message.role],
+    keywords: [taskTitle, message.role],
     score,
-    subtitle: task.title,
+    subtitle: taskTitle,
     group: 'Messages',
     onSelect: () => {
       setActiveTask(taskId);
@@ -56,7 +57,7 @@ function matchMessage(
 function collectMatchesForTask(
   messages: MessageData[],
   query: string,
-  task: TaskData,
+  taskTitle: string,
   taskId: string,
   close: () => void,
   setActiveTask: (id: string | null) => void,
@@ -65,32 +66,35 @@ function collectMatchesForTask(
   const items: CommandItem[] = [];
   for (const message of messages) {
     if (items.length >= limit) break;
-    const item = matchMessage(message, query, task, taskId, close, setActiveTask);
+    const item = matchMessage(message, query, taskTitle, taskId, close, setActiveTask);
     if (item) items.push(item);
   }
   return items;
 }
 
-export function createMessageSearchProvider(close: () => void): CommandProvider {
+export function createMessageSearchProvider(
+  close: () => void,
+  getTaskIndex?: () => Record<string, TaskIndexEntry>
+): CommandProvider {
   return (context: CommandContext): CommandItem[] => {
     if (context.query.length < MIN_QUERY_LENGTH) return [];
 
     const messagesByTask = useMessageStore.getState().messagesByTask;
-    const { tasks, setActiveTask } = useTaskStore.getState();
-    const taskMap = new Map(tasks.map((t) => [t.id, t]));
+    const { setActiveTask } = useTaskStore.getState();
+    const taskIndex = getTaskIndex?.() ?? {};
 
     const results: CommandItem[] = [];
 
     for (const [taskId, messages] of Object.entries(messagesByTask)) {
       if (results.length >= MAX_RESULTS) break;
-      const task = taskMap.get(taskId);
-      if (!task) continue;
+      const entry = taskIndex[taskId];
+      const taskTitle = entry?.title ?? taskId;
 
       const remaining = MAX_RESULTS - results.length;
       const items = collectMatchesForTask(
         messages,
         context.query,
-        task,
+        taskTitle,
         taskId,
         close,
         setActiveTask,

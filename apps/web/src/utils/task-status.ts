@@ -1,16 +1,21 @@
-import type { TaskData } from '../stores/types';
+import type { A2ATaskState } from '@shipyard/loro-schema';
 import { assertNever } from './assert-never';
 
-export function statusDotColor(agent: TaskData['agent']): string {
-  if (!agent) return 'bg-muted/40';
-  switch (agent.state) {
-    case 'running':
+export function statusDotColor(status: A2ATaskState): string {
+  switch (status) {
+    case 'submitted':
+      return 'bg-muted/40';
+    case 'working':
       return 'bg-warning motion-safe:animate-pulse';
-    case 'idle':
+    case 'input-required':
+      return 'bg-warning';
+    case 'completed':
       return 'bg-success';
-    case 'error':
+    case 'canceled':
+      return 'bg-muted/40';
+    case 'failed':
       return 'bg-danger';
     default:
-      return assertNever(agent.state);
+      return assertNever(status);
   }
 }

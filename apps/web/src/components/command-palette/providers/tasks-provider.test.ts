@@ -1,24 +1,49 @@
+import type { TaskIndexEntry } from '@shipyard/loro-schema';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useTaskStore } from '../../../stores/task-store';
 import type { CommandContext } from '../types';
 import { createTasksProvider } from './tasks-provider';
 
+const MOCK_TASK_INDEX: Record<string, TaskIndexEntry> = {
+  'task-1': {
+    taskId: 'task-1',
+    title: 'Scaffold authentication microservice',
+    status: 'working',
+    createdAt: Date.now() - 3600000,
+    updatedAt: Date.now() - 60000,
+  },
+  'task-2': {
+    taskId: 'task-2',
+    title: 'Review PR #42 - database migration',
+    status: 'submitted',
+    createdAt: Date.now() - 7200000,
+    updatedAt: Date.now() - 1800000,
+  },
+  'task-3': {
+    taskId: 'task-3',
+    title: 'Set up CI pipeline for monorepo',
+    status: 'completed',
+    createdAt: Date.now() - 86400000,
+    updatedAt: Date.now() - 43200000,
+  },
+};
+
 describe('createTasksProvider', () => {
   const close = vi.fn();
+  const getTaskIndex = () => MOCK_TASK_INDEX;
   let provider: ReturnType<typeof createTasksProvider>;
 
   beforeEach(() => {
     vi.clearAllMocks();
     useTaskStore.setState(useTaskStore.getInitialState(), true);
-    provider = createTasksProvider(close);
+    provider = createTasksProvider(close, getTaskIndex);
   });
 
   it('returns all tasks when query is empty', () => {
     const context: CommandContext = { activeTaskId: null, query: '' };
     const items = provider(context);
-    const tasks = useTaskStore.getState().tasks;
 
-    expect(items).toHaveLength(tasks.length);
+    expect(items).toHaveLength(Object.keys(MOCK_TASK_INDEX).length);
     for (const item of items) {
       expect(item.kind).toBe('task');
       expect(item.group).toBe('Tasks');

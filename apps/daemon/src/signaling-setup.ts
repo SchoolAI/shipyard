@@ -17,6 +17,9 @@ export interface SignalingHandle {
  * PersonalRoomConnection + DaemonSignaling, and wire auto-register
  * on connect.
  *
+ * Capabilities are detected but NOT sent via signaling. They are
+ * written to Loro ephemeral on the room document in serve.ts instead.
+ *
  * Returns null when SHIPYARD_SIGNALING_URL is not configured.
  */
 export async function createSignalingHandle(
@@ -47,7 +50,6 @@ export async function createSignalingHandle(
     machineId,
     machineName,
     agentType: 'daemon',
-    capabilities,
   });
 
   connection.onStateChange((state) => {

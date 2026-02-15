@@ -1,8 +1,8 @@
 import { Button, Chip, Dropdown, Label, Tooltip } from '@heroui/react';
-import type { GitRepoInfo, AgentInfo as SignalingAgentInfo } from '@shipyard/session';
+import type { AgentInfo as SignalingAgentInfo } from '@shipyard/session';
 import { ChevronDown, GitBranch, Monitor } from 'lucide-react';
 import { useMemo } from 'react';
-import type { MachineGroup } from '../../hooks/use-machine-selection';
+import type { GitRepoInfo, MachineGroup } from '../../hooks/use-machine-selection';
 import type { ConnectionState } from '../../hooks/use-personal-room';
 import { EnvironmentPicker } from './environment-picker';
 

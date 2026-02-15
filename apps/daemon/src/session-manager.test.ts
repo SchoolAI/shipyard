@@ -249,7 +249,7 @@ describe('SessionManager', () => {
         expect(result.error).toBeUndefined();
       });
 
-      it('writes assistant text to conversation as A2A messages', async () => {
+      it('writes assistant text to conversation as messages', async () => {
         mockQuery.mockReturnValue(
           mockQueryResponse([
             initMsg('sess-1'),
@@ -263,17 +263,13 @@ describe('SessionManager', () => {
 
         const json = taskDoc.toJSON();
         expect(json.conversation).toHaveLength(2);
-        expect(json.conversation[0]?.role).toBe('agent');
-        expect(json.conversation[0]?.taskId).toBe(taskId);
-        if (json.conversation[0]?.parts[0]?.kind === 'text') {
-          expect(json.conversation[0].parts[0].text).toBe('First response');
-        }
-        if (json.conversation[1]?.parts[0]?.kind === 'text') {
-          expect(json.conversation[1].parts[0].text).toBe('Second response');
-        }
+        expect(json.conversation[0]?.role).toBe('assistant');
+        expect(json.conversation[0]?.content).toHaveLength(1);
+        expect(json.conversation[0]?.content[0]).toEqual({ type: 'text', text: 'First response' });
+        expect(json.conversation[1]?.content[0]).toEqual({ type: 'text', text: 'Second response' });
       });
 
-      it('extracts only text blocks from assistant messages (ignores tool_use)', async () => {
+      it('captures both text and tool_use blocks from assistant messages', async () => {
         mockQuery.mockReturnValue(
           mockQueryResponse([
             initMsg('sess-1'),
@@ -286,10 +282,17 @@ describe('SessionManager', () => {
 
         const json = taskDoc.toJSON();
         expect(json.conversation).toHaveLength(1);
-        expect(json.conversation[0]?.parts).toHaveLength(1);
-        if (json.conversation[0]?.parts[0]?.kind === 'text') {
-          expect(json.conversation[0].parts[0].text).toBe('Analyzing the file...');
-        }
+        expect(json.conversation[0]?.content).toHaveLength(2);
+        expect(json.conversation[0]?.content[0]).toEqual({
+          type: 'text',
+          text: 'Analyzing the file...',
+        });
+        expect(json.conversation[0]?.content[1]).toEqual({
+          type: 'tool_use',
+          toolUseId: 'tool-1',
+          toolName: 'Read',
+          input: JSON.stringify({ file_path: '/tmp/test.ts' }),
+        });
       });
 
       it('logs warning when assistant message carries an error but still processes text', async () => {
@@ -312,12 +315,13 @@ describe('SessionManager', () => {
 
         const json = taskDoc.toJSON();
         expect(json.conversation).toHaveLength(1);
-        if (json.conversation[0]?.parts[0]?.kind === 'text') {
-          expect(json.conversation[0].parts[0].text).toBe('Partial response');
-        }
+        expect(json.conversation[0]?.content[0]).toEqual({
+          type: 'text',
+          text: 'Partial response',
+        });
       });
 
-      it('skips assistant messages with only tool_use blocks (no text)', async () => {
+      it('captures tool_use-only assistant messages', async () => {
         mockQuery.mockReturnValue(
           mockQueryResponse([initMsg('sess-1'), assistantMsgToolUseOnly(), successResult()])
         );
@@ -325,7 +329,14 @@ describe('SessionManager', () => {
         await manager.createSession({ prompt: 'Hello', cwd: '/tmp' });
 
         const json = taskDoc.toJSON();
-        expect(json.conversation).toHaveLength(0);
+        expect(json.conversation).toHaveLength(1);
+        expect(json.conversation[0]?.content).toHaveLength(1);
+        expect(json.conversation[0]?.content[0]).toEqual({
+          type: 'tool_use',
+          toolUseId: 'tool-2',
+          toolName: 'Bash',
+          input: JSON.stringify({ command: 'ls' }),
+        });
       });
     });
 
@@ -605,9 +616,10 @@ describe('SessionManager', () => {
 
       const json = taskDoc.toJSON();
       expect(json.conversation).toHaveLength(1);
-      if (json.conversation[0]?.parts[0]?.kind === 'text') {
-        expect(json.conversation[0].parts[0].text).toBe('Resumed work output');
-      }
+      expect(json.conversation[0]?.content[0]).toEqual({
+        type: 'text',
+        text: 'Resumed work output',
+      });
     });
 
     it('throws for unknown sessionId', async () => {
@@ -968,94 +980,73 @@ describe('SessionManager', () => {
       taskDoc.conversation.push({
         messageId: 'msg-1',
         role: 'user',
-        contextId: null,
-        taskId,
-        parts: [{ kind: 'text', text: 'Hello world' }],
-        referenceTaskIds: [],
+        content: [{ type: 'text', text: 'Hello world' }],
         timestamp: Date.now(),
       });
 
       expect(manager.getLatestUserPrompt()).toBe('Hello world');
     });
 
-    it('concatenates multiple text parts with newlines', () => {
+    it('concatenates multiple text content blocks with newlines', () => {
       taskDoc.conversation.push({
         messageId: 'msg-multi',
         role: 'user',
-        contextId: null,
-        taskId,
-        parts: [
-          { kind: 'text', text: 'First part' },
-          { kind: 'text', text: 'Second part' },
+        content: [
+          { type: 'text', text: 'First part' },
+          { type: 'text', text: 'Second part' },
         ],
-        referenceTaskIds: [],
         timestamp: Date.now(),
       });
 
       expect(manager.getLatestUserPrompt()).toBe('First part\nSecond part');
     });
 
-    it('skips agent messages and returns the last user message', () => {
+    it('skips assistant messages and returns the last user message', () => {
       taskDoc.conversation.push({
         messageId: 'msg-user-1',
         role: 'user',
-        contextId: null,
-        taskId,
-        parts: [{ kind: 'text', text: 'First user msg' }],
-        referenceTaskIds: [],
+        content: [{ type: 'text', text: 'First user msg' }],
         timestamp: Date.now(),
       });
       taskDoc.conversation.push({
         messageId: 'msg-agent-1',
-        role: 'agent',
-        contextId: null,
-        taskId,
-        parts: [{ kind: 'text', text: 'Agent response' }],
-        referenceTaskIds: [],
+        role: 'assistant',
+        content: [{ type: 'text', text: 'Assistant response' }],
         timestamp: Date.now(),
       });
       taskDoc.conversation.push({
         messageId: 'msg-user-2',
         role: 'user',
-        contextId: null,
-        taskId,
-        parts: [{ kind: 'text', text: 'Follow-up question' }],
-        referenceTaskIds: [],
+        content: [{ type: 'text', text: 'Follow-up question' }],
         timestamp: Date.now(),
       });
 
       expect(manager.getLatestUserPrompt()).toBe('Follow-up question');
     });
 
-    it('returns null when only agent messages exist', () => {
+    it('returns null when only assistant messages exist', () => {
       taskDoc.conversation.push({
         messageId: 'msg-agent',
-        role: 'agent',
-        contextId: null,
-        taskId,
-        parts: [{ kind: 'text', text: 'Agent only' }],
-        referenceTaskIds: [],
+        role: 'assistant',
+        content: [{ type: 'text', text: 'Assistant only' }],
         timestamp: Date.now(),
       });
 
       expect(manager.getLatestUserPrompt()).toBeNull();
     });
 
-    it('ignores non-text parts (file, data)', () => {
+    it('ignores non-text content blocks (tool_use, tool_result)', () => {
       taskDoc.conversation.push({
         messageId: 'msg-mixed',
         role: 'user',
-        contextId: null,
-        taskId,
-        parts: [
-          { kind: 'file', name: 'test.txt', mimeType: 'text/plain', uri: null, bytes: null },
-          { kind: 'text', text: 'With a file' },
+        content: [
+          { type: 'tool_result', toolUseId: 'tu-1', content: 'some result', isError: false },
+          { type: 'text', text: 'With a tool result' },
         ],
-        referenceTaskIds: [],
         timestamp: Date.now(),
       });
 
-      expect(manager.getLatestUserPrompt()).toBe('With a file');
+      expect(manager.getLatestUserPrompt()).toBe('With a tool result');
     });
   });
 

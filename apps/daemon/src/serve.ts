@@ -3,7 +3,7 @@ import { homedir, hostname } from 'node:os';
 import { resolve } from 'node:path';
 import type { CanUseTool, PermissionResult } from '@anthropic-ai/claude-agent-sdk';
 import { WebRtcDataChannelAdapter } from '@loro-extended/adapter-webrtc';
-import { change } from '@loro-extended/change';
+import { change, type TypedDoc } from '@loro-extended/change';
 import type { HandleWithEphemerals } from '@loro-extended/repo';
 import { Repo } from '@loro-extended/repo';
 import {
@@ -11,10 +11,16 @@ import {
   classifyToolRisk,
   DEFAULT_EPOCH,
   EpochDocumentSchema,
+  LOCAL_USER_ID,
+  type MachineCapabilitiesEphemeralValue,
   PermissionRequestEphemeral,
   PermissionResponseEphemeral,
+  ROOM_EPHEMERAL_DECLARATIONS,
   TaskDocumentSchema,
   type TaskDocumentShape,
+  TaskIndexDocumentSchema,
+  type TaskIndexDocumentShape,
+  updateTaskInIndex,
 } from '@shipyard/loro-schema';
 import type { PersonalRoomServerMessage } from '@shipyard/session';
 import { createBranchWatcher } from './branch-watcher.js';
@@ -28,7 +34,11 @@ import {
   type PeerManager,
   type SDPDescription,
 } from './peer-manager.js';
-import { SessionManager, type SessionResult } from './session-manager.js';
+import {
+  SessionManager,
+  type SessionResult,
+  type StatusChangeCallback,
+} from './session-manager.js';
 import type { DaemonSignaling } from './signaling.js';
 import { createSignalingHandle } from './signaling-setup.js';
 
@@ -110,11 +120,43 @@ export async function serve(env: Env): Promise<void> {
     },
   });
 
+  /**
+   * Write machine capabilities to the room document's ephemeral namespace.
+   * The browser reads these to populate model/environment/permission pickers.
+   * Keyed by machineId so each machine's capabilities are addressable.
+   */
+  const roomDocId = buildDocumentId('room', LOCAL_USER_ID, DEFAULT_EPOCH);
+  // eslint-disable-next-line no-restricted-syntax -- loro-extended generics require explicit cast
+  const roomHandle = repo.get(
+    roomDocId,
+    TaskIndexDocumentSchema as never,
+    ROOM_EPHEMERAL_DECLARATIONS
+  );
+
+  function publishCapabilities(caps: typeof capabilities): void {
+    const value: MachineCapabilitiesEphemeralValue = {
+      models: caps.models.map((m) => ({
+        ...m,
+        reasoning: m.reasoning ?? null,
+      })),
+      environments: caps.environments.map((e) => ({
+        ...e,
+        remote: e.remote ?? null,
+      })),
+      permissionModes: caps.permissionModes,
+      homeDir: caps.homeDir ?? null,
+    };
+    roomHandle.capabilities.set(machineId, value);
+    log.info({ machineId }, 'Published capabilities to room ephemeral');
+  }
+
+  publishCapabilities(capabilities);
+
   const branchWatcher = createBranchWatcher({
     environments: capabilities.environments,
     onUpdate: (updatedEnvs) => {
       capabilities.environments = updatedEnvs;
-      signaling.updateCapabilities({ ...capabilities });
+      publishCapabilities(capabilities);
     },
   });
 
@@ -128,6 +170,7 @@ export async function serve(env: Env): Promise<void> {
       signaling,
       connection,
       repo,
+      roomDoc: roomHandle.doc as TypedDoc<TaskIndexDocumentShape>,
       lifecycle,
       activeTasks,
       watchedTasks,
@@ -172,6 +215,7 @@ interface MessageHandlerContext {
   signaling: DaemonSignaling;
   connection: { send: (msg: import('@shipyard/session').PersonalRoomClientMessage) => void };
   repo: Repo;
+  roomDoc: TypedDoc<TaskIndexDocumentShape>;
   lifecycle: LifecycleManager;
   activeTasks: Map<string, ActiveTask>;
   watchedTasks: Map<string, () => void>;
@@ -230,7 +274,6 @@ function handleMessage(msg: PersonalRoomServerMessage, ctx: MessageHandlerContex
     case 'agent-joined':
     case 'agent-left':
     case 'agent-status-changed':
-    case 'agent-capabilities-changed':
     case 'error':
       ctx.log.debug({ type: msg.type }, 'Server notification');
       break;
@@ -313,6 +356,10 @@ async function watchTaskDocument(
   taskLog: ReturnType<typeof createChildLogger>,
   ctx: MessageHandlerContext
 ): Promise<void> {
+  // TODO: latent epoch mismatch -- browser uses DEFAULT_EPOCH for task doc IDs
+  // while daemon uses loadEpoch(). Both resolve to DEFAULT_EPOCH today, but if
+  // the epoch document ever advances, they will diverge. Fix by sharing epoch
+  // discovery or always using DEFAULT_EPOCH for task docs too.
   const epoch = await loadEpoch(ctx.repo);
   const taskDocId = buildDocumentId('task', taskId, epoch);
   taskLog.info({ taskDocId, epoch }, 'Watching task document');
@@ -416,6 +463,7 @@ function onTaskDocChanged(
   runTask({
     taskHandle,
     taskId,
+    roomDoc: ctx.roomDoc,
     cwd,
     model,
     permissionMode,
@@ -514,7 +562,9 @@ async function loadEpoch(repo: Repo): Promise<number> {
  */
 function buildCanUseTool(
   taskHandle: TaskHandle,
-  taskLog: ReturnType<typeof createChildLogger>
+  taskLog: ReturnType<typeof createChildLogger>,
+  roomDoc: TypedDoc<TaskIndexDocumentShape>,
+  taskId: string
 ): CanUseTool {
   return async (toolName, input, options) => {
     const { signal, toolUseID, blockedPath, decisionReason, agentID, suggestions } = options;
@@ -540,6 +590,7 @@ function buildCanUseTool(
       draft.meta.status = 'input-required';
       draft.meta.updatedAt = Date.now();
     });
+    updateTaskInIndex(roomDoc, taskId, { status: 'input-required', updatedAt: Date.now() });
 
     taskLog.info(
       {
@@ -578,6 +629,7 @@ function buildCanUseTool(
           draft.meta.status = 'working';
           draft.meta.updatedAt = Date.now();
         });
+        updateTaskInIndex(roomDoc, taskId, { status: 'working', updatedAt: Date.now() });
 
         taskLog.info(
           {
@@ -609,6 +661,7 @@ function buildCanUseTool(
 interface RunTaskOptions {
   taskHandle: TaskHandle;
   taskId: string;
+  roomDoc: TypedDoc<TaskIndexDocumentShape>;
   cwd: string;
   model?: string;
   permissionMode?: 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan';
@@ -622,6 +675,7 @@ async function runTask(opts: RunTaskOptions): Promise<SessionResult> {
   const {
     taskHandle,
     taskId,
+    roomDoc,
     cwd,
     model,
     permissionMode,
@@ -631,7 +685,10 @@ async function runTask(opts: RunTaskOptions): Promise<SessionResult> {
     log,
   } = opts;
 
-  const manager = new SessionManager(taskHandle.doc);
+  const onStatusChange: StatusChangeCallback = (status) => {
+    updateTaskInIndex(roomDoc, taskId, { status, updatedAt: Date.now() });
+  };
+  const manager = new SessionManager(taskHandle.doc, onStatusChange);
   const prompt = manager.getLatestUserPrompt();
   if (!prompt) {
     throw new Error(`No user message found in task ${taskId}`);
@@ -640,7 +697,9 @@ async function runTask(opts: RunTaskOptions): Promise<SessionResult> {
   log.info({ prompt: prompt.slice(0, 100) }, 'Running task with prompt from CRDT');
 
   const canUseTool =
-    permissionMode === 'bypassPermissions' ? undefined : buildCanUseTool(taskHandle, log);
+    permissionMode === 'bypassPermissions'
+      ? undefined
+      : buildCanUseTool(taskHandle, log, roomDoc, taskId);
 
   const resumeInfo = manager.shouldResume();
   if (resumeInfo.resume && resumeInfo.sessionId) {

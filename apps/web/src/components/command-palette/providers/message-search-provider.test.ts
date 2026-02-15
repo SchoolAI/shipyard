@@ -1,18 +1,37 @@
+import type { TaskIndexEntry } from '@shipyard/loro-schema';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useMessageStore } from '../../../stores/message-store';
 import { useTaskStore } from '../../../stores/task-store';
 import type { CommandContext } from '../types';
 import { createMessageSearchProvider } from './message-search-provider';
 
+const MOCK_TASK_INDEX: Record<string, TaskIndexEntry> = {
+  'task-1': {
+    taskId: 'task-1',
+    title: 'Scaffold authentication microservice',
+    status: 'working',
+    createdAt: Date.now() - 3600000,
+    updatedAt: Date.now() - 60000,
+  },
+  'task-2': {
+    taskId: 'task-2',
+    title: 'Review PR #42 - database migration',
+    status: 'submitted',
+    createdAt: Date.now() - 7200000,
+    updatedAt: Date.now() - 1800000,
+  },
+};
+
 describe('createMessageSearchProvider', () => {
   const close = vi.fn();
+  const getTaskIndex = () => MOCK_TASK_INDEX;
   let provider: ReturnType<typeof createMessageSearchProvider>;
 
   beforeEach(() => {
     vi.clearAllMocks();
     useTaskStore.setState(useTaskStore.getInitialState(), true);
     useMessageStore.setState(useMessageStore.getInitialState(), true);
-    provider = createMessageSearchProvider(close);
+    provider = createMessageSearchProvider(close, getTaskIndex);
   });
 
   it('returns nothing when query is empty', () => {

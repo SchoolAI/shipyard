@@ -1,5 +1,4 @@
 import type { PermissionMode } from '@shipyard/loro-schema';
-import type { GitRepoInfo } from '@shipyard/session';
 import type { LucideIcon } from 'lucide-react';
 import {
   Brain,
@@ -16,6 +15,7 @@ import type { KeyboardEvent } from 'react';
 import { useCallback, useMemo, useState } from 'react';
 import type { ReasoningLevel } from '../components/composer/reasoning-effort';
 import { fuzzyScore } from '../utils/fuzzy-match';
+import type { GitRepoInfo } from './use-machine-selection';
 
 export type SlashCommandAction =
   | { kind: 'setPermissionMode'; mode: PermissionMode }

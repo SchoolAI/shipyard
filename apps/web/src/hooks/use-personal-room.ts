@@ -56,13 +56,6 @@ export function usePersonalRoom(config: PersonalRoomConfig | null) {
             )
           );
           break;
-        case 'agent-capabilities-changed':
-          setAgents((prev) =>
-            prev.map((a) =>
-              a.agentId === msg.agentId ? { ...a, capabilities: msg.capabilities } : a
-            )
-          );
-          break;
         case 'error':
           break;
         case 'task-ack':

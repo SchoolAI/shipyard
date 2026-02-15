@@ -1,28 +1,33 @@
+import type { TaskIndexEntry } from '@shipyard/loro-schema';
 import { useTaskStore } from '../../../stores/task-store';
 import { fuzzyScore } from '../../../utils/fuzzy-match';
 import { statusDotColor } from '../../../utils/task-status';
 import type { CommandContext, CommandItem, CommandProvider } from '../types';
 
-export function createTasksProvider(close: () => void): CommandProvider {
+export function createTasksProvider(
+  close: () => void,
+  getTaskIndex: () => Record<string, TaskIndexEntry>
+): CommandProvider {
   return (context: CommandContext): CommandItem[] => {
-    const { tasks, setActiveTask } = useTaskStore.getState();
+    const { setActiveTask } = useTaskStore.getState();
+    const taskIndex = getTaskIndex();
 
-    return tasks
-      .map((task) => {
-        const score = context.query ? fuzzyScore(context.query, task.title) : 0;
+    return Object.values(taskIndex)
+      .map((entry) => {
+        const score = context.query ? fuzzyScore(context.query, entry.title) : 0;
 
         if (context.query && score < 0) return null;
 
         const item: CommandItem = {
-          id: `task:${task.id}`,
+          id: `task:${entry.taskId}`,
           kind: 'task',
-          label: task.title,
-          keywords: [task.status, task.id],
+          label: entry.title,
+          keywords: [entry.status, entry.taskId],
           score,
-          statusColor: statusDotColor(task.agent),
+          statusColor: statusDotColor(entry.status),
           group: 'Tasks',
           onSelect: () => {
-            setActiveTask(task.id);
+            setActiveTask(entry.taskId);
             close();
           },
         };

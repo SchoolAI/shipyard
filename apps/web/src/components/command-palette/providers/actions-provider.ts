@@ -22,7 +22,7 @@ const ACTIONS: ActionDef[] = [
     keywords: ['create', 'add', 'task'],
     shortcut: HOTKEYS.newTask.display,
     onSelect: (close) => {
-      useTaskStore.getState().createAndActivateTask('New task');
+      useTaskStore.getState().setActiveTask(null);
       close();
     },
   },

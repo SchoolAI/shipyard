@@ -8,7 +8,12 @@ import type {
 import { query } from '@anthropic-ai/claude-agent-sdk';
 import type { TypedDoc } from '@loro-extended/change';
 import { change } from '@loro-extended/change';
-import type { A2AMessage, SessionState, TaskDocumentShape } from '@shipyard/loro-schema';
+import type {
+  A2ATaskState,
+  ContentBlock,
+  SessionState,
+  TaskDocumentShape,
+} from '@shipyard/loro-schema';
 import { nanoid } from 'nanoid';
 import { logger } from './logger.js';
 
@@ -19,6 +24,47 @@ You are running inside Shipyard, a collaborative workspace with a built-in permi
 
 CRITICAL: Never ask the user conversationally for permission to perform an action. Always attempt the tool call directly. The permission system will prompt the user for approval automatically when needed. If a tool call is denied, you will receive the denial as a tool result — do not preemptively refuse or ask "should I proceed?" for file operations, bash commands, or any other tool use. Just call the tool.
 `;
+
+function parseToolResultBlock(block: Record<string, unknown>): ContentBlock | null {
+  if (typeof block.tool_use_id !== 'string') return null;
+  const resultContent =
+    typeof block.content === 'string' ? block.content : JSON.stringify(block.content ?? '');
+  return {
+    type: 'tool_result',
+    toolUseId: block.tool_use_id,
+    content: resultContent,
+    isError: typeof block.is_error === 'boolean' ? block.is_error : false,
+  };
+}
+
+function parseToolUseBlock(block: Record<string, unknown>): ContentBlock | null {
+  if (typeof block.id !== 'string' || typeof block.name !== 'string') return null;
+  return {
+    type: 'tool_use',
+    toolUseId: block.id,
+    toolName: block.name,
+    input: JSON.stringify(block.input ?? {}),
+  };
+}
+
+/**
+ * Parse a single SDK content block (untyped record) into a typed ContentBlock.
+ * Returns null for unrecognized or invalid block types (server_tool_use, redacted_thinking, etc.)
+ */
+function parseSdkBlock(block: Record<string, unknown>): ContentBlock | null {
+  switch (block.type) {
+    case 'text':
+      return typeof block.text === 'string' ? { type: 'text', text: block.text } : null;
+    case 'tool_use':
+      return parseToolUseBlock(block);
+    case 'tool_result':
+      return parseToolResultBlock(block);
+    case 'thinking':
+      return typeof block.thinking === 'string' ? { type: 'thinking', text: block.thinking } : null;
+    default:
+      return null;
+  }
+}
 
 export interface CreateSessionOptions {
   prompt: string;
@@ -53,11 +99,19 @@ export interface SessionResult {
  * Session lifecycle: pending -> active -> completed | failed
  * Task status mirrors: submitted -> working -> completed | failed
  */
+export type StatusChangeCallback = (status: A2ATaskState) => void;
+
 export class SessionManager {
   readonly #taskDoc: TypedDoc<TaskDocumentShape>;
+  readonly #onStatusChange: StatusChangeCallback | undefined;
 
-  constructor(taskDoc: TypedDoc<TaskDocumentShape>) {
+  constructor(taskDoc: TypedDoc<TaskDocumentShape>, onStatusChange?: StatusChangeCallback) {
     this.#taskDoc = taskDoc;
+    this.#onStatusChange = onStatusChange;
+  }
+
+  #notifyStatusChange(status: A2ATaskState): void {
+    this.#onStatusChange?.(status);
   }
 
   /**
@@ -72,9 +126,9 @@ export class SessionManager {
     for (let i = conversation.length - 1; i >= 0; i--) {
       const msg = conversation[i];
       if (msg?.role === 'user') {
-        return msg.parts
-          .filter((p): p is { kind: 'text'; text: string } => p.kind === 'text')
-          .map((p) => p.text)
+        return msg.content
+          .filter((block): block is ContentBlock & { type: 'text' } => block.type === 'text')
+          .map((block) => block.text)
           .join('\n');
       }
     }
@@ -130,6 +184,7 @@ export class SessionManager {
       draft.meta.status = 'working';
       draft.meta.updatedAt = now;
     });
+    this.#notifyStatusChange('working');
 
     const response: Query = query({
       prompt: opts.prompt,
@@ -204,6 +259,7 @@ export class SessionManager {
       draft.meta.status = 'working';
       draft.meta.updatedAt = now;
     });
+    this.#notifyStatusChange('working');
 
     const response: Query = query({
       prompt,
@@ -311,36 +367,26 @@ export class SessionManager {
   }
 
   #appendAssistantMessage(message: SDKMessage & { type: 'assistant' }): void {
-    const content = message.message.content;
-    if (!Array.isArray(content)) return;
+    const rawContent = message.message.content;
+    if (!Array.isArray(rawContent)) return;
 
-    interface TextBlock {
-      type: 'text';
-      text: string;
+    // eslint-disable-next-line no-restricted-syntax -- SDK content blocks typed as unknown[], need narrowing
+    const sdkBlocks = rawContent as Array<Record<string, unknown>>;
+    const contentBlocks: ContentBlock[] = [];
+    for (const block of sdkBlocks) {
+      const parsed = parseSdkBlock(block);
+      if (parsed) contentBlocks.push(parsed);
     }
-    // eslint-disable-next-line no-restricted-syntax -- SDK content blocks typed as unknown[], need narrowing for text extraction
-    const textParts = (content as Array<{ type: string; text?: string }>)
-      .filter(
-        (block): block is TextBlock => block.type === 'text' && typeof block.text === 'string'
-      )
-      .map((block) => block.text);
 
-    if (textParts.length === 0) return;
-
-    const taskId = this.#taskDoc.toJSON().meta.id;
-
-    const a2aMessage: A2AMessage = {
-      messageId: nanoid(),
-      role: 'agent',
-      contextId: null,
-      taskId,
-      parts: textParts.map((text) => ({ kind: 'text' as const, text })),
-      referenceTaskIds: [],
-      timestamp: Date.now(),
-    };
+    if (contentBlocks.length === 0) return;
 
     change(this.#taskDoc, (draft) => {
-      draft.conversation.push(a2aMessage);
+      draft.conversation.push({
+        messageId: nanoid(),
+        role: 'assistant',
+        content: contentBlocks,
+        timestamp: Date.now(),
+      });
       draft.meta.updatedAt = Date.now();
     });
   }
@@ -362,6 +408,7 @@ export class SessionManager {
         : null;
 
     const idx = this.#findSessionIndex(sessionId);
+    const taskStatus: A2ATaskState = isSuccess ? 'completed' : 'failed';
     change(this.#taskDoc, (draft) => {
       const session = idx >= 0 ? draft.sessions.get(idx) : undefined;
       if (session) {
@@ -373,9 +420,10 @@ export class SessionManager {
           session.error = errorText ?? `Agent SDK error: ${message.subtype}`;
         }
       }
-      draft.meta.status = isSuccess ? 'completed' : 'failed';
+      draft.meta.status = taskStatus;
       draft.meta.updatedAt = completedAt;
     });
+    this.#notifyStatusChange(taskStatus);
 
     const resultText =
       'result' in message && typeof message.result === 'string' ? message.result : undefined;
@@ -403,5 +451,6 @@ export class SessionManager {
       draft.meta.status = 'failed';
       draft.meta.updatedAt = Date.now();
     });
+    this.#notifyStatusChange('failed');
   }
 }

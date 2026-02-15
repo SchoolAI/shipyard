@@ -264,9 +264,6 @@ export class PersonalRoom extends DurableObject<Env> {
       case 'task-ack':
         this.handleTaskAck(ws, state, msg);
         break;
-      case 'update-capabilities':
-        await this.handleUpdateCapabilities(ws, state, msg);
-        break;
       default:
         assertNever(msg);
     }
@@ -305,7 +302,6 @@ export class PersonalRoom extends DurableObject<Env> {
       machineName: msg.machineName,
       agentType: msg.agentType,
       status: 'idle',
-      ...(msg.capabilities && { capabilities: msg.capabilities }),
       registeredAt: isReregistration ? (this.agents[msg.agentId]?.registeredAt ?? now) : now,
       lastSeenAt: now,
     };
@@ -399,41 +395,6 @@ export class PersonalRoom extends DurableObject<Env> {
     this.logger.debug('Agent status updated', {
       agentId: msg.agentId,
       status: msg.status,
-    });
-  }
-
-  private async handleUpdateCapabilities(
-    ws: WebSocket,
-    state: ConnectionState,
-    msg: Extract<PersonalRoomClientMessage, { type: 'update-capabilities' }>
-  ): Promise<void> {
-    if (state.agentId !== msg.agentId) {
-      this.sendError(ws, 'forbidden', 'Cannot update capabilities for another agent');
-      return;
-    }
-
-    const agent = this.agents[msg.agentId];
-    if (!agent) {
-      this.sendError(ws, 'not_found', `Agent ${msg.agentId} not found`);
-      return;
-    }
-
-    agent.capabilities = msg.capabilities;
-    agent.lastSeenAt = Date.now();
-    await this.ctx.storage.put('agents', this.agents);
-
-    broadcastExcept(
-      this.connections,
-      {
-        type: 'agent-capabilities-changed',
-        agentId: msg.agentId,
-        capabilities: msg.capabilities,
-      } satisfies PersonalRoomServerMessage,
-      ws
-    );
-
-    this.logger.debug('Agent capabilities updated', {
-      agentId: msg.agentId,
     });
   }
 

@@ -1,6 +1,8 @@
 import { Button, Kbd, Tooltip } from '@heroui/react';
+import { LOCAL_USER_ID } from '@shipyard/loro-schema';
 import { Diff, Terminal } from 'lucide-react';
 import { HOTKEYS } from '../constants/hotkeys';
+import { useTaskIndex } from '../hooks/use-task-index';
 import { useTaskStore } from '../stores';
 import { MobileSidebarToggle } from './sidebar';
 
@@ -11,15 +13,15 @@ interface TopBarProps {
 
 export function TopBar({ onToggleTerminal, onToggleDiff }: TopBarProps) {
   const activeTaskId = useTaskStore((s) => s.activeTaskId);
-  const tasks = useTaskStore((s) => s.tasks);
-  const activeTask = activeTaskId ? tasks.find((t) => t.id === activeTaskId) : undefined;
+  const { taskIndex } = useTaskIndex(LOCAL_USER_ID);
+  const activeEntry = activeTaskId ? taskIndex[activeTaskId] : undefined;
 
   return (
     <header className="flex items-center justify-between px-4 py-2 border-b border-separator/50 h-12">
       <div className="flex items-center gap-2 min-w-0">
         <MobileSidebarToggle />
-        {activeTask ? (
-          <h1 className="text-sm text-foreground font-medium truncate">{activeTask.title}</h1>
+        {activeEntry ? (
+          <h1 className="text-sm text-foreground font-medium truncate">{activeEntry.title}</h1>
         ) : (
           <span className="text-sm text-muted truncate">Shipyard</span>
         )}

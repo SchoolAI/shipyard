@@ -1,7 +1,7 @@
 import { Button, Description, Dropdown, Label } from '@heroui/react';
-import type { ModelInfo, ReasoningCapability } from '@shipyard/session';
 import { ChevronDown } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import type { ModelInfo, ReasoningCapability } from '../../hooks/use-machine-selection';
 
 export interface ModelConfig {
   id: string;
@@ -81,7 +81,7 @@ function mapModels(availableModels?: ModelInfo[]): ModelConfig[] {
       id: m.id,
       label: m.label,
       description: m.provider,
-      reasoning: m.reasoning,
+      reasoning: m.reasoning ?? undefined,
     }));
   }
   return FALLBACK_MODELS;

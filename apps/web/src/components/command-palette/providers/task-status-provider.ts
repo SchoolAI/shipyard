@@ -1,12 +1,11 @@
+import type { A2ATaskState, TaskIndexEntry } from '@shipyard/loro-schema';
 import type { LucideIcon } from 'lucide-react';
-import { AlertCircle, CheckCircle2, Circle, Play } from 'lucide-react';
-import { useTaskStore } from '../../../stores/task-store';
-import type { TaskStatus } from '../../../stores/types';
+import { AlertCircle, Ban, CheckCircle2, Circle, Loader, Play } from 'lucide-react';
 import { fuzzyScore } from '../../../utils/fuzzy-match';
 import type { CommandContext, CommandItem, CommandProvider } from '../types';
 
 interface StatusOption {
-  status: TaskStatus;
+  status: A2ATaskState;
   label: string;
   icon: LucideIcon;
   statusColor: string;
@@ -15,18 +14,25 @@ interface StatusOption {
 
 const STATUS_OPTIONS: StatusOption[] = [
   {
-    status: 'pending',
-    label: 'Set Pending',
+    status: 'submitted',
+    label: 'Set Submitted',
     icon: Circle,
     statusColor: 'bg-muted/40',
-    keywords: ['pending', 'wait', 'queue'],
+    keywords: ['submitted', 'new', 'queue'],
   },
   {
-    status: 'active',
-    label: 'Set Active',
+    status: 'working',
+    label: 'Set Working',
     icon: Play,
     statusColor: 'bg-warning',
-    keywords: ['active', 'start', 'run'],
+    keywords: ['working', 'active', 'run'],
+  },
+  {
+    status: 'input-required',
+    label: 'Set Input Required',
+    icon: Loader,
+    statusColor: 'bg-warning',
+    keywords: ['input', 'waiting', 'blocked'],
   },
   {
     status: 'completed',
@@ -36,23 +42,50 @@ const STATUS_OPTIONS: StatusOption[] = [
     keywords: ['completed', 'done', 'finish'],
   },
   {
-    status: 'error',
-    label: 'Set Error',
+    status: 'canceled',
+    label: 'Set Canceled',
+    icon: Ban,
+    statusColor: 'bg-muted/40',
+    keywords: ['canceled', 'cancel', 'stop'],
+  },
+  {
+    status: 'failed',
+    label: 'Set Failed',
     icon: AlertCircle,
     statusColor: 'bg-danger',
-    keywords: ['error', 'fail', 'broken'],
+    keywords: ['failed', 'error', 'broken'],
   },
 ];
 
-export function createTaskStatusProvider(close: () => void): CommandProvider {
+const VALID_TRANSITIONS: Record<A2ATaskState, readonly A2ATaskState[]> = {
+  submitted: ['canceled'],
+  working: ['canceled'],
+  'input-required': ['canceled'],
+  completed: [],
+  canceled: [],
+  failed: ['submitted'],
+};
+
+export function getValidTransitions(currentStatus: A2ATaskState): readonly A2ATaskState[] {
+  return VALID_TRANSITIONS[currentStatus] ?? [];
+}
+
+export function createTaskStatusProvider(
+  close: () => void,
+  getTaskIndex: () => Record<string, TaskIndexEntry>,
+  onUpdateStatus: (taskId: string, status: A2ATaskState) => void
+): CommandProvider {
   return (context: CommandContext): CommandItem[] => {
-    if (!context.activeTaskId) return [];
+    const { activeTaskId } = context;
+    if (!activeTaskId) return [];
 
-    const { tasks, updateTask } = useTaskStore.getState();
-    const activeTask = tasks.find((t) => t.id === context.activeTaskId);
-    if (!activeTask) return [];
+    const taskIndex = getTaskIndex();
+    const activeEntry = taskIndex[activeTaskId];
+    if (!activeEntry) return [];
 
-    return STATUS_OPTIONS.filter((option) => option.status !== activeTask.status)
+    const allowed = getValidTransitions(activeEntry.status);
+
+    return STATUS_OPTIONS.filter((option) => allowed.includes(option.status))
       .map((option) => {
         const score = context.query ? fuzzyScore(context.query, option.label) : 0;
 
@@ -69,10 +102,10 @@ export function createTaskStatusProvider(close: () => void): CommandProvider {
           keywords: option.keywords,
           score: Math.max(score, 0),
           statusColor: option.statusColor,
-          subtitle: `Change "${activeTask.title}" to ${option.status}`,
+          subtitle: `Change "${activeEntry.title}" to ${option.status}`,
           group: 'Change Status',
           onSelect: () => {
-            updateTask(activeTask.id, { status: option.status });
+            onUpdateStatus(activeTaskId, option.status);
             close();
           },
         };

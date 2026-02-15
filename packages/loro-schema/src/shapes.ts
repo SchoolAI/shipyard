@@ -12,38 +12,46 @@ export const EpochDocumentSchema = Shape.doc({
 });
 
 /**
- * A2A Part discriminated union (per A2A protocol spec).
- * Discriminated by 'kind': text, file, or data.
+ * MCP-aligned content block types.
+ * Matches Claude SDK message structure for direct mapping without translation.
  */
-export const A2APartShape = Shape.plain.discriminatedUnion('kind', {
+const CONTENT_BLOCK_TYPES = ['text', 'tool_use', 'tool_result', 'thinking'] as const;
+
+/**
+ * Content block discriminated union (MCP-aligned).
+ * Discriminated by 'type': text, tool_use, tool_result, or thinking.
+ */
+export const ContentBlockShape = Shape.plain.discriminatedUnion('type', {
   text: Shape.plain.struct({
-    kind: Shape.plain.string('text'),
+    type: Shape.plain.string('text'),
     text: Shape.plain.string(),
   }),
-  file: Shape.plain.struct({
-    kind: Shape.plain.string('file'),
-    name: Shape.plain.string().nullable(),
-    mimeType: Shape.plain.string().nullable(),
-    uri: Shape.plain.string().nullable(),
-    bytes: Shape.plain.string().nullable(),
+  tool_use: Shape.plain.struct({
+    type: Shape.plain.string('tool_use'),
+    toolUseId: Shape.plain.string(),
+    toolName: Shape.plain.string(),
+    input: Shape.plain.string(),
   }),
-  data: Shape.plain.struct({
-    kind: Shape.plain.string('data'),
-    data: Shape.plain.string(),
+  tool_result: Shape.plain.struct({
+    type: Shape.plain.string('tool_result'),
+    toolUseId: Shape.plain.string(),
+    content: Shape.plain.string(),
+    isError: Shape.plain.boolean(),
+  }),
+  thinking: Shape.plain.struct({
+    type: Shape.plain.string('thinking'),
+    text: Shape.plain.string(),
   }),
 });
 
 /**
- * A2A Message shape (per A2A protocol spec).
- * Messages are the units of conversation between agents.
+ * Message shape (MCP-aligned).
+ * Messages are the units of conversation between user and assistant.
  */
-export const A2AMessageShape = Shape.plain.struct({
+export const MessageShape = Shape.plain.struct({
   messageId: Shape.plain.string(),
-  role: Shape.plain.string('user', 'agent'),
-  contextId: Shape.plain.string().nullable(),
-  taskId: Shape.plain.string().nullable(),
-  parts: Shape.plain.array(A2APartShape),
-  referenceTaskIds: Shape.plain.array(Shape.plain.string()),
+  role: Shape.plain.string('user', 'assistant'),
+  content: Shape.plain.array(ContentBlockShape),
   timestamp: Shape.plain.number(),
 });
 
@@ -93,7 +101,7 @@ export const SessionEntryShape = Shape.plain.struct({
 
 /**
  * Task document schema.
- * One doc per task. Contains metadata, A2A conversation, and session tracking.
+ * One doc per task. Contains metadata, conversation, and session tracking.
  * Document ID pattern: "task:{taskId}:{epoch}"
  */
 export const TaskDocumentSchema = Shape.doc({
@@ -107,7 +115,7 @@ export const TaskDocumentSchema = Shape.doc({
 
   config: TaskConfigShape,
 
-  conversation: Shape.list(A2AMessageShape),
+  conversation: Shape.list(MessageShape),
 
   sessions: Shape.list(SessionEntryShape),
 });
@@ -122,15 +130,22 @@ export type MutableTaskDocument = InferMutableType<typeof TaskDocumentSchema>;
 
 export type TaskMeta = Infer<typeof TaskDocumentSchema.shapes.meta>;
 export type TaskConfig = Infer<typeof TaskConfigShape>;
-export type A2APart = Infer<typeof A2APartShape>;
-export type A2AMessage = Infer<typeof A2AMessageShape>;
+export type ContentBlock = Infer<typeof ContentBlockShape>;
+export type Message = Infer<typeof MessageShape>;
+export type ContentBlockType = (typeof CONTENT_BLOCK_TYPES)[number];
 export type SessionEntry = Infer<typeof SessionEntryShape>;
 
 export type A2ATaskState = (typeof A2A_TASK_STATES)[number];
 export type SessionState = (typeof SESSION_STATES)[number];
 export type ReasoningEffort = (typeof REASONING_EFFORTS)[number];
 export type PermissionMode = (typeof PERMISSION_MODES)[number];
-export { A2A_TASK_STATES, PERMISSION_MODES, REASONING_EFFORTS, SESSION_STATES };
+export {
+  A2A_TASK_STATES,
+  CONTENT_BLOCK_TYPES,
+  PERMISSION_MODES,
+  REASONING_EFFORTS,
+  SESSION_STATES,
+};
 
 const TOOL_RISK_LEVELS = ['low', 'medium', 'high'] as const;
 const PERMISSION_DECISIONS = ['approved', 'denied'] as const;

@@ -291,6 +291,8 @@ export type MachineCapabilities = z.infer<typeof MachineCapabilitiesSchema>;
 
 /**
  * Register agent message schema for personal room WebSocket.
+ * Capabilities are no longer sent via signaling -- they flow through
+ * Loro ephemeral on the room document instead.
  */
 export const RegisterAgentSchema = z.object({
   type: z.literal('register-agent'),
@@ -298,7 +300,6 @@ export const RegisterAgentSchema = z.object({
   machineId: z.string(),
   machineName: z.string(),
   agentType: z.string(),
-  capabilities: MachineCapabilitiesSchema.optional(),
 });
 
 /**
@@ -384,15 +385,6 @@ export const TaskAckSchema = z.object({
 });
 
 /**
- * Update capabilities message schema for personal room WebSocket.
- */
-export const UpdateCapabilitiesSchema = z.object({
-  type: z.literal('update-capabilities'),
-  agentId: z.string(),
-  capabilities: MachineCapabilitiesSchema,
-});
-
-/**
  * Union of all client-to-server messages for personal room WebSocket.
  */
 export const PersonalRoomClientMessageSchema = z.discriminatedUnion('type', [
@@ -404,7 +396,6 @@ export const PersonalRoomClientMessageSchema = z.discriminatedUnion('type', [
   WebRTCIceSchema,
   NotifyTaskSchema,
   TaskAckSchema,
-  UpdateCapabilitiesSchema,
 ]);
 
 export type PersonalRoomClientMessage = z.infer<typeof PersonalRoomClientMessageSchema>;
@@ -420,6 +411,7 @@ export const AuthenticatedSchema = z.object({
 
 /**
  * Agent info schema for personal room WebSocket.
+ * Capabilities are no longer included -- they flow through Loro ephemeral.
  */
 export const AgentInfoSchema = z.object({
   agentId: z.string(),
@@ -428,7 +420,6 @@ export const AgentInfoSchema = z.object({
   agentType: z.string(),
   status: z.enum(['idle', 'running', 'error']),
   activeTaskId: z.string().optional(),
-  capabilities: MachineCapabilitiesSchema.optional(),
 });
 
 export type AgentInfo = z.infer<typeof AgentInfoSchema>;
@@ -478,15 +469,6 @@ export const ErrorMessageSchema = z.object({
 });
 
 /**
- * Agent capabilities changed notification message schema for personal room WebSocket.
- */
-export const AgentCapabilitiesChangedSchema = z.object({
-  type: z.literal('agent-capabilities-changed'),
-  agentId: z.string(),
-  capabilities: MachineCapabilitiesSchema,
-});
-
-/**
  * Union of all server-to-client messages for personal room WebSocket.
  */
 export const PersonalRoomServerMessageSchema = z.discriminatedUnion('type', [
@@ -495,7 +477,6 @@ export const PersonalRoomServerMessageSchema = z.discriminatedUnion('type', [
   AgentJoinedSchema,
   AgentLeftSchema,
   AgentStatusChangedSchema,
-  AgentCapabilitiesChangedSchema,
   NotifyTaskSchema,
   TaskAckSchema,
   ErrorMessageSchema,

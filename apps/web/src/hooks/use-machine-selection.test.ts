@@ -1,8 +1,9 @@
+import type { MachineCapabilitiesEphemeralValue } from '@shipyard/loro-schema';
 import type { AgentInfo as SignalingAgentInfo } from '@shipyard/session';
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { useUIStore } from '../stores';
-import { mergeCapabilities, useMachineSelection } from './use-machine-selection';
+import { useMachineSelection } from './use-machine-selection';
 
 function makeAgent(overrides: Partial<SignalingAgentInfo> = {}): SignalingAgentInfo {
   return {
@@ -15,155 +16,19 @@ function makeAgent(overrides: Partial<SignalingAgentInfo> = {}): SignalingAgentI
   };
 }
 
-describe('mergeCapabilities', () => {
-  it('merges capabilities from multiple agents', () => {
-    const agents: SignalingAgentInfo[] = [
-      makeAgent({
-        agentId: 'a1',
-        capabilities: {
-          models: [
-            {
-              id: 'opus',
-              label: 'Opus',
-              provider: 'claude-code',
-              reasoning: { efforts: ['low', 'medium', 'high'], defaultEffort: 'high' },
-            },
-          ],
-          environments: [{ path: '/proj', name: 'proj', branch: 'main' }],
-          permissionModes: ['default'],
-        },
-      }),
-      makeAgent({
-        agentId: 'a2',
-        capabilities: {
-          models: [{ id: 'sonnet', label: 'Sonnet', provider: 'claude-code' }],
-          environments: [{ path: '/other', name: 'other', branch: 'dev' }],
-          permissionModes: ['accept-edits'],
-        },
-      }),
-    ];
+function makeCaps(
+  overrides: Partial<MachineCapabilitiesEphemeralValue> = {}
+): MachineCapabilitiesEphemeralValue {
+  return {
+    models: [],
+    environments: [],
+    permissionModes: [],
+    homeDir: null,
+    ...overrides,
+  };
+}
 
-    const result = mergeCapabilities(agents);
-    expect(result.models).toHaveLength(2);
-    expect(result.environments).toHaveLength(2);
-    expect(result.permissionModes).toEqual(expect.arrayContaining(['default', 'accept-edits']));
-  });
-
-  it('deduplicates models by id', () => {
-    const agents: SignalingAgentInfo[] = [
-      makeAgent({
-        agentId: 'a1',
-        capabilities: {
-          models: [
-            {
-              id: 'opus',
-              label: 'Opus',
-              provider: 'claude-code',
-              reasoning: { efforts: ['low', 'medium', 'high'], defaultEffort: 'high' },
-            },
-          ],
-          environments: [],
-          permissionModes: [],
-        },
-      }),
-      makeAgent({
-        agentId: 'a2',
-        capabilities: {
-          models: [
-            {
-              id: 'opus',
-              label: 'Opus Dupe',
-              provider: 'claude-code',
-              reasoning: { efforts: ['low', 'medium', 'high'], defaultEffort: 'high' },
-            },
-          ],
-          environments: [],
-          permissionModes: [],
-        },
-      }),
-    ];
-
-    const result = mergeCapabilities(agents);
-    expect(result.models).toHaveLength(1);
-    expect(result.models[0]?.label).toBe('Opus');
-  });
-
-  it('returns empty when agents have no capabilities', () => {
-    const agents: SignalingAgentInfo[] = [makeAgent({ agentId: 'a1' })];
-    const result = mergeCapabilities(agents);
-    expect(result.models).toEqual([]);
-    expect(result.environments).toEqual([]);
-    expect(result.permissionModes).toEqual([]);
-  });
-
-  it('extracts homeDir from first agent with homeDir capability', () => {
-    const agents: SignalingAgentInfo[] = [
-      makeAgent({
-        agentId: 'a1',
-        capabilities: {
-          models: [],
-          environments: [],
-          permissionModes: [],
-          homeDir: '/Users/test',
-        },
-      }),
-      makeAgent({
-        agentId: 'a2',
-        capabilities: {
-          models: [],
-          environments: [],
-          permissionModes: [],
-        },
-      }),
-    ];
-
-    const result = mergeCapabilities(agents);
-    expect(result.homeDir).toBe('/Users/test');
-  });
-
-  it('returns undefined homeDir when no agent provides it', () => {
-    const agents: SignalingAgentInfo[] = [
-      makeAgent({
-        agentId: 'a1',
-        capabilities: {
-          models: [],
-          environments: [],
-          permissionModes: [],
-        },
-      }),
-    ];
-
-    const result = mergeCapabilities(agents);
-    expect(result.homeDir).toBeUndefined();
-  });
-
-  it('deduplicates permission modes', () => {
-    const agents: SignalingAgentInfo[] = [
-      makeAgent({
-        agentId: 'a1',
-        capabilities: {
-          models: [],
-          environments: [],
-          permissionModes: ['default', 'bypass'],
-        },
-      }),
-      makeAgent({
-        agentId: 'a2',
-        capabilities: {
-          models: [],
-          environments: [],
-          permissionModes: ['default', 'accept-edits'],
-        },
-      }),
-    ];
-
-    const result = mergeCapabilities(agents);
-    expect(result.permissionModes).toHaveLength(3);
-    expect(result.permissionModes).toEqual(
-      expect.arrayContaining(['default', 'accept-edits', 'bypass'])
-    );
-  });
-});
+const EMPTY_CAPS = new Map<string, MachineCapabilitiesEphemeralValue>();
 
 describe('useMachineSelection', () => {
   beforeEach(() => {
@@ -171,9 +36,11 @@ describe('useMachineSelection', () => {
   });
 
   it('auto-selects the single machine when only one is connected', () => {
-    const agents: SignalingAgentInfo[] = [
-      makeAgent({
-        capabilities: {
+    const agents: SignalingAgentInfo[] = [makeAgent()];
+    const caps = new Map([
+      [
+        'machine-1',
+        makeCaps({
           models: [
             {
               id: 'opus',
@@ -182,20 +49,19 @@ describe('useMachineSelection', () => {
               reasoning: { efforts: ['low', 'medium', 'high'], defaultEffort: 'high' },
             },
           ],
-          environments: [],
           permissionModes: ['default'],
-        },
-      }),
-    ];
+        }),
+      ],
+    ]);
 
-    const { result } = renderHook(() => useMachineSelection(agents));
+    const { result } = renderHook(() => useMachineSelection(agents, caps));
     expect(result.current.selectedMachineId).toBe('machine-1');
     expect(result.current.selectedMachine?.machineName).toBe('My Machine');
     expect(result.current.availableModels).toHaveLength(1);
   });
 
   it('returns empty arrays when no machines are connected', () => {
-    const { result } = renderHook(() => useMachineSelection([]));
+    const { result } = renderHook(() => useMachineSelection([], EMPTY_CAPS));
     expect(result.current.machines).toEqual([]);
     expect(result.current.selectedMachineId).toBe(null);
     expect(result.current.selectedMachine).toBe(null);
@@ -210,7 +76,17 @@ describe('useMachineSelection', () => {
         agentId: 'a1',
         machineId: 'machine-1',
         machineName: 'Machine A',
-        capabilities: {
+      }),
+      makeAgent({
+        agentId: 'a2',
+        machineId: 'machine-2',
+        machineName: 'Machine B',
+      }),
+    ];
+    const caps = new Map<string, MachineCapabilitiesEphemeralValue>([
+      [
+        'machine-1',
+        makeCaps({
           models: [
             {
               id: 'opus',
@@ -219,23 +95,17 @@ describe('useMachineSelection', () => {
               reasoning: { efforts: ['low', 'medium', 'high'], defaultEffort: 'high' },
             },
           ],
-          environments: [],
-          permissionModes: [],
-        },
-      }),
-      makeAgent({
-        agentId: 'a2',
-        machineId: 'machine-2',
-        machineName: 'Machine B',
-        capabilities: {
-          models: [{ id: 'sonnet', label: 'Sonnet', provider: 'claude-code' }],
-          environments: [],
-          permissionModes: [],
-        },
-      }),
-    ];
+        }),
+      ],
+      [
+        'machine-2',
+        makeCaps({
+          models: [{ id: 'sonnet', label: 'Sonnet', provider: 'claude-code', reasoning: null }],
+        }),
+      ],
+    ]);
 
-    const { result } = renderHook(() => useMachineSelection(agents));
+    const { result } = renderHook(() => useMachineSelection(agents, caps));
 
     expect(result.current.machines).toHaveLength(2);
     expect(result.current.selectedMachineId).toBe('machine-1');
@@ -251,42 +121,40 @@ describe('useMachineSelection', () => {
   });
 
   it('exposes homeDir from selected machine capabilities', () => {
-    const agents: SignalingAgentInfo[] = [
-      makeAgent({
-        capabilities: {
-          models: [],
-          environments: [],
-          permissionModes: [],
-          homeDir: '/Users/test',
-        },
-      }),
-    ];
+    const agents: SignalingAgentInfo[] = [makeAgent()];
+    const caps = new Map([['machine-1', makeCaps({ homeDir: '/Users/test' })]]);
 
-    const { result } = renderHook(() => useMachineSelection(agents));
+    const { result } = renderHook(() => useMachineSelection(agents, caps));
     expect(result.current.homeDir).toBe('/Users/test');
   });
 
   it('returns undefined homeDir when no machine provides it', () => {
-    const agents: SignalingAgentInfo[] = [
-      makeAgent({
-        capabilities: {
-          models: [],
-          environments: [],
-          permissionModes: [],
-        },
-      }),
-    ];
+    const agents: SignalingAgentInfo[] = [makeAgent()];
+    const caps = new Map([['machine-1', makeCaps({ homeDir: null })]]);
 
-    const { result } = renderHook(() => useMachineSelection(agents));
+    const { result } = renderHook(() => useMachineSelection(agents, caps));
     expect(result.current.homeDir).toBeUndefined();
   });
 
-  it('merges capabilities from multiple agents on the same machine', () => {
+  it('uses empty capabilities when ephemeral has no entry for machine', () => {
+    const agents: SignalingAgentInfo[] = [makeAgent()];
+
+    const { result } = renderHook(() => useMachineSelection(agents, EMPTY_CAPS));
+    expect(result.current.machines).toHaveLength(1);
+    expect(result.current.availableModels).toEqual([]);
+    expect(result.current.availableEnvironments).toEqual([]);
+    expect(result.current.availablePermissionModes).toEqual([]);
+  });
+
+  it('groups multiple agents on the same machine with shared ephemeral capabilities', () => {
     const agents: SignalingAgentInfo[] = [
-      makeAgent({
-        agentId: 'a1',
-        machineId: 'machine-1',
-        capabilities: {
+      makeAgent({ agentId: 'a1', machineId: 'machine-1' }),
+      makeAgent({ agentId: 'a2', machineId: 'machine-1' }),
+    ];
+    const caps = new Map([
+      [
+        'machine-1',
+        makeCaps({
           models: [
             {
               id: 'opus',
@@ -294,24 +162,20 @@ describe('useMachineSelection', () => {
               provider: 'claude-code',
               reasoning: { efforts: ['low', 'medium', 'high'], defaultEffort: 'high' },
             },
+            { id: 'sonnet', label: 'Sonnet', provider: 'claude-code', reasoning: null },
           ],
-          environments: [{ path: '/proj', name: 'proj', branch: 'main' }],
-          permissionModes: ['default'],
-        },
-      }),
-      makeAgent({
-        agentId: 'a2',
-        machineId: 'machine-1',
-        capabilities: {
-          models: [{ id: 'sonnet', label: 'Sonnet', provider: 'claude-code' }],
-          environments: [{ path: '/other', name: 'other', branch: 'dev' }],
-          permissionModes: ['bypass'],
-        },
-      }),
-    ];
+          environments: [
+            { path: '/proj', name: 'proj', branch: 'main', remote: null },
+            { path: '/other', name: 'other', branch: 'dev', remote: null },
+          ],
+          permissionModes: ['default', 'bypass'],
+        }),
+      ],
+    ]);
 
-    const { result } = renderHook(() => useMachineSelection(agents));
+    const { result } = renderHook(() => useMachineSelection(agents, caps));
     expect(result.current.machines).toHaveLength(1);
+    expect(result.current.machines[0]?.agents).toHaveLength(2);
     expect(result.current.availableModels).toHaveLength(2);
     expect(result.current.availableEnvironments).toHaveLength(2);
     expect(result.current.availablePermissionModes).toHaveLength(2);

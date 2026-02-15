@@ -28,6 +28,9 @@ vi.mock('../stores', () => ({
     getState: () => ({ activeTaskId: 'task-1', setActiveTask: vi.fn() }),
   }),
 }));
+vi.mock('./use-task-index', () => ({
+  useTaskIndex: vi.fn(() => ({ taskIndex: {}, isLoading: false, doc: null })),
+}));
 
 import { renderHook } from '@testing-library/react';
 import { createActionsProvider } from '../components/command-palette/providers/actions-provider';

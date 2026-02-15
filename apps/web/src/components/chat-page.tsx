@@ -1,17 +1,22 @@
 import { change } from '@loro-extended/change';
-import type { A2APart } from '@shipyard/loro-schema';
+import type { ContentBlock } from '@shipyard/loro-schema';
 import {
+  addTaskToIndex,
   buildDocumentId,
   DEFAULT_EPOCH,
   generateTaskId,
+  LOCAL_USER_ID,
   TaskDocumentSchema,
+  TaskIndexDocumentSchema,
 } from '@shipyard/loro-schema';
 import { ChevronDown } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useAppHotkeys } from '../hooks/use-app-hotkeys';
 import { useMachineSelection } from '../hooks/use-machine-selection';
 import { usePersonalRoom } from '../hooks/use-personal-room';
+import { useRoomCapabilities } from '../hooks/use-room-capabilities';
 import { useTaskDocument } from '../hooks/use-task-document';
+import { useTaskIndex } from '../hooks/use-task-index';
 import { useWebRTCSync } from '../hooks/use-webrtc-sync';
 import { useRepo, useWebRtcAdapter } from '../providers/repo-provider';
 import { useMessageStore, useTaskStore, useUIStore } from '../stores';
@@ -32,6 +37,12 @@ import { Sidebar } from './sidebar';
 import { TopBar } from './top-bar';
 
 const useLoro = import.meta.env.VITE_DATA_SOURCE === 'loro';
+
+/** Wrap a plain text string into a ContentBlock[] for the legacy message store path. */
+function toContentBlocks(text: string): ContentBlock[] {
+  if (!text) return [];
+  return [{ type: 'text' as const, text }];
+}
 
 const SUGGESTION_CARDS = [
   {
@@ -111,6 +122,7 @@ function HeroState({ onSuggestionClick, environmentLabel }: HeroStateProps) {
 
 export function ChatPage() {
   const activeTaskId = useTaskStore((s) => s.activeTaskId);
+  const setActiveTask = useTaskStore((s) => s.setActiveTask);
   const messagesByTask = useMessageStore((s) => s.messagesByTask);
   const isTerminalOpen = useUIStore((s) => s.isTerminalOpen);
   const isDiffOpen = useUIStore((s) => s.isDiffOpen);
@@ -125,6 +137,7 @@ export function ChatPage() {
     return typeof url === 'string' && url.length > 0 ? { url } : null;
   }, []);
   const { agents, connectionState, connection, lastTaskAck } = usePersonalRoom(personalRoomConfig);
+  const capabilitiesByMachine = useRoomCapabilities(LOCAL_USER_ID);
   const {
     machines,
     selectedMachineId,
@@ -132,7 +145,7 @@ export function ChatPage() {
     availableModels,
     availableEnvironments,
     homeDir,
-  } = useMachineSelection(agents);
+  } = useMachineSelection(agents, capabilitiesByMachine);
 
   const repo = useRepo();
   const webrtcAdapter = useWebRtcAdapter();
@@ -145,23 +158,21 @@ export function ChatPage() {
   const loroTask = useTaskDocument(activeTaskId);
   const { pendingPermissions, respondToPermission } = loroTask;
 
+  const { taskIndex } = useTaskIndex(LOCAL_USER_ID);
+  const taskList = useMemo(
+    () => Object.values(taskIndex).sort((a, b) => b.updatedAt - a.updatedAt),
+    [taskIndex]
+  );
+
   const storeMessages = activeTaskId ? messagesByTask[activeTaskId] : undefined;
-  const allTasks = useTaskStore((s) => s.tasks);
-  const activeTask = allTasks.find((t) => t.id === activeTaskId);
-  const agentName = activeTask?.agent?.name;
+  const agentName = undefined;
   const messages: ChatMessageData[] = useMemo(() => {
     if (useLoro && loroTask.conversation.length > 0) {
       const mapped: ChatMessageData[] = loroTask.conversation.map((msg) => ({
         id: msg.messageId ?? crypto.randomUUID(),
-        role: msg.role === 'agent' ? ('agent' as const) : ('user' as const),
-        content:
-          msg.parts
-            ?.filter(
-              (p: A2APart): p is A2APart & { kind: 'text'; text: string } => p.kind === 'text'
-            )
-            .map((p) => p.text)
-            .join('\n') ?? '',
-        agentName: msg.role === 'agent' ? agentName : undefined,
+        role: msg.role === 'assistant' ? ('agent' as const) : ('user' as const),
+        content: msg.content,
+        agentName: msg.role === 'assistant' ? agentName : undefined,
       }));
 
       const status = loroTask.meta?.status;
@@ -171,7 +182,7 @@ export function ChatPage() {
         mapped.push({
           id: '__thinking__',
           role: 'agent' as const,
-          content: '',
+          content: [],
           isThinking: true,
         });
       }
@@ -182,7 +193,7 @@ export function ChatPage() {
       storeMessages?.map((m) => ({
         id: m.id,
         role: m.role,
-        content: m.content,
+        content: toContentBlocks(m.content),
         isThinking: m.isThinking,
         agentName: m.role === 'agent' ? agentName : undefined,
       })) ?? []
@@ -247,31 +258,27 @@ export function ChatPage() {
     }
   }, [activeTaskId, isTerminalOpen]);
 
-  const tasks = useTaskStore((s) => s.tasks);
-  const setActiveTask = useTaskStore((s) => s.setActiveTask);
-  const createAndActivateTask = useTaskStore((s) => s.createAndActivateTask);
-
   const handleNewTask = useCallback(() => {
-    createAndActivateTask('New task');
-  }, [createAndActivateTask]);
+    setActiveTask(null);
+  }, [setActiveTask]);
 
   const handleNavigateNextTask = useCallback(() => {
-    const currentIndex = tasks.findIndex((t) => t.id === activeTaskId);
+    const currentIndex = taskList.findIndex((t) => t.taskId === activeTaskId);
     const nextIndex = currentIndex + 1;
-    const next = tasks[nextIndex];
+    const next = taskList[nextIndex];
     if (next) {
-      setActiveTask(next.id);
+      setActiveTask(next.taskId);
     }
-  }, [tasks, activeTaskId, setActiveTask]);
+  }, [taskList, activeTaskId, setActiveTask]);
 
   const handleNavigatePrevTask = useCallback(() => {
-    const currentIndex = tasks.findIndex((t) => t.id === activeTaskId);
+    const currentIndex = taskList.findIndex((t) => t.taskId === activeTaskId);
     const prevIndex = currentIndex - 1;
-    const prev = tasks[prevIndex];
+    const prev = taskList[prevIndex];
     if (prev) {
-      setActiveTask(prev.id);
+      setActiveTask(prev.taskId);
     }
-  }, [tasks, activeTaskId, setActiveTask]);
+  }, [taskList, activeTaskId, setActiveTask]);
 
   const handleFocusComposer = useCallback(() => {
     composerRef.current?.focus();
@@ -323,12 +330,16 @@ export function ChatPage() {
     }
   }, [lastTaskAck, activeTaskId]);
 
+  // Ref avoids re-subscribing to connection.onMessage on every status change
+  const taskStatusRef = useRef(loroTask.meta?.status);
+  taskStatusRef.current = loroTask.meta?.status;
+
   useEffect(() => {
     if (!connection || !activeTaskId || !selectedMachineId) return;
 
     const unsub = connection.onMessage((msg) => {
       if (msg.type === 'agent-joined' && msg.agent.machineId === selectedMachineId) {
-        const status = loroTask.meta?.status;
+        const status = taskStatusRef.current;
         const isInFlight = status === 'submitted' || status === 'working';
         if (isInFlight) {
           connection.send({
@@ -342,13 +353,21 @@ export function ChatPage() {
     });
 
     return unsub;
-  }, [connection, activeTaskId, selectedMachineId, loroTask.meta?.status]);
+  }, [connection, activeTaskId, selectedMachineId]);
 
   const handleSubmit = useCallback(
     (payload: SubmitPayload) => {
       const { message, model, reasoningEffort, permissionMode } = payload;
       const taskId = generateTaskId();
-      const currentTaskId = activeTaskId ?? createAndActivateTask(message.slice(0, 80), taskId);
+      let currentTaskId: string;
+
+      if (activeTaskId) {
+        currentTaskId = activeTaskId;
+      } else {
+        currentTaskId = taskId;
+        setActiveTask(currentTaskId);
+        useMessageStore.getState().clearMessages(currentTaskId);
+      }
 
       const msgStore = useMessageStore.getState();
 
@@ -389,13 +408,23 @@ export function ChatPage() {
           draft.conversation.push({
             messageId: crypto.randomUUID(),
             role: 'user',
-            contextId: null,
-            taskId: currentTaskId,
-            parts: [{ kind: 'text', text: message }],
-            referenceTaskIds: [],
+            content: [{ type: 'text', text: message }],
             timestamp: now,
           });
         });
+
+        if (isNewTask) {
+          const roomDocId = buildDocumentId('room', LOCAL_USER_ID, DEFAULT_EPOCH);
+          // eslint-disable-next-line no-restricted-syntax -- loro-extended generics require explicit cast
+          const roomHandle = repo.get(roomDocId, TaskIndexDocumentSchema as never);
+          addTaskToIndex(roomHandle.doc, {
+            taskId: currentTaskId,
+            title: message.slice(0, 80),
+            status: 'submitted',
+            createdAt: now,
+            updatedAt: now,
+          });
+        }
       }
 
       if (connection && selectedMachineId) {
@@ -417,7 +446,7 @@ export function ChatPage() {
     },
     [
       activeTaskId,
-      createAndActivateTask,
+      setActiveTask,
       connection,
       selectedMachineId,
       selectedEnvironmentPath,
