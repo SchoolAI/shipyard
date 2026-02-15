@@ -252,7 +252,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
   const isEmpty = value.trim().length === 0;
 
   return (
-    <div className="w-full pb-2">
+    <div className="w-full pb-1">
       <div className="relative bg-surface rounded-xl border border-separator focus-within:border-focus focus-within:ring-1 focus-within:ring-focus">
         {slashCommands.isOpen && (
           <SlashCommandMenu
@@ -299,7 +299,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
         )}
 
         {/* Textarea area */}
-        <div className="px-4 pt-3 pb-2">
+        <div className="px-4 pt-2 pb-2">
           <textarea
             ref={textareaRef}
             value={value}
@@ -314,7 +314,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
         </div>
 
         {/* Bottom toolbar */}
-        <div className="flex items-center justify-between px-3 pb-3 gap-1">
+        <div className="flex items-center justify-between px-3 pb-2 gap-1">
           <div className="flex items-center gap-1 overflow-x-auto min-w-0">
             <AttachmentPopover />
             <ModelPicker

@@ -18,7 +18,7 @@ export function TopBar({ onToggleTerminal, onToggleDiff, hasUnviewedDiff }: TopB
   const activeEntry = activeTaskId ? taskIndex[activeTaskId] : undefined;
 
   return (
-    <header className="flex items-center justify-between px-4 py-2 border-b border-separator/50 h-12">
+    <header className="flex items-center justify-between px-4 py-1.5 border-b border-separator/50 h-10">
       <div className="flex items-center gap-2 min-w-0">
         <MobileSidebarToggle />
         {activeEntry ? (

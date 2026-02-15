@@ -59,7 +59,7 @@ export function StatusBar({
 
   return (
     <div
-      className="w-full max-w-3xl mx-auto pb-[max(0.75rem,env(safe-area-inset-bottom))]"
+      className="w-full max-w-3xl mx-auto pb-[max(0.5rem,env(safe-area-inset-bottom))]"
       role="status"
       aria-label="Connection status"
     >

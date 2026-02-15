@@ -146,7 +146,7 @@ export function Sidebar() {
         } ${isExpanded ? 'md:w-[260px]' : 'md:w-12'}`}
       >
         {/* Header */}
-        <div className="flex items-center justify-between h-12 px-2 shrink-0">
+        <div className="flex items-center justify-between h-10 px-2 shrink-0">
           {isExpanded ? (
             <>
               <img src="/icon.svg" alt="" className="w-5 h-5 shrink-0 ml-1 opacity-60" />
