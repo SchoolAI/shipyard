@@ -43,9 +43,9 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
         aria-hidden={!isOpen}
         inert={!isOpen || undefined}
         style={panelStyle}
-        className={`relative shrink-0 border-t border-separator bg-background hidden sm:block ${
-          isDragging ? '' : 'motion-safe:transition-[height] motion-safe:duration-300 ease-in-out'
-        }`}
+        className={`relative shrink-0 bg-background hidden sm:block ${
+          isOpen ? 'border-t border-separator' : ''
+        } ${isDragging ? '' : 'motion-safe:transition-[height] motion-safe:duration-300 ease-in-out'}`}
       >
         {/* Drag handle / separator (desktop only) */}
         {isOpen && <div {...separatorProps} />}

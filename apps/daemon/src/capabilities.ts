@@ -165,6 +165,16 @@ export async function getBranchFiles(
   }
 }
 
+/**
+ * Capture the full working-tree state as a git ref for later diffing.
+ *
+ * Returns a stash ref (uncommitted changes) or HEAD (clean tree). Callers
+ * diff the turn-start ref against the turn-end ref to produce a turn diff.
+ * The two refs may be of different kinds (e.g., stash vs HEAD) when the agent
+ * commits during a turn. This is intentional: git can diff any two tree-ish
+ * objects, so a stash ref vs a HEAD ref produces correct results regardless
+ * of whether the agent committed, staged, or left changes uncommitted.
+ */
 export async function captureTreeSnapshot(cwd: string): Promise<string | null> {
   try {
     const stashRef = await runWithTimeout('git', ['stash', 'create'], cwd, DIFF_TIMEOUT_MS);

@@ -10,7 +10,6 @@ import {
   buildDocumentId,
   classifyToolRisk,
   DEFAULT_EPOCH,
-  EpochDocumentSchema,
   LOCAL_USER_ID,
   type MachineCapabilitiesEphemeralValue,
   type PermissionDecision,
@@ -71,9 +70,12 @@ const TaskEphemeralDeclarations = {
 type TaskEphemeralDecls = typeof TaskEphemeralDeclarations;
 type TaskHandle = HandleWithEphemerals<TaskDocumentShape, TaskEphemeralDecls>;
 
+const DIFF_POLL_INTERVAL_MS = 5_000;
+
 interface ActiveTask {
   taskId: string;
   abortController: AbortController;
+  diffPollTimer: ReturnType<typeof setInterval> | null;
 }
 
 /**
@@ -176,6 +178,9 @@ export async function serve(env: Env): Promise<void> {
     log.info({ state }, 'Connection state changed');
   });
 
+  const diffThrottles = new Map<string, ThrottleState>();
+  const branchDiffThrottles = new Map<string, ThrottleState>();
+
   connection.onMessage((msg) => {
     handleMessage(msg, {
       log,
@@ -186,6 +191,8 @@ export async function serve(env: Env): Promise<void> {
       lifecycle,
       activeTasks,
       watchedTasks,
+      diffThrottles,
+      branchDiffThrottles,
       peerManager,
       env,
       machineId,
@@ -202,17 +209,18 @@ export async function serve(env: Env): Promise<void> {
     branchWatcher.close();
 
     for (const task of activeTasks.values()) {
+      if (task.diffPollTimer) clearInterval(task.diffPollTimer);
       task.abortController.abort();
     }
     activeTasks.clear();
-    for (const timer of diffDebounceTimers.values()) {
-      clearTimeout(timer);
+    for (const state of diffThrottles.values()) {
+      if (state.timer) clearTimeout(state.timer);
     }
-    diffDebounceTimers.clear();
-    for (const timer of branchDiffTimers.values()) {
-      clearTimeout(timer);
+    diffThrottles.clear();
+    for (const state of branchDiffThrottles.values()) {
+      if (state.timer) clearTimeout(state.timer);
     }
-    branchDiffTimers.clear();
+    branchDiffThrottles.clear();
     for (const unsub of watchedTasks.values()) {
       unsub();
     }
@@ -230,6 +238,11 @@ export async function serve(env: Env): Promise<void> {
   await new Promise<never>(() => {});
 }
 
+interface ThrottleState {
+  timer: ReturnType<typeof setTimeout> | null;
+  pending: boolean;
+}
+
 interface MessageHandlerContext {
   log: ReturnType<typeof createChildLogger>;
   signaling: DaemonSignaling;
@@ -239,34 +252,52 @@ interface MessageHandlerContext {
   lifecycle: LifecycleManager;
   activeTasks: Map<string, ActiveTask>;
   watchedTasks: Map<string, () => void>;
+  diffThrottles: Map<string, ThrottleState>;
+  branchDiffThrottles: Map<string, ThrottleState>;
   peerManager: PeerManager;
   env: Env;
   machineId: string;
 }
 
-const DIFF_DEBOUNCE_MS = 2_000;
-const BRANCH_DIFF_DEBOUNCE_MS = 10_000;
-const diffDebounceTimers = new Map<string, ReturnType<typeof setTimeout>>();
-const branchDiffTimers = new Map<string, ReturnType<typeof setTimeout>>();
+const DIFF_THROTTLE_MS = 2_000;
+const BRANCH_DIFF_THROTTLE_MS = 10_000;
 
-function debouncedDiffCapture(
+/**
+ * Leading+trailing throttle: fires immediately on first call, then at most
+ * once per cooldown interval. If additional calls arrive during cooldown,
+ * a single trailing call fires when the cooldown expires.
+ */
+function throttledDiffCapture(
   taskId: string,
   cwd: string,
   taskHandle: TaskHandle,
-  log: ReturnType<typeof createChildLogger>
+  log: ReturnType<typeof createChildLogger>,
+  throttles: Map<string, ThrottleState>
 ): void {
-  const existing = diffDebounceTimers.get(taskId);
-  if (existing) clearTimeout(existing);
+  const existing = throttles.get(taskId);
 
-  diffDebounceTimers.set(
-    taskId,
-    setTimeout(() => {
-      diffDebounceTimers.delete(taskId);
-      captureDiffState(cwd, taskHandle, log).catch((err: unknown) => {
-        log.warn({ err }, 'Failed to capture diff state');
-      });
-    }, DIFF_DEBOUNCE_MS)
-  );
+  if (!existing || !existing.timer) {
+    captureDiffState(cwd, taskHandle, log).catch((err: unknown) => {
+      log.warn({ err }, 'Failed to capture diff state');
+    });
+
+    const state: ThrottleState = {
+      timer: setTimeout(() => {
+        const s = throttles.get(taskId);
+        if (s?.pending) {
+          s.pending = false;
+          s.timer = null;
+          throttledDiffCapture(taskId, cwd, taskHandle, log, throttles);
+        } else {
+          throttles.delete(taskId);
+        }
+      }, DIFF_THROTTLE_MS),
+      pending: false,
+    };
+    throttles.set(taskId, state);
+  } else {
+    existing.pending = true;
+  }
 }
 
 async function captureDiffState(
@@ -294,24 +325,41 @@ async function captureDiffState(
   log.debug({ fileCount: files.length }, 'Diff state captured');
 }
 
-function debouncedBranchDiffCapture(
+/**
+ * Leading+trailing throttle for branch diff capture.
+ * Same pattern as throttledDiffCapture but with a longer cooldown.
+ */
+function throttledBranchDiffCapture(
   taskId: string,
   cwd: string,
   taskHandle: TaskHandle,
-  log: ReturnType<typeof createChildLogger>
+  log: ReturnType<typeof createChildLogger>,
+  throttles: Map<string, ThrottleState>
 ): void {
-  const existing = branchDiffTimers.get(taskId);
-  if (existing) clearTimeout(existing);
+  const existing = throttles.get(taskId);
 
-  branchDiffTimers.set(
-    taskId,
-    setTimeout(() => {
-      branchDiffTimers.delete(taskId);
-      captureBranchDiffState(cwd, taskHandle, log).catch((err: unknown) => {
-        log.warn({ err }, 'Failed to capture branch diff state');
-      });
-    }, BRANCH_DIFF_DEBOUNCE_MS)
-  );
+  if (!existing || !existing.timer) {
+    captureBranchDiffState(cwd, taskHandle, log).catch((err: unknown) => {
+      log.warn({ err }, 'Failed to capture branch diff state');
+    });
+
+    const state: ThrottleState = {
+      timer: setTimeout(() => {
+        const s = throttles.get(taskId);
+        if (s?.pending) {
+          s.pending = false;
+          s.timer = null;
+          throttledBranchDiffCapture(taskId, cwd, taskHandle, log, throttles);
+        } else {
+          throttles.delete(taskId);
+        }
+      }, BRANCH_DIFF_THROTTLE_MS),
+      pending: false,
+    };
+    throttles.set(taskId, state);
+  } else {
+    existing.pending = true;
+  }
 }
 
 async function captureBranchDiffState(
@@ -522,6 +570,9 @@ async function watchTaskDocument(
 
   const json = taskHandle.doc.toJSON();
   const initialCwd = json.config.cwd ?? process.cwd();
+  captureDiffState(initialCwd, taskHandle, taskLog).catch((err: unknown) => {
+    taskLog.warn({ err }, 'Failed to capture initial working tree diff');
+  });
   captureBranchDiffState(initialCwd, taskHandle, taskLog).catch((err: unknown) => {
     taskLog.warn({ err }, 'Failed to capture initial branch diff');
   });
@@ -580,8 +631,8 @@ function onTaskDocChanged(
 
   if (json.meta.status === 'working' || json.meta.status === 'input-required') {
     const activeCwd = json.config.cwd ?? process.cwd();
-    debouncedDiffCapture(taskId, activeCwd, taskHandle, taskLog);
-    debouncedBranchDiffCapture(taskId, activeCwd, taskHandle, taskLog);
+    throttledDiffCapture(taskId, activeCwd, taskHandle, taskLog, ctx.diffThrottles);
+    throttledBranchDiffCapture(taskId, activeCwd, taskHandle, taskLog, ctx.branchDiffThrottles);
 
     taskLog.debug({ status: json.meta.status }, 'Status blocks new work, skipping');
     return;
@@ -613,8 +664,13 @@ function onTaskDocChanged(
 
   const abortController = ctx.lifecycle.createAbortController();
 
-  const activeTask: ActiveTask = { taskId, abortController };
+  const activeTask: ActiveTask = { taskId, abortController, diffPollTimer: null };
   ctx.activeTasks.set(taskId, activeTask);
+
+  activeTask.diffPollTimer = setInterval(() => {
+    throttledDiffCapture(taskId, cwd, taskHandle, taskLog, ctx.diffThrottles);
+    throttledBranchDiffCapture(taskId, cwd, taskHandle, taskLog, ctx.branchDiffThrottles);
+  }, DIFF_POLL_INTERVAL_MS);
 
   ctx.signaling.updateStatus('running', taskId);
 
@@ -677,8 +733,14 @@ interface CleanupTaskRunOptions {
 async function cleanupTaskRun(opts: CleanupTaskRunOptions): Promise<void> {
   const { taskId, cwd, taskHandle, taskLog, turnStartRefPromise, abortController, ctx } = opts;
 
-  clearDebouncedTimer(diffDebounceTimers, taskId);
-  clearDebouncedTimer(branchDiffTimers, taskId);
+  const activeTask = ctx.activeTasks.get(taskId);
+  if (activeTask?.diffPollTimer) {
+    clearInterval(activeTask.diffPollTimer);
+    activeTask.diffPollTimer = null;
+  }
+
+  clearThrottleState(ctx.diffThrottles, taskId);
+  clearThrottleState(ctx.branchDiffThrottles, taskId);
 
   try {
     await captureDiffState(cwd, taskHandle, taskLog);
@@ -717,14 +779,11 @@ async function cleanupTaskRun(opts: CleanupTaskRunOptions): Promise<void> {
   ctx.signaling.updateStatus('idle');
 }
 
-function clearDebouncedTimer(
-  timers: Map<string, ReturnType<typeof setTimeout>>,
-  taskId: string
-): void {
-  const timer = timers.get(taskId);
-  if (timer) {
-    clearTimeout(timer);
-    timers.delete(taskId);
+function clearThrottleState(throttles: Map<string, ThrottleState>, taskId: string): void {
+  const state = throttles.get(taskId);
+  if (state) {
+    if (state.timer) clearTimeout(state.timer);
+    throttles.delete(taskId);
   }
 }
 
@@ -746,25 +805,6 @@ function mapPermissionMode(
     default:
       return undefined;
   }
-}
-
-async function loadEpoch(repo: Repo): Promise<number> {
-  const epochHandle = repo.get('epoch', EpochDocumentSchema);
-
-  try {
-    await epochHandle.waitForSync({ kind: 'storage', timeout: 5_000 });
-  } catch {
-    logger.debug('No existing epoch data in storage');
-  }
-
-  if (epochHandle.loroDoc.opCount() === 0) {
-    change(epochHandle.doc, (draft) => {
-      draft.schema.version = DEFAULT_EPOCH;
-    });
-    return DEFAULT_EPOCH;
-  }
-
-  return epochHandle.doc.toJSON().schema.version;
 }
 
 /**
@@ -980,12 +1020,12 @@ async function runTask(opts: RunTaskOptions): Promise<SessionResult> {
       : buildCanUseTool(taskHandle, log, roomDoc, taskId);
 
   const stderr = (data: string) => {
-    const trimmed = data.trim();
-    if (!trimmed) return;
-    if (trimmed.includes('Error') || trimmed.includes('error')) {
-      log.error({ stderr: trimmed }, 'SDK subprocess error');
+    const cleaned = data.replace(/\x1b\[[0-9;]*[A-Za-z]/g, '').trim();
+    if (!cleaned) return;
+    if (cleaned.includes('Error') || cleaned.includes('error')) {
+      log.error({ stderr: cleaned }, 'SDK subprocess error');
     } else {
-      log.debug({ stderr: trimmed }, 'SDK subprocess stderr');
+      log.debug({ stderr: cleaned }, 'SDK subprocess stderr');
     }
   };
 
