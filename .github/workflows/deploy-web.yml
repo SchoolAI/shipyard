@@ -39,6 +39,8 @@ jobs:
         run: pnpm turbo build --filter=@shipyard/web
         env:
           VITE_DATA_SOURCE: loro
+          VITE_GITHUB_CLIENT_ID: Ov23liNnbDyIs6wu4Btd
+          VITE_SESSION_SERVER_URL: https://shipyard-session-server.jacob-191.workers.dev
 
       - name: Deploy to Cloudflare Pages
         id: deploy
