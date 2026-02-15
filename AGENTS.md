@@ -71,6 +71,16 @@ For Loro, Agent SDK, A2A, and MCP work — always search local repos, never web 
 - `docs/decisions/` — ADRs (decision log)
 - `docs/whips/` — Work-in-progress designs
 
+## Parallel Agent Environment
+
+Multiple Claude Code agents often run simultaneously on this codebase. If a file has changed since you last read it, or an edit fails because the content no longer matches, **another agent is likely working on that file**. Do not:
+
+- Retry the same edit repeatedly
+- Overwrite the other agent's changes
+- Treat the conflict as a bug
+
+Instead: **skip that file, work on something else, and come back to it later.** Re-read the file when you return — the other agent may have finished. This applies to both `Edit` failures and unexpected `git status` changes.
+
 ## Core Principles
 
 1. **CRDT is source of truth** — not URLs, not GitHub
