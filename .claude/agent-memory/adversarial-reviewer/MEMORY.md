@@ -20,6 +20,11 @@
 - **Task index cross-doc consistency**: Daemon updates TaskDocument status but does NOT update the room's TaskIndex. Only the browser writes to TaskIndex. This means sidebar status goes stale unless the browser re-derives from task docs.
 - **Epoch mismatch**: Browser hardcodes `DEFAULT_EPOCH` for task doc IDs. Daemon uses `loadEpoch()` which reads from storage. If epoch ever changes, they will create different doc IDs and never sync.
 
+## @git-diff-view/react Library
+- `DiffView` `data.hunks` is `string[]` where EACH element is parsed by `DiffParser.parse()` which handles ONE unified diff section (one file)
+- Passing a multi-file `git diff` output as a single `hunks` entry crashes: parser throws "Invalid hunk header format" when it encounters the second `diff --git` line
+- Must split raw multi-file diffs into per-file segments before passing to `hunks`, or use one `DiffView` per file
+
 ## Key Files
 - Daemon serve: `/Users/jacobpetterle/Working Directory/shipyard/apps/daemon/src/serve.ts`
 - Session manager: `/Users/jacobpetterle/Working Directory/shipyard/apps/daemon/src/session-manager.ts`

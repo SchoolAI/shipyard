@@ -78,6 +78,27 @@ export const MessageShape = Shape.plain.struct({
   cwd: Shape.plain.string().nullable(),
 });
 
+const DiffFileShape = Shape.plain.struct({
+  path: Shape.plain.string(),
+  status: Shape.plain.string(),
+});
+
+export const DiffStateShape = Shape.struct({
+  unstaged: Shape.plain.string(),
+  staged: Shape.plain.string(),
+  files: Shape.list(DiffFileShape),
+  updatedAt: Shape.plain.number(),
+
+  branchDiff: Shape.plain.string(),
+  branchFiles: Shape.list(DiffFileShape),
+  branchBase: Shape.plain.string(),
+  branchUpdatedAt: Shape.plain.number(),
+
+  lastTurnDiff: Shape.plain.string(),
+  lastTurnFiles: Shape.list(DiffFileShape),
+  lastTurnUpdatedAt: Shape.plain.number(),
+});
+
 /**
  * Agent session entry shape.
  * Tracks a single Claude Code session associated with a task.
@@ -113,6 +134,8 @@ export const TaskDocumentSchema = Shape.doc({
   conversation: Shape.list(MessageShape),
 
   sessions: Shape.list(SessionEntryShape),
+
+  diffState: DiffStateShape,
 });
 
 export type EpochDocumentShape = typeof EpochDocumentSchema;
@@ -127,6 +150,8 @@ export type TaskMeta = Infer<typeof TaskDocumentSchema.shapes.meta>;
 export type ContentBlock = Infer<typeof ContentBlockShape>;
 export type Message = Infer<typeof MessageShape>;
 export type ContentBlockType = (typeof CONTENT_BLOCK_TYPES)[number];
+export type DiffFile = Infer<typeof DiffFileShape>;
+export type DiffState = Infer<typeof DiffStateShape>;
 export type SessionEntry = Infer<typeof SessionEntryShape>;
 
 export type A2ATaskState = (typeof A2A_TASK_STATES)[number];

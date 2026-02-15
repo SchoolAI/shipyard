@@ -2,6 +2,8 @@ import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
 
 export type Theme = 'dark' | 'light' | 'system';
+export type DiffScope = 'working-tree' | 'branch' | 'last-turn';
+export type DiffViewType = 'split' | 'unified';
 
 export interface UIStore {
   isSidebarExpanded: boolean;
@@ -14,6 +16,10 @@ export interface UIStore {
   selectedEnvironmentPath: string | null;
   theme: Theme;
   diffPanelWidth: number;
+  diffWordWrap: boolean;
+  diffScope: DiffScope;
+  diffViewType: DiffViewType;
+  diffLastViewedAt: number;
   terminalPanelHeight: number;
 
   toggleSidebar: () => void;
@@ -32,6 +38,10 @@ export interface UIStore {
   setSelectedEnvironmentPath: (path: string | null) => void;
   setTheme: (theme: Theme) => void;
   setDiffPanelWidth: (width: number) => void;
+  setDiffWordWrap: (wrap: boolean) => void;
+  setDiffScope: (scope: DiffScope) => void;
+  setDiffViewType: (type: DiffViewType) => void;
+  setDiffLastViewedAt: (ts: number) => void;
   setTerminalPanelHeight: (height: number) => void;
 }
 
@@ -49,6 +59,10 @@ export const useUIStore = create<UIStore>()(
         selectedEnvironmentPath: null,
         theme: 'dark',
         diffPanelWidth: typeof window !== 'undefined' ? Math.round(window.innerWidth * 0.5) : 600,
+        diffWordWrap: false,
+        diffScope: 'working-tree',
+        diffViewType: 'unified',
+        diffLastViewedAt: 0,
         terminalPanelHeight:
           typeof window !== 'undefined' ? Math.round(window.innerHeight * 0.4) : 400,
 
@@ -113,6 +127,15 @@ export const useUIStore = create<UIStore>()(
 
         setTheme: (theme) => set({ theme }, undefined, 'ui/setTheme'),
 
+        setDiffWordWrap: (wrap) => set({ diffWordWrap: wrap }, undefined, 'ui/setDiffWordWrap'),
+
+        setDiffScope: (scope) => set({ diffScope: scope }, undefined, 'ui/setDiffScope'),
+
+        setDiffViewType: (type) => set({ diffViewType: type }, undefined, 'ui/setDiffViewType'),
+
+        setDiffLastViewedAt: (ts) =>
+          set({ diffLastViewedAt: ts }, undefined, 'ui/setDiffLastViewedAt'),
+
         setDiffPanelWidth: (width) => {
           const max = typeof window !== 'undefined' ? Math.floor(window.innerWidth * 0.8) : 1200;
           const clamped = Math.min(Math.max(width, 400), max);
@@ -134,6 +157,10 @@ export const useUIStore = create<UIStore>()(
           selectedEnvironmentPath: state.selectedEnvironmentPath,
           theme: state.theme,
           diffPanelWidth: state.diffPanelWidth,
+          diffWordWrap: state.diffWordWrap,
+          diffScope: state.diffScope,
+          diffViewType: state.diffViewType,
+          diffLastViewedAt: state.diffLastViewedAt,
           terminalPanelHeight: state.terminalPanelHeight,
         }),
       }

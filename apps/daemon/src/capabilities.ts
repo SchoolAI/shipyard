@@ -23,6 +23,230 @@ function run(command: string, args: string[], cwd?: string): Promise<string> {
   });
 }
 
+function runWithTimeout(
+  command: string,
+  args: string[],
+  cwd: string,
+  timeoutMs: number
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    execFile(
+      command,
+      args,
+      { timeout: timeoutMs, cwd, maxBuffer: 2 * 1024 * 1024 },
+      (error, stdout) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+        resolve(stdout.trim());
+      }
+    );
+  });
+}
+
+const DIFF_TIMEOUT_MS = 15_000;
+const MAX_DIFF_SIZE = 200_000;
+
+async function withIntentToAdd<T>(cwd: string, fn: () => Promise<T>): Promise<T> {
+  let added = false;
+  try {
+    const untracked = await runWithTimeout(
+      'git',
+      ['ls-files', '--others', '--exclude-standard'],
+      cwd,
+      TIMEOUT_MS
+    );
+    if (untracked) {
+      await runWithTimeout('git', ['add', '-N', '.'], cwd, TIMEOUT_MS);
+      added = true;
+    }
+    return await fn();
+  } finally {
+    if (added) {
+      await runWithTimeout('git', ['reset'], cwd, TIMEOUT_MS).catch(() => {});
+    }
+  }
+}
+
+export async function getUnstagedDiff(cwd: string): Promise<string> {
+  const result = await withIntentToAdd(cwd, () =>
+    runWithTimeout('git', ['diff', '--no-color'], cwd, DIFF_TIMEOUT_MS)
+  );
+  return result.length > MAX_DIFF_SIZE
+    ? `${result.slice(0, MAX_DIFF_SIZE)}\n\n... diff truncated (exceeds 1MB) ...\n`
+    : result;
+}
+
+export async function getStagedDiff(cwd: string): Promise<string> {
+  const result = await runWithTimeout(
+    'git',
+    ['diff', '--cached', '--no-color'],
+    cwd,
+    DIFF_TIMEOUT_MS
+  );
+  return result.length > MAX_DIFF_SIZE
+    ? `${result.slice(0, MAX_DIFF_SIZE)}\n\n... diff truncated (exceeds 1MB) ...\n`
+    : result;
+}
+
+export async function getChangedFiles(
+  cwd: string
+): Promise<Array<{ path: string; status: string }>> {
+  const out = await runWithTimeout('git', ['status', '--porcelain'], cwd, DIFF_TIMEOUT_MS);
+  if (!out) return [];
+  return out
+    .split('\n')
+    .filter(Boolean)
+    .map((line) => ({
+      status: line.slice(0, 2).trim(),
+      path: line.slice(3),
+    }));
+}
+
+const BRANCH_DIFF_TIMEOUT_MS = 30_000;
+
+export async function getDefaultBranch(cwd: string): Promise<string | null> {
+  try {
+    const ref = await runWithTimeout(
+      'git',
+      ['symbolic-ref', 'refs/remotes/origin/HEAD', '--short'],
+      cwd,
+      TIMEOUT_MS
+    );
+    return ref || null;
+  } catch {
+    /* symbolic-ref failed, try common defaults */
+  }
+
+  for (const candidate of ['origin/main', 'origin/master']) {
+    try {
+      await runWithTimeout('git', ['rev-parse', '--verify', candidate], cwd, TIMEOUT_MS);
+      return candidate;
+    } catch {
+      /* candidate does not exist */
+    }
+  }
+
+  return null;
+}
+
+export async function getMergeBase(cwd: string, baseBranch: string): Promise<string | null> {
+  try {
+    return await runWithTimeout('git', ['merge-base', baseBranch, 'HEAD'], cwd, TIMEOUT_MS);
+  } catch {
+    return null;
+  }
+}
+
+export async function getBranchDiff(cwd: string, baseBranch: string): Promise<string> {
+  const mergeBase = await getMergeBase(cwd, baseBranch);
+  if (!mergeBase) return '';
+
+  try {
+    const result = await runWithTimeout(
+      'git',
+      ['diff', `${mergeBase}..HEAD`, '--no-color'],
+      cwd,
+      BRANCH_DIFF_TIMEOUT_MS
+    );
+    return result.length > MAX_DIFF_SIZE
+      ? `${result.slice(0, MAX_DIFF_SIZE)}\n\n... diff truncated (exceeds 1MB) ...\n`
+      : result;
+  } catch {
+    return '';
+  }
+}
+
+export async function getBranchFiles(
+  cwd: string,
+  baseBranch: string
+): Promise<Array<{ path: string; status: string }>> {
+  const mergeBase = await getMergeBase(cwd, baseBranch);
+  if (!mergeBase) return [];
+
+  try {
+    const out = await runWithTimeout(
+      'git',
+      ['diff', '--name-status', `${mergeBase}..HEAD`],
+      cwd,
+      BRANCH_DIFF_TIMEOUT_MS
+    );
+    if (!out) return [];
+    return out
+      .split('\n')
+      .filter(Boolean)
+      .map((line) => {
+        const parts = line.split('\t');
+        return {
+          status: parts[0] ?? '',
+          path: parts[1] ?? '',
+        };
+      });
+  } catch {
+    return [];
+  }
+}
+
+export async function captureTreeSnapshot(cwd: string): Promise<string | null> {
+  try {
+    const stashRef = await runWithTimeout('git', ['stash', 'create'], cwd, DIFF_TIMEOUT_MS);
+    if (stashRef) return stashRef;
+
+    return await runWithTimeout('git', ['rev-parse', 'HEAD'], cwd, DIFF_TIMEOUT_MS);
+  } catch {
+    return null;
+  }
+}
+
+export async function getSnapshotDiff(
+  cwd: string,
+  fromRef: string,
+  toRef: string
+): Promise<string> {
+  try {
+    const result = await runWithTimeout(
+      'git',
+      ['diff', fromRef, toRef, '--no-color'],
+      cwd,
+      DIFF_TIMEOUT_MS
+    );
+    return result.length > MAX_DIFF_SIZE
+      ? `${result.slice(0, MAX_DIFF_SIZE)}\n\n... diff truncated (exceeds 1MB) ...\n`
+      : result;
+  } catch {
+    return '';
+  }
+}
+
+export async function getSnapshotFiles(
+  cwd: string,
+  fromRef: string,
+  toRef: string
+): Promise<Array<{ path: string; status: string }>> {
+  try {
+    const out = await runWithTimeout(
+      'git',
+      ['diff', '--name-status', fromRef, toRef],
+      cwd,
+      DIFF_TIMEOUT_MS
+    );
+    if (!out) return [];
+    return out
+      .split('\n')
+      .filter(Boolean)
+      .map((line) => {
+        const parts = line.split('\t');
+        return {
+          status: parts[0] ?? '',
+          path: parts[1] ?? '',
+        };
+      });
+  } catch {
+    return [];
+  }
+}
+
 export async function detectModels(): Promise<ModelInfo[]> {
   const models: ModelInfo[] = [];
 

@@ -10,7 +10,6 @@ import {
   buildDocumentId,
   classifyToolRisk,
   DEFAULT_EPOCH,
-  EpochDocumentSchema,
   LOCAL_USER_ID,
   type MachineCapabilitiesEphemeralValue,
   type PermissionDecision,
@@ -25,6 +24,17 @@ import {
 } from '@shipyard/loro-schema';
 import type { PersonalRoomServerMessage } from '@shipyard/session';
 import { createBranchWatcher } from './branch-watcher.js';
+import {
+  captureTreeSnapshot,
+  getBranchDiff,
+  getBranchFiles,
+  getChangedFiles,
+  getDefaultBranch,
+  getSnapshotDiff,
+  getSnapshotFiles,
+  getStagedDiff,
+  getUnstagedDiff,
+} from './capabilities.js';
 import type { Env } from './env.js';
 import { FileStorageAdapter } from './file-storage-adapter.js';
 import { LifecycleManager } from './lifecycle.js';
@@ -194,6 +204,14 @@ export async function serve(env: Env): Promise<void> {
       task.abortController.abort();
     }
     activeTasks.clear();
+    for (const timer of diffDebounceTimers.values()) {
+      clearTimeout(timer);
+    }
+    diffDebounceTimers.clear();
+    for (const timer of branchDiffTimers.values()) {
+      clearTimeout(timer);
+    }
+    branchDiffTimers.clear();
     for (const unsub of watchedTasks.values()) {
       unsub();
     }
@@ -223,6 +241,155 @@ interface MessageHandlerContext {
   peerManager: PeerManager;
   env: Env;
   machineId: string;
+}
+
+const DIFF_DEBOUNCE_MS = 2_000;
+const BRANCH_DIFF_DEBOUNCE_MS = 10_000;
+const diffDebounceTimers = new Map<string, ReturnType<typeof setTimeout>>();
+const branchDiffTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+function debouncedDiffCapture(
+  taskId: string,
+  cwd: string,
+  taskHandle: TaskHandle,
+  log: ReturnType<typeof createChildLogger>
+): void {
+  const existing = diffDebounceTimers.get(taskId);
+  if (existing) clearTimeout(existing);
+
+  diffDebounceTimers.set(
+    taskId,
+    setTimeout(() => {
+      diffDebounceTimers.delete(taskId);
+      captureDiffState(cwd, taskHandle, log).catch((err: unknown) => {
+        log.warn({ err }, 'Failed to capture diff state');
+      });
+    }, DIFF_DEBOUNCE_MS)
+  );
+}
+
+async function captureDiffState(
+  cwd: string,
+  taskHandle: TaskHandle,
+  log: ReturnType<typeof createChildLogger>
+): Promise<void> {
+  const [unstaged, staged, files] = await Promise.all([
+    getUnstagedDiff(cwd),
+    getStagedDiff(cwd),
+    getChangedFiles(cwd),
+  ]);
+  change(taskHandle.doc, (draft) => {
+    draft.diffState.unstaged = unstaged;
+    draft.diffState.staged = staged;
+    const fileList = draft.diffState.files;
+    if (fileList.length > 0) {
+      fileList.delete(0, fileList.length);
+    }
+    for (const file of files) {
+      fileList.push(file);
+    }
+    draft.diffState.updatedAt = Date.now();
+  });
+  log.debug({ fileCount: files.length }, 'Diff state captured');
+}
+
+function debouncedBranchDiffCapture(
+  taskId: string,
+  cwd: string,
+  taskHandle: TaskHandle,
+  log: ReturnType<typeof createChildLogger>
+): void {
+  const existing = branchDiffTimers.get(taskId);
+  if (existing) clearTimeout(existing);
+
+  branchDiffTimers.set(
+    taskId,
+    setTimeout(() => {
+      branchDiffTimers.delete(taskId);
+      captureBranchDiffState(cwd, taskHandle, log).catch((err: unknown) => {
+        log.warn({ err }, 'Failed to capture branch diff state');
+      });
+    }, BRANCH_DIFF_DEBOUNCE_MS)
+  );
+}
+
+async function captureBranchDiffState(
+  cwd: string,
+  taskHandle: TaskHandle,
+  log: ReturnType<typeof createChildLogger>
+): Promise<void> {
+  const baseBranch = await getDefaultBranch(cwd);
+  if (!baseBranch) {
+    log.debug('No default branch found, skipping branch diff');
+    return;
+  }
+
+  const [branchDiff, branchFiles] = await Promise.all([
+    getBranchDiff(cwd, baseBranch),
+    getBranchFiles(cwd, baseBranch),
+  ]);
+
+  change(taskHandle.doc, (draft) => {
+    draft.diffState.branchDiff = branchDiff;
+    draft.diffState.branchBase = baseBranch;
+    const fileList = draft.diffState.branchFiles;
+    if (fileList.length > 0) {
+      fileList.delete(0, fileList.length);
+    }
+    for (const file of branchFiles) {
+      fileList.push(file);
+    }
+    draft.diffState.branchUpdatedAt = Date.now();
+  });
+  log.debug({ baseBranch, fileCount: branchFiles.length }, 'Branch diff state captured');
+}
+
+async function captureTurnDiff(
+  cwd: string,
+  turnStartRef: string | null,
+  taskHandle: TaskHandle,
+  log: ReturnType<typeof createChildLogger>
+): Promise<void> {
+  const turnEndRef = await captureTreeSnapshot(cwd);
+  if (!turnStartRef || !turnEndRef) {
+    log.debug('No turn diff to capture (refs missing)');
+    return;
+  }
+
+  let turnDiff = '';
+  let turnFiles: Array<{ path: string; status: string }> = [];
+
+  if (turnStartRef !== turnEndRef) {
+    [turnDiff, turnFiles] = await Promise.all([
+      getSnapshotDiff(cwd, turnStartRef, turnEndRef),
+      getSnapshotFiles(cwd, turnStartRef, turnEndRef),
+    ]);
+  }
+
+  if (!turnDiff && turnFiles.length === 0) {
+    [turnDiff, turnFiles] = await Promise.all([
+      getUnstagedDiff(cwd),
+      getChangedFiles(cwd),
+    ]);
+  }
+
+  if (!turnDiff && turnFiles.length === 0) {
+    log.debug('No turn diff to capture (no changes)');
+    return;
+  }
+
+  change(taskHandle.doc, (draft) => {
+    draft.diffState.lastTurnDiff = turnDiff;
+    const fileList = draft.diffState.lastTurnFiles;
+    if (fileList.length > 0) {
+      fileList.delete(0, fileList.length);
+    }
+    for (const file of turnFiles) {
+      fileList.push(file);
+    }
+    draft.diffState.lastTurnUpdatedAt = Date.now();
+  });
+  log.debug({ fromRef: turnStartRef, toRef: turnEndRef }, 'Turn diff captured');
 }
 
 function handleMessage(msg: PersonalRoomServerMessage, ctx: MessageHandlerContext): void {
@@ -369,6 +536,12 @@ async function watchTaskDocument(
     taskLog.debug({ taskDocId }, 'No existing task data in storage');
   }
 
+  const json = taskHandle.doc.toJSON();
+  const initialCwd = json.config.cwd ?? process.cwd();
+  captureBranchDiffState(initialCwd, taskHandle, taskLog).catch((err: unknown) => {
+    taskLog.warn({ err }, 'Failed to capture initial branch diff');
+  });
+
   const opCountBefore = taskHandle.loroDoc.opCount();
   taskLog.info({ taskDocId, opCount: opCountBefore }, 'Doc state before subscribe');
 
@@ -422,6 +595,10 @@ function onTaskDocChanged(
   );
 
   if (json.meta.status === 'working' || json.meta.status === 'input-required') {
+    const activeCwd = json.config.cwd ?? process.cwd();
+    debouncedDiffCapture(taskId, activeCwd, taskHandle, taskLog);
+    debouncedBranchDiffCapture(taskId, activeCwd, taskHandle, taskLog);
+
     taskLog.debug({ status: json.meta.status }, 'Status blocks new work, skipping');
     return;
   }
@@ -456,6 +633,12 @@ function onTaskDocChanged(
 
   ctx.signaling.updateStatus('running', taskId);
 
+  const turnStartRefPromise = captureTreeSnapshot(cwd);
+
+  turnStartRefPromise
+    .then((ref) => taskLog.debug({ turnStartRef: ref }, 'Captured turn start snapshot'))
+    .catch((err: unknown) => taskLog.warn({ err }, 'Failed to capture turn start snapshot'));
+
   runTask({
     taskHandle,
     taskId,
@@ -483,24 +666,81 @@ function onTaskDocChanged(
       const errMsg = err instanceof Error ? err.message : String(err);
       taskLog.error({ err: errMsg }, 'Task failed');
     })
-    .finally(() => {
-      abortController.abort();
+    .finally(() =>
+      cleanupTaskRun({
+        taskId,
+        cwd,
+        taskHandle,
+        taskLog,
+        turnStartRefPromise,
+        abortController,
+        ctx,
+      })
+    );
+}
 
-      for (const [key] of taskHandle.permReqs.getAll()) {
-        taskHandle.permReqs.delete(key);
-      }
-      for (const [key] of taskHandle.permResps.getAll()) {
-        taskHandle.permResps.delete(key);
-      }
+interface CleanupTaskRunOptions {
+  taskId: string;
+  cwd: string;
+  taskHandle: TaskHandle;
+  taskLog: ReturnType<typeof createChildLogger>;
+  turnStartRefPromise: Promise<string | null>;
+  abortController: AbortController;
+  ctx: MessageHandlerContext;
+}
 
-      ctx.activeTasks.delete(taskId);
-      const unsub = ctx.watchedTasks.get(taskId);
-      if (unsub) {
-        unsub();
-        ctx.watchedTasks.delete(taskId);
-      }
-      ctx.signaling.updateStatus('idle');
-    });
+async function cleanupTaskRun(opts: CleanupTaskRunOptions): Promise<void> {
+  const { taskId, cwd, taskHandle, taskLog, turnStartRefPromise, abortController, ctx } = opts;
+
+  clearDebouncedTimer(diffDebounceTimers, taskId);
+  clearDebouncedTimer(branchDiffTimers, taskId);
+
+  try {
+    await captureDiffState(cwd, taskHandle, taskLog);
+  } catch (err: unknown) {
+    taskLog.warn({ err }, 'Failed to capture final diff state');
+  }
+
+  try {
+    await captureBranchDiffState(cwd, taskHandle, taskLog);
+  } catch (err: unknown) {
+    taskLog.warn({ err }, 'Failed to capture final branch diff state');
+  }
+
+  try {
+    const turnStartRef = await turnStartRefPromise;
+    await captureTurnDiff(cwd, turnStartRef, taskHandle, taskLog);
+  } catch (err: unknown) {
+    taskLog.warn({ err }, 'Failed to capture turn diff');
+  }
+
+  abortController.abort();
+
+  for (const [key] of taskHandle.permReqs.getAll()) {
+    taskHandle.permReqs.delete(key);
+  }
+  for (const [key] of taskHandle.permResps.getAll()) {
+    taskHandle.permResps.delete(key);
+  }
+
+  ctx.activeTasks.delete(taskId);
+  const unsub = ctx.watchedTasks.get(taskId);
+  if (unsub) {
+    unsub();
+    ctx.watchedTasks.delete(taskId);
+  }
+  ctx.signaling.updateStatus('idle');
+}
+
+function clearDebouncedTimer(
+  timers: Map<string, ReturnType<typeof setTimeout>>,
+  taskId: string
+): void {
+  const timer = timers.get(taskId);
+  if (timer) {
+    clearTimeout(timer);
+    timers.delete(taskId);
+  }
 }
 
 /**
@@ -521,25 +761,6 @@ function mapPermissionMode(
     default:
       return undefined;
   }
-}
-
-async function loadEpoch(repo: Repo): Promise<number> {
-  const epochHandle = repo.get('epoch', EpochDocumentSchema);
-
-  try {
-    await epochHandle.waitForSync({ kind: 'storage', timeout: 5_000 });
-  } catch {
-    logger.debug('No existing epoch data in storage');
-  }
-
-  if (epochHandle.loroDoc.opCount() === 0) {
-    change(epochHandle.doc, (draft) => {
-      draft.schema.version = DEFAULT_EPOCH;
-    });
-    return DEFAULT_EPOCH;
-  }
-
-  return epochHandle.doc.toJSON().schema.version;
 }
 
 /**

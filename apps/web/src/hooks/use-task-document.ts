@@ -2,6 +2,7 @@ import { useDoc } from '@loro-extended/react';
 import {
   buildDocumentId,
   DEFAULT_EPOCH,
+  type DiffState,
   type Message,
   type PermissionDecision,
   type PermissionRequest,
@@ -30,6 +31,7 @@ export interface TaskDocumentResult {
   meta: TaskMeta | null;
   conversation: Message[];
   sessions: SessionEntry[];
+  diffState: DiffState | null;
   pendingPermissions: Map<string, PermissionRequest>;
   respondToPermission: (
     toolUseId: string,
@@ -65,6 +67,7 @@ export function useTaskDocument(taskId: string | null): TaskDocumentResult {
   const meta = useDoc(handle, (d: { meta: TaskMeta }) => d.meta);
   const conversation = useDoc(handle, (d: { conversation: Message[] }) => d.conversation);
   const sessions = useDoc(handle, (d: { sessions: SessionEntry[] }) => d.sessions);
+  const diffState = useDoc(handle, (d: { diffState: DiffState }) => d.diffState);
 
   /**
    * Permission requests from ephemeral state.
@@ -131,6 +134,7 @@ export function useTaskDocument(taskId: string | null): TaskDocumentResult {
       meta: null,
       conversation: [],
       sessions: [],
+      diffState: null,
       pendingPermissions: EMPTY_PERMISSIONS,
       respondToPermission,
       isLoading: false,
@@ -141,6 +145,7 @@ export function useTaskDocument(taskId: string | null): TaskDocumentResult {
     meta,
     conversation,
     sessions,
+    diffState,
     pendingPermissions,
     respondToPermission,
     isLoading: !meta,

@@ -9,9 +9,10 @@ import { MobileSidebarToggle } from './sidebar';
 interface TopBarProps {
   onToggleTerminal: () => void;
   onToggleDiff: () => void;
+  hasUnviewedDiff?: boolean;
 }
 
-export function TopBar({ onToggleTerminal, onToggleDiff }: TopBarProps) {
+export function TopBar({ onToggleTerminal, onToggleDiff, hasUnviewedDiff }: TopBarProps) {
   const activeTaskId = useTaskStore((s) => s.activeTaskId);
   const { taskIndex } = useTaskIndex(LOCAL_USER_ID);
   const activeEntry = activeTaskId ? taskIndex[activeTaskId] : undefined;
@@ -50,16 +51,21 @@ export function TopBar({ onToggleTerminal, onToggleDiff }: TopBarProps) {
         </Tooltip>
         <Tooltip>
           <Tooltip.Trigger>
-            <Button
-              isIconOnly
-              variant="ghost"
-              size="sm"
-              aria-label="Toggle diff panel"
-              onPress={onToggleDiff}
-              className="text-muted hover:text-foreground hover:bg-default w-9 h-9 sm:w-8 sm:h-8 min-w-0"
-            >
-              <Diff className="w-4 h-4" />
-            </Button>
+            <span className="relative inline-flex">
+              <Button
+                isIconOnly
+                variant="ghost"
+                size="sm"
+                aria-label="Toggle diff panel"
+                onPress={onToggleDiff}
+                className="text-muted hover:text-foreground hover:bg-default w-9 h-9 sm:w-8 sm:h-8 min-w-0"
+              >
+                <Diff className="w-4 h-4" />
+              </Button>
+              {hasUnviewedDiff && (
+                <span className="absolute top-0 right-0 w-2 h-2 rounded-full bg-accent" />
+              )}
+            </span>
           </Tooltip.Trigger>
           <Tooltip.Content>
             <span className="flex items-center gap-2">
