@@ -46,6 +46,31 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }
 
+/**
+ * Manages a resizable panel via pointer drag on a separator.
+ *
+ * ## Why the "settling" phase exists
+ *
+ * During drag, we bypass React and write `panel.style.width` directly for
+ * 60fps performance. On pointer-up we need to hand control back to React
+ * (which owns `style.width` via `panelStyle`). The tricky part:
+ *
+ * 1. We update the Zustand store (external to React).
+ * 2. `useSyncExternalStore` schedules a re-render, but it is NOT guaranteed
+ *    to flush synchronously — even inside `flushSync`, because `flushSync`
+ *    only forces React's own state updates (`useState`/`useReducer`).
+ * 3. If we remove our inline width override before React re-renders with the
+ *    new store value, the panel briefly shows the OLD width.
+ * 4. Worse: if CSS transitions are re-enabled at the same time, the browser
+ *    ANIMATES from old-width to new-width — the visible "snap-back" bug.
+ *
+ * Solution: a three-phase lifecycle:
+ *   - **dragging**: direct DOM, transitions disabled, React style ignored
+ *   - **settling**: drag ended, store updated, but we keep the inline width
+ *     override and transitions disabled until a `useEffect` confirms React
+ *     has re-rendered with the correct width
+ *   - **idle**: React owns the width, transitions enabled
+ */
 export function useResizablePanel({
   isOpen,
   width,
@@ -56,8 +81,13 @@ export function useResizablePanel({
 }: UseResizablePanelOptions): UseResizablePanelReturn {
   const panelRef = useRef<HTMLElement | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  /** True while we wait for React to render the final width from the store. */
+  const [isSettling, setIsSettling] = useState(false);
   const onWidthChangeRef = useRef(onWidthChange);
   onWidthChangeRef.current = onWidthChange;
+
+  /** The width we told the store to use on drag-end. */
+  const settleTargetRef = useRef<number | null>(null);
 
   const dragStateRef = useRef<{
     initialClientX: number;
@@ -81,6 +111,27 @@ export function useResizablePanel({
     };
   }, []);
 
+  /*
+   * Settling effect: fires after React re-renders with the new store value.
+   * At that point it is safe to remove the inline width override and
+   * re-enable CSS transitions.
+   */
+  useEffect(() => {
+    if (!isSettling) return;
+
+    const panel = panelRef.current;
+    if (!panel) {
+      setIsSettling(false);
+      return;
+    }
+
+    requestAnimationFrame(() => {
+      panel.style.removeProperty('width');
+      panel.style.removeProperty('transition');
+      setIsSettling(false);
+    });
+  }, [isSettling]);
+
   const handlePointerDown = useCallback(
     (e: PointerEvent) => {
       if (e.button !== 0) return;
@@ -88,15 +139,19 @@ export function useResizablePanel({
       const panel = panelRef.current;
       if (!panel) return;
 
-      const target = e.currentTarget as HTMLElement;
+      const target = e.currentTarget;
+      if (!(target instanceof HTMLElement)) return;
       target.setPointerCapture(e.pointerId);
 
+      // Disable CSS transitions for the duration of the drag + settle.
       panel.style.transition = 'none';
+
+      const actualWidth = panel.getBoundingClientRect().width;
 
       dragStateRef.current = {
         initialClientX: e.clientX,
-        initialWidth: width,
-        currentWidth: width,
+        initialWidth: actualWidth,
+        currentWidth: actualWidth,
         rafId: null,
       };
       setIsDragging(true);
@@ -132,21 +187,27 @@ export function useResizablePanel({
 
         const finalWidth = state.currentWidth;
         dragStateRef.current = null;
-        setIsDragging(false);
 
-        requestAnimationFrame(() => {
-          panel.style.removeProperty('transition');
-          panel.style.removeProperty('width');
-        });
+        // Keep the inline width as a bridge — it will be removed by the
+        // settling effect once React has rendered with the correct value.
+        panel.style.width = `${finalWidth}px`;
+        // Keep transition: none — also removed by settling effect.
 
+        settleTargetRef.current = finalWidth;
+
+        // Update the store and transition to settling phase.
+        // We do NOT remove the inline style here — that's the settling
+        // effect's job, ensuring React has had a chance to render first.
         onWidthChangeRef.current(finalWidth);
+        setIsDragging(false);
+        setIsSettling(true);
       };
 
       target.addEventListener('pointermove', onPointerMove);
       target.addEventListener('pointerup', onPointerEnd);
       target.addEventListener('pointercancel', onPointerEnd);
     },
-    [width, minWidth, getMaxWidth]
+    [minWidth, getMaxWidth]
   );
 
   const handleKeyDown = useCallback(
@@ -189,8 +250,13 @@ export function useResizablePanel({
     maxWidth > minWidth ? Math.round(((clampedWidth - minWidth) / (maxWidth - minWidth)) * 100) : 0;
 
   const panelStyle: CSSProperties = {
-    width: isOpen ? clampedWidth : 0,
+    width: isOpen ? (isSettling ? undefined : clampedWidth) : 0,
   };
+
+  // While dragging or settling, the panel should not have CSS transitions.
+  // The className in the consumer checks `isDragging` — we extend that to
+  // cover settling too.
+  const suppressTransition = isDragging || isSettling;
 
   const separatorProps = {
     role: 'separator' as const,
@@ -203,7 +269,7 @@ export function useResizablePanel({
     onPointerDown: handlePointerDown,
     onKeyDown: handleKeyDown,
     onDoubleClick: handleDoubleClick,
-    style: { touchAction: 'none' } as CSSProperties,
+    style: { touchAction: 'none' } satisfies CSSProperties,
     className: [
       'absolute left-0 top-0 bottom-0 w-2 -translate-x-1/2 cursor-col-resize z-10 max-sm:hidden',
       'before:absolute before:inset-y-0 before:left-1/2 before:-translate-x-1/2',
@@ -214,5 +280,10 @@ export function useResizablePanel({
     ].join(' '),
   };
 
-  return { panelRef, separatorProps, panelStyle, isDragging };
+  return {
+    panelRef,
+    separatorProps,
+    panelStyle,
+    isDragging: suppressTransition,
+  };
 }
