@@ -27,6 +27,16 @@
 3. Daemon sends `spawn-result` (client msg) -> server validates, relays to browser WS
 4. Browser receives as `PersonalRoomServerMessage` (already was there)
 
+## Claude Agent SDK canUseTool permissions
+- `{ behavior: 'allow' }` is a ONE-SHOT approval — only allows the current tool call
+- `{ behavior: 'allow', updatedPermissions: suggestions }` persists the rule for the session
+- SDK provides `options.suggestions` (PermissionUpdate[]) in every canUseTool callback
+- ALWAYS forward `suggestions` as `updatedPermissions` on approval to prevent re-prompting
+- Without `updatedPermissions`, SDK re-asks for every tool call hitting the same rule
+- `PermissionUpdate` types: addRules, replaceRules, removeRules, setMode, addDirectories, removeDirectories
+- `destination: 'session'` scopes rule updates to current session only
+- Common suggestion: `{ type: 'addDirectories', directories: ['/tmp'], destination: 'session' }`
+
 ## Testing patterns
 - Daemon tests use vitest with `globals: true`
 - For native modules like node-datachannel, prefer dependency injection over vi.mock

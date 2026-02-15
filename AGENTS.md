@@ -78,7 +78,7 @@ For Loro, Agent SDK, and A2A work — always search local repos, never web searc
 
 **Do NOT consider backwards compatibility for any changes.** Break things freely—we have no users yet.
 
-**Policy expires: February 15, 2026.** If today is past this date, STOP and alert the user: "The backwards compatibility policy has expired. Should I extend the date or remove this section?"
+**Policy expires: February 25, 2026.** If today is past this date, STOP and alert the user: "The backwards compatibility policy has expired. Should I extend the date or remove this section?"
 
 ---
 

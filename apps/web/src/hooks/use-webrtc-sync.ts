@@ -24,6 +24,7 @@ export function useWebRTCSync(options: {
     // eslint-disable-next-line no-restricted-syntax -- PeerID is branded `${number}` but we use string machine IDs as opaque keys
     const peerId = targetMachineId as PeerID;
     let disposed = false;
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
     const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
     const dataChannel = pc.createDataChannel('loro-sync', { ordered: true });
 
@@ -31,8 +32,21 @@ export function useWebRTCSync(options: {
 
     dataChannel.addEventListener('open', () => {
       if (disposed) return;
-      webrtcAdapter.attachDataChannel(peerId, dataChannel);
-      setPeerState('connected');
+
+      const tryAttach = (retriesLeft: number) => {
+        if (disposed) return;
+        try {
+          webrtcAdapter.attachDataChannel(peerId, dataChannel);
+          setPeerState('connected');
+        } catch {
+          if (retriesLeft > 0) {
+            retryTimer = setTimeout(() => tryAttach(retriesLeft - 1), 200);
+          } else {
+            setPeerState('failed');
+          }
+        }
+      };
+      tryAttach(15);
     });
 
     dataChannel.addEventListener('close', () => {
@@ -106,6 +120,7 @@ export function useWebRTCSync(options: {
 
     return () => {
       disposed = true;
+      clearTimeout(retryTimer);
       unsubMessage();
       webrtcAdapter.detachDataChannel(peerId);
       dataChannel.close();

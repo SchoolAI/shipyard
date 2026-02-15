@@ -542,7 +542,14 @@ function buildCanUseTool(
     });
 
     taskLog.info(
-      { toolName, toolUseID, riskLevel, decisionReason, blockedPath, hasSuggestions: !!suggestions?.length },
+      {
+        toolName,
+        toolUseID,
+        riskLevel,
+        decisionReason,
+        blockedPath,
+        hasSuggestions: !!suggestions?.length,
+      },
       'Permission request sent to browser'
     );
 
@@ -573,7 +580,13 @@ function buildCanUseTool(
         });
 
         taskLog.info(
-          { toolName, toolUseID, decision: value.decision, persist: value.persist, hasSuggestions: !!suggestions?.length },
+          {
+            toolName,
+            toolUseID,
+            decision: value.decision,
+            persist: value.persist,
+            hasSuggestions: !!suggestions?.length,
+          },
           'Permission response received'
         );
 

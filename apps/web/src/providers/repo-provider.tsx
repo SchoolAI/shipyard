@@ -1,7 +1,8 @@
 import { WebRtcDataChannelAdapter } from '@loro-extended/adapter-webrtc';
-import type { RepoProviderConfig } from '@loro-extended/react';
-import { RepoProvider as LoroRepoProvider, useRepo } from '@loro-extended/react';
-import { createContext, type ReactNode, useContext, useRef } from 'react';
+import { RepoContext, useRepo } from '@loro-extended/react';
+import type { RepoParams } from '@loro-extended/repo';
+import { Repo } from '@loro-extended/repo';
+import { createContext, type ReactNode, useContext, useEffect, useState } from 'react';
 
 const WebRtcAdapterContext = createContext<WebRtcDataChannelAdapter | null>(null);
 
@@ -12,53 +13,65 @@ export function useWebRtcAdapter(): WebRtcDataChannelAdapter | null {
 export { useRepo };
 
 /**
- * LoroRepoProvider creates a Repo via useMemo([config]) and calls
- * repo.reset() in its effect cleanup. In React StrictMode, the cleanup
- * runs then the effect re-runs — but useMemo returns the SAME Repo
- * (same config reference), so the Repo is already reset/stopped.
+ * Manages the Loro Repo lifecycle directly instead of delegating to
+ * LoroRepoProvider. The upstream provider uses useMemo([config]) to
+ * create the Repo and repo.reset() in effect cleanup. In React
+ * StrictMode the cleanup runs and then the effect re-runs, but
+ * useMemo returns the SAME (now reset) Repo because the config
+ * reference is unchanged. The reset Repo has no adapters, so the
+ * WebRTC adapter stays in "stopped" state and addChannel() throws.
  *
- * Fix: useRef guarantees a stable config+adapter pair that is created
- * once per component instance. Because LoroRepoProvider keys on the
- * config reference, a fresh ref means a fresh Repo on each mount.
- * StrictMode's cleanup resets the old Repo, but the remount creates
- * a new component instance with a new ref → new config → new Repo.
+ * Fix: create the Repo inside useEffect so each mount gets a fresh
+ * instance with properly initialised and started adapters. The
+ * cleanup calls repo.reset() on the old instance. StrictMode's
+ * cleanup + re-mount cycle therefore always produces a working Repo.
  */
 export function ShipyardRepoProvider({
   children,
   config,
 }: {
   children: ReactNode;
-  config?: RepoProviderConfig;
+  config?: RepoParams;
 }) {
-  const stableRef = useRef<{
-    repoConfig: RepoProviderConfig;
+  const [state, setState] = useState<{
+    repo: Repo;
     adapter: WebRtcDataChannelAdapter | null;
   } | null>(null);
 
-  if (!stableRef.current) {
+  useEffect(() => {
+    let repoParams: RepoParams;
+    let adapter: WebRtcDataChannelAdapter | null;
+
     if (config) {
-      const webrtc =
+      repoParams = config;
+      adapter =
         config.adapters?.find(
           (a): a is WebRtcDataChannelAdapter => a instanceof WebRtcDataChannelAdapter
         ) ?? null;
-      stableRef.current = { repoConfig: config, adapter: webrtc };
     } else {
       const webrtc = new WebRtcDataChannelAdapter();
-      stableRef.current = {
-        repoConfig: {
-          identity: { name: 'browser' },
-          adapters: [webrtc],
-        } satisfies RepoProviderConfig,
-        adapter: webrtc,
+      adapter = webrtc;
+      repoParams = {
+        identity: { name: 'browser' },
+        adapters: [webrtc],
       };
     }
-  }
 
-  const { repoConfig, adapter } = stableRef.current;
+    const repo = new Repo(repoParams);
+    setState({ repo, adapter });
+
+    return () => {
+      repo.reset();
+    };
+  }, [config]);
+
+  if (!state) return null;
 
   return (
-    <LoroRepoProvider config={repoConfig}>
-      <WebRtcAdapterContext.Provider value={adapter}>{children}</WebRtcAdapterContext.Provider>
-    </LoroRepoProvider>
+    <RepoContext.Provider value={state.repo}>
+      <WebRtcAdapterContext.Provider value={state.adapter}>
+        {children}
+      </WebRtcAdapterContext.Provider>
+    </RepoContext.Provider>
   );
 }
