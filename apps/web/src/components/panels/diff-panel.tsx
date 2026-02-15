@@ -2,7 +2,7 @@ import { DiffModeEnum, DiffView } from '@git-diff-view/react';
 import '@git-diff-view/react/styles/diff-view.css';
 import { Button, Tooltip } from '@heroui/react';
 import type { DiffState, DiffFile as SchemaDiffFile } from '@shipyard/loro-schema';
-import { ChevronDown, ChevronRight, Columns2, Rows3, WrapText, X } from 'lucide-react';
+import { Columns2, PanelLeft, Rows3, WrapText, X } from 'lucide-react';
 import {
   forwardRef,
   type KeyboardEvent,
@@ -17,6 +17,8 @@ import { useResizablePanel } from '../../hooks/use-resizable-panel';
 import { useTaskDocument } from '../../hooks/use-task-document';
 import type { DiffScope, DiffViewType } from '../../stores';
 import { useUIStore } from '../../stores';
+import { assertNever } from '../../utils/assert-never';
+import { DiffFileTree } from './diff-file-tree';
 
 const SM_BREAKPOINT = 640;
 const SPLIT_MIN_WIDTH = 800;
@@ -49,19 +51,6 @@ export interface DiffPanelHandle {
 type DiffTab = 'unstaged' | 'staged';
 
 const TABS: DiffTab[] = ['unstaged', 'staged'];
-
-const STATUS_COLORS: Record<string, string> = {
-  M: 'text-warning',
-  A: 'text-success',
-  D: 'text-danger',
-  R: 'text-secondary',
-  C: 'text-secondary',
-  MM: 'text-warning',
-  AM: 'text-success',
-  AD: 'text-danger',
-  UU: 'text-danger',
-  '??': 'text-muted',
-};
 
 const SCOPE_OPTIONS: { value: DiffScope; label: string }[] = [
   { value: 'working-tree', label: 'Working Tree' },
@@ -106,16 +95,65 @@ function splitDiffByFile(rawDiff: string): string[] {
   return segments;
 }
 
+function extractFilePath(diffSegment: string): string | null {
+  const match = diffSegment.match(/^diff --git a\/(.+?) b\//m);
+  if (match?.[1]) return match[1];
+
+  /** Fallback: extract from the +++ line (handles renames and edge cases) */
+  const plusMatch = diffSegment.match(/^\+\+\+ b\/(.+)$/m);
+  if (plusMatch?.[1]) return plusMatch[1];
+
+  return null;
+}
+
+/**
+ * Strip git-quoted paths (`"path"` -> `path`), unescape octal sequences,
+ * and remove trailing slashes.
+ */
+function normalizePath(p: string): string {
+  let cleaned = p;
+  if (cleaned.startsWith('"') && cleaned.endsWith('"')) {
+    cleaned = cleaned
+      .slice(1, -1)
+      .replace(/\\([0-7]{3})/g, (_match, oct: string) =>
+        String.fromCharCode(Number.parseInt(oct, 8))
+      );
+  }
+  return cleaned.replace(/\/+$/, '');
+}
+
+/** Build a set of file paths that actually appear in the diff text. */
+function extractDiffPaths(rawDiff: string): Set<string> {
+  const paths = new Set<string>();
+  for (const seg of splitDiffByFile(rawDiff)) {
+    const p = extractFilePath(seg);
+    if (p) paths.add(normalizePath(p));
+  }
+  return paths;
+}
+
+function filterDiffByFile(rawDiff: string, filePath: string): string {
+  const segments = splitDiffByFile(rawDiff);
+  const normalized = normalizePath(filePath);
+  const match = segments.find((seg) => {
+    const segPath = extractFilePath(seg);
+    return segPath !== null && normalizePath(segPath) === normalized;
+  });
+  return match ?? '';
+}
+
 function DiffContent({
   rawDiff,
   wordWrap,
   viewType,
   panelWidth,
+  selectedFile,
 }: {
   rawDiff: string;
   wordWrap: boolean;
   viewType: DiffViewType;
   panelWidth: number;
+  selectedFile: string | null;
 }) {
   const resolvedTheme = useTheme();
 
@@ -124,12 +162,21 @@ function DiffContent({
       ? DiffModeEnum.Split
       : DiffModeEnum.Unified;
 
-  const data = useMemo(
-    () => ({
-      hunks: splitDiffByFile(rawDiff),
-    }),
-    [rawDiff]
-  );
+  const data = useMemo(() => {
+    if (selectedFile) {
+      const filtered = filterDiffByFile(rawDiff, selectedFile);
+      return { hunks: filtered ? [filtered] : [] };
+    }
+    return { hunks: splitDiffByFile(rawDiff) };
+  }, [rawDiff, selectedFile]);
+
+  if (data.hunks.length === 0) {
+    return (
+      <div className="flex items-center justify-center flex-1 text-sm text-muted">
+        No changes for this file
+      </div>
+    );
+  }
 
   return (
     <DiffView
@@ -140,50 +187,6 @@ function DiffContent({
       diffViewHighlight
       diffViewFontSize={12}
     />
-  );
-}
-
-function FileList({
-  files,
-  isOpen,
-  onToggle,
-}: {
-  files: readonly SchemaDiffFile[];
-  isOpen: boolean;
-  onToggle: () => void;
-}) {
-  if (files.length === 0) return null;
-  const Icon = isOpen ? ChevronDown : ChevronRight;
-  return (
-    <div className="border-b border-separator/50">
-      <button
-        type="button"
-        className="flex items-center gap-2 w-full px-4 py-2 text-xs text-muted hover:text-foreground transition-colors"
-        onClick={onToggle}
-        aria-expanded={isOpen}
-      >
-        <Icon className="w-3 h-3" />
-        <span className="font-medium">
-          {files.length} file{files.length !== 1 ? 's' : ''} changed
-        </span>
-      </button>
-      {isOpen && (
-        <div role="list" className="pb-2">
-          {files.map((file) => (
-            <div
-              key={file.path}
-              role="listitem"
-              className="flex items-center gap-2 px-6 py-0.5 text-xs"
-            >
-              <span className={`font-mono ${STATUS_COLORS[file.status] ?? 'text-muted'}`}>
-                {file.status}
-              </span>
-              <span className="text-foreground/80 truncate">{file.path}</span>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
   );
 }
 
@@ -209,6 +212,8 @@ function getEmptyMessage(
     case 'last-turn':
       if (!diffState?.lastTurnUpdatedAt) return 'No turn changes captured yet';
       return 'No changes in the last turn';
+    default:
+      return assertNever(scope);
   }
 }
 
@@ -220,12 +225,14 @@ function getDiffData(
   if (!diffState) return { diff: undefined, files: [], updatedAt: undefined };
 
   switch (scope) {
-    case 'working-tree':
+    case 'working-tree': {
+      const diff = activeTab === 'unstaged' ? diffState.unstaged : diffState.staged;
       return {
-        diff: activeTab === 'unstaged' ? diffState.unstaged : diffState.staged,
+        diff,
         files: diffState.files,
         updatedAt: diffState.updatedAt,
       };
+    }
     case 'branch':
       return {
         diff: diffState.branchDiff,
@@ -238,31 +245,51 @@ function getDiffData(
         files: diffState.lastTurnFiles,
         updatedAt: diffState.lastTurnUpdatedAt,
       };
+    default:
+      return assertNever(scope);
   }
 }
 
-function TabPanelContent({
+function DiffBody({
   activeTaskId,
   activeTab,
   scope,
   diffState,
-  isFileListOpen,
-  onToggleFileList,
   wordWrap,
   viewType,
   panelWidth,
+  selectedFile,
+  onSelectFile,
+  isFileTreeOpen,
+  fileTreeWidth,
 }: {
   activeTaskId: string | null;
   activeTab: DiffTab;
   scope: DiffScope;
   diffState: DiffState | null;
-  isFileListOpen: boolean;
-  onToggleFileList: () => void;
   wordWrap: boolean;
   viewType: DiffViewType;
   panelWidth: number;
+  selectedFile: string | null;
+  onSelectFile: (path: string | null) => void;
+  isFileTreeOpen: boolean;
+  fileTreeWidth: number;
 }) {
   const { diff, files, updatedAt } = getDiffData(scope, activeTab, diffState);
+
+  /**
+   * For working-tree scope the daemon stores a single file list for both tabs,
+   * but the diff text is tab-specific.  Filter the tree to only files that
+   * actually have content in the current diff so clicking a file always shows
+   * something (untracked `??` files only appear in the unstaged diff, fully
+   * staged files only in the staged diff, etc.).
+   */
+  const diffPaths = useMemo(() => (diff ? extractDiffPaths(diff) : new Set<string>()), [diff]);
+  const visibleFiles = useMemo(
+    () =>
+      scope === 'working-tree' ? files.filter((f) => diffPaths.has(normalizePath(f.path))) : files,
+    [scope, files, diffPaths]
+  );
 
   if (!activeTaskId) return <EmptyState message="Select a task to see changes" />;
   if (!updatedAt) return <EmptyState message="Code changes will appear here" />;
@@ -270,10 +297,26 @@ function TabPanelContent({
     const msg = getEmptyMessage(scope, activeTab, diffState);
     return <EmptyState message={msg ?? 'No changes'} />;
   }
+
   return (
-    <div className="flex-1 min-h-0 overflow-y-auto">
-      <FileList files={files} isOpen={isFileListOpen} onToggle={onToggleFileList} />
-      <DiffContent rawDiff={diff} wordWrap={wordWrap} viewType={viewType} panelWidth={panelWidth} />
+    <div className="flex flex-1 min-h-0">
+      {isFileTreeOpen && visibleFiles.length > 0 && (
+        <DiffFileTree
+          files={visibleFiles}
+          selectedFile={selectedFile}
+          onSelectFile={onSelectFile}
+          width={fileTreeWidth}
+        />
+      )}
+      <div className="flex-1 min-w-0 overflow-y-auto">
+        <DiffContent
+          rawDiff={diff}
+          wordWrap={wordWrap}
+          viewType={viewType}
+          panelWidth={panelWidth}
+          selectedFile={selectedFile}
+        />
+      </div>
     </div>
   );
 }
@@ -294,7 +337,7 @@ export const DiffPanel = forwardRef<DiffPanelHandle, DiffPanelProps>(function Di
   ref
 ) {
   const [activeTab, setActiveTab] = useState<DiffTab>('unstaged');
-  const [isFileListOpen, setIsFileListOpen] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
 
   const diffPanelWidth = useUIStore((s) => s.diffPanelWidth);
@@ -305,6 +348,9 @@ export const DiffPanel = forwardRef<DiffPanelHandle, DiffPanelProps>(function Di
   const setDiffScope = useUIStore((s) => s.setDiffScope);
   const diffViewType = useUIStore((s) => s.diffViewType);
   const setDiffViewType = useUIStore((s) => s.setDiffViewType);
+  const isDiffFileTreeOpen = useUIStore((s) => s.isDiffFileTreeOpen);
+  const toggleDiffFileTree = useUIStore((s) => s.toggleDiffFileTree);
+  const diffFileTreeWidth = useUIStore((s) => s.diffFileTreeWidth);
 
   const isMobile = useIsMobile();
 
@@ -323,6 +369,10 @@ export const DiffPanel = forwardRef<DiffPanelHandle, DiffPanelProps>(function Di
     }),
     []
   );
+
+  useEffect(() => {
+    setSelectedFile(null);
+  }, [diffScope, activeTab, activeTaskId]);
 
   const handleTablistKeyDown = useCallback(
     (e: KeyboardEvent<HTMLDivElement>) => {
@@ -346,6 +396,7 @@ export const DiffPanel = forwardRef<DiffPanelHandle, DiffPanelProps>(function Di
   const isSplitViewActive = diffViewType === 'split';
   const SplitIcon = isSplitViewActive ? Rows3 : Columns2;
   const splitLabel = isSplitViewActive ? 'Switch to unified view' : 'Switch to split view';
+  const fileTreeLabel = isDiffFileTreeOpen ? 'Hide file tree' : 'Show file tree';
 
   return (
     <aside
@@ -360,18 +411,37 @@ export const DiffPanel = forwardRef<DiffPanelHandle, DiffPanelProps>(function Di
 
       <div className="flex flex-col h-full min-w-0 sm:min-w-[400px]">
         <div className="flex items-center justify-between px-4 py-2 border-b border-separator/50">
-          <select
-            aria-label="Diff scope"
-            value={diffScope}
-            onChange={(e) => setDiffScope(e.target.value as DiffScope)}
-            className="text-xs text-muted font-medium bg-transparent border-none outline-none cursor-pointer hover:text-foreground transition-colors"
-          >
-            {SCOPE_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
+          <div className="flex items-center gap-2">
+            <Tooltip delay={0}>
+              <Button
+                isIconOnly
+                variant="ghost"
+                size="sm"
+                aria-label={fileTreeLabel}
+                onPress={toggleDiffFileTree}
+                className={`text-muted hover:text-foreground hover:bg-default w-8 h-8 min-w-0 ${isDiffFileTreeOpen ? 'text-accent' : ''}`}
+              >
+                <PanelLeft className="w-3.5 h-3.5" />
+              </Button>
+              <Tooltip.Content>{fileTreeLabel}</Tooltip.Content>
+            </Tooltip>
+            <select
+              aria-label="Diff scope"
+              value={diffScope}
+              onChange={(e) => {
+                const value = e.target.value;
+                const validScope = SCOPE_OPTIONS.find((opt) => opt.value === value);
+                if (validScope) setDiffScope(validScope.value);
+              }}
+              className="text-xs text-muted font-medium bg-transparent border-none outline-none cursor-pointer hover:text-foreground transition-colors color-inherit [&_option]:bg-surface [&_option]:text-foreground"
+            >
+              {SCOPE_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
           <div className="flex items-center gap-1">
             <Tooltip delay={0}>
               <Button
@@ -445,25 +515,34 @@ export const DiffPanel = forwardRef<DiffPanelHandle, DiffPanelProps>(function Di
 
         <div
           ref={contentRef}
-          role="tabpanel"
-          id={`diff-tabpanel-${activeTab}`}
-          aria-labelledby={`diff-tab-${activeTab}`}
+          {...(diffScope === 'working-tree'
+            ? {
+                role: 'tabpanel' as const,
+                id: `diff-tabpanel-${activeTab}`,
+                'aria-labelledby': `diff-tab-${activeTab}`,
+              }
+            : {
+                role: 'region' as const,
+                'aria-label': 'Diff content',
+              })}
           tabIndex={isOpen ? 0 : -1}
           onKeyDown={(e) => {
             if (e.key === 'Escape') onClose();
           }}
           className="flex flex-col flex-1 min-h-0 focus-visible-ring"
         >
-          <TabPanelContent
+          <DiffBody
             activeTaskId={activeTaskId}
             activeTab={activeTab}
             scope={diffScope}
             diffState={diffState}
-            isFileListOpen={isFileListOpen}
-            onToggleFileList={() => setIsFileListOpen((v) => !v)}
             wordWrap={diffWordWrap}
             viewType={diffViewType}
             panelWidth={diffPanelWidth}
+            selectedFile={selectedFile}
+            onSelectFile={setSelectedFile}
+            isFileTreeOpen={isDiffFileTreeOpen && !isMobile}
+            fileTreeWidth={diffFileTreeWidth}
           />
         </div>
       </div>
