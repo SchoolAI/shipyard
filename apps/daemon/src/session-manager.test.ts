@@ -156,33 +156,6 @@ function assistantMsgToolUseOnly() {
   };
 }
 
-/** Stream events that simulate a thinking block being streamed before an assistant message. */
-function thinkingStreamEvents(thinkingText: string, parentToolUseId: string | null = null) {
-  return [
-    {
-      type: 'stream_event',
-      event: { type: 'content_block_start', index: 0, content_block: { type: 'thinking', thinking: '' } },
-      parent_tool_use_id: parentToolUseId,
-      uuid: '00000000-0000-0000-0000-000000000020',
-      session_id: 'sess-1',
-    },
-    {
-      type: 'stream_event',
-      event: { type: 'content_block_delta', index: 0, delta: { type: 'thinking_delta', thinking: thinkingText } },
-      parent_tool_use_id: parentToolUseId,
-      uuid: '00000000-0000-0000-0000-000000000021',
-      session_id: 'sess-1',
-    },
-    {
-      type: 'stream_event',
-      event: { type: 'content_block_stop', index: 0 },
-      parent_tool_use_id: parentToolUseId,
-      uuid: '00000000-0000-0000-0000-000000000022',
-      session_id: 'sess-1',
-    },
-  ];
-}
-
 function userToolResultMsg(toolUseId: string, content: string, isError = false) {
   return {
     type: 'user',
@@ -496,7 +469,6 @@ describe('SessionManager', () => {
             permissionMode: 'bypassPermissions',
             maxTurns: 10,
             allowDangerouslySkipPermissions: true,
-            includePartialMessages: true,
           }),
         });
       });
@@ -915,136 +887,6 @@ describe('SessionManager', () => {
         isError: false,
         parentToolUseId: null,
       });
-    });
-  });
-
-  describe('thinking block capture from stream events', () => {
-    it('prepends thinking blocks accumulated from stream events to assistant message', async () => {
-      mockQuery.mockReturnValue(
-        mockQueryResponse([
-          initMsg('sess-1'),
-          ...thinkingStreamEvents('Let me analyze this step by step...'),
-          assistantMsg('Here is my response.'),
-          successResult(),
-        ])
-      );
-
-      await manager.createSession({ prompt: 'Think and respond', cwd: '/tmp' });
-
-      const json = taskDoc.toJSON();
-      expect(json.conversation).toHaveLength(1);
-      expect(json.conversation[0]?.content).toHaveLength(2);
-      expect(json.conversation[0]?.content[0]).toEqual({
-        type: 'thinking',
-        text: 'Let me analyze this step by step...',
-      });
-      expect(json.conversation[0]?.content[1]).toEqual({
-        type: 'text',
-        text: 'Here is my response.',
-      });
-    });
-
-    it('accumulates thinking text across multiple deltas', async () => {
-      mockQuery.mockReturnValue(
-        mockQueryResponse([
-          initMsg('sess-1'),
-          {
-            type: 'stream_event',
-            event: { type: 'content_block_start', index: 0, content_block: { type: 'thinking', thinking: '' } },
-            parent_tool_use_id: null,
-            uuid: '00000000-0000-0000-0000-000000000020',
-            session_id: 'sess-1',
-          },
-          {
-            type: 'stream_event',
-            event: { type: 'content_block_delta', index: 0, delta: { type: 'thinking_delta', thinking: 'First ' } },
-            parent_tool_use_id: null,
-            uuid: '00000000-0000-0000-0000-000000000021',
-            session_id: 'sess-1',
-          },
-          {
-            type: 'stream_event',
-            event: { type: 'content_block_delta', index: 0, delta: { type: 'thinking_delta', thinking: 'second ' } },
-            parent_tool_use_id: null,
-            uuid: '00000000-0000-0000-0000-000000000022',
-            session_id: 'sess-1',
-          },
-          {
-            type: 'stream_event',
-            event: { type: 'content_block_delta', index: 0, delta: { type: 'thinking_delta', thinking: 'third.' } },
-            parent_tool_use_id: null,
-            uuid: '00000000-0000-0000-0000-000000000023',
-            session_id: 'sess-1',
-          },
-          assistantMsg('Done.'),
-          successResult(),
-        ])
-      );
-
-      await manager.createSession({ prompt: 'Hello', cwd: '/tmp' });
-
-      const json = taskDoc.toJSON();
-      expect(json.conversation[0]?.content[0]).toEqual({
-        type: 'thinking',
-        text: 'First second third.',
-      });
-    });
-
-    it('resets accumulator between assistant messages', async () => {
-      mockQuery.mockReturnValue(
-        mockQueryResponse([
-          initMsg('sess-1'),
-          ...thinkingStreamEvents('Thinking for first turn'),
-          assistantMsgWithToolUse('First response'),
-          userToolResultMsg('tool-1', 'file data'),
-          ...thinkingStreamEvents('Thinking for second turn'),
-          assistantMsg('Second response'),
-          successResult(),
-        ])
-      );
-
-      await manager.createSession({ prompt: 'Hello', cwd: '/tmp' });
-
-      const json = taskDoc.toJSON();
-      expect(json.conversation).toHaveLength(2);
-
-      expect(json.conversation[0]?.content[0]).toEqual({
-        type: 'thinking',
-        text: 'Thinking for first turn',
-      });
-
-      expect(json.conversation[1]?.content[0]).toEqual({
-        type: 'thinking',
-        text: 'Thinking for second turn',
-      });
-      expect(json.conversation[1]?.content[1]).toEqual({
-        type: 'text',
-        text: 'Second response',
-      });
-    });
-
-    it('ignores non-thinking stream events', async () => {
-      mockQuery.mockReturnValue(
-        mockQueryResponse([
-          initMsg('sess-1'),
-          {
-            type: 'stream_event',
-            event: { type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } },
-            parent_tool_use_id: null,
-            uuid: '00000000-0000-0000-0000-000000000020',
-            session_id: 'sess-1',
-          },
-          assistantMsg('Just text.'),
-          successResult(),
-        ])
-      );
-
-      await manager.createSession({ prompt: 'Hello', cwd: '/tmp' });
-
-      const json = taskDoc.toJSON();
-      expect(json.conversation).toHaveLength(1);
-      expect(json.conversation[0]?.content).toHaveLength(1);
-      expect(json.conversation[0]?.content[0]).toEqual({ type: 'text', text: 'Just text.' });
     });
   });
 

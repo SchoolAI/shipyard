@@ -64,7 +64,6 @@ export type {
   ReasoningEffort,
   SessionEntry,
   SessionState,
-  TaskConfig,
   TaskDocument,
   TaskDocumentShape,
   TaskMeta,
@@ -84,7 +83,6 @@ export {
   REASONING_EFFORTS,
   SESSION_STATES,
   SessionEntryShape,
-  TaskConfigShape,
   TaskDocumentSchema,
   TOOL_RISK_LEVELS,
 } from './shapes.js';

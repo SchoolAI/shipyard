@@ -136,8 +136,8 @@ describe('epoch evolution', () => {
       expect(epochDoc.toJSON().schema.version).toBe(3);
     });
 
-    it('DEFAULT_EPOCH is 1', () => {
-      expect(DEFAULT_EPOCH).toBe(1);
+    it('DEFAULT_EPOCH is 2', () => {
+      expect(DEFAULT_EPOCH).toBe(2);
     });
 
     it('epoch doc initialized at DEFAULT_EPOCH matches expected shape', () => {
@@ -147,7 +147,7 @@ describe('epoch evolution', () => {
       });
 
       const json = epochDoc.toJSON();
-      expect(json).toEqual({ schema: { version: 1 } });
+      expect(json).toEqual({ schema: { version: 2 } });
     });
 
     it('bumping epoch doc from 1 to 2 is a simple version write', () => {

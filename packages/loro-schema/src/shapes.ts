@@ -46,18 +46,6 @@ export const ContentBlockShape = Shape.plain.discriminatedUnion('type', {
   }),
 });
 
-/**
- * Message shape (MCP-aligned).
- * Messages are the units of conversation between user and assistant.
- */
-export const MessageShape = Shape.plain.struct({
-  messageId: Shape.plain.string(),
-  role: Shape.plain.string('user', 'assistant'),
-  content: Shape.plain.array(ContentBlockShape),
-  timestamp: Shape.plain.number(),
-  model: Shape.plain.string().nullable(),
-});
-
 const A2A_TASK_STATES = [
   'submitted',
   'working',
@@ -73,15 +61,21 @@ const REASONING_EFFORTS = ['low', 'medium', 'high'] as const;
 const PERMISSION_MODES = ['default', 'accept-edits', 'plan', 'bypass'] as const;
 
 /**
- * Task configuration shape.
- * Per-turn session config written by the browser, read by the daemon.
- * Lives in the CRDT so it syncs naturally and never touches signaling.
+ * Message shape (MCP-aligned).
+ * Messages are the units of conversation between user and assistant.
+ * Per-turn settings (model, machineId, etc.) live here so each turn
+ * carries its own context and switching back to a task restores them.
  */
-export const TaskConfigShape = Shape.struct({
+export const MessageShape = Shape.plain.struct({
+  messageId: Shape.plain.string(),
+  role: Shape.plain.string('user', 'assistant'),
+  content: Shape.plain.array(ContentBlockShape),
+  timestamp: Shape.plain.number(),
   model: Shape.plain.string().nullable(),
-  cwd: Shape.plain.string().nullable(),
+  machineId: Shape.plain.string().nullable(),
   reasoningEffort: Shape.plain.string(...REASONING_EFFORTS).nullable(),
   permissionMode: Shape.plain.string(...PERMISSION_MODES).nullable(),
+  cwd: Shape.plain.string().nullable(),
 });
 
 /**
@@ -116,8 +110,6 @@ export const TaskDocumentSchema = Shape.doc({
     updatedAt: Shape.plain.number(),
   }),
 
-  config: TaskConfigShape,
-
   conversation: Shape.list(MessageShape),
 
   sessions: Shape.list(SessionEntryShape),
@@ -132,7 +124,6 @@ export type TaskDocument = Infer<typeof TaskDocumentSchema>;
 export type MutableTaskDocument = InferMutableType<typeof TaskDocumentSchema>;
 
 export type TaskMeta = Infer<typeof TaskDocumentSchema.shapes.meta>;
-export type TaskConfig = Infer<typeof TaskConfigShape>;
 export type ContentBlock = Infer<typeof ContentBlockShape>;
 export type Message = Infer<typeof MessageShape>;
 export type ContentBlockType = (typeof CONTENT_BLOCK_TYPES)[number];

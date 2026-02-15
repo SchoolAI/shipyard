@@ -444,11 +444,10 @@ function onTaskDocChanged(
 
   taskLog.info('New user message detected, starting agent');
 
-  const config = json.config;
-  const cwd = config.cwd ?? process.cwd();
-  const model = config.model ?? undefined;
-  const permissionMode = mapPermissionMode(config.permissionMode);
-  const effort = config.reasoningEffort ?? undefined;
+  const cwd = lastMessage.cwd ?? process.cwd();
+  const model = lastMessage.model ?? undefined;
+  const permissionMode = mapPermissionMode(lastMessage.permissionMode);
+  const effort = lastMessage.reasoningEffort ?? undefined;
 
   const abortController = ctx.lifecycle.createAbortController();
 
