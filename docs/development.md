@@ -46,32 +46,27 @@ pnpm dev:og-proxy        # Start OG proxy worker (optional)
 
 ---
 
-## D1 Database Setup
-
-The session server uses Cloudflare D1 (edge SQLite) for user identity storage. For local development, `wrangler dev` uses a local SQLite file automatically — no cloud database needed.
-
-### Automated Setup
+## First-Time Setup
 
 ```bash
-pnpm setup:session-server
+pnpm setup
 ```
 
-This script:
-1. Creates `apps/session-server/.dev.vars` with an auto-generated JWT secret
-2. Applies D1 migrations to local SQLite
-3. Prints instructions for the one manual step: creating a GitHub OAuth App
+This runs three steps automatically:
+1. **Secrets** — creates `apps/session-server/.dev.vars` with auto-generated JWT secret and shared dev OAuth client ID
+2. **Database** — applies D1 migrations to local SQLite
+3. **Login** — builds the daemon, starts the session server, runs `shipyard login` device flow, then stops the server
 
-### Manual Step: GitHub OAuth App
+The only manual step is completing the GitHub OAuth prompt in your browser.
 
-The setup script prints these instructions, but for reference:
+### Individual Commands
 
-1. Go to https://github.com/settings/developers
-2. Click "New OAuth App"
-3. Fill in:
-   - **Application name:** Shipyard Local Dev
-   - **Homepage URL:** http://localhost:4444
-   - **Authorization callback URL:** http://localhost:4444/auth/device/verify
-4. Copy the Client ID and Client Secret into `apps/session-server/.dev.vars`
+| Command | When to use |
+|---------|------------|
+| `pnpm setup` | First time cloning the repo |
+| `pnpm setup:login` | Token expired (every 30 days) |
+| `pnpm db:migrate` | After pulling new D1 migrations |
+| `pnpm setup:secrets` | Regenerate `.dev.vars` |
 
 ---
 

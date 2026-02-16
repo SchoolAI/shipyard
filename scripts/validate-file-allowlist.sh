@@ -49,6 +49,10 @@ ALLOWED_SCRIPTS=(
   "scripts/validate-file-allowlist.sh"
   "scripts/generate-daemon-token.ts"
   "scripts/setup-session-server.sh"
+  "scripts/setup.sh"
+  "scripts/setup-secrets.sh"
+  "scripts/setup-login.sh"
+  "scripts/db-migrate.sh"
 )
 
 # Find all markdown and text files (excluding node_modules, .git, loro-extended-repo)
