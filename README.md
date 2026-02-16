@@ -62,6 +62,7 @@ Shipyard is in active development. The MCP server and web app are being rebuilt 
 | [**Session Server**](./apps/session-server) | Auth + WebRTC signaling (Cloudflare Workers + Durable Objects) |
 | [**OG Proxy**](./apps/og-proxy-worker) | Open Graph meta tags for social link previews |
 | [**Loro Schema**](./packages/loro-schema) | CRDT Shape definitions, typed documents, helpers |
+| [**Daemon**](./apps/daemon) | CLI agent runner + device flow auth (`@schoolai/shipyard` on npm) |
 | [**Session**](./packages/session) | Session/auth shared types and client |
 
 **Tech stack:** Loro CRDT (loro-extended), TipTap editor, HeroUI v3, Tailwind v4, Cloudflare Workers
@@ -84,6 +85,7 @@ Shipyard is in active development. The MCP server and web app are being rebuilt 
 | **[Development](./docs/development.md)** | Local setup, running services |
 | **[Architecture](./docs/architecture.md)** | Data model, sync topology, tech choices |
 | **[Engineering Standards](./docs/engineering-standards.md)** | Code quality, testing philosophy |
+| **[Installation](./docs/installation.md)** | Installing Shipyard across editors and CLI |
 
 ## Contributing
 

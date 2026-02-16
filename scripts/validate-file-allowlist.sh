@@ -30,6 +30,7 @@ ALLOWED_DOCS=(
   "docs/decisions/0005-rebrand-peer-plan-to-shipyard.md"
   "docs/decisions/0006-webrtc-p2p-sync-infrastructure.md"
   "docs/decisions/0007-partial-bun-migration.md"
+  "docs/decisions/0008-shipyard-native-identity.md"
   "docs/decisions/template.md"
 
   # Config

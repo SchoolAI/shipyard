@@ -46,6 +46,76 @@ pnpm dev:og-proxy        # Start OG proxy worker (optional)
 
 ---
 
+## D1 Database Setup
+
+The session server uses Cloudflare D1 (edge SQLite) for user identity storage.
+
+### First-Time Setup
+
+```bash
+# Create the D1 database (only needed once)
+wrangler d1 create shipyard-users-dev
+
+# Copy the database_id from the output into apps/session-server/wrangler.toml
+
+# Apply migrations
+cd apps/session-server
+wrangler d1 migrations apply shipyard-users-dev --local
+```
+
+### Setting Secrets
+
+The session server requires GitHub OAuth credentials and a JWT signing secret:
+
+```bash
+cd apps/session-server
+
+# For local development (creates .dev.vars file)
+echo "GITHUB_CLIENT_ID=your_github_oauth_client_id" >> .dev.vars
+echo "GITHUB_CLIENT_SECRET=your_github_oauth_client_secret" >> .dev.vars
+echo "JWT_SECRET=$(openssl rand -base64 32)" >> .dev.vars
+```
+
+To get GitHub OAuth credentials, create an OAuth App at https://github.com/settings/developers with callback URL `http://localhost:4444/auth/device/verify`.
+
+---
+
+## Daemon Authentication
+
+The daemon requires a Shipyard identity token to connect to the session server.
+
+### Login via Device Flow
+
+```bash
+# Start the session server first
+pnpm dev:session-server
+
+# In another terminal, run the login command
+shipyard login
+```
+
+This prints a URL and code. Open the URL in your browser, sign in with GitHub, and the CLI receives a token automatically. The token is saved to `~/.shipyard/config.json` (30-day expiry).
+
+### Auth Commands
+
+```bash
+shipyard login          # Authenticate via device flow
+shipyard login --check  # Show current auth status
+shipyard logout         # Clear stored credentials
+```
+
+### CI/Automation Override
+
+Set `SHIPYARD_USER_TOKEN` as an environment variable to skip the device flow. This takes precedence over the config file.
+
+### Token Lifecycle
+
+- Tokens expire after 30 days
+- The daemon checks expiry on startup and prints a message if expired
+- Run `shipyard login` again to refresh
+
+---
+
 ## OG Proxy Worker (Optional)
 
 Cloudflare Worker that injects dynamic Open Graph meta tags for social media crawlers.
@@ -78,6 +148,11 @@ pnpm lint:typeassertions # Check type assertions (ESLint)
 ## Environment Variables
 
 Session server configuration is in `apps/session-server/`. See the wrangler config for environment bindings.
+
+| Variable | Purpose |
+|----------|---------|
+| `SHIPYARD_USER_TOKEN` | JWT for signaling auth (alternative to `shipyard login`) |
+| `SHIPYARD_SIGNALING_URL` | Override signaling server URL |
 
 ### GitHub Authentication
 

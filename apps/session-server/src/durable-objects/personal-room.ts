@@ -143,7 +143,7 @@ export class PersonalRoom extends DurableObject<Env> {
       id: crypto.randomUUID(),
       type,
       userId: claims.sub,
-      username: claims.ghUser,
+      username: claims.displayName,
     };
 
     if (type === 'browser') {
@@ -157,7 +157,7 @@ export class PersonalRoom extends DurableObject<Env> {
     this.sendMessage(server, {
       type: 'authenticated',
       userId: claims.sub,
-      username: claims.ghUser,
+      username: claims.displayName,
     });
 
     this.sendMessage(server, {

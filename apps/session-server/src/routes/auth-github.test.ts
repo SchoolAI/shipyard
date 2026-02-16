@@ -1,9 +1,15 @@
 import { env, fetchMock } from 'cloudflare:test';
 import { ROUTES } from '@shipyard/session';
-import { afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { app } from './index';
 
-// GitHub API endpoints
+vi.mock('../db/index', () => ({
+  findOrCreateUser: vi.fn().mockResolvedValue({
+    user: { id: 'usr_test123', displayName: 'Test User', avatarUrl: 'https://avatars.githubusercontent.com/u/12345', createdAt: Date.now() },
+    providers: ['github'],
+  }),
+}));
+
 const GITHUB_TOKEN_URL = 'https://github.com';
 const GITHUB_API_URL = 'https://api.github.com';
 
@@ -68,7 +74,6 @@ describe(`POST ${ROUTES.AUTH_GITHUB_CALLBACK}`, () => {
   });
 
   it('returns 401 for invalid code (GitHub API error)', async () => {
-    // Mock GitHub token exchange failure
     fetchMock
       .get(GITHUB_TOKEN_URL)
       .intercept({ path: '/login/oauth/access_token', method: 'POST' })
@@ -100,7 +105,6 @@ describe(`POST ${ROUTES.AUTH_GITHUB_CALLBACK}`, () => {
   });
 
   it('returns 401 when GitHub user fetch fails', async () => {
-    // Mock successful token exchange
     fetchMock
       .get(GITHUB_TOKEN_URL)
       .intercept({ path: '/login/oauth/access_token', method: 'POST' })
@@ -108,7 +112,6 @@ describe(`POST ${ROUTES.AUTH_GITHUB_CALLBACK}`, () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-    // Mock failed user fetch
     fetchMock
       .get(GITHUB_API_URL)
       .intercept({ path: '/user', method: 'GET' })
@@ -133,7 +136,6 @@ describe(`POST ${ROUTES.AUTH_GITHUB_CALLBACK}`, () => {
   });
 
   it('returns Shipyard JWT for valid code', async () => {
-    // Mock successful token exchange
     fetchMock
       .get(GITHUB_TOKEN_URL)
       .intercept({ path: '/login/oauth/access_token', method: 'POST' })
@@ -141,7 +143,6 @@ describe(`POST ${ROUTES.AUTH_GITHUB_CALLBACK}`, () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-    // Mock successful user fetch
     fetchMock
       .get(GITHUB_API_URL)
       .intercept({ path: '/user', method: 'GET' })
@@ -172,22 +173,20 @@ describe(`POST ${ROUTES.AUTH_GITHUB_CALLBACK}`, () => {
     expect(res.status).toBe(200);
     const json = (await res.json()) as Record<string, unknown>;
 
-    // Verify response structure
     expect(json.token).toBeDefined();
     expect(typeof json.token).toBe('string');
-    expect((json.token as string).split('.')).toHaveLength(3); // JWT has 3 parts
+    expect((json.token as string).split('.')).toHaveLength(3);
 
     expect(json.user).toEqual({
-      id: 'gh_12345',
-      username: 'testuser',
+      id: 'usr_test123',
+      displayName: 'Test User',
+      providers: ['github'],
     });
 
-    // Should not have is_mobile for desktop user agent
     expect(json.is_mobile).toBeUndefined();
   });
 
   it('includes is_mobile for mobile user agents', async () => {
-    // Mock successful token exchange
     fetchMock
       .get(GITHUB_TOKEN_URL)
       .intercept({ path: '/login/oauth/access_token', method: 'POST' })
@@ -195,7 +194,6 @@ describe(`POST ${ROUTES.AUTH_GITHUB_CALLBACK}`, () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-    // Mock successful user fetch
     fetchMock
       .get(GITHUB_API_URL)
       .intercept({ path: '/user', method: 'GET' })
@@ -233,7 +231,6 @@ describe(`POST ${ROUTES.AUTH_GITHUB_CALLBACK}`, () => {
   });
 
   it('detects Android as mobile', async () => {
-    // Mock successful token exchange
     fetchMock
       .get(GITHUB_TOKEN_URL)
       .intercept({ path: '/login/oauth/access_token', method: 'POST' })
@@ -241,7 +238,6 @@ describe(`POST ${ROUTES.AUTH_GITHUB_CALLBACK}`, () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-    // Mock successful user fetch
     fetchMock
       .get(GITHUB_API_URL)
       .intercept({ path: '/user', method: 'GET' })

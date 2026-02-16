@@ -51,8 +51,8 @@ export interface SerializedCollabConnectionState {
 /** Claims passed from route to DO via header */
 export const PassedClaimsSchema = z.object({
   sub: z.string(),
-  ghUser: z.string(),
-  ghId: z.number(),
+  displayName: z.string(),
+  providers: z.array(z.string()),
 });
 export type PassedClaims = z.infer<typeof PassedClaimsSchema>;
 
@@ -65,7 +65,7 @@ export const PassedCollabPayloadSchema = z.object({
   userClaims: z
     .object({
       sub: z.string(),
-      ghUser: z.string(),
+      displayName: z.string(),
     })
     .optional(),
 });

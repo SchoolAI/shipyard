@@ -8,8 +8,8 @@ import { app } from './index';
 /**
  * Helper to create a valid JWT for testing
  */
-async function createTestToken(userId = 12345, username = 'testuser'): Promise<string> {
-  return generateSessionToken({ id: userId, login: username }, (env as unknown as Env).JWT_SECRET);
+async function createTestToken(userId = 'usr_test123', displayName = 'Test User'): Promise<string> {
+  return generateSessionToken({ id: userId, displayName }, ['github'], (env as unknown as Env).JWT_SECRET);
 }
 
 /**
@@ -23,9 +23,9 @@ function createExpiredToken(): string {
     .replace(/=+$/, '');
   const payload = btoa(
     JSON.stringify({
-      sub: 'gh_12345',
-      ghUser: 'testuser',
-      ghId: 12345,
+      sub: 'usr_test123',
+      displayName: 'Test User',
+      providers: ['github'],
       iat: Math.floor(Date.now() / 1000) - 86400,
       exp: Math.floor(Date.now() / 1000) - 3600, // Expired 1 hour ago
     })

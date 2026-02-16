@@ -52,7 +52,7 @@ Shipyard uses a **hub-and-spoke model** for real-time collaboration between huma
 - The **session server** connects peers: browsers, phones, other daemons
 - Data syncs via **Loro CRDT** using loro-extended adapters
 - P2P sync via **WebRTC**, persistence via **LevelDB** (server) and **IndexedDB** (browser)
-- Auth uses **Shipyard JWT** issued by the session server (GitHub OAuth for identity)
+- Auth uses **Shipyard JWT** with native user identity — users can link multiple OAuth providers (GitHub now, Google future)
 
 ### Room Topology
 
@@ -60,6 +60,40 @@ Shipyard uses a **hub-and-spoke model** for real-time collaboration between huma
 |-----------|---------|---------|
 | Personal | `user:{id}` | One per user, tracks all agents across machines |
 | Collaboration | `collab:{uuid}` | Ad-hoc sharing, pre-signed URL access |
+
+### Authentication & Identity
+
+Shipyard uses a native user identity model decoupled from any single OAuth provider:
+
+```
+ShipyardUser (D1)
+  id: "usr_abc123"              -- Stable across providers
+  displayName: "Jacob"
+  avatarUrl: "..."
+
+LinkedIdentity[] (D1)
+  provider: "github"            -- Extensible to google, etc.
+  providerId: "12345"
+  providerUsername: "jacob"
+```
+
+**JWT Claims:**
+```typescript
+{
+  sub: "usr_abc123",            // Shipyard-native ID
+  displayName: "Jacob",
+  providers: ["github"],
+  iat: number, exp: number,
+  scope?: "task:abc123",        // Agent-scoped tokens
+  machineId?: "macbook-pro",    // Daemon tokens
+}
+```
+
+**Login Flows:**
+- **Browser:** GitHub OAuth redirect → session server → Shipyard JWT
+- **CLI (daemon):** Device flow — `shipyard login` → browser OAuth → polling → JWT saved to `~/.shipyard/config.json`
+
+**Storage:** Cloudflare D1 (edge SQLite) in the session server for users, linked identities, and device flow state.
 
 ---
 
@@ -112,6 +146,7 @@ The actual source of truth is the distributed Loro CRDT state synced across peer
 | Persistence (server) | LevelDB | `@loro-extended/adapter-leveldb` |
 | Persistence (browser) | IndexedDB | `@loro-extended/adapter-indexeddb` |
 | URL compression | lz-string | `lz-string` |
+| User Identity | Cloudflare D1 | `wrangler d1`, SQLite at edge |
 | Auth/sessions | Shipyard JWT | `@shipyard/session`, GitHub OAuth |
 | Session server | Cloudflare Workers | Durable Objects for signaling |
 | MCP SDK | Official SDK | `@modelcontextprotocol/sdk` |

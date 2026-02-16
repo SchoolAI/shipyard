@@ -122,7 +122,7 @@ export class CollabRoom extends DurableObject<Env> {
     }
 
     const userId = payload.userClaims?.sub ?? payload.inviterId;
-    const username = payload.userClaims?.ghUser ?? 'anonymous';
+    const username = payload.userClaims?.displayName ?? 'anonymous';
     const role: 'owner' | 'collaborator' = userId === this.ownerId ? 'owner' : 'collaborator';
 
     const pair = new WebSocketPair();

@@ -88,6 +88,20 @@ How to publish and test Shipyard releases.
 
 **All publishing uses OIDC trusted publishing** - no tokens to manage!
 
+### Daemon Package
+
+The daemon CLI publishes separately as `@schoolai/shipyard` (see `apps/daemon/package-npm.json`). Users authenticate via:
+
+```bash
+npx @schoolai/shipyard login    # Device flow auth
+npx @schoolai/shipyard --help   # See all commands
+```
+
+Release notes should highlight changes to:
+- CLI commands (`login`, `logout`, `--check`)
+- Token format or expiry changes
+- Signaling server URL changes
+
 ### Triggering Releases
 
 **Via GitHub Actions UI:**

@@ -5,6 +5,7 @@ import type { Env } from '../env';
 import { isAllowedOrigin } from '../utils/cors';
 import { createLogger } from '../utils/logger';
 import { errorResponse } from '../utils/route-helpers';
+import { authDeviceRoute } from './auth-device';
 import { authGitHubRoute } from './auth-github';
 import { collabCreateRoute } from './collab-create';
 import { healthRoute } from './health';
@@ -47,6 +48,7 @@ app.use(
 );
 
 app.route('/', healthRoute);
+app.route('/', authDeviceRoute);
 app.route('/', authGitHubRoute);
 app.route('/', collabCreateRoute);
 app.route('/', wsPersonalRoute);
