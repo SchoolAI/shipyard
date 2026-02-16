@@ -13,6 +13,7 @@
     "lint:typeassertions": "bash scripts/lint-typeassertions.sh",
     "lint:fix": "turbo run lint:fix",
     "check": "bash scripts/validate-file-allowlist.sh && turbo run typecheck lint --filter='!@shipyard/session-server'",
+    "setup:session-server": "bash scripts/setup-session-server.sh",
     "dev:all": "bash scripts/dev-all.sh",
     "dev:local": "bash scripts/dev-local.sh",
     "dev:schema": "turbo run dev --filter=@shipyard/loro-schema",

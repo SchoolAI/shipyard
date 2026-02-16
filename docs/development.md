@@ -48,35 +48,30 @@ pnpm dev:og-proxy        # Start OG proxy worker (optional)
 
 ## D1 Database Setup
 
-The session server uses Cloudflare D1 (edge SQLite) for user identity storage.
+The session server uses Cloudflare D1 (edge SQLite) for user identity storage. For local development, `wrangler dev` uses a local SQLite file automatically — no cloud database needed.
 
-### First-Time Setup
-
-```bash
-# Create the D1 database (only needed once)
-wrangler d1 create shipyard-users-dev
-
-# Copy the database_id from the output into apps/session-server/wrangler.toml
-
-# Apply migrations
-cd apps/session-server
-wrangler d1 migrations apply shipyard-users-dev --local
-```
-
-### Setting Secrets
-
-The session server requires GitHub OAuth credentials and a JWT signing secret:
+### Automated Setup
 
 ```bash
-cd apps/session-server
-
-# For local development (creates .dev.vars file)
-echo "GITHUB_CLIENT_ID=your_github_oauth_client_id" >> .dev.vars
-echo "GITHUB_CLIENT_SECRET=your_github_oauth_client_secret" >> .dev.vars
-echo "JWT_SECRET=$(openssl rand -base64 32)" >> .dev.vars
+pnpm setup:session-server
 ```
 
-To get GitHub OAuth credentials, create an OAuth App at https://github.com/settings/developers with callback URL `http://localhost:4444/auth/device/verify`.
+This script:
+1. Creates `apps/session-server/.dev.vars` with an auto-generated JWT secret
+2. Applies D1 migrations to local SQLite
+3. Prints instructions for the one manual step: creating a GitHub OAuth App
+
+### Manual Step: GitHub OAuth App
+
+The setup script prints these instructions, but for reference:
+
+1. Go to https://github.com/settings/developers
+2. Click "New OAuth App"
+3. Fill in:
+   - **Application name:** Shipyard Local Dev
+   - **Homepage URL:** http://localhost:4444
+   - **Authorization callback URL:** http://localhost:4444/auth/device/verify
+4. Copy the Client ID and Client Secret into `apps/session-server/.dev.vars`
 
 ---
 
