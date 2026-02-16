@@ -48,6 +48,7 @@ export const ContentBlockShape = Shape.plain.discriminatedUnion('type', {
 
 const A2A_TASK_STATES = [
   'submitted',
+  'starting',
   'working',
   'input-required',
   'completed',

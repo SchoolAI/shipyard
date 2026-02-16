@@ -1,6 +1,6 @@
 import type { A2ATaskState, TaskIndexEntry } from '@shipyard/loro-schema';
 import type { LucideIcon } from 'lucide-react';
-import { AlertCircle, Ban, CheckCircle2, Circle, Loader, Play } from 'lucide-react';
+import { AlertCircle, Ban, CheckCircle2, Circle, Loader, Play, Zap } from 'lucide-react';
 import { fuzzyScore } from '../../../utils/fuzzy-match';
 import type { CommandContext, CommandItem, CommandProvider } from '../types';
 
@@ -19,6 +19,13 @@ const STATUS_OPTIONS: StatusOption[] = [
     icon: Circle,
     statusColor: 'bg-muted/40',
     keywords: ['submitted', 'new', 'queue'],
+  },
+  {
+    status: 'starting',
+    label: 'Set Starting',
+    icon: Zap,
+    statusColor: 'bg-primary',
+    keywords: ['starting', 'boot', 'cold'],
   },
   {
     status: 'working',
@@ -59,6 +66,7 @@ const STATUS_OPTIONS: StatusOption[] = [
 
 const VALID_TRANSITIONS: Record<A2ATaskState, readonly A2ATaskState[]> = {
   submitted: ['canceled'],
+  starting: ['canceled'],
   working: ['canceled'],
   'input-required': ['canceled'],
   completed: [],

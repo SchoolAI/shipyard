@@ -142,6 +142,7 @@ describe('TaskIndexDocumentSchema', () => {
   it('accepts all valid A2A_TASK_STATES values', () => {
     const states = [
       'submitted',
+      'starting',
       'working',
       'input-required',
       'completed',

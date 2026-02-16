@@ -5,6 +5,8 @@ export function statusDotColor(status: A2ATaskState): string {
   switch (status) {
     case 'submitted':
       return 'bg-muted/40';
+    case 'starting':
+      return 'bg-primary motion-safe:animate-pulse';
     case 'working':
       return 'bg-warning motion-safe:animate-pulse';
     case 'input-required':

@@ -126,6 +126,7 @@ type TaskHandle = HandleWithEphemerals<TaskDocumentShape, TaskEphemeralDecls>;
 interface ActiveTask {
   taskId: string;
   abortController: AbortController;
+  sessionManager: SessionManager;
 }
 
 /**
@@ -454,6 +455,7 @@ export async function serve(env: Env): Promise<void> {
     branchWatcher.close();
 
     for (const task of activeTasks.values()) {
+      task.sessionManager.closeSession();
       task.abortController.abort();
     }
     activeTasks.clear();
@@ -827,6 +829,26 @@ async function watchTaskDocument(
   }
 }
 
+function handleFollowUp(
+  activeTask: ActiveTask | undefined,
+  taskLog: ReturnType<typeof createChildLogger>
+): void {
+  if (!activeTask) return;
+  if (!activeTask.sessionManager.isStreaming) {
+    taskLog.debug('Task already running but not streaming, skipping');
+    return;
+  }
+  const prompt = activeTask.sessionManager.getLatestUserPrompt();
+  if (prompt) {
+    try {
+      taskLog.info('Sending follow-up to active streaming session');
+      activeTask.sessionManager.sendFollowUp(prompt);
+    } catch (err: unknown) {
+      taskLog.warn({ err }, 'Failed to send follow-up to streaming session');
+    }
+  }
+}
+
 /**
  * Called when a task document changes (from a remote import).
  * Checks if there is new work to do and dispatches accordingly.
@@ -850,12 +872,25 @@ function onTaskDocChanged(
     'onTaskDocChanged evaluation'
   );
 
-  if (json.meta.status === 'working' || json.meta.status === 'input-required') {
-    const activeLastUserMsg = [...json.conversation].reverse().find((m) => m.role === 'user');
+  if (ctx.activeTasks.has(taskId)) {
+    const conversation = json.conversation;
+    const lastMessage = conversation[conversation.length - 1];
+    if (lastMessage?.role === 'user') {
+      handleFollowUp(ctx.activeTasks.get(taskId), taskLog);
+    }
+
+    const activeLastUserMsg = [...conversation].reverse().find((m) => m.role === 'user');
     const activeCwd = activeLastUserMsg?.cwd ?? process.cwd();
     debouncedDiffCapture(taskId, activeCwd, taskHandle, taskLog);
     debouncedBranchDiffCapture(taskId, activeCwd, taskHandle, taskLog);
+    return;
+  }
 
+  if (
+    json.meta.status === 'working' ||
+    json.meta.status === 'input-required' ||
+    json.meta.status === 'starting'
+  ) {
     taskLog.debug({ status: json.meta.status }, 'Status blocks new work, skipping');
     return;
   }
@@ -871,11 +906,6 @@ function onTaskDocChanged(
     return;
   }
 
-  if (ctx.activeTasks.has(taskId)) {
-    taskLog.debug('Task already running, skipping');
-    return;
-  }
-
   taskLog.info('New user message detected, starting agent');
 
   const cwd = lastMessage.cwd ?? process.cwd();
@@ -885,7 +915,12 @@ function onTaskDocChanged(
 
   const abortController = ctx.lifecycle.createAbortController();
 
-  const activeTask: ActiveTask = { taskId, abortController };
+  const onStatusChange: StatusChangeCallback = (status) => {
+    updateTaskInIndex(ctx.roomDoc, taskId, { status, updatedAt: Date.now() });
+  };
+  const manager = new SessionManager(doc, onStatusChange);
+
+  const activeTask: ActiveTask = { taskId, abortController, sessionManager: manager };
   ctx.activeTasks.set(taskId, activeTask);
 
   ctx.signaling.updateStatus('running', taskId);
@@ -897,6 +932,7 @@ function onTaskDocChanged(
     .catch((err: unknown) => taskLog.warn({ err }, 'Failed to capture turn start snapshot'));
 
   runTask({
+    sessionManager: manager,
     taskHandle,
     taskId,
     roomDoc: ctx.roomDoc,
@@ -948,6 +984,9 @@ interface CleanupTaskRunOptions {
 
 async function cleanupTaskRun(opts: CleanupTaskRunOptions): Promise<void> {
   const { taskId, cwd, taskHandle, taskLog, turnStartRefPromise, abortController, ctx } = opts;
+
+  const activeTask = ctx.activeTasks.get(taskId);
+  activeTask?.sessionManager.closeSession();
 
   clearDebouncedTimer(diffDebounceTimers, taskId);
   clearDebouncedTimer(branchDiffTimers, taskId);
@@ -1209,6 +1248,7 @@ function buildCanUseTool(
 }
 
 interface RunTaskOptions {
+  sessionManager: SessionManager;
   taskHandle: TaskHandle;
   taskId: string;
   roomDoc: TypedDoc<TaskIndexDocumentShape>;
@@ -1223,6 +1263,7 @@ interface RunTaskOptions {
 
 async function runTask(opts: RunTaskOptions): Promise<SessionResult> {
   const {
+    sessionManager: manager,
     taskHandle,
     taskId,
     roomDoc,
@@ -1235,10 +1276,6 @@ async function runTask(opts: RunTaskOptions): Promise<SessionResult> {
     log,
   } = opts;
 
-  const onStatusChange: StatusChangeCallback = (status) => {
-    updateTaskInIndex(roomDoc, taskId, { status, updatedAt: Date.now() });
-  };
-  const manager = new SessionManager(taskHandle.doc, onStatusChange);
   const prompt = manager.getLatestUserPrompt();
   if (!prompt) {
     throw new Error(`No user message found in task ${taskId}`);

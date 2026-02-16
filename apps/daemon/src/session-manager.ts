@@ -17,6 +17,7 @@ import type {
 import { extractPlanMarkdown } from '@shipyard/loro-schema';
 import { nanoid } from 'nanoid';
 import { logger } from './logger.js';
+import { StreamingInputController } from './streaming-input-controller.js';
 
 function safeStringify(value: unknown): string {
   try {
@@ -117,6 +118,10 @@ export interface SessionResult {
  * Manages Claude Code sessions via the Agent SDK, syncing all state
  * transitions and conversation messages to a Loro CRDT task document.
  *
+ * V1 streaming mode: keeps the subprocess alive between turns by using
+ * an AsyncGenerator prompt. New user messages are pushed via sendFollowUp()
+ * instead of spawning a new query() subprocess.
+ *
  * Session lifecycle: pending -> active -> completed | failed
  * Task status mirrors: submitted -> working -> completed | failed
  */
@@ -127,10 +132,16 @@ export class SessionManager {
   readonly #onStatusChange: StatusChangeCallback | undefined;
   #currentModel: string | null = null;
   #machineId: string | null = null;
+  #inputController: StreamingInputController | null = null;
+  #activeQuery: Query | null = null;
 
   constructor(taskDoc: TypedDoc<TaskDocumentShape>, onStatusChange?: StatusChangeCallback) {
     this.#taskDoc = taskDoc;
     this.#onStatusChange = onStatusChange;
+  }
+
+  get isStreaming(): boolean {
+    return this.#inputController !== null && !this.#inputController.isDone;
   }
 
   #notifyStatusChange(status: A2ATaskState): void {
@@ -179,12 +190,13 @@ export class SessionManager {
   }
 
   /**
-   * Create a new Claude Code session and stream messages to the task doc.
+   * Create a new Claude Code session using streaming input mode.
    *
-   * 1. Pushes a 'pending' session entry
-   * 2. Calls query() to start the Agent SDK subprocess
-   * 3. Processes each SDKMessage: init, assistant, result
-   * 4. Returns the final SessionResult
+   * 1. Creates a StreamingInputController and pushes the first message
+   * 2. Calls query() with the controller's async iterable as prompt
+   * 3. Stores the Query and controller for follow-up messages
+   * 4. Processes messages until the session fully ends
+   * 5. Returns the final SessionResult
    */
   async createSession(opts: CreateSessionOptions): Promise<SessionResult> {
     this.#currentModel = opts.model ?? null;
@@ -206,13 +218,16 @@ export class SessionManager {
         durationMs: null,
         error: null,
       });
-      draft.meta.status = 'working';
+      draft.meta.status = 'starting';
       draft.meta.updatedAt = now;
     });
-    this.#notifyStatusChange('working');
+    this.#notifyStatusChange('starting');
+
+    const controller = new StreamingInputController();
+    controller.push(opts.prompt);
 
     const response: Query = query({
-      prompt: opts.prompt,
+      prompt: controller.iterable(),
       options: {
         cwd: opts.cwd,
         model: opts.model,
@@ -233,12 +248,52 @@ export class SessionManager {
       },
     });
 
+    this.#inputController = controller;
+    this.#activeQuery = response;
+
     return this.#processMessages(response, sessionId);
   }
 
   /**
-   * Resume an existing Claude Code session by looking up the agentSessionId
-   * from the task doc, then passing it as `resume` to query().
+   * Send a follow-up message to the active streaming session.
+   * The controller feeds the message to the generator, which wakes the
+   * agent subprocess for the next turn without a cold start.
+   */
+  sendFollowUp(prompt: string): void {
+    if (!this.#inputController || this.#inputController.isDone) {
+      throw new Error('No active streaming session to send follow-up to');
+    }
+    this.#inputController.push(prompt);
+
+    change(this.#taskDoc, (draft) => {
+      draft.meta.status = 'working';
+      draft.meta.updatedAt = Date.now();
+    });
+    this.#notifyStatusChange('working');
+  }
+
+  /**
+   * Gracefully close the active streaming session.
+   * Ends the input generator and closes the query subprocess.
+   */
+  closeSession(): void {
+    this.#inputController?.end();
+    this.#activeQuery?.close();
+    this.#inputController = null;
+    this.#activeQuery = null;
+  }
+
+  /**
+   * Change the model used by the active streaming session between turns.
+   */
+  async setModel(model: string): Promise<void> {
+    await this.#activeQuery?.setModel(model);
+    this.#currentModel = model;
+  }
+
+  /**
+   * Resume an existing Claude Code session using streaming input mode.
+   * Looks up the agentSessionId from the task doc and passes it as `resume`.
    */
   async resumeSession(
     sessionId: string,
@@ -285,13 +340,16 @@ export class SessionManager {
         durationMs: null,
         error: null,
       });
-      draft.meta.status = 'working';
+      draft.meta.status = 'starting';
       draft.meta.updatedAt = now;
     });
-    this.#notifyStatusChange('working');
+    this.#notifyStatusChange('starting');
+
+    const controller = new StreamingInputController();
+    controller.push(prompt);
 
     const response: Query = query({
-      prompt,
+      prompt: controller.iterable(),
       options: {
         resume: sessionEntry.agentSessionId,
         cwd: sessionEntry.cwd,
@@ -312,6 +370,9 @@ export class SessionManager {
         },
       },
     });
+
+    this.#inputController = controller;
+    this.#activeQuery = response;
 
     return this.#processMessages(response, newSessionId);
   }
@@ -339,6 +400,9 @@ export class SessionManager {
         status: 'failed',
         error: errorMsg,
       };
+    } finally {
+      this.#inputController = null;
+      this.#activeQuery = null;
     }
 
     this.#markFailed(sessionId, 'Session ended without result message');
@@ -377,8 +441,10 @@ export class SessionManager {
           session.agentSessionId = initSessionId;
           session.status = 'active';
         }
+        draft.meta.status = 'working';
         draft.meta.updatedAt = Date.now();
       });
+      this.#notifyStatusChange('working');
       return { agentSessionId: initSessionId };
     }
 

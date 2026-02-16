@@ -461,7 +461,7 @@ describe('SessionManager', () => {
         });
 
         expect(mockQuery).toHaveBeenCalledWith({
-          prompt: 'Do the work',
+          prompt: expect.anything(),
           options: expect.objectContaining({
             cwd: '/workspace',
             model: 'claude-opus-4-6',
@@ -604,7 +604,7 @@ describe('SessionManager', () => {
 
       expect(mockQuery).toHaveBeenCalledWith(
         expect.objectContaining({
-          prompt: 'Continue the work',
+          prompt: expect.anything(),
           options: expect.objectContaining({
             resume: 'agent-sess-orig',
             cwd: '/workspace',
@@ -708,7 +708,7 @@ describe('SessionManager', () => {
 
       expect(mockQuery).toHaveBeenCalledWith(
         expect.objectContaining({
-          prompt: 'Continue with overrides',
+          prompt: expect.anything(),
           options: expect.objectContaining({
             resume: 'agent-sess-orig',
             cwd: '/workspace',
@@ -1325,6 +1325,202 @@ describe('SessionManager', () => {
         resume: true,
         sessionId: 'sess-latest',
       });
+    });
+  });
+
+  describe('streaming input mode', () => {
+    /**
+     * Helper that creates a controllable Query mock. Messages are yielded
+     * on demand via emit(), and end() terminates the generator.
+     */
+    function mockQueryControllable() {
+      let resolve: ((msg: Record<string, unknown>) => void) | null = null;
+      const messages: Array<Record<string, unknown>> = [];
+      let done = false;
+
+      async function* gen() {
+        while (!done) {
+          if (messages.length > 0) {
+            yield messages.shift()!;
+          } else {
+            yield await new Promise<Record<string, unknown>>((r) => {
+              resolve = r;
+            });
+          }
+        }
+      }
+
+      const generator = gen();
+      // eslint-disable-next-line no-restricted-syntax -- Satisfying Query interface for mock
+      const queryObj = Object.assign(generator, {
+        interrupt: vi.fn(),
+        close: vi.fn(),
+        setPermissionMode: vi.fn(),
+        setModel: vi.fn(),
+        setMaxThinkingTokens: vi.fn(),
+        initializationResult: vi.fn(),
+        supportedCommands: vi.fn(),
+        supportedModels: vi.fn(),
+        mcpServerStatus: vi.fn(),
+        accountInfo: vi.fn(),
+        rewindFiles: vi.fn(),
+        reconnectMcpServer: vi.fn(),
+        toggleMcpServer: vi.fn(),
+        setMcpServers: vi.fn(),
+        streamInput: vi.fn(),
+      }) as unknown as Query;
+
+      return {
+        query: queryObj,
+        emit(msg: Record<string, unknown>) {
+          if (resolve) {
+            const r = resolve;
+            resolve = null;
+            r(msg);
+          } else {
+            messages.push(msg);
+          }
+        },
+        end() {
+          done = true;
+          if (resolve) {
+            const r = resolve;
+            resolve = null;
+            r({} as Record<string, unknown>);
+          }
+        },
+      };
+    }
+
+    it('isStreaming returns false before any session', () => {
+      expect(manager.isStreaming).toBe(false);
+    });
+
+    it('isStreaming returns true during active session', async () => {
+      const ctrl = mockQueryControllable();
+      mockQuery.mockReturnValue(ctrl.query);
+
+      const sessionPromise = manager.createSession({ prompt: 'Hello', cwd: '/tmp' });
+
+      // Emit init to start the session
+      ctrl.emit(initMsg('sess-streaming'));
+
+      // Session is still running, so isStreaming should be true
+      expect(manager.isStreaming).toBe(true);
+
+      // End the session
+      ctrl.emit(successResult());
+      ctrl.end();
+      await sessionPromise;
+    });
+
+    it('isStreaming returns false after session completes', async () => {
+      mockQuery.mockReturnValue(mockQueryResponse([initMsg('sess-done'), successResult()]));
+
+      await manager.createSession({ prompt: 'Hello', cwd: '/tmp' });
+
+      expect(manager.isStreaming).toBe(false);
+    });
+
+    it('sendFollowUp throws when no active session', () => {
+      expect(() => manager.sendFollowUp('hello')).toThrow(
+        'No active streaming session to send follow-up to'
+      );
+    });
+
+    it('sendFollowUp sets status to working', async () => {
+      const ctrl = mockQueryControllable();
+      mockQuery.mockReturnValue(ctrl.query);
+
+      const sessionPromise = manager.createSession({ prompt: 'Hello', cwd: '/tmp' });
+
+      // Emit init, then wait for input-required-like pause
+      ctrl.emit(initMsg('sess-followup'));
+
+      // Send a follow-up
+      manager.sendFollowUp('continue please');
+
+      const json = taskDoc.toJSON();
+      expect(json.meta.status).toBe('working');
+
+      // Clean up
+      ctrl.emit(successResult());
+      ctrl.end();
+      await sessionPromise;
+    });
+
+    it('closeSession ends the session', async () => {
+      const ctrl = mockQueryControllable();
+      mockQuery.mockReturnValue(ctrl.query);
+
+      const sessionPromise = manager.createSession({ prompt: 'Hello', cwd: '/tmp' });
+
+      ctrl.emit(initMsg('sess-close'));
+
+      expect(manager.isStreaming).toBe(true);
+
+      manager.closeSession();
+
+      expect(manager.isStreaming).toBe(false);
+
+      // The generator ends, so processMessages will fall through
+      ctrl.end();
+      await sessionPromise;
+    });
+
+    it('setModel delegates to query.setModel()', async () => {
+      const ctrl = mockQueryControllable();
+      mockQuery.mockReturnValue(ctrl.query);
+
+      const sessionPromise = manager.createSession({ prompt: 'Hello', cwd: '/tmp' });
+
+      ctrl.emit(initMsg('sess-model'));
+
+      await manager.setModel('claude-sonnet-4-20250514');
+
+      expect(ctrl.query.setModel).toHaveBeenCalledWith('claude-sonnet-4-20250514');
+
+      ctrl.emit(successResult());
+      ctrl.end();
+      await sessionPromise;
+    });
+
+    it('createSession sets status to starting initially', async () => {
+      const ctrl = mockQueryControllable();
+      mockQuery.mockReturnValue(ctrl.query);
+
+      const sessionPromise = manager.createSession({ prompt: 'Hello', cwd: '/tmp' });
+
+      // Before init message, status should be 'starting'
+      const json = taskDoc.toJSON();
+      expect(json.meta.status).toBe('starting');
+
+      ctrl.emit(initMsg('sess-starting'));
+      ctrl.emit(successResult());
+      ctrl.end();
+      await sessionPromise;
+    });
+
+    it('init message transitions status to working', async () => {
+      const ctrl = mockQueryControllable();
+      mockQuery.mockReturnValue(ctrl.query);
+
+      const sessionPromise = manager.createSession({ prompt: 'Hello', cwd: '/tmp' });
+
+      // Before init
+      expect(taskDoc.toJSON().meta.status).toBe('starting');
+
+      // Emit init
+      ctrl.emit(initMsg('sess-working'));
+
+      // Give microtask queue a tick for the for-await to process the message
+      await new Promise((r) => setTimeout(r, 10));
+
+      expect(taskDoc.toJSON().meta.status).toBe('working');
+
+      ctrl.emit(successResult());
+      ctrl.end();
+      await sessionPromise;
     });
   });
 

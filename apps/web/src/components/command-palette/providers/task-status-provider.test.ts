@@ -46,11 +46,22 @@ const MOCK_TASK_INDEX: Record<string, TaskIndexEntry> = {
     createdAt: Date.now() - 3600000,
     updatedAt: Date.now(),
   },
+  'task-starting': {
+    taskId: 'task-starting',
+    title: 'Starting task',
+    status: 'starting',
+    createdAt: Date.now() - 3600000,
+    updatedAt: Date.now(),
+  },
 };
 
 describe('getValidTransitions', () => {
   it('allows canceling a submitted task', () => {
     expect(getValidTransitions('submitted')).toEqual(['canceled']);
+  });
+
+  it('allows canceling a starting task', () => {
+    expect(getValidTransitions('starting')).toEqual(['canceled']);
   });
 
   it('allows canceling a working task', () => {
@@ -130,6 +141,14 @@ describe('createTaskStatusProvider', () => {
 
     expect(items).toHaveLength(1);
     expect(items[0]?.id).toBe('status:submitted');
+  });
+
+  it('only shows cancel for starting task', () => {
+    const context: CommandContext = { activeTaskId: 'task-starting', query: '' };
+    const items = provider(context);
+
+    expect(items).toHaveLength(1);
+    expect(items[0]?.id).toBe('status:canceled');
   });
 
   it('only shows cancel for input-required task', () => {
