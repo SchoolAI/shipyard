@@ -14,6 +14,12 @@ import type { Env } from '../env';
 import { createLogger } from '../utils/logger';
 import { errorResponse, parseAndValidateBody } from '../utils/route-helpers';
 
+function getBaseUrl(env: Env): string {
+  return env.ENVIRONMENT === 'production'
+    ? 'https://shipyard-session-server.jacob-191.workers.dev'
+    : 'http://localhost:4444';
+}
+
 function escapeHtml(str: string): string {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
@@ -33,7 +39,7 @@ authDeviceRoute.post(ROUTES.AUTH_DEVICE_START, async (c) => {
 
   const session = await createDeviceSession(c.env.DB);
 
-  const verificationUri = `${c.env.BASE_URL}${ROUTES.AUTH_DEVICE_VERIFY}?code=${session.userCode}`;
+  const verificationUri = `${getBaseUrl(c.env)}${ROUTES.AUTH_DEVICE_VERIFY}?code=${session.userCode}`;
 
   logger.info('Device flow started', { userCode: session.userCode });
 
@@ -80,7 +86,7 @@ authDeviceRoute.get(ROUTES.AUTH_DEVICE_VERIFY, async (c) => {
       );
     }
 
-    const redirectUri = `${c.env.BASE_URL}${ROUTES.AUTH_DEVICE_VERIFY}`;
+    const redirectUri = `${getBaseUrl(c.env)}${ROUTES.AUTH_DEVICE_VERIFY}`;
     const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${c.env.GITHUB_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${encodeURIComponent(userCode)}&scope=read:user`;
 
     return c.html(`<!DOCTYPE html>
@@ -106,7 +112,7 @@ authDeviceRoute.get(ROUTES.AUTH_DEVICE_VERIFY, async (c) => {
   const ghCode = code;
   const userCode = state;
 
-  const redirectUri = `${c.env.BASE_URL}${ROUTES.AUTH_DEVICE_VERIFY}`;
+  const redirectUri = `${getBaseUrl(c.env)}${ROUTES.AUTH_DEVICE_VERIFY}`;
   const tokenResult = await exchangeCodeForToken(
     ghCode,
     redirectUri,

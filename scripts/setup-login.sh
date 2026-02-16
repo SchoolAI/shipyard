@@ -6,9 +6,17 @@ ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 cd "$ROOT_DIR"
 
-# Step 1: Build daemon
-echo "Building daemon..."
-pnpm -F @shipyard/daemon build --silent 2>/dev/null || pnpm -F @shipyard/daemon build
+# Step 1: Build all packages (turbo handles dependency graph)
+echo "Building packages..."
+pnpm build 2>&1 || {
+  # Web app may fail due to missing env vars — that's OK, we only need daemon
+  if [ -f "$ROOT_DIR/apps/daemon/dist/index.js" ]; then
+    echo "  Note: some builds failed but daemon is ready"
+  else
+    echo "✗ Daemon build failed"
+    exit 1
+  fi
+}
 
 # Step 2: Start session server in background
 echo "Starting session server..."
@@ -44,9 +52,9 @@ if ! curl -sf http://localhost:4444/health > /dev/null 2>&1; then
   exit 1
 fi
 
-# Step 4: Run login
+# Step 4: Run login (point at local server)
 echo ""
-node apps/daemon/dist/index.js login
+SHIPYARD_SIGNALING_URL=http://localhost:4444 node apps/daemon/dist/index.js login
 
 echo ""
 echo "✓ Login complete. Stopping session server..."
