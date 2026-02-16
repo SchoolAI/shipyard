@@ -6,6 +6,7 @@ export const EnvSchema = z.object({
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
   SHIPYARD_SIGNALING_URL: z.string().url().optional(),
   SHIPYARD_USER_TOKEN: z.string().optional(),
+  SHIPYARD_USER_ID: z.string().optional(),
   SHIPYARD_MACHINE_ID: z.string().optional(),
   SHIPYARD_MACHINE_NAME: z.string().optional(),
 });

@@ -172,7 +172,7 @@ describe('App Configuration', () => {
 
     it('mounts WebSocket routes', async () => {
       // Personal room
-      const res1 = await app.request('/personal/gh_12345', {}, env);
+      const res1 = await app.request('/personal/usr_test123', {}, env);
       // Should get 426 (upgrade required), not 404
       expect(res1.status).toBe(426);
 

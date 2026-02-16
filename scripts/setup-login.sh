@@ -7,9 +7,8 @@ ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$ROOT_DIR"
 
 # Step 1: Build daemon and its dependencies (not the web app)
-echo "Building daemon..."
-TURBO_NO_UPDATE_NOTIFIER=1 pnpm -F @shipyard/loro-schema build > /dev/null 2>&1
-TURBO_NO_UPDATE_NOTIFIER=1 pnpm -F @shipyard/daemon build > /dev/null 2>&1
+echo "Building daemon and dependencies..."
+TURBO_NO_UPDATE_NOTIFIER=1 pnpm -F @shipyard/loro-schema -F @shipyard/session -F @shipyard/daemon build > /dev/null 2>&1
 
 if [ ! -f "$ROOT_DIR/apps/daemon/dist/index.js" ]; then
   echo "✗ Daemon build failed"
@@ -37,8 +36,8 @@ else
 
   cleanup() {
     if [ "$STARTED_SERVER" = true ] && kill -0 "$SERVER_PID" 2>/dev/null; then
-      # Kill entire process group (turbo + wrangler children)
-      kill -- -"$SERVER_PID" 2>/dev/null || kill "$SERVER_PID" 2>/dev/null
+      pkill -P "$SERVER_PID" 2>/dev/null
+      kill "$SERVER_PID" 2>/dev/null
       wait "$SERVER_PID" 2>/dev/null || true
     fi
   }

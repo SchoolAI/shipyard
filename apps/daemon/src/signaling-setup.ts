@@ -1,6 +1,6 @@
 import { hostname } from 'node:os';
 import type { MachineCapabilities } from '@shipyard/session';
-import { PersonalRoomConnection } from '@shipyard/session';
+import { PersonalRoomConnection, ROUTES } from '@shipyard/session';
 import { detectCapabilities } from './capabilities.js';
 import type { Env } from './env.js';
 import type { createChildLogger } from './logger.js';
@@ -33,6 +33,17 @@ export async function createSignalingHandle(
   const machineId = env.SHIPYARD_MACHINE_ID ?? hostname();
   const machineName = env.SHIPYARD_MACHINE_NAME ?? hostname();
   const wsUrl = new URL(env.SHIPYARD_SIGNALING_URL);
+
+  if (!wsUrl.pathname.includes('/personal/')) {
+    if (!env.SHIPYARD_USER_ID) {
+      log.error(
+        'No user ID available to construct signaling WebSocket path. Run `shipyard login` first.'
+      );
+      return null;
+    }
+    wsUrl.pathname = ROUTES.WS_PERSONAL.replace(':userId', env.SHIPYARD_USER_ID);
+  }
+
   if (env.SHIPYARD_USER_TOKEN) {
     wsUrl.searchParams.set('token', env.SHIPYARD_USER_TOKEN);
   }

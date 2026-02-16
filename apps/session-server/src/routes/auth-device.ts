@@ -194,6 +194,7 @@ authDeviceRoute.post(ROUTES.AUTH_DEVICE_POLL, async (c) => {
         user: {
           id: userData.user.id,
           displayName: userData.user.displayName,
+          avatarUrl: userData.user.avatarUrl,
           providers: userData.providers,
         },
       });

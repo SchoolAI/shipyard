@@ -42,7 +42,7 @@ export async function deleteConfig(): Promise<boolean> {
 }
 
 export type AuthResult =
-  | { status: 'ok'; token: string; signalingUrl?: string }
+  | { status: 'ok'; token: string; userId: string; signalingUrl?: string }
   | { status: 'expired' }
   | { status: 'missing' };
 
@@ -52,7 +52,12 @@ export type AuthResult =
 export async function loadAuthToken(): Promise<AuthResult> {
   const envToken = process.env.SHIPYARD_USER_TOKEN;
   if (envToken) {
-    return { status: 'ok', token: envToken, signalingUrl: process.env.SHIPYARD_SIGNALING_URL };
+    return {
+      status: 'ok',
+      token: envToken,
+      userId: process.env.SHIPYARD_USER_ID ?? '',
+      signalingUrl: process.env.SHIPYARD_SIGNALING_URL,
+    };
   }
 
   const config = await readConfig();
@@ -62,5 +67,10 @@ export async function loadAuthToken(): Promise<AuthResult> {
     return { status: 'expired' };
   }
 
-  return { status: 'ok', token: config.auth.token, signalingUrl: config.auth.signalingUrl };
+  return {
+    status: 'ok',
+    token: config.auth.token,
+    userId: config.auth.userId,
+    signalingUrl: config.auth.signalingUrl,
+  };
 }

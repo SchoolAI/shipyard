@@ -74,6 +74,7 @@ function parseCliArgs(): CliArgs {
         '  LOG_LEVEL                 Log level: debug, info, warn, error (default: info)',
         '  SHIPYARD_SIGNALING_URL    Signaling server WebSocket URL (optional)',
         '  SHIPYARD_USER_TOKEN       JWT for signaling auth (optional)',
+        '  SHIPYARD_USER_ID          User ID for signaling path (optional, from login)',
         '  SHIPYARD_MACHINE_ID       Machine identifier (default: os.hostname())',
         '  SHIPYARD_MACHINE_NAME     Human-readable machine name (default: os.hostname())',
       ].join('\n')
@@ -212,22 +213,30 @@ async function loadAuthFromConfig(env: Env): Promise<void> {
 
   const { loadAuthToken } = await import('./auth.js');
   const auth = await loadAuthToken();
-  if (auth?.token) {
+
+  if (auth.status === 'ok') {
     env.SHIPYARD_USER_TOKEN = auth.token;
+    env.SHIPYARD_USER_ID = auth.userId;
     if (auth.signalingUrl) {
       env.SHIPYARD_SIGNALING_URL = auth.signalingUrl;
     }
+    return;
   }
+
+  if (auth.status === 'expired') {
+    logger.warn('Auth token expired. Run `shipyard login` to re-authenticate.');
+    return;
+  }
+
+  logger.warn('No auth token found. Run `shipyard login` to authenticate.');
 }
 
-function validateTaskArgs(args: CliArgs): void {
+function validateTaskArgs(args: CliArgs, env: Env): void {
   if (!args.prompt && !args.resume) {
     logger.error('Either --prompt, --resume, or --serve is required. Use --help for usage.');
     process.exit(1);
   }
-}
 
-function validateApiKey(env: Env): void {
   if (!env.ANTHROPIC_API_KEY) {
     logger.error('ANTHROPIC_API_KEY is required when running tasks. Use --help for usage.');
     process.exit(1);
@@ -251,9 +260,25 @@ function createCleanup(
   };
 }
 
-async function runTask(args: CliArgs, env: Env): Promise<void> {
-  validateTaskArgs(args);
-  validateApiKey(env);
+function formatError(error: unknown): { err: string; stack: string | undefined } {
+  const err = error instanceof Error ? error.message : String(error);
+  const stack = error instanceof Error ? error.stack : undefined;
+  return { err, stack };
+}
+
+async function main(): Promise<void> {
+  if (await handleSubcommand()) return;
+
+  const env = validateEnv();
+  const args = parseCliArgs();
+
+  await loadAuthFromConfig(env);
+
+  if (args.serve) {
+    return serve(env);
+  }
+
+  validateTaskArgs(args, env);
 
   const dataDir = resolve(args.dataDir ?? env.SHIPYARD_DATA_DIR.replace('~', homedir()));
   const taskId = args.taskId ?? generateTaskId();
@@ -292,30 +317,13 @@ async function runTask(args: CliArgs, env: Env): Promise<void> {
 
     handleResult(log, result, startTime);
   } catch (error: unknown) {
-    const errMsg = error instanceof Error ? error.message : String(error);
-    const errStack = error instanceof Error ? error.stack : undefined;
-    log.error({ err: errMsg, stack: errStack }, 'Session failed');
+    const { err, stack } = formatError(error);
+    log.error({ err, stack }, 'Session failed');
     cleanup();
     process.exit(1);
   }
 
   cleanup();
-}
-
-async function main(): Promise<void> {
-  const handled = await handleSubcommand();
-  if (handled) return;
-
-  const env = validateEnv();
-  const args = parseCliArgs();
-
-  await loadAuthFromConfig(env);
-
-  if (args.serve) {
-    return serve(env);
-  }
-
-  await runTask(args, env);
 }
 
 main().catch((error: unknown) => {
