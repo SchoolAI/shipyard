@@ -99,6 +99,7 @@ jobs:
         if: steps.release.outputs.type == 'promote' || steps.changes.outputs.has_changes == 'true'
         with:
           node-version: '22.14.0'
+          registry-url: 'https://registry.npmjs.org'
 
       - name: Install pnpm via corepack
         if: steps.release.outputs.type == 'promote' || steps.changes.outputs.has_changes == 'true'
