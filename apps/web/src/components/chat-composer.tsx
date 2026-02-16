@@ -3,6 +3,7 @@ import type { PermissionMode } from '@shipyard/loro-schema';
 import { ArrowUp, Mic, X } from 'lucide-react';
 import type { KeyboardEvent } from 'react';
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
+import { HOTKEYS } from '../constants/hotkeys';
 import type { GitRepoInfo, ModelInfo } from '../hooks/use-machine-selection';
 import type { SlashCommandAction } from '../hooks/use-slash-commands';
 import { useSlashCommands } from '../hooks/use-slash-commands';
@@ -34,10 +35,15 @@ interface ChatComposerProps {
   onPermissionChange: (mode: PermissionMode) => void;
   isSubmitDisabled?: boolean;
   submitDisabledReason?: string;
+  isVoiceRecording?: boolean;
+  isVoiceSupported?: boolean;
+  onVoiceToggle?: () => void;
+  voiceInterimText?: string;
 }
 
 export interface ChatComposerHandle {
   focus: () => void;
+  insertText: (text: string) => void;
 }
 
 const MAX_HEIGHT = 200;
@@ -58,6 +64,10 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
     onPermissionChange,
     isSubmitDisabled,
     submitDisabledReason,
+    isVoiceRecording,
+    isVoiceSupported,
+    onVoiceToggle,
+    voiceInterimText,
   },
   ref
 ) {
@@ -65,14 +75,6 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
   const [stashedText, setStashedText] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { models, reasoning } = useModelPicker(availableModels, selectedModelId);
-
-  useImperativeHandle(
-    ref,
-    () => ({
-      focus: () => textareaRef.current?.focus(),
-    }),
-    []
-  );
 
   useEffect(() => {
     if (reasoning && !reasoning.efforts.includes(reasoningLevel)) {
@@ -161,6 +163,24 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
     textarea.style.height = `${Math.min(scrollHeight, MAX_HEIGHT)}px`;
     textarea.style.overflowY = scrollHeight > MAX_HEIGHT ? 'auto' : 'hidden';
   }, []);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      focus: () => textareaRef.current?.focus(),
+      insertText: (text: string) => {
+        setValue((prev) => {
+          const needsSpace = prev.length > 0 && !prev.endsWith(' ') && !text.startsWith(' ');
+          return prev + (needsSpace ? ' ' : '') + text;
+        });
+        requestAnimationFrame(() => {
+          adjustHeight();
+          textareaRef.current?.focus();
+        });
+      },
+    }),
+    [adjustHeight]
+  );
 
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -319,6 +339,15 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
             className="w-full bg-transparent text-foreground placeholder-muted/70 text-sm leading-relaxed resize-none outline-none"
             style={{ minHeight: `${MIN_HEIGHT}px`, maxHeight: `${MAX_HEIGHT}px` }}
           />
+          {voiceInterimText && (
+            <p
+              className="text-xs text-muted/60 italic mt-1 motion-safe:animate-pulse"
+              aria-live="polite"
+              aria-atomic="true"
+            >
+              {voiceInterimText}
+            </p>
+          )}
         </div>
 
         {/* Bottom toolbar */}
@@ -341,23 +370,36 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
           </div>
 
           <div className="flex items-center gap-1 shrink-0">
-            {/* Voice input -- hidden on mobile (placeholder, saves space) */}
-            <div className="hidden sm:flex">
-              <Tooltip>
-                <Tooltip.Trigger>
-                  <Button
-                    isIconOnly
-                    variant="ghost"
-                    size="sm"
-                    aria-label="Voice input"
-                    className="rounded-full text-muted hover:text-foreground hover:bg-default w-8 h-8 min-w-0"
-                  >
-                    <Mic className="w-4 h-4" />
-                  </Button>
-                </Tooltip.Trigger>
-                <Tooltip.Content>Voice input</Tooltip.Content>
-              </Tooltip>
-            </div>
+            {/* Voice input -- hidden on mobile and when unsupported */}
+            {isVoiceSupported === true && onVoiceToggle && (
+              <div className="hidden sm:flex">
+                <Tooltip>
+                  <Tooltip.Trigger>
+                    <Button
+                      isIconOnly
+                      variant="ghost"
+                      size="sm"
+                      aria-label={isVoiceRecording ? 'Stop voice input' : 'Start voice input'}
+                      aria-keyshortcuts="Meta+Alt+M"
+                      className={`rounded-full w-8 h-8 min-w-0 ${
+                        isVoiceRecording
+                          ? 'bg-danger text-danger-foreground motion-safe:animate-pulse'
+                          : 'text-muted hover:text-foreground hover:bg-default'
+                      }`}
+                      onPress={onVoiceToggle}
+                    >
+                      <Mic className="w-4 h-4" />
+                    </Button>
+                  </Tooltip.Trigger>
+                  <Tooltip.Content>
+                    <span className="flex items-center gap-2">
+                      {isVoiceRecording ? 'Stop recording' : 'Voice input'}
+                      <Kbd>{HOTKEYS.voiceInput.display}</Kbd>
+                    </span>
+                  </Tooltip.Content>
+                </Tooltip>
+              </div>
+            )}
             <Tooltip isDisabled={!isSubmitDisabled}>
               <Tooltip.Trigger>
                 <span tabIndex={isSubmitDisabled ? 0 : -1} className="inline-flex">

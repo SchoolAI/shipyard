@@ -33,6 +33,7 @@ function defaultCallbacks() {
     onNavigatePrevTask: vi.fn(),
     onFocusComposer: vi.fn(),
     onShowShortcuts: vi.fn(),
+    onToggleVoiceInput: vi.fn(),
   };
 }
 

@@ -107,4 +107,11 @@ export const HOTKEYS = {
     description: 'Toggle stash: save current input or restore stashed input',
     context: 'composer',
   },
+  voiceInput: {
+    key: 'meta+alt+m',
+    label: 'Voice Input',
+    display: '\u2318\u2325M',
+    description: 'Toggle voice input recording',
+    context: 'global',
+  },
 } as const satisfies Record<string, HotkeyDef>;

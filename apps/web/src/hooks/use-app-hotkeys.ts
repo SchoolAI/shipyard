@@ -15,6 +15,7 @@ interface AppHotkeyOptions {
   onNavigatePrevTask: () => void;
   onFocusComposer: () => void;
   onShowShortcuts: () => void;
+  onToggleVoiceInput: () => void;
 }
 
 const GLOBAL_OPTIONS = { preventDefault: true, enableOnFormTags: true } as const;
@@ -31,6 +32,7 @@ export function useAppHotkeys({
   onNavigatePrevTask,
   onFocusComposer,
   onShowShortcuts,
+  onToggleVoiceInput,
 }: AppHotkeyOptions) {
   const isOverlayOpen = useUIStore(
     (s) => s.isCommandPaletteOpen || s.isShortcutsModalOpen || s.isSettingsOpen
@@ -79,4 +81,6 @@ export function useAppHotkeys({
     onShowShortcuts,
     isOverlayOpen,
   ]);
+
+  useHotkeys(HOTKEYS.voiceInput.key, onToggleVoiceInput, GLOBAL_OPTIONS, [onToggleVoiceInput]);
 }

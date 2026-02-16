@@ -21,6 +21,7 @@ import { usePersonalRoom } from '../hooks/use-personal-room';
 import { useRoomCapabilities } from '../hooks/use-room-capabilities';
 import { useTaskDocument } from '../hooks/use-task-document';
 import { useTaskIndex } from '../hooks/use-task-index';
+import { useVoiceInput } from '../hooks/use-voice-input';
 import { useWebRTCSync } from '../hooks/use-webrtc-sync';
 import { useRepo, useWebRtcAdapter } from '../providers/repo-provider';
 import { useAuthStore, useMessageStore, useTaskStore, useUIStore } from '../stores';
@@ -443,6 +444,18 @@ export function ChatPage() {
     composerRef.current?.focus();
   }, []);
 
+  const voiceInput = useVoiceInput({
+    onTranscript: useCallback((text: string, isFinal: boolean) => {
+      if (isFinal) {
+        composerRef.current?.insertText(text);
+      }
+    }, []),
+  });
+
+  useEffect(() => {
+    voiceInput.stop();
+  }, [activeTaskId]); // eslint-disable-line react-hooks/exhaustive-deps -- stop recording on task switch
+
   const toggleSettings = useUIStore((s) => s.toggleSettings);
 
   const handleCloseSettings = useCallback(() => {
@@ -475,6 +488,7 @@ export function ChatPage() {
     onNavigatePrevTask: handleNavigatePrevTask,
     onFocusComposer: handleFocusComposer,
     onShowShortcuts: () => useUIStore.getState().toggleShortcutsModal(),
+    onToggleVoiceInput: voiceInput.toggle,
   });
 
   const scrollToBottom = useCallback(() => {
@@ -755,6 +769,10 @@ export function ChatPage() {
                     onPermissionChange={setComposerPermission}
                     isSubmitDisabled={!canSubmit}
                     submitDisabledReason={submitDisabledReason}
+                    isVoiceRecording={voiceInput.isListening}
+                    isVoiceSupported={voiceInput.isSupported}
+                    onVoiceToggle={voiceInput.toggle}
+                    voiceInterimText={voiceInput.interimText}
                   />
                   <StatusBar
                     connectionState={connectionState}
