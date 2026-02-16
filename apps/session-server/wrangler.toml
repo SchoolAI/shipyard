@@ -21,7 +21,7 @@ new_sqlite_classes = ["PersonalRoom", "CollabRoom"]
 [[d1_databases]]
 binding = "DB"
 database_name = "shipyard-users"
-database_id = "placeholder-create-with-wrangler"
+database_id = "dff012d3-9a9e-45e6-8e3b-4e09d3e2c085"
 migrations_dir = "migrations"
 
 # Development settings
@@ -54,7 +54,7 @@ new_sqlite_classes = ["PersonalRoom", "CollabRoom"]
 [[env.development.d1_databases]]
 binding = "DB"
 database_name = "shipyard-users-dev"
-database_id = "placeholder-create-with-wrangler"
+database_id = "a2966215-e1df-4b54-9808-eaa54b88a15e"
 migrations_dir = "migrations"
 
 # Secrets (set via wrangler secret put):
