@@ -2,6 +2,10 @@ packages:
   - 'packages/*'
   - 'apps/*'
 
+onlyBuiltDependencies:
+  - node-datachannel
+  - node-pty
+
 catalog:
   # ===== loro-extended packages =====
   "@loro-extended/change": "^5.4.2"

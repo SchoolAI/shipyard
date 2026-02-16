@@ -46,11 +46,5 @@
   "packageManager": "pnpm@10.9.0",
   "simple-git-hooks": {
     "pre-commit": "pnpm check"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "node-datachannel",
-      "node-pty"
-    ]
   }
 }
