@@ -16,6 +16,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PlanApprovalProvider } from '../contexts/plan-approval-context';
 import { useAppHotkeys } from '../hooks/use-app-hotkeys';
 import { useMachineSelection } from '../hooks/use-machine-selection';
+import type { ConnectionState } from '../hooks/use-personal-room';
 import { usePersonalRoom } from '../hooks/use-personal-room';
 import { useRoomCapabilities } from '../hooks/use-room-capabilities';
 import { useTaskDocument } from '../hooks/use-task-document';
@@ -100,6 +101,15 @@ function toContentBlocks(text: string): ContentBlock[] {
   return [{ type: 'text' as const, text }];
 }
 
+function getSubmitDisabledReason(
+  canSubmit: boolean,
+  connectionState: ConnectionState
+): string | undefined {
+  if (canSubmit) return undefined;
+  if (connectionState !== 'connected') return 'Connecting to Shipyard...';
+  return 'Select a machine to send messages';
+}
+
 const SUGGESTION_CARDS = [
   {
     id: 'scaffold',
@@ -118,9 +128,10 @@ const SUGGESTION_CARDS = [
 interface HeroStateProps {
   onSuggestionClick: (text: string) => void;
   environmentLabel?: string;
+  canSubmit?: boolean;
 }
 
-function HeroState({ onSuggestionClick, environmentLabel }: HeroStateProps) {
+function HeroState({ onSuggestionClick, environmentLabel, canSubmit = true }: HeroStateProps) {
   return (
     <div className="flex flex-col items-center flex-1 w-full max-w-3xl mx-auto px-3 sm:px-4 min-h-0 overflow-hidden">
       <div className="flex-1 min-h-0" />
@@ -162,7 +173,8 @@ function HeroState({ onSuggestionClick, environmentLabel }: HeroStateProps) {
               key={card.id}
               type="button"
               aria-label={`Use suggestion: ${card.text}`}
-              className="text-left p-3 sm:p-4 rounded-xl border border-separator bg-surface/50 hover:bg-default/70 transition-colors overflow-hidden min-w-0"
+              disabled={!canSubmit}
+              className={`text-left p-3 sm:p-4 rounded-xl border border-separator bg-surface/50 transition-colors overflow-hidden min-w-0 ${canSubmit ? 'hover:bg-default/70' : 'opacity-50 cursor-not-allowed'}`}
               onClick={() => onSuggestionClick(card.text)}
             >
               <p className="text-sm text-foreground/80 leading-relaxed line-clamp-3">{card.text}</p>
@@ -519,6 +531,7 @@ export function ChatPage() {
 
   const handleSubmit = useCallback(
     (payload: SubmitPayload) => {
+      if (!selectedMachineId || connectionState !== 'connected') return;
       const { message, model, reasoningEffort, permissionMode } = payload;
       lastSubmittedModelRef.current = model || null;
       const taskId = generateTaskId();
@@ -611,6 +624,7 @@ export function ChatPage() {
       activeTaskId,
       setActiveTask,
       connection,
+      connectionState,
       selectedMachineId,
       selectedEnvironmentPath,
       homeDir,
@@ -635,6 +649,12 @@ export function ChatPage() {
           : ds.updatedAt;
     return relevantUpdatedAt > diffLastViewedAt;
   }, [activeSidePanel, loroTask.diffState, diffScope, diffLastViewedAt]);
+
+  const canSubmit =
+    !!selectedMachineId &&
+    connectionState === 'connected' &&
+    machines.some((m) => m.machineId === selectedMachineId);
+  const submitDisabledReason = getSubmitDisabledReason(canSubmit, connectionState);
 
   const hasMessages = messages.length > 0;
 
@@ -706,6 +726,7 @@ export function ChatPage() {
                 ) : (
                   <HeroState
                     environmentLabel={heroEnvironmentLabel}
+                    canSubmit={canSubmit}
                     onSuggestionClick={(text) =>
                       handleSubmit({
                         message: text,
@@ -732,6 +753,8 @@ export function ChatPage() {
                     onReasoningChange={setComposerReasoning}
                     permissionMode={composerPermission}
                     onPermissionChange={setComposerPermission}
+                    isSubmitDisabled={!canSubmit}
+                    submitDisabledReason={submitDisabledReason}
                   />
                   <StatusBar
                     connectionState={connectionState}

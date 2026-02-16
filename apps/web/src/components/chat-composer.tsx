@@ -32,6 +32,8 @@ interface ChatComposerProps {
   onReasoningChange: (level: ReasoningLevel) => void;
   permissionMode: PermissionMode;
   onPermissionChange: (mode: PermissionMode) => void;
+  isSubmitDisabled?: boolean;
+  submitDisabledReason?: string;
 }
 
 export interface ChatComposerHandle {
@@ -54,6 +56,8 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
     onReasoningChange,
     permissionMode,
     onPermissionChange,
+    isSubmitDisabled,
+    submitDisabledReason,
   },
   ref
 ) {
@@ -169,6 +173,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
   );
 
   const handleSubmit = useCallback(() => {
+    if (isSubmitDisabled) return;
     const trimmed = value.trim();
     if (!trimmed) return;
 
@@ -183,6 +188,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
     resetTextareaHeight();
     requestAnimationFrame(() => restoreStash());
   }, [
+    isSubmitDisabled,
     value,
     onSubmit,
     slashCommands,
@@ -305,7 +311,9 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
             value={value}
             onChange={handleChange}
             onKeyDown={handleKeyDown}
-            placeholder="Ask Shipyard anything"
+            placeholder={
+              isSubmitDisabled ? 'Connect a machine to start...' : 'Ask Shipyard anything'
+            }
             aria-label="Message input"
             rows={1}
             className="w-full bg-transparent text-foreground placeholder-muted/70 text-sm leading-relaxed resize-none outline-none"
@@ -350,17 +358,24 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
                 <Tooltip.Content>Voice input</Tooltip.Content>
               </Tooltip>
             </div>
-            <Button
-              isIconOnly
-              variant="primary"
-              size="sm"
-              aria-label="Send message"
-              isDisabled={isEmpty}
-              className="rounded-full w-9 h-9 sm:w-8 sm:h-8 min-w-0 bg-accent text-accent-foreground"
-              onPress={handleSubmit}
-            >
-              <ArrowUp className="w-4 h-4" />
-            </Button>
+            <Tooltip isDisabled={!isSubmitDisabled}>
+              <Tooltip.Trigger>
+                <span tabIndex={isSubmitDisabled ? 0 : -1} className="inline-flex">
+                  <Button
+                    isIconOnly
+                    variant="primary"
+                    size="sm"
+                    aria-label="Send message"
+                    isDisabled={isEmpty || isSubmitDisabled}
+                    className="rounded-full w-9 h-9 sm:w-8 sm:h-8 min-w-0 bg-accent text-accent-foreground"
+                    onPress={handleSubmit}
+                  >
+                    <ArrowUp className="w-4 h-4" />
+                  </Button>
+                </span>
+              </Tooltip.Trigger>
+              <Tooltip.Content>{submitDisabledReason}</Tooltip.Content>
+            </Tooltip>
           </div>
         </div>
       </div>

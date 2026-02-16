@@ -1,6 +1,6 @@
 import { Button, Chip, Dropdown, Label, Tooltip } from '@heroui/react';
 import type { AgentInfo as SignalingAgentInfo } from '@shipyard/session';
-import { ChevronDown, GitBranch, Monitor } from 'lucide-react';
+import { AlertCircle, ChevronDown, GitBranch, Monitor } from 'lucide-react';
 import { useMemo } from 'react';
 import type { GitRepoInfo, MachineGroup } from '../../hooks/use-machine-selection';
 import type { ConnectionState } from '../../hooks/use-personal-room';
@@ -121,8 +121,8 @@ export function StatusBar({
               </Dropdown.Popover>
             </Dropdown>
           ) : (
-            <span className="flex items-center gap-1 min-w-0">
-              <Monitor className="w-3 h-3 shrink-0" aria-hidden="true" />
+            <span className="flex items-center gap-1 min-w-0 text-warning">
+              <AlertCircle className="w-3 h-3 shrink-0" aria-hidden="true" />
               <span className="truncate max-w-[4rem] sm:max-w-[6rem]">{machinesLabel}</span>
             </span>
           )}
