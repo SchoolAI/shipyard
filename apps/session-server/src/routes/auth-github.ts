@@ -55,6 +55,7 @@ authGitHubRoute.post(ROUTES.AUTH_GITHUB_CALLBACK, async (c) => {
     user: {
       id: shipyardUser.id,
       displayName: shipyardUser.displayName,
+      avatarUrl: shipyardUser.avatarUrl,
       providers,
     },
     ...(isMobile && { is_mobile: true }),

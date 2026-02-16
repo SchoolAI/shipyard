@@ -87,6 +87,8 @@ export const OAuthUserSchema = z.object({
   id: z.string(),
   /** Display name */
   displayName: z.string(),
+  /** GitHub avatar URL */
+  avatarUrl: z.string().nullable(),
   /** Linked providers */
   providers: z.array(z.string()),
 });

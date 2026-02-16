@@ -15,7 +15,7 @@ Developer guide for running Shipyard locally and contributing to the codebase.
 ## Installation
 
 ```bash
-cd /Users/jacobpetterle/Working\ Directory/shipyard
+cd path/to/shipyard
 pnpm install
 pnpm build
 ```
@@ -46,37 +46,27 @@ pnpm dev:og-proxy        # Start OG proxy worker (optional)
 
 ---
 
-## D1 Database Setup
-
-The session server uses Cloudflare D1 (edge SQLite) for user identity storage.
-
-### First-Time Setup
+## First-Time Setup
 
 ```bash
-# Create the D1 database (only needed once)
-wrangler d1 create shipyard-users-dev
-
-# Copy the database_id from the output into apps/session-server/wrangler.toml
-
-# Apply migrations
-cd apps/session-server
-wrangler d1 migrations apply shipyard-users-dev --local
+pnpm setup
 ```
 
-### Setting Secrets
+This runs three steps automatically:
+1. **Secrets** — creates `apps/session-server/.dev.vars` with auto-generated JWT secret and shared dev OAuth client ID
+2. **Database** — applies D1 migrations to local SQLite
+3. **Login** — builds the daemon, starts the session server, runs `shipyard login` device flow, then stops the server
 
-The session server requires GitHub OAuth credentials and a JWT signing secret:
+The only manual step is completing the GitHub OAuth prompt in your browser.
 
-```bash
-cd apps/session-server
+### Individual Commands
 
-# For local development (creates .dev.vars file)
-echo "GITHUB_CLIENT_ID=your_github_oauth_client_id" >> .dev.vars
-echo "GITHUB_CLIENT_SECRET=your_github_oauth_client_secret" >> .dev.vars
-echo "JWT_SECRET=$(openssl rand -base64 32)" >> .dev.vars
-```
-
-To get GitHub OAuth credentials, create an OAuth App at https://github.com/settings/developers with callback URL `http://localhost:4444/auth/device/verify`.
+| Command | When to use |
+|---------|------------|
+| `pnpm setup` | First time cloning the repo |
+| `pnpm setup:login` | Token expired (every 30 days) |
+| `pnpm db:migrate` | After pulling new D1 migrations |
+| `pnpm setup:secrets` | Regenerate `.dev.vars` |
 
 ---
 

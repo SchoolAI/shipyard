@@ -36,6 +36,7 @@ export interface TokenExchangeResponse {
   user: {
     id: string;
     displayName: string;
+    avatarUrl: string | null;
     providers: string[];
   };
   is_mobile?: boolean;

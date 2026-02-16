@@ -2,7 +2,15 @@ import { Button, Dropdown, Label, Tooltip } from '@heroui/react';
 import { LogOut } from 'lucide-react';
 import { useAuthStore } from '../stores';
 
-function Avatar({ displayName, size = 'md' }: { displayName: string; size?: 'sm' | 'md' }) {
+function Avatar({
+  displayName,
+  avatarUrl,
+  size = 'md',
+}: {
+  displayName: string;
+  avatarUrl?: string | null;
+  size?: 'sm' | 'md';
+}) {
   const dims = size === 'sm' ? 'w-6 h-6 text-[10px]' : 'w-7 h-7 text-xs';
 
   return (
@@ -10,7 +18,11 @@ function Avatar({ displayName, size = 'md' }: { displayName: string; size?: 'sm'
       aria-hidden="true"
       className={`flex items-center justify-center rounded-full bg-accent/20 text-accent font-semibold uppercase shrink-0 overflow-hidden ${dims}`}
     >
-      {displayName.charAt(0)}
+      {avatarUrl ? (
+        <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
+      ) : (
+        displayName.charAt(0)
+      )}
     </span>
   );
 }
@@ -37,7 +49,7 @@ export function UserMenu({ collapsed }: { collapsed?: boolean }) {
           aria-label={`${user.displayName} menu`}
           className="text-muted hover:text-foreground hover:bg-default/50 w-8 h-8 min-w-0"
         >
-          <Avatar displayName={user.displayName} size="sm" />
+          <Avatar displayName={user.displayName} avatarUrl={user.avatarUrl} size="sm" />
         </Button>
       </Tooltip.Trigger>
       <Tooltip.Content placement="right">{user.displayName}</Tooltip.Content>
@@ -49,7 +61,7 @@ export function UserMenu({ collapsed }: { collapsed?: boolean }) {
       className="justify-start text-muted hover:text-foreground hover:bg-default/30 gap-2 flex-1 h-9 min-w-0 px-2"
       aria-label={`${user.displayName} menu`}
     >
-      <Avatar displayName={user.displayName} />
+      <Avatar displayName={user.displayName} avatarUrl={user.avatarUrl} />
       <span className="text-sm truncate">{user.displayName}</span>
     </Button>
   );
