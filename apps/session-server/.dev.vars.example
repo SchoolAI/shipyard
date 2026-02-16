@@ -3,8 +3,8 @@
 
 # GitHub OAuth App credentials (same app used by web app)
 # Get the client secret from: https://github.com/settings/developers
-# Look for the OAuth App with Client ID: Ov23liNnbDyIs6wu4Btd
-GITHUB_CLIENT_ID=Ov23liNnbDyIs6wu4Btd
+# Look for the OAuth App with Client ID: Ov23liicW3sJTnXPegMu
+GITHUB_CLIENT_ID=Ov23liicW3sJTnXPegMu
 GITHUB_CLIENT_SECRET=your_client_secret_here
 
 # JWT signing secret (at least 32 characters)
