@@ -100,18 +100,19 @@ jobs:
         with:
           node-version: '22.14.0'
 
+      - name: Install npm@latest (OIDC trusted publishing)
+        if: steps.release.outputs.type == 'promote' || steps.changes.outputs.has_changes == 'true'
+        run: |
+          npm install -g npm@latest
+          npm config set registry https://registry.npmjs.org/
+          echo "npm version: $(npm --version)"
+
       - name: Install pnpm via corepack
         if: steps.release.outputs.type == 'promote' || steps.changes.outputs.has_changes == 'true'
         run: corepack enable && corepack install
 
       - uses: oven-sh/setup-bun@v2
         if: steps.release.outputs.type == 'promote' || steps.changes.outputs.has_changes == 'true'
-
-      - name: Install npm@latest (OIDC support)
-        if: steps.release.outputs.type == 'promote' || steps.changes.outputs.has_changes == 'true'
-        run: |
-          npm install -g npm@latest
-          npm config set registry https://registry.npmjs.org/
 
       # ── Build (nightly/RC only) ─────────────────────────────────────
       - name: Install dependencies
