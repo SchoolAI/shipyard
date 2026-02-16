@@ -103,7 +103,7 @@ jobs:
         with:
           node-version: '22.14.0'
           cache: 'pnpm'
-          # NOTE: Do NOT set registry-url here — it conflicts with npm OIDC provenance
+          registry-url: 'https://registry.npmjs.org'
 
       - uses: oven-sh/setup-bun@v2
         if: steps.release.outputs.type == 'promote' || steps.changes.outputs.has_changes == 'true'
@@ -147,11 +147,9 @@ jobs:
       - name: Publish to npm (nightly/RC)
         if: steps.release.outputs.type != 'promote' && steps.changes.outputs.has_changes == 'true'
         working-directory: apps/daemon
+        run: npm publish --tag next --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
-          echo "//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}" > .npmrc
-          npm publish --tag next --provenance --access public
 
       - name: Git tag (nightly/RC)
         if: steps.release.outputs.type != 'promote' && steps.changes.outputs.has_changes == 'true'
@@ -181,11 +179,9 @@ jobs:
         if: steps.release.outputs.type == 'promote'
         id: promote
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           PROMOTE_VERSION: ${{ github.event.inputs.promote_version }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
-          echo "//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}" > ~/.npmrc
-
           # Extract base version (strip prerelease suffix)
           STABLE_VERSION=$(echo "${PROMOTE_VERSION}" | sed 's/-.*//')
           echo "stable_version=${STABLE_VERSION}" >> "$GITHUB_OUTPUT"
