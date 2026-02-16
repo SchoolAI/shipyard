@@ -1,10 +1,8 @@
 import { Button, Dropdown, Label, Tooltip } from '@heroui/react';
-import { ExternalLink, LogOut } from 'lucide-react';
-import { useState } from 'react';
+import { LogOut } from 'lucide-react';
 import { useAuthStore } from '../stores';
 
-function Avatar({ username, size = 'md' }: { username: string; size?: 'sm' | 'md' }) {
-  const [imgFailed, setImgFailed] = useState(false);
+function Avatar({ displayName, size = 'md' }: { displayName: string; size?: 'sm' | 'md' }) {
   const dims = size === 'sm' ? 'w-6 h-6 text-[10px]' : 'w-7 h-7 text-xs';
 
   return (
@@ -12,16 +10,7 @@ function Avatar({ username, size = 'md' }: { username: string; size?: 'sm' | 'md
       aria-hidden="true"
       className={`flex items-center justify-center rounded-full bg-accent/20 text-accent font-semibold uppercase shrink-0 overflow-hidden ${dims}`}
     >
-      {imgFailed ? (
-        username.charAt(0)
-      ) : (
-        <img
-          src={`https://github.com/${username}.png?size=64`}
-          alt=""
-          className="w-full h-full object-cover"
-          onError={() => setImgFailed(true)}
-        />
-      )}
+      {displayName.charAt(0)}
     </span>
   );
 }
@@ -33,9 +22,7 @@ export function UserMenu({ collapsed }: { collapsed?: boolean }) {
   if (!user) return null;
 
   const handleAction = (key: React.Key) => {
-    if (key === 'github-profile') {
-      window.open(`https://github.com/${user.username}`, '_blank', 'noopener');
-    } else if (key === 'sign-out') {
+    if (key === 'sign-out') {
       logout();
     }
   };
@@ -47,23 +34,23 @@ export function UserMenu({ collapsed }: { collapsed?: boolean }) {
           isIconOnly
           variant="ghost"
           size="sm"
-          aria-label={`${user.username} menu`}
+          aria-label={`${user.displayName} menu`}
           className="text-muted hover:text-foreground hover:bg-default/50 w-8 h-8 min-w-0"
         >
-          <Avatar username={user.username} size="sm" />
+          <Avatar displayName={user.displayName} size="sm" />
         </Button>
       </Tooltip.Trigger>
-      <Tooltip.Content placement="right">{user.username}</Tooltip.Content>
+      <Tooltip.Content placement="right">{user.displayName}</Tooltip.Content>
     </Tooltip>
   ) : (
     <Button
       variant="ghost"
       size="sm"
       className="justify-start text-muted hover:text-foreground hover:bg-default/30 gap-2 flex-1 h-9 min-w-0 px-2"
-      aria-label={`${user.username} menu`}
+      aria-label={`${user.displayName} menu`}
     >
-      <Avatar username={user.username} />
-      <span className="text-sm truncate">{user.username}</span>
+      <Avatar displayName={user.displayName} />
+      <span className="text-sm truncate">{user.displayName}</span>
     </Button>
   );
 
@@ -72,10 +59,6 @@ export function UserMenu({ collapsed }: { collapsed?: boolean }) {
       {trigger}
       <Dropdown.Popover placement={collapsed ? 'right' : 'top start'} className="min-w-[180px]">
         <Dropdown.Menu onAction={handleAction}>
-          <Dropdown.Item id="github-profile" textValue="View GitHub Profile">
-            <ExternalLink className="w-4 h-4" />
-            <Label>View GitHub Profile</Label>
-          </Dropdown.Item>
           <Dropdown.Item id="sign-out" textValue="Sign Out" className="text-danger">
             <LogOut className="w-4 h-4" />
             <Label>Sign Out</Label>

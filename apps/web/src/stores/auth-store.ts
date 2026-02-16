@@ -3,7 +3,8 @@ import { devtools, persist } from 'zustand/middleware';
 
 export interface AuthUser {
   id: string;
-  username: string;
+  displayName: string;
+  providers: string[];
 }
 
 export interface AuthStore {

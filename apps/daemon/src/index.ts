@@ -188,49 +188,72 @@ function handleResult(
   }
 }
 
-async function main(): Promise<void> {
+async function handleSubcommand(): Promise<boolean> {
   const subcommand = process.argv[2];
 
   if (subcommand === 'login') {
     const { loginCommand } = await import('./commands/login.js');
     const hasCheck = process.argv.includes('--check');
     await loginCommand({ check: hasCheck });
-    return;
+    return true;
   }
 
   if (subcommand === 'logout') {
     const { logoutCommand } = await import('./commands/logout.js');
     await logoutCommand();
-    return;
+    return true;
   }
 
-  const env = validateEnv();
-  const args = parseCliArgs();
+  return false;
+}
 
-  if (!env.SHIPYARD_USER_TOKEN) {
-    const { loadAuthToken } = await import('./auth.js');
-    const auth = await loadAuthToken();
-    if (auth?.token) {
-      env.SHIPYARD_USER_TOKEN = auth.token;
-      if (auth.signalingUrl) {
-        env.SHIPYARD_SIGNALING_URL = auth.signalingUrl;
-      }
+async function loadAuthFromConfig(env: Env): Promise<void> {
+  if (env.SHIPYARD_USER_TOKEN) return;
+
+  const { loadAuthToken } = await import('./auth.js');
+  const auth = await loadAuthToken();
+  if (auth?.token) {
+    env.SHIPYARD_USER_TOKEN = auth.token;
+    if (auth.signalingUrl) {
+      env.SHIPYARD_SIGNALING_URL = auth.signalingUrl;
     }
   }
+}
 
-  if (args.serve) {
-    return serve(env);
-  }
-
+function validateTaskArgs(args: CliArgs): void {
   if (!args.prompt && !args.resume) {
     logger.error('Either --prompt, --resume, or --serve is required. Use --help for usage.');
     process.exit(1);
   }
+}
 
+function validateApiKey(env: Env): void {
   if (!env.ANTHROPIC_API_KEY) {
     logger.error('ANTHROPIC_API_KEY is required when running tasks. Use --help for usage.');
     process.exit(1);
   }
+}
+
+function createCleanup(
+  signalingHandle: SignalingHandle | null,
+  lifecycle: LifecycleManager,
+  repo: Repo
+): () => void {
+  let cleanedUp = false;
+  return () => {
+    if (cleanedUp) return;
+    cleanedUp = true;
+    signalingHandle?.signaling.unregister();
+    signalingHandle?.signaling.destroy();
+    signalingHandle?.connection.disconnect();
+    lifecycle.destroy();
+    repo.reset();
+  };
+}
+
+async function runTask(args: CliArgs, env: Env): Promise<void> {
+  validateTaskArgs(args);
+  validateApiKey(env);
 
   const dataDir = resolve(args.dataDir ?? env.SHIPYARD_DATA_DIR.replace('~', homedir()));
   const taskId = args.taskId ?? generateTaskId();
@@ -241,17 +264,7 @@ async function main(): Promise<void> {
   const repo = await setupRepo(dataDir);
   const lifecycle = new LifecycleManager();
   const signalingHandle = await setupSignaling(env, log);
-
-  let cleanedUp = false;
-  const cleanup = () => {
-    if (cleanedUp) return;
-    cleanedUp = true;
-    signalingHandle?.signaling.unregister();
-    signalingHandle?.signaling.destroy();
-    signalingHandle?.connection.disconnect();
-    lifecycle.destroy();
-    repo.reset();
-  };
+  const cleanup = createCleanup(signalingHandle, lifecycle, repo);
 
   lifecycle.onShutdown(async () => {
     log.info('Cleaning up...');
@@ -287,6 +300,22 @@ async function main(): Promise<void> {
   }
 
   cleanup();
+}
+
+async function main(): Promise<void> {
+  const handled = await handleSubcommand();
+  if (handled) return;
+
+  const env = validateEnv();
+  const args = parseCliArgs();
+
+  await loadAuthFromConfig(env);
+
+  if (args.serve) {
+    return serve(env);
+  }
+
+  await runTask(args, env);
 }
 
 main().catch((error: unknown) => {

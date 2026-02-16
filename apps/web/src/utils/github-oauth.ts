@@ -19,7 +19,7 @@ export async function exchangeCodeForToken(
   code: string,
   redirectUri: string,
   sessionServerUrl: string
-): Promise<{ token: string; user: { id: string; username: string } }> {
+): Promise<{ token: string; user: { id: string; displayName: string; providers: string[] } }> {
   const client = new SignalingClient(sessionServerUrl);
   const response = await client.authGitHubCallback({
     code,

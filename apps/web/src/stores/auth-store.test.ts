@@ -16,16 +16,20 @@ describe('useAuthStore', () => {
 
   it('login sets token and user, clears error', () => {
     useAuthStore.getState().setError('old error');
-    useAuthStore.getState().login('tok_abc', { id: 'gh_12345', username: 'octocat' });
+    useAuthStore
+      .getState()
+      .login('tok_abc', { id: 'gh_12345', displayName: 'Octocat', providers: ['github'] });
 
     const state = useAuthStore.getState();
     expect(state.token).toBe('tok_abc');
-    expect(state.user).toEqual({ id: 'gh_12345', username: 'octocat' });
+    expect(state.user).toEqual({ id: 'gh_12345', displayName: 'Octocat', providers: ['github'] });
     expect(state.error).toBe(null);
   });
 
   it('logout clears everything', () => {
-    useAuthStore.getState().login('tok_abc', { id: 'gh_12345', username: 'octocat' });
+    useAuthStore
+      .getState()
+      .login('tok_abc', { id: 'gh_12345', displayName: 'Octocat', providers: ['github'] });
     useAuthStore.getState().setExchanging(true);
     useAuthStore.getState().logout();
 
@@ -37,7 +41,9 @@ describe('useAuthStore', () => {
   });
 
   it('login then logout round-trip returns to initial state', () => {
-    useAuthStore.getState().login('tok_abc', { id: 'gh_12345', username: 'octocat' });
+    useAuthStore
+      .getState()
+      .login('tok_abc', { id: 'gh_12345', displayName: 'Octocat', providers: ['github'] });
     useAuthStore.getState().logout();
 
     const state = useAuthStore.getState();
@@ -59,14 +65,18 @@ describe('useAuthStore', () => {
 
   it('login clears prior error', () => {
     useAuthStore.getState().setError('prior error');
-    useAuthStore.getState().login('tok_xyz', { id: 'gh_99', username: 'mona' });
+    useAuthStore
+      .getState()
+      .login('tok_xyz', { id: 'gh_99', displayName: 'Mona', providers: ['github'] });
 
     expect(useAuthStore.getState().error).toBe(null);
   });
 
   it('login does not affect isExchanging if not set', () => {
     expect(useAuthStore.getState().isExchanging).toBe(false);
-    useAuthStore.getState().login('tok_abc', { id: 'gh_12345', username: 'octocat' });
+    useAuthStore
+      .getState()
+      .login('tok_abc', { id: 'gh_12345', displayName: 'Octocat', providers: ['github'] });
     expect(useAuthStore.getState().isExchanging).toBe(false);
   });
 });
