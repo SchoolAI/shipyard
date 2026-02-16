@@ -12,6 +12,7 @@ const EnvironmentSchema = z.enum(['development', 'production']).default('develop
 const BaseEnvSchema = z.object({
   PERSONAL_ROOM: z.custom<DurableObjectNamespace>((val) => val !== undefined),
   COLLAB_ROOM: z.custom<DurableObjectNamespace>((val) => val !== undefined),
+  DB: z.custom<D1Database>((val) => val !== undefined),
 
   GITHUB_CLIENT_ID: z.string().min(1, 'GITHUB_CLIENT_ID required'),
   GITHUB_CLIENT_SECRET: z.string().min(1, 'GITHUB_CLIENT_SECRET required'),

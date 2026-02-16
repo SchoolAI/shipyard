@@ -83,10 +83,12 @@ export type AuthGitHubCallbackRequest = z.infer<typeof AuthGitHubCallbackRequest
  * User info returned from successful OAuth.
  */
 export const OAuthUserSchema = z.object({
-  /** Shipyard user ID (derived from GitHub ID, e.g., 'gh_12345') */
+  /** Shipyard user ID ("usr_abc123") */
   id: z.string(),
-  /** GitHub username */
-  username: z.string(),
+  /** Display name */
+  displayName: z.string(),
+  /** Linked providers */
+  providers: z.array(z.string()),
 });
 
 export type OAuthUser = z.infer<typeof OAuthUserSchema>;
@@ -196,19 +198,17 @@ export type WsCollabError = z.infer<typeof WsCollabErrorSchema>;
  * This is the payload embedded in the JWT returned by /auth/github/callback.
  */
 export const ShipyardJWTClaimsSchema = z.object({
-  /** Shipyard user ID (internal, derived from GitHub ID) */
+  /** Shipyard user ID: "usr_abc123" */
   sub: z.string(),
-  /** GitHub username */
-  ghUser: z.string(),
-  /** GitHub user ID */
-  ghId: z.number(),
-  /** Issued at (Unix timestamp) */
+  /** Display name from primary provider */
+  displayName: z.string(),
+  /** Linked OAuth providers */
+  providers: z.array(z.string()),
   iat: z.number(),
-  /** Expiration (Unix timestamp) */
   exp: z.number(),
   /** Optional: Scope for agent tokens (e.g., 'task:abc123') */
   scope: z.string().optional(),
-  /** Optional: Machine ID for agent tokens */
+  /** Optional: Machine ID for daemon tokens */
   machineId: z.string().optional(),
 });
 
@@ -583,3 +583,32 @@ export const CollabRoomServerMessageSchema = z.discriminatedUnion('type', [
 ]);
 
 export type CollabRoomServerMessage = z.infer<typeof CollabRoomServerMessageSchema>;
+
+/** POST /auth/device/start — no request body needed */
+export const DeviceStartResponseSchema = z.object({
+  deviceCode: z.string(),
+  userCode: z.string(),
+  verificationUri: z.string().url(),
+  expiresIn: z.number(),
+  interval: z.number(),
+});
+export type DeviceStartResponse = z.infer<typeof DeviceStartResponseSchema>;
+
+/** POST /auth/device/poll request */
+export const DevicePollRequestSchema = z.object({
+  deviceCode: z.string().min(1, 'deviceCode is required'),
+});
+export type DevicePollRequest = z.infer<typeof DevicePollRequestSchema>;
+
+/** POST /auth/device/poll response (success) */
+export const DevicePollResponseSchema = z.object({
+  token: z.string(),
+  user: OAuthUserSchema,
+});
+export type DevicePollResponse = z.infer<typeof DevicePollResponseSchema>;
+
+/** POST /auth/device/poll response (pending/errors) */
+export const DevicePollPendingSchema = z.object({
+  error: z.enum(['authorization_pending', 'slow_down', 'expired_token']),
+});
+export type DevicePollPending = z.infer<typeof DevicePollPendingSchema>;

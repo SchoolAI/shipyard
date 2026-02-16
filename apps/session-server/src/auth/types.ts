@@ -12,19 +12,15 @@ export interface GitHubUser {
 
 /** Shipyard JWT claims */
 export interface ShipyardJWTClaims {
-  /** Shipyard user ID (internal, derived from GitHub ID) */
+  /** Shipyard user ID ("usr_abc123") */
   sub: string;
-  /** GitHub username */
-  ghUser: string;
-  /** GitHub user ID */
-  ghId: number;
-  /** Issued at (Unix timestamp) */
+  /** Display name */
+  displayName: string;
+  /** Linked OAuth providers */
+  providers: string[];
   iat: number;
-  /** Expiration (Unix timestamp) */
   exp: number;
-  /** Optional: Scope for agent tokens (e.g., 'task:abc123') */
   scope?: string;
-  /** Optional: Machine ID for agent tokens */
   machineId?: string;
 }
 
@@ -39,7 +35,8 @@ export interface TokenExchangeResponse {
   token: string;
   user: {
     id: string;
-    username: string;
+    displayName: string;
+    providers: string[];
   };
   is_mobile?: boolean;
 }

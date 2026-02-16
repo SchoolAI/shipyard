@@ -2,55 +2,51 @@ import { env } from 'cloudflare:test';
 import { describe, expect, it } from 'vitest';
 import type { Env } from '../env';
 import { decodeToken, generateAgentToken, generateSessionToken, validateToken } from './jwt';
-import type { GitHubUser } from './types';
 
 const testEnv = env as unknown as Env;
 const TEST_SECRET = testEnv.JWT_SECRET;
 
-const mockUser: GitHubUser = {
-  id: 12345,
-  login: 'testuser',
-  name: 'Test User',
-  avatar_url: 'https://avatars.githubusercontent.com/u/12345',
+const mockUser = {
+  id: 'usr_abc123',
+  displayName: 'Test User',
 };
+
+const mockProviders = ['github'];
 
 describe('jwt', () => {
   describe('generateSessionToken', () => {
     it('generates valid JWT with correct structure', async () => {
-      const token = await generateSessionToken(mockUser, TEST_SECRET);
+      const token = await generateSessionToken(mockUser, mockProviders, TEST_SECRET);
 
-      // JWT should have 3 parts
       const parts = token.split('.');
       expect(parts).toHaveLength(3);
 
-      // Should be base64url encoded
       for (const part of parts) {
         expect(part).toMatch(/^[A-Za-z0-9_-]+$/);
       }
     });
 
     it('includes correct claims in payload', async () => {
-      const token = await generateSessionToken(mockUser, TEST_SECRET);
+      const token = await generateSessionToken(mockUser, mockProviders, TEST_SECRET);
       const decoded = decodeToken(token);
 
       expect(decoded).not.toBeNull();
-      expect(decoded?.sub).toBe(`gh_${mockUser.id}`);
-      expect(decoded?.ghUser).toBe(mockUser.login);
-      expect(decoded?.ghId).toBe(mockUser.id);
+      expect(decoded?.sub).toBe(mockUser.id);
+      expect(decoded?.displayName).toBe(mockUser.displayName);
+      expect(decoded?.providers).toEqual(mockProviders);
       expect(decoded?.iat).toBeDefined();
       expect(decoded?.exp).toBeDefined();
       expect(decoded?.scope).toBeUndefined();
       expect(decoded?.machineId).toBeUndefined();
     });
 
-    it('generates token with 7-day expiration', async () => {
-      const token = await generateSessionToken(mockUser, TEST_SECRET);
+    it('generates token with 30-day expiration', async () => {
+      const token = await generateSessionToken(mockUser, mockProviders, TEST_SECRET);
       const decoded = decodeToken(token);
 
       expect(decoded).not.toBeNull();
       const expiresIn = (decoded?.exp ?? 0) - (decoded?.iat ?? 0);
-      // 7 days in seconds
-      expect(expiresIn).toBe(7 * 24 * 60 * 60);
+      expect(expiresIn).toBe(30 * 24 * 60 * 60);
     });
   });
 
@@ -59,36 +55,35 @@ describe('jwt', () => {
     const machineId = 'machine-xyz789';
 
     it('generates valid JWT with agent-specific claims', async () => {
-      const token = await generateAgentToken(mockUser, taskId, machineId, TEST_SECRET);
+      const token = await generateAgentToken(mockUser, mockProviders, taskId, machineId, TEST_SECRET);
       const decoded = decodeToken(token);
 
       expect(decoded).not.toBeNull();
-      expect(decoded?.sub).toBe(`gh_${mockUser.id}`);
-      expect(decoded?.ghUser).toBe(mockUser.login);
-      expect(decoded?.ghId).toBe(mockUser.id);
+      expect(decoded?.sub).toBe(mockUser.id);
+      expect(decoded?.displayName).toBe(mockUser.displayName);
+      expect(decoded?.providers).toEqual(mockProviders);
       expect(decoded?.scope).toBe(`task:${taskId}`);
       expect(decoded?.machineId).toBe(machineId);
     });
 
     it('generates token with 24-hour expiration', async () => {
-      const token = await generateAgentToken(mockUser, taskId, machineId, TEST_SECRET);
+      const token = await generateAgentToken(mockUser, mockProviders, taskId, machineId, TEST_SECRET);
       const decoded = decodeToken(token);
 
       expect(decoded).not.toBeNull();
       const expiresIn = (decoded?.exp ?? 0) - (decoded?.iat ?? 0);
-      // 24 hours in seconds
       expect(expiresIn).toBe(24 * 60 * 60);
     });
   });
 
   describe('validateToken', () => {
     it('validates correctly signed token', async () => {
-      const token = await generateSessionToken(mockUser, TEST_SECRET);
+      const token = await generateSessionToken(mockUser, mockProviders, TEST_SECRET);
       const claims = await validateToken(token, TEST_SECRET);
 
       expect(claims).not.toBeNull();
-      expect(claims?.sub).toBe(`gh_${mockUser.id}`);
-      expect(claims?.ghUser).toBe(mockUser.login);
+      expect(claims?.sub).toBe(mockUser.id);
+      expect(claims?.displayName).toBe(mockUser.displayName);
     });
 
     it('returns null for undefined token', async () => {
@@ -127,8 +122,7 @@ describe('jwt', () => {
     });
 
     it('returns null for token with invalid signature', async () => {
-      const token = await generateSessionToken(mockUser, TEST_SECRET);
-      // Replace last character of signature to invalidate it
+      const token = await generateSessionToken(mockUser, mockProviders, TEST_SECRET);
       const invalidToken = `${token.slice(0, -1)}X`;
       const claims = await validateToken(invalidToken, TEST_SECRET);
 
@@ -136,29 +130,26 @@ describe('jwt', () => {
     });
 
     it('returns null for token signed with different secret', async () => {
-      const token = await generateSessionToken(mockUser, 'wrong-secret');
+      const token = await generateSessionToken(mockUser, mockProviders, 'wrong-secret');
       const claims = await validateToken(token, TEST_SECRET);
 
       expect(claims).toBeNull();
     });
 
     it('returns null for expired token', async () => {
-      // Create token that expired 1 hour ago
-      const token = await generateSessionToken(mockUser, TEST_SECRET);
+      const token = await generateSessionToken(mockUser, mockProviders, TEST_SECRET);
       const decoded = decodeToken(token);
 
-      // Manually create expired token by modifying the payload
       const header = { alg: 'HS256', typ: 'JWT' };
       const expiredClaims = {
         ...decoded,
-        iat: Math.floor(Date.now() / 1000) - 7200, // 2 hours ago
-        exp: Math.floor(Date.now() / 1000) - 3600, // 1 hour ago
+        iat: Math.floor(Date.now() / 1000) - 7200,
+        exp: Math.floor(Date.now() / 1000) - 3600,
       };
 
       const headerB64 = base64UrlEncode(JSON.stringify(header));
       const payloadB64 = base64UrlEncode(JSON.stringify(expiredClaims));
 
-      // Use the real signing logic by importing crypto utilities
       const { hmacSign } = await import('../utils/crypto');
       const signature = await hmacSign(`${headerB64}.${payloadB64}`, TEST_SECRET);
       const expiredToken = `${headerB64}.${payloadB64}.${signature}`;
@@ -180,7 +171,7 @@ describe('jwt', () => {
 
     it('returns null for token with missing required fields', async () => {
       const header = base64UrlEncode(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
-      const invalidPayload = base64UrlEncode(JSON.stringify({ sub: 'test' })); // Missing required fields
+      const invalidPayload = base64UrlEncode(JSON.stringify({ sub: 'test' }));
       const { hmacSign } = await import('../utils/crypto');
       const signature = await hmacSign(`${header}.${invalidPayload}`, TEST_SECRET);
       const token = `${header}.${invalidPayload}.${signature}`;
@@ -190,7 +181,7 @@ describe('jwt', () => {
     });
 
     it('validates agent token with scope and machineId', async () => {
-      const token = await generateAgentToken(mockUser, 'task-123', 'machine-456', TEST_SECRET);
+      const token = await generateAgentToken(mockUser, mockProviders, 'task-123', 'machine-456', TEST_SECRET);
       const claims = await validateToken(token, TEST_SECRET);
 
       expect(claims).not.toBeNull();
@@ -201,13 +192,13 @@ describe('jwt', () => {
 
   describe('decodeToken', () => {
     it('decodes valid token without validation', async () => {
-      const token = await generateSessionToken(mockUser, TEST_SECRET);
+      const token = await generateSessionToken(mockUser, mockProviders, TEST_SECRET);
       const decoded = decodeToken(token);
 
       expect(decoded).not.toBeNull();
-      expect(decoded?.sub).toBe(`gh_${mockUser.id}`);
-      expect(decoded?.ghUser).toBe(mockUser.login);
-      expect(decoded?.ghId).toBe(mockUser.id);
+      expect(decoded?.sub).toBe(mockUser.id);
+      expect(decoded?.displayName).toBe(mockUser.displayName);
+      expect(decoded?.providers).toEqual(mockProviders);
     });
 
     it('returns null for malformed token (not 3 parts)', () => {
@@ -239,12 +230,11 @@ describe('jwt', () => {
     });
 
     it('decodes expired token (no validation)', async () => {
-      // Create token with expired timestamp
       const header = { alg: 'HS256', typ: 'JWT' };
       const expiredClaims = {
-        sub: 'gh_12345',
-        ghUser: 'testuser',
-        ghId: 12345,
+        sub: 'usr_abc123',
+        displayName: 'Test User',
+        providers: ['github'],
         iat: Math.floor(Date.now() / 1000) - 7200,
         exp: Math.floor(Date.now() / 1000) - 3600,
       };
@@ -255,15 +245,13 @@ describe('jwt', () => {
       const signature = await hmacSign(`${headerB64}.${payloadB64}`, TEST_SECRET);
       const token = `${headerB64}.${payloadB64}.${signature}`;
 
-      // decodeToken should return the payload even if expired
       const decoded = decodeToken(token);
       expect(decoded).not.toBeNull();
-      expect(decoded?.sub).toBe('gh_12345');
+      expect(decoded?.sub).toBe('usr_abc123');
     });
   });
 });
 
-// Helper function for base64url encoding (matching implementation)
 function base64UrlEncode(str: string): string {
   const base64 = btoa(str);
   return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');

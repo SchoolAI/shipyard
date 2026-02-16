@@ -8,8 +8,8 @@ import { app } from './index';
 /**
  * Helper to create a valid JWT for testing
  */
-async function createTestToken(userId = 12345, username = 'testuser'): Promise<string> {
-  return generateSessionToken({ id: userId, login: username }, (env as unknown as Env).JWT_SECRET);
+async function createTestToken(userId = 'usr_test123', displayName = 'Test User'): Promise<string> {
+  return generateSessionToken({ id: userId, displayName }, ['github'], (env as unknown as Env).JWT_SECRET);
 }
 
 describe(`GET ${ROUTES.WS_PERSONAL} (WebSocket)`, () => {
@@ -17,7 +17,7 @@ describe(`GET ${ROUTES.WS_PERSONAL} (WebSocket)`, () => {
     const token = await createTestToken();
 
     const res = await app.request(
-      `/personal/gh_12345?token=${token}`,
+      `/personal/usr_test123?token=${token}`,
       {
         method: 'GET',
       },
@@ -32,7 +32,7 @@ describe(`GET ${ROUTES.WS_PERSONAL} (WebSocket)`, () => {
 
   it('returns 401 without token query param', async () => {
     const res = await app.request(
-      '/personal/gh_12345',
+      '/personal/usr_test123',
       {
         method: 'GET',
         headers: {
@@ -50,7 +50,7 @@ describe(`GET ${ROUTES.WS_PERSONAL} (WebSocket)`, () => {
 
   it('returns 401 for invalid token', async () => {
     const res = await app.request(
-      '/personal/gh_12345?token=invalid.jwt.token',
+      '/personal/usr_test123?token=invalid.jwt.token',
       {
         method: 'GET',
         headers: {
@@ -68,7 +68,7 @@ describe(`GET ${ROUTES.WS_PERSONAL} (WebSocket)`, () => {
 
   it('returns 401 for malformed token', async () => {
     const res = await app.request(
-      '/personal/gh_12345?token=not-even-a-jwt',
+      '/personal/usr_test123?token=not-even-a-jwt',
       {
         method: 'GET',
         headers: {
@@ -84,11 +84,10 @@ describe(`GET ${ROUTES.WS_PERSONAL} (WebSocket)`, () => {
   });
 
   it('returns 403 when userId does not match token subject', async () => {
-    // Create token for user 12345, but request for different user
-    const token = await createTestToken(12345, 'testuser');
+    const token = await createTestToken('usr_test123', 'Test User');
 
     const res = await app.request(
-      `/personal/gh_99999?token=${token}`,
+      `/personal/usr_other999?token=${token}`,
       {
         method: 'GET',
         headers: {
@@ -105,7 +104,7 @@ describe(`GET ${ROUTES.WS_PERSONAL} (WebSocket)`, () => {
   });
 
   it('accepts valid WebSocket upgrade request with matching token', async () => {
-    const token = await createTestToken(12345, 'testuser');
+    const token = await createTestToken('usr_test123', 'Test User');
 
     // Note: In a full integration test, this would return a 101 Switching Protocols
     // but since we're using app.request() which doesn't support actual WebSocket
@@ -113,7 +112,7 @@ describe(`GET ${ROUTES.WS_PERSONAL} (WebSocket)`, () => {
     // The actual WebSocket connection would be handled by the Durable Object.
 
     const res = await app.request(
-      `/personal/gh_12345?token=${token}`,
+      `/personal/usr_test123?token=${token}`,
       {
         method: 'GET',
         headers: {
@@ -137,11 +136,11 @@ describe(`GET ${ROUTES.WS_PERSONAL} (WebSocket)`, () => {
   });
 
   it('handles URL-encoded token', async () => {
-    const token = await createTestToken(12345, 'testuser');
+    const token = await createTestToken('usr_test123', 'Test User');
     const encodedToken = encodeURIComponent(token);
 
     const res = await app.request(
-      `/personal/gh_12345?token=${encodedToken}`,
+      `/personal/usr_test123?token=${encodedToken}`,
       {
         method: 'GET',
         headers: {
@@ -159,7 +158,7 @@ describe(`GET ${ROUTES.WS_PERSONAL} (WebSocket)`, () => {
     const token = await createTestToken();
 
     const res = await app.request(
-      `/personal/gh_12345?token=${token}`,
+      `/personal/usr_test123?token=${token}`,
       {
         method: 'HEAD',
       },
@@ -173,7 +172,7 @@ describe(`GET ${ROUTES.WS_PERSONAL} (WebSocket)`, () => {
   it('validates token before checking userId match', async () => {
     // Even with matching userId, invalid token should fail first
     const res = await app.request(
-      '/personal/gh_12345?token=invalid.jwt.token',
+      '/personal/usr_test123?token=invalid.jwt.token',
       {
         method: 'GET',
         headers: {

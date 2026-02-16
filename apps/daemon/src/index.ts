@@ -50,6 +50,10 @@ function parseCliArgs(): CliArgs {
         'shipyard-daemon - Claude Agent SDK + Loro CRDT sync',
         '',
         'Usage:',
+        '  shipyard login              Authenticate with Shipyard',
+        '  shipyard login --check      Check current auth status',
+        '  shipyard logout             Clear stored credentials',
+        '',
         '  shipyard-daemon --prompt "Fix the bug in auth.ts" [options]',
         '  shipyard-daemon --resume <session-id> --task-id <id> [--prompt "Continue"]',
         '  shipyard-daemon --serve',
@@ -185,8 +189,34 @@ function handleResult(
 }
 
 async function main(): Promise<void> {
+  const subcommand = process.argv[2];
+
+  if (subcommand === 'login') {
+    const { loginCommand } = await import('./commands/login.js');
+    const hasCheck = process.argv.includes('--check');
+    await loginCommand({ check: hasCheck });
+    return;
+  }
+
+  if (subcommand === 'logout') {
+    const { logoutCommand } = await import('./commands/logout.js');
+    await logoutCommand();
+    return;
+  }
+
   const env = validateEnv();
   const args = parseCliArgs();
+
+  if (!env.SHIPYARD_USER_TOKEN) {
+    const { loadAuthToken } = await import('./auth.js');
+    const auth = await loadAuthToken();
+    if (auth?.token) {
+      env.SHIPYARD_USER_TOKEN = auth.token;
+      if (auth.signalingUrl) {
+        env.SHIPYARD_SIGNALING_URL = auth.signalingUrl;
+      }
+    }
+  }
 
   if (args.serve) {
     return serve(env);

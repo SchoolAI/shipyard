@@ -6,34 +6,38 @@
 
 import { z } from 'zod';
 import { hmacSign, hmacVerify } from '../utils/crypto';
-import type { GitHubUser, ShipyardJWTClaims } from './types';
+import type { ShipyardJWTClaims } from './types';
 
 /** Schema for validating JWT payload structure */
 const ShipyardJWTClaimsSchema = z.object({
   sub: z.string(),
-  ghUser: z.string(),
-  ghId: z.number(),
+  displayName: z.string(),
+  providers: z.array(z.string()),
   iat: z.number(),
   exp: z.number(),
   scope: z.string().optional(),
   machineId: z.string().optional(),
 });
 
-/** Session token expiration: 7 days */
-const SESSION_TOKEN_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000;
+/** Session token expiration: 30 days */
+const SESSION_TOKEN_EXPIRY_MS = 30 * 24 * 60 * 60 * 1000;
 
 /** Agent token expiration: 24 hours */
 const AGENT_TOKEN_EXPIRY_MS = 24 * 60 * 60 * 1000;
 
 /**
- * Generate a session JWT for browser use.
+ * Generate a session JWT for browser/CLI use.
  */
-export async function generateSessionToken(user: GitHubUser, secret: string): Promise<string> {
+export async function generateSessionToken(
+  user: { id: string; displayName: string },
+  providers: string[],
+  secret: string
+): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
   const claims: ShipyardJWTClaims = {
-    sub: `gh_${user.id}`,
-    ghUser: user.login,
-    ghId: user.id,
+    sub: user.id,
+    displayName: user.displayName,
+    providers,
     iat: now,
     exp: now + Math.floor(SESSION_TOKEN_EXPIRY_MS / 1000),
   };
@@ -44,16 +48,17 @@ export async function generateSessionToken(user: GitHubUser, secret: string): Pr
  * Generate a scoped agent JWT.
  */
 export async function generateAgentToken(
-  user: GitHubUser,
+  user: { id: string; displayName: string },
+  providers: string[],
   taskId: string,
   machineId: string,
   secret: string
 ): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
   const claims: ShipyardJWTClaims = {
-    sub: `gh_${user.id}`,
-    ghUser: user.login,
-    ghId: user.id,
+    sub: user.id,
+    displayName: user.displayName,
+    providers,
     iat: now,
     exp: now + Math.floor(AGENT_TOKEN_EXPIRY_MS / 1000),
     scope: `task:${taskId}`,

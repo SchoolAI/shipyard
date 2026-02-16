@@ -3,6 +3,7 @@ import { Hono } from 'hono';
 import { exchangeCodeForToken, fetchGitHubUser, isMobileUserAgent } from '../auth/github';
 import { generateSessionToken } from '../auth/jwt';
 import type { TokenExchangeResponse } from '../auth/types';
+import { findOrCreateUser } from '../db/index';
 import type { Env } from '../env';
 import { createLogger } from '../utils/logger';
 import { errorResponse, parseAndValidateBody } from '../utils/route-helpers';
@@ -12,7 +13,7 @@ import { errorResponse, parseAndValidateBody } from '../utils/route-helpers';
  *
  * POST /auth/github/callback
  * Body: { code: string, redirect_uri: string }
- * Returns: { token: string, user: { id, username }, is_mobile?: boolean }
+ * Returns: { token: string, user: { id, displayName, providers }, is_mobile?: boolean }
  */
 export const authGitHubRoute = new Hono<{ Bindings: Env }>();
 
@@ -42,7 +43,9 @@ authGitHubRoute.post(ROUTES.AUTH_GITHUB_CALLBACK, async (c) => {
     return errorResponse(c, 'user_fetch_failed', 'Could not fetch GitHub user', 401);
   }
 
-  const shipyardToken = await generateSessionToken(user, c.env.JWT_SECRET);
+  const { user: shipyardUser, providers } = await findOrCreateUser('github', user, c.env.DB);
+
+  const shipyardToken = await generateSessionToken(shipyardUser, providers, c.env.JWT_SECRET);
 
   const userAgent = c.req.header('User-Agent');
   const isMobile = isMobileUserAgent(userAgent ?? null);
@@ -50,12 +53,13 @@ authGitHubRoute.post(ROUTES.AUTH_GITHUB_CALLBACK, async (c) => {
   const response: TokenExchangeResponse = {
     token: shipyardToken,
     user: {
-      id: `gh_${user.id}`,
-      username: user.login,
+      id: shipyardUser.id,
+      displayName: shipyardUser.displayName,
+      providers,
     },
     ...(isMobile && { is_mobile: true }),
   };
 
-  logger.info('OAuth successful', { username: user.login, isMobile });
+  logger.info('OAuth successful', { userId: shipyardUser.id, isMobile });
   return c.json(response);
 });

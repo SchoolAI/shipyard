@@ -12,7 +12,7 @@ import { app } from './index';
 async function createPresignedToken(
   roomId: string,
   taskId = 'task-123',
-  inviterId = 'gh_12345',
+  inviterId = 'usr_test123',
   expiresInMs = 60 * 60 * 1000 // 1 hour
 ): Promise<string> {
   const payload: PresignedUrlPayload = {
@@ -37,7 +37,7 @@ async function createExpiredToken(roomId: string): Promise<string> {
   const payload: PresignedUrlPayload = {
     roomId,
     taskId: 'task-123',
-    inviterId: 'gh_12345',
+    inviterId: 'usr_test123',
     exp: Date.now() - 3600000, // Expired 1 hour ago
   };
 
@@ -212,7 +212,7 @@ describe(`GET ${ROUTES.WS_COLLAB} (WebSocket)`, () => {
     // Create token with incomplete payload (missing roomId)
     const incompletePayload = {
       taskId: 'task-123',
-      inviterId: 'gh_12345',
+      inviterId: 'usr_test123',
       exp: Date.now() + 3600000,
       // roomId is missing
     };

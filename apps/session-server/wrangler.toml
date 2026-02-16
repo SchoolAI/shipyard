@@ -17,6 +17,13 @@ class_name = "CollabRoom"
 tag = "v1"
 new_sqlite_classes = ["PersonalRoom", "CollabRoom"]
 
+# D1 Database for user identity
+[[d1_databases]]
+binding = "DB"
+database_name = "shipyard-users"
+database_id = "placeholder-create-with-wrangler"
+migrations_dir = "migrations"
+
 # Development settings
 [dev]
 port = 4444
@@ -43,6 +50,12 @@ class_name = "CollabRoom"
 [[env.development.migrations]]
 tag = "v1"
 new_sqlite_classes = ["PersonalRoom", "CollabRoom"]
+
+[[env.development.d1_databases]]
+binding = "DB"
+database_name = "shipyard-users-dev"
+database_id = "placeholder-create-with-wrangler"
+migrations_dir = "migrations"
 
 # Secrets (set via wrangler secret put):
 # - GITHUB_CLIENT_ID
