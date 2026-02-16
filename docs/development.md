@@ -15,7 +15,7 @@ Developer guide for running Shipyard locally and contributing to the codebase.
 ## Installation
 
 ```bash
-cd /Users/jacobpetterle/Working\ Directory/shipyard
+cd path/to/shipyard
 pnpm install
 pnpm build
 ```
