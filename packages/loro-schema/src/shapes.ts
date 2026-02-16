@@ -133,6 +133,24 @@ export const PlanVersionShape = Shape.plain.struct({
   createdAt: Shape.plain.number(),
 });
 
+const COMMENT_AUTHOR_TYPES = ['human', 'agent'] as const;
+const DIFF_COMMENT_SIDES = ['old', 'new'] as const;
+const DIFF_COMMENT_SCOPES = ['working-tree', 'last-turn'] as const;
+
+export const DiffCommentShape = Shape.plain.struct({
+  commentId: Shape.plain.string(),
+  filePath: Shape.plain.string(),
+  lineNumber: Shape.plain.number(),
+  side: Shape.plain.string(...DIFF_COMMENT_SIDES),
+  diffScope: Shape.plain.string(...DIFF_COMMENT_SCOPES),
+  lineContentHash: Shape.plain.string(),
+  body: Shape.plain.string(),
+  authorType: Shape.plain.string(...COMMENT_AUTHOR_TYPES),
+  authorId: Shape.plain.string(),
+  createdAt: Shape.plain.number(),
+  resolvedAt: Shape.plain.number().nullable(),
+});
+
 /**
  * Task document schema.
  * One doc per task. Contains metadata, conversation, and session tracking.
@@ -154,6 +172,8 @@ export const TaskDocumentSchema = Shape.doc({
   diffState: DiffStateShape,
 
   plans: Shape.list(PlanVersionShape),
+
+  diffComments: Shape.record(DiffCommentShape),
 });
 
 export type EpochDocumentShape = typeof EpochDocumentSchema;
@@ -178,9 +198,16 @@ export type A2ATaskState = (typeof A2A_TASK_STATES)[number];
 export type SessionState = (typeof SESSION_STATES)[number];
 export type ReasoningEffort = (typeof REASONING_EFFORTS)[number];
 export type PermissionMode = (typeof PERMISSION_MODES)[number];
+export type DiffComment = Infer<typeof DiffCommentShape>;
+export type CommentAuthorType = (typeof COMMENT_AUTHOR_TYPES)[number];
+export type DiffCommentSide = (typeof DIFF_COMMENT_SIDES)[number];
+export type DiffCommentScope = (typeof DIFF_COMMENT_SCOPES)[number];
 export {
   A2A_TASK_STATES,
+  COMMENT_AUTHOR_TYPES,
   CONTENT_BLOCK_TYPES,
+  DIFF_COMMENT_SCOPES,
+  DIFF_COMMENT_SIDES,
   PERMISSION_MODES,
   PLAN_REVIEW_STATUSES,
   REASONING_EFFORTS,

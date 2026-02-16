@@ -2,6 +2,8 @@ import type { DiffFile as SchemaDiffFile } from '@shipyard/loro-schema';
 import { ChevronDown, ChevronRight, FileText, FolderOpen } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+const EMPTY_FILES: readonly SchemaDiffFile[] = [];
+
 const STATUS_COLORS: Record<string, string> = {
   M: 'text-warning',
   A: 'text-success',
@@ -30,48 +32,49 @@ function sortNodes(nodes: TreeNode[]): TreeNode[] {
   });
 }
 
-function addFileToTree(
-  file: SchemaDiffFile,
-  root: TreeNode[],
-  dirMap: Map<string, TreeNode>
-): void {
-  const normalized = file.path.replace(/\/+$/, '');
-  if (!normalized) return;
-  const parts = normalized.split('/');
-  let currentChildren = root;
-  let currentPath = '';
-
-  for (let i = 0; i < parts.length; i++) {
-    const part = parts[i];
-    if (!part) continue;
-    currentPath = currentPath ? `${currentPath}/${part}` : part;
-    const isLast = i === parts.length - 1;
-
-    if (isLast) {
-      currentChildren.push({
-        name: part,
-        path: file.path,
-        isDir: false,
-        status: file.status,
-        children: [],
-      });
-    } else {
-      let dirNode = dirMap.get(currentPath);
-      if (!dirNode) {
-        dirNode = { name: part, path: currentPath, isDir: true, children: [] };
-        dirMap.set(currentPath, dirNode);
-        currentChildren.push(dirNode);
-      }
-      currentChildren = dirNode.children;
-    }
+function getOrCreateDir(
+  dirMap: Map<string, TreeNode>,
+  currentChildren: TreeNode[],
+  part: string,
+  currentPath: string
+): TreeNode {
+  let dirNode = dirMap.get(currentPath);
+  if (!dirNode) {
+    dirNode = { name: part, path: currentPath, isDir: true, children: [] };
+    dirMap.set(currentPath, dirNode);
+    currentChildren.push(dirNode);
   }
+  return dirNode;
 }
 
 function buildTree(files: readonly SchemaDiffFile[]): TreeNode[] {
   const root: TreeNode[] = [];
   const dirMap = new Map<string, TreeNode>();
   for (const file of files) {
-    addFileToTree(file, root, dirMap);
+    const normalized = file.path.replace(/\/+$/, '');
+    if (!normalized) continue;
+    const parts = normalized.split('/');
+    let currentChildren = root;
+    let currentPath = '';
+
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i] ?? '';
+      currentPath = currentPath ? `${currentPath}/${part}` : part;
+      const isLast = i === parts.length - 1;
+
+      if (isLast) {
+        currentChildren.push({
+          name: part,
+          path: file.path,
+          isDir: false,
+          status: file.status,
+          children: [],
+        });
+      } else {
+        const dirNode = getOrCreateDir(dirMap, currentChildren, part, currentPath);
+        currentChildren = dirNode.children;
+      }
+    }
   }
   return collapseAndSort(root);
 }
@@ -115,61 +118,247 @@ function flattenVisible(
   return result;
 }
 
-interface DiffFileTreeProps {
-  files: readonly SchemaDiffFile[];
+function collectDirPaths(files: readonly SchemaDiffFile[]): Set<string> {
+  const dirs = new Set<string>();
+  for (const file of files) {
+    const parts = file.path.replace(/\/+$/, '').split('/');
+    let p = '';
+    for (let i = 0; i < parts.length - 1; i++) {
+      p = p ? `${p}/${parts[i] ?? ''}` : (parts[i] ?? '');
+      dirs.add(p);
+    }
+  }
+  return dirs;
+}
+
+type DiffFileTreeProps = {
   selectedFile: string | null;
   onSelectFile: (path: string | null) => void;
   width: number;
+} & (
+  | { groupMode: 'flat'; files: readonly SchemaDiffFile[] }
+  | {
+      groupMode: 'staged-unstaged';
+      stagedFiles: readonly SchemaDiffFile[];
+      unstagedFiles: readonly SchemaDiffFile[];
+    }
+);
+
+interface SectionState {
+  tree: TreeNode[];
+  expandedDirs: Set<string>;
+  visibleItems: FlatItem[];
 }
 
-export function DiffFileTree({ files, selectedFile, onSelectFile, width }: DiffFileTreeProps) {
+function useSectionState(files: readonly SchemaDiffFile[]): SectionState & {
+  setExpandedDirs: React.Dispatch<React.SetStateAction<Set<string>>>;
+} {
   const tree = useMemo(() => buildTree(files), [files]);
 
-  const allDirPaths = useMemo(() => {
-    const dirs = new Set<string>();
-    for (const file of files) {
-      const parts = file.path.replace(/\/+$/, '').split('/');
-      let p = '';
-      for (let i = 0; i < parts.length - 1; i++) {
-        const segment = parts[i];
-        if (!segment) continue;
-        p = p ? `${p}/${segment}` : segment;
-        dirs.add(p);
-      }
-    }
-    return dirs;
-  }, [files]);
+  const pathsKey = useMemo(
+    () =>
+      files
+        .map((f) => f.path)
+        .sort()
+        .join('\n'),
+    [files]
+  );
 
-  const [expandedDirs, setExpandedDirs] = useState<Set<string>>(allDirPaths);
-  const [focusIndex, setFocusIndex] = useState(0);
-  const itemRefs = useRef<Map<number, HTMLElement>>(new Map());
+  const [expandedDirs, setExpandedDirs] = useState<Set<string>>(() => collectDirPaths(files));
 
+  const prevPathsKeyRef = useRef(pathsKey);
   useEffect(() => {
-    setExpandedDirs(allDirPaths);
-  }, [allDirPaths]);
+    if (prevPathsKeyRef.current !== pathsKey) {
+      prevPathsKeyRef.current = pathsKey;
+      setExpandedDirs(collectDirPaths(files));
+    }
+  }, [pathsKey, files]);
 
   const visibleItems = useMemo(
     () => flattenVisible(tree, expandedDirs, 0, null),
     [tree, expandedDirs]
   );
 
-  useEffect(() => {
-    if (focusIndex >= visibleItems.length && visibleItems.length > 0) {
-      setFocusIndex(visibleItems.length - 1);
-    }
-  }, [visibleItems.length, focusIndex]);
+  return { tree, expandedDirs, setExpandedDirs, visibleItems };
+}
 
-  const handleToggleDir = useCallback((path: string) => {
-    setExpandedDirs((prev) => {
-      const next = new Set(prev);
-      if (next.has(path)) {
-        next.delete(path);
+const SECTION_HEADER_CLASSES =
+  'text-[10px] text-muted font-medium uppercase tracking-wider px-2 py-1';
+
+function DirTreeItem({
+  node,
+  index,
+  paddingLeft,
+  isExpanded,
+  isFocused,
+  itemRefs,
+  onToggle,
+}: {
+  node: TreeNode;
+  index: number;
+  paddingLeft: number;
+  isExpanded: boolean;
+  isFocused: boolean;
+  itemRefs: React.RefObject<Map<number, HTMLElement>>;
+  onToggle: (path: string) => void;
+}) {
+  const Icon = isExpanded ? ChevronDown : ChevronRight;
+  return (
+    <div role="treeitem" aria-expanded={isExpanded} tabIndex={-1}>
+      <button
+        ref={(el) => {
+          if (el) itemRefs.current.set(index, el);
+          else itemRefs.current.delete(index);
+        }}
+        type="button"
+        className="flex items-center gap-1 w-full py-0.5 text-xs text-muted hover:text-foreground hover:bg-default/50 transition-colors"
+        style={{ paddingLeft }}
+        tabIndex={isFocused ? 0 : -1}
+        onClick={() => onToggle(node.path)}
+      >
+        <Icon className="w-3 h-3 shrink-0" />
+        <FolderOpen className="w-3 h-3 shrink-0 text-muted" />
+        <span className="truncate">{node.name}</span>
+      </button>
+    </div>
+  );
+}
+
+function FileTreeItem({
+  node,
+  index,
+  paddingLeft,
+  isSelected,
+  isFocused,
+  itemRefs,
+  onSelect,
+}: {
+  node: TreeNode;
+  index: number;
+  paddingLeft: number;
+  isSelected: boolean;
+  isFocused: boolean;
+  itemRefs: React.RefObject<Map<number, HTMLElement>>;
+  onSelect: (path: string) => void;
+}) {
+  const statusColor = STATUS_COLORS[node.status ?? ''] ?? 'text-muted';
+  return (
+    <div role="treeitem" aria-selected={isSelected} tabIndex={-1}>
+      <button
+        ref={(el) => {
+          if (el) itemRefs.current.set(index, el);
+          else itemRefs.current.delete(index);
+        }}
+        type="button"
+        className={`flex items-center gap-1 w-full py-0.5 text-xs transition-colors ${
+          isSelected ? 'bg-accent/15 text-foreground' : 'text-foreground/80 hover:bg-default/50'
+        }`}
+        style={{ paddingLeft }}
+        tabIndex={isFocused ? 0 : -1}
+        onClick={() => onSelect(node.path)}
+      >
+        <FileText className="w-3 h-3 shrink-0 text-muted" />
+        <span className="truncate flex-1 text-left">{node.name}</span>
+        <span className={`font-mono text-[10px] shrink-0 pr-2 ${statusColor}`}>{node.status}</span>
+      </button>
+    </div>
+  );
+}
+
+export function DiffFileTree(props: DiffFileTreeProps) {
+  const { selectedFile, onSelectFile, width } = props;
+
+  const stagedFiles = props.groupMode === 'staged-unstaged' ? props.stagedFiles : EMPTY_FILES;
+  const unstagedFiles = props.groupMode === 'staged-unstaged' ? props.unstagedFiles : EMPTY_FILES;
+  const flatFiles = props.groupMode === 'flat' ? props.files : EMPTY_FILES;
+
+  const {
+    visibleItems: stagedItems,
+    expandedDirs: stagedExpanded,
+    setExpandedDirs: setStagedExpanded,
+  } = useSectionState(stagedFiles);
+  const {
+    visibleItems: unstagedItems,
+    expandedDirs: unstagedExpanded,
+    setExpandedDirs: setUnstagedExpanded,
+  } = useSectionState(unstagedFiles);
+  const {
+    visibleItems: flatItems,
+    expandedDirs: flatExpanded,
+    setExpandedDirs: setFlatExpanded,
+  } = useSectionState(flatFiles);
+
+  const allVisibleItems = useMemo(() => {
+    if (props.groupMode === 'flat') {
+      return flatItems;
+    }
+    return [...stagedItems, ...unstagedItems];
+  }, [props.groupMode, flatItems, stagedItems, unstagedItems]);
+
+  const [focusIndex, setFocusIndex] = useState(0);
+  const itemRefs = useRef<Map<number, HTMLElement>>(new Map());
+
+  useEffect(() => {
+    if (focusIndex >= allVisibleItems.length && allVisibleItems.length > 0) {
+      setFocusIndex(allVisibleItems.length - 1);
+    }
+  }, [allVisibleItems.length, focusIndex]);
+
+  const toggleDir = useCallback(
+    (setter: React.Dispatch<React.SetStateAction<Set<string>>>, path: string) => {
+      setter((prev) => {
+        const next = new Set(prev);
+        if (next.has(path)) next.delete(path);
+        else next.add(path);
+        return next;
+      });
+    },
+    []
+  );
+
+  const handleToggleFlatDir = useCallback(
+    (path: string) => toggleDir(setFlatExpanded, path),
+    [toggleDir, setFlatExpanded]
+  );
+
+  const handleToggleStagedDir = useCallback(
+    (path: string) => toggleDir(setStagedExpanded, path),
+    [toggleDir, setStagedExpanded]
+  );
+
+  const handleToggleUnstagedDir = useCallback(
+    (path: string) => toggleDir(setUnstagedExpanded, path),
+    [toggleDir, setUnstagedExpanded]
+  );
+
+  const handleToggleDir = useCallback(
+    (path: string) => {
+      if (props.groupMode === 'flat') {
+        handleToggleFlatDir(path);
       } else {
-        next.add(path);
+        const inStaged = stagedItems.some((vi) => vi.node.path === path);
+        if (inStaged) {
+          handleToggleStagedDir(path);
+        } else {
+          handleToggleUnstagedDir(path);
+        }
       }
-      return next;
-    });
-  }, []);
+    },
+    [
+      props.groupMode,
+      stagedItems,
+      handleToggleFlatDir,
+      handleToggleStagedDir,
+      handleToggleUnstagedDir,
+    ]
+  );
+
+  const expandedDirsUnion = useMemo(() => {
+    if (props.groupMode === 'flat') {
+      return flatExpanded;
+    }
+    return new Set([...stagedExpanded, ...unstagedExpanded]);
+  }, [props.groupMode, flatExpanded, stagedExpanded, unstagedExpanded]);
 
   const handleSelectFile = useCallback(
     (path: string) => {
@@ -183,46 +372,34 @@ export function DiffFileTree({ files, selectedFile, onSelectFile, width }: DiffF
     itemRefs.current.get(index)?.focus();
   }, []);
 
-  const handleArrowDown = useCallback(() => {
-    if (focusIndex < visibleItems.length - 1) {
-      focusItem(focusIndex + 1);
-    }
-  }, [focusIndex, visibleItems.length, focusItem]);
-
-  const handleArrowUp = useCallback(() => {
-    if (focusIndex > 0) {
-      focusItem(focusIndex - 1);
-    }
-  }, [focusIndex, focusItem]);
-
   const handleArrowRight = useCallback(
     (item: FlatItem) => {
-      if (!item.node.isDir) return;
-      if (!expandedDirs.has(item.node.path)) {
-        handleToggleDir(item.node.path);
-      } else if (focusIndex < visibleItems.length - 1) {
-        focusItem(focusIndex + 1);
+      if (item.node.isDir) {
+        if (!expandedDirsUnion.has(item.node.path)) {
+          handleToggleDir(item.node.path);
+        } else if (focusIndex < allVisibleItems.length - 1) {
+          focusItem(focusIndex + 1);
+        }
       }
     },
-    [expandedDirs, handleToggleDir, focusIndex, visibleItems.length, focusItem]
+    [expandedDirsUnion, handleToggleDir, focusIndex, allVisibleItems.length, focusItem]
   );
 
   const handleArrowLeft = useCallback(
     (item: FlatItem) => {
-      if (item.node.isDir && expandedDirs.has(item.node.path)) {
+      if (item.node.isDir && expandedDirsUnion.has(item.node.path)) {
         handleToggleDir(item.node.path);
-        return;
-      }
-      if (!item.parentPath) return;
-      const parentIndex = visibleItems.findIndex((vi) => vi.node.path === item.parentPath);
-      if (parentIndex >= 0) {
-        focusItem(parentIndex);
+      } else if (item.parentPath) {
+        const parentIndex = allVisibleItems.findIndex((vi) => vi.node.path === item.parentPath);
+        if (parentIndex >= 0) {
+          focusItem(parentIndex);
+        }
       }
     },
-    [expandedDirs, handleToggleDir, visibleItems, focusItem]
+    [expandedDirsUnion, handleToggleDir, allVisibleItems, focusItem]
   );
 
-  const handleActivate = useCallback(
+  const handleActivateItem = useCallback(
     (item: FlatItem) => {
       if (item.node.isDir) {
         handleToggleDir(item.node.path);
@@ -235,112 +412,136 @@ export function DiffFileTree({ files, selectedFile, onSelectFile, width }: DiffF
 
   const handleTreeKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
-      const item = visibleItems[focusIndex];
+      const item = allVisibleItems[focusIndex];
       if (!item) return;
 
-      const handlers: Record<string, () => void> = {
-        ArrowDown: () => handleArrowDown(),
-        ArrowUp: () => handleArrowUp(),
-        ArrowRight: () => handleArrowRight(item),
-        ArrowLeft: () => handleArrowLeft(item),
-        Home: () => focusItem(0),
-        End: () => focusItem(visibleItems.length - 1),
-        Enter: () => handleActivate(item),
-        ' ': () => handleActivate(item),
-      };
-
-      const handler = handlers[e.key];
-      if (handler) {
-        e.preventDefault();
-        handler();
+      switch (e.key) {
+        case 'ArrowDown': {
+          e.preventDefault();
+          if (focusIndex < allVisibleItems.length - 1) focusItem(focusIndex + 1);
+          break;
+        }
+        case 'ArrowUp': {
+          e.preventDefault();
+          if (focusIndex > 0) focusItem(focusIndex - 1);
+          break;
+        }
+        case 'ArrowRight': {
+          e.preventDefault();
+          handleArrowRight(item);
+          break;
+        }
+        case 'ArrowLeft': {
+          e.preventDefault();
+          handleArrowLeft(item);
+          break;
+        }
+        case 'Home': {
+          e.preventDefault();
+          focusItem(0);
+          break;
+        }
+        case 'End': {
+          e.preventDefault();
+          if (allVisibleItems.length > 0) focusItem(allVisibleItems.length - 1);
+          break;
+        }
+        case 'Enter':
+        case ' ': {
+          e.preventDefault();
+          handleActivateItem(item);
+          break;
+        }
       }
     },
-    [
-      visibleItems,
-      focusIndex,
-      handleArrowDown,
-      handleArrowUp,
-      handleArrowRight,
-      handleArrowLeft,
-      handleActivate,
-      focusItem,
-    ]
+    [allVisibleItems, focusIndex, focusItem, handleArrowRight, handleArrowLeft, handleActivateItem]
   );
 
-  if (files.length === 0) return null;
+  const totalFiles =
+    props.groupMode === 'flat' ? flatFiles.length : stagedFiles.length + unstagedFiles.length;
+
+  if (totalFiles === 0) return null;
+
+  const renderTreeItems = (
+    items: FlatItem[],
+    indexOffset: number,
+    onToggle: (path: string) => void
+  ) =>
+    items.map((item, localIndex) => {
+      const index = indexOffset + localIndex;
+      const { node, depth } = item;
+      const paddingLeft = 8 + depth * 12;
+
+      if (node.isDir) {
+        return (
+          <DirTreeItem
+            key={node.path}
+            node={node}
+            index={index}
+            paddingLeft={paddingLeft}
+            isExpanded={expandedDirsUnion.has(node.path)}
+            isFocused={focusIndex === index}
+            itemRefs={itemRefs}
+            onToggle={onToggle}
+          />
+        );
+      }
+
+      return (
+        <FileTreeItem
+          key={node.path}
+          node={node}
+          index={index}
+          paddingLeft={paddingLeft}
+          isSelected={selectedFile === node.path}
+          isFocused={focusIndex === index}
+          itemRefs={itemRefs}
+          onSelect={handleSelectFile}
+        />
+      );
+    });
 
   return (
     <div
       className="shrink-0 border-r border-separator/50 flex flex-col h-full overflow-hidden"
       style={{ width }}
     >
-      <div className="flex items-center px-2 py-1.5 border-b border-separator/50">
-        <span className="text-[10px] text-muted font-medium uppercase tracking-wider">
-          {files.length} file{files.length !== 1 ? 's' : ''}
-        </span>
-      </div>
       <div
         className="flex-1 overflow-y-auto overflow-x-hidden py-1"
         role="tree"
         aria-label="Changed files"
         onKeyDown={handleTreeKeyDown}
       >
-        {visibleItems.map((item, index) => {
-          const { node, depth } = item;
-          const paddingLeft = 8 + depth * 12;
-
-          if (node.isDir) {
-            const isExpanded = expandedDirs.has(node.path);
-            const Icon = isExpanded ? ChevronDown : ChevronRight;
-            return (
-              <div key={node.path} role="treeitem" aria-expanded={isExpanded} tabIndex={-1}>
-                <button
-                  ref={(el) => {
-                    if (el) itemRefs.current.set(index, el);
-                    else itemRefs.current.delete(index);
-                  }}
-                  type="button"
-                  className="flex items-center gap-1 w-full py-0.5 text-xs text-muted hover:text-foreground hover:bg-default/50 transition-colors"
-                  style={{ paddingLeft }}
-                  tabIndex={focusIndex === index ? 0 : -1}
-                  onClick={() => handleToggleDir(node.path)}
-                >
-                  <Icon className="w-3 h-3 shrink-0" />
-                  <FolderOpen className="w-3 h-3 shrink-0 text-muted" />
-                  <span className="truncate">{node.name}</span>
-                </button>
-              </div>
-            );
-          }
-
-          const isSelected = selectedFile === node.path;
-          const statusColor = STATUS_COLORS[node.status ?? ''] ?? 'text-muted';
-          return (
-            <div key={node.path} role="treeitem" aria-selected={isSelected} tabIndex={-1}>
-              <button
-                ref={(el) => {
-                  if (el) itemRefs.current.set(index, el);
-                  else itemRefs.current.delete(index);
-                }}
-                type="button"
-                className={`flex items-center gap-1 w-full py-0.5 text-xs transition-colors ${
-                  isSelected
-                    ? 'bg-accent/15 text-foreground'
-                    : 'text-foreground/80 hover:bg-default/50'
-                }`}
-                style={{ paddingLeft }}
-                tabIndex={focusIndex === index ? 0 : -1}
-                onClick={() => handleSelectFile(node.path)}
-              >
-                <FileText className="w-3 h-3 shrink-0 text-muted" />
-                <span className="truncate flex-1 text-left">{node.name}</span>
-                <span className={`font-mono text-[10px] shrink-0 pr-2 ${statusColor}`}>
-                  {node.status}
-                </span>
-              </button>
+        {props.groupMode === 'flat' ? (
+          <div
+            role="group"
+            aria-label={`${flatFiles.length} file${flatFiles.length !== 1 ? 's' : ''}`}
+          >
+            <div role="presentation" className={SECTION_HEADER_CLASSES}>
+              {flatFiles.length} file{flatFiles.length !== 1 ? 's' : ''}
             </div>
-          );
-        })}
+            {renderTreeItems(flatItems, 0, handleToggleFlatDir)}
+          </div>
+        ) : (
+          <>
+            {stagedFiles.length > 0 && (
+              <div role="group" aria-label={`Staged (${stagedFiles.length})`}>
+                <div role="presentation" className={SECTION_HEADER_CLASSES}>
+                  Staged ({stagedFiles.length})
+                </div>
+                {renderTreeItems(stagedItems, 0, handleToggleStagedDir)}
+              </div>
+            )}
+            {unstagedFiles.length > 0 && (
+              <div role="group" aria-label={`Unstaged (${unstagedFiles.length})`}>
+                <div role="presentation" className={SECTION_HEADER_CLASSES}>
+                  Unstaged ({unstagedFiles.length})
+                </div>
+                {renderTreeItems(unstagedItems, stagedItems.length, handleToggleUnstagedDir)}
+              </div>
+            )}
+          </>
+        )}
       </div>
     </div>
   );

@@ -439,8 +439,22 @@ export function ChatPage() {
 
   useAppHotkeys({
     onToggleTerminal: toggleTerminal,
-    onToggleDiff: useCallback(() => toggleSidePanel('diff'), [toggleSidePanel]),
-    onTogglePlan: useCallback(() => toggleSidePanel('plan'), [toggleSidePanel]),
+    onToggleDiff: useCallback(() => {
+      const current = useUIStore.getState().activeSidePanel;
+      if (current !== null) {
+        useUIStore.getState().setActiveSidePanel(null);
+      } else {
+        toggleSidePanel('diff');
+      }
+    }, [toggleSidePanel]),
+    onTogglePlan: useCallback(() => {
+      const current = useUIStore.getState().activeSidePanel;
+      if (current !== null) {
+        useUIStore.getState().setActiveSidePanel(null);
+      } else {
+        toggleSidePanel('plan');
+      }
+    }, [toggleSidePanel]),
     onToggleSidebar: toggleSidebar,
     onNewTask: handleNewTask,
     onOpenSettings: toggleSettings,
@@ -746,8 +760,12 @@ export function ChatPage() {
 
         {/* Side panel (diff / plan) */}
         <SidePanel ref={sidePanelRef}>
-          {activeSidePanel === 'diff' && <DiffPanelContent activeTaskId={activeTaskId} />}
-          {activeSidePanel === 'plan' && <PlanPanelContent activeTaskId={activeTaskId} />}
+          <div className={activeSidePanel === 'diff' ? 'contents' : 'hidden'}>
+            <DiffPanelContent activeTaskId={activeTaskId} />
+          </div>
+          <div className={activeSidePanel === 'plan' ? 'contents' : 'hidden'}>
+            <PlanPanelContent activeTaskId={activeTaskId} />
+          </div>
         </SidePanel>
       </div>
     </PlanApprovalProvider>
