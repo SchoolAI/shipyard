@@ -99,7 +99,6 @@ jobs:
         if: steps.release.outputs.type == 'promote' || steps.changes.outputs.has_changes == 'true'
         with:
           node-version: '22.14.0'
-          registry-url: 'https://registry.npmjs.org'
 
       - name: Install pnpm via corepack
         if: steps.release.outputs.type == 'promote' || steps.changes.outputs.has_changes == 'true'
@@ -148,8 +147,6 @@ jobs:
         if: steps.release.outputs.type != 'promote' && steps.changes.outputs.has_changes == 'true'
         working-directory: apps/daemon
         run: npm publish --tag next --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Git tag (nightly/RC)
         if: steps.release.outputs.type != 'promote' && steps.changes.outputs.has_changes == 'true'
@@ -180,7 +177,6 @@ jobs:
         id: promote
         env:
           PROMOTE_VERSION: ${{ github.event.inputs.promote_version }}
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           # Extract base version (strip prerelease suffix)
           STABLE_VERSION=$(echo "${PROMOTE_VERSION}" | sed 's/-.*//')
