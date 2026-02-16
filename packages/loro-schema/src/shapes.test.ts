@@ -11,7 +11,7 @@ describe('EpochDocumentSchema', () => {
     doc.schema.version = DEFAULT_EPOCH;
 
     const json = doc.toJSON();
-    expect(json.schema.version).toBe(1);
+    expect(json.schema.version).toBe(DEFAULT_EPOCH);
   });
 
   it('increments epoch version', () => {
@@ -312,6 +312,111 @@ describe('TaskDocumentSchema', () => {
       const json = doc.toJSON();
       expect(json.sessions[0]?.status).toBe('failed');
       expect(json.sessions[0]?.error).toContain('error_max_turns');
+    });
+  });
+
+  describe('diffComments', () => {
+    it('adds a comment to the record', () => {
+      const commentId = 'cmt-1';
+      doc.diffComments.set(commentId, {
+        commentId,
+        filePath: 'src/index.ts',
+        lineNumber: 42,
+        side: 'new',
+        diffScope: 'working-tree',
+        lineContentHash: 'abc123',
+        body: 'This null check looks wrong',
+        authorType: 'human',
+        authorId: 'user-1',
+        createdAt: now,
+        resolvedAt: null,
+      });
+
+      const json = doc.toJSON();
+      expect(Object.keys(json.diffComments)).toHaveLength(1);
+      expect(json.diffComments[commentId]?.body).toBe('This null check looks wrong');
+      expect(json.diffComments[commentId]?.lineNumber).toBe(42);
+      expect(json.diffComments[commentId]?.resolvedAt).toBe(null);
+    });
+
+    it('resolves a comment', () => {
+      const commentId = 'cmt-2';
+      doc.diffComments.set(commentId, {
+        commentId,
+        filePath: 'src/app.tsx',
+        lineNumber: 10,
+        side: 'new',
+        diffScope: 'last-turn',
+        lineContentHash: 'def456',
+        body: 'Why did the agent remove this?',
+        authorType: 'human',
+        authorId: 'user-1',
+        createdAt: now,
+        resolvedAt: null,
+      });
+
+      const entry = doc.diffComments.get(commentId);
+      if (entry) {
+        doc.diffComments.set(commentId, { ...entry, resolvedAt: now + 5000 });
+      }
+
+      const json = doc.toJSON();
+      expect(json.diffComments[commentId]?.resolvedAt).toBe(now + 5000);
+    });
+
+    it('deletes a comment', () => {
+      const commentId = 'cmt-3';
+      doc.diffComments.set(commentId, {
+        commentId,
+        filePath: 'src/utils.ts',
+        lineNumber: 1,
+        side: 'old',
+        diffScope: 'working-tree',
+        lineContentHash: 'ghi789',
+        body: 'Temporary comment',
+        authorType: 'agent',
+        authorId: 'claude-1',
+        createdAt: now,
+        resolvedAt: null,
+      });
+
+      expect(Object.keys(doc.toJSON().diffComments)).toHaveLength(1);
+      doc.diffComments.delete(commentId);
+      expect(Object.keys(doc.toJSON().diffComments)).toHaveLength(0);
+    });
+
+    it('supports multiple comments on different files', () => {
+      doc.diffComments.set('cmt-a', {
+        commentId: 'cmt-a',
+        filePath: 'src/a.ts',
+        lineNumber: 1,
+        side: 'new',
+        diffScope: 'working-tree',
+        lineContentHash: 'hash-a',
+        body: 'Comment A',
+        authorType: 'human',
+        authorId: 'user-1',
+        createdAt: now,
+        resolvedAt: null,
+      });
+      doc.diffComments.set('cmt-b', {
+        commentId: 'cmt-b',
+        filePath: 'src/b.ts',
+        lineNumber: 5,
+        side: 'old',
+        diffScope: 'last-turn',
+        lineContentHash: 'hash-b',
+        body: 'Comment B',
+        authorType: 'agent',
+        authorId: 'claude-1',
+        createdAt: now + 1000,
+        resolvedAt: null,
+      });
+
+      const json = doc.toJSON();
+      expect(Object.keys(json.diffComments)).toHaveLength(2);
+      expect(json.diffComments['cmt-a']?.filePath).toBe('src/a.ts');
+      expect(json.diffComments['cmt-b']?.authorType).toBe('agent');
     });
   });
 });

@@ -1,7 +1,11 @@
+import { change, type TypedDoc } from '@loro-extended/change';
 import { useDoc } from '@loro-extended/react';
 import {
   buildDocumentId,
   DEFAULT_EPOCH,
+  type DiffComment,
+  type DiffCommentScope,
+  type DiffCommentSide,
   type DiffState,
   type Message,
   type PermissionDecision,
@@ -11,6 +15,7 @@ import {
   type PlanVersion,
   type SessionEntry,
   TaskDocumentSchema,
+  type TaskDocumentShape,
   type TaskMeta,
 } from '@shipyard/loro-schema';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -49,6 +54,18 @@ export interface TaskDocumentResult {
     decision: PermissionDecision,
     opts?: { persist?: boolean; message?: string }
   ) => void;
+  diffComments: DiffComment[];
+  addDiffComment: (comment: {
+    filePath: string;
+    lineNumber: number;
+    side: DiffCommentSide;
+    diffScope: DiffCommentScope;
+    lineContentHash: string;
+    body: string;
+    authorId: string;
+  }) => string;
+  resolveDiffComment: (commentId: string) => void;
+  deleteDiffComment: (commentId: string) => void;
   isLoading: boolean;
 }
 
@@ -80,6 +97,16 @@ export function useTaskDocument(taskId: string | null): TaskDocumentResult {
   const sessions = useDoc(handle, (d: { sessions: SessionEntry[] }) => d.sessions);
   const plans = useDoc(handle, (d: { plans: PlanVersion[] }) => d.plans);
   const diffState = useDoc(handle, (d: { diffState: DiffState }) => d.diffState);
+
+  const diffCommentsRecord = useDoc(
+    handle,
+    (d: { diffComments: Record<string, DiffComment> }) => d.diffComments
+  );
+
+  const diffComments = useMemo(
+    () => Object.values(diffCommentsRecord).sort((a, b) => a.createdAt - b.createdAt),
+    [diffCommentsRecord]
+  );
 
   const lastUserConfig = useMemo((): LastUserConfig | null => {
     for (let i = conversation.length - 1; i >= 0; i--) {
@@ -157,6 +184,58 @@ export function useTaskDocument(taskId: string | null): TaskDocumentResult {
     [handle]
   );
 
+  const addDiffComment = useCallback(
+    (comment: {
+      filePath: string;
+      lineNumber: number;
+      side: DiffCommentSide;
+      diffScope: DiffCommentScope;
+      lineContentHash: string;
+      body: string;
+      authorId: string;
+    }): string => {
+      const commentId = crypto.randomUUID();
+      // eslint-disable-next-line no-restricted-syntax -- loro-extended generics require explicit cast
+      change(handle.doc as unknown as TypedDoc<TaskDocumentShape>, (draft) => {
+        draft.diffComments.set(commentId, {
+          commentId,
+          ...comment,
+          authorType: 'human',
+          createdAt: Date.now(),
+          resolvedAt: null,
+        });
+      });
+      return commentId;
+    },
+    [handle]
+  );
+
+  const resolveDiffComment = useCallback(
+    (commentId: string) => {
+      // eslint-disable-next-line no-restricted-syntax -- loro-extended generics require explicit cast
+      change(handle.doc as unknown as TypedDoc<TaskDocumentShape>, (draft) => {
+        const existing = draft.diffComments.get(commentId);
+        if (existing) {
+          draft.diffComments.set(commentId, {
+            ...existing,
+            resolvedAt: Date.now(),
+          });
+        }
+      });
+    },
+    [handle]
+  );
+
+  const deleteDiffComment = useCallback(
+    (commentId: string) => {
+      // eslint-disable-next-line no-restricted-syntax -- loro-extended generics require explicit cast
+      change(handle.doc as unknown as TypedDoc<TaskDocumentShape>, (draft) => {
+        draft.diffComments.delete(commentId);
+      });
+    },
+    [handle]
+  );
+
   if (!taskId) {
     return {
       meta: null,
@@ -167,6 +246,10 @@ export function useTaskDocument(taskId: string | null): TaskDocumentResult {
       lastUserConfig: null,
       pendingPermissions: EMPTY_PERMISSIONS,
       respondToPermission,
+      diffComments: [],
+      addDiffComment: () => '',
+      resolveDiffComment: () => {},
+      deleteDiffComment: () => {},
       isLoading: false,
     };
   }
@@ -180,6 +263,10 @@ export function useTaskDocument(taskId: string | null): TaskDocumentResult {
     lastUserConfig,
     pendingPermissions,
     respondToPermission,
+    diffComments,
+    addDiffComment,
+    resolveDiffComment,
+    deleteDiffComment,
     isLoading: !meta,
   };
 }

@@ -1,22 +1,55 @@
-export { DiffPanelContent };
-
-import { DiffModeEnum, DiffView } from '@git-diff-view/react';
+import { DiffModeEnum, DiffView, SplitSide } from '@git-diff-view/react';
 import '@git-diff-view/react/styles/diff-view.css';
-import { Button, Tooltip } from '@heroui/react';
-import type { DiffState, DiffFile as SchemaDiffFile } from '@shipyard/loro-schema';
-import { Columns2, PanelLeft, Rows3, WrapText } from 'lucide-react';
-import { type KeyboardEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import { Label, Popover, Switch, Tooltip } from '@heroui/react';
+import type {
+  DiffComment,
+  DiffCommentSide,
+  DiffState,
+  DiffFile as SchemaDiffFile,
+} from '@shipyard/loro-schema';
+import { MessageSquare, PanelLeft, Settings2 } from 'lucide-react';
+import {
+  type ReactNode,
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import { useSidePanelToolbarSlot } from '../../contexts/side-panel-toolbar-context';
 import { useTaskDocument } from '../../hooks/use-task-document';
 import type { DiffScope, DiffViewType } from '../../stores';
 import { useUIStore } from '../../stores';
 import { assertNever } from '../../utils/assert-never';
+import { DiffCommentInput } from '../diff/diff-comment-input';
+import { DiffCommentWidget } from '../diff/diff-comment-widget';
 import { DiffFileTree } from './diff-file-tree';
 
 const SPLIT_MIN_WIDTH = 800;
 
-type DiffTab = 'unstaged' | 'staged';
+const SM_BREAKPOINT = 640;
 
-const TABS: DiffTab[] = ['unstaged', 'staged'];
+function splitSideToCommentSide(side: SplitSide): DiffCommentSide {
+  return side === SplitSide.old ? 'old' : 'new';
+}
+
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(
+    () => typeof window !== 'undefined' && window.innerWidth < SM_BREAKPOINT
+  );
+
+  useEffect(() => {
+    const mql = window.matchMedia(`(max-width: ${SM_BREAKPOINT - 1}px)`);
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    mql.addEventListener('change', handler);
+    return () => mql.removeEventListener('change', handler);
+  }, []);
+
+  return isMobile;
+}
+
+type DiffTab = 'unstaged' | 'staged';
 
 const SCOPE_OPTIONS: { value: DiffScope; label: string }[] = [
   { value: 'working-tree', label: 'Working Tree' },
@@ -114,12 +147,30 @@ function DiffContent({
   viewType,
   panelWidth,
   selectedFile,
+  scope,
+  diffComments,
+  onAddComment,
+  onResolveComment,
+  onDeleteComment,
+  showResolvedComments,
 }: {
   rawDiff: string;
   wordWrap: boolean;
   viewType: DiffViewType;
   panelWidth: number;
   selectedFile: string | null;
+  scope: DiffScope;
+  diffComments: DiffComment[];
+  onAddComment: (
+    filePath: string,
+    lineNumber: number,
+    side: DiffCommentSide,
+    lineContentHash: string,
+    body: string
+  ) => void;
+  onResolveComment: (commentId: string) => void;
+  onDeleteComment: (commentId: string) => void;
+  showResolvedComments: boolean;
 }) {
   const resolvedTheme = useTheme();
 
@@ -136,6 +187,66 @@ function DiffContent({
     return { hunks: splitDiffByFile(rawDiff) };
   }, [rawDiff, selectedFile]);
 
+  const extendData = useMemo(() => {
+    const oldFile: Record<string, { data: DiffComment[] }> = {};
+    const newFile: Record<string, { data: DiffComment[] }> = {};
+
+    for (const comment of diffComments) {
+      if (selectedFile && comment.filePath !== selectedFile) continue;
+      const target = comment.side === 'old' ? oldFile : newFile;
+      const key = String(comment.lineNumber);
+      if (!target[key]) target[key] = { data: [] };
+      target[key].data.push(comment);
+    }
+
+    return { oldFile, newFile };
+  }, [diffComments, selectedFile]);
+
+  const renderExtendLine = useCallback(
+    ({
+      data: comments,
+    }: {
+      data: DiffComment[];
+      side: SplitSide;
+      lineNumber: number;
+      diffFile: unknown;
+      onUpdate: () => void;
+    }) => (
+      <DiffCommentWidget
+        comments={comments}
+        onResolve={onResolveComment}
+        onDelete={onDeleteComment}
+        showResolved={showResolvedComments}
+      />
+    ),
+    [onResolveComment, onDeleteComment, showResolvedComments]
+  );
+
+  const renderWidgetLine = useCallback(
+    ({
+      diffFile,
+      side,
+      lineNumber,
+      onClose,
+    }: {
+      diffFile: { _newFileName?: string; _oldFileName?: string };
+      side: SplitSide;
+      lineNumber: number;
+      onClose: () => void;
+    }) => (
+      <DiffCommentInput
+        onSubmit={(body) => {
+          const filePath = diffFile._newFileName ?? diffFile._oldFileName ?? '';
+          const commentSide = splitSideToCommentSide(side);
+          onAddComment(filePath, lineNumber, commentSide, '', body);
+          onClose();
+        }}
+        onCancel={onClose}
+      />
+    ),
+    [onAddComment]
+  );
+
   if (data.hunks.length === 0) {
     return (
       <div className="flex items-center justify-center flex-1 text-sm text-muted">
@@ -150,8 +261,12 @@ function DiffContent({
       diffViewMode={effectiveMode}
       diffViewWrap={wordWrap}
       diffViewTheme={resolvedTheme}
-      diffViewHighlight
+      diffViewHighlight={false}
       diffViewFontSize={12}
+      diffViewAddWidget={scope !== 'branch'}
+      extendData={extendData}
+      renderExtendLine={renderExtendLine}
+      renderWidgetLine={renderWidgetLine}
     />
   );
 }
@@ -216,6 +331,115 @@ function getDiffData(
   }
 }
 
+function DiffActionBar({
+  fileCount,
+  isFileTreeOpen,
+  onToggleFileTree,
+  diffViewType,
+  setDiffViewType,
+  diffWordWrap,
+  setDiffWordWrap,
+  showResolvedComments,
+  toggleResolvedComments,
+  unresolvedCommentCount,
+}: {
+  fileCount: number;
+  isFileTreeOpen: boolean;
+  onToggleFileTree: () => void;
+  diffViewType: DiffViewType;
+  setDiffViewType: (type: DiffViewType) => void;
+  diffWordWrap: boolean;
+  setDiffWordWrap: (wrap: boolean) => void;
+  showResolvedComments: boolean;
+  toggleResolvedComments: () => void;
+  unresolvedCommentCount: number;
+}) {
+  const fileTreeLabel = isFileTreeOpen ? 'Hide files' : 'Show files';
+
+  return (
+    <div className="h-7 px-2 flex items-center justify-between border-b border-separator/50">
+      <div className="flex items-center gap-1">
+        <Tooltip delay={0}>
+          <Tooltip.Trigger>
+            <button
+              type="button"
+              aria-label={fileTreeLabel}
+              className="flex items-center gap-1 text-xs text-muted hover:text-foreground transition-colors px-1 py-0.5 rounded min-w-7 min-h-7"
+              onClick={onToggleFileTree}
+            >
+              <PanelLeft className="w-3.5 h-3.5" />
+              {!isFileTreeOpen && <span className="text-xs font-medium">Files ({fileCount})</span>}
+            </button>
+          </Tooltip.Trigger>
+          <Tooltip.Content>{fileTreeLabel}</Tooltip.Content>
+        </Tooltip>
+      </div>
+
+      <div className="flex items-center gap-1">
+        {unresolvedCommentCount > 0 && (
+          <span
+            role="status"
+            aria-label={`${unresolvedCommentCount} unresolved comment${unresolvedCommentCount !== 1 ? 's' : ''}`}
+            className="flex items-center gap-1 text-xs text-muted px-1"
+          >
+            <MessageSquare className="w-3 h-3" />
+            {unresolvedCommentCount}
+          </span>
+        )}
+
+        <Popover>
+          <Popover.Trigger>
+            <button
+              type="button"
+              aria-label="Diff settings"
+              className="flex items-center justify-center min-w-7 min-h-7 text-muted hover:text-foreground transition-colors rounded"
+            >
+              <Settings2 className="w-3.5 h-3.5" />
+            </button>
+          </Popover.Trigger>
+          <Popover.Content placement="bottom end" className="w-48">
+            <Popover.Dialog className="p-3">
+              <Popover.Heading className="text-xs font-medium mb-2">Diff Settings</Popover.Heading>
+              <div className="flex flex-col gap-2">
+                <Switch
+                  size="sm"
+                  isSelected={diffViewType === 'split'}
+                  onChange={() => setDiffViewType(diffViewType === 'split' ? 'unified' : 'split')}
+                >
+                  <Label className="text-xs flex-1">Split view</Label>
+                  <Switch.Control>
+                    <Switch.Thumb />
+                  </Switch.Control>
+                </Switch>
+                <Switch
+                  size="sm"
+                  isSelected={diffWordWrap}
+                  onChange={() => setDiffWordWrap(!diffWordWrap)}
+                >
+                  <Label className="text-xs flex-1">Word wrap</Label>
+                  <Switch.Control>
+                    <Switch.Thumb />
+                  </Switch.Control>
+                </Switch>
+                <Switch
+                  size="sm"
+                  isSelected={showResolvedComments}
+                  onChange={toggleResolvedComments}
+                >
+                  <Label className="text-xs flex-1">Show resolved</Label>
+                  <Switch.Control>
+                    <Switch.Thumb />
+                  </Switch.Control>
+                </Switch>
+              </div>
+            </Popover.Dialog>
+          </Popover.Content>
+        </Popover>
+      </div>
+    </div>
+  );
+}
+
 function DiffBody({
   activeTaskId,
   activeTab,
@@ -228,6 +452,11 @@ function DiffBody({
   onSelectFile,
   isFileTreeOpen,
   fileTreeWidth,
+  diffComments,
+  onAddComment,
+  onResolveComment,
+  onDeleteComment,
+  showResolvedComments,
 }: {
   activeTaskId: string | null;
   activeTab: DiffTab;
@@ -240,16 +469,24 @@ function DiffBody({
   onSelectFile: (path: string | null) => void;
   isFileTreeOpen: boolean;
   fileTreeWidth: number;
+  diffComments: DiffComment[];
+  onAddComment: (
+    filePath: string,
+    lineNumber: number,
+    side: DiffCommentSide,
+    lineContentHash: string,
+    body: string
+  ) => void;
+  onResolveComment: (commentId: string) => void;
+  onDeleteComment: (commentId: string) => void;
+  showResolvedComments: boolean;
 }) {
-  const { diff, files, updatedAt } = getDiffData(scope, activeTab, diffState);
+  const deferredDiffState = useDeferredValue(diffState);
+  const deferredSelectedFile = useDeferredValue(selectedFile);
+  const isStale = deferredDiffState !== diffState || deferredSelectedFile !== selectedFile;
 
-  /**
-   * For working-tree scope the daemon stores a single file list for both tabs,
-   * but the diff text is tab-specific.  Filter the tree to only files that
-   * actually have content in the current diff so clicking a file always shows
-   * something (untracked `??` files only appear in the unstaged diff, fully
-   * staged files only in the staged diff, etc.).
-   */
+  const { diff, files, updatedAt } = getDiffData(scope, activeTab, deferredDiffState);
+
   const diffPaths = useMemo(() => (diff ? extractDiffPaths(diff) : new Set<string>()), [diff]);
   const visibleFiles = useMemo(
     () =>
@@ -257,21 +494,59 @@ function DiffBody({
     [scope, files, diffPaths]
   );
 
+  const stagedPaths = useMemo(
+    () =>
+      scope === 'working-tree' && deferredDiffState?.staged
+        ? extractDiffPaths(deferredDiffState.staged)
+        : new Set<string>(),
+    [scope, deferredDiffState?.staged]
+  );
+  const unstagedPaths = useMemo(
+    () =>
+      scope === 'working-tree' && deferredDiffState?.unstaged
+        ? extractDiffPaths(deferredDiffState.unstaged)
+        : new Set<string>(),
+    [scope, deferredDiffState?.unstaged]
+  );
+  const stagedFiles = useMemo(
+    () => files.filter((f) => stagedPaths.has(normalizePath(f.path))),
+    [files, stagedPaths]
+  );
+  const unstagedFiles = useMemo(
+    () => files.filter((f) => unstagedPaths.has(normalizePath(f.path))),
+    [files, unstagedPaths]
+  );
+
+  const scopedComments = useMemo(() => {
+    let filtered = diffComments.filter((c) => c.diffScope === scope);
+    if (deferredSelectedFile) {
+      filtered = filtered.filter((c) => c.filePath === deferredSelectedFile);
+    }
+    return filtered;
+  }, [diffComments, scope, deferredSelectedFile]);
+
   if (!activeTaskId) return <EmptyState message="Select a task to see changes" />;
   if (!updatedAt) return <EmptyState message="Code changes will appear here" />;
   if (!diff) {
-    const msg = getEmptyMessage(scope, activeTab, diffState);
+    const msg = getEmptyMessage(scope, activeTab, deferredDiffState);
     return <EmptyState message={msg ?? 'No changes'} />;
   }
 
   return (
-    <div className="flex flex-1 min-h-0">
+    <div className="relative flex flex-1 min-h-0">
+      {isStale && (
+        <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/50">
+          <div className="w-4 h-4 border-2 border-muted border-t-accent rounded-full animate-spin" />
+        </div>
+      )}
       {isFileTreeOpen && visibleFiles.length > 0 && (
         <DiffFileTree
-          files={visibleFiles}
-          selectedFile={selectedFile}
+          selectedFile={deferredSelectedFile}
           onSelectFile={onSelectFile}
           width={fileTreeWidth}
+          {...(scope === 'working-tree'
+            ? { groupMode: 'staged-unstaged' as const, stagedFiles, unstagedFiles }
+            : { groupMode: 'flat' as const, files: visibleFiles })}
         />
       )}
       <div className="flex-1 min-w-0 overflow-y-auto">
@@ -279,19 +554,31 @@ function DiffBody({
           rawDiff={diff}
           wordWrap={wordWrap}
           viewType={viewType}
+          scope={scope}
           panelWidth={panelWidth}
-          selectedFile={selectedFile}
+          selectedFile={deferredSelectedFile}
+          diffComments={scopedComments}
+          onAddComment={onAddComment}
+          onResolveComment={onResolveComment}
+          onDeleteComment={onDeleteComment}
+          showResolvedComments={showResolvedComments}
         />
       </div>
     </div>
   );
 }
 
-function DiffPanelContent({ activeTaskId }: { activeTaskId: string | null }) {
-  const [activeTab, setActiveTab] = useState<DiffTab>('unstaged');
+interface DiffPanelContentProps {
+  activeTaskId: string | null;
+}
+
+export function DiffPanelContent({ activeTaskId }: DiffPanelContentProps) {
+  const activeTab: DiffTab = 'unstaged';
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
 
-  const sidePanelWidth = useUIStore((s) => s.sidePanelWidth);
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  const diffPanelWidth = useUIStore((s) => s.diffPanelWidth);
   const diffWordWrap = useUIStore((s) => s.diffWordWrap);
   const setDiffWordWrap = useUIStore((s) => s.setDiffWordWrap);
   const diffScope = useUIStore((s) => s.diffScope);
@@ -302,143 +589,101 @@ function DiffPanelContent({ activeTaskId }: { activeTaskId: string | null }) {
   const toggleDiffFileTree = useUIStore((s) => s.toggleDiffFileTree);
   const diffFileTreeWidth = useUIStore((s) => s.diffFileTreeWidth);
 
-  const { diffState } = useTaskDocument(activeTaskId);
+  const isMobile = useIsMobile();
+
+  const { diffState, diffComments, addDiffComment, resolveDiffComment, deleteDiffComment } =
+    useTaskDocument(activeTaskId);
+
+  const showResolvedComments = useUIStore((s) => s.showResolvedComments);
+  const toggleResolvedComments = useUIStore((s) => s.toggleResolvedComments);
+
+  const handleAddComment = useCallback(
+    (
+      filePath: string,
+      lineNumber: number,
+      side: DiffCommentSide,
+      lineContentHash: string,
+      body: string
+    ) => {
+      addDiffComment({
+        filePath,
+        lineNumber,
+        side,
+        diffScope: diffScope === 'branch' ? 'working-tree' : diffScope,
+        lineContentHash,
+        body,
+        authorId: 'local-user',
+      });
+    },
+    [addDiffComment, diffScope]
+  );
 
   useEffect(() => {
     setSelectedFile(null);
   }, [diffScope, activeTab, activeTaskId]);
 
-  const handleTablistKeyDown = useCallback(
-    (e: KeyboardEvent<HTMLDivElement>) => {
-      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
-
-      e.preventDefault();
-      const currentIndex = TABS.indexOf(activeTab);
-      const nextIndex =
-        e.key === 'ArrowRight'
-          ? (currentIndex + 1) % TABS.length
-          : (currentIndex - 1 + TABS.length) % TABS.length;
-      const nextTab = TABS[nextIndex];
-      if (nextTab) {
-        setActiveTab(nextTab);
-        document.getElementById(`diff-tab-${nextTab}`)?.focus();
-      }
-    },
-    [activeTab]
+  const unresolvedCommentCount = useMemo(
+    () => diffComments.filter((c) => c.resolvedAt === null).length,
+    [diffComments]
   );
 
-  const isSplitViewActive = diffViewType === 'split';
-  const SplitIcon = isSplitViewActive ? Rows3 : Columns2;
-  const splitLabel = isSplitViewActive ? 'Switch to unified view' : 'Switch to split view';
-  const fileTreeLabel = isDiffFileTreeOpen ? 'Hide file tree' : 'Show file tree';
+  const fileCount = useMemo(() => {
+    if (!diffState) return 0;
+    switch (diffScope) {
+      case 'working-tree':
+        return diffState.files.length;
+      case 'branch':
+        return diffState.branchFiles.length;
+      case 'last-turn':
+        return diffState.lastTurnFiles.length;
+      default:
+        return assertNever(diffScope);
+    }
+  }, [diffState, diffScope]);
+
+  const toolbarContent: ReactNode = useMemo(
+    () => (
+      <select
+        aria-label="Diff scope"
+        value={diffScope}
+        onChange={(e) => {
+          const value = e.target.value;
+          const validScope = SCOPE_OPTIONS.find((opt) => opt.value === value);
+          if (validScope) setDiffScope(validScope.value);
+        }}
+        className="text-xs text-muted font-medium bg-transparent border-none outline-none cursor-pointer hover:text-foreground transition-colors color-inherit [&_option]:bg-surface [&_option]:text-foreground"
+      >
+        {SCOPE_OPTIONS.map((opt) => (
+          <option key={opt.value} value={opt.value}>
+            {opt.label}
+          </option>
+        ))}
+      </select>
+    ),
+    [diffScope, setDiffScope]
+  );
+
+  const activeSidePanel = useUIStore((s) => s.activeSidePanel);
+  useSidePanelToolbarSlot(activeSidePanel === 'diff' ? toolbarContent : null);
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="flex items-center gap-2 px-3 h-9 border-b border-separator/30">
-        <Tooltip delay={0}>
-          <Button
-            isIconOnly
-            variant="ghost"
-            size="sm"
-            aria-label={fileTreeLabel}
-            onPress={toggleDiffFileTree}
-            className={`text-muted hover:text-foreground hover:bg-default w-8 h-8 min-w-0 ${isDiffFileTreeOpen ? 'text-accent' : ''}`}
-          >
-            <PanelLeft className="w-3.5 h-3.5" />
-          </Button>
-          <Tooltip.Content>{fileTreeLabel}</Tooltip.Content>
-        </Tooltip>
-        <select
-          aria-label="Diff scope"
-          value={diffScope}
-          onChange={(e) => {
-            const value = e.target.value;
-            const validScope = SCOPE_OPTIONS.find((opt) => opt.value === value);
-            if (validScope) setDiffScope(validScope.value);
-          }}
-          className="text-xs text-muted font-medium bg-transparent border-none outline-none cursor-pointer hover:text-foreground transition-colors color-inherit [&_option]:bg-surface [&_option]:text-foreground"
-        >
-          {SCOPE_OPTIONS.map((opt) => (
-            <option key={opt.value} value={opt.value}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
-
-        {diffScope === 'working-tree' && (
-          <div
-            role="tablist"
-            aria-label="Change categories"
-            className="flex items-center gap-1 ml-1 h-full"
-            onKeyDown={handleTablistKeyDown}
-          >
-            {TABS.map((tab) => (
-              <button
-                key={tab}
-                type="button"
-                role="tab"
-                aria-selected={activeTab === tab}
-                aria-controls={`diff-tabpanel-${tab}`}
-                id={`diff-tab-${tab}`}
-                tabIndex={activeTab === tab ? 0 : -1}
-                className={`relative h-full px-2 text-xs font-medium inline-flex items-center transition-colors ${
-                  activeTab === tab
-                    ? 'text-foreground after:absolute after:bottom-0 after:left-0.5 after:right-0.5 after:h-0.5 after:bg-accent after:rounded-full'
-                    : 'text-muted hover:text-foreground'
-                }`}
-                onClick={() => setActiveTab(tab)}
-              >
-                {tab === 'unstaged' ? 'Unstaged' : 'Staged'}
-              </button>
-            ))}
-          </div>
-        )}
-
-        <div className="flex-1" />
-
-        <div className="flex items-center gap-1">
-          <Tooltip delay={0}>
-            <Button
-              isIconOnly
-              variant="ghost"
-              size="sm"
-              aria-label={splitLabel}
-              onPress={() => setDiffViewType(isSplitViewActive ? 'unified' : 'split')}
-              className={`text-muted hover:text-foreground hover:bg-default w-8 h-8 min-w-0 ${isSplitViewActive ? 'text-accent' : ''}`}
-            >
-              <SplitIcon className="w-3.5 h-3.5" />
-            </Button>
-            <Tooltip.Content>{splitLabel}</Tooltip.Content>
-          </Tooltip>
-          <Tooltip delay={0}>
-            <Button
-              isIconOnly
-              variant="ghost"
-              size="sm"
-              aria-label={diffWordWrap ? 'Disable word wrap' : 'Enable word wrap'}
-              onPress={() => setDiffWordWrap(!diffWordWrap)}
-              className={`text-muted hover:text-foreground hover:bg-default w-8 h-8 min-w-0 ${diffWordWrap ? 'text-accent' : ''}`}
-            >
-              <WrapText className="w-3.5 h-3.5" />
-            </Button>
-            <Tooltip.Content>
-              {diffWordWrap ? 'Disable word wrap' : 'Enable word wrap'}
-            </Tooltip.Content>
-          </Tooltip>
-        </div>
-      </div>
-
+    <div className="flex flex-col h-full min-w-0 sm:min-w-[400px]">
+      <DiffActionBar
+        fileCount={fileCount}
+        isFileTreeOpen={isDiffFileTreeOpen && !isMobile}
+        onToggleFileTree={toggleDiffFileTree}
+        diffViewType={diffViewType}
+        setDiffViewType={setDiffViewType}
+        diffWordWrap={diffWordWrap}
+        setDiffWordWrap={setDiffWordWrap}
+        showResolvedComments={showResolvedComments}
+        toggleResolvedComments={toggleResolvedComments}
+        unresolvedCommentCount={unresolvedCommentCount}
+      />
       <div
-        {...(diffScope === 'working-tree'
-          ? {
-              role: 'tabpanel' as const,
-              id: `diff-tabpanel-${activeTab}`,
-              'aria-labelledby': `diff-tab-${activeTab}`,
-            }
-          : {
-              role: 'region' as const,
-              'aria-label': 'Diff content',
-            })}
+        ref={contentRef}
+        role="region"
+        aria-label="Diff content"
         className="flex flex-col flex-1 min-h-0"
       >
         <DiffBody
@@ -448,11 +693,16 @@ function DiffPanelContent({ activeTaskId }: { activeTaskId: string | null }) {
           diffState={diffState}
           wordWrap={diffWordWrap}
           viewType={diffViewType}
-          panelWidth={sidePanelWidth}
+          panelWidth={diffPanelWidth}
           selectedFile={selectedFile}
           onSelectFile={setSelectedFile}
-          isFileTreeOpen={isDiffFileTreeOpen}
+          isFileTreeOpen={isDiffFileTreeOpen && !isMobile}
           fileTreeWidth={diffFileTreeWidth}
+          diffComments={diffComments}
+          onAddComment={handleAddComment}
+          onResolveComment={resolveDiffComment}
+          onDeleteComment={deleteDiffComment}
+          showResolvedComments={showResolvedComments}
         />
       </div>
     </div>

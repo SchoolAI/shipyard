@@ -31,6 +31,8 @@ const mockHandle = {
       },
       conversation: [],
       sessions: [],
+      diffState: null,
+      diffComments: {},
     })),
   },
   loroDoc: {
@@ -47,6 +49,11 @@ mockRepo.get.mockReturnValue(mockHandle);
 vi.mock('../providers/repo-provider', () => ({
   useRepo: vi.fn(() => mockRepo),
 }));
+
+vi.mock('@loro-extended/change', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@loro-extended/change')>();
+  return { ...actual, change: vi.fn() };
+});
 
 vi.mock('@loro-extended/react', () => ({
   useDoc: vi.fn((_handle: unknown, selector: (doc: unknown) => unknown) => {

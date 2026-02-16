@@ -34,6 +34,7 @@ export interface UIStore {
   diffLastViewedAt: number;
   isDiffFileTreeOpen: boolean;
   diffFileTreeWidth: number;
+  showResolvedComments: boolean;
   terminalPanelHeight: number;
 
   toggleSidebar: () => void;
@@ -74,6 +75,8 @@ export interface UIStore {
   setDiffFileTreeOpen: (open: boolean) => void;
   toggleDiffFileTree: () => void;
   setDiffFileTreeWidth: (width: number) => void;
+  setShowResolvedComments: (show: boolean) => void;
+  toggleResolvedComments: () => void;
   setTerminalPanelHeight: (height: number) => void;
 }
 
@@ -106,6 +109,7 @@ export const useUIStore = create<UIStore>()(
         diffLastViewedAt: 0,
         isDiffFileTreeOpen: true,
         diffFileTreeWidth: 220,
+        showResolvedComments: false,
         terminalPanelHeight:
           typeof window !== 'undefined' ? Math.round(window.innerHeight * 0.4) : 400,
 
@@ -232,6 +236,16 @@ export const useUIStore = create<UIStore>()(
           set({ diffFileTreeWidth: clamped }, undefined, 'ui/setDiffFileTreeWidth');
         },
 
+        setShowResolvedComments: (show) =>
+          set({ showResolvedComments: show }, undefined, 'ui/setShowResolvedComments'),
+
+        toggleResolvedComments: () =>
+          set(
+            (state) => ({ showResolvedComments: !state.showResolvedComments }),
+            undefined,
+            'ui/toggleResolvedComments'
+          ),
+
         setTerminalPanelHeight: (height) => {
           const max = typeof window !== 'undefined' ? Math.floor(window.innerHeight * 0.7) : 700;
           const clamped = Math.min(Math.max(height, 100), max);
@@ -255,6 +269,7 @@ export const useUIStore = create<UIStore>()(
             const planWidth =
               typeof state.planPanelWidth === 'number' ? state.planPanelWidth : undefined;
             state.sidePanelWidth = diffWidth ?? planWidth ?? 600;
+            state.showResolvedComments ??= false;
           }
           return state;
         },
@@ -271,6 +286,7 @@ export const useUIStore = create<UIStore>()(
           diffLastViewedAt: state.diffLastViewedAt,
           isDiffFileTreeOpen: state.isDiffFileTreeOpen,
           diffFileTreeWidth: state.diffFileTreeWidth,
+          showResolvedComments: state.showResolvedComments,
           terminalPanelHeight: state.terminalPanelHeight,
         }),
       }

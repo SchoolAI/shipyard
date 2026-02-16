@@ -49,8 +49,12 @@ export {
 } from './room-schema.js';
 export type {
   A2ATaskState,
+  CommentAuthorType,
   ContentBlock,
   ContentBlockType,
+  DiffComment,
+  DiffCommentScope,
+  DiffCommentSide,
   DiffFile,
   DiffState,
   EpochDocument,
@@ -74,9 +78,13 @@ export type {
 } from './shapes.js';
 export {
   A2A_TASK_STATES,
+  COMMENT_AUTHOR_TYPES,
   CONTENT_BLOCK_TYPES,
   ContentBlockShape,
   classifyToolRisk,
+  DIFF_COMMENT_SCOPES,
+  DIFF_COMMENT_SIDES,
+  DiffCommentShape,
   DiffStateShape,
   EpochDocumentSchema,
   MessageShape,

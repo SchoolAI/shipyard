@@ -74,4 +74,24 @@ describe('useUIStore', () => {
     expect(useUIStore.getState().isTerminalOpen).toBe(false);
     expect(useUIStore.getState().isDiffOpen).toBe(false);
   });
+
+  it('initializes showResolvedComments to false', () => {
+    expect(useUIStore.getState().showResolvedComments).toBe(false);
+  });
+
+  it('toggles resolved comments visibility', () => {
+    useUIStore.getState().toggleResolvedComments();
+    expect(useUIStore.getState().showResolvedComments).toBe(true);
+
+    useUIStore.getState().toggleResolvedComments();
+    expect(useUIStore.getState().showResolvedComments).toBe(false);
+  });
+
+  it('sets resolved comments visibility directly', () => {
+    useUIStore.getState().setShowResolvedComments(true);
+    expect(useUIStore.getState().showResolvedComments).toBe(true);
+
+    useUIStore.getState().setShowResolvedComments(false);
+    expect(useUIStore.getState().showResolvedComments).toBe(false);
+  });
 });

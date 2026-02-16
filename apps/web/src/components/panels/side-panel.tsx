@@ -1,8 +1,7 @@
 export type { SidePanelHandle, SidePanelProps };
 export { SidePanel };
 
-import { Button } from '@heroui/react';
-import { ClipboardList, GitCompareArrows, X } from 'lucide-react';
+import { ClipboardList, GitCompareArrows } from 'lucide-react';
 import {
   type CSSProperties,
   forwardRef,
@@ -14,6 +13,10 @@ import {
   useRef,
   useState,
 } from 'react';
+import {
+  SidePanelToolbarProvider,
+  useSidePanelToolbar,
+} from '../../contexts/side-panel-toolbar-context';
 import { useResizablePanel } from '../../hooks/use-resizable-panel';
 import { useUIStore } from '../../stores';
 import type { SidePanelId } from '../../stores/ui-store';
@@ -26,7 +29,11 @@ interface SidePanelHandle {
 
 interface SidePanelProps {
   children: ReactNode;
-  toolbar?: ReactNode;
+}
+
+function ToolbarSlot() {
+  const { toolbar } = useSidePanelToolbar();
+  return <>{toolbar}</>;
 }
 
 interface TabDefinition {
@@ -69,7 +76,7 @@ function getAsideClassName(isMobile: boolean, isOpen: boolean, isDragging: boole
 }
 
 const SidePanel = forwardRef<SidePanelHandle, SidePanelProps>(function SidePanel(
-  { children, toolbar },
+  { children },
   ref
 ) {
   const contentRef = useRef<HTMLDivElement>(null);
@@ -133,69 +140,62 @@ const SidePanel = forwardRef<SidePanelHandle, SidePanelProps>(function SidePanel
     >
       {isOpen && !isMobile && <div {...separatorProps} />}
 
-      <div className="flex flex-col h-full min-w-0 sm:min-w-[400px]">
-        <div className="flex items-center h-10 border-b border-separator/50">
-          <div
-            role="tablist"
-            aria-label="Side panel tabs"
-            className="flex items-center gap-1 px-3 h-full"
-            onKeyDown={handleTabKeyDown}
-          >
-            {TABS.map((tab) => {
-              const isActive = activeSidePanel === tab.id;
-              const Icon = tab.icon;
-              return (
-                <button
-                  key={tab.id}
-                  type="button"
-                  role="tab"
-                  id={`side-panel-tab-${tab.id}`}
-                  aria-selected={isActive}
-                  aria-controls={`side-panel-tabpanel-${tab.id}`}
-                  tabIndex={isActive ? 0 : -1}
-                  className={[
-                    'relative h-full px-3 text-xs font-medium inline-flex items-center gap-1.5 transition-colors',
-                    isActive
-                      ? 'text-foreground after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[2px] after:bg-accent'
-                      : 'text-muted hover:text-foreground',
-                  ].join(' ')}
-                  onClick={() => setActiveSidePanel(tab.id)}
-                >
-                  <Icon className="w-3.5 h-3.5" />
-                  {tab.label}
-                </button>
-              );
-            })}
+      <SidePanelToolbarProvider>
+        <div className="flex flex-col h-full min-w-0 sm:min-w-[400px]">
+          <div className="flex items-center h-10 border-b border-separator/50">
+            <div
+              role="tablist"
+              aria-label="Side panel tabs"
+              className="flex items-center gap-1 px-3 h-full"
+              onKeyDown={handleTabKeyDown}
+            >
+              {TABS.map((tab) => {
+                const isActive = activeSidePanel === tab.id;
+                const Icon = tab.icon;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    role="tab"
+                    id={`side-panel-tab-${tab.id}`}
+                    aria-selected={isActive}
+                    aria-controls={`side-panel-tabpanel-${tab.id}`}
+                    tabIndex={isActive ? 0 : -1}
+                    className={[
+                      'relative h-full px-3 text-xs font-medium inline-flex items-center gap-1.5 transition-colors',
+                      isActive
+                        ? 'text-foreground after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[2px] after:bg-accent'
+                        : 'text-muted hover:text-foreground',
+                    ].join(' ')}
+                    onClick={() => setActiveSidePanel(tab.id)}
+                  >
+                    <Icon className="w-3.5 h-3.5" />
+                    {tab.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="flex-1 flex items-center justify-end gap-1 px-2">
+              <ToolbarSlot />
+            </div>
           </div>
 
-          <div className="flex-1 flex items-center justify-end gap-1 px-2">{toolbar}</div>
-
-          <Button
-            isIconOnly
-            variant="ghost"
-            size="sm"
-            aria-label="Close side panel"
-            onPress={handleClose}
-            className="text-muted hover:text-foreground hover:bg-default w-11 h-11 sm:w-8 sm:h-8 min-w-0 mr-2"
+          <div
+            ref={contentRef}
+            role="tabpanel"
+            id={`side-panel-tabpanel-${activeSidePanel}`}
+            aria-labelledby={`side-panel-tab-${activeSidePanel}`}
+            tabIndex={isOpen ? 0 : -1}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') handleClose();
+            }}
+            className="flex flex-col flex-1 min-h-0 focus-visible-ring"
           >
-            <X className="w-3.5 h-3.5" />
-          </Button>
+            {children}
+          </div>
         </div>
-
-        <div
-          ref={contentRef}
-          role="tabpanel"
-          id={`side-panel-tabpanel-${activeSidePanel}`}
-          aria-labelledby={`side-panel-tab-${activeSidePanel}`}
-          tabIndex={isOpen ? 0 : -1}
-          onKeyDown={(e) => {
-            if (e.key === 'Escape') handleClose();
-          }}
-          className="flex flex-col flex-1 min-h-0 focus-visible-ring"
-        >
-          {children}
-        </div>
-      </div>
+      </SidePanelToolbarProvider>
     </aside>
   );
 });
