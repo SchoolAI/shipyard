@@ -43,6 +43,7 @@ ALLOWED_SCRIPTS=(
   "scripts/lint-typeassertions.sh"
   "scripts/check-file-allowlist.sh"
   "scripts/validate-file-allowlist.sh"
+  "scripts/generate-daemon-token.ts"
 )
 
 # Get staged files (new or modified)

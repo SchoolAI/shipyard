@@ -44,10 +44,9 @@
     "pre-commit": "pnpm check"
   },
   "pnpm": {
-    "ignoredBuiltDependencies": [
-      "esbuild",
-      "simple-git-hooks",
-      "workerd"
+    "onlyBuiltDependencies": [
+      "node-datachannel",
+      "node-pty"
     ]
   }
 }

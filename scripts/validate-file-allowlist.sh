@@ -47,6 +47,7 @@ ALLOWED_SCRIPTS=(
   "scripts/check-file-allowlist.sh"
   "scripts/fix-node-pty-permissions.sh"
   "scripts/validate-file-allowlist.sh"
+  "scripts/generate-daemon-token.ts"
 )
 
 # Find all markdown and text files (excluding node_modules, .git, loro-extended-repo)
