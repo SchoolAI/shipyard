@@ -95,17 +95,15 @@ jobs:
           echo "No changes since last publish. Nothing to do." >> "$GITHUB_STEP_SUMMARY"
 
       # ── Setup toolchain ─────────────────────────────────────────────
-      - uses: pnpm/action-setup@v4
-        if: steps.release.outputs.type == 'promote' || steps.changes.outputs.has_changes == 'true'
-        with:
-          standalone: true
-
       - uses: actions/setup-node@v4
         if: steps.release.outputs.type == 'promote' || steps.changes.outputs.has_changes == 'true'
         with:
           node-version: '22.14.0'
-          cache: 'pnpm'
           registry-url: 'https://registry.npmjs.org'
+
+      - name: Install pnpm via corepack
+        if: steps.release.outputs.type == 'promote' || steps.changes.outputs.has_changes == 'true'
+        run: corepack enable && corepack install
 
       - uses: oven-sh/setup-bun@v2
         if: steps.release.outputs.type == 'promote' || steps.changes.outputs.has_changes == 'true'
