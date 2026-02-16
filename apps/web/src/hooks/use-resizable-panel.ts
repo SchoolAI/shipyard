@@ -250,7 +250,7 @@ export function useResizablePanel({
     maxWidth > minWidth ? Math.round(((clampedWidth - minWidth) / (maxWidth - minWidth)) * 100) : 0;
 
   const panelStyle: CSSProperties = {
-    width: isOpen ? (isSettling ? undefined : clampedWidth) : 0,
+    width: isOpen ? clampedWidth : 0,
   };
 
   // While dragging or settling, the panel should not have CSS transitions.
