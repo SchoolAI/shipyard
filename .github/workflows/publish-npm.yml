@@ -97,6 +97,8 @@ jobs:
       # ── Setup toolchain ─────────────────────────────────────────────
       - uses: pnpm/action-setup@v4
         if: steps.release.outputs.type == 'promote' || steps.changes.outputs.has_changes == 'true'
+        with:
+          standalone: true
 
       - uses: actions/setup-node@v4
         if: steps.release.outputs.type == 'promote' || steps.changes.outputs.has_changes == 'true'
