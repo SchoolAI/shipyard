@@ -1,7 +1,7 @@
 import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
-import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { z } from 'zod';
+import { getShipyardHome } from './env.js';
 
 const ShipyardConfigSchema = z.object({
   auth: z.object({
@@ -16,11 +16,13 @@ const ShipyardConfigSchema = z.object({
 
 export type ShipyardConfig = z.infer<typeof ShipyardConfigSchema>;
 
-const CONFIG_PATH = join(homedir(), '.shipyard', 'config.json');
+export function getConfigPath(): string {
+  return join(getShipyardHome(), 'config.json');
+}
 
 export async function readConfig(): Promise<ShipyardConfig | null> {
   try {
-    const raw = await readFile(CONFIG_PATH, 'utf-8');
+    const raw = await readFile(getConfigPath(), 'utf-8');
     return ShipyardConfigSchema.parse(JSON.parse(raw));
   } catch {
     return null;
@@ -28,13 +30,13 @@ export async function readConfig(): Promise<ShipyardConfig | null> {
 }
 
 export async function writeConfig(config: ShipyardConfig): Promise<void> {
-  await mkdir(dirname(CONFIG_PATH), { recursive: true, mode: 0o700 });
-  await writeFile(CONFIG_PATH, `${JSON.stringify(config, null, 2)}\n`, { mode: 0o600 });
+  await mkdir(dirname(getConfigPath()), { recursive: true, mode: 0o700 });
+  await writeFile(getConfigPath(), `${JSON.stringify(config, null, 2)}\n`, { mode: 0o600 });
 }
 
 export async function deleteConfig(): Promise<boolean> {
   try {
-    await unlink(CONFIG_PATH);
+    await unlink(getConfigPath());
     return true;
   } catch {
     return false;

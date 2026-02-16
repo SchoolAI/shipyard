@@ -6,6 +6,9 @@ set -e
 
 SESSION_PORT=4444
 
+# Enable dev mode (separate config + data directories)
+export SHIPYARD_DEV=1
+
 # Load daemon env for serve mode
 set -a
 source apps/daemon/.env

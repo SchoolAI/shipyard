@@ -70,6 +70,7 @@ function parseCliArgs(): CliArgs {
         '',
         'Environment:',
         '  ANTHROPIC_API_KEY         API key for Claude (required for task mode)',
+        '  SHIPYARD_DEV              Set to 1 for dev mode (uses ~/.shipyard-dev/)',
         '  SHIPYARD_DATA_DIR         Data directory (overridden by --data-dir)',
         '  LOG_LEVEL                 Log level: debug, info, warn, error (default: info)',
         '  SHIPYARD_SIGNALING_URL    Signaling server WebSocket URL (optional)',

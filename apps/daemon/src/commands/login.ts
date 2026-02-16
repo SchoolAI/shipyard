@@ -1,6 +1,6 @@
 import { ROUTES } from '@shipyard/session';
 import { z } from 'zod';
-import { readConfig, type ShipyardConfig, writeConfig } from '../auth.js';
+import { getConfigPath, readConfig, type ShipyardConfig, writeConfig } from '../auth.js';
 import { print, printError } from './output.js';
 
 const DEFAULT_SIGNALING_URL = 'https://shipyard-session-server.jacob-191.workers.dev';
@@ -117,7 +117,7 @@ async function handleSuccessfulPoll(pollRes: Response, signalingUrl: string): Pr
   await writeConfig(config);
 
   print(`\n  Logged in as ${pollData.user.displayName} (${pollData.user.providers.join(', ')})`);
-  print('  Token saved to ~/.shipyard/config.json');
+  print(`  Token saved to ${getConfigPath()}`);
 }
 
 async function handlePollError(pollRes: Response, interval: number): Promise<void> {

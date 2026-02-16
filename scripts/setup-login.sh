@@ -70,7 +70,7 @@ fi
 
 # Step 3: Run login (point at local server)
 echo ""
-SHIPYARD_SIGNALING_URL=http://localhost:4444 node apps/daemon/dist/index.js login
+SHIPYARD_DEV=1 SHIPYARD_SIGNALING_URL=http://localhost:4444 node apps/daemon/dist/index.js login
 
 echo ""
 if [ "$STARTED_SERVER" = true ]; then
