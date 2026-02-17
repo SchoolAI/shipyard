@@ -5,7 +5,12 @@ import { app } from './index';
 
 vi.mock('../db/index', () => ({
   findOrCreateUser: vi.fn().mockResolvedValue({
-    user: { id: 'usr_test123', displayName: 'Test User', avatarUrl: 'https://avatars.githubusercontent.com/u/12345', createdAt: Date.now() },
+    user: {
+      id: 'usr_test123',
+      displayName: 'Test User',
+      avatarUrl: 'https://avatars.githubusercontent.com/u/12345',
+      createdAt: Date.now(),
+    },
     providers: ['github'],
   }),
 }));

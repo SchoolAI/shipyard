@@ -11,7 +11,16 @@ interface ModeOption {
   icon: LucideIcon;
 }
 
-const MODE_IDS = new Set<string>(['default', 'accept-edits', 'plan', 'bypass']);
+const MODE_IDS: ReadonlySet<PermissionMode> = new Set<PermissionMode>([
+  'default',
+  'accept-edits',
+  'plan',
+  'bypass',
+]);
+
+function isPermissionMode(value: unknown): value is PermissionMode {
+  return typeof value === 'string' && MODE_IDS.has(value as never);
+}
 
 const DEFAULT_MODE: ModeOption = {
   id: 'default',
@@ -74,8 +83,8 @@ export function PermissionModePicker({ mode, onModeChange }: PermissionModePicke
           aria-label="Permission mode"
           onSelectionChange={(keys) => {
             const selected = [...keys][0];
-            if (typeof selected === 'string' && MODE_IDS.has(selected)) {
-              onModeChange(selected as PermissionMode);
+            if (isPermissionMode(selected)) {
+              onModeChange(selected);
             }
           }}
         >

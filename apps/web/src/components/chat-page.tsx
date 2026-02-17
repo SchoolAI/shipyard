@@ -454,7 +454,8 @@ export function ChatPage() {
 
   useEffect(() => {
     voiceInput.stop();
-  }, [activeTaskId]); // eslint-disable-line react-hooks/exhaustive-deps -- stop recording on task switch
+    // eslint-disable-next-line -- intentionally omit voiceInput.stop from deps; only re-run on task switch
+  }, [activeTaskId]);
 
   const toggleSettings = useUIStore((s) => s.toggleSettings);
 
@@ -703,7 +704,6 @@ export function ChatPage() {
               <SettingsPage onBack={handleCloseSettings} />
             ) : (
               <>
-                {/* Chat area */}
                 {hasMessages ? (
                   <div
                     ref={scrollRef}
@@ -752,7 +752,6 @@ export function ChatPage() {
                   />
                 )}
 
-                {/* Composer */}
                 <div className="shrink-0 w-full max-w-3xl mx-auto px-3 sm:px-4">
                   <ChatComposer
                     ref={composerRef}
@@ -789,7 +788,6 @@ export function ChatPage() {
             )}
           </main>
 
-          {/* Terminal panel */}
           <TerminalPanel
             ref={terminalRef}
             isOpen={isTerminalOpen}
@@ -799,7 +797,6 @@ export function ChatPage() {
           />
         </div>
 
-        {/* Side panel (diff / plan) */}
         <SidePanel ref={sidePanelRef}>
           <div className={activeSidePanel === 'diff' ? 'contents' : 'hidden'}>
             <DiffPanelContent activeTaskId={activeTaskId} />

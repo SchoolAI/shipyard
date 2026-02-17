@@ -145,7 +145,6 @@ export function Sidebar() {
           isExpanded ? 'translate-x-0' : '-translate-x-full'
         } ${isExpanded ? 'md:w-[260px]' : 'md:w-12'}`}
       >
-        {/* Header */}
         <div className="flex items-center justify-between h-10 px-2 shrink-0">
           {isExpanded ? (
             <>
@@ -201,9 +200,8 @@ export function Sidebar() {
           )}
         </div>
 
-        {/* Content area */}
         <div id="sidebar-content" className="flex flex-col flex-1 min-h-0">
-          {/* New task row -- ghost style, matches other sidebar rows */}
+          {/** New task row -- ghost style, matches other sidebar rows */}
           {isExpanded ? (
             <div className="px-1.5 mb-1">
               <Tooltip>
@@ -250,14 +248,12 @@ export function Sidebar() {
             </div>
           )}
 
-          {/* Section label */}
           {isExpanded && (
             <div className="px-3 mb-1 mt-1">
               <span className="text-xs font-medium text-muted/60">Tasks</span>
             </div>
           )}
 
-          {/* Task list */}
           <div
             role="listbox"
             aria-label="Tasks"
@@ -278,7 +274,7 @@ export function Sidebar() {
             )}
           </div>
 
-          {/* User + Settings -- pinned to bottom */}
+          {/** User + Settings -- pinned to bottom via mt-auto */}
           {isExpanded ? (
             <div className="mt-auto shrink-0 px-2 py-2">
               <div className="flex items-center gap-1">

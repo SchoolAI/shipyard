@@ -64,7 +64,6 @@ export function StatusBar({
       aria-label="Connection status"
     >
       <div className="flex items-center flex-nowrap gap-x-2 gap-y-1 text-xs text-muted sm:gap-x-3 overflow-hidden">
-        {/* Machine picker */}
         <div className="flex items-center min-w-0">
           {machines.length > 0 ? (
             <Dropdown>
@@ -128,7 +127,6 @@ export function StatusBar({
           )}
         </div>
 
-        {/* Environment */}
         <EnvironmentPicker
           environments={availableEnvironments}
           selectedPath={selectedEnvironmentPath ?? null}
@@ -136,7 +134,7 @@ export function StatusBar({
           homeDir={homeDir}
         />
 
-        {/* Branch -- only shown for real project environments */}
+        {/** Branch -- only shown for real project environments */}
         {selectedEnvironment && !isHomeDir && (
           <Tooltip>
             <Tooltip.Trigger>

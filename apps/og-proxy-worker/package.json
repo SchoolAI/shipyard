@@ -8,8 +8,9 @@
     "deploy": "wrangler deploy",
     "tail": "wrangler tail",
     "typecheck": "tsc --noEmit",
-    "lint": "echo 'Lint handled by root biome config'",
-    "test": "echo 'No tests yet for og-proxy-worker'"
+    "lint": "biome check src",
+    "test": "echo 'No tests yet for og-proxy-worker'",
+    "check": "pnpm typecheck && pnpm lint && pnpm test && pnpm build"
   },
   "dependencies": {
     "lz-string": "catalog:",

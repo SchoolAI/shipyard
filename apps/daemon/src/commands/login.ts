@@ -136,9 +136,7 @@ async function handlePollError(pollRes: Response, interval: number): Promise<voi
     if (errorData.error === 'slow_down') {
       await new Promise((resolve) => setTimeout(resolve, interval));
     }
-  } catch {
-    /* non-JSON response — keep polling */
-  }
+  } catch {}
 }
 
 async function checkLogin(): Promise<void> {

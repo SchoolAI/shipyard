@@ -132,12 +132,12 @@ export function createPeerManager(config: PeerManagerConfig): PeerManager {
         logger.info({ machineId, signalingState: sigState }, 'Signaling state changed');
       };
 
-    // eslint-disable-next-line no-restricted-syntax -- node-datachannel polyfill supports these handlers
+    /* eslint-disable no-restricted-syntax -- node-datachannel polyfill requires these casts */
     (
       pc as unknown as { onicegatheringstatechange: (() => void) | null }
     ).onicegatheringstatechange = () => {
-      // eslint-disable-next-line no-restricted-syntax -- reading state from underlying connection
       const iceState = (pc as unknown as { iceGatheringState: string }).iceGatheringState;
+      /* eslint-enable no-restricted-syntax */
       logger.info({ machineId, iceGatheringState: iceState }, 'ICE gathering state changed');
     };
   }

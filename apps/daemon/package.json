@@ -16,7 +16,8 @@
     "typecheck": "tsc --noEmit",
     "lint": "biome check src",
     "lint:fix": "biome check src --write",
-    "check": "pnpm typecheck && pnpm lint && pnpm test && pnpm build"
+    "check": "pnpm typecheck && pnpm lint && pnpm test && pnpm build",
+    "analyze:fan-in": "tsx ../../scripts/analyze-fan-in.ts"
   },
   "dependencies": {
     "@shipyard/loro-schema": "workspace:*",
@@ -34,7 +35,9 @@
   },
   "devDependencies": {
     "@types/node": "catalog:",
+    "@vitest/coverage-v8": "catalog:",
     "tsup": "catalog:",
+    "tsx": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:",
     "pino-pretty": "catalog:"

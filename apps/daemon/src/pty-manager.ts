@@ -128,9 +128,7 @@ export function createPtyManager(): PtyManager {
       log.warn({ pid: proc.pid }, 'PTY did not exit after SIGTERM, sending SIGKILL');
       try {
         proc.kill('SIGKILL');
-      } catch {
-        // Process may have already exited
-      }
+      } catch {}
     }, KILL_TIMEOUT_MS);
   }
 

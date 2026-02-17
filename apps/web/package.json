@@ -10,7 +10,9 @@
     "typecheck": "tsc --noEmit",
     "lint": "biome check src",
     "lint:fix": "biome check src --write",
-    "test": "vitest run"
+    "test": "vitest run",
+    "check": "pnpm typecheck && pnpm lint && pnpm test && pnpm build",
+    "analyze:fan-in": "tsx ../../scripts/analyze-fan-in.ts"
   },
   "dependencies": {
     "@git-diff-view/core": "^0.0.39",
@@ -44,8 +46,10 @@
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
     "@vitejs/plugin-react": "catalog:",
+    "@vitest/coverage-v8": "catalog:",
     "jsdom": "^26.1.0",
     "tailwindcss": "catalog:",
+    "tsx": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
     "vite-plugin-wasm": "^3.5.0",

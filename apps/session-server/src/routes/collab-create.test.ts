@@ -9,7 +9,11 @@ import { app } from './index';
  * Helper to create a valid JWT for testing
  */
 async function createTestToken(userId = 'usr_test123', displayName = 'Test User'): Promise<string> {
-  return generateSessionToken({ id: userId, displayName }, ['github'], (env as unknown as Env).JWT_SECRET);
+  return generateSessionToken(
+    { id: userId, displayName },
+    ['github'],
+    (env as unknown as Env).JWT_SECRET
+  );
 }
 
 /**

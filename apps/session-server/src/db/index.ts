@@ -40,7 +40,12 @@ export async function findOrCreateUser(
 
     const providers = await getProviders(user.id, db);
     return {
-      user: { id: user.id, displayName: user.display_name, avatarUrl: user.avatar_url, createdAt: user.created_at },
+      user: {
+        id: user.id,
+        displayName: user.display_name,
+        avatarUrl: user.avatar_url,
+        createdAt: user.created_at,
+      },
       providers,
     };
   }
@@ -90,7 +95,12 @@ export async function findUserById(
 
   const providers = await getProviders(user.id, db);
   return {
-    user: { id: user.id, displayName: user.display_name, avatarUrl: user.avatar_url, createdAt: user.created_at },
+    user: {
+      id: user.id,
+      displayName: user.display_name,
+      avatarUrl: user.avatar_url,
+      createdAt: user.created_at,
+    },
     providers,
   };
 }

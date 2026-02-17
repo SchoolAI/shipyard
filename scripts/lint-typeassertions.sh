@@ -9,15 +9,21 @@ set -e
 # New packages are automatically covered
 
 EXCLUDE_PATTERNS=(
-  "node_modules"
-  "dist"
-  "build"
+  "**/node_modules/**"
+  "**/dist/**"
+  "**/build/**"
   "*.config.*"
   "spikes"
   "**/*.test.ts"
   "**/*.test.tsx"
   "**/__tests__/**"
 )
+
+if [[ " $* " == *" --fix "* ]]; then
+  echo "❌ --fix is not allowed for type assertion linting."
+  echo "   Type assertion violations must be fixed manually (use type guards or add eslint-disable with reason)."
+  exit 1
+fi
 
 echo "Checking type assertions (ESLint)..."
 

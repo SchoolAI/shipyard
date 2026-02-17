@@ -21,6 +21,7 @@ catalog:
   bunup: "^0.16.22"
   tsup: "^8.5.0"
   vitest: "^4.0.17"
+  "@vitest/coverage-v8": "^4.0.17"
   "@vitest/coverage-istanbul": "^3.0.4"
 
   # ===== AI / Agent =====

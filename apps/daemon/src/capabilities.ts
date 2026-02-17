@@ -115,17 +115,13 @@ export async function getDefaultBranch(cwd: string): Promise<string | null> {
       TIMEOUT_MS
     );
     return ref || null;
-  } catch {
-    /* symbolic-ref failed, try common defaults */
-  }
+  } catch {}
 
   for (const candidate of ['origin/main', 'origin/master']) {
     try {
       await runWithTimeout('git', ['rev-parse', '--verify', candidate], cwd, TIMEOUT_MS);
       return candidate;
-    } catch {
-      /* candidate does not exist */
-    }
+    } catch {}
   }
 
   return null;

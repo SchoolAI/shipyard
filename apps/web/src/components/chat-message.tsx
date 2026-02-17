@@ -178,7 +178,6 @@ function ToolCallLine({ toolUse, toolResult }: ToolCallLineProps) {
 
   return (
     <div>
-      {/* Single-line summary row */}
       <button
         type="button"
         className="flex items-center gap-2 w-full min-h-[36px] sm:min-h-0 py-0.5 min-w-0 text-left rounded hover:bg-default/20 motion-safe:transition-colors group/tool"
@@ -189,7 +188,6 @@ function ToolCallLine({ toolUse, toolResult }: ToolCallLineProps) {
           if (!isPending) setShowDetails((prev) => !prev);
         }}
       >
-        {/* Status icon */}
         {isPending ? (
           <Loader2
             className="w-3.5 h-3.5 text-muted shrink-0 motion-safe:animate-spin"
@@ -202,7 +200,6 @@ function ToolCallLine({ toolUse, toolResult }: ToolCallLineProps) {
           <CheckCircle2 className="w-3.5 h-3.5 text-success/60 shrink-0" aria-hidden="true" />
         )}
 
-        {/* Tool name */}
         <span
           className="text-xs text-foreground/50 font-mono shrink-0 w-10 truncate"
           title={iconLabel}
@@ -210,7 +207,6 @@ function ToolCallLine({ toolUse, toolResult }: ToolCallLineProps) {
           {toolUse.toolName}
         </span>
 
-        {/* Summary */}
         <span
           className="text-xs text-foreground/70 font-mono truncate min-w-0 flex-1"
           title={summary}
@@ -218,7 +214,6 @@ function ToolCallLine({ toolUse, toolResult }: ToolCallLineProps) {
           {summary}
         </span>
 
-        {/* Chevron */}
         {!isPending && (
           <ChevronDown
             className={`w-3 h-3 text-muted shrink-0 opacity-0 group-hover/tool:opacity-100 focus-visible:opacity-100 motion-safe:transition-all ${showDetails ? 'rotate-180 opacity-100' : ''}`}
@@ -227,7 +222,6 @@ function ToolCallLine({ toolUse, toolResult }: ToolCallLineProps) {
         )}
       </button>
 
-      {/* Expanded details */}
       {showDetails && toolResult && (
         <div
           id={detailsPanelId}
@@ -240,7 +234,6 @@ function ToolCallLine({ toolUse, toolResult }: ToolCallLineProps) {
             {toolResult.content}
           </pre>
 
-          {/* Secondary: show raw input */}
           <button
             type="button"
             className="flex items-center gap-1 mt-1.5 min-h-[36px] sm:min-h-0 text-[0.6875rem] text-muted hover:text-foreground motion-safe:transition-colors"
@@ -281,7 +274,6 @@ function ThinkingBlock({ block }: ThinkingBlockProps) {
 
   return (
     <div>
-      {/* Single-line disclosure trigger */}
       <button
         type="button"
         className="flex items-center gap-2 w-full min-h-[36px] sm:min-h-0 py-0.5 min-w-0 text-left rounded hover:bg-default/20 motion-safe:transition-colors group/thinking"
@@ -304,7 +296,6 @@ function ThinkingBlock({ block }: ThinkingBlockProps) {
         />
       </button>
 
-      {/* Expanded content */}
       {expanded && (
         <div
           id={panelId}
@@ -350,7 +341,6 @@ function SubagentGroup({ taskToolUse, taskToolResult, children }: SubagentGroupP
 
   return (
     <div>
-      {/* Collapsed single-line summary */}
       <button
         type="button"
         className="flex items-center gap-2 w-full min-h-[36px] sm:min-h-0 py-0.5 min-w-0 text-left rounded hover:bg-default/20 motion-safe:transition-colors group/subagent"
@@ -358,7 +348,6 @@ function SubagentGroup({ taskToolUse, taskToolResult, children }: SubagentGroupP
         aria-controls={panelId}
         onClick={() => setExpanded((prev) => !prev)}
       >
-        {/* Status icon */}
         {isPending ? (
           <Loader2
             className="w-3.5 h-3.5 text-muted shrink-0 motion-safe:animate-spin"
@@ -370,12 +359,9 @@ function SubagentGroup({ taskToolUse, taskToolResult, children }: SubagentGroupP
         ) : (
           <CheckCircle2 className="w-3.5 h-3.5 text-success/60 shrink-0" aria-hidden="true" />
         )}
-
-        {/* Subagent icon + label */}
         <Layers className="w-3.5 h-3.5 text-secondary/60 shrink-0" aria-hidden="true" />
         <span className="text-xs text-foreground/50 font-mono shrink-0">Task</span>
 
-        {/* Description */}
         <span
           className="text-xs text-foreground/70 font-mono truncate min-w-0 flex-1"
           title={description}
@@ -383,21 +369,18 @@ function SubagentGroup({ taskToolUse, taskToolResult, children }: SubagentGroupP
           {description}
         </span>
 
-        {/* Tool call count */}
         {toolCallCount > 0 && (
           <span className="text-[0.6875rem] text-muted shrink-0">
             ({toolCallCount} tool{toolCallCount === 1 ? '' : 's'})
           </span>
         )}
 
-        {/* Chevron */}
         <ChevronDown
           className={`w-3 h-3 text-muted shrink-0 opacity-0 group-hover/subagent:opacity-100 focus-visible:opacity-100 motion-safe:transition-all ${expanded ? 'rotate-180 opacity-100' : ''}`}
           aria-hidden="true"
         />
       </button>
 
-      {/* Expanded children */}
       {expanded && (
         <div
           id={panelId}
@@ -449,7 +432,6 @@ function PlanBlock({ group }: { group: GroupedBlock & { kind: 'plan' } }) {
       aria-label="Plan"
       className={`${borderColor} border-l-3 rounded-xl border border-separator/30 bg-surface/30 overflow-hidden motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2`}
     >
-      {/* Header */}
       <div className="flex items-center gap-2 px-4 py-2.5 border-b border-separator/30">
         <ClipboardList className="w-4 h-4 text-secondary shrink-0" aria-hidden="true" />
         <span className="text-sm font-medium text-foreground">Plan</span>
@@ -479,7 +461,6 @@ function PlanBlock({ group }: { group: GroupedBlock & { kind: 'plan' } }) {
         </button>
       </div>
 
-      {/* Content */}
       {expanded && (
         <div
           id={contentId}
@@ -495,7 +476,6 @@ function PlanBlock({ group }: { group: GroupedBlock & { kind: 'plan' } }) {
         </div>
       )}
 
-      {/* Approval footer when pending */}
       {isPending && (
         <div className="flex flex-col items-end gap-2 px-4 py-3 border-t border-separator/30">
           <div className="flex items-center gap-2">
@@ -551,7 +531,6 @@ function PlanBlock({ group }: { group: GroupedBlock & { kind: 'plan' } }) {
         </div>
       )}
 
-      {/* Status badge when already reviewed */}
       {!isPending && reviewStatus === 'approved' && (
         <div className="flex justify-end px-4 py-2 border-t border-separator/30">
           <Chip size="sm" variant="soft" color="success">

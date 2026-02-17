@@ -55,29 +55,24 @@ export function AsciiShipThinking() {
         Agent status: {message}
       </span>
 
-      {/* Wave scene container */}
       <div className="font-mono text-sm select-none" aria-hidden="true">
-        {/* Top wave line — ship sails here */}
         <div className="relative overflow-hidden h-[1.5em] w-[13ch]">
-          {/* Static wave characters */}
           <span className="text-secondary/40 motion-safe:animate-wave-shimmer">
             {'~~~~~~~~~~~~~~'}
           </span>
 
-          {/* Ship — outer span sails horizontally, inner span bobs vertically */}
+          {/** Ship -- outer span sails horizontally, inner span bobs vertically */}
           <span className="absolute top-0 motion-safe:animate-sail motion-reduce:left-[calc(50%-1ch)]">
             <span className="text-accent motion-safe:animate-ship-bob inline-block">{'>=>'}</span>
           </span>
         </div>
 
-        {/* Middle wave line — decorative depth, offset right */}
         <div className="overflow-hidden h-[1.3em] w-[13ch] -mt-0.5 pl-2">
           <span className="text-secondary/25 motion-safe:animate-wave-shimmer-delayed">
             {'~~~~~~~~~~~~'}
           </span>
         </div>
 
-        {/* Bottom wave line — decorative depth, offset left */}
         <div className="overflow-hidden h-[1.3em] w-[13ch] -mt-0.5">
           <span className="text-secondary/15 motion-safe:animate-wave-shimmer-slow">
             {'~~~~~~~~~~'}
@@ -85,7 +80,6 @@ export function AsciiShipThinking() {
         </div>
       </div>
 
-      {/* Cycling status text with crossfade */}
       <span
         className="text-xs text-muted mt-0.5 block motion-safe:transition-opacity motion-safe:duration-300"
         aria-hidden="true"

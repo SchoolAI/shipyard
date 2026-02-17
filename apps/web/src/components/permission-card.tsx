@@ -10,7 +10,7 @@ import { type Key, useCallback, useEffect, useRef, useState } from 'react';
 import { summarizeToolAction } from '../utils/tool-summarizers';
 
 function isToolRiskLevel(value: string): value is ToolRiskLevel {
-  return (TOOL_RISK_LEVELS as readonly string[]).includes(value);
+  return TOOL_RISK_LEVELS.some((level) => level === value);
 }
 
 interface PermissionCardProps {
@@ -109,7 +109,7 @@ export function PermissionCard({ toolUseId, request, onRespond }: PermissionCard
   try {
     formattedInput = JSON.stringify(JSON.parse(request.toolInput), null, 2);
   } catch {
-    /* raw string is fine */
+    /** raw string is fine */
   }
 
   return (
@@ -119,7 +119,6 @@ export function PermissionCard({ toolUseId, request, onRespond }: PermissionCard
       className={`border-l-3 ${borderClass} bg-surface rounded-xl border border-separator p-4 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2`}
       onKeyDown={handleKeyDown}
     >
-      {/* Top row: tool name + risk badge + timestamp */}
       <div className="flex items-center justify-between gap-2 mb-2">
         <div className="flex items-center gap-2 min-w-0">
           <Shield className="w-3.5 h-3.5 shrink-0 text-muted" aria-hidden="true" />
@@ -133,22 +132,18 @@ export function PermissionCard({ toolUseId, request, onRespond }: PermissionCard
         </span>
       </div>
 
-      {/* Summary line */}
       <p className="text-sm text-foreground/90 leading-relaxed mb-2 font-mono break-all">
         {summary}
       </p>
 
-      {/* Reason line (if present) */}
       {request.reason && (
         <p className="text-xs text-muted leading-relaxed mb-2">{request.reason}</p>
       )}
 
-      {/* Description (if present) */}
       {request.description && (
         <p className="text-xs text-muted leading-relaxed mb-2">{request.description}</p>
       )}
 
-      {/* Expandable detail: full toolInput */}
       <div className="mb-3">
         <button
           type="button"
@@ -174,9 +169,8 @@ export function PermissionCard({ toolUseId, request, onRespond }: PermissionCard
         )}
       </div>
 
-      {/* Action buttons */}
       <div className="flex items-center justify-end gap-2">
-        {/* Allow split button: main Allow + dropdown chevron for "Always allow" */}
+        {/** Split button pattern: main Allow + dropdown chevron for "Always allow" */}
         <div className="flex items-center">
           <Button
             ref={allowRef}

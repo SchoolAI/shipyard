@@ -290,7 +290,6 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
           />
         )}
 
-        {/* Stash indicator */}
         {stashedText && (
           <div
             role="status"
@@ -324,7 +323,6 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
           </div>
         )}
 
-        {/* Textarea area */}
         <div className="px-4 pt-2 pb-2">
           <textarea
             ref={textareaRef}
@@ -350,7 +348,6 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
           )}
         </div>
 
-        {/* Bottom toolbar */}
         <div className="flex items-center justify-between px-3 pb-2 gap-1">
           <div className="flex items-center gap-1 overflow-x-auto min-w-0">
             <AttachmentPopover />
@@ -370,7 +367,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
           </div>
 
           <div className="flex items-center gap-1 shrink-0">
-            {/* Voice input -- hidden on mobile and when unsupported */}
+            {/** Voice input -- hidden on mobile and when unsupported */}
             {isVoiceSupported === true && onVoiceToggle && (
               <div className="hidden sm:flex">
                 <Tooltip>

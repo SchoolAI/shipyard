@@ -21,7 +21,11 @@ function getBaseUrl(env: Env): string {
 }
 
 function escapeHtml(str: string): string {
-  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }
 
 export const authDeviceRoute = new Hono<{ Bindings: Env }>();
@@ -146,7 +150,10 @@ authDeviceRoute.get(ROUTES.AUTH_DEVICE_VERIFY, async (c) => {
     );
   }
 
-  logger.info('Device authorized', { userId: shipyardUser.id, displayName: shipyardUser.displayName });
+  logger.info('Device authorized', {
+    userId: shipyardUser.id,
+    displayName: shipyardUser.displayName,
+  });
 
   return c.html(`<!DOCTYPE html>
 <html>

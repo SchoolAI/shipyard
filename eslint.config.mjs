@@ -35,8 +35,6 @@ const localRules = {
       },
       create(context) {
         const sourceCode = context.sourceCode || context.getSourceCode();
-        const filename = context.filename || context.getFilename();
-        const isTsx = filename.endsWith('.tsx');
 
         return {
           Program() {
@@ -60,12 +58,6 @@ const localRules = {
                */
               const isJSDoc = comment.type === 'Block' && comment.value.startsWith('*');
               if (isJSDoc) continue;
-
-              /**
-               * Allow block comments in .tsx files since JSX requires {/* syntax.
-               * You can't use // in JSX, so these aren't bypass attempts.
-               */
-              if (isTsx && comment.type === 'Block') continue;
 
               const allowedPatterns = [
                 /^@ts-/,

@@ -55,7 +55,13 @@ describe('jwt', () => {
     const machineId = 'machine-xyz789';
 
     it('generates valid JWT with agent-specific claims', async () => {
-      const token = await generateAgentToken(mockUser, mockProviders, taskId, machineId, TEST_SECRET);
+      const token = await generateAgentToken(
+        mockUser,
+        mockProviders,
+        taskId,
+        machineId,
+        TEST_SECRET
+      );
       const decoded = decodeToken(token);
 
       expect(decoded).not.toBeNull();
@@ -67,7 +73,13 @@ describe('jwt', () => {
     });
 
     it('generates token with 24-hour expiration', async () => {
-      const token = await generateAgentToken(mockUser, mockProviders, taskId, machineId, TEST_SECRET);
+      const token = await generateAgentToken(
+        mockUser,
+        mockProviders,
+        taskId,
+        machineId,
+        TEST_SECRET
+      );
       const decoded = decodeToken(token);
 
       expect(decoded).not.toBeNull();
@@ -181,7 +193,13 @@ describe('jwt', () => {
     });
 
     it('validates agent token with scope and machineId', async () => {
-      const token = await generateAgentToken(mockUser, mockProviders, 'task-123', 'machine-456', TEST_SECRET);
+      const token = await generateAgentToken(
+        mockUser,
+        mockProviders,
+        'task-123',
+        'machine-456',
+        TEST_SECRET
+      );
       const claims = await validateToken(token, TEST_SECRET);
 
       expect(claims).not.toBeNull();

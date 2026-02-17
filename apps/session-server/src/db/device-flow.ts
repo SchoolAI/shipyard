@@ -32,7 +32,9 @@ export async function createDeviceSession(db: D1Database): Promise<DeviceSession
   const expiresAt = now + DEVICE_CODE_EXPIRY_MS;
 
   await db
-    .prepare('INSERT INTO pending_devices (device_code, user_code, created_at, expires_at) VALUES (?, ?, ?, ?)')
+    .prepare(
+      'INSERT INTO pending_devices (device_code, user_code, created_at, expires_at) VALUES (?, ?, ?, ?)'
+    )
     .bind(deviceCode, userCode, now, expiresAt)
     .run();
 
@@ -43,7 +45,11 @@ export async function createDeviceSession(db: D1Database): Promise<DeviceSession
  * Authorize a device session (called after user completes OAuth in browser).
  * Returns true if the user code was found and authorized.
  */
-export async function authorizeDevice(userCode: string, userId: string, db: D1Database): Promise<boolean> {
+export async function authorizeDevice(
+  userCode: string,
+  userId: string,
+  db: D1Database
+): Promise<boolean> {
   const now = Date.now();
   const result = await db
     .prepare(
@@ -63,7 +69,12 @@ export async function authorizeDevice(userCode: string, userId: string, db: D1Da
 export async function pollDeviceAuthorization(
   deviceCode: string,
   db: D1Database
-): Promise<{ status: 'pending' } | { status: 'authorized'; userId: string } | { status: 'expired' } | { status: 'not_found' }> {
+): Promise<
+  | { status: 'pending' }
+  | { status: 'authorized'; userId: string }
+  | { status: 'expired' }
+  | { status: 'not_found' }
+> {
   const row = await db
     .prepare('SELECT authorized_user_id, expires_at FROM pending_devices WHERE device_code = ?')
     .bind(deviceCode)
@@ -97,6 +108,9 @@ export async function findDeviceByUserCode(
  * Delete expired device sessions. Call periodically or on each request.
  */
 export async function cleanupExpiredDevices(db: D1Database): Promise<number> {
-  const result = await db.prepare('DELETE FROM pending_devices WHERE expires_at < ?').bind(Date.now()).run();
+  const result = await db
+    .prepare('DELETE FROM pending_devices WHERE expires_at < ?')
+    .bind(Date.now())
+    .run();
   return result.meta.changes ?? 0;
 }

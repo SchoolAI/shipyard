@@ -12,7 +12,7 @@
     "lint:comments": "bash scripts/lint-comments.sh",
     "lint:typeassertions": "bash scripts/lint-typeassertions.sh",
     "lint:fix": "turbo run lint:fix",
-    "check": "bash scripts/validate-file-allowlist.sh && turbo run typecheck lint --filter='!@shipyard/session-server'",
+    "check": "bash scripts/validate-file-allowlist.sh && turbo run typecheck lint && pnpm lint:comments && pnpm lint:typeassertions",
     "setup": "bash scripts/setup.sh",
     "setup:secrets": "bash scripts/setup-secrets.sh",
     "setup:login": "bash scripts/setup-login.sh",

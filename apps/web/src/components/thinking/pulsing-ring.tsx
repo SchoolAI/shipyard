@@ -43,13 +43,11 @@ export function PulsingRingThinking() {
 
   return (
     <div className="inline-flex items-center gap-2 h-5">
-      {/* Decorative ring with conic-gradient sweep */}
       <div className="relative size-4 shrink-0 motion-reduce:opacity-60" aria-hidden="true">
         <div className="absolute inset-0 rounded-full bg-secondary/30 motion-reduce:bg-secondary/50" />
         <div className="absolute inset-0 rounded-full ring-sweep-gradient motion-safe:animate-ring-sweep motion-reduce:hidden" />
       </div>
 
-      {/* Status text with crossfade */}
       <span
         role="status"
         aria-live="polite"

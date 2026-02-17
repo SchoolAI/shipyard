@@ -34,7 +34,7 @@ export function AuthGate({ children }: AuthGateProps) {
     const params = getOAuthParamsFromUrl();
     if (!params) return;
 
-    // Clean URL immediately to prevent re-processing on re-render
+    /** Clean URL immediately to prevent re-processing on re-render */
     history.replaceState(null, '', window.location.pathname);
 
     if (!validateOAuthState(params.state)) {

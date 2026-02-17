@@ -88,9 +88,7 @@ function resolveTerminalCwd(
       const json = handle.doc.toJSON();
       const lastUserMsg = [...json.conversation].reverse().find((m) => m.role === 'user');
       if (lastUserMsg?.cwd) return lastUserMsg.cwd;
-    } catch {
-      // Skip if doc not available
-    }
+    } catch {}
   }
 
   for (const taskId of watchedTasks.keys()) {
@@ -102,9 +100,7 @@ function resolveTerminalCwd(
       const json = handle.doc.toJSON();
       const lastUserMsg = [...json.conversation].reverse().find((m) => m.role === 'user');
       if (lastUserMsg?.cwd) return lastUserMsg.cwd;
-    } catch {
-      // Skip if doc not available
-    }
+    } catch {}
   }
 
   return process.cwd();
@@ -233,9 +229,7 @@ export async function serve(env: Env): Promise<void> {
         for (const chunk of pendingBuffer) {
           try {
             channel.send(chunk);
-          } catch {
-            // Channel may have closed during flush
-          }
+          } catch {}
         }
         pendingBuffer.length = 0;
         pendingBufferBytes = 0;
@@ -245,9 +239,7 @@ export async function serve(env: Env): Promise<void> {
         if (channelOpen) {
           try {
             channel.send(data);
-          } catch {
-            // Channel may have closed between check and send
-          }
+          } catch {}
         } else {
           const byteLen = Buffer.byteLength(data);
           if (pendingBufferBytes + byteLen > TERMINAL_BUFFER_MAX_BYTES) {
@@ -308,9 +300,7 @@ export async function serve(env: Env): Promise<void> {
         for (const input of preSpawnInputBuffer) {
           try {
             ptyManager.write(input);
-          } catch {
-            // PTY may have exited
-          }
+          } catch {}
         }
         preSpawnInputBuffer.length = 0;
 
@@ -360,9 +350,7 @@ export async function serve(env: Env): Promise<void> {
         }
         try {
           ptyManager.write(raw);
-        } catch {
-          // PTY may have exited
-        }
+        } catch {}
       }
 
       channel.onmessage = (event) => {
@@ -436,6 +424,7 @@ export async function serve(env: Env): Promise<void> {
       signaling,
       connection,
       repo,
+      // eslint-disable-next-line no-restricted-syntax -- loro-extended generic erasure requires cast from TypedDoc<never> to concrete shape
       roomDoc: roomHandle.doc as TypedDoc<TaskIndexDocumentShape>,
       lifecycle,
       activeTasks,
@@ -677,8 +666,8 @@ function handleMessage(msg: PersonalRoomServerMessage, ctx: MessageHandlerContex
     case 'webrtc-answer': {
       const answerFrom = msg.fromMachineId ?? msg.targetMachineId;
       ctx.log.debug({ from: answerFrom }, 'Received WebRTC answer');
-      // eslint-disable-next-line no-restricted-syntax -- WebRTC payloads are opaque (z.unknown) bridged to node-datachannel API
       ctx.peerManager
+        // eslint-disable-next-line no-restricted-syntax -- WebRTC payloads are opaque (z.unknown) bridged to node-datachannel API
         .handleAnswer(answerFrom, msg.answer as SDPDescription)
         .catch((err: unknown) => {
           ctx.log.error({ err, from: answerFrom }, 'Failed to handle WebRTC answer');

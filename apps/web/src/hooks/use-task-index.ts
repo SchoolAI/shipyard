@@ -72,8 +72,10 @@ export function useTaskIndex(userId: string | null): TaskIndexResult {
 
   const stableRef = useRef<Record<string, TaskIndexEntry>>(EMPTY_INDEX);
 
-  // Return a stable reference when the data hasn't actually changed,
-  // avoiding unnecessary downstream re-renders from toJSON() producing new objects.
+  /*
+   * Return a stable reference when the data hasn't actually changed,
+   * avoiding unnecessary downstream re-renders from toJSON() producing new objects.
+   */
   const taskIndex = useMemo(() => {
     if (!rawTaskIndex) return stableRef.current;
     if (taskIndexEqual(rawTaskIndex, stableRef.current)) return stableRef.current;
@@ -92,6 +94,7 @@ export function useTaskIndex(userId: string | null): TaskIndexResult {
   return {
     taskIndex,
     isLoading: !rawTaskIndex,
+    // eslint-disable-next-line no-restricted-syntax -- loro-extended Handle.doc is loosely typed; cast needed to expose schema-specific fields
     doc: handle.doc as TypedDoc<TaskIndexDocumentShape>,
   };
 }

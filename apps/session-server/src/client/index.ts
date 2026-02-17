@@ -23,7 +23,6 @@
  * @module client
  */
 
-import { ROUTES } from './routes';
 import {
   type AuthGitHubCallbackRequest,
   AuthGitHubCallbackRequestSchema,
@@ -39,6 +38,7 @@ import {
   type ValidationErrorResponse,
   ValidationErrorResponseSchema,
 } from '@shipyard/session';
+import { ROUTES } from './routes';
 
 export { ROUTE_DESCRIPTIONS, ROUTES } from './routes';
 

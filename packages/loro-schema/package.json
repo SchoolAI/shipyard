@@ -17,10 +17,10 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
-    "lint": "biome check src && eslint 'src/**/*.ts' --no-warn-ignored --report-unused-disable-directives-severity=off --max-warnings 0",
+    "lint": "biome check src",
     "lint:fix": "biome check src --write",
-    "lint:typeassertions": "eslint 'src/**/*.ts' --no-warn-ignored --report-unused-disable-directives-severity=off --max-warnings 0",
-    "check": "pnpm typecheck && pnpm lint && pnpm test && pnpm build"
+    "check": "pnpm typecheck && pnpm lint && pnpm test && pnpm build",
+    "analyze:fan-in": "tsx ../../scripts/analyze-fan-in.ts"
   },
   "dependencies": {
     "@loro-extended/change": "catalog:",
@@ -34,6 +34,7 @@
   "devDependencies": {
     "@types/node": "catalog:",
     "bunup": "catalog:",
+    "tsx": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:",
     "loro-crdt": "catalog:"

@@ -25,7 +25,10 @@ vi.mock('../db/index', () => ({
 }));
 
 vi.mock('../db/device-flow', () => {
-  const sessions = new Map<string, { deviceCode: string; userCode: string; expiresAt: number; authorizedUserId: string | null }>();
+  const sessions = new Map<
+    string,
+    { deviceCode: string; userCode: string; expiresAt: number; authorizedUserId: string | null }
+  >();
 
   return {
     cleanupExpiredDevices: vi.fn().mockResolvedValue(0),
@@ -93,7 +96,11 @@ describe('Device Flow', () => {
 
   describe(`GET ${ROUTES.AUTH_DEVICE_VERIFY}`, () => {
     it('returns HTML page for valid user code', async () => {
-      const res = await app.request(`${ROUTES.AUTH_DEVICE_VERIFY}?code=ABCD-1234`, { method: 'GET' }, env);
+      const res = await app.request(
+        `${ROUTES.AUTH_DEVICE_VERIFY}?code=ABCD-1234`,
+        { method: 'GET' },
+        env
+      );
 
       expect(res.status).toBe(200);
       const html = await res.text();
@@ -111,7 +118,11 @@ describe('Device Flow', () => {
       const { findDeviceByUserCode } = await import('../db/device-flow');
       vi.mocked(findDeviceByUserCode).mockResolvedValueOnce(null);
 
-      const res = await app.request(`${ROUTES.AUTH_DEVICE_VERIFY}?code=XXXX-9999`, { method: 'GET' }, env);
+      const res = await app.request(
+        `${ROUTES.AUTH_DEVICE_VERIFY}?code=XXXX-9999`,
+        { method: 'GET' },
+        env
+      );
       expect(res.status).toBe(400);
       const html = await res.text();
       expect(html).toContain('Invalid or expired code');

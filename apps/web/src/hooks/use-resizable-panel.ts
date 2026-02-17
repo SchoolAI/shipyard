@@ -143,7 +143,6 @@ export function useResizablePanel({
       if (!(target instanceof HTMLElement)) return;
       target.setPointerCapture(e.pointerId);
 
-      // Disable CSS transitions for the duration of the drag + settle.
       panel.style.transition = 'none';
 
       const actualWidth = panel.getBoundingClientRect().width;
@@ -188,16 +187,18 @@ export function useResizablePanel({
         const finalWidth = state.currentWidth;
         dragStateRef.current = null;
 
-        // Keep the inline width as a bridge — it will be removed by the
-        // settling effect once React has rendered with the correct value.
+        /*
+         * Keep the inline width as a bridge — it will be removed by the
+         * settling effect once React has rendered with the correct value.
+         */
         panel.style.width = `${finalWidth}px`;
-        // Keep transition: none — also removed by settling effect.
-
         settleTargetRef.current = finalWidth;
 
-        // Update the store and transition to settling phase.
-        // We do NOT remove the inline style here — that's the settling
-        // effect's job, ensuring React has had a chance to render first.
+        /*
+         * Update the store and transition to settling phase.
+         * We do NOT remove the inline style here — that's the settling
+         * effect's job, ensuring React has had a chance to render first.
+         */
         onWidthChangeRef.current(finalWidth);
         setIsDragging(false);
         setIsSettling(true);
@@ -253,9 +254,11 @@ export function useResizablePanel({
     width: isOpen ? clampedWidth : 0,
   };
 
-  // While dragging or settling, the panel should not have CSS transitions.
-  // The className in the consumer checks `isDragging` — we extend that to
-  // cover settling too.
+  /*
+   * While dragging or settling, the panel should not have CSS transitions.
+   * The className in the consumer checks `isDragging` — we extend that to
+   * cover settling too.
+   */
   const suppressTransition = isDragging || isSettling;
 
   const separatorProps = {

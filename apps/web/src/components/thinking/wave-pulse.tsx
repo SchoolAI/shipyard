@@ -23,7 +23,6 @@ export function WavePulseThinking() {
     <div className="flex flex-col items-start gap-1.5 py-1" role="status">
       <span className="sr-only">Agent is thinking</span>
 
-      {/* Decorative wave lines */}
       <div className="flex flex-col gap-1" aria-hidden="true">
         <span
           className="h-[2px] rounded-full bg-secondary motion-safe:animate-wave-pulse"

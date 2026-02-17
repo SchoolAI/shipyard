@@ -2,10 +2,10 @@
 set -e
 
 EXCLUDE_PATTERNS=(
-  "node_modules"
-  "dist"
-  "build"
-  ".wrangler"
+  "**/node_modules/**"
+  "**/dist/**"
+  "**/build/**"
+  "**/.wrangler/**"
   "*.config.*"
   "spikes"
 )
@@ -20,6 +20,13 @@ ALLOWED_PREFIXES=(
   "@ts-"
   "biome-ignore"
 )
+
+if [[ " $* " == *" --fix "* ]]; then
+  echo "❌ --fix is not allowed for comment linting."
+  echo "   Comment violations must be fixed manually (delete or convert to JSDoc)."
+  echo "   Auto-fix would reformat noisy comments instead of deleting them."
+  exit 1
+fi
 
 echo "🔍 Checking comment style (ESLint)..."
 
