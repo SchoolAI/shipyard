@@ -56,9 +56,10 @@ export function useVerticalResizablePanel<T extends HTMLElement = HTMLElement>({
 }: UseVerticalResizablePanelOptions): UseVerticalResizablePanelReturn<T> {
   const panelRef = useRef<T | null>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [isSettling, setIsSettling] = useState(false);
   const onHeightChangeRef = useRef(onHeightChange);
   onHeightChangeRef.current = onHeightChange;
+
+  const transitionRafRef = useRef<number | null>(null);
 
   const dragStateRef = useRef<{
     initialClientY: number;
@@ -79,22 +80,12 @@ export function useVerticalResizablePanel<T extends HTMLElement = HTMLElement>({
         cancelAnimationFrame(state.rafId);
       }
       dragStateRef.current = null;
+      if (transitionRafRef.current != null) {
+        cancelAnimationFrame(transitionRafRef.current);
+        transitionRafRef.current = null;
+      }
     };
   }, []);
-
-  useEffect(() => {
-    if (!isSettling) return;
-    const panel = panelRef.current;
-    if (!panel) {
-      setIsSettling(false);
-      return;
-    }
-    requestAnimationFrame(() => {
-      panel.style.removeProperty('height');
-      panel.style.removeProperty('transition');
-      setIsSettling(false);
-    });
-  }, [isSettling]);
 
   const handlePointerDown = useCallback(
     (e: PointerEvent) => {
@@ -106,6 +97,11 @@ export function useVerticalResizablePanel<T extends HTMLElement = HTMLElement>({
       const target = e.currentTarget;
       if (!(target instanceof HTMLElement)) return;
       target.setPointerCapture(e.pointerId);
+
+      if (transitionRafRef.current != null) {
+        cancelAnimationFrame(transitionRafRef.current);
+        transitionRafRef.current = null;
+      }
 
       panel.style.transition = 'none';
 
@@ -151,11 +147,15 @@ export function useVerticalResizablePanel<T extends HTMLElement = HTMLElement>({
         const finalHeight = state.currentHeight;
         dragStateRef.current = null;
 
-        panel.style.height = `${finalHeight}px`;
-
         onHeightChangeRef.current(finalHeight);
         setIsDragging(false);
-        setIsSettling(true);
+
+        transitionRafRef.current = requestAnimationFrame(() => {
+          if (panelRef.current) {
+            panelRef.current.style.removeProperty('transition');
+          }
+          transitionRafRef.current = null;
+        });
       };
 
       target.addEventListener('pointermove', onPointerMove);
@@ -207,7 +207,7 @@ export function useVerticalResizablePanel<T extends HTMLElement = HTMLElement>({
       : 0;
 
   const panelStyle: CSSProperties = {
-    height: isOpen ? (isSettling ? undefined : clampedHeight) : 0,
+    height: isOpen ? clampedHeight : 0,
   };
 
   const separatorProps = {
@@ -232,5 +232,5 @@ export function useVerticalResizablePanel<T extends HTMLElement = HTMLElement>({
     ].join(' '),
   };
 
-  return { panelRef, separatorProps, panelStyle, isDragging: isDragging || isSettling };
+  return { panelRef, separatorProps, panelStyle, isDragging };
 }
