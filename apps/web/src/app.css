@@ -500,7 +500,6 @@ html, body {
   padding: 0.5rem 0.75rem;
   border: 1px solid var(--separator);
   color: var(--foreground);
-  background: var(--default);
   background: color-mix(in oklch, var(--default) 50%, transparent);
 }
 
@@ -523,6 +522,10 @@ html, body {
   padding: 0.0625rem 0;
   cursor: pointer;
   border-radius: 0.125rem;
+}
+
+.plan-editor .ProseMirror .comment-mark--active {
+  background: color-mix(in oklch, var(--warning) 35%, transparent);
 }
 
 /* -- First child margin reset (avoid gap at top of editor) -- */

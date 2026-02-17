@@ -1,14 +1,16 @@
+export { PlanCommentWidget };
+
 import { Button, Tooltip } from '@heroui/react';
-import type { DiffComment } from '@shipyard/loro-schema';
+import type { PlanComment } from '@shipyard/loro-schema';
 import { Check, Trash2 } from 'lucide-react';
 import { useCallback } from 'react';
 import { formatRelativeTimestamp } from '../../utils/format-timestamp';
 
-interface DiffCommentWidgetProps {
-  comments: DiffComment[];
+interface PlanCommentWidgetProps {
+  comments: PlanComment[];
   onResolve: (commentId: string) => void;
   onDelete: (commentId: string) => void;
-  showResolved: boolean;
+  showResolved?: boolean;
 }
 
 function CommentItem({
@@ -16,7 +18,7 @@ function CommentItem({
   onResolve,
   onDelete,
 }: {
-  comment: DiffComment;
+  comment: PlanComment;
   onResolve: (commentId: string) => void;
   onDelete: (commentId: string) => void;
 }) {
@@ -95,12 +97,12 @@ function CommentItem({
   );
 }
 
-export function DiffCommentWidget({
+function PlanCommentWidget({
   comments,
   onResolve,
   onDelete,
-  showResolved,
-}: DiffCommentWidgetProps) {
+  showResolved = false,
+}: PlanCommentWidgetProps) {
   const visibleComments = showResolved ? comments : comments.filter((c) => c.resolvedAt === null);
 
   if (visibleComments.length === 0) return null;

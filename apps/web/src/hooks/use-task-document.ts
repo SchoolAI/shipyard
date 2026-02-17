@@ -12,6 +12,7 @@ import {
   type PermissionRequest,
   PermissionRequestEphemeral,
   PermissionResponseEphemeral,
+  type PlanComment,
   type PlanVersion,
   type SessionEntry,
   TaskDocumentSchema,
@@ -66,6 +67,17 @@ export interface TaskDocumentResult {
   }) => string;
   resolveDiffComment: (commentId: string) => void;
   deleteDiffComment: (commentId: string) => void;
+  planComments: PlanComment[];
+  addPlanComment: (comment: {
+    commentId?: string;
+    planId: string;
+    from: number;
+    to: number;
+    body: string;
+    authorId: string;
+  }) => string;
+  resolvePlanComment: (commentId: string) => void;
+  deletePlanComment: (commentId: string) => void;
   isLoading: boolean;
 }
 
@@ -106,6 +118,16 @@ export function useTaskDocument(taskId: string | null): TaskDocumentResult {
   const diffComments = useMemo(
     () => Object.values(diffCommentsRecord).sort((a, b) => a.createdAt - b.createdAt),
     [diffCommentsRecord]
+  );
+
+  const planCommentsRecord = useDoc(
+    handle,
+    (d: { planComments: Record<string, PlanComment> }) => d.planComments
+  );
+
+  const planComments = useMemo(
+    () => Object.values(planCommentsRecord).sort((a, b) => a.createdAt - b.createdAt),
+    [planCommentsRecord]
   );
 
   const lastUserConfig = useMemo((): LastUserConfig | null => {
@@ -236,6 +258,58 @@ export function useTaskDocument(taskId: string | null): TaskDocumentResult {
     [handle]
   );
 
+  const addPlanComment = useCallback(
+    (comment: {
+      commentId?: string;
+      planId: string;
+      from: number;
+      to: number;
+      body: string;
+      authorId: string;
+    }): string => {
+      const commentId = comment.commentId ?? crypto.randomUUID();
+      const { commentId: _discarded, ...commentFields } = comment;
+      // eslint-disable-next-line no-restricted-syntax -- loro-extended generics require explicit cast
+      change(handle.doc as unknown as TypedDoc<TaskDocumentShape>, (draft) => {
+        draft.planComments.set(commentId, {
+          commentId,
+          ...commentFields,
+          authorType: 'human',
+          createdAt: Date.now(),
+          resolvedAt: null,
+        });
+      });
+      return commentId;
+    },
+    [handle]
+  );
+
+  const resolvePlanComment = useCallback(
+    (commentId: string) => {
+      // eslint-disable-next-line no-restricted-syntax -- loro-extended generics require explicit cast
+      change(handle.doc as unknown as TypedDoc<TaskDocumentShape>, (draft) => {
+        const existing = draft.planComments.get(commentId);
+        if (existing) {
+          draft.planComments.set(commentId, {
+            ...existing,
+            resolvedAt: Date.now(),
+          });
+        }
+      });
+    },
+    [handle]
+  );
+
+  const deletePlanComment = useCallback(
+    (commentId: string) => {
+      // eslint-disable-next-line no-restricted-syntax -- loro-extended generics require explicit cast
+      change(handle.doc as unknown as TypedDoc<TaskDocumentShape>, (draft) => {
+        draft.planComments.delete(commentId);
+      });
+    },
+    [handle]
+  );
+
   if (!taskId) {
     return {
       meta: null,
@@ -250,6 +324,10 @@ export function useTaskDocument(taskId: string | null): TaskDocumentResult {
       addDiffComment: () => '',
       resolveDiffComment: () => {},
       deleteDiffComment: () => {},
+      planComments: [],
+      addPlanComment: () => '',
+      resolvePlanComment: () => {},
+      deletePlanComment: () => {},
       isLoading: false,
     };
   }
@@ -267,6 +345,10 @@ export function useTaskDocument(taskId: string | null): TaskDocumentResult {
     addDiffComment,
     resolveDiffComment,
     deleteDiffComment,
+    planComments,
+    addPlanComment,
+    resolvePlanComment,
+    deletePlanComment,
     isLoading: !meta,
   };
 }

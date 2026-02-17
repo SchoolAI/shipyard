@@ -10,7 +10,7 @@ export function createLoroSyncExtension(loroDoc: LoroDoc, containerId: Container
       // eslint-disable-next-line no-restricted-syntax -- loro-prosemirror requires LoroDocType which is structurally identical to LoroDoc but nominally distinct
       const typedDoc = loroDoc as unknown as LoroDocType;
 
-      return [LoroSyncPlugin({ doc: typedDoc, containerId }), LoroUndoPlugin({ doc: loroDoc })];
+      return [LoroSyncPlugin({ doc: typedDoc, containerId }), LoroUndoPlugin({ doc: typedDoc })];
     },
 
     addKeyboardShortcuts() {
