@@ -30,8 +30,9 @@ export async function createSignalingHandle(
     return null;
   }
 
-  const machineId = env.SHIPYARD_MACHINE_ID ?? hostname();
-  const machineName = env.SHIPYARD_MACHINE_NAME ?? hostname();
+  const devSuffix = env.SHIPYARD_DEV ? '-dev' : '';
+  const machineId = env.SHIPYARD_MACHINE_ID ?? `${hostname()}${devSuffix}`;
+  const machineName = env.SHIPYARD_MACHINE_NAME ?? `${hostname()}${devSuffix}`;
   const wsUrl = new URL(env.SHIPYARD_SIGNALING_URL);
 
   if (!wsUrl.pathname.includes('/personal/')) {

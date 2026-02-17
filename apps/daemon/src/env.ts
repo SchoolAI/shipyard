@@ -2,7 +2,7 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { z } from 'zod';
 
-function isDevMode(): boolean {
+export function isDevMode(): boolean {
   return process.env.SHIPYARD_DEV === '1' || process.env.SHIPYARD_DEV === 'true';
 }
 

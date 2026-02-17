@@ -1,9 +1,11 @@
 import { ROUTES } from '@shipyard/session';
 import { z } from 'zod';
 import { getConfigPath, readConfig, type ShipyardConfig, writeConfig } from '../auth.js';
+import { isDevMode } from '../env.js';
 import { print, printError } from './output.js';
 
 const DEFAULT_SIGNALING_URL = 'https://shipyard-session-server.jacob-191.workers.dev';
+const DEFAULT_DEV_SIGNALING_URL = 'http://localhost:4444';
 
 const DeviceStartResponseSchema = z.object({
   deviceCode: z.string(),
@@ -31,7 +33,9 @@ export async function loginCommand(options: { check?: boolean }): Promise<void> 
     return checkLogin();
   }
 
-  const signalingUrl = process.env.SHIPYARD_SIGNALING_URL ?? DEFAULT_SIGNALING_URL;
+  const signalingUrl =
+    process.env.SHIPYARD_SIGNALING_URL ??
+    (isDevMode() ? DEFAULT_DEV_SIGNALING_URL : DEFAULT_SIGNALING_URL);
   const startData = await startDeviceFlow(signalingUrl);
 
   print(`  Open this URL in your browser:\n`);

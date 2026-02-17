@@ -155,7 +155,8 @@ export async function serve(env: Env): Promise<void> {
   const activeTasks = new Map<string, ActiveTask>();
   const watchedTasks = new Map<string, () => void>();
 
-  const machineId = env.SHIPYARD_MACHINE_ID ?? hostname();
+  const devSuffix = env.SHIPYARD_DEV ? '-dev' : '';
+  const machineId = env.SHIPYARD_MACHINE_ID ?? `${hostname()}${devSuffix}`;
 
   const dataDir = resolve(env.SHIPYARD_DATA_DIR.replace('~', homedir()));
   await mkdir(dataDir, { recursive: true, mode: 0o700 });
