@@ -96,10 +96,19 @@ function seedComposerState(
   if (config.cwd) target.setEnvironment(config.cwd);
 }
 
-/** Wrap a plain text string into a ContentBlock[] for the legacy message store path. */
-function toContentBlocks(text: string): ContentBlock[] {
-  if (!text) return [];
-  return [{ type: 'text' as const, text }];
+/** Wrap a plain text + images into ContentBlock[] for the legacy message store path. */
+function toContentBlocks(text: string, images?: SubmitPayload['images']): ContentBlock[] {
+  const blocks: ContentBlock[] = [];
+  if (text) blocks.push({ type: 'text' as const, text });
+  if (images) {
+    for (const img of images) {
+      blocks.push({
+        type: 'image' as const,
+        source: { type: 'base64' as const, mediaType: img.mediaType, data: img.data },
+      });
+    }
+  }
+  return blocks;
 }
 
 function getSubmitDisabledReason(
@@ -591,10 +600,19 @@ export function ChatPage() {
           draft.meta.status = 'submitted';
           draft.meta.updatedAt = now;
 
+          const contentBlocks: ContentBlock[] = [];
+          if (message) contentBlocks.push({ type: 'text', text: message });
+          for (const img of payload.images) {
+            contentBlocks.push({
+              type: 'image',
+              source: { type: 'base64', mediaType: img.mediaType, data: img.data },
+            });
+          }
+
           draft.conversation.push({
             messageId: crypto.randomUUID(),
             role: 'user',
-            content: [{ type: 'text', text: message }],
+            content: contentBlocks,
             timestamp: now,
             model: model || null,
             machineId: selectedMachineId ?? null,
@@ -744,6 +762,7 @@ export function ChatPage() {
                     onSuggestionClick={(text) =>
                       handleSubmit({
                         message: text,
+                        images: [],
                         model: composerModel,
                         reasoningEffort: composerReasoning,
                         permissionMode: composerPermission,

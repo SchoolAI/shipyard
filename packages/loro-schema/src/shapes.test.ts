@@ -183,6 +183,62 @@ describe('TaskDocumentSchema', () => {
       }
     });
 
+    it('supports image blocks with base64 source', () => {
+      doc.conversation.push({
+        messageId: 'msg-img',
+        role: 'user',
+        content: [
+          {
+            type: 'image',
+            source: { type: 'base64', mediaType: 'image/png', data: 'iVBOR...' },
+          },
+        ],
+        timestamp: now,
+        model: null,
+        machineId: null,
+        reasoningEffort: null,
+        permissionMode: null,
+        cwd: null,
+      });
+
+      const json = doc.toJSON();
+      expect(json.conversation).toHaveLength(1);
+      const block = json.conversation[0]?.content[0];
+      expect(block?.type).toBe('image');
+      if (block?.type === 'image') {
+        expect(block.source.type).toBe('base64');
+        if (block.source.type === 'base64') {
+          expect(block.source.mediaType).toBe('image/png');
+          expect(block.source.data).toBe('iVBOR...');
+        }
+      }
+    });
+
+    it('supports mixed text and image content', () => {
+      doc.conversation.push({
+        messageId: 'msg-mixed-img',
+        role: 'user',
+        content: [
+          { type: 'text', text: 'Check this screenshot' },
+          {
+            type: 'image',
+            source: { type: 'base64', mediaType: 'image/jpeg', data: '/9j/4AAQ...' },
+          },
+        ],
+        timestamp: now,
+        model: null,
+        machineId: null,
+        reasoningEffort: null,
+        permissionMode: null,
+        cwd: null,
+      });
+
+      const json = doc.toJSON();
+      expect(json.conversation[0]?.content).toHaveLength(2);
+      expect(json.conversation[0]?.content[0]?.type).toBe('text');
+      expect(json.conversation[0]?.content[1]?.type).toBe('image');
+    });
+
     it('supports messages with mixed content blocks', () => {
       doc.conversation.push({
         messageId: 'msg-6',

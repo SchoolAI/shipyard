@@ -10,6 +10,10 @@ function thinking(t: string): ContentBlock {
   return { type: 'thinking', text: t };
 }
 
+function image(mediaType = 'image/png', data = 'iVBOR...'): ContentBlock {
+  return { type: 'image', source: { type: 'base64', mediaType, data } };
+}
+
 function toolUse(
   id: string,
   name: string,
@@ -34,6 +38,24 @@ describe('groupContentBlocks', () => {
     expect(grouped).toHaveLength(3);
     expect(grouped[0]?.kind).toBe('text');
     expect(grouped[1]?.kind).toBe('thinking');
+    expect(grouped[2]?.kind).toBe('text');
+  });
+
+  it('passes image blocks through as image kind', () => {
+    const blocks: ContentBlock[] = [image()];
+    const grouped = groupContentBlocks(blocks);
+    expect(grouped).toHaveLength(1);
+    expect(grouped[0]?.kind).toBe('image');
+    const img = grouped[0] as GroupedBlock & { kind: 'image' };
+    expect(img.block.source.type).toBe('base64');
+  });
+
+  it('handles mixed text and image blocks', () => {
+    const blocks: ContentBlock[] = [text('Check this'), image(), text('See above')];
+    const grouped = groupContentBlocks(blocks);
+    expect(grouped).toHaveLength(3);
+    expect(grouped[0]?.kind).toBe('text');
+    expect(grouped[1]?.kind).toBe('image');
     expect(grouped[2]?.kind).toBe('text');
   });
 

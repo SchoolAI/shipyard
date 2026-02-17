@@ -15,7 +15,22 @@ export const EpochDocumentSchema = Shape.doc({
  * MCP-aligned content block types.
  * Matches Claude SDK message structure for direct mapping without translation.
  */
-const CONTENT_BLOCK_TYPES = ['text', 'tool_use', 'tool_result', 'thinking'] as const;
+const CONTENT_BLOCK_TYPES = ['text', 'tool_use', 'tool_result', 'thinking', 'image'] as const;
+
+const IMAGE_SOURCE_TYPES = ['base64'] as const;
+
+/**
+ * Image source discriminated union.
+ * Discriminated by 'type' — currently only 'base64' (inline).
+ * Future: add 'url' variant for GitHub branch CDN storage.
+ */
+const ImageSourceShape = Shape.plain.discriminatedUnion('type', {
+  base64: Shape.plain.struct({
+    type: Shape.plain.string('base64'),
+    mediaType: Shape.plain.string(),
+    data: Shape.plain.string(),
+  }),
+});
 
 /**
  * Content block discriminated union (MCP-aligned).
@@ -43,6 +58,10 @@ export const ContentBlockShape = Shape.plain.discriminatedUnion('type', {
   thinking: Shape.plain.struct({
     type: Shape.plain.string('thinking'),
     text: Shape.plain.string(),
+  }),
+  image: Shape.plain.struct({
+    type: Shape.plain.string('image'),
+    source: ImageSourceShape,
   }),
 });
 
@@ -205,10 +224,13 @@ export type DiffComment = Infer<typeof DiffCommentShape>;
 export type CommentAuthorType = (typeof COMMENT_AUTHOR_TYPES)[number];
 export type DiffCommentSide = (typeof DIFF_COMMENT_SIDES)[number];
 export type DiffCommentScope = (typeof DIFF_COMMENT_SCOPES)[number];
+export type ImageSourceType = (typeof IMAGE_SOURCE_TYPES)[number];
+export type ImageSource = Infer<typeof ImageSourceShape>;
 export {
   A2A_TASK_STATES,
   COMMENT_AUTHOR_TYPES,
   CONTENT_BLOCK_TYPES,
+  IMAGE_SOURCE_TYPES,
   DIFF_COMMENT_SCOPES,
   DIFF_COMMENT_SIDES,
   PERMISSION_MODES,
