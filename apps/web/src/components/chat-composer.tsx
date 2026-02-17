@@ -8,7 +8,10 @@ import type { GitRepoInfo, ModelInfo } from '../hooks/use-machine-selection';
 import type { SlashCommandAction } from '../hooks/use-slash-commands';
 import { useSlashCommands } from '../hooks/use-slash-commands';
 import { assertNever } from '../utils/assert-never';
+import type { ImageAttachment } from '../utils/image-utils';
+import { extractImagesFromClipboard, processImageFile } from '../utils/image-utils';
 import { AttachmentPopover } from './composer/attachment-popover';
+import { ImagePreview } from './composer/image-preview';
 import { ModelPicker, useModelPicker } from './composer/model-picker';
 import { PermissionModePicker } from './composer/permission-mode-picker';
 import { ReasoningEffort, type ReasoningLevel } from './composer/reasoning-effort';
@@ -16,6 +19,7 @@ import { SlashCommandMenu } from './composer/slash-command-menu';
 
 export interface SubmitPayload {
   message: string;
+  images: ImageAttachment[];
   model: string;
   reasoningEffort: ReasoningLevel;
   permissionMode: PermissionMode;
@@ -72,6 +76,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
   ref
 ) {
   const [value, setValue] = useState('');
+  const [images, setImages] = useState<ImageAttachment[]>([]);
   const [stashedText, setStashedText] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { models, reasoning } = useModelPicker(availableModels, selectedModelId);
@@ -192,24 +197,48 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
     [adjustHeight, slashCommands]
   );
 
+  const addImages = useCallback(async (files: File[]) => {
+    const results = await Promise.allSettled(files.map(processImageFile));
+    const successful = results
+      .filter((r): r is PromiseFulfilledResult<ImageAttachment> => r.status === 'fulfilled')
+      .map((r) => r.value);
+    if (successful.length > 0) {
+      setImages((prev) => [...prev, ...successful]);
+    }
+  }, []);
+
+  const handlePaste = useCallback(
+    (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+      const imageFiles = extractImagesFromClipboard(e.clipboardData);
+      if (imageFiles.length > 0) {
+        e.preventDefault();
+        addImages(imageFiles);
+      }
+    },
+    [addImages]
+  );
+
   const handleSubmit = useCallback(() => {
     if (isSubmitDisabled) return;
     const trimmed = value.trim();
-    if (!trimmed) return;
+    if (!trimmed && images.length === 0) return;
 
     onSubmit({
       message: trimmed,
+      images,
       model: selectedModelId,
       reasoningEffort: reasoningLevel,
       permissionMode,
     });
     setValue('');
+    setImages([]);
     slashCommands.close();
     resetTextareaHeight();
     requestAnimationFrame(() => restoreStash());
   }, [
     isSubmitDisabled,
     value,
+    images,
     onSubmit,
     slashCommands,
     selectedModelId,
@@ -275,7 +304,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
     [handleSubmit, slashCommands]
   );
 
-  const isEmpty = value.trim().length === 0;
+  const isEmpty = value.trim().length === 0 && images.length === 0;
 
   return (
     <div className="w-full pb-1">
@@ -323,12 +352,18 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
           </div>
         )}
 
+        <ImagePreview
+          images={images}
+          onRemove={(index) => setImages((prev) => prev.filter((_, i) => i !== index))}
+        />
+
         <div className="px-4 pt-2 pb-2">
           <textarea
             ref={textareaRef}
             value={value}
             onChange={handleChange}
             onKeyDown={handleKeyDown}
+            onPaste={handlePaste}
             placeholder={
               isSubmitDisabled ? 'Connect a machine to start...' : 'Ask Shipyard anything'
             }
@@ -350,7 +385,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
 
         <div className="flex items-center justify-between px-3 pb-2 gap-1">
           <div className="flex items-center gap-1 overflow-x-auto min-w-0">
-            <AttachmentPopover />
+            <AttachmentPopover onFilesSelected={addImages} />
             <ModelPicker
               selectedModelId={selectedModelId}
               onModelChange={onModelChange}

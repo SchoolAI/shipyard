@@ -7,6 +7,7 @@ type ToolResultBlock = ContentBlock & { type: 'tool_result' };
 
 export type GroupedBlock =
   | { kind: 'text'; block: ContentBlock & { type: 'text' } }
+  | { kind: 'image'; block: ContentBlock & { type: 'image' } }
   | { kind: 'thinking'; block: ContentBlock & { type: 'thinking' } }
   | {
       kind: 'tool_invocation';
@@ -138,6 +139,9 @@ function groupBlocksRecursive(blocks: ContentBlock[]): GroupedBlock[] {
     switch (block.type) {
       case 'text':
         grouped.push({ kind: 'text', block });
+        break;
+      case 'image':
+        grouped.push({ kind: 'image', block });
         break;
       case 'thinking':
         grouped.push({ kind: 'thinking', block });

@@ -82,6 +82,22 @@ function parseSdkBlock(
       return parseToolResultBlock(block, parentToolUseId);
     case 'thinking':
       return typeof block.thinking === 'string' ? { type: 'thinking', text: block.thinking } : null;
+    case 'image': {
+      // eslint-disable-next-line no-restricted-syntax -- SDK block.source is untyped Record
+      const source = block.source as Record<string, unknown> | undefined;
+      if (
+        source &&
+        source.type === 'base64' &&
+        typeof source.media_type === 'string' &&
+        typeof source.data === 'string'
+      ) {
+        return {
+          type: 'image',
+          source: { type: 'base64', mediaType: source.media_type, data: source.data },
+        };
+      }
+      return null;
+    }
     default:
       return null;
   }

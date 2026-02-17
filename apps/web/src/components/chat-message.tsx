@@ -1,5 +1,5 @@
 import { Button, Chip, Tooltip } from '@heroui/react';
-import type { ContentBlock } from '@shipyard/loro-schema';
+import type { ContentBlock, ImageSource } from '@shipyard/loro-schema';
 import {
   AlertCircle,
   BrainCircuit,
@@ -553,6 +553,36 @@ function PlanBlock({ group }: { group: GroupedBlock & { kind: 'plan' } }) {
   );
 }
 
+const SAFE_IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/webp']);
+
+function imageSourceToUrl(source: ImageSource): string | null {
+  if (source.type === 'base64') {
+    if (!SAFE_IMAGE_TYPES.has(source.mediaType)) return null;
+    return `data:${source.mediaType};base64,${source.data}`;
+  }
+  return null;
+}
+
+function ImageBlockView({ block }: { block: ContentBlock & { type: 'image' } }) {
+  const src = imageSourceToUrl(block.source);
+
+  if (!src) {
+    return (
+      <div className="text-xs text-muted italic px-2 py-1 border border-separator/30 rounded">
+        Unsupported attachment
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={src}
+      alt="User attachment"
+      className="max-w-full max-h-80 rounded-lg border border-separator"
+    />
+  );
+}
+
 function GroupedBlockRenderer({ group }: { group: GroupedBlock }) {
   switch (group.kind) {
     case 'text':
@@ -565,6 +595,8 @@ function GroupedBlockRenderer({ group }: { group: GroupedBlock }) {
           {group.block.text}
         </ReactMarkdown>
       );
+    case 'image':
+      return <ImageBlockView block={group.block} />;
     case 'thinking':
       return <ThinkingBlock block={group.block} />;
     case 'tool_invocation':
@@ -644,18 +676,30 @@ function AgentMessage({ message }: ChatMessageProps) {
 }
 
 function UserMessage({ message }: ChatMessageProps) {
-  const textContent = message.content
-    .filter((b): b is ContentBlock & { type: 'text' } => b.type === 'text')
-    .map((b) => b.text)
-    .join('\n');
+  const textBlocks = message.content.filter(
+    (b): b is ContentBlock & { type: 'text' } => b.type === 'text'
+  );
+  const imageBlocks = message.content.filter(
+    (b): b is ContentBlock & { type: 'image' } => b.type === 'image'
+  );
+  const textContent = textBlocks.map((b) => b.text).join('\n');
 
   return (
     <div className="flex justify-end max-w-3xl ml-auto">
       <div className="bg-default rounded-2xl px-4 py-2.5 max-w-[80%]">
         <span className="sr-only">You:</span>
-        <div className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">
-          {textContent}
-        </div>
+        {textContent && (
+          <div className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">
+            {textContent}
+          </div>
+        )}
+        {imageBlocks.length > 0 && (
+          <div className={`flex flex-wrap gap-2 ${textContent ? 'mt-2' : ''}`}>
+            {imageBlocks.map((block, i) => (
+              <ImageBlockView key={`img-${i}`} block={block} />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
