@@ -500,7 +500,6 @@ html, body {
   padding: 0.5rem 0.75rem;
   border: 1px solid var(--separator);
   color: var(--foreground);
-  background: var(--default);
   background: color-mix(in oklch, var(--default) 50%, transparent);
 }
 
