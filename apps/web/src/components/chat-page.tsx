@@ -15,6 +15,7 @@ import { ChevronDown } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PlanApprovalProvider } from '../contexts/plan-approval-context';
 import { useAppHotkeys } from '../hooks/use-app-hotkeys';
+import { useEnhancePrompt } from '../hooks/use-enhance-prompt';
 import { useMachineSelection } from '../hooks/use-machine-selection';
 import type { ConnectionState } from '../hooks/use-personal-room';
 import { usePersonalRoom } from '../hooks/use-personal-room';
@@ -466,6 +467,38 @@ export function ChatPage() {
     // eslint-disable-next-line -- intentionally omit voiceInput.stop from deps; only re-run on task switch
   }, [activeTaskId]);
 
+  const {
+    enhance: enhancePromptFn,
+    cancel: cancelEnhance,
+    isEnhancing,
+  } = useEnhancePrompt({
+    connection,
+    machineId: selectedMachineId,
+  });
+
+  const handleEnhance = useCallback(() => {
+    if (isEnhancing) {
+      cancelEnhance();
+      return;
+    }
+
+    const text = composerRef.current?.getText()?.trim();
+    if (!text) return;
+
+    enhancePromptFn(text, {
+      onChunk: (accumulated) => {
+        composerRef.current?.streamText(accumulated);
+      },
+      onDone: (fullText) => {
+        composerRef.current?.replaceText(fullText);
+        composerRef.current?.focus();
+      },
+      onError: () => {
+        composerRef.current?.focus();
+      },
+    });
+  }, [isEnhancing, cancelEnhance, enhancePromptFn]);
+
   const toggleSettings = useUIStore((s) => s.toggleSettings);
 
   const handleCloseSettings = useCallback(() => {
@@ -556,6 +589,7 @@ export function ChatPage() {
   const handleSubmit = useCallback(
     (payload: SubmitPayload) => {
       if (!selectedMachineId || connectionState !== 'connected') return;
+      cancelEnhance();
       const { message, model, reasoningEffort, permissionMode } = payload;
       lastSubmittedModelRef.current = model || null;
       const taskId = generateTaskId();
@@ -656,6 +690,7 @@ export function ChatPage() {
     [
       activeTaskId,
       setActiveTask,
+      cancelEnhance,
       connection,
       connectionState,
       selectedMachineId,
@@ -791,6 +826,8 @@ export function ChatPage() {
                     isVoiceSupported={voiceInput.isSupported}
                     onVoiceToggle={voiceInput.toggle}
                     voiceInterimText={voiceInput.interimText}
+                    isEnhancing={isEnhancing}
+                    onEnhance={handleEnhance}
                   />
                   <StatusBar
                     connectionState={connectionState}

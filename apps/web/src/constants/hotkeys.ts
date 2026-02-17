@@ -114,4 +114,11 @@ export const HOTKEYS = {
     description: 'Toggle voice input recording',
     context: 'global',
   },
+  enhancePrompt: {
+    key: 'meta+shift+e',
+    label: 'Enhance Prompt',
+    display: '\u2318\u21E7E',
+    description: 'Enhance the current prompt with AI',
+    context: 'composer',
+  },
 } as const satisfies Record<string, HotkeyDef>;

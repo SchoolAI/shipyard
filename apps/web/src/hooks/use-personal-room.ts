@@ -66,6 +66,9 @@ export function usePersonalRoom(config: PersonalRoomConfig | null) {
         case 'webrtc-offer':
         case 'webrtc-answer':
         case 'webrtc-ice':
+        case 'enhance-prompt-request':
+        case 'enhance-prompt-chunk':
+        case 'enhance-prompt-done':
           break;
         default:
           assertNever(msg);
