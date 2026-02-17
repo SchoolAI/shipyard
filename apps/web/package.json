@@ -11,6 +11,7 @@
     "lint": "biome check src",
     "lint:fix": "biome check src --write",
     "test": "vitest run",
+    "test:watch": "vitest",
     "check": "pnpm typecheck && pnpm lint && pnpm test && pnpm build",
     "analyze:fan-in": "tsx ../../scripts/analyze-fan-in.ts"
   },

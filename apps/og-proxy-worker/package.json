@@ -8,7 +8,9 @@
     "deploy": "wrangler deploy",
     "tail": "wrangler tail",
     "typecheck": "tsc --noEmit",
+    "build": "echo 'Cloudflare Workers build via wrangler deploy'",
     "lint": "biome check src",
+    "lint:fix": "biome check src --write",
     "test": "echo 'No tests yet for og-proxy-worker'",
     "check": "pnpm typecheck && pnpm lint && pnpm test && pnpm build"
   },
