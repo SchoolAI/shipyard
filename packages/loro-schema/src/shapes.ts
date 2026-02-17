@@ -171,6 +171,18 @@ export const DiffCommentShape = Shape.plain.struct({
   resolvedAt: Shape.plain.number().nullable(),
 });
 
+export const PlanCommentShape = Shape.plain.struct({
+  commentId: Shape.plain.string(),
+  planId: Shape.plain.string(),
+  from: Shape.plain.number(),
+  to: Shape.plain.number(),
+  body: Shape.plain.string(),
+  authorType: Shape.plain.string(...COMMENT_AUTHOR_TYPES),
+  authorId: Shape.plain.string(),
+  createdAt: Shape.plain.number(),
+  resolvedAt: Shape.plain.number().nullable(),
+});
+
 /**
  * Task document schema.
  * One doc per task. Contains metadata, conversation, and session tracking.
@@ -196,6 +208,8 @@ export const TaskDocumentSchema = Shape.doc({
   planEditorDocs: Shape.record(Shape.any()),
 
   diffComments: Shape.record(DiffCommentShape),
+
+  planComments: Shape.record(PlanCommentShape),
 });
 
 export type EpochDocumentShape = typeof EpochDocumentSchema;
@@ -221,6 +235,7 @@ export type SessionState = (typeof SESSION_STATES)[number];
 export type ReasoningEffort = (typeof REASONING_EFFORTS)[number];
 export type PermissionMode = (typeof PERMISSION_MODES)[number];
 export type DiffComment = Infer<typeof DiffCommentShape>;
+export type PlanComment = Infer<typeof PlanCommentShape>;
 export type CommentAuthorType = (typeof COMMENT_AUTHOR_TYPES)[number];
 export type DiffCommentSide = (typeof DIFF_COMMENT_SIDES)[number];
 export type DiffCommentScope = (typeof DIFF_COMMENT_SCOPES)[number];

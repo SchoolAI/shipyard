@@ -524,6 +524,10 @@ html, body {
   border-radius: 0.125rem;
 }
 
+.plan-editor .ProseMirror .comment-mark--active {
+  background: color-mix(in oklch, var(--warning) 35%, transparent);
+}
+
 /* -- First child margin reset (avoid gap at top of editor) -- */
 .plan-editor .ProseMirror > *:first-child {
   margin-top: 0;

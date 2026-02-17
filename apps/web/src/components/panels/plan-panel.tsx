@@ -115,12 +115,33 @@ function ApprovalFooter({ plan }: { plan: PlanVersion }) {
 function PlanPanelContent({ activeTaskId }: { activeTaskId: string | null }) {
   const [selectedVersion, setSelectedVersion] = useState<number | null>(null);
 
-  const { plans } = useTaskDocument(activeTaskId);
+  const { plans, planComments, addPlanComment, resolvePlanComment, deletePlanComment } =
+    useTaskDocument(activeTaskId);
 
   const activePlanIndex = selectedVersion ?? (plans.length > 0 ? plans.length - 1 : null);
   const activePlan = useMemo(
     () => (activePlanIndex !== null ? (plans[activePlanIndex] ?? null) : null),
     [plans, activePlanIndex]
+  );
+
+  const activePlanComments = useMemo(
+    () => planComments.filter((c) => activePlan !== null && c.planId === activePlan.planId),
+    [planComments, activePlan]
+  );
+
+  const handleAddComment = useCallback(
+    (body: string, from: number, to: number, commentId: string) => {
+      if (!activePlan) return;
+      addPlanComment({
+        commentId,
+        planId: activePlan.planId,
+        from,
+        to,
+        body,
+        authorId: 'local-user',
+      });
+    },
+    [activePlan, addPlanComment]
   );
 
   const handleVersionChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -157,7 +178,13 @@ function PlanPanelContent({ activeTaskId }: { activeTaskId: string | null }) {
       >
         {activePlan ? (
           <div className="px-4 py-3 text-sm text-foreground/90 leading-relaxed">
-            <PlanEditor markdown={activePlan.markdown} />
+            <PlanEditor
+              markdown={activePlan.markdown}
+              comments={activePlanComments}
+              onAddComment={handleAddComment}
+              onResolveComment={resolvePlanComment}
+              onDeleteComment={deletePlanComment}
+            />
           </div>
         ) : (
           <EmptyState />
