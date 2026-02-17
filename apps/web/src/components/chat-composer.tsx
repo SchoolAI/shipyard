@@ -1,9 +1,10 @@
 import { Button, Kbd, Tooltip } from '@heroui/react';
 import type { PermissionMode } from '@shipyard/loro-schema';
-import { ArrowUp, Mic, X } from 'lucide-react';
+import { ArrowUp, Mic, Sparkles, X } from 'lucide-react';
 import type { KeyboardEvent } from 'react';
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { HOTKEYS } from '../constants/hotkeys';
+import { useComposerHistory, useComposerUndoShortcut } from '../hooks/use-composer-history';
 import type { GitRepoInfo, ModelInfo } from '../hooks/use-machine-selection';
 import type { SlashCommandAction } from '../hooks/use-slash-commands';
 import { useSlashCommands } from '../hooks/use-slash-commands';
@@ -43,16 +44,24 @@ interface ChatComposerProps {
   isVoiceSupported?: boolean;
   onVoiceToggle?: () => void;
   voiceInterimText?: string;
+  isEnhancing?: boolean;
+  onEnhance?: () => void;
 }
 
 export interface ChatComposerHandle {
   focus: () => void;
   insertText: (text: string) => void;
+  replaceText: (text: string) => void;
+  /** Write directly to the DOM without React re-renders. Use during streaming. */
+  streamText: (text: string) => void;
+  getText: () => string;
+  clearHistory: () => void;
 }
 
 const MAX_HEIGHT = 200;
 const MIN_HEIGHT = 24;
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: composer integrates many keyboard shortcuts and conditional UI; further extraction would hurt readability
 export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(function ChatComposer(
   {
     onSubmit,
@@ -72,6 +81,8 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
     isVoiceSupported,
     onVoiceToggle,
     voiceInterimText,
+    isEnhancing,
+    onEnhance,
   },
   ref
 ) {
@@ -79,6 +90,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
   const [images, setImages] = useState<ImageAttachment[]>([]);
   const [stashedText, setStashedText] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const history = useComposerHistory();
   const { models, reasoning } = useModelPicker(availableModels, selectedModelId);
 
   useEffect(() => {
@@ -115,11 +127,16 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
   );
 
   const rafRef = useRef<number>(0);
+  const adjustRafRef = useRef<number>(0);
+  const streamSnapshotTakenRef = useRef(false);
   const stashedTextRef = useRef(stashedText);
   stashedTextRef.current = stashedText;
 
   useEffect(() => {
-    return () => cancelAnimationFrame(rafRef.current);
+    return () => {
+      cancelAnimationFrame(rafRef.current);
+      cancelAnimationFrame(adjustRafRef.current);
+    };
   }, []);
 
   const resetTextareaHeight = useCallback(() => {
@@ -169,6 +186,14 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
     textarea.style.overflowY = scrollHeight > MAX_HEIGHT ? 'auto' : 'hidden';
   }, []);
 
+  /** Schedule adjustHeight for the next animation frame, coalescing multiple calls into one. */
+  const scheduleAdjustHeight = useCallback(() => {
+    cancelAnimationFrame(adjustRafRef.current);
+    adjustRafRef.current = requestAnimationFrame(() => {
+      adjustHeight();
+    });
+  }, [adjustHeight]);
+
   useImperativeHandle(
     ref,
     () => ({
@@ -183,18 +208,40 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
           textareaRef.current?.focus();
         });
       },
+      replaceText: (text: string) => {
+        history.snapshotBeforeReplace(textareaRef.current?.value ?? '');
+        streamSnapshotTakenRef.current = false;
+        setValue(text);
+        requestAnimationFrame(() => {
+          adjustHeight();
+        });
+      },
+      streamText: (text: string) => {
+        if (!streamSnapshotTakenRef.current) {
+          history.snapshotBeforeReplace(textareaRef.current?.value ?? '');
+          streamSnapshotTakenRef.current = true;
+        }
+        const textarea = textareaRef.current;
+        if (textarea) {
+          textarea.value = text;
+        }
+        scheduleAdjustHeight();
+      },
+      getText: () => textareaRef.current?.value ?? '',
+      clearHistory: history.clear,
     }),
-    [adjustHeight]
+    [adjustHeight, scheduleAdjustHeight, history]
   );
 
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLTextAreaElement>) => {
       const newValue = e.target.value;
+      history.redoStack.current = [];
       setValue(newValue);
       slashCommands.handleInputChange(newValue);
       adjustHeight();
     },
-    [adjustHeight, slashCommands]
+    [adjustHeight, slashCommands, history]
   );
 
   const addImages = useCallback(async (files: File[]) => {
@@ -232,6 +279,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
     });
     setValue('');
     setImages([]);
+    history.clear();
     slashCommands.close();
     resetTextareaHeight();
     requestAnimationFrame(() => restoreStash());
@@ -244,6 +292,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
     selectedModelId,
     reasoningLevel,
     permissionMode,
+    history,
     resetTextareaHeight,
     restoreStash,
   ]);
@@ -262,27 +311,53 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
     setStashedText('');
   }, []);
 
+  const handleStashShortcut = useCallback(() => {
+    const trimmed = textareaRef.current?.value.trim();
+    if (trimmed) {
+      setStashedText(trimmed);
+      setValue('');
+      resetTextareaHeight();
+    } else if (stashedTextRef.current) {
+      handleUnstash();
+    }
+  }, [resetTextareaHeight, handleUnstash]);
+
+  const handleEnhanceShortcut = useCallback(() => {
+    if (!onEnhance) return;
+    if (isEnhancing) {
+      onEnhance();
+      return;
+    }
+    const hasText = (textareaRef.current?.value.trim().length ?? 0) > 0;
+    if (isSubmitDisabled || !hasText) return;
+    onEnhance();
+  }, [isSubmitDisabled, isEnhancing, onEnhance]);
+
   /**
-   * NOTE: Raw addEventListener workaround — react-hotkeys-hook v5 enableOnFormTags
+   * NOTE: Raw addEventListener workaround -- react-hotkeys-hook v5 enableOnFormTags
    * doesn't fire when textarea is focused (github.com/JohannesKlauss/react-hotkeys-hook/issues/1231).
    */
   useEffect(() => {
     const onKeyDown = (e: globalThis.KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+      const mod = e.metaKey || e.ctrlKey;
+      if (!mod) return;
+
+      if (e.key === 's' && !e.shiftKey) {
         e.preventDefault();
-        const trimmed = textareaRef.current?.value.trim();
-        if (trimmed) {
-          setStashedText(trimmed);
-          setValue('');
-          resetTextareaHeight();
-        } else if (stashedTextRef.current) {
-          handleUnstash();
-        }
+        handleStashShortcut();
+        return;
+      }
+
+      if (e.shiftKey && e.key.toLowerCase() === 'e') {
+        e.preventDefault();
+        handleEnhanceShortcut();
       }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [resetTextareaHeight, handleUnstash]);
+  }, [handleStashShortcut, handleEnhanceShortcut]);
+
+  useComposerUndoShortcut(history, setValue, adjustHeight, textareaRef);
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -305,6 +380,10 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
   );
 
   const isEmpty = value.trim().length === 0 && images.length === 0;
+  const enhanceLabel = isEnhancing ? 'Cancel enhancement' : 'Enhance prompt';
+  const enhanceClassName = isEnhancing
+    ? 'bg-secondary/20 text-secondary motion-safe:animate-pulse'
+    : 'text-muted hover:text-foreground hover:bg-default';
 
   return (
     <div className="w-full pb-1">
@@ -368,6 +447,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
               isSubmitDisabled ? 'Connect a machine to start...' : 'Ask Shipyard anything'
             }
             aria-label="Message input"
+            readOnly={isEnhancing}
             rows={1}
             className="w-full bg-transparent text-foreground placeholder-muted/70 text-sm leading-relaxed resize-none outline-none"
             style={{ minHeight: `${MIN_HEIGHT}px`, maxHeight: `${MAX_HEIGHT}px` }}
@@ -431,6 +511,30 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
                   </Tooltip.Content>
                 </Tooltip>
               </div>
+            )}
+            {onEnhance && (
+              <Tooltip>
+                <Tooltip.Trigger>
+                  <Button
+                    isIconOnly
+                    variant="ghost"
+                    size="sm"
+                    aria-label={enhanceLabel}
+                    aria-keyshortcuts="Meta+Shift+E"
+                    isDisabled={isEmpty || (isSubmitDisabled && !isEnhancing)}
+                    className={`rounded-full w-9 h-9 sm:w-8 sm:h-8 min-w-0 ${enhanceClassName}`}
+                    onPress={onEnhance}
+                  >
+                    <Sparkles className="w-4 h-4" />
+                  </Button>
+                </Tooltip.Trigger>
+                <Tooltip.Content>
+                  <span className="flex items-center gap-2">
+                    {enhanceLabel}
+                    <Kbd>{HOTKEYS.enhancePrompt.display}</Kbd>
+                  </span>
+                </Tooltip.Content>
+              </Tooltip>
             )}
             <Tooltip isDisabled={!isSubmitDisabled}>
               <Tooltip.Trigger>

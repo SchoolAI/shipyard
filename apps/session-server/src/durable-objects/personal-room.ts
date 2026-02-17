@@ -39,6 +39,8 @@ interface ConnectionState {
 export class PersonalRoom extends DurableObject<Env> {
   private agents: Record<string, AgentInfo> = {};
   private connections: Map<WebSocket, ConnectionState> = new Map();
+  /** Maps enhance-prompt requestId to the browser WebSocket that originated it. */
+  private enhanceRequestOrigins: Map<string, WebSocket> = new Map();
   private logger: Logger;
 
   constructor(ctx: DurableObjectState, env: Env) {
@@ -227,6 +229,12 @@ export class PersonalRoom extends DurableObject<Env> {
       );
     }
 
+    for (const [requestId, originWs] of this.enhanceRequestOrigins) {
+      if (originWs === ws) {
+        this.enhanceRequestOrigins.delete(requestId);
+      }
+    }
+
     this.connections.delete(ws);
   }
 
@@ -263,6 +271,16 @@ export class PersonalRoom extends DurableObject<Env> {
         break;
       case 'task-ack':
         this.handleTaskAck(ws, state, msg);
+        break;
+      case 'enhance-prompt-request':
+        this.handleEnhancePromptRequest(ws, state, msg);
+        break;
+      case 'enhance-prompt-chunk':
+      case 'enhance-prompt-done':
+        this.handleEnhancePromptResponse(ws, state, msg);
+        break;
+      case 'error':
+        this.handleErrorRelay(ws, state, msg);
         break;
       default:
         assertNever(msg);
@@ -486,6 +504,96 @@ export class PersonalRoom extends DurableObject<Env> {
       taskId: msg.taskId,
       accepted: msg.accepted,
     });
+  }
+
+  private handleErrorRelay(
+    _ws: WebSocket,
+    state: ConnectionState,
+    msg: Extract<PersonalRoomClientMessage, { type: 'error' }>
+  ): void {
+    if (state.type !== 'agent') {
+      return;
+    }
+
+    if (msg.requestId) {
+      const originWs = this.enhanceRequestOrigins.get(msg.requestId);
+      if (originWs) {
+        this.sendMessage(originWs, msg);
+        this.enhanceRequestOrigins.delete(msg.requestId);
+        return;
+      }
+    }
+
+    for (const [connWs, connState] of this.connections) {
+      if (connState.type === 'browser') {
+        this.sendMessage(connWs, msg);
+      }
+    }
+  }
+
+  private handleEnhancePromptRequest(
+    ws: WebSocket,
+    state: ConnectionState,
+    msg: Extract<PersonalRoomClientMessage, { type: 'enhance-prompt-request' }>
+  ): void {
+    if (state.type !== 'browser') {
+      this.sendError(ws, 'forbidden', 'Only browser connections can request prompt enhancement');
+      return;
+    }
+
+    const daemonWs = findWebSocketByMachineId(this.connections, msg.machineId);
+
+    if (!daemonWs) {
+      this.sendMessage(ws, {
+        type: 'error',
+        code: 'target_not_found',
+        message: `Daemon on machine ${msg.machineId} not connected`,
+        requestId: msg.requestId,
+      });
+      return;
+    }
+
+    this.enhanceRequestOrigins.set(msg.requestId, ws);
+    relayMessage(daemonWs, msg);
+
+    this.logger.debug('Enhance prompt request forwarded to daemon', {
+      requestId: msg.requestId,
+      machineId: msg.machineId,
+    });
+  }
+
+  private handleEnhancePromptResponse(
+    ws: WebSocket,
+    state: ConnectionState,
+    msg: Extract<
+      PersonalRoomClientMessage,
+      { type: 'enhance-prompt-chunk' | 'enhance-prompt-done' }
+    >
+  ): void {
+    if (state.type !== 'agent') {
+      this.sendError(
+        ws,
+        'forbidden',
+        'Only agent connections can send prompt enhancement responses'
+      );
+      return;
+    }
+
+    const originWs = this.enhanceRequestOrigins.get(msg.requestId);
+
+    if (originWs) {
+      this.sendMessage(originWs, msg);
+
+      if (msg.type === 'enhance-prompt-done') {
+        this.enhanceRequestOrigins.delete(msg.requestId);
+      }
+    } else {
+      for (const [connWs, connState] of this.connections) {
+        if (connState.type === 'browser') {
+          this.sendMessage(connWs, msg);
+        }
+      }
+    }
   }
 
   private sendMessage(ws: WebSocket, msg: PersonalRoomServerMessage): void {

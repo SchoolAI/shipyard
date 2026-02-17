@@ -2,6 +2,7 @@ import { mkdir } from 'node:fs/promises';
 import { homedir, hostname } from 'node:os';
 import { resolve } from 'node:path';
 import type { CanUseTool, PermissionResult } from '@anthropic-ai/claude-agent-sdk';
+import { query } from '@anthropic-ai/claude-agent-sdk';
 import { WebRtcDataChannelAdapter } from '@loro-extended/adapter-webrtc';
 import { change, type TypedDoc } from '@loro-extended/change';
 import type { HandleWithEphemerals } from '@loro-extended/repo';
@@ -687,6 +688,15 @@ function handleMessage(msg: PersonalRoomServerMessage, ctx: MessageHandlerContex
       break;
     }
 
+    case 'enhance-prompt-request':
+      handleEnhancePrompt(msg, ctx);
+      break;
+
+    case 'enhance-prompt-chunk':
+    case 'enhance-prompt-done':
+      ctx.log.debug({ type: msg.type }, 'Enhance prompt echo');
+      break;
+
     case 'authenticated':
     case 'agent-joined':
     case 'agent-left':
@@ -752,6 +762,137 @@ function handleNotifyTask(
     const errMsg = err instanceof Error ? err.message : String(err);
     taskLog.error({ err: errMsg }, 'Failed to start watching task document');
   });
+}
+
+const ENHANCE_PROMPT_TIMEOUT_MS = 30_000;
+
+const ENHANCE_SYSTEM_PROMPT = `You are a prompt rewriter that transforms rough user requests into clear, specific instructions for an AI coding assistant (Claude Code). The enhanced prompt will be sent AS the user's message to that assistant.
+
+RULES:
+- Write in imperative/request form ("Build...", "Create...", "Add...") — NEVER first person ("I'll...", "Let me...")
+- Return ONLY the rewritten prompt. No preamble, explanation, or markdown formatting.
+- Keep the user's core intent intact. Do not add features they didn't imply.
+- Expand vague ideas into concrete specifics: name technologies, list features, set constraints.
+- If the user names a technology, keep it. If they don't, pick sensible defaults.
+- Target 2-5x the input length. Be concise and direct — no filler, hype, or superlatives.
+- Do NOT add project setup boilerplate (e.g., "initialize a git repo", "set up CI/CD") unless asked.
+- Structure as a single paragraph or short bullet list, whichever is clearer.
+
+WHAT TO ADD:
+- Specific features the request implies but doesn't list
+- Technology choices when unspecified (framework, API, library)
+- Concrete parameters (sizes, ranges, counts) instead of vague adjectives
+- UI/UX details when building something visual
+- Scope boundaries to prevent over-building
+
+EXAMPLES:
+
+Input: "make a cool hello world beat app"
+Output: "Build a browser-based beat maker with a 4x4 pad grid that plays drum sounds on click. Include kick, snare, hi-hat, and clap samples using the Web Audio API. Add a step sequencer with play/pause, a tempo slider (60-200 BPM), and visual feedback on active pads. Keep it to a single page with a dark theme."
+
+Input: "fix the login bug"
+Output: "Investigate and fix the login bug. Check the authentication flow for common issues: expired tokens, incorrect credential validation, session handling errors, or CORS misconfigurations. Add error logging if missing and verify the fix works for both valid and invalid credential cases."
+
+Input: "add dark mode"
+Output: "Add a dark mode toggle to the app. Use CSS custom properties for theme colors, persist the user's preference in localStorage, and respect the system prefers-color-scheme setting as the default. Ensure all existing components have adequate contrast in both themes."
+
+Input: "make a landing page for my saas"
+Output: "Build a responsive landing page with: hero section with headline, subheadline, and CTA button; features grid (3-4 cards with icons); pricing section with 2-3 tier cards; FAQ accordion; and a footer with links. Use a clean, modern design with consistent spacing. Make it mobile-first with a sticky header."`;
+
+function handleEnhancePrompt(
+  msg: Extract<PersonalRoomServerMessage, { type: 'enhance-prompt-request' }>,
+  ctx: MessageHandlerContext
+): void {
+  const { requestId, prompt } = msg;
+  const enhanceLog = createChildLogger({ mode: 'enhance-prompt' });
+
+  if (!ctx.env.ANTHROPIC_API_KEY) {
+    enhanceLog.error('ANTHROPIC_API_KEY is required for prompt enhancement');
+    ctx.connection.send({
+      type: 'error',
+      code: 'missing_api_key',
+      message: 'ANTHROPIC_API_KEY not configured on daemon',
+      requestId,
+    });
+    return;
+  }
+
+  const abortController = ctx.lifecycle.createAbortController();
+  const timeout = setTimeout(() => abortController.abort(), ENHANCE_PROMPT_TIMEOUT_MS);
+
+  runEnhancePrompt(prompt, requestId, abortController, ctx, enhanceLog).finally(() => {
+    clearTimeout(timeout);
+    abortController.abort();
+  });
+}
+
+function extractTextChunks(rawContent: unknown): string[] {
+  if (!Array.isArray(rawContent)) return [];
+  const chunks: string[] = [];
+  for (const block of rawContent) {
+    // eslint-disable-next-line no-restricted-syntax -- SDK content blocks typed as unknown[]
+    const b = block as Record<string, unknown>;
+    if (b.type === 'text' && typeof b.text === 'string') {
+      chunks.push(b.text);
+    }
+  }
+  return chunks;
+}
+
+async function runEnhancePrompt(
+  prompt: string,
+  requestId: string,
+  abortController: AbortController,
+  ctx: MessageHandlerContext,
+  log: ReturnType<typeof createChildLogger>
+): Promise<void> {
+  let fullText = '';
+
+  try {
+    const response = query({
+      prompt,
+      options: {
+        maxTurns: 1,
+        allowedTools: [],
+        systemPrompt: ENHANCE_SYSTEM_PROMPT,
+        abortController,
+      },
+    });
+
+    for await (const message of response) {
+      if (message.type !== 'assistant') continue;
+
+      for (const text of extractTextChunks(message.message.content)) {
+        fullText += text;
+        ctx.connection.send({
+          type: 'enhance-prompt-chunk',
+          requestId,
+          text,
+        });
+      }
+    }
+
+    ctx.connection.send({
+      type: 'enhance-prompt-done',
+      requestId,
+      fullText,
+    });
+
+    log.info({ promptLen: prompt.length, resultLen: fullText.length }, 'Prompt enhanced');
+  } catch (err: unknown) {
+    if (abortController.signal.aborted) {
+      log.warn('Prompt enhancement aborted');
+    } else {
+      log.error({ err }, 'Prompt enhancement failed');
+    }
+
+    ctx.connection.send({
+      type: 'error',
+      code: 'enhance_failed',
+      message: err instanceof Error ? err.message : 'Prompt enhancement failed',
+      requestId,
+    });
+  }
 }
 
 /**

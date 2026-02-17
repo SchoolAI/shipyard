@@ -387,6 +387,51 @@ export const TaskAckSchema = z.object({
 });
 
 /**
+ * Enhance prompt request — browser asks daemon to improve a prompt.
+ * Ephemeral: no Loro doc is created or modified.
+ */
+export const EnhancePromptRequestSchema = z.object({
+  type: z.literal('enhance-prompt-request'),
+  requestId: z.string(),
+  machineId: z.string(),
+  prompt: z.string().min(1),
+});
+
+export type EnhancePromptRequest = z.infer<typeof EnhancePromptRequestSchema>;
+
+/**
+ * Enhance prompt chunk — streamed text fragment from daemon.
+ */
+export const EnhancePromptChunkSchema = z.object({
+  type: z.literal('enhance-prompt-chunk'),
+  requestId: z.string(),
+  text: z.string(),
+});
+
+export type EnhancePromptChunk = z.infer<typeof EnhancePromptChunkSchema>;
+
+/**
+ * Enhance prompt done — final result from daemon.
+ */
+export const EnhancePromptDoneSchema = z.object({
+  type: z.literal('enhance-prompt-done'),
+  requestId: z.string(),
+  fullText: z.string(),
+});
+
+export type EnhancePromptDone = z.infer<typeof EnhancePromptDoneSchema>;
+
+/**
+ * Error message schema for WebSocket connections.
+ */
+export const ErrorMessageSchema = z.object({
+  type: z.literal('error'),
+  code: z.string(),
+  message: z.string(),
+  requestId: z.string().optional(),
+});
+
+/**
  * Union of all client-to-server messages for personal room WebSocket.
  */
 export const PersonalRoomClientMessageSchema = z.discriminatedUnion('type', [
@@ -398,6 +443,10 @@ export const PersonalRoomClientMessageSchema = z.discriminatedUnion('type', [
   WebRTCIceSchema,
   NotifyTaskSchema,
   TaskAckSchema,
+  EnhancePromptRequestSchema,
+  EnhancePromptChunkSchema,
+  EnhancePromptDoneSchema,
+  ErrorMessageSchema,
 ]);
 
 export type PersonalRoomClientMessage = z.infer<typeof PersonalRoomClientMessageSchema>;
@@ -461,16 +510,6 @@ export const AgentStatusChangedSchema = z.object({
 });
 
 /**
- * Error message schema for WebSocket connections.
- */
-export const ErrorMessageSchema = z.object({
-  type: z.literal('error'),
-  code: z.string(),
-  message: z.string(),
-  requestId: z.string().optional(),
-});
-
-/**
  * Union of all server-to-client messages for personal room WebSocket.
  */
 export const PersonalRoomServerMessageSchema = z.discriminatedUnion('type', [
@@ -485,6 +524,9 @@ export const PersonalRoomServerMessageSchema = z.discriminatedUnion('type', [
   WebRTCOfferSchema,
   WebRTCAnswerSchema,
   WebRTCIceSchema,
+  EnhancePromptRequestSchema,
+  EnhancePromptChunkSchema,
+  EnhancePromptDoneSchema,
 ]);
 
 export type PersonalRoomServerMessage = z.infer<typeof PersonalRoomServerMessageSchema>;
