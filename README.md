@@ -64,6 +64,9 @@ shipyard login
 
 # Verify you're authenticated
 shipyard login --check
+
+# Start the daemon (connects to signaling, syncs via CRDT, runs agents)
+ANTHROPIC_API_KEY=sk-ant-... shipyard-daemon --serve
 ```
 
 See the [Installation Guide](./docs/installation.md) for editor-specific MCP setup (Claude Code, Cursor, VS Code, etc.).
