@@ -1,10 +1,10 @@
 ---
-name: adversarial-reviewer
+name: shipyard-adversarial-reviewer
 description: "Adversarial code reviewer that tries to DISPROVE correctness. Use proactively after any significant implementation, refactor, or migration work. Looks for race conditions, data loss, type holes, missing error handling, and edge cases."
 skills:
-  - engineering-standards
+  - shipyard-engineering-standards
   - loro-expert
-  - accessibility
+  - shipyard-accessibility
 tools: Read, Glob, Grep, Bash
 model: inherit
 memory: project

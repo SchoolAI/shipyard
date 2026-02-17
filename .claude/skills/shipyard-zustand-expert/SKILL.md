@@ -1,5 +1,5 @@
 ---
-name: zustand-expert
+name: shipyard-zustand-expert
 description: "Expert at Zustand state management for React/vanilla JS. Use when creating stores, managing client-side state, persisting to IndexedDB/localStorage, optimizing re-renders with selectors, composing middleware, typing stores with TypeScript, testing stores with Vitest, or choosing between global vs scoped store patterns."
 ---
 

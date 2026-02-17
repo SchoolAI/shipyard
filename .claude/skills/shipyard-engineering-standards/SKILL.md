@@ -1,5 +1,5 @@
 ---
-name: engineering-standards
+name: shipyard-engineering-standards
 description: "Expert at Shipyard's engineering quality gates and enforcement chain. Use when reviewing code, checking quality, running pre-commit validation, verifying test coverage, or ensuring compliance with comment style, type assertion rules, fan-in coverage, meta-tests, and strict TypeScript. Use for code reviews, PR reviews, and post-implementation QA."
 ---
 

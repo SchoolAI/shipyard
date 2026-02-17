@@ -34,18 +34,18 @@ Domain expertise is in skills — use subagents to keep the main context clean.
 - `loro-expert` — Loro Shapes, TypedDocs, Repo, adapters, React hooks
 - `tiptap-expert` — TipTap extensions, ProseMirror, loro-prosemirror bridge
 - `heroui-expert` — HeroUI v3 compound components, React Aria patterns
-- `accessibility` — WCAG 2.2, ARIA patterns, keyboard nav, focus management, screen readers
+- `shipyard-accessibility` — WCAG 2.2, ARIA patterns, keyboard nav, focus management, screen readers
 - `agent-sdk-expert` — Claude Agent SDK (subagents, hooks, sessions)
 - `a2a-protocol-expert` — A2A protocol + @a2a-js/sdk
 - `mcp-protocol-expert` — MCP protocol + @modelcontextprotocol/sdk
-- `design` — UI/UX design principles, layout, accessibility, visual hierarchy, responsive
-- `mobile` — Mobile-first responsive, touch interactions, viewport units, safe areas, virtual keyboard, container queries
-- `engineering-standards` — Quality gates, Biome, fan-in coverage, meta-tests
-- `council` — Multi-agent deliberation for design decisions
-- `deep-research` — Context saturation before implementation
+- `shipyard-design` — UI/UX design principles, layout, accessibility, visual hierarchy, responsive
+- `shipyard-mobile` — Mobile-first responsive, touch interactions, viewport units, safe areas, virtual keyboard, container queries
+- `shipyard-engineering-standards` — Quality gates, Biome, fan-in coverage, meta-tests
+- `shipyard-council` — Multi-agent deliberation for design decisions
+- `shipyard-deep-research` — Context saturation before implementation
 
 **Manual-only skills** (invoke with `/skill-name`):
-- `/qa` — Post-implementation review + auto-fix
+- `/shipyard-qa` — Post-implementation review + auto-fix
 - `/wt`, `/wts`, `/wt-rm` — Git worktree management
 - `/review-pr` — PR comment triage
 - `/site-branding` — Favicons, OG images, PWA setup

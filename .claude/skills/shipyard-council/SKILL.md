@@ -1,5 +1,5 @@
 ---
-name: council
+name: shipyard-council
 description: "Multi-agent deliberation council for design decisions and reviews. Use when the user asks for a council, design review, architecture review, multi-perspective analysis, or wants diverse expert opinions before making a decision. Spawns 2-4 agents with different personas to independently analyze the same question, then synthesizes findings."
 ---
 
@@ -96,7 +96,7 @@ You are a [PERSONA NAME] reviewing a [DECISION TYPE] for the Shipyard project.
 
 **Subagent tool restrictions:** Each subagent should only use read-only research tools: Read, Grep, Glob, WebSearch, WebFetch. They CANNOT spawn their own subagents, edit files, or run commands.
 
-**Use existing agents for matching personas:** When the Standards Enforcer persona is selected, use `subagent_type: "engineering-standards"` instead of a generic agent — it auto-loads the engineering-standards skill with full rule knowledge. Similarly, use `subagent_type: "frontend-expert"` or `subagent_type: "backend-expert"` when a persona aligns with those domains.
+**Use existing agents for matching personas:** When the Standards Enforcer persona is selected, use `subagent_type: "shipyard-engineering-standards"` instead of a generic agent — it auto-loads the shipyard-engineering-standards skill with full rule knowledge. Similarly, use `subagent_type: "shipyard-frontend-expert"` or `subagent_type: "shipyard-backend-expert"` when a persona aligns with those domains.
 
 ### Step 4: Synthesize
 

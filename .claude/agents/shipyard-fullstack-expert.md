@@ -1,17 +1,17 @@
 ---
-name: fullstack-expert
+name: shipyard-fullstack-expert
 description: "Full-stack specialist for Shipyard. Use when a task touches both frontend (planned) and backend (apps/session-server, packages/) simultaneously, or for cross-cutting changes that span UI, server, and schema layers."
 skills:
-  - accessibility
-  - design
-  - mobile
+  - shipyard-accessibility
+  - shipyard-design
+  - shipyard-mobile
   - heroui-expert
   - tiptap-expert
   - loro-expert
   - agent-sdk-expert
   - a2a-protocol-expert
   - mcp-protocol-expert
-  - engineering-standards
+  - shipyard-engineering-standards
 tools: Read, Write, Edit, Glob, Grep, Bash
 model: inherit
 ---

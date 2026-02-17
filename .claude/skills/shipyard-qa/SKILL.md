@@ -1,5 +1,5 @@
 ---
-name: qa
+name: shipyard-qa
 description: "Post-implementation review and fix. Spawns adversarial-reviewer + engineering-standards + domain expert in parallel, auto-fixes unanimous findings, presents disagreements to user."
 argument-hint: [description of what was implemented]
 ---
@@ -46,10 +46,10 @@ Collect the implementation context before spawning reviewers.
    | Priority | Changed files contain | Select |
    |----------|----------------------|--------|
    | 1 | `.claude/skills/**` or docs only | Skip 3rd reviewer (use 2 only) |
-   | 2 | Both `apps/web/**` and any backend path | `fullstack-expert` |
-   | 3 | `apps/web/**` only | `frontend-expert` |
-   | 4 | `apps/session-server/**`, `apps/daemon/**`, or `apps/og-proxy-worker/**` | `backend-expert` |
-   | 5 | `packages/**` only | `backend-expert` (add design checks to prompt if `packages/loro-schema/**` is touched, since it's shared with frontend) |
+   | 2 | Both `apps/web/**` and any backend path | `shipyard-fullstack-expert` |
+   | 3 | `apps/web/**` only | `shipyard-frontend-expert` |
+   | 4 | `apps/session-server/**`, `apps/daemon/**`, or `apps/og-proxy-worker/**` | `shipyard-backend-expert` |
+   | 5 | `packages/**` only | `shipyard-backend-expert` (add design checks to prompt if `packages/loro-schema/**` is touched, since it's shared with frontend) |
    | 6 | No match above | Skip 3rd reviewer (use 2 only) |
 
 4. **Build the file list** as absolute paths for subagent prompts.
@@ -63,7 +63,7 @@ After spawning all reviewers, **wait for each to complete** — the system sends
 **Reviewer 1: Adversarial Reviewer**
 
 ```
-subagent_type: "adversarial-reviewer"
+subagent_type: "shipyard-adversarial-reviewer"
 ```
 
 Prompt template — customize the file list and context per task:
@@ -98,7 +98,7 @@ You are reviewing a post-implementation change in Shipyard.
 **Reviewer 2: Engineering Standards**
 
 ```
-subagent_type: "engineering-standards"
+subagent_type: "shipyard-engineering-standards"
 ```
 
 Prompt template:

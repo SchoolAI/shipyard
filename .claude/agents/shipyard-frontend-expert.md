@@ -1,15 +1,15 @@
 ---
-name: frontend-expert
+name: shipyard-frontend-expert
 description: "Frontend specialist for Shipyard web app (planned). Use when building or modifying UI components, the TipTap editor, comment system, task views, Loro reactive state in the browser. Combines HeroUI v3, TipTap + loro-prosemirror, and Loro CRDT expertise."
 skills:
-  - accessibility
-  - design
-  - mobile
+  - shipyard-accessibility
+  - shipyard-design
+  - shipyard-mobile
   - heroui-expert
   - tiptap-expert
   - loro-expert
-  - zustand-expert
-  - engineering-standards
+  - shipyard-zustand-expert
+  - shipyard-engineering-standards
 tools: Read, Write, Edit, Glob, Grep, Bash
 model: inherit
 memory: project

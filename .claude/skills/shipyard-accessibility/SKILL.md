@@ -1,5 +1,5 @@
 ---
-name: accessibility
+name: shipyard-accessibility
 description: "Web accessibility expert following WCAG 2.2 and ARIA Authoring Practices. Use when implementing keyboard navigation, ARIA roles/states/properties, screen reader support, focus management, accessible forms, live regions, reduced motion, color contrast, or any a11y concern. Covers testing strategies and common anti-patterns."
 ---
 

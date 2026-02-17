@@ -1,5 +1,5 @@
 ---
-name: mobile
+name: shipyard-mobile
 description: "Mobile-first responsive design specialist. Use when building mobile layouts, handling touch interactions, viewport issues, safe areas, bottom navigation, responsive collapse patterns, virtual keyboard handling, or any mobile-specific concern. Covers touch targets, gesture patterns, viewport units (dvh/svh/lvh), container queries, mobile navigation, performance, and progressive enhancement from mobile to desktop."
 ---
 

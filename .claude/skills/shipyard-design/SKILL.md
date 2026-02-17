@@ -1,5 +1,5 @@
 ---
-name: design
+name: shipyard-design
 description: "Universal UI/UX design principles and Shipyard design system. Use when making layout decisions, reviewing visual design, improving accessibility, choosing component composition, designing responsive layouts, or working with typography, spacing, color, and animation. Covers WCAG accessibility, visual hierarchy, mobile-first responsive, and design review."
 ---
 

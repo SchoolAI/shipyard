@@ -1,12 +1,12 @@
 ---
-name: backend-expert
+name: shipyard-backend-expert
 description: "Backend specialist for Shipyard server infrastructure. Use when working on MCP tools, agent spawning, A2A protocol, signaling, server-side Loro sync, or anything in apps/session-server/ or apps/og-proxy-worker/. Combines Agent SDK, A2A protocol, and Loro CRDT expertise."
 skills:
   - agent-sdk-expert
   - a2a-protocol-expert
   - mcp-protocol-expert
   - loro-expert
-  - engineering-standards
+  - shipyard-engineering-standards
 tools: Read, Write, Edit, Glob, Grep, Bash
 model: inherit
 memory: project

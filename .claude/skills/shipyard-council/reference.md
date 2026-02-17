@@ -361,7 +361,7 @@ For new components: Does it follow existing Shipyard layout patterns? Is it cons
 Use the preloaded design skill for Shipyard's specific design system conventions.
 ```
 
-**Weight:** High for user-facing features, layout changes, new pages/components. Use `subagent_type: "design-expert"` to auto-load the design skill with full visual review capability.
+**Weight:** High for user-facing features, layout changes, new pages/components. Use `subagent_type: "shipyard-design-expert"` to auto-load the shipyard-design skill with full visual review capability.
 
 ---
 

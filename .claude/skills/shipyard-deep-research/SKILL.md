@@ -1,5 +1,5 @@
 ---
-name: deep-research
+name: shipyard-deep-research
 description: "Deep context research before implementing a feature. Use when starting a new feature, implementing a WHIP, beginning a multi-file change, or when the user says 'research first', 'saturate context', 'deep dive', or 'understand before building'. Gathers architecture docs, relevant files, similar patterns, and test infrastructure in parallel before writing any code."
 ---
 

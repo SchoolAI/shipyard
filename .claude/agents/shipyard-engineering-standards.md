@@ -1,8 +1,8 @@
 ---
-name: engineering-standards
+name: shipyard-engineering-standards
 description: "Engineering standards enforcer for code review and QA. Use when reviewing code for quality gate compliance, checking type assertions, comment style, fan-in coverage, meta-test requirements, or verifying code passes all Shipyard quality gates."
 skills:
-  - engineering-standards
+  - shipyard-engineering-standards
 tools: Read, Glob, Grep, Bash
 model: inherit
 ---
