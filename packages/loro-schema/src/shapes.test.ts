@@ -183,13 +183,14 @@ describe('TaskDocumentSchema', () => {
       }
     });
 
-    it('supports image blocks with base64 source', () => {
+    it('supports image blocks with base64 source and id', () => {
       doc.conversation.push({
         messageId: 'msg-img',
         role: 'user',
         content: [
           {
             type: 'image',
+            id: 'img_abc123',
             source: { type: 'base64', mediaType: 'image/png', data: 'iVBOR...' },
           },
         ],
@@ -206,6 +207,7 @@ describe('TaskDocumentSchema', () => {
       const block = json.conversation[0]?.content[0];
       expect(block?.type).toBe('image');
       if (block?.type === 'image') {
+        expect(block.id).toBe('img_abc123');
         expect(block.source.type).toBe('base64');
         if (block.source.type === 'base64') {
           expect(block.source.mediaType).toBe('image/png');
@@ -222,6 +224,7 @@ describe('TaskDocumentSchema', () => {
           { type: 'text', text: 'Check this screenshot' },
           {
             type: 'image',
+            id: 'img_mixed1',
             source: { type: 'base64', mediaType: 'image/jpeg', data: '/9j/4AAQ...' },
           },
         ],

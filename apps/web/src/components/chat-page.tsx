@@ -105,6 +105,7 @@ function toContentBlocks(text: string, images?: SubmitPayload['images']): Conten
     for (const img of images) {
       blocks.push({
         type: 'image' as const,
+        id: crypto.randomUUID(),
         source: { type: 'base64' as const, mediaType: img.mediaType, data: img.data },
       });
     }
@@ -639,6 +640,7 @@ export function ChatPage() {
           for (const img of payload.images) {
             contentBlocks.push({
               type: 'image',
+              id: crypto.randomUUID(),
               source: { type: 'base64', mediaType: img.mediaType, data: img.data },
             });
           }

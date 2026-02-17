@@ -493,6 +493,129 @@ describe('SessionManager', () => {
       });
     });
 
+    describe('image content block prompt formatting', () => {
+      let capturedPromptContent: unknown;
+
+      function mockQueryCapturingPrompt(messages: Array<Record<string, unknown>>): void {
+        mockQuery.mockImplementation((args: Record<string, unknown>) => {
+          const promptIterable = args.prompt as AsyncIterable<Record<string, unknown>>;
+          (async () => {
+            for await (const msg of promptIterable) {
+              capturedPromptContent = (msg as Record<string, unknown>).message;
+              break;
+            }
+          })();
+          return mockQueryResponse(messages);
+        });
+      }
+
+      it('reorders images before text with labels', async () => {
+        mockQueryCapturingPrompt([initMsg('sess-img'), successResult()]);
+
+        await manager.createSession({
+          prompt: [
+            { type: 'text', text: 'Fix the header in the screenshot' },
+            {
+              type: 'image',
+              id: 'img-prompt-1',
+              source: { type: 'base64', mediaType: 'image/png', data: 'iVBORw0KGgo=' },
+            },
+          ],
+          cwd: '/tmp',
+        });
+
+        expect(capturedPromptContent).toEqual({
+          role: 'user',
+          content: [
+            { type: 'text', text: 'Attachment 1:' },
+            {
+              type: 'image',
+              source: { type: 'base64', media_type: 'image/png', data: 'iVBORw0KGgo=' },
+            },
+            { type: 'text', text: 'Fix the header in the screenshot' },
+          ],
+        });
+      });
+
+      it('labels multiple images sequentially', async () => {
+        mockQueryCapturingPrompt([initMsg('sess-multi-img'), successResult()]);
+
+        await manager.createSession({
+          prompt: [
+            { type: 'text', text: 'Fix Image 1 to match Image 2' },
+            {
+              type: 'image',
+              id: 'img-a',
+              source: { type: 'base64', mediaType: 'image/png', data: 'png-data' },
+            },
+            {
+              type: 'image',
+              id: 'img-b',
+              source: { type: 'base64', mediaType: 'image/jpeg', data: 'jpeg-data' },
+            },
+          ],
+          cwd: '/tmp',
+        });
+
+        expect(capturedPromptContent).toEqual({
+          role: 'user',
+          content: [
+            { type: 'text', text: 'Attachment 1:' },
+            {
+              type: 'image',
+              source: { type: 'base64', media_type: 'image/png', data: 'png-data' },
+            },
+            { type: 'text', text: 'Attachment 2:' },
+            {
+              type: 'image',
+              source: { type: 'base64', media_type: 'image/jpeg', data: 'jpeg-data' },
+            },
+            { type: 'text', text: 'Fix Image 1 to match Image 2' },
+          ],
+        });
+      });
+
+      it('handles image-only prompt with label', async () => {
+        mockQueryCapturingPrompt([initMsg('sess-img-only'), successResult()]);
+
+        await manager.createSession({
+          prompt: [
+            {
+              type: 'image',
+              id: 'img-solo',
+              source: { type: 'base64', mediaType: 'image/jpeg', data: '/9j/4AAQ' },
+            },
+          ],
+          cwd: '/tmp',
+        });
+
+        expect(capturedPromptContent).toEqual({
+          role: 'user',
+          content: [
+            { type: 'text', text: 'Attachment 1:' },
+            {
+              type: 'image',
+              source: { type: 'base64', media_type: 'image/jpeg', data: '/9j/4AAQ' },
+            },
+          ],
+        });
+      });
+
+      it('passes text-only prompt without image labels', async () => {
+        mockQueryCapturingPrompt([initMsg('sess-text-only'), successResult()]);
+
+        await manager.createSession({
+          prompt: [{ type: 'text', text: 'Just a text message' }],
+          cwd: '/tmp',
+        });
+
+        expect(capturedPromptContent).toEqual({
+          role: 'user',
+          content: [{ type: 'text', text: 'Just a text message' }],
+        });
+      });
+    });
+
     describe('error handling', () => {
       it('marks session failed on error_max_turns', async () => {
         mockQuery.mockReturnValue(
@@ -1215,6 +1338,139 @@ describe('SessionManager', () => {
       });
 
       expect(manager.getLatestUserPrompt()).toBe('With a tool result');
+    });
+  });
+
+  describe('getLatestUserContentBlocks', () => {
+    it('returns null when conversation is empty', () => {
+      expect(manager.getLatestUserContentBlocks()).toBeNull();
+    });
+
+    it('returns text blocks from the last user message', () => {
+      taskDoc.conversation.push({
+        messageId: 'msg-1',
+        role: 'user',
+        content: [{ type: 'text', text: 'Hello world' }],
+        timestamp: Date.now(),
+        model: null,
+        machineId: null,
+        reasoningEffort: null,
+        permissionMode: null,
+        cwd: null,
+      });
+
+      expect(manager.getLatestUserContentBlocks()).toEqual([{ type: 'text', text: 'Hello world' }]);
+    });
+
+    it('returns image blocks alongside text blocks', () => {
+      taskDoc.conversation.push({
+        messageId: 'msg-img',
+        role: 'user',
+        content: [
+          { type: 'text', text: 'Check this screenshot' },
+          {
+            type: 'image',
+            id: 'img-1',
+            source: { type: 'base64', mediaType: 'image/png', data: 'iVBORw0KGgo=' },
+          },
+        ],
+        timestamp: Date.now(),
+        model: null,
+        machineId: null,
+        reasoningEffort: null,
+        permissionMode: null,
+        cwd: null,
+      });
+
+      const blocks = manager.getLatestUserContentBlocks();
+      expect(blocks).toHaveLength(2);
+      expect(blocks![0]).toEqual({ type: 'text', text: 'Check this screenshot' });
+      expect(blocks![1]).toEqual({
+        type: 'image',
+        id: 'img-1',
+        source: { type: 'base64', mediaType: 'image/png', data: 'iVBORw0KGgo=' },
+      });
+    });
+
+    it('returns image-only messages (no text)', () => {
+      taskDoc.conversation.push({
+        messageId: 'msg-img-only',
+        role: 'user',
+        content: [
+          {
+            type: 'image',
+            id: 'img-only-1',
+            source: { type: 'base64', mediaType: 'image/jpeg', data: '/9j/4AAQ' },
+          },
+        ],
+        timestamp: Date.now(),
+        model: null,
+        machineId: null,
+        reasoningEffort: null,
+        permissionMode: null,
+        cwd: null,
+      });
+
+      const blocks = manager.getLatestUserContentBlocks();
+      expect(blocks).toHaveLength(1);
+      expect(blocks![0]).toEqual({
+        type: 'image',
+        id: 'img-only-1',
+        source: { type: 'base64', mediaType: 'image/jpeg', data: '/9j/4AAQ' },
+      });
+    });
+
+    it('filters out non-user-facing block types (tool_use, tool_result, thinking)', () => {
+      taskDoc.conversation.push({
+        messageId: 'msg-mixed-all',
+        role: 'user',
+        content: [
+          {
+            type: 'tool_result',
+            toolUseId: 'tu-1',
+            content: 'result',
+            isError: false,
+            parentToolUseId: null,
+          },
+          { type: 'text', text: 'With context' },
+          {
+            type: 'image',
+            id: 'img-mixed-1',
+            source: { type: 'base64', mediaType: 'image/png', data: 'abc123' },
+          },
+        ],
+        timestamp: Date.now(),
+        model: null,
+        machineId: null,
+        reasoningEffort: null,
+        permissionMode: null,
+        cwd: null,
+      });
+
+      const blocks = manager.getLatestUserContentBlocks();
+      expect(blocks).toHaveLength(2);
+      expect(blocks![0]).toEqual({ type: 'text', text: 'With context' });
+      expect(blocks![1]).toEqual({
+        type: 'image',
+        id: 'img-mixed-1',
+        source: { type: 'base64', mediaType: 'image/png', data: 'abc123' },
+      });
+    });
+
+    it('returns null when only assistant messages exist', () => {
+      taskDoc.conversation.push({
+        messageId: 'msg-agent',
+        role: 'assistant',
+        content: [{ type: 'text', text: 'Assistant only' }],
+        timestamp: Date.now(),
+        model: null,
+        machineId: null,
+        reasoningEffort: null,
+        permissionMode: null,
+        cwd: null,
+      });
+
+      expect(manager.getLatestUserContentBlocks()).toBeNull();
     });
   });
 

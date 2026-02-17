@@ -1,5 +1,6 @@
 import { Button, Chip, Tooltip } from '@heroui/react';
 import type { ContentBlock, ImageSource } from '@shipyard/loro-schema';
+import { SUPPORTED_IMAGE_MEDIA_TYPES } from '@shipyard/loro-schema';
 import {
   AlertCircle,
   BrainCircuit,
@@ -388,20 +389,21 @@ function SubagentGroup({ taskToolUse, taskToolResult, children }: SubagentGroupP
           aria-label={`Subagent: ${description}`}
           className="ml-5 border-l-2 border-l-secondary/30 pl-3 mt-0.5 mb-1 space-y-1"
         >
-          {children.map((child, i) => (
-            <GroupedBlockRenderer
-              key={
-                child.kind === 'tool_invocation'
-                  ? child.toolUse.toolUseId
-                  : child.kind === 'subagent_group'
-                    ? child.taskToolUse.toolUseId
-                    : child.kind === 'plan'
-                      ? child.toolUse.toolUseId
-                      : `${child.kind}-${i}`
-              }
-              group={child}
-            />
-          ))}
+          {(() => {
+            const imgTotal = children.filter((c) => c.kind === 'image').length;
+            let imgIdx = 0;
+            return children.map((child, i) => {
+              const thisImgIdx = child.kind === 'image' ? imgIdx++ : 0;
+              return (
+                <GroupedBlockRenderer
+                  key={groupedBlockKey(child, i)}
+                  group={child}
+                  imageIndex={thisImgIdx}
+                  imageTotal={imgTotal}
+                />
+              );
+            });
+          })()}
         </div>
       )}
     </div>
@@ -553,7 +555,7 @@ function PlanBlock({ group }: { group: GroupedBlock & { kind: 'plan' } }) {
   );
 }
 
-const SAFE_IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/webp']);
+const SAFE_IMAGE_TYPES: ReadonlySet<string> = new Set(SUPPORTED_IMAGE_MEDIA_TYPES);
 
 function imageSourceToUrl(source: ImageSource): string | null {
   if (source.type === 'base64') {
@@ -563,7 +565,33 @@ function imageSourceToUrl(source: ImageSource): string | null {
   return null;
 }
 
-function ImageBlockView({ block }: { block: ContentBlock & { type: 'image' } }) {
+/** Browsers block `data:` URIs opened via target="_blank" — convert to blob URL instead */
+function openImageInNewTab(source: ImageSource) {
+  if (source.type !== 'base64' || !SAFE_IMAGE_TYPES.has(source.mediaType)) return;
+
+  try {
+    const byteString = atob(source.data);
+    const bytes = new Uint8Array(byteString.length);
+    for (let i = 0; i < byteString.length; i++) {
+      bytes[i] = byteString.charCodeAt(i);
+    }
+    const blob = new Blob([bytes], { type: source.mediaType });
+    const blobUrl = URL.createObjectURL(blob);
+
+    window.open(blobUrl, '_blank', 'noopener,noreferrer');
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
+  } catch {
+    /** CRDT data may arrive corrupted from peers — gracefully ignore decode failures */
+  }
+}
+
+interface ImageBlockViewProps {
+  block: ContentBlock & { type: 'image' };
+  index: number;
+  total: number;
+}
+
+function ImageBlockView({ block, index, total }: ImageBlockViewProps) {
   const src = imageSourceToUrl(block.source);
 
   if (!src) {
@@ -575,15 +603,31 @@ function ImageBlockView({ block }: { block: ContentBlock & { type: 'image' } }) 
   }
 
   return (
-    <img
-      src={src}
-      alt="User attachment"
-      className="max-w-full max-h-80 rounded-lg border border-separator"
-    />
+    <button
+      type="button"
+      onClick={() => openImageInNewTab(block.source)}
+      aria-label="Open attachment in new tab"
+      className="text-left"
+    >
+      <img
+        src={src}
+        alt={`Attachment ${index + 1} of ${total}`}
+        loading="lazy"
+        className="max-w-sm max-h-60 object-contain rounded-lg border border-separator cursor-pointer hover:opacity-90 motion-safe:transition-opacity"
+      />
+    </button>
   );
 }
 
-function GroupedBlockRenderer({ group }: { group: GroupedBlock }) {
+function GroupedBlockRenderer({
+  group,
+  imageIndex,
+  imageTotal,
+}: {
+  group: GroupedBlock;
+  imageIndex: number;
+  imageTotal: number;
+}) {
   switch (group.kind) {
     case 'text':
       return (
@@ -596,7 +640,7 @@ function GroupedBlockRenderer({ group }: { group: GroupedBlock }) {
         </ReactMarkdown>
       );
     case 'image':
-      return <ImageBlockView block={group.block} />;
+      return <ImageBlockView block={group.block} index={imageIndex} total={imageTotal} />;
     case 'thinking':
       return <ThinkingBlock block={group.block} />;
     case 'tool_invocation':
@@ -614,6 +658,13 @@ function GroupedBlockRenderer({ group }: { group: GroupedBlock }) {
     default:
       return assertNever(group);
   }
+}
+
+function groupedBlockKey(group: GroupedBlock, index: number): string {
+  if (group.kind === 'tool_invocation') return group.toolUse.toolUseId;
+  if (group.kind === 'subagent_group') return group.taskToolUse.toolUseId;
+  if (group.kind === 'plan') return group.toolUse.toolUseId;
+  return `${group.kind}-${index}`;
 }
 
 const VERSION_RE = /^(.+?)\s+([\d.]+)$/;
@@ -655,22 +706,119 @@ function AgentMessage({ message }: ChatMessageProps) {
         </div>
       ) : (
         <div className="text-sm text-foreground/90 leading-normal prose-shipyard space-y-1.5">
-          {grouped.map((group, i) => (
-            <GroupedBlockRenderer
-              key={
-                group.kind === 'tool_invocation'
-                  ? group.toolUse.toolUseId
-                  : group.kind === 'subagent_group'
-                    ? group.taskToolUse.toolUseId
-                    : group.kind === 'plan'
-                      ? group.toolUse.toolUseId
-                      : `${group.kind}-${i}`
-              }
-              group={group}
-            />
-          ))}
+          {(() => {
+            const imgTotal = grouped.filter((g) => g.kind === 'image').length;
+            let imgIdx = 0;
+            return grouped.map((group, i) => {
+              const thisImgIdx = group.kind === 'image' ? imgIdx++ : 0;
+              return (
+                <GroupedBlockRenderer
+                  key={groupedBlockKey(group, i)}
+                  group={group}
+                  imageIndex={thisImgIdx}
+                  imageTotal={imgTotal}
+                />
+              );
+            });
+          })()}
         </div>
       )}
+    </div>
+  );
+}
+
+function ImageBadge({ number }: { number: number }) {
+  return (
+    <span
+      className="absolute top-1 left-1 z-10 w-4 h-4 rounded-full bg-foreground/80 text-background text-[9px] font-semibold flex items-center justify-center"
+      aria-hidden="true"
+    >
+      {number}
+    </span>
+  );
+}
+
+function UserImageGrid({ imageBlocks }: { imageBlocks: (ContentBlock & { type: 'image' })[] }) {
+  const total = imageBlocks.length;
+
+  if (total === 1) {
+    const block = imageBlocks[0];
+    if (!block) return null;
+    const src = imageSourceToUrl(block.source);
+    if (!src) return null;
+    return (
+      <div className="relative inline-block">
+        <ImageBadge number={1} />
+        <button
+          type="button"
+          onClick={() => openImageInNewTab(block.source)}
+          aria-label="Open attachment in new tab"
+          className="text-left"
+        >
+          <img
+            src={src}
+            alt={`Attachment 1 of ${total}`}
+            loading="lazy"
+            className="max-w-36 max-h-36 object-contain rounded-lg cursor-pointer hover:opacity-90 motion-safe:transition-opacity"
+          />
+        </button>
+      </div>
+    );
+  }
+
+  const visibleCount = total <= 4 ? total : 3;
+  const overflow = total > 4 ? total - 3 : 0;
+
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {imageBlocks.slice(0, visibleCount).map((block, i) => {
+        const src = imageSourceToUrl(block.source);
+        if (!src) return null;
+        return (
+          <div
+            key={block.id ?? `img-${i}`}
+            className="relative w-20 h-20 overflow-hidden rounded-lg shrink-0"
+          >
+            <ImageBadge number={i + 1} />
+            <button
+              type="button"
+              onClick={() => openImageInNewTab(block.source)}
+              aria-label="Open attachment in new tab"
+              className="block w-full h-full"
+            >
+              <img
+                src={src}
+                alt={`Attachment ${i + 1} of ${total}`}
+                loading="lazy"
+                className="w-full h-full object-cover cursor-pointer hover:opacity-90 motion-safe:transition-opacity"
+              />
+            </button>
+          </div>
+        );
+      })}
+      {overflow > 0 &&
+        (() => {
+          const overflowBlock = imageBlocks[3];
+          if (!overflowBlock) return null;
+          const overflowSrc = imageSourceToUrl(overflowBlock.source);
+          if (!overflowSrc) return null;
+          return (
+            <div
+              key={overflowBlock.id ?? 'img-overflow'}
+              className="relative w-20 h-20 overflow-hidden rounded-lg shrink-0"
+            >
+              <img
+                src={overflowSrc}
+                alt={`Attachment 4 of ${total}`}
+                loading="lazy"
+                className="w-full h-full object-cover"
+              />
+              <div className="absolute inset-0 bg-black/60 rounded-lg flex items-center justify-center">
+                <span className="text-sm font-semibold text-white">+{overflow}</span>
+              </div>
+            </div>
+          );
+        })()}
     </div>
   );
 }
@@ -683,21 +831,20 @@ function UserMessage({ message }: ChatMessageProps) {
     (b): b is ContentBlock & { type: 'image' } => b.type === 'image'
   );
   const textContent = textBlocks.map((b) => b.text).join('\n');
+  const imageOnly = !textContent && imageBlocks.length > 0;
 
   return (
     <div className="flex justify-end max-w-3xl ml-auto">
-      <div className="bg-default rounded-2xl px-4 py-2.5 max-w-[80%]">
+      <div className={`bg-default rounded-2xl max-w-[80%] ${imageOnly ? 'p-1.5' : 'px-4 py-2.5'}`}>
         <span className="sr-only">You:</span>
+        {imageBlocks.length > 0 && (
+          <div className={textContent ? 'mb-2' : ''}>
+            <UserImageGrid imageBlocks={imageBlocks} />
+          </div>
+        )}
         {textContent && (
           <div className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">
             {textContent}
-          </div>
-        )}
-        {imageBlocks.length > 0 && (
-          <div className={`flex flex-wrap gap-2 ${textContent ? 'mt-2' : ''}`}>
-            {imageBlocks.map((block, i) => (
-              <ImageBlockView key={`img-${i}`} block={block} />
-            ))}
           </div>
         )}
       </div>

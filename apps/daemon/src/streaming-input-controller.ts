@@ -1,5 +1,6 @@
 import type { SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
 
+type MessageParam = SDKUserMessage['message'];
 type Resolver = (result: IteratorResult<SDKUserMessage>) => void;
 
 export class StreamingInputController {
@@ -7,7 +8,7 @@ export class StreamingInputController {
   #waiting: Resolver | null = null;
   #done = false;
 
-  push(message: string): void {
+  push(message: string | MessageParam['content']): void {
     const sdkMessage: SDKUserMessage = {
       type: 'user',
       message: {

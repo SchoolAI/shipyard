@@ -19,6 +19,8 @@ const CONTENT_BLOCK_TYPES = ['text', 'tool_use', 'tool_result', 'thinking', 'ima
 
 const IMAGE_SOURCE_TYPES = ['base64'] as const;
 
+const SUPPORTED_IMAGE_MEDIA_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'] as const;
+
 /**
  * Image source discriminated union.
  * Discriminated by 'type' — currently only 'base64' (inline).
@@ -61,6 +63,7 @@ export const ContentBlockShape = Shape.plain.discriminatedUnion('type', {
   }),
   image: Shape.plain.struct({
     type: Shape.plain.string('image'),
+    id: Shape.plain.string(),
     source: ImageSourceShape,
   }),
 });
@@ -241,11 +244,13 @@ export type DiffCommentSide = (typeof DIFF_COMMENT_SIDES)[number];
 export type DiffCommentScope = (typeof DIFF_COMMENT_SCOPES)[number];
 export type ImageSourceType = (typeof IMAGE_SOURCE_TYPES)[number];
 export type ImageSource = Infer<typeof ImageSourceShape>;
+export type SupportedImageMediaType = (typeof SUPPORTED_IMAGE_MEDIA_TYPES)[number];
 export {
   A2A_TASK_STATES,
   COMMENT_AUTHOR_TYPES,
   CONTENT_BLOCK_TYPES,
   IMAGE_SOURCE_TYPES,
+  SUPPORTED_IMAGE_MEDIA_TYPES,
   DIFF_COMMENT_SCOPES,
   DIFF_COMMENT_SIDES,
   PERMISSION_MODES,

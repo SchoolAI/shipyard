@@ -126,6 +126,7 @@ interface ActiveTask {
   taskId: string;
   abortController: AbortController;
   sessionManager: SessionManager;
+  lastDispatchedConvLen: number;
 }
 
 /**
@@ -154,6 +155,7 @@ export async function serve(env: Env): Promise<void> {
   const { signaling, connection, capabilities } = handle;
   const activeTasks = new Map<string, ActiveTask>();
   const watchedTasks = new Map<string, () => void>();
+  const taskHandles = new Map<string, TaskHandle>();
 
   const devSuffix = env.SHIPYARD_DEV ? '-dev' : '';
   const machineId = env.SHIPYARD_MACHINE_ID ?? `${hostname()}${devSuffix}`;
@@ -433,6 +435,7 @@ export async function serve(env: Env): Promise<void> {
       lifecycle,
       activeTasks,
       watchedTasks,
+      taskHandles,
       peerManager,
       env,
       machineId,
@@ -465,6 +468,7 @@ export async function serve(env: Env): Promise<void> {
       unsub();
     }
     watchedTasks.clear();
+    taskHandles.clear();
 
     for (const [id, ptyMgr] of terminalPtys) {
       ptyMgr.dispose();
@@ -492,6 +496,7 @@ interface MessageHandlerContext {
   lifecycle: LifecycleManager;
   activeTasks: Map<string, ActiveTask>;
   watchedTasks: Map<string, () => void>;
+  taskHandles: Map<string, TaskHandle>;
   peerManager: PeerManager;
   env: Env;
   machineId: string;
@@ -740,13 +745,17 @@ function handleNotifyTask(
   }
 
   if (ctx.watchedTasks.has(taskId)) {
-    taskLog.debug('Task already watched, sending ack');
+    taskLog.debug('Task already watched, re-checking for new work');
     ctx.connection.send({
       type: 'task-ack',
       requestId,
       taskId,
       accepted: true,
     });
+    const taskHandle = ctx.taskHandles.get(taskId);
+    if (taskHandle) {
+      onTaskDocChanged(taskId, taskHandle, taskLog, ctx);
+    }
     return;
   }
 
@@ -939,12 +948,11 @@ async function watchTaskDocument(
 
   const unsubscribe = taskHandle.subscribe((event) => {
     taskLog.info({ taskDocId, eventBy: event.by }, 'Subscription event received');
-    if (event.by === 'local') return;
-
     onTaskDocChanged(taskId, taskHandle, taskLog, ctx);
   });
 
   ctx.watchedTasks.set(taskId, unsubscribe);
+  ctx.taskHandles.set(taskId, taskHandle);
   taskLog.info({ taskDocId }, 'Subscribed to task document changes');
 
   /**
@@ -965,18 +973,27 @@ async function watchTaskDocument(
 
 function handleFollowUp(
   activeTask: ActiveTask | undefined,
+  conversationLen: number,
   taskLog: ReturnType<typeof createChildLogger>
 ): void {
   if (!activeTask) return;
+  if (conversationLen <= activeTask.lastDispatchedConvLen) {
+    taskLog.debug(
+      { conversationLen, lastDispatched: activeTask.lastDispatchedConvLen },
+      'Conversation unchanged since last dispatch, skipping duplicate'
+    );
+    return;
+  }
   if (!activeTask.sessionManager.isStreaming) {
     taskLog.debug('Task already running but not streaming, skipping');
     return;
   }
-  const prompt = activeTask.sessionManager.getLatestUserPrompt();
-  if (prompt) {
+  const contentBlocks = activeTask.sessionManager.getLatestUserContentBlocks();
+  if (contentBlocks && contentBlocks.length > 0) {
     try {
       taskLog.info('Sending follow-up to active streaming session');
-      activeTask.sessionManager.sendFollowUp(prompt);
+      activeTask.lastDispatchedConvLen = conversationLen;
+      activeTask.sessionManager.sendFollowUp(contentBlocks);
     } catch (err: unknown) {
       taskLog.warn({ err }, 'Failed to send follow-up to streaming session');
     }
@@ -1010,7 +1027,7 @@ function onTaskDocChanged(
     const conversation = json.conversation;
     const lastMessage = conversation[conversation.length - 1];
     if (lastMessage?.role === 'user') {
-      handleFollowUp(ctx.activeTasks.get(taskId), taskLog);
+      handleFollowUp(ctx.activeTasks.get(taskId), conversation.length, taskLog);
     }
 
     const activeLastUserMsg = [...conversation].reverse().find((m) => m.role === 'user');
@@ -1054,7 +1071,12 @@ function onTaskDocChanged(
   };
   const manager = new SessionManager(doc, onStatusChange);
 
-  const activeTask: ActiveTask = { taskId, abortController, sessionManager: manager };
+  const activeTask: ActiveTask = {
+    taskId,
+    abortController,
+    sessionManager: manager,
+    lastDispatchedConvLen: conversation.length,
+  };
   ctx.activeTasks.set(taskId, activeTask);
 
   ctx.signaling.updateStatus('running', taskId);
@@ -1154,6 +1176,7 @@ async function cleanupTaskRun(opts: CleanupTaskRunOptions): Promise<void> {
   }
 
   ctx.activeTasks.delete(taskId);
+  ctx.taskHandles.delete(taskId);
   const unsub = ctx.watchedTasks.get(taskId);
   if (unsub) {
     unsub();
@@ -1452,12 +1475,21 @@ async function runTask(opts: RunTaskOptions): Promise<SessionResult> {
     log,
   } = opts;
 
-  const prompt = manager.getLatestUserPrompt();
-  if (!prompt) {
+  const contentBlocks = manager.getLatestUserContentBlocks();
+  if (!contentBlocks || contentBlocks.length === 0) {
     throw new Error(`No user message found in task ${taskId}`);
   }
 
-  log.info({ prompt: prompt.slice(0, 100) }, 'Running task with prompt from CRDT');
+  const textPreview = contentBlocks
+    .filter((b): b is typeof b & { type: 'text' } => b.type === 'text')
+    .map((b) => b.text)
+    .join(' ')
+    .slice(0, 100);
+  const imageCount = contentBlocks.filter((b) => b.type === 'image').length;
+  log.info(
+    { prompt: textPreview || '(images only)', imageCount },
+    'Running task with prompt from CRDT'
+  );
 
   const canUseTool =
     permissionMode === 'bypassPermissions'
@@ -1477,7 +1509,7 @@ async function runTask(opts: RunTaskOptions): Promise<SessionResult> {
   const resumeInfo = manager.shouldResume();
   if (resumeInfo.resume && resumeInfo.sessionId) {
     log.info({ sessionId: resumeInfo.sessionId }, 'Resuming existing session');
-    return manager.resumeSession(resumeInfo.sessionId, prompt, {
+    return manager.resumeSession(resumeInfo.sessionId, contentBlocks, {
       abortController,
       machineId,
       model,
@@ -1490,7 +1522,7 @@ async function runTask(opts: RunTaskOptions): Promise<SessionResult> {
   }
 
   return manager.createSession({
-    prompt,
+    prompt: contentBlocks,
     cwd,
     machineId,
     model,

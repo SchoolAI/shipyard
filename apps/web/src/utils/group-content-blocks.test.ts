@@ -11,7 +11,7 @@ function thinking(t: string): ContentBlock {
 }
 
 function image(mediaType = 'image/png', data = 'iVBOR...'): ContentBlock {
-  return { type: 'image', source: { type: 'base64', mediaType, data } };
+  return { type: 'image', id: crypto.randomUUID(), source: { type: 'base64', mediaType, data } };
 }
 
 function toolUse(
