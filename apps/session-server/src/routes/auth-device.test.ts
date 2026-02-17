@@ -208,6 +208,7 @@ describe('Device Flow', () => {
       expect(json.user).toEqual({
         id: 'usr_device123',
         displayName: 'Device User',
+        avatarUrl: 'https://avatars.githubusercontent.com/u/99999',
         providers: ['github'],
       });
     });

@@ -40,6 +40,14 @@ catalog:
   "@cloudflare/workers-types": "^4.20260122.0"
   "@cloudflare/vitest-pool-workers": "^0.8.0"
 
+  # ===== TipTap / ProseMirror =====
+  "@tiptap/core": "^3.18.0"
+  "@tiptap/react": "^3.18.0"
+  "@tiptap/starter-kit": "^3.18.0"
+  "@tiptap/pm": "^3.18.0"
+  "@tiptap/extension-placeholder": "^3.18.0"
+  loro-prosemirror: "^0.4.2"
+
   # ===== Frontend =====
   react: "^19.2.3"
   react-dom: "^19.2.3"

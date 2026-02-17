@@ -174,6 +174,8 @@ export const TaskDocumentSchema = Shape.doc({
 
   plans: Shape.list(PlanVersionShape),
 
+  planEditorDocs: Shape.record(Shape.any()),
+
   diffComments: Shape.record(DiffCommentShape),
 });
 

@@ -4,14 +4,9 @@ import { Button, Chip } from '@heroui/react';
 import type { PlanVersion } from '@shipyard/loro-schema';
 import { Check, ClipboardList, MessageSquareX } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import ReactMarkdown from 'react-markdown';
 import { usePlanApproval } from '../../contexts/plan-approval-context';
 import { useTaskDocument } from '../../hooks/use-task-document';
-import {
-  markdownComponents,
-  REHYPE_PLUGINS,
-  REMARK_PLUGINS,
-} from '../../utils/markdown-components';
+import { PlanEditor } from '../plan-editor';
 
 function EmptyState() {
   return (
@@ -162,13 +157,7 @@ function PlanPanelContent({ activeTaskId }: { activeTaskId: string | null }) {
       >
         {activePlan ? (
           <div className="px-4 py-3 text-sm text-foreground/90 leading-relaxed">
-            <ReactMarkdown
-              remarkPlugins={REMARK_PLUGINS}
-              rehypePlugins={REHYPE_PLUGINS}
-              components={markdownComponents}
-            >
-              {activePlan.markdown}
-            </ReactMarkdown>
+            <PlanEditor markdown={activePlan.markdown} />
           </div>
         ) : (
           <EmptyState />

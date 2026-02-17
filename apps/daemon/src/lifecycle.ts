@@ -1,4 +1,20 @@
+import { unlinkSync } from 'node:fs';
+import { readFile, unlink, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { logger } from './logger.js';
+
+function isProcessAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function isEnoent(err: unknown): boolean {
+  return typeof err === 'object' && err !== null && 'code' in err && err.code === 'ENOENT';
+}
 
 /**
  * Manages graceful shutdown for the daemon process.
@@ -12,6 +28,7 @@ export class LifecycleManager {
   #shutdownCallbacks: Array<() => Promise<void>> = [];
   #isShuttingDown = false;
   #signalHandlers: { signal: string; handler: () => void }[] = [];
+  #pidFilePath: string | null = null;
 
   constructor() {
     const termHandler = () => void this.#shutdown('SIGTERM');
@@ -32,6 +49,46 @@ export class LifecycleManager {
     this.#isShuttingDown = false;
     this.#shutdownCallbacks = [];
     this.#abortControllers.clear();
+    this.#removePidFileSync();
+  }
+
+  async acquirePidFile(shipyardHome: string): Promise<void> {
+    const pidFilePath = join(shipyardHome, 'daemon.pid');
+
+    try {
+      const existing = await readFile(pidFilePath, 'utf-8');
+      const pid = Number.parseInt(existing.trim(), 10);
+      if (!Number.isNaN(pid) && isProcessAlive(pid)) {
+        logger.error(
+          { pid, pidFile: pidFilePath },
+          'Another daemon is already running. Stop it first or remove the stale PID file.'
+        );
+        process.exit(1);
+      }
+      logger.info({ stalePid: pid, pidFile: pidFilePath }, 'Removing stale PID file');
+    } catch (err: unknown) {
+      if (!isEnoent(err)) throw err;
+    }
+
+    await writeFile(pidFilePath, String(process.pid), { mode: 0o644 });
+    this.#pidFilePath = pidFilePath;
+    logger.info({ pid: process.pid, pidFile: pidFilePath }, 'PID file acquired');
+  }
+
+  #removePidFileSync(): void {
+    if (!this.#pidFilePath) return;
+    try {
+      unlinkSync(this.#pidFilePath);
+    } catch {}
+    this.#pidFilePath = null;
+  }
+
+  async #removePidFile(): Promise<void> {
+    if (!this.#pidFilePath) return;
+    try {
+      await unlink(this.#pidFilePath);
+    } catch {}
+    this.#pidFilePath = null;
   }
 
   /**
@@ -74,6 +131,8 @@ export class LifecycleManager {
         logger.error({ error }, 'Error during shutdown callback');
       }
     }
+
+    await this.#removePidFile();
 
     logger.info('Shutdown complete');
     await new Promise((resolve) => setTimeout(resolve, 100));

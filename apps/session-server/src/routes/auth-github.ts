@@ -45,7 +45,12 @@ authGitHubRoute.post(ROUTES.AUTH_GITHUB_CALLBACK, async (c) => {
 
   const { user: shipyardUser, providers } = await findOrCreateUser('github', user, c.env.DB);
 
-  const shipyardToken = await generateSessionToken(shipyardUser, providers, c.env.JWT_SECRET);
+  const shipyardToken = await generateSessionToken(
+    shipyardUser,
+    providers,
+    c.env.JWT_SECRET,
+    c.env.ENVIRONMENT
+  );
 
   const userAgent = c.req.header('User-Agent');
   const isMobile = isMobileUserAgent(userAgent ?? null);

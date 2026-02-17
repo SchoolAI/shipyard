@@ -5,6 +5,7 @@ import { decodeToken, generateAgentToken, generateSessionToken, validateToken } 
 
 const testEnv = env as unknown as Env;
 const TEST_SECRET = testEnv.JWT_SECRET;
+const TEST_ENVIRONMENT = 'test';
 
 const mockUser = {
   id: 'usr_abc123',
@@ -16,7 +17,12 @@ const mockProviders = ['github'];
 describe('jwt', () => {
   describe('generateSessionToken', () => {
     it('generates valid JWT with correct structure', async () => {
-      const token = await generateSessionToken(mockUser, mockProviders, TEST_SECRET);
+      const token = await generateSessionToken(
+        mockUser,
+        mockProviders,
+        TEST_SECRET,
+        TEST_ENVIRONMENT
+      );
 
       const parts = token.split('.');
       expect(parts).toHaveLength(3);
@@ -27,10 +33,16 @@ describe('jwt', () => {
     });
 
     it('includes correct claims in payload', async () => {
-      const token = await generateSessionToken(mockUser, mockProviders, TEST_SECRET);
+      const token = await generateSessionToken(
+        mockUser,
+        mockProviders,
+        TEST_SECRET,
+        TEST_ENVIRONMENT
+      );
       const decoded = decodeToken(token);
 
       expect(decoded).not.toBeNull();
+      expect(decoded?.iss).toBe(`shipyard:${TEST_ENVIRONMENT}`);
       expect(decoded?.sub).toBe(mockUser.id);
       expect(decoded?.displayName).toBe(mockUser.displayName);
       expect(decoded?.providers).toEqual(mockProviders);
@@ -41,7 +53,12 @@ describe('jwt', () => {
     });
 
     it('generates token with 30-day expiration', async () => {
-      const token = await generateSessionToken(mockUser, mockProviders, TEST_SECRET);
+      const token = await generateSessionToken(
+        mockUser,
+        mockProviders,
+        TEST_SECRET,
+        TEST_ENVIRONMENT
+      );
       const decoded = decodeToken(token);
 
       expect(decoded).not.toBeNull();
@@ -60,7 +77,8 @@ describe('jwt', () => {
         mockProviders,
         taskId,
         machineId,
-        TEST_SECRET
+        TEST_SECRET,
+        TEST_ENVIRONMENT
       );
       const decoded = decodeToken(token);
 
@@ -78,7 +96,8 @@ describe('jwt', () => {
         mockProviders,
         taskId,
         machineId,
-        TEST_SECRET
+        TEST_SECRET,
+        TEST_ENVIRONMENT
       );
       const decoded = decodeToken(token);
 
@@ -90,8 +109,13 @@ describe('jwt', () => {
 
   describe('validateToken', () => {
     it('validates correctly signed token', async () => {
-      const token = await generateSessionToken(mockUser, mockProviders, TEST_SECRET);
-      const claims = await validateToken(token, TEST_SECRET);
+      const token = await generateSessionToken(
+        mockUser,
+        mockProviders,
+        TEST_SECRET,
+        TEST_ENVIRONMENT
+      );
+      const claims = await validateToken(token, TEST_SECRET, TEST_ENVIRONMENT);
 
       expect(claims).not.toBeNull();
       expect(claims?.sub).toBe(mockUser.id);
@@ -99,57 +123,72 @@ describe('jwt', () => {
     });
 
     it('returns null for undefined token', async () => {
-      const claims = await validateToken(undefined, TEST_SECRET);
+      const claims = await validateToken(undefined, TEST_SECRET, TEST_ENVIRONMENT);
       expect(claims).toBeNull();
     });
 
     it('returns null for empty string token', async () => {
-      const claims = await validateToken('', TEST_SECRET);
+      const claims = await validateToken('', TEST_SECRET, TEST_ENVIRONMENT);
       expect(claims).toBeNull();
     });
 
     it('returns null for malformed token (not 3 parts)', async () => {
-      const claims = await validateToken('only.two', TEST_SECRET);
+      const claims = await validateToken('only.two', TEST_SECRET, TEST_ENVIRONMENT);
       expect(claims).toBeNull();
     });
 
     it('returns null for token with empty parts', async () => {
-      const claims = await validateToken('..', TEST_SECRET);
+      const claims = await validateToken('..', TEST_SECRET, TEST_ENVIRONMENT);
       expect(claims).toBeNull();
     });
 
     it('returns null for token with missing header', async () => {
-      const claims = await validateToken('.payload.signature', TEST_SECRET);
+      const claims = await validateToken('.payload.signature', TEST_SECRET, TEST_ENVIRONMENT);
       expect(claims).toBeNull();
     });
 
     it('returns null for token with missing payload', async () => {
-      const claims = await validateToken('header..signature', TEST_SECRET);
+      const claims = await validateToken('header..signature', TEST_SECRET, TEST_ENVIRONMENT);
       expect(claims).toBeNull();
     });
 
     it('returns null for token with missing signature', async () => {
-      const claims = await validateToken('header.payload.', TEST_SECRET);
+      const claims = await validateToken('header.payload.', TEST_SECRET, TEST_ENVIRONMENT);
       expect(claims).toBeNull();
     });
 
     it('returns null for token with invalid signature', async () => {
-      const token = await generateSessionToken(mockUser, mockProviders, TEST_SECRET);
+      const token = await generateSessionToken(
+        mockUser,
+        mockProviders,
+        TEST_SECRET,
+        TEST_ENVIRONMENT
+      );
       const invalidToken = `${token.slice(0, -1)}X`;
-      const claims = await validateToken(invalidToken, TEST_SECRET);
+      const claims = await validateToken(invalidToken, TEST_SECRET, TEST_ENVIRONMENT);
 
       expect(claims).toBeNull();
     });
 
     it('returns null for token signed with different secret', async () => {
-      const token = await generateSessionToken(mockUser, mockProviders, 'wrong-secret');
-      const claims = await validateToken(token, TEST_SECRET);
+      const token = await generateSessionToken(
+        mockUser,
+        mockProviders,
+        'wrong-secret',
+        TEST_ENVIRONMENT
+      );
+      const claims = await validateToken(token, TEST_SECRET, TEST_ENVIRONMENT);
 
       expect(claims).toBeNull();
     });
 
     it('returns null for expired token', async () => {
-      const token = await generateSessionToken(mockUser, mockProviders, TEST_SECRET);
+      const token = await generateSessionToken(
+        mockUser,
+        mockProviders,
+        TEST_SECRET,
+        TEST_ENVIRONMENT
+      );
       const decoded = decodeToken(token);
 
       const header = { alg: 'HS256', typ: 'JWT' };
@@ -166,7 +205,7 @@ describe('jwt', () => {
       const signature = await hmacSign(`${headerB64}.${payloadB64}`, TEST_SECRET);
       const expiredToken = `${headerB64}.${payloadB64}.${signature}`;
 
-      const claims = await validateToken(expiredToken, TEST_SECRET);
+      const claims = await validateToken(expiredToken, TEST_SECRET, TEST_ENVIRONMENT);
       expect(claims).toBeNull();
     });
 
@@ -177,7 +216,7 @@ describe('jwt', () => {
       const signature = await hmacSign(`${header}.${payload}`, TEST_SECRET);
       const token = `${header}.${payload}.${signature}`;
 
-      const claims = await validateToken(token, TEST_SECRET);
+      const claims = await validateToken(token, TEST_SECRET, TEST_ENVIRONMENT);
       expect(claims).toBeNull();
     });
 
@@ -188,7 +227,7 @@ describe('jwt', () => {
       const signature = await hmacSign(`${header}.${invalidPayload}`, TEST_SECRET);
       const token = `${header}.${invalidPayload}.${signature}`;
 
-      const claims = await validateToken(token, TEST_SECRET);
+      const claims = await validateToken(token, TEST_SECRET, TEST_ENVIRONMENT);
       expect(claims).toBeNull();
     });
 
@@ -198,19 +237,39 @@ describe('jwt', () => {
         mockProviders,
         'task-123',
         'machine-456',
-        TEST_SECRET
+        TEST_SECRET,
+        TEST_ENVIRONMENT
       );
-      const claims = await validateToken(token, TEST_SECRET);
+      const claims = await validateToken(token, TEST_SECRET, TEST_ENVIRONMENT);
 
       expect(claims).not.toBeNull();
       expect(claims?.scope).toBe('task:task-123');
       expect(claims?.machineId).toBe('machine-456');
     });
+
+    it('returns null when environment does not match iss claim', async () => {
+      const token = await generateSessionToken(mockUser, mockProviders, TEST_SECRET, 'development');
+      const claims = await validateToken(token, TEST_SECRET, 'production');
+
+      expect(claims).toBeNull();
+    });
+
+    it('returns null for token from different environment', async () => {
+      const token = await generateSessionToken(mockUser, mockProviders, TEST_SECRET, 'production');
+      const claims = await validateToken(token, TEST_SECRET, TEST_ENVIRONMENT);
+
+      expect(claims).toBeNull();
+    });
   });
 
   describe('decodeToken', () => {
     it('decodes valid token without validation', async () => {
-      const token = await generateSessionToken(mockUser, mockProviders, TEST_SECRET);
+      const token = await generateSessionToken(
+        mockUser,
+        mockProviders,
+        TEST_SECRET,
+        TEST_ENVIRONMENT
+      );
       const decoded = decodeToken(token);
 
       expect(decoded).not.toBeNull();
@@ -250,6 +309,7 @@ describe('jwt', () => {
     it('decodes expired token (no validation)', async () => {
       const header = { alg: 'HS256', typ: 'JWT' };
       const expiredClaims = {
+        iss: `shipyard:${TEST_ENVIRONMENT}`,
         sub: 'usr_abc123',
         displayName: 'Test User',
         providers: ['github'],
