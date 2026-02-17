@@ -53,6 +53,21 @@ Shipyard is the collaboration workspace for mixed human-agent teams. Agents crea
 4. **Agent uploads artifacts** (screenshots, videos) as proof of work
 5. **Task auto-completes** when all deliverables have receipts
 
+## Quick Start
+
+```bash
+# Install the daemon
+npm install -g @schoolai/shipyard
+
+# Log in with GitHub (opens browser for device auth)
+shipyard login
+
+# Verify you're authenticated
+shipyard login --check
+```
+
+See the [Installation Guide](./docs/installation.md) for editor-specific MCP setup (Claude Code, Cursor, VS Code, etc.).
+
 ## Current State
 
 Shipyard is in active development. The MCP server and web app are being rebuilt on a clean foundation:
