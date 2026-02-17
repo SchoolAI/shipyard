@@ -185,6 +185,7 @@ describe(`POST ${ROUTES.AUTH_GITHUB_CALLBACK}`, () => {
     expect(json.user).toEqual({
       id: 'usr_test123',
       displayName: 'Test User',
+      avatarUrl: 'https://avatars.githubusercontent.com/u/12345',
       providers: ['github'],
     });
 

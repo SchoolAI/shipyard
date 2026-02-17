@@ -12,7 +12,7 @@ if ! command -v wrangler &> /dev/null; then
   WRANGLER_CMD="npx wrangler"
 fi
 
-$WRANGLER_CMD d1 migrations apply shipyard-users --local || {
+$WRANGLER_CMD d1 migrations apply --env development --local DB || {
   echo "  ⚠️  Migration command failed. This may be OK if migrations were already applied."
   echo "  Run 'wrangler dev' to verify — it applies migrations on startup."
 }

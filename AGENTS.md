@@ -86,7 +86,7 @@ Instead: **skip that file, work on something else, and come back to it later.** 
 1. **CRDT is source of truth** — not URLs, not GitHub
 2. **URLs are snapshots** — materialized views for sharing/recovery
 3. **GitHub only for binary blobs** — screenshots, videos, test results
-4. **Break things freely** — no backwards compatibility until Feb 15, 2026
+4. **Break things freely** — no backwards compatibility until Feb 25, 2026
 
 ## Backwards Compatibility Policy
 

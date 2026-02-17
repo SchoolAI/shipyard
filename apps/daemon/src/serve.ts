@@ -36,6 +36,7 @@ import {
   getUnstagedDiff,
 } from './capabilities.js';
 import type { Env } from './env.js';
+import { getShipyardHome } from './env.js';
 import { FileStorageAdapter } from './file-storage-adapter.js';
 import { LifecycleManager } from './lifecycle.js';
 import { createChildLogger, logger } from './logger.js';
@@ -140,6 +141,7 @@ export async function serve(env: Env): Promise<void> {
 
   const log = createChildLogger({ mode: 'serve' });
   const lifecycle = new LifecycleManager();
+  await lifecycle.acquirePidFile(getShipyardHome());
 
   const handle = await createSignalingHandle(env, log);
   if (!handle) {

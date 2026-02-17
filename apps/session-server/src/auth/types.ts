@@ -12,6 +12,8 @@ export interface GitHubUser {
 
 /** Shipyard JWT claims */
 export interface ShipyardJWTClaims {
+  /** Token issuer (e.g. "shipyard:development", "shipyard:production") */
+  iss: string;
   /** Shipyard user ID ("usr_abc123") */
   sub: string;
   /** Display name */

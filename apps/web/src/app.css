@@ -300,6 +300,237 @@ html, body {
 }
 
 /*
+ * TipTap / ProseMirror editor styles
+ *
+ * Scoped under .plan-editor .ProseMirror to avoid leaking
+ * into other parts of the app. Mirrors the styling that was
+ * previously done inline via markdown-components.tsx.
+ */
+
+.plan-editor .ProseMirror {
+  outline: none;
+  caret-color: var(--accent);
+}
+
+/* -- Placeholder (empty-editor hint) -- */
+.plan-editor .ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: var(--muted);
+  pointer-events: none;
+  height: 0;
+}
+
+/* -- Headings -- */
+.plan-editor .ProseMirror h1 {
+  font-size: 1.125rem; /* text-lg */
+  font-weight: 700;
+  color: var(--foreground);
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;
+  line-height: 1.4;
+}
+
+.plan-editor .ProseMirror h2 {
+  font-size: 1rem; /* text-base */
+  font-weight: 600;
+  color: var(--foreground);
+  margin-top: 0.75rem;
+  margin-bottom: 0.375rem;
+  line-height: 1.4;
+}
+
+.plan-editor .ProseMirror h3 {
+  font-size: 0.875rem; /* text-sm */
+  font-weight: 600;
+  color: var(--foreground);
+  margin-top: 0.5rem;
+  margin-bottom: 0.25rem;
+  line-height: 1.4;
+}
+
+/* -- Paragraphs -- */
+.plan-editor .ProseMirror p {
+  margin-bottom: 0.5rem;
+  line-height: 1.625; /* leading-relaxed */
+}
+
+.plan-editor .ProseMirror p:last-child {
+  margin-bottom: 0;
+}
+
+/* -- Bold -- */
+.plan-editor .ProseMirror strong {
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+/* -- Links -- */
+.plan-editor .ProseMirror a {
+  color: var(--secondary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  transition: color 0.15s;
+}
+
+.plan-editor .ProseMirror a:hover {
+  color: var(--color-wave-light);
+}
+
+/* -- Code blocks (pre > code) -- */
+.plan-editor .ProseMirror pre {
+  background: var(--color-code-block);
+  border-radius: 0.375rem;
+  padding: 0.75rem;
+  overflow-x: auto;
+  font-size: 0.875rem;
+  line-height: 1.375;
+  border: 1px solid color-mix(in oklch, var(--separator) 30%, transparent);
+  margin: 0.5rem 0;
+}
+
+.plan-editor .ProseMirror pre code {
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+  font-size: 0.875rem;
+  color: inherit;
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace);
+}
+
+/* -- Inline code -- */
+.plan-editor .ProseMirror :not(pre) > code {
+  background: color-mix(in oklch, var(--default) 70%, transparent);
+  color: var(--accent);
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+  font-size: 0.8125rem;
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace);
+}
+
+/* -- Unordered lists -- */
+.plan-editor .ProseMirror ul {
+  list-style-type: disc;
+  padding-left: 1.25rem;
+  margin-bottom: 0.5rem;
+}
+
+.plan-editor .ProseMirror ul ul {
+  list-style-type: circle;
+}
+
+.plan-editor .ProseMirror ul ul ul {
+  list-style-type: square;
+}
+
+/* -- Ordered lists -- */
+.plan-editor .ProseMirror ol {
+  list-style-type: decimal;
+  padding-left: 1.25rem;
+  margin-bottom: 0.5rem;
+}
+
+/* -- List items -- */
+.plan-editor .ProseMirror li {
+  line-height: 1.5;
+}
+
+.plan-editor .ProseMirror li + li {
+  margin-top: 0.125rem;
+}
+
+.plan-editor .ProseMirror li p {
+  margin-bottom: 0;
+}
+
+/* -- Task lists (checkboxes) -- */
+.plan-editor .ProseMirror ul[data-type="taskList"] {
+  list-style-type: none;
+  padding-left: 0;
+}
+
+.plan-editor .ProseMirror ul[data-type="taskList"] li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.375rem;
+}
+
+.plan-editor .ProseMirror ul[data-type="taskList"] li > label {
+  flex-shrink: 0;
+  margin-top: 0.25rem;
+}
+
+.plan-editor .ProseMirror ul[data-type="taskList"] li > label input[type="checkbox"] {
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.plan-editor .ProseMirror ul[data-type="taskList"] li > div {
+  flex: 1;
+}
+
+/* -- Blockquotes -- */
+.plan-editor .ProseMirror blockquote {
+  border-left: 2px solid var(--accent);
+  padding-left: 0.75rem;
+  margin: 0.5rem 0;
+  color: var(--foreground);
+  opacity: 0.8;
+  font-style: italic;
+}
+
+.plan-editor .ProseMirror blockquote p:last-child {
+  margin-bottom: 0;
+}
+
+/* -- Tables -- */
+.plan-editor .ProseMirror table {
+  width: 100%;
+  font-size: 0.875rem;
+  border-collapse: collapse;
+  border: 1px solid var(--separator);
+  border-radius: 0.5rem;
+  margin: 0.5rem 0;
+  overflow: hidden;
+}
+
+.plan-editor .ProseMirror th {
+  text-align: left;
+  font-weight: 600;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--separator);
+  color: var(--foreground);
+  background: var(--default);
+  background: color-mix(in oklch, var(--default) 50%, transparent);
+}
+
+.plan-editor .ProseMirror td {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--separator);
+}
+
+/* -- Horizontal rules -- */
+.plan-editor .ProseMirror hr {
+  border: none;
+  border-top: 1px solid var(--separator);
+  margin: 0.5rem 0;
+}
+
+/* -- Comment mark highlights -- */
+.plan-editor .ProseMirror .comment-mark {
+  background: color-mix(in oklch, var(--warning) 20%, transparent);
+  border-bottom: 2px solid var(--warning);
+  padding: 0.0625rem 0;
+  cursor: pointer;
+  border-radius: 0.125rem;
+}
+
+/* -- First child margin reset (avoid gap at top of editor) -- */
+.plan-editor .ProseMirror > *:first-child {
+  margin-top: 0;
+}
+
+/*
  * Syntax highlighting for rehype-highlight
  *
  * Custom theme matching the Shipyard dark palette.

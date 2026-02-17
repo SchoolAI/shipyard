@@ -27,7 +27,7 @@ collabCreateRoute.post(ROUTES.COLLAB_CREATE, async (c) => {
   const tokenResult = extractBearerToken(c);
   if (!tokenResult.ok) return tokenResult.error;
 
-  const claims = await validateToken(tokenResult.value, c.env.JWT_SECRET);
+  const claims = await validateToken(tokenResult.value, c.env.JWT_SECRET, c.env.ENVIRONMENT);
   if (!claims) {
     return invalidTokenResponse(c);
   }

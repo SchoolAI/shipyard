@@ -1,3 +1,7 @@
+import { existsSync, writeFileSync } from 'node:fs';
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('./logger.js', () => ({
@@ -63,5 +67,107 @@ describe('LifecycleManager', () => {
 
     // Now process.exit should have been called
     expect(mockExit).toHaveBeenCalledWith(0);
+  });
+});
+
+describe('PID file management', () => {
+  let testDir: string;
+  let originalListeners: Array<{
+    event: string | symbol;
+    listener: (...args: unknown[]) => void;
+  }>;
+
+  beforeEach(async () => {
+    testDir = join(
+      tmpdir(),
+      `shipyard-lifecycle-test-${Date.now()}-${Math.random().toString(36).slice(2)}`
+    );
+    await mkdir(testDir, { recursive: true });
+
+    originalListeners = [];
+    const originalOn = process.on.bind(process);
+    vi.spyOn(process, 'on').mockImplementation(
+      // eslint-disable-next-line no-restricted-syntax -- process.on overloads require broad signature
+      ((event: string, listener: (...args: unknown[]) => void) => {
+        originalListeners.push({ event, listener });
+        return originalOn(event, listener);
+      }) as typeof process.on
+    );
+
+    vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);
+  });
+
+  afterEach(async () => {
+    vi.restoreAllMocks();
+    for (const { event, listener } of originalListeners) {
+      process.removeListener(event as string, listener);
+    }
+    await rm(testDir, { recursive: true, force: true });
+  });
+
+  it('writes a PID file on acquire', async () => {
+    const { LifecycleManager } = await import('./lifecycle.js');
+    const lifecycle = new LifecycleManager();
+
+    await lifecycle.acquirePidFile(testDir);
+
+    const pidFile = join(testDir, 'daemon.pid');
+    const content = await readFile(pidFile, 'utf-8');
+    expect(content).toBe(String(process.pid));
+
+    lifecycle.destroy();
+  });
+
+  it('removes the PID file on destroy()', async () => {
+    const { LifecycleManager } = await import('./lifecycle.js');
+    const lifecycle = new LifecycleManager();
+
+    await lifecycle.acquirePidFile(testDir);
+    const pidFile = join(testDir, 'daemon.pid');
+    expect(existsSync(pidFile)).toBe(true);
+
+    lifecycle.destroy();
+    expect(existsSync(pidFile)).toBe(false);
+  });
+
+  it('overwrites a stale PID file from a dead process', async () => {
+    const { LifecycleManager } = await import('./lifecycle.js');
+
+    const pidFile = join(testDir, 'daemon.pid');
+    await writeFile(pidFile, '999999999');
+
+    const lifecycle = new LifecycleManager();
+    await lifecycle.acquirePidFile(testDir);
+
+    const content = await readFile(pidFile, 'utf-8');
+    expect(content).toBe(String(process.pid));
+
+    lifecycle.destroy();
+  });
+
+  it('exits if another daemon is alive with the same PID file', async () => {
+    const { LifecycleManager } = await import('./lifecycle.js');
+
+    const pidFile = join(testDir, 'daemon.pid');
+    writeFileSync(pidFile, String(process.pid));
+
+    const lifecycle = new LifecycleManager();
+    await lifecycle.acquirePidFile(testDir);
+
+    expect(process.exit).toHaveBeenCalledWith(1);
+
+    lifecycle.destroy();
+  });
+
+  it('succeeds when no PID file exists', async () => {
+    const { LifecycleManager } = await import('./lifecycle.js');
+    const lifecycle = new LifecycleManager();
+
+    await lifecycle.acquirePidFile(testDir);
+
+    const pidFile = join(testDir, 'daemon.pid');
+    expect(existsSync(pidFile)).toBe(true);
+
+    lifecycle.destroy();
   });
 });

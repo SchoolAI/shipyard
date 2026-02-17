@@ -24,57 +24,62 @@ if [ -f "$DEV_VARS" ] && ! grep -q "^GITHUB_CLIENT_SECRET=.\+" "$DEV_VARS"; then
   exit 1
 fi
 
-# Step 3: Check if session server is already running
-STARTED_SERVER=false
-if curl -sf http://localhost:4444/health > /dev/null 2>&1; then
-  echo "✓ Session server already running on :4444"
-else
-  echo "Starting session server..."
-  pnpm dev:session-server > /dev/null 2>&1 &
-  SERVER_PID=$!
-  STARTED_SERVER=true
-
-  cleanup() {
-    if [ "$STARTED_SERVER" = true ] && kill -0 "$SERVER_PID" 2>/dev/null; then
-      pkill -P "$SERVER_PID" 2>/dev/null
-      kill "$SERVER_PID" 2>/dev/null
-      wait "$SERVER_PID" 2>/dev/null || true
-    fi
-  }
-  trap cleanup EXIT INT TERM
-
-  # Wait for server to be healthy
-  echo -n "Waiting for session server"
-  MAX_WAIT=30
-  for i in $(seq 1 "$MAX_WAIT"); do
-    if curl -sf http://localhost:4444/health > /dev/null 2>&1; then
-      echo ""
-      echo "✓ Session server is ready"
-      break
-    fi
-    if ! kill -0 "$SERVER_PID" 2>/dev/null; then
-      echo ""
-      echo "✗ Session server failed to start (check if port 4444 is in use)"
-      exit 1
-    fi
-    echo -n "."
+# Step 3: Kill any existing process on port 4444 (may be from another worktree)
+EXISTING_PID=$(lsof -ti :4444 2>/dev/null || true)
+if [ -n "$EXISTING_PID" ]; then
+  echo "WARNING: Killing existing process on port 4444 (PID $EXISTING_PID) -- may be from another worktree"
+  kill $EXISTING_PID 2>/dev/null || true
+  # Wait briefly for the port to be released
+  sleep 1
+  # Force-kill if still alive
+  STILL_ALIVE=$(lsof -ti :4444 2>/dev/null || true)
+  if [ -n "$STILL_ALIVE" ]; then
+    kill -9 $STILL_ALIVE 2>/dev/null || true
     sleep 1
-  done
-
-  if ! curl -sf http://localhost:4444/health > /dev/null 2>&1; then
-    echo ""
-    echo "✗ Session server did not become healthy in ${MAX_WAIT}s"
-    exit 1
   fi
 fi
 
-# Step 3: Run login (point at local server)
+# Step 4: Always start a fresh server from the current worktree
+echo "Starting session server from current worktree..."
+pnpm dev:session-server > /dev/null 2>&1 &
+SERVER_PID=$!
+
+cleanup() {
+  if kill -0 "$SERVER_PID" 2>/dev/null; then
+    pkill -P "$SERVER_PID" 2>/dev/null
+    kill "$SERVER_PID" 2>/dev/null
+    wait "$SERVER_PID" 2>/dev/null || true
+  fi
+}
+trap cleanup EXIT INT TERM
+
+# Wait for server to be healthy
+echo -n "Waiting for session server"
+MAX_WAIT=30
+for i in $(seq 1 "$MAX_WAIT"); do
+  if curl -sf http://localhost:4444/health > /dev/null 2>&1; then
+    echo ""
+    echo "Session server is ready"
+    break
+  fi
+  if ! kill -0 "$SERVER_PID" 2>/dev/null; then
+    echo ""
+    echo "Session server failed to start (check if port 4444 is in use)"
+    exit 1
+  fi
+  echo -n "."
+  sleep 1
+done
+
+if ! curl -sf http://localhost:4444/health > /dev/null 2>&1; then
+  echo ""
+  echo "Session server did not become healthy in ${MAX_WAIT}s"
+  exit 1
+fi
+
+# Step 5: Run login (point at local server)
 echo ""
 SHIPYARD_DEV=1 SHIPYARD_SIGNALING_URL=http://localhost:4444 node apps/daemon/dist/index.js login
 
 echo ""
-if [ "$STARTED_SERVER" = true ]; then
-  echo "✓ Login complete. Stopping session server..."
-else
-  echo "✓ Login complete."
-fi
+echo "Login complete. Stopping session server..."

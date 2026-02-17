@@ -11,7 +11,7 @@ import {
   generateTaskId,
   TaskDocumentSchema,
 } from '@shipyard/loro-schema';
-import { type Env, validateEnv } from './env.js';
+import { type Env, getShipyardHome, validateEnv } from './env.js';
 import { FileStorageAdapter } from './file-storage-adapter.js';
 import { LifecycleManager } from './lifecycle.js';
 import { createChildLogger, logger } from './logger.js';
@@ -289,6 +289,7 @@ async function main(): Promise<void> {
 
   const repo = await setupRepo(dataDir);
   const lifecycle = new LifecycleManager();
+  await lifecycle.acquirePidFile(getShipyardHome());
   const signalingHandle = await setupSignaling(env, log);
   const cleanup = createCleanup(signalingHandle, lifecycle, repo);
 

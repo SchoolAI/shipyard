@@ -53,7 +53,7 @@ wsCollabRoute.get(ROUTES.WS_COLLAB, async (c) => {
 
   let userClaims: { sub: string; displayName: string } | undefined;
   if (userToken) {
-    const claims = await validateToken(userToken, c.env.JWT_SECRET);
+    const claims = await validateToken(userToken, c.env.JWT_SECRET, c.env.ENVIRONMENT);
     if (claims) {
       userClaims = { sub: claims.sub, displayName: claims.displayName };
     }

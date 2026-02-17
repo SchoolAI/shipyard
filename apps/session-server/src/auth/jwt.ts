@@ -10,6 +10,7 @@ import type { ShipyardJWTClaims } from './types';
 
 /** Schema for validating JWT payload structure */
 const ShipyardJWTClaimsSchema = z.object({
+  iss: z.string().startsWith('shipyard:'),
   sub: z.string(),
   displayName: z.string(),
   providers: z.array(z.string()),
@@ -31,10 +32,12 @@ const AGENT_TOKEN_EXPIRY_MS = 24 * 60 * 60 * 1000;
 export async function generateSessionToken(
   user: { id: string; displayName: string },
   providers: string[],
-  secret: string
+  secret: string,
+  environment: string
 ): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
   const claims: ShipyardJWTClaims = {
+    iss: `shipyard:${environment}`,
     sub: user.id,
     displayName: user.displayName,
     providers,
@@ -52,10 +55,12 @@ export async function generateAgentToken(
   providers: string[],
   taskId: string,
   machineId: string,
-  secret: string
+  secret: string,
+  environment: string
 ): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
   const claims: ShipyardJWTClaims = {
+    iss: `shipyard:${environment}`,
     sub: user.id,
     displayName: user.displayName,
     providers,
@@ -73,7 +78,8 @@ export async function generateAgentToken(
  */
 export async function validateToken(
   token: string | undefined,
-  secret: string
+  secret: string,
+  environment: string
 ): Promise<ShipyardJWTClaims | null> {
   if (!token) return null;
 
@@ -99,6 +105,11 @@ export async function validateToken(
     }
 
     const payload = parseResult.data;
+
+    if (payload.iss !== `shipyard:${environment}`) {
+      return null;
+    }
+
     const now = Math.floor(Date.now() / 1000);
     if (payload.exp && payload.exp < now) {
       return null;

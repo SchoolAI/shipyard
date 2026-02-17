@@ -192,7 +192,12 @@ authDeviceRoute.post(ROUTES.AUTH_DEVICE_POLL, async (c) => {
         return errorResponse(c, 'user_not_found', 'Authorized user not found', 500);
       }
 
-      const token = await generateSessionToken(userData.user, userData.providers, c.env.JWT_SECRET);
+      const token = await generateSessionToken(
+        userData.user,
+        userData.providers,
+        c.env.JWT_SECRET,
+        c.env.ENVIRONMENT
+      );
 
       logger.info('Device flow completed', { userId: userData.user.id });
 
