@@ -27,6 +27,7 @@
     "@loro-extended/change": "catalog:",
     "@loro-extended/repo": "catalog:",
     "loro-crdt": "catalog:",
+    "marked": "^17.0.2",
     "node-datachannel": "^0.32.1",
     "pino": "catalog:",
     "nanoid": "catalog:",

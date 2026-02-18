@@ -7,7 +7,7 @@ import type {
 } from '@anthropic-ai/claude-agent-sdk';
 import { query } from '@anthropic-ai/claude-agent-sdk';
 import type { TypedDoc } from '@loro-extended/change';
-import { change } from '@loro-extended/change';
+import { change, loro } from '@loro-extended/change';
 import type {
   A2ATaskState,
   ContentBlock,
@@ -17,6 +17,7 @@ import type {
 import { extractPlanMarkdown } from '@shipyard/loro-schema';
 import { nanoid } from 'nanoid';
 import { logger } from './logger.js';
+import { initPlanEditorDoc } from './plan-editor/index.js';
 import { StreamingInputController } from './streaming-input-controller.js';
 
 function safeStringify(value: unknown): string {
@@ -601,9 +602,11 @@ export class SessionManager {
         continue;
       }
 
+      const planId = nanoid();
+
       change(this.#taskDoc, (draft) => {
         draft.plans.push({
-          planId: nanoid(),
+          planId,
           toolUseId: block.toolUseId,
           markdown: planMarkdown,
           reviewStatus: 'pending',
@@ -612,7 +615,12 @@ export class SessionManager {
         });
       });
 
-      logger.info({ toolUseId: block.toolUseId }, 'Extracted plan from ExitPlanMode tool call');
+      initPlanEditorDoc(loro(this.#taskDoc).container, planId, planMarkdown);
+
+      logger.info(
+        { toolUseId: block.toolUseId, planId },
+        'Extracted plan from ExitPlanMode tool call'
+      );
     }
   }
 
