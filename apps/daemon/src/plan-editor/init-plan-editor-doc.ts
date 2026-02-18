@@ -54,18 +54,23 @@ export function initPlanEditorDoc(loroDoc: LoroDoc, planId: string, markdown: st
 function writeBlockToken(parentList: LoroList, token: Token): void {
   switch (token.type) {
     case 'paragraph':
+      // eslint-disable-next-line no-restricted-syntax -- marked Token union does not narrow on .type
       writeParagraph(parentList, token as Tokens.Paragraph);
       break;
     case 'heading':
+      // eslint-disable-next-line no-restricted-syntax -- marked Token union does not narrow on .type
       writeHeading(parentList, token as Tokens.Heading);
       break;
     case 'code':
+      // eslint-disable-next-line no-restricted-syntax -- marked Token union does not narrow on .type
       writeCodeBlock(parentList, token as Tokens.Code);
       break;
     case 'blockquote':
+      // eslint-disable-next-line no-restricted-syntax -- marked Token union does not narrow on .type
       writeBlockquote(parentList, token as Tokens.Blockquote);
       break;
     case 'list':
+      // eslint-disable-next-line no-restricted-syntax -- marked Token union does not narrow on .type
       writeList(parentList, token as Tokens.List);
       break;
     case 'hr':
@@ -166,6 +171,7 @@ function flattenInlineTokens(tokens: Token[], inheritedMarks: Record<string, Val
   for (const token of tokens) {
     switch (token.type) {
       case 'text': {
+        // eslint-disable-next-line no-restricted-syntax -- marked Token union does not narrow on .type
         const textToken = token as Tokens.Text;
         if (textToken.tokens && textToken.tokens.length > 0) {
           runs.push(...flattenInlineTokens(textToken.tokens, inheritedMarks));
@@ -175,27 +181,35 @@ function flattenInlineTokens(tokens: Token[], inheritedMarks: Record<string, Val
         break;
       }
       case 'strong': {
+        // eslint-disable-next-line no-restricted-syntax -- marked Token union does not narrow on .type
         const strongToken = token as Tokens.Strong;
+        // eslint-disable-next-line no-restricted-syntax -- Loro Value type requires explicit cast for empty mark objects
         const marks = { ...inheritedMarks, bold: {} as Value };
         runs.push(...flattenInlineTokens(strongToken.tokens, marks));
         break;
       }
       case 'em': {
+        // eslint-disable-next-line no-restricted-syntax -- marked Token union does not narrow on .type
         const emToken = token as Tokens.Em;
+        // eslint-disable-next-line no-restricted-syntax -- Loro Value type requires explicit cast for empty mark objects
         const marks = { ...inheritedMarks, italic: {} as Value };
         runs.push(...flattenInlineTokens(emToken.tokens, marks));
         break;
       }
       case 'codespan': {
+        // eslint-disable-next-line no-restricted-syntax -- marked Token union does not narrow on .type
         const codeToken = token as Tokens.Codespan;
         runs.push({
           text: codeToken.text,
+          // eslint-disable-next-line no-restricted-syntax -- Loro Value type requires explicit cast for empty mark objects
           marks: { ...inheritedMarks, code: {} as Value },
         });
         break;
       }
       case 'del': {
+        // eslint-disable-next-line no-restricted-syntax -- marked Token union does not narrow on .type
         const delToken = token as Tokens.Del;
+        // eslint-disable-next-line no-restricted-syntax -- Loro Value type requires explicit cast for empty mark objects
         const marks = { ...inheritedMarks, strike: {} as Value };
         runs.push(...flattenInlineTokens(delToken.tokens, marks));
         break;
@@ -205,6 +219,7 @@ function flattenInlineTokens(tokens: Token[], inheritedMarks: Record<string, Val
         break;
       }
       case 'escape': {
+        // eslint-disable-next-line no-restricted-syntax -- marked Token union does not narrow on .type
         const escToken = token as Tokens.Escape;
         runs.push({ text: escToken.text, marks: { ...inheritedMarks } });
         break;

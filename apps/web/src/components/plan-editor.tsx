@@ -101,8 +101,7 @@ function PlanEditor({
     editor.commands.setContent(html);
   }, [editor, html, isLoroMode]);
 
-  // Comment marks are ProseMirror document mutations that would conflict with LoroSyncPlugin.
-  // In Loro mode, skip applying external comment marks -- Phase 2 will use Loro Cursor API.
+  /** Comment marks are ProseMirror mutations that conflict with LoroSyncPlugin — Phase 2 will use Loro Cursor API instead. */
   useEffect(() => {
     if (isLoroMode) return;
     if (!editor || editor.isDestroyed) return;

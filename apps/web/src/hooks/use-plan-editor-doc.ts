@@ -27,7 +27,6 @@ function usePlanEditorDoc(taskId: string | null, planId: string | null): PlanEdi
   // eslint-disable-next-line no-restricted-syntax -- loro-extended generics require explicit cast
   const handle = useMemo(() => repo.get(docId, TaskDocumentSchema as never), [repo, docId]);
 
-  // Reactive subscription: re-renders when planEditorDocs changes
   const planEditorDocs = useDoc(
     handle,
     (d: { planEditorDocs: Record<string, unknown> }) => d.planEditorDocs

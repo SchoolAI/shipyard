@@ -44,6 +44,7 @@ function readAttributes(map: LoroMap, node: ProseMirrorNode): void {
   const attrsContainer = map.get(ATTRIBUTES_KEY);
   if (!(attrsContainer instanceof LoroMap)) return;
 
+  // eslint-disable-next-line no-restricted-syntax -- LoroMap.toJSON() returns unknown, but we know it's a record
   const json = attrsContainer.toJSON() as Record<string, unknown>;
   if (Object.keys(json).length > 0) {
     node.attrs = json;
@@ -81,6 +82,7 @@ function readLoroText(text: LoroText): ProseMirrorNode[] {
       node.marks = Object.entries(d.attributes).map(([name, attrs]) => {
         const mark: { type: string; attrs?: Record<string, unknown> } = { type: name };
         if (attrs != null && typeof attrs === 'object' && Object.keys(attrs).length > 0) {
+          // eslint-disable-next-line no-restricted-syntax -- Loro delta attributes are typed as Value, narrowed by typeof check above
           mark.attrs = attrs as Record<string, unknown>;
         }
         return mark;
