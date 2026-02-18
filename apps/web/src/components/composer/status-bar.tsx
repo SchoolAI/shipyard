@@ -32,6 +32,7 @@ export interface StatusBarProps {
   selectedEnvironmentPath?: string | null;
   onEnvironmentSelect?: (path: string | null) => void;
   homeDir?: string;
+  onCreateWorktree?: (sourceRepo: GitRepoInfo) => void;
 }
 
 export function StatusBar({
@@ -43,6 +44,7 @@ export function StatusBar({
   selectedEnvironmentPath,
   onEnvironmentSelect,
   homeDir,
+  onCreateWorktree,
 }: StatusBarProps) {
   const machineKeys = useMemo(
     () => (selectedMachineId ? new Set([selectedMachineId]) : new Set<string>()),
@@ -132,6 +134,7 @@ export function StatusBar({
           selectedPath={selectedEnvironmentPath ?? null}
           onSelect={onEnvironmentSelect ?? (() => {})}
           homeDir={homeDir}
+          onCreateWorktree={onCreateWorktree}
         />
 
         {/** Branch -- only shown for real project environments */}

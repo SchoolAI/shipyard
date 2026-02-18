@@ -31,7 +31,7 @@ describe('useSlashCommands', () => {
     const { result } = setup();
     act(() => result.current.handleInputChange('/'));
     expect(result.current.isOpen).toBe(true);
-    expect(result.current.filteredCommands).toHaveLength(12);
+    expect(result.current.filteredCommands).toHaveLength(13);
   });
 
   it('filters to Plan mode with "/pl"', () => {

@@ -23,15 +23,17 @@ import {
   type TaskIndexDocumentShape,
   updateTaskInIndex,
 } from '@shipyard/loro-schema';
-import type { PersonalRoomServerMessage } from '@shipyard/session';
+import type { MachineCapabilities, PersonalRoomServerMessage } from '@shipyard/session';
 import { SignalingClient } from '@shipyard/session/client';
-import { createBranchWatcher } from './branch-watcher.js';
+import { type BranchWatcher, createBranchWatcher } from './branch-watcher.js';
 import {
   captureTreeSnapshot,
+  detectEnvironments,
   getBranchDiff,
   getBranchFiles,
   getChangedFiles,
   getDefaultBranch,
+  getRepoMetadata,
   getSnapshotDiff,
   getSnapshotFiles,
   getStagedDiff,
@@ -57,9 +59,28 @@ import {
 } from './session-manager.js';
 import type { DaemonSignaling } from './signaling.js';
 import { createSignalingHandle } from './signaling-setup.js';
+import { cleanupStaleSetupEntries } from './worktree-cleanup.js';
+import { createWorktree } from './worktree-command.js';
 
 function assertNever(x: never): never {
   throw new Error(`Unhandled message type: ${JSON.stringify(x)}`);
+}
+
+/**
+ * Deduplicates requests arriving via both ephemeral subscriptions and WebSocket relay.
+ * Cleaned up in finally blocks when operations complete.
+ */
+const processedRequestIds = new Set<string>();
+
+/** Tracks ephemeral cleanup timers so they can be cancelled during shutdown. */
+const pendingCleanupTimers = new Set<ReturnType<typeof setTimeout>>();
+
+function scheduleEphemeralCleanup(fn: () => void, delayMs: number): void {
+  const timer = setTimeout(() => {
+    pendingCleanupTimers.delete(timer);
+    fn();
+  }, delayMs);
+  pendingCleanupTimers.add(timer);
 }
 
 interface TerminalDataChannel {
@@ -438,6 +459,106 @@ export async function serve(env: Env): Promise<void> {
     },
   });
 
+  // eslint-disable-next-line no-restricted-syntax -- loro-extended generics require explicit cast for ephemeral access
+  const typedRoomHandle = roomHandle as HandleWithEphemerals<
+    TaskIndexDocumentShape,
+    typeof ROOM_EPHEMERAL_DECLARATIONS
+  >;
+
+  // eslint-disable-next-line no-restricted-syntax -- loro-extended generic erasure requires cast from TypedDoc<never> to concrete shape
+  const typedRoomDoc = roomHandle.doc as TypedDoc<TaskIndexDocumentShape>;
+
+  /** Clean up stale and orphaned worktree setup entries */
+  cleanupStaleSetupEntries(typedRoomDoc, machineId, log);
+
+  typedRoomHandle.enhancePromptReqs.subscribe(({ key: requestId, value, source }) => {
+    if (source !== 'remote') return;
+    if (!value) return;
+    if (value.machineId !== machineId) return;
+    if (processedRequestIds.has(requestId)) return;
+    processedRequestIds.add(requestId);
+
+    const enhLog = createChildLogger({ mode: `enhance-prompt-ephemeral:${requestId}` });
+    enhLog.info(
+      { promptLen: value.prompt.length },
+      'Received enhance-prompt request via ephemeral'
+    );
+
+    if (!env.ANTHROPIC_API_KEY) {
+      enhLog.error('ANTHROPIC_API_KEY is required for prompt enhancement');
+      typedRoomHandle.enhancePromptResps.set(requestId, {
+        status: 'error',
+        text: '',
+        error: 'ANTHROPIC_API_KEY not configured on daemon',
+      });
+      scheduleEphemeralCleanup(() => {
+        typedRoomHandle.enhancePromptReqs.delete(requestId);
+        typedRoomHandle.enhancePromptResps.delete(requestId);
+      }, EPHEMERAL_CLEANUP_DELAY_MS);
+      processedRequestIds.delete(requestId);
+      return;
+    }
+
+    const abortController = lifecycle.createAbortController();
+    const timeout = setTimeout(() => abortController.abort(), ENHANCE_PROMPT_TIMEOUT_MS);
+
+    runEnhancePromptEphemeral(
+      value.prompt,
+      requestId,
+      abortController,
+      typedRoomHandle,
+      enhLog
+    ).finally(() => {
+      clearTimeout(timeout);
+      abortController.abort();
+      processedRequestIds.delete(requestId);
+    });
+  });
+
+  typedRoomHandle.worktreeCreateReqs.subscribe(({ key: requestId, value, source }) => {
+    if (source !== 'remote') return;
+    if (!value) return;
+    if (value.machineId !== machineId) return;
+    if (processedRequestIds.has(requestId)) return;
+    processedRequestIds.add(requestId);
+
+    const wtLog = createChildLogger({ mode: `worktree-create-ephemeral:${requestId}` });
+    wtLog.info(
+      {
+        sourceRepoPath: value.sourceRepoPath,
+        branchName: value.branchName,
+        baseRef: value.baseRef,
+      },
+      'Received worktree-create request via ephemeral'
+    );
+
+    /** Prefer the request's setupScript; fall back to the persistent CRDT document */
+    const roomJson = typedRoomDoc.toJSON();
+    const crdtScriptEntry = roomJson?.userSettings?.worktreeScripts?.[value.sourceRepoPath];
+    const resolvedSetupScript = value.setupScript ?? crdtScriptEntry?.script ?? null;
+
+    runWorktreeCreateEphemeral(
+      requestId,
+      value.sourceRepoPath,
+      value.branchName,
+      value.baseRef,
+      resolvedSetupScript,
+      typedRoomHandle,
+      typedRoomDoc,
+      machineId,
+      capabilities,
+      publishCapabilities,
+      branchWatcher,
+      wtLog
+    )
+      .catch((err) => {
+        wtLog.error({ err }, 'Worktree create ephemeral handler failed');
+      })
+      .finally(() => {
+        processedRequestIds.delete(requestId);
+      });
+  });
+
   connection.onStateChange((state) => {
     log.info({ state }, 'Connection state changed');
   });
@@ -448,8 +569,8 @@ export async function serve(env: Env): Promise<void> {
       signaling,
       connection,
       repo,
-      // eslint-disable-next-line no-restricted-syntax -- loro-extended generic erasure requires cast from TypedDoc<never> to concrete shape
-      roomDoc: roomHandle.doc as TypedDoc<TaskIndexDocumentShape>,
+      roomDoc: typedRoomDoc,
+      roomHandle: typedRoomHandle,
       lifecycle,
       activeTasks,
       watchedTasks,
@@ -457,6 +578,9 @@ export async function serve(env: Env): Promise<void> {
       peerManager,
       env,
       machineId,
+      capabilities,
+      publishCapabilities,
+      branchWatcher,
     });
   });
 
@@ -488,6 +612,9 @@ export async function serve(env: Env): Promise<void> {
     watchedTasks.clear();
     taskHandles.clear();
 
+    for (const timer of pendingCleanupTimers) clearTimeout(timer);
+    pendingCleanupTimers.clear();
+
     for (const [id, ptyMgr] of terminalPtys) {
       ptyMgr.dispose();
       terminalPtys.delete(id);
@@ -511,6 +638,7 @@ interface MessageHandlerContext {
   connection: { send: (msg: import('@shipyard/session').PersonalRoomClientMessage) => void };
   repo: Repo;
   roomDoc: TypedDoc<TaskIndexDocumentShape>;
+  roomHandle: HandleWithEphemerals<TaskIndexDocumentShape, typeof ROOM_EPHEMERAL_DECLARATIONS>;
   lifecycle: LifecycleManager;
   activeTasks: Map<string, ActiveTask>;
   watchedTasks: Map<string, () => void>;
@@ -518,6 +646,9 @@ interface MessageHandlerContext {
   peerManager: PeerManager;
   env: Env;
   machineId: string;
+  capabilities: MachineCapabilities;
+  publishCapabilities: (caps: MachineCapabilities) => void;
+  branchWatcher: BranchWatcher;
 }
 
 const DIFF_DEBOUNCE_MS = 2_000;
@@ -721,6 +852,16 @@ function handleMessage(msg: PersonalRoomServerMessage, ctx: MessageHandlerContex
       ctx.log.debug({ type: msg.type }, 'Enhance prompt echo');
       break;
 
+    case 'worktree-create-request':
+      handleWorktreeCreate(msg, ctx);
+      break;
+
+    case 'worktree-create-progress':
+    case 'worktree-create-done':
+    case 'worktree-create-error':
+      ctx.log.debug({ type: msg.type }, 'Worktree create echo');
+      break;
+
     case 'authenticated':
     case 'agent-joined':
     case 'agent-left':
@@ -832,6 +973,9 @@ function handleEnhancePrompt(
   ctx: MessageHandlerContext
 ): void {
   const { requestId, prompt } = msg;
+  if (processedRequestIds.has(requestId)) return;
+  processedRequestIds.add(requestId);
+
   const enhanceLog = createChildLogger({ mode: 'enhance-prompt' });
 
   if (!ctx.env.ANTHROPIC_API_KEY) {
@@ -842,6 +986,7 @@ function handleEnhancePrompt(
       message: 'ANTHROPIC_API_KEY not configured on daemon',
       requestId,
     });
+    processedRequestIds.delete(requestId);
     return;
   }
 
@@ -851,6 +996,7 @@ function handleEnhancePrompt(
   runEnhancePrompt(prompt, requestId, abortController, ctx, enhanceLog).finally(() => {
     clearTimeout(timeout);
     abortController.abort();
+    processedRequestIds.delete(requestId);
   });
 }
 
@@ -920,6 +1066,431 @@ async function runEnhancePrompt(
       message: err instanceof Error ? err.message : 'Prompt enhancement failed',
       requestId,
     });
+  }
+}
+
+/**
+ * Handle a worktree-create-request message from the browser.
+ * Calls createWorktree() with progress callbacks relayed to the browser,
+ * re-detects environments on success, and sends done or error.
+ */
+function handleWorktreeCreate(
+  msg: Extract<PersonalRoomServerMessage, { type: 'worktree-create-request' }>,
+  ctx: MessageHandlerContext
+): void {
+  const { requestId, sourceRepoPath, branchName, baseRef } = msg;
+  if (processedRequestIds.has(requestId)) return;
+  processedRequestIds.add(requestId);
+
+  const wtLog = createChildLogger({ mode: 'worktree-create' });
+
+  /** WebSocket path: read setup script from persistent CRDT document */
+  const roomJson = ctx.roomDoc.toJSON();
+  const scriptEntry = roomJson?.userSettings?.worktreeScripts?.[sourceRepoPath];
+  const setupScript = scriptEntry?.script ?? null;
+
+  wtLog.info({ sourceRepoPath, branchName, baseRef }, 'Starting worktree creation');
+
+  runWorktreeCreate(requestId, sourceRepoPath, branchName, baseRef, setupScript, ctx, wtLog);
+}
+
+/**
+ * Monitor a setup script child process and write results on exit.
+ *
+ * When the child exits, writes the terminal status to the CRDT document
+ * (persistent, survives restarts) and publishes the result to the
+ * worktreeSetupResps ephemeral namespace (instant browser notification).
+ */
+function monitorSetupChild(
+  child: import('node:child_process').ChildProcess,
+  requestId: string,
+  worktreePath: string,
+  machineId: string,
+  roomHandle: RoomHandleWithEphemerals,
+  roomDoc: TypedDoc<TaskIndexDocumentShape>,
+  startedAt: number,
+  log: ReturnType<typeof createChildLogger>
+): void {
+  child.on('exit', (exitCode, signal) => {
+    const status = exitCode === 0 ? 'done' : 'failed';
+    log.info({ worktreePath, exitCode, signal, status }, 'Setup script exited');
+
+    /** Write terminal status to CRDT (persistent, survives daemon restarts) */
+    change(roomDoc, (draft) => {
+      draft.worktreeSetupStatus.set(worktreePath, {
+        status,
+        machineId,
+        startedAt,
+        completedAt: Date.now(),
+        exitCode: exitCode ?? null,
+        signal: signal ?? null,
+        pid: child.pid ?? null,
+      });
+    });
+
+    /** Publish result to ephemeral namespace for instant browser reactivity */
+    try {
+      roomHandle.worktreeSetupResps.set(requestId, {
+        exitCode: exitCode ?? null,
+        signal: signal ?? null,
+        worktreePath,
+      });
+    } catch (err: unknown) {
+      log.warn({ err }, 'Failed to publish setup result to ephemeral');
+    }
+
+    scheduleEphemeralCleanup(() => {
+      roomHandle.worktreeSetupResps.delete(requestId);
+    }, EPHEMERAL_CLEANUP_DELAY_MS);
+  });
+
+  child.on('error', (err) => {
+    log.warn({ err: err.message }, 'Setup script spawn error');
+
+    change(roomDoc, (draft) => {
+      draft.worktreeSetupStatus.set(worktreePath, {
+        status: 'failed',
+        machineId,
+        startedAt,
+        completedAt: Date.now(),
+        exitCode: null,
+        signal: null,
+        pid: child.pid ?? null,
+      });
+    });
+
+    roomHandle.worktreeSetupResps.set(requestId, {
+      exitCode: null,
+      signal: null,
+      worktreePath,
+    });
+
+    scheduleEphemeralCleanup(() => {
+      roomHandle.worktreeSetupResps.delete(requestId);
+    }, EPHEMERAL_CLEANUP_DELAY_MS);
+  });
+
+  /** Allow the daemon process to exit even if this child is still running */
+  child.unref();
+}
+
+async function runWorktreeCreate(
+  requestId: string,
+  sourceRepoPath: string,
+  branchName: string,
+  baseRef: string,
+  setupScript: string | null,
+  ctx: MessageHandlerContext,
+  log: ReturnType<typeof createChildLogger>
+): Promise<void> {
+  try {
+    const result = await createWorktree({
+      sourceRepoPath,
+      branchName,
+      baseRef,
+      setupScript,
+      onProgress(step, detail) {
+        ctx.connection.send({
+          type: 'worktree-create-progress',
+          requestId,
+          // eslint-disable-next-line no-restricted-syntax -- step string from createWorktree matches the schema enum
+          step: step as
+            | 'creating-worktree'
+            | 'copying-files'
+            | 'running-setup-script'
+            | 'refreshing-environments'
+            | 'done',
+          detail,
+        });
+      },
+    });
+
+    ctx.connection.send({
+      type: 'worktree-create-progress',
+      requestId,
+      step: 'refreshing-environments',
+      detail: 'Re-detecting git environments',
+    });
+
+    try {
+      const newEnvs = await detectEnvironments();
+      ctx.capabilities.environments = newEnvs;
+      ctx.publishCapabilities(ctx.capabilities);
+
+      const repoMeta = await getRepoMetadata(result.worktreePath);
+      if (repoMeta) {
+        ctx.branchWatcher.addEnvironment(result.worktreePath, repoMeta.branch);
+      }
+    } catch (err: unknown) {
+      log.warn({ err }, 'Failed to refresh environments after worktree creation');
+    }
+
+    ctx.connection.send({
+      type: 'worktree-create-done',
+      requestId,
+      worktreePath: result.worktreePath,
+      branchName: result.branchName,
+      setupScriptStarted: result.setupScriptStarted,
+      warnings: result.warnings.length > 0 ? result.warnings : undefined,
+    });
+
+    if (result.setupChild) {
+      const startedAt = Date.now();
+      change(ctx.roomDoc, (draft) => {
+        draft.worktreeSetupStatus.set(result.worktreePath, {
+          status: 'running',
+          machineId: ctx.machineId,
+          startedAt,
+          completedAt: null,
+          exitCode: null,
+          signal: null,
+          pid: result.setupChild?.pid ?? null,
+        });
+      });
+
+      monitorSetupChild(
+        result.setupChild,
+        requestId,
+        result.worktreePath,
+        ctx.machineId,
+        ctx.roomHandle,
+        ctx.roomDoc,
+        startedAt,
+        log
+      );
+    }
+
+    log.info(
+      {
+        worktreePath: result.worktreePath,
+        setupScriptStarted: result.setupScriptStarted,
+        warningCount: result.warnings.length,
+      },
+      'Worktree created successfully'
+    );
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    log.error({ err: message }, 'Worktree creation failed');
+
+    ctx.connection.send({
+      type: 'worktree-create-error',
+      requestId,
+      message,
+    });
+  } finally {
+    processedRequestIds.delete(requestId);
+  }
+}
+
+/**
+ * Type alias for the room handle with all ephemeral namespaces.
+ * Used by ephemeral request handlers that receive the handle directly
+ * rather than through the MessageHandlerContext.
+ */
+type RoomHandleWithEphemerals = HandleWithEphemerals<
+  TaskIndexDocumentShape,
+  typeof ROOM_EPHEMERAL_DECLARATIONS
+>;
+
+const EPHEMERAL_CLEANUP_DELAY_MS = 5_000;
+
+/**
+ * Process an enhance-prompt request received via Loro ephemeral.
+ * Streams accumulated text to the enhancePromptResps ephemeral namespace,
+ * then cleans up both req and resp entries after a delay.
+ */
+async function runEnhancePromptEphemeral(
+  prompt: string,
+  requestId: string,
+  abortController: AbortController,
+  roomHandle: RoomHandleWithEphemerals,
+  log: ReturnType<typeof createChildLogger>
+): Promise<void> {
+  let fullText = '';
+
+  try {
+    const response = query({
+      prompt,
+      options: {
+        maxTurns: 1,
+        allowedTools: [],
+        systemPrompt: ENHANCE_SYSTEM_PROMPT,
+        abortController,
+      },
+    });
+
+    for await (const message of response) {
+      if (message.type !== 'assistant') continue;
+
+      for (const text of extractTextChunks(message.message.content)) {
+        fullText += text;
+        roomHandle.enhancePromptResps.set(requestId, {
+          status: 'streaming',
+          text: fullText,
+          error: null,
+        });
+      }
+    }
+
+    roomHandle.enhancePromptResps.set(requestId, {
+      status: 'done',
+      text: fullText,
+      error: null,
+    });
+
+    log.info(
+      { promptLen: prompt.length, resultLen: fullText.length },
+      'Prompt enhanced via ephemeral'
+    );
+  } catch (err: unknown) {
+    if (abortController.signal.aborted) {
+      log.warn('Prompt enhancement aborted (ephemeral)');
+    } else {
+      log.error({ err }, 'Prompt enhancement failed (ephemeral)');
+    }
+
+    const errorMessage = err instanceof Error ? err.message : 'Prompt enhancement failed';
+    roomHandle.enhancePromptResps.set(requestId, {
+      status: 'error',
+      text: '',
+      error: errorMessage,
+    });
+  } finally {
+    scheduleEphemeralCleanup(() => {
+      roomHandle.enhancePromptReqs.delete(requestId);
+      roomHandle.enhancePromptResps.delete(requestId);
+    }, EPHEMERAL_CLEANUP_DELAY_MS);
+  }
+}
+
+/**
+ * Process a worktree-create request received via Loro ephemeral.
+ * Writes progress updates to worktreeCreateResps, then cleans up after a delay.
+ */
+async function runWorktreeCreateEphemeral(
+  requestId: string,
+  sourceRepoPath: string,
+  branchName: string,
+  baseRef: string,
+  setupScript: string | null,
+  roomHandle: RoomHandleWithEphemerals,
+  roomDoc: TypedDoc<TaskIndexDocumentShape>,
+  localMachineId: string,
+  caps: MachineCapabilities,
+  publishCaps: (caps: MachineCapabilities) => void,
+  watcher: BranchWatcher,
+  log: ReturnType<typeof createChildLogger>
+): Promise<void> {
+  try {
+    const result = await createWorktree({
+      sourceRepoPath,
+      branchName,
+      baseRef,
+      setupScript,
+      onProgress(step, detail) {
+        roomHandle.worktreeCreateResps.set(requestId, {
+          // eslint-disable-next-line no-restricted-syntax -- step string from createWorktree matches the schema enum
+          status: step as
+            | 'creating-worktree'
+            | 'copying-files'
+            | 'running-setup-script'
+            | 'refreshing-environments'
+            | 'done',
+          detail: detail ?? null,
+          worktreePath: null,
+          branchName: null,
+          setupScriptStarted: null,
+          warnings: null,
+          error: null,
+        });
+      },
+    });
+
+    roomHandle.worktreeCreateResps.set(requestId, {
+      status: 'refreshing-environments',
+      detail: 'Re-detecting git environments',
+      worktreePath: null,
+      branchName: null,
+      setupScriptStarted: null,
+      warnings: null,
+      error: null,
+    });
+
+    try {
+      const newEnvs = await detectEnvironments();
+      caps.environments = newEnvs;
+      publishCaps(caps);
+
+      const repoMeta = await getRepoMetadata(result.worktreePath);
+      if (repoMeta) {
+        watcher.addEnvironment(result.worktreePath, repoMeta.branch);
+      }
+    } catch (err: unknown) {
+      log.warn({ err }, 'Failed to refresh environments after worktree creation (ephemeral)');
+    }
+
+    roomHandle.worktreeCreateResps.set(requestId, {
+      status: 'done',
+      detail: null,
+      worktreePath: result.worktreePath,
+      branchName: result.branchName,
+      setupScriptStarted: result.setupScriptStarted,
+      warnings: result.warnings.length > 0 ? result.warnings : null,
+      error: null,
+    });
+
+    if (result.setupChild) {
+      const startedAt = Date.now();
+      change(roomDoc, (draft) => {
+        draft.worktreeSetupStatus.set(result.worktreePath, {
+          status: 'running',
+          machineId: localMachineId,
+          startedAt,
+          completedAt: null,
+          exitCode: null,
+          signal: null,
+          pid: result.setupChild?.pid ?? null,
+        });
+      });
+
+      monitorSetupChild(
+        result.setupChild,
+        requestId,
+        result.worktreePath,
+        localMachineId,
+        roomHandle,
+        roomDoc,
+        startedAt,
+        log
+      );
+    }
+
+    log.info(
+      {
+        worktreePath: result.worktreePath,
+        setupScriptStarted: result.setupScriptStarted,
+        warningCount: result.warnings.length,
+      },
+      'Worktree created successfully via ephemeral'
+    );
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    log.error({ err: message }, 'Worktree creation failed (ephemeral)');
+
+    roomHandle.worktreeCreateResps.set(requestId, {
+      status: 'error',
+      detail: null,
+      worktreePath: null,
+      branchName: null,
+      setupScriptStarted: null,
+      warnings: null,
+      error: message,
+    });
+  } finally {
+    scheduleEphemeralCleanup(() => {
+      roomHandle.worktreeCreateReqs.delete(requestId);
+      roomHandle.worktreeCreateResps.delete(requestId);
+    }, EPHEMERAL_CLEANUP_DELAY_MS);
   }
 }
 

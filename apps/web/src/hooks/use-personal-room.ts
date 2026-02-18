@@ -69,6 +69,10 @@ export function usePersonalRoom(config: PersonalRoomConfig | null) {
         case 'enhance-prompt-request':
         case 'enhance-prompt-chunk':
         case 'enhance-prompt-done':
+        case 'worktree-create-request':
+        case 'worktree-create-progress':
+        case 'worktree-create-done':
+        case 'worktree-create-error':
           break;
         default:
           assertNever(msg);

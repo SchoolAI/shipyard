@@ -1,5 +1,6 @@
-import type { PersonalRoomConnection, PersonalRoomServerMessage } from '@shipyard/session';
+import type { EnhancePromptResponseEphemeralValue } from '@shipyard/loro-schema';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import type { RoomHandle } from './use-room-handle';
 
 const TIMEOUT_MS = 30_000;
 
@@ -10,7 +11,7 @@ interface EnhanceCallbacks {
 }
 
 interface UseEnhancePromptOptions {
-  connection: PersonalRoomConnection | null;
+  roomHandle: RoomHandle | null;
   machineId: string | null;
 }
 
@@ -21,22 +22,50 @@ interface UseEnhancePromptResult {
   error: string | null;
 }
 
+/** Dispatch a single enhance-prompt response to the appropriate callback. */
+function dispatchEnhanceResponse(
+  value: EnhancePromptResponseEphemeralValue,
+  callbacks: EnhanceCallbacks,
+  setError: (e: string) => void,
+  cleanup: () => void
+): void {
+  if (value.status === 'streaming') {
+    callbacks.onChunk(value.text);
+    return;
+  }
+  if (value.status === 'done') {
+    callbacks.onDone(value.text);
+    cleanup();
+    return;
+  }
+  const errMsg = value.error ?? 'Unknown error';
+  setError(errMsg);
+  callbacks.onError(errMsg);
+  cleanup();
+}
+
 export function useEnhancePrompt({
-  connection,
+  roomHandle,
   machineId,
 }: UseEnhancePromptOptions): UseEnhancePromptResult {
   const [isEnhancing, setIsEnhancing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const activeRequestIdRef = useRef<string | null>(null);
-  const accumulatedRef = useRef('');
   const callbacksRef = useRef<EnhanceCallbacks | null>(null);
   const unsubRef = useRef<(() => void) | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  /** Keep a ref to roomHandle so cleanup can delete the request from the correct handle. */
+  const roomHandleRef = useRef<RoomHandle | null>(null);
+  roomHandleRef.current = roomHandle;
 
   const cleanup = useCallback(() => {
+    const reqId = activeRequestIdRef.current;
+    if (reqId) {
+      roomHandleRef.current?.enhancePromptReqs.delete(reqId);
+      roomHandleRef.current?.enhancePromptResps.delete(reqId);
+    }
     activeRequestIdRef.current = null;
-    accumulatedRef.current = '';
     callbacksRef.current = null;
     clearTimeout(timeoutRef.current);
     unsubRef.current?.();
@@ -51,7 +80,7 @@ export function useEnhancePrompt({
 
   const enhance = useCallback(
     (prompt: string, callbacks: EnhanceCallbacks) => {
-      if (!connection || !machineId) {
+      if (!roomHandle || !machineId) {
         callbacks.onError('No connection or machine selected');
         return;
       }
@@ -60,25 +89,16 @@ export function useEnhancePrompt({
 
       const requestId = crypto.randomUUID();
       activeRequestIdRef.current = requestId;
-      accumulatedRef.current = '';
       callbacksRef.current = callbacks;
       setIsEnhancing(true);
       setError(null);
 
-      const unsub = connection.onMessage((msg: PersonalRoomServerMessage) => {
+      /** Subscribe before writing so we never miss a fast response. */
+      const unsub = roomHandle.enhancePromptResps.subscribe(({ key, value, source }) => {
+        if (key !== requestId || !value || source === 'local') return;
         if (activeRequestIdRef.current !== requestId) return;
-
-        if (msg.type === 'enhance-prompt-chunk' && msg.requestId === requestId) {
-          accumulatedRef.current += msg.text;
-          callbacksRef.current?.onChunk(accumulatedRef.current);
-        } else if (msg.type === 'enhance-prompt-done' && msg.requestId === requestId) {
-          callbacksRef.current?.onDone(msg.fullText);
-          cleanup();
-        } else if (msg.type === 'error' && msg.requestId === requestId) {
-          setError(msg.message);
-          callbacksRef.current?.onError(msg.message);
-          cleanup();
-        }
+        if (!callbacksRef.current) return;
+        dispatchEnhanceResponse(value, callbacksRef.current, setError, cleanup);
       });
       unsubRef.current = unsub;
 
@@ -90,14 +110,13 @@ export function useEnhancePrompt({
         cleanup();
       }, TIMEOUT_MS);
 
-      connection.send({
-        type: 'enhance-prompt-request',
-        requestId,
+      roomHandle.enhancePromptReqs.set(requestId, {
         machineId,
         prompt,
+        requestedAt: Date.now(),
       });
     },
-    [connection, machineId, cleanup]
+    [roomHandle, machineId, cleanup]
   );
 
   useEffect(() => {

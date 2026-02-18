@@ -1,5 +1,6 @@
 import { type FSWatcher, watch } from 'node:fs';
-import { join } from 'node:path';
+import { readFile, stat } from 'node:fs/promises';
+import { isAbsolute, join } from 'node:path';
 import type { GitRepoInfo } from '@shipyard/session';
 import { getRepoMetadata } from './capabilities.js';
 import { logger } from './logger.js';
@@ -17,7 +18,38 @@ export interface BranchWatcherOptions {
  *
  * Returns a handle with a `close()` method that tears down all watchers.
  */
-export function createBranchWatcher(options: BranchWatcherOptions): { close: () => void } {
+export interface BranchWatcher {
+  close: () => void;
+  addEnvironment: (repoPath: string, branch: string) => void;
+}
+
+/**
+ * Resolve the path to the HEAD file for a git repo.
+ *
+ * Regular repos have `.git/` as a directory, so HEAD is at `.git/HEAD`.
+ * Worktrees have `.git` as a file containing `gitdir: <path>`, pointing
+ * to the actual git dir (e.g. `<main-repo>/.git/worktrees/<name>/`).
+ */
+async function resolveHeadPath(repoPath: string): Promise<string> {
+  const gitPath = join(repoPath, '.git');
+  const gitStat = await stat(gitPath);
+
+  if (gitStat.isDirectory()) {
+    return join(gitPath, 'HEAD');
+  }
+
+  const content = await readFile(gitPath, 'utf-8');
+  const match = content.trim().match(/^gitdir:\s*(.+)$/);
+  if (!match?.[1]) {
+    throw new Error(`Invalid .git file at ${gitPath}`);
+  }
+
+  const gitDir = match[1];
+  const resolvedGitDir = isAbsolute(gitDir) ? gitDir : join(repoPath, gitDir);
+  return join(resolvedGitDir, 'HEAD');
+}
+
+export function createBranchWatcher(options: BranchWatcherOptions): BranchWatcher {
   const log = logger.child({ component: 'branch-watcher' });
   const watchers = new Map<string, FSWatcher>();
   const branches = new Map<string, string>();
@@ -26,13 +58,20 @@ export function createBranchWatcher(options: BranchWatcherOptions): { close: () 
 
   for (const env of environments) {
     branches.set(env.path, env.branch);
-    startWatching(env.path);
+    void startWatching(env.path);
   }
 
   log.info({ count: environments.length }, 'Branch watcher started');
 
-  function startWatching(repoPath: string): void {
-    const headPath = join(repoPath, '.git', 'HEAD');
+  async function startWatching(repoPath: string): Promise<void> {
+    let headPath: string;
+    try {
+      headPath = await resolveHeadPath(repoPath);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      log.debug({ repoPath, err: msg }, 'Failed to resolve HEAD path, skipping watch');
+      return;
+    }
 
     try {
       const watcher = watch(headPath, () => {
@@ -47,7 +86,7 @@ export function createBranchWatcher(options: BranchWatcherOptions): { close: () 
       watchers.set(repoPath, watcher);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      log.debug({ repoPath, err: msg }, 'Failed to watch .git/HEAD');
+      log.debug({ repoPath, err: msg }, 'Failed to watch HEAD');
     }
   }
 
@@ -120,6 +159,23 @@ export function createBranchWatcher(options: BranchWatcherOptions): { close: () 
       watchers.clear();
 
       log.info('Branch watcher closed');
+    },
+
+    addEnvironment(repoPath: string, branch: string) {
+      if (watchers.has(repoPath)) {
+        log.debug({ repoPath }, 'Already watching, skipping addEnvironment');
+        return;
+      }
+
+      branches.set(repoPath, branch);
+      environments.push({
+        path: repoPath,
+        name: repoPath.split('/').pop() ?? repoPath,
+        branch,
+        remote: undefined,
+      });
+      void startWatching(repoPath);
+      log.info({ repoPath, branch }, 'Added environment to branch watcher');
     },
   };
 }
