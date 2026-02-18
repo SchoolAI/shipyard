@@ -57,7 +57,9 @@ function appendCommentSection(sections: string[], comments: PlanComment[], edite
 }
 
 /**
- * The `from` value is a character position in the edited text.
+ * ProseMirror positions are node-aware offsets (not plain-text character
+ * positions), so the line mapping is approximate. The "Near" prefix in
+ * the output communicates this imprecision to the reader.
  */
 function findNearestLine(lines: string[], charOffset: number): string | null {
   let pos = 0;
