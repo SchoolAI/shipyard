@@ -41,6 +41,8 @@ export class PersonalRoom extends DurableObject<Env> {
   private connections: Map<WebSocket, ConnectionState> = new Map();
   /** Maps enhance-prompt requestId to the browser WebSocket that originated it. */
   private enhanceRequestOrigins: Map<string, WebSocket> = new Map();
+  /** Maps worktree-create requestId to the browser WebSocket that originated it. */
+  private worktreeRequestOrigins: Map<string, WebSocket> = new Map();
   private logger: Logger;
 
   constructor(ctx: DurableObjectState, env: Env) {
@@ -235,6 +237,12 @@ export class PersonalRoom extends DurableObject<Env> {
       }
     }
 
+    for (const [requestId, originWs] of this.worktreeRequestOrigins) {
+      if (originWs === ws) {
+        this.worktreeRequestOrigins.delete(requestId);
+      }
+    }
+
     this.connections.delete(ws);
   }
 
@@ -278,6 +286,14 @@ export class PersonalRoom extends DurableObject<Env> {
       case 'enhance-prompt-chunk':
       case 'enhance-prompt-done':
         this.handleEnhancePromptResponse(ws, state, msg);
+        break;
+      case 'worktree-create-request':
+        this.handleWorktreeCreateRequest(ws, state, msg);
+        break;
+      case 'worktree-create-progress':
+      case 'worktree-create-done':
+      case 'worktree-create-error':
+        this.handleWorktreeCreateResponse(ws, state, msg);
         break;
       case 'error':
         this.handleErrorRelay(ws, state, msg);
@@ -516,10 +532,13 @@ export class PersonalRoom extends DurableObject<Env> {
     }
 
     if (msg.requestId) {
-      const originWs = this.enhanceRequestOrigins.get(msg.requestId);
+      const originWs =
+        this.enhanceRequestOrigins.get(msg.requestId) ??
+        this.worktreeRequestOrigins.get(msg.requestId);
       if (originWs) {
         this.sendMessage(originWs, msg);
         this.enhanceRequestOrigins.delete(msg.requestId);
+        this.worktreeRequestOrigins.delete(msg.requestId);
         return;
       }
     }
@@ -586,6 +605,71 @@ export class PersonalRoom extends DurableObject<Env> {
 
       if (msg.type === 'enhance-prompt-done') {
         this.enhanceRequestOrigins.delete(msg.requestId);
+      }
+    } else {
+      for (const [connWs, connState] of this.connections) {
+        if (connState.type === 'browser') {
+          this.sendMessage(connWs, msg);
+        }
+      }
+    }
+  }
+
+  private handleWorktreeCreateRequest(
+    ws: WebSocket,
+    state: ConnectionState,
+    msg: Extract<PersonalRoomClientMessage, { type: 'worktree-create-request' }>
+  ): void {
+    if (state.type !== 'browser') {
+      this.sendError(ws, 'forbidden', 'Only browser connections can request worktree creation');
+      return;
+    }
+
+    const daemonWs = findWebSocketByMachineId(this.connections, msg.machineId);
+
+    if (!daemonWs) {
+      this.sendMessage(ws, {
+        type: 'error',
+        code: 'target_not_found',
+        message: `Daemon on machine ${msg.machineId} not connected`,
+        requestId: msg.requestId,
+      });
+      return;
+    }
+
+    this.worktreeRequestOrigins.set(msg.requestId, ws);
+    relayMessage(daemonWs, msg);
+
+    this.logger.debug('Worktree create request forwarded to daemon', {
+      requestId: msg.requestId,
+      machineId: msg.machineId,
+    });
+  }
+
+  private handleWorktreeCreateResponse(
+    ws: WebSocket,
+    state: ConnectionState,
+    msg: Extract<
+      PersonalRoomClientMessage,
+      { type: 'worktree-create-progress' | 'worktree-create-done' | 'worktree-create-error' }
+    >
+  ): void {
+    if (state.type !== 'agent') {
+      this.sendError(
+        ws,
+        'forbidden',
+        'Only agent connections can send worktree creation responses'
+      );
+      return;
+    }
+
+    const originWs = this.worktreeRequestOrigins.get(msg.requestId);
+
+    if (originWs) {
+      this.sendMessage(originWs, msg);
+
+      if (msg.type === 'worktree-create-done' || msg.type === 'worktree-create-error') {
+        this.worktreeRequestOrigins.delete(msg.requestId);
       }
     } else {
       for (const [connWs, connState] of this.connections) {

@@ -17,6 +17,12 @@
 import { z } from 'zod';
 
 /**
+ * Pattern for valid git branch names.
+ * Shared between daemon validation and web form validation.
+ */
+export const BRANCH_NAME_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9/_.-]*$/;
+
+/**
  * Standard error response schema used across all endpoints.
  */
 export const ErrorResponseSchema = z.object({
@@ -447,6 +453,73 @@ export const ErrorMessageSchema = z.object({
 });
 
 /**
+ * Worktree creation request — browser asks daemon to create a git worktree.
+ */
+export const WorktreeCreateRequestSchema = z.object({
+  type: z.literal('worktree-create-request'),
+  requestId: z.string(),
+  machineId: z.string(),
+  sourceRepoPath: z.string(),
+  branchName: z.string().min(1),
+  baseRef: z.string(),
+});
+
+export type WorktreeCreateRequest = z.infer<typeof WorktreeCreateRequestSchema>;
+
+/**
+ * Worktree creation progress — step updates streamed from daemon.
+ */
+export const WorktreeCreateProgressSchema = z.object({
+  type: z.literal('worktree-create-progress'),
+  requestId: z.string(),
+  step: z.enum([
+    'creating-worktree',
+    'copying-files',
+    'running-setup-script',
+    'refreshing-environments',
+    'done',
+  ]),
+  detail: z.string().optional(),
+});
+
+export type WorktreeCreateProgress = z.infer<typeof WorktreeCreateProgressSchema>;
+
+/**
+ * Worktree creation completed successfully.
+ */
+export const WorktreeCreateDoneSchema = z.object({
+  type: z.literal('worktree-create-done'),
+  requestId: z.string(),
+  worktreePath: z.string(),
+  branchName: z.string(),
+  setupScriptStarted: z.boolean(),
+  warnings: z.array(z.string()).optional(),
+});
+
+export type WorktreeCreateDone = z.infer<typeof WorktreeCreateDoneSchema>;
+
+/**
+ * Worktree creation failed.
+ */
+export const WorktreeCreateErrorSchema = z.object({
+  type: z.literal('worktree-create-error'),
+  requestId: z.string(),
+  message: z.string(),
+  failedStep: z.string().optional(),
+});
+
+export type WorktreeCreateError = z.infer<typeof WorktreeCreateErrorSchema>;
+
+/**
+ * User settings schema — stored in CRDT, synced across daemons.
+ */
+export const UserSettingsSchema = z.object({
+  worktreeSetupScript: z.string().nullable(),
+});
+
+export type UserSettings = z.infer<typeof UserSettingsSchema>;
+
+/**
  * Union of all client-to-server messages for personal room WebSocket.
  */
 export const PersonalRoomClientMessageSchema = z.discriminatedUnion('type', [
@@ -461,6 +534,10 @@ export const PersonalRoomClientMessageSchema = z.discriminatedUnion('type', [
   EnhancePromptRequestSchema,
   EnhancePromptChunkSchema,
   EnhancePromptDoneSchema,
+  WorktreeCreateRequestSchema,
+  WorktreeCreateProgressSchema,
+  WorktreeCreateDoneSchema,
+  WorktreeCreateErrorSchema,
   ErrorMessageSchema,
 ]);
 
@@ -542,6 +619,10 @@ export const PersonalRoomServerMessageSchema = z.discriminatedUnion('type', [
   EnhancePromptRequestSchema,
   EnhancePromptChunkSchema,
   EnhancePromptDoneSchema,
+  WorktreeCreateRequestSchema,
+  WorktreeCreateProgressSchema,
+  WorktreeCreateDoneSchema,
+  WorktreeCreateErrorSchema,
 ]);
 
 export type PersonalRoomServerMessage = z.infer<typeof PersonalRoomServerMessageSchema>;

@@ -1,5 +1,11 @@
-import { change } from '@loro-extended/change';
-import type { ContentBlock, PermissionMode } from '@shipyard/loro-schema';
+import { change, type TypedDoc } from '@loro-extended/change';
+import { useDoc } from '@loro-extended/react';
+import type {
+  ContentBlock,
+  PermissionMode,
+  WorktreeScriptValue,
+  WorktreeSetupStatus,
+} from '@shipyard/loro-schema';
 import {
   addTaskToIndex,
   buildDocumentId,
@@ -8,24 +14,30 @@ import {
   LOCAL_USER_ID,
   PERMISSION_MODES,
   REASONING_EFFORTS,
+  ROOM_EPHEMERAL_DECLARATIONS,
   TaskDocumentSchema,
   TaskIndexDocumentSchema,
+  type TaskIndexDocumentShape,
 } from '@shipyard/loro-schema';
 import { ChevronDown } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PlanApprovalProvider } from '../contexts/plan-approval-context';
 import { useAppHotkeys } from '../hooks/use-app-hotkeys';
+import { useCreateWorktree } from '../hooks/use-create-worktree';
 import { useEnhancePrompt } from '../hooks/use-enhance-prompt';
+import type { GitRepoInfo } from '../hooks/use-machine-selection';
 import { useMachineSelection } from '../hooks/use-machine-selection';
 import type { ConnectionState } from '../hooks/use-personal-room';
 import { usePersonalRoom } from '../hooks/use-personal-room';
 import { useRoomCapabilities } from '../hooks/use-room-capabilities';
+import { useRoomHandle } from '../hooks/use-room-handle';
 import { useTaskDocument } from '../hooks/use-task-document';
 import { useTaskIndex } from '../hooks/use-task-index';
 import { useVoiceInput } from '../hooks/use-voice-input';
 import { useWebRTCSync } from '../hooks/use-webrtc-sync';
 import { useRepo, useWebRtcAdapter } from '../providers/repo-provider';
 import { useAuthStore, useMessageStore, useTaskStore, useUIStore } from '../stores';
+import { extractBranchFromWorktreePath } from '../utils/worktree-helpers';
 import type { ChatComposerHandle, SubmitPayload } from './chat-composer';
 import { ChatComposer } from './chat-composer';
 import type { ChatMessageData } from './chat-message';
@@ -44,6 +56,8 @@ import { SettingsPage } from './settings-page';
 import { ShortcutsModal } from './shortcuts-modal';
 import { Sidebar } from './sidebar';
 import { TopBar } from './top-bar';
+import { WorktreeCreationModal } from './worktree-creation-modal';
+import { WorktreeProgressCard } from './worktree-progress-card';
 
 const useLoro = import.meta.env.VITE_DATA_SOURCE === 'loro';
 
@@ -111,6 +125,41 @@ function toContentBlocks(text: string, images?: SubmitPayload['images']): Conten
     }
   }
   return blocks;
+}
+
+const ONE_HOUR_MS = 60 * 60 * 1000;
+
+/**
+ * Compute a relevance sort key for a setup entry.
+ * Returns null if the entry is not relevant (terminal and too old).
+ * `running` entries are always relevant; terminal entries only within the last hour.
+ */
+function setupEntrySortKey(entry: WorktreeSetupStatus, recentCutoff: number): number | null {
+  if (entry.status === 'running') return entry.startedAt ?? 0;
+  if (entry.completedAt && entry.completedAt > recentCutoff) return entry.completedAt;
+  return null;
+}
+
+/**
+ * Find the most relevant worktree setup entry from the CRDT that should be
+ * shown as a reconstructed progress card on page load. Returns null if
+ * no entry qualifies.
+ */
+function findRecentSetupEntry(
+  record: Record<string, WorktreeSetupStatus>
+): { worktreePath: string; entry: WorktreeSetupStatus } | null {
+  const recentCutoff = Date.now() - ONE_HOUR_MS;
+  let best: { worktreePath: string; entry: WorktreeSetupStatus; sortKey: number } | null = null;
+
+  for (const [worktreePath, entry] of Object.entries(record)) {
+    const sortKey = setupEntrySortKey(entry, recentCutoff);
+    if (sortKey != null && (!best || sortKey > best.sortKey)) {
+      best = { worktreePath, entry, sortKey };
+    }
+  }
+
+  if (!best) return null;
+  return { worktreePath: best.worktreePath, entry: best.entry };
 }
 
 function getSubmitDisabledReason(
@@ -200,6 +249,7 @@ function HeroState({ onSuggestionClick, environmentLabel, canSubmit = true }: He
   );
 }
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: page-level orchestrator integrating many hooks and conditional UI
 export function ChatPage() {
   const activeTaskId = useTaskStore((s) => s.activeTaskId);
   const setActiveTask = useTaskStore((s) => s.setActiveTask);
@@ -226,6 +276,7 @@ export function ChatPage() {
     };
   }, [authToken, authUser]);
   const { agents, connectionState, connection, lastTaskAck } = usePersonalRoom(personalRoomConfig);
+  const roomHandle = useRoomHandle(LOCAL_USER_ID);
   const capabilitiesByMachine = useRoomCapabilities(LOCAL_USER_ID);
   const {
     machines,
@@ -255,6 +306,25 @@ export function ChatPage() {
   const taskList = useMemo(
     () => Object.values(taskIndex).sort((a, b) => b.updatedAt - a.updatedAt),
     [taskIndex]
+  );
+
+  /**
+   * Subscribe to worktreeSetupStatus from the room CRDT document.
+   * This is the durable fallback for setup script results -- the browser reads
+   * this on mount (after a refresh) or when a CRDT sync arrives late.
+   * The ephemeral subscription below handles the instant fast path.
+   */
+  const roomDocId = useMemo(() => buildDocumentId('room', LOCAL_USER_ID, DEFAULT_EPOCH), []);
+  // eslint-disable-next-line no-restricted-syntax -- loro-extended generics require explicit cast
+  const roomDocHandle = useMemo(
+    () => repo.get(roomDocId, TaskIndexDocumentSchema as never, ROOM_EPHEMERAL_DECLARATIONS),
+    [repo, roomDocId]
+  );
+  // eslint-disable-next-line no-restricted-syntax -- loro-extended generic erasure requires cast from TypedDoc<never> to concrete shape
+  const roomTypedDoc = roomDocHandle.doc as unknown as TypedDoc<TaskIndexDocumentShape>;
+  const worktreeSetupStatusRecord = useDoc(
+    roomDocHandle,
+    (d: { worktreeSetupStatus: Record<string, WorktreeSetupStatus> }) => d.worktreeSetupStatus
   );
 
   const storeMessages = activeTaskId ? messagesByTask[activeTaskId] : undefined;
@@ -352,6 +422,127 @@ export function ChatPage() {
   const [composerModel, setComposerModel] = useState('claude-opus-4-6');
   const [composerReasoning, setComposerReasoning] = useState<ReasoningLevel>('medium');
   const [composerPermission, setComposerPermission] = useState<PermissionMode>('default');
+
+  const [isWorktreeModalOpen, setIsWorktreeModalOpen] = useState(false);
+  const [worktreeProgress, setWorktreeProgress] = useState<{
+    branchName: string;
+    step: string;
+    isComplete: boolean;
+    isError: boolean;
+    errorMessage?: string;
+    warnings?: string[];
+    worktreePath?: string;
+    setupScriptStarted?: boolean;
+    setupStatus?: 'running' | 'done' | 'failed';
+    setupExitCode?: number | null;
+    requestId?: string;
+  } | null>(null);
+
+  const { createWorktree, isCreating: isCreatingWorktree } = useCreateWorktree({
+    roomHandle,
+    machineId: selectedMachineId,
+  });
+
+  const worktreeScriptsRecord = useDoc(
+    roomDocHandle,
+    (d: { userSettings: { worktreeScripts: Record<string, WorktreeScriptValue> } }) =>
+      d.userSettings.worktreeScripts
+  );
+
+  const worktreeScripts = useMemo(
+    () => new Map(Object.entries(worktreeScriptsRecord ?? {})),
+    [worktreeScriptsRecord]
+  );
+
+  /**
+   * Subscribe to worktreeSetupResps ephemeral to receive setup script exit status.
+   * When the daemon's child process exits, it writes { exitCode, signal, worktreePath }
+   * keyed by the original requestId. We correlate with the active progress card.
+   */
+  useEffect(() => {
+    const unsub = roomHandle.worktreeSetupResps.subscribe(({ key, value, source }) => {
+      if (source === 'local') return;
+      if (!value) return;
+      setWorktreeProgress((prev) => {
+        if (!prev || prev.requestId !== key) return prev;
+        if (!prev.setupScriptStarted) return prev;
+        const exitCode = value.exitCode;
+        const isSuccess = exitCode === 0;
+        return {
+          ...prev,
+          setupStatus: isSuccess ? 'done' : 'failed',
+          setupExitCode: exitCode,
+        };
+      });
+    });
+    return unsub;
+  }, [roomHandle]);
+
+  /**
+   * CRDT fallback: when the browser refreshed or missed the ephemeral, the
+   * daemon's terminal status (done/failed) will be in the CRDT document.
+   * Correlate by worktreePath and update the progress card accordingly.
+   *
+   * Only runs when the progress card is showing a setup-in-progress state
+   * and the CRDT already has a terminal result for that worktree path.
+   */
+  useEffect(() => {
+    if (!worktreeProgress?.worktreePath) return;
+    if (!worktreeProgress.setupScriptStarted) return;
+    if (worktreeProgress.setupStatus === 'done' || worktreeProgress.setupStatus === 'failed') {
+      return;
+    }
+
+    const crdtEntry = worktreeSetupStatusRecord[worktreeProgress.worktreePath];
+    if (!crdtEntry) return;
+    if (crdtEntry.status === 'running') return;
+
+    const isSuccess = crdtEntry.status === 'done';
+    setWorktreeProgress((prev) => {
+      if (!prev) return prev;
+      if (prev.setupStatus === 'done' || prev.setupStatus === 'failed') return prev;
+      return {
+        ...prev,
+        setupStatus: isSuccess ? 'done' : 'failed',
+        setupExitCode: crdtEntry.exitCode,
+      };
+    });
+  }, [
+    worktreeProgress?.worktreePath,
+    worktreeProgress?.setupScriptStarted,
+    worktreeProgress?.setupStatus,
+    worktreeSetupStatusRecord,
+  ]);
+
+  /**
+   * Reconstruct the progress card from CRDT on mount.
+   * When the page loads after a refresh and the CRDT has recent worktree
+   * setup entries, show the card so the user sees the result.
+   * Only runs once (mount-only) -- the live subscription handles updates.
+   */
+  const hasReconstructedProgressRef = useRef(false);
+  useEffect(() => {
+    if (hasReconstructedProgressRef.current) return;
+    if (!worktreeSetupStatusRecord) return;
+    if (worktreeProgress) return;
+
+    const recent = findRecentSetupEntry(worktreeSetupStatusRecord);
+    if (!recent) return;
+
+    hasReconstructedProgressRef.current = true;
+
+    const isRunning = recent.entry.status === 'running';
+    setWorktreeProgress({
+      branchName: extractBranchFromWorktreePath(recent.worktreePath),
+      step: 'done',
+      isComplete: true,
+      isError: false,
+      worktreePath: recent.worktreePath,
+      setupScriptStarted: true,
+      setupStatus: isRunning ? 'running' : recent.entry.status === 'done' ? 'done' : 'failed',
+      setupExitCode: recent.entry.exitCode,
+    });
+  }, [worktreeSetupStatusRecord, worktreeProgress]);
 
   const seededTaskRef = useRef<string | null>(null);
 
@@ -473,7 +664,7 @@ export function ChatPage() {
     cancel: cancelEnhance,
     isEnhancing,
   } = useEnhancePrompt({
-    connection,
+    roomHandle,
     machineId: selectedMachineId,
   });
 
@@ -499,6 +690,79 @@ export function ChatPage() {
       },
     });
   }, [isEnhancing, cancelEnhance, enhancePromptFn]);
+
+  const [worktreeSourceRepo, setWorktreeSourceRepo] = useState<GitRepoInfo | null>(null);
+
+  const handleWorktreeCreate = useCallback(
+    (params: {
+      sourceRepoPath: string;
+      branchName: string;
+      baseRef: string;
+      setupScript: string | null;
+    }) => {
+      setWorktreeProgress({
+        branchName: params.branchName,
+        step: 'creating-worktree',
+        isComplete: false,
+        isError: false,
+      });
+      setIsWorktreeModalOpen(false);
+
+      createWorktree(
+        {
+          sourceRepoPath: params.sourceRepoPath,
+          branchName: params.branchName,
+          baseRef: params.baseRef,
+          setupScript: params.setupScript,
+        },
+        {
+          onProgress: (progress) => {
+            setWorktreeProgress((prev) => (prev ? { ...prev, step: progress.step } : null));
+          },
+          onDone: (result) => {
+            setWorktreeProgress((prev) =>
+              prev
+                ? {
+                    ...prev,
+                    isComplete: true,
+                    step: 'done',
+                    worktreePath: result.worktreePath,
+                    warnings: result.warnings,
+                    setupScriptStarted: result.setupScriptStarted,
+                    setupStatus: result.setupScriptStarted ? 'running' : undefined,
+                    requestId: result.requestId,
+                  }
+                : null
+            );
+          },
+          onError: (message) => {
+            setWorktreeProgress((prev) =>
+              prev
+                ? {
+                    ...prev,
+                    isError: true,
+                    errorMessage: message,
+                  }
+                : null
+            );
+          },
+        }
+      );
+    },
+    [createWorktree]
+  );
+
+  /** Open the worktree modal with a pre-selected source repo (from picker "+" button). */
+  const handleOpenWorktreeModalWithSource = useCallback((sourceRepo: GitRepoInfo) => {
+    setWorktreeSourceRepo(sourceRepo);
+    setIsWorktreeModalOpen(true);
+  }, []);
+
+  /** Open the worktree modal without a pre-selected source (from slash command). */
+  const handleOpenWorktreeModal = useCallback(() => {
+    setWorktreeSourceRepo(null);
+    setIsWorktreeModalOpen(true);
+  }, []);
 
   const toggleSettings = useUIStore((s) => s.toggleSettings);
 
@@ -728,6 +992,12 @@ export function ChatPage() {
 
   const hasMessages = messages.length > 0;
 
+  const worktreeSetupScript = useMemo(() => {
+    if (!worktreeSourceRepo) return null;
+    const entry = worktreeScripts.get(worktreeSourceRepo.path);
+    return entry?.script ?? null;
+  }, [worktreeSourceRepo, worktreeScripts]);
+
   const selectedEnv = availableEnvironments.find((e) => e.path === selectedEnvironmentPath);
   const heroEnvironmentLabel = selectedEnv
     ? homeDir && selectedEnv.path === homeDir
@@ -746,6 +1016,15 @@ export function ChatPage() {
       <div className="flex h-dvh overflow-hidden bg-background">
         <CommandPalette />
         <ShortcutsModal />
+        <WorktreeCreationModal
+          isOpen={isWorktreeModalOpen}
+          onClose={() => setIsWorktreeModalOpen(false)}
+          sourceRepo={worktreeSourceRepo}
+          environments={availableEnvironments}
+          onSubmit={handleWorktreeCreate}
+          isCreating={isCreatingWorktree}
+          setupScript={worktreeSetupScript}
+        />
         <Sidebar />
         <div className="flex flex-col flex-1 min-w-0 min-h-0" tabIndex={-1}>
           <TopBar
@@ -756,7 +1035,10 @@ export function ChatPage() {
 
           <main id="main-content" className="flex flex-col flex-1 min-h-0">
             {isSettingsOpen ? (
-              <SettingsPage onBack={handleCloseSettings} />
+              <SettingsPage
+                onBack={handleCloseSettings}
+                availableEnvironments={availableEnvironments}
+              />
             ) : (
               <>
                 {hasMessages ? (
@@ -809,6 +1091,50 @@ export function ChatPage() {
                 )}
 
                 <div className="shrink-0 w-full max-w-3xl mx-auto px-3 sm:px-4">
+                  {worktreeProgress && (
+                    <div className="mb-2">
+                      <WorktreeProgressCard
+                        branchName={worktreeProgress.branchName}
+                        currentStep={worktreeProgress.step}
+                        isComplete={worktreeProgress.isComplete}
+                        isError={worktreeProgress.isError}
+                        errorMessage={worktreeProgress.errorMessage}
+                        warnings={worktreeProgress.warnings}
+                        setupScriptStarted={worktreeProgress.setupScriptStarted}
+                        setupStatus={worktreeProgress.setupStatus}
+                        setupExitCode={worktreeProgress.setupExitCode}
+                        onSwitchToWorktree={
+                          worktreeProgress.worktreePath
+                            ? () => {
+                                const wtPath = worktreeProgress.worktreePath;
+                                setSelectedEnvironmentPath(wtPath ?? null);
+                                const isSetupTerminalOrAbsent =
+                                  !worktreeProgress.setupScriptStarted ||
+                                  worktreeProgress.setupStatus === 'done' ||
+                                  worktreeProgress.setupStatus === 'failed';
+                                if (isSetupTerminalOrAbsent) {
+                                  if (wtPath) {
+                                    change(roomTypedDoc, (draft) => {
+                                      draft.worktreeSetupStatus.delete(wtPath);
+                                    });
+                                  }
+                                  setWorktreeProgress(null);
+                                }
+                              }
+                            : undefined
+                        }
+                        onDismiss={() => {
+                          const wtPath = worktreeProgress.worktreePath;
+                          if (wtPath) {
+                            change(roomTypedDoc, (draft) => {
+                              draft.worktreeSetupStatus.delete(wtPath);
+                            });
+                          }
+                          setWorktreeProgress(null);
+                        }}
+                      />
+                    </div>
+                  )}
                   <ChatComposer
                     ref={composerRef}
                     onSubmit={handleSubmit}
@@ -830,6 +1156,7 @@ export function ChatPage() {
                     voiceInterimText={voiceInput.interimText}
                     isEnhancing={isEnhancing}
                     onEnhance={handleEnhance}
+                    onCreateWorktree={handleOpenWorktreeModal}
                   />
                   <StatusBar
                     connectionState={connectionState}
@@ -840,6 +1167,7 @@ export function ChatPage() {
                     selectedEnvironmentPath={selectedEnvironmentPath}
                     onEnvironmentSelect={setSelectedEnvironmentPath}
                     homeDir={homeDir}
+                    onCreateWorktree={handleOpenWorktreeModalWithSource}
                   />
                 </div>
               </>

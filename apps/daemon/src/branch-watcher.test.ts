@@ -17,6 +17,11 @@ vi.mock('node:fs', () => ({
   }),
 }));
 
+vi.mock('node:fs/promises', () => ({
+  stat: vi.fn(),
+  readFile: vi.fn(),
+}));
+
 vi.mock('./capabilities.js', () => ({
   getRepoMetadata: vi.fn(),
 }));
@@ -32,16 +37,41 @@ vi.mock('./logger.js', () => ({
 }));
 
 import { watch } from 'node:fs';
+import { readFile, stat } from 'node:fs/promises';
 import type { GitRepoInfo } from '@shipyard/session';
 import { createBranchWatcher } from './branch-watcher.js';
 import { getRepoMetadata } from './capabilities.js';
 
 const mockGetRepoMetadata = vi.mocked(getRepoMetadata);
 const mockWatch = vi.mocked(watch);
+const mockStat = vi.mocked(stat);
+const mockReadFile = vi.mocked(readFile);
 
 function makeEnv(path: string, branch: string, remote?: string): GitRepoInfo {
   const name = path.split('/').pop() ?? path;
   return { path, name, branch, ...(remote && { remote }) };
+}
+
+type StatResult = Awaited<ReturnType<typeof stat>>;
+
+/** Default mock: .git is a directory (regular repo) */
+function mockRegularRepo(): void {
+  mockStat.mockResolvedValue({
+    isDirectory: () => true,
+  } as StatResult);
+}
+
+/** Mock a worktree: .git is a file containing gitdir pointer */
+function mockWorktreeRepo(gitdir: string): void {
+  mockStat.mockResolvedValue({
+    isDirectory: () => false,
+  } as StatResult);
+  mockReadFile.mockResolvedValue(`gitdir: ${gitdir}\n`);
+}
+
+/** Flush microtask queue so async startWatching resolves */
+async function flushMicrotasks(): Promise<void> {
+  await vi.advanceTimersByTimeAsync(0);
 }
 
 beforeEach(() => {
@@ -49,6 +79,7 @@ beforeEach(() => {
   vi.useFakeTimers();
   fsListeners.clear();
   closedPaths.clear();
+  mockRegularRepo();
 });
 
 afterEach(() => {
@@ -56,10 +87,11 @@ afterEach(() => {
 });
 
 describe('createBranchWatcher', () => {
-  it('sets up fs.watch for each environment .git/HEAD', () => {
+  it('sets up fs.watch for each environment .git/HEAD', async () => {
     const envs = [makeEnv('/home/user/repo-a', 'main'), makeEnv('/home/user/repo-b', 'develop')];
 
     const watcher = createBranchWatcher({ environments: envs, onUpdate: vi.fn() });
+    await flushMicrotasks();
 
     expect(mockWatch).toHaveBeenCalledTimes(2);
     expect(mockWatch).toHaveBeenCalledWith('/home/user/repo-a/.git/HEAD', expect.any(Function));
@@ -72,6 +104,7 @@ describe('createBranchWatcher', () => {
     const envs = [makeEnv('/home/user/repo', 'main')];
     const onUpdate = vi.fn();
     const watcher = createBranchWatcher({ environments: envs, onUpdate });
+    await flushMicrotasks();
 
     mockGetRepoMetadata.mockResolvedValueOnce(makeEnv('/home/user/repo', 'feature-x'));
 
@@ -94,6 +127,7 @@ describe('createBranchWatcher', () => {
     const envs = [makeEnv('/home/user/repo', 'main')];
     const onUpdate = vi.fn();
     const watcher = createBranchWatcher({ environments: envs, onUpdate });
+    await flushMicrotasks();
 
     mockGetRepoMetadata.mockResolvedValueOnce(makeEnv('/home/user/repo', 'main'));
 
@@ -109,6 +143,7 @@ describe('createBranchWatcher', () => {
     const envs = [makeEnv('/home/user/repo', 'main')];
     const onUpdate = vi.fn();
     const watcher = createBranchWatcher({ environments: envs, onUpdate });
+    await flushMicrotasks();
 
     mockGetRepoMetadata.mockResolvedValue(makeEnv('/home/user/repo', 'feature-y'));
 
@@ -130,6 +165,7 @@ describe('createBranchWatcher', () => {
     const envs = [makeEnv('/home/user/repo-a', 'main'), makeEnv('/home/user/repo-b', 'develop')];
     const onUpdate = vi.fn();
     const watcher = createBranchWatcher({ environments: envs, onUpdate });
+    await flushMicrotasks();
 
     mockGetRepoMetadata.mockResolvedValueOnce(null);
 
@@ -142,9 +178,10 @@ describe('createBranchWatcher', () => {
     watcher.close();
   });
 
-  it('close() tears down all watchers and timers', () => {
+  it('close() tears down all watchers and timers', async () => {
     const envs = [makeEnv('/home/user/repo-a', 'main'), makeEnv('/home/user/repo-b', 'develop')];
     const watcher = createBranchWatcher({ environments: envs, onUpdate: vi.fn() });
+    await flushMicrotasks();
 
     expect(fsListeners.size).toBe(2);
 
@@ -154,7 +191,7 @@ describe('createBranchWatcher', () => {
     expect(closedPaths.has('/home/user/repo-b/.git/HEAD')).toBe(true);
   });
 
-  it('handles watch() throwing for a repo path gracefully', () => {
+  it('handles watch() throwing for a repo path gracefully', async () => {
     mockWatch.mockImplementationOnce(() => {
       throw new Error('ENOENT');
     });
@@ -162,10 +199,9 @@ describe('createBranchWatcher', () => {
     const envs = [makeEnv('/home/user/missing-repo', 'main')];
     const onUpdate = vi.fn();
 
-    expect(() => {
-      const watcher = createBranchWatcher({ environments: envs, onUpdate });
-      watcher.close();
-    }).not.toThrow();
+    const watcher = createBranchWatcher({ environments: envs, onUpdate });
+    await flushMicrotasks();
+    watcher.close();
   });
 
   it('updates only the changed repo in a multi-repo environment', async () => {
@@ -175,6 +211,7 @@ describe('createBranchWatcher', () => {
     ];
     const onUpdate = vi.fn();
     const watcher = createBranchWatcher({ environments: envs, onUpdate });
+    await flushMicrotasks();
 
     mockGetRepoMetadata.mockResolvedValueOnce(
       makeEnv('/home/user/repo-b', 'feature-z', 'git@github.com:user/b.git')
@@ -192,5 +229,108 @@ describe('createBranchWatcher', () => {
     );
 
     watcher.close();
+  });
+
+  describe('worktree support', () => {
+    it('resolves HEAD path from .git file for worktrees with absolute gitdir', async () => {
+      mockWorktreeRepo('/home/user/main-repo/.git/worktrees/feature-branch');
+
+      const envs = [makeEnv('/home/user/worktree', 'feature-branch')];
+      const watcher = createBranchWatcher({ environments: envs, onUpdate: vi.fn() });
+      await flushMicrotasks();
+
+      expect(mockWatch).toHaveBeenCalledTimes(1);
+      expect(mockWatch).toHaveBeenCalledWith(
+        '/home/user/main-repo/.git/worktrees/feature-branch/HEAD',
+        expect.any(Function)
+      );
+
+      watcher.close();
+    });
+
+    it('resolves HEAD path from .git file for worktrees with relative gitdir', async () => {
+      mockWorktreeRepo('../main-repo/.git/worktrees/feature-branch');
+
+      const envs = [makeEnv('/home/user/worktree', 'feature-branch')];
+      const watcher = createBranchWatcher({ environments: envs, onUpdate: vi.fn() });
+      await flushMicrotasks();
+
+      expect(mockWatch).toHaveBeenCalledTimes(1);
+      // join() normalizes the ../  segments
+      expect(mockWatch).toHaveBeenCalledWith(
+        '/home/user/main-repo/.git/worktrees/feature-branch/HEAD',
+        expect.any(Function)
+      );
+
+      watcher.close();
+    });
+
+    it('skips watching when .git file has invalid content', async () => {
+      mockStat.mockResolvedValue({
+        isDirectory: () => false,
+      } as StatResult);
+      mockReadFile.mockResolvedValue('not a gitdir pointer\n');
+
+      const envs = [makeEnv('/home/user/bad-worktree', 'main')];
+      const watcher = createBranchWatcher({ environments: envs, onUpdate: vi.fn() });
+      await flushMicrotasks();
+
+      expect(mockWatch).not.toHaveBeenCalled();
+
+      watcher.close();
+    });
+
+    it('skips watching when stat fails (no .git at all)', async () => {
+      mockStat.mockRejectedValue(new Error('ENOENT: no such file or directory'));
+
+      const envs = [makeEnv('/home/user/not-a-repo', 'main')];
+      const watcher = createBranchWatcher({ environments: envs, onUpdate: vi.fn() });
+      await flushMicrotasks();
+
+      expect(mockWatch).not.toHaveBeenCalled();
+
+      watcher.close();
+    });
+
+    it('watches worktree HEAD and triggers branch change detection', async () => {
+      mockWorktreeRepo('/home/user/main-repo/.git/worktrees/my-wt');
+
+      const envs = [makeEnv('/home/user/worktree', 'feature-a')];
+      const onUpdate = vi.fn();
+      const watcher = createBranchWatcher({ environments: envs, onUpdate });
+      await flushMicrotasks();
+
+      mockGetRepoMetadata.mockResolvedValueOnce(makeEnv('/home/user/worktree', 'feature-b'));
+
+      const headPath = '/home/user/main-repo/.git/worktrees/my-wt/HEAD';
+      const listener = fsListeners.get(headPath);
+      expect(listener).toBeDefined();
+      listener!();
+
+      await vi.advanceTimersByTimeAsync(500);
+
+      expect(mockGetRepoMetadata).toHaveBeenCalledWith('/home/user/worktree');
+      expect(onUpdate).toHaveBeenCalledTimes(1);
+      expect(onUpdate).toHaveBeenCalledWith([makeEnv('/home/user/worktree', 'feature-b')]);
+
+      watcher.close();
+    });
+
+    it('addEnvironment resolves worktree HEAD correctly', async () => {
+      const watcher = createBranchWatcher({ environments: [], onUpdate: vi.fn() });
+      await flushMicrotasks();
+
+      mockWorktreeRepo('/home/user/main/.git/worktrees/wt-branch');
+
+      watcher.addEnvironment('/home/user/wt', 'wt-branch');
+      await flushMicrotasks();
+
+      expect(mockWatch).toHaveBeenCalledWith(
+        '/home/user/main/.git/worktrees/wt-branch/HEAD',
+        expect.any(Function)
+      );
+
+      watcher.close();
+    });
   });
 });

@@ -34,18 +34,35 @@ export {
   updateTaskInIndex,
 } from './room-helpers.js';
 export type {
+  EnhancePromptRequestEphemeralValue,
+  EnhancePromptResponseEphemeralValue,
   MachineCapabilitiesEphemeralShape,
   MachineCapabilitiesEphemeralValue,
   MutableTaskIndexDocument,
   TaskIndexDocument,
   TaskIndexDocumentShape,
   TaskIndexEntry,
+  UserSettingsValue,
+  WorktreeCreateRequestEphemeralValue,
+  WorktreeCreateResponseEphemeralValue,
+  WorktreeScriptValue,
+  WorktreeSetupResultEphemeralValue,
+  WorktreeSetupStatus,
 } from './room-schema.js';
 export {
+  EnhancePromptRequestEphemeral,
+  EnhancePromptResponseEphemeral,
   MachineCapabilitiesEphemeral,
   ROOM_EPHEMERAL_DECLARATIONS,
   TaskIndexDocumentSchema,
   TaskIndexEntryShape,
+  UserSettingsShape,
+  WORKTREE_SETUP_STATUSES,
+  WorktreeCreateRequestEphemeral,
+  WorktreeCreateResponseEphemeral,
+  WorktreeScriptShape,
+  WorktreeSetupResultEphemeral,
+  WorktreeSetupStatusShape,
 } from './room-schema.js';
 export type {
   A2ATaskState,

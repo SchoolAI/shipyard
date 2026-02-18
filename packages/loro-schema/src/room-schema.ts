@@ -15,6 +15,42 @@ export const TaskIndexEntryShape = Shape.struct({
   updatedAt: Shape.plain.number(),
 });
 
+const WORKTREE_SETUP_STATUSES = ['running', 'done', 'failed'] as const;
+
+/**
+ * Status of a worktree setup script.
+ * All states (including `running`) are persisted in the CRDT.
+ * On daemon startup, orphaned `running` entries (dead PID, same machine)
+ * are marked `failed` via PID-based detection.
+ * Keyed by worktree path in the document record.
+ */
+export const WorktreeSetupStatusShape = Shape.struct({
+  status: Shape.plain.string(...WORKTREE_SETUP_STATUSES),
+  machineId: Shape.plain.string(),
+  startedAt: Shape.plain.number(),
+  completedAt: Shape.plain.number().nullable(),
+  exitCode: Shape.plain.number().nullable(),
+  signal: Shape.plain.string().nullable(),
+  pid: Shape.plain.number().nullable(),
+});
+
+/**
+ * Per-repo worktree setup script entry.
+ * Stored persistently in the CRDT document so scripts survive daemon restarts.
+ * Keyed by source repo path in the `userSettings.worktreeScripts` record.
+ */
+export const WorktreeScriptShape = Shape.plain.struct({
+  script: Shape.plain.string(),
+});
+
+/**
+ * Persistent user settings stored in the CRDT document.
+ * Unlike ephemeral state, these survive page refreshes and daemon restarts.
+ */
+export const UserSettingsShape = Shape.struct({
+  worktreeScripts: Shape.record(WorktreeScriptShape),
+});
+
 /**
  * Task index document schema.
  * One per user room. Provides a denormalized index of all tasks
@@ -23,10 +59,20 @@ export const TaskIndexEntryShape = Shape.struct({
  */
 export const TaskIndexDocumentSchema = Shape.doc({
   taskIndex: Shape.record(TaskIndexEntryShape),
+  worktreeSetupStatus: Shape.record(WorktreeSetupStatusShape),
+  userSettings: UserSettingsShape,
 });
 
 export type TaskIndexEntryShape = typeof TaskIndexEntryShape;
 export type TaskIndexEntry = Infer<typeof TaskIndexEntryShape>;
+
+export { WORKTREE_SETUP_STATUSES };
+export type WorktreeSetupStatusShape = typeof WorktreeSetupStatusShape;
+export type WorktreeSetupStatus = Infer<typeof WorktreeSetupStatusShape>;
+
+export type WorktreeScriptValue = Infer<typeof WorktreeScriptShape>;
+
+export type UserSettingsValue = Infer<typeof UserSettingsShape>;
 
 export type TaskIndexDocumentShape = typeof TaskIndexDocumentSchema;
 export type TaskIndexDocument = Infer<typeof TaskIndexDocumentSchema>;
@@ -88,9 +134,90 @@ export type MachineCapabilitiesEphemeralShape = typeof MachineCapabilitiesEpheme
 export type MachineCapabilitiesEphemeralValue = Infer<typeof MachineCapabilitiesEphemeral>;
 
 /**
+ * Ephemeral request shape for enhance-prompt (keyed by requestId).
+ * Browser writes, daemon reads. Replaces session server relay for prompt data.
+ */
+export const EnhancePromptRequestEphemeral = Shape.plain.struct({
+  machineId: Shape.plain.string(),
+  prompt: Shape.plain.string(),
+  requestedAt: Shape.plain.number(),
+});
+
+export type EnhancePromptRequestEphemeralValue = Infer<typeof EnhancePromptRequestEphemeral>;
+
+/**
+ * Ephemeral response shape for enhance-prompt (keyed by requestId).
+ * Daemon writes progressively, browser reads reactively.
+ * `text` accumulates — each write contains the full text so far.
+ */
+export const EnhancePromptResponseEphemeral = Shape.plain.struct({
+  status: Shape.plain.string('streaming', 'done', 'error'),
+  text: Shape.plain.string(),
+  error: Shape.plain.string().nullable(),
+});
+
+export type EnhancePromptResponseEphemeralValue = Infer<typeof EnhancePromptResponseEphemeral>;
+
+/**
+ * Ephemeral request shape for worktree creation (keyed by requestId).
+ * Browser writes, daemon reads. All private paths stay in P2P mesh.
+ */
+export const WorktreeCreateRequestEphemeral = Shape.plain.struct({
+  machineId: Shape.plain.string(),
+  sourceRepoPath: Shape.plain.string(),
+  branchName: Shape.plain.string(),
+  baseRef: Shape.plain.string(),
+  setupScript: Shape.plain.string().nullable(),
+  requestedAt: Shape.plain.number(),
+});
+
+export type WorktreeCreateRequestEphemeralValue = Infer<typeof WorktreeCreateRequestEphemeral>;
+
+/**
+ * Ephemeral response shape for worktree creation (keyed by requestId).
+ * Daemon writes progress updates, browser reads reactively.
+ */
+export const WorktreeCreateResponseEphemeral = Shape.plain.struct({
+  status: Shape.plain.string(
+    'creating-worktree',
+    'copying-files',
+    'running-setup-script',
+    'refreshing-environments',
+    'done',
+    'error'
+  ),
+  detail: Shape.plain.string().nullable(),
+  worktreePath: Shape.plain.string().nullable(),
+  branchName: Shape.plain.string().nullable(),
+  setupScriptStarted: Shape.plain.boolean().nullable(),
+  warnings: Shape.plain.array(Shape.plain.string()).nullable(),
+  error: Shape.plain.string().nullable(),
+});
+
+export type WorktreeCreateResponseEphemeralValue = Infer<typeof WorktreeCreateResponseEphemeral>;
+
+/**
+ * Ephemeral response shape for worktree setup script completion (keyed by requestId).
+ * Daemon writes when a setup script's child process exits.
+ * Browser reads to display setup script outcome.
+ */
+export const WorktreeSetupResultEphemeral = Shape.plain.struct({
+  exitCode: Shape.plain.number().nullable(),
+  signal: Shape.plain.string().nullable(),
+  worktreePath: Shape.plain.string(),
+});
+
+export type WorktreeSetupResultEphemeralValue = Infer<typeof WorktreeSetupResultEphemeral>;
+
+/**
  * Ephemeral declarations for the room/task-index document.
  * Passed as the third argument to `repo.get(docId, schema, ephemeralDeclarations)`.
  */
 export const ROOM_EPHEMERAL_DECLARATIONS = {
   capabilities: MachineCapabilitiesEphemeral,
+  enhancePromptReqs: EnhancePromptRequestEphemeral,
+  enhancePromptResps: EnhancePromptResponseEphemeral,
+  worktreeCreateReqs: WorktreeCreateRequestEphemeral,
+  worktreeCreateResps: WorktreeCreateResponseEphemeral,
+  worktreeSetupResps: WorktreeSetupResultEphemeral,
 };

@@ -5,6 +5,7 @@ import {
   Cpu,
   FileCheck,
   FolderGit,
+  GitBranch,
   HelpCircle,
   ListChecks,
   Shield,
@@ -23,7 +24,8 @@ export type SlashCommandAction =
   | { kind: 'setReasoning'; level: ReasoningLevel }
   | { kind: 'setEnvironment'; path: string }
   | { kind: 'clear' }
-  | { kind: 'help' };
+  | { kind: 'help' }
+  | { kind: 'createWorktree' };
 
 export interface SlashCommandItem {
   id: string;
@@ -124,6 +126,14 @@ const COMMANDS: SlashCommandItem[] = [
     keywords: ['reasoning', 'effort', 'think', 'high'],
     action: { kind: 'setReasoning', level: 'high' },
     parentLabel: 'Reasoning effort',
+  },
+  {
+    id: 'worktree',
+    name: 'New worktree',
+    description: 'Create a new git worktree from the current environment',
+    icon: GitBranch,
+    keywords: ['worktree', 'branch', 'wt'],
+    action: { kind: 'createWorktree' },
   },
   {
     id: 'clear',

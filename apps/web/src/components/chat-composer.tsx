@@ -46,6 +46,7 @@ interface ChatComposerProps {
   voiceInterimText?: string;
   isEnhancing?: boolean;
   onEnhance?: () => void;
+  onCreateWorktree?: () => void;
 }
 
 export interface ChatComposerHandle {
@@ -83,6 +84,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
     voiceInterimText,
     isEnhancing,
     onEnhance,
+    onCreateWorktree,
   },
   ref
 ) {
@@ -119,11 +121,21 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
           break;
         case 'help':
           break;
+        case 'createWorktree':
+          onCreateWorktree?.();
+          break;
         default:
           assertNever(action);
       }
     },
-    [onModelChange, onReasoningChange, onPermissionChange, onClearChat, onEnvironmentSelect]
+    [
+      onModelChange,
+      onReasoningChange,
+      onPermissionChange,
+      onClearChat,
+      onEnvironmentSelect,
+      onCreateWorktree,
+    ]
   );
 
   const rafRef = useRef<number>(0);

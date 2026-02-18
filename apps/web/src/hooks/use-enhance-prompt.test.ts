@@ -1,42 +1,82 @@
-import type { PersonalRoomConnection, PersonalRoomServerMessage } from '@shipyard/session';
+import type {
+  EnhancePromptRequestEphemeralValue,
+  EnhancePromptResponseEphemeralValue,
+} from '@shipyard/loro-schema';
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useEnhancePrompt } from './use-enhance-prompt';
+import type { RoomHandle } from './use-room-handle';
 
-type MessageHandler = (msg: PersonalRoomServerMessage) => void;
+type EphemeralSubscribeCb = (event: {
+  key: string;
+  value: EnhancePromptResponseEphemeralValue | undefined;
+  source: 'local' | 'remote' | 'initial';
+}) => void;
 
-function createMockConnection() {
-  const handlers = new Set<MessageHandler>();
-  const sendMock = vi.fn();
-  return {
-    sendMock,
-    connection: {
-      send: sendMock,
-      onMessage: vi.fn((handler: MessageHandler) => {
-        handlers.add(handler);
-        return () => handlers.delete(handler);
+function createMockRoomHandle() {
+  const reqSets = new Map<string, EnhancePromptRequestEphemeralValue>();
+  const reqDeletes = new Set<string>();
+  const respDeletes = new Set<string>();
+  const respSubscribers = new Set<EphemeralSubscribeCb>();
+
+  const handle = {
+    enhancePromptReqs: {
+      set: vi.fn((key: string, value: EnhancePromptRequestEphemeralValue) => {
+        reqSets.set(key, value);
       }),
-    } as unknown as PersonalRoomConnection,
-    handlers,
-    emit(msg: PersonalRoomServerMessage) {
-      for (const h of handlers) h(msg);
+      delete: vi.fn((key: string) => {
+        reqDeletes.add(key);
+      }),
+    },
+    enhancePromptResps: {
+      subscribe: vi.fn((cb: EphemeralSubscribeCb) => {
+        respSubscribers.add(cb);
+        return () => respSubscribers.delete(cb);
+      }),
+      delete: vi.fn((key: string) => {
+        respDeletes.add(key);
+      }),
+    },
+  } as unknown as RoomHandle;
+
+  return {
+    handle,
+    reqSets,
+    reqDeletes,
+    respDeletes,
+    respSubscribers,
+    /** Simulate a remote ephemeral response arriving. */
+    emitResponse(key: string, value: EnhancePromptResponseEphemeralValue) {
+      for (const cb of respSubscribers) {
+        cb({ key, value, source: 'remote' });
+      }
+    },
+    /** Simulate a local echo (should be ignored by the hook). */
+    emitLocalEcho(key: string, value: EnhancePromptResponseEphemeralValue) {
+      for (const cb of respSubscribers) {
+        cb({ key, value, source: 'local' });
+      }
+    },
+    /** Get the requestId from the most recent set call. */
+    getLastRequestId(): string {
+      const calls = (handle.enhancePromptReqs.set as ReturnType<typeof vi.fn>).mock.calls;
+      const last = calls[calls.length - 1];
+      return last ? (last[0] as string) : '';
     },
   };
 }
 
-function getRequestId(sendMock: ReturnType<typeof vi.fn>): string {
-  return (sendMock.mock.calls[0]![0] as Record<string, unknown>).requestId as string;
-}
-
-function setup(overrides: { machineId?: string | null } = {}) {
-  const mock = createMockConnection();
+function setup(overrides: { machineId?: string | null; handle?: RoomHandle | null } = {}) {
+  const mock = overrides.handle !== undefined ? null : createMockRoomHandle();
+  const roomHandle = overrides.handle !== undefined ? overrides.handle : mock!.handle;
+  const machineId = 'machineId' in overrides ? (overrides.machineId ?? null) : 'machine-1';
   const hook = renderHook(() =>
     useEnhancePrompt({
-      connection: mock.connection,
-      machineId: overrides.machineId ?? 'machine-1',
+      roomHandle,
+      machineId,
     })
   );
-  return { ...mock, ...hook };
+  return { mock, ...hook };
 }
 
 describe('useEnhancePrompt', () => {
@@ -54,18 +94,21 @@ describe('useEnhancePrompt', () => {
     expect(result.current.error).toBeNull();
   });
 
-  it('sends enhance-prompt-request on enhance()', () => {
-    const { result, sendMock } = setup();
+  it('writes request to enhancePromptReqs ephemeral on enhance()', () => {
+    const { mock, result } = setup();
     const callbacks = { onChunk: vi.fn(), onDone: vi.fn(), onError: vi.fn() };
 
     act(() => result.current.enhance('write tests', callbacks));
 
-    expect(sendMock).toHaveBeenCalledOnce();
-    const sent = sendMock.mock.calls[0]![0] as Record<string, unknown>;
-    expect(sent.type).toBe('enhance-prompt-request');
-    expect(sent.prompt).toBe('write tests');
-    expect(sent.machineId).toBe('machine-1');
-    expect(typeof sent.requestId).toBe('string');
+    expect(mock!.handle.enhancePromptReqs.set).toHaveBeenCalledOnce();
+    const [key, value] = (mock!.handle.enhancePromptReqs.set as ReturnType<typeof vi.fn>).mock
+      .calls[0]!;
+    expect(typeof key).toBe('string');
+    expect(value).toMatchObject({
+      machineId: 'machine-1',
+      prompt: 'write tests',
+    });
+    expect(typeof value.requestedAt).toBe('number');
   });
 
   it('sets isEnhancing to true while in-flight', () => {
@@ -77,38 +120,44 @@ describe('useEnhancePrompt', () => {
     expect(result.current.isEnhancing).toBe(true);
   });
 
-  it('calls onChunk with accumulated text', () => {
-    const { result, sendMock, emit } = setup();
+  it('calls onChunk when streaming response arrives', () => {
+    const { mock, result } = setup();
     const callbacks = { onChunk: vi.fn(), onDone: vi.fn(), onError: vi.fn() };
 
     act(() => result.current.enhance('hello', callbacks));
-
-    const requestId = getRequestId(sendMock);
-
-    act(() =>
-      emit({ type: 'enhance-prompt-chunk', requestId: requestId as string, text: 'First ' })
-    );
-    expect(callbacks.onChunk).toHaveBeenCalledWith('First ');
+    const requestId = mock!.getLastRequestId();
 
     act(() =>
-      emit({ type: 'enhance-prompt-chunk', requestId: requestId as string, text: 'Second' })
+      mock!.emitResponse(requestId, {
+        status: 'streaming',
+        text: 'First chunk',
+        error: null,
+      })
     );
-    expect(callbacks.onChunk).toHaveBeenCalledWith('First Second');
+    expect(callbacks.onChunk).toHaveBeenCalledWith('First chunk');
+
+    act(() =>
+      mock!.emitResponse(requestId, {
+        status: 'streaming',
+        text: 'First chunk more text',
+        error: null,
+      })
+    );
+    expect(callbacks.onChunk).toHaveBeenCalledWith('First chunk more text');
   });
 
-  it('calls onDone and resets state on enhance-prompt-done', () => {
-    const { result, sendMock, emit } = setup();
+  it('calls onDone and resets state on done response', () => {
+    const { mock, result } = setup();
     const callbacks = { onChunk: vi.fn(), onDone: vi.fn(), onError: vi.fn() };
 
     act(() => result.current.enhance('hello', callbacks));
-
-    const requestId = getRequestId(sendMock);
+    const requestId = mock!.getLastRequestId();
 
     act(() =>
-      emit({
-        type: 'enhance-prompt-done',
-        requestId: requestId as string,
-        fullText: 'Enhanced hello',
+      mock!.emitResponse(requestId, {
+        status: 'done',
+        text: 'Enhanced hello',
+        error: null,
       })
     );
 
@@ -116,13 +165,36 @@ describe('useEnhancePrompt', () => {
     expect(result.current.isEnhancing).toBe(false);
   });
 
-  it('ignores messages for a different requestId', () => {
-    const { result, emit } = setup();
+  it('ignores responses for a different requestId', () => {
+    const { mock, result } = setup();
     const callbacks = { onChunk: vi.fn(), onDone: vi.fn(), onError: vi.fn() };
 
     act(() => result.current.enhance('hello', callbacks));
 
-    act(() => emit({ type: 'enhance-prompt-chunk', requestId: 'wrong-id', text: 'Nope' }));
+    act(() =>
+      mock!.emitResponse('wrong-id', {
+        status: 'streaming',
+        text: 'Nope',
+        error: null,
+      })
+    );
+    expect(callbacks.onChunk).not.toHaveBeenCalled();
+  });
+
+  it('ignores local echo (source === "local")', () => {
+    const { mock, result } = setup();
+    const callbacks = { onChunk: vi.fn(), onDone: vi.fn(), onError: vi.fn() };
+
+    act(() => result.current.enhance('hello', callbacks));
+    const requestId = mock!.getLastRequestId();
+
+    act(() =>
+      mock!.emitLocalEcho(requestId, {
+        status: 'streaming',
+        text: 'Local echo',
+        error: null,
+      })
+    );
     expect(callbacks.onChunk).not.toHaveBeenCalled();
   });
 
@@ -140,24 +212,38 @@ describe('useEnhancePrompt', () => {
   });
 
   it('cancel() stops in-flight enhancement', () => {
-    const { result, sendMock, emit } = setup();
+    const { mock, result } = setup();
     const callbacks = { onChunk: vi.fn(), onDone: vi.fn(), onError: vi.fn() };
 
     act(() => result.current.enhance('hello', callbacks));
-
-    const requestId = getRequestId(sendMock);
+    const requestId = mock!.getLastRequestId();
 
     act(() => result.current.cancel());
     expect(result.current.isEnhancing).toBe(false);
 
-    act(() => emit({ type: 'enhance-prompt-chunk', requestId: requestId as string, text: 'Late' }));
+    act(() =>
+      mock!.emitResponse(requestId, {
+        status: 'streaming',
+        text: 'Late',
+        error: null,
+      })
+    );
     expect(callbacks.onChunk).not.toHaveBeenCalled();
   });
 
-  it('calls onError when no connection', () => {
-    const { result } = renderHook(() =>
-      useEnhancePrompt({ connection: null, machineId: 'machine-1' })
-    );
+  it('cancel() deletes the request from ephemeral', () => {
+    const { mock, result } = setup();
+    const callbacks = { onChunk: vi.fn(), onDone: vi.fn(), onError: vi.fn() };
+
+    act(() => result.current.enhance('hello', callbacks));
+    const requestId = mock!.getLastRequestId();
+
+    act(() => result.current.cancel());
+    expect(mock!.reqDeletes.has(requestId)).toBe(true);
+  });
+
+  it('calls onError when no roomHandle', () => {
+    const { result } = setup({ handle: null });
     const callbacks = { onChunk: vi.fn(), onDone: vi.fn(), onError: vi.fn() };
 
     act(() => result.current.enhance('hello', callbacks));
@@ -167,10 +253,7 @@ describe('useEnhancePrompt', () => {
   });
 
   it('calls onError when no machineId', () => {
-    const mock = createMockConnection();
-    const { result } = renderHook(() =>
-      useEnhancePrompt({ connection: mock.connection, machineId: null })
-    );
+    const { result } = setup({ machineId: null });
     const callbacks = { onChunk: vi.fn(), onDone: vi.fn(), onError: vi.fn() };
 
     act(() => result.current.enhance('hello', callbacks));
@@ -178,20 +261,18 @@ describe('useEnhancePrompt', () => {
     expect(callbacks.onError).toHaveBeenCalledWith('No connection or machine selected');
   });
 
-  it('calls onError on daemon error message', () => {
-    const { result, sendMock, emit } = setup();
+  it('calls onError on daemon error response', () => {
+    const { mock, result } = setup();
     const callbacks = { onChunk: vi.fn(), onDone: vi.fn(), onError: vi.fn() };
 
     act(() => result.current.enhance('hello', callbacks));
-
-    const requestId = getRequestId(sendMock);
+    const requestId = mock!.getLastRequestId();
 
     act(() =>
-      emit({
-        type: 'error',
-        code: 'enhance_failed',
-        message: 'Prompt enhancement failed',
-        requestId,
+      mock!.emitResponse(requestId, {
+        status: 'error',
+        text: '',
+        error: 'Prompt enhancement failed',
       })
     );
 
@@ -201,20 +282,24 @@ describe('useEnhancePrompt', () => {
   });
 
   it('cleans up previous request when enhance() is called again', () => {
-    const { result, sendMock, emit } = setup();
+    const { mock, result } = setup();
     const cb1 = { onChunk: vi.fn(), onDone: vi.fn(), onError: vi.fn() };
     const cb2 = { onChunk: vi.fn(), onDone: vi.fn(), onError: vi.fn() };
 
     act(() => result.current.enhance('first', cb1));
-    const firstRequestId = getRequestId(sendMock);
+    const firstRequestId = mock!.getLastRequestId();
 
     act(() => result.current.enhance('second', cb2));
 
+    // Old request should be deleted
+    expect(mock!.reqDeletes.has(firstRequestId)).toBe(true);
+
+    // Response on old requestId should be ignored
     act(() =>
-      emit({
-        type: 'enhance-prompt-chunk',
-        requestId: firstRequestId as string,
+      mock!.emitResponse(firstRequestId, {
+        status: 'streaming',
         text: 'Old',
+        error: null,
       })
     );
     expect(cb1.onChunk).not.toHaveBeenCalled();

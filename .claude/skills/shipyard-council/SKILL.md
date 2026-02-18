@@ -46,38 +46,52 @@ Full persona library with detailed system prompts: [reference.md](./reference.md
 
 ### Step 3: Spawn Agents in Parallel
 
+#### Context Brief Pattern
+
+Before spawning agents, write the full decision context to a temporary file:
+
+```
+/tmp/council-brief-{topic-slug}.md
+```
+
+Include in the brief:
+- The full proposal or decision being reviewed
+- The user's question and any proposed approach
+- Relevant context, constraints, and trade-offs
+- List of files to read (absolute paths)
+- Links to engineering standards, architecture docs, ADRs, WHIPs
+
+This avoids duplicating long context across 3-4 agent prompts, prevents context drift between agents (each getting slightly different descriptions), and avoids bloating the parent's context window with repeated text. The brief IS the shared context — each agent's prompt just wraps it with persona-specific instructions.
+
+#### Spawning
+
 Make multiple Task tool calls in a single message. Each subagent gets:
-1. Their persona identity and focus areas
-2. The decision context and question
-3. File paths to read
-4. Structured output instructions
+1. A reference to the context brief file
+2. Their persona identity and focus areas
+3. Structured output instructions
 
 **Subagent prompt template:**
 
 ```
 You are a [PERSONA NAME] reviewing a [DECISION TYPE] for the Shipyard project.
 
-## Context
-[WHAT IS BEING DECIDED — include the user's question and any proposed approach]
+## Context Brief
+Read the full decision context, proposal, and relevant file list from:
+/tmp/council-brief-{topic-slug}.md
+
+Read that file FIRST before doing anything else. It contains the proposal, constraints, trade-offs, and all file paths you need to review.
 
 ## Your Focus
 [PERSONA-SPECIFIC FOCUS AREAS — copied from reference.md persona entry]
 
-## Shipyard Context
-- Engineering standards: /Users/jacobpetterle/Working Directory/shipyard/docs/engineering-standards.md
-- Architecture: /Users/jacobpetterle/Working Directory/shipyard/docs/architecture.md
-[ADD any other relevant docs/files]
-
-## Files to Read
-[LIST ALL RELEVANT FILE PATHS — be specific, use absolute paths]
-
 ## Instructions
-1. Read ALL relevant files thoroughly — do not skim
-2. Read engineering-standards.md and architecture.md for project context
-3. Analyze ONLY from your persona's perspective — stay in character
-4. Be critical — find problems, not confirmations
-5. Reference specific file paths and line numbers for every finding
-6. Rate your confidence (high/medium/low) for each finding
+1. Read the context brief file thoroughly
+2. Read ALL files listed in the brief — do not skim
+3. Read engineering-standards.md and architecture.md for project context
+4. Analyze ONLY from your persona's perspective — stay in character
+5. Be critical — find problems, not confirmations
+6. Reference specific file paths and line numbers for every finding
+7. Rate your confidence (high/medium/low) for each finding
 
 ## Output Format
 ### Key Findings
