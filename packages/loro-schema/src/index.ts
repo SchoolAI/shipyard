@@ -74,6 +74,7 @@ export type {
   ReasoningEffort,
   SessionEntry,
   SessionState,
+  SupportedImageMediaType,
   TaskDocument,
   TaskDocumentShape,
   TaskMeta,
@@ -102,6 +103,7 @@ export {
   REASONING_EFFORTS,
   SESSION_STATES,
   SessionEntryShape,
+  SUPPORTED_IMAGE_MEDIA_TYPES,
   TaskDocumentSchema,
   TOOL_RISK_LEVELS,
 } from './shapes.js';

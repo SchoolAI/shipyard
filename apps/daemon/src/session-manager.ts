@@ -3,22 +3,81 @@ import type {
   PermissionMode,
   Query,
   SDKMessage,
+  SDKUserMessage,
   SettingSource,
 } from '@anthropic-ai/claude-agent-sdk';
 import { query } from '@anthropic-ai/claude-agent-sdk';
 import type { TypedDoc } from '@loro-extended/change';
+
+type MessageParam = SDKUserMessage['message'];
+
 import { change, loro } from '@loro-extended/change';
 import type {
   A2ATaskState,
   ContentBlock,
   SessionState,
+  SupportedImageMediaType,
   TaskDocumentShape,
 } from '@shipyard/loro-schema';
-import { extractPlanMarkdown } from '@shipyard/loro-schema';
+import { extractPlanMarkdown, SUPPORTED_IMAGE_MEDIA_TYPES } from '@shipyard/loro-schema';
 import { nanoid } from 'nanoid';
 import { logger } from './logger.js';
 import { initPlanEditorDoc } from './plan-editor/index.js';
 import { StreamingInputController } from './streaming-input-controller.js';
+
+/**
+ * Convert Loro ContentBlock[] to the Anthropic SDK message content format.
+ * Images are placed first with "Image N:" labels per Anthropic best practices,
+ * followed by all text blocks. Handles mediaType -> media_type conversion.
+ */
+const SAFE_MEDIA_TYPES: ReadonlySet<string> = new Set(SUPPORTED_IMAGE_MEDIA_TYPES);
+
+function isSafeMediaType(value: string): value is SupportedImageMediaType {
+  return SAFE_MEDIA_TYPES.has(value);
+}
+
+function toSdkContent(blocks: ContentBlock[]): MessageParam['content'] {
+  const imageBlocks: Array<ContentBlock & { type: 'image' }> = [];
+  const textBlocks: Array<ContentBlock & { type: 'text' }> = [];
+
+  for (const block of blocks) {
+    if (block.type === 'image') imageBlocks.push(block);
+    else if (block.type === 'text') textBlocks.push(block);
+  }
+
+  const result: MessageParam['content'] = [];
+
+  for (let i = 0; i < imageBlocks.length; i++) {
+    const img = imageBlocks[i];
+    if (!img) continue;
+    if (img.source.type !== 'base64') {
+      logger.warn({ sourceType: img.source.type }, 'Skipping image with unsupported source type');
+      continue;
+    }
+    if (!isSafeMediaType(img.source.mediaType)) {
+      logger.warn(
+        { mediaType: img.source.mediaType },
+        'Skipping image with unsupported media type'
+      );
+      continue;
+    }
+    result.push({ type: 'text' as const, text: `Attachment ${i + 1}:` });
+    result.push({
+      type: 'image' as const,
+      source: {
+        type: 'base64' as const,
+        media_type: img.source.mediaType,
+        data: img.source.data,
+      },
+    });
+  }
+
+  for (const block of textBlocks) {
+    result.push({ type: 'text' as const, text: block.text });
+  }
+
+  return result;
+}
 
 function safeStringify(value: unknown): string {
   try {
@@ -94,6 +153,7 @@ function parseSdkBlock(
       ) {
         return {
           type: 'image',
+          id: typeof block.id === 'string' ? block.id : nanoid(),
           source: { type: 'base64', mediaType: source.media_type, data: source.data },
         };
       }
@@ -105,7 +165,7 @@ function parseSdkBlock(
 }
 
 export interface CreateSessionOptions {
-  prompt: string;
+  prompt: string | ContentBlock[];
   cwd: string;
   machineId?: string;
   model?: string;
@@ -187,6 +247,26 @@ export class SessionManager {
   }
 
   /**
+   * Extract the latest user message as content blocks (text + image).
+   * Used when sending messages to Claude so images are included.
+   * Filters out tool_use/tool_result/thinking blocks that aren't
+   * relevant when constructing a new prompt.
+   */
+  getLatestUserContentBlocks(): ContentBlock[] | null {
+    const conversation = this.#taskDoc.toJSON().conversation;
+    for (let i = conversation.length - 1; i >= 0; i--) {
+      const msg = conversation[i];
+      if (msg?.role === 'user') {
+        return msg.content.filter(
+          (block): block is ContentBlock & { type: 'text' | 'image' } =>
+            block.type === 'text' || block.type === 'image'
+        );
+      }
+    }
+    return null;
+  }
+
+  /**
    * Determine whether to resume an existing session or start fresh.
    *
    * Walks backwards through sessions to find the most recent one with a
@@ -241,7 +321,7 @@ export class SessionManager {
     this.#notifyStatusChange('starting');
 
     const controller = new StreamingInputController();
-    controller.push(opts.prompt);
+    controller.push(typeof opts.prompt === 'string' ? opts.prompt : toSdkContent(opts.prompt));
 
     const response: Query = query({
       prompt: controller.iterable(),
@@ -276,11 +356,11 @@ export class SessionManager {
    * The controller feeds the message to the generator, which wakes the
    * agent subprocess for the next turn without a cold start.
    */
-  sendFollowUp(prompt: string): void {
+  sendFollowUp(prompt: string | ContentBlock[]): void {
     if (!this.#inputController || this.#inputController.isDone) {
       throw new Error('No active streaming session to send follow-up to');
     }
-    this.#inputController.push(prompt);
+    this.#inputController.push(typeof prompt === 'string' ? prompt : toSdkContent(prompt));
 
     change(this.#taskDoc, (draft) => {
       draft.meta.status = 'working';
@@ -314,7 +394,7 @@ export class SessionManager {
    */
   async resumeSession(
     sessionId: string,
-    prompt: string,
+    prompt: string | ContentBlock[],
     opts?: {
       abortController?: AbortController;
       machineId?: string;
@@ -363,7 +443,7 @@ export class SessionManager {
     this.#notifyStatusChange('starting');
 
     const controller = new StreamingInputController();
-    controller.push(prompt);
+    controller.push(typeof prompt === 'string' ? prompt : toSdkContent(prompt));
 
     const response: Query = query({
       prompt: controller.iterable(),
