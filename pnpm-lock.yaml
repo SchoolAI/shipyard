@@ -183,6 +183,9 @@ importers:
       loro-crdt:
         specifier: 'catalog:'
         version: 1.10.5
+      marked:
+        specifier: ^17.0.2
+        version: 17.0.2
       nanoid:
         specifier: 'catalog:'
         version: 5.1.6

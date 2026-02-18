@@ -47,6 +47,7 @@ import {
   type PeerManager,
   type SDPDescription,
 } from './peer-manager.js';
+import { formatPlanFeedbackForClaudeCode, serializePlanEditorDoc } from './plan-editor/index.js';
 import { createPtyManager, type PtyManager } from './pty-manager.js';
 import {
   SessionManager,
@@ -1249,6 +1250,63 @@ interface PermissionResponseContext {
 }
 
 /**
+ * Handle ExitPlanMode permission response: read the edited editor doc,
+ * gather unresolved comments, compute rich feedback, and update the plan
+ * reviewStatus in the CRDT. Mutates `value.message` so the rich feedback
+ * flows through to the SDK permission result.
+ */
+function resolveExitPlanMode(
+  taskHandle: TaskHandle,
+  taskLog: ReturnType<typeof createChildLogger>,
+  toolUseID: string,
+  value: { decision: string; persist: boolean; message: string | null }
+): void {
+  const plans = taskHandle.doc.toJSON().plans;
+  const planIndex = plans.findIndex((p) => p.toolUseId === toolUseID);
+  if (planIndex < 0) return;
+
+  const plan = plans[planIndex];
+  if (!plan) return;
+
+  const reviewStatus = value.decision === 'approved' ? 'approved' : 'changes-requested';
+  const editedMarkdown = serializePlanEditorDoc(taskHandle.loroDoc, plan.planId);
+
+  const allComments = taskHandle.doc.toJSON().planComments;
+  const planComments = Object.values(allComments).filter(
+    (c) => c.planId === plan.planId && c.resolvedAt === null
+  );
+
+  const richFeedback = formatPlanFeedbackForClaudeCode(
+    plan.markdown,
+    editedMarkdown || plan.markdown,
+    planComments,
+    value.message ?? null
+  );
+
+  change(taskHandle.doc, (draft) => {
+    const draftPlan = draft.plans.get(planIndex);
+    if (draftPlan) {
+      draftPlan.reviewStatus = reviewStatus;
+      draftPlan.reviewFeedback = (richFeedback || value.message) ?? null;
+    }
+  });
+
+  if (richFeedback) {
+    value.message = richFeedback;
+  }
+
+  taskLog.info(
+    {
+      toolUseID,
+      reviewStatus,
+      hasFeedback: !!richFeedback,
+      hasEdits: editedMarkdown !== plan.markdown,
+    },
+    'Updated plan reviewStatus in CRDT with rich feedback'
+  );
+}
+
+/**
  * Process a browser permission response: clean up ephemeral entries,
  * update task status back to 'working', log the response, and return
  * the SDK-compatible PermissionResult.
@@ -1267,22 +1325,7 @@ function resolvePermissionResponse(ctx: PermissionResponseContext): PermissionRe
   updateTaskInIndex(roomDoc, taskId, { status: 'working', updatedAt: Date.now() });
 
   if (toolName === 'ExitPlanMode') {
-    const plans = taskHandle.doc.toJSON().plans;
-    const planIndex = plans.findIndex((p) => p.toolUseId === toolUseID);
-    if (planIndex >= 0) {
-      const reviewStatus = value.decision === 'approved' ? 'approved' : 'changes-requested';
-      change(taskHandle.doc, (draft) => {
-        const plan = draft.plans.get(planIndex);
-        if (plan) {
-          plan.reviewStatus = reviewStatus;
-          plan.reviewFeedback = value.message ?? null;
-        }
-      });
-      taskLog.info(
-        { toolUseID, reviewStatus, hasFeedback: !!value.message },
-        'Updated plan reviewStatus in CRDT'
-      );
-    }
+    resolveExitPlanMode(taskHandle, taskLog, toolUseID, value);
   }
 
   taskLog.info(

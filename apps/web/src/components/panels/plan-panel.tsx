@@ -1,10 +1,11 @@
 export { PlanPanelContent };
 
 import { Button, Chip } from '@heroui/react';
-import type { PlanVersion } from '@shipyard/loro-schema';
+import type { PlanComment, PlanVersion } from '@shipyard/loro-schema';
 import { Check, ClipboardList, MessageSquareX } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { usePlanApproval } from '../../contexts/plan-approval-context';
+import { usePlanEditorDoc } from '../../hooks/use-plan-editor-doc';
 import { useTaskDocument } from '../../hooks/use-task-document';
 import { PlanEditor } from '../plan-editor';
 
@@ -112,6 +113,60 @@ function ApprovalFooter({ plan }: { plan: PlanVersion }) {
   );
 }
 
+function EditorLoadingState() {
+  return (
+    <div
+      className="flex items-center gap-2 text-muted text-sm py-4"
+      role="status"
+      aria-label="Preparing editor"
+    >
+      <span className="animate-spin" aria-hidden="true">
+        &#x27F3;
+      </span>
+      Preparing editor...
+    </div>
+  );
+}
+
+function ActivePlanContent({
+  plan,
+  isLatestVersion,
+  loroDoc,
+  containerId,
+  isReady,
+  comments,
+  onAddComment,
+  onResolveComment,
+  onDeleteComment,
+}: {
+  plan: PlanVersion;
+  isLatestVersion: boolean;
+  loroDoc: import('loro-crdt').LoroDoc | null;
+  containerId: import('loro-crdt').ContainerID | null;
+  isReady: boolean;
+  comments: PlanComment[];
+  onAddComment: (body: string, from: number, to: number, commentId: string) => void;
+  onResolveComment: (commentId: string) => void;
+  onDeleteComment: (commentId: string) => void;
+}) {
+  if (isLatestVersion && !isReady) {
+    return <EditorLoadingState />;
+  }
+
+  return (
+    <PlanEditor
+      markdown={plan.markdown}
+      editable={isLatestVersion}
+      comments={comments}
+      onAddComment={onAddComment}
+      onResolveComment={onResolveComment}
+      onDeleteComment={onDeleteComment}
+      loroDoc={isLatestVersion ? loroDoc : null}
+      containerId={isLatestVersion ? containerId : null}
+    />
+  );
+}
+
 function PlanPanelContent({ activeTaskId }: { activeTaskId: string | null }) {
   const [selectedVersion, setSelectedVersion] = useState<number | null>(null);
 
@@ -122,6 +177,13 @@ function PlanPanelContent({ activeTaskId }: { activeTaskId: string | null }) {
   const activePlan = useMemo(
     () => (activePlanIndex !== null ? (plans[activePlanIndex] ?? null) : null),
     [plans, activePlanIndex]
+  );
+
+  const isLatestVersion = activePlanIndex === plans.length - 1;
+
+  const { loroDoc, containerId, isReady } = usePlanEditorDoc(
+    activeTaskId,
+    isLatestVersion ? (activePlan?.planId ?? null) : null
   );
 
   const activePlanComments = useMemo(
@@ -178,8 +240,12 @@ function PlanPanelContent({ activeTaskId }: { activeTaskId: string | null }) {
       >
         {activePlan ? (
           <div className="px-4 py-3 text-sm text-foreground/90 leading-relaxed">
-            <PlanEditor
-              markdown={activePlan.markdown}
+            <ActivePlanContent
+              plan={activePlan}
+              isLatestVersion={isLatestVersion}
+              loroDoc={loroDoc}
+              containerId={containerId}
+              isReady={isReady}
               comments={activePlanComments}
               onAddComment={handleAddComment}
               onResolveComment={resolvePlanComment}

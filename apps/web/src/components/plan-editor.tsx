@@ -5,10 +5,11 @@ import type { PlanComment } from '@shipyard/loro-schema';
 import type { Editor } from '@tiptap/react';
 import { EditorContent, useEditor } from '@tiptap/react';
 import { BubbleMenu } from '@tiptap/react/menus';
+import type { ContainerID, LoroDoc } from 'loro-crdt';
 import { MessageSquarePlus } from 'lucide-react';
 import { marked } from 'marked';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { createExtensions } from '../editor';
+import { createExtensions, createLoroSyncExtension } from '../editor';
 import { PlanCommentInput } from './plan/plan-comment-input';
 import { PlanCommentWidget } from './plan/plan-comment-widget';
 
@@ -44,6 +45,8 @@ interface PlanEditorProps {
   onAddComment?: (body: string, from: number, to: number, commentId: string) => void;
   onResolveComment?: (commentId: string) => void;
   onDeleteComment?: (commentId: string) => void;
+  loroDoc?: LoroDoc | null;
+  containerId?: ContainerID | null;
 }
 
 function PlanEditor({
@@ -53,7 +56,11 @@ function PlanEditor({
   onAddComment,
   onResolveComment,
   onDeleteComment,
+  loroDoc,
+  containerId,
 }: PlanEditorProps) {
+  const isLoroMode = !!(loroDoc && containerId);
+
   const [showCommentInput, setShowCommentInput] = useState(false);
   const [activeCommentId, setActiveCommentId] = useState<string | null>(null);
   const [widgetPosition, setWidgetPosition] = useState<{ top: number; left: number } | null>(null);
@@ -61,38 +68,53 @@ function PlanEditor({
   const selectionRef = useRef<{ from: number; to: number } | null>(null);
   const prevHtmlRef = useRef<string | null>(null);
 
-  const extensions = useMemo(() => createExtensions('No plan content'), []);
+  const extensions = useMemo(() => {
+    const base = createExtensions('No plan content', { loroSync: isLoroMode });
+    if (isLoroMode) {
+      base.push(createLoroSyncExtension(loroDoc, containerId));
+    }
+    return base;
+  }, [isLoroMode, loroDoc, containerId]);
 
   const html = useMemo(() => {
+    if (isLoroMode) return '';
     const result = marked.parse(markdown, { async: false });
     if (typeof result !== 'string')
       throw new Error('marked.parse returned async result unexpectedly');
     return result;
-  }, [markdown]);
+  }, [markdown, isLoroMode]);
 
-  const editor = useEditor({
-    extensions,
-    content: html,
-    editable,
-  });
+  const editor = useEditor(
+    {
+      extensions,
+      content: isLoroMode ? '' : html,
+      editable: isLoroMode ? true : editable,
+    },
+    isLoroMode ? [loroDoc, containerId] : undefined
+  );
 
   useEffect(() => {
+    if (isLoroMode) return;
     if (!editor || editor.isDestroyed) return;
     if (prevHtmlRef.current === html) return;
     prevHtmlRef.current = html;
     editor.commands.setContent(html);
-  }, [editor, html]);
+  }, [editor, html, isLoroMode]);
 
+  // Comment marks are ProseMirror document mutations that would conflict with LoroSyncPlugin.
+  // In Loro mode, skip applying external comment marks -- Phase 2 will use Loro Cursor API.
   useEffect(() => {
+    if (isLoroMode) return;
     if (!editor || editor.isDestroyed) return;
     syncCommentMarks(editor, comments);
-  }, [editor, comments]);
+  }, [editor, comments, isLoroMode]);
 
   useEffect(() => {
+    if (isLoroMode) return;
     if (editor && !editor.isDestroyed) {
       editor.setEditable(editable);
     }
-  }, [editor, editable]);
+  }, [editor, editable, isLoroMode]);
 
   const handleOpenCommentInput = useCallback(() => {
     if (!editor) return;
