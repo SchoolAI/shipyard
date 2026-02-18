@@ -29,6 +29,8 @@ import {
   AuthGitHubCallbackRequestSchema,
   type AuthGitHubCallbackResponse,
   AuthGitHubCallbackResponseSchema,
+  type AuthVerifyResponse,
+  AuthVerifyResponseSchema,
   type CollabCreateRequest,
   CollabCreateRequestSchema,
   type CollabCreateResponse,
@@ -138,6 +140,45 @@ export class SignalingClient {
     if (!result.success) {
       throw new SignalingClientValidationError(
         `Invalid health response: ${result.error.message}`,
+        data
+      );
+    }
+
+    return result.data;
+  }
+
+  /**
+   * Verify a JWT against the database.
+   *
+   * GET /auth/verify
+   *
+   * Checks both cryptographic validity and that the user still exists in the database.
+   * Does NOT throw on 401 — returns `{ valid: false, reason }` instead.
+   *
+   * @param token - Shipyard JWT to verify
+   * @returns Verification result with user info (if valid) or failure reason
+   * @throws {SignalingClientError} If the server returns a non-401 error
+   * @throws {SignalingClientValidationError} If the response doesn't match expected schema
+   */
+  async verify(token: string): Promise<AuthVerifyResponse> {
+    const response = await this.fetch(`${this.baseUrl}${ROUTES.AUTH_VERIFY}`, {
+      method: 'GET',
+      headers: {
+        ...this.defaultHeaders,
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    const data = await response.json();
+
+    if (!response.ok && response.status !== 401) {
+      this.throwError(response.status, data);
+    }
+
+    const result = AuthVerifyResponseSchema.safeParse(data);
+    if (!result.success) {
+      throw new SignalingClientValidationError(
+        `Invalid verify response: ${result.error.message}`,
         data
       );
     }
@@ -381,6 +422,15 @@ export class AuthenticatedSignalingClient extends SignalingClient {
    */
   override buildCollabRoomUrl(roomId: string, presignedToken: string): string {
     return super.buildCollabRoomUrl(roomId, presignedToken, this.token);
+  }
+
+  /**
+   * Verify the stored token against the database.
+   *
+   * Convenience wrapper around verify() using the authenticated client's token.
+   */
+  async verifyToken(): Promise<AuthVerifyResponse> {
+    return this.verify(this.token);
   }
 
   /**

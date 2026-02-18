@@ -9,6 +9,9 @@ SESSION_PORT=4444
 # Enable dev mode (separate config + data directories)
 export SHIPYARD_DEV=1
 
+WRANGLER_STATE="${WRANGLER_STATE:-$HOME/.shipyard-dev/wrangler-state}"
+mkdir -p "$WRANGLER_STATE"
+
 # Load daemon env for serve mode
 set -a
 source apps/daemon/.env
@@ -23,6 +26,6 @@ exec pnpm exec concurrently \
   --kill-others-on-fail \
   --names "session,web,daemon" \
   --prefix-colors "cyan,green,magenta" \
-  "pnpm --filter @shipyard/session-server exec wrangler dev --env development --port ${SESSION_PORT} --inspector-port 9229" \
+  "pnpm --filter @shipyard/session-server exec wrangler dev --env development --port ${SESSION_PORT} --inspector-port 9229 --persist-to ${WRANGLER_STATE}" \
   "pnpm --filter @shipyard/web exec vite" \
   "sleep 3 && pnpm --filter @shipyard/daemon exec tsx src/index.ts --serve"

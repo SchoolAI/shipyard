@@ -1,4 +1,5 @@
 import { Spinner } from '@heroui/react';
+import { SignalingClient } from '@shipyard/session/client';
 import { useEffect, useRef } from 'react';
 import { useAuthStore } from '../stores/auth-store';
 import {
@@ -63,6 +64,36 @@ export function AuthGate({ children }: AuthGateProps) {
         setError(message);
       });
   }, [login, logout, setExchanging, setError]);
+
+  useEffect(() => {
+    const { token: currentToken, isExchanging: exchanging } = useAuthStore.getState();
+    if (!currentToken || exchanging || isTokenExpired(currentToken)) return;
+    if (getOAuthParamsFromUrl()) return;
+
+    const sessionServerUrl = import.meta.env.VITE_SESSION_SERVER_URL;
+    if (typeof sessionServerUrl !== 'string' || !sessionServerUrl) return;
+
+    const client = new SignalingClient(sessionServerUrl);
+    let cancelled = false;
+
+    client
+      .verify(currentToken)
+      .then((result) => {
+        if (cancelled) return;
+        if (currentToken !== useAuthStore.getState().token) return;
+        if (!result.valid) {
+          logout();
+        }
+      })
+      .catch((err: unknown) => {
+        // biome-ignore lint/suspicious/noConsole: surface schema/network errors in dev tools
+        console.warn('[AuthGate] Token verify failed:', err);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [logout]);
 
   if (isExchanging) {
     return (

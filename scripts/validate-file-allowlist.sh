@@ -53,6 +53,7 @@ ALLOWED_SCRIPTS=(
   "scripts/setup-secrets.sh"
   "scripts/setup-login.sh"
   "scripts/db-migrate.sh"
+  "scripts/reset-auth.sh"
 )
 
 # Find all markdown and text files (excluding node_modules, .git, loro-extended-repo)

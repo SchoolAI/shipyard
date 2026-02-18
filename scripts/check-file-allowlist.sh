@@ -44,6 +44,7 @@ ALLOWED_SCRIPTS=(
   "scripts/check-file-allowlist.sh"
   "scripts/validate-file-allowlist.sh"
   "scripts/generate-daemon-token.ts"
+  "scripts/reset-auth.sh"
 )
 
 # Get staged files (new or modified)

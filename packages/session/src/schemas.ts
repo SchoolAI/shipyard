@@ -112,6 +112,21 @@ export const AuthGitHubCallbackResponseSchema = z.object({
 export type AuthGitHubCallbackResponse = z.infer<typeof AuthGitHubCallbackResponseSchema>;
 
 /**
+ * GET /auth/verify response schema.
+ *
+ * Validates a JWT against the database and returns user info or failure reason.
+ */
+export const AuthVerifyResponseSchema = z.discriminatedUnion('valid', [
+  z.object({ valid: z.literal(true), user: OAuthUserSchema }),
+  z.object({
+    valid: z.literal(false),
+    reason: z.enum(['invalid_token', 'user_not_found']),
+  }),
+]);
+
+export type AuthVerifyResponse = z.infer<typeof AuthVerifyResponseSchema>;
+
+/**
  * POST /collab/create request body schema.
  *
  * Used to create a new collaboration room with a pre-signed URL.

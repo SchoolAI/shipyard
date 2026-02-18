@@ -24,6 +24,7 @@ import {
   updateTaskInIndex,
 } from '@shipyard/loro-schema';
 import type { PersonalRoomServerMessage } from '@shipyard/session';
+import { SignalingClient } from '@shipyard/session/client';
 import { createBranchWatcher } from './branch-watcher.js';
 import {
   captureTreeSnapshot,
@@ -143,6 +144,23 @@ export async function serve(env: Env): Promise<void> {
   }
 
   const log = createChildLogger({ mode: 'serve' });
+
+  if (env.SHIPYARD_USER_TOKEN && env.SHIPYARD_SIGNALING_URL) {
+    const client = new SignalingClient(env.SHIPYARD_SIGNALING_URL);
+    try {
+      const result = await client.verify(env.SHIPYARD_USER_TOKEN);
+      if (!result.valid) {
+        logger.error(
+          `Auth token is no longer valid (${result.reason}). Run \`shipyard login\` to re-authenticate.`
+        );
+        process.exit(1);
+      }
+      log.info('Token verified against session server');
+    } catch {
+      log.warn('Could not verify token with session server, proceeding anyway');
+    }
+  }
+
   const lifecycle = new LifecycleManager();
   await lifecycle.acquirePidFile(getShipyardHome());
 

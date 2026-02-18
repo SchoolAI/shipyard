@@ -3,6 +3,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+WRANGLER_STATE="${WRANGLER_STATE:-$HOME/.shipyard-dev/wrangler-state}"
+mkdir -p "$WRANGLER_STATE"
 
 cd "$ROOT_DIR"
 
@@ -41,7 +43,7 @@ fi
 
 # Step 4: Always start a fresh server from the current worktree
 echo "Starting session server from current worktree..."
-pnpm dev:session-server > /dev/null 2>&1 &
+pnpm --filter @shipyard/session-server exec wrangler dev --env development --port 4444 --persist-to "$WRANGLER_STATE" > /dev/null 2>&1 &
 SERVER_PID=$!
 
 cleanup() {
