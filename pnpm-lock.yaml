@@ -87,6 +87,9 @@ catalogs:
     pino-pretty:
       specifier: ^13.0.0
       version: 13.1.3
+    prosemirror-markdown:
+      specifier: ^1.13.4
+      version: 1.13.4
     react:
       specifier: ^19.2.3
       version: 19.2.4
@@ -180,12 +183,24 @@ importers:
       '@shipyard/session':
         specifier: workspace:*
         version: link:../../packages/session
+      '@tiptap/core':
+        specifier: 'catalog:'
+        version: 3.19.0(@tiptap/pm@3.19.0)
+      '@tiptap/pm':
+        specifier: 'catalog:'
+        version: 3.19.0
+      '@tiptap/starter-kit':
+        specifier: 'catalog:'
+        version: 3.19.0
       loro-crdt:
         specifier: 'catalog:'
         version: 1.10.5
-      marked:
-        specifier: ^17.0.2
-        version: 17.0.2
+      loro-prosemirror:
+        specifier: 'catalog:'
+        version: 0.4.2(loro-crdt@1.10.5)(prosemirror-model@1.25.4)(prosemirror-state@1.4.4)(prosemirror-view@1.41.6)
+      markdown-it:
+        specifier: ^14.1.1
+        version: 14.1.1
       nanoid:
         specifier: 'catalog:'
         version: 5.1.6
@@ -198,10 +213,16 @@ importers:
       pino:
         specifier: 'catalog:'
         version: 9.14.0
+      prosemirror-markdown:
+        specifier: 'catalog:'
+        version: 1.13.4
       zod:
         specifier: 'catalog:'
         version: 4.3.6
     devDependencies:
+      '@types/markdown-it':
+        specifier: ^14.1.2
+        version: 14.1.2
       '@types/node':
         specifier: 'catalog:'
         version: 25.2.0

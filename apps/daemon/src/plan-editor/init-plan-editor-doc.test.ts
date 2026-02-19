@@ -158,7 +158,7 @@ describe('initPlanEditorDoc', () => {
     expect(item1.get('nodeName')).toBe('listItem');
   });
 
-  it('handles empty markdown with empty children list', () => {
+  it('handles empty markdown with single empty paragraph', () => {
     const doc = new LoroDoc();
     initPlanEditorDoc(doc, 'plan-1', '');
 
@@ -166,7 +166,47 @@ describe('initPlanEditorDoc', () => {
     expect(rootMap.get('nodeName')).toBe('doc');
 
     const children = rootMap.get('children') as LoroList;
-    expect(children.length).toBe(0);
+    expect(children.length).toBe(1);
+    const para = children.get(0) as LoroMap;
+    expect(para.get('nodeName')).toBe('paragraph');
+  });
+
+  it('converts markdown links with link marks', () => {
+    const doc = new LoroDoc();
+    initPlanEditorDoc(doc, 'plan-1', 'See [docs](https://example.com) here');
+
+    const rootMap = doc.getMap('planEditorDocs').get('plan-1') as LoroMap;
+    const children = rootMap.get('children') as LoroList;
+    const para = children.get(0) as LoroMap;
+    const paraChildren = para.get('children') as LoroList;
+    const text = paraChildren.get(0) as LoroText;
+    const delta = text.toDelta();
+
+    const linkRun = delta.find((d) => d.attributes && 'link' in d.attributes);
+    expect(linkRun).toBeDefined();
+    expect(linkRun?.insert).toBe('docs');
+  });
+
+  it('handles markdown images without crashing', () => {
+    const doc = new LoroDoc();
+    const result = initPlanEditorDoc(doc, 'plan-1', '![screenshot](https://example.com/img.png)');
+    expect(result).toBe(true);
+  });
+
+  it('converts strikethrough marks', () => {
+    const doc = new LoroDoc();
+    initPlanEditorDoc(doc, 'plan-1', '~~deleted~~ text');
+
+    const rootMap = doc.getMap('planEditorDocs').get('plan-1') as LoroMap;
+    const children = rootMap.get('children') as LoroList;
+    const para = children.get(0) as LoroMap;
+    const paraChildren = para.get('children') as LoroList;
+    const text = paraChildren.get(0) as LoroText;
+    const delta = text.toDelta();
+
+    const strikeRun = delta.find((d) => d.attributes && 'strike' in d.attributes);
+    expect(strikeRun).toBeDefined();
+    expect(strikeRun?.insert).toBe('deleted');
   });
 
   it('is idempotent - calling again with same planId overwrites', () => {

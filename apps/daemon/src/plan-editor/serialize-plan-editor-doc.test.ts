@@ -132,6 +132,22 @@ describe('serializePlanEditorDoc', () => {
     expect(result).toContain('step two');
   });
 
+  it('roundtrips markdown links', () => {
+    const doc = new LoroDoc();
+    initPlanEditorDoc(doc, 'plan-1', 'See [docs](https://example.com) here');
+
+    const result = serializePlanEditorDoc(doc, 'plan-1');
+    expect(result).toContain('[docs](https://example.com)');
+  });
+
+  it('roundtrips strikethrough', () => {
+    const doc = new LoroDoc();
+    initPlanEditorDoc(doc, 'plan-1', '~~deleted~~ text');
+
+    const result = serializePlanEditorDoc(doc, 'plan-1');
+    expect(result).toContain('~~deleted~~');
+  });
+
   it('handles empty markdown roundtrip', () => {
     const doc = new LoroDoc();
     initPlanEditorDoc(doc, 'plan-1', '');

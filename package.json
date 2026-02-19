@@ -16,6 +16,7 @@
     "setup": "bash scripts/setup.sh",
     "setup:secrets": "bash scripts/setup-secrets.sh",
     "setup:login": "bash scripts/setup-login.sh",
+    "reset:auth": "bash scripts/reset-auth.sh",
     "db:migrate": "bash scripts/db-migrate.sh",
     "dev:all": "bash scripts/dev-all.sh",
     "dev:local": "bash scripts/dev-local.sh",

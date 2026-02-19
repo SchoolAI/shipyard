@@ -48,6 +48,7 @@ catalog:
   "@tiptap/extension-placeholder": "^3.18.0"
   "@tiptap/extension-bubble-menu": "^3.18.0"
   loro-prosemirror: "^0.4.2"
+  prosemirror-markdown: "^1.13.4"
 
   # ===== Frontend =====
   react: "^19.2.3"

@@ -5,8 +5,16 @@
       "path": "."
     },
     {
-      "name": "\ud83c\udf33\ud83d\udcdd block-editor-support",
-      "path": "../shipyard-wt/block-editor-support"
+      "name": "\ud83c\udf33\ud83d\udcf7 247-image-attachment",
+      "path": "../shipyard-wt/247-image-attachment"
+    },
+    {
+      "name": "\ud83c\udf33\ud83d\uddfa\ufe0f edit-plan",
+      "path": "../shipyard-wt/edit-plan"
+    },
+    {
+      "name": "\ud83c\udf33\ud83d\udd27 worktree-support",
+      "path": "../shipyard-wt/worktree-support"
     }
   ]
 }
