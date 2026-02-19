@@ -158,6 +158,8 @@ Status lifecycle: `working` → `input_required` | `completed` | `failed` | `can
 - [reference.md](./reference.md) — Full API reference with all types
 - [gotchas.md](./gotchas.md) — Critical pitfalls
 - MCP Spec (local): `/Users/jacobpetterle/Working Directory/mcp-specification/`
+  - **If this directory does not exist, clone it first:** `git clone https://github.com/modelcontextprotocol/specification.git "/Users/jacobpetterle/Working Directory/mcp-specification"`
 - MCP TypeScript SDK (local): `/Users/jacobpetterle/Working Directory/mcp-typescript-sdk/`
+  - **If this directory does not exist, clone it first:** `git clone https://github.com/modelcontextprotocol/typescript-sdk.git "/Users/jacobpetterle/Working Directory/mcp-typescript-sdk"`
 - Schema: `/Users/jacobpetterle/Working Directory/mcp-specification/schema/2025-11-25/schema.ts`
 - Spec site: https://modelcontextprotocol.io/specification/2025-11-25

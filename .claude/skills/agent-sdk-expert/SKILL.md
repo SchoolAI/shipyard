@@ -103,4 +103,5 @@ Read, Write, Edit, Bash, BashOutput, KillBash, Glob, Grep, WebSearch, WebFetch, 
 - [reference.md](./reference.md) — Full API reference
 - [gotchas.md](./gotchas.md) — Critical pitfalls
 - Local repo: `/Users/jacobpetterle/Working Directory/claude-agent-sdk-typescript/`
+  - **If this directory does not exist, clone it first:** `git clone https://github.com/anthropics/claude-agent-sdk-typescript.git "/Users/jacobpetterle/Working Directory/claude-agent-sdk-typescript"`
 - Docs: https://platform.claude.com/docs/en/agent-sdk/overview

@@ -119,6 +119,8 @@ const { self, peers } = useEphemeral(handle.presence);
 
 Local repo: `/Users/jacobpetterle/Working Directory/loro-extended/`
 
+> **If this directory does not exist, clone it first:** `git clone https://github.com/SchoolAI/loro-extended.git "/Users/jacobpetterle/Working Directory/loro-extended"`
+
 Key directories:
 - `packages/change/src/` -- Shape, TypedDoc, change(), typed refs
 - `packages/repo/src/` -- Repo, Handle, Synchronizer, adapters

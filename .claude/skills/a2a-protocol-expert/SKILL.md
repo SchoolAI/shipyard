@@ -84,4 +84,6 @@ for await (const event of client.sendMessageStream({ message: { ... } })) {
 - [reference.md](./reference.md) — Full API reference
 - [gotchas.md](./gotchas.md) — Common pitfalls
 - Spec: `/Users/jacobpetterle/Working Directory/A2A/`
+  - **If this directory does not exist, clone it first:** `git clone https://github.com/a2aproject/A2A.git "/Users/jacobpetterle/Working Directory/A2A"`
 - JS SDK: `/Users/jacobpetterle/Working Directory/a2a-js/`
+  - **If this directory does not exist, clone it first:** `git clone https://github.com/a2aproject/a2a-js.git "/Users/jacobpetterle/Working Directory/a2a-js"`
