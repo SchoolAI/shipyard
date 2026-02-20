@@ -72,6 +72,8 @@ function isPermissionMode(value: string): value is PermissionMode {
   return VALID_MODES.includes(value);
 }
 
+const SCROLL_THRESHOLD = 80;
+
 interface ComposerSeedTarget {
   setModel: (v: string) => void;
   setReasoning: (v: ReasoningLevel) => void;
@@ -409,6 +411,7 @@ export function ChatPage() {
   }, [loroTask.conversation, loroTask.meta?.status, storeMessages, modelLabelMap]);
 
   const scrollRef = useRef<HTMLDivElement>(null);
+  const isNearBottomRef = useRef(true);
   const demoTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const composerRef = useRef<ChatComposerHandle>(null);
   const terminalRef = useRef<TerminalPanelHandle>(null);
@@ -799,16 +802,37 @@ export function ChatPage() {
     onToggleVoiceInput: voiceInput.toggle,
   });
 
+  const [showScrollButton, setShowScrollButton] = useState(false);
+
+  const checkIfNearBottom = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight <= SCROLL_THRESHOLD;
+    isNearBottomRef.current = nearBottom;
+    setShowScrollButton(!nearBottom);
+  }, []);
+
   const scrollToBottom = useCallback(() => {
     const el = scrollRef.current;
     if (el) {
-      el.scrollTop = el.scrollHeight;
+      requestAnimationFrame(() => {
+        el.scrollTop = el.scrollHeight;
+      });
+      isNearBottomRef.current = true;
+      setShowScrollButton(false);
     }
   }, []);
 
   useEffect(() => {
-    scrollToBottom();
+    if (isNearBottomRef.current) {
+      scrollToBottom();
+    }
   }, [messages, scrollToBottom]);
+
+  useEffect(() => {
+    isNearBottomRef.current = true;
+    scrollToBottom();
+  }, [activeTaskId, scrollToBottom]);
 
   useEffect(() => {
     if (!lastTaskAck || !activeTaskId) return;
@@ -1044,6 +1068,7 @@ export function ChatPage() {
                 {hasMessages ? (
                   <div
                     ref={scrollRef}
+                    onScroll={checkIfNearBottom}
                     className="flex-1 min-h-0 overflow-y-auto"
                     role="log"
                     aria-label="Chat messages"
@@ -1073,6 +1098,18 @@ export function ChatPage() {
                         </div>
                       )}
                     </div>
+                    {showScrollButton && (
+                      <div className="sticky bottom-3 flex justify-center pointer-events-none">
+                        <button
+                          type="button"
+                          aria-label="Scroll to latest messages"
+                          className="pointer-events-auto flex items-center justify-center w-8 h-8 rounded-full bg-default-100 hover:bg-default-200 shadow-md transition-colors"
+                          onClick={scrollToBottom}
+                        >
+                          <ChevronDown className="w-4 h-4 text-default-600" />
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <HeroState
