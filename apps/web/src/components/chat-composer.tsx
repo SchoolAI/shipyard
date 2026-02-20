@@ -426,7 +426,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
               <span className="text-xs text-muted/50 shrink-0">Stashed</span>
               <span className="text-xs text-muted/40 truncate max-w-[200px]">{stashedText}</span>
               <span className="text-[10px] text-muted/30 shrink-0 hidden sm:inline-flex items-center gap-1">
-                <Kbd className="text-[10px]">⌘S</Kbd>
+                <Kbd className="text-[10px]">⌃S</Kbd>
                 <span>restore</span>
                 <span className="text-muted/20">·</span>
                 <span>auto-restores on send</span>

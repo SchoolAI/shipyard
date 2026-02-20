@@ -101,9 +101,9 @@ export const HOTKEYS = {
     context: 'navigation',
   },
   stashPrompt: {
-    key: 'meta+s',
+    key: 'ctrl+s',
     label: 'Stash / Unstash Prompt',
-    display: '\u2318S',
+    display: '\u2303S',
     description: 'Toggle stash: save current input or restore stashed input',
     context: 'composer',
   },
