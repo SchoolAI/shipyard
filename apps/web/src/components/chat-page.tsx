@@ -37,6 +37,7 @@ import { useVoiceInput } from '../hooks/use-voice-input';
 import { useWebRTCSync } from '../hooks/use-webrtc-sync';
 import { useRepo, useWebRtcAdapter } from '../providers/repo-provider';
 import { useAuthStore, useMessageStore, useTaskStore, useUIStore } from '../stores';
+import { navigateFromSettings, navigateToSettings } from '../utils/url-sync';
 import { extractBranchFromWorktreePath } from '../utils/worktree-helpers';
 import type { ChatComposerHandle, SubmitPayload } from './chat-composer';
 import { ChatComposer } from './chat-composer';
@@ -155,7 +156,7 @@ function findRecentSetupEntry(
 
   for (const [worktreePath, entry] of Object.entries(record)) {
     const sortKey = setupEntrySortKey(entry, recentCutoff);
-    if (sortKey != null && (!best || sortKey > best.sortKey)) {
+    if (sortKey !== null && (!best || sortKey > best.sortKey)) {
       best = { worktreePath, entry, sortKey };
     }
   }
@@ -262,7 +263,6 @@ export function ChatPage() {
   const toggleTerminal = useUIStore((s) => s.toggleTerminal);
   const toggleSidePanel = useUIStore((s) => s.toggleSidePanel);
   const toggleSidebar = useUIStore((s) => s.toggleSidebar);
-  const setSettingsOpen = useUIStore((s) => s.setSettingsOpen);
   const setSidebarExpanded = useUIStore((s) => s.setSidebarExpanded);
 
   const authToken = useAuthStore((s) => s.token);
@@ -767,11 +767,17 @@ export function ChatPage() {
     setIsWorktreeModalOpen(true);
   }, []);
 
-  const toggleSettings = useUIStore((s) => s.toggleSettings);
+  const toggleSettings = useCallback(() => {
+    if (useUIStore.getState().isSettingsOpen) {
+      navigateFromSettings();
+    } else {
+      navigateToSettings();
+    }
+  }, []);
 
   const handleCloseSettings = useCallback(() => {
-    setSettingsOpen(false);
-  }, [setSettingsOpen]);
+    navigateFromSettings();
+  }, []);
 
   useAppHotkeys({
     onToggleTerminal: toggleTerminal,

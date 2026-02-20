@@ -6,6 +6,7 @@ import { HOTKEYS } from '../constants/hotkeys';
 import { useTaskIndex } from '../hooks/use-task-index';
 import { useAuthStore, useTaskStore, useUIStore } from '../stores';
 import { statusDotColor } from '../utils/task-status';
+import { navigateToSettings } from '../utils/url-sync';
 import { ThemeToggle } from './theme-toggle';
 import { UserMenu } from './user-menu';
 
@@ -288,7 +289,7 @@ export function Sidebar() {
                         size="sm"
                         aria-label="Settings"
                         className="text-muted hover:text-foreground hover:bg-default/50 w-8 h-8 min-w-0"
-                        onPress={() => useUIStore.getState().setSettingsOpen(true)}
+                        onPress={() => navigateToSettings()}
                       >
                         <Settings className="w-4 h-4" />
                       </Button>
@@ -315,7 +316,7 @@ export function Sidebar() {
                     size="sm"
                     aria-label="Settings"
                     className="text-muted hover:text-foreground hover:bg-default/50 w-8 h-8 min-w-0"
-                    onPress={() => useUIStore.getState().setSettingsOpen(true)}
+                    onPress={() => navigateToSettings()}
                   >
                     <Settings className="w-4 h-4" />
                   </Button>

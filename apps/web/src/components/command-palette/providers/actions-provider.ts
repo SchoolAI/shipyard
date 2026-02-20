@@ -3,6 +3,7 @@ import { HOTKEYS } from '../../../constants/hotkeys';
 import { useTaskStore } from '../../../stores/task-store';
 import { useUIStore } from '../../../stores/ui-store';
 import { fuzzyScore } from '../../../utils/fuzzy-match';
+import { navigateToSettings } from '../../../utils/url-sync';
 import type { CommandContext, CommandItem, CommandProvider } from '../types';
 
 interface ActionDef {
@@ -66,7 +67,7 @@ const ACTIONS: ActionDef[] = [
     keywords: ['settings', 'preferences', 'config'],
     shortcut: HOTKEYS.settings.display,
     onSelect: (close) => {
-      useUIStore.getState().setSettingsOpen(true);
+      navigateToSettings();
       close();
     },
   },

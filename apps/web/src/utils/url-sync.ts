@@ -1,10 +1,12 @@
 import { useTaskStore } from '../stores/task-store';
+import { useUIStore } from '../stores/ui-store';
 
 const TASK_PATH_RE = /^\/tasks\/([^/]+)\/?$/;
 const TASK_ID_RE = /^[a-zA-Z0-9_-]+$/;
+const SETTINGS_PATH = '/settings';
 
 function isOwnedPath(pathname: string): boolean {
-  return pathname === '/' || TASK_PATH_RE.test(pathname);
+  return pathname === '/' || pathname === SETTINGS_PATH || TASK_PATH_RE.test(pathname);
 }
 
 function parseTaskIdFromPath(pathname: string): string | null {
@@ -13,25 +15,66 @@ function parseTaskIdFromPath(pathname: string): string | null {
   return id && TASK_ID_RE.test(id) ? id : null;
 }
 
-function pathForTaskId(id: string | null): string {
-  return id ? `/tasks/${id}` : '/';
+function pathForState(taskId: string | null, isSettings: boolean): string {
+  if (isSettings) return SETTINGS_PATH;
+  return taskId ? `/tasks/${taskId}` : '/';
+}
+
+export function navigateToSettings(): void {
+  useUIStore.getState().setSettingsOpen(true);
+}
+
+export function navigateFromSettings(): void {
+  const taskId = useTaskStore.getState().activeTaskId;
+  const fallback = pathForState(taskId, false);
+  useUIStore.getState().setSettingsOpen(false);
+  window.history.replaceState(null, '', fallback);
 }
 
 export function initUrlSync(): () => void {
   let handlingPopstate = false;
+  let closingSettingsForTaskSwitch = false;
 
-  const initialId = parseTaskIdFromPath(window.location.pathname);
-  if (initialId) {
-    useTaskStore.getState().setActiveTask(initialId);
-  } else if (window.location.pathname !== '/') {
-    window.history.replaceState(null, '', '/');
+  const initialPath = window.location.pathname;
+  if (initialPath === SETTINGS_PATH) {
+    useUIStore.getState().setSettingsOpen(true);
+  } else {
+    const initialId = parseTaskIdFromPath(initialPath);
+    if (initialId) {
+      useTaskStore.getState().setActiveTask(initialId);
+    } else if (initialPath !== '/') {
+      window.history.replaceState(null, '', '/');
+    }
   }
 
-  const unsubscribe = useTaskStore.subscribe((state, prev) => {
+  const unsubTask = useTaskStore.subscribe((state, prev) => {
     if (handlingPopstate) return;
     if (state.activeTaskId === prev.activeTaskId) return;
 
-    const target = pathForTaskId(state.activeTaskId);
+    closingSettingsForTaskSwitch = true;
+    useUIStore.getState().setSettingsOpen(false);
+    closingSettingsForTaskSwitch = false;
+
+    const target = pathForState(state.activeTaskId, false);
+    if (window.location.pathname === target) return;
+
+    window.history.pushState(null, '', target);
+  });
+
+  let prevSettingsOpen = useUIStore.getState().isSettingsOpen;
+  const unsubUI = useUIStore.subscribe((state) => {
+    if (handlingPopstate) return;
+    if (closingSettingsForTaskSwitch) {
+      prevSettingsOpen = state.isSettingsOpen;
+      return;
+    }
+
+    const isSettings = state.isSettingsOpen;
+    if (isSettings === prevSettingsOpen) return;
+    prevSettingsOpen = isSettings;
+
+    const taskId = useTaskStore.getState().activeTaskId;
+    const target = pathForState(taskId, isSettings);
     if (window.location.pathname === target) return;
 
     window.history.pushState(null, '', target);
@@ -43,10 +86,15 @@ export function initUrlSync(): () => void {
 
     handlingPopstate = true;
     try {
-      const id = parseTaskIdFromPath(path);
-      const current = useTaskStore.getState().activeTaskId;
-      if (id !== current) {
-        useTaskStore.getState().setActiveTask(id);
+      if (path === SETTINGS_PATH) {
+        useUIStore.getState().setSettingsOpen(true);
+      } else {
+        useUIStore.getState().setSettingsOpen(false);
+        const id = parseTaskIdFromPath(path);
+        const current = useTaskStore.getState().activeTaskId;
+        if (id !== current) {
+          useTaskStore.getState().setActiveTask(id);
+        }
       }
     } finally {
       handlingPopstate = false;
@@ -56,7 +104,8 @@ export function initUrlSync(): () => void {
   window.addEventListener('popstate', onPopstate);
 
   return () => {
-    unsubscribe();
+    unsubTask();
+    unsubUI();
     window.removeEventListener('popstate', onPopstate);
   };
 }

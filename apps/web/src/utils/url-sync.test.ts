@@ -106,7 +106,7 @@ describe('url-sync', () => {
     cleanup = initUrlSync();
     useTaskStore.getState().setActiveTask('task-1');
 
-    window.history.replaceState(null, '', '/settings');
+    window.history.replaceState(null, '', '/about');
     window.dispatchEvent(new PopStateEvent('popstate'));
 
     expect(useTaskStore.getState().activeTaskId).toBe('task-1');

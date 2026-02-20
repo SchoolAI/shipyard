@@ -12,7 +12,7 @@ import { BRANCH_NAME_PATTERN } from '@shipyard/session';
 import { ChevronDown, ChevronUp, FolderGit2, GitBranch, Loader2, Terminal } from 'lucide-react';
 import { useCallback, useId, useMemo, useState } from 'react';
 import type { GitRepoInfo } from '../hooks/use-machine-selection';
-import { useUIStore } from '../stores';
+import { navigateToSettings } from '../utils/url-sync';
 import { isWorktreePath } from '../utils/worktree-helpers';
 
 interface WorktreeCreationModalProps {
@@ -87,7 +87,7 @@ function SetupScriptDisclosure({
               className="text-xs text-accent hover:underline"
               onClick={() => {
                 onClose();
-                useUIStore.getState().setSettingsOpen(true);
+                navigateToSettings();
               }}
             >
               Edit default in Settings
