@@ -183,6 +183,34 @@ function userToolResultMsgReplay(toolUseId: string, content: string) {
   };
 }
 
+function taskNotificationMsg(
+  taskId: string,
+  status: 'completed' | 'failed' | 'stopped' = 'completed'
+) {
+  return {
+    type: 'system',
+    subtype: 'task_notification',
+    task_id: taskId,
+    status,
+    output_file: '/tmp/output.txt',
+    summary: `Task ${taskId} ${status}`,
+    uuid: '00000000-0000-0000-0000-000000000020',
+    session_id: 'sess-1',
+  };
+}
+
+function toolProgressMsg(toolUseId: string, toolName: string, elapsed: number) {
+  return {
+    type: 'tool_progress',
+    tool_use_id: toolUseId,
+    tool_name: toolName,
+    parent_tool_use_id: null,
+    elapsed_time_seconds: elapsed,
+    uuid: '00000000-0000-0000-0000-000000000021',
+    session_id: 'sess-1',
+  };
+}
+
 function successResult(opts: { result?: string; costUsd?: number; durationMs?: number } = {}) {
   return {
     type: 'result',
@@ -230,6 +258,80 @@ function errorResult(subtype: string, errors: string[] = []) {
     errors,
     uuid: '00000000-0000-0000-0000-000000000011',
     session_id: 'sess-1',
+  };
+}
+
+function mockQueryControllable() {
+  let resolve: ((msg: Record<string, unknown>) => void) | null = null;
+  const messages: Array<Record<string, unknown>> = [];
+  let done = false;
+
+  async function* gen() {
+    while (!done) {
+      if (messages.length > 0) {
+        yield messages.shift()!;
+      } else {
+        const msg = await new Promise<Record<string, unknown>>((r) => {
+          resolve = r;
+        });
+        if (done) return;
+        yield msg;
+      }
+    }
+  }
+
+  const generator = gen();
+
+  const closeFn = vi.fn(() => {
+    done = true;
+    if (resolve) {
+      const r = resolve;
+      resolve = null;
+      r({} as Record<string, unknown>);
+    }
+  });
+
+  // eslint-disable-next-line no-restricted-syntax -- Satisfying Query interface for mock
+  const queryObj = Object.assign(generator, {
+    interrupt: vi.fn(),
+    close: closeFn,
+    setPermissionMode: vi.fn(),
+    setModel: vi.fn(),
+    setMaxThinkingTokens: vi.fn(),
+    initializationResult: vi.fn(),
+    supportedCommands: vi.fn(),
+    supportedModels: vi.fn(),
+    mcpServerStatus: vi.fn(),
+    accountInfo: vi.fn(),
+    rewindFiles: vi.fn(),
+    reconnectMcpServer: vi.fn(),
+    toggleMcpServer: vi.fn(),
+    setMcpServers: vi.fn(),
+    streamInput: vi.fn(),
+  }) as unknown as Query;
+
+  return {
+    query: queryObj,
+    emit(msg: Record<string, unknown>) {
+      if (resolve) {
+        const r = resolve;
+        resolve = null;
+        r(msg);
+      } else {
+        messages.push(msg);
+      }
+    },
+    end() {
+      done = true;
+      if (resolve) {
+        const r = resolve;
+        resolve = null;
+        r({} as Record<string, unknown>);
+      }
+    },
+    get done() {
+      return done;
+    },
   };
 }
 
@@ -917,6 +1019,161 @@ describe('SessionManager', () => {
     });
   });
 
+  describe('task_notification handling', () => {
+    it('processes task_notification without breaking session flow', async () => {
+      mockQuery.mockReturnValue(
+        mockQueryResponse([
+          initMsg('sess-1'),
+          taskNotificationMsg('sub-task-1', 'completed'),
+          assistantMsg('The sub-task finished'),
+          successResult(),
+        ])
+      );
+
+      const result = await manager.createSession({ prompt: 'Hello', cwd: '/tmp' });
+
+      expect(result.status).toBe('completed');
+    });
+
+    it('logs task_notification with taskId and status', async () => {
+      const { logger: mockLogger } = await import('./logger.js');
+
+      mockQuery.mockReturnValue(
+        mockQueryResponse([
+          initMsg('sess-1'),
+          taskNotificationMsg('sub-task-2', 'failed'),
+          successResult(),
+        ])
+      );
+
+      await manager.createSession({ prompt: 'Hello', cwd: '/tmp' });
+
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        expect.objectContaining({
+          taskId: 'sub-task-2',
+          status: 'failed',
+        }),
+        expect.stringContaining('task_notification')
+      );
+    });
+  });
+
+  describe('tool_progress handling', () => {
+    it('processes tool_progress without adding to conversation', async () => {
+      mockQuery.mockReturnValue(
+        mockQueryResponse([
+          initMsg('sess-1'),
+          toolProgressMsg('tool-x', 'Bash', 5),
+          toolProgressMsg('tool-x', 'Bash', 10),
+          assistantMsg('Done with bash'),
+          successResult(),
+        ])
+      );
+
+      const result = await manager.createSession({ prompt: 'Hello', cwd: '/tmp' });
+
+      expect(result.status).toBe('completed');
+      const json = taskDoc.toJSON();
+      expect(json.conversation).toHaveLength(1);
+    });
+
+    it('logs tool_progress at debug level', async () => {
+      const { logger: mockLogger } = await import('./logger.js');
+
+      mockQuery.mockReturnValue(
+        mockQueryResponse([
+          initMsg('sess-1'),
+          toolProgressMsg('tool-y', 'Read', 3),
+          successResult(),
+        ])
+      );
+
+      await manager.createSession({ prompt: 'Hello', cwd: '/tmp' });
+
+      expect(mockLogger.debug).toHaveBeenCalledWith(
+        expect.objectContaining({
+          toolName: 'Read',
+          toolUseId: 'tool-y',
+          elapsedSeconds: 3,
+        }),
+        expect.stringContaining('tool_progress')
+      );
+    });
+  });
+
+  describe('idle timeout', () => {
+    it('aborts session after IDLE_TIMEOUT_MS of no messages', async () => {
+      vi.useFakeTimers();
+      try {
+        const ctrl = mockQueryControllable();
+        mockQuery.mockReturnValue(ctrl.query);
+
+        const sessionPromise = manager.createSession({ prompt: 'Hello', cwd: '/tmp' });
+
+        ctrl.emit(initMsg('sess-idle'));
+        await vi.advanceTimersByTimeAsync(100);
+
+        // Advance past the 5-minute idle timeout
+        await vi.advanceTimersByTimeAsync(5 * 60 * 1000 + 1000);
+
+        ctrl.end();
+        const result = await sessionPromise;
+
+        expect(result.status).toBe('failed');
+        expect(result.error).toMatch(/idle timeout/i);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('resets timer when messages arrive', async () => {
+      vi.useFakeTimers();
+      try {
+        const ctrl = mockQueryControllable();
+        mockQuery.mockReturnValue(ctrl.query);
+
+        const sessionPromise = manager.createSession({ prompt: 'Hello', cwd: '/tmp' });
+
+        ctrl.emit(initMsg('sess-heartbeat'));
+        await vi.advanceTimersByTimeAsync(100);
+
+        // Advance 4 minutes (under threshold)
+        await vi.advanceTimersByTimeAsync(4 * 60 * 1000);
+
+        // Send a heartbeat -- each advanceTimersByTimeAsync(1) flushes microtasks,
+        // giving the for-await loop time to process the message and update lastMessageAt
+        ctrl.emit(toolProgressMsg('tool-hb', 'Bash', 240));
+        for (let i = 0; i < 10; i++) await vi.advanceTimersByTimeAsync(1);
+
+        // Advance another 4 minutes (only 4 since last message, still under 5 min)
+        await vi.advanceTimersByTimeAsync(4 * 60 * 1000);
+
+        ctrl.emit(successResult());
+        // Flush microtasks so the for-await loop processes successResult
+        for (let i = 0; i < 10; i++) await vi.advanceTimersByTimeAsync(1);
+        const result = await sessionPromise;
+
+        expect(result.status).toBe('completed');
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('clears timer on normal completion', async () => {
+      vi.useFakeTimers();
+      try {
+        mockQuery.mockReturnValue(mockQueryResponse([initMsg('sess-clean'), successResult()]));
+
+        await manager.createSession({ prompt: 'Hello', cwd: '/tmp' });
+
+        // Advance far past timeout -- no leaked timer should cause issues
+        await vi.advanceTimersByTimeAsync(10 * 60 * 1000);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
+
   describe('tool result capture from user messages', () => {
     it('appends tool_result blocks to the last assistant message', async () => {
       mockQuery.mockReturnValue(
@@ -1585,69 +1842,6 @@ describe('SessionManager', () => {
   });
 
   describe('streaming input mode', () => {
-    /**
-     * Helper that creates a controllable Query mock. Messages are yielded
-     * on demand via emit(), and end() terminates the generator.
-     */
-    function mockQueryControllable() {
-      let resolve: ((msg: Record<string, unknown>) => void) | null = null;
-      const messages: Array<Record<string, unknown>> = [];
-      let done = false;
-
-      async function* gen() {
-        while (!done) {
-          if (messages.length > 0) {
-            yield messages.shift()!;
-          } else {
-            yield await new Promise<Record<string, unknown>>((r) => {
-              resolve = r;
-            });
-          }
-        }
-      }
-
-      const generator = gen();
-      // eslint-disable-next-line no-restricted-syntax -- Satisfying Query interface for mock
-      const queryObj = Object.assign(generator, {
-        interrupt: vi.fn(),
-        close: vi.fn(),
-        setPermissionMode: vi.fn(),
-        setModel: vi.fn(),
-        setMaxThinkingTokens: vi.fn(),
-        initializationResult: vi.fn(),
-        supportedCommands: vi.fn(),
-        supportedModels: vi.fn(),
-        mcpServerStatus: vi.fn(),
-        accountInfo: vi.fn(),
-        rewindFiles: vi.fn(),
-        reconnectMcpServer: vi.fn(),
-        toggleMcpServer: vi.fn(),
-        setMcpServers: vi.fn(),
-        streamInput: vi.fn(),
-      }) as unknown as Query;
-
-      return {
-        query: queryObj,
-        emit(msg: Record<string, unknown>) {
-          if (resolve) {
-            const r = resolve;
-            resolve = null;
-            r(msg);
-          } else {
-            messages.push(msg);
-          }
-        },
-        end() {
-          done = true;
-          if (resolve) {
-            const r = resolve;
-            resolve = null;
-            r({} as Record<string, unknown>);
-          }
-        },
-      };
-    }
-
     it('isStreaming returns false before any session', () => {
       expect(manager.isStreaming).toBe(false);
     });
