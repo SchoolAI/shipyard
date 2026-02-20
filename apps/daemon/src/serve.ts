@@ -1765,12 +1765,6 @@ async function cleanupTaskRun(opts: CleanupTaskRunOptions): Promise<void> {
   }
 
   ctx.activeTasks.delete(taskId);
-  ctx.taskHandles.delete(taskId);
-  const unsub = ctx.watchedTasks.get(taskId);
-  if (unsub) {
-    unsub();
-    ctx.watchedTasks.delete(taskId);
-  }
   ctx.signaling.updateStatus('idle');
 }
 

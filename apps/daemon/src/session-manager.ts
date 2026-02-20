@@ -26,6 +26,9 @@ import { logger } from './logger.js';
 import { initPlanEditorDoc } from './plan-editor/index.js';
 import { StreamingInputController } from './streaming-input-controller.js';
 
+export const IDLE_TIMEOUT_MS = 5 * 60 * 1000;
+export const IDLE_CHECK_INTERVAL_MS = 30_000;
+
 /**
  * Convert Loro ContentBlock[] to the Anthropic SDK message content format.
  * Images are placed first with "Image N:" labels per Anthropic best practices,
@@ -477,9 +480,23 @@ export class SessionManager {
 
   async #processMessages(response: Query, sessionId: string): Promise<SessionResult> {
     let agentSessionId = '';
+    let lastMessageAt = Date.now();
+    let idleTimedOut = false;
+
+    const idleTimer = setInterval(() => {
+      if (Date.now() - lastMessageAt >= IDLE_TIMEOUT_MS) {
+        idleTimedOut = true;
+        logger.warn(
+          { sessionId, idleMs: Date.now() - lastMessageAt },
+          'Session idle timeout, closing'
+        );
+        response.close();
+      }
+    }, IDLE_CHECK_INTERVAL_MS);
 
     try {
       for await (const message of response) {
+        lastMessageAt = Date.now();
         const result = this.#handleMessage(message, sessionId, agentSessionId);
         if (result.agentSessionId) {
           agentSessionId = result.agentSessionId;
@@ -499,16 +516,21 @@ export class SessionManager {
         error: errorMsg,
       };
     } finally {
+      clearInterval(idleTimer);
       this.#inputController = null;
       this.#activeQuery = null;
     }
 
-    this.#markFailed(sessionId, 'Session ended without result message');
+    const errorMsg = idleTimedOut
+      ? 'Session idle timeout exceeded'
+      : 'Session ended without result message';
+
+    this.#markFailed(sessionId, errorMsg);
     return {
       sessionId,
       agentSessionId,
       status: 'failed',
-      error: 'Session ended without result message',
+      error: errorMsg,
     };
   }
 
@@ -527,7 +549,31 @@ export class SessionManager {
     sessionId: string,
     agentSessionId: string
   ): { agentSessionId?: string; sessionResult?: SessionResult } {
-    if (message.type === 'system' && 'subtype' in message && message.subtype === 'init') {
+    switch (message.type) {
+      case 'system':
+        return this.#handleSystemMessage(message, sessionId);
+      case 'assistant':
+        return this.#handleAssistantMsg(message, sessionId);
+      case 'user':
+        if (!('isReplay' in message && message.isReplay)) {
+          this.#appendUserToolResults(message);
+        }
+        return {};
+      case 'result':
+        return { sessionResult: this.#handleResult(message, sessionId, agentSessionId) };
+      case 'tool_progress':
+        this.#handleToolProgress(message);
+        return {};
+      default:
+        return {};
+    }
+  }
+
+  #handleSystemMessage(
+    message: SDKMessage & { type: 'system' },
+    sessionId: string
+  ): { agentSessionId?: string } {
+    if ('subtype' in message && message.subtype === 'init') {
       const initSessionId = message.session_id;
       if ('model' in message && typeof message.model === 'string') {
         this.#currentModel = message.model;
@@ -546,26 +592,32 @@ export class SessionManager {
       return { agentSessionId: initSessionId };
     }
 
-    if (message.type === 'assistant') {
-      if ('error' in message && message.error) {
-        logger.warn({ error: message.error, sessionId }, 'Assistant message carried an error');
-      }
-      this.#appendAssistantMessage(message);
-      return {};
-    }
-
-    if (message.type === 'user' && !('isReplay' in message && message.isReplay)) {
-      this.#appendUserToolResults(message);
-      return {};
-    }
-
-    if (message.type === 'result') {
-      return {
-        sessionResult: this.#handleResult(message, sessionId, agentSessionId),
-      };
+    if ('subtype' in message && message.subtype === 'task_notification') {
+      const taskId = 'task_id' in message ? message.task_id : 'unknown';
+      const status = 'status' in message ? message.status : 'unknown';
+      const summary = 'summary' in message ? message.summary : '';
+      logger.info({ taskId, status, summary }, 'Received task_notification from subagent');
     }
 
     return {};
+  }
+
+  #handleAssistantMsg(
+    message: SDKMessage & { type: 'assistant' },
+    sessionId: string
+  ): Record<string, never> {
+    if ('error' in message && message.error) {
+      logger.warn({ error: message.error, sessionId }, 'Assistant message carried an error');
+    }
+    this.#appendAssistantMessage(message);
+    return {};
+  }
+
+  #handleToolProgress(message: SDKMessage & { type: 'tool_progress' }): void {
+    const toolName = 'tool_name' in message ? message.tool_name : 'unknown';
+    const toolUseId = 'tool_use_id' in message ? message.tool_use_id : 'unknown';
+    const elapsedSeconds = 'elapsed_time_seconds' in message ? message.elapsed_time_seconds : 0;
+    logger.debug({ toolName, toolUseId, elapsedSeconds }, 'tool_progress heartbeat');
   }
 
   /**
