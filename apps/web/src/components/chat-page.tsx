@@ -1022,12 +1022,6 @@ export function ChatPage() {
 
   const hasMessages = messages.length > 0;
 
-  const worktreeSetupScript = useMemo(() => {
-    if (!worktreeSourceRepo) return null;
-    const entry = worktreeScripts.get(worktreeSourceRepo.path);
-    return entry?.script ?? null;
-  }, [worktreeSourceRepo, worktreeScripts]);
-
   const selectedEnv = availableEnvironments.find((e) => e.path === selectedEnvironmentPath);
   const heroEnvironmentLabel = selectedEnv
     ? homeDir && selectedEnv.path === homeDir
@@ -1053,7 +1047,7 @@ export function ChatPage() {
           environments={availableEnvironments}
           onSubmit={handleWorktreeCreate}
           isCreating={isCreatingWorktree}
-          setupScript={worktreeSetupScript}
+          worktreeScripts={worktreeScripts}
         />
         <Sidebar />
         <div className="flex flex-col flex-1 min-w-0 min-h-0" tabIndex={-1}>

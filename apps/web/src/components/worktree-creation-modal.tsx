@@ -27,7 +27,7 @@ interface WorktreeCreationModalProps {
     setupScript: string | null;
   }) => void;
   isCreating: boolean;
-  setupScript?: string | null;
+  worktreeScripts?: Map<string, { script: string }>;
 }
 
 function isWorktree(env: GitRepoInfo): boolean {
@@ -107,7 +107,7 @@ export function WorktreeCreationModal({
   environments,
   onSubmit,
   isCreating,
-  setupScript = null,
+  worktreeScripts,
 }: WorktreeCreationModalProps) {
   const [branchName, setBranchName] = useState('');
   const [baseRef, setBaseRef] = useState('main');
@@ -119,6 +119,9 @@ export function WorktreeCreationModal({
 
   const effectiveRepo = sourceRepo ?? mainRepos.find((r) => r.path === selectedRepoPath) ?? null;
 
+  const setupScript = effectiveRepo
+    ? (worktreeScripts?.get(effectiveRepo.path)?.script ?? null)
+    : null;
   const resolvedScript = editedScript ?? setupScript;
 
   const handleSubmit = useCallback(() => {
@@ -214,6 +217,7 @@ export function WorktreeCreationModal({
                             const selected = [...keys][0];
                             if (typeof selected === 'string') {
                               setSelectedRepoPath(selected);
+                              setEditedScript(null);
                             }
                           }}
                         >
