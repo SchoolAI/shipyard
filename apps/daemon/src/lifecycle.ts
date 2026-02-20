@@ -50,9 +50,18 @@ export class LifecycleManager {
 
     const rejectionHandler = (reason: unknown) => {
       try {
-        logger.error({ reason }, 'Unhandled rejection — initiating shutdown');
+        let jsonStr: string;
+        try {
+          jsonStr = JSON.stringify(reason);
+        } catch {
+          jsonStr = '(not serializable)';
+        }
+        const detail =
+          reason instanceof Error
+            ? { message: reason.message, stack: reason.stack }
+            : { inspected: `${String(reason)} ${jsonStr}` };
+        logger.error(detail, 'Unhandled rejection (non-fatal)');
       } catch {}
-      void this.#shutdown('unhandledRejection');
     };
 
     process.on('uncaughtException', exceptionHandler);

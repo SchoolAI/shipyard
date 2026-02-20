@@ -504,17 +504,15 @@ export async function serve(env: Env): Promise<void> {
     const abortController = lifecycle.createAbortController();
     const timeout = setTimeout(() => abortController.abort(), ENHANCE_PROMPT_TIMEOUT_MS);
 
-    runEnhancePromptEphemeral(
-      value.prompt,
-      requestId,
-      abortController,
-      typedRoomHandle,
-      enhLog
-    ).finally(() => {
-      clearTimeout(timeout);
-      abortController.abort();
-      processedRequestIds.delete(requestId);
-    });
+    runEnhancePromptEphemeral(value.prompt, requestId, abortController, typedRoomHandle, enhLog)
+      .catch((err: unknown) => {
+        enhLog.error({ err }, 'Enhance prompt ephemeral failed');
+      })
+      .finally(() => {
+        clearTimeout(timeout);
+        abortController.abort();
+        processedRequestIds.delete(requestId);
+      });
   });
 
   typedRoomHandle.worktreeCreateReqs.subscribe(({ key: requestId, value, source }) => {
@@ -995,11 +993,15 @@ function handleEnhancePrompt(
   const abortController = ctx.lifecycle.createAbortController();
   const timeout = setTimeout(() => abortController.abort(), ENHANCE_PROMPT_TIMEOUT_MS);
 
-  runEnhancePrompt(prompt, requestId, abortController, ctx, enhanceLog).finally(() => {
-    clearTimeout(timeout);
-    abortController.abort();
-    processedRequestIds.delete(requestId);
-  });
+  runEnhancePrompt(prompt, requestId, abortController, ctx, enhanceLog)
+    .catch((err: unknown) => {
+      enhanceLog.error({ err }, 'Enhance prompt failed');
+    })
+    .finally(() => {
+      clearTimeout(timeout);
+      abortController.abort();
+      processedRequestIds.delete(requestId);
+    });
 }
 
 function extractTextChunks(rawContent: unknown): string[] {
@@ -1093,7 +1095,11 @@ function handleWorktreeCreate(
 
   wtLog.info({ sourceRepoPath, branchName, baseRef }, 'Starting worktree creation');
 
-  runWorktreeCreate(requestId, sourceRepoPath, branchName, baseRef, setupScript, ctx, wtLog);
+  runWorktreeCreate(requestId, sourceRepoPath, branchName, baseRef, setupScript, ctx, wtLog).catch(
+    (err: unknown) => {
+      wtLog.error({ err }, 'Worktree create handler failed');
+    }
+  );
 }
 
 /**
@@ -1527,6 +1533,12 @@ async function watchTaskDocument(
     taskLog.debug({ taskDocId }, 'No existing task data in storage');
   }
 
+  try {
+    await taskHandle.waitForSync({ kind: 'network', timeout: 3_000 });
+  } catch {
+    taskLog.debug({ taskDocId }, 'Network sync timed out (browser may not be connected yet)');
+  }
+
   const json = taskHandle.doc.toJSON();
   const lastUserMsg = [...json.conversation].reverse().find((m) => m.role === 'user');
   const initialCwd = lastUserMsg?.cwd ?? process.cwd();
@@ -1715,6 +1727,8 @@ function onTaskDocChanged(
         turnStartRefPromise,
         abortController,
         ctx,
+      }).catch((cleanupErr: unknown) => {
+        taskLog.warn({ err: cleanupErr }, 'cleanupTaskRun failed');
       })
     );
 }

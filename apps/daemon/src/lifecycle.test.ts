@@ -42,6 +42,42 @@ describe('LifecycleManager', () => {
     }
   });
 
+  it('treats unhandled rejections as non-fatal (no shutdown)', async () => {
+    const { LifecycleManager } = await import('./lifecycle.js');
+    const lifecycle = new LifecycleManager();
+
+    const mockExit = vi.mocked(process.exit);
+
+    const rejectionListener = originalListeners.find((l) => l.event === 'unhandledRejection');
+    expect(rejectionListener).toBeDefined();
+
+    rejectionListener!.listener(new Error('test rejection'));
+    rejectionListener!.listener({ weird: 'object' });
+    rejectionListener!.listener('string reason');
+
+    await vi.advanceTimersByTimeAsync(500);
+
+    expect(mockExit).not.toHaveBeenCalled();
+
+    lifecycle.destroy();
+  });
+
+  it('treats uncaught exceptions as fatal (triggers shutdown)', async () => {
+    const { LifecycleManager } = await import('./lifecycle.js');
+    new LifecycleManager();
+
+    const mockExit = vi.mocked(process.exit);
+
+    const exceptionListener = originalListeners.find((l) => l.event === 'uncaughtException');
+    expect(exceptionListener).toBeDefined();
+
+    exceptionListener!.listener(new Error('test exception'));
+
+    await vi.advanceTimersByTimeAsync(500);
+
+    expect(mockExit).toHaveBeenCalledWith(0);
+  });
+
   it('does not call process.exit immediately after shutdown log -- waits for flush', async () => {
     const { LifecycleManager } = await import('./lifecycle.js');
     // Instantiation registers signal handlers; we need the side effect
