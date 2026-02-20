@@ -21,14 +21,15 @@ concurrency:
   group: publish-npm
   cancel-in-progress: false
 
-permissions:
-  contents: write
-  id-token: write
+permissions: {}
 
 jobs:
   publish:
     runs-on: ubuntu-latest
     name: Publish @schoolai/shipyard
+    permissions:
+      contents: write
+      id-token: write
     steps:
       # ── Determine release type ──────────────────────────────────────
       - name: Determine release type
@@ -57,7 +58,7 @@ jobs:
           fi
 
       # ── Checkout ────────────────────────────────────────────────────
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -95,15 +96,15 @@ jobs:
           echo "No changes since last publish. Nothing to do." >> "$GITHUB_STEP_SUMMARY"
 
       # ── Setup toolchain ─────────────────────────────────────────────
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4.4.0
         if: steps.release.outputs.type == 'promote' || steps.changes.outputs.has_changes == 'true'
         with:
           node-version: '22.14.0'
 
-      - name: Install npm@latest (OIDC trusted publishing)
+      - name: Install npm (OIDC trusted publishing)
         if: steps.release.outputs.type == 'promote' || steps.changes.outputs.has_changes == 'true'
         run: |
-          npm install -g npm@latest
+          npm install -g npm@11.3.0
           npm config set registry https://registry.npmjs.org/
           echo "npm version: $(npm --version)"
 
@@ -111,7 +112,7 @@ jobs:
         if: steps.release.outputs.type == 'promote' || steps.changes.outputs.has_changes == 'true'
         run: corepack enable && corepack install
 
-      - uses: oven-sh/setup-bun@v2
+      - uses: oven-sh/setup-bun@3d267786b128fe76c2f16a390aa2448b815359f3  # v2.1.2
         if: steps.release.outputs.type == 'promote' || steps.changes.outputs.has_changes == 'true'
 
       # ── Build (nightly/RC only) ─────────────────────────────────────
@@ -214,7 +215,7 @@ jobs:
           node -e "
             const fs = require('fs');
             const pkg = JSON.parse(fs.readFileSync('package-npm.json', 'utf8'));
-            pkg.version = '${STABLE_VERSION}';
+            pkg.version = process.env.STABLE_VERSION;
             fs.writeFileSync('package-npm.json', JSON.stringify(pkg, null, 2) + '\n');
           "
           cd ../..
