@@ -27,7 +27,8 @@ export class LifecycleManager {
   #abortControllers = new Set<AbortController>();
   #shutdownCallbacks: Array<() => Promise<void>> = [];
   #isShuttingDown = false;
-  #signalHandlers: { signal: string; handler: () => void }[] = [];
+  // biome-ignore lint/suspicious/noExplicitAny: process event handlers have heterogeneous signatures
+  #signalHandlers: { signal: string; handler: (...args: any[]) => void }[] = [];
   #pidFilePath: string | null = null;
 
   constructor() {
@@ -39,6 +40,27 @@ export class LifecycleManager {
       { signal: 'SIGTERM', handler: termHandler },
       { signal: 'SIGINT', handler: intHandler },
     ];
+
+    const exceptionHandler = (error: Error) => {
+      try {
+        logger.error({ error }, 'Uncaught exception — initiating shutdown');
+      } catch {}
+      void this.#shutdown('uncaughtException');
+    };
+
+    const rejectionHandler = (reason: unknown) => {
+      try {
+        logger.error({ reason }, 'Unhandled rejection — initiating shutdown');
+      } catch {}
+      void this.#shutdown('unhandledRejection');
+    };
+
+    process.on('uncaughtException', exceptionHandler);
+    process.on('unhandledRejection', rejectionHandler);
+    this.#signalHandlers.push(
+      { signal: 'uncaughtException', handler: exceptionHandler },
+      { signal: 'unhandledRejection', handler: rejectionHandler }
+    );
   }
 
   destroy(): void {
@@ -119,14 +141,31 @@ export class LifecycleManager {
 
     logger.info({ signal }, 'Shutdown signal received');
 
+    const HARD_KILL_MS = 15_000;
+    const forceExit = setTimeout(() => {
+      logger.error('Graceful shutdown timed out, forcing exit');
+      process.exit(1);
+    }, HARD_KILL_MS);
+    forceExit.unref();
+
     for (const controller of this.#abortControllers) {
       controller.abort();
     }
     this.#abortControllers.clear();
 
+    const CALLBACK_TIMEOUT_MS = 5_000;
     for (const callback of this.#shutdownCallbacks) {
+      let timeoutId: ReturnType<typeof setTimeout>;
       try {
-        await callback();
+        await Promise.race([
+          callback(),
+          new Promise<void>((_, reject) => {
+            timeoutId = setTimeout(
+              () => reject(new Error('Shutdown callback timed out')),
+              CALLBACK_TIMEOUT_MS
+            );
+          }),
+        ]).finally(() => clearTimeout(timeoutId));
       } catch (error) {
         logger.error({ error }, 'Error during shutdown callback');
       }
@@ -134,6 +173,7 @@ export class LifecycleManager {
 
     await this.#removePidFile();
 
+    clearTimeout(forceExit);
     logger.info('Shutdown complete');
     await new Promise((resolve) => setTimeout(resolve, 100));
     process.exit(0);

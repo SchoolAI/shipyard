@@ -414,7 +414,9 @@ export async function serve(env: Env): Promise<void> {
         clearTimeout(openTimeout);
         clearTimeout(cwdTimeout);
         ptyManager.dispose();
-        terminalPtys.delete(fromMachineId);
+        if (terminalPtys.get(fromMachineId) === ptyManager) {
+          terminalPtys.delete(fromMachineId);
+        }
       };
     },
   });
@@ -1994,12 +1996,32 @@ function buildCanUseTool(
     );
 
     return new Promise<PermissionResult>((resolve) => {
+      const PERMISSION_TIMEOUT_MS = 5 * 60 * 1000;
+      let settled = false;
       let unsub: (() => void) | undefined;
 
-      const onAbort = () => {
+      const settle = (result: PermissionResult) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeout);
         unsub?.();
+        signal.removeEventListener('abort', onAbort);
         taskHandle.permReqs.delete(toolUseID);
-        resolve({ behavior: 'deny', message: 'Task was aborted' });
+        change(taskHandle.doc, (draft) => {
+          draft.meta.status = 'working';
+          draft.meta.updatedAt = Date.now();
+        });
+        updateTaskInIndex(roomDoc, taskId, { status: 'working', updatedAt: Date.now() });
+        resolve(result);
+      };
+
+      const timeout = setTimeout(() => {
+        taskLog.warn({ toolName, toolUseID }, 'Permission request timed out');
+        settle({ behavior: 'deny', message: 'Permission request timed out' });
+      }, PERMISSION_TIMEOUT_MS);
+
+      const onAbort = () => {
+        settle({ behavior: 'deny', message: 'Task was aborted' });
       };
 
       signal.addEventListener('abort', onAbort, { once: true });
@@ -2008,10 +2030,7 @@ function buildCanUseTool(
         if (source === 'local') return;
         if (key !== toolUseID || !value) return;
 
-        unsub?.();
-        signal.removeEventListener('abort', onAbort);
-
-        resolve(
+        settle(
           resolvePermissionResponse({
             taskHandle,
             roomDoc,

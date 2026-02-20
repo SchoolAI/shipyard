@@ -174,6 +174,15 @@ export function createPeerManager(config: PeerManagerConfig): PeerManager {
       })();
 
       pendingCreates.set(fromMachineId, promise);
+
+      const HANDSHAKE_TIMEOUT_MS = 30_000;
+      setTimeout(() => {
+        if (pendingCreates.get(fromMachineId) === promise) {
+          pendingCreates.delete(fromMachineId);
+          logger.warn({ fromMachineId }, 'WebRTC handshake timed out');
+        }
+      }, HANDSHAKE_TIMEOUT_MS);
+
       await promise;
     },
 
@@ -215,6 +224,7 @@ export function createPeerManager(config: PeerManagerConfig): PeerManager {
         pc.close();
       }
       peers.clear();
+      pendingCreates.clear();
     },
   };
 }
