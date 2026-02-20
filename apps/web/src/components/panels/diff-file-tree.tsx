@@ -362,9 +362,9 @@ export function DiffFileTree(props: DiffFileTreeProps) {
 
   const handleSelectFile = useCallback(
     (path: string) => {
-      onSelectFile(selectedFile === path ? null : path);
+      onSelectFile(path);
     },
-    [selectedFile, onSelectFile]
+    [onSelectFile]
   );
 
   const focusItem = useCallback((index: number) => {

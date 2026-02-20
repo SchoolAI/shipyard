@@ -184,7 +184,9 @@ function DiffContent({
       const filtered = filterDiffByFile(rawDiff, selectedFile);
       return { hunks: filtered ? [filtered] : [] };
     }
-    return { hunks: splitDiffByFile(rawDiff) };
+    const segments = splitDiffByFile(rawDiff);
+    const first = segments[0];
+    return { hunks: first ? [first] : [] };
   }, [rawDiff, selectedFile]);
 
   const extendData = useMemo(() => {
@@ -516,6 +518,27 @@ function DiffBody({
     () => files.filter((f) => unstagedPaths.has(normalizePath(f.path))),
     [files, unstagedPaths]
   );
+
+  /** Auto-select the first visible file when nothing is selected. */
+  const allFiles = useMemo(
+    () => (scope === 'working-tree' ? [...stagedFiles, ...unstagedFiles] : visibleFiles),
+    [scope, stagedFiles, unstagedFiles, visibleFiles]
+  );
+
+  const firstFilePath = useMemo(() => {
+    const first = allFiles[0];
+    return first?.path ?? null;
+  }, [allFiles]);
+
+  const allFilePaths = useMemo(() => new Set(allFiles.map((f) => f.path)), [allFiles]);
+
+  useEffect(() => {
+    if (selectedFile && !allFilePaths.has(selectedFile)) {
+      onSelectFile(null);
+    } else if (!selectedFile && firstFilePath) {
+      onSelectFile(firstFilePath);
+    }
+  }, [selectedFile, firstFilePath, allFilePaths, onSelectFile]);
 
   const scopedComments = useMemo(() => {
     let filtered = diffComments.filter((c) => c.diffScope === scope);
