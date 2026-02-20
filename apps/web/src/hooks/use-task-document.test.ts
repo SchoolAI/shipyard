@@ -33,6 +33,7 @@ const mockHandle = {
       sessions: [],
       diffState: null,
       diffComments: {},
+      planComments: {},
     })),
   },
   loroDoc: {

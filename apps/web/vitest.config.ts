@@ -7,6 +7,7 @@ const fanInThresholds = generateCoverageThresholds('./src', DEFAULT_TIER_THRESHO
 export default defineConfig({
   test: {
     environment: 'jsdom',
+    setupFiles: ['src/test-setup.ts'],
     include: ['src/**/*.test.{ts,tsx}'],
     passWithNoTests: true,
     retry: 0,
