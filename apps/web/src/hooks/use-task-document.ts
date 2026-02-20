@@ -116,7 +116,7 @@ export function useTaskDocument(taskId: string | null): TaskDocumentResult {
   );
 
   const diffComments = useMemo(
-    () => Object.values(diffCommentsRecord).sort((a, b) => a.createdAt - b.createdAt),
+    () => Object.values(diffCommentsRecord ?? {}).sort((a, b) => a.createdAt - b.createdAt),
     [diffCommentsRecord]
   );
 
@@ -126,7 +126,7 @@ export function useTaskDocument(taskId: string | null): TaskDocumentResult {
   );
 
   const planComments = useMemo(
-    () => Object.values(planCommentsRecord).sort((a, b) => a.createdAt - b.createdAt),
+    () => Object.values(planCommentsRecord ?? {}).sort((a, b) => a.createdAt - b.createdAt),
     [planCommentsRecord]
   );
 

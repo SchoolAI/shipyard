@@ -485,6 +485,7 @@ export class SessionManager {
 
     const idleTimer = setInterval(() => {
       if (Date.now() - lastMessageAt >= IDLE_TIMEOUT_MS) {
+        clearInterval(idleTimer);
         idleTimedOut = true;
         logger.warn(
           { sessionId, idleMs: Date.now() - lastMessageAt },
@@ -506,7 +507,11 @@ export class SessionManager {
         }
       }
     } catch (error: unknown) {
-      const errorMsg = error instanceof Error ? error.message : String(error);
+      const errorMsg = idleTimedOut
+        ? 'Session idle timeout exceeded'
+        : error instanceof Error
+          ? error.message
+          : String(error);
       this.#markFailed(sessionId, errorMsg);
 
       return {
