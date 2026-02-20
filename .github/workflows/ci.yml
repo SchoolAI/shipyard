@@ -6,26 +6,54 @@ on:
       - 'docs/**'
       - '**/*.md'
       - 'spikes/**'
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
+      - 'spikes/**'
+  workflow_dispatch:
+    inputs:
+      deploy:
+        description: 'Which service to deploy (or "all")'
+        required: true
+        type: choice
+        options:
+          - all
+          - session-server
+          - web
+          - og-proxy
 
 concurrency:
-  group: ci-${{ github.head_ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.head_ref || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions: {}
 
 jobs:
+  # ── Quality gate ───────────────────────────────────────────────────
   check:
     runs-on: ubuntu-latest
     name: Typecheck, Lint & Test
+    permissions:
+      contents: read
+    outputs:
+      session-server: ${{ steps.changes.outputs.session-server }}
+      web: ${{ steps.changes.outputs.web }}
+      og-proxy: ${{ steps.changes.outputs.og-proxy }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
+        with:
+          fetch-depth: ${{ github.event_name == 'push' && 2 || 1 }}
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061  # v4.2.0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4.4.0
         with:
           node-version: '22.14.0'
           cache: 'pnpm'
 
-      - uses: oven-sh/setup-bun@v2
+      - uses: oven-sh/setup-bun@3d267786b128fe76c2f16a390aa2448b815359f3  # v2.1.2
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -33,11 +61,245 @@ jobs:
       - name: Build packages
         run: pnpm turbo build --filter='./packages/*'
 
-      - name: Typecheck & Lint
-        run: pnpm turbo typecheck lint --filter='!@shipyard/session-server'
+      - name: Check (typecheck + lint + file-allowlist + comment lint + type assertions)
+        run: pnpm check
 
       - name: Test
         run: pnpm turbo test
 
       - name: Meta-tests
         run: pnpm test:meta
+
+      - name: Detect changed paths
+        id: changes
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+          SHA: ${{ github.sha }}
+          DEPLOY_INPUT: ${{ github.event.inputs.deploy }}
+        run: |
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            echo "Manual deploy requested: $DEPLOY_INPUT"
+            if [ "$DEPLOY_INPUT" = "all" ] || [ "$DEPLOY_INPUT" = "session-server" ]; then
+              echo "session-server=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "session-server=false" >> "$GITHUB_OUTPUT"
+            fi
+            if [ "$DEPLOY_INPUT" = "all" ] || [ "$DEPLOY_INPUT" = "web" ]; then
+              echo "web=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "web=false" >> "$GITHUB_OUTPUT"
+            fi
+            if [ "$DEPLOY_INPUT" = "all" ] || [ "$DEPLOY_INPUT" = "og-proxy" ]; then
+              echo "og-proxy=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "og-proxy=false" >> "$GITHUB_OUTPUT"
+            fi
+            exit 0
+          fi
+
+          NULL_SHA="0000000000000000000000000000000000000000"
+          if [ "$BEFORE" = "$NULL_SHA" ]; then
+            echo "First push or force push — deploying everything"
+            echo "session-server=true" >> "$GITHUB_OUTPUT"
+            echo "web=true" >> "$GITHUB_OUTPUT"
+            echo "og-proxy=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          CHANGED=$(git diff --name-only "$BEFORE" "$SHA")
+          echo "Changed files:"
+          echo "$CHANGED"
+
+          if echo "$CHANGED" | grep -qE '^apps/session-server/|^packages/session/'; then
+            echo "session-server=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "session-server=false" >> "$GITHUB_OUTPUT"
+          fi
+
+          if echo "$CHANGED" | grep -qE '^apps/web/|^packages/loro-schema/|^packages/session/'; then
+            echo "web=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "web=false" >> "$GITHUB_OUTPUT"
+          fi
+
+          if echo "$CHANGED" | grep -qE '^apps/og-proxy-worker/'; then
+            echo "og-proxy=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "og-proxy=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  # ── Required status check (sole gate for branch protection) ────────
+  ci-ok:
+    if: always()
+    needs: [check]
+    runs-on: ubuntu-latest
+    name: CI OK
+    steps:
+      - name: Gate
+        env:
+          CHECK_RESULT: ${{ needs.check.result }}
+        run: |
+          if [ "$CHECK_RESULT" = "failure" ] || [ "$CHECK_RESULT" = "cancelled" ]; then
+            echo "::error::check job failed or was cancelled"
+            exit 1
+          fi
+
+  # ── Deploy: Session Server ────────────────────────────────────────
+  deploy-session-server:
+    needs: [ci-ok, check]
+    if: |
+      (github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch')
+      && needs.check.outputs.session-server == 'true'
+    runs-on: ubuntu-latest
+    name: Deploy Session Server
+    permissions:
+      contents: read
+      deployments: write
+    concurrency:
+      group: deploy-session-server
+      cancel-in-progress: false
+    environment: production-session-server
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
+
+      - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061  # v4.2.0
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4.4.0
+        with:
+          node-version: '22.14.0'
+          cache: 'pnpm'
+
+      - uses: oven-sh/setup-bun@3d267786b128fe76c2f16a390aa2448b815359f3  # v2.1.2
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build workspace dependencies
+        run: pnpm turbo build --filter=@shipyard/session
+
+      - name: Deploy to Cloudflare Workers
+        uses: cloudflare/wrangler-action@da0e0dfe58b7a431659754fdf3f186c529afbe65  # v3.14.1
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          workingDirectory: apps/session-server
+          command: deploy
+          packageManager: pnpm
+          secrets: |
+            GITHUB_CLIENT_ID
+            GITHUB_CLIENT_SECRET
+            JWT_SECRET
+        env:
+          GITHUB_CLIENT_ID: ${{ vars.GH_OAUTH_CLIENT_ID }}
+          GITHUB_CLIENT_SECRET: ${{ secrets.GH_OAUTH_CLIENT_SECRET }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+
+      - name: Smoke test
+        run: |
+          for i in 1 2 3 4 5; do
+            curl -sf https://shipyard-session-server.jacob-191.workers.dev/health && exit 0
+            sleep 5
+          done
+          exit 1
+
+  # ── Deploy: Web App ───────────────────────────────────────────────
+  deploy-web:
+    needs: [ci-ok, check]
+    if: |
+      (github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch')
+      && needs.check.outputs.web == 'true'
+    runs-on: ubuntu-latest
+    name: Deploy Web App
+    permissions:
+      contents: read
+      deployments: write
+    concurrency:
+      group: deploy-web
+      cancel-in-progress: false
+    environment:
+      name: production-web
+      url: ${{ steps.deploy.outputs.url }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
+
+      - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061  # v4.2.0
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4.4.0
+        with:
+          node-version: '22.14.0'
+          cache: 'pnpm'
+
+      - uses: oven-sh/setup-bun@3d267786b128fe76c2f16a390aa2448b815359f3  # v2.1.2
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build web app
+        run: pnpm turbo build --filter=@shipyard/web
+        env:
+          VITE_DATA_SOURCE: loro
+          VITE_GITHUB_CLIENT_ID: ${{ vars.GH_OAUTH_CLIENT_ID }}
+          VITE_SESSION_SERVER_URL: https://shipyard-session-server.jacob-191.workers.dev
+
+      - name: Deploy to Cloudflare Pages
+        id: deploy
+        uses: cloudflare/wrangler-action@da0e0dfe58b7a431659754fdf3f186c529afbe65  # v3.14.1
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy apps/web/dist --project-name=shipyard
+
+      - name: Smoke test
+        env:
+          DEPLOY_URL: ${{ steps.deploy.outputs.deployment-url }}
+        run: |
+          URL="${DEPLOY_URL:-https://shipyard-92m.pages.dev}"
+          for i in 1 2 3 4 5; do
+            curl -sf "$URL" && exit 0
+            sleep 5
+          done
+          exit 1
+
+  # ── Deploy: OG Proxy Worker ───────────────────────────────────────
+  deploy-og-proxy:
+    needs: [ci-ok, check]
+    if: |
+      (github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch')
+      && needs.check.outputs.og-proxy == 'true'
+    runs-on: ubuntu-latest
+    name: Deploy OG Proxy
+    permissions:
+      contents: read
+      deployments: write
+    concurrency:
+      group: deploy-og-proxy
+      cancel-in-progress: false
+    environment: production-og-proxy
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
+
+      - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061  # v4.2.0
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4.4.0
+        with:
+          node-version: '22.14.0'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Deploy to Cloudflare Workers
+        uses: cloudflare/wrangler-action@da0e0dfe58b7a431659754fdf3f186c529afbe65  # v3.14.1
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          workingDirectory: apps/og-proxy-worker
+          command: deploy
+
+      - name: Smoke test
+        run: |
+          for i in 1 2 3 4 5; do
+            curl -sf https://shipyard-og-proxy.jacob-191.workers.dev/health && exit 0
+            sleep 5
+          done
+          exit 1
