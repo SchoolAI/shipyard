@@ -82,6 +82,16 @@ function isPermissionMode(value: string): value is PermissionMode {
   return VALID_MODES.includes(value);
 }
 
+function toReasoningLevel(value: string | null): ReasoningLevel | null {
+  if (value && isReasoningLevel(value)) return value;
+  return null;
+}
+
+function toPermissionMode(value: string | null): PermissionMode | null {
+  if (value && isPermissionMode(value)) return value;
+  return null;
+}
+
 const SCROLL_THRESHOLD = 80;
 
 interface ComposerSeedTarget {
@@ -105,9 +115,6 @@ function seedComposerState(
   if (taskId !== target.seededRef.current) target.seededRef.current = null;
 
   if (!config && !taskId) {
-    target.setModel('claude-opus-4-6');
-    target.setReasoning('medium');
-    target.setPermission('default');
     target.setEnvironment(null);
     return;
   }
@@ -363,6 +370,20 @@ function ChatPageInner() {
     (d: { worktreeSetupStatus: Record<string, WorktreeSetupStatus> }) => d.worktreeSetupStatus
   );
 
+  const crdtComposerModel = useDoc(
+    roomDocHandle,
+    (d: { userSettings: { composerModel: string | null } }) => d.userSettings.composerModel
+  );
+  const crdtComposerReasoning = useDoc(
+    roomDocHandle,
+    (d: { userSettings: { composerReasoning: string | null } }) => d.userSettings.composerReasoning
+  );
+  const crdtComposerPermission = useDoc(
+    roomDocHandle,
+    (d: { userSettings: { composerPermission: string | null } }) =>
+      d.userSettings.composerPermission
+  );
+
   const storeMessages = activeTaskId ? messagesByTask[activeTaskId] : undefined;
 
   const lastSubmittedModelRef = useRef<string | null>(null);
@@ -548,9 +569,59 @@ function ChatPageInner() {
   const selectedEnvironmentPath = useUIStore((s) => s.selectedEnvironmentPath);
   const setSelectedEnvironmentPath = useUIStore((s) => s.setSelectedEnvironmentPath);
 
-  const [composerModel, setComposerModel] = useState('claude-opus-4-6');
-  const [composerReasoning, setComposerReasoning] = useState<ReasoningLevel>('medium');
-  const [composerPermission, setComposerPermission] = useState<PermissionMode>('default');
+  const [composerModel, setComposerModelLocal] = useState(
+    () => crdtComposerModel ?? 'claude-opus-4-6'
+  );
+  const resolvedReasoning = toReasoningLevel(crdtComposerReasoning);
+  const [composerReasoning, setComposerReasoningLocal] = useState<ReasoningLevel>(
+    () => resolvedReasoning ?? 'medium'
+  );
+  const resolvedPermission = toPermissionMode(crdtComposerPermission);
+  const [composerPermission, setComposerPermissionLocal] = useState<PermissionMode>(
+    () => resolvedPermission ?? 'default'
+  );
+
+  useEffect(() => {
+    if (crdtComposerModel) setComposerModelLocal(crdtComposerModel);
+  }, [crdtComposerModel]);
+
+  useEffect(() => {
+    if (resolvedReasoning) setComposerReasoningLocal(resolvedReasoning);
+  }, [resolvedReasoning]);
+
+  useEffect(() => {
+    if (resolvedPermission) setComposerPermissionLocal(resolvedPermission);
+  }, [resolvedPermission]);
+
+  const setComposerModel = useCallback(
+    (modelId: string) => {
+      setComposerModelLocal(modelId);
+      change(roomTypedDoc, (draft) => {
+        draft.userSettings.composerModel = modelId;
+      });
+    },
+    [roomTypedDoc]
+  );
+
+  const setComposerReasoning = useCallback(
+    (level: ReasoningLevel) => {
+      setComposerReasoningLocal(level);
+      change(roomTypedDoc, (draft) => {
+        draft.userSettings.composerReasoning = level;
+      });
+    },
+    [roomTypedDoc]
+  );
+
+  const setComposerPermission = useCallback(
+    (mode: PermissionMode) => {
+      setComposerPermissionLocal(mode);
+      change(roomTypedDoc, (draft) => {
+        draft.userSettings.composerPermission = mode;
+      });
+    },
+    [roomTypedDoc]
+  );
 
   const [isWorktreeModalOpen, setIsWorktreeModalOpen] = useState(false);
   const [worktreeProgress, setWorktreeProgress] = useState<{
@@ -683,12 +754,19 @@ function ChatPageInner() {
       setEnvironment: setSelectedEnvironmentPath,
       seededRef: seededTaskRef,
     });
-  }, [activeTaskId, loroTask.lastUserConfig, setSelectedEnvironmentPath]);
+  }, [
+    activeTaskId,
+    loroTask.lastUserConfig,
+    setSelectedEnvironmentPath,
+    setComposerModel,
+    setComposerReasoning,
+    setComposerPermission,
+  ]);
 
   useEffect(() => {
     if (availableModels.length === 0) return;
     if (!availableModels.some((m) => m.id === composerModel)) {
-      setComposerModel(availableModels[0]?.id ?? 'claude-opus-4-6');
+      setComposerModelLocal(availableModels[0]?.id ?? 'claude-opus-4-6');
     }
   }, [availableModels, composerModel]);
 
