@@ -104,7 +104,7 @@ jobs:
       - name: Install npm (OIDC trusted publishing)
         if: steps.release.outputs.type == 'promote' || steps.changes.outputs.has_changes == 'true'
         run: |
-          npm install -g npm@11.3.0
+          npm install -g npm@latest
           npm config set registry https://registry.npmjs.org/
           echo "npm version: $(npm --version)"
 
