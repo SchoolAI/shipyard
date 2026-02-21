@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from 'vitest';
  * Values created in vi.hoisted() are available to hoisted vi.mock()
  * factories and to normal test code.
  */
-const { SharedRepoContext, mockRepoReset } = vi.hoisted(() => {
+const { SharedRepoContext, mockRepoReset, mockRepoConstructorArgs } = vi.hoisted(() => {
   /**
    * vi.hoisted() runs at the top of the module before any imports,
    * so we cannot reference the 'react' import. However vitest
@@ -19,7 +19,15 @@ const { SharedRepoContext, mockRepoReset } = vi.hoisted(() => {
   return {
     SharedRepoContext: { current: null as ReturnType<typeof createContext<unknown>> | null },
     mockRepoReset: vi.fn(),
+    mockRepoConstructorArgs: { current: null as Record<string, unknown> | null },
   };
+});
+
+vi.mock('@loro-extended/adapter-indexeddb', () => {
+  class MockIndexedDBStorageAdapter {
+    adapterType = 'indexeddb';
+  }
+  return { IndexedDBStorageAdapter: MockIndexedDBStorageAdapter };
 });
 
 vi.mock('@loro-extended/adapter-webrtc', () => {
@@ -35,6 +43,7 @@ vi.mock('@loro-extended/repo', () => {
     reset = mockRepoReset;
     constructor(params: Record<string, unknown>) {
       this.identity = params?.identity ?? 'test';
+      mockRepoConstructorArgs.current = params;
     }
   }
   return { Repo: MockRepo };
@@ -81,6 +90,16 @@ describe('ShipyardRepoProvider', () => {
   it('returns null for useWebRtcAdapter without provider', () => {
     const { result } = renderHook(() => useWebRtcAdapter());
     expect(result.current).toBeNull();
+  });
+
+  it('includes IndexedDB adapter when indexedDB is available', () => {
+    vi.stubGlobal('indexedDB', {});
+    renderHook(() => useRepo(), { wrapper });
+    const adapters = mockRepoConstructorArgs.current?.adapters as { adapterType: string }[];
+    expect(adapters).toBeDefined();
+    expect(adapters.some((a) => a.adapterType === 'indexeddb')).toBe(true);
+    expect(adapters.some((a) => a.adapterType === 'webrtc-datachannel')).toBe(true);
+    vi.unstubAllGlobals();
   });
 
   it('calls repo.reset() on unmount', () => {
