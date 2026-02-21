@@ -156,22 +156,37 @@ jobs:
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
 
+      - name: Skip if superseded by newer commit
+        id: guard
+        run: |
+          LATEST=$(git ls-remote origin refs/heads/main | awk '{print $1}')
+          if [ "${{ github.sha }}" != "$LATEST" ]; then
+            echo "::notice::Skipping deploy — ${{ github.sha }} is no longer HEAD of main ($LATEST)"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061  # v4.2.0
+        if: steps.guard.outputs.skip != 'true'
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4.4.0
+        if: steps.guard.outputs.skip != 'true'
         with:
           node-version: '22.14.0'
           cache: 'pnpm'
 
       - uses: oven-sh/setup-bun@3d267786b128fe76c2f16a390aa2448b815359f3  # v2.1.2
+        if: steps.guard.outputs.skip != 'true'
 
       - name: Install dependencies
+        if: steps.guard.outputs.skip != 'true'
         run: pnpm install --frozen-lockfile
 
       - name: Build workspace dependencies
+        if: steps.guard.outputs.skip != 'true'
         run: pnpm turbo build --filter=@shipyard/session
 
       - name: Deploy to Cloudflare Workers
+        if: steps.guard.outputs.skip != 'true'
         uses: cloudflare/wrangler-action@da0e0dfe58b7a431659754fdf3f186c529afbe65  # v3.14.1
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -188,6 +203,7 @@ jobs:
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
 
       - name: Smoke test
+        if: steps.guard.outputs.skip != 'true'
         run: |
           for i in 1 2 3 4 5; do
             curl -sf https://shipyard-session-server.jacob-191.workers.dev/health && exit 0
@@ -215,19 +231,33 @@ jobs:
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
 
+      - name: Skip if superseded by newer commit
+        id: guard
+        run: |
+          LATEST=$(git ls-remote origin refs/heads/main | awk '{print $1}')
+          if [ "${{ github.sha }}" != "$LATEST" ]; then
+            echo "::notice::Skipping deploy — ${{ github.sha }} is no longer HEAD of main ($LATEST)"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061  # v4.2.0
+        if: steps.guard.outputs.skip != 'true'
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4.4.0
+        if: steps.guard.outputs.skip != 'true'
         with:
           node-version: '22.14.0'
           cache: 'pnpm'
 
       - uses: oven-sh/setup-bun@3d267786b128fe76c2f16a390aa2448b815359f3  # v2.1.2
+        if: steps.guard.outputs.skip != 'true'
 
       - name: Install dependencies
+        if: steps.guard.outputs.skip != 'true'
         run: pnpm install --frozen-lockfile
 
       - name: Build web app
+        if: steps.guard.outputs.skip != 'true'
         run: pnpm turbo build --filter=@shipyard/web
         env:
           VITE_DATA_SOURCE: loro
@@ -235,16 +265,18 @@ jobs:
           VITE_SESSION_SERVER_URL: https://shipyard-session-server.jacob-191.workers.dev
 
       - name: Deploy to Cloudflare Pages
+        if: steps.guard.outputs.skip != 'true'
         id: deploy
         uses: cloudflare/wrangler-action@da0e0dfe58b7a431659754fdf3f186c529afbe65  # v3.14.1
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: apps/web
-          command: pages deploy dist --project-name=shipyard
+          command: pages deploy dist --project-name=shipyard --branch main
           packageManager: pnpm
 
       - name: Smoke test
+        if: steps.guard.outputs.skip != 'true'
         env:
           DEPLOY_URL: ${{ steps.deploy.outputs.deployment-url }}
         run: |
@@ -273,17 +305,30 @@ jobs:
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
 
+      - name: Skip if superseded by newer commit
+        id: guard
+        run: |
+          LATEST=$(git ls-remote origin refs/heads/main | awk '{print $1}')
+          if [ "${{ github.sha }}" != "$LATEST" ]; then
+            echo "::notice::Skipping deploy — ${{ github.sha }} is no longer HEAD of main ($LATEST)"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061  # v4.2.0
+        if: steps.guard.outputs.skip != 'true'
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4.4.0
+        if: steps.guard.outputs.skip != 'true'
         with:
           node-version: '22.14.0'
           cache: 'pnpm'
 
       - name: Install dependencies
+        if: steps.guard.outputs.skip != 'true'
         run: pnpm install --frozen-lockfile
 
       - name: Deploy to Cloudflare Workers
+        if: steps.guard.outputs.skip != 'true'
         uses: cloudflare/wrangler-action@da0e0dfe58b7a431659754fdf3f186c529afbe65  # v3.14.1
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -291,6 +336,7 @@ jobs:
           command: deploy
 
       - name: Smoke test
+        if: steps.guard.outputs.skip != 'true'
         run: |
           for i in 1 2 3 4 5; do
             curl -sf https://shipyard-og-proxy.jacob-191.workers.dev/health && exit 0
