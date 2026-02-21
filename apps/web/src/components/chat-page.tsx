@@ -42,6 +42,7 @@ import { useRoomCapabilities } from '../hooks/use-room-capabilities';
 import { useRoomHandle } from '../hooks/use-room-handle';
 import { useTaskDocument } from '../hooks/use-task-document';
 import { useTaskIndex } from '../hooks/use-task-index';
+import { useVisualViewport } from '../hooks/use-visual-viewport';
 import { useVoiceInput } from '../hooks/use-voice-input';
 import { useWebRTCSync } from '../hooks/use-webrtc-sync';
 import { useRepo, useWebRtcAdapter } from '../providers/repo-provider';
@@ -324,6 +325,8 @@ function ChatPageInner() {
   const toggleSidePanel = useUIStore((s) => s.toggleSidePanel);
   const toggleSidebar = useUIStore((s) => s.toggleSidebar);
   const setSidebarExpanded = useUIStore((s) => s.setSidebarExpanded);
+
+  const visualViewportHeight = useVisualViewport();
 
   const authToken = useAuthStore((s) => s.token);
   const authUser = useAuthStore((s) => s.user);
@@ -1344,7 +1347,10 @@ function ChatPageInner() {
       respondToPermission={respondToPermission}
       plans={plans}
     >
-      <div className="flex h-dvh overflow-hidden bg-background">
+      <div
+        className="flex overflow-hidden bg-background"
+        style={{ height: visualViewportHeight ? `${visualViewportHeight}px` : '100dvh' }}
+      >
         <CommandPalette />
         <ShortcutsModal />
         <WorktreeCreationModal
