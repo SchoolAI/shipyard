@@ -41,6 +41,7 @@ import {
   getStagedDiff,
   getUnstagedDiff,
 } from './capabilities.js';
+import { recoverOrphanedTask } from './crash-recovery.js';
 import type { Env } from './env.js';
 import { getShipyardHome } from './env.js';
 import { FileStorageAdapter } from './file-storage-adapter.js';
@@ -1649,6 +1650,10 @@ async function watchTaskDocument(
     await taskHandle.waitForSync({ kind: 'network', timeout: 3_000 });
   } catch {
     taskLog.debug({ taskDocId }, 'Network sync timed out (browser may not be connected yet)');
+  }
+
+  if (recoverOrphanedTask(taskHandle.doc, taskLog)) {
+    updateTaskInIndex(ctx.roomDoc, taskId, { status: 'failed', updatedAt: Date.now() });
   }
 
   const json = taskHandle.doc.toJSON();
