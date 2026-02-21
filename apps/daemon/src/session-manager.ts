@@ -11,7 +11,7 @@ import type { TypedDoc } from '@loro-extended/change';
 
 type MessageParam = SDKUserMessage['message'];
 
-import { change, loro } from '@loro-extended/change';
+import { change, getLoroDoc } from '@loro-extended/change';
 import type {
   A2ATaskState,
   ContentBlock,
@@ -20,7 +20,6 @@ import type {
   TaskDocumentShape,
 } from '@shipyard/loro-schema';
 import { extractPlanMarkdown, SUPPORTED_IMAGE_MEDIA_TYPES } from '@shipyard/loro-schema';
-import type { LoroDoc } from 'loro-crdt';
 import { nanoid } from 'nanoid';
 import { logger } from './logger.js';
 import { initPlanEditorDoc } from './plan-editor/index.js';
@@ -753,8 +752,7 @@ export class SessionManager {
         });
       });
 
-      // eslint-disable-next-line no-restricted-syntax -- extract raw LoroDoc from branded TypedDocRef wrapper
-      const loroDoc = (loro(this.#taskDoc) as unknown as { doc: LoroDoc }).doc;
+      const loroDoc = getLoroDoc(this.#taskDoc);
       const initOk = initPlanEditorDoc(loroDoc, planId, planMarkdown);
       if (!initOk) {
         logger.warn(

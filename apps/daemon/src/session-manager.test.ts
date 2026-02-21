@@ -1,9 +1,8 @@
 import type { Query } from '@anthropic-ai/claude-agent-sdk';
 import type { TypedDoc } from '@loro-extended/change';
-import { createTypedDoc, loro } from '@loro-extended/change';
+import { createTypedDoc, getLoroDoc } from '@loro-extended/change';
 import type { TaskDocumentShape } from '@shipyard/loro-schema';
 import { generateTaskId, TaskDocumentSchema } from '@shipyard/loro-schema';
-import type { LoroDoc } from 'loro-crdt';
 import { isContainer } from 'loro-crdt';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SessionManager } from './session-manager.js';
@@ -2016,8 +2015,7 @@ describe('SessionManager', () => {
 
       const planId = json.plans[0]!.planId;
 
-      // eslint-disable-next-line no-restricted-syntax -- accessing raw LoroDoc from typed wrapper
-      const loroDoc = (loro(taskDoc) as unknown as { doc: LoroDoc }).doc;
+      const loroDoc = getLoroDoc(taskDoc);
       const planEditorDocsMap = loroDoc.getMap('planEditorDocs');
       const container = planEditorDocsMap.get(planId);
       expect(isContainer(container)).toBe(true);
