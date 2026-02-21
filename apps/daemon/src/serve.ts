@@ -1737,22 +1737,16 @@ function promotePendingFollowUps(
     }
   });
 
-  const latestPending = pending[pending.length - 1];
-  if (latestPending) {
-    const contentBlocks = latestPending.content.filter(
-      (block: { type: string }) => block.type === 'text' || block.type === 'image'
-    );
-    if (contentBlocks.length > 0) {
-      try {
-        taskLog.info(
-          { pendingCount: pending.length },
-          'Promoted pending follow-ups to conversation'
-        );
-        activeTask.lastDispatchedConvLen = json.conversation.length + pending.length;
-        activeTask.sessionManager.sendFollowUp(contentBlocks);
-      } catch (err: unknown) {
-        taskLog.warn({ err }, 'Failed to send promoted follow-up');
-      }
+  const allContentBlocks = pending.flatMap((msg) =>
+    msg.content.filter((block: { type: string }) => block.type === 'text' || block.type === 'image')
+  );
+  if (allContentBlocks.length > 0) {
+    try {
+      taskLog.info({ pendingCount: pending.length }, 'Promoted pending follow-ups to conversation');
+      activeTask.lastDispatchedConvLen = json.conversation.length + pending.length;
+      activeTask.sessionManager.sendFollowUp(allContentBlocks);
+    } catch (err: unknown) {
+      taskLog.warn({ err }, 'Failed to send promoted follow-up');
     }
   }
 }
