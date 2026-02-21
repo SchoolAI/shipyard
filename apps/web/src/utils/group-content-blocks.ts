@@ -5,6 +5,53 @@ import { assertNever } from './assert-never';
 type ToolUseBlock = ContentBlock & { type: 'tool_use' };
 type ToolResultBlock = ContentBlock & { type: 'tool_result' };
 
+export interface QuestionOption {
+  label: string;
+  description: string;
+}
+
+export interface ParsedQuestion {
+  question: string;
+  header: string;
+  options: QuestionOption[];
+  multiSelect: boolean;
+}
+
+function normalizeParsedQuestion(q: Record<string, unknown>): ParsedQuestion {
+  return {
+    question: typeof q.question === 'string' ? q.question : '',
+    header: typeof q.header === 'string' ? q.header : '',
+    options: Array.isArray(q.options) ? q.options.filter(isValidOption) : [],
+    multiSelect: typeof q.multiSelect === 'boolean' ? q.multiSelect : false,
+  };
+}
+
+function isValidOption(o: unknown): o is QuestionOption {
+  return isRecord(o) && typeof o.label === 'string' && typeof o.description === 'string';
+}
+
+export type ParsedQuestions = ParsedQuestion[];
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function hasQuestionField(q: Record<string, unknown>): boolean {
+  return typeof q.question === 'string';
+}
+
+function extractQuestions(toolInput: string): ParsedQuestions {
+  try {
+    const parsed: unknown = JSON.parse(toolInput);
+    if (!isRecord(parsed)) return [];
+    const questions = parsed.questions;
+    if (!Array.isArray(questions)) return [];
+    return questions.filter(isRecord).filter(hasQuestionField).map(normalizeParsedQuestion);
+  } catch {
+    return [];
+  }
+}
+
 export type GroupedBlock =
   | { kind: 'text'; block: ContentBlock & { type: 'text' } }
   | { kind: 'image'; block: ContentBlock & { type: 'image' } }
@@ -25,6 +72,12 @@ export type GroupedBlock =
       toolUse: ToolUseBlock;
       toolResult: ToolResultBlock | null;
       markdown: string;
+    }
+  | {
+      kind: 'ask_question';
+      toolUse: ToolUseBlock;
+      toolResult: ToolResultBlock | null;
+      questions: ParsedQuestions;
     };
 
 /**
@@ -107,6 +160,15 @@ function groupToolUse(
       toolUse: block,
       toolResult: result,
       markdown: extractPlanMarkdown(block.input),
+    };
+  }
+
+  if (block.toolName === 'AskUserQuestion') {
+    return {
+      kind: 'ask_question',
+      toolUse: block,
+      toolResult: result,
+      questions: extractQuestions(block.input),
     };
   }
 

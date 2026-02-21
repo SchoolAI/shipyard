@@ -51,6 +51,20 @@ function summarizeExitPlanModeFromRaw(toolInput: string): string {
   return truncateToolInput(firstLine || 'Plan ready for review', 100);
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function summarizeAskUserQuestion(input: Record<string, unknown>): string {
+  const questions = Array.isArray(input.questions) ? input.questions : [];
+  const first: unknown = questions[0];
+  if (isRecord(first)) {
+    const q = first.question;
+    if (typeof q === 'string') return truncateToolInput(q, 100);
+  }
+  return 'Asking question';
+}
+
 export const TOOL_SUMMARIZERS: Record<string, (input: Record<string, unknown>) => string> = {
   Bash: summarizeBash,
   Edit: summarizeEdit,
@@ -58,6 +72,7 @@ export const TOOL_SUMMARIZERS: Record<string, (input: Record<string, unknown>) =
   Read: summarizeRead,
   Glob: summarizeGlob,
   Grep: summarizeGrep,
+  AskUserQuestion: summarizeAskUserQuestion,
 };
 
 /**
@@ -66,6 +81,15 @@ export const TOOL_SUMMARIZERS: Record<string, (input: Record<string, unknown>) =
  */
 export function summarizeToolAction(toolName: string, toolInput: string): string {
   if (toolName === 'ExitPlanMode') return summarizeExitPlanModeFromRaw(toolInput);
+  if (toolName === 'AskUserQuestion') {
+    try {
+      const input: unknown = JSON.parse(toolInput);
+      if (isRecord(input)) return summarizeAskUserQuestion(input);
+    } catch {
+      return 'Asking question';
+    }
+    return 'Asking question';
+  }
 
   try {
     // eslint-disable-next-line no-restricted-syntax -- toolInput is daemon-serialized JSON, shape is known at write site
@@ -90,4 +114,5 @@ export const TOOL_ICON_LABELS: Record<string, string> = {
   Grep: 'Search',
   Task: 'Subagent',
   ExitPlanMode: 'Plan',
+  AskUserQuestion: 'Question',
 };
