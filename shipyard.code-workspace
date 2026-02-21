@@ -5,12 +5,16 @@
       "path": "."
     },
     {
-      "name": "\ud83c\udf33\ud83d\udc1b task-not-starting",
-      "path": "../shipyard-wt/task-not-starting"
+      "name": "\ud83c\udf33\ud83d\udd10 enable-anthropic-login",
+      "path": "../shipyard-wt/enable-anthropic-login"
     },
     {
-      "name": "\ud83c\udf33\u2699\ufe0f 263-harden-ci",
-      "path": "../shipyard-wt/263-harden-ci"
+      "name": "\ud83c\udf33\ud83c\udfa8 auto-open-plan-panel",
+      "path": "../shipyard-wt/auto-open-plan-panel"
+    },
+    {
+      "name": "\ud83c\udf33\ud83d\udd27 daemon-crash",
+      "path": "../shipyard-wt/daemon-crash"
     }
   ]
 }

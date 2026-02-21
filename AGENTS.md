@@ -81,6 +81,16 @@ Multiple Claude Code agents often run simultaneously on this codebase. If a file
 
 Instead: **skip that file, work on something else, and come back to it later.** Re-read the file when you return — the other agent may have finished. This applies to both `Edit` failures and unexpected `git status` changes.
 
+## Git & Graphite Workflow
+
+Use **Graphite** (`gt`) for commits, PRs, and stack management. Use `git` for everything else (status, diff, log, fetch, etc.).
+
+- **Commit**: `gt modify -m "message"` (not `git commit`)
+- **Submit/Push**: `gt submit -smp --no-verify`
+- **PR creation**: Use Graphite URLs (`app.graphite.dev`) not GitHub URLs
+- **Stack ops**: `gt sync`, `gt restack`, `gt up`, `gt ls`
+- **Everything else**: `git status`, `git diff`, `git log`, `git fetch`, etc. are fine
+
 ## Core Principles
 
 1. **CRDT is source of truth** — not URLs, not GitHub
