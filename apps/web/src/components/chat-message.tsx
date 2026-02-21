@@ -268,6 +268,106 @@ function ToolCallLine({ toolUse, toolResult }: ToolCallLineProps) {
   );
 }
 
+interface ToolCallGroupProps {
+  group: GroupedBlock & { kind: 'tool_call_group' };
+}
+
+function deriveGroupStatus(
+  invocations: { toolResult: { isError?: boolean } | null }[]
+): 'pending' | 'error' | 'success' {
+  const hasPending = invocations.some((inv) => inv.toolResult === null);
+  if (hasPending) return 'pending';
+  const hasError = invocations.some((inv) => inv.toolResult?.isError);
+  if (hasError) return 'error';
+  return 'success';
+}
+
+function ToolCallGroup({ group }: ToolCallGroupProps) {
+  const { invocations } = group;
+  const status = deriveGroupStatus(invocations);
+  const [expanded, setExpanded] = useState(status === 'error');
+  const panelId = useId();
+
+  useEffect(() => {
+    if (status === 'error') setExpanded(true);
+  }, [status]);
+
+  const toolNames = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const inv of invocations) {
+      counts.set(inv.toolUse.toolName, (counts.get(inv.toolUse.toolName) ?? 0) + 1);
+    }
+    return Array.from(counts.entries())
+      .map(([name, count]) => (count > 1 ? `${name} x${count}` : name))
+      .join(', ');
+  }, [invocations]);
+
+  const errorCount = useMemo(
+    () => invocations.filter((inv) => inv.toolResult?.isError).length,
+    [invocations]
+  );
+
+  return (
+    <div>
+      <button
+        type="button"
+        className="flex items-center gap-2 w-full min-h-[36px] sm:min-h-0 py-0.5 min-w-0 text-left rounded hover:bg-default/20 motion-safe:transition-colors group/toolgroup"
+        aria-expanded={expanded}
+        aria-controls={panelId}
+        onClick={() => setExpanded((prev) => !prev)}
+      >
+        {status === 'pending' ? (
+          <Loader2
+            className="w-3.5 h-3.5 text-muted shrink-0 motion-safe:animate-spin"
+            role="status"
+            aria-label="Running"
+          />
+        ) : status === 'error' ? (
+          <AlertCircle className="w-3.5 h-3.5 text-danger shrink-0" aria-hidden="true" />
+        ) : (
+          <CheckCircle2 className="w-3.5 h-3.5 text-success/60 shrink-0" aria-hidden="true" />
+        )}
+
+        <span className="text-xs text-foreground/70 font-mono shrink-0">
+          {invocations.length} tool call{invocations.length === 1 ? '' : 's'}
+        </span>
+
+        <span className="text-xs text-muted font-mono truncate min-w-0 flex-1" title={toolNames}>
+          {toolNames}
+        </span>
+
+        {errorCount > 0 && (
+          <span className="text-[0.6875rem] text-danger shrink-0">
+            {errorCount} error{errorCount === 1 ? '' : 's'}
+          </span>
+        )}
+
+        <ChevronDown
+          className={`w-3 h-3 text-muted shrink-0 opacity-0 group-hover/toolgroup:opacity-100 focus-visible:opacity-100 motion-safe:transition-all ${expanded ? 'rotate-180 opacity-100' : ''}`}
+          aria-hidden="true"
+        />
+      </button>
+
+      {expanded && (
+        <div
+          id={panelId}
+          role="region"
+          aria-label={`${invocations.length} tool calls`}
+          className="ml-5 border-l-2 border-l-default/40 pl-3 mt-0.5 mb-1 space-y-0.5"
+        >
+          {invocations.map((inv) => (
+            <ToolCallLine
+              key={inv.toolUse.toolUseId}
+              toolUse={inv.toolUse}
+              toolResult={inv.toolResult}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 interface ThinkingBlockProps {
   block: ContentBlock & { type: 'thinking' };
 }
@@ -329,9 +429,11 @@ function SubagentGroup({ taskToolUse, taskToolResult, children }: SubagentGroupP
   const [expanded, setExpanded] = useState(false);
   const panelId = useId();
 
-  const toolCallCount = children.filter(
-    (g) => g.kind === 'tool_invocation' || g.kind === 'subagent_group'
-  ).length;
+  const toolCallCount = children.reduce((acc, g) => {
+    if (g.kind === 'tool_invocation' || g.kind === 'subagent_group') return acc + 1;
+    if (g.kind === 'tool_call_group') return acc + g.invocations.length;
+    return acc;
+  }, 0);
 
   const description = useMemo(() => {
     try {
@@ -657,6 +759,8 @@ function GroupedBlockRenderer({
       return <ThinkingBlock block={group.block} />;
     case 'tool_invocation':
       return <ToolCallLine toolUse={group.toolUse} toolResult={group.toolResult} />;
+    case 'tool_call_group':
+      return <ToolCallGroup group={group} />;
     case 'subagent_group':
       return (
         <SubagentGroup
@@ -676,6 +780,8 @@ function GroupedBlockRenderer({
 
 function groupedBlockKey(group: GroupedBlock, index: number): string {
   if (group.kind === 'tool_invocation') return group.toolUse.toolUseId;
+  if (group.kind === 'tool_call_group')
+    return `tcg-${group.invocations[0]?.toolUse.toolUseId ?? index}`;
   if (group.kind === 'subagent_group') return group.taskToolUse.toolUseId;
   if (group.kind === 'plan') return group.toolUse.toolUseId;
   if (group.kind === 'ask_question') return group.toolUse.toolUseId;

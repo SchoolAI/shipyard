@@ -62,6 +62,13 @@ export type GroupedBlock =
       toolResult: ToolResultBlock | null;
     }
   | {
+      kind: 'tool_call_group';
+      invocations: {
+        toolUse: ToolUseBlock;
+        toolResult: ToolResultBlock | null;
+      }[];
+    }
+  | {
       kind: 'subagent_group';
       taskToolUse: ToolUseBlock;
       taskToolResult: ToolResultBlock | null;
@@ -90,8 +97,42 @@ export type GroupedBlock =
  *    (recursively grouped), others become tool_invocations.
  * 4. Blocks consumed as children are excluded from the top-level list.
  */
+const MIN_GROUP_SIZE = 2;
+
+/**
+ * Collapse consecutive tool_invocation entries into tool_call_group entries.
+ * Runs of fewer than MIN_GROUP_SIZE are left as individual tool_invocations.
+ */
+function collapseToolCallRuns(groups: GroupedBlock[]): GroupedBlock[] {
+  const result: GroupedBlock[] = [];
+  let run: { toolUse: ToolUseBlock; toolResult: ToolResultBlock | null }[] = [];
+
+  function flushRun() {
+    if (run.length >= MIN_GROUP_SIZE) {
+      result.push({ kind: 'tool_call_group', invocations: run });
+    } else {
+      for (const inv of run) {
+        result.push({ kind: 'tool_invocation', ...inv });
+      }
+    }
+    run = [];
+  }
+
+  for (const group of groups) {
+    if (group.kind === 'tool_invocation') {
+      run.push({ toolUse: group.toolUse, toolResult: group.toolResult });
+    } else {
+      flushRun();
+      result.push(group);
+    }
+  }
+  flushRun();
+
+  return result;
+}
+
 export function groupContentBlocks(blocks: ContentBlock[]): GroupedBlock[] {
-  return groupBlocksRecursive(blocks);
+  return collapseToolCallRuns(groupBlocksRecursive(blocks));
 }
 
 /** Extract parentToolUseId from blocks that carry it, null otherwise. */
@@ -178,9 +219,11 @@ function groupToolUse(
       kind: 'subagent_group',
       taskToolUse: block,
       taskToolResult: result,
-      children: groupBlocksRecursive(
-        childBlocks.map((b) =>
-          b.type === 'tool_use' || b.type === 'tool_result' ? { ...b, parentToolUseId: null } : b
+      children: collapseToolCallRuns(
+        groupBlocksRecursive(
+          childBlocks.map((b) =>
+            b.type === 'tool_use' || b.type === 'tool_result' ? { ...b, parentToolUseId: null } : b
+          )
         )
       ),
     };
