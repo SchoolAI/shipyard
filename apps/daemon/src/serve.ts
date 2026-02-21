@@ -1772,15 +1772,16 @@ function promotePendingFollowUps(
     taskLog.debug('Task is being aborted, skipping pending follow-up promotion');
     return;
   }
-  if (!activeTask.sessionManager.isStreaming) {
-    taskLog.debug('Task not streaming, skipping pending follow-up promotion');
-    return;
-  }
-
   const json = taskHandle.doc.toJSON();
   const pending = json.pendingFollowUps ?? [];
   if (pending.length === 0) return;
 
+  /**
+   * Always promote from pendingFollowUps → conversation regardless of streaming state.
+   * During cleanupTaskRun, closeSession() nulls the input controller (making isStreaming
+   * false) before activeTasks.delete runs. Remote CRDT imports during that async gap
+   * would otherwise leave messages permanently stuck in pendingFollowUps.
+   */
   change(taskHandle.doc, (draft) => {
     const items = draft.pendingFollowUps.toArray();
     for (const msg of items) {
@@ -1791,12 +1792,18 @@ function promotePendingFollowUps(
     }
   });
 
+  taskLog.info({ pendingCount: pending.length }, 'Promoted pending follow-ups to conversation');
+
+  if (!activeTask.sessionManager.isStreaming) {
+    taskLog.debug('Task not streaming, skipping follow-up dispatch');
+    return;
+  }
+
   const allContentBlocks = pending.flatMap((msg) =>
     msg.content.filter((block: { type: string }) => block.type === 'text' || block.type === 'image')
   );
   if (allContentBlocks.length > 0) {
     try {
-      taskLog.info({ pendingCount: pending.length }, 'Promoted pending follow-ups to conversation');
       activeTask.lastDispatchedConvLen = json.conversation.length + pending.length;
       activeTask.sessionManager.sendFollowUp(allContentBlocks);
     } catch (err: unknown) {
