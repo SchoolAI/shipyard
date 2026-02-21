@@ -576,6 +576,65 @@ describe('SessionManager', () => {
         });
       });
 
+      it('resolves claude-opus-4-6-fast to real model with extraArgs', async () => {
+        mockQuery.mockReturnValue(mockQueryResponse([initMsg('sess-fast'), successResult()]));
+
+        await manager.createSession({
+          prompt: 'Hello',
+          cwd: '/tmp',
+          model: 'claude-opus-4-6-fast',
+        });
+
+        expect(mockQuery).toHaveBeenCalledWith(
+          expect.objectContaining({
+            options: expect.objectContaining({
+              model: 'claude-opus-4-6',
+              extraArgs: { settings: '{"fastMode":true}' },
+            }),
+          })
+        );
+      });
+
+      it('preserves synthetic fast model ID in conversation despite init reporting real model', async () => {
+        mockQuery.mockReturnValue(
+          mockQueryResponse([
+            initMsg('sess-fast-conv'),
+            assistantMsg('Fast response'),
+            successResult(),
+          ])
+        );
+
+        await manager.createSession({
+          prompt: 'Hello',
+          cwd: '/tmp',
+          model: 'claude-opus-4-6-fast',
+        });
+
+        const json = taskDoc.toJSON();
+        expect(json.conversation).toHaveLength(1);
+        expect(json.conversation[0]?.model).toBe('claude-opus-4-6-fast');
+      });
+
+      it('does not add extraArgs for non-fast models', async () => {
+        mockQuery.mockReturnValue(mockQueryResponse([initMsg('sess-normal'), successResult()]));
+
+        await manager.createSession({
+          prompt: 'Hello',
+          cwd: '/tmp',
+          model: 'claude-opus-4-6',
+        });
+
+        expect(mockQuery).toHaveBeenCalledWith(
+          expect.objectContaining({
+            options: expect.objectContaining({
+              model: 'claude-opus-4-6',
+            }),
+          })
+        );
+        const calledOptions = mockQuery.mock.calls[0]?.[0]?.options;
+        expect(calledOptions?.extraArgs).toBeUndefined();
+      });
+
       it('passes abortController to query()', async () => {
         const controller = new AbortController();
         mockQuery.mockReturnValue(mockQueryResponse([initMsg('sess-abort'), successResult()]));
@@ -957,6 +1016,23 @@ describe('SessionManager', () => {
       const json = taskDoc.toJSON();
       const newSession = json.sessions.find((s) => s.sessionId === result.sessionId);
       expect(newSession?.model).toBe('claude-sonnet-4-20250514');
+    });
+
+    it('resolves fast model when resuming session', async () => {
+      mockQuery.mockReturnValue(mockQueryResponse([initMsg('agent-sess-orig'), successResult()]));
+
+      await manager.resumeSession('orig-session', 'Continue', {
+        model: 'claude-opus-4-6-fast',
+      });
+
+      expect(mockQuery).toHaveBeenCalledWith(
+        expect.objectContaining({
+          options: expect.objectContaining({
+            model: 'claude-opus-4-6',
+            extraArgs: { settings: '{"fastMode":true}' },
+          }),
+        })
+      );
     });
 
     it('falls back to original session model when no model override provided', async () => {
@@ -1930,6 +2006,29 @@ describe('SessionManager', () => {
       await manager.setModel('claude-sonnet-4-20250514');
 
       expect(ctrl.query.setModel).toHaveBeenCalledWith('claude-sonnet-4-20250514');
+
+      ctrl.emit(successResult());
+      ctrl.end();
+      await sessionPromise;
+    });
+
+    it('setModel resolves fast model to real model and logs warning', async () => {
+      const { logger: mockLogger } = await import('./logger.js');
+
+      const ctrl = mockQueryControllable();
+      mockQuery.mockReturnValue(ctrl.query);
+
+      const sessionPromise = manager.createSession({ prompt: 'Hello', cwd: '/tmp' });
+
+      ctrl.emit(initMsg('sess-fast-switch'));
+
+      await manager.setModel('claude-opus-4-6-fast');
+
+      expect(ctrl.query.setModel).toHaveBeenCalledWith('claude-opus-4-6');
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        expect.objectContaining({ model: 'claude-opus-4-6-fast' }),
+        expect.stringContaining('extraArgs ignored')
+      );
 
       ctrl.emit(successResult());
       ctrl.end();

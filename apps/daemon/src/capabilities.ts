@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { readdir } from 'node:fs/promises';
+import { readdir, readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { basename, join } from 'node:path';
 import {
@@ -244,6 +244,18 @@ export async function getSnapshotFiles(
   }
 }
 
+export async function detectFastMode(): Promise<boolean> {
+  try {
+    const settingsPath = join(homedir(), '.claude', 'settings.json');
+    const raw = await readFile(settingsPath, 'utf-8');
+    // eslint-disable-next-line no-restricted-syntax -- JSON.parse returns unknown; only checking one boolean field
+    const settings = JSON.parse(raw) as { fastMode?: boolean };
+    return settings.fastMode === true;
+  } catch {
+    return false;
+  }
+}
+
 export async function detectModels(): Promise<ModelInfo[]> {
   const models: ModelInfo[] = [];
 
@@ -273,6 +285,16 @@ export async function detectModels(): Promise<ModelInfo[]> {
         provider: 'claude-code',
       }
     );
+
+    const fastMode = await detectFastMode();
+    if (fastMode) {
+      models.push({
+        id: 'claude-opus-4-6-fast',
+        label: 'Claude Opus 4.6 (Fast)',
+        provider: 'claude-code',
+        reasoning: { efforts: ['low', 'medium', 'high'], defaultEffort: 'high' },
+      });
+    }
   } catch {}
 
   try {
