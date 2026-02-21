@@ -119,6 +119,52 @@ interface ActiveTask {
   lastDispatchedConvLen: number;
 }
 
+const TERMINAL_STATUSES = new Set(['completed', 'failed', 'canceled']);
+
+/**
+ * Load all non-terminal task documents from storage so they are serveable
+ * via WebRTC when the browser requests them. Without this, task documents
+ * sit in LevelDB but are invisible to peers — the Loro repo requires an
+ * explicit repo.get() to make a document discoverable.
+ */
+async function rehydrateTaskDocuments(
+  roomHandle: ReturnType<Repo['get']>,
+  roomDoc: TypedDoc<TaskIndexDocumentShape>,
+  repo: Repo,
+  log: ReturnType<typeof createChildLogger>
+): Promise<void> {
+  try {
+    await roomHandle.waitForSync({ kind: 'storage', timeout: 5_000 });
+  } catch {
+    log.info('Room doc storage sync timed out during rehydration');
+  }
+
+  const roomJson = roomDoc.toJSON();
+  const taskEntries = Object.entries(roomJson.taskIndex ?? {});
+
+  log.info({ count: taskEntries.length }, 'Rehydrating task documents from storage');
+
+  for (const [taskId, entry] of taskEntries) {
+    if (TERMINAL_STATUSES.has(entry.status)) continue;
+
+    try {
+      const taskDocId = buildDocumentId('task', taskId, DEFAULT_EPOCH);
+      const taskHandle = repo.get(taskDocId, TaskDocumentSchema, TaskEphemeralDeclarations);
+      await taskHandle.waitForSync({ kind: 'storage', timeout: 5_000 });
+
+      if (recoverOrphanedTask(taskHandle.doc, createChildLogger({ mode: 'rehydrate', taskId }))) {
+        updateTaskInIndex(roomDoc, taskId, { status: 'failed', updatedAt: Date.now() });
+      }
+
+      log.debug({ taskId, taskDocId }, 'Task document rehydrated');
+    } catch (err) {
+      log.warn({ taskId, err }, 'Failed to rehydrate task document');
+    }
+  }
+
+  log.info('Task document rehydration complete');
+}
+
 /**
  * Run the daemon in serve mode: connect to signaling, register capabilities,
  * and stay alive waiting for task notifications via CRDT subscriptions.
@@ -450,6 +496,8 @@ export async function serve(env: Env): Promise<void> {
 
   /** Clean up stale and orphaned worktree setup entries */
   cleanupStaleSetupEntries(typedRoomDoc, machineId, log);
+
+  await rehydrateTaskDocuments(roomHandle, typedRoomDoc, repo, log);
 
   typedRoomHandle.enhancePromptReqs.subscribe(({ key: requestId, value, source }) => {
     if (source !== 'remote') return;
@@ -1660,13 +1708,16 @@ async function watchTaskDocument(
   try {
     await taskHandle.waitForSync({ kind: 'storage', timeout: 5_000 });
   } catch {
-    taskLog.debug({ taskDocId }, 'No existing task data in storage');
+    taskLog.info({ taskDocId }, 'No existing task data in storage');
   }
 
   try {
     await taskHandle.waitForSync({ kind: 'network', timeout: 3_000 });
   } catch {
-    taskLog.debug({ taskDocId }, 'Network sync timed out (browser may not be connected yet)');
+    taskLog.warn(
+      { taskDocId, timeoutMs: 3_000 },
+      'Network sync timed out (browser may not be connected yet)'
+    );
   }
 
   if (recoverOrphanedTask(taskHandle.doc, taskLog)) {
