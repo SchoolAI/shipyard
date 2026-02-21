@@ -34,6 +34,7 @@ function defaultCallbacks() {
     onFocusComposer: vi.fn(),
     onShowShortcuts: vi.fn(),
     onToggleVoiceInput: vi.fn(),
+    onStopAgent: vi.fn(),
   };
 }
 

@@ -8,6 +8,7 @@ import { useEffect, useState } from 'react';
 import { assertNever } from '../utils/assert-never';
 
 export type TaskAck = Extract<PersonalRoomServerMessage, { type: 'task-ack' }>;
+export type ControlAck = Extract<PersonalRoomServerMessage, { type: 'control-ack' }>;
 export type { AgentInfo, ConnectionState };
 
 interface PersonalRoomConfig {
@@ -19,6 +20,7 @@ export function usePersonalRoom(config: PersonalRoomConfig | null) {
   const [connectionState, setConnectionState] = useState<ConnectionState>('disconnected');
   const [connection, setConnection] = useState<PersonalRoomConnection | null>(null);
   const [lastTaskAck, setLastTaskAck] = useState<TaskAck | null>(null);
+  const [lastControlAck, setLastControlAck] = useState<ControlAck | null>(null);
 
   useEffect(() => {
     if (!config) {
@@ -26,10 +28,12 @@ export function usePersonalRoom(config: PersonalRoomConfig | null) {
       setConnectionState('disconnected');
       setConnection(null);
       setLastTaskAck(null);
+      setLastControlAck(null);
       return;
     }
 
     setLastTaskAck(null);
+    setLastControlAck(null);
 
     const conn = new PersonalRoomConnection({ url: config.url });
     setConnection(conn);
@@ -61,8 +65,12 @@ export function usePersonalRoom(config: PersonalRoomConfig | null) {
         case 'task-ack':
           setLastTaskAck(msg);
           break;
+        case 'control-ack':
+          setLastControlAck(msg);
+          break;
         case 'authenticated':
         case 'notify-task':
+        case 'cancel-task':
         case 'webrtc-offer':
         case 'webrtc-answer':
         case 'webrtc-ice':
@@ -93,5 +101,5 @@ export function usePersonalRoom(config: PersonalRoomConfig | null) {
     };
   }, [config?.url]);
 
-  return { agents, connectionState, connection, lastTaskAck };
+  return { agents, connectionState, connection, lastTaskAck, lastControlAck };
 }

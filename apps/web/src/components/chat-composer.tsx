@@ -1,6 +1,6 @@
-import { Button, Kbd, Tooltip } from '@heroui/react';
+import { Button, Dropdown, Kbd, Label, Tooltip } from '@heroui/react';
 import type { PermissionMode } from '@shipyard/loro-schema';
-import { ArrowUp, Mic, Sparkles, X } from 'lucide-react';
+import { ArrowUp, ChevronDown, Mic, Sparkles, X, Zap } from 'lucide-react';
 import type { KeyboardEvent } from 'react';
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { HOTKEYS } from '../constants/hotkeys';
@@ -48,6 +48,9 @@ interface ChatComposerProps {
   onEnhance?: () => void;
   onCreateWorktree?: () => void;
   isEnvironmentLocked?: boolean;
+  isAgentRunning?: boolean;
+  onInterruptAndSend?: (payload: SubmitPayload) => void;
+  onStopAgent?: () => void;
 }
 
 export interface ChatComposerHandle {
@@ -87,6 +90,9 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
     onEnhance,
     onCreateWorktree,
     isEnvironmentLocked,
+    isAgentRunning,
+    onInterruptAndSend,
+    onStopAgent,
   },
   ref
 ) {
@@ -313,6 +319,38 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
     restoreStash,
   ]);
 
+  const handleInterruptAndSend = useCallback(() => {
+    if (!onInterruptAndSend || isSubmitDisabled) return;
+    const trimmed = value.trim();
+    if (!trimmed && images.length === 0) return;
+
+    onInterruptAndSend({
+      message: trimmed,
+      images,
+      model: selectedModelId,
+      reasoningEffort: reasoningLevel,
+      permissionMode,
+    });
+    setValue('');
+    setImages([]);
+    history.clear();
+    slashCommands.close();
+    resetTextareaHeight();
+    requestAnimationFrame(() => restoreStash());
+  }, [
+    onInterruptAndSend,
+    isSubmitDisabled,
+    value,
+    images,
+    selectedModelId,
+    reasoningLevel,
+    permissionMode,
+    history,
+    slashCommands,
+    resetTextareaHeight,
+    restoreStash,
+  ]);
+
   const handleUnstash = useCallback(() => {
     if (!stashedText) return;
     setValue(stashedText);
@@ -384,6 +422,15 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
       if (e.key === 'Escape') {
         e.preventDefault();
         textareaRef.current?.blur();
+        if (isAgentRunning) {
+          onStopAgent?.();
+        }
+        return;
+      }
+
+      if (e.key === 'Enter' && e.shiftKey && isAgentRunning) {
+        e.preventDefault();
+        handleInterruptAndSend();
         return;
       }
 
@@ -392,10 +439,11 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
         handleSubmit();
       }
     },
-    [handleSubmit, slashCommands]
+    [handleSubmit, handleInterruptAndSend, isAgentRunning, onStopAgent, slashCommands]
   );
 
   const isEmpty = value.trim().length === 0 && images.length === 0;
+  const showSplitButton = isAgentRunning === true && !isEmpty;
   const enhanceLabel = isEnhancing ? 'Cancel enhancement' : 'Enhance prompt';
   const enhanceClassName = isEnhancing
     ? 'bg-secondary/20 text-secondary motion-safe:animate-pulse'
@@ -552,24 +600,75 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
                 </Tooltip.Content>
               </Tooltip>
             )}
-            <Tooltip isDisabled={!isSubmitDisabled}>
-              <Tooltip.Trigger>
-                <span tabIndex={isSubmitDisabled ? 0 : -1} className="inline-flex">
+            {showSplitButton ? (
+              <div
+                className="inline-flex items-center h-9 sm:h-8 rounded-full bg-accent overflow-hidden"
+                role="group"
+                aria-label="Send options"
+              >
+                <Button
+                  isIconOnly
+                  onPress={handleSubmit}
+                  aria-label="Send and queue message"
+                  className="rounded-none rounded-l-full bg-accent text-accent-foreground hover:brightness-110 active:opacity-70 w-9 sm:w-8 h-full min-w-0 border-none"
+                >
+                  <ArrowUp className="w-4 h-4" />
+                </Button>
+                <div className="w-px h-5 bg-accent-foreground/30 shrink-0" aria-hidden="true" />
+                <Dropdown>
                   <Button
                     isIconOnly
-                    variant="primary"
-                    size="sm"
-                    aria-label="Send message"
-                    isDisabled={isEmpty || isSubmitDisabled}
-                    className="rounded-full w-9 h-9 sm:w-8 sm:h-8 min-w-0 bg-accent text-accent-foreground"
-                    onPress={handleSubmit}
+                    aria-label="More send options"
+                    className="rounded-none rounded-r-full bg-accent text-accent-foreground hover:brightness-110 w-6 h-full min-w-0 border-none"
                   >
-                    <ArrowUp className="w-4 h-4" />
+                    <ChevronDown className="w-3 h-3" />
                   </Button>
-                </span>
-              </Tooltip.Trigger>
-              <Tooltip.Content>{submitDisabledReason}</Tooltip.Content>
-            </Tooltip>
+                  <Dropdown.Popover placement="top end" className="min-w-[220px]">
+                    <Dropdown.Menu
+                      aria-label="Send options"
+                      onAction={(key) => {
+                        if (key === 'queue') handleSubmit();
+                        if (key === 'interrupt') handleInterruptAndSend();
+                      }}
+                    >
+                      <Dropdown.Item id="queue" textValue="Send and Queue">
+                        <div className="flex items-center gap-2">
+                          <ArrowUp className="w-4 h-4 text-muted shrink-0" />
+                          <Label className="flex-1">Send &amp; Queue</Label>
+                          <Kbd className="text-[11px]">Enter</Kbd>
+                        </div>
+                      </Dropdown.Item>
+                      <Dropdown.Item id="interrupt" textValue="Interrupt and Send">
+                        <div className="flex items-center gap-2">
+                          <Zap className="w-4 h-4 text-muted shrink-0" />
+                          <Label className="flex-1">Interrupt &amp; Send</Label>
+                          <Kbd className="text-[11px]">{'\u21E7'}Enter</Kbd>
+                        </div>
+                      </Dropdown.Item>
+                    </Dropdown.Menu>
+                  </Dropdown.Popover>
+                </Dropdown>
+              </div>
+            ) : (
+              <Tooltip isDisabled={!isSubmitDisabled}>
+                <Tooltip.Trigger>
+                  <span tabIndex={isSubmitDisabled ? 0 : -1} className="inline-flex">
+                    <Button
+                      isIconOnly
+                      variant="primary"
+                      size="sm"
+                      aria-label="Send message"
+                      isDisabled={isEmpty || isSubmitDisabled}
+                      className="rounded-full w-9 h-9 sm:w-8 sm:h-8 min-w-0 bg-accent text-accent-foreground"
+                      onPress={handleSubmit}
+                    >
+                      <ArrowUp className="w-4 h-4" />
+                    </Button>
+                  </span>
+                </Tooltip.Trigger>
+                <Tooltip.Content>{submitDisabledReason}</Tooltip.Content>
+              </Tooltip>
+            )}
           </div>
         </div>
       </div>
