@@ -5,8 +5,10 @@ import type { PlanComment, PlanVersion } from '@shipyard/loro-schema';
 import { Check, ClipboardList, MessageSquareX } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { usePlanApproval } from '../../contexts/plan-approval-context';
+import { FOCUS_PRIORITY, useFocusTarget } from '../../hooks/use-focus-hierarchy';
 import { usePlanEditorDoc } from '../../hooks/use-plan-editor-doc';
 import { useTaskDocument } from '../../hooks/use-task-document';
+import { useUIStore } from '../../stores';
 import { PlanEditor } from '../plan-editor';
 
 function EmptyState() {
@@ -23,8 +25,17 @@ function ApprovalFooter({ plan }: { plan: PlanVersion }) {
   const [showFeedbackInput, setShowFeedbackInput] = useState(false);
   const [feedbackText, setFeedbackText] = useState('');
   const feedbackInputRef = useRef<HTMLInputElement>(null);
+  const approveRef = useRef<HTMLButtonElement>(null);
 
   const isPending = plan.reviewStatus === 'pending' && pendingPermissions.has(plan.toolUseId);
+  const activeSidePanel = useUIStore((s) => s.activeSidePanel);
+
+  useFocusTarget({
+    id: `panel-plan-approval-${plan.planId}`,
+    ref: approveRef,
+    priority: FOCUS_PRIORITY.PLAN_APPROVAL + 1,
+    active: isPending && activeSidePanel === 'plan',
+  });
 
   useEffect(() => {
     if (showFeedbackInput) {
@@ -61,6 +72,7 @@ function ApprovalFooter({ plan }: { plan: PlanVersion }) {
     <div className="flex flex-col items-end gap-2 px-4 py-3 border-t border-separator/30">
       <div className="flex items-center gap-2">
         <Button
+          ref={approveRef}
           variant="primary"
           size="sm"
           onPress={() => respondToPermission(plan.toolUseId, 'approved')}

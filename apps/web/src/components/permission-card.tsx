@@ -6,7 +6,8 @@ import {
   type ToolRiskLevel,
 } from '@shipyard/loro-schema';
 import { Check, ChevronDown, ChevronUp, Shield, X } from 'lucide-react';
-import { type Key, useCallback, useEffect, useRef, useState } from 'react';
+import { type Key, useCallback, useRef, useState } from 'react';
+import { FOCUS_PRIORITY, useFocusTarget } from '../hooks/use-focus-hierarchy';
 import { summarizeToolAction } from '../utils/tool-summarizers';
 
 function isToolRiskLevel(value: string): value is ToolRiskLevel {
@@ -95,11 +96,12 @@ export function PermissionCard({ toolUseId, request, onRespond }: PermissionCard
     [handleDeny]
   );
 
-  useEffect(() => {
-    if (!isResolved) {
-      allowRef.current?.focus();
-    }
-  }, [isResolved]);
+  useFocusTarget({
+    id: `permission-${toolUseId}`,
+    ref: allowRef,
+    priority: FOCUS_PRIORITY.PERMISSION,
+    active: !isResolved,
+  });
 
   if (isResolved) {
     return null;
