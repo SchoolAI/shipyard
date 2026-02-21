@@ -164,6 +164,16 @@ Multiple publishes on the same day produce: `0.8.0-rc.20260221.0`, `0.8.0-rc.202
 
 **Change detection:** Nightly/RC publishes skip if there are no code changes since the last publish tag. Changes to `package-npm.json` alone (e.g., version bumps) are excluded from this check.
 
+### Patch Releases
+
+The promote flow always bumps `minor + 1` (e.g., `0.8.0` → `0.9.0`). For a patch release:
+
+1. Manually edit `apps/daemon/package-npm.json` to the patch version (e.g., `0.8.1`)
+2. Commit and merge to main
+3. Trigger RC: `gh workflow run publish-npm.yml -f release_type=rc` → `0.8.1-rc.YYYYMMDD.N`
+4. Test, then promote: `gh workflow run publish-npm.yml -f release_type=promote -f promote_version=0.8.1-rc.YYYYMMDD.N` → `0.8.1`
+5. The auto-PR will bump to `0.9.0` — close it and set the version manually if you want `0.8.2` instead
+
 ### Rollback
 
 ```bash
