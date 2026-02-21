@@ -95,6 +95,8 @@ LinkedIdentity[] (D1)
 
 **Storage:** Cloudflare D1 (edge SQLite) in the session server for users, linked identities, and device flow state.
 
+**Agent Execution Auth (separate):** Running Claude agents requires Anthropic credentials independent of the Shipyard JWT. The daemon detects auth via `claude auth status` (Claude Code OAuth) or the `ANTHROPIC_API_KEY` env var. Auth state is per-machine and published to the browser via Loro ephemeral. See `docs/development.md` for setup.
+
 ---
 
 ## Data Model

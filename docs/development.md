@@ -59,6 +59,8 @@ This runs three steps automatically:
 
 The only manual step is completing the GitHub OAuth prompt in your browser.
 
+After setup completes, you also need to authenticate with Anthropic to run agents — see [Anthropic Authentication](#anthropic-authentication).
+
 ### Individual Commands
 
 | Command | When to use |
@@ -71,6 +73,8 @@ The only manual step is completing the GitHub OAuth prompt in your browser.
 ---
 
 ## Daemon Authentication
+
+> This section covers Shipyard session auth (connecting to the signaling server). For Anthropic/Claude auth needed to run agents, see [Anthropic Authentication](#anthropic-authentication) below.
 
 The daemon requires a Shipyard identity token to connect to the session server.
 
@@ -103,6 +107,40 @@ Set `SHIPYARD_USER_TOKEN` as an environment variable to skip the device flow. Th
 - Tokens expire after 30 days
 - The daemon checks expiry on startup and prints a message if expired
 - Run `shipyard login` again to refresh
+
+---
+
+## Anthropic Authentication
+
+The daemon needs Anthropic credentials to run Claude agents. This is separate from Shipyard session auth above — both are required for full functionality.
+
+Auth is **per-machine**: each daemon machine has independent Anthropic auth state, visible in the browser Settings page.
+
+### Option 1: Claude Code OAuth (recommended for local dev)
+
+```bash
+claude auth login
+```
+
+The daemon detects this automatically via `claude auth status` on startup. No additional config needed.
+
+You can also trigger login from the browser: **Settings > Anthropic Auth > Login with Claude**. This runs `claude auth login` on the daemon machine (not in the browser) — watch your terminal or daemon logs for the OAuth URL.
+
+### Option 2: API Key (CI/headless environments)
+
+```bash
+export ANTHROPIC_API_KEY=sk-ant-...
+```
+
+If `ANTHROPIC_API_KEY` is set, it takes precedence and OAuth status is not checked.
+
+### Verify Status
+
+```bash
+claude auth status
+```
+
+If the status shows `unknown`, Claude Code CLI may not be installed or not on your PATH.
 
 ---
 
@@ -141,6 +179,7 @@ Session server configuration is in `apps/session-server/`. See the wrangler conf
 
 | Variable | Purpose |
 |----------|---------|
+| `ANTHROPIC_API_KEY` | Anthropic API key (alternative to `claude auth login`) |
 | `SHIPYARD_USER_TOKEN` | JWT for signaling auth (alternative to `shipyard login`) |
 | `SHIPYARD_SIGNALING_URL` | Override signaling server URL |
 
@@ -205,4 +244,4 @@ PORT=4445 pnpm dev:all
 
 ---
 
-*Last updated: 2026-02-11*
+*Last updated: 2026-02-20*
