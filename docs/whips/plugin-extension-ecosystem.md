@@ -85,6 +85,14 @@ Browser UI ──→ Daemon ──(ACP)──→ Agent Runtime (Claude, Gemini, 
 
 ACP Registry: 17 agents (Claude, Gemini, Codex, Copilot, Goose, Junie, Qwen, Mistral, etc.)
 
+### Naming Disambiguation
+
+There are **TWO protocols abbreviated "ACP"** in the AI ecosystem:
+1. **Agent Client Protocol** (Zed/Google) — editor ↔ agent communication. **This is the one we adopt.**
+2. **Agent Communication Protocol** (IBM Research/BeeAI) — agent ↔ agent, REST-based. Has merged into A2A under the Linux Foundation. **Not this one.**
+
+When searching, use "Agent Client Protocol" or `agentclientprotocol.com` to find the right one.
+
 ### ACP vs Claude Agent SDK
 
 Anthropic declined native ACP support in Claude Code (GitHub issue #6686, closed "not planned"). The `claude-agent-acp` bridge is maintained by Zed Industries. Shipyard should:
@@ -318,7 +326,9 @@ agentCardUrl: https://review-service.example.com/.well-known/agent.json
 - `SidePanelId` union (`apps/web/src/stores/ui-store.ts`)
 - `PlanApprovalContext` (`apps/web/src/contexts/plan-approval-context.tsx`)
 
-**CRDT safety warning**: Editor extensions (TipTap/ProseMirror plugins) run in the main thread with direct Loro document write access. A buggy extension can corrupt CRDT state that propagates to ALL peers. **Editor extensions must be first-party only** until a sandboxing strategy exists (read-only typed API or isolated rendering context).
+**CRDT safety warning**: Editor extensions (TipTap/ProseMirror plugins) run in the main thread with direct Loro document write access. A buggy extension can corrupt CRDT state that propagates to ALL peers. **Editor extensions must be first-party only** until a sandboxing strategy exists.
+
+**Future sandboxing model**: When community Views are needed, adopt Figma's dual-context approach: plugin logic runs in a sandbox (iframe or Web Worker) with a read-only typed API to CRDT state, while plugin UI renders in a separate iframe communicating via `postMessage`. The logic sandbox can request CRDT writes through a controlled API that validates operations before applying them. This prevents direct document corruption while preserving plugin capability.
 
 **Hello world**: A sidebar panel that says "Hello from a plugin!"
 
@@ -544,7 +554,139 @@ Install checks for dependencies, prompts to install if missing.
 
 ---
 
-## 5. Real-World Scenario: Linear Ticket → Agent → PR → Merge
+## 5. Plugin Manifest Format
+
+A single `shipyard-plugin.json` manifest can contribute to multiple categories. One plugin can provide themes AND agents AND tools.
+
+```jsonc
+{
+  "$schema": "https://shipyard.so/schemas/plugin-v1.json",
+  "name": "security-reviewer",
+  "version": "1.0.0",
+  "displayName": "Security Reviewer",
+  "description": "OWASP Top 10 focused code review agent with Semgrep integration",
+  "author": "Shipyard Community",
+  "license": "MIT",
+
+  "contributions": {
+    // Agent definitions (Category 4)
+    "agents": [
+      {
+        "id": "security-reviewer",
+        "path": "./agents/security-reviewer.md"
+      }
+    ],
+
+    // Skills (Category 2)
+    "skills": [
+      {
+        "id": "owasp-top-10",
+        "path": "./skills/owasp-top-10/SKILL.md"
+      }
+    ],
+
+    // MCP Tool Servers (Category 3)
+    "tools": [
+      {
+        "id": "semgrep",
+        "command": "npx",
+        "args": ["@shipyard-plugins/semgrep-mcp"],
+        "env": {
+          "SEMGREP_TOKEN": { "required": false, "secret": true }
+        },
+        "scope": "agent"  // "agent" = per-session, "daemon" = shared singleton
+      }
+    ],
+
+    // Themes (Category 1)
+    "themes": [
+      {
+        "id": "security-dark",
+        "label": "Security Dark",
+        "path": "./themes/security-dark.json"
+      }
+    ],
+
+    // View contributions (Category 5)
+    "views": {
+      "chatRenderers": [
+        {
+          "toolName": "semgrep_scan",
+          "component": "./dist/SemgrepRenderer.js"
+        }
+      ],
+      "sidebarPanels": [
+        {
+          "id": "security-findings",
+          "label": "Security",
+          "icon": "shield",
+          "component": "./dist/SecurityPanel.js"
+        }
+      ],
+      "commandProviders": [
+        {
+          "component": "./dist/SecurityCommands.js"
+        }
+      ],
+      "slashCommands": [
+        {
+          "id": "security-scan",
+          "name": "security-scan",
+          "description": "Run security scan on current changes",
+          "action": { "kind": "plugin", "pluginId": "security-reviewer", "commandId": "scan" }
+        }
+      ]
+    },
+
+    // Lifecycle Hooks
+    "hooks": [
+      {
+        "event": "SessionEnd",
+        "command": "./hooks/post-security-summary.sh"
+      }
+    ]
+  },
+
+  // Dependencies on other plugins
+  "dependencies": {
+    "tools": ["semgrep-mcp@^1.0"],
+    "skills": ["owasp-top-10@^1.0"]
+  },
+
+  // User-configurable settings (auto-generates UI)
+  "settings": {
+    "severity_threshold": {
+      "type": "string",
+      "label": "Minimum Severity to Report",
+      "options": ["critical", "high", "medium", "low"],
+      "default": "medium"
+    },
+    "auto_spawn": {
+      "type": "boolean",
+      "label": "Auto-run after every agent session",
+      "default": false
+    }
+  },
+
+  // Trust/sandbox declarations
+  "permissions": {
+    "network": ["semgrep.dev"],
+    "fileSystem": "read-only",
+    "subprocess": true
+  }
+}
+```
+
+**Key design choices:**
+- **Flat `contributions` object** — a single plugin can contribute across all categories. No artificial layering.
+- **`scope` on tools** — `"agent"` (fresh per session) vs `"daemon"` (shared singleton). Matters for resource management.
+- **`settings` with types** — auto-generates a configuration UI in the browser. `type: "secret"` routes to secure storage.
+- **`permissions` block** — declares the security envelope. UI-only plugins declare `fileSystem: "none"` and `subprocess: false`.
+- **View sub-contributions** — `chatRenderers`, `sidebarPanels`, `commandProviders`, `slashCommands` map directly to existing codebase extension points.
+
+---
+
+## 6. Real-World Scenario: Linear Ticket → Agent → PR → Merge
 
 Full lifecycle demonstrating all plugin categories working together.
 
@@ -574,6 +716,23 @@ Full lifecycle demonstrating all plugin categories working together.
 | 11 | Human reviews + merges PR | GitHub webhook → session server → daemon | Trigger |
 | 12 | PR merged | Hook closes Linear ticket, notifies Slack | Hook + Tool (Linear + Slack MCP) |
 | 13 | Cost logged | View reads `totalCostUsd` from Loro CRDT | View (cost tracker) |
+
+### Additional Scenarios
+
+| # | Scenario | Themes | Skills | Tools | Agents | Views | Hooks |
+|---|----------|--------|--------|-------|--------|-------|-------|
+| 1 | **Auto-file Linear bugs**: Agent finds out-of-scope bug, files a Linear ticket instead of fixing it | | X | X (Linear) | opt | | |
+| 2 | **PR-style code review**: Inline diff review with line-level comments and approve/reject | | X | | | X (diff reviewer) | |
+| 3 | **Auto-PR + Slack notify**: Agent completes → create PR → post link to Slack | | | X (Slack, GitHub) | | | X (SessionEnd) |
+| 4 | **Security second opinion**: After main agent completes, auto-spawn security reviewer on the diff | | X (OWASP) | X (Semgrep) | X (security-reviewer) | | X (SessionEnd → spawn) |
+| 5 | **Jira workflow**: Agent reads Jira ticket, updates status as it works, logs time when done | | X (jira-workflow) | X (Jira) | X (jira-developer) | | |
+| 6 | **Cost tracking dashboard**: See token usage and cost per session, per model, per day | | | | | X (sidebar panel) | |
+| 7 | **Test-on-edit guardrails**: Run tests after every file edit, inject failures into agent context | | | | | | X (PostToolUse) |
+| 8 | **Design system compliance**: Agent uses your HeroUI components and brand tokens | X (brand theme) | X (design-system) | | | | |
+| 9 | **Shared team agent**: Published agent profile that team installs, centrally maintained with updates | | X | X | X (published) | | |
+| 10 | **Internal API (no code)**: Drop an OpenAPI spec, generic MCP server auto-generates tools from it | | X (deploy-policy) | X (openapi-mcp) | | | |
+
+**Pattern**: Skills and Tools are the backbone (8/10 scenarios). Agents bundle them (5/10). Hooks automate (3/10). Views add visibility (2/10). Themes are cosmetic (1/10).
 
 ---
 
