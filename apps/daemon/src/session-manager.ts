@@ -205,6 +205,20 @@ export interface SessionResult {
  * Session lifecycle: pending -> active -> completed | failed
  * Task status mirrors: submitted -> working -> completed | failed
  */
+const FAST_MODEL_ID = 'claude-opus-4-6-fast';
+const FAST_MODEL_REAL = 'claude-opus-4-6';
+const FAST_MODE_EXTRA_ARGS = { settings: '{"fastMode":true}' };
+
+function resolveModel(model: string | undefined): {
+  model: string | undefined;
+  extraArgs?: Record<string, string | null>;
+} {
+  if (model === FAST_MODEL_ID) {
+    return { model: FAST_MODEL_REAL, extraArgs: FAST_MODE_EXTRA_ARGS };
+  }
+  return { model };
+}
+
 export type StatusChangeCallback = (status: A2ATaskState) => void;
 
 export class SessionManager {
@@ -302,6 +316,7 @@ export class SessionManager {
   async createSession(opts: CreateSessionOptions): Promise<SessionResult> {
     this.#currentModel = opts.model ?? null;
     this.#machineId = opts.machineId ?? null;
+    const resolved = resolveModel(opts.model);
     const sessionId = nanoid();
     const now = Date.now();
 
@@ -331,7 +346,7 @@ export class SessionManager {
       prompt: controller.iterable(),
       options: {
         cwd: opts.cwd,
-        model: opts.model,
+        model: resolved.model,
         effort: opts.effort,
         allowedTools: opts.allowedTools,
         permissionMode: opts.permissionMode,
@@ -346,6 +361,7 @@ export class SessionManager {
         },
         canUseTool: opts.canUseTool,
         stderr: opts.stderr,
+        extraArgs: resolved.extraArgs,
       },
     });
 
@@ -388,7 +404,15 @@ export class SessionManager {
    * Change the model used by the active streaming session between turns.
    */
   async setModel(model: string): Promise<void> {
-    await this.#activeQuery?.setModel(model);
+    const resolved = resolveModel(model);
+    if (resolved.extraArgs) {
+      /** NOTE: extraArgs can only be set at session creation — SDK's setModel() only accepts a string */
+      logger.warn(
+        { model, resolvedModel: resolved.model },
+        'Fast mode requires a new session — switching model only, extraArgs ignored'
+      );
+    }
+    await this.#activeQuery?.setModel(resolved.model ?? model);
     this.#currentModel = model;
   }
 
@@ -428,6 +452,7 @@ export class SessionManager {
 
     this.#currentModel = opts?.model ?? sessionEntry.model ?? null;
     this.#machineId = opts?.machineId ?? sessionEntry.machineId ?? null;
+    const resolved = resolveModel(opts?.model ?? sessionEntry.model ?? undefined);
     const newSessionId = nanoid();
     const now = Date.now();
 
@@ -458,7 +483,7 @@ export class SessionManager {
       options: {
         resume: sessionEntry.agentSessionId,
         cwd: sessionEntry.cwd,
-        model: opts?.model,
+        model: resolved.model,
         effort: opts?.effort,
         allowedTools: opts?.allowedTools,
         permissionMode: opts?.permissionMode,
@@ -473,6 +498,7 @@ export class SessionManager {
           preset: 'claude_code',
           append: SHIPYARD_SYSTEM_PROMPT_APPEND,
         },
+        extraArgs: resolved.extraArgs,
       },
     });
 
@@ -576,6 +602,14 @@ export class SessionManager {
     }
   }
 
+  /** NOTE: Preserves synthetic model ID when init reports the underlying real model */
+  #updateModelFromInit(reportedModel: string): void {
+    const isFastAlias = this.#currentModel === FAST_MODEL_ID && reportedModel === FAST_MODEL_REAL;
+    if (!isFastAlias) {
+      this.#currentModel = reportedModel;
+    }
+  }
+
   #handleSystemMessage(
     message: SDKMessage & { type: 'system' },
     sessionId: string
@@ -583,7 +617,7 @@ export class SessionManager {
     if ('subtype' in message && message.subtype === 'init') {
       const initSessionId = message.session_id;
       if ('model' in message && typeof message.model === 'string') {
-        this.#currentModel = message.model;
+        this.#updateModelFromInit(message.model);
       }
       const idx = this.#findSessionIndex(sessionId);
       change(this.#taskDoc, (draft) => {

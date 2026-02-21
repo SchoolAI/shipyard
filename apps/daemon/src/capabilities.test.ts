@@ -6,6 +6,7 @@ vi.mock('node:child_process', () => ({
 
 vi.mock('node:fs/promises', () => ({
   readdir: vi.fn(),
+  readFile: vi.fn(),
 }));
 
 vi.mock('node:os', () => ({
@@ -13,12 +14,13 @@ vi.mock('node:os', () => ({
 }));
 
 import { execFile } from 'node:child_process';
-import { readdir } from 'node:fs/promises';
+import { readdir, readFile } from 'node:fs/promises';
 import {
   captureTreeSnapshot,
   detectAnthropicAuth,
   detectCapabilities,
   detectEnvironments,
+  detectFastMode,
   detectModels,
   findGitRepos,
   getBranchDiff,
@@ -32,6 +34,7 @@ import {
 
 const mockExecFile = vi.mocked(execFile);
 const mockReaddir = vi.mocked(readdir);
+const mockReadFile = vi.mocked(readFile);
 
 function stubExecFile(results: Record<string, { stdout?: string; error?: Error }>) {
   mockExecFile.mockImplementation(((
@@ -69,12 +72,56 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
+describe('detectFastMode', () => {
+  it('returns true when settings.json has fastMode: true', async () => {
+    mockReadFile.mockResolvedValueOnce(JSON.stringify({ fastMode: true }));
+
+    const result = await detectFastMode();
+
+    expect(result).toBe(true);
+    expect(mockReadFile).toHaveBeenCalledWith('/home/testuser/.claude/settings.json', 'utf-8');
+  });
+
+  it('returns false when fastMode is not set', async () => {
+    mockReadFile.mockResolvedValueOnce(JSON.stringify({}));
+
+    const result = await detectFastMode();
+
+    expect(result).toBe(false);
+  });
+
+  it('returns false when fastMode is false', async () => {
+    mockReadFile.mockResolvedValueOnce(JSON.stringify({ fastMode: false }));
+
+    const result = await detectFastMode();
+
+    expect(result).toBe(false);
+  });
+
+  it('returns false when settings file does not exist', async () => {
+    mockReadFile.mockRejectedValueOnce(new Error('ENOENT'));
+
+    const result = await detectFastMode();
+
+    expect(result).toBe(false);
+  });
+
+  it('returns false when settings file has malformed JSON', async () => {
+    mockReadFile.mockResolvedValueOnce('not valid json{{{');
+
+    const result = await detectFastMode();
+
+    expect(result).toBe(false);
+  });
+});
+
 describe('detectModels', () => {
   it('detects claude models when `which claude` succeeds', async () => {
     stubExecFile({
       'which claude': { stdout: '/usr/local/bin/claude' },
       'which codex': { error: new Error('not found') },
     });
+    mockReadFile.mockResolvedValueOnce(JSON.stringify({}));
 
     const models = await detectModels();
 
@@ -99,6 +146,7 @@ describe('detectModels', () => {
       'which claude': { stdout: '/usr/local/bin/claude' },
       'which codex': { error: new Error('not found') },
     });
+    mockReadFile.mockResolvedValueOnce(JSON.stringify({}));
 
     const models = await detectModels();
 
@@ -162,6 +210,38 @@ describe('detectModels', () => {
     const models = await detectModels();
 
     expect(models).toEqual([]);
+  });
+
+  it('includes opus fast model when fastMode is enabled in settings', async () => {
+    stubExecFile({
+      'which claude': { stdout: '/usr/local/bin/claude' },
+      'which codex': { error: new Error('not found') },
+    });
+    mockReadFile.mockResolvedValueOnce(JSON.stringify({ fastMode: true }));
+
+    const models = await detectModels();
+
+    expect(models).toHaveLength(5);
+    const fastModel = models.find((m) => m.id === 'claude-opus-4-6-fast');
+    expect(fastModel).toEqual({
+      id: 'claude-opus-4-6-fast',
+      label: 'Claude Opus 4.6 (Fast)',
+      provider: 'claude-code',
+      reasoning: { efforts: ['low', 'medium', 'high'], defaultEffort: 'high' },
+    });
+  });
+
+  it('excludes opus fast model when fastMode is disabled', async () => {
+    stubExecFile({
+      'which claude': { stdout: '/usr/local/bin/claude' },
+      'which codex': { error: new Error('not found') },
+    });
+    mockReadFile.mockResolvedValueOnce(JSON.stringify({ fastMode: false }));
+
+    const models = await detectModels();
+
+    expect(models).toHaveLength(4);
+    expect(models.find((m) => m.id === 'claude-opus-4-6-fast')).toBeUndefined();
   });
 });
 
@@ -326,6 +406,7 @@ describe('detectCapabilities', () => {
 
     mockReaddir.mockResolvedValueOnce([makeDirent('shipyard', true)] as never);
     mockReaddir.mockResolvedValueOnce([makeDirent('.git', true)] as never);
+    mockReadFile.mockResolvedValueOnce(JSON.stringify({}));
 
     const caps = await detectCapabilities();
 
