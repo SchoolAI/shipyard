@@ -201,7 +201,7 @@ jobs:
           # Publish as latest
           npm publish --tag latest --access public
 
-      - name: Update base version and tag (promote)
+      - name: Tag stable release and bump for next cycle (promote)
         if: steps.release.outputs.type == 'promote'
         env:
           STABLE_VERSION: ${{ steps.promote.outputs.stable_version }}
@@ -210,20 +210,27 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          # Update package-npm.json base version
+          # Tag the stable release
+          git tag "${TAG}"
+          git push origin "${TAG}"
+
+          # Bump base version minor for next release cycle
           cd apps/daemon
+          NEXT_VERSION=$(node -e "
+            const [major, minor, patch] = process.env.STABLE_VERSION.split('.').map(Number);
+            console.log(major + '.' + (minor + 1) + '.0');
+          ")
           node -e "
             const fs = require('fs');
             const pkg = JSON.parse(fs.readFileSync('package-npm.json', 'utf8'));
-            pkg.version = process.env.STABLE_VERSION;
+            pkg.version = process.env.NEXT_VERSION;
             fs.writeFileSync('package-npm.json', JSON.stringify(pkg, null, 2) + '\n');
           "
           cd ../..
 
           git add apps/daemon/package-npm.json
-          git commit -m "chore: bump @schoolai/shipyard to ${STABLE_VERSION}"
-          git tag "${TAG}"
-          git push origin HEAD "${TAG}"
+          git commit -m "chore: bump base version to ${NEXT_VERSION} for next release cycle"
+          git push origin HEAD
 
       - name: GitHub release (promote)
         if: steps.release.outputs.type == 'promote'
