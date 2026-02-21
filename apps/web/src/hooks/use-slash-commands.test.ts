@@ -8,13 +8,23 @@ function makeKeyEvent(key: string): KeyboardEvent<HTMLTextAreaElement> {
   return { key, preventDefault: vi.fn() } as unknown as KeyboardEvent<HTMLTextAreaElement>;
 }
 
-function setup() {
+function setup(opts?: {
+  isEnvironmentLocked?: boolean;
+  environments?: { name: string; branch: string; path: string; remote: string | null }[];
+}) {
   const onExecute = vi.fn<(action: SlashCommandAction) => void>();
   const onClearInput = vi.fn();
   return {
     onExecute,
     onClearInput,
-    ...renderHook(() => useSlashCommands({ onExecute, onClearInput })),
+    ...renderHook(() =>
+      useSlashCommands({
+        onExecute,
+        onClearInput,
+        isEnvironmentLocked: opts?.isEnvironmentLocked,
+        environments: opts?.environments,
+      })
+    ),
   };
 }
 
@@ -177,5 +187,49 @@ describe('useSlashCommands', () => {
     act(() => result.current.handleInputChange('/'));
     act(() => result.current.setSelectedIndex(3));
     expect(result.current.selectedIndex).toBe(3);
+  });
+
+  describe('isEnvironmentLocked', () => {
+    const envs = [
+      { name: 'shipyard', branch: 'main', path: '/home/user/shipyard', remote: null },
+      { name: 'shipyard-wt', branch: 'feat', path: '/home/user/shipyard-wt/feat', remote: null },
+    ];
+
+    it('excludes environment commands from "/" when locked', () => {
+      const { result } = setup({ isEnvironmentLocked: true, environments: envs });
+      act(() => result.current.handleInputChange('/'));
+      const ids = result.current.filteredCommands.map((c) => c.id);
+      expect(ids).not.toContain('env:/home/user/shipyard');
+      expect(ids).not.toContain('env:/home/user/shipyard-wt/feat');
+    });
+
+    it('includes environment commands from "/" when not locked', () => {
+      const { result } = setup({ isEnvironmentLocked: false, environments: envs });
+      act(() => result.current.handleInputChange('/'));
+      const ids = result.current.filteredCommands.map((c) => c.id);
+      expect(ids).toContain('env:/home/user/shipyard');
+      expect(ids).toContain('env:/home/user/shipyard-wt/feat');
+    });
+
+    it('excludes environment commands from "/env" search when locked', () => {
+      const { result } = setup({ isEnvironmentLocked: true, environments: envs });
+      act(() => result.current.handleInputChange('/env'));
+      const ids = result.current.filteredCommands.map((c) => c.id);
+      expect(ids.every((id) => !id.startsWith('env:'))).toBe(true);
+    });
+
+    it('excludes worktree command when locked', () => {
+      const { result } = setup({ isEnvironmentLocked: true });
+      act(() => result.current.handleInputChange('/'));
+      const ids = result.current.filteredCommands.map((c) => c.id);
+      expect(ids).not.toContain('worktree');
+    });
+
+    it('includes worktree command when not locked', () => {
+      const { result } = setup({ isEnvironmentLocked: false });
+      act(() => result.current.handleInputChange('/'));
+      const ids = result.current.filteredCommands.map((c) => c.id);
+      expect(ids).toContain('worktree');
+    });
   });
 });
