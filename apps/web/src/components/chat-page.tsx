@@ -519,7 +519,9 @@ function ChatPageInner() {
         last.role === msg.role &&
         last.agentName === msg.agentName &&
         !last.isThinking &&
-        !msg.isThinking
+        !msg.isThinking &&
+        !last.isQueued &&
+        !msg.isQueued
       ) {
         last.content = [...last.content, ...msg.content];
       } else {
@@ -527,7 +529,13 @@ function ChatPageInner() {
       }
     }
     return grouped;
-  }, [loroTask.conversation, loroTask.meta?.status, storeMessages, modelLabelMap]);
+  }, [
+    loroTask.conversation,
+    loroTask.pendingFollowUps,
+    loroTask.meta?.status,
+    storeMessages,
+    modelLabelMap,
+  ]);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const isNearBottomRef = useRef(true);
