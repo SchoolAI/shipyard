@@ -192,4 +192,48 @@ describe('createPeerManager', () => {
 
     pm.destroy();
   });
+
+  it('routes terminal-io:taskId channels with extracted taskId', async () => {
+    const onTerminalChannel = vi.fn();
+    const adapter = createMockWebRtcAdapter();
+    const mockPc = createMockPeerConnection();
+    const config = createMockConfig({
+      webrtcAdapter: adapter as unknown as PeerManagerConfig['webrtcAdapter'],
+      createPeerConnection: () => mockPc,
+      onTerminalChannel,
+    });
+    const pm = createPeerManager(config);
+
+    await pm.handleOffer('browser-1', { type: 'offer', sdp: 'v=0\r\n' });
+
+    const fakeChannel = { label: 'terminal-io:task-abc-123' };
+    mockPc.ondatachannel?.({ channel: fakeChannel });
+
+    expect(onTerminalChannel).toHaveBeenCalledWith('browser-1', fakeChannel, 'task-abc-123');
+    expect(adapter.attachDataChannel).not.toHaveBeenCalled();
+
+    pm.destroy();
+  });
+
+  it('falls through to Loro adapter for old terminal-io label without taskId suffix', async () => {
+    const onTerminalChannel = vi.fn();
+    const adapter = createMockWebRtcAdapter();
+    const mockPc = createMockPeerConnection();
+    const config = createMockConfig({
+      webrtcAdapter: adapter as unknown as PeerManagerConfig['webrtcAdapter'],
+      createPeerConnection: () => mockPc,
+      onTerminalChannel,
+    });
+    const pm = createPeerManager(config);
+
+    await pm.handleOffer('browser-1', { type: 'offer', sdp: 'v=0\r\n' });
+
+    const fakeChannel = { label: 'terminal-io' };
+    mockPc.ondatachannel?.({ channel: fakeChannel });
+
+    expect(onTerminalChannel).not.toHaveBeenCalled();
+    expect(adapter.attachDataChannel).toHaveBeenCalled();
+
+    pm.destroy();
+  });
 });

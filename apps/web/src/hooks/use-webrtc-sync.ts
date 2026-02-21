@@ -1,7 +1,7 @@
 import type { WebRtcDataChannelAdapter } from '@loro-extended/adapter-webrtc';
 import type { PeerID } from '@loro-extended/repo';
 import type { PersonalRoomConnection, PersonalRoomServerMessage } from '@shipyard/session';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 export type PeerState = 'idle' | 'connecting' | 'connected' | 'failed';
 
@@ -11,15 +11,33 @@ export function useWebRTCSync(options: {
   connection: PersonalRoomConnection | null;
   webrtcAdapter: WebRtcDataChannelAdapter | null;
   targetMachineId: string | null;
-}): { peerState: PeerState; terminalChannel: RTCDataChannel | null } {
+}): { peerState: PeerState; createTerminalChannel: (taskId: string) => RTCDataChannel | null } {
   const { connection, webrtcAdapter, targetMachineId } = options;
   const [peerState, setPeerState] = useState<PeerState>('idle');
-  const [terminalChannel, setTerminalChannel] = useState<RTCDataChannel | null>(null);
+  const pcRef = useRef<RTCPeerConnection | null>(null);
+  const terminalChannelsRef = useRef(new Map<string, RTCDataChannel>());
+
+  const createTerminalChannel = useCallback((taskId: string): RTCDataChannel | null => {
+    const pc = pcRef.current;
+    if (!pc || pc.connectionState === 'closed' || pc.connectionState === 'failed') {
+      return null;
+    }
+    const existing = terminalChannelsRef.current.get(taskId);
+    if (existing && existing.readyState !== 'closed') {
+      return existing;
+    }
+    const ch = pc.createDataChannel(`terminal-io:${taskId}`, { ordered: true });
+    ch.binaryType = 'arraybuffer';
+    terminalChannelsRef.current.set(taskId, ch);
+    ch.addEventListener('close', () => {
+      terminalChannelsRef.current.delete(taskId);
+    });
+    return ch;
+  }, []);
 
   useEffect(() => {
     if (!connection || !webrtcAdapter || !targetMachineId) {
       setPeerState('idle');
-      setTerminalChannel(null);
       return;
     }
 
@@ -28,20 +46,10 @@ export function useWebRTCSync(options: {
     let disposed = false;
     let retryTimer: ReturnType<typeof setTimeout> | undefined;
     const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+    pcRef.current = pc;
     const dataChannel = pc.createDataChannel('loro-sync', { ordered: true });
-    const termChannel = pc.createDataChannel('terminal-io', { ordered: true });
-    termChannel.binaryType = 'arraybuffer';
 
     setPeerState('connecting');
-
-    termChannel.addEventListener('open', () => {
-      if (disposed) return;
-      setTerminalChannel(termChannel);
-    });
-    termChannel.addEventListener('close', () => {
-      if (disposed) return;
-      setTerminalChannel(null);
-    });
 
     dataChannel.addEventListener('open', () => {
       if (disposed) return;
@@ -137,12 +145,15 @@ export function useWebRTCSync(options: {
       unsubMessage();
       webrtcAdapter.detachDataChannel(peerId);
       dataChannel.close();
-      termChannel.close();
+      for (const [, ch] of terminalChannelsRef.current) {
+        ch.close();
+      }
+      terminalChannelsRef.current.clear();
+      pcRef.current = null;
       pc.close();
       setPeerState('idle');
-      setTerminalChannel(null);
     };
   }, [connection, webrtcAdapter, targetMachineId]);
 
-  return { peerState, terminalChannel };
+  return { peerState, createTerminalChannel };
 }

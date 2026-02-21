@@ -19,7 +19,9 @@ function sendResize(channel: RTCDataChannel, cols: number, rows: number) {
 interface TerminalPanelProps {
   isOpen: boolean;
   onClose: () => void;
-  terminalChannel: RTCDataChannel | null;
+  activeTaskId: string | null;
+  createTerminalChannel: (taskId: string) => RTCDataChannel | null;
+  peerState: import('../../hooks/use-webrtc-sync').PeerState;
   selectedEnvironmentPath: string | null;
 }
 
@@ -28,14 +30,22 @@ export interface TerminalPanelHandle {
   write: (data: string | Uint8Array) => void;
 }
 
+interface TerminalSession {
+  xterm: XTerm;
+  fitAddon: FitAddon;
+  wrapperDiv: HTMLDivElement;
+  channel: RTCDataChannel | null;
+  cwdSent: boolean;
+  disposers: Array<() => void>;
+}
+
 export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>(
-  function TerminalPanel({ isOpen, onClose, terminalChannel, selectedEnvironmentPath }, ref) {
+  function TerminalPanel(
+    { isOpen, onClose, activeTaskId, createTerminalChannel, peerState, selectedEnvironmentPath },
+    ref
+  ) {
     const containerRef = useRef<HTMLDivElement>(null);
-    const xtermRef = useRef<XTerm | null>(null);
-    const fitAddonRef = useRef<FitAddon | null>(null);
-    const wasOpenRef = useRef(false);
-    const terminalChannelRef = useRef<RTCDataChannel | null>(null);
-    terminalChannelRef.current = terminalChannel;
+    const sessionsRef = useRef(new Map<string, TerminalSession>());
 
     const terminalPanelHeight = useUIStore((s) => s.terminalPanelHeight);
     const setTerminalPanelHeight = useUIStore((s) => s.setTerminalPanelHeight);
@@ -47,11 +57,12 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
         onHeightChange: setTerminalPanelHeight,
       });
 
-    const ensureTerminal = useCallback(() => {
-      if (xtermRef.current || !containerRef.current) return;
+    const ensureSession = useCallback((taskId: string): TerminalSession => {
+      const existing = sessionsRef.current.get(taskId);
+      if (existing) return existing;
 
       const fitAddon = new FitAddon();
-      const terminal = new XTerm({
+      const xterm = new XTerm({
         cursorBlink: true,
         fontSize: 13,
         fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
@@ -63,95 +74,159 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
         },
         allowProposedApi: true,
       });
+      xterm.loadAddon(fitAddon);
 
-      terminal.loadAddon(fitAddon);
-      terminal.open(containerRef.current);
+      const wrapperDiv = document.createElement('div');
+      wrapperDiv.style.width = '100%';
+      wrapperDiv.style.height = '100%';
+      xterm.open(wrapperDiv);
 
-      xtermRef.current = terminal;
-      fitAddonRef.current = fitAddon;
-
-      requestAnimationFrame(() => fitAddon.fit());
+      const session: TerminalSession = {
+        xterm,
+        fitAddon,
+        wrapperDiv,
+        channel: null,
+        cwdSent: false,
+        disposers: [],
+      };
+      sessionsRef.current.set(taskId, session);
+      return session;
     }, []);
-
-    useEffect(() => {
-      if (isOpen && !wasOpenRef.current) {
-        ensureTerminal();
-        requestAnimationFrame(() => fitAddonRef.current?.fit());
-      }
-      wasOpenRef.current = isOpen;
-    }, [isOpen, ensureTerminal]);
 
     useEffect(() => {
       const container = containerRef.current;
       if (!container) return;
 
-      const observer = new ResizeObserver(() => {
-        if (isOpen && fitAddonRef.current) {
-          requestAnimationFrame(() => {
-            fitAddonRef.current?.fit();
-            const term = xtermRef.current;
-            const ch = terminalChannelRef.current;
-            if (term && ch) {
-              sendResize(ch, term.cols, term.rows);
-            }
-          });
+      if (!isOpen || !activeTaskId) {
+        while (container.firstChild) {
+          container.removeChild(container.firstChild);
         }
+        return;
+      }
+
+      const session = ensureSession(activeTaskId);
+
+      while (container.firstChild) {
+        container.removeChild(container.firstChild);
+      }
+      container.appendChild(session.wrapperDiv);
+
+      requestAnimationFrame(() => {
+        session.fitAddon.fit();
+        session.xterm.focus();
+      });
+
+      return () => {
+        if (session.wrapperDiv.parentNode === container) {
+          container.removeChild(session.wrapperDiv);
+        }
+      };
+    }, [isOpen, activeTaskId, ensureSession]);
+
+    /** Effect: channel wiring -- create/reuse a data channel for the active task */
+    useEffect(() => {
+      if (!isOpen || !activeTaskId) return;
+
+      const session = sessionsRef.current.get(activeTaskId);
+      if (!session) return;
+
+      if (!session.channel || session.channel.readyState === 'closed') {
+        const ch = createTerminalChannel(activeTaskId);
+        if (!ch) return;
+        session.channel = ch;
+      }
+
+      const channel = session.channel;
+      const { xterm } = session;
+
+      const onMessage = (event: MessageEvent) => {
+        if (typeof event.data === 'string') {
+          xterm.write(event.data);
+        } else {
+          xterm.write(new Uint8Array(event.data));
+        }
+      };
+      channel.addEventListener('message', onMessage);
+
+      const onData = xterm.onData((data) => {
+        if (channel.readyState === 'open') {
+          channel.send(data);
+        }
+      });
+
+      const sendInitial = () => {
+        if (selectedEnvironmentPath && !session.cwdSent) {
+          channel.send(
+            CONTROL_PREFIX + JSON.stringify({ type: 'cwd', path: selectedEnvironmentPath })
+          );
+          session.cwdSent = true;
+        }
+        sendResize(channel, xterm.cols, xterm.rows);
+      };
+
+      if (channel.readyState === 'open') {
+        sendInitial();
+      } else {
+        const onOpen = () => sendInitial();
+        channel.addEventListener('open', onOpen);
+        session.disposers.push(() => channel.removeEventListener('open', onOpen));
+      }
+
+      return () => {
+        channel.removeEventListener('message', onMessage);
+        onData.dispose();
+        for (const dispose of session.disposers) {
+          dispose();
+        }
+        session.disposers = [];
+      };
+    }, [isOpen, activeTaskId, createTerminalChannel, peerState, selectedEnvironmentPath]);
+
+    useEffect(() => {
+      const container = containerRef.current;
+      if (!container || !isOpen || !activeTaskId) return;
+
+      const observer = new ResizeObserver(() => {
+        const session = sessionsRef.current.get(activeTaskId);
+        if (!session) return;
+        requestAnimationFrame(() => {
+          session.fitAddon.fit();
+          if (session.channel) {
+            sendResize(session.channel, session.xterm.cols, session.xterm.rows);
+          }
+        });
       });
 
       observer.observe(container);
       return () => observer.disconnect();
-    }, [isOpen]);
-
-    useEffect(() => {
-      const term = xtermRef.current;
-      if (!terminalChannel || !term) return;
-
-      const onMessage = (event: MessageEvent) => {
-        if (typeof event.data === 'string') {
-          term.write(event.data);
-        } else {
-          term.write(new Uint8Array(event.data));
-        }
-      };
-      terminalChannel.addEventListener('message', onMessage);
-
-      const onData = term.onData((data) => {
-        if (terminalChannel.readyState === 'open') {
-          terminalChannel.send(data);
-        }
-      });
-
-      fitAddonRef.current?.fit();
-
-      if (selectedEnvironmentPath && terminalChannel.readyState === 'open') {
-        terminalChannel.send(
-          CONTROL_PREFIX + JSON.stringify({ type: 'cwd', path: selectedEnvironmentPath })
-        );
-      }
-
-      sendResize(terminalChannel, term.cols, term.rows);
-
-      return () => {
-        terminalChannel.removeEventListener('message', onMessage);
-        onData.dispose();
-      };
-    }, [terminalChannel, isOpen, selectedEnvironmentPath]);
+    }, [isOpen, activeTaskId]);
 
     useEffect(() => {
       return () => {
-        xtermRef.current?.dispose();
-        xtermRef.current = null;
-        fitAddonRef.current = null;
+        for (const [, session] of sessionsRef.current) {
+          for (const dispose of session.disposers) {
+            dispose();
+          }
+          session.xterm.dispose();
+          if (session.channel) {
+            session.channel.close();
+          }
+        }
+        sessionsRef.current.clear();
       };
     }, []);
 
     useImperativeHandle(
       ref,
       () => ({
-        focus: () => xtermRef.current?.focus(),
-        write: (data: string | Uint8Array) => xtermRef.current?.write(data),
+        focus: () => {
+          if (activeTaskId) sessionsRef.current.get(activeTaskId)?.xterm.focus();
+        },
+        write: (data: string | Uint8Array) => {
+          if (activeTaskId) sessionsRef.current.get(activeTaskId)?.xterm.write(data);
+        },
       }),
-      []
+      [activeTaskId]
     );
 
     return (
