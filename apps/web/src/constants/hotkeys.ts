@@ -1,4 +1,4 @@
-import { AUTOFOCUS_DELAY_MS } from '../hooks/use-delayed-autofocus';
+import { AUTOFOCUS_DELAY_MS } from '../hooks/use-focus-hierarchy';
 
 export type HotkeyContext = 'global' | 'navigation' | 'composer';
 

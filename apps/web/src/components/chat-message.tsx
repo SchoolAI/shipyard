@@ -17,6 +17,7 @@ import {
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { usePlanApproval } from '../contexts/plan-approval-context';
+import { FOCUS_PRIORITY, useFocusTarget } from '../hooks/use-focus-hierarchy';
 import { useUIStore } from '../stores';
 import { assertNever } from '../utils/assert-never';
 import { type GroupedBlock, groupContentBlocks } from '../utils/group-content-blocks';
@@ -416,10 +417,18 @@ function PlanBlock({ group }: { group: GroupedBlock & { kind: 'plan' } }) {
   const [showFeedbackInput, setShowFeedbackInput] = useState(false);
   const [feedbackText, setFeedbackText] = useState('');
   const contentId = useId();
+  const approveRef = useRef<HTMLButtonElement>(null);
 
   const planVersion = plans.find((p) => p.toolUseId === group.toolUse.toolUseId);
   const reviewStatus = planVersion?.reviewStatus ?? 'pending';
   const isPending = pendingPermissions.has(group.toolUse.toolUseId);
+
+  useFocusTarget({
+    id: `inline-plan-approval-${group.toolUse.toolUseId}`,
+    ref: approveRef,
+    priority: FOCUS_PRIORITY.PLAN_APPROVAL,
+    active: isPending,
+  });
 
   const borderColor =
     reviewStatus === 'approved'
@@ -482,6 +491,7 @@ function PlanBlock({ group }: { group: GroupedBlock & { kind: 'plan' } }) {
         <div className="flex flex-col items-end gap-2 px-4 py-3 border-t border-separator/30">
           <div className="flex items-center gap-2">
             <Button
+              ref={approveRef}
               variant="primary"
               size="sm"
               className="min-w-[100px]"

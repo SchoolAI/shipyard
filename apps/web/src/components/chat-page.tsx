@@ -24,8 +24,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PlanApprovalProvider } from '../contexts/plan-approval-context';
 import { useAppHotkeys } from '../hooks/use-app-hotkeys';
 import { useCreateWorktree } from '../hooks/use-create-worktree';
-import { useDelayedAutofocus } from '../hooks/use-delayed-autofocus';
 import { useEnhancePrompt } from '../hooks/use-enhance-prompt';
+import {
+  AUTOFOCUS_DELAY_MS,
+  FOCUS_PRIORITY,
+  FocusHierarchyProvider,
+  useFocusHierarchy,
+  useFocusTarget,
+} from '../hooks/use-focus-hierarchy';
 import type { GitRepoInfo } from '../hooks/use-machine-selection';
 import { useMachineSelection } from '../hooks/use-machine-selection';
 import type { ConnectionState } from '../hooks/use-personal-room';
@@ -258,8 +264,16 @@ function HeroState({ onSuggestionClick, environmentLabel, canSubmit = true }: He
   );
 }
 
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: page-level orchestrator integrating many hooks and conditional UI
 export function ChatPage() {
+  return (
+    <FocusHierarchyProvider>
+      <ChatPageInner />
+    </FocusHierarchyProvider>
+  );
+}
+
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: page-level orchestrator integrating many hooks and conditional UI
+function ChatPageInner() {
   const activeTaskId = useTaskStore((s) => s.activeTaskId);
   const setActiveTask = useTaskStore((s) => s.setActiveTask);
   const messagesByTask = useMessageStore((s) => s.messagesByTask);
@@ -428,8 +442,6 @@ export function ChatPage() {
   const composerRef = useRef<ChatComposerHandle>(null);
   const terminalRef = useRef<TerminalPanelHandle>(null);
   const sidePanelRef = useRef<SidePanelHandle>(null);
-  const prevTerminalOpen = useRef(false);
-  const prevSidePanelOpen = useRef(false);
 
   const selectedEnvironmentPath = useUIStore((s) => s.selectedEnvironmentPath);
   const setSelectedEnvironmentPath = useUIStore((s) => s.setSelectedEnvironmentPath);
@@ -598,34 +610,15 @@ export function ChatPage() {
     return () => clearTimeout(demoTimerRef.current);
   }, []);
 
-  useEffect(() => {
-    if (isTerminalOpen && !prevTerminalOpen.current) {
-      requestAnimationFrame(() => {
-        terminalRef.current?.focus();
-      });
-    } else if (!isTerminalOpen && prevTerminalOpen.current) {
-      requestAnimationFrame(() => {
-        composerRef.current?.focus();
-      });
-    }
-    prevTerminalOpen.current = isTerminalOpen;
-  }, [isTerminalOpen]);
+  useFocusTarget({
+    id: 'terminal',
+    ref: terminalRef,
+    priority: FOCUS_PRIORITY.PANEL,
+    active: isTerminalOpen,
+  });
 
   useEffect(() => {
-    const isOpen = activeSidePanel !== null;
-    const wasOpen = prevSidePanelOpen.current;
-
-    if (isOpen && !wasOpen) {
-      if (activeSidePanel === 'diff') setDiffLastViewedAt(Date.now());
-      requestAnimationFrame(() => {
-        sidePanelRef.current?.focus();
-      });
-    } else if (!isOpen && wasOpen) {
-      requestAnimationFrame(() => {
-        composerRef.current?.focus();
-      });
-    }
-    prevSidePanelOpen.current = isOpen;
+    if (activeSidePanel === 'diff') setDiffLastViewedAt(Date.now());
   }, [activeSidePanel, setDiffLastViewedAt]);
 
   useEffect(() => {
@@ -648,24 +641,29 @@ export function ChatPage() {
     }
   }, [activeTaskId, plans.length]);
 
-  const delayedFocus = useDelayedAutofocus(composerRef);
   const isKeyboardNavRef = useRef(false);
+  const { focusTarget, scheduleFocus, cancelPending } = useFocusHierarchy();
+
+  useFocusTarget({
+    id: 'composer',
+    ref: composerRef,
+    priority: FOCUS_PRIORITY.COMPOSER,
+    active: !isTerminalOpen,
+  });
 
   useEffect(() => {
     if (isKeyboardNavRef.current) {
       isKeyboardNavRef.current = false;
       if (!isTerminalOpen) {
-        delayedFocus.schedule();
+        scheduleFocus('composer', AUTOFOCUS_DELAY_MS);
       }
     } else {
-      delayedFocus.cancel();
+      cancelPending();
       if (!isTerminalOpen) {
-        requestAnimationFrame(() => {
-          composerRef.current?.focus();
-        });
+        focusTarget('composer');
       }
     }
-  }, [activeTaskId, isTerminalOpen, delayedFocus]);
+  }, [activeTaskId, isTerminalOpen, focusTarget, scheduleFocus, cancelPending]);
 
   const handleNewTask = useCallback(() => {
     setActiveTask(null);
@@ -692,8 +690,8 @@ export function ChatPage() {
   }, [taskList, activeTaskId, setActiveTask]);
 
   const handleFocusComposer = useCallback(() => {
-    composerRef.current?.focus();
-  }, []);
+    focusTarget('composer');
+  }, [focusTarget]);
 
   const voiceInput = useVoiceInput({
     onTranscript: useCallback((text: string, isFinal: boolean) => {
@@ -733,13 +731,13 @@ export function ChatPage() {
       },
       onDone: (fullText) => {
         composerRef.current?.replaceText(fullText);
-        composerRef.current?.focus();
+        focusTarget('composer');
       },
       onError: () => {
-        composerRef.current?.focus();
+        focusTarget('composer');
       },
     });
-  }, [isEnhancing, cancelEnhance, enhancePromptFn]);
+  }, [isEnhancing, cancelEnhance, enhancePromptFn, focusTarget]);
 
   const [worktreeSourceRepo, setWorktreeSourceRepo] = useState<GitRepoInfo | null>(null);
 
