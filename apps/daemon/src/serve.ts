@@ -163,6 +163,7 @@ export async function serve(env: Env): Promise<void> {
   const activeTasks = new Map<string, ActiveTask>();
   const watchedTasks = new Map<string, () => void>();
   const taskHandles = new Map<string, TaskHandle>();
+  const lastProcessedConvLen = new Map<string, number>();
 
   const devSuffix = env.SHIPYARD_DEV ? '-dev' : '';
   const machineId = env.SHIPYARD_MACHINE_ID ?? `${hostname()}${devSuffix}`;
@@ -654,6 +655,7 @@ export async function serve(env: Env): Promise<void> {
       activeTasks,
       watchedTasks,
       taskHandles,
+      lastProcessedConvLen,
       peerManager,
       env,
       machineId,
@@ -690,6 +692,7 @@ export async function serve(env: Env): Promise<void> {
     }
     watchedTasks.clear();
     taskHandles.clear();
+    lastProcessedConvLen.clear();
 
     for (const timer of pendingCleanupTimers) clearTimeout(timer);
     pendingCleanupTimers.clear();
@@ -722,6 +725,7 @@ interface MessageHandlerContext {
   activeTasks: Map<string, ActiveTask>;
   watchedTasks: Map<string, () => void>;
   taskHandles: Map<string, TaskHandle>;
+  lastProcessedConvLen: Map<string, number>;
   peerManager: PeerManager;
   env: Env;
   machineId: string;
@@ -941,6 +945,14 @@ function handleMessage(msg: PersonalRoomServerMessage, ctx: MessageHandlerContex
       ctx.log.debug({ type: msg.type }, 'Worktree create echo');
       break;
 
+    case 'cancel-task':
+      handleCancelTask(msg, ctx);
+      break;
+
+    case 'control-ack':
+      ctx.log.debug({ type: msg.type }, 'Control ack echo');
+      break;
+
     case 'authenticated':
     case 'agent-joined':
     case 'agent-left':
@@ -1009,6 +1021,44 @@ function handleNotifyTask(
   watchTaskDocument(taskId, taskLog, ctx).catch((err: unknown) => {
     const errMsg = err instanceof Error ? err.message : String(err);
     taskLog.error({ err: errMsg }, 'Failed to start watching task document');
+  });
+}
+
+/**
+ * Handle a cancel-task message from the browser (relayed via signaling).
+ *
+ * Aborts the running agent for the given task and responds with control-ack.
+ */
+function handleCancelTask(
+  msg: Extract<PersonalRoomServerMessage, { type: 'cancel-task' }>,
+  ctx: MessageHandlerContext
+): void {
+  const { taskId, requestId } = msg;
+  const taskLog = createChildLogger({ mode: 'serve', taskId });
+
+  const activeTask = ctx.activeTasks.get(taskId);
+  if (!activeTask) {
+    taskLog.warn('Cancel requested but no active task found');
+    ctx.connection.send({
+      type: 'control-ack',
+      requestId,
+      taskId,
+      action: 'cancel',
+      accepted: false,
+      error: 'No active agent running for this task',
+    });
+    return;
+  }
+
+  taskLog.info('Canceling active task');
+  activeTask.abortController.abort();
+
+  ctx.connection.send({
+    type: 'control-ack',
+    requestId,
+    taskId,
+    action: 'cancel',
+    accepted: true,
   });
 }
 
@@ -1664,6 +1714,10 @@ function handleFollowUp(
   taskLog: ReturnType<typeof createChildLogger>
 ): void {
   if (!activeTask) return;
+  if (activeTask.abortController.signal.aborted) {
+    taskLog.debug('Task is being aborted, skipping follow-up');
+    return;
+  }
   if (conversationLen <= activeTask.lastDispatchedConvLen) {
     taskLog.debug(
       { conversationLen, lastDispatched: activeTask.lastDispatchedConvLen },
@@ -1724,15 +1778,6 @@ function onTaskDocChanged(
     return;
   }
 
-  if (
-    json.meta.status === 'working' ||
-    json.meta.status === 'input-required' ||
-    json.meta.status === 'starting'
-  ) {
-    taskLog.debug({ status: json.meta.status }, 'Status blocks new work, skipping');
-    return;
-  }
-
   const conversation = json.conversation;
   if (conversation.length === 0) {
     taskLog.debug('No conversation messages, skipping');
@@ -1744,7 +1789,19 @@ function onTaskDocChanged(
     return;
   }
 
-  taskLog.info('New user message detected, starting agent');
+  const prevLen = ctx.lastProcessedConvLen.get(taskId) ?? 0;
+  if (conversation.length <= prevLen) {
+    taskLog.debug(
+      { conversationLen: conversation.length, lastProcessed: prevLen },
+      'No new messages since last run, skipping'
+    );
+    return;
+  }
+
+  taskLog.info(
+    { prevLen, newLen: conversation.length },
+    'New user message detected, starting agent'
+  );
 
   const cwd = lastMessage.cwd ?? process.cwd();
   const model = lastMessage.model ?? undefined;
@@ -1765,6 +1822,7 @@ function onTaskDocChanged(
     lastDispatchedConvLen: conversation.length,
   };
   ctx.activeTasks.set(taskId, activeTask);
+  ctx.lastProcessedConvLen.set(taskId, conversation.length);
 
   ctx.signaling.updateStatus('running', taskId);
 
@@ -1832,6 +1890,7 @@ async function cleanupTaskRun(opts: CleanupTaskRunOptions): Promise<void> {
 
   const activeTask = ctx.activeTasks.get(taskId);
   activeTask?.sessionManager.closeSession();
+  abortController.abort();
 
   clearDebouncedTimer(diffDebounceTimers, taskId);
   clearDebouncedTimer(branchDiffTimers, taskId);
@@ -1855,8 +1914,6 @@ async function cleanupTaskRun(opts: CleanupTaskRunOptions): Promise<void> {
     taskLog.warn({ err }, 'Failed to capture turn diff');
   }
 
-  abortController.abort();
-
   for (const [key] of taskHandle.permReqs.getAll()) {
     taskHandle.permReqs.delete(key);
   }
@@ -1866,6 +1923,8 @@ async function cleanupTaskRun(opts: CleanupTaskRunOptions): Promise<void> {
 
   ctx.activeTasks.delete(taskId);
   ctx.signaling.updateStatus('idle');
+
+  onTaskDocChanged(taskId, taskHandle, taskLog, ctx);
 }
 
 function clearDebouncedTimer(

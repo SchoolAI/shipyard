@@ -273,7 +273,8 @@ export class SessionManager {
    * Determine whether to resume an existing session or start fresh.
    *
    * Walks backwards through sessions to find the most recent one with a
-   * non-empty agentSessionId that has not failed. If found, returns
+   * non-empty agentSessionId that has not genuinely failed. Interrupted
+   * (user-cancelled) sessions are resumable. If found, returns
    * { resume: true, sessionId } so the caller can pass it to resumeSession().
    */
   shouldResume(): { resume: boolean; sessionId?: string } {
@@ -351,7 +352,7 @@ export class SessionManager {
     this.#inputController = controller;
     this.#activeQuery = response;
 
-    return this.#processMessages(response, sessionId);
+    return this.#processMessages(response, sessionId, opts.abortController);
   }
 
   /**
@@ -474,10 +475,14 @@ export class SessionManager {
     this.#inputController = controller;
     this.#activeQuery = response;
 
-    return this.#processMessages(response, newSessionId);
+    return this.#processMessages(response, newSessionId, opts?.abortController);
   }
 
-  async #processMessages(response: Query, sessionId: string): Promise<SessionResult> {
+  async #processMessages(
+    response: Query,
+    sessionId: string,
+    abortController?: AbortController
+  ): Promise<SessionResult> {
     let agentSessionId = '';
     let lastMessageAt = Date.now();
     let idleTimedOut = false;
@@ -506,19 +511,13 @@ export class SessionManager {
         }
       }
     } catch (error: unknown) {
-      const errorMsg = idleTimedOut
-        ? 'Session idle timeout exceeded'
-        : error instanceof Error
-          ? error.message
-          : String(error);
-      this.#markFailed(sessionId, errorMsg);
-
-      return {
+      return this.#handleProcessError(
+        error,
         sessionId,
         agentSessionId,
-        status: 'failed',
-        error: errorMsg,
-      };
+        idleTimedOut,
+        abortController
+      );
     } finally {
       clearInterval(idleTimer);
       this.#inputController = null;
@@ -814,6 +813,41 @@ export class SessionManager {
       durationMs: message.duration_ms,
       error: !isSuccess ? (errorText ?? message.subtype) : undefined,
     };
+  }
+
+  #handleProcessError(
+    error: unknown,
+    sessionId: string,
+    agentSessionId: string,
+    idleTimedOut: boolean,
+    abortController?: AbortController
+  ): SessionResult {
+    if (abortController?.signal.aborted) {
+      this.#markInterrupted(sessionId);
+      return { sessionId, agentSessionId, status: 'interrupted' };
+    }
+
+    const errorMsg = idleTimedOut
+      ? 'Session idle timeout exceeded'
+      : error instanceof Error
+        ? error.message
+        : String(error);
+    this.#markFailed(sessionId, errorMsg);
+    return { sessionId, agentSessionId, status: 'failed', error: errorMsg };
+  }
+
+  #markInterrupted(sessionId: string): void {
+    const idx = this.#findSessionIndex(sessionId);
+    change(this.#taskDoc, (draft) => {
+      const session = idx >= 0 ? draft.sessions.get(idx) : undefined;
+      if (session) {
+        session.status = 'interrupted';
+        session.completedAt = Date.now();
+      }
+      draft.meta.status = 'canceled';
+      draft.meta.updatedAt = Date.now();
+    });
+    this.#notifyStatusChange('canceled');
   }
 
   #markFailed(sessionId: string, errorMsg: string): void {

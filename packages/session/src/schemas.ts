@@ -420,6 +420,34 @@ export const TaskAckSchema = z.object({
 });
 
 /**
+ * Cancel task message schema for personal room WebSocket.
+ * Sent by a browser to request cancellation of a running agent task.
+ */
+export const CancelTaskSchema = z.object({
+  type: z.literal('cancel-task'),
+  requestId: z.string(),
+  taskId: z.string(),
+  machineId: z.string(),
+});
+
+export type CancelTask = z.infer<typeof CancelTaskSchema>;
+
+/**
+ * Control acknowledgment message schema for personal room WebSocket.
+ * Sent by the server/daemon to confirm a control action (e.g. cancellation).
+ */
+export const ControlAckSchema = z.object({
+  type: z.literal('control-ack'),
+  requestId: z.string(),
+  taskId: z.string(),
+  action: z.enum(['cancel']),
+  accepted: z.boolean(),
+  error: z.string().optional(),
+});
+
+export type ControlAck = z.infer<typeof ControlAckSchema>;
+
+/**
  * Enhance prompt request — browser asks daemon to improve a prompt.
  * Ephemeral: no Loro doc is created or modified.
  */
@@ -543,6 +571,8 @@ export const PersonalRoomClientMessageSchema = z.discriminatedUnion('type', [
   WebRTCIceSchema,
   NotifyTaskSchema,
   TaskAckSchema,
+  CancelTaskSchema,
+  ControlAckSchema,
   EnhancePromptRequestSchema,
   EnhancePromptChunkSchema,
   EnhancePromptDoneSchema,
@@ -624,6 +654,8 @@ export const PersonalRoomServerMessageSchema = z.discriminatedUnion('type', [
   AgentStatusChangedSchema,
   NotifyTaskSchema,
   TaskAckSchema,
+  CancelTaskSchema,
+  ControlAckSchema,
   ErrorMessageSchema,
   WebRTCOfferSchema,
   WebRTCAnswerSchema,

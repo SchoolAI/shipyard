@@ -125,4 +125,11 @@ export const HOTKEYS = {
     description: 'Enhance the current prompt with AI',
     context: 'composer',
   },
-} satisfies Record<string, HotkeyDef>;
+  stopAgent: {
+    key: 'escape',
+    label: 'Stop Agent',
+    display: 'Esc',
+    description: 'Stop the currently running agent',
+    context: 'global',
+  },
+} as const satisfies Record<string, HotkeyDef>;

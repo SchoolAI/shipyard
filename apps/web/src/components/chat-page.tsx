@@ -46,6 +46,7 @@ import { useRepo, useWebRtcAdapter } from '../providers/repo-provider';
 import { useAuthStore, useMessageStore, useTaskStore, useUIStore } from '../stores';
 import { navigateFromSettings, navigateToSettings } from '../utils/url-sync';
 import { extractBranchFromWorktreePath } from '../utils/worktree-helpers';
+import { AgentStatusCard } from './agent-status-card';
 import type { ChatComposerHandle, SubmitPayload } from './chat-composer';
 import { ChatComposer } from './chat-composer';
 import type { ChatMessageData } from './chat-message';
@@ -297,7 +298,8 @@ function ChatPageInner() {
       url: `${wsBase}/personal/${encodeURIComponent(authUser.id)}?token=${encodeURIComponent(authToken)}`,
     };
   }, [authToken, authUser]);
-  const { agents, connectionState, connection, lastTaskAck } = usePersonalRoom(personalRoomConfig);
+  const { agents, connectionState, connection, lastTaskAck, lastControlAck } =
+    usePersonalRoom(personalRoomConfig);
   const roomHandle = useRoomHandle(LOCAL_USER_ID);
   const capabilitiesByMachine = useRoomCapabilities(LOCAL_USER_ID);
 
@@ -330,6 +332,11 @@ function ChatPageInner() {
   const setDiffLastViewedAt = useUIStore((s) => s.setDiffLastViewedAt);
   const diffScope = useUIStore((s) => s.diffScope);
 
+  const taskStatus = loroTask.meta?.status;
+  const isAgentRunning =
+    taskStatus === 'submitted' || taskStatus === 'starting' || taskStatus === 'working';
+  const isAgentFailed = taskStatus === 'failed';
+
   const { taskIndex } = useTaskIndex(LOCAL_USER_ID);
   const taskList = useMemo(
     () => Object.values(taskIndex).sort((a, b) => b.updatedAt - a.updatedAt),
@@ -358,6 +365,82 @@ function ChatPageInner() {
   const storeMessages = activeTaskId ? messagesByTask[activeTaskId] : undefined;
 
   const lastSubmittedModelRef = useRef<string | null>(null);
+
+  const [stoppingTaskId, setStoppingTaskId] = useState<string | null>(null);
+  const isStopping = stoppingTaskId === activeTaskId;
+  const pendingInterruptPayloadRef = useRef<SubmitPayload | null>(null);
+  const handleSubmitRef = useRef<((payload: SubmitPayload) => void) | null>(null);
+
+  const handleStopAgent = useCallback(() => {
+    if (!connection || !activeTaskId || !selectedMachineId) return;
+    if (stoppingTaskId === activeTaskId) return;
+    setStoppingTaskId(activeTaskId);
+    connection.send({
+      type: 'cancel-task',
+      requestId: crypto.randomUUID(),
+      machineId: selectedMachineId,
+      taskId: activeTaskId,
+    });
+  }, [connection, activeTaskId, selectedMachineId, stoppingTaskId]);
+
+  useEffect(() => {
+    if (!isAgentRunning && stoppingTaskId === activeTaskId) {
+      setStoppingTaskId(null);
+
+      const pending = pendingInterruptPayloadRef.current;
+      if (pending) {
+        pendingInterruptPayloadRef.current = null;
+        handleSubmitRef.current?.(pending);
+      }
+    }
+  }, [isAgentRunning, stoppingTaskId, activeTaskId]);
+
+  useEffect(() => {
+    if (!stoppingTaskId || stoppingTaskId !== activeTaskId || !isAgentRunning) return;
+    if (!pendingInterruptPayloadRef.current) return;
+
+    const ABORT_TIMEOUT_MS = 15_000;
+    const timer = setTimeout(() => {
+      setStoppingTaskId(null);
+      const pending = pendingInterruptPayloadRef.current;
+      if (pending) {
+        pendingInterruptPayloadRef.current = null;
+        handleSubmitRef.current?.(pending);
+      }
+    }, ABORT_TIMEOUT_MS);
+
+    return () => clearTimeout(timer);
+  }, [stoppingTaskId, activeTaskId, isAgentRunning]);
+
+  useEffect(() => {
+    if (!lastControlAck || lastControlAck.accepted) return;
+    if (lastControlAck.taskId === stoppingTaskId) {
+      setStoppingTaskId(null);
+      const pending = pendingInterruptPayloadRef.current;
+      if (pending) {
+        pendingInterruptPayloadRef.current = null;
+        handleSubmitRef.current?.(pending);
+      }
+    }
+  }, [lastControlAck, stoppingTaskId]);
+
+  const [dismissedFailedTaskId, setDismissedFailedTaskId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setDismissedFailedTaskId(null);
+  }, [activeTaskId]);
+
+  useEffect(() => {
+    if (stoppingTaskId && stoppingTaskId !== activeTaskId) {
+      setStoppingTaskId(null);
+      pendingInterruptPayloadRef.current = null;
+    }
+  }, [activeTaskId, stoppingTaskId]);
+
+  const showFailedCard = isAgentFailed && dismissedFailedTaskId !== activeTaskId;
+
+  const isAgentRunningRef = useRef(false);
+  isAgentRunningRef.current = isAgentRunning;
 
   /** Build a lookup from model IDs to human-readable labels using available models. */
   const modelLabelMap = useMemo(() => {
@@ -396,7 +479,7 @@ function ChatPageInner() {
       }));
 
       const status = loroTask.meta?.status;
-      const isInFlight = status === 'submitted' || status === 'working';
+      const isInFlight = status === 'submitted' || status === 'starting' || status === 'working';
       const lastMsg = raw[raw.length - 1];
       if (isInFlight && lastMsg?.role === 'user') {
         raw.push({
@@ -851,6 +934,9 @@ function ChatPageInner() {
     onFocusComposer: handleFocusComposer,
     onShowShortcuts: () => useUIStore.getState().toggleShortcutsModal(),
     onToggleVoiceInput: voiceInput.toggle,
+    onStopAgent: useCallback(() => {
+      if (isAgentRunningRef.current) handleStopAgent();
+    }, [handleStopAgent]),
   });
 
   const [showScrollButton, setShowScrollButton] = useState(false);
@@ -911,7 +997,7 @@ function ChatPageInner() {
     const unsub = connection.onMessage((msg) => {
       if (msg.type === 'agent-joined' && msg.agent.machineId === selectedMachineId) {
         const status = taskStatusRef.current;
-        const isInFlight = status === 'submitted' || status === 'working';
+        const isInFlight = status === 'submitted' || status === 'starting' || status === 'working';
         if (isInFlight) {
           connection.send({
             type: 'notify-task',
@@ -971,7 +1057,9 @@ function ChatPageInner() {
             draft.meta.title = message.slice(0, 80);
             draft.meta.createdAt = now;
           }
-          draft.meta.status = 'submitted';
+          if (!isAgentRunningRef.current) {
+            draft.meta.status = 'submitted';
+          }
           draft.meta.updatedAt = now;
 
           const contentBlocks: ContentBlock[] = [];
@@ -1039,6 +1127,25 @@ function ChatPageInner() {
       homeDir,
       repo,
     ]
+  );
+
+  handleSubmitRef.current = handleSubmit;
+
+  const handleInterruptAndSend = useCallback(
+    (payload: SubmitPayload) => {
+      if (!connection || !activeTaskId || !selectedMachineId) return;
+      pendingInterruptPayloadRef.current = payload;
+      if (stoppingTaskId !== activeTaskId) {
+        setStoppingTaskId(activeTaskId);
+        connection.send({
+          type: 'cancel-task',
+          requestId: crypto.randomUUID(),
+          machineId: selectedMachineId,
+          taskId: activeTaskId,
+        });
+      }
+    },
+    [connection, activeTaskId, selectedMachineId, stoppingTaskId]
   );
 
   const handleClearChat = useCallback(() => {
@@ -1189,7 +1296,9 @@ function ChatPageInner() {
                         setupStatus={worktreeProgress.setupStatus}
                         setupExitCode={worktreeProgress.setupExitCode}
                         onSwitchToWorktree={
-                          worktreeProgress.worktreePath && !taskHasUserMessage
+                          worktreeProgress.worktreePath &&
+                          !taskHasUserMessage &&
+                          selectedEnvironmentPath !== worktreeProgress.worktreePath
                             ? () => {
                                 const wtPath = worktreeProgress.worktreePath;
                                 setSelectedEnvironmentPath(wtPath ?? null);
@@ -1220,6 +1329,28 @@ function ChatPageInner() {
                       />
                     </div>
                   )}
+                  {isAgentRunning && (
+                    <div className="mb-2">
+                      <AgentStatusCard
+                        status="running"
+                        modelName={lastSubmittedModelRef.current ?? undefined}
+                        onStop={handleStopAgent}
+                        isStopping={isStopping}
+                      />
+                    </div>
+                  )}
+                  {showFailedCard && (
+                    <div className="mb-2">
+                      <AgentStatusCard
+                        status="failed"
+                        modelName={lastSubmittedModelRef.current ?? undefined}
+                        errorMessage={
+                          loroTask.sessions?.[loroTask.sessions.length - 1]?.error ?? undefined
+                        }
+                        onDismiss={() => setDismissedFailedTaskId(activeTaskId)}
+                      />
+                    </div>
+                  )}
                   <ChatComposer
                     key={activeTaskId ?? 'new'}
                     ref={composerRef}
@@ -1244,6 +1375,9 @@ function ChatPageInner() {
                     onEnhance={handleEnhance}
                     onCreateWorktree={handleOpenWorktreeModal}
                     isEnvironmentLocked={taskHasUserMessage}
+                    isAgentRunning={isAgentRunning}
+                    onInterruptAndSend={handleInterruptAndSend}
+                    onStopAgent={handleStopAgent}
                   />
                   <StatusBar
                     connectionState={connectionState}

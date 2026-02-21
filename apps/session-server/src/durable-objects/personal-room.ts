@@ -280,6 +280,12 @@ export class PersonalRoom extends DurableObject<Env> {
       case 'task-ack':
         this.handleTaskAck(ws, state, msg);
         break;
+      case 'cancel-task':
+        this.handleCancelTask(ws, state, msg);
+        break;
+      case 'control-ack':
+        this.handleControlAck(ws, state, msg);
+        break;
       case 'enhance-prompt-request':
         this.handleEnhancePromptRequest(ws, state, msg);
         break;
@@ -518,6 +524,63 @@ export class PersonalRoom extends DurableObject<Env> {
     this.logger.info('Task ack relayed to browsers', {
       requestId: msg.requestId,
       taskId: msg.taskId,
+      accepted: msg.accepted,
+    });
+  }
+
+  private handleCancelTask(
+    ws: WebSocket,
+    state: ConnectionState,
+    msg: Extract<PersonalRoomClientMessage, { type: 'cancel-task' }>
+  ): void {
+    if (state.type !== 'browser') {
+      this.sendError(ws, 'forbidden', 'Only browser connections can cancel tasks');
+      return;
+    }
+
+    const daemonWs = findWebSocketByMachineId(this.connections, msg.machineId);
+
+    if (!daemonWs) {
+      this.sendMessage(ws, {
+        type: 'control-ack',
+        requestId: msg.requestId,
+        taskId: msg.taskId,
+        action: 'cancel',
+        accepted: false,
+        error: `Daemon on machine ${msg.machineId} not connected`,
+      });
+      return;
+    }
+
+    relayMessage(daemonWs, msg);
+
+    this.logger.info('Cancel task forwarded to daemon', {
+      requestId: msg.requestId,
+      machineId: msg.machineId,
+      taskId: msg.taskId,
+    });
+  }
+
+  private handleControlAck(
+    ws: WebSocket,
+    state: ConnectionState,
+    msg: Extract<PersonalRoomClientMessage, { type: 'control-ack' }>
+  ): void {
+    if (state.type !== 'agent') {
+      this.sendError(ws, 'forbidden', 'Only agent connections can send control acknowledgments');
+      return;
+    }
+
+    for (const [connWs, connState] of this.connections) {
+      if (connState.type === 'browser') {
+        this.sendMessage(connWs, msg);
+      }
+    }
+
+    this.logger.info('Control ack relayed to browsers', {
+      requestId: msg.requestId,
+      taskId: msg.taskId,
+      action: msg.action,
       accepted: msg.accepted,
     });
   }
