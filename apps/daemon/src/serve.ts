@@ -2178,6 +2178,40 @@ function resolveExitPlanMode(
 }
 
 /**
+ * Handle AskUserQuestion permission response: parse the user's answers
+ * from the browser's JSON message and merge them into the tool input so
+ * the SDK receives `{ ...originalInput, answers: { ... } }`.
+ *
+ * Returns a (possibly enriched) copy of `input`.
+ */
+function resolveAskUserQuestion(
+  taskLog: ReturnType<typeof createChildLogger>,
+  toolUseID: string,
+  input: Record<string, unknown>,
+  value: { decision: string; persist: boolean; message: string | null }
+): Record<string, unknown> {
+  if (value.decision !== 'approved' || !value.message) return input;
+
+  try {
+    // eslint-disable-next-line no-restricted-syntax -- JSON.parse returns unknown; shape validated on next line
+    const parsed = JSON.parse(value.message) as Record<string, unknown>;
+    if (
+      'answers' in parsed &&
+      parsed.answers &&
+      typeof parsed.answers === 'object' &&
+      !Array.isArray(parsed.answers)
+    ) {
+      taskLog.info({ toolUseID }, 'Merged AskUserQuestion answers into input');
+      return { ...input, answers: parsed.answers };
+    }
+  } catch {
+    taskLog.warn({ toolUseID }, 'Failed to parse AskUserQuestion answers from message');
+  }
+
+  return input;
+}
+
+/**
  * Process a browser permission response: clean up ephemeral entries,
  * update task status back to 'working', log the response, and return
  * the SDK-compatible PermissionResult.
@@ -2199,6 +2233,11 @@ function resolvePermissionResponse(ctx: PermissionResponseContext): PermissionRe
     resolveExitPlanMode(taskHandle, taskLog, toolUseID, value);
   }
 
+  let resolvedInput = input;
+  if (toolName === 'AskUserQuestion') {
+    resolvedInput = resolveAskUserQuestion(taskLog, toolUseID, input, value);
+  }
+
   taskLog.info(
     {
       toolName,
@@ -2211,7 +2250,9 @@ function resolvePermissionResponse(ctx: PermissionResponseContext): PermissionRe
   );
 
   const decision = value.decision === 'approved' ? 'approved' : 'denied';
-  return toPermissionResult(decision, input, suggestions, value.message);
+  const resultMessage =
+    toolName === 'AskUserQuestion' && decision === 'approved' ? null : value.message;
+  return toPermissionResult(decision, resolvedInput, suggestions, resultMessage);
 }
 
 function buildCanUseTool(

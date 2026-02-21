@@ -1265,7 +1265,11 @@ function ChatPageInner() {
                           aria-live="polite"
                         >
                           {Array.from(pendingPermissions.entries())
-                            .filter(([_toolUseId, request]) => request.toolName !== 'ExitPlanMode')
+                            .filter(
+                              ([_toolUseId, request]) =>
+                                request.toolName !== 'ExitPlanMode' &&
+                                request.toolName !== 'AskUserQuestion'
+                            )
                             .map(([toolUseId, request]) => (
                               <PermissionCard
                                 key={toolUseId}

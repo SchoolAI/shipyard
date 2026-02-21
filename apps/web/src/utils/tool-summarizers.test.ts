@@ -147,6 +147,40 @@ describe('summarizeToolAction', () => {
     });
   });
 
+  describe('AskUserQuestion', () => {
+    it('returns the first question text', () => {
+      const input = JSON.stringify({
+        questions: [
+          { question: 'Which auth method?', header: 'Auth', options: [], multiSelect: false },
+        ],
+      });
+      expect(summarizeToolAction('AskUserQuestion', input)).toBe('Which auth method?');
+    });
+
+    it('truncates long question text', () => {
+      const longQuestion = 'q'.repeat(200);
+      const input = JSON.stringify({
+        questions: [{ question: longQuestion, header: 'Q', options: [], multiSelect: false }],
+      });
+      const result = summarizeToolAction('AskUserQuestion', input);
+      expect(result).toBe(`${'q'.repeat(100)}...`);
+    });
+
+    it('returns fallback when questions array is empty', () => {
+      const input = JSON.stringify({ questions: [] });
+      expect(summarizeToolAction('AskUserQuestion', input)).toBe('Asking question');
+    });
+
+    it('returns fallback when questions field is missing', () => {
+      const input = JSON.stringify({});
+      expect(summarizeToolAction('AskUserQuestion', input)).toBe('Asking question');
+    });
+
+    it('returns fallback for malformed JSON', () => {
+      expect(summarizeToolAction('AskUserQuestion', 'not-json')).toBe('Asking question');
+    });
+  });
+
   describe('unknown tool', () => {
     it('returns tool name with truncated input', () => {
       const input = JSON.stringify({ foo: 'bar' });
@@ -176,7 +210,7 @@ describe('summarizeToolAction', () => {
 describe('TOOL_SUMMARIZERS', () => {
   it('has entries for all known tools', () => {
     expect(Object.keys(TOOL_SUMMARIZERS)).toEqual(
-      expect.arrayContaining(['Bash', 'Edit', 'Write', 'Read', 'Glob', 'Grep'])
+      expect.arrayContaining(['Bash', 'Edit', 'Write', 'Read', 'Glob', 'Grep', 'AskUserQuestion'])
     );
   });
 
@@ -197,5 +231,6 @@ describe('TOOL_ICON_LABELS', () => {
     expect(TOOL_ICON_LABELS.Grep).toBe('Search');
     expect(TOOL_ICON_LABELS.Task).toBe('Subagent');
     expect(TOOL_ICON_LABELS.ExitPlanMode).toBe('Plan');
+    expect(TOOL_ICON_LABELS.AskUserQuestion).toBe('Question');
   });
 });

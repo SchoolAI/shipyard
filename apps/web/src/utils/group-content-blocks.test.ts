@@ -172,4 +172,102 @@ describe('groupContentBlocks', () => {
     const plan = grouped[0] as GroupedBlock & { kind: 'plan' };
     expect(plan.markdown).toBe('');
   });
+
+  it('groups AskUserQuestion as ask_question kind with parsed questions', () => {
+    const input = JSON.stringify({
+      questions: [
+        {
+          question: 'Which auth method?',
+          header: 'Auth',
+          options: [
+            { label: 'JWT', description: 'Stateless tokens' },
+            { label: 'Session', description: 'Cookie-based' },
+          ],
+          multiSelect: false,
+        },
+      ],
+    });
+    const blocks: ContentBlock[] = [
+      {
+        type: 'tool_use',
+        toolUseId: 'auq-1',
+        toolName: 'AskUserQuestion',
+        input,
+        parentToolUseId: null,
+      },
+      toolResult('auq-1', 'User selected JWT'),
+    ];
+    const grouped = groupContentBlocks(blocks);
+    expect(grouped).toHaveLength(1);
+    expect(grouped[0]?.kind).toBe('ask_question');
+
+    const q = grouped[0] as GroupedBlock & { kind: 'ask_question' };
+    expect(q.toolUse.toolUseId).toBe('auq-1');
+    expect(q.toolResult?.content).toBe('User selected JWT');
+    expect(q.questions).toHaveLength(1);
+    expect(q.questions[0]?.question).toBe('Which auth method?');
+    expect(q.questions[0]?.options).toHaveLength(2);
+  });
+
+  it('handles AskUserQuestion with malformed JSON gracefully', () => {
+    const blocks: ContentBlock[] = [
+      {
+        type: 'tool_use',
+        toolUseId: 'auq-2',
+        toolName: 'AskUserQuestion',
+        input: 'not-json',
+        parentToolUseId: null,
+      },
+    ];
+    const grouped = groupContentBlocks(blocks);
+    expect(grouped).toHaveLength(1);
+    expect(grouped[0]?.kind).toBe('ask_question');
+
+    const q = grouped[0] as GroupedBlock & { kind: 'ask_question' };
+    expect(q.questions).toHaveLength(0);
+  });
+
+  it('handles AskUserQuestion without questions field', () => {
+    const blocks: ContentBlock[] = [
+      {
+        type: 'tool_use',
+        toolUseId: 'auq-3',
+        toolName: 'AskUserQuestion',
+        input: '{}',
+        parentToolUseId: null,
+      },
+    ];
+    const grouped = groupContentBlocks(blocks);
+    const q = grouped[0] as GroupedBlock & { kind: 'ask_question' };
+    expect(q.questions).toHaveLength(0);
+  });
+
+  it('handles AskUserQuestion pending without tool_result', () => {
+    const input = JSON.stringify({
+      questions: [
+        {
+          question: 'Pick one',
+          header: 'Choice',
+          options: [
+            { label: 'A', description: '' },
+            { label: 'B', description: '' },
+          ],
+          multiSelect: false,
+        },
+      ],
+    });
+    const blocks: ContentBlock[] = [
+      {
+        type: 'tool_use',
+        toolUseId: 'auq-4',
+        toolName: 'AskUserQuestion',
+        input,
+        parentToolUseId: null,
+      },
+    ];
+    const grouped = groupContentBlocks(blocks);
+    const q = grouped[0] as GroupedBlock & { kind: 'ask_question' };
+    expect(q.toolResult).toBeNull();
+    expect(q.questions).toHaveLength(1);
+  });
 });

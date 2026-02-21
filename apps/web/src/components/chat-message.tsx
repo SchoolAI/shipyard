@@ -27,6 +27,7 @@ import {
   markdownComponents as sharedMarkdownComponents,
 } from '../utils/markdown-components';
 import { summarizeToolAction, TOOL_ICON_LABELS } from '../utils/tool-summarizers';
+import { AskUserQuestionCard } from './ask-user-question-card';
 import { AsciiShipThinking } from './thinking/ascii-ship';
 
 export type MessageRole = 'user' | 'assistant';
@@ -666,6 +667,8 @@ function GroupedBlockRenderer({
       );
     case 'plan':
       return <PlanBlock group={group} />;
+    case 'ask_question':
+      return <AskUserQuestionCard group={group} />;
     default:
       return assertNever(group);
   }
@@ -675,6 +678,7 @@ function groupedBlockKey(group: GroupedBlock, index: number): string {
   if (group.kind === 'tool_invocation') return group.toolUse.toolUseId;
   if (group.kind === 'subagent_group') return group.taskToolUse.toolUseId;
   if (group.kind === 'plan') return group.toolUse.toolUseId;
+  if (group.kind === 'ask_question') return group.toolUse.toolUseId;
   return `${group.kind}-${index}`;
 }
 
