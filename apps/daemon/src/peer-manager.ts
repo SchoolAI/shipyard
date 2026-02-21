@@ -42,7 +42,7 @@ export interface PeerManagerConfig {
   webrtcAdapter: WebRtcDataChannelAdapter;
   onAnswer: (targetMachineId: string, answer: SDPDescription) => void;
   onIceCandidate: (targetMachineId: string, candidate: ICECandidate) => void;
-  onTerminalChannel?: (machineId: string, channel: unknown) => void;
+  onTerminalChannel?: (machineId: string, channel: unknown, taskId: string) => void;
   /** Factory to create peer connections. Defaults to node-datachannel/polyfill. */
   createPeerConnection?: () => MinimalPeerConnection;
 }
@@ -99,9 +99,14 @@ export function createPeerManager(config: PeerManagerConfig): PeerManager {
     pc.ondatachannel = (event) => {
       // eslint-disable-next-line no-restricted-syntax -- node-datachannel channel type is opaque
       const channel = event.channel as { label?: string };
-      if (channel.label === 'terminal-io') {
-        logger.info({ machineId }, 'Terminal data channel received');
-        config.onTerminalChannel?.(machineId, event.channel);
+      if (channel.label?.startsWith('terminal-io:')) {
+        const taskId = channel.label.slice('terminal-io:'.length);
+        if (!taskId) {
+          logger.warn({ machineId }, 'Terminal channel with empty taskId, ignoring');
+          return;
+        }
+        logger.info({ machineId, taskId }, 'Terminal data channel received');
+        config.onTerminalChannel?.(machineId, event.channel, taskId);
       } else {
         logger.info({ machineId }, 'Data channel received from browser');
         // eslint-disable-next-line no-restricted-syntax -- RTCDataChannel from node-datachannel satisfies the adapter interface

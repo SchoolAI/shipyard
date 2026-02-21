@@ -99,41 +99,6 @@ const TERMINAL_OPEN_TIMEOUT_MS = 10_000;
 const TERMINAL_CWD_TIMEOUT_MS = 5_000;
 
 /**
- * Determine the best cwd for a new terminal session by checking the most
- * recently active task's cwd. Falls back to process.cwd().
- */
-function resolveTerminalCwd(
-  activeTasks: Map<string, ActiveTask>,
-  watchedTasks: Map<string, () => void>,
-  repo: Repo
-): string {
-  for (const taskId of activeTasks.keys()) {
-    const epoch = DEFAULT_EPOCH;
-    const taskDocId = buildDocumentId('task', taskId, epoch);
-    try {
-      const handle = repo.get(taskDocId, TaskDocumentSchema);
-      const json = handle.doc.toJSON();
-      const lastUserMsg = [...json.conversation].reverse().find((m) => m.role === 'user');
-      if (lastUserMsg?.cwd) return lastUserMsg.cwd;
-    } catch {}
-  }
-
-  for (const taskId of watchedTasks.keys()) {
-    if (activeTasks.has(taskId)) continue;
-    const epoch = DEFAULT_EPOCH;
-    const taskDocId = buildDocumentId('task', taskId, epoch);
-    try {
-      const handle = repo.get(taskDocId, TaskDocumentSchema);
-      const json = handle.doc.toJSON();
-      const lastUserMsg = [...json.conversation].reverse().find((m) => m.role === 'user');
-      if (lastUserMsg?.cwd) return lastUserMsg.cwd;
-    } catch {}
-  }
-
-  return process.cwd();
-}
-
-/**
  * Ephemeral namespace declarations for task documents.
  * permReqs: daemon writes pending tool permission requests (browser reads)
  * permResps: browser writes permission decisions (daemon reads)
@@ -229,20 +194,21 @@ export async function serve(env: Env): Promise<void> {
         candidate,
       });
     },
-    onTerminalChannel(fromMachineId, rawChannel) {
+    onTerminalChannel(fromMachineId, rawChannel, taskId) {
       // eslint-disable-next-line no-restricted-syntax -- node-datachannel channel type is opaque
       const channel = rawChannel as TerminalDataChannel;
-      const termLog = createChildLogger({ mode: `terminal:${fromMachineId}` });
+      const terminalKey = `${fromMachineId}:${taskId}`;
+      const termLog = createChildLogger({ mode: `terminal:${fromMachineId}:${taskId}` });
 
-      const existingPty = terminalPtys.get(fromMachineId);
+      const existingPty = terminalPtys.get(terminalKey);
       if (existingPty) {
         termLog.info('Disposing existing PTY for reconnecting machine');
         existingPty.dispose();
-        terminalPtys.delete(fromMachineId);
+        terminalPtys.delete(terminalKey);
       }
 
       const ptyManager = createPtyManager();
-      terminalPtys.set(fromMachineId, ptyManager);
+      terminalPtys.set(terminalKey, ptyManager);
       let ptySpawned = false;
 
       /**
@@ -266,7 +232,7 @@ export async function serve(env: Env): Promise<void> {
         clearTimeout(openTimeout);
         clearTimeout(cwdTimeout);
         ptyManager.dispose();
-        terminalPtys.delete(fromMachineId);
+        terminalPtys.delete(terminalKey);
         if (channel.readyState === 'open') {
           channel.close();
         }
@@ -328,7 +294,7 @@ export async function serve(env: Env): Promise<void> {
         } catch (err: unknown) {
           termLog.error({ err }, 'Failed to spawn terminal PTY');
           channel.close();
-          terminalPtys.delete(fromMachineId);
+          terminalPtys.delete(terminalKey);
           return;
         }
 
@@ -341,7 +307,7 @@ export async function serve(env: Env): Promise<void> {
           if (channel.readyState === 'open') {
             channel.close();
           }
-          terminalPtys.delete(fromMachineId);
+          terminalPtys.delete(terminalKey);
         });
 
         for (const input of preSpawnInputBuffer) {
@@ -357,11 +323,11 @@ export async function serve(env: Env): Promise<void> {
         );
       }
 
-      /** Timeout: if no cwd message arrives, fall back to heuristic. */
+      /** Timeout: if no cwd message arrives, fall back to $HOME. */
       const cwdTimeout = setTimeout(() => {
         if (!ptySpawned) {
-          termLog.info('No cwd control message received, falling back to heuristic');
-          const fallbackCwd = resolveTerminalCwd(activeTasks, watchedTasks, repo);
+          termLog.info('No cwd control message received, falling back to $HOME');
+          const fallbackCwd = process.env.HOME ?? process.cwd();
           spawnPty(fallbackCwd);
         }
       }, TERMINAL_CWD_TIMEOUT_MS);
@@ -410,14 +376,15 @@ export async function serve(env: Env): Promise<void> {
         }
       };
 
+      // TODO: Add idle timeout for PTY cleanup. For now, PTYs live until the data channel closes.
       channel.onclose = () => {
         termLog.info('Terminal data channel closed');
         channelOpen = false;
         clearTimeout(openTimeout);
         clearTimeout(cwdTimeout);
         ptyManager.dispose();
-        if (terminalPtys.get(fromMachineId) === ptyManager) {
-          terminalPtys.delete(fromMachineId);
+        if (terminalPtys.get(terminalKey) === ptyManager) {
+          terminalPtys.delete(terminalKey);
         }
       };
     },

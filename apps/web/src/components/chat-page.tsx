@@ -79,7 +79,7 @@ interface ComposerSeedTarget {
   setModel: (v: string) => void;
   setReasoning: (v: ReasoningLevel) => void;
   setPermission: (v: PermissionMode) => void;
-  setEnvironment: (v: string) => void;
+  setEnvironment: (v: string | null) => void;
   seededRef: React.MutableRefObject<string | null>;
 }
 
@@ -99,9 +99,14 @@ function seedComposerState(
     target.setModel('claude-opus-4-6');
     target.setReasoning('medium');
     target.setPermission('default');
+    target.setEnvironment(null);
     return;
   }
-  if (!config || target.seededRef.current === taskId) return;
+  if (!config) {
+    target.setEnvironment(null);
+    return;
+  }
+  if (target.seededRef.current === taskId) return;
   target.seededRef.current = taskId;
 
   if (config.model) target.setModel(config.model);
@@ -111,7 +116,7 @@ function seedComposerState(
   if (config.permissionMode && isPermissionMode(config.permissionMode)) {
     target.setPermission(config.permissionMode);
   }
-  if (config.cwd) target.setEnvironment(config.cwd);
+  target.setEnvironment(config.cwd);
 }
 
 /** Wrap a plain text + images into ContentBlock[] for the legacy message store path. */
@@ -292,7 +297,7 @@ export function ChatPage() {
 
   const repo = useRepo();
   const webrtcAdapter = useWebRtcAdapter();
-  const { peerState: _peerState, terminalChannel } = useWebRTCSync({
+  const { peerState, createTerminalChannel } = useWebRTCSync({
     connection,
     webrtcAdapter,
     targetMachineId: selectedMachineId,
@@ -658,11 +663,6 @@ export function ChatPage() {
     }, []),
   });
 
-  useEffect(() => {
-    voiceInput.stop();
-    // eslint-disable-next-line -- intentionally omit voiceInput.stop from deps; only re-run on task switch
-  }, [activeTaskId]);
-
   const {
     enhance: enhancePromptFn,
     cancel: cancelEnhance,
@@ -671,6 +671,12 @@ export function ChatPage() {
     roomHandle,
     machineId: selectedMachineId,
   });
+
+  useEffect(() => {
+    voiceInput.stop();
+    cancelEnhance();
+    // eslint-disable-next-line -- intentionally omit voiceInput.stop/cancelEnhance from deps; only re-run on task switch
+  }, [activeTaskId]);
 
   const handleEnhance = useCallback(() => {
     if (isEnhancing) {
@@ -1177,6 +1183,7 @@ export function ChatPage() {
                     </div>
                   )}
                   <ChatComposer
+                    key={activeTaskId ?? 'new'}
                     ref={composerRef}
                     onSubmit={handleSubmit}
                     onClearChat={handleClearChat}
@@ -1219,17 +1226,19 @@ export function ChatPage() {
             ref={terminalRef}
             isOpen={isTerminalOpen}
             onClose={() => useUIStore.getState().setTerminalOpen(false)}
-            terminalChannel={terminalChannel}
+            activeTaskId={activeTaskId}
+            createTerminalChannel={createTerminalChannel}
+            peerState={peerState}
             selectedEnvironmentPath={selectedEnvironmentPath}
           />
         </div>
 
         <SidePanel ref={sidePanelRef}>
           <div className={activeSidePanel === 'diff' ? 'contents' : 'hidden'}>
-            <DiffPanelContent activeTaskId={activeTaskId} />
+            <DiffPanelContent key={activeTaskId ?? 'new'} activeTaskId={activeTaskId} />
           </div>
           <div className={activeSidePanel === 'plan' ? 'contents' : 'hidden'}>
-            <PlanPanelContent activeTaskId={activeTaskId} />
+            <PlanPanelContent key={activeTaskId ?? 'new'} activeTaskId={activeTaskId} />
           </div>
         </SidePanel>
       </div>
