@@ -17,6 +17,7 @@ import {
   type PermissionDecision,
   PermissionRequestEphemeral,
   PermissionResponseEphemeral,
+  type PlanComment,
   ROOM_EPHEMERAL_DECLARATIONS,
   TaskDocumentSchema,
   type TaskDocumentShape,
@@ -54,7 +55,11 @@ import {
   type PeerManager,
   type SDPDescription,
 } from './peer-manager.js';
-import { formatPlanFeedbackForClaudeCode, serializePlanEditorDoc } from './plan-editor/index.js';
+import {
+  formatDiffFeedbackForClaudeCode,
+  formatPlanFeedbackForClaudeCode,
+  serializePlanEditorDoc,
+} from './plan-editor/index.js';
 import { createPtyManager, type PtyManager } from './pty-manager.js';
 import {
   SessionManager,
@@ -2352,6 +2357,106 @@ function buildCanUseTool(
   };
 }
 
+/**
+ * Collect formatted feedback strings from unresolved plan comments,
+ * grouped by planId with plan context (original + edited markdown).
+ */
+function collectPlanFeedback(
+  unresolvedPlan: PlanComment[],
+  plans: Array<{ planId: string; markdown: string }>,
+  loroDoc: TaskHandle['loroDoc']
+): string[] {
+  const parts: string[] = [];
+  const byPlanId = new Map<string, typeof unresolvedPlan>();
+  for (const c of unresolvedPlan) {
+    const existing = byPlanId.get(c.planId) ?? [];
+    existing.push(c);
+    byPlanId.set(c.planId, existing);
+  }
+
+  for (const [planId, comments] of byPlanId) {
+    const plan = plans.find((p) => p.planId === planId);
+    const originalMarkdown = plan?.markdown ?? '';
+    const editedMarkdown = serializePlanEditorDoc(loroDoc, planId) || originalMarkdown;
+    const feedback = formatPlanFeedbackForClaudeCode(
+      originalMarkdown,
+      editedMarkdown,
+      comments,
+      null
+    );
+    if (feedback) {
+      parts.push(feedback);
+    }
+  }
+
+  return parts;
+}
+
+/**
+ * Safety-net comment harvesting: gather unresolved, undelivered diff and plan
+ * comments from the CRDT and append them as text content blocks to the user
+ * message. The browser may have already included these in the message text,
+ * but this catches any that were missed.
+ *
+ * After harvesting, the comment IDs are written to deliveredCommentIds to
+ * prevent re-delivery on subsequent turns.
+ */
+function harvestUndeliveredComments(
+  taskHandle: TaskHandle,
+  contentBlocks: Array<{ type: string; text?: string }>,
+  log: ReturnType<typeof createChildLogger>
+): void {
+  const json = taskHandle.doc.toJSON();
+  const deliveredSet = new Set(json.deliveredCommentIds ?? []);
+
+  const unresolvedDiff = Object.values(json.diffComments).filter(
+    (c) => c.resolvedAt === null && !deliveredSet.has(c.commentId)
+  );
+  const unresolvedPlan = Object.values(json.planComments).filter(
+    (c) => c.resolvedAt === null && !deliveredSet.has(c.commentId)
+  );
+
+  if (unresolvedDiff.length === 0 && unresolvedPlan.length === 0) {
+    return;
+  }
+
+  const feedbackParts: string[] = [];
+
+  if (unresolvedDiff.length > 0) {
+    const diffFeedback = formatDiffFeedbackForClaudeCode(unresolvedDiff, null);
+    if (diffFeedback) {
+      feedbackParts.push(diffFeedback);
+    }
+  }
+
+  if (unresolvedPlan.length > 0) {
+    feedbackParts.push(...collectPlanFeedback(unresolvedPlan, json.plans, taskHandle.loroDoc));
+  }
+
+  if (feedbackParts.length === 0) {
+    return;
+  }
+
+  const feedbackText = `\n\n---\n**User feedback on your changes (comments from code review):**\n\n${feedbackParts.join('\n\n')}`;
+  contentBlocks.push({ type: 'text', text: feedbackText });
+
+  const harvestedIds = [
+    ...unresolvedDiff.map((c) => c.commentId),
+    ...unresolvedPlan.map((c) => c.commentId),
+  ];
+
+  change(taskHandle.doc, (draft) => {
+    for (const id of harvestedIds) {
+      draft.deliveredCommentIds.push(id);
+    }
+  });
+
+  log.info(
+    { diffCommentCount: unresolvedDiff.length, planCommentCount: unresolvedPlan.length },
+    'Harvested undelivered comments as safety net'
+  );
+}
+
 interface RunTaskOptions {
   sessionManager: SessionManager;
   taskHandle: TaskHandle;
@@ -2385,6 +2490,8 @@ async function runTask(opts: RunTaskOptions): Promise<SessionResult> {
   if (!contentBlocks || contentBlocks.length === 0) {
     throw new Error(`No user message found in task ${taskId}`);
   }
+
+  harvestUndeliveredComments(taskHandle, contentBlocks, log);
 
   const textPreview = contentBlocks
     .filter((b): b is typeof b & { type: 'text' } => b.type === 'text')

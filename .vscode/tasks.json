@@ -14,10 +14,10 @@
       "icon": { "id": "hubot" },
       "color": "terminal.ansiCyan",
       "type": "shell",
-      "command": "CLAUDE_WORKTREE='🌳🔒 permissions-verification' claude --dangerously-skip-permissions",
+      "command": "CLAUDE_WORKTREE='🌳💬 comment-injection' claude --dangerously-skip-permissions",
       "isBackground": true,
       "options": {
-        "cwd": "/Users/jacob/repos/shipyard-wt/permissions-verification/.",
+        "cwd": "/Users/jacob/repos/shipyard-wt/comment-injection",
         "env": {
           "PATH": "${env:HOME}/.local/bin:${env:PATH}"
         }
@@ -33,7 +33,7 @@
       "presentation": {
         "reveal": "always",
         "panel": "dedicated",
-        "group": "wt-permissions-verification",
+        "group": "wt-comment-injection",
         "echo": false,
         "showReuseMessage": false
       }
@@ -43,10 +43,10 @@
       "icon": { "id": "terminal-bash" },
       "color": "terminal.ansiGreen",
       "type": "shell",
-      "command": "tmux new-session -A -s wt-permissions-verification -c '/Users/jacob/repos/shipyard-wt/permissions-verification/.'",
+      "command": "tmux new-session -A -s wt-comment-injection -c '/Users/jacob/repos/shipyard-wt/comment-injection'",
       "isBackground": true,
       "options": {
-        "cwd": "/Users/jacob/repos/shipyard-wt/permissions-verification/."
+        "cwd": "/Users/jacob/repos/shipyard-wt/comment-injection"
       },
       "problemMatcher": {
         "pattern": { "regexp": "^$" },
@@ -59,7 +59,7 @@
       "presentation": {
         "reveal": "always",
         "panel": "dedicated",
-        "group": "wt-permissions-verification",
+        "group": "wt-comment-injection",
         "echo": false,
         "showReuseMessage": false
       }

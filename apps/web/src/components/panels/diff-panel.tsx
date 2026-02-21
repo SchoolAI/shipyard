@@ -7,7 +7,7 @@ import type {
   DiffState,
   DiffFile as SchemaDiffFile,
 } from '@shipyard/loro-schema';
-import { MessageSquare, PanelLeft, Settings2 } from 'lucide-react';
+import { PanelLeft, Settings2 } from 'lucide-react';
 import {
   type ReactNode,
   useCallback,
@@ -18,12 +18,14 @@ import {
   useState,
 } from 'react';
 import { useSidePanelToolbarSlot } from '../../contexts/side-panel-toolbar-context';
+import { useFeedbackActions } from '../../hooks/use-feedback-actions';
 import { useTaskDocument } from '../../hooks/use-task-document';
 import type { DiffScope, DiffViewType } from '../../stores';
 import { useUIStore } from '../../stores';
 import { assertNever } from '../../utils/assert-never';
 import { DiffCommentInput } from '../diff/diff-comment-input';
 import { DiffCommentWidget } from '../diff/diff-comment-widget';
+import { FeedbackBadge } from '../feedback/feedback-badge';
 import { DiffFileTree } from './diff-file-tree';
 
 const SPLIT_MIN_WIDTH = 800;
@@ -343,7 +345,7 @@ function DiffActionBar({
   setDiffWordWrap,
   showResolvedComments,
   toggleResolvedComments,
-  unresolvedCommentCount,
+  feedbackBadge,
 }: {
   fileCount: number;
   isFileTreeOpen: boolean;
@@ -354,7 +356,7 @@ function DiffActionBar({
   setDiffWordWrap: (wrap: boolean) => void;
   showResolvedComments: boolean;
   toggleResolvedComments: () => void;
-  unresolvedCommentCount: number;
+  feedbackBadge: ReactNode;
 }) {
   const fileTreeLabel = isFileTreeOpen ? 'Hide files' : 'Show files';
 
@@ -378,16 +380,7 @@ function DiffActionBar({
       </div>
 
       <div className="flex items-center gap-1">
-        {unresolvedCommentCount > 0 && (
-          <span
-            role="status"
-            aria-label={`${unresolvedCommentCount} unresolved comment${unresolvedCommentCount !== 1 ? 's' : ''}`}
-            className="flex items-center gap-1 text-xs text-muted px-1"
-          >
-            <MessageSquare className="w-3 h-3" />
-            {unresolvedCommentCount}
-          </span>
-        )}
+        {feedbackBadge}
 
         <Popover>
           <Popover.Trigger>
@@ -614,8 +607,16 @@ export function DiffPanelContent({ activeTaskId }: DiffPanelContentProps) {
 
   const isMobile = useIsMobile();
 
-  const { diffState, diffComments, addDiffComment, resolveDiffComment, deleteDiffComment } =
-    useTaskDocument(activeTaskId);
+  const {
+    diffState,
+    diffComments,
+    addDiffComment,
+    resolveDiffComment,
+    deleteDiffComment,
+    planComments,
+    deliveredCommentIds,
+    markCommentsDelivered,
+  } = useTaskDocument(activeTaskId);
 
   const showResolvedComments = useUIStore((s) => s.showResolvedComments);
   const toggleResolvedComments = useUIStore((s) => s.toggleResolvedComments);
@@ -645,9 +646,11 @@ export function DiffPanelContent({ activeTaskId }: DiffPanelContentProps) {
     setSelectedFile(null);
   }, [diffScope, activeTab, activeTaskId]);
 
-  const unresolvedCommentCount = useMemo(
-    () => diffComments.filter((c) => c.resolvedAt === null).length,
-    [diffComments]
+  const feedbackActions = useFeedbackActions(
+    diffComments,
+    planComments,
+    deliveredCommentIds,
+    markCommentsDelivered
   );
 
   const fileCount = useMemo(() => {
@@ -701,7 +704,7 @@ export function DiffPanelContent({ activeTaskId }: DiffPanelContentProps) {
         setDiffWordWrap={setDiffWordWrap}
         showResolvedComments={showResolvedComments}
         toggleResolvedComments={toggleResolvedComments}
-        unresolvedCommentCount={unresolvedCommentCount}
+        feedbackBadge={<FeedbackBadge {...feedbackActions} />}
       />
       <div
         ref={contentRef}

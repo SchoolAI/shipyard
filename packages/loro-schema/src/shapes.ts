@@ -220,6 +220,8 @@ export const TaskDocumentSchema = Shape.doc({
   diffComments: Shape.record(DiffCommentShape),
 
   planComments: Shape.record(PlanCommentShape),
+
+  deliveredCommentIds: Shape.list(Shape.plain.string()),
 });
 
 export type EpochDocumentShape = typeof EpochDocumentSchema;
