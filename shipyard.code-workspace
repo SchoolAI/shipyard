@@ -5,28 +5,8 @@
       "path": "."
     },
     {
-      "name": "\ud83c\udf33\ud83d\udd10 enable-anthropic-login",
-      "path": "../shipyard-wt/enable-anthropic-login"
-    },
-    {
       "name": "\ud83c\udf33\ud83d\udd14 interrupt",
       "path": "../shipyard-wt/interrupt"
-    },
-    {
-      "name": "\ud83c\udf33\ud83d\udcc1 terminal-dir",
-      "path": "../shipyard-wt/terminal-dir"
-    },
-    {
-      "name": "\ud83c\udf33\u2328\ufe0f wrong-stash-hotkey",
-      "path": "../shipyard-wt/wrong-stash-hotkey"
-    },
-    {
-      "name": "\ud83c\udf33\ud83c\udfaf focus-heigharchy",
-      "path": "../shipyard-wt/focus-heigharchy"
-    },
-    {
-      "name": "\ud83c\udf33\ud83d\udd12 lock-env-when-task",
-      "path": "../shipyard-wt/lock-env-when-task"
     }
   ]
 }
