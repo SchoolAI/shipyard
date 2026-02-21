@@ -15,6 +15,22 @@
     {
       "name": "\ud83c\udf33\ud83d\udd27 daemon-crash",
       "path": "../shipyard-wt/daemon-crash"
+    },
+    {
+      "name": "\ud83c\udf33\u26a1 jk-delay",
+      "path": "../shipyard-wt/jk-delay"
+    },
+    {
+      "name": "\ud83c\udf33\ud83d\udd14 interrupt",
+      "path": "../shipyard-wt/interrupt"
+    },
+    {
+      "name": "\ud83c\udf33\ud83d\udcc1 terminal-dir",
+      "path": "../shipyard-wt/terminal-dir"
+    },
+    {
+      "name": "\ud83c\udf33\u2328\ufe0f wrong-stash-hotkey",
+      "path": "../shipyard-wt/wrong-stash-hotkey"
     }
   ]
 }

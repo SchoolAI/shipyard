@@ -62,6 +62,7 @@
     "typescript": "catalog:",
     "vite": "catalog:",
     "vite-plugin-wasm": "^3.5.0",
-    "vitest": "catalog:"
+    "vitest": "catalog:",
+    "wrangler": "catalog:"
   }
 }
