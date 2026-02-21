@@ -306,7 +306,7 @@ function ChatPageInner() {
   const loroTask = useTaskDocument(activeTaskId);
   const { pendingPermissions, respondToPermission, plans } = loroTask;
   const taskHasUserMessage = useMemo(
-    () => !!activeTaskId && loroTask.conversation.some((m) => m.role === 'user'),
+    () => !!activeTaskId && (loroTask.conversation?.some((m) => m.role === 'user') ?? false),
     [activeTaskId, loroTask.conversation]
   );
 
@@ -471,7 +471,7 @@ function ChatPageInner() {
 
     let raw: ChatMessageData[];
 
-    if (useLoro && loroTask.conversation.length > 0) {
+    if (useLoro && (loroTask.conversation?.length ?? 0) > 0) {
       raw = loroTask.conversation.map((msg) => ({
         id: msg.messageId ?? crypto.randomUUID(),
         role: msg.role,
@@ -1006,16 +1006,12 @@ function ChatPageInner() {
 
     const unsub = connection.onMessage((msg) => {
       if (msg.type === 'agent-joined' && msg.agent.machineId === selectedMachineId) {
-        const status = taskStatusRef.current;
-        const isInFlight = status === 'submitted' || status === 'starting' || status === 'working';
-        if (isInFlight) {
-          connection.send({
-            type: 'notify-task',
-            requestId: crypto.randomUUID(),
-            machineId: selectedMachineId,
-            taskId: activeTaskId,
-          });
-        }
+        connection.send({
+          type: 'notify-task',
+          requestId: crypto.randomUUID(),
+          machineId: selectedMachineId,
+          taskId: activeTaskId,
+        });
       }
     });
 
