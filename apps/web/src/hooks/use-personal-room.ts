@@ -35,8 +35,16 @@ export function usePersonalRoom(config: PersonalRoomConfig | null) {
     setLastTaskAck(null);
     setLastControlAck(null);
 
-    const conn = new PersonalRoomConnection({ url: config.url });
+    const conn = new PersonalRoomConnection({
+      url: config.url,
+      maxRetries: -1,
+      initialDelayMs: 1000,
+      maxDelayMs: 30000,
+      backoffMultiplier: 2,
+    });
     setConnection(conn);
+
+    let currentState: ConnectionState = 'disconnected';
 
     const unsubMessage = conn.onMessage((msg: PersonalRoomServerMessage) => {
       switch (msg.type) {
@@ -88,12 +96,30 @@ export function usePersonalRoom(config: PersonalRoomConfig | null) {
     });
 
     const unsubState = conn.onStateChange((state) => {
+      currentState = state;
       setConnectionState(state);
     });
 
     conn.connect();
 
+    const handleVisibilityChange = () => {
+      if (!document.hidden && (currentState === 'disconnected' || currentState === 'error')) {
+        conn.connect();
+      }
+    };
+
+    const handleOnline = () => {
+      if (currentState === 'disconnected' || currentState === 'error') {
+        conn.connect();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('online', handleOnline);
+
     return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('online', handleOnline);
       unsubMessage();
       unsubState();
       conn.disconnect();

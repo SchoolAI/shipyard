@@ -1,7 +1,12 @@
 import type { PersonalRoomClientMessage, PersonalRoomServerMessage } from './schemas';
 import { PersonalRoomServerMessageSchema } from './schemas';
 
-export type ConnectionState = 'connecting' | 'connected' | 'disconnected' | 'error';
+export type ConnectionState =
+  | 'connecting'
+  | 'connected'
+  | 'disconnected'
+  | 'reconnecting'
+  | 'error';
 
 interface MinimalWebSocket {
   onopen: ((ev: unknown) => void) | null;
@@ -15,6 +20,10 @@ interface MinimalWebSocket {
 export interface PersonalRoomConnectionConfig {
   url: string;
   WebSocketImpl?: new (url: string) => MinimalWebSocket;
+  maxRetries?: number;
+  initialDelayMs?: number;
+  maxDelayMs?: number;
+  backoffMultiplier?: number;
 }
 
 export class PersonalRoomConnection {
@@ -23,6 +32,9 @@ export class PersonalRoomConnection {
   private readonly messageHandlers = new Set<(msg: PersonalRoomServerMessage) => void>();
   private readonly stateChangeHandlers = new Set<(state: ConnectionState) => void>();
   private readonly config: PersonalRoomConnectionConfig;
+  private retryCount = 0;
+  private retryTimer: ReturnType<typeof setTimeout> | null = null;
+  private intentionalDisconnect = false;
 
   constructor(config: PersonalRoomConnectionConfig) {
     this.config = config;
@@ -33,6 +45,13 @@ export class PersonalRoomConnection {
   }
 
   connect(): void {
+    this.intentionalDisconnect = false;
+
+    if (this.retryTimer !== null) {
+      clearTimeout(this.retryTimer);
+      this.retryTimer = null;
+    }
+
     if (this.ws) {
       this.ws.onopen = null;
       this.ws.onclose = null;
@@ -43,7 +62,13 @@ export class PersonalRoomConnection {
     }
 
     const Impl = this.config.WebSocketImpl ?? (WebSocket as never);
-    this.ws = new Impl(this.config.url);
+    try {
+      this.ws = new Impl(this.config.url);
+    } catch {
+      this.setState('error');
+      this.reconnectWithBackoff();
+      return;
+    }
     this.setState('connecting');
 
     this.ws.onopen = () => {
@@ -51,13 +76,19 @@ export class PersonalRoomConnection {
     };
 
     this.ws.onclose = () => {
-      if (this.state !== 'error') {
+      if (this.state !== 'error' && this.state !== 'reconnecting') {
         this.setState('disconnected');
+      }
+      if (!this.intentionalDisconnect) {
+        this.reconnectWithBackoff();
       }
     };
 
     this.ws.onerror = () => {
       this.setState('error');
+      if (!this.intentionalDisconnect) {
+        this.reconnectWithBackoff();
+      }
     };
 
     this.ws.onmessage = (event: { data: string }) => {
@@ -73,7 +104,7 @@ export class PersonalRoomConnection {
         return;
       }
 
-      for (const handler of this.messageHandlers) {
+      for (const handler of [...this.messageHandlers]) {
         handler(result.data);
       }
     };
@@ -102,6 +133,15 @@ export class PersonalRoomConnection {
   }
 
   disconnect(): void {
+    this.intentionalDisconnect = true;
+
+    if (this.retryTimer !== null) {
+      clearTimeout(this.retryTimer);
+      this.retryTimer = null;
+    }
+
+    this.retryCount = 0;
+
     if (this.ws) {
       this.ws.onopen = null;
       this.ws.onclose = null;
@@ -113,9 +153,41 @@ export class PersonalRoomConnection {
     this.setState('disconnected');
   }
 
+  private reconnectWithBackoff(): void {
+    if (this.retryTimer !== null) return;
+
+    const maxRetries = this.config.maxRetries;
+    if (maxRetries === undefined || maxRetries === 0) {
+      return;
+    }
+
+    if (maxRetries !== -1 && this.retryCount >= maxRetries) {
+      return;
+    }
+
+    this.setState('reconnecting');
+
+    if (this.intentionalDisconnect) return;
+
+    const initialDelay = this.config.initialDelayMs ?? 1000;
+    const maxDelay = this.config.maxDelayMs ?? 30000;
+    const multiplier = this.config.backoffMultiplier ?? 2;
+    const delay = Math.min(initialDelay * multiplier ** this.retryCount, maxDelay);
+
+    this.retryCount++;
+
+    this.retryTimer = setTimeout(() => {
+      this.retryTimer = null;
+      this.connect();
+    }, delay);
+  }
+
   private setState(newState: ConnectionState): void {
     this.state = newState;
-    for (const handler of this.stateChangeHandlers) {
+    if (newState === 'connected') {
+      this.retryCount = 0;
+    }
+    for (const handler of [...this.stateChangeHandlers]) {
       handler(newState);
     }
   }

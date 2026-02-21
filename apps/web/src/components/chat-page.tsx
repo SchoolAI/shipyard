@@ -376,6 +376,7 @@ function ChatPageInner() {
     connection,
     webrtcAdapter,
     targetMachineId: selectedMachineId,
+    connectionState,
   });
 
   const diffLastViewedAt = useUIStore((s) => s.diffLastViewedAt);
