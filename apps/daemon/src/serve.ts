@@ -1772,15 +1772,16 @@ function promotePendingFollowUps(
     taskLog.debug('Task is being aborted, skipping pending follow-up promotion');
     return;
   }
-  if (!activeTask.sessionManager.isStreaming) {
-    taskLog.debug('Task not streaming, skipping pending follow-up promotion');
-    return;
-  }
-
   const json = taskHandle.doc.toJSON();
   const pending = json.pendingFollowUps ?? [];
   if (pending.length === 0) return;
 
+  /**
+   * Promote regardless of streaming state so messages aren't stuck when isStreaming
+   * is transiently false while the task is still active. For the cleanupTaskRun race
+   * (abort + isStreaming both false), the orphaned handler at onTaskDocChanged serves
+   * as the safety net after activeTasks.delete.
+   */
   change(taskHandle.doc, (draft) => {
     const items = draft.pendingFollowUps.toArray();
     for (const msg of items) {
@@ -1791,12 +1792,18 @@ function promotePendingFollowUps(
     }
   });
 
+  taskLog.info({ pendingCount: pending.length }, 'Promoted pending follow-ups to conversation');
+
+  if (!activeTask.sessionManager.isStreaming) {
+    taskLog.debug('Task not streaming, skipping follow-up dispatch');
+    return;
+  }
+
   const allContentBlocks = pending.flatMap((msg) =>
     msg.content.filter((block: { type: string }) => block.type === 'text' || block.type === 'image')
   );
   if (allContentBlocks.length > 0) {
     try {
-      taskLog.info({ pendingCount: pending.length }, 'Promoted pending follow-ups to conversation');
       activeTask.lastDispatchedConvLen = json.conversation.length + pending.length;
       activeTask.sessionManager.sendFollowUp(allContentBlocks);
     } catch (err: unknown) {
