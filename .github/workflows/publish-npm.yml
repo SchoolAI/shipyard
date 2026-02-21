@@ -13,7 +13,7 @@ on:
           - rc
           - promote
       promote_version:
-        description: 'Version to promote (e.g. 0.1.0-nightly.20260215). Required for promote.'
+        description: 'Version to promote (e.g. 0.8.0-rc.20260221.0). Required for promote.'
         required: false
         type: string
 
@@ -34,12 +34,14 @@ jobs:
       # ── Determine release type ──────────────────────────────────────
       - name: Determine release type
         id: release
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_RELEASE_TYPE: ${{ github.event.inputs.release_type }}
         run: |
-          if [ "${{ github.event_name }}" = "schedule" ]; then
+          if [ "${EVENT_NAME}" = "schedule" ]; then
             echo "type=nightly" >> "$GITHUB_OUTPUT"
           else
-            RELEASE_TYPE="${{ github.event.inputs.release_type }}"
-            echo "type=${RELEASE_TYPE}" >> "$GITHUB_OUTPUT"
+            echo "type=${INPUT_RELEASE_TYPE}" >> "$GITHUB_OUTPUT"
           fi
 
       # ── Validate promote input ──────────────────────────────────────
@@ -52,8 +54,8 @@ jobs:
             echo "::error::promote_version is required for promote releases"
             exit 1
           fi
-          if ! echo "${PROMOTE_VERSION}" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+-(nightly|rc)\.[0-9]{8}$'; then
-            echo "::error::Invalid version format: ${PROMOTE_VERSION}. Expected: X.Y.Z-(nightly|rc).YYYYMMDD"
+          if ! echo "${PROMOTE_VERSION}" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+-(nightly|rc)\.[0-9]{8}(\.[0-9]+)?$'; then
+            echo "::error::Invalid version format: ${PROMOTE_VERSION}. Expected: X.Y.Z-(nightly|rc).YYYYMMDD[.N]"
             exit 1
           fi
 
@@ -75,10 +77,13 @@ jobs:
             exit 0
           fi
           echo "Comparing against ${LAST_TAG}"
+          # Exclude package-npm.json: version-bump-only changes shouldn't trigger publishes.
+          # Trade-off: also masks rare dep changes in that file, acceptable for now.
           CHANGED=$(git diff --name-only "${LAST_TAG}"..HEAD -- \
             apps/daemon/ \
             packages/loro-schema/ \
             packages/session/ \
+            ':!apps/daemon/package-npm.json' \
           )
           if [ -z "${CHANGED}" ]; then
             echo "No changes since ${LAST_TAG}, skipping publish"
@@ -133,10 +138,29 @@ jobs:
         run: |
           BASE_VERSION=$(node -p "require('./apps/daemon/package-npm.json').version")
           DATE_STAMP=$(date -u +%Y%m%d)
-          VERSION="${BASE_VERSION}-${RELEASE_TYPE}.${DATE_STAMP}"
+          PREFIX="${BASE_VERSION}-${RELEASE_TYPE}.${DATE_STAMP}."
+
+          # Verify registry is reachable before querying versions
+          if ! npm view @schoolai/shipyard --json > /dev/null 2>&1; then
+            echo "::error::npm registry unreachable or package not found"
+            exit 1
+          fi
+
+          COUNTER=$(node -e "
+            const versions = JSON.parse(process.argv[1]);
+            const prefix = process.env.PREFIX;
+            const arr = Array.isArray(versions) ? versions : (typeof versions === 'string' ? [versions] : []);
+            const counters = arr
+              .filter(v => typeof v === 'string' && v.startsWith(prefix))
+              .map(v => Number(v.slice(prefix.length)))
+              .filter(n => Number.isFinite(n) && n >= 0);
+            console.log(counters.length === 0 ? 0 : Math.max(...counters) + 1);
+          " "$(npm view @schoolai/shipyard versions --json 2>/dev/null || echo '[]')")
+
+          VERSION="${BASE_VERSION}-${RELEASE_TYPE}.${DATE_STAMP}.${COUNTER}"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "tag=v${VERSION}" >> "$GITHUB_OUTPUT"
-          echo "Computed version: ${VERSION}"
+          echo "Computed version: ${VERSION} (counter: ${COUNTER})"
 
       - name: Prepare npm package
         if: steps.release.outputs.type != 'promote' && steps.changes.outputs.has_changes == 'true'
@@ -147,13 +171,26 @@ jobs:
           cp package-npm.json package.json
           npm version "${VERSION}" --no-git-tag-version --allow-same-version
 
-      - name: Publish to npm (nightly/RC)
+      - name: Check if version already published (nightly/RC)
         if: steps.release.outputs.type != 'promote' && steps.changes.outputs.has_changes == 'true'
+        id: check_published
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          if npm view "@schoolai/shipyard@${VERSION}" version > /dev/null 2>&1; then
+            echo "::notice::Version ${VERSION} already exists on npm, skipping publish"
+            echo "already_published=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "already_published=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish to npm (nightly/RC)
+        if: steps.release.outputs.type != 'promote' && steps.changes.outputs.has_changes == 'true' && steps.check_published.outputs.already_published != 'true'
         working-directory: apps/daemon
         run: npm publish --tag next --provenance --access public
 
       - name: Git tag (nightly/RC)
-        if: steps.release.outputs.type != 'promote' && steps.changes.outputs.has_changes == 'true'
+        if: steps.release.outputs.type != 'promote' && steps.changes.outputs.has_changes == 'true' && steps.check_published.outputs.already_published != 'true'
         env:
           TAG: ${{ steps.version.outputs.tag }}
         run: |
@@ -163,7 +200,7 @@ jobs:
           git push origin "${TAG}"
 
       - name: GitHub pre-release (nightly/RC)
-        if: steps.release.outputs.type != 'promote' && steps.changes.outputs.has_changes == 'true'
+        if: steps.release.outputs.type != 'promote' && steps.changes.outputs.has_changes == 'true' && steps.check_published.outputs.already_published != 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ steps.version.outputs.tag }}
@@ -198,8 +235,12 @@ jobs:
           cd /tmp/promote-pkg/package
           npm version "${STABLE_VERSION}" --no-git-tag-version --allow-same-version
 
-          # Publish as latest
-          npm publish --tag latest --access public
+          # Publish as latest (skip if already published)
+          if npm view "@schoolai/shipyard@${STABLE_VERSION}" version > /dev/null 2>&1; then
+            echo "::notice::Version ${STABLE_VERSION} already exists on npm, skipping publish"
+          else
+            npm publish --tag latest --access public
+          fi
 
       - name: Tag stable release (promote)
         if: steps.release.outputs.type == 'promote'
@@ -208,8 +249,8 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag "${TAG}"
-          git push origin "${TAG}"
+          git tag -f "${TAG}"
+          git push --force origin "${TAG}"
 
       - name: Bump base version for next cycle (promote)
         if: steps.release.outputs.type == 'promote'
@@ -226,7 +267,8 @@ jobs:
           ")
 
           BRANCH="chore/bump-npm-version-to-${NEXT_VERSION}"
-          git checkout -b "${BRANCH}"
+
+          git checkout -B "${BRANCH}"
 
           cd apps/daemon
           node -e "
@@ -239,13 +281,18 @@ jobs:
 
           git add apps/daemon/package-npm.json
           git commit -m "chore: bump base version to ${NEXT_VERSION} for next release cycle"
-          git push origin "${BRANCH}"
+          git push --force origin "${BRANCH}"
 
-          gh pr create \
-            --title "chore: bump npm base version to ${NEXT_VERSION}" \
-            --body "Auto-generated after promoting v${STABLE_VERSION} to stable. Bumps base version for next release cycle." \
-            --base main \
-            --head "${BRANCH}"
+          # Create PR only if one doesn't already exist for this branch
+          if ! gh pr list --head "${BRANCH}" --state open --json number --jq '.[0].number' | grep -q .; then
+            gh pr create \
+              --title "chore: bump npm base version to ${NEXT_VERSION}" \
+              --body "Auto-generated after promoting v${STABLE_VERSION} to stable. Bumps base version for next release cycle." \
+              --base main \
+              --head "${BRANCH}"
+          else
+            echo "::notice::PR already exists for branch ${BRANCH}"
+          fi
 
       - name: GitHub release (promote)
         if: steps.release.outputs.type == 'promote'
