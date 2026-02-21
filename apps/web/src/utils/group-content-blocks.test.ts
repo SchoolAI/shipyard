@@ -242,6 +242,145 @@ describe('groupContentBlocks', () => {
     expect(q.questions).toHaveLength(0);
   });
 
+  it('collapses 2+ consecutive tool_invocations into a tool_call_group', () => {
+    const blocks: ContentBlock[] = [
+      toolUse('tu-1', 'Read'),
+      toolResult('tu-1', 'file1'),
+      toolUse('tu-2', 'Read'),
+      toolResult('tu-2', 'file2'),
+      toolUse('tu-3', 'Grep'),
+      toolResult('tu-3', 'matches'),
+    ];
+    const grouped = groupContentBlocks(blocks);
+    expect(grouped).toHaveLength(1);
+    expect(grouped[0]?.kind).toBe('tool_call_group');
+
+    const group = grouped[0] as GroupedBlock & { kind: 'tool_call_group' };
+    expect(group.invocations).toHaveLength(3);
+    expect(group.invocations[0]?.toolUse.toolName).toBe('Read');
+    expect(group.invocations[2]?.toolUse.toolName).toBe('Grep');
+  });
+
+  it('does not collapse a single tool_invocation into a group', () => {
+    const blocks: ContentBlock[] = [toolUse('tu-1', 'Bash'), toolResult('tu-1', 'ok')];
+    const grouped = groupContentBlocks(blocks);
+    expect(grouped).toHaveLength(1);
+    expect(grouped[0]?.kind).toBe('tool_invocation');
+  });
+
+  it('splits tool_call_groups around non-tool blocks', () => {
+    const blocks: ContentBlock[] = [
+      toolUse('tu-1', 'Read'),
+      toolResult('tu-1', 'f1'),
+      toolUse('tu-2', 'Read'),
+      toolResult('tu-2', 'f2'),
+      text('thinking about it...'),
+      toolUse('tu-3', 'Bash'),
+      toolResult('tu-3', 'ok'),
+      toolUse('tu-4', 'Grep'),
+      toolResult('tu-4', 'matches'),
+    ];
+    const grouped = groupContentBlocks(blocks);
+    expect(grouped).toHaveLength(3);
+    expect(grouped[0]?.kind).toBe('tool_call_group');
+    expect(grouped[1]?.kind).toBe('text');
+    expect(grouped[2]?.kind).toBe('tool_call_group');
+
+    const g1 = grouped[0] as GroupedBlock & { kind: 'tool_call_group' };
+    const g2 = grouped[2] as GroupedBlock & { kind: 'tool_call_group' };
+    expect(g1.invocations).toHaveLength(2);
+    expect(g2.invocations).toHaveLength(2);
+  });
+
+  it('does not group subagent_group or plan into tool_call_group', () => {
+    const planInput = JSON.stringify({ plan: '# Plan' });
+    const blocks: ContentBlock[] = [
+      toolUse('tu-1', 'Read'),
+      toolResult('tu-1', 'f1'),
+      {
+        type: 'tool_use',
+        toolUseId: 'epm-1',
+        toolName: 'ExitPlanMode',
+        input: planInput,
+        parentToolUseId: null,
+      },
+      toolResult('epm-1', 'approved'),
+      toolUse('tu-2', 'Read'),
+      toolResult('tu-2', 'f2'),
+    ];
+    const grouped = groupContentBlocks(blocks);
+    expect(grouped[0]?.kind).toBe('tool_invocation');
+    expect(grouped[1]?.kind).toBe('plan');
+    expect(grouped[2]?.kind).toBe('tool_invocation');
+  });
+
+  it('does not group AskUserQuestion into tool_call_group', () => {
+    const aqInput = JSON.stringify({
+      questions: [
+        {
+          question: 'Pick one',
+          header: 'Choice',
+          options: [
+            { label: 'A', description: '' },
+            { label: 'B', description: '' },
+          ],
+          multiSelect: false,
+        },
+      ],
+    });
+    const blocks: ContentBlock[] = [
+      toolUse('tu-1', 'Read'),
+      toolResult('tu-1', 'f1'),
+      {
+        type: 'tool_use',
+        toolUseId: 'auq-1',
+        toolName: 'AskUserQuestion',
+        input: aqInput,
+        parentToolUseId: null,
+      },
+      toolResult('auq-1', 'User selected A'),
+      toolUse('tu-2', 'Read'),
+      toolResult('tu-2', 'f2'),
+    ];
+    const grouped = groupContentBlocks(blocks);
+    expect(grouped[0]?.kind).toBe('tool_invocation');
+    expect(grouped[1]?.kind).toBe('ask_question');
+    expect(grouped[2]?.kind).toBe('tool_invocation');
+  });
+
+  it('collapses tool calls inside subagent children', () => {
+    const blocks: ContentBlock[] = [
+      toolUse('task-1', 'Task'),
+      toolUse('r1', 'Read', 'task-1'),
+      toolResult('r1', 'f1', 'task-1'),
+      toolUse('r2', 'Grep', 'task-1'),
+      toolResult('r2', 'matches', 'task-1'),
+      toolResult('task-1', 'done'),
+    ];
+    const grouped = groupContentBlocks(blocks);
+    expect(grouped).toHaveLength(1);
+    expect(grouped[0]?.kind).toBe('subagent_group');
+
+    const group = grouped[0] as GroupedBlock & { kind: 'subagent_group' };
+    expect(group.children).toHaveLength(1);
+    expect(group.children[0]?.kind).toBe('tool_call_group');
+  });
+
+  it('preserves pending tool calls within a group', () => {
+    const blocks: ContentBlock[] = [
+      toolUse('tu-1', 'Read'),
+      toolResult('tu-1', 'f1'),
+      toolUse('tu-2', 'Bash'),
+    ];
+    const grouped = groupContentBlocks(blocks);
+    expect(grouped).toHaveLength(1);
+    expect(grouped[0]?.kind).toBe('tool_call_group');
+
+    const group = grouped[0] as GroupedBlock & { kind: 'tool_call_group' };
+    expect(group.invocations).toHaveLength(2);
+    expect(group.invocations[1]?.toolResult).toBeNull();
+  });
+
   it('handles AskUserQuestion pending without tool_result', () => {
     const input = JSON.stringify({
       questions: [
