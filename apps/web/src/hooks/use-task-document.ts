@@ -79,6 +79,8 @@ export interface TaskDocumentResult {
   }) => string;
   resolvePlanComment: (commentId: string) => void;
   deletePlanComment: (commentId: string) => void;
+  deliveredCommentIds: string[];
+  markCommentsDelivered: (commentIds: string[]) => void;
   isLoading: boolean;
 }
 
@@ -133,6 +135,24 @@ export function useTaskDocument(taskId: string | null): TaskDocumentResult {
   const planComments = useMemo(
     () => Object.values(planCommentsRecord ?? {}).sort((a, b) => a.createdAt - b.createdAt),
     [planCommentsRecord]
+  );
+
+  const rawDeliveredIds: string[] | undefined = useDoc(
+    handle,
+    (d: { deliveredCommentIds: string[] }) => d.deliveredCommentIds
+  );
+  const deliveredCommentIds: string[] = rawDeliveredIds ?? [];
+
+  const markCommentsDelivered = useCallback(
+    (commentIds: string[]) => {
+      if (commentIds.length === 0) return;
+      const loroList = handle.loroDoc.getList('deliveredCommentIds');
+      for (const id of commentIds) {
+        loroList.push(id);
+      }
+      handle.loroDoc.commit();
+    },
+    [handle]
   );
 
   const lastUserConfig = useMemo((): LastUserConfig | null => {
@@ -334,6 +354,8 @@ export function useTaskDocument(taskId: string | null): TaskDocumentResult {
       addPlanComment: () => '',
       resolvePlanComment: () => {},
       deletePlanComment: () => {},
+      deliveredCommentIds: [],
+      markCommentsDelivered: () => {},
       isLoading: false,
     };
   }
@@ -356,6 +378,8 @@ export function useTaskDocument(taskId: string | null): TaskDocumentResult {
     addPlanComment,
     resolvePlanComment,
     deletePlanComment,
+    deliveredCommentIds,
+    markCommentsDelivered,
     isLoading: !meta,
   };
 }

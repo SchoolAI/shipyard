@@ -22,6 +22,7 @@ import {
 } from '@shipyard/loro-schema';
 import { ChevronDown } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { FeedbackProvider } from '../contexts/feedback-context';
 import { PlanApprovalProvider } from '../contexts/plan-approval-context';
 import { useAppHotkeys } from '../hooks/use-app-hotkeys';
 import { useCreateWorktree } from '../hooks/use-create-worktree';
@@ -45,6 +46,7 @@ import { useVoiceInput } from '../hooks/use-voice-input';
 import { useWebRTCSync } from '../hooks/use-webrtc-sync';
 import { useRepo, useWebRtcAdapter } from '../providers/repo-provider';
 import { useAuthStore, useMessageStore, useTaskStore, useUIStore } from '../stores';
+import { formatBrowserFeedback } from '../utils/format-feedback';
 import { navigateFromSettings, navigateToSettings } from '../utils/url-sync';
 import { extractBranchFromWorktreePath } from '../utils/worktree-helpers';
 import { AgentStatusCard } from './agent-status-card';
@@ -133,6 +135,35 @@ function seedComposerState(
     target.setPermission(config.permissionMode);
   }
   target.setEnvironment(config.cwd);
+}
+
+function buildAutoAttachFeedback(
+  message: string,
+  diffComments: import('@shipyard/loro-schema').DiffComment[],
+  planComments: import('@shipyard/loro-schema').PlanComment[],
+  deliveredCommentIds: string[]
+): { fullMessage: string; commentIdsToDeliver: string[] } {
+  const deliveredSet = new Set(deliveredCommentIds);
+  const unresolvedDiff = diffComments.filter(
+    (c) => c.resolvedAt === null && !deliveredSet.has(c.commentId)
+  );
+  const unresolvedPlan = planComments.filter(
+    (c) => c.resolvedAt === null && !deliveredSet.has(c.commentId)
+  );
+  const feedback =
+    unresolvedDiff.length > 0 || unresolvedPlan.length > 0
+      ? formatBrowserFeedback(unresolvedDiff, unresolvedPlan)
+      : '';
+  const ids = [
+    ...unresolvedDiff.map((c) => c.commentId),
+    ...unresolvedPlan.map((c) => c.commentId),
+  ];
+  const fullMessage = feedback
+    ? message
+      ? `${message}\n\n---\n\n${feedback}`
+      : feedback
+    : message;
+  return { fullMessage, commentIdsToDeliver: ids };
 }
 
 /** Wrap a plain text + images into ContentBlock[] for the legacy message store path. */
@@ -312,7 +343,15 @@ function ChatPageInner() {
   const capabilitiesByMachine = useRoomCapabilities(LOCAL_USER_ID);
 
   const loroTask = useTaskDocument(activeTaskId);
-  const { pendingPermissions, respondToPermission, plans } = loroTask;
+  const {
+    pendingPermissions,
+    respondToPermission,
+    plans,
+    diffComments,
+    planComments,
+    deliveredCommentIds,
+    markCommentsDelivered,
+  } = loroTask;
   const taskHasUserMessage = useMemo(
     () => !!activeTaskId && (loroTask.conversation?.some((m) => m.role === 'user') ?? false),
     [activeTaskId, loroTask.conversation]
@@ -1146,6 +1185,13 @@ function ChatPageInner() {
         const now = Date.now();
         const isNewTask = handle.loroDoc.opCount() === 0;
 
+        const { fullMessage, commentIdsToDeliver } = buildAutoAttachFeedback(
+          message,
+          diffComments,
+          planComments,
+          deliveredCommentIds
+        );
+
         // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: CRDT write handles new task init, status, content blocks, images, and queue routing
         change(handle.doc, (draft) => {
           if (isNewTask) {
@@ -1158,8 +1204,12 @@ function ChatPageInner() {
           }
           draft.meta.updatedAt = now;
 
+          for (const id of commentIdsToDeliver) {
+            draft.deliveredCommentIds.push(id);
+          }
+
           const contentBlocks: ContentBlock[] = [];
-          if (message) contentBlocks.push({ type: 'text', text: message });
+          if (fullMessage) contentBlocks.push({ type: 'text', text: fullMessage });
           for (const img of payload.images) {
             contentBlocks.push({
               type: 'image',
@@ -1228,6 +1278,9 @@ function ChatPageInner() {
       selectedEnvironmentPath,
       homeDir,
       repo,
+      diffComments,
+      planComments,
+      deliveredCommentIds,
     ]
   );
 
@@ -1514,14 +1567,24 @@ function ChatPageInner() {
           />
         </div>
 
-        <SidePanel ref={sidePanelRef}>
-          <div className={activeSidePanel === 'diff' ? 'contents' : 'hidden'}>
-            <DiffPanelContent key={activeTaskId ?? 'new'} activeTaskId={activeTaskId} />
-          </div>
-          <div className={activeSidePanel === 'plan' ? 'contents' : 'hidden'}>
-            <PlanPanelContent key={activeTaskId ?? 'new'} activeTaskId={activeTaskId} />
-          </div>
-        </SidePanel>
+        <FeedbackProvider
+          onSubmit={handleSubmit}
+          onInterruptAndSend={handleInterruptAndSend}
+          isAgentRunning={isAgentRunning}
+          composerModel={composerModel}
+          composerReasoning={composerReasoning}
+          composerPermission={composerPermission}
+          markCommentsDelivered={markCommentsDelivered}
+        >
+          <SidePanel ref={sidePanelRef}>
+            <div className={activeSidePanel === 'diff' ? 'contents' : 'hidden'}>
+              <DiffPanelContent key={activeTaskId ?? 'new'} activeTaskId={activeTaskId} />
+            </div>
+            <div className={activeSidePanel === 'plan' ? 'contents' : 'hidden'}>
+              <PlanPanelContent key={activeTaskId ?? 'new'} activeTaskId={activeTaskId} />
+            </div>
+          </SidePanel>
+        </FeedbackProvider>
       </div>
     </PlanApprovalProvider>
   );

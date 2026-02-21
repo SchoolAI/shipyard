@@ -5,10 +5,12 @@ import type { PlanComment, PlanVersion } from '@shipyard/loro-schema';
 import { Check, ClipboardList, MessageSquareX } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { usePlanApproval } from '../../contexts/plan-approval-context';
+import { useFeedbackActions } from '../../hooks/use-feedback-actions';
 import { FOCUS_PRIORITY, useFocusTarget } from '../../hooks/use-focus-hierarchy';
 import { usePlanEditorDoc } from '../../hooks/use-plan-editor-doc';
 import { useTaskDocument } from '../../hooks/use-task-document';
 import { useUIStore } from '../../stores';
+import { FeedbackBadge } from '../feedback/feedback-badge';
 import { PlanEditor } from '../plan-editor';
 
 function EmptyState() {
@@ -182,8 +184,16 @@ function ActivePlanContent({
 function PlanPanelContent({ activeTaskId }: { activeTaskId: string | null }) {
   const [selectedVersion, setSelectedVersion] = useState<number | null>(null);
 
-  const { plans, planComments, addPlanComment, resolvePlanComment, deletePlanComment } =
-    useTaskDocument(activeTaskId);
+  const {
+    plans,
+    planComments,
+    addPlanComment,
+    resolvePlanComment,
+    deletePlanComment,
+    diffComments,
+    deliveredCommentIds,
+    markCommentsDelivered,
+  } = useTaskDocument(activeTaskId);
 
   const activePlanIndex = selectedVersion ?? (plans.length > 0 ? plans.length - 1 : null);
   const activePlan = useMemo(
@@ -201,6 +211,13 @@ function PlanPanelContent({ activeTaskId }: { activeTaskId: string | null }) {
   const activePlanComments = useMemo(
     () => planComments.filter((c) => activePlan !== null && c.planId === activePlan.planId),
     [planComments, activePlan]
+  );
+
+  const feedbackActions = useFeedbackActions(
+    diffComments,
+    planComments,
+    deliveredCommentIds,
+    markCommentsDelivered
   );
 
   const handleAddComment = useCallback(
@@ -228,20 +245,25 @@ function PlanPanelContent({ activeTaskId }: { activeTaskId: string | null }) {
 
   return (
     <div className="flex flex-col h-full">
-      {plans.length > 1 && (
-        <div className="flex items-center gap-2 px-3 h-9 border-b border-separator/30">
-          <select
-            aria-label="Plan version"
-            value={activePlanIndex ?? 0}
-            onChange={handleVersionChange}
-            className="text-xs text-muted font-medium bg-transparent border-none outline-none cursor-pointer hover:text-foreground transition-colors"
-          >
-            {plans.map((plan, i) => (
-              <option key={plan.planId} value={i}>
-                v{i + 1}
-              </option>
-            ))}
-          </select>
+      {plans.length > 0 && (
+        <div className="flex items-center justify-between px-3 h-9 border-b border-separator/30">
+          <div>
+            {plans.length > 1 && (
+              <select
+                aria-label="Plan version"
+                value={activePlanIndex ?? 0}
+                onChange={handleVersionChange}
+                className="text-xs text-muted font-medium bg-transparent border-none outline-none cursor-pointer hover:text-foreground transition-colors"
+              >
+                {plans.map((plan, i) => (
+                  <option key={plan.planId} value={i}>
+                    v{i + 1}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+          <FeedbackBadge {...feedbackActions} />
         </div>
       )}
 
