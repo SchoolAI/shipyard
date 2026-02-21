@@ -4,6 +4,9 @@ import { logger } from './logger.js';
 
 const ICE_SERVERS = [{ urls: 'stun:stun.l.google.com:19302' }];
 
+/** node-datachannel defaults to 256KB which silently drops oversized CRDT sync messages containing base64 images. */
+export const MAX_MESSAGE_SIZE = 16 * 1024 * 1024;
+
 /** SDP offer/answer passed over the signaling channel. */
 export interface SDPDescription {
   type: 'offer' | 'answer';
@@ -64,7 +67,10 @@ async function loadDefaultFactory(): Promise<() => MinimalPeerConnection> {
   const { RTCPeerConnection } = await import('node-datachannel/polyfill');
   return () => {
     // eslint-disable-next-line no-restricted-syntax -- node-datachannel config is compatible
-    const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS } as never);
+    const pc = new RTCPeerConnection({
+      iceServers: ICE_SERVERS,
+      maxMessageSize: MAX_MESSAGE_SIZE,
+    } as never);
     // eslint-disable-next-line no-restricted-syntax -- MinimalPeerConnection subset
     return pc as unknown as MinimalPeerConnection;
   };

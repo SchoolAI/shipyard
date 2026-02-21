@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   createPeerManager,
+  MAX_MESSAGE_SIZE,
   type MinimalPeerConnection,
   type PeerManagerConfig,
   type SDPDescription,
@@ -213,6 +214,60 @@ describe('createPeerManager', () => {
     expect(adapter.attachDataChannel).not.toHaveBeenCalled();
 
     pm.destroy();
+  });
+
+  it('MAX_MESSAGE_SIZE accommodates worst-case CRDT sync for a 4MB image', () => {
+    const maxImageBytes = 4 * 1024 * 1024;
+    // base64 expands by 4/3, applied twice (CRDT storage + JSON transport)
+    const worstCaseSize = Math.ceil(Math.ceil(maxImageBytes * (4 / 3)) * (4 / 3));
+    expect(MAX_MESSAGE_SIZE).toBeGreaterThanOrEqual(worstCaseSize);
+  });
+
+  it('MAX_MESSAGE_SIZE exceeds the default node-datachannel 256KB limit', () => {
+    const defaultLimit = 256 * 1024;
+    expect(MAX_MESSAGE_SIZE).toBeGreaterThan(defaultLimit);
+  });
+
+  it('loadDefaultFactory passes maxMessageSize to RTCPeerConnection', async () => {
+    let capturedConfig: Record<string, unknown> | undefined;
+    vi.doMock('node-datachannel/polyfill', () => ({
+      RTCPeerConnection: class {
+        connectionState = 'new';
+        onicecandidate = null;
+        ondatachannel = null;
+        onconnectionstatechange = null;
+        onsignalingstatechange = null;
+        onicegatheringstatechange = null;
+        signalingState = 'stable';
+        iceGatheringState = 'new';
+        constructor(config: Record<string, unknown>) {
+          capturedConfig = config;
+        }
+        setRemoteDescription = vi.fn(async () => {});
+        createAnswer = vi.fn(async () => ({ type: 'answer' as const, sdp: 'v=0\r\n' }));
+        setLocalDescription = vi.fn(async () => {});
+        addIceCandidate = vi.fn(async () => {});
+        close = vi.fn();
+      },
+    }));
+
+    const { createPeerManager: createPM, MAX_MESSAGE_SIZE: MAX_MSG } = await import(
+      './peer-manager.js'
+    );
+    const adapter = createMockWebRtcAdapter();
+    const pm = createPM({
+      webrtcAdapter: adapter as unknown as PeerManagerConfig['webrtcAdapter'],
+      onAnswer: vi.fn(),
+      onIceCandidate: vi.fn(),
+    });
+
+    await pm.handleOffer('browser-1', { type: 'offer', sdp: 'v=0\r\n' });
+
+    expect(capturedConfig).toBeDefined();
+    expect(capturedConfig!.maxMessageSize).toBe(MAX_MSG);
+
+    pm.destroy();
+    vi.doUnmock('node-datachannel/polyfill');
   });
 
   it('falls through to Loro adapter for old terminal-io label without taskId suffix', async () => {
