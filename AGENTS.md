@@ -26,29 +26,26 @@ packages/
 
 **Always use `run_in_background: true`** on all Task tool calls. There is a known Claude Code bug ([#22087](https://github.com/anthropics/claude-code/issues/22087)) where `classifyHandoffIfNeeded is not defined` crashes agents at completion. The bug is in the ctrl+b "move to background" handler — starting agents in background mode from the beginning bypasses it. Use `Read` on the `output_file` to retrieve results.
 
-## Skills & Subagents
+## Skills
 
 Domain expertise is in skills — use subagents to keep the main context clean.
 
-**Auto-triggered skills** (loaded when relevant):
-- `loro-expert` — Loro Shapes, TypedDocs, Repo, adapters, React hooks
-- `tiptap-expert` — TipTap extensions, ProseMirror, loro-prosemirror bridge
-- `heroui-expert` — HeroUI v3 compound components, React Aria patterns
-- `shipyard-accessibility` — WCAG 2.2, ARIA patterns, keyboard nav, focus management, screen readers
-- `agent-sdk-expert` — Claude Agent SDK (subagents, hooks, sessions)
-- `a2a-protocol-expert` — A2A protocol + @a2a-js/sdk
-- `mcp-protocol-expert` — MCP protocol + @modelcontextprotocol/sdk
-- `shipyard-design` — UI/UX design principles, layout, accessibility, visual hierarchy, responsive
-- `shipyard-mobile` — Mobile-first responsive, touch interactions, viewport units, safe areas, virtual keyboard, container queries
-- `shipyard-engineering-standards` — Quality gates, Biome, fan-in coverage, meta-tests
-- `shipyard-council` — Multi-agent deliberation for design decisions
-- `shipyard-deep-research` — Context saturation before implementation
-
-**Manual-only skills** (invoke with `/skill-name`):
-- `/shipyard-qa` — Post-implementation review + auto-fix
-- `/wt`, `/wts`, `/wt-rm` — Git worktree management
-- `/review-pr` — PR comment triage
-- `/site-branding` — Favicons, OG images, PWA setup
+| Skill | Domain |
+|-------|--------|
+| `loro-expert` | Loro Shapes, TypedDocs, Repo, adapters, React hooks |
+| `tiptap-expert` | TipTap extensions, ProseMirror, loro-prosemirror bridge |
+| `heroui-expert` | HeroUI v3 compound components, React Aria patterns |
+| `shipyard-accessibility` | WCAG 2.2, ARIA patterns, keyboard nav, focus management |
+| `agent-sdk-expert` | Claude Agent SDK (subagents, hooks, sessions) |
+| `a2a-protocol-expert` | A2A protocol + @a2a-js/sdk |
+| `mcp-protocol-expert` | MCP protocol + @modelcontextprotocol/sdk |
+| `shipyard-design` | UI/UX design principles, layout, visual hierarchy, responsive |
+| `shipyard-mobile` | Mobile-first responsive, touch, viewport, safe areas |
+| `shipyard-engineering-standards` | Quality gates, Biome, fan-in coverage, meta-tests |
+| `shipyard-council` | Multi-agent deliberation for design decisions |
+| `shipyard-deep-research` | Context saturation before implementation |
+| `shipyard-qa` | Post-implementation review + auto-fix |
+| `shipyard-zustand-expert` | Zustand state management, stores, middleware |
 
 ## Local Reference Repos
 
