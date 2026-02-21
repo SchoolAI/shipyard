@@ -241,6 +241,7 @@ export type PlanVersion = Infer<typeof PlanVersionShape>;
 export type PlanReviewStatus = (typeof PLAN_REVIEW_STATUSES)[number];
 
 export type A2ATaskState = (typeof A2A_TASK_STATES)[number];
+export const TERMINAL_TASK_STATES: readonly A2ATaskState[] = ['completed', 'failed', 'canceled'];
 export type SessionState = (typeof SESSION_STATES)[number];
 export type ReasoningEffort = (typeof REASONING_EFFORTS)[number];
 export type PermissionMode = (typeof PERMISSION_MODES)[number];
