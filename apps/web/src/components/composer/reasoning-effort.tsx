@@ -31,11 +31,11 @@ export function ReasoningEffort({ level, onLevelChange, supportedEfforts }: Reas
         variant="ghost"
         size="sm"
         aria-label="Extended thinking enabled"
-        className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs text-muted cursor-default"
+        className="flex items-center gap-1 min-w-11 sm:min-w-0 min-h-[44px] sm:min-h-0 px-1.5 sm:px-2 py-1 rounded-lg text-xs text-muted cursor-default"
         isDisabled
       >
-        <Brain className="w-3 h-3" aria-hidden="true" />
-        Thinking
+        <Brain className="w-3.5 h-3.5 sm:w-3 sm:h-3" aria-hidden="true" />
+        <span className="hidden sm:inline">Thinking</span>
       </Button>
     );
   }
@@ -46,11 +46,11 @@ export function ReasoningEffort({ level, onLevelChange, supportedEfforts }: Reas
         variant="ghost"
         size="sm"
         aria-label={`Reasoning effort: ${currentLabel}`}
-        className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs text-muted hover:text-foreground hover:bg-default transition-colors"
+        className="flex items-center gap-1 min-w-11 sm:min-w-0 min-h-[44px] sm:min-h-0 px-1.5 sm:px-2 py-1 rounded-lg text-xs text-muted hover:text-foreground hover:bg-default transition-colors"
       >
-        <Brain className="w-3 h-3" aria-hidden="true" />
-        {currentLabel}
-        <ChevronDown className="w-3 h-3" aria-hidden="true" />
+        <Brain className="w-3.5 h-3.5 sm:w-3 sm:h-3" aria-hidden="true" />
+        <span className="hidden sm:inline">{currentLabel}</span>
+        <ChevronDown className="w-3 h-3 hidden sm:block" aria-hidden="true" />
       </Button>
       <Dropdown.Popover placement="top start" className="min-w-[140px]">
         <Dropdown.Menu

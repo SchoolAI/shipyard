@@ -68,13 +68,13 @@ export function PermissionModePicker({ mode, onModeChange }: PermissionModePicke
         variant="ghost"
         size="sm"
         aria-label={`Permission mode: ${current.label}`}
-        className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs min-h-[44px] sm:min-h-0 ${
+        className={`flex items-center gap-1 min-w-11 sm:min-w-0 px-1.5 sm:px-2 py-1 rounded-lg text-xs min-h-[44px] sm:min-h-0 ${
           isBypass ? 'text-warning' : 'text-muted'
         } hover:text-foreground hover:bg-default transition-colors`}
       >
         <Icon className="w-3.5 h-3.5 sm:w-3 sm:h-3" aria-hidden="true" />
-        {current.label}
-        <ChevronDown className="w-3 h-3" aria-hidden="true" />
+        <span className="hidden sm:inline">{current.label}</span>
+        <ChevronDown className="w-3 h-3 hidden sm:block" aria-hidden="true" />
       </Button>
       <Dropdown.Popover placement="top start" className="min-w-[240px]">
         <Dropdown.Menu
