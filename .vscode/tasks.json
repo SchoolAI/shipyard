@@ -1,0 +1,68 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "s",
+      "icon": { "id": "play-circle" },
+      "color": "terminal.ansiYellow",
+      "dependsOn": ["t", "c"],
+      "dependsOrder": "parallel",
+      "problemMatcher": []
+    },
+    {
+      "label": "c",
+      "icon": { "id": "hubot" },
+      "color": "terminal.ansiCyan",
+      "type": "shell",
+      "command": "CLAUDE_WORKTREE='🌳🔒 permissions-verification' claude --dangerously-skip-permissions",
+      "isBackground": true,
+      "options": {
+        "cwd": "/Users/jacob/repos/shipyard-wt/permissions-verification/.",
+        "env": {
+          "PATH": "${env:HOME}/.local/bin:${env:PATH}"
+        }
+      },
+      "problemMatcher": {
+        "pattern": { "regexp": "^$" },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": ".",
+          "endsPattern": "Resume Session|How can I help"
+        }
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "group": "wt-permissions-verification",
+        "echo": false,
+        "showReuseMessage": false
+      }
+    },
+    {
+      "label": "t",
+      "icon": { "id": "terminal-bash" },
+      "color": "terminal.ansiGreen",
+      "type": "shell",
+      "command": "tmux new-session -A -s wt-permissions-verification -c '/Users/jacob/repos/shipyard-wt/permissions-verification/.'",
+      "isBackground": true,
+      "options": {
+        "cwd": "/Users/jacob/repos/shipyard-wt/permissions-verification/."
+      },
+      "problemMatcher": {
+        "pattern": { "regexp": "^$" },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": ".",
+          "endsPattern": "attached|new-session|\\[wt-"
+        }
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "group": "wt-permissions-verification",
+        "echo": false,
+        "showReuseMessage": false
+      }
+    }
+  ]
+}

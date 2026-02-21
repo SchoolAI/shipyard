@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process';
 import { mkdir } from 'node:fs/promises';
 import { homedir, hostname } from 'node:os';
 import { resolve } from 'node:path';
-import type { CanUseTool, PermissionResult } from '@anthropic-ai/claude-agent-sdk';
+import type { CanUseTool, PermissionMode, PermissionResult } from '@anthropic-ai/claude-agent-sdk';
 import { query } from '@anthropic-ai/claude-agent-sdk';
 import { WebRtcDataChannelAdapter } from '@loro-extended/adapter-webrtc';
 import { change, type TypedDoc } from '@loro-extended/change';
@@ -1802,13 +1802,32 @@ function promotePendingFollowUps(
   const allContentBlocks = pending.flatMap((msg) =>
     msg.content.filter((block: { type: string }) => block.type === 'text' || block.type === 'image')
   );
-  if (allContentBlocks.length > 0) {
+  if (allContentBlocks.length === 0) return;
+
+  const dispatchFollowUp = () => {
     try {
       activeTask.lastDispatchedConvLen = json.conversation.length + pending.length;
       activeTask.sessionManager.sendFollowUp(allContentBlocks);
     } catch (err: unknown) {
       taskLog.warn({ err }, 'Failed to send promoted follow-up');
     }
+  };
+
+  const lastPending = pending[pending.length - 1];
+  const mappedMode = lastPending?.permissionMode
+    ? mapPermissionMode(lastPending.permissionMode)
+    : undefined;
+
+  if (mappedMode) {
+    activeTask.sessionManager
+      .setPermissionMode(mappedMode)
+      .then(dispatchFollowUp)
+      .catch((err: unknown) => {
+        taskLog.warn({ err }, 'Failed to update permission mode from queued message');
+        dispatchFollowUp();
+      });
+  } else {
+    dispatchFollowUp();
   }
 }
 
@@ -2030,9 +2049,7 @@ function clearDebouncedTimer(
 /**
  * Map the CRDT permission mode string to the Agent SDK PermissionMode type.
  */
-function mapPermissionMode(
-  mode: string | null
-): 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan' | undefined {
+function mapPermissionMode(mode: string | null): PermissionMode | undefined {
   switch (mode) {
     case 'accept-edits':
       return 'acceptEdits';
@@ -2301,7 +2318,7 @@ interface RunTaskOptions {
   roomDoc: TypedDoc<TaskIndexDocumentShape>;
   cwd: string;
   model?: string;
-  permissionMode?: 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan';
+  permissionMode?: PermissionMode;
   effort?: 'low' | 'medium' | 'high';
   machineId: string;
   abortController: AbortController;
@@ -2339,10 +2356,7 @@ async function runTask(opts: RunTaskOptions): Promise<SessionResult> {
     'Running task with prompt from CRDT'
   );
 
-  const canUseTool =
-    permissionMode === 'bypassPermissions'
-      ? undefined
-      : buildCanUseTool(taskHandle, log, roomDoc, taskId);
+  const canUseTool = buildCanUseTool(taskHandle, log, roomDoc, taskId);
 
   const stderr = (data: string) => {
     const trimmed = data.trim();
@@ -2365,7 +2379,7 @@ async function runTask(opts: RunTaskOptions): Promise<SessionResult> {
       effort,
       canUseTool,
       stderr,
-      allowDangerouslySkipPermissions: permissionMode === 'bypassPermissions' ? true : undefined,
+      allowDangerouslySkipPermissions: true,
     });
   }
 
@@ -2379,6 +2393,6 @@ async function runTask(opts: RunTaskOptions): Promise<SessionResult> {
     abortController,
     canUseTool,
     stderr,
-    allowDangerouslySkipPermissions: permissionMode === 'bypassPermissions' ? true : undefined,
+    allowDangerouslySkipPermissions: true,
   });
 }
